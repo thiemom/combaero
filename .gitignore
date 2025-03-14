@@ -1,0 +1,53 @@
+# Build directories
+build/
+cmake-build-*/
+
+# Excluded folders
+humidair_examples/
+cantera_examples/
+temp/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*~
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+*.cmake
+!CMakeLists.txt
+
+# macOS specific
+.DS_Store
