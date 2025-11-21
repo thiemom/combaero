@@ -34,7 +34,7 @@ double mwmix(const std::vector<double>& X) {
     }
     
     double sum = 0.0;
-    for (size_t i = 0; i < X.size(); ++i) {
+    for (std::size_t i = 0; i < X.size(); ++i) {
         sum += X[i] * molar_masses[i];
     }
     return sum;
@@ -139,8 +139,8 @@ double cp(double T, const std::vector<double>& X) {
     }
     
     double cp_mix = 0.0;
-    for (size_t i = 0; i < X.size(); ++i) {
-        cp_mix += X[i] * cp_R(i, T) * R_GAS;
+    for (std::size_t i = 0; i < X.size(); ++i) {
+        cp_mix += X[i] * cp_R(static_cast<int>(i), T) * R_GAS;
     }
     return cp_mix;
 }
@@ -152,8 +152,8 @@ double h(double T, const std::vector<double>& X) {
     }
     
     double h_mix = 0.0;
-    for (size_t i = 0; i < X.size(); ++i) {
-        h_mix += X[i] * h_RT(i, T) * R_GAS * T;
+    for (std::size_t i = 0; i < X.size(); ++i) {
+        h_mix += X[i] * h_RT(static_cast<int>(i), T) * R_GAS * T;
     }
     return h_mix;
 }
@@ -168,10 +168,10 @@ double s(double T, double P, const std::vector<double>& X) {
     double P_ref = 101325.0; // Reference pressure [Pa]
     
     // Calculate pure species entropies and mixing term
-    for (size_t i = 0; i < X.size(); ++i) {
+    for (std::size_t i = 0; i < X.size(); ++i) {
         if (X[i] > 0.0) {
             // Pure species entropy at reference pressure
-            double s_i = s_R(i, T) * R_GAS;
+            double s_i = s_R(static_cast<int>(i), T) * R_GAS;
             
             // Pressure correction: -R * ln(P/P_ref)
             s_i -= R_GAS * std::log(P / P_ref);

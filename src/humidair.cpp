@@ -10,7 +10,7 @@
 const std::unordered_map<std::string, double> dry_air_composition = {
     {"N2", 0.7808},
     {"O2", 0.2095},
-    {"Ar", 0.0093},
+    {"AR", 0.0093},  // Match case from generated header
     {"CO2", 0.0004}
 };
 

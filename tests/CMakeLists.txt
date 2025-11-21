@@ -4,7 +4,6 @@
 set(TEST_SOURCES
     test_thermo_transport.cpp  # Core thermodynamic property tests
     test_humidair.cpp          # Humid air calculation tests
-    test_fraction_functions.cpp # Mole fraction utility tests
 )
 
 # First create a library from our source files
@@ -30,7 +29,10 @@ add_custom_command(TARGET thermo_tests POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E echo "Tests built! Run with: ./tests/thermo_tests"
 )
 
-# Add standalone accuracy test executables
+# Add standalone test executables (these have their own main())
+add_executable(test_fraction_functions test_fraction_functions.cpp)
+target_link_libraries(test_fraction_functions PRIVATE thermo_lib)
+
 add_executable(test_ice_equation_accuracy test_ice_equation_accuracy.cpp)
 target_link_libraries(test_ice_equation_accuracy PRIVATE thermo_lib)
 
