@@ -51,3 +51,16 @@ CMakeFiles/
 
 # macOS specific
 .DS_Store
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Generated thermo_data_generator artifacts
+thermo_data_generator/test_create_cpp_header_output.txt
+thermo_data_generator/thermo_transport_data.h
+
+# CTest runtime output
+Testing/
+tests/Testing/
