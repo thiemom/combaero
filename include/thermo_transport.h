@@ -75,4 +75,23 @@ std::vector<double> normalize_fractions(const std::vector<double>& fractions);
 // Returns all zeros with a warning if input contains only water vapor
 std::vector<double> convert_to_dry_fractions(const std::vector<double>& mole_fractions);
 
+// Combustion calculations
+double oxygen_required_per_mol_fuel(int fuel_index);
+double oxygen_required_per_kg_fuel(int fuel_index);
+double oxygen_required_per_mol_mixture(const std::vector<double>& X);
+double oxygen_required_per_kg_mixture(const std::vector<double>& X);
+
+// Complete combustion to CO2 and H2O.
+// - If O2 >= stoich: all fuel burns, possible O2 left over.
+// - If 0 < O2 < stoich: all fuels burn with the same fraction f of their
+//   stoichiometric amount based on available O2, and O2 is fully consumed.
+// - If no fuel or no O2: mixture is returned unchanged.
+std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double>& X);
+
+// Overload that also returns the fuel-burn fraction f (0 <= f <= 1).
+// - f = 1 for fuel-limited cases (O2 in excess or exactly stoichiometric).
+// - 0 < f < 1 for O2-limited cases.
+// - f = 0 if no combustion occurs (no fuel or no O2).
+std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double>& X, double& fuel_burn_fraction);
+
 #endif // THERMO_H

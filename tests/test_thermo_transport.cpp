@@ -212,3 +212,122 @@ TEST_F(ThermoTransportTest, TransportProperties) {
     EXPECT_GT(pr, 1e-6);  // Just check it's positive and finite
     EXPECT_LT(pr, 100.0);
 }
+
+// Helper to build a CH4/O2 mixture (other species zero)
+static std::vector<double> make_CH4_O2_mixture(double n_CH4, double n_O2) {
+    std::vector<double> X(species_names.size(), 0.0);
+
+    int idx_CH4 = species_index_from_name("CH4");
+    int idx_O2  = species_index_from_name("O2");
+
+    double n_tot = n_CH4 + n_O2;
+    X[idx_CH4] = n_CH4 / n_tot;
+    X[idx_O2]  = n_O2  / n_tot;
+
+    return X;
+}
+
+// No O2: mixture should be unchanged, f = 0
+TEST_F(ThermoTransportTest, Combustion_NoOxygen) {
+    auto X_in = make_CH4_O2_mixture(1.0, 0.0);
+
+    double f = -1.0;
+    auto X_out = complete_combustion_to_CO2_H2O(X_in, f);
+
+    EXPECT_NEAR(f, 0.0, 1e-12);
+    EXPECT_TRUE(vectors_approx_equal(X_in, X_out));
+}
+
+// Exactly stoichiometric O2: CH4 + 2 O2 -> CO2 + 2 H2O, f = 1, no O2 remaining
+TEST_F(ThermoTransportTest, Combustion_StoichiometricOxygen) {
+    // 1 mol CH4, 2 mol O2
+    auto X_in = make_CH4_O2_mixture(1.0, 2.0);
+
+    int idx_CO2 = species_index_from_name("CO2");
+    int idx_H2O = species_index_from_name("H2O");
+    int idx_O2  = species_index_from_name("O2");
+    int idx_CH4 = species_index_from_name("CH4");
+
+    double f = -1.0;
+    auto X_out = complete_combustion_to_CO2_H2O(X_in, f);
+
+    EXPECT_NEAR(f, 1.0, 1e-12);
+
+    // Final moles: 1 CO2 + 2 H2O = 3 mol
+    // Mole fractions: CO2 = 1/3, H2O = 2/3
+    EXPECT_NEAR(X_out[idx_CO2], 1.0 / 3.0, 1e-8);
+    EXPECT_NEAR(X_out[idx_H2O], 2.0 / 3.0, 1e-8);
+    EXPECT_NEAR(X_out[idx_O2], 0.0, 1e-12);
+    EXPECT_NEAR(X_out[idx_CH4], 0.0, 1e-12);
+}
+
+// Excess O2 (strongly lean): CH4 + 3 O2, f = 1, O2 remaining
+TEST_F(ThermoTransportTest, Combustion_ExcessOxygenStronglyLean) {
+    auto X_in = make_CH4_O2_mixture(1.0, 3.0);
+
+    int idx_CO2 = species_index_from_name("CO2");
+    int idx_H2O = species_index_from_name("H2O");
+    int idx_O2  = species_index_from_name("O2");
+    int idx_CH4 = species_index_from_name("CH4");
+
+    double f = -1.0;
+    auto X_out = complete_combustion_to_CO2_H2O(X_in, f);
+
+    EXPECT_NEAR(f, 1.0, 1e-12);
+
+    // After reaction: 1 CO2 + 2 H2O + 1 O2 = 4 mol
+    // Mole fractions: O2 = 1/4, CO2 = 1/4, H2O = 1/2
+    EXPECT_NEAR(X_out[idx_O2],  0.25, 1e-8);
+    EXPECT_NEAR(X_out[idx_CO2], 0.25, 1e-8);
+    EXPECT_NEAR(X_out[idx_H2O], 0.50, 1e-8);
+    EXPECT_NEAR(X_out[idx_CH4], 0.0,  1e-12);
+}
+
+// Intermediate lean case: CH4 + 2.5 O2 (still fuel-limited), f = 1
+TEST_F(ThermoTransportTest, Combustion_IntermediateLean) {
+    auto X_in = make_CH4_O2_mixture(1.0, 2.5);
+
+    int idx_CO2 = species_index_from_name("CO2");
+    int idx_H2O = species_index_from_name("H2O");
+    int idx_O2  = species_index_from_name("O2");
+    int idx_CH4 = species_index_from_name("CH4");
+
+    double f = -1.0;
+    auto X_out = complete_combustion_to_CO2_H2O(X_in, f);
+
+    EXPECT_NEAR(f, 1.0, 1e-12);
+
+    // After reaction: 1 CO2 + 2 H2O + 0.5 O2 = 3.5 mol
+    // Mole fractions: O2 = 0.5/3.5, CO2 = 1/3.5, H2O = 2/3.5
+    double denom = 3.5;
+    EXPECT_NEAR(X_out[idx_O2],  0.5 / denom, 1e-8);
+    EXPECT_NEAR(X_out[idx_CO2], 1.0 / denom, 1e-8);
+    EXPECT_NEAR(X_out[idx_H2O], 2.0 / denom, 1e-8);
+    EXPECT_NEAR(X_out[idx_CH4], 0.0,         1e-12);
+}
+
+// Intermediate rich case: CH4 + 1.5 O2 (O2-limited), 0 < f < 1, CH4 remains
+TEST_F(ThermoTransportTest, Combustion_IntermediateRich) {
+    auto X_in = make_CH4_O2_mixture(1.0, 1.5);
+
+    int idx_CO2 = species_index_from_name("CO2");
+    int idx_H2O = species_index_from_name("H2O");
+    int idx_O2  = species_index_from_name("O2");
+    int idx_CH4 = species_index_from_name("CH4");
+
+    double f = -1.0;
+    auto X_out = complete_combustion_to_CO2_H2O(X_in, f);
+
+    // Stoichiometric O2 requirement is 2 mol per mol CH4
+    // Here we have 1.5 mol O2 -> f = 1.5 / 2 = 0.75
+    EXPECT_NEAR(f, 0.75, 1e-12);
+
+    // Reacted CH4: 0.75 mol, remaining CH4: 0.25 mol
+    // Products: 0.75 CO2, 1.5 H2O, all O2 consumed
+    // Total moles after reaction: 0.25 CH4 + 0.75 CO2 + 1.5 H2O = 2.5
+    double denom = 2.5;
+    EXPECT_NEAR(X_out[idx_CH4], 0.25 / denom, 1e-8);
+    EXPECT_NEAR(X_out[idx_CO2], 0.75 / denom, 1e-8);
+    EXPECT_NEAR(X_out[idx_H2O], 1.50 / denom, 1e-8);
+    EXPECT_NEAR(X_out[idx_O2],  0.0,          1e-12);
+}

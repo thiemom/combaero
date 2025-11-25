@@ -396,6 +396,98 @@ double oxygen_required_per_kg_mixture(const std::vector<double>& X) {
     return molar_oxygen_required * oxygen_mw / mixture_mw;  // kg O2/kg mixture
 }
 
+std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double>& X, double& fuel_burn_fraction) {
+    const double tol_sum = 1.0e-5;
+    const double tol     = 1.0e-12;
+
+    double sum = std::accumulate(X.begin(), X.end(), 0.0);
+    if (std::abs(sum - 1.0) > tol_sum) {
+        throw std::runtime_error("Mole fractions must sum to 1.0");
+    }
+
+    if (X.size() != molecular_structures.size()) {
+        throw std::runtime_error("Mixture size does not match number of species");
+    }
+
+    // 1 mol of mixture as basis
+    std::vector<double> n = X;
+
+    const int idx_O2  = species_index.at("O2");
+    const int idx_CO2 = species_index.at("CO2");
+    const int idx_H2O = species_index.at("H2O");
+    const int idx_N2  = species_index.at("N2");
+
+    double n_O2_available = n[idx_O2];
+    if (n_O2_available <= tol) {
+        // No oxygen --> no combustion
+        fuel_burn_fraction = 0.0;
+        return X;
+    }
+
+    // Total O2 needed to fully burn all fuels in this mixture (1 mol basis)
+    double n_O2_required_total = oxygen_required_per_mol_mixture(X);
+    if (n_O2_required_total <= tol) {
+        // No fuel --> nothing to burn
+        fuel_burn_fraction = 0.0;
+        return X;
+    }
+
+    // Fraction of fuel that can burn:
+    // f = 1 if O2 >= stoich, else f = O2_available / O2_required_total
+    double f = 1.0;
+    if (n_O2_available + tol < n_O2_required_total) {
+        f = n_O2_available / n_O2_required_total;  // 0 < f < 1
+    }
+    fuel_burn_fraction = f;
+
+    double delta_CO2 = 0.0;
+    double delta_H2O = 0.0;
+    double delta_N2  = 0.0;
+
+    // Loop over species and burn a fraction f of every O2-consuming fuel
+    for (size_t i = 0; i < n.size(); ++i) {
+        if (n[i] <= 0.0) continue;
+
+        // Only treat species that actually require O2 (CO2/H2O have requirement=0)
+        double nu_O2 = oxygen_required_per_mol_fuel(static_cast<int>(i));
+        if (nu_O2 <= 0.0) continue;
+
+        const Molecular_Structure& sp = molecular_structures[i];
+
+        double n_fuel_initial   = n[i];
+        double n_fuel_reacted   = f * n_fuel_initial;
+        double n_fuel_remaining = n_fuel_initial - n_fuel_reacted;
+
+        n[i] = n_fuel_remaining;
+
+        // C_x H_y O_z N_w + ... -> x CO2 + (y/2) H2O + (w/2) N2
+        delta_CO2 += sp.C * n_fuel_reacted;
+        delta_H2O += 0.5 * sp.H * n_fuel_reacted;
+        delta_N2  += 0.5 * sp.N * n_fuel_reacted;
+    }
+
+    // Consume O2: fully if O2-limited, partially if fuel-limited
+    if (f >= 1.0 - tol) {
+        n[idx_O2] -= n_O2_required_total;
+        if (n[idx_O2] < 0.0) n[idx_O2] = 0.0;  // numeric safety
+    } else {
+        n[idx_O2] = 0.0;  // all available O2 consumed
+    }
+
+    // Add products
+    n[idx_CO2] += delta_CO2;
+    n[idx_H2O] += delta_H2O;
+    n[idx_N2]  += delta_N2;
+
+    // Back to mole fractions
+    return normalize_fractions(n);
+}
+
+std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double>& X) {
+    double fuel_burn_fraction = 0.0;
+    return complete_combustion_to_CO2_H2O(X, fuel_burn_fraction);
+}
+
 // Implementation of collision integral tables
 
 // Collision integral lookup tables based on Cantera's MMCollisionInt
