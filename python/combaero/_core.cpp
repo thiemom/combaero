@@ -76,6 +76,115 @@ PYBIND11_MODULE(_core, m)
         "Mixture enthalpy at temperature T and mole fractions X."
     );
 
+    // Thermodynamic mixture properties
+    m.def(
+        "cp",
+        [](double T,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr)
+        {
+            auto X = to_vec(X_arr);
+            return cp(T, X);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        "Mixture isobaric heat capacity Cp(T, X) [J/(mol·K)]."
+    );
+
+    m.def(
+        "h",
+        [](double T,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr)
+        {
+            auto X = to_vec(X_arr);
+            return h(T, X);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        "Mixture enthalpy h(T, X) [J/mol]."
+    );
+
+    m.def(
+        "s",
+        [](double T,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double P,
+           double P_ref)
+        {
+            auto X = to_vec(X_arr);
+            return s(T, X, P, P_ref);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        py::arg("P"),
+        py::arg("P_ref") = 101325.0,
+        "Mixture entropy s(T, X, P, P_ref) [J/(mol·K)]."
+    );
+
+    m.def(
+        "cv",
+        [](double T,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr)
+        {
+            auto X = to_vec(X_arr);
+            return cv(T, X);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        "Mixture isochoric heat capacity Cv(T, X) [J/(mol·K)]."
+    );
+
+    m.def(
+        "density",
+        [](double T,
+           double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr)
+        {
+            auto X = to_vec(X_arr);
+            return density(T, P, X);
+        },
+        py::arg("T"),
+        py::arg("P"),
+        py::arg("X"),
+        "Mixture density rho(T, P, X) [kg/m^3]."
+    );
+
+    m.def(
+        "specific_gas_constant",
+        [](py::array_t<double, py::array::c_style | py::array::forcecast> X_arr)
+        {
+            auto X = to_vec(X_arr);
+            return specific_gas_constant(X);
+        },
+        py::arg("X"),
+        "Mixture specific gas constant R_s(X) [J/(kg·K)]."
+    );
+
+    m.def(
+        "isentropic_expansion_coefficient",
+        [](double T,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr)
+        {
+            auto X = to_vec(X_arr);
+            return isentropic_expansion_coefficient(T, X);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        "Isentropic expansion coefficient gamma(T, X) = Cp/Cv."
+    );
+
+    m.def(
+        "speed_of_sound",
+        [](double T,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr)
+        {
+            auto X = to_vec(X_arr);
+            return speed_of_sound(T, X);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        "Speed of sound c(T, X) [m/s]."
+    );
+
     m.def(
         "adiabatic_T_wgs",
         [](double T_in,

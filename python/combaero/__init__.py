@@ -38,13 +38,44 @@ __version__: str = _load_version()
 try:
     # Preferred: local extension in the same package (installed wheel or
     # in-tree build where _core was successfully built next to this file).
-    from ._core import mixture_h, adiabatic_T_wgs  # type: ignore[attr-defined]
+    from ._core import (  # type: ignore[attr-defined]
+        mixture_h,
+        adiabatic_T_wgs,
+        cp,
+        h,
+        s,
+        cv,
+        density,
+        specific_gas_constant,
+        isentropic_expansion_coefficient,
+        speed_of_sound,
+    )
 except ModuleNotFoundError:
     # Fallback: attempt to import from an installed combaero package that
     # already has _core available, then re-export the symbols.
     _core = import_module("combaero._core")
     mixture_h = _core.mixture_h
     adiabatic_T_wgs = _core.adiabatic_T_wgs
+    cp = _core.cp
+    h = _core.h
+    s = _core.s
+    cv = _core.cv
+    density = _core.density
+    specific_gas_constant = _core.specific_gas_constant
+    isentropic_expansion_coefficient = _core.isentropic_expansion_coefficient
+    speed_of_sound = _core.speed_of_sound
 
 
-__all__ = ["mixture_h", "adiabatic_T_wgs", "__version__"]
+__all__ = [
+    "mixture_h",
+    "adiabatic_T_wgs",
+    "cp",
+    "h",
+    "s",
+    "cv",
+    "density",
+    "specific_gas_constant",
+    "isentropic_expansion_coefficient",
+    "speed_of_sound",
+    "__version__",
+]
