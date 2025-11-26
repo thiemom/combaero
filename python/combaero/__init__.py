@@ -68,6 +68,7 @@ try:
         humid_air_composition,
         dewpoint,
         relative_humidity_from_dewpoint,
+        species_common_names,
         calc_T_from_h,
         calc_T_from_s,
         calc_T_from_cp,
@@ -111,6 +112,7 @@ except ModuleNotFoundError:
     humid_air_composition = _core.humid_air_composition
     dewpoint = _core.dewpoint
     relative_humidity_from_dewpoint = _core.relative_humidity_from_dewpoint
+    species_common_names = _core.species_common_names
     calc_T_from_h = _core.calc_T_from_h
     calc_T_from_s = _core.calc_T_from_s
     calc_T_from_cp = _core.calc_T_from_cp
@@ -152,6 +154,7 @@ __all__ = [
     "humid_air_composition",
     "dewpoint",
     "relative_humidity_from_dewpoint",
+    "species_common_names",
     "calc_T_from_h",
     "calc_T_from_s",
     "calc_T_from_cp",

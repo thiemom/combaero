@@ -6,6 +6,7 @@
 #include "thermo_transport.h"
 #include "equilibrium.h"
 #include "humidair.h"
+#include "species_common_names.h"
 
 namespace py = pybind11;
 
@@ -63,6 +64,15 @@ PYBIND11_MODULE(_core, m)
         &species_molar_mass_from_name,
         py::arg("name"),
         "Return the molar mass [g/mol] for a given species name."
+    );
+
+    // Common names for species symbols
+    m.def(
+        "species_common_names",
+        []() {
+            return combaero::species_common_names;
+        },
+        "Mapping from canonical species symbols (e.g. 'CH4') to human-readable common names (e.g. 'Methane')."
     );
 
     m.def(
