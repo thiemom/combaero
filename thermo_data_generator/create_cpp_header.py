@@ -32,10 +32,10 @@ struct Transport_Props {
 };
 
 struct Molecular_Structure {
-    int C;
-    int H;
-    int O;
-    int N;
+    std::size_t C;
+    std::size_t H;
+    std::size_t O;
+    std::size_t N;
 };
 
 const std::vector<std::string> species_names = {"""

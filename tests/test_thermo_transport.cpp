@@ -48,7 +48,7 @@ protected:
         
         // Pure water vapor
         try {
-            int h2o_idx = species_index_from_name("H2O");
+            std::size_t h2o_idx = species_index_from_name("H2O");
             water_vapor[h2o_idx] = 1.0;
         } catch (...) {
             // If H2O doesn't exist, leave as zeros
@@ -129,7 +129,7 @@ TEST_F(ThermoTransportTest, ConvertToDryFractions) {
     
     // Check that water vapor is zero (if H2O exists)
     try {
-        int h2o_idx = species_index_from_name("H2O");
+        std::size_t h2o_idx = species_index_from_name("H2O");
         EXPECT_DOUBLE_EQ(result[h2o_idx], 0.0);
     } catch (...) {
         // H2O doesn't exist in species list, skip this check
@@ -259,6 +259,82 @@ TEST_F(ThermoTransportTest, EquivalenceRatioConsistency) {
     }
 }
 
+// Mass-basis equivalence-ratio consistency test: mirrors mole-based test
+TEST_F(ThermoTransportTest, EquivalenceRatioMassConsistency) {
+    const std::size_t n = species_names.size();
+
+    // Fuel stream (mole basis): pure CH4
+    std::vector<double> X_fuel(n, 0.0);
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    X_fuel[idx_CH4] = 1.0;
+
+    // Oxidizer stream (mole basis): simple N2/O2 "air" (79% N2, 21% O2)
+    std::vector<double> X_ox(n, 0.0);
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    X_ox[idx_N2] = 0.79;
+    X_ox[idx_O2] = 0.21;
+
+    // Convert to mass fractions for mass-basis helpers
+    std::vector<double> Y_fuel = mole_to_mass(X_fuel);
+    std::vector<double> Y_ox   = mole_to_mass(X_ox);
+
+    const double phis[] = {0.5, 1.0, 2.0};
+
+    for (double phi_target : phis) {
+        auto Y_mix = set_equivalence_ratio_mass(phi_target, Y_fuel, Y_ox);
+
+        // Mixture should be normalized
+        double sum = 0.0;
+        for (double y : Y_mix) sum += y;
+        EXPECT_NEAR(sum, 1.0, 1e-12);
+
+        double phi_back = equivalence_ratio_mass(Y_mix, Y_fuel, Y_ox);
+        EXPECT_NEAR(phi_back, phi_target, 1e-10);
+    }
+}
+
+// Bilger Z <-> phi (mass basis) consistency test
+TEST_F(ThermoTransportTest, BilgerZPhiMassConsistency) {
+    const std::size_t n = species_names.size();
+
+    // Fuel stream (mole basis): pure CH4
+    std::vector<double> X_fuel(n, 0.0);
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    X_fuel[idx_CH4] = 1.0;
+
+    // Oxidizer stream (mole basis): simple N2/O2 "air" (79% N2, 21% O2)
+    std::vector<double> X_ox(n, 0.0);
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    X_ox[idx_N2] = 0.79;
+    X_ox[idx_O2] = 0.21;
+
+    // Convert to mass fractions
+    std::vector<double> Y_fuel = mole_to_mass(X_fuel);
+    std::vector<double> Y_ox   = mole_to_mass(X_ox);
+
+    // Round-trip test for several phi values
+    const double phis[] = {0.5, 1.0, 2.0};
+
+    for (double phi_target : phis) {
+        const double Z = bilger_Z_from_equivalence_ratio_mass(phi_target, Y_fuel, Y_ox);
+        EXPECT_GT(Z, 0.0);
+        EXPECT_LT(Z, 1.0);
+
+        const double phi_back = equivalence_ratio_from_bilger_Z_mass(Z, Y_fuel, Y_ox);
+        EXPECT_NEAR(phi_back, phi_target, 1e-10);
+    }
+
+    // Check that Z_st corresponds to phi ~ 1
+    const double Z_st = bilger_stoich_mixture_fraction_mass(Y_fuel, Y_ox);
+    EXPECT_GT(Z_st, 0.0);
+    EXPECT_LT(Z_st, 1.0);
+
+    const double phi_from_Z_st = equivalence_ratio_from_bilger_Z_mass(Z_st, Y_fuel, Y_ox);
+    EXPECT_NEAR(phi_from_Z_st, 1.0, 1e-10);
+}
+
 // No O2: mixture should be unchanged, f = 0
 TEST_F(ThermoTransportTest, Combustion_NoOxygen) {
     auto X_in = make_CH4_O2_mixture(1.0, 0.0);
@@ -297,10 +373,10 @@ TEST_F(ThermoTransportTest, Combustion_StoichiometricOxygen) {
 TEST_F(ThermoTransportTest, Combustion_ExcessOxygenStronglyLean) {
     auto X_in = make_CH4_O2_mixture(1.0, 3.0);
 
-    int idx_CO2 = species_index_from_name("CO2");
-    int idx_H2O = species_index_from_name("H2O");
-    int idx_O2  = species_index_from_name("O2");
-    int idx_CH4 = species_index_from_name("CH4");
+    std::size_t idx_CO2 = species_index_from_name("CO2");
+    std::size_t idx_H2O = species_index_from_name("H2O");
+    std::size_t idx_O2  = species_index_from_name("O2");
+    std::size_t idx_CH4 = species_index_from_name("CH4");
 
     double f = -1.0;
     auto X_out = complete_combustion_to_CO2_H2O(X_in, f);
@@ -319,10 +395,10 @@ TEST_F(ThermoTransportTest, Combustion_ExcessOxygenStronglyLean) {
 TEST_F(ThermoTransportTest, Combustion_IntermediateLean) {
     auto X_in = make_CH4_O2_mixture(1.0, 2.5);
 
-    int idx_CO2 = species_index_from_name("CO2");
-    int idx_H2O = species_index_from_name("H2O");
-    int idx_O2  = species_index_from_name("O2");
-    int idx_CH4 = species_index_from_name("CH4");
+    std::size_t idx_CO2 = species_index_from_name("CO2");
+    std::size_t idx_H2O = species_index_from_name("H2O");
+    std::size_t idx_O2  = species_index_from_name("O2");
+    std::size_t idx_CH4 = species_index_from_name("CH4");
 
     double f = -1.0;
     auto X_out = complete_combustion_to_CO2_H2O(X_in, f);
@@ -342,10 +418,10 @@ TEST_F(ThermoTransportTest, Combustion_IntermediateLean) {
 TEST_F(ThermoTransportTest, Combustion_IntermediateRich) {
     auto X_in = make_CH4_O2_mixture(1.0, 1.5);
 
-    int idx_CO2 = species_index_from_name("CO2");
-    int idx_H2O = species_index_from_name("H2O");
-    int idx_O2  = species_index_from_name("O2");
-    int idx_CH4 = species_index_from_name("CH4");
+    std::size_t idx_CO2 = species_index_from_name("CO2");
+    std::size_t idx_H2O = species_index_from_name("H2O");
+    std::size_t idx_O2  = species_index_from_name("O2");
+    std::size_t idx_CH4 = species_index_from_name("CH4");
 
     double f = -1.0;
     auto X_out = complete_combustion_to_CO2_H2O(X_in, f);

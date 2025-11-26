@@ -1,5 +1,6 @@
 #include "../include/thermo_transport.h"
 #include <cmath>
+#include <cstddef>
 #include <stdexcept>
 #include <algorithm>
 #include <numeric>
@@ -40,7 +41,7 @@ double mwmix(const std::vector<double>& X) {
 }
 
 // NASA polynomial evaluation for Cp/R
-double cp_R(int species_idx, double T) {
+double cp_R(std::size_t species_idx, double T) {
     const NASA_Coeffs& nasa = nasa_coeffs[species_idx];
     
     const std::vector<double>* coeffs;
@@ -70,12 +71,12 @@ double cp_R(int species_idx, double T) {
 }
 
 // Cv/R = Cp/R - 1
-inline double cv_R(int species_idx, double T) {
+inline double cv_R(std::size_t species_idx, double T) {
     return cp_R(species_idx, T) - 1.0;
 }
 
 // NASA polynomial evaluation for H/RT
-double h_RT(int species_idx, double T) {
+double h_RT(std::size_t species_idx, double T) {
     const NASA_Coeffs& nasa = nasa_coeffs[species_idx];
     
     const std::vector<double>* coeffs;
@@ -106,7 +107,7 @@ double h_RT(int species_idx, double T) {
 }
 
 // NASA polynomial evaluation for S/R
-double s_R(int species_idx, double T) {
+double s_R(std::size_t species_idx, double T) {
     const NASA_Coeffs& nasa = nasa_coeffs[species_idx];
     
     const std::vector<double>* coeffs;
@@ -137,7 +138,7 @@ double s_R(int species_idx, double T) {
 }
 
 // Dimensionless Gibbs free energy G/(R*T) = H/(R*T) - S/R
-double g_over_RT(int species_idx, double T) {
+double g_over_RT(std::size_t species_idx, double T) {
     return h_RT(species_idx, T) - s_R(species_idx, T);
 }
 
@@ -147,8 +148,8 @@ std::size_t num_species() {
 }
 
 // Molar mass lookup [g/mol]
-double species_molar_mass(int species_index) {
-    if (species_index < 0 || static_cast<std::size_t>(species_index) >= molar_masses.size()) {
+double species_molar_mass(std::size_t species_index) {
+    if (species_index >= molar_masses.size()) {
         throw std::out_of_range("species_molar_mass: species_index out of range");
     }
     return molar_masses[species_index];
@@ -438,10 +439,10 @@ std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double>& X,
     // 1 mol of mixture as basis
     std::vector<double> n = X;
 
-    const int idx_O2  = species_index.at("O2");
-    const int idx_CO2 = species_index.at("CO2");
-    const int idx_H2O = species_index.at("H2O");
-    const int idx_N2  = species_index.at("N2");
+    const std::size_t idx_O2  = species_index.at("O2");
+    const std::size_t idx_CO2 = species_index.at("CO2");
+    const std::size_t idx_H2O = species_index.at("H2O");
+    const std::size_t idx_N2  = species_index.at("N2");
 
     double n_O2_available = n[idx_O2];
     if (n_O2_available <= tol) {
@@ -521,11 +522,11 @@ std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double>& X)
 // We assume species_names, molar_masses and oxygen_required_per_mol_mixture(X)
 // are defined in thermo_transport_data / this translation unit.
 
-static int find_species_index(const std::string& name)
+static std::size_t find_species_index(const std::string& name)
 {
     for (std::size_t k = 0; k < species_names.size(); ++k) {
         if (species_names[k] == name) {
-            return static_cast<int>(k);
+            return k;
         }
     }
     throw std::runtime_error("find_species_index: species '" + name + "' not found");
@@ -546,9 +547,9 @@ static double stoich_f_over_o_mole(
         throw std::invalid_argument("stoich_f_over_o_mole: size mismatch");
     }
 
-    static const int O2_index = find_species_index("O2");
+    static const std::size_t O2_index = find_species_index("O2");
 
-    const double X_O2_ox = X_ox[static_cast<std::size_t>(O2_index)];
+    const double X_O2_ox = X_ox[O2_index];
     if (X_O2_ox <= 0.0) {
         throw std::runtime_error(
             "stoich_f_over_o_mole: oxidizer has zero O2 mole fraction");
@@ -744,9 +745,9 @@ static double stoich_f_over_o_mass(
         throw std::invalid_argument("stoich_f_over_o_mass: size mismatch");
     }
 
-    static const int O2_index = find_species_index("O2");
+    static const std::size_t O2_index = find_species_index("O2");
 
-    const double Y_O2_ox = Y_ox[static_cast<std::size_t>(O2_index)];
+    const double Y_O2_ox = Y_ox[O2_index];
     if (Y_O2_ox <= 0.0) {
         throw std::runtime_error(
             "stoich_f_over_o_mass: oxidizer has zero O2 mass fraction");
@@ -1003,8 +1004,8 @@ double linear_interp(double x, const std::vector<double>& x_values, const std::v
     // Find position
     auto it = std::lower_bound(x_values.begin(), x_values.end(), x);
     if (it == x_values.begin()) return y_values.front();
-    
-    int idx = std::distance(x_values.begin(), it) - 1;
+
+    std::size_t idx = static_cast<std::size_t>(std::distance(x_values.begin(), it) - 1);
     double x1 = x_values[idx];
     double x2 = x_values[idx + 1];
     double y1 = y_values[idx];
@@ -1278,7 +1279,7 @@ double kinematic_viscosity(double T, double P, const std::vector<double>& X) {
 }
 
 // Calculate temperature from enthalpy using Newton's method
-double calc_T_from_h(double h_target, const std::vector<double>& X, double T_guess, double tol, int max_iter) {
+double calc_T_from_h(double h_target, const std::vector<double>& X, double T_guess, double tol, std::size_t max_iter) {
     if (X.size() != species_names.size()) {
         throw std::invalid_argument("Mole fraction vector size does not match number of species");
     }
@@ -1301,7 +1302,7 @@ double calc_T_from_h(double h_target, const std::vector<double>& X, double T_gue
     double h_val, dh_dT_val;
     double delta_T;
     
-    for (int iter = 0; iter < max_iter; ++iter) {
+    for (std::size_t iter = 0; iter < max_iter; ++iter) {
         // Calculate h and dh/dT at current temperature
         h_val = h(T, X);
         dh_dT_val = dh_dT(T, X);
@@ -1344,7 +1345,7 @@ double calc_T_from_h(double h_target, const std::vector<double>& X, double T_gue
 }
 
 // Calculate temperature from entropy using Newton's method
-double calc_T_from_s(double s_target, double P, const std::vector<double>& X, double T_guess, double tol, int max_iter) {
+double calc_T_from_s(double s_target, double P, const std::vector<double>& X, double T_guess, double tol, std::size_t max_iter) {
     if (X.size() != species_names.size()) {
         throw std::invalid_argument("Mole fraction vector size does not match number of species");
     }
@@ -1372,7 +1373,7 @@ double calc_T_from_s(double s_target, double P, const std::vector<double>& X, do
     double s_val, ds_dT_val;
     double delta_T;
     
-    for (int iter = 0; iter < max_iter; ++iter) {
+    for (std::size_t iter = 0; iter < max_iter; ++iter) {
         // Calculate s and ds/dT at current temperature
         s_val = s(T, X, P);
         ds_dT_val = ds_dT(T, X);
@@ -1415,7 +1416,7 @@ double calc_T_from_s(double s_target, double P, const std::vector<double>& X, do
 }
 
 // Calculate temperature from heat capacity using Newton's method
-double calc_T_from_cp(double cp_target, const std::vector<double>& X, double T_guess, double tol, int max_iter) {
+double calc_T_from_cp(double cp_target, const std::vector<double>& X, double T_guess, double tol, std::size_t max_iter) {
     if (X.size() != species_names.size()) {
         throw std::invalid_argument("Mole fraction vector size does not match number of species");
     }
@@ -1438,7 +1439,7 @@ double calc_T_from_cp(double cp_target, const std::vector<double>& X, double T_g
     double cp_val, dcp_dT_val;
     double delta_T;
     
-    for (int iter = 0; iter < max_iter; ++iter) {
+    for (std::size_t iter = 0; iter < max_iter; ++iter) {
         // Calculate cp and dcp/dT at current temperature
         cp_val = cp(T, X);
         dcp_dT_val = dcp_dT(T, X);
@@ -1507,14 +1508,14 @@ std::vector<double> normalize_fractions(const std::vector<double>& fractions) {
 // Returns all zeros with a warning if input contains only water vapor
 std::vector<double> convert_to_dry_fractions(const std::vector<double>& mole_fractions) {
     // Get the index of water vapor
-    int h2o_idx = species_index_from_name("H2O");
+    std::size_t h2o_idx = species_index_from_name("H2O");
     
     // Create a copy of the input vector for the result
     std::vector<double> dry_fractions = mole_fractions;
     
     // Calculate the sum of all non-water fractions
     double sum = 0.0;
-    for (size_t i = 0; i < dry_fractions.size(); ++i) {
+    for (std::size_t i = 0; i < dry_fractions.size(); ++i) {
         if (static_cast<int>(i) != h2o_idx) {
             sum += dry_fractions[i];
         }

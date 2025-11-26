@@ -30,8 +30,8 @@ int main() {
     std::vector<double> X(species_names.size(), 0.0);
     
     // Set mole fractions for air (O2 = 0.21, N2 = 0.79)
-    int o2_idx = species_index_from_name("O2");
-    int n2_idx = species_index_from_name("N2");
+    std::size_t o2_idx = species_index_from_name("O2");
+    std::size_t n2_idx = species_index_from_name("N2");
     
     X[o2_idx] = 0.21;
     X[n2_idx] = 0.79;

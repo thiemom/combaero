@@ -58,11 +58,11 @@ static inline double Kp_WGS(double T, const WgsConfig& cfg)
 template<typename Fun>
 static double newton_damped(Fun&& F, double x0,
                             double xmin, double xmax,
-                            int maxIt = 40)
+                            std::size_t maxIt = 40)
 {
     double x = x0;
 
-    for (int it = 0; it < maxIt; ++it) {
+    for (std::size_t it = 0; it < maxIt; ++it) {
         double f0 = F.f(x);
 
         // Converged?

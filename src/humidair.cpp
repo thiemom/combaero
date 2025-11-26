@@ -180,10 +180,10 @@ double dewpoint(double T, double P, double RH) {
     Tdp = std::min(Tdp, T);      // Maximum ambient temperature
     
     // Iterative solution
-    const int max_iterations = 100;
+    const std::size_t max_iterations = 100;
     const double tolerance = 1e-6;
     
-    for (int i = 0; i < max_iterations; i++) {
+    for (std::size_t i = 0; i < max_iterations; i++) {
         // Calculate saturation vapor pressure at current Tdp estimate
         double P_ws_Tdp = saturation_vapor_pressure(Tdp);
         
@@ -254,10 +254,10 @@ double wet_bulb_temperature(double T, double P, double RH) {
     double W = humidity_ratio(T, P, RH);
     
     // Iterative solution
-    const int max_iterations = 100;
+    const std::size_t max_iterations = 100;
     const double tolerance = 1e-6;
     
-    for (int i = 0; i < max_iterations; i++) {
+    for (std::size_t i = 0; i < max_iterations; i++) {
         // Calculate saturation vapor pressure at wet-bulb temperature
         double P_ws_Twb = saturation_vapor_pressure(Twb);
         

@@ -2,6 +2,7 @@
 #define THERMO_H
 
 #include "thermo_transport_data.h"
+#include <iterator>
 #include <vector>
 #include <string>
 
@@ -24,7 +25,7 @@ std::size_t species_index_from_name(const std::string& name);
 std::size_t num_species();
 
 // Molar mass lookup [kg/kmol equivalent: here stored as g/mol]
-double species_molar_mass(int species_index);
+double species_molar_mass(std::size_t species_index);
 double species_molar_mass_from_name(const std::string& name);
 
 // Mixture properties
@@ -36,11 +37,11 @@ double mwmix(const std::vector<double>& X);
 // h_RT      : dimensionless enthalpy  H/(R*T)
 // s_R       : dimensionless entropy   S/R at reference pressure and pure species
 // g_over_RT : dimensionless Gibbs free energy G/(R*T) = H/(R*T) - S/R
-double cp_R(int species_idx, double T);
-double cv_R(int species_idx, double T);
-double h_RT(int species_idx, double T);
-double s_R(int species_idx, double T);
-double g_over_RT(int species_idx, double T);
+double cp_R(std::size_t species_idx, double T);
+double cv_R(std::size_t species_idx, double T);
+double h_RT(std::size_t species_idx, double T);
+double s_R(std::size_t species_idx, double T);
+double g_over_RT(std::size_t species_idx, double T);
 
 // Thermodynamic properties
 double cp(double T, const std::vector<double>& X);
@@ -149,9 +150,9 @@ double prandtl(double T, double P, const std::vector<double>& X);
 double kinematic_viscosity(double T, double P, const std::vector<double>& X);
 
 // Inverse calculations (solving for temperature)
-double calc_T_from_h(double h_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, int max_iter = 50);
-double calc_T_from_s(double s_target, double P, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, int max_iter = 50);
-double calc_T_from_cp(double cp_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, int max_iter = 50);
+double calc_T_from_h(double h_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
+double calc_T_from_s(double s_target, double P, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
+double calc_T_from_cp(double cp_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 
 // Utility functions
 void print_mixture_properties(double T, double P, const std::vector<double>& X);
