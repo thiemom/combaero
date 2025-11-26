@@ -32,6 +32,37 @@ PYBIND11_MODULE(_core, m)
 {
     m.doc() = "Python bindings for combaero core";
 
+    // Species metadata helpers
+    m.def("num_species", &num_species, "Number of thermo species in the internal tables.");
+
+    m.def(
+        "species_name",
+        &species_name,
+        py::arg("index"),
+        "Return the canonical species name for a given index."
+    );
+
+    m.def(
+        "species_index_from_name",
+        &species_index_from_name,
+        py::arg("name"),
+        "Return the species index for a given canonical name."
+    );
+
+    m.def(
+        "species_molar_mass",
+        &species_molar_mass,
+        py::arg("index"),
+        "Return the molar mass [g/mol] for a given species index."
+    );
+
+    m.def(
+        "species_molar_mass_from_name",
+        &species_molar_mass_from_name,
+        py::arg("name"),
+        "Return the molar mass [g/mol] for a given species name."
+    );
+
     m.def(
         "mixture_h",
         [](double T,

@@ -136,6 +136,24 @@ double g_over_RT(int species_idx, double T) {
     return h_RT(species_idx, T) - s_R(species_idx, T);
 }
 
+// Number of thermo species used in the internal tables
+std::size_t num_species() {
+    return species_names.size();
+}
+
+// Molar mass lookup [g/mol]
+double species_molar_mass(int species_index) {
+    if (species_index < 0 || static_cast<std::size_t>(species_index) >= molar_masses.size()) {
+        throw std::out_of_range("species_molar_mass: species_index out of range");
+    }
+    return molar_masses[static_cast<std::size_t>(species_index)];
+}
+
+double species_molar_mass_from_name(const std::string& name) {
+    const int idx = species_index_from_name(name);
+    return species_molar_mass(idx);
+}
+
 // Calculate heat capacity at constant pressure [J/(mol·K)]
 double cp(double T, const std::vector<double>& X) {
     if (X.size() != species_names.size()) {

@@ -16,9 +16,16 @@ constexpr double PI = 3.14159265358979323846;
 // Conversion factor from J/mol to J/kg
 double J_per_mol_to_J_per_kg(double value, double molar_mass);
 
-// Species name lookup functions
+// Species metadata and lookup functions
 std::string species_name(int species_index);
 int species_index_from_name(const std::string& name);
+
+// Number of thermo species in the internal data tables
+std::size_t num_species();
+
+// Molar mass lookup [kg/kmol equivalent: here stored as g/mol]
+double species_molar_mass(int species_index);
+double species_molar_mass_from_name(const std::string& name);
 
 // Mixture properties
 double mwmix(const std::vector<double>& X);
