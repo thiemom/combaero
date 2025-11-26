@@ -5,9 +5,9 @@
 #include <iomanip>
 
 /**
- * Thermo Library Main Example
+ * CombAero Library Main Example
  * 
- * This file provides a simple demonstration of the thermo library's capabilities.
+ * This file provides a simple demonstration of the combaero library's capabilities.
  * For more detailed examples, see the examples directory:
  * - examples/thermo_example.cpp: Demonstrates thermodynamic and transport properties
  * - examples/humidair_example.cpp: Demonstrates humid air calculations
@@ -17,9 +17,9 @@ int main() {
     std::cout << std::fixed << std::setprecision(6);
     
     std::cout << "===========================================" << std::endl;
-    std::cout << "         Thermo Library Demo" << std::endl;
+    std::cout << "        CombAero Library Demo" << std::endl;
     std::cout << "===========================================" << std::endl;
-    std::cout << "This is a simple demonstration of the thermo library." << std::endl;
+    std::cout << "This is a simple demonstration of the combaero library." << std::endl;
     std::cout << "For more detailed examples, see the examples directory." << std::endl;
     
     // Define temperature and pressure
@@ -80,7 +80,7 @@ int main() {
     }
     
     std::cout << "\nFor more examples, run:" << std::endl;
-    std::cout << "  ./thermo_example - For thermodynamic and transport properties" << std::endl;
+    std::cout << "  ./combaero_example - For thermodynamic and transport properties" << std::endl;
     std::cout << "  ./humidair_example - For humid air calculations" << std::endl;
     
     return 0;

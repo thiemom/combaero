@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <numeric>
 #include <iostream>
-#include <iomanip>
 
 // Conversion factor from J/mol to J/kg
 double J_per_mol_to_J_per_kg(double value, double molar_mass) {

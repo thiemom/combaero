@@ -1,4 +1,4 @@
-# Thermo
+# CombAero
 
 A C++ library for thermodynamic and combustion calculations for gas mixtures.
 
@@ -34,8 +34,8 @@ This library provides tools for ideal-gas thermodynamic properties, combustion s
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/thermo.git
-cd thermo
+git clone https://github.com/thiemom/combaero.git
+cd combaero
 
 # Create a build directory
 mkdir -p build
@@ -63,7 +63,6 @@ The project uses GoogleTest and CTest to validate the accuracy of calculations:
 - Core thermodynamic and transport property tests
 - Combustion and mixture-fraction tests
 - Humid air and saturation pressure tests
-- Evaporative cooler model tests
 - Accuracy validation against Hyland-Wexler reference values
 
 From the build directory you can run:
@@ -72,11 +71,11 @@ From the build directory you can run:
 # Run all tests via CTest
 ctest --output-on-failure
 
-# Run only the main thermo test suite
-ctest -R thermo_tests --output-on-failure
+# Run only the main combaero test suite
+ctest -R combaero_tests --output-on-failure
 
 # Or invoke the test executable directly
-./tests/thermo_tests
+./tests/combaero_tests
 
 # Accuracy tests for saturation vapor pressure
 ./tests/test_ice_equation_accuracy

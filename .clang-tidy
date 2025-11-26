@@ -1,0 +1,29 @@
+Checks: >
+  # Start with nothing, then opt in
+  -*
+  # Core bug-finding
+  clang-diagnostic-*,
+  clang-analyzer-*,
+  bugprone-*,
+  performance-*,
+  portability-*,
+  # Good modernization for C++17
+  modernize-*,
+  # Readability and basic style
+  readability-*,
+  # A subset of C++ Core Guidelines (you can tighten/loosen later)
+  cppcoreguidelines-*, 
+  # But disable rules that fight with your style or are project-specific
+  -clang-diagnostic-c++17-extensions,
+  -myproject-no-system-algorithm,
+  -llvm-*,
+  -fuchsia-*,
+  -google-*,
+  -hicpp-*,
+  -zircon-*,
+  # If any of these become noisy, you can turn them off too:
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-pro-type-reinterpret-cast
+
+WarningsAsErrors: ''

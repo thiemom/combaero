@@ -1,6 +1,6 @@
-# Contributing to Thermo
+# Contributing to CombAero
 
-Thank you for your interest in contributing to the Thermo project! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to the CombAero project! This document provides guidelines and instructions for contributing.
 
 ## Code Style
 
@@ -32,7 +32,7 @@ Run tests before submitting a pull request:
 ```bash
 cd build
 make test
-./tests/thermo_tests
+./tests/combaero_tests
 ./tests/test_ice_equation_accuracy
 ./tests/test_water_equation_accuracy
 ```
