@@ -36,7 +36,11 @@ target_include_directories(combaero_lib PUBLIC
 
 # Create main executable
 add_executable(combaero_main src/main.cpp)
-target_compile_options(combaero_main PRIVATE -Wall -Wextra)
+if (MSVC)
+    target_compile_options(combaero_main PRIVATE /W4)
+else()
+    target_compile_options(combaero_main PRIVATE -Wall -Wextra)
+endif()
 target_link_libraries(combaero_main PRIVATE combaero_lib)
 
 # Print message when main build is complete
@@ -48,9 +52,14 @@ add_custom_command(TARGET combaero_main POST_BUILD
 add_executable(combaero_example examples/thermo_example.cpp)
 add_executable(humidair_example examples/humidair_example.cpp)
 
-# Add compiler flags for examples
-target_compile_options(combaero_example PRIVATE -Wall -Wextra)
-target_compile_options(humidair_example PRIVATE -Wall -Wextra)
+# Add compiler warnings for examples
+if (MSVC)
+    target_compile_options(combaero_example PRIVATE /W4)
+    target_compile_options(humidair_example PRIVATE /W4)
+else()
+    target_compile_options(combaero_example PRIVATE -Wall -Wextra)
+    target_compile_options(humidair_example PRIVATE -Wall -Wextra)
+endif()
 
 target_link_libraries(combaero_example PRIVATE combaero_lib)
 target_link_libraries(humidair_example PRIVATE combaero_lib)
