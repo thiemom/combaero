@@ -27,14 +27,31 @@ All new features should include appropriate tests:
 - Integration tests for complex features
 - Accuracy tests for numerical algorithms
 
-Run tests before submitting a pull request:
+Run the C++ test suite before submitting a pull request:
 
 ```bash
+mkdir -p build
 cd build
-make test
+cmake ..
+cmake --build .
+
+# All C++ tests
+ctest --output-on-failure
+
+# Main test executable directly (bypassing CTest)
 ./tests/combaero_tests
+
+# Accuracy tests for saturation vapor pressure
 ./tests/test_ice_equation_accuracy
 ./tests/test_water_equation_accuracy
+```
+
+If you modify the Python bindings or packaging, also run the Python smoke tests from the repository root (with direnv active):
+
+```bash
+python -m build --wheel
+python -m pip install --force-reinstall dist/combaero-0.0.1-*.whl
+python -m pytest python/tests/test_import.py
 ```
 
 ## Pull Request Process

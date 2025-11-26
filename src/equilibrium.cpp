@@ -41,10 +41,11 @@ static inline void molefractions(const std::vector<double>& n, std::vector<doubl
 
 static inline double Kp_WGS(double T, const WgsConfig& cfg)
 {
-    double g_CO2 = g_over_RT(cfg.i_CO2, T);
-    double g_H2  = g_over_RT(cfg.i_H2,  T);
-    double g_CO  = g_over_RT(cfg.i_CO,  T);
-    double g_H2O = g_over_RT(cfg.i_H2O, T);
+    // Use the global g_over_RT(int, double) from thermo_transport.h
+    double g_CO2 = ::g_over_RT(static_cast<int>(cfg.i_CO2), T);
+    double g_H2  = ::g_over_RT(static_cast<int>(cfg.i_H2),  T);
+    double g_CO  = ::g_over_RT(static_cast<int>(cfg.i_CO),  T);
+    double g_H2O = ::g_over_RT(static_cast<int>(cfg.i_H2O), T);
 
     double d_gRT = (g_CO2 + g_H2) - (g_CO + g_H2O);
     return std::exp(-d_gRT);

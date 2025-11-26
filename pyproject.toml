@@ -1,0 +1,23 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "pybind11>=2.12"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "combaero"
+version = "0.0.1"
+description = "Combustion and aerothermal tools (C++ core with Python bindings)"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest"]
+generator = ["pandas>=2.2.3", "pyyaml>=6.0.2"]
+
+[tool.scikit-build]
+# Python package lives under python/combaero
+wheel.packages = ["python/combaero"]
+build.verbose = true
+
+[tool.scikit-build.cmake]
+args = ["-DCOMBAERO_ENABLE_TESTS=OFF", "-DCOMBAERO_BUILD_PYTHON=ON"]

@@ -131,6 +131,11 @@ double s_R(int species_idx, double T) {
            (*coeffs)[6];
 }
 
+// Dimensionless Gibbs free energy G/(R*T) = H/(R*T) - S/R
+double g_over_RT(int species_idx, double T) {
+    return h_RT(species_idx, T) - s_R(species_idx, T);
+}
+
 // Calculate heat capacity at constant pressure [J/(mol·K)]
 double cp(double T, const std::vector<double>& X) {
     if (X.size() != species_names.size()) {

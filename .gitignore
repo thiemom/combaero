@@ -52,10 +52,29 @@ CMakeFiles/
 # macOS specific
 .DS_Store
 
+# Windows / Linux OS-specific
+Thumbs.db
+Thumbs.db:encryptable
+Desktop.ini
+$RECYCLE.BIN/
+ehthumbs.db
+Icon?
+.Spotlight-V100
+.Trashes
+.fseventsd
+.directory
+
 # Python artifacts
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# Python build output
+dist/
+.venv/
+
+# scikit-build-core sdist staging dir
+-sdist/
 
 # Generated thermo_data_generator artifacts
 thermo_data_generator/test_create_cpp_header_output.txt

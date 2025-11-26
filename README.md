@@ -56,31 +56,78 @@ The `examples` directory contains sample applications demonstrating the library'
 - `thermo_example`: Basic thermodynamic calculations
 - `humidair_example`: Humid air property calculations
 
-## Testing
+## Development workflow
 
-The project uses GoogleTest and CTest to validate the accuracy of calculations:
+### Environment setup (direnv + Python)
 
-- Core thermodynamic and transport property tests
-- Combustion and mixture-fraction tests
-- Humid air and saturation pressure tests
-- Accuracy validation against Hyland-Wexler reference values
-
-From the build directory you can run:
+These steps assume you have `direnv` and `uv` installed.
 
 ```bash
-# Run all tests via CTest
+git clone https://github.com/thiemom/combaero.git
+cd combaero
+
+# Allow direnv to manage the root .venv
+direnv allow
+
+# direnv will create .venv/ and uv will bootstrap Python tooling
+which python   # should point to .venv/bin/python inside the repo
+```
+
+The root `.envrc` manages a single virtual environment at `./.venv` for:
+
+- Building the Python wheel via `scikit-build-core`
+- Running Python tests with `pytest`
+- Running data generator scripts in `thermo_data_generator/`
+
+### Build C++ and run C++ tests
+
+```bash
+mkdir -p build
+cd build
+
+cmake ..
+cmake --build .
+
+# Run all C++ tests
 ctest --output-on-failure
 
-# Run only the main combaero test suite
-ctest -R combaero_tests --output-on-failure
-
-# Or invoke the test executable directly
+# Or invoke the main test executable directly
 ./tests/combaero_tests
 
 # Accuracy tests for saturation vapor pressure
 ./tests/test_ice_equation_accuracy
 ./tests/test_water_equation_accuracy
 ```
+
+### Build and test the Python wheel
+
+From the repository root (with direnv active):
+
+```bash
+# Optionally clean old wheels
+rm -f dist/combaero-*.whl
+
+# Build the wheel
+python -m build --wheel
+
+# Install (or reinstall) the wheel into the root .venv
+python -m pip install --force-reinstall dist/combaero-0.0.1-*.whl
+
+# Run Python smoke tests
+python -m pytest python/tests/test_import.py
+```
+
+## Testing
+
+The project uses GoogleTest and CTest for C++ tests, and pytest for Python smoke tests:
+
+- Core thermodynamic and transport property tests
+- Combustion and mixture-fraction tests
+- Humid air and saturation pressure tests
+- Accuracy validation against Hyland-Wexler reference values
+- Python import tests for the `combaero` wheel
+
+See the *Development workflow* section above for concrete commands.
 
 ## License
 
