@@ -1,11 +1,10 @@
 #include "../include/equilibrium.h"
-#include "../include/thermo.h"
 
 // -------------------------------------------------------------
-// Utilities
+// Internal utilities
 // -------------------------------------------------------------
 
-namespace combaero::equilibrium {
+namespace {
 
 static inline double clamp(double v, double lo, double hi)
 {
@@ -41,11 +40,10 @@ static inline void molefractions(const std::vector<double>& n, std::vector<doubl
 
 static inline double Kp_WGS(double T, const WgsConfig& cfg)
 {
-    // Use the global g_over_RT(int, double) from thermo_transport.h
-    double g_CO2 = ::g_over_RT(static_cast<int>(cfg.i_CO2), T);
-    double g_H2  = ::g_over_RT(static_cast<int>(cfg.i_H2),  T);
-    double g_CO  = ::g_over_RT(static_cast<int>(cfg.i_CO),  T);
-    double g_H2O = ::g_over_RT(static_cast<int>(cfg.i_H2O), T);
+    double g_CO2 = ::g_over_RT(cfg.i_CO2, T);
+    double g_H2  = ::g_over_RT(cfg.i_H2,  T);
+    double g_CO  = ::g_over_RT(cfg.i_CO,  T);
+    double g_H2O = ::g_over_RT(cfg.i_H2O, T);
 
     double d_gRT = (g_CO2 + g_H2) - (g_CO + g_H2O);
     return std::exp(-d_gRT);
@@ -178,6 +176,12 @@ struct AdiabaticFun {
     }
 };
 
+} // anonymous namespace
+
+// -------------------------------------------------------------
+// Public API
+// -------------------------------------------------------------
+
 double solve_adiabatic_T_wgs(const std::vector<double>& n_in,
                              double H_target,
                              double T_guess,
@@ -191,5 +195,3 @@ double solve_adiabatic_T_wgs(const std::vector<double>& n_in,
 
     return newton_damped(F, T_guess, Tmin, Tmax, 50);
 }
-
-} // namespace combaero::equilibrium
