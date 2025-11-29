@@ -1,5 +1,4 @@
-#include "../include/thermo_transport.h"
-#include "../include/thermo_transport_data.h"
+#include "../include/thermo.h"
 #include <iostream>
 #include <iomanip>
 #include <vector>

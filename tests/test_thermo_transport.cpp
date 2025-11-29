@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
-#include "../include/thermo_transport.h"
+#include "../include/thermo.h"
+#include "../include/transport.h"
+#include "../include/combustion.h"
 #include <vector>
 #include <cmath>
 

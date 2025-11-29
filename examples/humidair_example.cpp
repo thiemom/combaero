@@ -1,7 +1,8 @@
 #include <iostream>
 #include <iomanip>
 #include <vector>
-#include "../include/thermo_transport.h"
+#include "../include/thermo.h"
+#include "../include/transport.h"
 #include "../include/humidair.h"
 
 /**

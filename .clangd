@@ -1,0 +1,4 @@
+If:
+  PathMatch: python/combaero/_core.cpp
+Diagnostics:
+  Suppress: '*'

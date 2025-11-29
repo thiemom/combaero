@@ -3,6 +3,9 @@
 #include <pybind11/stl.h>
 #include <vector>
 
+#include "thermo.h"
+#include "transport.h"
+#include "combustion.h"
 #include "equilibrium.h"
 #include "humidair.h"
 #include "species_common_names.h"
@@ -10,9 +13,9 @@
 namespace py = pybind11;
 
 // Build WgsConfig using species indices looked up by name
-static combaero::equilibrium::WgsConfig make_wgs_cfg()
+static WgsConfig make_wgs_cfg()
 {
-    combaero::equilibrium::WgsConfig cfg{};
+    WgsConfig cfg{};
     cfg.i_CO  = species_index_from_name("CO");
     cfg.i_H2O = species_index_from_name("H2O");
     cfg.i_CO2 = species_index_from_name("CO2");
@@ -591,7 +594,7 @@ PYBIND11_MODULE(_core, m)
             double H_target = h(T_in, X_in);
             auto cfg = make_wgs_cfg();
 
-            double T_eq = combaero::equilibrium::solve_adiabatic_T_wgs(
+            double T_eq = solve_adiabatic_T_wgs(
                 n_in, H_target, T_guess, cfg
             );
             return T_eq;

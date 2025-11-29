@@ -23,9 +23,12 @@ include_directories(include)
 
 # Core library sources
 set(SOURCES
-    src/thermo_transport.cpp
+    src/thermo.cpp
+    src/transport.cpp
+    src/combustion.cpp
     src/humidair.cpp
     src/equilibrium.cpp
+    src/utils.cpp
 )
 
 # Core library

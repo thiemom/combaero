@@ -18,11 +18,26 @@ This library provides tools for ideal-gas thermodynamic properties, combustion s
 - Ideal-gas mixture properties: Cp, H, S, density, speed of sound
 - Gibbs free energy helpers `g_over_RT` and `dg_over_RT_dT`
 - Combustion tools: O₂ demand per fuel/mixture, complete combustion to CO₂/H₂O
+- Equivalence ratio and Bilger mixture fraction utilities
 - Accurate saturation vapor pressure using Hyland-Wexler equations
   - For ice (-80°C to 0°C): maximum relative error ≤ 0.023%
   - For water vapor (0°C to 80°C): maximum relative error ≤ 0.0057%
 - Dry air and humid air utilities (humidity ratio, compositions, dew point)
 - Mole fraction normalization and wet/dry conversion utilities
+- Transport properties: viscosity, thermal conductivity, Prandtl number
+
+## Library Structure
+
+The library is organized into focused modules:
+
+| Header | Description |
+|--------|-------------|
+| `thermo.h` | Thermodynamic properties (cp, h, s, density, etc.) and physical constants |
+| `transport.h` | Transport properties (viscosity, thermal conductivity, Prandtl) |
+| `combustion.h` | Combustion calculations (O₂ demand, equivalence ratio, Bilger) |
+| `equilibrium.h` | Chemical equilibrium solver (WGS partial equilibrium) |
+| `humidair.h` | Humid air properties and saturation vapor pressure |
+| `utils.h` | Utility functions (mixture property printing) |
 
 ## Building the Project
 

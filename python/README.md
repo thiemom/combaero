@@ -27,12 +27,19 @@ Example using NumPy arrays and the high-level `combaero` package:
 import numpy as np
 import combaero as ca
 
-T = 300.0
-P = 101325.0
-X = np.zeros(len(ca.species_common_names()), dtype=float)
-X[ca.species_common_names().keys().__iter__().__next__()]  # set your composition here
+# Get species index for N2 and O2
+i_N2 = ca.species_index_from_name("N2")
+i_O2 = ca.species_index_from_name("O2")
 
-print("cp =", ca.cp(T, X))
-print("rho =", ca.density(T, P, X))
-print("species names =", ca.species_common_names())
+# Create air composition (79% N2, 21% O2)
+X = np.zeros(ca.num_species(), dtype=float)
+X[i_N2] = 0.79
+X[i_O2] = 0.21
+
+T = 300.0   # K
+P = 101325.0  # Pa
+
+print(f"cp = {ca.cp(T, X):.2f} J/(mol·K)")
+print(f"density = {ca.density(T, P, X):.4f} kg/m³")
+print(f"viscosity = {ca.viscosity(T, P, X):.2e} Pa·s")
 ```
