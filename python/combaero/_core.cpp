@@ -3,6 +3,9 @@
 #include <pybind11/stl.h>
 #include <vector>
 
+#include "thermo.h"
+#include "transport.h"
+#include "combustion.h"
 #include "equilibrium.h"
 #include "humidair.h"
 #include "species_common_names.h"

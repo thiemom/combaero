@@ -1,5 +1,5 @@
 #include "../include/equilibrium.h"
-#include "../include/thermo_transport.h"
+#include "../include/thermo.h"
 
 // -------------------------------------------------------------
 // Utilities

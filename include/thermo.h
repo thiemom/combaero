@@ -1,10 +1,14 @@
 #ifndef THERMO_H
 #define THERMO_H
 
+// TODO: check if imports are needed and update to new refactored structure
+
 #include "thermo_transport_data.h"
 #include <cstddef>
 #include <vector>
 #include <string>
+
+// TODO: wrap this in namespace combaero::thermo similar to equilibrium.h
 
 // Universal gas constant [J/(mol·K)]
 constexpr double R_GAS = 8.31446261815324;
@@ -12,14 +16,24 @@ constexpr double R_GAS = 8.31446261815324;
 // Constants needed for collision integrals
 constexpr double BOLTZMANN = 1.380649e-23;  // J/K, Boltzmann constant
 constexpr double AVOGADRO = 6.02214076e23;  // 1/mol, Avogadro's number
-constexpr double PI = 3.14159265358979323846;
 
 // Conversion factor from J/mol to J/kg
 double J_per_mol_to_J_per_kg(double value, double molar_mass);
 
-// Species name lookup functions
+// Species metadata and lookup functions
 std::string species_name(std::size_t species_index);
 std::size_t species_index_from_name(const std::string& name);
+std::size_t num_species();
+
+// Molar mass of a species [g/mol]
+double species_molar_mass(std::size_t species_index);
+double species_molar_mass_from_name(const std::string& name);
+
+// Convert mole fractions X_k to mass fractions Y_k using molar_masses.
+std::vector<double> mole_to_mass(const std::vector<double>& X);
+
+// Convert mass fractions Y_k to mole fractions X_k using molar_masses.
+std::vector<double> mass_to_mole(const std::vector<double>& Y);
 
 // Mixture properties
 double mwmix(const std::vector<double>& X);
@@ -44,27 +58,11 @@ double specific_gas_constant(const std::vector<double>& X);
 double isentropic_expansion_coefficient(double T, const std::vector<double>& X);
 double speed_of_sound(double T, const std::vector<double>& X);
 
-// Combustion calculations
-double oxygen_required_per_mol_fuel(std::size_t fuel_index);
-double oxygen_required_per_kg_fuel(std::size_t fuel_index);
-double oxygen_required_per_mol_mixture(const std::vector<double>& X);
-double oxygen_required_per_kg_mixture(const std::vector<double>& X);
-
 // Derivatives of thermodynamic properties with respect to temperature
 double dh_dT(double T, const std::vector<double>& X);
 double ds_dT(double T, const std::vector<double>& X);
 double dcp_dT(double T, const std::vector<double>& X);
 double dg_over_RT_dT(double T, const std::vector<double>& X);
-
-// Collision integral functions
-double linear_interp(double x, const std::vector<double>& x_values, const std::vector<double>& y_values);
-double omega22(double T, double well_depth);
-
-// Transport properties
-double viscosity(double T, double P, const std::vector<double>& X);
-double thermal_conductivity(double T, double P, const std::vector<double>& X);
-double prandtl(double T, double P, const std::vector<double>& X);
-double kinematic_viscosity(double T, double P, const std::vector<double>& X);
 
 // Inverse calculations (solving for temperature)
 double calc_T_from_h(double h_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
@@ -72,6 +70,7 @@ double calc_T_from_s(double s_target, double P, const std::vector<double>& X, do
 double calc_T_from_cp(double cp_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 
 // Utility functions
+// TODO: MOVE TO NEW utils.h
 void print_mixture_properties(double T, double P, const std::vector<double>& X);
 
 // Normalize a vector of fractions to sum to 1.0

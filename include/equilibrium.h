@@ -1,10 +1,9 @@
-#pragma once
+#ifndef EQUILIBRIUM_H
+#define EQUILIBRIUM_H
 
-#include "thermo_transport.h"
+#include "thermo.h"
 #include <vector>
 #include <cstddef>
-#include <cmath>
-#include <algorithm>
 
 namespace combaero::equilibrium {
 
@@ -21,4 +20,7 @@ double solve_adiabatic_T_wgs(const std::vector<double>& n_in,
                              double T_guess,
                              const WgsConfig& cfg);
 
+
 } // namespace combaero::equilibrium
+
+#endif // EQUILIBRIUM_H
