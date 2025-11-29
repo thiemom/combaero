@@ -1,11 +1,10 @@
 #include "../include/combustion.h"
 #include "../include/thermo.h"
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
-#include <stdexcept>
-#include <algorithm>
 #include <numeric>
-#include <iostream>
+#include <stdexcept>
 
 
 // Calculate oxygen required for complete combustion [mol O2/mol fuel]
@@ -366,42 +365,6 @@ std::vector<double> set_equivalence_ratio_mole(
 }
 
 
-//TODO: use thermo.h mass mole converstion functions
-
-// -------------------------------------------------------------
-// Helpers: mass <-> mole conversion
-// -------------------------------------------------------------
-
-static void mass_to_mole(
-    const std::vector<double>& Y,
-    std::vector<double>& X)
-{
-    if (Y.size() != molar_masses.size()) {
-        throw std::invalid_argument("mass_to_mole: size mismatch");
-    }
-
-    const std::size_t n = Y.size();
-    double denom = 0.0;
-
-    for (std::size_t k = 0; k < n; ++k) {
-        double Wk = molar_masses[k]; // g/mol (any consistent unit)
-        if (Wk <= 0.0) {
-            throw std::runtime_error("mass_to_mole: non-positive molar mass");
-        }
-        denom += Y[k] / Wk;
-    }
-
-    if (denom <= 0.0) {
-        throw std::runtime_error("mass_to_mole: non-positive denominator");
-    }
-
-    X.resize(n);
-    for (std::size_t k = 0; k < n; ++k) {
-        double Wk = molar_masses[k];
-        X[k] = (Y[k] / Wk) / denom;
-    }
-}
-
 // -------------------------------------------------------------
 // Stoichiometric F/O (mass basis)
 // -------------------------------------------------------------
@@ -431,8 +394,7 @@ static double stoich_f_over_o_mass(
 
     // Convert fuel stream from mass fractions to mole fractions for use in
     // oxygen_required_per_kg_mixture(X_fuel).
-    std::vector<double> X_fuel;
-    mass_to_mole(Y_fuel, X_fuel);
+    std::vector<double> X_fuel = mass_to_mole(Y_fuel);
 
     // kg O2 per kg fuel mixture
     const double m_O2_req = oxygen_required_per_kg_mixture(X_fuel);
