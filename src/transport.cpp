@@ -227,3 +227,17 @@ double kinematic_viscosity(double T, double P, const std::vector<double>& X)
 
     return visc_val / rho_val;
 }
+
+// Thermal diffusivity [m^2/s]
+// α = k / (ρ * cp)
+double thermal_diffusivity(double T, double P, const std::vector<double>& X)
+{
+    double k = thermal_conductivity(T, P, X);
+    double rho_val = density(T, P, X);
+    
+    double Cp = cp(T, X);
+    double MW = mwmix(X) / 1000.0;  // kg/mol
+    double Cp_mass = Cp / MW;       // J/(kg·K)
+
+    return k / (rho_val * Cp_mass);
+}

@@ -230,6 +230,16 @@ TEST_F(ThermoTransportTest, TransportProperties) {
     EXPECT_GT(mu, 1.0e-6);  // Lower bound for gas viscosity
     EXPECT_LT(mu, 1.0e-4);  // Upper bound for gas viscosity
     
+    // Test thermal diffusivity: α = k / (ρ * cp)
+    double alpha = thermal_diffusivity(T, P, air_composition);
+    double k_val = thermal_conductivity(T, P, air_composition);
+    double rho_val = density(T, P, air_composition);
+    double cp_val = cp(T, air_composition);
+    double MW = mwmix(air_composition) / 1000.0;  // kg/mol
+    double cp_mass = cp_val / MW;
+    double expected_alpha = k_val / (rho_val * cp_mass);
+    EXPECT_NEAR(alpha, expected_alpha, 1.0e-12);
+    
     // Test thermal conductivity - should be positive
     double k = thermal_conductivity(T, P, air_composition);
     EXPECT_GT(k, 0.001);
