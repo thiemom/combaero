@@ -596,7 +596,63 @@ PYBIND11_MODULE(_core, m)
         .def(py::init<>())
         .def_readwrite("T", &State::T, "Temperature [K]")
         .def_readwrite("P", &State::P, "Pressure [Pa]")
-        .def_readwrite("X", &State::X, "Mole fractions [-]");
+        .def_readwrite("X", &State::X, "Mole fractions [-]")
+        // Property getters
+        .def("mw", &State::mw, "Molecular weight [g/mol]")
+        .def("cp", &State::cp, "Specific heat at constant pressure [J/(mol·K)]")
+        .def("h", &State::h, "Specific enthalpy [J/mol]")
+        .def("s", &State::s, "Specific entropy [J/(mol·K)]")
+        .def("cv", &State::cv, "Specific heat at constant volume [J/(mol·K)]")
+        .def("u", &State::u, "Specific internal energy [J/mol]")
+        .def("rho", &State::rho, "Density [kg/m³]")
+        .def("R", &State::R, "Specific gas constant [J/(mol·K)]")
+        .def("gamma", &State::gamma, "Isentropic expansion coefficient [-]")
+        .def("a", &State::a, "Speed of sound [m/s]")
+        // Setters
+        .def("set_T", &State::set_T, py::arg("T"), "Set temperature [K]")
+        .def("set_P", &State::set_P, py::arg("P"), "Set pressure [Pa]")
+        .def("set_X", [](State& s, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) -> State& {
+            s.X = to_vec(X_arr);
+            return s;
+        }, py::arg("X"), "Set mole fractions [-]");
+
+    // Stream struct binding
+    py::class_<Stream>(m, "Stream")
+        .def(py::init<>())
+        .def_readwrite("state", &Stream::state, "Thermodynamic state")
+        .def_readwrite("mdot", &Stream::mdot, "Mass flow rate [kg/s]")
+        // Convenience accessors
+        .def("T", &Stream::T, "Temperature [K]")
+        .def("P", &Stream::P, "Pressure [Pa]")
+        .def("X", &Stream::X, "Mole fractions [-]")
+        // Property getters
+        .def("mw", &Stream::mw, "Molecular weight [g/mol]")
+        .def("cp", &Stream::cp, "Specific heat at constant pressure [J/(mol·K)]")
+        .def("h", &Stream::h, "Specific enthalpy [J/mol]")
+        .def("s", &Stream::s, "Specific entropy [J/(mol·K)]")
+        .def("rho", &Stream::rho, "Density [kg/m³]")
+        // Setters
+        .def("set_T", &Stream::set_T, py::arg("T"), "Set temperature [K]")
+        .def("set_P", &Stream::set_P, py::arg("P"), "Set pressure [Pa]")
+        .def("set_X", [](Stream& s, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) -> Stream& {
+            s.state.X = to_vec(X_arr);
+            return s;
+        }, py::arg("X"), "Set mole fractions [-]")
+        .def("set_mdot", &Stream::set_mdot, py::arg("mdot"), "Set mass flow rate [kg/s]");
+
+    // Stream mixing function
+    m.def(
+        "mix",
+        [](const std::vector<Stream>& streams, double P_out) {
+            return mix(streams, P_out);
+        },
+        py::arg("streams"),
+        py::arg("P_out") = -1.0,
+        "Mix multiple streams, solving mass and enthalpy balance.\n\n"
+        "streams : list of Stream objects\n"
+        "P_out   : output pressure [Pa] (default: minimum inlet pressure)\n\n"
+        "Returns mixed Stream."
+    );
 
     // State-based combustion functions
     m.def(

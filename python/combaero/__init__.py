@@ -80,6 +80,8 @@ try:
         complete_combustion_to_CO2_H2O_with_fraction,
         # State-based API
         State,
+        Stream,
+        mix,
         complete_combustion,
         complete_combustion_isothermal,
         wgs_equilibrium,
@@ -130,6 +132,8 @@ except ModuleNotFoundError:
     complete_combustion_to_CO2_H2O_with_fraction = _core.complete_combustion_to_CO2_H2O_with_fraction
     # State-based API
     State = _core.State
+    Stream = _core.Stream
+    mix = _core.mix
     complete_combustion = _core.complete_combustion
     complete_combustion_isothermal = _core.complete_combustion_isothermal
     wgs_equilibrium = _core.wgs_equilibrium
@@ -178,6 +182,8 @@ __all__ = [
     "complete_combustion_to_CO2_H2O_with_fraction",
     # State-based API
     "State",
+    "Stream",
+    "mix",
     "complete_combustion",
     "complete_combustion_isothermal",
     "wgs_equilibrium",

@@ -580,6 +580,138 @@ TEST_F(ThermoTransportTest, StateBasedWgsEquilibrium) {
     EXPECT_NEAR(H_in, H_out, 1.0);  // Within 1 J/mol
 }
 
+// Test State property getters
+TEST_F(ThermoTransportTest, StatePropertyGetters) {
+    State s;
+    s.T = 300.0;
+    s.P = 101325.0;
+    s.X = air_composition;
+    
+    // Test property getters match free functions
+    EXPECT_NEAR(s.mw(), mwmix(s.X), 1e-12);
+    EXPECT_NEAR(s.cp(), cp(s.T, s.X), 1e-12);
+    EXPECT_NEAR(s.h(), h(s.T, s.X), 1e-12);
+    EXPECT_NEAR(s.s(), ::s(s.T, s.X, s.P), 1e-12);
+    EXPECT_NEAR(s.cv(), cv(s.T, s.X), 1e-12);
+    EXPECT_NEAR(s.rho(), density(s.T, s.P, s.X), 1e-12);
+    EXPECT_NEAR(s.gamma(), isentropic_expansion_coefficient(s.T, s.X), 1e-12);
+    EXPECT_NEAR(s.a(), speed_of_sound(s.T, s.X), 1e-12);
+    
+    // Test setters with chaining
+    State s2;
+    s2.set_T(400.0).set_P(200000.0).set_X(air_composition);
+    EXPECT_NEAR(s2.T, 400.0, 1e-12);
+    EXPECT_NEAR(s2.P, 200000.0, 1e-12);
+}
+
+// Test Stream mixing
+TEST_F(ThermoTransportTest, StreamMixing) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    
+    // Stream 1: Hot air at 500 K
+    std::vector<double> X_air(n, 0.0);
+    X_air[idx_N2] = 0.79;
+    X_air[idx_O2] = 0.21;
+    
+    Stream s1;
+    s1.state.T = 500.0;
+    s1.state.P = 101325.0;
+    s1.state.X = X_air;
+    s1.mdot = 1.0;  // 1 kg/s
+    
+    // Stream 2: Cold CO2 at 300 K
+    std::vector<double> X_co2(n, 0.0);
+    X_co2[idx_CO2] = 1.0;
+    
+    Stream s2;
+    s2.state.T = 300.0;
+    s2.state.P = 90000.0;  // Lower pressure
+    s2.state.X = X_co2;
+    s2.mdot = 0.5;  // 0.5 kg/s
+    
+    // Mix streams
+    Stream mixed = mix({s1, s2});
+    
+    // Check mass balance
+    EXPECT_NEAR(mixed.mdot, 1.5, 1e-12);
+    
+    // Check pressure is minimum (90000 Pa)
+    EXPECT_NEAR(mixed.P(), 90000.0, 1e-12);
+    
+    // Check temperature is between inputs (energy balance)
+    EXPECT_GT(mixed.T(), 300.0);
+    EXPECT_LT(mixed.T(), 500.0);
+    
+    // Check composition has both species
+    EXPECT_GT(mixed.X()[idx_N2], 0.0);
+    EXPECT_GT(mixed.X()[idx_O2], 0.0);
+    EXPECT_GT(mixed.X()[idx_CO2], 0.0);
+    
+    // Mole fractions should sum to 1
+    double sum = 0.0;
+    for (double x : mixed.X()) sum += x;
+    EXPECT_NEAR(sum, 1.0, 1e-10);
+}
+
+// Test Stream mixing with pressure override
+TEST_F(ThermoTransportTest, StreamMixingPressureOverride) {
+    const std::size_t n = species_names.size();
+    
+    Stream s1;
+    s1.state.T = 400.0;
+    s1.state.P = 100000.0;
+    s1.state.X = air_composition;
+    s1.mdot = 1.0;
+    
+    Stream s2;
+    s2.state.T = 300.0;
+    s2.state.P = 80000.0;
+    s2.state.X = air_composition;
+    s2.mdot = 1.0;
+    
+    // Mix with explicit pressure
+    double P_override = 150000.0;
+    Stream mixed = mix({s1, s2}, P_override);
+    
+    EXPECT_NEAR(mixed.P(), P_override, 1e-12);
+}
+
+// Test Stream mixing enthalpy conservation
+TEST_F(ThermoTransportTest, StreamMixingEnthalpyConservation) {
+    const std::size_t n = species_names.size();
+    
+    Stream s1;
+    s1.state.T = 600.0;
+    s1.state.P = 101325.0;
+    s1.state.X = air_composition;
+    s1.mdot = 2.0;
+    
+    Stream s2;
+    s2.state.T = 300.0;
+    s2.state.P = 101325.0;
+    s2.state.X = air_composition;
+    s2.mdot = 1.0;
+    
+    Stream mixed = mix({s1, s2});
+    
+    // Calculate enthalpy flows (J/s)
+    auto H_flow = [](const Stream& st) {
+        double h_molar = st.h();  // J/mol
+        double MW = st.mw();      // g/mol
+        double h_mass = h_molar / (MW * 1e-3);  // J/kg
+        return h_mass * st.mdot;  // W
+    };
+    
+    double H_in = H_flow(s1) + H_flow(s2);
+    double H_out = H_flow(mixed);
+    
+    // Enthalpy should be conserved
+    EXPECT_NEAR(H_in, H_out, std::abs(H_in) * 1e-6);
+}
+
 // Test dry air requirements for combustion
 TEST_F(ThermoTransportTest, DryAirRequirements) {
     const std::size_t idx_CH4 = species_index_from_name("CH4");

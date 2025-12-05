@@ -28,6 +28,7 @@ set(SOURCES
     src/combustion.cpp
     src/humidair.cpp
     src/equilibrium.cpp
+    src/state.cpp
     src/utils.cpp
 )
 
