@@ -1,10 +1,20 @@
 #include "../include/equilibrium.h"
+#include "../include/thermo.h"
+#include "../include/thermo_transport_data.h"
 
 // -------------------------------------------------------------
 // Internal utilities
 // -------------------------------------------------------------
 
 namespace {
+
+// Internal WGS configuration (species indices)
+struct WgsConfig {
+    std::size_t i_CO;
+    std::size_t i_H2O;
+    std::size_t i_CO2;
+    std::size_t i_H2;
+};
 
 static inline double clamp(double v, double lo, double hi)
 {
@@ -187,16 +197,11 @@ static WgsConfig make_wgs_config()
     return cfg;
 }
 
-} // anonymous namespace
-
-// -------------------------------------------------------------
-// Public API (legacy)
-// -------------------------------------------------------------
-
-double solve_adiabatic_T_wgs(const std::vector<double>& n_in,
-                             double H_target,
-                             double T_guess,
-                             const WgsConfig& cfg)
+// Solve for adiabatic T with WGS partial equilibrium (internal)
+static double solve_adiabatic_T_wgs(const std::vector<double>& n_in,
+                                    double H_target,
+                                    double T_guess,
+                                    const WgsConfig& cfg)
 {
     AdiabaticFun F{n_in, H_target, cfg};
 
@@ -207,8 +212,10 @@ double solve_adiabatic_T_wgs(const std::vector<double>& n_in,
     return newton_damped(F, T_guess, Tmin, Tmax, 50);
 }
 
+} // anonymous namespace
+
 // -------------------------------------------------------------
-// State-based WGS equilibrium functions
+// State-based WGS equilibrium functions (Public API)
 // -------------------------------------------------------------
 
 // WGS equilibrium (isothermal) - equilibrate at input temperature
