@@ -1,5 +1,6 @@
 #include "../include/state.h"
 #include "../include/thermo.h"
+#include "../include/transport.h"
 #include <algorithm>
 #include <stdexcept>
 #include <limits>
@@ -18,6 +19,16 @@ double State::rho() const { return ::density(T, P, X); }
 double State::R() const { return ::specific_gas_constant(X); }
 double State::gamma() const { return ::isentropic_expansion_coefficient(T, X); }
 double State::a() const { return ::speed_of_sound(T, X); }
+
+// -------------------------------------------------------------
+// Transport properties
+// -------------------------------------------------------------
+
+double State::mu() const { return ::viscosity(T, P, X); }
+double State::k() const { return ::thermal_conductivity(T, P, X); }
+double State::nu() const { return ::kinematic_viscosity(T, P, X); }
+double State::Pr() const { return ::prandtl(T, P, X); }
+double State::alpha() const { return ::thermal_diffusivity(T, P, X); }
 
 // -------------------------------------------------------------
 // Stream mixing

@@ -50,12 +50,19 @@ struct State {
     double P = 101325.0;         // Pressure [Pa]
     std::vector<double> X;       // Mole fractions [-]
     
-    // Property getters
+    // Thermodynamic properties
     double mw() const;           // Molecular weight [g/mol]
     double cp() const;           // Specific heat [J/(mol·K)]
     double h() const;            // Enthalpy [J/mol]
     double rho() const;          // Density [kg/m³]
     // ... and more (s, cv, u, R, gamma, a)
+    
+    // Transport properties
+    double mu() const;           // Dynamic viscosity [Pa·s]
+    double k() const;            // Thermal conductivity [W/(m·K)]
+    double nu() const;           // Kinematic viscosity [m²/s]
+    double Pr() const;           // Prandtl number [-]
+    double alpha() const;        // Thermal diffusivity [m²/s]
     
     // Setters with chaining
     State& set_T(double T);
@@ -79,6 +86,7 @@ in.set_T(300.0).set_P(101325.0).set_X(X_unburned);
 State burned = complete_combustion(in);
 std::cout << "Adiabatic flame T: " << burned.T << " K\n";
 std::cout << "Flame density: " << burned.rho() << " kg/m³\n";
+std::cout << "Flame viscosity: " << burned.mu() << " Pa·s\n";
 
 // WGS equilibrium (isothermal or adiabatic)
 State eq_iso = wgs_equilibrium(in);

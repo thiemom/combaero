@@ -3,6 +3,10 @@
 
 #include <vector>
 
+// NOTE: For better performance, consider making T, P, X private with
+// getter/setters that invalidate a transport cache. Currently transport
+// properties are recomputed on every call.
+
 // Thermodynamic state of a gas mixture
 struct State {
     double T = 298.15;               // Temperature [K]
@@ -20,6 +24,13 @@ struct State {
     double R() const;
     double gamma() const;
     double a() const;
+
+    // Transport properties (recomputed on each call)
+    double mu() const;     // Dynamic viscosity [Pa·s]
+    double k() const;      // Thermal conductivity [W/(m·K)]
+    double nu() const;     // Kinematic viscosity [m²/s]
+    double Pr() const;     // Prandtl number [-]
+    double alpha() const;  // Thermal diffusivity [m²/s]
 
     // Convenience setters (return *this for chaining)
     State& set_T(double T_new) { T = T_new; return *this; }

@@ -56,12 +56,17 @@ import combaero as ca
 s = ca.State()
 s.set_T(300.0).set_P(101325.0).set_X(X_air)
 
-# Access properties directly
+# Access thermodynamic properties
 print(f"cp = {s.cp():.2f} J/(mol·K)")
 print(f"h = {s.h():.0f} J/mol")
 print(f"rho = {s.rho():.4f} kg/m³")
 print(f"gamma = {s.gamma():.3f}")
 print(f"speed of sound = {s.a():.1f} m/s")
+
+# Access transport properties
+print(f"viscosity = {s.mu():.2e} Pa·s")
+print(f"thermal conductivity = {s.k():.4f} W/(m·K)")
+print(f"Prandtl = {s.Pr():.3f}")
 ```
 
 ### Combustion and Equilibrium

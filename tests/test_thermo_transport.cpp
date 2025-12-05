@@ -598,6 +598,13 @@ TEST_F(ThermoTransportTest, StatePropertyGetters) {
     EXPECT_NEAR(s.gamma(), isentropic_expansion_coefficient(s.T, s.X), 1e-12);
     EXPECT_NEAR(s.a(), speed_of_sound(s.T, s.X), 1e-12);
     
+    // Test transport properties
+    EXPECT_NEAR(s.mu(), viscosity(s.T, s.P, s.X), 1e-12);
+    EXPECT_NEAR(s.k(), thermal_conductivity(s.T, s.P, s.X), 1e-12);
+    EXPECT_NEAR(s.nu(), kinematic_viscosity(s.T, s.P, s.X), 1e-12);
+    EXPECT_NEAR(s.Pr(), prandtl(s.T, s.P, s.X), 1e-12);
+    EXPECT_NEAR(s.alpha(), thermal_diffusivity(s.T, s.P, s.X), 1e-12);
+    
     // Test setters with chaining
     State s2;
     s2.set_T(400.0).set_P(200000.0).set_X(air_composition);

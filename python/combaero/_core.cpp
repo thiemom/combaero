@@ -608,6 +608,12 @@ PYBIND11_MODULE(_core, m)
         .def("R", &State::R, "Specific gas constant [J/(mol·K)]")
         .def("gamma", &State::gamma, "Isentropic expansion coefficient [-]")
         .def("a", &State::a, "Speed of sound [m/s]")
+        // Transport properties
+        .def("mu", &State::mu, "Dynamic viscosity [Pa·s]")
+        .def("k", &State::k, "Thermal conductivity [W/(m·K)]")
+        .def("nu", &State::nu, "Kinematic viscosity [m²/s]")
+        .def("Pr", &State::Pr, "Prandtl number [-]")
+        .def("alpha", &State::alpha, "Thermal diffusivity [m²/s]")
         // Setters
         .def("set_T", &State::set_T, py::arg("T"), "Set temperature [K]")
         .def("set_P", &State::set_P, py::arg("P"), "Set pressure [Pa]")
