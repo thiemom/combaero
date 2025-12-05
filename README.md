@@ -42,28 +42,66 @@ The library is organized into focused modules:
 
 ### State-based API
 
-The library provides a unified `State` struct for representing thermodynamic states:
+The library provides `State` and `Stream` structs for representing thermodynamic states:
 
 ```cpp
 struct State {
-    double T;                    // Temperature [K]
+    double T = 298.15;           // Temperature [K]
     double P = 101325.0;         // Pressure [Pa]
     std::vector<double> X;       // Mole fractions [-]
+    
+    // Property getters
+    double mw() const;           // Molecular weight [g/mol]
+    double cp() const;           // Specific heat [J/(mol·K)]
+    double h() const;            // Enthalpy [J/mol]
+    double rho() const;          // Density [kg/m³]
+    // ... and more (s, cv, u, R, gamma, a)
+    
+    // Setters with chaining
+    State& set_T(double T);
+    State& set_P(double P);
+    State& set_X(const std::vector<double>& X);
+};
+
+struct Stream {
+    State state;
+    double mdot = 0.0;           // Mass flow rate [kg/s]
 };
 ```
 
 Combustion and equilibrium functions accept and return `State` objects:
 
 ```cpp
-State in{300.0, 101325.0, X_unburned};
+State in;
+in.set_T(300.0).set_P(101325.0).set_X(X_unburned);
 
 // Adiabatic complete combustion
 State burned = complete_combustion(in);
 std::cout << "Adiabatic flame T: " << burned.T << " K\n";
+std::cout << "Flame density: " << burned.rho() << " kg/m³\n";
 
 // WGS equilibrium (isothermal or adiabatic)
 State eq_iso = wgs_equilibrium(in);
 State eq_ad = wgs_equilibrium_adiabatic(in);
+```
+
+### Stream Mixing
+
+Mix multiple streams with mass and enthalpy balance:
+
+```cpp
+Stream air, fuel;
+air.state.set_T(400.0).set_P(101325.0).set_X(X_air);
+air.mdot = 10.0;  // kg/s
+
+fuel.state.set_T(300.0).set_P(101325.0).set_X(X_fuel);
+fuel.mdot = 0.5;  // kg/s
+
+// Mix streams (uses minimum inlet pressure by default)
+Stream mixed = mix({air, fuel});
+
+// Or specify output pressure explicitly
+Stream mixed2 = mix({air, fuel}, 150000.0);
 ```
 
 ## Building the Project
