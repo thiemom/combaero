@@ -1,6 +1,8 @@
 #include "../include/equilibrium.h"
 #include "../include/thermo.h"
 #include "../include/thermo_transport_data.h"
+#include <algorithm>
+#include <cmath>
 
 // -------------------------------------------------------------
 // Internal utilities
