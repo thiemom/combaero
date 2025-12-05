@@ -4,6 +4,11 @@
 #include <cmath>
 #include <stdexcept>
 
+// M_PI is not defined by default on MSVC
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 using combaero::thermo::R_GAS;
 using combaero::thermo::BOLTZMANN;
 using combaero::thermo::AVOGADRO;
