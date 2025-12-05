@@ -9,19 +9,9 @@
 #include "equilibrium.h"
 #include "humidair.h"
 #include "species_common_names.h"
+#include "state.h"
 
 namespace py = pybind11;
-
-// Build WgsConfig using species indices looked up by name
-static WgsConfig make_wgs_cfg()
-{
-    WgsConfig cfg{};
-    cfg.i_CO  = species_index_from_name("CO");
-    cfg.i_H2O = species_index_from_name("H2O");
-    cfg.i_CO2 = species_index_from_name("CO2");
-    cfg.i_H2  = species_index_from_name("H2");
-    return cfg;
-}
 
 static std::vector<double> to_vec(
     py::array_t<double, py::array::c_style | py::array::forcecast> arr)
@@ -578,33 +568,103 @@ PYBIND11_MODULE(_core, m)
         "adiabatic_T_wgs",
         [](double T_in,
            py::array_t<double, py::array::c_style | py::array::forcecast> X_in_arr,
-           py::object T_guess_obj)
+           double P)
         {
             auto X_in = to_vec(X_in_arr);
             if (X_in.empty())
                 throw std::runtime_error("X_in must be non-empty");
 
-            double T_guess = T_in + 500.0;
-            if (!T_guess_obj.is_none())
-                T_guess = T_guess_obj.cast<double>();
+            State in;
+            in.T = T_in;
+            in.P = P;
+            in.X = X_in;
 
-            // 1 mol basis
-            std::vector<double> n_in = X_in;
-
-            double H_target = h(T_in, X_in);
-            auto cfg = make_wgs_cfg();
-
-            double T_eq = solve_adiabatic_T_wgs(
-                n_in, H_target, T_guess, cfg
-            );
-            return T_eq;
+            State out = wgs_equilibrium_adiabatic(in);
+            return out.T;
         },
         py::arg("T_in"),
         py::arg("X_in"),
-        py::arg("T_guess") = py::none(),
+        py::arg("P") = 101325.0,
         "Adiabatic flame temperature with WGS limited equilibrium.\n\n"
-        "T_in   : inlet temperature [K]\n"
-        "X_in   : inlet mole fractions (1D NumPy array)\n"
-        "T_guess: optional initial guess for T [K]"
+        "T_in : inlet temperature [K]\n"
+        "X_in : inlet mole fractions (1D NumPy array)\n"
+        "P    : pressure [Pa] (default 101325)"
+    );
+
+    // State struct binding
+    py::class_<State>(m, "State")
+        .def(py::init<>())
+        .def_readwrite("T", &State::T, "Temperature [K]")
+        .def_readwrite("P", &State::P, "Pressure [Pa]")
+        .def_readwrite("X", &State::X, "Mole fractions [-]");
+
+    // State-based combustion functions
+    m.def(
+        "complete_combustion",
+        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        {
+            State in;
+            in.T = T;
+            in.P = P;
+            in.X = to_vec(X_arr);
+            return complete_combustion(in);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        py::arg("P") = 101325.0,
+        "Adiabatic complete combustion to CO2 and H2O.\n\n"
+        "Returns State with adiabatic flame temperature and burned composition."
+    );
+
+    m.def(
+        "complete_combustion_isothermal",
+        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        {
+            State in;
+            in.T = T;
+            in.P = P;
+            in.X = to_vec(X_arr);
+            return complete_combustion_isothermal(in);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        py::arg("P") = 101325.0,
+        "Isothermal complete combustion to CO2 and H2O.\n\n"
+        "Returns State with same temperature and burned composition."
+    );
+
+    // State-based WGS equilibrium functions
+    m.def(
+        "wgs_equilibrium",
+        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        {
+            State in;
+            in.T = T;
+            in.P = P;
+            in.X = to_vec(X_arr);
+            return wgs_equilibrium(in);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        py::arg("P") = 101325.0,
+        "Isothermal WGS equilibrium (CO + H2O <-> CO2 + H2).\n\n"
+        "Returns State with equilibrium composition at input temperature."
+    );
+
+    m.def(
+        "wgs_equilibrium_adiabatic",
+        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        {
+            State in;
+            in.T = T;
+            in.P = P;
+            in.X = to_vec(X_arr);
+            return wgs_equilibrium_adiabatic(in);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        py::arg("P") = 101325.0,
+        "Adiabatic WGS equilibrium (CO + H2O <-> CO2 + H2).\n\n"
+        "Returns State with equilibrium temperature and composition."
     );
 }

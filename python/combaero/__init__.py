@@ -78,6 +78,12 @@ try:
         oxygen_required_per_kg_mixture,
         complete_combustion_to_CO2_H2O,
         complete_combustion_to_CO2_H2O_with_fraction,
+        # State-based API
+        State,
+        complete_combustion,
+        complete_combustion_isothermal,
+        wgs_equilibrium,
+        wgs_equilibrium_adiabatic,
     )
 except ModuleNotFoundError:
     # Fallback: attempt to import from an installed combaero package that
@@ -122,6 +128,12 @@ except ModuleNotFoundError:
     oxygen_required_per_kg_mixture = _core.oxygen_required_per_kg_mixture
     complete_combustion_to_CO2_H2O = _core.complete_combustion_to_CO2_H2O
     complete_combustion_to_CO2_H2O_with_fraction = _core.complete_combustion_to_CO2_H2O_with_fraction
+    # State-based API
+    State = _core.State
+    complete_combustion = _core.complete_combustion
+    complete_combustion_isothermal = _core.complete_combustion_isothermal
+    wgs_equilibrium = _core.wgs_equilibrium
+    wgs_equilibrium_adiabatic = _core.wgs_equilibrium_adiabatic
 
 
 __all__ = [
@@ -164,5 +176,11 @@ __all__ = [
     "oxygen_required_per_kg_mixture",
     "complete_combustion_to_CO2_H2O",
     "complete_combustion_to_CO2_H2O_with_fraction",
+    # State-based API
+    "State",
+    "complete_combustion",
+    "complete_combustion_isothermal",
+    "wgs_equilibrium",
+    "wgs_equilibrium_adiabatic",
     "__version__",
 ]
