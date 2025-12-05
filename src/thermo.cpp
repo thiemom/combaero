@@ -629,3 +629,46 @@ std::vector<double> convert_to_dry_fractions(const std::vector<double>& mole_fra
     return dry_fractions;
 }
 
+// -------------------------------------------------------------
+// State-based overloads
+// -------------------------------------------------------------
+
+double mwmix(const State& s) {
+    return mwmix(s.X);
+}
+
+double cp(const State& s) {
+    return cp(s.T, s.X);
+}
+
+double h(const State& s) {
+    return h(s.T, s.X);
+}
+
+double s(const State& st) {
+    return s(st.T, st.X, st.P);
+}
+
+double cv(const State& s) {
+    return cv(s.T, s.X);
+}
+
+double u(const State& s) {
+    return u(s.T, s.X);
+}
+
+double density(const State& s) {
+    return density(s.T, s.P, s.X);
+}
+
+double specific_gas_constant(const State& s) {
+    return specific_gas_constant(s.X);
+}
+
+double isentropic_expansion_coefficient(const State& s) {
+    return isentropic_expansion_coefficient(s.T, s.X);
+}
+
+double speed_of_sound(const State& s) {
+    return speed_of_sound(s.T, s.X);
+}

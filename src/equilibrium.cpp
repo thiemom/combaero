@@ -176,10 +176,21 @@ struct AdiabaticFun {
     }
 };
 
+// Build WgsConfig from species names
+static WgsConfig make_wgs_config()
+{
+    WgsConfig cfg;
+    cfg.i_CO  = species_index.at("CO");
+    cfg.i_H2O = species_index.at("H2O");
+    cfg.i_CO2 = species_index.at("CO2");
+    cfg.i_H2  = species_index.at("H2");
+    return cfg;
+}
+
 } // anonymous namespace
 
 // -------------------------------------------------------------
-// Public API
+// Public API (legacy)
 // -------------------------------------------------------------
 
 double solve_adiabatic_T_wgs(const std::vector<double>& n_in,
@@ -194,4 +205,60 @@ double solve_adiabatic_T_wgs(const std::vector<double>& n_in,
     double Tmax = 4500.0;
 
     return newton_damped(F, T_guess, Tmin, Tmax, 50);
+}
+
+// -------------------------------------------------------------
+// State-based WGS equilibrium functions
+// -------------------------------------------------------------
+
+// WGS equilibrium (isothermal) - equilibrate at input temperature
+State wgs_equilibrium(const State& in)
+{
+    WgsConfig cfg = make_wgs_config();
+    
+    // Solve for extent of reaction at fixed T
+    WgsIsothermalFun F{in.X, in.T, cfg};
+    
+    double xi_min = -1e30;
+    double xi_max =  1e30;
+    xi_min = std::max(xi_min, -in.X[cfg.i_CO]);
+    xi_min = std::max(xi_min, -in.X[cfg.i_H2O]);
+    xi_max = std::min(xi_max, in.X[cfg.i_CO2]);
+    xi_max = std::min(xi_max, in.X[cfg.i_H2]);
+    
+    double xi = newton_damped(F, 0.0, xi_min, xi_max, 40);
+    
+    // Build output composition
+    std::vector<double> n_out;
+    composition_from_xi(in.X, xi, cfg, n_out);
+    
+    std::vector<double> X_out;
+    molefractions(n_out, X_out);
+    
+    State out;
+    out.T = in.T;
+    out.P = in.P;
+    out.X = X_out;
+    return out;
+}
+
+// WGS equilibrium (adiabatic) - solve for equilibrium T and composition
+State wgs_equilibrium_adiabatic(const State& in)
+{
+    WgsConfig cfg = make_wgs_config();
+    
+    // Target enthalpy (conserved)
+    double H_target = h(in.T, in.X);
+    
+    // Solve for adiabatic temperature
+    double T_ad = solve_adiabatic_T_wgs(in.X, H_target, in.T, cfg);
+    
+    // Get equilibrium composition at T_ad
+    State at_T_ad;
+    at_T_ad.T = T_ad;
+    at_T_ad.P = in.P;
+    at_T_ad.X = in.X;
+    
+    State out = wgs_equilibrium(at_T_ad);
+    return out;
 }

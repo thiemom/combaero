@@ -759,3 +759,34 @@ double bilger_mixture_fraction_from_moles(
 
     return bilger_mixture_fraction(Y, Y_F, Y_O);
 }
+
+// -------------------------------------------------------------
+// State-based combustion functions
+// -------------------------------------------------------------
+
+// Complete combustion (isothermal) - keeps input temperature
+State complete_combustion_isothermal(const State& in) {
+    State out;
+    out.T = in.T;
+    out.P = in.P;
+    out.X = complete_combustion_to_CO2_H2O(in.X);
+    return out;
+}
+
+// Complete combustion (adiabatic) - solves for flame temperature
+State complete_combustion(const State& in) {
+    // Get burned composition at constant T first
+    std::vector<double> X_burned = complete_combustion_to_CO2_H2O(in.X);
+    
+    // Calculate inlet enthalpy
+    double H_in = h(in.T, in.X);
+    
+    // Solve for adiabatic flame temperature: h(T_ad, X_burned) = H_in
+    double T_ad = calc_T_from_h(H_in, X_burned, in.T);
+    
+    State out;
+    out.T = T_ad;
+    out.P = in.P;
+    out.X = X_burned;
+    return out;
+}

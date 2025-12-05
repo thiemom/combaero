@@ -1,6 +1,7 @@
 #ifndef THERMO_H
 #define THERMO_H
 
+#include "state.h"
 #include "thermo_transport_data.h"
 #include <cstddef>
 #include <string>
@@ -84,5 +85,20 @@ std::vector<double> normalize_fractions(const std::vector<double>& fractions);
 // Convert mole fractions to dry fractions (remove water vapor and normalize)
 // Returns all zeros with a warning if input contains only water vapor
 std::vector<double> convert_to_dry_fractions(const std::vector<double>& mole_fractions);
+
+// -------------------------------------------------------------
+// State-based overloads
+// -------------------------------------------------------------
+
+double mwmix(const State& s);
+double cp(const State& s);
+double h(const State& s);
+double s(const State& s);
+double cv(const State& s);
+double u(const State& s);
+double density(const State& s);
+double specific_gas_constant(const State& s);
+double isentropic_expansion_coefficient(const State& s);
+double speed_of_sound(const State& s);
 
 #endif // THERMO_H

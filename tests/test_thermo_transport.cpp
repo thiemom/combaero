@@ -2,6 +2,7 @@
 #include "../include/thermo.h"
 #include "../include/transport.h"
 #include "../include/combustion.h"
+#include "../include/equilibrium.h"
 #include <vector>
 #include <cmath>
 
@@ -476,6 +477,107 @@ TEST_F(ThermoTransportTest, Combustion_IntermediateRich) {
     EXPECT_NEAR(X_out[idx_CO2], 0.75 / denom, 1e-8);
     EXPECT_NEAR(X_out[idx_H2O], 1.50 / denom, 1e-8);
     EXPECT_NEAR(X_out[idx_O2],  0.0,          1e-12);
+}
+
+// Test State-based thermo functions
+TEST_F(ThermoTransportTest, StateBasedThermo) {
+    State s;
+    s.T = 300.0;
+    s.P = 101325.0;
+    s.X = air_composition;
+    
+    // State-based functions should match vector-based functions
+    EXPECT_NEAR(cp(s), cp(s.T, s.X), 1e-12);
+    EXPECT_NEAR(h(s), h(s.T, s.X), 1e-12);
+    EXPECT_NEAR(::s(s), ::s(s.T, s.X, s.P), 1e-12);
+    EXPECT_NEAR(cv(s), cv(s.T, s.X), 1e-12);
+    EXPECT_NEAR(u(s), u(s.T, s.X), 1e-12);
+    EXPECT_NEAR(density(s), density(s.T, s.P, s.X), 1e-12);
+    EXPECT_NEAR(mwmix(s), mwmix(s.X), 1e-12);
+}
+
+// Test State-based combustion functions
+TEST_F(ThermoTransportTest, StateBasedCombustion) {
+    const std::size_t n = species_names.size();
+    
+    // Create stoichiometric CH4 + air mixture
+    std::vector<double> X_mix(n, 0.0);
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    // CH4 + 2 O2 -> CO2 + 2 H2O, stoichiometric with air (21% O2)
+    // For phi=1: need 2 mol O2 per mol CH4
+    // Air is 21% O2, so need 2/0.21 = 9.52 mol air per mol CH4
+    double n_CH4 = 1.0;
+    double n_air = 9.52;
+    double n_total = n_CH4 + n_air;
+    X_mix[idx_CH4] = n_CH4 / n_total;
+    X_mix[idx_O2] = 0.21 * n_air / n_total;
+    X_mix[idx_N2] = 0.79 * n_air / n_total;
+    
+    State in;
+    in.T = 300.0;
+    in.P = 101325.0;
+    in.X = X_mix;
+    
+    // Isothermal combustion should preserve T
+    State out_iso = complete_combustion_isothermal(in);
+    EXPECT_NEAR(out_iso.T, in.T, 1e-10);
+    EXPECT_NEAR(out_iso.P, in.P, 1e-10);
+    
+    // Adiabatic combustion should increase T significantly
+    State out_ad = complete_combustion(in);
+    EXPECT_GT(out_ad.T, in.T + 1000.0);  // Flame temp should be >1300 K
+    EXPECT_NEAR(out_ad.P, in.P, 1e-10);
+    
+    // Enthalpy should be conserved in adiabatic case
+    double H_in = h(in);
+    double H_out = h(out_ad);
+    EXPECT_NEAR(H_in, H_out, 1.0);  // Within 1 J/mol
+}
+
+// Test State-based WGS equilibrium functions
+TEST_F(ThermoTransportTest, StateBasedWgsEquilibrium) {
+    const std::size_t n = species_names.size();
+    
+    // Create a mixture with CO, H2O, CO2, H2
+    std::vector<double> X_mix(n, 0.0);
+    const std::size_t idx_CO = species_index_from_name("CO");
+    const std::size_t idx_H2O = species_index_from_name("H2O");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    const std::size_t idx_H2 = species_index_from_name("H2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    X_mix[idx_CO] = 0.1;
+    X_mix[idx_H2O] = 0.2;
+    X_mix[idx_CO2] = 0.05;
+    X_mix[idx_H2] = 0.05;
+    X_mix[idx_N2] = 0.6;  // Diluent
+    
+    State in;
+    in.T = 1000.0;  // High T for WGS
+    in.P = 101325.0;
+    in.X = X_mix;
+    
+    // Isothermal WGS should preserve T
+    State out_iso = wgs_equilibrium(in);
+    EXPECT_NEAR(out_iso.T, in.T, 1e-10);
+    EXPECT_NEAR(out_iso.P, in.P, 1e-10);
+    
+    // Mole fractions should still sum to 1
+    double sum = 0.0;
+    for (double x : out_iso.X) sum += x;
+    EXPECT_NEAR(sum, 1.0, 1e-10);
+    
+    // Adiabatic WGS
+    State out_ad = wgs_equilibrium_adiabatic(in);
+    EXPECT_NEAR(out_ad.P, in.P, 1e-10);
+    
+    // Enthalpy should be conserved
+    double H_in = h(in);
+    double H_out = h(out_ad);
+    EXPECT_NEAR(H_in, H_out, 1.0);  // Within 1 J/mol
 }
 
 // Test dry air requirements for combustion

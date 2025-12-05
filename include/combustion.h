@@ -1,6 +1,7 @@
 #ifndef COMBUSTION_H
 #define COMBUSTION_H
 
+#include "state.h"
 #include "thermo_transport_data.h"
 #include <cstddef>
 #include <vector>
@@ -101,5 +102,19 @@ double bilger_mixture_fraction_from_moles(
     const std::vector<double>& X_F,
     const std::vector<double>& X_O
 );
+
+// -------------------------------------------------------------
+// State-based combustion functions
+// -------------------------------------------------------------
+
+// Complete combustion to CO2 and H2O (adiabatic)
+// Input: unburned state with T, P, X
+// Output: burned state with adiabatic flame temperature
+State complete_combustion(const State& in);
+
+// Complete combustion to CO2 and H2O (isothermal)
+// Input: unburned state with T, P, X
+// Output: burned state at same temperature
+State complete_combustion_isothermal(const State& in);
 
 #endif // COMBUSTION_H
