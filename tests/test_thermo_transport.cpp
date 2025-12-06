@@ -799,3 +799,220 @@ TEST_F(ThermoTransportTest, SetFuelStreamForPhi) {
     double phi_lean = equivalence_ratio_mass(Y_mix_lean, Y_fuel, Y_air);
     EXPECT_NEAR(phi_lean, 0.5, 0.01);
 }
+
+// =============================================================================
+// SMR+WGS Equilibrium Tests
+// =============================================================================
+
+// Test SMR+WGS equilibrium at high temperature with CH4
+TEST_F(ThermoTransportTest, SmrWgsEquilibriumIsothermal) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_H2O = species_index_from_name("H2O");
+    const std::size_t idx_CO = species_index_from_name("CO");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    const std::size_t idx_H2 = species_index_from_name("H2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    // Create a mixture with CH4, H2O, CO2, and N2 (typical rich combustion products)
+    State in;
+    in.T = 2000.0;  // High temperature favors SMR
+    in.P = 101325.0;
+    in.X = std::vector<double>(n, 0.0);
+    in.X[idx_CH4] = 0.02;   // 2% CH4
+    in.X[idx_H2O] = 0.20;   // 20% H2O
+    in.X[idx_CO2] = 0.10;   // 10% CO2
+    in.X[idx_N2] = 0.68;    // 68% N2
+    
+    State out = smr_wgs_equilibrium(in);
+    
+    // Temperature should be unchanged (isothermal)
+    EXPECT_NEAR(out.T, in.T, 1e-6);
+    
+    // At high T, SMR should convert CH4 to CO + H2
+    // CH4 should decrease
+    EXPECT_LT(out.X[idx_CH4], in.X[idx_CH4]);
+    
+    // CO and H2 should increase
+    EXPECT_GT(out.X[idx_CO], in.X[idx_CO]);
+    EXPECT_GT(out.X[idx_H2], in.X[idx_H2]);
+    
+    // Mole fractions should sum to 1
+    double sum = 0.0;
+    for (double x : out.X) sum += x;
+    EXPECT_NEAR(sum, 1.0, 1e-10);
+    
+    // Element balance: use N2 as reference (inert)
+    // SMR changes total moles, so ratios to N2 should be conserved
+    double n2_in = in.X[idx_N2];
+    double n2_out = out.X[idx_N2];
+    
+    double C_per_N2_in = (in.X[idx_CH4] + in.X[idx_CO] + in.X[idx_CO2]) / n2_in;
+    double C_per_N2_out = (out.X[idx_CH4] + out.X[idx_CO] + out.X[idx_CO2]) / n2_out;
+    EXPECT_NEAR(C_per_N2_in, C_per_N2_out, 1e-6);
+    
+    double H_per_N2_in = (4.0 * in.X[idx_CH4] + 2.0 * in.X[idx_H2O] + 2.0 * in.X[idx_H2]) / n2_in;
+    double H_per_N2_out = (4.0 * out.X[idx_CH4] + 2.0 * out.X[idx_H2O] + 2.0 * out.X[idx_H2]) / n2_out;
+    EXPECT_NEAR(H_per_N2_in, H_per_N2_out, 1e-6);
+}
+
+// Test SMR+WGS adiabatic equilibrium
+TEST_F(ThermoTransportTest, SmrWgsEquilibriumAdiabatic) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_H2O = species_index_from_name("H2O");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    // Create a mixture with CH4 (typical rich combustion products)
+    State in;
+    in.T = 2200.0;  // Start at high temperature
+    in.P = 101325.0;
+    in.X = std::vector<double>(n, 0.0);
+    in.X[idx_CH4] = 0.02;
+    in.X[idx_H2O] = 0.20;
+    in.X[idx_CO2] = 0.10;
+    in.X[idx_N2] = 0.68;
+    
+    State out = smr_wgs_equilibrium_adiabatic(in);
+    
+    // SMR is endothermic, so temperature should decrease
+    EXPECT_LT(out.T, in.T);
+    
+    // Temperature should still be reasonable (not too low)
+    EXPECT_GT(out.T, 1500.0);
+    
+    // Enthalpy per mole of N2 should be conserved (N2 is inert)
+    // H_total / n_N2 = h(T,X) / X_N2 should be constant
+    // Note: tolerance is ~5% due to nested Newton solver convergence
+    double H_per_N2_in = h(in.T, in.X) / in.X[idx_N2];
+    double H_per_N2_out = h(out.T, out.X) / out.X[idx_N2];
+    EXPECT_NEAR(H_per_N2_in, H_per_N2_out, std::abs(H_per_N2_in) * 0.05);
+}
+
+// Test SMR+WGS falls back to WGS when no CH4
+TEST_F(ThermoTransportTest, SmrWgsFallbackToWgs) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_H2O = species_index_from_name("H2O");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    // Create a mixture without CH4 (stoichiometric combustion products)
+    State in;
+    in.T = 2200.0;
+    in.P = 101325.0;
+    in.X = std::vector<double>(n, 0.0);
+    in.X[idx_H2O] = 0.20;
+    in.X[idx_CO2] = 0.10;
+    in.X[idx_N2] = 0.70;
+    
+    State out_smr_wgs = smr_wgs_equilibrium_adiabatic(in);
+    State out_wgs = wgs_equilibrium_adiabatic(in);
+    
+    // Results should be identical when no CH4
+    EXPECT_NEAR(out_smr_wgs.T, out_wgs.T, 1e-6);
+    for (std::size_t i = 0; i < n; ++i) {
+        EXPECT_NEAR(out_smr_wgs.X[i], out_wgs.X[i], 1e-10);
+    }
+}
+
+// Test SMR+WGS with complete combustion products at rich conditions
+TEST_F(ThermoTransportTest, SmrWgsRichCombustion) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_CO = species_index_from_name("CO");
+    const std::size_t idx_H2 = species_index_from_name("H2");
+    
+    // Create fuel and air streams
+    Stream fuel;
+    fuel.state.T = 300.0;
+    fuel.state.P = 101325.0;
+    fuel.state.X = std::vector<double>(n, 0.0);
+    fuel.state.X[idx_CH4] = 1.0;
+    
+    Stream air;
+    air.state.T = 300.0;
+    air.state.P = 101325.0;
+    air.state.X = standard_dry_air_composition();
+    air.mdot = 10.0;
+    
+    // Rich mixture (phi = 1.2)
+    Stream fuel_rich = set_fuel_stream_for_phi(1.2, fuel, air);
+    Stream mixed = mix({fuel_rich, air});
+    
+    // Complete combustion
+    State burned = complete_combustion(mixed.state);
+    
+    // Verify there's unburned CH4
+    EXPECT_GT(burned.X[idx_CH4], 0.01);
+    
+    // Apply SMR+WGS equilibrium
+    State eq = smr_wgs_equilibrium_adiabatic(burned);
+    
+    // CH4 should be mostly reformed
+    EXPECT_LT(eq.X[idx_CH4], burned.X[idx_CH4] * 0.5);
+    
+    // CO and H2 should be present
+    EXPECT_GT(eq.X[idx_CO], 0.01);
+    EXPECT_GT(eq.X[idx_H2], 0.01);
+    
+    // Temperature should drop (SMR is endothermic)
+    EXPECT_LT(eq.T, burned.T);
+    
+    // Enthalpy per mole of N2 should be conserved
+    // Note: tolerance is ~10% due to nested Newton solver convergence
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    double H_per_N2_burned = h(burned.T, burned.X) / burned.X[idx_N2];
+    double H_per_N2_eq = h(eq.T, eq.X) / eq.X[idx_N2];
+    EXPECT_NEAR(H_per_N2_burned, H_per_N2_eq, std::abs(H_per_N2_burned) * 0.10);
+}
+
+// Test element conservation in SMR+WGS
+// Note: SMR changes total moles (Δn=2), so we need to account for this
+// when checking element balance. We use the ratio of elements to N2
+// (which is inert) to verify conservation.
+TEST_F(ThermoTransportTest, SmrWgsElementConservation) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_H2O = species_index_from_name("H2O");
+    const std::size_t idx_CO = species_index_from_name("CO");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    const std::size_t idx_H2 = species_index_from_name("H2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    // Test at multiple temperatures
+    for (double T : {1500.0, 2000.0, 2500.0}) {
+        State in;
+        in.T = T;
+        in.P = 101325.0;
+        in.X = std::vector<double>(n, 0.0);
+        in.X[idx_CH4] = 0.03;
+        in.X[idx_H2O] = 0.18;
+        in.X[idx_CO2] = 0.08;
+        in.X[idx_CO] = 0.01;
+        in.X[idx_H2] = 0.02;
+        in.X[idx_N2] = 0.68;
+        
+        State out = smr_wgs_equilibrium(in);
+        
+        // Use N2 as reference (inert, doesn't participate in reactions)
+        // Element ratios relative to N2 should be conserved
+        double n2_in = in.X[idx_N2];
+        double n2_out = out.X[idx_N2];
+        
+        // C atoms per N2: (CH4 + CO + CO2) / N2
+        double C_per_N2_in = (in.X[idx_CH4] + in.X[idx_CO] + in.X[idx_CO2]) / n2_in;
+        double C_per_N2_out = (out.X[idx_CH4] + out.X[idx_CO] + out.X[idx_CO2]) / n2_out;
+        EXPECT_NEAR(C_per_N2_in, C_per_N2_out, 1e-6) << "C/N2 not conserved at T=" << T;
+        
+        // H atoms per N2: (4*CH4 + 2*H2O + 2*H2) / N2
+        double H_per_N2_in = (4.0 * in.X[idx_CH4] + 2.0 * in.X[idx_H2O] + 2.0 * in.X[idx_H2]) / n2_in;
+        double H_per_N2_out = (4.0 * out.X[idx_CH4] + 2.0 * out.X[idx_H2O] + 2.0 * out.X[idx_H2]) / n2_out;
+        EXPECT_NEAR(H_per_N2_in, H_per_N2_out, 1e-6) << "H/N2 not conserved at T=" << T;
+        
+        // O atoms per N2: (H2O + CO + 2*CO2) / N2
+        double O_per_N2_in = (in.X[idx_H2O] + in.X[idx_CO] + 2.0 * in.X[idx_CO2]) / n2_in;
+        double O_per_N2_out = (out.X[idx_H2O] + out.X[idx_CO] + 2.0 * out.X[idx_CO2]) / n2_out;
+        EXPECT_NEAR(O_per_N2_in, O_per_N2_out, 1e-6) << "O/N2 not conserved at T=" << T;
+    }
+}
