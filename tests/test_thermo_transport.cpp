@@ -967,6 +967,82 @@ TEST_F(ThermoTransportTest, SmrWgsRichCombustion) {
     EXPECT_NEAR(H_per_N2_burned, H_per_N2_eq, std::abs(H_per_N2_burned) * 0.10);
 }
 
+// Test general reforming equilibrium with multiple hydrocarbons
+TEST_F(ThermoTransportTest, ReformingEquilibriumMultipleHydrocarbons) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_C2H6 = species_index_from_name("C2H6");
+    const std::size_t idx_C3H8 = species_index_from_name("C3H8");
+    const std::size_t idx_H2O = species_index_from_name("H2O");
+    const std::size_t idx_CO = species_index_from_name("CO");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    const std::size_t idx_H2 = species_index_from_name("H2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    // Create a mixture with multiple hydrocarbons (simulating natural gas combustion)
+    State in;
+    in.T = 2000.0;  // High temperature
+    in.P = 101325.0;
+    in.X = std::vector<double>(n, 0.0);
+    in.X[idx_CH4] = 0.015;   // 1.5% CH4
+    in.X[idx_C2H6] = 0.003;  // 0.3% C2H6
+    in.X[idx_C3H8] = 0.002;  // 0.2% C3H8
+    in.X[idx_H2O] = 0.20;    // 20% H2O
+    in.X[idx_CO2] = 0.08;    // 8% CO2
+    in.X[idx_N2] = 0.70;     // 70% N2
+    
+    State out = reforming_equilibrium(in);
+    
+    // All hydrocarbons should be mostly reformed at high T
+    EXPECT_LT(out.X[idx_CH4], in.X[idx_CH4] * 0.5);
+    EXPECT_LT(out.X[idx_C2H6], in.X[idx_C2H6] * 0.5);
+    EXPECT_LT(out.X[idx_C3H8], in.X[idx_C3H8] * 0.5);
+    
+    // CO and H2 should be produced
+    EXPECT_GT(out.X[idx_CO], 0.01);
+    EXPECT_GT(out.X[idx_H2], 0.01);
+    
+    // Element balance using N2 as reference
+    double n2_in = in.X[idx_N2];
+    double n2_out = out.X[idx_N2];
+    
+    // C atoms: CH4 + 2*C2H6 + 3*C3H8 + CO + CO2
+    double C_per_N2_in = (in.X[idx_CH4] + 2*in.X[idx_C2H6] + 3*in.X[idx_C3H8] 
+                        + in.X[idx_CO] + in.X[idx_CO2]) / n2_in;
+    double C_per_N2_out = (out.X[idx_CH4] + 2*out.X[idx_C2H6] + 3*out.X[idx_C3H8]
+                         + out.X[idx_CO] + out.X[idx_CO2]) / n2_out;
+    EXPECT_NEAR(C_per_N2_in, C_per_N2_out, 1e-6);
+}
+
+// Test general reforming adiabatic equilibrium
+TEST_F(ThermoTransportTest, ReformingEquilibriumAdiabatic) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_C2H6 = species_index_from_name("C2H6");
+    const std::size_t idx_H2O = species_index_from_name("H2O");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    // Create a mixture with multiple hydrocarbons
+    State in;
+    in.T = 2200.0;
+    in.P = 101325.0;
+    in.X = std::vector<double>(n, 0.0);
+    in.X[idx_CH4] = 0.015;
+    in.X[idx_C2H6] = 0.005;
+    in.X[idx_H2O] = 0.20;
+    in.X[idx_CO2] = 0.08;
+    in.X[idx_N2] = 0.70;
+    
+    State out = reforming_equilibrium_adiabatic(in);
+    
+    // Reforming is endothermic, so temperature should decrease
+    EXPECT_LT(out.T, in.T);
+    
+    // Temperature should be reasonable
+    EXPECT_GT(out.T, 1500.0);
+}
+
 // Test element conservation in SMR+WGS
 // Note: SMR changes total moles (Δn=2), so we need to account for this
 // when checking element balance. We use the ratio of elements to N2

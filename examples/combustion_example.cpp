@@ -86,9 +86,9 @@ int main()
         // Complete combustion (adiabatic, CO2 + H2O products)
         State burned_complete = complete_combustion(mixed.state);
 
-        // SMR+WGS equilibrium on burned products
-        // CH4 + H2O <-> CO + 3H2 (SMR) and CO + H2O <-> CO2 + H2 (WGS)
-        State burned_eq = smr_wgs_equilibrium_adiabatic(burned_complete);
+        // General reforming + WGS equilibrium on burned products
+        // CnHm + n*H2O <-> n*CO + (n+m/2)*H2 (reforming) and CO + H2O <-> CO2 + H2 (WGS)
+        State burned_eq = reforming_equilibrium_adiabatic(burned_complete);
 
         // Output results
         std::cout << std::setw(6) << phi
@@ -115,7 +115,7 @@ int main()
     Stream fuel_stoich = set_fuel_stream_for_phi(1.0, fuel, air);
     Stream mixed_stoich = mix({fuel_stoich, air});
     State burned_stoich = complete_combustion(mixed_stoich.state);
-    State eq_stoich = smr_wgs_equilibrium_adiabatic(burned_stoich);
+    State eq_stoich = reforming_equilibrium_adiabatic(burned_stoich);
 
     std::cout << "Mixed Stream (before combustion):\n";
     std::cout << "  T = " << mixed_stoich.state.T << " K\n";
@@ -133,14 +133,14 @@ int main()
     std::cout << "  Pr = " << burned_stoich.Pr() << "\n";
     std::cout << "  a = " << burned_stoich.a() << " m/s\n\n";
 
-    std::cout << "SMR+WGS Equilibrium:\n";
+    std::cout << "Reforming + WGS Equilibrium:\n";
     std::cout << "  T_eq = " << eq_stoich.T << " K\n";
     std::cout << "  rho = " << eq_stoich.rho() << " kg/m³\n";
     std::cout << "  mu = " << eq_stoich.mu() * 1.0e6 << " μPa·s\n";
     std::cout << "  Pr = " << eq_stoich.Pr() << "\n\n";
 
     // Show product composition
-    std::cout << "Product Composition (SMR+WGS equilibrium, mole fractions > 0.001):\n";
+    std::cout << "Product Composition (Reforming+WGS equilibrium, mole fractions > 0.001):\n";
     for (std::size_t i = 0; i < n_species; ++i) {
         if (eq_stoich.X[i] > 0.001) {
             std::cout << "  " << std::setw(6) << species_names[i]
@@ -149,17 +149,17 @@ int main()
     }
 
     // =========================================================================
-    // Rich case (phi = 1.2) - SMR converts CH4 to CO + H2
+    // Rich case (phi = 1.2) - Reforming converts hydrocarbons to CO + H2
     // =========================================================================
 
     std::cout << "\n=========================================================================\n";
-    std::cout << "Rich Case (phi = 1.2) - SMR+WGS Equilibrium\n";
+    std::cout << "Rich Case (phi = 1.2) - Reforming + WGS Equilibrium\n";
     std::cout << "=========================================================================\n\n";
 
     Stream fuel_rich = set_fuel_stream_for_phi(1.2, fuel, air);
     Stream mixed_rich = mix({fuel_rich, air});
     State burned_rich = complete_combustion(mixed_rich.state);
-    State eq_rich = smr_wgs_equilibrium_adiabatic(burned_rich);
+    State eq_rich = reforming_equilibrium_adiabatic(burned_rich);
 
     std::cout << "Complete Combustion (before equilibrium):\n";
     std::cout << "  T_ad = " << burned_rich.T << " K\n";
@@ -170,7 +170,7 @@ int main()
         }
     }
 
-    std::cout << "\nSMR+WGS Equilibrium (CH4 reformed to CO + H2):\n";
+    std::cout << "\nReforming + WGS Equilibrium (hydrocarbons reformed to CO + H2):\n";
     std::cout << "  T_eq = " << eq_rich.T << " K\n";
     for (std::size_t i = 0; i < n_species; ++i) {
         if (eq_rich.X[i] > 0.001) {

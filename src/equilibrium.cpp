@@ -215,9 +215,46 @@ static double solve_adiabatic_T_wgs(const std::vector<double>& n_in,
 }
 
 // -------------------------------------------------------------
-// SMR + WGS configuration (species indices)
+// General Steam Reforming + WGS configuration
 // -------------------------------------------------------------
+// Handles all hydrocarbons CnHm via:
+//   CnHm + n*H2O -> n*CO + (n + m/2)*H2
+// Plus WGS:
+//   CO + H2O <-> CO2 + H2
 
+struct ReformingConfig {
+    std::size_t i_H2O;
+    std::size_t i_CO;
+    std::size_t i_CO2;
+    std::size_t i_H2;
+    
+    // Hydrocarbon species indices and their C, H counts
+    std::vector<std::size_t> hc_indices;
+    std::vector<int> hc_C;  // number of C atoms
+    std::vector<int> hc_H;  // number of H atoms
+};
+
+static ReformingConfig make_reforming_config()
+{
+    ReformingConfig cfg;
+    cfg.i_H2O = species_index.at("H2O");
+    cfg.i_CO  = species_index.at("CO");
+    cfg.i_CO2 = species_index.at("CO2");
+    cfg.i_H2  = species_index.at("H2");
+    
+    // Find all hydrocarbon species (C > 0, H > 0, O = 0, N = 0)
+    for (std::size_t i = 0; i < species_names.size(); ++i) {
+        const auto& ms = molecular_structures[i];
+        if (ms.C > 0 && ms.H > 0 && ms.O == 0 && ms.N == 0) {
+            cfg.hc_indices.push_back(i);
+            cfg.hc_C.push_back(static_cast<int>(ms.C));
+            cfg.hc_H.push_back(static_cast<int>(ms.H));
+        }
+    }
+    return cfg;
+}
+
+// Legacy config for backward compatibility
 struct SmrWgsConfig {
     std::size_t i_CH4;
     std::size_t i_H2O;
@@ -594,6 +631,272 @@ State smr_wgs_equilibrium_adiabatic(const State& in)
     
     std::vector<double> n_out;
     composition_from_xi_smr_wgs(in.X, xi1, xi2, cfg, n_out);
+    
+    std::vector<double> X_out;
+    molefractions(n_out, X_out);
+    
+    State out;
+    out.T = T_ad;
+    out.P = in.P;
+    out.X = X_out;
+    return out;
+}
+
+// -------------------------------------------------------------
+// General Reforming + WGS equilibrium (handles all hydrocarbons)
+// -------------------------------------------------------------
+
+// Equilibrium constant for general steam reforming: CnHm + n*H2O <-> n*CO + (n+m/2)*H2
+// Kp = (y_CO^n * y_H2^(n+m/2)) / (y_CnHm * y_H2O^n) * (P/P0)^(delta_n)
+// where delta_n = n + (n+m/2) - 1 - n = m/2 - 1 + n = (m-2)/2 + n
+static double Kp_reforming(double T, std::size_t i_hc, int n_C, int n_H,
+                           const ReformingConfig& cfg)
+{
+    double g_hc  = ::g_over_RT(i_hc, T);
+    double g_H2O = ::g_over_RT(cfg.i_H2O, T);
+    double g_CO  = ::g_over_RT(cfg.i_CO, T);
+    double g_H2  = ::g_over_RT(cfg.i_H2, T);
+    
+    // CnHm + n*H2O -> n*CO + (n + m/2)*H2
+    double n_H2_prod = n_C + 0.5 * n_H;  // n + m/2
+    
+    // ΔG/RT = n*g_CO + (n+m/2)*g_H2 - g_CnHm - n*g_H2O
+    double d_gRT = n_C * g_CO + n_H2_prod * g_H2 - g_hc - n_C * g_H2O;
+    return std::exp(-d_gRT);
+}
+
+// Solve single hydrocarbon reforming equilibrium at fixed T
+// CnHm + n*H2O <-> n*CO + (n+m/2)*H2
+static double solve_reforming_isothermal(const std::vector<double>& n0,
+                                         double T, double P,
+                                         std::size_t i_hc, int n_C, int n_H,
+                                         const ReformingConfig& cfg)
+{
+    const double min_species = 1e-12;
+    
+    // Check if reaction can proceed
+    if (n0[i_hc] < min_species || n0[cfg.i_H2O] < min_species * n_C) {
+        return 0.0;  // No hydrocarbon or insufficient H2O
+    }
+    
+    double Kp = Kp_reforming(T, i_hc, n_C, n_H, cfg);
+    double lnKp = std::log(Kp);
+    
+    // Reference pressure
+    const double P0 = 101325.0;
+    
+    // delta_n = products - reactants = (n + (n+m/2)) - (1 + n) = n + m/2 - 1
+    double delta_n = n_C + 0.5 * n_H - 1.0;
+    
+    // Bounds: xi in [0, min(n0[hc], n0[H2O]/n_C)]
+    double xi_max = std::min(n0[i_hc], n0[cfg.i_H2O] / n_C);
+    
+    // Newton iteration
+    double xi = std::min(0.001, xi_max * 0.1);  // Initial guess
+    const double tol = 1e-10;
+    
+    for (int it = 0; it < 50; ++it) {
+        // Current composition
+        double n_hc = n0[i_hc] - xi;
+        double n_H2O = n0[cfg.i_H2O] - n_C * xi;
+        double n_CO = n0[cfg.i_CO] + n_C * xi;
+        double n_H2 = n0[cfg.i_H2] + (n_C + 0.5 * n_H) * xi;
+        
+        // Total moles
+        double nt = 0.0;
+        for (double v : n0) nt += v;
+        nt += delta_n * xi;
+        
+        const double tiny = 1e-15;
+        double y_hc = std::max(n_hc / nt, tiny);
+        double y_H2O = std::max(n_H2O / nt, tiny);
+        double y_CO = std::max(n_CO / nt, tiny);
+        double y_H2 = std::max(n_H2 / nt, tiny);
+        
+        // Reaction quotient Q
+        // Q = (y_CO^n * y_H2^(n+m/2)) / (y_hc * y_H2O^n) * (P/P0)^delta_n
+        double lnQ = n_C * std::log(y_CO) + (n_C + 0.5 * n_H) * std::log(y_H2)
+                   - std::log(y_hc) - n_C * std::log(y_H2O)
+                   + delta_n * std::log(P / P0);
+        
+        double F = lnQ - lnKp;
+        
+        if (std::abs(F) < tol) {
+            return std::max(0.0, std::min(xi, xi_max));
+        }
+        
+        // Numerical derivative
+        double eps = 1e-8;
+        double xi_p = xi + eps;
+        
+        double n_hc_p = n0[i_hc] - xi_p;
+        double n_H2O_p = n0[cfg.i_H2O] - n_C * xi_p;
+        double n_CO_p = n0[cfg.i_CO] + n_C * xi_p;
+        double n_H2_p = n0[cfg.i_H2] + (n_C + 0.5 * n_H) * xi_p;
+        double nt_p = nt + delta_n * eps;
+        
+        double y_hc_p = std::max(n_hc_p / nt_p, tiny);
+        double y_H2O_p = std::max(n_H2O_p / nt_p, tiny);
+        double y_CO_p = std::max(n_CO_p / nt_p, tiny);
+        double y_H2_p = std::max(n_H2_p / nt_p, tiny);
+        
+        double lnQ_p = n_C * std::log(y_CO_p) + (n_C + 0.5 * n_H) * std::log(y_H2_p)
+                     - std::log(y_hc_p) - n_C * std::log(y_H2O_p)
+                     + delta_n * std::log(P / P0);
+        
+        double dF = (lnQ_p - lnKp - F) / eps;
+        
+        if (std::abs(dF) < 1e-20) break;
+        
+        double dxi = -F / dF;
+        
+        // Damped update with bounds
+        double lambda = 1.0;
+        for (int ls = 0; ls < 10; ++ls) {
+            double xi_new = xi + lambda * dxi;
+            if (xi_new >= 0.0 && xi_new <= xi_max) {
+                xi = xi_new;
+                break;
+            }
+            lambda *= 0.5;
+        }
+    }
+    
+    return std::max(0.0, std::min(xi, xi_max));
+}
+
+// Apply reforming extent to composition
+static void apply_reforming(std::vector<double>& n,
+                           double xi, std::size_t i_hc, int n_C, int n_H,
+                           const ReformingConfig& cfg)
+{
+    n[i_hc] -= xi;
+    n[cfg.i_H2O] -= n_C * xi;
+    n[cfg.i_CO] += n_C * xi;
+    n[cfg.i_H2] += (n_C + 0.5 * n_H) * xi;
+}
+
+// Solve general reforming + WGS equilibrium at fixed T
+// Sequential approach: reform each hydrocarbon, then apply WGS
+static void solve_reforming_wgs_isothermal(const std::vector<double>& n0,
+                                           double T, double P,
+                                           const ReformingConfig& cfg,
+                                           std::vector<double>& n_out)
+{
+    n_out = n0;
+    
+    // Reform each hydrocarbon sequentially
+    for (std::size_t k = 0; k < cfg.hc_indices.size(); ++k) {
+        std::size_t i_hc = cfg.hc_indices[k];
+        int n_C = cfg.hc_C[k];
+        int n_H = cfg.hc_H[k];
+        
+        double xi = solve_reforming_isothermal(n_out, T, P, i_hc, n_C, n_H, cfg);
+        apply_reforming(n_out, xi, i_hc, n_C, n_H, cfg);
+    }
+    
+    // Apply WGS equilibrium
+    WgsConfig wgs_cfg = make_wgs_config();
+    
+    double xi_min = std::max(-n_out[wgs_cfg.i_CO2], -n_out[wgs_cfg.i_H2]);
+    double xi_max = std::min(n_out[wgs_cfg.i_CO], n_out[wgs_cfg.i_H2O]);
+    
+    if (xi_max > xi_min + 1e-15) {
+        WgsIsothermalFun F{n_out, T, wgs_cfg};
+        double xi_wgs = newton_damped(F, 0.0, xi_min, xi_max, 40);
+        
+        n_out[wgs_cfg.i_CO] -= xi_wgs;
+        n_out[wgs_cfg.i_H2O] -= xi_wgs;
+        n_out[wgs_cfg.i_CO2] += xi_wgs;
+        n_out[wgs_cfg.i_H2] += xi_wgs;
+    }
+}
+
+// Adiabatic solver functor for general reforming + WGS
+struct ReformingAdiabaticFun {
+    const std::vector<double>& n_in;
+    double H_target;
+    double P;
+    ReformingConfig cfg;
+    
+    mutable std::vector<double> n;
+    mutable std::vector<double> X;
+    
+    ReformingAdiabaticFun(const std::vector<double>& n_in_, double H_target_,
+                          double P_, const ReformingConfig& cfg_)
+        : n_in(n_in_), H_target(H_target_), P(P_), cfg(cfg_),
+          n(n_in_.size()), X(n_in_.size()) {}
+    
+    double f(double T) const
+    {
+        solve_reforming_wgs_isothermal(n_in, T, P, cfg, n);
+        molefractions(n, X);
+        double H = h(T, X);
+        return H - H_target;
+    }
+};
+
+// Public API: General reforming + WGS equilibrium (isothermal)
+State reforming_equilibrium(const State& in)
+{
+    ReformingConfig cfg = make_reforming_config();
+    
+    // Check if any hydrocarbon is present
+    bool has_hc = false;
+    for (std::size_t i_hc : cfg.hc_indices) {
+        if (in.X[i_hc] > 1e-10) {
+            has_hc = true;
+            break;
+        }
+    }
+    
+    if (!has_hc) {
+        // No hydrocarbons - fall back to WGS only
+        return wgs_equilibrium(in);
+    }
+    
+    std::vector<double> n_out;
+    solve_reforming_wgs_isothermal(in.X, in.T, in.P, cfg, n_out);
+    
+    std::vector<double> X_out;
+    molefractions(n_out, X_out);
+    
+    State out;
+    out.T = in.T;
+    out.P = in.P;
+    out.X = X_out;
+    return out;
+}
+
+// Public API: General reforming + WGS equilibrium (adiabatic)
+State reforming_equilibrium_adiabatic(const State& in)
+{
+    ReformingConfig cfg = make_reforming_config();
+    
+    // Check if any hydrocarbon is present
+    bool has_hc = false;
+    for (std::size_t i_hc : cfg.hc_indices) {
+        if (in.X[i_hc] > 1e-10) {
+            has_hc = true;
+            break;
+        }
+    }
+    
+    if (!has_hc) {
+        // No hydrocarbons - fall back to WGS only
+        return wgs_equilibrium_adiabatic(in);
+    }
+    
+    // Target enthalpy
+    double H_target = h(in.T, in.X);
+    
+    // Solve for adiabatic temperature
+    ReformingAdiabaticFun F{in.X, H_target, in.P, cfg};
+    double T_ad = newton_damped(F, in.T, 300.0, 4500.0, 50);
+    
+    // Get equilibrium composition at T_ad
+    std::vector<double> n_out;
+    solve_reforming_wgs_isothermal(in.X, T_ad, in.P, cfg, n_out);
     
     std::vector<double> X_out;
     molefractions(n_out, X_out);
