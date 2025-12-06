@@ -176,7 +176,11 @@ double thermal_conductivity(double T, double P, const std::vector<double>& X)
         double cp_species = cp_R(i, T) * R_GAS;
 
         // Convert cp from J/(mol·K) to J/(kg·K)
-        double cp_mass = cp_species * 1000.0 / mw_kg;
+        // mw_kg is in kg/mol, so cp_species / mw_kg = J/(kg·K)
+        double cp_mass = cp_species / mw_kg;
+
+        // Specific gas constant R_specific = R / M [J/(kg·K)]
+        double R_specific = R_GAS / mw_kg;
 
         // Determine rotational contribution based on geometry
         double f_rot = 0.0;
@@ -189,9 +193,9 @@ double thermal_conductivity(double T, double P, const std::vector<double>& X)
         }
 
         // Modified Eucken formula for thermal conductivity
-        double R_specific = R_GAS * 1000.0 / mw_kg; // J/(kg·K)
-        double scale_factor = 0.1; // Correction factor to match experimental data
-        pure_cond[i] = visc * (cp_mass + f_rot * R_specific) * scale_factor;
+        // k = mu * (Cv + 9/4 * R) for monatomic
+        // k = mu * (Cp + f_rot * R) is a simplified form
+        pure_cond[i] = visc * (cp_mass + f_rot * R_specific);
     }
 
     // Mixture rule (average of upper and lower bounds)

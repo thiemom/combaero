@@ -52,7 +52,7 @@ int main()
               << air.mdot << " kg/s\n\n";
 
     // =========================================================================
-    // Sweep equivalence ratio from 0.45 to 1.0
+    // Sweep equivalence ratio from 0.5 to 1.2 (lean to slightly rich)
     // =========================================================================
 
     std::cout << "Equivalence Ratio Sweep\n";
@@ -76,7 +76,7 @@ int main()
               << "\n";
     std::cout << std::string(70, '-') << "\n";
 
-    for (double phi = 0.45; phi <= 1.01; phi += 0.05) {
+    for (double phi = 0.5; phi <= 1.21; phi += 0.1) {
         // Use set_fuel_stream_for_phi to get fuel stream with correct mdot
         Stream fuel_phi = set_fuel_stream_for_phi(phi, fuel, air);
 
@@ -146,6 +146,29 @@ int main()
                       << ": " << std::setprecision(4) << wgs_stoich.X[i] << "\n";
         }
     }
+
+    // =========================================================================
+    // Rich case (phi = 1.2) - shows unburned fuel
+    // =========================================================================
+
+    std::cout << "\n=========================================================================\n";
+    std::cout << "Rich Case (phi = 1.2) - Unburned Fuel\n";
+    std::cout << "=========================================================================\n\n";
+
+    Stream fuel_rich = set_fuel_stream_for_phi(1.2, fuel, air);
+    Stream mixed_rich = mix({fuel_rich, air});
+    State burned_rich = complete_combustion(mixed_rich.state);
+
+    std::cout << "Complete Combustion Products (mole fractions > 0.001):\n";
+    for (std::size_t i = 0; i < n_species; ++i) {
+        if (burned_rich.X[i] > 0.001) {
+            std::cout << "  " << std::setw(6) << species_names[i]
+                      << ": " << std::setprecision(4) << burned_rich.X[i] << "\n";
+        }
+    }
+    std::cout << "\nNote: At rich conditions, unburned CH4 remains.\n";
+    std::cout << "WGS equilibrium only shifts CO/H2O/CO2/H2 balance,\n";
+    std::cout << "it does not reform CH4 to CO + H2.\n";
 
     return 0;
 }

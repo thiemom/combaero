@@ -145,16 +145,16 @@ static double solve_wgs_isothermal(const std::vector<double>& n0,
 {
     WgsIsothermalFun F{n0, T, cfg};
 
-    // Determine ξ bounds
-    double xi_min = -1e30;
-    double xi_max =  1e30;
+    // Determine ξ bounds from non-negativity constraints
+    // Reaction: CO + H2O -> CO2 + H2 (forward: xi > 0)
+    //
+    // n[CO]  = n0[CO]  - xi  >= 0  =>  xi <= n0[CO]
+    // n[H2O] = n0[H2O] - xi  >= 0  =>  xi <= n0[H2O]
+    // n[CO2] = n0[CO2] + xi  >= 0  =>  xi >= -n0[CO2]
+    // n[H2]  = n0[H2]  + xi  >= 0  =>  xi >= -n0[H2]
 
-    // From n[k] >= 0 → xi >= -n0[k]/nu
-    xi_min = std::max(xi_min, -n0[cfg.i_CO]);
-    xi_min = std::max(xi_min, -n0[cfg.i_H2O]);
-    // From n[k] >= 0 → xi <= n0[k] for products
-    xi_max = std::min(xi_max, n0[cfg.i_CO2]);
-    xi_max = std::min(xi_max, n0[cfg.i_H2]);
+    double xi_min = std::max(-n0[cfg.i_CO2], -n0[cfg.i_H2]);
+    double xi_max = std::min(n0[cfg.i_CO], n0[cfg.i_H2O]);
 
     return newton_damped(F, 0.0, xi_min, xi_max, 40);
 }
@@ -228,12 +228,9 @@ State wgs_equilibrium(const State& in)
     // Solve for extent of reaction at fixed T
     WgsIsothermalFun F{in.X, in.T, cfg};
     
-    double xi_min = -1e30;
-    double xi_max =  1e30;
-    xi_min = std::max(xi_min, -in.X[cfg.i_CO]);
-    xi_min = std::max(xi_min, -in.X[cfg.i_H2O]);
-    xi_max = std::min(xi_max, in.X[cfg.i_CO2]);
-    xi_max = std::min(xi_max, in.X[cfg.i_H2]);
+    // Bounds from non-negativity (same logic as solve_wgs_isothermal)
+    double xi_min = std::max(-in.X[cfg.i_CO2], -in.X[cfg.i_H2]);
+    double xi_max = std::min(in.X[cfg.i_CO], in.X[cfg.i_H2O]);
     
     double xi = newton_damped(F, 0.0, xi_min, xi_max, 40);
     
