@@ -136,6 +136,17 @@ eq_smr = ca.smr_wgs_equilibrium_adiabatic(T=2200.0, X=X)
 - `smr_wgs_equilibrium_adiabatic(T, X, P)` - Adiabatic SMR+WGS (CH4 only)
 - `reforming_equilibrium(T, X, P)` - Isothermal reforming (all hydrocarbons)
 - `reforming_equilibrium_adiabatic(T, X, P)` - Adiabatic reforming (all hydrocarbons)
+- `combustion_equilibrium(T, X, P)` - **One-step**: combustion + reforming + WGS
+
+**Tip:** Use `combustion_equilibrium` when starting from an unburned fuel+air mixture.
+It combines complete combustion with reforming equilibrium in one call:
+
+```python
+# Unburned fuel + air -> equilibrium products in one step
+X_unburned = ...  # CH4 + O2 + N2
+result = ca.combustion_equilibrium(T=300.0, X=X_unburned)
+print(f"Equilibrium T: {result.T:.0f} K")
+```
 
 ### Stream Mixing
 

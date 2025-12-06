@@ -1,4 +1,5 @@
 #include "../include/equilibrium.h"
+#include "../include/combustion.h"
 #include "../include/thermo.h"
 #include "../include/thermo_transport_data.h"
 #include <algorithm>
@@ -906,4 +907,21 @@ State reforming_equilibrium_adiabatic(const State& in)
     out.P = in.P;
     out.X = X_out;
     return out;
+}
+
+// -------------------------------------------------------------
+// Combustion + Equilibrium (convenience function)
+// -------------------------------------------------------------
+
+State combustion_equilibrium(const State& in)
+{
+    // Step 1: Complete combustion (adiabatic)
+    // This burns fuel with available O2, producing CO2 + H2O
+    // Excess fuel (rich) or O2 (lean) remains
+    State burned = complete_combustion(in);
+    
+    // Step 2: Reforming + WGS equilibrium on combustion products
+    // For rich mixtures: unburned HC + H2O -> CO + H2
+    // For all mixtures: CO + H2O <-> CO2 + H2
+    return reforming_equilibrium_adiabatic(burned);
 }

@@ -48,4 +48,22 @@ State reforming_equilibrium(const State& in);
 // General reforming + WGS equilibrium (adiabatic)
 State reforming_equilibrium_adiabatic(const State& in);
 
+// -------------------------------------------------------------
+// Combustion + Equilibrium (convenience functions)
+// -------------------------------------------------------------
+// These functions combine complete combustion with equilibrium in one call.
+// They are useful when starting from an unburned fuel+air mixture.
+//
+// The workflow is:
+//   1. Complete combustion (fuel + O2 -> CO2 + H2O, with excess fuel remaining)
+//   2. Reforming + WGS equilibrium on the products
+//
+// This handles the common case where users want to go directly from
+// an unburned mixture to equilibrium products.
+
+// Combustion + equilibrium (adiabatic)
+// Input: unburned fuel+air mixture at inlet temperature
+// Output: equilibrium products at adiabatic flame temperature
+State combustion_equilibrium(const State& in);
+
 #endif // EQUILIBRIUM_H

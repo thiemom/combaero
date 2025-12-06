@@ -90,6 +90,7 @@ try:
         smr_wgs_equilibrium_adiabatic,
         reforming_equilibrium,
         reforming_equilibrium_adiabatic,
+        combustion_equilibrium,
     )
 except ModuleNotFoundError:
     # Fallback: attempt to import from an installed combaero package that
@@ -146,6 +147,7 @@ except ModuleNotFoundError:
     smr_wgs_equilibrium_adiabatic = _core.smr_wgs_equilibrium_adiabatic
     reforming_equilibrium = _core.reforming_equilibrium
     reforming_equilibrium_adiabatic = _core.reforming_equilibrium_adiabatic
+    combustion_equilibrium = _core.combustion_equilibrium
 
 
 __all__ = [
@@ -200,5 +202,6 @@ __all__ = [
     "smr_wgs_equilibrium_adiabatic",
     "reforming_equilibrium",
     "reforming_equilibrium_adiabatic",
+    "combustion_equilibrium",
     "__version__",
 ]

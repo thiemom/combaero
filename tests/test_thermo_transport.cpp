@@ -1624,3 +1624,90 @@ TEST_F(ThermoTransportTest, SmrWgsElementConservation) {
         EXPECT_NEAR(O_per_N2_in, O_per_N2_out, 1e-6) << "O/N2 not conserved at T=" << T;
     }
 }
+
+// =============================================================================
+// Combustion + Equilibrium Convenience Function Tests
+// =============================================================================
+
+// Test combustion_equilibrium with unburned fuel+air mixture
+TEST_F(ThermoTransportTest, CombustionEquilibriumFromUnburned) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    const std::size_t idx_H2O = species_index_from_name("H2O");
+    const std::size_t idx_CO = species_index_from_name("CO");
+    const std::size_t idx_H2 = species_index_from_name("H2");
+    
+    // Rich CH4 + air mixture (unburned)
+    State in;
+    in.T = 300.0;
+    in.P = 101325.0;
+    in.X = std::vector<double>(n, 0.0);
+    in.X[idx_CH4] = 0.11;   // Rich
+    in.X[idx_O2] = 0.19;
+    in.X[idx_N2] = 0.70;
+    
+    // One-step: combustion_equilibrium
+    State result = combustion_equilibrium(in);
+    
+    // Two-step equivalent: complete_combustion + reforming_equilibrium_adiabatic
+    State burned = complete_combustion(in);
+    State eq = reforming_equilibrium_adiabatic(burned);
+    
+    // Results should be identical
+    EXPECT_NEAR(result.T, eq.T, 0.1);
+    EXPECT_NEAR(result.X[idx_CO], eq.X[idx_CO], 1e-6);
+    EXPECT_NEAR(result.X[idx_H2], eq.X[idx_H2], 1e-6);
+    EXPECT_NEAR(result.X[idx_CO2], eq.X[idx_CO2], 1e-6);
+    EXPECT_NEAR(result.X[idx_H2O], eq.X[idx_H2O], 1e-6);
+    
+    // Temperature should be high (combustion occurred)
+    EXPECT_GT(result.T, 2000.0);
+    
+    // CH4 should be fully consumed
+    EXPECT_LT(result.X[idx_CH4], 1e-6);
+    
+    // CO and H2 should be present (rich combustion + reforming)
+    EXPECT_GT(result.X[idx_CO], 0.01);
+    EXPECT_GT(result.X[idx_H2], 0.01);
+}
+
+// Test combustion_equilibrium with stoichiometric mixture
+TEST_F(ThermoTransportTest, CombustionEquilibriumStoichiometric) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    const std::size_t idx_H2O = species_index_from_name("H2O");
+    const std::size_t idx_CO = species_index_from_name("CO");
+    const std::size_t idx_H2 = species_index_from_name("H2");
+    
+    // Stoichiometric CH4 + air mixture
+    State in;
+    in.T = 300.0;
+    in.P = 101325.0;
+    in.X = std::vector<double>(n, 0.0);
+    in.X[idx_CH4] = 0.095;  // Stoichiometric
+    in.X[idx_O2] = 0.19;
+    in.X[idx_N2] = 0.715;
+    
+    State result = combustion_equilibrium(in);
+    
+    // Temperature should be high
+    EXPECT_GT(result.T, 2200.0);
+    
+    // CH4 and O2 should be fully consumed
+    EXPECT_LT(result.X[idx_CH4], 1e-6);
+    EXPECT_LT(result.X[idx_O2], 1e-6);
+    
+    // Products should be mainly CO2 and H2O
+    EXPECT_GT(result.X[idx_CO2], 0.05);
+    EXPECT_GT(result.X[idx_H2O], 0.10);
+    
+    // Little CO/H2 at stoichiometric (WGS equilibrium)
+    EXPECT_LT(result.X[idx_CO], 0.01);
+    EXPECT_LT(result.X[idx_H2], 0.01);
+}

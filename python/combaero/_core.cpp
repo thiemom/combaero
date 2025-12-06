@@ -823,4 +823,27 @@ PYBIND11_MODULE(_core, m)
         "Returns State with equilibrium temperature and composition.\n"
         "Temperature decreases due to endothermic reforming reactions."
     );
+
+    // Combustion + Equilibrium (convenience function)
+    m.def(
+        "combustion_equilibrium",
+        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        {
+            State in;
+            in.T = T;
+            in.P = P;
+            in.X = to_vec(X_arr);
+            return combustion_equilibrium(in);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        py::arg("P") = 101325.0,
+        "Combustion + equilibrium in one step.\n\n"
+        "Combines complete combustion with reforming + WGS equilibrium.\n"
+        "Use this when starting from an unburned fuel+air mixture.\n\n"
+        "Workflow:\n"
+        "  1. Complete combustion (fuel + O2 -> CO2 + H2O)\n"
+        "  2. Reforming + WGS equilibrium on products\n\n"
+        "Returns State with equilibrium temperature and composition."
+    );
 }
