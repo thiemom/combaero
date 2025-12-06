@@ -1043,6 +1043,211 @@ TEST_F(ThermoTransportTest, ReformingEquilibriumAdiabatic) {
     EXPECT_GT(out.T, 1500.0);
 }
 
+// Test reforming with natural gas composition (CH4 + C2H6 + C3H8 + inerts)
+TEST_F(ThermoTransportTest, ReformingNaturalGasCombustion) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_C2H6 = species_index_from_name("C2H6");
+    const std::size_t idx_C3H8 = species_index_from_name("C3H8");
+    const std::size_t idx_H2O = species_index_from_name("H2O");
+    const std::size_t idx_CO = species_index_from_name("CO");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    const std::size_t idx_H2 = species_index_from_name("H2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    const std::size_t idx_AR = species_index_from_name("AR");
+    
+    // Simulate rich combustion products from natural gas
+    // Natural gas: ~90% CH4, ~5% C2H6, ~2% C3H8, ~2% N2, ~1% CO2
+    // After rich combustion, some unburned hydrocarbons remain
+    State in;
+    in.T = 2100.0;
+    in.P = 101325.0;
+    in.X = std::vector<double>(n, 0.0);
+    in.X[idx_CH4] = 0.012;   // Unburned CH4
+    in.X[idx_C2H6] = 0.002;  // Unburned C2H6
+    in.X[idx_C3H8] = 0.001;  // Unburned C3H8
+    in.X[idx_H2O] = 0.18;    // Combustion product
+    in.X[idx_CO2] = 0.09;    // Combustion product + fuel inert
+    in.X[idx_N2] = 0.705;    // Air N2 + fuel N2
+    in.X[idx_AR] = 0.01;     // Air Ar
+    
+    State out = reforming_equilibrium_adiabatic(in);
+    
+    // All hydrocarbons should be significantly reformed
+    EXPECT_LT(out.X[idx_CH4], in.X[idx_CH4] * 0.3);
+    EXPECT_LT(out.X[idx_C2H6], in.X[idx_C2H6] * 0.3);
+    EXPECT_LT(out.X[idx_C3H8], in.X[idx_C3H8] * 0.3);
+    
+    // CO and H2 should be produced
+    EXPECT_GT(out.X[idx_CO], 0.01);
+    EXPECT_GT(out.X[idx_H2], 0.01);
+    
+    // Inerts should be unchanged (relative to total moles via N2 reference)
+    double ar_per_n2_in = in.X[idx_AR] / in.X[idx_N2];
+    double ar_per_n2_out = out.X[idx_AR] / out.X[idx_N2];
+    EXPECT_NEAR(ar_per_n2_in, ar_per_n2_out, 1e-10);
+    
+    // Temperature should drop (endothermic reforming)
+    EXPECT_LT(out.T, in.T);
+}
+
+// Test reforming with heavier hydrocarbons (C4+)
+TEST_F(ThermoTransportTest, ReformingHeavyHydrocarbons) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_C3H8 = species_index_from_name("C3H8");
+    const std::size_t idx_IC4H10 = species_index_from_name("IC4H10");
+    const std::size_t idx_NC5H12 = species_index_from_name("NC5H12");
+    const std::size_t idx_H2O = species_index_from_name("H2O");
+    const std::size_t idx_CO = species_index_from_name("CO");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    const std::size_t idx_H2 = species_index_from_name("H2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    const std::size_t idx_AR = species_index_from_name("AR");
+    
+    // Mixture with heavier hydrocarbons (simulating LPG or gasoline-like fuel)
+    State in;
+    in.T = 2000.0;
+    in.P = 101325.0;
+    in.X = std::vector<double>(n, 0.0);
+    in.X[idx_CH4] = 0.005;    // Small amount of CH4
+    in.X[idx_C3H8] = 0.008;   // Propane
+    in.X[idx_IC4H10] = 0.004; // Isobutane
+    in.X[idx_NC5H12] = 0.002; // n-Pentane
+    in.X[idx_H2O] = 0.20;
+    in.X[idx_CO2] = 0.08;
+    in.X[idx_N2] = 0.69;
+    in.X[idx_AR] = 0.011;
+    
+    State out = reforming_equilibrium(in);
+    
+    // All hydrocarbons should be reformed at high T
+    EXPECT_LT(out.X[idx_CH4], in.X[idx_CH4] * 0.5);
+    EXPECT_LT(out.X[idx_C3H8], in.X[idx_C3H8] * 0.5);
+    EXPECT_LT(out.X[idx_IC4H10], in.X[idx_IC4H10] * 0.5);
+    EXPECT_LT(out.X[idx_NC5H12], in.X[idx_NC5H12] * 0.5);
+    
+    // CO and H2 should be produced
+    EXPECT_GT(out.X[idx_CO], 0.01);
+    EXPECT_GT(out.X[idx_H2], 0.01);
+    
+    // Element balance: C atoms per N2 should be conserved
+    double n2_in = in.X[idx_N2];
+    double n2_out = out.X[idx_N2];
+    
+    // C atoms: 1*CH4 + 3*C3H8 + 4*iC4H10 + 5*nC5H12 + CO + CO2
+    double C_per_N2_in = (in.X[idx_CH4] + 3*in.X[idx_C3H8] + 4*in.X[idx_IC4H10] 
+                        + 5*in.X[idx_NC5H12] + in.X[idx_CO] + in.X[idx_CO2]) / n2_in;
+    double C_per_N2_out = (out.X[idx_CH4] + 3*out.X[idx_C3H8] + 4*out.X[idx_IC4H10]
+                         + 5*out.X[idx_NC5H12] + out.X[idx_CO] + out.X[idx_CO2]) / n2_out;
+    EXPECT_NEAR(C_per_N2_in, C_per_N2_out, 1e-6);
+    
+    // H atoms per N2 should be conserved
+    // H atoms: 4*CH4 + 8*C3H8 + 10*iC4H10 + 12*nC5H12 + 2*H2O + 2*H2
+    double H_per_N2_in = (4*in.X[idx_CH4] + 8*in.X[idx_C3H8] + 10*in.X[idx_IC4H10]
+                        + 12*in.X[idx_NC5H12] + 2*in.X[idx_H2O] + 2*in.X[idx_H2]) / n2_in;
+    double H_per_N2_out = (4*out.X[idx_CH4] + 8*out.X[idx_C3H8] + 10*out.X[idx_IC4H10]
+                         + 12*out.X[idx_NC5H12] + 2*out.X[idx_H2O] + 2*out.X[idx_H2]) / n2_out;
+    EXPECT_NEAR(H_per_N2_in, H_per_N2_out, 1e-6);
+    
+    // Ar should be unchanged relative to N2
+    double ar_per_n2_in = in.X[idx_AR] / n2_in;
+    double ar_per_n2_out = out.X[idx_AR] / n2_out;
+    EXPECT_NEAR(ar_per_n2_in, ar_per_n2_out, 1e-10);
+}
+
+// Test reforming with only C2+ hydrocarbons (no CH4)
+TEST_F(ThermoTransportTest, ReformingC2PlusOnly) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_C2H6 = species_index_from_name("C2H6");
+    const std::size_t idx_C3H8 = species_index_from_name("C3H8");
+    const std::size_t idx_H2O = species_index_from_name("H2O");
+    const std::size_t idx_CO = species_index_from_name("CO");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    const std::size_t idx_H2 = species_index_from_name("H2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    // Mixture with only C2+ hydrocarbons (no CH4)
+    State in;
+    in.T = 2000.0;
+    in.P = 101325.0;
+    in.X = std::vector<double>(n, 0.0);
+    in.X[idx_CH4] = 0.0;      // No CH4!
+    in.X[idx_C2H6] = 0.010;   // Ethane only
+    in.X[idx_C3H8] = 0.005;   // Propane
+    in.X[idx_H2O] = 0.20;
+    in.X[idx_CO2] = 0.085;
+    in.X[idx_N2] = 0.70;
+    
+    State out = reforming_equilibrium(in);
+    
+    // C2H6 and C3H8 should be reformed even without CH4
+    EXPECT_LT(out.X[idx_C2H6], in.X[idx_C2H6] * 0.5);
+    EXPECT_LT(out.X[idx_C3H8], in.X[idx_C3H8] * 0.5);
+    
+    // CO and H2 should be produced
+    EXPECT_GT(out.X[idx_CO], 0.01);
+    EXPECT_GT(out.X[idx_H2], 0.01);
+    
+    // Element balance: C atoms per N2
+    double n2_in = in.X[idx_N2];
+    double n2_out = out.X[idx_N2];
+    double C_per_N2_in = (in.X[idx_CH4] + 2*in.X[idx_C2H6] + 3*in.X[idx_C3H8]
+                        + in.X[idx_CO] + in.X[idx_CO2]) / n2_in;
+    double C_per_N2_out = (out.X[idx_CH4] + 2*out.X[idx_C2H6] + 3*out.X[idx_C3H8]
+                         + out.X[idx_CO] + out.X[idx_CO2]) / n2_out;
+    EXPECT_NEAR(C_per_N2_in, C_per_N2_out, 1e-6);
+}
+
+// Test reforming with pre-existing CO and H2
+TEST_F(ThermoTransportTest, ReformingWithExistingCOH2) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_C2H6 = species_index_from_name("C2H6");
+    const std::size_t idx_H2O = species_index_from_name("H2O");
+    const std::size_t idx_CO = species_index_from_name("CO");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    const std::size_t idx_H2 = species_index_from_name("H2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    const std::size_t idx_AR = species_index_from_name("AR");
+    
+    // Mixture with pre-existing CO and H2 (partial reforming already occurred)
+    State in;
+    in.T = 2000.0;
+    in.P = 101325.0;
+    in.X = std::vector<double>(n, 0.0);
+    in.X[idx_CH4] = 0.010;
+    in.X[idx_C2H6] = 0.003;
+    in.X[idx_H2O] = 0.18;
+    in.X[idx_CO] = 0.02;     // Pre-existing CO
+    in.X[idx_CO2] = 0.07;
+    in.X[idx_H2] = 0.01;     // Pre-existing H2
+    in.X[idx_N2] = 0.70;
+    in.X[idx_AR] = 0.007;
+    
+    State out = reforming_equilibrium(in);
+    
+    // Hydrocarbons should still be reformed
+    EXPECT_LT(out.X[idx_CH4], in.X[idx_CH4] * 0.5);
+    EXPECT_LT(out.X[idx_C2H6], in.X[idx_C2H6] * 0.5);
+    
+    // CO and H2 should increase further
+    EXPECT_GT(out.X[idx_CO], in.X[idx_CO]);
+    EXPECT_GT(out.X[idx_H2], in.X[idx_H2]);
+    
+    // Element balance
+    double n2_in = in.X[idx_N2];
+    double n2_out = out.X[idx_N2];
+    
+    double C_per_N2_in = (in.X[idx_CH4] + 2*in.X[idx_C2H6] + in.X[idx_CO] + in.X[idx_CO2]) / n2_in;
+    double C_per_N2_out = (out.X[idx_CH4] + 2*out.X[idx_C2H6] + out.X[idx_CO] + out.X[idx_CO2]) / n2_out;
+    EXPECT_NEAR(C_per_N2_in, C_per_N2_out, 1e-6);
+    
+    // Ar unchanged
+    EXPECT_NEAR(in.X[idx_AR] / n2_in, out.X[idx_AR] / n2_out, 1e-10);
+}
+
 // Test element conservation in SMR+WGS
 // Note: SMR changes total moles (Δn=2), so we need to account for this
 // when checking element balance. We use the ratio of elements to N2
