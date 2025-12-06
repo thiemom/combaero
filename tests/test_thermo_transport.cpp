@@ -801,6 +801,333 @@ TEST_F(ThermoTransportTest, SetFuelStreamForPhi) {
 }
 
 // =============================================================================
+// Hydrocarbon Mixture Tests (Combustion, Mixing, Thermo)
+// =============================================================================
+
+// Test thermo properties for natural gas mixture
+TEST_F(ThermoTransportTest, ThermoPropertiesNaturalGasMixture) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_C2H6 = species_index_from_name("C2H6");
+    const std::size_t idx_C3H8 = species_index_from_name("C3H8");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    
+    // Natural gas composition: ~90% CH4, 5% C2H6, 2% C3H8, 2% N2, 1% CO2
+    State ng;
+    ng.T = 300.0;
+    ng.P = 101325.0;
+    ng.X = std::vector<double>(n, 0.0);
+    ng.X[idx_CH4] = 0.90;
+    ng.X[idx_C2H6] = 0.05;
+    ng.X[idx_C3H8] = 0.02;
+    ng.X[idx_N2] = 0.02;
+    ng.X[idx_CO2] = 0.01;
+    
+    // Verify thermo properties are reasonable
+    EXPECT_GT(ng.cp(), 30.0);  // J/(mol·K)
+    EXPECT_LT(ng.cp(), 50.0);
+    EXPECT_GT(ng.rho(), 0.5);  // kg/m³
+    EXPECT_LT(ng.rho(), 1.5);
+    EXPECT_GT(ng.mw(), 16.0);  // g/mol (CH4 is 16)
+    EXPECT_LT(ng.mw(), 20.0);
+    
+    // Enthalpy should be negative (formation enthalpy of hydrocarbons)
+    EXPECT_LT(h(ng.T, ng.X), 0.0);
+    
+    // Transport properties
+    EXPECT_GT(ng.mu(), 1e-6);  // Pa·s
+    EXPECT_LT(ng.mu(), 2e-5);
+    EXPECT_GT(ng.Pr(), 0.6);
+    EXPECT_LT(ng.Pr(), 1.0);
+}
+
+// Test mixing of natural gas with humid air
+TEST_F(ThermoTransportTest, MixingNaturalGasWithHumidAir) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_C2H6 = species_index_from_name("C2H6");
+    const std::size_t idx_C3H8 = species_index_from_name("C3H8");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    const std::size_t idx_H2O = species_index_from_name("H2O");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_AR = species_index_from_name("AR");
+    
+    // Natural gas fuel
+    State ng;
+    ng.T = 300.0;
+    ng.P = 101325.0;
+    ng.X = std::vector<double>(n, 0.0);
+    ng.X[idx_CH4] = 0.90;
+    ng.X[idx_C2H6] = 0.05;
+    ng.X[idx_C3H8] = 0.02;
+    ng.X[idx_N2] = 0.02;
+    ng.X[idx_CO2] = 0.01;
+    
+    Stream fuel;
+    fuel.state = ng;
+    fuel.mdot = 1.0;  // 1 kg/s
+    
+    // Humid air
+    std::vector<double> X_air = humid_air_composition(298.15, 101325.0, 0.5);
+    State air_state;
+    air_state.T = 298.15;
+    air_state.P = 101325.0;
+    air_state.X = X_air;
+    Stream air;
+    air.state = air_state;
+    air.mdot = 20.0;  // 20 kg/s
+    
+    // Mix streams
+    Stream mixed = mix({fuel, air});
+    
+    // Verify mixing conserves mass
+    EXPECT_NEAR(mixed.mdot, fuel.mdot + air.mdot, 1e-10);
+    
+    // Verify all species are present
+    EXPECT_GT(mixed.X()[idx_CH4], 0.0);
+    EXPECT_GT(mixed.X()[idx_C2H6], 0.0);
+    EXPECT_GT(mixed.X()[idx_C3H8], 0.0);
+    EXPECT_GT(mixed.X()[idx_O2], 0.0);
+    EXPECT_GT(mixed.X()[idx_N2], 0.0);
+    EXPECT_GT(mixed.X()[idx_H2O], 0.0);
+    EXPECT_GT(mixed.X()[idx_AR], 0.0);
+    
+    // Mole fractions should sum to 1
+    double sum = 0.0;
+    for (double x : mixed.X()) sum += x;
+    EXPECT_NEAR(sum, 1.0, 1e-10);
+}
+
+// Test complete combustion of natural gas mixture
+TEST_F(ThermoTransportTest, CompleteCombustionNaturalGas) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_C2H6 = species_index_from_name("C2H6");
+    const std::size_t idx_C3H8 = species_index_from_name("C3H8");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    const std::size_t idx_H2O = species_index_from_name("H2O");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_AR = species_index_from_name("AR");
+    
+    // Natural gas fuel
+    State ng;
+    ng.T = 300.0;
+    ng.P = 101325.0;
+    ng.X = std::vector<double>(n, 0.0);
+    ng.X[idx_CH4] = 0.90;
+    ng.X[idx_C2H6] = 0.05;
+    ng.X[idx_C3H8] = 0.02;
+    ng.X[idx_N2] = 0.02;
+    ng.X[idx_CO2] = 0.01;
+    
+    Stream fuel;
+    fuel.state = ng;
+    fuel.mdot = 1.0;
+    
+    // Humid air
+    std::vector<double> X_air = humid_air_composition(298.15, 101325.0, 0.5);
+    State air_state;
+    air_state.T = 298.15;
+    air_state.P = 101325.0;
+    air_state.X = X_air;
+    Stream air;
+    air.state = air_state;
+    air.mdot = 20.0;  // Excess air for complete combustion
+    
+    // Mix and combust
+    Stream mixed = mix({fuel, air});
+    State burned = complete_combustion(mixed.state);
+    
+    // All hydrocarbons should be consumed
+    EXPECT_LT(burned.X[idx_CH4], 1e-10);
+    EXPECT_LT(burned.X[idx_C2H6], 1e-10);
+    EXPECT_LT(burned.X[idx_C3H8], 1e-10);
+    
+    // CO2 and H2O should be produced
+    EXPECT_GT(burned.X[idx_CO2], 0.05);
+    EXPECT_GT(burned.X[idx_H2O], 0.10);
+    
+    // Temperature should increase significantly
+    EXPECT_GT(burned.T, 1500.0);
+    
+    // Inerts should still be present
+    EXPECT_GT(burned.X[idx_N2], 0.5);
+    EXPECT_GT(burned.X[idx_AR], 0.001);
+}
+
+// Test equivalence ratio calculation with natural gas
+TEST_F(ThermoTransportTest, EquivalenceRatioNaturalGas) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_C2H6 = species_index_from_name("C2H6");
+    const std::size_t idx_C3H8 = species_index_from_name("C3H8");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    
+    // Natural gas fuel
+    State ng;
+    ng.T = 300.0;
+    ng.P = 101325.0;
+    ng.X = std::vector<double>(n, 0.0);
+    ng.X[idx_CH4] = 0.90;
+    ng.X[idx_C2H6] = 0.05;
+    ng.X[idx_C3H8] = 0.02;
+    ng.X[idx_N2] = 0.02;
+    ng.X[idx_CO2] = 0.01;
+    
+    Stream fuel;
+    fuel.state = ng;
+    fuel.mdot = 1.0;
+    
+    // Humid air
+    std::vector<double> X_air = humid_air_composition(298.15, 101325.0, 0.5);
+    State air_state;
+    air_state.T = 298.15;
+    air_state.P = 101325.0;
+    air_state.X = X_air;
+    Stream air;
+    air.state = air_state;
+    air.mdot = 10.0;
+    
+    // Test set_fuel_stream_for_phi with natural gas
+    Stream fuel_stoich = set_fuel_stream_for_phi(1.0, fuel, air);
+    EXPECT_GT(fuel_stoich.mdot, 0.0);
+    
+    // Mix and verify equivalence ratio
+    Stream mixed = mix({fuel_stoich, air});
+    std::vector<double> Y_fuel = mole_to_mass(fuel.X());
+    std::vector<double> Y_air = mole_to_mass(air.X());
+    std::vector<double> Y_mix = mole_to_mass(mixed.X());
+    
+    double phi_check = equivalence_ratio_mass(Y_mix, Y_fuel, Y_air);
+    EXPECT_NEAR(phi_check, 1.0, 0.02);
+    
+    // Test rich case
+    Stream fuel_rich = set_fuel_stream_for_phi(1.2, fuel, air);
+    Stream mixed_rich = mix({fuel_rich, air});
+    std::vector<double> Y_mix_rich = mole_to_mass(mixed_rich.X());
+    double phi_rich = equivalence_ratio_mass(Y_mix_rich, Y_fuel, Y_air);
+    EXPECT_NEAR(phi_rich, 1.2, 0.02);
+}
+
+// Test LPG (propane/butane) combustion
+TEST_F(ThermoTransportTest, CompleteCombustionLPG) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_C3H8 = species_index_from_name("C3H8");
+    const std::size_t idx_IC4H10 = species_index_from_name("IC4H10");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    const std::size_t idx_H2O = species_index_from_name("H2O");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_AR = species_index_from_name("AR");
+    
+    // LPG: ~60% propane, 40% butane
+    State lpg;
+    lpg.T = 300.0;
+    lpg.P = 101325.0;
+    lpg.X = std::vector<double>(n, 0.0);
+    lpg.X[idx_C3H8] = 0.60;
+    lpg.X[idx_IC4H10] = 0.40;
+    
+    Stream fuel;
+    fuel.state = lpg;
+    fuel.mdot = 1.0;
+    
+    // Dry air
+    std::vector<double> X_air = humid_air_composition(298.15, 101325.0, 0.0);
+    State air_state;
+    air_state.T = 298.15;
+    air_state.P = 101325.0;
+    air_state.X = X_air;
+    Stream air;
+    air.state = air_state;
+    air.mdot = 25.0;  // Excess air
+    
+    // Mix and combust
+    Stream mixed = mix({fuel, air});
+    State burned = complete_combustion(mixed.state);
+    
+    // All hydrocarbons consumed
+    EXPECT_LT(burned.X[idx_C3H8], 1e-10);
+    EXPECT_LT(burned.X[idx_IC4H10], 1e-10);
+    
+    // Products formed
+    EXPECT_GT(burned.X[idx_CO2], 0.05);
+    EXPECT_GT(burned.X[idx_H2O], 0.08);
+    
+    // Temperature increase
+    EXPECT_GT(burned.T, 1500.0);
+    
+    // Inerts present
+    EXPECT_GT(burned.X[idx_N2], 0.5);
+    EXPECT_GT(burned.X[idx_AR], 0.001);
+}
+
+// Test rich combustion with natural gas produces unburned hydrocarbons
+TEST_F(ThermoTransportTest, RichCombustionNaturalGasUnburnedHC) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_C2H6 = species_index_from_name("C2H6");
+    const std::size_t idx_C3H8 = species_index_from_name("C3H8");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    const std::size_t idx_H2O = species_index_from_name("H2O");
+    const std::size_t idx_CO = species_index_from_name("CO");
+    const std::size_t idx_H2 = species_index_from_name("H2");
+    
+    // Natural gas fuel
+    State ng;
+    ng.T = 300.0;
+    ng.P = 101325.0;
+    ng.X = std::vector<double>(n, 0.0);
+    ng.X[idx_CH4] = 0.90;
+    ng.X[idx_C2H6] = 0.05;
+    ng.X[idx_C3H8] = 0.02;
+    ng.X[idx_N2] = 0.02;
+    ng.X[idx_CO2] = 0.01;
+    
+    Stream fuel;
+    fuel.state = ng;
+    fuel.mdot = 1.0;
+    
+    // Humid air
+    std::vector<double> X_air = humid_air_composition(298.15, 101325.0, 0.5);
+    State air_state;
+    air_state.T = 298.15;
+    air_state.P = 101325.0;
+    air_state.X = X_air;
+    Stream air;
+    air.state = air_state;
+    air.mdot = 10.0;
+    
+    // Rich mixture (phi = 1.3)
+    Stream fuel_rich = set_fuel_stream_for_phi(1.3, fuel, air);
+    Stream mixed = mix({fuel_rich, air});
+    State burned = complete_combustion(mixed.state);
+    
+    // Some unburned hydrocarbons should remain
+    double total_hc = burned.X[idx_CH4] + burned.X[idx_C2H6] + burned.X[idx_C3H8];
+    EXPECT_GT(total_hc, 0.005);
+    
+    // Apply reforming equilibrium
+    State eq = reforming_equilibrium_adiabatic(burned);
+    
+    // Hydrocarbons should be reformed
+    double total_hc_eq = eq.X[idx_CH4] + eq.X[idx_C2H6] + eq.X[idx_C3H8];
+    EXPECT_LT(total_hc_eq, total_hc * 0.5);
+    
+    // CO and H2 should be produced
+    EXPECT_GT(eq.X[idx_CO], 0.01);
+    EXPECT_GT(eq.X[idx_H2], 0.01);
+    
+    // Temperature should drop (endothermic reforming)
+    EXPECT_LT(eq.T, burned.T);
+}
+
+// =============================================================================
 // SMR+WGS Equilibrium Tests
 // =============================================================================
 
