@@ -9,14 +9,13 @@
 #include <vector>
 
 /**
- * Combustion Example: Fuel + Humid Air -> Mix -> Combust
+ * Combustion Example: Fuel + Humid Air -> Mix -> Combust -> Equilibrium
  *
  * Demonstrates:
  * - Using set_fuel_stream_for_phi to configure fuel stream for target phi
  * - Stream mixing with enthalpy balance
- * - Complete combustion (CO2 + H2O products)
- * - WGS equilibrium (CO + H2O <-> CO2 + H2)
- * - Varying equivalence ratio from lean to stoichiometric
+ * - combustion_equilibrium: one-step combustion + reforming + WGS equilibrium
+ * - Varying equivalence ratio from lean to rich
  */
 int main()
 {
@@ -61,7 +60,6 @@ int main()
     std::cout << std::setw(6) << "phi"
               << std::setw(10) << "mdot_f"
               << std::setw(10) << "T_mix"
-              << std::setw(10) << "T_ad"
               << std::setw(10) << "T_eq"
               << std::setw(12) << "mu_eq"
               << std::setw(12) << "Pr_eq"
@@ -70,11 +68,10 @@ int main()
               << std::setw(10) << "[kg/s]"
               << std::setw(10) << "[K]"
               << std::setw(10) << "[K]"
-              << std::setw(10) << "[K]"
               << std::setw(12) << "[uPa.s]"
               << std::setw(12) << "[-]"
               << "\n";
-    std::cout << std::string(70, '-') << "\n";
+    std::cout << std::string(60, '-') << "\n";
 
     for (double phi = 0.5; phi <= 1.21; phi += 0.1) {
         // Use set_fuel_stream_for_phi to get fuel stream with correct mdot
@@ -83,21 +80,16 @@ int main()
         // Mix streams (enthalpy balance gives mixed temperature)
         Stream mixed = mix({fuel_phi, air});
 
-        // Complete combustion (adiabatic, CO2 + H2O products)
-        State burned_complete = complete_combustion(mixed.state);
-
-        // General reforming + WGS equilibrium on burned products
-        // CnHm + n*H2O <-> n*CO + (n+m/2)*H2 (reforming) and CO + H2O <-> CO2 + H2 (WGS)
-        State burned_eq = reforming_equilibrium_adiabatic(burned_complete);
+        // One-step: combustion + reforming + WGS equilibrium
+        State eq = combustion_equilibrium(mixed.state);
 
         // Output results
         std::cout << std::setw(6) << phi
                   << std::setw(10) << fuel_phi.mdot
                   << std::setw(10) << mixed.state.T
-                  << std::setw(10) << burned_complete.T
-                  << std::setw(10) << burned_eq.T
-                  << std::setw(12) << burned_eq.mu() * 1.0e6  // convert to μPa·s
-                  << std::setw(12) << burned_eq.Pr()
+                  << std::setw(10) << eq.T
+                  << std::setw(12) << eq.mu() * 1.0e6  // convert to μPa·s
+                  << std::setw(12) << eq.Pr()
                   << "\n";
     }
 
@@ -114,8 +106,12 @@ int main()
     // Use set_fuel_stream_for_phi for stoichiometric mixture
     Stream fuel_stoich = set_fuel_stream_for_phi(1.0, fuel, air);
     Stream mixed_stoich = mix({fuel_stoich, air});
+    
+    // One-step: combustion + reforming + WGS equilibrium
+    State eq_stoich = combustion_equilibrium(mixed_stoich.state);
+    
+    // For comparison, also show complete combustion (before equilibrium)
     State burned_stoich = complete_combustion(mixed_stoich.state);
-    State eq_stoich = reforming_equilibrium_adiabatic(burned_stoich);
 
     std::cout << "Mixed Stream (before combustion):\n";
     std::cout << "  T = " << mixed_stoich.state.T << " K\n";
@@ -158,8 +154,12 @@ int main()
 
     Stream fuel_rich = set_fuel_stream_for_phi(1.2, fuel, air);
     Stream mixed_rich = mix({fuel_rich, air});
+    
+    // One-step: combustion + reforming + WGS equilibrium
+    State eq_rich = combustion_equilibrium(mixed_rich.state);
+    
+    // For comparison, also show complete combustion (before equilibrium)
     State burned_rich = complete_combustion(mixed_rich.state);
-    State eq_rich = reforming_equilibrium_adiabatic(burned_rich);
 
     std::cout << "Complete Combustion (before equilibrium):\n";
     std::cout << "  T_ad = " << burned_rich.T << " K\n";

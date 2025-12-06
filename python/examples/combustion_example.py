@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Combustion example: Natural gas + humid air with reforming equilibrium.
+"""Combustion example: Natural gas + humid air with combustion_equilibrium.
 
 This example demonstrates:
 - Creating fuel and air streams
 - Mixing streams with enthalpy balance
-- Complete combustion calculation
-- Reforming + WGS equilibrium for rich mixtures
-- Equivalence ratio sweep
+- combustion_equilibrium: one-step combustion + reforming + WGS equilibrium
+- Equivalence ratio sweep from lean to rich
 """
 from __future__ import annotations
 
@@ -61,20 +60,21 @@ def main() -> None:
 
     print("\nEquivalence Ratio Sweep")
     print("-" * 75)
-    print(f"{'phi':>6s} {'mdot_f':>10s} {'T_mix':>10s} {'T_ad':>10s} "
-          f"{'T_eq':>10s} {'X_CO':>10s} {'X_H2':>10s}")
+    print(f"{'phi':>6s} {'mdot_f':>10s} {'T_mix':>10s} {'T_eq':>10s} "
+          f"{'X_CO':>10s} {'X_H2':>10s}")
     print(f"{'[-]':>6s} {'[kg/s]':>10s} {'[K]':>10s} {'[K]':>10s} "
-          f"{'[K]':>10s} {'[%]':>10s} {'[%]':>10s}")
-    print("-" * 75)
+          f"{'[%]':>10s} {'[%]':>10s}")
+    print("-" * 65)
+
+    # Pre-calculate stoichiometric ratio
+    Y_fuel = np.array(ca.mole_to_mass(list(X_fuel)))
+    Y_air = np.array(ca.mole_to_mass(list(X_air)))
+    stoich_ratio = ca.bilger_stoich_mixture_fraction_mass(list(Y_fuel), list(Y_air))
 
     for phi in np.arange(0.5, 1.25, 0.1):
         # Calculate fuel mass flow for target equivalence ratio
-        Y_fuel = np.array(ca.mole_to_mass(list(X_fuel)))
-        Y_air = np.array(ca.mole_to_mass(list(X_air)))
-        stoich_ratio = ca.bilger_stoich_mixture_fraction_mass(list(Y_fuel), list(Y_air))
-
-        # For phi, we need: Z = phi * Z_st / (1 + (phi - 1) * Z_st)
-        # And Z = mdot_fuel / (mdot_fuel + mdot_air)
+        # Z = phi * Z_st / (1 + (phi - 1) * Z_st)
+        # Z = mdot_fuel / (mdot_fuel + mdot_air)
         Z_target = phi * stoich_ratio / (1 + (phi - 1) * stoich_ratio)
         mdot_fuel = Z_target * air.mdot / (1 - Z_target)
 
@@ -83,18 +83,15 @@ def main() -> None:
         # Mix streams
         mixed = ca.mix([fuel, air])
 
-        # Complete combustion
-        burned = ca.complete_combustion(mixed.T, mixed.X, mixed.P)
-
-        # Reforming + WGS equilibrium
-        eq = ca.reforming_equilibrium_adiabatic(burned.T, burned.X, burned.P)
+        # One-step: combustion + reforming + WGS equilibrium
+        eq = ca.combustion_equilibrium(mixed.T, mixed.X, mixed.P)
 
         # Get CO and H2 mole fractions
         X_CO = eq.X[sp.indices["CO"]] * 100
         X_H2 = eq.X[sp.indices["H2"]] * 100
 
-        print(f"{phi:6.2f} {mdot_fuel:10.4f} {mixed.T:10.2f} {burned.T:10.2f} "
-              f"{eq.T:10.2f} {X_CO:10.4f} {X_H2:10.4f}")
+        print(f"{phi:6.2f} {mdot_fuel:10.4f} {mixed.T:10.2f} {eq.T:10.2f} "
+              f"{X_CO:10.4f} {X_H2:10.4f}")
 
     # =========================================================================
     # Detailed results at stoichiometric
@@ -108,8 +105,12 @@ def main() -> None:
     fuel.mdot = Z_target * air.mdot / (1 - Z_target)
 
     mixed = ca.mix([fuel, air])
+    
+    # One-step: combustion + reforming + WGS equilibrium
+    eq = ca.combustion_equilibrium(mixed.T, mixed.X, mixed.P)
+    
+    # For comparison, also show complete combustion (before equilibrium)
     burned = ca.complete_combustion(mixed.T, mixed.X, mixed.P)
-    eq = ca.reforming_equilibrium_adiabatic(burned.T, burned.X, burned.P)
 
     print(f"\nMixed Stream (before combustion):")
     print(f"  T = {mixed.T:.2f} K")
@@ -119,7 +120,7 @@ def main() -> None:
     print(f"\nComplete Combustion (CO2 + H2O only):")
     print(f"  T_ad = {burned.T:.2f} K")
 
-    print(f"\nReforming + WGS Equilibrium:")
+    print(f"\nCombustion + Equilibrium (one-step):")
     print(f"  T_eq = {eq.T:.2f} K")
 
     print(f"\nProduct Composition (mole fractions > 0.1%):")
@@ -139,8 +140,12 @@ def main() -> None:
     fuel.mdot = Z_target * air.mdot / (1 - Z_target)
 
     mixed = ca.mix([fuel, air])
+    
+    # One-step: combustion + reforming + WGS equilibrium
+    eq = ca.combustion_equilibrium(mixed.T, mixed.X, mixed.P)
+    
+    # For comparison, also show complete combustion (before equilibrium)
     burned = ca.complete_combustion(mixed.T, mixed.X, mixed.P)
-    eq = ca.reforming_equilibrium_adiabatic(burned.T, burned.X, burned.P)
 
     print(f"\nComplete Combustion (before equilibrium):")
     print(f"  T_ad = {burned.T:.2f} K")
@@ -149,7 +154,7 @@ def main() -> None:
         if burned.X[sp.indices[hc]] > 1e-6:
             print(f"    {hc}: {burned.X[sp.indices[hc]]*100:.4f}%")
 
-    print(f"\nReforming + WGS Equilibrium (hydrocarbons reformed to CO + H2):")
+    print(f"\nCombustion + Equilibrium (one-step, hydrocarbons reformed to CO + H2):")
     print(f"  T_eq = {eq.T:.2f} K (dropped {burned.T - eq.T:.1f} K)")
     print(f"  Product composition:")
     for i, name in enumerate(sp.names):
