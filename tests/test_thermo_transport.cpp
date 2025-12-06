@@ -4,6 +4,7 @@
 #include "../include/transport.h"
 #include "../include/combustion.h"
 #include "../include/equilibrium.h"
+#include "../include/humidair.h"
 #include <vector>
 #include <cmath>
 
@@ -755,4 +756,46 @@ TEST_F(ThermoTransportTest, DryAirRequirements) {
     
     double air_per_kg_mix = dryair_required_per_kg_mixture(X_fuel);
     EXPECT_NEAR(air_per_kg_mix, air_per_kg, 1e-10);
+}
+
+// Test set_fuel_stream_for_phi
+TEST_F(ThermoTransportTest, SetFuelStreamForPhi) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    
+    // Fuel stream: pure CH4
+    Stream fuel;
+    fuel.state.T = 300.0;
+    fuel.state.P = 101325.0;
+    fuel.state.X = std::vector<double>(n, 0.0);
+    fuel.state.X[idx_CH4] = 1.0;
+    
+    // Oxidizer stream: dry air at 10 kg/s
+    Stream air;
+    air.state.T = 300.0;
+    air.state.P = 101325.0;
+    air.state.X = standard_dry_air_composition();
+    air.mdot = 10.0;
+    
+    // Test stoichiometric case (phi = 1.0)
+    Stream fuel_stoich = set_fuel_stream_for_phi(1.0, fuel, air);
+    EXPECT_GT(fuel_stoich.mdot, 0.0);
+    
+    // Mix and verify equivalence ratio
+    Stream mixed = mix({fuel_stoich, air});
+    std::vector<double> Y_fuel = mole_to_mass(fuel.X());
+    std::vector<double> Y_air = mole_to_mass(air.X());
+    std::vector<double> Y_mix = mole_to_mass(mixed.X());
+    
+    double phi_check = equivalence_ratio_mass(Y_mix, Y_fuel, Y_air);
+    EXPECT_NEAR(phi_check, 1.0, 0.01);
+    
+    // Test lean case (phi = 0.5)
+    Stream fuel_lean = set_fuel_stream_for_phi(0.5, fuel, air);
+    EXPECT_LT(fuel_lean.mdot, fuel_stoich.mdot);
+    
+    Stream mixed_lean = mix({fuel_lean, air});
+    std::vector<double> Y_mix_lean = mole_to_mass(mixed_lean.X());
+    double phi_lean = equivalence_ratio_mass(Y_mix_lean, Y_fuel, Y_air);
+    EXPECT_NEAR(phi_lean, 0.5, 0.01);
 }

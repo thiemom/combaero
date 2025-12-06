@@ -762,6 +762,62 @@ double bilger_mixture_fraction_from_moles(
 }
 
 // -------------------------------------------------------------
+// Stream-based equivalence ratio helpers
+// -------------------------------------------------------------
+
+Stream set_fuel_stream_for_phi(double phi, const Stream& fuel, const Stream& oxidizer) {
+    if (phi <= 0.0) {
+        throw std::invalid_argument("set_fuel_stream_for_phi: phi must be positive");
+    }
+    if (oxidizer.mdot <= 0.0) {
+        throw std::invalid_argument("set_fuel_stream_for_phi: oxidizer.mdot must be positive");
+    }
+
+    // Convert to mass fractions
+    std::vector<double> Y_fuel = mole_to_mass(fuel.X());
+    std::vector<double> Y_ox = mole_to_mass(oxidizer.X());
+
+    // Get mixture mass fractions for target phi
+    std::vector<double> Y_mix = set_equivalence_ratio_mass(phi, Y_fuel, Y_ox);
+
+    // Calculate fuel mass flow from mixture composition
+    // Y_mix = (mdot_fuel * Y_fuel + mdot_ox * Y_ox) / (mdot_fuel + mdot_ox)
+    //
+    // For a fuel-only species k (where Y_ox[k] = 0):
+    //   Y_mix[k] = mdot_fuel * Y_fuel[k] / (mdot_fuel + mdot_ox)
+    //   => mdot_fuel / (mdot_fuel + mdot_ox) = Y_mix[k] / Y_fuel[k]
+    //
+    // Find a fuel species (present in fuel but not in oxidizer)
+    double alpha = -1.0;
+    for (std::size_t i = 0; i < Y_fuel.size(); ++i) {
+        if (Y_fuel[i] > 1e-10 && Y_ox[i] < 1e-10) {
+            // This is a fuel-only species
+            alpha = Y_mix[i] / Y_fuel[i];
+            break;
+        }
+    }
+
+    if (alpha < 0.0) {
+        throw std::runtime_error(
+            "set_fuel_stream_for_phi: no fuel-only species found "
+            "(fuel must contain species not present in oxidizer)");
+    }
+
+    // mdot_fuel / (mdot_fuel + mdot_ox) = alpha
+    // => mdot_fuel = alpha * mdot_ox / (1 - alpha)
+    if (alpha >= 1.0 || alpha <= 0.0) {
+        throw std::runtime_error("set_fuel_stream_for_phi: invalid mass fraction ratio");
+    }
+
+    double mdot_fuel = alpha * oxidizer.mdot / (1.0 - alpha);
+
+    // Return fuel stream with computed mdot
+    Stream result = fuel;
+    result.mdot = mdot_fuel;
+    return result;
+}
+
+// -------------------------------------------------------------
 // State-based combustion functions
 // -------------------------------------------------------------
 

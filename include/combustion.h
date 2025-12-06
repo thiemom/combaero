@@ -103,6 +103,22 @@ double bilger_mixture_fraction_from_moles(
 );
 
 // -------------------------------------------------------------
+// Stream-based equivalence ratio helpers
+// -------------------------------------------------------------
+
+// Given a target equivalence ratio phi, a fuel stream (composition only, mdot ignored),
+// and an oxidizer stream (with mdot set), return a copy of the fuel stream with mdot
+// set to achieve the target phi when mixed with the oxidizer.
+//
+// Example:
+//   Stream fuel, air;
+//   fuel.set_T(300).set_X(X_CH4);       // mdot not needed
+//   air.set_T(298).set_X(X_air).set_mdot(10.0);
+//   Stream fuel_phi = set_fuel_stream_for_phi(0.8, fuel, air);
+//   Stream mixed = mix({fuel_phi, air});
+Stream set_fuel_stream_for_phi(double phi, const Stream& fuel, const Stream& oxidizer);
+
+// -------------------------------------------------------------
 // State-based combustion functions
 // -------------------------------------------------------------
 
