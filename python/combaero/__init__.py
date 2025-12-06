@@ -86,6 +86,10 @@ try:
         complete_combustion_isothermal,
         wgs_equilibrium,
         wgs_equilibrium_adiabatic,
+        smr_wgs_equilibrium,
+        smr_wgs_equilibrium_adiabatic,
+        reforming_equilibrium,
+        reforming_equilibrium_adiabatic,
     )
 except ModuleNotFoundError:
     # Fallback: attempt to import from an installed combaero package that
@@ -138,6 +142,10 @@ except ModuleNotFoundError:
     complete_combustion_isothermal = _core.complete_combustion_isothermal
     wgs_equilibrium = _core.wgs_equilibrium
     wgs_equilibrium_adiabatic = _core.wgs_equilibrium_adiabatic
+    smr_wgs_equilibrium = _core.smr_wgs_equilibrium
+    smr_wgs_equilibrium_adiabatic = _core.smr_wgs_equilibrium_adiabatic
+    reforming_equilibrium = _core.reforming_equilibrium
+    reforming_equilibrium_adiabatic = _core.reforming_equilibrium_adiabatic
 
 
 __all__ = [
@@ -188,5 +196,9 @@ __all__ = [
     "complete_combustion_isothermal",
     "wgs_equilibrium",
     "wgs_equilibrium_adiabatic",
+    "smr_wgs_equilibrium",
+    "smr_wgs_equilibrium_adiabatic",
+    "reforming_equilibrium",
+    "reforming_equilibrium_adiabatic",
     "__version__",
 ]

@@ -91,6 +91,46 @@ eq = ca.wgs_equilibrium_adiabatic(T=1500.0, X=burned.X)
 print(f"Equilibrium T: {eq.T:.0f} K")
 ```
 
+### Reforming Equilibrium (Rich Combustion)
+
+For rich combustion products with unburned hydrocarbons, use reforming equilibrium
+to compute the steam reforming + water-gas shift equilibrium:
+
+```python
+import numpy as np
+import combaero as ca
+
+# Rich combustion products (with unburned CH4, C2H6, etc.)
+X = np.zeros(ca.num_species(), dtype=float)
+X[ca.species_index_from_name("CH4")] = 0.02    # Unburned methane
+X[ca.species_index_from_name("C2H6")] = 0.003  # Unburned ethane
+X[ca.species_index_from_name("H2O")] = 0.20
+X[ca.species_index_from_name("CO2")] = 0.08
+X[ca.species_index_from_name("N2")] = 0.70
+
+# General reforming equilibrium (handles all hydrocarbons)
+# CnHm + n*H2O <-> n*CO + (n + m/2)*H2
+# CO + H2O <-> CO2 + H2 (WGS)
+eq = ca.reforming_equilibrium_adiabatic(T=2200.0, X=X)
+print(f"Equilibrium T: {eq.T:.0f} K")
+print(f"CO: {eq.X[ca.species_index_from_name('CO')]*100:.2f}%")
+print(f"H2: {eq.X[ca.species_index_from_name('H2')]*100:.2f}%")
+
+# Isothermal version (fixed temperature)
+eq_iso = ca.reforming_equilibrium(T=2000.0, X=X)
+
+# SMR+WGS (CH4 only, for backward compatibility)
+eq_smr = ca.smr_wgs_equilibrium_adiabatic(T=2200.0, X=X)
+```
+
+**Available equilibrium functions:**
+- `wgs_equilibrium(T, X, P)` - Isothermal WGS (CO + H2O ⇌ CO2 + H2)
+- `wgs_equilibrium_adiabatic(T, X, P)` - Adiabatic WGS
+- `smr_wgs_equilibrium(T, X, P)` - Isothermal SMR+WGS (CH4 only)
+- `smr_wgs_equilibrium_adiabatic(T, X, P)` - Adiabatic SMR+WGS (CH4 only)
+- `reforming_equilibrium(T, X, P)` - Isothermal reforming (all hydrocarbons)
+- `reforming_equilibrium_adiabatic(T, X, P)` - Adiabatic reforming (all hydrocarbons)
+
 ### Stream Mixing
 
 Mix multiple streams with mass and enthalpy balance:

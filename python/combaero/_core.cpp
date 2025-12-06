@@ -729,4 +729,86 @@ PYBIND11_MODULE(_core, m)
         "Adiabatic WGS equilibrium (CO + H2O <-> CO2 + H2).\n\n"
         "Returns State with equilibrium temperature and composition."
     );
+
+    // SMR+WGS equilibrium (CH4 only)
+    m.def(
+        "smr_wgs_equilibrium",
+        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        {
+            State in;
+            in.T = T;
+            in.P = P;
+            in.X = to_vec(X_arr);
+            return smr_wgs_equilibrium(in);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        py::arg("P") = 101325.0,
+        "Isothermal SMR+WGS equilibrium for CH4.\n\n"
+        "Steam Methane Reforming: CH4 + H2O <-> CO + 3H2\n"
+        "Water-Gas Shift: CO + H2O <-> CO2 + H2\n\n"
+        "Returns State with equilibrium composition at input temperature."
+    );
+
+    m.def(
+        "smr_wgs_equilibrium_adiabatic",
+        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        {
+            State in;
+            in.T = T;
+            in.P = P;
+            in.X = to_vec(X_arr);
+            return smr_wgs_equilibrium_adiabatic(in);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        py::arg("P") = 101325.0,
+        "Adiabatic SMR+WGS equilibrium for CH4.\n\n"
+        "Steam Methane Reforming: CH4 + H2O <-> CO + 3H2\n"
+        "Water-Gas Shift: CO + H2O <-> CO2 + H2\n\n"
+        "Returns State with equilibrium temperature and composition.\n"
+        "Temperature decreases due to endothermic SMR reaction."
+    );
+
+    // General reforming + WGS equilibrium (all hydrocarbons)
+    m.def(
+        "reforming_equilibrium",
+        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        {
+            State in;
+            in.T = T;
+            in.P = P;
+            in.X = to_vec(X_arr);
+            return reforming_equilibrium(in);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        py::arg("P") = 101325.0,
+        "Isothermal steam reforming + WGS equilibrium for all hydrocarbons.\n\n"
+        "General reforming: CnHm + n*H2O <-> n*CO + (n + m/2)*H2\n"
+        "Water-Gas Shift: CO + H2O <-> CO2 + H2\n\n"
+        "Handles all hydrocarbons: CH4, C2H6, C3H8, iC4H10, nC5H12, etc.\n"
+        "Returns State with equilibrium composition at input temperature."
+    );
+
+    m.def(
+        "reforming_equilibrium_adiabatic",
+        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        {
+            State in;
+            in.T = T;
+            in.P = P;
+            in.X = to_vec(X_arr);
+            return reforming_equilibrium_adiabatic(in);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        py::arg("P") = 101325.0,
+        "Adiabatic steam reforming + WGS equilibrium for all hydrocarbons.\n\n"
+        "General reforming: CnHm + n*H2O <-> n*CO + (n + m/2)*H2\n"
+        "Water-Gas Shift: CO + H2O <-> CO2 + H2\n\n"
+        "Handles all hydrocarbons: CH4, C2H6, C3H8, iC4H10, nC5H12, etc.\n"
+        "Returns State with equilibrium temperature and composition.\n"
+        "Temperature decreases due to endothermic reforming reactions."
+    );
 }
