@@ -82,6 +82,18 @@ try:
         State,
         Stream,
         mix,
+        # Inverse solvers - find fuel stream
+        set_fuel_stream_for_Tad,
+        set_fuel_stream_for_O2,
+        set_fuel_stream_for_O2_dry,
+        set_fuel_stream_for_CO2,
+        set_fuel_stream_for_CO2_dry,
+        # Inverse solvers - find oxidizer stream
+        set_oxidizer_stream_for_Tad,
+        set_oxidizer_stream_for_O2,
+        set_oxidizer_stream_for_O2_dry,
+        set_oxidizer_stream_for_CO2,
+        set_oxidizer_stream_for_CO2_dry,
         complete_combustion,
         complete_combustion_isothermal,
         wgs_equilibrium,
@@ -139,6 +151,18 @@ except ModuleNotFoundError:
     State = _core.State
     Stream = _core.Stream
     mix = _core.mix
+    # Inverse solvers - find fuel stream
+    set_fuel_stream_for_Tad = _core.set_fuel_stream_for_Tad
+    set_fuel_stream_for_O2 = _core.set_fuel_stream_for_O2
+    set_fuel_stream_for_O2_dry = _core.set_fuel_stream_for_O2_dry
+    set_fuel_stream_for_CO2 = _core.set_fuel_stream_for_CO2
+    set_fuel_stream_for_CO2_dry = _core.set_fuel_stream_for_CO2_dry
+    # Inverse solvers - find oxidizer stream
+    set_oxidizer_stream_for_Tad = _core.set_oxidizer_stream_for_Tad
+    set_oxidizer_stream_for_O2 = _core.set_oxidizer_stream_for_O2
+    set_oxidizer_stream_for_O2_dry = _core.set_oxidizer_stream_for_O2_dry
+    set_oxidizer_stream_for_CO2 = _core.set_oxidizer_stream_for_CO2
+    set_oxidizer_stream_for_CO2_dry = _core.set_oxidizer_stream_for_CO2_dry
     complete_combustion = _core.complete_combustion
     complete_combustion_isothermal = _core.complete_combustion_isothermal
     wgs_equilibrium = _core.wgs_equilibrium
@@ -194,6 +218,18 @@ __all__ = [
     "State",
     "Stream",
     "mix",
+    # Inverse solvers - find fuel stream
+    "set_fuel_stream_for_Tad",
+    "set_fuel_stream_for_O2",
+    "set_fuel_stream_for_O2_dry",
+    "set_fuel_stream_for_CO2",
+    "set_fuel_stream_for_CO2_dry",
+    # Inverse solvers - find oxidizer stream
+    "set_oxidizer_stream_for_Tad",
+    "set_oxidizer_stream_for_O2",
+    "set_oxidizer_stream_for_O2_dry",
+    "set_oxidizer_stream_for_CO2",
+    "set_oxidizer_stream_for_CO2_dry",
     "complete_combustion",
     "complete_combustion_isothermal",
     "wgs_equilibrium",

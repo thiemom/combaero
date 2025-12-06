@@ -5,6 +5,7 @@
 #include "../include/combustion.h"
 #include "../include/equilibrium.h"
 #include "../include/humidair.h"
+#include "../include/state.h"
 #include <vector>
 #include <cmath>
 
@@ -1733,4 +1734,723 @@ TEST_F(ThermoTransportTest, CombustionEquilibriumStoichiometric) {
     // Little CO/H2 at stoichiometric (WGS equilibrium)
     EXPECT_LT(result.X[idx_CO], 0.01);
     EXPECT_LT(result.X[idx_H2], 0.01);
+}
+
+// -------------------------------------------------------------
+// Inverse solvers for fuel stream tests
+// -------------------------------------------------------------
+
+// Test set_fuel_stream_for_Tad
+TEST_F(ThermoTransportTest, SetFuelStreamForTad) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    // Fuel stream: pure CH4 at 300 K
+    Stream fuel;
+    fuel.state.T = 300.0;
+    fuel.state.P = 101325.0;
+    fuel.state.X = std::vector<double>(n, 0.0);
+    fuel.state.X[idx_CH4] = 1.0;
+    
+    // Oxidizer stream: dry air at 300 K, 10 kg/s
+    Stream air;
+    air.state.T = 300.0;
+    air.state.P = 101325.0;
+    air.state.X = std::vector<double>(n, 0.0);
+    air.state.X[idx_O2] = 0.21;
+    air.state.X[idx_N2] = 0.79;
+    air.mdot = 10.0;
+    
+    // Target Tad = 1500 K (lean combustion)
+    double T_ad_target = 1500.0;
+    Stream fuel_result = set_fuel_stream_for_Tad(T_ad_target, fuel, air);
+    
+    // Verify fuel mdot is positive and reasonable
+    EXPECT_GT(fuel_result.mdot, 0.0);
+    EXPECT_LT(fuel_result.mdot, 1.0);  // Should be lean
+    
+    // Verify the result by mixing and combusting
+    Stream mixed = mix({fuel_result, air});
+    State burned = complete_combustion(mixed.state);
+    
+    // Check that achieved Tad is close to target
+    EXPECT_NEAR(burned.T, T_ad_target, 2.0);  // Within 2 K
+    
+    // Verify O2 is present in products (lean combustion)
+    EXPECT_GT(burned.X[idx_O2], 0.0);
+}
+
+// Test set_fuel_stream_for_O2
+TEST_F(ThermoTransportTest, SetFuelStreamForO2) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    // Fuel stream: pure CH4 at 300 K
+    Stream fuel;
+    fuel.state.T = 300.0;
+    fuel.state.P = 101325.0;
+    fuel.state.X = std::vector<double>(n, 0.0);
+    fuel.state.X[idx_CH4] = 1.0;
+    
+    // Oxidizer stream: dry air at 300 K, 10 kg/s
+    Stream air;
+    air.state.T = 300.0;
+    air.state.P = 101325.0;
+    air.state.X = std::vector<double>(n, 0.0);
+    air.state.X[idx_O2] = 0.21;
+    air.state.X[idx_N2] = 0.79;
+    air.mdot = 10.0;
+    
+    // Target O2 = 10% in burned products (lean combustion)
+    double X_O2_target = 0.10;
+    Stream fuel_result = set_fuel_stream_for_O2(X_O2_target, fuel, air);
+    
+    // Verify fuel mdot is positive and reasonable
+    EXPECT_GT(fuel_result.mdot, 0.0);
+    EXPECT_LT(fuel_result.mdot, 1.0);  // Should be lean
+    
+    // Verify the result by mixing and combusting
+    Stream mixed = mix({fuel_result, air});
+    std::vector<double> X_burned = complete_combustion_to_CO2_H2O(mixed.state.X);
+    
+    // Check that achieved O2 is close to target
+    EXPECT_NEAR(X_burned[idx_O2], X_O2_target, 1e-5);
+}
+
+// Test set_fuel_stream_for_CO2
+TEST_F(ThermoTransportTest, SetFuelStreamForCO2) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    
+    // Fuel stream: pure CH4 at 300 K
+    Stream fuel;
+    fuel.state.T = 300.0;
+    fuel.state.P = 101325.0;
+    fuel.state.X = std::vector<double>(n, 0.0);
+    fuel.state.X[idx_CH4] = 1.0;
+    
+    // Oxidizer stream: dry air at 300 K, 10 kg/s
+    Stream air;
+    air.state.T = 300.0;
+    air.state.P = 101325.0;
+    air.state.X = std::vector<double>(n, 0.0);
+    air.state.X[idx_O2] = 0.21;
+    air.state.X[idx_N2] = 0.79;
+    air.mdot = 10.0;
+    
+    // Target CO2 = 5% in burned products (lean combustion)
+    double X_CO2_target = 0.05;
+    Stream fuel_result = set_fuel_stream_for_CO2(X_CO2_target, fuel, air);
+    
+    // Verify fuel mdot is positive and reasonable
+    EXPECT_GT(fuel_result.mdot, 0.0);
+    EXPECT_LT(fuel_result.mdot, 1.0);  // Should be lean
+    
+    // Verify the result by mixing and combusting
+    Stream mixed = mix({fuel_result, air});
+    std::vector<double> X_burned = complete_combustion_to_CO2_H2O(mixed.state.X);
+    
+    // Check that achieved CO2 is close to target
+    EXPECT_NEAR(X_burned[idx_CO2], X_CO2_target, 1e-5);
+}
+
+// Test set_fuel_stream_for_Tad with different fuel temperature
+TEST_F(ThermoTransportTest, SetFuelStreamForTadHotFuel) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    // Fuel stream: pure CH4 at 500 K (preheated)
+    Stream fuel;
+    fuel.state.T = 500.0;
+    fuel.state.P = 101325.0;
+    fuel.state.X = std::vector<double>(n, 0.0);
+    fuel.state.X[idx_CH4] = 1.0;
+    
+    // Oxidizer stream: dry air at 300 K, 10 kg/s
+    Stream air;
+    air.state.T = 300.0;
+    air.state.P = 101325.0;
+    air.state.X = std::vector<double>(n, 0.0);
+    air.state.X[idx_O2] = 0.21;
+    air.state.X[idx_N2] = 0.79;
+    air.mdot = 10.0;
+    
+    // Target Tad = 1500 K
+    double T_ad_target = 1500.0;
+    Stream fuel_result = set_fuel_stream_for_Tad(T_ad_target, fuel, air);
+    
+    // Verify the result
+    Stream mixed = mix({fuel_result, air});
+    State burned = complete_combustion(mixed.state);
+    
+    EXPECT_NEAR(burned.T, T_ad_target, 2.0);
+}
+
+// Test set_fuel_stream_for_O2 with multi-component fuel
+TEST_F(ThermoTransportTest, SetFuelStreamForO2MultiComponentFuel) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_C2H6 = species_index_from_name("C2H6");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    // Fuel stream: 90% CH4 + 10% C2H6 at 300 K
+    Stream fuel;
+    fuel.state.T = 300.0;
+    fuel.state.P = 101325.0;
+    fuel.state.X = std::vector<double>(n, 0.0);
+    fuel.state.X[idx_CH4] = 0.90;
+    fuel.state.X[idx_C2H6] = 0.10;
+    
+    // Oxidizer stream: dry air at 300 K, 10 kg/s
+    Stream air;
+    air.state.T = 300.0;
+    air.state.P = 101325.0;
+    air.state.X = std::vector<double>(n, 0.0);
+    air.state.X[idx_O2] = 0.21;
+    air.state.X[idx_N2] = 0.79;
+    air.mdot = 10.0;
+    
+    // Target O2 = 8% in burned products
+    double X_O2_target = 0.08;
+    Stream fuel_result = set_fuel_stream_for_O2(X_O2_target, fuel, air);
+    
+    // Verify the result
+    Stream mixed = mix({fuel_result, air});
+    std::vector<double> X_burned = complete_combustion_to_CO2_H2O(mixed.state.X);
+    
+    EXPECT_NEAR(X_burned[idx_O2], X_O2_target, 1e-5);
+}
+
+// Test set_oxidizer_stream_for_Tad
+TEST_F(ThermoTransportTest, SetOxidizerStreamForTad) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    // Fuel stream: pure CH4 at 300 K, 0.5 kg/s
+    Stream fuel;
+    fuel.state.T = 300.0;
+    fuel.state.P = 101325.0;
+    fuel.state.X = std::vector<double>(n, 0.0);
+    fuel.state.X[idx_CH4] = 1.0;
+    fuel.mdot = 0.5;
+    
+    // Oxidizer stream: dry air at 300 K (mdot to be solved)
+    Stream air;
+    air.state.T = 300.0;
+    air.state.P = 101325.0;
+    air.state.X = std::vector<double>(n, 0.0);
+    air.state.X[idx_O2] = 0.21;
+    air.state.X[idx_N2] = 0.79;
+    
+    // Target Tad = 1500 K (lean combustion)
+    double T_ad_target = 1500.0;
+    Stream air_result = set_oxidizer_stream_for_Tad(T_ad_target, fuel, air);
+    
+    // Verify air mdot is positive and reasonable
+    EXPECT_GT(air_result.mdot, 0.0);
+    
+    // Verify the result by mixing and combusting
+    Stream mixed = mix({fuel, air_result});
+    State burned = complete_combustion(mixed.state);
+    
+    // Check that achieved Tad is close to target
+    EXPECT_NEAR(burned.T, T_ad_target, 2.0);
+    
+    // Verify O2 is present in products (lean combustion)
+    EXPECT_GT(burned.X[idx_O2], 0.0);
+}
+
+// Test set_fuel_stream_for_O2_dry
+TEST_F(ThermoTransportTest, SetFuelStreamForO2Dry) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    // Fuel stream: pure CH4 at 300 K
+    Stream fuel;
+    fuel.state.T = 300.0;
+    fuel.state.P = 101325.0;
+    fuel.state.X = std::vector<double>(n, 0.0);
+    fuel.state.X[idx_CH4] = 1.0;
+    
+    // Oxidizer stream: dry air at 300 K, 10 kg/s
+    Stream air;
+    air.state.T = 300.0;
+    air.state.P = 101325.0;
+    air.state.X = std::vector<double>(n, 0.0);
+    air.state.X[idx_O2] = 0.21;
+    air.state.X[idx_N2] = 0.79;
+    air.mdot = 10.0;
+    
+    // Target dry O2 = 12% in burned products
+    double X_O2_dry_target = 0.12;
+    Stream fuel_result = set_fuel_stream_for_O2_dry(X_O2_dry_target, fuel, air);
+    
+    // Verify fuel mdot is positive
+    EXPECT_GT(fuel_result.mdot, 0.0);
+    
+    // Verify the result
+    Stream mixed = mix({fuel_result, air});
+    std::vector<double> X_burned = complete_combustion_to_CO2_H2O(mixed.state.X);
+    std::vector<double> X_dry = convert_to_dry_fractions(X_burned);
+    
+    EXPECT_NEAR(X_dry[idx_O2], X_O2_dry_target, 1e-5);
+}
+
+// Test set_fuel_stream_for_CO2_dry
+TEST_F(ThermoTransportTest, SetFuelStreamForCO2Dry) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    
+    // Fuel stream: pure CH4 at 300 K
+    Stream fuel;
+    fuel.state.T = 300.0;
+    fuel.state.P = 101325.0;
+    fuel.state.X = std::vector<double>(n, 0.0);
+    fuel.state.X[idx_CH4] = 1.0;
+    
+    // Oxidizer stream: dry air at 300 K, 10 kg/s
+    Stream air;
+    air.state.T = 300.0;
+    air.state.P = 101325.0;
+    air.state.X = std::vector<double>(n, 0.0);
+    air.state.X[idx_O2] = 0.21;
+    air.state.X[idx_N2] = 0.79;
+    air.mdot = 10.0;
+    
+    // Target dry CO2 = 6% in burned products
+    double X_CO2_dry_target = 0.06;
+    Stream fuel_result = set_fuel_stream_for_CO2_dry(X_CO2_dry_target, fuel, air);
+    
+    // Verify fuel mdot is positive
+    EXPECT_GT(fuel_result.mdot, 0.0);
+    
+    // Verify the result
+    Stream mixed = mix({fuel_result, air});
+    std::vector<double> X_burned = complete_combustion_to_CO2_H2O(mixed.state.X);
+    std::vector<double> X_dry = convert_to_dry_fractions(X_burned);
+    
+    EXPECT_NEAR(X_dry[idx_CO2], X_CO2_dry_target, 1e-5);
+}
+
+// -------------------------------------------------------------
+// Round-trip tests: Create lean mixture at known phi, combust, 
+// extract properties, then verify inverse solvers recover the same mdot
+// -------------------------------------------------------------
+
+TEST_F(ThermoTransportTest, InverseSolversRoundTripFromPhi) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    
+    // Fuel stream: pure CH4 at 350 K
+    Stream fuel;
+    fuel.state.T = 350.0;
+    fuel.state.P = 101325.0;
+    fuel.state.X = std::vector<double>(n, 0.0);
+    fuel.state.X[idx_CH4] = 1.0;
+    
+    // Oxidizer stream: dry air at 300 K, 10 kg/s
+    Stream air;
+    air.state.T = 300.0;
+    air.state.P = 101325.0;
+    air.state.X = std::vector<double>(n, 0.0);
+    air.state.X[idx_O2] = 0.21;
+    air.state.X[idx_N2] = 0.79;
+    air.mdot = 10.0;
+    
+    // Test at phi = 0.7 (lean)
+    double phi = 0.7;
+    Stream fuel_phi = set_fuel_stream_for_phi(phi, fuel, air);
+    double mdot_fuel_original = fuel_phi.mdot;
+    
+    // Mix and combust
+    Stream mixed = mix({fuel_phi, air});
+    State burned = complete_combustion(mixed.state);
+    std::vector<double> X_burned = burned.X;
+    std::vector<double> X_dry = convert_to_dry_fractions(X_burned);
+    
+    // Extract properties from burned products
+    double Tad = burned.T;
+    double X_O2 = X_burned[idx_O2];
+    double X_CO2 = X_burned[idx_CO2];
+    double X_O2_dry = X_dry[idx_O2];
+    double X_CO2_dry = X_dry[idx_CO2];
+    
+    // Verify we have lean combustion products
+    EXPECT_GT(X_O2, 0.0);
+    EXPECT_GT(X_CO2, 0.0);
+    EXPECT_GT(Tad, air.T());
+    
+    // Now test each inverse solver recovers the original fuel mdot
+    const double tol_T = 1.0;
+    const double tol_X = 1e-6;
+    const double tol_mdot_rel = 0.01;  // 1% relative tolerance on mdot
+    
+    // Test set_fuel_stream_for_Tad
+    Stream fuel_from_Tad = set_fuel_stream_for_Tad(Tad, fuel, air, tol_T);
+    EXPECT_NEAR(fuel_from_Tad.mdot, mdot_fuel_original, mdot_fuel_original * tol_mdot_rel);
+    
+    // Test set_fuel_stream_for_O2
+    Stream fuel_from_O2 = set_fuel_stream_for_O2(X_O2, fuel, air, tol_X);
+    EXPECT_NEAR(fuel_from_O2.mdot, mdot_fuel_original, mdot_fuel_original * tol_mdot_rel);
+    
+    // Test set_fuel_stream_for_CO2
+    Stream fuel_from_CO2 = set_fuel_stream_for_CO2(X_CO2, fuel, air, tol_X);
+    EXPECT_NEAR(fuel_from_CO2.mdot, mdot_fuel_original, mdot_fuel_original * tol_mdot_rel);
+    
+    // Test set_fuel_stream_for_O2_dry
+    Stream fuel_from_O2_dry = set_fuel_stream_for_O2_dry(X_O2_dry, fuel, air, tol_X);
+    EXPECT_NEAR(fuel_from_O2_dry.mdot, mdot_fuel_original, mdot_fuel_original * tol_mdot_rel);
+    
+    // Test set_fuel_stream_for_CO2_dry
+    Stream fuel_from_CO2_dry = set_fuel_stream_for_CO2_dry(X_CO2_dry, fuel, air, tol_X);
+    EXPECT_NEAR(fuel_from_CO2_dry.mdot, mdot_fuel_original, mdot_fuel_original * tol_mdot_rel);
+}
+
+// Test round-trip for oxidizer solvers
+TEST_F(ThermoTransportTest, InverseSolversRoundTripOxidizer) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    const std::size_t idx_CO2 = species_index_from_name("CO2");
+    
+    // Fuel stream: pure CH4 at 300 K, 0.3 kg/s (fixed)
+    Stream fuel;
+    fuel.state.T = 300.0;
+    fuel.state.P = 101325.0;
+    fuel.state.X = std::vector<double>(n, 0.0);
+    fuel.state.X[idx_CH4] = 1.0;
+    fuel.mdot = 0.3;
+    
+    // Oxidizer stream: dry air at 320 K
+    Stream air;
+    air.state.T = 320.0;
+    air.state.P = 101325.0;
+    air.state.X = std::vector<double>(n, 0.0);
+    air.state.X[idx_O2] = 0.21;
+    air.state.X[idx_N2] = 0.79;
+    
+    // Set air mdot for phi = 0.6 (lean)
+    // phi = (mdot_fuel / mdot_air) / (mdot_fuel / mdot_air)_stoich
+    // For CH4: stoich air/fuel ratio ~ 17.2 kg air / kg fuel
+    // At phi=0.6: air/fuel = 17.2 / 0.6 = 28.7
+    // mdot_air = mdot_fuel * 28.7 = 0.3 * 28.7 = 8.6 kg/s (approximate)
+    // Use set_fuel_stream_for_phi in reverse to get correct air mdot
+    Stream air_template = air;
+    air_template.mdot = 10.0;  // temporary
+    Stream fuel_at_phi = set_fuel_stream_for_phi(0.6, fuel, air_template);
+    // Now scale: we want fuel.mdot = 0.3, so air.mdot = 10.0 * (0.3 / fuel_at_phi.mdot)
+    double mdot_air_original = 10.0 * (0.3 / fuel_at_phi.mdot);
+    air.mdot = mdot_air_original;
+    
+    // Mix and combust
+    Stream mixed = mix({fuel, air});
+    State burned = complete_combustion(mixed.state);
+    std::vector<double> X_burned = burned.X;
+    std::vector<double> X_dry = convert_to_dry_fractions(X_burned);
+    
+    double Tad = burned.T;
+    double X_O2 = X_burned[idx_O2];
+    double X_CO2 = X_burned[idx_CO2];
+    double X_O2_dry = X_dry[idx_O2];
+    double X_CO2_dry = X_dry[idx_CO2];
+    
+    // Verify lean combustion
+    EXPECT_GT(X_O2, 0.0);
+    
+    const double tol_T = 1.0;
+    const double tol_X = 1e-6;
+    const double tol_mdot_rel = 0.01;
+    
+    // Test set_oxidizer_stream_for_Tad
+    Stream air_from_Tad = set_oxidizer_stream_for_Tad(Tad, fuel, air, tol_T);
+    EXPECT_NEAR(air_from_Tad.mdot, mdot_air_original, mdot_air_original * tol_mdot_rel);
+    
+    // Test set_oxidizer_stream_for_O2
+    Stream air_from_O2 = set_oxidizer_stream_for_O2(X_O2, fuel, air, tol_X);
+    EXPECT_NEAR(air_from_O2.mdot, mdot_air_original, mdot_air_original * tol_mdot_rel);
+    
+    // Test set_oxidizer_stream_for_CO2
+    Stream air_from_CO2 = set_oxidizer_stream_for_CO2(X_CO2, fuel, air, tol_X);
+    EXPECT_NEAR(air_from_CO2.mdot, mdot_air_original, mdot_air_original * tol_mdot_rel);
+    
+    // Test set_oxidizer_stream_for_O2_dry
+    Stream air_from_O2_dry = set_oxidizer_stream_for_O2_dry(X_O2_dry, fuel, air, tol_X);
+    EXPECT_NEAR(air_from_O2_dry.mdot, mdot_air_original, mdot_air_original * tol_mdot_rel);
+    
+    // Test set_oxidizer_stream_for_CO2_dry
+    Stream air_from_CO2_dry = set_oxidizer_stream_for_CO2_dry(X_CO2_dry, fuel, air, tol_X);
+    EXPECT_NEAR(air_from_CO2_dry.mdot, mdot_air_original, mdot_air_original * tol_mdot_rel);
+}
+
+// -------------------------------------------------------------
+// Edge case tests: Verify solvers reject invalid/ambiguous inputs
+// -------------------------------------------------------------
+
+// Test that Tad solver rejects target below oxidizer temperature
+TEST_F(ThermoTransportTest, SetFuelStreamForTadRejectsBelowOxidizerT) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    Stream fuel;
+    fuel.state.T = 300.0;
+    fuel.state.P = 101325.0;
+    fuel.state.X = std::vector<double>(n, 0.0);
+    fuel.state.X[idx_CH4] = 1.0;
+    
+    Stream air;
+    air.state.T = 400.0;  // Hot air
+    air.state.P = 101325.0;
+    air.state.X = std::vector<double>(n, 0.0);
+    air.state.X[idx_O2] = 0.21;
+    air.state.X[idx_N2] = 0.79;
+    air.mdot = 10.0;
+    
+    // Target Tad = 350 K, which is below air temperature (400 K)
+    // This should throw because Tad cannot be below oxidizer T
+    EXPECT_THROW(set_fuel_stream_for_Tad(350.0, fuel, air), std::invalid_argument);
+}
+
+// Test that oxidizer Tad solver rejects target below fuel temperature
+TEST_F(ThermoTransportTest, SetOxidizerStreamForTadRejectsBelowFuelT) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    Stream fuel;
+    fuel.state.T = 500.0;  // Hot fuel
+    fuel.state.P = 101325.0;
+    fuel.state.X = std::vector<double>(n, 0.0);
+    fuel.state.X[idx_CH4] = 1.0;
+    fuel.mdot = 0.5;
+    
+    Stream air;
+    air.state.T = 300.0;
+    air.state.P = 101325.0;
+    air.state.X = std::vector<double>(n, 0.0);
+    air.state.X[idx_O2] = 0.21;
+    air.state.X[idx_N2] = 0.79;
+    
+    // Target Tad = 400 K, which is below fuel temperature (500 K)
+    EXPECT_THROW(set_oxidizer_stream_for_Tad(400.0, fuel, air), std::invalid_argument);
+}
+
+// Test that O2 solver rejects target >= oxidizer O2 (impossible)
+TEST_F(ThermoTransportTest, SetFuelStreamForO2RejectsAboveOxidizerO2) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    Stream fuel;
+    fuel.state.T = 300.0;
+    fuel.state.P = 101325.0;
+    fuel.state.X = std::vector<double>(n, 0.0);
+    fuel.state.X[idx_CH4] = 1.0;
+    
+    Stream air;
+    air.state.T = 300.0;
+    air.state.P = 101325.0;
+    air.state.X = std::vector<double>(n, 0.0);
+    air.state.X[idx_O2] = 0.21;
+    air.state.X[idx_N2] = 0.79;
+    air.mdot = 10.0;
+    
+    // Target O2 = 0.25, which is above air O2 (0.21) - impossible
+    EXPECT_THROW(set_fuel_stream_for_O2(0.25, fuel, air), std::invalid_argument);
+    
+    // Target O2 = 0.0 - also invalid (would require stoich or rich)
+    EXPECT_THROW(set_fuel_stream_for_O2(0.0, fuel, air), std::invalid_argument);
+    
+    // Target O2 negative - invalid
+    EXPECT_THROW(set_fuel_stream_for_O2(-0.05, fuel, air), std::invalid_argument);
+}
+
+// Test that CO2 solver rejects zero or negative target
+TEST_F(ThermoTransportTest, SetFuelStreamForCO2RejectsInvalidTarget) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    Stream fuel;
+    fuel.state.T = 300.0;
+    fuel.state.P = 101325.0;
+    fuel.state.X = std::vector<double>(n, 0.0);
+    fuel.state.X[idx_CH4] = 1.0;
+    
+    Stream air;
+    air.state.T = 300.0;
+    air.state.P = 101325.0;
+    air.state.X = std::vector<double>(n, 0.0);
+    air.state.X[idx_O2] = 0.21;
+    air.state.X[idx_N2] = 0.79;
+    air.mdot = 10.0;
+    
+    // Target CO2 = 0.0 - invalid
+    EXPECT_THROW(set_fuel_stream_for_CO2(0.0, fuel, air), std::invalid_argument);
+    
+    // Target CO2 negative - invalid
+    EXPECT_THROW(set_fuel_stream_for_CO2(-0.05, fuel, air), std::invalid_argument);
+}
+
+// Round-trip test for rich combustion (phi > 1)
+TEST_F(ThermoTransportTest, InverseSolversRoundTripRich) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    // Fuel stream: pure CH4 at 300 K
+    Stream fuel;
+    fuel.state.T = 300.0;
+    fuel.state.P = 101325.0;
+    fuel.state.X = std::vector<double>(n, 0.0);
+    fuel.state.X[idx_CH4] = 1.0;
+    
+    // Oxidizer stream: dry air at 300 K, 10 kg/s
+    Stream air;
+    air.state.T = 300.0;
+    air.state.P = 101325.0;
+    air.state.X = std::vector<double>(n, 0.0);
+    air.state.X[idx_O2] = 0.21;
+    air.state.X[idx_N2] = 0.79;
+    air.mdot = 10.0;
+    
+    // Test at phi = 1.3 (rich)
+    double phi = 1.3;
+    Stream fuel_phi = set_fuel_stream_for_phi(phi, fuel, air);
+    double mdot_fuel_original = fuel_phi.mdot;
+    
+    // Mix and combust
+    Stream mixed = mix({fuel_phi, air});
+    State burned = complete_combustion(mixed.state);
+    
+    // Extract Tad from burned products
+    double Tad = burned.T;
+    
+    // Verify we have rich combustion (no O2 in products)
+    EXPECT_LT(burned.X[idx_O2], 0.001);
+    EXPECT_GT(Tad, air.T());
+    
+    // Test set_fuel_stream_for_Tad with lean=false recovers the original fuel mdot
+    const double tol_T = 1.0;
+    const double tol_mdot_rel = 0.01;  // 1% relative tolerance on mdot
+    
+    Stream fuel_from_Tad = set_fuel_stream_for_Tad(Tad, fuel, air, tol_T, 100, false);
+    EXPECT_NEAR(fuel_from_Tad.mdot, mdot_fuel_original, mdot_fuel_original * tol_mdot_rel);
+    
+    // Verify the recovered fuel produces the same Tad
+    Stream mixed_check = mix({fuel_from_Tad, air});
+    State burned_check = complete_combustion(mixed_check.state);
+    EXPECT_NEAR(burned_check.T, Tad, tol_T);
+}
+
+// Test set_fuel_stream_for_Tad with lean=false (rich side)
+TEST_F(ThermoTransportTest, SetFuelStreamForTadRichSide) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    // Fuel stream: pure CH4 at 300 K
+    Stream fuel;
+    fuel.state.T = 300.0;
+    fuel.state.P = 101325.0;
+    fuel.state.X = std::vector<double>(n, 0.0);
+    fuel.state.X[idx_CH4] = 1.0;
+    
+    // Oxidizer stream: dry air at 300 K, 10 kg/s
+    Stream air;
+    air.state.T = 300.0;
+    air.state.P = 101325.0;
+    air.state.X = std::vector<double>(n, 0.0);
+    air.state.X[idx_O2] = 0.21;
+    air.state.X[idx_N2] = 0.79;
+    air.mdot = 10.0;
+    
+    // Target Tad = 1800 K (achievable on both lean and rich sides)
+    double T_ad_target = 1800.0;
+    
+    // Get lean solution
+    Stream fuel_lean = set_fuel_stream_for_Tad(T_ad_target, fuel, air, 1.0, 100, true);
+    
+    // Get rich solution
+    Stream fuel_rich = set_fuel_stream_for_Tad(T_ad_target, fuel, air, 1.0, 100, false);
+    
+    // Verify both achieve the target Tad
+    Stream mixed_lean = mix({fuel_lean, air});
+    State burned_lean = complete_combustion(mixed_lean.state);
+    EXPECT_NEAR(burned_lean.T, T_ad_target, 2.0);
+    
+    Stream mixed_rich = mix({fuel_rich, air});
+    State burned_rich = complete_combustion(mixed_rich.state);
+    EXPECT_NEAR(burned_rich.T, T_ad_target, 2.0);
+    
+    // Verify lean has O2 in products, rich has no O2
+    EXPECT_GT(burned_lean.X[idx_O2], 0.01);  // Lean: O2 excess
+    EXPECT_LT(burned_rich.X[idx_O2], 0.001); // Rich: no O2 (all consumed)
+    
+    // Verify rich has more fuel than lean
+    EXPECT_GT(fuel_rich.mdot, fuel_lean.mdot);
+}
+
+// Test that solvers reject zero mdot on the fixed stream
+TEST_F(ThermoTransportTest, InverseSolversRejectZeroMdot) {
+    const std::size_t n = species_names.size();
+    const std::size_t idx_CH4 = species_index_from_name("CH4");
+    const std::size_t idx_O2 = species_index_from_name("O2");
+    const std::size_t idx_N2 = species_index_from_name("N2");
+    
+    Stream fuel;
+    fuel.state.T = 300.0;
+    fuel.state.P = 101325.0;
+    fuel.state.X = std::vector<double>(n, 0.0);
+    fuel.state.X[idx_CH4] = 1.0;
+    fuel.mdot = 0.0;  // Zero mdot
+    
+    Stream air;
+    air.state.T = 300.0;
+    air.state.P = 101325.0;
+    air.state.X = std::vector<double>(n, 0.0);
+    air.state.X[idx_O2] = 0.21;
+    air.state.X[idx_N2] = 0.79;
+    air.mdot = 0.0;  // Zero mdot
+    
+    // Fuel solvers should reject zero oxidizer mdot
+    EXPECT_THROW(set_fuel_stream_for_Tad(1500.0, fuel, air), std::invalid_argument);
+    EXPECT_THROW(set_fuel_stream_for_O2(0.10, fuel, air), std::invalid_argument);
+    EXPECT_THROW(set_fuel_stream_for_CO2(0.05, fuel, air), std::invalid_argument);
+    
+    // Set air mdot for oxidizer solver tests
+    air.mdot = 10.0;
+    fuel.mdot = 0.0;
+    
+    // Oxidizer solvers should reject zero fuel mdot
+    EXPECT_THROW(set_oxidizer_stream_for_Tad(1500.0, fuel, air), std::invalid_argument);
+    EXPECT_THROW(set_oxidizer_stream_for_O2(0.10, fuel, air), std::invalid_argument);
+    EXPECT_THROW(set_oxidizer_stream_for_CO2(0.05, fuel, air), std::invalid_argument);
 }

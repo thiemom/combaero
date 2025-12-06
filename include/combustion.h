@@ -119,6 +119,70 @@ double bilger_mixture_fraction_from_moles(
 Stream set_fuel_stream_for_phi(double phi, const Stream& fuel, const Stream& oxidizer);
 
 // -------------------------------------------------------------
+// Inverse solvers for fuel/oxidizer streams (complete combustion only)
+// -------------------------------------------------------------
+// These functions find the fuel or oxidizer mass flow rate to achieve a target
+// property in the burned products (complete combustion to CO2/H2O, no WGS).
+//
+// For Tad solvers: The same Tad can be achieved on both lean (O2 excess) and
+// rich (fuel excess) sides of stoichiometric. Use the 'lean' parameter to
+// select which side to search (default: lean=true).
+//
+// For O2/CO2 solvers: Only lean combustion is supported (O2 > 0 in products).
+
+// --- Find fuel stream (oxidizer mdot fixed) ---
+
+// Find fuel mdot to achieve target adiabatic flame temperature [K].
+// T_ad_target must be in (T_oxidizer, T_ad_stoich] K.
+// lean: if true (default), search on lean side (O2 excess); if false, search on rich side.
+// phi_max: maximum equivalence ratio for rich side search (default: 10.0).
+Stream set_fuel_stream_for_Tad(double T_ad_target, const Stream& fuel, const Stream& oxidizer,
+                                double tol = 1.0, std::size_t max_iter = 100, bool lean = true,
+                                double phi_max = 10.0);
+
+// Find fuel mdot to achieve target O2 mole fraction in burned products (wet basis).
+Stream set_fuel_stream_for_O2(double X_O2_target, const Stream& fuel, const Stream& oxidizer,
+                               double tol = 1e-6, std::size_t max_iter = 100);
+
+// Find fuel mdot to achieve target O2 mole fraction in burned products (dry basis).
+Stream set_fuel_stream_for_O2_dry(double X_O2_dry_target, const Stream& fuel, const Stream& oxidizer,
+                                   double tol = 1e-6, std::size_t max_iter = 100);
+
+// Find fuel mdot to achieve target CO2 mole fraction in burned products (wet basis).
+Stream set_fuel_stream_for_CO2(double X_CO2_target, const Stream& fuel, const Stream& oxidizer,
+                                double tol = 1e-6, std::size_t max_iter = 100);
+
+// Find fuel mdot to achieve target CO2 mole fraction in burned products (dry basis).
+Stream set_fuel_stream_for_CO2_dry(double X_CO2_dry_target, const Stream& fuel, const Stream& oxidizer,
+                                    double tol = 1e-6, std::size_t max_iter = 100);
+
+// --- Find oxidizer stream (fuel mdot fixed) ---
+
+// Find oxidizer mdot to achieve target adiabatic flame temperature [K].
+// T_ad_target must be in (T_fuel, T_ad_stoich] K.
+// lean: if true (default), search on lean side (O2 excess); if false, search on rich side.
+// phi_max: maximum equivalence ratio for search range (default: 10.0).
+Stream set_oxidizer_stream_for_Tad(double T_ad_target, const Stream& fuel, const Stream& oxidizer,
+                                    double tol = 1.0, std::size_t max_iter = 100, bool lean = true,
+                                    double phi_max = 10.0);
+
+// Find oxidizer mdot to achieve target O2 mole fraction in burned products (wet basis).
+Stream set_oxidizer_stream_for_O2(double X_O2_target, const Stream& fuel, const Stream& oxidizer,
+                                   double tol = 1e-6, std::size_t max_iter = 100);
+
+// Find oxidizer mdot to achieve target O2 mole fraction in burned products (dry basis).
+Stream set_oxidizer_stream_for_O2_dry(double X_O2_dry_target, const Stream& fuel, const Stream& oxidizer,
+                                       double tol = 1e-6, std::size_t max_iter = 100);
+
+// Find oxidizer mdot to achieve target CO2 mole fraction in burned products (wet basis).
+Stream set_oxidizer_stream_for_CO2(double X_CO2_target, const Stream& fuel, const Stream& oxidizer,
+                                    double tol = 1e-6, std::size_t max_iter = 100);
+
+// Find oxidizer mdot to achieve target CO2 mole fraction in burned products (dry basis).
+Stream set_oxidizer_stream_for_CO2_dry(double X_CO2_dry_target, const Stream& fuel, const Stream& oxidizer,
+                                        double tol = 1e-6, std::size_t max_iter = 100);
+
+// -------------------------------------------------------------
 // State-based combustion functions
 // -------------------------------------------------------------
 

@@ -19,6 +19,7 @@ This library provides tools for ideal-gas thermodynamic properties, combustion s
 - Gibbs free energy helpers `g_over_RT` and `dg_over_RT_dT`
 - Combustion tools: O₂ demand per fuel/mixture, complete combustion to CO₂/H₂O
 - Equivalence ratio and Bilger mixture fraction utilities
+- **Inverse combustion solvers**: find fuel or oxidizer flow for target Tad, O₂, or CO₂
 - Accurate saturation vapor pressure using Hyland-Wexler equations
   - For ice (-80°C to 0°C): maximum relative error ≤ 0.023%
   - For water vapor (0°C to 80°C): maximum relative error ≤ 0.0057%
@@ -217,6 +218,14 @@ The project uses GoogleTest and CTest for C++ tests, and pytest for Python tests
 - Python tests for the `combaero` API (thermo/transport, humid air, combustion helpers, species common names)
 
 See the *Development workflow* section above for concrete commands.
+
+## Documentation
+
+- **[API Reference](docs/API_REFERENCE.md)**: Detailed function signatures and usage examples (useful for LLMs)
+
+## Acknowledgments
+
+This library was developed with significant assistance from AI coding agents, including Claude (Anthropic) for the majority of implementation and testing, and ChatGPT (OpenAI) for early water-gas shift equilibrium guidance. These tools made it possible to build a comprehensive thermodynamic library in a fraction of the time it would otherwise require.
 
 ## License
 

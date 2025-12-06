@@ -672,6 +672,178 @@ PYBIND11_MODULE(_core, m)
         "Returns mixed Stream."
     );
 
+    // -------------------------------------------------------------
+    // Inverse solvers for fuel/oxidizer streams (complete combustion only)
+    // -------------------------------------------------------------
+
+    // --- Find fuel stream (oxidizer mdot fixed) ---
+
+    m.def(
+        "set_fuel_stream_for_Tad",
+        [](double T_ad_target, const Stream& fuel, const Stream& oxidizer, double tol, std::size_t max_iter, bool lean, double phi_max) {
+            return set_fuel_stream_for_Tad(T_ad_target, fuel, oxidizer, tol, max_iter, lean, phi_max);
+        },
+        py::arg("T_ad_target"),
+        py::arg("fuel"),
+        py::arg("oxidizer"),
+        py::arg("tol") = 1.0,
+        py::arg("max_iter") = 100,
+        py::arg("lean") = true,
+        py::arg("phi_max") = 10.0,
+        "Find fuel mass flow rate to achieve target adiabatic flame temperature.\n\n"
+        "Uses complete combustion to CO2/H2O (no WGS).\n\n"
+        "T_ad_target : target adiabatic flame temperature [K] (must be > oxidizer T)\n"
+        "fuel        : fuel Stream (T, P, X set; mdot ignored)\n"
+        "oxidizer    : oxidizer Stream (with mdot set)\n"
+        "tol         : temperature tolerance [K] (default: 1.0)\n"
+        "max_iter    : maximum iterations (default: 100)\n"
+        "lean        : if True (default), search on lean side; if False, search on rich side\n"
+        "phi_max     : maximum equivalence ratio for rich side search (default: 10.0)\n\n"
+        "Returns fuel Stream with mdot set to achieve target T_ad."
+    );
+
+    m.def(
+        "set_fuel_stream_for_O2",
+        [](double X_O2_target, const Stream& fuel, const Stream& oxidizer, double tol, std::size_t max_iter) {
+            return set_fuel_stream_for_O2(X_O2_target, fuel, oxidizer, tol, max_iter);
+        },
+        py::arg("X_O2_target"),
+        py::arg("fuel"),
+        py::arg("oxidizer"),
+        py::arg("tol") = 1e-6,
+        py::arg("max_iter") = 100,
+        "Find fuel mass flow rate to achieve target O2 mole fraction in burned products (wet basis).\n\n"
+        "Uses complete combustion to CO2/H2O (no WGS). Lean combustion only."
+    );
+
+    m.def(
+        "set_fuel_stream_for_O2_dry",
+        [](double X_O2_dry_target, const Stream& fuel, const Stream& oxidizer, double tol, std::size_t max_iter) {
+            return set_fuel_stream_for_O2_dry(X_O2_dry_target, fuel, oxidizer, tol, max_iter);
+        },
+        py::arg("X_O2_dry_target"),
+        py::arg("fuel"),
+        py::arg("oxidizer"),
+        py::arg("tol") = 1e-6,
+        py::arg("max_iter") = 100,
+        "Find fuel mass flow rate to achieve target O2 mole fraction in burned products (dry basis).\n\n"
+        "Uses complete combustion to CO2/H2O (no WGS). Lean combustion only.\n"
+        "Dry basis: water vapor removed from products before computing mole fraction."
+    );
+
+    m.def(
+        "set_fuel_stream_for_CO2",
+        [](double X_CO2_target, const Stream& fuel, const Stream& oxidizer, double tol, std::size_t max_iter) {
+            return set_fuel_stream_for_CO2(X_CO2_target, fuel, oxidizer, tol, max_iter);
+        },
+        py::arg("X_CO2_target"),
+        py::arg("fuel"),
+        py::arg("oxidizer"),
+        py::arg("tol") = 1e-6,
+        py::arg("max_iter") = 100,
+        "Find fuel mass flow rate to achieve target CO2 mole fraction in burned products (wet basis).\n\n"
+        "Uses complete combustion to CO2/H2O (no WGS). Lean combustion only."
+    );
+
+    m.def(
+        "set_fuel_stream_for_CO2_dry",
+        [](double X_CO2_dry_target, const Stream& fuel, const Stream& oxidizer, double tol, std::size_t max_iter) {
+            return set_fuel_stream_for_CO2_dry(X_CO2_dry_target, fuel, oxidizer, tol, max_iter);
+        },
+        py::arg("X_CO2_dry_target"),
+        py::arg("fuel"),
+        py::arg("oxidizer"),
+        py::arg("tol") = 1e-6,
+        py::arg("max_iter") = 100,
+        "Find fuel mass flow rate to achieve target CO2 mole fraction in burned products (dry basis).\n\n"
+        "Uses complete combustion to CO2/H2O (no WGS). Lean combustion only.\n"
+        "Dry basis: water vapor removed from products before computing mole fraction."
+    );
+
+    // --- Find oxidizer stream (fuel mdot fixed) ---
+
+    m.def(
+        "set_oxidizer_stream_for_Tad",
+        [](double T_ad_target, const Stream& fuel, const Stream& oxidizer, double tol, std::size_t max_iter, bool lean, double phi_max) {
+            return set_oxidizer_stream_for_Tad(T_ad_target, fuel, oxidizer, tol, max_iter, lean, phi_max);
+        },
+        py::arg("T_ad_target"),
+        py::arg("fuel"),
+        py::arg("oxidizer"),
+        py::arg("tol") = 1.0,
+        py::arg("max_iter") = 100,
+        py::arg("lean") = true,
+        py::arg("phi_max") = 10.0,
+        "Find oxidizer mass flow rate to achieve target adiabatic flame temperature.\n\n"
+        "Uses complete combustion to CO2/H2O (no WGS).\n\n"
+        "T_ad_target : target adiabatic flame temperature [K] (must be > fuel T)\n"
+        "fuel        : fuel Stream (with mdot set)\n"
+        "oxidizer    : oxidizer Stream (T, P, X set; mdot ignored)\n"
+        "tol         : temperature tolerance [K] (default: 1.0)\n"
+        "max_iter    : maximum iterations (default: 100)\n"
+        "lean        : if True (default), search on lean side; if False, search on rich side\n"
+        "phi_max     : maximum equivalence ratio for search range (default: 10.0)\n\n"
+        "Returns oxidizer Stream with mdot set to achieve target T_ad."
+    );
+
+    m.def(
+        "set_oxidizer_stream_for_O2",
+        [](double X_O2_target, const Stream& fuel, const Stream& oxidizer, double tol, std::size_t max_iter) {
+            return set_oxidizer_stream_for_O2(X_O2_target, fuel, oxidizer, tol, max_iter);
+        },
+        py::arg("X_O2_target"),
+        py::arg("fuel"),
+        py::arg("oxidizer"),
+        py::arg("tol") = 1e-6,
+        py::arg("max_iter") = 100,
+        "Find oxidizer mass flow rate to achieve target O2 mole fraction in burned products (wet basis).\n\n"
+        "Uses complete combustion to CO2/H2O (no WGS). Lean combustion only."
+    );
+
+    m.def(
+        "set_oxidizer_stream_for_O2_dry",
+        [](double X_O2_dry_target, const Stream& fuel, const Stream& oxidizer, double tol, std::size_t max_iter) {
+            return set_oxidizer_stream_for_O2_dry(X_O2_dry_target, fuel, oxidizer, tol, max_iter);
+        },
+        py::arg("X_O2_dry_target"),
+        py::arg("fuel"),
+        py::arg("oxidizer"),
+        py::arg("tol") = 1e-6,
+        py::arg("max_iter") = 100,
+        "Find oxidizer mass flow rate to achieve target O2 mole fraction in burned products (dry basis).\n\n"
+        "Uses complete combustion to CO2/H2O (no WGS). Lean combustion only.\n"
+        "Dry basis: water vapor removed from products before computing mole fraction."
+    );
+
+    m.def(
+        "set_oxidizer_stream_for_CO2",
+        [](double X_CO2_target, const Stream& fuel, const Stream& oxidizer, double tol, std::size_t max_iter) {
+            return set_oxidizer_stream_for_CO2(X_CO2_target, fuel, oxidizer, tol, max_iter);
+        },
+        py::arg("X_CO2_target"),
+        py::arg("fuel"),
+        py::arg("oxidizer"),
+        py::arg("tol") = 1e-6,
+        py::arg("max_iter") = 100,
+        "Find oxidizer mass flow rate to achieve target CO2 mole fraction in burned products (wet basis).\n\n"
+        "Uses complete combustion to CO2/H2O (no WGS). Lean combustion only."
+    );
+
+    m.def(
+        "set_oxidizer_stream_for_CO2_dry",
+        [](double X_CO2_dry_target, const Stream& fuel, const Stream& oxidizer, double tol, std::size_t max_iter) {
+            return set_oxidizer_stream_for_CO2_dry(X_CO2_dry_target, fuel, oxidizer, tol, max_iter);
+        },
+        py::arg("X_CO2_dry_target"),
+        py::arg("fuel"),
+        py::arg("oxidizer"),
+        py::arg("tol") = 1e-6,
+        py::arg("max_iter") = 100,
+        "Find oxidizer mass flow rate to achieve target CO2 mole fraction in burned products (dry basis).\n\n"
+        "Uses complete combustion to CO2/H2O (no WGS). Lean combustion only.\n"
+        "Dry basis: water vapor removed from products before computing mole fraction."
+    );
+
     // State-based combustion functions
     m.def(
         "complete_combustion",
