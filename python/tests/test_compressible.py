@@ -251,3 +251,62 @@ def test_nozzle_mass_conservation() -> None:
     for st in sol.profile[::10]:
         mdot_local = st.rho * st.u * st.A
         assert np.isclose(mdot_local, sol.mdot, rtol=0.01)
+
+
+def test_nozzle_thrust() -> None:
+    """Rocket nozzle thrust calculation."""
+    X = cb.standard_dry_air_composition()
+    
+    T0 = 2000.0  # K (hot combustion gas)
+    P0 = 2000000.0  # Pa (20 bar chamber)
+    P_amb = 101325.0  # Pa (sea level)
+    
+    A_inlet = 0.002
+    A_throat = 0.0005
+    A_exit = 0.0012
+    
+    sol = cb.nozzle_cd(
+        T0, P0, P_amb,
+        A_inlet, A_throat, A_exit,
+        0.05, 0.12, X
+    )
+    
+    thrust = cb.nozzle_thrust(sol, P_amb)
+    
+    # Thrust should be positive
+    assert thrust.thrust > 0
+    
+    # Isp should be reasonable (100-300 s for hot gas)
+    assert 100 < thrust.specific_impulse < 300
+    
+    # Thrust coefficient typically 1.0-2.0
+    assert 1.0 < thrust.thrust_coefficient < 2.0
+    
+    # Verify thrust formula: F = mdot*u_e + (P_e - P_amb)*A_e
+    exit_station = sol.profile[-1]
+    A_e = exit_station.A
+    F_calc = thrust.mdot * thrust.u_exit + (thrust.P_exit - P_amb) * A_e
+    assert np.isclose(thrust.thrust, F_calc, rtol=1e-6)
+
+
+def test_nozzle_thrust_vacuum() -> None:
+    """Thrust in vacuum (P_amb = 0)."""
+    X = cb.standard_dry_air_composition()
+    
+    T0 = 2000.0
+    P0 = 2000000.0
+    P_amb_sea = 101325.0
+    P_amb_vac = 0.0
+    
+    sol = cb.nozzle_cd(
+        T0, P0, P_amb_sea,
+        0.002, 0.0005, 0.0012,
+        0.05, 0.12, X
+    )
+    
+    thrust_sea = cb.nozzle_thrust(sol, P_amb_sea)
+    thrust_vac = cb.nozzle_thrust(sol, P_amb_vac)
+    
+    # Vacuum thrust should be higher (no back pressure)
+    assert thrust_vac.thrust > thrust_sea.thrust
+    assert thrust_vac.specific_impulse > thrust_sea.specific_impulse

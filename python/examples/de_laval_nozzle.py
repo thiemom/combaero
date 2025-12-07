@@ -104,10 +104,18 @@ def main() -> None:
     print(f"  P = {exit_station.P/1e5:.2f} bar")
     print(f"  u = {exit_station.u:.1f} m/s")
     
-    # Thrust calculation (simplified, no external pressure correction)
-    thrust = sol_design.mdot * exit_station.u + (exit_station.P - P_exit_design) * A_exit
-    print(f"\nThrust (ideal): {thrust:.1f} N")
-    print(f"Specific impulse: {thrust / (sol_design.mdot * 9.81):.1f} s")
+    # Thrust calculation using nozzle_thrust
+    thrust_result = cb.nozzle_thrust(sol_design, P_exit_design)
+    print(f"\nThrust performance:")
+    print(f"  Thrust: {thrust_result.thrust:.1f} N")
+    print(f"  Specific impulse: {thrust_result.specific_impulse:.1f} s")
+    print(f"  Thrust coefficient: {thrust_result.thrust_coefficient:.3f}")
+    
+    # Vacuum thrust (space conditions)
+    thrust_vac = cb.nozzle_thrust(sol_design, 0.0)
+    print(f"\nVacuum performance (P_amb = 0):")
+    print(f"  Thrust: {thrust_vac.thrust:.1f} N")
+    print(f"  Specific impulse: {thrust_vac.specific_impulse:.1f} s")
     
     # =========================================================================
     # Case 2: Subsonic flow (high back pressure)

@@ -1136,6 +1136,16 @@ PYBIND11_MODULE(_core, m)
         .def_readwrite("A_throat", &NozzleSolution::A_throat, "Throat area [m²]")
         .def_readwrite("profile", &NozzleSolution::profile, "Axial profile");
 
+    // ThrustResult struct
+    py::class_<ThrustResult>(m, "ThrustResult")
+        .def(py::init<>())
+        .def_readwrite("thrust", &ThrustResult::thrust, "Thrust force [N]")
+        .def_readwrite("specific_impulse", &ThrustResult::specific_impulse, "Specific impulse Isp [s]")
+        .def_readwrite("thrust_coefficient", &ThrustResult::thrust_coefficient, "Thrust coefficient C_F [-]")
+        .def_readwrite("mdot", &ThrustResult::mdot, "Mass flow rate [kg/s]")
+        .def_readwrite("u_exit", &ThrustResult::u_exit, "Exit velocity [m/s]")
+        .def_readwrite("P_exit", &ThrustResult::P_exit, "Exit pressure [Pa]");
+
     // FannoStation struct
     py::class_<FannoStation>(m, "FannoStation")
         .def(py::init<>())
@@ -1415,5 +1425,48 @@ PYBIND11_MODULE(_core, m)
         "Colebrook-White friction factor (implicit, reference standard).\n\n"
         "Re  : Reynolds number [-]\n"
         "e_D : relative roughness ε/D [-]"
+    );
+
+    // Nozzle thrust (from NozzleSolution)
+    m.def(
+        "nozzle_thrust",
+        py::overload_cast<const NozzleSolution&, double>(&nozzle_thrust),
+        py::arg("sol"),
+        py::arg("P_amb"),
+        "Calculate rocket nozzle thrust from nozzle solution.\n\n"
+        "F = mdot * u_e + (P_e - P_amb) * A_e\n\n"
+        "sol   : NozzleSolution from nozzle_cd()\n"
+        "P_amb : Ambient pressure [Pa]\n\n"
+        "Returns ThrustResult with thrust, Isp, and C_F."
+    );
+
+    // Nozzle thrust (convenience, from parameters)
+    m.def(
+        "nozzle_thrust_cd",
+        [](double T0, double P0, double P_amb,
+           double A_inlet, double A_throat, double A_exit,
+           double x_throat, double x_exit,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           std::size_t n_stations, double tol, std::size_t max_iter)
+        {
+            auto X = to_vec(X_arr);
+            return nozzle_thrust(T0, P0, P_amb, A_inlet, A_throat, A_exit,
+                                 x_throat, x_exit, X, n_stations, tol, max_iter);
+        },
+        py::arg("T0"),
+        py::arg("P0"),
+        py::arg("P_amb"),
+        py::arg("A_inlet"),
+        py::arg("A_throat"),
+        py::arg("A_exit"),
+        py::arg("x_throat"),
+        py::arg("x_exit"),
+        py::arg("X"),
+        py::arg("n_stations") = 100,
+        py::arg("tol") = 1e-8,
+        py::arg("max_iter") = 50,
+        "Calculate rocket nozzle thrust directly from geometry.\n\n"
+        "Convenience function that calls nozzle_cd() then nozzle_thrust().\n\n"
+        "Returns ThrustResult with thrust, Isp, and C_F."
     );
 }

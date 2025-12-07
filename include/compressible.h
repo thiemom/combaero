@@ -270,4 +270,40 @@ double fanno_max_length(
     const std::vector<double>& X,
     double tol = 1e-6, std::size_t max_iter = 100);
 
+// -------------------------------------------------------------
+// Rocket nozzle thrust
+// -------------------------------------------------------------
+
+// Thrust calculation result
+struct ThrustResult {
+    double thrust = 0.0;              // Thrust force [N]
+    double specific_impulse = 0.0;    // Specific impulse Isp [s]
+    double thrust_coefficient = 0.0;  // Thrust coefficient C_F [-]
+    double mdot = 0.0;                // Mass flow rate [kg/s]
+    double u_exit = 0.0;              // Exit velocity [m/s]
+    double P_exit = 0.0;              // Exit pressure [Pa]
+};
+
+// Calculate rocket nozzle thrust from nozzle solution and ambient pressure.
+//
+// F = mdot * u_e + (P_e - P_amb) * A_e
+// Isp = F / (mdot * g0)
+// C_F = F / (P0 * A_throat)
+//
+// Inputs:
+//   sol   : NozzleSolution from nozzle_cd() or similar
+//   P_amb : Ambient pressure [Pa] (e.g., 101325 for sea level, 0 for vacuum)
+//
+// Returns ThrustResult with thrust, Isp, and thrust coefficient.
+ThrustResult nozzle_thrust(const NozzleSolution& sol, double P_amb);
+
+// Convenience: calculate thrust directly from nozzle parameters
+ThrustResult nozzle_thrust(
+    double T0, double P0, double P_amb,
+    double A_inlet, double A_throat, double A_exit,
+    double x_throat, double x_exit,
+    const std::vector<double>& X,
+    std::size_t n_stations = 100,
+    double tol = 1e-8, std::size_t max_iter = 50);
+
 #endif // COMPRESSIBLE_H

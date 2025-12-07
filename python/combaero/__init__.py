@@ -125,6 +125,10 @@ try:
         nozzle_cd,
         fanno_pipe,
         fanno_max_length,
+        # Thrust
+        ThrustResult,
+        nozzle_thrust,
+        nozzle_thrust_cd,
         # Friction
         friction_haaland,
         friction_serghides,
@@ -220,6 +224,10 @@ except ModuleNotFoundError:
     nozzle_cd = _core.nozzle_cd
     fanno_pipe = _core.fanno_pipe
     fanno_max_length = _core.fanno_max_length
+    # Thrust
+    ThrustResult = _core.ThrustResult
+    nozzle_thrust = _core.nozzle_thrust
+    nozzle_thrust_cd = _core.nozzle_thrust_cd
     # Friction
     friction_haaland = _core.friction_haaland
     friction_serghides = _core.friction_serghides
@@ -313,6 +321,10 @@ __all__ = [
     "nozzle_cd",
     "fanno_pipe",
     "fanno_max_length",
+    # Thrust
+    "ThrustResult",
+    "nozzle_thrust",
+    "nozzle_thrust_cd",
     # Friction
     "friction_haaland",
     "friction_serghides",

@@ -1176,3 +1176,58 @@ NozzleSolution nozzle_cd(
     
     return nozzle_quasi1d(T0, P0, P_exit, area_func, 0.0, x_exit, X, n_stations, tol, max_iter);
 }
+
+// -------------------------------------------------------------
+// Rocket nozzle thrust
+// -------------------------------------------------------------
+
+constexpr double G0 = 9.80665;  // Standard gravity [m/s²]
+
+ThrustResult nozzle_thrust(const NozzleSolution& sol, double P_amb)
+{
+    ThrustResult result;
+    
+    if (sol.profile.empty()) {
+        throw std::runtime_error("nozzle_thrust: empty nozzle solution");
+    }
+    
+    // Get exit conditions from last station
+    const NozzleStation& exit = sol.profile.back();
+    
+    result.mdot = sol.mdot;
+    result.u_exit = exit.u;
+    result.P_exit = exit.P;
+    
+    // Exit area
+    double A_exit = exit.A;
+    
+    // Thrust: F = mdot * u_e + (P_e - P_amb) * A_e
+    double momentum_thrust = sol.mdot * exit.u;
+    double pressure_thrust = (exit.P - P_amb) * A_exit;
+    result.thrust = momentum_thrust + pressure_thrust;
+    
+    // Specific impulse: Isp = F / (mdot * g0)
+    if (sol.mdot > 0.0) {
+        result.specific_impulse = result.thrust / (sol.mdot * G0);
+    }
+    
+    // Thrust coefficient: C_F = F / (P0 * A_throat)
+    if (sol.P0 > 0.0 && sol.A_throat > 0.0) {
+        result.thrust_coefficient = result.thrust / (sol.P0 * sol.A_throat);
+    }
+    
+    return result;
+}
+
+ThrustResult nozzle_thrust(
+    double T0, double P0, double P_amb,
+    double A_inlet, double A_throat, double A_exit,
+    double x_throat, double x_exit,
+    const std::vector<double>& X,
+    std::size_t n_stations,
+    double tol, std::size_t max_iter)
+{
+    NozzleSolution sol = nozzle_cd(T0, P0, P_amb, A_inlet, A_throat, A_exit,
+                                    x_throat, x_exit, X, n_stations, tol, max_iter);
+    return nozzle_thrust(sol, P_amb);
+}
