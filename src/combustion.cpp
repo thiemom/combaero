@@ -23,7 +23,7 @@ double oxygen_required_per_mol_fuel(std::size_t fuel_index) {
     // C_x H_y O_z N_w + (x + y/4 - z/2) O2 -> x CO2 + (y/2) H2O + (w/2) N2
     // Oxygen required = x + y/4 - z/2 [mol O2/mol fuel]
     
-    double oxygen_required = fuel.C + fuel.H / 4.0 - fuel.O / 2.0;
+    double oxygen_required = static_cast<double>(fuel.C) + static_cast<double>(fuel.H) / 4.0 - static_cast<double>(fuel.O) / 2.0;
     
     // Ensure non-negative value (for cases where fuel already has excess oxygen)
     return std::max(0.0, oxygen_required);
@@ -204,9 +204,9 @@ std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double>& X,
         n[i] = n_fuel_remaining;
 
         // C_x H_y O_z N_w + ... -> x CO2 + (y/2) H2O + (w/2) N2
-        delta_CO2 += sp.C * n_fuel_reacted;
-        delta_H2O += 0.5 * sp.H * n_fuel_reacted;
-        delta_N2  += 0.5 * sp.N * n_fuel_reacted;
+        delta_CO2 += static_cast<double>(sp.C) * n_fuel_reacted;
+        delta_H2O += 0.5 * static_cast<double>(sp.H) * n_fuel_reacted;
+        delta_N2  += 0.5 * static_cast<double>(sp.N) * n_fuel_reacted;
     }
 
     // Consume O2: fully if O2-limited, partially if fuel-limited
