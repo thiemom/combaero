@@ -777,8 +777,7 @@ double find_throat_x(const AreaFunction& area_func, double x_start, double x_end
     double x_min = x_start;
     double A_min = area_func(x_start);
     
-    for (std::size_t i = 1; i <= n_search; ++i) {
-        double x = x_start + i * dx;
+    for (double x = x_start + dx; x <= x_end; x += dx) {
         double A = area_func(x);
         if (A < A_min) {
             A_min = A;
@@ -932,7 +931,7 @@ NozzleSolution nozzle_quasi1d(
     // Precompute ideal-gas Mach profile
     std::vector<double> M_ideal(n_stations);
     for (std::size_t i = 0; i < n_stations; ++i) {
-        double x = x_start + i * dx;
+        double x = x_start + static_cast<double>(i) * dx;
         double A = area_func(x);
         double A_ratio = A / A_star_eff;
         
@@ -972,7 +971,7 @@ NozzleSolution nozzle_quasi1d(
     sol.profile.reserve(n_stations);
     
     for (std::size_t i = 0; i < n_stations; ++i) {
-        double x = x_start + i * dx;
+        double x = x_start + static_cast<double>(i) * dx;
         double A = area_func(x);
         
         // Use ideal-gas Mach to determine branch and as constraint
