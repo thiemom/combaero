@@ -235,3 +235,123 @@ std::vector<double> humid_air_composition(double T, double P, double RH);
 // Dew point temperature
 double dewpoint(double T, double P, const std::vector<double>& X);
 ```
+
+## Compressible Flow
+
+Compressible flow solvers for ideal gas with variable cp(T). Uses NASA polynomial fits for temperature-dependent properties.
+
+### Isentropic Nozzle Flow
+
+```cpp
+// Forward problem: given geometry and pressures, find mass flow
+CompressibleFlowSolution nozzle_flow(
+    double T0, double P0,           // Stagnation conditions [K, Pa]
+    double P_back,                  // Back pressure [Pa]
+    double A_eff,                   // Effective flow area [m²] (= A * Cd)
+    const std::vector<double>& X,   // Mole fractions
+    double tol = 1e-8,
+    std::size_t max_iter = 50
+);
+
+// Inverse problems: solve for unknown given mass flow
+double solve_A_eff_from_mdot(double T0, double P0, double P_back, double mdot_target,
+                              const std::vector<double>& X, ...);
+double solve_P_back_from_mdot(double T0, double P0, double A_eff, double mdot_target,
+                               const std::vector<double>& X, ...);
+double solve_P0_from_mdot(double T0, double P_back, double A_eff, double mdot_target,
+                           const std::vector<double>& X, ...);
+
+// Utilities
+double critical_pressure_ratio(double T0, double P0, const std::vector<double>& X, ...);
+double mach_from_pressure_ratio(double T0, double P0, double P, const std::vector<double>& X, ...);
+double mass_flux_isentropic(double T0, double P0, double P, const std::vector<double>& X, ...);
+```
+
+### Fanno Flow (Adiabatic Pipe with Friction)
+
+Solves compressible pipe flow with wall friction using RK4 integration:
+- Mass: ρuA = const
+- Energy: h + u²/2 = h₀ (adiabatic)
+- Momentum: dp/dx = -f/(2D)·ρu²
+
+```cpp
+// Solve Fanno flow through a pipe segment
+FannoSolution fanno_pipe(
+    double T_in, double P_in,       // Inlet static conditions [K, Pa]
+    double u_in,                    // Inlet velocity [m/s]
+    double L, double D,             // Pipe length and diameter [m]
+    double f,                       // Darcy friction factor [-]
+    const std::vector<double>& X,   // Mole fractions
+    std::size_t n_steps = 100,      // Integration steps
+    bool store_profile = false      // Store axial profile
+);
+
+// Convenience overload with State
+FannoSolution fanno_pipe(const State& inlet, double u_in, double L, double D, double f,
+                          std::size_t n_steps = 100, bool store_profile = false);
+
+// Find maximum pipe length before choking (L*)
+double fanno_max_length(double T_in, double P_in, double u_in, double D, double f,
+                         const std::vector<double>& X, double tol = 1e-6, ...);
+```
+
+### Result Structures
+
+```cpp
+struct CompressibleFlowSolution {
+    State stagnation;    // Stagnation state (T0, P0, ...)
+    State outlet;        // Outlet static state
+    double v;            // Outlet velocity [m/s]
+    double M;            // Outlet Mach number [-]
+    double mdot;         // Mass flow rate [kg/s]
+    bool choked;         // True if flow is choked (M = 1)
+};
+
+struct FannoStation {
+    double x, P, T, rho, u, M, h, s;  // Axial profile data
+};
+
+struct FannoSolution {
+    State inlet, outlet;              // Inlet/outlet states
+    double mdot, h0, L, D, f;         // Flow parameters
+    bool choked;                      // True if M reached 1
+    double L_choke;                   // Length to choking [m]
+    std::vector<FannoStation> profile; // Axial profile (if requested)
+};
+```
+
+## Friction Factor Correlations
+
+Darcy friction factor for turbulent pipe flow. Valid for Re > ~2300.
+
+```cpp
+// Haaland (1983) - explicit, ~2-3% accuracy vs Colebrook
+// 1/√f = -1.8·log₁₀((ε/D/3.7)^1.11 + 6.9/Re)
+double friction_haaland(double Re, double e_D);
+
+// Serghides (1984) - explicit, <0.3% accuracy vs Colebrook
+double friction_serghides(double Re, double e_D);
+
+// Colebrook-White (1939) - implicit, reference standard
+// 1/√f = -2·log₁₀(ε/D/3.7 + 2.51/(Re·√f))
+// Solved iteratively with Haaland initial guess
+double friction_colebrook(double Re, double e_D, double tol = 1e-10, int max_iter = 20);
+```
+
+### Parameters
+
+- `Re`: Reynolds number [-] (must be > 0)
+- `e_D`: Relative roughness ε/D [-] (must be ≥ 0)
+
+### Usage Example
+
+```cpp
+double Re = 50000.0;
+double e_D = 0.001;  // Relative roughness
+
+double f_haaland = friction_haaland(Re, e_D);     // Fast explicit
+double f_serghides = friction_serghides(Re, e_D); // More accurate explicit
+double f_colebrook = friction_colebrook(Re, e_D); // Reference (iterative)
+
+// Use in pressure drop: ΔP = f·(L/D)·(ρv²/2)
+```

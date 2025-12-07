@@ -20,6 +20,8 @@ This library provides tools for ideal-gas thermodynamic properties, combustion s
 - Combustion tools: O₂ demand per fuel/mixture, complete combustion to CO₂/H₂O
 - Equivalence ratio and Bilger mixture fraction utilities
 - **Inverse combustion solvers**: find fuel or oxidizer flow for target Tad, O₂, or CO₂
+- **Compressible flow**: isentropic nozzle flow and Fanno flow (adiabatic pipe with friction)
+- **Friction factors**: Colebrook-White, Haaland, and Serghides correlations
 - Accurate saturation vapor pressure using Hyland-Wexler equations
   - For ice (-80°C to 0°C): maximum relative error ≤ 0.023%
   - For water vapor (0°C to 80°C): maximum relative error ≤ 0.0057%
@@ -38,6 +40,8 @@ The library is organized into focused modules:
 | `transport.h` | Transport properties (viscosity, thermal conductivity, Prandtl) |
 | `combustion.h` | Combustion calculations (O₂ demand, equivalence ratio, complete combustion) |
 | `equilibrium.h` | Chemical equilibrium solver (WGS partial equilibrium) |
+| `compressible.h` | Compressible flow (isentropic nozzle, Fanno pipe flow) |
+| `friction.h` | Darcy friction factor correlations (Colebrook, Haaland, Serghides) |
 | `humidair.h` | Humid air properties and saturation vapor pressure |
 | `utils.h` | Utility functions (mixture property printing) |
 

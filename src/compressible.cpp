@@ -390,3 +390,308 @@ double mass_flux_isentropic(
     
     return compute_mass_flux(T0, P0, P, s0, h0, X, tol, max_iter);
 }
+
+// -------------------------------------------------------------
+// Fanno flow implementation
+// -------------------------------------------------------------
+
+namespace {
+
+// Solve for T given P such that h(T) + u²/2 = h0, with u from mass conservation.
+// Returns T, and sets u_out and rho_out.
+double solve_T_from_energy(
+    double P, double h0_mass, double mdot, double A,
+    const std::vector<double>& X, double mw_kg,  // mw in kg/mol
+    double T_guess,
+    double& u_out, double& rho_out,
+    double tol = 1e-8, std::size_t max_iter = 50)
+{
+    double T = T_guess;
+    constexpr double T_MIN = 200.0;
+    constexpr double T_MAX = 6000.0;
+    double mw_g = mw_kg * 1000.0;  // g/mol for enthalpy conversion
+    
+    for (std::size_t iter = 0; iter < max_iter; ++iter) {
+        // Density from ideal gas: rho = P * mw / (R * T), mw in kg/mol
+        double rho = P * mw_kg / (R_GAS * T);
+        
+        // Velocity from mass conservation: u = mdot / (rho * A)
+        double u = mdot / (rho * A);
+        
+        // Specific enthalpy [J/kg]
+        // h() returns J/mol, mw_g in g/mol
+        // h_mass = h_mol / mw_g * 1000 = J/mol / (g/mol) * 1000 = J/g * 1000 = J/kg
+        double h_mol = h(T, X);  // J/mol
+        double h_mass = h_mol / mw_g * 1000.0;  // J/kg
+        
+        // Energy equation residual: h + u²/2 - h0 = 0
+        double F = h_mass + 0.5 * u * u - h0_mass;
+        
+        // Derivative: dF/dT = dh/dT + u * du/dT
+        // dh/dT = cp (mass basis)
+        // du/dT = d(mdot/(rho*A))/dT = mdot/A * d(1/rho)/dT
+        //       = mdot/A * d(R*T/(P*mw_kg))/dT = mdot*R/(A*P*mw_kg) = u/T
+        double cp_mol = cp(T, X);  // J/(mol·K)
+        double cp_mass = cp_mol / mw_g * 1000.0;  // J/(kg·K)
+        double du_dT = u / T;
+        double dF = cp_mass + u * du_dT;
+        
+        if (std::abs(dF) < 1e-30) break;
+        
+        double dT = -F / dF;
+        
+        // Limit step size
+        double max_step = 0.3 * T;
+        if (std::abs(dT) > max_step) {
+            dT = (dT > 0) ? max_step : -max_step;
+        }
+        
+        T += dT;
+        T = std::clamp(T, T_MIN, T_MAX);
+        
+        if (std::abs(dT) < tol * T) {
+            break;
+        }
+    }
+    
+    // Final values
+    rho_out = P * mw_kg / (R_GAS * T);
+    u_out = mdot / (rho_out * A);
+    
+    return T;
+}
+
+// Compute dp/dx from momentum equation: dp/dx = -f/(2D) * rho * u²
+double dpdx_fanno(double rho, double u, double f, double D) {
+    return -f / (2.0 * D) * rho * u * u;
+}
+
+}  // namespace
+
+FannoSolution fanno_pipe(
+    double T_in, double P_in, double u_in,
+    double L, double D, double f,
+    const std::vector<double>& X,
+    std::size_t n_steps,
+    bool store_profile)
+{
+    // Validate inputs
+    if (T_in <= 0.0) {
+        throw std::invalid_argument("fanno_pipe: T_in must be positive");
+    }
+    if (P_in <= 0.0) {
+        throw std::invalid_argument("fanno_pipe: P_in must be positive");
+    }
+    if (L <= 0.0) {
+        throw std::invalid_argument("fanno_pipe: L must be positive");
+    }
+    if (D <= 0.0) {
+        throw std::invalid_argument("fanno_pipe: D must be positive");
+    }
+    if (f < 0.0) {
+        throw std::invalid_argument("fanno_pipe: f must be non-negative");
+    }
+    if (n_steps == 0) {
+        throw std::invalid_argument("fanno_pipe: n_steps must be positive");
+    }
+    
+    FannoSolution sol;
+    sol.L = L;
+    sol.D = D;
+    sol.f = f;
+    
+    // Inlet state
+    sol.inlet.T = T_in;
+    sol.inlet.P = P_in;
+    sol.inlet.X = X;
+    double mw_g = sol.inlet.mw();  // g/mol
+    double mw_kg = mw_g / 1000.0;  // kg/mol
+    double A = M_PI * D * D / 4.0;  // m²
+    
+    // Inlet density and mass flow
+    double rho_in = sol.inlet.rho();
+    sol.mdot = rho_in * u_in * A;
+    
+    // Stagnation enthalpy (conserved): h0 = h + u²/2
+    double h_in_mol = h(T_in, X);  // J/mol
+    double h_in_mass = h_in_mol / mw_g * 1000.0;  // J/kg
+    sol.h0 = h_in_mass + 0.5 * u_in * u_in;
+    
+    // Check inlet Mach number
+    double a_in = sol.inlet.a();
+    double M_in = u_in / a_in;
+    if (M_in >= 1.0) {
+        throw std::invalid_argument("fanno_pipe: inlet flow is supersonic (M >= 1), not supported");
+    }
+    
+    // Store inlet profile point
+    if (store_profile) {
+        FannoStation st;
+        st.x = 0.0;
+        st.P = P_in;
+        st.T = T_in;
+        st.rho = rho_in;
+        st.u = u_in;
+        st.M = M_in;
+        st.h = h_in_mass;
+        st.s = sol.inlet.s() / mw_g * 1000.0;  // J/(kg·K)
+        sol.profile.push_back(st);
+    }
+    
+    // Integration using RK4
+    double dx = L / static_cast<double>(n_steps);
+    double x = 0.0;
+    double P = P_in;
+    double T = T_in;
+    double rho = rho_in;
+    double u = u_in;
+    
+    for (std::size_t step = 0; step < n_steps; ++step) {
+        // RK4 integration of dp/dx
+        // k1
+        double k1 = dpdx_fanno(rho, u, f, D);
+        
+        // k2: evaluate at x + dx/2, P + k1*dx/2
+        double P2 = P + 0.5 * k1 * dx;
+        if (P2 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
+        double T2, u2, rho2;
+        T2 = solve_T_from_energy(P2, sol.h0, sol.mdot, A, X, mw_kg, T, u2, rho2);
+        double k2 = dpdx_fanno(rho2, u2, f, D);
+        
+        // k3: evaluate at x + dx/2, P + k2*dx/2
+        double P3 = P + 0.5 * k2 * dx;
+        if (P3 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
+        double T3, u3, rho3;
+        T3 = solve_T_from_energy(P3, sol.h0, sol.mdot, A, X, mw_kg, T, u3, rho3);
+        double k3 = dpdx_fanno(rho3, u3, f, D);
+        
+        // k4: evaluate at x + dx, P + k3*dx
+        double P4 = P + k3 * dx;
+        if (P4 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
+        double T4, u4, rho4;
+        T4 = solve_T_from_energy(P4, sol.h0, sol.mdot, A, X, mw_kg, T, u4, rho4);
+        double k4 = dpdx_fanno(rho4, u4, f, D);
+        
+        // Update P
+        double P_new = P + dx * (k1 + 2.0*k2 + 2.0*k3 + k4) / 6.0;
+        
+        if (P_new <= 0.0) {
+            sol.choked = true;
+            sol.L_choke = x;
+            break;
+        }
+        
+        // Update state
+        x += dx;
+        P = P_new;
+        T = solve_T_from_energy(P, sol.h0, sol.mdot, A, X, mw_kg, T, u, rho);
+        
+        // Check for choking (M approaching 1)
+        State current;
+        current.T = T;
+        current.P = P;
+        current.X = X;
+        double a = current.a();
+        double M = u / a;
+        
+        if (M >= 0.999) {
+            sol.choked = true;
+            sol.L_choke = x;
+            break;
+        }
+        
+        // Store profile point
+        if (store_profile) {
+            FannoStation st;
+            st.x = x;
+            st.P = P;
+            st.T = T;
+            st.rho = rho;
+            st.u = u;
+            st.M = M;
+            st.h = h(T, X) / mw_g * 1000.0;
+            st.s = current.s() / mw_g * 1000.0;
+            sol.profile.push_back(st);
+        }
+    }
+    
+    // Set outlet state
+    sol.outlet.T = T;
+    sol.outlet.P = P;
+    sol.outlet.X = X;
+    
+    return sol;
+}
+
+FannoSolution fanno_pipe(
+    const State& inlet, double u_in,
+    double L, double D, double f,
+    std::size_t n_steps,
+    bool store_profile)
+{
+    return fanno_pipe(inlet.T, inlet.P, u_in, L, D, f, inlet.X, n_steps, store_profile);
+}
+
+double fanno_max_length(
+    double T_in, double P_in, double u_in,
+    double D, double f,
+    const std::vector<double>& X,
+    double tol, std::size_t max_iter)
+{
+    // Binary search for length that causes choking
+    // Start with an estimate based on ideal gas relations
+    
+    State inlet;
+    inlet.T = T_in;
+    inlet.P = P_in;
+    inlet.X = X;
+    double M_in = u_in / inlet.a();
+    
+    if (M_in >= 1.0) {
+        return 0.0;  // Already choked
+    }
+    
+    // Initial estimate: use ideal gas Fanno relation
+    // 4fL*/D = (1-M²)/(γM²) + (γ+1)/(2γ) * ln((γ+1)M² / (2 + (γ-1)M²))
+    double gamma = inlet.gamma();
+    double M2 = M_in * M_in;
+    double term1 = (1.0 - M2) / (gamma * M2);
+    double term2 = (gamma + 1.0) / (2.0 * gamma) * 
+                   std::log((gamma + 1.0) * M2 / (2.0 + (gamma - 1.0) * M2));
+    double L_star_estimate = D * (term1 + term2) / (4.0 * f);
+    
+    // Binary search
+    double L_low = 0.0;
+    double L_high = 2.0 * L_star_estimate;
+    
+    for (std::size_t iter = 0; iter < max_iter; ++iter) {
+        double L_mid = 0.5 * (L_low + L_high);
+        
+        try {
+            auto sol = fanno_pipe(T_in, P_in, u_in, L_mid, D, f, X, 200, false);
+            
+            if (sol.choked) {
+                L_high = L_mid;
+            } else {
+                // Check outlet Mach
+                double A = M_PI * D * D / 4.0;
+                double u_out = sol.mdot / (sol.outlet.rho() * A);
+                double M_out = u_out / sol.outlet.a();
+                
+                if (M_out > 0.99) {
+                    L_high = L_mid;
+                } else {
+                    L_low = L_mid;
+                }
+            }
+        } catch (...) {
+            L_high = L_mid;
+        }
+        
+        if ((L_high - L_low) / L_high < tol) {
+            break;
+        }
+    }
+    
+    return 0.5 * (L_low + L_high);
+}

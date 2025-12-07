@@ -6,6 +6,7 @@
 #include "../include/equilibrium.h"
 #include "../include/humidair.h"
 #include "../include/compressible.h"
+#include "../include/friction.h"
 #include "../include/state.h"
 #include <vector>
 #include <cmath>
@@ -2625,4 +2626,216 @@ TEST_F(ThermoTransportTest, CompressibleInvalidInputs) {
     // Invalid A_eff
     EXPECT_THROW(nozzle_flow(500.0, 200000.0, 100000.0, 0.0, X_air), std::invalid_argument);
     EXPECT_THROW(nozzle_flow(500.0, 200000.0, 100000.0, -0.001, X_air), std::invalid_argument);
+}
+
+// =============================================================================
+// Friction Factor Tests
+// =============================================================================
+
+// Test Haaland correlation against known values
+TEST_F(ThermoTransportTest, FrictionHaaland) {
+    // Smooth pipe (e_D = 0) at Re = 100000
+    // Expected f ~ 0.018 for smooth turbulent flow
+    double f_smooth = friction_haaland(100000.0, 0.0);
+    EXPECT_GT(f_smooth, 0.015);
+    EXPECT_LT(f_smooth, 0.025);
+    
+    // Rough pipe (e_D = 0.001) at Re = 100000
+    double f_rough = friction_haaland(100000.0, 0.001);
+    EXPECT_GT(f_rough, f_smooth);  // Rougher = higher friction
+    
+    // Very high Re (fully rough regime)
+    double f_high_re = friction_haaland(1e7, 0.001);
+    EXPECT_GT(f_high_re, 0.01);
+    EXPECT_LT(f_high_re, 0.03);
+}
+
+// Test Serghides correlation against known values
+TEST_F(ThermoTransportTest, FrictionSerghides) {
+    // Smooth pipe at Re = 100000
+    double f_smooth = friction_serghides(100000.0, 0.0);
+    EXPECT_GT(f_smooth, 0.015);
+    EXPECT_LT(f_smooth, 0.025);
+    
+    // Rough pipe
+    double f_rough = friction_serghides(100000.0, 0.001);
+    EXPECT_GT(f_rough, f_smooth);
+}
+
+// Test Colebrook-White against Serghides (should be very close)
+TEST_F(ThermoTransportTest, FrictionColebrookVsSerghides) {
+    // Serghides claims ~0.003% accuracy vs Colebrook
+    // Test at various conditions
+    
+    double Re_vals[] = {4000.0, 10000.0, 100000.0, 1000000.0};
+    double eD_vals[] = {0.0, 0.0001, 0.001, 0.01};
+    
+    for (double Re : Re_vals) {
+        for (double eD : eD_vals) {
+            double f_colebrook = friction_colebrook(Re, eD);
+            double f_serghides = friction_serghides(Re, eD);
+            
+            // Should match within 0.1%
+            double rel_diff = std::abs(f_colebrook - f_serghides) / f_colebrook;
+            EXPECT_LT(rel_diff, 0.001);
+        }
+    }
+}
+
+// Test consistency: all correlations should give similar results
+TEST_F(ThermoTransportTest, FrictionCorrelationsConsistent) {
+    double Re = 50000.0;
+    double eD = 0.0005;
+    
+    double f_haaland = friction_haaland(Re, eD);
+    double f_serghides = friction_serghides(Re, eD);
+    double f_colebrook = friction_colebrook(Re, eD);
+    
+    // Haaland within 2% of Colebrook
+    EXPECT_NEAR(f_haaland, f_colebrook, 0.02 * f_colebrook);
+    
+    // Serghides within 0.1% of Colebrook
+    EXPECT_NEAR(f_serghides, f_colebrook, 0.001 * f_colebrook);
+}
+
+// Test invalid inputs throw exceptions
+TEST_F(ThermoTransportTest, FrictionInvalidInputs) {
+    // Invalid Re
+    EXPECT_THROW(friction_haaland(0.0, 0.001), std::invalid_argument);
+    EXPECT_THROW(friction_haaland(-1000.0, 0.001), std::invalid_argument);
+    EXPECT_THROW(friction_serghides(0.0, 0.001), std::invalid_argument);
+    EXPECT_THROW(friction_colebrook(0.0, 0.001), std::invalid_argument);
+    
+    // Invalid e_D (negative)
+    EXPECT_THROW(friction_haaland(10000.0, -0.001), std::invalid_argument);
+    EXPECT_THROW(friction_serghides(10000.0, -0.001), std::invalid_argument);
+    EXPECT_THROW(friction_colebrook(10000.0, -0.001), std::invalid_argument);
+}
+
+// =============================================================================
+// Fanno Flow Tests
+// =============================================================================
+
+// Test basic Fanno flow: pressure drops, temperature drops, velocity increases
+TEST_F(ThermoTransportTest, FannoFlowBasic) {
+    const std::size_t n = species_names.size();
+    std::vector<double> X_air(n, 0.0);
+    X_air[species_index_from_name("O2")] = 0.21;
+    X_air[species_index_from_name("N2")] = 0.79;
+    
+    double T_in = 400.0;      // K
+    double P_in = 200000.0;   // Pa
+    double u_in = 50.0;       // m/s (subsonic)
+    double L = 10.0;          // m
+    double D = 0.05;          // m (5 cm pipe)
+    double f = 0.02;          // Darcy friction factor
+    
+    auto sol = fanno_pipe(T_in, P_in, u_in, L, D, f, X_air);
+    
+    // Pressure should drop due to friction
+    EXPECT_LT(sol.outlet.P, P_in);
+    
+    // Temperature should drop (adiabatic expansion)
+    EXPECT_LT(sol.outlet.T, T_in);
+    
+    // Mass flow should be conserved
+    double A = M_PI * D * D / 4.0;
+    double mdot_in = sol.inlet.rho() * u_in * A;
+    double u_out = sol.mdot / (sol.outlet.rho() * A);
+    double mdot_out = sol.outlet.rho() * u_out * A;
+    EXPECT_NEAR(mdot_out, mdot_in, mdot_in * 0.001);
+    
+    // Velocity should increase (density drops faster than pressure)
+    EXPECT_GT(u_out, u_in);
+    
+    // Should not be choked for short pipe
+    EXPECT_FALSE(sol.choked);
+}
+
+// Test Fanno flow energy conservation
+TEST_F(ThermoTransportTest, FannoFlowEnergyConservation) {
+    const std::size_t n = species_names.size();
+    std::vector<double> X_air(n, 0.0);
+    X_air[species_index_from_name("O2")] = 0.21;
+    X_air[species_index_from_name("N2")] = 0.79;
+    
+    double T_in = 500.0;
+    double P_in = 300000.0;
+    double u_in = 100.0;
+    double L = 5.0;
+    double D = 0.1;
+    double f = 0.015;
+    
+    auto sol = fanno_pipe(T_in, P_in, u_in, L, D, f, X_air, 200, true);
+    
+    // Stagnation enthalpy should be conserved
+    double mw = sol.inlet.mw();
+    double h_in = sol.inlet.h() / mw * 1000.0;  // J/kg
+    double h0_in = h_in + 0.5 * u_in * u_in;
+    
+    double A = M_PI * D * D / 4.0;
+    double u_out = sol.mdot / (sol.outlet.rho() * A);
+    double h_out = sol.outlet.h() / mw * 1000.0;
+    double h0_out = h_out + 0.5 * u_out * u_out;
+    
+    // h0 should be conserved within 0.1%
+    EXPECT_NEAR(h0_out, h0_in, h0_in * 0.001);
+}
+
+// Test Fanno flow with profile storage
+TEST_F(ThermoTransportTest, FannoFlowProfile) {
+    const std::size_t n = species_names.size();
+    std::vector<double> X_air(n, 0.0);
+    X_air[species_index_from_name("O2")] = 0.21;
+    X_air[species_index_from_name("N2")] = 0.79;
+    
+    double T_in = 400.0;
+    double P_in = 200000.0;
+    double u_in = 80.0;
+    double L = 20.0;
+    double D = 0.05;
+    double f = 0.02;
+    
+    auto sol = fanno_pipe(T_in, P_in, u_in, L, D, f, X_air, 50, true);
+    
+    // Profile should have entries
+    EXPECT_GT(sol.profile.size(), 0u);
+    
+    // Pressure should monotonically decrease
+    for (std::size_t i = 1; i < sol.profile.size(); ++i) {
+        EXPECT_LT(sol.profile[i].P, sol.profile[i-1].P);
+    }
+    
+    // Mach number should monotonically increase
+    for (std::size_t i = 1; i < sol.profile.size(); ++i) {
+        EXPECT_GT(sol.profile[i].M, sol.profile[i-1].M);
+    }
+    
+    // Entropy should increase (irreversible process)
+    for (std::size_t i = 1; i < sol.profile.size(); ++i) {
+        EXPECT_GT(sol.profile[i].s, sol.profile[i-1].s);
+    }
+}
+
+// Test invalid inputs throw exceptions
+TEST_F(ThermoTransportTest, FannoFlowInvalidInputs) {
+    const std::size_t n = species_names.size();
+    std::vector<double> X_air(n, 0.0);
+    X_air[species_index_from_name("O2")] = 0.21;
+    X_air[species_index_from_name("N2")] = 0.79;
+    
+    // Invalid T_in
+    EXPECT_THROW(fanno_pipe(0.0, 200000.0, 50.0, 10.0, 0.05, 0.02, X_air), std::invalid_argument);
+    
+    // Invalid P_in
+    EXPECT_THROW(fanno_pipe(400.0, 0.0, 50.0, 10.0, 0.05, 0.02, X_air), std::invalid_argument);
+    
+    // Invalid L
+    EXPECT_THROW(fanno_pipe(400.0, 200000.0, 50.0, 0.0, 0.05, 0.02, X_air), std::invalid_argument);
+    
+    // Invalid D
+    EXPECT_THROW(fanno_pipe(400.0, 200000.0, 50.0, 10.0, 0.0, 0.02, X_air), std::invalid_argument);
+    
+    // Invalid f (negative)
+    EXPECT_THROW(fanno_pipe(400.0, 200000.0, 50.0, 10.0, 0.05, -0.02, X_air), std::invalid_argument);
 }
