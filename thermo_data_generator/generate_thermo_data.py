@@ -3,29 +3,30 @@
 
 This script supports multiple input formats:
 1. Combined Cantera YAML mechanism (thermo + transport in one file)
-2. Separate thermo database (NASA7 or NASA9 format) + transport database
+2. Merged JSON from extract_species_data.py (NASA-9 thermo + transport)
 
 Usage:
-    # From combined YAML mechanism (current workflow)
+    # From combined YAML mechanism (NASA-7)
     python generate_thermo_data.py --mechanism gri30.yaml --species N2,O2,CH4
 
-    # From separate sources (future workflow)
-    python generate_thermo_data.py --thermo thermo.dat --transport transport.dat --species N2,O2,CH4
+    # From merged JSON (NASA-9 preferred)
+    python generate_thermo_data.py --json merged_species.json --species N2,O2,CH4 --prefer-nasa9
 
-    # List available species in a mechanism
+    # List available species
     python generate_thermo_data.py --mechanism gri30.yaml --list-species
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import re
 import sys
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import TextIO
+from typing import Any, TextIO
 
 
 class NASAFormat(Enum):
@@ -247,13 +248,107 @@ def load_nasa9_thermo(path: Path, species_filter: set[str] | None = None) -> lis
 
 
 # -----------------------------------------------------------------------------
-# Transport Database Parser
+# JSON Loader (from extract_species_data.py output)
 # -----------------------------------------------------------------------------
 
-def load_transport_database(path: Path) -> dict[str, TransportProps]:
-    """Load transport properties from a standalone transport database."""
-    # TODO: Implement transport database parser
-    raise NotImplementedError("Standalone transport parser not yet implemented. Use YAML mechanism.")
+def load_merged_json(
+    path: Path,
+    species_filter: set[str] | None = None,
+    prefer_nasa9: bool = True,
+) -> tuple[list[SpeciesData], NASAFormat]:
+    """Load species data from merged JSON (output of extract_species_data.py).
+    
+    Args:
+        path: Path to JSON file
+        species_filter: Optional set of species names to include
+        prefer_nasa9: If True, use NASA-9 thermo when available; else NASA-7
+    
+    Returns:
+        Tuple of (species_data list, detected NASA format)
+    """
+    with open(path) as f:
+        data = json.load(f)
+    
+    result: list[SpeciesData] = []
+    has_nasa9 = False
+    
+    for sp in data.get("species", []):
+        name = sp.get("name", "").upper()
+        name_norm = sp.get("name_normalized", name)
+        
+        if species_filter and name_norm not in {s.upper() for s in species_filter}:
+            continue
+        
+        # Determine which thermo format to use
+        has_n9 = "thermo_nasa9" in sp
+        has_n7 = "thermo_nasa7" in sp
+        
+        if prefer_nasa9 and has_n9:
+            nasa9 = sp["thermo_nasa9"]
+            intervals = nasa9.get("intervals", [])
+            # Build T_ranges from intervals: [T0, T1, T2, ...]
+            t_ranges = []
+            for iv in intervals:
+                if not t_ranges:
+                    t_ranges.append(iv["T_min"])
+                t_ranges.append(iv["T_max"])
+            coeffs = [iv["coeffs"] for iv in intervals]
+            nasa = NASACoeffs(format=NASAFormat.NASA9, T_ranges=t_ranges, coeffs=coeffs)
+            has_nasa9 = True
+        elif has_n7:
+            nasa7 = sp["thermo_nasa7"]
+            t_ranges = [nasa7.get("T_min"), nasa7.get("T_mid"), nasa7.get("T_max")]
+            coeffs = [nasa7.get("coeffs_low", []), nasa7.get("coeffs_high", [])]
+            nasa = NASACoeffs(format=NASAFormat.NASA7, T_ranges=t_ranges, coeffs=coeffs)
+        else:
+            print(f"Warning: {name} has no thermo data, skipping")
+            continue
+        
+        # Transport
+        transport: TransportProps | None = None
+        tr = sp.get("transport", {})
+        if tr.get("geometry"):
+            try:
+                geom = Geometry(tr["geometry"])
+            except ValueError:
+                geom = Geometry.NONLINEAR
+            transport = TransportProps(
+                geometry=geom,
+                well_depth=tr.get("well_depth", 0.0) or 0.0,
+                diameter=tr.get("diameter", 0.0) or 0.0,
+                polarizability=tr.get("polarizability", 0.0) or 0.0,
+                rotational_relaxation=tr.get("rotational_relaxation", 0.0) or 0.0,
+            )
+        
+        # Composition
+        comp = sp.get("composition", {})
+        structure = MolecularStructure(
+            C=comp.get("C", 0),
+            H=comp.get("H", 0),
+            O=comp.get("O", 0),
+            N=comp.get("N", 0),
+            Ar=comp.get("AR", 0),
+        )
+        
+        molar_mass = sp.get("molar_mass", 0.0)
+        
+        result.append(SpeciesData(
+            name=name,
+            molar_mass=molar_mass,
+            nasa=nasa,
+            transport=transport,
+            structure=structure,
+        ))
+    
+    detected_format = NASAFormat.NASA9 if has_nasa9 else NASAFormat.NASA7
+    return result, detected_format
+
+
+def list_species_in_json(path: Path) -> list[str]:
+    """List all species names in a merged JSON file."""
+    with open(path) as f:
+        data = json.load(f)
+    return [sp.get("name", "") for sp in data.get("species", [])]
 
 
 # -----------------------------------------------------------------------------
@@ -487,14 +582,20 @@ def main() -> int:
         help="Cantera YAML mechanism file (combined thermo + transport)",
     )
     parser.add_argument(
-        "--thermo", "-t",
+        "--json", "-j",
         type=Path,
-        help="Standalone thermo database (NASA7 or NASA9 format)",
+        help="Merged JSON from extract_species_data.py",
     )
     parser.add_argument(
-        "--transport", "-r",
-        type=Path,
-        help="Standalone transport database",
+        "--prefer-nasa9",
+        action="store_true",
+        default=True,
+        help="Prefer NASA-9 thermo when available (default: True)",
+    )
+    parser.add_argument(
+        "--prefer-nasa7",
+        action="store_true",
+        help="Prefer NASA-7 thermo when available",
     )
     
     # Species selection
@@ -520,21 +621,25 @@ def main() -> int:
     args = parser.parse_args()
     
     # Validate arguments
-    if args.mechanism and (args.thermo or args.transport):
-        parser.error("Cannot use --mechanism with --thermo or --transport")
+    if args.mechanism and args.json:
+        parser.error("Cannot use --mechanism with --json")
     
-    if not args.mechanism and not args.thermo:
-        parser.error("Must specify either --mechanism or --thermo")
+    if not args.mechanism and not args.json:
+        parser.error("Must specify either --mechanism or --json")
     
     # List species mode
     if args.list_species:
         if args.mechanism:
             species_names = list_species_in_yaml(args.mechanism)
             print(f"Species in {args.mechanism} ({len(species_names)} total):")
-            for name in sorted(species_names):
-                print(f"  {name}")
+        elif args.json:
+            species_names = list_species_in_json(args.json)
+            print(f"Species in {args.json} ({len(species_names)} total):")
         else:
-            parser.error("--list-species requires --mechanism")
+            parser.error("--list-species requires --mechanism or --json")
+            return 1
+        for name in sorted(species_names):
+            print(f"  {name}")
         return 0
     
     # Parse species filter
@@ -543,28 +648,19 @@ def main() -> int:
         species_filter = set(parse_species_list(args.species))
         print(f"Filtering to {len(species_filter)} species")
     
+    # Determine NASA format preference
+    prefer_nasa9 = not args.prefer_nasa7
+    
     # Load data
     if args.mechanism:
         print(f"Loading mechanism: {args.mechanism}")
         species_data, nasa_format = load_cantera_yaml(args.mechanism, species_filter)
+    elif args.json:
+        print(f"Loading JSON: {args.json}")
+        species_data, nasa_format = load_merged_json(args.json, species_filter, prefer_nasa9)
     else:
-        # Separate sources
-        print(f"Loading thermo: {args.thermo}")
-        nasa_format = detect_nasa_format(args.thermo)
-        print(f"Detected format: {nasa_format.name}")
-        
-        if nasa_format == NASAFormat.NASA7:
-            species_data = load_nasa7_thermo(args.thermo, species_filter)
-        else:
-            species_data = load_nasa9_thermo(args.thermo, species_filter)
-        
-        if args.transport:
-            print(f"Loading transport: {args.transport}")
-            transport_db = load_transport_database(args.transport)
-            # Merge transport data
-            for sp in species_data:
-                if sp.name in transport_db:
-                    sp.transport = transport_db[sp.name]
+        parser.error("Must specify --mechanism or --json")
+        return 1
     
     print(f"Loaded {len(species_data)} species, format: {nasa_format.name}")
     
