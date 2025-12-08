@@ -126,6 +126,18 @@ if (COMBAERO_ENABLE_SOURCE_CHECKS AND NOT WIN32)
         # Make library depend on the check
         add_dependencies(combaero_lib check_source_style)
     endif()
+
+    # Regenerate UNITS.md from units_data.h
+    find_program(PYTHON_EXECUTABLE python3 python)
+    if (PYTHON_EXECUTABLE AND EXISTS "${CMAKE_SOURCE_DIR}/scripts/generate_units_md.py")
+        add_custom_target(generate_units_md ALL
+            COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/generate_units_md.py
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            COMMENT "Regenerating docs/UNITS.md..."
+            DEPENDS ${CMAKE_SOURCE_DIR}/include/units_data.h
+        )
+        add_dependencies(combaero_lib generate_units_md)
+    endif()
 endif()
 
 # Testing setup (can be disabled, e.g. for Python wheel builds)
