@@ -55,8 +55,6 @@ python generate_thermo_data.py \
 
 | Script | Purpose |
 |--------|---------|
-| `extract_thermo_transport_data.py` | Standalone YAML extractor |
-| `extract_nasa_cea_data.py` | Standalone CEA extractor |
 | `create_cpp_header.py` | CSV to header converter |
 
 ## Data Sources
