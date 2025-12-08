@@ -133,6 +133,23 @@ try:
         friction_haaland,
         friction_serghides,
         friction_colebrook,
+        # Incompressible flow
+        bernoulli_P2,
+        bernoulli_v2,
+        orifice_mdot,
+        orifice_Q,
+        orifice_velocity,
+        orifice_area,
+        orifice_dP,
+        pipe_dP,
+        pipe_dP_mdot,
+        pipe_velocity,
+        pipe_mdot,
+        dynamic_pressure,
+        velocity_from_q,
+        hydraulic_diameter,
+        hydraulic_diameter_rect,
+        hydraulic_diameter_annulus,
     )
 except ModuleNotFoundError:
     # Fallback: attempt to import from an installed combaero package that
@@ -232,6 +249,23 @@ except ModuleNotFoundError:
     friction_haaland = _core.friction_haaland
     friction_serghides = _core.friction_serghides
     friction_colebrook = _core.friction_colebrook
+    # Incompressible flow
+    bernoulli_P2 = _core.bernoulli_P2
+    bernoulli_v2 = _core.bernoulli_v2
+    orifice_mdot = _core.orifice_mdot
+    orifice_Q = _core.orifice_Q
+    orifice_velocity = _core.orifice_velocity
+    orifice_area = _core.orifice_area
+    orifice_dP = _core.orifice_dP
+    pipe_dP = _core.pipe_dP
+    pipe_dP_mdot = _core.pipe_dP_mdot
+    pipe_velocity = _core.pipe_velocity
+    pipe_mdot = _core.pipe_mdot
+    dynamic_pressure = _core.dynamic_pressure
+    velocity_from_q = _core.velocity_from_q
+    hydraulic_diameter = _core.hydraulic_diameter
+    hydraulic_diameter_rect = _core.hydraulic_diameter_rect
+    hydraulic_diameter_annulus = _core.hydraulic_diameter_annulus
 
 
 __all__ = [
@@ -329,5 +363,22 @@ __all__ = [
     "friction_haaland",
     "friction_serghides",
     "friction_colebrook",
+    # Incompressible flow
+    "bernoulli_P2",
+    "bernoulli_v2",
+    "orifice_mdot",
+    "orifice_Q",
+    "orifice_velocity",
+    "orifice_area",
+    "orifice_dP",
+    "pipe_dP",
+    "pipe_dP_mdot",
+    "pipe_velocity",
+    "pipe_mdot",
+    "dynamic_pressure",
+    "velocity_from_q",
+    "hydraulic_diameter",
+    "hydraulic_diameter_rect",
+    "hydraulic_diameter_annulus",
     "__version__",
 ]

@@ -8,6 +8,7 @@ This package provides Python bindings for the core CombAero C++ library:
 - Humid air properties and standard dry-air composition
 - Species common-name mapping
 - Compressible flow (isentropic nozzle, quasi-1D, Fanno flow)
+- Incompressible flow (Bernoulli, orifice, pipe pressure drop)
 - Friction factor correlations (Colebrook, Haaland, Serghides)
 
 The bindings are implemented with [pybind11](https://pybind11.readthedocs.io/) and built via [scikit-build-core](https://scikit-build-core.readthedocs.io/).
@@ -255,4 +256,29 @@ print(ca.formula("Water"))    # "H2O"
 # Get full mappings
 formula_map = ca.formula_to_name()  # dict: formula -> name
 name_map = ca.name_to_formula()     # dict: name -> formula
+```
+
+### Incompressible Flow
+
+For liquids and low-speed gas flows (Ma < 0.3):
+
+```python
+import combaero as ca
+
+rho = 998.0  # Water density [kg/m³]
+
+# Bernoulli equation
+P2 = ca.bernoulli_P2(P1=200000, v1=2.0, v2=5.0, rho=rho)
+v2 = ca.bernoulli_v2(P1=200000, P2=150000, v1=2.0, rho=rho)
+
+# Orifice flow
+mdot = ca.orifice_mdot(P1=200000, P2=100000, A=0.001, Cd=0.62, rho=rho)
+A = ca.orifice_area(mdot=5.0, P1=200000, P2=100000, Cd=0.62, rho=rho)
+
+# Pipe pressure drop (Darcy-Weisbach)
+f = ca.friction_colebrook(Re=100000, e_D=0.0001)
+dP = ca.pipe_dP(v=2.0, L=10.0, D=0.05, f=f, rho=rho)
+
+# Hydraulic diameter
+Dh = ca.hydraulic_diameter_rect(a=0.1, b=0.05)  # Rectangular duct
 ```

@@ -10,6 +10,7 @@
 #include "humidair.h"
 #include "common_names.h"
 #include "compressible.h"
+#include "incompressible.h"
 #include "friction.h"
 #include "state.h"
 
@@ -1468,5 +1469,221 @@ PYBIND11_MODULE(_core, m)
         "Calculate rocket nozzle thrust directly from geometry.\n\n"
         "Convenience function that calls nozzle_cd() then nozzle_thrust().\n\n"
         "Returns ThrustResult with thrust, Isp, and C_F."
+    );
+
+    // =========================================================================
+    // Incompressible flow
+    // =========================================================================
+
+    // Bernoulli equation
+    m.def(
+        "bernoulli_P2",
+        &bernoulli_P2,
+        py::arg("P1"),
+        py::arg("v1"),
+        py::arg("v2"),
+        py::arg("rho"),
+        py::arg("dz") = 0.0,
+        py::arg("g") = 9.80665,
+        "Bernoulli equation: solve for downstream pressure P2.\n\n"
+        "P1 + ½ρv1² + ρgh1 = P2 + ½ρv2² + ρgh2\n\n"
+        "P1  : upstream pressure [Pa]\n"
+        "v1  : upstream velocity [m/s]\n"
+        "v2  : downstream velocity [m/s]\n"
+        "rho : fluid density [kg/m³]\n"
+        "dz  : elevation change z2-z1 [m] (positive=up)\n"
+        "g   : gravitational acceleration [m/s²]"
+    );
+
+    m.def(
+        "bernoulli_v2",
+        &bernoulli_v2,
+        py::arg("P1"),
+        py::arg("P2"),
+        py::arg("v1"),
+        py::arg("rho"),
+        py::arg("dz") = 0.0,
+        py::arg("g") = 9.80665,
+        "Bernoulli equation: solve for downstream velocity v2.\n\n"
+        "P1  : upstream pressure [Pa]\n"
+        "P2  : downstream pressure [Pa]\n"
+        "v1  : upstream velocity [m/s]\n"
+        "rho : fluid density [kg/m³]\n"
+        "dz  : elevation change z2-z1 [m]\n"
+        "g   : gravitational acceleration [m/s²]"
+    );
+
+    // Orifice flow
+    m.def(
+        "orifice_mdot",
+        &orifice_mdot,
+        py::arg("P1"),
+        py::arg("P2"),
+        py::arg("A"),
+        py::arg("Cd"),
+        py::arg("rho"),
+        "Orifice mass flow rate (incompressible).\n\n"
+        "ṁ = Cd · A · √(2 · ρ · ΔP)\n\n"
+        "P1  : upstream pressure [Pa]\n"
+        "P2  : downstream pressure [Pa]\n"
+        "A   : orifice area [m²]\n"
+        "Cd  : discharge coefficient [-] (typically 0.6-0.65)\n"
+        "rho : fluid density [kg/m³]\n\n"
+        "Returns: mass flow rate [kg/s]"
+    );
+
+    m.def(
+        "orifice_Q",
+        &orifice_Q,
+        py::arg("P1"),
+        py::arg("P2"),
+        py::arg("A"),
+        py::arg("Cd"),
+        py::arg("rho"),
+        "Orifice volumetric flow rate.\n\n"
+        "Q = Cd · A · √(2 · ΔP / ρ)\n\n"
+        "Returns: volumetric flow rate [m³/s]"
+    );
+
+    m.def(
+        "orifice_velocity",
+        &orifice_velocity,
+        py::arg("P1"),
+        py::arg("P2"),
+        py::arg("rho"),
+        "Ideal orifice velocity (no losses).\n\n"
+        "v = √(2 · ΔP / ρ)\n\n"
+        "Returns: velocity [m/s]"
+    );
+
+    m.def(
+        "orifice_area",
+        &orifice_area,
+        py::arg("mdot"),
+        py::arg("P1"),
+        py::arg("P2"),
+        py::arg("Cd"),
+        py::arg("rho"),
+        "Solve for required orifice area given mass flow.\n\n"
+        "A = ṁ / (Cd · √(2 · ρ · ΔP))\n\n"
+        "Returns: orifice area [m²]"
+    );
+
+    m.def(
+        "orifice_dP",
+        &orifice_dP,
+        py::arg("mdot"),
+        py::arg("A"),
+        py::arg("Cd"),
+        py::arg("rho"),
+        "Solve for pressure drop given mass flow and area.\n\n"
+        "ΔP = (ṁ / (Cd · A))² / (2 · ρ)\n\n"
+        "Returns: pressure drop P1-P2 [Pa]"
+    );
+
+    // Pipe flow
+    m.def(
+        "pipe_dP",
+        &pipe_dP,
+        py::arg("v"),
+        py::arg("L"),
+        py::arg("D"),
+        py::arg("f"),
+        py::arg("rho"),
+        "Pipe pressure drop (Darcy-Weisbach).\n\n"
+        "ΔP = f · (L/D) · (ρ · v² / 2)\n\n"
+        "v   : flow velocity [m/s]\n"
+        "L   : pipe length [m]\n"
+        "D   : pipe diameter [m]\n"
+        "f   : Darcy friction factor [-]\n"
+        "rho : fluid density [kg/m³]\n\n"
+        "Returns: pressure drop [Pa]"
+    );
+
+    m.def(
+        "pipe_dP_mdot",
+        &pipe_dP_mdot,
+        py::arg("mdot"),
+        py::arg("L"),
+        py::arg("D"),
+        py::arg("f"),
+        py::arg("rho"),
+        "Pipe pressure drop from mass flow rate.\n\n"
+        "Returns: pressure drop [Pa]"
+    );
+
+    m.def(
+        "pipe_velocity",
+        &pipe_velocity,
+        py::arg("mdot"),
+        py::arg("D"),
+        py::arg("rho"),
+        "Pipe velocity from mass flow rate.\n\n"
+        "v = ṁ / (ρ · π · D² / 4)\n\n"
+        "Returns: velocity [m/s]"
+    );
+
+    m.def(
+        "pipe_mdot",
+        &pipe_mdot,
+        py::arg("v"),
+        py::arg("D"),
+        py::arg("rho"),
+        "Pipe mass flow from velocity.\n\n"
+        "ṁ = ρ · v · π · D² / 4\n\n"
+        "Returns: mass flow rate [kg/s]"
+    );
+
+    // Hydraulic utilities
+    m.def(
+        "dynamic_pressure",
+        &dynamic_pressure,
+        py::arg("v"),
+        py::arg("rho"),
+        "Dynamic pressure (velocity head).\n\n"
+        "q = ½ · ρ · v²\n\n"
+        "Returns: dynamic pressure [Pa]"
+    );
+
+    m.def(
+        "velocity_from_q",
+        &velocity_from_q,
+        py::arg("q"),
+        py::arg("rho"),
+        "Velocity from dynamic pressure.\n\n"
+        "v = √(2 · q / ρ)\n\n"
+        "Returns: velocity [m/s]"
+    );
+
+    m.def(
+        "hydraulic_diameter",
+        &hydraulic_diameter,
+        py::arg("A"),
+        py::arg("P_wetted"),
+        "Hydraulic diameter for non-circular cross-sections.\n\n"
+        "Dh = 4 · A / P_wetted\n\n"
+        "A        : cross-sectional area [m²]\n"
+        "P_wetted : wetted perimeter [m]\n\n"
+        "Returns: hydraulic diameter [m]"
+    );
+
+    m.def(
+        "hydraulic_diameter_rect",
+        &hydraulic_diameter_rect,
+        py::arg("a"),
+        py::arg("b"),
+        "Hydraulic diameter for rectangular duct.\n\n"
+        "Dh = 2·a·b / (a + b)\n\n"
+        "Returns: hydraulic diameter [m]"
+    );
+
+    m.def(
+        "hydraulic_diameter_annulus",
+        &hydraulic_diameter_annulus,
+        py::arg("D_outer"),
+        py::arg("D_inner"),
+        "Hydraulic diameter for annulus.\n\n"
+        "Dh = D_outer - D_inner\n\n"
+        "Returns: hydraulic diameter [m]"
     );
 }

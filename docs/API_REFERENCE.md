@@ -428,3 +428,111 @@ double f_colebrook = friction_colebrook(Re, e_D); // Reference (iterative)
 
 // Use in pressure drop: ΔP = f·(L/D)·(ρv²/2)
 ```
+
+## Incompressible Flow (`incompressible.h`)
+
+Analytical equations for incompressible (constant density) flow. These are valid for:
+- Mach number < 0.3 (density change < 5%)
+- Pressure ratio close to 1 (ΔP/P << 1)
+
+For higher Mach numbers or large pressure ratios, use `compressible.h`.
+
+### Bernoulli Equation
+
+```cpp
+// Solve for downstream pressure P2
+// P1 + ½ρv1² + ρgh1 = P2 + ½ρv2² + ρgh2
+double bernoulli_P2(double P1, double v1, double v2, double rho,
+                    double dz = 0.0, double g = 9.80665);
+
+// Solve for downstream velocity v2
+double bernoulli_v2(double P1, double P2, double v1, double rho,
+                    double dz = 0.0, double g = 9.80665);
+```
+
+### Orifice Flow
+
+```cpp
+// Mass flow rate: ṁ = Cd · A · √(2 · ρ · ΔP)
+double orifice_mdot(double P1, double P2, double A, double Cd, double rho);
+
+// Volumetric flow rate: Q = Cd · A · √(2 · ΔP / ρ)
+double orifice_Q(double P1, double P2, double A, double Cd, double rho);
+
+// Ideal velocity (no losses): v = √(2 · ΔP / ρ)
+double orifice_velocity(double P1, double P2, double rho);
+
+// Inverse: solve for area given mass flow
+double orifice_area(double mdot, double P1, double P2, double Cd, double rho);
+
+// Inverse: solve for pressure drop given mass flow
+double orifice_dP(double mdot, double A, double Cd, double rho);
+```
+
+**Typical discharge coefficients (Cd):**
+- Sharp-edge orifice: 0.60-0.65
+- Rounded orifice: 0.95-0.98
+- Nozzle: 0.95-0.99
+
+### Pipe Flow (Darcy-Weisbach)
+
+```cpp
+// Pressure drop: ΔP = f · (L/D) · (ρ · v² / 2)
+double pipe_dP(double v, double L, double D, double f, double rho);
+
+// Pressure drop from mass flow rate
+double pipe_dP_mdot(double mdot, double L, double D, double f, double rho);
+
+// Velocity from mass flow: v = ṁ / (ρ · π · D² / 4)
+double pipe_velocity(double mdot, double D, double rho);
+
+// Mass flow from velocity: ṁ = ρ · v · π · D² / 4
+double pipe_mdot(double v, double D, double rho);
+```
+
+### Hydraulic Utilities
+
+```cpp
+// Dynamic pressure (velocity head): q = ½ · ρ · v²
+double dynamic_pressure(double v, double rho);
+
+// Velocity from dynamic pressure: v = √(2 · q / ρ)
+double velocity_from_q(double q, double rho);
+
+// Hydraulic diameter: Dh = 4 · A / P_wetted
+double hydraulic_diameter(double A, double P_wetted);
+
+// Rectangular duct: Dh = 2·a·b / (a + b)
+double hydraulic_diameter_rect(double a, double b);
+
+// Annulus: Dh = D_outer - D_inner
+double hydraulic_diameter_annulus(double D_outer, double D_inner);
+```
+
+### Usage Example
+
+```cpp
+#include "incompressible.h"
+#include "friction.h"
+
+// Water flow through pipe
+double rho = 998.0;  // kg/m³
+double D = 0.05;     // m
+double L = 10.0;     // m
+double v = 2.0;      // m/s
+
+// Calculate Reynolds number and friction factor
+double mu = 0.001;   // Pa·s (water viscosity)
+double Re = rho * v * D / mu;
+double e_D = 0.0001; // Relative roughness
+double f = friction_colebrook(Re, e_D);
+
+// Pressure drop
+double dP = pipe_dP(v, L, D, f, rho);
+
+// Orifice sizing
+double mdot = pipe_mdot(v, D, rho);
+double Cd = 0.62;
+double dP_orifice = 50000.0;  // Pa
+double A_orifice = orifice_area(mdot, 200000.0, 150000.0, Cd, rho);
+```
