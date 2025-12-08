@@ -12,6 +12,7 @@
 #include "compressible.h"
 #include "incompressible.h"
 #include "friction.h"
+#include "heat_transfer.h"
 #include "state.h"
 #include "orifice.h"
 #include "units.h"
@@ -1436,6 +1437,190 @@ PYBIND11_MODULE(_core, m)
         "Colebrook-White friction factor (implicit, reference standard).\n\n"
         "Re  : Reynolds number [-]\n"
         "e_D : relative roughness ε/D [-]"
+    );
+
+    m.def(
+        "friction_petukhov",
+        &friction_petukhov,
+        py::arg("Re"),
+        "Petukhov friction factor for smooth tubes (Re > 3000).\n\n"
+        "Re : Reynolds number [-]\n\n"
+        "Returns Darcy friction factor f [-]."
+    );
+
+    // -------------------------------------------------------------
+    // Heat transfer correlations
+    // -------------------------------------------------------------
+
+    m.def(
+        "nusselt_dittus_boelter",
+        &nusselt_dittus_boelter,
+        py::arg("Re"),
+        py::arg("Pr"),
+        py::arg("heating") = true,
+        "Dittus-Boelter correlation for turbulent pipe flow.\n\n"
+        "Nu = 0.023 * Re^0.8 * Pr^n\n"
+        "n = 0.4 (heating) or 0.3 (cooling)\n\n"
+        "Valid: Re > 10000, 0.6 < Pr < 160, L/D > 10"
+    );
+
+    m.def(
+        "nusselt_gnielinski",
+        [](double Re, double Pr, double f) {
+            if (f < 0) {
+                return nusselt_gnielinski(Re, Pr);
+            }
+            return nusselt_gnielinski(Re, Pr, f);
+        },
+        py::arg("Re"),
+        py::arg("Pr"),
+        py::arg("f") = -1.0,
+        "Gnielinski correlation for transitional/turbulent pipe flow.\n\n"
+        "Valid: 3000 < Re < 5e6, 0.5 < Pr < 2000\n\n"
+        "f : friction factor (if < 0, uses Petukhov correlation)"
+    );
+
+    m.def(
+        "nusselt_sieder_tate",
+        &nusselt_sieder_tate,
+        py::arg("Re"),
+        py::arg("Pr"),
+        py::arg("mu_ratio"),
+        "Sieder-Tate correlation with viscosity correction.\n\n"
+        "Nu = 0.027 * Re^0.8 * Pr^(1/3) * (μ/μ_w)^0.14\n\n"
+        "mu_ratio : μ_bulk / μ_wall"
+    );
+
+    m.def(
+        "nusselt_petukhov",
+        [](double Re, double Pr, double f) {
+            if (f < 0) {
+                return nusselt_petukhov(Re, Pr);
+            }
+            return nusselt_petukhov(Re, Pr, f);
+        },
+        py::arg("Re"),
+        py::arg("Pr"),
+        py::arg("f") = -1.0,
+        "Petukhov correlation for turbulent pipe flow.\n\n"
+        "Valid: 1e4 < Re < 5e6, 0.5 < Pr < 2000\n\n"
+        "f : friction factor (if < 0, uses Petukhov correlation)"
+    );
+
+    m.def(
+        "htc_from_nusselt",
+        &htc_from_nusselt,
+        py::arg("Nu"),
+        py::arg("k"),
+        py::arg("L"),
+        "Heat transfer coefficient from Nusselt number.\n\n"
+        "h = Nu * k / L  [W/(m²·K)]\n\n"
+        "Nu : Nusselt number [-]\n"
+        "k  : thermal conductivity [W/(m·K)]\n"
+        "L  : characteristic length [m]"
+    );
+
+    m.def(
+        "overall_htc",
+        [](py::array_t<double, py::array::c_style | py::array::forcecast> h_arr,
+           py::array_t<double, py::array::c_style | py::array::forcecast> tk_arr)
+        {
+            auto h_values = to_vec(h_arr);
+            auto t_over_k = to_vec(tk_arr);
+            return overall_htc(h_values, t_over_k);
+        },
+        py::arg("h_values"),
+        py::arg("t_over_k") = py::array_t<double>(),
+        "Overall HTC from thermal resistance network.\n\n"
+        "1/U = Σ(1/h_i) + Σ(t_j/k_j)\n\n"
+        "h_values : convective HTCs [W/(m²·K)]\n"
+        "t_over_k : thickness/conductivity ratios [m²·K/W]"
+    );
+
+    m.def(
+        "overall_htc_wall",
+        py::overload_cast<double, double, double, double>(&overall_htc_wall),
+        py::arg("h_inner"),
+        py::arg("h_outer"),
+        py::arg("t_wall"),
+        py::arg("k_wall"),
+        "Overall HTC for single-layer wall.\n\n"
+        "1/U = 1/h_inner + t_wall/k_wall + 1/h_outer"
+    );
+
+    m.def(
+        "overall_htc_wall_multilayer",
+        [](double h_inner, double h_outer,
+           py::array_t<double, py::array::c_style | py::array::forcecast> tk_arr,
+           double R_fouling)
+        {
+            auto layers = to_vec(tk_arr);
+            if (R_fouling >= 0) {
+                return overall_htc_wall(h_inner, h_outer, layers, R_fouling);
+            }
+            return overall_htc_wall(h_inner, h_outer, layers);
+        },
+        py::arg("h_inner"),
+        py::arg("h_outer"),
+        py::arg("t_over_k_layers"),
+        py::arg("R_fouling") = -1.0,
+        "Overall HTC for multi-layer wall.\n\n"
+        "1/U = 1/h_inner + Σ(t_i/k_i) + 1/h_outer [+ R_fouling]\n\n"
+        "Example: steel + insulation\n"
+        "  overall_htc_wall_multilayer(500, 10, [0.003/50, 0.05/0.04])"
+    );
+
+    m.def(
+        "thermal_resistance",
+        &thermal_resistance,
+        py::arg("h"),
+        py::arg("A"),
+        "Thermal resistance for convection.\n\n"
+        "R = 1/(h*A) [K/W]"
+    );
+
+    m.def(
+        "thermal_resistance_wall",
+        &thermal_resistance_wall,
+        py::arg("thickness"),
+        py::arg("k"),
+        py::arg("A"),
+        "Thermal resistance for conduction through wall.\n\n"
+        "R = t/(k*A) [K/W]"
+    );
+
+    m.def(
+        "lmtd",
+        &lmtd,
+        py::arg("dT1"),
+        py::arg("dT2"),
+        "Log Mean Temperature Difference.\n\n"
+        "LMTD = (ΔT1 - ΔT2) / ln(ΔT1/ΔT2)\n\n"
+        "Handles equal ΔT gracefully (returns arithmetic mean)."
+    );
+
+    m.def(
+        "lmtd_counterflow",
+        &lmtd_counterflow,
+        py::arg("T_hot_in"),
+        py::arg("T_hot_out"),
+        py::arg("T_cold_in"),
+        py::arg("T_cold_out"),
+        "LMTD for counter-flow heat exchanger.\n\n"
+        "ΔT1 = T_hot_in - T_cold_out\n"
+        "ΔT2 = T_hot_out - T_cold_in"
+    );
+
+    m.def(
+        "lmtd_parallelflow",
+        &lmtd_parallelflow,
+        py::arg("T_hot_in"),
+        py::arg("T_hot_out"),
+        py::arg("T_cold_in"),
+        py::arg("T_cold_out"),
+        "LMTD for parallel-flow heat exchanger.\n\n"
+        "ΔT1 = T_hot_in - T_cold_in\n"
+        "ΔT2 = T_hot_out - T_cold_out"
     );
 
     // Nozzle thrust (from NozzleSolution)

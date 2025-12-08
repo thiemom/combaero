@@ -134,6 +134,21 @@ try:
         friction_haaland,
         friction_serghides,
         friction_colebrook,
+        friction_petukhov,
+        # Heat transfer
+        nusselt_dittus_boelter,
+        nusselt_gnielinski,
+        nusselt_sieder_tate,
+        nusselt_petukhov,
+        htc_from_nusselt,
+        overall_htc,
+        overall_htc_wall,
+        overall_htc_wall_multilayer,
+        thermal_resistance,
+        thermal_resistance_wall,
+        lmtd,
+        lmtd_counterflow,
+        lmtd_parallelflow,
         # Incompressible flow
         bernoulli_P2,
         bernoulli_v2,
@@ -272,6 +287,21 @@ except ModuleNotFoundError:
     friction_haaland = _core.friction_haaland
     friction_serghides = _core.friction_serghides
     friction_colebrook = _core.friction_colebrook
+    friction_petukhov = _core.friction_petukhov
+    # Heat transfer
+    nusselt_dittus_boelter = _core.nusselt_dittus_boelter
+    nusselt_gnielinski = _core.nusselt_gnielinski
+    nusselt_sieder_tate = _core.nusselt_sieder_tate
+    nusselt_petukhov = _core.nusselt_petukhov
+    htc_from_nusselt = _core.htc_from_nusselt
+    overall_htc = _core.overall_htc
+    overall_htc_wall = _core.overall_htc_wall
+    overall_htc_wall_multilayer = _core.overall_htc_wall_multilayer
+    thermal_resistance = _core.thermal_resistance
+    thermal_resistance_wall = _core.thermal_resistance_wall
+    lmtd = _core.lmtd
+    lmtd_counterflow = _core.lmtd_counterflow
+    lmtd_parallelflow = _core.lmtd_parallelflow
     # Incompressible flow
     bernoulli_P2 = _core.bernoulli_P2
     bernoulli_v2 = _core.bernoulli_v2
@@ -408,6 +438,21 @@ __all__ = [
     "friction_haaland",
     "friction_serghides",
     "friction_colebrook",
+    "friction_petukhov",
+    # Heat transfer
+    "nusselt_dittus_boelter",
+    "nusselt_gnielinski",
+    "nusselt_sieder_tate",
+    "nusselt_petukhov",
+    "htc_from_nusselt",
+    "overall_htc",
+    "overall_htc_wall",
+    "overall_htc_wall_multilayer",
+    "thermal_resistance",
+    "thermal_resistance_wall",
+    "lmtd",
+    "lmtd_counterflow",
+    "lmtd_parallelflow",
     # Incompressible flow
     "bernoulli_P2",
     "bernoulli_v2",
