@@ -3232,3 +3232,52 @@ TEST(HeatTransferTest, StateBased) {
     double k = s.k();
     EXPECT_NEAR(h, Nu * k / diameter, 0.01);
 }
+
+TEST(HeatTransferTest, LmtdBasic) {
+    // Test LMTD with known values
+    // Counter-flow: hot 100->60, cold 20->80
+    // dT1 = 100 - 80 = 20, dT2 = 60 - 20 = 40
+    double lmtd_val = lmtd(20.0, 40.0);
+    
+    // LMTD = (20 - 40) / ln(20/40) = -20 / ln(0.5) = -20 / -0.693 ≈ 28.85
+    EXPECT_NEAR(lmtd_val, 28.85, 0.1);
+}
+
+TEST(HeatTransferTest, LmtdEqualDeltaT) {
+    // When dT1 ≈ dT2, should return arithmetic mean
+    double lmtd_val = lmtd(30.0, 30.0);
+    EXPECT_NEAR(lmtd_val, 30.0, 0.01);
+    
+    // Very close values
+    double lmtd_close = lmtd(30.0, 30.00001);
+    EXPECT_NEAR(lmtd_close, 30.0, 0.01);
+}
+
+TEST(HeatTransferTest, LmtdCounterflow) {
+    // Counter-flow heat exchanger
+    // Hot: 150°C -> 90°C, Cold: 30°C -> 110°C
+    double lmtd_cf = lmtd_counterflow(150 + 273.15, 90 + 273.15,
+                                       30 + 273.15, 110 + 273.15);
+    
+    // dT1 = 150 - 110 = 40, dT2 = 90 - 30 = 60
+    // LMTD = (40 - 60) / ln(40/60) ≈ 49.3 K
+    EXPECT_NEAR(lmtd_cf, 49.3, 0.5);
+}
+
+TEST(HeatTransferTest, LmtdParallelflow) {
+    // Parallel-flow heat exchanger
+    // Hot: 150°C -> 90°C, Cold: 30°C -> 70°C
+    double lmtd_pf = lmtd_parallelflow(150 + 273.15, 90 + 273.15,
+                                        30 + 273.15, 70 + 273.15);
+    
+    // dT1 = 150 - 30 = 120, dT2 = 90 - 70 = 20
+    // LMTD = (120 - 20) / ln(120/20) = 100 / ln(6) ≈ 55.8 K
+    EXPECT_NEAR(lmtd_pf, 55.8, 0.5);
+}
+
+TEST(HeatTransferTest, LmtdInvalidInput) {
+    // Negative or zero temperature differences should throw
+    EXPECT_THROW(lmtd(0.0, 10.0), std::invalid_argument);
+    EXPECT_THROW(lmtd(10.0, 0.0), std::invalid_argument);
+    EXPECT_THROW(lmtd(-5.0, 10.0), std::invalid_argument);
+}

@@ -118,6 +118,9 @@ inline constexpr Entry function_units[] = {
     {"pipe_mdot",               "v: m/s, D: m, rho: kg/m^3",            "kg/s"},
     {"dynamic_pressure",        "v: m/s, rho: kg/m^3",                  "Pa"},
     {"velocity_from_q",         "q: Pa, rho: kg/m^3",                   "m/s"},
+    // -------------------------------------------------------------------------
+    // geometry.h - Geometric Utilities
+    // -------------------------------------------------------------------------
     {"hydraulic_diameter",      "A: m^2, P_wetted: m",                  "m"},
     {"hydraulic_diameter_rect", "a: m, b: m",                           "m"},
     {"hydraulic_diameter_annulus", "D_outer: m, D_inner: m",            "m"},
@@ -128,6 +131,7 @@ inline constexpr Entry function_units[] = {
     {"friction_haaland",        "Re: -, e_D: -",                        "- (f)"},
     {"friction_serghides",      "Re: -, e_D: -",                        "- (f)"},
     {"friction_colebrook",      "Re: -, e_D: -",                        "- (f)"},
+    {"friction_petukhov",       "Re: -",                                "- (f)"},
 
     // -------------------------------------------------------------------------
     // heat_transfer.h - Heat Transfer Correlations
@@ -137,9 +141,11 @@ inline constexpr Entry function_units[] = {
     {"nusselt_sieder_tate",     "Re: -, Pr: -, mu_ratio: -",            "- (Nu)"},
     {"nusselt_petukhov",        "Re: -, Pr: -, f: - (optional)",        "- (Nu)"},
     {"htc_from_nusselt",        "Nu: -, k: W/(m*K), L: m",              "W/(m^2*K)"},
-    {"friction_petukhov",       "Re: -",                                "- (f)"},
     {"nusselt_pipe",            "State, V: m/s, D: m",                  "- (Nu)"},
     {"htc_pipe",                "State, V: m/s, D: m",                  "W/(m^2*K)"},
+    {"lmtd",                    "dT1: K, dT2: K",                       "K"},
+    {"lmtd_counterflow",        "T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K", "K"},
+    {"lmtd_parallelflow",       "T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K", "K"},
 
     // -------------------------------------------------------------------------
     // orifice.h - Discharge Coefficients

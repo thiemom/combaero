@@ -34,4 +34,11 @@ double friction_serghides(double Re, double e_D);
 // Uses Haaland as initial guess, Newton-Raphson iteration.
 double friction_colebrook(double Re, double e_D, double tol = 1e-10, int max_iter = 20);
 
+// Petukhov correlation (1970) - smooth pipes only
+// f = (0.790 * ln(Re) - 1.64)^(-2)
+// Valid for 3000 < Re < 5×10^6
+// Often used with Gnielinski/Petukhov heat transfer correlations.
+// Reference: Petukhov (1970), Advances in Heat Transfer, 6, 503
+double friction_petukhov(double Re);
+
 #endif // FRICTION_H

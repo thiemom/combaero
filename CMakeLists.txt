@@ -29,6 +29,7 @@ set(SOURCES
     src/compressible.cpp
     src/incompressible.cpp
     src/friction.cpp
+    src/geometry.cpp
     src/heat_transfer.cpp
     src/humidair.cpp
     src/equilibrium.cpp

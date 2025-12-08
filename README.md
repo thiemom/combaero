@@ -45,7 +45,8 @@ The library is organized into focused modules:
 | `equilibrium.h` | Chemical equilibrium solver (WGS partial equilibrium) |
 | `compressible.h` | Compressible flow (isentropic nozzle, Fanno pipe flow) |
 | `friction.h` | Darcy friction factor correlations (Colebrook, Haaland, Serghides) |
-| `heat_transfer.h` | Nusselt correlations (Dittus-Boelter, Gnielinski, Sieder-Tate, Petukhov) |
+| `heat_transfer.h` | Nusselt correlations, LMTD for heat exchangers |
+| `geometry.h` | Hydraulic diameter for non-circular cross-sections |
 | `incompressible.h` | Incompressible flow (Bernoulli, pipe flow, orifice) |
 | `orifice.h` | Orifice discharge coefficient (Cd) correlations |
 | `humidair.h` | Humid air properties and saturation vapor pressure |

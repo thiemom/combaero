@@ -176,17 +176,14 @@ All functions use consistent units to avoid conversion errors.
 
 #### Pipe Flow
 
-| Function                     | Input Units                               | Output Unit |
-|------------------------------|-------------------------------------------|-------------|
-| `pipe_dP`                    | v: m/s, L: m, D: m, f: -, rho: kg/m^3     | Pa          |
-| `pipe_dP_mdot`               | mdot: kg/s, L: m, D: m, f: -, rho: kg/m^3 | Pa          |
-| `pipe_velocity`              | mdot: kg/s, D: m, rho: kg/m^3             | m/s         |
-| `pipe_mdot`                  | v: m/s, D: m, rho: kg/m^3                 | kg/s        |
-| `dynamic_pressure`           | v: m/s, rho: kg/m^3                       | Pa          |
-| `velocity_from_q`            | q: Pa, rho: kg/m^3                        | m/s         |
-| `hydraulic_diameter`         | A: m^2, P_wetted: m                       | m           |
-| `hydraulic_diameter_rect`    | a: m, b: m                                | m           |
-| `hydraulic_diameter_annulus` | D_outer: m, D_inner: m                    | m           |
+| Function           | Input Units                               | Output Unit |
+|--------------------|-------------------------------------------|-------------|
+| `pipe_dP`          | v: m/s, L: m, D: m, f: -, rho: kg/m^3     | Pa          |
+| `pipe_dP_mdot`     | mdot: kg/s, L: m, D: m, f: -, rho: kg/m^3 | Pa          |
+| `pipe_velocity`    | mdot: kg/s, D: m, rho: kg/m^3             | m/s         |
+| `pipe_mdot`        | v: m/s, D: m, rho: kg/m^3                 | kg/s        |
+| `dynamic_pressure` | v: m/s, rho: kg/m^3                       | Pa          |
+| `velocity_from_q`  | q: Pa, rho: kg/m^3                        | m/s         |
 
 ---
 
@@ -199,6 +196,7 @@ All functions use consistent units to avoid conversion errors.
 | `friction_haaland`   | Re: -, e_D: - | - (f)       |
 | `friction_serghides` | Re: -, e_D: - | - (f)       |
 | `friction_colebrook` | Re: -, e_D: - | - (f)       |
+| `friction_petukhov`  | Re: -         | - (f)       |
 
 ---
 
@@ -341,18 +339,28 @@ All functions use consistent units to avoid conversion errors.
 |----------------|-------------|-------------|
 | `Stream::mdot` | -           | kg/s        |
 
+### geometry.h - Geometric Utilities
+
+| Function                     | Input Units            | Output Unit |
+|------------------------------|------------------------|-------------|
+| `hydraulic_diameter`         | A: m^2, P_wetted: m    | m           |
+| `hydraulic_diameter_rect`    | a: m, b: m             | m           |
+| `hydraulic_diameter_annulus` | D_outer: m, D_inner: m | m           |
+
 ### heat_transfer.h - Heat Transfer Correlations
 
-| Function                 | Input Units                   | Output Unit |
-|--------------------------|-------------------------------|-------------|
-| `nusselt_dittus_boelter` | Re: -, Pr: -, heating: bool   | - (Nu)      |
-| `nusselt_gnielinski`     | Re: -, Pr: -, f: - (optional) | - (Nu)      |
-| `nusselt_sieder_tate`    | Re: -, Pr: -, mu_ratio: -     | - (Nu)      |
-| `nusselt_petukhov`       | Re: -, Pr: -, f: - (optional) | - (Nu)      |
-| `htc_from_nusselt`       | Nu: -, k: W/(m*K), L: m       | W/(m^2*K)   |
-| `friction_petukhov`      | Re: -                         | - (f)       |
-| `nusselt_pipe`           | State, V: m/s, D: m           | - (Nu)      |
-| `htc_pipe`               | State, V: m/s, D: m           | W/(m^2*K)   |
+| Function                 | Input Units                                            | Output Unit |
+|--------------------------|--------------------------------------------------------|-------------|
+| `nusselt_dittus_boelter` | Re: -, Pr: -, heating: bool                            | - (Nu)      |
+| `nusselt_gnielinski`     | Re: -, Pr: -, f: - (optional)                          | - (Nu)      |
+| `nusselt_sieder_tate`    | Re: -, Pr: -, mu_ratio: -                              | - (Nu)      |
+| `nusselt_petukhov`       | Re: -, Pr: -, f: - (optional)                          | - (Nu)      |
+| `htc_from_nusselt`       | Nu: -, k: W/(m*K), L: m                                | W/(m^2*K)   |
+| `nusselt_pipe`           | State, V: m/s, D: m                                    | - (Nu)      |
+| `htc_pipe`               | State, V: m/s, D: m                                    | W/(m^2*K)   |
+| `lmtd`                   | dT1: K, dT2: K                                         | K           |
+| `lmtd_counterflow`       | T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K | K           |
+| `lmtd_parallelflow`      | T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K | K           |
 
 ---
 

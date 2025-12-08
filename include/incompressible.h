@@ -1,6 +1,8 @@
 #ifndef INCOMPRESSIBLE_H
 #define INCOMPRESSIBLE_H
 
+#include "geometry.h"  // Re-export hydraulic_diameter functions
+
 // Incompressible flow equations
 //
 // These functions assume constant density (incompressible flow).
@@ -120,19 +122,9 @@ double dynamic_pressure(double v, double rho);
 // Returns: velocity [m/s]
 double velocity_from_q(double q, double rho);
 
-// Hydraulic diameter for non-circular cross-sections.
-// Dh = 4 · A / P_wetted
-// Returns: hydraulic diameter [m]
-double hydraulic_diameter(double A, double P_wetted);
-
-// Hydraulic diameter for rectangular duct.
-// Dh = 2·a·b / (a + b)
-// Returns: hydraulic diameter [m]
-double hydraulic_diameter_rect(double a, double b);
-
-// Hydraulic diameter for annulus (outer - inner).
-// Dh = D_outer - D_inner
-// Returns: hydraulic diameter [m]
-double hydraulic_diameter_annulus(double D_outer, double D_inner);
+// Hydraulic diameter functions are in geometry.h (included above)
+// - hydraulic_diameter(A, P_wetted)
+// - hydraulic_diameter_rect(a, b)
+// - hydraulic_diameter_annulus(D_outer, D_inner)
 
 #endif // INCOMPRESSIBLE_H

@@ -111,10 +111,41 @@ constexpr double NU_LAMINAR_CONST_Q = 4.36;
 //   L  : characteristic length [m] (diameter for pipe flow)
 double htc_from_nusselt(double Nu, double k, double L);
 
-// Petukhov friction factor for smooth pipes
-// f = (0.790 * ln(Re) - 1.64)^(-2)
-// Valid for 3000 < Re < 5×10^6
-double friction_petukhov(double Re);
+// -------------------------------------------------------------
+// Log Mean Temperature Difference (LMTD)
+// -------------------------------------------------------------
+
+// LMTD for heat exchangers
+// LMTD = (ΔT1 - ΔT2) / ln(ΔT1 / ΔT2)
+//
+// For counter-flow:
+//   ΔT1 = T_hot_in - T_cold_out
+//   ΔT2 = T_hot_out - T_cold_in
+//
+// For parallel-flow:
+//   ΔT1 = T_hot_in - T_cold_in
+//   ΔT2 = T_hot_out - T_cold_out
+//
+// Parameters:
+//   dT1 : temperature difference at one end [K]
+//   dT2 : temperature difference at other end [K]
+// Returns: log mean temperature difference [K]
+//
+// Note: If dT1 ≈ dT2, returns arithmetic mean to avoid 0/0.
+double lmtd(double dT1, double dT2);
+
+// LMTD for counter-flow heat exchanger (convenience function)
+// Parameters:
+//   T_hot_in   : hot fluid inlet temperature [K]
+//   T_hot_out  : hot fluid outlet temperature [K]
+//   T_cold_in  : cold fluid inlet temperature [K]
+//   T_cold_out : cold fluid outlet temperature [K]
+double lmtd_counterflow(double T_hot_in, double T_hot_out,
+                        double T_cold_in, double T_cold_out);
+
+// LMTD for parallel-flow heat exchanger (convenience function)
+double lmtd_parallelflow(double T_hot_in, double T_hot_out,
+                         double T_cold_in, double T_cold_out);
 
 // -------------------------------------------------------------
 // State-based convenience functions

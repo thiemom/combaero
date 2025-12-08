@@ -146,30 +146,3 @@ double velocity_from_q(double q, double rho)
     // v = √(2 · q / ρ)
     return std::sqrt(2.0 * q / rho);
 }
-
-double hydraulic_diameter(double A, double P_wetted)
-{
-    if (A <= 0.0 || P_wetted <= 0.0) {
-        throw std::invalid_argument("hydraulic_diameter: A and P_wetted must be positive");
-    }
-    // Dh = 4 · A / P_wetted
-    return 4.0 * A / P_wetted;
-}
-
-double hydraulic_diameter_rect(double a, double b)
-{
-    if (a <= 0.0 || b <= 0.0) {
-        throw std::invalid_argument("hydraulic_diameter_rect: a and b must be positive");
-    }
-    // Dh = 2·a·b / (a + b)
-    return 2.0 * a * b / (a + b);
-}
-
-double hydraulic_diameter_annulus(double D_outer, double D_inner)
-{
-    if (D_outer <= D_inner || D_inner < 0.0) {
-        throw std::invalid_argument("hydraulic_diameter_annulus: D_outer > D_inner >= 0 required");
-    }
-    // Dh = D_outer - D_inner
-    return D_outer - D_inner;
-}

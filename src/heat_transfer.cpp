@@ -1,21 +1,9 @@
 #include "../include/heat_transfer.h"
 #include "../include/state.h"
-#include "../include/friction.h"
+#include "../include/friction.h"  // friction_petukhov, friction_colebrook
 #include <cmath>
 #include <stdexcept>
 #include <algorithm>
-
-// -------------------------------------------------------------
-// Friction factor helpers
-// -------------------------------------------------------------
-
-double friction_petukhov(double Re) {
-    if (Re < 3000) {
-        throw std::invalid_argument("friction_petukhov: Re must be > 3000");
-    }
-    double x = 0.790 * std::log(Re) - 1.64;
-    return 1.0 / (x * x);
-}
 
 // -------------------------------------------------------------
 // Internal Flow Correlations
@@ -106,6 +94,38 @@ double htc_from_nusselt(double Nu, double k, double L) {
         throw std::invalid_argument("htc_from_nusselt: thermal conductivity must be positive");
     }
     return Nu * k / L;
+}
+
+// -------------------------------------------------------------
+// Log Mean Temperature Difference (LMTD)
+// -------------------------------------------------------------
+
+double lmtd(double dT1, double dT2) {
+    if (dT1 <= 0 || dT2 <= 0) {
+        throw std::invalid_argument("lmtd: temperature differences must be positive");
+    }
+    
+    // If dT1 ≈ dT2, use arithmetic mean to avoid 0/0
+    double ratio = dT1 / dT2;
+    if (std::abs(ratio - 1.0) < 1e-6) {
+        return (dT1 + dT2) / 2.0;
+    }
+    
+    return (dT1 - dT2) / std::log(ratio);
+}
+
+double lmtd_counterflow(double T_hot_in, double T_hot_out,
+                        double T_cold_in, double T_cold_out) {
+    double dT1 = T_hot_in - T_cold_out;
+    double dT2 = T_hot_out - T_cold_in;
+    return lmtd(dT1, dT2);
+}
+
+double lmtd_parallelflow(double T_hot_in, double T_hot_out,
+                         double T_cold_in, double T_cold_out) {
+    double dT1 = T_hot_in - T_cold_in;
+    double dT2 = T_hot_out - T_cold_out;
+    return lmtd(dT1, dT2);
 }
 
 // -------------------------------------------------------------
