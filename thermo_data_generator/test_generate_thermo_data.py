@@ -130,8 +130,9 @@ class TestGenerateHeader:
             for sp in REFERENCE_SPECIES:
                 assert f'"{sp}"' in content, f"Species {sp} not in output"
             
-            # Check structs are defined
-            assert "struct NASA_Coeffs" in content
+            # Check structs are defined (NASA7_Coeffs with alias, or NASA9_Coeffs)
+            assert "struct NASA7_Coeffs" in content or "struct NASA9_Coeffs" in content
+            assert "using NASA_Coeffs" in content
             assert "struct Transport_Props" in content
             assert "struct Molecular_Structure" in content
         finally:

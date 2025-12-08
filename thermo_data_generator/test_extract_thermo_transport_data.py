@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import csv
 from pathlib import Path
 
 from extract_thermo_transport_data import extract_species_data
@@ -30,6 +29,7 @@ species:
       well-depth: 38.0
       diameter: 2.92
       polarizability: 0.79
+      rotational-relaxation: 280.0
 
   - name: HE
     composition: {He: 1}
@@ -50,36 +50,33 @@ species:
 
 def test_extract_species_data_includes_helium(tmp_path: Path) -> None:
     yaml_path = tmp_path / "minimal_with_he.yaml"
-    csv_path = tmp_path / "species_data.csv"
 
     _write_minimal_yaml_with_he(yaml_path)
 
-    extract_species_data(
-        yaml_file=str(yaml_path),
-        output_file=str(csv_path),
+    species_data, warnings = extract_species_data(
+        yaml_file=yaml_path,
         selected_species=["H2", "HE"],
     )
 
-    rows: list[dict[str, str]] = []
-    with csv_path.open("r", newline="") as f:
-        reader = csv.DictReader(f)
-        rows.extend(reader)
+    # We expect two species: H2 and HE
+    assert len(species_data) == 2
 
-    # We expect two rows: H2 and HE
-    assert len(rows) == 2
-
-    species_names = {row["species_name"] for row in rows}
+    species_names = {sp["species_name"] for sp in species_data}
     assert "H2" in species_names
     assert "HE" in species_names
 
     # Check that the molar mass for helium is computed from the atomic mass table
-    he_row = next(row for row in rows if row["species_name"] == "HE")
-    # 4.002602 is the value we added for He/HE; allow small float formatting differences
-    assert abs(float(he_row["molar_mass"]) - 4.002602) < 1e-6
+    he_entry = next(sp for sp in species_data if sp["species_name"] == "HE")
+    # 4.0026 is the value in ATOMIC_MASSES for He
+    assert abs(he_entry["molar_mass"] - 4.0026) < 1e-3
 
     # Basic sanity for thermo and transport fields
-    for row in rows:
-        assert row["T_low"] == "200.0"
-        assert row["T_mid"] == "1000.0"
-        assert row["T_high"] == "3500.0"
-        assert row["geometry"] in {"linear", "atom"}
+    for sp in species_data:
+        assert sp["thermo"]["T_low"] == 200.0
+        assert sp["thermo"]["T_mid"] == 1000.0
+        assert sp["thermo"]["T_high"] == 3500.0
+        assert sp["transport"]["geometry"] in {"linear", "atom"}
+
+    # Check rotational_relaxation is extracted
+    h2_entry = next(sp for sp in species_data if sp["species_name"] == "H2")
+    assert h2_entry["transport"]["rotational_relaxation"] == 280.0

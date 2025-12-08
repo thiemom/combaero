@@ -294,6 +294,37 @@ def format_double(value: float) -> str:
     return str(value)
 
 
+def _format_nasa9_intervals(nasa: NASACoeffs) -> str:
+    """Format NASA-9 intervals for C++ initializer list.
+    
+    NASA-9 can have 1-3 temperature intervals. Each interval has:
+    - T_min, T_max: temperature bounds
+    - 10 coefficients: a1-a7 (Cp), unused, b1 (H), b2 (S)
+    """
+    interval_strs = []
+    n_intervals = len(nasa.coeffs)
+    
+    for i, coeffs in enumerate(nasa.coeffs):
+        # Determine temperature bounds from T_ranges
+        # T_ranges for NASA-9: [T0, T1, T2, ...] where intervals are [T0,T1], [T1,T2], etc.
+        if len(nasa.T_ranges) > i + 1:
+            t_min = nasa.T_ranges[i]
+            t_max = nasa.T_ranges[i + 1]
+        else:
+            # Fallback: use standard CEA breakpoints
+            t_breaks = [200.0, 1000.0, 6000.0, 20000.0]
+            t_min = t_breaks[i] if i < len(t_breaks) else 200.0
+            t_max = t_breaks[i + 1] if i + 1 < len(t_breaks) else 6000.0
+        
+        # Pad coefficients to 10 if needed
+        padded = list(coeffs) + [0.0] * (10 - len(coeffs))
+        coeffs_str = "{" + ", ".join(str(c) for c in padded[:10]) + "}"
+        
+        interval_strs.append(f"{{{t_min}, {t_max}, {coeffs_str}}}")
+    
+    return "{" + ", ".join(interval_strs) + "}"
+
+
 def generate_cpp_header(
     species: list[SpeciesData],
     nasa_format: NASAFormat,
@@ -307,6 +338,7 @@ def generate_cpp_header(
     output.write("""#ifndef THERMO_TRANSPORT_DATA_H
 #define THERMO_TRANSPORT_DATA_H
 
+#include <array>
 #include <vector>
 #include <string>
 #include <unordered_map>
@@ -322,23 +354,29 @@ def generate_cpp_header(
     
     # NASA coefficients struct
     if nasa_format == NASAFormat.NASA7:
-        output.write("""struct NASA_Coeffs {
+        output.write("""struct NASA7_Coeffs {
     double T_low;
     double T_mid;
     double T_high;
-    std::vector<double> low_coeffs;
-    std::vector<double> high_coeffs;
+    std::vector<double> low_coeffs;   // 7 coefficients for T_low <= T < T_mid
+    std::vector<double> high_coeffs;  // 7 coefficients for T_mid <= T <= T_high
 };
+
+using NASA_Coeffs = NASA7_Coeffs;
 
 """)
     else:
-        output.write("""struct NASA_Coeffs {
-    double T_low;
-    double T_mid;
-    double T_high;
-    std::vector<double> low_coeffs;   // 9 coefficients
-    std::vector<double> high_coeffs;  // 9 coefficients
+        output.write("""struct NASA9_Interval {
+    double T_min;
+    double T_max;
+    std::array<double, 10> coeffs;  // a1-a7, unused, b1 (H), b2 (S)
 };
+
+struct NASA9_Coeffs {
+    std::vector<NASA9_Interval> intervals;  // 1-3 temperature intervals
+};
+
+using NASA_Coeffs = NASA9_Coeffs;
 
 """)
     
@@ -376,18 +414,25 @@ struct Molecular_Structure {
     # NASA coefficients
     output.write("const std::vector<NASA_Coeffs> nasa_coeffs = {\n")
     nasa_entries = []
-    for sp in species:
-        T_low = sp.nasa.T_ranges[0] if len(sp.nasa.T_ranges) > 0 else 300.0
-        T_mid = sp.nasa.T_ranges[1] if len(sp.nasa.T_ranges) > 1 else 1000.0
-        T_high = sp.nasa.T_ranges[2] if len(sp.nasa.T_ranges) > 2 else 5000.0
-        
-        low_coeffs = sp.nasa.coeffs[0] if len(sp.nasa.coeffs) > 0 else []
-        high_coeffs = sp.nasa.coeffs[1] if len(sp.nasa.coeffs) > 1 else []
-        
-        low_str = "{" + ", ".join(str(c) for c in low_coeffs) + "}"
-        high_str = "{" + ", ".join(str(c) for c in high_coeffs) + "}"
-        
-        nasa_entries.append(f"{{{T_low}, {T_mid}, {T_high}, {low_str}, {high_str}}}")
+    
+    if nasa_format == NASAFormat.NASA7:
+        for sp in species:
+            T_low = sp.nasa.T_ranges[0] if len(sp.nasa.T_ranges) > 0 else 300.0
+            T_mid = sp.nasa.T_ranges[1] if len(sp.nasa.T_ranges) > 1 else 1000.0
+            T_high = sp.nasa.T_ranges[2] if len(sp.nasa.T_ranges) > 2 else 5000.0
+            
+            low_coeffs = sp.nasa.coeffs[0] if len(sp.nasa.coeffs) > 0 else []
+            high_coeffs = sp.nasa.coeffs[1] if len(sp.nasa.coeffs) > 1 else []
+            
+            low_str = "{" + ", ".join(str(c) for c in low_coeffs) + "}"
+            high_str = "{" + ", ".join(str(c) for c in high_coeffs) + "}"
+            
+            nasa_entries.append(f"{{{T_low}, {T_mid}, {T_high}, {low_str}, {high_str}}}")
+    else:
+        # NASA-9: variable number of intervals (1-3)
+        for sp in species:
+            intervals_str = _format_nasa9_intervals(sp.nasa)
+            nasa_entries.append(f"{{{intervals_str}}}")
     
     output.write(",\n".join(nasa_entries))
     output.write("\n};\n\n")

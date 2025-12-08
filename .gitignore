@@ -77,6 +77,13 @@ _skbuild/
 thermo_data_generator/test_create_cpp_header_output.txt
 thermo_data_generator/thermo_transport_data.h
 
+# Thermo data generator - source data files (not included due to licensing)
+# Users must obtain these themselves from original sources
+thermo_data_generator/*.yaml
+thermo_data_generator/*.txt
+thermo_data_generator/*.json
+thermo_data_generator/*.csv
+
 # Example output (plots, data)
 examples/*.png
 examples/*.csv
