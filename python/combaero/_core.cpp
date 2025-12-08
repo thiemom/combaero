@@ -13,6 +13,7 @@
 #include "incompressible.h"
 #include "friction.h"
 #include "state.h"
+#include "orifice.h"
 
 namespace py = pybind11;
 
@@ -1685,5 +1686,154 @@ PYBIND11_MODULE(_core, m)
         "Hydraulic diameter for annulus.\n\n"
         "Dh = D_outer - D_inner\n\n"
         "Returns: hydraulic diameter [m]"
+    );
+
+    // =========================================================================
+    // Orifice Cd Correlations
+    // =========================================================================
+
+    // OrificeGeometry struct
+    py::class_<OrificeGeometry>(m, "OrificeGeometry",
+        "Orifice geometry for Cd correlations.\n\n"
+        "Attributes:\n"
+        "  d : orifice bore diameter [m]\n"
+        "  D : pipe diameter [m]\n"
+        "  t : plate thickness [m] (for thick plate)\n"
+        "  r : inlet edge radius [m] (for rounded entry)")
+        .def(py::init<>())
+        .def_readwrite("d", &OrificeGeometry::d, "Orifice bore diameter [m]")
+        .def_readwrite("D", &OrificeGeometry::D, "Pipe diameter [m]")
+        .def_readwrite("t", &OrificeGeometry::t, "Plate thickness [m]")
+        .def_readwrite("r", &OrificeGeometry::r, "Inlet edge radius [m]")
+        .def_readwrite("bevel", &OrificeGeometry::bevel, "Bevel angle [rad]")
+        .def_property_readonly("beta", &OrificeGeometry::beta, "Diameter ratio d/D [-]")
+        .def_property_readonly("area", &OrificeGeometry::area, "Orifice area [m²]")
+        .def_property_readonly("t_over_d", &OrificeGeometry::t_over_d, "Thickness ratio t/d [-]")
+        .def_property_readonly("r_over_d", &OrificeGeometry::r_over_d, "Radius ratio r/d [-]")
+        .def("is_valid", &OrificeGeometry::is_valid, "Check if geometry is valid");
+
+    // OrificeState struct
+    py::class_<OrificeState>(m, "OrificeState",
+        "Flow state at orifice for Cd correlations.\n\n"
+        "Attributes:\n"
+        "  Re_D : pipe Reynolds number (based on D) [-]\n"
+        "  dP   : differential pressure [Pa]\n"
+        "  rho  : fluid density [kg/m³]\n"
+        "  mu   : dynamic viscosity [Pa·s]")
+        .def(py::init<>())
+        .def_readwrite("Re_D", &OrificeState::Re_D, "Pipe Reynolds number [-]")
+        .def_readwrite("dP", &OrificeState::dP, "Differential pressure [Pa]")
+        .def_readwrite("rho", &OrificeState::rho, "Fluid density [kg/m³]")
+        .def_readwrite("mu", &OrificeState::mu, "Dynamic viscosity [Pa·s]")
+        .def("Re_d", &OrificeState::Re_d, py::arg("beta"),
+             "Orifice Reynolds number (based on d)");
+
+    // Cd correlation functions
+    m.def(
+        "Cd_sharp_thin_plate",
+        &Cd_sharp_thin_plate,
+        py::arg("geom"),
+        py::arg("state"),
+        "Discharge coefficient for sharp thin-plate orifice (ISO 5167-2).\n\n"
+        "Uses Reader-Harris/Gallagher correlation.\n"
+        "Valid for: 0.1 <= beta <= 0.75, Re_D >= 5000, D >= 50mm"
+    );
+
+    m.def(
+        "Cd_thick_plate",
+        &Cd_thick_plate,
+        py::arg("geom"),
+        py::arg("state"),
+        "Discharge coefficient for thick-plate orifice.\n\n"
+        "Applies Idelchik thickness correction to thin-plate Cd.\n"
+        "Valid for: 0 < t/d < ~3"
+    );
+
+    m.def(
+        "Cd_rounded_entry",
+        &Cd_rounded_entry,
+        py::arg("geom"),
+        py::arg("state"),
+        "Discharge coefficient for rounded-entry orifice.\n\n"
+        "Based on Idelchik contraction loss coefficients.\n"
+        "Valid for: 0 < r/d <= 0.2 (typical)"
+    );
+
+    m.def(
+        "Cd_orifice",
+        &Cd,
+        py::arg("geom"),
+        py::arg("state"),
+        "Discharge coefficient with auto-selected correlation.\n\n"
+        "Selects correlation based on geometry:\n"
+        "  - r/d > 0.01: rounded entry\n"
+        "  - t/d > 0.02: thick plate\n"
+        "  - otherwise: sharp thin plate"
+    );
+
+    // Orifice flow calculations with Cd
+    m.def(
+        "orifice_mdot_Cd",
+        static_cast<double(*)(const OrificeGeometry&, double, double, double)>(&orifice_mdot),
+        py::arg("geom"),
+        py::arg("Cd"),
+        py::arg("dP"),
+        py::arg("rho"),
+        "Mass flow through orifice given Cd.\n\n"
+        "mdot = Cd * A * sqrt(2 * rho * dP)\n\n"
+        "Returns: mass flow rate [kg/s]"
+    );
+
+    m.def(
+        "orifice_dP_Cd",
+        static_cast<double(*)(const OrificeGeometry&, double, double, double)>(&orifice_dP),
+        py::arg("geom"),
+        py::arg("Cd"),
+        py::arg("mdot"),
+        py::arg("rho"),
+        "Pressure drop for given mass flow and Cd.\n\n"
+        "dP = (mdot / (Cd * A))² / (2 * rho)\n\n"
+        "Returns: pressure drop [Pa]"
+    );
+
+    m.def(
+        "orifice_Cd_from_measurement",
+        &orifice_Cd_from_measurement,
+        py::arg("geom"),
+        py::arg("mdot"),
+        py::arg("dP"),
+        py::arg("rho"),
+        "Solve for Cd given measured mass flow and pressure drop.\n\n"
+        "Cd = mdot / (A * sqrt(2 * rho * dP))\n\n"
+        "Returns: discharge coefficient [-]"
+    );
+
+    // Namespace functions
+    m.def(
+        "orifice_K_from_Cd",
+        &orifice::K_from_Cd,
+        py::arg("Cd"),
+        py::arg("beta"),
+        "Loss coefficient K from discharge coefficient Cd.\n\n"
+        "K = (1/Cd² - 1) * (1 - beta⁴)"
+    );
+
+    m.def(
+        "orifice_Cd_from_K",
+        &orifice::Cd_from_K,
+        py::arg("K"),
+        py::arg("beta"),
+        "Discharge coefficient Cd from loss coefficient K.\n\n"
+        "Cd = 1 / sqrt(1 + K / (1 - beta⁴))"
+    );
+
+    m.def(
+        "orifice_thickness_correction",
+        &orifice::thickness_correction,
+        py::arg("t_over_d"),
+        py::arg("beta"),
+        "Thickness correction factor for thick-plate orifices.\n\n"
+        "Multiplies thin-plate Cd to account for flow reattachment.\n"
+        "Returns 1.0 for t/d <= 0.02 (thin plate)."
     );
 }

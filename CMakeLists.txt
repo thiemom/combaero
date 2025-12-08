@@ -33,6 +33,7 @@ set(SOURCES
     src/equilibrium.cpp
     src/state.cpp
     src/utils.cpp
+    src/orifice.cpp
 )
 
 # Core library

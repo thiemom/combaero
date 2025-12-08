@@ -1,0 +1,495 @@
+#include "../include/orifice.h"
+#include <cmath>
+#include <stdexcept>
+#include <algorithm>
+
+// -------------------------------------------------------------
+// Constants
+// -------------------------------------------------------------
+
+namespace {
+constexpr double PI = 3.14159265358979323846;
+} // namespace
+
+// -------------------------------------------------------------
+// OrificeGeometry implementation
+// -------------------------------------------------------------
+
+double OrificeGeometry::beta() const {
+    if (D <= 0.0) {
+        throw std::invalid_argument("OrificeGeometry: pipe diameter D must be > 0");
+    }
+    return d / D;
+}
+
+double OrificeGeometry::area() const {
+    return PI * d * d / 4.0;
+}
+
+double OrificeGeometry::t_over_d() const {
+    if (d <= 0.0) return 0.0;
+    return t / d;
+}
+
+double OrificeGeometry::r_over_d() const {
+    if (d <= 0.0) return 0.0;
+    return r / d;
+}
+
+bool OrificeGeometry::is_valid() const {
+    if (d <= 0.0 || D <= 0.0) return false;
+    if (d >= D) return false;
+    if (t < 0.0 || r < 0.0) return false;
+    return true;
+}
+
+// -------------------------------------------------------------
+// OrificeState implementation
+// -------------------------------------------------------------
+
+double OrificeState::Re_d(double beta) const {
+    // Re_d = Re_D * beta (velocity scales as 1/beta^2, length as beta)
+    // Actually: Re_d = (rho * v_orifice * d) / mu = Re_D * (v_orifice/v_pipe) * beta
+    // For continuity: v_orifice = v_pipe / beta^2, so Re_d = Re_D / beta
+    // But commonly Re_d is just Re_D * beta for the characteristic length ratio
+    return Re_D * beta;
+}
+
+// -------------------------------------------------------------
+// Namespace: individual correlations
+// -------------------------------------------------------------
+
+namespace orifice {
+
+// Reader-Harris/Gallagher (1998) correlation
+// ISO 5167-2:2003, also ASME MFC-3M
+// Valid for: 0.1 <= beta <= 0.75, Re_D >= 5000 (preferably >= 10000)
+//            D >= 50 mm, d >= 12.5 mm
+double Cd_ReaderHarrisGallagher(double beta, double Re_D, double D) {
+    // Ensure minimum Reynolds number
+    if (Re_D < 1.0) Re_D = 1.0;
+
+    const double beta2 = beta * beta;
+    const double beta4 = beta2 * beta2;
+    const double beta8 = beta4 * beta4;
+
+    // Coefficient of discharge (Reader-Harris/Gallagher equation)
+    // C = 0.5961 + 0.0261*beta^2 - 0.216*beta^8
+    //     + 0.000521*(10^6*beta/Re_D)^0.7
+    //     + (0.0188 + 0.0063*A)*beta^3.5*(10^6/Re_D)^0.3
+    //     + (0.043 + 0.080*exp(-10*L1) - 0.123*exp(-7*L1))*(1 - 0.11*A)*beta^4/(1 - beta^4)
+    //     - 0.031*(M2 - 0.8*M2^1.1)*beta^1.3
+    //
+    // For flange taps (most common):
+    //   L1 = L2 = 25.4/D (mm), A = (19000*beta/Re_D)^0.8
+
+    // Convert D to mm for the correlation
+    const double D_mm = D * 1000.0;
+
+    // Flange tap geometry (25.4 mm from plate face)
+    const double L1 = 25.4 / D_mm;  // Upstream tap distance ratio
+    const double L2 = 25.4 / D_mm;  // Downstream tap distance ratio
+
+    // A parameter (small-bore correction)
+    const double A = std::pow(19000.0 * beta / Re_D, 0.8);
+
+    // M2 parameter (downstream tap correction)
+    const double M2 = 2.0 * L2 / (1.0 - beta);
+
+    // Base coefficient
+    double C = 0.5961
+             + 0.0261 * beta2
+             - 0.216 * beta8;
+
+    // Reynolds number term
+    C += 0.000521 * std::pow(1.0e6 * beta / Re_D, 0.7);
+
+    // Small-bore correction
+    C += (0.0188 + 0.0063 * A) * std::pow(beta, 3.5) * std::pow(1.0e6 / Re_D, 0.3);
+
+    // Upstream tap term
+    const double exp_term1 = std::exp(-10.0 * L1);
+    const double exp_term2 = std::exp(-7.0 * L1);
+    C += (0.043 + 0.080 * exp_term1 - 0.123 * exp_term2)
+       * (1.0 - 0.11 * A) * beta4 / (1.0 - beta4);
+
+    // Downstream tap term
+    C -= 0.031 * (M2 - 0.8 * std::pow(M2, 1.1)) * std::pow(beta, 1.3);
+
+    return C;
+}
+
+// Stolz (1978) correlation - older ISO 5167
+double Cd_Stolz(double beta, double Re_D) {
+    if (Re_D < 1.0) Re_D = 1.0;
+
+    const double beta2 = beta * beta;
+    const double beta4 = beta2 * beta2;
+
+    // Stolz equation (corner taps)
+    // C = 0.5959 + 0.0312*beta^2.1 - 0.184*beta^8 + 91.71*beta^2.5/Re_D^0.75
+    double C = 0.5959
+             + 0.0312 * std::pow(beta, 2.1)
+             - 0.184 * std::pow(beta, 8.0)
+             + 91.71 * std::pow(beta, 2.5) / std::pow(Re_D, 0.75);
+
+    return C;
+}
+
+// Miller (1996) simplified correlation
+double Cd_Miller(double beta, double Re_D) {
+    if (Re_D < 1.0) Re_D = 1.0;
+
+    // Simplified form: C ≈ 0.596 + 0.031*beta^2 for high Re
+    // With Reynolds correction
+    const double beta2 = beta * beta;
+
+    double C = 0.596 + 0.031 * beta2;
+
+    // Reynolds number correction (approximate)
+    if (Re_D < 1.0e6) {
+        C += 0.5 * std::pow(beta, 2.5) / std::pow(Re_D, 0.5);
+    }
+
+    return C;
+}
+
+// Thickness correction factor for thick plates
+// Based on Idelchik: for t/d > 0, flow may reattach inside orifice
+// For t/d < 0.02: thin plate (no correction)
+// For 0.02 < t/d < 2-3: correction applies
+// For t/d > 3: approaches pipe entrance behavior
+double thickness_correction(double t_over_d, double beta) {
+    if (t_over_d <= 0.02) {
+        return 1.0;  // Thin plate, no correction
+    }
+
+    // Idelchik-based correction
+    // For sharp-edged thick plate, Cd increases with thickness
+    // as flow reattaches inside the orifice bore
+    //
+    // Approximate formula (fitted to Idelchik data):
+    // correction = 1 + 0.25 * (1 - exp(-3 * t/d)) * (1 - beta^2)
+
+    const double factor = 1.0 - std::exp(-3.0 * t_over_d);
+    const double correction = 1.0 + 0.25 * factor * (1.0 - beta * beta);
+
+    // Limit correction to reasonable range
+    return std::min(correction, 1.3);
+}
+
+// Rounded-entry Cd
+// For well-rounded entries (r/d >= 0.15), Cd approaches 0.98-0.99
+// Based on Idelchik contraction loss coefficients
+double Cd_rounded(double r_over_d, double beta, double Re_D) {
+    if (Re_D < 1.0) Re_D = 1.0;
+
+    // For r/d = 0: sharp edge, use thin-plate correlation
+    if (r_over_d <= 0.0) {
+        return Cd_Stolz(beta, Re_D);
+    }
+
+    // Idelchik: loss coefficient K for rounded entry
+    // K = 0.5 * (1 - r/d/0.15)^2 for r/d < 0.15
+    // K ≈ 0.03 - 0.05 for r/d >= 0.15 (well-rounded)
+    //
+    // Convert K to Cd using: Cd = 1 / sqrt(1 + K / (1 - beta^4))
+
+    double K;
+    if (r_over_d >= 0.15) {
+        // Well-rounded entry
+        K = 0.04;
+    } else {
+        // Partially rounded
+        const double ratio = 1.0 - r_over_d / 0.15;
+        K = 0.5 * ratio * ratio;
+    }
+
+    // Account for beta effect
+    const double beta4 = std::pow(beta, 4.0);
+    const double Cd = 1.0 / std::sqrt(1.0 + K / (1.0 - beta4));
+
+    // Reynolds number correction for low Re
+    double Re_correction = 1.0;
+    if (Re_D < 1.0e5) {
+        Re_correction = 1.0 - 0.1 * std::pow(1.0e5 / Re_D, 0.2);
+    }
+
+    return Cd * Re_correction;
+}
+
+// Convert between Cd and loss coefficient K
+double K_from_Cd(double Cd, double beta) {
+    if (Cd <= 0.0 || Cd > 1.0) {
+        throw std::invalid_argument("Cd must be in (0, 1]");
+    }
+    const double beta4 = std::pow(beta, 4.0);
+    return (1.0 / (Cd * Cd) - 1.0) * (1.0 - beta4);
+}
+
+double Cd_from_K(double K, double beta) {
+    if (K < 0.0) {
+        throw std::invalid_argument("K must be >= 0");
+    }
+    const double beta4 = std::pow(beta, 4.0);
+    return 1.0 / std::sqrt(1.0 + K / (1.0 - beta4));
+}
+
+} // namespace orifice
+
+// -------------------------------------------------------------
+// Main Cd functions (free functions)
+// -------------------------------------------------------------
+
+double Cd_sharp_thin_plate(const OrificeGeometry& geom, const OrificeState& state) {
+    if (!geom.is_valid()) {
+        throw std::invalid_argument("Invalid orifice geometry");
+    }
+    return orifice::Cd_ReaderHarrisGallagher(geom.beta(), state.Re_D, geom.D);
+}
+
+double Cd_thick_plate(const OrificeGeometry& geom, const OrificeState& state) {
+    if (!geom.is_valid()) {
+        throw std::invalid_argument("Invalid orifice geometry");
+    }
+
+    // Start with thin-plate Cd
+    double Cd = orifice::Cd_ReaderHarrisGallagher(geom.beta(), state.Re_D, geom.D);
+
+    // Apply thickness correction
+    Cd *= orifice::thickness_correction(geom.t_over_d(), geom.beta());
+
+    return Cd;
+}
+
+double Cd_rounded_entry(const OrificeGeometry& geom, const OrificeState& state) {
+    if (!geom.is_valid()) {
+        throw std::invalid_argument("Invalid orifice geometry");
+    }
+    return orifice::Cd_rounded(geom.r_over_d(), geom.beta(), state.Re_D);
+}
+
+double Cd(const OrificeGeometry& geom, const OrificeState& state) {
+    if (!geom.is_valid()) {
+        throw std::invalid_argument("Invalid orifice geometry");
+    }
+
+    // Auto-select based on geometry
+    if (geom.r_over_d() > 0.01) {
+        // Rounded entry
+        return Cd_rounded_entry(geom, state);
+    } else if (geom.t_over_d() > 0.02) {
+        // Thick plate
+        return Cd_thick_plate(geom, state);
+    } else {
+        // Sharp thin plate (default)
+        return Cd_sharp_thin_plate(geom, state);
+    }
+}
+
+// -------------------------------------------------------------
+// Correlation classes
+// -------------------------------------------------------------
+
+namespace {
+
+class ReaderHarrisGallagherCorrelation : public OrificeCorrelationBase {
+public:
+    double Cd(const OrificeGeometry& geom, const OrificeState& state) const override {
+        return Cd_sharp_thin_plate(geom, state);
+    }
+    std::string name() const override { return "Reader-Harris/Gallagher (ISO 5167-2)"; }
+};
+
+class StolzCorrelation : public OrificeCorrelationBase {
+public:
+    double Cd(const OrificeGeometry& geom, const OrificeState& state) const override {
+        return orifice::Cd_Stolz(geom.beta(), state.Re_D);
+    }
+    std::string name() const override { return "Stolz (ISO 5167:1980)"; }
+};
+
+class MillerCorrelation : public OrificeCorrelationBase {
+public:
+    double Cd(const OrificeGeometry& geom, const OrificeState& state) const override {
+        return orifice::Cd_Miller(geom.beta(), state.Re_D);
+    }
+    std::string name() const override { return "Miller (1996)"; }
+};
+
+class ThickPlateCorrelation : public OrificeCorrelationBase {
+public:
+    double Cd(const OrificeGeometry& geom, const OrificeState& state) const override {
+        return Cd_thick_plate(geom, state);
+    }
+    std::string name() const override { return "Thick Plate (Idelchik correction)"; }
+};
+
+class RoundedEntryCorrelation : public OrificeCorrelationBase {
+public:
+    double Cd(const OrificeGeometry& geom, const OrificeState& state) const override {
+        return Cd_rounded_entry(geom, state);
+    }
+    std::string name() const override { return "Rounded Entry (Idelchik)"; }
+};
+
+class ConstantCdCorrelation : public OrificeCorrelationBase {
+    double Cd_value_;
+public:
+    explicit ConstantCdCorrelation(double Cd = 0.61) : Cd_value_(Cd) {}
+    double Cd(const OrificeGeometry&, const OrificeState&) const override {
+        return Cd_value_;
+    }
+    std::string name() const override { return "Constant Cd"; }
+};
+
+class UserFunctionCorrelation : public OrificeCorrelationBase {
+    CdFunction fn_;
+    std::string name_;
+public:
+    UserFunctionCorrelation(CdFunction fn, std::string name)
+        : fn_(std::move(fn)), name_(std::move(name)) {}
+    double Cd(const OrificeGeometry& geom, const OrificeState& state) const override {
+        return fn_(geom, state);
+    }
+    std::string name() const override { return name_; }
+};
+
+class TabulatedCorrelation : public OrificeCorrelationBase {
+    std::vector<double> beta_values_;
+    std::vector<double> Re_values_;
+    std::vector<std::vector<double>> Cd_table_;
+    std::string name_;
+
+public:
+    TabulatedCorrelation(std::vector<double> beta_values,
+                         std::vector<double> Re_values,
+                         std::vector<std::vector<double>> Cd_table,
+                         std::string name)
+        : beta_values_(std::move(beta_values))
+        , Re_values_(std::move(Re_values))
+        , Cd_table_(std::move(Cd_table))
+        , name_(std::move(name)) {}
+
+    double Cd(const OrificeGeometry& geom, const OrificeState& state) const override {
+        return interpolate(geom.beta(), state.Re_D);
+    }
+
+    std::string name() const override { return name_; }
+
+private:
+    double interpolate(double beta, double Re_D) const {
+        // Bilinear interpolation in beta and log(Re_D)
+        const double log_Re = std::log10(std::max(Re_D, 1.0));
+
+        // Find beta indices
+        auto it_beta = std::lower_bound(beta_values_.begin(), beta_values_.end(), beta);
+        std::size_t i_beta = (it_beta == beta_values_.begin()) ? 0 :
+                             (it_beta == beta_values_.end()) ? beta_values_.size() - 2 :
+                             static_cast<std::size_t>(it_beta - beta_values_.begin() - 1);
+
+        // Find Re indices (in log space)
+        std::vector<double> log_Re_values;
+        log_Re_values.reserve(Re_values_.size());
+        for (double Re : Re_values_) {
+            log_Re_values.push_back(std::log10(std::max(Re, 1.0)));
+        }
+        auto it_Re = std::lower_bound(log_Re_values.begin(), log_Re_values.end(), log_Re);
+        std::size_t i_Re = (it_Re == log_Re_values.begin()) ? 0 :
+                           (it_Re == log_Re_values.end()) ? log_Re_values.size() - 2 :
+                           static_cast<std::size_t>(it_Re - log_Re_values.begin() - 1);
+
+        // Clamp indices
+        i_beta = std::min(i_beta, beta_values_.size() - 2);
+        i_Re = std::min(i_Re, Re_values_.size() - 2);
+
+        // Interpolation weights
+        const double t_beta = (beta - beta_values_[i_beta]) /
+                              (beta_values_[i_beta + 1] - beta_values_[i_beta]);
+        const double t_Re = (log_Re - log_Re_values[i_Re]) /
+                            (log_Re_values[i_Re + 1] - log_Re_values[i_Re]);
+
+        // Clamp weights to [0, 1]
+        const double tb = std::clamp(t_beta, 0.0, 1.0);
+        const double tr = std::clamp(t_Re, 0.0, 1.0);
+
+        // Bilinear interpolation
+        const double c00 = Cd_table_[i_beta][i_Re];
+        const double c10 = Cd_table_[i_beta + 1][i_Re];
+        const double c01 = Cd_table_[i_beta][i_Re + 1];
+        const double c11 = Cd_table_[i_beta + 1][i_Re + 1];
+
+        return (1 - tb) * (1 - tr) * c00
+             + tb * (1 - tr) * c10
+             + (1 - tb) * tr * c01
+             + tb * tr * c11;
+    }
+};
+
+} // anonymous namespace
+
+std::unique_ptr<OrificeCorrelationBase> make_correlation(CdCorrelation id) {
+    switch (id) {
+        case CdCorrelation::ReaderHarrisGallagher:
+            return std::make_unique<ReaderHarrisGallagherCorrelation>();
+        case CdCorrelation::Stolz:
+            return std::make_unique<StolzCorrelation>();
+        case CdCorrelation::Miller:
+            return std::make_unique<MillerCorrelation>();
+        case CdCorrelation::IdelchikThick:
+        case CdCorrelation::BohlThick:
+            return std::make_unique<ThickPlateCorrelation>();
+        case CdCorrelation::IdelchikRounded:
+        case CdCorrelation::BohlRounded:
+            return std::make_unique<RoundedEntryCorrelation>();
+        case CdCorrelation::Constant:
+            return std::make_unique<ConstantCdCorrelation>();
+        case CdCorrelation::UserFunction:
+            return nullptr;  // Use make_user_correlation instead
+    }
+    return nullptr;
+}
+
+std::unique_ptr<OrificeCorrelationBase> make_user_correlation(
+    CdFunction fn,
+    const std::string& name) {
+    return std::make_unique<UserFunctionCorrelation>(std::move(fn), name);
+}
+
+std::unique_ptr<OrificeCorrelationBase> make_tabulated_correlation(
+    const std::vector<double>& beta_values,
+    const std::vector<double>& Re_values,
+    const std::vector<std::vector<double>>& Cd_table,
+    const std::string& name) {
+    return std::make_unique<TabulatedCorrelation>(beta_values, Re_values, Cd_table, name);
+}
+
+// -------------------------------------------------------------
+// Flow calculations
+// -------------------------------------------------------------
+
+double orifice_mdot(const OrificeGeometry& geom, double Cd, double dP, double rho) {
+    if (dP < 0.0 || rho <= 0.0 || Cd <= 0.0) {
+        throw std::invalid_argument("orifice_mdot: invalid parameters");
+    }
+    return Cd * geom.area() * std::sqrt(2.0 * rho * dP);
+}
+
+double orifice_dP(const OrificeGeometry& geom, double Cd, double mdot, double rho) {
+    if (mdot < 0.0 || rho <= 0.0 || Cd <= 0.0) {
+        throw std::invalid_argument("orifice_dP: invalid parameters");
+    }
+    // From mdot = Cd * A * sqrt(2 * rho * dP)
+    // Solve for dP: dP = (mdot / (Cd * A))^2 / (2 * rho)
+    const double A = geom.area();
+    const double term = mdot / (Cd * A);
+    return term * term / (2.0 * rho);
+}
+
+double orifice_Cd_from_measurement(const OrificeGeometry& geom,
+                                    double mdot, double dP, double rho) {
+    if (dP <= 0.0 || rho <= 0.0 || mdot <= 0.0) {
+        throw std::invalid_argument("orifice_Cd_from_measurement: invalid parameters");
+    }
+    return mdot / (geom.area() * std::sqrt(2.0 * rho * dP));
+}

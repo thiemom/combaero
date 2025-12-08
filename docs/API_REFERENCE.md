@@ -536,3 +536,143 @@ double Cd = 0.62;
 double dP_orifice = 50000.0;  // Pa
 double A_orifice = orifice_area(mdot, 200000.0, 150000.0, Cd, rho);
 ```
+
+## Orifice Cd Correlations (`orifice.h`)
+
+Discharge coefficient (Cd) correlations for various orifice geometries. Cd relates actual to ideal flow:
+```
+mdot_actual = Cd * A * sqrt(2 * rho * dP)
+```
+
+**Compressible flow note**: For sharp-edged orifices, Cd is weakly dependent on Mach number. These correlations provide adequate Cd values into the choked-flow regime when combined with compressible mass-flow relations (see `compressible.h`).
+
+### Geometry and State Structs
+
+```cpp
+struct OrificeGeometry {
+    double d = 0.0;       // Orifice bore diameter [m]
+    double D = 0.0;       // Pipe diameter [m]
+    double t = 0.0;       // Plate thickness [m] (for thick plate)
+    double r = 0.0;       // Inlet edge radius [m] (for rounded entry)
+
+    double beta() const;          // Diameter ratio d/D [-]
+    double area() const;          // Orifice area [m²]
+    double t_over_d() const;      // Thickness ratio t/d [-]
+    double r_over_d() const;      // Radius ratio r/d [-]
+    bool is_valid() const;
+};
+
+struct OrificeState {
+    double Re_D = 0.0;    // Pipe Reynolds number (based on D) [-]
+    double dP = 0.0;      // Differential pressure [Pa]
+    double rho = 0.0;     // Fluid density [kg/m³]
+    double mu = 0.0;      // Dynamic viscosity [Pa·s]
+};
+```
+
+### Cd Correlation Functions
+
+```cpp
+// Sharp thin-plate orifice (ISO 5167-2, Reader-Harris/Gallagher)
+// Valid for: 0.1 <= beta <= 0.75, Re_D >= 5000, D >= 50mm
+double Cd_sharp_thin_plate(const OrificeGeometry& geom, const OrificeState& state);
+
+// Thick-plate orifice (Idelchik thickness correction)
+// Valid for: 0 < t/d < ~3
+double Cd_thick_plate(const OrificeGeometry& geom, const OrificeState& state);
+
+// Rounded-entry orifice (Idelchik-based)
+// Valid for: 0 < r/d <= 0.2
+double Cd_rounded_entry(const OrificeGeometry& geom, const OrificeState& state);
+
+// Auto-select correlation based on geometry
+double Cd(const OrificeGeometry& geom, const OrificeState& state);
+```
+
+### Flow Calculations with Cd
+
+```cpp
+// Mass flow through orifice
+double orifice_mdot(const OrificeGeometry& geom, double Cd, double dP, double rho);
+
+// Pressure drop for given mass flow
+double orifice_dP(const OrificeGeometry& geom, double Cd, double mdot, double rho);
+
+// Solve for Cd from measurement
+double orifice_Cd_from_measurement(const OrificeGeometry& geom,
+                                    double mdot, double dP, double rho);
+```
+
+### Utility Functions
+
+```cpp
+namespace orifice {
+    // Loss coefficient K from Cd: K = (1/Cd² - 1) * (1 - beta⁴)
+    double K_from_Cd(double Cd, double beta);
+
+    // Cd from loss coefficient K
+    double Cd_from_K(double K, double beta);
+
+    // Thickness correction factor (multiplies thin-plate Cd)
+    double thickness_correction(double t_over_d, double beta);
+}
+```
+
+### Usage Example
+
+```cpp
+#include "orifice.h"
+
+// Define geometry: 50mm orifice in 100mm pipe
+OrificeGeometry geom;
+geom.d = 0.050;
+geom.D = 0.100;
+
+// Define flow state
+OrificeState state;
+state.Re_D = 100000.0;
+state.dP = 10000.0;   // 10 kPa
+state.rho = 1.2;      // kg/m³
+
+// Get Cd (auto-selects thin-plate for this geometry)
+double Cd = Cd(geom, state);  // ~0.61
+
+// Calculate mass flow
+double mdot = orifice_mdot(geom, Cd, state.dP, state.rho);
+
+// For thick plate, set thickness
+geom.t = 0.010;  // 10mm
+double Cd_thick = Cd_thick_plate(geom, state);  // Higher than thin plate
+
+// For rounded entry, set radius
+geom.t = 0.0;
+geom.r = 0.008;  // 8mm radius
+double Cd_round = Cd_rounded_entry(geom, state);  // ~0.95-0.98
+```
+
+### Python Usage
+
+```python
+import combaero as cb
+
+# Define geometry
+geom = cb.OrificeGeometry()
+geom.d = 0.050
+geom.D = 0.100
+
+# Define flow state
+state = cb.OrificeState()
+state.Re_D = 100000.0
+state.dP = 10000.0
+state.rho = 1.2
+
+# Get Cd
+Cd = cb.Cd_orifice(geom, state)
+
+# Calculate mass flow
+mdot = cb.orifice_mdot_Cd(geom, Cd, state.dP, state.rho)
+
+# Convert between Cd and loss coefficient K
+K = cb.orifice_K_from_Cd(Cd, geom.beta)
+Cd_back = cb.orifice_Cd_from_K(K, geom.beta)
+```

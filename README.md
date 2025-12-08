@@ -22,6 +22,7 @@ This library provides tools for ideal-gas thermodynamic properties, combustion s
 - **Inverse combustion solvers**: find fuel or oxidizer flow for target Tad, O₂, or CO₂
 - **Compressible flow**: isentropic nozzle flow and Fanno flow (adiabatic pipe with friction)
 - **Friction factors**: Colebrook-White, Haaland, and Serghides correlations
+- **Orifice Cd correlations**: ISO 5167, thick-plate, rounded-entry (Idelchik/Bohl)
 - Accurate saturation vapor pressure using Hyland-Wexler equations
   - For ice (-80°C to 0°C): maximum relative error ≤ 0.023%
   - For water vapor (0°C to 80°C): maximum relative error ≤ 0.0057%
@@ -42,6 +43,8 @@ The library is organized into focused modules:
 | `equilibrium.h` | Chemical equilibrium solver (WGS partial equilibrium) |
 | `compressible.h` | Compressible flow (isentropic nozzle, Fanno pipe flow) |
 | `friction.h` | Darcy friction factor correlations (Colebrook, Haaland, Serghides) |
+| `incompressible.h` | Incompressible flow (Bernoulli, pipe flow, orifice) |
+| `orifice.h` | Orifice discharge coefficient (Cd) correlations |
 | `humidair.h` | Humid air properties and saturation vapor pressure |
 | `utils.h` | Utility functions (mixture property printing) |
 

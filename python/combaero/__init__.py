@@ -150,6 +150,19 @@ try:
         hydraulic_diameter,
         hydraulic_diameter_rect,
         hydraulic_diameter_annulus,
+        # Orifice Cd correlations
+        OrificeGeometry,
+        OrificeState,
+        Cd_sharp_thin_plate,
+        Cd_thick_plate,
+        Cd_rounded_entry,
+        Cd_orifice,
+        orifice_mdot_Cd,
+        orifice_dP_Cd,
+        orifice_Cd_from_measurement,
+        orifice_K_from_Cd,
+        orifice_Cd_from_K,
+        orifice_thickness_correction,
     )
 except ModuleNotFoundError:
     # Fallback: attempt to import from an installed combaero package that
@@ -266,6 +279,19 @@ except ModuleNotFoundError:
     hydraulic_diameter = _core.hydraulic_diameter
     hydraulic_diameter_rect = _core.hydraulic_diameter_rect
     hydraulic_diameter_annulus = _core.hydraulic_diameter_annulus
+    # Orifice Cd correlations
+    OrificeGeometry = _core.OrificeGeometry
+    OrificeState = _core.OrificeState
+    Cd_sharp_thin_plate = _core.Cd_sharp_thin_plate
+    Cd_thick_plate = _core.Cd_thick_plate
+    Cd_rounded_entry = _core.Cd_rounded_entry
+    Cd_orifice = _core.Cd_orifice
+    orifice_mdot_Cd = _core.orifice_mdot_Cd
+    orifice_dP_Cd = _core.orifice_dP_Cd
+    orifice_Cd_from_measurement = _core.orifice_Cd_from_measurement
+    orifice_K_from_Cd = _core.orifice_K_from_Cd
+    orifice_Cd_from_K = _core.orifice_Cd_from_K
+    orifice_thickness_correction = _core.orifice_thickness_correction
 
 
 __all__ = [
@@ -380,5 +406,18 @@ __all__ = [
     "hydraulic_diameter",
     "hydraulic_diameter_rect",
     "hydraulic_diameter_annulus",
+    # Orifice Cd correlations
+    "OrificeGeometry",
+    "OrificeState",
+    "Cd_sharp_thin_plate",
+    "Cd_thick_plate",
+    "Cd_rounded_entry",
+    "Cd_orifice",
+    "orifice_mdot_Cd",
+    "orifice_dP_Cd",
+    "orifice_Cd_from_measurement",
+    "orifice_K_from_Cd",
+    "orifice_Cd_from_K",
+    "orifice_thickness_correction",
     "__version__",
 ]
