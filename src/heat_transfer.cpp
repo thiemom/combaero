@@ -127,24 +127,29 @@ double overall_htc(const std::vector<double>& h_values,
     return 1.0 / R_total;
 }
 
-double overall_htc_tube(double h_inner, double h_outer,
+double overall_htc_wall(double h_inner, double h_outer,
                         double t_wall, double k_wall) {
     if (k_wall <= 0) {
-        throw std::invalid_argument("overall_htc_tube: k_wall must be positive");
+        throw std::invalid_argument("overall_htc_wall: k_wall must be positive");
     }
     return overall_htc({h_inner, h_outer}, {t_wall / k_wall});
 }
 
-double overall_htc_tube(double h_inner, double h_outer,
-                        double t_wall, double k_wall,
+double overall_htc_wall(double h_inner, double h_outer,
+                        const std::vector<double>& t_over_k_layers) {
+    return overall_htc({h_inner, h_outer}, t_over_k_layers);
+}
+
+double overall_htc_wall(double h_inner, double h_outer,
+                        const std::vector<double>& t_over_k_layers,
                         double R_fouling) {
-    if (k_wall <= 0) {
-        throw std::invalid_argument("overall_htc_tube: k_wall must be positive");
-    }
     if (R_fouling < 0) {
-        throw std::invalid_argument("overall_htc_tube: R_fouling must be non-negative");
+        throw std::invalid_argument("overall_htc_wall: R_fouling must be non-negative");
     }
-    return overall_htc({h_inner, h_outer}, {t_wall / k_wall, R_fouling});
+    // Append fouling resistance to layers
+    std::vector<double> all_resistances = t_over_k_layers;
+    all_resistances.push_back(R_fouling);
+    return overall_htc({h_inner, h_outer}, all_resistances);
 }
 
 double thermal_resistance(double h, double A) {

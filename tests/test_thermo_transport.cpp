@@ -3347,3 +3347,25 @@ TEST(HeatTransferTest, ThermalResistanceWall) {
     // R = t/(k*A) = 0.01/(50*2) = 0.0001 K/W
     EXPECT_NEAR(R, 0.0001, 1e-8);
 }
+
+TEST(HeatTransferTest, OverallHtcMultiLayer) {
+    // Insulated steel pipe: steel 3mm + insulation 50mm
+    double h_inner = 500.0;   // W/(m²·K)
+    double h_outer = 10.0;    // W/(m²·K), natural convection
+    double t_steel = 0.003;   // 3 mm
+    double k_steel = 50.0;    // W/(m·K)
+    double t_insul = 0.05;    // 50 mm
+    double k_insul = 0.04;    // W/(m·K), mineral wool
+    
+    double U = overall_htc_wall(h_inner, h_outer, 
+                                {t_steel / k_steel, t_insul / k_insul});
+    
+    // 1/U = 1/500 + 0.003/50 + 0.05/0.04 + 1/10
+    //     = 0.002 + 0.00006 + 1.25 + 0.1 = 1.35206
+    // U ≈ 0.74 W/(m²·K)
+    EXPECT_NEAR(U, 0.74, 0.01);
+    
+    // Insulation dominates - removing it should increase U dramatically
+    double U_no_insul = overall_htc_wall(h_inner, h_outer, t_steel, k_steel);
+    EXPECT_GT(U_no_insul, U * 10);  // At least 10x higher
+}

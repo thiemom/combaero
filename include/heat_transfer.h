@@ -130,16 +130,37 @@ double htc_from_nusselt(double Nu, double k, double L);
 double overall_htc(const std::vector<double>& h_values,
                    const std::vector<double>& t_over_k = {});
 
-// Convenience: overall HTC for tube with inner/outer convection and wall
+// Convenience: overall HTC for wall with inner/outer convection and single layer
 // 1/U = 1/h_inner + t_wall/k_wall + 1/h_outer
-double overall_htc_tube(double h_inner, double h_outer,
+double overall_htc_wall(double h_inner, double h_outer,
                         double t_wall, double k_wall);
 
-// With fouling resistance (R_f in m²·K/W)
-// 1/U = 1/h_inner + t_wall/k_wall + 1/h_outer + R_fouling
-double overall_htc_tube(double h_inner, double h_outer,
-                        double t_wall, double k_wall,
+// Multi-layer wall: h_in, [t1/k1, t2/k2, ...], h_out
+// 1/U = 1/h_inner + Σ(t_i/k_i) + 1/h_outer
+//
+// Example: insulated pipe with steel + insulation
+//   overall_htc_wall(500, 10, {0.003/50, 0.05/0.04})
+//   = h_in=500, h_out=10, steel 3mm @ k=50, insulation 50mm @ k=0.04
+double overall_htc_wall(double h_inner, double h_outer,
+                        const std::vector<double>& t_over_k_layers);
+
+// With additional fouling resistance (R_f in m²·K/W)
+double overall_htc_wall(double h_inner, double h_outer,
+                        const std::vector<double>& t_over_k_layers,
                         double R_fouling);
+
+// Legacy alias for single-layer wall
+inline double overall_htc_tube(double h_inner, double h_outer,
+                               double t_wall, double k_wall) {
+    return overall_htc_wall(h_inner, h_outer, t_wall, k_wall);
+}
+
+inline double overall_htc_tube(double h_inner, double h_outer,
+                               double t_wall, double k_wall,
+                               double R_fouling) {
+    std::vector<double> layers = {t_wall / k_wall};
+    return overall_htc_wall(h_inner, h_outer, layers, R_fouling);
+}
 
 // Thermal resistance from HTC and area
 // R = 1 / (h * A)  [K/W]

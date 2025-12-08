@@ -147,6 +147,7 @@ inline constexpr Entry function_units[] = {
     {"lmtd_counterflow",        "T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K", "K"},
     {"lmtd_parallelflow",       "T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K", "K"},
     {"overall_htc",             "h_values: W/(m^2*K), t_over_k: m^2*K/W", "W/(m^2*K)"},
+    {"overall_htc_wall",        "h_inner, h_outer: W/(m^2*K), t_over_k_layers: m^2*K/W", "W/(m^2*K)"},
     {"overall_htc_tube",        "h_inner, h_outer: W/(m^2*K), t_wall: m, k_wall: W/(m*K)", "W/(m^2*K)"},
     {"thermal_resistance",      "h: W/(m^2*K), A: m^2",                 "K/W"},
     {"thermal_resistance_wall", "t: m, k: W/(m*K), A: m^2",             "K/W"},
