@@ -341,6 +341,19 @@ All functions use consistent units to avoid conversion errors.
 |----------------|-------------|-------------|
 | `Stream::mdot` | -           | kg/s        |
 
+### heat_transfer.h - Heat Transfer Correlations
+
+| Function                 | Input Units                   | Output Unit |
+|--------------------------|-------------------------------|-------------|
+| `nusselt_dittus_boelter` | Re: -, Pr: -, heating: bool   | - (Nu)      |
+| `nusselt_gnielinski`     | Re: -, Pr: -, f: - (optional) | - (Nu)      |
+| `nusselt_sieder_tate`    | Re: -, Pr: -, mu_ratio: -     | - (Nu)      |
+| `nusselt_petukhov`       | Re: -, Pr: -, f: - (optional) | - (Nu)      |
+| `htc_from_nusselt`       | Nu: -, k: W/(m*K), L: m       | W/(m^2*K)   |
+| `friction_petukhov`      | Re: -                         | - (f)       |
+| `nusselt_pipe`           | State, V: m/s, D: m           | - (Nu)      |
+| `htc_pipe`               | State, V: m/s, D: m           | W/(m^2*K)   |
+
 ---
 
 ## Dimensionless Quantities

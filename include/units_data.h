@@ -130,6 +130,18 @@ inline constexpr Entry function_units[] = {
     {"friction_colebrook",      "Re: -, e_D: -",                        "- (f)"},
 
     // -------------------------------------------------------------------------
+    // heat_transfer.h - Heat Transfer Correlations
+    // -------------------------------------------------------------------------
+    {"nusselt_dittus_boelter",  "Re: -, Pr: -, heating: bool",          "- (Nu)"},
+    {"nusselt_gnielinski",      "Re: -, Pr: -, f: - (optional)",        "- (Nu)"},
+    {"nusselt_sieder_tate",     "Re: -, Pr: -, mu_ratio: -",            "- (Nu)"},
+    {"nusselt_petukhov",        "Re: -, Pr: -, f: - (optional)",        "- (Nu)"},
+    {"htc_from_nusselt",        "Nu: -, k: W/(m*K), L: m",              "W/(m^2*K)"},
+    {"friction_petukhov",       "Re: -",                                "- (f)"},
+    {"nusselt_pipe",            "State, V: m/s, D: m",                  "- (Nu)"},
+    {"htc_pipe",                "State, V: m/s, D: m",                  "W/(m^2*K)"},
+
+    // -------------------------------------------------------------------------
     // orifice.h - Discharge Coefficients
     // -------------------------------------------------------------------------
     {"Cd_sharp_thin_plate",     "OrificeGeometry, OrificeState",        "- (Cd)"},

@@ -3068,3 +3068,167 @@ TEST(Quasi1DNozzle, InvalidInputs) {
     EXPECT_THROW(nozzle_cd(500.0, 400000.0, 200000.0, 0.01, 0.02, 0.01, 0.1, 0.2, X_air), 
                  std::invalid_argument);  // A_throat > A_inlet
 }
+
+// =============================================================================
+// Heat Transfer Tests
+// =============================================================================
+
+#include "../include/heat_transfer.h"
+
+TEST(HeatTransferTest, DittusBoelterBasic) {
+    // Test Dittus-Boelter at typical conditions
+    // Re = 50000, Pr = 0.7 (air-like)
+    double Nu_heat = nusselt_dittus_boelter(50000, 0.7, true);
+    double Nu_cool = nusselt_dittus_boelter(50000, 0.7, false);
+    
+    // Nu should be positive and reasonable (typically 100-300 for these conditions)
+    EXPECT_GT(Nu_heat, 50);
+    EXPECT_LT(Nu_heat, 500);
+    
+    // For Pr < 1: heating (n=0.4) gives lower Nu than cooling (n=0.3)
+    // because Pr^0.4 < Pr^0.3 when Pr < 1
+    EXPECT_LT(Nu_heat, Nu_cool);
+    
+    // Check approximate value: Nu ≈ 0.023 * 50000^0.8 * 0.7^0.4 ≈ 115
+    EXPECT_NEAR(Nu_heat, 115, 10);
+}
+
+TEST(HeatTransferTest, DittusBoelterValidRange) {
+    // Should throw for Re < 10000
+    EXPECT_THROW(nusselt_dittus_boelter(5000, 0.7), std::invalid_argument);
+    
+    // Should throw for Pr outside [0.6, 160]
+    EXPECT_THROW(nusselt_dittus_boelter(50000, 0.5), std::invalid_argument);
+    EXPECT_THROW(nusselt_dittus_boelter(50000, 200), std::invalid_argument);
+}
+
+TEST(HeatTransferTest, GnielinskiBasic) {
+    // Test Gnielinski at typical conditions
+    double Nu = nusselt_gnielinski(50000, 0.7);
+    
+    // Should be similar to Dittus-Boelter but slightly different
+    EXPECT_GT(Nu, 50);
+    EXPECT_LT(Nu, 500);
+    
+    // Gnielinski is valid in transition region too
+    double Nu_trans = nusselt_gnielinski(5000, 0.7);
+    EXPECT_GT(Nu_trans, 10);
+    EXPECT_LT(Nu_trans, 100);
+}
+
+TEST(HeatTransferTest, GnielinskiWithFriction) {
+    // Test with explicit friction factor
+    double f = 0.02;  // Typical turbulent friction factor
+    double Nu = nusselt_gnielinski(50000, 0.7, f);
+    
+    EXPECT_GT(Nu, 50);
+    EXPECT_LT(Nu, 500);
+}
+
+TEST(HeatTransferTest, GnielinskiValidRange) {
+    // Should throw for Re outside [2300, 5e6]
+    EXPECT_THROW(nusselt_gnielinski(2000, 0.7), std::invalid_argument);
+    EXPECT_THROW(nusselt_gnielinski(6e6, 0.7), std::invalid_argument);
+    
+    // Should throw for Pr outside [0.5, 2000]
+    EXPECT_THROW(nusselt_gnielinski(50000, 0.4), std::invalid_argument);
+    EXPECT_THROW(nusselt_gnielinski(50000, 3000), std::invalid_argument);
+}
+
+TEST(HeatTransferTest, SiederTateBasic) {
+    // Test Sieder-Tate with no viscosity correction
+    double Nu = nusselt_sieder_tate(50000, 0.7, 1.0);
+    
+    EXPECT_GT(Nu, 50);
+    EXPECT_LT(Nu, 500);
+    
+    // mu_ratio = mu_bulk / mu_wall
+    // When heating: wall is hotter, mu_wall < mu_bulk, so mu_ratio > 1
+    // When cooling: wall is colder, mu_wall > mu_bulk, so mu_ratio < 1
+    // The (mu_ratio)^0.14 factor increases Nu when mu_ratio > 1
+    
+    double Nu_high_ratio = nusselt_sieder_tate(50000, 0.7, 2.0);  // heating case
+    double Nu_low_ratio = nusselt_sieder_tate(50000, 0.7, 0.5);   // cooling case
+    
+    EXPECT_GT(Nu_high_ratio, Nu);
+    EXPECT_LT(Nu_low_ratio, Nu);
+}
+
+TEST(HeatTransferTest, PetukhovBasic) {
+    // Test Petukhov correlation
+    double Nu = nusselt_petukhov(50000, 0.7);
+    
+    EXPECT_GT(Nu, 50);
+    EXPECT_LT(Nu, 500);
+}
+
+TEST(HeatTransferTest, HtcFromNusselt) {
+    // h = Nu * k / L
+    double Nu = 100;
+    double k = 0.026;  // W/(m·K), typical for air
+    double D = 0.05;   // m
+    
+    double h = htc_from_nusselt(Nu, k, D);
+    
+    // h = 100 * 0.026 / 0.05 = 52 W/(m²·K)
+    EXPECT_NEAR(h, 52.0, 0.1);
+}
+
+TEST(HeatTransferTest, FrictionPetukhov) {
+    // Test Petukhov friction factor
+    double f = friction_petukhov(50000);
+    
+    // Should be in typical range for smooth pipe turbulent flow
+    EXPECT_GT(f, 0.01);
+    EXPECT_LT(f, 0.05);
+    
+    // Compare with Colebrook for smooth pipe (e/D = 0)
+    double f_colebrook = friction_colebrook(50000, 0.0);
+    EXPECT_NEAR(f, f_colebrook, f * 0.1);  // Within 10%
+}
+
+TEST(HeatTransferTest, CorrelationsConsistent) {
+    // All correlations should give similar results for same conditions
+    double Re = 100000;
+    double Pr = 0.7;
+    
+    double Nu_db = nusselt_dittus_boelter(Re, Pr);
+    double Nu_gn = nusselt_gnielinski(Re, Pr);
+    double Nu_st = nusselt_sieder_tate(Re, Pr, 1.0);
+    double Nu_pt = nusselt_petukhov(Re, Pr);
+    
+    // All should be in similar range (within factor of 2)
+    // Sieder-Tate tends to give higher values due to different formulation
+    EXPECT_GT(Nu_db, 100);
+    EXPECT_LT(Nu_db, 400);
+    EXPECT_GT(Nu_gn, 100);
+    EXPECT_LT(Nu_gn, 400);
+    EXPECT_GT(Nu_st, 100);
+    EXPECT_LT(Nu_st, 400);
+    EXPECT_GT(Nu_pt, 100);
+    EXPECT_LT(Nu_pt, 400);
+}
+
+TEST(HeatTransferTest, StateBased) {
+    // Test state-based convenience functions
+    std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    
+    State s;
+    s.set_T(400.0).set_P(101325.0).set_X(X_air);
+    
+    double velocity = 10.0;  // m/s
+    double diameter = 0.05;  // m
+    
+    double Nu = nusselt_pipe(s, velocity, diameter);
+    double h = htc_pipe(s, velocity, diameter);
+    
+    // Check reasonable values
+    EXPECT_GT(Nu, 10);
+    EXPECT_LT(Nu, 500);
+    EXPECT_GT(h, 10);
+    EXPECT_LT(h, 500);
+    
+    // h should equal Nu * k / D
+    double k = s.k();
+    EXPECT_NEAR(h, Nu * k / diameter, 0.01);
+}
