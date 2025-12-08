@@ -3281,3 +3281,69 @@ TEST(HeatTransferTest, LmtdInvalidInput) {
     EXPECT_THROW(lmtd(10.0, 0.0), std::invalid_argument);
     EXPECT_THROW(lmtd(-5.0, 10.0), std::invalid_argument);
 }
+
+TEST(HeatTransferTest, OverallHtcBasic) {
+    // Two convective resistances in series
+    // 1/U = 1/h1 + 1/h2
+    double h1 = 100.0;  // W/(m²·K)
+    double h2 = 200.0;  // W/(m²·K)
+    
+    double U = overall_htc({h1, h2});
+    
+    // 1/U = 1/100 + 1/200 = 0.01 + 0.005 = 0.015
+    // U = 66.67 W/(m²·K)
+    EXPECT_NEAR(U, 66.67, 0.1);
+}
+
+TEST(HeatTransferTest, OverallHtcWithWall) {
+    // Convection + conduction + convection
+    double h_inner = 500.0;   // W/(m²·K)
+    double h_outer = 50.0;    // W/(m²·K)
+    double t_wall = 0.003;    // 3 mm
+    double k_wall = 50.0;     // W/(m·K), steel
+    
+    double U = overall_htc_tube(h_inner, h_outer, t_wall, k_wall);
+    
+    // 1/U = 1/500 + 0.003/50 + 1/50 = 0.002 + 0.00006 + 0.02 = 0.02206
+    // U ≈ 45.3 W/(m²·K)
+    EXPECT_NEAR(U, 45.3, 0.5);
+}
+
+TEST(HeatTransferTest, OverallHtcWithFouling) {
+    double h_inner = 500.0;
+    double h_outer = 50.0;
+    double t_wall = 0.003;
+    double k_wall = 50.0;
+    double R_fouling = 0.0002;  // m²·K/W, typical fouling
+    
+    double U_clean = overall_htc_tube(h_inner, h_outer, t_wall, k_wall);
+    double U_fouled = overall_htc_tube(h_inner, h_outer, t_wall, k_wall, R_fouling);
+    
+    // Fouling should reduce U
+    EXPECT_LT(U_fouled, U_clean);
+    
+    // 1/U_fouled = 1/U_clean + R_fouling
+    double expected = 1.0 / (1.0/U_clean + R_fouling);
+    EXPECT_NEAR(U_fouled, expected, 0.01);
+}
+
+TEST(HeatTransferTest, ThermalResistance) {
+    double h = 100.0;  // W/(m²·K)
+    double A = 2.0;    // m²
+    
+    double R = thermal_resistance(h, A);
+    
+    // R = 1/(h*A) = 1/(100*2) = 0.005 K/W
+    EXPECT_NEAR(R, 0.005, 1e-6);
+}
+
+TEST(HeatTransferTest, ThermalResistanceWall) {
+    double t = 0.01;   // 10 mm
+    double k = 50.0;   // W/(m·K)
+    double A = 2.0;    // m²
+    
+    double R = thermal_resistance_wall(t, k, A);
+    
+    // R = t/(k*A) = 0.01/(50*2) = 0.0001 K/W
+    EXPECT_NEAR(R, 0.0001, 1e-8);
+}

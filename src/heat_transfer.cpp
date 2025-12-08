@@ -97,6 +97,71 @@ double htc_from_nusselt(double Nu, double k, double L) {
 }
 
 // -------------------------------------------------------------
+// Overall Heat Transfer Coefficient
+// -------------------------------------------------------------
+
+double overall_htc(const std::vector<double>& h_values,
+                   const std::vector<double>& t_over_k) {
+    if (h_values.empty()) {
+        throw std::invalid_argument("overall_htc: at least one h value required");
+    }
+    
+    double R_total = 0.0;
+    
+    // Add convective resistances: 1/h
+    for (double h : h_values) {
+        if (h <= 0) {
+            throw std::invalid_argument("overall_htc: h values must be positive");
+        }
+        R_total += 1.0 / h;
+    }
+    
+    // Add conductive resistances: t/k
+    for (double tk : t_over_k) {
+        if (tk < 0) {
+            throw std::invalid_argument("overall_htc: t/k values must be non-negative");
+        }
+        R_total += tk;
+    }
+    
+    return 1.0 / R_total;
+}
+
+double overall_htc_tube(double h_inner, double h_outer,
+                        double t_wall, double k_wall) {
+    if (k_wall <= 0) {
+        throw std::invalid_argument("overall_htc_tube: k_wall must be positive");
+    }
+    return overall_htc({h_inner, h_outer}, {t_wall / k_wall});
+}
+
+double overall_htc_tube(double h_inner, double h_outer,
+                        double t_wall, double k_wall,
+                        double R_fouling) {
+    if (k_wall <= 0) {
+        throw std::invalid_argument("overall_htc_tube: k_wall must be positive");
+    }
+    if (R_fouling < 0) {
+        throw std::invalid_argument("overall_htc_tube: R_fouling must be non-negative");
+    }
+    return overall_htc({h_inner, h_outer}, {t_wall / k_wall, R_fouling});
+}
+
+double thermal_resistance(double h, double A) {
+    if (h <= 0 || A <= 0) {
+        throw std::invalid_argument("thermal_resistance: h and A must be positive");
+    }
+    return 1.0 / (h * A);
+}
+
+double thermal_resistance_wall(double thickness, double k, double A) {
+    if (thickness < 0 || k <= 0 || A <= 0) {
+        throw std::invalid_argument("thermal_resistance_wall: invalid parameters");
+    }
+    return thickness / (k * A);
+}
+
+// -------------------------------------------------------------
 // Log Mean Temperature Difference (LMTD)
 // -------------------------------------------------------------
 

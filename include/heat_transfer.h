@@ -1,6 +1,8 @@
 #ifndef HEAT_TRANSFER_H
 #define HEAT_TRANSFER_H
 
+#include <vector>
+
 // -------------------------------------------------------------
 // Heat Transfer Correlations for Forced Convection
 // -------------------------------------------------------------
@@ -110,6 +112,42 @@ constexpr double NU_LAMINAR_CONST_Q = 4.36;
 //   k  : thermal conductivity [W/(m·K)]
 //   L  : characteristic length [m] (diameter for pipe flow)
 double htc_from_nusselt(double Nu, double k, double L);
+
+// -------------------------------------------------------------
+// Overall Heat Transfer Coefficient (Thermal Resistance Networks)
+// -------------------------------------------------------------
+
+// Overall HTC from individual resistances (per unit area)
+// 1/U = 1/h1 + 1/h2 + ... + t1/k1 + t2/k2 + ...
+//
+// For a typical tube heat exchanger:
+//   1/U = 1/h_inner + t_wall/k_wall + 1/h_outer + R_fouling
+//
+// Parameters:
+//   h_values : vector of convective HTCs [W/(m²·K)]
+//   t_over_k : vector of thickness/conductivity ratios [m / W/(m·K) = m²·K/W]
+// Returns: overall HTC [W/(m²·K)]
+double overall_htc(const std::vector<double>& h_values,
+                   const std::vector<double>& t_over_k = {});
+
+// Convenience: overall HTC for tube with inner/outer convection and wall
+// 1/U = 1/h_inner + t_wall/k_wall + 1/h_outer
+double overall_htc_tube(double h_inner, double h_outer,
+                        double t_wall, double k_wall);
+
+// With fouling resistance (R_f in m²·K/W)
+// 1/U = 1/h_inner + t_wall/k_wall + 1/h_outer + R_fouling
+double overall_htc_tube(double h_inner, double h_outer,
+                        double t_wall, double k_wall,
+                        double R_fouling);
+
+// Thermal resistance from HTC and area
+// R = 1 / (h * A)  [K/W]
+double thermal_resistance(double h, double A);
+
+// Thermal resistance for conduction through wall
+// R = t / (k * A)  [K/W]
+double thermal_resistance_wall(double thickness, double k, double A);
 
 // -------------------------------------------------------------
 // Log Mean Temperature Difference (LMTD)

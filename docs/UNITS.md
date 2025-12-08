@@ -349,18 +349,22 @@ All functions use consistent units to avoid conversion errors.
 
 ### heat_transfer.h - Heat Transfer Correlations
 
-| Function                 | Input Units                                            | Output Unit |
-|--------------------------|--------------------------------------------------------|-------------|
-| `nusselt_dittus_boelter` | Re: -, Pr: -, heating: bool                            | - (Nu)      |
-| `nusselt_gnielinski`     | Re: -, Pr: -, f: - (optional)                          | - (Nu)      |
-| `nusselt_sieder_tate`    | Re: -, Pr: -, mu_ratio: -                              | - (Nu)      |
-| `nusselt_petukhov`       | Re: -, Pr: -, f: - (optional)                          | - (Nu)      |
-| `htc_from_nusselt`       | Nu: -, k: W/(m*K), L: m                                | W/(m^2*K)   |
-| `nusselt_pipe`           | State, V: m/s, D: m                                    | - (Nu)      |
-| `htc_pipe`               | State, V: m/s, D: m                                    | W/(m^2*K)   |
-| `lmtd`                   | dT1: K, dT2: K                                         | K           |
-| `lmtd_counterflow`       | T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K | K           |
-| `lmtd_parallelflow`      | T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K | K           |
+| Function                  | Input Units                                             | Output Unit |
+|---------------------------|---------------------------------------------------------|-------------|
+| `nusselt_dittus_boelter`  | Re: -, Pr: -, heating: bool                             | - (Nu)      |
+| `nusselt_gnielinski`      | Re: -, Pr: -, f: - (optional)                           | - (Nu)      |
+| `nusselt_sieder_tate`     | Re: -, Pr: -, mu_ratio: -                               | - (Nu)      |
+| `nusselt_petukhov`        | Re: -, Pr: -, f: - (optional)                           | - (Nu)      |
+| `htc_from_nusselt`        | Nu: -, k: W/(m*K), L: m                                 | W/(m^2*K)   |
+| `nusselt_pipe`            | State, V: m/s, D: m                                     | - (Nu)      |
+| `htc_pipe`                | State, V: m/s, D: m                                     | W/(m^2*K)   |
+| `lmtd`                    | dT1: K, dT2: K                                          | K           |
+| `lmtd_counterflow`        | T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K  | K           |
+| `lmtd_parallelflow`       | T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K  | K           |
+| `overall_htc`             | h_values: W/(m^2*K), t_over_k: m^2*K/W                  | W/(m^2*K)   |
+| `overall_htc_tube`        | h_inner, h_outer: W/(m^2*K), t_wall: m, k_wall: W/(m*K) | W/(m^2*K)   |
+| `thermal_resistance`      | h: W/(m^2*K), A: m^2                                    | K/W         |
+| `thermal_resistance_wall` | t: m, k: W/(m*K), A: m^2                                | K/W         |
 
 ---
 
