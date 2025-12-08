@@ -6,12 +6,6 @@
 #include <unordered_map>
 #include <limits>
 
-// NASA polynomial format used in this build
-// NASA7: Cp/R = a1 + a2*T + a3*T^2 + a4*T^3 + a5*T^4
-// NASA9: Cp/R = a1/T^2 + a2/T + a3 + a4*T + a5*T^2 + a6*T^3 + a7*T^4
-// This file uses NASA7 format
-constexpr bool USE_NASA9 = false;
-
 struct NASA_Coeffs {
     double T_low;
     double T_mid;
@@ -28,10 +22,10 @@ struct Transport_Props {
 };
 
 struct Molecular_Structure {
-    std::size_t C;
-    std::size_t H;
-    std::size_t O;
-    std::size_t N;
+    int C;
+    int H;
+    int O;
+    int N;
 };
 
 const std::vector<std::string> species_names = {"N2", "O2", "AR", "CO2", "H2O", "CH4", "C2H6", "C3H8", "IC4H10", "NC5H12", "NC6H14", "NC7H16", "CO", "H2"};
@@ -53,7 +47,7 @@ const std::unordered_map<std::string, int> species_index = {
     {"H2", 13}
 };
 
-const std::vector<double> molar_masses = {28.014, 31.998, 39.948, 44.009, 18.015, 16.043, 30.07, 44.097, 58.123999999999995, 72.151, 86.178, 100.205, 28.009999999999998, 2.016};
+const std::vector<double> molar_masses = {28.014, 32.0, 39.948, 44.011, 18.016, 16.043, 30.07, 44.097, 58.123999999999995, 72.151, 86.178, 100.205, 28.011, 2.016};
 
 const std::vector<NASA_Coeffs> nasa_coeffs = {
 {300.0, 1000.0, 5000.0, {3.298677, 0.0014082404, -3.963222e-06, 5.641515e-09, -2.444854e-12, -1020.8999, 3.950372}, {2.92664, 0.0014879768, -5.68476e-07, 1.0097038e-10, -6.753351e-15, -922.7977, 5.980528}},
@@ -75,16 +69,16 @@ const std::vector<NASA_Coeffs> nasa_coeffs = {
 const std::vector<Transport_Props> transport_props = {
 {"linear", 97.53, 3.621, 1.76},
 {"linear", 107.4, 3.458, 1.6},
-{"atom", 136.5, 3.33, 0.0},
+{"atom", 136.5, 3.33, std::numeric_limits<double>::quiet_NaN()},
 {"linear", 244.0, 3.763, 2.65},
-{"nonlinear", 572.4, 2.605, 0.0},
+{"nonlinear", 572.4, 2.605, std::numeric_limits<double>::quiet_NaN()},
 {"nonlinear", 141.4, 3.746, 2.6},
-{"nonlinear", 252.3, 4.302, 0.0},
-{"nonlinear", 266.8, 4.982, 0.0},
-{"nonlinear", 357.0, 5.176, 0.0},
-{"nonlinear", 458.182, 5.445, 0.0},
-{"nonlinear", 512.225, 5.742, 0.0},
-{"nonlinear", 564.03, 6.004, 0.0},
+{"nonlinear", 252.3, 4.302, std::numeric_limits<double>::quiet_NaN()},
+{"nonlinear", 266.8, 4.982, std::numeric_limits<double>::quiet_NaN()},
+{"nonlinear", 357.0, 5.176, std::numeric_limits<double>::quiet_NaN()},
+{"nonlinear", 458.182, 5.445, std::numeric_limits<double>::quiet_NaN()},
+{"nonlinear", 512.225, 5.742, std::numeric_limits<double>::quiet_NaN()},
+{"nonlinear", 564.03, 6.004, std::numeric_limits<double>::quiet_NaN()},
 {"linear", 98.1, 3.65, 1.95},
 {"linear", 38.0, 2.92, 0.79}
 };
