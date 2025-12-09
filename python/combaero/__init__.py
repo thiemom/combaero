@@ -178,6 +178,12 @@ try:
         modes_in_range,
         closest_mode,
         min_mode_separation,
+        # Residence time
+        residence_time,
+        residence_time_tube,
+        residence_time_annulus,
+        residence_time_mdot,
+        space_velocity,
         # Incompressible flow
         bernoulli_P2,
         bernoulli_v2,
@@ -360,6 +366,12 @@ except ModuleNotFoundError:
     modes_in_range = _core.modes_in_range
     closest_mode = _core.closest_mode
     min_mode_separation = _core.min_mode_separation
+    # Residence time
+    residence_time = _core.residence_time
+    residence_time_tube = _core.residence_time_tube
+    residence_time_annulus = _core.residence_time_annulus
+    residence_time_mdot = _core.residence_time_mdot
+    space_velocity = _core.space_velocity
     # Incompressible flow
     bernoulli_P2 = _core.bernoulli_P2
     bernoulli_v2 = _core.bernoulli_v2
@@ -540,6 +552,12 @@ __all__ = [
     "modes_in_range",
     "closest_mode",
     "min_mode_separation",
+    # Residence time
+    "residence_time",
+    "residence_time_tube",
+    "residence_time_annulus",
+    "residence_time_mdot",
+    "space_velocity",
     # Incompressible flow
     "bernoulli_P2",
     "bernoulli_v2",

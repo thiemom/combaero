@@ -396,6 +396,14 @@ All functions use consistent units to avoid conversion errors.
 | `closest_mode`            | modes, f_target: Hz                                                                 | AcousticMode |
 | `min_mode_separation`     | modes                                                                               | Hz           |
 
+### geometry.h - Residence Time
+
+| Function              | Input Units                     | Output Unit |
+|-----------------------|---------------------------------|-------------|
+| `residence_time`      | V: m^3, Q: m^3/s                | s           |
+| `residence_time_mdot` | V: m^3, mdot: kg/s, rho: kg/m^3 | s           |
+| `space_velocity`      | Q: m^3/s, V: m^3                | 1/s         |
+
 ---
 
 ## Dimensionless Quantities

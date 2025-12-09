@@ -4004,3 +4004,68 @@ TEST(AcousticsTest, RealCombustorExample) {
     EXPECT_EQ(mode_1T->label(), "1T");
     EXPECT_NEAR(mode_1T->frequency, f_1T, 1.0);
 }
+
+// ============================================================
+// Residence Time Tests
+// ============================================================
+
+TEST(GeometryTest, ResidenceTimeBasic) {
+    // τ = V / Q
+    double V = 0.001;  // 1 liter = 0.001 m³
+    double Q = 0.0001; // 0.1 L/s = 0.0001 m³/s
+    
+    double tau = residence_time(V, Q);
+    EXPECT_NEAR(tau, 10.0, 1e-10);  // 10 seconds
+}
+
+TEST(GeometryTest, ResidenceTimeMdot) {
+    // τ = V * ρ / ṁ
+    double V = 0.001;    // 1 liter
+    double mdot = 0.001; // 1 g/s = 0.001 kg/s
+    double rho = 1.0;    // 1 kg/m³
+    
+    double tau = residence_time_mdot(V, mdot, rho);
+    EXPECT_NEAR(tau, 1.0, 1e-10);  // 1 second
+}
+
+TEST(GeometryTest, ResidenceTimeTube) {
+    Tube tube{1.0, 0.1};  // L=1m, D=0.1m
+    double Q = tube.area();  // Q = A means u = 1 m/s
+    
+    double tau = residence_time(tube, Q);
+    EXPECT_NEAR(tau, 1.0, 1e-10);  // τ = L/u = 1s
+}
+
+TEST(GeometryTest, ResidenceTimeAnnulus) {
+    Annulus ann{0.5, 0.08, 0.1};  // L=0.5m
+    double Q = ann.area();  // u = 1 m/s
+    
+    double tau = residence_time(ann, Q);
+    EXPECT_NEAR(tau, 0.5, 1e-10);  // τ = L/u = 0.5s
+}
+
+TEST(GeometryTest, SpaceVelocity) {
+    double V = 0.001;
+    double Q = 0.01;
+    
+    double SV = space_velocity(Q, V);
+    EXPECT_NEAR(SV, 10.0, 1e-10);  // 10 /s
+    
+    // SV = 1/τ
+    double tau = residence_time(V, Q);
+    EXPECT_NEAR(SV, 1.0 / tau, 1e-10);
+}
+
+TEST(GeometryTest, ResidenceTimeConsistency) {
+    // residence_time(V, Q) should equal residence_time_mdot(V, mdot, rho)
+    // when Q = mdot / rho
+    Tube tube{0.3, 0.05};
+    double rho = 1.2;
+    double mdot = 0.01;
+    double Q = mdot / rho;
+    
+    double tau1 = residence_time(tube, Q);
+    double tau2 = residence_time_mdot(tube, mdot, rho);
+    
+    EXPECT_NEAR(tau1, tau2, 1e-10);
+}

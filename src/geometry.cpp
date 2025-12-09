@@ -62,3 +62,44 @@ double Annulus::volume() const {
 double Annulus::circumference() const {
     return M_PI * D_mean();
 }
+
+// -------------------------------------------------------------
+// Residence Time
+// -------------------------------------------------------------
+
+double residence_time(double V, double Q) {
+    if (V <= 0 || Q <= 0) {
+        throw std::invalid_argument("residence_time: V and Q must be positive");
+    }
+    return V / Q;
+}
+
+double residence_time_mdot(double V, double mdot, double rho) {
+    if (V <= 0 || mdot <= 0 || rho <= 0) {
+        throw std::invalid_argument("residence_time_mdot: V, mdot, and rho must be positive");
+    }
+    return V * rho / mdot;
+}
+
+double residence_time(const Tube& tube, double Q) {
+    return residence_time(tube.volume(), Q);
+}
+
+double residence_time(const Annulus& annulus, double Q) {
+    return residence_time(annulus.volume(), Q);
+}
+
+double residence_time_mdot(const Tube& tube, double mdot, double rho) {
+    return residence_time_mdot(tube.volume(), mdot, rho);
+}
+
+double residence_time_mdot(const Annulus& annulus, double mdot, double rho) {
+    return residence_time_mdot(annulus.volume(), mdot, rho);
+}
+
+double space_velocity(double Q, double V) {
+    if (Q <= 0 || V <= 0) {
+        throw std::invalid_argument("space_velocity: Q and V must be positive");
+    }
+    return Q / V;
+}

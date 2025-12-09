@@ -1988,6 +1988,53 @@ PYBIND11_MODULE(_core, m)
         "Minimum frequency separation between adjacent modes [Hz]."
     );
 
+    // Residence time
+    m.def(
+        "residence_time",
+        py::overload_cast<double, double>(&residence_time),
+        py::arg("V"),
+        py::arg("Q"),
+        "Residence time τ = V / Q̇ [s].\n\n"
+        "V : volume [m³]\n"
+        "Q : volumetric flow rate [m³/s]"
+    );
+
+    m.def(
+        "residence_time_tube",
+        py::overload_cast<const Tube&, double>(&residence_time),
+        py::arg("tube"),
+        py::arg("Q"),
+        "Residence time for a tube [s]."
+    );
+
+    m.def(
+        "residence_time_annulus",
+        py::overload_cast<const Annulus&, double>(&residence_time),
+        py::arg("annulus"),
+        py::arg("Q"),
+        "Residence time for an annulus [s]."
+    );
+
+    m.def(
+        "residence_time_mdot",
+        py::overload_cast<double, double, double>(&residence_time_mdot),
+        py::arg("V"),
+        py::arg("mdot"),
+        py::arg("rho"),
+        "Residence time from mass flow: τ = V·ρ / ṁ [s].\n\n"
+        "V    : volume [m³]\n"
+        "mdot : mass flow rate [kg/s]\n"
+        "rho  : density [kg/m³]"
+    );
+
+    m.def(
+        "space_velocity",
+        &space_velocity,
+        py::arg("Q"),
+        py::arg("V"),
+        "Space velocity SV = Q̇ / V = 1/τ [1/s]."
+    );
+
     // Nozzle thrust (from NozzleSolution)
     m.def(
         "nozzle_thrust",

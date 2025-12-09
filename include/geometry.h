@@ -63,4 +63,36 @@ struct Annulus {
     double circumference() const;  // Mean circumference [m]: π * D_mean
 };
 
+// -------------------------------------------------------------
+// Residence Time
+// -------------------------------------------------------------
+// Time for fluid to pass through a volume.
+// τ = V / Q̇  [s]
+//
+// Applications:
+// - Reactor design (Damköhler number: Da = τ_res / τ_reaction)
+// - Combustor sizing
+// - Mixing time estimates
+
+// Generic: τ = V / Q̇
+// V : volume [m³]
+// Q : volumetric flow rate [m³/s]
+double residence_time(double V, double Q);
+
+// From mass flow: τ = V·ρ / ṁ
+// V    : volume [m³]
+// mdot : mass flow rate [kg/s]
+// rho  : density [kg/m³]
+double residence_time_mdot(double V, double mdot, double rho);
+
+// Convenience overloads for geometry structs
+double residence_time(const Tube& tube, double Q);
+double residence_time(const Annulus& annulus, double Q);
+double residence_time_mdot(const Tube& tube, double mdot, double rho);
+double residence_time_mdot(const Annulus& annulus, double mdot, double rho);
+
+// Space velocity (inverse of residence time)
+// SV = Q̇ / V = 1/τ  [1/s]
+double space_velocity(double Q, double V);
+
 #endif // GEOMETRY_H
