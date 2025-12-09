@@ -190,6 +190,15 @@ try:
         # Convenience
         quarter_wave_frequency,
         half_wave_frequency,
+        # Viscothermal
+        stokes_layer,
+        thermal_layer,
+        effective_viscothermal_layer,
+        # Quality factor
+        helmholtz_Q,
+        tube_Q,
+        damping_ratio,
+        bandwidth,
         # Residence time
         residence_time,
         residence_time_tube,
@@ -390,6 +399,15 @@ except ModuleNotFoundError:
     # Convenience
     quarter_wave_frequency = _core.quarter_wave_frequency
     half_wave_frequency = _core.half_wave_frequency
+    # Viscothermal
+    stokes_layer = _core.stokes_layer
+    thermal_layer = _core.thermal_layer
+    effective_viscothermal_layer = _core.effective_viscothermal_layer
+    # Quality factor
+    helmholtz_Q = _core.helmholtz_Q
+    tube_Q = _core.tube_Q
+    damping_ratio = _core.damping_ratio
+    bandwidth = _core.bandwidth
     # Residence time
     residence_time = _core.residence_time
     residence_time_tube = _core.residence_time_tube
@@ -588,6 +606,15 @@ __all__ = [
     # Convenience
     "quarter_wave_frequency",
     "half_wave_frequency",
+    # Viscothermal
+    "stokes_layer",
+    "thermal_layer",
+    "effective_viscothermal_layer",
+    # Quality factor
+    "helmholtz_Q",
+    "tube_Q",
+    "damping_ratio",
+    "bandwidth",
     # Residence time
     "residence_time",
     "residence_time_tube",

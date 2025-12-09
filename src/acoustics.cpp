@@ -336,3 +336,116 @@ double half_wave_frequency(double L, double c) {
     }
     return c / (2.0 * L);
 }
+
+// -------------------------------------------------------------
+// Viscothermal Boundary Layers
+// -------------------------------------------------------------
+
+double stokes_layer(double nu, double f) {
+    if (nu <= 0 || f <= 0) {
+        throw std::invalid_argument("stokes_layer: nu and f must be positive");
+    }
+    double omega = 2.0 * M_PI * f;
+    return std::sqrt(2.0 * nu / omega);
+}
+
+double thermal_layer(double alpha, double f) {
+    if (alpha <= 0 || f <= 0) {
+        throw std::invalid_argument("thermal_layer: alpha and f must be positive");
+    }
+    double omega = 2.0 * M_PI * f;
+    return std::sqrt(2.0 * alpha / omega);
+}
+
+double effective_viscothermal_layer(double delta_nu, double delta_kappa, double gamma) {
+    if (delta_nu <= 0 || delta_kappa <= 0) {
+        throw std::invalid_argument("effective_viscothermal_layer: deltas must be positive");
+    }
+    if (gamma <= 1.0) {
+        throw std::invalid_argument("effective_viscothermal_layer: gamma must be > 1");
+    }
+    return delta_nu + (gamma - 1.0) * delta_kappa;
+}
+
+// -------------------------------------------------------------
+// Quality Factor (Screening Estimates)
+// -------------------------------------------------------------
+
+double helmholtz_Q(double V, double A_neck, double L_neck,
+                   double nu, double alpha, double gamma, double f) {
+    if (V <= 0 || A_neck <= 0 || L_neck <= 0) {
+        throw std::invalid_argument("helmholtz_Q: geometry parameters must be positive");
+    }
+    if (nu <= 0 || alpha <= 0 || f <= 0) {
+        throw std::invalid_argument("helmholtz_Q: fluid/frequency parameters must be positive");
+    }
+    if (gamma <= 1.0) {
+        throw std::invalid_argument("helmholtz_Q: gamma must be > 1");
+    }
+    
+    // Boundary layer thicknesses
+    double delta_nu = stokes_layer(nu, f);
+    double delta_kappa = thermal_layer(alpha, f);
+    double delta_eff = effective_viscothermal_layer(delta_nu, delta_kappa, gamma);
+    
+    // Neck diameter and perimeter
+    double d_neck = 2.0 * std::sqrt(A_neck / M_PI);
+    double perimeter = M_PI * d_neck;
+    
+    // Effective neck length (with standard end correction)
+    double L_eff = L_neck + 0.85 * d_neck;
+    
+    // Losses occur in the neck boundary layer
+    // Q ≈ (neck volume) / (boundary layer volume in neck)
+    // Q ≈ (A_neck * L_eff) / (perimeter * L_eff * delta_eff)
+    // Q ≈ A_neck / (perimeter * delta_eff)
+    // Q ≈ d_neck / (4 * delta_eff)  for circular neck
+    //
+    // But cavity also stores energy, so scale by V/(A_neck * L_eff)
+    // This gives the classic result: Q ~ V / (A_neck * delta_eff * factor)
+    
+    // Simplified model: Q ≈ d_neck / (4 * delta_eff) * sqrt(V / (A_neck * L_eff))
+    // This captures both neck losses and cavity energy storage
+    double Q = (d_neck / (4.0 * delta_eff)) * std::sqrt(V / (A_neck * L_eff));
+    
+    return Q;
+}
+
+double tube_Q(double L, double D, double nu, double alpha, double gamma, double f) {
+    if (L <= 0 || D <= 0) {
+        throw std::invalid_argument("tube_Q: L and D must be positive");
+    }
+    if (nu <= 0 || alpha <= 0 || f <= 0) {
+        throw std::invalid_argument("tube_Q: fluid/frequency parameters must be positive");
+    }
+    if (gamma <= 1.0) {
+        throw std::invalid_argument("tube_Q: gamma must be > 1");
+    }
+    
+    // Boundary layer thicknesses
+    double delta_nu = stokes_layer(nu, f);
+    double delta_kappa = thermal_layer(alpha, f);
+    double delta_eff = effective_viscothermal_layer(delta_nu, delta_kappa, gamma);
+    
+    // For a tube, losses occur along the entire length
+    // Q ≈ (tube cross-section) / (boundary layer area)
+    // Q ≈ (π D²/4) / (π D * delta_eff)
+    // Q ≈ D / (4 * delta_eff)
+    double Q = D / (4.0 * delta_eff);
+    
+    return Q;
+}
+
+double damping_ratio(double Q) {
+    if (Q <= 0) {
+        throw std::invalid_argument("damping_ratio: Q must be positive");
+    }
+    return 1.0 / (2.0 * Q);
+}
+
+double bandwidth(double f0, double Q) {
+    if (f0 <= 0 || Q <= 0) {
+        throw std::invalid_argument("bandwidth: f0 and Q must be positive");
+    }
+    return f0 / Q;
+}

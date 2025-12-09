@@ -4207,3 +4207,119 @@ TEST(AcousticsTest, HalfWaveFrequency) {
                                    BoundaryCondition::Closed, 1);
     EXPECT_NEAR(modes[0].frequency, f, 0.01);
 }
+
+// ============================================================
+// Viscothermal Boundary Layer Tests
+// ============================================================
+
+TEST(AcousticsTest, StokesLayer) {
+    // Air at 20°C: ν ≈ 1.5e-5 m²/s
+    double nu = 1.5e-5;
+    double f = 100.0;  // Hz
+    
+    // δ_ν = √(2ν/ω) = √(2 * 1.5e-5 / (2π * 100)) ≈ 0.22 mm
+    double delta = stokes_layer(nu, f);
+    EXPECT_NEAR(delta * 1000, 0.22, 0.01);  // in mm
+    
+    // Higher frequency -> thinner layer
+    double delta_high = stokes_layer(nu, 1000.0);
+    EXPECT_LT(delta_high, delta);
+    EXPECT_NEAR(delta_high, delta / std::sqrt(10.0), 1e-6);
+}
+
+TEST(AcousticsTest, ThermalLayer) {
+    // Air at 20°C: α ≈ 2.1e-5 m²/s
+    double alpha = 2.1e-5;
+    double f = 100.0;
+    
+    double delta = thermal_layer(alpha, f);
+    
+    // Should be slightly larger than Stokes layer (Pr < 1 for air)
+    double nu = 1.5e-5;
+    double delta_nu = stokes_layer(nu, f);
+    EXPECT_GT(delta, delta_nu);
+    
+    // Ratio should be 1/√Pr ≈ 1.18 for air (Pr ≈ 0.71)
+    double ratio = delta / delta_nu;
+    EXPECT_NEAR(ratio, std::sqrt(alpha / nu), 1e-6);
+}
+
+TEST(AcousticsTest, EffectiveViscothermalLayer) {
+    double delta_nu = 0.0002;    // 0.2 mm
+    double delta_kappa = 0.00024; // 0.24 mm
+    double gamma = 1.4;
+    
+    // δ_eff = δ_ν + (γ-1)·δ_κ = 0.2 + 0.4*0.24 = 0.296 mm
+    double delta_eff = effective_viscothermal_layer(delta_nu, delta_kappa, gamma);
+    EXPECT_NEAR(delta_eff * 1000, 0.296, 0.001);
+}
+
+TEST(AcousticsTest, TubeQ) {
+    // Quarter-wave tube: L=25cm, D=2cm
+    double L = 0.25;
+    double D = 0.02;
+    double c = 343.0;
+    double f = quarter_wave_frequency(L, c);  // ~343 Hz
+    
+    // Air properties
+    double nu = 1.5e-5;
+    double alpha = 2.1e-5;
+    double gamma = 1.4;
+    
+    double Q = tube_Q(L, D, nu, alpha, gamma, f);
+    
+    // Q should be in reasonable range (50-500 for typical dampers)
+    EXPECT_GT(Q, 20);
+    EXPECT_LT(Q, 500);
+    
+    // Larger diameter -> higher Q
+    double Q_large = tube_Q(L, 2 * D, nu, alpha, gamma, f);
+    EXPECT_GT(Q_large, Q);
+    EXPECT_NEAR(Q_large, 2 * Q, 0.1);  // Q ~ D
+}
+
+TEST(AcousticsTest, HelmholtzQ) {
+    // Helmholtz resonator: V=500mL, d_neck=2cm, L_neck=3cm
+    double V = 0.0005;
+    double d_neck = 0.02;
+    double A_neck = M_PI * d_neck * d_neck / 4.0;
+    double L_neck = 0.03;
+    double c = 343.0;
+    
+    double f = helmholtz_frequency(V, A_neck, L_neck, c);
+    
+    // Air properties
+    double nu = 1.5e-5;
+    double alpha = 2.1e-5;
+    double gamma = 1.4;
+    
+    double Q = helmholtz_Q(V, A_neck, L_neck, nu, alpha, gamma, f);
+    
+    // Q should be in reasonable range
+    EXPECT_GT(Q, 10);
+    EXPECT_LT(Q, 500);
+    
+    // Larger cavity -> higher Q (more energy storage)
+    double Q_large = helmholtz_Q(4 * V, A_neck, L_neck, nu, alpha, gamma, f);
+    EXPECT_GT(Q_large, Q);
+}
+
+TEST(AcousticsTest, DampingRatio) {
+    double Q = 50.0;
+    double zeta = damping_ratio(Q);
+    
+    // ζ = 1/(2Q) = 0.01
+    EXPECT_NEAR(zeta, 0.01, 1e-10);
+    
+    // Higher Q -> lower damping
+    EXPECT_LT(damping_ratio(100.0), zeta);
+}
+
+TEST(AcousticsTest, Bandwidth) {
+    double f0 = 200.0;
+    double Q = 50.0;
+    
+    // Δf = f0/Q = 4 Hz
+    double df = bandwidth(f0, Q);
+    EXPECT_NEAR(df, 4.0, 1e-10);
+}

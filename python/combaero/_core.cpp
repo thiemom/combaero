@@ -2072,6 +2072,80 @@ PYBIND11_MODULE(_core, m)
         "Half-wave resonator fundamental: f = c / (2L)"
     );
 
+    // Viscothermal boundary layers
+    m.def(
+        "stokes_layer",
+        &stokes_layer,
+        py::arg("nu"),
+        py::arg("f"),
+        "Stokes (viscous) boundary layer thickness: δ_ν = √(2ν/ω)\n\n"
+        "nu : kinematic viscosity [m²/s]\n"
+        "f  : frequency [Hz]"
+    );
+
+    m.def(
+        "thermal_layer",
+        &thermal_layer,
+        py::arg("alpha"),
+        py::arg("f"),
+        "Thermal penetration depth: δ_κ = √(2α/ω)\n\n"
+        "alpha : thermal diffusivity [m²/s]\n"
+        "f     : frequency [Hz]"
+    );
+
+    m.def(
+        "effective_viscothermal_layer",
+        &effective_viscothermal_layer,
+        py::arg("delta_nu"),
+        py::arg("delta_kappa"),
+        py::arg("gamma"),
+        "Effective viscothermal layer: δ_eff = δ_ν + (γ-1)·δ_κ"
+    );
+
+    // Quality factor screening
+    m.def(
+        "helmholtz_Q",
+        &helmholtz_Q,
+        py::arg("V"),
+        py::arg("A_neck"),
+        py::arg("L_neck"),
+        py::arg("nu"),
+        py::arg("alpha"),
+        py::arg("gamma"),
+        py::arg("f"),
+        "Helmholtz resonator Q factor (viscothermal losses).\n\n"
+        "Screening estimate - expect ±50% accuracy.\n"
+        "Real designs require experimental validation."
+    );
+
+    m.def(
+        "tube_Q",
+        &tube_Q,
+        py::arg("L"),
+        py::arg("D"),
+        py::arg("nu"),
+        py::arg("alpha"),
+        py::arg("gamma"),
+        py::arg("f"),
+        "Quarter/half-wave tube Q factor (viscothermal losses).\n\n"
+        "Screening estimate - expect ±50% accuracy."
+    );
+
+    m.def(
+        "damping_ratio",
+        &damping_ratio,
+        py::arg("Q"),
+        "Damping ratio from quality factor: ζ = 1/(2Q)"
+    );
+
+    m.def(
+        "bandwidth",
+        &bandwidth,
+        py::arg("f0"),
+        py::arg("Q"),
+        "Half-power bandwidth: Δf = f₀/Q [Hz]"
+    );
+
     // Residence time
     m.def(
         "residence_time",

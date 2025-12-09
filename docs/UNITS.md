@@ -386,23 +386,30 @@ All functions use consistent units to avoid conversion errors.
 
 ### acoustics.h - Acoustic Mode Analysis
 
-| Function                  | Input Units                                                                         | Output Unit  |
-|---------------------------|-------------------------------------------------------------------------------------|--------------|
-| `tube_axial_modes`        | Tube (L: m, D: m), c: m/s, upstream: BC, downstream: BC, n_max                      | Hz (vector)  |
-| `annulus_axial_modes`     | Annulus (L: m, D_inner: m, D_outer: m), c: m/s, upstream: BC, downstream: BC, n_max | Hz (vector)  |
-| `annulus_azimuthal_modes` | Annulus, c: m/s, m_max                                                              | Hz (vector)  |
-| `annulus_modes`           | Annulus, c: m/s, upstream: BC, downstream: BC, n_max, m_max                         | Hz (vector)  |
-| `modes_in_range`          | modes, f_min: Hz, f_max: Hz                                                         | Hz (vector)  |
-| `closest_mode`            | modes, f_target: Hz                                                                 | AcousticMode |
-| `min_mode_separation`     | modes                                                                               | Hz           |
-| `axial_mode_upstream`     | f0: Hz, M: -                                                                        | Hz           |
-| `axial_mode_downstream`   | f0: Hz, M: -                                                                        | Hz           |
-| `axial_mode_split`        | f0: Hz, M: -                                                                        | (Hz, Hz)     |
-| `helmholtz_frequency`     | V: m^3, A_neck: m^2, L_neck: m, c: m/s, end_correction: -                           | Hz           |
-| `strouhal`                | f: Hz, L: m, u: m/s                                                                 | - (St)       |
-| `frequency_from_strouhal` | St: -, L: m, u: m/s                                                                 | Hz           |
-| `quarter_wave_frequency`  | L: m, c: m/s                                                                        | Hz           |
-| `half_wave_frequency`     | L: m, c: m/s                                                                        | Hz           |
+| Function                       | Input Units                                                                         | Output Unit  |
+|--------------------------------|-------------------------------------------------------------------------------------|--------------|
+| `tube_axial_modes`             | Tube (L: m, D: m), c: m/s, upstream: BC, downstream: BC, n_max                      | Hz (vector)  |
+| `annulus_axial_modes`          | Annulus (L: m, D_inner: m, D_outer: m), c: m/s, upstream: BC, downstream: BC, n_max | Hz (vector)  |
+| `annulus_azimuthal_modes`      | Annulus, c: m/s, m_max                                                              | Hz (vector)  |
+| `annulus_modes`                | Annulus, c: m/s, upstream: BC, downstream: BC, n_max, m_max                         | Hz (vector)  |
+| `modes_in_range`               | modes, f_min: Hz, f_max: Hz                                                         | Hz (vector)  |
+| `closest_mode`                 | modes, f_target: Hz                                                                 | AcousticMode |
+| `min_mode_separation`          | modes                                                                               | Hz           |
+| `axial_mode_upstream`          | f0: Hz, M: -                                                                        | Hz           |
+| `axial_mode_downstream`        | f0: Hz, M: -                                                                        | Hz           |
+| `axial_mode_split`             | f0: Hz, M: -                                                                        | (Hz, Hz)     |
+| `helmholtz_frequency`          | V: m^3, A_neck: m^2, L_neck: m, c: m/s, end_correction: -                           | Hz           |
+| `strouhal`                     | f: Hz, L: m, u: m/s                                                                 | - (St)       |
+| `frequency_from_strouhal`      | St: -, L: m, u: m/s                                                                 | Hz           |
+| `quarter_wave_frequency`       | L: m, c: m/s                                                                        | Hz           |
+| `half_wave_frequency`          | L: m, c: m/s                                                                        | Hz           |
+| `stokes_layer`                 | nu: m^2/s, f: Hz                                                                    | m            |
+| `thermal_layer`                | alpha: m^2/s, f: Hz                                                                 | m            |
+| `effective_viscothermal_layer` | delta_nu: m, delta_kappa: m, gamma: -                                               | m            |
+| `helmholtz_Q`                  | V: m^3, A_neck: m^2, L_neck: m, nu: m^2/s, alpha: m^2/s, gamma: -, f: Hz            | - (Q)        |
+| `tube_Q`                       | L: m, D: m, nu: m^2/s, alpha: m^2/s, gamma: -, f: Hz                                | - (Q)        |
+| `damping_ratio`                | Q: -                                                                                | - (zeta)     |
+| `bandwidth`                    | f0: Hz, Q: -                                                                        | Hz           |
 
 ### geometry.h - Residence Time
 

@@ -189,4 +189,72 @@ double quarter_wave_frequency(double L, double c);
 // (Open-open or closed-closed tube)
 double half_wave_frequency(double L, double c);
 
+// -------------------------------------------------------------
+// Viscothermal Boundary Layers
+// -------------------------------------------------------------
+// Penetration depths for viscous and thermal effects at walls.
+// These determine acoustic losses in resonators and ducts.
+//
+// Educational screening tools - expect ±50% accuracy.
+// Real designs require experimental validation.
+
+// Stokes (viscous) layer thickness: δ_ν = √(2ν/ω)
+// nu : kinematic viscosity [m²/s]
+// f  : frequency [Hz]
+double stokes_layer(double nu, double f);
+
+// Thermal penetration depth: δ_κ = √(2α/ω)
+// alpha : thermal diffusivity [m²/s] (use thermal_diffusivity from transport.h)
+// f     : frequency [Hz]
+double thermal_layer(double alpha, double f);
+
+// Effective viscothermal layer for acoustic losses
+// δ_eff = δ_ν + (γ-1)·δ_κ
+// Combines viscous and thermal boundary layer effects.
+double effective_viscothermal_layer(double delta_nu, double delta_kappa, double gamma);
+
+// -------------------------------------------------------------
+// Quality Factor (Screening Estimates)
+// -------------------------------------------------------------
+// Idealized Q estimates for resonators with viscothermal losses.
+// Assumes: smooth walls, no mean flow, linear acoustics, isothermal walls.
+//
+// These are ORDER OF MAGNITUDE screening tools.
+// For design: add 50% margin, validate experimentally.
+//
+// References:
+// - Lieuwen, Unsteady Combustor Physics (lumped element models)
+// - Bellucci et al., JEGTP (Helmholtz dampers)
+// - Bourquard & Noiray, JSV 2018 (HR/QW comparison)
+
+// Helmholtz resonator quality factor (viscothermal losses only)
+// Q ≈ V / (A_neck · δ_eff · correction_factor)
+//
+// V      : cavity volume [m³]
+// A_neck : neck cross-sectional area [m²]
+// L_neck : neck length [m]
+// nu     : kinematic viscosity [m²/s]
+// alpha  : thermal diffusivity [m²/s]
+// gamma  : specific heat ratio [-]
+// f      : frequency [Hz] (use helmholtz_frequency result)
+double helmholtz_Q(double V, double A_neck, double L_neck,
+                   double nu, double alpha, double gamma, double f);
+
+// Quarter-wave tube quality factor (viscothermal losses only)
+// Q ≈ D / (2 · δ_eff)
+//
+// L     : tube length [m]
+// D     : tube diameter [m]
+// nu    : kinematic viscosity [m²/s]
+// alpha : thermal diffusivity [m²/s]
+// gamma : specific heat ratio [-]
+// f     : frequency [Hz]
+double tube_Q(double L, double D, double nu, double alpha, double gamma, double f);
+
+// Damping ratio from quality factor: ζ = 1/(2Q)
+double damping_ratio(double Q);
+
+// Half-power bandwidth: Δf = f₀/Q
+double bandwidth(double f0, double Q);
+
 #endif // ACOUSTICS_H
