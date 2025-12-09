@@ -162,6 +162,10 @@ try:
         heat_flux_from_T_at_edge,
         heat_flux_from_T_at_depth,
         bulk_T_from_edge_T_and_q,
+        dT_edge_dT_hot,
+        dT_edge_dT_cold,
+        dT_edge_dT_bulk,
+        dT_edge_dq,
         # Incompressible flow
         bernoulli_P2,
         bernoulli_v2,
@@ -328,6 +332,10 @@ except ModuleNotFoundError:
     heat_flux_from_T_at_edge = _core.heat_flux_from_T_at_edge
     heat_flux_from_T_at_depth = _core.heat_flux_from_T_at_depth
     bulk_T_from_edge_T_and_q = _core.bulk_T_from_edge_T_and_q
+    dT_edge_dT_hot = _core.dT_edge_dT_hot
+    dT_edge_dT_cold = _core.dT_edge_dT_cold
+    dT_edge_dT_bulk = _core.dT_edge_dT_bulk
+    dT_edge_dq = _core.dT_edge_dq
     # Incompressible flow
     bernoulli_P2 = _core.bernoulli_P2
     bernoulli_v2 = _core.bernoulli_v2
@@ -492,6 +500,10 @@ __all__ = [
     "heat_flux_from_T_at_edge",
     "heat_flux_from_T_at_depth",
     "bulk_T_from_edge_T_and_q",
+    "dT_edge_dT_hot",
+    "dT_edge_dT_cold",
+    "dT_edge_dT_bulk",
+    "dT_edge_dq",
     # Incompressible flow
     "bernoulli_P2",
     "bernoulli_v2",

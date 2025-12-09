@@ -1796,6 +1796,70 @@ PYBIND11_MODULE(_core, m)
         "Returns inferred bulk temperature [K]."
     );
 
+    m.def(
+        "dT_edge_dT_hot",
+        [](std::size_t edge_idx, double h_hot, double h_cold,
+           py::array_t<double, py::array::c_style | py::array::forcecast> tk_arr)
+        {
+            auto t_over_k = to_vec(tk_arr);
+            return dT_edge_dT_hot(edge_idx, h_hot, h_cold, t_over_k);
+        },
+        py::arg("edge_idx"),
+        py::arg("h_hot"),
+        py::arg("h_cold"),
+        py::arg("t_over_k"),
+        "Sensitivity of edge temperature to hot-side bulk temperature.\n\n"
+        "Returns ∂T_edge/∂T_hot [-] (0 to 1)."
+    );
+
+    m.def(
+        "dT_edge_dT_cold",
+        [](std::size_t edge_idx, double h_hot, double h_cold,
+           py::array_t<double, py::array::c_style | py::array::forcecast> tk_arr)
+        {
+            auto t_over_k = to_vec(tk_arr);
+            return dT_edge_dT_cold(edge_idx, h_hot, h_cold, t_over_k);
+        },
+        py::arg("edge_idx"),
+        py::arg("h_hot"),
+        py::arg("h_cold"),
+        py::arg("t_over_k"),
+        "Sensitivity of edge temperature to cold-side bulk temperature.\n\n"
+        "Returns ∂T_edge/∂T_cold [-] (0 to 1)."
+    );
+
+    m.def(
+        "dT_edge_dT_bulk",
+        [](std::size_t edge_idx, double h_hot, double h_cold,
+           py::array_t<double, py::array::c_style | py::array::forcecast> tk_arr)
+        {
+            auto t_over_k = to_vec(tk_arr);
+            auto [dT_hot, dT_cold] = dT_edge_dT_bulk(edge_idx, h_hot, h_cold, t_over_k);
+            return py::make_tuple(dT_hot, dT_cold);
+        },
+        py::arg("edge_idx"),
+        py::arg("h_hot"),
+        py::arg("h_cold"),
+        py::arg("t_over_k"),
+        "Both sensitivities at once.\n\n"
+        "Returns (∂T_edge/∂T_hot, ∂T_edge/∂T_cold)."
+    );
+
+    m.def(
+        "dT_edge_dq",
+        [](std::size_t edge_idx, double h_hot,
+           py::array_t<double, py::array::c_style | py::array::forcecast> tk_arr)
+        {
+            auto t_over_k = to_vec(tk_arr);
+            return dT_edge_dq(edge_idx, h_hot, t_over_k);
+        },
+        py::arg("edge_idx"),
+        py::arg("h_hot"),
+        py::arg("t_over_k"),
+        "Sensitivity of edge temperature to heat flux.\n\n"
+        "Returns ∂T_edge/∂q [K·m²/W] (negative)."
+    );
+
     // Nozzle thrust (from NozzleSolution)
     m.def(
         "nozzle_thrust",

@@ -3713,3 +3713,92 @@ TEST(HeatTransferTest, HeatFluxFromDepthRoundTrip) {
             << "Round-trip failed at depth " << depth << " m";
     }
 }
+
+// ============================================================
+// Temperature Sensitivity Tests
+// ============================================================
+
+TEST(HeatTransferTest, TemperatureSensitivityBasic) {
+    double h_hot = 500.0;
+    double h_cold = 100.0;
+    std::vector<double> t_over_k = {0.01 / 50.0};  // single layer (thin steel)
+    
+    // At edge 0 (hot surface): influenced more by T_hot than T_cold
+    auto [dT_hot_0, dT_cold_0] = dT_edge_dT_bulk(0, h_hot, h_cold, t_over_k);
+    EXPECT_GT(dT_hot_0, dT_cold_0);  // Hot surface closer to T_hot
+    EXPECT_NEAR(dT_hot_0 + dT_cold_0, 1.0, 1e-10);  // Must sum to 1
+    
+    // At edge 1 (cold surface): influenced more by T_cold than T_hot
+    auto [dT_hot_1, dT_cold_1] = dT_edge_dT_bulk(1, h_hot, h_cold, t_over_k);
+    EXPECT_GT(dT_hot_1, dT_cold_1);  // Cold surface still closer to hot due to low h_cold
+    EXPECT_NEAR(dT_hot_1 + dT_cold_1, 1.0, 1e-10);
+    
+    // With thin wall and h_cold << h_hot, cold-side convection dominates
+    // so even cold surface is closer to T_hot than T_cold
+    // This is physically correct: low h_cold means large dT across cold boundary layer
+}
+
+TEST(HeatTransferTest, TemperatureSensitivityMultiLayer) {
+    double h_hot = 500.0;
+    double h_cold = 50.0;
+    
+    // Steel + thick insulation
+    std::vector<double> t_over_k = {0.01 / 50.0, 0.1 / 0.04};  // insulation dominates
+    
+    // Sensitivities should be monotonic: edges closer to hot have higher dT/dT_hot
+    double prev_dT_hot = 1.0;
+    for (std::size_t i = 0; i <= t_over_k.size(); ++i) {
+        auto [dT_hot, dT_cold] = dT_edge_dT_bulk(i, h_hot, h_cold, t_over_k);
+        
+        // Sum must be 1
+        EXPECT_NEAR(dT_hot + dT_cold, 1.0, 1e-10);
+        
+        // dT_hot should decrease as we go from hot to cold
+        EXPECT_LE(dT_hot, prev_dT_hot);
+        prev_dT_hot = dT_hot;
+    }
+}
+
+TEST(HeatTransferTest, TemperatureSensitivityVerifyWithFiniteDiff) {
+    // Verify analytical sensitivity against finite difference
+    double T_hot = 500.0;
+    double T_cold = 300.0;
+    double h_hot = 500.0;
+    double h_cold = 50.0;
+    std::vector<double> t_over_k = {0.01 / 50.0, 0.05 / 0.5};
+    
+    double dT = 1.0;  // 1K perturbation
+    
+    for (std::size_t edge = 0; edge <= t_over_k.size(); ++edge) {
+        // Analytical sensitivity
+        auto [dT_dT_hot_anal, dT_dT_cold_anal] = dT_edge_dT_bulk(edge, h_hot, h_cold, t_over_k);
+        
+        // Finite difference for T_hot
+        double q1, q2;
+        auto temps1 = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q1);
+        auto temps2 = wall_temperature_profile(T_hot + dT, T_cold, h_hot, h_cold, t_over_k, q2);
+        double dT_dT_hot_fd = (temps2[edge] - temps1[edge]) / dT;
+        
+        // Finite difference for T_cold
+        auto temps3 = wall_temperature_profile(T_hot, T_cold + dT, h_hot, h_cold, t_over_k, q1);
+        double dT_dT_cold_fd = (temps3[edge] - temps1[edge]) / dT;
+        
+        EXPECT_NEAR(dT_dT_hot_anal, dT_dT_hot_fd, 1e-6) << "Edge " << edge;
+        EXPECT_NEAR(dT_dT_cold_anal, dT_dT_cold_fd, 1e-6) << "Edge " << edge;
+    }
+}
+
+TEST(HeatTransferTest, TemperatureSensitivityToHeatFlux) {
+    double h_hot = 500.0;
+    std::vector<double> t_over_k = {0.01 / 50.0, 0.05 / 0.5};
+    
+    // dT/dq should be negative (higher q means lower edge T)
+    // and magnitude should increase with edge index
+    double prev_mag = 0.0;
+    for (std::size_t edge = 0; edge <= t_over_k.size(); ++edge) {
+        double sens = dT_edge_dq(edge, h_hot, t_over_k);
+        EXPECT_LE(sens, 0.0);  // Always negative
+        EXPECT_GE(std::abs(sens), prev_mag);  // Magnitude increases
+        prev_mag = std::abs(sens);
+    }
+}

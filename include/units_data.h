@@ -164,6 +164,10 @@ inline constexpr Entry function_units[] = {
     {"heat_flux_from_T_at_edge", "T_measured: K, edge_idx, T_hot: K, T_cold: K, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W", "W/m^2"},
     {"heat_flux_from_T_at_depth", "T_measured: K, depth: m, T_hot: K, T_cold: K, h_hot, h_cold: W/(m^2*K), thicknesses: m, conductivities: W/(m*K)", "W/m^2"},
     {"bulk_T_from_edge_T_and_q", "T_measured: K, edge_idx, q: W/m^2, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W, solve_for: str", "K"},
+    {"dT_edge_dT_hot",          "edge_idx, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W", "- (dT_edge/dT_hot)"},
+    {"dT_edge_dT_cold",         "edge_idx, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W", "- (dT_edge/dT_cold)"},
+    {"dT_edge_dT_bulk",         "edge_idx, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W", "- (dT/dT_hot, dT/dT_cold)"},
+    {"dT_edge_dq",              "edge_idx, h_hot: W/(m^2*K), t_over_k: m^2*K/W", "K*m^2/W (dT_edge/dq)"},
 
     // -------------------------------------------------------------------------
     // orifice.h - Discharge Coefficients

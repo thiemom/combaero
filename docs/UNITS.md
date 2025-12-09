@@ -349,36 +349,40 @@ All functions use consistent units to avoid conversion errors.
 
 ### heat_transfer.h - Heat Transfer Correlations
 
-| Function                       | Input Units                                                                                                     | Output Unit |
-|--------------------------------|-----------------------------------------------------------------------------------------------------------------|-------------|
-| `nusselt_dittus_boelter`       | Re: -, Pr: -, heating: bool                                                                                     | - (Nu)      |
-| `nusselt_gnielinski`           | Re: -, Pr: -, f: - (optional)                                                                                   | - (Nu)      |
-| `nusselt_sieder_tate`          | Re: -, Pr: -, mu_ratio: -                                                                                       | - (Nu)      |
-| `nusselt_petukhov`             | Re: -, Pr: -, f: - (optional)                                                                                   | - (Nu)      |
-| `htc_from_nusselt`             | Nu: -, k: W/(m*K), L: m                                                                                         | W/(m^2*K)   |
-| `nusselt_pipe`                 | State, V: m/s, D: m                                                                                             | - (Nu)      |
-| `htc_pipe`                     | State, V: m/s, D: m                                                                                             | W/(m^2*K)   |
-| `lmtd`                         | dT1: K, dT2: K                                                                                                  | K           |
-| `lmtd_counterflow`             | T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K                                                          | K           |
-| `lmtd_parallelflow`            | T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K                                                          | K           |
-| `overall_htc`                  | h_values: W/(m^2*K), t_over_k: m^2*K/W                                                                          | W/(m^2*K)   |
-| `overall_htc_wall`             | h_inner, h_outer: W/(m^2*K), t_over_k_layers: m^2*K/W                                                           | W/(m^2*K)   |
-| `overall_htc_tube`             | h_inner, h_outer: W/(m^2*K), t_wall: m, k_wall: W/(m*K)                                                         | W/(m^2*K)   |
-| `thermal_resistance`           | h: W/(m^2*K), A: m^2                                                                                            | K/W         |
-| `thermal_resistance_wall`      | t: m, k: W/(m*K), A: m^2                                                                                        | K/W         |
-| `heat_rate`                    | U: W/(m^2*K), A: m^2, dT: K                                                                                     | W           |
-| `heat_flux`                    | U: W/(m^2*K), dT: K                                                                                             | W/m^2       |
-| `heat_transfer_area`           | Q: W, U: W/(m^2*K), dT: K                                                                                       | m^2         |
-| `heat_transfer_dT`             | Q: W, U: W/(m^2*K), A: m^2                                                                                      | K           |
-| `wall_temperature_profile`     | T_hot: K, T_cold: K, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W                                                | K (vector)  |
-| `ntu`                          | U: W/(m^2*K), A: m^2, C_min: W/K                                                                                | -           |
-| `capacity_ratio`               | C_min: W/K, C_max: W/K                                                                                          | -           |
-| `effectiveness_counterflow`    | NTU: -, C_r: -                                                                                                  | -           |
-| `effectiveness_parallelflow`   | NTU: -, C_r: -                                                                                                  | -           |
-| `heat_rate_from_effectiveness` | epsilon: -, C_min: W/K, T_hot_in: K, T_cold_in: K                                                               | W           |
-| `heat_flux_from_T_at_edge`     | T_measured: K, edge_idx, T_hot: K, T_cold: K, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W                       | W/m^2       |
-| `heat_flux_from_T_at_depth`    | T_measured: K, depth: m, T_hot: K, T_cold: K, h_hot, h_cold: W/(m^2*K), thicknesses: m, conductivities: W/(m*K) | W/m^2       |
-| `bulk_T_from_edge_T_and_q`     | T_measured: K, edge_idx, q: W/m^2, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W, solve_for: str                  | K           |
+| Function                       | Input Units                                                                                                     | Output Unit               |
+|--------------------------------|-----------------------------------------------------------------------------------------------------------------|---------------------------|
+| `nusselt_dittus_boelter`       | Re: -, Pr: -, heating: bool                                                                                     | - (Nu)                    |
+| `nusselt_gnielinski`           | Re: -, Pr: -, f: - (optional)                                                                                   | - (Nu)                    |
+| `nusselt_sieder_tate`          | Re: -, Pr: -, mu_ratio: -                                                                                       | - (Nu)                    |
+| `nusselt_petukhov`             | Re: -, Pr: -, f: - (optional)                                                                                   | - (Nu)                    |
+| `htc_from_nusselt`             | Nu: -, k: W/(m*K), L: m                                                                                         | W/(m^2*K)                 |
+| `nusselt_pipe`                 | State, V: m/s, D: m                                                                                             | - (Nu)                    |
+| `htc_pipe`                     | State, V: m/s, D: m                                                                                             | W/(m^2*K)                 |
+| `lmtd`                         | dT1: K, dT2: K                                                                                                  | K                         |
+| `lmtd_counterflow`             | T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K                                                          | K                         |
+| `lmtd_parallelflow`            | T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K                                                          | K                         |
+| `overall_htc`                  | h_values: W/(m^2*K), t_over_k: m^2*K/W                                                                          | W/(m^2*K)                 |
+| `overall_htc_wall`             | h_inner, h_outer: W/(m^2*K), t_over_k_layers: m^2*K/W                                                           | W/(m^2*K)                 |
+| `overall_htc_tube`             | h_inner, h_outer: W/(m^2*K), t_wall: m, k_wall: W/(m*K)                                                         | W/(m^2*K)                 |
+| `thermal_resistance`           | h: W/(m^2*K), A: m^2                                                                                            | K/W                       |
+| `thermal_resistance_wall`      | t: m, k: W/(m*K), A: m^2                                                                                        | K/W                       |
+| `heat_rate`                    | U: W/(m^2*K), A: m^2, dT: K                                                                                     | W                         |
+| `heat_flux`                    | U: W/(m^2*K), dT: K                                                                                             | W/m^2                     |
+| `heat_transfer_area`           | Q: W, U: W/(m^2*K), dT: K                                                                                       | m^2                       |
+| `heat_transfer_dT`             | Q: W, U: W/(m^2*K), A: m^2                                                                                      | K                         |
+| `wall_temperature_profile`     | T_hot: K, T_cold: K, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W                                                | K (vector)                |
+| `ntu`                          | U: W/(m^2*K), A: m^2, C_min: W/K                                                                                | -                         |
+| `capacity_ratio`               | C_min: W/K, C_max: W/K                                                                                          | -                         |
+| `effectiveness_counterflow`    | NTU: -, C_r: -                                                                                                  | -                         |
+| `effectiveness_parallelflow`   | NTU: -, C_r: -                                                                                                  | -                         |
+| `heat_rate_from_effectiveness` | epsilon: -, C_min: W/K, T_hot_in: K, T_cold_in: K                                                               | W                         |
+| `heat_flux_from_T_at_edge`     | T_measured: K, edge_idx, T_hot: K, T_cold: K, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W                       | W/m^2                     |
+| `heat_flux_from_T_at_depth`    | T_measured: K, depth: m, T_hot: K, T_cold: K, h_hot, h_cold: W/(m^2*K), thicknesses: m, conductivities: W/(m*K) | W/m^2                     |
+| `bulk_T_from_edge_T_and_q`     | T_measured: K, edge_idx, q: W/m^2, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W, solve_for: str                  | K                         |
+| `dT_edge_dT_hot`               | edge_idx, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W                                                           | - (dT_edge/dT_hot)        |
+| `dT_edge_dT_cold`              | edge_idx, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W                                                           | - (dT_edge/dT_cold)       |
+| `dT_edge_dT_bulk`              | edge_idx, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W                                                           | - (dT/dT_hot, dT/dT_cold) |
+| `dT_edge_dq`                   | edge_idx, h_hot: W/(m^2*K), t_over_k: m^2*K/W                                                                   | K*m^2/W (dT_edge/dq)      |
 
 ---
 

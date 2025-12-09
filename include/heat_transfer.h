@@ -349,6 +349,56 @@ double bulk_T_from_edge_T_and_q(
     const std::string& solve_for);
 
 // -------------------------------------------------------------
+// Temperature Sensitivity (for risk assessment)
+// -------------------------------------------------------------
+//
+// Partial derivatives of edge temperatures with respect to bulk temperatures.
+// Useful for:
+//   - Risk assessment: "If T_hot increases by 50K, how much does the 
+//     steel-ceramic interface temperature increase?"
+//   - Uncertainty propagation
+//   - Control system design
+//
+// For steady-state 1D conduction:
+//   T_edge = T_hot - q * R_hot_to_edge
+//          = T_hot - (T_hot - T_cold) / R_total * R_hot_to_edge
+//          = T_hot * (1 - R_hot_to_edge/R_total) + T_cold * (R_hot_to_edge/R_total)
+//
+// Therefore:
+//   ∂T_edge/∂T_hot  = R_edge_to_cold / R_total  (always positive, ≤1)
+//   ∂T_edge/∂T_cold = R_hot_to_edge / R_total   (always positive, ≤1)
+//   Sum = 1 (as expected for linear interpolation)
+
+// Sensitivity of edge temperature to hot-side bulk temperature change
+// Returns: ∂T_edge/∂T_hot [-] (dimensionless, 0 to 1)
+double dT_edge_dT_hot(
+    std::size_t edge_idx,
+    double h_hot, double h_cold,
+    const std::vector<double>& t_over_k);
+
+// Sensitivity of edge temperature to cold-side bulk temperature change
+// Returns: ∂T_edge/∂T_cold [-] (dimensionless, 0 to 1)
+double dT_edge_dT_cold(
+    std::size_t edge_idx,
+    double h_hot, double h_cold,
+    const std::vector<double>& t_over_k);
+
+// Both sensitivities at once (more efficient)
+// Returns: {∂T_edge/∂T_hot, ∂T_edge/∂T_cold}
+std::pair<double, double> dT_edge_dT_bulk(
+    std::size_t edge_idx,
+    double h_hot, double h_cold,
+    const std::vector<double>& t_over_k);
+
+// Sensitivity of edge temperature to heat flux change
+// Returns: ∂T_edge/∂q [K·m²/W] (negative for edges closer to hot side)
+// Useful for: "If heat flux increases by 100 W/m², how does edge T change?"
+double dT_edge_dq(
+    std::size_t edge_idx,
+    double h_hot,
+    const std::vector<double>& t_over_k);
+
+// -------------------------------------------------------------
 // NTU-Effectiveness Method
 // -------------------------------------------------------------
 

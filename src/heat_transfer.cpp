@@ -387,6 +387,89 @@ double bulk_T_from_edge_T_and_q(
 }
 
 // -------------------------------------------------------------
+// Temperature Sensitivity
+// -------------------------------------------------------------
+
+std::pair<double, double> dT_edge_dT_bulk(
+    std::size_t edge_idx,
+    double h_hot, double h_cold,
+    const std::vector<double>& t_over_k) {
+    
+    std::size_t n_layers = t_over_k.size();
+    if (edge_idx > n_layers) {
+        throw std::invalid_argument(
+            "dT_edge_dT_bulk: edge_idx out of range (max = " + 
+            std::to_string(n_layers) + ")");
+    }
+    
+    if (h_hot <= 0 || h_cold <= 0) {
+        throw std::invalid_argument("dT_edge_dT_bulk: HTCs must be positive");
+    }
+    
+    // Total thermal resistance
+    double R_total = 1.0 / h_hot + 1.0 / h_cold;
+    for (double r : t_over_k) {
+        R_total += r;
+    }
+    
+    // Resistance from hot bulk to edge
+    double R_hot_to_edge = 1.0 / h_hot;
+    for (std::size_t i = 0; i < edge_idx; ++i) {
+        R_hot_to_edge += t_over_k[i];
+    }
+    
+    // Resistance from edge to cold bulk
+    double R_edge_to_cold = R_total - R_hot_to_edge;
+    
+    // Sensitivities
+    // T_edge = T_hot * (R_edge_to_cold / R_total) + T_cold * (R_hot_to_edge / R_total)
+    double dT_dT_hot = R_edge_to_cold / R_total;
+    double dT_dT_cold = R_hot_to_edge / R_total;
+    
+    return {dT_dT_hot, dT_dT_cold};
+}
+
+double dT_edge_dT_hot(
+    std::size_t edge_idx,
+    double h_hot, double h_cold,
+    const std::vector<double>& t_over_k) {
+    return dT_edge_dT_bulk(edge_idx, h_hot, h_cold, t_over_k).first;
+}
+
+double dT_edge_dT_cold(
+    std::size_t edge_idx,
+    double h_hot, double h_cold,
+    const std::vector<double>& t_over_k) {
+    return dT_edge_dT_bulk(edge_idx, h_hot, h_cold, t_over_k).second;
+}
+
+double dT_edge_dq(
+    std::size_t edge_idx,
+    double h_hot,
+    const std::vector<double>& t_over_k) {
+    
+    std::size_t n_layers = t_over_k.size();
+    if (edge_idx > n_layers) {
+        throw std::invalid_argument(
+            "dT_edge_dq: edge_idx out of range (max = " + 
+            std::to_string(n_layers) + ")");
+    }
+    
+    if (h_hot <= 0) {
+        throw std::invalid_argument("dT_edge_dq: h_hot must be positive");
+    }
+    
+    // T_edge = T_hot - q * R_hot_to_edge
+    // ∂T_edge/∂q = -R_hot_to_edge
+    double R_hot_to_edge = 1.0 / h_hot;
+    for (std::size_t i = 0; i < edge_idx; ++i) {
+        R_hot_to_edge += t_over_k[i];
+    }
+    
+    return -R_hot_to_edge;
+}
+
+// -------------------------------------------------------------
 // NTU-Effectiveness Method
 // -------------------------------------------------------------
 
