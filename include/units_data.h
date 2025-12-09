@@ -161,6 +161,9 @@ inline constexpr Entry function_units[] = {
     {"effectiveness_counterflow", "NTU: -, C_r: -",                     "-"},
     {"effectiveness_parallelflow", "NTU: -, C_r: -",                    "-"},
     {"heat_rate_from_effectiveness", "epsilon: -, C_min: W/K, T_hot_in: K, T_cold_in: K", "W"},
+    {"heat_flux_from_T_at_edge", "T_measured: K, edge_idx, T_hot: K, T_cold: K, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W", "W/m^2"},
+    {"heat_flux_from_T_at_depth", "T_measured: K, depth: m, T_hot: K, T_cold: K, h_hot, h_cold: W/(m^2*K), thicknesses: m, conductivities: W/(m*K)", "W/m^2"},
+    {"bulk_T_from_edge_T_and_q", "T_measured: K, edge_idx, q: W/m^2, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W, solve_for: str", "K"},
 
     // -------------------------------------------------------------------------
     // orifice.h - Discharge Coefficients

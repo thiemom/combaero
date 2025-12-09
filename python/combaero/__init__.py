@@ -159,6 +159,9 @@ try:
         effectiveness_counterflow,
         effectiveness_parallelflow,
         heat_rate_from_effectiveness,
+        heat_flux_from_T_at_edge,
+        heat_flux_from_T_at_depth,
+        bulk_T_from_edge_T_and_q,
         # Incompressible flow
         bernoulli_P2,
         bernoulli_v2,
@@ -322,6 +325,9 @@ except ModuleNotFoundError:
     effectiveness_counterflow = _core.effectiveness_counterflow
     effectiveness_parallelflow = _core.effectiveness_parallelflow
     heat_rate_from_effectiveness = _core.heat_rate_from_effectiveness
+    heat_flux_from_T_at_edge = _core.heat_flux_from_T_at_edge
+    heat_flux_from_T_at_depth = _core.heat_flux_from_T_at_depth
+    bulk_T_from_edge_T_and_q = _core.bulk_T_from_edge_T_and_q
     # Incompressible flow
     bernoulli_P2 = _core.bernoulli_P2
     bernoulli_v2 = _core.bernoulli_v2
@@ -483,6 +489,9 @@ __all__ = [
     "effectiveness_counterflow",
     "effectiveness_parallelflow",
     "heat_rate_from_effectiveness",
+    "heat_flux_from_T_at_edge",
+    "heat_flux_from_T_at_depth",
+    "bulk_T_from_edge_T_and_q",
     # Incompressible flow
     "bernoulli_P2",
     "bernoulli_v2",

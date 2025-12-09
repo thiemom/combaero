@@ -3542,3 +3542,174 @@ TEST(HeatTransferTest, HeatRateFromEffectiveness) {
     // Q = ε * C_min * (T_hot_in - T_cold_in) = 0.8 * 500 * 100 = 40000 W
     EXPECT_DOUBLE_EQ(heat_rate_from_effectiveness(epsilon, C_min, T_hot_in, T_cold_in), 40000.0);
 }
+
+// ============================================================
+// Heat Flux from Measured Temperature Tests
+// ============================================================
+
+TEST(HeatTransferTest, HeatFluxFromTAtEdge) {
+    // Single layer wall
+    double T_hot = 400.0;
+    double T_cold = 300.0;
+    double h_hot = 500.0;
+    double h_cold = 100.0;
+    std::vector<double> t_over_k = {0.01 / 50.0};  // 10mm steel
+    
+    // First, compute the actual temperature profile
+    double q_expected;
+    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_expected);
+    
+    // Now verify we can recover q from each edge temperature
+    double q0 = heat_flux_from_T_at_edge(temps[0], 0, T_hot, T_cold, h_hot, h_cold, t_over_k);
+    double q1 = heat_flux_from_T_at_edge(temps[1], 1, T_hot, T_cold, h_hot, h_cold, t_over_k);
+    
+    EXPECT_NEAR(q0, q_expected, 1.0);
+    EXPECT_NEAR(q1, q_expected, 1.0);
+}
+
+TEST(HeatTransferTest, HeatFluxFromTAtEdgeMultiLayer) {
+    double T_hot = 500.0;
+    double T_cold = 300.0;
+    double h_hot = 500.0;
+    double h_cold = 50.0;
+    
+    // Steel + insulation
+    std::vector<double> t_over_k = {0.005 / 50.0, 0.05 / 0.04};
+    
+    double q_expected;
+    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_expected);
+    
+    // Verify all edges
+    for (std::size_t i = 0; i < temps.size(); ++i) {
+        double q = heat_flux_from_T_at_edge(temps[i], i, T_hot, T_cold, h_hot, h_cold, t_over_k);
+        EXPECT_NEAR(q, q_expected, 0.1) << "Edge " << i;
+    }
+}
+
+TEST(HeatTransferTest, HeatFluxFromTAtDepth) {
+    double T_hot = 400.0;
+    double T_cold = 300.0;
+    double h_hot = 500.0;
+    double h_cold = 100.0;
+    
+    std::vector<double> thicknesses = {0.01};  // 10mm
+    std::vector<double> conductivities = {50.0};  // steel
+    std::vector<double> t_over_k = {0.01 / 50.0};
+    
+    double q_expected;
+    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_expected);
+    
+    // At depth 0 (hot surface)
+    double q0 = heat_flux_from_T_at_depth(temps[0], 0.0, T_hot, T_cold, h_hot, h_cold,
+                                          thicknesses, conductivities);
+    EXPECT_NEAR(q0, q_expected, 1.0);
+    
+    // At depth = thickness (cold surface)
+    double q1 = heat_flux_from_T_at_depth(temps[1], 0.01, T_hot, T_cold, h_hot, h_cold,
+                                          thicknesses, conductivities);
+    EXPECT_NEAR(q1, q_expected, 1.0);
+    
+    // At mid-depth (should also give same q)
+    // T at mid-depth = temps[0] - q * (0.005 / 50)
+    double T_mid = temps[0] - q_expected * (0.005 / 50.0);
+    double q_mid = heat_flux_from_T_at_depth(T_mid, 0.005, T_hot, T_cold, h_hot, h_cold,
+                                             thicknesses, conductivities);
+    EXPECT_NEAR(q_mid, q_expected, 1.0);
+}
+
+TEST(HeatTransferTest, BulkTFromEdgeTAndQ) {
+    double T_hot = 400.0;
+    double T_cold = 300.0;
+    double h_hot = 500.0;
+    double h_cold = 100.0;
+    std::vector<double> t_over_k = {0.01 / 50.0};
+    
+    double q;
+    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q);
+    
+    // From hot surface temperature, recover T_hot
+    double T_hot_calc = bulk_T_from_edge_T_and_q(temps[0], 0, q, h_hot, h_cold, t_over_k, "hot");
+    EXPECT_NEAR(T_hot_calc, T_hot, 0.01);
+    
+    // From cold surface temperature, recover T_cold
+    double T_cold_calc = bulk_T_from_edge_T_and_q(temps[1], 1, q, h_hot, h_cold, t_over_k, "cold");
+    EXPECT_NEAR(T_cold_calc, T_cold, 0.01);
+    
+    // From hot surface, can also solve for T_cold
+    double T_cold_from_hot = bulk_T_from_edge_T_and_q(temps[0], 0, q, h_hot, h_cold, t_over_k, "cold");
+    EXPECT_NEAR(T_cold_from_hot, T_cold, 0.01);
+}
+
+TEST(HeatTransferTest, HeatFluxRoundTrip) {
+    // Round-trip test: compute U -> get q -> get T at edge -> recover q
+    double T_hot = 450.0;
+    double T_cold = 320.0;
+    double h_hot = 800.0;
+    double h_cold = 120.0;
+    
+    // Multi-layer: steel + ceramic + insulation
+    std::vector<double> t_over_k = {
+        0.008 / 45.0,   // 8mm steel
+        0.015 / 2.5,    // 15mm ceramic
+        0.040 / 0.035   // 40mm insulation
+    };
+    
+    // Step 1: Compute overall HTC and heat flux
+    double U = overall_htc({h_hot, h_cold}, t_over_k);
+    double dT = T_hot - T_cold;
+    double q_original = heat_flux(U, dT);
+    
+    // Step 2: Get temperature profile
+    double q_profile;
+    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_profile);
+    
+    // Verify heat flux from profile matches
+    EXPECT_NEAR(q_profile, q_original, 0.01);
+    
+    // Step 3: For each edge, recover heat flux from measured temperature
+    for (std::size_t i = 0; i < temps.size(); ++i) {
+        double q_recovered = heat_flux_from_T_at_edge(
+            temps[i], i, T_hot, T_cold, h_hot, h_cold, t_over_k);
+        EXPECT_NEAR(q_recovered, q_original, 0.01) 
+            << "Round-trip failed at edge " << i;
+    }
+}
+
+TEST(HeatTransferTest, HeatFluxFromDepthRoundTrip) {
+    // Round-trip with depth-based measurement (embedded thermocouple)
+    double T_hot = 500.0;
+    double T_cold = 300.0;
+    double h_hot = 500.0;
+    double h_cold = 50.0;
+    
+    std::vector<double> thicknesses = {0.010, 0.050};  // 10mm steel, 50mm insulation
+    std::vector<double> conductivities = {50.0, 0.04};
+    std::vector<double> t_over_k = {0.010/50.0, 0.050/0.04};
+    
+    // Get reference heat flux
+    double q_ref;
+    wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_ref);
+    
+    // Test at various depths (simulating embedded thermocouples)
+    std::vector<double> test_depths = {0.0, 0.005, 0.010, 0.025, 0.060};
+    
+    for (double depth : test_depths) {
+        // Calculate expected temperature at this depth
+        double R_to_depth = 1.0 / h_hot;  // convective
+        double remaining = depth;
+        for (std::size_t i = 0; i < thicknesses.size() && remaining > 0; ++i) {
+            double in_layer = std::min(remaining, thicknesses[i]);
+            R_to_depth += in_layer / conductivities[i];
+            remaining -= in_layer;
+        }
+        double T_at_depth = T_hot - q_ref * R_to_depth;
+        
+        // Recover heat flux from this "measured" temperature
+        double q_recovered = heat_flux_from_T_at_depth(
+            T_at_depth, depth, T_hot, T_cold, h_hot, h_cold,
+            thicknesses, conductivities);
+        
+        EXPECT_NEAR(q_recovered, q_ref, 0.1) 
+            << "Round-trip failed at depth " << depth << " m";
+    }
+}

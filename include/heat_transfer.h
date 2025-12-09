@@ -276,6 +276,79 @@ inline std::vector<double> wall_temperature_profile(
 }
 
 // -------------------------------------------------------------
+// Heat Flux from Measured Temperature
+// -------------------------------------------------------------
+//
+// Solve for heat flux given a measured temperature at a known location.
+// Useful for inferring heat transfer from thermocouple measurements.
+//
+// Edge indexing (for N conductive layers):
+//   Edge 0: hot-side wall surface (after convective boundary layer)
+//   Edge 1: interface between layer 0 and layer 1
+//   Edge 2: interface between layer 1 and layer 2
+//   ...
+//   Edge N: cold-side wall surface (before convective boundary layer)
+//
+// Example: 2-layer wall (steel + insulation)
+//   Edge 0: steel hot surface
+//   Edge 1: steel-insulation interface
+//   Edge 2: insulation cold surface
+
+// Heat flux from temperature measured at a wall edge
+// Parameters:
+//   T_measured : measured temperature at the edge [K]
+//   edge_idx   : edge index (0 = hot surface, N = cold surface)
+//   T_hot      : hot-side bulk fluid temperature [K]
+//   T_cold     : cold-side bulk fluid temperature [K]
+//   h_hot      : hot-side convective HTC [W/(m²·K)]
+//   h_cold     : cold-side convective HTC [W/(m²·K)]
+//   t_over_k   : vector of thickness/conductivity for each layer [m²·K/W]
+//
+// Returns: heat flux q [W/m²]
+double heat_flux_from_T_at_edge(
+    double T_measured, std::size_t edge_idx,
+    double T_hot, double T_cold,
+    double h_hot, double h_cold,
+    const std::vector<double>& t_over_k);
+
+// Heat flux from temperature measured at a depth from hot surface
+// Parameters:
+//   T_measured     : measured temperature [K]
+//   depth_from_hot : depth from hot surface into wall [m]
+//   T_hot, T_cold  : bulk fluid temperatures [K]
+//   h_hot, h_cold  : convective HTCs [W/(m²·K)]
+//   thicknesses    : vector of layer thicknesses [m]
+//   conductivities : vector of layer thermal conductivities [W/(m·K)]
+//
+// Returns: heat flux q [W/m²]
+// Throws if depth is outside the wall or negative
+double heat_flux_from_T_at_depth(
+    double T_measured, double depth_from_hot,
+    double T_hot, double T_cold,
+    double h_hot, double h_cold,
+    const std::vector<double>& thicknesses,
+    const std::vector<double>& conductivities);
+
+// Infer unknown bulk temperature from measured edge temperature and heat flux
+// Useful when you know q (e.g., from power input) and measure a surface T
+//
+// Parameters:
+//   T_measured : measured temperature at edge [K]
+//   edge_idx   : edge index
+//   q          : known heat flux [W/m²] (positive = hot to cold)
+//   h_hot      : hot-side HTC [W/(m²·K)]
+//   h_cold     : cold-side HTC [W/(m²·K)]
+//   t_over_k   : layer resistances [m²·K/W]
+//   solve_for  : "hot" or "cold" - which bulk temperature to solve for
+//
+// Returns: inferred bulk fluid temperature [K]
+double bulk_T_from_edge_T_and_q(
+    double T_measured, std::size_t edge_idx, double q,
+    double h_hot, double h_cold,
+    const std::vector<double>& t_over_k,
+    const std::string& solve_for);
+
+// -------------------------------------------------------------
 // NTU-Effectiveness Method
 // -------------------------------------------------------------
 

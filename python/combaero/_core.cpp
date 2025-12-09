@@ -1724,6 +1724,78 @@ PYBIND11_MODULE(_core, m)
         "Heat rate from effectiveness: Q = ε * C_min * (T_hot_in - T_cold_in) [W]"
     );
 
+    m.def(
+        "heat_flux_from_T_at_edge",
+        [](double T_measured, std::size_t edge_idx,
+           double T_hot, double T_cold,
+           double h_hot, double h_cold,
+           py::array_t<double, py::array::c_style | py::array::forcecast> tk_arr)
+        {
+            auto t_over_k = to_vec(tk_arr);
+            return heat_flux_from_T_at_edge(T_measured, edge_idx, T_hot, T_cold,
+                                            h_hot, h_cold, t_over_k);
+        },
+        py::arg("T_measured"),
+        py::arg("edge_idx"),
+        py::arg("T_hot"),
+        py::arg("T_cold"),
+        py::arg("h_hot"),
+        py::arg("h_cold"),
+        py::arg("t_over_k"),
+        "Heat flux from temperature measured at wall edge.\n\n"
+        "Edge indexing: 0 = hot surface, N = cold surface.\n"
+        "Returns heat flux q [W/m²]."
+    );
+
+    m.def(
+        "heat_flux_from_T_at_depth",
+        [](double T_measured, double depth_from_hot,
+           double T_hot, double T_cold,
+           double h_hot, double h_cold,
+           py::array_t<double, py::array::c_style | py::array::forcecast> t_arr,
+           py::array_t<double, py::array::c_style | py::array::forcecast> k_arr)
+        {
+            auto thicknesses = to_vec(t_arr);
+            auto conductivities = to_vec(k_arr);
+            return heat_flux_from_T_at_depth(T_measured, depth_from_hot, T_hot, T_cold,
+                                             h_hot, h_cold, thicknesses, conductivities);
+        },
+        py::arg("T_measured"),
+        py::arg("depth_from_hot"),
+        py::arg("T_hot"),
+        py::arg("T_cold"),
+        py::arg("h_hot"),
+        py::arg("h_cold"),
+        py::arg("thicknesses"),
+        py::arg("conductivities"),
+        "Heat flux from temperature measured at depth from hot surface.\n\n"
+        "Useful when thermocouple is embedded slightly into wall.\n"
+        "Returns heat flux q [W/m²]."
+    );
+
+    m.def(
+        "bulk_T_from_edge_T_and_q",
+        [](double T_measured, std::size_t edge_idx, double q,
+           double h_hot, double h_cold,
+           py::array_t<double, py::array::c_style | py::array::forcecast> tk_arr,
+           const std::string& solve_for)
+        {
+            auto t_over_k = to_vec(tk_arr);
+            return bulk_T_from_edge_T_and_q(T_measured, edge_idx, q,
+                                            h_hot, h_cold, t_over_k, solve_for);
+        },
+        py::arg("T_measured"),
+        py::arg("edge_idx"),
+        py::arg("q"),
+        py::arg("h_hot"),
+        py::arg("h_cold"),
+        py::arg("t_over_k"),
+        py::arg("solve_for"),
+        "Infer bulk fluid temperature from edge temperature and known heat flux.\n\n"
+        "solve_for: 'hot' or 'cold'\n"
+        "Returns inferred bulk temperature [K]."
+    );
+
     // Nozzle thrust (from NozzleSolution)
     m.def(
         "nozzle_thrust",

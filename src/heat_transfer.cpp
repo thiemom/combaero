@@ -251,6 +251,142 @@ std::vector<double> wall_temperature_profile(
 }
 
 // -------------------------------------------------------------
+// Heat Flux from Measured Temperature
+// -------------------------------------------------------------
+
+double heat_flux_from_T_at_edge(
+    double T_measured, std::size_t edge_idx,
+    double T_hot, double T_cold,
+    double h_hot, double h_cold,
+    const std::vector<double>& t_over_k) {
+    
+    std::size_t n_layers = t_over_k.size();
+    if (edge_idx > n_layers) {
+        throw std::invalid_argument(
+            "heat_flux_from_T_at_edge: edge_idx out of range (max = " + 
+            std::to_string(n_layers) + ")");
+    }
+    
+    if (h_hot <= 0 || h_cold <= 0) {
+        throw std::invalid_argument("heat_flux_from_T_at_edge: HTCs must be positive");
+    }
+    
+    // Thermal resistance from hot bulk to edge
+    double R_hot_to_edge = 1.0 / h_hot;  // convective resistance
+    for (std::size_t i = 0; i < edge_idx; ++i) {
+        R_hot_to_edge += t_over_k[i];
+    }
+    
+    // Thermal resistance from edge to cold bulk
+    double R_edge_to_cold = 0.0;
+    for (std::size_t i = edge_idx; i < n_layers; ++i) {
+        R_edge_to_cold += t_over_k[i];
+    }
+    R_edge_to_cold += 1.0 / h_cold;  // convective resistance
+    
+    // Heat flux: q = (T_hot - T_measured) / R_hot_to_edge
+    //          = (T_measured - T_cold) / R_edge_to_cold
+    // Both should give same q in steady state
+    // Use the side with larger resistance for better numerical stability
+    if (R_hot_to_edge >= R_edge_to_cold) {
+        return (T_hot - T_measured) / R_hot_to_edge;
+    } else {
+        return (T_measured - T_cold) / R_edge_to_cold;
+    }
+}
+
+double heat_flux_from_T_at_depth(
+    double T_measured, double depth_from_hot,
+    double T_hot, double T_cold,
+    double h_hot, double h_cold,
+    const std::vector<double>& thicknesses,
+    const std::vector<double>& conductivities) {
+    
+    if (thicknesses.size() != conductivities.size()) {
+        throw std::invalid_argument(
+            "heat_flux_from_T_at_depth: thicknesses and conductivities must have same size");
+    }
+    if (depth_from_hot < 0) {
+        throw std::invalid_argument("heat_flux_from_T_at_depth: depth must be non-negative");
+    }
+    if (h_hot <= 0 || h_cold <= 0) {
+        throw std::invalid_argument("heat_flux_from_T_at_depth: HTCs must be positive");
+    }
+    
+    // Calculate total wall thickness
+    double total_thickness = 0.0;
+    for (double t : thicknesses) {
+        total_thickness += t;
+    }
+    
+    if (depth_from_hot > total_thickness) {
+        throw std::invalid_argument(
+            "heat_flux_from_T_at_depth: depth exceeds total wall thickness (" +
+            std::to_string(total_thickness) + " m)");
+    }
+    
+    // Find which layer the depth is in and compute resistance to that point
+    double R_hot_to_point = 1.0 / h_hot;  // convective resistance
+    double cumulative_depth = 0.0;
+    
+    for (std::size_t i = 0; i < thicknesses.size(); ++i) {
+        double layer_end = cumulative_depth + thicknesses[i];
+        
+        if (depth_from_hot <= layer_end) {
+            // Point is in this layer
+            double depth_in_layer = depth_from_hot - cumulative_depth;
+            R_hot_to_point += depth_in_layer / conductivities[i];
+            break;
+        } else {
+            // Point is past this layer
+            R_hot_to_point += thicknesses[i] / conductivities[i];
+            cumulative_depth = layer_end;
+        }
+    }
+    
+    // q = (T_hot - T_measured) / R_hot_to_point
+    return (T_hot - T_measured) / R_hot_to_point;
+}
+
+double bulk_T_from_edge_T_and_q(
+    double T_measured, std::size_t edge_idx, double q,
+    double h_hot, double h_cold,
+    const std::vector<double>& t_over_k,
+    const std::string& solve_for) {
+    
+    std::size_t n_layers = t_over_k.size();
+    if (edge_idx > n_layers) {
+        throw std::invalid_argument(
+            "bulk_T_from_edge_T_and_q: edge_idx out of range (max = " + 
+            std::to_string(n_layers) + ")");
+    }
+    
+    if (h_hot <= 0 || h_cold <= 0) {
+        throw std::invalid_argument("bulk_T_from_edge_T_and_q: HTCs must be positive");
+    }
+    
+    if (solve_for == "hot") {
+        // T_hot = T_measured + q * R_hot_to_edge
+        double R_hot_to_edge = 1.0 / h_hot;
+        for (std::size_t i = 0; i < edge_idx; ++i) {
+            R_hot_to_edge += t_over_k[i];
+        }
+        return T_measured + q * R_hot_to_edge;
+    } else if (solve_for == "cold") {
+        // T_cold = T_measured - q * R_edge_to_cold
+        double R_edge_to_cold = 0.0;
+        for (std::size_t i = edge_idx; i < n_layers; ++i) {
+            R_edge_to_cold += t_over_k[i];
+        }
+        R_edge_to_cold += 1.0 / h_cold;
+        return T_measured - q * R_edge_to_cold;
+    } else {
+        throw std::invalid_argument(
+            "bulk_T_from_edge_T_and_q: solve_for must be 'hot' or 'cold'");
+    }
+}
+
+// -------------------------------------------------------------
 // NTU-Effectiveness Method
 // -------------------------------------------------------------
 
