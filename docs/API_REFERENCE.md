@@ -968,3 +968,174 @@ NTU = ca.ntu(U=100, A=10, C_min=500)
 eps = ca.effectiveness_counterflow(NTU, C_r=0.5)
 Q = ca.heat_rate_from_effectiveness(eps, 500, 400, 300)
 ```
+
+---
+
+## Acoustics
+
+Functions for acoustic mode analysis, resonator design, and damping estimation.
+
+### Geometry
+
+```python
+# Tube geometry
+tube = ca.Tube(L=0.5, D=0.05)  # Length, Diameter [m]
+tube.area()       # Cross-sectional area [m²]
+tube.volume()     # Volume [m³]
+tube.perimeter()  # Circumference [m]
+
+# Annular geometry (gas turbine combustors)
+annulus = ca.Annulus(L=0.3, D_inner=0.5, D_outer=0.7)
+annulus.D_mean()        # Mean diameter [m]
+annulus.gap()           # Annular gap [m]
+annulus.area()          # Cross-sectional area [m²]
+annulus.circumference() # Mean circumference [m]
+```
+
+### Acoustic Modes
+
+```python
+# Boundary conditions
+ca.BoundaryCondition.Open    # Pressure release (p'=0)
+ca.BoundaryCondition.Closed  # Rigid wall (u'=0)
+
+# Tube axial modes
+tube = ca.Tube(L=1.0, D=0.1)
+c = 343.0  # Speed of sound [m/s]
+modes = ca.tube_axial_modes(tube, c, 
+                             ca.BoundaryCondition.Closed,
+                             ca.BoundaryCondition.Open,
+                             n_max=5)
+
+for m in modes:
+    print(f"{m.label()}: {m.frequency:.1f} Hz")
+# Output: 1L: 85.8 Hz, 2L: 257.3 Hz, ...
+
+# Annulus modes (axial + azimuthal)
+combustor = ca.Annulus(L=0.3, D_inner=0.5, D_outer=0.7)
+modes = ca.annulus_modes(combustor, c=800,
+                          ca.BoundaryCondition.Closed,
+                          ca.BoundaryCondition.Open,
+                          n_max=3, m_max=3)
+# Returns: 1T, 1L, 1L1T, 2T, ...
+
+# Utility functions
+danger_modes = ca.modes_in_range(modes, f_min=200, f_max=600)
+closest = ca.closest_mode(modes, f_target=500)
+min_sep = ca.min_mode_separation(modes)
+```
+
+### Mean Flow Correction
+
+```python
+# Frequency shift due to mean flow (axial modes only)
+f0 = 500.0  # Quiescent frequency [Hz]
+M = 0.15    # Mach number
+
+f_up = ca.axial_mode_upstream(f0, M)      # f+ = f0/(1-M)
+f_down = ca.axial_mode_downstream(f0, M)  # f- = f0/(1+M)
+f_up, f_down = ca.axial_mode_split(f0, M) # Both at once
+```
+
+### Resonator Frequencies
+
+```python
+# Helmholtz resonator
+# f = (c/2π) * √(A/(V*L_eff))
+f = ca.helmholtz_frequency(
+    V=0.0005,           # Cavity volume [m³]
+    A_neck=0.0003,      # Neck area [m²]
+    L_neck=0.03,        # Neck length [m]
+    c=343.0,            # Speed of sound [m/s]
+    end_correction=0.85 # Flanged (default), use 0.6 for unflanged
+)
+
+# Quarter-wave and half-wave tubes
+f_qw = ca.quarter_wave_frequency(L=0.25, c=343)  # c/(4L)
+f_hw = ca.half_wave_frequency(L=0.5, c=343)      # c/(2L)
+```
+
+### Strouhal Number
+
+```python
+# Dimensionless frequency for vortex shedding, flame dynamics
+St = ca.strouhal(f=100, L=0.01, u=5.0)  # St = fL/u
+f = ca.frequency_from_strouhal(St=0.2, L=0.01, u=5.0)  # f = St*u/L
+```
+
+### Viscothermal Damping (Screening)
+
+Educational screening tools for resonator Q estimation. Expect ±50% accuracy.
+Real designs require experimental validation.
+
+```python
+# Boundary layer thicknesses
+nu = 1.5e-5     # Kinematic viscosity [m²/s]
+alpha = 2.1e-5  # Thermal diffusivity [m²/s]
+f = 400.0       # Frequency [Hz]
+gamma = 1.4     # Specific heat ratio
+
+delta_nu = ca.stokes_layer(nu, f)      # δ_ν = √(2ν/ω)
+delta_kappa = ca.thermal_layer(alpha, f)  # δ_κ = √(2α/ω)
+delta_eff = ca.effective_viscothermal_layer(delta_nu, delta_kappa, gamma)
+
+# Quality factor estimates
+Q_tube = ca.tube_Q(L=0.2, D=0.025, nu=nu, alpha=alpha, gamma=gamma, f=f)
+Q_helm = ca.helmholtz_Q(V=0.0005, A_neck=0.0003, L_neck=0.03,
+                         nu=nu, alpha=alpha, gamma=gamma, f=200)
+
+# Derived quantities
+zeta = ca.damping_ratio(Q_tube)   # ζ = 1/(2Q)
+df = ca.bandwidth(f, Q_tube)      # Δf = f/Q
+```
+
+### Residence Time
+
+```python
+# Time for fluid to pass through a volume
+tau = ca.residence_time(V=0.001, Q=0.0001)  # τ = V/Q̇ [s]
+tau = ca.residence_time_mdot(V=0.001, mdot=0.001, rho=1.2)  # τ = Vρ/ṁ
+
+# With geometry structs
+tau = ca.residence_time_tube(tube, Q=0.01)
+tau = ca.residence_time_annulus(annulus, Q=0.1)
+
+# Space velocity (inverse)
+SV = ca.space_velocity(Q=0.01, V=0.001)  # SV = 1/τ [1/s]
+```
+
+### Complete Example: Combustor Acoustic Analysis
+
+```python
+import combaero as ca
+import math
+
+# Gas turbine annular combustor
+combustor = ca.Annulus(L=0.3, D_inner=0.5, D_outer=0.7)
+c = 800.0  # Hot products speed of sound [m/s]
+
+# Get all modes
+modes = ca.annulus_modes(combustor, c,
+                          ca.BoundaryCondition.Closed,
+                          ca.BoundaryCondition.Open,
+                          n_max=3, m_max=3)
+
+print("Acoustic modes:")
+for m in modes[:5]:
+    print(f"  {m.label():6s} {m.frequency:7.1f} Hz")
+
+# Check for modes in instability-prone range
+danger = ca.modes_in_range(modes, 200, 600)
+print(f"\nModes in 200-600 Hz range: {[m.label() for m in danger]}")
+
+# Design quarter-wave damper for 1T mode
+f_1T = modes[0].frequency
+L_damper = ca.quarter_wave_frequency.__doc__  # c/(4L) → L = c/(4f)
+L_damper = c / (4 * f_1T)
+print(f"\nQuarter-wave damper for {modes[0].label()}: L = {L_damper*100:.1f} cm")
+
+# Estimate damper Q (screening)
+nu, alpha, gamma = 3e-5, 4e-5, 1.3  # Hot gas properties
+Q = ca.tube_Q(L_damper, D=0.03, nu=nu, alpha=alpha, gamma=gamma, f=f_1T)
+print(f"Estimated Q ≈ {Q:.0f} (±50%, validate experimentally)")
+```

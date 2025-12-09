@@ -25,6 +25,7 @@ This library provides tools for ideal-gas thermodynamic properties, combustion s
 - **Friction factors**: Colebrook-White, Haaland, and Serghides correlations
 - **Orifice Cd correlations**: ISO 5167, thick-plate, rounded-entry (Idelchik/Bohl)
 - **Heat transfer correlations**: Dittus-Boelter, Gnielinski, Sieder-Tate, Petukhov
+- **Acoustics**: Tube/annulus modes, Helmholtz resonators, Q factor screening
 - Accurate saturation vapor pressure using Hyland-Wexler equations
   - For ice (-80°C to 0°C): maximum relative error ≤ 0.023%
   - For water vapor (0°C to 80°C): maximum relative error ≤ 0.0057%
@@ -46,9 +47,10 @@ The library is organized into focused modules:
 | `compressible.h` | Compressible flow (isentropic nozzle, Fanno pipe flow) |
 | `friction.h` | Darcy friction factor correlations (Colebrook, Haaland, Serghides) |
 | `heat_transfer.h` | Nusselt correlations, LMTD for heat exchangers |
-| `geometry.h` | Hydraulic diameter for non-circular cross-sections |
+| `geometry.h` | Hydraulic diameter, Tube/Annulus geometry, residence time |
 | `incompressible.h` | Incompressible flow (Bernoulli, pipe flow, orifice) |
 | `orifice.h` | Orifice discharge coefficient (Cd) correlations |
+| `acoustics.h` | Acoustic modes, Helmholtz/quarter-wave resonators, Q factors |
 | `humidair.h` | Humid air properties and saturation vapor pressure |
 | `utils.h` | Utility functions (mixture property printing) |
 
