@@ -3369,3 +3369,176 @@ TEST(HeatTransferTest, OverallHtcMultiLayer) {
     double U_no_insul = overall_htc_wall(h_inner, h_outer, t_steel, k_steel);
     EXPECT_GT(U_no_insul, U * 10);  // At least 10x higher
 }
+
+// ============================================================
+// Heat Rate and Heat Flux Tests
+// ============================================================
+
+TEST(HeatTransferTest, HeatRate) {
+    double U = 100.0;   // W/(m²·K)
+    double A = 2.0;     // m²
+    double dT = 50.0;   // K
+    
+    // Q = U * A * dT = 100 * 2 * 50 = 10000 W
+    EXPECT_DOUBLE_EQ(heat_rate(U, A, dT), 10000.0);
+}
+
+TEST(HeatTransferTest, HeatFlux) {
+    double U = 100.0;   // W/(m²·K)
+    double dT = 50.0;   // K
+    
+    // q = U * dT = 100 * 50 = 5000 W/m²
+    EXPECT_DOUBLE_EQ(heat_flux(U, dT), 5000.0);
+}
+
+TEST(HeatTransferTest, HeatTransferArea) {
+    double Q = 10000.0;  // W
+    double U = 100.0;    // W/(m²·K)
+    double dT = 50.0;    // K
+    
+    // A = Q / (U * dT) = 10000 / (100 * 50) = 2 m²
+    EXPECT_DOUBLE_EQ(heat_transfer_area(Q, U, dT), 2.0);
+}
+
+TEST(HeatTransferTest, HeatTransferDT) {
+    double Q = 10000.0;  // W
+    double U = 100.0;    // W/(m²·K)
+    double A = 2.0;      // m²
+    
+    // dT = Q / (U * A) = 10000 / (100 * 2) = 50 K
+    EXPECT_DOUBLE_EQ(heat_transfer_dT(Q, U, A), 50.0);
+}
+
+// ============================================================
+// Wall Temperature Profile Tests
+// ============================================================
+
+TEST(HeatTransferTest, WallTemperatureProfileSingleLayer) {
+    double T_hot = 400.0;   // K
+    double T_cold = 300.0;  // K
+    double h_hot = 500.0;   // W/(m²·K)
+    double h_cold = 100.0;  // W/(m²·K)
+    double t_wall = 0.01;   // m
+    double k_wall = 50.0;   // W/(m·K)
+    
+    double q;
+    std::vector<double> layers = {t_wall / k_wall};
+    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, layers, q);
+    
+    // Total R = 1/500 + 0.01/50 + 1/100 = 0.002 + 0.0002 + 0.01 = 0.0122 m²·K/W
+    // q = 100 / 0.0122 ≈ 8197 W/m²
+    EXPECT_NEAR(q, 8197, 10);
+    
+    // Should have 2 interface temperatures
+    ASSERT_EQ(temps.size(), 2u);
+    
+    // T_hot_surface = T_hot - q/h_hot = 400 - 8197/500 ≈ 383.6 K
+    EXPECT_NEAR(temps[0], 383.6, 0.5);
+    
+    // T_cold_surface = T_hot_surface - q*(t/k) ≈ 383.6 - 8197*0.0002 ≈ 382.0 K
+    EXPECT_NEAR(temps[1], 382.0, 0.5);
+    
+    // Verify: T_cold_surface - q/h_cold should equal T_cold
+    EXPECT_NEAR(temps[1] - q / h_cold, T_cold, 0.1);
+}
+
+TEST(HeatTransferTest, WallTemperatureProfileMultiLayer) {
+    double T_hot = 500.0;   // K
+    double T_cold = 300.0;  // K
+    double h_hot = 500.0;   // W/(m²·K)
+    double h_cold = 50.0;   // W/(m²·K)
+    
+    // Steel + insulation
+    double t_steel = 0.005;   // m
+    double k_steel = 50.0;    // W/(m·K)
+    double t_insul = 0.05;    // m
+    double k_insul = 0.04;    // W/(m·K)
+    
+    double q;
+    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold,
+                                          {t_steel / k_steel, t_insul / k_insul}, q);
+    
+    // Should have 3 interface temperatures
+    ASSERT_EQ(temps.size(), 3u);
+    
+    // Insulation dominates, so most temperature drop is across insulation
+    double dT_steel = temps[0] - temps[1];
+    double dT_insul = temps[1] - temps[2];
+    
+    // Insulation has much higher resistance, so larger dT
+    EXPECT_GT(dT_insul, dT_steel * 10);
+    
+    // All temperatures should be between T_hot and T_cold
+    for (double T : temps) {
+        EXPECT_GE(T, T_cold);
+        EXPECT_LE(T, T_hot);
+    }
+    
+    // Temperatures should be monotonically decreasing
+    EXPECT_GT(temps[0], temps[1]);
+    EXPECT_GT(temps[1], temps[2]);
+}
+
+// ============================================================
+// NTU-Effectiveness Tests
+// ============================================================
+
+TEST(HeatTransferTest, NTU) {
+    double U = 100.0;     // W/(m²·K)
+    double A = 10.0;      // m²
+    double C_min = 500.0; // W/K
+    
+    // NTU = U * A / C_min = 100 * 10 / 500 = 2
+    EXPECT_DOUBLE_EQ(ntu(U, A, C_min), 2.0);
+}
+
+TEST(HeatTransferTest, CapacityRatio) {
+    EXPECT_DOUBLE_EQ(capacity_ratio(500.0, 1000.0), 0.5);
+    EXPECT_DOUBLE_EQ(capacity_ratio(1000.0, 1000.0), 1.0);
+}
+
+TEST(HeatTransferTest, EffectivenessCounterflowBalanced) {
+    // For C_r = 1: ε = NTU / (1 + NTU)
+    EXPECT_NEAR(effectiveness_counterflow(1.0, 1.0), 0.5, 1e-10);
+    EXPECT_NEAR(effectiveness_counterflow(2.0, 1.0), 2.0/3.0, 1e-10);
+    EXPECT_NEAR(effectiveness_counterflow(9.0, 1.0), 0.9, 1e-10);
+}
+
+TEST(HeatTransferTest, EffectivenessCounterflowCondenser) {
+    // For C_r = 0: ε = 1 - exp(-NTU)
+    EXPECT_NEAR(effectiveness_counterflow(1.0, 0.0), 1.0 - std::exp(-1.0), 1e-10);
+    EXPECT_NEAR(effectiveness_counterflow(3.0, 0.0), 1.0 - std::exp(-3.0), 1e-10);
+}
+
+TEST(HeatTransferTest, EffectivenessCounterflowGeneral) {
+    // NTU = 2, C_r = 0.5
+    // ε = (1 - exp(-2*0.5)) / (1 - 0.5*exp(-2*0.5))
+    //   = (1 - exp(-1)) / (1 - 0.5*exp(-1))
+    //   ≈ 0.6321 / 0.8161 ≈ 0.775
+    double eps = effectiveness_counterflow(2.0, 0.5);
+    EXPECT_NEAR(eps, 0.775, 0.001);
+}
+
+TEST(HeatTransferTest, EffectivenessParallelflow) {
+    // For C_r = 0: ε = 1 - exp(-NTU)
+    EXPECT_NEAR(effectiveness_parallelflow(1.0, 0.0), 1.0 - std::exp(-1.0), 1e-10);
+    
+    // General case: NTU = 2, C_r = 0.5
+    // ε = (1 - exp(-2*1.5)) / 1.5 = (1 - exp(-3)) / 1.5 ≈ 0.633
+    double eps = effectiveness_parallelflow(2.0, 0.5);
+    EXPECT_NEAR(eps, 0.633, 0.001);
+    
+    // Parallel flow always has lower effectiveness than counter flow
+    double eps_counter = effectiveness_counterflow(2.0, 0.5);
+    EXPECT_LT(eps, eps_counter);
+}
+
+TEST(HeatTransferTest, HeatRateFromEffectiveness) {
+    double epsilon = 0.8;
+    double C_min = 500.0;  // W/K
+    double T_hot_in = 400.0;
+    double T_cold_in = 300.0;
+    
+    // Q = ε * C_min * (T_hot_in - T_cold_in) = 0.8 * 500 * 100 = 40000 W
+    EXPECT_DOUBLE_EQ(heat_rate_from_effectiveness(epsilon, C_min, T_hot_in, T_cold_in), 40000.0);
+}

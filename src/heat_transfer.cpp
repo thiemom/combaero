@@ -199,6 +199,102 @@ double lmtd_parallelflow(double T_hot_in, double T_hot_out,
 }
 
 // -------------------------------------------------------------
+// Temperature Profile Through Wall
+// -------------------------------------------------------------
+
+std::vector<double> wall_temperature_profile(
+    double T_hot, double T_cold,
+    double h_hot, double h_cold,
+    const std::vector<double>& t_over_k,
+    double& q) {
+    
+    if (h_hot <= 0 || h_cold <= 0) {
+        throw std::invalid_argument("wall_temperature_profile: HTCs must be positive");
+    }
+    
+    // Total thermal resistance per unit area [m²·K/W]
+    double R_total = 1.0 / h_hot + 1.0 / h_cold;
+    for (double r : t_over_k) {
+        if (r < 0) {
+            throw std::invalid_argument("wall_temperature_profile: t/k values must be non-negative");
+        }
+        R_total += r;
+    }
+    
+    // Heat flux (constant through all layers)
+    q = (T_hot - T_cold) / R_total;
+    
+    // Build temperature profile
+    // Start from hot side, subtract temperature drops
+    std::vector<double> temps;
+    temps.reserve(t_over_k.size() + 2);
+    
+    // Hot surface temperature (after convective resistance)
+    double T = T_hot - q / h_hot;
+    temps.push_back(T);
+    
+    // Temperature at each layer interface
+    for (double r : t_over_k) {
+        T -= q * r;
+        temps.push_back(T);
+    }
+    
+    return temps;
+}
+
+std::vector<double> wall_temperature_profile(
+    double T_hot, double T_cold,
+    double h_hot, double h_cold,
+    const std::vector<double>& t_over_k) {
+    double q_unused;
+    return wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_unused);
+}
+
+// -------------------------------------------------------------
+// NTU-Effectiveness Method
+// -------------------------------------------------------------
+
+double effectiveness_counterflow(double NTU, double C_r) {
+    if (NTU < 0) {
+        throw std::invalid_argument("effectiveness_counterflow: NTU must be non-negative");
+    }
+    if (C_r < 0 || C_r > 1) {
+        throw std::invalid_argument("effectiveness_counterflow: C_r must be in [0, 1]");
+    }
+    
+    // Special case: C_r = 1 (balanced heat exchanger)
+    if (std::abs(C_r - 1.0) < 1e-10) {
+        return NTU / (1.0 + NTU);
+    }
+    
+    // Special case: C_r = 0 (one fluid has infinite capacity, e.g., condenser/evaporator)
+    if (C_r < 1e-10) {
+        return 1.0 - std::exp(-NTU);
+    }
+    
+    // General case
+    double exp_term = std::exp(-NTU * (1.0 - C_r));
+    return (1.0 - exp_term) / (1.0 - C_r * exp_term);
+}
+
+double effectiveness_parallelflow(double NTU, double C_r) {
+    if (NTU < 0) {
+        throw std::invalid_argument("effectiveness_parallelflow: NTU must be non-negative");
+    }
+    if (C_r < 0 || C_r > 1) {
+        throw std::invalid_argument("effectiveness_parallelflow: C_r must be in [0, 1]");
+    }
+    
+    // Special case: C_r = 0
+    if (C_r < 1e-10) {
+        return 1.0 - std::exp(-NTU);
+    }
+    
+    // General case
+    return (1.0 - std::exp(-NTU * (1.0 + C_r))) / (1.0 + C_r);
+}
+
+// -------------------------------------------------------------
 // State-based convenience functions
 // -------------------------------------------------------------
 

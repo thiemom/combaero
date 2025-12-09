@@ -207,6 +207,108 @@ double lmtd_parallelflow(double T_hot_in, double T_hot_out,
                          double T_cold_in, double T_cold_out);
 
 // -------------------------------------------------------------
+// Heat Transfer Rate and Heat Flux
+// -------------------------------------------------------------
+
+// Heat transfer rate Q = U * A * ΔT  [W]
+// U  : overall heat transfer coefficient [W/(m²·K)]
+// A  : heat transfer area [m²]
+// dT : temperature difference [K]
+inline double heat_rate(double U, double A, double dT) {
+    return U * A * dT;
+}
+
+// Heat flux q = U * ΔT  [W/m²]
+// (heat rate per unit area)
+inline double heat_flux(double U, double dT) {
+    return U * dT;
+}
+
+// Required area for given heat rate
+// A = Q / (U * ΔT)  [m²]
+inline double heat_transfer_area(double Q, double U, double dT) {
+    return Q / (U * dT);
+}
+
+// Temperature difference for given heat rate
+// ΔT = Q / (U * A)  [K]
+inline double heat_transfer_dT(double Q, double U, double A) {
+    return Q / (U * A);
+}
+
+// -------------------------------------------------------------
+// Temperature Profile Through Wall
+// -------------------------------------------------------------
+
+// Temperature profile through a multi-layer wall
+// Returns vector of temperatures at each interface:
+//   [T_hot_surface, T_layer1_2, T_layer2_3, ..., T_cold_surface]
+//
+// Parameters:
+//   T_hot      : hot-side bulk fluid temperature [K]
+//   T_cold     : cold-side bulk fluid temperature [K]
+//   h_hot      : hot-side convective HTC [W/(m²·K)]
+//   h_cold     : cold-side convective HTC [W/(m²·K)]
+//   t_over_k   : vector of thickness/conductivity for each layer [m²·K/W]
+//   q          : (output) heat flux through wall [W/m²]
+//
+// The heat flux is constant through all layers (steady state).
+std::vector<double> wall_temperature_profile(
+    double T_hot, double T_cold,
+    double h_hot, double h_cold,
+    const std::vector<double>& t_over_k,
+    double& q);
+
+// Simplified version without heat flux output
+std::vector<double> wall_temperature_profile(
+    double T_hot, double T_cold,
+    double h_hot, double h_cold,
+    const std::vector<double>& t_over_k);
+
+// Single-layer wall convenience function
+// Returns: {T_hot_surface, T_cold_surface}
+inline std::vector<double> wall_temperature_profile(
+    double T_hot, double T_cold,
+    double h_hot, double h_cold,
+    double t_wall, double k_wall) {
+    return wall_temperature_profile(T_hot, T_cold, h_hot, h_cold,
+                                    std::vector<double>{t_wall / k_wall});
+}
+
+// -------------------------------------------------------------
+// NTU-Effectiveness Method
+// -------------------------------------------------------------
+
+// Number of Transfer Units
+// NTU = U * A / C_min
+// C_min : minimum heat capacity rate [W/K]
+inline double ntu(double U, double A, double C_min) {
+    return U * A / C_min;
+}
+
+// Heat capacity rate ratio
+// C_r = C_min / C_max
+inline double capacity_ratio(double C_min, double C_max) {
+    return C_min / C_max;
+}
+
+// Effectiveness for counter-flow heat exchanger
+// ε = (1 - exp(-NTU*(1-C_r))) / (1 - C_r*exp(-NTU*(1-C_r)))
+// For C_r = 1: ε = NTU / (1 + NTU)
+double effectiveness_counterflow(double NTU, double C_r);
+
+// Effectiveness for parallel-flow heat exchanger
+// ε = (1 - exp(-NTU*(1+C_r))) / (1 + C_r)
+double effectiveness_parallelflow(double NTU, double C_r);
+
+// Actual heat transfer from effectiveness
+// Q = ε * C_min * (T_hot_in - T_cold_in)
+inline double heat_rate_from_effectiveness(double epsilon, double C_min,
+                                           double T_hot_in, double T_cold_in) {
+    return epsilon * C_min * (T_hot_in - T_cold_in);
+}
+
+// -------------------------------------------------------------
 // State-based convenience functions
 // -------------------------------------------------------------
 

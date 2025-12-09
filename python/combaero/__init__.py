@@ -149,6 +149,16 @@ try:
         lmtd,
         lmtd_counterflow,
         lmtd_parallelflow,
+        heat_rate,
+        heat_flux,
+        heat_transfer_area,
+        heat_transfer_dT,
+        wall_temperature_profile,
+        ntu,
+        capacity_ratio,
+        effectiveness_counterflow,
+        effectiveness_parallelflow,
+        heat_rate_from_effectiveness,
         # Incompressible flow
         bernoulli_P2,
         bernoulli_v2,
@@ -302,6 +312,16 @@ except ModuleNotFoundError:
     lmtd = _core.lmtd
     lmtd_counterflow = _core.lmtd_counterflow
     lmtd_parallelflow = _core.lmtd_parallelflow
+    heat_rate = _core.heat_rate
+    heat_flux = _core.heat_flux
+    heat_transfer_area = _core.heat_transfer_area
+    heat_transfer_dT = _core.heat_transfer_dT
+    wall_temperature_profile = _core.wall_temperature_profile
+    ntu = _core.ntu
+    capacity_ratio = _core.capacity_ratio
+    effectiveness_counterflow = _core.effectiveness_counterflow
+    effectiveness_parallelflow = _core.effectiveness_parallelflow
+    heat_rate_from_effectiveness = _core.heat_rate_from_effectiveness
     # Incompressible flow
     bernoulli_P2 = _core.bernoulli_P2
     bernoulli_v2 = _core.bernoulli_v2
@@ -453,6 +473,16 @@ __all__ = [
     "lmtd",
     "lmtd_counterflow",
     "lmtd_parallelflow",
+    "heat_rate",
+    "heat_flux",
+    "heat_transfer_area",
+    "heat_transfer_dT",
+    "wall_temperature_profile",
+    "ntu",
+    "capacity_ratio",
+    "effectiveness_counterflow",
+    "effectiveness_parallelflow",
+    "heat_rate_from_effectiveness",
     # Incompressible flow
     "bernoulli_P2",
     "bernoulli_v2",

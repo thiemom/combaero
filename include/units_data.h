@@ -151,6 +151,16 @@ inline constexpr Entry function_units[] = {
     {"overall_htc_tube",        "h_inner, h_outer: W/(m^2*K), t_wall: m, k_wall: W/(m*K)", "W/(m^2*K)"},
     {"thermal_resistance",      "h: W/(m^2*K), A: m^2",                 "K/W"},
     {"thermal_resistance_wall", "t: m, k: W/(m*K), A: m^2",             "K/W"},
+    {"heat_rate",               "U: W/(m^2*K), A: m^2, dT: K",          "W"},
+    {"heat_flux",               "U: W/(m^2*K), dT: K",                  "W/m^2"},
+    {"heat_transfer_area",      "Q: W, U: W/(m^2*K), dT: K",            "m^2"},
+    {"heat_transfer_dT",        "Q: W, U: W/(m^2*K), A: m^2",           "K"},
+    {"wall_temperature_profile", "T_hot: K, T_cold: K, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W", "K (vector)"},
+    {"ntu",                     "U: W/(m^2*K), A: m^2, C_min: W/K",     "-"},
+    {"capacity_ratio",          "C_min: W/K, C_max: W/K",               "-"},
+    {"effectiveness_counterflow", "NTU: -, C_r: -",                     "-"},
+    {"effectiveness_parallelflow", "NTU: -, C_r: -",                    "-"},
+    {"heat_rate_from_effectiveness", "epsilon: -, C_min: W/K, T_hot_in: K, T_cold_in: K", "W"},
 
     // -------------------------------------------------------------------------
     // orifice.h - Discharge Coefficients

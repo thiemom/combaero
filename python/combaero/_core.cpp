@@ -1623,6 +1623,107 @@ PYBIND11_MODULE(_core, m)
         "ΔT2 = T_hot_out - T_cold_out"
     );
 
+    m.def(
+        "heat_rate",
+        &heat_rate,
+        py::arg("U"),
+        py::arg("A"),
+        py::arg("dT"),
+        "Heat transfer rate Q = U * A * ΔT [W]"
+    );
+
+    m.def(
+        "heat_flux",
+        &heat_flux,
+        py::arg("U"),
+        py::arg("dT"),
+        "Heat flux q = U * ΔT [W/m²]"
+    );
+
+    m.def(
+        "heat_transfer_area",
+        &heat_transfer_area,
+        py::arg("Q"),
+        py::arg("U"),
+        py::arg("dT"),
+        "Required area A = Q / (U * ΔT) [m²]"
+    );
+
+    m.def(
+        "heat_transfer_dT",
+        &heat_transfer_dT,
+        py::arg("Q"),
+        py::arg("U"),
+        py::arg("A"),
+        "Temperature difference ΔT = Q / (U * A) [K]"
+    );
+
+    m.def(
+        "wall_temperature_profile",
+        [](double T_hot, double T_cold, double h_hot, double h_cold,
+           py::array_t<double, py::array::c_style | py::array::forcecast> tk_arr)
+        {
+            auto t_over_k = to_vec(tk_arr);
+            double q;
+            auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q);
+            return py::make_tuple(temps, q);
+        },
+        py::arg("T_hot"),
+        py::arg("T_cold"),
+        py::arg("h_hot"),
+        py::arg("h_cold"),
+        py::arg("t_over_k"),
+        "Temperature profile through multi-layer wall.\n\n"
+        "Returns (temps, q) where:\n"
+        "  temps : interface temperatures [K]\n"
+        "  q     : heat flux [W/m²]"
+    );
+
+    m.def(
+        "ntu",
+        &ntu,
+        py::arg("U"),
+        py::arg("A"),
+        py::arg("C_min"),
+        "Number of Transfer Units: NTU = U * A / C_min"
+    );
+
+    m.def(
+        "capacity_ratio",
+        &capacity_ratio,
+        py::arg("C_min"),
+        py::arg("C_max"),
+        "Heat capacity ratio: C_r = C_min / C_max"
+    );
+
+    m.def(
+        "effectiveness_counterflow",
+        &effectiveness_counterflow,
+        py::arg("NTU"),
+        py::arg("C_r"),
+        "Effectiveness for counter-flow heat exchanger.\n\n"
+        "ε = (1 - exp(-NTU*(1-C_r))) / (1 - C_r*exp(-NTU*(1-C_r)))"
+    );
+
+    m.def(
+        "effectiveness_parallelflow",
+        &effectiveness_parallelflow,
+        py::arg("NTU"),
+        py::arg("C_r"),
+        "Effectiveness for parallel-flow heat exchanger.\n\n"
+        "ε = (1 - exp(-NTU*(1+C_r))) / (1 + C_r)"
+    );
+
+    m.def(
+        "heat_rate_from_effectiveness",
+        &heat_rate_from_effectiveness,
+        py::arg("epsilon"),
+        py::arg("C_min"),
+        py::arg("T_hot_in"),
+        py::arg("T_cold_in"),
+        "Heat rate from effectiveness: Q = ε * C_min * (T_hot_in - T_cold_in) [W]"
+    );
+
     // Nozzle thrust (from NozzleSolution)
     m.def(
         "nozzle_thrust",
