@@ -33,4 +33,34 @@ double hydraulic_diameter_rect(double a, double b);
 // Returns: hydraulic diameter [m]
 double hydraulic_diameter_annulus(double D_outer, double D_inner);
 
+// -------------------------------------------------------------
+// Acoustic Geometry Primitives
+// -------------------------------------------------------------
+// Standard shapes for acoustic mode calculations.
+// All dimensions in SI units (meters).
+
+// Cylindrical tube (pipe, duct, combustor liner)
+struct Tube {
+    double L;   // Length [m]
+    double D;   // Diameter [m]
+    
+    double area() const;           // Cross-sectional area [m²]
+    double volume() const;         // Volume [m³]
+    double perimeter() const;      // Circumference [m]
+};
+
+// Annular duct (gas turbine combustor, annular gaps)
+// Thin annulus approximation valid when (D_outer - D_inner) << D_mean
+struct Annulus {
+    double L;        // Length [m]
+    double D_inner;  // Inner diameter [m]
+    double D_outer;  // Outer diameter [m]
+    
+    double D_mean() const;         // Mean diameter [m]: (D_inner + D_outer) / 2
+    double gap() const;            // Annular gap [m]: (D_outer - D_inner) / 2
+    double area() const;           // Cross-sectional area [m²]
+    double volume() const;         // Volume [m³]
+    double circumference() const;  // Mean circumference [m]: π * D_mean
+};
+
 #endif // GEOMETRY_H

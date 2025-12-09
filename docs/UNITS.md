@@ -384,6 +384,18 @@ All functions use consistent units to avoid conversion errors.
 | `dT_edge_dT_bulk`              | edge_idx, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W                                                           | - (dT/dT_hot, dT/dT_cold) |
 | `dT_edge_dq`                   | edge_idx, h_hot: W/(m^2*K), t_over_k: m^2*K/W                                                                   | K*m^2/W (dT_edge/dq)      |
 
+### acoustics.h - Acoustic Mode Analysis
+
+| Function                  | Input Units                                                                         | Output Unit  |
+|---------------------------|-------------------------------------------------------------------------------------|--------------|
+| `tube_axial_modes`        | Tube (L: m, D: m), c: m/s, upstream: BC, downstream: BC, n_max                      | Hz (vector)  |
+| `annulus_axial_modes`     | Annulus (L: m, D_inner: m, D_outer: m), c: m/s, upstream: BC, downstream: BC, n_max | Hz (vector)  |
+| `annulus_azimuthal_modes` | Annulus, c: m/s, m_max                                                              | Hz (vector)  |
+| `annulus_modes`           | Annulus, c: m/s, upstream: BC, downstream: BC, n_max, m_max                         | Hz (vector)  |
+| `modes_in_range`          | modes, f_min: Hz, f_max: Hz                                                         | Hz (vector)  |
+| `closest_mode`            | modes, f_target: Hz                                                                 | AcousticMode |
+| `min_mode_separation`     | modes                                                                               | Hz           |
+
 ---
 
 ## Dimensionless Quantities

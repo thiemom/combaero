@@ -1,4 +1,5 @@
 #include "../include/geometry.h"
+#include "../include/math_constants.h"
 #include <stdexcept>
 
 double hydraulic_diameter(double A, double P_wetted) {
@@ -20,4 +21,44 @@ double hydraulic_diameter_annulus(double D_outer, double D_inner) {
         throw std::invalid_argument("hydraulic_diameter_annulus: D_outer > D_inner >= 0 required");
     }
     return D_outer - D_inner;
+}
+
+// -------------------------------------------------------------
+// Tube methods
+// -------------------------------------------------------------
+
+double Tube::area() const {
+    return M_PI * D * D / 4.0;
+}
+
+double Tube::volume() const {
+    return area() * L;
+}
+
+double Tube::perimeter() const {
+    return M_PI * D;
+}
+
+// -------------------------------------------------------------
+// Annulus methods
+// -------------------------------------------------------------
+
+double Annulus::D_mean() const {
+    return (D_inner + D_outer) / 2.0;
+}
+
+double Annulus::gap() const {
+    return (D_outer - D_inner) / 2.0;
+}
+
+double Annulus::area() const {
+    return M_PI * (D_outer * D_outer - D_inner * D_inner) / 4.0;
+}
+
+double Annulus::volume() const {
+    return area() * L;
+}
+
+double Annulus::circumference() const {
+    return M_PI * D_mean();
 }

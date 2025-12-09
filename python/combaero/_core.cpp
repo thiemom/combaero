@@ -13,6 +13,7 @@
 #include "incompressible.h"
 #include "friction.h"
 #include "heat_transfer.h"
+#include "acoustics.h"
 #include "state.h"
 #include "orifice.h"
 #include "units.h"
@@ -1858,6 +1859,133 @@ PYBIND11_MODULE(_core, m)
         py::arg("t_over_k"),
         "Sensitivity of edge temperature to heat flux.\n\n"
         "Returns ∂T_edge/∂q [K·m²/W] (negative)."
+    );
+
+    // =========================================================================
+    // Acoustics
+    // =========================================================================
+
+    // Tube struct
+    py::class_<Tube>(m, "Tube", "Cylindrical tube geometry for acoustic analysis")
+        .def(py::init<double, double>(), py::arg("L"), py::arg("D"),
+             "Create tube with length L [m] and diameter D [m]")
+        .def_readwrite("L", &Tube::L, "Length [m]")
+        .def_readwrite("D", &Tube::D, "Diameter [m]")
+        .def("area", &Tube::area, "Cross-sectional area [m²]")
+        .def("volume", &Tube::volume, "Volume [m³]")
+        .def("perimeter", &Tube::perimeter, "Circumference [m]");
+
+    // Annulus struct
+    py::class_<Annulus>(m, "Annulus", "Annular duct geometry for acoustic analysis")
+        .def(py::init<double, double, double>(),
+             py::arg("L"), py::arg("D_inner"), py::arg("D_outer"),
+             "Create annulus with length L [m], inner diameter D_inner [m], outer diameter D_outer [m]")
+        .def_readwrite("L", &Annulus::L, "Length [m]")
+        .def_readwrite("D_inner", &Annulus::D_inner, "Inner diameter [m]")
+        .def_readwrite("D_outer", &Annulus::D_outer, "Outer diameter [m]")
+        .def("D_mean", &Annulus::D_mean, "Mean diameter [m]")
+        .def("gap", &Annulus::gap, "Annular gap [m]")
+        .def("area", &Annulus::area, "Cross-sectional area [m²]")
+        .def("volume", &Annulus::volume, "Volume [m³]")
+        .def("circumference", &Annulus::circumference, "Mean circumference [m]");
+
+    // BoundaryCondition enum
+    py::enum_<BoundaryCondition>(m, "BoundaryCondition", "Acoustic boundary condition")
+        .value("Open", BoundaryCondition::Open, "Pressure release (p'=0)")
+        .value("Closed", BoundaryCondition::Closed, "Rigid wall (u'=0)");
+
+    // AcousticMode struct
+    py::class_<AcousticMode>(m, "AcousticMode", "Acoustic mode with frequency and indices")
+        .def_readonly("n_axial", &AcousticMode::n_axial, "Longitudinal mode number")
+        .def_readonly("n_azimuthal", &AcousticMode::n_azimuthal, "Azimuthal mode number")
+        .def_readonly("frequency", &AcousticMode::frequency, "Natural frequency [Hz]")
+        .def("label", &AcousticMode::label, "Mode label (e.g., '1L', '2T', '1L1T')")
+        .def("__repr__", [](const AcousticMode& m) {
+            return "<AcousticMode " + m.label() + " @ " + 
+                   std::to_string(m.frequency) + " Hz>";
+        });
+
+    // Tube modes
+    m.def(
+        "tube_axial_modes",
+        &tube_axial_modes,
+        py::arg("tube"),
+        py::arg("c"),
+        py::arg("upstream"),
+        py::arg("downstream"),
+        py::arg("n_max") = 5,
+        "Compute axial acoustic modes of a tube.\n\n"
+        "tube      : Tube geometry\n"
+        "c         : Speed of sound [m/s]\n"
+        "upstream  : Boundary condition at x=0\n"
+        "downstream: Boundary condition at x=L\n"
+        "n_max     : Maximum mode number (default: 5)\n\n"
+        "Returns list of AcousticMode sorted by frequency."
+    );
+
+    // Annulus modes
+    m.def(
+        "annulus_axial_modes",
+        &annulus_axial_modes,
+        py::arg("annulus"),
+        py::arg("c"),
+        py::arg("upstream"),
+        py::arg("downstream"),
+        py::arg("n_max") = 5,
+        "Compute axial acoustic modes of an annulus."
+    );
+
+    m.def(
+        "annulus_azimuthal_modes",
+        &annulus_azimuthal_modes,
+        py::arg("annulus"),
+        py::arg("c"),
+        py::arg("m_max") = 4,
+        "Compute azimuthal (tangential) acoustic modes of an annulus.\n\n"
+        "f_m = m * c / (π * D_mean)"
+    );
+
+    m.def(
+        "annulus_modes",
+        &annulus_modes,
+        py::arg("annulus"),
+        py::arg("c"),
+        py::arg("upstream"),
+        py::arg("downstream"),
+        py::arg("n_max") = 5,
+        py::arg("m_max") = 4,
+        "Compute all acoustic modes (axial, azimuthal, combined) of an annulus.\n\n"
+        "Returns list of AcousticMode sorted by frequency."
+    );
+
+    // Utility functions
+    m.def(
+        "modes_in_range",
+        &modes_in_range,
+        py::arg("modes"),
+        py::arg("f_min"),
+        py::arg("f_max"),
+        "Filter modes within a frequency range [f_min, f_max] Hz."
+    );
+
+    m.def(
+        "closest_mode",
+        [](const std::vector<AcousticMode>& modes, double f_target) -> py::object {
+            const auto* m = closest_mode(modes, f_target);
+            if (m) return py::cast(*m);
+            return py::none();
+        },
+        py::arg("modes"),
+        py::arg("f_target"),
+        "Find the mode closest to a target frequency.\n\n"
+        "Returns AcousticMode or None if modes is empty."
+    );
+
+    m.def(
+        "min_mode_separation",
+        &min_mode_separation,
+        py::arg("modes"),
+        "Minimum frequency separation between adjacent modes [Hz]."
     );
 
     // Nozzle thrust (from NozzleSolution)

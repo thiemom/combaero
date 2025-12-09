@@ -166,6 +166,18 @@ try:
         dT_edge_dT_cold,
         dT_edge_dT_bulk,
         dT_edge_dq,
+        # Acoustics
+        Tube,
+        Annulus,
+        BoundaryCondition,
+        AcousticMode,
+        tube_axial_modes,
+        annulus_axial_modes,
+        annulus_azimuthal_modes,
+        annulus_modes,
+        modes_in_range,
+        closest_mode,
+        min_mode_separation,
         # Incompressible flow
         bernoulli_P2,
         bernoulli_v2,
@@ -336,6 +348,18 @@ except ModuleNotFoundError:
     dT_edge_dT_cold = _core.dT_edge_dT_cold
     dT_edge_dT_bulk = _core.dT_edge_dT_bulk
     dT_edge_dq = _core.dT_edge_dq
+    # Acoustics
+    Tube = _core.Tube
+    Annulus = _core.Annulus
+    BoundaryCondition = _core.BoundaryCondition
+    AcousticMode = _core.AcousticMode
+    tube_axial_modes = _core.tube_axial_modes
+    annulus_axial_modes = _core.annulus_axial_modes
+    annulus_azimuthal_modes = _core.annulus_azimuthal_modes
+    annulus_modes = _core.annulus_modes
+    modes_in_range = _core.modes_in_range
+    closest_mode = _core.closest_mode
+    min_mode_separation = _core.min_mode_separation
     # Incompressible flow
     bernoulli_P2 = _core.bernoulli_P2
     bernoulli_v2 = _core.bernoulli_v2
@@ -504,6 +528,18 @@ __all__ = [
     "dT_edge_dT_cold",
     "dT_edge_dT_bulk",
     "dT_edge_dq",
+    # Acoustics
+    "Tube",
+    "Annulus",
+    "BoundaryCondition",
+    "AcousticMode",
+    "tube_axial_modes",
+    "annulus_axial_modes",
+    "annulus_azimuthal_modes",
+    "annulus_modes",
+    "modes_in_range",
+    "closest_mode",
+    "min_mode_separation",
     # Incompressible flow
     "bernoulli_P2",
     "bernoulli_v2",

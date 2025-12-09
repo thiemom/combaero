@@ -7,6 +7,7 @@
 #include "../include/humidair.h"
 #include "../include/compressible.h"
 #include "../include/friction.h"
+#include "../include/acoustics.h"
 #include "../include/state.h"
 #include "../include/math_constants.h"  // MSVC compatibility for M_PI
 #include <vector>
@@ -3801,4 +3802,205 @@ TEST(HeatTransferTest, TemperatureSensitivityToHeatFlux) {
         EXPECT_GE(std::abs(sens), prev_mag);  // Magnitude increases
         prev_mag = std::abs(sens);
     }
+}
+
+// ============================================================
+// Acoustic Mode Tests
+// ============================================================
+
+TEST(AcousticsTest, TubeGeometry) {
+    Tube tube{1.0, 0.1};  // L=1m, D=0.1m
+    
+    EXPECT_DOUBLE_EQ(tube.L, 1.0);
+    EXPECT_DOUBLE_EQ(tube.D, 0.1);
+    EXPECT_NEAR(tube.area(), M_PI * 0.01 / 4.0, 1e-10);
+    EXPECT_NEAR(tube.volume(), M_PI * 0.01 / 4.0, 1e-10);
+    EXPECT_NEAR(tube.perimeter(), M_PI * 0.1, 1e-10);
+}
+
+TEST(AcousticsTest, AnnulusGeometry) {
+    Annulus ann{0.5, 0.4, 0.5};  // L=0.5m, D_inner=0.4m, D_outer=0.5m
+    
+    EXPECT_DOUBLE_EQ(ann.D_mean(), 0.45);
+    EXPECT_DOUBLE_EQ(ann.gap(), 0.05);
+    EXPECT_NEAR(ann.circumference(), M_PI * 0.45, 1e-10);
+    
+    // Area = π/4 * (D_outer² - D_inner²)
+    double expected_area = M_PI / 4.0 * (0.25 - 0.16);
+    EXPECT_NEAR(ann.area(), expected_area, 1e-10);
+}
+
+TEST(AcousticsTest, TubeClosedClosed) {
+    // Closed-Closed tube: f_n = n * c / (2L)
+    Tube tube{1.0, 0.1};
+    double c = 343.0;  // Air at ~20°C
+    
+    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Closed, 
+                                   BoundaryCondition::Closed, 5);
+    
+    ASSERT_EQ(modes.size(), 5u);
+    
+    // Check frequencies
+    EXPECT_NEAR(modes[0].frequency, 171.5, 0.1);   // 1L: c/2L
+    EXPECT_NEAR(modes[1].frequency, 343.0, 0.1);   // 2L: c/L
+    EXPECT_NEAR(modes[2].frequency, 514.5, 0.1);   // 3L: 3c/2L
+    
+    // Check mode labels
+    EXPECT_EQ(modes[0].label(), "1L");
+    EXPECT_EQ(modes[1].label(), "2L");
+    EXPECT_EQ(modes[2].label(), "3L");
+    
+    // Check mode indices
+    EXPECT_EQ(modes[0].n_axial, 1);
+    EXPECT_EQ(modes[0].n_azimuthal, 0);
+}
+
+TEST(AcousticsTest, TubeOpenOpen) {
+    // Open-Open has same frequencies as Closed-Closed
+    Tube tube{1.0, 0.1};
+    double c = 343.0;
+    
+    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Open, 
+                                   BoundaryCondition::Open, 3);
+    
+    EXPECT_NEAR(modes[0].frequency, 171.5, 0.1);
+    EXPECT_NEAR(modes[1].frequency, 343.0, 0.1);
+}
+
+TEST(AcousticsTest, TubeOpenClosed) {
+    // Quarter-wave tube: f_n = (2n-1) * c / (4L)
+    Tube tube{1.0, 0.1};
+    double c = 343.0;
+    
+    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Open, 
+                                   BoundaryCondition::Closed, 3);
+    
+    EXPECT_NEAR(modes[0].frequency, 85.75, 0.1);   // 1L: c/4L
+    EXPECT_NEAR(modes[1].frequency, 257.25, 0.1);  // 2L: 3c/4L
+    EXPECT_NEAR(modes[2].frequency, 428.75, 0.1);  // 3L: 5c/4L
+}
+
+TEST(AcousticsTest, AnnulusAxialModes) {
+    // Same as tube for axial modes
+    Annulus ann{0.5, 0.4, 0.5};
+    double c = 500.0;  // Hot combustion products
+    
+    auto modes = annulus_axial_modes(ann, c, BoundaryCondition::Closed, 
+                                      BoundaryCondition::Closed, 3);
+    
+    // f_n = n * c / (2L) = n * 500 / 1.0 = n * 500
+    EXPECT_NEAR(modes[0].frequency, 500.0, 0.1);   // 1L
+    EXPECT_NEAR(modes[1].frequency, 1000.0, 0.1);  // 2L
+}
+
+TEST(AcousticsTest, AnnulusAzimuthalModes) {
+    // f_m = m * c / (π * D_mean)
+    Annulus ann{0.5, 0.4, 0.5};  // D_mean = 0.45m
+    double c = 500.0;
+    
+    auto modes = annulus_azimuthal_modes(ann, c, 3);
+    
+    // f_1 = c / (π * D_mean) = 500 / (π * 0.45) ≈ 353.7 Hz
+    double f_1T = c / (M_PI * 0.45);
+    EXPECT_NEAR(modes[0].frequency, f_1T, 0.1);
+    EXPECT_NEAR(modes[1].frequency, 2 * f_1T, 0.1);
+    
+    // Check labels
+    EXPECT_EQ(modes[0].label(), "1T");
+    EXPECT_EQ(modes[1].label(), "2T");
+}
+
+TEST(AcousticsTest, AnnulusCombinedModes) {
+    Annulus ann{0.5, 0.4, 0.5};
+    double c = 500.0;
+    
+    auto modes = annulus_modes(ann, c, BoundaryCondition::Closed, 
+                                BoundaryCondition::Closed, 2, 2);
+    
+    // Should have: 1L, 2L, 1T, 2T, 1L1T, 1L2T, 2L1T, 2L2T
+    // Sorted by frequency
+    ASSERT_GE(modes.size(), 8u);
+    
+    // Verify sorted by frequency
+    for (std::size_t i = 1; i < modes.size(); ++i) {
+        EXPECT_LE(modes[i-1].frequency, modes[i].frequency);
+    }
+    
+    // Check combined mode label format
+    bool found_combined = false;
+    for (const auto& m : modes) {
+        if (m.n_axial > 0 && m.n_azimuthal > 0) {
+            found_combined = true;
+            // Label should be like "1L1T"
+            EXPECT_TRUE(m.label().find('L') != std::string::npos);
+            EXPECT_TRUE(m.label().find('T') != std::string::npos);
+        }
+    }
+    EXPECT_TRUE(found_combined);
+}
+
+TEST(AcousticsTest, ModesInRange) {
+    Tube tube{1.0, 0.1};
+    double c = 343.0;
+    
+    auto all_modes = tube_axial_modes(tube, c, BoundaryCondition::Closed, 
+                                       BoundaryCondition::Closed, 10);
+    
+    auto filtered = modes_in_range(all_modes, 300.0, 600.0);
+    
+    // Should include 2L (343 Hz), 3L (514.5 Hz)
+    EXPECT_GE(filtered.size(), 2u);
+    for (const auto& m : filtered) {
+        EXPECT_GE(m.frequency, 300.0);
+        EXPECT_LE(m.frequency, 600.0);
+    }
+}
+
+TEST(AcousticsTest, ClosestMode) {
+    Tube tube{1.0, 0.1};
+    double c = 343.0;
+    
+    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Closed, 
+                                   BoundaryCondition::Closed, 5);
+    
+    // Find mode closest to 350 Hz (should be 2L at 343 Hz)
+    const auto* closest = closest_mode(modes, 350.0);
+    ASSERT_NE(closest, nullptr);
+    EXPECT_EQ(closest->label(), "2L");
+    
+    // Find mode closest to 100 Hz (should be 1L at 171.5 Hz)
+    closest = closest_mode(modes, 100.0);
+    ASSERT_NE(closest, nullptr);
+    EXPECT_EQ(closest->label(), "1L");
+}
+
+TEST(AcousticsTest, MinModeSeparation) {
+    Tube tube{1.0, 0.1};
+    double c = 343.0;
+    
+    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Closed, 
+                                   BoundaryCondition::Closed, 5);
+    
+    // For closed-closed, separation is constant: c/2L = 171.5 Hz
+    double sep = min_mode_separation(modes);
+    EXPECT_NEAR(sep, 171.5, 0.1);
+}
+
+TEST(AcousticsTest, RealCombustorExample) {
+    // Typical gas turbine annular combustor
+    // L ~ 0.3m, D_mean ~ 0.6m, hot products c ~ 800 m/s
+    Annulus combustor{0.3, 0.5, 0.7};  // D_mean = 0.6m
+    double c = 800.0;
+    
+    auto modes = annulus_modes(combustor, c, BoundaryCondition::Closed, 
+                                BoundaryCondition::Open, 3, 3);
+    
+    // 1T mode: f = c / (π * D_mean) = 800 / (π * 0.6) ≈ 424 Hz
+    // This is in the typical combustion instability range (100-1000 Hz)
+    double f_1T = c / (M_PI * 0.6);
+    
+    const auto* mode_1T = closest_mode(modes, f_1T);
+    ASSERT_NE(mode_1T, nullptr);
+    EXPECT_EQ(mode_1T->label(), "1T");
+    EXPECT_NEAR(mode_1T->frequency, f_1T, 1.0);
 }

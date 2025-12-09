@@ -30,6 +30,7 @@ set(SOURCES
     src/incompressible.cpp
     src/friction.cpp
     src/geometry.cpp
+    src/acoustics.cpp
     src/heat_transfer.cpp
     src/humidair.cpp
     src/equilibrium.cpp
