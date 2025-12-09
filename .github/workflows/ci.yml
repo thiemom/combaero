@@ -41,3 +41,25 @@ jobs:
         working-directory: build
         run: |
           ctest --output-on-failure
+
+  build-mingw:
+    name: Build (Ubuntu -> Windows MinGW)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install MinGW-w64
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mingw-w64
+
+      - name: Configure (CMake with MinGW)
+        run: |
+          cmake -S . -B build-mingw \
+            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/cmake/toolchain-mingw.cmake \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Windows binaries
+        run: cmake --build build-mingw --config Release
