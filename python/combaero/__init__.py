@@ -178,6 +178,18 @@ try:
         modes_in_range,
         closest_mode,
         min_mode_separation,
+        # Mean flow correction
+        axial_mode_upstream,
+        axial_mode_downstream,
+        axial_mode_split,
+        # Helmholtz resonator
+        helmholtz_frequency,
+        # Strouhal
+        strouhal,
+        frequency_from_strouhal,
+        # Convenience
+        quarter_wave_frequency,
+        half_wave_frequency,
         # Residence time
         residence_time,
         residence_time_tube,
@@ -366,6 +378,18 @@ except ModuleNotFoundError:
     modes_in_range = _core.modes_in_range
     closest_mode = _core.closest_mode
     min_mode_separation = _core.min_mode_separation
+    # Mean flow correction
+    axial_mode_upstream = _core.axial_mode_upstream
+    axial_mode_downstream = _core.axial_mode_downstream
+    axial_mode_split = _core.axial_mode_split
+    # Helmholtz resonator
+    helmholtz_frequency = _core.helmholtz_frequency
+    # Strouhal
+    strouhal = _core.strouhal
+    frequency_from_strouhal = _core.frequency_from_strouhal
+    # Convenience
+    quarter_wave_frequency = _core.quarter_wave_frequency
+    half_wave_frequency = _core.half_wave_frequency
     # Residence time
     residence_time = _core.residence_time
     residence_time_tube = _core.residence_time_tube
@@ -552,6 +576,18 @@ __all__ = [
     "modes_in_range",
     "closest_mode",
     "min_mode_separation",
+    # Mean flow correction
+    "axial_mode_upstream",
+    "axial_mode_downstream",
+    "axial_mode_split",
+    # Helmholtz resonator
+    "helmholtz_frequency",
+    # Strouhal
+    "strouhal",
+    "frequency_from_strouhal",
+    # Convenience
+    "quarter_wave_frequency",
+    "half_wave_frequency",
     # Residence time
     "residence_time",
     "residence_time_tube",

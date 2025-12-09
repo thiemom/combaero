@@ -4069,3 +4069,141 @@ TEST(GeometryTest, ResidenceTimeConsistency) {
     
     EXPECT_NEAR(tau1, tau2, 1e-10);
 }
+
+// ============================================================
+// Acoustics Phase 2 Tests
+// ============================================================
+
+TEST(AcousticsTest, AxialModeUpstream) {
+    double f0 = 100.0;  // Hz
+    double M = 0.2;
+    
+    // f+ = f0 / (1 - M) = 100 / 0.8 = 125 Hz
+    double f_up = axial_mode_upstream(f0, M);
+    EXPECT_NEAR(f_up, 125.0, 0.01);
+    
+    // Zero Mach: no shift
+    EXPECT_NEAR(axial_mode_upstream(f0, 0.0), f0, 1e-10);
+}
+
+TEST(AcousticsTest, AxialModeDownstream) {
+    double f0 = 100.0;
+    double M = 0.2;
+    
+    // f- = f0 / (1 + M) = 100 / 1.2 ≈ 83.33 Hz
+    double f_down = axial_mode_downstream(f0, M);
+    EXPECT_NEAR(f_down, 83.333, 0.01);
+    
+    // Zero Mach: no shift
+    EXPECT_NEAR(axial_mode_downstream(f0, 0.0), f0, 1e-10);
+}
+
+TEST(AcousticsTest, AxialModeSplit) {
+    double f0 = 200.0;
+    double M = 0.1;
+    
+    auto [f_up, f_down] = axial_mode_split(f0, M);
+    
+    // f+ = 200 / 0.9 ≈ 222.22
+    // f- = 200 / 1.1 ≈ 181.82
+    EXPECT_NEAR(f_up, 222.22, 0.01);
+    EXPECT_NEAR(f_down, 181.82, 0.01);
+    
+    // Frequency split increases with Mach
+    EXPECT_GT(f_up - f_down, 0);
+}
+
+TEST(AcousticsTest, HelmholtzFrequency) {
+    // Classic example: 500 mL bottle with 2 cm diameter, 5 cm long neck
+    double V = 0.0005;           // 500 mL = 0.0005 m³
+    double d_neck = 0.02;        // 2 cm
+    double A_neck = M_PI * d_neck * d_neck / 4.0;
+    double L_neck = 0.05;        // 5 cm
+    double c = 343.0;            // Air at 20°C
+    
+    double f = helmholtz_frequency(V, A_neck, L_neck, c);
+    
+    // Expected: roughly 100-200 Hz for typical bottle
+    EXPECT_GT(f, 50.0);
+    EXPECT_LT(f, 300.0);
+    
+    // Larger volume -> lower frequency
+    double f_large = helmholtz_frequency(2 * V, A_neck, L_neck, c);
+    EXPECT_LT(f_large, f);
+    
+    // Larger neck area -> higher frequency
+    double f_wide = helmholtz_frequency(V, 2 * A_neck, L_neck, c);
+    EXPECT_GT(f_wide, f);
+}
+
+TEST(AcousticsTest, HelmholtzEndCorrection) {
+    double V = 0.001;
+    double A_neck = 0.0001;
+    double L_neck = 0.05;
+    double c = 343.0;
+    
+    // Flanged (0.85) vs unflanged (0.6)
+    double f_flanged = helmholtz_frequency(V, A_neck, L_neck, c, 0.85);
+    double f_unflanged = helmholtz_frequency(V, A_neck, L_neck, c, 0.6);
+    
+    // Smaller end correction -> shorter L_eff -> higher frequency
+    EXPECT_GT(f_unflanged, f_flanged);
+}
+
+TEST(AcousticsTest, Strouhal) {
+    // Vortex shedding from cylinder: St ≈ 0.2
+    double f = 100.0;  // Hz
+    double L = 0.01;   // 1 cm diameter
+    double u = 5.0;    // 5 m/s
+    
+    double St = strouhal(f, L, u);
+    EXPECT_NEAR(St, 0.2, 0.001);
+    
+    // Inverse
+    double f_back = frequency_from_strouhal(St, L, u);
+    EXPECT_NEAR(f_back, f, 1e-10);
+}
+
+TEST(AcousticsTest, StrouhalScaling) {
+    // Same Strouhal at different scales
+    double St = 0.2;
+    
+    // Small scale: L=1cm, u=5m/s
+    double f1 = frequency_from_strouhal(St, 0.01, 5.0);
+    
+    // Large scale: L=10cm, u=50m/s (same St)
+    double f2 = frequency_from_strouhal(St, 0.1, 50.0);
+    
+    // Same frequency (St scaling)
+    EXPECT_NEAR(f1, f2, 0.01);
+}
+
+TEST(AcousticsTest, QuarterWaveFrequency) {
+    double L = 0.25;   // 25 cm
+    double c = 343.0;
+    
+    // f = c / (4L) = 343 / 1.0 = 343 Hz
+    double f = quarter_wave_frequency(L, c);
+    EXPECT_NEAR(f, 343.0, 0.01);
+    
+    // Should match tube_axial_modes with Open-Closed
+    Tube tube{L, 0.05};
+    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Open, 
+                                   BoundaryCondition::Closed, 1);
+    EXPECT_NEAR(modes[0].frequency, f, 0.01);
+}
+
+TEST(AcousticsTest, HalfWaveFrequency) {
+    double L = 0.5;    // 50 cm
+    double c = 343.0;
+    
+    // f = c / (2L) = 343 / 1.0 = 343 Hz
+    double f = half_wave_frequency(L, c);
+    EXPECT_NEAR(f, 343.0, 0.01);
+    
+    // Should match tube_axial_modes with Closed-Closed
+    Tube tube{L, 0.05};
+    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Closed, 
+                                   BoundaryCondition::Closed, 1);
+    EXPECT_NEAR(modes[0].frequency, f, 0.01);
+}

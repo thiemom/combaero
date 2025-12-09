@@ -250,3 +250,89 @@ double min_mode_separation(const std::vector<AcousticMode>& modes) {
     
     return min_sep;
 }
+
+// -------------------------------------------------------------
+// Mean Flow Correction
+// -------------------------------------------------------------
+
+double axial_mode_upstream(double f0, double M) {
+    if (f0 <= 0) {
+        throw std::invalid_argument("axial_mode_upstream: f0 must be positive");
+    }
+    if (M < 0 || M >= 1) {
+        throw std::invalid_argument("axial_mode_upstream: M must be in [0, 1)");
+    }
+    return f0 / (1.0 - M);
+}
+
+double axial_mode_downstream(double f0, double M) {
+    if (f0 <= 0) {
+        throw std::invalid_argument("axial_mode_downstream: f0 must be positive");
+    }
+    if (M < 0) {
+        throw std::invalid_argument("axial_mode_downstream: M must be >= 0");
+    }
+    return f0 / (1.0 + M);
+}
+
+std::pair<double, double> axial_mode_split(double f0, double M) {
+    return {axial_mode_upstream(f0, M), axial_mode_downstream(f0, M)};
+}
+
+// -------------------------------------------------------------
+// Helmholtz Resonator
+// -------------------------------------------------------------
+
+double helmholtz_frequency(double V, double A_neck, double L_neck, double c,
+                           double end_correction) {
+    if (V <= 0 || A_neck <= 0 || L_neck <= 0 || c <= 0) {
+        throw std::invalid_argument("helmholtz_frequency: all parameters must be positive");
+    }
+    if (end_correction < 0) {
+        throw std::invalid_argument("helmholtz_frequency: end_correction must be >= 0");
+    }
+    
+    // Effective neck length with end correction
+    // d_neck = 2 * sqrt(A_neck / π)
+    double d_neck = 2.0 * std::sqrt(A_neck / M_PI);
+    double L_eff = L_neck + end_correction * d_neck;
+    
+    // f = (c / 2π) * sqrt(A / (V * L_eff))
+    return (c / (2.0 * M_PI)) * std::sqrt(A_neck / (V * L_eff));
+}
+
+// -------------------------------------------------------------
+// Strouhal Number
+// -------------------------------------------------------------
+
+double strouhal(double f, double L, double u) {
+    if (f <= 0 || L <= 0 || u <= 0) {
+        throw std::invalid_argument("strouhal: f, L, and u must be positive");
+    }
+    return f * L / u;
+}
+
+double frequency_from_strouhal(double St, double L, double u) {
+    if (St <= 0 || L <= 0 || u <= 0) {
+        throw std::invalid_argument("frequency_from_strouhal: St, L, and u must be positive");
+    }
+    return St * u / L;
+}
+
+// -------------------------------------------------------------
+// Convenience Functions
+// -------------------------------------------------------------
+
+double quarter_wave_frequency(double L, double c) {
+    if (L <= 0 || c <= 0) {
+        throw std::invalid_argument("quarter_wave_frequency: L and c must be positive");
+    }
+    return c / (4.0 * L);
+}
+
+double half_wave_frequency(double L, double c) {
+    if (L <= 0 || c <= 0) {
+        throw std::invalid_argument("half_wave_frequency: L and c must be positive");
+    }
+    return c / (2.0 * L);
+}

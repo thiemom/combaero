@@ -1988,6 +1988,90 @@ PYBIND11_MODULE(_core, m)
         "Minimum frequency separation between adjacent modes [Hz]."
     );
 
+    // Mean flow correction
+    m.def(
+        "axial_mode_upstream",
+        &axial_mode_upstream,
+        py::arg("f0"),
+        py::arg("M"),
+        "Upstream-propagating wave frequency with mean flow.\n\n"
+        "f+ = f0 / (1 - M)\n\n"
+        "f0 : quiescent frequency [Hz]\n"
+        "M  : Mach number [-]"
+    );
+
+    m.def(
+        "axial_mode_downstream",
+        &axial_mode_downstream,
+        py::arg("f0"),
+        py::arg("M"),
+        "Downstream-propagating wave frequency with mean flow.\n\n"
+        "f- = f0 / (1 + M)"
+    );
+
+    m.def(
+        "axial_mode_split",
+        &axial_mode_split,
+        py::arg("f0"),
+        py::arg("M"),
+        "Frequency split due to mean flow.\n\n"
+        "Returns (f_upstream, f_downstream)."
+    );
+
+    // Helmholtz resonator
+    m.def(
+        "helmholtz_frequency",
+        &helmholtz_frequency,
+        py::arg("V"),
+        py::arg("A_neck"),
+        py::arg("L_neck"),
+        py::arg("c"),
+        py::arg("end_correction") = 0.85,
+        "Helmholtz resonator frequency.\n\n"
+        "f = (c / 2π) * √(A / (V * L_eff))\n\n"
+        "V              : cavity volume [m³]\n"
+        "A_neck         : neck area [m²]\n"
+        "L_neck         : neck length [m]\n"
+        "c              : speed of sound [m/s]\n"
+        "end_correction : end correction factor (default: 0.85 flanged)"
+    );
+
+    // Strouhal
+    m.def(
+        "strouhal",
+        &strouhal,
+        py::arg("f"),
+        py::arg("L"),
+        py::arg("u"),
+        "Strouhal number: St = f * L / u"
+    );
+
+    m.def(
+        "frequency_from_strouhal",
+        &frequency_from_strouhal,
+        py::arg("St"),
+        py::arg("L"),
+        py::arg("u"),
+        "Frequency from Strouhal number: f = St * u / L"
+    );
+
+    // Convenience
+    m.def(
+        "quarter_wave_frequency",
+        &quarter_wave_frequency,
+        py::arg("L"),
+        py::arg("c"),
+        "Quarter-wave resonator fundamental: f = c / (4L)"
+    );
+
+    m.def(
+        "half_wave_frequency",
+        &half_wave_frequency,
+        py::arg("L"),
+        py::arg("c"),
+        "Half-wave resonator fundamental: f = c / (2L)"
+    );
+
     // Residence time
     m.def(
         "residence_time",

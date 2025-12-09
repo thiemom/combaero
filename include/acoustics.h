@@ -123,4 +123,70 @@ const AcousticMode* closest_mode(
 // Useful for assessing mode clustering
 double min_mode_separation(const std::vector<AcousticMode>& modes);
 
+// -------------------------------------------------------------
+// Mean Flow Correction (Axial Modes)
+// -------------------------------------------------------------
+// Convective frequency shift for waves propagating with/against mean flow.
+// f± = f₀ / (1 ∓ M)
+//
+// Valid for: M < 0.3 (linear acoustics)
+// Note: For azimuthal modes with swirl, use specialized tools (not covered here)
+
+// Upstream-propagating wave (against flow): f+ = f0 / (1 - M)
+double axial_mode_upstream(double f0, double M);
+
+// Downstream-propagating wave (with flow): f- = f0 / (1 + M)
+double axial_mode_downstream(double f0, double M);
+
+// Both directions at once: {f_upstream, f_downstream}
+std::pair<double, double> axial_mode_split(double f0, double M);
+
+// -------------------------------------------------------------
+// Helmholtz Resonator
+// -------------------------------------------------------------
+// Classic "bottle resonance" frequency.
+// f = (c / 2π) * √(A / (V * L_eff))
+//
+// where L_eff = L_neck + end_correction * d_neck
+//
+// Parameters:
+//   V              : cavity volume [m³]
+//   A_neck         : neck cross-sectional area [m²]
+//   L_neck         : neck length [m]
+//   c              : speed of sound [m/s]
+//   end_correction : end correction factor [-] (default: 0.85 for flanged)
+//                    Use ~0.6 for unflanged opening
+//
+// Applications: acoustic dampers, fuel system tuning, side-branch resonators
+double helmholtz_frequency(double V, double A_neck, double L_neck, double c,
+                           double end_correction = 0.85);
+
+// -------------------------------------------------------------
+// Strouhal Number
+// -------------------------------------------------------------
+// Dimensionless frequency relating oscillation to flow.
+// St = f * L / u
+//
+// Applications:
+// - Vortex shedding: St ≈ 0.2 for cylinders
+// - Flame dynamics: relates heat release oscillation to convective time
+// - Scaling between test rigs and full scale
+
+double strouhal(double f, double L, double u);
+double frequency_from_strouhal(double St, double L, double u);
+
+// -------------------------------------------------------------
+// Convenience Functions
+// -------------------------------------------------------------
+// Named helpers for common frequency calculations.
+// Trivial but self-documenting.
+
+// Quarter-wave resonator fundamental: f = c / (4L)
+// (Open-closed tube, e.g., side-branch damper)
+double quarter_wave_frequency(double L, double c);
+
+// Half-wave resonator fundamental: f = c / (2L)
+// (Open-open or closed-closed tube)
+double half_wave_frequency(double L, double c);
+
 #endif // ACOUSTICS_H

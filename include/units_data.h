@@ -179,6 +179,14 @@ inline constexpr Entry function_units[] = {
     {"modes_in_range",          "modes, f_min: Hz, f_max: Hz", "Hz (vector)"},
     {"closest_mode",            "modes, f_target: Hz", "AcousticMode"},
     {"min_mode_separation",     "modes", "Hz"},
+    {"axial_mode_upstream",     "f0: Hz, M: -", "Hz"},
+    {"axial_mode_downstream",   "f0: Hz, M: -", "Hz"},
+    {"axial_mode_split",        "f0: Hz, M: -", "(Hz, Hz)"},
+    {"helmholtz_frequency",     "V: m^3, A_neck: m^2, L_neck: m, c: m/s, end_correction: -", "Hz"},
+    {"strouhal",                "f: Hz, L: m, u: m/s", "- (St)"},
+    {"frequency_from_strouhal", "St: -, L: m, u: m/s", "Hz"},
+    {"quarter_wave_frequency",  "L: m, c: m/s", "Hz"},
+    {"half_wave_frequency",     "L: m, c: m/s", "Hz"},
 
     // -------------------------------------------------------------------------
     // geometry.h - Residence Time
