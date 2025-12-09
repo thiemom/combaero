@@ -1,9 +1,10 @@
 #include "../include/heat_transfer.h"
 #include "../include/state.h"
 #include "../include/friction.h"  // friction_petukhov, friction_colebrook
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
-#include <algorithm>
+#include <string>
 
 // -------------------------------------------------------------
 // Internal Flow Correlations

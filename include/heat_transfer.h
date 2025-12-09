@@ -1,6 +1,8 @@
 #ifndef HEAT_TRANSFER_H
 #define HEAT_TRANSFER_H
 
+#include <string>
+#include <utility>
 #include <vector>
 
 // -------------------------------------------------------------
