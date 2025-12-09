@@ -58,7 +58,7 @@ jobs:
       - name: Configure (CMake with MinGW)
         run: |
           cmake -S . -B build-mingw \
-            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/cmake/toolchain-mingw.cmake \
+            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/.github/workflows/toolchain-mingw.cmake \
             -DCMAKE_BUILD_TYPE=Release
 
       - name: Build Windows binaries

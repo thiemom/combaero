@@ -46,6 +46,7 @@ CMakeCache.txt
 CMakeFiles/
 *.cmake
 !CMakeLists.txt
+!.github/workflows/toolchain-mingw.cmake
 
 # macOS
 .DS_Store
