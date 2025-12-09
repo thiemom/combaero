@@ -59,7 +59,8 @@ jobs:
         run: |
           cmake -S . -B build-mingw \
             -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/.github/workflows/toolchain-mingw.cmake \
-            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCOMBAERO_ENABLE_TESTS=OFF
 
       - name: Build Windows binaries
         run: cmake --build build-mingw --config Release
