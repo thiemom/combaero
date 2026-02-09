@@ -43,25 +43,31 @@ poetry run pytest --cov=. --cov-report=html
 
 **Complete Combustion**: Uses enthalpy balance (NOT equilibrium) to find adiabatic flame temperature. This correctly validates CombAero's complete combustion model (CO2 + H2O only) without equilibrium effects (no CO, H2, dissociation).
 
+**WGS Equilibrium**: Uses Cantera's equilibrium solver with restricted species (CO, H2O, CO2, H2) to match CombAero's partial equilibrium model. Validates both isothermal and adiabatic equilibrium, plus equilibrium constant calculations.
+
 ## Test Structure
 
 - `test_combustion_validation.py`: Complete combustion, adiabatic flame temperature, product composition (12 tests)
+- `test_equilibrium_validation.py`: WGS equilibrium (isothermal, adiabatic), equilibrium constants (6 tests)
 - `test_mixing_validation.py`: Stream mixing, enthalpy balance, mixture properties (8 tests)
 - `test_transport_validation.py`: Viscosity, thermal conductivity, Prandtl number (12 tests)
 
-**Total**: 32 validation tests
+**Total**: 38 validation tests
 
 ## Tolerances
 
 Based on measured deviations (NASA-7 vs NASA-9 polynomials):
 
-- **Temperature**: ±5 K (measured max: 4.6 K for C3H8)
+- **Temperature**: ±5 K (measured max: 4.6 K for C3H8 combustion)
 - **Mole fractions**: ±0.01 (1% absolute, stoichiometry exact)
 - **Enthalpy**: ±1.5% relative (measured max: 1.02%)
 - **Transport properties**: ±25% relative (measured max: 21.5% at high T)
 - **Density**: ±1% relative (ideal gas law, very accurate)
+- **Equilibrium composition**: ±0.0001 (0.01% absolute, measured max: 0.002%)
+- **Equilibrium temperature**: ±1 K (measured max: 0.0 K)
+- **Equilibrium constant (Kp)**: ±0.2% relative (measured max: 0.12%)
 
-See `FINAL_TEST_REPORT.md` for detailed validation results.
+See `FINAL_TEST_REPORT.md` and `EQUILIBRIUM_TEST_RESULTS.md` for detailed validation results.
 
 ## Pre-commit Integration
 

@@ -72,6 +72,7 @@ def tolerance_config():
     Tolerances based on measured deviations:
     - Temperature: 5.0 K (observed max: 4.6 K for C3H8, NASA-7 vs NASA-9)
     - Transport: 20% (observed: 10-18%, different correlations expected)
+    - Equilibrium: 0.01% composition, 1 K temperature (observed: 0.002%, 0.0 K)
     - Others: Conservative 1% for thermodynamic consistency
     """
     return {
@@ -80,4 +81,7 @@ def tolerance_config():
         "enthalpy": 0.01,  # relative (1%)
         "transport": 0.20,  # relative (20%) - increased for correlation differences
         "density": 0.01,  # relative (1%)
+        "equilibrium_composition": 0.0001,  # absolute (0.01%) - WGS equilibrium
+        "equilibrium_temperature": 1.0,  # K - adiabatic equilibrium
+        "equilibrium_constant": 0.002,  # relative (0.2%) - Kp validation
     }
