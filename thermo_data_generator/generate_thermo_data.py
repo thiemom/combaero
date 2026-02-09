@@ -43,6 +43,7 @@ class Geometry(Enum):
 @dataclass
 class NASACoeffs:
     """NASA polynomial coefficients for a species."""
+
     format: NASAFormat
     T_ranges: list[float]  # [T_low, T_mid, T_high] for NASA7, can have more for NASA9
     coeffs: list[list[float]]  # One set of coefficients per temperature range
@@ -51,6 +52,7 @@ class NASACoeffs:
 @dataclass
 class TransportProps:
     """Lennard-Jones transport properties."""
+
     geometry: Geometry
     well_depth: float  # K
     diameter: float  # Angstrom
@@ -61,6 +63,7 @@ class TransportProps:
 @dataclass
 class MolecularStructure:
     """Atomic composition."""
+
     C: int = 0
     H: int = 0
     O: int = 0
@@ -71,6 +74,7 @@ class MolecularStructure:
 @dataclass
 class SpeciesData:
     """Complete data for a species."""
+
     name: str
     molar_mass: float
     nasa: NASACoeffs
@@ -94,19 +98,17 @@ ATOMIC_MASSES = {
 
 def calculate_molar_mass(composition: dict[str, int]) -> float:
     """Calculate molar mass from atomic composition."""
-    return sum(
-        count * ATOMIC_MASSES.get(elem.upper(), 0.0)
-        for elem, count in composition.items()
-    )
+    return sum(count * ATOMIC_MASSES.get(elem.upper(), 0.0) for elem, count in composition.items())
 
 
 # -----------------------------------------------------------------------------
 # Cantera YAML Parser
 # -----------------------------------------------------------------------------
 
+
 def _fix_yaml_species_name(name) -> str:
     """Fix species names that YAML misparses as booleans.
-    
+
     YAML 1.1 parses 'NO' as boolean False and 'ON' as boolean True.
     """
     if name is False:
@@ -116,31 +118,33 @@ def _fix_yaml_species_name(name) -> str:
     return str(name).upper()
 
 
-def load_cantera_yaml(path: Path, species_filter: set[str] | None = None) -> tuple[list[SpeciesData], NASAFormat]:
+def load_cantera_yaml(
+    path: Path, species_filter: set[str] | None = None
+) -> tuple[list[SpeciesData], NASAFormat]:
     """Load species data from a Cantera YAML mechanism file."""
     import yaml
-    
+
     with open(path) as f:
         data = yaml.safe_load(f)
-    
+
     species_list = data.get("species", [])
     if not species_list:
         raise ValueError(f"No species found in {path}")
-    
+
     # Normalize filter to uppercase
     if species_filter:
         species_filter = {s.upper() for s in species_filter}
-    
+
     result: list[SpeciesData] = []
     detected_format: NASAFormat | None = None
-    
+
     for sp in species_list:
         # YAML may parse some names (like NO) as booleans
         name = _fix_yaml_species_name(sp["name"])
-        
+
         if species_filter and name not in species_filter:
             continue
-        
+
         # Composition
         comp = sp.get("composition", {})
         structure = MolecularStructure(
@@ -151,11 +155,11 @@ def load_cantera_yaml(path: Path, species_filter: set[str] | None = None) -> tup
             Ar=comp.get("Ar", 0),
         )
         molar_mass = calculate_molar_mass(comp)
-        
+
         # Thermo
         thermo = sp.get("thermo", {})
         model = thermo.get("model", "NASA7").upper()
-        
+
         if model == "NASA7":
             fmt = NASAFormat.NASA7
         elif model == "NASA9":
@@ -163,21 +167,21 @@ def load_cantera_yaml(path: Path, species_filter: set[str] | None = None) -> tup
         else:
             print(f"Warning: Unknown thermo model '{model}' for {name}, assuming NASA7")
             fmt = NASAFormat.NASA7
-        
+
         if detected_format is None:
             detected_format = fmt
         elif detected_format != fmt:
             raise ValueError(f"Mixed NASA formats detected: {detected_format} and {fmt}")
-        
+
         T_ranges = thermo.get("temperature-ranges", [])
         coeffs_data = thermo.get("data", [])
-        
+
         nasa = NASACoeffs(
             format=fmt,
             T_ranges=T_ranges,
             coeffs=coeffs_data,
         )
-        
+
         # Transport
         transport_data = sp.get("transport", {})
         transport: TransportProps | None = None
@@ -187,7 +191,7 @@ def load_cantera_yaml(path: Path, species_filter: set[str] | None = None) -> tup
                 geom = Geometry(geom_str)
             except ValueError:
                 geom = Geometry.NONLINEAR
-            
+
             transport = TransportProps(
                 geometry=geom,
                 well_depth=transport_data.get("well-depth", 0.0),
@@ -195,25 +199,27 @@ def load_cantera_yaml(path: Path, species_filter: set[str] | None = None) -> tup
                 polarizability=transport_data.get("polarizability", 0.0),
                 rotational_relaxation=transport_data.get("rotational-relaxation", 0.0),
             )
-        
-        result.append(SpeciesData(
-            name=name,
-            molar_mass=molar_mass,
-            nasa=nasa,
-            transport=transport,
-            structure=structure,
-        ))
-    
+
+        result.append(
+            SpeciesData(
+                name=name,
+                molar_mass=molar_mass,
+                nasa=nasa,
+                transport=transport,
+                structure=structure,
+            )
+        )
+
     return result, detected_format or NASAFormat.NASA7
 
 
 def list_species_in_yaml(path: Path) -> list[str]:
     """List all species names in a Cantera YAML file."""
     import yaml
-    
+
     with open(path) as f:
         data = yaml.safe_load(f)
-    
+
     return [_fix_yaml_species_name(sp["name"]) for sp in data.get("species", [])]
 
 
@@ -221,17 +227,18 @@ def list_species_in_yaml(path: Path) -> list[str]:
 # NASA Thermo Database Parser (for future NASA9 support)
 # -----------------------------------------------------------------------------
 
+
 def detect_nasa_format(path: Path) -> NASAFormat:
     """Detect whether a thermo database is NASA7 or NASA9 format."""
     with open(path) as f:
         content = f.read(2000)  # Read first 2KB
-    
+
     # NASA9 typically has 9 coefficients and different header format
     # NASA7 (Chemkin) has fixed-width format with specific column positions
-    
-    if "thermo nasa9" in content.lower() or re.search(r'\d+\.\d+\s+\d+\.\d+\s+9\s+', content):
+
+    if "thermo nasa9" in content.lower() or re.search(r"\d+\.\d+\s+\d+\.\d+\s+9\s+", content):
         return NASAFormat.NASA9
-    
+
     return NASAFormat.NASA7
 
 
@@ -251,38 +258,39 @@ def load_nasa9_thermo(path: Path, species_filter: set[str] | None = None) -> lis
 # JSON Loader (from extract_species_data.py output)
 # -----------------------------------------------------------------------------
 
+
 def load_merged_json(
     path: Path,
     species_filter: set[str] | None = None,
     prefer_nasa9: bool = True,
 ) -> tuple[list[SpeciesData], NASAFormat]:
     """Load species data from merged JSON (output of extract_species_data.py).
-    
+
     Args:
         path: Path to JSON file
         species_filter: Optional set of species names to include
         prefer_nasa9: If True, use NASA-9 thermo when available; else NASA-7
-    
+
     Returns:
         Tuple of (species_data list, detected NASA format)
     """
     with open(path) as f:
         data = json.load(f)
-    
+
     result: list[SpeciesData] = []
     has_nasa9 = False
-    
+
     for sp in data.get("species", []):
         name = sp.get("name", "").upper()
         name_norm = sp.get("name_normalized", name)
-        
+
         if species_filter and name_norm not in {s.upper() for s in species_filter}:
             continue
-        
+
         # Determine which thermo format to use
         has_n9 = "thermo_nasa9" in sp
         has_n7 = "thermo_nasa7" in sp
-        
+
         if prefer_nasa9 and has_n9:
             nasa9 = sp["thermo_nasa9"]
             intervals = nasa9.get("intervals", [])
@@ -303,7 +311,7 @@ def load_merged_json(
         else:
             print(f"Warning: {name} has no thermo data, skipping")
             continue
-        
+
         # Transport
         transport: TransportProps | None = None
         tr = sp.get("transport", {})
@@ -319,7 +327,7 @@ def load_merged_json(
                 polarizability=tr.get("polarizability", 0.0) or 0.0,
                 rotational_relaxation=tr.get("rotational_relaxation", 0.0) or 0.0,
             )
-        
+
         # Composition
         comp = sp.get("composition", {})
         structure = MolecularStructure(
@@ -329,17 +337,19 @@ def load_merged_json(
             N=comp.get("N", 0),
             Ar=comp.get("AR", 0),
         )
-        
+
         molar_mass = sp.get("molar_mass", 0.0)
-        
-        result.append(SpeciesData(
-            name=name,
-            molar_mass=molar_mass,
-            nasa=nasa,
-            transport=transport,
-            structure=structure,
-        ))
-    
+
+        result.append(
+            SpeciesData(
+                name=name,
+                molar_mass=molar_mass,
+                nasa=nasa,
+                transport=transport,
+                structure=structure,
+            )
+        )
+
     detected_format = NASAFormat.NASA9 if has_nasa9 else NASAFormat.NASA7
     return result, detected_format
 
@@ -355,29 +365,30 @@ def list_species_in_json(path: Path) -> list[str]:
 # C++ Header Generator
 # -----------------------------------------------------------------------------
 
+
 def species_sort_key(sp: SpeciesData) -> tuple:
     """Sort species into human-friendly groups."""
     name = sp.name.upper()
-    
+
     # Air species first, in specific order
     air_order = ["N2", "O2", "AR", "CO2", "H2O"]
     if name in air_order:
         return (0, air_order.index(name), name)
-    
+
     C, H, O, N = sp.structure.C, sp.structure.H, sp.structure.O, sp.structure.N
-    
+
     # Inert species (no C, H, O)
     if C == 0 and H == 0 and O == 0:
         return (1, name)
-    
+
     # Hydrocarbons (C>0, H>0, no O or N)
     if C > 0 and H > 0 and O == 0 and N == 0:
         return (2, C, name)
-    
+
     # Other carbon-containing species
     if C > 0:
         return (3, name)
-    
+
     # Everything else
     return (4, name)
 
@@ -391,14 +402,14 @@ def format_double(value: float) -> str:
 
 def _format_nasa9_intervals(nasa: NASACoeffs) -> str:
     """Format NASA-9 intervals for C++ initializer list.
-    
+
     NASA-9 can have 1-3 temperature intervals. Each interval has:
     - T_min, T_max: temperature bounds
     - 10 coefficients: a1-a7 (Cp), unused, b1 (H), b2 (S)
     """
     interval_strs = []
     n_intervals = len(nasa.coeffs)
-    
+
     for i, coeffs in enumerate(nasa.coeffs):
         # Determine temperature bounds from T_ranges
         # T_ranges for NASA-9: [T0, T1, T2, ...] where intervals are [T0,T1], [T1,T2], etc.
@@ -410,13 +421,13 @@ def _format_nasa9_intervals(nasa: NASACoeffs) -> str:
             t_breaks = [200.0, 1000.0, 6000.0, 20000.0]
             t_min = t_breaks[i] if i < len(t_breaks) else 200.0
             t_max = t_breaks[i + 1] if i + 1 < len(t_breaks) else 6000.0
-        
+
         # Pad coefficients to 10 if needed
         padded = list(coeffs) + [0.0] * (10 - len(coeffs))
         coeffs_str = "{" + ", ".join(str(c) for c in padded[:10]) + "}"
-        
+
         interval_strs.append(f"{{{t_min}, {t_max}, {coeffs_str}}}")
-    
+
     return "{" + ", ".join(interval_strs) + "}"
 
 
@@ -426,11 +437,12 @@ def generate_cpp_header(
     output: TextIO,
 ) -> None:
     """Generate the C++ header file."""
-    
+
     # Sort species
     species = sorted(species, key=species_sort_key)
-    
-    output.write("""#ifndef THERMO_TRANSPORT_DATA_H
+
+    output.write(
+        """#ifndef THERMO_TRANSPORT_DATA_H
 #define THERMO_TRANSPORT_DATA_H
 
 #include <array>
@@ -442,14 +454,18 @@ def generate_cpp_header(
 // NASA polynomial format used in this build
 // NASA7: Cp/R = a1 + a2*T + a3*T^2 + a4*T^3 + a5*T^4
 // NASA9: Cp/R = a1/T^2 + a2/T + a3 + a4*T + a5*T^2 + a6*T^3 + a7*T^4
-""")
-    
+"""
+    )
+
     output.write(f"// This file uses {nasa_format.name} format\n")
-    output.write(f"constexpr bool USE_NASA9 = {'true' if nasa_format == NASAFormat.NASA9 else 'false'};\n\n")
-    
+    output.write(
+        f"constexpr bool USE_NASA9 = {'true' if nasa_format == NASAFormat.NASA9 else 'false'};\n\n"
+    )
+
     # NASA coefficients struct
     if nasa_format == NASAFormat.NASA7:
-        output.write("""struct NASA7_Coeffs {
+        output.write(
+            """struct NASA7_Coeffs {
     double T_low;
     double T_mid;
     double T_high;
@@ -459,9 +475,11 @@ def generate_cpp_header(
 
 using NASA_Coeffs = NASA7_Coeffs;
 
-""")
+"""
+        )
     else:
-        output.write("""struct NASA9_Interval {
+        output.write(
+            """struct NASA9_Interval {
     double T_min;
     double T_max;
     std::array<double, 10> coeffs;  // a1-a7, unused, b1 (H), b2 (S)
@@ -473,9 +491,11 @@ struct NASA9_Coeffs {
 
 using NASA_Coeffs = NASA9_Coeffs;
 
-""")
-    
-    output.write("""struct Transport_Props {
+"""
+        )
+
+    output.write(
+        """struct Transport_Props {
     std::string geometry;
     double well_depth;
     double diameter;
@@ -489,49 +509,50 @@ struct Molecular_Structure {
     std::size_t N;
 };
 
-""")
-    
+"""
+    )
+
     # Species names
     output.write("const std::vector<std::string> species_names = {")
     output.write(", ".join(f'"{sp.name}"' for sp in species))
     output.write("};\n\n")
-    
+
     # Species index map
     output.write("const std::unordered_map<std::string, int> species_index = {\n")
     output.write(",\n".join(f'    {{"{sp.name}", {i}}}' for i, sp in enumerate(species)))
     output.write("\n};\n\n")
-    
+
     # Molar masses
     output.write("const std::vector<double> molar_masses = {")
     output.write(", ".join(str(sp.molar_mass) for sp in species))
     output.write("};\n\n")
-    
+
     # NASA coefficients
     output.write("const std::vector<NASA_Coeffs> nasa_coeffs = {\n")
     nasa_entries = []
-    
+
     if nasa_format == NASAFormat.NASA7:
         for sp in species:
             T_low = sp.nasa.T_ranges[0] if len(sp.nasa.T_ranges) > 0 else 300.0
             T_mid = sp.nasa.T_ranges[1] if len(sp.nasa.T_ranges) > 1 else 1000.0
             T_high = sp.nasa.T_ranges[2] if len(sp.nasa.T_ranges) > 2 else 5000.0
-            
+
             low_coeffs = sp.nasa.coeffs[0] if len(sp.nasa.coeffs) > 0 else []
             high_coeffs = sp.nasa.coeffs[1] if len(sp.nasa.coeffs) > 1 else []
-            
+
             low_str = "{" + ", ".join(str(c) for c in low_coeffs) + "}"
             high_str = "{" + ", ".join(str(c) for c in high_coeffs) + "}"
-            
+
             nasa_entries.append(f"{{{T_low}, {T_mid}, {T_high}, {low_str}, {high_str}}}")
     else:
         # NASA-9: variable number of intervals (1-3)
         for sp in species:
             intervals_str = _format_nasa9_intervals(sp.nasa)
             nasa_entries.append(f"{{{intervals_str}}}")
-    
+
     output.write(",\n".join(nasa_entries))
     output.write("\n};\n\n")
-    
+
     # Transport properties
     output.write("const std::vector<Transport_Props> transport_props = {\n")
     transport_entries = []
@@ -539,29 +560,32 @@ struct Molecular_Structure {
         if sp.transport:
             t = sp.transport
             pol_str = format_double(t.polarizability)
-            transport_entries.append(f'{{"{t.geometry.value}", {t.well_depth}, {t.diameter}, {pol_str}}}')
+            transport_entries.append(
+                f'{{"{t.geometry.value}", {t.well_depth}, {t.diameter}, {pol_str}}}'
+            )
         else:
             transport_entries.append('{"nonlinear", 0.0, 0.0, 0.0}')
-    
+
     output.write(",\n".join(transport_entries))
     output.write("\n};\n\n")
-    
+
     # Molecular structures
     output.write("const std::vector<Molecular_Structure> molecular_structures = {\n")
     struct_entries = []
     for sp in species:
         s = sp.structure
         struct_entries.append(f"{{{s.C}, {s.H}, {s.O}, {s.N}}}")
-    
+
     output.write(",\n".join(struct_entries))
     output.write("\n};\n\n")
-    
+
     output.write("#endif // THERMO_TRANSPORT_DATA_H\n")
 
 
 # -----------------------------------------------------------------------------
 # Main
 # -----------------------------------------------------------------------------
+
 
 def parse_species_list(s: str) -> list[str]:
     """Parse comma-separated species list."""
@@ -574,15 +598,17 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    
+
     # Input sources
     parser.add_argument(
-        "--mechanism", "-m",
+        "--mechanism",
+        "-m",
         type=Path,
         help="Cantera YAML mechanism file (combined thermo + transport)",
     )
     parser.add_argument(
-        "--json", "-j",
+        "--json",
+        "-j",
         type=Path,
         help="Merged JSON from extract_species_data.py",
     )
@@ -597,10 +623,11 @@ def main() -> int:
         action="store_true",
         help="Prefer NASA-7 thermo when available",
     )
-    
+
     # Species selection
     parser.add_argument(
-        "--species", "-s",
+        "--species",
+        "-s",
         type=str,
         help="Comma-separated list of species to include",
     )
@@ -609,24 +636,25 @@ def main() -> int:
         action="store_true",
         help="List available species and exit",
     )
-    
+
     # Output
     parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         type=Path,
         default=Path("thermo_transport_data.h"),
         help="Output header file (default: thermo_transport_data.h)",
     )
-    
+
     args = parser.parse_args()
-    
+
     # Validate arguments
     if args.mechanism and args.json:
         parser.error("Cannot use --mechanism with --json")
-    
+
     if not args.mechanism and not args.json:
         parser.error("Must specify either --mechanism or --json")
-    
+
     # List species mode
     if args.list_species:
         if args.mechanism:
@@ -641,16 +669,16 @@ def main() -> int:
         for name in sorted(species_names):
             print(f"  {name}")
         return 0
-    
+
     # Parse species filter
     species_filter: set[str] | None = None
     if args.species:
         species_filter = set(parse_species_list(args.species))
         print(f"Filtering to {len(species_filter)} species")
-    
+
     # Determine NASA format preference
     prefer_nasa9 = not args.prefer_nasa7
-    
+
     # Load data
     if args.mechanism:
         print(f"Loading mechanism: {args.mechanism}")
@@ -661,19 +689,21 @@ def main() -> int:
     else:
         parser.error("Must specify --mechanism or --json")
         return 1
-    
+
     print(f"Loaded {len(species_data)} species, format: {nasa_format.name}")
-    
+
     # Check for missing transport
     missing_transport = [sp.name for sp in species_data if sp.transport is None]
     if missing_transport:
-        print(f"Warning: {len(missing_transport)} species missing transport data: {missing_transport[:5]}...")
-    
+        print(
+            f"Warning: {len(missing_transport)} species missing transport data: {missing_transport[:5]}..."
+        )
+
     # Generate header
     print(f"Generating: {args.output}")
     with open(args.output, "w") as f:
         generate_cpp_header(species_data, nasa_format, f)
-    
+
     print("Done!")
     return 0
 

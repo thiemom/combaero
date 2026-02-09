@@ -28,9 +28,7 @@ class SpeciesLocator:
         n = _core.num_species()
         names = [_core.species_name(i) for i in range(n)]
         indices: Dict[str, int] = {name: i for i, name in enumerate(names)}
-        molar_masses = np.array(
-            [_core.species_molar_mass(i) for i in range(n)], dtype=float
-        )
+        molar_masses = np.array([_core.species_molar_mass(i) for i in range(n)], dtype=float)
         return cls(names=names, indices=indices, molar_masses=molar_masses)
 
     def empty(self) -> np.ndarray:

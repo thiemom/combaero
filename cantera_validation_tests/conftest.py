@@ -2,12 +2,14 @@ import pytest
 
 try:
     import combaero as cb
+
     COMBAERO_AVAILABLE = True
 except ImportError:
     COMBAERO_AVAILABLE = False
 
 try:
     import cantera as ct
+
     CANTERA_AVAILABLE = True
 except ImportError:
     CANTERA_AVAILABLE = False
@@ -18,6 +20,7 @@ def combaero():
     if not COMBAERO_AVAILABLE:
         pytest.skip("CombAero not available")
     import combaero as cb
+
     return cb
 
 
@@ -26,6 +29,7 @@ def cantera():
     if not CANTERA_AVAILABLE:
         pytest.skip("Cantera not available")
     import cantera as ct
+
     return ct
 
 
@@ -54,7 +58,7 @@ def species_mapping():
 def complete_combustion_gas(cantera):
     """
     Gas phase with only complete combustion species.
-    
+
     This restricts equilibrium to only produce CO2 and H2O from fuel,
     matching CombAero's complete_combustion() behavior (no CO, H2, etc.).
     """
@@ -68,7 +72,7 @@ def complete_combustion_gas(cantera):
 @pytest.fixture
 def tolerance_config():
     """Standard tolerance configuration for validation tests.
-    
+
     Tolerances based on measured deviations:
     - Temperature: 5.0 K (observed max: 4.6 K for C3H8, NASA-7 vs NASA-9)
     - Transport: 20% (observed: 10-18%, different correlations expected)

@@ -23,8 +23,20 @@ from generate_thermo_data import (
 
 # Species used in the reference header (from JetSurf2)
 REFERENCE_SPECIES = [
-    "N2", "O2", "AR", "CO2", "H2O", "CH4", "C2H6", "C3H8",
-    "IC4H10", "NC5H12", "NC6H14", "NC7H16", "CO", "H2"
+    "N2",
+    "O2",
+    "AR",
+    "CO2",
+    "H2O",
+    "CH4",
+    "C2H6",
+    "C3H8",
+    "IC4H10",
+    "NC5H12",
+    "NC6H14",
+    "NC7H16",
+    "CO",
+    "H2",
 ]
 
 MECHANISM_FILE = Path(__file__).parent / "JetSurf2.yaml"
@@ -33,16 +45,16 @@ REFERENCE_HEADER = Path(__file__).parent / "reference_thermo_transport_data.h"
 
 class TestListSpecies:
     """Test species listing functionality."""
-    
+
     def test_list_species_jetsurf2(self) -> None:
         """Verify we can list species from JetSurf2."""
         species = list_species_in_yaml(MECHANISM_FILE)
         assert len(species) > 100  # JetSurf2 has many species
-        
+
         # Check our reference species are present
         for sp in REFERENCE_SPECIES:
             assert sp in species, f"Expected species {sp} not found"
-    
+
     def test_handles_yaml_boolean_parsing(self) -> None:
         """YAML parses 'NO' as False - verify we handle this."""
         # This is tested implicitly by list_species returning strings
@@ -53,83 +65,84 @@ class TestListSpecies:
 
 class TestLoadCanteraYaml:
     """Test YAML mechanism loading."""
-    
+
     def test_load_filtered_species(self) -> None:
         """Load only the reference species from JetSurf2."""
         species_filter = set(REFERENCE_SPECIES)
         species_data, nasa_format = load_cantera_yaml(MECHANISM_FILE, species_filter)
-        
+
         assert nasa_format == NASAFormat.NASA7
         assert len(species_data) == len(REFERENCE_SPECIES)
-        
+
         loaded_names = {sp.name for sp in species_data}
         assert loaded_names == species_filter
-    
+
     def test_species_have_thermo_data(self) -> None:
         """Verify all species have NASA coefficients."""
         species_filter = set(REFERENCE_SPECIES)
         species_data, _ = load_cantera_yaml(MECHANISM_FILE, species_filter)
-        
+
         for sp in species_data:
             assert sp.nasa is not None
             assert len(sp.nasa.T_ranges) >= 3  # T_low, T_mid, T_high
             assert len(sp.nasa.coeffs) >= 2  # low and high ranges
             assert len(sp.nasa.coeffs[0]) == 7  # NASA7 has 7 coefficients
-    
+
     def test_species_have_transport_data(self) -> None:
         """Verify all species have transport properties."""
         species_filter = set(REFERENCE_SPECIES)
         species_data, _ = load_cantera_yaml(MECHANISM_FILE, species_filter)
-        
+
         for sp in species_data:
             assert sp.transport is not None, f"{sp.name} missing transport"
             assert sp.transport.diameter > 0
             assert sp.transport.well_depth > 0
-    
+
     def test_molar_mass_calculation(self) -> None:
         """Verify molar masses are calculated correctly."""
         species_filter = {"CH4", "H2O", "CO2"}
         species_data, _ = load_cantera_yaml(MECHANISM_FILE, species_filter)
-        
+
         expected = {
             "CH4": 16.043,  # C + 4*H
             "H2O": 18.015,  # 2*H + O (using 15.999 for O)
             "CO2": 44.009,  # C + 2*O
         }
-        
+
         for sp in species_data:
             assert sp.name in expected
-            assert abs(sp.molar_mass - expected[sp.name]) < 0.01, \
-                f"{sp.name}: expected {expected[sp.name]}, got {sp.molar_mass}"
+            assert (
+                abs(sp.molar_mass - expected[sp.name]) < 0.01
+            ), f"{sp.name}: expected {expected[sp.name]}, got {sp.molar_mass}"
 
 
 class TestGenerateHeader:
     """Test C++ header generation."""
-    
+
     def test_generates_valid_header(self) -> None:
         """Generate header and verify basic structure."""
         species_filter = set(REFERENCE_SPECIES)
         species_data, nasa_format = load_cantera_yaml(MECHANISM_FILE, species_filter)
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.h', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".h", delete=False) as f:
             generate_cpp_header(species_data, nasa_format, f)
             output_path = Path(f.name)
-        
+
         try:
             content = output_path.read_text()
-            
+
             # Check header guards
             assert "#ifndef THERMO_TRANSPORT_DATA_H" in content
             assert "#define THERMO_TRANSPORT_DATA_H" in content
             assert "#endif" in content
-            
+
             # Check format flag
             assert "constexpr bool USE_NASA9 = false;" in content
-            
+
             # Check all species are present
             for sp in REFERENCE_SPECIES:
                 assert f'"{sp}"' in content, f"Species {sp} not in output"
-            
+
             # Check structs are defined (NASA7_Coeffs with alias, or NASA9_Coeffs)
             assert "struct NASA7_Coeffs" in content or "struct NASA9_Coeffs" in content
             assert "using NASA_Coeffs" in content
@@ -137,26 +150,26 @@ class TestGenerateHeader:
             assert "struct Molecular_Structure" in content
         finally:
             output_path.unlink()
-    
+
     def test_species_ordering(self) -> None:
         """Verify species are sorted correctly (air species first)."""
         species_filter = set(REFERENCE_SPECIES)
         species_data, nasa_format = load_cantera_yaml(MECHANISM_FILE, species_filter)
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.h', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".h", delete=False) as f:
             generate_cpp_header(species_data, nasa_format, f)
             output_path = Path(f.name)
-        
+
         try:
             content = output_path.read_text()
-            
+
             # Extract species_names vector
-            match = re.search(r'species_names = \{([^}]+)\}', content)
+            match = re.search(r"species_names = \{([^}]+)\}", content)
             assert match, "Could not find species_names"
-            
+
             names_str = match.group(1)
-            names = [n.strip().strip('"') for n in names_str.split(',')]
-            
+            names = [n.strip().strip('"') for n in names_str.split(",")]
+
             # Air species should be first, in order
             air_species = ["N2", "O2", "AR", "CO2", "H2O"]
             for i, sp in enumerate(air_species):
@@ -168,82 +181,84 @@ class TestGenerateHeader:
 
 class TestReferenceComparison:
     """Compare generated output with reference header."""
-    
+
     def test_species_names_match_reference(self) -> None:
         """Verify species names match the reference header."""
         if not REFERENCE_HEADER.exists():
             pytest.skip("Reference header not found")
-        
+
         ref_content = REFERENCE_HEADER.read_text()
-        
+
         # Extract species from reference
-        match = re.search(r'species_names = \{([^}]+)\}', ref_content)
+        match = re.search(r"species_names = \{([^}]+)\}", ref_content)
         assert match
-        ref_names = [n.strip().strip('"') for n in match.group(1).split(',')]
-        
+        ref_names = [n.strip().strip('"') for n in match.group(1).split(",")]
+
         # Generate new header
         species_filter = set(REFERENCE_SPECIES)
         species_data, nasa_format = load_cantera_yaml(MECHANISM_FILE, species_filter)
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.h', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".h", delete=False) as f:
             generate_cpp_header(species_data, nasa_format, f)
             output_path = Path(f.name)
-        
+
         try:
             new_content = output_path.read_text()
-            match = re.search(r'species_names = \{([^}]+)\}', new_content)
+            match = re.search(r"species_names = \{([^}]+)\}", new_content)
             assert match
-            new_names = [n.strip().strip('"') for n in match.group(1).split(',')]
-            
-            assert new_names == ref_names, \
-                f"Species order mismatch:\nRef: {ref_names}\nNew: {new_names}"
+            new_names = [n.strip().strip('"') for n in match.group(1).split(",")]
+
+            assert (
+                new_names == ref_names
+            ), f"Species order mismatch:\nRef: {ref_names}\nNew: {new_names}"
         finally:
             output_path.unlink()
-    
+
     def test_molar_masses_match_reference(self) -> None:
         """Verify molar masses match the reference header."""
         if not REFERENCE_HEADER.exists():
             pytest.skip("Reference header not found")
-        
+
         ref_content = REFERENCE_HEADER.read_text()
-        
+
         # Extract molar masses from reference
-        match = re.search(r'molar_masses = \{([^}]+)\}', ref_content)
+        match = re.search(r"molar_masses = \{([^}]+)\}", ref_content)
         assert match
-        ref_masses = [float(m.strip()) for m in match.group(1).split(',')]
-        
+        ref_masses = [float(m.strip()) for m in match.group(1).split(",")]
+
         # Generate new header
         species_filter = set(REFERENCE_SPECIES)
         species_data, nasa_format = load_cantera_yaml(MECHANISM_FILE, species_filter)
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.h', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".h", delete=False) as f:
             generate_cpp_header(species_data, nasa_format, f)
             output_path = Path(f.name)
-        
+
         try:
             new_content = output_path.read_text()
-            match = re.search(r'molar_masses = \{([^}]+)\}', new_content)
+            match = re.search(r"molar_masses = \{([^}]+)\}", new_content)
             assert match
-            new_masses = [float(m.strip()) for m in match.group(1).split(',')]
-            
+            new_masses = [float(m.strip()) for m in match.group(1).split(",")]
+
             assert len(new_masses) == len(ref_masses)
             for i, (ref, new) in enumerate(zip(ref_masses, new_masses)):
-                assert abs(ref - new) < 0.01, \
-                    f"Molar mass mismatch at index {i}: ref={ref}, new={new}"
+                assert (
+                    abs(ref - new) < 0.01
+                ), f"Molar mass mismatch at index {i}: ref={ref}, new={new}"
         finally:
             output_path.unlink()
 
 
 class TestTwoFileWorkflow:
     """Test loading thermo and transport from separate sources.
-    
+
     For now, we simulate this by loading the same YAML file twice,
     which exercises the code path for merging data sources.
     """
-    
+
     def test_placeholder_for_separate_sources(self) -> None:
         """Placeholder test for future two-file workflow.
-        
+
         When NASA9 parser is implemented, this will test:
         - Loading thermo from NASA9 database
         - Loading transport from separate file
@@ -252,7 +267,7 @@ class TestTwoFileWorkflow:
         # For now, just verify we can load from single source
         species_filter = set(REFERENCE_SPECIES)
         species_data, nasa_format = load_cantera_yaml(MECHANISM_FILE, species_filter)
-        
+
         assert len(species_data) == len(REFERENCE_SPECIES)
         assert nasa_format == NASAFormat.NASA7
 

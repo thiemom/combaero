@@ -53,17 +53,19 @@ def main() -> None:
     print("Combustion Example: Natural Gas + Humid Air")
     print("=" * 75)
     print(f"\nFuel: Natural gas at {fuel.T:.1f} K")
-    print(f"      CH4: {X_fuel[sp.indices['CH4']]*100:.0f}%, "
-          f"C2H6: {X_fuel[sp.indices['C2H6']]*100:.0f}%, "
-          f"C3H8: {X_fuel[sp.indices['C3H8']]*100:.0f}%")
+    print(
+        f"      CH4: {X_fuel[sp.indices['CH4']]*100:.0f}%, "
+        f"C2H6: {X_fuel[sp.indices['C2H6']]*100:.0f}%, "
+        f"C3H8: {X_fuel[sp.indices['C3H8']]*100:.0f}%"
+    )
     print(f"Air:  Humid air at {air.T:.0f} K, 60% RH, {air.mdot:.1f} kg/s")
 
     print("\nEquivalence Ratio Sweep")
     print("-" * 75)
-    print(f"{'phi':>6s} {'mdot_f':>10s} {'T_mix':>10s} {'T_eq':>10s} "
-          f"{'X_CO':>10s} {'X_H2':>10s}")
-    print(f"{'[-]':>6s} {'[kg/s]':>10s} {'[K]':>10s} {'[K]':>10s} "
-          f"{'[%]':>10s} {'[%]':>10s}")
+    print(
+        f"{'phi':>6s} {'mdot_f':>10s} {'T_mix':>10s} {'T_eq':>10s} " f"{'X_CO':>10s} {'X_H2':>10s}"
+    )
+    print(f"{'[-]':>6s} {'[kg/s]':>10s} {'[K]':>10s} {'[K]':>10s} " f"{'[%]':>10s} {'[%]':>10s}")
     print("-" * 65)
 
     # Pre-calculate stoichiometric ratio
@@ -90,8 +92,10 @@ def main() -> None:
         X_CO = eq.X[sp.indices["CO"]] * 100
         X_H2 = eq.X[sp.indices["H2"]] * 100
 
-        print(f"{phi:6.2f} {mdot_fuel:10.4f} {mixed.T:10.2f} {eq.T:10.2f} "
-              f"{X_CO:10.4f} {X_H2:10.4f}")
+        print(
+            f"{phi:6.2f} {mdot_fuel:10.4f} {mixed.T:10.2f} {eq.T:10.2f} "
+            f"{X_CO:10.4f} {X_H2:10.4f}"
+        )
 
     # =========================================================================
     # Detailed results at stoichiometric
@@ -105,10 +109,10 @@ def main() -> None:
     fuel.mdot = Z_target * air.mdot / (1 - Z_target)
 
     mixed = ca.mix([fuel, air])
-    
+
     # One-step: combustion + reforming + WGS equilibrium
     eq = ca.combustion_equilibrium(mixed.T, mixed.X, mixed.P)
-    
+
     # For comparison, also show complete combustion (before equilibrium)
     burned = ca.complete_combustion(mixed.T, mixed.X, mixed.P)
 
@@ -140,10 +144,10 @@ def main() -> None:
     fuel.mdot = Z_target * air.mdot / (1 - Z_target)
 
     mixed = ca.mix([fuel, air])
-    
+
     # One-step: combustion + reforming + WGS equilibrium
     eq = ca.combustion_equilibrium(mixed.T, mixed.X, mixed.P)
-    
+
     # For comparison, also show complete combustion (before equilibrium)
     burned = ca.complete_combustion(mixed.T, mixed.X, mixed.P)
 

@@ -293,7 +293,9 @@ except ModuleNotFoundError:
     oxygen_required_per_mol_mixture = _core.oxygen_required_per_mol_mixture
     oxygen_required_per_kg_mixture = _core.oxygen_required_per_kg_mixture
     complete_combustion_to_CO2_H2O = _core.complete_combustion_to_CO2_H2O
-    complete_combustion_to_CO2_H2O_with_fraction = _core.complete_combustion_to_CO2_H2O_with_fraction
+    complete_combustion_to_CO2_H2O_with_fraction = (
+        _core.complete_combustion_to_CO2_H2O_with_fraction
+    )
     # State-based API
     State = _core.State
     Stream = _core.Stream

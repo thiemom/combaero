@@ -91,10 +91,7 @@ def main() -> None:
     P_exit = 200000.0  # Pa
 
     sol_cd = cb.nozzle_cd(
-        T0_cd, P0_cd, P_exit,
-        A_inlet, A_throat, A_exit,
-        x_throat, x_exit, X,
-        n_stations=50
+        T0_cd, P0_cd, P_exit, A_inlet, A_throat, A_exit, x_throat, x_exit, X, n_stations=50
     )
 
     print(f"Inlet: A = {A_inlet*1e4:.1f} cm², Throat: A = {A_throat*1e4:.1f} cm²")

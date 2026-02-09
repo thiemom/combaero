@@ -1,4 +1,5 @@
 """Tests for reforming equilibrium functions."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -113,10 +114,18 @@ class TestReformingEquilibrium:
         n2_out = result.X[sp.indices["N2"]]
 
         # C atoms per N2: CH4 + 2*C2H6 + CO + CO2
-        C_per_N2_in = (X[sp.indices["CH4"]] + 2*X[sp.indices["C2H6"]]
-                      + X[sp.indices["CO"]] + X[sp.indices["CO2"]]) / n2_in
-        C_per_N2_out = (result.X[sp.indices["CH4"]] + 2*result.X[sp.indices["C2H6"]]
-                       + result.X[sp.indices["CO"]] + result.X[sp.indices["CO2"]]) / n2_out
+        C_per_N2_in = (
+            X[sp.indices["CH4"]]
+            + 2 * X[sp.indices["C2H6"]]
+            + X[sp.indices["CO"]]
+            + X[sp.indices["CO2"]]
+        ) / n2_in
+        C_per_N2_out = (
+            result.X[sp.indices["CH4"]]
+            + 2 * result.X[sp.indices["C2H6"]]
+            + result.X[sp.indices["CO"]]
+            + result.X[sp.indices["CO2"]]
+        ) / n2_out
         assert C_per_N2_in == pytest.approx(C_per_N2_out, rel=1e-5)
 
         # Ar per N2 should be unchanged
