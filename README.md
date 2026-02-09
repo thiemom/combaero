@@ -230,8 +230,38 @@ The project uses GoogleTest and CTest for C++ tests, and pytest for Python tests
 - Humid air and saturation pressure tests
 - Accuracy validation against Hyland-Wexler reference values
 - Python tests for the `combaero` API (thermo/transport, humid air, combustion helpers, species common names)
+- **Cantera validation tests**: Comprehensive validation against Cantera for combustion, mixing, and transport properties
 
 See the *Development workflow* section above for concrete commands.
+
+### Cantera Validation Tests
+
+A comprehensive test suite validates CombAero's combustion, mixing, and transport calculations against Cantera as a reference implementation. These tests are integrated into the pre-commit workflow.
+
+```bash
+cd cantera_validation_tests
+
+# Install dependencies
+poetry install
+
+# Run all validation tests
+poetry run pytest -v
+
+# Run specific test categories
+poetry run pytest test_combustion_validation.py -v
+poetry run pytest test_mixing_validation.py -v
+poetry run pytest test_transport_validation.py -v
+
+# Run in parallel
+poetry run pytest -n auto
+```
+
+The validation tests cover:
+- **Combustion**: Adiabatic flame temperature, product composition, equivalence ratio
+- **Mixing**: Stream mixing with enthalpy balance, density calculations
+- **Transport**: Viscosity, thermal conductivity, Prandtl number at various conditions
+
+See [`cantera_validation_tests/README.md`](cantera_validation_tests/README.md) and [`cantera_validation_tests/INTEGRATION_GUIDE.md`](cantera_validation_tests/INTEGRATION_GUIDE.md) for detailed documentation.
 
 ## Documentation
 
