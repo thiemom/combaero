@@ -56,7 +56,10 @@ Check Python code style and quality (PEP 8 compliance).
 **Dependencies:**
 ```bash
 pip install black isort flake8 mypy
+# or: uv pip install black isort flake8 mypy
 ```
+
+See [INSTALL.md](INSTALL.md) for detailed installation options (Poetry, uv, pre-commit).
 
 ### run-clang-tidy.sh
 
