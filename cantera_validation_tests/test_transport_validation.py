@@ -247,7 +247,7 @@ class TestTransportProperties:
 
         X_air = cb.standard_dry_air_composition()
         X_fuel = np.zeros(len(X_air))
-        X_fuel[cb.species_index_from_name("CH4")] = 1.0
+        X_fuel[species_index_from_name("CH4")] = 1.0
 
         phi = 1.0
         X_mix = cb.set_equivalence_ratio_mole(phi, X_fuel, X_air)
