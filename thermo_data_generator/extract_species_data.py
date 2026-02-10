@@ -17,8 +17,6 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
-
 # =============================================================================
 # Atomic masses (IUPAC 2021 standard atomic weights)
 # =============================================================================

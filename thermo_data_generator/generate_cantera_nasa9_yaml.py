@@ -16,8 +16,6 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
-
 # Atomic masses for molar mass calculation (IUPAC 2021)
 ATOMIC_MASSES = {
     "H": 1.008,
