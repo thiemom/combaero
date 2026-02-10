@@ -310,7 +310,8 @@ class TestNASA9Polynomials:
 
             print(f"\n{species} @ {T_boundary} K:")
             print(
-                f"  Cp/R: {cp_below:.6f} ({T_below}K) -> {cp_boundary:.6f} ({T_boundary}K) -> {cp_above:.6f} ({T_above}K)"
+                f"  Cp/R: {cp_below:.6f} ({T_below}K) -> "
+                f"{cp_boundary:.6f} ({T_boundary}K) -> {cp_above:.6f} ({T_above}K)"
             )
             print(f"  Slope change: {slope_change*100:.4f}%")
 

@@ -17,7 +17,7 @@ from combaero.species import SpeciesLocator
 
 def main() -> None:
     sp = SpeciesLocator.from_core()
-    n = len(sp.names)
+    # Number of species: len(sp.names)
 
     # =========================================================================
     # Define fuel: Natural gas (90% CH4, 5% C2H6, 2% C3H8, 2% N2, 1% CO2)
@@ -116,7 +116,7 @@ def main() -> None:
     # For comparison, also show complete combustion (before equilibrium)
     burned = ca.complete_combustion(mixed.T, mixed.X, mixed.P)
 
-    print(f"\nMixed Stream (before combustion):")
+    print("\nMixed Stream (before combustion):")
     print(f"  T = {mixed.T:.2f} K")
     print(f"  P = {mixed.P:.0f} Pa")
     print(f"  mdot = {mixed.mdot:.4f} kg/s")

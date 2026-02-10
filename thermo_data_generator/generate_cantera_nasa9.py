@@ -169,7 +169,7 @@ def write_nasa9_chemkin(
             T_common = ranges[0]["T_max"] if len(ranges) > 1 else (T_low + T_high) / 2
 
             # Number of temperature ranges
-            num_ranges = len(ranges)
+            # Number of temperature ranges: len(ranges)
 
             # Reference enthalpy (from first range, coefficient a8)
             # Convert to formation enthalpy at 298.15 K (approximation)
@@ -225,7 +225,7 @@ def write_nasa9_chemkin(
 
     print(f"Generated Cantera NASA-9 file: {output_path}")
     print(f"Species included: {', '.join(species_list)}")
-    print(f"\nNext step: Convert to YAML using:")
+    print("\nNext step: Convert to YAML using:")
     print(f"  ck2yaml --input={output_path} --output={output_path.stem}.yaml")
 
 

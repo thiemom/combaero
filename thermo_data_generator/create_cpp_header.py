@@ -78,7 +78,7 @@ const std::vector<std::string> species_names = {"""
 
         C = get_int_or_zero(row.get("C"))
         H = get_int_or_zero(row.get("H"))
-        O = get_int_or_zero(row.get("O"))
+        O_count = get_int_or_zero(row.get("O"))
         N = get_int_or_zero(row.get("N"))
 
         # Inert species: no C, H, O; allow N or others, but exclude air species
@@ -114,13 +114,15 @@ const std::vector<std::string> species_names = {"""
 
         polarizability_str = format_double(row["polarizability"])
         transport_props_list.append(
-            f"{{\"{row['geometry']}\", {row['well-depth']}, {row['diameter']}, {polarizability_str}}}"
+            f"{{\"{row['geometry']}\", {row['well-depth']}, "
+            f"{row['diameter']}, {polarizability_str}}}"
         )
 
         molar_masses_list.append(str(row["molar_mass"]))
 
         molecular_structures_list.append(
-            f"{{{get_int_or_zero(row['C'])}, {get_int_or_zero(row['H'])}, {get_int_or_zero(row['O'])}, {get_int_or_zero(row['N'])}}}"
+            f"{{{get_int_or_zero(row['C'])}, {get_int_or_zero(row['H'])}, "
+            f"{get_int_or_zero(row['O'])}, {get_int_or_zero(row['N'])}}}"
         )
 
     header_content += ", ".join(f'"{s}"' for s in species_list) + "};\n\n"
