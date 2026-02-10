@@ -21,7 +21,7 @@
 Example parameters (verified against GRI-Mech 3.0):
 ```cpp
 {"linear", 97.53, 3.621, 1.76},   // N2
-{"linear", 107.4, 3.458, 1.6},    // O2  
+{"linear", 107.4, 3.458, 1.6},    // O2
 {"nonlinear", 141.4, 3.746, 2.6}, // CH4
 ```
 
@@ -106,7 +106,7 @@ c++ -O3 -shared -std=c++17 \
 ### Before Fix (Current Python Module)
 ```
 T=300K:  10.0% deviation
-T=500K:   0.2% deviation  
+T=500K:   0.2% deviation
 T=1000K: 15.6% deviation
 T=1500K: 21.9% deviation
 T=2000K: 30.8% deviation ❌

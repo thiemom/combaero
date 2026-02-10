@@ -44,7 +44,7 @@ class TestStreamMixing:
         """Test mixing two streams with equal mass flow rates."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = np.array(cb.standard_dry_air_composition())
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("CH4")] = 1.0
 
@@ -97,7 +97,7 @@ class TestStreamMixing:
         """Test mixing two streams with different mass flow rates."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = np.array(cb.standard_dry_air_composition())
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("CH4")] = 1.0
 
@@ -128,8 +128,9 @@ class TestStreamMixing:
 
         h_mixed_target = (mdot1 * h1 + mdot2 * h2) / (mdot1 + mdot2)
 
-        Y1 = cb.mole_to_mass(X_air)
-        Y2 = cb.mole_to_mass(X_fuel)
+        Y1 = np.array(cb.mole_to_mass(stream1.X))
+        Y2 = np.array(cb.mole_to_mass(stream2.X))
+
         Y_mixed = (mdot1 * Y1 + mdot2 * Y2) / (mdot1 + mdot2)
         X_mixed_target = cb.mass_to_mole(Y_mixed)
 
@@ -151,7 +152,7 @@ class TestStreamMixing:
         """Test mixing three streams."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = np.array(cb.standard_dry_air_composition())
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("CH4")] = 1.0
         X_steam = np.zeros(len(X_air))
@@ -192,9 +193,10 @@ class TestStreamMixing:
         mdot_total = stream1.mdot + stream2.mdot + stream3.mdot
         h_mixed_target = (stream1.mdot * h1 + stream2.mdot * h2 + stream3.mdot * h3) / mdot_total
 
-        Y1 = cb.mole_to_mass(X_air)
-        Y2 = cb.mole_to_mass(X_fuel)
-        Y3 = cb.mole_to_mass(X_steam)
+        Y1 = np.array(cb.mole_to_mass(stream1.X))
+        Y2 = np.array(cb.mole_to_mass(stream2.X))
+        Y3 = np.array(cb.mole_to_mass(stream3.X))
+
         Y_mixed = (stream1.mdot * Y1 + stream2.mdot * Y2 + stream3.mdot * Y3) / mdot_total
         X_mixed_target = cb.mass_to_mole(Y_mixed)
 
@@ -212,7 +214,7 @@ class TestStreamMixing:
         """Test that mixing conserves enthalpy."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = np.array(cb.standard_dry_air_composition())
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("CH4")] = 1.0
 
@@ -245,7 +247,7 @@ class TestStreamMixing:
 
         mixed_cb = cb.mix([stream1, stream2])
         h_mixed_actual = cb.h(mixed_cb.T, mixed_cb.X)
-
+        mw_mixed = cb.mwmix(mixed_cb.X)
         rel_diff = abs(h_mixed_actual - h_mixed_expected) / abs(h_mixed_expected)
         assert rel_diff < tolerance_config["enthalpy"], (
             f"Enthalpy [J/mol]: Expected {h_mixed_expected:.1f}, "
