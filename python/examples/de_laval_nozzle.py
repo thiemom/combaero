@@ -62,7 +62,7 @@ def main() -> None:
     # Critical pressure ratio
     P_ratio_crit = cb.critical_pressure_ratio(T0, P0, X)
     P_crit = P0 * P_ratio_crit
-    print(f"\nCritical (sonic) conditions:")
+    print("\nCritical (sonic) conditions:")
     print(f"  P*/P0 = {P_ratio_crit:.4f}")
     print(f"  P* = {P_crit/1e5:.2f} bar")
 
@@ -103,14 +103,14 @@ def main() -> None:
 
     # Thrust calculation using nozzle_thrust
     thrust_result = cb.nozzle_thrust(sol_design, P_exit_design)
-    print(f"\nThrust performance:")
+    print("\nThrust performance:")
     print(f"  Thrust: {thrust_result.thrust:.1f} N")
     print(f"  Specific impulse: {thrust_result.specific_impulse:.1f} s")
     print(f"  Thrust coefficient: {thrust_result.thrust_coefficient:.3f}")
 
     # Vacuum thrust (space conditions)
     thrust_vac = cb.nozzle_thrust(sol_design, 0.0)
-    print(f"\nVacuum performance (P_amb = 0):")
+    print("\nVacuum performance (P_amb = 0):")
     print(f"  Thrust: {thrust_vac.thrust:.1f} N")
     print(f"  Specific impulse: {thrust_vac.specific_impulse:.1f} s")
 

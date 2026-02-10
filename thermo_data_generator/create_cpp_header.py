@@ -1,6 +1,5 @@
 import pandas as pd
 import math
-import os
 
 # This script generates thermo_transport_data.h from species_data.csv to keep
 # all thermo and transport data in the C++ thermo project consistent and typo-free.
@@ -82,11 +81,11 @@ const std::vector<std::string> species_names = {"""
         N = get_int_or_zero(row.get("N"))
 
         # Inert species: no C, H, O; allow N or others, but exclude air species
-        if C == 0 and H == 0 and O == 0:
+        if C == 0 and H == 0 and O_count == 0:
             return (1, name)
 
         # Hydrocarbons: C>0, H>0, no O or N
-        if C > 0 and H > 0 and O == 0 and N == 0:
+        if C > 0 and H > 0 and O_count == 0 and N == 0:
             return (2, C, name)
 
         # Other fuels: contain carbon but are not pure hydrocarbons

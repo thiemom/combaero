@@ -55,7 +55,6 @@ def test_mach_from_pressure_ratio() -> None:
     X = cb.standard_dry_air_composition()
     T0 = 500.0  # K
     P0 = 500000.0  # Pa
-    A_eff = 0.001  # m^2
     P = 80000.0  # Pa
 
     M = cb.mach_from_pressure_ratio(T0, P0, P, X)

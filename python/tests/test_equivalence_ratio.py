@@ -5,7 +5,6 @@ import numpy as np
 from combaero import (
     equivalence_ratio_mass,
     equivalence_ratio_mole,
-    mass_to_mole,
     mole_to_mass,
     set_equivalence_ratio_mass,
     set_equivalence_ratio_mole,
