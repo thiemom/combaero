@@ -18,6 +18,7 @@ from generate_thermo_data import (
     list_species_in_yaml,
     load_cantera_yaml,
 )  # Species used in the reference header (from JetSurf2)
+
 REFERENCE_SPECIES = [
     "N2",
     "O2",

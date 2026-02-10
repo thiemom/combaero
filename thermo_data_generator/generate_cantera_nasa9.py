@@ -146,7 +146,8 @@ def write_nasa9_chemkin(
             molar_mass = calculate_molar_mass(composition)
 
             # Species header line (80 characters total)
-            # Format: NAME(18) DATE(6) FORMULA(20) PHASE(1) TLOW(10) THIGH(10) COMMON(5) MOLAR_MASS(10)
+            # Format: NAME(18) DATE(6) FORMULA(20) PHASE(1)
+            # TLOW(10) THIGH(10) COMMON(5) MOLAR_MASS(10)
             species_name = species.ljust(18)
             date = "NASA  "  # 6 chars
 
@@ -176,7 +177,9 @@ def write_nasa9_chemkin(
 
             # Write species header
             f.write(
-                f"{species_name}{date}{formula}{phase}{T_low:10.3f}{T_high:10.3f}{T_common:5.0f}.{molar_mass:13.7f}{H_ref:15.3f}\n"
+                f"{species_name}{date}{formula}{phase}"
+                f"{T_low:10.3f}{T_high:10.3f}{T_common:5.0f}."
+                f"{molar_mass:13.7f}{H_ref:15.3f}\n"
             )
 
             # Write temperature ranges
@@ -186,7 +189,8 @@ def write_nasa9_chemkin(
                 coeffs = range_data["coeffs"]
 
                 # Ensure we have 10 coefficients (a1-a7, a8, a9, and reference H)
-                # NASA-9 format: a1-a7 are polynomial coeffs, a8 is H integration, a9 is S integration
+                # NASA-9 format: a1-a7 are polynomial coeffs,
+                # a8 is H integration, a9 is S integration
                 if len(coeffs) < 10:
                     # Pad with zeros if needed
                     coeffs = coeffs + [0.0] * (10 - len(coeffs))
@@ -200,24 +204,31 @@ def write_nasa9_chemkin(
                 # The number after T_max is the number of intervals (always 7 for NASA-9)
                 # followed by exponents and reference enthalpy
                 f.write(
-                    f"    {T_min:8.3f}   {T_max:8.3f}7 -2.0 -1.0  0.0  1.0  2.0  3.0  4.0  0.0{H_ref_range:12.3f}\n"
+                    f"    {T_min:8.3f}   {T_max:8.3f}7 -2.0 -1.0  0.0  "
+                    f"1.0  2.0  3.0  4.0  0.0{H_ref_range:12.3f}\n"
                 )
 
                 # Coefficient lines (3 coefficients per line, 5 values per coefficient field)
                 # Line 1: a1, a2, a3
                 f.write(
-                    f" {format_scientific_d(coeffs[0])}{format_scientific_d(coeffs[1])}{format_scientific_d(coeffs[2])}\n"
+                    f" {format_scientific_d(coeffs[0])}"
+                    f"{format_scientific_d(coeffs[1])}"
+                    f"{format_scientific_d(coeffs[2])}\n"
                 )
 
                 # Line 2: a4, a5, a6
                 f.write(
-                    f" {format_scientific_d(coeffs[3])}{format_scientific_d(coeffs[4])}{format_scientific_d(coeffs[5])}\n"
+                    f" {format_scientific_d(coeffs[3])}"
+                    f"{format_scientific_d(coeffs[4])}"
+                    f"{format_scientific_d(coeffs[5])}\n"
                 )
 
                 # Line 3: a7, a8 (H integration), a9 (S integration)
                 # Note: Last line has different format - a7, then two blank spaces, then a8 and a9
                 f.write(
-                    f" {format_scientific_d(coeffs[6])}                 {format_scientific_d(coeffs[7])}{format_scientific_d(coeffs[8])}\n"
+                    f" {format_scientific_d(coeffs[6])}                 "
+                    f"{format_scientific_d(coeffs[7])}"
+                    f"{format_scientific_d(coeffs[8])}\n"
                 )
 
         f.write("END\n")
