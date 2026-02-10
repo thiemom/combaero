@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Dict, Mapping
 
 import numpy as np
 
@@ -18,16 +18,16 @@ class SpeciesLocator:
     """
 
     names: list[str]
-    indices: Dict[str, int]
+    indices: dict[str, int]
     molar_masses: np.ndarray
 
     @classmethod
-    def from_core(cls) -> "SpeciesLocator":
+    def from_core(cls) -> SpeciesLocator:
         """Build a layout from the compiled core metadata."""
 
         n = _core.num_species()
         names = [_core.species_name(i) for i in range(n)]
-        indices: Dict[str, int] = {name: i for i, name in enumerate(names)}
+        indices: dict[str, int] = {name: i for i, name in enumerate(names)}
         molar_masses = np.array([_core.species_molar_mass(i) for i in range(n)], dtype=float)
         return cls(names=names, indices=indices, molar_masses=molar_masses)
 

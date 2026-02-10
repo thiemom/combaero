@@ -95,7 +95,7 @@ def test_fanno_pipe_basic() -> None:
     sol = cb.fanno_pipe(T_in, P_in, u_in, L, D, f, X)
 
     # Pressure should drop due to friction
-    assert sol.outlet.P < P_in
+    assert P_in > sol.outlet.P
     # Velocity should increase (subsonic Fanno)
     assert sol.outlet.T > 0
     assert sol.mdot > 0

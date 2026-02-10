@@ -29,7 +29,7 @@ class TestReformingEquilibrium:
         result = ca.reforming_equilibrium(T_in, X)
 
         # Temperature should be unchanged (isothermal)
-        assert result.T == pytest.approx(T_in, rel=1e-6)
+        assert pytest.approx(T_in, rel=1e-6) == result.T
 
         # CH4 should be mostly reformed at high T
         assert result.X[sp.indices["CH4"]] < X[sp.indices["CH4"]] * 0.5
@@ -50,7 +50,7 @@ class TestReformingEquilibrium:
         result = ca.reforming_equilibrium_adiabatic(T_in, X)
 
         # Temperature should decrease (endothermic reforming)
-        assert result.T < T_in
+        assert T_in > result.T
         assert result.T > 1500.0  # But still reasonable
 
         # CH4 should be reformed
@@ -165,7 +165,7 @@ class TestSmrWgsEquilibrium:
         result = ca.smr_wgs_equilibrium_adiabatic(T_in, X)
 
         # Temperature should decrease
-        assert result.T < T_in
+        assert T_in > result.T
 
     def test_smr_wgs_fallback_to_wgs(self, sp: SpeciesLocator) -> None:
         """Test that SMR+WGS falls back to WGS when no CH4 present."""
@@ -178,6 +178,6 @@ class TestSmrWgsEquilibrium:
         result = ca.smr_wgs_equilibrium(2000.0, X)
 
         # Should still work (WGS only)
-        assert result.T == pytest.approx(2000.0, rel=1e-6)
+        assert pytest.approx(2000.0, rel=1e-6) == result.T
         # WGS shifts CO + H2O -> CO2 + H2
         assert result.X[sp.indices["H2"]] > 0.0
