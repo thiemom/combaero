@@ -16,7 +16,7 @@ def test_reynolds_air() -> None:
 
     # Re should be positive and reasonable for air
     assert Re > 0
-    # For air at STP: rho ~ 1.2 kg/m³, mu ~ 1.8e-5 Pa·s
+    # For air at STP: rho ~ 1.2 kg/m^3, mu ~ 1.8e-5 Pa*s
     # Re ~ 1.2 * 10 * 0.1 / 1.8e-5 ~ 67000
     assert 50000 < Re < 100000
 
@@ -48,7 +48,7 @@ def test_thermal_diffusivity_air() -> None:
     alpha = cb.thermal_diffusivity(T, P, X)
 
     # alpha = k / (rho * cp)
-    # For air at STP: alpha ~ 2e-5 m²/s
+    # For air at STP: alpha ~ 2e-5 m^2/s
     assert 1e-5 < alpha < 5e-5
 
 

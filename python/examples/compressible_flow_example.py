@@ -29,7 +29,7 @@ def main() -> None:
 
     T0 = 500.0  # K (stagnation temperature)
     P0 = 500000.0  # Pa (stagnation pressure, 5 bar)
-    A_eff = 0.001  # m² (effective flow area)
+    A_eff = 0.001  # m^2 (effective flow area)
 
     # Calculate critical pressure ratio
     P_ratio_crit = cb.critical_pressure_ratio(T0, P0, X)
@@ -80,9 +80,9 @@ def main() -> None:
     print("-" * 40)
 
     # Nozzle geometry
-    A_inlet = 0.01  # m² (inlet area)
-    A_throat = 0.005  # m² (throat area)
-    A_exit = 0.008  # m² (exit area)
+    A_inlet = 0.01  # m^2 (inlet area)
+    A_throat = 0.005  # m^2 (throat area)
+    A_exit = 0.008  # m^2 (exit area)
     x_throat = 0.1  # m (throat position)
     x_exit = 0.2  # m (exit position)
 

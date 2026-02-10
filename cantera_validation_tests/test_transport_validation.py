@@ -46,7 +46,7 @@ class TestTransportProperties:
         T = 300.0
         P = 101325.0
 
-        # Compare dynamic viscosity [Pa·s]
+        # Compare dynamic viscosity [Pa*s]
         # CombAero: Sutherland/polynomial correlations with specific L-J parameters
         # Cantera: GRI-Mech 3.0 transport data with different L-J parameters
         # Expected differences: 10-20% due to different correlations
@@ -114,7 +114,7 @@ class TestTransportProperties:
         T = 300.0
         P = 101325.0
 
-        # Compare thermal conductivity [W/(m·K)]
+        # Compare thermal conductivity [W/(m*K)]
         # CombAero: Eucken or modified Eucken formula with specific transport data
         # Cantera: GRI-Mech 3.0 transport data with different mixing rules
         # Expected differences: 15-20% due to different correlations and mixing rules
@@ -190,9 +190,9 @@ class TestTransportProperties:
         self.set_cantera_composition(gri30_gas, X_air, species_mapping)
         gri30_gas.TP = T, P
 
-        cp_ct = gri30_gas.cp_mass  # [J/(kg·K)]
-        mu_ct = gri30_gas.viscosity  # [Pa·s]
-        k_ct = gri30_gas.thermal_conductivity  # [W/(m·K)]
+        cp_ct = gri30_gas.cp_mass  # [J/(kg*K)]
+        mu_ct = gri30_gas.viscosity  # [Pa*s]
+        k_ct = gri30_gas.thermal_conductivity  # [W/(m*K)]
         Pr_ct = cp_ct * mu_ct / k_ct  # [dimensionless]
 
         rel_diff = abs(Pr_cb - Pr_ct) / Pr_ct
@@ -310,15 +310,15 @@ class TestThermodynamicProperties:
         T = 300.0
         P = 101325.0
 
-        # Compare molar heat capacity at constant pressure [J/(mol·K)]
+        # Compare molar heat capacity at constant pressure [J/(mol*K)]
         # CombAero: NASA-9 polynomials (7 coefficients, 200-6000 K)
         # Cantera: NASA-7 polynomials (7 coefficients per range, with break point)
         # Expected differences: < 1% for well-fitted polynomials
-        cp_cb = cb.cp(T, X_air)  # [J/(mol·K)]
+        cp_cb = cb.cp(T, X_air)  # [J/(mol*K)]
 
         self.set_cantera_composition(gri30_gas, X_air, species_mapping)
         gri30_gas.TP = T, P
-        cp_ct = gri30_gas.cp_mole / 1000.0  # Convert [J/(kmol·K)] to [J/(mol·K)]
+        cp_ct = gri30_gas.cp_mole / 1000.0  # Convert [J/(kmol*K)] to [J/(mol*K)]
 
         rel_diff = abs(cp_cb - cp_ct) / cp_ct
         assert (
@@ -339,7 +339,7 @@ class TestThermodynamicProperties:
 
             self.set_cantera_composition(gri30_gas, X_air, species_mapping)
             gri30_gas.TP = T, P
-            cp_ct = gri30_gas.cp_mole / 1000.0  # Convert J/(kmol·K) to J/(mol·K)
+            cp_ct = gri30_gas.cp_mole / 1000.0  # Convert J/(kmol*K) to J/(mol*K)
 
             rel_diff = abs(cp_cb - cp_ct) / cp_ct
             assert (
@@ -355,7 +355,7 @@ class TestThermodynamicProperties:
         P = 101325.0
 
         # Compare molar enthalpy [J/mol]
-        # H(T) = H°(298.15K) + ∫Cp(T)dT from 298.15K to T
+        # H(T) = H_ref(298.15K) + integral(Cp(T)dT) from 298.15K to T
         # CombAero: NASA-9 polynomials integrated
         # Cantera: NASA-7 polynomials integrated
         # Expected differences: < 1.5% due to polynomial differences

@@ -282,7 +282,7 @@ class TestNASA9Polynomials:
         print("NASA-9 Polynomial Validation: Temperature Range Continuity")
         print(f"{'='*80}")
 
-        # Test at 1000 K boundary (±1 K)
+        # Test at 1000 K boundary (+/- 1 K)
         T_boundary = 1000.0
         T_below = 999.0
         T_above = 1001.0

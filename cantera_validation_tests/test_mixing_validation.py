@@ -293,8 +293,8 @@ class TestDensityCalculation:
         T = 300.0
         P = 101325.0
 
-        # Compare density [kg/m³]
-        # Ideal gas law: ρ = P·MW / (R·T)
+        # Compare density [kg/m^3]
+        # Ideal gas law: rho = P*MW / (R*T)
         # CombAero: Uses mixture molecular weight from mole fractions
         # Cantera: Same calculation with same ideal gas assumption
         # Expected differences: < 0.1% (only from MW calculation precision)

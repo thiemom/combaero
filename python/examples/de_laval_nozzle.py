@@ -22,9 +22,9 @@ def main() -> None:
     D_throat = 0.025  # m (throat diameter)
     D_exit = 0.04  # m (exit diameter)
 
-    A_inlet = np.pi * (D_inlet / 2) ** 2  # 19.6 cm²
-    A_throat = np.pi * (D_throat / 2) ** 2  # 4.9 cm²
-    A_exit = np.pi * (D_exit / 2) ** 2  # 12.6 cm²
+    A_inlet = np.pi * (D_inlet / 2) ** 2  # 19.6 cm^2
+    A_throat = np.pi * (D_throat / 2) ** 2  # 4.9 cm^2
+    A_exit = np.pi * (D_exit / 2) ** 2  # 12.6 cm^2
 
     x_throat = 0.05  # m (throat at 5 cm)
     x_exit = 0.12  # m (exit at 12 cm)
@@ -141,7 +141,7 @@ def main() -> None:
 
     # Extract profile data for design case
     x = np.array([st.x for st in sol_design.profile]) * 100  # cm
-    A = np.array([st.A for st in sol_design.profile]) * 1e4  # cm²
+    A = np.array([st.A for st in sol_design.profile]) * 1e4  # cm^2
     M = np.array([st.M for st in sol_design.profile])
     T = np.array([st.T for st in sol_design.profile])
     P = np.array([st.P for st in sol_design.profile]) / 1e5  # bar

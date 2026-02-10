@@ -5,8 +5,8 @@ import pytest
 import combaero as cb
 
 
-# Water at 20°C
-RHO_WATER = 998.0  # kg/m³
+# Water at 20 deg C
+RHO_WATER = 998.0  # kg/m^3
 
 
 class TestBernoulli:
@@ -23,7 +23,7 @@ class TestBernoulli:
 
         # P2 < P1 because v2 > v1
         assert P2 < P1
-        # Check formula: P2 = P1 + 0.5*rho*(v1² - v2²)
+        # Check formula: P2 = P1 + 0.5*rho*(v1^2 - v2^2)
         expected = P1 + 0.5 * rho * (v1**2 - v2**2)
         assert np.isclose(P2, expected)
 
@@ -78,7 +78,7 @@ class TestOrifice:
         """Basic orifice mass flow."""
         P1 = 200000.0
         P2 = 100000.0
-        A = 0.001  # m²
+        A = 0.001  # m^2
         Cd = 0.62
         rho = RHO_WATER
 
@@ -150,7 +150,7 @@ class TestPipe:
 
         dP = cb.pipe_dP(v, L, D, f, rho)
 
-        # Check formula: dP = f * (L/D) * (rho * v² / 2)
+        # Check formula: dP = f * (L/D) * (rho * v^2 / 2)
         expected = f * (L / D) * 0.5 * rho * v**2
         assert np.isclose(dP, expected)
 

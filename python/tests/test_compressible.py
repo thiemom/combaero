@@ -165,9 +165,9 @@ def test_de_laval_nozzle_supersonic() -> None:
     X = cb.standard_dry_air_composition()
 
     # Nozzle geometry
-    A_inlet = 0.002  # m²
-    A_throat = 0.001  # m²
-    A_exit = 0.0015  # m² (area ratio 1.5)
+    A_inlet = 0.002  # m^2
+    A_throat = 0.001  # m^2
+    A_exit = 0.0015  # m^2 (area ratio 1.5)
     x_throat = 0.05
     x_exit = 0.10
 
