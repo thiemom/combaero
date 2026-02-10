@@ -64,11 +64,11 @@ class TransportProps:
 class MolecularStructure:
     """Atomic composition."""
 
-    C: int = 0
-    H: int = 0
-    O_count: int = 0
-    N: int = 0
-    Ar: int = 0
+    C_atoms: int = 0
+    H_atoms: int = 0
+    O_atoms: int = 0
+    N_atoms: int = 0
+    Ar_atoms: int = 0
 
 
 @dataclass
@@ -148,11 +148,11 @@ def load_cantera_yaml(
         # Composition
         comp = sp.get("composition", {})
         structure = MolecularStructure(
-            C=comp.get("C", 0),
-            H=comp.get("H", 0),
-            O_count=comp.get("O", 0),
-            N=comp.get("N", 0),
-            Ar=comp.get("Ar", 0),
+            C_atoms=comp.get("C", 0),
+            H_atoms=comp.get("H", 0),
+            O_atoms=comp.get("O", 0),
+            N_atoms=comp.get("N", 0),
+            Ar_atoms=comp.get("Ar", 0),
         )
         molar_mass = calculate_molar_mass(comp)
 
@@ -331,11 +331,11 @@ def load_merged_json(
         # Composition
         comp = sp.get("composition", {})
         structure = MolecularStructure(
-            C=comp.get("C", 0),
-            H=comp.get("H", 0),
-            O_count=comp.get("O", 0),
-            N=comp.get("N", 0),
-            Ar=comp.get("AR", 0),
+            C_atoms=comp.get("C", 0),
+            H_atoms=comp.get("H", 0),
+            O_atoms=comp.get("O", 0),
+            N_atoms=comp.get("N", 0),
+            Ar_atoms=comp.get("AR", 0),
         )
 
         molar_mass = sp.get("molar_mass", 0.0)
@@ -375,19 +375,19 @@ def species_sort_key(sp: SpeciesData) -> tuple:
     if name in air_order:
         return (0, air_order.index(name), name)
 
-    C, H, O_count, N = (
-        sp.structure.C,
-        sp.structure.H,
-        sp.structure.O_count,
-        sp.structure.N,
+    C, H, O, N = (
+        sp.structure.C_atoms,
+        sp.structure.H_atoms,
+        sp.structure.O_atoms,
+        sp.structure.N_atoms,
     )
 
     # Inert species (no C, H, O)
-    if C == 0 and H == 0 and O_count == 0:
+    if C == 0 and H == 0 and O == 0:
         return (1, name)
 
     # Hydrocarbons (C>0, H>0, no O or N)
-    if C > 0 and H > 0 and O_count == 0 and N == 0:
+    if C > 0 and H > 0 and O == 0 and N == 0:
         return (2, C, name)
 
     # Other carbon-containing species
