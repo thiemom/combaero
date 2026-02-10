@@ -2,13 +2,9 @@ import math
 
 import numpy as np
 
-from combaero import (
-    equivalence_ratio_mass,
-    equivalence_ratio_mole,
-    mole_to_mass,
-    set_equivalence_ratio_mass,
-    set_equivalence_ratio_mole,
-)
+from combaero import (equivalence_ratio_mass, equivalence_ratio_mole,
+                      mole_to_mass, set_equivalence_ratio_mass,
+                      set_equivalence_ratio_mole)
 from combaero._core import num_species, species_index_from_name
 
 

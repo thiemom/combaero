@@ -2,13 +2,7 @@ import math
 
 import numpy as np
 
-from combaero import (
-    cp,
-    density,
-    h,
-    specific_gas_constant,
-    speed_of_sound,
-)
+from combaero import cp, density, h, specific_gas_constant, speed_of_sound
 from combaero._core import num_species, species_index_from_name
 
 
