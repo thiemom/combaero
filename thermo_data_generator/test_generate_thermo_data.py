@@ -12,7 +12,11 @@ from pathlib import Path
 
 import pytest
 from generate_thermo_data import (  # Species used in the reference header (from JetSurf2)
-    NASAFormat, generate_cpp_header, list_species_in_yaml, load_cantera_yaml)
+    NASAFormat,
+    generate_cpp_header,
+    list_species_in_yaml,
+    load_cantera_yaml,
+)
 
 REFERENCE_SPECIES = [
     "N2",
