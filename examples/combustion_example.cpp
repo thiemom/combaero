@@ -105,10 +105,10 @@ int main()
     // Use set_fuel_stream_for_phi for stoichiometric mixture
     Stream fuel_stoich = set_fuel_stream_for_phi(1.0, fuel, air);
     Stream mixed_stoich = mix({fuel_stoich, air});
-    
+
     // One-step: combustion + reforming + WGS equilibrium
     State eq_stoich = combustion_equilibrium(mixed_stoich.state);
-    
+
     // For comparison, also show complete combustion (before equilibrium)
     State burned_stoich = complete_combustion(mixed_stoich.state);
 
@@ -153,10 +153,10 @@ int main()
 
     Stream fuel_rich = set_fuel_stream_for_phi(1.2, fuel, air);
     Stream mixed_rich = mix({fuel_rich, air});
-    
+
     // One-step: combustion + reforming + WGS equilibrium
     State eq_rich = combustion_equilibrium(mixed_rich.state);
-    
+
     // For comparison, also show complete combustion (before equilibrium)
     State burned_rich = complete_combustion(mixed_rich.state);
 

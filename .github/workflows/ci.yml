@@ -24,17 +24,17 @@ jobs:
       - name: Check C++ source code style
         if: runner.os != 'Windows'
         run: ./scripts/check-source-style.sh --verbose
-      
+
       - name: Set up Python (for style check)
         if: runner.os != 'Windows'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
       - name: Install Python style tools
         if: runner.os != 'Windows'
         run: pip install black isort flake8
-      
+
       - name: Check Python code style
         if: runner.os != 'Windows'
         run: ./scripts/check-python-style.sh --verbose

@@ -9,8 +9,8 @@ set(TEST_SOURCES
 
 # Link against Google Test and our library
 add_executable(combaero_tests ${TEST_SOURCES})
-target_link_libraries(combaero_tests PRIVATE 
-    gtest 
+target_link_libraries(combaero_tests PRIVATE
+    gtest
     gtest_main
     combaero_lib
 )

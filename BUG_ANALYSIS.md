@@ -12,8 +12,8 @@ Conducted systematic bug hunting in the C++ codebase. Found and fixed **1 critic
 
 ### Bug #1: Type Casting Error in `complete_combustion_to_CO2_H2O`
 
-**Severity**: Medium (Type Safety Issue)  
-**Location**: `src/combustion.cpp:195`  
+**Severity**: Medium (Type Safety Issue)
+**Location**: `src/combustion.cpp:195`
 **Status**: ✅ FIXED
 
 #### Description

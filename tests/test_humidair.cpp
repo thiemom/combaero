@@ -16,9 +16,9 @@ protected:
         // Temperature range for testing
         temp_range = {-50.0, -20.0, -10.0, -5.0, -1.0, 0.0, 0.1, 1.0, 5.0, 10.0, 20.0, 50.0, 80.0, 100.0};
     }
-    
+
     std::vector<double> temp_range;
-    
+
     // Helper function to check if a value is within expected range
     void expect_in_range(double value, double min_val, double max_val, const std::string& description) {
         EXPECT_GE(value, min_val) << description << " is too low: " << value << " < " << min_val;
@@ -32,10 +32,10 @@ TEST_F(HumidAirTest, SaturationVaporPressure) {
     for (double T_celsius : temp_range) {
         double T_kelvin = T_celsius + 273.15;
         double P_sat = saturation_vapor_pressure(T_kelvin);
-        
+
         // Saturation pressure should be positive
         EXPECT_GT(P_sat, 0.0) << "Saturation pressure at " << T_celsius << "°C is not positive";
-        
+
         // Check against known reference values (approximate)
         if (T_celsius == 0.0) {
             // At 0°C, saturation pressure should be around 611 Pa
@@ -55,10 +55,10 @@ TEST_F(HumidAirTest, ContinuityAtTransition) {
     // Test just below and just above 0°C
     double T_below = 273.15 - 0.001;  // Just below 0°C
     double T_above = 273.15 + 0.001;  // Just above 0°C
-    
+
     double P_below = saturation_vapor_pressure(T_below);
     double P_above = saturation_vapor_pressure(T_above);
-    
+
     // The difference should be very small (continuous function)
     EXPECT_NEAR(P_below, P_above, 0.1);
 }
@@ -67,28 +67,28 @@ TEST_F(HumidAirTest, ContinuityAtTransition) {
 TEST_F(HumidAirTest, StandardDryAirComposition) {
     // Get standard dry air composition
     std::vector<double> dry_air = standard_dry_air_composition();
-    
+
     // Check that it has the correct size
     EXPECT_EQ(dry_air.size(), species_names.size());
-    
+
     // Check that the sum is 1.0
     double sum = 0.0;
     for (double x : dry_air) sum += x;
     EXPECT_NEAR(sum, 1.0, 1e-6);
-    
+
     // Check specific components if they exist
     try {
         const std::size_t n2_idx = species_index_from_name("N2");
         const std::size_t o2_idx = species_index_from_name("O2");
-        
+
         // N2 should be the dominant component (~78%)
         EXPECT_GT(dry_air[n2_idx], 0.7);
         EXPECT_LT(dry_air[n2_idx], 0.8);
-        
+
         // O2 should be second (~21%)
         EXPECT_GT(dry_air[o2_idx], 0.19);
         EXPECT_LT(dry_air[o2_idx], 0.22);
-        
+
         // H2O should be zero for dry air
         if (species_index.count("H2O")) {
             const std::size_t h2o_idx = species_index_from_name("H2O");
@@ -105,15 +105,15 @@ TEST_F(HumidAirTest, ExtremeTemperatures) {
     // Very low temperature (-100°C)
     double T_very_low = 173.15;
     double P_very_low = saturation_vapor_pressure(T_very_low);
-    
+
     // Should be positive but very small
     EXPECT_GT(P_very_low, 0.0);
     EXPECT_LT(P_very_low, 1.0);
-    
+
     // Very high temperature (200°C)
     double T_very_high = 473.15;
     double P_very_high = saturation_vapor_pressure(T_very_high);
-    
+
     // Should be positive and large
     EXPECT_GT(P_very_high, 1.0e5);
 }
@@ -121,15 +121,15 @@ TEST_F(HumidAirTest, ExtremeTemperatures) {
 // Test monotonicity of the saturation vapor pressure function
 TEST_F(HumidAirTest, Monotonicity) {
     double prev_pressure = -1.0;
-    
+
     // Test that pressure increases with temperature
     for (double T = 173.15; T <= 473.15; T += 10.0) {
         double P_sat = saturation_vapor_pressure(T);
-        
+
         if (prev_pressure > 0.0) {
             EXPECT_GT(P_sat, prev_pressure) << "Saturation pressure decreased at T = " << T;
         }
-        
+
         prev_pressure = P_sat;
     }
 }
@@ -145,20 +145,20 @@ TEST_F(HumidAirTest, IceEquationAccuracy) {
         {-20.0, 103.239},
         {0.0, 611.153}
     };
-    
+
     double max_relative_error = 0.0;
     double worst_temp = 0.0;
     double worst_calc = 0.0;
     double worst_ref = 0.0;
-    
+
     // Test each reference point
     for (const auto& [t_celsius, p_ref] : ice_reference) {
         double T_kelvin = t_celsius + 273.15;
         double p_calc = saturation_vapor_pressure(T_kelvin);
-        
+
         // Calculate relative error
         double rel_error = std::abs(p_calc - p_ref) / p_ref * 100.0;
-        
+
         // Track maximum relative error
         if (rel_error > max_relative_error) {
             max_relative_error = rel_error;
@@ -166,32 +166,32 @@ TEST_F(HumidAirTest, IceEquationAccuracy) {
             worst_calc = p_calc;
             worst_ref = p_ref;
         }
-        
+
         // Output for debugging
-        std::cout << "Ice: " << t_celsius << "°C, Ref: " << p_ref 
+        std::cout << "Ice: " << t_celsius << "°C, Ref: " << p_ref
                   << " Pa, Calc: " << p_calc << " Pa, RE: " << rel_error << "%" << std::endl;
-        
+
         // Check individual point
-        EXPECT_NEAR(p_calc, p_ref, p_ref * 0.001) 
+        EXPECT_NEAR(p_calc, p_ref, p_ref * 0.001)
             << "Excessive error at " << t_celsius << "°C: " << rel_error << "%";
     }
-    
+
     // Accuracy validation with boundary temperature consideration:
     // The claimed accuracy is 0.023%, which is met for all temperatures except -100°C
     // -100°C is at the extreme boundary of the validated range (-100°C to 100°C)
     // and shows 0.069% error, which is still excellent but exceeds the claimed accuracy.
-    // 
+    //
     // We use a relaxed threshold of 0.1% to allow the test to pass while documenting
     // that future improvements could bring -100°C within the 0.023% target.
-    
+
     EXPECT_LE(max_relative_error, 0.1)
         << "Maximum relative error exceeds reasonable threshold of 0.1%\n"
-        << "Worst case at " << worst_temp << "°C: Ref = " << worst_ref 
+        << "Worst case at " << worst_temp << "°C: Ref = " << worst_ref
         << " Pa, Calc = " << worst_calc << " Pa, RE = " << max_relative_error << "%";
-    
+
     // Document current status for -100°C boundary case
     if (worst_temp == -100.0 && max_relative_error > 0.023) {
-        std::cout << "\nNote: -100°C boundary temperature shows " << max_relative_error 
+        std::cout << "\nNote: -100°C boundary temperature shows " << max_relative_error
                   << "% error, exceeding claimed 0.023% accuracy.\n"
                   << "This is acceptable for extreme boundary conditions. "
                   << "Future improvements may reduce this.\n";
@@ -209,20 +209,20 @@ TEST_F(HumidAirTest, WaterEquationAccuracy) {
         {80.0, 47414.5},
         {100.0, 101418.0}
     };
-    
+
     double max_relative_error = 0.0;
     double worst_temp = 0.0;
     double worst_calc = 0.0;
     double worst_ref = 0.0;
-    
+
     // Test each reference point
     for (const auto& [t_celsius, p_ref] : water_reference) {
         double T_kelvin = t_celsius + 273.15;
         double p_calc = saturation_vapor_pressure(T_kelvin);
-        
+
         // Calculate relative error
         double rel_error = std::abs(p_calc - p_ref) / p_ref * 100.0;
-        
+
         // Track maximum relative error
         if (rel_error > max_relative_error) {
             max_relative_error = rel_error;
@@ -230,19 +230,19 @@ TEST_F(HumidAirTest, WaterEquationAccuracy) {
             worst_calc = p_calc;
             worst_ref = p_ref;
         }
-        
+
         // Output for debugging
-        std::cout << "Water: " << t_celsius << "°C, Ref: " << p_ref 
+        std::cout << "Water: " << t_celsius << "°C, Ref: " << p_ref
                   << " Pa, Calc: " << p_calc << " Pa, RE: " << rel_error << "%" << std::endl;
-        
+
         // Check individual point
-        EXPECT_NEAR(p_calc, p_ref, p_ref * 0.0001) 
+        EXPECT_NEAR(p_calc, p_ref, p_ref * 0.0001)
             << "Excessive error at " << t_celsius << "°C: " << rel_error << "%";
     }
-    
+
     // Check that maximum relative error is within claimed accuracy (0.0057%)
-    EXPECT_LE(max_relative_error, 0.0057) 
+    EXPECT_LE(max_relative_error, 0.0057)
         << "Maximum relative error exceeds claimed accuracy of 0.0057%\n"
-        << "Worst case at " << worst_temp << "°C: Ref = " << worst_ref 
+        << "Worst case at " << worst_temp << "°C: Ref = " << worst_ref
         << " Pa, Calc = " << worst_calc << " Pa, RE = " << max_relative_error << "%";
 }

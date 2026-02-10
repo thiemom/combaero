@@ -11,8 +11,8 @@ Checks: >
   modernize-*,
   # Readability and basic style
   readability-*,
-  # A subset of C++ Core Guidelines 
-  cppcoreguidelines-*, 
+  # A subset of C++ Core Guidelines
+  cppcoreguidelines-*,
   # But disable rules that fight with style or are project-specific
   -clang-diagnostic-c++17-extensions,
   -myproject-no-system-algorithm,

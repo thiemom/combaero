@@ -18,51 +18,51 @@ protected:
     // Set up common test data
     void SetUp() override {
         size_t n_species = species_names.size();
-        
+
         // Create generic test vectors sized for current species list
         air_composition.resize(n_species, 0.0);
         non_normalized.resize(n_species, 0.0);
         humid_air.resize(n_species, 0.0);
         water_vapor.resize(n_species, 0.0);
         all_zeros.resize(n_species, 0.0);
-        
+
         // Set up air composition: N2 ~78%, O2 ~21%, Ar ~1%
         // Species are guaranteed to exist in our fixed species list
         air_composition[species_index_from_name("N2")] = 0.78;
         air_composition[species_index_from_name("O2")] = 0.21;
         air_composition[species_index_from_name("AR")] = 0.01;
-        
+
         // Non-normalized: arbitrary non-zero values
         non_normalized[species_index_from_name("N2")] = 0.1;
         non_normalized[species_index_from_name("O2")] = 0.4;
         non_normalized[species_index_from_name("H2")] = 0.05;
-        
+
         // Humid air: air with 4% water vapor
         humid_air = air_composition;
         for (auto& val : humid_air) val *= 0.96;
         humid_air[species_index_from_name("H2O")] = 0.04;
-        
+
         // Pure water vapor
         water_vapor[species_index_from_name("H2O")] = 1.0;
     }
-    
+
     std::vector<double> air_composition;
     std::vector<double> non_normalized;
     std::vector<double> humid_air;
     std::vector<double> water_vapor;
     std::vector<double> all_zeros;
-    
+
     // Helper function to check if two vectors are approximately equal
     bool vectors_approx_equal(const std::vector<double>& a, const std::vector<double>& b, double tolerance = 1e-6) {
         if (a.size() != b.size()) return false;
-        
+
         for (size_t i = 0; i < a.size(); ++i) {
             if (std::abs(a[i] - b[i]) > tolerance) return false;
         }
-        
+
         return true;
     }
-    
+
     // Helper function to check if sum of vector elements is approximately equal to a value
     bool sum_approx_equal(const std::vector<double>& vec, double value, double tolerance = 1e-6) {
         double sum = 0.0;
@@ -74,10 +74,10 @@ protected:
 // Test normalize_fractions function with normal input
 TEST_F(ThermoTransportTest, NormalizeNormalInput) {
     auto result = normalize_fractions(non_normalized);
-    
+
     // Check that sum is 1.0
     EXPECT_TRUE(sum_approx_equal(result, 1.0));
-    
+
     // Check that relative proportions are preserved
     for (size_t i = 0; i < non_normalized.size(); ++i) {
         if (std::abs(non_normalized[i]) > 1e-10) {
@@ -91,10 +91,10 @@ TEST_F(ThermoTransportTest, NormalizeNormalInput) {
 // Test normalize_fractions function with already normalized input
 TEST_F(ThermoTransportTest, NormalizeNormalizedInput) {
     auto result = normalize_fractions(air_composition);
-    
+
     // Should be approximately the same as input
     EXPECT_TRUE(vectors_approx_equal(result, air_composition));
-    
+
     // Sum should still be 1.0
     EXPECT_TRUE(sum_approx_equal(result, 1.0));
 }
@@ -103,13 +103,13 @@ TEST_F(ThermoTransportTest, NormalizeNormalizedInput) {
 TEST_F(ThermoTransportTest, NormalizeAllZeros) {
     // Redirect cerr to capture warning
     testing::internal::CaptureStderr();
-    
+
     auto result = normalize_fractions(all_zeros);
-    
+
     // Check that warning was issued
     std::string output = testing::internal::GetCapturedStderr();
     EXPECT_TRUE(output.find("Warning") != std::string::npos);
-    
+
     // Result should be all zeros
     EXPECT_TRUE(vectors_approx_equal(result, all_zeros));
 }
@@ -117,11 +117,11 @@ TEST_F(ThermoTransportTest, NormalizeAllZeros) {
 // Test convert_to_dry_fractions function with humid air
 TEST_F(ThermoTransportTest, ConvertToDryFractions) {
     auto result = convert_to_dry_fractions(humid_air);
-    
+
     // Check that water vapor is zero
     std::size_t h2o_idx = species_index_from_name("H2O");
     EXPECT_DOUBLE_EQ(result[h2o_idx], 0.0);
-    
+
     // Check that sum is 1.0
     EXPECT_TRUE(sum_approx_equal(result, 1.0));
 }
@@ -130,13 +130,13 @@ TEST_F(ThermoTransportTest, ConvertToDryFractions) {
 TEST_F(ThermoTransportTest, ConvertPureWaterVaporToDry) {
     // Redirect cerr to capture warning
     testing::internal::CaptureStderr();
-    
+
     auto result = convert_to_dry_fractions(water_vapor);
-    
+
     // Check that warning was issued
     std::string output = testing::internal::GetCapturedStderr();
     EXPECT_TRUE(output.find("Warning") != std::string::npos);
-    
+
     // Result should be all zeros
     EXPECT_TRUE(vectors_approx_equal(result, all_zeros));
 }
@@ -145,20 +145,20 @@ TEST_F(ThermoTransportTest, ConvertPureWaterVaporToDry) {
 TEST_F(ThermoTransportTest, TemperatureBelowValidRangeWarning) {
     // Use 150 K which is below the 200 K minimum for NASA-9 polynomials
     double T = 150.0;
-    
+
     // Redirect cerr to capture warning
     testing::internal::CaptureStderr();
-    
+
     // Calculate cp - should still work but issue warning
     double cp_value = cp(T, air_composition);
-    
+
     // Check that warning was issued
     std::string output = testing::internal::GetCapturedStderr();
-    EXPECT_TRUE(output.find("Warning") != std::string::npos) 
+    EXPECT_TRUE(output.find("Warning") != std::string::npos)
         << "Expected temperature range warning for T=150 K";
     EXPECT_TRUE(output.find("below valid range") != std::string::npos)
         << "Warning should mention 'below valid range'";
-    
+
     // Result should still be reasonable (extrapolated from 200 K)
     EXPECT_GT(cp_value, 20.0);
     EXPECT_LT(cp_value, 50.0);
@@ -170,36 +170,36 @@ TEST_F(ThermoTransportTest, DerivativesMatchNumerical) {
     std::vector<double> test_temps = {300.0, 500.0, 1000.0, 2000.0, 4000.0};
     double dT = 0.1;  // Step for numerical differentiation
     double P = 101325.0;
-    
+
     for (double T : test_temps) {
         // Numerical derivatives using central difference
         double cp_plus = cp(T + dT, air_composition);
         double cp_minus = cp(T - dT, air_composition);
         double dcp_dT_numerical = (cp_plus - cp_minus) / (2.0 * dT);
-        
+
         double s_plus = s(T + dT, air_composition, P);
         double s_minus = s(T - dT, air_composition, P);
         double ds_dT_numerical = (s_plus - s_minus) / (2.0 * dT);
-        
+
         double h_plus = h(T + dT, air_composition);
         double h_minus = h(T - dT, air_composition);
         double dh_dT_numerical = (h_plus - h_minus) / (2.0 * dT);
-        
+
         // Analytical derivatives
         double dcp_dT_analytical = dcp_dT(T, air_composition);
         double ds_dT_analytical = ds_dT(T, air_composition);
         double dh_dT_analytical = dh_dT(T, air_composition);
-        
+
         // dH/dT should equal Cp for ideal gas
         double cp_value = cp(T, air_composition);
-        EXPECT_NEAR(dh_dT_analytical, cp_value, 1e-10) 
+        EXPECT_NEAR(dh_dT_analytical, cp_value, 1e-10)
             << "dH/dT should equal Cp at T=" << T;
-        
+
         // Analytical should match numerical within 1%
         double tol_dcp = std::max(std::abs(dcp_dT_analytical) * 0.01, 1e-6);
         double tol_ds = std::max(std::abs(ds_dT_analytical) * 0.01, 1e-6);
         double tol_dh = std::max(std::abs(dh_dT_analytical) * 0.01, 1e-6);
-        
+
         EXPECT_NEAR(dcp_dT_analytical, dcp_dT_numerical, tol_dcp)
             << "dCp/dT mismatch at T=" << T;
         EXPECT_NEAR(ds_dT_analytical, ds_dT_numerical, tol_ds)
@@ -214,26 +214,26 @@ TEST_F(ThermoTransportTest, BasicThermodynamicProperties) {
     // Test at standard conditions (300 K to avoid boundary warnings)
     double T = 300.0;
     double P = 101325.0;
-    
+
     // Test specific heat capacity - should be positive and reasonable
     double cp_value = cp(T, air_composition);
     EXPECT_GT(cp_value, 20.0);  // Reasonable lower bound
     EXPECT_LT(cp_value, 50.0);  // Reasonable upper bound
-    
+
     // Test enthalpy - should be finite
     double h_value = h(T, air_composition);
     EXPECT_TRUE(std::isfinite(h_value));
-    
+
     // Test entropy - should be positive and finite
     double s_value = s(T, air_composition, P);
     EXPECT_GT(s_value, 100.0);
     EXPECT_TRUE(std::isfinite(s_value));
-    
+
     // Test density - should be positive and reasonable for a gas
     double rho = density(T, P, air_composition);
     EXPECT_GT(rho, 0.5);  // Reasonable for any gas mixture
     EXPECT_LT(rho, 5.0);  // Reasonable upper bound
-    
+
     // Test internal energy: u = h - R*T for ideal gas
     double u_value = u(T, air_composition);
     double expected_u = h_value - 8.31446261815324 * T;
@@ -252,17 +252,17 @@ TEST_F(ThermoTransportTest, MolecularWeight) {
 TEST_F(ThermoTransportTest, PerSpeciesProperties) {
     double T = 300.0;
     std::size_t i_N2 = species_index_from_name("N2");
-    
+
     // cp_species = cp_R * R
     double cp_dim = cp_species(i_N2, T);
     double cp_nondim = cp_R(i_N2, T);
     EXPECT_NEAR(cp_dim, cp_nondim * 8.31446261815324, 1.0e-10);
-    
+
     // h_species = h_RT * R * T
     double h_dim = h_species(i_N2, T);
     double h_nondim = h_RT(i_N2, T);
     EXPECT_NEAR(h_dim, h_nondim * 8.31446261815324 * T, 1.0e-6);
-    
+
     // s_species = s_R * R
     double s_dim = s_species(i_N2, T);
     double s_nondim = s_R(i_N2, T);
@@ -274,12 +274,12 @@ TEST_F(ThermoTransportTest, TransportProperties) {
     // Test at 300 K to avoid boundary warnings
     double T = 300.0;
     double P = 101325.0;
-    
+
     // Test viscosity - should be positive and reasonable for gases
     double mu = viscosity(T, P, air_composition);
     EXPECT_GT(mu, 1.0e-6);  // Lower bound for gas viscosity
     EXPECT_LT(mu, 1.0e-4);  // Upper bound for gas viscosity
-    
+
     // Test thermal diffusivity: α = k / (ρ * cp)
     double alpha = thermal_diffusivity(T, P, air_composition);
     double k_val = thermal_conductivity(T, P, air_composition);
@@ -289,12 +289,12 @@ TEST_F(ThermoTransportTest, TransportProperties) {
     double cp_mass = cp_val / MW;
     double expected_alpha = k_val / (rho_val * cp_mass);
     EXPECT_NEAR(alpha, expected_alpha, 1.0e-12);
-    
+
     // Test thermal conductivity - should be positive
     double k = thermal_conductivity(T, P, air_composition);
     EXPECT_GT(k, 0.001);
     EXPECT_LT(k, 10.0);  // Wide range for different species mixtures
-    
+
     // Test Prandtl number - should be positive
     double pr = prandtl(T, P, air_composition);
     EXPECT_GT(pr, 1e-6);  // Just check it's positive and finite
@@ -534,7 +534,7 @@ TEST_F(ThermoTransportTest, StateBasedThermo) {
     s.T = 300.0;
     s.P = 101325.0;
     s.X = air_composition;
-    
+
     // State-based functions should match vector-based functions
     EXPECT_NEAR(cp(s), cp(s.T, s.X), 1e-12);
     EXPECT_NEAR(h(s), h(s.T, s.X), 1e-12);
@@ -548,13 +548,13 @@ TEST_F(ThermoTransportTest, StateBasedThermo) {
 // Test State-based combustion functions
 TEST_F(ThermoTransportTest, StateBasedCombustion) {
     const std::size_t n = species_names.size();
-    
+
     // Create stoichiometric CH4 + air mixture
     std::vector<double> X_mix(n, 0.0);
     const std::size_t idx_CH4 = species_index_from_name("CH4");
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     // CH4 + 2 O2 -> CO2 + 2 H2O, stoichiometric with air (21% O2)
     // For phi=1: need 2 mol O2 per mol CH4
     // Air is 21% O2, so need 2/0.21 = 9.52 mol air per mol CH4
@@ -564,22 +564,22 @@ TEST_F(ThermoTransportTest, StateBasedCombustion) {
     X_mix[idx_CH4] = n_CH4 / n_total;
     X_mix[idx_O2] = 0.21 * n_air / n_total;
     X_mix[idx_N2] = 0.79 * n_air / n_total;
-    
+
     State in;
     in.T = 300.0;
     in.P = 101325.0;
     in.X = X_mix;
-    
+
     // Isothermal combustion should preserve T
     State out_iso = complete_combustion_isothermal(in);
     EXPECT_NEAR(out_iso.T, in.T, 1e-10);
     EXPECT_NEAR(out_iso.P, in.P, 1e-10);
-    
+
     // Adiabatic combustion should increase T significantly
     State out_ad = complete_combustion(in);
     EXPECT_GT(out_ad.T, in.T + 1000.0);  // Flame temp should be >1300 K
     EXPECT_NEAR(out_ad.P, in.P, 1e-10);
-    
+
     // Enthalpy should be conserved in adiabatic case
     double H_in = h(in);
     double H_out = h(out_ad);
@@ -589,7 +589,7 @@ TEST_F(ThermoTransportTest, StateBasedCombustion) {
 // Test State-based WGS equilibrium functions
 TEST_F(ThermoTransportTest, StateBasedWgsEquilibrium) {
     const std::size_t n = species_names.size();
-    
+
     // Create a mixture with CO, H2O, CO2, H2
     std::vector<double> X_mix(n, 0.0);
     const std::size_t idx_CO = species_index_from_name("CO");
@@ -597,32 +597,32 @@ TEST_F(ThermoTransportTest, StateBasedWgsEquilibrium) {
     const std::size_t idx_CO2 = species_index_from_name("CO2");
     const std::size_t idx_H2 = species_index_from_name("H2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     X_mix[idx_CO] = 0.1;
     X_mix[idx_H2O] = 0.2;
     X_mix[idx_CO2] = 0.05;
     X_mix[idx_H2] = 0.05;
     X_mix[idx_N2] = 0.6;  // Diluent
-    
+
     State in;
     in.T = 1000.0;  // High T for WGS
     in.P = 101325.0;
     in.X = X_mix;
-    
+
     // Isothermal WGS should preserve T
     State out_iso = wgs_equilibrium(in);
     EXPECT_NEAR(out_iso.T, in.T, 1e-10);
     EXPECT_NEAR(out_iso.P, in.P, 1e-10);
-    
+
     // Mole fractions should still sum to 1
     double sum = 0.0;
     for (double x : out_iso.X) sum += x;
     EXPECT_NEAR(sum, 1.0, 1e-10);
-    
+
     // Adiabatic WGS
     State out_ad = wgs_equilibrium_adiabatic(in);
     EXPECT_NEAR(out_ad.P, in.P, 1e-10);
-    
+
     // Enthalpy should be conserved
     double H_in = h(in);
     double H_out = h(out_ad);
@@ -635,7 +635,7 @@ TEST_F(ThermoTransportTest, StatePropertyGetters) {
     s.T = 300.0;
     s.P = 101325.0;
     s.X = air_composition;
-    
+
     // Test property getters match free functions
     EXPECT_NEAR(s.mw(), mwmix(s.X), 1e-12);
     EXPECT_NEAR(s.cp(), cp(s.T, s.X), 1e-12);
@@ -645,14 +645,14 @@ TEST_F(ThermoTransportTest, StatePropertyGetters) {
     EXPECT_NEAR(s.rho(), density(s.T, s.P, s.X), 1e-12);
     EXPECT_NEAR(s.gamma(), isentropic_expansion_coefficient(s.T, s.X), 1e-12);
     EXPECT_NEAR(s.a(), speed_of_sound(s.T, s.X), 1e-12);
-    
+
     // Test transport properties
     EXPECT_NEAR(s.mu(), viscosity(s.T, s.P, s.X), 1e-12);
     EXPECT_NEAR(s.k(), thermal_conductivity(s.T, s.P, s.X), 1e-12);
     EXPECT_NEAR(s.nu(), kinematic_viscosity(s.T, s.P, s.X), 1e-12);
     EXPECT_NEAR(s.Pr(), prandtl(s.T, s.P, s.X), 1e-12);
     EXPECT_NEAR(s.alpha(), thermal_diffusivity(s.T, s.P, s.X), 1e-12);
-    
+
     // Test setters with chaining
     State s2;
     s2.set_T(400.0).set_P(200000.0).set_X(air_composition);
@@ -666,46 +666,46 @@ TEST_F(ThermoTransportTest, StreamMixing) {
     const std::size_t idx_N2 = species_index_from_name("N2");
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_CO2 = species_index_from_name("CO2");
-    
+
     // Stream 1: Hot air at 500 K
     std::vector<double> X_air(n, 0.0);
     X_air[idx_N2] = 0.79;
     X_air[idx_O2] = 0.21;
-    
+
     Stream s1;
     s1.state.T = 500.0;
     s1.state.P = 101325.0;
     s1.state.X = X_air;
     s1.mdot = 1.0;  // 1 kg/s
-    
+
     // Stream 2: Cold CO2 at 300 K
     std::vector<double> X_co2(n, 0.0);
     X_co2[idx_CO2] = 1.0;
-    
+
     Stream s2;
     s2.state.T = 300.0;
     s2.state.P = 90000.0;  // Lower pressure
     s2.state.X = X_co2;
     s2.mdot = 0.5;  // 0.5 kg/s
-    
+
     // Mix streams
     Stream mixed = mix({s1, s2});
-    
+
     // Check mass balance
     EXPECT_NEAR(mixed.mdot, 1.5, 1e-12);
-    
+
     // Check pressure is minimum (90000 Pa)
     EXPECT_NEAR(mixed.P(), 90000.0, 1e-12);
-    
+
     // Check temperature is between inputs (energy balance)
     EXPECT_GT(mixed.T(), 300.0);
     EXPECT_LT(mixed.T(), 500.0);
-    
+
     // Check composition has both species
     EXPECT_GT(mixed.X()[idx_N2], 0.0);
     EXPECT_GT(mixed.X()[idx_O2], 0.0);
     EXPECT_GT(mixed.X()[idx_CO2], 0.0);
-    
+
     // Mole fractions should sum to 1
     double sum = 0.0;
     for (double x : mixed.X()) sum += x;
@@ -715,44 +715,44 @@ TEST_F(ThermoTransportTest, StreamMixing) {
 // Test Stream mixing with pressure override
 TEST_F(ThermoTransportTest, StreamMixingPressureOverride) {
     const std::size_t n = species_names.size();
-    
+
     Stream s1;
     s1.state.T = 400.0;
     s1.state.P = 100000.0;
     s1.state.X = air_composition;
     s1.mdot = 1.0;
-    
+
     Stream s2;
     s2.state.T = 300.0;
     s2.state.P = 80000.0;
     s2.state.X = air_composition;
     s2.mdot = 1.0;
-    
+
     // Mix with explicit pressure
     double P_override = 150000.0;
     Stream mixed = mix({s1, s2}, P_override);
-    
+
     EXPECT_NEAR(mixed.P(), P_override, 1e-12);
 }
 
 // Test Stream mixing enthalpy conservation
 TEST_F(ThermoTransportTest, StreamMixingEnthalpyConservation) {
     const std::size_t n = species_names.size();
-    
+
     Stream s1;
     s1.state.T = 600.0;
     s1.state.P = 101325.0;
     s1.state.X = air_composition;
     s1.mdot = 2.0;
-    
+
     Stream s2;
     s2.state.T = 300.0;
     s2.state.P = 101325.0;
     s2.state.X = air_composition;
     s2.mdot = 1.0;
-    
+
     Stream mixed = mix({s1, s2});
-    
+
     // Calculate enthalpy flows (J/s)
     auto H_flow = [](const Stream& st) {
         double h_molar = st.h();  // J/mol
@@ -760,10 +760,10 @@ TEST_F(ThermoTransportTest, StreamMixingEnthalpyConservation) {
         double h_mass = h_molar / (MW * 1e-3);  // J/kg
         return h_mass * st.mdot;  // W
     };
-    
+
     double H_in = H_flow(s1) + H_flow(s2);
     double H_out = H_flow(mixed);
-    
+
     // Enthalpy should be conserved
     EXPECT_NEAR(H_in, H_out, std::abs(H_in) * 1e-6);
 }
@@ -771,36 +771,36 @@ TEST_F(ThermoTransportTest, StreamMixingEnthalpyConservation) {
 // Test dry air requirements for combustion
 TEST_F(ThermoTransportTest, DryAirRequirements) {
     const std::size_t idx_CH4 = species_index_from_name("CH4");
-    
+
     // CH4 + 2 O2 -> CO2 + 2 H2O
     // O2 required per mol CH4 = 2
     double O2_per_mol = oxygen_required_per_mol_fuel(idx_CH4);
     EXPECT_NEAR(O2_per_mol, 2.0, 1e-10);
-    
+
     // Dry air is ~20.95% O2, so air required = O2_required / 0.2095
     double air_per_mol = dryair_required_per_mol_fuel(idx_CH4);
     double expected_air = O2_per_mol / 0.2095;
     EXPECT_NEAR(air_per_mol, expected_air, 1e-10);
-    
+
     // Test mass basis consistency
     double O2_per_kg = oxygen_required_per_kg_fuel(idx_CH4);
     double air_per_kg = dryair_required_per_kg_fuel(idx_CH4);
-    
+
     // Both should be positive
     EXPECT_GT(O2_per_kg, 0.0);
     EXPECT_GT(air_per_kg, 0.0);
-    
+
     // Air requirement should be larger than O2 requirement (air is ~21% O2)
     EXPECT_GT(air_per_kg, O2_per_kg);
-    
+
     // Test mixture functions with pure CH4
     const std::size_t n = species_names.size();
     std::vector<double> X_fuel(n, 0.0);
     X_fuel[idx_CH4] = 1.0;
-    
+
     double air_per_mol_mix = dryair_required_per_mol_mixture(X_fuel);
     EXPECT_NEAR(air_per_mol_mix, air_per_mol, 1e-10);
-    
+
     double air_per_kg_mix = dryair_required_per_kg_mixture(X_fuel);
     EXPECT_NEAR(air_per_kg_mix, air_per_kg, 1e-10);
 }
@@ -809,38 +809,38 @@ TEST_F(ThermoTransportTest, DryAirRequirements) {
 TEST_F(ThermoTransportTest, SetFuelStreamForPhi) {
     const std::size_t n = species_names.size();
     const std::size_t idx_CH4 = species_index_from_name("CH4");
-    
+
     // Fuel stream: pure CH4
     Stream fuel;
     fuel.state.T = 300.0;
     fuel.state.P = 101325.0;
     fuel.state.X = std::vector<double>(n, 0.0);
     fuel.state.X[idx_CH4] = 1.0;
-    
+
     // Oxidizer stream: dry air at 10 kg/s
     Stream air;
     air.state.T = 300.0;
     air.state.P = 101325.0;
     air.state.X = standard_dry_air_composition();
     air.mdot = 10.0;
-    
+
     // Test stoichiometric case (phi = 1.0)
     Stream fuel_stoich = set_fuel_stream_for_phi(1.0, fuel, air);
     EXPECT_GT(fuel_stoich.mdot, 0.0);
-    
+
     // Mix and verify equivalence ratio
     Stream mixed = mix({fuel_stoich, air});
     std::vector<double> Y_fuel = mole_to_mass(fuel.X());
     std::vector<double> Y_air = mole_to_mass(air.X());
     std::vector<double> Y_mix = mole_to_mass(mixed.X());
-    
+
     double phi_check = equivalence_ratio_mass(Y_mix, Y_fuel, Y_air);
     EXPECT_NEAR(phi_check, 1.0, 0.01);
-    
+
     // Test lean case (phi = 0.5)
     Stream fuel_lean = set_fuel_stream_for_phi(0.5, fuel, air);
     EXPECT_LT(fuel_lean.mdot, fuel_stoich.mdot);
-    
+
     Stream mixed_lean = mix({fuel_lean, air});
     std::vector<double> Y_mix_lean = mole_to_mass(mixed_lean.X());
     double phi_lean = equivalence_ratio_mass(Y_mix_lean, Y_fuel, Y_air);
@@ -859,7 +859,7 @@ TEST_F(ThermoTransportTest, ThermoPropertiesNaturalGasMixture) {
     const std::size_t idx_C3H8 = species_index_from_name("C3H8");
     const std::size_t idx_N2 = species_index_from_name("N2");
     const std::size_t idx_CO2 = species_index_from_name("CO2");
-    
+
     // Natural gas composition: ~90% CH4, 5% C2H6, 2% C3H8, 2% N2, 1% CO2
     State ng;
     ng.T = 300.0;
@@ -870,7 +870,7 @@ TEST_F(ThermoTransportTest, ThermoPropertiesNaturalGasMixture) {
     ng.X[idx_C3H8] = 0.02;
     ng.X[idx_N2] = 0.02;
     ng.X[idx_CO2] = 0.01;
-    
+
     // Verify thermo properties are reasonable
     EXPECT_GT(ng.cp(), 30.0);  // J/(mol·K)
     EXPECT_LT(ng.cp(), 50.0);
@@ -878,10 +878,10 @@ TEST_F(ThermoTransportTest, ThermoPropertiesNaturalGasMixture) {
     EXPECT_LT(ng.rho(), 1.5);
     EXPECT_GT(ng.mw(), 16.0);  // g/mol (CH4 is 16)
     EXPECT_LT(ng.mw(), 20.0);
-    
+
     // Enthalpy should be negative (formation enthalpy of hydrocarbons)
     EXPECT_LT(h(ng.T, ng.X), 0.0);
-    
+
     // Transport properties
     EXPECT_GT(ng.mu(), 1e-6);  // Pa·s
     EXPECT_LT(ng.mu(), 2e-5);
@@ -900,7 +900,7 @@ TEST_F(ThermoTransportTest, MixingNaturalGasWithHumidAir) {
     const std::size_t idx_H2O = species_index_from_name("H2O");
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_AR = species_index_from_name("AR");
-    
+
     // Natural gas fuel
     State ng;
     ng.T = 300.0;
@@ -911,11 +911,11 @@ TEST_F(ThermoTransportTest, MixingNaturalGasWithHumidAir) {
     ng.X[idx_C3H8] = 0.02;
     ng.X[idx_N2] = 0.02;
     ng.X[idx_CO2] = 0.01;
-    
+
     Stream fuel;
     fuel.state = ng;
     fuel.mdot = 1.0;  // 1 kg/s
-    
+
     // Humid air
     std::vector<double> X_air = humid_air_composition(300.0, 101325.0, 0.5);
     State air_state;
@@ -925,13 +925,13 @@ TEST_F(ThermoTransportTest, MixingNaturalGasWithHumidAir) {
     Stream air;
     air.state = air_state;
     air.mdot = 20.0;  // 20 kg/s
-    
+
     // Mix streams
     Stream mixed = mix({fuel, air});
-    
+
     // Verify mixing conserves mass
     EXPECT_NEAR(mixed.mdot, fuel.mdot + air.mdot, 1e-10);
-    
+
     // Verify all species are present
     EXPECT_GT(mixed.X()[idx_CH4], 0.0);
     EXPECT_GT(mixed.X()[idx_C2H6], 0.0);
@@ -940,7 +940,7 @@ TEST_F(ThermoTransportTest, MixingNaturalGasWithHumidAir) {
     EXPECT_GT(mixed.X()[idx_N2], 0.0);
     EXPECT_GT(mixed.X()[idx_H2O], 0.0);
     EXPECT_GT(mixed.X()[idx_AR], 0.0);
-    
+
     // Mole fractions should sum to 1
     double sum = 0.0;
     for (double x : mixed.X()) sum += x;
@@ -958,7 +958,7 @@ TEST_F(ThermoTransportTest, CompleteCombustionNaturalGas) {
     const std::size_t idx_H2O = species_index_from_name("H2O");
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_AR = species_index_from_name("AR");
-    
+
     // Natural gas fuel
     State ng;
     ng.T = 300.0;
@@ -969,11 +969,11 @@ TEST_F(ThermoTransportTest, CompleteCombustionNaturalGas) {
     ng.X[idx_C3H8] = 0.02;
     ng.X[idx_N2] = 0.02;
     ng.X[idx_CO2] = 0.01;
-    
+
     Stream fuel;
     fuel.state = ng;
     fuel.mdot = 1.0;
-    
+
     // Humid air
     std::vector<double> X_air = humid_air_composition(300.0, 101325.0, 0.5);
     State air_state;
@@ -983,23 +983,23 @@ TEST_F(ThermoTransportTest, CompleteCombustionNaturalGas) {
     Stream air;
     air.state = air_state;
     air.mdot = 20.0;  // Excess air for complete combustion
-    
+
     // Mix and combust
     Stream mixed = mix({fuel, air});
     State burned = complete_combustion(mixed.state);
-    
+
     // All hydrocarbons should be consumed
     EXPECT_LT(burned.X[idx_CH4], 1e-10);
     EXPECT_LT(burned.X[idx_C2H6], 1e-10);
     EXPECT_LT(burned.X[idx_C3H8], 1e-10);
-    
+
     // CO2 and H2O should be produced
     EXPECT_GT(burned.X[idx_CO2], 0.05);
     EXPECT_GT(burned.X[idx_H2O], 0.10);
-    
+
     // Temperature should increase significantly
     EXPECT_GT(burned.T, 1500.0);
-    
+
     // Inerts should still be present
     EXPECT_GT(burned.X[idx_N2], 0.5);
     EXPECT_GT(burned.X[idx_AR], 0.001);
@@ -1013,7 +1013,7 @@ TEST_F(ThermoTransportTest, EquivalenceRatioNaturalGas) {
     const std::size_t idx_C3H8 = species_index_from_name("C3H8");
     const std::size_t idx_N2 = species_index_from_name("N2");
     const std::size_t idx_CO2 = species_index_from_name("CO2");
-    
+
     // Natural gas fuel
     State ng;
     ng.T = 300.0;
@@ -1024,11 +1024,11 @@ TEST_F(ThermoTransportTest, EquivalenceRatioNaturalGas) {
     ng.X[idx_C3H8] = 0.02;
     ng.X[idx_N2] = 0.02;
     ng.X[idx_CO2] = 0.01;
-    
+
     Stream fuel;
     fuel.state = ng;
     fuel.mdot = 1.0;
-    
+
     // Humid air
     std::vector<double> X_air = humid_air_composition(300.0, 101325.0, 0.5);
     State air_state;
@@ -1038,20 +1038,20 @@ TEST_F(ThermoTransportTest, EquivalenceRatioNaturalGas) {
     Stream air;
     air.state = air_state;
     air.mdot = 10.0;
-    
+
     // Test set_fuel_stream_for_phi with natural gas
     Stream fuel_stoich = set_fuel_stream_for_phi(1.0, fuel, air);
     EXPECT_GT(fuel_stoich.mdot, 0.0);
-    
+
     // Mix and verify equivalence ratio
     Stream mixed = mix({fuel_stoich, air});
     std::vector<double> Y_fuel = mole_to_mass(fuel.X());
     std::vector<double> Y_air = mole_to_mass(air.X());
     std::vector<double> Y_mix = mole_to_mass(mixed.X());
-    
+
     double phi_check = equivalence_ratio_mass(Y_mix, Y_fuel, Y_air);
     EXPECT_NEAR(phi_check, 1.0, 0.02);
-    
+
     // Test rich case
     Stream fuel_rich = set_fuel_stream_for_phi(1.2, fuel, air);
     Stream mixed_rich = mix({fuel_rich, air});
@@ -1070,7 +1070,7 @@ TEST_F(ThermoTransportTest, CompleteCombustionLPG) {
     const std::size_t idx_H2O = species_index_from_name("H2O");
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_AR = species_index_from_name("AR");
-    
+
     // LPG: ~60% propane, 40% butane
     State lpg;
     lpg.T = 300.0;
@@ -1078,11 +1078,11 @@ TEST_F(ThermoTransportTest, CompleteCombustionLPG) {
     lpg.X = std::vector<double>(n, 0.0);
     lpg.X[idx_C3H8] = 0.60;
     lpg.X[idx_IC4H10] = 0.40;
-    
+
     Stream fuel;
     fuel.state = lpg;
     fuel.mdot = 1.0;
-    
+
     // Dry air
     std::vector<double> X_air = humid_air_composition(300.0, 101325.0, 0.0);
     State air_state;
@@ -1092,22 +1092,22 @@ TEST_F(ThermoTransportTest, CompleteCombustionLPG) {
     Stream air;
     air.state = air_state;
     air.mdot = 25.0;  // Excess air
-    
+
     // Mix and combust
     Stream mixed = mix({fuel, air});
     State burned = complete_combustion(mixed.state);
-    
+
     // All hydrocarbons consumed
     EXPECT_LT(burned.X[idx_C3H8], 1e-10);
     EXPECT_LT(burned.X[idx_IC4H10], 1e-10);
-    
+
     // Products formed
     EXPECT_GT(burned.X[idx_CO2], 0.05);
     EXPECT_GT(burned.X[idx_H2O], 0.08);
-    
+
     // Temperature increase
     EXPECT_GT(burned.T, 1500.0);
-    
+
     // Inerts present
     EXPECT_GT(burned.X[idx_N2], 0.5);
     EXPECT_GT(burned.X[idx_AR], 0.001);
@@ -1124,7 +1124,7 @@ TEST_F(ThermoTransportTest, RichCombustionNaturalGasUnburnedHC) {
     const std::size_t idx_H2O = species_index_from_name("H2O");
     const std::size_t idx_CO = species_index_from_name("CO");
     const std::size_t idx_H2 = species_index_from_name("H2");
-    
+
     // Natural gas fuel
     State ng;
     ng.T = 300.0;
@@ -1135,11 +1135,11 @@ TEST_F(ThermoTransportTest, RichCombustionNaturalGasUnburnedHC) {
     ng.X[idx_C3H8] = 0.02;
     ng.X[idx_N2] = 0.02;
     ng.X[idx_CO2] = 0.01;
-    
+
     Stream fuel;
     fuel.state = ng;
     fuel.mdot = 1.0;
-    
+
     // Humid air
     std::vector<double> X_air = humid_air_composition(300.0, 101325.0, 0.5);
     State air_state;
@@ -1149,27 +1149,27 @@ TEST_F(ThermoTransportTest, RichCombustionNaturalGasUnburnedHC) {
     Stream air;
     air.state = air_state;
     air.mdot = 10.0;
-    
+
     // Rich mixture (phi = 1.3)
     Stream fuel_rich = set_fuel_stream_for_phi(1.3, fuel, air);
     Stream mixed = mix({fuel_rich, air});
     State burned = complete_combustion(mixed.state);
-    
+
     // Some unburned hydrocarbons should remain
     double total_hc = burned.X[idx_CH4] + burned.X[idx_C2H6] + burned.X[idx_C3H8];
     EXPECT_GT(total_hc, 0.005);
-    
+
     // Apply reforming equilibrium
     State eq = reforming_equilibrium_adiabatic(burned);
-    
+
     // Hydrocarbons should be reformed
     double total_hc_eq = eq.X[idx_CH4] + eq.X[idx_C2H6] + eq.X[idx_C3H8];
     EXPECT_LT(total_hc_eq, total_hc * 0.5);
-    
+
     // CO and H2 should be produced
     EXPECT_GT(eq.X[idx_CO], 0.01);
     EXPECT_GT(eq.X[idx_H2], 0.01);
-    
+
     // Temperature should drop (endothermic reforming)
     EXPECT_LT(eq.T, burned.T);
 }
@@ -1187,7 +1187,7 @@ TEST_F(ThermoTransportTest, SmrWgsEquilibriumIsothermal) {
     const std::size_t idx_CO2 = species_index_from_name("CO2");
     const std::size_t idx_H2 = species_index_from_name("H2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     // Create a mixture with CH4, H2O, CO2, and N2 (typical rich combustion products)
     State in;
     in.T = 2000.0;  // High temperature favors SMR
@@ -1197,34 +1197,34 @@ TEST_F(ThermoTransportTest, SmrWgsEquilibriumIsothermal) {
     in.X[idx_H2O] = 0.20;   // 20% H2O
     in.X[idx_CO2] = 0.10;   // 10% CO2
     in.X[idx_N2] = 0.68;    // 68% N2
-    
+
     State out = smr_wgs_equilibrium(in);
-    
+
     // Temperature should be unchanged (isothermal)
     EXPECT_NEAR(out.T, in.T, 1e-6);
-    
+
     // At high T, SMR should convert CH4 to CO + H2
     // CH4 should decrease
     EXPECT_LT(out.X[idx_CH4], in.X[idx_CH4]);
-    
+
     // CO and H2 should increase
     EXPECT_GT(out.X[idx_CO], in.X[idx_CO]);
     EXPECT_GT(out.X[idx_H2], in.X[idx_H2]);
-    
+
     // Mole fractions should sum to 1
     double sum = 0.0;
     for (double x : out.X) sum += x;
     EXPECT_NEAR(sum, 1.0, 1e-10);
-    
+
     // Element balance: use N2 as reference (inert)
     // SMR changes total moles, so ratios to N2 should be conserved
     double n2_in = in.X[idx_N2];
     double n2_out = out.X[idx_N2];
-    
+
     double C_per_N2_in = (in.X[idx_CH4] + in.X[idx_CO] + in.X[idx_CO2]) / n2_in;
     double C_per_N2_out = (out.X[idx_CH4] + out.X[idx_CO] + out.X[idx_CO2]) / n2_out;
     EXPECT_NEAR(C_per_N2_in, C_per_N2_out, 1e-6);
-    
+
     double H_per_N2_in = (4.0 * in.X[idx_CH4] + 2.0 * in.X[idx_H2O] + 2.0 * in.X[idx_H2]) / n2_in;
     double H_per_N2_out = (4.0 * out.X[idx_CH4] + 2.0 * out.X[idx_H2O] + 2.0 * out.X[idx_H2]) / n2_out;
     EXPECT_NEAR(H_per_N2_in, H_per_N2_out, 1e-6);
@@ -1237,7 +1237,7 @@ TEST_F(ThermoTransportTest, SmrWgsEquilibriumAdiabatic) {
     const std::size_t idx_H2O = species_index_from_name("H2O");
     const std::size_t idx_CO2 = species_index_from_name("CO2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     // Create a mixture with CH4 (typical rich combustion products)
     State in;
     in.T = 2200.0;  // Start at high temperature
@@ -1247,15 +1247,15 @@ TEST_F(ThermoTransportTest, SmrWgsEquilibriumAdiabatic) {
     in.X[idx_H2O] = 0.20;
     in.X[idx_CO2] = 0.10;
     in.X[idx_N2] = 0.68;
-    
+
     State out = smr_wgs_equilibrium_adiabatic(in);
-    
+
     // SMR is endothermic, so temperature should decrease
     EXPECT_LT(out.T, in.T);
-    
+
     // Temperature should still be reasonable (not too low)
     EXPECT_GT(out.T, 1500.0);
-    
+
     // Enthalpy per mole of N2 should be conserved (N2 is inert)
     // H_total / n_N2 = h(T,X) / X_N2 should be constant
     // Note: tolerance is ~5% due to nested Newton solver convergence
@@ -1270,7 +1270,7 @@ TEST_F(ThermoTransportTest, SmrWgsFallbackToWgs) {
     const std::size_t idx_H2O = species_index_from_name("H2O");
     const std::size_t idx_CO2 = species_index_from_name("CO2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     // Create a mixture without CH4 (stoichiometric combustion products)
     State in;
     in.T = 2200.0;
@@ -1279,10 +1279,10 @@ TEST_F(ThermoTransportTest, SmrWgsFallbackToWgs) {
     in.X[idx_H2O] = 0.20;
     in.X[idx_CO2] = 0.10;
     in.X[idx_N2] = 0.70;
-    
+
     State out_smr_wgs = smr_wgs_equilibrium_adiabatic(in);
     State out_wgs = wgs_equilibrium_adiabatic(in);
-    
+
     // Results should be identical when no CH4
     EXPECT_NEAR(out_smr_wgs.T, out_wgs.T, 1e-6);
     for (std::size_t i = 0; i < n; ++i) {
@@ -1296,43 +1296,43 @@ TEST_F(ThermoTransportTest, SmrWgsRichCombustion) {
     const std::size_t idx_CH4 = species_index_from_name("CH4");
     const std::size_t idx_CO = species_index_from_name("CO");
     const std::size_t idx_H2 = species_index_from_name("H2");
-    
+
     // Create fuel and air streams
     Stream fuel;
     fuel.state.T = 300.0;
     fuel.state.P = 101325.0;
     fuel.state.X = std::vector<double>(n, 0.0);
     fuel.state.X[idx_CH4] = 1.0;
-    
+
     Stream air;
     air.state.T = 300.0;
     air.state.P = 101325.0;
     air.state.X = standard_dry_air_composition();
     air.mdot = 10.0;
-    
+
     // Rich mixture (phi = 1.2)
     Stream fuel_rich = set_fuel_stream_for_phi(1.2, fuel, air);
     Stream mixed = mix({fuel_rich, air});
-    
+
     // Complete combustion
     State burned = complete_combustion(mixed.state);
-    
+
     // Verify there's unburned CH4
     EXPECT_GT(burned.X[idx_CH4], 0.01);
-    
+
     // Apply SMR+WGS equilibrium
     State eq = smr_wgs_equilibrium_adiabatic(burned);
-    
+
     // CH4 should be mostly reformed
     EXPECT_LT(eq.X[idx_CH4], burned.X[idx_CH4] * 0.5);
-    
+
     // CO and H2 should be present
     EXPECT_GT(eq.X[idx_CO], 0.01);
     EXPECT_GT(eq.X[idx_H2], 0.01);
-    
+
     // Temperature should drop (SMR is endothermic)
     EXPECT_LT(eq.T, burned.T);
-    
+
     // Enthalpy per mole of N2 should be conserved
     // Note: tolerance is relaxed due to adiabatic solver convergence and
     // differences between NASA-7 and NASA-9 thermodynamic data
@@ -1355,7 +1355,7 @@ TEST_F(ThermoTransportTest, ReformingEquilibriumMultipleHydrocarbons) {
     const std::size_t idx_CO2 = species_index_from_name("CO2");
     const std::size_t idx_H2 = species_index_from_name("H2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     // Create a mixture with multiple hydrocarbons (simulating natural gas combustion)
     State in;
     in.T = 2000.0;  // High temperature
@@ -1367,24 +1367,24 @@ TEST_F(ThermoTransportTest, ReformingEquilibriumMultipleHydrocarbons) {
     in.X[idx_H2O] = 0.20;    // 20% H2O
     in.X[idx_CO2] = 0.08;    // 8% CO2
     in.X[idx_N2] = 0.70;     // 70% N2
-    
+
     State out = reforming_equilibrium(in);
-    
+
     // All hydrocarbons should be mostly reformed at high T
     EXPECT_LT(out.X[idx_CH4], in.X[idx_CH4] * 0.5);
     EXPECT_LT(out.X[idx_C2H6], in.X[idx_C2H6] * 0.5);
     EXPECT_LT(out.X[idx_C3H8], in.X[idx_C3H8] * 0.5);
-    
+
     // CO and H2 should be produced
     EXPECT_GT(out.X[idx_CO], 0.01);
     EXPECT_GT(out.X[idx_H2], 0.01);
-    
+
     // Element balance using N2 as reference
     double n2_in = in.X[idx_N2];
     double n2_out = out.X[idx_N2];
-    
+
     // C atoms: CH4 + 2*C2H6 + 3*C3H8 + CO + CO2
-    double C_per_N2_in = (in.X[idx_CH4] + 2*in.X[idx_C2H6] + 3*in.X[idx_C3H8] 
+    double C_per_N2_in = (in.X[idx_CH4] + 2*in.X[idx_C2H6] + 3*in.X[idx_C3H8]
                         + in.X[idx_CO] + in.X[idx_CO2]) / n2_in;
     double C_per_N2_out = (out.X[idx_CH4] + 2*out.X[idx_C2H6] + 3*out.X[idx_C3H8]
                          + out.X[idx_CO] + out.X[idx_CO2]) / n2_out;
@@ -1399,7 +1399,7 @@ TEST_F(ThermoTransportTest, ReformingEquilibriumAdiabatic) {
     const std::size_t idx_H2O = species_index_from_name("H2O");
     const std::size_t idx_CO2 = species_index_from_name("CO2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     // Create a mixture with multiple hydrocarbons
     State in;
     in.T = 2200.0;
@@ -1410,12 +1410,12 @@ TEST_F(ThermoTransportTest, ReformingEquilibriumAdiabatic) {
     in.X[idx_H2O] = 0.20;
     in.X[idx_CO2] = 0.08;
     in.X[idx_N2] = 0.70;
-    
+
     State out = reforming_equilibrium_adiabatic(in);
-    
+
     // Reforming is endothermic, so temperature should decrease
     EXPECT_LT(out.T, in.T);
-    
+
     // Temperature should be reasonable
     EXPECT_GT(out.T, 1500.0);
 }
@@ -1432,7 +1432,7 @@ TEST_F(ThermoTransportTest, ReformingNaturalGasCombustion) {
     const std::size_t idx_H2 = species_index_from_name("H2");
     const std::size_t idx_N2 = species_index_from_name("N2");
     const std::size_t idx_AR = species_index_from_name("AR");
-    
+
     // Simulate rich combustion products from natural gas
     // Natural gas: ~90% CH4, ~5% C2H6, ~2% C3H8, ~2% N2, ~1% CO2
     // After rich combustion, some unburned hydrocarbons remain
@@ -1447,23 +1447,23 @@ TEST_F(ThermoTransportTest, ReformingNaturalGasCombustion) {
     in.X[idx_CO2] = 0.09;    // Combustion product + fuel inert
     in.X[idx_N2] = 0.705;    // Air N2 + fuel N2
     in.X[idx_AR] = 0.01;     // Air Ar
-    
+
     State out = reforming_equilibrium_adiabatic(in);
-    
+
     // All hydrocarbons should be significantly reformed
     EXPECT_LT(out.X[idx_CH4], in.X[idx_CH4] * 0.3);
     EXPECT_LT(out.X[idx_C2H6], in.X[idx_C2H6] * 0.3);
     EXPECT_LT(out.X[idx_C3H8], in.X[idx_C3H8] * 0.3);
-    
+
     // CO and H2 should be produced
     EXPECT_GT(out.X[idx_CO], 0.01);
     EXPECT_GT(out.X[idx_H2], 0.01);
-    
+
     // Inerts should be unchanged (relative to total moles via N2 reference)
     double ar_per_n2_in = in.X[idx_AR] / in.X[idx_N2];
     double ar_per_n2_out = out.X[idx_AR] / out.X[idx_N2];
     EXPECT_NEAR(ar_per_n2_in, ar_per_n2_out, 1e-10);
-    
+
     // Temperature should drop (endothermic reforming)
     EXPECT_LT(out.T, in.T);
 }
@@ -1481,7 +1481,7 @@ TEST_F(ThermoTransportTest, ReformingHeavyHydrocarbons) {
     const std::size_t idx_H2 = species_index_from_name("H2");
     const std::size_t idx_N2 = species_index_from_name("N2");
     const std::size_t idx_AR = species_index_from_name("AR");
-    
+
     // Mixture with heavier hydrocarbons (simulating LPG or gasoline-like fuel)
     State in;
     in.T = 2000.0;
@@ -1495,30 +1495,30 @@ TEST_F(ThermoTransportTest, ReformingHeavyHydrocarbons) {
     in.X[idx_CO2] = 0.08;
     in.X[idx_N2] = 0.69;
     in.X[idx_AR] = 0.011;
-    
+
     State out = reforming_equilibrium(in);
-    
+
     // All hydrocarbons should be reformed at high T
     EXPECT_LT(out.X[idx_CH4], in.X[idx_CH4] * 0.5);
     EXPECT_LT(out.X[idx_C3H8], in.X[idx_C3H8] * 0.5);
     EXPECT_LT(out.X[idx_IC4H10], in.X[idx_IC4H10] * 0.5);
     EXPECT_LT(out.X[idx_NC5H12], in.X[idx_NC5H12] * 0.5);
-    
+
     // CO and H2 should be produced
     EXPECT_GT(out.X[idx_CO], 0.01);
     EXPECT_GT(out.X[idx_H2], 0.01);
-    
+
     // Element balance: C atoms per N2 should be conserved
     double n2_in = in.X[idx_N2];
     double n2_out = out.X[idx_N2];
-    
+
     // C atoms: 1*CH4 + 3*C3H8 + 4*iC4H10 + 5*nC5H12 + CO + CO2
-    double C_per_N2_in = (in.X[idx_CH4] + 3*in.X[idx_C3H8] + 4*in.X[idx_IC4H10] 
+    double C_per_N2_in = (in.X[idx_CH4] + 3*in.X[idx_C3H8] + 4*in.X[idx_IC4H10]
                         + 5*in.X[idx_NC5H12] + in.X[idx_CO] + in.X[idx_CO2]) / n2_in;
     double C_per_N2_out = (out.X[idx_CH4] + 3*out.X[idx_C3H8] + 4*out.X[idx_IC4H10]
                          + 5*out.X[idx_NC5H12] + out.X[idx_CO] + out.X[idx_CO2]) / n2_out;
     EXPECT_NEAR(C_per_N2_in, C_per_N2_out, 1e-6);
-    
+
     // H atoms per N2 should be conserved
     // H atoms: 4*CH4 + 8*C3H8 + 10*iC4H10 + 12*nC5H12 + 2*H2O + 2*H2
     double H_per_N2_in = (4*in.X[idx_CH4] + 8*in.X[idx_C3H8] + 10*in.X[idx_IC4H10]
@@ -1526,7 +1526,7 @@ TEST_F(ThermoTransportTest, ReformingHeavyHydrocarbons) {
     double H_per_N2_out = (4*out.X[idx_CH4] + 8*out.X[idx_C3H8] + 10*out.X[idx_IC4H10]
                          + 12*out.X[idx_NC5H12] + 2*out.X[idx_H2O] + 2*out.X[idx_H2]) / n2_out;
     EXPECT_NEAR(H_per_N2_in, H_per_N2_out, 1e-6);
-    
+
     // Ar should be unchanged relative to N2
     double ar_per_n2_in = in.X[idx_AR] / n2_in;
     double ar_per_n2_out = out.X[idx_AR] / n2_out;
@@ -1544,7 +1544,7 @@ TEST_F(ThermoTransportTest, ReformingC2PlusOnly) {
     const std::size_t idx_CO2 = species_index_from_name("CO2");
     const std::size_t idx_H2 = species_index_from_name("H2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     // Mixture with only C2+ hydrocarbons (no CH4)
     State in;
     in.T = 2000.0;
@@ -1556,17 +1556,17 @@ TEST_F(ThermoTransportTest, ReformingC2PlusOnly) {
     in.X[idx_H2O] = 0.20;
     in.X[idx_CO2] = 0.085;
     in.X[idx_N2] = 0.70;
-    
+
     State out = reforming_equilibrium(in);
-    
+
     // C2H6 and C3H8 should be reformed even without CH4
     EXPECT_LT(out.X[idx_C2H6], in.X[idx_C2H6] * 0.5);
     EXPECT_LT(out.X[idx_C3H8], in.X[idx_C3H8] * 0.5);
-    
+
     // CO and H2 should be produced
     EXPECT_GT(out.X[idx_CO], 0.01);
     EXPECT_GT(out.X[idx_H2], 0.01);
-    
+
     // Element balance: C atoms per N2
     double n2_in = in.X[idx_N2];
     double n2_out = out.X[idx_N2];
@@ -1588,7 +1588,7 @@ TEST_F(ThermoTransportTest, ReformingWithExistingCOH2) {
     const std::size_t idx_H2 = species_index_from_name("H2");
     const std::size_t idx_N2 = species_index_from_name("N2");
     const std::size_t idx_AR = species_index_from_name("AR");
-    
+
     // Mixture with pre-existing CO and H2 (partial reforming already occurred)
     State in;
     in.T = 2000.0;
@@ -1602,25 +1602,25 @@ TEST_F(ThermoTransportTest, ReformingWithExistingCOH2) {
     in.X[idx_H2] = 0.01;     // Pre-existing H2
     in.X[idx_N2] = 0.70;
     in.X[idx_AR] = 0.007;
-    
+
     State out = reforming_equilibrium(in);
-    
+
     // Hydrocarbons should still be reformed
     EXPECT_LT(out.X[idx_CH4], in.X[idx_CH4] * 0.5);
     EXPECT_LT(out.X[idx_C2H6], in.X[idx_C2H6] * 0.5);
-    
+
     // CO and H2 should increase further
     EXPECT_GT(out.X[idx_CO], in.X[idx_CO]);
     EXPECT_GT(out.X[idx_H2], in.X[idx_H2]);
-    
+
     // Element balance
     double n2_in = in.X[idx_N2];
     double n2_out = out.X[idx_N2];
-    
+
     double C_per_N2_in = (in.X[idx_CH4] + 2*in.X[idx_C2H6] + in.X[idx_CO] + in.X[idx_CO2]) / n2_in;
     double C_per_N2_out = (out.X[idx_CH4] + 2*out.X[idx_C2H6] + out.X[idx_CO] + out.X[idx_CO2]) / n2_out;
     EXPECT_NEAR(C_per_N2_in, C_per_N2_out, 1e-6);
-    
+
     // Ar unchanged
     EXPECT_NEAR(in.X[idx_AR] / n2_in, out.X[idx_AR] / n2_out, 1e-10);
 }
@@ -1637,7 +1637,7 @@ TEST_F(ThermoTransportTest, SmrWgsElementConservation) {
     const std::size_t idx_CO2 = species_index_from_name("CO2");
     const std::size_t idx_H2 = species_index_from_name("H2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     // Test at multiple temperatures
     for (double T : {1500.0, 2000.0, 2500.0}) {
         State in;
@@ -1650,24 +1650,24 @@ TEST_F(ThermoTransportTest, SmrWgsElementConservation) {
         in.X[idx_CO] = 0.01;
         in.X[idx_H2] = 0.02;
         in.X[idx_N2] = 0.68;
-        
+
         State out = smr_wgs_equilibrium(in);
-        
+
         // Use N2 as reference (inert, doesn't participate in reactions)
         // Element ratios relative to N2 should be conserved
         double n2_in = in.X[idx_N2];
         double n2_out = out.X[idx_N2];
-        
+
         // C atoms per N2: (CH4 + CO + CO2) / N2
         double C_per_N2_in = (in.X[idx_CH4] + in.X[idx_CO] + in.X[idx_CO2]) / n2_in;
         double C_per_N2_out = (out.X[idx_CH4] + out.X[idx_CO] + out.X[idx_CO2]) / n2_out;
         EXPECT_NEAR(C_per_N2_in, C_per_N2_out, 1e-6) << "C/N2 not conserved at T=" << T;
-        
+
         // H atoms per N2: (4*CH4 + 2*H2O + 2*H2) / N2
         double H_per_N2_in = (4.0 * in.X[idx_CH4] + 2.0 * in.X[idx_H2O] + 2.0 * in.X[idx_H2]) / n2_in;
         double H_per_N2_out = (4.0 * out.X[idx_CH4] + 2.0 * out.X[idx_H2O] + 2.0 * out.X[idx_H2]) / n2_out;
         EXPECT_NEAR(H_per_N2_in, H_per_N2_out, 1e-6) << "H/N2 not conserved at T=" << T;
-        
+
         // O atoms per N2: (H2O + CO + 2*CO2) / N2
         double O_per_N2_in = (in.X[idx_H2O] + in.X[idx_CO] + 2.0 * in.X[idx_CO2]) / n2_in;
         double O_per_N2_out = (out.X[idx_H2O] + out.X[idx_CO] + 2.0 * out.X[idx_CO2]) / n2_out;
@@ -1689,7 +1689,7 @@ TEST_F(ThermoTransportTest, CombustionEquilibriumFromUnburned) {
     const std::size_t idx_H2O = species_index_from_name("H2O");
     const std::size_t idx_CO = species_index_from_name("CO");
     const std::size_t idx_H2 = species_index_from_name("H2");
-    
+
     // Rich CH4 + air mixture (unburned)
     State in;
     in.T = 300.0;
@@ -1698,27 +1698,27 @@ TEST_F(ThermoTransportTest, CombustionEquilibriumFromUnburned) {
     in.X[idx_CH4] = 0.11;   // Rich
     in.X[idx_O2] = 0.19;
     in.X[idx_N2] = 0.70;
-    
+
     // One-step: combustion_equilibrium
     State result = combustion_equilibrium(in);
-    
+
     // Two-step equivalent: complete_combustion + reforming_equilibrium_adiabatic
     State burned = complete_combustion(in);
     State eq = reforming_equilibrium_adiabatic(burned);
-    
+
     // Results should be identical
     EXPECT_NEAR(result.T, eq.T, 0.1);
     EXPECT_NEAR(result.X[idx_CO], eq.X[idx_CO], 1e-6);
     EXPECT_NEAR(result.X[idx_H2], eq.X[idx_H2], 1e-6);
     EXPECT_NEAR(result.X[idx_CO2], eq.X[idx_CO2], 1e-6);
     EXPECT_NEAR(result.X[idx_H2O], eq.X[idx_H2O], 1e-6);
-    
+
     // Temperature should be high (combustion occurred)
     EXPECT_GT(result.T, 2000.0);
-    
+
     // CH4 should be fully consumed
     EXPECT_LT(result.X[idx_CH4], 1e-6);
-    
+
     // CO and H2 should be present (rich combustion + reforming)
     EXPECT_GT(result.X[idx_CO], 0.01);
     EXPECT_GT(result.X[idx_H2], 0.01);
@@ -1734,7 +1734,7 @@ TEST_F(ThermoTransportTest, CombustionEquilibriumStoichiometric) {
     const std::size_t idx_H2O = species_index_from_name("H2O");
     const std::size_t idx_CO = species_index_from_name("CO");
     const std::size_t idx_H2 = species_index_from_name("H2");
-    
+
     // Stoichiometric CH4 + air mixture
     State in;
     in.T = 300.0;
@@ -1743,20 +1743,20 @@ TEST_F(ThermoTransportTest, CombustionEquilibriumStoichiometric) {
     in.X[idx_CH4] = 0.095;  // Stoichiometric
     in.X[idx_O2] = 0.19;
     in.X[idx_N2] = 0.715;
-    
+
     State result = combustion_equilibrium(in);
-    
+
     // Temperature should be high
     EXPECT_GT(result.T, 2200.0);
-    
+
     // CH4 and O2 should be fully consumed
     EXPECT_LT(result.X[idx_CH4], 1e-6);
     EXPECT_LT(result.X[idx_O2], 1e-6);
-    
+
     // Products should be mainly CO2 and H2O
     EXPECT_GT(result.X[idx_CO2], 0.05);
     EXPECT_GT(result.X[idx_H2O], 0.10);
-    
+
     // Little CO/H2 at stoichiometric (WGS equilibrium)
     EXPECT_LT(result.X[idx_CO], 0.01);
     EXPECT_LT(result.X[idx_H2], 0.01);
@@ -1772,14 +1772,14 @@ TEST_F(ThermoTransportTest, SetFuelStreamForTad) {
     const std::size_t idx_CH4 = species_index_from_name("CH4");
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     // Fuel stream: pure CH4 at 300 K
     Stream fuel;
     fuel.state.T = 300.0;
     fuel.state.P = 101325.0;
     fuel.state.X = std::vector<double>(n, 0.0);
     fuel.state.X[idx_CH4] = 1.0;
-    
+
     // Oxidizer stream: dry air at 300 K, 10 kg/s
     Stream air;
     air.state.T = 300.0;
@@ -1788,22 +1788,22 @@ TEST_F(ThermoTransportTest, SetFuelStreamForTad) {
     air.state.X[idx_O2] = 0.21;
     air.state.X[idx_N2] = 0.79;
     air.mdot = 10.0;
-    
+
     // Target Tad = 1500 K (lean combustion)
     double T_ad_target = 1500.0;
     Stream fuel_result = set_fuel_stream_for_Tad(T_ad_target, fuel, air);
-    
+
     // Verify fuel mdot is positive and reasonable
     EXPECT_GT(fuel_result.mdot, 0.0);
     EXPECT_LT(fuel_result.mdot, 1.0);  // Should be lean
-    
+
     // Verify the result by mixing and combusting
     Stream mixed = mix({fuel_result, air});
     State burned = complete_combustion(mixed.state);
-    
+
     // Check that achieved Tad is close to target
     EXPECT_NEAR(burned.T, T_ad_target, 2.0);  // Within 2 K
-    
+
     // Verify O2 is present in products (lean combustion)
     EXPECT_GT(burned.X[idx_O2], 0.0);
 }
@@ -1814,14 +1814,14 @@ TEST_F(ThermoTransportTest, SetFuelStreamForO2) {
     const std::size_t idx_CH4 = species_index_from_name("CH4");
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     // Fuel stream: pure CH4 at 300 K
     Stream fuel;
     fuel.state.T = 300.0;
     fuel.state.P = 101325.0;
     fuel.state.X = std::vector<double>(n, 0.0);
     fuel.state.X[idx_CH4] = 1.0;
-    
+
     // Oxidizer stream: dry air at 300 K, 10 kg/s
     Stream air;
     air.state.T = 300.0;
@@ -1830,19 +1830,19 @@ TEST_F(ThermoTransportTest, SetFuelStreamForO2) {
     air.state.X[idx_O2] = 0.21;
     air.state.X[idx_N2] = 0.79;
     air.mdot = 10.0;
-    
+
     // Target O2 = 10% in burned products (lean combustion)
     double X_O2_target = 0.10;
     Stream fuel_result = set_fuel_stream_for_O2(X_O2_target, fuel, air);
-    
+
     // Verify fuel mdot is positive and reasonable
     EXPECT_GT(fuel_result.mdot, 0.0);
     EXPECT_LT(fuel_result.mdot, 1.0);  // Should be lean
-    
+
     // Verify the result by mixing and combusting
     Stream mixed = mix({fuel_result, air});
     std::vector<double> X_burned = complete_combustion_to_CO2_H2O(mixed.state.X);
-    
+
     // Check that achieved O2 is close to target
     EXPECT_NEAR(X_burned[idx_O2], X_O2_target, 1e-5);
 }
@@ -1854,14 +1854,14 @@ TEST_F(ThermoTransportTest, SetFuelStreamForCO2) {
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_N2 = species_index_from_name("N2");
     const std::size_t idx_CO2 = species_index_from_name("CO2");
-    
+
     // Fuel stream: pure CH4 at 300 K
     Stream fuel;
     fuel.state.T = 300.0;
     fuel.state.P = 101325.0;
     fuel.state.X = std::vector<double>(n, 0.0);
     fuel.state.X[idx_CH4] = 1.0;
-    
+
     // Oxidizer stream: dry air at 300 K, 10 kg/s
     Stream air;
     air.state.T = 300.0;
@@ -1870,19 +1870,19 @@ TEST_F(ThermoTransportTest, SetFuelStreamForCO2) {
     air.state.X[idx_O2] = 0.21;
     air.state.X[idx_N2] = 0.79;
     air.mdot = 10.0;
-    
+
     // Target CO2 = 5% in burned products (lean combustion)
     double X_CO2_target = 0.05;
     Stream fuel_result = set_fuel_stream_for_CO2(X_CO2_target, fuel, air);
-    
+
     // Verify fuel mdot is positive and reasonable
     EXPECT_GT(fuel_result.mdot, 0.0);
     EXPECT_LT(fuel_result.mdot, 1.0);  // Should be lean
-    
+
     // Verify the result by mixing and combusting
     Stream mixed = mix({fuel_result, air});
     std::vector<double> X_burned = complete_combustion_to_CO2_H2O(mixed.state.X);
-    
+
     // Check that achieved CO2 is close to target
     EXPECT_NEAR(X_burned[idx_CO2], X_CO2_target, 1e-5);
 }
@@ -1893,14 +1893,14 @@ TEST_F(ThermoTransportTest, SetFuelStreamForTadHotFuel) {
     const std::size_t idx_CH4 = species_index_from_name("CH4");
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     // Fuel stream: pure CH4 at 500 K (preheated)
     Stream fuel;
     fuel.state.T = 500.0;
     fuel.state.P = 101325.0;
     fuel.state.X = std::vector<double>(n, 0.0);
     fuel.state.X[idx_CH4] = 1.0;
-    
+
     // Oxidizer stream: dry air at 300 K, 10 kg/s
     Stream air;
     air.state.T = 300.0;
@@ -1909,15 +1909,15 @@ TEST_F(ThermoTransportTest, SetFuelStreamForTadHotFuel) {
     air.state.X[idx_O2] = 0.21;
     air.state.X[idx_N2] = 0.79;
     air.mdot = 10.0;
-    
+
     // Target Tad = 1500 K
     double T_ad_target = 1500.0;
     Stream fuel_result = set_fuel_stream_for_Tad(T_ad_target, fuel, air);
-    
+
     // Verify the result
     Stream mixed = mix({fuel_result, air});
     State burned = complete_combustion(mixed.state);
-    
+
     EXPECT_NEAR(burned.T, T_ad_target, 2.0);
 }
 
@@ -1928,7 +1928,7 @@ TEST_F(ThermoTransportTest, SetFuelStreamForO2MultiComponentFuel) {
     const std::size_t idx_C2H6 = species_index_from_name("C2H6");
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     // Fuel stream: 90% CH4 + 10% C2H6 at 300 K
     Stream fuel;
     fuel.state.T = 300.0;
@@ -1936,7 +1936,7 @@ TEST_F(ThermoTransportTest, SetFuelStreamForO2MultiComponentFuel) {
     fuel.state.X = std::vector<double>(n, 0.0);
     fuel.state.X[idx_CH4] = 0.90;
     fuel.state.X[idx_C2H6] = 0.10;
-    
+
     // Oxidizer stream: dry air at 300 K, 10 kg/s
     Stream air;
     air.state.T = 300.0;
@@ -1945,15 +1945,15 @@ TEST_F(ThermoTransportTest, SetFuelStreamForO2MultiComponentFuel) {
     air.state.X[idx_O2] = 0.21;
     air.state.X[idx_N2] = 0.79;
     air.mdot = 10.0;
-    
+
     // Target O2 = 8% in burned products
     double X_O2_target = 0.08;
     Stream fuel_result = set_fuel_stream_for_O2(X_O2_target, fuel, air);
-    
+
     // Verify the result
     Stream mixed = mix({fuel_result, air});
     std::vector<double> X_burned = complete_combustion_to_CO2_H2O(mixed.state.X);
-    
+
     EXPECT_NEAR(X_burned[idx_O2], X_O2_target, 1e-5);
 }
 
@@ -1963,7 +1963,7 @@ TEST_F(ThermoTransportTest, SetOxidizerStreamForTad) {
     const std::size_t idx_CH4 = species_index_from_name("CH4");
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     // Fuel stream: pure CH4 at 300 K, 0.5 kg/s
     Stream fuel;
     fuel.state.T = 300.0;
@@ -1971,7 +1971,7 @@ TEST_F(ThermoTransportTest, SetOxidizerStreamForTad) {
     fuel.state.X = std::vector<double>(n, 0.0);
     fuel.state.X[idx_CH4] = 1.0;
     fuel.mdot = 0.5;
-    
+
     // Oxidizer stream: dry air at 300 K (mdot to be solved)
     Stream air;
     air.state.T = 300.0;
@@ -1979,21 +1979,21 @@ TEST_F(ThermoTransportTest, SetOxidizerStreamForTad) {
     air.state.X = std::vector<double>(n, 0.0);
     air.state.X[idx_O2] = 0.21;
     air.state.X[idx_N2] = 0.79;
-    
+
     // Target Tad = 1500 K (lean combustion)
     double T_ad_target = 1500.0;
     Stream air_result = set_oxidizer_stream_for_Tad(T_ad_target, fuel, air);
-    
+
     // Verify air mdot is positive and reasonable
     EXPECT_GT(air_result.mdot, 0.0);
-    
+
     // Verify the result by mixing and combusting
     Stream mixed = mix({fuel, air_result});
     State burned = complete_combustion(mixed.state);
-    
+
     // Check that achieved Tad is close to target
     EXPECT_NEAR(burned.T, T_ad_target, 2.0);
-    
+
     // Verify O2 is present in products (lean combustion)
     EXPECT_GT(burned.X[idx_O2], 0.0);
 }
@@ -2004,14 +2004,14 @@ TEST_F(ThermoTransportTest, SetFuelStreamForO2Dry) {
     const std::size_t idx_CH4 = species_index_from_name("CH4");
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     // Fuel stream: pure CH4 at 300 K
     Stream fuel;
     fuel.state.T = 300.0;
     fuel.state.P = 101325.0;
     fuel.state.X = std::vector<double>(n, 0.0);
     fuel.state.X[idx_CH4] = 1.0;
-    
+
     // Oxidizer stream: dry air at 300 K, 10 kg/s
     Stream air;
     air.state.T = 300.0;
@@ -2020,19 +2020,19 @@ TEST_F(ThermoTransportTest, SetFuelStreamForO2Dry) {
     air.state.X[idx_O2] = 0.21;
     air.state.X[idx_N2] = 0.79;
     air.mdot = 10.0;
-    
+
     // Target dry O2 = 12% in burned products
     double X_O2_dry_target = 0.12;
     Stream fuel_result = set_fuel_stream_for_O2_dry(X_O2_dry_target, fuel, air);
-    
+
     // Verify fuel mdot is positive
     EXPECT_GT(fuel_result.mdot, 0.0);
-    
+
     // Verify the result
     Stream mixed = mix({fuel_result, air});
     std::vector<double> X_burned = complete_combustion_to_CO2_H2O(mixed.state.X);
     std::vector<double> X_dry = convert_to_dry_fractions(X_burned);
-    
+
     EXPECT_NEAR(X_dry[idx_O2], X_O2_dry_target, 1e-5);
 }
 
@@ -2043,14 +2043,14 @@ TEST_F(ThermoTransportTest, SetFuelStreamForCO2Dry) {
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_N2 = species_index_from_name("N2");
     const std::size_t idx_CO2 = species_index_from_name("CO2");
-    
+
     // Fuel stream: pure CH4 at 300 K
     Stream fuel;
     fuel.state.T = 300.0;
     fuel.state.P = 101325.0;
     fuel.state.X = std::vector<double>(n, 0.0);
     fuel.state.X[idx_CH4] = 1.0;
-    
+
     // Oxidizer stream: dry air at 300 K, 10 kg/s
     Stream air;
     air.state.T = 300.0;
@@ -2059,24 +2059,24 @@ TEST_F(ThermoTransportTest, SetFuelStreamForCO2Dry) {
     air.state.X[idx_O2] = 0.21;
     air.state.X[idx_N2] = 0.79;
     air.mdot = 10.0;
-    
+
     // Target dry CO2 = 6% in burned products
     double X_CO2_dry_target = 0.06;
     Stream fuel_result = set_fuel_stream_for_CO2_dry(X_CO2_dry_target, fuel, air);
-    
+
     // Verify fuel mdot is positive
     EXPECT_GT(fuel_result.mdot, 0.0);
-    
+
     // Verify the result
     Stream mixed = mix({fuel_result, air});
     std::vector<double> X_burned = complete_combustion_to_CO2_H2O(mixed.state.X);
     std::vector<double> X_dry = convert_to_dry_fractions(X_burned);
-    
+
     EXPECT_NEAR(X_dry[idx_CO2], X_CO2_dry_target, 1e-5);
 }
 
 // -------------------------------------------------------------
-// Round-trip tests: Create lean mixture at known phi, combust, 
+// Round-trip tests: Create lean mixture at known phi, combust,
 // extract properties, then verify inverse solvers recover the same mdot
 // -------------------------------------------------------------
 
@@ -2086,14 +2086,14 @@ TEST_F(ThermoTransportTest, InverseSolversRoundTripFromPhi) {
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_N2 = species_index_from_name("N2");
     const std::size_t idx_CO2 = species_index_from_name("CO2");
-    
+
     // Fuel stream: pure CH4 at 350 K
     Stream fuel;
     fuel.state.T = 350.0;
     fuel.state.P = 101325.0;
     fuel.state.X = std::vector<double>(n, 0.0);
     fuel.state.X[idx_CH4] = 1.0;
-    
+
     // Oxidizer stream: dry air at 300 K, 10 kg/s
     Stream air;
     air.state.T = 300.0;
@@ -2102,51 +2102,51 @@ TEST_F(ThermoTransportTest, InverseSolversRoundTripFromPhi) {
     air.state.X[idx_O2] = 0.21;
     air.state.X[idx_N2] = 0.79;
     air.mdot = 10.0;
-    
+
     // Test at phi = 0.7 (lean)
     double phi = 0.7;
     Stream fuel_phi = set_fuel_stream_for_phi(phi, fuel, air);
     double mdot_fuel_original = fuel_phi.mdot;
-    
+
     // Mix and combust
     Stream mixed = mix({fuel_phi, air});
     State burned = complete_combustion(mixed.state);
     std::vector<double> X_burned = burned.X;
     std::vector<double> X_dry = convert_to_dry_fractions(X_burned);
-    
+
     // Extract properties from burned products
     double Tad = burned.T;
     double X_O2 = X_burned[idx_O2];
     double X_CO2 = X_burned[idx_CO2];
     double X_O2_dry = X_dry[idx_O2];
     double X_CO2_dry = X_dry[idx_CO2];
-    
+
     // Verify we have lean combustion products
     EXPECT_GT(X_O2, 0.0);
     EXPECT_GT(X_CO2, 0.0);
     EXPECT_GT(Tad, air.T());
-    
+
     // Now test each inverse solver recovers the original fuel mdot
     const double tol_T = 1.0;
     const double tol_X = 1e-6;
     const double tol_mdot_rel = 0.01;  // 1% relative tolerance on mdot
-    
+
     // Test set_fuel_stream_for_Tad
     Stream fuel_from_Tad = set_fuel_stream_for_Tad(Tad, fuel, air, tol_T);
     EXPECT_NEAR(fuel_from_Tad.mdot, mdot_fuel_original, mdot_fuel_original * tol_mdot_rel);
-    
+
     // Test set_fuel_stream_for_O2
     Stream fuel_from_O2 = set_fuel_stream_for_O2(X_O2, fuel, air, tol_X);
     EXPECT_NEAR(fuel_from_O2.mdot, mdot_fuel_original, mdot_fuel_original * tol_mdot_rel);
-    
+
     // Test set_fuel_stream_for_CO2
     Stream fuel_from_CO2 = set_fuel_stream_for_CO2(X_CO2, fuel, air, tol_X);
     EXPECT_NEAR(fuel_from_CO2.mdot, mdot_fuel_original, mdot_fuel_original * tol_mdot_rel);
-    
+
     // Test set_fuel_stream_for_O2_dry
     Stream fuel_from_O2_dry = set_fuel_stream_for_O2_dry(X_O2_dry, fuel, air, tol_X);
     EXPECT_NEAR(fuel_from_O2_dry.mdot, mdot_fuel_original, mdot_fuel_original * tol_mdot_rel);
-    
+
     // Test set_fuel_stream_for_CO2_dry
     Stream fuel_from_CO2_dry = set_fuel_stream_for_CO2_dry(X_CO2_dry, fuel, air, tol_X);
     EXPECT_NEAR(fuel_from_CO2_dry.mdot, mdot_fuel_original, mdot_fuel_original * tol_mdot_rel);
@@ -2159,7 +2159,7 @@ TEST_F(ThermoTransportTest, InverseSolversRoundTripOxidizer) {
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_N2 = species_index_from_name("N2");
     const std::size_t idx_CO2 = species_index_from_name("CO2");
-    
+
     // Fuel stream: pure CH4 at 300 K, 0.3 kg/s (fixed)
     Stream fuel;
     fuel.state.T = 300.0;
@@ -2167,7 +2167,7 @@ TEST_F(ThermoTransportTest, InverseSolversRoundTripOxidizer) {
     fuel.state.X = std::vector<double>(n, 0.0);
     fuel.state.X[idx_CH4] = 1.0;
     fuel.mdot = 0.3;
-    
+
     // Oxidizer stream: dry air at 320 K
     Stream air;
     air.state.T = 320.0;
@@ -2175,7 +2175,7 @@ TEST_F(ThermoTransportTest, InverseSolversRoundTripOxidizer) {
     air.state.X = std::vector<double>(n, 0.0);
     air.state.X[idx_O2] = 0.21;
     air.state.X[idx_N2] = 0.79;
-    
+
     // Set air mdot for phi = 0.6 (lean)
     // phi = (mdot_fuel / mdot_air) / (mdot_fuel / mdot_air)_stoich
     // For CH4: stoich air/fuel ratio ~ 17.2 kg air / kg fuel
@@ -2188,42 +2188,42 @@ TEST_F(ThermoTransportTest, InverseSolversRoundTripOxidizer) {
     // Now scale: we want fuel.mdot = 0.3, so air.mdot = 10.0 * (0.3 / fuel_at_phi.mdot)
     double mdot_air_original = 10.0 * (0.3 / fuel_at_phi.mdot);
     air.mdot = mdot_air_original;
-    
+
     // Mix and combust
     Stream mixed = mix({fuel, air});
     State burned = complete_combustion(mixed.state);
     std::vector<double> X_burned = burned.X;
     std::vector<double> X_dry = convert_to_dry_fractions(X_burned);
-    
+
     double Tad = burned.T;
     double X_O2 = X_burned[idx_O2];
     double X_CO2 = X_burned[idx_CO2];
     double X_O2_dry = X_dry[idx_O2];
     double X_CO2_dry = X_dry[idx_CO2];
-    
+
     // Verify lean combustion
     EXPECT_GT(X_O2, 0.0);
-    
+
     const double tol_T = 1.0;
     const double tol_X = 1e-6;
     const double tol_mdot_rel = 0.01;
-    
+
     // Test set_oxidizer_stream_for_Tad
     Stream air_from_Tad = set_oxidizer_stream_for_Tad(Tad, fuel, air, tol_T);
     EXPECT_NEAR(air_from_Tad.mdot, mdot_air_original, mdot_air_original * tol_mdot_rel);
-    
+
     // Test set_oxidizer_stream_for_O2
     Stream air_from_O2 = set_oxidizer_stream_for_O2(X_O2, fuel, air, tol_X);
     EXPECT_NEAR(air_from_O2.mdot, mdot_air_original, mdot_air_original * tol_mdot_rel);
-    
+
     // Test set_oxidizer_stream_for_CO2
     Stream air_from_CO2 = set_oxidizer_stream_for_CO2(X_CO2, fuel, air, tol_X);
     EXPECT_NEAR(air_from_CO2.mdot, mdot_air_original, mdot_air_original * tol_mdot_rel);
-    
+
     // Test set_oxidizer_stream_for_O2_dry
     Stream air_from_O2_dry = set_oxidizer_stream_for_O2_dry(X_O2_dry, fuel, air, tol_X);
     EXPECT_NEAR(air_from_O2_dry.mdot, mdot_air_original, mdot_air_original * tol_mdot_rel);
-    
+
     // Test set_oxidizer_stream_for_CO2_dry
     Stream air_from_CO2_dry = set_oxidizer_stream_for_CO2_dry(X_CO2_dry, fuel, air, tol_X);
     EXPECT_NEAR(air_from_CO2_dry.mdot, mdot_air_original, mdot_air_original * tol_mdot_rel);
@@ -2239,13 +2239,13 @@ TEST_F(ThermoTransportTest, SetFuelStreamForTadRejectsBelowOxidizerT) {
     const std::size_t idx_CH4 = species_index_from_name("CH4");
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     Stream fuel;
     fuel.state.T = 300.0;
     fuel.state.P = 101325.0;
     fuel.state.X = std::vector<double>(n, 0.0);
     fuel.state.X[idx_CH4] = 1.0;
-    
+
     Stream air;
     air.state.T = 400.0;  // Hot air
     air.state.P = 101325.0;
@@ -2253,7 +2253,7 @@ TEST_F(ThermoTransportTest, SetFuelStreamForTadRejectsBelowOxidizerT) {
     air.state.X[idx_O2] = 0.21;
     air.state.X[idx_N2] = 0.79;
     air.mdot = 10.0;
-    
+
     // Target Tad = 350 K, which is below air temperature (400 K)
     // This should throw because Tad cannot be below oxidizer T
     EXPECT_THROW(set_fuel_stream_for_Tad(350.0, fuel, air), std::invalid_argument);
@@ -2265,21 +2265,21 @@ TEST_F(ThermoTransportTest, SetOxidizerStreamForTadRejectsBelowFuelT) {
     const std::size_t idx_CH4 = species_index_from_name("CH4");
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     Stream fuel;
     fuel.state.T = 500.0;  // Hot fuel
     fuel.state.P = 101325.0;
     fuel.state.X = std::vector<double>(n, 0.0);
     fuel.state.X[idx_CH4] = 1.0;
     fuel.mdot = 0.5;
-    
+
     Stream air;
     air.state.T = 300.0;
     air.state.P = 101325.0;
     air.state.X = std::vector<double>(n, 0.0);
     air.state.X[idx_O2] = 0.21;
     air.state.X[idx_N2] = 0.79;
-    
+
     // Target Tad = 400 K, which is below fuel temperature (500 K)
     EXPECT_THROW(set_oxidizer_stream_for_Tad(400.0, fuel, air), std::invalid_argument);
 }
@@ -2290,13 +2290,13 @@ TEST_F(ThermoTransportTest, SetFuelStreamForO2RejectsAboveOxidizerO2) {
     const std::size_t idx_CH4 = species_index_from_name("CH4");
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     Stream fuel;
     fuel.state.T = 300.0;
     fuel.state.P = 101325.0;
     fuel.state.X = std::vector<double>(n, 0.0);
     fuel.state.X[idx_CH4] = 1.0;
-    
+
     Stream air;
     air.state.T = 300.0;
     air.state.P = 101325.0;
@@ -2304,13 +2304,13 @@ TEST_F(ThermoTransportTest, SetFuelStreamForO2RejectsAboveOxidizerO2) {
     air.state.X[idx_O2] = 0.21;
     air.state.X[idx_N2] = 0.79;
     air.mdot = 10.0;
-    
+
     // Target O2 = 0.25, which is above air O2 (0.21) - impossible
     EXPECT_THROW(set_fuel_stream_for_O2(0.25, fuel, air), std::invalid_argument);
-    
+
     // Target O2 = 0.0 - also invalid (would require stoich or rich)
     EXPECT_THROW(set_fuel_stream_for_O2(0.0, fuel, air), std::invalid_argument);
-    
+
     // Target O2 negative - invalid
     EXPECT_THROW(set_fuel_stream_for_O2(-0.05, fuel, air), std::invalid_argument);
 }
@@ -2321,13 +2321,13 @@ TEST_F(ThermoTransportTest, SetFuelStreamForCO2RejectsInvalidTarget) {
     const std::size_t idx_CH4 = species_index_from_name("CH4");
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     Stream fuel;
     fuel.state.T = 300.0;
     fuel.state.P = 101325.0;
     fuel.state.X = std::vector<double>(n, 0.0);
     fuel.state.X[idx_CH4] = 1.0;
-    
+
     Stream air;
     air.state.T = 300.0;
     air.state.P = 101325.0;
@@ -2335,10 +2335,10 @@ TEST_F(ThermoTransportTest, SetFuelStreamForCO2RejectsInvalidTarget) {
     air.state.X[idx_O2] = 0.21;
     air.state.X[idx_N2] = 0.79;
     air.mdot = 10.0;
-    
+
     // Target CO2 = 0.0 - invalid
     EXPECT_THROW(set_fuel_stream_for_CO2(0.0, fuel, air), std::invalid_argument);
-    
+
     // Target CO2 negative - invalid
     EXPECT_THROW(set_fuel_stream_for_CO2(-0.05, fuel, air), std::invalid_argument);
 }
@@ -2349,14 +2349,14 @@ TEST_F(ThermoTransportTest, InverseSolversRoundTripRich) {
     const std::size_t idx_CH4 = species_index_from_name("CH4");
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     // Fuel stream: pure CH4 at 300 K
     Stream fuel;
     fuel.state.T = 300.0;
     fuel.state.P = 101325.0;
     fuel.state.X = std::vector<double>(n, 0.0);
     fuel.state.X[idx_CH4] = 1.0;
-    
+
     // Oxidizer stream: dry air at 300 K, 10 kg/s
     Stream air;
     air.state.T = 300.0;
@@ -2365,30 +2365,30 @@ TEST_F(ThermoTransportTest, InverseSolversRoundTripRich) {
     air.state.X[idx_O2] = 0.21;
     air.state.X[idx_N2] = 0.79;
     air.mdot = 10.0;
-    
+
     // Test at phi = 1.3 (rich)
     double phi = 1.3;
     Stream fuel_phi = set_fuel_stream_for_phi(phi, fuel, air);
     double mdot_fuel_original = fuel_phi.mdot;
-    
+
     // Mix and combust
     Stream mixed = mix({fuel_phi, air});
     State burned = complete_combustion(mixed.state);
-    
+
     // Extract Tad from burned products
     double Tad = burned.T;
-    
+
     // Verify we have rich combustion (no O2 in products)
     EXPECT_LT(burned.X[idx_O2], 0.001);
     EXPECT_GT(Tad, air.T());
-    
+
     // Test set_fuel_stream_for_Tad with lean=false recovers the original fuel mdot
     const double tol_T = 1.0;
     const double tol_mdot_rel = 0.01;  // 1% relative tolerance on mdot
-    
+
     Stream fuel_from_Tad = set_fuel_stream_for_Tad(Tad, fuel, air, tol_T, 100, false);
     EXPECT_NEAR(fuel_from_Tad.mdot, mdot_fuel_original, mdot_fuel_original * tol_mdot_rel);
-    
+
     // Verify the recovered fuel produces the same Tad
     Stream mixed_check = mix({fuel_from_Tad, air});
     State burned_check = complete_combustion(mixed_check.state);
@@ -2401,14 +2401,14 @@ TEST_F(ThermoTransportTest, SetFuelStreamForTadRichSide) {
     const std::size_t idx_CH4 = species_index_from_name("CH4");
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     // Fuel stream: pure CH4 at 300 K
     Stream fuel;
     fuel.state.T = 300.0;
     fuel.state.P = 101325.0;
     fuel.state.X = std::vector<double>(n, 0.0);
     fuel.state.X[idx_CH4] = 1.0;
-    
+
     // Oxidizer stream: dry air at 300 K, 10 kg/s
     Stream air;
     air.state.T = 300.0;
@@ -2417,29 +2417,29 @@ TEST_F(ThermoTransportTest, SetFuelStreamForTadRichSide) {
     air.state.X[idx_O2] = 0.21;
     air.state.X[idx_N2] = 0.79;
     air.mdot = 10.0;
-    
+
     // Target Tad = 1800 K (achievable on both lean and rich sides)
     double T_ad_target = 1800.0;
-    
+
     // Get lean solution
     Stream fuel_lean = set_fuel_stream_for_Tad(T_ad_target, fuel, air, 1.0, 100, true);
-    
+
     // Get rich solution
     Stream fuel_rich = set_fuel_stream_for_Tad(T_ad_target, fuel, air, 1.0, 100, false);
-    
+
     // Verify both achieve the target Tad
     Stream mixed_lean = mix({fuel_lean, air});
     State burned_lean = complete_combustion(mixed_lean.state);
     EXPECT_NEAR(burned_lean.T, T_ad_target, 2.0);
-    
+
     Stream mixed_rich = mix({fuel_rich, air});
     State burned_rich = complete_combustion(mixed_rich.state);
     EXPECT_NEAR(burned_rich.T, T_ad_target, 2.0);
-    
+
     // Verify lean has O2 in products, rich has no O2
     EXPECT_GT(burned_lean.X[idx_O2], 0.01);  // Lean: O2 excess
     EXPECT_LT(burned_rich.X[idx_O2], 0.001); // Rich: no O2 (all consumed)
-    
+
     // Verify rich has more fuel than lean
     EXPECT_GT(fuel_rich.mdot, fuel_lean.mdot);
 }
@@ -2450,14 +2450,14 @@ TEST_F(ThermoTransportTest, InverseSolversRejectZeroMdot) {
     const std::size_t idx_CH4 = species_index_from_name("CH4");
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_N2 = species_index_from_name("N2");
-    
+
     Stream fuel;
     fuel.state.T = 300.0;
     fuel.state.P = 101325.0;
     fuel.state.X = std::vector<double>(n, 0.0);
     fuel.state.X[idx_CH4] = 1.0;
     fuel.mdot = 0.0;  // Zero mdot
-    
+
     Stream air;
     air.state.T = 300.0;
     air.state.P = 101325.0;
@@ -2465,16 +2465,16 @@ TEST_F(ThermoTransportTest, InverseSolversRejectZeroMdot) {
     air.state.X[idx_O2] = 0.21;
     air.state.X[idx_N2] = 0.79;
     air.mdot = 0.0;  // Zero mdot
-    
+
     // Fuel solvers should reject zero oxidizer mdot
     EXPECT_THROW(set_fuel_stream_for_Tad(1500.0, fuel, air), std::invalid_argument);
     EXPECT_THROW(set_fuel_stream_for_O2(0.10, fuel, air), std::invalid_argument);
     EXPECT_THROW(set_fuel_stream_for_CO2(0.05, fuel, air), std::invalid_argument);
-    
+
     // Set air mdot for oxidizer solver tests
     air.mdot = 10.0;
     fuel.mdot = 0.0;
-    
+
     // Oxidizer solvers should reject zero fuel mdot
     EXPECT_THROW(set_oxidizer_stream_for_Tad(1500.0, fuel, air), std::invalid_argument);
     EXPECT_THROW(set_oxidizer_stream_for_O2(0.10, fuel, air), std::invalid_argument);
@@ -2493,19 +2493,19 @@ TEST_F(ThermoTransportTest, NozzleFlowSubsonicBasic) {
     const std::size_t n = species_names.size();
     const std::size_t idx_N2 = species_index_from_name("N2");
     const std::size_t idx_O2 = species_index_from_name("O2");
-    
+
     std::vector<double> X_air(n, 0.0);
     X_air[idx_O2] = 0.21;
     X_air[idx_N2] = 0.79;
-    
+
     // Use high T0 so outlet stays above 300K even with expansion
     double T0 = 500.0;      // K
     double P0 = 150000.0;   // Pa (1.5 bar)
     double P_back = 120000.0; // Pa - mild expansion, subsonic
     double A_eff = 0.001;   // m²
-    
+
     auto sol = nozzle_flow(T0, P0, P_back, A_eff, X_air);
-    
+
     // Basic sanity checks
     EXPECT_FALSE(sol.choked);
     EXPECT_GT(sol.M, 0.0);
@@ -2522,24 +2522,24 @@ TEST_F(ThermoTransportTest, CompressibleRoundTripAeff) {
     const std::size_t n = species_names.size();
     const std::size_t idx_N2 = species_index_from_name("N2");
     const std::size_t idx_O2 = species_index_from_name("O2");
-    
+
     std::vector<double> X_air(n, 0.0);
     X_air[idx_O2] = 0.21;
     X_air[idx_N2] = 0.79;
-    
+
     double T0 = 600.0;       // K - high enough for mild expansion
     double P0 = 200000.0;    // Pa
     double P_back = 180000.0; // Pa - subsonic, mild expansion
     double A_eff_orig = 0.0005;
-    
+
     // Forward: compute mass flow
     auto sol = nozzle_flow(T0, P0, P_back, A_eff_orig, X_air);
     EXPECT_GT(sol.mdot, 0.0);
     EXPECT_GT(sol.outlet.T, 300.0);  // Verify in valid range
-    
+
     // Inverse: recover A_eff from mdot
     double A_eff_calc = solve_A_eff_from_mdot(T0, P0, P_back, sol.mdot, X_air);
-    
+
     // Round-trip should match within 1%
     EXPECT_NEAR(A_eff_calc, A_eff_orig, A_eff_orig * 0.01);
 }
@@ -2549,24 +2549,24 @@ TEST_F(ThermoTransportTest, CompressibleRoundTripPback) {
     const std::size_t n = species_names.size();
     const std::size_t idx_N2 = species_index_from_name("N2");
     const std::size_t idx_O2 = species_index_from_name("O2");
-    
+
     std::vector<double> X_air(n, 0.0);
     X_air[idx_O2] = 0.21;
     X_air[idx_N2] = 0.79;
-    
+
     double T0 = 600.0;
     double P0 = 200000.0;
     double P_back_orig = 170000.0;  // Subsonic
     double A_eff = 0.001;
-    
+
     // Forward
     auto sol = nozzle_flow(T0, P0, P_back_orig, A_eff, X_air);
     EXPECT_FALSE(sol.choked);
     EXPECT_GT(sol.outlet.T, 300.0);
-    
+
     // Inverse
     double P_back_calc = solve_P_back_from_mdot(T0, P0, A_eff, sol.mdot, X_air);
-    
+
     EXPECT_NEAR(P_back_calc, P_back_orig, P_back_orig * 0.01);
 }
 
@@ -2575,23 +2575,23 @@ TEST_F(ThermoTransportTest, CompressibleRoundTripP0) {
     const std::size_t n = species_names.size();
     const std::size_t idx_N2 = species_index_from_name("N2");
     const std::size_t idx_O2 = species_index_from_name("O2");
-    
+
     std::vector<double> X_air(n, 0.0);
     X_air[idx_O2] = 0.21;
     X_air[idx_N2] = 0.79;
-    
+
     double T0 = 600.0;
     double P0_orig = 180000.0;
     double P_back = 150000.0;
     double A_eff = 0.001;
-    
+
     // Forward
     auto sol = nozzle_flow(T0, P0_orig, P_back, A_eff, X_air);
     EXPECT_GT(sol.outlet.T, 300.0);
-    
+
     // Inverse
     double P0_calc = solve_P0_from_mdot(T0, P_back, A_eff, sol.mdot, X_air);
-    
+
     EXPECT_NEAR(P0_calc, P0_orig, P0_orig * 0.01);
 }
 
@@ -2602,29 +2602,29 @@ TEST_F(ThermoTransportTest, CompressibleRoundTripHotGas) {
     const std::size_t idx_O2 = species_index_from_name("O2");
     const std::size_t idx_CO2 = species_index_from_name("CO2");
     const std::size_t idx_H2O = species_index_from_name("H2O");
-    
+
     // Approximate lean combustion products
     std::vector<double> X_products(n, 0.0);
     X_products[idx_N2] = 0.72;
     X_products[idx_O2] = 0.05;
     X_products[idx_CO2] = 0.10;
     X_products[idx_H2O] = 0.13;
-    
+
     double T0 = 1200.0;      // K (hot gas, but not extreme)
     double P0 = 300000.0;    // Pa (3 bar)
     double P_back = 250000.0; // Pa - mild expansion
     double A_eff_orig = 0.0002;
-    
+
     // Forward
     auto sol = nozzle_flow(T0, P0, P_back, A_eff_orig, X_products);
     EXPECT_GT(sol.mdot, 0.0);
     EXPECT_GT(sol.outlet.T, 300.0);
     EXPECT_GT(sol.v, 0.0);
-    
+
     // Inverse: recover A_eff
     double A_eff_calc = solve_A_eff_from_mdot(T0, P0, P_back, sol.mdot, X_products);
     EXPECT_NEAR(A_eff_calc, A_eff_orig, A_eff_orig * 0.01);
-    
+
     // Inverse: recover P_back
     double P_back_calc = solve_P_back_from_mdot(T0, P0, A_eff_orig, sol.mdot, X_products);
     EXPECT_NEAR(P_back_calc, P_back, P_back * 0.01);
@@ -2635,15 +2635,15 @@ TEST_F(ThermoTransportTest, CompressibleMassFlowMonotonic) {
     const std::size_t n = species_names.size();
     const std::size_t idx_N2 = species_index_from_name("N2");
     const std::size_t idx_O2 = species_index_from_name("O2");
-    
+
     std::vector<double> X_air(n, 0.0);
     X_air[idx_O2] = 0.21;
     X_air[idx_N2] = 0.79;
-    
+
     double T0 = 800.0;
     double P0 = 200000.0;
     double A_eff = 0.001;
-    
+
     // Mass flow should increase as P_back decreases (more expansion)
     double mdot_prev = 0.0;
     for (double P_back = 190000.0; P_back >= 160000.0; P_back -= 10000.0) {
@@ -2660,18 +2660,18 @@ TEST_F(ThermoTransportTest, CompressibleInvalidInputs) {
     std::vector<double> X_air(n, 0.0);
     X_air[species_index_from_name("O2")] = 0.21;
     X_air[species_index_from_name("N2")] = 0.79;
-    
+
     // Invalid T0
     EXPECT_THROW(nozzle_flow(0.0, 200000.0, 100000.0, 0.001, X_air), std::invalid_argument);
     EXPECT_THROW(nozzle_flow(-100.0, 200000.0, 100000.0, 0.001, X_air), std::invalid_argument);
-    
+
     // Invalid P0
     EXPECT_THROW(nozzle_flow(500.0, 0.0, 100000.0, 0.001, X_air), std::invalid_argument);
     EXPECT_THROW(nozzle_flow(500.0, -100000.0, 100000.0, 0.001, X_air), std::invalid_argument);
-    
+
     // Invalid P_back
     EXPECT_THROW(nozzle_flow(500.0, 200000.0, 0.0, 0.001, X_air), std::invalid_argument);
-    
+
     // Invalid A_eff
     EXPECT_THROW(nozzle_flow(500.0, 200000.0, 100000.0, 0.0, X_air), std::invalid_argument);
     EXPECT_THROW(nozzle_flow(500.0, 200000.0, 100000.0, -0.001, X_air), std::invalid_argument);
@@ -2688,11 +2688,11 @@ TEST_F(ThermoTransportTest, FrictionHaaland) {
     double f_smooth = friction_haaland(100000.0, 0.0);
     EXPECT_GT(f_smooth, 0.015);
     EXPECT_LT(f_smooth, 0.025);
-    
+
     // Rough pipe (e_D = 0.001) at Re = 100000
     double f_rough = friction_haaland(100000.0, 0.001);
     EXPECT_GT(f_rough, f_smooth);  // Rougher = higher friction
-    
+
     // Very high Re (fully rough regime)
     double f_high_re = friction_haaland(1e7, 0.001);
     EXPECT_GT(f_high_re, 0.01);
@@ -2705,7 +2705,7 @@ TEST_F(ThermoTransportTest, FrictionSerghides) {
     double f_smooth = friction_serghides(100000.0, 0.0);
     EXPECT_GT(f_smooth, 0.015);
     EXPECT_LT(f_smooth, 0.025);
-    
+
     // Rough pipe
     double f_rough = friction_serghides(100000.0, 0.001);
     EXPECT_GT(f_rough, f_smooth);
@@ -2715,15 +2715,15 @@ TEST_F(ThermoTransportTest, FrictionSerghides) {
 TEST_F(ThermoTransportTest, FrictionColebrookVsSerghides) {
     // Serghides claims ~0.003% accuracy vs Colebrook
     // Test at various conditions
-    
+
     double Re_vals[] = {4000.0, 10000.0, 100000.0, 1000000.0};
     double eD_vals[] = {0.0, 0.0001, 0.001, 0.01};
-    
+
     for (double Re : Re_vals) {
         for (double eD : eD_vals) {
             double f_colebrook = friction_colebrook(Re, eD);
             double f_serghides = friction_serghides(Re, eD);
-            
+
             // Should match within 0.1%
             double rel_diff = std::abs(f_colebrook - f_serghides) / f_colebrook;
             EXPECT_LT(rel_diff, 0.001);
@@ -2735,14 +2735,14 @@ TEST_F(ThermoTransportTest, FrictionColebrookVsSerghides) {
 TEST_F(ThermoTransportTest, FrictionCorrelationsConsistent) {
     double Re = 50000.0;
     double eD = 0.0005;
-    
+
     double f_haaland = friction_haaland(Re, eD);
     double f_serghides = friction_serghides(Re, eD);
     double f_colebrook = friction_colebrook(Re, eD);
-    
+
     // Haaland within 2% of Colebrook
     EXPECT_NEAR(f_haaland, f_colebrook, 0.02 * f_colebrook);
-    
+
     // Serghides within 0.1% of Colebrook
     EXPECT_NEAR(f_serghides, f_colebrook, 0.001 * f_colebrook);
 }
@@ -2754,7 +2754,7 @@ TEST_F(ThermoTransportTest, FrictionInvalidInputs) {
     EXPECT_THROW(friction_haaland(-1000.0, 0.001), std::invalid_argument);
     EXPECT_THROW(friction_serghides(0.0, 0.001), std::invalid_argument);
     EXPECT_THROW(friction_colebrook(0.0, 0.001), std::invalid_argument);
-    
+
     // Invalid e_D (negative)
     EXPECT_THROW(friction_haaland(10000.0, -0.001), std::invalid_argument);
     EXPECT_THROW(friction_serghides(10000.0, -0.001), std::invalid_argument);
@@ -2771,32 +2771,32 @@ TEST_F(ThermoTransportTest, FannoFlowBasic) {
     std::vector<double> X_air(n, 0.0);
     X_air[species_index_from_name("O2")] = 0.21;
     X_air[species_index_from_name("N2")] = 0.79;
-    
+
     double T_in = 400.0;      // K
     double P_in = 200000.0;   // Pa
     double u_in = 50.0;       // m/s (subsonic)
     double L = 10.0;          // m
     double D = 0.05;          // m (5 cm pipe)
     double f = 0.02;          // Darcy friction factor
-    
+
     auto sol = fanno_pipe(T_in, P_in, u_in, L, D, f, X_air);
-    
+
     // Pressure should drop due to friction
     EXPECT_LT(sol.outlet.P, P_in);
-    
+
     // Temperature should drop (adiabatic expansion)
     EXPECT_LT(sol.outlet.T, T_in);
-    
+
     // Mass flow should be conserved
     double A = M_PI * D * D / 4.0;
     double mdot_in = sol.inlet.rho() * u_in * A;
     double u_out = sol.mdot / (sol.outlet.rho() * A);
     double mdot_out = sol.outlet.rho() * u_out * A;
     EXPECT_NEAR(mdot_out, mdot_in, mdot_in * 0.001);
-    
+
     // Velocity should increase (density drops faster than pressure)
     EXPECT_GT(u_out, u_in);
-    
+
     // Should not be choked for short pipe
     EXPECT_FALSE(sol.choked);
 }
@@ -2807,26 +2807,26 @@ TEST_F(ThermoTransportTest, FannoFlowEnergyConservation) {
     std::vector<double> X_air(n, 0.0);
     X_air[species_index_from_name("O2")] = 0.21;
     X_air[species_index_from_name("N2")] = 0.79;
-    
+
     double T_in = 500.0;
     double P_in = 300000.0;
     double u_in = 100.0;
     double L = 5.0;
     double D = 0.1;
     double f = 0.015;
-    
+
     auto sol = fanno_pipe(T_in, P_in, u_in, L, D, f, X_air, 200, true);
-    
+
     // Stagnation enthalpy should be conserved
     double mw = sol.inlet.mw();
     double h_in = sol.inlet.h() / mw * 1000.0;  // J/kg
     double h0_in = h_in + 0.5 * u_in * u_in;
-    
+
     double A = M_PI * D * D / 4.0;
     double u_out = sol.mdot / (sol.outlet.rho() * A);
     double h_out = sol.outlet.h() / mw * 1000.0;
     double h0_out = h_out + 0.5 * u_out * u_out;
-    
+
     // h0 should be conserved within 0.1%
     EXPECT_NEAR(h0_out, h0_in, h0_in * 0.001);
 }
@@ -2837,29 +2837,29 @@ TEST_F(ThermoTransportTest, FannoFlowProfile) {
     std::vector<double> X_air(n, 0.0);
     X_air[species_index_from_name("O2")] = 0.21;
     X_air[species_index_from_name("N2")] = 0.79;
-    
+
     double T_in = 400.0;
     double P_in = 200000.0;
     double u_in = 80.0;
     double L = 20.0;
     double D = 0.05;
     double f = 0.02;
-    
+
     auto sol = fanno_pipe(T_in, P_in, u_in, L, D, f, X_air, 50, true);
-    
+
     // Profile should have entries
     EXPECT_GT(sol.profile.size(), 0u);
-    
+
     // Pressure should monotonically decrease
     for (std::size_t i = 1; i < sol.profile.size(); ++i) {
         EXPECT_LT(sol.profile[i].P, sol.profile[i-1].P);
     }
-    
+
     // Mach number should monotonically increase
     for (std::size_t i = 1; i < sol.profile.size(); ++i) {
         EXPECT_GT(sol.profile[i].M, sol.profile[i-1].M);
     }
-    
+
     // Entropy should increase (irreversible process)
     for (std::size_t i = 1; i < sol.profile.size(); ++i) {
         EXPECT_GT(sol.profile[i].s, sol.profile[i-1].s);
@@ -2872,19 +2872,19 @@ TEST_F(ThermoTransportTest, FannoFlowInvalidInputs) {
     std::vector<double> X_air(n, 0.0);
     X_air[species_index_from_name("O2")] = 0.21;
     X_air[species_index_from_name("N2")] = 0.79;
-    
+
     // Invalid T_in
     EXPECT_THROW(fanno_pipe(0.0, 200000.0, 50.0, 10.0, 0.05, 0.02, X_air), std::invalid_argument);
-    
+
     // Invalid P_in
     EXPECT_THROW(fanno_pipe(400.0, 0.0, 50.0, 10.0, 0.05, 0.02, X_air), std::invalid_argument);
-    
+
     // Invalid L
     EXPECT_THROW(fanno_pipe(400.0, 200000.0, 50.0, 0.0, 0.05, 0.02, X_air), std::invalid_argument);
-    
+
     // Invalid D
     EXPECT_THROW(fanno_pipe(400.0, 200000.0, 50.0, 10.0, 0.0, 0.02, X_air), std::invalid_argument);
-    
+
     // Invalid f (negative)
     EXPECT_THROW(fanno_pipe(400.0, 200000.0, 50.0, 10.0, 0.05, -0.02, X_air), std::invalid_argument);
 }
@@ -2897,34 +2897,34 @@ TEST(Quasi1DNozzle, SubsonicConvergingDiverging) {
     // Subsonic flow through C-D nozzle (high back pressure)
     // Species: N2, O2, AR, CO2, H2O, CH4, C2H6, C3H8, IC4H10, NC5H12, NC6H14, NC7H16, CO, H2
     std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    
+
     double T0 = 500.0;  // K
     double P0 = 500000.0;  // Pa
     double P_exit = 450000.0;  // High back pressure -> subsonic
-    
+
     double A_inlet = 0.01;   // m²
     double A_throat = 0.005; // m²
     double A_exit = 0.01;    // m²
     double x_throat = 0.1;   // m
     double x_exit = 0.2;     // m
-    
+
     auto sol = nozzle_cd(T0, P0, P_exit, A_inlet, A_throat, A_exit, x_throat, x_exit, X_air, 50);
-    
+
     // Should not be choked
     EXPECT_FALSE(sol.choked);
-    
+
     // Mass flow should be positive
     EXPECT_GT(sol.mdot, 0.0);
-    
+
     // Exit pressure should match (approximately) the specified back pressure
     EXPECT_NEAR(sol.outlet.P, P_exit, P_exit * 0.05);
-    
+
     // Temperature should drop then recover (subsonic)
     EXPECT_LT(sol.outlet.T, T0);
-    
+
     // Profile should have stations
     EXPECT_EQ(sol.profile.size(), 50u);
-    
+
     // Mach should be < 1 everywhere
     for (const auto& st : sol.profile) {
         EXPECT_LT(st.M, 1.0);
@@ -2934,32 +2934,32 @@ TEST(Quasi1DNozzle, SubsonicConvergingDiverging) {
 TEST(Quasi1DNozzle, ChokedConvergingDiverging) {
     // Choked flow through C-D nozzle (low back pressure)
     std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    
+
     double T0 = 500.0;  // K
     double P0 = 500000.0;  // Pa
     double P_exit = 50000.0;  // Low back pressure -> choked, supersonic exit
-    
+
     double A_inlet = 0.01;
     double A_throat = 0.005;
     double A_exit = 0.01;
     double x_throat = 0.1;
     double x_exit = 0.2;
-    
+
     auto sol = nozzle_cd(T0, P0, P_exit, A_inlet, A_throat, A_exit, x_throat, x_exit, X_air, 100);
-    
+
     // Should be choked
     EXPECT_TRUE(sol.choked);
-    
+
     // Mass flow should be positive
     EXPECT_GT(sol.mdot, 0.0);
-    
+
     // Throat should be at minimum area
     EXPECT_NEAR(sol.x_throat, x_throat, 0.01);
     EXPECT_NEAR(sol.A_throat, A_throat, 1e-6);
-    
+
     // Exit Mach should be supersonic
     EXPECT_GT(sol.profile.back().M, 1.0);
-    
+
     // Temperature should drop significantly
     EXPECT_LT(sol.outlet.T, T0 * 0.8);
 }
@@ -2967,13 +2967,13 @@ TEST(Quasi1DNozzle, ChokedConvergingDiverging) {
 TEST(Quasi1DNozzle, MassConservation) {
     // Verify mass conservation along nozzle
     std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    
+
     double T0 = 600.0;
     double P0 = 300000.0;
     double P_exit = 100000.0;
-    
+
     auto sol = nozzle_cd(T0, P0, P_exit, 0.02, 0.01, 0.015, 0.1, 0.2, X_air, 50);
-    
+
     // Check mass conservation at each station
     for (const auto& st : sol.profile) {
         double mdot_local = st.rho * st.u * st.A;
@@ -2984,21 +2984,21 @@ TEST(Quasi1DNozzle, MassConservation) {
 TEST(Quasi1DNozzle, AreaFunctionInterface) {
     // Test with custom area function
     std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    
+
     double T0 = 500.0;
     double P0 = 400000.0;
     double P_exit = 200000.0;
-    
+
     // Linear converging nozzle: A(x) = 0.01 - 0.05*x for x in [0, 0.1]
     auto area_func = [](double x) {
         return 0.01 - 0.05 * x;  // Converges from 0.01 to 0.005
     };
-    
+
     auto sol = nozzle_quasi1d(T0, P0, P_exit, area_func, 0.0, 0.1, X_air, 20);
-    
+
     EXPECT_GT(sol.mdot, 0.0);
     EXPECT_EQ(sol.profile.size(), 20u);
-    
+
     // Area should decrease along nozzle
     EXPECT_GT(sol.profile.front().A, sol.profile.back().A);
 }
@@ -3006,11 +3006,11 @@ TEST(Quasi1DNozzle, AreaFunctionInterface) {
 TEST(Quasi1DNozzle, AreaProfileInterface) {
     // Test with (x, A) pairs
     std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    
+
     double T0 = 500.0;
     double P0 = 400000.0;
     double P_exit = 300000.0;
-    
+
     std::vector<std::pair<double, double>> area_profile = {
         {0.0, 0.01},
         {0.05, 0.007},
@@ -3018,12 +3018,12 @@ TEST(Quasi1DNozzle, AreaProfileInterface) {
         {0.15, 0.007},
         {0.2, 0.01}
     };
-    
+
     auto sol = nozzle_quasi1d(T0, P0, P_exit, area_profile, X_air, 30);
-    
+
     EXPECT_GT(sol.mdot, 0.0);
     EXPECT_EQ(sol.profile.size(), 30u);
-    
+
     // Throat should be near x = 0.1
     EXPECT_NEAR(sol.x_throat, 0.1, 0.01);
 }
@@ -3032,41 +3032,41 @@ TEST(Quasi1DNozzle, PolynomialArea) {
     // Test with polynomial area: A(x) = 0.01 - 0.1*x + 0.5*x²
     // This gives a minimum at x = 0.1
     std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    
+
     double T0 = 500.0;
     double P0 = 400000.0;
     double P_exit = 350000.0;
-    
+
     std::vector<double> coeffs = {0.01, -0.1, 0.5};  // a0 + a1*x + a2*x²
-    
+
     auto sol = nozzle_quasi1d_poly(T0, P0, P_exit, coeffs, 0.0, 0.2, X_air, 25);
-    
+
     EXPECT_GT(sol.mdot, 0.0);
     EXPECT_EQ(sol.profile.size(), 25u);
-    
+
     // Throat should be near x = 0.1 (minimum of parabola)
     EXPECT_NEAR(sol.x_throat, 0.1, 0.01);
 }
 
 TEST(Quasi1DNozzle, InvalidInputs) {
     std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    
+
     auto area_func = [](double x) { return 0.01 - 0.05 * x; };
-    
+
     // Invalid T0
-    EXPECT_THROW(nozzle_quasi1d(0.0, 400000.0, 200000.0, area_func, 0.0, 0.1, X_air), 
+    EXPECT_THROW(nozzle_quasi1d(0.0, 400000.0, 200000.0, area_func, 0.0, 0.1, X_air),
                  std::invalid_argument);
-    
+
     // Invalid P0
-    EXPECT_THROW(nozzle_quasi1d(500.0, 0.0, 200000.0, area_func, 0.0, 0.1, X_air), 
+    EXPECT_THROW(nozzle_quasi1d(500.0, 0.0, 200000.0, area_func, 0.0, 0.1, X_air),
                  std::invalid_argument);
-    
+
     // P_exit >= P0
-    EXPECT_THROW(nozzle_quasi1d(500.0, 400000.0, 500000.0, area_func, 0.0, 0.1, X_air), 
+    EXPECT_THROW(nozzle_quasi1d(500.0, 400000.0, 500000.0, area_func, 0.0, 0.1, X_air),
                  std::invalid_argument);
-    
+
     // Invalid C-D nozzle geometry
-    EXPECT_THROW(nozzle_cd(500.0, 400000.0, 200000.0, 0.01, 0.02, 0.01, 0.1, 0.2, X_air), 
+    EXPECT_THROW(nozzle_cd(500.0, 400000.0, 200000.0, 0.01, 0.02, 0.01, 0.1, 0.2, X_air),
                  std::invalid_argument);  // A_throat > A_inlet
 }
 
@@ -3081,15 +3081,15 @@ TEST(HeatTransferTest, DittusBoelterBasic) {
     // Re = 50000, Pr = 0.7 (air-like)
     double Nu_heat = nusselt_dittus_boelter(50000, 0.7, true);
     double Nu_cool = nusselt_dittus_boelter(50000, 0.7, false);
-    
+
     // Nu should be positive and reasonable (typically 100-300 for these conditions)
     EXPECT_GT(Nu_heat, 50);
     EXPECT_LT(Nu_heat, 500);
-    
+
     // For Pr < 1: heating (n=0.4) gives lower Nu than cooling (n=0.3)
     // because Pr^0.4 < Pr^0.3 when Pr < 1
     EXPECT_LT(Nu_heat, Nu_cool);
-    
+
     // Check approximate value: Nu ≈ 0.023 * 50000^0.8 * 0.7^0.4 ≈ 115
     EXPECT_NEAR(Nu_heat, 115, 10);
 }
@@ -3097,7 +3097,7 @@ TEST(HeatTransferTest, DittusBoelterBasic) {
 TEST(HeatTransferTest, DittusBoelterValidRange) {
     // Should throw for Re < 10000
     EXPECT_THROW(nusselt_dittus_boelter(5000, 0.7), std::invalid_argument);
-    
+
     // Should throw for Pr outside [0.6, 160]
     EXPECT_THROW(nusselt_dittus_boelter(50000, 0.5), std::invalid_argument);
     EXPECT_THROW(nusselt_dittus_boelter(50000, 200), std::invalid_argument);
@@ -3106,11 +3106,11 @@ TEST(HeatTransferTest, DittusBoelterValidRange) {
 TEST(HeatTransferTest, GnielinskiBasic) {
     // Test Gnielinski at typical conditions
     double Nu = nusselt_gnielinski(50000, 0.7);
-    
+
     // Should be similar to Dittus-Boelter but slightly different
     EXPECT_GT(Nu, 50);
     EXPECT_LT(Nu, 500);
-    
+
     // Gnielinski is valid in transition region too
     double Nu_trans = nusselt_gnielinski(5000, 0.7);
     EXPECT_GT(Nu_trans, 10);
@@ -3121,7 +3121,7 @@ TEST(HeatTransferTest, GnielinskiWithFriction) {
     // Test with explicit friction factor
     double f = 0.02;  // Typical turbulent friction factor
     double Nu = nusselt_gnielinski(50000, 0.7, f);
-    
+
     EXPECT_GT(Nu, 50);
     EXPECT_LT(Nu, 500);
 }
@@ -3130,7 +3130,7 @@ TEST(HeatTransferTest, GnielinskiValidRange) {
     // Should throw for Re outside [2300, 5e6]
     EXPECT_THROW(nusselt_gnielinski(2000, 0.7), std::invalid_argument);
     EXPECT_THROW(nusselt_gnielinski(6e6, 0.7), std::invalid_argument);
-    
+
     // Should throw for Pr outside [0.5, 2000]
     EXPECT_THROW(nusselt_gnielinski(50000, 0.4), std::invalid_argument);
     EXPECT_THROW(nusselt_gnielinski(50000, 3000), std::invalid_argument);
@@ -3139,18 +3139,18 @@ TEST(HeatTransferTest, GnielinskiValidRange) {
 TEST(HeatTransferTest, SiederTateBasic) {
     // Test Sieder-Tate with no viscosity correction
     double Nu = nusselt_sieder_tate(50000, 0.7, 1.0);
-    
+
     EXPECT_GT(Nu, 50);
     EXPECT_LT(Nu, 500);
-    
+
     // mu_ratio = mu_bulk / mu_wall
     // When heating: wall is hotter, mu_wall < mu_bulk, so mu_ratio > 1
     // When cooling: wall is colder, mu_wall > mu_bulk, so mu_ratio < 1
     // The (mu_ratio)^0.14 factor increases Nu when mu_ratio > 1
-    
+
     double Nu_high_ratio = nusselt_sieder_tate(50000, 0.7, 2.0);  // heating case
     double Nu_low_ratio = nusselt_sieder_tate(50000, 0.7, 0.5);   // cooling case
-    
+
     EXPECT_GT(Nu_high_ratio, Nu);
     EXPECT_LT(Nu_low_ratio, Nu);
 }
@@ -3158,7 +3158,7 @@ TEST(HeatTransferTest, SiederTateBasic) {
 TEST(HeatTransferTest, PetukhovBasic) {
     // Test Petukhov correlation
     double Nu = nusselt_petukhov(50000, 0.7);
-    
+
     EXPECT_GT(Nu, 50);
     EXPECT_LT(Nu, 500);
 }
@@ -3168,9 +3168,9 @@ TEST(HeatTransferTest, HtcFromNusselt) {
     double Nu = 100;
     double k = 0.026;  // W/(m·K), typical for air
     double D = 0.05;   // m
-    
+
     double h = htc_from_nusselt(Nu, k, D);
-    
+
     // h = 100 * 0.026 / 0.05 = 52 W/(m²·K)
     EXPECT_NEAR(h, 52.0, 0.1);
 }
@@ -3178,11 +3178,11 @@ TEST(HeatTransferTest, HtcFromNusselt) {
 TEST(HeatTransferTest, FrictionPetukhov) {
     // Test Petukhov friction factor
     double f = friction_petukhov(50000);
-    
+
     // Should be in typical range for smooth pipe turbulent flow
     EXPECT_GT(f, 0.01);
     EXPECT_LT(f, 0.05);
-    
+
     // Compare with Colebrook for smooth pipe (e/D = 0)
     double f_colebrook = friction_colebrook(50000, 0.0);
     EXPECT_NEAR(f, f_colebrook, f * 0.1);  // Within 10%
@@ -3192,12 +3192,12 @@ TEST(HeatTransferTest, CorrelationsConsistent) {
     // All correlations should give similar results for same conditions
     double Re = 100000;
     double Pr = 0.7;
-    
+
     double Nu_db = nusselt_dittus_boelter(Re, Pr);
     double Nu_gn = nusselt_gnielinski(Re, Pr);
     double Nu_st = nusselt_sieder_tate(Re, Pr, 1.0);
     double Nu_pt = nusselt_petukhov(Re, Pr);
-    
+
     // All should be in similar range (within factor of 2)
     // Sieder-Tate tends to give higher values due to different formulation
     EXPECT_GT(Nu_db, 100);
@@ -3213,22 +3213,22 @@ TEST(HeatTransferTest, CorrelationsConsistent) {
 TEST(HeatTransferTest, StateBased) {
     // Test state-based convenience functions
     std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    
+
     State s;
     s.set_T(400.0).set_P(101325.0).set_X(X_air);
-    
+
     double velocity = 10.0;  // m/s
     double diameter = 0.05;  // m
-    
+
     double Nu = nusselt_pipe(s, velocity, diameter);
     double h = htc_pipe(s, velocity, diameter);
-    
+
     // Check reasonable values
     EXPECT_GT(Nu, 10);
     EXPECT_LT(Nu, 500);
     EXPECT_GT(h, 10);
     EXPECT_LT(h, 500);
-    
+
     // h should equal Nu * k / D
     double k = s.k();
     EXPECT_NEAR(h, Nu * k / diameter, 0.01);
@@ -3239,7 +3239,7 @@ TEST(HeatTransferTest, LmtdBasic) {
     // Counter-flow: hot 100->60, cold 20->80
     // dT1 = 100 - 80 = 20, dT2 = 60 - 20 = 40
     double lmtd_val = lmtd(20.0, 40.0);
-    
+
     // LMTD = (20 - 40) / ln(20/40) = -20 / ln(0.5) = -20 / -0.693 ≈ 28.85
     EXPECT_NEAR(lmtd_val, 28.85, 0.1);
 }
@@ -3248,7 +3248,7 @@ TEST(HeatTransferTest, LmtdEqualDeltaT) {
     // When dT1 ≈ dT2, should return arithmetic mean
     double lmtd_val = lmtd(30.0, 30.0);
     EXPECT_NEAR(lmtd_val, 30.0, 0.01);
-    
+
     // Very close values
     double lmtd_close = lmtd(30.0, 30.00001);
     EXPECT_NEAR(lmtd_close, 30.0, 0.01);
@@ -3259,7 +3259,7 @@ TEST(HeatTransferTest, LmtdCounterflow) {
     // Hot: 150°C -> 90°C, Cold: 30°C -> 110°C
     double lmtd_cf = lmtd_counterflow(150 + 273.15, 90 + 273.15,
                                        30 + 273.15, 110 + 273.15);
-    
+
     // dT1 = 150 - 110 = 40, dT2 = 90 - 30 = 60
     // LMTD = (40 - 60) / ln(40/60) ≈ 49.3 K
     EXPECT_NEAR(lmtd_cf, 49.3, 0.5);
@@ -3270,7 +3270,7 @@ TEST(HeatTransferTest, LmtdParallelflow) {
     // Hot: 150°C -> 90°C, Cold: 30°C -> 70°C
     double lmtd_pf = lmtd_parallelflow(150 + 273.15, 90 + 273.15,
                                         30 + 273.15, 70 + 273.15);
-    
+
     // dT1 = 150 - 30 = 120, dT2 = 90 - 70 = 20
     // LMTD = (120 - 20) / ln(120/20) = 100 / ln(6) ≈ 55.8 K
     EXPECT_NEAR(lmtd_pf, 55.8, 0.5);
@@ -3288,9 +3288,9 @@ TEST(HeatTransferTest, OverallHtcBasic) {
     // 1/U = 1/h1 + 1/h2
     double h1 = 100.0;  // W/(m²·K)
     double h2 = 200.0;  // W/(m²·K)
-    
+
     double U = overall_htc({h1, h2});
-    
+
     // 1/U = 1/100 + 1/200 = 0.01 + 0.005 = 0.015
     // U = 66.67 W/(m²·K)
     EXPECT_NEAR(U, 66.67, 0.1);
@@ -3302,9 +3302,9 @@ TEST(HeatTransferTest, OverallHtcWithWall) {
     double h_outer = 50.0;    // W/(m²·K)
     double t_wall = 0.003;    // 3 mm
     double k_wall = 50.0;     // W/(m·K), steel
-    
+
     double U = overall_htc_tube(h_inner, h_outer, t_wall, k_wall);
-    
+
     // 1/U = 1/500 + 0.003/50 + 1/50 = 0.002 + 0.00006 + 0.02 = 0.02206
     // U ≈ 45.3 W/(m²·K)
     EXPECT_NEAR(U, 45.3, 0.5);
@@ -3316,13 +3316,13 @@ TEST(HeatTransferTest, OverallHtcWithFouling) {
     double t_wall = 0.003;
     double k_wall = 50.0;
     double R_fouling = 0.0002;  // m²·K/W, typical fouling
-    
+
     double U_clean = overall_htc_tube(h_inner, h_outer, t_wall, k_wall);
     double U_fouled = overall_htc_tube(h_inner, h_outer, t_wall, k_wall, R_fouling);
-    
+
     // Fouling should reduce U
     EXPECT_LT(U_fouled, U_clean);
-    
+
     // 1/U_fouled = 1/U_clean + R_fouling
     double expected = 1.0 / (1.0/U_clean + R_fouling);
     EXPECT_NEAR(U_fouled, expected, 0.01);
@@ -3331,9 +3331,9 @@ TEST(HeatTransferTest, OverallHtcWithFouling) {
 TEST(HeatTransferTest, ThermalResistance) {
     double h = 100.0;  // W/(m²·K)
     double A = 2.0;    // m²
-    
+
     double R = thermal_resistance(h, A);
-    
+
     // R = 1/(h*A) = 1/(100*2) = 0.005 K/W
     EXPECT_NEAR(R, 0.005, 1e-6);
 }
@@ -3342,9 +3342,9 @@ TEST(HeatTransferTest, ThermalResistanceWall) {
     double t = 0.01;   // 10 mm
     double k = 50.0;   // W/(m·K)
     double A = 2.0;    // m²
-    
+
     double R = thermal_resistance_wall(t, k, A);
-    
+
     // R = t/(k*A) = 0.01/(50*2) = 0.0001 K/W
     EXPECT_NEAR(R, 0.0001, 1e-8);
 }
@@ -3357,15 +3357,15 @@ TEST(HeatTransferTest, OverallHtcMultiLayer) {
     double k_steel = 50.0;    // W/(m·K)
     double t_insul = 0.05;    // 50 mm
     double k_insul = 0.04;    // W/(m·K), mineral wool
-    
-    double U = overall_htc_wall(h_inner, h_outer, 
+
+    double U = overall_htc_wall(h_inner, h_outer,
                                 {t_steel / k_steel, t_insul / k_insul});
-    
+
     // 1/U = 1/500 + 0.003/50 + 0.05/0.04 + 1/10
     //     = 0.002 + 0.00006 + 1.25 + 0.1 = 1.35206
     // U ≈ 0.74 W/(m²·K)
     EXPECT_NEAR(U, 0.74, 0.01);
-    
+
     // Insulation dominates - removing it should increase U dramatically
     double U_no_insul = overall_htc_wall(h_inner, h_outer, t_steel, k_steel);
     EXPECT_GT(U_no_insul, U * 10);  // At least 10x higher
@@ -3379,7 +3379,7 @@ TEST(HeatTransferTest, HeatRate) {
     double U = 100.0;   // W/(m²·K)
     double A = 2.0;     // m²
     double dT = 50.0;   // K
-    
+
     // Q = U * A * dT = 100 * 2 * 50 = 10000 W
     EXPECT_DOUBLE_EQ(heat_rate(U, A, dT), 10000.0);
 }
@@ -3387,7 +3387,7 @@ TEST(HeatTransferTest, HeatRate) {
 TEST(HeatTransferTest, HeatFlux) {
     double U = 100.0;   // W/(m²·K)
     double dT = 50.0;   // K
-    
+
     // q = U * dT = 100 * 50 = 5000 W/m²
     EXPECT_DOUBLE_EQ(heat_flux(U, dT), 5000.0);
 }
@@ -3396,7 +3396,7 @@ TEST(HeatTransferTest, HeatTransferArea) {
     double Q = 10000.0;  // W
     double U = 100.0;    // W/(m²·K)
     double dT = 50.0;    // K
-    
+
     // A = Q / (U * dT) = 10000 / (100 * 50) = 2 m²
     EXPECT_DOUBLE_EQ(heat_transfer_area(Q, U, dT), 2.0);
 }
@@ -3405,7 +3405,7 @@ TEST(HeatTransferTest, HeatTransferDT) {
     double Q = 10000.0;  // W
     double U = 100.0;    // W/(m²·K)
     double A = 2.0;      // m²
-    
+
     // dT = Q / (U * A) = 10000 / (100 * 2) = 50 K
     EXPECT_DOUBLE_EQ(heat_transfer_dT(Q, U, A), 50.0);
 }
@@ -3421,24 +3421,24 @@ TEST(HeatTransferTest, WallTemperatureProfileSingleLayer) {
     double h_cold = 100.0;  // W/(m²·K)
     double t_wall = 0.01;   // m
     double k_wall = 50.0;   // W/(m·K)
-    
+
     double q;
     std::vector<double> layers = {t_wall / k_wall};
     auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, layers, q);
-    
+
     // Total R = 1/500 + 0.01/50 + 1/100 = 0.002 + 0.0002 + 0.01 = 0.0122 m²·K/W
     // q = 100 / 0.0122 ≈ 8197 W/m²
     EXPECT_NEAR(q, 8197, 10);
-    
+
     // Should have 2 interface temperatures
     ASSERT_EQ(temps.size(), 2u);
-    
+
     // T_hot_surface = T_hot - q/h_hot = 400 - 8197/500 ≈ 383.6 K
     EXPECT_NEAR(temps[0], 383.6, 0.5);
-    
+
     // T_cold_surface = T_hot_surface - q*(t/k) ≈ 383.6 - 8197*0.0002 ≈ 382.0 K
     EXPECT_NEAR(temps[1], 382.0, 0.5);
-    
+
     // Verify: T_cold_surface - q/h_cold should equal T_cold
     EXPECT_NEAR(temps[1] - q / h_cold, T_cold, 0.1);
 }
@@ -3448,33 +3448,33 @@ TEST(HeatTransferTest, WallTemperatureProfileMultiLayer) {
     double T_cold = 300.0;  // K
     double h_hot = 500.0;   // W/(m²·K)
     double h_cold = 50.0;   // W/(m²·K)
-    
+
     // Steel + insulation
     double t_steel = 0.005;   // m
     double k_steel = 50.0;    // W/(m·K)
     double t_insul = 0.05;    // m
     double k_insul = 0.04;    // W/(m·K)
-    
+
     double q;
     auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold,
                                           {t_steel / k_steel, t_insul / k_insul}, q);
-    
+
     // Should have 3 interface temperatures
     ASSERT_EQ(temps.size(), 3u);
-    
+
     // Insulation dominates, so most temperature drop is across insulation
     double dT_steel = temps[0] - temps[1];
     double dT_insul = temps[1] - temps[2];
-    
+
     // Insulation has much higher resistance, so larger dT
     EXPECT_GT(dT_insul, dT_steel * 10);
-    
+
     // All temperatures should be between T_hot and T_cold
     for (double T : temps) {
         EXPECT_GE(T, T_cold);
         EXPECT_LE(T, T_hot);
     }
-    
+
     // Temperatures should be monotonically decreasing
     EXPECT_GT(temps[0], temps[1]);
     EXPECT_GT(temps[1], temps[2]);
@@ -3488,7 +3488,7 @@ TEST(HeatTransferTest, NTU) {
     double U = 100.0;     // W/(m²·K)
     double A = 10.0;      // m²
     double C_min = 500.0; // W/K
-    
+
     // NTU = U * A / C_min = 100 * 10 / 500 = 2
     EXPECT_DOUBLE_EQ(ntu(U, A, C_min), 2.0);
 }
@@ -3523,12 +3523,12 @@ TEST(HeatTransferTest, EffectivenessCounterflowGeneral) {
 TEST(HeatTransferTest, EffectivenessParallelflow) {
     // For C_r = 0: ε = 1 - exp(-NTU)
     EXPECT_NEAR(effectiveness_parallelflow(1.0, 0.0), 1.0 - std::exp(-1.0), 1e-10);
-    
+
     // General case: NTU = 2, C_r = 0.5
     // ε = (1 - exp(-2*1.5)) / 1.5 = (1 - exp(-3)) / 1.5 ≈ 0.633
     double eps = effectiveness_parallelflow(2.0, 0.5);
     EXPECT_NEAR(eps, 0.633, 0.001);
-    
+
     // Parallel flow always has lower effectiveness than counter flow
     double eps_counter = effectiveness_counterflow(2.0, 0.5);
     EXPECT_LT(eps, eps_counter);
@@ -3539,7 +3539,7 @@ TEST(HeatTransferTest, HeatRateFromEffectiveness) {
     double C_min = 500.0;  // W/K
     double T_hot_in = 400.0;
     double T_cold_in = 300.0;
-    
+
     // Q = ε * C_min * (T_hot_in - T_cold_in) = 0.8 * 500 * 100 = 40000 W
     EXPECT_DOUBLE_EQ(heat_rate_from_effectiveness(epsilon, C_min, T_hot_in, T_cold_in), 40000.0);
 }
@@ -3555,15 +3555,15 @@ TEST(HeatTransferTest, HeatFluxFromTAtEdge) {
     double h_hot = 500.0;
     double h_cold = 100.0;
     std::vector<double> t_over_k = {0.01 / 50.0};  // 10mm steel
-    
+
     // First, compute the actual temperature profile
     double q_expected;
     auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_expected);
-    
+
     // Now verify we can recover q from each edge temperature
     double q0 = heat_flux_from_T_at_edge(temps[0], 0, T_hot, T_cold, h_hot, h_cold, t_over_k);
     double q1 = heat_flux_from_T_at_edge(temps[1], 1, T_hot, T_cold, h_hot, h_cold, t_over_k);
-    
+
     EXPECT_NEAR(q0, q_expected, 1.0);
     EXPECT_NEAR(q1, q_expected, 1.0);
 }
@@ -3573,13 +3573,13 @@ TEST(HeatTransferTest, HeatFluxFromTAtEdgeMultiLayer) {
     double T_cold = 300.0;
     double h_hot = 500.0;
     double h_cold = 50.0;
-    
+
     // Steel + insulation
     std::vector<double> t_over_k = {0.005 / 50.0, 0.05 / 0.04};
-    
+
     double q_expected;
     auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_expected);
-    
+
     // Verify all edges
     for (std::size_t i = 0; i < temps.size(); ++i) {
         double q = heat_flux_from_T_at_edge(temps[i], i, T_hot, T_cold, h_hot, h_cold, t_over_k);
@@ -3592,24 +3592,24 @@ TEST(HeatTransferTest, HeatFluxFromTAtDepth) {
     double T_cold = 300.0;
     double h_hot = 500.0;
     double h_cold = 100.0;
-    
+
     std::vector<double> thicknesses = {0.01};  // 10mm
     std::vector<double> conductivities = {50.0};  // steel
     std::vector<double> t_over_k = {0.01 / 50.0};
-    
+
     double q_expected;
     auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_expected);
-    
+
     // At depth 0 (hot surface)
     double q0 = heat_flux_from_T_at_depth(temps[0], 0.0, T_hot, T_cold, h_hot, h_cold,
                                           thicknesses, conductivities);
     EXPECT_NEAR(q0, q_expected, 1.0);
-    
+
     // At depth = thickness (cold surface)
     double q1 = heat_flux_from_T_at_depth(temps[1], 0.01, T_hot, T_cold, h_hot, h_cold,
                                           thicknesses, conductivities);
     EXPECT_NEAR(q1, q_expected, 1.0);
-    
+
     // At mid-depth (should also give same q)
     // T at mid-depth = temps[0] - q * (0.005 / 50)
     double T_mid = temps[0] - q_expected * (0.005 / 50.0);
@@ -3624,18 +3624,18 @@ TEST(HeatTransferTest, BulkTFromEdgeTAndQ) {
     double h_hot = 500.0;
     double h_cold = 100.0;
     std::vector<double> t_over_k = {0.01 / 50.0};
-    
+
     double q;
     auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q);
-    
+
     // From hot surface temperature, recover T_hot
     double T_hot_calc = bulk_T_from_edge_T_and_q(temps[0], 0, q, h_hot, h_cold, t_over_k, "hot");
     EXPECT_NEAR(T_hot_calc, T_hot, 0.01);
-    
+
     // From cold surface temperature, recover T_cold
     double T_cold_calc = bulk_T_from_edge_T_and_q(temps[1], 1, q, h_hot, h_cold, t_over_k, "cold");
     EXPECT_NEAR(T_cold_calc, T_cold, 0.01);
-    
+
     // From hot surface, can also solve for T_cold
     double T_cold_from_hot = bulk_T_from_edge_T_and_q(temps[0], 0, q, h_hot, h_cold, t_over_k, "cold");
     EXPECT_NEAR(T_cold_from_hot, T_cold, 0.01);
@@ -3647,31 +3647,31 @@ TEST(HeatTransferTest, HeatFluxRoundTrip) {
     double T_cold = 320.0;
     double h_hot = 800.0;
     double h_cold = 120.0;
-    
+
     // Multi-layer: steel + ceramic + insulation
     std::vector<double> t_over_k = {
         0.008 / 45.0,   // 8mm steel
         0.015 / 2.5,    // 15mm ceramic
         0.040 / 0.035   // 40mm insulation
     };
-    
+
     // Step 1: Compute overall HTC and heat flux
     double U = overall_htc({h_hot, h_cold}, t_over_k);
     double dT = T_hot - T_cold;
     double q_original = heat_flux(U, dT);
-    
+
     // Step 2: Get temperature profile
     double q_profile;
     auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_profile);
-    
+
     // Verify heat flux from profile matches
     EXPECT_NEAR(q_profile, q_original, 0.01);
-    
+
     // Step 3: For each edge, recover heat flux from measured temperature
     for (std::size_t i = 0; i < temps.size(); ++i) {
         double q_recovered = heat_flux_from_T_at_edge(
             temps[i], i, T_hot, T_cold, h_hot, h_cold, t_over_k);
-        EXPECT_NEAR(q_recovered, q_original, 0.01) 
+        EXPECT_NEAR(q_recovered, q_original, 0.01)
             << "Round-trip failed at edge " << i;
     }
 }
@@ -3682,18 +3682,18 @@ TEST(HeatTransferTest, HeatFluxFromDepthRoundTrip) {
     double T_cold = 300.0;
     double h_hot = 500.0;
     double h_cold = 50.0;
-    
+
     std::vector<double> thicknesses = {0.010, 0.050};  // 10mm steel, 50mm insulation
     std::vector<double> conductivities = {50.0, 0.04};
     std::vector<double> t_over_k = {0.010/50.0, 0.050/0.04};
-    
+
     // Get reference heat flux
     double q_ref;
     wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_ref);
-    
+
     // Test at various depths (simulating embedded thermocouples)
     std::vector<double> test_depths = {0.0, 0.005, 0.010, 0.025, 0.060};
-    
+
     for (double depth : test_depths) {
         // Calculate expected temperature at this depth
         double R_to_depth = 1.0 / h_hot;  // convective
@@ -3704,13 +3704,13 @@ TEST(HeatTransferTest, HeatFluxFromDepthRoundTrip) {
             remaining -= in_layer;
         }
         double T_at_depth = T_hot - q_ref * R_to_depth;
-        
+
         // Recover heat flux from this "measured" temperature
         double q_recovered = heat_flux_from_T_at_depth(
             T_at_depth, depth, T_hot, T_cold, h_hot, h_cold,
             thicknesses, conductivities);
-        
-        EXPECT_NEAR(q_recovered, q_ref, 0.1) 
+
+        EXPECT_NEAR(q_recovered, q_ref, 0.1)
             << "Round-trip failed at depth " << depth << " m";
     }
 }
@@ -3723,17 +3723,17 @@ TEST(HeatTransferTest, TemperatureSensitivityBasic) {
     double h_hot = 500.0;
     double h_cold = 100.0;
     std::vector<double> t_over_k = {0.01 / 50.0};  // single layer (thin steel)
-    
+
     // At edge 0 (hot surface): influenced more by T_hot than T_cold
     auto [dT_hot_0, dT_cold_0] = dT_edge_dT_bulk(0, h_hot, h_cold, t_over_k);
     EXPECT_GT(dT_hot_0, dT_cold_0);  // Hot surface closer to T_hot
     EXPECT_NEAR(dT_hot_0 + dT_cold_0, 1.0, 1e-10);  // Must sum to 1
-    
+
     // At edge 1 (cold surface): influenced more by T_cold than T_hot
     auto [dT_hot_1, dT_cold_1] = dT_edge_dT_bulk(1, h_hot, h_cold, t_over_k);
     EXPECT_GT(dT_hot_1, dT_cold_1);  // Cold surface still closer to hot due to low h_cold
     EXPECT_NEAR(dT_hot_1 + dT_cold_1, 1.0, 1e-10);
-    
+
     // With thin wall and h_cold << h_hot, cold-side convection dominates
     // so even cold surface is closer to T_hot than T_cold
     // This is physically correct: low h_cold means large dT across cold boundary layer
@@ -3742,18 +3742,18 @@ TEST(HeatTransferTest, TemperatureSensitivityBasic) {
 TEST(HeatTransferTest, TemperatureSensitivityMultiLayer) {
     double h_hot = 500.0;
     double h_cold = 50.0;
-    
+
     // Steel + thick insulation
     std::vector<double> t_over_k = {0.01 / 50.0, 0.1 / 0.04};  // insulation dominates
-    
+
     // Sensitivities should be monotonic: edges closer to hot have higher dT/dT_hot
     double prev_dT_hot = 1.0;
     for (std::size_t i = 0; i <= t_over_k.size(); ++i) {
         auto [dT_hot, dT_cold] = dT_edge_dT_bulk(i, h_hot, h_cold, t_over_k);
-        
+
         // Sum must be 1
         EXPECT_NEAR(dT_hot + dT_cold, 1.0, 1e-10);
-        
+
         // dT_hot should decrease as we go from hot to cold
         EXPECT_LE(dT_hot, prev_dT_hot);
         prev_dT_hot = dT_hot;
@@ -3767,23 +3767,23 @@ TEST(HeatTransferTest, TemperatureSensitivityVerifyWithFiniteDiff) {
     double h_hot = 500.0;
     double h_cold = 50.0;
     std::vector<double> t_over_k = {0.01 / 50.0, 0.05 / 0.5};
-    
+
     double dT = 1.0;  // 1K perturbation
-    
+
     for (std::size_t edge = 0; edge <= t_over_k.size(); ++edge) {
         // Analytical sensitivity
         auto [dT_dT_hot_anal, dT_dT_cold_anal] = dT_edge_dT_bulk(edge, h_hot, h_cold, t_over_k);
-        
+
         // Finite difference for T_hot
         double q1, q2;
         auto temps1 = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q1);
         auto temps2 = wall_temperature_profile(T_hot + dT, T_cold, h_hot, h_cold, t_over_k, q2);
         double dT_dT_hot_fd = (temps2[edge] - temps1[edge]) / dT;
-        
+
         // Finite difference for T_cold
         auto temps3 = wall_temperature_profile(T_hot, T_cold + dT, h_hot, h_cold, t_over_k, q1);
         double dT_dT_cold_fd = (temps3[edge] - temps1[edge]) / dT;
-        
+
         EXPECT_NEAR(dT_dT_hot_anal, dT_dT_hot_fd, 1e-6) << "Edge " << edge;
         EXPECT_NEAR(dT_dT_cold_anal, dT_dT_cold_fd, 1e-6) << "Edge " << edge;
     }
@@ -3792,7 +3792,7 @@ TEST(HeatTransferTest, TemperatureSensitivityVerifyWithFiniteDiff) {
 TEST(HeatTransferTest, TemperatureSensitivityToHeatFlux) {
     double h_hot = 500.0;
     std::vector<double> t_over_k = {0.01 / 50.0, 0.05 / 0.5};
-    
+
     // dT/dq should be negative (higher q means lower edge T)
     // and magnitude should increase with edge index
     double prev_mag = 0.0;
@@ -3810,7 +3810,7 @@ TEST(HeatTransferTest, TemperatureSensitivityToHeatFlux) {
 
 TEST(AcousticsTest, TubeGeometry) {
     Tube tube{1.0, 0.1};  // L=1m, D=0.1m
-    
+
     EXPECT_DOUBLE_EQ(tube.L, 1.0);
     EXPECT_DOUBLE_EQ(tube.D, 0.1);
     EXPECT_NEAR(tube.area(), M_PI * 0.01 / 4.0, 1e-10);
@@ -3820,11 +3820,11 @@ TEST(AcousticsTest, TubeGeometry) {
 
 TEST(AcousticsTest, AnnulusGeometry) {
     Annulus ann{0.5, 0.4, 0.5};  // L=0.5m, D_inner=0.4m, D_outer=0.5m
-    
+
     EXPECT_DOUBLE_EQ(ann.D_mean(), 0.45);
     EXPECT_DOUBLE_EQ(ann.gap(), 0.05);
     EXPECT_NEAR(ann.circumference(), M_PI * 0.45, 1e-10);
-    
+
     // Area = π/4 * (D_outer² - D_inner²)
     double expected_area = M_PI / 4.0 * (0.25 - 0.16);
     EXPECT_NEAR(ann.area(), expected_area, 1e-10);
@@ -3834,22 +3834,22 @@ TEST(AcousticsTest, TubeClosedClosed) {
     // Closed-Closed tube: f_n = n * c / (2L)
     Tube tube{1.0, 0.1};
     double c = 343.0;  // Air at ~20°C
-    
-    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Closed, 
+
+    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Closed,
                                    BoundaryCondition::Closed, 5);
-    
+
     ASSERT_EQ(modes.size(), 5u);
-    
+
     // Check frequencies
     EXPECT_NEAR(modes[0].frequency, 171.5, 0.1);   // 1L: c/2L
     EXPECT_NEAR(modes[1].frequency, 343.0, 0.1);   // 2L: c/L
     EXPECT_NEAR(modes[2].frequency, 514.5, 0.1);   // 3L: 3c/2L
-    
+
     // Check mode labels
     EXPECT_EQ(modes[0].label(), "1L");
     EXPECT_EQ(modes[1].label(), "2L");
     EXPECT_EQ(modes[2].label(), "3L");
-    
+
     // Check mode indices
     EXPECT_EQ(modes[0].n_axial, 1);
     EXPECT_EQ(modes[0].n_azimuthal, 0);
@@ -3859,10 +3859,10 @@ TEST(AcousticsTest, TubeOpenOpen) {
     // Open-Open has same frequencies as Closed-Closed
     Tube tube{1.0, 0.1};
     double c = 343.0;
-    
-    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Open, 
+
+    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Open,
                                    BoundaryCondition::Open, 3);
-    
+
     EXPECT_NEAR(modes[0].frequency, 171.5, 0.1);
     EXPECT_NEAR(modes[1].frequency, 343.0, 0.1);
 }
@@ -3871,10 +3871,10 @@ TEST(AcousticsTest, TubeOpenClosed) {
     // Quarter-wave tube: f_n = (2n-1) * c / (4L)
     Tube tube{1.0, 0.1};
     double c = 343.0;
-    
-    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Open, 
+
+    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Open,
                                    BoundaryCondition::Closed, 3);
-    
+
     EXPECT_NEAR(modes[0].frequency, 85.75, 0.1);   // 1L: c/4L
     EXPECT_NEAR(modes[1].frequency, 257.25, 0.1);  // 2L: 3c/4L
     EXPECT_NEAR(modes[2].frequency, 428.75, 0.1);  // 3L: 5c/4L
@@ -3884,10 +3884,10 @@ TEST(AcousticsTest, AnnulusAxialModes) {
     // Same as tube for axial modes
     Annulus ann{0.5, 0.4, 0.5};
     double c = 500.0;  // Hot combustion products
-    
-    auto modes = annulus_axial_modes(ann, c, BoundaryCondition::Closed, 
+
+    auto modes = annulus_axial_modes(ann, c, BoundaryCondition::Closed,
                                       BoundaryCondition::Closed, 3);
-    
+
     // f_n = n * c / (2L) = n * 500 / 1.0 = n * 500
     EXPECT_NEAR(modes[0].frequency, 500.0, 0.1);   // 1L
     EXPECT_NEAR(modes[1].frequency, 1000.0, 0.1);  // 2L
@@ -3897,14 +3897,14 @@ TEST(AcousticsTest, AnnulusAzimuthalModes) {
     // f_m = m * c / (π * D_mean)
     Annulus ann{0.5, 0.4, 0.5};  // D_mean = 0.45m
     double c = 500.0;
-    
+
     auto modes = annulus_azimuthal_modes(ann, c, 3);
-    
+
     // f_1 = c / (π * D_mean) = 500 / (π * 0.45) ≈ 353.7 Hz
     double f_1T = c / (M_PI * 0.45);
     EXPECT_NEAR(modes[0].frequency, f_1T, 0.1);
     EXPECT_NEAR(modes[1].frequency, 2 * f_1T, 0.1);
-    
+
     // Check labels
     EXPECT_EQ(modes[0].label(), "1T");
     EXPECT_EQ(modes[1].label(), "2T");
@@ -3913,19 +3913,19 @@ TEST(AcousticsTest, AnnulusAzimuthalModes) {
 TEST(AcousticsTest, AnnulusCombinedModes) {
     Annulus ann{0.5, 0.4, 0.5};
     double c = 500.0;
-    
-    auto modes = annulus_modes(ann, c, BoundaryCondition::Closed, 
+
+    auto modes = annulus_modes(ann, c, BoundaryCondition::Closed,
                                 BoundaryCondition::Closed, 2, 2);
-    
+
     // Should have: 1L, 2L, 1T, 2T, 1L1T, 1L2T, 2L1T, 2L2T
     // Sorted by frequency
     ASSERT_GE(modes.size(), 8u);
-    
+
     // Verify sorted by frequency
     for (std::size_t i = 1; i < modes.size(); ++i) {
         EXPECT_LE(modes[i-1].frequency, modes[i].frequency);
     }
-    
+
     // Check combined mode label format
     bool found_combined = false;
     for (const auto& m : modes) {
@@ -3942,12 +3942,12 @@ TEST(AcousticsTest, AnnulusCombinedModes) {
 TEST(AcousticsTest, ModesInRange) {
     Tube tube{1.0, 0.1};
     double c = 343.0;
-    
-    auto all_modes = tube_axial_modes(tube, c, BoundaryCondition::Closed, 
+
+    auto all_modes = tube_axial_modes(tube, c, BoundaryCondition::Closed,
                                        BoundaryCondition::Closed, 10);
-    
+
     auto filtered = modes_in_range(all_modes, 300.0, 600.0);
-    
+
     // Should include 2L (343 Hz), 3L (514.5 Hz)
     EXPECT_GE(filtered.size(), 2u);
     for (const auto& m : filtered) {
@@ -3959,15 +3959,15 @@ TEST(AcousticsTest, ModesInRange) {
 TEST(AcousticsTest, ClosestMode) {
     Tube tube{1.0, 0.1};
     double c = 343.0;
-    
-    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Closed, 
+
+    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Closed,
                                    BoundaryCondition::Closed, 5);
-    
+
     // Find mode closest to 350 Hz (should be 2L at 343 Hz)
     const auto* closest = closest_mode(modes, 350.0);
     ASSERT_NE(closest, nullptr);
     EXPECT_EQ(closest->label(), "2L");
-    
+
     // Find mode closest to 100 Hz (should be 1L at 171.5 Hz)
     closest = closest_mode(modes, 100.0);
     ASSERT_NE(closest, nullptr);
@@ -3977,10 +3977,10 @@ TEST(AcousticsTest, ClosestMode) {
 TEST(AcousticsTest, MinModeSeparation) {
     Tube tube{1.0, 0.1};
     double c = 343.0;
-    
-    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Closed, 
+
+    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Closed,
                                    BoundaryCondition::Closed, 5);
-    
+
     // For closed-closed, separation is constant: c/2L = 171.5 Hz
     double sep = min_mode_separation(modes);
     EXPECT_NEAR(sep, 171.5, 0.1);
@@ -3991,14 +3991,14 @@ TEST(AcousticsTest, RealCombustorExample) {
     // L ~ 0.3m, D_mean ~ 0.6m, hot products c ~ 800 m/s
     Annulus combustor{0.3, 0.5, 0.7};  // D_mean = 0.6m
     double c = 800.0;
-    
-    auto modes = annulus_modes(combustor, c, BoundaryCondition::Closed, 
+
+    auto modes = annulus_modes(combustor, c, BoundaryCondition::Closed,
                                 BoundaryCondition::Open, 3, 3);
-    
+
     // 1T mode: f = c / (π * D_mean) = 800 / (π * 0.6) ≈ 424 Hz
     // This is in the typical combustion instability range (100-1000 Hz)
     double f_1T = c / (M_PI * 0.6);
-    
+
     const auto* mode_1T = closest_mode(modes, f_1T);
     ASSERT_NE(mode_1T, nullptr);
     EXPECT_EQ(mode_1T->label(), "1T");
@@ -4013,7 +4013,7 @@ TEST(GeometryTest, ResidenceTimeBasic) {
     // τ = V / Q
     double V = 0.001;  // 1 liter = 0.001 m³
     double Q = 0.0001; // 0.1 L/s = 0.0001 m³/s
-    
+
     double tau = residence_time(V, Q);
     EXPECT_NEAR(tau, 10.0, 1e-10);  // 10 seconds
 }
@@ -4023,7 +4023,7 @@ TEST(GeometryTest, ResidenceTimeMdot) {
     double V = 0.001;    // 1 liter
     double mdot = 0.001; // 1 g/s = 0.001 kg/s
     double rho = 1.0;    // 1 kg/m³
-    
+
     double tau = residence_time_mdot(V, mdot, rho);
     EXPECT_NEAR(tau, 1.0, 1e-10);  // 1 second
 }
@@ -4031,7 +4031,7 @@ TEST(GeometryTest, ResidenceTimeMdot) {
 TEST(GeometryTest, ResidenceTimeTube) {
     Tube tube{1.0, 0.1};  // L=1m, D=0.1m
     double Q = tube.area();  // Q = A means u = 1 m/s
-    
+
     double tau = residence_time(tube, Q);
     EXPECT_NEAR(tau, 1.0, 1e-10);  // τ = L/u = 1s
 }
@@ -4039,7 +4039,7 @@ TEST(GeometryTest, ResidenceTimeTube) {
 TEST(GeometryTest, ResidenceTimeAnnulus) {
     Annulus ann{0.5, 0.08, 0.1};  // L=0.5m
     double Q = ann.area();  // u = 1 m/s
-    
+
     double tau = residence_time(ann, Q);
     EXPECT_NEAR(tau, 0.5, 1e-10);  // τ = L/u = 0.5s
 }
@@ -4047,10 +4047,10 @@ TEST(GeometryTest, ResidenceTimeAnnulus) {
 TEST(GeometryTest, SpaceVelocity) {
     double V = 0.001;
     double Q = 0.01;
-    
+
     double SV = space_velocity(Q, V);
     EXPECT_NEAR(SV, 10.0, 1e-10);  // 10 /s
-    
+
     // SV = 1/τ
     double tau = residence_time(V, Q);
     EXPECT_NEAR(SV, 1.0 / tau, 1e-10);
@@ -4063,10 +4063,10 @@ TEST(GeometryTest, ResidenceTimeConsistency) {
     double rho = 1.2;
     double mdot = 0.01;
     double Q = mdot / rho;
-    
+
     double tau1 = residence_time(tube, Q);
     double tau2 = residence_time_mdot(tube, mdot, rho);
-    
+
     EXPECT_NEAR(tau1, tau2, 1e-10);
 }
 
@@ -4077,11 +4077,11 @@ TEST(GeometryTest, ResidenceTimeConsistency) {
 TEST(AcousticsTest, AxialModeUpstream) {
     double f0 = 100.0;  // Hz
     double M = 0.2;
-    
+
     // f+ = f0 / (1 - M) = 100 / 0.8 = 125 Hz
     double f_up = axial_mode_upstream(f0, M);
     EXPECT_NEAR(f_up, 125.0, 0.01);
-    
+
     // Zero Mach: no shift
     EXPECT_NEAR(axial_mode_upstream(f0, 0.0), f0, 1e-10);
 }
@@ -4089,11 +4089,11 @@ TEST(AcousticsTest, AxialModeUpstream) {
 TEST(AcousticsTest, AxialModeDownstream) {
     double f0 = 100.0;
     double M = 0.2;
-    
+
     // f- = f0 / (1 + M) = 100 / 1.2 ≈ 83.33 Hz
     double f_down = axial_mode_downstream(f0, M);
     EXPECT_NEAR(f_down, 83.333, 0.01);
-    
+
     // Zero Mach: no shift
     EXPECT_NEAR(axial_mode_downstream(f0, 0.0), f0, 1e-10);
 }
@@ -4101,14 +4101,14 @@ TEST(AcousticsTest, AxialModeDownstream) {
 TEST(AcousticsTest, AxialModeSplit) {
     double f0 = 200.0;
     double M = 0.1;
-    
+
     auto [f_up, f_down] = axial_mode_split(f0, M);
-    
+
     // f+ = 200 / 0.9 ≈ 222.22
     // f- = 200 / 1.1 ≈ 181.82
     EXPECT_NEAR(f_up, 222.22, 0.01);
     EXPECT_NEAR(f_down, 181.82, 0.01);
-    
+
     // Frequency split increases with Mach
     EXPECT_GT(f_up - f_down, 0);
 }
@@ -4120,17 +4120,17 @@ TEST(AcousticsTest, HelmholtzFrequency) {
     double A_neck = M_PI * d_neck * d_neck / 4.0;
     double L_neck = 0.05;        // 5 cm
     double c = 343.0;            // Air at 20°C
-    
+
     double f = helmholtz_frequency(V, A_neck, L_neck, c);
-    
+
     // Expected: roughly 100-200 Hz for typical bottle
     EXPECT_GT(f, 50.0);
     EXPECT_LT(f, 300.0);
-    
+
     // Larger volume -> lower frequency
     double f_large = helmholtz_frequency(2 * V, A_neck, L_neck, c);
     EXPECT_LT(f_large, f);
-    
+
     // Larger neck area -> higher frequency
     double f_wide = helmholtz_frequency(V, 2 * A_neck, L_neck, c);
     EXPECT_GT(f_wide, f);
@@ -4141,11 +4141,11 @@ TEST(AcousticsTest, HelmholtzEndCorrection) {
     double A_neck = 0.0001;
     double L_neck = 0.05;
     double c = 343.0;
-    
+
     // Flanged (0.85) vs unflanged (0.6)
     double f_flanged = helmholtz_frequency(V, A_neck, L_neck, c, 0.85);
     double f_unflanged = helmholtz_frequency(V, A_neck, L_neck, c, 0.6);
-    
+
     // Smaller end correction -> shorter L_eff -> higher frequency
     EXPECT_GT(f_unflanged, f_flanged);
 }
@@ -4155,10 +4155,10 @@ TEST(AcousticsTest, Strouhal) {
     double f = 100.0;  // Hz
     double L = 0.01;   // 1 cm diameter
     double u = 5.0;    // 5 m/s
-    
+
     double St = strouhal(f, L, u);
     EXPECT_NEAR(St, 0.2, 0.001);
-    
+
     // Inverse
     double f_back = frequency_from_strouhal(St, L, u);
     EXPECT_NEAR(f_back, f, 1e-10);
@@ -4167,13 +4167,13 @@ TEST(AcousticsTest, Strouhal) {
 TEST(AcousticsTest, StrouhalScaling) {
     // Same Strouhal at different scales
     double St = 0.2;
-    
+
     // Small scale: L=1cm, u=5m/s
     double f1 = frequency_from_strouhal(St, 0.01, 5.0);
-    
+
     // Large scale: L=10cm, u=50m/s (same St)
     double f2 = frequency_from_strouhal(St, 0.1, 50.0);
-    
+
     // Same frequency (St scaling)
     EXPECT_NEAR(f1, f2, 0.01);
 }
@@ -4181,14 +4181,14 @@ TEST(AcousticsTest, StrouhalScaling) {
 TEST(AcousticsTest, QuarterWaveFrequency) {
     double L = 0.25;   // 25 cm
     double c = 343.0;
-    
+
     // f = c / (4L) = 343 / 1.0 = 343 Hz
     double f = quarter_wave_frequency(L, c);
     EXPECT_NEAR(f, 343.0, 0.01);
-    
+
     // Should match tube_axial_modes with Open-Closed
     Tube tube{L, 0.05};
-    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Open, 
+    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Open,
                                    BoundaryCondition::Closed, 1);
     EXPECT_NEAR(modes[0].frequency, f, 0.01);
 }
@@ -4196,14 +4196,14 @@ TEST(AcousticsTest, QuarterWaveFrequency) {
 TEST(AcousticsTest, HalfWaveFrequency) {
     double L = 0.5;    // 50 cm
     double c = 343.0;
-    
+
     // f = c / (2L) = 343 / 1.0 = 343 Hz
     double f = half_wave_frequency(L, c);
     EXPECT_NEAR(f, 343.0, 0.01);
-    
+
     // Should match tube_axial_modes with Closed-Closed
     Tube tube{L, 0.05};
-    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Closed, 
+    auto modes = tube_axial_modes(tube, c, BoundaryCondition::Closed,
                                    BoundaryCondition::Closed, 1);
     EXPECT_NEAR(modes[0].frequency, f, 0.01);
 }
@@ -4216,11 +4216,11 @@ TEST(AcousticsTest, StokesLayer) {
     // Air at 20°C: ν ≈ 1.5e-5 m²/s
     double nu = 1.5e-5;
     double f = 100.0;  // Hz
-    
+
     // δ_ν = √(2ν/ω) = √(2 * 1.5e-5 / (2π * 100)) ≈ 0.22 mm
     double delta = stokes_layer(nu, f);
     EXPECT_NEAR(delta * 1000, 0.22, 0.01);  // in mm
-    
+
     // Higher frequency -> thinner layer
     double delta_high = stokes_layer(nu, 1000.0);
     EXPECT_LT(delta_high, delta);
@@ -4231,14 +4231,14 @@ TEST(AcousticsTest, ThermalLayer) {
     // Air at 20°C: α ≈ 2.1e-5 m²/s
     double alpha = 2.1e-5;
     double f = 100.0;
-    
+
     double delta = thermal_layer(alpha, f);
-    
+
     // Should be slightly larger than Stokes layer (Pr < 1 for air)
     double nu = 1.5e-5;
     double delta_nu = stokes_layer(nu, f);
     EXPECT_GT(delta, delta_nu);
-    
+
     // Ratio should be 1/√Pr ≈ 1.18 for air (Pr ≈ 0.71)
     double ratio = delta / delta_nu;
     EXPECT_NEAR(ratio, std::sqrt(alpha / nu), 1e-6);
@@ -4248,7 +4248,7 @@ TEST(AcousticsTest, EffectiveViscothermalLayer) {
     double delta_nu = 0.0002;    // 0.2 mm
     double delta_kappa = 0.00024; // 0.24 mm
     double gamma = 1.4;
-    
+
     // δ_eff = δ_ν + (γ-1)·δ_κ = 0.2 + 0.4*0.24 = 0.296 mm
     double delta_eff = effective_viscothermal_layer(delta_nu, delta_kappa, gamma);
     EXPECT_NEAR(delta_eff * 1000, 0.296, 0.001);
@@ -4260,18 +4260,18 @@ TEST(AcousticsTest, TubeQ) {
     double D = 0.02;
     double c = 343.0;
     double f = quarter_wave_frequency(L, c);  // ~343 Hz
-    
+
     // Air properties
     double nu = 1.5e-5;
     double alpha = 2.1e-5;
     double gamma = 1.4;
-    
+
     double Q = tube_Q(L, D, nu, alpha, gamma, f);
-    
+
     // Q should be in reasonable range (50-500 for typical dampers)
     EXPECT_GT(Q, 20);
     EXPECT_LT(Q, 500);
-    
+
     // Larger diameter -> higher Q
     double Q_large = tube_Q(L, 2 * D, nu, alpha, gamma, f);
     EXPECT_GT(Q_large, Q);
@@ -4285,20 +4285,20 @@ TEST(AcousticsTest, HelmholtzQ) {
     double A_neck = M_PI * d_neck * d_neck / 4.0;
     double L_neck = 0.03;
     double c = 343.0;
-    
+
     double f = helmholtz_frequency(V, A_neck, L_neck, c);
-    
+
     // Air properties
     double nu = 1.5e-5;
     double alpha = 2.1e-5;
     double gamma = 1.4;
-    
+
     double Q = helmholtz_Q(V, A_neck, L_neck, nu, alpha, gamma, f);
-    
+
     // Q should be in reasonable range
     EXPECT_GT(Q, 10);
     EXPECT_LT(Q, 500);
-    
+
     // Larger cavity -> higher Q (more energy storage)
     double Q_large = helmholtz_Q(4 * V, A_neck, L_neck, nu, alpha, gamma, f);
     EXPECT_GT(Q_large, Q);
@@ -4307,10 +4307,10 @@ TEST(AcousticsTest, HelmholtzQ) {
 TEST(AcousticsTest, DampingRatio) {
     double Q = 50.0;
     double zeta = damping_ratio(Q);
-    
+
     // ζ = 1/(2Q) = 0.01
     EXPECT_NEAR(zeta, 0.01, 1e-10);
-    
+
     // Higher Q -> lower damping
     EXPECT_LT(damping_ratio(100.0), zeta);
 }
@@ -4318,7 +4318,7 @@ TEST(AcousticsTest, DampingRatio) {
 TEST(AcousticsTest, Bandwidth) {
     double f0 = 200.0;
     double Q = 50.0;
-    
+
     // Δf = f0/Q = 4 Hz
     double df = bandwidth(f0, Q);
     EXPECT_NEAR(df, 4.0, 1e-10);

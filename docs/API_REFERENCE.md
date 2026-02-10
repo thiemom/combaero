@@ -1002,7 +1002,7 @@ ca.BoundaryCondition.Closed  # Rigid wall (u'=0)
 # Tube axial modes
 tube = ca.Tube(L=1.0, D=0.1)
 c = 343.0  # Speed of sound [m/s]
-modes = ca.tube_axial_modes(tube, c, 
+modes = ca.tube_axial_modes(tube, c,
                              ca.BoundaryCondition.Closed,
                              ca.BoundaryCondition.Open,
                              n_max=5)

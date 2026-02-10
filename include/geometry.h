@@ -43,7 +43,7 @@ double hydraulic_diameter_annulus(double D_outer, double D_inner);
 struct Tube {
     double L;   // Length [m]
     double D;   // Diameter [m]
-    
+
     double area() const;           // Cross-sectional area [m²]
     double volume() const;         // Volume [m³]
     double perimeter() const;      // Circumference [m]
@@ -55,7 +55,7 @@ struct Annulus {
     double L;        // Length [m]
     double D_inner;  // Inner diameter [m]
     double D_outer;  // Outer diameter [m]
-    
+
     double D_mean() const;         // Mean diameter [m]: (D_inner + D_outer) / 2
     double gap() const;            // Annular gap [m]: (D_outer - D_inner) / 2
     double area() const;           // Cross-sectional area [m²]

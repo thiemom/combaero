@@ -18,7 +18,7 @@ Comprehensive testing of the Python interface after C++ bug fix. **All tests pas
 
 **Test Coverage**:
 - Compressible flow (14 tests)
-- Fanno flow (6 tests)  
+- Fanno flow (6 tests)
 - Friction calculations (6 tests)
 - Acoustics (9 tests)
 - Incompressible flow (4 tests)
@@ -241,7 +241,7 @@ Average: ~2.1 ms per test
 ### C++ Tests
 - **193/193 passed** (100%)
 
-### Python Unit Tests  
+### Python Unit Tests
 - **71/71 passed** (100%)
 
 ### Cantera Validation Tests

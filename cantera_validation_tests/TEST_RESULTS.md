@@ -8,7 +8,7 @@ February 9, 2026
 ### Complete Combustion Tests
 **Method**: Enthalpy balance (NOT equilibrium)
 - Calculate H(T_reactants, X_reactants) using Cantera
-- Calculate H(T_products, X_products) at various T using Cantera  
+- Calculate H(T_products, X_products) at various T using Cantera
 - Find T where H_products = H_reactants
 - Compare to CombAero's adiabatic flame temperature
 

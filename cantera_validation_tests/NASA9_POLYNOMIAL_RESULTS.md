@@ -27,15 +27,15 @@ Four test methods validating polynomial evaluation:
    - Validates Cp/R polynomial across 200-6000 K
    - Tests 10 species × 11 temperatures = 110 data points
    - **Result**: < 0.00002% deviation
-   
+
 2. **test_enthalpy_integration** ✅ PASSED
    - Validates polynomial integration via ∫Cp dT
    - Numerically integrates Cp from 298.15 K
    - **Result**: 0.000000% deviation (perfect match)
-   
+
 3. **test_entropy_evaluation** ⚠️ SKIPPED
    - Same reference state issue (Cp integration sufficient)
-   
+
 4. **test_temperature_range_continuity** ✅ PASSED
    - Validates smooth transitions at 1000 K boundary
    - **Result**: All species < 25% slope change

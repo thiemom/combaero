@@ -10,19 +10,19 @@
 
 std::string AcousticMode::label() const {
     std::string result;
-    
+
     if (n_axial > 0) {
         result += std::to_string(n_axial) + "L";
     }
     if (n_azimuthal > 0) {
         result += std::to_string(n_azimuthal) + "T";
     }
-    
+
     // Handle bulk mode (0L0T) - shouldn't normally occur
     if (result.empty()) {
         result = "0";
     }
-    
+
     return result;
 }
 
@@ -34,7 +34,7 @@ std::vector<AcousticMode> tube_axial_modes(
     const Tube& tube, double c,
     BoundaryCondition upstream, BoundaryCondition downstream,
     int n_max) {
-    
+
     if (tube.L <= 0 || tube.D <= 0) {
         throw std::invalid_argument("tube_axial_modes: tube dimensions must be positive");
     }
@@ -44,17 +44,17 @@ std::vector<AcousticMode> tube_axial_modes(
     if (n_max < 1) {
         throw std::invalid_argument("tube_axial_modes: n_max must be >= 1");
     }
-    
+
     std::vector<AcousticMode> modes;
     modes.reserve(static_cast<std::size_t>(n_max));
-    
+
     bool same_bc = (upstream == downstream);
-    
+
     for (int n = 1; n <= n_max; ++n) {
         AcousticMode mode;
         mode.n_axial = n;
         mode.n_azimuthal = 0;
-        
+
         if (same_bc) {
             // Closed-Closed or Open-Open: f_n = n * c / (2L)
             mode.frequency = n * c / (2.0 * tube.L);
@@ -62,10 +62,10 @@ std::vector<AcousticMode> tube_axial_modes(
             // Open-Closed (quarter-wave): f_n = (2n-1) * c / (4L)
             mode.frequency = (2 * n - 1) * c / (4.0 * tube.L);
         }
-        
+
         modes.push_back(mode);
     }
-    
+
     return modes;
 }
 
@@ -77,7 +77,7 @@ std::vector<AcousticMode> annulus_axial_modes(
     const Annulus& annulus, double c,
     BoundaryCondition upstream, BoundaryCondition downstream,
     int n_max) {
-    
+
     if (annulus.L <= 0 || annulus.D_outer <= annulus.D_inner || annulus.D_inner < 0) {
         throw std::invalid_argument("annulus_axial_modes: invalid annulus dimensions");
     }
@@ -87,33 +87,33 @@ std::vector<AcousticMode> annulus_axial_modes(
     if (n_max < 1) {
         throw std::invalid_argument("annulus_axial_modes: n_max must be >= 1");
     }
-    
+
     std::vector<AcousticMode> modes;
     modes.reserve(static_cast<std::size_t>(n_max));
-    
+
     bool same_bc = (upstream == downstream);
-    
+
     for (int n = 1; n <= n_max; ++n) {
         AcousticMode mode;
         mode.n_axial = n;
         mode.n_azimuthal = 0;
-        
+
         if (same_bc) {
             mode.frequency = n * c / (2.0 * annulus.L);
         } else {
             mode.frequency = (2 * n - 1) * c / (4.0 * annulus.L);
         }
-        
+
         modes.push_back(mode);
     }
-    
+
     return modes;
 }
 
 std::vector<AcousticMode> annulus_azimuthal_modes(
     const Annulus& annulus, double c,
     int m_max) {
-    
+
     if (annulus.D_outer <= annulus.D_inner || annulus.D_inner < 0) {
         throw std::invalid_argument("annulus_azimuthal_modes: invalid annulus dimensions");
     }
@@ -123,23 +123,23 @@ std::vector<AcousticMode> annulus_azimuthal_modes(
     if (m_max < 1) {
         throw std::invalid_argument("annulus_azimuthal_modes: m_max must be >= 1");
     }
-    
+
     std::vector<AcousticMode> modes;
     modes.reserve(static_cast<std::size_t>(m_max));
-    
+
     double D_mean = annulus.D_mean();
-    
+
     for (int m = 1; m <= m_max; ++m) {
         AcousticMode mode;
         mode.n_axial = 0;
         mode.n_azimuthal = m;
-        
+
         // f_m = m * c / (π * D_mean)
         mode.frequency = m * c / (M_PI * D_mean);
-        
+
         modes.push_back(mode);
     }
-    
+
     return modes;
 }
 
@@ -147,23 +147,23 @@ std::vector<AcousticMode> annulus_modes(
     const Annulus& annulus, double c,
     BoundaryCondition upstream, BoundaryCondition downstream,
     int n_max, int m_max) {
-    
+
     // Get pure axial and azimuthal modes
     auto axial = annulus_axial_modes(annulus, c, upstream, downstream, n_max);
     auto azimuthal = annulus_azimuthal_modes(annulus, c, m_max);
-    
+
     std::vector<AcousticMode> modes;
-    
+
     // Add pure axial modes (mT = 0)
     for (const auto& mode : axial) {
         modes.push_back(mode);
     }
-    
+
     // Add pure azimuthal modes (nL = 0)
     for (const auto& mode : azimuthal) {
         modes.push_back(mode);
     }
-    
+
     // Add combined modes
     for (const auto& ax : axial) {
         for (const auto& az : azimuthal) {
@@ -171,18 +171,18 @@ std::vector<AcousticMode> annulus_modes(
             combined.n_axial = ax.n_axial;
             combined.n_azimuthal = az.n_azimuthal;
             // Combined frequency: f = sqrt(f_axial² + f_azimuthal²)
-            combined.frequency = std::sqrt(ax.frequency * ax.frequency + 
+            combined.frequency = std::sqrt(ax.frequency * ax.frequency +
                                            az.frequency * az.frequency);
             modes.push_back(combined);
         }
     }
-    
+
     // Sort by frequency
     std::sort(modes.begin(), modes.end(),
               [](const AcousticMode& a, const AcousticMode& b) {
                   return a.frequency < b.frequency;
               });
-    
+
     return modes;
 }
 
@@ -193,29 +193,29 @@ std::vector<AcousticMode> annulus_modes(
 std::vector<AcousticMode> modes_in_range(
     const std::vector<AcousticMode>& modes,
     double f_min, double f_max) {
-    
+
     std::vector<AcousticMode> result;
-    
+
     for (const auto& mode : modes) {
         if (mode.frequency >= f_min && mode.frequency <= f_max) {
             result.push_back(mode);
         }
     }
-    
+
     return result;
 }
 
 const AcousticMode* closest_mode(
     const std::vector<AcousticMode>& modes,
     double f_target) {
-    
+
     if (modes.empty()) {
         return nullptr;
     }
-    
+
     const AcousticMode* closest = &modes[0];
     double min_diff = std::abs(modes[0].frequency - f_target);
-    
+
     for (const auto& mode : modes) {
         double diff = std::abs(mode.frequency - f_target);
         if (diff < min_diff) {
@@ -223,7 +223,7 @@ const AcousticMode* closest_mode(
             closest = &mode;
         }
     }
-    
+
     return closest;
 }
 
@@ -231,7 +231,7 @@ double min_mode_separation(const std::vector<AcousticMode>& modes) {
     if (modes.size() < 2) {
         return 0.0;
     }
-    
+
     // Make a sorted copy
     std::vector<double> freqs;
     freqs.reserve(modes.size());
@@ -239,7 +239,7 @@ double min_mode_separation(const std::vector<AcousticMode>& modes) {
         freqs.push_back(mode.frequency);
     }
     std::sort(freqs.begin(), freqs.end());
-    
+
     double min_sep = freqs[1] - freqs[0];
     for (std::size_t i = 2; i < freqs.size(); ++i) {
         double sep = freqs[i] - freqs[i - 1];
@@ -247,7 +247,7 @@ double min_mode_separation(const std::vector<AcousticMode>& modes) {
             min_sep = sep;
         }
     }
-    
+
     return min_sep;
 }
 
@@ -291,12 +291,12 @@ double helmholtz_frequency(double V, double A_neck, double L_neck, double c,
     if (end_correction < 0) {
         throw std::invalid_argument("helmholtz_frequency: end_correction must be >= 0");
     }
-    
+
     // Effective neck length with end correction
     // d_neck = 2 * sqrt(A_neck / π)
     double d_neck = 2.0 * std::sqrt(A_neck / M_PI);
     double L_eff = L_neck + end_correction * d_neck;
-    
+
     // f = (c / 2π) * sqrt(A / (V * L_eff))
     return (c / (2.0 * M_PI)) * std::sqrt(A_neck / (V * L_eff));
 }
@@ -382,19 +382,19 @@ double helmholtz_Q(double V, double A_neck, double L_neck,
     if (gamma <= 1.0) {
         throw std::invalid_argument("helmholtz_Q: gamma must be > 1");
     }
-    
+
     // Boundary layer thicknesses
     double delta_nu = stokes_layer(nu, f);
     double delta_kappa = thermal_layer(alpha, f);
     double delta_eff = effective_viscothermal_layer(delta_nu, delta_kappa, gamma);
-    
+
     // Neck diameter and perimeter
     double d_neck = 2.0 * std::sqrt(A_neck / M_PI);
     double perimeter = M_PI * d_neck;
-    
+
     // Effective neck length (with standard end correction)
     double L_eff = L_neck + 0.85 * d_neck;
-    
+
     // Losses occur in the neck boundary layer
     // Q ≈ (neck volume) / (boundary layer volume in neck)
     // Q ≈ (A_neck * L_eff) / (perimeter * L_eff * delta_eff)
@@ -403,11 +403,11 @@ double helmholtz_Q(double V, double A_neck, double L_neck,
     //
     // But cavity also stores energy, so scale by V/(A_neck * L_eff)
     // This gives the classic result: Q ~ V / (A_neck * delta_eff * factor)
-    
+
     // Simplified model: Q ≈ d_neck / (4 * delta_eff) * sqrt(V / (A_neck * L_eff))
     // This captures both neck losses and cavity energy storage
     double Q = (d_neck / (4.0 * delta_eff)) * std::sqrt(V / (A_neck * L_eff));
-    
+
     return Q;
 }
 
@@ -421,18 +421,18 @@ double tube_Q(double L, double D, double nu, double alpha, double gamma, double 
     if (gamma <= 1.0) {
         throw std::invalid_argument("tube_Q: gamma must be > 1");
     }
-    
+
     // Boundary layer thicknesses
     double delta_nu = stokes_layer(nu, f);
     double delta_kappa = thermal_layer(alpha, f);
     double delta_eff = effective_viscothermal_layer(delta_nu, delta_kappa, gamma);
-    
+
     // For a tube, losses occur along the entire length
     // Q ≈ (tube cross-section) / (boundary layer area)
     // Q ≈ (π D²/4) / (π D * delta_eff)
     // Q ≈ D / (4 * delta_eff)
     double Q = D / (4.0 * delta_eff);
-    
+
     return Q;
 }
 

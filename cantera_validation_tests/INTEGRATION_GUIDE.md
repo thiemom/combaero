@@ -245,18 +245,18 @@ For CI/CD pipelines, add the following step:
 def test_new_case(self, combaero, cantera, gri30_gas, species_mapping, tolerance_config):
     """Test description."""
     cb = combaero
-    
+
     # Setup
     X_mix = ...
-    
+
     # CombAero calculation
     result_cb = cb.some_function(...)
-    
+
     # Cantera calculation
     self.set_cantera_composition(gri30_gas, X_mix, species_mapping)
     gri30_gas.TP = T, P
     result_ct = ...
-    
+
     # Assertion
     assert abs(result_cb - result_ct) < tolerance_config["..."]
 ```

@@ -15,16 +15,16 @@ double oxygen_required_per_mol_fuel(std::size_t fuel_index) {
     if (fuel_index >= molecular_structures.size()) {
         throw std::runtime_error("Invalid fuel index");
     }
-    
+
     // Get molecular structure
     const Molecular_Structure& fuel = molecular_structures[fuel_index];
-    
+
     // For complete combustion:
     // C_x H_y O_z N_w + (x + y/4 - z/2) O2 -> x CO2 + (y/2) H2O + (w/2) N2
     // Oxygen required = x + y/4 - z/2 [mol O2/mol fuel]
-    
+
     double oxygen_required = static_cast<double>(fuel.C) + static_cast<double>(fuel.H) / 4.0 - static_cast<double>(fuel.O) / 2.0;
-    
+
     // Ensure non-negative value (for cases where fuel already has excess oxygen)
     return std::max(0.0, oxygen_required);
 }
@@ -35,14 +35,14 @@ double oxygen_required_per_kg_fuel(std::size_t fuel_index) {
     if (fuel_index >= molar_masses.size()) {
         throw std::runtime_error("Invalid fuel index");
     }
-    
+
     // Get molar masses
     double fuel_molar_mass = molar_masses[fuel_index];  // g/mol
     double oxygen_molar_mass = molar_masses[species_index.at("O2")];  // g/mol
-    
+
     // Calculate molar oxygen requirement
     double molar_oxygen_required = oxygen_required_per_mol_fuel(fuel_index);  // mol O2/mol fuel
-    
+
     // Convert to mass basis: (mol O2/mol fuel) * (g O2/mol O2) / (g fuel/mol fuel)
     return molar_oxygen_required * oxygen_molar_mass / fuel_molar_mass;  // kg O2/kg fuel
 }
@@ -54,20 +54,20 @@ double oxygen_required_per_mol_mixture(const std::vector<double>& X) {
     if (std::abs(sum - 1.0) > 1.0e-5) {
         throw std::runtime_error("Mole fractions must sum to 1.0");
     }
-    
+
     double total_oxygen_required = 0.0;
-    
+
     // Calculate weighted sum of oxygen requirements for each fuel component
     for (size_t i = 0; i < X.size(); ++i) {
         // Skip if mole fraction is zero
         if (X[i] <= 0.0) continue;
-        
+
         // Check if this is a fuel (contains carbon or hydrogen)
         if (molecular_structures[i].C > 0 || molecular_structures[i].H > 0) {
             total_oxygen_required += X[i] * oxygen_required_per_mol_fuel(i);
         }
     }
-    
+
     return total_oxygen_required;  // mol O2/mol mixture
 }
 
@@ -78,21 +78,21 @@ double oxygen_required_per_kg_mixture(const std::vector<double>& X) {
     if (std::abs(sum - 1.0) > 1.0e-5) {
         throw std::runtime_error("Mole fractions must sum to 1.0");
     }
-    
+
     // Calculate mixture molecular weight
     double mixture_mw = mwmix(X);  // g/mol
-    
+
     // Get oxygen molecular weight
     double oxygen_mw = molar_masses[species_index.at("O2")];  // g/mol
-    
+
     // Calculate molar oxygen requirement for the mixture
     double molar_oxygen_required = oxygen_required_per_mol_mixture(X);  // mol O2/mol mixture
-    
+
     // If no oxygen required (no fuel in mixture), return 0
     if (molar_oxygen_required <= 0.0) {
         return 0.0;
     }
-    
+
     // Convert to mass basis: (mol O2/mol mixture) * (g O2/mol O2) / (g mixture/mol mixture)
     return molar_oxygen_required * oxygen_mw / mixture_mw;  // kg O2/kg mixture
 }
@@ -113,11 +113,11 @@ double dryair_required_per_kg_fuel(std::size_t fuel_index) {
     if (fuel_index >= molar_masses.size()) {
         throw std::runtime_error("Invalid fuel index");
     }
-    
+
     double fuel_mw = molar_masses[fuel_index];  // g/mol
     std::vector<double> X_air = standard_dry_air_composition();
     double air_mw = mwmix(X_air);  // g/mol
-    
+
     double molar_air_required = dryair_required_per_mol_fuel(fuel_index);
     return molar_air_required * air_mw / fuel_mw;
 }
@@ -134,7 +134,7 @@ double dryair_required_per_kg_mixture(const std::vector<double>& X) {
     double mixture_mw = mwmix(X);  // g/mol
     std::vector<double> X_air = standard_dry_air_composition();
     double air_mw = mwmix(X_air);  // g/mol
-    
+
     double molar_air_required = dryair_required_per_mol_mixture(X);
     return molar_air_required * air_mw / mixture_mw;
 }
@@ -818,31 +818,31 @@ double bisection_solve(Func f, double target, double x_lo, double x_hi,
                        double tol_f, std::size_t max_iter, double tol_x_rel = 1e-10) {
     double f_lo = f(x_lo);
     double f_hi = f(x_hi);
-    
+
     // Check if target is within range
     double f_min = std::min(f_lo, f_hi);
     double f_max = std::max(f_lo, f_hi);
     if (target < f_min - tol_f || target > f_max + tol_f) {
         throw std::runtime_error("bisection_solve: target outside achievable range");
     }
-    
+
     // Determine monotonicity direction
     bool increasing = (f_hi > f_lo);
-    
+
     for (std::size_t iter = 0; iter < max_iter; ++iter) {
         double x_mid = 0.5 * (x_lo + x_hi);
         double f_mid = f(x_mid);
-        
+
         // Check convergence on function value
         if (std::abs(f_mid - target) < tol_f) {
             return x_mid;
         }
-        
+
         // Check convergence on x (relative)
         if ((x_hi - x_lo) < tol_x_rel * x_mid) {
             return x_mid;
         }
-        
+
         bool mid_below_target = (f_mid < target);
         if (increasing == mid_below_target) {
             x_lo = x_mid;
@@ -850,7 +850,7 @@ double bisection_solve(Func f, double target, double x_lo, double x_hi,
             x_hi = x_mid;
         }
     }
-    
+
     return 0.5 * (x_lo + x_hi);
 }
 
@@ -861,7 +861,7 @@ double stoich_fuel_ox_ratio(const std::vector<double>& X_fuel, const std::vector
     double MW_ox = mwmix(X_ox);
     double MW_O2 = molar_masses[species_index.at("O2")];
     double Y_O2_ox = X_O2_ox * MW_O2 / MW_ox;
-    
+
     if (O2_req_per_kg_fuel > 0.0 && Y_O2_ox > 0.0) {
         return Y_O2_ox / O2_req_per_kg_fuel;
     }
@@ -946,7 +946,7 @@ Stream set_fuel_stream_for_Tad(double T_ad_target, const Stream& fuel, const Str
     if (phi_max <= 1.0) {
         throw std::invalid_argument("set_fuel_stream_for_Tad: phi_max must be > 1.0");
     }
-    
+
     // Tad must be above oxidizer temperature (minimum achievable with zero fuel)
     double T_min = oxidizer.T();
     if (T_ad_target <= T_min) {
@@ -955,46 +955,46 @@ Stream set_fuel_stream_for_Tad(double T_ad_target, const Stream& fuel, const Str
     if (T_ad_target > 5000.0) {
         throw std::invalid_argument("set_fuel_stream_for_Tad: T_ad_target must be <= 5000 K");
     }
-    
+
     // Estimate stoichiometric fuel mass flow
     double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
     double mdot_stoich = oxidizer.mdot * ratio;
-    
+
     // Peak Tad is at stoichiometric
     double mdot_peak = mdot_stoich;
     double T_peak = compute_Tad_fuel(mdot_peak, fuel, oxidizer);
-    
+
     if (T_ad_target > T_peak + tol) {
         throw std::runtime_error("set_fuel_stream_for_Tad: target T_ad exceeds maximum achievable (stoichiometric)");
     }
-    
+
     double mdot_result = 0.0;
     auto f = [&](double mdot) { return compute_Tad_fuel(mdot, fuel, oxidizer); };
-    
+
     if (lean) {
         // Search on lean side: low fuel to stoichiometric
         // Tad increases with fuel on lean side
         double mdot_lo = mdot_stoich * 0.01;
         double T_lo = compute_Tad_fuel(mdot_lo, fuel, oxidizer);
-        
+
         if (T_ad_target < T_lo - tol) {
             throw std::runtime_error("set_fuel_stream_for_Tad: target T_ad below minimum achievable (lean)");
         }
-        
+
         mdot_result = bisection_solve(f, T_ad_target, mdot_lo, mdot_peak, tol, max_iter);
     } else {
         // Search on rich side: stoichiometric to phi_max
         // Tad decreases with fuel on rich side
         double mdot_hi = mdot_stoich * phi_max;
         double T_hi = compute_Tad_fuel(mdot_hi, fuel, oxidizer);
-        
+
         if (T_ad_target < T_hi - tol) {
             throw std::runtime_error("set_fuel_stream_for_Tad: target T_ad below minimum achievable (rich)");
         }
-        
+
         mdot_result = bisection_solve(f, T_ad_target, mdot_peak, mdot_hi, tol, max_iter);
     }
-    
+
     Stream result = fuel;
     result.mdot = mdot_result;
     return result;
@@ -1005,21 +1005,21 @@ Stream set_fuel_stream_for_O2(double X_O2_target, const Stream& fuel, const Stre
     if (oxidizer.mdot <= 0.0) {
         throw std::invalid_argument("set_fuel_stream_for_O2: oxidizer.mdot must be positive");
     }
-    
+
     double X_O2_ox = oxidizer.X()[species_index.at("O2")];
     if (X_O2_target <= 0.0 || X_O2_target >= X_O2_ox) {
         throw std::invalid_argument("set_fuel_stream_for_O2: X_O2_target must be in (0, X_O2_oxidizer)");
     }
-    
+
     double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
     double mdot_stoich = oxidizer.mdot * ratio;
-    
+
     double mdot_lo = mdot_stoich * 0.001;
     double mdot_hi = mdot_stoich * 0.999;
-    
+
     auto f = [&](double mdot) { return compute_O2_burned_fuel(mdot, fuel, oxidizer); };
     double mdot_result = bisection_solve(f, X_O2_target, mdot_lo, mdot_hi, tol, max_iter);
-    
+
     Stream result = fuel;
     result.mdot = mdot_result;
     return result;
@@ -1030,23 +1030,23 @@ Stream set_fuel_stream_for_O2_dry(double X_O2_dry_target, const Stream& fuel, co
     if (oxidizer.mdot <= 0.0) {
         throw std::invalid_argument("set_fuel_stream_for_O2_dry: oxidizer.mdot must be positive");
     }
-    
+
     // Dry O2 upper bound is from dry oxidizer composition
     std::vector<double> X_ox_dry = convert_to_dry_fractions(oxidizer.X());
     double X_O2_ox_dry = X_ox_dry[species_index.at("O2")];
     if (X_O2_dry_target <= 0.0 || X_O2_dry_target >= X_O2_ox_dry) {
         throw std::invalid_argument("set_fuel_stream_for_O2_dry: X_O2_dry_target must be in (0, X_O2_dry_oxidizer)");
     }
-    
+
     double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
     double mdot_stoich = oxidizer.mdot * ratio;
-    
+
     double mdot_lo = mdot_stoich * 0.001;
     double mdot_hi = mdot_stoich * 0.999;
-    
+
     auto f = [&](double mdot) { return compute_O2_dry_burned_fuel(mdot, fuel, oxidizer); };
     double mdot_result = bisection_solve(f, X_O2_dry_target, mdot_lo, mdot_hi, tol, max_iter);
-    
+
     Stream result = fuel;
     result.mdot = mdot_result;
     return result;
@@ -1060,16 +1060,16 @@ Stream set_fuel_stream_for_CO2(double X_CO2_target, const Stream& fuel, const St
     if (X_CO2_target <= 0.0) {
         throw std::invalid_argument("set_fuel_stream_for_CO2: X_CO2_target must be positive");
     }
-    
+
     double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
     double mdot_stoich = oxidizer.mdot * ratio;
-    
+
     double mdot_lo = mdot_stoich * 0.001;
     double mdot_hi = mdot_stoich * 0.999;
-    
+
     auto f = [&](double mdot) { return compute_CO2_burned_fuel(mdot, fuel, oxidizer); };
     double mdot_result = bisection_solve(f, X_CO2_target, mdot_lo, mdot_hi, tol, max_iter);
-    
+
     Stream result = fuel;
     result.mdot = mdot_result;
     return result;
@@ -1083,16 +1083,16 @@ Stream set_fuel_stream_for_CO2_dry(double X_CO2_dry_target, const Stream& fuel, 
     if (X_CO2_dry_target <= 0.0) {
         throw std::invalid_argument("set_fuel_stream_for_CO2_dry: X_CO2_dry_target must be positive");
     }
-    
+
     double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
     double mdot_stoich = oxidizer.mdot * ratio;
-    
+
     double mdot_lo = mdot_stoich * 0.001;
     double mdot_hi = mdot_stoich * 0.999;
-    
+
     auto f = [&](double mdot) { return compute_CO2_dry_burned_fuel(mdot, fuel, oxidizer); };
     double mdot_result = bisection_solve(f, X_CO2_dry_target, mdot_lo, mdot_hi, tol, max_iter);
-    
+
     Stream result = fuel;
     result.mdot = mdot_result;
     return result;
@@ -1110,7 +1110,7 @@ Stream set_oxidizer_stream_for_Tad(double T_ad_target, const Stream& fuel, const
     if (phi_max <= 1.0) {
         throw std::invalid_argument("set_oxidizer_stream_for_Tad: phi_max must be > 1.0");
     }
-    
+
     // Tad must be above fuel temperature (minimum achievable with infinite air)
     double T_min = fuel.T();
     if (T_ad_target <= T_min) {
@@ -1119,46 +1119,46 @@ Stream set_oxidizer_stream_for_Tad(double T_ad_target, const Stream& fuel, const
     if (T_ad_target > 5000.0) {
         throw std::invalid_argument("set_oxidizer_stream_for_Tad: T_ad_target must be <= 5000 K");
     }
-    
+
     // Estimate stoichiometric oxidizer mass flow
     double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
     double mdot_stoich = (ratio > 0.0) ? fuel.mdot / ratio : fuel.mdot * 20.0;
-    
+
     // Peak Tad is at stoichiometric
     double mdot_peak = mdot_stoich;
     double T_peak = compute_Tad_ox(mdot_peak, fuel, oxidizer);
-    
+
     if (T_ad_target > T_peak + tol) {
         throw std::runtime_error("set_oxidizer_stream_for_Tad: target T_ad exceeds maximum achievable (stoichiometric)");
     }
-    
+
     double mdot_result = 0.0;
     auto f = [&](double mdot) { return compute_Tad_ox(mdot, fuel, oxidizer); };
-    
+
     if (lean) {
         // Search on lean side: stoichiometric to high oxidizer (1/phi_min factor)
         // Tad decreases with oxidizer on lean side
         double mdot_hi = mdot_stoich * phi_max;  // phi_max used as dilution factor
         double T_hi = compute_Tad_ox(mdot_hi, fuel, oxidizer);
-        
+
         if (T_ad_target < T_hi - tol) {
             throw std::runtime_error("set_oxidizer_stream_for_Tad: target T_ad below minimum achievable (lean)");
         }
-        
+
         mdot_result = bisection_solve(f, T_ad_target, mdot_peak, mdot_hi, tol, max_iter);
     } else {
         // Search on rich side: low oxidizer (1/phi_max) to stoichiometric
         // Tad increases with oxidizer on rich side
         double mdot_lo = mdot_stoich / phi_max;
         double T_lo = compute_Tad_ox(mdot_lo, fuel, oxidizer);
-        
+
         if (T_ad_target < T_lo - tol) {
             throw std::runtime_error("set_oxidizer_stream_for_Tad: target T_ad below minimum achievable (rich)");
         }
-        
+
         mdot_result = bisection_solve(f, T_ad_target, mdot_lo, mdot_peak, tol, max_iter);
     }
-    
+
     Stream result = oxidizer;
     result.mdot = mdot_result;
     return result;
@@ -1169,22 +1169,22 @@ Stream set_oxidizer_stream_for_O2(double X_O2_target, const Stream& fuel, const 
     if (fuel.mdot <= 0.0) {
         throw std::invalid_argument("set_oxidizer_stream_for_O2: fuel.mdot must be positive");
     }
-    
+
     double X_O2_ox = oxidizer.X()[species_index.at("O2")];
     if (X_O2_target <= 0.0 || X_O2_target >= X_O2_ox) {
         throw std::invalid_argument("set_oxidizer_stream_for_O2: X_O2_target must be in (0, X_O2_oxidizer)");
     }
-    
+
     double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
     double mdot_stoich = (ratio > 0.0) ? fuel.mdot / ratio : fuel.mdot * 20.0;
-    
+
     double mdot_lo = mdot_stoich * 1.001;  // just above stoich -> low O2
     double mdot_hi = mdot_stoich * 100.0;  // very lean -> high O2
-    
+
     // O2 increases with increasing oxidizer (on lean side)
     auto f = [&](double mdot) { return compute_O2_burned_ox(mdot, fuel, oxidizer); };
     double mdot_result = bisection_solve(f, X_O2_target, mdot_lo, mdot_hi, tol, max_iter);
-    
+
     Stream result = oxidizer;
     result.mdot = mdot_result;
     return result;
@@ -1195,22 +1195,22 @@ Stream set_oxidizer_stream_for_O2_dry(double X_O2_dry_target, const Stream& fuel
     if (fuel.mdot <= 0.0) {
         throw std::invalid_argument("set_oxidizer_stream_for_O2_dry: fuel.mdot must be positive");
     }
-    
+
     std::vector<double> X_ox_dry = convert_to_dry_fractions(oxidizer.X());
     double X_O2_ox_dry = X_ox_dry[species_index.at("O2")];
     if (X_O2_dry_target <= 0.0 || X_O2_dry_target >= X_O2_ox_dry) {
         throw std::invalid_argument("set_oxidizer_stream_for_O2_dry: X_O2_dry_target must be in (0, X_O2_dry_oxidizer)");
     }
-    
+
     double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
     double mdot_stoich = (ratio > 0.0) ? fuel.mdot / ratio : fuel.mdot * 20.0;
-    
+
     double mdot_lo = mdot_stoich * 1.001;
     double mdot_hi = mdot_stoich * 100.0;
-    
+
     auto f = [&](double mdot) { return compute_O2_dry_burned_ox(mdot, fuel, oxidizer); };
     double mdot_result = bisection_solve(f, X_O2_dry_target, mdot_lo, mdot_hi, tol, max_iter);
-    
+
     Stream result = oxidizer;
     result.mdot = mdot_result;
     return result;
@@ -1224,17 +1224,17 @@ Stream set_oxidizer_stream_for_CO2(double X_CO2_target, const Stream& fuel, cons
     if (X_CO2_target <= 0.0) {
         throw std::invalid_argument("set_oxidizer_stream_for_CO2: X_CO2_target must be positive");
     }
-    
+
     double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
     double mdot_stoich = (ratio > 0.0) ? fuel.mdot / ratio : fuel.mdot * 20.0;
-    
+
     double mdot_lo = mdot_stoich * 1.001;  // just above stoich -> high CO2
     double mdot_hi = mdot_stoich * 100.0;  // very lean -> low CO2
-    
+
     // CO2 decreases with increasing oxidizer (dilution)
     auto f = [&](double mdot) { return compute_CO2_burned_ox(mdot, fuel, oxidizer); };
     double mdot_result = bisection_solve(f, X_CO2_target, mdot_lo, mdot_hi, tol, max_iter);
-    
+
     Stream result = oxidizer;
     result.mdot = mdot_result;
     return result;
@@ -1248,16 +1248,16 @@ Stream set_oxidizer_stream_for_CO2_dry(double X_CO2_dry_target, const Stream& fu
     if (X_CO2_dry_target <= 0.0) {
         throw std::invalid_argument("set_oxidizer_stream_for_CO2_dry: X_CO2_dry_target must be positive");
     }
-    
+
     double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
     double mdot_stoich = (ratio > 0.0) ? fuel.mdot / ratio : fuel.mdot * 20.0;
-    
+
     double mdot_lo = mdot_stoich * 1.001;
     double mdot_hi = mdot_stoich * 100.0;
-    
+
     auto f = [&](double mdot) { return compute_CO2_dry_burned_ox(mdot, fuel, oxidizer); };
     double mdot_result = bisection_solve(f, X_CO2_dry_target, mdot_lo, mdot_hi, tol, max_iter);
-    
+
     Stream result = oxidizer;
     result.mdot = mdot_result;
     return result;
@@ -1280,13 +1280,13 @@ State complete_combustion_isothermal(const State& in) {
 State complete_combustion(const State& in) {
     // Get burned composition at constant T first
     std::vector<double> X_burned = complete_combustion_to_CO2_H2O(in.X);
-    
+
     // Calculate inlet enthalpy
     double H_in = h(in.T, in.X);
-    
+
     // Solve for adiabatic flame temperature: h(T_ad, X_burned) = H_in
     double T_ad = calc_T_from_h(H_in, X_burned, in.T);
-    
+
     State out;
     out.T = T_ad;
     out.P = in.P;

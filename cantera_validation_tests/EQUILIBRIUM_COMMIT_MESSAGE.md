@@ -10,7 +10,7 @@ expected tolerances.
 
 ### WGS Isothermal Equilibrium (3 tests)
 - High temperature (1200 K) - favors reactants
-- Low temperature (800 K) - favors products  
+- Low temperature (800 K) - favors products
 - Temperature sweep (800-1500 K)
 
 ### WGS Adiabatic Equilibrium (2 tests)

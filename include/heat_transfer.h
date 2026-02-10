@@ -356,7 +356,7 @@ double bulk_T_from_edge_T_and_q(
 //
 // Partial derivatives of edge temperatures with respect to bulk temperatures.
 // Useful for:
-//   - Risk assessment: "If T_hot increases by 50K, how much does the 
+//   - Risk assessment: "If T_hot increases by 50K, how much does the
 //     steel-ceramic interface temperature increase?"
 //   - Uncertainty propagation
 //   - Control system design

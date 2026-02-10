@@ -75,7 +75,7 @@ N2, O2, AR, CO2, H2O, CH4, C2H6, C3H8, IC4H10, NC5H12, NC6H14, NC7H16, CO, H2
 
 **Script**: `generate_cantera_nasa9.py`
 
-**Input**: 
+**Input**:
 - `NASA9_coeffs.json` (existing CombAero NASA-9 data)
 - Species list (all 14 or subset)
 
@@ -409,7 +409,7 @@ cantera_validation_tests/
 
 ## Implementation Results (Feb 10, 2026)
 
-### Phase 1: Converter - COMPLETED 
+### Phase 1: Converter - COMPLETED
 
 **File**: `generate_cantera_nasa9_yaml.py` (200 lines)
 - Direct YAML generation (bypassed complex Chemkin format)
@@ -417,27 +417,27 @@ cantera_validation_tests/
 - Fixed element naming (Ar not AR for Cantera compatibility)
 - **Output**: `combaero_nasa9.yaml` (Cantera-compatible NASA-9 data)
 
-### Phase 2: Validation Tests - COMPLETED 
+### Phase 2: Validation Tests - COMPLETED
 
 **File**: `cantera_validation_tests/test_nasa9_polynomials.py` (300 lines)
 
 **Test Results**:
-1. **test_cp_evaluation** - PASSED 
+1. **test_cp_evaluation** - PASSED
    - Direct Cp/R polynomial evaluation
    - All 10 species, 200-6000 K range
    - **Deviation**: < 0.00002% (max: 0.000016% for CO)
 
-2. **test_enthalpy_integration** - PASSED 
+2. **test_enthalpy_integration** - PASSED
    - Validates polynomial integration via ∫Cp dT
    - Numerically integrates Cp from 298.15 K
    - **Deviation**: 0.000000% (perfect match!)
    - Example: N2 (298→1000K) = 21462.14 J/mol (identical)
 
-3. **test_temperature_range_continuity** - PASSED 
+3. **test_temperature_range_continuity** - PASSED
    - Smooth transitions at 1000 K boundary
    - All species < 25% slope change
 
-4. **test_entropy_evaluation** - SKIPPED 
+4. **test_entropy_evaluation** - SKIPPED
    - Same reference state issue (Cp integration sufficient)
 
 ### Key Findings

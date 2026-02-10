@@ -6,19 +6,19 @@ configfile: pytest.ini
 plugins: xdist-3.8.0, cov-4.1.0
 collecting ... collected 12 items
 
-test_combustion_validation.py::TestCompleteCombustion::test_methane_air_stoichiometric 
+test_combustion_validation.py::TestCompleteCombustion::test_methane_air_stoichiometric
 CH4 stoich: CombAero=2327.7 K, Cantera=2327.6 K, diff=0.1 K
 PASSED
-test_combustion_validation.py::TestCompleteCombustion::test_methane_air_lean 
+test_combustion_validation.py::TestCompleteCombustion::test_methane_air_lean
 CH4 lean (phi=0.8): CombAero=2016.8 K, Cantera=2016.9 K, diff=0.1 K
 PASSED
-test_combustion_validation.py::TestCompleteCombustion::test_propane_air_stoichiometric 
+test_combustion_validation.py::TestCompleteCombustion::test_propane_air_stoichiometric
 C3H8 stoich: CombAero=2389.6 K, Cantera=2394.2 K, diff=4.6 K
 PASSED
-test_combustion_validation.py::TestCompleteCombustion::test_hydrogen_air_stoichiometric 
+test_combustion_validation.py::TestCompleteCombustion::test_hydrogen_air_stoichiometric
 H2 stoich: CombAero=2522.1 K, Cantera=2521.7 K, diff=0.4 K
 PASSED
-test_combustion_validation.py::TestCompleteCombustion::test_temperature_variation 
+test_combustion_validation.py::TestCompleteCombustion::test_temperature_variation
 T_in=300.0 K: CombAero=2327.7 K, Cantera=2327.6 K, diff=0.1 K
 
 T_in=400.0 K: CombAero=2399.2 K, Cantera=2399.1 K, diff=0.1 K
@@ -29,7 +29,7 @@ T_in=600.0 K: CombAero=2548.1 K, Cantera=2548.0 K, diff=0.1 K
 
 Max temperature deviation: 0.1 K
 PASSED
-test_combustion_validation.py::TestCompleteCombustion::test_pressure_variation 
+test_combustion_validation.py::TestCompleteCombustion::test_pressure_variation
 P_in=1.0 bar: CombAero=2327.7 K, Cantera=2327.6 K, diff=0.1 K
 
 P_in=2.0 bar: CombAero=2327.7 K, Cantera=2327.6 K, diff=0.1 K

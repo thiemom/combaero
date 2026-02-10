@@ -93,7 +93,7 @@ PYBIND11_MODULE(_core, m)
         "formula",
         &combaero::formula,
         py::arg("name"),
-        "Get formula from common name (e.g., 'Methane' -> 'CH4')."  
+        "Get formula from common name (e.g., 'Methane' -> 'CH4')."
     );
 
     m.def(
@@ -1901,7 +1901,7 @@ PYBIND11_MODULE(_core, m)
         .def_readonly("frequency", &AcousticMode::frequency, "Natural frequency [Hz]")
         .def("label", &AcousticMode::label, "Mode label (e.g., '1L', '2T', '1L1T')")
         .def("__repr__", [](const AcousticMode& m) {
-            return "<AcousticMode " + m.label() + " @ " + 
+            return "<AcousticMode " + m.label() + " @ " +
                    std::to_string(m.frequency) + " Hz>";
         });
 

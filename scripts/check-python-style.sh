@@ -103,7 +103,7 @@ else
             done < <(grep -n -P '[\x80-\xFF]' "$file" || true)
         fi
     done
-    
+
     if [ "$NON_ASCII_FOUND" = true ]; then
         echo -e "${RED}  ✗ Non-ASCII characters found${NC}"
         ((VIOLATIONS++))
@@ -125,17 +125,17 @@ if command -v flake8 &> /dev/null; then
         "--extend-ignore=E203,W503"  # Black compatibility
         "--exclude=.venv,__pycache__,.pytest_cache,build,dist"
     )
-    
+
     if [ "$STRICT" = true ]; then
         FLAKE8_ARGS+=("--max-complexity=10")
     fi
-    
+
     if [ "$VERBOSE" = true ]; then
         FLAKE8_ARGS+=("--show-source" "--statistics")
     fi
-    
+
     FLAKE8_OUTPUT=$(flake8 "${FLAKE8_ARGS[@]}" "${SCAN_DIRS[@]}" 2>&1 || true)
-    
+
     if [ -n "$FLAKE8_OUTPUT" ]; then
         echo -e "${RED}  ✗ PEP 8 violations found${NC}"
         if [ "$VERBOSE" = true ]; then
@@ -169,7 +169,7 @@ if command -v black &> /dev/null; then
         echo -e "${GREEN}  ✓ Code formatted${NC}"
     else
         BLACK_OUTPUT=$(black --check --line-length=100 "${SCAN_DIRS[@]}" 2>&1 || true)
-        
+
         if echo "$BLACK_OUTPUT" | grep -q "would reformat"; then
             echo -e "${RED}  ✗ Code formatting issues found${NC}"
             if [ "$VERBOSE" = true ]; then
@@ -201,14 +201,14 @@ if command -v isort &> /dev/null; then
         "--skip=.venv"
         "--skip=__pycache__"
     )
-    
+
     if [ "$FIX" = true ]; then
         echo "  Sorting imports..."
         isort "${ISORT_ARGS[@]}" "${SCAN_DIRS[@]}"
         echo -e "${GREEN}  ✓ Imports sorted${NC}"
     else
         ISORT_OUTPUT=$(isort "${ISORT_ARGS[@]}" --check-only --diff "${SCAN_DIRS[@]}" 2>&1 || true)
-        
+
         if [ -n "$ISORT_OUTPUT" ]; then
             echo -e "${RED}  ✗ Import sorting issues found${NC}"
             if [ "$VERBOSE" = true ]; then
@@ -239,13 +239,13 @@ if command -v mypy &> /dev/null; then
         "--no-strict-optional"
         "--warn-unused-ignores"
     )
-    
+
     if [ "$STRICT" = true ]; then
         MYPY_ARGS+=("--strict")
     fi
-    
+
     MYPY_OUTPUT=$(mypy "${MYPY_ARGS[@]}" "${SCAN_DIRS[@]}" 2>&1 || true)
-    
+
     # Only fail on errors, not warnings (unless strict)
     if echo "$MYPY_OUTPUT" | grep -q "error:"; then
         echo -e "${RED}  ✗ Type checking errors found${NC}"

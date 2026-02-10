@@ -98,16 +98,16 @@ std::vector<double> mass_to_mole(const std::vector<double>& Y)
 // Returns pointer to the 10-coefficient array for the given temperature
 static const std::array<double, 10>* find_nasa9_interval(
     const NASA_Coeffs& nasa, double& T, std::size_t species_idx) {
-    
+
     const auto& intervals = nasa.intervals;
     if (intervals.empty()) {
         throw std::runtime_error("No NASA-9 intervals for species " + species_names[species_idx]);
     }
-    
+
     // Check bounds
     double T_min = intervals.front().T_min;
     double T_max = intervals.back().T_max;
-    
+
     if (T < T_min) {
         std::cerr << "Warning: Temperature " << T << " K is below valid range (" << T_min
                   << " K) for species " << species_names[species_idx] << std::endl;
@@ -117,14 +117,14 @@ static const std::array<double, 10>* find_nasa9_interval(
                   << " K) for species " << species_names[species_idx] << std::endl;
         T = T_max;
     }
-    
+
     // Find the interval containing T
     for (const auto& interval : intervals) {
         if (T >= interval.T_min && T <= interval.T_max) {
             return &interval.coeffs;
         }
     }
-    
+
     // Fallback to last interval (shouldn't happen if bounds check worked)
     return &intervals.back().coeffs;
 }
@@ -138,14 +138,14 @@ static double cp_R_nasa9(const std::array<double, 10>& a, double T) {
 // NASA-9 polynomial for H/RT: -a1/T^2 + a2*ln(T)/T + a3 + a4*T/2 + a5*T^2/3 + a6*T^3/4 + a7*T^4/5 + b1/T
 static double h_RT_nasa9(const std::array<double, 10>& a, double T) {
     double T2 = T * T;
-    return -a[0] / T2 + a[1] * std::log(T) / T + a[2] + a[3] * T / 2.0 + a[4] * T2 / 3.0 
+    return -a[0] / T2 + a[1] * std::log(T) / T + a[2] + a[3] * T / 2.0 + a[4] * T2 / 3.0
            + a[5] * T2 * T / 4.0 + a[6] * T2 * T2 / 5.0 + a[8] / T;
 }
 
 // NASA-9 polynomial for S/R: -a1/(2*T^2) - a2/T + a3*ln(T) + a4*T + a5*T^2/2 + a6*T^3/3 + a7*T^4/4 + b2
 static double s_R_nasa9(const std::array<double, 10>& a, double T) {
     double T2 = T * T;
-    return -a[0] / (2.0 * T2) - a[1] / T + a[2] * std::log(T) + a[3] * T + a[4] * T2 / 2.0 
+    return -a[0] / (2.0 * T2) - a[1] / T + a[2] * std::log(T) + a[3] * T + a[4] * T2 / 2.0
            + a[5] * T2 * T / 3.0 + a[6] * T2 * T2 / 4.0 + a[9];
 }
 

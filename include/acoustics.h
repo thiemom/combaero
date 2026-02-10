@@ -33,7 +33,7 @@ struct AcousticMode {
     int n_axial;       // Longitudinal mode number (1, 2, 3, ...)
     int n_azimuthal;   // Tangential/azimuthal mode number (0, 1, 2, ...)
     double frequency;  // Natural frequency [Hz]
-    
+
     // Human-readable mode label
     // Examples: "1L", "2L", "1T", "2T", "1L1T"
     std::string label() const;

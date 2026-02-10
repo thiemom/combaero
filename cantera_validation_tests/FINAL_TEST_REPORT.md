@@ -192,7 +192,7 @@ H_reactants = H(T_in, X_reactants)
 @pytest.fixture
 def tolerance_config():
     """Validated tolerance configuration based on measured deviations.
-    
+
     All tolerances include safety margin above measured maximums:
     - Temperature: 5.0 K (measured max: 4.6 K)
     - Enthalpy: 1.5% (measured max: 1.02%)

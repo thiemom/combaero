@@ -17,7 +17,7 @@ double nusselt_dittus_boelter(double Re, double Pr, bool heating) {
     if (Pr < 0.6 || Pr > 160) {
         throw std::invalid_argument("nusselt_dittus_boelter: Pr must be in range [0.6, 160]");
     }
-    
+
     double n = heating ? 0.4 : 0.3;
     return 0.023 * std::pow(Re, 0.8) * std::pow(Pr, n);
 }
@@ -32,11 +32,11 @@ double nusselt_gnielinski(double Re, double Pr, double f) {
     if (f <= 0) {
         throw std::invalid_argument("nusselt_gnielinski: friction factor must be positive");
     }
-    
+
     double f8 = f / 8.0;
     double sqrt_f8 = std::sqrt(f8);
     double Pr_23 = std::pow(Pr, 2.0/3.0);
-    
+
     return f8 * (Re - 1000.0) * Pr / (1.0 + 12.7 * sqrt_f8 * (Pr_23 - 1.0));
 }
 
@@ -56,7 +56,7 @@ double nusselt_sieder_tate(double Re, double Pr, double mu_ratio) {
     if (mu_ratio <= 0) {
         throw std::invalid_argument("nusselt_sieder_tate: mu_ratio must be positive");
     }
-    
+
     return 0.027 * std::pow(Re, 0.8) * std::pow(Pr, 1.0/3.0) * std::pow(mu_ratio, 0.14);
 }
 
@@ -70,11 +70,11 @@ double nusselt_petukhov(double Re, double Pr, double f) {
     if (f <= 0) {
         throw std::invalid_argument("nusselt_petukhov: friction factor must be positive");
     }
-    
+
     double f8 = f / 8.0;
     double sqrt_f8 = std::sqrt(f8);
     double Pr_23 = std::pow(Pr, 2.0/3.0);
-    
+
     return f8 * Re * Pr / (1.07 + 12.7 * sqrt_f8 * (Pr_23 - 1.0));
 }
 
@@ -106,9 +106,9 @@ double overall_htc(const std::vector<double>& h_values,
     if (h_values.empty()) {
         throw std::invalid_argument("overall_htc: at least one h value required");
     }
-    
+
     double R_total = 0.0;
-    
+
     // Add convective resistances: 1/h
     for (double h : h_values) {
         if (h <= 0) {
@@ -116,7 +116,7 @@ double overall_htc(const std::vector<double>& h_values,
         }
         R_total += 1.0 / h;
     }
-    
+
     // Add conductive resistances: t/k
     for (double tk : t_over_k) {
         if (tk < 0) {
@@ -124,7 +124,7 @@ double overall_htc(const std::vector<double>& h_values,
         }
         R_total += tk;
     }
-    
+
     return 1.0 / R_total;
 }
 
@@ -175,13 +175,13 @@ double lmtd(double dT1, double dT2) {
     if (dT1 <= 0 || dT2 <= 0) {
         throw std::invalid_argument("lmtd: temperature differences must be positive");
     }
-    
+
     // If dT1 ≈ dT2, use arithmetic mean to avoid 0/0
     double ratio = dT1 / dT2;
     if (std::abs(ratio - 1.0) < 1e-6) {
         return (dT1 + dT2) / 2.0;
     }
-    
+
     return (dT1 - dT2) / std::log(ratio);
 }
 
@@ -208,11 +208,11 @@ std::vector<double> wall_temperature_profile(
     double h_hot, double h_cold,
     const std::vector<double>& t_over_k,
     double& q) {
-    
+
     if (h_hot <= 0 || h_cold <= 0) {
         throw std::invalid_argument("wall_temperature_profile: HTCs must be positive");
     }
-    
+
     // Total thermal resistance per unit area [m²·K/W]
     double R_total = 1.0 / h_hot + 1.0 / h_cold;
     for (double r : t_over_k) {
@@ -221,25 +221,25 @@ std::vector<double> wall_temperature_profile(
         }
         R_total += r;
     }
-    
+
     // Heat flux (constant through all layers)
     q = (T_hot - T_cold) / R_total;
-    
+
     // Build temperature profile
     // Start from hot side, subtract temperature drops
     std::vector<double> temps;
     temps.reserve(t_over_k.size() + 2);
-    
+
     // Hot surface temperature (after convective resistance)
     double T = T_hot - q / h_hot;
     temps.push_back(T);
-    
+
     // Temperature at each layer interface
     for (double r : t_over_k) {
         T -= q * r;
         temps.push_back(T);
     }
-    
+
     return temps;
 }
 
@@ -260,31 +260,31 @@ double heat_flux_from_T_at_edge(
     double T_hot, double T_cold,
     double h_hot, double h_cold,
     const std::vector<double>& t_over_k) {
-    
+
     std::size_t n_layers = t_over_k.size();
     if (edge_idx > n_layers) {
         throw std::invalid_argument(
-            "heat_flux_from_T_at_edge: edge_idx out of range (max = " + 
+            "heat_flux_from_T_at_edge: edge_idx out of range (max = " +
             std::to_string(n_layers) + ")");
     }
-    
+
     if (h_hot <= 0 || h_cold <= 0) {
         throw std::invalid_argument("heat_flux_from_T_at_edge: HTCs must be positive");
     }
-    
+
     // Thermal resistance from hot bulk to edge
     double R_hot_to_edge = 1.0 / h_hot;  // convective resistance
     for (std::size_t i = 0; i < edge_idx; ++i) {
         R_hot_to_edge += t_over_k[i];
     }
-    
+
     // Thermal resistance from edge to cold bulk
     double R_edge_to_cold = 0.0;
     for (std::size_t i = edge_idx; i < n_layers; ++i) {
         R_edge_to_cold += t_over_k[i];
     }
     R_edge_to_cold += 1.0 / h_cold;  // convective resistance
-    
+
     // Heat flux: q = (T_hot - T_measured) / R_hot_to_edge
     //          = (T_measured - T_cold) / R_edge_to_cold
     // Both should give same q in steady state
@@ -302,7 +302,7 @@ double heat_flux_from_T_at_depth(
     double h_hot, double h_cold,
     const std::vector<double>& thicknesses,
     const std::vector<double>& conductivities) {
-    
+
     if (thicknesses.size() != conductivities.size()) {
         throw std::invalid_argument(
             "heat_flux_from_T_at_depth: thicknesses and conductivities must have same size");
@@ -313,26 +313,26 @@ double heat_flux_from_T_at_depth(
     if (h_hot <= 0 || h_cold <= 0) {
         throw std::invalid_argument("heat_flux_from_T_at_depth: HTCs must be positive");
     }
-    
+
     // Calculate total wall thickness
     double total_thickness = 0.0;
     for (double t : thicknesses) {
         total_thickness += t;
     }
-    
+
     if (depth_from_hot > total_thickness) {
         throw std::invalid_argument(
             "heat_flux_from_T_at_depth: depth exceeds total wall thickness (" +
             std::to_string(total_thickness) + " m)");
     }
-    
+
     // Find which layer the depth is in and compute resistance to that point
     double R_hot_to_point = 1.0 / h_hot;  // convective resistance
     double cumulative_depth = 0.0;
-    
+
     for (std::size_t i = 0; i < thicknesses.size(); ++i) {
         double layer_end = cumulative_depth + thicknesses[i];
-        
+
         if (depth_from_hot <= layer_end) {
             // Point is in this layer
             double depth_in_layer = depth_from_hot - cumulative_depth;
@@ -344,7 +344,7 @@ double heat_flux_from_T_at_depth(
             cumulative_depth = layer_end;
         }
     }
-    
+
     // q = (T_hot - T_measured) / R_hot_to_point
     return (T_hot - T_measured) / R_hot_to_point;
 }
@@ -354,18 +354,18 @@ double bulk_T_from_edge_T_and_q(
     double h_hot, double h_cold,
     const std::vector<double>& t_over_k,
     const std::string& solve_for) {
-    
+
     std::size_t n_layers = t_over_k.size();
     if (edge_idx > n_layers) {
         throw std::invalid_argument(
-            "bulk_T_from_edge_T_and_q: edge_idx out of range (max = " + 
+            "bulk_T_from_edge_T_and_q: edge_idx out of range (max = " +
             std::to_string(n_layers) + ")");
     }
-    
+
     if (h_hot <= 0 || h_cold <= 0) {
         throw std::invalid_argument("bulk_T_from_edge_T_and_q: HTCs must be positive");
     }
-    
+
     if (solve_for == "hot") {
         // T_hot = T_measured + q * R_hot_to_edge
         double R_hot_to_edge = 1.0 / h_hot;
@@ -395,38 +395,38 @@ std::pair<double, double> dT_edge_dT_bulk(
     std::size_t edge_idx,
     double h_hot, double h_cold,
     const std::vector<double>& t_over_k) {
-    
+
     std::size_t n_layers = t_over_k.size();
     if (edge_idx > n_layers) {
         throw std::invalid_argument(
-            "dT_edge_dT_bulk: edge_idx out of range (max = " + 
+            "dT_edge_dT_bulk: edge_idx out of range (max = " +
             std::to_string(n_layers) + ")");
     }
-    
+
     if (h_hot <= 0 || h_cold <= 0) {
         throw std::invalid_argument("dT_edge_dT_bulk: HTCs must be positive");
     }
-    
+
     // Total thermal resistance
     double R_total = 1.0 / h_hot + 1.0 / h_cold;
     for (double r : t_over_k) {
         R_total += r;
     }
-    
+
     // Resistance from hot bulk to edge
     double R_hot_to_edge = 1.0 / h_hot;
     for (std::size_t i = 0; i < edge_idx; ++i) {
         R_hot_to_edge += t_over_k[i];
     }
-    
+
     // Resistance from edge to cold bulk
     double R_edge_to_cold = R_total - R_hot_to_edge;
-    
+
     // Sensitivities
     // T_edge = T_hot * (R_edge_to_cold / R_total) + T_cold * (R_hot_to_edge / R_total)
     double dT_dT_hot = R_edge_to_cold / R_total;
     double dT_dT_cold = R_hot_to_edge / R_total;
-    
+
     return {dT_dT_hot, dT_dT_cold};
 }
 
@@ -448,25 +448,25 @@ double dT_edge_dq(
     std::size_t edge_idx,
     double h_hot,
     const std::vector<double>& t_over_k) {
-    
+
     std::size_t n_layers = t_over_k.size();
     if (edge_idx > n_layers) {
         throw std::invalid_argument(
-            "dT_edge_dq: edge_idx out of range (max = " + 
+            "dT_edge_dq: edge_idx out of range (max = " +
             std::to_string(n_layers) + ")");
     }
-    
+
     if (h_hot <= 0) {
         throw std::invalid_argument("dT_edge_dq: h_hot must be positive");
     }
-    
+
     // T_edge = T_hot - q * R_hot_to_edge
     // ∂T_edge/∂q = -R_hot_to_edge
     double R_hot_to_edge = 1.0 / h_hot;
     for (std::size_t i = 0; i < edge_idx; ++i) {
         R_hot_to_edge += t_over_k[i];
     }
-    
+
     return -R_hot_to_edge;
 }
 
@@ -481,17 +481,17 @@ double effectiveness_counterflow(double NTU, double C_r) {
     if (C_r < 0 || C_r > 1) {
         throw std::invalid_argument("effectiveness_counterflow: C_r must be in [0, 1]");
     }
-    
+
     // Special case: C_r = 1 (balanced heat exchanger)
     if (std::abs(C_r - 1.0) < 1e-10) {
         return NTU / (1.0 + NTU);
     }
-    
+
     // Special case: C_r = 0 (one fluid has infinite capacity, e.g., condenser/evaporator)
     if (C_r < 1e-10) {
         return 1.0 - std::exp(-NTU);
     }
-    
+
     // General case
     double exp_term = std::exp(-NTU * (1.0 - C_r));
     return (1.0 - exp_term) / (1.0 - C_r * exp_term);
@@ -504,12 +504,12 @@ double effectiveness_parallelflow(double NTU, double C_r) {
     if (C_r < 0 || C_r > 1) {
         throw std::invalid_argument("effectiveness_parallelflow: C_r must be in [0, 1]");
     }
-    
+
     // Special case: C_r = 0
     if (C_r < 1e-10) {
         return 1.0 - std::exp(-NTU);
     }
-    
+
     // General case
     return (1.0 - std::exp(-NTU * (1.0 + C_r))) / (1.0 + C_r);
 }
@@ -526,21 +526,21 @@ double nusselt_pipe(const State& s, double velocity, double diameter,
     if (diameter <= 0) {
         throw std::invalid_argument("nusselt_pipe: diameter must be positive");
     }
-    
+
     // Re = ρ * V * D / μ
     double rho = s.rho();
     double mu = s.mu();
     double Re = rho * velocity * diameter / mu;
     double Pr = s.Pr();
-    
+
     // Laminar flow
     if (Re < 2300) {
         return heating ? NU_LAMINAR_CONST_T : NU_LAMINAR_CONST_Q;
     }
-    
+
     // Transition region (2300 < Re < 10000): use Gnielinski
     // Turbulent (Re > 10000): Gnielinski is still good, or could use Dittus-Boelter
-    
+
     // Get friction factor
     double e_D = roughness / diameter;
     double f;
@@ -549,7 +549,7 @@ double nusselt_pipe(const State& s, double velocity, double diameter,
     } else {
         f = friction_petukhov(std::max(Re, 3000.0));
     }
-    
+
     return nusselt_gnielinski(Re, Pr, f);
 }
 

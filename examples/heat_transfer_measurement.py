@@ -16,7 +16,7 @@ The wall consists of:
 
 Thermocouples are installed at:
   - TC1: Hot-side steel surface (edge 0)
-  - TC2: Steel-ceramic interface (edge 1)  
+  - TC2: Steel-ceramic interface (edge 1)
   - TC3: Embedded 20mm into ceramic (depth = 30mm from hot surface)
   - TC4: Cold-side casing surface (edge 3)
 

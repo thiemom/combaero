@@ -27,35 +27,35 @@ class UnitEntry:
 def parse_units_data(path: Path) -> list[UnitEntry]:
     """Parse units_data.h and extract all unit entries."""
     content = path.read_text()
-    
+
     entries: list[UnitEntry] = []
     current_section = ""
-    
+
     # Match section comments like: // thermo.h - Species Data
     section_pattern = re.compile(r'//\s*[-]+\s*\n\s*//\s*(.+?)\s*\n\s*//\s*[-]+')
-    
+
     # Match entries like: {"name", "input", "output"},
     entry_pattern = re.compile(r'\{"([^"]+)",\s*"([^"]*)",\s*"([^"]*)"\}')
-    
+
     # Find all sections and their positions
     sections: list[tuple[int, str]] = []
     for match in section_pattern.finditer(content):
         sections.append((match.end(), match.group(1).strip()))
-    
+
     # Find all entries
     for match in entry_pattern.finditer(content):
         pos = match.start()
         name, input_units, output_units = match.groups()
-        
+
         # Determine which section this entry belongs to
         section = ""
         for sec_pos, sec_name in reversed(sections):
             if pos > sec_pos:
                 section = sec_name
                 break
-        
+
         entries.append(UnitEntry(name, input_units, output_units, section))
-    
+
     return entries
 
 
@@ -71,34 +71,34 @@ def format_table(entries: list[UnitEntry]) -> str:
     """Format a list of entries as a Markdown table."""
     if not entries:
         return ""
-    
+
     # Calculate column widths
     name_width = max(len(f"`{e.name}`") for e in entries)
     input_width = max(len(e.input) for e in entries)
     output_width = max(len(e.output) for e in entries)
-    
+
     # Minimum widths for headers
     name_width = max(name_width, len("Function"))
     input_width = max(input_width, len("Input Units"))
     output_width = max(output_width, len("Output Unit"))
-    
+
     lines = []
     # Header
     lines.append(f"| {'Function':<{name_width}} | {'Input Units':<{input_width}} | {'Output Unit':<{output_width}} |")
     lines.append(f"|{'-' * (name_width + 2)}|{'-' * (input_width + 2)}|{'-' * (output_width + 2)}|")
-    
+
     # Rows
     for e in entries:
         name_col = f"`{e.name}`"
         lines.append(f"| {name_col:<{name_width}} | {e.input:<{input_width}} | {e.output:<{output_width}} |")
-    
+
     return "\n".join(lines)
 
 
 def generate_markdown(entries: list[UnitEntry]) -> str:
     """Generate the full UNITS.md content."""
     grouped = group_by_section(entries)
-    
+
     lines = [
         "# combaero Units Reference",
         "",
@@ -158,7 +158,7 @@ def generate_markdown(entries: list[UnitEntry]) -> str:
         "## Function Units by Module",
         "",
     ]
-    
+
     # Section order (roughly matching the header file organization)
     section_order = [
         "thermo.h - Species Data",
@@ -185,7 +185,7 @@ def generate_markdown(entries: list[UnitEntry]) -> str:
         "state.h - State Properties",
         "state.h - Stream Properties",
     ]
-    
+
     # Add sections in order, tracking current header to avoid repetition
     current_header = ""
     for section in section_order:
@@ -210,7 +210,7 @@ def generate_markdown(entries: list[UnitEntry]) -> str:
             lines.append("")
             lines.append(format_table(grouped[section]))
             lines.append("")
-    
+
     # Add any sections not in the predefined order
     for section, section_entries in grouped.items():
         if section not in section_order and section:
@@ -218,7 +218,7 @@ def generate_markdown(entries: list[UnitEntry]) -> str:
             lines.append("")
             lines.append(format_table(section_entries))
             lines.append("")
-    
+
     # Add dimensionless quantities section
     lines.extend([
         "---",
@@ -264,7 +264,7 @@ def generate_markdown(entries: list[UnitEntry]) -> str:
         "8. **Angles**: Radians (rad)",
         "",
     ])
-    
+
     return "\n".join(lines)
 
 
@@ -272,23 +272,23 @@ def main() -> None:
     # Determine paths relative to script location
     script_dir = Path(__file__).parent
     project_root = script_dir.parent
-    
+
     units_data_path = project_root / "include" / "units_data.h"
     output_path = project_root / "docs" / "UNITS.md"
-    
+
     if not units_data_path.exists():
         raise FileNotFoundError(f"units_data.h not found at {units_data_path}")
-    
+
     print(f"Parsing {units_data_path}...")
     entries = parse_units_data(units_data_path)
     print(f"Found {len(entries)} unit entries")
-    
+
     print(f"Generating {output_path}...")
     content = generate_markdown(entries)
-    
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(content)
-    
+
     print(f"Done! Generated {output_path}")
 
 
