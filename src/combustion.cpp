@@ -192,7 +192,7 @@ std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double>& X,
         if (n[i] <= 0.0) continue;
 
         // Only treat species that actually require O2 (CO2/H2O have requirement=0)
-        double nu_O2 = oxygen_required_per_mol_fuel(static_cast<int>(i));
+        double nu_O2 = oxygen_required_per_mol_fuel(i);
         if (nu_O2 <= 0.0) continue;
 
         const Molecular_Structure& sp = molecular_structures[i];
