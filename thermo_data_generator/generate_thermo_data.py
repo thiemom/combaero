@@ -98,7 +98,10 @@ ATOMIC_MASSES = {
 
 def calculate_molar_mass(composition: dict[str, int]) -> float:
     """Calculate molar mass from atomic composition."""
-    return sum(count * ATOMIC_MASSES.get(elem.upper(), 0.0) for elem, count in composition.items())
+    return sum(
+        count * ATOMIC_MASSES.get(elem.upper(), 0.0)
+        for elem, count in composition.items()
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -171,7 +174,9 @@ def load_cantera_yaml(
         if detected_format is None:
             detected_format = fmt
         elif detected_format != fmt:
-            raise ValueError(f"Mixed NASA formats detected: {detected_format} and {fmt}")
+            raise ValueError(
+                f"Mixed NASA formats detected: {detected_format} and {fmt}"
+            )
 
         T_ranges = thermo.get("temperature-ranges", [])
         coeffs_data = thermo.get("data", [])
@@ -236,19 +241,27 @@ def detect_nasa_format(path: Path) -> NASAFormat:
     # NASA9 typically has 9 coefficients and different header format
     # NASA7 (Chemkin) has fixed-width format with specific column positions
 
-    if "thermo nasa9" in content.lower() or re.search(r"\d+\.\d+\s+\d+\.\d+\s+9\s+", content):
+    if "thermo nasa9" in content.lower() or re.search(
+        r"\d+\.\d+\s+\d+\.\d+\s+9\s+", content
+    ):
         return NASAFormat.NASA9
 
     return NASAFormat.NASA7
 
 
-def load_nasa7_thermo(path: Path, species_filter: set[str] | None = None) -> list[SpeciesData]:
+def load_nasa7_thermo(
+    path: Path, species_filter: set[str] | None = None
+) -> list[SpeciesData]:
     """Load NASA7 format thermo database (Chemkin format)."""
     # TODO: Implement Chemkin NASA7 parser
-    raise NotImplementedError("Standalone NASA7 parser not yet implemented. Use YAML mechanism.")
+    raise NotImplementedError(
+        "Standalone NASA7 parser not yet implemented. Use YAML mechanism."
+    )
 
 
-def load_nasa9_thermo(path: Path, species_filter: set[str] | None = None) -> list[SpeciesData]:
+def load_nasa9_thermo(
+    path: Path, species_filter: set[str] | None = None
+) -> list[SpeciesData]:
     """Load NASA9 format thermo database (NASA Glenn format)."""
     # TODO: Implement NASA9 parser
     raise NotImplementedError("NASA9 parser not yet implemented.")
@@ -444,8 +457,7 @@ def generate_cpp_header(
     # Sort species
     species = sorted(species, key=species_sort_key)
 
-    output.write(
-        """#ifndef THERMO_TRANSPORT_DATA_H
+    output.write("""#ifndef THERMO_TRANSPORT_DATA_H
 #define THERMO_TRANSPORT_DATA_H
 
 #include <array>
@@ -457,8 +469,7 @@ def generate_cpp_header(
 // NASA polynomial format used in this build
 // NASA7: Cp/R = a1 + a2*T + a3*T^2 + a4*T^3 + a5*T^4
 // NASA9: Cp/R = a1/T^2 + a2/T + a3 + a4*T + a5*T^2 + a6*T^3 + a7*T^4
-"""
-    )
+""")
 
     output.write(f"// This file uses {nasa_format.name} format\n")
     output.write(
@@ -467,8 +478,7 @@ def generate_cpp_header(
 
     # NASA coefficients struct
     if nasa_format == NASAFormat.NASA7:
-        output.write(
-            """struct NASA7_Coeffs {
+        output.write("""struct NASA7_Coeffs {
     double T_low;
     double T_mid;
     double T_high;
@@ -478,11 +488,9 @@ def generate_cpp_header(
 
 using NASA_Coeffs = NASA7_Coeffs;
 
-"""
-        )
+""")
     else:
-        output.write(
-            """struct NASA9_Interval {
+        output.write("""struct NASA9_Interval {
     double T_min;
     double T_max;
     std::array<double, 10> coeffs;  // a1-a7, unused, b1 (H), b2 (S)
@@ -494,11 +502,9 @@ struct NASA9_Coeffs {
 
 using NASA_Coeffs = NASA9_Coeffs;
 
-"""
-        )
+""")
 
-    output.write(
-        """struct Transport_Props {
+    output.write("""struct Transport_Props {
     std::string geometry;
     double well_depth;
     double diameter;
@@ -512,8 +518,7 @@ struct Molecular_Structure {
     std::size_t N;
 };
 
-"""
-    )
+""")
 
     # Species names
     output.write("const std::vector<std::string> species_names = {")
@@ -522,7 +527,9 @@ struct Molecular_Structure {
 
     # Species index map
     output.write("const std::unordered_map<std::string, int> species_index = {\n")
-    output.write(",\n".join(f'    {{"{sp.name}", {i}}}' for i, sp in enumerate(species)))
+    output.write(
+        ",\n".join(f'    {{"{sp.name}", {i}}}' for i, sp in enumerate(species))
+    )
     output.write("\n};\n\n")
 
     # Molar masses
@@ -546,7 +553,9 @@ struct Molecular_Structure {
             low_str = "{" + ", ".join(str(c) for c in low_coeffs) + "}"
             high_str = "{" + ", ".join(str(c) for c in high_coeffs) + "}"
 
-            nasa_entries.append(f"{{{T_low}, {T_mid}, {T_high}, {low_str}, {high_str}}}")
+            nasa_entries.append(
+                f"{{{T_low}, {T_mid}, {T_high}, {low_str}, {high_str}}}"
+            )
     else:
         # NASA-9: variable number of intervals (1-3)
         for sp in species:
@@ -688,7 +697,9 @@ def main() -> int:
         species_data, nasa_format = load_cantera_yaml(args.mechanism, species_filter)
     elif args.json:
         print(f"Loading JSON: {args.json}")
-        species_data, nasa_format = load_merged_json(args.json, species_filter, prefer_nasa9)
+        species_data, nasa_format = load_merged_json(
+            args.json, species_filter, prefer_nasa9
+        )
     else:
         parser.error("Must specify --mechanism or --json")
         return 1
