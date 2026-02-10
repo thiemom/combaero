@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 import combaero as ca
 from combaero.species import SpeciesLocator
 
