@@ -69,16 +69,17 @@ jobs:
           path: cantera_validation_tests/.venv
           key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('cantera_validation_tests/poetry.lock') }}
       
-      - name: Build CombAero Python package
-        run: |
-          python -m pip install --upgrade pip build
-          python -m build --wheel
-          pip install dist/*.whl
-      
       - name: Install validation test dependencies
         working-directory: cantera_validation_tests
         run: |
           poetry install --no-interaction
+      
+      - name: Build and install CombAero Python package
+        run: |
+          pip install build
+          python -m build --wheel
+          cd cantera_validation_tests
+          poetry run pip install ../dist/*.whl
       
       - name: Run combustion validation tests
         working-directory: cantera_validation_tests
