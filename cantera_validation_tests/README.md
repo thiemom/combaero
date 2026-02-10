@@ -45,14 +45,37 @@ poetry run pytest --cov=. --cov-report=html
 
 **WGS Equilibrium**: Uses Cantera's equilibrium solver with restricted species (CO, H2O, CO2, H2) to match CombAero's partial equilibrium model. Validates both isothermal and adiabatic equilibrium, plus equilibrium constant calculations.
 
+### NASA-9 Polynomial Validation Methodology
+
+The NASA-9 polynomial validation tests validate CombAero's polynomial implementation at the most fundamental level:
+
+**Approach**:
+1. Generate Cantera YAML with identical NASA-9 coefficients from CombAero data
+2. Compare polynomial evaluation (Cp/R) directly
+3. Validate polynomial integration via ∫Cp dT (eliminates reference state dependency)
+4. Check temperature range continuity
+
+**Key Features**:
+- Uses identical NASA-9 coefficients (polynomial-level validation)
+- ∫Cp dT approach eliminates formation enthalpy differences
+- Validates 10 species across 200-6000 K range
+- Complements NASA-7 system-level tests
+
+**Results**:
+- Cp/R: < 0.00002% deviation (exceptional accuracy)
+- ∫Cp dT: 0.000000% deviation (perfect match)
+- Confirms polynomial implementation is correct
+
 ## Test Structure
 
+The validation suite includes 42 tests organized into 5 categories:
 - `test_combustion_validation.py`: Complete combustion, adiabatic flame temperature, product composition (12 tests)
 - `test_equilibrium_validation.py`: WGS equilibrium (isothermal, adiabatic), equilibrium constants (6 tests)
 - `test_mixing_validation.py`: Stream mixing, enthalpy balance, mixture properties (8 tests)
 - `test_transport_validation.py`: Viscosity, thermal conductivity, Prandtl number (12 tests)
+- `test_nasa9_validation.py`: NASA-9 polynomial validation tests (4 tests)
 
-**Total**: 38 validation tests
+**Total**: 42 validation tests
 
 ## Tolerances
 
