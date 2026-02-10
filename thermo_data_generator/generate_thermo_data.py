@@ -375,7 +375,12 @@ def species_sort_key(sp: SpeciesData) -> tuple:
     if name in air_order:
         return (0, air_order.index(name), name)
 
-    C, H, O_count, N = sp.structure.C, sp.structure.H, sp.structure.O_count, sp.structure.N
+    C, H, O_count, N = (
+        sp.structure.C,
+        sp.structure.H,
+        sp.structure.O_count,
+        sp.structure.N,
+    )
 
     # Inert species (no C, H, O)
     if C == 0 and H == 0 and O_count == 0:
