@@ -143,6 +143,7 @@ try:
         modes_in_range,
         molar_volume,
         mole_to_mass,
+        mwmix,
         name_to_formula,
         normalize_fractions,
         nozzle_cd,
