@@ -73,9 +73,9 @@ class TestWgsEquilibrium:
         wgs_gas.equilibrate("TP")  # Isothermal equilibrium
 
         # Compare temperature [K] - should be unchanged (isothermal)
-        assert (
-            abs(result_cb.T - T) < 0.1
-        ), f"Temperature should be unchanged: {result_cb.T:.1f} K vs {T:.1f} K"
+        assert abs(result_cb.T - T) < 0.1, (
+            f"Temperature should be unchanged: {result_cb.T:.1f} K vs {T:.1f} K"
+        )
 
         # Compare equilibrium composition [mol/mol]
         # At high T, WGS favors reactants (CO + H2O), so expect shift toward products
@@ -89,9 +89,9 @@ class TestWgsEquilibrium:
 
             # Major species tolerance
             if X_cb > 0.01 or X_ct > 0.01:
-                assert (
-                    diff < 0.005
-                ), f"{species} [mol/mol]: CombAero={X_cb:.6f}, Cantera={X_ct:.6f}, diff={diff:.6f}"
+                assert diff < 0.005, (
+                    f"{species} [mol/mol]: CombAero={X_cb:.6f}, Cantera={X_ct:.6f}, diff={diff:.6f}"
+                )
 
     def test_wgs_isothermal_low_temp(
         self, combaero, cantera, wgs_gas, species_mapping, tolerance_config
@@ -306,11 +306,11 @@ class TestWgsEquilibrium:
 
             print(
                 f"  T = {T} K: CombAero Kp={Kp_cb:.4f}, "
-                f"Cantera Kp={Kp_ct:.4f}, diff={rel_diff*100:.2f}%"
+                f"Cantera Kp={Kp_ct:.4f}, diff={rel_diff * 100:.2f}%"
             )
 
             # Kp should match within 5% (due to Gibbs free energy polynomial differences)
             assert rel_diff < 0.05, (
                 f"Kp [dimensionless] @ {T} K: CombAero={Kp_cb:.4f}, "
-                f"Cantera={Kp_ct:.4f}, diff={rel_diff*100:.1f}%"
+                f"Cantera={Kp_ct:.4f}, diff={rel_diff * 100:.1f}%"
             )

@@ -87,9 +87,9 @@ class TestStreamMixing:
 
         # Compare total mass flow rate [kg/s]
         # Should be exact: mdot_total = mdot1 + mdot2
-        assert (
-            abs(mixed_cb.mdot - 2.0) < 1e-10
-        ), f"Mass flow rate [kg/s]: Expected 2.0, got {mixed_cb.mdot}"
+        assert abs(mixed_cb.mdot - 2.0) < 1e-10, (
+            f"Mass flow rate [kg/s]: Expected 2.0, got {mixed_cb.mdot}"
+        )
 
     def test_two_stream_mixing_unequal_mass(
         self, combaero, cantera, gri30_gas, species_mapping, tolerance_config
@@ -137,13 +137,13 @@ class TestStreamMixing:
         gri30_gas.HP = h_mixed_target, mixed_cb.P
 
         T_diff = abs(mixed_cb.T - gri30_gas.T)
-        assert (
-            T_diff < tolerance_config["temperature"]
-        ), f"Temperature mismatch: CombAero={mixed_cb.T:.1f} K, Cantera={gri30_gas.T:.1f} K"
+        assert T_diff < tolerance_config["temperature"], (
+            f"Temperature mismatch: CombAero={mixed_cb.T:.1f} K, Cantera={gri30_gas.T:.1f} K"
+        )
 
-        assert (
-            abs(mixed_cb.mdot - (mdot1 + mdot2)) < 1e-10
-        ), f"Mass flow should be {mdot1 + mdot2} kg/s, got {mixed_cb.mdot}"
+        assert abs(mixed_cb.mdot - (mdot1 + mdot2)) < 1e-10, (
+            f"Mass flow should be {mdot1 + mdot2} kg/s, got {mixed_cb.mdot}"
+        )
 
     def test_three_stream_mixing(
         self, combaero, cantera, gri30_gas, species_mapping, tolerance_config
@@ -202,9 +202,9 @@ class TestStreamMixing:
         gri30_gas.HP = h_mixed_target, mixed_cb.P
 
         T_diff = abs(mixed_cb.T - gri30_gas.T)
-        assert (
-            T_diff < tolerance_config["temperature"]
-        ), f"Temperature mismatch: CombAero={mixed_cb.T:.1f} K, Cantera={gri30_gas.T:.1f} K"
+        assert T_diff < tolerance_config["temperature"], (
+            f"Temperature mismatch: CombAero={mixed_cb.T:.1f} K, Cantera={gri30_gas.T:.1f} K"
+        )
 
     def test_enthalpy_conservation(
         self, combaero, cantera, gri30_gas, species_mapping, tolerance_config
@@ -249,7 +249,7 @@ class TestStreamMixing:
         rel_diff = abs(h_mixed_actual - h_mixed_expected) / abs(h_mixed_expected)
         assert rel_diff < tolerance_config["enthalpy"], (
             f"Enthalpy [J/mol]: Expected {h_mixed_expected:.1f}, "
-            f"got {h_mixed_actual:.1f}, diff={rel_diff*100:.2f}%"
+            f"got {h_mixed_actual:.1f}, diff={rel_diff * 100:.2f}%"
         )
 
 
@@ -307,9 +307,9 @@ class TestDensityCalculation:
         rho_ct = gri30_gas.density
 
         rel_diff = abs(rho_cb - rho_ct) / rho_ct
-        assert (
-            rel_diff < tolerance_config["density"]
-        ), f"Density [kg/m³]: CombAero={rho_cb:.4f}, Cantera={rho_ct:.4f}, diff={rel_diff*100:.2f}%"
+        assert rel_diff < tolerance_config["density"], (
+            f"Density [kg/m³]: CombAero={rho_cb:.4f}, Cantera={rho_ct:.4f}, diff={rel_diff * 100:.2f}%"
+        )
 
     def test_methane_density(self, combaero, cantera, gri30_gas, species_mapping, tolerance_config):
         """Test pure methane density."""
@@ -327,9 +327,9 @@ class TestDensityCalculation:
         rho_ct = gri30_gas.density
 
         rel_diff = abs(rho_cb - rho_ct) / rho_ct
-        assert (
-            rel_diff < tolerance_config["density"]
-        ), f"Density mismatch: CombAero={rho_cb:.4f} kg/m³, Cantera={rho_ct:.4f} kg/m³"
+        assert rel_diff < tolerance_config["density"], (
+            f"Density mismatch: CombAero={rho_cb:.4f} kg/m³, Cantera={rho_ct:.4f} kg/m³"
+        )
 
     def test_density_temperature_variation(
         self, combaero, cantera, gri30_gas, species_mapping, tolerance_config
@@ -348,9 +348,9 @@ class TestDensityCalculation:
             rho_ct = gri30_gas.density
 
             rel_diff = abs(rho_cb - rho_ct) / rho_ct
-            assert (
-                rel_diff < tolerance_config["density"]
-            ), f"T={T} K: CombAero={rho_cb:.4f} kg/m³, Cantera={rho_ct:.4f} kg/m³"
+            assert rel_diff < tolerance_config["density"], (
+                f"T={T} K: CombAero={rho_cb:.4f} kg/m³, Cantera={rho_ct:.4f} kg/m³"
+            )
 
     def test_density_pressure_variation(
         self, combaero, cantera, gri30_gas, species_mapping, tolerance_config
@@ -369,6 +369,6 @@ class TestDensityCalculation:
             rho_ct = gri30_gas.density
 
             rel_diff = abs(rho_cb - rho_ct) / rho_ct
-            assert (
-                rel_diff < tolerance_config["density"]
-            ), f"P={P/1e5:.1f} bar: CombAero={rho_cb:.4f} kg/m³, Cantera={rho_ct:.4f} kg/m³"
+            assert rel_diff < tolerance_config["density"], (
+                f"P={P / 1e5:.1f} bar: CombAero={rho_cb:.4f} kg/m³, Cantera={rho_ct:.4f} kg/m³"
+            )

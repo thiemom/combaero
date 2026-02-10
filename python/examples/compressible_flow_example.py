@@ -33,14 +33,14 @@ def main() -> None:
     # Calculate critical pressure ratio
     P_ratio_crit = cb.critical_pressure_ratio(T0, P0, X)
     P_crit = P0 * P_ratio_crit
-    print(f"Stagnation: T0 = {T0:.1f} K, P0 = {P0/1000:.1f} kPa")
+    print(f"Stagnation: T0 = {T0:.1f} K, P0 = {P0 / 1000:.1f} kPa")
     print(f"Critical pressure ratio: P*/P0 = {P_ratio_crit:.4f}")
-    print(f"Critical pressure: P* = {P_crit/1000:.1f} kPa")
+    print(f"Critical pressure: P* = {P_crit / 1000:.1f} kPa")
 
     # Subsonic flow (P_back > P_crit)
     P_back_sub = 400000.0  # Pa
     sol_sub = cb.nozzle_flow(T0, P0, P_back_sub, A_eff, X)
-    print(f"\nSubsonic case (P_back = {P_back_sub/1000:.0f} kPa):")
+    print(f"\nSubsonic case (P_back = {P_back_sub / 1000:.0f} kPa):")
     print(f"  Mach number: {sol_sub.M:.3f}")
     print(f"  Mass flow: {sol_sub.mdot:.4f} kg/s")
     print(f"  Outlet T: {sol_sub.outlet.T:.1f} K")
@@ -49,7 +49,7 @@ def main() -> None:
     # Choked flow (P_back < P_crit)
     P_back_choked = 100000.0  # Pa (atmospheric)
     sol_choked = cb.nozzle_flow(T0, P0, P_back_choked, A_eff, X)
-    print(f"\nChoked case (P_back = {P_back_choked/1000:.0f} kPa):")
+    print(f"\nChoked case (P_back = {P_back_choked / 1000:.0f} kPa):")
     print(f"  Mach number at throat: {sol_choked.M:.3f}")
     print(f"  Mass flow: {sol_choked.mdot:.4f} kg/s")
     print(f"  Outlet T: {sol_choked.outlet.T:.1f} K")
@@ -66,7 +66,7 @@ def main() -> None:
 
     A_required = cb.solve_A_eff_from_mdot(T0, P0, P_back, mdot_target, X)
     print(f"Target mass flow: {mdot_target:.2f} kg/s")
-    print(f"Required effective area: {A_required*1e4:.2f} cm²")
+    print(f"Required effective area: {A_required * 1e4:.2f} cm²")
 
     # Verify
     sol_verify = cb.nozzle_flow(T0, P0, P_back, A_required, X)
@@ -93,9 +93,9 @@ def main() -> None:
         T0_cd, P0_cd, P_exit, A_inlet, A_throat, A_exit, x_throat, x_exit, X, n_stations=50
     )
 
-    print(f"Inlet: A = {A_inlet*1e4:.1f} cm², Throat: A = {A_throat*1e4:.1f} cm²")
-    print(f"Exit: A = {A_exit*1e4:.1f} cm²")
-    print(f"Stagnation: T0 = {sol_cd.T0:.1f} K, P0 = {sol_cd.P0/1000:.0f} kPa")
+    print(f"Inlet: A = {A_inlet * 1e4:.1f} cm², Throat: A = {A_throat * 1e4:.1f} cm²")
+    print(f"Exit: A = {A_exit * 1e4:.1f} cm²")
+    print(f"Stagnation: T0 = {sol_cd.T0:.1f} K, P0 = {sol_cd.P0 / 1000:.0f} kPa")
     print(f"Mass flow: {sol_cd.mdot:.4f} kg/s")
     print(f"Choked: {sol_cd.choked}")
     print(f"Throat location: x = {sol_cd.x_throat:.3f} m")
@@ -105,7 +105,7 @@ def main() -> None:
     print(f"{'x [m]':>8} {'A [cm²]':>10} {'M [-]':>8} {'T [K]':>8} {'P [kPa]':>10}")
     for i in range(0, len(sol_cd.profile), len(sol_cd.profile) // 5):
         st = sol_cd.profile[i]
-        print(f"{st.x:8.3f} {st.A*1e4:10.2f} {st.M:8.3f} {st.T:8.1f} {st.P/1000:10.1f}")
+        print(f"{st.x:8.3f} {st.A * 1e4:10.2f} {st.M:8.3f} {st.T:8.1f} {st.P / 1000:10.1f}")
 
     # -------------------------------------------------------------------------
     # 4. Fanno Flow (Adiabatic Pipe with Friction)
@@ -126,8 +126,8 @@ def main() -> None:
     e_D = 0.0001  # relative roughness (smooth pipe)
     f = cb.friction_colebrook(Re, e_D)
 
-    print(f"Inlet: T = {T_in:.0f} K, P = {P_in/1000:.0f} kPa, u = {u_in:.0f} m/s")
-    print(f"Pipe: D = {D*100:.1f} cm, L = {L:.1f} m")
+    print(f"Inlet: T = {T_in:.0f} K, P = {P_in / 1000:.0f} kPa, u = {u_in:.0f} m/s")
+    print(f"Pipe: D = {D * 100:.1f} cm, L = {L:.1f} m")
     print(f"Reynolds number: Re = {Re:.0f}")
     print(f"Friction factor (Colebrook): f = {f:.5f}")
 
@@ -140,7 +140,7 @@ def main() -> None:
 
     print(f"\nOutlet conditions (L = {L:.1f} m):")
     print(f"  T = {sol_fanno.outlet.T:.1f} K")
-    print(f"  P = {sol_fanno.outlet.P/1000:.1f} kPa")
+    print(f"  P = {sol_fanno.outlet.P / 1000:.1f} kPa")
     print(f"  Choked: {sol_fanno.choked}")
     print(f"  Mass flow: {sol_fanno.mdot:.4f} kg/s")
 
@@ -161,8 +161,8 @@ def main() -> None:
     print(f"  Haaland:   f = {f_haaland:.6f}")
     print(f"  Serghides: f = {f_serghides:.6f}")
     print(f"  Colebrook: f = {f_colebrook:.6f} (reference)")
-    print(f"  Haaland error:   {100*(f_haaland-f_colebrook)/f_colebrook:+.2f}%")
-    print(f"  Serghides error: {100*(f_serghides-f_colebrook)/f_colebrook:+.3f}%")
+    print(f"  Haaland error:   {100 * (f_haaland - f_colebrook) / f_colebrook:+.2f}%")
+    print(f"  Serghides error: {100 * (f_serghides - f_colebrook) / f_colebrook:+.3f}%")
 
     print("\n" + "=" * 60)
     print("Done!")

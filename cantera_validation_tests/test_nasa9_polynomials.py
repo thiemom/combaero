@@ -59,9 +59,9 @@ class TestNASA9Polynomials:
         cb = combaero
         R = 8.314462618  # J/mol-K (universal gas constant)
 
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print("NASA-9 Polynomial Validation: Cp/R Evaluation")
-        print(f"{'='*80}")
+        print(f"{'=' * 80}")
 
         max_deviations = {}
 
@@ -95,22 +95,22 @@ class TestNASA9Polynomials:
 
                 if T in [300.0, 1000.0, 3000.0, 6000.0]:
                     print(
-                        f"  {T:8.1f}  {cp_r_cb:12.6f}  {cp_r_ct:12.6f}  {rel_deviation*100:11.4f}%"
+                        f"  {T:8.1f}  {cp_r_cb:12.6f}  {cp_r_ct:12.6f}  {rel_deviation * 100:11.4f}%"
                     )
 
             max_dev = max(deviations)
             max_deviations[species] = max_dev
-            print(f"  Maximum deviation: {max_dev*100:.6f}%")
+            print(f"  Maximum deviation: {max_dev * 100:.6f}%")
 
             # Assert < 0.01% deviation (numerical precision)
-            assert max_dev < 0.0001, f"{species} Cp/R deviation {max_dev*100:.4f}% exceeds 0.01%"
+            assert max_dev < 0.0001, f"{species} Cp/R deviation {max_dev * 100:.4f}% exceeds 0.01%"
 
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print("Summary: Cp/R Evaluation")
-        print(f"{'='*80}")
+        print(f"{'=' * 80}")
         for species, dev in max_deviations.items():
-            print(f"  {species:6s}: {dev*100:8.6f}% max deviation")
-        print(f"{'='*80}\n")
+            print(f"  {species:6s}: {dev * 100:8.6f}% max deviation")
+        print(f"{'=' * 80}\n")
 
     def test_enthalpy_integration(
         self, combaero, nasa9_gas, test_species, test_temperatures, species_mapping
@@ -124,9 +124,9 @@ class TestNASA9Polynomials:
         cb = combaero
         T_ref = 298.15  # Reference temperature [K]
 
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print(f"NASA-9 Polynomial Validation: ∫Cp dT Integration (from {T_ref} K)")
-        print(f"{'='*80}")
+        print(f"{'=' * 80}")
 
         max_deviations = {}
 
@@ -174,25 +174,25 @@ class TestNASA9Polynomials:
                 if T_target in [500.0, 1000.0, 3000.0, 6000.0]:
                     print(
                         f"  {T_target:8.1f}  {h_int_cb:14.2f}  "
-                        f"{h_int_ct:14.2f}  {rel_deviation*100:11.6f}%"
+                        f"{h_int_ct:14.2f}  {rel_deviation * 100:11.6f}%"
                     )
 
             if deviations:
                 max_dev = max(deviations)
                 max_deviations[species] = max_dev
-                print(f"  Maximum deviation: {max_dev*100:.6f}%")
+                print(f"  Maximum deviation: {max_dev * 100:.6f}%")
 
                 # Assert < 0.01% deviation (validates polynomial integration)
-                assert (
-                    max_dev < 0.0001
-                ), f"{species} ∫Cp dT deviation {max_dev*100:.6f}% exceeds 0.01%"
+                assert max_dev < 0.0001, (
+                    f"{species} ∫Cp dT deviation {max_dev * 100:.6f}% exceeds 0.01%"
+                )
 
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print("Summary: ∫Cp dT Integration")
-        print(f"{'='*80}")
+        print(f"{'=' * 80}")
         for species, dev in max_deviations.items():
-            print(f"  {species:6s}: {dev*100:8.6f}% max deviation")
-        print(f"{'='*80}\n")
+            print(f"  {species:6s}: {dev * 100:8.6f}% max deviation")
+        print(f"{'=' * 80}\n")
 
     @pytest.mark.skip(
         reason="Entropy has reference state dependency - Cp integration test is sufficient"
@@ -210,9 +210,9 @@ class TestNASA9Polynomials:
         T_ref = 298.15  # Reference temperature [K]
         P = 101325.0  # Pressure [Pa]
 
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print(f"NASA-9 Polynomial Validation: ΔS/R Evaluation (relative to {T_ref} K)")
-        print(f"{'='*80}")
+        print(f"{'=' * 80}")
 
         max_deviations = {}
 
@@ -252,22 +252,22 @@ class TestNASA9Polynomials:
 
                 if T in [300.0, 1000.0, 3000.0, 6000.0]:
                     print(
-                        f"  {T:8.1f}  {ds_r_cb:12.6f}  {ds_r_ct:12.6f}  {rel_deviation*100:11.4f}%"
+                        f"  {T:8.1f}  {ds_r_cb:12.6f}  {ds_r_ct:12.6f}  {rel_deviation * 100:11.4f}%"
                     )
 
             max_dev = max(deviations)
             max_deviations[species] = max_dev
-            print(f"  Maximum deviation: {max_dev*100:.6f}%")
+            print(f"  Maximum deviation: {max_dev * 100:.6f}%")
 
             # Assert < 1% deviation (validates polynomial integration)
-            assert max_dev < 0.01, f"{species} ΔS/R deviation {max_dev*100:.4f}% exceeds 1%"
+            assert max_dev < 0.01, f"{species} ΔS/R deviation {max_dev * 100:.4f}% exceeds 1%"
 
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print("Summary: ΔS/R Evaluation")
-        print(f"{'='*80}")
+        print(f"{'=' * 80}")
         for species, dev in max_deviations.items():
-            print(f"  {species:6s}: {dev*100:8.6f}% max deviation")
-        print(f"{'='*80}\n")
+            print(f"  {species:6s}: {dev * 100:8.6f}% max deviation")
+        print(f"{'=' * 80}\n")
 
     def test_temperature_range_continuity(self, combaero, nasa9_gas, test_species, species_mapping):
         """Test continuity at temperature range boundaries.
@@ -277,9 +277,9 @@ class TestNASA9Polynomials:
         cb = combaero
         R = 8.314462618
 
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print("NASA-9 Polynomial Validation: Temperature Range Continuity")
-        print(f"{'='*80}")
+        print(f"{'=' * 80}")
 
         # Test at 1000 K boundary (+/- 1 K)
         T_boundary = 1000.0
@@ -313,13 +313,13 @@ class TestNASA9Polynomials:
                 f"  Cp/R: {cp_below:.6f} ({T_below}K) -> "
                 f"{cp_boundary:.6f} ({T_boundary}K) -> {cp_above:.6f} ({T_above}K)"
             )
-            print(f"  Slope change: {slope_change*100:.4f}%")
+            print(f"  Slope change: {slope_change * 100:.4f}%")
 
             # Slope should not change dramatically (< 25% change is acceptable)
             # Note: NASA-9 polynomials may have small discontinuities at range boundaries
             # This is expected behavior, especially for light molecules like H2
-            assert (
-                slope_change < 0.25
-            ), f"{species} has large discontinuity at {T_boundary} K (>{slope_change*100:.1f}%)"
+            assert slope_change < 0.25, (
+                f"{species} has large discontinuity at {T_boundary} K (>{slope_change * 100:.1f}%)"
+            )
 
-        print(f"{'='*80}\n")
+        print(f"{'=' * 80}\n")

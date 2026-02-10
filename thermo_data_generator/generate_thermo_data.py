@@ -66,7 +66,7 @@ class MolecularStructure:
 
     C: int = 0
     H: int = 0
-    O: int = 0
+    O_count: int = 0
     N: int = 0
     Ar: int = 0
 
@@ -150,7 +150,7 @@ def load_cantera_yaml(
         structure = MolecularStructure(
             C=comp.get("C", 0),
             H=comp.get("H", 0),
-            O=comp.get("O", 0),
+            O_count=comp.get("O", 0),
             N=comp.get("N", 0),
             Ar=comp.get("Ar", 0),
         )
@@ -333,7 +333,7 @@ def load_merged_json(
         structure = MolecularStructure(
             C=comp.get("C", 0),
             H=comp.get("H", 0),
-            O=comp.get("O", 0),
+            O_count=comp.get("O", 0),
             N=comp.get("N", 0),
             Ar=comp.get("AR", 0),
         )
@@ -375,14 +375,14 @@ def species_sort_key(sp: SpeciesData) -> tuple:
     if name in air_order:
         return (0, air_order.index(name), name)
 
-    C, H, O, N = sp.structure.C, sp.structure.H, sp.structure.O, sp.structure.N
+    C, H, O_count, N = sp.structure.C, sp.structure.H, sp.structure.O_count, sp.structure.N
 
     # Inert species (no C, H, O)
-    if C == 0 and H == 0 and O == 0:
+    if C == 0 and H == 0 and O_count == 0:
         return (1, name)
 
     # Hydrocarbons (C>0, H>0, no O or N)
-    if C > 0 and H > 0 and O == 0 and N == 0:
+    if C > 0 and H > 0 and O_count == 0 and N == 0:
         return (2, C, name)
 
     # Other carbon-containing species

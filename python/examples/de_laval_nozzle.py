@@ -36,9 +36,9 @@ def main() -> None:
     print("De Laval Nozzle Analysis")
     print("=" * 60)
     print("\nGeometry:")
-    print(f"  Inlet diameter:  {D_inlet*100:.1f} cm  (A = {A_inlet*1e4:.2f} cm²)")
-    print(f"  Throat diameter: {D_throat*100:.1f} cm  (A = {A_throat*1e4:.2f} cm²)")
-    print(f"  Exit diameter:   {D_exit*100:.1f} cm  (A = {A_exit*1e4:.2f} cm²)")
+    print(f"  Inlet diameter:  {D_inlet * 100:.1f} cm  (A = {A_inlet * 1e4:.2f} cm²)")
+    print(f"  Throat diameter: {D_throat * 100:.1f} cm  (A = {A_throat * 1e4:.2f} cm²)")
+    print(f"  Exit diameter:   {D_exit * 100:.1f} cm  (A = {A_exit * 1e4:.2f} cm²)")
     print(f"  Area ratio A_exit/A_throat: {AR:.2f}")
 
     # =========================================================================
@@ -52,7 +52,7 @@ def main() -> None:
 
     print("\nStagnation conditions:")
     print(f"  T0 = {T0:.0f} K")
-    print(f"  P0 = {P0/1e5:.1f} bar")
+    print(f"  P0 = {P0 / 1e5:.1f} bar")
 
     # Get gas properties at stagnation
     gamma = cb.isentropic_expansion_coefficient(T0, X)
@@ -65,7 +65,7 @@ def main() -> None:
     P_crit = P0 * P_ratio_crit
     print("\nCritical (sonic) conditions:")
     print(f"  P*/P0 = {P_ratio_crit:.4f}")
-    print(f"  P* = {P_crit/1e5:.2f} bar")
+    print(f"  P* = {P_crit / 1e5:.2f} bar")
 
     # =========================================================================
     # Case 1: Fully expanded supersonic flow (design condition)
@@ -81,7 +81,7 @@ def main() -> None:
         T0, P0, P_exit_design, A_inlet, A_throat, A_exit, x_throat, x_exit, X, n_stations=100
     )
 
-    print(f"Exit pressure: {P_exit_design/1e5:.2f} bar")
+    print(f"Exit pressure: {P_exit_design / 1e5:.2f} bar")
     print(f"Choked: {sol_design.choked}")
     print(f"Mass flow: {sol_design.mdot:.4f} kg/s")
 
@@ -93,13 +93,13 @@ def main() -> None:
     print(f"\nThroat conditions (x = {throat_station.x:.3f} m):")
     print(f"  M = {throat_station.M:.3f}")
     print(f"  T = {throat_station.T:.1f} K")
-    print(f"  P = {throat_station.P/1e5:.2f} bar")
+    print(f"  P = {throat_station.P / 1e5:.2f} bar")
     print(f"  u = {throat_station.u:.1f} m/s")
 
     print(f"\nExit conditions (x = {exit_station.x:.3f} m):")
     print(f"  M = {exit_station.M:.3f}")
     print(f"  T = {exit_station.T:.1f} K")
-    print(f"  P = {exit_station.P/1e5:.2f} bar")
+    print(f"  P = {exit_station.P / 1e5:.2f} bar")
     print(f"  u = {exit_station.u:.1f} m/s")
 
     # Thrust calculation using nozzle_thrust
@@ -128,7 +128,7 @@ def main() -> None:
         T0, P0, P_exit_subsonic, A_inlet, A_throat, A_exit, x_throat, x_exit, X, n_stations=100
     )
 
-    print(f"Exit pressure: {P_exit_subsonic/1e5:.2f} bar")
+    print(f"Exit pressure: {P_exit_subsonic / 1e5:.2f} bar")
     print(f"Choked: {sol_subsonic.choked}")
     print(f"Mass flow: {sol_subsonic.mdot:.4f} kg/s")
 
@@ -182,7 +182,7 @@ def main() -> None:
     # Pressure
     ax = axes[1, 1]
     ax.plot(x, P, "m-", linewidth=2)
-    ax.axhline(P0 / 1e5, color="gray", linestyle="--", label=f"P₀ = {P0/1e5:.0f} bar")
+    ax.axhline(P0 / 1e5, color="gray", linestyle="--", label=f"P₀ = {P0 / 1e5:.0f} bar")
     ax.axvline(x_throat * 100, color="gray", linestyle=":", alpha=0.5)
     ax.set_xlabel("Axial position [cm]")
     ax.set_ylabel("Pressure [bar]")

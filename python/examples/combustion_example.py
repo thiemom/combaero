@@ -7,6 +7,7 @@ This example demonstrates:
 - combustion_equilibrium: one-step combustion + reforming + WGS equilibrium
 - Equivalence ratio sweep from lean to rich
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -54,18 +55,16 @@ def main() -> None:
     print("=" * 75)
     print(f"\nFuel: Natural gas at {fuel.T:.1f} K")
     print(
-        f"      CH4: {X_fuel[sp.indices['CH4']]*100:.0f}%, "
-        f"C2H6: {X_fuel[sp.indices['C2H6']]*100:.0f}%, "
-        f"C3H8: {X_fuel[sp.indices['C3H8']]*100:.0f}%"
+        f"      CH4: {X_fuel[sp.indices['CH4']] * 100:.0f}%, "
+        f"C2H6: {X_fuel[sp.indices['C2H6']] * 100:.0f}%, "
+        f"C3H8: {X_fuel[sp.indices['C3H8']] * 100:.0f}%"
     )
     print(f"Air:  Humid air at {air.T:.0f} K, 60% RH, {air.mdot:.1f} kg/s")
 
     print("\nEquivalence Ratio Sweep")
     print("-" * 75)
-    print(
-        f"{'phi':>6s} {'mdot_f':>10s} {'T_mix':>10s} {'T_eq':>10s} " f"{'X_CO':>10s} {'X_H2':>10s}"
-    )
-    print(f"{'[-]':>6s} {'[kg/s]':>10s} {'[K]':>10s} {'[K]':>10s} " f"{'[%]':>10s} {'[%]':>10s}")
+    print(f"{'phi':>6s} {'mdot_f':>10s} {'T_mix':>10s} {'T_eq':>10s} {'X_CO':>10s} {'X_H2':>10s}")
+    print(f"{'[-]':>6s} {'[kg/s]':>10s} {'[K]':>10s} {'[K]':>10s} {'[%]':>10s} {'[%]':>10s}")
     print("-" * 65)
 
     # Pre-calculate stoichiometric ratio
@@ -93,8 +92,7 @@ def main() -> None:
         X_H2 = eq.X[sp.indices["H2"]] * 100
 
         print(
-            f"{phi:6.2f} {mdot_fuel:10.4f} {mixed.T:10.2f} {eq.T:10.2f} "
-            f"{X_CO:10.4f} {X_H2:10.4f}"
+            f"{phi:6.2f} {mdot_fuel:10.4f} {mixed.T:10.2f} {eq.T:10.2f} {X_CO:10.4f} {X_H2:10.4f}"
         )
 
     # =========================================================================
@@ -130,7 +128,7 @@ def main() -> None:
     print("\nProduct Composition (mole fractions > 0.1%):")
     for i, name in enumerate(sp.names):
         if eq.X[i] > 0.001:
-            print(f"  {name:>8s}: {eq.X[i]*100:6.2f}%")
+            print(f"  {name:>8s}: {eq.X[i] * 100:6.2f}%")
 
     # =========================================================================
     # Rich case (phi = 1.2) - Reforming converts hydrocarbons to CO + H2
@@ -156,14 +154,14 @@ def main() -> None:
     print("  Unburned hydrocarbons:")
     for hc in ["CH4", "C2H6", "C3H8"]:
         if burned.X[sp.indices[hc]] > 1e-6:
-            print(f"    {hc}: {burned.X[sp.indices[hc]]*100:.4f}%")
+            print(f"    {hc}: {burned.X[sp.indices[hc]] * 100:.4f}%")
 
     print("\nCombustion + Equilibrium (one-step, hydrocarbons reformed to CO + H2):")
     print(f"  T_eq = {eq.T:.2f} K (dropped {burned.T - eq.T:.1f} K)")
     print("  Product composition:")
     for i, name in enumerate(sp.names):
         if eq.X[i] > 0.001:
-            print(f"    {name:>8s}: {eq.X[i]*100:6.2f}%")
+            print(f"    {name:>8s}: {eq.X[i] * 100:6.2f}%")
 
 
 if __name__ == "__main__":

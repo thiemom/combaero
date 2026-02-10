@@ -114,8 +114,7 @@ const std::vector<std::string> species_names = {"""
 
         polarizability_str = format_double(row["polarizability"])
         transport_props_list.append(
-            f"{{\"{row['geometry']}\", {row['well-depth']}, "
-            f"{row['diameter']}, {polarizability_str}}}"
+            f'{{"{row["geometry"]}", {row["well-depth"]}, {row["diameter"]}, {polarizability_str}}}'
         )
 
         molar_masses_list.append(str(row["molar_mass"]))
@@ -153,7 +152,7 @@ const std::vector<std::string> species_names = {"""
         + "\n};\n\n"
     )
 
-    header_content += "#endif // THERMO_TRANSPORT_DATA_H" ""
+    header_content += "#endif // THERMO_TRANSPORT_DATA_H"
 
     with open(output_header, "w") as f:
         f.write(header_content)
