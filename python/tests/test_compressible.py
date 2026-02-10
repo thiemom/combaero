@@ -27,7 +27,7 @@ def test_nozzle_flow_choked() -> None:
     T0 = 600.0  # K (high enough for large expansion)
     P0 = 200000.0  # Pa
     P_back = 50000.0  # Pa (choked)
-    A_eff = 0.001  # m²
+    A_eff = 0.001  # m^2
 
     sol = cb.nozzle_flow(T0, P0, P_back, A_eff, X)
 
@@ -54,7 +54,8 @@ def test_mach_from_pressure_ratio() -> None:
     """Mach number from isentropic pressure ratio."""
     X = cb.standard_dry_air_composition()
     T0 = 500.0  # K
-    P0 = 100000.0  # Pa
+    P0 = 500000.0  # Pa
+    A_eff = 0.001  # m^2
     P = 80000.0  # Pa
 
     M = cb.mach_from_pressure_ratio(T0, P0, P, X)
