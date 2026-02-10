@@ -144,7 +144,7 @@ class TestWgsEquilibrium:
 
         P = 101325.0
 
-        print(f"\nWGS isothermal temperature sweep:")
+        print("\nWGS isothermal temperature sweep:")
         max_deviations = {"CO": 0.0, "H2O": 0.0, "CO2": 0.0, "H2": 0.0}
 
         for T in [800.0, 1000.0, 1200.0, 1500.0]:
@@ -163,7 +163,7 @@ class TestWgsEquilibrium:
                 max_deviations[species] = max(max_deviations[species], diff)
                 print(f"    {species}: CombAero={X_cb:.6f}, Cantera={X_ct:.6f}, diff={diff:.6f}")
 
-        print(f"\n  Maximum deviations:")
+        print("\n  Maximum deviations:")
         for species, max_diff in max_deviations.items():
             print(f"    {species}: {max_diff:.6f}")
 
@@ -194,10 +194,11 @@ class TestWgsEquilibrium:
         # WGS is exothermic in forward direction (CO + H2O → CO2 + H2)
         # At high T, equilibrium favors reactants, so forward reaction releases heat
         T_diff = abs(result_cb.T - wgs_gas.T)
-        print(f"\nWGS adiabatic:")
+        print("\nWGS adiabatic:")
         print(f"  T_in: {T_in:.1f} K")
         print(
-            f"  T_final: CombAero={result_cb.T:.1f} K, Cantera={wgs_gas.T:.1f} K, diff={T_diff:.1f} K"
+            f"  T_final: CombAero={result_cb.T:.1f} K, "
+            f"Cantera={wgs_gas.T:.1f} K, diff={T_diff:.1f} K"
         )
 
         assert (

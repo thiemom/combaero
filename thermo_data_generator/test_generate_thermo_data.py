@@ -14,10 +14,9 @@ import pytest
 
 from generate_thermo_data import (
     NASAFormat,
-    SpeciesData,
-    load_cantera_yaml,
-    list_species_in_yaml,
     generate_cpp_header,
+    list_species_in_yaml,
+    load_cantera_yaml,
 )
 
 

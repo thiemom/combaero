@@ -100,12 +100,16 @@ class TestCompleteCombustion:
         # Cantera: NASA-7 polynomials, enthalpy balance (same products)
         T_diff = abs(burned_cb.T - T_cantera)
         print(
-            f"\nCH4 stoich: CombAero={burned_cb.T:.1f} K, Cantera={T_cantera:.1f} K, diff={T_diff:.1f} K"
+            f"\nCH4 stoich: CombAero={burned_cb.T:.1f} K, "
+            f"Cantera={T_cantera:.1f} K, diff={T_diff:.1f} K"
         )
 
         assert (
             T_diff < tolerance_config["temperature"]
-        ), f"Temperature mismatch [K]: CombAero={burned_cb.T:.1f}, Cantera={T_cantera:.1f}, diff={T_diff:.1f}"
+        ), (
+            f"Temperature mismatch [K]: CombAero={burned_cb.T:.1f}, "
+            f"Cantera={T_cantera:.1f}, diff={T_diff:.1f}"
+        )
 
         # Verify product composition matches stoichiometry
         for species in ["CO2", "H2O", "N2"]:
@@ -139,7 +143,8 @@ class TestCompleteCombustion:
 
         T_diff = abs(burned_cb.T - T_cantera)
         print(
-            f"\nCH4 lean (phi=0.8): CombAero={burned_cb.T:.1f} K, Cantera={T_cantera:.1f} K, diff={T_diff:.1f} K"
+            f"\nCH4 lean (phi=0.8): CombAero={burned_cb.T:.1f} K, "
+            f"Cantera={T_cantera:.1f} K, diff={T_diff:.1f} K"
         )
 
         assert (
@@ -177,7 +182,8 @@ class TestCompleteCombustion:
 
         T_diff = abs(burned_cb.T - T_cantera)
         print(
-            f"\nC3H8 stoich: CombAero={burned_cb.T:.1f} K, Cantera={T_cantera:.1f} K, diff={T_diff:.1f} K"
+            f"\nC3H8 stoich: CombAero={burned_cb.T:.1f} K, "
+            f"Cantera={T_cantera:.1f} K, diff={T_diff:.1f} K"
         )
 
         assert (
@@ -210,7 +216,8 @@ class TestCompleteCombustion:
 
         T_diff = abs(burned_cb.T - T_cantera)
         print(
-            f"\nH2 stoich: CombAero={burned_cb.T:.1f} K, Cantera={T_cantera:.1f} K, diff={T_diff:.1f} K"
+            f"\nH2 stoich: CombAero={burned_cb.T:.1f} K, "
+            f"Cantera={T_cantera:.1f} K, diff={T_diff:.1f} K"
         )
 
         assert (
@@ -247,7 +254,8 @@ class TestCompleteCombustion:
             T_diff = abs(burned_cb.T - T_cantera)
             max_diff = max(max_diff, T_diff)
             print(
-                f"\nT_in={T_in} K: CombAero={burned_cb.T:.1f} K, Cantera={T_cantera:.1f} K, diff={T_diff:.1f} K"
+                f"\nT_in={T_in} K: CombAero={burned_cb.T:.1f} K, "
+                f"Cantera={T_cantera:.1f} K, diff={T_diff:.1f} K"
             )
 
             assert (
@@ -281,7 +289,8 @@ class TestCompleteCombustion:
             T_diff = abs(burned_cb.T - T_cantera)
             max_diff = max(max_diff, T_diff)
             print(
-                f"\nP_in={P_in/1e5:.1f} bar: CombAero={burned_cb.T:.1f} K, Cantera={T_cantera:.1f} K, diff={T_diff:.1f} K"
+                f"\nP_in={P_in/1e5:.1f} bar: CombAero={burned_cb.T:.1f} K, "
+                f"Cantera={T_cantera:.1f} K, diff={T_diff:.1f} K"
             )
 
             assert (

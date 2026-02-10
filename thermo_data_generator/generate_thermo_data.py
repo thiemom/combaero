@@ -696,7 +696,8 @@ def main() -> int:
     missing_transport = [sp.name for sp in species_data if sp.transport is None]
     if missing_transport:
         print(
-            f"Warning: {len(missing_transport)} species missing transport data: {missing_transport[:5]}..."
+            f"Warning: {len(missing_transport)} species missing transport data: "
+            f"{missing_transport[:5]}..."
         )
 
     # Generate header

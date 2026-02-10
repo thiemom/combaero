@@ -6,6 +6,7 @@ def combaero():
     """Provide combaero module."""
     try:
         import combaero as cb
+
         return cb
     except ImportError:
         pytest.skip("combaero not installed")
@@ -16,6 +17,7 @@ def cantera():
     """Provide cantera module."""
     try:
         import cantera as ct
+
         return ct
     except ImportError:
         pytest.skip("cantera not installed")

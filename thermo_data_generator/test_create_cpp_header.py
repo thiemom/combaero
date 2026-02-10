@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import csv
-import tempfile
+import json
 from pathlib import Path
 
 from create_cpp_header import generate_cpp_header

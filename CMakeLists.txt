@@ -44,6 +44,8 @@ add_library(combaero_lib STATIC ${SOURCES})
 target_include_directories(combaero_lib PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
+# Enable position-independent code for shared library linking
+set_target_properties(combaero_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Create main executable
 add_executable(combaero_main src/main.cpp)
