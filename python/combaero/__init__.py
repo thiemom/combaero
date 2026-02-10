@@ -39,7 +39,7 @@ __version__: str = _load_version()
 try:
     # Preferred: local extension in the same package (installed wheel or
     # in-tree build where _core was successfully built next to this file).
-    from ._core import (  # type: ignore[attr-defined]; State-based API; Inverse solvers - find fuel stream; Inverse solvers - find oxidizer stream; Compressible flow; Thrust; Friction; Heat transfer; Acoustics; Mean flow correction; Helmholtz resonator; Strouhal; Convenience; Viscothermal; Quality factor; Residence time; Incompressible flow; Orifice Cd correlations; Units query API
+    from ._core import (  # type: ignore[attr-defined]
         AcousticMode,
         Annulus,
         BoundaryCondition,
