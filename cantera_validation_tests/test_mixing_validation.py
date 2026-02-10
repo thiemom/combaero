@@ -38,7 +38,6 @@ class TestStreamMixing:
                 ct_species[ct_name] = cb_X[i]
         gas.X = ct_species
 
-    @pytest.mark.skip(reason="Cantera HP convergence issue with this specific mixture")
     def test_two_stream_mixing_equal_mass(
         self, combaero, cantera, gri30_gas, species_mapping, tolerance_config
     ):
@@ -73,7 +72,12 @@ class TestStreamMixing:
 
         h_mixed_target = 0.5 * (h1 + h2)
 
-        X_mixed_target = 0.5 * X_air + 0.5 * X_fuel
+        # For equal MASS flow rates, must mix mass fractions, not mole fractions
+        Y1 = np.array(cb.mole_to_mass(X_air))
+        Y2 = np.array(cb.mole_to_mass(X_fuel))
+        Y_mixed = 0.5 * Y1 + 0.5 * Y2
+        X_mixed_target = cb.mass_to_mole(Y_mixed)
+
         self.set_cantera_composition(gri30_gas, X_mixed_target, species_mapping)
         gri30_gas.HP = h_mixed_target, mixed_cb.P
 

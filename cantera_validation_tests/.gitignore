@@ -30,3 +30,8 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Development artifacts
+*COMMIT_MESSAGE.md
+*_REPORT.md
+*_NOTES.md

@@ -247,6 +247,9 @@ double peclet(double T, double P, const std::vector<double>& X, double V, double
 ## Utility Functions
 
 ```cpp
+// Mixture molecular weight
+double mwmix(const std::vector<double>& X);  // [g/mol]
+
 // Mole/mass fraction conversion
 std::vector<double> mole_to_mass(const std::vector<double>& X);
 std::vector<double> mass_to_mole(const std::vector<double>& Y);
