@@ -292,7 +292,7 @@ class TestCompleteCombustion:
             )
 
             assert T_diff < tolerance_config["temperature"], (
-                f"P_in={P_in / 1e5:.1f} bar: CombAero={burned_cb.T:.1f} K, Cantera={T_cantera:.1f} K"
+                f"P_in={P_in / 1e5:.1f} bar: CombAero={burned_cb.T:.1f} K, Cantera={T_cantera:.1f} K"  # noqa: E501
             )
 
         print(f"\nMax temperature deviation: {max_diff:.1f} K")

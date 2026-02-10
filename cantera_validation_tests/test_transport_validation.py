@@ -58,7 +58,8 @@ class TestTransportProperties:
 
         rel_diff = abs(mu_cb - mu_ct) / mu_ct
         assert rel_diff < tolerance_config["transport"], (
-            f"Viscosity [Pa·s]: CombAero={mu_cb:.2e}, Cantera={mu_ct:.2e}, diff={rel_diff * 100:.1f}%"
+            f"Viscosity [Pa·s]: CombAero={mu_cb:.2e}, Cantera={mu_ct:.2e}, "  # noqa: E501
+            f"diff={rel_diff * 100:.1f}%"
         )
 
     def test_viscosity_temperature_variation(
@@ -236,7 +237,7 @@ class TestTransportProperties:
             f"Viscosity mismatch: CombAero={mu_cb:.2e} Pa·s, Cantera={mu_ct:.2e} Pa·s"
         )
         assert k_rel_diff < tolerance_config["transport"], (
-            f"Thermal conductivity mismatch: CombAero={k_cb:.4f} W/(m·K), Cantera={k_ct:.4f} W/(m·K)"
+            f"Thermal conductivity mismatch: CombAero={k_cb:.4f} W/(m·K), Cantera={k_ct:.4f} W/(m·K)"  # noqa: E501
         )
 
     def test_high_temperature_transport(

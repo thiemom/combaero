@@ -308,7 +308,7 @@ class TestDensityCalculation:
 
         rel_diff = abs(rho_cb - rho_ct) / rho_ct
         assert rel_diff < tolerance_config["density"], (
-            f"Density [kg/m³]: CombAero={rho_cb:.4f}, Cantera={rho_ct:.4f}, diff={rel_diff * 100:.2f}%"
+            f"Density [kg/m³]: CombAero={rho_cb:.4f}, Cantera={rho_ct:.4f}, diff={rel_diff * 100:.2f}%"  # noqa: E501
         )
 
     def test_methane_density(self, combaero, cantera, gri30_gas, species_mapping, tolerance_config):
