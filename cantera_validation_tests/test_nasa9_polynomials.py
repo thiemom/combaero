@@ -195,19 +195,85 @@ class TestNASA9Polynomials:
             print(f"  {species:6s}: {dev * 100:8.6f}% max deviation")
         print(f"{'=' * 80}\n")
 
-    @pytest.mark.skip(
-        reason="Cantera entropy values incompatible - different reference state even with ΔS"
-    )
     def test_entropy_evaluation(
         self, combaero, nasa9_gas, test_species, test_temperatures, species_mapping
     ):
-        """Test ΔS/R polynomial evaluation using s(T) - s(Tref).
+        """Test ΔS polynomial evaluation using s(T) - s(Tref).
 
-        SKIPPED: Cantera returns vastly different entropy values (100860 vs 36 J/(mol·K))
-        even when using ΔS = S(T) - S(Tref). This indicates incompatible reference states
-        or different entropy calculation methods. Cp integration test validates polynomials.
+        Compares entropy CHANGES (not absolute values) to avoid reference state issues.
         """
-        pass
+        cb = combaero
+        T_ref = 298.15  # Reference temperature [K]
+        P = 101325.0  # Pressure [Pa]
+
+        print(f"\n{'=' * 80}")
+        print(f"NASA-9 Polynomial Validation: ΔS Evaluation (relative to {T_ref} K)")
+        print(f"{'=' * 80}")
+
+        max_deviations = {}
+
+        for species in test_species:
+            idx_cb = species_index_from_name(species)
+            ct_name = species_mapping.get(species, species)
+
+            if ct_name not in nasa9_gas.species_names:
+                continue
+
+            deviations = []
+
+            # Get reference entropy at T_ref
+            X_ref = np.zeros(num_species())
+            X_ref[idx_cb] = 1.0
+            s_ref_cb = cb.s(T_ref, X_ref, P)  # J/mol-K
+
+            nasa9_gas.TPX = T_ref, P, {ct_name: 1.0}
+            s_ref_ct = nasa9_gas.entropy_mole / 1000.0  # J/kmol -> J/mol
+
+            print(f"\n{species}:")
+            print("     T [K]     ΔS (CB)       ΔS (CT)       Deviation")
+
+            for T in test_temperatures:
+                X = np.zeros(num_species())
+                X[idx_cb] = 1.0
+                s_cb = cb.s(T, X, P)  # J/mol-K
+
+                nasa9_gas.TPX = T, P, {ct_name: 1.0}
+                s_ct = nasa9_gas.entropy_mole / 1000.0  # J/kmol -> J/mol
+
+                # Calculate ΔS = S(T) - S(Tref)
+                delta_s_cb = s_cb - s_ref_cb
+                delta_s_ct = s_ct - s_ref_ct
+
+                # Relative deviation in ΔS
+                deviation = (
+                    abs(delta_s_cb - delta_s_ct) / abs(delta_s_ct)
+                    if abs(delta_s_ct) > 1e-6
+                    else 0.0
+                )
+                deviations.append(deviation)
+
+                if T in [300.0, 1000.0, 3000.0, 6000.0]:
+                    print(
+                        f"  {T:8.1f}  {delta_s_cb:12.6f}  {delta_s_ct:12.6f}  "
+                        f"{deviation * 100:11.4f}%"
+                    )
+
+            if deviations:
+                max_dev = max(deviations)
+                max_deviations[species] = max_dev
+                print(f"  Maximum deviation: {max_dev * 100:.6f}%")
+
+                # Assert < 0.01% deviation (same precision as Cp test)
+                assert (
+                    max_dev < 0.0001
+                ), f"{species} ΔS deviation {max_dev * 100:.6f}% exceeds 0.01%"
+
+        print(f"\n{'=' * 80}")
+        print("Summary: ΔS = S(T) - S(Tref) Evaluation")
+        print(f"{'=' * 80}")
+        for species, dev in max_deviations.items():
+            print(f"  {species:6s}: {dev * 100:8.6f}% max deviation")
+        print(f"{'=' * 80}\n")
 
     def test_temperature_range_continuity(self, combaero, nasa9_gas, test_species, species_mapping):
         """Test continuity at temperature range boundaries.

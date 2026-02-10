@@ -110,16 +110,21 @@ def create_cantera_yaml(
             T_max = range_data["T_max"]
             coeffs = range_data["coeffs"]
 
-            # Ensure we have 9 coefficients (a1-a7, a8, a9)
-            if len(coeffs) < 9:
-                coeffs = coeffs + [0.0] * (9 - len(coeffs))
+            # NASA-9 coefficients: [a1, a2, ..., a7, unused, b1, b2] = 10 values
+            # Cantera expects: [a1, a2, a3, a4, a5, a6, a7, b1, b2] = 9 values
+            # Skip index 7 (unused=0.0) and take a1-a7, b1, b2
+            if len(coeffs) >= 10:
+                range_coeffs = coeffs[:7] + coeffs[8:10]  # [a1-a7] + [b1, b2]
+            else:
+                # Fallback for unexpected format
+                range_coeffs = (
+                    coeffs[:9] if len(coeffs) >= 9 else coeffs + [0.0] * (9 - len(coeffs))
+                )
 
-            # Cantera NASA-9 format uses [a1, a2, a3, a4, a5, a6, a7, a8, a9]
-            # where a8 and a9 are integration constants
             thermo_range = {
                 "T-min": T_min,
                 "T-max": T_max,
-                "data": coeffs[:9],  # a1-a7, a8, a9
+                "data": range_coeffs,
             }
             thermo_ranges.append(thermo_range)
 

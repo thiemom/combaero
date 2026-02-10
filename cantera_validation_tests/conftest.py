@@ -59,6 +59,12 @@ def complete_combustion_gas(cantera):
     return cantera.Solution(thermo="ideal-gas", species=complete_species)
 
 
+@pytest.fixture(scope="session")
+def nasa9_gas(cantera):
+    """Cantera gas phase for NASA9 polynomial validation."""
+    return cantera.Solution("gri30.yaml")
+
+
 @pytest.fixture
 def tolerance_config():
     """Standard tolerance configuration for validation tests.
