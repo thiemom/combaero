@@ -31,9 +31,7 @@ print("VISCOSITY COMPARISON: CombAero vs Cantera (GRI-Mech 3.0)")
 print("=" * 80)
 print("\nMixture: Standard dry air")
 print(f"Pressure: {P/1000:.1f} kPa\n")
-print(
-    f"{'T (K)':<10} {'CombAero':<15} {'Cantera':<15} {'Abs Diff':<15} {'Rel Diff (%)':<15}"
-)
+print(f"{'T (K)':<10} {'CombAero':<15} {'Cantera':<15} {'Abs Diff':<15} {'Rel Diff (%)':<15}")
 print("-" * 80)
 
 temperatures = [300, 500, 1000, 1500, 2000, 2500]
@@ -49,9 +47,7 @@ for T in temperatures:
     abs_diff = mu_cb - mu_ct
     rel_diff = abs(mu_cb - mu_ct) / mu_ct * 100
 
-    print(
-        f"{T:<10.0f} {mu_cb:.4e}      {mu_ct:.4e}      {abs_diff:+.4e}      {rel_diff:>6.1f}%"
-    )
+    print(f"{T:<10.0f} {mu_cb:.4e}      {mu_ct:.4e}      {abs_diff:+.4e}      {rel_diff:>6.1f}%")
 
 print("\n" + "=" * 80)
 print("ANALYSIS")
