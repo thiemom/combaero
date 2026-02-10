@@ -1,36 +1,24 @@
 import pytest
 
-try:
-    import combaero as cb
-
-    COMBAERO_AVAILABLE = True
-except ImportError:
-    COMBAERO_AVAILABLE = False
-
-try:
-    import cantera as ct
-
-    CANTERA_AVAILABLE = True
-except ImportError:
-    CANTERA_AVAILABLE = False
-
 
 @pytest.fixture(scope="session")
 def combaero():
-    if not COMBAERO_AVAILABLE:
-        pytest.skip("CombAero not available")
-    import combaero as cb
-
-    return cb
+    """Provide combaero module."""
+    try:
+        import combaero as cb
+        return cb
+    except ImportError:
+        pytest.skip("combaero not installed")
 
 
 @pytest.fixture(scope="session")
 def cantera():
-    if not CANTERA_AVAILABLE:
-        pytest.skip("Cantera not available")
-    import cantera as ct
-
-    return ct
+    """Provide cantera module."""
+    try:
+        import cantera as ct
+        return ct
+    except ImportError:
+        pytest.skip("cantera not installed")
 
 
 @pytest.fixture(scope="session")
