@@ -10,7 +10,7 @@ def test_nozzle_flow_subsonic() -> None:
     T0 = 500.0  # K (high enough to stay above 300K after expansion)
     P0 = 200000.0  # Pa
     P_back = 150000.0  # Pa (subsonic)
-    A_eff = 0.001  # m²
+    A_eff = 0.001  # m^2
 
     sol = cb.nozzle_flow(T0, P0, P_back, A_eff, X)
 
