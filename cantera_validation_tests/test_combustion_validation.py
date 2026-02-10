@@ -145,9 +145,9 @@ class TestCompleteCombustion:
             f"Cantera={T_cantera:.1f} K, diff={T_diff:.1f} K"
         )
 
-        assert T_diff < tolerance_config["temperature"], (
-            f"Temperature mismatch: CombAero={burned_cb.T:.1f} K, Cantera={T_cantera:.1f} K"
-        )
+        assert (
+            T_diff < tolerance_config["temperature"]
+        ), f"Temperature mismatch: CombAero={burned_cb.T:.1f} K, Cantera={T_cantera:.1f} K"
 
         # Verify excess O2 present
         idx_O2 = species_index_from_name("O2")
@@ -184,9 +184,9 @@ class TestCompleteCombustion:
             f"Cantera={T_cantera:.1f} K, diff={T_diff:.1f} K"
         )
 
-        assert T_diff < tolerance_config["temperature"], (
-            f"Temperature mismatch: CombAero={burned_cb.T:.1f} K, Cantera={T_cantera:.1f} K"
-        )
+        assert (
+            T_diff < tolerance_config["temperature"]
+        ), f"Temperature mismatch: CombAero={burned_cb.T:.1f} K, Cantera={T_cantera:.1f} K"
 
     def test_hydrogen_air_stoichiometric(
         self, combaero, cantera, complete_combustion_gas, species_mapping, tolerance_config
@@ -218,9 +218,9 @@ class TestCompleteCombustion:
             f"Cantera={T_cantera:.1f} K, diff={T_diff:.1f} K"
         )
 
-        assert T_diff < tolerance_config["temperature"], (
-            f"Temperature mismatch: CombAero={burned_cb.T:.1f} K, Cantera={T_cantera:.1f} K"
-        )
+        assert (
+            T_diff < tolerance_config["temperature"]
+        ), f"Temperature mismatch: CombAero={burned_cb.T:.1f} K, Cantera={T_cantera:.1f} K"
 
         # Verify H2O production
         idx_H2O = species_index_from_name("H2O")
@@ -256,9 +256,9 @@ class TestCompleteCombustion:
                 f"Cantera={T_cantera:.1f} K, diff={T_diff:.1f} K"
             )
 
-            assert T_diff < tolerance_config["temperature"], (
-                f"T_in={T_in} K: CombAero={burned_cb.T:.1f} K, Cantera={T_cantera:.1f} K"
-            )
+            assert (
+                T_diff < tolerance_config["temperature"]
+            ), f"T_in={T_in} K: CombAero={burned_cb.T:.1f} K, Cantera={T_cantera:.1f} K"
 
         print(f"\nMax temperature deviation: {max_diff:.1f} K")
 
@@ -291,9 +291,9 @@ class TestCompleteCombustion:
                 f"Cantera={T_cantera:.1f} K, diff={T_diff:.1f} K"
             )
 
-            assert T_diff < tolerance_config["temperature"], (
-                f"P_in={P_in / 1e5:.1f} bar: CombAero={burned_cb.T:.1f} K, Cantera={T_cantera:.1f} K"  # noqa: E501
-            )
+            assert (
+                T_diff < tolerance_config["temperature"]
+            ), f"P_in={P_in / 1e5:.1f} bar: CombAero={burned_cb.T:.1f} K, Cantera={T_cantera:.1f} K"  # noqa: E501
 
         print(f"\nMax temperature deviation: {max_diff:.1f} K")
 
@@ -308,9 +308,9 @@ class TestOxygenRequirement:
 
         # Compare stoichiometric O2 requirement [mol O2 / mol fuel]
         O2_per_mol = cb.oxygen_required_per_mol_fuel(idx_CH4)
-        assert abs(O2_per_mol - 2.0) < 1e-10, (
-            f"O2 requirement [mol O2/mol CH4]: Expected 2.0, got {O2_per_mol}"
-        )
+        assert (
+            abs(O2_per_mol - 2.0) < 1e-10
+        ), f"O2 requirement [mol O2/mol CH4]: Expected 2.0, got {O2_per_mol}"
 
     def test_propane_oxygen_requirement(self, combaero):
         """Test C3H8 oxygen requirement: C3H8 + 5 O2 -> 3 CO2 + 4 H2O."""
@@ -346,9 +346,9 @@ class TestEquivalenceRatio:
         # Compare equivalence ratio [dimensionless]
         # Round-trip test: set φ=1.0, calculate φ from mixture
         phi_calc = cb.equivalence_ratio_mole(X_mix, X_fuel, X_air)
-        assert abs(phi_calc - phi_target) < 1e-6, (
-            f"Equivalence ratio [dimensionless]: Expected {phi_target}, got {phi_calc}"
-        )
+        assert (
+            abs(phi_calc - phi_target) < 1e-6
+        ), f"Equivalence ratio [dimensionless]: Expected {phi_target}, got {phi_calc}"
 
     def test_lean_mixture(self, combaero):
         """Test lean mixture (phi < 1)."""

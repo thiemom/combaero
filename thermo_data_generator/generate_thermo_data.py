@@ -375,7 +375,7 @@ def species_sort_key(sp: SpeciesData) -> tuple:
     if name in air_order:
         return (0, air_order.index(name), name)
 
-    C, H, O, N = (
+    C_atoms, H_atoms, O_atoms, N_atoms = (
         sp.structure.C_atoms,
         sp.structure.H_atoms,
         sp.structure.O_atoms,
@@ -383,15 +383,15 @@ def species_sort_key(sp: SpeciesData) -> tuple:
     )
 
     # Inert species (no C, H, O)
-    if C == 0 and H == 0 and O == 0:
+    if C_atoms == 0 and H_atoms == 0 and O_atoms == 0:
         return (1, name)
 
     # Hydrocarbons (C>0, H>0, no O or N)
-    if C > 0 and H > 0 and O == 0 and N == 0:
-        return (2, C, name)
+    if C_atoms > 0 and H_atoms > 0 and O_atoms == 0 and N_atoms == 0:
+        return (2, C_atoms, name)
 
     # Other carbon-containing species
-    if C > 0:
+    if C_atoms > 0:
         return (3, name)
 
     # Everything else

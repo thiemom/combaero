@@ -184,9 +184,9 @@ class TestNASA9Polynomials:
                 print(f"  Maximum deviation: {max_dev * 100:.6f}%")
 
                 # Assert < 0.01% deviation (validates polynomial integration)
-                assert max_dev < 0.0001, (
-                    f"{species} ∫Cp dT deviation {max_dev * 100:.6f}% exceeds 0.01%"
-                )
+                assert (
+                    max_dev < 0.0001
+                ), f"{species} ∫Cp dT deviation {max_dev * 100:.6f}% exceeds 0.01%"
 
         print(f"\n{'=' * 80}")
         print("Summary: ∫Cp dT Integration")
@@ -319,8 +319,8 @@ class TestNASA9Polynomials:
             # Slope should not change dramatically (< 25% change is acceptable)
             # Note: NASA-9 polynomials may have small discontinuities at range boundaries
             # This is expected behavior, especially for light molecules like H2
-            assert slope_change < 0.25, (
-                f"{species} has large discontinuity at {T_boundary} K (>{slope_change * 100:.1f}%)"
-            )
+            assert (
+                slope_change < 0.25
+            ), f"{species} has large discontinuity at {T_boundary} K (>{slope_change * 100:.1f}%)"
 
         print(f"{'=' * 80}\n")
