@@ -201,12 +201,13 @@ class TestWgsEquilibrium:
             f"Cantera={wgs_gas.T:.1f} K, diff={T_diff:.1f} K"
         )
 
-        assert (
-            T_diff < 10.0
-        ), f"Temperature [K]: CombAero={result_cb.T:.1f}, Cantera={wgs_gas.T:.1f}, diff={T_diff:.1f}"
+        assert T_diff < 10.0, (
+            f"Temperature [K]: CombAero={result_cb.T:.1f}, "
+            f"Cantera={wgs_gas.T:.1f}, diff={T_diff:.1f}"
+        )
 
         # Compare equilibrium composition
-        print(f"  Composition:")
+        print("  Composition:")
         for species in ["CO", "H2O", "CO2", "H2"]:
             idx_cb = species_index_from_name(species)
             X_cb = result_cb.X[idx_cb]
@@ -231,7 +232,7 @@ class TestWgsEquilibrium:
 
         P = 101325.0
 
-        print(f"\nWGS adiabatic temperature sweep:")
+        print("\nWGS adiabatic temperature sweep:")
         max_T_diff = 0.0
 
         for T_in in [1000.0, 1200.0, 1500.0, 1800.0]:
@@ -246,7 +247,8 @@ class TestWgsEquilibrium:
 
             print(f"\n  T_in = {T_in} K:")
             print(
-                f"    T_final: CombAero={result_cb.T:.1f} K, Cantera={wgs_gas.T:.1f} K, diff={T_diff:.1f} K"
+                f"    T_final: CombAero={result_cb.T:.1f} K, "
+                f"Cantera={wgs_gas.T:.1f} K, diff={T_diff:.1f} K"
             )
 
             for species in ["CO", "H2O", "CO2", "H2"]:
@@ -272,7 +274,7 @@ class TestWgsEquilibrium:
 
         P = 101325.0
 
-        print(f"\nWGS equilibrium constant Kp:")
+        print("\nWGS equilibrium constant Kp:")
 
         for T in [800.0, 1000.0, 1200.0, 1500.0]:
             # CombAero equilibrium
@@ -303,10 +305,12 @@ class TestWgsEquilibrium:
             rel_diff = abs(Kp_cb - Kp_ct) / Kp_ct if Kp_ct > 1e-10 else 0.0
 
             print(
-                f"  T = {T} K: CombAero Kp={Kp_cb:.4f}, Cantera Kp={Kp_ct:.4f}, diff={rel_diff*100:.2f}%"
+                f"  T = {T} K: CombAero Kp={Kp_cb:.4f}, "
+                f"Cantera Kp={Kp_ct:.4f}, diff={rel_diff*100:.2f}%"
             )
 
             # Kp should match within 5% (due to Gibbs free energy polynomial differences)
-            assert (
-                rel_diff < 0.05
-            ), f"Kp [dimensionless] @ {T} K: CombAero={Kp_cb:.4f}, Cantera={Kp_ct:.4f}, diff={rel_diff*100:.1f}%"
+            assert rel_diff < 0.05, (
+                f"Kp [dimensionless] @ {T} K: CombAero={Kp_cb:.4f}, "
+                f"Cantera={Kp_ct:.4f}, diff={rel_diff*100:.1f}%"
+            )

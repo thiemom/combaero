@@ -173,7 +173,8 @@ class TestNASA9Polynomials:
 
                 if T_target in [500.0, 1000.0, 3000.0, 6000.0]:
                     print(
-                        f"  {T_target:8.1f}  {h_int_cb:14.2f}  {h_int_ct:14.2f}  {rel_deviation*100:11.6f}%"
+                        f"  {T_target:8.1f}  {h_int_cb:14.2f}  "
+                        f"{h_int_ct:14.2f}  {rel_deviation*100:11.6f}%"
                     )
 
             if deviations:

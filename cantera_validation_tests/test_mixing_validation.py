@@ -80,9 +80,10 @@ class TestStreamMixing:
         # Both use enthalpy balance: H_mixed = (m1*H1 + m2*H2) / (m1 + m2)
         # Then find T where H(T, X_mixed) = H_mixed
         T_diff = abs(mixed_cb.T - gri30_gas.T)
-        assert (
-            T_diff < tolerance_config["temperature"]
-        ), f"Temperature [K]: CombAero={mixed_cb.T:.1f}, Cantera={gri30_gas.T:.1f}, diff={T_diff:.1f}"
+        assert T_diff < tolerance_config["temperature"], (
+            f"Temperature [K]: CombAero={mixed_cb.T:.1f}, "
+            f"Cantera={gri30_gas.T:.1f}, diff={T_diff:.1f}"
+        )
 
         # Compare total mass flow rate [kg/s]
         # Should be exact: mdot_total = mdot1 + mdot2
@@ -246,9 +247,10 @@ class TestStreamMixing:
         h_mixed_actual = cb.h(mixed_cb.T, mixed_cb.X)
 
         rel_diff = abs(h_mixed_actual - h_mixed_expected) / abs(h_mixed_expected)
-        assert (
-            rel_diff < tolerance_config["enthalpy"]
-        ), f"Enthalpy [J/mol]: Expected {h_mixed_expected:.1f}, got {h_mixed_actual:.1f}, diff={rel_diff*100:.2f}%"
+        assert rel_diff < tolerance_config["enthalpy"], (
+            f"Enthalpy [J/mol]: Expected {h_mixed_expected:.1f}, "
+            f"got {h_mixed_actual:.1f}, diff={rel_diff*100:.2f}%"
+        )
 
 
 class TestDensityCalculation:

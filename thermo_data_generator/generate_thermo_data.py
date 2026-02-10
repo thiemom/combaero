@@ -26,7 +26,7 @@ import sys
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, TextIO
+from typing import TextIO
 
 
 class NASAFormat(Enum):
@@ -408,8 +408,6 @@ def _format_nasa9_intervals(nasa: NASACoeffs) -> str:
     - 10 coefficients: a1-a7 (Cp), unused, b1 (H), b2 (S)
     """
     interval_strs = []
-    n_intervals = len(nasa.coeffs)
-
     for i, coeffs in enumerate(nasa.coeffs):
         # Determine temperature bounds from T_ranges
         # T_ranges for NASA-9: [T0, T1, T2, ...] where intervals are [T0,T1], [T1,T2], etc.

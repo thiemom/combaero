@@ -104,9 +104,7 @@ class TestCompleteCombustion:
             f"Cantera={T_cantera:.1f} K, diff={T_diff:.1f} K"
         )
 
-        assert (
-            T_diff < tolerance_config["temperature"]
-        ), (
+        assert T_diff < tolerance_config["temperature"], (
             f"Temperature mismatch [K]: CombAero={burned_cb.T:.1f}, "
             f"Cantera={T_cantera:.1f}, diff={T_diff:.1f}"
         )
