@@ -237,7 +237,7 @@ class TestReferenceComparison:
             new_masses = [float(m.strip()) for m in match.group(1).split(",")]
 
             assert len(new_masses) == len(ref_masses)
-            for i, (ref, new) in enumerate(zip(ref_masses, new_masses)):
+            for i, (ref, new) in enumerate(zip(ref_masses, new_masses, strict=True)):
                 assert (
                     abs(ref - new) < 0.01
                 ), f"Molar mass mismatch at index {i}: ref={ref}, new={new}"

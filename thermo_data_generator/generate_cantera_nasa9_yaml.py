@@ -67,7 +67,7 @@ def create_cantera_yaml(
         species_list = list(nasa9_data["species"].keys())
 
     # Normalize species names (case-insensitive matching)
-    species_map = {name.upper(): name for name in nasa9_data["species"].keys()}
+    species_map = {name.upper(): name for name in nasa9_data["species"]}
 
     # Collect elements
     elements = set()

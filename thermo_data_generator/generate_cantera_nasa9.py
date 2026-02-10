@@ -81,7 +81,7 @@ def write_nasa9_chemkin(
         species_list = list(nasa9_data["species"].keys())
 
     # Normalize species names (case-insensitive matching)
-    species_map = {name.upper(): name for name in nasa9_data["species"].keys()}
+    species_map = {name.upper(): name for name in nasa9_data["species"]}
 
     with open(output_path, "w") as f:
         # Header
