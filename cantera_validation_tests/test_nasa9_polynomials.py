@@ -253,7 +253,7 @@ class TestNASA9Polynomials:
 
                 if T in [300.0, 1000.0, 3000.0, 6000.0]:
                     print(
-                        f"  {T:8.1f}  {ds_r_cb:12.6f}  {ds_r_ct:12.6f}  {rel_deviation * 100:11.4f}%"
+                        f"  {T:8.1f}  {ds_r_cb:12.6f}  {ds_r_ct:12.6f}  {rel_deviation * 100:11.4f}%"  # noqa: E501
                     )
 
             max_dev = max(deviations)

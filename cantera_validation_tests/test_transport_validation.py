@@ -173,7 +173,7 @@ class TestTransportProperties:
 
         rel_diff = abs(k_cb - k_ct) / k_ct
         assert rel_diff < tolerance_config["transport"], (
-            f"Thermal conductivity mismatch: CombAero={k_cb:.4f} W/(m·K), Cantera={k_ct:.4f} W/(m·K)"
+            f"Thermal conductivity mismatch: CombAero={k_cb:.4f} W/(m·K), Cantera={k_ct:.4f} W/(m·K)"  # noqa: E501
         )
 
     def test_prandtl_number(self, combaero, cantera, gri30_gas, species_mapping, tolerance_config):
