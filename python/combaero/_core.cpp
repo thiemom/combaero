@@ -388,14 +388,17 @@ PYBIND11_MODULE(_core, m)
 
     m.def(
         "mass_to_mole",
-        [](py::array_t<double, py::array::c_style | py::array::forcecast> Y_arr)
-        {
-            auto Y = to_vec(Y_arr);
-            return mass_to_mole(Y);
-        },
+        [](py::array_t<double> Y) { return mass_to_mole(to_vec(Y)); },
         py::arg("Y"),
-        "Convert mass fractions Y to mole fractions X.")
-    ;
+        "Convert mass fractions to mole fractions."
+    );
+
+    m.def(
+        "mwmix",
+        [](py::array_t<double> X) { return mwmix(to_vec(X)); },
+        py::arg("X"),
+        "Calculate mixture molecular weight [g/mol] from mole fractions."
+    );
 
     // Fraction utilities
     m.def(

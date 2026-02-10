@@ -209,7 +209,6 @@ class TestStreamMixing:
             T_diff < tolerance_config["temperature"]
         ), f"Temperature mismatch: CombAero={mixed_cb.T:.1f} K, Cantera={gri30_gas.T:.1f} K"
 
-    @pytest.mark.skip(reason="Requires molar_mass API that doesn't exist in current version")
     def test_enthalpy_conservation(
         self, combaero, cantera, gri30_gas, species_mapping, tolerance_config
     ):
@@ -235,9 +234,9 @@ class TestStreamMixing:
         h1_cb = cb.h(stream1.T, stream1.X)
         h2_cb = cb.h(stream2.T, stream2.X)
 
-        # Calculate mixture molecular weight manually
-        mw1 = sum(stream1.X[i] * cb.molar_mass(i) for i in range(len(stream1.X)))
-        mw2 = sum(stream2.X[i] * cb.molar_mass(i) for i in range(len(stream2.X)))
+        # Calculate mixture molecular weight using mwmix
+        mw1 = cb.mwmix(stream1.X)
+        mw2 = cb.mwmix(stream2.X)
 
         n1 = stream1.mdot / (mw1 / 1000.0)
         n2 = stream2.mdot / (mw2 / 1000.0)
