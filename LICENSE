@@ -19,3 +19,23 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+## Third-Party Software and Data
+
+### Validation Testing
+
+This project uses **Cantera** (https://cantera.org) for validation testing purposes only.
+Cantera is licensed under the BSD 3-Clause License. The Cantera library is not included
+in or required by the CombAero library itself - it is used solely to validate the
+accuracy of CombAero's thermodynamic and transport property calculations.
+
+### Thermodynamic Data
+
+NASA polynomial coefficients used in this library are derived from publicly available
+thermodynamic databases including:
+- NASA CEA (Chemical Equilibrium with Applications)
+- GRI-Mech combustion mechanism data
+
+These databases are in the public domain or available under permissive licenses.
