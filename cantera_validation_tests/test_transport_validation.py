@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from combaero._core import species_index_from_name, num_species
+from combaero._core import num_species, species_index_from_name
 
 
 class TestTransportProperties:

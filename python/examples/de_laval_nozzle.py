@@ -9,8 +9,9 @@ Classical supersonic nozzle problem demonstrating:
 This example models a small rocket nozzle with hot combustion products.
 """
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+
 import combaero as cb
 
 

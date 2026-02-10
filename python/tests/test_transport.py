@@ -1,6 +1,7 @@
 """Tests for transport properties: reynolds, peclet, thermal_diffusivity."""
 
 import numpy as np
+
 import combaero as cb
 
 

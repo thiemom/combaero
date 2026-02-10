@@ -1,6 +1,7 @@
 """Tests for compressible flow functions."""
 
 import numpy as np
+
 import combaero as cb
 
 

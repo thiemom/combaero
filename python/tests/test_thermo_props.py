@@ -4,10 +4,10 @@ import numpy as np
 
 from combaero import (
     cp,
-    h,
     density,
-    speed_of_sound,
+    h,
     specific_gas_constant,
+    speed_of_sound,
 )
 from combaero._core import num_species, species_index_from_name
 

@@ -2,8 +2,8 @@
 
 import numpy as np
 import pytest
-import combaero as cb
 
+import combaero as cb
 
 # Water at 20 deg C
 RHO_WATER = 998.0  # kg/m^3

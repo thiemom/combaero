@@ -1,5 +1,6 @@
-import pandas as pd
 import math
+
+import pandas as pd
 
 # This script generates thermo_transport_data.h from species_data.csv to keep
 # all thermo and transport data in the C++ thermo project consistent and typo-free.
