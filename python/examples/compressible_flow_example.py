@@ -9,7 +9,6 @@ This example shows:
 5. Friction factor correlations
 """
 
-import numpy as np
 import combaero as cb
 
 

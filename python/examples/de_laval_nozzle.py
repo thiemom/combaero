@@ -34,7 +34,7 @@ def main() -> None:
     print("=" * 60)
     print("De Laval Nozzle Analysis")
     print("=" * 60)
-    print(f"\nGeometry:")
+    print("\nGeometry:")
     print(f"  Inlet diameter:  {D_inlet*100:.1f} cm  (A = {A_inlet*1e4:.2f} cm²)")
     print(f"  Throat diameter: {D_throat*100:.1f} cm  (A = {A_throat*1e4:.2f} cm²)")
     print(f"  Exit diameter:   {D_exit*100:.1f} cm  (A = {A_exit*1e4:.2f} cm²)")
@@ -49,7 +49,7 @@ def main() -> None:
     T0 = 2000.0  # K (stagnation temperature - hot combustion gas)
     P0 = 2000000.0  # Pa (stagnation pressure - 20 bar chamber pressure)
 
-    print(f"\nStagnation conditions:")
+    print("\nStagnation conditions:")
     print(f"  T0 = {T0:.0f} K")
     print(f"  P0 = {P0/1e5:.1f} bar")
 

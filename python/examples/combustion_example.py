@@ -121,13 +121,13 @@ def main() -> None:
     print(f"  P = {mixed.P:.0f} Pa")
     print(f"  mdot = {mixed.mdot:.4f} kg/s")
 
-    print(f"\nComplete Combustion (CO2 + H2O only):")
+    print("\nComplete Combustion (CO2 + H2O only):")
     print(f"  T_ad = {burned.T:.2f} K")
 
-    print(f"\nCombustion + Equilibrium (one-step):")
+    print("\nCombustion + Equilibrium (one-step):")
     print(f"  T_eq = {eq.T:.2f} K")
 
-    print(f"\nProduct Composition (mole fractions > 0.1%):")
+    print("\nProduct Composition (mole fractions > 0.1%):")
     for i, name in enumerate(sp.names):
         if eq.X[i] > 0.001:
             print(f"  {name:>8s}: {eq.X[i]*100:6.2f}%")
@@ -151,16 +151,16 @@ def main() -> None:
     # For comparison, also show complete combustion (before equilibrium)
     burned = ca.complete_combustion(mixed.T, mixed.X, mixed.P)
 
-    print(f"\nComplete Combustion (before equilibrium):")
+    print("\nComplete Combustion (before equilibrium):")
     print(f"  T_ad = {burned.T:.2f} K")
-    print(f"  Unburned hydrocarbons:")
+    print("  Unburned hydrocarbons:")
     for hc in ["CH4", "C2H6", "C3H8"]:
         if burned.X[sp.indices[hc]] > 1e-6:
             print(f"    {hc}: {burned.X[sp.indices[hc]]*100:.4f}%")
 
-    print(f"\nCombustion + Equilibrium (one-step, hydrocarbons reformed to CO + H2):")
+    print("\nCombustion + Equilibrium (one-step, hydrocarbons reformed to CO + H2):")
     print(f"  T_eq = {eq.T:.2f} K (dropped {burned.T - eq.T:.1f} K)")
-    print(f"  Product composition:")
+    print("  Product composition:")
     for i, name in enumerate(sp.names):
         if eq.X[i] > 0.001:
             print(f"    {name:>8s}: {eq.X[i]*100:6.2f}%")
