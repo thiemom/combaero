@@ -24,6 +24,7 @@ ignore = [
     "N802",  # Allow function names with uppercase (e.g., find_adiabatic_T)
     "N803",  # Allow argument names with uppercase (e.g., T, P, X for scientific variables)
     "N806",  # Allow variables in functions with uppercase (e.g., T, P, X)
+    "N816",  # Allow mixedCase in global scope (e.g., dT, dP, Cd, Q)
 ]
 
 # Exclude directories
