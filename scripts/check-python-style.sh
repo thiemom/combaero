@@ -115,44 +115,42 @@ fi
 echo ""
 
 # -----------------------------------------------------------------------------
-# Check 2: PEP 8 compliance (flake8)
+# Check 2: Code quality (ruff)
 # -----------------------------------------------------------------------------
-echo "Check 2: PEP 8 compliance (flake8)..."
+echo "Check 2: Code quality (ruff)..."
 
-if command -v flake8 &> /dev/null; then
-    FLAKE8_ARGS=(
-        "--max-line-length=100"
-        "--extend-ignore=E203,W503"  # Black compatibility
+if command -v ruff &> /dev/null; then
+    RUFF_ARGS=(
+        "--line-length=100"
         "--exclude=.venv,__pycache__,.pytest_cache,build,dist"
     )
 
-    if [ "$STRICT" = true ]; then
-        FLAKE8_ARGS+=("--max-complexity=10")
-    fi
-
-    if [ "$VERBOSE" = true ]; then
-        FLAKE8_ARGS+=("--show-source" "--statistics")
-    fi
-
-    FLAKE8_OUTPUT=$(flake8 "${FLAKE8_ARGS[@]}" "${SCAN_DIRS[@]}" 2>&1 || true)
-
-    if [ -n "$FLAKE8_OUTPUT" ]; then
-        echo -e "${RED}  ✗ PEP 8 violations found${NC}"
-        if [ "$VERBOSE" = true ]; then
-            echo "$FLAKE8_OUTPUT"
-        else
-            echo "$FLAKE8_OUTPUT" | head -20
-            TOTAL_LINES=$(echo "$FLAKE8_OUTPUT" | wc -l)
-            if [ "$TOTAL_LINES" -gt 20 ]; then
-                echo "  ... and $((TOTAL_LINES - 20)) more (use --verbose to see all)"
-            fi
-        fi
-        ((VIOLATIONS++))
+    if [ "$FIX" = true ]; then
+        echo "  Running ruff with auto-fix..."
+        ruff check "${RUFF_ARGS[@]}" --fix "${SCAN_DIRS[@]}"
+        echo -e "${GREEN}  ✓ Ruff checks passed (with fixes)${NC}"
     else
-        echo -e "${GREEN}  ✓ PEP 8 compliant${NC}"
+        RUFF_OUTPUT=$(ruff check "${RUFF_ARGS[@]}" "${SCAN_DIRS[@]}" 2>&1 || true)
+
+        if [ -n "$RUFF_OUTPUT" ]; then
+            echo -e "${RED}  ✗ Code quality issues found${NC}"
+            if [ "$VERBOSE" = true ]; then
+                echo "$RUFF_OUTPUT"
+            else
+                echo "$RUFF_OUTPUT" | head -20
+                TOTAL_LINES=$(echo "$RUFF_OUTPUT" | wc -l)
+                if [ "$TOTAL_LINES" -gt 20 ]; then
+                    echo "  ... and $((TOTAL_LINES - 20)) more (use --verbose to see all)"
+                fi
+            fi
+            echo "  Run with --fix to auto-fix"
+            ((VIOLATIONS++))
+        else
+            echo -e "${GREEN}  ✓ Code quality checks passed${NC}"
+        fi
     fi
 else
-    echo -e "${YELLOW}  ⚠ flake8 not found (install: pip install flake8)${NC}"
+    echo -e "${YELLOW}  ⚠ ruff not found (install: pip install ruff)${NC}"
 fi
 
 echo ""
@@ -190,48 +188,9 @@ fi
 echo ""
 
 # -----------------------------------------------------------------------------
-# Check 4: Import sorting (isort)
+# Check 4: Type hints (mypy) - optional
 # -----------------------------------------------------------------------------
-echo "Check 4: Import sorting (isort)..."
-
-if command -v isort &> /dev/null; then
-    ISORT_ARGS=(
-        "--profile=black"
-        "--line-length=100"
-        "--skip=.venv"
-        "--skip=__pycache__"
-    )
-
-    if [ "$FIX" = true ]; then
-        echo "  Sorting imports..."
-        isort "${ISORT_ARGS[@]}" "${SCAN_DIRS[@]}"
-        echo -e "${GREEN}  ✓ Imports sorted${NC}"
-    else
-        ISORT_OUTPUT=$(isort "${ISORT_ARGS[@]}" --check-only --diff "${SCAN_DIRS[@]}" 2>&1 || true)
-
-        if [ -n "$ISORT_OUTPUT" ]; then
-            echo -e "${RED}  ✗ Import sorting issues found${NC}"
-            if [ "$VERBOSE" = true ]; then
-                echo "$ISORT_OUTPUT"
-            else
-                echo "$ISORT_OUTPUT" | head -20
-            fi
-            echo "  Run with --fix to auto-sort"
-            ((VIOLATIONS++))
-        else
-            echo -e "${GREEN}  ✓ Imports properly sorted${NC}"
-        fi
-    fi
-else
-    echo -e "${YELLOW}  ⚠ isort not found (install: pip install isort)${NC}"
-fi
-
-echo ""
-
-# -----------------------------------------------------------------------------
-# Check 5: Type hints (mypy) - optional
-# -----------------------------------------------------------------------------
-echo "Check 5: Type hints (mypy)..."
+echo "Check 4: Type hints (mypy)..."
 
 if command -v mypy &> /dev/null; then
     MYPY_ARGS=(

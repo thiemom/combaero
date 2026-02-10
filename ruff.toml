@@ -1,0 +1,43 @@
+# Ruff configuration for combaero
+# https://docs.astral.sh/ruff/
+
+line-length = 100
+target-version = "py311"
+
+[lint]
+# Enable pycodestyle (E), Pyflakes (F), isort (I), and other useful rules
+select = [
+    "E",   # pycodestyle errors
+    "F",   # Pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+]
+
+# Ignore specific rules
+ignore = [
+    "E203",  # Whitespace before ':' (conflicts with black)
+    "E501",  # Line too long (handled by black and noqa comments)
+]
+
+# Exclude directories
+exclude = [
+    ".venv",
+    "__pycache__",
+    ".pytest_cache",
+    "build",
+    "dist",
+    ".git",
+]
+
+[lint.isort]
+# Use black-compatible import sorting
+force-single-line = false
+known-first-party = ["combaero"]
+
+[lint.per-file-ignores]
+# Allow unused imports in __init__.py files
+"__init__.py" = ["F401"]
