@@ -233,7 +233,7 @@ def main() -> None:
     Re = 5e4
     Pr = 0.7
     D = 0.1  # Pipe diameter [m]
-    eps = ca.pipe_roughness('commercial_steel')  # Use pipe_roughness database
+    eps = ca.pipe_roughness("commercial_steel")  # Use pipe_roughness database
     e_D = eps / D
 
     # Get friction factor

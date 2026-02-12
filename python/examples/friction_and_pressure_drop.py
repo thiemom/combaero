@@ -55,7 +55,7 @@ def main() -> None:
 
     Re = 1e5
     D = 0.1  # Pipe diameter [m]
-    
+
     # Use pipe_roughness database for standard materials
     materials = ["drawn_tubing", "commercial_steel", "galvanized_iron", "cast_iron"]
 
@@ -78,7 +78,7 @@ def main() -> None:
     # Pipe geometry
     D = 0.1  # Diameter [m]
     L = 100.0  # Length [m]
-    eps = ca.pipe_roughness('commercial_steel')  # Get roughness from database
+    eps = ca.pipe_roughness("commercial_steel")  # Get roughness from database
     e_D = eps / D
 
     # Air properties at 300K
@@ -90,8 +90,8 @@ def main() -> None:
     v = 10.0  # Velocity [m/s]
 
     # Use pressure_drop_pipe composite function (calculates Re, f, and ΔP)
-    dP, Re, f = ca.pressure_drop_pipe(T, P, X_air, v, D, L, eps, 'haaland')
-    
+    dP, Re, f = ca.pressure_drop_pipe(T, P, X_air, v, D, L, eps, "haaland")
+
     # Also get density and viscosity for display
     rho = ca.density(T, P, X_air)
     mu = ca.viscosity(T, P, X_air)
@@ -145,7 +145,7 @@ def main() -> None:
     mdot = 0.5  # Mass flow rate [kg/s]
     L = 50.0  # Pipe length [m]
     dP_max = 5000.0  # Maximum allowable pressure drop [Pa]
-    eps = ca.pipe_roughness('commercial_steel')  # Get roughness from database
+    eps = ca.pipe_roughness("commercial_steel")  # Get roughness from database
 
     # Air properties
     T = 300.0
@@ -171,7 +171,7 @@ def main() -> None:
         A = ca.pipe_area(D)
         v = mdot / (rho * A)
         # Use pressure_drop_pipe composite function
-        dP, Re, f = ca.pressure_drop_pipe(T, P, X_air, v, D, L, eps, 'haaland')
+        dP, Re, f = ca.pressure_drop_pipe(T, P, X_air, v, D, L, eps, "haaland")
         ok = "✓" if dP <= dP_max else "✗"
         print(f"{D*1000:10.1f}  {v:10.2f}  {Re:12.2e}  {f:10.6f}  {dP/1000:12.3f}  {ok:>6s}")
 

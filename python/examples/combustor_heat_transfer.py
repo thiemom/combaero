@@ -134,11 +134,11 @@ def main() -> None:
 
     # Use pressure_drop_pipe composite function
     # Note: Using cast_iron roughness as proxy for combustor liner
-    eps = ca.pipe_roughness('cast_iron')
+    eps = ca.pipe_roughness("cast_iron")
     dP_friction, Re, f = ca.pressure_drop_pipe(
-        T_avg, P_combustor, burned.X, v_avg, Dh, L_combustor, eps, 'haaland'
+        T_avg, P_combustor, burned.X, v_avg, Dh, L_combustor, eps, "haaland"
     )
-    
+
     # Also get viscosity for display
     mu_avg = ca.viscosity(T_avg, P_combustor, burned.X)
 
@@ -300,7 +300,7 @@ def main() -> None:
         v_avg_test = mixed_test.mdot / (rho_avg_test * A_annular)
         # Use pressure_drop_pipe composite function
         dP_friction_test, Re_test, f_test = ca.pressure_drop_pipe(
-            T_avg_test, P_combustor, burned_test.X, v_avg_test, Dh, L_combustor, eps, 'haaland'
+            T_avg_test, P_combustor, burned_test.X, v_avg_test, Dh, L_combustor, eps, "haaland"
         )
         dP_test = dP_friction_test * 1.5  # Account for additional losses
 
