@@ -44,7 +44,7 @@ repos:
         pass_filenames: false
         files: ^python/.*\.py$
         stages: [commit]
-      
+
       - id: cantera-validation-tests
         name: Cantera Validation Tests
         entry: bash -c 'cd cantera_validation_tests && poetry install --quiet && poetry run pytest -v --tb=short'
