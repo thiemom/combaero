@@ -59,6 +59,7 @@ try:
         UnitInfo,
         adiabatic_T_wgs,
         all_units,
+        annular_area,
         annulus_axial_modes,
         annulus_azimuthal_modes,
         annulus_modes,
@@ -175,10 +176,12 @@ try:
         oxygen_required_per_mol_fuel,
         oxygen_required_per_mol_mixture,
         peclet,
+        pipe_area,
         pipe_dP,
         pipe_dP_mdot,
         pipe_mdot,
         pipe_velocity,
+        pipe_volume,
         prandtl,
         quarter_wave_frequency,
         reforming_equilibrium,
@@ -415,6 +418,9 @@ except ModuleNotFoundError:
     hydraulic_diameter = _core.hydraulic_diameter
     hydraulic_diameter_rect = _core.hydraulic_diameter_rect
     hydraulic_diameter_annulus = _core.hydraulic_diameter_annulus
+    pipe_area = _core.pipe_area
+    annular_area = _core.annular_area
+    pipe_volume = _core.pipe_volume
     # Orifice Cd correlations
     OrificeGeometry = _core.OrificeGeometry
     OrificeState = _core.OrificeState
@@ -622,6 +628,9 @@ __all__ = [
     "hydraulic_diameter",
     "hydraulic_diameter_rect",
     "hydraulic_diameter_annulus",
+    "pipe_area",
+    "annular_area",
+    "pipe_volume",
     # Orifice Cd correlations
     "OrificeGeometry",
     "OrificeState",

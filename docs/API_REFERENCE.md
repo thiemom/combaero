@@ -339,6 +339,11 @@ lmtd(dT1, dT2)  # [K]
 Hydraulic diameter and residence time calculations for flow systems.
 
 ```python
+# Simple geometry helpers
+pipe_area(D)                                 # Circular pipe area [m²]
+annular_area(D_outer, D_inner)               # Annular area [m²]
+pipe_volume(D, L)                            # Pipe volume [m³]
+
 # Hydraulic diameter calculations
 hydraulic_diameter(A, P_wetted)              # Generic [m]
 hydraulic_diameter_rect(a, b)                # Rectangular duct [m]

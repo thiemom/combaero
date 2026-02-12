@@ -1,12 +1,161 @@
 """Tests for geometry utility functions.
 
 Verifies Python bindings for hydraulic diameter and residence time calculations.
-Units: Dh in [m], τ in [s], SV in [1/s].
+Units: Dh in [m], τ in [s], SV in [1/s], A in [m²], V in [m³].
 """
 
+import numpy as np
 import pytest
 
 import combaero as cb
+
+
+class TestSimpleGeometryHelpers:
+    """Test simple geometry helper functions (Phase 1)."""
+
+    def test_pipe_area_basic(self):
+        """Test pipe area calculation."""
+        D = 0.1  # Diameter [m]
+        A = cb.pipe_area(D)
+
+        # A = π * (D/2)²
+        expected = np.pi * (D / 2) ** 2
+        assert abs(A - expected) < 1e-15
+
+        # Units check: should be in m²
+        assert A > 0
+        assert isinstance(A, float)
+
+    def test_pipe_area_matches_manual(self):
+        """Test pipe area matches manual calculation exactly."""
+        D = 0.05  # 50 mm diameter
+        A = cb.pipe_area(D)
+
+        # Manual calculation
+        A_manual = np.pi * 0.025**2
+        assert abs(A - A_manual) < 1e-15  # Machine precision
+
+    def test_pipe_area_various_sizes(self):
+        """Test pipe area for various diameters."""
+        for D in [0.01, 0.05, 0.1, 0.5, 1.0]:
+            A = cb.pipe_area(D)
+            expected = np.pi * (D / 2) ** 2
+            assert abs(A - expected) / expected < 1e-14
+
+    def test_pipe_area_error_on_zero(self):
+        """Test pipe area raises error for zero diameter."""
+        with pytest.raises(ValueError):  # C++ invalid_argument → ValueError
+            cb.pipe_area(0.0)
+
+    def test_pipe_area_error_on_negative(self):
+        """Test pipe area raises error for negative diameter."""
+        with pytest.raises(ValueError):
+            cb.pipe_area(-0.1)
+
+    def test_annular_area_basic(self):
+        """Test annular area calculation."""
+        D_outer = 0.15  # Outer diameter [m]
+        D_inner = 0.10  # Inner diameter [m]
+        A = cb.annular_area(D_outer, D_inner)
+
+        # A = π * ((D_outer/2)² - (D_inner/2)²)
+        expected = np.pi * ((D_outer / 2) ** 2 - (D_inner / 2) ** 2)
+        assert abs(A - expected) < 1e-15
+
+        # Units check: should be in m²
+        assert A > 0
+        assert isinstance(A, float)
+
+    def test_annular_area_matches_manual(self):
+        """Test annular area matches manual calculation exactly."""
+        D_outer = 0.6  # 600 mm
+        D_inner = 0.4  # 400 mm
+        A = cb.annular_area(D_outer, D_inner)
+
+        # Manual calculation
+        A_manual = np.pi * (0.3**2 - 0.2**2)
+        assert abs(A - A_manual) < 1e-15  # Machine precision
+
+    def test_annular_area_thin_gap(self):
+        """Test annular area for thin annular gap."""
+        D_outer = 0.101
+        D_inner = 0.100
+        A = cb.annular_area(D_outer, D_inner)
+
+        expected = np.pi * ((D_outer / 2) ** 2 - (D_inner / 2) ** 2)
+        assert abs(A - expected) / expected < 1e-14
+
+    def test_annular_area_error_on_invalid(self):
+        """Test annular area raises error for D_outer <= D_inner."""
+        with pytest.raises(ValueError):
+            cb.annular_area(0.1, 0.1)  # Equal
+
+        with pytest.raises(ValueError):
+            cb.annular_area(0.1, 0.15)  # Inner > outer
+
+    def test_annular_area_error_on_negative(self):
+        """Test annular area raises error for negative diameter."""
+        with pytest.raises(ValueError):
+            cb.annular_area(0.15, -0.1)
+
+    def test_pipe_volume_basic(self):
+        """Test pipe volume calculation."""
+        D = 0.1  # Diameter [m]
+        L = 2.0  # Length [m]
+        V = cb.pipe_volume(D, L)
+
+        # V = π * (D/2)² * L
+        expected = np.pi * (D / 2) ** 2 * L
+        assert abs(V - expected) < 1e-15
+
+        # Units check: should be in m³
+        assert V > 0
+        assert isinstance(V, float)
+
+    def test_pipe_volume_matches_manual(self):
+        """Test pipe volume matches manual calculation exactly."""
+        D = 0.05  # 50 mm diameter
+        L = 10.0  # 10 m length
+        V = cb.pipe_volume(D, L)
+
+        # Manual calculation
+        V_manual = np.pi * 0.025**2 * 10.0
+        assert abs(V - V_manual) < 1e-15  # Machine precision
+
+    def test_pipe_volume_various_sizes(self):
+        """Test pipe volume for various dimensions."""
+        test_cases = [(0.01, 1.0), (0.05, 5.0), (0.1, 10.0), (0.2, 2.0)]
+        for D, L in test_cases:
+            V = cb.pipe_volume(D, L)
+            expected = np.pi * (D / 2) ** 2 * L
+            assert abs(V - expected) / expected < 1e-14
+
+    def test_pipe_volume_consistency_with_area(self):
+        """Test pipe volume is consistent with pipe area."""
+        D = 0.1
+        L = 5.0
+
+        A = cb.pipe_area(D)
+        V = cb.pipe_volume(D, L)
+
+        # V should equal A * L
+        assert abs(V - A * L) < 1e-15  # Machine precision
+
+    def test_pipe_volume_error_on_zero(self):
+        """Test pipe volume raises error for zero dimensions."""
+        with pytest.raises(ValueError):
+            cb.pipe_volume(0.0, 1.0)
+
+        with pytest.raises(ValueError):
+            cb.pipe_volume(0.1, 0.0)
+
+    def test_pipe_volume_error_on_negative(self):
+        """Test pipe volume raises error for negative dimensions."""
+        with pytest.raises(ValueError):
+            cb.pipe_volume(-0.1, 1.0)
+
+        with pytest.raises(ValueError):
+            cb.pipe_volume(0.1, -1.0)
 
 
 class TestHydraulicDiameter:

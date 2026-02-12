@@ -1372,6 +1372,43 @@ PYBIND11_MODULE(_core, m)
         "Returns: space velocity SV [1/s]"
     );
 
+    m.def(
+        "pipe_area",
+        &pipe_area,
+        py::arg("D"),
+        "Circular pipe cross-sectional area.\n\n"
+        "A = π * (D/2)²\n\n"
+        "Parameters:\n"
+        "  D : diameter [m]\n\n"
+        "Returns: area [m²]"
+    );
+
+    m.def(
+        "annular_area",
+        &annular_area,
+        py::arg("D_outer"),
+        py::arg("D_inner"),
+        "Annular cross-sectional area.\n\n"
+        "A = π * ((D_outer/2)² - (D_inner/2)²)\n\n"
+        "Parameters:\n"
+        "  D_outer : outer diameter [m]\n"
+        "  D_inner : inner diameter [m]\n\n"
+        "Returns: area [m²]"
+    );
+
+    m.def(
+        "pipe_volume",
+        &pipe_volume,
+        py::arg("D"),
+        py::arg("L"),
+        "Cylindrical pipe volume.\n\n"
+        "V = π * (D/2)² * L\n\n"
+        "Parameters:\n"
+        "  D : diameter [m]\n"
+        "  L : length [m]\n\n"
+        "Returns: volume [m³]"
+    );
+
     // -------------------------------------------------------------
     // Compressible flow
     // -------------------------------------------------------------

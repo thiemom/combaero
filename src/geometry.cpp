@@ -24,6 +24,31 @@ double hydraulic_diameter_annulus(double D_outer, double D_inner) {
 }
 
 // -------------------------------------------------------------
+// Simple Geometry Helpers
+// -------------------------------------------------------------
+
+double pipe_area(double D) {
+    if (D <= 0.0) {
+        throw std::invalid_argument("pipe_area: D must be positive");
+    }
+    return M_PI * D * D / 4.0;
+}
+
+double annular_area(double D_outer, double D_inner) {
+    if (D_outer <= D_inner || D_inner < 0.0) {
+        throw std::invalid_argument("annular_area: D_outer > D_inner >= 0 required");
+    }
+    return M_PI * (D_outer * D_outer - D_inner * D_inner) / 4.0;
+}
+
+double pipe_volume(double D, double L) {
+    if (D <= 0.0 || L <= 0.0) {
+        throw std::invalid_argument("pipe_volume: D and L must be positive");
+    }
+    return M_PI * D * D * L / 4.0;
+}
+
+// -------------------------------------------------------------
 // Tube methods
 // -------------------------------------------------------------
 

@@ -34,6 +34,37 @@ double hydraulic_diameter_rect(double a, double b);
 double hydraulic_diameter_annulus(double D_outer, double D_inner);
 
 // -------------------------------------------------------------
+// Simple Geometry Helpers
+// -------------------------------------------------------------
+// Common geometric calculations for pipe flow
+
+// Circular pipe cross-sectional area
+// A = π * (D/2)²
+//
+// Parameters:
+//   D : diameter [m]
+// Returns: area [m²]
+double pipe_area(double D);
+
+// Annular cross-sectional area
+// A = π * ((D_outer/2)² - (D_inner/2)²)
+//
+// Parameters:
+//   D_outer : outer diameter [m]
+//   D_inner : inner diameter [m]
+// Returns: area [m²]
+double annular_area(double D_outer, double D_inner);
+
+// Cylindrical pipe volume
+// V = π * (D/2)² * L
+//
+// Parameters:
+//   D : diameter [m]
+//   L : length [m]
+// Returns: volume [m³]
+double pipe_volume(double D, double L);
+
+// -------------------------------------------------------------
 // Acoustic Geometry Primitives
 // -------------------------------------------------------------
 // Standard shapes for acoustic mode calculations.
