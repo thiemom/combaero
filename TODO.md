@@ -221,11 +221,11 @@ we should have mass-basis equivalents for all of them to avoid user confusion.
 - Test case-insensitive lookup
 - Test error handling for unknown materials
 
-**Status:** Not started
+**Status:** ✅ COMPLETED
 
 ---
 
-## Phase 7: LMTD Convenience Wrappers ⏳
+## Phase 7: LMTD Convenience Wrappers ✅
 
 **Priority:** MEDIUM - Convenience, saves users from calculating dT
 **Difficulty:** EASY - Simple wrappers around existing lmtd()
@@ -254,7 +254,7 @@ we should have mass-basis equivalents for all of them to avoid user confusion.
 - Test with realistic heat exchanger temperatures
 - Verify counterflow > parallelflow for same conditions
 
-**Status:** Not started
+**Status:** ✅ COMPLETED (lmtd_counterflow, lmtd_parallelflow already implemented)
 
 ---
 

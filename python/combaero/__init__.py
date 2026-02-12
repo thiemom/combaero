@@ -45,6 +45,7 @@ try:
         Cd_rounded_entry,
         Cd_sharp_thin_plate,
         Cd_thick_plate,
+        CdCorrelation,
         CompressibleFlowSolution,
         FannoSolution,
         FannoStation,
@@ -104,6 +105,7 @@ try:
         equivalence_ratio_mass,
         equivalence_ratio_mole,
         expansibility_factor,
+        solve_orifice_mdot,
         fanno_max_length,
         fanno_pipe,
         formula,
@@ -182,6 +184,7 @@ try:
         peclet,
         pipe_area,
         pipe_dP,
+        pipe_roughness,
         pipe_dP_mdot,
         pipe_mdot,
         pipe_velocity,
@@ -220,6 +223,7 @@ try:
         specific_gas_constant,
         speed_of_sound,
         standard_dry_air_composition,
+        standard_pipe_roughness,
         stokes_layer,
         strouhal,
         thermal_conductivity,
@@ -273,6 +277,7 @@ except ModuleNotFoundError:
     bilger_Z_from_equivalence_ratio_mass = _core.bilger_Z_from_equivalence_ratio_mass
     equivalence_ratio_from_bilger_Z_mass = _core.equivalence_ratio_from_bilger_Z_mass
     expansibility_factor = _core.expansibility_factor
+    solve_orifice_mdot = _core.solve_orifice_mdot
     standard_dry_air_composition = _core.standard_dry_air_composition
     humid_air_composition = _core.humid_air_composition
     dewpoint = _core.dewpoint
@@ -433,9 +438,12 @@ except ModuleNotFoundError:
     pipe_area = _core.pipe_area
     annular_area = _core.annular_area
     pipe_volume = _core.pipe_volume
+    pipe_roughness = _core.pipe_roughness
+    standard_pipe_roughness = _core.standard_pipe_roughness
     # Orifice Cd correlations
     OrificeGeometry = _core.OrificeGeometry
     OrificeState = _core.OrificeState
+    CdCorrelation = _core.CdCorrelation
     Cd_sharp_thin_plate = _core.Cd_sharp_thin_plate
     Cd_thick_plate = _core.Cd_thick_plate
     Cd_rounded_entry = _core.Cd_rounded_entry
@@ -491,6 +499,7 @@ __all__ = [
     "bilger_stoich_mixture_fraction_mass",
     "bilger_Z_from_equivalence_ratio_mass",
     "expansibility_factor",
+    "solve_orifice_mdot",
     "standard_dry_air_composition",
     "humid_air_composition",
     "dewpoint",
@@ -649,9 +658,12 @@ __all__ = [
     "pipe_area",
     "annular_area",
     "pipe_volume",
+    "pipe_roughness",
+    "standard_pipe_roughness",
     # Orifice Cd correlations
     "OrificeGeometry",
     "OrificeState",
+    "CdCorrelation",
     "Cd_sharp_thin_plate",
     "Cd_thick_plate",
     "Cd_rounded_entry",

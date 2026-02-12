@@ -226,10 +226,21 @@ All functions take temperature [K] and mole fractions vector:
 ```cpp
 double cp(double T, const std::vector<double>& X);      // J/(mol·K)
 double h(double T, const std::vector<double>& X);       // J/mol
-double s(double T, const std::vector<double>& X);       // J/(mol·K)
+double s(double T, const std::vector<double>& X, double P, double P_ref=101325.0);  // J/(mol·K)
 double cv(double T, const std::vector<double>& X);      // J/(mol·K)
 double density(double T, double P, const std::vector<double>& X);  // kg/m³
 double speed_of_sound(double T, const std::vector<double>& X);     // m/s
+```
+
+### Mass-Specific Properties
+
+Symmetric interface to molar-basis functions. Converts via: `property_mass = property_molar / mwmix × 1000`
+
+```cpp
+double cp_mass(double T, const std::vector<double>& X);  // J/(kg·K)
+double cv_mass(double T, const std::vector<double>& X);  // J/(kg·K)
+double h_mass(double T, const std::vector<double>& X);   // J/kg
+double s_mass(double T, const std::vector<double>& X, double P, double P_ref=101325.0);  // J/(kg·K)
 ```
 
 ## Transport Properties
@@ -343,6 +354,10 @@ Hydraulic diameter and residence time calculations for flow systems.
 pipe_area(D)                                 # Circular pipe area [m²]
 annular_area(D_outer, D_inner)               # Annular area [m²]
 pipe_volume(D, L)                            # Pipe volume [m³]
+
+# Pipe roughness database
+pipe_roughness(material)                     # Absolute roughness ε [m]
+standard_pipe_roughness()                    # All materials dict
 
 # Hydraulic diameter calculations
 hydraulic_diameter(A, P_wetted)              # Generic [m]

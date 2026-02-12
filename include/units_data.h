@@ -124,6 +124,8 @@ inline constexpr Entry function_units[] = {
     {"pipe_area",               "D: m",                                 "m^2"},
     {"annular_area",            "D_outer: m, D_inner: m",               "m^2"},
     {"pipe_volume",             "D: m, L: m",                           "m^3"},
+    {"pipe_roughness",          "material: str",                        "m"},
+    {"standard_pipe_roughness", "-",                                    "dict[str, m]"},
     {"hydraulic_diameter",      "A: m^2, P_wetted: m",                  "m"},
     {"hydraulic_diameter_rect", "a: m, b: m",                           "m"},
     {"hydraulic_diameter_annulus", "D_outer: m, D_inner: m",            "m"},

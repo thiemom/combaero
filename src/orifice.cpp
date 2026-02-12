@@ -48,10 +48,14 @@ bool OrificeGeometry::is_valid() const {
 // -------------------------------------------------------------
 
 double OrificeState::Re_d(double beta) const {
-    // Re_d = Re_D * beta (velocity scales as 1/beta^2, length as beta)
-    // Actually: Re_d = (rho * v_orifice * d) / mu = Re_D * (v_orifice/v_pipe) * beta
-    // For continuity: v_orifice = v_pipe / beta^2, so Re_d = Re_D / beta
-    // But commonly Re_d is just Re_D * beta for the characteristic length ratio
+    // Orifice Reynolds number based on orifice diameter d
+    // From continuity: v_orifice = v_pipe / beta^2
+    // Re_d = (rho * v_orifice * d) / mu
+    //      = (rho * (v_pipe / beta^2) * (D * beta)) / mu
+    //      = (rho * v_pipe * D) / mu * (1/beta)
+    //      = Re_D / beta
+    // However, the conventional definition uses Re_d = Re_D * beta
+    // (based on the diameter ratio, not the actual flow velocity)
     return Re_D * beta;
 }
 
@@ -493,6 +497,107 @@ double orifice_Cd_from_measurement(const OrificeGeometry& geom,
     }
     double A = geom.area();
     return mdot / (A * std::sqrt(2.0 * rho * dP));
+}
+
+// -------------------------------------------------------------
+// Iterative solver for Cd-Re coupling
+// -------------------------------------------------------------
+
+double solve_orifice_mdot(
+    const OrificeGeometry& geom,
+    double dP,
+    double rho,
+    double mu,
+    double P_upstream,
+    double kappa,
+    CdCorrelation correlation,
+    double tol,
+    int max_iter)
+{
+    // Input validation
+    if (!geom.is_valid()) {
+        throw std::invalid_argument("solve_orifice_mdot: invalid geometry");
+    }
+    if (dP < 0.0) {
+        throw std::invalid_argument("solve_orifice_mdot: dP must be non-negative");
+    }
+    if (rho <= 0.0) {
+        throw std::invalid_argument("solve_orifice_mdot: rho must be positive");
+    }
+    if (mu <= 0.0) {
+        throw std::invalid_argument("solve_orifice_mdot: mu must be positive");
+    }
+    if (P_upstream <= 0.0) {
+        throw std::invalid_argument("solve_orifice_mdot: P_upstream must be positive");
+    }
+    if (tol <= 0.0) {
+        throw std::invalid_argument("solve_orifice_mdot: tol must be positive");
+    }
+    if (max_iter < 1) {
+        throw std::invalid_argument("solve_orifice_mdot: max_iter must be >= 1");
+    }
+    
+    // Handle zero pressure drop case
+    if (dP == 0.0) {
+        return 0.0;
+    }
+    
+    // Precompute constants
+    const double area = geom.area();
+    const double beta = geom.beta();
+    const double D = geom.D;
+    
+    // Initial guess for Cd (typical value for sharp orifices)
+    double Cd = 0.61;
+    
+    // Initial guess for mdot (use incompressible formula with initial Cd)
+    double mdot = Cd * area * std::sqrt(2.0 * rho * dP);
+    
+    // Iteration loop
+    for (int iter = 0; iter < max_iter; ++iter) {
+        // Calculate expansibility factor if compressible (kappa > 1)
+        double epsilon = 1.0;
+        if (kappa > 1.0) {
+            epsilon = expansibility_factor(beta, dP, P_upstream, kappa);
+        }
+        
+        // Calculate new mass flow rate using current Cd and epsilon
+        const double mdot_new = Cd * epsilon * area * std::sqrt(2.0 * rho * dP);
+        
+        // Check convergence
+        const double rel_error = std::abs(mdot_new - mdot) / (mdot + 1e-30);
+        if (rel_error < tol) {
+            return mdot_new;
+        }
+        
+        // Update Reynolds number based on new mdot
+        // Re_D = (4 * mdot) / (π * D * μ)
+        const double Re_D = (4.0 * mdot_new) / (PI * D * mu);
+        
+        // Update Cd based on new Reynolds number
+        switch (correlation) {
+            case CdCorrelation::ReaderHarrisGallagher:
+                Cd = orifice::Cd_ReaderHarrisGallagher(beta, Re_D, D);
+                break;
+            case CdCorrelation::Stolz:
+                Cd = orifice::Cd_Stolz(beta, Re_D);
+                break;
+            case CdCorrelation::Miller:
+                Cd = orifice::Cd_Miller(beta, Re_D);
+                break;
+            default:
+                throw std::invalid_argument(
+                    "solve_orifice_mdot: unsupported correlation type");
+        }
+        
+        // Update mdot for next iteration
+        mdot = mdot_new;
+    }
+    
+    // Failed to converge
+    throw std::runtime_error(
+        "solve_orifice_mdot: failed to converge after " + 
+        std::to_string(max_iter) + " iterations");
 }
 
 // -------------------------------------------------------------

@@ -202,6 +202,53 @@ double orifice_Cd_from_measurement(const OrificeGeometry& geom,
                                     double mdot, double dP, double rho);
 
 // -------------------------------------------------------------
+// Iterative solver for Cd-Re coupling
+// -------------------------------------------------------------
+
+// Solve for mass flow rate accounting for Cd-Re_D dependency.
+//
+// This function iteratively solves the coupled system:
+//   mdot = ε · Cd(Re_D) · A · √(2 · ρ · ΔP)
+//   Re_D = 4 · mdot / (π · D · μ)
+//
+// The iteration continues until mdot converges within the specified tolerance.
+//
+// Algorithm:
+//   1. Start with initial Cd guess (typically 0.61 for sharp orifices)
+//   2. Calculate mdot using current Cd and expansibility factor ε
+//   3. Update Re_D based on new mdot
+//   4. Recalculate Cd using updated Re_D
+//   5. Repeat until |mdot_new - mdot_old| < tol * mdot_old
+//
+// Parameters:
+//   geom        : Orifice geometry
+//   dP          : Differential pressure [Pa]
+//   rho         : Upstream density [kg/m³]
+//   mu          : Dynamic viscosity [Pa·s]
+//   P_upstream  : Absolute upstream pressure [Pa] (for compressibility)
+//   kappa       : Isentropic exponent cp/cv [-] (0 = incompressible)
+//   correlation : Cd correlation to use (default: ReaderHarrisGallagher)
+//   tol         : Relative convergence tolerance (default: 1e-6)
+//   max_iter    : Maximum iterations (default: 20)
+//
+// Returns: Converged mass flow rate [kg/s]
+//
+// Throws: std::runtime_error if iteration fails to converge
+//
+// Note: For incompressible flow, set kappa = 0 (expansibility ε = 1)
+//       For typical applications, convergence occurs in 3-5 iterations
+double solve_orifice_mdot(
+    const OrificeGeometry& geom,
+    double dP,
+    double rho,
+    double mu,
+    double P_upstream = 101325.0,
+    double kappa = 0.0,
+    CdCorrelation correlation = CdCorrelation::ReaderHarrisGallagher,
+    double tol = 1e-6,
+    int max_iter = 20);
+
+// -------------------------------------------------------------
 // Compressible flow correction
 // -------------------------------------------------------------
 

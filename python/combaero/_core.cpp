@@ -3,8 +3,10 @@
 #include <pybind11/stl.h>
 #include <vector>
 
+#include "state.h"
 #include "thermo.h"
 #include "transport.h"
+#include "utils.h"
 #include "combustion.h"
 #include "equilibrium.h"
 #include "humidair.h"
@@ -14,7 +16,6 @@
 #include "friction.h"
 #include "heat_transfer.h"
 #include "acoustics.h"
-#include "state.h"
 #include "orifice.h"
 #include "pipe_flow.h"
 #include "units.h"
@@ -2310,6 +2311,12 @@ PYBIND11_MODULE(_core, m)
         .def("volume", &Tube::volume, "Volume [m³]")
         .def("perimeter", &Tube::perimeter, "Circumference [m]");
 
+    // CdCorrelation enum (early binding for default arguments)
+    py::enum_<CdCorrelation>(m, "CdCorrelation", "Orifice discharge coefficient correlations")
+        .value("ReaderHarrisGallagher", CdCorrelation::ReaderHarrisGallagher, "ISO 5167-2 / ASME MFC-3M")
+        .value("Stolz", CdCorrelation::Stolz, "ISO 5167:1980 (older)")
+        .value("Miller", CdCorrelation::Miller, "Miller (1996) simplified");
+
     // Annulus struct
     py::class_<Annulus>(m, "Annulus", "Annular duct geometry for acoustic analysis")
         .def(py::init<double, double, double>(),
@@ -2970,6 +2977,41 @@ PYBIND11_MODULE(_core, m)
         "  - otherwise: sharp thin plate"
     );
 
+    m.def(
+        "solve_orifice_mdot",
+        &solve_orifice_mdot,
+        py::arg("geom"),
+        py::arg("dP"),
+        py::arg("rho"),
+        py::arg("mu"),
+        py::arg("P_upstream") = 101325.0,
+        py::arg("kappa") = 0.0,
+        py::arg("correlation") = CdCorrelation::ReaderHarrisGallagher,
+        py::arg("tol") = 1e-6,
+        py::arg("max_iter") = 20,
+        "Iterative solver for orifice mass flow with Cd-Re coupling.\n\n"
+        "Solves the coupled system:\n"
+        "  mdot = ε · Cd(Re_D) · A · √(2 · ρ · ΔP)\n"
+        "  Re_D = 4 · mdot / (π · D · μ)\n\n"
+        "Iterates until mdot converges (typically 3-5 iterations).\n\n"
+        "Parameters:\n"
+        "  geom        : OrificeGeometry\n"
+        "  dP          : differential pressure [Pa]\n"
+        "  rho         : upstream density [kg/m³]\n"
+        "  mu          : dynamic viscosity [Pa·s]\n"
+        "  P_upstream  : absolute upstream pressure [Pa] (default: 101325)\n"
+        "  kappa       : isentropic exponent cp/cv (0 = incompressible)\n"
+        "  correlation : Cd correlation (default: ReaderHarrisGallagher)\n"
+        "  tol         : relative convergence tolerance (default: 1e-6)\n"
+        "  max_iter    : maximum iterations (default: 20)\n\n"
+        "Returns: converged mass flow rate [kg/s]\n\n"
+        "Raises: RuntimeError if fails to converge\n\n"
+        "Example:\n"
+        "  >>> geom = OrificeGeometry(d=0.05, D=0.1)\n"
+        "  >>> mdot = solve_orifice_mdot(geom, 10000, 1.2, 1.8e-5)\n"
+        "  >>> print(f'Mass flow: {mdot:.4f} kg/s')"
+    );
+
     // Orifice flow calculations with Cd
     m.def(
         "orifice_mdot_Cd",
@@ -3063,9 +3105,52 @@ PYBIND11_MODULE(_core, m)
         "Returns 1.0 for t/d <= 0.02 (thin plate)."
     );
 
-    // -------------------------------------------------------------------------
-    // Units query API
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // Pipe Roughness Database
+    // =========================================================================
+
+    m.def(
+        "pipe_roughness",
+        &pipe_roughness,
+        py::arg("material"),
+        "Get absolute roughness for a standard pipe material.\n\n"
+        "Returns the absolute roughness ε [m] for common pipe materials.\n"
+        "Material names are case-insensitive.\n\n"
+        "Parameters:\n"
+        "  material : pipe material name (str)\n\n"
+        "Returns: absolute roughness ε [m]\n\n"
+        "Available materials:\n"
+        "  - 'smooth', 'drawn_tubing', 'pvc', 'plastic'\n"
+        "  - 'commercial_steel', 'new_steel', 'wrought_iron'\n"
+        "  - 'galvanized_iron', 'galvanized_steel', 'rusted_steel'\n"
+        "  - 'cast_iron', 'asphalted_cast_iron'\n"
+        "  - 'concrete', 'rough_concrete'\n"
+        "  - 'riveted_steel', 'wood_stave', 'corrugated_metal'\n\n"
+        "Raises: ValueError if material not found\n\n"
+        "References:\n"
+        "  - Moody (1944), Colebrook (1939), White (2011),\n"
+        "    Munson (2013), Crane (2009)\n\n"
+        "Example:\n"
+        "  >>> eps = pipe_roughness('commercial_steel')\n"
+        "  >>> print(f'Roughness: {eps*1e6:.1f} μm')  # 45.0 μm"
+    );
+
+    m.def(
+        "standard_pipe_roughness",
+        &standard_pipe_roughness,
+        "Get all standard pipe roughness values.\n\n"
+        "Returns a dictionary mapping material names to absolute\n"
+        "roughness values [m].\n\n"
+        "Returns: dict[str, float] - material -> roughness [m]\n\n"
+        "Example:\n"
+        "  >>> roughness_db = standard_pipe_roughness()\n"
+        "  >>> for material, eps in sorted(roughness_db.items()):\n"
+        "  ...     print(f'{material:20s}: {eps*1e6:8.2f} μm')"
+    );
+
+    // =========================================================================
+    // Units Query API
+    // =========================================================================
 
     py::class_<combaero::units::UnitInfo>(m, "UnitInfo")
         .def_readonly("input", &combaero::units::UnitInfo::input, "Input units description")
