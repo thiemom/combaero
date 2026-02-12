@@ -334,6 +334,44 @@ lmtd(dT1, dT2)  # [K]
 - Gnielinski: 2300 < Re < 5×10⁶, 0.5 < Pr < 2000
 - Sieder-Tate: Re > 10,000, 0.7 < Pr < 16,700
 
+## Geometry Utilities
+
+Hydraulic diameter and residence time calculations for flow systems.
+
+```python
+# Hydraulic diameter calculations
+hydraulic_diameter(A, P_wetted)              # Generic [m]
+hydraulic_diameter_rect(a, b)                # Rectangular duct [m]
+hydraulic_diameter_annulus(D_outer, D_inner) # Annular duct [m]
+
+# Residence time calculations
+residence_time(V, Q)              # From volumetric flow [s]
+residence_time_mdot(V, mdot, rho) # From mass flow [s]
+space_velocity(Q, V)              # Inverse of residence time [1/s]
+```
+
+**Parameters:**
+- `A`: Cross-sectional area [m²]
+- `P_wetted`: Wetted perimeter [m]
+- `a`, `b`: Rectangular duct side lengths [m]
+- `D_outer`, `D_inner`: Annulus diameters [m]
+- `V`: Volume [m³]
+- `Q`: Volumetric flow rate [m³/s]
+- `mdot`: Mass flow rate [kg/s]
+- `rho`: Density [kg/m³]
+
+**Returns:**
+- Hydraulic diameter: Dh [m]
+- Residence time: τ [s]
+- Space velocity: SV [1/s]
+
+**Formulas:**
+- Generic: Dh = 4A / P_wetted
+- Rectangular: Dh = 2ab / (a + b)
+- Annular: Dh = D_outer - D_inner
+- Residence time: τ = V / Q = V·ρ / ṁ
+- Space velocity: SV = 1/τ
+
 ```cpp
 
 // Oxygen requirements

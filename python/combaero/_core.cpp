@@ -1287,6 +1287,92 @@ PYBIND11_MODULE(_core, m)
     );
 
     // -------------------------------------------------------------
+    // Geometry utilities
+    // -------------------------------------------------------------
+
+    m.def(
+        "hydraulic_diameter",
+        &hydraulic_diameter,
+        py::arg("A"),
+        py::arg("P_wetted"),
+        "Hydraulic diameter for arbitrary cross-section.\n\n"
+        "Dh = 4 * A / P_wetted\n\n"
+        "Parameters:\n"
+        "  A        : cross-sectional area [m²]\n"
+        "  P_wetted : wetted perimeter [m]\n\n"
+        "Returns: hydraulic diameter Dh [m]"
+    );
+
+    m.def(
+        "hydraulic_diameter_rect",
+        &hydraulic_diameter_rect,
+        py::arg("a"),
+        py::arg("b"),
+        "Hydraulic diameter for rectangular duct.\n\n"
+        "Dh = 2*a*b / (a + b)\n\n"
+        "Parameters:\n"
+        "  a : side length [m]\n"
+        "  b : side length [m]\n\n"
+        "Returns: hydraulic diameter Dh [m]"
+    );
+
+    m.def(
+        "hydraulic_diameter_annulus",
+        &hydraulic_diameter_annulus,
+        py::arg("D_outer"),
+        py::arg("D_inner"),
+        "Hydraulic diameter for annular duct (concentric pipes).\n\n"
+        "Dh = D_outer - D_inner\n\n"
+        "Parameters:\n"
+        "  D_outer : outer diameter [m]\n"
+        "  D_inner : inner diameter [m]\n\n"
+        "Returns: hydraulic diameter Dh [m]"
+    );
+
+    m.def(
+        "residence_time",
+        py::overload_cast<double, double>(&residence_time),
+        py::arg("V"),
+        py::arg("Q"),
+        "Residence time from volumetric flow rate.\n\n"
+        "τ = V / Q̇\n\n"
+        "Time for fluid to pass through a volume.\n"
+        "Used in reactor design (Damköhler number), combustor sizing.\n\n"
+        "Parameters:\n"
+        "  V : volume [m³]\n"
+        "  Q : volumetric flow rate [m³/s]\n\n"
+        "Returns: residence time τ [s]"
+    );
+
+    m.def(
+        "residence_time_mdot",
+        py::overload_cast<double, double, double>(&residence_time_mdot),
+        py::arg("V"),
+        py::arg("mdot"),
+        py::arg("rho"),
+        "Residence time from mass flow rate.\n\n"
+        "τ = V·ρ / ṁ\n\n"
+        "Parameters:\n"
+        "  V    : volume [m³]\n"
+        "  mdot : mass flow rate [kg/s]\n"
+        "  rho  : density [kg/m³]\n\n"
+        "Returns: residence time τ [s]"
+    );
+
+    m.def(
+        "space_velocity",
+        &space_velocity,
+        py::arg("Q"),
+        py::arg("V"),
+        "Space velocity (inverse of residence time).\n\n"
+        "SV = Q̇ / V = 1/τ\n\n"
+        "Parameters:\n"
+        "  Q : volumetric flow rate [m³/s]\n"
+        "  V : volume [m³]\n\n"
+        "Returns: space velocity SV [1/s]"
+    );
+
+    // -------------------------------------------------------------
     // Compressible flow
     // -------------------------------------------------------------
 
