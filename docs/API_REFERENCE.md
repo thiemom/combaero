@@ -353,6 +353,18 @@ hydraulic_diameter_annulus(D_outer, D_inner) # Annular duct [m]
 residence_time(V, Q)              # From volumetric flow [s]
 residence_time_mdot(V, mdot, rho) # From mass flow [s]
 space_velocity(Q, V)              # Inverse of residence time [1/s]
+
+# Pipe Flow
+
+pipe_dP(v, L, D, f, rho)           # Pressure drop [Pa]
+pipe_dP_mdot(mdot, L, D, f, rho)   # Pressure drop from mass flow [Pa]
+pipe_velocity(mdot, D, rho)        # Velocity from mass flow [m/s]
+pipe_mdot(v, D, rho)               # Mass flow from velocity [kg/s]
+
+# Composite function (all-in-one)
+pressure_drop_pipe(T, P, X, v, D, L, roughness=0.0, correlation='haaland')
+    # Returns: (dP [Pa], Re [-], f [-])
+    # Combines: property evaluation, Re calculation, friction factor, pressure drop
 ```
 
 **Parameters:**

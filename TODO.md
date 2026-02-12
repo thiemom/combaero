@@ -90,13 +90,13 @@ we should have mass-basis equivalents for all of them to avoid user confusion.
 
 ---
 
-## Phase 3: Velocity from Mass Flow ⏳
+## Phase 3: Velocity from Mass Flow
 
 **Priority:** HIGH - Common conversion in flow calculations
 **Difficulty:** EASY - Simple formula with geometry
 
 **Functions to implement (1):**
-- [ ] `velocity_from_mdot(mdot, rho, D)` - Velocity from mass flow [m/s]
+- [x] `pipe_velocity(mdot, D, rho)` - Velocity from mass flow [m/s]
 
 **Implementation:**
 - [ ] Add function to `src/incompressible.cpp` (or new `src/flow_utils.cpp`)
@@ -116,11 +116,11 @@ we should have mass-basis equivalents for all of them to avoid user confusion.
 - Test round-trip consistency
 - Verify units [m/s]
 
-**Status:** Not started
+**Status:** ✅ ALREADY EXISTS (pipe_velocity)
 
 ---
 
-## Phase 4: Pressure Drop in Pipe (Composite) ⏳
+## Phase 4: Pressure Drop in Pipe (Composite) ✅
 
 **Priority:** HIGH - Very common, combines multiple steps
 **Difficulty:** MEDIUM - Composite function, multiple dependencies

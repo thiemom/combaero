@@ -98,13 +98,17 @@ All functions use consistent units to avoid conversion errors.
 
 #### Mixture Properties (Mass/Other Basis)
 
-| Function                           | Input Units             | Output Unit |
-|------------------------------------|-------------------------|-------------|
-| `density`                          | T: K, P: Pa, X: mol/mol | kg/m^3      |
-| `molar_volume`                     | T: K, P: Pa             | m^3/mol     |
-| `specific_gas_constant`            | X: mol/mol              | J/(kg*K)    |
-| `isentropic_expansion_coefficient` | T: K, X: mol/mol        | - (gamma)   |
-| `speed_of_sound`                   | T: K, X: mol/mol        | m/s         |
+| Function                           | Input Units                        | Output Unit |
+|------------------------------------|------------------------------------|-------------|
+| `density`                          | T: K, P: Pa, X: mol/mol            | kg/m^3      |
+| `molar_volume`                     | T: K, P: Pa                        | m^3/mol     |
+| `specific_gas_constant`            | X: mol/mol                         | J/(kg*K)    |
+| `isentropic_expansion_coefficient` | T: K, X: mol/mol                   | - (gamma)   |
+| `speed_of_sound`                   | T: K, X: mol/mol                   | m/s         |
+| `cp_mass`                          | T: K, X: mol/mol                   | J/(kg*K)    |
+| `cv_mass`                          | T: K, X: mol/mol                   | J/(kg*K)    |
+| `h_mass`                           | T: K, X: mol/mol                   | J/kg        |
+| `s_mass`                           | T: K, X: mol/mol, P: Pa, P_ref: Pa | J/(kg*K)    |
 
 #### Inverse Solvers
 
@@ -338,6 +342,12 @@ All functions use consistent units to avoid conversion errors.
 | Function       | Input Units | Output Unit |
 |----------------|-------------|-------------|
 | `Stream::mdot` | -           | kg/s        |
+
+### pipe_flow.h - Composite Pipe Flow Functions
+
+| Function             | Input Units                                                                 | Output Unit     |
+|----------------------|-----------------------------------------------------------------------------|-----------------|
+| `pressure_drop_pipe` | T: K, P: Pa, X: mol/mol, v: m/s, D: m, L: m, roughness: m, correlation: str | tuple(Pa, -, -) |
 
 ### geometry.h - Geometric Utilities
 

@@ -186,6 +186,7 @@ try:
         pipe_velocity,
         pipe_volume,
         prandtl,
+        pressure_drop_pipe,
         quarter_wave_frequency,
         reforming_equilibrium,
         reforming_equilibrium_adiabatic,
@@ -421,6 +422,7 @@ except ModuleNotFoundError:
     pipe_dP_mdot = _core.pipe_dP_mdot
     pipe_velocity = _core.pipe_velocity
     pipe_mdot = _core.pipe_mdot
+    pressure_drop_pipe = _core.pressure_drop_pipe
     dynamic_pressure = _core.dynamic_pressure
     velocity_from_q = _core.velocity_from_q
     hydraulic_diameter = _core.hydraulic_diameter
@@ -635,6 +637,7 @@ __all__ = [
     "pipe_dP_mdot",
     "pipe_velocity",
     "pipe_mdot",
+    "pressure_drop_pipe",
     "dynamic_pressure",
     "velocity_from_q",
     "hydraulic_diameter",

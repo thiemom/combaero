@@ -16,6 +16,7 @@
 #include "acoustics.h"
 #include "state.h"
 #include "orifice.h"
+#include "pipe_flow.h"
 #include "units.h"
 
 namespace py = pybind11;
@@ -1430,6 +1431,67 @@ PYBIND11_MODULE(_core, m)
         "  mdot : mass flow rate [kg/s]\n"
         "  rho  : density [kg/m³]\n\n"
         "Returns: residence time τ [s]"
+    );
+
+    m.def(
+        "pipe_mdot",
+        &pipe_mdot,
+        py::arg("v"),
+        py::arg("D"),
+        py::arg("rho"),
+        "Pipe mass flow rate from velocity.\n\n"
+        "mdot = rho * v * pi * D^2 / 4\n\n"
+        "Parameters:\n"
+        "  v   : velocity [m/s]\n"
+        "  D   : diameter [m]\n"
+        "  rho : density [kg/m^3]\n\n"
+        "Returns: mass flow rate [kg/s]"
+    );
+
+    // Composite pipe flow function
+    m.def(
+        "pressure_drop_pipe",
+        [](double T,
+           double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double v,
+           double D,
+           double L,
+           double roughness,
+           const std::string& correlation) {
+            auto X = to_vec(X_arr);
+            return pressure_drop_pipe(T, P, X, v, D, L, roughness, correlation);
+        },
+        py::arg("T"),
+        py::arg("P"),
+        py::arg("X"),
+        py::arg("v"),
+        py::arg("D"),
+        py::arg("L"),
+        py::arg("roughness") = 0.0,
+        py::arg("correlation") = "haaland",
+        "Composite pressure drop calculation for pipe flow.\n\n"
+        "Combines thermodynamic properties, Reynolds number, friction factor,\n"
+        "and Darcy-Weisbach equation in one call.\n\n"
+        "Steps:\n"
+        "  1. Calculate density and viscosity from (T, P, X)\n"
+        "  2. Calculate Reynolds number: Re = rho * v * D / mu\n"
+        "  3. Calculate friction factor using specified correlation\n"
+        "  4. Calculate pressure drop: dP = f * (L/D) * (rho * v^2 / 2)\n\n"
+        "Parameters:\n"
+        "  T           : temperature [K]\n"
+        "  P           : pressure [Pa]\n"
+        "  X           : mole fractions [mol/mol]\n"
+        "  v           : velocity [m/s]\n"
+        "  D           : diameter [m]\n"
+        "  L           : length [m]\n"
+        "  roughness   : absolute roughness [m] (default: 0.0 = smooth)\n"
+        "  correlation : friction correlation (default: 'haaland')\n"
+        "                Options: 'haaland', 'serghides', 'colebrook', 'petukhov'\n\n"
+        "Returns: tuple of (dP [Pa], Re [-], f [-])\n\n"
+        "Example:\n"
+        "  >>> dP, Re, f = pressure_drop_pipe(300, 101325, X_air, 10.0, 0.1, 100.0)\n"
+        "  >>> print(f'Pressure drop: {dP:.1f} Pa, Re: {Re:.0f}, f: {f:.4f}')"
     );
 
     m.def(

@@ -122,6 +122,11 @@ inline constexpr Entry function_units[] = {
     {"pipe_mdot",               "v: m/s, D: m, rho: kg/m^3",            "kg/s"},
     {"dynamic_pressure",        "v: m/s, rho: kg/m^3",                  "Pa"},
     {"velocity_from_q",         "q: Pa, rho: kg/m^3",                   "m/s"},
+
+    // -------------------------------------------------------------------------
+    // pipe_flow.h - Composite Pipe Flow Functions
+    // -------------------------------------------------------------------------
+    {"pressure_drop_pipe",      "T: K, P: Pa, X: mol/mol, v: m/s, D: m, L: m, roughness: m, correlation: str", "tuple(Pa, -, -)"},
     // -------------------------------------------------------------------------
     // geometry.h - Geometric Utilities
     // -------------------------------------------------------------------------
