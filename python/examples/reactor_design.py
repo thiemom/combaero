@@ -30,7 +30,7 @@ def main() -> None:
 
     # Circular pipe
     D_pipe = 0.1  # Diameter [m]
-    A_pipe = np.pi * (D_pipe / 2) ** 2
+    A_pipe = ca.pipe_area(D_pipe)  # Use pipe_area helper
     P_pipe = np.pi * D_pipe
     Dh_pipe = ca.hydraulic_diameter(A_pipe, P_pipe)
 
@@ -82,7 +82,7 @@ def main() -> None:
     # Reactor geometry
     D = 0.2  # Diameter [m]
     L = 2.0  # Length [m]
-    V = np.pi * (D / 2) ** 2 * L  # Volume [m³]
+    V = ca.pipe_volume(D, L)  # Use pipe_volume helper
 
     # Flow conditions
     Q = 0.01  # Volumetric flow rate [m³/s]

@@ -12,11 +12,11 @@
 // -------------------------------------------------------------
 
 // Absolute roughness values for common pipe materials [m]
-// 
+//
 // References:
-// - Moody, L.F. (1944). "Friction factors for pipe flow". 
+// - Moody, L.F. (1944). "Friction factors for pipe flow".
 //   Transactions of the ASME, 66(8), 671-684.
-// - Colebrook, C.F. (1939). "Turbulent flow in pipes, with particular 
+// - Colebrook, C.F. (1939). "Turbulent flow in pipes, with particular
 //   reference to the transition region between smooth and rough pipe laws".
 //   Journal of the Institution of Civil Engineers, 11(4), 133-156.
 // - White, F.M. (2011). "Fluid Mechanics" (7th ed.). McGraw-Hill.
@@ -35,7 +35,7 @@ static const std::unordered_map<std::string, double> ROUGHNESS_DATA = {
     {"drawn_tubing",        1.5e-6},        // Drawn brass, copper, glass, plastic (White 2011)
     {"pvc",                 1.5e-6},        // PVC, polyethylene (White 2011)
     {"plastic",             1.5e-6},        // Generic plastic pipe
-    
+
     // Steel pipes
     {"commercial_steel",    4.5e-5},        // New commercial steel (Moody 1944, White 2011)
     {"new_steel",           4.5e-5},        // Alias for commercial_steel
@@ -43,15 +43,15 @@ static const std::unordered_map<std::string, double> ROUGHNESS_DATA = {
     {"galvanized_iron",     1.5e-4},        // Galvanized iron/steel (Moody 1944, Crane 2009)
     {"galvanized_steel",    1.5e-4},        // Alias for galvanized_iron
     {"rusted_steel",        2.5e-4},        // Moderately rusted steel (Munson 2013)
-    
+
     // Cast iron
     {"cast_iron",           2.6e-4},        // Uncoated cast iron (Moody 1944, White 2011)
     {"asphalted_cast_iron", 1.2e-4},        // Asphalted cast iron (White 2011)
-    
+
     // Concrete
     {"concrete",            3.0e-4},        // Concrete, well-finished (Moody 1944, Munson 2013)
     {"rough_concrete",      3.0e-3},        // Rough concrete (White 2011)
-    
+
     // Other materials
     {"riveted_steel",       9.0e-4},        // Riveted steel (Moody 1944, Crane 2009)
     {"wood_stave",          1.8e-4},        // Wood stave pipe (White 2011)
@@ -65,14 +65,14 @@ std::unordered_map<std::string, double> standard_pipe_roughness() {
 double pipe_roughness(const std::string& material) {
     // Convert to lowercase for case-insensitive lookup
     std::string material_lower = material;
-    std::transform(material_lower.begin(), material_lower.end(), 
+    std::transform(material_lower.begin(), material_lower.end(),
                    material_lower.begin(), ::tolower);
-    
+
     auto it = ROUGHNESS_DATA.find(material_lower);
     if (it != ROUGHNESS_DATA.end()) {
         return it->second;
     }
-    
+
     // Material not found - provide helpful error message
     throw std::invalid_argument(
         "pipe_roughness: unknown material '" + material + "'. "

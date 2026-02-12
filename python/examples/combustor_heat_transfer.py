@@ -93,8 +93,8 @@ def main() -> None:
     D_inner = 0.4  # Inner diameter [m]
     L_combustor = 0.4  # Length [m]
 
-    # Calculate volume
-    A_annular = np.pi * ((D_outer / 2) ** 2 - (D_inner / 2) ** 2)
+    # Calculate volume using annular_area helper
+    A_annular = ca.annular_area(D_outer, D_inner)
     V_combustor = A_annular * L_combustor
 
     # Hydraulic diameter
@@ -132,16 +132,15 @@ def main() -> None:
     # Flow velocity
     v_avg = mixed.mdot / (rho_avg * A_annular)
 
-    # Reynolds number
+    # Use pressure_drop_pipe composite function
+    # Note: Using cast_iron roughness as proxy for combustor liner
+    eps = ca.pipe_roughness('cast_iron')
+    dP_friction, Re, f = ca.pressure_drop_pipe(
+        T_avg, P_combustor, burned.X, v_avg, Dh, L_combustor, eps, 'haaland'
+    )
+    
+    # Also get viscosity for display
     mu_avg = ca.viscosity(T_avg, P_combustor, burned.X)
-    Re = rho_avg * v_avg * Dh / mu_avg
-
-    # Friction factor (assume moderate roughness for combustor liner)
-    e_D = 0.002  # Relative roughness
-    f = ca.friction_haaland(Re, e_D)
-
-    # Pressure drop: ΔP = f * (L/Dh) * (ρ*v²/2)
-    dP_friction = f * (L_combustor / Dh) * (rho_avg * v_avg**2 / 2.0)
 
     # Total pressure drop (friction + other losses, typically 3-5%)
     dP_total = dP_friction * 1.5  # Account for additional losses
@@ -299,10 +298,11 @@ def main() -> None:
         tau_test = ca.residence_time_mdot(V_combustor, mixed_test.mdot, rho_avg_test)
 
         v_avg_test = mixed_test.mdot / (rho_avg_test * A_annular)
-        mu_avg_test = ca.viscosity(T_avg_test, P_combustor, burned_test.X)
-        Re_test = rho_avg_test * v_avg_test * Dh / mu_avg_test
-        f_test = ca.friction_haaland(Re_test, e_D)
-        dP_test = f_test * (L_combustor / Dh) * (rho_avg_test * v_avg_test**2 / 2.0) * 1.5
+        # Use pressure_drop_pipe composite function
+        dP_friction_test, Re_test, f_test = ca.pressure_drop_pipe(
+            T_avg_test, P_combustor, burned_test.X, v_avg_test, Dh, L_combustor, eps, 'haaland'
+        )
+        dP_test = dP_friction_test * 1.5  # Account for additional losses
 
         print(
             f"{phi_test:6.2f}  {burned_test.T:12.1f}  {tau_test*1000:10.2f}  {dP_test/P_combustor*100:12.3f}"

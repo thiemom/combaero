@@ -112,13 +112,11 @@ def main() -> None:
     rho = ca.density(T_avg, P, X_air)
     mu = ca.viscosity(T_avg, P, X_air)
     k = ca.thermal_conductivity(T_avg, P, X_air)
-    cp_molar = ca.cp(T_avg, X_air)
-    mw = ca.mwmix(X_air)
-    cp_mass = cp_molar / mw * 1000  # Convert to J/(kg·K)
+    cp_mass = ca.cp_mass(T_avg, X_air)  # Use cp_mass convenience function
     Pr = ca.prandtl(T_avg, P, X_air)
 
     # Flow velocity
-    A = np.pi * (D / 2) ** 2
+    A = ca.pipe_area(D)  # Use pipe_area helper
     v = mdot / (rho * A)
     Re = rho * v * D / mu
 
@@ -172,9 +170,10 @@ def main() -> None:
     T_cold_in = 293.15  # 20°C
     T_cold_out = 323.15  # 50°C
 
-    dT1 = T_hot_in - T_cold_out  # Hot in - Cold out
-    dT2 = T_hot_out - T_cold_in  # Hot out - Cold in
-    LMTD_counter = ca.lmtd(dT1, dT2)
+    # Use lmtd_counterflow convenience function
+    LMTD_counter = ca.lmtd_counterflow(T_hot_in, T_hot_out, T_cold_in, T_cold_out)
+    dT1 = T_hot_in - T_cold_out  # For display
+    dT2 = T_hot_out - T_cold_in
 
     print(f"  Hot side:  {T_hot_in-273.15:.0f}°C → {T_hot_out-273.15:.0f}°C")
     print(f"  Cold side: {T_cold_in-273.15:.0f}°C → {T_cold_out-273.15:.0f}°C")
@@ -184,9 +183,10 @@ def main() -> None:
 
     # Parallel-flow heat exchanger
     print("\nParallel-flow heat exchanger (same temperatures):")
-    dT1_par = T_hot_in - T_cold_in  # Both inlets
-    dT2_par = T_hot_out - T_cold_out  # Both outlets
-    LMTD_parallel = ca.lmtd(dT1_par, dT2_par)
+    # Use lmtd_parallelflow convenience function
+    LMTD_parallel = ca.lmtd_parallelflow(T_hot_in, T_hot_out, T_cold_in, T_cold_out)
+    dT1_par = T_hot_in - T_cold_in  # For display
+    dT2_par = T_hot_out - T_cold_out
 
     print(f"  ΔT1 = {dT1_par:.2f} K (both inlets)")
     print(f"  ΔT2 = {dT2_par:.2f} K (both outlets)")
@@ -232,7 +232,9 @@ def main() -> None:
 
     Re = 5e4
     Pr = 0.7
-    e_D = 0.001  # Moderate roughness
+    D = 0.1  # Pipe diameter [m]
+    eps = ca.pipe_roughness('commercial_steel')  # Use pipe_roughness database
+    e_D = eps / D
 
     # Get friction factor
     f = ca.friction_haaland(Re, e_D)
@@ -245,7 +247,9 @@ def main() -> None:
 
     print(f"\nReynolds number: Re = {Re:.0e}")
     print(f"Prandtl number:  Pr = {Pr:.2f}")
-    print(f"Roughness:       ε/D = {e_D:.4f}")
+    print(f"Pipe diameter:   D = {D*1000:.0f} mm")
+    print(f"Roughness:       ε = {eps*1e6:.1f} μm (commercial steel)")
+    print(f"Relative rough:  ε/D = {e_D:.6f}")
 
     print("\nResults:")
     print(f"  Friction factor:          f = {f:.6f}")

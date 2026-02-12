@@ -536,23 +536,23 @@ double solve_orifice_mdot(
     if (max_iter < 1) {
         throw std::invalid_argument("solve_orifice_mdot: max_iter must be >= 1");
     }
-    
+
     // Handle zero pressure drop case
     if (dP == 0.0) {
         return 0.0;
     }
-    
+
     // Precompute constants
     const double area = geom.area();
     const double beta = geom.beta();
     const double D = geom.D;
-    
+
     // Initial guess for Cd (typical value for sharp orifices)
     double Cd = 0.61;
-    
+
     // Initial guess for mdot (use incompressible formula with initial Cd)
     double mdot = Cd * area * std::sqrt(2.0 * rho * dP);
-    
+
     // Iteration loop
     for (int iter = 0; iter < max_iter; ++iter) {
         // Calculate expansibility factor if compressible (kappa > 1)
@@ -560,20 +560,20 @@ double solve_orifice_mdot(
         if (kappa > 1.0) {
             epsilon = expansibility_factor(beta, dP, P_upstream, kappa);
         }
-        
+
         // Calculate new mass flow rate using current Cd and epsilon
         const double mdot_new = Cd * epsilon * area * std::sqrt(2.0 * rho * dP);
-        
+
         // Check convergence
         const double rel_error = std::abs(mdot_new - mdot) / (mdot + 1e-30);
         if (rel_error < tol) {
             return mdot_new;
         }
-        
+
         // Update Reynolds number based on new mdot
         // Re_D = (4 * mdot) / (π * D * μ)
         const double Re_D = (4.0 * mdot_new) / (PI * D * mu);
-        
+
         // Update Cd based on new Reynolds number
         switch (correlation) {
             case CdCorrelation::ReaderHarrisGallagher:
@@ -589,14 +589,14 @@ double solve_orifice_mdot(
                 throw std::invalid_argument(
                     "solve_orifice_mdot: unsupported correlation type");
         }
-        
+
         // Update mdot for next iteration
         mdot = mdot_new;
     }
-    
+
     // Failed to converge
     throw std::runtime_error(
-        "solve_orifice_mdot: failed to converge after " + 
+        "solve_orifice_mdot: failed to converge after " +
         std::to_string(max_iter) + " iterations");
 }
 
