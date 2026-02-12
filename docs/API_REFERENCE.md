@@ -792,7 +792,8 @@ namespace orifice {
     double Cd_from_K(double K, double beta);
 
     // Thickness correction factor (multiplies thin-plate Cd)
-    double thickness_correction(double t_over_d, double beta);
+    // Idelchik model: Cd rises (reattachment) then falls (friction)
+    double thickness_correction(double t_over_d, double beta, double Re_d);
 }
 ```
 

@@ -136,10 +136,20 @@ class TestUtilityFunctions:
         assert Cd_back == pytest.approx(Cd)
 
     def test_thickness_correction(self):
-        """Test thickness correction factor."""
+        """Test thickness correction factor with Idelchik model."""
+        Re_d = 1e5  # Typical Reynolds number
+        
         # Thin plate: no correction
-        assert cb.orifice_thickness_correction(0.01, 0.5) == pytest.approx(1.0)
+        assert cb.orifice_thickness_correction(0.01, 0.5, Re_d) == pytest.approx(1.0)
 
-        # Thick plate: correction > 1
-        corr = cb.orifice_thickness_correction(0.5, 0.5)
-        assert corr > 1.0
+        # Moderate thickness: correction > 1 (reattachment benefit)
+        corr1 = cb.orifice_thickness_correction(0.5, 0.5, Re_d)
+        assert corr1 > 1.0
+        
+        # Peak around t/d ~ 1.0
+        corr_peak = cb.orifice_thickness_correction(1.0, 0.5, Re_d)
+        assert corr_peak > corr1
+        
+        # Large thickness: friction reduces Cd (non-monotonic behavior)
+        corr2 = cb.orifice_thickness_correction(3.0, 0.5, Re_d)
+        assert corr2 < corr_peak  # Falls at large t/d due to friction

@@ -140,8 +140,9 @@ double Cd_Stolz(double beta, double Re_D);
 double Cd_Miller(double beta, double Re_D);
 
 // Thickness correction factor (multiplies thin-plate Cd)
-// Based on Idelchik: accounts for flow reattachment in thick plates
-double thickness_correction(double t_over_d, double beta);
+// Idelchik model: Cd rises (reattachment) then falls (friction)
+// Smooth in Re_d for solver stability
+double thickness_correction(double t_over_d, double beta, double Re_d);
 
 // Rounded-entry Cd (Idelchik-based)
 // For well-rounded entries, Cd approaches 1.0

@@ -3100,7 +3100,9 @@ PYBIND11_MODULE(_core, m)
         &orifice::thickness_correction,
         py::arg("t_over_d"),
         py::arg("beta"),
+        py::arg("Re_d"),
         "Thickness correction factor for thick-plate orifices.\n\n"
+        "Idelchik model: Cd rises (reattachment) then falls (friction).\n\n"
         "Multiplies thin-plate Cd to account for flow reattachment.\n"
         "Returns 1.0 for t/d <= 0.02 (thin plate)."
     );

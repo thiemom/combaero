@@ -236,12 +236,20 @@ TEST_F(OrificeTest, KFromCd) {
 }
 
 TEST_F(OrificeTest, ThicknessCorrection) {
+    const double Re_d = 1e5;  // Typical Reynolds number
+    
     // No correction for thin plate
-    EXPECT_DOUBLE_EQ(orifice::thickness_correction(0.01, 0.5), 1.0);
+    EXPECT_DOUBLE_EQ(orifice::thickness_correction(0.01, 0.5, Re_d), 1.0);
 
-    // Correction increases with thickness
-    double corr1 = orifice::thickness_correction(0.1, 0.5);
-    double corr2 = orifice::thickness_correction(0.5, 0.5);
+    // Correction initially increases with thickness (reattachment)
+    double corr1 = orifice::thickness_correction(0.5, 0.5, Re_d);
     EXPECT_GT(corr1, 1.0);
-    EXPECT_GT(corr2, corr1);
+    
+    // Peak around t/d ~ 1.0
+    double corr_peak = orifice::thickness_correction(1.0, 0.5, Re_d);
+    EXPECT_GT(corr_peak, corr1);
+    
+    // Eventually decreases at large t/d (friction dominates)
+    double corr3 = orifice::thickness_correction(3.0, 0.5, Re_d);
+    EXPECT_LT(corr3, corr_peak);  // Falls at large t/d due to friction
 }

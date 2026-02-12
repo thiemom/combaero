@@ -159,27 +159,46 @@ double Cd_Miller(double beta, double Re_D) {
 }
 
 // Thickness correction factor for thick plates
-// Based on Idelchik: for t/d > 0, flow may reattach inside orifice
-// For t/d < 0.02: thin plate (no correction)
-// For 0.02 < t/d < 2-3: correction applies
-// For t/d > 3: approaches pipe entrance behavior
-double thickness_correction(double t_over_d, double beta) {
+// Idelchik model: Cd rises (reattachment) then falls (friction)
+//
+// Physical model:
+// - For small t/d: flow reattachment increases Cd (vena contracta recovery)
+// - For large t/d: friction in bore decreases Cd (pipe friction losses)
+// - Peak Cd occurs at t/d ≈ 0.5-1.5 (depending on beta, Re)
+//
+// References:
+// - Idelchik, I.E. (2008). "Handbook of Hydraulic Resistance" (4th ed.)
+//   Diagram 4-15: Discharge coefficients for thick-plate orifices
+// - Lichtarowicz, A., et al. (1965). "Discharge Coefficients for
+//   Incompressible Non-Cavitating Flow through Long Orifices"
+//   J. Mech. Eng. Sci., 7(2), 210-219.
+//
+// Note: Smooth in Re_d for solver stability (t/d is constant per geometry)
+//
+double thickness_correction(double t_over_d, double beta, double Re_d) {
     if (t_over_d <= 0.02) {
         return 1.0;  // Thin plate, no correction
     }
 
-    // Idelchik-based correction
-    // For sharp-edged thick plate, Cd increases with thickness
-    // as flow reattaches inside the orifice bore
-    //
-    // Approximate formula (fitted to Idelchik data):
-    // correction = 1 + 0.25 * (1 - exp(-3 * t/d)) * (1 - beta^2)
+    // Ensure Re_d is positive for stability
+    Re_d = std::max(Re_d, 100.0);
 
-    const double factor = 1.0 - std::exp(-3.0 * t_over_d);
-    const double correction = 1.0 + 0.25 * factor * (1.0 - beta * beta);
+    // Component 1: Reattachment benefit (independent of Re)
+    // Cd increases as flow reattaches to bore wall, reducing vena contracta
+    const double reattach_factor = 0.25 * (1.0 - std::exp(-3.0 * t_over_d));
+    const double reattachment = reattach_factor * (1.0 - beta * beta);
 
-    // Limit correction to reasonable range
-    return std::min(correction, 1.3);
+    // Component 2: Friction penalty (smooth Re dependence)
+    // Use Blasius smooth turbulent friction: f = 0.316 / Re^0.25
+    // Friction loss in bore reduces effective Cd
+    const double f = 0.316 / std::pow(Re_d, 0.25);
+    const double friction_loss = 0.5 * f * t_over_d;
+
+    // Combined correction: rise (reattachment) then fall (friction)
+    const double correction = 1.0 + reattachment - friction_loss;
+
+    // Simple clamping (t/d is constant, so no smoothing needed)
+    return std::max(0.6, std::min(correction, 1.3));
 }
 
 // Rounded-entry Cd
@@ -260,8 +279,8 @@ double Cd_thick_plate(const OrificeGeometry& geom, const OrificeState& state) {
     // Start with thin-plate Cd
     double Cd = orifice::Cd_ReaderHarrisGallagher(geom.beta(), state.Re_D, geom.D);
 
-    // Apply thickness correction
-    Cd *= orifice::thickness_correction(geom.t_over_d(), geom.beta());
+    // Apply thickness correction (includes reattachment + friction effects)
+    Cd *= orifice::thickness_correction(geom.t_over_d(), geom.beta(), state.Re_D);
 
     return Cd;
 }
