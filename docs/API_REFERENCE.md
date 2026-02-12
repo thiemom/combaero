@@ -259,6 +259,39 @@ std::vector<double> convert_to_dry_fractions(const std::vector<double>& X);
 
 // Normalize fractions to sum to 1
 std::vector<double> normalize_fractions(const std::vector<double>& X);
+```
+
+## Friction Factor Correlations
+
+Darcy friction factor for turbulent pipe flow. Used in pressure drop calculations:
+**ΔP = f · (L/D) · (ρ·v²/2)**
+
+```python
+# Haaland correlation (1983) - explicit, ~2-3% accuracy
+friction_haaland(Re, e_D)  # [-]
+
+# Serghides correlation (1984) - explicit, <0.3% accuracy
+friction_serghides(Re, e_D)  # [-]
+
+# Colebrook-White equation (1939) - iterative, reference standard
+friction_colebrook(Re, e_D, tol=1e-10, max_iter=20)  # [-]
+
+# Petukhov correlation (1970) - smooth pipes only
+friction_petukhov(Re)  # [-]
+```
+
+**Parameters:**
+- `Re`: Reynolds number [-] (dimensionless)
+- `e_D`: Relative roughness ε/D [-] (dimensionless)
+- `tol`: Convergence tolerance for Colebrook (default: 1e-10)
+- `max_iter`: Maximum iterations for Colebrook (default: 20)
+
+**Returns:** Darcy friction factor f [-] (dimensionless)
+
+**Valid range:** Turbulent flow (Re > ~2300)
+**Note:** For laminar flow (Re < 2300), use f = 64/Re
+
+```cpp
 
 // Oxygen requirements
 double oxygen_required_per_mol_fuel(const std::string& fuel);

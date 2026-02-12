@@ -1113,6 +1113,76 @@ PYBIND11_MODULE(_core, m)
     );
 
     // -------------------------------------------------------------
+    // Friction factor correlations
+    // -------------------------------------------------------------
+
+    m.def(
+        "friction_haaland",
+        &friction_haaland,
+        py::arg("Re"),
+        py::arg("e_D"),
+        "Haaland friction factor correlation (1983).\n\n"
+        "Explicit approximation to Colebrook-White equation.\n"
+        "Accuracy: ~2-3% vs Colebrook-White.\n\n"
+        "f = 1 / [-1.8 * log10((e_D/3.7)^1.11 + 6.9/Re)]^2\n\n"
+        "Parameters:\n"
+        "  Re  : Reynolds number [-] (must be > 0)\n"
+        "  e_D : relative roughness ε/D [-] (must be >= 0)\n\n"
+        "Returns: Darcy friction factor f [-] (dimensionless)\n\n"
+        "Valid for turbulent flow (Re > ~2300).\n"
+        "For laminar flow, use f = 64/Re."
+    );
+
+    m.def(
+        "friction_serghides",
+        &friction_serghides,
+        py::arg("Re"),
+        py::arg("e_D"),
+        "Serghides friction factor correlation (1984).\n\n"
+        "Explicit approximation using Steffensen acceleration.\n"
+        "Accuracy: <0.3% vs Colebrook-White (very accurate).\n\n"
+        "Parameters:\n"
+        "  Re  : Reynolds number [-] (must be > 0)\n"
+        "  e_D : relative roughness ε/D [-] (must be >= 0)\n\n"
+        "Returns: Darcy friction factor f [-] (dimensionless)\n\n"
+        "Valid for turbulent flow (Re > ~2300)."
+    );
+
+    m.def(
+        "friction_colebrook",
+        &friction_colebrook,
+        py::arg("Re"),
+        py::arg("e_D"),
+        py::arg("tol") = 1e-10,
+        py::arg("max_iter") = 20,
+        "Colebrook-White friction factor equation (1939).\n\n"
+        "Implicit equation solved iteratively using Newton-Raphson.\n"
+        "The reference standard for turbulent friction factor.\n\n"
+        "1/√f = -2 * log10(ε/D/3.7 + 2.51/(Re*√f))\n\n"
+        "Parameters:\n"
+        "  Re       : Reynolds number [-] (must be > 0)\n"
+        "  e_D      : relative roughness ε/D [-] (must be >= 0)\n"
+        "  tol      : convergence tolerance [-] (default: 1e-10)\n"
+        "  max_iter : maximum iterations (default: 20)\n\n"
+        "Returns: Darcy friction factor f [-] (dimensionless)\n\n"
+        "Uses Haaland correlation as initial guess."
+    );
+
+    m.def(
+        "friction_petukhov",
+        &friction_petukhov,
+        py::arg("Re"),
+        "Petukhov friction factor correlation (1970).\n\n"
+        "For smooth pipes only (zero roughness).\n"
+        "f = [0.790 * ln(Re) - 1.64]^(-2)\n\n"
+        "Parameters:\n"
+        "  Re : Reynolds number [-] (must be > 0)\n\n"
+        "Returns: Darcy friction factor f [-] (dimensionless)\n\n"
+        "Valid for: 3000 < Re < 5×10^6\n"
+        "Often used with Gnielinski/Petukhov heat transfer correlations."
+    );
+
+    // -------------------------------------------------------------
     // Compressible flow
     // -------------------------------------------------------------
 
