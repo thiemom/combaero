@@ -67,6 +67,12 @@ double specific_gas_constant(const std::vector<double>& X);
 double isentropic_expansion_coefficient(double T, const std::vector<double>& X);
 double speed_of_sound(double T, const std::vector<double>& X);
 
+// Mass-specific thermodynamic properties (symmetric interface to molar-basis functions)
+double cp_mass(double T, const std::vector<double>& X);  // [J/(kg·K)]
+double cv_mass(double T, const std::vector<double>& X);  // [J/(kg·K)]
+double h_mass(double T, const std::vector<double>& X);   // [J/kg]
+double s_mass(double T, const std::vector<double>& X, double P, double P_ref = 101325.0);  // [J/(kg·K)]
+
 // Derivatives of thermodynamic properties with respect to temperature
 double dh_dT(double T, const std::vector<double>& X);
 double ds_dT(double T, const std::vector<double>& X);

@@ -58,6 +58,10 @@ inline constexpr Entry function_units[] = {
     {"specific_gas_constant",   "X: mol/mol",                           "J/(kg*K)"},
     {"isentropic_expansion_coefficient", "T: K, X: mol/mol",            "- (gamma)"},
     {"speed_of_sound",          "T: K, X: mol/mol",                     "m/s"},
+    {"cp_mass",                 "T: K, X: mol/mol",                     "J/(kg*K)"},
+    {"cv_mass",                 "T: K, X: mol/mol",                     "J/(kg*K)"},
+    {"h_mass",                  "T: K, X: mol/mol",                     "J/kg"},
+    {"s_mass",                  "T: K, X: mol/mol, P: Pa, P_ref: Pa",   "J/(kg*K)"},
 
     // -------------------------------------------------------------------------
     // thermo.h - Inverse Solvers

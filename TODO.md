@@ -47,31 +47,44 @@ Add helper functions identified from example analysis to simplify user code and 
 
 ---
 
-## Phase 2: Mass-Specific Heat Capacity ⏳
+## Phase 2: Mass-Specific Thermodynamic Properties ⏳
 
-**Priority:** HIGH - Frequently needed, simple conversion
-**Difficulty:** EASY - Simple wrapper around existing functions
+**Priority:** HIGH - Frequently needed, simple conversions
+**Difficulty:** EASY - Simple wrappers around existing functions
 
-**Functions to implement (1):**
-- [ ] `cp_mass(T, X)` - Mass-specific heat capacity [J/(kg·K)]
+**Rationale:** Maintain symmetric interface - if we have molar-basis functions (cp, h, cv, s),
+we should have mass-basis equivalents for all of them to avoid user confusion.
+
+**Functions to implement (4):**
+- [ ] `cp_mass(T, X)` - Mass-specific heat capacity at constant pressure [J/(kg·K)]
+- [ ] `cv_mass(T, X)` - Mass-specific heat capacity at constant volume [J/(kg·K)]
+- [ ] `h_mass(T, X)` - Mass-specific enthalpy [J/kg]
+- [ ] `s_mass(T, P, X, P_ref)` - Mass-specific entropy [J/(kg·K)]
 
 **Implementation:**
-- [ ] Add function to `src/thermo.cpp`
-- [ ] Add declaration to `include/thermo.h`
-- [ ] Add Python binding to `python/combaero/_core.cpp`
+- [ ] Add functions to `src/thermo.cpp`
+- [ ] Add declarations to `include/thermo.h`
+- [ ] Add Python bindings to `python/combaero/_core.cpp`
+- [ ] Export in `python/combaero/__init__.py`
 - [ ] Write unit tests in `python/tests/test_thermo_transport.py`
-- [ ] **CRITICAL TEST:** Verify cp_mass(T, X) == cp(T, X) / mwmix(X) * 1000
+- [ ] **CRITICAL TESTS:**
+  - Verify cp_mass(T, X) == cp(T, X) / mwmix(X) * 1000
+  - Verify cv_mass(T, X) == cv(T, X) / mwmix(X) * 1000
+  - Verify h_mass(T, X) == h(T, X) / mwmix(X) * 1000
+  - Verify s_mass(T, P, X) == s(T, P, X) / mwmix(X) * 1000
+  - All must match within machine precision
 - [ ] Test with multiple compositions (air, fuel, products)
 - [ ] Update `docs/API_REFERENCE.md`
-- [ ] **Add unit entry to `include/units_data.h`**
+- [ ] **Add unit entries to `include/units_data.h` (4 entries)**
 - [ ] **Run `python scripts/generate_units_md.py` to regenerate `docs/UNITS.md`**
 - [ ] Run all tests: `pytest python/tests/`
-- [ ] Commit: "Add mass-specific heat capacity function (cp_mass)"
+- [ ] Commit: "Add mass-specific thermodynamic property functions"
 
 **Testing requirements:**
-- Must match cp(T, X) / mwmix(X) * 1000 within machine precision
+- Each function must match molar / mwmix * 1000 within machine precision
 - Test with air, fuel mixtures, combustion products
-- Verify units [J/(kg·K)]
+- Verify units [J/(kg·K)] for cp/cv/s, [J/kg] for h
+- Test consistency: gamma_mass = cp_mass / cv_mass should equal gamma_molar
 
 **Status:** Not started
 
@@ -320,21 +333,117 @@ Add helper functions identified from example analysis to simplify user code and 
 
 ---
 
+## Phase 10: Orifice Flow Utilities ⏳
+
+**Priority:** MEDIUM - Useful for flow metering and injection applications
+**Difficulty:** EASY - Simple geometric and flow calculations
+
+**Rationale:** The orifice module is comprehensive but lacks simple helper functions for common calculations. No examples exist demonstrating the Cd correlation system.
+
+**Functions to implement (4):**
+- [ ] `orifice_velocity(mdot, rho, d)` - Velocity through orifice throat [m/s]
+- [ ] `orifice_area_from_beta(D, beta)` - Orifice area from beta ratio [m²]
+- [ ] `beta_from_diameters(d, D)` - Beta ratio from diameters [-] (standalone)
+- [ ] `orifice_Re_d(mdot, d, mu)` - Orifice Reynolds number from mass flow [-]
+
+**Implementation:**
+- [ ] Add functions to `src/orifice.cpp`
+- [ ] Add declarations to `include/orifice.h`
+- [ ] Add Python bindings to `python/combaero/_core.cpp`
+- [ ] Export in `python/combaero/__init__.py`
+- [ ] Write unit tests in `python/tests/test_orifice.py`
+- [ ] **CRITICAL TESTS:**
+  - Verify orifice_velocity = mdot / (rho * π(d/2)²)
+  - Verify orifice_area_from_beta = π(D*beta/2)²
+  - Verify beta_from_diameters = d/D
+  - Verify orifice_Re_d = 4*mdot / (π*d*mu)
+  - All must match within machine precision
+- [ ] Update `docs/API_REFERENCE.md`
+- [ ] **Add unit entries to `include/units_data.h` (4 entries)**
+- [ ] **Run `python scripts/generate_units_md.py` to regenerate `docs/UNITS.md`**
+- [ ] Run all tests: `pytest python/tests/`
+- [ ] Commit: "Add orifice flow utility functions"
+
+**Testing requirements:**
+- Each function must match manual calculation within machine precision
+- Test with realistic orifice geometries (beta = 0.2 to 0.7)
+- Verify units: [m/s], [m²], [-], [-]
+- Round-trip tests where applicable
+
+**Example to create:**
+- [ ] `python/examples/orifice_flow_metering.py` - Demonstrate Cd correlations, beta effects, Re effects, flow measurement
+
+**Status:** Not started
+
+---
+
+## Phase 11: Acoustics Utilities ⏳
+
+**Priority:** MEDIUM - Useful for combustor design and instability analysis
+**Difficulty:** EASY - Simple frequency and wavelength calculations
+
+**Rationale:** The acoustics module is comprehensive but lacks simple helper functions. No examples exist demonstrating acoustic mode analysis for combustors.
+
+**Functions to implement (5):**
+- [ ] `wavelength(f, c)` - Acoustic wavelength [m]
+- [ ] `frequency_from_wavelength(lambda, c)` - Frequency from wavelength [Hz]
+- [ ] `acoustic_impedance(rho, c)` - Characteristic acoustic impedance [Pa·s/m]
+- [ ] `sound_pressure_level(p_rms, p_ref)` - SPL in dB [dB]
+- [ ] `particle_velocity(p, rho, c)` - Particle velocity from pressure [m/s]
+
+**Implementation:**
+- [ ] Add functions to `src/acoustics.cpp`
+- [ ] Add declarations to `include/acoustics.h`
+- [ ] Add Python bindings to `python/combaero/_core.cpp`
+- [ ] Export in `python/combaero/__init__.py`
+- [ ] Write unit tests in `python/tests/test_acoustics.py`
+- [ ] **CRITICAL TESTS:**
+  - Verify wavelength = c / f
+  - Verify frequency_from_wavelength = c / lambda
+  - Verify acoustic_impedance = rho * c
+  - Verify SPL = 20*log10(p_rms/p_ref)
+  - Verify particle_velocity = p / (rho*c)
+  - All must match within machine precision
+- [ ] Update `docs/API_REFERENCE.md`
+- [ ] **Add unit entries to `include/units_data.h` (5 entries)**
+- [ ] **Run `python scripts/generate_units_md.py` to regenerate `docs/UNITS.md`**
+- [ ] Run all tests: `pytest python/tests/`
+- [ ] Commit: "Add acoustics utility functions"
+
+**Testing requirements:**
+- Each function must match manual calculation within machine precision
+- Test with realistic combustor conditions (T=1500K, P=15 bar)
+- Verify units: [m], [Hz], [Pa·s/m], [dB], [m/s]
+- Test consistency: wavelength * frequency = c
+
+**Example to create:**
+- [ ] `python/examples/combustor_acoustics.py` - Demonstrate mode analysis, Helmholtz resonators, quarter-wave dampers, instability screening
+
+**Status:** Not started
+
+---
+
 ## Completion Checklist
 
-- [ ] All Phase 1 tests passing (geometry helpers)
-- [ ] All Phase 2 tests passing (cp_mass)
+- [x] All Phase 1 tests passing (geometry helpers) ✅
+- [ ] All Phase 2 tests passing (mass-specific thermo properties)
 - [ ] All Phase 3 tests passing (velocity_from_mdot)
 - [ ] All Phase 4 tests passing (pressure_drop_pipe)
 - [ ] All Phase 5 tests passing (htc_pipe)
 - [ ] All Phase 6 tests passing (roughness database)
 - [ ] All Phase 7 tests passing (LMTD wrappers)
 - [ ] All Phase 8 tests passing (air_properties - optional)
-- [ ] Documentation updated for all new functions
-- [ ] All commits pushed to main
 - [ ] **Phase 9: Examples updated to use new convenience functions**
 - [ ] All examples run successfully with new functions
 - [ ] Code is cleaner and demonstrates ease of use
+- [ ] **Phase 10: Orifice utilities and example**
+- [ ] All orifice utility tests passing
+- [ ] Orifice flow metering example created and working
+- [ ] **Phase 11: Acoustics utilities and example**
+- [ ] All acoustics utility tests passing
+- [ ] Combustor acoustics example created and working
+- [ ] Documentation updated for all new functions
+- [ ] All commits pushed to main
 
 ---
 
@@ -372,30 +481,54 @@ Add helper functions identified from example analysis to simplify user code and 
 
 ## Estimated Effort
 
-- **Phase 1:** 1-2 hours (simple geometry)
-- **Phase 2:** 30 min (simple wrapper)
+- **Phase 1:** 1-2 hours (simple geometry) ✅ DONE
+- **Phase 2:** 1-1.5 hours (4 simple wrappers, symmetric interface)
 - **Phase 3:** 30 min (simple formula)
 - **Phase 4:** 2-3 hours (composite, multiple correlations)
 - **Phase 5:** 2-3 hours (composite, multiple correlations)
 - **Phase 6:** 1 hour (data entry)
 - **Phase 7:** 1 hour (simple wrappers)
 - **Phase 8:** 2 hours (struct design, optional)
+- **Phase 9:** 2-3 hours (refactor 4 examples)
+- **Phase 10:** 1.5 hours (4 orifice utilities + example)
+- **Phase 11:** 1.5 hours (5 acoustics utilities + example)
 
-**Total:** ~10-14 hours for Phases 1-7 (recommended scope)
+**Total Core (1-7,9):** ~11-15 hours
+**Total Extended (1-7,9-11):** ~14-18 hours
+**Total Complete (1-11):** ~16-20 hours
 
 ---
 
 ## Priority Order (Recommended Implementation)
 
-1. **Phase 1** - Geometry helpers (foundation for other functions)
-2. **Phase 2** - cp_mass (simple, high value)
+### **Core Phases (High Priority):**
+1. **Phase 1** - Geometry helpers ✅ DONE
+2. **Phase 2** - Mass-specific thermo (symmetric interface)
 3. **Phase 3** - velocity_from_mdot (simple, high value)
 4. **Phase 4** - pressure_drop_pipe (high value composite)
 5. **Phase 5** - htc_pipe (high value composite)
 6. **Phase 6** - Roughness database (convenience)
 7. **Phase 7** - LMTD wrappers (convenience)
-8. **Phase 8** - Air properties (optional, nice to have)
-9. **Phase 9** - Update examples (demonstrate value, improve code quality)
+9. **Phase 9** - Update examples (demonstrate value)
 
-**Recommended scope:** Phases 1-7 + Phase 9 for maximum ROI.
+### **Extended Phases (Medium Priority):**
+10. **Phase 10** - Orifice utilities + example (flow metering)
+11. **Phase 11** - Acoustics utilities + example (combustor design)
+
+### **Optional Phase:**
+8. **Phase 8** - Air properties bundle (nice to have)
+
+**Recommended scope:** Phases 1-7 + 9 for maximum ROI (core utilities + examples).
+Add Phases 10-11 for domain-specific applications (orifice metering, acoustics).
 Phase 8 can be added later if needed.
+
+---
+
+## Notes
+
+- Do NOT commit this TODO.md file itself
+- Each phase must be fully tested before moving to next
+- Composite functions are the most valuable but require careful testing
+- Start with simple geometry helpers to build confidence
+- Machine precision testing is critical for composite functions
+- Update examples in a separate task after all functions are implemented

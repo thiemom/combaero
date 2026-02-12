@@ -305,6 +305,41 @@ double cv(double T, const std::vector<double>& X) {
     return cp(T, X) - R_GAS;
 }
 
+// -------------------------------------------------------------
+// Mass-specific thermodynamic properties
+// -------------------------------------------------------------
+// These provide a symmetric interface to the molar-basis functions.
+// Conversion: property_mass = property_molar / mwmix * 1000
+// (mwmix is in g/mol, so multiply by 1000 to get kg/mol)
+
+// Heat capacity at constant pressure [J/(kg·K)]
+double cp_mass(double T, const std::vector<double>& X) {
+    double cp_molar = cp(T, X);  // [J/(mol·K)]
+    double mw = mwmix(X);         // [g/mol]
+    return cp_molar / mw * 1000.0;  // [J/(kg·K)]
+}
+
+// Heat capacity at constant volume [J/(kg·K)]
+double cv_mass(double T, const std::vector<double>& X) {
+    double cv_molar = cv(T, X);  // [J/(mol·K)]
+    double mw = mwmix(X);         // [g/mol]
+    return cv_molar / mw * 1000.0;  // [J/(kg·K)]
+}
+
+// Enthalpy [J/kg]
+double h_mass(double T, const std::vector<double>& X) {
+    double h_molar = h(T, X);    // [J/mol]
+    double mw = mwmix(X);         // [g/mol]
+    return h_molar / mw * 1000.0;  // [J/kg]
+}
+
+// Entropy [J/(kg·K)]
+double s_mass(double T, const std::vector<double>& X, double P, double P_ref) {
+    double s_molar = s(T, X, P, P_ref);  // [J/(mol·K)]
+    double mw = mwmix(X);                 // [g/mol]
+    return s_molar / mw * 1000.0;          // [J/(kg·K)]
+}
+
 // Calculate internal energy [J/mol]
 // For ideal gas: u = h - R*T
 double u(double T, const std::vector<double>& X) {

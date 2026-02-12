@@ -207,15 +207,88 @@ PYBIND11_MODULE(_core, m)
 
     m.def(
         "speed_of_sound",
-        [](double T,
-           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr)
-        {
+        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
             auto X = to_vec(X_arr);
             return speed_of_sound(T, X);
         },
         py::arg("T"),
         py::arg("X"),
-        "Speed of sound c(T, X) [m/s]."
+        "Speed of sound [m/s].\n\n"
+        "Parameters:\n"
+        "  T : temperature [K]\n"
+        "  X : mole fractions [mol/mol]\n\n"
+        "Returns: speed of sound [m/s]"
+    );
+
+    m.def(
+        "cp_mass",
+        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+            auto X = to_vec(X_arr);
+            return cp_mass(T, X);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        "Mass-specific heat capacity at constant pressure.\n\n"
+        "Cp_mass = Cp_molar / mwmix * 1000\n\n"
+        "Parameters:\n"
+        "  T : temperature [K]\n"
+        "  X : mole fractions [mol/mol]\n\n"
+        "Returns: heat capacity [J/(kg·K)]"
+    );
+
+    m.def(
+        "cv_mass",
+        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+            auto X = to_vec(X_arr);
+            return cv_mass(T, X);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        "Mass-specific heat capacity at constant volume.\n\n"
+        "Cv_mass = Cv_molar / mwmix * 1000\n\n"
+        "Parameters:\n"
+        "  T : temperature [K]\n"
+        "  X : mole fractions [mol/mol]\n\n"
+        "Returns: heat capacity [J/(kg·K)]"
+    );
+
+    m.def(
+        "h_mass",
+        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+            auto X = to_vec(X_arr);
+            return h_mass(T, X);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        "Mass-specific enthalpy.\n\n"
+        "h_mass = h_molar / mwmix * 1000\n\n"
+        "Parameters:\n"
+        "  T : temperature [K]\n"
+        "  X : mole fractions [mol/mol]\n\n"
+        "Returns: enthalpy [J/kg]"
+    );
+
+    m.def(
+        "s_mass",
+        [](double T,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double P,
+           double P_ref = 101325.0) {
+            auto X = to_vec(X_arr);
+            return s_mass(T, X, P, P_ref);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        py::arg("P"),
+        py::arg("P_ref") = 101325.0,
+        "Mass-specific entropy.\n\n"
+        "s_mass = s_molar / mwmix * 1000\n\n"
+        "Parameters:\n"
+        "  T     : temperature [K]\n"
+        "  X     : mole fractions [mol/mol]\n"
+        "  P     : pressure [Pa]\n"
+        "  P_ref : reference pressure [Pa] (default: 101325)\n\n"
+        "Returns: entropy [J/(kg·K)]"
     );
 
     m.def(

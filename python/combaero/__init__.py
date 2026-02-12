@@ -85,8 +85,10 @@ try:
         complete_combustion_to_CO2_H2O_with_fraction,
         convert_to_dry_fractions,
         cp,
+        cp_mass,
         critical_pressure_ratio,
         cv,
+        cv_mass,
         damping_ratio,
         density,
         dewpoint,
@@ -112,6 +114,7 @@ try:
         friction_serghides,
         get_units,
         h,
+        h_mass,
         half_wave_frequency,
         has_units,
         heat_flux,
@@ -193,6 +196,7 @@ try:
         residence_time_tube,
         reynolds,
         s,
+        s_mass,
         set_equivalence_ratio_mass,
         set_equivalence_ratio_mole,
         set_fuel_stream_for_CO2,
@@ -236,9 +240,13 @@ except ModuleNotFoundError:
     mixture_h = _core.mixture_h
     adiabatic_T_wgs = _core.adiabatic_T_wgs
     cp = _core.cp
+    cp_mass = _core.cp_mass
     h = _core.h
+    h_mass = _core.h_mass
     s = _core.s
+    s_mass = _core.s_mass
     cv = _core.cv
+    cv_mass = _core.cv_mass
     density = _core.density
     specific_gas_constant = _core.specific_gas_constant
     isentropic_expansion_coefficient = _core.isentropic_expansion_coefficient
@@ -448,9 +456,13 @@ __all__ = [
     "mixture_h",
     "adiabatic_T_wgs",
     "cp",
+    "cp_mass",
     "h",
+    "h_mass",
     "s",
+    "s_mass",
     "cv",
+    "cv_mass",
     "density",
     "specific_gas_constant",
     "isentropic_expansion_coefficient",
