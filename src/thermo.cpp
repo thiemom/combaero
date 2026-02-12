@@ -130,39 +130,63 @@ static const std::array<double, 10>* find_nasa9_interval(
 }
 
 // NASA-9 polynomial for Cp/R: a1/T^2 + a2/T + a3 + a4*T + a5*T^2 + a6*T^3 + a7*T^4
+// Uses Horner's algorithm for efficient evaluation
 static double cp_R_nasa9(const std::array<double, 10>& a, double T) {
     double T2 = T * T;
-    return a[0] / T2 + a[1] / T + a[2] + a[3] * T + a[4] * T2 + a[5] * T2 * T + a[6] * T2 * T2;
+    double T_inv = 1.0 / T;
+    // Negative powers using Horner: (a1/T + a2)/T = a1/T^2 + a2/T
+    double neg_terms = (a[0] * T_inv + a[1]) * T_inv;
+    // Positive powers using Horner: a3 + T*(a4 + T*(a5 + T*(a6 + T*a7)))
+    double pos_terms = a[2] + T * (a[3] + T * (a[4] + T * (a[5] + T * a[6])));
+    return neg_terms + pos_terms;
 }
 
 // NASA-9 polynomial for H/RT: -a1/T^2 + a2*ln(T)/T + a3 + a4*T/2 + a5*T^2/3 + a6*T^3/4 + a7*T^4/5 + b1/T
+// Uses Horner's algorithm for efficient evaluation
 static double h_RT_nasa9(const std::array<double, 10>& a, double T) {
-    double T2 = T * T;
-    return -a[0] / T2 + a[1] * std::log(T) / T + a[2] + a[3] * T / 2.0 + a[4] * T2 / 3.0
-           + a[5] * T2 * T / 4.0 + a[6] * T2 * T2 / 5.0 + a[8] / T;
+    double T_inv = 1.0 / T;
+    double ln_T = std::log(T);
+    // Negative powers: -a1/T^2 + a2*ln(T)/T + b1/T
+    double neg_terms = (-a[0] * T_inv + a[1] * ln_T + a[8]) * T_inv;
+    // Positive powers using Horner: a3 + T*(a4/2 + T*(a5/3 + T*(a6/4 + T*a7/5)))
+    double pos_terms = a[2] + T * (a[3] / 2.0 + T * (a[4] / 3.0 + T * (a[5] / 4.0 + T * a[6] / 5.0)));
+    return neg_terms + pos_terms;
 }
 
 // NASA-9 polynomial for S/R: -a1/(2*T^2) - a2/T + a3*ln(T) + a4*T + a5*T^2/2 + a6*T^3/3 + a7*T^4/4 + b2
+// Uses Horner's algorithm for efficient evaluation
 static double s_R_nasa9(const std::array<double, 10>& a, double T) {
-    double T2 = T * T;
-    return -a[0] / (2.0 * T2) - a[1] / T + a[2] * std::log(T) + a[3] * T + a[4] * T2 / 2.0
-           + a[5] * T2 * T / 3.0 + a[6] * T2 * T2 / 4.0 + a[9];
+    double T_inv = 1.0 / T;
+    double ln_T = std::log(T);
+    // Negative powers: -a1/(2*T^2) - a2/T
+    double neg_terms = (-a[0] / 2.0 * T_inv - a[1]) * T_inv;
+    // Positive powers using Horner: a3*ln(T) + a4*T + T^2*(a5/2 + T*(a6/3 + T*a7/4))
+    double pos_terms = a[2] * ln_T + a[3] * T + T * T * (a[4] / 2.0 + T * (a[5] / 3.0 + T * a[6] / 4.0));
+    return neg_terms + pos_terms + a[9];
 }
 
 // NASA-9 derivative of Cp/R with respect to T:
 // d(Cp/R)/dT = -2*a1/T^3 - a2/T^2 + a4 + 2*a5*T + 3*a6*T^2 + 4*a7*T^3
+// Uses Horner's algorithm for efficient evaluation
 static double dcp_R_dT_nasa9(const std::array<double, 10>& a, double T) {
-    double T2 = T * T;
-    double T3 = T2 * T;
-    return -2.0 * a[0] / T3 - a[1] / T2 + a[3] + 2.0 * a[4] * T + 3.0 * a[5] * T2 + 4.0 * a[6] * T3;
+    double T_inv = 1.0 / T;
+    // Negative powers using Horner: (-2*a1/T - a2)/T^2
+    double neg_terms = (-2.0 * a[0] * T_inv - a[1]) * T_inv * T_inv;
+    // Positive powers using Horner: a4 + T*(2*a5 + T*(3*a6 + T*4*a7))
+    double pos_terms = a[3] + T * (2.0 * a[4] + T * (3.0 * a[5] + T * 4.0 * a[6]));
+    return neg_terms + pos_terms;
 }
 
 // NASA-9 derivative of S/R with respect to T:
 // d(S/R)/dT = a1/T^3 + a2/T^2 + a3/T + a4 + a5*T + a6*T^2 + a7*T^3
+// Uses Horner's algorithm for efficient evaluation
 static double ds_R_dT_nasa9(const std::array<double, 10>& a, double T) {
-    double T2 = T * T;
-    double T3 = T2 * T;
-    return a[0] / T3 + a[1] / T2 + a[2] / T + a[3] + a[4] * T + a[5] * T2 + a[6] * T3;
+    double T_inv = 1.0 / T;
+    // Negative powers using Horner: (a1/T + a2)/T^2 + a3/T
+    double neg_terms = ((a[0] * T_inv + a[1]) * T_inv + a[2]) * T_inv;
+    // Positive powers using Horner: a4 + T*(a5 + T*(a6 + T*a7))
+    double pos_terms = a[3] + T * (a[4] + T * (a[5] + T * a[6]));
+    return neg_terms + pos_terms;
 }
 
 // NASA polynomial evaluation for Cp/R
