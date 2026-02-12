@@ -1,53 +1,20 @@
-# Missing Utility Functions Implementation Plan
+# CombAero TODO - Pending Work
 
 ## Overview
-Add helper functions identified from example analysis to simplify user code and reduce repetition.
+Remaining utility functions and improvements to implement.
 
 **Requirements:**
 1. Every function needs comprehensive tests
 2. Composite functions must match single-call results with machine precision
-3. Split into phases: easy → difficult, sorted by priority
-4. Commit after each phase if all tests and pre-commit hooks pass
-5. Do NOT commit this TODO.md file itself
-6. **DOCUMENTATION: Every phase must update:**
+3. Commit after each phase if all tests and pre-commit hooks pass
+4. **DOCUMENTATION: Every phase must update:**
    - `docs/API_REFERENCE.md` - function signatures, parameters, units
    - `include/units_data.h` - add unit entries for new functions
    - Run `python scripts/generate_units_md.py` to regenerate `docs/UNITS.md`
 
 ---
 
-## Phase 1: Simple Geometry Helpers ✅
-
-**Priority:** HIGH - Simple, frequently used, no dependencies
-**Difficulty:** EASY - Pure geometric calculations
-
-**Functions to implement (3):**
-- [x] `pipe_area(D)` - Circular pipe cross-sectional area [m²]
-- [x] `annular_area(D_outer, D_inner)` - Annular cross-sectional area [m²]
-- [x] `pipe_volume(D, L)` - Cylindrical pipe volume [m³]
-
-**Implementation:**
-- [x] Add functions to `src/geometry.cpp`
-- [x] Add declarations to `include/geometry.h`
-- [x] Add Python bindings to `python/combaero/_core.cpp`
-- [x] Write unit tests in `python/tests/test_geometry.py` (16 tests)
-- [x] Verify formulas: A = π(D/2)², A_annular = π((D_o/2)² - (D_i/2)²), V = πD²L/4
-- [x] Update `docs/API_REFERENCE.md`
-- [x] **Add unit entries to `include/units_data.h`**
-- [x] **Run `python scripts/generate_units_md.py` to regenerate `docs/UNITS.md`**
-- [x] Run all tests: `pytest python/tests/` - **137/137 PASSED**
-- [x] Commit: "Add simple geometry helper functions (pipe_area, annular_area, pipe_volume)"
-
-**Testing requirements:**
-- Verify against manual calculations with known values
-- Test edge cases (D=0 should error, D_outer < D_inner should error)
-- Verify units are correct [m²] and [m³]
-
-**Status:** ✅ COMPLETED
-
----
-
-## Phase 2: Mass-Specific Thermodynamic Properties ⏳
+## Phase 2: Mass-Specific Thermodynamic Properties
 
 **Priority:** HIGH - Frequently needed, simple conversions
 **Difficulty:** EASY - Simple wrappers around existing functions
@@ -90,74 +57,7 @@ we should have mass-basis equivalents for all of them to avoid user confusion.
 
 ---
 
-## Phase 3: Velocity from Mass Flow
-
-**Priority:** HIGH - Common conversion in flow calculations
-**Difficulty:** EASY - Simple formula with geometry
-
-**Functions to implement (1):**
-- [x] `pipe_velocity(mdot, D, rho)` - Velocity from mass flow [m/s]
-
-**Implementation:**
-- [ ] Add function to `src/incompressible.cpp` (or new `src/flow_utils.cpp`)
-- [ ] Add declaration to `include/incompressible.h`
-- [ ] Add Python binding to `python/combaero/_core.cpp`
-- [ ] Write unit tests in `python/tests/test_flow_utils.py`
-- [ ] **CRITICAL TEST:** Verify v = mdot / (rho * π(D/2)²)
-- [ ] Test round-trip: mdot → v → mdot should match
-- [ ] Update `docs/API_REFERENCE.md`
-- [ ] **Add unit entry to `include/units_data.h`**
-- [ ] **Run `python scripts/generate_units_md.py` to regenerate `docs/UNITS.md`**
-- [ ] Run all tests: `pytest python/tests/`
-- [ ] Commit: "Add velocity from mass flow function (velocity_from_mdot)"
-
-**Testing requirements:**
-- Must match manual calculation: v = mdot / (rho * A) where A = π(D/2)²
-- Test round-trip consistency
-- Verify units [m/s]
-
-**Status:** ✅ ALREADY EXISTS (pipe_velocity)
-
----
-
-## Phase 4: Pressure Drop in Pipe (Composite) ✅
-
-**Priority:** HIGH - Very common, combines multiple steps
-**Difficulty:** MEDIUM - Composite function, multiple dependencies
-
-**Functions to implement (1):**
-- [ ] `pressure_drop_pipe(T, P, X, v, D, L, roughness=0.0, correlation='haaland')`
-  - Returns: tuple (dP [Pa], Re [-], f [-])
-
-**Implementation:**
-- [ ] Add function to `src/incompressible.cpp` or new `src/pipe_flow.cpp`
-- [ ] Add declaration to header
-- [ ] Add Python binding with tuple return
-- [ ] Write comprehensive unit tests in `python/tests/test_pipe_flow.py`
-- [ ] **CRITICAL TESTS:**
-  - Verify dP matches manual calculation: f * (L/D) * (ρv²/2)
-  - Verify Re matches: ρvD/μ
-  - Verify f matches friction correlation
-  - Test all correlations: 'haaland', 'serghides', 'colebrook', 'petukhov'
-  - Test smooth vs rough pipes
-- [ ] Update `docs/API_REFERENCE.md`
-- [ ] **Add unit entry to `include/units_data.h`**
-- [ ] **Run `python scripts/generate_units_md.py` to regenerate `docs/UNITS.md`**
-- [ ] Run all tests: `pytest python/tests/`
-- [ ] Commit: "Add composite pressure drop function (pressure_drop_pipe)"
-
-**Testing requirements:**
-- Decompose and verify each step matches individual function calls
-- Test with air at different conditions
-- Test with different roughness values
-- Verify all correlation options work
-- Machine precision match with manual multi-step calculation
-
-**Status:** Not started
-
----
-
-## Phase 5: Heat Transfer Coefficient in Pipe (Composite) ⏳
+## Phase 5: Heat Transfer Coefficient in Pipe (Composite)
 
 **Priority:** HIGH - Very common heat transfer calculation
 **Difficulty:** MEDIUM - Composite function, multiple dependencies
@@ -195,70 +95,7 @@ we should have mass-basis equivalents for all of them to avoid user confusion.
 
 ---
 
-## Phase 6: Pipe Roughness Database ⏳
-
-**Priority:** MEDIUM - Convenience for users
-**Difficulty:** EASY - Just data storage
-
-**Functions to implement (2):**
-- [ ] `pipe_roughness(material)` - Returns absolute roughness ε [m]
-- [ ] `standard_pipe_roughness()` - Returns dict of all materials
-
-**Implementation:**
-- [ ] Add to `src/utils.cpp` or new file
-- [ ] Create static map/dict of standard roughness values
-- [ ] Materials: 'smooth', 'drawn_tubing', 'commercial_steel', 'galvanized_iron', 'cast_iron', 'concrete', 'riveted_steel'
-- [ ] Add Python bindings
-- [ ] Write unit tests
-- [ ] Update `docs/API_REFERENCE.md`
-- [ ] **Add unit entries to `include/units_data.h`**
-- [ ] **Run `python scripts/generate_units_md.py` to regenerate `docs/UNITS.md`**
-- [ ] Run all tests: `pytest python/tests/`
-- [ ] Commit: "Add pipe roughness database functions"
-
-**Testing requirements:**
-- Verify values match engineering handbooks
-- Test case-insensitive lookup
-- Test error handling for unknown materials
-
-**Status:** ✅ COMPLETED
-
----
-
-## Phase 7: LMTD Convenience Wrappers ✅
-
-**Priority:** MEDIUM - Convenience, saves users from calculating dT
-**Difficulty:** EASY - Simple wrappers around existing lmtd()
-
-**Functions to implement (2):**
-- [ ] `lmtd_counterflow(T_hot_in, T_hot_out, T_cold_in, T_cold_out)` - Returns LMTD [K]
-- [ ] `lmtd_parallelflow(T_hot_in, T_hot_out, T_cold_in, T_cold_out)` - Returns LMTD [K]
-
-**Implementation:**
-- [ ] Add to `src/heat_transfer.cpp`
-- [ ] Add declarations to `include/heat_transfer.h`
-- [ ] Add Python bindings
-- [ ] Write unit tests in `python/tests/test_heat_transfer.py`
-- [ ] **CRITICAL TESTS:**
-  - Verify counterflow: lmtd(T_hot_in - T_cold_out, T_hot_out - T_cold_in)
-  - Verify parallelflow: lmtd(T_hot_in - T_cold_in, T_hot_out - T_cold_out)
-  - Must match existing lmtd() function exactly
-- [ ] Update `docs/API_REFERENCE.md`
-- [ ] **Add unit entries to `include/units_data.h`**
-- [ ] **Run `python scripts/generate_units_md.py` to regenerate `docs/UNITS.md`**
-- [ ] Run all tests: `pytest python/tests/`
-- [ ] Commit: "Add LMTD convenience wrapper functions"
-
-**Testing requirements:**
-- Must match manual lmtd() calls exactly
-- Test with realistic heat exchanger temperatures
-- Verify counterflow > parallelflow for same conditions
-
-**Status:** ✅ COMPLETED (lmtd_counterflow, lmtd_parallelflow already implemented)
-
----
-
-## Phase 8: Air Properties Bundle (Optional) ⏳
+## Phase 8: Air Properties Bundle (Optional)
 
 **Priority:** LOW - Nice to have, but multiple calls aren't too bad
 **Difficulty:** MEDIUM - Returns struct/dict, needs careful design
@@ -288,52 +125,7 @@ we should have mass-basis equivalents for all of them to avoid user confusion.
 
 ---
 
-## Phase 9: Update Examples to Use Convenience Functions ⏳
-
-**Priority:** HIGH - Demonstrate value of new functions, improve code quality
-**Difficulty:** EASY - Refactoring existing working code
-
-**Goal:** Update all 4 new example files to use the new convenience functions where applicable.
-
-**Files to update:**
-- [ ] `python/examples/friction_and_pressure_drop.py`
-- [ ] `python/examples/heat_transfer_pipe_flow.py`
-- [ ] `python/examples/reactor_design.py`
-- [ ] `python/examples/combustor_heat_transfer.py`
-
-**Changes to make:**
-- [ ] Replace manual Reynolds number calculations with existing `ca.reynolds()` or composite functions
-- [ ] Replace manual area calculations with `ca.pipe_area()` and `ca.annular_area()`
-- [ ] Replace manual volume calculations with `ca.pipe_volume()`
-- [ ] Replace multi-step pressure drop with `ca.pressure_drop_pipe()`
-- [ ] Replace multi-step heat transfer with `ca.htc_pipe()`
-- [ ] Replace manual cp_mass conversions with `ca.cp_mass()`
-- [ ] Replace manual velocity calculations with `ca.velocity_from_mdot()`
-- [ ] Use `ca.pipe_roughness()` for standard materials
-- [ ] Use `ca.lmtd_counterflow()` / `ca.lmtd_parallelflow()` where applicable
-
-**Implementation:**
-- [ ] Update each example file one at a time
-- [ ] **CRITICAL:** Verify output remains identical (or very close) after refactoring
-- [ ] Run each example to ensure it still works: `python python/examples/<file>.py`
-- [ ] Ensure examples are cleaner and more readable
-- [ ] Add comments showing the convenience of new functions
-- [ ] Run all tests to ensure nothing broke: `pytest python/tests/`
-- [ ] Commit: "Refactor examples to use new convenience functions"
-
-**Testing requirements:**
-- Each example must still run successfully
-- Output should be identical (or negligibly different due to rounding)
-- Code should be noticeably cleaner and shorter
-- Examples should better demonstrate CombAero's ease of use
-
-**Status:** ✅ COMPLETED
-
-**Note:** All 4 examples successfully refactored to use new convenience functions.
-
----
-
-## Phase 10: Orifice Flow Utilities ⏳
+## Phase 10: Orifice Flow Utilities
 
 **Priority:** MEDIUM - Useful for flow metering and injection applications
 **Difficulty:** EASY - Simple geometric and flow calculations
@@ -377,7 +169,7 @@ we should have mass-basis equivalents for all of them to avoid user confusion.
 
 ---
 
-## Phase 11: Acoustics Utilities ⏳
+## Phase 11: Acoustics Utilities
 
 **Priority:** MEDIUM - Useful for combustor design and instability analysis
 **Difficulty:** EASY - Simple frequency and wavelength calculations
@@ -423,27 +215,22 @@ we should have mass-basis equivalents for all of them to avoid user confusion.
 
 ---
 
-## Completion Checklist
+## Completion Status
 
-- [x] All Phase 1 tests passing (geometry helpers) ✅
-- [ ] All Phase 2 tests passing (mass-specific thermo properties)
-- [ ] All Phase 3 tests passing (velocity_from_mdot)
-- [ ] All Phase 4 tests passing (pressure_drop_pipe)
-- [ ] All Phase 5 tests passing (htc_pipe)
-- [ ] All Phase 6 tests passing (roughness database)
-- [ ] All Phase 7 tests passing (LMTD wrappers)
-- [ ] All Phase 8 tests passing (air_properties - optional)
-- [ ] **Phase 9: Examples updated to use new convenience functions**
-- [ ] All examples run successfully with new functions
-- [ ] Code is cleaner and demonstrates ease of use
-- [ ] **Phase 10: Orifice utilities and example**
-- [ ] All orifice utility tests passing
-- [ ] Orifice flow metering example created and working
-- [ ] **Phase 11: Acoustics utilities and example**
-- [ ] All acoustics utility tests passing
-- [ ] Combustor acoustics example created and working
-- [ ] Documentation updated for all new functions
-- [ ] All commits pushed to main
+### Completed:
+- ✅ Phase 1: Geometry helpers (pipe_area, annular_area, pipe_volume)
+- ✅ Phase 3: Velocity from mass flow (already existed as pipe_velocity)
+- ✅ Phase 4: Pressure drop composite (pressure_drop_pipe)
+- ✅ Phase 6: Pipe roughness database
+- ✅ Phase 7: LMTD convenience wrappers
+- ✅ Phase 9: Examples refactored to use convenience functions
+
+### Pending:
+- [ ] Phase 2: Mass-specific thermodynamic properties (cp_mass, cv_mass, h_mass, s_mass)
+- [ ] Phase 5: Heat transfer coefficient composite (htc_pipe)
+- [ ] Phase 8: Air properties bundle (optional)
+- [ ] Phase 10: Orifice flow utilities + example
+- [ ] Phase 11: Acoustics utilities + example
 
 ---
 
@@ -479,48 +266,40 @@ we should have mass-basis equivalents for all of them to avoid user confusion.
 
 ---
 
-## Estimated Effort
+## Estimated Effort (Remaining)
 
-- **Phase 1:** 1-2 hours (simple geometry) ✅ DONE
-- **Phase 2:** 1-1.5 hours (4 simple wrappers, symmetric interface)
-- **Phase 3:** 30 min (simple formula)
-- **Phase 4:** 2-3 hours (composite, multiple correlations)
-- **Phase 5:** 2-3 hours (composite, multiple correlations)
-- **Phase 6:** 1 hour (data entry)
-- **Phase 7:** 1 hour (simple wrappers)
-- **Phase 8:** 2 hours (struct design, optional)
-- **Phase 9:** 2-3 hours (refactor 4 examples)
-- **Phase 10:** 1.5 hours (4 orifice utilities + example)
-- **Phase 11:** 1.5 hours (5 acoustics utilities + example)
+### Completed: ~8-10 hours
+- Phase 1, 3, 4, 6, 7, 9 ✅
 
-**Total Core (1-7,9):** ~11-15 hours
-**Total Extended (1-7,9-11):** ~14-18 hours
-**Total Complete (1-11):** ~16-20 hours
+### Remaining:
+- **Phase 2:** 1-1.5 hours (4 simple wrappers)
+- **Phase 5:** 2-3 hours (htc_pipe composite)
+- **Phase 8:** 2 hours (air_properties - optional)
+- **Phase 10:** 1.5 hours (orifice utilities + example)
+- **Phase 11:** 1.5 hours (acoustics utilities + example)
+
+**Remaining Core (2, 5):** ~3-4.5 hours
+**Remaining Extended (2, 5, 10, 11):** ~6-8 hours
+**Remaining Complete (2, 5, 8, 10, 11):** ~8-10 hours
 
 ---
 
-## Priority Order (Recommended Implementation)
+## Priority Order (Remaining Work)
 
-### **Core Phases (High Priority):**
-1. **Phase 1** - Geometry helpers ✅ DONE
-2. **Phase 2** - Mass-specific thermo (symmetric interface)
-3. **Phase 3** - velocity_from_mdot (simple, high value)
-4. **Phase 4** - pressure_drop_pipe (high value composite)
-5. **Phase 5** - htc_pipe (high value composite)
-6. **Phase 6** - Roughness database (convenience)
-7. **Phase 7** - LMTD wrappers (convenience)
-9. **Phase 9** - Update examples (demonstrate value)
+### **High Priority (Core):**
+1. **Phase 2** - Mass-specific thermo (symmetric interface, frequently needed)
+2. **Phase 5** - htc_pipe (high value composite for heat transfer)
 
-### **Extended Phases (Medium Priority):**
-10. **Phase 10** - Orifice utilities + example (flow metering)
-11. **Phase 11** - Acoustics utilities + example (combustor design)
+### **Medium Priority (Extended):**
+3. **Phase 10** - Orifice utilities + example (flow metering applications)
+4. **Phase 11** - Acoustics utilities + example (combustor design)
 
-### **Optional Phase:**
-8. **Phase 8** - Air properties bundle (nice to have)
+### **Low Priority (Optional):**
+5. **Phase 8** - Air properties bundle (nice to have, but not critical)
 
-**Recommended scope:** Phases 1-7 + 9 for maximum ROI (core utilities + examples).
-Add Phases 10-11 for domain-specific applications (orifice metering, acoustics).
-Phase 8 can be added later if needed.
+**Recommended next steps:** Complete Phase 2 and Phase 5 for core functionality.
+Add Phases 10-11 for domain-specific applications if needed.
+Phase 8 can be deferred or skipped.
 
 ---
 

@@ -2,7 +2,7 @@
 
 Verifies Python bindings for cp_mass, cv_mass, h_mass, s_mass.
 These functions provide a symmetric interface to molar-basis properties.
-Units: All mass-specific properties in [J/kg] or [J/(kg·K)].
+Units: All mass-specific properties in [J/kg] or [J/(kg*K)].
 """
 
 import combaero as cb
@@ -16,16 +16,16 @@ class TestMassSpecificThermodynamicProperties:
         T = 300.0  # K
         X_air = cb.standard_dry_air_composition()
 
-        cp_molar = cb.cp(T, X_air)  # [J/(mol·K)]
+        cp_molar = cb.cp(T, X_air)  # [J/(mol*K)]
         mw = cb.mwmix(X_air)  # [g/mol]
-        cp_mass_expected = cp_molar / mw * 1000.0  # [J/(kg·K)]
+        cp_mass_expected = cp_molar / mw * 1000.0  # [J/(kg*K)]
 
         cp_mass_actual = cb.cp_mass(T, X_air)
 
         # Must match within machine precision
         assert abs(cp_mass_actual - cp_mass_expected) < 1e-12
 
-        # Sanity check: air cp_mass ~ 1005 J/(kg·K) at 300K
+        # Sanity check: air cp_mass ~ 1005 J/(kg*K) at 300K
         assert 1000.0 < cp_mass_actual < 1010.0
 
     def test_cv_mass_air(self):
@@ -33,16 +33,16 @@ class TestMassSpecificThermodynamicProperties:
         T = 300.0  # K
         X_air = cb.standard_dry_air_composition()
 
-        cv_molar = cb.cv(T, X_air)  # [J/(mol·K)]
+        cv_molar = cb.cv(T, X_air)  # [J/(mol*K)]
         mw = cb.mwmix(X_air)  # [g/mol]
-        cv_mass_expected = cv_molar / mw * 1000.0  # [J/(kg·K)]
+        cv_mass_expected = cv_molar / mw * 1000.0  # [J/(kg*K)]
 
         cv_mass_actual = cb.cv_mass(T, X_air)
 
         # Must match within machine precision
         assert abs(cv_mass_actual - cv_mass_expected) < 1e-12
 
-        # Sanity check: air cv_mass ~ 718 J/(kg·K) at 300K
+        # Sanity check: air cv_mass ~ 718 J/(kg*K) at 300K
         assert 710.0 < cv_mass_actual < 725.0
 
     def test_h_mass_air(self):
@@ -65,9 +65,9 @@ class TestMassSpecificThermodynamicProperties:
         P = 101325.0  # Pa
         X_air = cb.standard_dry_air_composition()
 
-        s_molar = cb.s(T, X_air, P)  # [J/(mol·K)]
+        s_molar = cb.s(T, X_air, P)  # [J/(mol*K)]
         mw = cb.mwmix(X_air)  # [g/mol]
-        s_mass_expected = s_molar / mw * 1000.0  # [J/(kg·K)]
+        s_mass_expected = s_molar / mw * 1000.0  # [J/(kg*K)]
 
         s_mass_actual = cb.s_mass(T, X_air, P)
 
@@ -171,7 +171,7 @@ class TestMassSpecificThermodynamicProperties:
         # s can be negative depending on reference state
 
     def test_units_are_correct(self):
-        """Verify units are in J/kg and J/(kg·K) not J/mol."""
+        """Verify units are in J/kg and J/(kg*K) not J/mol."""
         T = 300.0  # K
         P = 101325.0  # Pa
         X_air = cb.standard_dry_air_composition()
@@ -190,7 +190,7 @@ class TestMassSpecificThermodynamicProperties:
         assert abs(cp_mass * ratio - cp_molar) / cp_molar < 1e-12
 
         # Typical air values at 300K
-        assert 1000 < cp_mass < 1010  # [J/(kg·K)]
-        assert 710 < cv_mass < 725  # [J/(kg·K)]
+        assert 1000 < cp_mass < 1010  # [J/(kg*K)]
+        assert 710 < cv_mass < 725  # [J/(kg*K)]
         assert isinstance(h_mass, float)  # [J/kg]
-        assert isinstance(s_mass, float)  # [J/(kg·K)]
+        assert isinstance(s_mass, float)  # [J/(kg*K)]

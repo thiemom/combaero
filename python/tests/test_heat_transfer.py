@@ -1,7 +1,7 @@
 """Tests for heat transfer correlations.
 
 Verifies Python bindings for Nusselt number and LMTD functions.
-Units: Nu dimensionless [-], h in [W/(m²·K)], LMTD in [K].
+Units: Nu dimensionless [-], h in [W/(m2*K)], LMTD in [K].
 """
 
 import pytest
@@ -141,36 +141,36 @@ class TestHeatTransferCoefficient:
     def test_htc_from_nusselt_basic(self):
         """Test HTC calculation from Nusselt number."""
         Nu = 100.0  # Nusselt number [-]
-        k = 0.025  # Thermal conductivity (air) [W/(m·K)]
+        k = 0.025  # Thermal conductivity (air) [W/(m*K)]
         L = 0.05  # Characteristic length (pipe diameter) [m]
 
         h = cb.htc_from_nusselt(Nu, k, L)
 
-        # h = Nu * k / L = 100 * 0.025 / 0.05 = 50 W/(m²·K)
+        # h = Nu * k / L = 100 * 0.025 / 0.05 = 50 W/(m2*K)
         assert abs(h - 50.0) < 0.01
 
-        # Units check: h should be in W/(m²·K)
+        # Units check: h should be in W/(m2*K)
         assert h > 0
         assert isinstance(h, float)
 
     def test_htc_units_verification(self):
-        """Verify HTC has correct units [W/(m²·K)]."""
+        """Verify HTC has correct units [W/(m2*K)]."""
         Nu = 200.0  # Nusselt number [-]
-        k = 0.6  # Thermal conductivity (water) [W/(m·K)]
+        k = 0.6  # Thermal conductivity (water) [W/(m*K)]
         L = 0.1  # Diameter [m]
 
         h = cb.htc_from_nusselt(Nu, k, L)
 
-        # h = 200 * 0.6 / 0.1 = 1200 W/(m²·K)
+        # h = 200 * 0.6 / 0.1 = 1200 W/(m2*K)
         assert abs(h - 1200.0) < 0.1
 
-        # Typical HTC for water: 500-10,000 W/(m²·K)
+        # Typical HTC for water: 500-10,000 W/(m2*K)
         assert 500 < h < 10000
 
     def test_htc_diameter_effect(self):
         """Test HTC decreases with increasing diameter."""
         Nu = 100.0  # Fixed Nusselt number [-]
-        k = 0.025  # Fixed thermal conductivity [W/(m·K)]
+        k = 0.025  # Fixed thermal conductivity [W/(m*K)]
 
         D_small = 0.01  # Small diameter [m]
         D_large = 0.1  # Large diameter [m]
@@ -191,8 +191,8 @@ class TestLMTD:
     def test_lmtd_counterflow(self):
         """Test LMTD for counter-flow heat exchanger."""
         # Counter-flow: hot and cold streams flow in opposite directions
-        # Hot: 100°C -> 60°C
-        # Cold: 20°C -> 50°C
+        # Hot: 100degC -> 60degC
+        # Cold: 20degC -> 50degC
         dT1 = 100 - 50  # Hot in - Cold out = 50 K
         dT2 = 60 - 20  # Hot out - Cold in = 40 K
 
@@ -207,8 +207,8 @@ class TestLMTD:
     def test_lmtd_parallelflow(self):
         """Test LMTD for parallel-flow heat exchanger."""
         # Parallel-flow: both streams flow in same direction
-        # Hot: 100°C -> 60°C
-        # Cold: 20°C -> 40°C
+        # Hot: 100degC -> 60degC
+        # Cold: 20degC -> 40degC
         dT1 = 100 - 20  # Hot in - Cold in = 80 K
         dT2 = 60 - 40  # Hot out - Cold out = 20 K
 
@@ -263,7 +263,7 @@ class TestIntegration:
         # Air flow in a pipe
         Re = 5e4  # Reynolds number [-]
         Pr = 0.7  # Prandtl number (air) [-]
-        k = 0.026  # Thermal conductivity (air at 300K) [W/(m·K)]
+        k = 0.026  # Thermal conductivity (air at 300K) [W/(m*K)]
         D = 0.05  # Pipe diameter [m]
 
         # Calculate Nusselt number
@@ -272,7 +272,7 @@ class TestIntegration:
         # Calculate heat transfer coefficient
         h = cb.htc_from_nusselt(Nu, k, D)
 
-        # Typical HTC for air: 10-100 W/(m²·K)
+        # Typical HTC for air: 10-100 W/(m2*K)
         assert 10 < h < 200
 
         # Verify units are consistent
@@ -282,10 +282,10 @@ class TestIntegration:
     def test_heat_exchanger_design(self):
         """Test heat exchanger design calculation."""
         # Counter-flow heat exchanger
-        T_hot_in = 373.15  # 100°C [K]
-        T_hot_out = 333.15  # 60°C [K]
-        T_cold_in = 293.15  # 20°C [K]
-        T_cold_out = 323.15  # 50°C [K]
+        T_hot_in = 373.15  # 100degC [K]
+        T_hot_out = 333.15  # 60degC [K]
+        T_cold_in = 293.15  # 20degC [K]
+        T_cold_out = 323.15  # 50degC [K]
 
         # Calculate LMTD
         dT1 = T_hot_in - T_cold_out  # 50 K
