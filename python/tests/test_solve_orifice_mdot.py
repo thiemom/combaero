@@ -21,8 +21,8 @@ class TestSolveOrificeMdot:
 
         # Flow conditions (air at standard conditions)
         dP = 10000.0  # Pa (10 kPa)
-        rho = 1.2  # kg/m³
-        mu = 1.8e-5  # Pa·s
+        rho = 1.2  # kg/m3
+        mu = 1.8e-5  # Pa*s
 
         # Solve
         mdot = cb.solve_orifice_mdot(geom, dP, rho, mu)
@@ -50,8 +50,8 @@ class TestSolveOrificeMdot:
         geom.D = 0.1
 
         dP = 10000.0  # Pa
-        rho = 1.2  # kg/m³
-        mu = 1.8e-5  # Pa·s
+        rho = 1.2  # kg/m3
+        mu = 1.8e-5  # Pa*s
         P_upstream = 101325.0  # Pa
         kappa = 1.4  # Air
 
@@ -70,8 +70,8 @@ class TestSolveOrificeMdot:
         geom.D = 0.1
 
         dP = 5000.0  # Pa
-        rho = 1.2  # kg/m³
-        mu = 1.8e-5  # Pa·s
+        rho = 1.2  # kg/m3
+        mu = 1.8e-5  # Pa*s
 
         # Solve iteratively
         mdot_solved = cb.solve_orifice_mdot(geom, dP, rho, mu)
@@ -223,8 +223,8 @@ class TestSolveOrificeMdot:
 
         dP = 25000.0  # Pa (25% pressure drop)
         P_upstream = 100000.0  # Pa
-        rho = 1.2  # kg/m³
-        mu = 1.8e-5  # Pa·s
+        rho = 1.2  # kg/m3
+        mu = 1.8e-5  # Pa*s
         kappa = 1.4  # Air
 
         mdot = cb.solve_orifice_mdot(geom, dP, rho, mu, P_upstream, kappa)
@@ -248,8 +248,8 @@ class TestSolveOrificeMdot:
 
         dP = 15000.0  # Pa
         P_upstream = 5000000.0  # Pa (50 bar)
-        rho = 40.0  # kg/m³ (high pressure gas)
-        mu = 1.1e-5  # Pa·s (natural gas)
+        rho = 40.0  # kg/m3 (high pressure gas)
+        mu = 1.1e-5  # Pa*s (natural gas)
         kappa = 1.3  # Natural gas
 
         mdot = cb.solve_orifice_mdot(geom, dP, rho, mu, P_upstream, kappa)

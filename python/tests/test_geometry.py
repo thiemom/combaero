@@ -1,7 +1,7 @@
 """Tests for geometry utility functions.
 
 Verifies Python bindings for hydraulic diameter and residence time calculations.
-Units: Dh in [m], τ in [s], SV in [1/s], A in [m²], V in [m³].
+Units: Dh in [m], τ in [s], SV in [1/s], A in [m2], V in [m3].
 """
 
 import numpy as np
@@ -18,11 +18,11 @@ class TestSimpleGeometryHelpers:
         D = 0.1  # Diameter [m]
         A = cb.pipe_area(D)
 
-        # A = π * (D/2)²
+        # A = π * (D/2)2
         expected = np.pi * (D / 2) ** 2
         assert abs(A - expected) < 1e-15
 
-        # Units check: should be in m²
+        # Units check: should be in m2
         assert A > 0
         assert isinstance(A, float)
 
@@ -58,11 +58,11 @@ class TestSimpleGeometryHelpers:
         D_inner = 0.10  # Inner diameter [m]
         A = cb.annular_area(D_outer, D_inner)
 
-        # A = π * ((D_outer/2)² - (D_inner/2)²)
+        # A = π * ((D_outer/2)2 - (D_inner/2)2)
         expected = np.pi * ((D_outer / 2) ** 2 - (D_inner / 2) ** 2)
         assert abs(A - expected) < 1e-15
 
-        # Units check: should be in m²
+        # Units check: should be in m2
         assert A > 0
         assert isinstance(A, float)
 
@@ -104,11 +104,11 @@ class TestSimpleGeometryHelpers:
         L = 2.0  # Length [m]
         V = cb.pipe_volume(D, L)
 
-        # V = π * (D/2)² * L
+        # V = π * (D/2)2 * L
         expected = np.pi * (D / 2) ** 2 * L
         assert abs(V - expected) < 1e-15
 
-        # Units check: should be in m³
+        # Units check: should be in m3
         assert V > 0
         assert isinstance(V, float)
 
@@ -165,7 +165,7 @@ class TestHydraulicDiameter:
         """Test hydraulic diameter for circular pipe."""
         # For circular pipe: Dh = D
         D = 0.1  # Diameter [m]
-        A = 3.14159 * (D / 2) ** 2  # Area [m²]
+        A = 3.14159 * (D / 2) ** 2  # Area [m2]
         P = 3.14159 * D  # Perimeter [m]
 
         Dh = cb.hydraulic_diameter(A, P)
@@ -181,12 +181,12 @@ class TestHydraulicDiameter:
         """Test hydraulic diameter for square duct."""
         # For square duct: Dh = side length
         a = 0.1  # Side length [m]
-        A = a * a  # Area [m²]
+        A = a * a  # Area [m2]
         P = 4 * a  # Perimeter [m]
 
         Dh = cb.hydraulic_diameter(A, P)
 
-        # Dh = 4*A/P = 4*a²/(4*a) = a
+        # Dh = 4*A/P = 4*a2/(4*a) = a
         assert abs(Dh - a) < 1e-10
         assert Dh > 0
 
@@ -239,7 +239,7 @@ class TestHydraulicDiameter:
 
     def test_hydraulic_diameter_units_meters(self):
         """Verify hydraulic diameter returns meters."""
-        A = 0.01  # Area [m²]
+        A = 0.01  # Area [m2]
         P = 0.4  # Perimeter [m]
 
         Dh = cb.hydraulic_diameter(A, P)
@@ -256,8 +256,8 @@ class TestResidenceTime:
 
     def test_residence_time_basic(self):
         """Test basic residence time calculation."""
-        V = 1.0  # Volume [m³]
-        Q = 0.1  # Volumetric flow rate [m³/s]
+        V = 1.0  # Volume [m3]
+        Q = 0.1  # Volumetric flow rate [m3/s]
 
         tau = cb.residence_time(V, Q)
 
@@ -270,8 +270,8 @@ class TestResidenceTime:
 
     def test_residence_time_fast_flow(self):
         """Test residence time with fast flow."""
-        V = 0.5  # Volume [m³]
-        Q = 10.0  # High flow rate [m³/s]
+        V = 0.5  # Volume [m3]
+        Q = 10.0  # High flow rate [m3/s]
 
         tau = cb.residence_time(V, Q)
 
@@ -281,9 +281,9 @@ class TestResidenceTime:
 
     def test_residence_time_mdot_basic(self):
         """Test residence time from mass flow rate."""
-        V = 1.0  # Volume [m³]
+        V = 1.0  # Volume [m3]
         mdot = 1.2  # Mass flow rate [kg/s]
-        rho = 1.2  # Density (air) [kg/m³]
+        rho = 1.2  # Density (air) [kg/m3]
 
         tau = cb.residence_time_mdot(V, mdot, rho)
 
@@ -293,9 +293,9 @@ class TestResidenceTime:
 
     def test_residence_time_mdot_vs_volumetric(self):
         """Test consistency between mass and volumetric methods."""
-        V = 2.0  # Volume [m³]
-        rho = 1.2  # Density [kg/m³]
-        Q = 0.5  # Volumetric flow rate [m³/s]
+        V = 2.0  # Volume [m3]
+        rho = 1.2  # Density [kg/m3]
+        Q = 0.5  # Volumetric flow rate [m3/s]
         mdot = rho * Q  # Mass flow rate [kg/s]
 
         tau_vol = cb.residence_time(V, Q)
@@ -306,9 +306,9 @@ class TestResidenceTime:
 
     def test_residence_time_combustor(self):
         """Test realistic combustor residence time."""
-        V = 0.1  # Combustor volume [m³]
+        V = 0.1  # Combustor volume [m3]
         mdot = 0.5  # Air mass flow [kg/s]
-        rho = 1.2  # Air density [kg/m³]
+        rho = 1.2  # Air density [kg/m3]
 
         tau = cb.residence_time_mdot(V, mdot, rho)
 
@@ -320,8 +320,8 @@ class TestResidenceTime:
 
     def test_residence_time_units_seconds(self):
         """Verify residence time returns seconds."""
-        V = 5.0  # Volume [m³]
-        Q = 2.0  # Flow rate [m³/s]
+        V = 5.0  # Volume [m3]
+        Q = 2.0  # Flow rate [m3/s]
 
         tau = cb.residence_time(V, Q)
 
@@ -335,8 +335,8 @@ class TestSpaceVelocity:
 
     def test_space_velocity_basic(self):
         """Test basic space velocity calculation."""
-        Q = 0.1  # Volumetric flow rate [m³/s]
-        V = 1.0  # Volume [m³]
+        Q = 0.1  # Volumetric flow rate [m3/s]
+        V = 1.0  # Volume [m3]
 
         SV = cb.space_velocity(Q, V)
 
@@ -349,8 +349,8 @@ class TestSpaceVelocity:
 
     def test_space_velocity_inverse_residence_time(self):
         """Test space velocity is inverse of residence time."""
-        Q = 0.5  # Flow rate [m³/s]
-        V = 2.0  # Volume [m³]
+        Q = 0.5  # Flow rate [m3/s]
+        V = 2.0  # Volume [m3]
 
         SV = cb.space_velocity(Q, V)
         tau = cb.residence_time(V, Q)
@@ -361,8 +361,8 @@ class TestSpaceVelocity:
 
     def test_space_velocity_high_flow(self):
         """Test space velocity with high flow rate."""
-        Q = 10.0  # High flow rate [m³/s]
-        V = 0.5  # Small volume [m³]
+        Q = 10.0  # High flow rate [m3/s]
+        V = 0.5  # Small volume [m3]
 
         SV = cb.space_velocity(Q, V)
 
@@ -372,8 +372,8 @@ class TestSpaceVelocity:
 
     def test_space_velocity_units_inverse_seconds(self):
         """Verify space velocity returns 1/s."""
-        Q = 2.0  # Flow rate [m³/s]
-        V = 5.0  # Volume [m³]
+        Q = 2.0  # Flow rate [m3/s]
+        V = 5.0  # Volume [m3]
 
         SV = cb.space_velocity(Q, V)
 
@@ -395,11 +395,11 @@ class TestIntegration:
         v = 5.0  # Velocity [m/s]
 
         # Calculate volume
-        A = 3.14159 * (D / 2) ** 2  # Area [m²]
-        V = A * L  # Volume [m³]
+        A = 3.14159 * (D / 2) ** 2  # Area [m2]
+        V = A * L  # Volume [m3]
 
         # Calculate flow rate
-        Q = A * v  # Volumetric flow rate [m³/s]
+        Q = A * v  # Volumetric flow rate [m3/s]
 
         # Calculate residence time
         tau = cb.residence_time(V, Q)
@@ -414,7 +414,7 @@ class TestIntegration:
         a = 0.2  # Width [m]
         b = 0.3  # Height [m]
         L = 1.0  # Length [m]
-        Q = 0.01  # Flow rate [m³/s]
+        Q = 0.01  # Flow rate [m3/s]
 
         # Calculate hydraulic diameter
         Dh = cb.hydraulic_diameter_rect(a, b)
@@ -437,7 +437,7 @@ class TestIntegration:
         D_inner = 0.4  # Inner diameter [m]
         L = 0.3  # Length [m]
         mdot = 2.0  # Mass flow [kg/s]
-        rho = 1.2  # Density [kg/m³]
+        rho = 1.2  # Density [kg/m3]
 
         # Calculate hydraulic diameter
         Dh = cb.hydraulic_diameter_annulus(D_outer, D_inner)

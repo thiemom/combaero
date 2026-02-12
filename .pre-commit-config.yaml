@@ -37,6 +37,14 @@ repos:
 
   - repo: local
     hooks:
+      - id: python-non-ascii-check
+        name: Check Python files for non-ASCII characters
+        entry: bash -c './scripts/check-python-style.sh'
+        language: system
+        pass_filenames: false
+        files: ^python/.*\.py$
+        stages: [commit]
+      
       - id: cantera-validation-tests
         name: Cantera Validation Tests
         entry: bash -c 'cd cantera_validation_tests && poetry install --quiet && poetry run pytest -v --tb=short'

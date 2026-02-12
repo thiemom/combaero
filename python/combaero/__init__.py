@@ -37,9 +37,9 @@ __version__: str = _load_version()
 try:
     # Preferred: local extension in the same package (installed wheel or
     # in-tree build where _core was successfully built next to this file).
+    from ._core import Annulus  # type: ignore[attr-defined]
     from ._core import (
         AcousticMode,
-        Annulus,  # type: ignore[attr-defined]
         BoundaryCondition,
         Cd_orifice,
         Cd_rounded_entry,

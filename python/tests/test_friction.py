@@ -186,7 +186,7 @@ class TestFrictionFactors:
         # This is a sanity check on units
         assert 0.001 < f < 1.0
 
-        # Darcy friction factor is used in: ΔP = f * (L/D) * (ρ*v²/2)
+        # Darcy friction factor is used in: DeltaP = f * (L/D) * (ρ*v2/2)
         # So f must be dimensionless for units to work out
 
 

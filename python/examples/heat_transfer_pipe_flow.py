@@ -81,16 +81,16 @@ def main() -> None:
     print(f"Air temperature: T = {T:.0f} K")
 
     print("\nAir properties:")
-    print(f"  Density:              ρ = {rho:.3f} kg/m³")
-    print(f"  Viscosity:            μ = {mu*1e6:.2f} μPa·s")
-    print(f"  Thermal conductivity: k = {k*1000:.2f} mW/(m·K)")
-    print(f"  Specific heat:        cp = {cp:.1f} J/(mol·K)")
+    print(f"  Density:              ρ = {rho:.3f} kg/m3")
+    print(f"  Viscosity:            μ = {mu*1e6:.2f} μPa*s")
+    print(f"  Thermal conductivity: k = {k*1000:.2f} mW/(m*K)")
+    print(f"  Specific heat:        cp = {cp:.1f} J/(mol*K)")
     print(f"  Prandtl number:       Pr = {Pr:.3f}")
 
     print("\nResults:")
     print(f"  Reynolds number:      Re = {Re:.2e}")
     print(f"  Nusselt number:       Nu = {Nu:.2f}")
-    print(f"  Heat transfer coeff:  h = {h:.2f} W/(m²·K)")
+    print(f"  Heat transfer coeff:  h = {h:.2f} W/(m2*K)")
 
     # =========================================================================
     # Example 3: Pipe heating design
@@ -149,7 +149,7 @@ def main() -> None:
 
     print("\nHeat transfer:")
     print(f"  Nusselt number:   Nu = {Nu:.2f}")
-    print(f"  HTC:              h = {h:.2f} W/(m²·K)")
+    print(f"  HTC:              h = {h:.2f} W/(m2*K)")
     print(f"  Heat duty:        Q = {Q/1000:.2f} kW")
     print(f"  LMTD:             LMTD = {LMTD:.2f} K")
 
@@ -165,20 +165,20 @@ def main() -> None:
 
     # Counter-flow heat exchanger
     print("\nCounter-flow heat exchanger:")
-    T_hot_in = 373.15  # 100°C
-    T_hot_out = 333.15  # 60°C
-    T_cold_in = 293.15  # 20°C
-    T_cold_out = 323.15  # 50°C
+    T_hot_in = 373.15  # 100degC
+    T_hot_out = 333.15  # 60degC
+    T_cold_in = 293.15  # 20degC
+    T_cold_out = 323.15  # 50degC
 
     # Use lmtd_counterflow convenience function
     LMTD_counter = ca.lmtd_counterflow(T_hot_in, T_hot_out, T_cold_in, T_cold_out)
     dT1 = T_hot_in - T_cold_out  # For display
     dT2 = T_hot_out - T_cold_in
 
-    print(f"  Hot side:  {T_hot_in-273.15:.0f}°C → {T_hot_out-273.15:.0f}°C")
-    print(f"  Cold side: {T_cold_in-273.15:.0f}°C → {T_cold_out-273.15:.0f}°C")
-    print(f"  ΔT1 = {dT1:.2f} K (hot in - cold out)")
-    print(f"  ΔT2 = {dT2:.2f} K (hot out - cold in)")
+    print(f"  Hot side:  {T_hot_in-273.15:.0f}degC → {T_hot_out-273.15:.0f}degC")
+    print(f"  Cold side: {T_cold_in-273.15:.0f}degC → {T_cold_out-273.15:.0f}degC")
+    print(f"  DeltaT1 = {dT1:.2f} K (hot in - cold out)")
+    print(f"  DeltaT2 = {dT2:.2f} K (hot out - cold in)")
     print(f"  LMTD = {LMTD_counter:.2f} K")
 
     # Parallel-flow heat exchanger
@@ -188,8 +188,8 @@ def main() -> None:
     dT1_par = T_hot_in - T_cold_in  # For display
     dT2_par = T_hot_out - T_cold_out
 
-    print(f"  ΔT1 = {dT1_par:.2f} K (both inlets)")
-    print(f"  ΔT2 = {dT2_par:.2f} K (both outlets)")
+    print(f"  DeltaT1 = {dT1_par:.2f} K (both inlets)")
+    print(f"  DeltaT2 = {dT2_par:.2f} K (both outlets)")
     print(f"  LMTD = {LMTD_parallel:.2f} K")
 
     print("\nCounter-flow is more efficient:")

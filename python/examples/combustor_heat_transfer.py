@@ -113,12 +113,12 @@ def main() -> None:
     print(f"  Inner diameter:    D_i = {D_inner*1000:.0f} mm")
     print(f"  Hydraulic diameter: Dh = {Dh*1000:.0f} mm")
     print(f"  Length:            L = {L_combustor*1000:.0f} mm")
-    print(f"  Annular area:      A = {A_annular*1e4:.2f} cm²")
+    print(f"  Annular area:      A = {A_annular*1e4:.2f} cm2")
     print(f"  Volume:            V = {V_combustor*1000:.2f} L")
 
     print("\nFlow characteristics:")
     print(f"  Average temp:      T_avg = {T_avg:.0f} K")
-    print(f"  Average density:   ρ_avg = {rho_avg:.3f} kg/m³")
+    print(f"  Average density:   ρ_avg = {rho_avg:.3f} kg/m3")
     print(f"  Residence time:    τ = {tau*1000:.1f} ms")
     print(f"  Space velocity:    SV = {SV*3600:.0f} h⁻¹")
 
@@ -148,13 +148,13 @@ def main() -> None:
     print("\nFlow conditions:")
     print(f"  Average velocity:  v = {v_avg:.1f} m/s")
     print(f"  Reynolds number:   Re = {Re:.2e}")
-    print(f"  Viscosity:         μ = {mu_avg*1e6:.2f} μPa·s")
+    print(f"  Viscosity:         μ = {mu_avg*1e6:.2f} μPa*s")
 
     print("\nPressure drop:")
     print(f"  Friction factor:   f = {f:.6f}")
-    print(f"  Friction loss:     ΔP_f = {dP_friction/1000:.2f} kPa")
-    print(f"  Total loss:        ΔP = {dP_total/1000:.2f} kPa")
-    print(f"  Pressure ratio:    ΔP/P = {dP_total/P_combustor*100:.2f}%")
+    print(f"  Friction loss:     DeltaP_f = {dP_friction/1000:.2f} kPa")
+    print(f"  Total loss:        DeltaP = {dP_total/1000:.2f} kPa")
+    print(f"  Pressure ratio:    DeltaP/P = {dP_total/P_combustor*100:.2f}%")
 
     # =========================================================================
     # Example 4: Heat transfer to combustor liner
@@ -189,9 +189,9 @@ def main() -> None:
 
     # Liner wall (assume thermal barrier coating + metal)
     t_tbc = 0.001  # TBC thickness [m]
-    k_tbc = 1.0  # TBC thermal conductivity [W/(m·K)]
+    k_tbc = 1.0  # TBC thermal conductivity [W/(m*K)]
     t_metal = 0.003  # Metal thickness [m]
-    k_metal = 20.0  # Metal thermal conductivity [W/(m·K)]
+    k_metal = 20.0  # Metal thermal conductivity [W/(m*K)]
 
     # Overall heat transfer coefficient
     R_tbc = t_tbc / k_tbc
@@ -211,22 +211,22 @@ def main() -> None:
     print(f"  Reynolds number:   Re = {Re:.2e}")
     print(f"  Prandtl number:    Pr = {Pr_gas:.3f}")
     print(f"  Nusselt number:    Nu = {Nu_gas:.1f}")
-    print(f"  HTC:               h = {h_gas:.1f} W/(m²·K)")
+    print(f"  HTC:               h = {h_gas:.1f} W/(m2*K)")
 
     print("\nCooling air side:")
     print(f"  Temperature:       T = {T_cool:.0f} K")
     print(f"  Velocity:          v = {v_cool:.0f} m/s")
     print(f"  Reynolds number:   Re = {Re_cool:.2e}")
     print(f"  Nusselt number:    Nu = {Nu_cool:.1f}")
-    print(f"  HTC:               h = {h_cool:.1f} W/(m²·K)")
+    print(f"  HTC:               h = {h_cool:.1f} W/(m2*K)")
 
     print("\nLiner wall:")
-    print(f"  TBC thickness:     t = {t_tbc*1000:.1f} mm (k = {k_tbc:.1f} W/(m·K))")
-    print(f"  Metal thickness:   t = {t_metal*1000:.1f} mm (k = {k_metal:.0f} W/(m·K))")
+    print(f"  TBC thickness:     t = {t_tbc*1000:.1f} mm (k = {k_tbc:.1f} W/(m*K))")
+    print(f"  Metal thickness:   t = {t_metal*1000:.1f} mm (k = {k_metal:.0f} W/(m*K))")
 
     print("\nHeat transfer:")
-    print(f"  Overall HTC:       U = {U:.1f} W/(m²·K)")
-    print(f"  Heat flux:         q = {q/1000:.1f} kW/m²")
+    print(f"  Overall HTC:       U = {U:.1f} W/(m2*K)")
+    print(f"  Heat flux:         q = {q/1000:.1f} kW/m2")
     print(f"  Total heat loss:   Q = {Q_total/1e6:.2f} MW")
     print("  (Fraction of combustion power)")
 
@@ -253,8 +253,8 @@ def main() -> None:
     print("\nCombustor Performance:")
     print(f"  Inlet temperature:     T_in = {mixed.T:.0f} K")
     print(f"  Outlet temperature:    T_out = {burned.T:.0f} K")
-    print(f"  Temperature rise:      ΔT = {dT_combustion:.0f} K")
-    print(f"  Pressure loss:         ΔP/P = {pressure_loss_pct:.2f}%")
+    print(f"  Temperature rise:      DeltaT = {dT_combustion:.0f} K")
+    print(f"  Pressure loss:         DeltaP/P = {pressure_loss_pct:.2f}%")
     print(f"  Residence time:        τ = {tau*1000:.1f} ms")
     print(f"  Heat release:          Q = {Q_combustion/1e6:.1f} MW")
     print(
@@ -264,7 +264,7 @@ def main() -> None:
 
     print("\nDesign metrics:")
     print(f"  Loading parameter:     ṁ√T/P = {mdot_air*np.sqrt(T_air_in)/P_combustor:.4f}")
-    print(f"  Volumetric heat release: {Q_combustion/V_combustor/1e9:.1f} GW/m³")
+    print(f"  Volumetric heat release: {Q_combustion/V_combustor/1e9:.1f} GW/m3")
 
     # =========================================================================
     # Example 6: Parametric study - effect of equivalence ratio
@@ -273,7 +273,7 @@ def main() -> None:
     print("Example 6: Effect of Equivalence Ratio on Combustor Performance")
     print("=" * 80)
 
-    print(f"\n{'φ':>6s}  {'T_out [K]':>12s}  {'τ [ms]':>10s}  {'ΔP/P [%]':>12s}")
+    print(f"\n{'φ':>6s}  {'T_out [K]':>12s}  {'τ [ms]':>10s}  {'DeltaP/P [%]':>12s}")
     print("-" * 45)
 
     for phi_test in [0.6, 0.7, 0.8, 0.9, 1.0]:

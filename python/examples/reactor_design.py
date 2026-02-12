@@ -36,7 +36,7 @@ def main() -> None:
 
     print("\nCircular pipe:")
     print(f"  Diameter:           D = {D_pipe*1000:.1f} mm")
-    print(f"  Area:               A = {A_pipe*1e6:.2f} mm²")
+    print(f"  Area:               A = {A_pipe*1e6:.2f} mm2")
     print(f"  Perimeter:          P = {P_pipe*1000:.2f} mm")
     print(f"  Hydraulic diameter: Dh = {Dh_pipe*1000:.2f} mm")
     print("  (Should equal D for circular pipe)")
@@ -85,7 +85,7 @@ def main() -> None:
     V = ca.pipe_volume(D, L)  # Use pipe_volume helper
 
     # Flow conditions
-    Q = 0.01  # Volumetric flow rate [m³/s]
+    Q = 0.01  # Volumetric flow rate [m3/s]
 
     # Calculate residence time
     tau = ca.residence_time(V, Q)
@@ -111,7 +111,7 @@ def main() -> None:
     print("=" * 80)
 
     # Reactor volume
-    V = 0.05  # Volume [m³]
+    V = 0.05  # Volume [m3]
 
     # Air flow
     mdot = 0.5  # Mass flow rate [kg/s]
@@ -131,7 +131,7 @@ def main() -> None:
     print("\nAir flow:")
     print(f"  Mass flow rate:  ṁ = {mdot:.2f} kg/s")
     print(f"  Temperature:     T = {T:.0f} K")
-    print(f"  Density:         ρ = {rho:.3f} kg/m³")
+    print(f"  Density:         ρ = {rho:.3f} kg/m3")
     print(f"  Volumetric flow: Q = {Q*1000:.2f} L/s")
 
     print("\nResidence time:")
@@ -177,13 +177,13 @@ def main() -> None:
     print(f"  Average temperature:   T = {T_avg:.0f} K")
 
     print("\nAir properties:")
-    print(f"  Density:               ρ = {rho:.3f} kg/m³")
+    print(f"  Density:               ρ = {rho:.3f} kg/m3")
 
     print("\nAnnular combustor:")
     print(f"  Outer diameter:        D_o = {D_outer*1000:.0f} mm")
     print(f"  Inner diameter:        D_i = {D_inner*1000:.0f} mm")
     print(f"  Hydraulic diameter:    Dh = {Dh*1000:.0f} mm")
-    print(f"  Annular area:          A = {A_annular*1e4:.2f} cm²")
+    print(f"  Annular area:          A = {A_annular*1e4:.2f} cm2")
 
     print("\nResults:")
     print(f"  Required volume:       V = {V_required*1000:.2f} L")
@@ -201,7 +201,7 @@ def main() -> None:
     print("=" * 80)
 
     # Fixed reactor volume
-    V = 0.1  # Volume [m³]
+    V = 0.1  # Volume [m3]
 
     # Air properties
     T = 300.0
@@ -210,7 +210,7 @@ def main() -> None:
     rho = ca.density(T, P, X_air)
 
     print(f"\nFixed reactor volume: V = {V*1000:.1f} L")
-    print(f"Air at {T:.0f} K, {P/1000:.0f} kPa (ρ = {rho:.3f} kg/m³)")
+    print(f"Air at {T:.0f} K, {P/1000:.0f} kPa (ρ = {rho:.3f} kg/m3)")
 
     print(f"\n{'ṁ [kg/s]':>12s}  {'Q [L/s]':>12s}  {'τ [s]':>12s}  {'SV [h⁻¹]':>12s}")
     print("-" * 52)
@@ -222,22 +222,22 @@ def main() -> None:
         print(f"{mdot:12.2f}  {Q*1000:12.2f}  {tau:12.3f}  {SV*3600:12.1f}")
 
     # =========================================================================
-    # Example 6: Damköhler number (reaction vs residence time)
+    # Example 6: Damkohler number (reaction vs residence time)
     # =========================================================================
     print("\n" + "=" * 80)
-    print("Example 6: Damköhler Number Analysis")
+    print("Example 6: Damkohler Number Analysis")
     print("=" * 80)
 
     # Reactor parameters
-    V = 0.05  # Volume [m³]
-    Q = 0.01  # Flow rate [m³/s]
+    V = 0.05  # Volume [m3]
+    Q = 0.01  # Flow rate [m3/s]
     tau = ca.residence_time(V, Q)
 
     # Reaction time scale (example: first-order reaction)
     k = 10.0  # Reaction rate constant [1/s]
     tau_reaction = 1.0 / k  # Reaction time scale [s]
 
-    # Damköhler number
+    # Damkohler number
     Da = tau / tau_reaction
 
     print("\nReactor:")
@@ -249,7 +249,7 @@ def main() -> None:
     print(f"  Rate constant:   k = {k:.1f} s⁻¹")
     print(f"  Reaction time:   τ_rxn = {tau_reaction:.3f} s")
 
-    print("\nDamköhler number:")
+    print("\nDamkohler number:")
     print(f"  Da = τ/τ_rxn = {Da:.2f}")
 
     if Da > 10:
