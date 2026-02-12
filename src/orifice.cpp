@@ -185,14 +185,17 @@ double thickness_correction(double t_over_d, double beta, double Re_d) {
 
     // Component 1: Reattachment benefit (independent of Re)
     // Cd increases as flow reattaches to bore wall, reducing vena contracta
-    const double reattach_factor = 0.25 * (1.0 - std::exp(-3.0 * t_over_d));
+    // Peak occurs at t/d ≈ 0.2-0.3, giving ~20% increase for beta=0.5
+    const double reattach_factor = 0.35 * (1.0 - std::exp(-8.0 * t_over_d));
     const double reattachment = reattach_factor * (1.0 - beta * beta);
 
     // Component 2: Friction penalty (smooth Re dependence)
     // Use Blasius smooth turbulent friction: f = 0.316 / Re^0.25
     // Friction loss in bore reduces effective Cd
+    // Coefficient calibrated to Idelchik data: k_t ≈ 0.96 at t/d=3.0, beta=0.5, Re=1e5
+    // Calculation: need friction_loss ≈ 0.30 at t/d=3.0 → coeff ≈ 5.67
     const double f = 0.316 / std::pow(Re_d, 0.25);
-    const double friction_loss = 0.5 * f * t_over_d;
+    const double friction_loss = 5.67 * f * t_over_d;
 
     // Combined correction: rise (reattachment) then fall (friction)
     const double correction = 1.0 + reattachment - friction_loss;

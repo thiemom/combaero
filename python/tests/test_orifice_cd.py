@@ -142,14 +142,15 @@ class TestUtilityFunctions:
         # Thin plate: no correction
         assert cb.orifice_thickness_correction(0.01, 0.5, Re_d) == pytest.approx(1.0)
 
-        # Moderate thickness: correction > 1 (reattachment benefit)
-        corr1 = cb.orifice_thickness_correction(0.5, 0.5, Re_d)
-        assert corr1 > 1.0
+        # Small thickness: reattachment benefit
+        corr_small = cb.orifice_thickness_correction(0.2, 0.5, Re_d)
+        assert corr_small > 1.0
         
-        # Peak around t/d ~ 1.0
-        corr_peak = cb.orifice_thickness_correction(1.0, 0.5, Re_d)
-        assert corr_peak > corr1
+        # Peak around t/d ~ 0.3 (calibrated to Idelchik data)
+        corr_peak = cb.orifice_thickness_correction(0.3, 0.5, Re_d)
+        assert corr_peak > corr_small
         
         # Large thickness: friction reduces Cd (non-monotonic behavior)
-        corr2 = cb.orifice_thickness_correction(3.0, 0.5, Re_d)
-        assert corr2 < corr_peak  # Falls at large t/d due to friction
+        corr_long = cb.orifice_thickness_correction(3.0, 0.5, Re_d)
+        assert corr_long < corr_peak  # Falls at large t/d due to friction
+        assert corr_long < 1.0  # Long-tube behavior: k_t < 1.0
