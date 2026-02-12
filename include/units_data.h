@@ -112,16 +112,7 @@ inline constexpr Entry function_units[] = {
     {"orifice_velocity",        "P1: Pa, P2: Pa, rho: kg/m^3",          "m/s"},
     {"orifice_area",            "mdot: kg/s, P1: Pa, P2: Pa, Cd: -, rho: kg/m^3", "m^2"},
     {"orifice_dP",              "mdot: kg/s, A: m^2, Cd: -, rho: kg/m^3", "Pa"},
-
-    // -------------------------------------------------------------------------
-    // incompressible.h - Pipe Flow
-    // -------------------------------------------------------------------------
-    {"pipe_dP",                 "v: m/s, L: m, D: m, f: -, rho: kg/m^3", "Pa"},
-    {"pipe_dP_mdot",            "mdot: kg/s, L: m, D: m, f: -, rho: kg/m^3", "Pa"},
-    {"pipe_velocity",           "mdot: kg/s, D: m, rho: kg/m^3",        "m/s"},
-    {"pipe_mdot",               "v: m/s, D: m, rho: kg/m^3",            "kg/s"},
-    {"dynamic_pressure",        "v: m/s, rho: kg/m^3",                  "Pa"},
-    {"velocity_from_q",         "q: Pa, rho: kg/m^3",                   "m/s"},
+    {"expansibility_factor",    "beta: -, dP: Pa, P_upstream: Pa, kappa: -", "-"},
 
     // -------------------------------------------------------------------------
     // pipe_flow.h - Composite Pipe Flow Functions

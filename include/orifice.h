@@ -201,4 +201,42 @@ double orifice_dP(const OrificeGeometry& geom, double Cd, double mdot, double rh
 double orifice_Cd_from_measurement(const OrificeGeometry& geom,
                                     double mdot, double dP, double rho);
 
+// -------------------------------------------------------------
+// Compressible flow correction
+// -------------------------------------------------------------
+
+// Expansibility factor for compressible gas flow through orifices.
+//
+// The expansibility factor ε accounts for gas expansion as it accelerates
+// through the orifice. For incompressible flow, ε = 1.0.
+//
+// Formula from ISO 5167-2:2003, Section 5.3.2.2:
+//   ε = 1 - (0.351 + 0.256·β⁴ + 0.93·β⁸) · [1 - (1 - τ)^(1/κ)]
+//
+// where:
+//   τ = ΔP / P_upstream  (pressure ratio)
+//   β = d/D              (diameter ratio)
+//   κ = cp/cv            (isentropic exponent)
+//
+// Usage in compressible mass flow:
+//   mdot = ε · Cd · A · √(2 · ρ_upstream · ΔP)
+//
+// Valid for:
+//   - 0.1 ≤ β ≤ 0.75
+//   - τ ≤ 0.25 (ΔP/P ≤ 25%)
+//   - Ideal gas behavior
+//
+// Parameters:
+//   beta        : Diameter ratio d/D [-]
+//   dP          : Differential pressure [Pa]
+//   P_upstream  : Absolute upstream static pressure [Pa]
+//   kappa       : Isentropic exponent cp/cv [-]
+//
+// Returns: Expansibility factor ε [-] (dimensionless, 0 < ε ≤ 1)
+//
+// Reference: ISO 5167-2:2003, Measurement of fluid flow by means of
+//            pressure differential devices inserted in circular cross-section
+//            conduits running full
+double expansibility_factor(double beta, double dP, double P_upstream, double kappa);
+
 #endif // ORIFICE_H

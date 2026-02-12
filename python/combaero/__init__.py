@@ -103,6 +103,7 @@ try:
         equivalence_ratio_from_bilger_Z_mass,
         equivalence_ratio_mass,
         equivalence_ratio_mole,
+        expansibility_factor,
         fanno_max_length,
         fanno_pipe,
         formula,
@@ -271,6 +272,7 @@ except ModuleNotFoundError:
     bilger_stoich_mixture_fraction_mass = _core.bilger_stoich_mixture_fraction_mass
     bilger_Z_from_equivalence_ratio_mass = _core.bilger_Z_from_equivalence_ratio_mass
     equivalence_ratio_from_bilger_Z_mass = _core.equivalence_ratio_from_bilger_Z_mass
+    expansibility_factor = _core.expansibility_factor
     standard_dry_air_composition = _core.standard_dry_air_composition
     humid_air_composition = _core.humid_air_composition
     dewpoint = _core.dewpoint
@@ -485,9 +487,10 @@ __all__ = [
     "set_equivalence_ratio_mole",
     "equivalence_ratio_mass",
     "set_equivalence_ratio_mass",
+    "equivalence_ratio_from_bilger_Z_mass",
     "bilger_stoich_mixture_fraction_mass",
     "bilger_Z_from_equivalence_ratio_mass",
-    "equivalence_ratio_from_bilger_Z_mass",
+    "expansibility_factor",
     "standard_dry_air_composition",
     "humid_air_composition",
     "dewpoint",

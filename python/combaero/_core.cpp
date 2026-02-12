@@ -3002,9 +3002,36 @@ PYBIND11_MODULE(_core, m)
         py::arg("mdot"),
         py::arg("dP"),
         py::arg("rho"),
-        "Solve for Cd given measured mass flow and pressure drop.\n\n"
+        "Solve for discharge coefficient from measurement.\n\n"
         "Cd = mdot / (A * sqrt(2 * rho * dP))\n\n"
-        "Returns: discharge coefficient [-]"
+        "Parameters:\n"
+        "  geom : OrificeGeometry\n"
+        "  mdot : mass flow rate [kg/s]\n"
+        "  dP   : pressure drop [Pa]\n"
+        "  rho  : density [kg/m^3]\n\n"
+        "Returns: discharge coefficient Cd [-]"
+    );
+
+    m.def(
+        "expansibility_factor",
+        &expansibility_factor,
+        py::arg("beta"),
+        py::arg("dP"),
+        py::arg("P_upstream"),
+        py::arg("kappa"),
+        "Expansibility factor for compressible gas flow through orifices.\n\n"
+        "Accounts for gas expansion as it accelerates through the orifice.\n"
+        "Formula from ISO 5167-2:2003, Section 5.3.2.2.\n\n"
+        "ε = 1 - (0.351 + 0.256·β⁴ + 0.93·β⁸) · [1 - (1 - τ)^(1/κ)]\n\n"
+        "where τ = ΔP/P_upstream, β = d/D, κ = cp/cv\n\n"
+        "Usage: mdot = ε · Cd · A · √(2 · ρ_upstream · ΔP)\n\n"
+        "Parameters:\n"
+        "  beta        : diameter ratio d/D [-]\n"
+        "  dP          : differential pressure [Pa]\n"
+        "  P_upstream  : absolute upstream pressure [Pa]\n"
+        "  kappa       : isentropic exponent cp/cv [-]\n\n"
+        "Returns: expansibility factor ε [-] (0 < ε ≤ 1)\n\n"
+        "Valid for: 0.1 ≤ β ≤ 0.75, τ ≤ 0.25, ideal gas"
     );
 
     // Namespace functions

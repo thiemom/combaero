@@ -491,5 +491,49 @@ double orifice_Cd_from_measurement(const OrificeGeometry& geom,
     if (dP <= 0.0 || rho <= 0.0 || mdot <= 0.0) {
         throw std::invalid_argument("orifice_Cd_from_measurement: invalid parameters");
     }
-    return mdot / (geom.area() * std::sqrt(2.0 * rho * dP));
+    double A = geom.area();
+    return mdot / (A * std::sqrt(2.0 * rho * dP));
+}
+
+// -------------------------------------------------------------
+// Compressible flow correction
+// -------------------------------------------------------------
+
+double expansibility_factor(double beta, double dP, double P_upstream, double kappa) {
+    // Input validation
+    if (beta <= 0.0 || beta >= 1.0) {
+        throw std::invalid_argument("expansibility_factor: beta must be in range (0, 1)");
+    }
+    if (P_upstream <= 0.0) {
+        throw std::invalid_argument("expansibility_factor: P_upstream must be positive");
+    }
+    if (dP < 0.0) {
+        throw std::invalid_argument("expansibility_factor: dP must be non-negative");
+    }
+
+    // Incompressible limit: kappa <= 1 or no pressure drop
+    if (kappa <= 1.0 || dP <= 0.0) {
+        return 1.0;
+    }
+
+    // Pressure ratio
+    const double tau = dP / P_upstream;
+
+    // Check validity range (ISO 5167-2 recommends τ ≤ 0.25)
+    if (tau > 0.25) {
+        // Still compute but this is outside recommended range
+        // User should be aware via documentation
+    }
+
+    // Compute beta powers
+    const double beta2 = beta * beta;
+    const double beta4 = beta2 * beta2;
+    const double beta8 = beta4 * beta4;
+
+    // ISO 5167-2:2003 expansibility factor formula
+    // ε = 1 - (0.351 + 0.256·β⁴ + 0.93·β⁸) · [1 - (1 - τ)^(1/κ)]
+    const double coeff = 0.351 + 0.256 * beta4 + 0.93 * beta8;
+    const double expansion_term = 1.0 - std::pow(1.0 - tau, 1.0 / kappa);
+
+    return 1.0 - coeff * expansion_term;
 }

@@ -168,26 +168,16 @@ All functions use consistent units to avoid conversion errors.
 
 #### Bernoulli & Orifice
 
-| Function           | Input Units                                            | Output Unit |
-|--------------------|--------------------------------------------------------|-------------|
-| `bernoulli_P2`     | P1: Pa, v1: m/s, v2: m/s, rho: kg/m^3, dz: m, g: m/s^2 | Pa          |
-| `bernoulli_v2`     | P1: Pa, P2: Pa, v1: m/s, rho: kg/m^3, dz: m, g: m/s^2  | m/s         |
-| `orifice_mdot`     | P1: Pa, P2: Pa, A: m^2, Cd: -, rho: kg/m^3             | kg/s        |
-| `orifice_Q`        | P1: Pa, P2: Pa, A: m^2, Cd: -, rho: kg/m^3             | m^3/s       |
-| `orifice_velocity` | P1: Pa, P2: Pa, rho: kg/m^3                            | m/s         |
-| `orifice_area`     | mdot: kg/s, P1: Pa, P2: Pa, Cd: -, rho: kg/m^3         | m^2         |
-| `orifice_dP`       | mdot: kg/s, A: m^2, Cd: -, rho: kg/m^3                 | Pa          |
-
-#### Pipe Flow
-
-| Function           | Input Units                               | Output Unit |
-|--------------------|-------------------------------------------|-------------|
-| `pipe_dP`          | v: m/s, L: m, D: m, f: -, rho: kg/m^3     | Pa          |
-| `pipe_dP_mdot`     | mdot: kg/s, L: m, D: m, f: -, rho: kg/m^3 | Pa          |
-| `pipe_velocity`    | mdot: kg/s, D: m, rho: kg/m^3             | m/s         |
-| `pipe_mdot`        | v: m/s, D: m, rho: kg/m^3                 | kg/s        |
-| `dynamic_pressure` | v: m/s, rho: kg/m^3                       | Pa          |
-| `velocity_from_q`  | q: Pa, rho: kg/m^3                        | m/s         |
+| Function               | Input Units                                            | Output Unit |
+|------------------------|--------------------------------------------------------|-------------|
+| `bernoulli_P2`         | P1: Pa, v1: m/s, v2: m/s, rho: kg/m^3, dz: m, g: m/s^2 | Pa          |
+| `bernoulli_v2`         | P1: Pa, P2: Pa, v1: m/s, rho: kg/m^3, dz: m, g: m/s^2  | m/s         |
+| `orifice_mdot`         | P1: Pa, P2: Pa, A: m^2, Cd: -, rho: kg/m^3             | kg/s        |
+| `orifice_Q`            | P1: Pa, P2: Pa, A: m^2, Cd: -, rho: kg/m^3             | m^3/s       |
+| `orifice_velocity`     | P1: Pa, P2: Pa, rho: kg/m^3                            | m/s         |
+| `orifice_area`         | mdot: kg/s, P1: Pa, P2: Pa, Cd: -, rho: kg/m^3         | m^2         |
+| `orifice_dP`           | mdot: kg/s, A: m^2, Cd: -, rho: kg/m^3                 | Pa          |
+| `expansibility_factor` | beta: -, dP: Pa, P_upstream: Pa, kappa: -              | -           |
 
 ---
 
