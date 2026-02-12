@@ -180,7 +180,7 @@ class TestPipeRoughness:
         roughness_db = cb.standard_pipe_roughness()
 
         # Every material in the database should be retrievable
-        for material in roughness_db.keys():
+        for material in roughness_db:
             eps_from_dict = roughness_db[material]
             eps_from_func = cb.pipe_roughness(material)
             assert eps_from_dict == eps_from_func

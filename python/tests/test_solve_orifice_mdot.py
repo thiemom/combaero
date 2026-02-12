@@ -79,8 +79,6 @@ class TestSolveOrificeMdot:
         # Calculate Re_D from solved mdot
         Re_D = (4.0 * mdot_solved) / (3.14159 * geom.D * mu)
 
-        # Get Cd for this Re_D
-        beta = geom.beta
         # Use OrificeState to calculate Cd
         state = cb.OrificeState()
         state.Re_D = Re_D

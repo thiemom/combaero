@@ -200,8 +200,10 @@ double thickness_correction(double t_over_d, double beta, double Re_d) {
     // Combined correction: rise (reattachment) then fall (friction)
     const double correction = 1.0 + reattachment - friction_loss;
 
-    // Simple clamping (t/d is constant, so no smoothing needed)
-    return std::max(0.6, std::min(correction, 1.3));
+    // Clamping with safety floor for extreme cases
+    // Lower bound: 0.5 (extremely thick/rough orifices approach pipe entrance)
+    // Upper bound: 1.3 (maximum reattachment benefit)
+    return std::max(0.5, std::min(correction, 1.3));
 }
 
 // Rounded-entry Cd

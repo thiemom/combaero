@@ -54,7 +54,6 @@ class TestPressureDropPipeComposite:
 
         # Manual calculation
         rho = cb.density(T, P, X_air)
-        mu = cb.viscosity(T, P, X_air)
         Re_manual = cb.reynolds(T, P, X_air, v, D)
         e_D = roughness / D
         f_manual = cb.friction_haaland(Re_manual, e_D)
