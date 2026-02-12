@@ -32,25 +32,25 @@ Add Python bindings for friction, heat transfer, and geometry utility functions.
 
 ---
 
-## Phase 2: Basic Heat Transfer Correlations ⏳
+## Phase 2: Basic Heat Transfer Correlations ✅
 
 **Functions to bind (6):**
-- [ ] `nusselt_dittus_boelter(Re, Pr, heating)` - Dittus-Boelter Nu [-]
-- [ ] `nusselt_gnielinski(Re, Pr, f)` - Gnielinski Nu with friction [-]
-- [ ] `nusselt_gnielinski(Re, Pr)` - Gnielinski Nu auto-friction [-]
-- [ ] `nusselt_sieder_tate(Re, Pr, mu_ratio)` - Sieder-Tate Nu [-]
-- [ ] `htc_from_nusselt(Nu, k, L)` - Heat transfer coefficient [W/(m²·K)]
-- [ ] `lmtd(dT1, dT2)` - Log mean temperature difference [K]
+- [x] `nusselt_dittus_boelter(Re, Pr, heating)` - Dittus-Boelter Nu [-]
+- [x] `nusselt_gnielinski(Re, Pr, f)` - Gnielinski Nu with friction [-]
+- [x] `nusselt_gnielinski(Re, Pr)` - Gnielinski Nu auto-friction [-]
+- [x] `nusselt_sieder_tate(Re, Pr, mu_ratio)` - Sieder-Tate Nu [-]
+- [x] `htc_from_nusselt(Nu, k, L)` - Heat transfer coefficient [W/(m²·K)]
+- [x] `lmtd(dT1, dT2)` - Log mean temperature difference [K]
 
 **Tasks:**
-- [ ] Add bindings to `python/combaero/_core.cpp`
-- [ ] Write unit tests in `python/tests/test_heat_transfer.py`
-- [ ] Verify units in docstrings (Nu dimensionless, h in W/(m²·K), LMTD in K)
-- [ ] Update `docs/API_REFERENCE.md` with heat transfer functions
-- [ ] Run all tests: `pytest python/tests/`
-- [ ] Commit: "Add Python bindings for heat transfer correlations"
+- [x] Add bindings to `python/combaero/_core.cpp`
+- [x] Write unit tests in `python/tests/test_heat_transfer.py` (18 tests)
+- [x] Verify units in docstrings (Nu dimensionless, h in W/(m²·K), LMTD in K)
+- [x] Update `docs/API_REFERENCE.md` with heat transfer functions
+- [x] Run all tests: `pytest python/tests/` - **18/18 PASSED**
+- [x] Commit: "Add Python bindings for heat transfer correlations"
 
-**Status:** Not started
+**Status:** ✅ COMPLETED
 
 ---
 

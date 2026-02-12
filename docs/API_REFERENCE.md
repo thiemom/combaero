@@ -291,6 +291,49 @@ friction_petukhov(Re)  # [-]
 **Valid range:** Turbulent flow (Re > ~2300)
 **Note:** For laminar flow (Re < 2300), use f = 64/Re
 
+## Heat Transfer Correlations
+
+Nusselt number correlations for forced convection in pipes. Heat transfer coefficient: **h = Nu · k / L**
+
+```python
+# Dittus-Boelter correlation (1930) - simple, widely used
+nusselt_dittus_boelter(Re, Pr, heating=True)  # [-]
+
+# Gnielinski correlation (1976) - more accurate
+nusselt_gnielinski(Re, Pr, f)  # With explicit friction factor [-]
+nusselt_gnielinski(Re, Pr)     # Auto friction (smooth pipe) [-]
+
+# Sieder-Tate correlation (1936) - viscosity correction
+nusselt_sieder_tate(Re, Pr, mu_ratio=1.0)  # [-]
+
+# Heat transfer coefficient from Nusselt number
+htc_from_nusselt(Nu, k, L)  # [W/(m²·K)]
+
+# Log mean temperature difference for heat exchangers
+lmtd(dT1, dT2)  # [K]
+```
+
+**Parameters:**
+- `Re`: Reynolds number [-] (dimensionless)
+- `Pr`: Prandtl number [-] (dimensionless)
+- `heating`: True for heating, False for cooling (Dittus-Boelter only)
+- `f`: Darcy friction factor [-] (use friction correlations)
+- `mu_ratio`: μ_bulk / μ_wall [-] (viscosity correction, default: 1.0)
+- `Nu`: Nusselt number [-] (dimensionless)
+- `k`: Thermal conductivity [W/(m·K)]
+- `L`: Characteristic length [m] (diameter for pipe flow)
+- `dT1`, `dT2`: Temperature differences at heat exchanger ends [K]
+
+**Returns:**
+- Nusselt correlations: Nu [-] (dimensionless)
+- `htc_from_nusselt`: h [W/(m²·K)]
+- `lmtd`: LMTD [K]
+
+**Valid ranges:**
+- Dittus-Boelter: Re > 10,000, 0.6 < Pr < 160
+- Gnielinski: 2300 < Re < 5×10⁶, 0.5 < Pr < 2000
+- Sieder-Tate: Re > 10,000, 0.7 < Pr < 16,700
+
 ```cpp
 
 // Oxygen requirements

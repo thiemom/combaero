@@ -1183,6 +1183,110 @@ PYBIND11_MODULE(_core, m)
     );
 
     // -------------------------------------------------------------
+    // Heat transfer correlations
+    // -------------------------------------------------------------
+
+    m.def(
+        "nusselt_dittus_boelter",
+        &nusselt_dittus_boelter,
+        py::arg("Re"),
+        py::arg("Pr"),
+        py::arg("heating") = true,
+        "Dittus-Boelter Nusselt number correlation (1930).\n\n"
+        "Nu = 0.023 * Re^0.8 * Pr^n\n"
+        "where n = 0.4 for heating, n = 0.3 for cooling.\n\n"
+        "Parameters:\n"
+        "  Re      : Reynolds number [-] (must be > 10,000)\n"
+        "  Pr      : Prandtl number [-] (must be 0.6 < Pr < 160)\n"
+        "  heating : True if fluid is being heated, False if cooled (default: True)\n\n"
+        "Returns: Nusselt number Nu [-] (dimensionless)\n\n"
+        "Valid for fully developed turbulent flow with L/D > 10.\n"
+        "Heat transfer coefficient: h = Nu * k / L [W/(m²·K)]"
+    );
+
+    m.def(
+        "nusselt_gnielinski",
+        py::overload_cast<double, double, double>(&nusselt_gnielinski),
+        py::arg("Re"),
+        py::arg("Pr"),
+        py::arg("f"),
+        "Gnielinski Nusselt number correlation (1976) with friction factor.\n\n"
+        "Nu = (f/8) * (Re - 1000) * Pr / (1 + 12.7 * sqrt(f/8) * (Pr^(2/3) - 1))\n\n"
+        "More accurate than Dittus-Boelter, especially in transition region.\n\n"
+        "Parameters:\n"
+        "  Re : Reynolds number [-] (2300 < Re < 5×10^6)\n"
+        "  Pr : Prandtl number [-] (0.5 < Pr < 2000)\n"
+        "  f  : Darcy friction factor [-] (use friction_colebrook or similar)\n\n"
+        "Returns: Nusselt number Nu [-] (dimensionless)"
+    );
+
+    m.def(
+        "nusselt_gnielinski",
+        py::overload_cast<double, double>(&nusselt_gnielinski),
+        py::arg("Re"),
+        py::arg("Pr"),
+        "Gnielinski Nusselt number correlation (1976) with automatic friction.\n\n"
+        "Uses Petukhov friction correlation for smooth pipes:\n"
+        "f = [0.790 * ln(Re) - 1.64]^(-2)\n\n"
+        "Parameters:\n"
+        "  Re : Reynolds number [-] (2300 < Re < 5×10^6)\n"
+        "  Pr : Prandtl number [-] (0.5 < Pr < 2000)\n\n"
+        "Returns: Nusselt number Nu [-] (dimensionless)"
+    );
+
+    m.def(
+        "nusselt_sieder_tate",
+        &nusselt_sieder_tate,
+        py::arg("Re"),
+        py::arg("Pr"),
+        py::arg("mu_ratio") = 1.0,
+        "Sieder-Tate Nusselt number correlation (1936).\n\n"
+        "Nu = 0.027 * Re^0.8 * Pr^(1/3) * (μ_bulk / μ_wall)^0.14\n\n"
+        "Accounts for viscosity variation between bulk and wall temperatures.\n\n"
+        "Parameters:\n"
+        "  Re       : Reynolds number at bulk temperature [-] (Re > 10,000)\n"
+        "  Pr       : Prandtl number at bulk temperature [-] (0.7 < Pr < 16,700)\n"
+        "  mu_ratio : μ_bulk / μ_wall [-] (default: 1.0, typically 0.5-2.0)\n\n"
+        "Returns: Nusselt number Nu [-] (dimensionless)\n\n"
+        "Valid for L/D > 10."
+    );
+
+    m.def(
+        "htc_from_nusselt",
+        &htc_from_nusselt,
+        py::arg("Nu"),
+        py::arg("k"),
+        py::arg("L"),
+        "Heat transfer coefficient from Nusselt number.\n\n"
+        "h = Nu * k / L\n\n"
+        "Parameters:\n"
+        "  Nu : Nusselt number [-] (dimensionless)\n"
+        "  k  : thermal conductivity [W/(m·K)]\n"
+        "  L  : characteristic length [m] (diameter for pipe flow)\n\n"
+        "Returns: heat transfer coefficient h [W/(m²·K)]"
+    );
+
+    m.def(
+        "lmtd",
+        &lmtd,
+        py::arg("dT1"),
+        py::arg("dT2"),
+        "Log mean temperature difference (LMTD) for heat exchangers.\n\n"
+        "LMTD = (ΔT1 - ΔT2) / ln(ΔT1 / ΔT2)\n\n"
+        "For counter-flow:\n"
+        "  ΔT1 = T_hot_in - T_cold_out\n"
+        "  ΔT2 = T_hot_out - T_cold_in\n\n"
+        "For parallel-flow:\n"
+        "  ΔT1 = T_hot_in - T_cold_in\n"
+        "  ΔT2 = T_hot_out - T_cold_out\n\n"
+        "Parameters:\n"
+        "  dT1 : temperature difference at one end [K]\n"
+        "  dT2 : temperature difference at other end [K]\n\n"
+        "Returns: log mean temperature difference [K]\n\n"
+        "Note: If dT1 ≈ dT2, returns arithmetic mean to avoid 0/0."
+    );
+
+    // -------------------------------------------------------------
     // Compressible flow
     // -------------------------------------------------------------
 
