@@ -180,7 +180,11 @@ we should have mass-basis equivalents for all of them to avoid user confusion.
 **Future consideration:**
 - [ ] Add `.to_dict()` method to AirProperties for serialization
 - [ ] Consider adding `.to_dict()` to all exported dataclass-like structs in the codebase
-- [ ] Evaluate if other property bundles would be useful (e.g., combustion_properties)
+- [ ] Evaluate if other property bundles would be useful:
+  - **ThermoProperties** - Bundle of thermodynamic properties (cp, cv, h, s, u, gamma, R_specific)
+  - **TransportProperties** - Bundle of transport properties (mu, k, nu, alpha, Pr)
+  - **CombustionProperties** - Bundle for combustion results (T_ad, phi, X_products, etc.)
+- [ ] Consider replacing or augmenting existing `State` class with dataclass pattern for better IDE support
 
 **Status:** Not started
 
