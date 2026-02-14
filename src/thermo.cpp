@@ -305,6 +305,12 @@ double cv(double T, const std::vector<double>& X) {
     return cp(T, X) - R_GAS;
 }
 
+// Calculate internal energy [J/mol]
+// For ideal gas: u = h - R*T
+double u(double T, const std::vector<double>& X) {
+    return h(T, X) - R_GAS * T;
+}
+
 // -------------------------------------------------------------
 // Mass-specific thermodynamic properties
 // -------------------------------------------------------------
@@ -340,10 +346,11 @@ double s_mass(double T, const std::vector<double>& X, double P, double P_ref) {
     return s_molar / mw * 1000.0;          // [J/(kg·K)]
 }
 
-// Calculate internal energy [J/mol]
-// For ideal gas: u = h - R*T
-double u(double T, const std::vector<double>& X) {
-    return h(T, X) - R_GAS * T;
+// Internal energy [J/kg]
+double u_mass(double T, const std::vector<double>& X) {
+    double u_molar = u(T, X);    // [J/mol]
+    double mw = mwmix(X);         // [g/mol]
+    return u_molar / mw * 1000.0;  // [J/kg]
 }
 
 // Calculate derivative of enthalpy with respect to temperature [J/(mol·K)]

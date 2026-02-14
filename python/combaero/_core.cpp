@@ -165,7 +165,25 @@ PYBIND11_MODULE(_core, m)
         },
         py::arg("T"),
         py::arg("X"),
-        "Mixture isochoric heat capacity Cv(T, X) [J/(mol·K)]."
+        "Mixture isochoric heat capacity Cv(T, X) [J/(mol*K)]."
+    );
+
+    m.def(
+        "u",
+        [](double T,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr)
+        {
+            auto X = to_vec(X_arr);
+            return u(T, X);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        "Mixture internal energy u(T, X) [J/mol].\n\n"
+        "For ideal gas: u = h - RT\n\n"
+        "Parameters:\n"
+        "  T : temperature [K]\n"
+        "  X : mole fractions [mol/mol]\n\n"
+        "Returns: internal energy [J/mol]"
     );
 
     m.def(
@@ -290,7 +308,23 @@ PYBIND11_MODULE(_core, m)
         "  X     : mole fractions [mol/mol]\n"
         "  P     : pressure [Pa]\n"
         "  P_ref : reference pressure [Pa] (default: 101325)\n\n"
-        "Returns: entropy [J/(kg·K)]"
+        "Returns: entropy [J/(kg*K)]"
+    );
+
+    m.def(
+        "u_mass",
+        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+            auto X = to_vec(X_arr);
+            return u_mass(T, X);
+        },
+        py::arg("T"),
+        py::arg("X"),
+        "Mass-specific internal energy.\n\n"
+        "u_mass = u_molar / mwmix * 1000\n\n"
+        "Parameters:\n"
+        "  T : temperature [K]\n"
+        "  X : mole fractions [mol/mol]\n\n"
+        "Returns: internal energy [J/kg]"
     );
 
     m.def(

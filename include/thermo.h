@@ -72,6 +72,7 @@ double cp_mass(double T, const std::vector<double>& X);  // [J/(kg·K)]
 double cv_mass(double T, const std::vector<double>& X);  // [J/(kg·K)]
 double h_mass(double T, const std::vector<double>& X);   // [J/kg]
 double s_mass(double T, const std::vector<double>& X, double P, double P_ref = 101325.0);  // [J/(kg·K)]
+double u_mass(double T, const std::vector<double>& X);   // [J/kg]
 
 // Derivatives of thermodynamic properties with respect to temperature
 double dh_dT(double T, const std::vector<double>& X);

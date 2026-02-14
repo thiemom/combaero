@@ -109,6 +109,7 @@ All functions use consistent units to avoid conversion errors.
 | `cv_mass`                          | T: K, X: mol/mol                   | J/(kg*K)    |
 | `h_mass`                           | T: K, X: mol/mol                   | J/kg        |
 | `s_mass`                           | T: K, X: mol/mol, P: Pa, P_ref: Pa | J/(kg*K)    |
+| `u_mass`                           | T: K, X: mol/mol                   | J/kg        |
 
 #### Inverse Solvers
 

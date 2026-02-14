@@ -7,7 +7,12 @@ Remaining utility functions and improvements to implement.
 1. Every function needs comprehensive tests
 2. Composite functions must match single-call results with machine precision
 3. Commit after each phase if all tests and pre-commit hooks pass
-4. **DOCUMENTATION: Every phase must update:**
+4. **CODE QUALITY:**
+   - **NO non-ASCII characters** in Python or C++ code (use ASCII equivalents: ° → deg, · → *, ² → 2, ³ → 3, etc.)
+   - Run `./scripts/check-python-style.sh` before committing Python changes
+   - Use `pre-commit run --all-files` to catch issues early
+   - Target **100% pass** for every commit (all tests + CI checks green)
+5. **DOCUMENTATION: Every phase must update:**
    - `docs/API_REFERENCE.md` - function signatures, parameters, units
    - `include/units_data.h` - add unit entries for new functions
    - Run `python scripts/generate_units_md.py` to regenerate `docs/UNITS.md`

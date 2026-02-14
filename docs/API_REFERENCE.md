@@ -237,10 +237,11 @@ double speed_of_sound(double T, const std::vector<double>& X);     // m/s
 Symmetric interface to molar-basis functions. Converts via: `property_mass = property_molar / mwmix × 1000`
 
 ```cpp
-double cp_mass(double T, const std::vector<double>& X);  // J/(kg·K)
-double cv_mass(double T, const std::vector<double>& X);  // J/(kg·K)
+double cp_mass(double T, const std::vector<double>& X);  // J/(kg*K)
+double cv_mass(double T, const std::vector<double>& X);  // J/(kg*K)
 double h_mass(double T, const std::vector<double>& X);   // J/kg
-double s_mass(double T, const std::vector<double>& X, double P, double P_ref=101325.0);  // J/(kg·K)
+double s_mass(double T, const std::vector<double>& X, double P, double P_ref=101325.0);  // J/(kg*K)
+double u_mass(double T, const std::vector<double>& X);   // J/kg
 ```
 
 ## Transport Properties

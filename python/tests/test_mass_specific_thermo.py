@@ -74,6 +74,27 @@ class TestMassSpecificThermodynamicProperties:
         # Must match within machine precision
         assert abs(s_mass_actual - s_mass_expected) < 1e-12
 
+    def test_u_mass_air(self):
+        """Test mass-specific internal energy for air."""
+        T = 500.0  # K
+        X_air = cb.standard_dry_air_composition()
+
+        u_molar = cb.u(T, X_air)  # [J/mol]
+        mw = cb.mwmix(X_air)  # [g/mol]
+        u_mass_expected = u_molar / mw * 1000.0  # [J/kg]
+
+        u_mass_actual = cb.u_mass(T, X_air)
+
+        # Must match within machine precision
+        assert abs(u_mass_actual - u_mass_expected) < 1e-10
+
+        # Verify u = h - RT relationship holds for mass basis
+        h_mass_actual = cb.h_mass(T, X_air)
+        R_specific = cb.specific_gas_constant(X_air)  # [J/(kg*K)]
+        u_from_h = h_mass_actual - R_specific * T
+
+        assert abs(u_mass_actual - u_from_h) < 1e-10
+
     def test_gamma_consistency(self):
         """Test that gamma = cp/cv is same for molar and mass basis."""
         T = 400.0  # K
