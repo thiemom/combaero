@@ -187,7 +187,7 @@ we should have mass-basis equivalents for all of them to avoid user confusion.
 - Supports both dry and humid air
 - Single function call replaces 10+ individual calls
 
-**Status:** ✅ COMPLETE (Commit: [pending])
+**Status:** ✅ COMPLETE (Commit: 48da87d)
 
 ---
 
