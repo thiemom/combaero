@@ -1,10 +1,13 @@
 #include "../include/heat_transfer.h"
 #include "../include/state.h"
 #include "../include/friction.h"  // friction_petukhov, friction_colebrook
+#include "../include/thermo.h"    // density, cp_mass
+#include "../include/transport.h" // viscosity, thermal_conductivity, prandtl
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 
 // -------------------------------------------------------------
 // Internal Flow Correlations
@@ -558,4 +561,106 @@ double htc_pipe(const State& s, double velocity, double diameter,
     double Nu = nusselt_pipe(s, velocity, diameter, heating, roughness);
     double k = s.k();
     return htc_from_nusselt(Nu, k, diameter);
+}
+
+// Composite function: compute HTC from thermodynamic state
+// Returns: (h [W/(m²·K)], Nu [-], Re [-])
+std::tuple<double, double, double> htc_pipe(
+    double T, double P, const std::vector<double>& X,
+    double velocity, double diameter,
+    const std::string& correlation,
+    bool heating,
+    double mu_ratio,
+    double roughness)
+{
+    if (velocity <= 0) {
+        throw std::invalid_argument("htc_pipe: velocity must be positive");
+    }
+    if (diameter <= 0) {
+        throw std::invalid_argument("htc_pipe: diameter must be positive");
+    }
+    if (T <= 0) {
+        throw std::invalid_argument("htc_pipe: temperature must be positive");
+    }
+    if (P <= 0) {
+        throw std::invalid_argument("htc_pipe: pressure must be positive");
+    }
+
+    // Compute thermodynamic and transport properties
+    double rho = density(T, P, X);
+    double mu = viscosity(T, P, X);
+    double k = thermal_conductivity(T, P, X);
+    double cp = cp_mass(T, X);
+    double Pr = prandtl(T, P, X);
+
+    // Reynolds number
+    double Re = rho * velocity * diameter / mu;
+
+    // Select correlation and compute Nusselt number
+    double Nu;
+
+    if (correlation == "gnielinski") {
+        // Gnielinski: 2300 < Re < 5e6, 0.5 < Pr < 2000
+        if (Re < 2300) {
+            // Laminar flow
+            Nu = heating ? NU_LAMINAR_CONST_T : NU_LAMINAR_CONST_Q;
+        } else {
+            // Get friction factor
+            double e_D = roughness / diameter;
+            double f;
+            if (e_D > 0 && Re > 4000) {
+                f = friction_colebrook(Re, e_D);
+            } else {
+                f = friction_petukhov(std::max(Re, 3000.0));
+            }
+            Nu = nusselt_gnielinski(Re, Pr, f);
+        }
+    }
+    else if (correlation == "dittus_boelter") {
+        // Dittus-Boelter: Re > 10000, 0.6 < Pr < 160
+        if (Re < 2300) {
+            Nu = heating ? NU_LAMINAR_CONST_T : NU_LAMINAR_CONST_Q;
+        } else if (Re < 10000) {
+            throw std::invalid_argument(
+                "htc_pipe: Dittus-Boelter requires Re > 10000 (got Re=" +
+                std::to_string(Re) + "). Use 'gnielinski' for transition region.");
+        } else {
+            Nu = nusselt_dittus_boelter(Re, Pr, heating);
+        }
+    }
+    else if (correlation == "sieder_tate") {
+        // Sieder-Tate: Re > 10000, 0.7 < Pr < 16700
+        if (Re < 2300) {
+            Nu = heating ? NU_LAMINAR_CONST_T : NU_LAMINAR_CONST_Q;
+        } else if (Re < 10000) {
+            throw std::invalid_argument(
+                "htc_pipe: Sieder-Tate requires Re > 10000 (got Re=" +
+                std::to_string(Re) + "). Use 'gnielinski' for transition region.");
+        } else {
+            Nu = nusselt_sieder_tate(Re, Pr, mu_ratio);
+        }
+    }
+    else if (correlation == "petukhov") {
+        // Petukhov: 1e4 < Re < 5e6, 0.5 < Pr < 2000
+        if (Re < 2300) {
+            Nu = heating ? NU_LAMINAR_CONST_T : NU_LAMINAR_CONST_Q;
+        } else if (Re < 1e4) {
+            throw std::invalid_argument(
+                "htc_pipe: Petukhov requires Re > 10000 (got Re=" +
+                std::to_string(Re) + "). Use 'gnielinski' for transition region.");
+        } else {
+            double f = friction_petukhov(Re);
+            Nu = nusselt_petukhov(Re, Pr, f);
+        }
+    }
+    else {
+        throw std::invalid_argument(
+            "htc_pipe: unknown correlation '" + correlation + "'. " +
+            "Valid options: 'gnielinski', 'dittus_boelter', 'sieder_tate', 'petukhov'");
+    }
+
+    // Heat transfer coefficient
+    double h = htc_from_nusselt(Nu, k, diameter);
+
+    return std::make_tuple(h, Nu, Re);
 }

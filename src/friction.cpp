@@ -104,7 +104,7 @@ double friction_colebrook(double Re, double e_D, double tol, int max_iter) {
 
 // Petukhov correlation (1970) - smooth pipes only
 // f = (0.790 * ln(Re) - 1.64)^(-2)
-// Valid for 3000 < Re < 5×10^6
+// Valid for 3000 < Re < 5x10^6
 double friction_petukhov(double Re) {
     if (Re < 3000) {
         throw std::invalid_argument("friction_petukhov: Re must be > 3000");

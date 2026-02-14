@@ -364,6 +364,7 @@ All functions use consistent units to avoid conversion errors.
 | `htc_from_nusselt`             | Nu: -, k: W/(m*K), L: m                                                                                         | W/(m^2*K)                 |
 | `nusselt_pipe`                 | State, V: m/s, D: m                                                                                             | - (Nu)                    |
 | `htc_pipe`                     | State, V: m/s, D: m                                                                                             | W/(m^2*K)                 |
+| `htc_pipe`                     | T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, correlation: str, heating: bool, mu_ratio: -, roughness: m | tuple(W/(m^2*K), -, -)    |
 | `lmtd`                         | dT1: K, dT2: K                                                                                                  | K                         |
 | `lmtd_counterflow`             | T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K                                                          | K                         |
 | `lmtd_parallelflow`            | T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K                                                          | K                         |

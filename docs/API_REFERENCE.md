@@ -321,6 +321,13 @@ nusselt_sieder_tate(Re, Pr, mu_ratio=1.0)  # [-]
 # Heat transfer coefficient from Nusselt number
 htc_from_nusselt(Nu, k, L)  # [W/(m²·K)]
 
+# Composite HTC calculation from thermodynamic state
+h, Nu, Re = htc_pipe(T, P, X, velocity, diameter,
+                     correlation='gnielinski',  # or 'dittus_boelter', 'sieder_tate', 'petukhov'
+                     heating=True,
+                     mu_ratio=1.0,
+                     roughness=0.0)  # Returns tuple: (h [W/(m²·K)], Nu [-], Re [-])
+
 # Log mean temperature difference for heat exchangers
 lmtd(dT1, dT2)  # [K]
 ```
@@ -335,16 +342,28 @@ lmtd(dT1, dT2)  # [K]
 - `k`: Thermal conductivity [W/(m·K)]
 - `L`: Characteristic length [m] (diameter for pipe flow)
 - `dT1`, `dT2`: Temperature differences at heat exchanger ends [K]
+- **`htc_pipe` composite parameters:**
+  - `T`: Temperature [K]
+  - `P`: Pressure [Pa]
+  - `X`: Mole fractions [mol/mol]
+  - `velocity`: Flow velocity [m/s]
+  - `diameter`: Pipe diameter [m]
+  - `correlation`: 'gnielinski' (default), 'dittus_boelter', 'sieder_tate', 'petukhov'
+  - `roughness`: Absolute roughness [m] (default: 0.0 = smooth pipe)
 
 **Returns:**
 - Nusselt correlations: Nu [-] (dimensionless)
 - `htc_from_nusselt`: h [W/(m²·K)]
+- **`htc_pipe`: tuple (h [W/(m²·K)], Nu [-], Re [-])**
 - `lmtd`: LMTD [K]
 
 **Valid ranges:**
 - Dittus-Boelter: Re > 10,000, 0.6 < Pr < 160
-- Gnielinski: 2300 < Re < 5×10⁶, 0.5 < Pr < 2000
+- Gnielinski: 2300 < Re < 5x10^6, 0.5 < Pr < 2000 (best general-purpose)
 - Sieder-Tate: Re > 10,000, 0.7 < Pr < 16,700
+- Petukhov: Re > 10,000, 0.5 < Pr < 2000
+
+**Note:** `htc_pipe` automatically computes density, viscosity, thermal conductivity, Prandtl number, and Reynolds number from (T, P, X). Handles laminar flow (Re < 2300) with constant Nu.
 
 ## Geometry Utilities
 

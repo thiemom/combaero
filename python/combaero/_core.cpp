@@ -1287,7 +1287,7 @@ PYBIND11_MODULE(_core, m)
         "Parameters:\n"
         "  Re : Reynolds number [-] (must be > 0)\n\n"
         "Returns: Darcy friction factor f [-] (dimensionless)\n\n"
-        "Valid for: 3000 < Re < 5×10^6\n"
+        "Valid for: 3000 < Re < 5x10^6\n"
         "Often used with Gnielinski/Petukhov heat transfer correlations."
     );
 
@@ -1323,7 +1323,7 @@ PYBIND11_MODULE(_core, m)
         "Nu = (f/8) * (Re - 1000) * Pr / (1 + 12.7 * sqrt(f/8) * (Pr^(2/3) - 1))\n\n"
         "More accurate than Dittus-Boelter, especially in transition region.\n\n"
         "Parameters:\n"
-        "  Re : Reynolds number [-] (2300 < Re < 5×10^6)\n"
+        "  Re : Reynolds number [-] (2300 < Re < 5x10^6)\n"
         "  Pr : Prandtl number [-] (0.5 < Pr < 2000)\n"
         "  f  : Darcy friction factor [-] (use friction_colebrook or similar)\n\n"
         "Returns: Nusselt number Nu [-] (dimensionless)"
@@ -1338,7 +1338,7 @@ PYBIND11_MODULE(_core, m)
         "Uses Petukhov friction correlation for smooth pipes:\n"
         "f = [0.790 * ln(Re) - 1.64]^(-2)\n\n"
         "Parameters:\n"
-        "  Re : Reynolds number [-] (2300 < Re < 5×10^6)\n"
+        "  Re : Reynolds number [-] (2300 < Re < 5x10^6)\n"
         "  Pr : Prandtl number [-] (0.5 < Pr < 2000)\n\n"
         "Returns: Nusselt number Nu [-] (dimensionless)"
     );
@@ -1373,6 +1373,52 @@ PYBIND11_MODULE(_core, m)
         "  k  : thermal conductivity [W/(m·K)]\n"
         "  L  : characteristic length [m] (diameter for pipe flow)\n\n"
         "Returns: heat transfer coefficient h [W/(m²·K)]"
+    );
+
+    m.def(
+        "htc_pipe",
+        [](double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double velocity, double diameter,
+           const std::string& correlation,
+           bool heating,
+           double mu_ratio,
+           double roughness) {
+            auto X = to_vec(X_arr);
+            return htc_pipe(T, P, X, velocity, diameter, correlation, heating, mu_ratio, roughness);
+        },
+        py::arg("T"),
+        py::arg("P"),
+        py::arg("X"),
+        py::arg("velocity"),
+        py::arg("diameter"),
+        py::arg("correlation") = "gnielinski",
+        py::arg("heating") = true,
+        py::arg("mu_ratio") = 1.0,
+        py::arg("roughness") = 0.0,
+        "Composite heat transfer coefficient for pipe flow.\n\n"
+        "Computes HTC, Nusselt number, and Reynolds number from thermodynamic state.\n"
+        "Automatically calculates density, viscosity, thermal conductivity, and Prandtl number.\n\n"
+        "Parameters:\n"
+        "  T           : temperature [K]\n"
+        "  P           : pressure [Pa]\n"
+        "  X           : mole fractions [mol/mol]\n"
+        "  velocity    : flow velocity [m/s]\n"
+        "  diameter    : pipe diameter [m]\n"
+        "  correlation : 'gnielinski' (default), 'dittus_boelter', 'sieder_tate', 'petukhov'\n"
+        "  heating     : True for heating, False for cooling (affects Dittus-Boelter)\n"
+        "  mu_ratio    : μ_bulk / μ_wall for Sieder-Tate viscosity correction (default: 1.0)\n"
+        "  roughness   : absolute roughness [m] (default: 0.0 = smooth pipe)\n\n"
+        "Returns: tuple (h, Nu, Re)\n"
+        "  h  : heat transfer coefficient [W/(m²·K)]\n"
+        "  Nu : Nusselt number [-]\n"
+        "  Re : Reynolds number [-]\n\n"
+        "Correlations:\n"
+        "  - gnielinski    : 2300 < Re < 5e6, 0.5 < Pr < 2000 (best general-purpose)\n"
+        "  - dittus_boelter: Re > 10000, 0.6 < Pr < 160 (simple, fast)\n"
+        "  - sieder_tate   : Re > 10000, 0.7 < Pr < 16700 (viscosity correction)\n"
+        "  - petukhov      : Re > 10000, 0.5 < Pr < 2000 (high accuracy)\n\n"
+        "Automatically handles laminar flow (Re < 2300) with constant Nu."
     );
 
     m.def(

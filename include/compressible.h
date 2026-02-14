@@ -112,7 +112,7 @@ double mass_flux_isentropic(
 //   - Energy: h + u²/2 = h0 (adiabatic)
 //   - Momentum: dp/dx + ρ*u*du/dx = 0 (frictionless) or with loss model
 //
-// Marches along x, solving 2×2 nonlinear system (T, P) at each station
+// Marches along x, solving 2x2 nonlinear system (T, P) at each station
 // using Newton iteration with analytic derivatives from thermo backend.
 
 // Function type for area distribution A(x)

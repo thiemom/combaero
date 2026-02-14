@@ -47,7 +47,7 @@ double nusselt_dittus_boelter(double Re, double Pr, bool heating = true);
 //
 // More accurate than Dittus-Boelter, especially in transition region.
 // Valid for:
-//   - 2300 < Re < 5×10^6
+//   - 2300 < Re < 5x10^6
 //   - 0.5 < Pr < 2000
 //
 // Parameters:
@@ -80,7 +80,7 @@ double nusselt_sieder_tate(double Re, double Pr, double mu_ratio = 1.0);
 //
 // Basis for Gnielinski; valid for fully turbulent flow.
 // Valid for:
-//   - 10^4 < Re < 5×10^6
+//   - 10^4 < Re < 5x10^6
 //   - 0.5 < Pr < 2000
 //
 // Parameters:
@@ -447,5 +447,29 @@ double nusselt_pipe(const State& s, double velocity, double diameter,
 // Heat transfer coefficient for pipe flow [W/(m²·K)]
 double htc_pipe(const State& s, double velocity, double diameter,
                 bool heating = true, double roughness = 0.0);
+
+// Composite function: compute HTC, Nu, and Re from thermodynamic state
+// Returns: tuple (h [W/(m²·K)], Nu [-], Re [-])
+//
+// Parameters:
+//   T           : temperature [K]
+//   P           : pressure [Pa]
+//   X           : mole fractions [mol/mol]
+//   velocity    : flow velocity [m/s]
+//   diameter    : pipe diameter [m]
+//   correlation : "gnielinski" (default), "dittus_boelter", "sieder_tate", "petukhov"
+//   heating     : true for heating, false for cooling (affects Dittus-Boelter)
+//   mu_ratio    : μ_bulk / μ_wall for Sieder-Tate viscosity correction (default: 1.0)
+//   roughness   : absolute roughness [m] (default: 0.0 = smooth pipe)
+//
+// Automatically computes: ρ, μ, k, Pr, Re from (T, P, X)
+// Selects appropriate correlation and handles laminar flow (Re < 2300)
+std::tuple<double, double, double> htc_pipe(
+    double T, double P, const std::vector<double>& X,
+    double velocity, double diameter,
+    const std::string& correlation = "gnielinski",
+    bool heating = true,
+    double mu_ratio = 1.0,
+    double roughness = 0.0);
 
 #endif // HEAT_TRANSFER_H

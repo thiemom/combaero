@@ -19,46 +19,51 @@ Remaining utility functions and improvements to implement.
 
 ---
 
-## Phase 2: Mass-Specific Thermodynamic Properties
+## Phase 2: Mass-Specific Thermodynamic Properties ✅ COMPLETE
 
 **Priority:** HIGH - Frequently needed, simple conversions
 **Difficulty:** EASY - Simple wrappers around existing functions
 
-**Rationale:** Maintain symmetric interface - if we have molar-basis functions (cp, h, cv, s),
+**Rationale:** Maintain symmetric interface - if we have molar-basis functions (cp, h, cv, s, u),
 we should have mass-basis equivalents for all of them to avoid user confusion.
 
-**Functions to implement (4):**
-- [ ] `cp_mass(T, X)` - Mass-specific heat capacity at constant pressure [J/(kg·K)]
-- [ ] `cv_mass(T, X)` - Mass-specific heat capacity at constant volume [J/(kg·K)]
-- [ ] `h_mass(T, X)` - Mass-specific enthalpy [J/kg]
-- [ ] `s_mass(T, P, X, P_ref)` - Mass-specific entropy [J/(kg·K)]
+**Functions implemented (5):**
+- [x] `cp_mass(T, X)` - Mass-specific heat capacity at constant pressure [J/(kg·K)]
+- [x] `cv_mass(T, X)` - Mass-specific heat capacity at constant volume [J/(kg·K)]
+- [x] `h_mass(T, X)` - Mass-specific enthalpy [J/kg]
+- [x] `s_mass(T, P, X, P_ref)` - Mass-specific entropy [J/(kg·K)]
+- [x] `u_mass(T, X)` - Mass-specific internal energy [J/kg] ⭐ ADDED
 
 **Implementation:**
-- [ ] Add functions to `src/thermo.cpp`
-- [ ] Add declarations to `include/thermo.h`
-- [ ] Add Python bindings to `python/combaero/_core.cpp`
-- [ ] Export in `python/combaero/__init__.py`
-- [ ] Write unit tests in `python/tests/test_thermo_transport.py`
-- [ ] **CRITICAL TESTS:**
+- [x] Add functions to `src/thermo.cpp`
+- [x] Add declarations to `include/thermo.h`
+- [x] Add Python bindings to `python/combaero/_core.cpp`
+- [x] Export in `python/combaero/__init__.py`
+- [x] Write unit tests in `python/tests/test_mass_specific_thermo.py`
+- [x] **CRITICAL TESTS:**
   - Verify cp_mass(T, X) == cp(T, X) / mwmix(X) * 1000
   - Verify cv_mass(T, X) == cv(T, X) / mwmix(X) * 1000
   - Verify h_mass(T, X) == h(T, X) / mwmix(X) * 1000
   - Verify s_mass(T, P, X) == s(T, P, X) / mwmix(X) * 1000
-  - All must match within machine precision
-- [ ] Test with multiple compositions (air, fuel, products)
-- [ ] Update `docs/API_REFERENCE.md`
-- [ ] **Add unit entries to `include/units_data.h` (4 entries)**
-- [ ] **Run `python scripts/generate_units_md.py` to regenerate `docs/UNITS.md`**
-- [ ] Run all tests: `pytest python/tests/`
-- [ ] Commit: "Add mass-specific thermodynamic property functions"
+  - Verify u_mass(T, X) == u(T, X) / mwmix(X) * 1000
+  - All match within machine precision ✅
+- [x] Test with multiple compositions (air, fuel, products)
+- [x] Update `docs/API_REFERENCE.md`
+- [x] **Add unit entries to `include/units_data.h` (5 entries)**
+- [x] **Run `python scripts/generate_units_md.py` to regenerate `docs/UNITS.md`**
+- [x] Run all tests: `pytest python/tests/` - **202 tests pass** ✅
+- [x] Commit: "Complete Phase 2: Add internal energy functions (u and u_mass)"
 
-**Testing requirements:**
-- Each function must match molar / mwmix * 1000 within machine precision
-- Test with air, fuel mixtures, combustion products
-- Verify units [J/(kg·K)] for cp/cv/s, [J/kg] for h
-- Test consistency: gamma_mass = cp_mass / cv_mass should equal gamma_molar
+**Testing results:**
+- All functions match molar / mwmix * 1000 within machine precision ✅
+- Tested with air, fuel mixtures, combustion products ✅
+- Verified units [J/(kg·K)] for cp/cv/s, [J/kg] for h/u ✅
+- Verified consistency: gamma_mass = cp_mass / cv_mass equals gamma_molar ✅
+- Verified u = h - RT relationship for mass basis ✅
 
-**Status:** Not started
+**Bonus:** Also added missing `u(T, X)` molar function to Python bindings
+
+**Status:** ✅ COMPLETE (Commit: 078aa14)
 
 ---
 
