@@ -124,28 +124,63 @@ we should have mass-basis equivalents for all of them to avoid user confusion.
 ## Phase 8: Air Properties Bundle (Optional)
 
 **Priority:** LOW - Nice to have, but multiple calls aren't too bad
-**Difficulty:** MEDIUM - Returns struct/dict, needs careful design
+**Difficulty:** MEDIUM - Returns struct/dataclass, needs careful design
+
+**Design Decision:** ✅ **Dataclass-like struct** (C++ struct → pybind11 class binding)
+- **Rationale:** IDE autocomplete, type safety, self-documenting, better UX for engineers
+- **C++ side:** `struct AirProperties { double rho; double mu; ... };`
+- **Python side:** Bound as class with readonly attributes (behaves like frozen dataclass)
+- **Future consideration:** Add `.to_dict()` method to all exported dataclasses for serialization
 
 **Functions to implement (1):**
-- [ ] `air_properties(T, P, humidity=0.0)` - Returns struct/dict with all properties
+- [ ] `air_properties(T, P, humidity=0.0)` - Returns AirProperties struct/class
+
+**Properties to include (10):**
+- [ ] `rho` - Density [kg/m³]
+- [ ] `mu` - Dynamic viscosity [Pa·s]
+- [ ] `k` - Thermal conductivity [W/(m·K)]
+- [ ] `cp` - Specific heat at constant pressure [J/(kg·K)]
+- [ ] `cv` - Specific heat at constant volume [J/(kg·K)]
+- [ ] `Pr` - Prandtl number [-]
+- [ ] `nu` - Kinematic viscosity [m²/s]
+- [ ] `alpha` - Thermal diffusivity [m²/s]
+- [ ] `gamma` - Heat capacity ratio [-]
+- [ ] `a` - Speed of sound [m/s]
 
 **Implementation:**
-- [ ] Design return type (struct in C++, dict or named tuple in Python)
-- [ ] Add to `src/thermo.cpp` or `src/air_utils.cpp`
-- [ ] Properties: rho, mu, k, cp, cv, Pr, nu, alpha, gamma, a
-- [ ] Add Python binding
-- [ ] Write unit tests
-- [ ] **CRITICAL TESTS:** Each property must match individual function call
-- [ ] Update `docs/API_REFERENCE.md`
+- [ ] Create `struct AirProperties` in `include/thermo.h` or new `include/air_properties.h`
+- [ ] Implement `air_properties()` function in `src/thermo.cpp`
+- [ ] Add pybind11 class binding in `python/combaero/_core.cpp`
+  - Use `py::class_<AirProperties>` with `.def_readonly()` for each property
+  - Add docstrings with units for each property
+  - Add `__repr__` for nice debugging output
+- [ ] Export `AirProperties` class in `python/combaero/__init__.py`
+- [ ] Write comprehensive unit tests in `python/tests/test_air_properties.py`
+- [ ] **CRITICAL TESTS:**
+  - Each property must match individual function call with machine precision
+  - Test with dry air (humidity=0.0)
+  - Test with humid air (humidity>0.0)
+  - Test at various temperatures (200K - 600K)
+  - Test at various pressures (50kPa - 200kPa)
+  - Verify derived properties: nu = mu/rho, alpha = k/(rho*cp), gamma = cp/cv
+- [ ] Update `docs/API_REFERENCE.md` with struct definition and usage examples
 - [ ] **Add unit entry to `include/units_data.h`**
 - [ ] **Run `python scripts/generate_units_md.py` to regenerate `docs/UNITS.md`**
 - [ ] Run all tests: `pytest python/tests/`
-- [ ] Commit: "Add air properties bundle function"
+- [ ] Commit: "Add air properties bundle function with AirProperties dataclass"
+- [ ] **Update TODO.md to mark phase complete** ✅
 
 **Testing requirements:**
-- Each property must match individual function call exactly
+- Each property must match individual function call exactly (machine precision)
 - Test with dry air and humid air
 - Test at different temperatures and pressures
+- Verify IDE autocomplete works (manual check)
+- Verify type hints work with mypy/pyright
+
+**Future consideration:**
+- [ ] Add `.to_dict()` method to AirProperties for serialization
+- [ ] Consider adding `.to_dict()` to all exported dataclass-like structs in the codebase
+- [ ] Evaluate if other property bundles would be useful (e.g., combustion_properties)
 
 **Status:** Not started
 
