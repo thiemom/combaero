@@ -40,6 +40,7 @@ try:
     from ._core import Annulus  # type: ignore[attr-defined]
     from ._core import (
         AcousticMode,
+        AirProperties,
         BoundaryCondition,
         Cd_orifice,
         Cd_rounded_entry,
@@ -59,6 +60,7 @@ try:
         Tube,
         UnitInfo,
         adiabatic_T_wgs,
+        air_properties,
         all_units,
         annular_area,
         annulus_axial_modes,
@@ -526,6 +528,8 @@ __all__ = [
     # State-based API
     "State",
     "Stream",
+    "AirProperties",
+    "air_properties",
     "mix",
     # Inverse solvers - find fuel stream
     "set_fuel_stream_for_Tad",

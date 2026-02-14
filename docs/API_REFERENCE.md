@@ -244,6 +244,41 @@ double s_mass(double T, const std::vector<double>& X, double P, double P_ref=101
 double u_mass(double T, const std::vector<double>& X);   // J/kg
 ```
 
+### Air Properties Bundle
+
+Convenience function that computes all air properties in a single call. Returns `AirProperties` struct with read-only attributes.
+
+```python
+# Python usage with IDE autocomplete
+props = cb.air_properties(T=300, P=101325, humidity=0.0)
+print(props.rho)    # 1.177 kg/m³
+print(props.mu)     # 1.85e-05 Pa·s
+print(props.Pr)     # 0.707
+```
+
+**AirProperties attributes:**
+- `rho` - Density [kg/m³]
+- `mu` - Dynamic viscosity [Pa·s]
+- `k` - Thermal conductivity [W/(m·K)]
+- `cp` - Specific heat at constant pressure [J/(kg·K)]
+- `cv` - Specific heat at constant volume [J/(kg·K)]
+- `Pr` - Prandtl number [-]
+- `nu` - Kinematic viscosity [m²/s] (= μ/ρ)
+- `alpha` - Thermal diffusivity [m²/s] (= k/(ρ·cp))
+- `gamma` - Heat capacity ratio [-] (= cp/cv)
+- `a` - Speed of sound [m/s]
+
+**Parameters:**
+- `T` - Temperature [K]
+- `P` - Pressure [Pa]
+- `humidity` - Relative humidity [0-1] (default: 0.0 = dry air)
+
+**Benefits:**
+- Single function call for all properties
+- IDE autocomplete for all attributes
+- Type-safe attribute access
+- Consistent with State class pattern
+
 ## Transport Properties
 
 ```cpp

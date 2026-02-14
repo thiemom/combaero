@@ -1,5 +1,7 @@
 #include "../include/thermo.h"
 #include "../include/thermo_transport_data.h"
+#include "../include/humidair.h"
+#include "../include/transport.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -708,4 +710,49 @@ double isentropic_expansion_coefficient(const State& s) {
 
 double speed_of_sound(const State& s) {
     return speed_of_sound(s.T, s.X);
+}
+
+// -------------------------------------------------------------
+// Air Properties Bundle
+// -------------------------------------------------------------
+
+AirProperties air_properties(double T, double P, double humidity) {
+    if (T <= 0) {
+        throw std::invalid_argument("air_properties: temperature must be positive");
+    }
+    if (P <= 0) {
+        throw std::invalid_argument("air_properties: pressure must be positive");
+    }
+    if (humidity < 0.0 || humidity > 1.0) {
+        throw std::invalid_argument("air_properties: humidity must be in range [0, 1]");
+    }
+
+    // Get air composition (dry or humid)
+    std::vector<double> X;
+    if (humidity > 0.0) {
+        X = humid_air_composition(T, P, humidity);
+    } else {
+        X = standard_dry_air_composition();
+    }
+
+    // Compute all properties
+    AirProperties props;
+
+    // Thermodynamic properties
+    props.rho = density(T, P, X);
+    props.cp = cp_mass(T, X);
+    props.cv = cv_mass(T, X);
+    props.gamma = props.cp / props.cv;
+    props.a = speed_of_sound(T, X);
+
+    // Transport properties
+    props.mu = viscosity(T, P, X);
+    props.k = thermal_conductivity(T, P, X);
+
+    // Derived properties
+    props.nu = props.mu / props.rho;           // Kinematic viscosity
+    props.alpha = props.k / (props.rho * props.cp);  // Thermal diffusivity
+    props.Pr = prandtl(T, P, X);
+
+    return props;
 }

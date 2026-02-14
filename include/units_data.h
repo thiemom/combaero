@@ -63,6 +63,7 @@ inline constexpr Entry function_units[] = {
     {"h_mass",                  "T: K, X: mol/mol",                     "J/kg"},
     {"s_mass",                  "T: K, X: mol/mol, P: Pa, P_ref: Pa",   "J/(kg*K)"},
     {"u_mass",                  "T: K, X: mol/mol",                     "J/kg"},
+    {"air_properties",          "T: K, P: Pa, humidity: - (0-1)",       "AirProperties struct"},
 
     // -------------------------------------------------------------------------
     // thermo.h - Inverse Solvers

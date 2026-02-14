@@ -74,6 +74,33 @@ double h_mass(double T, const std::vector<double>& X);   // [J/kg]
 double s_mass(double T, const std::vector<double>& X, double P, double P_ref = 101325.0);  // [J/(kg·K)]
 double u_mass(double T, const std::vector<double>& X);   // [J/kg]
 
+// -------------------------------------------------------------
+// Air Properties Bundle
+// -------------------------------------------------------------
+
+// Bundle of air properties for convenient access
+// All properties computed from (T, P, humidity) in a single call
+struct AirProperties {
+    double rho;      // Density [kg/m³]
+    double mu;       // Dynamic viscosity [Pa·s]
+    double k;        // Thermal conductivity [W/(m·K)]
+    double cp;       // Specific heat at constant pressure [J/(kg·K)]
+    double cv;       // Specific heat at constant volume [J/(kg·K)]
+    double Pr;       // Prandtl number [-]
+    double nu;       // Kinematic viscosity [m²/s]
+    double alpha;    // Thermal diffusivity [m²/s]
+    double gamma;    // Heat capacity ratio [-]
+    double a;        // Speed of sound [m/s]
+};
+
+// Compute all air properties at once
+// Parameters:
+//   T        : temperature [K]
+//   P        : pressure [Pa]
+//   humidity : relative humidity [0-1] (default: 0.0 = dry air)
+// Returns: AirProperties struct with all properties
+AirProperties air_properties(double T, double P, double humidity = 0.0);
+
 // Derivatives of thermodynamic properties with respect to temperature
 double dh_dT(double T, const std::vector<double>& X);
 double ds_dT(double T, const std::vector<double>& X);
