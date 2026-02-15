@@ -383,6 +383,49 @@ print(state.nu)      # 1.42e-05 m²/s
 - Boundary layer computations
 - Reynolds and Prandtl number evaluations
 
+### Complete State Bundle
+
+Convenience function that computes all thermodynamic AND transport properties for a gas mixture in a single call. Returns `CompleteState` struct with nested `ThermoState` and `TransportState`.
+
+```python
+# Python usage with IDE autocomplete
+X = cb.standard_dry_air_composition()
+state = cb.complete_state(T=300, P=101325, X=X)
+
+# Access thermodynamic properties
+print(state.thermo.h)        # -103.6 J/mol
+print(state.thermo.gamma)    # 1.400
+
+# Access transport properties
+print(state.transport.mu)    # 1.68e-05 Pa·s
+print(state.transport.Pr)    # 0.781
+```
+
+**CompleteState attributes:**
+- `thermo` - ThermoState with all 16 thermodynamic properties
+  - T, P, rho, cp, cv, h, s, u, gamma, a, cp_mass, cv_mass, h_mass, s_mass, u_mass, mw
+- `transport` - TransportState with all 9 transport properties
+  - T, P, rho, mu, k, nu, alpha, Pr, cp
+
+**Parameters:**
+- `T` - Temperature [K]
+- `P` - Pressure [Pa]
+- `X` - Mole fractions [-]
+- `P_ref` - Reference pressure for entropy [Pa] (default: 101325.0)
+
+**Benefits:**
+- Single function call for ALL properties (25 total)
+- Nested structure keeps organization clear
+- IDE autocomplete for all attributes
+- Consistent with ThermoState, TransportState patterns
+- Building block for CombustionState
+
+**Use cases:**
+- Comprehensive gas property analysis
+- Combustion calculations (reactants and products)
+- Heat transfer with fluid dynamics
+- Complete state characterization
+
 ## Utility Functions
 
 ```cpp

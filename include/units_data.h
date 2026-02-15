@@ -66,6 +66,7 @@ inline constexpr Entry function_units[] = {
     {"air_properties",          "T: K, P: Pa, humidity: - (0-1)",       "AirProperties struct"},
     {"thermo_state",            "T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325)", "ThermoState struct"},
     {"transport_state",         "T: K, P: Pa, X: mol/mol",              "TransportState struct"},
+    {"complete_state",          "T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325)", "CompleteState struct"},
 
     // -------------------------------------------------------------------------
     // acoustics.h - Acoustic Properties

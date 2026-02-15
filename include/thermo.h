@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <string>
 #include <vector>
+#include "transport.h"
 
 namespace combaero::thermo {
 
@@ -134,6 +135,26 @@ struct ThermoState {
 //   P_ref : reference pressure for entropy [Pa] (default: 101325.0)
 // Returns: ThermoState struct with all properties
 ThermoState thermo_state(double T, double P, const std::vector<double>& X, double P_ref = 101325.0);
+
+// -------------------------------------------------------------
+// Complete State Bundle (Thermo + Transport)
+// -------------------------------------------------------------
+
+// Bundle of thermodynamic and transport properties for a gas mixture
+// Combines ThermoState + TransportState in a single call
+struct CompleteState {
+    ThermoState thermo;       // All 16 thermodynamic properties
+    TransportState transport; // All 9 transport properties
+};
+
+// Compute all thermodynamic and transport properties at once
+// Parameters:
+//   T     : temperature [K]
+//   P     : pressure [Pa]
+//   X     : mole fractions [-]
+//   P_ref : reference pressure for entropy [Pa] (default: 101325.0)
+// Returns: CompleteState struct with nested thermo and transport states
+CompleteState complete_state(double T, double P, const std::vector<double>& X, double P_ref = 101325.0);
 
 // Derivatives of thermodynamic properties with respect to temperature
 double dh_dT(double T, const std::vector<double>& X);

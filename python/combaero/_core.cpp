@@ -512,6 +512,58 @@ PYBIND11_MODULE(_core, m)
         "  0.707"
     );
 
+    // CompleteState struct binding - Bundle of thermo + transport properties
+    py::class_<CompleteState>(m, "CompleteState",
+        "Bundle of thermodynamic and transport properties for a gas mixture.\n\n"
+        "All properties are read-only attributes computed in a single call.\n"
+        "Provides IDE autocomplete and type safety.\n\n"
+        "Attributes:\n"
+        "  thermo    : ThermoState with all 16 thermodynamic properties\n"
+        "  transport : TransportState with all 9 transport properties")
+        .def_readonly("thermo", &CompleteState::thermo, "ThermoState with all thermodynamic properties")
+        .def_readonly("transport", &CompleteState::transport, "TransportState with all transport properties")
+        .def("__repr__", [](const CompleteState& s) {
+            return "<CompleteState: T=" + std::to_string(s.thermo.T) + " K, "
+                   "P=" + std::to_string(s.thermo.P) + " Pa, "
+                   "rho=" + std::to_string(s.thermo.rho) + " kg/m³, "
+                   "mu=" + std::to_string(s.transport.mu) + " Pa·s>";
+        });
+
+    m.def(
+        "complete_state",
+        [](double T,
+           double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double P_ref)
+        {
+            auto X = to_vec(X_arr);
+            return complete_state(T, P, X, P_ref);
+        },
+        py::arg("T"),
+        py::arg("P"),
+        py::arg("X"),
+        py::arg("P_ref") = 101325.0,
+        "Compute all thermodynamic and transport properties at once.\n\n"
+        "Convenience function that computes all thermodynamic and transport\n"
+        "properties for a gas mixture in a single call. Returns CompleteState\n"
+        "struct with nested thermo and transport states.\n\n"
+        "Parameters:\n"
+        "  T     : temperature [K]\n"
+        "  P     : pressure [Pa]\n"
+        "  X     : mole fractions [-]\n"
+        "  P_ref : reference pressure for entropy [Pa] (default: 101325.0)\n\n"
+        "Returns: CompleteState object with nested attributes:\n"
+        "  thermo.T, thermo.P, thermo.rho, thermo.cp, thermo.h, etc. (16 properties)\n"
+        "  transport.mu, transport.k, transport.Pr, etc. (9 properties)\n\n"
+        "Example:\n"
+        "  >>> X = cb.standard_dry_air_composition()\n"
+        "  >>> state = cb.complete_state(T=300, P=101325, X=X)\n"
+        "  >>> print(state.thermo.h)      # Thermodynamic property\n"
+        "  -103.6\n"
+        "  >>> print(state.transport.mu)  # Transport property\n"
+        "  1.68e-05"
+    );
+
     // Humid air utilities
     m.def(
         "standard_dry_air_composition",

@@ -805,3 +805,19 @@ ThermoState thermo_state(double T, double P, const std::vector<double>& X, doubl
 
     return state;
 }
+
+// -------------------------------------------------------------
+// Complete State Bundle (Thermo + Transport)
+// -------------------------------------------------------------
+
+CompleteState complete_state(double T, double P, const std::vector<double>& X, double P_ref) {
+    CompleteState state;
+    
+    // Compute thermodynamic state
+    state.thermo = thermo_state(T, P, X, P_ref);
+    
+    // Compute transport state
+    state.transport = transport_state(T, P, X);
+    
+    return state;
+}
