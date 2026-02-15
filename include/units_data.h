@@ -66,6 +66,15 @@ inline constexpr Entry function_units[] = {
     {"air_properties",          "T: K, P: Pa, humidity: - (0-1)",       "AirProperties struct"},
 
     // -------------------------------------------------------------------------
+    // orifice.h - Orifice Flow Utilities
+    // -------------------------------------------------------------------------
+    {"orifice_flow",            "geom: OrificeGeometry, dP: Pa, T: K, P: Pa, mu: Pa*s, Z: - (default 1.0)", "OrificeFlowResult struct"},
+    {"orifice_velocity_from_mdot", "mdot: kg/s, rho: kg/m^3, d: m, Z: - (default 1.0)", "m/s"},
+    {"orifice_area_from_beta",  "D: m, beta: -",                        "m^2"},
+    {"beta_from_diameters",     "d: m, D: m",                           "-"},
+    {"orifice_Re_d_from_mdot",  "mdot: kg/s, d: m, mu: Pa*s",           "- (Reynolds number)"},
+
+    // -------------------------------------------------------------------------
     // thermo.h - Inverse Solvers
     // -------------------------------------------------------------------------
     {"calc_T_from_h",           "h_target: J/mol, X: mol/mol",          "K"},

@@ -37,10 +37,10 @@ __version__: str = _load_version()
 try:
     # Preferred: local extension in the same package (installed wheel or
     # in-tree build where _core was successfully built next to this file).
-    from ._core import Annulus  # type: ignore[attr-defined]
     from ._core import (
         AcousticMode,
         AirProperties,
+        Annulus,  # type: ignore[attr-defined]
         BoundaryCondition,
         Cd_orifice,
         Cd_rounded_entry,
@@ -52,6 +52,7 @@ try:
         FannoStation,
         NozzleSolution,
         NozzleStation,
+        OrificeFlowResult,
         OrificeGeometry,
         OrificeState,
         State,
@@ -72,6 +73,7 @@ try:
         bandwidth,
         bernoulli_P2,
         bernoulli_v2,
+        beta_from_diameters,
         bilger_stoich_mixture_fraction_mass,
         bilger_Z_from_equivalence_ratio_mass,
         bulk_T_from_edge_T_and_q,
@@ -165,16 +167,20 @@ try:
         nusselt_petukhov,
         nusselt_sieder_tate,
         orifice_area,
+        orifice_area_from_beta,
         orifice_Cd_from_K,
         orifice_Cd_from_measurement,
         orifice_dP,
         orifice_dP_Cd,
+        orifice_flow,
         orifice_K_from_Cd,
         orifice_mdot,
         orifice_mdot_Cd,
         orifice_Q,
+        orifice_Re_d_from_mdot,
         orifice_thickness_correction,
         orifice_velocity,
+        orifice_velocity_from_mdot,
         output_units,
         overall_htc,
         overall_htc_wall,
@@ -459,6 +465,13 @@ except ModuleNotFoundError:
     orifice_K_from_Cd = _core.orifice_K_from_Cd
     orifice_Cd_from_K = _core.orifice_Cd_from_K
     orifice_thickness_correction = _core.orifice_thickness_correction
+    # Orifice flow utilities
+    OrificeFlowResult = _core.OrificeFlowResult
+    orifice_flow = _core.orifice_flow
+    orifice_velocity_from_mdot = _core.orifice_velocity_from_mdot
+    orifice_area_from_beta = _core.orifice_area_from_beta
+    beta_from_diameters = _core.beta_from_diameters
+    orifice_Re_d_from_mdot = _core.orifice_Re_d_from_mdot
     # Units query API
     UnitInfo = _core.UnitInfo
     get_units = _core.get_units
@@ -685,6 +698,13 @@ __all__ = [
     "orifice_K_from_Cd",
     "orifice_Cd_from_K",
     "orifice_thickness_correction",
+    # Orifice flow utilities
+    "OrificeFlowResult",
+    "orifice_flow",
+    "orifice_velocity_from_mdot",
+    "orifice_area_from_beta",
+    "beta_from_diameters",
+    "orifice_Re_d_from_mdot",
     # Units query API
     "UnitInfo",
     "get_units",

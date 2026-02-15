@@ -666,3 +666,181 @@ double expansibility_factor(double beta, double dP, double P_upstream, double ka
 
     return 1.0 - coeff * expansion_term;
 }
+
+// -------------------------------------------------------------
+// Orifice flow result bundle
+// -------------------------------------------------------------
+
+OrificeFlowResult orifice_flow(
+    const OrificeGeometry& geom,
+    double dP,
+    double T,
+    double P,
+    double mu,
+    double Z,
+    const std::vector<double>& X,
+    double kappa,
+    CdCorrelation correlation)
+{
+    // Input validation
+    if (!geom.is_valid()) {
+        throw std::invalid_argument("orifice_flow: invalid geometry");
+    }
+    if (T <= 0.0) {
+        throw std::invalid_argument("orifice_flow: temperature must be positive");
+    }
+    if (P <= 0.0) {
+        throw std::invalid_argument("orifice_flow: pressure must be positive");
+    }
+    if (mu <= 0.0) {
+        throw std::invalid_argument("orifice_flow: viscosity must be positive");
+    }
+    if (Z <= 0.0) {
+        throw std::invalid_argument("orifice_flow: compressibility factor Z must be positive");
+    }
+    if (dP < 0.0) {
+        throw std::invalid_argument("orifice_flow: differential pressure must be non-negative");
+    }
+
+    // Compute ideal gas density
+    // For now, use simple ideal gas law with air composition
+    // rho_ideal = P * MW / (R * T)
+    // For air: MW ≈ 28.97 g/mol, R = 8.314 J/(mol·K)
+    const double R_gas = 8.314;  // J/(mol·K)
+    const double MW_air = 0.02897;  // kg/mol (air molecular weight)
+    const double rho_ideal = (P * MW_air) / (R_gas * T);
+
+    // Apply real gas correction
+    const double rho_corrected = rho_ideal / Z;
+
+    // Solve for mass flow rate with corrected density
+    const double mdot = solve_orifice_mdot(
+        geom, dP, rho_corrected, mu, P, kappa, correlation);
+
+    // Calculate expansibility factor
+    const double beta = geom.beta();
+    const double epsilon = (kappa > 1.0) ?
+        expansibility_factor(beta, dP, P, kappa) : 1.0;
+
+    // Calculate velocity through orifice
+    const double A = geom.area();
+    const double v = mdot / (rho_corrected * A);
+
+    // Calculate Reynolds numbers
+    const double D = geom.D;
+    const double d = geom.d;
+    const double Re_D = (4.0 * mdot) / (PI * D * mu);
+    const double Re_d = (4.0 * mdot) / (PI * d * mu);
+
+    // Get discharge coefficient
+    OrificeState state;
+    state.Re_D = Re_D;
+    state.dP = dP;
+    state.rho = rho_corrected;
+    state.mu = mu;
+
+    double Cd_value = 0.61;  // Default
+    switch (correlation) {
+        case CdCorrelation::ReaderHarrisGallagher:
+            Cd_value = Cd_sharp_thin_plate(geom, state);
+            break;
+        case CdCorrelation::Stolz:
+            Cd_value = orifice::Cd_Stolz(beta, Re_D);
+            break;
+        case CdCorrelation::Miller:
+            Cd_value = orifice::Cd_Miller(beta, Re_D);
+            break;
+        case CdCorrelation::IdelchikThick:
+            Cd_value = Cd_thick_plate(geom, state);
+            break;
+        case CdCorrelation::IdelchikRounded:
+            Cd_value = Cd_rounded_entry(geom, state);
+            break;
+        default:
+            Cd_value = Cd(geom, state);  // Auto-select
+            break;
+    }
+
+    // Populate result struct
+    OrificeFlowResult result;
+    result.mdot = mdot;
+    result.v = v;
+    result.Re_D = Re_D;
+    result.Re_d = Re_d;
+    result.Cd = Cd_value;
+    result.epsilon = epsilon;
+    result.rho_corrected = rho_corrected;
+
+    return result;
+}
+
+// -------------------------------------------------------------
+// Utility functions
+// -------------------------------------------------------------
+
+double orifice_velocity_from_mdot(double mdot, double rho, double d, double Z) {
+    if (mdot < 0.0) {
+        throw std::invalid_argument("orifice_velocity_from_mdot: mdot must be non-negative");
+    }
+    if (rho <= 0.0) {
+        throw std::invalid_argument("orifice_velocity_from_mdot: rho must be positive");
+    }
+    if (d <= 0.0) {
+        throw std::invalid_argument("orifice_velocity_from_mdot: d must be positive");
+    }
+    if (Z <= 0.0) {
+        throw std::invalid_argument("orifice_velocity_from_mdot: Z must be positive");
+    }
+
+    // Apply real gas correction to density
+    const double rho_corrected = rho / Z;
+
+    // Calculate area
+    const double A = PI * d * d / 4.0;
+
+    // v = mdot / (rho_corrected * A)
+    return mdot / (rho_corrected * A);
+}
+
+double orifice_area_from_beta(double D, double beta) {
+    if (D <= 0.0) {
+        throw std::invalid_argument("orifice_area_from_beta: D must be positive");
+    }
+    if (beta <= 0.0 || beta >= 1.0) {
+        throw std::invalid_argument("orifice_area_from_beta: beta must be in range (0, 1)");
+    }
+
+    // A = π * (D * beta / 2)²
+    const double d = D * beta;
+    return PI * d * d / 4.0;
+}
+
+double beta_from_diameters(double d, double D) {
+    if (d <= 0.0) {
+        throw std::invalid_argument("beta_from_diameters: d must be positive");
+    }
+    if (D <= 0.0) {
+        throw std::invalid_argument("beta_from_diameters: D must be positive");
+    }
+    if (d >= D) {
+        throw std::invalid_argument("beta_from_diameters: d must be < D");
+    }
+
+    // beta = d / D
+    return d / D;
+}
+
+double orifice_Re_d_from_mdot(double mdot, double d, double mu) {
+    if (mdot < 0.0) {
+        throw std::invalid_argument("orifice_Re_d_from_mdot: mdot must be non-negative");
+    }
+    if (d <= 0.0) {
+        throw std::invalid_argument("orifice_Re_d_from_mdot: d must be positive");
+    }
+    if (mu <= 0.0) {
+        throw std::invalid_argument("orifice_Re_d_from_mdot: mu must be positive");
+    }
+
+    // Re_d = 4 * mdot / (π * d * mu)
+    return (4.0 * mdot) / (PI * d * mu);
+}

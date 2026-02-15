@@ -3245,6 +3245,137 @@ PYBIND11_MODULE(_core, m)
         "Returns 1.0 for t/d <= 0.02 (thin plate)."
     );
 
+    // OrificeFlowResult struct binding - Bundle of orifice flow properties
+    py::class_<OrificeFlowResult>(m, "OrificeFlowResult",
+        "Bundle of orifice flow properties computed from (geom, dP, T, P, mu, Z).\n\n"
+        "All properties are read-only attributes computed in a single call.\n"
+        "Provides IDE autocomplete and type safety.\n\n"
+        "Attributes:\n"
+        "  mdot          : Mass flow rate [kg/s]\n"
+        "  v             : Velocity through orifice throat [m/s]\n"
+        "  Re_D          : Pipe Reynolds number (based on D) [-]\n"
+        "  Re_d          : Orifice Reynolds number (based on d) [-]\n"
+        "  Cd            : Discharge coefficient [-]\n"
+        "  epsilon       : Expansibility factor [-] (1.0 for incompressible)\n"
+        "  rho_corrected : Density corrected for compressibility [kg/m³]")
+        .def_readonly("mdot", &OrificeFlowResult::mdot, "Mass flow rate [kg/s]")
+        .def_readonly("v", &OrificeFlowResult::v, "Velocity through orifice throat [m/s]")
+        .def_readonly("Re_D", &OrificeFlowResult::Re_D, "Pipe Reynolds number (based on D) [-]")
+        .def_readonly("Re_d", &OrificeFlowResult::Re_d, "Orifice Reynolds number (based on d) [-]")
+        .def_readonly("Cd", &OrificeFlowResult::Cd, "Discharge coefficient [-]")
+        .def_readonly("epsilon", &OrificeFlowResult::epsilon, "Expansibility factor [-]")
+        .def_readonly("rho_corrected", &OrificeFlowResult::rho_corrected, "Density corrected for compressibility [kg/m³]")
+        .def("__repr__", [](const OrificeFlowResult& r) {
+            return "<OrificeFlowResult: mdot=" + std::to_string(r.mdot) + " kg/s, "
+                   "v=" + std::to_string(r.v) + " m/s, "
+                   "Cd=" + std::to_string(r.Cd) + ", "
+                   "Re_d=" + std::to_string(r.Re_d) + ">";
+        });
+
+    m.def(
+        "orifice_flow",
+        &orifice_flow,
+        py::arg("geom"),
+        py::arg("dP"),
+        py::arg("T"),
+        py::arg("P"),
+        py::arg("mu"),
+        py::arg("Z") = 1.0,
+        py::arg("X") = std::vector<double>(),
+        py::arg("kappa") = 0.0,
+        py::arg("correlation") = CdCorrelation::ReaderHarrisGallagher,
+        "Compute all orifice flow properties at once with real gas correction.\n\n"
+        "Convenience function that computes all orifice flow properties in a\n"
+        "single call. Returns OrificeFlowResult struct with read-only attributes\n"
+        "for IDE autocomplete support.\n\n"
+        "Parameters:\n"
+        "  geom        : OrificeGeometry\n"
+        "  dP          : differential pressure [Pa]\n"
+        "  T           : temperature [K]\n"
+        "  P           : absolute upstream pressure [Pa]\n"
+        "  mu          : dynamic viscosity [Pa·s]\n"
+        "  Z           : compressibility factor [-] (default: 1.0 = ideal gas)\n"
+        "  X           : mole fractions [-] (optional, uses air if empty)\n"
+        "  kappa       : isentropic exponent cp/cv [-] (default: 0.0 = incompressible)\n"
+        "  correlation : Cd correlation (default: ReaderHarrisGallagher)\n\n"
+        "Returns: OrificeFlowResult object with attributes:\n"
+        "  mdot, v, Re_D, Re_d, Cd, epsilon, rho_corrected\n\n"
+        "Real Gas Support:\n"
+        "  The compressibility factor Z corrects density for non-ideal behavior:\n"
+        "    rho_corrected = rho_ideal / Z\n"
+        "  For ideal gas: Z = 1.0 (default)\n"
+        "  For real gas: Z typically ranges 0.7-1.0 depending on P, T, composition\n"
+        "  Users can obtain Z from REFPROP, Peng-Robinson, or other EOS libraries\n\n"
+        "Example:\n"
+        "  >>> geom = cb.OrificeGeometry()\n"
+        "  >>> geom.d = 0.05  # 50 mm orifice\n"
+        "  >>> geom.D = 0.1   # 100 mm pipe\n"
+        "  >>> result = cb.orifice_flow(geom, dP=50000, T=300, P=10e6, mu=1.1e-5, Z=0.85)\n"
+        "  >>> print(f'Mass flow: {result.mdot:.3f} kg/s')\n"
+        "  >>> print(f'Velocity: {result.v:.2f} m/s')\n"
+        "  >>> print(f'Cd: {result.Cd:.3f}')"
+    );
+
+    // Utility functions
+    m.def(
+        "orifice_velocity_from_mdot",
+        &orifice_velocity_from_mdot,
+        py::arg("mdot"),
+        py::arg("rho"),
+        py::arg("d"),
+        py::arg("Z") = 1.0,
+        "Velocity through orifice from mass flow rate with real gas correction.\n\n"
+        "v = mdot / (rho_corrected * A)\n"
+        "where rho_corrected = rho / Z, A = π·d²/4\n\n"
+        "Parameters:\n"
+        "  mdot : mass flow rate [kg/s]\n"
+        "  rho  : density [kg/m³]\n"
+        "  d    : orifice diameter [m]\n"
+        "  Z    : compressibility factor [-] (default: 1.0 = ideal gas)\n\n"
+        "Returns: velocity [m/s]"
+    );
+
+    m.def(
+        "orifice_area_from_beta",
+        &orifice_area_from_beta,
+        py::arg("D"),
+        py::arg("beta"),
+        "Orifice area from beta ratio.\n\n"
+        "A = π·(D·beta/2)²\n\n"
+        "Parameters:\n"
+        "  D    : pipe diameter [m]\n"
+        "  beta : diameter ratio d/D [-]\n\n"
+        "Returns: orifice area [m²]"
+    );
+
+    m.def(
+        "beta_from_diameters",
+        &beta_from_diameters,
+        py::arg("d"),
+        py::arg("D"),
+        "Beta ratio from diameters.\n\n"
+        "beta = d / D\n\n"
+        "Parameters:\n"
+        "  d : orifice diameter [m]\n"
+        "  D : pipe diameter [m]\n\n"
+        "Returns: beta ratio [-]"
+    );
+
+    m.def(
+        "orifice_Re_d_from_mdot",
+        &orifice_Re_d_from_mdot,
+        py::arg("mdot"),
+        py::arg("d"),
+        py::arg("mu"),
+        "Orifice Reynolds number from mass flow rate.\n\n"
+        "Re_d = 4·mdot / (π·d·μ)\n\n"
+        "Parameters:\n"
+        "  mdot : mass flow rate [kg/s]\n"
+        "  d    : orifice diameter [m]\n"
+        "  mu   : dynamic viscosity [Pa·s]\n\n"
+        "Returns: Reynolds number [-]"
+    );
+
     // =========================================================================
     // Pipe Roughness Database
     // =========================================================================

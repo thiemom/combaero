@@ -822,6 +822,80 @@ double Cd_rounded_entry(const OrificeGeometry& geom, const OrificeState& state);
 double Cd(const OrificeGeometry& geom, const OrificeState& state);
 ```
 
+### Orifice Flow Bundle with Real Gas Support
+
+Convenience function that computes all orifice flow properties in a single call. Returns `OrificeFlowResult` struct with read-only attributes.
+
+```python
+# Python usage with IDE autocomplete and real gas correction
+geom = cb.OrificeGeometry()
+geom.d = 0.05  # 50 mm orifice
+geom.D = 0.1   # 100 mm pipe
+
+# High-pressure natural gas (Z from external library)
+result = cb.orifice_flow(geom, dP=50000, T=300, P=10e6, mu=1.1e-5, Z=0.85)
+
+print(f"Mass flow: {result.mdot:.3f} kg/s")
+print(f"Velocity: {result.v:.2f} m/s")
+print(f"Cd: {result.Cd:.3f}")
+print(f"Re_d: {result.Re_d:.0f}")
+print(f"Density (corrected): {result.rho_corrected:.3f} kg/m³")
+```
+
+**OrificeFlowResult attributes:**
+- `mdot` - Mass flow rate [kg/s]
+- `v` - Velocity through orifice throat [m/s]
+- `Re_D` - Pipe Reynolds number (based on D) [-]
+- `Re_d` - Orifice Reynolds number (based on d) [-]
+- `Cd` - Discharge coefficient [-]
+- `epsilon` - Expansibility factor [-] (1.0 for incompressible)
+- `rho_corrected` - Density corrected for compressibility [kg/m³]
+
+**Parameters:**
+- `geom` - OrificeGeometry
+- `dP` - Differential pressure [Pa]
+- `T` - Temperature [K]
+- `P` - Absolute upstream pressure [Pa]
+- `mu` - Dynamic viscosity [Pa·s]
+- `Z` - Compressibility factor [-] (default: 1.0 = ideal gas)
+- `X` - Mole fractions [-] (optional, uses air if empty)
+- `kappa` - Isentropic exponent cp/cv [-] (default: 0.0 = incompressible)
+- `correlation` - Cd correlation (default: ReaderHarrisGallagher)
+
+**Real Gas Support:**
+The compressibility factor Z corrects density for non-ideal behavior:
+- `rho_corrected = rho_ideal / Z`
+- For ideal gas: Z = 1.0 (default)
+- For real gas: Z typically ranges 0.7-1.0 depending on P, T, composition
+- Users can obtain Z from REFPROP, Peng-Robinson, or other EOS libraries
+
+**Benefits:**
+- Single function call for all properties
+- IDE autocomplete for all attributes
+- Type-safe attribute access
+- Real gas correction for high-pressure applications
+- Consistent with AirProperties pattern
+
+### Utility Functions
+
+```cpp
+// Velocity through orifice from mass flow rate with real gas correction
+// v = mdot / (rho_corrected * A) where rho_corrected = rho / Z
+double orifice_velocity_from_mdot(double mdot, double rho, double d, double Z = 1.0);
+
+// Orifice area from beta ratio
+// A = π * (D * beta / 2)²
+double orifice_area_from_beta(double D, double beta);
+
+// Beta ratio from diameters
+// beta = d / D
+double beta_from_diameters(double d, double D);
+
+// Orifice Reynolds number from mass flow rate
+// Re_d = 4 * mdot / (π * d * μ)
+double orifice_Re_d_from_mdot(double mdot, double d, double mu);
+```
+
 ### Flow Calculations with Cd
 
 ```cpp

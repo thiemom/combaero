@@ -335,6 +335,16 @@ All functions use consistent units to avoid conversion errors.
 |----------------|-------------|-------------|
 | `Stream::mdot` | -           | kg/s        |
 
+### orifice.h - Orifice Flow Utilities
+
+| Function                     | Input Units                                                              | Output Unit              |
+|------------------------------|--------------------------------------------------------------------------|--------------------------|
+| `orifice_flow`               | geom: OrificeGeometry, dP: Pa, T: K, P: Pa, mu: Pa*s, Z: - (default 1.0) | OrificeFlowResult struct |
+| `orifice_velocity_from_mdot` | mdot: kg/s, rho: kg/m^3, d: m, Z: - (default 1.0)                        | m/s                      |
+| `orifice_area_from_beta`     | D: m, beta: -                                                            | m^2                      |
+| `beta_from_diameters`        | d: m, D: m                                                               | -                        |
+| `orifice_Re_d_from_mdot`     | mdot: kg/s, d: m, mu: Pa*s                                               | - (Reynolds number)      |
+
 ### pipe_flow.h - Composite Pipe Flow Functions
 
 | Function             | Input Units                                                                 | Output Unit     |

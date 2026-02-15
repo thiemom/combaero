@@ -250,6 +250,65 @@ double solve_orifice_mdot(
     int max_iter = 20);
 
 // -------------------------------------------------------------
+// Orifice flow result bundle
+// -------------------------------------------------------------
+
+// Bundle of orifice flow properties for convenient access
+// All properties computed from (geom, dP, T, P, mu, Z) in a single call
+struct OrificeFlowResult {
+    double mdot;           // Mass flow rate [kg/s]
+    double v;              // Velocity through orifice throat [m/s]
+    double Re_D;           // Pipe Reynolds number (based on D) [-]
+    double Re_d;           // Orifice Reynolds number (based on d) [-]
+    double Cd;             // Discharge coefficient [-]
+    double epsilon;        // Expansibility factor [-] (1.0 for incompressible)
+    double rho_corrected;  // Density corrected for compressibility [kg/m³]
+};
+
+// Compute all orifice flow properties at once with real gas correction
+// Parameters:
+//   geom        : Orifice geometry
+//   dP          : Differential pressure [Pa]
+//   T           : Temperature [K]
+//   P           : Absolute upstream pressure [Pa]
+//   mu          : Dynamic viscosity [Pa·s]
+//   Z           : Compressibility factor [-] (default: 1.0 = ideal gas)
+//   X           : Mole fractions [-] (optional, uses air if empty)
+//   kappa       : Isentropic exponent cp/cv [-] (default: 0.0 = incompressible)
+//   correlation : Cd correlation to use (default: ReaderHarrisGallagher)
+// Returns: OrificeFlowResult struct with all properties
+OrificeFlowResult orifice_flow(
+    const OrificeGeometry& geom,
+    double dP,
+    double T,
+    double P,
+    double mu,
+    double Z = 1.0,
+    const std::vector<double>& X = {},
+    double kappa = 0.0,
+    CdCorrelation correlation = CdCorrelation::ReaderHarrisGallagher);
+
+// -------------------------------------------------------------
+// Utility functions
+// -------------------------------------------------------------
+
+// Velocity through orifice from mass flow rate with real gas correction
+// v = mdot / (rho_corrected * A) where rho_corrected = rho / Z
+double orifice_velocity_from_mdot(double mdot, double rho, double d, double Z = 1.0);
+
+// Orifice area from beta ratio
+// A = π * (D * beta / 2)²
+double orifice_area_from_beta(double D, double beta);
+
+// Beta ratio from diameters
+// beta = d / D
+double beta_from_diameters(double d, double D);
+
+// Orifice Reynolds number from mass flow rate
+// Re_d = 4 * mdot / (π * d * mu)
+double orifice_Re_d_from_mdot(double mdot, double d, double mu);
+
+// -------------------------------------------------------------
 // Compressible flow correction
 // -------------------------------------------------------------
 
