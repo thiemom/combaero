@@ -183,13 +183,15 @@ transport_state(T: float, P: float, X: list[float]) -> TransportState
   - Reactants and products are full thermodynamic states - reuse ThermoState!
   - Avoids duplication: instead of storing T, P, X, h separately, nest ThermoState objects
 
-**Properties (~4-5 core + 2×16 from nested ThermoStates = ~36 total):**
+**Properties (~4 core + 2×25 from nested CompleteStates = ~54 total):**
 - [ ] `phi` - Equivalence ratio [-] (input, echoed back)
 - [ ] `fuel_name` - Optional fuel label (string, default: "")
-- [ ] `reactants` - **ThermoState** at (T_reactants, P, X_reactants)
+- [ ] `reactants` - **CompleteState** at (T_reactants, P, X_reactants)
   - Includes all 16 ThermoState properties: T, P, rho, cp, cv, h, s, u, gamma, a, cp_mass, cv_mass, h_mass, s_mass, u_mass, mw
-- [ ] `products` - **ThermoState** at (T_ad, P, X_products)
+  - Includes all 9 TransportState properties: T, P, rho, mu, k, nu, alpha, Pr, cp
+- [ ] `products` - **CompleteState** at (T_ad, P, X_products)
   - Includes all 16 ThermoState properties: T, P, rho, cp, cv, h, s, u, gamma, a, cp_mass, cv_mass, h_mass, s_mass, u_mass, mw
+  - Includes all 9 TransportState properties: T, P, rho, mu, k, nu, alpha, Pr, cp
 - [ ] `mixture_fraction` - Bilger mixture fraction [-]
 - [ ] `fuel_burn_fraction` - Fraction of fuel burned [0-1] (useful for O2-limited cases)
 
@@ -212,26 +214,35 @@ X_air = cb.standard_dry_air_composition()
 state = cb.combustion_state(X_CH4, X_air, phi=1.0, T_reactants=300, P=101325)
 
 # Combustion properties
-print(state.phi)                    # 1.0
-print(state.mixture_fraction)       # 0.055
+print(state.phi)                         # 1.0
+print(state.mixture_fraction)            # 0.055
 
-# Reactant thermo properties (all 16 from ThermoState)
-print(state.reactants.T)            # 300 K
-print(state.reactants.h)            # -103.6 J/mol
-print(state.reactants.rho)          # 1.177 kg/m³
+# Reactant thermo properties (via CompleteState)
+print(state.reactants.thermo.T)          # 300 K
+print(state.reactants.thermo.h)          # -103.6 J/mol
+print(state.reactants.thermo.rho)        # 1.177 kg/m³
 
-# Product thermo properties (all 16 from ThermoState)
-print(state.products.T)             # 2328 K (T_ad)
-print(state.products.h)             # -103.6 J/mol (energy balance)
-print(state.products.gamma)         # 1.28 (lower at high T)
+# Reactant transport properties (via CompleteState)
+print(state.reactants.transport.mu)      # 1.68e-5 Pa·s
+print(state.reactants.transport.Pr)      # 0.781
+
+# Product thermo properties (via CompleteState)
+print(state.products.thermo.T)           # 2328 K (T_ad)
+print(state.products.thermo.h)           # -103.6 J/mol (energy balance)
+print(state.products.thermo.gamma)       # 1.28 (lower at high T)
+
+# Product transport properties (via CompleteState)
+print(state.products.transport.mu)       # 6.8e-5 Pa·s (higher at high T)
+print(state.products.transport.Pr)       # 0.73
 ```
 
 **Implementation:**
-- [ ] Create `struct CombustionState` in `include/combustion.h` (with nested ThermoState)
+- [ ] **Prerequisite:** Phase 15 (CompleteState) must be implemented first
+- [ ] Create `struct CombustionState` in `include/combustion.h` (with nested CompleteState)
 - [ ] Implement `combustion_state()` function in `src/combustion.cpp`
   - Compute X_reactants from set_equivalence_ratio_mole()
   - Compute X_products from complete_combustion_to_CO2_H2O()
-  - Call thermo_state() for reactants and products
+  - Call complete_state() for reactants and products
   - Compute mixture_fraction from bilger_mixture_fraction_from_moles()
 - [ ] Add pybind11 binding in `python/combaero/_core.cpp`
 - [ ] Export in `python/combaero/__init__.py`
@@ -241,50 +252,73 @@ print(state.products.gamma)         # 1.28 (lower at high T)
 - [ ] Regenerate `docs/UNITS.md`
 
 **Testing requirements:**
-- Verify nested ThermoState properties match individual thermo_state() calls
-- Verify energy balance: state.reactants.h == state.products.h (for adiabatic)
+- Verify nested CompleteState properties match individual complete_state() calls
+- Verify energy balance: state.reactants.thermo.h == state.products.thermo.h (for adiabatic)
 - Test with various fuels (CH4, C3H8, fuel mixtures)
 - Test at various equivalence ratios (lean, stoichiometric, rich)
 - Verify phi matches equivalence_ratio_mole() calculation
 - Verify mixture_fraction matches bilger_mixture_fraction_from_moles()
 - Compare T_ad with Cantera validation tests
+- Verify transport properties are reasonable (mu increases with T, etc.)
 
-**Status:** Not started
+**Status:** Not started (implement Phase 15 first to use in Phase 14)
 
 ---
 
-## Phase 15: CompleteState Dataclass (Optional)
+## Phase 15: CompleteState Dataclass
 
-**Priority:** LOW - Ultimate convenience bundle
-**Difficulty:** MEDIUM - Combines all previous dataclasses
+**Priority:** HIGH - Building block for CombustionState
+**Difficulty:** LOW - Simple composition of existing dataclasses
 
-**Rationale:** For maximum convenience, provide a single dataclass that includes thermodynamic, transport, and derived properties. This is the "kitchen sink" option for users who want everything.
+**Rationale:** Combine thermodynamic and transport properties in one dataclass. This will be used as a building block for CombustionState (reactants and products) and is also useful standalone.
 
-**Design Decision:** ✅ **Mega-dataclass combining thermo + transport**
+**Design Decision:** ✅ **Nested dataclass combining thermo + transport**
 - **C++ side:** `struct CompleteState { ThermoState thermo; TransportState transport; };`
-- **Python side:** Nested dataclass or flat structure
-- **Alternative:** Just document using both `thermo_state()` and `transport_state()`
+- **Python side:** Nested structure with `state.thermo.X` and `state.transport.X` access
+- **Reusable:** Will be used in Phase 14 for reactants and products
 
-**Properties to include (~20):**
-- All properties from ThermoState
-- All properties from TransportState
-- Possibly additional derived properties
+**Properties (~25 total = 16 thermo + 9 transport):**
+- [ ] `thermo` - **ThermoState** with all 16 thermodynamic properties
+  - T, P, rho, cp, cv, h, s, u, gamma, a, cp_mass, cv_mass, h_mass, s_mass, u_mass, mw
+- [ ] `transport` - **TransportState** with all 9 transport properties
+  - T, P, rho, mu, k, nu, alpha, Pr, cp
 
 **Function signature:**
 ```python
-complete_state(T: float, P: float, X: list[float]) -> CompleteState
+complete_state(T: float, P: float, X: list[float], P_ref: float = 101325.0) -> CompleteState
+```
+
+**Usage example:**
+```python
+X = cb.standard_dry_air_composition()
+state = cb.complete_state(T=300, P=101325, X=X)
+
+# Thermodynamic properties
+print(state.thermo.h)        # -103.6 J/mol
+print(state.thermo.gamma)    # 1.400
+
+# Transport properties
+print(state.transport.mu)    # 1.68e-5 Pa·s
+print(state.transport.Pr)    # 0.781
 ```
 
 **Implementation:**
-- [ ] Decide on nested vs flat structure
-- [ ] Create `struct CompleteState` in appropriate header
-- [ ] Implement `complete_state()` function
-- [ ] Add pybind11 binding
-- [ ] Export in `__init__.py`
-- [ ] Write tests
-- [ ] Update documentation
+- [ ] Create `struct CompleteState` in `include/state.h` (or new header)
+- [ ] Implement `complete_state()` function (just calls thermo_state + transport_state)
+- [ ] Add pybind11 binding in `python/combaero/_core.cpp`
+- [ ] Export in `python/combaero/__init__.py`
+- [ ] Write comprehensive tests in `python/tests/test_complete_state.py`
+- [ ] Update `docs/API_REFERENCE.md`
+- [ ] Add unit entry to `include/units_data.h`
+- [ ] Regenerate `docs/UNITS.md`
 
-**Status:** Not started (may skip in favor of separate dataclasses)
+**Testing requirements:**
+- Verify state.thermo matches thermo_state() call
+- Verify state.transport matches transport_state() call
+- Test with various compositions and conditions
+- Verify all nested properties are accessible
+
+**Status:** Ready to implement (Phase 15 → Phase 14)
 
 ---
 
