@@ -366,14 +366,14 @@ we should have mass-basis equivalents for all of them to avoid user confusion.
 - ✅ Phase 4: Pressure drop composite (pressure_drop_pipe)
 - ✅ Phase 6: Pipe roughness database
 - ✅ Phase 7: LMTD convenience wrappers
+- ✅ Phase 8: Air properties bundle (Commit: 48da87d)
 - ✅ Phase 9: Examples refactored to use convenience functions
+- ✅ Phase 10: Orifice flow utilities with real gas support (Commit: 663501b)
+- ✅ Phase 11: Acoustics utilities with dataclass pattern (Commit: 96850c6)
 
-### Pending:
+### Remaining (Optional):
 - [ ] Phase 2: Mass-specific thermodynamic properties (cp_mass, cv_mass, h_mass, s_mass)
 - [ ] Phase 5: Heat transfer coefficient composite (htc_pipe)
-- [ ] Phase 8: Air properties bundle (optional)
-- [ ] Phase 10: Orifice flow utilities + example
-- [ ] Phase 11: Acoustics utilities + example
 
 ---
 
