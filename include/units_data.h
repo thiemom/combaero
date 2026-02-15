@@ -69,6 +69,16 @@ inline constexpr Entry function_units[] = {
     {"complete_state",          "T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325)", "CompleteState struct"},
 
     // -------------------------------------------------------------------------
+    // materials.h - Material Thermal Conductivity
+    // -------------------------------------------------------------------------
+    {"k_inconel718",            "T: K",                                 "W/(m*K)"},
+    {"k_haynes230",             "T: K",                                 "W/(m*K)"},
+    {"k_stainless_steel_316",   "T: K",                                 "W/(m*K)"},
+    {"k_aluminum_6061",         "T: K",                                 "W/(m*K)"},
+    {"k_tbc_ysz",               "T: K, hours: h (default 0)",           "W/(m*K)"},
+    {"list_materials",          "-",                                    "list[str]"},
+
+    // -------------------------------------------------------------------------
     // acoustics.h - Acoustic Properties
     // -------------------------------------------------------------------------
     {"acoustic_properties",     "f: Hz, rho: kg/m^3, c: m/s, p_rms: Pa (default 20e-6), p_ref: Pa (default 20e-6)", "AcousticProperties struct"},

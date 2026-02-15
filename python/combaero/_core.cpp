@@ -18,6 +18,7 @@
 #include "acoustics.h"
 #include "orifice.h"
 #include "pipe_flow.h"
+#include "materials.h"
 #include "units.h"
 
 namespace py = pybind11;
@@ -3726,7 +3727,89 @@ PYBIND11_MODULE(_core, m)
     );
 
     // =========================================================================
-    // Units Query API
+    // Materials Database
+    // =========================================================================
+
+    // Material thermal conductivity functions
+    m.def(
+        "k_inconel718",
+        &combaero::materials::k_inconel718,
+        py::arg("T"),
+        "Thermal conductivity of Inconel 718 [W/(m·K)].\n\n"
+        "Ni-based superalloy commonly used in turbine applications.\n\n"
+        "Parameters:\n"
+        "  T : temperature [K]\n\n"
+        "Valid range: 300-1200 K\n"
+        "Source: Haynes International, Special Metals Corporation"
+    );
+
+    m.def(
+        "k_haynes230",
+        &combaero::materials::k_haynes230,
+        py::arg("T"),
+        "Thermal conductivity of Haynes 230 [W/(m·K)].\n\n"
+        "Ni-Cr-W-Mo alloy with high-temperature oxidation resistance.\n\n"
+        "Parameters:\n"
+        "  T : temperature [K]\n\n"
+        "Valid range: 300-1400 K\n"
+        "Source: Haynes International Technical Data"
+    );
+
+    m.def(
+        "k_stainless_steel_316",
+        &combaero::materials::k_stainless_steel_316,
+        py::arg("T"),
+        "Thermal conductivity of Stainless Steel 316 [W/(m·K)].\n\n"
+        "Austenitic stainless steel with corrosion resistance.\n\n"
+        "Parameters:\n"
+        "  T : temperature [K]\n\n"
+        "Valid range: 300-1200 K\n"
+        "Source: NIST, ASM Handbook"
+    );
+
+    m.def(
+        "k_aluminum_6061",
+        &combaero::materials::k_aluminum_6061,
+        py::arg("T"),
+        "Thermal conductivity of Aluminum 6061 [W/(m·K)].\n\n"
+        "Aluminum alloy, limited to <300°C due to T6 temper stability.\n\n"
+        "Parameters:\n"
+        "  T : temperature [K]\n\n"
+        "Valid range: 200-600 K\n"
+        "Source: ASM Handbook, Aluminum Association"
+    );
+
+    m.def(
+        "k_tbc_ysz",
+        &combaero::materials::k_tbc_ysz,
+        py::arg("T"),
+        py::arg("hours") = 0.0,
+        "Thermal conductivity of YSZ thermal barrier coating [W/(m·K)].\n\n"
+        "7-8 wt% Y2O3 stabilized zirconia with sintering model.\n"
+        "Conductivity increases over time at high temperature due to pore closure.\n\n"
+        "Parameters:\n"
+        "  T     : temperature [K]\n"
+        "  hours : operating hours at temperature (default: 0 = as-sprayed)\n\n"
+        "Valid range: 300-1700 K\n"
+        "Source: NASA TM-2010-216765 (Zhu/Miller sintering model)\n\n"
+        "Example:\n"
+        "  >>> k_fresh = cb.k_tbc_ysz(T=1500)       # As-sprayed\n"
+        "  >>> k_aged = cb.k_tbc_ysz(T=1500, hours=1000)  # After 1000h"
+    );
+
+    m.def(
+        "list_materials",
+        &combaero::materials::list_materials,
+        "List all available materials in the database.\n\n"
+        "Returns: List of material names (strings)\n\n"
+        "Example:\n"
+        "  >>> materials = cb.list_materials()\n"
+        "  >>> print(materials)\n"
+        "  ['inconel718', 'haynes230', 'ss316', 'al6061', 'ysz']"
+    );
+
+    // =========================================================================
+    // Units System
     // =========================================================================
 
     py::class_<combaero::units::UnitInfo>(m, "UnitInfo")

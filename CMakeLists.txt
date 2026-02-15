@@ -38,6 +38,7 @@ set(SOURCES
     src/utils.cpp
     src/orifice.cpp
     src/pipe_flow.cpp
+    src/materials.cpp
 )
 
 # Core library

@@ -426,6 +426,74 @@ print(state.transport.Pr)    # 0.781
 - Heat transfer with fluid dynamics
 - Complete state characterization
 
+## Materials Database
+
+Material thermal conductivity database for high-temperature applications. All functions take temperature in Kelvin and return thermal conductivity in W/(m·K).
+
+### Superalloys
+
+```python
+# Inconel 718 (Ni-based superalloy)
+k = cb.k_inconel718(T=800)  # W/(m·K)
+# Valid: 300-1200 K
+# Source: Haynes International, Special Metals Corporation
+# Common in turbine applications
+
+# Haynes 230 (Ni-Cr-W-Mo alloy)
+k = cb.k_haynes230(T=1200)  # W/(m·K)
+# Valid: 300-1400 K
+# Source: Haynes International Technical Data
+# High-temperature oxidation resistance
+```
+
+### Structural Alloys
+
+```python
+# Stainless Steel 316 (austenitic)
+k = cb.k_stainless_steel_316(T=600)  # W/(m·K)
+# Valid: 300-1200 K
+# Source: NIST, ASM Handbook
+# Corrosion resistant
+
+# Aluminum 6061-T6
+k = cb.k_aluminum_6061(T=400)  # W/(m·K)
+# Valid: 200-600 K (limited by T6 temper)
+# Source: ASM Handbook, Aluminum Association
+```
+
+### Thermal Barrier Coatings
+
+```python
+# YSZ (7-8 wt% Y2O3 stabilized zirconia)
+k_fresh = cb.k_tbc_ysz(T=1500, hours=0)      # As-sprayed
+k_aged = cb.k_tbc_ysz(T=1500, hours=1000)    # After 1000h
+# Valid: 300-1700 K
+# Source: NASA TM-2010-216765 (Zhu/Miller sintering model)
+# Conductivity increases with aging due to pore closure
+```
+
+**Sintering model for TBC:**
+- Fresh coating: k ≈ 0.8-1.5 W/(m·K)
+- Fully sintered: k ≈ 1.8-2.0 W/(m·K)
+- Rate increases with temperature (Arrhenius)
+- Progress follows stretched exponential
+
+### Database Access
+
+```python
+# List all available materials
+materials = cb.list_materials()
+# Returns: ['al6061', 'haynes230', 'inconel718', 'ss316', 'ysz']
+```
+
+**Physical trends:**
+- Superalloys: k increases with T (electron dominance)
+- Aluminum: k decreases with T (phonon scattering)
+- TBC: k increases with T (radiation contribution)
+
+**Temperature validation:**
+All functions validate temperature is within valid range and raise `RuntimeError` if out of bounds.
+
 ## Utility Functions
 
 ```cpp
