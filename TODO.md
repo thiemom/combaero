@@ -286,7 +286,7 @@ we should have mass-basis equivalents for all of them to avoid user confusion.
 - Consistent with AirProperties pattern from Phase 8
 - Backward compatible (Z=1.0 default)
 
-**Status:** ✅ COMPLETE (Commit: [pending])
+**Status:** ✅ COMPLETE (Commit: 663501b)
 
 ---
 
