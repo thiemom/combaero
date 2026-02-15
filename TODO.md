@@ -354,7 +354,7 @@ we should have mass-basis equivalents for all of them to avoid user confusion.
 - Consistent with AirProperties and OrificeFlowResult patterns
 - Default parameters for standard reference pressure (20 μPa)
 
-**Status:** ✅ COMPLETE (Commit: [pending])
+**Status:** ✅ COMPLETE (Commit: 96850c6)
 
 ---
 
