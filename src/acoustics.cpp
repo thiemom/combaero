@@ -449,3 +449,101 @@ double bandwidth(double f0, double Q) {
     }
     return f0 / Q;
 }
+
+// -------------------------------------------------------------
+// Acoustic properties bundle
+// -------------------------------------------------------------
+
+AcousticProperties acoustic_properties(
+    double f,
+    double rho,
+    double c,
+    double p_rms,
+    double p_ref)
+{
+    // Input validation
+    if (f <= 0.0) {
+        throw std::invalid_argument("acoustic_properties: frequency must be positive");
+    }
+    if (rho <= 0.0) {
+        throw std::invalid_argument("acoustic_properties: density must be positive");
+    }
+    if (c <= 0.0) {
+        throw std::invalid_argument("acoustic_properties: speed of sound must be positive");
+    }
+    if (p_rms < 0.0) {
+        throw std::invalid_argument("acoustic_properties: p_rms must be non-negative");
+    }
+    if (p_ref <= 0.0) {
+        throw std::invalid_argument("acoustic_properties: p_ref must be positive");
+    }
+
+    AcousticProperties props;
+    props.frequency = f;
+    props.wavelength = c / f;
+    props.impedance = rho * c;
+    props.particle_velocity = p_rms / (rho * c);
+    props.spl = 20.0 * std::log10(p_rms / p_ref);
+
+    return props;
+}
+
+// -------------------------------------------------------------
+// Utility functions
+// -------------------------------------------------------------
+
+double wavelength(double f, double c) {
+    if (f <= 0.0) {
+        throw std::invalid_argument("wavelength: frequency must be positive");
+    }
+    if (c <= 0.0) {
+        throw std::invalid_argument("wavelength: speed of sound must be positive");
+    }
+    return c / f;
+}
+
+double frequency_from_wavelength(double lambda, double c) {
+    if (lambda <= 0.0) {
+        throw std::invalid_argument("frequency_from_wavelength: wavelength must be positive");
+    }
+    if (c <= 0.0) {
+        throw std::invalid_argument("frequency_from_wavelength: speed of sound must be positive");
+    }
+    return c / lambda;
+}
+
+double acoustic_impedance(double rho, double c) {
+    if (rho <= 0.0) {
+        throw std::invalid_argument("acoustic_impedance: density must be positive");
+    }
+    if (c <= 0.0) {
+        throw std::invalid_argument("acoustic_impedance: speed of sound must be positive");
+    }
+    return rho * c;
+}
+
+double sound_pressure_level(double p_rms, double p_ref) {
+    if (p_rms < 0.0) {
+        throw std::invalid_argument("sound_pressure_level: p_rms must be non-negative");
+    }
+    if (p_ref <= 0.0) {
+        throw std::invalid_argument("sound_pressure_level: p_ref must be positive");
+    }
+    if (p_rms == 0.0) {
+        return -std::numeric_limits<double>::infinity();  // -∞ dB for zero pressure
+    }
+    return 20.0 * std::log10(p_rms / p_ref);
+}
+
+double particle_velocity(double p, double rho, double c) {
+    if (p < 0.0) {
+        throw std::invalid_argument("particle_velocity: pressure must be non-negative");
+    }
+    if (rho <= 0.0) {
+        throw std::invalid_argument("particle_velocity: density must be positive");
+    }
+    if (c <= 0.0) {
+        throw std::invalid_argument("particle_velocity: speed of sound must be positive");
+    }
+    return p / (rho * c);
+}

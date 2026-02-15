@@ -335,6 +335,17 @@ All functions use consistent units to avoid conversion errors.
 |----------------|-------------|-------------|
 | `Stream::mdot` | -           | kg/s        |
 
+### acoustics.h - Acoustic Properties
+
+| Function                    | Input Units                                                                      | Output Unit               |
+|-----------------------------|----------------------------------------------------------------------------------|---------------------------|
+| `acoustic_properties`       | f: Hz, rho: kg/m^3, c: m/s, p_rms: Pa (default 20e-6), p_ref: Pa (default 20e-6) | AcousticProperties struct |
+| `wavelength`                | f: Hz, c: m/s                                                                    | m                         |
+| `frequency_from_wavelength` | lambda: m, c: m/s                                                                | Hz                        |
+| `acoustic_impedance`        | rho: kg/m^3, c: m/s                                                              | Pa*s/m                    |
+| `sound_pressure_level`      | p_rms: Pa, p_ref: Pa (default 20e-6)                                             | dB                        |
+| `particle_velocity`         | p: Pa, rho: kg/m^3, c: m/s                                                       | m/s                       |
+
 ### orifice.h - Orifice Flow Utilities
 
 | Function                     | Input Units                                                              | Output Unit              |

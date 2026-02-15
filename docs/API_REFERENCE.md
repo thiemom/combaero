@@ -1271,6 +1271,59 @@ annulus.area()          # Cross-sectional area [m²]
 annulus.circumference() # Mean circumference [m]
 ```
 
+### Acoustic Properties Bundle
+
+Convenience function that computes all acoustic properties in a single call. Returns `AcousticProperties` struct with read-only attributes.
+
+```python
+# Compute all acoustic properties at once
+props = ca.acoustic_properties(f=1000, rho=1.2, c=340, p_rms=1.0)
+
+print(f"Wavelength: {props.wavelength:.3f} m")
+print(f"Impedance: {props.impedance:.1f} Pa·s/m")
+print(f"Particle velocity: {props.particle_velocity:.4f} m/s")
+print(f"SPL: {props.spl:.1f} dB")
+```
+
+**AcousticProperties attributes:**
+- `wavelength` - Acoustic wavelength [m]
+- `frequency` - Frequency [Hz]
+- `impedance` - Characteristic acoustic impedance [Pa·s/m]
+- `particle_velocity` - Particle velocity amplitude [m/s]
+- `spl` - Sound pressure level [dB]
+
+**Parameters:**
+- `f` - Frequency [Hz]
+- `rho` - Density [kg/m³]
+- `c` - Speed of sound [m/s]
+- `p_rms` - RMS pressure amplitude [Pa] (default: 20e-6 Pa = 0 dB reference)
+- `p_ref` - Reference pressure for SPL [Pa] (default: 20e-6 Pa in air)
+
+**Benefits:**
+- Single function call for all properties
+- IDE autocomplete for all attributes
+- Type-safe attribute access
+- Consistent with AirProperties and OrificeFlowResult patterns
+
+### Utility Functions
+
+```python
+# Wavelength from frequency
+lambda_ = ca.wavelength(f=1000, c=340)  # 0.34 m
+
+# Frequency from wavelength
+f = ca.frequency_from_wavelength(lambda_=0.34, c=340)  # 1000 Hz
+
+# Characteristic acoustic impedance
+Z = ca.acoustic_impedance(rho=1.2, c=340)  # 408 Pa·s/m
+
+# Sound pressure level
+spl = ca.sound_pressure_level(p_rms=1.0)  # 93.98 dB
+
+# Particle velocity from pressure
+u = ca.particle_velocity(p=1.0, rho=1.2, c=340)  # 0.00245 m/s
+```
+
 ### Acoustic Modes
 
 ```python

@@ -39,6 +39,7 @@ try:
     # in-tree build where _core was successfully built next to this file).
     from ._core import (
         AcousticMode,
+        AcousticProperties,
         AirProperties,
         Annulus,  # type: ignore[attr-defined]
         BoundaryCondition,
@@ -60,6 +61,8 @@ try:
         ThrustResult,
         Tube,
         UnitInfo,
+        acoustic_impedance,
+        acoustic_properties,
         adiabatic_T_wgs,
         air_properties,
         all_units,
@@ -114,6 +117,7 @@ try:
         formula,
         formula_to_name,
         frequency_from_strouhal,
+        frequency_from_wavelength,
         friction_colebrook,
         friction_haaland,
         friction_petukhov,
@@ -189,6 +193,7 @@ try:
         oxygen_required_per_kg_mixture,
         oxygen_required_per_mol_fuel,
         oxygen_required_per_mol_mixture,
+        particle_velocity,
         peclet,
         pipe_area,
         pipe_dP,
@@ -228,6 +233,7 @@ try:
         solve_orifice_mdot,
         solve_P0_from_mdot,
         solve_P_back_from_mdot,
+        sound_pressure_level,
         space_velocity,
         specific_gas_constant,
         speed_of_sound,
@@ -247,6 +253,7 @@ try:
         velocity_from_q,
         viscosity,
         wall_temperature_profile,
+        wavelength,
         wgs_equilibrium,
         wgs_equilibrium_adiabatic,
     )
@@ -422,6 +429,14 @@ except ModuleNotFoundError:
     tube_Q = _core.tube_Q
     damping_ratio = _core.damping_ratio
     bandwidth = _core.bandwidth
+    # Acoustic properties
+    AcousticProperties = _core.AcousticProperties
+    acoustic_properties = _core.acoustic_properties
+    wavelength = _core.wavelength
+    frequency_from_wavelength = _core.frequency_from_wavelength
+    acoustic_impedance = _core.acoustic_impedance
+    sound_pressure_level = _core.sound_pressure_level
+    particle_velocity = _core.particle_velocity
     # Residence time
     residence_time = _core.residence_time
     residence_time_tube = _core.residence_time_tube
@@ -655,6 +670,14 @@ __all__ = [
     "tube_Q",
     "damping_ratio",
     "bandwidth",
+    # Acoustic properties
+    "AcousticProperties",
+    "acoustic_properties",
+    "wavelength",
+    "frequency_from_wavelength",
+    "acoustic_impedance",
+    "sound_pressure_level",
+    "particle_velocity",
     # Residence time
     "residence_time",
     "residence_time_tube",

@@ -142,6 +142,60 @@ double axial_mode_downstream(double f0, double M);
 std::pair<double, double> axial_mode_split(double f0, double M);
 
 // -------------------------------------------------------------
+// Acoustic properties bundle
+// -------------------------------------------------------------
+
+// Bundle of acoustic properties for convenient access
+// All properties computed from (f, rho, c, p_rms) in a single call
+struct AcousticProperties {
+    double wavelength;         // Acoustic wavelength [m]
+    double frequency;          // Frequency [Hz]
+    double impedance;          // Characteristic acoustic impedance [Pa·s/m]
+    double particle_velocity;  // Particle velocity amplitude [m/s]
+    double spl;                // Sound pressure level [dB]
+};
+
+// Compute all acoustic properties at once
+// Parameters:
+//   f     : frequency [Hz]
+//   rho   : density [kg/m³]
+//   c     : speed of sound [m/s]
+//   p_rms : RMS pressure amplitude [Pa] (default: 20e-6 Pa = 0 dB reference)
+//   p_ref : reference pressure for SPL [Pa] (default: 20e-6 Pa in air)
+// Returns: AcousticProperties struct with all properties
+AcousticProperties acoustic_properties(
+    double f,
+    double rho,
+    double c,
+    double p_rms = 20e-6,
+    double p_ref = 20e-6);
+
+// -------------------------------------------------------------
+// Utility functions
+// -------------------------------------------------------------
+
+// Acoustic wavelength from frequency
+// λ = c / f
+double wavelength(double f, double c);
+
+// Frequency from wavelength
+// f = c / λ
+double frequency_from_wavelength(double lambda, double c);
+
+// Characteristic acoustic impedance
+// Z = ρ · c
+double acoustic_impedance(double rho, double c);
+
+// Sound pressure level in dB
+// SPL = 20 · log₁₀(p_rms / p_ref)
+// Default p_ref = 20 μPa (standard reference in air)
+double sound_pressure_level(double p_rms, double p_ref = 20e-6);
+
+// Particle velocity from pressure amplitude
+// u = p / (ρ · c)
+double particle_velocity(double p, double rho, double c);
+
+// -------------------------------------------------------------
 // Helmholtz Resonator
 // -------------------------------------------------------------
 // Classic "bottle resonance" frequency.

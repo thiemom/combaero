@@ -2726,6 +2726,123 @@ PYBIND11_MODULE(_core, m)
         "Half-power bandwidth: Δf = f₀/Q [Hz]"
     );
 
+    // AcousticProperties struct binding - Bundle of acoustic properties
+    py::class_<AcousticProperties>(m, "AcousticProperties",
+        "Bundle of acoustic properties computed from (f, rho, c, p_rms).\n\n"
+        "All properties are read-only attributes computed in a single call.\n"
+        "Provides IDE autocomplete and type safety.\n\n"
+        "Attributes:\n"
+        "  wavelength        : Acoustic wavelength [m]\n"
+        "  frequency         : Frequency [Hz]\n"
+        "  impedance         : Characteristic acoustic impedance [Pa·s/m]\n"
+        "  particle_velocity : Particle velocity amplitude [m/s]\n"
+        "  spl               : Sound pressure level [dB]")
+        .def_readonly("wavelength", &AcousticProperties::wavelength, "Acoustic wavelength [m]")
+        .def_readonly("frequency", &AcousticProperties::frequency, "Frequency [Hz]")
+        .def_readonly("impedance", &AcousticProperties::impedance, "Characteristic acoustic impedance [Pa·s/m]")
+        .def_readonly("particle_velocity", &AcousticProperties::particle_velocity, "Particle velocity amplitude [m/s]")
+        .def_readonly("spl", &AcousticProperties::spl, "Sound pressure level [dB]")
+        .def("__repr__", [](const AcousticProperties& p) {
+            return "<AcousticProperties: f=" + std::to_string(p.frequency) + " Hz, "
+                   "λ=" + std::to_string(p.wavelength) + " m, "
+                   "SPL=" + std::to_string(p.spl) + " dB>";
+        });
+
+    m.def(
+        "acoustic_properties",
+        &acoustic_properties,
+        py::arg("f"),
+        py::arg("rho"),
+        py::arg("c"),
+        py::arg("p_rms") = 20e-6,
+        py::arg("p_ref") = 20e-6,
+        "Compute all acoustic properties at once.\n\n"
+        "Convenience function that computes all acoustic properties in a\n"
+        "single call. Returns AcousticProperties struct with read-only attributes\n"
+        "for IDE autocomplete support.\n\n"
+        "Parameters:\n"
+        "  f     : frequency [Hz]\n"
+        "  rho   : density [kg/m³]\n"
+        "  c     : speed of sound [m/s]\n"
+        "  p_rms : RMS pressure amplitude [Pa] (default: 20e-6 Pa = 0 dB reference)\n"
+        "  p_ref : reference pressure for SPL [Pa] (default: 20e-6 Pa in air)\n\n"
+        "Returns: AcousticProperties object with attributes:\n"
+        "  wavelength, frequency, impedance, particle_velocity, spl\n\n"
+        "Example:\n"
+        "  >>> props = cb.acoustic_properties(f=1000, rho=1.2, c=340, p_rms=1.0)\n"
+        "  >>> print(f'Wavelength: {props.wavelength:.3f} m')\n"
+        "  >>> print(f'Impedance: {props.impedance:.1f} Pa·s/m')\n"
+        "  >>> print(f'SPL: {props.spl:.1f} dB')"
+    );
+
+    // Utility functions
+    m.def(
+        "wavelength",
+        &wavelength,
+        py::arg("f"),
+        py::arg("c"),
+        "Acoustic wavelength from frequency.\n\n"
+        "λ = c / f\n\n"
+        "Parameters:\n"
+        "  f : frequency [Hz]\n"
+        "  c : speed of sound [m/s]\n\n"
+        "Returns: wavelength [m]"
+    );
+
+    m.def(
+        "frequency_from_wavelength",
+        &frequency_from_wavelength,
+        py::arg("lambda"),
+        py::arg("c"),
+        "Frequency from wavelength.\n\n"
+        "f = c / λ\n\n"
+        "Parameters:\n"
+        "  lambda : wavelength [m]\n"
+        "  c      : speed of sound [m/s]\n\n"
+        "Returns: frequency [Hz]"
+    );
+
+    m.def(
+        "acoustic_impedance",
+        &acoustic_impedance,
+        py::arg("rho"),
+        py::arg("c"),
+        "Characteristic acoustic impedance.\n\n"
+        "Z = ρ · c\n\n"
+        "Parameters:\n"
+        "  rho : density [kg/m³]\n"
+        "  c   : speed of sound [m/s]\n\n"
+        "Returns: impedance [Pa·s/m]"
+    );
+
+    m.def(
+        "sound_pressure_level",
+        &sound_pressure_level,
+        py::arg("p_rms"),
+        py::arg("p_ref") = 20e-6,
+        "Sound pressure level in dB.\n\n"
+        "SPL = 20 · log₁₀(p_rms / p_ref)\n\n"
+        "Parameters:\n"
+        "  p_rms : RMS pressure amplitude [Pa]\n"
+        "  p_ref : reference pressure [Pa] (default: 20e-6 Pa in air)\n\n"
+        "Returns: SPL [dB]"
+    );
+
+    m.def(
+        "particle_velocity",
+        &particle_velocity,
+        py::arg("p"),
+        py::arg("rho"),
+        py::arg("c"),
+        "Particle velocity from pressure amplitude.\n\n"
+        "u = p / (ρ · c)\n\n"
+        "Parameters:\n"
+        "  p   : pressure amplitude [Pa]\n"
+        "  rho : density [kg/m³]\n"
+        "  c   : speed of sound [m/s]\n\n"
+        "Returns: particle velocity [m/s]"
+    );
+
     // Residence time
     m.def(
         "residence_time",
