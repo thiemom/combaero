@@ -195,26 +195,51 @@ transport_state(T: float, P: float, X: list[float]) -> TransportState
 - [ ] `mixture_fraction` - Bilger mixture fraction [-]
 - [ ] `fuel_burn_fraction` - Fraction of fuel burned [0-1] (useful for O2-limited cases)
 
-**Function signature:**
+**Function signatures:**
+
+**Variant 1: From equivalence ratio (for calculations)**
 ```python
 combustion_state(
     X_fuel: list[float],      # Fuel composition (can be pure or mixture)
     X_ox: list[float],        # Oxidizer composition
-    phi: float,               # Equivalence ratio [-]
+    phi: float,               # Equivalence ratio [-] (INPUT)
     T_reactants: float,       # Reactant temperature [K]
     P: float,                 # Pressure [Pa]
     fuel_name: str = ""       # Optional label for fuel (e.g., "CH4", "Natural Gas")
 ) -> CombustionState
 ```
 
-**Usage example:**
+**Variant 2: From streams (for lab measurements where flows are measured)**
+```python
+combustion_state_from_streams(
+    fuel_stream: Stream,      # Fuel stream with mdot, T, X
+    oxidizer_stream: Stream,  # Oxidizer stream with mdot, T, X
+    fuel_name: str = ""       # Optional label for fuel
+) -> CombustionState
+# In this variant, phi is COMPUTED from mass flow rates (output, not input)
+```
+
+**Usage examples:**
+
+**Example 1: From phi (typical for calculations)**
 ```python
 X_CH4 = [0, 0, 0, 0, 0, 1.0, 0, ...]  # Pure methane
 X_air = cb.standard_dry_air_composition()
 state = cb.combustion_state(X_CH4, X_air, phi=1.0, T_reactants=300, P=101325)
 
-# Combustion properties
-print(state.phi)                         # 1.0
+# Combustion properties (phi was INPUT)
+print(state.phi)                         # 1.0 (echoed back)
+print(state.mixture_fraction)            # 0.055
+```
+
+**Example 2: From streams (typical for lab measurements)**
+```python
+fuel = cb.Stream().set_T(300).set_X(X_CH4).set_mdot(0.01)  # 0.01 kg/s
+air = cb.Stream().set_T(298).set_X(X_air).set_mdot(0.17)   # 0.17 kg/s (measured)
+state = cb.combustion_state_from_streams(fuel, air, fuel_name="CH4")
+
+# Combustion properties (phi was COMPUTED from mdot)
+print(state.phi)                         # 1.0 (computed from flow rates)
 print(state.mixture_fraction)            # 0.055
 
 # Reactant thermo properties (via CompleteState)
@@ -239,16 +264,24 @@ print(state.products.transport.Pr)       # 0.73
 **Implementation:**
 - [ ] **Prerequisite:** Phase 15 (CompleteState) must be implemented first
 - [ ] Create `struct CombustionState` in `include/combustion.h` (with nested CompleteState)
-- [ ] Implement `combustion_state()` function in `src/combustion.cpp`
+- [ ] Implement `combustion_state()` function in `src/combustion.cpp` (from phi)
   - Compute X_reactants from set_equivalence_ratio_mole()
   - Compute X_products from complete_combustion_to_CO2_H2O()
   - Call complete_state() for reactants and products
   - Compute mixture_fraction from bilger_mixture_fraction_from_moles()
-- [ ] Add pybind11 binding in `python/combaero/_core.cpp`
-- [ ] Export in `python/combaero/__init__.py`
+- [ ] Implement `combustion_state_from_streams()` function in `src/combustion.cpp`
+  - Mix streams to get X_reactants and T_reactants
+  - Compute phi from equivalence_ratio_mole()
+  - Compute X_products from complete_combustion_to_CO2_H2O()
+  - Call complete_state() for reactants and products
+  - Compute mixture_fraction from bilger_mixture_fraction_from_moles()
+- [ ] Add pybind11 bindings for both functions in `python/combaero/_core.cpp`
+- [ ] Export both functions in `python/combaero/__init__.py`
 - [ ] Write comprehensive tests in `python/tests/test_combustion_state.py`
+  - Test both phi-based and stream-based variants
+  - Verify phi matches between variants for same conditions
 - [ ] Update `docs/API_REFERENCE.md`
-- [ ] Add unit entry to `include/units_data.h`
+- [ ] Add unit entries to `include/units_data.h`
 - [ ] Regenerate `docs/UNITS.md`
 
 **Testing requirements:**
@@ -256,10 +289,14 @@ print(state.products.transport.Pr)       # 0.73
 - Verify energy balance: state.reactants.thermo.h == state.products.thermo.h (for adiabatic)
 - Test with various fuels (CH4, C3H8, fuel mixtures)
 - Test at various equivalence ratios (lean, stoichiometric, rich)
-- Verify phi matches equivalence_ratio_mole() calculation
+- **Test both variants produce same results:**
+  - combustion_state(X_fuel, X_ox, phi=1.0, ...)
+  - combustion_state_from_streams(fuel, oxidizer) with mdot set for phi=1.0
+- Verify phi matches equivalence_ratio_mole() calculation (both variants)
 - Verify mixture_fraction matches bilger_mixture_fraction_from_moles()
 - Compare T_ad with Cantera validation tests
 - Verify transport properties are reasonable (mu increases with T, etc.)
+- **Stream variant specific:** Verify phi is correctly computed from mass flow rates
 
 **Status:** Not started (implement Phase 15 first to use in Phase 14)
 
