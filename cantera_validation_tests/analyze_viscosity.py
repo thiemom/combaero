@@ -52,7 +52,8 @@ for T in temperatures:
 print("\n" + "=" * 80)
 print("ANALYSIS")
 print("=" * 80)
-print("""
+print(
+    """
 CombAero uses Sutherland's formula:
   μ(T) = μ_ref * (T/T_ref)^1.5 * (T_ref + S) / (T + S)
 
@@ -77,4 +78,5 @@ Reference: Cantera's values are based on experimental data from:
 For CombAero's use case (fast combustion calculations), this accuracy
 is acceptable as transport properties have secondary importance compared
 to thermodynamics and reaction kinetics.
-""")
+"""
+)

@@ -237,18 +237,18 @@ TEST_F(OrificeTest, KFromCd) {
 
 TEST_F(OrificeTest, ThicknessCorrection) {
     const double Re_d = 1e5;  // Typical Reynolds number
-    
+
     // No correction for thin plate
     EXPECT_DOUBLE_EQ(orifice::thickness_correction(0.01, 0.5, Re_d), 1.0);
 
     // Small thickness: reattachment benefit
     double corr_small = orifice::thickness_correction(0.2, 0.5, Re_d);
     EXPECT_GT(corr_small, 1.0);
-    
+
     // Peak around t/d ~ 0.3 (calibrated to Idelchik data)
     double corr_peak = orifice::thickness_correction(0.3, 0.5, Re_d);
     EXPECT_GT(corr_peak, corr_small);
-    
+
     // Long tube: friction dominates, k_t < 1.0
     double corr_long = orifice::thickness_correction(3.0, 0.5, Re_d);
     EXPECT_LT(corr_long, corr_peak);  // Falls at large t/d

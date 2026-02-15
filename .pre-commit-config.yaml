@@ -27,14 +27,6 @@ repos:
         args: [--line-length=100]
         files: ^(python/|cantera_validation_tests/|thermo_data_generator/)
 
-  # isort - Python import sorter
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-        args: [--profile=black, --line-length=100]
-        files: ^(python/|cantera_validation_tests/|thermo_data_generator/)
-
   - repo: local
     hooks:
       - id: python-non-ascii-check
@@ -43,7 +35,7 @@ repos:
         language: system
         pass_filenames: false
         files: ^python/.*\.py$
-        stages: [commit]
+        stages: [pre-commit]
 
       - id: cantera-validation-tests
         name: Cantera Validation Tests
@@ -52,7 +44,7 @@ repos:
         pass_filenames: false
         always_run: false
         files: ^(src/|include/|python/|cantera_validation_tests/)
-        stages: [commit]
+        stages: [pre-commit]
 
       - id: python-unit-tests
         name: Python Unit Tests
@@ -61,4 +53,4 @@ repos:
         pass_filenames: false
         always_run: false
         files: ^(src/|include/|python/)
-        stages: [commit]
+        stages: [pre-commit]
