@@ -279,6 +279,56 @@ print(props.Pr)     # 0.707
 - Type-safe attribute access
 - Consistent with State class pattern
 
+### Thermodynamic State Bundle
+
+Convenience function that computes all thermodynamic properties for a gas mixture in a single call. Returns `ThermoState` struct with read-only attributes.
+
+```python
+# Python usage with IDE autocomplete
+X = cb.standard_dry_air_composition()
+state = cb.thermo_state(T=300, P=101325, X=X)
+print(state.h)       # -103.6 J/mol
+print(state.gamma)   # 1.400
+print(state.mw)      # 28.97 g/mol
+```
+
+**ThermoState attributes:**
+- `T` - Temperature [K] (input, echoed back)
+- `P` - Pressure [Pa] (input, echoed back)
+- `rho` - Density [kg/m³]
+- `cp` - Specific heat at constant pressure [J/(mol·K)]
+- `cv` - Specific heat at constant volume [J/(mol·K)]
+- `h` - Specific enthalpy [J/mol]
+- `s` - Specific entropy [J/(mol·K)]
+- `u` - Specific internal energy [J/mol]
+- `gamma` - Isentropic expansion coefficient [-]
+- `a` - Speed of sound [m/s]
+- `cp_mass` - Mass-specific cp [J/(kg·K)]
+- `cv_mass` - Mass-specific cv [J/(kg·K)]
+- `h_mass` - Mass-specific enthalpy [J/kg]
+- `s_mass` - Mass-specific entropy [J/(kg·K)]
+- `u_mass` - Mass-specific internal energy [J/kg]
+- `mw` - Molecular weight [g/mol]
+
+**Parameters:**
+- `T` - Temperature [K]
+- `P` - Pressure [Pa]
+- `X` - Mole fractions [-]
+- `P_ref` - Reference pressure for entropy [Pa] (default: 101325.0)
+
+**Benefits:**
+- Single function call for all thermodynamic properties
+- IDE autocomplete for all attributes
+- Type-safe attribute access
+- Consistent with AirProperties and OrificeFlowResult patterns
+- Both molar and mass-specific properties included
+
+**Use cases:**
+- Rapid thermodynamic state evaluation
+- Combustion analysis workflows
+- Compressor/turbine calculations
+- Heat exchanger design
+
 ## Transport Properties
 
 ```cpp

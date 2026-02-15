@@ -756,3 +756,52 @@ AirProperties air_properties(double T, double P, double humidity) {
 
     return props;
 }
+
+// -------------------------------------------------------------
+// Thermodynamic State Bundle
+// -------------------------------------------------------------
+
+ThermoState thermo_state(double T, double P, const std::vector<double>& X, double P_ref) {
+    if (T <= 0) {
+        throw std::invalid_argument("thermo_state: temperature must be positive");
+    }
+    if (P <= 0) {
+        throw std::invalid_argument("thermo_state: pressure must be positive");
+    }
+    if (P_ref <= 0) {
+        throw std::invalid_argument("thermo_state: reference pressure must be positive");
+    }
+    if (X.empty()) {
+        throw std::invalid_argument("thermo_state: mole fractions vector cannot be empty");
+    }
+
+    ThermoState state;
+
+    // Echo back inputs
+    state.T = T;
+    state.P = P;
+
+    // Molecular weight
+    state.mw = mwmix(X);
+
+    // Molar-basis thermodynamic properties
+    state.cp = cp(T, X);
+    state.cv = cv(T, X);
+    state.h = h(T, X);
+    state.s = s(T, X, P, P_ref);
+    state.u = u(T, X);
+    state.gamma = isentropic_expansion_coefficient(T, X);
+    state.a = speed_of_sound(T, X);
+
+    // Mass-basis thermodynamic properties
+    state.cp_mass = cp_mass(T, X);
+    state.cv_mass = cv_mass(T, X);
+    state.h_mass = h_mass(T, X);
+    state.s_mass = s_mass(T, X, P, P_ref);
+    state.u_mass = u_mass(T, X);
+
+    // Density
+    state.rho = density(T, P, X);
+
+    return state;
+}

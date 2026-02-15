@@ -883,6 +883,80 @@ PYBIND11_MODULE(_core, m)
         "  0.707"
     );
 
+    // ThermoState struct binding - Bundle of thermodynamic properties
+    py::class_<ThermoState>(m, "ThermoState",
+        "Bundle of thermodynamic properties for a gas mixture.\n\n"
+        "All properties are read-only attributes computed in a single call.\n"
+        "Provides IDE autocomplete and type safety.\n\n"
+        "Attributes:\n"
+        "  T       : Temperature [K] (input, echoed back)\n"
+        "  P       : Pressure [Pa] (input, echoed back)\n"
+        "  rho     : Density [kg/m³]\n"
+        "  cp      : Specific heat at constant pressure [J/(mol·K)]\n"
+        "  cv      : Specific heat at constant volume [J/(mol·K)]\n"
+        "  h       : Specific enthalpy [J/mol]\n"
+        "  s       : Specific entropy [J/(mol·K)]\n"
+        "  u       : Specific internal energy [J/mol]\n"
+        "  gamma   : Isentropic expansion coefficient [-]\n"
+        "  a       : Speed of sound [m/s]\n"
+        "  cp_mass : Mass-specific cp [J/(kg·K)]\n"
+        "  cv_mass : Mass-specific cv [J/(kg·K)]\n"
+        "  h_mass  : Mass-specific enthalpy [J/kg]\n"
+        "  s_mass  : Mass-specific entropy [J/(kg·K)]\n"
+        "  u_mass  : Mass-specific internal energy [J/kg]\n"
+        "  mw      : Molecular weight [g/mol]")
+        .def_readonly("T", &ThermoState::T, "Temperature [K]")
+        .def_readonly("P", &ThermoState::P, "Pressure [Pa]")
+        .def_readonly("rho", &ThermoState::rho, "Density [kg/m³]")
+        .def_readonly("cp", &ThermoState::cp, "Specific heat at constant pressure [J/(mol·K)]")
+        .def_readonly("cv", &ThermoState::cv, "Specific heat at constant volume [J/(mol·K)]")
+        .def_readonly("h", &ThermoState::h, "Specific enthalpy [J/mol]")
+        .def_readonly("s", &ThermoState::s, "Specific entropy [J/(mol·K)]")
+        .def_readonly("u", &ThermoState::u, "Specific internal energy [J/mol]")
+        .def_readonly("gamma", &ThermoState::gamma, "Isentropic expansion coefficient [-]")
+        .def_readonly("a", &ThermoState::a, "Speed of sound [m/s]")
+        .def_readonly("cp_mass", &ThermoState::cp_mass, "Mass-specific cp [J/(kg·K)]")
+        .def_readonly("cv_mass", &ThermoState::cv_mass, "Mass-specific cv [J/(kg·K)]")
+        .def_readonly("h_mass", &ThermoState::h_mass, "Mass-specific enthalpy [J/kg]")
+        .def_readonly("s_mass", &ThermoState::s_mass, "Mass-specific entropy [J/(kg·K)]")
+        .def_readonly("u_mass", &ThermoState::u_mass, "Mass-specific internal energy [J/kg]")
+        .def_readonly("mw", &ThermoState::mw, "Molecular weight [g/mol]")
+        .def("__repr__", [](const ThermoState& s) {
+            return "<ThermoState: T=" + std::to_string(s.T) + " K, "
+                   "P=" + std::to_string(s.P) + " Pa, "
+                   "rho=" + std::to_string(s.rho) + " kg/m³, "
+                   "h=" + std::to_string(s.h) + " J/mol, "
+                   "mw=" + std::to_string(s.mw) + " g/mol>";
+        });
+
+    m.def(
+        "thermo_state",
+        &thermo_state,
+        py::arg("T"),
+        py::arg("P"),
+        py::arg("X"),
+        py::arg("P_ref") = 101325.0,
+        "Compute all thermodynamic properties at once.\n\n"
+        "Convenience function that computes all thermodynamic properties\n"
+        "for a gas mixture in a single call. Returns ThermoState struct\n"
+        "with read-only attributes for IDE autocomplete support.\n\n"
+        "Parameters:\n"
+        "  T     : temperature [K]\n"
+        "  P     : pressure [Pa]\n"
+        "  X     : mole fractions [-]\n"
+        "  P_ref : reference pressure for entropy [Pa] (default: 101325.0)\n\n"
+        "Returns: ThermoState object with attributes:\n"
+        "  T, P, rho, cp, cv, h, s, u, gamma, a,\n"
+        "  cp_mass, cv_mass, h_mass, s_mass, u_mass, mw\n\n"
+        "Example:\n"
+        "  >>> X = cb.standard_dry_air_composition()\n"
+        "  >>> state = cb.thermo_state(T=300, P=101325, X=X)\n"
+        "  >>> print(state.h)  # IDE autocomplete works!\n"
+        "  8682.5\n"
+        "  >>> print(state.gamma)\n"
+        "  1.400"
+    );
+
     // Stream struct binding - Pythonic property-based API
     py::class_<Stream>(m, "Stream")
         .def(py::init<>())

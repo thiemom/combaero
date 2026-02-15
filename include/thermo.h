@@ -101,6 +101,40 @@ struct AirProperties {
 // Returns: AirProperties struct with all properties
 AirProperties air_properties(double T, double P, double humidity = 0.0);
 
+// -------------------------------------------------------------
+// Thermodynamic State Bundle
+// -------------------------------------------------------------
+
+// Bundle of thermodynamic properties for a gas mixture
+// All properties computed from (T, P, X) in a single call
+struct ThermoState {
+    double T;         // Temperature [K] (input, echoed back)
+    double P;         // Pressure [Pa] (input, echoed back)
+    double rho;       // Density [kg/m³]
+    double cp;        // Specific heat at constant pressure [J/(mol·K)]
+    double cv;        // Specific heat at constant volume [J/(mol·K)]
+    double h;         // Specific enthalpy [J/mol]
+    double s;         // Specific entropy [J/(mol·K)]
+    double u;         // Specific internal energy [J/mol]
+    double gamma;     // Isentropic expansion coefficient [-]
+    double a;         // Speed of sound [m/s]
+    double cp_mass;   // Mass-specific cp [J/(kg·K)]
+    double cv_mass;   // Mass-specific cv [J/(kg·K)]
+    double h_mass;    // Mass-specific enthalpy [J/kg]
+    double s_mass;    // Mass-specific entropy [J/(kg·K)]
+    double u_mass;    // Mass-specific internal energy [J/kg]
+    double mw;        // Molecular weight [g/mol]
+};
+
+// Compute all thermodynamic properties at once
+// Parameters:
+//   T     : temperature [K]
+//   P     : pressure [Pa]
+//   X     : mole fractions [-]
+//   P_ref : reference pressure for entropy [Pa] (default: 101325.0)
+// Returns: ThermoState struct with all properties
+ThermoState thermo_state(double T, double P, const std::vector<double>& X, double P_ref = 101325.0);
+
 // Derivatives of thermodynamic properties with respect to temperature
 double dh_dT(double T, const std::vector<double>& X);
 double ds_dT(double T, const std::vector<double>& X);

@@ -98,19 +98,20 @@ All functions use consistent units to avoid conversion errors.
 
 #### Mixture Properties (Mass/Other Basis)
 
-| Function                           | Input Units                        | Output Unit          |
-|------------------------------------|------------------------------------|----------------------|
-| `density`                          | T: K, P: Pa, X: mol/mol            | kg/m^3               |
-| `molar_volume`                     | T: K, P: Pa                        | m^3/mol              |
-| `specific_gas_constant`            | X: mol/mol                         | J/(kg*K)             |
-| `isentropic_expansion_coefficient` | T: K, X: mol/mol                   | - (gamma)            |
-| `speed_of_sound`                   | T: K, X: mol/mol                   | m/s                  |
-| `cp_mass`                          | T: K, X: mol/mol                   | J/(kg*K)             |
-| `cv_mass`                          | T: K, X: mol/mol                   | J/(kg*K)             |
-| `h_mass`                           | T: K, X: mol/mol                   | J/kg                 |
-| `s_mass`                           | T: K, X: mol/mol, P: Pa, P_ref: Pa | J/(kg*K)             |
-| `u_mass`                           | T: K, X: mol/mol                   | J/kg                 |
-| `air_properties`                   | T: K, P: Pa, humidity: - (0-1)     | AirProperties struct |
+| Function                           | Input Units                                         | Output Unit          |
+|------------------------------------|-----------------------------------------------------|----------------------|
+| `density`                          | T: K, P: Pa, X: mol/mol                             | kg/m^3               |
+| `molar_volume`                     | T: K, P: Pa                                         | m^3/mol              |
+| `specific_gas_constant`            | X: mol/mol                                          | J/(kg*K)             |
+| `isentropic_expansion_coefficient` | T: K, X: mol/mol                                    | - (gamma)            |
+| `speed_of_sound`                   | T: K, X: mol/mol                                    | m/s                  |
+| `cp_mass`                          | T: K, X: mol/mol                                    | J/(kg*K)             |
+| `cv_mass`                          | T: K, X: mol/mol                                    | J/(kg*K)             |
+| `h_mass`                           | T: K, X: mol/mol                                    | J/kg                 |
+| `s_mass`                           | T: K, X: mol/mol, P: Pa, P_ref: Pa                  | J/(kg*K)             |
+| `u_mass`                           | T: K, X: mol/mol                                    | J/kg                 |
+| `air_properties`                   | T: K, P: Pa, humidity: - (0-1)                      | AirProperties struct |
+| `thermo_state`                     | T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325) | ThermoState struct   |
 
 #### Inverse Solvers
 
