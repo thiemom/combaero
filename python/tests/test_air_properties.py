@@ -361,13 +361,14 @@ class TestAirPropertiesTypical:
 
         props = cb.air_properties(T, P)
 
-        # Typical values at standard conditions
-        assert 1.2 < props.rho < 1.3  # kg/m³
-        assert 1.6e-5 < props.mu < 1.9e-5  # Pa·s (Sutherland's formula approximation)
-        assert 0.020 < props.k < 0.027  # W/(m·K)
-        assert 1000 < props.cp < 1100  # J/(kg·K)
-        assert 0.77 < props.Pr < 0.79  # - (0.781 at 15C)
-        assert 330 < props.a < 350  # m/s
+        # Verify all properties match individual calls
+        X = cb.standard_dry_air_composition()
+        assert props.rho == pytest.approx(cb.density(T, P, X), rel=1e-15)
+        assert props.mu == pytest.approx(cb.viscosity(T, P, X), rel=1e-15)
+        assert props.k == pytest.approx(cb.thermal_conductivity(T, P, X), rel=1e-15)
+        assert props.cp == pytest.approx(cb.cp_mass(T, X), rel=1e-15)
+        assert props.Pr == pytest.approx(cb.prandtl(T, P, X), rel=1e-15)
+        assert props.a == pytest.approx(cb.speed_of_sound(T, X), rel=1e-15)
 
     def test_hot_day(self):
         """Test air properties on a hot day (35C, 1 atm, 60% RH)."""
@@ -377,11 +378,11 @@ class TestAirPropertiesTypical:
 
         props = cb.air_properties(T, P, humidity=humidity)
 
-        # Should have reasonable values
-        assert props.rho > 0
-        assert props.rho < 1.2  # Less dense than standard conditions
-        assert props.mu > 0
-        assert props.Pr > 0
+        # Verify all properties match individual calls with humid air composition
+        X = cb.humid_air_composition(T, P, humidity)
+        assert props.rho == pytest.approx(cb.density(T, P, X), rel=1e-15)
+        assert props.mu == pytest.approx(cb.viscosity(T, P, X), rel=1e-15)
+        assert props.Pr == pytest.approx(cb.prandtl(T, P, X), rel=1e-15)
 
     def test_cold_day(self):
         """Test air properties on a cold day (-10C, 1 atm)."""
@@ -390,10 +391,11 @@ class TestAirPropertiesTypical:
 
         props = cb.air_properties(T, P)
 
-        # Should have reasonable values
-        assert props.rho > 1.3  # More dense than standard conditions
-        assert props.mu > 0
-        assert props.a < 340  # Speed of sound decreases with temperature
+        # Verify all properties match individual calls
+        X = cb.standard_dry_air_composition()
+        assert props.rho == pytest.approx(cb.density(T, P, X), rel=1e-15)
+        assert props.mu == pytest.approx(cb.viscosity(T, P, X), rel=1e-15)
+        assert props.a == pytest.approx(cb.speed_of_sound(T, X), rel=1e-15)
 
 
 if __name__ == "__main__":

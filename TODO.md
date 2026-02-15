@@ -122,13 +122,16 @@ thermo_state(T: float, P: float, X: list[float], P_ref: float = 101325.0) -> The
 - **Python side:** Bound as class with readonly attributes
 - **Consistent with:** Established dataclass patterns
 
-**Properties to include (~5-6):**
-- [ ] `mu` - Dynamic viscosity [Pa·s]
-- [ ] `k` - Thermal conductivity [W/(m·K)]
-- [ ] `nu` - Kinematic viscosity [m²/s]
-- [ ] `alpha` - Thermal diffusivity [m²/s]
-- [ ] `Pr` - Prandtl number [-]
-- [ ] `rho` - Density [kg/m³] (needed for nu calculation, echoed)
+**Properties to include (9):**
+- [x] `T` - Temperature [K] (input, echoed back)
+- [x] `P` - Pressure [Pa] (input, echoed back)
+- [x] `rho` - Density [kg/m³]
+- [x] `mu` - Dynamic viscosity [Pa·s]
+- [x] `k` - Thermal conductivity [W/(m·K)]
+- [x] `nu` - Kinematic viscosity [m²/s]
+- [x] `alpha` - Thermal diffusivity [m²/s]
+- [x] `Pr` - Prandtl number [-]
+- [x] `cp` - Specific heat at constant pressure [J/(kg·K)]
 
 **Function signature:**
 ```python
@@ -136,22 +139,31 @@ transport_state(T: float, P: float, X: list[float]) -> TransportState
 ```
 
 **Implementation:**
-- [ ] Create `struct TransportState` in `include/transport.h`
-- [ ] Implement `transport_state()` function in `src/transport.cpp`
-- [ ] Add pybind11 binding in `python/combaero/_core.cpp`
-- [ ] Export in `python/combaero/__init__.py`
-- [ ] Write comprehensive tests in `python/tests/test_transport_state.py`
-- [ ] Update `docs/API_REFERENCE.md`
-- [ ] Add unit entry to `include/units_data.h`
-- [ ] Regenerate `docs/UNITS.md`
+- [x] Create `struct TransportState` in `include/transport.h`
+- [x] Implement `transport_state()` function in `src/transport.cpp`
+- [x] Add pybind11 binding in `python/combaero/_core.cpp`
+- [x] Export in `python/combaero/__init__.py`
+- [x] Write comprehensive tests in `python/tests/test_transport_state.py`
+- [x] Update `docs/API_REFERENCE.md`
+- [x] Add unit entry to `include/units_data.h`
+- [x] Regenerate `docs/UNITS.md`
 
 **Testing requirements:**
-- Each property must match individual function call within machine precision
-- Test with various gas compositions
-- Test temperature dependence (Sutherland's law validation)
-- Verify Pr = mu * cp / k
+- [x] Each property must match individual function call within machine precision
+- [x] Test with various gas compositions
+- [x] Test temperature dependence (Sutherland's law validation)
+- [x] Verify Pr = mu * cp / k
 
-**Status:** Not started
+**Test Results:**
+- ✅ 31 new tests (13 test classes)
+- ✅ Machine precision verification using individual function calls as reference
+- ✅ Physical relationships verified (nu=mu/rho, alpha=k/(rho*cp), Pr=mu*cp/k)
+- ✅ Various compositions tested (air, N2, CH4, combustion products)
+- ✅ Temperature range: 200-2000 K
+- ✅ Pressure range: 1 kPa - 10 MPa
+- ✅ All 388 tests pass (31 new + 357 existing)
+
+**Status:** ✅ COMPLETE (Commit: 1d9769f)
 
 ---
 
@@ -177,7 +189,8 @@ transport_state(T: float, P: float, X: list[float]) -> TransportState
 - [ ] `Y_products` - Product mass fractions (vector)
 - [ ] `h_reactants` - Reactant enthalpy [J/mol]
 - [ ] `h_products` - Product enthalpy [J/mol]
-- [ ] `fuel_name` - Fuel name (string)
+- [ ] `fuel_name` - Fuel name (string). <-- what is "fuel_name" ?
+- [ ] `mixture_fraction' - Bilger Mixture fraction [-]
 
 **Function signature:**
 ```python

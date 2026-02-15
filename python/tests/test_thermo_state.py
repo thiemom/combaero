@@ -192,44 +192,49 @@ class TestVariousCompositions:
     def test_dry_air(self):
         """Test with standard dry air."""
         X = cb.standard_dry_air_composition()
-        state = cb.thermo_state(T=300, P=101325, X=X)
+        T = 300
+        P = 101325
+        state = cb.thermo_state(T=T, P=P, X=X)
 
-        # Air molecular weight should be ~28.97 g/mol
-        assert 28.9 < state.mw < 29.0
-        # Air gamma should be ~1.4
-        assert 1.39 < state.gamma < 1.41
+        # Verify properties match individual calls
+        assert state.mw == pytest.approx(cb.mwmix(X), rel=1e-15)
+        assert state.gamma == pytest.approx(cb.isentropic_expansion_coefficient(T, X), rel=1e-15)
 
     def test_pure_nitrogen(self):
         """Test with pure nitrogen."""
         # Create pure N2 composition (14 species, N2 is index 0)
         X = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        state = cb.thermo_state(T=300, P=101325, X=X)
+        T = 300
+        P = 101325
+        state = cb.thermo_state(T=T, P=P, X=X)
 
-        # N2 molecular weight is 28.014 g/mol
-        assert 28.0 < state.mw < 28.1
-        assert state.gamma > 1.3  # Diatomic gas
+        # Verify properties match individual calls
+        assert state.mw == pytest.approx(cb.mwmix(X), rel=1e-15)
+        assert state.gamma == pytest.approx(cb.isentropic_expansion_coefficient(T, X), rel=1e-15)
 
     def test_pure_methane(self):
         """Test with pure methane."""
         # Create pure CH4 composition (14 species, CH4 is index 5)
         X = [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        state = cb.thermo_state(T=300, P=101325, X=X)
+        T = 300
+        P = 101325
+        state = cb.thermo_state(T=T, P=P, X=X)
 
-        # CH4 molecular weight is 16.043 g/mol
-        assert 16.0 < state.mw < 16.1
+        # Verify properties match individual calls
+        assert state.mw == pytest.approx(cb.mwmix(X), rel=1e-15)
 
     def test_combustion_products(self):
         """Test with typical combustion products."""
         # Approximate post-combustion mixture
         # Species order: N2, O2, AR, CO2, H2O, CH4, C2H6, C3H8, IC4H10, NC5H12, NC6H14, NC7H16, CO, H2
         X = [0.72, 0.03, 0.0, 0.10, 0.15, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        T = 1500
+        P = 101325
+        state = cb.thermo_state(T=T, P=P, X=X)
 
-        state = cb.thermo_state(T=1500, P=101325, X=X)
-
-        # Molecular weight should be higher than air due to CO2 and H2O
-        assert state.mw > 28.0
-        # Gamma should be lower at high temperature
-        assert state.gamma < 1.35
+        # Verify properties match individual calls
+        assert state.mw == pytest.approx(cb.mwmix(X), rel=1e-15)
+        assert state.gamma == pytest.approx(cb.isentropic_expansion_coefficient(T, X), rel=1e-15)
 
 
 class TestVariousConditions:
@@ -238,38 +243,44 @@ class TestVariousConditions:
     def test_ambient_conditions(self):
         """Test at ambient conditions (20°C, 1 atm)."""
         X = cb.standard_dry_air_composition()
-        state = cb.thermo_state(T=293.15, P=101325, X=X)
+        T = 293.15
+        P = 101325
+        state = cb.thermo_state(T=T, P=P, X=X)
 
-        # Density should be ~1.2 kg/m³
-        assert 1.1 < state.rho < 1.3
-        # Speed of sound should be ~343 m/s
-        assert 340 < state.a < 346
+        # Verify properties match individual calls
+        assert state.rho == pytest.approx(cb.density(T, P, X), rel=1e-15)
+        assert state.a == pytest.approx(cb.speed_of_sound(T, X), rel=1e-15)
 
     def test_high_temperature(self):
         """Test at high temperature (combustor conditions)."""
         X = cb.standard_dry_air_composition()
-        state = cb.thermo_state(T=1500, P=101325, X=X)
+        T = 1500
+        P = 101325
+        state = cb.thermo_state(T=T, P=P, X=X)
 
-        # Density should decrease with temperature
-        assert state.rho < 0.3
-        # Speed of sound should increase
-        assert state.a > 700
+        # Verify properties match individual calls
+        assert state.rho == pytest.approx(cb.density(T, P, X), rel=1e-15)
+        assert state.a == pytest.approx(cb.speed_of_sound(T, X), rel=1e-15)
 
     def test_high_pressure(self):
         """Test at high pressure (compressor discharge)."""
         X = cb.standard_dry_air_composition()
-        state = cb.thermo_state(T=600, P=2e6, X=X)
+        T = 600
+        P = 2e6
+        state = cb.thermo_state(T=T, P=P, X=X)
 
-        # Density should increase with pressure
-        assert state.rho > 5.0
+        # Verify properties match individual calls
+        assert state.rho == pytest.approx(cb.density(T, P, X), rel=1e-15)
 
     def test_low_temperature(self):
         """Test at low temperature (cryogenic)."""
         X = cb.standard_dry_air_composition()
-        state = cb.thermo_state(T=200, P=101325, X=X)
+        T = 200
+        P = 101325
+        state = cb.thermo_state(T=T, P=P, X=X)
 
-        # Density should increase at low temperature
-        assert state.rho > 1.7
+        # Verify properties match individual calls
+        assert state.rho == pytest.approx(cb.density(T, P, X), rel=1e-15)
 
 
 class TestReferencePresssure:

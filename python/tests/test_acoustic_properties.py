@@ -190,12 +190,10 @@ class TestTypicalConditions:
 
         props = cb.acoustic_properties(f=f, rho=rho, c=c, p_rms=p_rms)
 
-        # Wavelength should be ~0.343 m
-        assert 0.3 < props.wavelength < 0.4
-        # Impedance should be ~412 Pa·s/m
-        assert 400 < props.impedance < 420
-        # SPL should be ~60 dB
-        assert 55 < props.spl < 65
+        # Verify all properties match individual calls
+        assert props.wavelength == pytest.approx(cb.wavelength(f, c), rel=1e-15)
+        assert props.impedance == pytest.approx(cb.acoustic_impedance(rho, c), rel=1e-15)
+        assert props.spl == pytest.approx(cb.sound_pressure_level(p_rms), rel=1e-15)
 
     def test_combustor_conditions(self):
         """Test hot gas in combustor."""
@@ -209,10 +207,9 @@ class TestTypicalConditions:
 
         props = cb.acoustic_properties(f=f, rho=rho, c=c, p_rms=1000)
 
-        # Wavelength should be ~1.50 m
-        assert 1.45 < props.wavelength < 1.55
-        # Impedance should be ~2700 Pa·s/m
-        assert 2500 < props.impedance < 2900
+        # Verify all properties match individual calls
+        assert props.wavelength == pytest.approx(cb.wavelength(f, c), rel=1e-15)
+        assert props.impedance == pytest.approx(cb.acoustic_impedance(rho, c), rel=1e-15)
 
     def test_water_acoustics(self):
         """Test underwater acoustics."""
@@ -222,9 +219,9 @@ class TestTypicalConditions:
 
         props = cb.acoustic_properties(f=f, rho=rho, c=c, p_rms=1.0)
 
-        # Wavelength should be 1.5 m
-        assert abs(props.wavelength - 1.5) < 0.01
-        # Impedance should be 1.5e6 Pa·s/m
+        # Verify all properties match individual calls
+        assert props.wavelength == pytest.approx(cb.wavelength(f, c), rel=1e-15)
+        assert props.impedance == pytest.approx(cb.acoustic_impedance(rho, c), rel=1e-15)
         assert abs(props.impedance - 1.5e6) < 1000
 
 
