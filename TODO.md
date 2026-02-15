@@ -191,45 +191,142 @@ we should have mass-basis equivalents for all of them to avoid user confusion.
 
 ---
 
-## Phase 10: Orifice Flow Utilities
+## Phase 10: Orifice Flow Utilities with Real Gas Support
 
 **Priority:** MEDIUM - Useful for flow metering and injection applications
-**Difficulty:** EASY - Simple geometric and flow calculations
+**Difficulty:** MEDIUM - Dataclass pattern + real gas corrections
 
-**Rationale:** The orifice module is comprehensive but lacks simple helper functions for common calculations. No examples exist demonstrating the Cd correlation system.
+**Rationale:** The orifice module is comprehensive but lacks:
+1. Simple helper functions for common calculations
+2. Real gas support via compressibility factor Z (for high-pressure applications)
+3. Dataclass pattern for bundled orifice flow results
+4. Examples demonstrating the Cd correlation system
 
-**Functions to implement (4):**
-- [ ] `orifice_velocity(mdot, rho, d)` - Velocity through orifice throat [m/s]
+**Design Decision:** ✅ **Dataclass-like struct for orifice flow results**
+- **Rationale:** Consistent with `AirProperties` pattern, IDE autocomplete, type safety
+- **C++ side:** `struct OrificeFlowResult { double mdot; double v; double Re_d; double Cd; ... };`
+- **Python side:** Bound as class with readonly attributes (behaves like frozen dataclass)
+- **Real gas support:** Add optional `Z` parameter (default=1.0) to density-dependent functions
+
+**Functions to implement (1 composite + 4 utilities):**
+
+### Composite Function (returns dataclass):
+- [ ] `orifice_flow(geom, dP, T, P, mu, Z=1.0, correlation='reader_harris')` → `OrificeFlowResult`
+  - **Returns:** Dataclass with `mdot`, `v`, `Re_D`, `Re_d`, `Cd`, `epsilon`, `rho_corrected`
+  - **Computes:** All orifice flow properties in one call with real gas correction
+  - **Real gas:** Uses `rho_corrected = rho_ideal / Z` for accurate mass flow
+  - **Benefits:** Single function call, IDE autocomplete, consistent with Phase 8 pattern
+
+### Utility Functions (simple calculations):
+- [ ] `orifice_velocity_from_mdot(mdot, rho, d, Z=1.0)` - Velocity through orifice [m/s]
+  - Uses `rho_corrected = rho / Z` for real gas
 - [ ] `orifice_area_from_beta(D, beta)` - Orifice area from beta ratio [m²]
-- [ ] `beta_from_diameters(d, D)` - Beta ratio from diameters [-] (standalone)
-- [ ] `orifice_Re_d(mdot, d, mu)` - Orifice Reynolds number from mass flow [-]
+- [ ] `beta_from_diameters(d, D)` - Beta ratio from diameters [-]
+- [ ] `orifice_Re_d_from_mdot(mdot, d, mu)` - Orifice Reynolds number [-]
+
+**OrificeFlowResult Properties (7):**
+- [ ] `mdot` - Mass flow rate [kg/s]
+- [ ] `v` - Velocity through orifice throat [m/s]
+- [ ] `Re_D` - Pipe Reynolds number (based on D) [-]
+- [ ] `Re_d` - Orifice Reynolds number (based on d) [-]
+- [ ] `Cd` - Discharge coefficient [-]
+- [ ] `epsilon` - Expansibility factor [-] (1.0 for incompressible)
+- [ ] `rho_corrected` - Density corrected for compressibility [kg/m³]
 
 **Implementation:**
-- [ ] Add functions to `src/orifice.cpp`
-- [ ] Add declarations to `include/orifice.h`
-- [ ] Add Python bindings to `python/combaero/_core.cpp`
-- [ ] Export in `python/combaero/__init__.py`
-- [ ] Write unit tests in `python/tests/test_orifice.py`
+- [ ] Create `struct OrificeFlowResult` in `include/orifice.h`
+- [ ] Implement `orifice_flow()` composite function in `src/orifice.cpp`
+  - Compute composition from (T, P) using ideal gas or user-provided X
+  - Apply Z correction: `rho_corrected = rho_ideal / Z`
+  - Call `solve_orifice_mdot()` with corrected density
+  - Compute all derived properties (v, Re_D, Re_d)
+  - Return populated `OrificeFlowResult` struct
+- [ ] Implement 4 utility functions in `src/orifice.cpp`
+  - Add Z parameter to density-dependent functions
+  - Simple, machine-precision calculations
+- [ ] Add pybind11 class binding for `OrificeFlowResult` in `python/combaero/_core.cpp`
+  - Use `py::class_<OrificeFlowResult>` with `.def_readonly()` for each property
+  - Add docstrings with units for each property
+  - Add `__repr__` for nice debugging output
+- [ ] Add pybind11 bindings for `orifice_flow()` and utility functions
+- [ ] Export `OrificeFlowResult` class and functions in `python/combaero/__init__.py`
+- [ ] Write comprehensive unit tests in `python/tests/test_orifice_flow.py`
 - [ ] **CRITICAL TESTS:**
-  - Verify orifice_velocity = mdot / (rho * π(d/2)²)
-  - Verify orifice_area_from_beta = π(D*beta/2)²
-  - Verify beta_from_diameters = d/D
-  - Verify orifice_Re_d = 4*mdot / (π*d*mu)
-  - All must match within machine precision
-- [ ] Update `docs/API_REFERENCE.md`
-- [ ] **Add unit entries to `include/units_data.h` (4 entries)**
+  - Verify `mdot` matches `solve_orifice_mdot()` with Z correction
+  - Verify `v = mdot / (rho_corrected * A)` within machine precision
+  - Verify `Re_d = 4*mdot / (π*d*mu)` within machine precision
+  - Verify `rho_corrected = rho_ideal / Z` for Z ≠ 1
+  - Test with Z=1.0 (ideal gas) matches existing functions
+  - Test with Z=0.8 (high-pressure natural gas) shows correct density correction
+  - Test all utility functions match manual calculations
+  - Test round-trip: area → beta → area
+- [ ] Update `docs/API_REFERENCE.md` with struct definition and usage examples
+- [ ] **Add unit entries to `include/units_data.h` (5 entries: 1 composite + 4 utilities)**
 - [ ] **Run `python scripts/generate_units_md.py` to regenerate `docs/UNITS.md`**
 - [ ] Run all tests: `pytest python/tests/`
-- [ ] Commit: "Add orifice flow utility functions"
+- [ ] Commit: "Add orifice flow utilities with real gas support and OrificeFlowResult dataclass"
+- [ ] **Update TODO.md to mark phase complete**
 
 **Testing requirements:**
-- Each function must match manual calculation within machine precision
+- Each property in `OrificeFlowResult` must match individual function calls
+- Test with ideal gas (Z=1.0) and real gas (Z=0.7-0.9)
 - Test with realistic orifice geometries (beta = 0.2 to 0.7)
-- Verify units: [m/s], [m²], [-], [-]
+- Test at various pressures: low (1 bar, Z≈1.0), medium (10 bar, Z≈0.95), high (100 bar, Z≈0.8)
+- Verify units: [kg/s], [m/s], [-], [-], [-], [-], [kg/m³]
+- Verify IDE autocomplete works (manual check)
 - Round-trip tests where applicable
 
+**Engineering Perspective:**
+- **Real gas correction is critical** for high-pressure applications (natural gas metering, CO2 injection)
+- **Z factor typically ranges:** 0.7-1.0 depending on pressure, temperature, gas composition
+- **Users can obtain Z from:** NIST REFPROP, Peng-Robinson EOS, or other libraries
+- **Default Z=1.0** ensures backward compatibility with ideal gas assumptions
+- **Dataclass pattern** provides excellent UX: `result.mdot`, `result.Cd`, etc.
+
+**Software Perspective:**
+- **Consistent with Phase 8** (`AirProperties` dataclass pattern)
+- **Single composite function** reduces API surface area, easier to maintain
+- **Z parameter is optional** - doesn't break existing code
+- **Utility functions** still available for simple calculations
+- **Type-safe** - IDE knows all properties and their types
+- **Self-documenting** - property names are clear and unambiguous
+
+**Example Usage:**
+```python
+import combaero as cb
+
+# High-pressure natural gas metering (Z from external library)
+geom = cb.OrificeGeometry(d=0.05, D=0.1)  # beta = 0.5
+T = 300  # K
+P = 10e6  # 100 bar
+mu = 1.1e-5  # Pa·s
+Z = 0.85  # From REFPROP or Peng-Robinson
+
+# Single call gets all properties with real gas correction
+result = cb.orifice_flow(geom, dP=50000, T=T, P=P, mu=mu, Z=Z)
+
+print(f"Mass flow: {result.mdot:.3f} kg/s")
+print(f"Velocity: {result.v:.2f} m/s")
+print(f"Cd: {result.Cd:.3f}")
+print(f"Re_d: {result.Re_d:.0f}")
+print(f"Density (corrected): {result.rho_corrected:.3f} kg/m³")
+```
+
 **Example to create:**
-- [ ] `python/examples/orifice_flow_metering.py` - Demonstrate Cd correlations, beta effects, Re effects, flow measurement
+- [ ] `python/examples/orifice_flow_metering.py` - Demonstrate:
+  - Cd correlations (sharp, thick, rounded)
+  - Beta effects on pressure drop
+  - Reynolds number effects
+  - Real gas correction (Z factor) for high-pressure natural gas
+  - Comparison: ideal gas (Z=1.0) vs real gas (Z=0.85)
+  - Flow measurement uncertainty analysis
+
+**Future Considerations:**
+- [ ] Add `to_dict()` method to `OrificeFlowResult` for serialization
+- [ ] Consider similar dataclass patterns for other flow types:
+  - **PipeFlowResult** - Bundle pipe flow properties (v, Re, f, dP, etc.)
+  - **NozzleFlowResult** - Bundle nozzle flow properties (mdot, M, T_exit, etc.)
+  - **CompressorResult** - Bundle compressor performance (mdot, W, eta, T_out, etc.)
 
 **Status:** Not started
 
