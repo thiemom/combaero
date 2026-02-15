@@ -273,3 +273,36 @@ double peclet(double T, double P, const std::vector<double>& X, double V, double
 
     return (V * L) / alpha;
 }
+
+// -------------------------------------------------------------
+// Transport State Bundle
+// -------------------------------------------------------------
+
+TransportState transport_state(double T, double P, const std::vector<double>& X) {
+    if (T <= 0) {
+        throw std::invalid_argument("transport_state: temperature must be positive");
+    }
+    if (P <= 0) {
+        throw std::invalid_argument("transport_state: pressure must be positive");
+    }
+    if (X.empty()) {
+        throw std::invalid_argument("transport_state: mole fractions vector cannot be empty");
+    }
+
+    TransportState state;
+
+    // Echo back inputs
+    state.T = T;
+    state.P = P;
+
+    // Compute all transport properties
+    state.rho = density(T, P, X);
+    state.mu = viscosity(T, P, X);
+    state.k = thermal_conductivity(T, P, X);
+    state.nu = kinematic_viscosity(T, P, X);
+    state.alpha = thermal_diffusivity(T, P, X);
+    state.Pr = prandtl(T, P, X);
+    state.cp = cp_mass(T, X);
+
+    return state;
+}

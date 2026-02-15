@@ -449,6 +449,69 @@ PYBIND11_MODULE(_core, m)
         "Peclet number Pe = V*L/alpha (thermal) [-]."
     );
 
+    // TransportState struct binding - Bundle of transport properties
+    py::class_<TransportState>(m, "TransportState",
+        "Bundle of transport properties for a gas mixture.\n\n"
+        "All properties are read-only attributes computed in a single call.\n"
+        "Provides IDE autocomplete and type safety.\n\n"
+        "Attributes:\n"
+        "  T     : Temperature [K] (input, echoed back)\n"
+        "  P     : Pressure [Pa] (input, echoed back)\n"
+        "  rho   : Density [kg/m³]\n"
+        "  mu    : Dynamic viscosity [Pa·s]\n"
+        "  k     : Thermal conductivity [W/(m·K)]\n"
+        "  nu    : Kinematic viscosity [m²/s]\n"
+        "  alpha : Thermal diffusivity [m²/s]\n"
+        "  Pr    : Prandtl number [-]\n"
+        "  cp    : Specific heat at constant pressure [J/(kg·K)]")
+        .def_readonly("T", &TransportState::T, "Temperature [K]")
+        .def_readonly("P", &TransportState::P, "Pressure [Pa]")
+        .def_readonly("rho", &TransportState::rho, "Density [kg/m³]")
+        .def_readonly("mu", &TransportState::mu, "Dynamic viscosity [Pa·s]")
+        .def_readonly("k", &TransportState::k, "Thermal conductivity [W/(m·K)]")
+        .def_readonly("nu", &TransportState::nu, "Kinematic viscosity [m²/s]")
+        .def_readonly("alpha", &TransportState::alpha, "Thermal diffusivity [m²/s]")
+        .def_readonly("Pr", &TransportState::Pr, "Prandtl number [-]")
+        .def_readonly("cp", &TransportState::cp, "Specific heat at constant pressure [J/(kg·K)]")
+        .def("__repr__", [](const TransportState& s) {
+            return "<TransportState: T=" + std::to_string(s.T) + " K, "
+                   "P=" + std::to_string(s.P) + " Pa, "
+                   "mu=" + std::to_string(s.mu) + " Pa·s, "
+                   "k=" + std::to_string(s.k) + " W/(m·K), "
+                   "Pr=" + std::to_string(s.Pr) + ">";
+        });
+
+    m.def(
+        "transport_state",
+        [](double T,
+           double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr)
+        {
+            auto X = to_vec(X_arr);
+            return transport_state(T, P, X);
+        },
+        py::arg("T"),
+        py::arg("P"),
+        py::arg("X"),
+        "Compute all transport properties at once.\n\n"
+        "Convenience function that computes all transport properties\n"
+        "for a gas mixture in a single call. Returns TransportState struct\n"
+        "with read-only attributes for IDE autocomplete support.\n\n"
+        "Parameters:\n"
+        "  T : temperature [K]\n"
+        "  P : pressure [Pa]\n"
+        "  X : mole fractions [-]\n\n"
+        "Returns: TransportState object with attributes:\n"
+        "  T, P, rho, mu, k, nu, alpha, Pr, cp\n\n"
+        "Example:\n"
+        "  >>> X = cb.standard_dry_air_composition()\n"
+        "  >>> state = cb.transport_state(T=300, P=101325, X=X)\n"
+        "  >>> print(state.mu)  # IDE autocomplete works!\n"
+        "  1.85e-05\n"
+        "  >>> print(state.Pr)\n"
+        "  0.707"
+    );
+
     // Humid air utilities
     m.def(
         "standard_dry_air_composition",

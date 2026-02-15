@@ -57,47 +57,56 @@ Next target: Composite Python dataclasses for thermodynamic, transport, and comb
 - **Python side:** Bound as class with readonly attributes
 - **Consistent with:** AirProperties, OrificeFlowResult, AcousticProperties patterns
 
-**Properties to include (~15):**
-- [ ] `T` - Temperature [K] (input, echoed back)
-- [ ] `P` - Pressure [Pa] (input, echoed back)
-- [ ] `rho` - Density [kg/m³]
-- [ ] `cp` - Specific heat at constant pressure [J/(mol·K)]
-- [ ] `cv` - Specific heat at constant volume [J/(mol·K)]
-- [ ] `h` - Specific enthalpy [J/mol]
-- [ ] `s` - Specific entropy [J/(mol·K)]
-- [ ] `u` - Specific internal energy [J/mol]
-- [ ] `gamma` - Isentropic expansion coefficient [-]
-- [ ] `a` - Speed of sound [m/s]
-- [ ] `cp_mass` - Mass-specific cp [J/(kg·K)]
-- [ ] `cv_mass` - Mass-specific cv [J/(kg·K)]
-- [ ] `h_mass` - Mass-specific enthalpy [J/kg]
-- [ ] `s_mass` - Mass-specific entropy [J/(kg·K)]
-- [ ] `u_mass` - Mass-specific internal energy [J/kg]
-- [ ] `mw` - Molecular weight [g/mol]
+**Properties to include (16):**
+- [x] `T` - Temperature [K] (input, echoed back)
+- [x] `P` - Pressure [Pa] (input, echoed back)
+- [x] `rho` - Density [kg/m³]
+- [x] `cp` - Specific heat at constant pressure [J/(mol·K)]
+- [x] `cv` - Specific heat at constant volume [J/(mol·K)]
+- [x] `h` - Specific enthalpy [J/mol]
+- [x] `s` - Specific entropy [J/(mol·K)]
+- [x] `u` - Specific internal energy [J/mol]
+- [x] `gamma` - Isentropic expansion coefficient [-]
+- [x] `a` - Speed of sound [m/s]
+- [x] `cp_mass` - Mass-specific cp [J/(kg·K)]
+- [x] `cv_mass` - Mass-specific cv [J/(kg·K)]
+- [x] `h_mass` - Mass-specific enthalpy [J/kg]
+- [x] `s_mass` - Mass-specific entropy [J/(kg·K)]
+- [x] `u_mass` - Mass-specific internal energy [J/kg]
+- [x] `mw` - Molecular weight [g/mol]
 
 **Function signature:**
 ```python
-thermo_state(T: float, P: float, X: list[float]) -> ThermoState
+thermo_state(T: float, P: float, X: list[float], P_ref: float = 101325.0) -> ThermoState
 ```
 
 **Implementation:**
-- [ ] Create `struct ThermoState` in `include/thermo.h`
-- [ ] Implement `thermo_state()` function in `src/thermo.cpp`
-- [ ] Add pybind11 binding in `python/combaero/_core.cpp`
-- [ ] Export in `python/combaero/__init__.py`
-- [ ] Write comprehensive tests in `python/tests/test_thermo_state.py`
-- [ ] Update `docs/API_REFERENCE.md`
-- [ ] Add unit entry to `include/units_data.h`
-- [ ] Regenerate `docs/UNITS.md`
-- [ ] **Design consideration:** Property names suitable for `.to_dict()` serialization
+- [x] Create `struct ThermoState` in `include/thermo.h`
+- [x] Implement `thermo_state()` function in `src/thermo.cpp`
+- [x] Add pybind11 binding in `python/combaero/_core.cpp`
+- [x] Export in `python/combaero/__init__.py`
+- [x] Write comprehensive tests in `python/tests/test_thermo_state.py`
+- [x] Update `docs/API_REFERENCE.md`
+- [x] Add unit entry to `include/units_data.h`
+- [x] Regenerate `docs/UNITS.md`
+- [x] **Design consideration:** Property names suitable for `.to_dict()` serialization
 
 **Testing requirements:**
-- Each property must match individual function call within machine precision
-- Test with various gas compositions (air, methane, combustion products)
-- Test at various conditions (ambient, high T, high P)
-- Verify all properties are consistent (e.g., h = u + P/rho)
+- [x] Each property must match individual function call within machine precision
+- [x] Test with various gas compositions (air, methane, combustion products)
+- [x] Test at various conditions (ambient, high T, high P)
+- [x] Verify all properties are consistent (e.g., h = u + P/rho)
 
-**Status:** Not started
+**Test Results:**
+- ✅ 35 new tests (14 test classes)
+- ✅ Machine precision verification for all 16 properties
+- ✅ Physical relationships verified (gamma=cp/cv, h=u+PV, ideal gas law)
+- ✅ Mass-molar conversion consistency
+- ✅ Temperature range: 200-2000 K
+- ✅ Pressure range: 1 kPa - 10 MPa
+- ✅ All 357 tests pass (35 new + 322 existing)
+
+**Status:** ✅ COMPLETE (Commit: 17ff696)
 
 ---
 

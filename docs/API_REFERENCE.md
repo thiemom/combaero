@@ -341,6 +341,48 @@ double reynolds(double T, double P, const std::vector<double>& X, double V, doub
 double peclet(double T, double P, const std::vector<double>& X, double V, double L);    // Pe = VL/α
 ```
 
+### Transport State Bundle
+
+Convenience function that computes all transport properties for a gas mixture in a single call. Returns `TransportState` struct with read-only attributes.
+
+```python
+# Python usage with IDE autocomplete
+X = cb.standard_dry_air_composition()
+state = cb.transport_state(T=300, P=101325, X=X)
+print(state.mu)      # 1.68e-05 Pa·s
+print(state.Pr)      # 0.781
+print(state.nu)      # 1.42e-05 m²/s
+```
+
+**TransportState attributes:**
+- `T` - Temperature [K] (input, echoed back)
+- `P` - Pressure [Pa] (input, echoed back)
+- `rho` - Density [kg/m³]
+- `mu` - Dynamic viscosity [Pa·s]
+- `k` - Thermal conductivity [W/(m·K)]
+- `nu` - Kinematic viscosity [m²/s]
+- `alpha` - Thermal diffusivity [m²/s]
+- `Pr` - Prandtl number [-]
+- `cp` - Specific heat at constant pressure [J/(kg·K)]
+
+**Parameters:**
+- `T` - Temperature [K]
+- `P` - Pressure [Pa]
+- `X` - Mole fractions [-]
+
+**Benefits:**
+- Single function call for all transport properties
+- IDE autocomplete for all attributes
+- Type-safe attribute access
+- Consistent with ThermoState, AirProperties patterns
+- Includes derived properties (nu, alpha, Pr)
+
+**Use cases:**
+- Heat transfer calculations
+- Fluid dynamics analysis
+- Boundary layer computations
+- Reynolds and Prandtl number evaluations
+
 ## Utility Functions
 
 ```cpp
