@@ -174,32 +174,65 @@ transport_state(T: float, P: float, X: list[float]) -> TransportState
 
 **Rationale:** Combustion calculations involve many related properties (equivalence ratio, adiabatic temperature, product composition). A dataclass bundles these for convenient analysis.
 
-**Design Decision:** ✅ **Dataclass for combustion state**
-- **C++ side:** `struct CombustionState { double phi; double T_ad; double LHV; ... };`
-- **Python side:** Bound as class with readonly attributes
-- **Consistent with:** Established dataclass patterns
+**Design Decision:** ✅ **Nested dataclass with ThermoState objects**
+- **C++ side:** `struct CombustionState { ThermoState reactants; ThermoState products; double phi; ... };`
+- **Python side:** Bound as class with readonly attributes, nested ThermoState access
+- **Consistent with:** Established dataclass patterns + composition over duplication
+- **Key insights:**
+  - Fuel/oxidizer are composition vectors (not strings) to support fuel mixtures
+  - Reactants and products are full thermodynamic states - reuse ThermoState!
+  - Avoids duplication: instead of storing T, P, X, h separately, nest ThermoState objects
 
-**Properties to include (~8-10):**
-- [ ] `phi` - Equivalence ratio [-]
-- [ ] `T_ad` - Adiabatic flame temperature [K]
-- [ ] `LHV` - Lower heating value [J/mol or J/kg]
-- [ ] `AFR_mass` - Air-fuel ratio (mass basis) [-]
-- [ ] `AFR_mole` - Air-fuel ratio (mole basis) [-]
-- [ ] `X_products` - Product mole fractions (vector)
-- [ ] `Y_products` - Product mass fractions (vector)
-- [ ] `h_reactants` - Reactant enthalpy [J/mol]
-- [ ] `h_products` - Product enthalpy [J/mol]
-- [ ] `fuel_name` - Fuel name (string). <-- what is "fuel_name" ?
-- [ ] `mixture_fraction' - Bilger Mixture fraction [-]
+**Properties (~4-5 core + 2×16 from nested ThermoStates = ~36 total):**
+- [ ] `phi` - Equivalence ratio [-] (input, echoed back)
+- [ ] `fuel_name` - Optional fuel label (string, default: "")
+- [ ] `reactants` - **ThermoState** at (T_reactants, P, X_reactants)
+  - Includes all 16 ThermoState properties: T, P, rho, cp, cv, h, s, u, gamma, a, cp_mass, cv_mass, h_mass, s_mass, u_mass, mw
+- [ ] `products` - **ThermoState** at (T_ad, P, X_products)
+  - Includes all 16 ThermoState properties: T, P, rho, cp, cv, h, s, u, gamma, a, cp_mass, cv_mass, h_mass, s_mass, u_mass, mw
+- [ ] `mixture_fraction` - Bilger mixture fraction [-]
+- [ ] `fuel_burn_fraction` - Fraction of fuel burned [0-1] (useful for O2-limited cases)
 
 **Function signature:**
 ```python
-combustion_state(fuel: str, phi: float, T_reactants: float, P: float) -> CombustionState
+combustion_state(
+    X_fuel: list[float],      # Fuel composition (can be pure or mixture)
+    X_ox: list[float],        # Oxidizer composition
+    phi: float,               # Equivalence ratio [-]
+    T_reactants: float,       # Reactant temperature [K]
+    P: float,                 # Pressure [Pa]
+    fuel_name: str = ""       # Optional label for fuel (e.g., "CH4", "Natural Gas")
+) -> CombustionState
+```
+
+**Usage example:**
+```python
+X_CH4 = [0, 0, 0, 0, 0, 1.0, 0, ...]  # Pure methane
+X_air = cb.standard_dry_air_composition()
+state = cb.combustion_state(X_CH4, X_air, phi=1.0, T_reactants=300, P=101325)
+
+# Combustion properties
+print(state.phi)                    # 1.0
+print(state.mixture_fraction)       # 0.055
+
+# Reactant thermo properties (all 16 from ThermoState)
+print(state.reactants.T)            # 300 K
+print(state.reactants.h)            # -103.6 J/mol
+print(state.reactants.rho)          # 1.177 kg/m³
+
+# Product thermo properties (all 16 from ThermoState)
+print(state.products.T)             # 2328 K (T_ad)
+print(state.products.h)             # -103.6 J/mol (energy balance)
+print(state.products.gamma)         # 1.28 (lower at high T)
 ```
 
 **Implementation:**
-- [ ] Create `struct CombustionState` in `include/combustion.h`
+- [ ] Create `struct CombustionState` in `include/combustion.h` (with nested ThermoState)
 - [ ] Implement `combustion_state()` function in `src/combustion.cpp`
+  - Compute X_reactants from set_equivalence_ratio_mole()
+  - Compute X_products from complete_combustion_to_CO2_H2O()
+  - Call thermo_state() for reactants and products
+  - Compute mixture_fraction from bilger_mixture_fraction_from_moles()
 - [ ] Add pybind11 binding in `python/combaero/_core.cpp`
 - [ ] Export in `python/combaero/__init__.py`
 - [ ] Write comprehensive tests in `python/tests/test_combustion_state.py`
@@ -208,11 +241,13 @@ combustion_state(fuel: str, phi: float, T_reactants: float, P: float) -> Combust
 - [ ] Regenerate `docs/UNITS.md`
 
 **Testing requirements:**
-- Each property must match individual function call within machine precision
-- Test with various fuels (CH4, C3H8, etc.)
+- Verify nested ThermoState properties match individual thermo_state() calls
+- Verify energy balance: state.reactants.h == state.products.h (for adiabatic)
+- Test with various fuels (CH4, C3H8, fuel mixtures)
 - Test at various equivalence ratios (lean, stoichiometric, rich)
-- Verify energy balance: h_reactants = h_products (for adiabatic)
-- Compare with Cantera validation tests
+- Verify phi matches equivalence_ratio_mole() calculation
+- Verify mixture_fraction matches bilger_mixture_fraction_from_moles()
+- Compare T_ad with Cantera validation tests
 
 **Status:** Not started
 
