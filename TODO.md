@@ -314,10 +314,10 @@ print(state.products.transport.Pr)       # 0.73
 - **Python side:** Nested structure with `state.thermo.X` and `state.transport.X` access
 - **Reusable:** Will be used in Phase 14 for reactants and products
 
-**Properties (~25 total = 16 thermo + 9 transport):**
-- [ ] `thermo` - **ThermoState** with all 16 thermodynamic properties
+**Properties (25 total = 16 thermo + 9 transport):**
+- [x] `thermo` - **ThermoState** with all 16 thermodynamic properties
   - T, P, rho, cp, cv, h, s, u, gamma, a, cp_mass, cv_mass, h_mass, s_mass, u_mass, mw
-- [ ] `transport` - **TransportState** with all 9 transport properties
+- [x] `transport` - **TransportState** with all 9 transport properties
   - T, P, rho, mu, k, nu, alpha, Pr, cp
 
 **Function signature:**
@@ -340,22 +340,31 @@ print(state.transport.Pr)    # 0.781
 ```
 
 **Implementation:**
-- [ ] Create `struct CompleteState` in `include/state.h` (or new header)
-- [ ] Implement `complete_state()` function (just calls thermo_state + transport_state)
-- [ ] Add pybind11 binding in `python/combaero/_core.cpp`
-- [ ] Export in `python/combaero/__init__.py`
-- [ ] Write comprehensive tests in `python/tests/test_complete_state.py`
-- [ ] Update `docs/API_REFERENCE.md`
-- [ ] Add unit entry to `include/units_data.h`
-- [ ] Regenerate `docs/UNITS.md`
+- [x] Create `struct CompleteState` in `include/thermo.h`
+- [x] Implement `complete_state()` function (calls thermo_state + transport_state)
+- [x] Add pybind11 binding in `python/combaero/_core.cpp`
+- [x] Export in `python/combaero/__init__.py`
+- [x] Write comprehensive tests in `python/tests/test_complete_state.py`
+- [x] Update `docs/API_REFERENCE.md`
+- [x] Add unit entry to `include/units_data.h`
+- [x] Regenerate `docs/UNITS.md`
 
 **Testing requirements:**
-- Verify state.thermo matches thermo_state() call
-- Verify state.transport matches transport_state() call
-- Test with various compositions and conditions
-- Verify all nested properties are accessible
+- [x] Verify state.thermo matches thermo_state() call
+- [x] Verify state.transport matches transport_state() call
+- [x] Test with various compositions and conditions
+- [x] Verify all nested properties are accessible
 
-**Status:** Ready to implement (Phase 15 → Phase 14)
+**Test Results:**
+- ✅ 23 new tests (8 test classes)
+- ✅ Nested states match individual function calls at machine precision
+- ✅ Consistency verified between thermo and transport (T, P, rho)
+- ✅ Various compositions tested (air, N2, CH4)
+- ✅ Temperature range: 200-1500 K
+- ✅ Pressure range: 1 kPa - 2 MPa
+- ✅ All 411 tests pass (23 new + 388 existing)
+
+**Status:** ✅ COMPLETE (Commit: cc9a10c)
 
 ---
 
