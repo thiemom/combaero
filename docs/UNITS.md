@@ -353,13 +353,14 @@ All functions use consistent units to avoid conversion errors.
 
 ### cooling_correlations.h - Advanced Cooling Correlations
 
-| Function                         | Input Units                                                      | Output Unit |
-|----------------------------------|------------------------------------------------------------------|-------------|
-| `rib_enhancement_factor`         | e_D: -, P_e: -, alpha: deg                                       | -           |
-| `rib_friction_multiplier`        | e_D: -, P_e: -                                                   | -           |
-| `impingement_nusselt`            | Re_jet: -, Pr: -, z_D: -, x_D: - (default 0), y_D: - (default 0) | -           |
-| `film_cooling_effectiveness`     | x_D: -, M: -, DR: -, alpha_deg: deg                              | -           |
-| `film_cooling_effectiveness_avg` | x_D: -, M: -, DR: -, alpha_deg: deg, s_D: - (default 3)          | -           |
+| Function                         | Input Units                                                        | Output Unit |
+|----------------------------------|--------------------------------------------------------------------|-------------|
+| `rib_enhancement_factor`         | e_D: -, P_e: -, alpha: deg                                         | -           |
+| `rib_friction_multiplier`        | e_D: -, P_e: -                                                     | -           |
+| `impingement_nusselt`            | Re_jet: -, Pr: -, z_D: -, x_D: - (default 0), y_D: - (default 0)   | -           |
+| `film_cooling_effectiveness`     | x_D: -, M: -, DR: -, alpha_deg: deg                                | -           |
+| `film_cooling_effectiveness_avg` | x_D: -, M: -, DR: -, alpha_deg: deg, s_D: - (default 3.0)          | -           |
+| `film_cooling_multirow_sellers`  | row_positions_xD: list[-], eval_xD: -, M: -, DR: -, alpha_deg: deg | -           |
 
 ### acoustics.h - Acoustic Properties
 

@@ -274,4 +274,147 @@ double film_cooling_multirow_sellers(
     return 1.0 - product_term;
 }
 
+// -------------------------------------------------------------
+// Effusion Cooling
+// -------------------------------------------------------------
+
+// Validate effusion cooling parameters
+void validate_effusion_params(double M, double DR, double porosity, double s_D, double alpha_deg) {
+    if (M < 1.0 || M > 4.0) {
+        throw std::runtime_error("Effusion blowing ratio M must be in range [1.0, 4.0], got " + std::to_string(M));
+    }
+    if (DR < 1.2 || DR > 2.0) {
+        throw std::runtime_error("Density ratio DR must be in range [1.2, 2.0], got " + std::to_string(DR));
+    }
+    if (porosity < 0.02 || porosity > 0.10) {
+        throw std::runtime_error("Porosity must be in range [0.02, 0.10], got " + std::to_string(porosity));
+    }
+    if (s_D < 4.0 || s_D > 8.0) {
+        throw std::runtime_error("Hole spacing s_D must be in range [4.0, 8.0], got " + std::to_string(s_D));
+    }
+    if (alpha_deg < 20.0 || alpha_deg > 45.0) {
+        throw std::runtime_error("Injection angle alpha must be in range [20, 45] degrees, got " + std::to_string(alpha_deg));
+    }
+}
+
+// Validate effusion discharge coefficient parameters
+void validate_effusion_discharge_params(double Re_d, double P_ratio, double alpha_deg, double L_D) {
+    if (Re_d < 3000.0) {
+        throw std::runtime_error("Hole Reynolds number Re_d must be > 3000, got " + std::to_string(Re_d));
+    }
+    if (P_ratio < 1.02 || P_ratio > 1.15) {
+        throw std::runtime_error("Pressure ratio P_ratio must be in range [1.02, 1.15], got " + std::to_string(P_ratio));
+    }
+    if (alpha_deg < 20.0 || alpha_deg > 45.0) {
+        throw std::runtime_error("Injection angle alpha must be in range [20, 45] degrees, got " + std::to_string(alpha_deg));
+    }
+    if (L_D < 2.0 || L_D > 8.0) {
+        throw std::runtime_error("Hole length/diameter L_D must be in range [2.0, 8.0], got " + std::to_string(L_D));
+    }
+}
+
+// Effusion cooling effectiveness
+// Based on Lefebvre (1984) momentum flux ratio approach with crossflow effects
+double effusion_effectiveness(
+    double x_D,
+    double M,
+    double DR,
+    double porosity,
+    double s_D,
+    double alpha_deg
+) {
+    // Validate parameters
+    validate_effusion_params(M, DR, porosity, s_D, alpha_deg);
+    
+    if (x_D < 0.0) {
+        throw std::runtime_error("Distance x_D must be non-negative, got " + std::to_string(x_D));
+    }
+    
+    // Convert angle to radians
+    double alpha_rad = alpha_deg * M_PI / 180.0;
+    
+    // Momentum flux ratio (key parameter for effusion)
+    // I = (rho_c * v_c^2) / (rho_inf * v_inf^2) = M^2 * DR
+    double I = M * M * DR;
+    
+    // Effective blowing ratio accounting for hole density
+    // Higher porosity → more coolant → higher effective coverage
+    double M_eff = M * std::sqrt(porosity / 0.05);  // Normalized to 5% porosity
+    
+    // Crossflow accumulation factor (L'Ecuyer & Matsuura 1985)
+    // Effusion builds up crossflow, reducing effectiveness decay
+    double crossflow_factor = 1.0 + 0.3 * porosity * x_D / s_D;
+    
+    // Angle correction (shallow angles better for lateral spreading)
+    double f_angle = 1.0 - 0.3 * std::pow(std::sin(alpha_rad), 2.0);
+    
+    // Lefebvre-style decay with momentum flux ratio
+    // eta = 1 / (1 + C * (x/I^0.5)^n)
+    // Modified for effusion with crossflow buildup
+    double C = 0.6 / crossflow_factor;  // Decay constant reduced by crossflow
+    double decay_param = (x_D / std::sqrt(I)) * std::pow(s_D / 6.0, 0.5);
+    
+    double eta = f_angle / (1.0 + C * std::pow(decay_param, 0.75));
+    
+    // Initial region (x_D < 2): blend from hole exit to fully developed
+    if (x_D < 2.0) {
+        double eta_exit = 0.5 * f_angle;  // Typical hole exit effectiveness
+        eta = eta_exit + (eta - eta_exit) * (x_D / 2.0);
+    }
+    
+    // Clamp to physical bounds
+    return std::max(0.0, std::min(1.0, eta));
+}
+
+// Effusion hole discharge coefficient
+// Accounts for compressibility, inclination, and L/D ratio
+double effusion_discharge_coefficient(
+    double Re_d,
+    double P_ratio,
+    double alpha_deg,
+    double L_D
+) {
+    // Validate parameters
+    validate_effusion_discharge_params(Re_d, P_ratio, alpha_deg, L_D);
+    
+    // Convert angle to radians
+    double alpha_rad = alpha_deg * M_PI / 180.0;
+    
+    // Base discharge coefficient for straight cylindrical hole
+    // Hay & Spencer (1992): Cd_base depends on L/D and Re
+    double Cd_base = 0.72 - 0.05 * std::log(L_D);  // Decreases with L/D
+    
+    // Reynolds number correction (turbulent flow, Re > 3000)
+    // Cd increases slightly with Re in turbulent regime
+    double f_Re = 1.0 + 0.02 * std::log10(Re_d / 10000.0);
+    f_Re = std::max(0.95, std::min(1.05, f_Re));
+    
+    // Inclination angle effect (Gritsch et al. 1998)
+    // Shallow angles reduce effective area and increase losses
+    double f_angle = 1.0 - 0.15 * (1.0 - std::cos(alpha_rad));
+    
+    // Compressibility correction for P_ratio
+    // Use isentropic flow relations for subsonic flow
+    // gamma = 1.4 for air
+    const double gamma = 1.4;
+    double P_crit = std::pow(2.0 / (gamma + 1.0), gamma / (gamma - 1.0));  // ~0.528
+    
+    double f_compress;
+    if (P_ratio < 1.0 / P_crit) {
+        // Subsonic flow: use isentropic relation
+        double term = std::pow(P_ratio, 2.0 / gamma) - std::pow(P_ratio, (gamma + 1.0) / gamma);
+        f_compress = std::sqrt(term / (1.0 - P_ratio));
+        f_compress = std::max(0.9, std::min(1.1, f_compress));
+    } else {
+        // Choked flow (shouldn't happen for P_ratio < 1.15, but handle it)
+        f_compress = 1.0;
+    }
+    
+    // Combined discharge coefficient
+    double Cd = Cd_base * f_Re * f_angle * f_compress;
+    
+    // Clamp to reasonable bounds
+    return std::max(0.50, std::min(0.85, Cd));
+}
+
 }  // namespace combaero::cooling

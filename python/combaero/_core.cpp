@@ -4002,11 +4002,72 @@ PYBIND11_MODULE(_core, m)
         "References:\n"
         "  - Sellers (1963): Superposition principle for multiple rows\n"
         "  - Baldauf et al. (2002): Single-row effectiveness correlation\n\n"
-        "Accuracy: ±15-20% (flat plate; curvature requires Ito correction)\n\n"
+        "Accuracy: +/-15-20% (flat plate; curvature requires Ito correction)\n\n"
         "Example:\n"
         "  >>> rows = [0, 10, 20]  # Three rows at x/D = 0, 10, 20\n"
         "  >>> eta = cb.film_cooling_multirow_sellers(rows, eval_xD=30, M=0.5, DR=1.8, alpha_deg=30)\n"
         "  >>> print(eta)  # Combined effectiveness at x/D = 30"
+    );
+
+    m.def(
+        "effusion_effectiveness",
+        &combaero::cooling::effusion_effectiveness,
+        py::arg("x_D"),
+        py::arg("M"),
+        py::arg("DR"),
+        py::arg("porosity"),
+        py::arg("s_D"),
+        py::arg("alpha_deg"),
+        "Effusion cooling effectiveness for high-density hole arrays.\n\n"
+        "Used in combustor liners with continuous coolant injection.\n"
+        "Based on Lefebvre (1984) momentum flux ratio approach with\n"
+        "crossflow accumulation effects (L'Ecuyer & Matsuura 1985).\n\n"
+        "Parameters:\n"
+        "  x_D      : streamwise distance from first row / hole diameter [-]\n"
+        "  M        : blowing ratio (rho_c*v_c)/(rho_inf*v_inf) [-]\n"
+        "  DR       : density ratio rho_c/rho_inf [-]\n"
+        "  porosity : hole area / total surface area [-]\n"
+        "  s_D      : hole pitch / hole diameter [-]\n"
+        "  alpha_deg: injection angle [degrees]\n\n"
+        "Returns: adiabatic effectiveness eta [-] (0 = no cooling, 1 = perfect)\n\n"
+        "Valid ranges:\n"
+        "  M = 1-4, DR = 1.2-2.0, porosity = 0.02-0.10\n"
+        "  s_D = 4-8, alpha = 20-45 deg\n\n"
+        "Accuracy: +/-20-25% (high-density arrays, combustor liner geometry)\n\n"
+        "References:\n"
+        "  - Lefebvre (1984): Gas Turbine Combustion\n"
+        "  - L'Ecuyer & Matsuura (1985): Crossflow effects\n\n"
+        "Example:\n"
+        "  >>> eta = cb.effusion_effectiveness(x_D=10, M=2.0, DR=1.8, porosity=0.05, s_D=6.0, alpha_deg=30)\n"
+        "  >>> print(eta)  # Effectiveness at x/D = 10"
+    );
+
+    m.def(
+        "effusion_discharge_coefficient",
+        &combaero::cooling::effusion_discharge_coefficient,
+        py::arg("Re_d"),
+        py::arg("P_ratio"),
+        py::arg("alpha_deg"),
+        py::arg("L_D") = 4.0,
+        "Effusion hole discharge coefficient.\n\n"
+        "Accounts for compressibility, inclination, and hole geometry.\n"
+        "Uses isentropic flow relations for subsonic flow.\n\n"
+        "Parameters:\n"
+        "  Re_d      : hole Reynolds number based on diameter [-]\n"
+        "  P_ratio   : plenum/mainstream pressure ratio [-]\n"
+        "  alpha_deg : hole inclination angle [degrees]\n"
+        "  L_D       : hole length / diameter [-] (default: 4.0)\n\n"
+        "Returns: discharge coefficient Cd [-]\n\n"
+        "Valid ranges:\n"
+        "  Re_d > 3000, 1.02 < P_ratio < 1.15\n"
+        "  20 < alpha < 45 deg, 2 < L_D < 8\n\n"
+        "Accuracy: +/-10-15%\n\n"
+        "References:\n"
+        "  - Hay & Spencer (1992): Compressible flow through inclined holes\n"
+        "  - Gritsch et al. (1998): Shaped hole discharge\n\n"
+        "Example:\n"
+        "  >>> Cd = cb.effusion_discharge_coefficient(Re_d=10000, P_ratio=1.05, alpha_deg=30, L_D=4.0)\n"
+        "  >>> print(Cd)  # Discharge coefficient"
     );
 
     // =========================================================================

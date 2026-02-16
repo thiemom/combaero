@@ -106,13 +106,65 @@ double film_cooling_effectiveness_avg(double x_D, double M, double DR,
 //   alpha_deg        : injection angle [deg]
 // Returns: total adiabatic effectiveness [-]
 // Reference: Sellers (1963), Baldauf et al. (2002)
-// Accuracy: ±15-20% (flat plate; curvature requires Ito correction)
+// Accuracy: +/- 15-20% (flat plate; curvature requires Ito correction)
 double film_cooling_multirow_sellers(
     const std::vector<double>& row_positions_xD,
     double eval_xD,
     double M,
     double DR,
     double alpha_deg
+);
+
+// -------------------------------------------------------------
+// Effusion Cooling
+// -------------------------------------------------------------
+
+// Effusion cooling effectiveness for high-density hole arrays
+// Used in combustor liners with continuous coolant injection
+//
+// Parameters:
+//   x_D      : streamwise distance from first row / hole diameter [-]
+//   M        : blowing ratio (rho_c*v_c)/(rho_inf*v_inf) [-]
+//   DR       : density ratio rho_c/rho_inf [-]
+//   porosity : hole area / total surface area [-]
+//   s_D      : hole pitch / hole diameter [-]
+//   alpha_deg: injection angle [degrees]
+//
+// Returns: Adiabatic effectiveness eta [-] (0 = no cooling, 1 = perfect)
+//
+// Source: Lefebvre (1984), "Gas Turbine Combustion"
+//         L'Ecuyer & Matsuura (1985), crossflow effects
+// Valid: M = 1-4, DR = 1.2-2.0, porosity = 0.02-0.10, s_D = 4-8, alpha = 20-45 deg
+// Accuracy: +/- 20-25% (high-density arrays, combustor liner geometry)
+double effusion_effectiveness(
+    double x_D,
+    double M,
+    double DR,
+    double porosity,
+    double s_D,
+    double alpha_deg
+);
+
+// Effusion hole discharge coefficient
+// Accounts for compressibility, inclination, and hole geometry
+//
+// Parameters:
+//   Re_d      : hole Reynolds number based on diameter [-]
+//   P_ratio   : plenum/mainstream pressure ratio [-]
+//   alpha_deg : hole inclination angle [degrees]
+//   L_D       : hole length / diameter [-] (default: 4.0)
+//
+// Returns: Discharge coefficient Cd [-]
+//
+// Source: Hay & Spencer (1992), compressible flow through inclined holes
+//         Gritsch et al. (1998), shaped hole discharge
+// Valid: Re_d > 3000, 1.02 < P_ratio < 1.15, 20 < alpha < 45 deg, 2 < L_D < 8
+// Accuracy: +/- 10-15%
+double effusion_discharge_coefficient(
+    double Re_d,
+    double P_ratio,
+    double alpha_deg,
+    double L_D = 4.0
 );
 
 // -------------------------------------------------------------
@@ -123,6 +175,8 @@ double film_cooling_multirow_sellers(
 void validate_rib_params(double e_D, double P_e, double alpha);
 void validate_impingement_params(double Re_jet, double z_D, double x_D, double y_D);
 void validate_film_cooling_params(double M, double DR, double alpha_deg);
+void validate_effusion_params(double M, double DR, double porosity, double s_D, double alpha_deg);
+void validate_effusion_discharge_params(double Re_d, double P_ratio, double alpha_deg, double L_D);
 
 } // namespace combaero::cooling
 

@@ -344,10 +344,10 @@ class TestMultiRowSellers:
         M = 0.5
         DR = 1.8
         alpha = 30.0
-        
+
         eta_multirow = cb.film_cooling_multirow_sellers(rows, eval_xD, M, DR, alpha)
         eta_single = cb.film_cooling_effectiveness(eval_xD, M, DR, alpha)
-        
+
         assert eta_multirow == pytest.approx(eta_single, rel=1e-10)
 
     def test_two_rows_higher_than_single(self):
@@ -356,13 +356,13 @@ class TestMultiRowSellers:
         DR = 1.8
         alpha = 30.0
         eval_xD = 20.0
-        
+
         # Single row at x/D = 0
         eta_single = cb.film_cooling_multirow_sellers([0.0], eval_xD, M, DR, alpha)
-        
+
         # Two rows at x/D = 0 and 10
         eta_double = cb.film_cooling_multirow_sellers([0.0, 10.0], eval_xD, M, DR, alpha)
-        
+
         # Double row should be more effective
         assert eta_double > eta_single
 
@@ -372,10 +372,10 @@ class TestMultiRowSellers:
         DR = 1.8
         alpha = 30.0
         eval_xD = 30.0
-        
+
         eta_two = cb.film_cooling_multirow_sellers([0.0, 10.0], eval_xD, M, DR, alpha)
         eta_three = cb.film_cooling_multirow_sellers([0.0, 10.0, 20.0], eval_xD, M, DR, alpha)
-        
+
         assert eta_three > eta_two
 
     def test_downstream_rows_ignored(self):
@@ -384,11 +384,15 @@ class TestMultiRowSellers:
         DR = 1.8
         alpha = 30.0
         eval_xD = 15.0
-        
+
         # Only first two rows should contribute
-        eta_with_downstream = cb.film_cooling_multirow_sellers([0.0, 10.0, 20.0, 30.0], eval_xD, M, DR, alpha)
-        eta_without_downstream = cb.film_cooling_multirow_sellers([0.0, 10.0], eval_xD, M, DR, alpha)
-        
+        eta_with_downstream = cb.film_cooling_multirow_sellers(
+            [0.0, 10.0, 20.0, 30.0], eval_xD, M, DR, alpha
+        )
+        eta_without_downstream = cb.film_cooling_multirow_sellers(
+            [0.0, 10.0], eval_xD, M, DR, alpha
+        )
+
         assert eta_with_downstream == pytest.approx(eta_without_downstream, rel=1e-10)
 
     def test_sellers_superposition_formula(self):
@@ -398,16 +402,16 @@ class TestMultiRowSellers:
         M = 0.5
         DR = 1.8
         alpha = 30.0
-        
+
         # Get individual row effectiveness
         eta1 = cb.film_cooling_effectiveness(eval_xD - rows[0], M, DR, alpha)
         eta2 = cb.film_cooling_effectiveness(eval_xD - rows[1], M, DR, alpha)
-        
+
         # Sellers formula: eta_total = 1 - (1-eta1)*(1-eta2)
         eta_expected = 1.0 - (1.0 - eta1) * (1.0 - eta2)
-        
+
         eta_actual = cb.film_cooling_multirow_sellers(rows, eval_xD, M, DR, alpha)
-        
+
         assert eta_actual == pytest.approx(eta_expected, rel=1e-10)
 
     def test_effectiveness_bounded_by_one(self):
@@ -417,7 +421,7 @@ class TestMultiRowSellers:
         M = 2.0
         DR = 2.0
         alpha = 30.0
-        
+
         for eval_xD in [25.0, 30.0, 40.0]:
             eta = cb.film_cooling_multirow_sellers(rows, eval_xD, M, DR, alpha)
             assert eta <= 1.0
@@ -435,11 +439,130 @@ class TestMultiRowSellers:
         M = 0.5
         DR = 1.8
         alpha = 30.0
-        
+
         eta_ordered = cb.film_cooling_multirow_sellers(rows_ordered, eval_xD, M, DR, alpha)
         eta_shuffled = cb.film_cooling_multirow_sellers(rows_shuffled, eval_xD, M, DR, alpha)
-        
+
         assert eta_ordered == pytest.approx(eta_shuffled, rel=1e-10)
+
+
+class TestEffusionCooling:
+    """Test effusion cooling correlations."""
+
+    def test_effusion_effectiveness_baseline(self):
+        """Test effusion effectiveness at typical conditions."""
+        eta = cb.effusion_effectiveness(
+            x_D=10.0, M=2.0, DR=1.8, porosity=0.05, s_D=6.0, alpha_deg=30
+        )
+        # Should be moderate effectiveness (0.2-0.5 range typical)
+        assert 0.2 < eta < 0.6
+
+    def test_effusion_higher_porosity_increases_effectiveness(self):
+        """Test that higher porosity gives better cooling."""
+        eta_low = cb.effusion_effectiveness(10, 2.0, 1.8, 0.03, 6.0, 30)
+        eta_high = cb.effusion_effectiveness(10, 2.0, 1.8, 0.08, 6.0, 30)
+
+        assert eta_high > eta_low
+
+    def test_effusion_effectiveness_decays_downstream(self):
+        """Test that effectiveness decays with distance."""
+        eta_near = cb.effusion_effectiveness(5, 2.0, 1.8, 0.05, 6.0, 30)
+        eta_far = cb.effusion_effectiveness(20, 2.0, 1.8, 0.05, 6.0, 30)
+
+        assert eta_near > eta_far
+
+    def test_effusion_higher_blowing_ratio_increases_effectiveness(self):
+        """Test that higher M gives better cooling."""
+        eta_low = cb.effusion_effectiveness(10, 1.5, 1.8, 0.05, 6.0, 30)
+        eta_high = cb.effusion_effectiveness(10, 3.0, 1.8, 0.05, 6.0, 30)
+
+        assert eta_high > eta_low
+
+    def test_effusion_parameter_validation(self):
+        """Test parameter range validation."""
+        # M out of range
+        with pytest.raises(RuntimeError, match="blowing ratio M"):
+            cb.effusion_effectiveness(10, 0.5, 1.8, 0.05, 6.0, 30)
+
+        with pytest.raises(RuntimeError, match="blowing ratio M"):
+            cb.effusion_effectiveness(10, 5.0, 1.8, 0.05, 6.0, 30)
+
+        # DR out of range
+        with pytest.raises(RuntimeError, match="Density ratio DR"):
+            cb.effusion_effectiveness(10, 2.0, 1.0, 0.05, 6.0, 30)
+
+        # Porosity out of range
+        with pytest.raises(RuntimeError, match="Porosity"):
+            cb.effusion_effectiveness(10, 2.0, 1.8, 0.01, 6.0, 30)
+
+        with pytest.raises(RuntimeError, match="Porosity"):
+            cb.effusion_effectiveness(10, 2.0, 1.8, 0.15, 6.0, 30)
+
+        # s_D out of range
+        with pytest.raises(RuntimeError, match="spacing s_D"):
+            cb.effusion_effectiveness(10, 2.0, 1.8, 0.05, 3.0, 30)
+
+        # Angle out of range
+        with pytest.raises(RuntimeError, match="angle alpha"):
+            cb.effusion_effectiveness(10, 2.0, 1.8, 0.05, 6.0, 15)
+
+    def test_effusion_effectiveness_bounded(self):
+        """Test that effectiveness is bounded [0, 1]."""
+        # Try various conditions
+        for x_D in [1, 5, 10, 20]:
+            for M in [1.0, 2.0, 3.5]:
+                eta = cb.effusion_effectiveness(x_D, M, 1.8, 0.05, 6.0, 30)
+                assert 0.0 <= eta <= 1.0
+
+    def test_effusion_discharge_coefficient_baseline(self):
+        """Test discharge coefficient at typical conditions."""
+        Cd = cb.effusion_discharge_coefficient(
+            Re_d=10000, P_ratio=1.05, alpha_deg=30, L_D=4.0
+        )
+        # Typical Cd range for effusion holes
+        assert 0.5 < Cd < 0.8
+
+    def test_effusion_cd_increases_with_pressure_ratio(self):
+        """Test that Cd increases with pressure ratio."""
+        Cd_low = cb.effusion_discharge_coefficient(10000, 1.03, 30, 4.0)
+        Cd_high = cb.effusion_discharge_coefficient(10000, 1.10, 30, 4.0)
+
+        assert Cd_high > Cd_low
+
+    def test_effusion_cd_decreases_with_LD(self):
+        """Test that Cd decreases with longer holes."""
+        Cd_short = cb.effusion_discharge_coefficient(10000, 1.05, 30, 2.5)
+        Cd_long = cb.effusion_discharge_coefficient(10000, 1.05, 30, 7.0)
+
+        assert Cd_short > Cd_long
+
+    def test_effusion_cd_parameter_validation(self):
+        """Test discharge coefficient parameter validation."""
+        # Re_d too low
+        with pytest.raises(RuntimeError, match="Reynolds number Re_d"):
+            cb.effusion_discharge_coefficient(2000, 1.05, 30, 4.0)
+
+        # P_ratio out of range
+        with pytest.raises(RuntimeError, match="Pressure ratio"):
+            cb.effusion_discharge_coefficient(10000, 1.01, 30, 4.0)
+
+        with pytest.raises(RuntimeError, match="Pressure ratio"):
+            cb.effusion_discharge_coefficient(10000, 1.20, 30, 4.0)
+
+        # Angle out of range
+        with pytest.raises(RuntimeError, match="angle alpha"):
+            cb.effusion_discharge_coefficient(10000, 1.05, 15, 4.0)
+
+        # L_D out of range
+        with pytest.raises(RuntimeError, match="length/diameter L_D"):
+            cb.effusion_discharge_coefficient(10000, 1.05, 30, 1.5)
+
+    def test_effusion_cd_bounded(self):
+        """Test that Cd is bounded to reasonable range."""
+        for Re_d in [5000, 10000, 20000]:
+            for P_ratio in [1.03, 1.07, 1.12]:
+                Cd = cb.effusion_discharge_coefficient(Re_d, P_ratio, 30, 4.0)
+                assert 0.5 <= Cd <= 0.85
 
 
 class TestPhysicalConsistency:

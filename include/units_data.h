@@ -89,6 +89,8 @@ inline constexpr Entry function_units[] = {
     {"film_cooling_effectiveness", "x_D: -, M: -, DR: -, alpha_deg: deg", "-"},
     {"film_cooling_effectiveness_avg", "x_D: -, M: -, DR: -, alpha_deg: deg, s_D: - (default 3.0)", "-"},
     {"film_cooling_multirow_sellers", "row_positions_xD: list[-], eval_xD: -, M: -, DR: -, alpha_deg: deg", "-"},
+    {"effusion_effectiveness", "x_D: -, M: -, DR: -, porosity: -, s_D: -, alpha_deg: deg", "-"},
+    {"effusion_discharge_coefficient", "Re_d: -, P_ratio: -, alpha_deg: deg, L_D: - (default 4.0)", "-"},
 
     // -------------------------------------------------------------------------
     // acoustics.h - Acoustic Properties

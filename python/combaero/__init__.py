@@ -113,6 +113,8 @@ try:
         dT_edge_dT_hot,
         dynamic_pressure,
         effective_viscothermal_layer,
+        effusion_discharge_coefficient,
+        effusion_effectiveness,
         effectiveness_counterflow,
         effectiveness_parallelflow,
         equivalence_ratio_from_bilger_Z_mass,
