@@ -3038,6 +3038,31 @@ PYBIND11_MODULE(_core, m)
         "  >>> print(f'SPL: {props.spl:.1f} dB')"
     );
 
+
+    // =========================================================================
+    // Transfer Matrix Method - Advanced Thermoacoustics
+    // =========================================================================
+
+    py::class_<TransferMatrix>(m, "TransferMatrix")
+        .def(py::init<>())
+        .def_readwrite("T11", &TransferMatrix::T11)
+        .def_readwrite("T12", &TransferMatrix::T12)
+        .def_readwrite("T21", &TransferMatrix::T21)
+        .def_readwrite("T22", &TransferMatrix::T22)
+        .def("__mul__", &TransferMatrix::operator*);
+
+    m.def("orifice_impedance_with_flow", &orifice_impedance_with_flow,
+        py::arg("freq"), py::arg("u_bias"), py::arg("u_grazing"),
+        py::arg("d_orifice"), py::arg("l_orifice"), py::arg("porosity"),
+        py::arg("Cd"), py::arg("rho"), py::arg("c"));
+
+    m.def("quarter_wave_resonator_tmm", &quarter_wave_resonator_tmm,
+        py::arg("freq"), py::arg("L_tube"), py::arg("A_duct"), py::arg("A_tube"),
+        py::arg("d_orifice"), py::arg("l_orifice"), py::arg("porosity"), py::arg("Cd"),
+        py::arg("u_bias"), py::arg("u_grazing"), py::arg("rho"), py::arg("c"));
+
+    m.def("is_whistling_risk", &is_whistling_risk,
+        py::arg("freq"), py::arg("u_bias"), py::arg("d_orifice"));
     // Utility functions
     m.def(
         "wavelength",

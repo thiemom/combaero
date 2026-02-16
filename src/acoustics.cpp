@@ -2,6 +2,7 @@
 #include "../include/math_constants.h"
 #include <algorithm>
 #include <cmath>
+#include <complex>
 #include <stdexcept>
 
 // -------------------------------------------------------------
@@ -489,7 +490,177 @@ AcousticProperties acoustic_properties(
 }
 
 // -------------------------------------------------------------
-// Utility functions
+// Transfer Matrix Method
+// -------------------------------------------------------------
+
+// Transfer matrix multiplication for cascading elements
+TransferMatrix TransferMatrix::operator*(const TransferMatrix& other) const {
+    return {
+        T11 * other.T11 + T12 * other.T21,
+        T11 * other.T12 + T12 * other.T22,
+        T21 * other.T11 + T22 * other.T21,
+        T21 * other.T12 + T22 * other.T22
+    };
+}
+
+// Orifice impedance with bias and grazing flow
+std::complex<double> orifice_impedance_with_flow(
+    double freq,
+    double u_bias,
+    double u_grazing,
+    double d_orifice,
+    double l_orifice,
+    double porosity,
+    double Cd,
+    double rho,
+    double c
+) {
+    // Validate parameters
+    if (freq <= 0.0) {
+        throw std::runtime_error("Frequency must be positive, got " + std::to_string(freq));
+    }
+    if (d_orifice <= 0.0 || l_orifice <= 0.0) {
+        throw std::runtime_error("Orifice dimensions must be positive");
+    }
+    if (porosity <= 0.0 || porosity > 0.5) {
+        throw std::runtime_error("Porosity must be in range (0, 0.5], got " + std::to_string(porosity));
+    }
+    if (Cd <= 0.0 || Cd > 1.0) {
+        throw std::runtime_error("Discharge coefficient must be in range (0, 1], got " + std::to_string(Cd));
+    }
+    
+    // Check Mach numbers (should be << 1 for acoustic theory)
+    double M_bias = std::abs(u_bias) / c;
+    double M_grazing = std::abs(u_grazing) / c;
+    if (M_bias > 0.3) {
+        throw std::runtime_error("Bias Mach number too high: " + std::to_string(M_bias) + " > 0.3");
+    }
+    if (M_grazing > 0.3) {
+        throw std::runtime_error("Grazing Mach number too high: " + std::to_string(M_grazing) + " > 0.3");
+    }
+    
+    double omega = 2.0 * M_PI * freq;
+    
+    // 1. Resistance (Real Part)
+    // Bias flow resistance (Rogers & Marble 1956)
+    // R_bias = M_b / (σ * Cd²)
+    double R_bias = M_bias / (porosity * Cd * Cd);
+    
+    // Grazing flow resistance (Howe 1979, Bourquard & Noiray 2019)
+    // R_grazing = M_g / (2σ)
+    double R_grazing = M_grazing / (2.0 * porosity);
+    
+    // Total resistance (linear superposition for small Mach numbers)
+    double R = R_bias + R_grazing;
+    
+    // 2. Reactance (Imaginary Part)
+    // Rayleigh end correction modified by flow
+    double delta_0 = 0.85 * (d_orifice / 2.0);  // ~0.425 * d
+    
+    // Flow reduces effective end correction (frequency shift)
+    // Empirical: δ_eff = δ_0 / (1 + M_g)
+    double flow_modifier = 1.0 / (1.0 + M_grazing);
+    double l_eff = l_orifice + delta_0 * flow_modifier;
+    
+    // Inertance (mass reactance): X = ω*l_eff / (c*σ)
+    double X = (omega * l_eff) / (c * porosity);
+    
+    // Return normalized impedance Z/(ρc)
+    return std::complex<double>(R, X);
+}
+
+// Quarter-wave resonator transfer matrix
+TransferMatrix quarter_wave_resonator_tmm(
+    double freq,
+    double L_tube,
+    double A_duct,
+    double A_tube,
+    double d_orifice,
+    double l_orifice,
+    double porosity,
+    double Cd,
+    double u_bias,
+    double u_grazing,
+    double rho,
+    double c
+) {
+    // Validate parameters
+    if (L_tube <= 0.0) {
+        throw std::runtime_error("Tube length must be positive, got " + std::to_string(L_tube));
+    }
+    if (A_duct <= 0.0 || A_tube <= 0.0) {
+        throw std::runtime_error("Areas must be positive");
+    }
+    
+    double k = (2.0 * M_PI * freq) / c;
+    
+    // Check that we're below cutoff (kL < π for quarter-wave)
+    if (k * L_tube > M_PI) {
+        throw std::runtime_error("Frequency too high: kL = " + std::to_string(k * L_tube) + 
+                                 " > π (above quarter-wave cutoff)");
+    }
+    
+    // 1. Neck impedance (with flow effects)
+    std::complex<double> Z_neck = orifice_impedance_with_flow(
+        freq, u_bias, u_grazing, d_orifice, l_orifice, porosity, Cd, rho, c
+    );
+    
+    // 2. Tube backing impedance (closed-end quarter-wave)
+    // For a closed-end tube: Z_tube = -i*cot(kL)
+    // This is the normalized impedance (Z/(ρc))
+    std::complex<double> i(0.0, 1.0);
+    std::complex<double> Z_tube = -i / std::tan(k * L_tube);
+    
+    // 3. Total branch impedance
+    // Series combination: Z_branch = Z_neck + Z_tube
+    std::complex<double> Z_branch_norm = Z_neck + Z_tube;
+    
+    // 4. Scale by area ratio and denormalize
+    // The orifice area is: A_orifice = porosity * A_duct
+    // Branch admittance in main duct: Y = A_orifice / (ρc * Z_branch)
+    double A_orifice = porosity * A_duct;
+    std::complex<double> Y_branch = A_orifice / (rho * c * Z_branch_norm);
+    
+    // 5. Transfer matrix for side-branch
+    // For a shunt element (parallel admittance):
+    // [p_u]   [1    0  ] [p_d]
+    // [u_u*S] = [Y_br  1  ] [u_d*S]
+    //
+    // where Y_br is the branch admittance
+    return TransferMatrix{
+        std::complex<double>(1.0, 0.0),  // T11
+        std::complex<double>(0.0, 0.0),  // T12
+        Y_branch,                         // T21
+        std::complex<double>(1.0, 0.0)   // T22
+    };
+}
+
+// Whistling risk assessment based on Strouhal number
+bool is_whistling_risk(
+    double freq,
+    double u_bias,
+    double d_orifice
+) {
+    // Validate inputs
+    if (freq < 0.0 || d_orifice <= 0.0) {
+        throw std::runtime_error("Invalid parameters for whistling risk assessment");
+    }
+    
+    // No flow, no whistling
+    if (std::abs(u_bias) < 0.01) {
+        return false;
+    }
+    
+    // Strouhal number: St = f * d / U
+    double St = (freq * d_orifice) / std::abs(u_bias);
+    
+    // Critical Strouhal range for vortex lock-in: 0.2 < St < 0.5
+    // This is when vortex shedding frequency matches acoustic frequency
+    return (St >= 0.2 && St <= 0.5);
+}
+
+// -------------------------------------------------------------
+// Utility functions (already in namespace)
 // -------------------------------------------------------------
 
 double wavelength(double f, double c) {

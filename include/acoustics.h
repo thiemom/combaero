@@ -2,6 +2,7 @@
 #define ACOUSTICS_H
 
 #include "geometry.h"
+#include <complex>
 #include <string>
 #include <vector>
 
@@ -169,6 +170,123 @@ AcousticProperties acoustic_properties(
     double c,
     double p_rms = 20e-6,
     double p_ref = 20e-6);
+
+// -------------------------------------------------------------
+// Transfer Matrix Method (TMM) for Acoustic Networks
+// -------------------------------------------------------------
+
+// 2x2 Transfer matrix relating [p; u*S] at upstream and downstream ports
+// [p_u]   [T11 T12] [p_d]
+// [u_u*S] = [T21 T22] [u_d*S]
+//
+// Used for cascading acoustic elements (orifices, tubes, resonators)
+struct TransferMatrix {
+    std::complex<double> T11, T12, T21, T22;
+    
+    // Matrix multiplication for cascading elements
+    TransferMatrix operator*(const TransferMatrix& other) const;
+};
+
+// Orifice/neck impedance with bias and grazing flow effects
+// Combines resistance from bias flow and grazing flow
+//
+// Parameters:
+//   freq       : frequency [Hz]
+//   u_bias     : bias flow velocity through orifice [m/s]
+//   u_grazing  : grazing flow velocity past orifice [m/s]
+//   d_orifice  : orifice diameter [m]
+//   l_orifice  : orifice/neck length [m]
+//   porosity   : open area ratio A_orifice/A_duct [-]
+//   Cd         : discharge coefficient [-]
+//   rho        : fluid density [kg/m³]
+//   c          : speed of sound [m/s]
+//
+// Returns: Complex impedance Z/ρc (normalized) [-]
+//
+// References:
+//   - Bourquard & Noiray (2019): Resistance with flow
+//   - Rogers & Marble (1956): Bias flow resistance
+//   - Howe (1979): Grazing flow effects
+//
+// Valid: M_bias < 0.3, M_grazing < 0.3, porosity = 0.05-0.3
+// Accuracy: +/-20-30% (flow-acoustic interaction is complex)
+std::complex<double> orifice_impedance_with_flow(
+    double freq,
+    double u_bias,
+    double u_grazing,
+    double d_orifice,
+    double l_orifice,
+    double porosity,
+    double Cd,
+    double rho,
+    double c
+);
+
+// Quarter-wave resonator transfer matrix with flow effects
+// Distributed parameter model for side-branch tube resonator
+//
+// Three distinct areas:
+//   A_duct     : main duct cross-sectional area [m²]
+//   A_orifice  : neck/orifice area (= porosity * A_duct) [m²]
+//   A_tube     : resonator tube cross-sectional area [m²]
+//
+// Parameters:
+//   freq       : frequency [Hz]
+//   L_tube     : resonator tube length [m]
+//   A_duct     : main duct area [m²]
+//   A_tube     : resonator tube area [m²]
+//   d_orifice  : neck/orifice diameter [m]
+//   l_orifice  : neck length [m]
+//   porosity   : open area ratio A_orifice/A_duct [-]
+//   Cd         : discharge coefficient [-]
+//   u_bias     : bias flow through orifice [m/s]
+//   u_grazing  : grazing flow in main duct [m/s]
+//   rho        : fluid density [kg/m³]
+//   c          : speed of sound [m/s]
+//
+// Returns: 2x2 TransferMatrix for the side-branch resonator
+//
+// References:
+//   - Munjal (1987): Acoustics of Ducts and Mufflers
+//   - Dowling & Ffowcs Williams (1983): Sound and Sources of Sound
+//
+// Valid: kL < π (below cutoff), M < 0.3
+// Accuracy: +/-15-20%
+TransferMatrix quarter_wave_resonator_tmm(
+    double freq,
+    double L_tube,
+    double A_duct,
+    double A_tube,
+    double d_orifice,
+    double l_orifice,
+    double porosity,
+    double Cd,
+    double u_bias,
+    double u_grazing,
+    double rho,
+    double c
+);
+
+// Strouhal-based whistling risk assessment for orifices
+// Vortex shedding can lock-in with acoustic modes causing whistling
+//
+// Parameters:
+//   freq      : acoustic frequency [Hz]
+//   u_bias    : flow velocity through orifice [m/s]
+//   d_orifice : orifice diameter [m]
+//
+// Returns: true if in critical Strouhal range (0.2 < St < 0.5)
+//
+// References:
+//   - Rockwell & Naudascher (1979): Self-sustained oscillations
+//   - Bruggeman et al. (1991): Flow-induced pulsations
+//
+// Critical Strouhal range: 0.2-0.5 (vortex lock-in regime)
+bool is_whistling_risk(
+    double freq,
+    double u_bias,
+    double d_orifice
+);
 
 // -------------------------------------------------------------
 // Utility functions

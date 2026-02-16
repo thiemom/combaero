@@ -617,24 +617,24 @@ class TestPinFinArrays:
         """Test that staggered arrays have higher Nu than inline."""
         Nu_staggered = cb.pin_fin_nusselt(20000, 0.7, 2.0, 2.5, 2.5, is_staggered=True)
         Nu_inline = cb.pin_fin_nusselt(20000, 0.7, 2.0, 2.5, 2.5, is_staggered=False)
-        
+
         assert Nu_staggered > Nu_inline
 
     def test_pin_fin_increases_with_reynolds(self):
         """Test that Nu increases with Re."""
         Nu_low = cb.pin_fin_nusselt(5000, 0.7, 2.0, 2.5, 2.5)
         Nu_high = cb.pin_fin_nusselt(50000, 0.7, 2.0, 2.5, 2.5)
-        
+
         assert Nu_high > Nu_low
 
     def test_pin_fin_parameter_validation(self):
         """Test parameter range validation."""
         with pytest.raises(RuntimeError, match="Re_d"):
             cb.pin_fin_nusselt(2000, 0.7, 2.0, 2.5, 2.5)
-        
+
         with pytest.raises(RuntimeError, match="Prandtl"):
             cb.pin_fin_nusselt(20000, 0.3, 2.0, 2.5, 2.5)
-        
+
         with pytest.raises(RuntimeError, match="L_D"):
             cb.pin_fin_nusselt(20000, 0.7, 0.3, 2.5, 2.5)
 
@@ -645,7 +645,7 @@ class TestDimpledSurfaces:
     def test_dimple_enhancement_baseline(self):
         """Test dimple enhancement at typical conditions."""
         enh = cb.dimple_nusselt_enhancement(Re_Dh=30000, d_Dh=0.2, h_d=0.2, S_d=2.0)
-        
+
         # Typical range 1.8-2.5x
         assert 1.5 < enh < 2.8
 
@@ -654,14 +654,14 @@ class TestDimpledSurfaces:
         # Try extreme conditions
         enh_max = cb.dimple_nusselt_enhancement(80000, 0.3, 0.3, 1.5)
         enh_min = cb.dimple_nusselt_enhancement(10000, 0.1, 0.1, 3.0)
-        
+
         assert 1.5 <= enh_max <= 2.8
         assert 1.5 <= enh_min <= 2.8
 
     def test_dimple_friction_baseline(self):
         """Test dimple friction multiplier at typical conditions."""
         f_ratio = cb.dimple_friction_multiplier(Re_Dh=30000, d_Dh=0.2, h_d=0.2)
-        
+
         # Should be much lower than ribs (1.3-2.2x vs 6-10x)
         assert 1.3 < f_ratio < 2.2
 
@@ -669,7 +669,7 @@ class TestDimpledSurfaces:
         """Test that friction is bounded to realistic range."""
         f_max = cb.dimple_friction_multiplier(80000, 0.3, 0.3)
         f_min = cb.dimple_friction_multiplier(10000, 0.1, 0.1)
-        
+
         assert 1.3 <= f_max <= 2.2
         assert 1.3 <= f_min <= 2.2
 
@@ -677,13 +677,13 @@ class TestDimpledSurfaces:
         """Test parameter range validation."""
         with pytest.raises(RuntimeError, match="Re_Dh"):
             cb.dimple_nusselt_enhancement(5000, 0.2, 0.2, 2.0)
-        
+
         with pytest.raises(RuntimeError, match="d_Dh"):
             cb.dimple_nusselt_enhancement(30000, 0.05, 0.2, 2.0)
-        
+
         with pytest.raises(RuntimeError, match="h_d"):
             cb.dimple_nusselt_enhancement(30000, 0.2, 0.05, 2.0)
-        
+
         with pytest.raises(RuntimeError, match="S_d"):
             cb.dimple_nusselt_enhancement(30000, 0.2, 0.2, 1.0)
 
@@ -691,9 +691,9 @@ class TestDimpledSurfaces:
         """Test that dimples have lower friction penalty than ribs."""
         # Dimple friction
         f_dimple = cb.dimple_friction_multiplier(30000, 0.2, 0.2)
-        
+
         # Rib friction (from existing tests)
         f_rib = cb.rib_friction_multiplier(e_D=0.05, P_e=10.0)
-        
+
         # Dimples should have much lower friction penalty
         assert f_dimple < f_rib / 2
