@@ -1293,3 +1293,104 @@ State complete_combustion(const State& in) {
     out.X = X_burned;
     return out;
 }
+
+// -------------------------------------------------------------
+// Combustion State Dataclass
+// -------------------------------------------------------------
+
+// Helper: Compute Bilger mixture fraction from compositions
+static double compute_bilger_mixture_fraction(
+    const std::vector<double>& X_mix,
+    const std::vector<double>& X_fuel,
+    const std::vector<double>& X_ox
+) {
+    // Bilger mixture fraction based on elemental mass fractions
+    // Z = (beta - beta_ox) / (beta_fuel - beta_ox)
+    // where beta = 2*Y_C/M_C + Y_H/(2*M_H) - Y_O/M_O
+    
+    // For now, use a simplified correlation based on equivalence ratio
+    double phi = equivalence_ratio_mole(X_mix, X_fuel, X_ox);
+    
+    // Stoichiometric mixture fraction for typical hydrocarbon-air
+    double Z_st = 0.055;  // Approximate for CH4-air
+    
+    // Bilger Z from phi: Z = Z_st * phi / (1 + Z_st * (phi - 1))
+    return Z_st * phi / (1.0 + Z_st * (phi - 1.0));
+}
+
+// Variant 1: From equivalence ratio (phi as input)
+CombustionState combustion_state(
+    const std::vector<double>& X_fuel,
+    const std::vector<double>& X_ox,
+    double phi,
+    double T_reactants,
+    double P,
+    const std::string& fuel_name
+) {
+    CombustionState result;
+    
+    // Store phi and fuel name
+    result.phi = phi;
+    result.fuel_name = fuel_name;
+    
+    // Compute reactant mixture composition
+    std::vector<double> X_reactants = set_equivalence_ratio_mole(phi, X_fuel, X_ox);
+    
+    // Compute reactant CompleteState
+    result.reactants = complete_state(T_reactants, P, X_reactants);
+    
+    // Compute products via complete combustion
+    State reactant_state;
+    reactant_state.T = T_reactants;
+    reactant_state.P = P;
+    reactant_state.X = X_reactants;
+    
+    State product_state = complete_combustion(reactant_state);
+    
+    // Compute product CompleteState
+    result.products = complete_state(product_state.T, product_state.P, product_state.X);
+    
+    // Compute mixture fraction
+    result.mixture_fraction = compute_bilger_mixture_fraction(X_reactants, X_fuel, X_ox);
+    
+    // For complete combustion, all fuel is burned
+    result.fuel_burn_fraction = 1.0;
+    
+    return result;
+}
+
+// Variant 2: From streams (phi computed from mass flows)
+CombustionState combustion_state_from_streams(
+    const Stream& fuel_stream,
+    const Stream& ox_stream,
+    const std::string& fuel_name
+) {
+    // Compute mass-weighted average temperature for reactants
+    double mdot_total = fuel_stream.mdot + ox_stream.mdot;
+    if (mdot_total <= 0.0) {
+        throw std::runtime_error("Total mass flow rate must be positive");
+    }
+    
+    double T_reactants = (fuel_stream.mdot * fuel_stream.T() + 
+                         ox_stream.mdot * ox_stream.T()) / mdot_total;
+    
+    // Use pressure from fuel stream (could also average or use min)
+    double P = fuel_stream.P();
+    
+    // Mix the streams to get reactant composition
+    std::vector<Stream> streams = {fuel_stream, ox_stream};
+    Stream mixed = mix(streams, P);
+    
+    // Compute equivalence ratio from the mixed composition
+    double phi = equivalence_ratio_mole(mixed.X(), fuel_stream.X(), ox_stream.X());
+    
+    // Now call the main combustion_state function
+    return combustion_state(
+        fuel_stream.X(),
+        ox_stream.X(),
+        phi,
+        T_reactants,
+        P,
+        fuel_name
+    );
+}

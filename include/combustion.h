@@ -2,8 +2,10 @@
 #define COMBUSTION_H
 
 #include "state.h"
+#include "thermo.h"
 #include <cstddef>
 #include <vector>
+#include <string>
 
 // Combustion calculations - oxygen requirements
 double oxygen_required_per_mol_fuel(std::size_t fuel_index);
@@ -195,5 +197,49 @@ State complete_combustion(const State& in);
 // Input: unburned state with T, P, X
 // Output: burned state at same temperature
 State complete_combustion_isothermal(const State& in);
+
+// -------------------------------------------------------------
+// Combustion State Dataclass
+// -------------------------------------------------------------
+
+// Bundle of combustion properties with nested CompleteState objects
+struct CombustionState {
+    double phi;                    // Equivalence ratio [-]
+    std::string fuel_name;         // Optional fuel label (e.g., "CH4", "Natural Gas")
+    CompleteState reactants;       // Reactant state (all thermo + transport properties)
+    CompleteState products;        // Product state (all thermo + transport properties)
+    double mixture_fraction;       // Bilger mixture fraction [-]
+    double fuel_burn_fraction;     // Fraction of fuel burned [0-1]
+};
+
+// Compute combustion state from equivalence ratio (typical for calculations)
+// Parameters:
+//   X_fuel       : fuel composition (mole fractions) [-]
+//   X_ox         : oxidizer composition (mole fractions) [-]
+//   phi          : equivalence ratio [-] (INPUT)
+//   T_reactants  : reactant temperature [K]
+//   P            : pressure [Pa]
+//   fuel_name    : optional fuel label (default: "")
+// Returns: CombustionState with reactants, products, phi, mixture_fraction
+CombustionState combustion_state(
+    const std::vector<double>& X_fuel,
+    const std::vector<double>& X_ox,
+    double phi,
+    double T_reactants,
+    double P,
+    const std::string& fuel_name = ""
+);
+
+// Compute combustion state from measured streams (typical for lab data)
+// Parameters:
+//   fuel_stream : fuel stream with mdot, T, X
+//   ox_stream   : oxidizer stream with mdot, T, X
+//   fuel_name   : optional fuel label (default: "")
+// Returns: CombustionState with phi COMPUTED from mass flow rates
+CombustionState combustion_state_from_streams(
+    const Stream& fuel_stream,
+    const Stream& ox_stream,
+    const std::string& fuel_name = ""
+);
 
 #endif // COMBUSTION_H

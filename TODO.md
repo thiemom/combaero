@@ -1,5 +1,23 @@
 # CombAero TODO - Composite Dataclass States
 
+## Recent Completion: Thermal Cooling Refactor (Phases A & B)
+
+**Phase A: Materials Database** ✅ COMPLETE (Commit: 1e2246a)
+- Separated materials database from heat transfer correlations
+- 5 materials with k(T) functions (superalloys, structural, TBC)
+- YSZ TBC with NASA sintering model
+- 26 comprehensive tests, all documentation updated
+
+**Phase B: Advanced Cooling Correlations** ✅ COMPLETE (Commit: pending)
+- Rib-enhanced cooling (Han et al. 1988)
+- Impingement cooling (Florschuetz et al. 1981, Martin 1977)
+- Film cooling effectiveness (Baldauf et al. 2002)
+- 26 comprehensive tests (463 total tests pass)
+- Full documentation in API_REFERENCE.md
+- 5 new unit entries (224 total)
+
+---
+
 ## Overview
 Next target: Composite Python dataclasses for thermodynamic, transport, and combustion states. These will provide convenient bundles of related properties with IDE autocomplete and type safety.
 
@@ -171,6 +189,8 @@ transport_state(T: float, P: float, X: list[float]) -> TransportState
 
 **Priority:** MEDIUM - Combustion analysis bundle
 **Difficulty:** MEDIUM-HIGH - Dataclass pattern + combustion calculations
+
+**Status:** ✅ COMPLETE (Commit: pending)
 
 **Rationale:** Combustion calculations involve many related properties (equivalence ratio, adiabatic temperature, product composition). A dataclass bundles these for convenient analysis.
 

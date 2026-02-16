@@ -39,6 +39,7 @@ set(SOURCES
     src/orifice.cpp
     src/pipe_flow.cpp
     src/materials.cpp
+    src/cooling_correlations.cpp
 )
 
 # Core library

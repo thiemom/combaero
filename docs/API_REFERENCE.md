@@ -426,6 +426,74 @@ print(state.transport.Pr)    # 0.781
 - Heat transfer with fluid dynamics
 - Complete state characterization
 
+## Combustion State Bundle
+
+Comprehensive combustion analysis with nested CompleteState objects for reactants and products. Two variants: phi as input (calculations) or phi as output (lab measurements).
+
+### Variant 1: From Equivalence Ratio
+
+```python
+# Typical use: calculations where phi is specified
+X_CH4 = [0]*5 + [1.0] + [0]*8  # Pure methane
+X_air = cb.standard_dry_air_composition()
+
+state = cb.combustion_state(
+    X_fuel=X_CH4,
+    X_ox=X_air,
+    phi=1.0,              # INPUT: equivalence ratio
+    T_reactants=300,      # K
+    P=101325,             # Pa
+    fuel_name="CH4"       # Optional label
+)
+
+# Access combustion properties
+print(state.phi)                         # 1.0 (echoed back)
+print(state.mixture_fraction)            # 0.055
+print(state.fuel_burn_fraction)          # 1.0 (complete combustion)
+
+# Access reactant properties (via nested CompleteState)
+print(state.reactants.thermo.T)          # 300 K
+print(state.reactants.thermo.h)          # Enthalpy [J/mol]
+print(state.reactants.transport.mu)      # Viscosity [Pa·s]
+
+# Access product properties (via nested CompleteState)
+print(state.products.thermo.T)           # 2328 K (adiabatic flame temperature)
+print(state.products.thermo.gamma)       # 1.28 (lower at high T)
+print(state.products.transport.mu)       # Higher viscosity at high T
+```
+
+### Variant 2: From Measured Streams
+
+```python
+# Typical use: lab measurements where mass flows are measured
+fuel = cb.Stream().set_T(300).set_X(X_CH4).set_mdot(0.01)  # 0.01 kg/s
+air = cb.Stream().set_T(298).set_X(X_air).set_mdot(0.172)  # Measured flow
+
+state = cb.combustion_state_from_streams(
+    fuel_stream=fuel,
+    ox_stream=air,
+    fuel_name="CH4"
+)
+
+# Phi is COMPUTED from mass flow rates (output, not input)
+print(state.phi)  # ~1.0 (computed from mdot_air/mdot_fuel)
+```
+
+**CombustionState attributes:**
+- `phi` - Equivalence ratio [-]
+- `fuel_name` - Optional fuel label (string)
+- `reactants` - CompleteState at reactant conditions (25 properties total)
+- `products` - CompleteState at product conditions/T_ad (25 properties total)
+- `mixture_fraction` - Bilger mixture fraction [-]
+- `fuel_burn_fraction` - Fraction of fuel burned [0-1]
+
+**Benefits:**
+- Single function call for complete combustion analysis
+- Nested CompleteState objects provide all thermo + transport properties
+- Two variants for different use cases (calculations vs measurements)
+- Automatic adiabatic flame temperature calculation
+- Energy balance verified (h_reactants = h_products)
+
 ## Materials Database
 
 Material thermal conductivity database for high-temperature applications. All functions take temperature in Kelvin and return thermal conductivity in W/(m·K).
@@ -493,6 +561,108 @@ materials = cb.list_materials()
 
 **Temperature validation:**
 All functions validate temperature is within valid range and raise `RuntimeError` if out of bounds.
+
+## Advanced Cooling Correlations
+
+High-temperature turbine cooling techniques with validated correlations from literature.
+
+### Rib-Enhanced Cooling
+
+Ribs increase heat transfer through surface area and turbulence, but also increase pressure drop.
+
+```python
+# Rib enhancement factor (Han et al. 1988)
+enhancement = cb.rib_enhancement_factor(
+    e_D=0.05,    # Rib height / hydraulic diameter [-]
+    P_e=10.0,    # Rib pitch / rib height [-]
+    alpha=90.0   # Rib angle [degrees]
+)
+# Returns: Nu/Nu_smooth [-] (typically 1.0-3.5)
+
+# Rib friction multiplier (Han et al. 1988)
+friction = cb.rib_friction_multiplier(
+    e_D=0.05,    # Rib height / hydraulic diameter [-]
+    P_e=10.0     # Rib pitch / rib height [-]
+)
+# Returns: f/f_smooth [-] (typically 1.0-8.0)
+```
+
+**Valid ranges:**
+- e_D = 0.02-0.1
+- P_e = 5-20
+- alpha = 30-90 deg
+
+**Design tradeoff:** Ribs increase both heat transfer and friction. Optimization required.
+
+### Impingement Cooling
+
+Jet impingement provides high local heat transfer coefficients.
+
+```python
+# Single jet (Martin 1977)
+Nu_single = cb.impingement_nusselt(
+    Re_jet=20000,  # Reynolds number based on jet diameter [-]
+    Pr=0.7,        # Prandtl number [-]
+    z_D=6.0        # Jet-to-plate distance / jet diameter [-]
+)
+
+# Jet array with crossflow (Florschuetz et al. 1981)
+Nu_array = cb.impingement_nusselt(
+    Re_jet=20000,
+    Pr=0.7,
+    z_D=6.0,
+    x_D=8.0,       # Streamwise spacing / jet diameter [-]
+    y_D=8.0        # Spanwise spacing / jet diameter [-]
+)
+# Array Nu < single jet due to crossflow degradation
+```
+
+**Valid ranges:**
+- Re_jet = 5000-80000
+- z_D = 1-12
+- x_D, y_D = 4-16 (for arrays)
+
+**Key effects:**
+- Closer jets (lower z_D) → higher Nu
+- Array crossflow degrades downstream jets
+- Higher Re → higher Nu
+
+### Film Cooling
+
+Film cooling protects surfaces from hot gas using coolant film layer.
+
+```python
+# Centerline effectiveness (Baldauf et al. 2002)
+eta = cb.film_cooling_effectiveness(
+    x_D=10.0,       # Downstream distance / hole diameter [-]
+    M=1.0,          # Blowing ratio (rho_c*v_c)/(rho_inf*v_inf) [-]
+    DR=1.5,         # Density ratio rho_c/rho_inf [-]
+    alpha_deg=30.0  # Injection angle [degrees]
+)
+# Returns: eta [-] (0 = no cooling, 1 = perfect)
+
+# Laterally averaged effectiveness
+eta_avg = cb.film_cooling_effectiveness_avg(
+    x_D=10.0,
+    M=1.0,
+    DR=1.5,
+    alpha_deg=30.0,
+    s_D=3.0         # Hole spacing / hole diameter [-]
+)
+# Averaged < centerline (accounts for gaps between holes)
+```
+
+**Valid ranges:**
+- M = 0.3-2.5
+- DR = 1.2-2.0
+- alpha = 20-90 deg
+- s_D = 2-6
+
+**Key effects:**
+- Effectiveness decays downstream (exp decay)
+- Optimal M exists (~0.6*sqrt(DR))
+- Shallow angles (30 deg) better than steep (90 deg)
+- Closer holes (lower s_D) → better coverage
 
 ## Utility Functions
 

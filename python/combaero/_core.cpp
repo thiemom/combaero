@@ -19,6 +19,7 @@
 #include "orifice.h"
 #include "pipe_flow.h"
 #include "materials.h"
+#include "cooling_correlations.h"
 #include "units.h"
 
 namespace py = pybind11;
@@ -1040,9 +1041,7 @@ PYBIND11_MODULE(_core, m)
         .def("__repr__", [](const ThermoState& s) {
             return "<ThermoState: T=" + std::to_string(s.T) + " K, "
                    "P=" + std::to_string(s.P) + " Pa, "
-                   "rho=" + std::to_string(s.rho) + " kg/m³, "
-                   "h=" + std::to_string(s.h) + " J/mol, "
-                   "mw=" + std::to_string(s.mw) + " g/mol>";
+                   "rho=" + std::to_string(s.rho) + " kg/m³>";
         });
 
     m.def(
@@ -2626,6 +2625,80 @@ PYBIND11_MODULE(_core, m)
     );
 
     // =========================================================================
+    // Combustion State
+    // =========================================================================
+
+    py::class_<CombustionState>(m, "CombustionState",
+        "Bundle of combustion properties with nested CompleteState objects.\n\n"
+        "Contains reactant and product states with all thermodynamic and transport properties.\n\n"
+        "Attributes:\n"
+        "  phi                : equivalence ratio [-]\n"
+        "  fuel_name          : optional fuel label (string)\n"
+        "  reactants          : CompleteState at reactant conditions\n"
+        "  products           : CompleteState at product conditions (T_ad)\n"
+        "  mixture_fraction   : Bilger mixture fraction [-]\n"
+        "  fuel_burn_fraction : fraction of fuel burned [0-1]")
+        .def_readonly("phi", &CombustionState::phi, "Equivalence ratio [-]")
+        .def_readonly("fuel_name", &CombustionState::fuel_name, "Fuel label (e.g., 'CH4', 'Natural Gas')")
+        .def_readonly("reactants", &CombustionState::reactants, "Reactant CompleteState (all thermo + transport)")
+        .def_readonly("products", &CombustionState::products, "Product CompleteState at T_ad (all thermo + transport)")
+        .def_readonly("mixture_fraction", &CombustionState::mixture_fraction, "Bilger mixture fraction [-]")
+        .def_readonly("fuel_burn_fraction", &CombustionState::fuel_burn_fraction, "Fraction of fuel burned [0-1]")
+        .def("__repr__", [](const CombustionState& s) {
+            return "<CombustionState: phi=" + std::to_string(s.phi) + 
+                   ", T_reactants=" + std::to_string(s.reactants.thermo.T) + " K" +
+                   ", T_products=" + std::to_string(s.products.thermo.T) + " K" +
+                   (s.fuel_name.empty() ? "" : ", fuel='" + s.fuel_name + "'") + ">";
+        });
+
+    m.def(
+        "combustion_state",
+        &combustion_state,
+        py::arg("X_fuel"),
+        py::arg("X_ox"),
+        py::arg("phi"),
+        py::arg("T_reactants"),
+        py::arg("P"),
+        py::arg("fuel_name") = "",
+        "Compute combustion state from equivalence ratio.\n\n"
+        "Typical use: calculations where phi is specified.\n\n"
+        "Parameters:\n"
+        "  X_fuel       : fuel composition (mole fractions) [-]\n"
+        "  X_ox         : oxidizer composition (mole fractions) [-]\n"
+        "  phi          : equivalence ratio [-] (INPUT)\n"
+        "  T_reactants  : reactant temperature [K]\n"
+        "  P            : pressure [Pa]\n"
+        "  fuel_name    : optional fuel label (default: '')\n\n"
+        "Returns: CombustionState with reactants, products, phi, mixture_fraction\n\n"
+        "Example:\n"
+        "  >>> X_CH4 = [0]*5 + [1.0] + [0]*8  # Pure methane\n"
+        "  >>> X_air = cb.standard_dry_air_composition()\n"
+        "  >>> state = cb.combustion_state(X_CH4, X_air, phi=1.0, T_reactants=300, P=101325)\n"
+        "  >>> state.products.thermo.T  # Adiabatic flame temperature [K]"
+    );
+
+    m.def(
+        "combustion_state_from_streams",
+        &combustion_state_from_streams,
+        py::arg("fuel_stream"),
+        py::arg("ox_stream"),
+        py::arg("fuel_name") = "",
+        "Compute combustion state from measured streams.\n\n"
+        "Typical use: lab measurements where mass flows are measured.\n"
+        "Phi is COMPUTED from mass flow rates (output, not input).\n\n"
+        "Parameters:\n"
+        "  fuel_stream : fuel stream with mdot, T, X\n"
+        "  ox_stream   : oxidizer stream with mdot, T, X\n"
+        "  fuel_name   : optional fuel label (default: '')\n\n"
+        "Returns: CombustionState with phi computed from flow rates\n\n"
+        "Example:\n"
+        "  >>> fuel = cb.Stream().set_T(300).set_X(X_CH4).set_mdot(0.01)\n"
+        "  >>> air = cb.Stream().set_T(298).set_X(X_air).set_mdot(0.17)\n"
+        "  >>> state = cb.combustion_state_from_streams(fuel, air, 'CH4')\n"
+        "  >>> state.phi  # Computed from mass flows"
+    );
+
+    // =========================================================================
     // Acoustics
     // =========================================================================
 
@@ -3806,6 +3879,106 @@ PYBIND11_MODULE(_core, m)
         "  >>> materials = cb.list_materials()\n"
         "  >>> print(materials)\n"
         "  ['inconel718', 'haynes230', 'ss316', 'al6061', 'ysz']"
+    );
+
+    // =========================================================================
+    // Advanced Cooling Correlations
+    // =========================================================================
+
+    // Rib-enhanced cooling
+    m.def(
+        "rib_enhancement_factor",
+        &combaero::cooling::rib_enhancement_factor,
+        py::arg("e_D"),
+        py::arg("P_e"),
+        py::arg("alpha"),
+        "Rib enhancement factor for heat transfer [-].\n\n"
+        "Accounts for increased surface area and turbulence from ribs.\n\n"
+        "Parameters:\n"
+        "  e_D   : rib height to hydraulic diameter ratio [-]\n"
+        "  P_e   : rib pitch to rib height ratio [-]\n"
+        "  alpha : rib angle [degrees]\n\n"
+        "Valid range: e_D = 0.02-0.1, P_e = 5-20, alpha = 30-90 deg\n"
+        "Source: Han et al. (1988)\n\n"
+        "Returns: Enhancement factor [-] (typically 1.5-4.0)"
+    );
+
+    m.def(
+        "rib_friction_multiplier",
+        &combaero::cooling::rib_friction_multiplier,
+        py::arg("e_D"),
+        py::arg("P_e"),
+        "Rib friction factor multiplier [-].\n\n"
+        "Accounts for increased pressure drop from ribs.\n\n"
+        "Parameters:\n"
+        "  e_D : rib height to hydraulic diameter ratio [-]\n"
+        "  P_e : rib pitch to rib height ratio [-]\n\n"
+        "Valid range: e_D = 0.02-0.1, P_e = 5-20\n"
+        "Source: Han et al. (1988)\n\n"
+        "Returns: Friction multiplier [-] (typically 2-10)"
+    );
+
+    // Impingement cooling
+    m.def(
+        "impingement_nusselt",
+        &combaero::cooling::impingement_nusselt,
+        py::arg("Re_jet"),
+        py::arg("Pr"),
+        py::arg("z_D"),
+        py::arg("x_D") = 0.0,
+        py::arg("y_D") = 0.0,
+        "Impingement jet Nusselt number correlation [-].\n\n"
+        "For single jet or jet array impinging on flat plate.\n\n"
+        "Parameters:\n"
+        "  Re_jet : Reynolds number based on jet diameter [-]\n"
+        "  Pr     : Prandtl number [-]\n"
+        "  z_D    : jet-to-plate distance / jet diameter [-]\n"
+        "  x_D    : streamwise spacing / jet diameter [-] (default: 0 for single jet)\n"
+        "  y_D    : spanwise spacing / jet diameter [-] (default: 0 for single jet)\n\n"
+        "Valid range: Re_jet = 5000-80000, z_D = 1-12, x_D/y_D = 4-16\n"
+        "Source: Florschuetz et al. (1981), Martin (1977)\n\n"
+        "Returns: Average Nusselt number [-]"
+    );
+
+    // Film cooling
+    m.def(
+        "film_cooling_effectiveness",
+        &combaero::cooling::film_cooling_effectiveness,
+        py::arg("x_D"),
+        py::arg("M"),
+        py::arg("DR"),
+        py::arg("alpha_deg"),
+        "Adiabatic film cooling effectiveness [-].\n\n"
+        "Measures how well coolant film protects surface from hot gas.\n\n"
+        "Parameters:\n"
+        "  x_D       : downstream distance / hole diameter [-]\n"
+        "  M         : blowing ratio (rho_c*v_c)/(rho_inf*v_inf) [-]\n"
+        "  DR        : density ratio rho_c/rho_inf [-]\n"
+        "  alpha_deg : injection angle [degrees]\n\n"
+        "Valid range: M = 0.3-2.5, DR = 1.2-2.0, alpha = 20-90 deg, x_D >= 0\n"
+        "Source: Baldauf et al. (2002)\n\n"
+        "Returns: Adiabatic effectiveness eta [-] (0 = no cooling, 1 = perfect)"
+    );
+
+    m.def(
+        "film_cooling_effectiveness_avg",
+        &combaero::cooling::film_cooling_effectiveness_avg,
+        py::arg("x_D"),
+        py::arg("M"),
+        py::arg("DR"),
+        py::arg("alpha_deg"),
+        py::arg("s_D") = 3.0,
+        "Laterally averaged film cooling effectiveness [-].\n\n"
+        "Averaged across span for design calculations.\n\n"
+        "Parameters:\n"
+        "  x_D       : downstream distance / hole diameter [-]\n"
+        "  M         : blowing ratio [-]\n"
+        "  DR        : density ratio [-]\n"
+        "  alpha_deg : injection angle [degrees]\n"
+        "  s_D       : hole spacing / hole diameter [-] (default: 3.0)\n\n"
+        "Valid range: M = 0.3-2.5, DR = 1.2-2.0, s_D = 2-6\n"
+        "Source: Baldauf et al. (2002)\n\n"
+        "Returns: Laterally averaged effectiveness eta_avg [-]"
     );
 
     // =========================================================================

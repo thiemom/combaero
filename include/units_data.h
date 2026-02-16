@@ -67,6 +67,8 @@ inline constexpr Entry function_units[] = {
     {"thermo_state",            "T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325)", "ThermoState struct"},
     {"transport_state",         "T: K, P: Pa, X: mol/mol",              "TransportState struct"},
     {"complete_state",          "T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325)", "CompleteState struct"},
+    {"combustion_state",        "X_fuel: mol/mol, X_ox: mol/mol, phi: -, T_reactants: K, P: Pa, fuel_name: str (default '')", "CombustionState struct"},
+    {"combustion_state_from_streams", "fuel_stream: Stream, ox_stream: Stream, fuel_name: str (default '')", "CombustionState struct"},
 
     // -------------------------------------------------------------------------
     // materials.h - Material Thermal Conductivity
@@ -77,6 +79,15 @@ inline constexpr Entry function_units[] = {
     {"k_aluminum_6061",         "T: K",                                 "W/(m*K)"},
     {"k_tbc_ysz",               "T: K, hours: h (default 0)",           "W/(m*K)"},
     {"list_materials",          "-",                                    "list[str]"},
+
+    // -------------------------------------------------------------------------
+    // cooling_correlations.h - Advanced Cooling Correlations
+    // -------------------------------------------------------------------------
+    {"rib_enhancement_factor",  "e_D: -, P_e: -, alpha: deg",           "-"},
+    {"rib_friction_multiplier", "e_D: -, P_e: -",                       "-"},
+    {"impingement_nusselt",     "Re_jet: -, Pr: -, z_D: -, x_D: - (default 0), y_D: - (default 0)", "-"},
+    {"film_cooling_effectiveness", "x_D: -, M: -, DR: -, alpha_deg: deg", "-"},
+    {"film_cooling_effectiveness_avg", "x_D: -, M: -, DR: -, alpha_deg: deg, s_D: - (default 3)", "-"},
 
     // -------------------------------------------------------------------------
     // acoustics.h - Acoustic Properties

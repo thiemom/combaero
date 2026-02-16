@@ -98,22 +98,24 @@ All functions use consistent units to avoid conversion errors.
 
 #### Mixture Properties (Mass/Other Basis)
 
-| Function                           | Input Units                                         | Output Unit           |
-|------------------------------------|-----------------------------------------------------|-----------------------|
-| `density`                          | T: K, P: Pa, X: mol/mol                             | kg/m^3                |
-| `molar_volume`                     | T: K, P: Pa                                         | m^3/mol               |
-| `specific_gas_constant`            | X: mol/mol                                          | J/(kg*K)              |
-| `isentropic_expansion_coefficient` | T: K, X: mol/mol                                    | - (gamma)             |
-| `speed_of_sound`                   | T: K, X: mol/mol                                    | m/s                   |
-| `cp_mass`                          | T: K, X: mol/mol                                    | J/(kg*K)              |
-| `cv_mass`                          | T: K, X: mol/mol                                    | J/(kg*K)              |
-| `h_mass`                           | T: K, X: mol/mol                                    | J/kg                  |
-| `s_mass`                           | T: K, X: mol/mol, P: Pa, P_ref: Pa                  | J/(kg*K)              |
-| `u_mass`                           | T: K, X: mol/mol                                    | J/kg                  |
-| `air_properties`                   | T: K, P: Pa, humidity: - (0-1)                      | AirProperties struct  |
-| `thermo_state`                     | T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325) | ThermoState struct    |
-| `transport_state`                  | T: K, P: Pa, X: mol/mol                             | TransportState struct |
-| `complete_state`                   | T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325) | CompleteState struct  |
+| Function                           | Input Units                                                                                | Output Unit            |
+|------------------------------------|--------------------------------------------------------------------------------------------|------------------------|
+| `density`                          | T: K, P: Pa, X: mol/mol                                                                    | kg/m^3                 |
+| `molar_volume`                     | T: K, P: Pa                                                                                | m^3/mol                |
+| `specific_gas_constant`            | X: mol/mol                                                                                 | J/(kg*K)               |
+| `isentropic_expansion_coefficient` | T: K, X: mol/mol                                                                           | - (gamma)              |
+| `speed_of_sound`                   | T: K, X: mol/mol                                                                           | m/s                    |
+| `cp_mass`                          | T: K, X: mol/mol                                                                           | J/(kg*K)               |
+| `cv_mass`                          | T: K, X: mol/mol                                                                           | J/(kg*K)               |
+| `h_mass`                           | T: K, X: mol/mol                                                                           | J/kg                   |
+| `s_mass`                           | T: K, X: mol/mol, P: Pa, P_ref: Pa                                                         | J/(kg*K)               |
+| `u_mass`                           | T: K, X: mol/mol                                                                           | J/kg                   |
+| `air_properties`                   | T: K, P: Pa, humidity: - (0-1)                                                             | AirProperties struct   |
+| `thermo_state`                     | T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325)                                        | ThermoState struct     |
+| `transport_state`                  | T: K, P: Pa, X: mol/mol                                                                    | TransportState struct  |
+| `complete_state`                   | T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325)                                        | CompleteState struct   |
+| `combustion_state`                 | X_fuel: mol/mol, X_ox: mol/mol, phi: -, T_reactants: K, P: Pa, fuel_name: str (default '') | CombustionState struct |
+| `combustion_state_from_streams`    | fuel_stream: Stream, ox_stream: Stream, fuel_name: str (default '')                        | CombustionState struct |
 
 #### Inverse Solvers
 
@@ -348,6 +350,16 @@ All functions use consistent units to avoid conversion errors.
 | `k_aluminum_6061`       | T: K                       | W/(m*K)     |
 | `k_tbc_ysz`             | T: K, hours: h (default 0) | W/(m*K)     |
 | `list_materials`        | -                          | list[str]   |
+
+### cooling_correlations.h - Advanced Cooling Correlations
+
+| Function                         | Input Units                                                      | Output Unit |
+|----------------------------------|------------------------------------------------------------------|-------------|
+| `rib_enhancement_factor`         | e_D: -, P_e: -, alpha: deg                                       | -           |
+| `rib_friction_multiplier`        | e_D: -, P_e: -                                                   | -           |
+| `impingement_nusselt`            | Re_jet: -, Pr: -, z_D: -, x_D: - (default 0), y_D: - (default 0) | -           |
+| `film_cooling_effectiveness`     | x_D: -, M: -, DR: -, alpha_deg: deg                              | -           |
+| `film_cooling_effectiveness_avg` | x_D: -, M: -, DR: -, alpha_deg: deg, s_D: - (default 3)          | -           |
 
 ### acoustics.h - Acoustic Properties
 
