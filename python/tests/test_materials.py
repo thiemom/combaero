@@ -207,21 +207,116 @@ class TestThermalBarrierCoatings:
         assert k_negative == k_zero
 
 
+class TestTBCSintering:
+    """Test TBC sintering model enhancements."""
+
+    def test_tbc_no_sintering_at_low_temperature(self):
+        """Verify no sintering occurs below 1073 K (800 C)."""
+        # At 773 K (500 C), sintering should not occur
+        k_cold_fresh = cb.k_tbc_ysz(T=773, hours=0)
+        k_cold_aged = cb.k_tbc_ysz(T=773, hours=1000)
+        
+        # Should be identical (no sintering)
+        assert k_cold_fresh == pytest.approx(k_cold_aged, rel=1e-10)
+
+    def test_tbc_sintering_at_high_temperature(self):
+        """Verify sintering occurs above 1073 K."""
+        # At 1373 K (1100 C), sintering should be significant
+        k_hot_fresh = cb.k_tbc_ysz(T=1373, hours=0)
+        k_hot_aged = cb.k_tbc_ysz(T=1373, hours=200)
+        
+        # Aged coating should have higher k due to pore closure
+        assert k_hot_aged > k_hot_fresh
+        
+        # Should be bounded by fully dense YSZ limit
+        assert k_hot_aged <= 1.85
+
+    def test_tbc_sintering_increases_with_time(self):
+        """Verify k increases monotonically with exposure time."""
+        T = 1500  # K
+        k_0h = cb.k_tbc_ysz(T, hours=0)
+        k_100h = cb.k_tbc_ysz(T, hours=100)
+        k_500h = cb.k_tbc_ysz(T, hours=500)
+        k_1000h = cb.k_tbc_ysz(T, hours=1000)
+        
+        # Should increase monotonically
+        assert k_100h > k_0h
+        assert k_500h > k_100h
+        assert k_1000h > k_500h
+
+    def test_tbc_ebpvd_higher_than_aps(self):
+        """Verify EB-PVD has higher initial k than APS."""
+        T = 1273  # K
+        
+        # As-sprayed comparison
+        k_aps = cb.k_tbc_ysz(T, hours=0, is_ebpvd=False)
+        k_ebpvd = cb.k_tbc_ysz(T, hours=0, is_ebpvd=True)
+        
+        # EB-PVD should have higher initial k (columnar vs splat)
+        assert k_ebpvd > k_aps
+        
+        # Typical values
+        assert 0.8 < k_aps < 1.2  # APS range
+        assert 1.5 < k_ebpvd < 1.8  # EB-PVD range
+
+    def test_tbc_ebpvd_also_sinters(self):
+        """Verify EB-PVD also undergoes sintering at high T."""
+        T = 1500  # K
+        
+        k_ebpvd_fresh = cb.k_tbc_ysz(T, hours=0, is_ebpvd=True)
+        k_ebpvd_aged = cb.k_tbc_ysz(T, hours=500, is_ebpvd=True)
+        
+        # EB-PVD should also sinter (though starts higher)
+        assert k_ebpvd_aged > k_ebpvd_fresh
+
+    def test_tbc_sintering_rate_increases_with_temperature(self):
+        """Verify Arrhenius behavior - faster sintering at higher T."""
+        # Compare sintering progress at two temperatures
+        hours = 100
+        
+        k_low_fresh = cb.k_tbc_ysz(T=1273, hours=0)
+        k_low_aged = cb.k_tbc_ysz(T=1273, hours=hours)
+        delta_low = k_low_aged - k_low_fresh
+        
+        k_high_fresh = cb.k_tbc_ysz(T=1573, hours=0)
+        k_high_aged = cb.k_tbc_ysz(T=1573, hours=hours)
+        delta_high = k_high_aged - k_high_fresh
+        
+        # Higher temperature should cause more sintering in same time
+        assert delta_high > delta_low
+
+    def test_tbc_bounded_by_dense_limit(self):
+        """Verify k never exceeds fully dense YSZ limit."""
+        # Extreme aging at very high temperature
+        k_extreme = cb.k_tbc_ysz(T=1600, hours=10000)
+        
+        # Should not exceed fully dense limit
+        assert k_extreme <= 1.85
+
+    def test_tbc_backward_compatibility(self):
+        """Verify default behavior matches original APS implementation."""
+        # Default should be APS (is_ebpvd=False)
+        k_default = cb.k_tbc_ysz(T=1500, hours=100)
+        k_aps_explicit = cb.k_tbc_ysz(T=1500, hours=100, is_ebpvd=False)
+        
+        assert k_default == pytest.approx(k_aps_explicit, rel=1e-10)
+
+
 class TestMaterialDatabase:
     """Test material database access functions."""
 
     def test_list_materials(self):
-        """Test listing all materials in database."""
+        """Test that list_materials returns expected materials."""
         materials = cb.list_materials()
 
-        # Should return a list
+        # Should be a list
         assert isinstance(materials, list)
 
-        # Should contain expected materials
+        # Should contain our known materials
         assert "inconel718" in materials
         assert "haynes230" in materials
-        assert "ss316" in materials
-        assert "al6061" in materials
+        assert "stainless_steel_316" in materials
+        assert "aluminum_6061" in materials
         assert "ysz" in materials
 
         # Should have at least 5 materials

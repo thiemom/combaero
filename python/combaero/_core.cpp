@@ -3857,17 +3857,23 @@ PYBIND11_MODULE(_core, m)
         &combaero::materials::k_tbc_ysz,
         py::arg("T"),
         py::arg("hours") = 0.0,
+        py::arg("is_ebpvd") = false,
         "Thermal conductivity of YSZ thermal barrier coating [W/(m·K)].\n\n"
         "7-8 wt% Y2O3 stabilized zirconia with sintering model.\n"
-        "Conductivity increases over time at high temperature due to pore closure.\n\n"
+        "Conductivity increases over time at high temperature (>1073 K) due to pore closure.\n\n"
         "Parameters:\n"
-        "  T     : temperature [K]\n"
-        "  hours : operating hours at temperature (default: 0 = as-sprayed)\n\n"
+        "  T        : temperature [K]\n"
+        "  hours    : operating hours at temperature (default: 0 = as-sprayed)\n"
+        "  is_ebpvd : True for EB-PVD coating, False for APS (default: False)\n\n"
         "Valid range: 300-1700 K\n"
         "Source: NASA TM-2010-216765 (Zhu/Miller sintering model)\n\n"
+        "Coating types:\n"
+        "  - APS (Atmospheric Plasma Spray): Lower initial k, splat boundaries\n"
+        "  - EB-PVD (Electron Beam PVD): Higher initial k, columnar structure\n\n"
         "Example:\n"
-        "  >>> k_fresh = cb.k_tbc_ysz(T=1500)       # As-sprayed\n"
-        "  >>> k_aged = cb.k_tbc_ysz(T=1500, hours=1000)  # After 1000h"
+        "  >>> k_aps_fresh = cb.k_tbc_ysz(T=1500)  # APS as-sprayed\n"
+        "  >>> k_aps_aged = cb.k_tbc_ysz(T=1500, hours=1000)  # APS after 1000h\n"
+        "  >>> k_ebpvd = cb.k_tbc_ysz(T=1500, is_ebpvd=True)  # EB-PVD as-sprayed"
     );
 
     m.def(

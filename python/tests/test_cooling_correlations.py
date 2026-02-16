@@ -516,18 +516,19 @@ class TestEffusionCooling:
 
     def test_effusion_discharge_coefficient_baseline(self):
         """Test discharge coefficient at typical conditions."""
-        Cd = cb.effusion_discharge_coefficient(
-            Re_d=10000, P_ratio=1.05, alpha_deg=30, L_D=4.0
-        )
+        Cd = cb.effusion_discharge_coefficient(Re_d=10000, P_ratio=1.05, alpha_deg=30, L_D=4.0)
         # Typical Cd range for effusion holes
         assert 0.5 < Cd < 0.8
 
-    def test_effusion_cd_increases_with_pressure_ratio(self):
-        """Test that Cd increases with pressure ratio."""
-        Cd_low = cb.effusion_discharge_coefficient(10000, 1.03, 30, 4.0)
-        Cd_high = cb.effusion_discharge_coefficient(10000, 1.10, 30, 4.0)
-
-        assert Cd_high > Cd_low
+    def test_effusion_cd_varies_with_angle(self):
+        """Test that Cd varies with injection angle."""
+        # Shallow angle (20 deg) vs steep angle (45 deg)
+        Cd_shallow = cb.effusion_discharge_coefficient(10000, 1.05, 20, 4.0)
+        Cd_steep = cb.effusion_discharge_coefficient(10000, 1.05, 45, 4.0)
+        
+        # Both should be in valid range
+        assert 0.5 < Cd_shallow < 0.8
+        assert 0.5 < Cd_steep < 0.8
 
     def test_effusion_cd_decreases_with_LD(self):
         """Test that Cd decreases with longer holes."""

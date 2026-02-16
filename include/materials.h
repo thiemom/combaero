@@ -68,17 +68,16 @@ double k_aluminum_6061(double T);
 //
 // Sintering model:
 // - Initial k increases linearly with T
-// - Over time, pores close (sintering) -> k increases
+// - Over time at high T (>1073 K), pores close (sintering) -> k increases
 // - Rate depends on temperature (Arrhenius)
+// - EB-PVD (columnar) has higher initial k than APS (splat boundaries)
 //
 // Parameters:
-//   T     : temperature [K]
-//   hours : operating hours at temperature (default: 0 = as-sprayed)
-//
-// Returns: k [W/(m·K)]
-//   - As-sprayed: ~0.8-1.5 W/(m·K)
-//   - Fully sintered: ~1.8-2.0 W/(m·K)
-double k_tbc_ysz(double T, double hours = 0.0);
+//   T        : temperature [K]
+//   hours    : operating hours at temperature (default: 0 = as-sprayed)
+//   is_ebpvd : true for EB-PVD coating, false for APS (default: false)
+// Returns: thermal conductivity k [W/(m·K)]
+double k_tbc_ysz(double T, double hours = 0.0, bool is_ebpvd = false);
 
 // -------------------------------------------------------------
 // Helper Functions

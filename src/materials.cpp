@@ -66,34 +66,50 @@ double k_aluminum_6061(double T) {
 // Thermal Barrier Coatings
 // -------------------------------------------------------------
 
-double k_tbc_ysz(double T, double hours) {
-    constexpr double T_min = 300.0;
-    constexpr double T_max = 1700.0;
-    validate_temperature("YSZ TBC", T, T_min, T_max);
+double k_tbc_ysz(double T, double hours, bool is_ebpvd) {
+    // Validate temperature
+    if (T < 300.0 || T > 1700.0) {
+        throw std::runtime_error("k_tbc_ysz: Temperature must be in range [300, 1700] K, got " + std::to_string(T));
+    }
     
     double T_C = T - 273.15;
     
-    // As-sprayed thermal conductivity (linear with temperature)
-    double k_initial = 0.8 + 0.00045 * T_C;
+    // As-sprayed thermal conductivity (different for APS vs EB-PVD)
+    double k_initial;
+    if (is_ebpvd) {
+        // EB-PVD: Electron beam physical vapor deposition
+        // Columnar microstructure -> higher initial conductivity
+        k_initial = 1.5 + 0.0002 * T_C;
+    } else {
+        // APS: Atmospheric plasma spray (default)
+        // Splat boundaries -> lower initial conductivity
+        k_initial = 0.8 + 0.00045 * T_C;
+    }
     
-    // No aging - return as-sprayed value
-    if (hours <= 0.0) {
+    // No aging or low temperature (sintering negligible below ~1073 K / 800 C)
+    // Sintering is diffusion-driven and requires high temperature
+    if (hours <= 0.0 || T < 1073.0) {
         return k_initial;
     }
     
-    // Sintering model (NASA Zhu/Miller)
+    // Sintering model (NASA Zhu/Miller TM-2010-216765)
     // k increases as pores close over time at high temperature
-    constexpr double k_fully_sintered = 1.85;  // W/(m·K)
+    constexpr double k_fully_sintered = 1.85;  // W/(m·K) - fully dense YSZ limit
     constexpr double E_activation = 12000.0;   // Activation energy [K]
     
-    // Sintering rate (Arrhenius)
+    // Sintering rate (Arrhenius relationship)
+    // Rate increases exponentially with temperature
     double rate = 0.01 * std::exp(-E_activation / T);
     
-    // Sintering progress (stretched exponential)
+    // Sintering progress (stretched exponential, n=0.4 for APS YSZ)
+    // zeta = 1 - exp(-(rate*t)^n) where 0 <= zeta <= 1
     double progress = 1.0 - std::exp(-std::pow(rate * hours, 0.4));
     
     // Interpolate between as-sprayed and fully sintered
-    return k_initial + (k_fully_sintered - k_initial) * progress;
+    double k_sintered = k_initial + (k_fully_sintered - k_initial) * progress;
+    
+    // Clamp to physical limit (fully dense YSZ)
+    return std::min(k_sintered, k_fully_sintered);
 }
 
 // -------------------------------------------------------------
