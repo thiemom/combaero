@@ -123,6 +123,7 @@ try:
         fanno_pipe,
         film_cooling_effectiveness,
         film_cooling_effectiveness_avg,
+        film_cooling_multirow_sellers,
         formula,
         formula_to_name,
         frequency_from_strouhal,

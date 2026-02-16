@@ -3981,6 +3981,34 @@ PYBIND11_MODULE(_core, m)
         "Returns: Laterally averaged effectiveness eta_avg [-]"
     );
 
+    m.def(
+        "film_cooling_multirow_sellers",
+        &combaero::cooling::film_cooling_multirow_sellers,
+        py::arg("row_positions_xD"),
+        py::arg("eval_xD"),
+        py::arg("M"),
+        py::arg("DR"),
+        py::arg("alpha_deg"),
+        "Multi-row film cooling using Sellers (1963) superposition.\n\n"
+        "Combines effectiveness from multiple upstream rows using the\n"
+        "Sellers superposition principle: eta_total = 1 - product(1 - eta_i).\n\n"
+        "Parameters:\n"
+        "  row_positions_xD : streamwise positions of hole rows [x/D]\n"
+        "  eval_xD          : evaluation location [x/D]\n"
+        "  M                : blowing ratio [-]\n"
+        "  DR               : density ratio [-]\n"
+        "  alpha_deg        : injection angle [deg]\n\n"
+        "Returns: total adiabatic effectiveness [-]\n\n"
+        "References:\n"
+        "  - Sellers (1963): Superposition principle for multiple rows\n"
+        "  - Baldauf et al. (2002): Single-row effectiveness correlation\n\n"
+        "Accuracy: ±15-20% (flat plate; curvature requires Ito correction)\n\n"
+        "Example:\n"
+        "  >>> rows = [0, 10, 20]  # Three rows at x/D = 0, 10, 20\n"
+        "  >>> eta = cb.film_cooling_multirow_sellers(rows, eval_xD=30, M=0.5, DR=1.8, alpha_deg=30)\n"
+        "  >>> print(eta)  # Combined effectiveness at x/D = 30"
+    );
+
     // =========================================================================
     // Units System
     // =========================================================================

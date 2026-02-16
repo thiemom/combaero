@@ -241,4 +241,37 @@ double film_cooling_effectiveness_avg(double x_D, double M, double DR,
     return std::max(0.0, std::min(1.0, eta_avg));
 }
 
-} // namespace combaero::cooling
+// Multi-row film cooling using Sellers (1963) superposition principle
+// Combines effectiveness from multiple upstream rows
+double film_cooling_multirow_sellers(
+    const std::vector<double>& row_positions_xD,
+    double eval_xD,
+    double M,
+    double DR,
+    double alpha_deg
+) {
+    // Validate inputs
+    if (row_positions_xD.empty()) {
+        throw std::runtime_error("row_positions_xD cannot be empty");
+    }
+    
+    // Sellers superposition: eta_total = 1 - product(1 - eta_i)
+    // Each row contributes based on its local x/D from injection point
+    double product_term = 1.0;
+    
+    for (double row_x : row_positions_xD) {
+        double local_xD = eval_xD - row_x;
+        
+        // Only consider upstream rows (local_xD > 0)
+        if (local_xD > 0.0) {
+            // Get single-row effectiveness using Baldauf correlation
+            // Parameter validation happens inside film_cooling_effectiveness
+            double eta_i = film_cooling_effectiveness(local_xD, M, DR, alpha_deg);
+            product_term *= (1.0 - eta_i);
+        }
+    }
+    
+    return 1.0 - product_term;
+}
+
+}  // namespace combaero::cooling

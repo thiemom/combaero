@@ -87,7 +87,8 @@ inline constexpr Entry function_units[] = {
     {"rib_friction_multiplier", "e_D: -, P_e: -",                       "-"},
     {"impingement_nusselt",     "Re_jet: -, Pr: -, z_D: -, x_D: - (default 0), y_D: - (default 0)", "-"},
     {"film_cooling_effectiveness", "x_D: -, M: -, DR: -, alpha_deg: deg", "-"},
-    {"film_cooling_effectiveness_avg", "x_D: -, M: -, DR: -, alpha_deg: deg, s_D: - (default 3)", "-"},
+    {"film_cooling_effectiveness_avg", "x_D: -, M: -, DR: -, alpha_deg: deg, s_D: - (default 3.0)", "-"},
+    {"film_cooling_multirow_sellers", "row_positions_xD: list[-], eval_xD: -, M: -, DR: -, alpha_deg: deg", "-"},
 
     // -------------------------------------------------------------------------
     // acoustics.h - Acoustic Properties

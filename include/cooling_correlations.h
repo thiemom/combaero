@@ -96,6 +96,25 @@ double film_cooling_effectiveness(double x_D, double M, double DR, double alpha_
 double film_cooling_effectiveness_avg(double x_D, double M, double DR,
                                      double alpha_deg, double s_D = 3.0);
 
+// Multi-row film cooling using Sellers (1963) superposition
+// Combines effectiveness from multiple upstream rows
+// Parameters:
+//   row_positions_xD : streamwise positions of hole rows [x/D]
+//   eval_xD          : evaluation location [x/D]
+//   M                : blowing ratio [-]
+//   DR               : density ratio [-]
+//   alpha_deg        : injection angle [deg]
+// Returns: total adiabatic effectiveness [-]
+// Reference: Sellers (1963), Baldauf et al. (2002)
+// Accuracy: ±15-20% (flat plate; curvature requires Ito correction)
+double film_cooling_multirow_sellers(
+    const std::vector<double>& row_positions_xD,
+    double eval_xD,
+    double M,
+    double DR,
+    double alpha_deg
+);
+
 // -------------------------------------------------------------
 // Helper Functions
 // -------------------------------------------------------------
