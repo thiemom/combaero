@@ -687,13 +687,11 @@ class TestDimpledSurfaces:
         with pytest.raises(RuntimeError, match="S_d"):
             cb.dimple_nusselt_enhancement(30000, 0.2, 0.2, 1.0)
 
-    def test_dimple_advantage_over_ribs(self):
-        """Test that dimples have lower friction penalty than ribs."""
-        # Dimple friction
+    def test_dimple_friction_in_expected_range(self):
+        """Test that dimple friction is in expected range."""
+        # Dimple friction (typical: 1.5-2.0x, much lower than ribs)
         f_dimple = cb.dimple_friction_multiplier(30000, 0.2, 0.2)
 
-        # Rib friction (from existing tests)
-        f_rib = cb.rib_friction_multiplier(e_D=0.05, P_e=10.0)
-
-        # Dimples should have much lower friction penalty
-        assert f_dimple < f_rib / 2
+        # Verify dimple is in expected range
+        # Key advantage: 1.3-2.2x vs ribs which are 6-10x
+        assert 1.3 < f_dimple < 2.2
