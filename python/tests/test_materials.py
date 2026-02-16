@@ -18,15 +18,15 @@ class TestSuperalloys:
 
     def test_inconel718_ambient(self):
         """Test Inconel 718 at ambient temperature."""
-        T = 300.0  # K (27°C)
+        T = 300.0  # K (27degC)
         k = cb.k_inconel718(T)
 
-        # At 300K (27°C): k ≈ 11.4 + 0.0146*27 ≈ 11.79 W/(m·K)
+        # At 300K (27degC): k ≈ 11.4 + 0.0146*27 ≈ 11.79 W/(m*K)
         assert k == pytest.approx(11.79, abs=0.1)
 
     def test_inconel718_high_temp(self):
         """Test Inconel 718 at high temperature."""
-        T = 1000.0  # K (727°C)
+        T = 1000.0  # K (727degC)
         k = cb.k_inconel718(T)
 
         # At 1000K (727C): k approx 11.4 + 0.0146*727 approx 22.0 W/(m*K)
@@ -357,7 +357,7 @@ class TestMagnitudeRanges:
     """Test that thermal conductivity values are in reasonable ranges."""
 
     def test_superalloy_magnitude(self):
-        """Test superalloy k is in typical range (10-30 W/(m·K))."""
+        """Test superalloy k is in typical range (10-30 W/(m*K))."""
         T = 800.0
 
         k_inconel = cb.k_inconel718(T)
@@ -367,21 +367,21 @@ class TestMagnitudeRanges:
         assert 10 < k_haynes < 30
 
     def test_stainless_steel_magnitude(self):
-        """Test stainless steel k is in typical range (13-25 W/(m·K))."""
+        """Test stainless steel k is in typical range (13-25 W/(m*K))."""
         T = 600.0
         k = cb.k_stainless_steel_316(T)
 
         assert 13 < k < 25
 
     def test_aluminum_magnitude(self):
-        """Test aluminum k is in typical range (150-180 W/(m·K))."""
+        """Test aluminum k is in typical range (150-180 W/(m*K))."""
         T = 300.0
         k = cb.k_aluminum_6061(T)
 
         assert 150 < k < 180
 
     def test_tbc_magnitude(self):
-        """Test TBC k is in typical range (0.8-2.0 W/(m·K))."""
+        """Test TBC k is in typical range (0.8-2.0 W/(m*K))."""
         T = 1200.0
 
         k_fresh = cb.k_tbc_ysz(T, hours=0)

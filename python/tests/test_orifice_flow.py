@@ -111,11 +111,11 @@ class TestOrificeFlowIdealGas:
 
         result = cb.orifice_flow(geom, dP=10000, T=300, P=101325, mu=mu, Z=1.0)
 
-        # Re_D = 4 * mdot / (π * D * μ)
+        # Re_D = 4 * mdot / (pi * D * μ)
         Re_D_expected = (4.0 * result.mdot) / (np.pi * geom.D * mu)
         assert abs(result.Re_D - Re_D_expected) < 1e-10
 
-        # Re_d = 4 * mdot / (π * d * μ)
+        # Re_d = 4 * mdot / (pi * d * μ)
         Re_d_expected = (4.0 * result.mdot) / (np.pi * geom.d * mu)
         assert abs(result.Re_d - Re_d_expected) < 1e-10
 
@@ -136,7 +136,7 @@ class TestOrificeFlowRealGas:
         result = cb.orifice_flow(geom, dP=50000, T=T, P=P, mu=mu, Z=Z)
 
         # Calculate ideal gas density
-        R_gas = 8.314  # J/(mol·K)
+        R_gas = 8.314  # J/(mol*K)
         MW_air = 0.02897  # kg/mol
         rho_ideal = (P * MW_air) / (R_gas * T)
 
@@ -191,7 +191,7 @@ class TestUtilityFunctions:
     def test_orifice_velocity_from_mdot_ideal_gas(self):
         """Test velocity calculation with ideal gas."""
         mdot = 1.0  # kg/s
-        rho = 1.2  # kg/m³
+        rho = 1.2  # kg/m^3
         d = 0.05  # m
         Z = 1.0
 
@@ -206,7 +206,7 @@ class TestUtilityFunctions:
     def test_orifice_velocity_from_mdot_real_gas(self):
         """Test velocity calculation with real gas correction."""
         mdot = 1.0  # kg/s
-        rho = 1.2  # kg/m³
+        rho = 1.2  # kg/m^3
         d = 0.05  # m
         Z = 0.85
 
@@ -226,7 +226,7 @@ class TestUtilityFunctions:
 
         A = cb.orifice_area_from_beta(D, beta)
 
-        # A = π * (D * beta / 2)²
+        # A = pi * (D * beta / 2)^2
         d = D * beta
         A_expected = np.pi * d**2 / 4.0
 
@@ -248,11 +248,11 @@ class TestUtilityFunctions:
         """Test Reynolds number calculation from mass flow."""
         mdot = 1.0  # kg/s
         d = 0.05  # m
-        mu = 1.8e-5  # Pa·s
+        mu = 1.8e-5  # Pa*s
 
         Re_d = cb.orifice_Re_d_from_mdot(mdot, d, mu)
 
-        # Re_d = 4 * mdot / (π * d * μ)
+        # Re_d = 4 * mdot / (pi * d * μ)
         Re_d_expected = (4.0 * mdot) / (np.pi * d * mu)
 
         assert abs(Re_d - Re_d_expected) < 1e-10

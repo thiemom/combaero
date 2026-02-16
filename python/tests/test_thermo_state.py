@@ -179,7 +179,7 @@ class TestPhysicalRelationships:
         X = cb.standard_dry_air_composition()
         state = cb.thermo_state(T=300, P=101325, X=X)
 
-        R = 8.31446261815324  # Universal gas constant [J/(mol·K)]
+        R = 8.31446261815324  # Universal gas constant [J/(mol*K)]
         V_molar = R * state.T / state.P
         h_from_u = state.u + state.P * V_molar
 
@@ -241,7 +241,7 @@ class TestVariousConditions:
     """Test at various temperature and pressure conditions."""
 
     def test_ambient_conditions(self):
-        """Test at ambient conditions (20°C, 1 atm)."""
+        """Test at ambient conditions (20degC, 1 atm)."""
         X = cb.standard_dry_air_composition()
         T = 293.15
         P = 101325

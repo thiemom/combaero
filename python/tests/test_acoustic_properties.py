@@ -58,7 +58,7 @@ class TestAcousticPropertiesCalculations:
 
     def test_impedance_calculation(self):
         """Test that impedance = rho * c."""
-        rho = 1.2  # kg/m³
+        rho = 1.2  # kg/m^3
         c = 340  # m/s
         props = cb.acoustic_properties(f=1000, rho=rho, c=c)
 
@@ -67,7 +67,7 @@ class TestAcousticPropertiesCalculations:
 
     def test_particle_velocity_calculation(self):
         """Test that particle_velocity = p_rms / (rho * c)."""
-        rho = 1.2  # kg/m³
+        rho = 1.2  # kg/m^3
         c = 340  # m/s
         p_rms = 1.0  # Pa
         props = cb.acoustic_properties(f=1000, rho=rho, c=c, p_rms=p_rms)
@@ -133,7 +133,7 @@ class TestUtilityFunctions:
 
     def test_acoustic_impedance(self):
         """Test acoustic impedance calculation."""
-        rho = 1.2  # kg/m³
+        rho = 1.2  # kg/m^3
         c = 340  # m/s
         Z = cb.acoustic_impedance(rho, c)
 
@@ -160,7 +160,7 @@ class TestUtilityFunctions:
     def test_particle_velocity(self):
         """Test particle velocity calculation."""
         p = 1.0  # Pa
-        rho = 1.2  # kg/m³
+        rho = 1.2  # kg/m^3
         c = 340  # m/s
         u = cb.particle_velocity(p, rho, c)
 
@@ -182,10 +182,10 @@ class TestTypicalConditions:
     """Test with typical acoustic conditions."""
 
     def test_air_at_standard_conditions(self):
-        """Test air at 20°C, 1 atm."""
+        """Test air at 20degC, 1 atm."""
         f = 1000  # Hz
-        rho = 1.2  # kg/m³
-        c = 343  # m/s at 20°C
+        rho = 1.2  # kg/m^3
+        c = 343  # m/s at 20degC
         p_rms = 0.02  # Pa (quiet room)
 
         props = cb.acoustic_properties(f=f, rho=rho, c=c, p_rms=p_rms)
@@ -202,7 +202,7 @@ class TestTypicalConditions:
         P = 15e5  # Pa (15 bar)
 
         # Approximate properties for hot air
-        rho = P / (287 * T)  # ~3.5 kg/m³
+        rho = P / (287 * T)  # ~3.5 kg/m^3
         c = np.sqrt(1.3 * 287 * T)  # ~775 m/s
 
         props = cb.acoustic_properties(f=f, rho=rho, c=c, p_rms=1000)
@@ -214,7 +214,7 @@ class TestTypicalConditions:
     def test_water_acoustics(self):
         """Test underwater acoustics."""
         f = 1000  # Hz
-        rho = 1000  # kg/m³
+        rho = 1000  # kg/m^3
         c = 1500  # m/s (speed of sound in water)
 
         props = cb.acoustic_properties(f=f, rho=rho, c=c, p_rms=1.0)
