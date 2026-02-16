@@ -33,9 +33,9 @@ class TestTransferMatrixMethod:
             u_bias=10, u_grazing=5, rho=1.2, c=343
         )
         # Should be a shunt element: T11=1, T12=0, T22=1
-        assert tm.T11 == pytest.approx(1.0+0j, abs=1e-10)
-        assert tm.T12 == pytest.approx(0.0+0j, abs=1e-10)
-        assert tm.T22 == pytest.approx(1.0+0j, abs=1e-10)
+        assert pytest.approx(1.0+0j, abs=1e-10) == tm.T11
+        assert pytest.approx(0.0+0j, abs=1e-10) == tm.T12
+        assert pytest.approx(1.0+0j, abs=1e-10) == tm.T22
         # T21 should be non-zero (branch admittance)
         assert abs(tm.T21) > 0
 
@@ -55,10 +55,10 @@ class TestTransferMatrixMethod:
         
         tm_result = tm1 * tm2
         # Verify matrix multiplication
-        assert tm_result.T11 == pytest.approx(1.0+0j)
-        assert tm_result.T12 == pytest.approx(0.5+0j)
-        assert tm_result.T21 == pytest.approx(2.0+0j)
-        assert tm_result.T22 == pytest.approx(2.0+0j)
+        assert pytest.approx(1.0+0j) == tm_result.T11
+        assert pytest.approx(0.5+0j) == tm_result.T12
+        assert pytest.approx(2.0+0j) == tm_result.T21
+        assert pytest.approx(2.0+0j) == tm_result.T22
 
     def test_whistling_risk_detection(self):
         """Test Strouhal-based whistling risk."""

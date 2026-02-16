@@ -289,6 +289,69 @@ bool is_whistling_risk(
 );
 
 // -------------------------------------------------------------
+// Can-Annular Combustor Acoustics (Bloch-Floquet Theory)
+// -------------------------------------------------------------
+
+// Geometry of a can-annular combustor system
+// N cans coupled by an annular plenum
+struct CanAnnularGeometry {
+    int n_cans;            // Total number of cans (N)
+    double length_can;     // Length of one can [m]
+    double area_can;       // Cross-sectional area of one can [m²]
+    double radius_plenum;  // Mean radius of the annular plenum [m]
+    double area_plenum;    // Cross-sectional area of the plenum [m²]
+};
+
+// Bloch mode (eigenmode of periodic can-annular system)
+// Uses Bloch-Floquet theory to reduce N-can problem to single sector
+struct BlochMode {
+    int m_azimuthal;       // Azimuthal mode number (0 to N/2)
+    double frequency;      // Eigenfrequency [Hz]
+    int n_cans;            // Number of cans (needed for symmetry classification)
+    
+    // Mode symmetry classification
+    // m=0: "Push-Push" (all cans in phase)
+    // m=N/2: "Push-Pull" (adjacent cans 180° out of phase)
+    // 0 < m < N/2: "Spinning/Standing wave"
+    std::string symmetry_type() const;
+};
+
+// Solve for passive acoustic eigenmodes of can-annular system
+// Uses Argument Principle Method (Nyquist contour) for robust root finding
+//
+// Finds ALL modes in frequency range by counting zeros of dispersion relation:
+//   D(ω) = Y_can(ω) + Y_annulus(ω, m) = 0
+//
+// Parameters:
+//   geom       : can-annular geometry
+//   c_can      : speed of sound in can [m/s]
+//   c_plenum   : speed of sound in plenum [m/s] (often different!)
+//   rho_can    : density in can [kg/m³]
+//   rho_plenum : density in plenum [kg/m³]
+//   f_max      : maximum frequency to search [Hz] (default: 2000 Hz)
+//   bc_can_top : boundary condition at can top (default: Closed)
+//
+// Returns: Vector of BlochMode sorted by frequency
+//
+// References:
+//   - Noiray et al. (2011): "A unified framework for nonlinear combustion instability analysis"
+//   - Evesque & Polifke (2005): "Low-order acoustic modelling for annular combustors"
+//   - Silva et al. (2013): "Combining Helmholtz solver with flame describing function"
+//
+// Method: Argument Principle (counts zeros inside contour in complex plane)
+// Accuracy: Finds all modes, no missed roots
+// Valid: Passive acoustics (no flame response)
+std::vector<BlochMode> can_annular_eigenmodes(
+    const CanAnnularGeometry& geom,
+    double c_can,
+    double c_plenum,
+    double rho_can,
+    double rho_plenum,
+    double f_max = 2000.0,
+    BoundaryCondition bc_can_top = BoundaryCondition::Closed
+);
+
+// -------------------------------------------------------------
 // Utility functions
 // -------------------------------------------------------------
 
