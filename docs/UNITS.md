@@ -342,27 +342,30 @@ All functions use consistent units to avoid conversion errors.
 
 ### materials.h - Material Thermal Conductivity
 
-| Function                | Input Units                | Output Unit |
-|-------------------------|----------------------------|-------------|
-| `k_inconel718`          | T: K                       | W/(m*K)     |
-| `k_haynes230`           | T: K                       | W/(m*K)     |
-| `k_stainless_steel_316` | T: K                       | W/(m*K)     |
-| `k_aluminum_6061`       | T: K                       | W/(m*K)     |
-| `k_tbc_ysz`             | T: K, hours: h (default 0) | W/(m*K)     |
-| `list_materials`        | -                          | list[str]   |
+| Function                | Input Units                                                | Output Unit |
+|-------------------------|------------------------------------------------------------|-------------|
+| `k_inconel718`          | T: K                                                       | W/(m*K)     |
+| `k_haynes230`           | T: K                                                       | W/(m*K)     |
+| `k_stainless_steel_316` | T: K                                                       | W/(m*K)     |
+| `k_aluminum_6061`       | T: K                                                       | W/(m*K)     |
+| `k_tbc_ysz`             | T: K, hours: h (default 0), is_ebpvd: bool (default False) | W/(m*K)     |
+| `list_materials`        | -                                                          | list[str]   |
 
 ### cooling_correlations.h - Advanced Cooling Correlations
 
-| Function                         | Input Units                                                        | Output Unit |
-|----------------------------------|--------------------------------------------------------------------|-------------|
-| `rib_enhancement_factor`         | e_D: -, P_e: -, alpha: deg                                         | -           |
-| `rib_friction_multiplier`        | e_D: -, P_e: -                                                     | -           |
-| `impingement_nusselt`            | Re_jet: -, Pr: -, z_D: -, x_D: - (default 0), y_D: - (default 0)   | -           |
-| `film_cooling_effectiveness`     | x_D: -, M: -, DR: -, alpha_deg: deg                                | -           |
-| `film_cooling_effectiveness_avg` | x_D: -, M: -, DR: -, alpha_deg: deg, s_D: - (default 3.0)          | -           |
-| `film_cooling_multirow_sellers`  | row_positions_xD: list[-], eval_xD: -, M: -, DR: -, alpha_deg: deg | -           |
-| `effusion_effectiveness`         | x_D: -, M: -, DR: -, porosity: -, s_D: -, alpha_deg: deg           | -           |
-| `effusion_discharge_coefficient` | Re_d: -, P_ratio: -, alpha_deg: deg, L_D: - (default 4.0)          | -           |
+| Function                         | Input Units                                                               | Output Unit |
+|----------------------------------|---------------------------------------------------------------------------|-------------|
+| `rib_enhancement_factor`         | e_D: -, P_e: -, alpha: deg                                                | -           |
+| `rib_friction_multiplier`        | e_D: -, P_e: -                                                            | -           |
+| `impingement_nusselt`            | Re_jet: -, Pr: -, z_D: -, x_D: - (default 0), y_D: - (default 0)          | -           |
+| `film_cooling_effectiveness`     | x_D: -, M: -, DR: -, alpha_deg: deg                                       | -           |
+| `film_cooling_effectiveness_avg` | x_D: -, M: -, DR: -, alpha_deg: deg, s_D: - (default 3.0)                 | -           |
+| `film_cooling_multirow_sellers`  | row_positions_xD: list[-], eval_xD: -, M: -, DR: -, alpha_deg: deg        | -           |
+| `effusion_effectiveness`         | x_D: -, M: -, DR: -, porosity: -, s_D: -, alpha_deg: deg                  | -           |
+| `pin_fin_nusselt`                | Re_d: -, Pr: -, L_D: -, S_D: -, X_D: -, is_staggered: bool (default True) | -           |
+| `dimple_nusselt_enhancement`     | Re_Dh: -, d_Dh: -, h_d: -, S_d: -                                         | -           |
+| `dimple_friction_multiplier`     | Re_Dh: -, d_Dh: -, h_d: -                                                 | -           |
+| `effusion_discharge_coefficient` | Re_d: -, P_ratio: -, alpha_deg: deg, L_D: - (default 4.0)                 | -           |
 
 ### acoustics.h - Acoustic Properties
 

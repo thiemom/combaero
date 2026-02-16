@@ -417,4 +417,155 @@ double effusion_discharge_coefficient(
     return std::max(0.50, std::min(0.85, Cd));
 }
 
+// -------------------------------------------------------------
+// Pin Fin Arrays
+// -------------------------------------------------------------
+
+// Validate pin fin parameters
+void validate_pin_fin_params(double Re_d, double L_D, double S_D, double X_D) {
+    if (Re_d < 3000.0 || Re_d > 90000.0) {
+        throw std::runtime_error("Pin fin Re_d must be in range [3000, 90000], got " + std::to_string(Re_d));
+    }
+    if (L_D < 0.5 || L_D > 4.0) {
+        throw std::runtime_error("Pin fin L_D must be in range [0.5, 4.0], got " + std::to_string(L_D));
+    }
+    if (S_D < 1.5 || S_D > 4.0) {
+        throw std::runtime_error("Pin fin S_D must be in range [1.5, 4.0], got " + std::to_string(S_D));
+    }
+    if (X_D < 1.5 || X_D > 4.0) {
+        throw std::runtime_error("Pin fin X_D must be in range [1.5, 4.0], got " + std::to_string(X_D));
+    }
+}
+
+// Pin fin array Nusselt number (Metzger et al. 1982)
+double pin_fin_nusselt(
+    double Re_d,
+    double Pr,
+    double L_D,
+    double S_D,
+    double X_D,
+    bool is_staggered
+) {
+    // Validate parameters
+    validate_pin_fin_params(Re_d, L_D, S_D, X_D);
+    
+    if (Pr < 0.5 || Pr > 1.0) {
+        throw std::runtime_error("Prandtl number Pr must be in range [0.5, 1.0], got " + std::to_string(Pr));
+    }
+    
+    // Metzger correlation: Nu = C * Re_d^m * Pr^0.4 * f(spacing)
+    // Constants depend on staggered vs inline arrangement
+    double C, m;
+    if (is_staggered) {
+        // Staggered arrays have better heat transfer
+        C = 0.135;
+        m = 0.69;
+    } else {
+        // Inline arrays (lower performance)
+        C = 0.092;
+        m = 0.675;
+    }
+    
+    // Base Nusselt number
+    double Nu_base = C * std::pow(Re_d, m) * std::pow(Pr, 0.4);
+    
+    // Length effect: longer pins have lower average Nu due to boundary layer growth
+    double f_length = std::pow(L_D, -0.11);
+    
+    // Spacing effects (Metzger empirical fits)
+    // Tighter spacing -> better heat transfer but higher pressure drop
+    double f_spacing = std::pow(S_D / 2.5, -0.15) * std::pow(X_D / 2.5, -0.10);
+    
+    return Nu_base * f_length * f_spacing;
+}
+
+// -------------------------------------------------------------
+// Dimpled Surfaces
+// -------------------------------------------------------------
+
+// Validate dimple parameters
+void validate_dimple_params(double Re_Dh, double d_Dh, double h_d, double S_d) {
+    if (Re_Dh < 10000.0 || Re_Dh > 80000.0) {
+        throw std::runtime_error("Dimple Re_Dh must be in range [10000, 80000], got " + std::to_string(Re_Dh));
+    }
+    if (d_Dh < 0.1 || d_Dh > 0.3) {
+        throw std::runtime_error("Dimple d_Dh must be in range [0.1, 0.3], got " + std::to_string(d_Dh));
+    }
+    if (h_d < 0.1 || h_d > 0.3) {
+        throw std::runtime_error("Dimple h_d must be in range [0.1, 0.3], got " + std::to_string(h_d));
+    }
+    if (S_d < 1.5 || S_d > 3.0) {
+        throw std::runtime_error("Dimple S_d must be in range [1.5, 3.0], got " + std::to_string(S_d));
+    }
+}
+
+// Dimpled surface heat transfer enhancement (Chyu et al. 1997)
+double dimple_nusselt_enhancement(
+    double Re_Dh,
+    double d_Dh,
+    double h_d,
+    double S_d
+) {
+    // Validate parameters
+    validate_dimple_params(Re_Dh, d_Dh, h_d, S_d);
+    
+    // Chyu correlation: Nu/Nu_0 = f(Re, geometry)
+    // Enhancement increases with Re (vortex strength)
+    double Re_effect = std::pow(Re_Dh / 30000.0, 0.1);  // Weak Re dependence
+    
+    // Dimple depth effect: optimal around h/d = 0.2
+    // Deeper dimples create stronger vortices
+    double depth_factor = 1.0 + 2.0 * (h_d - 0.15);
+    depth_factor = std::max(1.0, std::min(1.5, depth_factor));
+    
+    // Dimple density effect: closer spacing -> more vortex interaction
+    double spacing_factor = std::pow(2.0 / S_d, 0.3);
+    
+    // Dimple size effect: larger dimples (higher d/Dh) -> more coverage
+    double size_factor = 1.0 + 1.5 * (d_Dh - 0.15);
+    
+    // Base enhancement (typical for well-designed dimple arrays)
+    double base_enhancement = 1.8;
+    
+    double enhancement = base_enhancement * Re_effect * depth_factor * spacing_factor * size_factor;
+    
+    // Clamp to realistic range (1.5 - 2.8x)
+    return std::max(1.5, std::min(2.8, enhancement));
+}
+
+// Dimpled surface friction multiplier
+double dimple_friction_multiplier(
+    double Re_Dh,
+    double d_Dh,
+    double h_d
+) {
+    // Validate Re and geometry (S_d not needed for friction)
+    if (Re_Dh < 10000.0 || Re_Dh > 80000.0) {
+        throw std::runtime_error("Dimple Re_Dh must be in range [10000, 80000], got " + std::to_string(Re_Dh));
+    }
+    if (d_Dh < 0.1 || d_Dh > 0.3) {
+        throw std::runtime_error("Dimple d_Dh must be in range [0.1, 0.3], got " + std::to_string(d_Dh));
+    }
+    if (h_d < 0.1 || h_d > 0.3) {
+        throw std::runtime_error("Dimple h_d must be in range [0.1, 0.3], got " + std::to_string(h_d));
+    }
+    
+    // Friction penalty for dimples (Chyu et al. 1997)
+    // Much lower than ribs (1.5-2.0x vs 6-10x)
+    
+    // Base friction multiplier
+    double f_base = 1.5;
+    
+    // Depth effect: deeper dimples -> higher friction
+    double depth_penalty = 1.0 + 0.8 * (h_d - 0.15);
+    
+    // Size effect: larger dimples -> slightly higher friction
+    double size_penalty = 1.0 + 0.4 * (d_Dh - 0.15);
+    
+    double f_ratio = f_base * depth_penalty * size_penalty;
+    
+    // Clamp to realistic range (1.3 - 2.2x)
+    return std::max(1.3, std::min(2.2, f_ratio));
+}
+
 }  // namespace combaero::cooling

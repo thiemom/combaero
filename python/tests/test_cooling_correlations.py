@@ -525,7 +525,7 @@ class TestEffusionCooling:
         # Shallow angle (20 deg) vs steep angle (45 deg)
         Cd_shallow = cb.effusion_discharge_coefficient(10000, 1.05, 20, 4.0)
         Cd_steep = cb.effusion_discharge_coefficient(10000, 1.05, 45, 4.0)
-        
+
         # Both should be in valid range
         assert 0.5 < Cd_shallow < 0.8
         assert 0.5 < Cd_steep < 0.8
@@ -603,3 +603,97 @@ class TestPhysicalConsistency:
 
         # Should be very low far downstream
         assert eta_far < 0.2
+
+
+class TestPinFinArrays:
+    """Test pin fin array correlations."""
+
+    def test_pin_fin_baseline(self):
+        """Test pin fin Nusselt at typical conditions."""
+        Nu = cb.pin_fin_nusselt(Re_d=20000, Pr=0.7, L_D=2.0, S_D=2.5, X_D=2.5)
+        assert 80 < Nu < 120
+
+    def test_pin_fin_staggered_higher_than_inline(self):
+        """Test that staggered arrays have higher Nu than inline."""
+        Nu_staggered = cb.pin_fin_nusselt(20000, 0.7, 2.0, 2.5, 2.5, is_staggered=True)
+        Nu_inline = cb.pin_fin_nusselt(20000, 0.7, 2.0, 2.5, 2.5, is_staggered=False)
+        
+        assert Nu_staggered > Nu_inline
+
+    def test_pin_fin_increases_with_reynolds(self):
+        """Test that Nu increases with Re."""
+        Nu_low = cb.pin_fin_nusselt(5000, 0.7, 2.0, 2.5, 2.5)
+        Nu_high = cb.pin_fin_nusselt(50000, 0.7, 2.0, 2.5, 2.5)
+        
+        assert Nu_high > Nu_low
+
+    def test_pin_fin_parameter_validation(self):
+        """Test parameter range validation."""
+        with pytest.raises(RuntimeError, match="Re_d"):
+            cb.pin_fin_nusselt(2000, 0.7, 2.0, 2.5, 2.5)
+        
+        with pytest.raises(RuntimeError, match="Prandtl"):
+            cb.pin_fin_nusselt(20000, 0.3, 2.0, 2.5, 2.5)
+        
+        with pytest.raises(RuntimeError, match="L_D"):
+            cb.pin_fin_nusselt(20000, 0.7, 0.3, 2.5, 2.5)
+
+
+class TestDimpledSurfaces:
+    """Test dimpled surface correlations."""
+
+    def test_dimple_enhancement_baseline(self):
+        """Test dimple enhancement at typical conditions."""
+        enh = cb.dimple_nusselt_enhancement(Re_Dh=30000, d_Dh=0.2, h_d=0.2, S_d=2.0)
+        
+        # Typical range 1.8-2.5x
+        assert 1.5 < enh < 2.8
+
+    def test_dimple_enhancement_bounded(self):
+        """Test that enhancement is bounded to realistic range."""
+        # Try extreme conditions
+        enh_max = cb.dimple_nusselt_enhancement(80000, 0.3, 0.3, 1.5)
+        enh_min = cb.dimple_nusselt_enhancement(10000, 0.1, 0.1, 3.0)
+        
+        assert 1.5 <= enh_max <= 2.8
+        assert 1.5 <= enh_min <= 2.8
+
+    def test_dimple_friction_baseline(self):
+        """Test dimple friction multiplier at typical conditions."""
+        f_ratio = cb.dimple_friction_multiplier(Re_Dh=30000, d_Dh=0.2, h_d=0.2)
+        
+        # Should be much lower than ribs (1.3-2.2x vs 6-10x)
+        assert 1.3 < f_ratio < 2.2
+
+    def test_dimple_friction_bounded(self):
+        """Test that friction is bounded to realistic range."""
+        f_max = cb.dimple_friction_multiplier(80000, 0.3, 0.3)
+        f_min = cb.dimple_friction_multiplier(10000, 0.1, 0.1)
+        
+        assert 1.3 <= f_max <= 2.2
+        assert 1.3 <= f_min <= 2.2
+
+    def test_dimple_parameter_validation(self):
+        """Test parameter range validation."""
+        with pytest.raises(RuntimeError, match="Re_Dh"):
+            cb.dimple_nusselt_enhancement(5000, 0.2, 0.2, 2.0)
+        
+        with pytest.raises(RuntimeError, match="d_Dh"):
+            cb.dimple_nusselt_enhancement(30000, 0.05, 0.2, 2.0)
+        
+        with pytest.raises(RuntimeError, match="h_d"):
+            cb.dimple_nusselt_enhancement(30000, 0.2, 0.05, 2.0)
+        
+        with pytest.raises(RuntimeError, match="S_d"):
+            cb.dimple_nusselt_enhancement(30000, 0.2, 0.2, 1.0)
+
+    def test_dimple_advantage_over_ribs(self):
+        """Test that dimples have lower friction penalty than ribs."""
+        # Dimple friction
+        f_dimple = cb.dimple_friction_multiplier(30000, 0.2, 0.2)
+        
+        # Rib friction (from existing tests)
+        f_rib = cb.rib_friction_multiplier(e_D=0.05, P_e=10.0)
+        
+        # Dimples should have much lower friction penalty
+        assert f_dimple < f_rib / 2

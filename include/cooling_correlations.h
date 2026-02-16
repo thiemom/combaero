@@ -168,6 +168,79 @@ double effusion_discharge_coefficient(
 );
 
 // -------------------------------------------------------------
+// Pin Fin Arrays
+// -------------------------------------------------------------
+
+// Pin fin array Nusselt number for internal cooling
+// Staggered or inline arrangements of cylindrical pins
+//
+// Parameters:
+//   Re_d         : Reynolds number based on pin diameter [-]
+//   Pr           : Prandtl number [-]
+//   L_D          : pin length / diameter [-]
+//   S_D          : spanwise spacing / diameter [-]
+//   X_D          : streamwise spacing / diameter [-]
+//   is_staggered : true for staggered, false for inline (default: true)
+//
+// Returns: Average Nusselt number Nu_d [-]
+//
+// Source: Metzger et al. (1982), "Effects of Pin Shape and Array Orientation"
+// Valid: Re_d = 3000-90000, L_D = 0.5-4.0, S_D = 1.5-4.0, X_D = 1.5-4.0
+// Accuracy: +/-15-20%
+double pin_fin_nusselt(
+    double Re_d,
+    double Pr,
+    double L_D,
+    double S_D,
+    double X_D,
+    bool is_staggered = true
+);
+
+// -------------------------------------------------------------
+// Dimpled Surfaces
+// -------------------------------------------------------------
+
+// Dimpled surface heat transfer enhancement factor
+// Semi-spherical indentations for internal cooling
+//
+// Parameters:
+//   Re_Dh : Reynolds number based on channel hydraulic diameter [-]
+//   d_Dh  : dimple diameter / channel height [-]
+//   h_d   : dimple depth / diameter [-]
+//   S_d   : dimple spacing / diameter [-]
+//
+// Returns: Enhancement factor Nu_dimple/Nu_smooth [-]
+//
+// Source: Chyu et al. (1997), "Heat Transfer of Arrays of Semi-Spherical Indentations"
+// Valid: Re_Dh = 10000-80000, d_Dh = 0.1-0.3, h_d = 0.1-0.3, S_d = 1.5-3.0
+// Accuracy: +/-20%
+double dimple_nusselt_enhancement(
+    double Re_Dh,
+    double d_Dh,
+    double h_d,
+    double S_d
+);
+
+// Dimpled surface friction multiplier
+// Friction penalty for dimpled surfaces
+//
+// Parameters:
+//   Re_Dh : Reynolds number based on channel hydraulic diameter [-]
+//   d_Dh  : dimple diameter / channel height [-]
+//   h_d   : dimple depth / diameter [-]
+//
+// Returns: Friction multiplier f_dimple/f_smooth [-]
+//
+// Source: Chyu et al. (1997)
+// Valid: Re_Dh = 10000-80000, d_Dh = 0.1-0.3, h_d = 0.1-0.3
+// Accuracy: +/-15%
+double dimple_friction_multiplier(
+    double Re_Dh,
+    double d_Dh,
+    double h_d
+);
+
+// -------------------------------------------------------------
 // Helper Functions
 // -------------------------------------------------------------
 
@@ -177,6 +250,8 @@ void validate_impingement_params(double Re_jet, double z_D, double x_D, double y
 void validate_film_cooling_params(double M, double DR, double alpha_deg);
 void validate_effusion_params(double M, double DR, double porosity, double s_D, double alpha_deg);
 void validate_effusion_discharge_params(double Re_d, double P_ratio, double alpha_deg, double L_D);
+void validate_pin_fin_params(double Re_d, double L_D, double S_D, double X_D);
+void validate_dimple_params(double Re_Dh, double d_Dh, double h_d, double S_d);
 
 } // namespace combaero::cooling
 

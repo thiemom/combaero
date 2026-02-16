@@ -4076,6 +4076,89 @@ PYBIND11_MODULE(_core, m)
         "  >>> print(Cd)  # Discharge coefficient"
     );
 
+    m.def(
+        "pin_fin_nusselt",
+        &combaero::cooling::pin_fin_nusselt,
+        py::arg("Re_d"),
+        py::arg("Pr"),
+        py::arg("L_D"),
+        py::arg("S_D"),
+        py::arg("X_D"),
+        py::arg("is_staggered") = true,
+        "Pin fin array Nusselt number for internal cooling.\n\n"
+        "Staggered or inline arrangements of cylindrical pins.\n"
+        "Based on Metzger et al. (1982) correlations.\n\n"
+        "Parameters:\n"
+        "  Re_d         : Reynolds number based on pin diameter [-]\n"
+        "  Pr           : Prandtl number [-]\n"
+        "  L_D          : pin length / diameter [-]\n"
+        "  S_D          : spanwise spacing / diameter [-]\n"
+        "  X_D          : streamwise spacing / diameter [-]\n"
+        "  is_staggered : True for staggered, False for inline (default: True)\n\n"
+        "Returns: Average Nusselt number Nu_d [-]\n\n"
+        "Valid ranges:\n"
+        "  Re_d = 3000-90000, Pr = 0.5-1.0, L_D = 0.5-4.0\n"
+        "  S_D = 1.5-4.0, X_D = 1.5-4.0\n\n"
+        "Accuracy: +/-15-20%\n\n"
+        "References:\n"
+        "  - Metzger et al. (1982): Effects of Pin Shape and Array Orientation\n\n"
+        "Example:\n"
+        "  >>> Nu = cb.pin_fin_nusselt(Re_d=20000, Pr=0.7, L_D=2.0, S_D=2.5, X_D=2.5)\n"
+        "  >>> print(Nu)  # Nusselt number for staggered array"
+    );
+
+    m.def(
+        "dimple_nusselt_enhancement",
+        &combaero::cooling::dimple_nusselt_enhancement,
+        py::arg("Re_Dh"),
+        py::arg("d_Dh"),
+        py::arg("h_d"),
+        py::arg("S_d"),
+        "Dimpled surface heat transfer enhancement factor.\n\n"
+        "Semi-spherical indentations for internal cooling.\n"
+        "Returns enhancement ratio Nu_dimple/Nu_smooth.\n\n"
+        "Parameters:\n"
+        "  Re_Dh : Reynolds number based on channel hydraulic diameter [-]\n"
+        "  d_Dh  : dimple diameter / channel height [-]\n"
+        "  h_d   : dimple depth / diameter [-]\n"
+        "  S_d   : dimple spacing / diameter [-]\n\n"
+        "Returns: Enhancement factor Nu_dimple/Nu_smooth [-]\n\n"
+        "Valid ranges:\n"
+        "  Re_Dh = 10000-80000, d_Dh = 0.1-0.3\n"
+        "  h_d = 0.1-0.3, S_d = 1.5-3.0\n\n"
+        "Accuracy: +/-20%\n\n"
+        "References:\n"
+        "  - Chyu et al. (1997): Heat Transfer of Arrays of Semi-Spherical Indentations\n\n"
+        "Key advantage: Lower friction penalty than ribs (1.5-2x vs 6-10x)\n\n"
+        "Example:\n"
+        "  >>> enhancement = cb.dimple_nusselt_enhancement(Re_Dh=30000, d_Dh=0.2, h_d=0.2, S_d=2.0)\n"
+        "  >>> print(enhancement)  # Typically 1.8-2.5x"
+    );
+
+    m.def(
+        "dimple_friction_multiplier",
+        &combaero::cooling::dimple_friction_multiplier,
+        py::arg("Re_Dh"),
+        py::arg("d_Dh"),
+        py::arg("h_d"),
+        "Dimpled surface friction multiplier.\n\n"
+        "Friction penalty for dimpled surfaces (f_dimple/f_smooth).\n\n"
+        "Parameters:\n"
+        "  Re_Dh : Reynolds number based on channel hydraulic diameter [-]\n"
+        "  d_Dh  : dimple diameter / channel height [-]\n"
+        "  h_d   : dimple depth / diameter [-]\n\n"
+        "Returns: Friction multiplier f_dimple/f_smooth [-]\n\n"
+        "Valid ranges:\n"
+        "  Re_Dh = 10000-80000, d_Dh = 0.1-0.3, h_d = 0.1-0.3\n\n"
+        "Accuracy: +/-15%\n\n"
+        "References:\n"
+        "  - Chyu et al. (1997)\n\n"
+        "Typical range: 1.3-2.2x (much lower than ribs)\n\n"
+        "Example:\n"
+        "  >>> f_ratio = cb.dimple_friction_multiplier(Re_Dh=30000, d_Dh=0.2, h_d=0.2)\n"
+        "  >>> print(f_ratio)  # Typically 1.5-2.0x"
+    );
+
     // =========================================================================
     // Units System
     // =========================================================================
