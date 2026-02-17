@@ -8,6 +8,12 @@ on:
       - 'include/**'
       - 'python/**'
       - 'cantera_validation_tests/**'
+      - 'scripts/**'
+      - '.github/workflows/**'
+      - 'ruff.toml'
+      - '.pre-commit-config.yaml'
+      - '.python-version'
+      - 'Makefile'
   pull_request:
     branches: [ main, master ]
     paths:
@@ -15,6 +21,12 @@ on:
       - 'include/**'
       - 'python/**'
       - 'cantera_validation_tests/**'
+      - 'scripts/**'
+      - '.github/workflows/**'
+      - 'ruff.toml'
+      - '.pre-commit-config.yaml'
+      - '.python-version'
+      - 'Makefile'
 
 jobs:
   python-style:
