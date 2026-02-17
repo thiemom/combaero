@@ -1029,29 +1029,21 @@ std::vector<BlochMode> can_annular_eigenmodes(
 
     std::vector<BlochMode> modes;
 
-    // Estimate fundamental frequency (quarter-wave for closed-closed)
-    double f_fundamental = c_can / (4.0 * geom.length_can);
-
-    // Search for modes in bands around harmonics
-    int max_harmonic = static_cast<int>(std::ceil(f_max / f_fundamental)) + 1;
-
     // Loop over azimuthal modes m = 0 to N/2
     int m_max = geom.n_cans / 2;
-
-    // Direct magnitude minimization approach (simpler and more reliable)
+    
+    // Continuous sliding window scan (no assumptions about harmonic spacing)
+    double scan_window_width = 50.0;  // Hz per window
+    
     for (int m = 0; m <= m_max; ++m) {
-        // Search in bands around expected harmonics
-        for (int n = 1; n <= max_harmonic; ++n) {
-            double f_center = (2 * n - 1) * f_fundamental;
-            double f_band_min = std::max(10.0, f_center - 0.6 * f_fundamental);
-            double f_band_max = std::min(f_max, f_center + 0.6 * f_fundamental);
+        // Sliding window: scan from 10 Hz up to f_max in small chunks
+        for (double f_start = 10.0; f_start < f_max; f_start += scan_window_width) {
+            double f_end = std::min(f_start + scan_window_width, f_max);
             
-            if (f_band_min >= f_band_max) continue;
-            
-            // Find local minima of |D(ω)| in this band
+            // Scan for minima in this specific window
             auto guesses = find_zero_guesses(
                 m, geom, c_can, c_plenum, rho_can, rho_plenum,
-                f_band_min, f_band_max, bc_can_top, 3
+                f_start, f_end, bc_can_top, 2  // Up to 2 guesses per window
             );
             
             // Refine each guess with Muller's method
@@ -1060,16 +1052,20 @@ std::vector<BlochMode> can_annular_eigenmodes(
                     f_guess, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_can_top
                 );
                 
-                // Verify it's a good zero
+                // Validation: is it actually a zero?
                 if (f_refined > 1.0 && f_refined < f_max) {
                     double omega_refined = 2.0 * M_PI * f_refined;
-                    auto D_refined = dispersion_relation(omega_refined, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_can_top);
+                    auto D_refined = dispersion_relation(
+                        omega_refined, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_can_top
+                    );
                     
-                    // Accept if |D| is small
-                    if (std::abs(D_refined) < 1.0) {
+                    // Strict check: |D| should be small at a true zero
+                    if (std::abs(D_refined) < 0.1) {
+                        // Check for duplicates
                         bool is_duplicate = false;
                         for (const auto& existing : modes) {
-                            if (existing.m_azimuthal == m && std::abs(existing.frequency - f_refined) < 1.0) {
+                            if (existing.m_azimuthal == m && 
+                                std::abs(existing.frequency - f_refined) < 1.0) {
                                 is_duplicate = true;
                                 break;
                             }
