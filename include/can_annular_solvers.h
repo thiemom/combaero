@@ -7,6 +7,22 @@
 namespace combaero {
 
 // -------------------------------------------------------------
+// Annular Duct Geometry (Pure Annular, No Cans)
+// -------------------------------------------------------------
+
+struct AnnularDuctGeometry {
+    double length;          // Axial length [m]
+    double radius_inner;    // Inner radius [m]
+    double radius_outer;    // Outer radius [m]
+    int n_azimuthal_max;    // Maximum azimuthal mode number to search
+    
+    // Derived: cross-sectional area
+    double area() const {
+        return M_PI * (radius_outer * radius_outer - radius_inner * radius_inner);
+    }
+};
+
+// -------------------------------------------------------------
 // Can-Annular Acoustic Solver Methods
 // -------------------------------------------------------------
 
@@ -96,6 +112,50 @@ std::vector<double> identify_pole_frequencies(
     double f_min,
     double f_max,
     BoundaryCondition bc_top
+);
+
+// -------------------------------------------------------------
+// Annular Duct Modes (Pure Annular Geometry, No Cans)
+// -------------------------------------------------------------
+
+// Annular duct mode (azimuthal + axial mode numbers)
+struct AnnularMode {
+    int m_azimuthal;    // Azimuthal mode number (0, 1, 2, ...)
+    int n_axial;        // Axial mode number (1, 2, 3, ...)
+    double frequency;   // Frequency [Hz]
+    
+    // Mode type description
+    std::string mode_type() const {
+        if (m_azimuthal == 0) {
+            return "Axisymmetric (m=0)";
+        } else {
+            return "Azimuthal (m=" + std::to_string(m_azimuthal) + ")";
+        }
+    }
+};
+
+// Find all annular duct eigenmodes using Argument Principle
+// 
+// Pure annular duct (no cans) with Bloch-Floquet periodic boundary conditions
+// Finds modes by solving dispersion relation for annular waveguide
+//
+// Parameters:
+//   geom    : annular duct geometry
+//   c       : speed of sound [m/s]
+//   rho     : density [kg/m³]
+//   f_max   : maximum frequency [Hz]
+//   bc_ends : boundary condition at duct ends (default: Closed)
+//
+// Returns: Vector of AnnularMode sorted by frequency
+//
+// Method: Argument Principle (Nyquist contour) for robust root finding
+// Finds ALL modes in frequency range, no missed roots
+std::vector<AnnularMode> annular_duct_eigenmodes(
+    const AnnularDuctGeometry& geom,
+    double c,
+    double rho,
+    double f_max,
+    BoundaryCondition bc_ends = BoundaryCondition::Closed
 );
 
 }  // namespace combaero

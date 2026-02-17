@@ -312,4 +312,203 @@ std::vector<BlochMode> solve_argument_principle(
     return modes;
 }
 
+// -------------------------------------------------------------
+// Annular Duct Modes (Pure Annular Geometry)
+// -------------------------------------------------------------
+
+// Helper: Annular duct dispersion relation
+// For a simple annular duct: D(ω) = Y_duct(ω, m)
+static std::complex<double> annular_duct_dispersion(
+    std::complex<double> omega,
+    int m,
+    const AnnularDuctGeometry& geom,
+    double c,
+    double rho,
+    BoundaryCondition bc_ends
+) {
+    std::complex<double> k = omega / c;
+    std::complex<double> i(0.0, 1.0);
+    
+    // Duct admittance (similar to can admittance)
+    std::complex<double> Y_char = geom.area() / (rho * c);
+    std::complex<double> sin_kl = std::sin(k * geom.length);
+    std::complex<double> cos_kl = std::cos(k * geom.length);
+    
+    std::complex<double> Y_duct;
+    if (bc_ends == BoundaryCondition::Closed) {
+        // Y = i * Y_char * tan(kL)
+        if (std::abs(cos_kl) < 1e-12) {
+            return std::complex<double>(1e12, 0.0);  // Pole
+        }
+        Y_duct = i * Y_char * (sin_kl / cos_kl);
+    } else {
+        // Y = -i * Y_char * cot(kL)
+        if (std::abs(sin_kl) < 1e-12) {
+            return std::complex<double>(1e12, 0.0);  // Pole
+        }
+        Y_duct = -i * Y_char * (cos_kl / sin_kl);
+    }
+    
+    // For annular duct, dispersion relation is just the admittance
+    // (zeros occur at resonance frequencies)
+    return Y_duct;
+}
+
+// Helper: Count zeros for annular duct using Argument Principle
+static int count_zeros_annular_duct(
+    double f_min,
+    double f_max,
+    double imag_min,
+    double imag_max,
+    int m,
+    const AnnularDuctGeometry& geom,
+    double c,
+    double rho,
+    BoundaryCondition bc_ends
+) {
+    int n_steps_f = 40;
+    int n_steps_i = 20;
+    
+    std::vector<std::complex<double>> contour;
+    contour.reserve(2 * (n_steps_f + n_steps_i));
+    
+    // Build rectangular contour
+    for (int i = 0; i < n_steps_f; ++i) {
+        double f = f_min + (f_max - f_min) * i / n_steps_f;
+        contour.push_back(std::complex<double>(2.0 * M_PI * f, imag_min));
+    }
+    for (int i = 0; i < n_steps_i; ++i) {
+        double imag = imag_min + (imag_max - imag_min) * i / n_steps_i;
+        contour.push_back(std::complex<double>(2.0 * M_PI * f_max, imag));
+    }
+    for (int i = 0; i < n_steps_f; ++i) {
+        double f = f_max - (f_max - f_min) * i / n_steps_f;
+        contour.push_back(std::complex<double>(2.0 * M_PI * f, imag_max));
+    }
+    for (int i = 0; i < n_steps_i; ++i) {
+        double imag = imag_max - (imag_max - imag_min) * i / n_steps_i;
+        contour.push_back(std::complex<double>(2.0 * M_PI * f_min, imag));
+    }
+    
+    // Compute winding number
+    double total_phase_change = 0.0;
+    std::complex<double> prev_val = annular_duct_dispersion(
+        contour[0], m, geom, c, rho, bc_ends
+    );
+    
+    for (size_t i = 1; i <= contour.size(); ++i) {
+        std::complex<double> curr_z = contour[i % contour.size()];
+        std::complex<double> curr_val = annular_duct_dispersion(
+            curr_z, m, geom, c, rho, bc_ends
+        );
+        
+        if (std::abs(curr_val) < 1e-9) {
+            return 1;  // Hit a root
+        }
+        
+        std::complex<double> ratio = curr_val / prev_val;
+        if (std::abs(ratio) < 1e-9 || std::isinf(ratio.real())) {
+            return 0;  // Hit pole - abort
+        }
+        
+        total_phase_change += std::arg(ratio);
+        prev_val = curr_val;
+    }
+    
+    return static_cast<int>(std::round(total_phase_change / (2.0 * M_PI)));
+}
+
+std::vector<AnnularMode> annular_duct_eigenmodes(
+    const AnnularDuctGeometry& geom,
+    double c,
+    double rho,
+    double f_max,
+    BoundaryCondition bc_ends
+) {
+    // Validate inputs
+    if (geom.length <= 0.0) {
+        throw std::runtime_error("Duct length must be positive");
+    }
+    if (geom.radius_inner < 0.0 || geom.radius_outer <= geom.radius_inner) {
+        throw std::runtime_error("Invalid annular geometry");
+    }
+    if (c <= 0.0 || rho <= 0.0) {
+        throw std::runtime_error("Speed of sound and density must be positive");
+    }
+    if (f_max <= 0.0) {
+        throw std::runtime_error("Maximum frequency must be positive");
+    }
+    
+    std::vector<AnnularMode> modes;
+    
+    // Grid search parameters
+    double box_width = 50.0;   // Hz
+    double imag_min = -10.0;
+    double imag_max = 200.0;
+    
+    // Loop over azimuthal modes
+    for (int m = 0; m <= geom.n_azimuthal_max; ++m) {
+        int n_axial = 0;  // Track axial mode number
+        
+        for (double f_start = 10.0; f_start < f_max; f_start += box_width) {
+            double f_end = std::min(f_start + box_width, f_max);
+            
+            // Use Argument Principle to count zeros
+            int n_zeros = count_zeros_annular_duct(
+                f_start, f_end, imag_min, imag_max,
+                m, geom, c, rho, bc_ends
+            );
+            
+            if (n_zeros > 0) {
+                // Found a mode - estimate frequency
+                // For closed-closed: f ≈ n * c / (2*L)
+                // For closed-open: f ≈ (2n-1) * c / (4*L)
+                double f_estimate = (f_start + f_end) / 2.0;
+                
+                // Simple refinement: scan for minimum |D|
+                double f_best = f_estimate;
+                double min_mag = 1e10;
+                
+                for (int i = 0; i < 100; ++i) {
+                    double f_test = f_start + (f_end - f_start) * i / 99.0;
+                    double omega_test = 2.0 * M_PI * f_test;
+                    auto D_test = annular_duct_dispersion(
+                        std::complex<double>(omega_test, 0.0),
+                        m, geom, c, rho, bc_ends
+                    );
+                    double mag = std::abs(D_test);
+                    if (mag < min_mag) {
+                        min_mag = mag;
+                        f_best = f_test;
+                    }
+                }
+                
+                // Check if it's a good zero
+                if (min_mag < 0.1) {
+                    n_axial++;
+                    
+                    // Check for duplicates
+                    bool is_duplicate = false;
+                    for (const auto& existing : modes) {
+                        if (existing.m_azimuthal == m && 
+                            std::abs(existing.frequency - f_best) < 1.0) {
+                            is_duplicate = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!is_duplicate) {
+                        modes.push_back({m, n_axial, f_best});
+                    }
+                }
+            }
+        }
+    }
+    
+    std::sort(modes.begin(), modes.end(),
+              [](const AnnularMode& a, const AnnularMode& b) { return a.frequency < b.frequency; });
+    
+    return modes;
+}
+
 }  // namespace combaero
