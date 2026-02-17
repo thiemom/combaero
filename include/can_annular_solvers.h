@@ -11,6 +11,9 @@ namespace combaero {
 // Annular Duct Geometry (Pure Annular, No Cans)
 // -------------------------------------------------------------
 
+// Uniform annular duct model (current implementation):
+// - radius_inner and radius_outer are constant along the full length.
+// - No axial taper, area variation, or segmented liners are represented.
 struct AnnularDuctGeometry {
     double length;          // Axial length [m]
     double radius_inner;    // Inner radius [m]
@@ -151,6 +154,7 @@ struct AnnularMode {
 //
 // Method: Argument Principle (Nyquist contour) for robust root finding
 // Finds ALL modes in frequency range, no missed roots
+// Assumes uniform annular geometry and homogeneous acoustic medium.
 std::vector<AnnularMode> annular_duct_eigenmodes(
     const AnnularDuctGeometry& geom,
     double c,
@@ -161,6 +165,7 @@ std::vector<AnnularMode> annular_duct_eigenmodes(
 
 // Analytical annular mode estimate used for validation and lightweight examples
 // Uses thin-annulus approximation with combined axial and azimuthal wavenumbers.
+// Assumes uniform annular geometry over full axial length.
 std::vector<AnnularMode> annular_duct_modes_analytical(
     const AnnularDuctGeometry& geom,
     double c,

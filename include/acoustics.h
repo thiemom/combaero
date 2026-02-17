@@ -378,7 +378,14 @@ bool is_whistling_risk(
 // -------------------------------------------------------------
 
 // Geometry of a can-annular combustor system
-// N cans coupled by an annular plenum
+// N cans coupled by an annular plenum.
+//
+// Uniform-section assumption (current model):
+// - Each can is represented by a single uniform acoustic segment
+//   with constant area_can and length_can.
+// - The annular plenum is represented by a uniform ring with
+//   constant mean radius radius_plenum and area_plenum.
+// - No axial variation/taper/segmentation is represented in this struct.
 struct CanAnnularGeometry {
     int n_cans;            // Total number of cans (N)
     double length_can;     // Length of one can [m]
@@ -406,6 +413,9 @@ struct BlochMode {
 //
 // Finds ALL modes in frequency range by counting zeros of dispersion relation:
 //   D(ω) = Y_can(ω) + Y_annulus(ω, m) = 0
+//
+// Modeling assumption: geometry is uniform within each region defined by
+// CanAnnularGeometry (single can section + single annulus section).
 //
 // Parameters:
 //   geom       : can-annular geometry
