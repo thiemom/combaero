@@ -660,6 +660,278 @@ bool is_whistling_risk(
 }
 
 // -------------------------------------------------------------
+// Can-Annular Combustor Acoustics (Bloch-Floquet Theory)
+// -------------------------------------------------------------
+
+// BlochMode symmetry classification
+std::string BlochMode::symmetry_type() const {
+    if (m_azimuthal == 0) {
+        return "Push-Push (all cans in phase)";
+    } else if (m_azimuthal == n_cans / 2) {
+        return "Push-Pull (adjacent cans 180deg out of phase)";
+    } else {
+        return "Spinning/Standing wave (m=" + std::to_string(m_azimuthal) + ")";
+    }
+}
+
+// Internal helper: Can admittance (1D duct with boundary conditions)
+static std::complex<double> can_admittance(
+    double omega,
+    const CanAnnularGeometry& geom,
+    double c,
+    double rho,
+    BoundaryCondition bc_top
+) {
+    std::complex<double> k = omega / c;
+    std::complex<double> Y_char = geom.area_can / (rho * c);
+    std::complex<double> i(0.0, 1.0);
+    
+    if (bc_top == BoundaryCondition::Closed) {
+        // Rigid wall at top: u=0, Y = i*Y_char*tan(kL)
+        return i * Y_char * std::tan(k * geom.length_can);
+    } else {
+        // Open at top: p=0, Y = -i*Y_char/tan(kL)
+        std::complex<double> tan_kL = std::tan(k * geom.length_can);
+        if (std::abs(tan_kL) < 1e-10) {
+            return std::complex<double>(1e10, 0.0);  // Avoid singularity
+        }
+        return -i * Y_char / tan_kL;
+    }
+}
+
+// Internal helper: Annulus admittance (Bloch-Floquet waveguide)
+static std::complex<double> annulus_admittance(
+    double omega,
+    int m,
+    const CanAnnularGeometry& geom,
+    double c,
+    double rho
+) {
+    // Special case: single can (N=1) has no annulus coupling
+    if (geom.n_cans == 1) {
+        return std::complex<double>(0.0, 0.0);  // No coupling
+    }
+    
+    std::complex<double> k = omega / c;
+    
+    // Sector geometry
+    double sector_angle = 2.0 * M_PI / geom.n_cans;
+    double sector_length = sector_angle * geom.radius_plenum;
+    
+    // Bloch phase shift for mode m
+    double psi = 2.0 * M_PI * m / geom.n_cans;
+    
+    // Transfer matrix formulation (Evesque & Polifke 2005, Eq. 14)
+    std::complex<double> kL = k * sector_length;
+    std::complex<double> cos_kL = std::cos(kL);
+    std::complex<double> sin_kL = std::sin(kL);
+    std::complex<double> cos_psi(std::cos(psi), 0.0);
+    
+    // Avoid singularities
+    std::complex<double> num = cos_kL - cos_psi;
+    if (std::abs(num) < 1e-10) {
+        return std::complex<double>(1e10, 0.0);
+    }
+    if (std::abs(sin_kL) < 1e-10) {
+        return std::complex<double>(1e10, 0.0);
+    }
+    
+    // Effective annulus impedance: Z_ann = -i*(rho*c)/(2*A_ann) * sin(kL)/(cos(kL)-cos(psi))
+    std::complex<double> i(0.0, 1.0);
+    std::complex<double> Z_ann = -i * (rho * c / (2.0 * geom.area_plenum)) * (sin_kL / num);
+    
+    // Return admittance
+    if (std::abs(Z_ann) < 1e-10) {
+        return std::complex<double>(1e10, 0.0);
+    }
+    return 1.0 / Z_ann;
+}
+
+// Internal helper: Dispersion relation D(omega, m) = Y_can + Y_annulus
+static std::complex<double> dispersion_relation(
+    double omega,
+    int m,
+    const CanAnnularGeometry& geom,
+    double c_can,
+    double c_plenum,
+    double rho_can,
+    double rho_plenum,
+    BoundaryCondition bc_top
+) {
+    return can_admittance(omega, geom, c_can, rho_can, bc_top) +
+           annulus_admittance(omega, m, geom, c_plenum, rho_plenum);
+}
+
+// Internal helper: Simplified zero finder using sign changes
+// For lossless acoustics, admittances are purely imaginary, so look at Im[D(omega)]
+static std::vector<double> find_zeros_bisection(
+    int m,
+    const CanAnnularGeometry& geom,
+    double c_can,
+    double c_plenum,
+    double rho_can,
+    double rho_plenum,
+    double f_min,
+    double f_max,
+    BoundaryCondition bc_top,
+    int n_points = 200
+) {
+    std::vector<double> zeros;
+    
+    // Sample dispersion relation along frequency axis
+    std::vector<double> freqs;
+    std::vector<double> vals;
+    
+    for (int i = 0; i < n_points; ++i) {
+        double f = f_min + (f_max - f_min) * i / (n_points - 1);
+        double omega = 2.0 * M_PI * f;
+        auto D = dispersion_relation(omega, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
+        
+        freqs.push_back(f);
+        // For lossless acoustics, admittances are imaginary, so look at imaginary part
+        vals.push_back(D.imag());
+    }
+    
+    // Find sign changes (zero crossings)
+    for (size_t i = 1; i < vals.size(); ++i) {
+        if (vals[i-1] * vals[i] < 0) {  // Sign change
+            // Bisection to refine
+            double f_low = freqs[i-1];
+            double f_high = freqs[i];
+            
+            for (int iter = 0; iter < 20; ++iter) {
+                double f_mid = 0.5 * (f_low + f_high);
+                double omega_mid = 2.0 * M_PI * f_mid;
+                auto D_mid = dispersion_relation(omega_mid, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
+                
+                double val_low = dispersion_relation(2.0 * M_PI * f_low, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top).imag();
+                
+                if (val_low * D_mid.imag() < 0) {
+                    f_high = f_mid;
+                } else {
+                    f_low = f_mid;
+                }
+            }
+            
+            zeros.push_back(0.5 * (f_low + f_high));
+        }
+    }
+    
+    return zeros;
+}
+
+// Internal helper: Refine root using Newton-Raphson
+static double refine_root_newton(
+    double f_guess,
+    int m,
+    const CanAnnularGeometry& geom,
+    double c_can,
+    double c_plenum,
+    double rho_can,
+    double rho_plenum,
+    BoundaryCondition bc_top,
+    int max_iter = 50
+) {
+    double omega = 2.0 * M_PI * f_guess;
+    double eps = 1.0;  // Finite difference step for derivative
+    
+    for (int iter = 0; iter < max_iter; ++iter) {
+        auto val = dispersion_relation(omega, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
+        auto val_plus = dispersion_relation(omega + eps, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
+        
+        std::complex<double> deriv = (val_plus - val) / eps;
+        
+        if (std::abs(deriv) < 1e-10) break;  // Derivative too small
+        
+        std::complex<double> step = val / deriv;
+        omega -= step.real();
+        
+        if (std::abs(step) < 1e-6) break;  // Converged
+    }
+    
+    return omega / (2.0 * M_PI);
+}
+
+// Main solver: Find all eigenmodes using Argument Principle
+std::vector<BlochMode> can_annular_eigenmodes(
+    const CanAnnularGeometry& geom,
+    double c_can,
+    double c_plenum,
+    double rho_can,
+    double rho_plenum,
+    double f_max,
+    BoundaryCondition bc_can_top
+) {
+    // Validate inputs
+    if (geom.n_cans < 1) {
+        throw std::runtime_error("Number of cans must be positive");
+    }
+    if (geom.length_can <= 0.0 || geom.area_can <= 0.0) {
+        throw std::runtime_error("Can dimensions must be positive");
+    }
+    if (geom.radius_plenum <= 0.0 || geom.area_plenum <= 0.0) {
+        throw std::runtime_error("Plenum dimensions must be positive");
+    }
+    if (c_can <= 0.0 || c_plenum <= 0.0) {
+        throw std::runtime_error("Speed of sound must be positive");
+    }
+    if (rho_can <= 0.0 || rho_plenum <= 0.0) {
+        throw std::runtime_error("Density must be positive");
+    }
+    if (f_max <= 0.0) {
+        throw std::runtime_error("Maximum frequency must be positive");
+    }
+    
+    std::vector<BlochMode> modes;
+    
+    // Estimate fundamental frequency (quarter-wave for closed-closed)
+    double f_fundamental = c_can / (4.0 * geom.length_can);
+    
+    // Search for modes in bands around harmonics
+    int max_harmonic = static_cast<int>(std::ceil(f_max / f_fundamental)) + 1;
+    
+    // Loop over azimuthal modes m = 0 to N/2
+    int m_max = geom.n_cans / 2;
+    
+    for (int m = 0; m <= m_max; ++m) {
+        // Find all zeros in the full frequency range for this azimuthal mode
+        auto zeros = find_zeros_bisection(
+            m, geom, c_can, c_plenum, rho_can, rho_plenum,
+            10.0, f_max, bc_can_top
+        );
+        
+        // Add all found zeros as modes
+        for (double f : zeros) {
+            if (f > 1.0 && f < f_max) {
+                // Refine with Newton-Raphson
+                double f_refined = refine_root_newton(
+                    f, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_can_top
+                );
+                
+                // Check for duplicates
+                bool is_duplicate = false;
+                for (const auto& existing : modes) {
+                    if (existing.m_azimuthal == m && std::abs(existing.frequency - f_refined) < 1.0) {
+                        is_duplicate = true;
+                        break;
+                    }
+                }
+                
+                if (!is_duplicate && f_refined > 1.0 && f_refined < f_max) {
+                    modes.push_back({m, f_refined, geom.n_cans});
+                }
+            }
+        }
+    }
+    
+    // Sort by frequency
+    std::sort(modes.begin(), modes.end(), 
+              [](const BlochMode& a, const BlochMode& b) { return a.frequency < b.frequency; });
+    
+    return modes;
+}
+
+// -------------------------------------------------------------
 // Utility functions (already in namespace)
 // -------------------------------------------------------------
 

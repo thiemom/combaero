@@ -3063,6 +3063,81 @@ PYBIND11_MODULE(_core, m)
 
     m.def("is_whistling_risk", &is_whistling_risk,
         py::arg("freq"), py::arg("u_bias"), py::arg("d_orifice"));
+
+    // =========================================================================
+    // Can-Annular Combustor Acoustics (Bloch-Floquet Theory)
+    // =========================================================================
+
+    py::class_<CanAnnularGeometry>(m, "CanAnnularGeometry")
+        .def(py::init<>())
+        .def_readwrite("n_cans", &CanAnnularGeometry::n_cans)
+        .def_readwrite("length_can", &CanAnnularGeometry::length_can)
+        .def_readwrite("area_can", &CanAnnularGeometry::area_can)
+        .def_readwrite("radius_plenum", &CanAnnularGeometry::radius_plenum)
+        .def_readwrite("area_plenum", &CanAnnularGeometry::area_plenum)
+        .def("__repr__", [](const CanAnnularGeometry& g) {
+            return "CanAnnularGeometry(n_cans=" + std::to_string(g.n_cans) +
+                   ", length_can=" + std::to_string(g.length_can) +
+                   ", area_can=" + std::to_string(g.area_can) +
+                   ", radius_plenum=" + std::to_string(g.radius_plenum) +
+                   ", area_plenum=" + std::to_string(g.area_plenum) + ")";
+        });
+
+    py::class_<BlochMode>(m, "BlochMode")
+        .def(py::init<>())
+        .def_readwrite("m_azimuthal", &BlochMode::m_azimuthal)
+        .def_readwrite("frequency", &BlochMode::frequency)
+        .def_readwrite("n_cans", &BlochMode::n_cans)
+        .def("symmetry_type", &BlochMode::symmetry_type)
+        .def("__repr__", [](const BlochMode& m) {
+            return "BlochMode(m=" + std::to_string(m.m_azimuthal) +
+                   ", f=" + std::to_string(m.frequency) + " Hz, " +
+                   m.symmetry_type() + ")";
+        });
+
+    m.def("can_annular_eigenmodes", &can_annular_eigenmodes,
+        py::arg("geom"),
+        py::arg("c_can"),
+        py::arg("c_plenum"),
+        py::arg("rho_can"),
+        py::arg("rho_plenum"),
+        py::arg("f_max") = 2000.0,
+        py::arg("bc_can_top") = BoundaryCondition::Closed,
+        "Solve for passive acoustic eigenmodes of can-annular combustor.\n\n"
+        "Uses Argument Principle Method (Nyquist contour) for robust root finding.\n"
+        "Finds ALL modes in frequency range by counting zeros of dispersion relation.\n\n"
+        "Parameters:\n"
+        "  geom       : CanAnnularGeometry (N cans, dimensions)\n"
+        "  c_can      : speed of sound in can [m/s]\n"
+        "  c_plenum   : speed of sound in plenum [m/s]\n"
+        "  rho_can    : density in can [kg/m^3]\n"
+        "  rho_plenum : density in plenum [kg/m^3]\n"
+        "  f_max      : maximum frequency to search [Hz] (default: 2000)\n"
+        "  bc_can_top : boundary condition at can top (default: Closed)\n\n"
+        "Returns: List of BlochMode objects sorted by frequency\n\n"
+        "Theory: Bloch-Floquet analysis reduces N-can problem to single sector.\n"
+        "Dispersion relation: Y_can(omega) + Y_annulus(omega, m) = 0\n\n"
+        "Mode types:\n"
+        "  m=0     : Push-Push (all cans in phase)\n"
+        "  m=N/2   : Push-Pull (adjacent cans 180deg out of phase)\n"
+        "  0<m<N/2 : Spinning/Standing waves\n\n"
+        "References:\n"
+        "  - Noiray et al. (2011): Unified framework for combustion instability\n"
+        "  - Evesque & Polifke (2005): Low-order acoustic modelling\n"
+        "  - Silva et al. (2013): Argument Principle for thermoacoustics\n\n"
+        "Example:\n"
+        "  >>> geom = cb.CanAnnularGeometry()\n"
+        "  >>> geom.n_cans = 24\n"
+        "  >>> geom.length_can = 0.5  # m\n"
+        "  >>> geom.area_can = 0.01   # m^2\n"
+        "  >>> geom.radius_plenum = 0.5  # m\n"
+        "  >>> geom.area_plenum = 0.02   # m^2\n"
+        "  >>> modes = cb.can_annular_eigenmodes(geom, c_can=500, c_plenum=600,\n"
+        "  ...                                    rho_can=1.0, rho_plenum=1.2)\n"
+        "  >>> for mode in modes[:5]:\n"
+        "  ...     print(f'm={mode.m_azimuthal}, f={mode.frequency:.1f} Hz')"
+    );
+
     // Utility functions
     m.def(
         "wavelength",

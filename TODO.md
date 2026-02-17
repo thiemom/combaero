@@ -1,6 +1,10 @@
 # CombAero TODO -
 
+All multi property functions have been implemented.
 
+### Implement .to_dict() for all dataclasses
+- Create re-usable code for this
+- Use `dataclasses.to_dict()`
 
 ---
 
