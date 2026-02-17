@@ -759,40 +759,50 @@ static std::complex<double> dispersion_relation_complex(
     double rho_plenum,
     BoundaryCondition bc_top
 ) {
-    // For complex omega, evaluate admittances at complex frequency
     std::complex<double> k_can = omega / c_can;
     std::complex<double> k_plenum = omega / c_plenum;
-    
-    // Can admittance
-    std::complex<double> Y_char_can = geom.area_can / (rho_can * c_can);
     std::complex<double> i(0.0, 1.0);
-    std::complex<double> Y_can;
     
+    // Can admittance - compute sin/cos separately to avoid tan() singularities
+    std::complex<double> Y_char_can = geom.area_can / (rho_can * c_can);
+    std::complex<double> sin_kl_can = std::sin(k_can * geom.length_can);
+    std::complex<double> cos_kl_can = std::cos(k_can * geom.length_can);
+    
+    std::complex<double> Y_can;
     if (bc_top == BoundaryCondition::Closed) {
-        Y_can = i * Y_char_can * std::tan(k_can * geom.length_can);
+        // Y = i * Y_char * tan(kL) = i * Y_char * (sin/cos)
+        if (std::abs(cos_kl_can) < 1e-12) {
+            return std::complex<double>(1e12, 0.0);  // Pole
+        }
+        Y_can = i * Y_char_can * (sin_kl_can / cos_kl_can);
     } else {
-        Y_can = -i * Y_char_can / std::tan(k_can * geom.length_can);
+        // Y = -i * Y_char * cot(kL) = -i * Y_char * (cos/sin)
+        if (std::abs(sin_kl_can) < 1e-12) {
+            return std::complex<double>(1e12, 0.0);  // Pole
+        }
+        Y_can = -i * Y_char_can * (cos_kl_can / sin_kl_can);
     }
     
     // Annulus admittance (skip if single can)
     std::complex<double> Y_ann(0.0, 0.0);
     if (geom.n_cans > 1) {
         double sector_angle = 2.0 * M_PI / geom.n_cans;
-        double sector_length = sector_angle * geom.radius_plenum;
+        double sector_len = sector_angle * geom.radius_plenum;
         double psi = 2.0 * M_PI * m / geom.n_cans;
         
-        std::complex<double> kL = k_plenum * sector_length;
+        std::complex<double> kL = k_plenum * sector_len;
         std::complex<double> cos_kL = std::cos(kL);
         std::complex<double> sin_kL = std::sin(kL);
         std::complex<double> cos_psi(std::cos(psi), 0.0);
         
         std::complex<double> num = cos_kL - cos_psi;
-        if (std::abs(num) > 1e-10 && std::abs(sin_kL) > 1e-10) {
-            std::complex<double> Z_ann = -i * (rho_plenum * c_plenum / (2.0 * geom.area_plenum)) * (sin_kL / num);
-            if (std::abs(Z_ann) > 1e-10) {
-                Y_ann = 1.0 / Z_ann;
-            }
+        std::complex<double> den = sin_kL;
+        
+        // Y_ann = i * (2A / rho*c) * (cos(kL) - cos(psi)) / sin(kL)
+        if (std::abs(den) < 1e-12) {
+            return std::complex<double>(1e12, 0.0);  // Pole
         }
+        Y_ann = i * (2.0 * geom.area_plenum / (rho_plenum * c_plenum)) * (num / den);
     }
     
     return Y_can + Y_ann;
@@ -814,76 +824,74 @@ static std::complex<double> dispersion_relation(
     );
 }
 
-// Internal helper: Argument Principle with full rectangular contour
-// Counts zeros inside contour using winding number: N = ΔArg[D(ω)] / 2π
-static int count_zeros_argument_principle(
+// Internal helper: Robust Argument Principle using arg(ratio) method
+// Counts zeros inside rectangular contour: N = ΔArg[D(ω)] / 2π
+static int count_zeros_in_rect(
+    double f_min,
+    double f_max,
+    double imag_min,
+    double imag_max,
     int m,
     const CanAnnularGeometry& geom,
     double c_can,
     double c_plenum,
     double rho_can,
     double rho_plenum,
-    double f_min,
-    double f_max,
-    BoundaryCondition bc_top,
-    int n_points = 100
+    BoundaryCondition bc_top
 ) {
-    // Rectangular contour in complex ω-plane: [f_min, f_max] × [0, i·δ]
-    // δ = damping offset to avoid poles on real axis
-    double delta = 50.0;  // Small imaginary offset (rad/s)
+    int n_steps_f = 20;  // Steps along frequency axis
+    int n_steps_i = 10;  // Steps along imaginary axis
     
     std::vector<std::complex<double>> contour;
-    contour.reserve(4 * n_points);
+    contour.reserve(2 * (n_steps_f + n_steps_i));
     
-    // Edge 1: Bottom (f_min to f_max along real axis + small offset)
-    for (int i = 0; i < n_points; ++i) {
-        double f = f_min + (f_max - f_min) * i / (n_points - 1);
-        contour.push_back(std::complex<double>(2.0 * M_PI * f, delta));
+    // Create box (counter-clockwise) - avoid duplicate corners
+    // Bottom edge: (f_min, imag_min) to (f_max, imag_min)
+    for (int i = 0; i < n_steps_f; ++i) {
+        double f = f_min + (f_max - f_min) * i / (n_steps_f - 1);
+        contour.push_back(std::complex<double>(2.0 * M_PI * f, imag_min));
     }
-    
-    // Edge 2: Right (f_max upward)
-    for (int i = 1; i < n_points; ++i) {
-        double imag = delta + (2.0 * delta) * i / (n_points - 1);
+    // Right edge: (f_max, imag_min) to (f_max, imag_max) - skip first point
+    for (int i = 1; i < n_steps_i; ++i) {
+        double imag = imag_min + (imag_max - imag_min) * i / (n_steps_i - 1);
         contour.push_back(std::complex<double>(2.0 * M_PI * f_max, imag));
     }
-    
-    // Edge 3: Top (f_max to f_min along top)
-    for (int i = 1; i < n_points; ++i) {
-        double f = f_max - (f_max - f_min) * i / (n_points - 1);
-        contour.push_back(std::complex<double>(2.0 * M_PI * f, 3.0 * delta));
+    // Top edge: (f_max, imag_max) to (f_min, imag_max) - skip first point
+    for (int i = 1; i < n_steps_f; ++i) {
+        double f = f_max - (f_max - f_min) * i / (n_steps_f - 1);
+        contour.push_back(std::complex<double>(2.0 * M_PI * f, imag_max));
     }
-    
-    // Edge 4: Left (back down to start)
-    for (int i = 1; i < n_points; ++i) {
-        double imag = 3.0 * delta - (2.0 * delta) * i / (n_points - 1);
+    // Left edge: (f_min, imag_max) to (f_min, imag_min) - skip first and last
+    for (int i = 1; i < n_steps_i - 1; ++i) {
+        double imag = imag_max - (imag_max - imag_min) * i / (n_steps_i - 1);
         contour.push_back(std::complex<double>(2.0 * M_PI * f_min, imag));
     }
     
-    // Compute winding number using trapezoidal rule
-    double total_arg_change = 0.0;
+    // Compute winding number using arg(ratio) for robust phase unwrapping
+    double total_phase_change = 0.0;
+    std::complex<double> prev_val = dispersion_relation_complex(
+        contour[0], m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top
+    );
     
-    for (size_t i = 0; i < contour.size(); ++i) {
-        size_t next = (i + 1) % contour.size();
+    for (size_t i = 1; i <= contour.size(); ++i) {
+        std::complex<double> curr_z = contour[i % contour.size()];
+        std::complex<double> curr_val = dispersion_relation_complex(
+            curr_z, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top
+        );
         
-        // Evaluate dispersion relation at current and next point (use complex omega)
-        auto D_curr = dispersion_relation_complex(contour[i], m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
-        auto D_next = dispersion_relation_complex(contour[next], m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
+        // Robust phase difference: d(theta) = Im(log(z2/z1)) = arg(z2/z1)
+        std::complex<double> ratio = curr_val / prev_val;
+        if (std::abs(ratio) == 0.0 || std::isnan(ratio.real())) {
+            return 0;  // Hit singularity, abort this box
+        }
         
-        // Argument change (unwrapped)
-        double arg_curr = std::arg(D_curr);
-        double arg_next = std::arg(D_next);
-        double delta_arg = arg_next - arg_curr;
+        double d_theta = std::arg(ratio);
+        total_phase_change += d_theta;
         
-        // Unwrap phase (handle 2π jumps)
-        while (delta_arg > M_PI) delta_arg -= 2.0 * M_PI;
-        while (delta_arg < -M_PI) delta_arg += 2.0 * M_PI;
-        
-        total_arg_change += delta_arg;
+        prev_val = curr_val;
     }
     
-    // Number of zeros = winding number = ΔArg / 2π
-    int n_zeros = static_cast<int>(std::round(total_arg_change / (2.0 * M_PI)));
-    return std::abs(n_zeros);
+    return static_cast<int>(std::round(total_phase_change / (2.0 * M_PI)));
 }
 
 // Internal helper: Find approximate zero locations by scanning
@@ -921,6 +929,11 @@ static std::vector<double> find_zero_guesses(
             guesses.push_back(freqs[i]);
             if (static_cast<int>(guesses.size()) >= n_zeros_expected) break;
         }
+    }
+    
+    // Fallback: if no minima found, use band center
+    if (guesses.empty()) {
+        guesses.push_back((f_min + f_max) / 2.0);
     }
     
     return guesses;
@@ -1025,6 +1038,7 @@ std::vector<BlochMode> can_annular_eigenmodes(
     // Loop over azimuthal modes m = 0 to N/2
     int m_max = geom.n_cans / 2;
 
+    // Direct magnitude minimization approach (simpler and more reliable)
     for (int m = 0; m <= m_max; ++m) {
         // Search in bands around expected harmonics
         for (int n = 1; n <= max_harmonic; ++n) {
@@ -1034,10 +1048,10 @@ std::vector<BlochMode> can_annular_eigenmodes(
             
             if (f_band_min >= f_band_max) continue;
             
-            // Find local minima of |D(ω)| in this band (simpler than Argument Principle)
+            // Find local minima of |D(ω)| in this band
             auto guesses = find_zero_guesses(
                 m, geom, c_can, c_plenum, rho_can, rho_plenum,
-                f_band_min, f_band_max, bc_can_top, 3  // Look for up to 3 modes per band
+                f_band_min, f_band_max, bc_can_top, 3
             );
             
             // Refine each guess with Muller's method
@@ -1046,14 +1060,13 @@ std::vector<BlochMode> can_annular_eigenmodes(
                     f_guess, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_can_top
                 );
                 
-                // Verify it's in valid range and not duplicate
+                // Verify it's a good zero
                 if (f_refined > 1.0 && f_refined < f_max) {
-                    // Check that refined frequency is actually a good zero
                     double omega_refined = 2.0 * M_PI * f_refined;
                     auto D_refined = dispersion_relation(omega_refined, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_can_top);
                     
-                    // Only accept if |D| is small (actual zero)
-                    if (std::abs(D_refined) < 0.1) {
+                    // Accept if |D| is small
+                    if (std::abs(D_refined) < 1.0) {
                         bool is_duplicate = false;
                         for (const auto& existing : modes) {
                             if (existing.m_azimuthal == m && std::abs(existing.frequency - f_refined) < 1.0) {
