@@ -5,9 +5,9 @@
 
 #include "state.h"
 #include "thermo.h"
-#include "transport.h"
-#include "utils.h"
-#include "combustion.h"
+#include "../../include/acoustics.h"
+#include "../../include/can_annular_solvers.h"
+#include "../../include/combustion.h"
 #include "equilibrium.h"
 #include "humidair.h"
 #include "common_names.h"
