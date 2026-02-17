@@ -2777,6 +2777,38 @@ PYBIND11_MODULE(_core, m)
         .def("volume", &Annulus::volume, "Volume [m³]")
         .def("circumference", &Annulus::circumference, "Mean circumference [m]");
 
+    py::class_<CanAnnularFlowGeometry>(
+        m,
+        "CanAnnularFlowGeometry",
+        "Parameterized can-annular flow geometry with primary, transition, and annular sections"
+    )
+        .def(
+            py::init<double, double, double, double, double, double>(),
+            py::arg("L"),
+            py::arg("D_inner"),
+            py::arg("D_outer"),
+            py::arg("L_primary"),
+            py::arg("D_primary"),
+            py::arg("L_transition"),
+            "Create geometry with annular section and dedicated can transition parameters."
+        )
+        .def_readwrite("L", &CanAnnularFlowGeometry::L, "Annular section length [m]")
+        .def_readwrite("D_inner", &CanAnnularFlowGeometry::D_inner, "Annular inner diameter [m]")
+        .def_readwrite("D_outer", &CanAnnularFlowGeometry::D_outer, "Annular outer diameter [m]")
+        .def_readwrite("L_primary", &CanAnnularFlowGeometry::L_primary, "Primary zone length [m]")
+        .def_readwrite("D_primary", &CanAnnularFlowGeometry::D_primary, "Primary zone diameter [m]")
+        .def_readwrite("L_transition", &CanAnnularFlowGeometry::L_transition, "Transition length [m]")
+        .def("D_mean", &CanAnnularFlowGeometry::D_mean, "Annular mean diameter [m]")
+        .def("gap", &CanAnnularFlowGeometry::gap, "Annular gap [m]")
+        .def("area", &CanAnnularFlowGeometry::area, "Annular cross-sectional area [m²]")
+        .def("volume", &CanAnnularFlowGeometry::volume, "Annular section volume [m³]")
+        .def("circumference", &CanAnnularFlowGeometry::circumference, "Annular mean circumference [m]")
+        .def("area_primary", &CanAnnularFlowGeometry::area_primary, "Primary circular area [m²]")
+        .def("volume_primary", &CanAnnularFlowGeometry::volume_primary, "Primary zone volume [m³]")
+        .def("volume_transition", &CanAnnularFlowGeometry::volume_transition, "Transition volume [m³]")
+        .def("volume_total", &CanAnnularFlowGeometry::volume_total, "Total geometry volume [m³]")
+        .def("length_total", &CanAnnularFlowGeometry::length_total, "Total geometry length [m]");
+
     // BoundaryCondition enum
     py::enum_<BoundaryCondition>(m, "BoundaryCondition", "Acoustic boundary condition")
         .value("Open", BoundaryCondition::Open, "Pressure release (p'=0)")
@@ -3441,6 +3473,14 @@ PYBIND11_MODULE(_core, m)
     );
 
     m.def(
+        "residence_time_can_annular",
+        py::overload_cast<const CanAnnularFlowGeometry&, double>(&residence_time),
+        py::arg("geom"),
+        py::arg("Q"),
+        "Residence time for CanAnnularFlowGeometry based on total volume [s]."
+    );
+
+    m.def(
         "residence_time_mdot",
         py::overload_cast<double, double, double>(&residence_time_mdot),
         py::arg("V"),
@@ -3450,6 +3490,15 @@ PYBIND11_MODULE(_core, m)
         "V    : volume [m³]\n"
         "mdot : mass flow rate [kg/s]\n"
         "rho  : density [kg/m³]"
+    );
+
+    m.def(
+        "residence_time_mdot_can_annular",
+        py::overload_cast<const CanAnnularFlowGeometry&, double, double>(&residence_time_mdot),
+        py::arg("geom"),
+        py::arg("mdot"),
+        py::arg("rho"),
+        "Residence time for CanAnnularFlowGeometry from mass flow [s]."
     );
 
     m.def(

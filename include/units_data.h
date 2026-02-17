@@ -269,7 +269,11 @@ inline constexpr Entry function_units[] = {
     // geometry.h - Residence Time
     // -------------------------------------------------------------------------
     {"residence_time",          "V: m^3, Q: m^3/s", "s"},
+    {"residence_time_tube",     "tube: Tube, Q: m^3/s", "s"},
+    {"residence_time_annulus",  "annulus: Annulus, Q: m^3/s", "s"},
+    {"residence_time_can_annular", "geom: CanAnnularFlowGeometry, Q: m^3/s", "s"},
     {"residence_time_mdot",     "V: m^3, mdot: kg/s, rho: kg/m^3", "s"},
+    {"residence_time_mdot_can_annular", "geom: CanAnnularFlowGeometry, mdot: kg/s, rho: kg/m^3", "s"},
     {"space_velocity",          "Q: m^3/s, V: m^3", "1/s"},
 
     // -------------------------------------------------------------------------

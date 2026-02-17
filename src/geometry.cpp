@@ -89,6 +89,50 @@ double Annulus::circumference() const {
 }
 
 // -------------------------------------------------------------
+// CanAnnularFlowGeometry methods
+// -------------------------------------------------------------
+
+double CanAnnularFlowGeometry::D_mean() const {
+    return (D_inner + D_outer) / 2.0;
+}
+
+double CanAnnularFlowGeometry::gap() const {
+    return (D_outer - D_inner) / 2.0;
+}
+
+double CanAnnularFlowGeometry::area() const {
+    return M_PI * (D_outer * D_outer - D_inner * D_inner) / 4.0;
+}
+
+double CanAnnularFlowGeometry::volume() const {
+    return area() * L;
+}
+
+double CanAnnularFlowGeometry::circumference() const {
+    return M_PI * D_mean();
+}
+
+double CanAnnularFlowGeometry::area_primary() const {
+    return M_PI * D_primary * D_primary / 4.0;
+}
+
+double CanAnnularFlowGeometry::volume_primary() const {
+    return area_primary() * L_primary;
+}
+
+double CanAnnularFlowGeometry::volume_transition() const {
+    return 0.5 * (area_primary() + area()) * L_transition;
+}
+
+double CanAnnularFlowGeometry::volume_total() const {
+    return volume_primary() + volume_transition() + volume();
+}
+
+double CanAnnularFlowGeometry::length_total() const {
+    return L_primary + L_transition + L;
+}
+
+// -------------------------------------------------------------
 // Residence Time
 // -------------------------------------------------------------
 
@@ -114,12 +158,20 @@ double residence_time(const Annulus& annulus, double Q) {
     return residence_time(annulus.volume(), Q);
 }
 
+double residence_time(const CanAnnularFlowGeometry& geom, double Q) {
+    return residence_time(geom.volume_total(), Q);
+}
+
 double residence_time_mdot(const Tube& tube, double mdot, double rho) {
     return residence_time_mdot(tube.volume(), mdot, rho);
 }
 
 double residence_time_mdot(const Annulus& annulus, double mdot, double rho) {
     return residence_time_mdot(annulus.volume(), mdot, rho);
+}
+
+double residence_time_mdot(const CanAnnularFlowGeometry& geom, double mdot, double rho) {
+    return residence_time_mdot(geom.volume_total(), mdot, rho);
 }
 
 double space_velocity(double Q, double V) {

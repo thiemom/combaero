@@ -47,6 +47,7 @@ try:
         Annulus,  # type: ignore[attr-defined]
         BlochMode,
         BoundaryCondition,
+        CanAnnularFlowGeometry,
         CanAnnularGeometry,
         Cd_orifice,
         Cd_rounded_entry,
@@ -256,7 +257,9 @@ try:
         relative_humidity_from_dewpoint,
         residence_time,
         residence_time_annulus,
+        residence_time_can_annular,
         residence_time_mdot,
+        residence_time_mdot_can_annular,
         residence_time_tube,
         reynolds,
         rib_enhancement_factor,
@@ -454,6 +457,7 @@ except ModuleNotFoundError:
     # Acoustics
     Tube = _core.Tube
     Annulus = _core.Annulus
+    CanAnnularFlowGeometry = _core.CanAnnularFlowGeometry
     BoundaryCondition = _core.BoundaryCondition
     AcousticMode = _core.AcousticMode
     tube_axial_modes = _core.tube_axial_modes
@@ -496,7 +500,9 @@ except ModuleNotFoundError:
     residence_time = _core.residence_time
     residence_time_tube = _core.residence_time_tube
     residence_time_annulus = _core.residence_time_annulus
+    residence_time_can_annular = _core.residence_time_can_annular
     residence_time_mdot = _core.residence_time_mdot
+    residence_time_mdot_can_annular = _core.residence_time_mdot_can_annular
     space_velocity = _core.space_velocity
     # Incompressible flow
     bernoulli_P2 = _core.bernoulli_P2
@@ -750,6 +756,7 @@ __all__ = [
     # Acoustics
     "Tube",
     "Annulus",
+    "CanAnnularFlowGeometry",
     "BoundaryCondition",
     "AcousticMode",
     "tube_axial_modes",
@@ -792,7 +799,9 @@ __all__ = [
     "residence_time",
     "residence_time_tube",
     "residence_time_annulus",
+    "residence_time_can_annular",
     "residence_time_mdot",
+    "residence_time_mdot_can_annular",
     "space_velocity",
     # Incompressible flow
     "bernoulli_P2",

@@ -1650,6 +1650,19 @@ annulus.D_mean()        # Mean diameter [m]
 annulus.gap()           # Annular gap [m]
 annulus.area()          # Cross-sectional area [m²]
 annulus.circumference() # Mean circumference [m]
+
+# Parameterized can-annular flow geometry
+# (primary circular zone + transition + annular section)
+geom = ca.CanAnnularFlowGeometry(
+    L=0.30, D_inner=0.40, D_outer=0.60,
+    L_primary=0.12, D_primary=0.15, L_transition=0.08,
+)
+geom.volume_total()      # Total combustor volume [m³]
+geom.length_total()      # Total modeled length [m]
+
+# Residence time helpers on geometry object
+tau_q = ca.residence_time_can_annular(geom, Q=0.12)
+tau_m = ca.residence_time_mdot_can_annular(geom, mdot=1.5, rho=2.0)
 ```
 
 ### Acoustic Properties Bundle
@@ -1753,6 +1766,10 @@ modes_ref = ca.annular_duct_modes_analytical(
     duct, c=800.0, f_max=3000.0, bc_ends=ca.BoundaryCondition.Closed
 )
 ```
+
+**Modeling assumptions (current implementation):**
+- `AnnularDuctGeometry`: uniform radii and area over full duct length (no axial taper/segmentation).
+- `CanAnnularGeometry` (Bloch-Floquet solver): single uniform can section + single uniform annulus/plenum section.
 
 ### Streamlined Liner API
 

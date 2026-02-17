@@ -456,5 +456,52 @@ class TestIntegration:
         assert 0.01 < tau < 1.0  # Typical combustor range
 
 
+class TestCanAnnularFlowGeometry:
+    """Tests for parameterized can-annular flow geometry helpers."""
+
+    def test_can_annular_geometry_volume_breakdown(self):
+        geom = cb.CanAnnularFlowGeometry(
+            L=0.30,
+            D_inner=0.40,
+            D_outer=0.60,
+            L_primary=0.12,
+            D_primary=0.15,
+            L_transition=0.08,
+        )
+
+        a_primary = np.pi * (0.15**2) / 4.0
+        a_annulus = np.pi * (0.60**2 - 0.40**2) / 4.0
+        v_primary = a_primary * 0.12
+        v_annulus = a_annulus * 0.30
+        v_transition = 0.5 * (a_primary + a_annulus) * 0.08
+
+        assert geom.area_primary() == pytest.approx(a_primary)
+        assert geom.area() == pytest.approx(a_annulus)
+        assert geom.volume_primary() == pytest.approx(v_primary)
+        assert geom.volume() == pytest.approx(v_annulus)
+        assert geom.volume_transition() == pytest.approx(v_transition)
+        assert geom.volume_total() == pytest.approx(v_primary + v_transition + v_annulus)
+        assert geom.length_total() == pytest.approx(0.12 + 0.08 + 0.30)
+
+    def test_can_annular_residence_time_helpers(self):
+        geom = cb.CanAnnularFlowGeometry(
+            L=0.25,
+            D_inner=0.45,
+            D_outer=0.65,
+            L_primary=0.10,
+            D_primary=0.16,
+            L_transition=0.05,
+        )
+
+        q = 0.15
+        tau_q = cb.residence_time_can_annular(geom, q)
+        assert tau_q == pytest.approx(geom.volume_total() / q)
+
+        mdot = 1.8
+        rho = 2.1
+        tau_m = cb.residence_time_mdot_can_annular(geom, mdot, rho)
+        assert tau_m == pytest.approx(geom.volume_total() * rho / mdot)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
