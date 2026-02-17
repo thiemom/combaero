@@ -2645,7 +2645,7 @@ PYBIND11_MODULE(_core, m)
         .def_readonly("mixture_fraction", &CombustionState::mixture_fraction, "Bilger mixture fraction [-]")
         .def_readonly("fuel_burn_fraction", &CombustionState::fuel_burn_fraction, "Fraction of fuel burned [0-1]")
         .def("__repr__", [](const CombustionState& s) {
-            return "<CombustionState: phi=" + std::to_string(s.phi) + 
+            return "<CombustionState: phi=" + std::to_string(s.phi) +
                    ", T_reactants=" + std::to_string(s.reactants.thermo.T) + " K" +
                    ", T_products=" + std::to_string(s.products.thermo.T) + " K" +
                    (s.fuel_name.empty() ? "" : ", fuel='" + s.fuel_name + "'") + ">";

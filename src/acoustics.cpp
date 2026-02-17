@@ -528,7 +528,7 @@ std::complex<double> orifice_impedance_with_flow(
     if (Cd <= 0.0 || Cd > 1.0) {
         throw std::runtime_error("Discharge coefficient must be in range (0, 1], got " + std::to_string(Cd));
     }
-    
+
     // Check Mach numbers (should be << 1 for acoustic theory)
     double M_bias = std::abs(u_bias) / c;
     double M_grazing = std::abs(u_grazing) / c;
@@ -538,33 +538,33 @@ std::complex<double> orifice_impedance_with_flow(
     if (M_grazing > 0.3) {
         throw std::runtime_error("Grazing Mach number too high: " + std::to_string(M_grazing) + " > 0.3");
     }
-    
+
     double omega = 2.0 * M_PI * freq;
-    
+
     // 1. Resistance (Real Part)
     // Bias flow resistance (Rogers & Marble 1956)
     // R_bias = M_b / (σ * Cd²)
     double R_bias = M_bias / (porosity * Cd * Cd);
-    
+
     // Grazing flow resistance (Howe 1979, Bourquard & Noiray 2019)
     // R_grazing = M_g / (2σ)
     double R_grazing = M_grazing / (2.0 * porosity);
-    
+
     // Total resistance (linear superposition for small Mach numbers)
     double R = R_bias + R_grazing;
-    
+
     // 2. Reactance (Imaginary Part)
     // Rayleigh end correction modified by flow
     double delta_0 = 0.85 * (d_orifice / 2.0);  // ~0.425 * d
-    
+
     // Flow reduces effective end correction (frequency shift)
     // Empirical: δ_eff = δ_0 / (1 + M_g)
     double flow_modifier = 1.0 / (1.0 + M_grazing);
     double l_eff = l_orifice + delta_0 * flow_modifier;
-    
+
     // Inertance (mass reactance): X = ω*l_eff / (c*σ)
     double X = (omega * l_eff) / (c * porosity);
-    
+
     // Return normalized impedance Z/(ρc)
     return std::complex<double>(R, X);
 }
@@ -591,36 +591,36 @@ TransferMatrix quarter_wave_resonator_tmm(
     if (A_duct <= 0.0 || A_tube <= 0.0) {
         throw std::runtime_error("Areas must be positive");
     }
-    
+
     double k = (2.0 * M_PI * freq) / c;
-    
+
     // Check that we're below cutoff (kL < π for quarter-wave)
     if (k * L_tube > M_PI) {
-        throw std::runtime_error("Frequency too high: kL = " + std::to_string(k * L_tube) + 
+        throw std::runtime_error("Frequency too high: kL = " + std::to_string(k * L_tube) +
                                  " > π (above quarter-wave cutoff)");
     }
-    
+
     // 1. Neck impedance (with flow effects)
     std::complex<double> Z_neck = orifice_impedance_with_flow(
         freq, u_bias, u_grazing, d_orifice, l_orifice, porosity, Cd, rho, c
     );
-    
+
     // 2. Tube backing impedance (closed-end quarter-wave)
     // For a closed-end tube: Z_tube = -i*cot(kL)
     // This is the normalized impedance (Z/(ρc))
     std::complex<double> i(0.0, 1.0);
     std::complex<double> Z_tube = -i / std::tan(k * L_tube);
-    
+
     // 3. Total branch impedance
     // Series combination: Z_branch = Z_neck + Z_tube
     std::complex<double> Z_branch_norm = Z_neck + Z_tube;
-    
+
     // 4. Scale by area ratio and denormalize
     // The orifice area is: A_orifice = porosity * A_duct
     // Branch admittance in main duct: Y = A_orifice / (ρc * Z_branch)
     double A_orifice = porosity * A_duct;
     std::complex<double> Y_branch = A_orifice / (rho * c * Z_branch_norm);
-    
+
     // 5. Transfer matrix for side-branch
     // For a shunt element (parallel admittance):
     // [p_u]   [1    0  ] [p_d]
@@ -645,15 +645,15 @@ bool is_whistling_risk(
     if (freq < 0.0 || d_orifice <= 0.0) {
         throw std::runtime_error("Invalid parameters for whistling risk assessment");
     }
-    
+
     // No flow, no whistling
     if (std::abs(u_bias) < 0.01) {
         return false;
     }
-    
+
     // Strouhal number: St = f * d / U
     double St = (freq * d_orifice) / std::abs(u_bias);
-    
+
     // Critical Strouhal range for vortex lock-in: 0.2 < St < 0.5
     // This is when vortex shedding frequency matches acoustic frequency
     return (St >= 0.2 && St <= 0.5);
@@ -685,7 +685,7 @@ static std::complex<double> can_admittance(
     std::complex<double> k = omega / c;
     std::complex<double> Y_char = geom.area_can / (rho * c);
     std::complex<double> i(0.0, 1.0);
-    
+
     if (bc_top == BoundaryCondition::Closed) {
         // Rigid wall at top: u=0, Y = i*Y_char*tan(kL)
         return i * Y_char * std::tan(k * geom.length_can);
@@ -711,22 +711,22 @@ static std::complex<double> annulus_admittance(
     if (geom.n_cans == 1) {
         return std::complex<double>(0.0, 0.0);  // No coupling
     }
-    
+
     std::complex<double> k = omega / c;
-    
+
     // Sector geometry
     double sector_angle = 2.0 * M_PI / geom.n_cans;
     double sector_length = sector_angle * geom.radius_plenum;
-    
+
     // Bloch phase shift for mode m
     double psi = 2.0 * M_PI * m / geom.n_cans;
-    
+
     // Transfer matrix formulation (Evesque & Polifke 2005, Eq. 14)
     std::complex<double> kL = k * sector_length;
     std::complex<double> cos_kL = std::cos(kL);
     std::complex<double> sin_kL = std::sin(kL);
     std::complex<double> cos_psi(std::cos(psi), 0.0);
-    
+
     // Avoid singularities
     std::complex<double> num = cos_kL - cos_psi;
     if (std::abs(num) < 1e-10) {
@@ -735,11 +735,11 @@ static std::complex<double> annulus_admittance(
     if (std::abs(sin_kL) < 1e-10) {
         return std::complex<double>(1e10, 0.0);
     }
-    
+
     // Effective annulus impedance: Z_ann = -i*(rho*c)/(2*A_ann) * sin(kL)/(cos(kL)-cos(psi))
     std::complex<double> i(0.0, 1.0);
     std::complex<double> Z_ann = -i * (rho * c / (2.0 * geom.area_plenum)) * (sin_kL / num);
-    
+
     // Return admittance
     if (std::abs(Z_ann) < 1e-10) {
         return std::complex<double>(1e10, 0.0);
@@ -748,6 +748,57 @@ static std::complex<double> annulus_admittance(
 }
 
 // Internal helper: Dispersion relation D(omega, m) = Y_can + Y_annulus
+// Overload for complex omega (needed for Argument Principle)
+static std::complex<double> dispersion_relation_complex(
+    std::complex<double> omega,
+    int m,
+    const CanAnnularGeometry& geom,
+    double c_can,
+    double c_plenum,
+    double rho_can,
+    double rho_plenum,
+    BoundaryCondition bc_top
+) {
+    // For complex omega, evaluate admittances at complex frequency
+    std::complex<double> k_can = omega / c_can;
+    std::complex<double> k_plenum = omega / c_plenum;
+    
+    // Can admittance
+    std::complex<double> Y_char_can = geom.area_can / (rho_can * c_can);
+    std::complex<double> i(0.0, 1.0);
+    std::complex<double> Y_can;
+    
+    if (bc_top == BoundaryCondition::Closed) {
+        Y_can = i * Y_char_can * std::tan(k_can * geom.length_can);
+    } else {
+        Y_can = -i * Y_char_can / std::tan(k_can * geom.length_can);
+    }
+    
+    // Annulus admittance (skip if single can)
+    std::complex<double> Y_ann(0.0, 0.0);
+    if (geom.n_cans > 1) {
+        double sector_angle = 2.0 * M_PI / geom.n_cans;
+        double sector_length = sector_angle * geom.radius_plenum;
+        double psi = 2.0 * M_PI * m / geom.n_cans;
+        
+        std::complex<double> kL = k_plenum * sector_length;
+        std::complex<double> cos_kL = std::cos(kL);
+        std::complex<double> sin_kL = std::sin(kL);
+        std::complex<double> cos_psi(std::cos(psi), 0.0);
+        
+        std::complex<double> num = cos_kL - cos_psi;
+        if (std::abs(num) > 1e-10 && std::abs(sin_kL) > 1e-10) {
+            std::complex<double> Z_ann = -i * (rho_plenum * c_plenum / (2.0 * geom.area_plenum)) * (sin_kL / num);
+            if (std::abs(Z_ann) > 1e-10) {
+                Y_ann = 1.0 / Z_ann;
+            }
+        }
+    }
+    
+    return Y_can + Y_ann;
+}
+
+// Real omega version (for backward compatibility)
 static std::complex<double> dispersion_relation(
     double omega,
     int m,
@@ -758,13 +809,14 @@ static std::complex<double> dispersion_relation(
     double rho_plenum,
     BoundaryCondition bc_top
 ) {
-    return can_admittance(omega, geom, c_can, rho_can, bc_top) +
-           annulus_admittance(omega, m, geom, c_plenum, rho_plenum);
+    return dispersion_relation_complex(
+        std::complex<double>(omega, 0.0), m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top
+    );
 }
 
-// Internal helper: Simplified zero finder using sign changes
-// For lossless acoustics, admittances are purely imaginary, so look at Im[D(omega)]
-static std::vector<double> find_zeros_bisection(
+// Internal helper: Argument Principle with full rectangular contour
+// Counts zeros inside contour using winding number: N = ΔArg[D(ω)] / 2π
+static int count_zeros_argument_principle(
     int m,
     const CanAnnularGeometry& geom,
     double c_can,
@@ -774,54 +826,109 @@ static std::vector<double> find_zeros_bisection(
     double f_min,
     double f_max,
     BoundaryCondition bc_top,
-    int n_points = 200
+    int n_points = 100
 ) {
-    std::vector<double> zeros;
+    // Rectangular contour in complex ω-plane: [f_min, f_max] × [0, i·δ]
+    // δ = damping offset to avoid poles on real axis
+    double delta = 50.0;  // Small imaginary offset (rad/s)
     
-    // Sample dispersion relation along frequency axis
-    std::vector<double> freqs;
-    std::vector<double> vals;
+    std::vector<std::complex<double>> contour;
+    contour.reserve(4 * n_points);
     
+    // Edge 1: Bottom (f_min to f_max along real axis + small offset)
     for (int i = 0; i < n_points; ++i) {
         double f = f_min + (f_max - f_min) * i / (n_points - 1);
+        contour.push_back(std::complex<double>(2.0 * M_PI * f, delta));
+    }
+    
+    // Edge 2: Right (f_max upward)
+    for (int i = 1; i < n_points; ++i) {
+        double imag = delta + (2.0 * delta) * i / (n_points - 1);
+        contour.push_back(std::complex<double>(2.0 * M_PI * f_max, imag));
+    }
+    
+    // Edge 3: Top (f_max to f_min along top)
+    for (int i = 1; i < n_points; ++i) {
+        double f = f_max - (f_max - f_min) * i / (n_points - 1);
+        contour.push_back(std::complex<double>(2.0 * M_PI * f, 3.0 * delta));
+    }
+    
+    // Edge 4: Left (back down to start)
+    for (int i = 1; i < n_points; ++i) {
+        double imag = 3.0 * delta - (2.0 * delta) * i / (n_points - 1);
+        contour.push_back(std::complex<double>(2.0 * M_PI * f_min, imag));
+    }
+    
+    // Compute winding number using trapezoidal rule
+    double total_arg_change = 0.0;
+    
+    for (size_t i = 0; i < contour.size(); ++i) {
+        size_t next = (i + 1) % contour.size();
+        
+        // Evaluate dispersion relation at current and next point (use complex omega)
+        auto D_curr = dispersion_relation_complex(contour[i], m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
+        auto D_next = dispersion_relation_complex(contour[next], m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
+        
+        // Argument change (unwrapped)
+        double arg_curr = std::arg(D_curr);
+        double arg_next = std::arg(D_next);
+        double delta_arg = arg_next - arg_curr;
+        
+        // Unwrap phase (handle 2π jumps)
+        while (delta_arg > M_PI) delta_arg -= 2.0 * M_PI;
+        while (delta_arg < -M_PI) delta_arg += 2.0 * M_PI;
+        
+        total_arg_change += delta_arg;
+    }
+    
+    // Number of zeros = winding number = ΔArg / 2π
+    int n_zeros = static_cast<int>(std::round(total_arg_change / (2.0 * M_PI)));
+    return std::abs(n_zeros);
+}
+
+// Internal helper: Find approximate zero locations by scanning
+static std::vector<double> find_zero_guesses(
+    int m,
+    const CanAnnularGeometry& geom,
+    double c_can,
+    double c_plenum,
+    double rho_can,
+    double rho_plenum,
+    double f_min,
+    double f_max,
+    BoundaryCondition bc_top,
+    int n_zeros_expected
+) {
+    std::vector<double> guesses;
+    
+    // Scan for local minima of |D(ω)|
+    int n_scan = 500;
+    std::vector<double> freqs;
+    std::vector<double> mags;
+    
+    for (int i = 0; i < n_scan; ++i) {
+        double f = f_min + (f_max - f_min) * i / (n_scan - 1);
         double omega = 2.0 * M_PI * f;
         auto D = dispersion_relation(omega, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
         
         freqs.push_back(f);
-        // For lossless acoustics, admittances are imaginary, so look at imaginary part
-        vals.push_back(D.imag());
+        mags.push_back(std::abs(D));
     }
     
-    // Find sign changes (zero crossings)
-    for (size_t i = 1; i < vals.size(); ++i) {
-        if (vals[i-1] * vals[i] < 0) {  // Sign change
-            // Bisection to refine
-            double f_low = freqs[i-1];
-            double f_high = freqs[i];
-            
-            for (int iter = 0; iter < 20; ++iter) {
-                double f_mid = 0.5 * (f_low + f_high);
-                double omega_mid = 2.0 * M_PI * f_mid;
-                auto D_mid = dispersion_relation(omega_mid, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
-                
-                double val_low = dispersion_relation(2.0 * M_PI * f_low, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top).imag();
-                
-                if (val_low * D_mid.imag() < 0) {
-                    f_high = f_mid;
-                } else {
-                    f_low = f_mid;
-                }
-            }
-            
-            zeros.push_back(0.5 * (f_low + f_high));
+    // Find local minima
+    for (int i = 1; i < n_scan - 1; ++i) {
+        if (mags[i] < mags[i-1] && mags[i] < mags[i+1]) {
+            guesses.push_back(freqs[i]);
+            if (static_cast<int>(guesses.size()) >= n_zeros_expected) break;
         }
     }
     
-    return zeros;
+    return guesses;
 }
 
-// Internal helper: Refine root using Newton-Raphson
-static double refine_root_newton(
+// Internal helper: Muller's method for complex root refinement
+// More robust than Newton-Raphson for thermoacoustic problems
+static double refine_root_muller(
     double f_guess,
     int m,
     const CanAnnularGeometry& geom,
@@ -832,24 +939,49 @@ static double refine_root_newton(
     BoundaryCondition bc_top,
     int max_iter = 50
 ) {
-    double omega = 2.0 * M_PI * f_guess;
-    double eps = 1.0;  // Finite difference step for derivative
+    // Initialize three starting points around guess
+    double h = 0.01 * f_guess;  // Step size
+    std::complex<double> x0(2.0 * M_PI * (f_guess - h), 0.0);
+    std::complex<double> x1(2.0 * M_PI * f_guess, 0.0);
+    std::complex<double> x2(2.0 * M_PI * (f_guess + h), 0.0);
+    
+    auto f0 = dispersion_relation(x0.real(), m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
+    auto f1 = dispersion_relation(x1.real(), m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
+    auto f2 = dispersion_relation(x2.real(), m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
     
     for (int iter = 0; iter < max_iter; ++iter) {
-        auto val = dispersion_relation(omega, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
-        auto val_plus = dispersion_relation(omega + eps, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
+        // Muller's method: fit parabola through 3 points
+        std::complex<double> q = (x2 - x1) / (x1 - x0);
+        std::complex<double> A = q * f2 - q * (1.0 + q) * f1 + q * q * f0;
+        std::complex<double> B = (2.0 * q + 1.0) * f2 - (1.0 + q) * (1.0 + q) * f1 + q * q * f0;
+        std::complex<double> C = (1.0 + q) * f2;
         
-        std::complex<double> deriv = (val_plus - val) / eps;
+        // Solve quadratic: choose root with larger denominator (more stable)
+        std::complex<double> disc = std::sqrt(B * B - 4.0 * A * C);
+        std::complex<double> denom1 = B + disc;
+        std::complex<double> denom2 = B - disc;
+        std::complex<double> denom = (std::abs(denom1) > std::abs(denom2)) ? denom1 : denom2;
         
-        if (std::abs(deriv) < 1e-10) break;  // Derivative too small
+        if (std::abs(denom) < 1e-14) break;  // Avoid division by zero
         
-        std::complex<double> step = val / deriv;
-        omega -= step.real();
+        std::complex<double> dx = -(x2 - x1) * 2.0 * C / denom;
+        std::complex<double> x3 = x2 + dx;
         
-        if (std::abs(step) < 1e-6) break;  // Converged
+        // Check convergence
+        if (std::abs(dx) < 1e-6) {
+            return x3.real() / (2.0 * M_PI);
+        }
+        
+        // Update points
+        x0 = x1;
+        x1 = x2;
+        x2 = x3;
+        f0 = f1;
+        f1 = f2;
+        f2 = dispersion_relation(x2.real(), m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
     }
     
-    return omega / (2.0 * M_PI);
+    return x2.real() / (2.0 * M_PI);
 }
 
 // Main solver: Find all eigenmodes using Argument Principle
@@ -881,53 +1013,68 @@ std::vector<BlochMode> can_annular_eigenmodes(
     if (f_max <= 0.0) {
         throw std::runtime_error("Maximum frequency must be positive");
     }
-    
+
     std::vector<BlochMode> modes;
-    
+
     // Estimate fundamental frequency (quarter-wave for closed-closed)
     double f_fundamental = c_can / (4.0 * geom.length_can);
-    
+
     // Search for modes in bands around harmonics
     int max_harmonic = static_cast<int>(std::ceil(f_max / f_fundamental)) + 1;
-    
+
     // Loop over azimuthal modes m = 0 to N/2
     int m_max = geom.n_cans / 2;
-    
+
     for (int m = 0; m <= m_max; ++m) {
-        // Find all zeros in the full frequency range for this azimuthal mode
-        auto zeros = find_zeros_bisection(
-            m, geom, c_can, c_plenum, rho_can, rho_plenum,
-            10.0, f_max, bc_can_top
-        );
-        
-        // Add all found zeros as modes
-        for (double f : zeros) {
-            if (f > 1.0 && f < f_max) {
-                // Refine with Newton-Raphson
-                double f_refined = refine_root_newton(
-                    f, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_can_top
+        // Search in bands around expected harmonics
+        for (int n = 1; n <= max_harmonic; ++n) {
+            double f_center = (2 * n - 1) * f_fundamental;
+            double f_band_min = std::max(10.0, f_center - 0.6 * f_fundamental);
+            double f_band_max = std::min(f_max, f_center + 0.6 * f_fundamental);
+            
+            if (f_band_min >= f_band_max) continue;
+            
+            // Find local minima of |D(ω)| in this band (simpler than Argument Principle)
+            auto guesses = find_zero_guesses(
+                m, geom, c_can, c_plenum, rho_can, rho_plenum,
+                f_band_min, f_band_max, bc_can_top, 3  // Look for up to 3 modes per band
+            );
+            
+            // Refine each guess with Muller's method
+            for (double f_guess : guesses) {
+                double f_refined = refine_root_muller(
+                    f_guess, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_can_top
                 );
                 
-                // Check for duplicates
-                bool is_duplicate = false;
-                for (const auto& existing : modes) {
-                    if (existing.m_azimuthal == m && std::abs(existing.frequency - f_refined) < 1.0) {
-                        is_duplicate = true;
-                        break;
+                // Verify it's in valid range and not duplicate
+                if (f_refined > 1.0 && f_refined < f_max) {
+                    // Check that refined frequency is actually a good zero
+                    double omega_refined = 2.0 * M_PI * f_refined;
+                    auto D_refined = dispersion_relation(omega_refined, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_can_top);
+                    
+                    // Only accept if |D| is small (actual zero)
+                    if (std::abs(D_refined) < 0.1) {
+                        bool is_duplicate = false;
+                        for (const auto& existing : modes) {
+                            if (existing.m_azimuthal == m && std::abs(existing.frequency - f_refined) < 1.0) {
+                                is_duplicate = true;
+                                break;
+                            }
+                        }
+                        
+                        if (!is_duplicate) {
+                            modes.push_back({m, f_refined, geom.n_cans});
+                        }
                     }
-                }
-                
-                if (!is_duplicate && f_refined > 1.0 && f_refined < f_max) {
-                    modes.push_back({m, f_refined, geom.n_cans});
                 }
             }
         }
     }
-    
+
     // Sort by frequency
-    std::sort(modes.begin(), modes.end(), 
+    std::sort(modes.begin(), modes.end(),
               [](const BlochMode& a, const BlochMode& b) { return a.frequency < b.frequency; });
-    
+
     return modes;
 }
 
