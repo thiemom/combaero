@@ -1,8 +1,10 @@
 """Tests for annular duct acoustic solver."""
 
-import pytest
-import combaero as cb
 import math
+
+import pytest
+
+import combaero as cb
 
 
 class TestAnnularDuctGeometry:
@@ -158,7 +160,7 @@ class TestMultipleAzimuthalModes:
         modes = cb.annular_duct_eigenmodes(geom, 500, 1.2, f_max=1500)
 
         # Should find modes with different m
-        azimuthal_modes = set(m.m_azimuthal for m in modes)
+        azimuthal_modes = {m.m_azimuthal for m in modes}
         assert len(azimuthal_modes) > 1
 
         # Should have modes between 0 and n_azimuthal_max

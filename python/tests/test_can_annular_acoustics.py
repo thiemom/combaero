@@ -1,6 +1,7 @@
 """Tests for can-annular and annular duct acoustic solvers."""
 
 import pytest
+
 import combaero as cb
 
 
@@ -137,7 +138,7 @@ class TestMultiCanModeSplitting:
         modes = cb.can_annular_eigenmodes(geom, 500, 600, 1.0, 1.2, f_max=600)
 
         # Should find modes with different azimuthal numbers
-        azimuthal_modes = set(mode.m_azimuthal for mode in modes)
+        azimuthal_modes = {mode.m_azimuthal for mode in modes}
         assert len(azimuthal_modes) > 1  # Multiple azimuthal modes
 
         # Should have modes between 0 and N/2 = 12

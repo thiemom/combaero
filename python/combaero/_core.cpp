@@ -3137,6 +3137,10 @@ PYBIND11_MODULE(_core, m)
     );
 
     // Annular Duct Geometry and Modes
+    using combaero::AnnularDuctGeometry;
+    using combaero::AnnularMode;
+    using combaero::annular_duct_eigenmodes;
+
     py::class_<AnnularDuctGeometry>(m, "AnnularDuctGeometry")
         .def(py::init<>())
         .def_readwrite("length", &AnnularDuctGeometry::length)

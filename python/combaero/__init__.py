@@ -41,6 +41,8 @@ try:
         AcousticMode,
         AcousticProperties,
         AirProperties,
+        AnnularDuctGeometry,
+        AnnularMode,
         Annulus,  # type: ignore[attr-defined]
         BlochMode,
         BoundaryCondition,
@@ -74,6 +76,7 @@ try:
         air_properties,
         all_units,
         annular_area,
+        annular_duct_eigenmodes,
         annulus_axial_modes,
         annulus_azimuthal_modes,
         annulus_modes,

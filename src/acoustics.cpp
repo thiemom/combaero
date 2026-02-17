@@ -749,7 +749,7 @@ static std::complex<double> annulus_admittance(
 
 // Internal helper: Dispersion relation D(omega, m) = Y_can + Y_annulus
 // Overload for complex omega (needed for Argument Principle)
-static std::complex<double> dispersion_relation_complex(
+std::complex<double> dispersion_relation_complex(
     std::complex<double> omega,
     int m,
     const CanAnnularGeometry& geom,
@@ -762,12 +762,12 @@ static std::complex<double> dispersion_relation_complex(
     std::complex<double> k_can = omega / c_can;
     std::complex<double> k_plenum = omega / c_plenum;
     std::complex<double> i(0.0, 1.0);
-    
+
     // Can admittance - compute sin/cos separately to avoid tan() singularities
     std::complex<double> Y_char_can = geom.area_can / (rho_can * c_can);
     std::complex<double> sin_kl_can = std::sin(k_can * geom.length_can);
     std::complex<double> cos_kl_can = std::cos(k_can * geom.length_can);
-    
+
     std::complex<double> Y_can;
     if (bc_top == BoundaryCondition::Closed) {
         // Y = i * Y_char * tan(kL) = i * Y_char * (sin/cos)
@@ -782,34 +782,34 @@ static std::complex<double> dispersion_relation_complex(
         }
         Y_can = -i * Y_char_can * (cos_kl_can / sin_kl_can);
     }
-    
+
     // Annulus admittance (skip if single can)
     std::complex<double> Y_ann(0.0, 0.0);
     if (geom.n_cans > 1) {
         double sector_angle = 2.0 * M_PI / geom.n_cans;
         double sector_len = sector_angle * geom.radius_plenum;
         double psi = 2.0 * M_PI * m / geom.n_cans;
-        
+
         std::complex<double> kL = k_plenum * sector_len;
         std::complex<double> cos_kL = std::cos(kL);
         std::complex<double> sin_kL = std::sin(kL);
         std::complex<double> cos_psi(std::cos(psi), 0.0);
-        
+
         std::complex<double> num = cos_kL - cos_psi;
         std::complex<double> den = sin_kL;
-        
+
         // Y_ann = i * (2A / rho*c) * (cos(kL) - cos(psi)) / sin(kL)
         if (std::abs(den) < 1e-12) {
             return std::complex<double>(1e12, 0.0);  // Pole
         }
         Y_ann = i * (2.0 * geom.area_plenum / (rho_plenum * c_plenum)) * (num / den);
     }
-    
+
     return Y_can + Y_ann;
 }
 
 // Real omega version (for backward compatibility)
-static std::complex<double> dispersion_relation(
+std::complex<double> dispersion_relation(
     double omega,
     int m,
     const CanAnnularGeometry& geom,
@@ -841,10 +841,10 @@ static int count_zeros_in_rect(
 ) {
     int n_steps_f = 20;  // Steps along frequency axis
     int n_steps_i = 10;  // Steps along imaginary axis
-    
+
     std::vector<std::complex<double>> contour;
     contour.reserve(2 * (n_steps_f + n_steps_i));
-    
+
     // Create box (counter-clockwise) - avoid duplicate corners
     // Bottom edge: (f_min, imag_min) to (f_max, imag_min)
     for (int i = 0; i < n_steps_f; ++i) {
@@ -866,36 +866,36 @@ static int count_zeros_in_rect(
         double imag = imag_max - (imag_max - imag_min) * i / (n_steps_i - 1);
         contour.push_back(std::complex<double>(2.0 * M_PI * f_min, imag));
     }
-    
+
     // Compute winding number using arg(ratio) for robust phase unwrapping
     double total_phase_change = 0.0;
     std::complex<double> prev_val = dispersion_relation_complex(
         contour[0], m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top
     );
-    
+
     for (size_t i = 1; i <= contour.size(); ++i) {
         std::complex<double> curr_z = contour[i % contour.size()];
         std::complex<double> curr_val = dispersion_relation_complex(
             curr_z, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top
         );
-        
+
         // Robust phase difference: d(theta) = Im(log(z2/z1)) = arg(z2/z1)
         std::complex<double> ratio = curr_val / prev_val;
         if (std::abs(ratio) == 0.0 || std::isnan(ratio.real())) {
             return 0;  // Hit singularity, abort this box
         }
-        
+
         double d_theta = std::arg(ratio);
         total_phase_change += d_theta;
-        
+
         prev_val = curr_val;
     }
-    
+
     return static_cast<int>(std::round(total_phase_change / (2.0 * M_PI)));
 }
 
 // Internal helper: Find approximate zero locations by scanning
-static std::vector<double> find_zero_guesses(
+std::vector<double> find_zero_guesses(
     int m,
     const CanAnnularGeometry& geom,
     double c_can,
@@ -908,21 +908,21 @@ static std::vector<double> find_zero_guesses(
     int n_zeros_expected
 ) {
     std::vector<double> guesses;
-    
+
     // Scan for local minima of |D(ω)|
     int n_scan = 500;
     std::vector<double> freqs;
     std::vector<double> mags;
-    
+
     for (int i = 0; i < n_scan; ++i) {
         double f = f_min + (f_max - f_min) * i / (n_scan - 1);
         double omega = 2.0 * M_PI * f;
         auto D = dispersion_relation(omega, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
-        
+
         freqs.push_back(f);
         mags.push_back(std::abs(D));
     }
-    
+
     // Find local minima
     for (int i = 1; i < n_scan - 1; ++i) {
         if (mags[i] < mags[i-1] && mags[i] < mags[i+1]) {
@@ -930,18 +930,18 @@ static std::vector<double> find_zero_guesses(
             if (static_cast<int>(guesses.size()) >= n_zeros_expected) break;
         }
     }
-    
+
     // Fallback: if no minima found, use band center
     if (guesses.empty()) {
         guesses.push_back((f_min + f_max) / 2.0);
     }
-    
+
     return guesses;
 }
 
 // Internal helper: Muller's method for complex root refinement
 // More robust than Newton-Raphson for thermoacoustic problems
-static double refine_root_muller(
+double refine_root_muller(
     double f_guess,
     int m,
     const CanAnnularGeometry& geom,
@@ -957,34 +957,34 @@ static double refine_root_muller(
     std::complex<double> x0(2.0 * M_PI * (f_guess - h), 0.0);
     std::complex<double> x1(2.0 * M_PI * f_guess, 0.0);
     std::complex<double> x2(2.0 * M_PI * (f_guess + h), 0.0);
-    
+
     auto f0 = dispersion_relation(x0.real(), m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
     auto f1 = dispersion_relation(x1.real(), m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
     auto f2 = dispersion_relation(x2.real(), m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
-    
+
     for (int iter = 0; iter < max_iter; ++iter) {
         // Muller's method: fit parabola through 3 points
         std::complex<double> q = (x2 - x1) / (x1 - x0);
         std::complex<double> A = q * f2 - q * (1.0 + q) * f1 + q * q * f0;
         std::complex<double> B = (2.0 * q + 1.0) * f2 - (1.0 + q) * (1.0 + q) * f1 + q * q * f0;
         std::complex<double> C = (1.0 + q) * f2;
-        
+
         // Solve quadratic: choose root with larger denominator (more stable)
         std::complex<double> disc = std::sqrt(B * B - 4.0 * A * C);
         std::complex<double> denom1 = B + disc;
         std::complex<double> denom2 = B - disc;
         std::complex<double> denom = (std::abs(denom1) > std::abs(denom2)) ? denom1 : denom2;
-        
+
         if (std::abs(denom) < 1e-14) break;  // Avoid division by zero
-        
+
         std::complex<double> dx = -(x2 - x1) * 2.0 * C / denom;
         std::complex<double> x3 = x2 + dx;
-        
+
         // Check convergence
         if (std::abs(dx) < 1e-6) {
             return x3.real() / (2.0 * M_PI);
         }
-        
+
         // Update points
         x0 = x1;
         x1 = x2;
@@ -993,7 +993,7 @@ static double refine_root_muller(
         f1 = f2;
         f2 = dispersion_relation(x2.real(), m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
     }
-    
+
     return x2.real() / (2.0 * M_PI);
 }
 
@@ -1031,40 +1031,40 @@ std::vector<BlochMode> can_annular_eigenmodes(
     // For research-grade Argument Principle, use can_annular_eigenmodes_with_method
     std::vector<BlochMode> modes;
     int m_max = geom.n_cans / 2;
-    
+
     // Continuous sliding window scan
     double scan_window_width = 50.0;
-    
+
     for (int m = 0; m <= m_max; ++m) {
         for (double f_start = 10.0; f_start < f_max; f_start += scan_window_width) {
             double f_end = std::min(f_start + scan_window_width, f_max);
-            
+
             auto guesses = find_zero_guesses(
                 m, geom, c_can, c_plenum, rho_can, rho_plenum,
                 f_start, f_end, bc_can_top, 2
             );
-            
+
             for (double f_guess : guesses) {
                 double f_refined = refine_root_muller(
                     f_guess, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_can_top
                 );
-                
+
                 if (f_refined > 1.0 && f_refined < f_max) {
                     double omega_refined = 2.0 * M_PI * f_refined;
                     auto D_refined = dispersion_relation(
                         omega_refined, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_can_top
                     );
-                    
+
                     if (std::abs(D_refined) < 0.1) {
                         bool is_duplicate = false;
                         for (const auto& existing : modes) {
-                            if (existing.m_azimuthal == m && 
+                            if (existing.m_azimuthal == m &&
                                 std::abs(existing.frequency - f_refined) < 1.0) {
                                 is_duplicate = true;
                                 break;
                             }
                         }
-                        
+
                         if (!is_duplicate) {
                             modes.push_back({m, f_refined, geom.n_cans});
                         }
