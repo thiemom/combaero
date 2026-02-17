@@ -3103,28 +3103,25 @@ PYBIND11_MODULE(_core, m)
         py::arg("rho_plenum"),
         py::arg("f_max") = 2000.0,
         py::arg("bc_can_top") = BoundaryCondition::Closed,
-        "Solve for passive acoustic eigenmodes of can-annular combustor.\n\n"
-        "Uses Argument Principle Method (Nyquist contour) for robust root finding.\n"
-        "Finds ALL modes in frequency range by counting zeros of dispersion relation.\n\n"
+        "Find all can-annular combustor eigenmodes using Bloch-Floquet theory.\n\n"
+        "Solves the dispersion relation D(omega) = Y_can + Y_annulus = 0\n"
+        "for a system of N cans coupled by an annular plenum.\n\n"
+        "Uses magnitude minimization + Muller refinement (fast, reliable).\n"
+        "For research-grade Argument Principle, use can_annular_eigenmodes_with_method.\n\n"
         "Parameters:\n"
-        "  geom       : CanAnnularGeometry (N cans, dimensions)\n"
+        "  geom       : CanAnnularGeometry with N cans, lengths, areas\n"
         "  c_can      : speed of sound in can [m/s]\n"
-        "  c_plenum   : speed of sound in plenum [m/s]\n"
+        "  c_plenum   : speed of sound in plenum [m/s] (often different!)\n"
         "  rho_can    : density in can [kg/m^3]\n"
         "  rho_plenum : density in plenum [kg/m^3]\n"
         "  f_max      : maximum frequency to search [Hz] (default: 2000)\n"
         "  bc_can_top : boundary condition at can top (default: Closed)\n\n"
-        "Returns: List of BlochMode objects sorted by frequency\n\n"
-        "Theory: Bloch-Floquet analysis reduces N-can problem to single sector.\n"
-        "Dispersion relation: Y_can(omega) + Y_annulus(omega, m) = 0\n\n"
-        "Mode types:\n"
-        "  m=0     : Push-Push (all cans in phase)\n"
-        "  m=N/2   : Push-Pull (adjacent cans 180deg out of phase)\n"
-        "  0<m<N/2 : Spinning/Standing waves\n\n"
+        "Returns: List of BlochMode sorted by frequency\n\n"
+        "Method: Continuous sliding window scan + magnitude minimization\n"
+        "Accuracy: Finds modes wherever they occur (no harmonic assumptions)\n\n"
         "References:\n"
         "  - Noiray et al. (2011): Unified framework for combustion instability\n"
-        "  - Evesque & Polifke (2005): Low-order acoustic modelling\n"
-        "  - Silva et al. (2013): Argument Principle for thermoacoustics\n\n"
+        "  - Evesque & Polifke (2005): Low-order acoustic modelling\n\n"
         "Example:\n"
         "  >>> geom = cb.CanAnnularGeometry()\n"
         "  >>> geom.n_cans = 24\n"
@@ -3136,6 +3133,63 @@ PYBIND11_MODULE(_core, m)
         "  ...                                    rho_can=1.0, rho_plenum=1.2)\n"
         "  >>> for mode in modes[:5]:\n"
         "  ...     print(f'm={mode.m_azimuthal}, f={mode.frequency:.1f} Hz')"
+    );
+
+    // Annular Duct Geometry and Modes
+    py::class_<AnnularDuctGeometry>(m, "AnnularDuctGeometry")
+        .def(py::init<>())
+        .def_readwrite("length", &AnnularDuctGeometry::length)
+        .def_readwrite("radius_inner", &AnnularDuctGeometry::radius_inner)
+        .def_readwrite("radius_outer", &AnnularDuctGeometry::radius_outer)
+        .def_readwrite("n_azimuthal_max", &AnnularDuctGeometry::n_azimuthal_max)
+        .def("area", &AnnularDuctGeometry::area)
+        .def("__repr__", [](const AnnularDuctGeometry& g) {
+            return "AnnularDuctGeometry(length=" + std::to_string(g.length) +
+                   ", r_inner=" + std::to_string(g.radius_inner) +
+                   ", r_outer=" + std::to_string(g.radius_outer) +
+                   ", n_azimuthal_max=" + std::to_string(g.n_azimuthal_max) + ")";
+        });
+
+    py::class_<AnnularMode>(m, "AnnularMode")
+        .def(py::init<>())
+        .def_readwrite("m_azimuthal", &AnnularMode::m_azimuthal)
+        .def_readwrite("n_axial", &AnnularMode::n_axial)
+        .def_readwrite("frequency", &AnnularMode::frequency)
+        .def("mode_type", &AnnularMode::mode_type)
+        .def("__repr__", [](const AnnularMode& mode) {
+            return "AnnularMode(m=" + std::to_string(mode.m_azimuthal) +
+                   ", n=" + std::to_string(mode.n_axial) +
+                   ", f=" + std::to_string(mode.frequency) + " Hz, " +
+                   mode.mode_type() + ")";
+        });
+
+    m.def("annular_duct_eigenmodes", &annular_duct_eigenmodes,
+        py::arg("geom"),
+        py::arg("c"),
+        py::arg("rho"),
+        py::arg("f_max"),
+        py::arg("bc_ends") = BoundaryCondition::Closed,
+        "Find all annular duct eigenmodes using Argument Principle.\n\n"
+        "Pure annular waveguide (no cans) with Bloch-Floquet periodic BCs.\n"
+        "Uses Nyquist contour integration for robust root finding.\n\n"
+        "Parameters:\n"
+        "  geom    : AnnularDuctGeometry (length, radii, max azimuthal mode)\n"
+        "  c       : speed of sound [m/s]\n"
+        "  rho     : density [kg/m^3]\n"
+        "  f_max   : maximum frequency [Hz]\n"
+        "  bc_ends : boundary condition at duct ends (default: Closed)\n\n"
+        "Returns: List of AnnularMode sorted by frequency\n\n"
+        "Method: Argument Principle (gold standard for finding ALL roots)\n"
+        "Guarantees: No missed modes, handles complex frequencies\n\n"
+        "Example:\n"
+        "  >>> geom = cb.AnnularDuctGeometry()\n"
+        "  >>> geom.length = 1.0  # m\n"
+        "  >>> geom.radius_inner = 0.2  # m\n"
+        "  >>> geom.radius_outer = 0.5  # m\n"
+        "  >>> geom.n_azimuthal_max = 5\n"
+        "  >>> modes = cb.annular_duct_eigenmodes(geom, c=500, rho=1.2, f_max=1000)\n"
+        "  >>> for mode in modes[:5]:\n"
+        "  ...     print(f'm={mode.m_azimuthal}, n={mode.n_axial}, f={mode.frequency:.1f} Hz')"
     );
 
     // Utility functions
