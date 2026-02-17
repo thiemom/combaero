@@ -120,19 +120,15 @@ echo ""
 echo "Check 2: Code quality (ruff)..."
 
 if command -v ruff &> /dev/null; then
-    RUFF_ARGS=(
-        "--line-length=100"
-        "--exclude=.venv,__pycache__,.pytest_cache,build,dist"
-    )
-
     if [ "$FIX" = true ]; then
         echo "  Running ruff with auto-fix..."
-        ruff check "${RUFF_ARGS[@]}" --fix "${SCAN_DIRS[@]}"
+        ruff check --fix "${SCAN_DIRS[@]}"
         echo -e "${GREEN}  ✓ Ruff checks passed (with fixes)${NC}"
     else
-        RUFF_OUTPUT=$(ruff check "${RUFF_ARGS[@]}" "${SCAN_DIRS[@]}" 2>&1 || true)
+        RUFF_OUTPUT=$(ruff check "${SCAN_DIRS[@]}" 2>&1)
+        RUFF_STATUS=$?
 
-        if [ -n "$RUFF_OUTPUT" ]; then
+        if [ $RUFF_STATUS -ne 0 ]; then
             echo -e "${RED}  ✗ Code quality issues found${NC}"
             if [ "$VERBOSE" = true ]; then
                 echo "$RUFF_OUTPUT"
@@ -147,6 +143,9 @@ if command -v ruff &> /dev/null; then
             ((VIOLATIONS++))
         else
             echo -e "${GREEN}  ✓ Code quality checks passed${NC}"
+            if [ "$VERBOSE" = true ] && [ -n "$RUFF_OUTPUT" ]; then
+                echo "$RUFF_OUTPUT"
+            fi
         fi
     fi
 else

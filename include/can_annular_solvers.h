@@ -16,7 +16,7 @@ struct AnnularDuctGeometry {
     double radius_inner;    // Inner radius [m]
     double radius_outer;    // Outer radius [m]
     int n_azimuthal_max;    // Maximum azimuthal mode number to search
-    
+
     // Derived: cross-sectional area
     double area() const {
         return M_PI * (radius_outer * radius_outer - radius_inner * radius_inner);
@@ -124,7 +124,7 @@ struct AnnularMode {
     int m_azimuthal;    // Azimuthal mode number (0, 1, 2, ...)
     int n_axial;        // Axial mode number (1, 2, 3, ...)
     double frequency;   // Frequency [Hz]
-    
+
     // Mode type description
     std::string mode_type() const {
         if (m_azimuthal == 0) {
@@ -136,7 +136,7 @@ struct AnnularMode {
 };
 
 // Find all annular duct eigenmodes using Argument Principle
-// 
+//
 // Pure annular duct (no cans) with Bloch-Floquet periodic boundary conditions
 // Finds modes by solving dispersion relation for annular waveguide
 //
@@ -155,6 +155,15 @@ std::vector<AnnularMode> annular_duct_eigenmodes(
     const AnnularDuctGeometry& geom,
     double c,
     double rho,
+    double f_max,
+    BoundaryCondition bc_ends = BoundaryCondition::Closed
+);
+
+// Analytical annular mode estimate used for validation and lightweight examples
+// Uses thin-annulus approximation with combined axial and azimuthal wavenumbers.
+std::vector<AnnularMode> annular_duct_modes_analytical(
+    const AnnularDuctGeometry& geom,
+    double c,
     double f_max,
     BoundaryCondition bc_ends = BoundaryCondition::Closed
 );

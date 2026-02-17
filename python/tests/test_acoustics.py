@@ -133,3 +133,61 @@ class TestTransferMatrixMethod:
                 rho=1.2,
                 c=343,
             )
+
+
+class TestLinerHelperApi:
+    """Test streamlined liner helper APIs for demos and user code."""
+
+    @staticmethod
+    def _build_common_objects():
+        medium = cb.AcousticMedium()
+        medium.rho = 1.2
+        medium.c = 340.0
+
+        orifice = cb.LinerOrificeGeometry()
+        orifice.d_orifice = 0.003
+        orifice.l_orifice = 0.005
+        orifice.porosity = 0.08
+        orifice.Cd = 0.7
+
+        flow = cb.LinerFlowState()
+        flow.u_bias = 10.0
+        flow.u_grazing = 80.0
+
+        cavity = cb.LinerCavity()
+        cavity.depth = 0.05
+
+        return medium, orifice, flow, cavity
+
+    def test_sdof_absorption_range(self):
+        """SDOF helper should return bounded physical absorption."""
+        medium, orifice, flow, cavity = self._build_common_objects()
+        alpha = cb.liner_sdof_absorption(400.0, orifice, cavity, flow, medium)
+        assert 0.0 <= alpha <= 1.0
+
+    def test_sdof_sweep_length(self):
+        """Sweep helper returns one value per frequency."""
+        medium, orifice, flow, cavity = self._build_common_objects()
+        freqs = [200.0, 400.0, 600.0]
+        alpha = cb.sweep_liner_sdof_absorption(freqs, orifice, cavity, flow, medium)
+        assert len(alpha) == len(freqs)
+
+    def test_serial_2dof_differs_from_sdof(self):
+        """2-DOF serial response should differ from baseline SDOF response."""
+        medium, orifice, flow, cavity = self._build_common_objects()
+
+        alpha_sdof = cb.sweep_liner_sdof_absorption(
+            [300.0, 600.0, 900.0], orifice, cavity, flow, medium
+        )
+        alpha_2dof = cb.sweep_liner_2dof_serial_absorption(
+            [300.0, 600.0, 900.0],
+            orifice,
+            orifice,
+            0.025,
+            0.025,
+            flow,
+            flow,
+            medium,
+        )
+
+        assert any(abs(a - b) > 1e-6 for a, b in zip(alpha_sdof, alpha_2dof, strict=True))

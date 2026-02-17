@@ -3052,6 +3052,102 @@ PYBIND11_MODULE(_core, m)
         .def_readwrite("T22", &TransferMatrix::T22)
         .def("__mul__", &TransferMatrix::operator*);
 
+    py::class_<AcousticMedium>(m, "AcousticMedium")
+        .def(py::init<>())
+        .def_readwrite("rho", &AcousticMedium::rho)
+        .def_readwrite("c", &AcousticMedium::c);
+
+    py::class_<LinerOrificeGeometry>(m, "LinerOrificeGeometry")
+        .def(py::init<>())
+        .def_readwrite("d_orifice", &LinerOrificeGeometry::d_orifice)
+        .def_readwrite("l_orifice", &LinerOrificeGeometry::l_orifice)
+        .def_readwrite("porosity", &LinerOrificeGeometry::porosity)
+        .def_readwrite("Cd", &LinerOrificeGeometry::Cd);
+
+    py::class_<LinerFlowState>(m, "LinerFlowState")
+        .def(py::init<>())
+        .def_readwrite("u_bias", &LinerFlowState::u_bias)
+        .def_readwrite("u_grazing", &LinerFlowState::u_grazing);
+
+    py::class_<LinerCavity>(m, "LinerCavity")
+        .def(py::init<>())
+        .def_readwrite("depth", &LinerCavity::depth);
+
+    m.def(
+        "absorption_from_impedance_norm",
+        &absorption_from_impedance_norm,
+        py::arg("z_norm")
+    );
+
+    m.def(
+        "liner_sdof_impedance_norm",
+        &liner_sdof_impedance_norm,
+        py::arg("freq"),
+        py::arg("orifice"),
+        py::arg("cavity"),
+        py::arg("flow"),
+        py::arg("medium")
+    );
+
+    m.def(
+        "liner_sdof_absorption",
+        &liner_sdof_absorption,
+        py::arg("freq"),
+        py::arg("orifice"),
+        py::arg("cavity"),
+        py::arg("flow"),
+        py::arg("medium")
+    );
+
+    m.def(
+        "sweep_liner_sdof_absorption",
+        &sweep_liner_sdof_absorption,
+        py::arg("freqs"),
+        py::arg("orifice"),
+        py::arg("cavity"),
+        py::arg("flow"),
+        py::arg("medium")
+    );
+
+    m.def(
+        "liner_2dof_serial_impedance_norm",
+        &liner_2dof_serial_impedance_norm,
+        py::arg("freq"),
+        py::arg("face_orifice"),
+        py::arg("septum_orifice"),
+        py::arg("depth_1"),
+        py::arg("depth_2"),
+        py::arg("face_flow"),
+        py::arg("septum_flow"),
+        py::arg("medium")
+    );
+
+    m.def(
+        "liner_2dof_serial_absorption",
+        &liner_2dof_serial_absorption,
+        py::arg("freq"),
+        py::arg("face_orifice"),
+        py::arg("septum_orifice"),
+        py::arg("depth_1"),
+        py::arg("depth_2"),
+        py::arg("face_flow"),
+        py::arg("septum_flow"),
+        py::arg("medium")
+    );
+
+    m.def(
+        "sweep_liner_2dof_serial_absorption",
+        &sweep_liner_2dof_serial_absorption,
+        py::arg("freqs"),
+        py::arg("face_orifice"),
+        py::arg("septum_orifice"),
+        py::arg("depth_1"),
+        py::arg("depth_2"),
+        py::arg("face_flow"),
+        py::arg("septum_flow"),
+        py::arg("medium")
+    );
+
     m.def("orifice_impedance_with_flow", &orifice_impedance_with_flow,
         py::arg("freq"), py::arg("u_bias"), py::arg("u_grazing"),
         py::arg("d_orifice"), py::arg("l_orifice"), py::arg("porosity"),
@@ -3140,6 +3236,7 @@ PYBIND11_MODULE(_core, m)
     using combaero::AnnularDuctGeometry;
     using combaero::AnnularMode;
     using combaero::annular_duct_eigenmodes;
+    using combaero::annular_duct_modes_analytical;
 
     py::class_<AnnularDuctGeometry>(m, "AnnularDuctGeometry")
         .def(py::init<>())
@@ -3195,6 +3292,13 @@ PYBIND11_MODULE(_core, m)
         "  >>> modes = cb.annular_duct_eigenmodes(geom, c=500, rho=1.2, f_max=1000)\n"
         "  >>> for mode in modes[:5]:\n"
         "  ...     print(f'm={mode.m_azimuthal}, n={mode.n_axial}, f={mode.frequency:.1f} Hz')"
+    );
+
+    m.def("annular_duct_modes_analytical", &annular_duct_modes_analytical,
+        py::arg("geom"),
+        py::arg("c"),
+        py::arg("f_max"),
+        py::arg("bc_ends") = BoundaryCondition::Closed
     );
 
     // Utility functions

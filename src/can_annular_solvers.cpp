@@ -329,10 +329,19 @@ static std::complex<double> annular_duct_dispersion(
     std::complex<double> k = omega / c;
     std::complex<double> i(0.0, 1.0);
 
+    // Thin-annulus approximation: split total wavenumber into azimuthal and axial parts
+    const double r_mean = 0.5 * (geom.radius_inner + geom.radius_outer);
+    const double k_theta = (r_mean > 0.0) ? static_cast<double>(m) / r_mean : 0.0;
+    const std::complex<double> k_axial = std::sqrt(k * k - k_theta * k_theta);
+
+    if (std::abs(k) < 1e-12 || std::abs(k_axial) < 1e-12) {
+        return std::complex<double>(1e12, 0.0);
+    }
+
     // Duct admittance (similar to can admittance)
-    std::complex<double> Y_char = geom.area() / (rho * c);
-    std::complex<double> sin_kl = std::sin(k * geom.length);
-    std::complex<double> cos_kl = std::cos(k * geom.length);
+    std::complex<double> Y_char = (geom.area() / (rho * c)) * (k_axial / k);
+    std::complex<double> sin_kl = std::sin(k_axial * geom.length);
+    std::complex<double> cos_kl = std::cos(k_axial * geom.length);
 
     std::complex<double> Y_duct;
     if (bc_ends == BoundaryCondition::Closed) {
@@ -349,7 +358,7 @@ static std::complex<double> annular_duct_dispersion(
         Y_duct = -i * Y_char * (cos_kl / sin_kl);
     }
 
-    // For annular duct, dispersion relation is just the admittance
+    // For annular duct, dispersion relation is the modal admittance
     // (zeros occur at resonance frequencies)
     return Y_duct;
 }
@@ -507,6 +516,58 @@ std::vector<AnnularMode> annular_duct_eigenmodes(
 
     std::sort(modes.begin(), modes.end(),
               [](const AnnularMode& a, const AnnularMode& b) { return a.frequency < b.frequency; });
+
+    return modes;
+}
+
+std::vector<AnnularMode> annular_duct_modes_analytical(
+    const AnnularDuctGeometry& geom,
+    double c,
+    double f_max,
+    BoundaryCondition bc_ends
+) {
+    if (geom.length <= 0.0) {
+        throw std::runtime_error("Duct length must be positive");
+    }
+    if (geom.radius_inner < 0.0 || geom.radius_outer <= geom.radius_inner) {
+        throw std::runtime_error("Invalid annular geometry");
+    }
+    if (c <= 0.0) {
+        throw std::runtime_error("Speed of sound must be positive");
+    }
+    if (f_max <= 0.0) {
+        throw std::runtime_error("Maximum frequency must be positive");
+    }
+
+    std::vector<AnnularMode> modes;
+    const double r_mean = 0.5 * (geom.radius_inner + geom.radius_outer);
+    const double d_mean = 2.0 * r_mean;
+
+    for (int m = 0; m <= geom.n_azimuthal_max; ++m) {
+        const double f_az = (m == 0) ? 0.0 : (m * c) / (M_PI * d_mean);
+
+        for (int n = 1; n < 200; ++n) {
+            double f_axial = 0.0;
+            if (bc_ends == BoundaryCondition::Closed) {
+                f_axial = n * c / (2.0 * geom.length);
+            } else {
+                f_axial = (2.0 * n - 1.0) * c / (4.0 * geom.length);
+            }
+
+            const double frequency = std::sqrt(f_axial * f_axial + f_az * f_az);
+            if (frequency > f_max) {
+                break;
+            }
+
+            modes.push_back({m, n, frequency});
+        }
+    }
+
+    std::sort(
+        modes.begin(),
+        modes.end(),
+        [](const AnnularMode& a, const AnnularMode& b) { return a.frequency < b.frequency; }
+    );
 
     return modes;
 }

@@ -13,10 +13,10 @@ repos:
     rev: v0.1.9
     hooks:
       - id: ruff
-        args: [--fix, --line-length=100]
+        args: [--fix]
         files: ^(python/|cantera_validation_tests/|thermo_data_generator/)
       - id: ruff-format
-        args: [--line-length=100]
+        args: []
         files: ^(python/|cantera_validation_tests/|thermo_data_generator/)
 
   # Black - Python code formatter
@@ -39,7 +39,7 @@ repos:
 
       - id: cantera-validation-tests
         name: Cantera Validation Tests
-        entry: bash -c 'cd cantera_validation_tests && poetry install --quiet && poetry run pytest -v --tb=short'
+        entry: bash -c 'CANTERA_DATA=/Users/thiemo/Projects/combaero/cantera_validation_tests /Users/thiemo/Projects/combaero/.venv/bin/python -m pytest cantera_validation_tests -v --tb=short'
         language: system
         pass_filenames: false
         always_run: false
@@ -48,7 +48,7 @@ repos:
 
       - id: python-unit-tests
         name: Python Unit Tests
-        entry: bash -c 'cd python && python -m pytest tests/ -v'
+        entry: bash -c '/Users/thiemo/Projects/combaero/.venv/bin/python -m pytest python/tests/ -v'
         language: system
         pass_filenames: false
         always_run: false

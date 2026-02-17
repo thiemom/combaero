@@ -1728,6 +1728,65 @@ modes = ca.annulus_modes(combustor, c=800,
 danger_modes = ca.modes_in_range(modes, f_min=200, f_max=600)
 closest = ca.closest_mode(modes, f_target=500)
 min_sep = ca.min_mode_separation(modes)
+
+# Pure annular duct (argument principle solver)
+duct = ca.AnnularDuctGeometry()
+duct.length = 0.35
+duct.radius_inner = 0.40
+duct.radius_outer = 0.48
+duct.n_azimuthal_max = 8
+
+modes_ap = ca.annular_duct_eigenmodes(
+    duct, c=800.0, rho=1.2, f_max=3000.0, bc_ends=ca.BoundaryCondition.Closed
+)
+
+# Analytical reference helper for validation/examples
+modes_ref = ca.annular_duct_modes_analytical(
+    duct, c=800.0, f_max=3000.0, bc_ends=ca.BoundaryCondition.Closed
+)
+```
+
+### Streamlined Liner API
+
+The liner helper API removes repeated impedance-network algebra from user code by
+packaging geometry, flow, and medium parameters in small structs.
+
+```python
+medium = ca.AcousticMedium()
+medium.rho = 1.2
+medium.c = 340.0
+
+orifice = ca.LinerOrificeGeometry()
+orifice.d_orifice = 0.003
+orifice.l_orifice = 0.005
+orifice.porosity = 0.08
+orifice.Cd = 0.7
+
+flow = ca.LinerFlowState()
+flow.u_bias = 10.0
+flow.u_grazing = 80.0
+
+cavity = ca.LinerCavity()
+cavity.depth = 0.05
+
+# Single cavity (SDOF)
+alpha = ca.liner_sdof_absorption(400.0, orifice, cavity, flow, medium)
+curve = ca.sweep_liner_sdof_absorption([200.0, 400.0, 600.0], orifice, cavity, flow, medium)
+
+# Two-cavity serial (2-DOF)
+alpha_2dof = ca.liner_2dof_serial_absorption(
+    400.0,
+    orifice,
+    orifice,
+    0.025,
+    0.025,
+    flow,
+    flow,
+    medium,
+)
+
+# Utility: absorption from normalized impedance z = Z/(rho*c)
+alpha_from_z = ca.absorption_from_impedance_norm(1.2 + 0.4j)
 ```
 
 ### Mean Flow Correction

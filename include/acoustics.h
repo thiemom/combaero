@@ -182,10 +182,95 @@ AcousticProperties acoustic_properties(
 // Used for cascading acoustic elements (orifices, tubes, resonators)
 struct TransferMatrix {
     std::complex<double> T11, T12, T21, T22;
-    
+
     // Matrix multiplication for cascading elements
     TransferMatrix operator*(const TransferMatrix& other) const;
 };
+
+// Convenience bundles for liner and damper calculations
+// These reduce long argument lists and make units explicit.
+struct AcousticMedium {
+    double rho;  // Density [kg/m^3]
+    double c;    // Speed of sound [m/s]
+};
+
+struct LinerOrificeGeometry {
+    double d_orifice;  // Orifice diameter [m]
+    double l_orifice;  // Orifice length [m]
+    double porosity;   // Open area ratio [-]
+    double Cd;         // Discharge coefficient [-]
+};
+
+struct LinerFlowState {
+    double u_bias;     // Bias flow velocity [m/s]
+    double u_grazing;  // Grazing flow velocity [m/s]
+};
+
+struct LinerCavity {
+    double depth;  // Cavity depth [m]
+};
+
+// Reflection and absorption helpers using normalized impedance z = Z/(rho*c)
+double absorption_from_impedance_norm(const std::complex<double>& z_norm);
+
+// Single-cavity liner (SDOF) helpers
+std::complex<double> liner_sdof_impedance_norm(
+    double freq,
+    const LinerOrificeGeometry& orifice,
+    const LinerCavity& cavity,
+    const LinerFlowState& flow,
+    const AcousticMedium& medium
+);
+
+double liner_sdof_absorption(
+    double freq,
+    const LinerOrificeGeometry& orifice,
+    const LinerCavity& cavity,
+    const LinerFlowState& flow,
+    const AcousticMedium& medium
+);
+
+std::vector<double> sweep_liner_sdof_absorption(
+    const std::vector<double>& freqs,
+    const LinerOrificeGeometry& orifice,
+    const LinerCavity& cavity,
+    const LinerFlowState& flow,
+    const AcousticMedium& medium
+);
+
+// Two-cavity serial liner (2-DOF) helpers
+std::complex<double> liner_2dof_serial_impedance_norm(
+    double freq,
+    const LinerOrificeGeometry& face_orifice,
+    const LinerOrificeGeometry& septum_orifice,
+    double depth_1,
+    double depth_2,
+    const LinerFlowState& face_flow,
+    const LinerFlowState& septum_flow,
+    const AcousticMedium& medium
+);
+
+double liner_2dof_serial_absorption(
+    double freq,
+    const LinerOrificeGeometry& face_orifice,
+    const LinerOrificeGeometry& septum_orifice,
+    double depth_1,
+    double depth_2,
+    const LinerFlowState& face_flow,
+    const LinerFlowState& septum_flow,
+    const AcousticMedium& medium
+);
+
+std::vector<double> sweep_liner_2dof_serial_absorption(
+    const std::vector<double>& freqs,
+    const LinerOrificeGeometry& face_orifice,
+    const LinerOrificeGeometry& septum_orifice,
+    double depth_1,
+    double depth_2,
+    const LinerFlowState& face_flow,
+    const LinerFlowState& septum_flow,
+    const AcousticMedium& medium
+);
 
 // Orifice/neck impedance with bias and grazing flow effects
 // Combines resistance from bias flow and grazing flow
@@ -308,7 +393,7 @@ struct BlochMode {
     int m_azimuthal;       // Azimuthal mode number (0 to N/2)
     double frequency;      // Eigenfrequency [Hz]
     int n_cans;            // Number of cans (needed for symmetry classification)
-    
+
     // Mode symmetry classification
     // m=0: "Push-Push" (all cans in phase)
     // m=N/2: "Push-Pull" (adjacent cans 180° out of phase)

@@ -503,6 +503,179 @@ TransferMatrix TransferMatrix::operator*(const TransferMatrix& other) const {
     };
 }
 
+double absorption_from_impedance_norm(const std::complex<double>& z_norm) {
+    const std::complex<double> one(1.0, 0.0);
+    const std::complex<double> denom = z_norm + one;
+    if (std::abs(denom) < 1e-12) {
+        return 0.0;
+    }
+
+    const std::complex<double> r = (z_norm - one) / denom;
+    const double alpha = 1.0 - std::norm(r);
+    return std::clamp(alpha, 0.0, 1.0);
+}
+
+std::complex<double> liner_sdof_impedance_norm(
+    double freq,
+    const LinerOrificeGeometry& orifice,
+    const LinerCavity& cavity,
+    const LinerFlowState& flow,
+    const AcousticMedium& medium
+) {
+    if (cavity.depth <= 0.0) {
+        throw std::runtime_error("Cavity depth must be positive");
+    }
+
+    const std::complex<double> z_neck = orifice_impedance_with_flow(
+        freq,
+        flow.u_bias,
+        flow.u_grazing,
+        orifice.d_orifice,
+        orifice.l_orifice,
+        orifice.porosity,
+        orifice.Cd,
+        medium.rho,
+        medium.c
+    );
+
+    const double k = (2.0 * M_PI * freq) / medium.c;
+    const std::complex<double> i(0.0, 1.0);
+    const std::complex<double> z_cavity = -i / std::tan(k * cavity.depth);
+    return z_neck + z_cavity;
+}
+
+double liner_sdof_absorption(
+    double freq,
+    const LinerOrificeGeometry& orifice,
+    const LinerCavity& cavity,
+    const LinerFlowState& flow,
+    const AcousticMedium& medium
+) {
+    const std::complex<double> z_norm =
+        liner_sdof_impedance_norm(freq, orifice, cavity, flow, medium);
+    return absorption_from_impedance_norm(z_norm);
+}
+
+std::vector<double> sweep_liner_sdof_absorption(
+    const std::vector<double>& freqs,
+    const LinerOrificeGeometry& orifice,
+    const LinerCavity& cavity,
+    const LinerFlowState& flow,
+    const AcousticMedium& medium
+) {
+    std::vector<double> alpha;
+    alpha.reserve(freqs.size());
+    for (double freq : freqs) {
+        alpha.push_back(liner_sdof_absorption(freq, orifice, cavity, flow, medium));
+    }
+    return alpha;
+}
+
+std::complex<double> liner_2dof_serial_impedance_norm(
+    double freq,
+    const LinerOrificeGeometry& face_orifice,
+    const LinerOrificeGeometry& septum_orifice,
+    double depth_1,
+    double depth_2,
+    const LinerFlowState& face_flow,
+    const LinerFlowState& septum_flow,
+    const AcousticMedium& medium
+) {
+    if (depth_1 <= 0.0 || depth_2 <= 0.0) {
+        throw std::runtime_error("Serial cavity depths must be positive");
+    }
+
+    const std::complex<double> z_face = orifice_impedance_with_flow(
+        freq,
+        face_flow.u_bias,
+        face_flow.u_grazing,
+        face_orifice.d_orifice,
+        face_orifice.l_orifice,
+        face_orifice.porosity,
+        face_orifice.Cd,
+        medium.rho,
+        medium.c
+    );
+
+    const std::complex<double> z_septum = orifice_impedance_with_flow(
+        freq,
+        septum_flow.u_bias,
+        septum_flow.u_grazing,
+        septum_orifice.d_orifice,
+        septum_orifice.l_orifice,
+        septum_orifice.porosity,
+        septum_orifice.Cd,
+        medium.rho,
+        medium.c
+    );
+
+    const double k = (2.0 * M_PI * freq) / medium.c;
+    const std::complex<double> i(0.0, 1.0);
+
+    const std::complex<double> z_vol2 = -i / std::tan(k * depth_2);
+    const std::complex<double> z_load = z_septum + z_vol2;
+
+    // Transmission line transform through cavity 1 with normalized Z_char = 1
+    const std::complex<double> tan_kL1 = std::tan(k * depth_1);
+    std::complex<double> denom = 1.0 + i * z_load * tan_kL1;
+    if (std::abs(denom) < 1e-12) {
+        denom = std::complex<double>(1e-12, 0.0);
+    }
+    const std::complex<double> z_in_vol1 = (z_load + i * tan_kL1) / denom;
+
+    return z_face + z_in_vol1;
+}
+
+double liner_2dof_serial_absorption(
+    double freq,
+    const LinerOrificeGeometry& face_orifice,
+    const LinerOrificeGeometry& septum_orifice,
+    double depth_1,
+    double depth_2,
+    const LinerFlowState& face_flow,
+    const LinerFlowState& septum_flow,
+    const AcousticMedium& medium
+) {
+    const std::complex<double> z_norm = liner_2dof_serial_impedance_norm(
+        freq,
+        face_orifice,
+        septum_orifice,
+        depth_1,
+        depth_2,
+        face_flow,
+        septum_flow,
+        medium
+    );
+    return absorption_from_impedance_norm(z_norm);
+}
+
+std::vector<double> sweep_liner_2dof_serial_absorption(
+    const std::vector<double>& freqs,
+    const LinerOrificeGeometry& face_orifice,
+    const LinerOrificeGeometry& septum_orifice,
+    double depth_1,
+    double depth_2,
+    const LinerFlowState& face_flow,
+    const LinerFlowState& septum_flow,
+    const AcousticMedium& medium
+) {
+    std::vector<double> alpha;
+    alpha.reserve(freqs.size());
+    for (double freq : freqs) {
+        alpha.push_back(liner_2dof_serial_absorption(
+            freq,
+            face_orifice,
+            septum_orifice,
+            depth_1,
+            depth_2,
+            face_flow,
+            septum_flow,
+            medium
+        ));
+    }
+    return alpha;
+}
+
 // Orifice impedance with bias and grazing flow
 std::complex<double> orifice_impedance_with_flow(
     double freq,

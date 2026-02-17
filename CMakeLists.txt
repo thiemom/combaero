@@ -9,7 +9,7 @@ endif()
 
 set(_proj_version "${SKBUILD_PROJECT_VERSION}")
 if(NOT _proj_version)
-    set(_proj_version "0.0.1")
+    set(_proj_version "0.0.2")
 endif()
 
 project(${_proj_name} LANGUAGES CXX VERSION ${_proj_version})
