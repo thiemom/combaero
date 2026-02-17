@@ -93,15 +93,18 @@ def main() -> None:
     D_inner = 0.4  # Inner diameter [m]
     L_combustor = 0.4  # Length [m]
 
-    # Calculate volume using annular_area helper
-    A_annular = ca.annular_area(D_outer, D_inner)
-    V_combustor = A_annular * L_combustor
+    # Combustor area/volume from geometry helper
+    annulus = ca.Annulus(L_combustor, D_inner, D_outer)
+    A_annular = annulus.area()
+    V_combustor = annulus.volume()
 
     # Hydraulic diameter
     Dh = ca.hydraulic_diameter_annulus(D_outer, D_inner)
 
-    # Average properties (use average of inlet and outlet)
-    T_avg = (mixed.T + burned.T) / 2
+    # Use a burned-dominant effective state for global pressure-drop/residence estimates.
+    # Toy assumption: thin flame zone near inlet (~10% of length), remainder near burned state.
+    flame_zone_fraction = 0.10
+    T_avg = flame_zone_fraction * mixed.T + (1.0 - flame_zone_fraction) * burned.T
     rho_avg = ca.density(T_avg, P_combustor, burned.X)
 
     # Residence time
@@ -117,6 +120,7 @@ def main() -> None:
     print(f"  Volume:            V = {V_combustor * 1000:.2f} L")
 
     print("\nFlow characteristics:")
+    print(f"  Flame-zone fraction: flame = {flame_zone_fraction:.2f} of combustor length")
     print(f"  Average temp:      T_avg = {T_avg:.0f} K")
     print(f"  Average density:   ρ_avg = {rho_avg:.3f} kg/m3")
     print(f"  Residence time:    τ = {tau * 1000:.1f} ms")
@@ -188,6 +192,7 @@ def main() -> None:
     h_cool = ca.htc_from_nusselt(Nu_cool, k_cool, D_cool)
 
     # Liner wall (assume thermal barrier coating + metal)
+    #
     t_tbc = 0.001  # TBC thickness [m]
     k_tbc = 1.0  # TBC thermal conductivity [W/(m*K)]
     t_metal = 0.003  # Metal thickness [m]
@@ -237,9 +242,9 @@ def main() -> None:
     print("Example 5: Combustor Performance Summary")
     print("=" * 80)
 
-    # Combustion efficiency (simplified)
-    LHV_CH4 = 50e6  # Lower heating value of CH4 [J/kg]
-    Q_combustion = mdot_fuel * LHV_CH4  # Approximate
+    # Fuel chemical power using mixture LHV API [J/kg fuel]
+    lhv_fuel = ca.fuel_lhv_mass(X_fuel)
+    Q_combustion = mdot_fuel * lhv_fuel
 
     # Temperature rise
     dT_combustion = burned.T - mixed.T
@@ -257,6 +262,7 @@ def main() -> None:
     print(f"  Pressure loss:         DeltaP/P = {pressure_loss_pct:.2f}%")
     print(f"  Residence time:        τ = {tau * 1000:.1f} ms")
     print(f"  Heat release:          Q = {Q_combustion / 1e6:.1f} MW")
+    print(f"  Fuel LHV (mixture):    LHV = {lhv_fuel / 1e6:.2f} MJ/kg")
     print(
         f"  Heat loss to walls:    Q_loss = {Q_total / 1e6:.2f} MW ({Q_total / Q_combustion * 100:.1f}%)"
     )
@@ -277,23 +283,17 @@ def main() -> None:
     print("-" * 45)
 
     for phi_test in [0.6, 0.7, 0.8, 0.9, 1.0]:
-        # Adjust fuel flow for equivalence ratio
-        # (simplified - would need proper stoichiometry calculation)
-        mdot_fuel_test = mdot_fuel * phi_test / phi
-
-        # Create streams
-        fuel_test = ca.Stream()
-        fuel_test.T = 300.0
-        fuel_test.P = P_combustor
-        fuel_test.X = X_fuel
-        fuel_test.mdot = mdot_fuel_test
+        # Set fuel flow consistently from target equivalence ratio
+        fuel_test = ca.set_fuel_stream_for_phi(phi_test, fuel, air)
 
         # Mix and burn
         mixed_test = ca.mix([fuel_test, air], P_out=P_combustor)
         burned_test = ca.combustion_equilibrium(mixed_test.T, mixed_test.X, mixed_test.P)
 
         # Recalculate residence time and pressure drop
-        T_avg_test = (mixed_test.T + burned_test.T) / 2
+        T_avg_test = (
+            flame_zone_fraction * mixed_test.T + (1.0 - flame_zone_fraction) * burned_test.T
+        )
         rho_avg_test = ca.density(T_avg_test, P_combustor, burned_test.X)
         tau_test = ca.residence_time_mdot(V_combustor, mixed_test.mdot, rho_avg_test)
 

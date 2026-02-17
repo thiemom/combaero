@@ -13,6 +13,11 @@ double oxygen_required_per_kg_fuel(std::size_t fuel_index);
 double oxygen_required_per_mol_mixture(const std::vector<double>& X);
 double oxygen_required_per_kg_mixture(const std::vector<double>& X);
 
+// Fuel lower heating value (LHV) from complete combustion to CO2 + H2O(g)
+// X_fuel must be mole fractions over the global species set.
+double fuel_lhv_molar(const std::vector<double>& X_fuel, const double reference_temperature = 298.15);  // [J/mol fuel mixture]
+double fuel_lhv_mass(const std::vector<double>& X_fuel, const double reference_temperature = 298.15);   // [J/kg fuel mixture]
+
 // Combustion calculations - dry air requirements (using standard dry air composition)
 double dryair_required_per_mol_fuel(std::size_t fuel_index);
 double dryair_required_per_kg_fuel(std::size_t fuel_index);

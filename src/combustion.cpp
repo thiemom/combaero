@@ -8,6 +8,30 @@
 #include <numeric>
 #include <stdexcept>
 
+namespace {
+
+std::vector<double> pure_species_mole_fractions(std::size_t idx) {
+    std::vector<double> X(species_names.size(), 0.0);
+    X[idx] = 1.0;
+    return X;
+}
+
+double pure_species_enthalpy(std::size_t idx, const double reference_temperature) {
+    return h(reference_temperature, pure_species_mole_fractions(idx));
+}
+
+void validate_fuel_mole_fractions(const std::vector<double>& X_fuel) {
+    if (X_fuel.size() != species_names.size()) {
+        throw std::runtime_error("fuel_lhv_*: mixture size does not match number of species");
+    }
+    const double sum = std::accumulate(X_fuel.begin(), X_fuel.end(), 0.0);
+    if (std::abs(sum - 1.0) > 1.0e-5) {
+        throw std::runtime_error("fuel_lhv_*: mole fractions must sum to 1.0");
+    }
+}
+
+}  // namespace
+
 
 // Calculate oxygen required for complete combustion [mol O2/mol fuel]
 double oxygen_required_per_mol_fuel(std::size_t fuel_index) {
@@ -95,6 +119,60 @@ double oxygen_required_per_kg_mixture(const std::vector<double>& X) {
 
     // Convert to mass basis: (mol O2/mol mixture) * (g O2/mol O2) / (g mixture/mol mixture)
     return molar_oxygen_required * oxygen_mw / mixture_mw;  // kg O2/kg mixture
+}
+
+double fuel_lhv_molar(const std::vector<double>& X_fuel, const double reference_temperature) {
+    validate_fuel_mole_fractions(X_fuel);
+
+    if (reference_temperature <= 0.0) {
+        throw std::runtime_error("fuel_lhv_molar: reference_temperature must be positive");
+    }
+
+    const std::size_t idx_O2 = species_index.at("O2");
+    const std::size_t idx_CO2 = species_index.at("CO2");
+    const std::size_t idx_H2O = species_index.at("H2O");
+    const std::size_t idx_N2 = species_index.at("N2");
+
+    const double h_O2 = pure_species_enthalpy(idx_O2, reference_temperature);
+    const double h_CO2 = pure_species_enthalpy(idx_CO2, reference_temperature);
+    const double h_H2O = pure_species_enthalpy(idx_H2O, reference_temperature);
+    const double h_N2 = pure_species_enthalpy(idx_N2, reference_temperature);
+
+    double lhv_molar = 0.0;
+
+    for (std::size_t i = 0; i < X_fuel.size(); ++i) {
+        const double x_i = X_fuel[i];
+        if (x_i <= 0.0) {
+            continue;
+        }
+
+        const double nu_O2 = oxygen_required_per_mol_fuel(i);
+        if (nu_O2 <= 0.0) {
+            continue;
+        }
+
+        const Molecular_Structure& s = molecular_structures[i];
+        const double h_fuel_i = pure_species_enthalpy(i, reference_temperature);
+
+        const double h_react = h_fuel_i + nu_O2 * h_O2;
+        const double h_prod = static_cast<double>(s.C) * h_CO2
+                              + 0.5 * static_cast<double>(s.H) * h_H2O
+                              + 0.5 * static_cast<double>(s.N) * h_N2;
+
+        const double delta_h_rxn = h_prod - h_react;  // [J/mol species i]
+        lhv_molar += x_i * (-delta_h_rxn);
+    }
+
+    return std::max(0.0, lhv_molar); // [J/mol fuel]
+}
+
+double fuel_lhv_mass(const std::vector<double>& X_fuel, const double reference_temperature) {
+    validate_fuel_mole_fractions(X_fuel);
+    const double mw_fuel = mwmix(X_fuel);  // [g/mol]
+    if (mw_fuel <= 0.0) {
+        throw std::runtime_error("fuel_lhv_mass: fuel molecular weight must be positive");
+    }
+    return fuel_lhv_molar(X_fuel, reference_temperature) * 1000.0 / mw_fuel; // [J/kg fuel]
 }
 
 // -------------------------------------------------------------

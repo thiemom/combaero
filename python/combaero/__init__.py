@@ -78,6 +78,7 @@ try:
         acoustic_impedance,
         acoustic_properties,
         adiabatic_T_wgs,
+        adiabatic_wall_temperature,
         air_properties,
         all_units,
         annular_area,
@@ -112,6 +113,7 @@ try:
         complete_combustion_to_CO2_H2O_with_fraction,
         complete_state,
         convert_to_dry_fractions,
+        cooled_wall_heat_flux,
         cp,
         cp_mass,
         critical_pressure_ratio,
@@ -149,6 +151,8 @@ try:
         friction_haaland,
         friction_petukhov,
         friction_serghides,
+        fuel_lhv_mass,
+        fuel_lhv_molar,
         get_units,
         h,
         h_mass,
@@ -265,6 +269,7 @@ try:
         set_fuel_stream_for_CO2_dry,
         set_fuel_stream_for_O2,
         set_fuel_stream_for_O2_dry,
+        set_fuel_stream_for_phi,
         set_fuel_stream_for_Tad,
         set_oxidizer_stream_for_CO2,
         set_oxidizer_stream_for_CO2_dry,
@@ -359,6 +364,8 @@ except ModuleNotFoundError:
     oxygen_required_per_kg_fuel = _core.oxygen_required_per_kg_fuel
     oxygen_required_per_mol_mixture = _core.oxygen_required_per_mol_mixture
     oxygen_required_per_kg_mixture = _core.oxygen_required_per_kg_mixture
+    fuel_lhv_molar = _core.fuel_lhv_molar
+    fuel_lhv_mass = _core.fuel_lhv_mass
     complete_combustion_to_CO2_H2O = _core.complete_combustion_to_CO2_H2O
     complete_combustion_to_CO2_H2O_with_fraction = (
         _core.complete_combustion_to_CO2_H2O_with_fraction
@@ -587,8 +594,6 @@ __all__ = [
     "standard_dry_air_composition",
     "humid_air_composition",
     "dewpoint",
-    "dimple_friction_multiplier",
-    "dimple_nusselt_enhancement",
     "relative_humidity_from_dewpoint",
     "formula_to_name",
     "name_to_formula",
@@ -601,6 +606,8 @@ __all__ = [
     "oxygen_required_per_kg_fuel",
     "oxygen_required_per_mol_mixture",
     "oxygen_required_per_kg_mixture",
+    "fuel_lhv_molar",
+    "fuel_lhv_mass",
     "complete_combustion_to_CO2_H2O",
     "complete_combustion_to_CO2_H2O_with_fraction",
     # State-based API
@@ -631,8 +638,17 @@ __all__ = [
     "impingement_nusselt",
     "film_cooling_effectiveness",
     "film_cooling_effectiveness_avg",
+    "film_cooling_multirow_sellers",
+    "effusion_effectiveness",
+    "effusion_discharge_coefficient",
+    "pin_fin_nusselt",
+    "dimple_nusselt_enhancement",
+    "dimple_friction_multiplier",
+    "adiabatic_wall_temperature",
+    "cooled_wall_heat_flux",
     # Inverse solvers - find fuel stream
     "set_fuel_stream_for_Tad",
+    "set_fuel_stream_for_phi",
     "set_fuel_stream_for_O2",
     "set_fuel_stream_for_O2_dry",
     "set_fuel_stream_for_CO2",

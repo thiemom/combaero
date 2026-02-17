@@ -835,16 +835,24 @@ pressure_drop_pipe(T, P, X, v, D, L, roughness=0.0, correlation='haaland')
 ```cpp
 
 // Oxygen requirements
-double oxygen_required_per_mol_fuel(const std::string& fuel);
-double oxygen_required_per_kg_fuel(const std::string& fuel);
+double oxygen_required_per_mol_fuel(std::size_t fuel_index);
+double oxygen_required_per_kg_fuel(std::size_t fuel_index);
 double oxygen_required_per_mol_mixture(const std::vector<double>& X);
 double oxygen_required_per_kg_mixture(const std::vector<double>& X);
 
+// Fuel lower heating value (LHV), complete combustion to CO2 + H2O(g)
+double fuel_lhv_molar(const std::vector<double>& X_fuel,
+                      double reference_temperature = 298.15);
+double fuel_lhv_mass(const std::vector<double>& X_fuel,
+                     double reference_temperature = 298.15);
+
 // Equivalence ratio
-double equivalence_ratio_mole(const std::vector<double>& X_fuel, const std::vector<double>& X_ox,
-                               const std::vector<double>& X_mix);
-double equivalence_ratio_mass(const std::vector<double>& Y_fuel, const std::vector<double>& Y_ox,
-                               const std::vector<double>& Y_mix);
+double equivalence_ratio_mole(const std::vector<double>& X_mix,
+                              const std::vector<double>& X_fuel,
+                              const std::vector<double>& X_ox);
+double equivalence_ratio_mass(const std::vector<double>& Y_mix,
+                              const std::vector<double>& Y_fuel,
+                              const std::vector<double>& Y_ox);
 ```
 
 ## Humid Air

@@ -859,6 +859,34 @@ PYBIND11_MODULE(_core, m)
         "Mass of O2 [kg] required per kg of fuel mixture with mole fractions X."
     );
 
+    m.def(
+        "fuel_lhv_molar",
+        [](py::array_t<double, py::array::c_style | py::array::forcecast> X_fuel_arr,
+           double reference_temperature)
+        {
+            auto X_fuel = to_vec(X_fuel_arr);
+            return fuel_lhv_molar(X_fuel, reference_temperature);
+        },
+        py::arg("X_fuel"),
+        py::arg("reference_temperature") = 298.15,
+        "Fuel lower heating value (LHV) on molar basis [J/mol fuel mixture].\n\n"
+        "Computed from complete combustion to CO2 + H2O(g) at reference temperature."
+    );
+
+    m.def(
+        "fuel_lhv_mass",
+        [](py::array_t<double, py::array::c_style | py::array::forcecast> X_fuel_arr,
+           double reference_temperature)
+        {
+            auto X_fuel = to_vec(X_fuel_arr);
+            return fuel_lhv_mass(X_fuel, reference_temperature);
+        },
+        py::arg("X_fuel"),
+        py::arg("reference_temperature") = 298.15,
+        "Fuel lower heating value (LHV) on mass basis [J/kg fuel mixture].\n\n"
+        "Computed from complete combustion to CO2 + H2O(g) at reference temperature."
+    );
+
     // Complete combustion helper
     m.def(
         "complete_combustion_to_CO2_H2O",
@@ -1127,6 +1155,22 @@ PYBIND11_MODULE(_core, m)
     // -------------------------------------------------------------
 
     // --- Find fuel stream (oxidizer mdot fixed) ---
+
+    m.def(
+        "set_fuel_stream_for_phi",
+        &set_fuel_stream_for_phi,
+        py::arg("phi"),
+        py::arg("fuel"),
+        py::arg("oxidizer"),
+        "Find fuel stream mass flow rate for target equivalence ratio phi.\n\n"
+        "This is a direct algebraic helper (no iteration):\n"
+        "  fuel.mdot = phi * fuel_stoich_mdot(oxidizer stream)\n\n"
+        "Parameters:\n"
+        "  phi      : target equivalence ratio [-]\n"
+        "  fuel     : fuel Stream (T, P, X set; mdot ignored)\n"
+        "  oxidizer : oxidizer Stream (with mdot set)\n\n"
+        "Returns: fuel Stream with mdot set for requested phi."
+    );
 
     m.def(
         "set_fuel_stream_for_Tad",
@@ -4420,6 +4464,45 @@ PYBIND11_MODULE(_core, m)
         "Example:\n"
         "  >>> f_ratio = cb.dimple_friction_multiplier(Re_Dh=30000, d_Dh=0.2, h_d=0.2)\n"
         "  >>> print(f_ratio)  # Typically 1.5-2.0x"
+    );
+
+    m.def(
+        "adiabatic_wall_temperature",
+        &combaero::cooling::adiabatic_wall_temperature,
+        py::arg("T_hot"),
+        py::arg("T_coolant"),
+        py::arg("eta"),
+        "Adiabatic wall temperature from cooling effectiveness.\n\n"
+        "Uses: eta = (T_hot - T_aw) / (T_hot - T_coolant).\n\n"
+        "Parameters:\n"
+        "  T_hot     : mainstream hot-gas temperature [K]\n"
+        "  T_coolant : coolant supply temperature [K]\n"
+        "  eta       : adiabatic effectiveness [-]\n\n"
+        "Returns: adiabatic wall temperature T_aw [K]"
+    );
+
+    m.def(
+        "cooled_wall_heat_flux",
+        &combaero::cooling::cooled_wall_heat_flux,
+        py::arg("T_hot"),
+        py::arg("T_coolant"),
+        py::arg("h_hot"),
+        py::arg("h_coolant"),
+        py::arg("eta"),
+        py::arg("t_wall"),
+        py::arg("k_wall"),
+        "Film/effusion-cooled wall heat flux with single wall layer.\n\n"
+        "Computes q = U * (T_aw - T_coolant), where T_aw is from cooling\n"
+        "effectiveness and U includes both convection sides plus wall conduction.\n\n"
+        "Parameters:\n"
+        "  T_hot      : mainstream hot-gas temperature [K]\n"
+        "  T_coolant  : coolant supply temperature [K]\n"
+        "  h_hot      : hot-side HTC [W/(m^2*K)]\n"
+        "  h_coolant  : coolant-side HTC [W/(m^2*K)]\n"
+        "  eta        : adiabatic effectiveness [-]\n"
+        "  t_wall     : wall thickness [m]\n"
+        "  k_wall     : wall thermal conductivity [W/(m*K)]\n\n"
+        "Returns: wall heat flux q [W/m^2]"
     );
 
     // =========================================================================
