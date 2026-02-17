@@ -31,6 +31,7 @@ set(SOURCES
     src/friction.cpp
     src/geometry.cpp
     src/acoustics.cpp
+    src/can_annular_solvers.cpp
     src/heat_transfer.cpp
     src/humidair.cpp
     src/equilibrium.cpp

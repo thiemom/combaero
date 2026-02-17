@@ -997,7 +997,7 @@ static double refine_root_muller(
     return x2.real() / (2.0 * M_PI);
 }
 
-// Main solver: Find all eigenmodes using Argument Principle
+// Main solver: Find all eigenmodes (delegates to solver infrastructure)
 std::vector<BlochMode> can_annular_eigenmodes(
     const CanAnnularGeometry& geom,
     double c_can,
@@ -1027,41 +1027,35 @@ std::vector<BlochMode> can_annular_eigenmodes(
         throw std::runtime_error("Maximum frequency must be positive");
     }
 
+    // Delegate to magnitude minimization solver (fast, reliable)
+    // For research-grade Argument Principle, use can_annular_eigenmodes_with_method
     std::vector<BlochMode> modes;
-
-    // Loop over azimuthal modes m = 0 to N/2
     int m_max = geom.n_cans / 2;
     
-    // Continuous sliding window scan (no assumptions about harmonic spacing)
-    double scan_window_width = 50.0;  // Hz per window
+    // Continuous sliding window scan
+    double scan_window_width = 50.0;
     
     for (int m = 0; m <= m_max; ++m) {
-        // Sliding window: scan from 10 Hz up to f_max in small chunks
         for (double f_start = 10.0; f_start < f_max; f_start += scan_window_width) {
             double f_end = std::min(f_start + scan_window_width, f_max);
             
-            // Scan for minima in this specific window
             auto guesses = find_zero_guesses(
                 m, geom, c_can, c_plenum, rho_can, rho_plenum,
-                f_start, f_end, bc_can_top, 2  // Up to 2 guesses per window
+                f_start, f_end, bc_can_top, 2
             );
             
-            // Refine each guess with Muller's method
             for (double f_guess : guesses) {
                 double f_refined = refine_root_muller(
                     f_guess, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_can_top
                 );
                 
-                // Validation: is it actually a zero?
                 if (f_refined > 1.0 && f_refined < f_max) {
                     double omega_refined = 2.0 * M_PI * f_refined;
                     auto D_refined = dispersion_relation(
                         omega_refined, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_can_top
                     );
                     
-                    // Strict check: |D| should be small at a true zero
                     if (std::abs(D_refined) < 0.1) {
-                        // Check for duplicates
                         bool is_duplicate = false;
                         for (const auto& existing : modes) {
                             if (existing.m_azimuthal == m && 
@@ -1080,7 +1074,6 @@ std::vector<BlochMode> can_annular_eigenmodes(
         }
     }
 
-    // Sort by frequency
     std::sort(modes.begin(), modes.end(),
               [](const BlochMode& a, const BlochMode& b) { return a.frequency < b.frequency; });
 
