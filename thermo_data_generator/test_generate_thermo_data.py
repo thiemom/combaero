@@ -107,9 +107,9 @@ class TestLoadCanteraYaml:
 
         for sp in species_data:
             assert sp.name in expected
-            assert (
-                abs(sp.molar_mass - expected[sp.name]) < 0.01
-            ), f"{sp.name}: expected {expected[sp.name]}, got {sp.molar_mass}"
+            assert abs(sp.molar_mass - expected[sp.name]) < 0.01, (
+                f"{sp.name}: expected {expected[sp.name]}, got {sp.molar_mass}"
+            )
 
 
 class TestGenerateHeader:
@@ -204,9 +204,9 @@ class TestReferenceComparison:
             assert match
             new_names = [n.strip().strip('"') for n in match.group(1).split(",")]
 
-            assert (
-                new_names == ref_names
-            ), f"Species order mismatch:\nRef: {ref_names}\nNew: {new_names}"
+            assert new_names == ref_names, (
+                f"Species order mismatch:\nRef: {ref_names}\nNew: {new_names}"
+            )
         finally:
             output_path.unlink()
 
@@ -238,9 +238,9 @@ class TestReferenceComparison:
 
             assert len(new_masses) == len(ref_masses)
             for i, (ref, new) in enumerate(zip(ref_masses, new_masses, strict=True)):
-                assert (
-                    abs(ref - new) < 0.01
-                ), f"Molar mass mismatch at index {i}: ref={ref}, new={new}"
+                assert abs(ref - new) < 0.01, (
+                    f"Molar mass mismatch at index {i}: ref={ref}, new={new}"
+                )
         finally:
             output_path.unlink()
 

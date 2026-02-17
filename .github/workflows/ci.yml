@@ -29,11 +29,11 @@ jobs:
         if: runner.os != 'Windows'
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: Install Python style tools
         if: runner.os != 'Windows'
-        run: pip install black isort flake8
+        run: pip install ruff mypy
 
       - name: Check Python code style
         if: runner.os != 'Windows'

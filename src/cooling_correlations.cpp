@@ -254,14 +254,14 @@ double film_cooling_multirow_sellers(
     if (row_positions_xD.empty()) {
         throw std::runtime_error("row_positions_xD cannot be empty");
     }
-    
+
     // Sellers superposition: eta_total = 1 - product(1 - eta_i)
     // Each row contributes based on its local x/D from injection point
     double product_term = 1.0;
-    
+
     for (double row_x : row_positions_xD) {
         double local_xD = eval_xD - row_x;
-        
+
         // Only consider upstream rows (local_xD > 0)
         if (local_xD > 0.0) {
             // Get single-row effectiveness using Baldauf correlation
@@ -270,7 +270,7 @@ double film_cooling_multirow_sellers(
             product_term *= (1.0 - eta_i);
         }
     }
-    
+
     return 1.0 - product_term;
 }
 
@@ -325,43 +325,43 @@ double effusion_effectiveness(
 ) {
     // Validate parameters
     validate_effusion_params(M, DR, porosity, s_D, alpha_deg);
-    
+
     if (x_D < 0.0) {
         throw std::runtime_error("Distance x_D must be non-negative, got " + std::to_string(x_D));
     }
-    
+
     // Convert angle to radians
     double alpha_rad = alpha_deg * M_PI / 180.0;
-    
+
     // Momentum flux ratio (key parameter for effusion)
     // I = (rho_c * v_c^2) / (rho_inf * v_inf^2) = M^2 * DR
     double I = M * M * DR;
-    
+
     // Effective blowing ratio accounting for hole density
     // Higher porosity → more coolant → higher effective coverage
     double M_eff = M * std::sqrt(porosity / 0.05);  // Normalized to 5% porosity
-    
+
     // Crossflow accumulation factor (L'Ecuyer & Matsuura 1985)
     // Effusion builds up crossflow, reducing effectiveness decay
     double crossflow_factor = 1.0 + 0.3 * porosity * x_D / s_D;
-    
+
     // Angle correction (shallow angles better for lateral spreading)
     double f_angle = 1.0 - 0.3 * std::pow(std::sin(alpha_rad), 2.0);
-    
+
     // Lefebvre-style decay with momentum flux ratio
     // eta = 1 / (1 + C * (x/I^0.5)^n)
     // Modified for effusion with crossflow buildup
     double C = 0.6 / crossflow_factor;  // Decay constant reduced by crossflow
     double decay_param = (x_D / std::sqrt(I)) * std::pow(s_D / 6.0, 0.5);
-    
+
     double eta = f_angle / (1.0 + C * std::pow(decay_param, 0.75));
-    
+
     // Initial region (x_D < 2): blend from hole exit to fully developed
     if (x_D < 2.0) {
         double eta_exit = 0.5 * f_angle;  // Typical hole exit effectiveness
         eta = eta_exit + (eta - eta_exit) * (x_D / 2.0);
     }
-    
+
     // Clamp to physical bounds
     return std::max(0.0, std::min(1.0, eta));
 }
@@ -376,29 +376,29 @@ double effusion_discharge_coefficient(
 ) {
     // Validate parameters
     validate_effusion_discharge_params(Re_d, P_ratio, alpha_deg, L_D);
-    
+
     // Convert angle to radians
     double alpha_rad = alpha_deg * M_PI / 180.0;
-    
+
     // Base discharge coefficient for straight cylindrical hole
     // Hay & Spencer (1992): Cd_base depends on L/D and Re
     double Cd_base = 0.72 - 0.05 * std::log(L_D);  // Decreases with L/D
-    
+
     // Reynolds number correction (turbulent flow, Re > 3000)
     // Cd increases slightly with Re in turbulent regime
     double f_Re = 1.0 + 0.02 * std::log10(Re_d / 10000.0);
     f_Re = std::max(0.95, std::min(1.05, f_Re));
-    
+
     // Inclination angle effect (Gritsch et al. 1998)
     // Shallow angles reduce effective area and increase losses
     double f_angle = 1.0 - 0.15 * (1.0 - std::cos(alpha_rad));
-    
+
     // Compressibility correction for P_ratio
     // Use isentropic flow relations for subsonic flow
     // gamma = 1.4 for air
     const double gamma = 1.4;
     double P_crit = std::pow(2.0 / (gamma + 1.0), gamma / (gamma - 1.0));  // ~0.528
-    
+
     double f_compress;
     if (P_ratio < 1.0 / P_crit) {
         // Subsonic flow: use isentropic relation
@@ -409,10 +409,10 @@ double effusion_discharge_coefficient(
         // Choked flow (shouldn't happen for P_ratio < 1.15, but handle it)
         f_compress = 1.0;
     }
-    
+
     // Combined discharge coefficient
     double Cd = Cd_base * f_Re * f_angle * f_compress;
-    
+
     // Clamp to reasonable bounds
     return std::max(0.50, std::min(0.85, Cd));
 }
@@ -448,11 +448,11 @@ double pin_fin_nusselt(
 ) {
     // Validate parameters
     validate_pin_fin_params(Re_d, L_D, S_D, X_D);
-    
+
     if (Pr < 0.5 || Pr > 1.0) {
         throw std::runtime_error("Prandtl number Pr must be in range [0.5, 1.0], got " + std::to_string(Pr));
     }
-    
+
     // Metzger correlation: Nu = C * Re_d^m * Pr^0.4 * f(spacing)
     // Constants depend on staggered vs inline arrangement
     double C, m;
@@ -465,17 +465,17 @@ double pin_fin_nusselt(
         C = 0.092;
         m = 0.675;
     }
-    
+
     // Base Nusselt number
     double Nu_base = C * std::pow(Re_d, m) * std::pow(Pr, 0.4);
-    
+
     // Length effect: longer pins have lower average Nu due to boundary layer growth
     double f_length = std::pow(L_D, -0.11);
-    
+
     // Spacing effects (Metzger empirical fits)
     // Tighter spacing -> better heat transfer but higher pressure drop
     double f_spacing = std::pow(S_D / 2.5, -0.15) * std::pow(X_D / 2.5, -0.10);
-    
+
     return Nu_base * f_length * f_spacing;
 }
 
@@ -508,27 +508,27 @@ double dimple_nusselt_enhancement(
 ) {
     // Validate parameters
     validate_dimple_params(Re_Dh, d_Dh, h_d, S_d);
-    
+
     // Chyu correlation: Nu/Nu_0 = f(Re, geometry)
     // Enhancement increases with Re (vortex strength)
     double Re_effect = std::pow(Re_Dh / 30000.0, 0.1);  // Weak Re dependence
-    
+
     // Dimple depth effect: optimal around h/d = 0.2
     // Deeper dimples create stronger vortices
     double depth_factor = 1.0 + 2.0 * (h_d - 0.15);
     depth_factor = std::max(1.0, std::min(1.5, depth_factor));
-    
+
     // Dimple density effect: closer spacing -> more vortex interaction
     double spacing_factor = std::pow(2.0 / S_d, 0.3);
-    
+
     // Dimple size effect: larger dimples (higher d/Dh) -> more coverage
     double size_factor = 1.0 + 1.5 * (d_Dh - 0.15);
-    
+
     // Base enhancement (typical for well-designed dimple arrays)
     double base_enhancement = 1.8;
-    
+
     double enhancement = base_enhancement * Re_effect * depth_factor * spacing_factor * size_factor;
-    
+
     // Clamp to realistic range (1.5 - 2.8x)
     return std::max(1.5, std::min(2.8, enhancement));
 }
@@ -549,21 +549,21 @@ double dimple_friction_multiplier(
     if (h_d < 0.1 || h_d > 0.3) {
         throw std::runtime_error("Dimple h_d must be in range [0.1, 0.3], got " + std::to_string(h_d));
     }
-    
+
     // Friction penalty for dimples (Chyu et al. 1997)
     // Much lower than ribs (1.5-2.0x vs 6-10x)
-    
+
     // Base friction multiplier
     double f_base = 1.5;
-    
+
     // Depth effect: deeper dimples -> higher friction
     double depth_penalty = 1.0 + 0.8 * (h_d - 0.15);
-    
+
     // Size effect: larger dimples -> slightly higher friction
     double size_penalty = 1.0 + 0.4 * (d_Dh - 0.15);
-    
+
     double f_ratio = f_base * depth_penalty * size_penalty;
-    
+
     // Clamp to realistic range (1.3 - 2.2x)
     return std::max(1.3, std::min(2.2, f_ratio));
 }

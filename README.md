@@ -161,27 +161,45 @@ The `examples` directory contains sample applications demonstrating the library'
 
 ## Development workflow
 
-### Environment setup (direnv + Python)
+### Environment setup (single local .venv)
 
-These steps assume you have `direnv` and `uv` installed.
+Use the repository-local virtual environment as the only Python runtime for
+development tooling, tests, and hooks.
 
 ```bash
 git clone https://github.com/thiemom/combaero.git
 cd combaero
 
-# Allow direnv to manage the root .venv
-direnv allow
+# Create/update .venv and install dev tooling
+./scripts/bootstrap.sh
 
-# direnv will create .venv/ and uv will bootstrap Python tooling
-which python   # should point to .venv/bin/python inside the repo
+# Activate shell (optional but convenient)
+source .venv/bin/activate
+
+# Verify interpreter contract
+python scripts/ensure_venv.py
+which python  # should point to .venv/bin/python
 ```
 
-The root `.envrc` manages a single virtual environment at `./.venv` for:
+The root `.venv` is the single source of truth for:
 
 - Building the Python wheel via `scikit-build-core`
 - Running Python tests with `pytest`
 - Running data generator scripts in `thermo_data_generator/`
 - Running `scripts/generate_units_md.py` to regenerate `docs/UNITS.md`
+
+### Version sync checklist (update together)
+
+When bumping Python/tooling versions, keep these files in sync:
+
+- Local interpreter pin: `.python-version`
+- Ruff syntax target: `ruff.toml` (`target-version`)
+- CI style Python: `.github/workflows/ci.yml`
+- Validation/style Python: `.github/workflows/validation-tests.yml`
+- Local hook/runtime interpreter paths: `.pre-commit-config.yaml`, `Makefile`,
+  `scripts/bootstrap.sh`, and `scripts/check-python-style.sh`
+
+If these drift, local checks and GitHub Actions can disagree.
 
 ### Build C++ and run C++ tests
 
@@ -205,20 +223,20 @@ ctest --output-on-failure
 
 ### Build and test the Python wheel
 
-From the repository root (with direnv active):
+From the repository root (with `.venv` active):
 
 ```bash
 # Optionally clean old wheels
 rm -f dist/combaero-*.whl
 
 # Build the wheel
-python -m build --wheel
+./.venv/bin/python -m build --wheel
 
 # Install (or reinstall) the wheel into the root .venv
-python -m pip install --force-reinstall dist/combaero-0.0.1-*.whl
+./.venv/bin/python -m pip install --force-reinstall dist/combaero-*.whl
 
 # Run Python tests
-python -m pytest python/tests
+./.venv/bin/python -m pytest python/tests
 ```
 
 ## Testing
@@ -239,21 +257,16 @@ See the *Development workflow* section above for concrete commands.
 A comprehensive test suite validates CombAero's combustion, mixing, and transport calculations against Cantera as a reference implementation. These tests are integrated into the pre-commit workflow.
 
 ```bash
-cd cantera_validation_tests
-
-# Install dependencies
-poetry install
-
-# Run all validation tests
-poetry run pytest -v
+# Run all validation tests from repo root
+CANTERA_DATA=$PWD/cantera_validation_tests ./.venv/bin/python -m pytest cantera_validation_tests -v
 
 # Run specific test categories
-poetry run pytest test_combustion_validation.py -v
-poetry run pytest test_mixing_validation.py -v
-poetry run pytest test_transport_validation.py -v
+CANTERA_DATA=$PWD/cantera_validation_tests ./.venv/bin/python -m pytest cantera_validation_tests/test_combustion_validation.py -v
+CANTERA_DATA=$PWD/cantera_validation_tests ./.venv/bin/python -m pytest cantera_validation_tests/test_mixing_validation.py -v
+CANTERA_DATA=$PWD/cantera_validation_tests ./.venv/bin/python -m pytest cantera_validation_tests/test_transport_validation.py -v
 
 # Run in parallel
-poetry run pytest -n auto
+CANTERA_DATA=$PWD/cantera_validation_tests ./.venv/bin/python -m pytest cantera_validation_tests -n auto
 ```
 
 The validation tests cover:

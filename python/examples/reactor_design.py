@@ -35,10 +35,10 @@ def main() -> None:
     Dh_pipe = ca.hydraulic_diameter(A_pipe, P_pipe)
 
     print("\nCircular pipe:")
-    print(f"  Diameter:           D = {D_pipe*1000:.1f} mm")
-    print(f"  Area:               A = {A_pipe*1e6:.2f} mm2")
-    print(f"  Perimeter:          P = {P_pipe*1000:.2f} mm")
-    print(f"  Hydraulic diameter: Dh = {Dh_pipe*1000:.2f} mm")
+    print(f"  Diameter:           D = {D_pipe * 1000:.1f} mm")
+    print(f"  Area:               A = {A_pipe * 1e6:.2f} mm2")
+    print(f"  Perimeter:          P = {P_pipe * 1000:.2f} mm")
+    print(f"  Hydraulic diameter: Dh = {Dh_pipe * 1000:.2f} mm")
     print("  (Should equal D for circular pipe)")
 
     # Square duct
@@ -46,8 +46,8 @@ def main() -> None:
     Dh_square = ca.hydraulic_diameter_rect(a, a)
 
     print("\nSquare duct:")
-    print(f"  Side length:        a = {a*1000:.1f} mm")
-    print(f"  Hydraulic diameter: Dh = {Dh_square*1000:.2f} mm")
+    print(f"  Side length:        a = {a * 1000:.1f} mm")
+    print(f"  Hydraulic diameter: Dh = {Dh_square * 1000:.2f} mm")
     print("  (Should equal a for square)")
 
     # Rectangular duct
@@ -56,10 +56,10 @@ def main() -> None:
     Dh_rect = ca.hydraulic_diameter_rect(a_rect, b_rect)
 
     print("\nRectangular duct:")
-    print(f"  Width:              a = {a_rect*1000:.1f} mm")
-    print(f"  Height:             b = {b_rect*1000:.1f} mm")
-    print(f"  Hydraulic diameter: Dh = {Dh_rect*1000:.2f} mm")
-    print(f"  Dh = 2ab/(a+b) = {2*a_rect*b_rect/(a_rect+b_rect)*1000:.2f} mm")
+    print(f"  Width:              a = {a_rect * 1000:.1f} mm")
+    print(f"  Height:             b = {b_rect * 1000:.1f} mm")
+    print(f"  Hydraulic diameter: Dh = {Dh_rect * 1000:.2f} mm")
+    print(f"  Dh = 2ab/(a+b) = {2 * a_rect * b_rect / (a_rect + b_rect) * 1000:.2f} mm")
 
     # Annular duct
     D_outer = 0.15  # Outer diameter [m]
@@ -67,10 +67,10 @@ def main() -> None:
     Dh_annulus = ca.hydraulic_diameter_annulus(D_outer, D_inner)
 
     print("\nAnnular duct:")
-    print(f"  Outer diameter:     D_o = {D_outer*1000:.1f} mm")
-    print(f"  Inner diameter:     D_i = {D_inner*1000:.1f} mm")
-    print(f"  Hydraulic diameter: Dh = {Dh_annulus*1000:.2f} mm")
-    print(f"  Dh = D_o - D_i = {(D_outer-D_inner)*1000:.2f} mm")
+    print(f"  Outer diameter:     D_o = {D_outer * 1000:.1f} mm")
+    print(f"  Inner diameter:     D_i = {D_inner * 1000:.1f} mm")
+    print(f"  Hydraulic diameter: Dh = {Dh_annulus * 1000:.2f} mm")
+    print(f"  Dh = D_o - D_i = {(D_outer - D_inner) * 1000:.2f} mm")
 
     # =========================================================================
     # Example 2: Residence time in a reactor
@@ -92,16 +92,16 @@ def main() -> None:
     SV = ca.space_velocity(Q, V)
 
     print("\nReactor geometry:")
-    print(f"  Diameter:        D = {D*1000:.0f} mm")
+    print(f"  Diameter:        D = {D * 1000:.0f} mm")
     print(f"  Length:          L = {L:.1f} m")
-    print(f"  Volume:          V = {V*1000:.2f} L")
+    print(f"  Volume:          V = {V * 1000:.2f} L")
 
     print("\nFlow conditions:")
-    print(f"  Volumetric flow: Q = {Q*1000:.1f} L/s")
+    print(f"  Volumetric flow: Q = {Q * 1000:.1f} L/s")
 
     print("\nResults:")
-    print(f"  Residence time:  τ = {tau:.2f} s = {tau/60:.3f} min")
-    print(f"  Space velocity:  SV = {SV:.4f} s⁻¹ = {SV*3600:.1f} h⁻¹")
+    print(f"  Residence time:  τ = {tau:.2f} s = {tau / 60:.3f} min")
+    print(f"  Space velocity:  SV = {SV:.4f} s⁻¹ = {SV * 3600:.1f} h⁻¹")
 
     # =========================================================================
     # Example 3: Residence time from mass flow rate
@@ -127,12 +127,12 @@ def main() -> None:
     Q = mdot / rho
     tau_Q = ca.residence_time(V, Q)
 
-    print(f"\nReactor volume:  V = {V*1000:.1f} L")
+    print(f"\nReactor volume:  V = {V * 1000:.1f} L")
     print("\nAir flow:")
     print(f"  Mass flow rate:  ṁ = {mdot:.2f} kg/s")
     print(f"  Temperature:     T = {T:.0f} K")
     print(f"  Density:         ρ = {rho:.3f} kg/m3")
-    print(f"  Volumetric flow: Q = {Q*1000:.2f} L/s")
+    print(f"  Volumetric flow: Q = {Q * 1000:.2f} L/s")
 
     print("\nResidence time:")
     print(f"  From mass flow:  τ = {tau_mdot:.3f} s")
@@ -171,27 +171,27 @@ def main() -> None:
     Dh = ca.hydraulic_diameter_annulus(D_outer, D_inner)
 
     print("\nDesign requirements:")
-    print(f"  Target residence time: τ = {tau_target*1000:.1f} ms")
+    print(f"  Target residence time: τ = {tau_target * 1000:.1f} ms")
     print(f"  Air mass flow:         ṁ = {mdot_air:.1f} kg/s")
-    print(f"  Operating pressure:    P = {P/1e5:.0f} bar")
+    print(f"  Operating pressure:    P = {P / 1e5:.0f} bar")
     print(f"  Average temperature:   T = {T_avg:.0f} K")
 
     print("\nAir properties:")
     print(f"  Density:               ρ = {rho:.3f} kg/m3")
 
     print("\nAnnular combustor:")
-    print(f"  Outer diameter:        D_o = {D_outer*1000:.0f} mm")
-    print(f"  Inner diameter:        D_i = {D_inner*1000:.0f} mm")
-    print(f"  Hydraulic diameter:    Dh = {Dh*1000:.0f} mm")
-    print(f"  Annular area:          A = {A_annular*1e4:.2f} cm2")
+    print(f"  Outer diameter:        D_o = {D_outer * 1000:.0f} mm")
+    print(f"  Inner diameter:        D_i = {D_inner * 1000:.0f} mm")
+    print(f"  Hydraulic diameter:    Dh = {Dh * 1000:.0f} mm")
+    print(f"  Annular area:          A = {A_annular * 1e4:.2f} cm2")
 
     print("\nResults:")
-    print(f"  Required volume:       V = {V_required*1000:.2f} L")
-    print(f"  Required length:       L = {L_required*1000:.0f} mm")
+    print(f"  Required volume:       V = {V_required * 1000:.2f} L")
+    print(f"  Required length:       L = {L_required * 1000:.0f} mm")
 
     # Verify
     tau_actual = ca.residence_time_mdot(V_required, mdot_air, rho)
-    print(f"  Actual residence time: τ = {tau_actual*1000:.2f} ms ✓")
+    print(f"  Actual residence time: τ = {tau_actual * 1000:.2f} ms ✓")
 
     # =========================================================================
     # Example 5: Reactor sizing for different flow rates
@@ -209,8 +209,8 @@ def main() -> None:
     X_air = ca.standard_dry_air_composition()
     rho = ca.density(T, P, X_air)
 
-    print(f"\nFixed reactor volume: V = {V*1000:.1f} L")
-    print(f"Air at {T:.0f} K, {P/1000:.0f} kPa (ρ = {rho:.3f} kg/m3)")
+    print(f"\nFixed reactor volume: V = {V * 1000:.1f} L")
+    print(f"Air at {T:.0f} K, {P / 1000:.0f} kPa (ρ = {rho:.3f} kg/m3)")
 
     print(f"\n{'ṁ [kg/s]':>12s}  {'Q [L/s]':>12s}  {'τ [s]':>12s}  {'SV [h⁻¹]':>12s}")
     print("-" * 52)
@@ -219,7 +219,7 @@ def main() -> None:
         Q = mdot / rho
         tau = ca.residence_time_mdot(V, mdot, rho)
         SV = ca.space_velocity(Q, V)
-        print(f"{mdot:12.2f}  {Q*1000:12.2f}  {tau:12.3f}  {SV*3600:12.1f}")
+        print(f"{mdot:12.2f}  {Q * 1000:12.2f}  {tau:12.3f}  {SV * 3600:12.1f}")
 
     # =========================================================================
     # Example 6: Damkohler number (reaction vs residence time)
@@ -241,8 +241,8 @@ def main() -> None:
     Da = tau / tau_reaction
 
     print("\nReactor:")
-    print(f"  Volume:          V = {V*1000:.1f} L")
-    print(f"  Flow rate:       Q = {Q*1000:.1f} L/s")
+    print(f"  Volume:          V = {V * 1000:.1f} L")
+    print(f"  Flow rate:       Q = {Q * 1000:.1f} L/s")
     print(f"  Residence time:  τ = {tau:.2f} s")
 
     print("\nReaction:")
@@ -283,13 +283,13 @@ def main() -> None:
     tau_simple = L / v
 
     print("\nPipe:")
-    print(f"  Diameter:        D = {D*1000:.0f} mm")
+    print(f"  Diameter:        D = {D * 1000:.0f} mm")
     print(f"  Length:          L = {L:.1f} m")
-    print(f"  Volume:          V = {V*1000:.3f} L")
+    print(f"  Volume:          V = {V * 1000:.3f} L")
 
     print("\nFlow:")
     print(f"  Velocity:        v = {v:.1f} m/s")
-    print(f"  Volumetric flow: Q = {Q*1000:.3f} L/s")
+    print(f"  Volumetric flow: Q = {Q * 1000:.3f} L/s")
 
     print("\nResidence time:")
     print(f"  τ = V/Q = {tau:.3f} s")

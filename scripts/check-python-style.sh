@@ -10,16 +10,16 @@ set -euo pipefail
 # Options:
 #   --verbose   Show detailed output from all tools
 #   --strict    Fail on warnings, not just errors
-#   --fix       Auto-fix issues where possible (black, isort)
+#   --fix       Auto-fix issues where possible (ruff + ruff format)
 #
 # Checks:
 #   1. Non-ASCII characters outside comments and strings
-#   2. PEP 8 compliance (via flake8)
-#   3. Code formatting (via black --check)
-#   4. Import sorting (via isort --check)
+#   2. Code quality and import sorting (via ruff)
+#   3. Code formatting (via ruff format)
 #   5. Type hints (via mypy, if available)
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PYTHON="${ROOT_DIR}/.venv/bin/python"
 
 # Directories to scan
 SCAN_DIRS=("python" "cantera_validation_tests" "thermo_data_generator")
@@ -47,6 +47,13 @@ for arg in "$@"; do
 done
 
 cd "${ROOT_DIR}"
+
+if [ ! -x "${PYTHON}" ]; then
+    echo "ERROR: missing ${PYTHON}. Run ./scripts/bootstrap.sh first."
+    exit 1
+fi
+
+"${PYTHON}" "${ROOT_DIR}/scripts/ensure_venv.py" --quiet
 
 # Colors for output
 RED='\033[0;31m'
@@ -115,17 +122,17 @@ fi
 echo ""
 
 # -----------------------------------------------------------------------------
-# Check 2: Code quality (ruff)
+# Check 2: Code quality + import sorting (ruff)
 # -----------------------------------------------------------------------------
 echo "Check 2: Code quality (ruff)..."
 
-if command -v ruff &> /dev/null; then
+if "${PYTHON}" -m ruff --version > /dev/null 2>&1; then
     if [ "$FIX" = true ]; then
         echo "  Running ruff with auto-fix..."
-        ruff check --fix "${SCAN_DIRS[@]}"
+        "${PYTHON}" -m ruff check --fix "${SCAN_DIRS[@]}"
         echo -e "${GREEN}  ✓ Ruff checks passed (with fixes)${NC}"
     else
-        RUFF_OUTPUT=$(ruff check "${SCAN_DIRS[@]}" 2>&1)
+        RUFF_OUTPUT=$("${PYTHON}" -m ruff check "${SCAN_DIRS[@]}" 2>&1)
         RUFF_STATUS=$?
 
         if [ $RUFF_STATUS -ne 0 ]; then
@@ -149,30 +156,30 @@ if command -v ruff &> /dev/null; then
         fi
     fi
 else
-    echo -e "${YELLOW}  ⚠ ruff not found (install: pip install ruff)${NC}"
+    echo -e "${YELLOW}  ⚠ ruff not found in .venv (install via ./scripts/bootstrap.sh)${NC}"
 fi
 
 echo ""
 
 # -----------------------------------------------------------------------------
-# Check 3: Code formatting (black)
+# Check 3: Code formatting (ruff format)
 # -----------------------------------------------------------------------------
-echo "Check 3: Code formatting (black)..."
+echo "Check 3: Code formatting (ruff format)..."
 
-if command -v black &> /dev/null; then
+if "${PYTHON}" -m ruff --version > /dev/null 2>&1; then
     if [ "$FIX" = true ]; then
-        echo "  Applying black formatting..."
-        black --line-length=100 "${SCAN_DIRS[@]}"
+        echo "  Applying ruff formatting..."
+        "${PYTHON}" -m ruff format "${SCAN_DIRS[@]}"
         echo -e "${GREEN}  ✓ Code formatted${NC}"
     else
-        BLACK_OUTPUT=$(black --check --line-length=100 "${SCAN_DIRS[@]}" 2>&1 || true)
+        RUFF_FORMAT_OUTPUT=$("${PYTHON}" -m ruff format --check "${SCAN_DIRS[@]}" 2>&1 || true)
 
-        if echo "$BLACK_OUTPUT" | grep -q "would reformat"; then
+        if echo "$RUFF_FORMAT_OUTPUT" | grep -q "Would reformat\|would be reformatted"; then
             echo -e "${RED}  ✗ Code formatting issues found${NC}"
             if [ "$VERBOSE" = true ]; then
-                echo "$BLACK_OUTPUT"
+                echo "$RUFF_FORMAT_OUTPUT"
             else
-                echo "$BLACK_OUTPUT" | grep "would reformat" | head -10
+                echo "$RUFF_FORMAT_OUTPUT" | head -10
             fi
             echo "  Run with --fix to auto-format"
             ((VIOLATIONS++))
@@ -181,7 +188,7 @@ if command -v black &> /dev/null; then
         fi
     fi
 else
-    echo -e "${YELLOW}  ⚠ black not found (install: pip install black)${NC}"
+    echo -e "${YELLOW}  ⚠ ruff not found in .venv (install via ./scripts/bootstrap.sh)${NC}"
 fi
 
 echo ""
@@ -191,7 +198,7 @@ echo ""
 # -----------------------------------------------------------------------------
 echo "Check 4: Type hints (mypy)..."
 
-if command -v mypy &> /dev/null; then
+if "${PYTHON}" -m mypy --version > /dev/null 2>&1; then
     MYPY_ARGS=(
         "--ignore-missing-imports"
         "--no-strict-optional"
@@ -202,7 +209,7 @@ if command -v mypy &> /dev/null; then
         MYPY_ARGS+=("--strict")
     fi
 
-    MYPY_OUTPUT=$(mypy "${MYPY_ARGS[@]}" "${SCAN_DIRS[@]}" 2>&1 || true)
+    MYPY_OUTPUT=$("${PYTHON}" -m mypy "${MYPY_ARGS[@]}" "${SCAN_DIRS[@]}" 2>&1 || true)
 
     # Only fail on errors, not warnings (unless strict)
     if echo "$MYPY_OUTPUT" | grep -q "error:"; then
@@ -221,7 +228,7 @@ if command -v mypy &> /dev/null; then
         echo -e "${GREEN}  ✓ Type hints OK${NC}"
     fi
 else
-    echo -e "${YELLOW}  ⚠ mypy not found (install: pip install mypy)${NC}"
+    echo -e "${YELLOW}  ⚠ mypy not found in .venv (install via ./scripts/bootstrap.sh)${NC}"
 fi
 
 echo ""

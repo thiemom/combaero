@@ -1,8 +1,16 @@
-.PHONY: help build test test-all clean style style-check style-fix install-deps
+.PHONY: help bootstrap venv-check build test test-all clean style style-check style-fix install-deps pre-build ci
+
+ROOT_DIR := $(abspath .)
+PYTHON := $(ROOT_DIR)/.venv/bin/python
+PIP := $(PYTHON) -m pip
 
 # Default target
 help:
 	@echo "CombAero - Make targets:"
+	@echo ""
+	@echo "Environment:"
+	@echo "  make bootstrap          - Create/update local .venv and install tools"
+	@echo "  make venv-check         - Verify commands use local .venv"
 	@echo ""
 	@echo "Build targets:"
 	@echo "  make build              - Build C++ library and tests (Release)"
@@ -28,6 +36,12 @@ help:
 	@echo "  make pre-build          - Run style checks before building"
 	@echo "  make ci                 - Full CI workflow (style + build + test)"
 
+bootstrap:
+	@./scripts/bootstrap.sh
+
+venv-check:
+	@$(PYTHON) scripts/ensure_venv.py
+
 # Build targets
 build:
 	@echo "Building CombAero (Release)..."
@@ -48,13 +62,15 @@ test:
 	@echo "✓ C++ tests complete"
 
 test-python:
+	@$(PYTHON) scripts/ensure_venv.py --quiet
 	@echo "Running Python unit tests..."
-	@cd python/tests && python -m pytest -v
+	@$(PYTHON) -m pytest python/tests -v
 	@echo "✓ Python tests complete"
 
 test-validation:
+	@$(PYTHON) scripts/ensure_venv.py --quiet
 	@echo "Running Cantera validation tests..."
-	@cd cantera_validation_tests && poetry run pytest -v
+	@CANTERA_DATA=$(ROOT_DIR)/cantera_validation_tests $(PYTHON) -m pytest cantera_validation_tests -v
 	@echo "✓ Validation tests complete"
 
 test-all: test test-python test-validation
@@ -67,6 +83,7 @@ style-check-cpp:
 	@echo "✓ C++ style check complete"
 
 style-check-python:
+	@$(PYTHON) scripts/ensure_venv.py --quiet
 	@echo "Checking Python code style..."
 	@./scripts/check-python-style.sh
 	@echo "✓ Python style check complete"
@@ -75,15 +92,17 @@ style-check: style-check-cpp style-check-python
 	@echo "✓ All style checks complete"
 
 style-fix:
+	@$(PYTHON) scripts/ensure_venv.py --quiet
 	@echo "Auto-fixing Python code style..."
 	@./scripts/check-python-style.sh --fix
 	@echo "✓ Python style fixed"
 
 # Dependencies
 install-deps:
+	@$(PYTHON) scripts/ensure_venv.py --quiet
 	@echo "Installing Python dependencies..."
-	@cd cantera_validation_tests && poetry install
-	@cd thermo_data_generator && poetry install
+	@$(PIP) install -e .[dev,examples] --no-build-isolation
+	@$(PIP) install ruff black isort flake8 mypy pre-commit build
 	@echo "✓ Dependencies installed"
 
 # Pre-build workflow

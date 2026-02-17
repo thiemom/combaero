@@ -444,7 +444,8 @@ def generate_cpp_header(
     # Sort species
     species = sorted(species, key=species_sort_key)
 
-    output.write("""#ifndef THERMO_TRANSPORT_DATA_H
+    output.write(
+        """#ifndef THERMO_TRANSPORT_DATA_H
 #define THERMO_TRANSPORT_DATA_H
 
 #include <array>
@@ -456,7 +457,8 @@ def generate_cpp_header(
 // NASA polynomial format used in this build
 // NASA7: Cp/R = a1 + a2*T + a3*T^2 + a4*T^3 + a5*T^4
 // NASA9: Cp/R = a1/T^2 + a2/T + a3 + a4*T + a5*T^2 + a6*T^3 + a7*T^4
-""")
+"""
+    )
 
     output.write(f"// This file uses {nasa_format.name} format\n")
     output.write(
@@ -465,7 +467,8 @@ def generate_cpp_header(
 
     # NASA coefficients struct
     if nasa_format == NASAFormat.NASA7:
-        output.write("""struct NASA7_Coeffs {
+        output.write(
+            """struct NASA7_Coeffs {
     double T_low;
     double T_mid;
     double T_high;
@@ -475,9 +478,11 @@ def generate_cpp_header(
 
 using NASA_Coeffs = NASA7_Coeffs;
 
-""")
+"""
+        )
     else:
-        output.write("""struct NASA9_Interval {
+        output.write(
+            """struct NASA9_Interval {
     double T_min;
     double T_max;
     std::array<double, 10> coeffs;  // a1-a7, unused, b1 (H), b2 (S)
@@ -489,9 +494,11 @@ struct NASA9_Coeffs {
 
 using NASA_Coeffs = NASA9_Coeffs;
 
-""")
+"""
+        )
 
-    output.write("""struct Transport_Props {
+    output.write(
+        """struct Transport_Props {
     std::string geometry;
     double well_depth;
     double diameter;
@@ -505,7 +512,8 @@ struct Molecular_Structure {
     std::size_t N;
 };
 
-""")
+"""
+    )
 
     # Species names
     output.write("const std::vector<std::string> species_names = {")

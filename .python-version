@@ -1,0 +1,2 @@
+# Keep this version in sync with ruff.toml target-version and GitHub workflow python-version fields.
+3.12.11

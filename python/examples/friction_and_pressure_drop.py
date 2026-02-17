@@ -60,13 +60,13 @@ def main() -> None:
     materials = ["drawn_tubing", "commercial_steel", "galvanized_iron", "cast_iron"]
 
     print(f"\nReynolds number: {Re:.0e}")
-    print(f"Pipe diameter: {D*1000:.0f} mm")
+    print(f"Pipe diameter: {D * 1000:.0f} mm")
     print("\nFriction factors for different pipe materials:")
     for material in materials:
         eps = ca.pipe_roughness(material)  # Get roughness from database
         e_D = eps / D
         f = ca.friction_haaland(Re, e_D)
-        print(f"  {material:25s}: f = {f:.6f}  (ε = {eps*1e6:.1f} μm, ε/D = {e_D:.6f})")
+        print(f"  {material:25s}: f = {f:.6f}  (ε = {eps * 1e6:.1f} μm, ε/D = {e_D:.6f})")
 
     # =========================================================================
     # Example 3: Pressure drop calculation
@@ -97,22 +97,22 @@ def main() -> None:
     mu = ca.viscosity(T, P, X_air)
 
     print("\nPipe specifications:")
-    print(f"  Diameter:        D = {D*1000:.1f} mm")
+    print(f"  Diameter:        D = {D * 1000:.1f} mm")
     print(f"  Length:          L = {L:.1f} m")
-    print(f"  Roughness:       ε = {eps*1e6:.1f} μm (commercial steel)")
+    print(f"  Roughness:       ε = {eps * 1e6:.1f} μm (commercial steel)")
     print(f"  Relative rough:  ε/D = {e_D:.6f}")
 
     print("\nFlow conditions:")
     print(f"  Fluid:           Air at {T:.0f} K")
     print(f"  Velocity:        v = {v:.1f} m/s")
     print(f"  Density:         ρ = {rho:.3f} kg/m³")
-    print(f"  Viscosity:       μ = {mu*1e6:.2f} μPa·s")
+    print(f"  Viscosity:       μ = {mu * 1e6:.2f} μPa·s")
     print(f"  Reynolds number: Re = {Re:.2e}")
 
     print("\nResults:")
     print(f"  Friction factor: f = {f:.6f}")
-    print(f"  Pressure drop:   ΔP = {dP:.1f} Pa = {dP/1000:.3f} kPa")
-    print(f"  Pressure drop:   ΔP/L = {dP/L:.2f} Pa/m")
+    print(f"  Pressure drop:   ΔP = {dP:.1f} Pa = {dP / 1000:.3f} kPa")
+    print(f"  Pressure drop:   ΔP/L = {dP / L:.2f} Pa/m")
 
     # =========================================================================
     # Example 4: Reynolds number sweep
@@ -157,8 +157,8 @@ def main() -> None:
     print("\nDesign requirements:")
     print(f"  Mass flow rate:  ṁ = {mdot:.2f} kg/s")
     print(f"  Pipe length:     L = {L:.1f} m")
-    print(f"  Max pressure drop: ΔP_max = {dP_max/1000:.1f} kPa")
-    print(f"  Roughness:       ε = {eps*1e6:.1f} μm (commercial steel)")
+    print(f"  Max pressure drop: ΔP_max = {dP_max / 1000:.1f} kPa")
+    print(f"  Roughness:       ε = {eps * 1e6:.1f} μm (commercial steel)")
 
     # Try different diameters
     print(
@@ -173,7 +173,7 @@ def main() -> None:
         # Use pressure_drop_pipe composite function
         dP, Re, f = ca.pressure_drop_pipe(T, P, X_air, v, D, L, eps, "haaland")
         ok = "✓" if dP <= dP_max else "✗"
-        print(f"{D*1000:10.1f}  {v:10.2f}  {Re:12.2e}  {f:10.6f}  {dP/1000:12.3f}  {ok:>6s}")
+        print(f"{D * 1000:10.1f}  {v:10.2f}  {Re:12.2e}  {f:10.6f}  {dP / 1000:12.3f}  {ok:>6s}")
 
     print("\n✓ = Meets pressure drop requirement")
     print("✗ = Exceeds pressure drop limit")

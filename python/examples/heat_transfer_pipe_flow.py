@@ -76,14 +76,14 @@ def main() -> None:
     # Calculate heat transfer coefficient
     h = ca.htc_from_nusselt(Nu, k, D)
 
-    print(f"\nPipe diameter:   D = {D*1000:.1f} mm")
+    print(f"\nPipe diameter:   D = {D * 1000:.1f} mm")
     print(f"Air velocity:    v = {v:.1f} m/s")
     print(f"Air temperature: T = {T:.0f} K")
 
     print("\nAir properties:")
     print(f"  Density:              ρ = {rho:.3f} kg/m3")
-    print(f"  Viscosity:            μ = {mu*1e6:.2f} μPa*s")
-    print(f"  Thermal conductivity: k = {k*1000:.2f} mW/(m*K)")
+    print(f"  Viscosity:            μ = {mu * 1e6:.2f} μPa*s")
+    print(f"  Thermal conductivity: k = {k * 1000:.2f} mW/(m*K)")
     print(f"  Specific heat:        cp = {cp:.1f} J/(mol*K)")
     print(f"  Prandtl number:       Pr = {Pr:.3f}")
 
@@ -140,7 +140,7 @@ def main() -> None:
     print(f"  Heat air from {T_in:.0f} K to {T_out:.0f} K")
     print(f"  Mass flow rate:  ṁ = {mdot:.3f} kg/s")
     print(f"  Wall temperature: T_wall = {T_wall:.0f} K")
-    print(f"  Pipe diameter:    D = {D*1000:.1f} mm")
+    print(f"  Pipe diameter:    D = {D * 1000:.1f} mm")
 
     print(f"\nFlow conditions (at T_avg = {T_avg:.0f} K):")
     print(f"  Velocity:         v = {v:.2f} m/s")
@@ -150,7 +150,7 @@ def main() -> None:
     print("\nHeat transfer:")
     print(f"  Nusselt number:   Nu = {Nu:.2f}")
     print(f"  HTC:              h = {h:.2f} W/(m2*K)")
-    print(f"  Heat duty:        Q = {Q/1000:.2f} kW")
+    print(f"  Heat duty:        Q = {Q / 1000:.2f} kW")
     print(f"  LMTD:             LMTD = {LMTD:.2f} K")
 
     print("\nResult:")
@@ -175,8 +175,8 @@ def main() -> None:
     dT1 = T_hot_in - T_cold_out  # For display
     dT2 = T_hot_out - T_cold_in
 
-    print(f"  Hot side:  {T_hot_in-273.15:.0f}degC → {T_hot_out-273.15:.0f}degC")
-    print(f"  Cold side: {T_cold_in-273.15:.0f}degC → {T_cold_out-273.15:.0f}degC")
+    print(f"  Hot side:  {T_hot_in - 273.15:.0f}degC → {T_hot_out - 273.15:.0f}degC")
+    print(f"  Cold side: {T_cold_in - 273.15:.0f}degC → {T_cold_out - 273.15:.0f}degC")
     print(f"  DeltaT1 = {dT1:.2f} K (hot in - cold out)")
     print(f"  DeltaT2 = {dT2:.2f} K (hot out - cold in)")
     print(f"  LMTD = {LMTD_counter:.2f} K")
@@ -193,7 +193,7 @@ def main() -> None:
     print(f"  LMTD = {LMTD_parallel:.2f} K")
 
     print("\nCounter-flow is more efficient:")
-    print(f"  LMTD_counter / LMTD_parallel = {LMTD_counter/LMTD_parallel:.3f}")
+    print(f"  LMTD_counter / LMTD_parallel = {LMTD_counter / LMTD_parallel:.3f}")
 
     # =========================================================================
     # Example 5: Viscosity correction (Sieder-Tate)
@@ -247,15 +247,15 @@ def main() -> None:
 
     print(f"\nReynolds number: Re = {Re:.0e}")
     print(f"Prandtl number:  Pr = {Pr:.2f}")
-    print(f"Pipe diameter:   D = {D*1000:.0f} mm")
-    print(f"Roughness:       ε = {eps*1e6:.1f} μm (commercial steel)")
+    print(f"Pipe diameter:   D = {D * 1000:.0f} mm")
+    print(f"Roughness:       ε = {eps * 1e6:.1f} μm (commercial steel)")
     print(f"Relative rough:  ε/D = {e_D:.6f}")
 
     print("\nResults:")
     print(f"  Friction factor:          f = {f:.6f}")
     print(f"  Nu (with friction):       Nu = {Nu_with_f:.2f}")
     print(f"  Nu (auto, smooth pipe):   Nu = {Nu_auto:.2f}")
-    print(f"  Difference:               {(Nu_with_f-Nu_auto)/Nu_auto*100:+.2f}%")
+    print(f"  Difference:               {(Nu_with_f - Nu_auto) / Nu_auto * 100:+.2f}%")
 
     print("\nNote: Roughness affects both friction and heat transfer!")
 

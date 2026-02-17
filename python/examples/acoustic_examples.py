@@ -17,7 +17,7 @@ warnings.filterwarnings("ignore")
 
 
 def print_header(title):
-    print(f"\n{'='*70}\n {title}\n{'='*70}")
+    print(f"\n{'=' * 70}\n {title}\n{'=' * 70}")
 
 
 # -------------------------------------------------------------------------

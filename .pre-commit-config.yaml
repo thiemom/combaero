@@ -8,38 +8,19 @@ repos:
       - id: check-added-large-files
       - id: check-merge-conflict
 
-  # Ruff - fast Python linter (replaces flake8, isort, and more)
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.9
-    hooks:
-      - id: ruff
-        args: [--fix]
-        files: ^(python/|cantera_validation_tests/|thermo_data_generator/)
-      - id: ruff-format
-        args: []
-        files: ^(python/|cantera_validation_tests/|thermo_data_generator/)
-
-  # Black - Python code formatter
-  - repo: https://github.com/psf/black
-    rev: 24.1.1
-    hooks:
-      - id: black
-        args: [--line-length=100]
-        files: ^(python/|cantera_validation_tests/|thermo_data_generator/)
-
   - repo: local
     hooks:
-      - id: python-non-ascii-check
-        name: Check Python files for non-ASCII characters
+      - id: python-style-check
+        name: Python style checks (ruff + ruff format + optional mypy)
         entry: bash -c './scripts/check-python-style.sh'
         language: system
         pass_filenames: false
-        files: ^python/.*\.py$
+        files: ^(python/|cantera_validation_tests/|thermo_data_generator/)
         stages: [pre-commit]
 
       - id: cantera-validation-tests
         name: Cantera Validation Tests
-        entry: bash -c 'CANTERA_DATA=/Users/thiemo/Projects/combaero/cantera_validation_tests /Users/thiemo/Projects/combaero/.venv/bin/python -m pytest cantera_validation_tests -v --tb=short'
+        entry: bash -c 'CANTERA_DATA="$PWD/cantera_validation_tests" ./.venv/bin/python -m pytest cantera_validation_tests -v --tb=short'
         language: system
         pass_filenames: false
         always_run: false
@@ -48,7 +29,7 @@ repos:
 
       - id: python-unit-tests
         name: Python Unit Tests
-        entry: bash -c '/Users/thiemo/Projects/combaero/.venv/bin/python -m pytest python/tests/ -v'
+        entry: bash -c './.venv/bin/python -m pytest python/tests/ -v'
         language: system
         pass_filenames: false
         always_run: false

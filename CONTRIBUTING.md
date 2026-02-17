@@ -50,12 +50,15 @@ ctest --output-on-failure
 ./tests/test_water_equation_accuracy
 ```
 
-If you modify the Python bindings or packaging, also run the Python smoke tests from the repository root (with direnv active):
+If you modify the Python bindings or packaging, run Python smoke tests from the
+repository root using the local `.venv` interpreter:
 
 ```bash
-python -m build --wheel
-python -m pip install --force-reinstall dist/combaero-0.0.1-*.whl
-python -m pytest python/tests/test_import.py
+./scripts/bootstrap.sh
+./.venv/bin/python scripts/ensure_venv.py
+./.venv/bin/python -m build --wheel
+./.venv/bin/python -m pip install --force-reinstall dist/combaero-*.whl
+./.venv/bin/python -m pytest python/tests/test_import.py
 ```
 
 ## Pull Request Process
