@@ -1,6 +1,7 @@
 #pragma once
 
 #include "acoustics.h"
+#include "math_constants.h"  // MSVC compatibility for M_PI
 #include <vector>
 #include <complex>
 
