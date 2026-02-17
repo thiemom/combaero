@@ -49,11 +49,25 @@ done
 cd "${ROOT_DIR}"
 
 if [ ! -x "${PYTHON}" ]; then
-    echo "ERROR: missing ${PYTHON}. Run ./scripts/bootstrap.sh first."
-    exit 1
+    if [ "${CI:-}" = "true" ] || [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+        if command -v python3 > /dev/null 2>&1; then
+            PYTHON="$(command -v python3)"
+        elif command -v python > /dev/null 2>&1; then
+            PYTHON="$(command -v python)"
+        else
+            echo "ERROR: no Python interpreter found in CI environment."
+            exit 1
+        fi
+        echo "INFO: .venv missing in CI; using ${PYTHON}"
+    else
+        echo "ERROR: missing ${PYTHON}. Run ./scripts/bootstrap.sh first."
+        exit 1
+    fi
 fi
 
-"${PYTHON}" "${ROOT_DIR}/scripts/ensure_venv.py" --quiet
+if [ "${CI:-}" != "true" ] && [ "${GITHUB_ACTIONS:-}" != "true" ]; then
+    "${PYTHON}" "${ROOT_DIR}/scripts/ensure_venv.py" --quiet
+fi
 
 # Colors for output
 RED='\033[0;31m'
