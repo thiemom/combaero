@@ -121,6 +121,34 @@ struct ThermoState {
 // air_properties(T, P, humidity) returns a TransportState with all fields populated.
 using AirProperties = TransportState;
 
+// -------------------------------------------------------------
+// Equilibrium Result Bundle
+// -------------------------------------------------------------
+
+// Result of any equilibrium solve — carries the final state plus diagnostics.
+// Designed to be network-node-friendly: converged flag propagates through a
+// network without silently passing bad values.
+struct EquilibriumResult {
+    State state;       // Equilibrium T, P, X
+    double T_in;       // Input temperature [K]
+    double delta_T;    // state.T - T_in [K] (negative = endothermic)
+    bool converged;    // Solver convergence flag
+};
+
+// -------------------------------------------------------------
+// Combustion Method
+// -------------------------------------------------------------
+
+// Selects the product model used by combustion_state / combustion_state_from_streams.
+//   Complete    : complete combustion to CO2 + H2O (fast, default)
+//   Equilibrium : complete combustion followed by reforming + WGS equilibrium
+//                 (slower, physically correct for rich or high-T conditions)
+// Designed for extension: a future WGS-only or full-Gibbs option can be added here.
+enum class CombustionMethod {
+    Complete,
+    Equilibrium,
+};
+
 // Bundle of thermodynamic and transport properties for a gas mixture
 // Combines ThermoState + TransportState in a single call
 struct CompleteState {
@@ -136,6 +164,7 @@ struct CompleteState {
 struct CombustionState {
     double phi;                    // Equivalence ratio [-]
     std::string fuel_name;         // Optional fuel label (e.g., "CH4", "Natural Gas")
+    CombustionMethod method;       // Product model used (Complete or Equilibrium)
     CompleteState reactants;       // Reactant state (all thermo + transport properties)
     CompleteState products;        // Product state (all thermo + transport properties)
     double mixture_fraction;       // Bilger mixture fraction [-]

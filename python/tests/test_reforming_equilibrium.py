@@ -29,14 +29,14 @@ class TestReformingEquilibrium:
         result = ca.reforming_equilibrium(T_in, X)
 
         # Temperature should be unchanged (isothermal)
-        assert pytest.approx(T_in, rel=1e-6) == result.T
+        assert pytest.approx(T_in, rel=1e-6) == result.state.T
 
         # CH4 should be mostly reformed at high T
-        assert result.X[sp.indices["CH4"]] < X[sp.indices["CH4"]] * 0.5
+        assert result.state.X[sp.indices["CH4"]] < X[sp.indices["CH4"]] * 0.5
 
         # CO and H2 should be produced
-        assert result.X[sp.indices["CO"]] > 0.01
-        assert result.X[sp.indices["H2"]] > 0.01
+        assert result.state.X[sp.indices["CO"]] > 0.01
+        assert result.state.X[sp.indices["H2"]] > 0.01
 
     def test_reforming_equilibrium_adiabatic(self, sp: SpeciesLocator) -> None:
         """Test adiabatic reforming equilibrium - temperature should drop."""
@@ -50,11 +50,11 @@ class TestReformingEquilibrium:
         result = ca.reforming_equilibrium_adiabatic(T_in, X)
 
         # Temperature should decrease (endothermic reforming)
-        assert T_in > result.T
-        assert result.T > 1500.0  # But still reasonable
+        assert T_in > result.state.T
+        assert result.state.T > 1500.0  # But still reasonable
 
         # CH4 should be reformed
-        assert result.X[sp.indices["CH4"]] < X[sp.indices["CH4"]] * 0.5
+        assert result.state.X[sp.indices["CH4"]] < X[sp.indices["CH4"]] * 0.5
 
     def test_reforming_multiple_hydrocarbons(self, sp: SpeciesLocator) -> None:
         """Test reforming with multiple hydrocarbons (natural gas)."""
@@ -69,13 +69,13 @@ class TestReformingEquilibrium:
         result = ca.reforming_equilibrium(2000.0, X)
 
         # All hydrocarbons should be reformed
-        assert result.X[sp.indices["CH4"]] < X[sp.indices["CH4"]] * 0.5
-        assert result.X[sp.indices["C2H6"]] < X[sp.indices["C2H6"]] * 0.5
-        assert result.X[sp.indices["C3H8"]] < X[sp.indices["C3H8"]] * 0.5
+        assert result.state.X[sp.indices["CH4"]] < X[sp.indices["CH4"]] * 0.5
+        assert result.state.X[sp.indices["C2H6"]] < X[sp.indices["C2H6"]] * 0.5
+        assert result.state.X[sp.indices["C3H8"]] < X[sp.indices["C3H8"]] * 0.5
 
         # CO and H2 should be produced
-        assert result.X[sp.indices["CO"]] > 0.01
-        assert result.X[sp.indices["H2"]] > 0.01
+        assert result.state.X[sp.indices["CO"]] > 0.01
+        assert result.state.X[sp.indices["H2"]] > 0.01
 
     def test_reforming_c2plus_only(self, sp: SpeciesLocator) -> None:
         """Test reforming with only C2+ hydrocarbons (no CH4)."""
@@ -89,12 +89,12 @@ class TestReformingEquilibrium:
         result = ca.reforming_equilibrium(2000.0, X)
 
         # C2H6 and C3H8 should be reformed even without CH4
-        assert result.X[sp.indices["C2H6"]] < X[sp.indices["C2H6"]] * 0.5
-        assert result.X[sp.indices["C3H8"]] < X[sp.indices["C3H8"]] * 0.5
+        assert result.state.X[sp.indices["C2H6"]] < X[sp.indices["C2H6"]] * 0.5
+        assert result.state.X[sp.indices["C3H8"]] < X[sp.indices["C3H8"]] * 0.5
 
         # CO and H2 should be produced
-        assert result.X[sp.indices["CO"]] > 0.01
-        assert result.X[sp.indices["H2"]] > 0.01
+        assert result.state.X[sp.indices["CO"]] > 0.01
+        assert result.state.X[sp.indices["H2"]] > 0.01
 
     def test_element_conservation(self, sp: SpeciesLocator) -> None:
         """Test that element ratios are conserved (using N2 as reference)."""
@@ -110,7 +110,7 @@ class TestReformingEquilibrium:
 
         # N2 is inert, so element ratios per N2 should be conserved
         n2_in = X[sp.indices["N2"]]
-        n2_out = result.X[sp.indices["N2"]]
+        n2_out = result.state.X[sp.indices["N2"]]
 
         # C atoms per N2: CH4 + 2*C2H6 + CO + CO2
         C_per_N2_in = (
@@ -120,16 +120,16 @@ class TestReformingEquilibrium:
             + X[sp.indices["CO2"]]
         ) / n2_in
         C_per_N2_out = (
-            result.X[sp.indices["CH4"]]
-            + 2 * result.X[sp.indices["C2H6"]]
-            + result.X[sp.indices["CO"]]
-            + result.X[sp.indices["CO2"]]
+            result.state.X[sp.indices["CH4"]]
+            + 2 * result.state.X[sp.indices["C2H6"]]
+            + result.state.X[sp.indices["CO"]]
+            + result.state.X[sp.indices["CO2"]]
         ) / n2_out
         assert C_per_N2_in == pytest.approx(C_per_N2_out, rel=1e-5)
 
         # Ar per N2 should be unchanged
         ar_per_n2_in = X[sp.indices["AR"]] / n2_in
-        ar_per_n2_out = result.X[sp.indices["AR"]] / n2_out
+        ar_per_n2_out = result.state.X[sp.indices["AR"]] / n2_out
         assert ar_per_n2_in == pytest.approx(ar_per_n2_out, rel=1e-10)
 
 
@@ -147,11 +147,11 @@ class TestSmrWgsEquilibrium:
         result = ca.smr_wgs_equilibrium(2000.0, X)
 
         # CH4 should be reformed
-        assert result.X[sp.indices["CH4"]] < X[sp.indices["CH4"]] * 0.5
+        assert result.state.X[sp.indices["CH4"]] < X[sp.indices["CH4"]] * 0.5
 
         # CO and H2 should be produced
-        assert result.X[sp.indices["CO"]] > 0.01
-        assert result.X[sp.indices["H2"]] > 0.01
+        assert result.state.X[sp.indices["CO"]] > 0.01
+        assert result.state.X[sp.indices["H2"]] > 0.01
 
     def test_smr_wgs_adiabatic(self, sp: SpeciesLocator) -> None:
         """Test adiabatic SMR+WGS equilibrium."""
@@ -165,7 +165,7 @@ class TestSmrWgsEquilibrium:
         result = ca.smr_wgs_equilibrium_adiabatic(T_in, X)
 
         # Temperature should decrease
-        assert T_in > result.T
+        assert T_in > result.state.T
 
     def test_smr_wgs_fallback_to_wgs(self, sp: SpeciesLocator) -> None:
         """Test that SMR+WGS falls back to WGS when no CH4 present."""
@@ -178,6 +178,6 @@ class TestSmrWgsEquilibrium:
         result = ca.smr_wgs_equilibrium(2000.0, X)
 
         # Should still work (WGS only)
-        assert pytest.approx(2000.0, rel=1e-6) == result.T
+        assert pytest.approx(2000.0, rel=1e-6) == result.state.T
         # WGS shifts CO + H2O -> CO2 + H2
-        assert result.X[sp.indices["H2"]] > 0.0
+        assert result.state.X[sp.indices["H2"]] > 0.0

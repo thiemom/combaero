@@ -493,6 +493,26 @@ PYBIND11_MODULE(_core, m)
                    "a=" + std::to_string(s.a) + " m/s>";
         });
 
+    // EquilibriumResult struct binding
+    py::class_<EquilibriumResult>(m, "EquilibriumResult",
+        "Result of an equilibrium solve.\n\n"
+        "Carries the final state plus solver diagnostics, suitable for use\n"
+        "in network solvers where non-convergence must be detectable.\n\n"
+        "Attributes:\n"
+        "  state     : equilibrium State (T, P, X)\n"
+        "  T_in      : input temperature [K]\n"
+        "  delta_T   : state.T - T_in [K] (negative = endothermic)\n"
+        "  converged : solver convergence flag")
+        .def_readonly("state", &EquilibriumResult::state, "Equilibrium State (T, P, X)")
+        .def_readonly("T_in", &EquilibriumResult::T_in, "Input temperature [K]")
+        .def_readonly("delta_T", &EquilibriumResult::delta_T, "state.T - T_in [K]")
+        .def_readonly("converged", &EquilibriumResult::converged, "Solver convergence flag")
+        .def("__repr__", [](const EquilibriumResult& r) {
+            return "<EquilibriumResult: T=" + std::to_string(r.state.T) +
+                   " K, delta_T=" + std::to_string(r.delta_T) +
+                   " K, converged=" + (r.converged ? "True" : "False") + ">";
+        });
+
     m.def(
         "transport_state",
         [](double T,
@@ -936,8 +956,8 @@ PYBIND11_MODULE(_core, m)
             in.P = P;
             in.X = X_in;
 
-            State out = wgs_equilibrium_adiabatic(in);
-            return out.T;
+            EquilibriumResult out = wgs_equilibrium_adiabatic(in);
+            return out.state.T;
         },
         py::arg("T_in"),
         py::arg("X_in"),
@@ -1352,92 +1372,69 @@ PYBIND11_MODULE(_core, m)
         "Returns State with same temperature and burned composition."
     );
 
+    // Helper: construct State from (T, P, X_arr) — avoids 4-line boilerplate in every binding
+    auto make_state = [](double T, double P,
+                         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+        State s;
+        s.T = T;
+        s.P = P;
+        s.X = to_vec(X_arr);
+        return s;
+    };
+
     // State-based WGS equilibrium functions
     m.def(
         "wgs_equilibrium",
-        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
-        {
-            State in;
-            in.T = T;
-            in.P = P;
-            in.X = to_vec(X_arr);
-            return wgs_equilibrium(in);
-        },
+        [make_state](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        { return wgs_equilibrium(make_state(T, P, X_arr)); },
         py::arg("T"),
         py::arg("X"),
         py::arg("P") = 101325.0,
         "Isothermal WGS equilibrium (CO + H2O <-> CO2 + H2).\n\n"
-        "Returns State with equilibrium composition at input temperature."
+        "Returns EquilibriumResult with equilibrium composition at input temperature."
     );
 
     m.def(
         "wgs_equilibrium_adiabatic",
-        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
-        {
-            State in;
-            in.T = T;
-            in.P = P;
-            in.X = to_vec(X_arr);
-            return wgs_equilibrium_adiabatic(in);
-        },
+        [make_state](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        { return wgs_equilibrium_adiabatic(make_state(T, P, X_arr)); },
         py::arg("T"),
         py::arg("X"),
         py::arg("P") = 101325.0,
         "Adiabatic WGS equilibrium (CO + H2O <-> CO2 + H2).\n\n"
-        "Returns State with equilibrium temperature and composition."
+        "Returns EquilibriumResult with equilibrium temperature and composition."
     );
 
-    // SMR+WGS equilibrium (CH4 only)
+    // SMR+WGS equilibrium (CH4 only) — deprecated, use reforming_equilibrium instead
     m.def(
         "smr_wgs_equilibrium",
-        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
-        {
-            State in;
-            in.T = T;
-            in.P = P;
-            in.X = to_vec(X_arr);
-            return smr_wgs_equilibrium(in);
-        },
+        [make_state](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        { return smr_wgs_equilibrium(make_state(T, P, X_arr)); },
         py::arg("T"),
         py::arg("X"),
         py::arg("P") = 101325.0,
-        "Isothermal SMR+WGS equilibrium for CH4.\n\n"
-        "Steam Methane Reforming: CH4 + H2O <-> CO + 3H2\n"
-        "Water-Gas Shift: CO + H2O <-> CO2 + H2\n\n"
-        "Returns State with equilibrium composition at input temperature."
+        "Isothermal SMR+WGS equilibrium for CH4 (deprecated).\n\n"
+        "Use reforming_equilibrium instead — it handles CH4 and all other hydrocarbons.\n\n"
+        "Returns EquilibriumResult with equilibrium composition at input temperature."
     );
 
     m.def(
         "smr_wgs_equilibrium_adiabatic",
-        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
-        {
-            State in;
-            in.T = T;
-            in.P = P;
-            in.X = to_vec(X_arr);
-            return smr_wgs_equilibrium_adiabatic(in);
-        },
+        [make_state](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        { return smr_wgs_equilibrium_adiabatic(make_state(T, P, X_arr)); },
         py::arg("T"),
         py::arg("X"),
         py::arg("P") = 101325.0,
-        "Adiabatic SMR+WGS equilibrium for CH4.\n\n"
-        "Steam Methane Reforming: CH4 + H2O <-> CO + 3H2\n"
-        "Water-Gas Shift: CO + H2O <-> CO2 + H2\n\n"
-        "Returns State with equilibrium temperature and composition.\n"
-        "Temperature decreases due to endothermic SMR reaction."
+        "Adiabatic SMR+WGS equilibrium for CH4 (deprecated).\n\n"
+        "Use reforming_equilibrium_adiabatic instead.\n\n"
+        "Returns EquilibriumResult with equilibrium temperature and composition."
     );
 
     // General reforming + WGS equilibrium (all hydrocarbons)
     m.def(
         "reforming_equilibrium",
-        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
-        {
-            State in;
-            in.T = T;
-            in.P = P;
-            in.X = to_vec(X_arr);
-            return reforming_equilibrium(in);
-        },
+        [make_state](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        { return reforming_equilibrium(make_state(T, P, X_arr)); },
         py::arg("T"),
         py::arg("X"),
         py::arg("P") = 101325.0,
@@ -1445,19 +1442,13 @@ PYBIND11_MODULE(_core, m)
         "General reforming: CnHm + n*H2O <-> n*CO + (n + m/2)*H2\n"
         "Water-Gas Shift: CO + H2O <-> CO2 + H2\n\n"
         "Handles all hydrocarbons: CH4, C2H6, C3H8, iC4H10, nC5H12, etc.\n"
-        "Returns State with equilibrium composition at input temperature."
+        "Returns EquilibriumResult with equilibrium composition at input temperature."
     );
 
     m.def(
         "reforming_equilibrium_adiabatic",
-        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
-        {
-            State in;
-            in.T = T;
-            in.P = P;
-            in.X = to_vec(X_arr);
-            return reforming_equilibrium_adiabatic(in);
-        },
+        [make_state](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        { return reforming_equilibrium_adiabatic(make_state(T, P, X_arr)); },
         py::arg("T"),
         py::arg("X"),
         py::arg("P") = 101325.0,
@@ -1465,21 +1456,14 @@ PYBIND11_MODULE(_core, m)
         "General reforming: CnHm + n*H2O <-> n*CO + (n + m/2)*H2\n"
         "Water-Gas Shift: CO + H2O <-> CO2 + H2\n\n"
         "Handles all hydrocarbons: CH4, C2H6, C3H8, iC4H10, nC5H12, etc.\n"
-        "Returns State with equilibrium temperature and composition.\n"
-        "Temperature decreases due to endothermic reforming reactions."
+        "Returns EquilibriumResult with equilibrium temperature and composition."
     );
 
     // Combustion + Equilibrium (convenience function)
     m.def(
         "combustion_equilibrium",
-        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
-        {
-            State in;
-            in.T = T;
-            in.P = P;
-            in.X = to_vec(X_arr);
-            return combustion_equilibrium(in);
-        },
+        [make_state](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        { return combustion_equilibrium(make_state(T, P, X_arr)); },
         py::arg("T"),
         py::arg("X"),
         py::arg("P") = 101325.0,
@@ -2649,8 +2633,17 @@ PYBIND11_MODULE(_core, m)
     );
 
     // =========================================================================
-    // Combustion State
+    // Combustion Method enum + Combustion State
     // =========================================================================
+
+    py::enum_<CombustionMethod>(m, "CombustionMethod",
+        "Product model for combustion_state / combustion_state_from_streams.\n\n"
+        "  Complete    : complete combustion to CO2 + H2O (fast, default)\n"
+        "  Equilibrium : complete combustion + reforming + WGS equilibrium\n"
+        "                (slower, physically correct for rich or high-T conditions)")
+        .value("Complete", CombustionMethod::Complete)
+        .value("Equilibrium", CombustionMethod::Equilibrium)
+        .export_values();
 
     py::class_<CombustionState>(m, "CombustionState",
         "Bundle of combustion properties with nested CompleteState objects.\n\n"
@@ -2658,18 +2651,22 @@ PYBIND11_MODULE(_core, m)
         "Attributes:\n"
         "  phi                : equivalence ratio [-]\n"
         "  fuel_name          : optional fuel label (string)\n"
+        "  method             : CombustionMethod used for products\n"
         "  reactants          : CompleteState at reactant conditions\n"
         "  products           : CompleteState at product conditions (T_ad)\n"
         "  mixture_fraction   : Bilger mixture fraction [-]\n"
         "  fuel_burn_fraction : fraction of fuel burned [0-1]")
         .def_readonly("phi", &CombustionState::phi, "Equivalence ratio [-]")
         .def_readonly("fuel_name", &CombustionState::fuel_name, "Fuel label (e.g., 'CH4', 'Natural Gas')")
+        .def_readonly("method", &CombustionState::method, "CombustionMethod used for products")
         .def_readonly("reactants", &CombustionState::reactants, "Reactant CompleteState (all thermo + transport)")
         .def_readonly("products", &CombustionState::products, "Product CompleteState at T_ad (all thermo + transport)")
         .def_readonly("mixture_fraction", &CombustionState::mixture_fraction, "Bilger mixture fraction [-]")
         .def_readonly("fuel_burn_fraction", &CombustionState::fuel_burn_fraction, "Fraction of fuel burned [0-1]")
         .def("__repr__", [](const CombustionState& s) {
+            std::string method_str = (s.method == CombustionMethod::Equilibrium) ? "Equilibrium" : "Complete";
             return "<CombustionState: phi=" + std::to_string(s.phi) +
+                   ", method=" + method_str +
                    ", T_reactants=" + std::to_string(s.reactants.thermo.T) + " K" +
                    ", T_products=" + std::to_string(s.products.thermo.T) + " K" +
                    (s.fuel_name.empty() ? "" : ", fuel='" + s.fuel_name + "'") + ">";
@@ -2684,21 +2681,21 @@ PYBIND11_MODULE(_core, m)
         py::arg("T_reactants"),
         py::arg("P"),
         py::arg("fuel_name") = "",
+        py::arg("method") = CombustionMethod::Complete,
         "Compute combustion state from equivalence ratio.\n\n"
-        "Typical use: calculations where phi is specified.\n\n"
         "Parameters:\n"
         "  X_fuel       : fuel composition (mole fractions) [-]\n"
         "  X_ox         : oxidizer composition (mole fractions) [-]\n"
-        "  phi          : equivalence ratio [-] (INPUT)\n"
+        "  phi          : equivalence ratio [-]\n"
         "  T_reactants  : reactant temperature [K]\n"
         "  P            : pressure [Pa]\n"
-        "  fuel_name    : optional fuel label (default: '')\n\n"
+        "  fuel_name    : optional fuel label (default: '')\n"
+        "  method       : CombustionMethod.Complete (default) or CombustionMethod.Equilibrium\n\n"
         "Returns: CombustionState with reactants, products, phi, mixture_fraction\n\n"
         "Example:\n"
-        "  >>> X_CH4 = [0]*5 + [1.0] + [0]*8  # Pure methane\n"
-        "  >>> X_air = cb.standard_dry_air_composition()\n"
         "  >>> state = cb.combustion_state(X_CH4, X_air, phi=1.0, T_reactants=300, P=101325)\n"
-        "  >>> state.products.thermo.T  # Adiabatic flame temperature [K]"
+        "  >>> state_eq = cb.combustion_state(X_CH4, X_air, phi=1.2, T_reactants=300, P=101325,\n"
+        "  ...                               method=cb.CombustionMethod.Equilibrium)"
     );
 
     m.def(
@@ -2707,19 +2704,15 @@ PYBIND11_MODULE(_core, m)
         py::arg("fuel_stream"),
         py::arg("ox_stream"),
         py::arg("fuel_name") = "",
+        py::arg("method") = CombustionMethod::Complete,
         "Compute combustion state from measured streams.\n\n"
-        "Typical use: lab measurements where mass flows are measured.\n"
         "Phi is COMPUTED from mass flow rates (output, not input).\n\n"
         "Parameters:\n"
         "  fuel_stream : fuel stream with mdot, T, X\n"
         "  ox_stream   : oxidizer stream with mdot, T, X\n"
-        "  fuel_name   : optional fuel label (default: '')\n\n"
-        "Returns: CombustionState with phi computed from flow rates\n\n"
-        "Example:\n"
-        "  >>> fuel = cb.Stream().set_T(300).set_X(X_CH4).set_mdot(0.01)\n"
-        "  >>> air = cb.Stream().set_T(298).set_X(X_air).set_mdot(0.17)\n"
-        "  >>> state = cb.combustion_state_from_streams(fuel, air, 'CH4')\n"
-        "  >>> state.phi  # Computed from mass flows"
+        "  fuel_name   : optional fuel label (default: '')\n"
+        "  method      : CombustionMethod.Complete (default) or CombustionMethod.Equilibrium\n\n"
+        "Returns: CombustionState with phi computed from flow rates"
     );
 
     // =========================================================================
