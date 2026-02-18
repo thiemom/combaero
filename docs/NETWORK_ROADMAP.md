@@ -1,0 +1,311 @@
+# CombAero Network Solver — Project Roadmap
+
+## Vision
+
+A Python-based thermodynamic network solver with a React GUI, built on top of
+CombAero's C++ physics kernels. Users draw networks of combustion system
+elements, specify boundary conditions, and solve for pressures, temperatures,
+mass flows, and compositions throughout the system.
+
+---
+
+## Tech Stack
+
+| Layer | Technology | License | Rationale |
+|---|---|---|---|
+| Physics kernels | C++ / CombAero | yours | Thermodynamics, transport, acoustics — already exists |
+| Python bindings | pybind11 | BSD | Already exists |
+| Network solver | Python + SciPy `root` | BSD | Phase 1–2; upgrade to CasADi for exact Jacobians in Phase 3+ |
+| Auto-differentiation | CasADi (Phase 3+) | LGPL | Exact sparse Jacobians through element residuals |
+| Graph topology | NetworkX | BSD | Incidence matrix, traversal, validation |
+| Regression elements | scikit-learn / PyTorch | BSD / BSD | Custom element pressure loss maps |
+| API backend | FastAPI | MIT | Exposes solver as `POST /solve` |
+| GUI frontend | React + React Flow | MIT | Node-graph editor |
+| UI components | Tailwind + shadcn/ui | MIT | Controls, panels, results display |
+| Packaging | Docker or PyInstaller | — | Standalone app or server deployment |
+
+---
+
+## Scope Separation: C++ vs Python
+
+```
+┌──────────────────────────────────────────────────────┐
+│  PYTHON — network layer                              │
+│                                                      │
+│  NetworkSolver      Newton iteration, convergence    │
+│  NetworkGraph       topology, validation, assembly   │
+│  NetworkNode ABC    PlenumNode, MomentumChamber,     │
+│                     JunctionNode, BoundaryNode       │
+│  NetworkElement ABC OrificeElement, PipeElement,     │
+│                     CombustionElement, HeatExchanger,│
+│                     RegressionElement, MixingElement │
+│  BoundaryCondition  PressureBC, MassFlowBC           │
+│  MixtureState       P, T, m_dot, X[14]              │
+└────────────────────────┬─────────────────────────────┘
+                         │ pybind11
+┌────────────────────────▼─────────────────────────────┐
+│  C++ — CombAero physics kernels                      │
+│                                                      │
+│  h(), cp(), cv()         mixture enthalpy/heat cap   │
+│  density()               ideal gas law               │
+│  speed_of_sound()        isentropic                  │
+│  viscosity(), prandtl()  transport properties        │
+│  calc_T_from_h()         Newton inversion            │
+│  mole_to_mass()          composition conversion      │
+│  orifice_mass_flow()     Cd·A correlation            │
+│  cooling_correlations    Nusselt, friction factor    │
+│  can_annular_eigenmodes  acoustics (Phase 4)         │
+└──────────────────────────────────────────────────────┘
+```
+
+**Rule:** C++ owns property evaluation and correlations. Python owns equation
+assembly, graph logic, and solver orchestration. The solver never calls C++
+directly — always through element `residuals()`.
+
+---
+
+## Node Types
+
+### Interior Nodes (unknowns solved by Newton)
+
+| Node | Unknowns | Physics |
+|---|---|---|
+| `PlenumNode` | P, T, X | P_total = P_static (v ≈ 0), energy balance |
+| `MomentumChamberNode` | P_static, P_total, v | Isentropic total/static relation, momentum flux, requires flow area |
+| `JunctionNode` | P, T | Massless split/merge, Σṁ = 0 |
+
+### Boundary Nodes (fixed values, contribute no residuals)
+
+| BC | Fixed inputs | Free (solved) | Typical use |
+|---|---|---|---|
+| `PressureBoundary` | P_total, T_total, X | ṁ | Inlet reservoir, atmosphere exit |
+| `MassFlowBoundary` | ṁ, T_total, X | P | Fuel injector, compressor delivery |
+
+**Constraint:** every network requires at least one `PressureBoundary` for
+well-posedness. The solver validates this at setup.
+
+---
+
+## Element Catalogue
+
+### Flow Elements
+
+| Element | Residual | CombAero call |
+|---|---|---|
+| `OrificeElement` | `ṁ = Cd·A·√(2ρΔP)` | `density()` |
+| `PipeElement` | `ΔP = f·(L/D)·½ρv²` | `density()`, `viscosity()` |
+| `MomentumChamberElement` | Momentum + area change | `density()`, `speed_of_sound()` |
+
+### Thermal Elements
+
+| Element | Residual | CombAero call |
+|---|---|---|
+| `HeatExchangerElement` | `Q = h·A·ΔT_LM`, solves T_wall | `prandtl()`, `thermal_conductivity()` |
+| `AdiabticWallElement` | `Q = 0` | — |
+
+### Reaction / Mixing Elements
+
+| Element | Residual | CombAero call |
+|---|---|---|
+| `MixingElement` | Mass + species + enthalpy balance | `h()`, `mole_to_mass()` |
+| `CombustionElement` | Atom balance + energy | `h()`, `calc_T_from_h()` — see `COMBUSTION_ELEMENTS.md` |
+
+### Custom / Data-Driven Elements
+
+| Element | Residual | Backend |
+|---|---|---|
+| `RegressionElement` | `ΔP = model(ṁ, T, ...)` | sklearn / PyTorch |
+
+---
+
+## MixtureState Dataclass
+
+The common currency between all nodes and elements:
+
+```python
+from dataclasses import dataclass, field
+
+@dataclass
+class MixtureState:
+    P: float                    # static pressure [Pa]
+    P_total: float              # total pressure [Pa]
+    T: float                    # static temperature [K]
+    T_total: float              # total temperature [K]
+    m_dot: float                # mass flow rate [kg/s]
+    X: list[float]              # mole fractions [14 species]
+
+    # Derived — computed on demand via CombAero
+    def density(self) -> float: ...
+    def enthalpy(self) -> float: ...
+    def speed_of_sound(self) -> float: ...
+```
+
+For a plenum node `P = P_total` and `T = T_total`. For a momentum chamber
+node they differ and the isentropic relation closes the system.
+
+---
+
+## Abstract Interfaces
+
+```python
+from abc import ABC, abstractmethod
+
+class NetworkNode(ABC):
+    @abstractmethod
+    def unknowns(self) -> list[str]:
+        """Names of unknowns this node contributes to the solver."""
+        ...
+
+    @abstractmethod
+    def residuals(self, state: MixtureState) -> list[float]:
+        """Returns zero when node equations are satisfied."""
+        ...
+
+class NetworkElement(ABC):
+    @abstractmethod
+    def residuals(self,
+                  state_in: MixtureState,
+                  state_out: MixtureState) -> list[float]:
+        """Returns zero when element equations are satisfied."""
+        ...
+
+    @abstractmethod
+    def n_equations(self) -> int:
+        """Number of residual equations contributed."""
+        ...
+```
+
+---
+
+## Network JSON Format
+
+```json
+{
+  "nodes": [
+    {
+      "id": "inlet",
+      "type": "pressure_bc",
+      "P_total": 500000,
+      "T_total": 700,
+      "X": {"N2": 0.76, "O2": 0.21, "AR": 0.01, "CO2": 0.02}
+    },
+    {
+      "id": "plenum_1",
+      "type": "plenum"
+    },
+    {
+      "id": "chamber_1",
+      "type": "momentum_chamber",
+      "area": 0.05
+    },
+    {
+      "id": "exit",
+      "type": "pressure_bc",
+      "P_total": 101325,
+      "T_total": 300,
+      "X": {"N2": 0.79, "O2": 0.21}
+    }
+  ],
+  "edges": [
+    {
+      "id": "orif_1",
+      "type": "orifice",
+      "from": "inlet",
+      "to": "plenum_1",
+      "Cd": 0.7,
+      "area": 0.001
+    },
+    {
+      "id": "burner_1",
+      "type": "combustion",
+      "from": "plenum_1",
+      "to": "chamber_1",
+      "eta": 0.99,
+      "delta_P_frac": 0.04,
+      "fuel": {
+        "type": "mass_flow_bc",
+        "m_dot": 0.05,
+        "T_total": 300,
+        "X": {"CH4": 1.0}
+      }
+    },
+    {
+      "id": "orif_2",
+      "type": "orifice",
+      "from": "chamber_1",
+      "to": "exit",
+      "Cd": 0.65,
+      "area": 0.002
+    }
+  ]
+}
+```
+
+---
+
+## Phased Roadmap
+
+### Phase 1 — Isothermal Flow Network
+
+**Goal:** solve P and ṁ throughout a network of orifices, pipes, and plenums.
+
+- `MixtureState`: P and ṁ only (T and X fixed, no composition tracking)
+- Nodes: `PlenumNode`, `JunctionNode`, `PressureBoundary`, `MassFlowBoundary`
+- Elements: `OrificeElement`, `PipeElement`
+- Solver: `scipy.optimize.root` with finite-difference Jacobian
+- Graph: NetworkX incidence matrix for equation assembly
+- Network described and validated via JSON
+- **No GUI** — JSON in, JSON out
+- Validation: orifices in series/parallel, known analytical solutions
+
+### Phase 2 — Combustion and Composition
+
+**Goal:** track mixture composition and temperature; add combustion element.
+
+- `MixtureState` gains T and X[14]
+- Nodes: `MomentumChamberNode` with total/static distinction
+- Elements: `CombustionElement`, `MixingElement`, `RegressionElement`
+- Segregated solve: flow first, then energy/composition propagation
+- See `COMBUSTION_ELEMENTS.md` for combustion function design
+- Validation: adiabatic flame temperature against Cantera
+
+### Phase 3 — Heat Exchange
+
+**Goal:** conjugate heat transfer between streams through walls.
+
+- `HeatExchangerElement` with `T_wall` as additional unknown per segment
+- Nusselt correlations via `cooling_correlations` (already in CombAero)
+- Upgrade solver to CasADi for exact sparse Jacobians
+- Fully coupled Newton solve over [P, ṁ, T, T_wall, X]
+- BC types: fixed T_wall, fixed Q, adiabatic, convective both sides
+
+### Phase 4 — GUI
+
+**Goal:** visual network editor. Can develop in parallel with Phase 2–3.
+
+- React + React Flow node-graph editor
+- Nodes and edges map 1:1 to Python element classes
+- FastAPI backend: `POST /solve` accepts network JSON, returns solution JSON
+- Results overlay: colour-coded P, T, ṁ per element
+- Export: network JSON, CSV results
+
+### Phase 5 — Acoustics
+
+**Goal:** linearise mean flow solution → acoustic transfer matrix propagation.
+
+- Mean flow from Phase 1–3 provides the operating point
+- Acoustic transfer matrices propagate on top of mean flow
+- `can_annular_eigenmodes`, `annular_duct_modes` already in CombAero
+- Assemble global transfer matrix from element acoustic matrices
+- GUI: display mode shapes and frequency response
+
+---
+
+## Well-Posedness Rules
+
+1. Every network requires ≥1 `PressureBoundary`
+2. Number of pressure BCs + mass flow BCs = number of independent flow paths
+3. Every node must be reachable from a boundary node
+4. No isolated subgraphs
+
+The solver validates all four at setup before attempting Newton iteration.
