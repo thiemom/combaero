@@ -60,10 +60,9 @@ class TestAirPropertiesStruct:
         props = cb.air_properties(T, P)
         repr_str = repr(props)
 
-        # Should contain key properties
-        assert "AirProperties" in repr_str
-        assert "rho=" in repr_str
-        assert "kg/m" in repr_str
+        # Should contain key properties (AirProperties is now an alias for TransportState)
+        assert "AirProperties" in repr_str or "TransportState" in repr_str
+        assert "mu=" in repr_str
 
 
 class TestAirPropertiesDryAir:

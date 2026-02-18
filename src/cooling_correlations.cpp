@@ -12,7 +12,7 @@ namespace combaero::cooling {
 // Helper Functions
 // -------------------------------------------------------------
 
-void validate_rib_params(double e_D, double P_e, double alpha) {
+void validate_rib_params(double e_D, double P_e) {
     if (e_D < 0.02 || e_D > 0.1) {
         throw std::runtime_error(
             "Rib height ratio e_D = " + std::to_string(e_D) +
@@ -25,6 +25,10 @@ void validate_rib_params(double e_D, double P_e, double alpha) {
             " is outside valid range [5, 20]"
         );
     }
+}
+
+void validate_rib_params(double e_D, double P_e, double alpha) {
+    validate_rib_params(e_D, P_e);
     if (alpha < 30.0 || alpha > 90.0) {
         throw std::runtime_error(
             "Rib angle alpha = " + std::to_string(alpha) +
@@ -104,19 +108,7 @@ double rib_enhancement_factor(double e_D, double P_e, double alpha) {
 }
 
 double rib_friction_multiplier(double e_D, double P_e) {
-    // Validate only e_D and P_e (alpha not needed for friction)
-    if (e_D < 0.02 || e_D > 0.1) {
-        throw std::runtime_error(
-            "Rib height ratio e_D = " + std::to_string(e_D) +
-            " is outside valid range [0.02, 0.1]"
-        );
-    }
-    if (P_e < 5.0 || P_e > 20.0) {
-        throw std::runtime_error(
-            "Rib pitch ratio P_e = " + std::to_string(P_e) +
-            " is outside valid range [5, 20]"
-        );
-    }
+    validate_rib_params(e_D, P_e);
 
     // Han et al. (1988) friction correlation
     // f/f_smooth = C * (e/D)^a * (P/e)^b
@@ -398,18 +390,16 @@ double effusion_discharge_coefficient(
     // Use isentropic flow relations for subsonic flow
     // gamma = 1.4 for air
     const double gamma = 1.4;
-    double P_crit = std::pow(2.0 / (gamma + 1.0), gamma / (gamma - 1.0));  // ~0.528
 
-    double f_compress;
-    if (P_ratio < 1.0 / P_crit) {
-        // Subsonic flow: use isentropic relation
-        double term = std::pow(P_ratio, 2.0 / gamma) - std::pow(P_ratio, (gamma + 1.0) / gamma);
-        f_compress = std::sqrt(term / (1.0 - P_ratio));
-        f_compress = std::max(0.9, std::min(1.1, f_compress));
-    } else {
-        // Choked flow (shouldn't happen for P_ratio < 1.15, but handle it)
-        f_compress = 1.0;
-    }
+    // Isentropic mass-flow function Psi(p) = sqrt((2g/(g-1))*(p^(2/g) - p^((g+1)/g)))
+    // where p = P_downstream/P_upstream = 1/P_ratio (P_ratio = P_plenum/P_mainstream > 1)
+    // Psi(1) = 0 (no flow at zero pressure drop), so normalise to Psi at P_ratio_ref = 1.02
+    auto psi = [gamma](double p) {
+        return std::sqrt((2.0 * gamma / (gamma - 1.0)) *
+            (std::pow(p, 2.0 / gamma) - std::pow(p, (gamma + 1.0) / gamma)));
+    };
+    const double p_ref = 1.0 / 1.02;
+    const double f_compress = psi(1.0 / P_ratio) / psi(p_ref);
 
     // Combined discharge coefficient
     double Cd = Cd_base * f_Re * f_angle * f_compress;
@@ -485,7 +475,7 @@ double pin_fin_nusselt(
 // -------------------------------------------------------------
 
 // Validate dimple parameters
-void validate_dimple_params(double Re_Dh, double d_Dh, double h_d, double S_d) {
+void validate_dimple_params(double Re_Dh, double d_Dh, double h_d) {
     if (Re_Dh < 10000.0 || Re_Dh > 80000.0) {
         throw std::runtime_error("Dimple Re_Dh must be in range [10000, 80000], got " + std::to_string(Re_Dh));
     }
@@ -495,6 +485,10 @@ void validate_dimple_params(double Re_Dh, double d_Dh, double h_d, double S_d) {
     if (h_d < 0.1 || h_d > 0.3) {
         throw std::runtime_error("Dimple h_d must be in range [0.1, 0.3], got " + std::to_string(h_d));
     }
+}
+
+void validate_dimple_params(double Re_Dh, double d_Dh, double h_d, double S_d) {
+    validate_dimple_params(Re_Dh, d_Dh, h_d);
     if (S_d < 1.5 || S_d > 3.0) {
         throw std::runtime_error("Dimple S_d must be in range [1.5, 3.0], got " + std::to_string(S_d));
     }
@@ -540,16 +534,7 @@ double dimple_friction_multiplier(
     double d_Dh,
     double h_d
 ) {
-    // Validate Re and geometry (S_d not needed for friction)
-    if (Re_Dh < 10000.0 || Re_Dh > 80000.0) {
-        throw std::runtime_error("Dimple Re_Dh must be in range [10000, 80000], got " + std::to_string(Re_Dh));
-    }
-    if (d_Dh < 0.1 || d_Dh > 0.3) {
-        throw std::runtime_error("Dimple d_Dh must be in range [0.1, 0.3], got " + std::to_string(d_Dh));
-    }
-    if (h_d < 0.1 || h_d > 0.3) {
-        throw std::runtime_error("Dimple h_d must be in range [0.1, 0.3], got " + std::to_string(h_d));
-    }
+    validate_dimple_params(Re_Dh, d_Dh, h_d);
 
     // Friction penalty for dimples (Chyu et al. 1997)
     // Much lower than ribs (1.5-2.0x vs 6-10x)

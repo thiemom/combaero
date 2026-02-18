@@ -87,6 +87,9 @@ struct TransportState {
     double alpha;  // Thermal diffusivity [m²/s]
     double Pr;     // Prandtl number [-]
     double cp;     // Specific heat at constant pressure [J/(kg·K)]
+    double cv;     // Specific heat at constant volume [J/(kg·K)]
+    double gamma;  // Heat capacity ratio cp/cv [-]
+    double a;      // Speed of sound [m/s]
 };
 
 // -------------------------------------------------------------
@@ -114,20 +117,9 @@ struct ThermoState {
     double mw;        // Molecular weight [g/mol]
 };
 
-// Bundle of air properties for convenient access
-// All properties computed from (T, P, humidity) in a single call
-struct AirProperties {
-    double rho;      // Density [kg/m³]
-    double mu;       // Dynamic viscosity [Pa·s]
-    double k;        // Thermal conductivity [W/(m·K)]
-    double cp;       // Specific heat at constant pressure [J/(kg·K)]
-    double cv;       // Specific heat at constant volume [J/(kg·K)]
-    double Pr;       // Prandtl number [-]
-    double nu;       // Kinematic viscosity [m²/s]
-    double alpha;    // Thermal diffusivity [m²/s]
-    double gamma;    // Heat capacity ratio [-]
-    double a;        // Speed of sound [m/s]
-};
+// AirProperties is an alias for TransportState.
+// air_properties(T, P, humidity) returns a TransportState with all fields populated.
+using AirProperties = TransportState;
 
 // Bundle of thermodynamic and transport properties for a gas mixture
 // Combines ThermoState + TransportState in a single call

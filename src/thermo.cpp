@@ -737,6 +737,8 @@ AirProperties air_properties(double T, double P, double humidity) {
 
     // Compute all properties
     AirProperties props;
+    props.T = T;
+    props.P = P;
 
     // Thermodynamic properties
     props.rho = density(T, P, X);

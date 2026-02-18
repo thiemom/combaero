@@ -44,8 +44,7 @@ double nusselt_gnielinski(double Re, double Pr, double f) {
 }
 
 double nusselt_gnielinski(double Re, double Pr) {
-    // Use Petukhov friction factor for smooth pipe
-    double f = friction_petukhov(std::max(Re, 3000.0));
+    double f = friction_petukhov(Re);
     return nusselt_gnielinski(Re, Pr, f);
 }
 

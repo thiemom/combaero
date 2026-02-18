@@ -275,12 +275,14 @@ double cooled_wall_heat_flux(double T_hot, double T_coolant,
                              double eta,
                              double t_wall, double k_wall);
 
+void validate_rib_params(double e_D, double P_e);
 void validate_rib_params(double e_D, double P_e, double alpha);
 void validate_impingement_params(double Re_jet, double z_D, double x_D, double y_D);
 void validate_film_cooling_params(double M, double DR, double alpha_deg);
 void validate_effusion_params(double M, double DR, double porosity, double s_D, double alpha_deg);
 void validate_effusion_discharge_params(double Re_d, double P_ratio, double alpha_deg, double L_D);
 void validate_pin_fin_params(double Re_d, double L_D, double S_D, double X_D);
+void validate_dimple_params(double Re_Dh, double d_Dh, double h_d);
 void validate_dimple_params(double Re_Dh, double d_Dh, double h_d, double S_d);
 
 } // namespace combaero::cooling

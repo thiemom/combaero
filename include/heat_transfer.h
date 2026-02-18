@@ -243,8 +243,13 @@ inline double heat_transfer_dT(double Q, double U, double A) {
 // -------------------------------------------------------------
 
 // Temperature profile through a multi-layer wall
-// Returns vector of temperatures at each interface:
-//   [T_hot_surface, T_layer1_2, T_layer2_3, ..., T_cold_surface]
+// Returns N+1 wall-surface temperatures (not bulk fluid temperatures):
+//   [T_wall_hot_surface, T_layer1_2, T_layer2_3, ..., T_wall_cold_surface]
+// where N = number of conductive layers.
+//
+// Note: T_wall_hot_surface = T_hot - q/h_hot  (hot wall surface, inside boundary layer)
+//       T_wall_cold_surface = last element     (cold wall surface, inside boundary layer)
+//       To recover cold bulk: T_cold_bulk = T_wall_cold_surface - q/h_cold
 //
 // Parameters:
 //   T_hot      : hot-side bulk fluid temperature [K]
