@@ -51,6 +51,37 @@ python generate_thermo_data.py \
     --output ../include/thermo_transport_data.h
 ```
 
+### Step 4: Check common-name completeness (optional)
+
+`include/common_names.h` maps formula → human-readable name (e.g. `CH4` → `"Methane"`).
+It is **maintained by hand** because common names are editorial choices (history, culture,
+trade names) that cannot be derived from formulas or thermo data.
+
+When adding new species, verify they have an entry in `common_names.h`:
+
+```bash
+python generate_thermo_data.py \
+    --json species.json \
+    --species "N2,O2,C2H4" \
+    --check-names \
+    --output ../include/thermo_transport_data.h
+```
+
+Use `--strict` to make missing entries a hard error (useful in CI):
+
+```bash
+python generate_thermo_data.py --json species.json --species "..." \
+    --check-names --strict --output ../include/thermo_transport_data.h
+```
+
+**Convention for adding a new species:**
+1. Add thermo/transport data to `merged_species.json` (via `extract_species_data.py`)
+2. Add the formula → name mapping to `include/common_names.h` (both `formula_to_name` and `name_to_formula`)
+3. Regenerate `include/thermo_transport_data.h` with `--check-names`
+
+`include/common_names.h` is the **single source of truth** for common names.
+`merged_species.json` is gitignored (large derived file) and carries no name data.
+
 ## Scripts
 
 | Script | Purpose |
@@ -120,14 +151,18 @@ Coefficients a8, a9 are integration constants for H and S.
   "species": [
     {
       "name": "N2",
+      "name_normalized": "N2",
       "molar_mass": 28.014,
-      "thermo_nasa7": {...},
-      "thermo_nasa9": {"intervals": [...]},
-      "transport": {"geometry": "linear", ...}
+      "thermo_nasa7": {"...": "..."},
+      "thermo_nasa9": {"intervals": ["..."]},
+      "transport": {"geometry": "linear"}
     }
   ]
 }
 ```
+
+The `common_name` field shown above is illustrative; `merged_species.json` is gitignored
+and not the authoritative source. The canonical mapping lives in `include/common_names.h`.
 
 ### C++ Header (from generate_thermo_data.py)
 

@@ -604,6 +604,61 @@ using G = MolecularGeometry;
 
 
 # -----------------------------------------------------------------------------
+# Common-name completeness check
+# -----------------------------------------------------------------------------
+
+
+def _parse_common_names_header(header_path: Path) -> set[str]:
+    """Extract the set of formula keys from common_names.h.
+
+    Parses lines of the form:  {"FORMULA", "..."},
+    Returns the set of formula strings (upper-cased).
+    """
+    known: set[str] = set()
+    pattern = re.compile(r'\{\s*"([^"]+)"\s*,')
+    try:
+        for line in header_path.read_text().splitlines():
+            m = pattern.search(line)
+            if m:
+                known.add(m.group(1).upper())
+    except FileNotFoundError:
+        pass
+    return known
+
+
+def check_common_names(
+    species: list[SpeciesData],
+    header_path: Path,
+    *,
+    error_on_missing: bool = False,
+) -> list[str]:
+    """Warn (or error) for species that have no entry in common_names.h.
+
+    Args:
+        species: loaded species list
+        header_path: path to include/common_names.h
+        error_on_missing: if True, treat missing entries as an error
+
+    Returns:
+        list of formula strings that are missing from common_names.h
+    """
+    known = _parse_common_names_header(header_path)
+    missing = [sp.name for sp in species if sp.name.upper() not in known]
+
+    if missing:
+        tag = "ERROR" if error_on_missing else "Warning"
+        print(f"{tag}: {len(missing)} species have no entry in common_names.h:")
+        for name in sorted(missing):
+            print(f"  {name}")
+        print(
+            "  Add them manually to include/common_names.h and "
+            "thermo_data_generator/merged_species.json."
+        )
+
+    return missing
+
+
+# -----------------------------------------------------------------------------
 # Main
 # -----------------------------------------------------------------------------
 
@@ -666,6 +721,20 @@ def main() -> int:
         default=Path("thermo_transport_data.h"),
         help="Output header file (default: thermo_transport_data.h)",
     )
+    parser.add_argument(
+        "--check-names",
+        action="store_true",
+        help=(
+            "After loading species, warn for any that lack an entry in "
+            "include/common_names.h. Use --check-names --strict to treat "
+            "missing entries as an error."
+        ),
+    )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Combined with --check-names: exit non-zero if any species is missing a common name.",
+    )
 
     args = parser.parse_args()
 
@@ -712,6 +781,14 @@ def main() -> int:
         return 1
 
     print(f"Loaded {len(species_data)} species, format: {nasa_format.name}")
+
+    # Common-name completeness check
+    if args.check_names:
+        repo_root = Path(__file__).parent.parent
+        header_path = repo_root / "include" / "common_names.h"
+        missing = check_common_names(species_data, header_path, error_on_missing=args.strict)
+        if args.strict and missing:
+            return 1
 
     # Check for missing transport
     missing_transport = [sp.name for sp in species_data if sp.transport is None]
