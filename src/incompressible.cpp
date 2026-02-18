@@ -146,3 +146,44 @@ double velocity_from_q(double q, double rho)
     // v = √(2 · q / ρ)
     return std::sqrt(2.0 * q / rho);
 }
+
+// -------------------------------------------------------------
+// Pressure loss coefficient (zeta / K)
+// -------------------------------------------------------------
+
+double pressure_loss(double v, double rho, double zeta)
+{
+    if (rho <= 0.0 || zeta < 0.0) {
+        throw std::invalid_argument("pressure_loss: rho > 0 and zeta >= 0 required");
+    }
+    // ΔP = ζ · ½ρv²
+    return zeta * 0.5 * rho * v * v;
+}
+
+double velocity_from_pressure_loss(double dP, double rho, double zeta)
+{
+    if (dP < 0.0 || rho <= 0.0 || zeta <= 0.0) {
+        throw std::invalid_argument(
+            "velocity_from_pressure_loss: dP >= 0, rho > 0, zeta > 0 required");
+    }
+    // v = √(2·ΔP / (ζ·ρ))
+    return std::sqrt(2.0 * dP / (zeta * rho));
+}
+
+double zeta_from_Cd(double Cd)
+{
+    if (Cd <= 0.0) {
+        throw std::invalid_argument("zeta_from_Cd: Cd must be positive");
+    }
+    // ζ = 1 / Cd²
+    return 1.0 / (Cd * Cd);
+}
+
+double Cd_from_zeta(double zeta)
+{
+    if (zeta <= 0.0) {
+        throw std::invalid_argument("Cd_from_zeta: zeta must be positive");
+    }
+    // Cd = 1 / √ζ
+    return 1.0 / std::sqrt(zeta);
+}

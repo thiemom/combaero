@@ -127,4 +127,44 @@ double velocity_from_q(double q, double rho);
 // - hydraulic_diameter_rect(a, b)
 // - hydraulic_diameter_annulus(D_outer, D_inner)
 
+// -------------------------------------------------------------
+// Pressure loss coefficient (zeta / K)
+// -------------------------------------------------------------
+//
+// The pressure loss coefficient ζ (also written K) relates pressure drop
+// to dynamic pressure:
+//
+//   ΔP = ζ · ½ρv²
+//
+// where v is the reference velocity (at the throat / restriction area).
+// This form is geometry-independent and applies to any local restriction:
+// bends, valves, sudden expansions, orifices, etc.
+//
+// Relationship to discharge coefficient Cd (throat area as reference):
+//
+//   ζ = 1 / Cd²     Cd = 1 / √ζ
+//
+// Note: orifice.h provides K_from_Cd(Cd, beta) / Cd_from_K(K, beta) which
+// include the area-ratio (β⁴) correction for pipe orifices where the
+// reference velocity is the upstream pipe velocity, not the throat velocity.
+// Use the functions below when the reference area IS the throat area.
+
+// Pressure drop from velocity and loss coefficient.
+// ΔP = ζ · ½ρv²
+// Returns: pressure drop [Pa]
+double pressure_loss(double v, double rho, double zeta);
+
+// Velocity from pressure drop and loss coefficient.
+// v = √(2·ΔP / (ζ·ρ))
+// Returns: velocity [m/s]
+double velocity_from_pressure_loss(double dP, double rho, double zeta);
+
+// Loss coefficient from discharge coefficient (throat area as reference).
+// ζ = 1 / Cd²
+double zeta_from_Cd(double Cd);
+
+// Discharge coefficient from loss coefficient (throat area as reference).
+// Cd = 1 / √ζ
+double Cd_from_zeta(double zeta);
+
 #endif // INCOMPRESSIBLE_H
