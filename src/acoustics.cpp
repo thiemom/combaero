@@ -1,4 +1,6 @@
 #include "../include/acoustics.h"
+#include "../include/acoustics_internal.h"
+#include "../include/can_annular_solvers.h"
 #include "../include/math_constants.h"
 #include <algorithm>
 #include <cmath>
@@ -1230,57 +1232,8 @@ std::vector<BlochMode> can_annular_eigenmodes(
         throw std::runtime_error("Maximum frequency must be positive");
     }
 
-    // Delegate to magnitude minimization solver (fast, reliable)
-    // For research-grade Argument Principle, use can_annular_eigenmodes_with_method
-    std::vector<BlochMode> modes;
-    int m_max = geom.n_cans / 2;
-
-    // Continuous sliding window scan
-    double scan_window_width = 50.0;
-
-    for (int m = 0; m <= m_max; ++m) {
-        for (double f_start = 10.0; f_start < f_max; f_start += scan_window_width) {
-            double f_end = std::min(f_start + scan_window_width, f_max);
-
-            auto guesses = find_zero_guesses(
-                m, geom, c_can, c_plenum, rho_can, rho_plenum,
-                f_start, f_end, bc_can_top, 2
-            );
-
-            for (double f_guess : guesses) {
-                double f_refined = refine_root_muller(
-                    f_guess, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_can_top
-                );
-
-                if (f_refined > 1.0 && f_refined < f_max) {
-                    double omega_refined = 2.0 * M_PI * f_refined;
-                    auto D_refined = dispersion_relation(
-                        omega_refined, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_can_top
-                    );
-
-                    if (std::abs(D_refined) < 0.1) {
-                        bool is_duplicate = false;
-                        for (const auto& existing : modes) {
-                            if (existing.m_azimuthal == m &&
-                                std::abs(existing.frequency - f_refined) < 1.0) {
-                                is_duplicate = true;
-                                break;
-                            }
-                        }
-
-                        if (!is_duplicate) {
-                            modes.push_back({m, f_refined, geom.n_cans});
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    std::sort(modes.begin(), modes.end(),
-              [](const BlochMode& a, const BlochMode& b) { return a.frequency < b.frequency; });
-
-    return modes;
+    // Delegate to the canonical magnitude-minimization solver.
+    return solve_magnitude_minimization(geom, c_can, c_plenum, rho_can, rho_plenum, f_max, bc_can_top);
 }
 
 // -------------------------------------------------------------
