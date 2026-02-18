@@ -5,7 +5,6 @@
 #include <cstddef>
 #include <string>
 #include <vector>
-#include "transport.h"
 
 namespace combaero::thermo {
 
@@ -78,21 +77,7 @@ double u_mass(double T, const std::vector<double>& X);   // [J/kg]
 // -------------------------------------------------------------
 // Air Properties Bundle
 // -------------------------------------------------------------
-
-// Bundle of air properties for convenient access
-// All properties computed from (T, P, humidity) in a single call
-struct AirProperties {
-    double rho;      // Density [kg/m³]
-    double mu;       // Dynamic viscosity [Pa·s]
-    double k;        // Thermal conductivity [W/(m·K)]
-    double cp;       // Specific heat at constant pressure [J/(kg·K)]
-    double cv;       // Specific heat at constant volume [J/(kg·K)]
-    double Pr;       // Prandtl number [-]
-    double nu;       // Kinematic viscosity [m²/s]
-    double alpha;    // Thermal diffusivity [m²/s]
-    double gamma;    // Heat capacity ratio [-]
-    double a;        // Speed of sound [m/s]
-};
+// AirProperties is defined in state.h
 
 // Compute all air properties at once
 // Parameters:
@@ -105,27 +90,7 @@ AirProperties air_properties(double T, double P, double humidity = 0.0);
 // -------------------------------------------------------------
 // Thermodynamic State Bundle
 // -------------------------------------------------------------
-
-// Bundle of thermodynamic properties for a gas mixture
-// All properties computed from (T, P, X) in a single call
-struct ThermoState {
-    double T;         // Temperature [K] (input, echoed back)
-    double P;         // Pressure [Pa] (input, echoed back)
-    double rho;       // Density [kg/m³]
-    double cp;        // Specific heat at constant pressure [J/(mol·K)]
-    double cv;        // Specific heat at constant volume [J/(mol·K)]
-    double h;         // Specific enthalpy [J/mol]
-    double s;         // Specific entropy [J/(mol·K)]
-    double u;         // Specific internal energy [J/mol]
-    double gamma;     // Isentropic expansion coefficient [-]
-    double a;         // Speed of sound [m/s]
-    double cp_mass;   // Mass-specific cp [J/(kg·K)]
-    double cv_mass;   // Mass-specific cv [J/(kg·K)]
-    double h_mass;    // Mass-specific enthalpy [J/kg]
-    double s_mass;    // Mass-specific entropy [J/(kg·K)]
-    double u_mass;    // Mass-specific internal energy [J/kg]
-    double mw;        // Molecular weight [g/mol]
-};
+// ThermoState is defined in state.h
 
 // Compute all thermodynamic properties at once
 // Parameters:
@@ -139,13 +104,7 @@ ThermoState thermo_state(double T, double P, const std::vector<double>& X, doubl
 // -------------------------------------------------------------
 // Complete State Bundle (Thermo + Transport)
 // -------------------------------------------------------------
-
-// Bundle of thermodynamic and transport properties for a gas mixture
-// Combines ThermoState + TransportState in a single call
-struct CompleteState {
-    ThermoState thermo;       // All 16 thermodynamic properties
-    TransportState transport; // All 9 transport properties
-};
+// CompleteState is defined in state.h
 
 // Compute all thermodynamic and transport properties at once
 // Parameters:

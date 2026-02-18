@@ -1,6 +1,7 @@
 #ifndef STATE_H
 #define STATE_H
 
+#include <string>
 #include <vector>
 
 // NOTE: For better performance, consider making T, P, X private with
@@ -69,5 +70,84 @@ struct Stream {
 // Mix multiple streams, solving mass and enthalpy balance
 // P_out: output pressure (default -1 means use minimum inlet pressure)
 Stream mix(const std::vector<Stream>& streams, double P_out = -1.0);
+
+// -------------------------------------------------------------
+// Transport State Bundle
+// -------------------------------------------------------------
+
+// Bundle of transport properties for a gas mixture
+// All properties computed from (T, P, X) in a single call
+struct TransportState {
+    double T;      // Temperature [K] (input, echoed back)
+    double P;      // Pressure [Pa] (input, echoed back)
+    double rho;    // Density [kg/m³]
+    double mu;     // Dynamic viscosity [Pa·s]
+    double k;      // Thermal conductivity [W/(m·K)]
+    double nu;     // Kinematic viscosity [m²/s]
+    double alpha;  // Thermal diffusivity [m²/s]
+    double Pr;     // Prandtl number [-]
+    double cp;     // Specific heat at constant pressure [J/(kg·K)]
+};
+
+// -------------------------------------------------------------
+// Thermo State Bundles
+// -------------------------------------------------------------
+
+// Bundle of thermodynamic properties for a gas mixture
+// All properties computed from (T, P, X) in a single call
+struct ThermoState {
+    double T;         // Temperature [K] (input, echoed back)
+    double P;         // Pressure [Pa] (input, echoed back)
+    double rho;       // Density [kg/m³]
+    double cp;        // Specific heat at constant pressure [J/(mol·K)]
+    double cv;        // Specific heat at constant volume [J/(mol·K)]
+    double h;         // Specific enthalpy [J/mol]
+    double s;         // Specific entropy [J/(mol·K)]
+    double u;         // Specific internal energy [J/mol]
+    double gamma;     // Isentropic expansion coefficient [-]
+    double a;         // Speed of sound [m/s]
+    double cp_mass;   // Mass-specific cp [J/(kg·K)]
+    double cv_mass;   // Mass-specific cv [J/(kg·K)]
+    double h_mass;    // Mass-specific enthalpy [J/kg]
+    double s_mass;    // Mass-specific entropy [J/(kg·K)]
+    double u_mass;    // Mass-specific internal energy [J/kg]
+    double mw;        // Molecular weight [g/mol]
+};
+
+// Bundle of air properties for convenient access
+// All properties computed from (T, P, humidity) in a single call
+struct AirProperties {
+    double rho;      // Density [kg/m³]
+    double mu;       // Dynamic viscosity [Pa·s]
+    double k;        // Thermal conductivity [W/(m·K)]
+    double cp;       // Specific heat at constant pressure [J/(kg·K)]
+    double cv;       // Specific heat at constant volume [J/(kg·K)]
+    double Pr;       // Prandtl number [-]
+    double nu;       // Kinematic viscosity [m²/s]
+    double alpha;    // Thermal diffusivity [m²/s]
+    double gamma;    // Heat capacity ratio [-]
+    double a;        // Speed of sound [m/s]
+};
+
+// Bundle of thermodynamic and transport properties for a gas mixture
+// Combines ThermoState + TransportState in a single call
+struct CompleteState {
+    ThermoState thermo;       // All 16 thermodynamic properties
+    TransportState transport; // All 9 transport properties
+};
+
+// -------------------------------------------------------------
+// Combustion State Bundle
+// -------------------------------------------------------------
+
+// Bundle of combustion properties with nested CompleteState objects
+struct CombustionState {
+    double phi;                    // Equivalence ratio [-]
+    std::string fuel_name;         // Optional fuel label (e.g., "CH4", "Natural Gas")
+    CompleteState reactants;       // Reactant state (all thermo + transport properties)
+    CompleteState products;        // Product state (all thermo + transport properties)
+    double mixture_fraction;       // Bilger mixture fraction [-]
+    double fuel_burn_fraction;     // Fraction of fuel burned [0-1]
+};
 
 #endif // STATE_H

@@ -2,7 +2,6 @@
 #define COMBUSTION_H
 
 #include "state.h"
-#include "thermo.h"
 #include <cstddef>
 #include <vector>
 #include <string>
@@ -206,16 +205,7 @@ State complete_combustion_isothermal(const State& in);
 // -------------------------------------------------------------
 // Combustion State Dataclass
 // -------------------------------------------------------------
-
-// Bundle of combustion properties with nested CompleteState objects
-struct CombustionState {
-    double phi;                    // Equivalence ratio [-]
-    std::string fuel_name;         // Optional fuel label (e.g., "CH4", "Natural Gas")
-    CompleteState reactants;       // Reactant state (all thermo + transport properties)
-    CompleteState products;        // Product state (all thermo + transport properties)
-    double mixture_fraction;       // Bilger mixture fraction [-]
-    double fuel_burn_fraction;     // Fraction of fuel burned [0-1]
-};
+// CombustionState is defined in state.h
 
 // Compute combustion state from equivalence ratio (typical for calculations)
 // Parameters:

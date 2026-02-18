@@ -11,6 +11,12 @@ The single return type from all combustion and mixing functions. Contains the
 complete thermodynamic state of the burned/mixed stream — everything the network
 solver needs to continue propagating state downstream.
 
+> **Note:** The existing C++ `CombustionState` struct (reactants + products +
+> phi + mixture_fraction) lives in `include/state.h` alongside `State`,
+> `Stream`, `TransportState`, `ThermoState`, `AirProperties`, and
+> `CompleteState`. All state types are consolidated there as the single
+> source of truth for the state design pattern.
+
 ```python
 from dataclasses import dataclass
 
