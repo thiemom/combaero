@@ -1887,38 +1887,38 @@ PYBIND11_MODULE(_core, m)
     // CompressibleFlowSolution struct
     py::class_<CompressibleFlowSolution>(m, "CompressibleFlowSolution")
         .def(py::init<>())
-        .def_readwrite("stagnation", &CompressibleFlowSolution::stagnation, "Stagnation state")
-        .def_readwrite("outlet", &CompressibleFlowSolution::outlet, "Outlet static state")
-        .def_readwrite("v", &CompressibleFlowSolution::v, "Outlet velocity [m/s]")
-        .def_readwrite("M", &CompressibleFlowSolution::M, "Outlet Mach number [-]")
-        .def_readwrite("mdot", &CompressibleFlowSolution::mdot, "Mass flow rate [kg/s]")
-        .def_readwrite("choked", &CompressibleFlowSolution::choked, "True if flow is choked");
+        .def_readonly("stagnation", &CompressibleFlowSolution::stagnation, "Stagnation state")
+        .def_readonly("outlet", &CompressibleFlowSolution::outlet, "Outlet static state")
+        .def_readonly("v", &CompressibleFlowSolution::v, "Outlet velocity [m/s]")
+        .def_readonly("M", &CompressibleFlowSolution::M, "Outlet Mach number [-]")
+        .def_readonly("mdot", &CompressibleFlowSolution::mdot, "Mass flow rate [kg/s]")
+        .def_readonly("choked", &CompressibleFlowSolution::choked, "True if flow is choked");
 
     // NozzleStation struct
     py::class_<NozzleStation>(m, "NozzleStation")
         .def(py::init<>())
-        .def_readwrite("x", &NozzleStation::x, "Axial position [m]")
-        .def_readwrite("A", &NozzleStation::A, "Area [m²]")
-        .def_readwrite("P", &NozzleStation::P, "Static pressure [Pa]")
-        .def_readwrite("T", &NozzleStation::T, "Static temperature [K]")
-        .def_readwrite("rho", &NozzleStation::rho, "Density [kg/m³]")
-        .def_readwrite("u", &NozzleStation::u, "Velocity [m/s]")
-        .def_readwrite("M", &NozzleStation::M, "Mach number [-]")
-        .def_readwrite("h", &NozzleStation::h, "Specific enthalpy [J/kg]");
+        .def_readonly("x", &NozzleStation::x, "Axial position [m]")
+        .def_readonly("A", &NozzleStation::A, "Area [m²]")
+        .def_readonly("P", &NozzleStation::P, "Static pressure [Pa]")
+        .def_readonly("T", &NozzleStation::T, "Static temperature [K]")
+        .def_readonly("rho", &NozzleStation::rho, "Density [kg/m³]")
+        .def_readonly("u", &NozzleStation::u, "Velocity [m/s]")
+        .def_readonly("M", &NozzleStation::M, "Mach number [-]")
+        .def_readonly("h", &NozzleStation::h, "Specific enthalpy [J/kg]");
 
     // NozzleSolution struct
     py::class_<NozzleSolution>(m, "NozzleSolution")
         .def(py::init<>())
-        .def_readwrite("inlet", &NozzleSolution::inlet, "Inlet state")
-        .def_readwrite("outlet", &NozzleSolution::outlet, "Outlet state")
-        .def_readwrite("mdot", &NozzleSolution::mdot, "Mass flow rate [kg/s]")
-        .def_readwrite("h0", &NozzleSolution::h0, "Stagnation enthalpy [J/kg]")
-        .def_readwrite("T0", &NozzleSolution::T0, "Stagnation temperature [K]")
-        .def_readwrite("P0", &NozzleSolution::P0, "Stagnation pressure [Pa]")
-        .def_readwrite("choked", &NozzleSolution::choked, "True if throat is sonic")
-        .def_readwrite("x_throat", &NozzleSolution::x_throat, "Throat position [m]")
-        .def_readwrite("A_throat", &NozzleSolution::A_throat, "Throat area [m²]")
-        .def_readwrite("profile", &NozzleSolution::profile, "Axial profile");
+        .def_readonly("inlet", &NozzleSolution::inlet, "Inlet state")
+        .def_readonly("outlet", &NozzleSolution::outlet, "Outlet state")
+        .def_readonly("mdot", &NozzleSolution::mdot, "Mass flow rate [kg/s]")
+        .def_readonly("h0", &NozzleSolution::h0, "Stagnation enthalpy [J/kg]")
+        .def_readonly("T0", &NozzleSolution::T0, "Stagnation temperature [K]")
+        .def_readonly("P0", &NozzleSolution::P0, "Stagnation pressure [Pa]")
+        .def_readonly("choked", &NozzleSolution::choked, "True if throat is sonic")
+        .def_readonly("x_throat", &NozzleSolution::x_throat, "Throat position [m]")
+        .def_readonly("A_throat", &NozzleSolution::A_throat, "Throat area [m²]")
+        .def_readonly("profile", &NozzleSolution::profile, "Axial profile");
 
     // ThrustResult struct
     py::class_<ThrustResult>(m, "ThrustResult")
@@ -1933,28 +1933,28 @@ PYBIND11_MODULE(_core, m)
     // FannoStation struct
     py::class_<FannoStation>(m, "FannoStation")
         .def(py::init<>())
-        .def_readwrite("x", &FannoStation::x, "Position [m]")
-        .def_readwrite("P", &FannoStation::P, "Static pressure [Pa]")
-        .def_readwrite("T", &FannoStation::T, "Static temperature [K]")
-        .def_readwrite("rho", &FannoStation::rho, "Density [kg/m³]")
-        .def_readwrite("u", &FannoStation::u, "Velocity [m/s]")
-        .def_readwrite("M", &FannoStation::M, "Mach number [-]")
-        .def_readwrite("h", &FannoStation::h, "Specific enthalpy [J/kg]")
-        .def_readwrite("s", &FannoStation::s, "Specific entropy [J/(kg·K)]");
+        .def_readonly("x", &FannoStation::x, "Position [m]")
+        .def_readonly("P", &FannoStation::P, "Static pressure [Pa]")
+        .def_readonly("T", &FannoStation::T, "Static temperature [K]")
+        .def_readonly("rho", &FannoStation::rho, "Density [kg/m³]")
+        .def_readonly("u", &FannoStation::u, "Velocity [m/s]")
+        .def_readonly("M", &FannoStation::M, "Mach number [-]")
+        .def_readonly("h", &FannoStation::h, "Specific enthalpy [J/kg]")
+        .def_readonly("s", &FannoStation::s, "Specific entropy [J/(kg·K)]");
 
     // FannoSolution struct
     py::class_<FannoSolution>(m, "FannoSolution")
         .def(py::init<>())
-        .def_readwrite("inlet", &FannoSolution::inlet, "Inlet state")
-        .def_readwrite("outlet", &FannoSolution::outlet, "Outlet state")
-        .def_readwrite("mdot", &FannoSolution::mdot, "Mass flow rate [kg/s]")
-        .def_readwrite("h0", &FannoSolution::h0, "Stagnation enthalpy [J/kg]")
-        .def_readwrite("L", &FannoSolution::L, "Pipe length [m]")
-        .def_readwrite("D", &FannoSolution::D, "Pipe diameter [m]")
-        .def_readwrite("f", &FannoSolution::f, "Darcy friction factor [-]")
-        .def_readwrite("choked", &FannoSolution::choked, "True if flow reached M=1")
-        .def_readwrite("L_choke", &FannoSolution::L_choke, "Length to choking [m]")
-        .def_readwrite("profile", &FannoSolution::profile, "Axial profile");
+        .def_readonly("inlet", &FannoSolution::inlet, "Inlet state")
+        .def_readonly("outlet", &FannoSolution::outlet, "Outlet state")
+        .def_readonly("mdot", &FannoSolution::mdot, "Mass flow rate [kg/s]")
+        .def_readonly("h0", &FannoSolution::h0, "Stagnation enthalpy [J/kg]")
+        .def_readonly("L", &FannoSolution::L, "Pipe length [m]")
+        .def_readonly("D", &FannoSolution::D, "Pipe diameter [m]")
+        .def_readonly("f", &FannoSolution::f, "Darcy friction factor [-]")
+        .def_readonly("choked", &FannoSolution::choked, "True if flow reached M=1")
+        .def_readonly("L_choke", &FannoSolution::L_choke, "Length to choking [m]")
+        .def_readonly("profile", &FannoSolution::profile, "Axial profile");
 
     // Isentropic nozzle flow
     m.def(
@@ -2173,51 +2173,6 @@ PYBIND11_MODULE(_core, m)
         py::arg("tol") = 1e-6,
         py::arg("max_iter") = 100,
         "Maximum pipe length before choking (L*)."
-    );
-
-    // -------------------------------------------------------------
-    // Friction factor correlations
-    // -------------------------------------------------------------
-
-    m.def(
-        "friction_haaland",
-        &friction_haaland,
-        py::arg("Re"),
-        py::arg("e_D"),
-        "Haaland friction factor correlation (explicit, ~2-3% accuracy).\n\n"
-        "Re  : Reynolds number [-]\n"
-        "e_D : relative roughness ε/D [-]"
-    );
-
-    m.def(
-        "friction_serghides",
-        &friction_serghides,
-        py::arg("Re"),
-        py::arg("e_D"),
-        "Serghides friction factor correlation (explicit, <0.3% accuracy).\n\n"
-        "Re  : Reynolds number [-]\n"
-        "e_D : relative roughness ε/D [-]"
-    );
-
-    m.def(
-        "friction_colebrook",
-        &friction_colebrook,
-        py::arg("Re"),
-        py::arg("e_D"),
-        py::arg("tol") = 1e-10,
-        py::arg("max_iter") = 20,
-        "Colebrook-White friction factor (implicit, reference standard).\n\n"
-        "Re  : Reynolds number [-]\n"
-        "e_D : relative roughness ε/D [-]"
-    );
-
-    m.def(
-        "friction_petukhov",
-        &friction_petukhov,
-        py::arg("Re"),
-        "Petukhov friction factor for smooth tubes (Re > 3000).\n\n"
-        "Re : Reynolds number [-]\n\n"
-        "Returns Darcy friction factor f [-]."
     );
 
     // -------------------------------------------------------------
@@ -4046,6 +4001,52 @@ PYBIND11_MODULE(_core, m)
         "  >>> print(f'Mass flow: {result.mdot:.3f} kg/s')\n"
         "  >>> print(f'Velocity: {result.v:.2f} m/s')\n"
         "  >>> print(f'Cd: {result.Cd:.3f}')"
+    );
+
+    // Convenience wrapper: computes mu from thermodynamic state
+    m.def(
+        "orifice_flow_state",
+        [](const OrificeGeometry& geom,
+           double dP,
+           double T,
+           double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double Z,
+           double kappa,
+           CdCorrelation correlation)
+        {
+            auto X = to_vec(X_arr);
+            double mu = viscosity(T, P, X);
+            return orifice_flow(geom, dP, T, P, mu, Z, X, kappa, correlation);
+        },
+        py::arg("geom"),
+        py::arg("dP"),
+        py::arg("T"),
+        py::arg("P"),
+        py::arg("X"),
+        py::arg("Z") = 1.0,
+        py::arg("kappa") = 0.0,
+        py::arg("correlation") = CdCorrelation::ReaderHarrisGallagher,
+        "Compute all orifice flow properties from thermodynamic state.\n\n"
+        "Convenience wrapper around orifice_flow() that computes dynamic viscosity\n"
+        "internally from (T, P, X) using the built-in transport correlations.\n\n"
+        "Parameters:\n"
+        "  geom        : OrificeGeometry\n"
+        "  dP          : differential pressure [Pa]\n"
+        "  T           : temperature [K]\n"
+        "  P           : absolute upstream pressure [Pa]\n"
+        "  X           : mole fractions [-]\n"
+        "  Z           : compressibility factor [-] (default: 1.0 = ideal gas)\n"
+        "  kappa       : isentropic exponent cp/cv [-] (default: 0.0 = incompressible)\n"
+        "  correlation : Cd correlation (default: ReaderHarrisGallagher)\n\n"
+        "Returns: OrificeFlowResult with mdot, v, Re_D, Re_d, Cd, epsilon, rho_corrected\n\n"
+        "Example:\n"
+        "  >>> geom = cb.OrificeGeometry()\n"
+        "  >>> geom.d = 0.05\n"
+        "  >>> geom.D = 0.1\n"
+        "  >>> X_air = cb.standard_dry_air_composition()\n"
+        "  >>> result = cb.orifice_flow_state(geom, dP=10000, T=300, P=101325, X=X_air)\n"
+        "  >>> print(f'Mass flow: {result.mdot:.4f} kg/s')"
     );
 
     // Utility functions

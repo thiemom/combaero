@@ -223,6 +223,7 @@ try:
         orifice_dP,
         orifice_dP_Cd,
         orifice_flow,
+        orifice_flow_state,
         orifice_impedance_with_flow,
         orifice_K_from_Cd,
         orifice_mdot,
@@ -548,6 +549,7 @@ except ModuleNotFoundError:
     # Orifice flow utilities
     OrificeFlowResult = _core.OrificeFlowResult
     orifice_flow = _core.orifice_flow
+    orifice_flow_state = _core.orifice_flow_state
     orifice_velocity_from_mdot = _core.orifice_velocity_from_mdot
     orifice_area_from_beta = _core.orifice_area_from_beta
     beta_from_diameters = _core.beta_from_diameters
@@ -848,6 +850,7 @@ __all__ = [
     # Orifice flow utilities
     "OrificeFlowResult",
     "orifice_flow",
+    "orifice_flow_state",
     "orifice_velocity_from_mdot",
     "orifice_area_from_beta",
     "beta_from_diameters",
