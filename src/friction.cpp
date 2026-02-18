@@ -6,8 +6,10 @@
 // - Serghides (1984): Chemical Engineering, Nov. 5
 
 #include "friction.h"
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <unordered_map>
 
 // Haaland correlation (1983)
 // 1/√f = -1.8 * log10( (ε/D / 3.7)^1.11 + 6.9/Re )
@@ -100,6 +102,51 @@ double friction_colebrook(double Re, double e_D, double tol, int max_iter) {
     }
 
     return 1.0 / (x * x);
+}
+
+// -------------------------------------------------------------
+// Pipe Roughness Database
+// -------------------------------------------------------------
+
+static const std::unordered_map<std::string, double> ROUGHNESS_DATA = {
+    // Smooth surfaces
+    {"smooth",              0.0},
+    {"drawn_tubing",        1.5e-6},
+    {"pvc",                 1.5e-6},
+    {"plastic",             1.5e-6},
+    // Steel pipes
+    {"commercial_steel",    4.5e-5},
+    {"new_steel",           4.5e-5},
+    {"wrought_iron",        4.5e-5},
+    {"galvanized_iron",     1.5e-4},
+    {"galvanized_steel",    1.5e-4},
+    {"rusted_steel",        2.5e-4},
+    // Cast iron
+    {"cast_iron",           2.6e-4},
+    {"asphalted_cast_iron", 1.2e-4},
+    // Concrete
+    {"concrete",            3.0e-4},
+    {"rough_concrete",      3.0e-3},
+    // Other materials
+    {"riveted_steel",       9.0e-4},
+    {"wood_stave",          1.8e-4},
+    {"corrugated_metal",    4.5e-2},
+};
+
+std::unordered_map<std::string, double> standard_pipe_roughness() {
+    return ROUGHNESS_DATA;
+}
+
+double pipe_roughness(const std::string& material) {
+    std::string key = material;
+    std::transform(key.begin(), key.end(), key.begin(), ::tolower);
+    auto it = ROUGHNESS_DATA.find(key);
+    if (it != ROUGHNESS_DATA.end()) {
+        return it->second;
+    }
+    throw std::invalid_argument(
+        "pipe_roughness: unknown material '" + material + "'. "
+        "Use standard_pipe_roughness() to see available materials.");
 }
 
 // Petukhov correlation (1970) - smooth pipes only

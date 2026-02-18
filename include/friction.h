@@ -1,6 +1,9 @@
 #ifndef FRICTION_H
 #define FRICTION_H
 
+#include <string>
+#include <unordered_map>
+
 // -------------------------------------------------------------
 // Darcy friction factor correlations for turbulent pipe flow
 // -------------------------------------------------------------
@@ -40,5 +43,27 @@ double friction_colebrook(double Re, double e_D, double tol = 1e-10, int max_ite
 // Often used with Gnielinski/Petukhov heat transfer correlations.
 // Reference: Petukhov (1970), Advances in Heat Transfer, 6, 503
 double friction_petukhov(double Re);
+
+// -------------------------------------------------------------
+// Pipe Roughness Database
+// -------------------------------------------------------------
+// Absolute roughness ε [m] for common pipe materials.
+// Used as e_D = ε/D in friction factor correlations.
+//
+// References:
+// - Moody (1944): Transactions of the ASME, 66(8)
+// - White (2011): Fluid Mechanics (7th ed.), Table 6.1
+// - Munson et al. (2013): Fundamentals of Fluid Mechanics (7th ed.), Table 8.1
+// - Crane Co. (2009): Technical Paper No. 410, Table A-24
+
+// Get absolute roughness for a standard pipe material [m].
+// Material names are case-insensitive.
+// Throws std::invalid_argument if material not found.
+// Use standard_pipe_roughness() to list available materials.
+double pipe_roughness(const std::string& material);
+
+// Get all standard pipe roughness values.
+// Returns: map of material name -> roughness [m]
+std::unordered_map<std::string, double> standard_pipe_roughness();
 
 #endif // FRICTION_H
