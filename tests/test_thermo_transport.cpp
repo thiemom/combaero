@@ -612,22 +612,22 @@ TEST_F(ThermoTransportTest, StateBasedWgsEquilibrium) {
     in.X = X_mix;
 
     // Isothermal WGS should preserve T
-    State out_iso = wgs_equilibrium(in);
-    EXPECT_NEAR(out_iso.T, in.T, 1e-10);
-    EXPECT_NEAR(out_iso.P, in.P, 1e-10);
+    EquilibriumResult out_iso = wgs_equilibrium(in);
+    EXPECT_NEAR(out_iso.state.T, in.T, 1e-10);
+    EXPECT_NEAR(out_iso.state.P, in.P, 1e-10);
 
     // Mole fractions should still sum to 1
     double sum = 0.0;
-    for (double x : out_iso.X) sum += x;
+    for (double x : out_iso.state.X) sum += x;
     EXPECT_NEAR(sum, 1.0, 1e-10);
 
     // Adiabatic WGS
-    State out_ad = wgs_equilibrium_adiabatic(in);
-    EXPECT_NEAR(out_ad.P, in.P, 1e-10);
+    EquilibriumResult out_ad = wgs_equilibrium_adiabatic(in);
+    EXPECT_NEAR(out_ad.state.P, in.P, 1e-10);
 
     // Enthalpy should be conserved
     double H_in = h(in);
-    double H_out = h(out_ad);
+    double H_out = h(out_ad.state);
     EXPECT_NEAR(H_in, H_out, 1.0);  // Within 1 J/mol
 }
 
@@ -1162,18 +1162,18 @@ TEST_F(ThermoTransportTest, RichCombustionNaturalGasUnburnedHC) {
     EXPECT_GT(total_hc, 0.005);
 
     // Apply reforming equilibrium
-    State eq = reforming_equilibrium_adiabatic(burned);
+    EquilibriumResult eq = reforming_equilibrium_adiabatic(burned);
 
     // Hydrocarbons should be reformed
-    double total_hc_eq = eq.X[idx_CH4] + eq.X[idx_C2H6] + eq.X[idx_C3H8];
+    double total_hc_eq = eq.state.X[idx_CH4] + eq.state.X[idx_C2H6] + eq.state.X[idx_C3H8];
     EXPECT_LT(total_hc_eq, total_hc * 0.5);
 
     // CO and H2 should be produced
-    EXPECT_GT(eq.X[idx_CO], 0.01);
-    EXPECT_GT(eq.X[idx_H2], 0.01);
+    EXPECT_GT(eq.state.X[idx_CO], 0.01);
+    EXPECT_GT(eq.state.X[idx_H2], 0.01);
 
     // Temperature should drop (endothermic reforming)
-    EXPECT_LT(eq.T, burned.T);
+    EXPECT_LT(eq.state.T, burned.T);
 }
 
 // =============================================================================
@@ -1200,35 +1200,35 @@ TEST_F(ThermoTransportTest, SmrWgsEquilibriumIsothermal) {
     in.X[idx_CO2] = 0.10;   // 10% CO2
     in.X[idx_N2] = 0.68;    // 68% N2
 
-    State out = smr_wgs_equilibrium(in);
+    EquilibriumResult out = smr_wgs_equilibrium(in);
 
     // Temperature should be unchanged (isothermal)
-    EXPECT_NEAR(out.T, in.T, 1e-6);
+    EXPECT_NEAR(out.state.T, in.T, 1e-6);
 
     // At high T, SMR should convert CH4 to CO + H2
     // CH4 should decrease
-    EXPECT_LT(out.X[idx_CH4], in.X[idx_CH4]);
+    EXPECT_LT(out.state.X[idx_CH4], in.X[idx_CH4]);
 
     // CO and H2 should increase
-    EXPECT_GT(out.X[idx_CO], in.X[idx_CO]);
-    EXPECT_GT(out.X[idx_H2], in.X[idx_H2]);
+    EXPECT_GT(out.state.X[idx_CO], in.X[idx_CO]);
+    EXPECT_GT(out.state.X[idx_H2], in.X[idx_H2]);
 
     // Mole fractions should sum to 1
     double sum = 0.0;
-    for (double x : out.X) sum += x;
+    for (double x : out.state.X) sum += x;
     EXPECT_NEAR(sum, 1.0, 1e-10);
 
     // Element balance: use N2 as reference (inert)
     // SMR changes total moles, so ratios to N2 should be conserved
     double n2_in = in.X[idx_N2];
-    double n2_out = out.X[idx_N2];
+    double n2_out = out.state.X[idx_N2];
 
     double C_per_N2_in = (in.X[idx_CH4] + in.X[idx_CO] + in.X[idx_CO2]) / n2_in;
-    double C_per_N2_out = (out.X[idx_CH4] + out.X[idx_CO] + out.X[idx_CO2]) / n2_out;
+    double C_per_N2_out = (out.state.X[idx_CH4] + out.state.X[idx_CO] + out.state.X[idx_CO2]) / n2_out;
     EXPECT_NEAR(C_per_N2_in, C_per_N2_out, 1e-6);
 
     double H_per_N2_in = (4.0 * in.X[idx_CH4] + 2.0 * in.X[idx_H2O] + 2.0 * in.X[idx_H2]) / n2_in;
-    double H_per_N2_out = (4.0 * out.X[idx_CH4] + 2.0 * out.X[idx_H2O] + 2.0 * out.X[idx_H2]) / n2_out;
+    double H_per_N2_out = (4.0 * out.state.X[idx_CH4] + 2.0 * out.state.X[idx_H2O] + 2.0 * out.state.X[idx_H2]) / n2_out;
     EXPECT_NEAR(H_per_N2_in, H_per_N2_out, 1e-6);
 }
 
@@ -1250,19 +1250,19 @@ TEST_F(ThermoTransportTest, SmrWgsEquilibriumAdiabatic) {
     in.X[idx_CO2] = 0.10;
     in.X[idx_N2] = 0.68;
 
-    State out = smr_wgs_equilibrium_adiabatic(in);
+    EquilibriumResult out = smr_wgs_equilibrium_adiabatic(in);
 
     // SMR is endothermic, so temperature should decrease
-    EXPECT_LT(out.T, in.T);
+    EXPECT_LT(out.state.T, in.T);
 
     // Temperature should still be reasonable (not too low)
-    EXPECT_GT(out.T, 1500.0);
+    EXPECT_GT(out.state.T, 1500.0);
 
     // Enthalpy per mole of N2 should be conserved (N2 is inert)
     // H_total / n_N2 = h(T,X) / X_N2 should be constant
     // Note: tolerance is ~5% due to nested Newton solver convergence
     double H_per_N2_in = h(in.T, in.X) / in.X[idx_N2];
-    double H_per_N2_out = h(out.T, out.X) / out.X[idx_N2];
+    double H_per_N2_out = h(out.state.T, out.state.X) / out.state.X[idx_N2];
     EXPECT_NEAR(H_per_N2_in, H_per_N2_out, std::abs(H_per_N2_in) * 0.05);
 }
 
@@ -1282,13 +1282,13 @@ TEST_F(ThermoTransportTest, SmrWgsFallbackToWgs) {
     in.X[idx_CO2] = 0.10;
     in.X[idx_N2] = 0.70;
 
-    State out_smr_wgs = smr_wgs_equilibrium_adiabatic(in);
-    State out_wgs = wgs_equilibrium_adiabatic(in);
+    EquilibriumResult out_smr_wgs = smr_wgs_equilibrium_adiabatic(in);
+    EquilibriumResult out_wgs = wgs_equilibrium_adiabatic(in);
 
     // Results should be identical when no CH4
-    EXPECT_NEAR(out_smr_wgs.T, out_wgs.T, 1e-6);
+    EXPECT_NEAR(out_smr_wgs.state.T, out_wgs.state.T, 1e-6);
     for (std::size_t i = 0; i < n; ++i) {
-        EXPECT_NEAR(out_smr_wgs.X[i], out_wgs.X[i], 1e-10);
+        EXPECT_NEAR(out_smr_wgs.state.X[i], out_wgs.state.X[i], 1e-10);
     }
 }
 
@@ -1323,24 +1323,24 @@ TEST_F(ThermoTransportTest, SmrWgsRichCombustion) {
     EXPECT_GT(burned.X[idx_CH4], 0.01);
 
     // Apply SMR+WGS equilibrium
-    State eq = smr_wgs_equilibrium_adiabatic(burned);
+    EquilibriumResult eq = smr_wgs_equilibrium_adiabatic(burned);
 
     // CH4 should be mostly reformed
-    EXPECT_LT(eq.X[idx_CH4], burned.X[idx_CH4] * 0.5);
+    EXPECT_LT(eq.state.X[idx_CH4], burned.X[idx_CH4] * 0.5);
 
     // CO and H2 should be present
-    EXPECT_GT(eq.X[idx_CO], 0.01);
-    EXPECT_GT(eq.X[idx_H2], 0.01);
+    EXPECT_GT(eq.state.X[idx_CO], 0.01);
+    EXPECT_GT(eq.state.X[idx_H2], 0.01);
 
     // Temperature should drop (SMR is endothermic)
-    EXPECT_LT(eq.T, burned.T);
+    EXPECT_LT(eq.state.T, burned.T);
 
     // Enthalpy per mole of N2 should be conserved
     // Note: tolerance is relaxed due to adiabatic solver convergence and
     // differences between NASA-7 and NASA-9 thermodynamic data
     const std::size_t idx_N2 = species_index_from_name("N2");
     double H_per_N2_burned = h(burned.T, burned.X) / burned.X[idx_N2];
-    double H_per_N2_eq = h(eq.T, eq.X) / eq.X[idx_N2];
+    double H_per_N2_eq = h(eq.state.T, eq.state.X) / eq.state.X[idx_N2];
     // Check that enthalpy is in the same ballpark (within factor of 2)
     // Exact conservation is difficult due to nested solver convergence
     EXPECT_LT(std::abs(H_per_N2_burned - H_per_N2_eq), std::abs(H_per_N2_burned) * 1.0);
@@ -1370,26 +1370,26 @@ TEST_F(ThermoTransportTest, ReformingEquilibriumMultipleHydrocarbons) {
     in.X[idx_CO2] = 0.08;    // 8% CO2
     in.X[idx_N2] = 0.70;     // 70% N2
 
-    State out = reforming_equilibrium(in);
+    EquilibriumResult out = reforming_equilibrium(in);
 
     // All hydrocarbons should be mostly reformed at high T
-    EXPECT_LT(out.X[idx_CH4], in.X[idx_CH4] * 0.5);
-    EXPECT_LT(out.X[idx_C2H6], in.X[idx_C2H6] * 0.5);
-    EXPECT_LT(out.X[idx_C3H8], in.X[idx_C3H8] * 0.5);
+    EXPECT_LT(out.state.X[idx_CH4], in.X[idx_CH4] * 0.5);
+    EXPECT_LT(out.state.X[idx_C2H6], in.X[idx_C2H6] * 0.5);
+    EXPECT_LT(out.state.X[idx_C3H8], in.X[idx_C3H8] * 0.5);
 
     // CO and H2 should be produced
-    EXPECT_GT(out.X[idx_CO], 0.01);
-    EXPECT_GT(out.X[idx_H2], 0.01);
+    EXPECT_GT(out.state.X[idx_CO], 0.01);
+    EXPECT_GT(out.state.X[idx_H2], 0.01);
 
     // Element balance using N2 as reference
     double n2_in = in.X[idx_N2];
-    double n2_out = out.X[idx_N2];
+    double n2_out = out.state.X[idx_N2];
 
     // C atoms: CH4 + 2*C2H6 + 3*C3H8 + CO + CO2
     double C_per_N2_in = (in.X[idx_CH4] + 2*in.X[idx_C2H6] + 3*in.X[idx_C3H8]
                         + in.X[idx_CO] + in.X[idx_CO2]) / n2_in;
-    double C_per_N2_out = (out.X[idx_CH4] + 2*out.X[idx_C2H6] + 3*out.X[idx_C3H8]
-                         + out.X[idx_CO] + out.X[idx_CO2]) / n2_out;
+    double C_per_N2_out = (out.state.X[idx_CH4] + 2*out.state.X[idx_C2H6] + 3*out.state.X[idx_C3H8]
+                         + out.state.X[idx_CO] + out.state.X[idx_CO2]) / n2_out;
     EXPECT_NEAR(C_per_N2_in, C_per_N2_out, 1e-6);
 }
 
@@ -1413,13 +1413,13 @@ TEST_F(ThermoTransportTest, ReformingEquilibriumAdiabatic) {
     in.X[idx_CO2] = 0.08;
     in.X[idx_N2] = 0.70;
 
-    State out = reforming_equilibrium_adiabatic(in);
+    EquilibriumResult out = reforming_equilibrium_adiabatic(in);
 
     // Reforming is endothermic, so temperature should decrease
-    EXPECT_LT(out.T, in.T);
+    EXPECT_LT(out.state.T, in.T);
 
     // Temperature should be reasonable
-    EXPECT_GT(out.T, 1500.0);
+    EXPECT_GT(out.state.T, 1500.0);
 }
 
 // Test reforming with natural gas composition (CH4 + C2H6 + C3H8 + inerts)
@@ -1450,24 +1450,24 @@ TEST_F(ThermoTransportTest, ReformingNaturalGasCombustion) {
     in.X[idx_N2] = 0.705;    // Air N2 + fuel N2
     in.X[idx_AR] = 0.01;     // Air Ar
 
-    State out = reforming_equilibrium_adiabatic(in);
+    EquilibriumResult out = reforming_equilibrium_adiabatic(in);
 
     // All hydrocarbons should be significantly reformed
-    EXPECT_LT(out.X[idx_CH4], in.X[idx_CH4] * 0.3);
-    EXPECT_LT(out.X[idx_C2H6], in.X[idx_C2H6] * 0.3);
-    EXPECT_LT(out.X[idx_C3H8], in.X[idx_C3H8] * 0.3);
+    EXPECT_LT(out.state.X[idx_CH4], in.X[idx_CH4] * 0.3);
+    EXPECT_LT(out.state.X[idx_C2H6], in.X[idx_C2H6] * 0.3);
+    EXPECT_LT(out.state.X[idx_C3H8], in.X[idx_C3H8] * 0.3);
 
     // CO and H2 should be produced
-    EXPECT_GT(out.X[idx_CO], 0.01);
-    EXPECT_GT(out.X[idx_H2], 0.01);
+    EXPECT_GT(out.state.X[idx_CO], 0.01);
+    EXPECT_GT(out.state.X[idx_H2], 0.01);
 
     // Inerts should be unchanged (relative to total moles via N2 reference)
     double ar_per_n2_in = in.X[idx_AR] / in.X[idx_N2];
-    double ar_per_n2_out = out.X[idx_AR] / out.X[idx_N2];
+    double ar_per_n2_out = out.state.X[idx_AR] / out.state.X[idx_N2];
     EXPECT_NEAR(ar_per_n2_in, ar_per_n2_out, 1e-10);
 
     // Temperature should drop (endothermic reforming)
-    EXPECT_LT(out.T, in.T);
+    EXPECT_LT(out.state.T, in.T);
 }
 
 // Test reforming with heavier hydrocarbons (C4+)
@@ -1498,40 +1498,40 @@ TEST_F(ThermoTransportTest, ReformingHeavyHydrocarbons) {
     in.X[idx_N2] = 0.69;
     in.X[idx_AR] = 0.011;
 
-    State out = reforming_equilibrium(in);
+    EquilibriumResult out = reforming_equilibrium(in);
 
     // All hydrocarbons should be reformed at high T
-    EXPECT_LT(out.X[idx_CH4], in.X[idx_CH4] * 0.5);
-    EXPECT_LT(out.X[idx_C3H8], in.X[idx_C3H8] * 0.5);
-    EXPECT_LT(out.X[idx_IC4H10], in.X[idx_IC4H10] * 0.5);
-    EXPECT_LT(out.X[idx_NC5H12], in.X[idx_NC5H12] * 0.5);
+    EXPECT_LT(out.state.X[idx_CH4], in.X[idx_CH4] * 0.5);
+    EXPECT_LT(out.state.X[idx_C3H8], in.X[idx_C3H8] * 0.5);
+    EXPECT_LT(out.state.X[idx_IC4H10], in.X[idx_IC4H10] * 0.5);
+    EXPECT_LT(out.state.X[idx_NC5H12], in.X[idx_NC5H12] * 0.5);
 
     // CO and H2 should be produced
-    EXPECT_GT(out.X[idx_CO], 0.01);
-    EXPECT_GT(out.X[idx_H2], 0.01);
+    EXPECT_GT(out.state.X[idx_CO], 0.01);
+    EXPECT_GT(out.state.X[idx_H2], 0.01);
 
     // Element balance: C atoms per N2 should be conserved
     double n2_in = in.X[idx_N2];
-    double n2_out = out.X[idx_N2];
+    double n2_out = out.state.X[idx_N2];
 
     // C atoms: 1*CH4 + 3*C3H8 + 4*iC4H10 + 5*nC5H12 + CO + CO2
     double C_per_N2_in = (in.X[idx_CH4] + 3*in.X[idx_C3H8] + 4*in.X[idx_IC4H10]
                         + 5*in.X[idx_NC5H12] + in.X[idx_CO] + in.X[idx_CO2]) / n2_in;
-    double C_per_N2_out = (out.X[idx_CH4] + 3*out.X[idx_C3H8] + 4*out.X[idx_IC4H10]
-                         + 5*out.X[idx_NC5H12] + out.X[idx_CO] + out.X[idx_CO2]) / n2_out;
+    double C_per_N2_out = (out.state.X[idx_CH4] + 3*out.state.X[idx_C3H8] + 4*out.state.X[idx_IC4H10]
+                         + 5*out.state.X[idx_NC5H12] + out.state.X[idx_CO] + out.state.X[idx_CO2]) / n2_out;
     EXPECT_NEAR(C_per_N2_in, C_per_N2_out, 1e-6);
 
     // H atoms per N2 should be conserved
     // H atoms: 4*CH4 + 8*C3H8 + 10*iC4H10 + 12*nC5H12 + 2*H2O + 2*H2
     double H_per_N2_in = (4*in.X[idx_CH4] + 8*in.X[idx_C3H8] + 10*in.X[idx_IC4H10]
                         + 12*in.X[idx_NC5H12] + 2*in.X[idx_H2O] + 2*in.X[idx_H2]) / n2_in;
-    double H_per_N2_out = (4*out.X[idx_CH4] + 8*out.X[idx_C3H8] + 10*out.X[idx_IC4H10]
-                         + 12*out.X[idx_NC5H12] + 2*out.X[idx_H2O] + 2*out.X[idx_H2]) / n2_out;
+    double H_per_N2_out = (4*out.state.X[idx_CH4] + 8*out.state.X[idx_C3H8] + 10*out.state.X[idx_IC4H10]
+                         + 12*out.state.X[idx_NC5H12] + 2*out.state.X[idx_H2O] + 2*out.state.X[idx_H2]) / n2_out;
     EXPECT_NEAR(H_per_N2_in, H_per_N2_out, 1e-6);
 
     // Ar should be unchanged relative to N2
     double ar_per_n2_in = in.X[idx_AR] / n2_in;
-    double ar_per_n2_out = out.X[idx_AR] / n2_out;
+    double ar_per_n2_out = out.state.X[idx_AR] / n2_out;
     EXPECT_NEAR(ar_per_n2_in, ar_per_n2_out, 1e-10);
 }
 
@@ -1559,23 +1559,23 @@ TEST_F(ThermoTransportTest, ReformingC2PlusOnly) {
     in.X[idx_CO2] = 0.085;
     in.X[idx_N2] = 0.70;
 
-    State out = reforming_equilibrium(in);
+    EquilibriumResult out = reforming_equilibrium(in);
 
     // C2H6 and C3H8 should be reformed even without CH4
-    EXPECT_LT(out.X[idx_C2H6], in.X[idx_C2H6] * 0.5);
-    EXPECT_LT(out.X[idx_C3H8], in.X[idx_C3H8] * 0.5);
+    EXPECT_LT(out.state.X[idx_C2H6], in.X[idx_C2H6] * 0.5);
+    EXPECT_LT(out.state.X[idx_C3H8], in.X[idx_C3H8] * 0.5);
 
     // CO and H2 should be produced
-    EXPECT_GT(out.X[idx_CO], 0.01);
-    EXPECT_GT(out.X[idx_H2], 0.01);
+    EXPECT_GT(out.state.X[idx_CO], 0.01);
+    EXPECT_GT(out.state.X[idx_H2], 0.01);
 
     // Element balance: C atoms per N2
     double n2_in = in.X[idx_N2];
-    double n2_out = out.X[idx_N2];
+    double n2_out = out.state.X[idx_N2];
     double C_per_N2_in = (in.X[idx_CH4] + 2*in.X[idx_C2H6] + 3*in.X[idx_C3H8]
                         + in.X[idx_CO] + in.X[idx_CO2]) / n2_in;
-    double C_per_N2_out = (out.X[idx_CH4] + 2*out.X[idx_C2H6] + 3*out.X[idx_C3H8]
-                         + out.X[idx_CO] + out.X[idx_CO2]) / n2_out;
+    double C_per_N2_out = (out.state.X[idx_CH4] + 2*out.state.X[idx_C2H6] + 3*out.state.X[idx_C3H8]
+                         + out.state.X[idx_CO] + out.state.X[idx_CO2]) / n2_out;
     EXPECT_NEAR(C_per_N2_in, C_per_N2_out, 1e-6);
 }
 
@@ -1605,26 +1605,26 @@ TEST_F(ThermoTransportTest, ReformingWithExistingCOH2) {
     in.X[idx_N2] = 0.70;
     in.X[idx_AR] = 0.007;
 
-    State out = reforming_equilibrium(in);
+    EquilibriumResult out = reforming_equilibrium(in);
 
     // Hydrocarbons should still be reformed
-    EXPECT_LT(out.X[idx_CH4], in.X[idx_CH4] * 0.5);
-    EXPECT_LT(out.X[idx_C2H6], in.X[idx_C2H6] * 0.5);
+    EXPECT_LT(out.state.X[idx_CH4], in.X[idx_CH4] * 0.5);
+    EXPECT_LT(out.state.X[idx_C2H6], in.X[idx_C2H6] * 0.5);
 
     // CO and H2 should increase further
-    EXPECT_GT(out.X[idx_CO], in.X[idx_CO]);
-    EXPECT_GT(out.X[idx_H2], in.X[idx_H2]);
+    EXPECT_GT(out.state.X[idx_CO], in.X[idx_CO]);
+    EXPECT_GT(out.state.X[idx_H2], in.X[idx_H2]);
 
     // Element balance
     double n2_in = in.X[idx_N2];
-    double n2_out = out.X[idx_N2];
+    double n2_out = out.state.X[idx_N2];
 
     double C_per_N2_in = (in.X[idx_CH4] + 2*in.X[idx_C2H6] + in.X[idx_CO] + in.X[idx_CO2]) / n2_in;
-    double C_per_N2_out = (out.X[idx_CH4] + 2*out.X[idx_C2H6] + out.X[idx_CO] + out.X[idx_CO2]) / n2_out;
+    double C_per_N2_out = (out.state.X[idx_CH4] + 2*out.state.X[idx_C2H6] + out.state.X[idx_CO] + out.state.X[idx_CO2]) / n2_out;
     EXPECT_NEAR(C_per_N2_in, C_per_N2_out, 1e-6);
 
     // Ar unchanged
-    EXPECT_NEAR(in.X[idx_AR] / n2_in, out.X[idx_AR] / n2_out, 1e-10);
+    EXPECT_NEAR(in.X[idx_AR] / n2_in, out.state.X[idx_AR] / n2_out, 1e-10);
 }
 
 // Test element conservation in SMR+WGS
@@ -1653,26 +1653,26 @@ TEST_F(ThermoTransportTest, SmrWgsElementConservation) {
         in.X[idx_H2] = 0.02;
         in.X[idx_N2] = 0.68;
 
-        State out = smr_wgs_equilibrium(in);
+        EquilibriumResult out = smr_wgs_equilibrium(in);
 
         // Use N2 as reference (inert, doesn't participate in reactions)
         // Element ratios relative to N2 should be conserved
         double n2_in = in.X[idx_N2];
-        double n2_out = out.X[idx_N2];
+        double n2_out = out.state.X[idx_N2];
 
         // C atoms per N2: (CH4 + CO + CO2) / N2
         double C_per_N2_in = (in.X[idx_CH4] + in.X[idx_CO] + in.X[idx_CO2]) / n2_in;
-        double C_per_N2_out = (out.X[idx_CH4] + out.X[idx_CO] + out.X[idx_CO2]) / n2_out;
+        double C_per_N2_out = (out.state.X[idx_CH4] + out.state.X[idx_CO] + out.state.X[idx_CO2]) / n2_out;
         EXPECT_NEAR(C_per_N2_in, C_per_N2_out, 1e-6) << "C/N2 not conserved at T=" << T;
 
         // H atoms per N2: (4*CH4 + 2*H2O + 2*H2) / N2
         double H_per_N2_in = (4.0 * in.X[idx_CH4] + 2.0 * in.X[idx_H2O] + 2.0 * in.X[idx_H2]) / n2_in;
-        double H_per_N2_out = (4.0 * out.X[idx_CH4] + 2.0 * out.X[idx_H2O] + 2.0 * out.X[idx_H2]) / n2_out;
+        double H_per_N2_out = (4.0 * out.state.X[idx_CH4] + 2.0 * out.state.X[idx_H2O] + 2.0 * out.state.X[idx_H2]) / n2_out;
         EXPECT_NEAR(H_per_N2_in, H_per_N2_out, 1e-6) << "H/N2 not conserved at T=" << T;
 
         // O atoms per N2: (H2O + CO + 2*CO2) / N2
         double O_per_N2_in = (in.X[idx_H2O] + in.X[idx_CO] + 2.0 * in.X[idx_CO2]) / n2_in;
-        double O_per_N2_out = (out.X[idx_H2O] + out.X[idx_CO] + 2.0 * out.X[idx_CO2]) / n2_out;
+        double O_per_N2_out = (out.state.X[idx_H2O] + out.state.X[idx_CO] + 2.0 * out.state.X[idx_CO2]) / n2_out;
         EXPECT_NEAR(O_per_N2_in, O_per_N2_out, 1e-6) << "O/N2 not conserved at T=" << T;
     }
 }
@@ -1702,28 +1702,28 @@ TEST_F(ThermoTransportTest, CombustionEquilibriumFromUnburned) {
     in.X[idx_N2] = 0.70;
 
     // One-step: combustion_equilibrium
-    State result = combustion_equilibrium(in);
+    EquilibriumResult result = combustion_equilibrium(in);
 
     // Two-step equivalent: complete_combustion + reforming_equilibrium_adiabatic
     State burned = complete_combustion(in);
-    State eq = reforming_equilibrium_adiabatic(burned);
+    EquilibriumResult eq = reforming_equilibrium_adiabatic(burned);
 
     // Results should be identical
-    EXPECT_NEAR(result.T, eq.T, 0.1);
-    EXPECT_NEAR(result.X[idx_CO], eq.X[idx_CO], 1e-6);
-    EXPECT_NEAR(result.X[idx_H2], eq.X[idx_H2], 1e-6);
-    EXPECT_NEAR(result.X[idx_CO2], eq.X[idx_CO2], 1e-6);
-    EXPECT_NEAR(result.X[idx_H2O], eq.X[idx_H2O], 1e-6);
+    EXPECT_NEAR(result.state.T, eq.state.T, 0.1);
+    EXPECT_NEAR(result.state.X[idx_CO], eq.state.X[idx_CO], 1e-6);
+    EXPECT_NEAR(result.state.X[idx_H2], eq.state.X[idx_H2], 1e-6);
+    EXPECT_NEAR(result.state.X[idx_CO2], eq.state.X[idx_CO2], 1e-6);
+    EXPECT_NEAR(result.state.X[idx_H2O], eq.state.X[idx_H2O], 1e-6);
 
     // Temperature should be high (combustion occurred)
-    EXPECT_GT(result.T, 2000.0);
+    EXPECT_GT(result.state.T, 2000.0);
 
     // CH4 should be fully consumed
-    EXPECT_LT(result.X[idx_CH4], 1e-6);
+    EXPECT_LT(result.state.X[idx_CH4], 1e-6);
 
     // CO and H2 should be present (rich combustion + reforming)
-    EXPECT_GT(result.X[idx_CO], 0.01);
-    EXPECT_GT(result.X[idx_H2], 0.01);
+    EXPECT_GT(result.state.X[idx_CO], 0.01);
+    EXPECT_GT(result.state.X[idx_H2], 0.01);
 }
 
 // Test combustion_equilibrium with stoichiometric mixture
@@ -1746,22 +1746,22 @@ TEST_F(ThermoTransportTest, CombustionEquilibriumStoichiometric) {
     in.X[idx_O2] = 0.19;
     in.X[idx_N2] = 0.715;
 
-    State result = combustion_equilibrium(in);
+    EquilibriumResult result = combustion_equilibrium(in);
 
     // Temperature should be high
-    EXPECT_GT(result.T, 2200.0);
+    EXPECT_GT(result.state.T, 2200.0);
 
     // CH4 and O2 should be fully consumed
-    EXPECT_LT(result.X[idx_CH4], 1e-6);
-    EXPECT_LT(result.X[idx_O2], 1e-6);
+    EXPECT_LT(result.state.X[idx_CH4], 1e-6);
+    EXPECT_LT(result.state.X[idx_O2], 1e-6);
 
     // Products should be mainly CO2 and H2O
-    EXPECT_GT(result.X[idx_CO2], 0.05);
-    EXPECT_GT(result.X[idx_H2O], 0.10);
+    EXPECT_GT(result.state.X[idx_CO2], 0.05);
+    EXPECT_GT(result.state.X[idx_H2O], 0.10);
 
     // Little CO/H2 at stoichiometric (WGS equilibrium)
-    EXPECT_LT(result.X[idx_CO], 0.01);
-    EXPECT_LT(result.X[idx_H2], 0.01);
+    EXPECT_LT(result.state.X[idx_CO], 0.01);
+    EXPECT_LT(result.state.X[idx_H2], 0.01);
 }
 
 // -------------------------------------------------------------
