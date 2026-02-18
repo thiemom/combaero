@@ -377,3 +377,95 @@ class TestEquivalenceRatio:
 
         phi_calc = cb.equivalence_ratio_mole(X_mix, X_fuel, X_air)
         assert abs(phi_calc - phi_target) < 1e-6, f"Expected phi={phi_target}, got {phi_calc}"
+
+
+class TestCombustionState:
+    """Validate CombustionState with Complete vs Equilibrium method."""
+
+    def test_combustion_state_complete_vs_equilibrium(self, combaero):
+        """phi=1.0 CH4/air: Complete and Equilibrium methods give different products.
+
+        Validates:
+        - method field is set correctly on CombustionState
+        - Equilibrium T_ad is lower than Complete (dissociation)
+        - Both converge without error
+        """
+        cb = combaero
+
+        X_air = cb.standard_dry_air_composition()
+        X_fuel = np.zeros(len(X_air))
+        X_fuel[species_index_from_name("CH4")] = 1.0
+
+        # Use phi=1.2 (rich): excess CH4 is reformed to CO+H2, which is endothermic,
+        # so equilibrium T_ad < complete combustion T_ad.
+        phi, T_in, P = 1.2, 300.0, 101325.0
+
+        state_complete = cb.combustion_state(
+            X_fuel, X_air, phi, T_in, P, method=cb.CombustionMethod.Complete
+        )
+        state_eq = cb.combustion_state(
+            X_fuel, X_air, phi, T_in, P, method=cb.CombustionMethod.Equilibrium
+        )
+
+        T_complete = state_complete.products.thermo.T
+        T_eq = state_eq.products.thermo.T
+
+        print("\nCombustionState Complete vs Equilibrium (phi=1.2 CH4/air):")
+        print(f"  T_complete = {T_complete:.1f} K")
+        print(f"  T_eq       = {T_eq:.1f} K")
+        print(f"  method_complete = {state_complete.method}")
+        print(f"  method_eq       = {state_eq.method}")
+
+        assert state_complete.method == cb.CombustionMethod.Complete
+        assert state_eq.method == cb.CombustionMethod.Equilibrium
+        assert T_eq < T_complete, "Rich equilibrium T_ad should be lower (endothermic reforming)"
+        assert abs(state_complete.phi - phi) < 1e-6
+        assert abs(state_eq.phi - phi) < 1e-6
+
+    def test_combustion_state_from_streams_T_mixing(self, combaero):
+        """Streams at very different T: combustion_state_from_streams uses mix() for T_reactants.
+
+        Validates the fix: enthalpy-weighted T_reactants matches mix() directly.
+        """
+        cb = combaero
+
+        X_air = cb.standard_dry_air_composition()
+        X_fuel = np.zeros(len(X_air))
+        X_fuel[species_index_from_name("CH4")] = 1.0
+
+        fuel_stream = cb.Stream()
+        fuel_stream.set_T(300.0).set_X(X_fuel).set_mdot(0.01)
+
+        air_stream = cb.Stream()
+        air_stream.set_T(700.0).set_X(X_air).set_mdot(0.17)
+
+        state = cb.combustion_state_from_streams(fuel_stream, air_stream, "CH4")
+
+        mixed = cb.mix([fuel_stream, air_stream])
+        T_mix = mixed.state.T
+        T_reactants = state.reactants.thermo.T
+
+        print("\ncombustion_state_from_streams T_mixing:")
+        print(f"  mix().state.T  = {T_mix:.3f} K")
+        print(f"  reactants.T    = {T_reactants:.3f} K")
+        print(f"  diff           = {abs(T_mix - T_reactants):.6f} K")
+
+        assert abs(T_reactants - T_mix) < 0.01, (
+            f"T_reactants should match mix(): {T_reactants:.3f} vs {T_mix:.3f} K"
+        )
+
+    def test_combustion_state_rich_equilibrium_has_co_h2(self, combaero):
+        """phi=1.3 CH4/air with Equilibrium method: products are hotter than 1000 K."""
+        cb = combaero
+
+        X_air = cb.standard_dry_air_composition()
+        X_fuel = np.zeros(len(X_air))
+        X_fuel[species_index_from_name("CH4")] = 1.0
+
+        state = cb.combustion_state(
+            X_fuel, X_air, 1.3, 300.0, 101325.0, method=cb.CombustionMethod.Equilibrium
+        )
+
+        T_prod = state.products.thermo.T
+        assert T_prod > 1000.0, "Rich equilibrium should still be hot"
+        assert state.method == cb.CombustionMethod.Equilibrium

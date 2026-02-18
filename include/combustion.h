@@ -215,6 +215,7 @@ State complete_combustion_isothermal(const State& in);
 //   T_reactants  : reactant temperature [K]
 //   P            : pressure [Pa]
 //   fuel_name    : optional fuel label (default: "")
+//   method       : product model — Complete (default, fast) or Equilibrium
 // Returns: CombustionState with reactants, products, phi, mixture_fraction
 CombustionState combustion_state(
     const std::vector<double>& X_fuel,
@@ -222,7 +223,8 @@ CombustionState combustion_state(
     double phi,
     double T_reactants,
     double P,
-    const std::string& fuel_name = ""
+    const std::string& fuel_name = "",
+    CombustionMethod method = CombustionMethod::Complete
 );
 
 // Compute combustion state from measured streams (typical for lab data)
@@ -230,11 +232,13 @@ CombustionState combustion_state(
 //   fuel_stream : fuel stream with mdot, T, X
 //   ox_stream   : oxidizer stream with mdot, T, X
 //   fuel_name   : optional fuel label (default: "")
+//   method      : product model — Complete (default, fast) or Equilibrium
 // Returns: CombustionState with phi COMPUTED from mass flow rates
 CombustionState combustion_state_from_streams(
     const Stream& fuel_stream,
     const Stream& ox_stream,
-    const std::string& fuel_name = ""
+    const std::string& fuel_name = "",
+    CombustionMethod method = CombustionMethod::Complete
 );
 
 #endif // COMBUSTION_H

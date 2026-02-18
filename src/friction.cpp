@@ -60,7 +60,7 @@ double friction_serghides(double Re, double e_D) {
 
 // Colebrook-White equation (1939) - implicit, solved iteratively
 // 1/√f = -2 * log10( ε/D/3.7 + 2.51/(Re*√f) )
-// Uses Haaland as initial guess, Newton-Raphson iteration.
+// Uses Serghides as initial guess, Newton-Raphson iteration.
 double friction_colebrook(double Re, double e_D, double tol, int max_iter) {
     if (Re <= 0.0) {
         throw std::invalid_argument("friction_colebrook: Re must be positive");

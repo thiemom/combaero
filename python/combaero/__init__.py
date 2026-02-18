@@ -54,9 +54,11 @@ try:
         Cd_sharp_thin_plate,
         Cd_thick_plate,
         CdCorrelation,
+        CombustionMethod,
         CombustionState,
         CompleteState,
         CompressibleFlowSolution,
+        EquilibriumResult,
         FannoSolution,
         FannoStation,
         LinerCavity,
@@ -221,6 +223,7 @@ try:
         orifice_dP,
         orifice_dP_Cd,
         orifice_flow,
+        orifice_flow_state,
         orifice_impedance_with_flow,
         orifice_K_from_Cd,
         orifice_mdot,
@@ -280,7 +283,7 @@ try:
         set_oxidizer_stream_for_O2_dry,
         set_oxidizer_stream_for_Tad,
         smr_wgs_equilibrium,
-        smr_wgs_equilibrium_adiabatic,
+        smr_wgs_equilibrium_adiabatic,  # deprecated: use reforming_equilibrium
         solve_A_eff_from_mdot,
         solve_orifice_mdot,
         solve_P0_from_mdot,
@@ -546,6 +549,7 @@ except ModuleNotFoundError:
     # Orifice flow utilities
     OrificeFlowResult = _core.OrificeFlowResult
     orifice_flow = _core.orifice_flow
+    orifice_flow_state = _core.orifice_flow_state
     orifice_velocity_from_mdot = _core.orifice_velocity_from_mdot
     orifice_area_from_beta = _core.orifice_area_from_beta
     beta_from_diameters = _core.beta_from_diameters
@@ -629,6 +633,8 @@ __all__ = [
     "transport_state",
     "CompleteState",
     "complete_state",
+    "EquilibriumResult",
+    "CombustionMethod",
     "CombustionState",
     "combustion_state",
     "combustion_state_from_streams",
@@ -671,8 +677,6 @@ __all__ = [
     "complete_combustion_isothermal",
     "wgs_equilibrium",
     "wgs_equilibrium_adiabatic",
-    "smr_wgs_equilibrium",
-    "smr_wgs_equilibrium_adiabatic",
     "reforming_equilibrium",
     "reforming_equilibrium_adiabatic",
     "combustion_equilibrium",
@@ -846,6 +850,7 @@ __all__ = [
     # Orifice flow utilities
     "OrificeFlowResult",
     "orifice_flow",
+    "orifice_flow_state",
     "orifice_velocity_from_mdot",
     "orifice_area_from_beta",
     "beta_from_diameters",

@@ -493,6 +493,26 @@ PYBIND11_MODULE(_core, m)
                    "a=" + std::to_string(s.a) + " m/s>";
         });
 
+    // EquilibriumResult struct binding
+    py::class_<EquilibriumResult>(m, "EquilibriumResult",
+        "Result of an equilibrium solve.\n\n"
+        "Carries the final state plus solver diagnostics, suitable for use\n"
+        "in network solvers where non-convergence must be detectable.\n\n"
+        "Attributes:\n"
+        "  state     : equilibrium State (T, P, X)\n"
+        "  T_in      : input temperature [K]\n"
+        "  delta_T   : state.T - T_in [K] (negative = endothermic)\n"
+        "  converged : solver convergence flag")
+        .def_readonly("state", &EquilibriumResult::state, "Equilibrium State (T, P, X)")
+        .def_readonly("T_in", &EquilibriumResult::T_in, "Input temperature [K]")
+        .def_readonly("delta_T", &EquilibriumResult::delta_T, "state.T - T_in [K]")
+        .def_readonly("converged", &EquilibriumResult::converged, "Solver convergence flag")
+        .def("__repr__", [](const EquilibriumResult& r) {
+            return "<EquilibriumResult: T=" + std::to_string(r.state.T) +
+                   " K, delta_T=" + std::to_string(r.delta_T) +
+                   " K, converged=" + (r.converged ? "True" : "False") + ">";
+        });
+
     m.def(
         "transport_state",
         [](double T,
@@ -936,8 +956,8 @@ PYBIND11_MODULE(_core, m)
             in.P = P;
             in.X = X_in;
 
-            State out = wgs_equilibrium_adiabatic(in);
-            return out.T;
+            EquilibriumResult out = wgs_equilibrium_adiabatic(in);
+            return out.state.T;
         },
         py::arg("T_in"),
         py::arg("X_in"),
@@ -1352,92 +1372,69 @@ PYBIND11_MODULE(_core, m)
         "Returns State with same temperature and burned composition."
     );
 
+    // Helper: construct State from (T, P, X_arr) — avoids 4-line boilerplate in every binding
+    auto make_state = [](double T, double P,
+                         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+        State s;
+        s.T = T;
+        s.P = P;
+        s.X = to_vec(X_arr);
+        return s;
+    };
+
     // State-based WGS equilibrium functions
     m.def(
         "wgs_equilibrium",
-        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
-        {
-            State in;
-            in.T = T;
-            in.P = P;
-            in.X = to_vec(X_arr);
-            return wgs_equilibrium(in);
-        },
+        [make_state](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        { return wgs_equilibrium(make_state(T, P, X_arr)); },
         py::arg("T"),
         py::arg("X"),
         py::arg("P") = 101325.0,
         "Isothermal WGS equilibrium (CO + H2O <-> CO2 + H2).\n\n"
-        "Returns State with equilibrium composition at input temperature."
+        "Returns EquilibriumResult with equilibrium composition at input temperature."
     );
 
     m.def(
         "wgs_equilibrium_adiabatic",
-        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
-        {
-            State in;
-            in.T = T;
-            in.P = P;
-            in.X = to_vec(X_arr);
-            return wgs_equilibrium_adiabatic(in);
-        },
+        [make_state](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        { return wgs_equilibrium_adiabatic(make_state(T, P, X_arr)); },
         py::arg("T"),
         py::arg("X"),
         py::arg("P") = 101325.0,
         "Adiabatic WGS equilibrium (CO + H2O <-> CO2 + H2).\n\n"
-        "Returns State with equilibrium temperature and composition."
+        "Returns EquilibriumResult with equilibrium temperature and composition."
     );
 
-    // SMR+WGS equilibrium (CH4 only)
+    // SMR+WGS equilibrium (CH4 only) — deprecated, use reforming_equilibrium instead
     m.def(
         "smr_wgs_equilibrium",
-        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
-        {
-            State in;
-            in.T = T;
-            in.P = P;
-            in.X = to_vec(X_arr);
-            return smr_wgs_equilibrium(in);
-        },
+        [make_state](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        { return smr_wgs_equilibrium(make_state(T, P, X_arr)); },
         py::arg("T"),
         py::arg("X"),
         py::arg("P") = 101325.0,
-        "Isothermal SMR+WGS equilibrium for CH4.\n\n"
-        "Steam Methane Reforming: CH4 + H2O <-> CO + 3H2\n"
-        "Water-Gas Shift: CO + H2O <-> CO2 + H2\n\n"
-        "Returns State with equilibrium composition at input temperature."
+        "Isothermal SMR+WGS equilibrium for CH4 (deprecated).\n\n"
+        "Use reforming_equilibrium instead — it handles CH4 and all other hydrocarbons.\n\n"
+        "Returns EquilibriumResult with equilibrium composition at input temperature."
     );
 
     m.def(
         "smr_wgs_equilibrium_adiabatic",
-        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
-        {
-            State in;
-            in.T = T;
-            in.P = P;
-            in.X = to_vec(X_arr);
-            return smr_wgs_equilibrium_adiabatic(in);
-        },
+        [make_state](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        { return smr_wgs_equilibrium_adiabatic(make_state(T, P, X_arr)); },
         py::arg("T"),
         py::arg("X"),
         py::arg("P") = 101325.0,
-        "Adiabatic SMR+WGS equilibrium for CH4.\n\n"
-        "Steam Methane Reforming: CH4 + H2O <-> CO + 3H2\n"
-        "Water-Gas Shift: CO + H2O <-> CO2 + H2\n\n"
-        "Returns State with equilibrium temperature and composition.\n"
-        "Temperature decreases due to endothermic SMR reaction."
+        "Adiabatic SMR+WGS equilibrium for CH4 (deprecated).\n\n"
+        "Use reforming_equilibrium_adiabatic instead.\n\n"
+        "Returns EquilibriumResult with equilibrium temperature and composition."
     );
 
     // General reforming + WGS equilibrium (all hydrocarbons)
     m.def(
         "reforming_equilibrium",
-        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
-        {
-            State in;
-            in.T = T;
-            in.P = P;
-            in.X = to_vec(X_arr);
-            return reforming_equilibrium(in);
-        },
+        [make_state](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        { return reforming_equilibrium(make_state(T, P, X_arr)); },
         py::arg("T"),
         py::arg("X"),
         py::arg("P") = 101325.0,
@@ -1445,19 +1442,13 @@ PYBIND11_MODULE(_core, m)
         "General reforming: CnHm + n*H2O <-> n*CO + (n + m/2)*H2\n"
         "Water-Gas Shift: CO + H2O <-> CO2 + H2\n\n"
         "Handles all hydrocarbons: CH4, C2H6, C3H8, iC4H10, nC5H12, etc.\n"
-        "Returns State with equilibrium composition at input temperature."
+        "Returns EquilibriumResult with equilibrium composition at input temperature."
     );
 
     m.def(
         "reforming_equilibrium_adiabatic",
-        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
-        {
-            State in;
-            in.T = T;
-            in.P = P;
-            in.X = to_vec(X_arr);
-            return reforming_equilibrium_adiabatic(in);
-        },
+        [make_state](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        { return reforming_equilibrium_adiabatic(make_state(T, P, X_arr)); },
         py::arg("T"),
         py::arg("X"),
         py::arg("P") = 101325.0,
@@ -1465,21 +1456,14 @@ PYBIND11_MODULE(_core, m)
         "General reforming: CnHm + n*H2O <-> n*CO + (n + m/2)*H2\n"
         "Water-Gas Shift: CO + H2O <-> CO2 + H2\n\n"
         "Handles all hydrocarbons: CH4, C2H6, C3H8, iC4H10, nC5H12, etc.\n"
-        "Returns State with equilibrium temperature and composition.\n"
-        "Temperature decreases due to endothermic reforming reactions."
+        "Returns EquilibriumResult with equilibrium temperature and composition."
     );
 
     // Combustion + Equilibrium (convenience function)
     m.def(
         "combustion_equilibrium",
-        [](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
-        {
-            State in;
-            in.T = T;
-            in.P = P;
-            in.X = to_vec(X_arr);
-            return combustion_equilibrium(in);
-        },
+        [make_state](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, double P)
+        { return combustion_equilibrium(make_state(T, P, X_arr)); },
         py::arg("T"),
         py::arg("X"),
         py::arg("P") = 101325.0,
@@ -1903,38 +1887,38 @@ PYBIND11_MODULE(_core, m)
     // CompressibleFlowSolution struct
     py::class_<CompressibleFlowSolution>(m, "CompressibleFlowSolution")
         .def(py::init<>())
-        .def_readwrite("stagnation", &CompressibleFlowSolution::stagnation, "Stagnation state")
-        .def_readwrite("outlet", &CompressibleFlowSolution::outlet, "Outlet static state")
-        .def_readwrite("v", &CompressibleFlowSolution::v, "Outlet velocity [m/s]")
-        .def_readwrite("M", &CompressibleFlowSolution::M, "Outlet Mach number [-]")
-        .def_readwrite("mdot", &CompressibleFlowSolution::mdot, "Mass flow rate [kg/s]")
-        .def_readwrite("choked", &CompressibleFlowSolution::choked, "True if flow is choked");
+        .def_readonly("stagnation", &CompressibleFlowSolution::stagnation, "Stagnation state")
+        .def_readonly("outlet", &CompressibleFlowSolution::outlet, "Outlet static state")
+        .def_readonly("v", &CompressibleFlowSolution::v, "Outlet velocity [m/s]")
+        .def_readonly("M", &CompressibleFlowSolution::M, "Outlet Mach number [-]")
+        .def_readonly("mdot", &CompressibleFlowSolution::mdot, "Mass flow rate [kg/s]")
+        .def_readonly("choked", &CompressibleFlowSolution::choked, "True if flow is choked");
 
     // NozzleStation struct
     py::class_<NozzleStation>(m, "NozzleStation")
         .def(py::init<>())
-        .def_readwrite("x", &NozzleStation::x, "Axial position [m]")
-        .def_readwrite("A", &NozzleStation::A, "Area [m²]")
-        .def_readwrite("P", &NozzleStation::P, "Static pressure [Pa]")
-        .def_readwrite("T", &NozzleStation::T, "Static temperature [K]")
-        .def_readwrite("rho", &NozzleStation::rho, "Density [kg/m³]")
-        .def_readwrite("u", &NozzleStation::u, "Velocity [m/s]")
-        .def_readwrite("M", &NozzleStation::M, "Mach number [-]")
-        .def_readwrite("h", &NozzleStation::h, "Specific enthalpy [J/kg]");
+        .def_readonly("x", &NozzleStation::x, "Axial position [m]")
+        .def_readonly("A", &NozzleStation::A, "Area [m²]")
+        .def_readonly("P", &NozzleStation::P, "Static pressure [Pa]")
+        .def_readonly("T", &NozzleStation::T, "Static temperature [K]")
+        .def_readonly("rho", &NozzleStation::rho, "Density [kg/m³]")
+        .def_readonly("u", &NozzleStation::u, "Velocity [m/s]")
+        .def_readonly("M", &NozzleStation::M, "Mach number [-]")
+        .def_readonly("h", &NozzleStation::h, "Specific enthalpy [J/kg]");
 
     // NozzleSolution struct
     py::class_<NozzleSolution>(m, "NozzleSolution")
         .def(py::init<>())
-        .def_readwrite("inlet", &NozzleSolution::inlet, "Inlet state")
-        .def_readwrite("outlet", &NozzleSolution::outlet, "Outlet state")
-        .def_readwrite("mdot", &NozzleSolution::mdot, "Mass flow rate [kg/s]")
-        .def_readwrite("h0", &NozzleSolution::h0, "Stagnation enthalpy [J/kg]")
-        .def_readwrite("T0", &NozzleSolution::T0, "Stagnation temperature [K]")
-        .def_readwrite("P0", &NozzleSolution::P0, "Stagnation pressure [Pa]")
-        .def_readwrite("choked", &NozzleSolution::choked, "True if throat is sonic")
-        .def_readwrite("x_throat", &NozzleSolution::x_throat, "Throat position [m]")
-        .def_readwrite("A_throat", &NozzleSolution::A_throat, "Throat area [m²]")
-        .def_readwrite("profile", &NozzleSolution::profile, "Axial profile");
+        .def_readonly("inlet", &NozzleSolution::inlet, "Inlet state")
+        .def_readonly("outlet", &NozzleSolution::outlet, "Outlet state")
+        .def_readonly("mdot", &NozzleSolution::mdot, "Mass flow rate [kg/s]")
+        .def_readonly("h0", &NozzleSolution::h0, "Stagnation enthalpy [J/kg]")
+        .def_readonly("T0", &NozzleSolution::T0, "Stagnation temperature [K]")
+        .def_readonly("P0", &NozzleSolution::P0, "Stagnation pressure [Pa]")
+        .def_readonly("choked", &NozzleSolution::choked, "True if throat is sonic")
+        .def_readonly("x_throat", &NozzleSolution::x_throat, "Throat position [m]")
+        .def_readonly("A_throat", &NozzleSolution::A_throat, "Throat area [m²]")
+        .def_readonly("profile", &NozzleSolution::profile, "Axial profile");
 
     // ThrustResult struct
     py::class_<ThrustResult>(m, "ThrustResult")
@@ -1949,28 +1933,28 @@ PYBIND11_MODULE(_core, m)
     // FannoStation struct
     py::class_<FannoStation>(m, "FannoStation")
         .def(py::init<>())
-        .def_readwrite("x", &FannoStation::x, "Position [m]")
-        .def_readwrite("P", &FannoStation::P, "Static pressure [Pa]")
-        .def_readwrite("T", &FannoStation::T, "Static temperature [K]")
-        .def_readwrite("rho", &FannoStation::rho, "Density [kg/m³]")
-        .def_readwrite("u", &FannoStation::u, "Velocity [m/s]")
-        .def_readwrite("M", &FannoStation::M, "Mach number [-]")
-        .def_readwrite("h", &FannoStation::h, "Specific enthalpy [J/kg]")
-        .def_readwrite("s", &FannoStation::s, "Specific entropy [J/(kg·K)]");
+        .def_readonly("x", &FannoStation::x, "Position [m]")
+        .def_readonly("P", &FannoStation::P, "Static pressure [Pa]")
+        .def_readonly("T", &FannoStation::T, "Static temperature [K]")
+        .def_readonly("rho", &FannoStation::rho, "Density [kg/m³]")
+        .def_readonly("u", &FannoStation::u, "Velocity [m/s]")
+        .def_readonly("M", &FannoStation::M, "Mach number [-]")
+        .def_readonly("h", &FannoStation::h, "Specific enthalpy [J/kg]")
+        .def_readonly("s", &FannoStation::s, "Specific entropy [J/(kg·K)]");
 
     // FannoSolution struct
     py::class_<FannoSolution>(m, "FannoSolution")
         .def(py::init<>())
-        .def_readwrite("inlet", &FannoSolution::inlet, "Inlet state")
-        .def_readwrite("outlet", &FannoSolution::outlet, "Outlet state")
-        .def_readwrite("mdot", &FannoSolution::mdot, "Mass flow rate [kg/s]")
-        .def_readwrite("h0", &FannoSolution::h0, "Stagnation enthalpy [J/kg]")
-        .def_readwrite("L", &FannoSolution::L, "Pipe length [m]")
-        .def_readwrite("D", &FannoSolution::D, "Pipe diameter [m]")
-        .def_readwrite("f", &FannoSolution::f, "Darcy friction factor [-]")
-        .def_readwrite("choked", &FannoSolution::choked, "True if flow reached M=1")
-        .def_readwrite("L_choke", &FannoSolution::L_choke, "Length to choking [m]")
-        .def_readwrite("profile", &FannoSolution::profile, "Axial profile");
+        .def_readonly("inlet", &FannoSolution::inlet, "Inlet state")
+        .def_readonly("outlet", &FannoSolution::outlet, "Outlet state")
+        .def_readonly("mdot", &FannoSolution::mdot, "Mass flow rate [kg/s]")
+        .def_readonly("h0", &FannoSolution::h0, "Stagnation enthalpy [J/kg]")
+        .def_readonly("L", &FannoSolution::L, "Pipe length [m]")
+        .def_readonly("D", &FannoSolution::D, "Pipe diameter [m]")
+        .def_readonly("f", &FannoSolution::f, "Darcy friction factor [-]")
+        .def_readonly("choked", &FannoSolution::choked, "True if flow reached M=1")
+        .def_readonly("L_choke", &FannoSolution::L_choke, "Length to choking [m]")
+        .def_readonly("profile", &FannoSolution::profile, "Axial profile");
 
     // Isentropic nozzle flow
     m.def(
@@ -2189,51 +2173,6 @@ PYBIND11_MODULE(_core, m)
         py::arg("tol") = 1e-6,
         py::arg("max_iter") = 100,
         "Maximum pipe length before choking (L*)."
-    );
-
-    // -------------------------------------------------------------
-    // Friction factor correlations
-    // -------------------------------------------------------------
-
-    m.def(
-        "friction_haaland",
-        &friction_haaland,
-        py::arg("Re"),
-        py::arg("e_D"),
-        "Haaland friction factor correlation (explicit, ~2-3% accuracy).\n\n"
-        "Re  : Reynolds number [-]\n"
-        "e_D : relative roughness ε/D [-]"
-    );
-
-    m.def(
-        "friction_serghides",
-        &friction_serghides,
-        py::arg("Re"),
-        py::arg("e_D"),
-        "Serghides friction factor correlation (explicit, <0.3% accuracy).\n\n"
-        "Re  : Reynolds number [-]\n"
-        "e_D : relative roughness ε/D [-]"
-    );
-
-    m.def(
-        "friction_colebrook",
-        &friction_colebrook,
-        py::arg("Re"),
-        py::arg("e_D"),
-        py::arg("tol") = 1e-10,
-        py::arg("max_iter") = 20,
-        "Colebrook-White friction factor (implicit, reference standard).\n\n"
-        "Re  : Reynolds number [-]\n"
-        "e_D : relative roughness ε/D [-]"
-    );
-
-    m.def(
-        "friction_petukhov",
-        &friction_petukhov,
-        py::arg("Re"),
-        "Petukhov friction factor for smooth tubes (Re > 3000).\n\n"
-        "Re : Reynolds number [-]\n\n"
-        "Returns Darcy friction factor f [-]."
     );
 
     // -------------------------------------------------------------
@@ -2649,8 +2588,17 @@ PYBIND11_MODULE(_core, m)
     );
 
     // =========================================================================
-    // Combustion State
+    // Combustion Method enum + Combustion State
     // =========================================================================
+
+    py::enum_<CombustionMethod>(m, "CombustionMethod",
+        "Product model for combustion_state / combustion_state_from_streams.\n\n"
+        "  Complete    : complete combustion to CO2 + H2O (fast, default)\n"
+        "  Equilibrium : complete combustion + reforming + WGS equilibrium\n"
+        "                (slower, physically correct for rich or high-T conditions)")
+        .value("Complete", CombustionMethod::Complete)
+        .value("Equilibrium", CombustionMethod::Equilibrium)
+        .export_values();
 
     py::class_<CombustionState>(m, "CombustionState",
         "Bundle of combustion properties with nested CompleteState objects.\n\n"
@@ -2658,18 +2606,22 @@ PYBIND11_MODULE(_core, m)
         "Attributes:\n"
         "  phi                : equivalence ratio [-]\n"
         "  fuel_name          : optional fuel label (string)\n"
+        "  method             : CombustionMethod used for products\n"
         "  reactants          : CompleteState at reactant conditions\n"
         "  products           : CompleteState at product conditions (T_ad)\n"
         "  mixture_fraction   : Bilger mixture fraction [-]\n"
         "  fuel_burn_fraction : fraction of fuel burned [0-1]")
         .def_readonly("phi", &CombustionState::phi, "Equivalence ratio [-]")
         .def_readonly("fuel_name", &CombustionState::fuel_name, "Fuel label (e.g., 'CH4', 'Natural Gas')")
+        .def_readonly("method", &CombustionState::method, "CombustionMethod used for products")
         .def_readonly("reactants", &CombustionState::reactants, "Reactant CompleteState (all thermo + transport)")
         .def_readonly("products", &CombustionState::products, "Product CompleteState at T_ad (all thermo + transport)")
         .def_readonly("mixture_fraction", &CombustionState::mixture_fraction, "Bilger mixture fraction [-]")
         .def_readonly("fuel_burn_fraction", &CombustionState::fuel_burn_fraction, "Fraction of fuel burned [0-1]")
         .def("__repr__", [](const CombustionState& s) {
+            std::string method_str = (s.method == CombustionMethod::Equilibrium) ? "Equilibrium" : "Complete";
             return "<CombustionState: phi=" + std::to_string(s.phi) +
+                   ", method=" + method_str +
                    ", T_reactants=" + std::to_string(s.reactants.thermo.T) + " K" +
                    ", T_products=" + std::to_string(s.products.thermo.T) + " K" +
                    (s.fuel_name.empty() ? "" : ", fuel='" + s.fuel_name + "'") + ">";
@@ -2684,21 +2636,21 @@ PYBIND11_MODULE(_core, m)
         py::arg("T_reactants"),
         py::arg("P"),
         py::arg("fuel_name") = "",
+        py::arg("method") = CombustionMethod::Complete,
         "Compute combustion state from equivalence ratio.\n\n"
-        "Typical use: calculations where phi is specified.\n\n"
         "Parameters:\n"
         "  X_fuel       : fuel composition (mole fractions) [-]\n"
         "  X_ox         : oxidizer composition (mole fractions) [-]\n"
-        "  phi          : equivalence ratio [-] (INPUT)\n"
+        "  phi          : equivalence ratio [-]\n"
         "  T_reactants  : reactant temperature [K]\n"
         "  P            : pressure [Pa]\n"
-        "  fuel_name    : optional fuel label (default: '')\n\n"
+        "  fuel_name    : optional fuel label (default: '')\n"
+        "  method       : CombustionMethod.Complete (default) or CombustionMethod.Equilibrium\n\n"
         "Returns: CombustionState with reactants, products, phi, mixture_fraction\n\n"
         "Example:\n"
-        "  >>> X_CH4 = [0]*5 + [1.0] + [0]*8  # Pure methane\n"
-        "  >>> X_air = cb.standard_dry_air_composition()\n"
         "  >>> state = cb.combustion_state(X_CH4, X_air, phi=1.0, T_reactants=300, P=101325)\n"
-        "  >>> state.products.thermo.T  # Adiabatic flame temperature [K]"
+        "  >>> state_eq = cb.combustion_state(X_CH4, X_air, phi=1.2, T_reactants=300, P=101325,\n"
+        "  ...                               method=cb.CombustionMethod.Equilibrium)"
     );
 
     m.def(
@@ -2707,19 +2659,15 @@ PYBIND11_MODULE(_core, m)
         py::arg("fuel_stream"),
         py::arg("ox_stream"),
         py::arg("fuel_name") = "",
+        py::arg("method") = CombustionMethod::Complete,
         "Compute combustion state from measured streams.\n\n"
-        "Typical use: lab measurements where mass flows are measured.\n"
         "Phi is COMPUTED from mass flow rates (output, not input).\n\n"
         "Parameters:\n"
         "  fuel_stream : fuel stream with mdot, T, X\n"
         "  ox_stream   : oxidizer stream with mdot, T, X\n"
-        "  fuel_name   : optional fuel label (default: '')\n\n"
-        "Returns: CombustionState with phi computed from flow rates\n\n"
-        "Example:\n"
-        "  >>> fuel = cb.Stream().set_T(300).set_X(X_CH4).set_mdot(0.01)\n"
-        "  >>> air = cb.Stream().set_T(298).set_X(X_air).set_mdot(0.17)\n"
-        "  >>> state = cb.combustion_state_from_streams(fuel, air, 'CH4')\n"
-        "  >>> state.phi  # Computed from mass flows"
+        "  fuel_name   : optional fuel label (default: '')\n"
+        "  method      : CombustionMethod.Complete (default) or CombustionMethod.Equilibrium\n\n"
+        "Returns: CombustionState with phi computed from flow rates"
     );
 
     // =========================================================================
@@ -4053,6 +4001,52 @@ PYBIND11_MODULE(_core, m)
         "  >>> print(f'Mass flow: {result.mdot:.3f} kg/s')\n"
         "  >>> print(f'Velocity: {result.v:.2f} m/s')\n"
         "  >>> print(f'Cd: {result.Cd:.3f}')"
+    );
+
+    // Convenience wrapper: computes mu from thermodynamic state
+    m.def(
+        "orifice_flow_state",
+        [](const OrificeGeometry& geom,
+           double dP,
+           double T,
+           double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double Z,
+           double kappa,
+           CdCorrelation correlation)
+        {
+            auto X = to_vec(X_arr);
+            double mu = viscosity(T, P, X);
+            return orifice_flow(geom, dP, T, P, mu, Z, X, kappa, correlation);
+        },
+        py::arg("geom"),
+        py::arg("dP"),
+        py::arg("T"),
+        py::arg("P"),
+        py::arg("X"),
+        py::arg("Z") = 1.0,
+        py::arg("kappa") = 0.0,
+        py::arg("correlation") = CdCorrelation::ReaderHarrisGallagher,
+        "Compute all orifice flow properties from thermodynamic state.\n\n"
+        "Convenience wrapper around orifice_flow() that computes dynamic viscosity\n"
+        "internally from (T, P, X) using the built-in transport correlations.\n\n"
+        "Parameters:\n"
+        "  geom        : OrificeGeometry\n"
+        "  dP          : differential pressure [Pa]\n"
+        "  T           : temperature [K]\n"
+        "  P           : absolute upstream pressure [Pa]\n"
+        "  X           : mole fractions [-]\n"
+        "  Z           : compressibility factor [-] (default: 1.0 = ideal gas)\n"
+        "  kappa       : isentropic exponent cp/cv [-] (default: 0.0 = incompressible)\n"
+        "  correlation : Cd correlation (default: ReaderHarrisGallagher)\n\n"
+        "Returns: OrificeFlowResult with mdot, v, Re_D, Re_d, Cd, epsilon, rho_corrected\n\n"
+        "Example:\n"
+        "  >>> geom = cb.OrificeGeometry()\n"
+        "  >>> geom.d = 0.05\n"
+        "  >>> geom.D = 0.1\n"
+        "  >>> X_air = cb.standard_dry_air_composition()\n"
+        "  >>> result = cb.orifice_flow_state(geom, dP=10000, T=300, P=101325, X=X_air)\n"
+        "  >>> print(f'Mass flow: {result.mdot:.4f} kg/s')"
     );
 
     // Utility functions

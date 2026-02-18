@@ -80,15 +80,15 @@ int main()
         Stream mixed = mix({fuel_phi, air});
 
         // One-step: combustion + reforming + WGS equilibrium
-        State eq = combustion_equilibrium(mixed.state);
+        EquilibriumResult eq = combustion_equilibrium(mixed.state);
 
         // Output results
         std::cout << std::setw(6) << phi
                   << std::setw(10) << fuel_phi.mdot
                   << std::setw(10) << mixed.state.T
-                  << std::setw(10) << eq.T
-                  << std::setw(12) << eq.mu() * 1.0e6  // convert to μPa·s
-                  << std::setw(12) << eq.Pr()
+                  << std::setw(10) << eq.state.T
+                  << std::setw(12) << eq.state.mu() * 1.0e6  // convert to μPa·s
+                  << std::setw(12) << eq.state.Pr()
                   << "\n";
     }
 
@@ -107,7 +107,7 @@ int main()
     Stream mixed_stoich = mix({fuel_stoich, air});
 
     // One-step: combustion + reforming + WGS equilibrium
-    State eq_stoich = combustion_equilibrium(mixed_stoich.state);
+    EquilibriumResult eq_stoich = combustion_equilibrium(mixed_stoich.state);
 
     // For comparison, also show complete combustion (before equilibrium)
     State burned_stoich = complete_combustion(mixed_stoich.state);
@@ -129,17 +129,17 @@ int main()
     std::cout << "  a = " << burned_stoich.a() << " m/s\n\n";
 
     std::cout << "Reforming + WGS Equilibrium:\n";
-    std::cout << "  T_eq = " << eq_stoich.T << " K\n";
-    std::cout << "  rho = " << eq_stoich.rho() << " kg/m³\n";
-    std::cout << "  mu = " << eq_stoich.mu() * 1.0e6 << " μPa·s\n";
-    std::cout << "  Pr = " << eq_stoich.Pr() << "\n\n";
+    std::cout << "  T_eq = " << eq_stoich.state.T << " K\n";
+    std::cout << "  rho = " << eq_stoich.state.rho() << " kg/m³\n";
+    std::cout << "  mu = " << eq_stoich.state.mu() * 1.0e6 << " μPa·s\n";
+    std::cout << "  Pr = " << eq_stoich.state.Pr() << "\n\n";
 
     // Show product composition
     std::cout << "Product Composition (Reforming+WGS equilibrium, mole fractions > 0.001):\n";
     for (std::size_t i = 0; i < n_species; ++i) {
-        if (eq_stoich.X[i] > 0.001) {
+        if (eq_stoich.state.X[i] > 0.001) {
             std::cout << "  " << std::setw(6) << species_names[i]
-                      << ": " << std::setprecision(4) << eq_stoich.X[i] << "\n";
+                      << ": " << std::setprecision(4) << eq_stoich.state.X[i] << "\n";
         }
     }
 
@@ -155,7 +155,7 @@ int main()
     Stream mixed_rich = mix({fuel_rich, air});
 
     // One-step: combustion + reforming + WGS equilibrium
-    State eq_rich = combustion_equilibrium(mixed_rich.state);
+    EquilibriumResult eq_rich = combustion_equilibrium(mixed_rich.state);
 
     // For comparison, also show complete combustion (before equilibrium)
     State burned_rich = complete_combustion(mixed_rich.state);
@@ -170,11 +170,11 @@ int main()
     }
 
     std::cout << "\nReforming + WGS Equilibrium (hydrocarbons reformed to CO + H2):\n";
-    std::cout << "  T_eq = " << eq_rich.T << " K\n";
+    std::cout << "  T_eq = " << eq_rich.state.T << " K\n";
     for (std::size_t i = 0; i < n_species; ++i) {
-        if (eq_rich.X[i] > 0.001) {
+        if (eq_rich.state.X[i] > 0.001) {
             std::cout << "  " << std::setw(6) << species_names[i]
-                      << ": " << std::setprecision(4) << eq_rich.X[i] << "\n";
+                      << ": " << std::setprecision(4) << eq_rich.state.X[i] << "\n";
         }
     }
 

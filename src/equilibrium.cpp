@@ -51,15 +51,18 @@ static inline void molefractions(const std::vector<double>& n, std::vector<doubl
     }
 }
 
+static inline double kp_wgs_from_indices(double T,
+                                          std::size_t i_CO2, std::size_t i_H2,
+                                          std::size_t i_CO,  std::size_t i_H2O)
+{
+    double d_gRT = (::g_over_RT(i_CO2, T) + ::g_over_RT(i_H2, T))
+                 - (::g_over_RT(i_CO,  T) + ::g_over_RT(i_H2O, T));
+    return std::exp(-d_gRT);
+}
+
 static inline double Kp_WGS(double T, const WgsConfig& cfg)
 {
-    double g_CO2 = ::g_over_RT(cfg.i_CO2, T);
-    double g_H2  = ::g_over_RT(cfg.i_H2,  T);
-    double g_CO  = ::g_over_RT(cfg.i_CO,  T);
-    double g_H2O = ::g_over_RT(cfg.i_H2O, T);
-
-    double d_gRT = (g_CO2 + g_H2) - (g_CO + g_H2O);
-    return std::exp(-d_gRT);
+    return kp_wgs_from_indices(T, cfg.i_CO2, cfg.i_H2, cfg.i_CO, cfg.i_H2O);
 }
 
 // -------------------------------------------------------------
@@ -306,16 +309,10 @@ static inline double Kp_SMR(double T, const SmrWgsConfig& cfg)
     return std::exp(-d_gRT);
 }
 
-// Equilibrium constant for WGS (reuse existing)
+// Equilibrium constant for WGS — delegates to shared helper
 static inline double Kp_WGS_smr(double T, const SmrWgsConfig& cfg)
 {
-    double g_CO2 = ::g_over_RT(cfg.i_CO2, T);
-    double g_H2  = ::g_over_RT(cfg.i_H2,  T);
-    double g_CO  = ::g_over_RT(cfg.i_CO,  T);
-    double g_H2O = ::g_over_RT(cfg.i_H2O, T);
-
-    double d_gRT = (g_CO2 + g_H2) - (g_CO + g_H2O);
-    return std::exp(-d_gRT);
+    return kp_wgs_from_indices(T, cfg.i_CO2, cfg.i_H2, cfg.i_CO, cfg.i_H2O);
 }
 
 // -------------------------------------------------------------
@@ -524,7 +521,7 @@ static double solve_adiabatic_T_smr_wgs(const std::vector<double>& n_in,
 // -------------------------------------------------------------
 
 // WGS equilibrium (isothermal) - equilibrate at input temperature
-State wgs_equilibrium(const State& in)
+EquilibriumResult wgs_equilibrium(const State& in)
 {
     WgsConfig cfg = make_wgs_config();
 
@@ -548,11 +545,11 @@ State wgs_equilibrium(const State& in)
     out.T = in.T;
     out.P = in.P;
     out.X = X_out;
-    return out;
+    return EquilibriumResult{out, in.T, 0.0, true};
 }
 
 // WGS equilibrium (adiabatic) - solve for equilibrium T and composition
-State wgs_equilibrium_adiabatic(const State& in)
+EquilibriumResult wgs_equilibrium_adiabatic(const State& in)
 {
     WgsConfig cfg = make_wgs_config();
 
@@ -568,8 +565,8 @@ State wgs_equilibrium_adiabatic(const State& in)
     at_T_ad.P = in.P;
     at_T_ad.X = in.X;
 
-    State out = wgs_equilibrium(at_T_ad);
-    return out;
+    EquilibriumResult inner = wgs_equilibrium(at_T_ad);
+    return EquilibriumResult{inner.state, in.T, inner.state.T - in.T, true};
 }
 
 // -------------------------------------------------------------
@@ -577,7 +574,7 @@ State wgs_equilibrium_adiabatic(const State& in)
 // -------------------------------------------------------------
 
 // SMR+WGS equilibrium (isothermal) - equilibrate at input temperature
-State smr_wgs_equilibrium(const State& in)
+EquilibriumResult smr_wgs_equilibrium(const State& in)
 {
     SmrWgsConfig cfg = make_smr_wgs_config();
 
@@ -591,7 +588,7 @@ State smr_wgs_equilibrium(const State& in)
 
     // Solve for extents of reaction at fixed T
     double xi1, xi2;
-    solve_smr_wgs_isothermal(in.X, in.T, in.P, cfg, xi1, xi2);
+    bool conv = solve_smr_wgs_isothermal(in.X, in.T, in.P, cfg, xi1, xi2);
 
     // Build output composition
     std::vector<double> n_out;
@@ -604,11 +601,11 @@ State smr_wgs_equilibrium(const State& in)
     out.T = in.T;
     out.P = in.P;
     out.X = X_out;
-    return out;
+    return EquilibriumResult{out, in.T, 0.0, conv};
 }
 
 // SMR+WGS equilibrium (adiabatic) - solve for equilibrium T and composition
-State smr_wgs_equilibrium_adiabatic(const State& in)
+EquilibriumResult smr_wgs_equilibrium_adiabatic(const State& in)
 {
     SmrWgsConfig cfg = make_smr_wgs_config();
 
@@ -628,7 +625,7 @@ State smr_wgs_equilibrium_adiabatic(const State& in)
 
     // Get equilibrium composition at T_ad
     double xi1, xi2;
-    solve_smr_wgs_isothermal(in.X, T_ad, in.P, cfg, xi1, xi2);
+    bool conv = solve_smr_wgs_isothermal(in.X, T_ad, in.P, cfg, xi1, xi2);
 
     std::vector<double> n_out;
     composition_from_xi_smr_wgs(in.X, xi1, xi2, cfg, n_out);
@@ -640,7 +637,7 @@ State smr_wgs_equilibrium_adiabatic(const State& in)
     out.T = T_ad;
     out.P = in.P;
     out.X = X_out;
-    return out;
+    return EquilibriumResult{out, in.T, T_ad - in.T, conv};
 }
 
 // -------------------------------------------------------------
@@ -838,7 +835,7 @@ struct ReformingAdiabaticFun {
 };
 
 // Public API: General reforming + WGS equilibrium (isothermal)
-State reforming_equilibrium(const State& in)
+EquilibriumResult reforming_equilibrium(const State& in)
 {
     ReformingConfig cfg = make_reforming_config();
 
@@ -866,11 +863,11 @@ State reforming_equilibrium(const State& in)
     out.T = in.T;
     out.P = in.P;
     out.X = X_out;
-    return out;
+    return EquilibriumResult{out, in.T, 0.0, true};
 }
 
 // Public API: General reforming + WGS equilibrium (adiabatic)
-State reforming_equilibrium_adiabatic(const State& in)
+EquilibriumResult reforming_equilibrium_adiabatic(const State& in)
 {
     ReformingConfig cfg = make_reforming_config();
 
@@ -906,14 +903,14 @@ State reforming_equilibrium_adiabatic(const State& in)
     out.T = T_ad;
     out.P = in.P;
     out.X = X_out;
-    return out;
+    return EquilibriumResult{out, in.T, T_ad - in.T, true};
 }
 
 // -------------------------------------------------------------
 // Combustion + Equilibrium (convenience function)
 // -------------------------------------------------------------
 
-State combustion_equilibrium(const State& in)
+EquilibriumResult combustion_equilibrium(const State& in)
 {
     // Step 1: Complete combustion (adiabatic)
     // This burns fuel with available O2, producing CO2 + H2O
@@ -923,5 +920,6 @@ State combustion_equilibrium(const State& in)
     // Step 2: Reforming + WGS equilibrium on combustion products
     // For rich mixtures: unburned HC + H2O -> CO + H2
     // For all mixtures: CO + H2O <-> CO2 + H2
-    return reforming_equilibrium_adiabatic(burned);
+    EquilibriumResult result = reforming_equilibrium_adiabatic(burned);
+    return EquilibriumResult{result.state, in.T, result.state.T - in.T, result.converged};
 }

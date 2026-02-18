@@ -1,4 +1,5 @@
 #include "../include/combustion.h"
+#include "../include/equilibrium.h"
 #include "../include/humidair.h"
 #include "../include/thermo.h"
 #include "../include/thermo_transport_data.h"
@@ -1356,13 +1357,15 @@ CombustionState combustion_state(
     double phi,
     double T_reactants,
     double P,
-    const std::string& fuel_name
+    const std::string& fuel_name,
+    CombustionMethod method
 ) {
     CombustionState result;
 
-    // Store phi and fuel name
+    // Store phi, fuel name, and method
     result.phi = phi;
     result.fuel_name = fuel_name;
+    result.method = method;
 
     // Compute reactant mixture composition
     std::vector<double> X_reactants = set_equivalence_ratio_mole(phi, X_fuel, X_ox);
@@ -1370,17 +1373,23 @@ CombustionState combustion_state(
     // Compute reactant CompleteState
     result.reactants = complete_state(T_reactants, P, X_reactants);
 
-    // Compute products via complete combustion
-    State product_state = complete_combustion(State{T_reactants, P, X_reactants});
+    // Compute products via selected method
+    State reactant_state{T_reactants, P, X_reactants};
+    State product_state;
+    if (method == CombustionMethod::Equilibrium) {
+        EquilibriumResult eq = combustion_equilibrium(reactant_state);
+        product_state = eq.state;
+        result.fuel_burn_fraction = eq.converged ? 1.0 : 0.0;
+    } else {
+        product_state = complete_combustion(reactant_state);
+        result.fuel_burn_fraction = 1.0;
+    }
 
     // Compute product CompleteState
     result.products = complete_state(product_state.T, product_state.P, product_state.X);
 
     // Compute mixture fraction
     result.mixture_fraction = compute_bilger_mixture_fraction(X_reactants, X_fuel, X_ox);
-
-    // For complete combustion, all fuel is burned
-    result.fuel_burn_fraction = 1.0;
 
     return result;
 }
@@ -1389,16 +1398,17 @@ CombustionState combustion_state(
 CombustionState combustion_state_from_streams(
     const Stream& fuel_stream,
     const Stream& ox_stream,
-    const std::string& fuel_name
+    const std::string& fuel_name,
+    CombustionMethod method
 ) {
     const double mdot_total = fuel_stream.mdot + ox_stream.mdot;
     if (mdot_total <= 0.0) {
         throw std::runtime_error("Total mass flow rate must be positive");
     }
 
-    // Mass-weighted average temperature
-    const double T_reactants = (fuel_stream.mdot * fuel_stream.T() +
-                                ox_stream.mdot  * ox_stream.T()) / mdot_total;
+    // Enthalpy-weighted mixed temperature via mix() — more accurate than
+    // a simple mass-weighted average, especially for large T differences.
+    const double T_reactants = mix({fuel_stream, ox_stream}).state.T;
     const double P = fuel_stream.P();
 
     // Compute phi directly from mass flows — avoids a redundant mix() call.
@@ -1406,5 +1416,5 @@ CombustionState combustion_state_from_streams(
     const double FAR_stoich = stoich_fuel_ox_ratio(fuel_stream.X(), ox_stream.X());
     const double phi = (fuel_stream.mdot / ox_stream.mdot) / FAR_stoich;
 
-    return combustion_state(fuel_stream.X(), ox_stream.X(), phi, T_reactants, P, fuel_name);
+    return combustion_state(fuel_stream.X(), ox_stream.X(), phi, T_reactants, P, fuel_name, method);
 }
