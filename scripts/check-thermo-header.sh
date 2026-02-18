@@ -2,6 +2,12 @@
 # Check that include/thermo_transport_data.h is in sync with the generator.
 # Fails if the committed header differs from what the generator would produce.
 # Run this manually or via pre-commit to catch accidental manual edits.
+#
+# NOTE: The --species argument below pins the exact species set. If you add a
+# new species, you must update --species here AND the banner comment in
+# generate_thermo_data.py — otherwise this check will fail even on a valid
+# regeneration. This is intentional: adding a species is a deliberate change
+# that should require updating the hook explicitly.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
