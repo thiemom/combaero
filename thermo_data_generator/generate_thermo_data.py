@@ -609,21 +609,43 @@ using G = MolecularGeometry;
 
 
 def _parse_common_names_header(header_path: Path) -> set[str]:
-    """Extract the set of formula keys from common_names.h.
+    """Extract the set of formula keys from the formula_to_name map in common_names.h.
 
-    Parses lines of the form:  {"FORMULA", "..."},
+    Parses lines of the form:  {"FORMULA", "Common name"},
     Returns the set of formula strings (upper-cased).
     """
-    known: set[str] = set()
-    pattern = re.compile(r'\{\s*"([^"]+)"\s*,')
     try:
-        for line in header_path.read_text().splitlines():
-            m = pattern.search(line)
-            if m:
-                known.add(m.group(1).upper())
+        text = header_path.read_text()
     except FileNotFoundError:
-        pass
-    return known
+        return set()
+    m = re.search(r"formula_to_name\{(.*?)\};", text, re.DOTALL)
+    if not m:
+        return set()
+    return {key.upper() for key in re.findall(r'\{\s*"([^"]+)"\s*,', m.group(1))}
+
+
+def _parse_formula_to_name(header_path: Path) -> dict[str, str]:
+    """Return the full formula -> common_name mapping from common_names.h."""
+    try:
+        text = header_path.read_text()
+    except FileNotFoundError:
+        return {}
+    m = re.search(r"formula_to_name\{(.*?)\};", text, re.DOTALL)
+    if not m:
+        return {}
+    return dict(re.findall(r'\{\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\}', m.group(1)))
+
+
+def _parse_name_to_formula(header_path: Path) -> dict[str, str]:
+    """Return the full common_name -> formula mapping from common_names.h."""
+    try:
+        text = header_path.read_text()
+    except FileNotFoundError:
+        return {}
+    m = re.search(r"name_to_formula\{(.*?)\};", text, re.DOTALL)
+    if not m:
+        return {}
+    return dict(re.findall(r'\{\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\}', m.group(1)))
 
 
 def check_common_names(

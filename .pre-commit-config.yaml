@@ -43,3 +43,11 @@ repos:
         pass_filenames: false
         files: ^(thermo_data_generator/|include/thermo_transport_data\.h)
         stages: [pre-commit]
+
+      - id: common-names-check
+        name: Common names completeness check
+        entry: bash -c './scripts/check-common-names.sh'
+        language: system
+        pass_filenames: false
+        files: ^include/(thermo_transport_data|common_names)\.h$
+        stages: [pre-commit]

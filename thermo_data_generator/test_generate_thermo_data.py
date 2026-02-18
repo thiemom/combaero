@@ -13,6 +13,11 @@ from pathlib import Path
 import pytest
 from generate_thermo_data import (  # Species used in the reference header (from JetSurf2)
     NASAFormat,
+    SpeciesData,
+    _parse_common_names_header,
+    _parse_formula_to_name,
+    _parse_name_to_formula,
+    check_common_names,
     generate_cpp_header,
     list_species_in_yaml,
     load_cantera_yaml,
@@ -266,6 +271,159 @@ class TestTwoFileWorkflow:
 
         assert len(species_data) == len(REFERENCE_SPECIES)
         assert nasa_format == NASAFormat.NASA7
+
+
+REAL_COMMON_NAMES_H = Path(__file__).parent.parent / "include" / "common_names.h"
+
+
+class TestParseCommonNamesHeader:
+    """Tests for _parse_common_names_header()."""
+
+    def test_parses_real_header(self) -> None:
+        """All 14 active species must be present in the real common_names.h."""
+        known = _parse_common_names_header(REAL_COMMON_NAMES_H)
+        for formula in REFERENCE_SPECIES:
+            assert formula in known, f"{formula} missing from common_names.h"
+
+    def test_returns_empty_for_missing_file(self) -> None:
+        known = _parse_common_names_header(Path("/nonexistent/common_names.h"))
+        assert known == set()
+
+    def test_parses_synthetic_header(self, tmp_path: Path) -> None:
+        header = tmp_path / "common_names.h"
+        header.write_text(
+            "inline const std::unordered_map<std::string, std::string> formula_to_name{\n"
+            '    {"CH4", "Methane"},\n'
+            '    {"CO2", "Carbon dioxide"},\n'
+            "};\n"
+        )
+        known = _parse_common_names_header(header)
+        assert known == {"CH4", "CO2"}
+
+    def test_keys_are_uppercased(self, tmp_path: Path) -> None:
+        header = tmp_path / "common_names.h"
+        header.write_text(
+            "inline const std::unordered_map<std::string, std::string> formula_to_name{\n"
+            '    {"ch4", "Methane"},\n'
+            "};\n"
+        )
+        known = _parse_common_names_header(header)
+        assert "CH4" in known
+        assert "ch4" not in known
+
+
+class TestCheckCommonNames:
+    """Tests for check_common_names()."""
+
+    def _make_species(self, *names: str) -> list[SpeciesData]:
+        """Create minimal SpeciesData stubs with just a name."""
+        from generate_thermo_data import NASACoeffs, NASAFormat
+
+        return [
+            SpeciesData(
+                name=n,
+                molar_mass=0.0,
+                nasa=NASACoeffs(format=NASAFormat.NASA9, T_ranges=[], coeffs=[]),
+            )
+            for n in names
+        ]
+
+    def test_no_missing_for_known_species(self, capsys: pytest.CaptureFixture) -> None:
+        species = self._make_species(*REFERENCE_SPECIES)
+        missing = check_common_names(species, REAL_COMMON_NAMES_H)
+        assert missing == []
+        captured = capsys.readouterr()
+        assert captured.out == ""
+
+    def test_warns_for_unknown_species(self, capsys: pytest.CaptureFixture) -> None:
+        species = self._make_species("N2", "C2H4")  # C2H4 not in common_names.h
+        missing = check_common_names(species, REAL_COMMON_NAMES_H)
+        assert missing == ["C2H4"]
+        captured = capsys.readouterr()
+        assert "Warning" in captured.out
+        assert "C2H4" in captured.out
+
+    def test_error_tag_when_strict(self, capsys: pytest.CaptureFixture) -> None:
+        species = self._make_species("C2H4")
+        missing = check_common_names(species, REAL_COMMON_NAMES_H, error_on_missing=True)
+        assert missing == ["C2H4"]
+        captured = capsys.readouterr()
+        assert "ERROR" in captured.out
+
+    def test_missing_header_treats_all_as_missing(self, capsys: pytest.CaptureFixture) -> None:
+        species = self._make_species("N2", "O2")
+        missing = check_common_names(species, Path("/nonexistent/common_names.h"))
+        assert set(missing) == {"N2", "O2"}
+
+
+ACTIVE_THERMO_H = Path(__file__).parent.parent / "include" / "thermo_transport_data.h"
+
+
+class TestCommonNamesSymmetry:
+    """Invariant tests directly on include/common_names.h.
+
+    These act as a regression guard: if someone adds a species to
+    thermo_transport_data.h or edits common_names.h inconsistently,
+    one of these tests will catch it.
+    """
+
+    def test_formula_to_name_nonempty(self) -> None:
+        f2n = _parse_formula_to_name(REAL_COMMON_NAMES_H)
+        assert len(f2n) > 0, "formula_to_name map is empty"
+
+    def test_name_to_formula_nonempty(self) -> None:
+        n2f = _parse_name_to_formula(REAL_COMMON_NAMES_H)
+        assert len(n2f) > 0, "name_to_formula map is empty"
+
+    def test_maps_same_size(self) -> None:
+        """Both maps must have the same number of entries."""
+        f2n = _parse_formula_to_name(REAL_COMMON_NAMES_H)
+        n2f = _parse_name_to_formula(REAL_COMMON_NAMES_H)
+        assert len(f2n) == len(n2f), (
+            f"formula_to_name has {len(f2n)} entries but "
+            f"name_to_formula has {len(n2f)} — maps are out of sync"
+        )
+
+    def test_formula_to_name_is_inverse_of_name_to_formula(self) -> None:
+        """For every (formula, name) in formula_to_name, name_to_formula[name] == formula."""
+        f2n = _parse_formula_to_name(REAL_COMMON_NAMES_H)
+        n2f = _parse_name_to_formula(REAL_COMMON_NAMES_H)
+        for formula, name in f2n.items():
+            assert name in n2f, f'"{name}" is in formula_to_name but missing from name_to_formula'
+            assert n2f[name] == formula, (
+                f'name_to_formula["{name}"] = "{n2f[name]}" '
+                f'but formula_to_name["{formula}"] = "{name}" — maps disagree'
+            )
+
+    def test_name_to_formula_is_inverse_of_formula_to_name(self) -> None:
+        """For every (name, formula) in name_to_formula, formula_to_name[formula] == name."""
+        f2n = _parse_formula_to_name(REAL_COMMON_NAMES_H)
+        n2f = _parse_name_to_formula(REAL_COMMON_NAMES_H)
+        for name, formula in n2f.items():
+            assert formula in f2n, (
+                f'"{formula}" is in name_to_formula but missing from formula_to_name'
+            )
+            assert f2n[formula] == name, (
+                f'formula_to_name["{formula}"] = "{f2n[formula]}" '
+                f'but name_to_formula["{name}"] = "{formula}" — maps disagree'
+            )
+
+    def test_all_active_species_have_common_name(self) -> None:
+        """Every species in thermo_transport_data.h must have a common name."""
+        if not ACTIVE_THERMO_H.exists():
+            pytest.skip("thermo_transport_data.h not present")
+        f2n = _parse_formula_to_name(REAL_COMMON_NAMES_H)
+        text = ACTIVE_THERMO_H.read_text()
+        import re as _re
+
+        m = _re.search(r"species_names\s*=\s*\{([^;]+)\}", text)
+        assert m, "Could not find species_names in thermo_transport_data.h"
+        active = _re.findall(r'"([^"]+)"', m.group(1))
+        missing = [s for s in active if s not in f2n]
+        assert missing == [], (
+            f"{len(missing)} active species have no common name: {missing}\n"
+            "Add them to include/common_names.h (both maps)."
+        )
 
 
 if __name__ == "__main__":
