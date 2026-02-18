@@ -112,20 +112,20 @@ static const std::array<double, 10>* find_nasa9_interval(
         throw std::runtime_error("No NASA-9 intervals for species " + species_names[species_idx]);
     }
 
-    const double T_min = intervals.front().T_min;
-    const double T_max = intervals.back().T_max;
-    const double span  = T_max - T_min;
-    const double tol   = NASA9_EXTRAP_TOL * span;
+    const double T_min    = intervals.front().T_min;
+    const double T_max    = intervals.back().T_max;
+    const double tol_low  = NASA9_EXTRAP_TOL * T_min;   // 5% of 200 K = 10 K
+    const double tol_high = NASA9_EXTRAP_TOL * T_max;   // 5% of 6000 K = 300 K
 
-    if (T < T_min - tol) {
+    if (T < T_min - tol_low) {
         throw std::out_of_range(
             "Temperature " + std::to_string(T) + " K is below extrapolation limit (" +
-            std::to_string(T_min - tol) + " K) for species " + species_names[species_idx]);
+            std::to_string(T_min - tol_low) + " K) for species " + species_names[species_idx]);
     }
-    if (T > T_max + tol) {
+    if (T > T_max + tol_high) {
         throw std::out_of_range(
             "Temperature " + std::to_string(T) + " K is above extrapolation limit (" +
-            std::to_string(T_max + tol) + " K) for species " + species_names[species_idx]);
+            std::to_string(T_max + tol_high) + " K) for species " + species_names[species_idx]);
     }
 
     // Clamp to boundary for small extrapolations
