@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+namespace combaero {
+
 // -------------------------------------------------------------
 // Acoustic Mode Analysis
 // -------------------------------------------------------------
@@ -616,5 +618,7 @@ double damping_ratio(double Q);
 
 // Half-power bandwidth: Δf = f₀/Q
 double bandwidth(double f0, double Q);
+
+} // namespace combaero
 
 #endif // ACOUSTICS_H

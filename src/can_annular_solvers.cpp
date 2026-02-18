@@ -4,7 +4,9 @@
 #include <cmath>
 #include <complex>
 
-// Forward declarations of helpers from acoustics.cpp (in global namespace)
+namespace combaero {
+
+// Forward declarations of helpers from acoustics.cpp
 extern std::complex<double> dispersion_relation_complex(
     std::complex<double> omega,
     int m,
@@ -52,7 +54,6 @@ extern double refine_root_muller(
     int max_iter
 );
 
-namespace combaero {
 
 // -------------------------------------------------------------
 // Main Solver with Method Selection
@@ -98,19 +99,19 @@ std::vector<BlochMode> solve_magnitude_minimization(
         for (double f_start = 10.0; f_start < f_max; f_start += scan_window_width) {
             double f_end = std::min(f_start + scan_window_width, f_max);
 
-            auto guesses = ::find_zero_guesses(
+            auto guesses = find_zero_guesses(
                 m, geom, c_can, c_plenum, rho_can, rho_plenum,
                 f_start, f_end, bc_can_top, 2
             );
 
             for (double f_guess : guesses) {
-                double f_refined = ::refine_root_muller(
+                double f_refined = refine_root_muller(
                     f_guess, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_can_top, 50
                 );
 
                 if (f_refined > 1.0 && f_refined < f_max) {
                     double omega_refined = 2.0 * M_PI * f_refined;
-                    auto D_refined = ::dispersion_relation(
+                    auto D_refined = dispersion_relation(
                         omega_refined, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_can_top
                     );
 
@@ -222,13 +223,13 @@ int count_zeros_argument_principle_improved(
 
     // Compute winding number
     double total_phase_change = 0.0;
-    std::complex<double> prev_val = ::dispersion_relation_complex(
+    std::complex<double> prev_val = dispersion_relation_complex(
         contour[0], m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top
     );
 
     for (size_t i = 1; i <= contour.size(); ++i) {
         std::complex<double> curr_z = contour[i % contour.size()];
-        std::complex<double> curr_val = ::dispersion_relation_complex(
+        std::complex<double> curr_val = dispersion_relation_complex(
             curr_z, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top
         );
 
@@ -283,7 +284,7 @@ std::vector<BlochMode> solve_argument_principle(
                 double f_center = (f_start + f_end) / 2.0;
 
                 // Can run Muller multiple times with perturbations if n_zeros > 1
-                double f_refined = ::refine_root_muller(
+                double f_refined = refine_root_muller(
                     f_center, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_can_top, 50
                 );
 

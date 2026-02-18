@@ -11,23 +11,18 @@ class TestAnnularDuctGeometry:
     """Test AnnularDuctGeometry structure."""
 
     def test_geometry_creation(self):
-        """Test creating annular duct geometry."""
-        geom = cb.AnnularDuctGeometry()
-        geom.length = 1.0
-        geom.radius_inner = 0.2
-        geom.radius_outer = 0.5
+        """Test creating annular duct geometry (Annulus API)."""
+        geom = cb.Annulus(L=1.0, D_inner=0.4, D_outer=1.0)
         geom.n_azimuthal_max = 5
 
-        assert geom.length == 1.0
-        assert geom.radius_inner == 0.2
-        assert geom.radius_outer == 0.5
+        assert geom.L == 1.0
+        assert abs(geom.radius_inner - 0.2) < 1e-12
+        assert abs(geom.radius_outer - 0.5) < 1e-12
         assert geom.n_azimuthal_max == 5
 
     def test_area_calculation(self):
         """Test annular area calculation."""
-        geom = cb.AnnularDuctGeometry()
-        geom.radius_inner = 0.2
-        geom.radius_outer = 0.5
+        geom = cb.Annulus(L=1.0, D_inner=0.4, D_outer=1.0)
 
         # Area = pi * (r_outer^2 - r_inner^2)
         expected_area = math.pi * (0.5**2 - 0.2**2)
@@ -73,7 +68,7 @@ class TestAnalyticalValidation:
 
     def test_closed_closed_duct_modes(self):
         """Test closed-closed duct finds correct resonances."""
-        geom = cb.AnnularDuctGeometry()
+        geom = cb.Annulus()
         geom.length = 1.0  # m
         geom.radius_inner = 0.2
         geom.radius_outer = 0.5
@@ -95,7 +90,7 @@ class TestAnalyticalValidation:
 
     def test_frequency_scaling_with_sound_speed(self):
         """Test that frequencies scale linearly with sound speed."""
-        geom = cb.AnnularDuctGeometry()
+        geom = cb.Annulus()
         geom.length = 1.0
         geom.radius_inner = 0.2
         geom.radius_outer = 0.5
@@ -120,13 +115,13 @@ class TestAnalyticalValidation:
 
     def test_frequency_scaling_with_length(self):
         """Test that frequencies scale inversely with length."""
-        geom1 = cb.AnnularDuctGeometry()
+        geom1 = cb.Annulus()
         geom1.length = 1.0
         geom1.radius_inner = 0.2
         geom1.radius_outer = 0.5
         geom1.n_azimuthal_max = 2
 
-        geom2 = cb.AnnularDuctGeometry()
+        geom2 = cb.Annulus()
         geom2.length = 2.0  # Double length
         geom2.radius_inner = 0.2
         geom2.radius_outer = 0.5
@@ -150,7 +145,7 @@ class TestMultipleAzimuthalModes:
 
     def test_finds_multiple_azimuthal_modes(self):
         """Test that different azimuthal modes are found."""
-        geom = cb.AnnularDuctGeometry()
+        geom = cb.Annulus()
         geom.length = 1.0
         geom.radius_inner = 0.2
         geom.radius_outer = 0.5
@@ -168,7 +163,7 @@ class TestMultipleAzimuthalModes:
 
     def test_axisymmetric_mode_exists(self):
         """Test that axisymmetric mode (m=0) is found."""
-        geom = cb.AnnularDuctGeometry()
+        geom = cb.Annulus()
         geom.length = 1.0
         geom.radius_inner = 0.2
         geom.radius_outer = 0.5
@@ -182,7 +177,7 @@ class TestMultipleAzimuthalModes:
 
     def test_m_changes_frequency_for_same_axial_order(self):
         """For fixed n, increasing m should increase frequency."""
-        geom = cb.AnnularDuctGeometry()
+        geom = cb.Annulus()
         geom.length = 1.0
         geom.radius_inner = 0.2
         geom.radius_outer = 0.5
@@ -202,7 +197,7 @@ class TestParameterValidation:
 
     def test_invalid_length(self):
         """Test that invalid length raises error."""
-        geom = cb.AnnularDuctGeometry()
+        geom = cb.Annulus()
         geom.length = -1.0  # Invalid
         geom.radius_inner = 0.2
         geom.radius_outer = 0.5
@@ -213,7 +208,7 @@ class TestParameterValidation:
 
     def test_invalid_radii(self):
         """Test that invalid radii raise error."""
-        geom = cb.AnnularDuctGeometry()
+        geom = cb.Annulus()
         geom.length = 1.0
         geom.radius_inner = 0.5
         geom.radius_outer = 0.2  # Invalid: inner > outer
@@ -224,7 +219,7 @@ class TestParameterValidation:
 
     def test_invalid_sound_speed(self):
         """Test that invalid sound speed raises error."""
-        geom = cb.AnnularDuctGeometry()
+        geom = cb.Annulus()
         geom.length = 1.0
         geom.radius_inner = 0.2
         geom.radius_outer = 0.5
@@ -239,7 +234,7 @@ class TestPhysicalConsistency:
 
     def test_modes_sorted_by_frequency(self):
         """Test that modes are sorted by frequency."""
-        geom = cb.AnnularDuctGeometry()
+        geom = cb.Annulus()
         geom.length = 1.0
         geom.radius_inner = 0.2
         geom.radius_outer = 0.5
@@ -252,7 +247,7 @@ class TestPhysicalConsistency:
 
     def test_frequencies_positive(self):
         """Test that all frequencies are positive."""
-        geom = cb.AnnularDuctGeometry()
+        geom = cb.Annulus()
         geom.length = 1.0
         geom.radius_inner = 0.2
         geom.radius_outer = 0.5
@@ -265,7 +260,7 @@ class TestPhysicalConsistency:
 
     def test_frequencies_within_range(self):
         """Test that frequencies are within specified range."""
-        geom = cb.AnnularDuctGeometry()
+        geom = cb.Annulus()
         geom.length = 1.0
         geom.radius_inner = 0.2
         geom.radius_outer = 0.5
@@ -279,7 +274,7 @@ class TestPhysicalConsistency:
 
     def test_axial_mode_numbers_positive(self):
         """Test that axial mode numbers are positive."""
-        geom = cb.AnnularDuctGeometry()
+        geom = cb.Annulus()
         geom.length = 1.0
         geom.radius_inner = 0.2
         geom.radius_outer = 0.5
@@ -296,7 +291,7 @@ class TestAnalyticalReference:
 
     def test_analytical_modes_available(self):
         """Analytical helper should return modes in requested range."""
-        geom = cb.AnnularDuctGeometry()
+        geom = cb.Annulus()
         geom.length = 1.0
         geom.radius_inner = 0.2
         geom.radius_outer = 0.5
@@ -308,7 +303,7 @@ class TestAnalyticalReference:
 
     def test_argument_principle_matches_analytical_fundamental(self):
         """AP and analytical should be close for the fundamental axisymmetric mode."""
-        geom = cb.AnnularDuctGeometry()
+        geom = cb.Annulus()
         geom.length = 1.0
         geom.radius_inner = 0.2
         geom.radius_outer = 0.5
@@ -339,7 +334,7 @@ class TestComparisonWithCanAnnular:
         can_geom.area_plenum = 0.1
 
         # Equivalent annular duct
-        ann_geom = cb.AnnularDuctGeometry()
+        ann_geom = cb.Annulus()
         ann_geom.length = 1.0
         ann_geom.radius_inner = 0.0
         ann_geom.radius_outer = math.sqrt(0.1 / math.pi)  # Same area

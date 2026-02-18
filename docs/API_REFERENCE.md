@@ -1663,6 +1663,20 @@ geom.length_total()      # Total modeled length [m]
 # Residence time helpers on geometry object
 tau_q = ca.residence_time_can_annular(geom, Q=0.12)
 tau_m = ca.residence_time_mdot_can_annular(geom, mdot=1.5, rho=2.0)
+
+# Adapter: Convert flow geometry to acoustic geometry for Bloch-Floquet solver
+acoustic_geom = ca.to_acoustic_geometry(geom, n_cans=24, L_can=0.5, D_can=0.1)
+# acoustic_geom now has: n_cans, length_can, area_can, radius_plenum, area_plenum
+
+# Use with can-annular eigenmode solver
+modes = ca.can_annular_eigenmodes(
+    acoustic_geom,
+    c_can=800.0,      # Speed of sound in can [m/s]
+    c_plenum=850.0,   # Speed of sound in plenum [m/s]
+    rho_can=1.2,      # Density in can [kg/m³]
+    rho_plenum=1.0,   # Density in plenum [kg/m³]
+    f_max=2000.0      # Maximum frequency to search [Hz]
+)
 ```
 
 ### Acoustic Properties Bundle

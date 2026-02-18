@@ -301,6 +301,7 @@ try:
         thermal_resistance,
         thermal_resistance_wall,
         thermo_state,
+        to_acoustic_geometry,
         transport_state,
         tube_axial_modes,
         tube_Q,
@@ -460,6 +461,7 @@ except ModuleNotFoundError:
     CanAnnularFlowGeometry = _core.CanAnnularFlowGeometry
     BoundaryCondition = _core.BoundaryCondition
     AcousticMode = _core.AcousticMode
+    to_acoustic_geometry = _core.to_acoustic_geometry
     tube_axial_modes = _core.tube_axial_modes
     annulus_axial_modes = _core.annulus_axial_modes
     annulus_azimuthal_modes = _core.annulus_azimuthal_modes
@@ -759,6 +761,7 @@ __all__ = [
     "CanAnnularFlowGeometry",
     "BoundaryCondition",
     "AcousticMode",
+    "to_acoustic_geometry",
     "tube_axial_modes",
     "annulus_axial_modes",
     "annulus_azimuthal_modes",

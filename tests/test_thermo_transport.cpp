@@ -12,6 +12,8 @@
 #include "../include/math_constants.h"  // MSVC compatibility for M_PI
 #include <vector>
 
+using namespace combaero;
+
 // Test fixture for thermo transport tests
 class ThermoTransportTest : public ::testing::Test {
 protected:

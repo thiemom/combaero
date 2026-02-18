@@ -24,6 +24,7 @@
 #include "units.h"
 
 namespace py = pybind11;
+using namespace combaero;
 
 static std::vector<double> to_vec(
     py::array_t<double, py::array::c_style | py::array::forcecast> arr)
@@ -2765,6 +2766,7 @@ PYBIND11_MODULE(_core, m)
 
     // Annulus struct
     py::class_<Annulus>(m, "Annulus", "Annular duct geometry for acoustic analysis")
+        .def(py::init<>())
         .def(py::init<double, double, double>(),
              py::arg("L"), py::arg("D_inner"), py::arg("D_outer"),
              "Create annulus with length L [m], inner diameter D_inner [m], outer diameter D_outer [m]")
@@ -2777,8 +2779,19 @@ PYBIND11_MODULE(_core, m)
         .def("area", &Annulus::area, "Cross-sectional area [m²]")
         .def("volume", &Annulus::volume, "Volume [m³]")
         .def("circumference", &Annulus::circumference, "Mean circumference [m]")
-        .def("radius_inner", &Annulus::radius_inner, "Inner radius [m]")
-        .def("radius_outer", &Annulus::radius_outer, "Outer radius [m]");
+        // Backward-compat properties for AnnularDuctGeometry API (settable radius accessors)
+        .def_property("length",
+            [](const Annulus& g) { return g.L; },
+            [](Annulus& g, double v) { g.L = v; },
+            "Axial length [m] (alias for L)")
+        .def_property("radius_inner",
+            [](const Annulus& g) { return g.radius_inner(); },
+            [](Annulus& g, double v) { g.D_inner = v * 2.0; },
+            "Inner radius [m]")
+        .def_property("radius_outer",
+            [](const Annulus& g) { return g.radius_outer(); },
+            [](Annulus& g, double v) { g.D_outer = v * 2.0; },
+            "Outer radius [m]");
 
     py::class_<CanAnnularFlowGeometry>(
         m,
@@ -3340,40 +3353,8 @@ PYBIND11_MODULE(_core, m)
     );
 
     // Annular Duct Geometry and Modes
-    // AnnularDuctGeometry is now an alias for Annulus - keep for backward compatibility
-    using combaero::Annulus;
-    using combaero::AnnularMode;
-    using combaero::annular_duct_eigenmodes;
-    using combaero::annular_duct_modes_analytical;
-
-    // AnnularDuctGeometry is deprecated, use Annulus instead
-    // This binding provides backward compatibility with the old API
-    py::class_<Annulus>(m, "AnnularDuctGeometry",
-        "Annular duct geometry for acoustic solvers.\n\n"
-        "Deprecated: Use Annulus from geometry.h instead.\n\n"
-        "Note: AnnularDuctGeometry is now an alias for Annulus with acoustic solver compatibility.")
-        .def(py::init<>())
-        .def_property("length",
-            [](const Annulus& g) { return g.L; },
-            [](Annulus& g, double val) { g.L = val; },
-            "Axial length [m]")
-        .def_property("radius_inner",
-            [](const Annulus& g) { return g.radius_inner(); },
-            [](Annulus& g, double val) { g.D_inner = val * 2.0; },
-            "Inner radius [m]")
-        .def_property("radius_outer",
-            [](const Annulus& g) { return g.radius_outer(); },
-            [](Annulus& g, double val) { g.D_outer = val * 2.0; },
-            "Outer radius [m]")
-        .def_readwrite("n_azimuthal_max", &Annulus::n_azimuthal_max,
-            "Maximum azimuthal mode number to search")
-        .def("area", &Annulus::area, "Cross-sectional area [m²]")
-        .def("__repr__", [](const Annulus& g) {
-            return "AnnularDuctGeometry(length=" + std::to_string(g.L) +
-                   ", r_inner=" + std::to_string(g.radius_inner()) +
-                   ", r_outer=" + std::to_string(g.radius_outer()) +
-                   ", n_azimuthal_max=" + std::to_string(g.n_azimuthal_max) + ")";
-        });
+    // AnnularDuctGeometry is a Python-level alias for Annulus (backward compatibility)
+    m.attr("AnnularDuctGeometry") = m.attr("Annulus");
 
     py::class_<AnnularMode>(m, "AnnularMode")
         .def(py::init<>())

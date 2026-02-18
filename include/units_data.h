@@ -256,6 +256,7 @@ inline constexpr Entry function_units[] = {
     {"sweep_liner_2dof_serial_absorption", "freqs: Hz (vector), face_orifice: LinerOrificeGeometry, septum_orifice: LinerOrificeGeometry, depth_1: m, depth_2: m, face_flow: LinerFlowState, septum_flow: LinerFlowState, medium: AcousticMedium", "- (alpha vector)"},
     {"is_whistling_risk", "freq: Hz, u_bias: m/s, d_orifice: m", "bool"},
     {"annular_duct_modes_analytical", "geom: AnnularDuctGeometry, c: m/s, f_max: Hz, bc_ends: BoundaryCondition", "AnnularMode vector"},
+    {"to_acoustic_geometry",    "flow_geom: CanAnnularFlowGeometry, n_cans: -, L_can: m, D_can: m", "CanAnnularGeometry struct"},
     {"half_wave_frequency",     "L: m, c: m/s", "Hz"},
     {"stokes_layer",            "nu: m^2/s, f: Hz", "m"},
     {"thermal_layer",           "alpha: m^2/s, f: Hz", "m"},

@@ -5,6 +5,8 @@
 #include <complex>
 #include <stdexcept>
 
+namespace combaero {
+
 // -------------------------------------------------------------
 // AcousticMode methods
 // -------------------------------------------------------------
@@ -1340,3 +1342,5 @@ double particle_velocity(double p, double rho, double c) {
     }
     return p / (rho * c);
 }
+
+} // namespace combaero

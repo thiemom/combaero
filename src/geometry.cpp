@@ -2,6 +2,8 @@
 #include "../include/math_constants.h"
 #include <stdexcept>
 
+namespace combaero {
+
 double hydraulic_diameter(double A, double P_wetted) {
     if (A <= 0.0 || P_wetted <= 0.0) {
         throw std::invalid_argument("hydraulic_diameter: A and P_wetted must be positive");
@@ -180,3 +182,5 @@ double space_velocity(double Q, double V) {
     }
     return Q / V;
 }
+
+} // namespace combaero

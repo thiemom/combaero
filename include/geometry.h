@@ -1,6 +1,8 @@
 #ifndef GEOMETRY_H
 #define GEOMETRY_H
 
+namespace combaero {
+
 // -------------------------------------------------------------
 // Geometric utilities for flow calculations
 // -------------------------------------------------------------
@@ -169,5 +171,7 @@ double residence_time_mdot(const CanAnnularFlowGeometry& geom, double mdot, doub
 // Space velocity (inverse of residence time)
 // SV = Q̇ / V = 1/τ  [1/s]
 double space_velocity(double Q, double V);
+
+} // namespace combaero
 
 #endif // GEOMETRY_H
