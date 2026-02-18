@@ -69,21 +69,25 @@ add_custom_command(TARGET combaero_main POST_BUILD
 add_executable(combaero_example examples/thermo_example.cpp)
 add_executable(humidair_example examples/humidair_example.cpp)
 add_executable(combustion_example examples/combustion_example.cpp)
+add_executable(cooling_example examples/cooling_example.cpp)
 
 # Add compiler warnings for examples
 if (MSVC)
     target_compile_options(combaero_example PRIVATE /W4)
     target_compile_options(humidair_example PRIVATE /W4)
     target_compile_options(combustion_example PRIVATE /W4)
+    target_compile_options(cooling_example PRIVATE /W4)
 else()
     target_compile_options(combaero_example PRIVATE -Wall -Wextra)
     target_compile_options(humidair_example PRIVATE -Wall -Wextra)
     target_compile_options(combustion_example PRIVATE -Wall -Wextra)
+    target_compile_options(cooling_example PRIVATE -Wall -Wextra)
 endif()
 
 target_link_libraries(combaero_example PRIVATE combaero_lib)
 target_link_libraries(humidair_example PRIVATE combaero_lib)
 target_link_libraries(combustion_example PRIVATE combaero_lib)
+target_link_libraries(cooling_example PRIVATE combaero_lib)
 
 # Print message when examples are built
 add_custom_command(TARGET combaero_example POST_BUILD
@@ -96,6 +100,10 @@ add_custom_command(TARGET humidair_example POST_BUILD
 
 add_custom_command(TARGET combustion_example POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E echo "Combustion example built! Run with: ./combustion_example"
+)
+
+add_custom_command(TARGET cooling_example POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "Cooling example built! Run with: ./cooling_example"
 )
 
 # Optional Python bindings (enabled explicitly or via scikit-build-core)

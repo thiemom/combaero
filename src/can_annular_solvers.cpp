@@ -321,7 +321,7 @@ std::vector<BlochMode> solve_argument_principle(
 static std::complex<double> annular_duct_dispersion(
     std::complex<double> omega,
     int m,
-    const AnnularDuctGeometry& geom,
+    const Annulus& geom,
     double c,
     double rho,
     BoundaryCondition bc_ends
@@ -330,7 +330,7 @@ static std::complex<double> annular_duct_dispersion(
     std::complex<double> i(0.0, 1.0);
 
     // Thin-annulus approximation: split total wavenumber into azimuthal and axial parts
-    const double r_mean = 0.5 * (geom.radius_inner + geom.radius_outer);
+    const double r_mean = 0.5 * (geom.radius_inner() + geom.radius_outer());
     const double k_theta = (r_mean > 0.0) ? static_cast<double>(m) / r_mean : 0.0;
     const std::complex<double> k_axial = std::sqrt(k * k - k_theta * k_theta);
 
@@ -340,8 +340,8 @@ static std::complex<double> annular_duct_dispersion(
 
     // Duct admittance (similar to can admittance)
     std::complex<double> Y_char = (geom.area() / (rho * c)) * (k_axial / k);
-    std::complex<double> sin_kl = std::sin(k_axial * geom.length);
-    std::complex<double> cos_kl = std::cos(k_axial * geom.length);
+    std::complex<double> sin_kl = std::sin(k_axial * geom.L);
+    std::complex<double> cos_kl = std::cos(k_axial * geom.L);
 
     std::complex<double> Y_duct;
     if (bc_ends == BoundaryCondition::Closed) {
@@ -370,7 +370,7 @@ static int count_zeros_annular_duct(
     double imag_min,
     double imag_max,
     int m,
-    const AnnularDuctGeometry& geom,
+    const Annulus& geom,
     double c,
     double rho,
     BoundaryCondition bc_ends
@@ -428,17 +428,17 @@ static int count_zeros_annular_duct(
 }
 
 std::vector<AnnularMode> annular_duct_eigenmodes(
-    const AnnularDuctGeometry& geom,
+    const Annulus& geom,
     double c,
     double rho,
     double f_max,
     BoundaryCondition bc_ends
 ) {
     // Validate inputs
-    if (geom.length <= 0.0) {
+    if (geom.L <= 0.0) {
         throw std::runtime_error("Duct length must be positive");
     }
-    if (geom.radius_inner < 0.0 || geom.radius_outer <= geom.radius_inner) {
+    if (geom.radius_inner() < 0.0 || geom.radius_outer() <= geom.radius_inner()) {
         throw std::runtime_error("Invalid annular geometry");
     }
     if (c <= 0.0 || rho <= 0.0) {
@@ -521,15 +521,15 @@ std::vector<AnnularMode> annular_duct_eigenmodes(
 }
 
 std::vector<AnnularMode> annular_duct_modes_analytical(
-    const AnnularDuctGeometry& geom,
+    const Annulus& geom,
     double c,
     double f_max,
     BoundaryCondition bc_ends
 ) {
-    if (geom.length <= 0.0) {
+    if (geom.L <= 0.0) {
         throw std::runtime_error("Duct length must be positive");
     }
-    if (geom.radius_inner < 0.0 || geom.radius_outer <= geom.radius_inner) {
+    if (geom.radius_inner() < 0.0 || geom.radius_outer() <= geom.radius_inner()) {
         throw std::runtime_error("Invalid annular geometry");
     }
     if (c <= 0.0) {
@@ -540,7 +540,7 @@ std::vector<AnnularMode> annular_duct_modes_analytical(
     }
 
     std::vector<AnnularMode> modes;
-    const double r_mean = 0.5 * (geom.radius_inner + geom.radius_outer);
+    const double r_mean = 0.5 * (geom.radius_inner() + geom.radius_outer());
     const double d_mean = 2.0 * r_mean;
 
     for (int m = 0; m <= geom.n_azimuthal_max; ++m) {
@@ -549,9 +549,9 @@ std::vector<AnnularMode> annular_duct_modes_analytical(
         for (int n = 1; n < 200; ++n) {
             double f_axial = 0.0;
             if (bc_ends == BoundaryCondition::Closed) {
-                f_axial = n * c / (2.0 * geom.length);
+                f_axial = n * c / (2.0 * geom.L);
             } else {
-                f_axial = (2.0 * n - 1.0) * c / (4.0 * geom.length);
+                f_axial = (2.0 * n - 1.0) * c / (4.0 * geom.L);
             }
 
             const double frequency = std::sqrt(f_axial * f_axial + f_az * f_az);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "acoustics.h"
+#include "geometry.h"  // For Annulus
 #include "math_constants.h"  // MSVC compatibility for M_PI
 #include <vector>
 #include <complex>
@@ -11,20 +12,11 @@ namespace combaero {
 // Annular Duct Geometry (Pure Annular, No Cans)
 // -------------------------------------------------------------
 
-// Uniform annular duct model (current implementation):
-// - radius_inner and radius_outer are constant along the full length.
-// - No axial taper, area variation, or segmented liners are represented.
-struct AnnularDuctGeometry {
-    double length;          // Axial length [m]
-    double radius_inner;    // Inner radius [m]
-    double radius_outer;    // Outer radius [m]
-    int n_azimuthal_max;    // Maximum azimuthal mode number to search
-
-    // Derived: cross-sectional area
-    double area() const {
-        return M_PI * (radius_outer * radius_outer - radius_inner * radius_inner);
-    }
-};
+// [[deprecated("Use Annulus from geometry.h instead")]]
+// AnnularDuctGeometry is now an alias for Annulus from geometry.h
+// The Annulus struct has been extended with n_azimuthal_max and radius methods
+// for full compatibility with acoustic solvers.
+using AnnularDuctGeometry [[deprecated("Use Annulus from geometry.h instead")]] = Annulus;
 
 // -------------------------------------------------------------
 // Can-Annular Acoustic Solver Methods
@@ -144,7 +136,7 @@ struct AnnularMode {
 // Finds modes by solving dispersion relation for annular waveguide
 //
 // Parameters:
-//   geom    : annular duct geometry
+//   geom    : Annulus geometry (from geometry.h)
 //   c       : speed of sound [m/s]
 //   rho     : density [kg/m³]
 //   f_max   : maximum frequency [Hz]
@@ -156,7 +148,7 @@ struct AnnularMode {
 // Finds ALL modes in frequency range, no missed roots
 // Assumes uniform annular geometry and homogeneous acoustic medium.
 std::vector<AnnularMode> annular_duct_eigenmodes(
-    const AnnularDuctGeometry& geom,
+    const Annulus& geom,
     double c,
     double rho,
     double f_max,
@@ -167,7 +159,7 @@ std::vector<AnnularMode> annular_duct_eigenmodes(
 // Uses thin-annulus approximation with combined axial and azimuthal wavenumbers.
 // Assumes uniform annular geometry over full axial length.
 std::vector<AnnularMode> annular_duct_modes_analytical(
-    const AnnularDuctGeometry& geom,
+    const Annulus& geom,
     double c,
     double f_max,
     BoundaryCondition bc_ends = BoundaryCondition::Closed

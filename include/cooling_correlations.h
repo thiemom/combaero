@@ -244,7 +244,37 @@ double dimple_friction_multiplier(
 // Helper Functions
 // -------------------------------------------------------------
 
-// Validate parameter ranges for correlations
+// Adiabatic wall temperature from cooling effectiveness
+// Uses definition: eta = (T_hot - T_aw) / (T_hot - T_coolant)
+//
+// Parameters:
+//   T_hot      : mainstream hot-gas temperature [K]
+//   T_coolant  : coolant supply temperature [K]
+//   eta        : adiabatic cooling effectiveness [-]
+//
+// Returns: adiabatic wall temperature [K]
+double adiabatic_wall_temperature(double T_hot, double T_coolant, double eta);
+
+// Film/effusion-cooled wall heat flux with single wall layer
+// Computes q based on adiabatic wall temperature and thermal resistance network:
+//   q = U * (T_aw - T_coolant)
+// where U uses both convective sides and wall conduction.
+//
+// Parameters:
+//   T_hot      : mainstream hot-gas temperature [K]
+//   T_coolant  : coolant supply temperature [K]
+//   h_hot      : hot-side HTC [W/(m^2*K)]
+//   h_coolant  : coolant-side HTC [W/(m^2*K)]
+//   eta        : adiabatic cooling effectiveness [-]
+//   t_wall     : wall thickness [m]
+//   k_wall     : wall thermal conductivity [W/(m*K)]
+//
+// Returns: wall heat flux [W/m^2]
+double cooled_wall_heat_flux(double T_hot, double T_coolant,
+                             double h_hot, double h_coolant,
+                             double eta,
+                             double t_wall, double k_wall);
+
 void validate_rib_params(double e_D, double P_e, double alpha);
 void validate_impingement_params(double Re_jet, double z_D, double x_D, double y_D);
 void validate_film_cooling_params(double M, double DR, double alpha_deg);

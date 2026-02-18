@@ -158,6 +158,13 @@ The `examples` directory contains sample applications demonstrating the library'
 
 - `thermo_example`: Basic thermodynamic calculations
 - `humidair_example`: Humid air property calculations
+- `cooling_example`: Simple C++ cooling workflow (convective + effusion correlations)
+
+The `python/examples` directory includes higher-level workflows such as:
+
+- `combustor_heat_transfer.py`: Integrated combustor heat-transfer workflow
+- `counterflow_effusion_combustor.py`: Toy industrial combustor can with
+  counterflow convective cooling, effusion front plate, and burner-driven hot side
 
 ## Development workflow
 

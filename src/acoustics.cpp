@@ -836,6 +836,34 @@ bool is_whistling_risk(
 // Can-Annular Combustor Acoustics (Bloch-Floquet Theory)
 // -------------------------------------------------------------
 
+// Adapter: Convert CanAnnularFlowGeometry to CanAnnularGeometry
+CanAnnularGeometry to_acoustic_geometry(
+    const CanAnnularFlowGeometry& flow_geom,
+    int n_cans,
+    double L_can,
+    double D_can
+) {
+    // Validate inputs
+    if (n_cans < 1) {
+        throw std::invalid_argument("to_acoustic_geometry: n_cans must be positive");
+    }
+    if (L_can <= 0.0) {
+        throw std::invalid_argument("to_acoustic_geometry: L_can must be positive");
+    }
+    if (D_can <= 0.0) {
+        throw std::invalid_argument("to_acoustic_geometry: D_can must be positive");
+    }
+
+    CanAnnularGeometry geom;
+    geom.n_cans = n_cans;
+    geom.length_can = L_can;
+    geom.area_can = M_PI * (D_can / 2.0) * (D_can / 2.0);
+    geom.radius_plenum = flow_geom.D_mean() / 2.0;
+    geom.area_plenum = flow_geom.area();
+
+    return geom;
+}
+
 // BlochMode symmetry classification
 std::string BlochMode::symmetry_type() const {
     if (m_azimuthal == 0) {

@@ -394,6 +394,36 @@ struct CanAnnularGeometry {
     double area_plenum;    // Cross-sectional area of the plenum [m²]
 };
 
+// Adapter: Convert CanAnnularFlowGeometry (flow/geometry) to CanAnnularGeometry (acoustic solver)
+//
+// This function bridges the two geometry representations:
+// - CanAnnularFlowGeometry (from geometry.h): Flow-focused with primary/transition/annular sections
+// - CanAnnularGeometry (above): Acoustic-focused with cans + annular plenum
+//
+// Parameters:
+//   flow_geom : CanAnnularFlowGeometry with flow geometry parameters
+//   n_cans    : Number of cans (required for acoustic model)
+//   L_can     : Can length [m] (acoustic model uses single section per can)
+//   D_can     : Can diameter [m] (for circular can cross-section)
+//
+// Returns: CanAnnularGeometry for acoustic solvers
+//
+// Notes:
+// - Plenum radius derived from flow_geom.D_mean() / 2
+// - Plenum area from flow_geom.area()
+// - Can area from π*(D_can/2)²
+//
+// Example:
+//   auto flow_geom = CanAnnularFlowGeometry{...};
+//   auto acoustic_geom = to_acoustic_geometry(flow_geom, 24, 0.5, 0.1);
+//   auto modes = can_annular_eigenmodes(acoustic_geom, c_can, c_plenum, ...);
+CanAnnularGeometry to_acoustic_geometry(
+    const CanAnnularFlowGeometry& flow_geom,
+    int n_cans,
+    double L_can,
+    double D_can
+);
+
 // Bloch mode (eigenmode of periodic can-annular system)
 // Uses Bloch-Floquet theory to reduce N-can problem to single sector
 struct BlochMode {

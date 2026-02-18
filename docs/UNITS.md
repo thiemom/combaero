@@ -237,16 +237,18 @@ All functions use consistent units to avoid conversion errors.
 
 #### Stoichiometry
 
-| Function                          | Input Units | Output Unit      |
-|-----------------------------------|-------------|------------------|
-| `oxygen_required_per_mol_fuel`    | -           | mol O2/mol fuel  |
-| `oxygen_required_per_kg_fuel`     | -           | mol O2/kg fuel   |
-| `oxygen_required_per_mol_mixture` | X: mol/mol  | mol O2/mol mix   |
-| `oxygen_required_per_kg_mixture`  | X: mol/mol  | mol O2/kg mix    |
-| `dryair_required_per_mol_fuel`    | -           | mol air/mol fuel |
-| `dryair_required_per_kg_fuel`     | -           | mol air/kg fuel  |
-| `dryair_required_per_mol_mixture` | X: mol/mol  | mol air/mol mix  |
-| `dryair_required_per_kg_mixture`  | X: mol/mol  | mol air/kg mix   |
+| Function                          | Input Units                               | Output Unit      |
+|-----------------------------------|-------------------------------------------|------------------|
+| `oxygen_required_per_mol_fuel`    | -                                         | mol O2/mol fuel  |
+| `oxygen_required_per_kg_fuel`     | -                                         | mol O2/kg fuel   |
+| `oxygen_required_per_mol_mixture` | X: mol/mol                                | mol O2/mol mix   |
+| `oxygen_required_per_kg_mixture`  | X: mol/mol                                | mol O2/kg mix    |
+| `fuel_lhv_molar`                  | X_fuel: mol/mol, reference_temperature: K | J/mol fuel       |
+| `fuel_lhv_mass`                   | X_fuel: mol/mol, reference_temperature: K | J/kg fuel        |
+| `dryair_required_per_mol_fuel`    | -                                         | mol air/mol fuel |
+| `dryair_required_per_kg_fuel`     | -                                         | mol air/kg fuel  |
+| `dryair_required_per_mol_mixture` | X: mol/mol                                | mol air/mol mix  |
+| `dryair_required_per_kg_mixture`  | X: mol/mol                                | mol air/kg mix   |
 
 #### Equivalence Ratio
 
@@ -437,6 +439,8 @@ All functions use consistent units to avoid conversion errors.
 | `effectiveness_counterflow`    | NTU: -, C_r: -                                                                                                  | -                         |
 | `effectiveness_parallelflow`   | NTU: -, C_r: -                                                                                                  | -                         |
 | `heat_rate_from_effectiveness` | epsilon: -, C_min: W/K, T_hot_in: K, T_cold_in: K                                                               | W                         |
+| `adiabatic_wall_temperature`   | T_hot: K, T_coolant: K, eta: -                                                                                  | K                         |
+| `cooled_wall_heat_flux`        | T_hot: K, T_coolant: K, h_hot: W/(m^2*K), h_coolant: W/(m^2*K), eta: -, t_wall: m, k_wall: W/(m*K)              | W/m^2                     |
 | `heat_flux_from_T_at_edge`     | T_measured: K, edge_idx, T_hot: K, T_cold: K, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W                       | W/m^2                     |
 | `heat_flux_from_T_at_depth`    | T_measured: K, depth: m, T_hot: K, T_cold: K, h_hot, h_cold: W/(m^2*K), thicknesses: m, conductivities: W/(m*K) | W/m^2                     |
 | `bulk_T_from_edge_T_and_q`     | T_measured: K, edge_idx, q: W/m^2, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W, solve_for: str                  | K                         |
@@ -485,11 +489,15 @@ All functions use consistent units to avoid conversion errors.
 
 ### geometry.h - Residence Time
 
-| Function              | Input Units                     | Output Unit |
-|-----------------------|---------------------------------|-------------|
-| `residence_time`      | V: m^3, Q: m^3/s                | s           |
-| `residence_time_mdot` | V: m^3, mdot: kg/s, rho: kg/m^3 | s           |
-| `space_velocity`      | Q: m^3/s, V: m^3                | 1/s         |
+| Function                          | Input Units                                           | Output Unit |
+|-----------------------------------|-------------------------------------------------------|-------------|
+| `residence_time`                  | V: m^3, Q: m^3/s                                      | s           |
+| `residence_time_tube`             | tube: Tube, Q: m^3/s                                  | s           |
+| `residence_time_annulus`          | annulus: Annulus, Q: m^3/s                            | s           |
+| `residence_time_can_annular`      | geom: CanAnnularFlowGeometry, Q: m^3/s                | s           |
+| `residence_time_mdot`             | V: m^3, mdot: kg/s, rho: kg/m^3                       | s           |
+| `residence_time_mdot_can_annular` | geom: CanAnnularFlowGeometry, mdot: kg/s, rho: kg/m^3 | s           |
+| `space_velocity`                  | Q: m^3/s, V: m^3                                      | 1/s         |
 
 ---
 

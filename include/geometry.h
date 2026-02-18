@@ -87,11 +87,19 @@ struct Annulus {
     double D_inner;  // Inner diameter [m]
     double D_outer;  // Outer diameter [m]
 
+    // Acoustic solver compatibility
+    int n_azimuthal_max = 5;  // Maximum azimuthal mode number to search
+
+    // Diameter-based accessors (flow/geometry convention)
     double D_mean() const;         // Mean diameter [m]: (D_inner + D_outer) / 2
     double gap() const;            // Annular gap [m]: (D_outer - D_inner) / 2
     double area() const;           // Cross-sectional area [m²]
     double volume() const;         // Volume [m³]
     double circumference() const;  // Mean circumference [m]: π * D_mean
+
+    // Radius-based accessors (acoustic solver convention)
+    double radius_inner() const { return D_inner / 2.0; }  // Inner radius [m]
+    double radius_outer() const { return D_outer / 2.0; }  // Outer radius [m]
 };
 
 // Parameterized can-annular combustor geometry.

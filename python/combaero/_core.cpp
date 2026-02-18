@@ -2771,11 +2771,14 @@ PYBIND11_MODULE(_core, m)
         .def_readwrite("L", &Annulus::L, "Length [m]")
         .def_readwrite("D_inner", &Annulus::D_inner, "Inner diameter [m]")
         .def_readwrite("D_outer", &Annulus::D_outer, "Outer diameter [m]")
+        .def_readwrite("n_azimuthal_max", &Annulus::n_azimuthal_max, "Maximum azimuthal mode number to search")
         .def("D_mean", &Annulus::D_mean, "Mean diameter [m]")
         .def("gap", &Annulus::gap, "Annular gap [m]")
         .def("area", &Annulus::area, "Cross-sectional area [m²]")
         .def("volume", &Annulus::volume, "Volume [m³]")
-        .def("circumference", &Annulus::circumference, "Mean circumference [m]");
+        .def("circumference", &Annulus::circumference, "Mean circumference [m]")
+        .def("radius_inner", &Annulus::radius_inner, "Inner radius [m]")
+        .def("radius_outer", &Annulus::radius_outer, "Outer radius [m]");
 
     py::class_<CanAnnularFlowGeometry>(
         m,
@@ -3308,23 +3311,67 @@ PYBIND11_MODULE(_core, m)
         "  ...     print(f'm={mode.m_azimuthal}, f={mode.frequency:.1f} Hz')"
     );
 
+    // Adapter function to convert CanAnnularFlowGeometry to CanAnnularGeometry
+    m.def("to_acoustic_geometry", &to_acoustic_geometry,
+        py::arg("flow_geom"),
+        py::arg("n_cans"),
+        py::arg("L_can"),
+        py::arg("D_can"),
+        "Convert CanAnnularFlowGeometry to CanAnnularGeometry for acoustic solvers.\n\n"
+        "This adapter bridges flow geometry (with primary/transition/annular sections)\n"
+        "to acoustic geometry (cans + annular plenum).\n\n"
+        "Parameters:\n"
+        "  flow_geom : CanAnnularFlowGeometry from geometry.h\n"
+        "  n_cans    : Number of cans (required for acoustic model)\n"
+        "  L_can     : Can length [m] (acoustic model uses single section)\n"
+        "  D_can     : Can diameter [m] (for circular cross-section)\n\n"
+        "Returns: CanAnnularGeometry for can_annular_eigenmodes()\n\n"
+        "Notes:\n"
+        "  - Plenum radius derived from flow_geom.D_mean() / 2\n"
+        "  - Plenum area from flow_geom.area()\n"
+        "  - Can area computed as π*(D_can/2)²\n\n"
+        "Example:\n"
+        "  >>> flow_geom = cb.CanAnnularFlowGeometry(L=0.3, D_inner=0.4, D_outer=0.6,\n"
+        "  ...                                        L_primary=0.2, D_primary=0.1,\n"
+        "  ...                                        L_transition=0.05)\n"
+        "  >>> geom = cb.to_acoustic_geometry(flow_geom, n_cans=24, L_can=0.5, D_can=0.1)\n"
+        "  >>> modes = cb.can_annular_eigenmodes(geom, c_can=500, c_plenum=550,\n"
+        "  ...                                    rho_can=1.2, rho_plenum=1.0)"
+    );
+
     // Annular Duct Geometry and Modes
-    using combaero::AnnularDuctGeometry;
+    // AnnularDuctGeometry is now an alias for Annulus - keep for backward compatibility
+    using combaero::Annulus;
     using combaero::AnnularMode;
     using combaero::annular_duct_eigenmodes;
     using combaero::annular_duct_modes_analytical;
 
-    py::class_<AnnularDuctGeometry>(m, "AnnularDuctGeometry")
+    // AnnularDuctGeometry is deprecated, use Annulus instead
+    // This binding provides backward compatibility with the old API
+    py::class_<Annulus>(m, "AnnularDuctGeometry",
+        "Annular duct geometry for acoustic solvers.\n\n"
+        "Deprecated: Use Annulus from geometry.h instead.\n\n"
+        "Note: AnnularDuctGeometry is now an alias for Annulus with acoustic solver compatibility.")
         .def(py::init<>())
-        .def_readwrite("length", &AnnularDuctGeometry::length)
-        .def_readwrite("radius_inner", &AnnularDuctGeometry::radius_inner)
-        .def_readwrite("radius_outer", &AnnularDuctGeometry::radius_outer)
-        .def_readwrite("n_azimuthal_max", &AnnularDuctGeometry::n_azimuthal_max)
-        .def("area", &AnnularDuctGeometry::area)
-        .def("__repr__", [](const AnnularDuctGeometry& g) {
-            return "AnnularDuctGeometry(length=" + std::to_string(g.length) +
-                   ", r_inner=" + std::to_string(g.radius_inner) +
-                   ", r_outer=" + std::to_string(g.radius_outer) +
+        .def_property("length",
+            [](const Annulus& g) { return g.L; },
+            [](Annulus& g, double val) { g.L = val; },
+            "Axial length [m]")
+        .def_property("radius_inner",
+            [](const Annulus& g) { return g.radius_inner(); },
+            [](Annulus& g, double val) { g.D_inner = val * 2.0; },
+            "Inner radius [m]")
+        .def_property("radius_outer",
+            [](const Annulus& g) { return g.radius_outer(); },
+            [](Annulus& g, double val) { g.D_outer = val * 2.0; },
+            "Outer radius [m]")
+        .def_readwrite("n_azimuthal_max", &Annulus::n_azimuthal_max,
+            "Maximum azimuthal mode number to search")
+        .def("area", &Annulus::area, "Cross-sectional area [m²]")
+        .def("__repr__", [](const Annulus& g) {
+            return "AnnularDuctGeometry(length=" + std::to_string(g.L) +
+                   ", r_inner=" + std::to_string(g.radius_inner()) +
+                   ", r_outer=" + std::to_string(g.radius_outer()) +
                    ", n_azimuthal_max=" + std::to_string(g.n_azimuthal_max) + ")";
         });
 
@@ -3351,7 +3398,7 @@ PYBIND11_MODULE(_core, m)
         "Pure annular waveguide (no cans) with Bloch-Floquet periodic BCs.\n"
         "Uses Nyquist contour integration for robust root finding.\n\n"
         "Parameters:\n"
-        "  geom    : AnnularDuctGeometry (length, radii, max azimuthal mode)\n"
+        "  geom    : Annulus geometry (from geometry.h)\n"
         "  c       : speed of sound [m/s]\n"
         "  rho     : density [kg/m^3]\n"
         "  f_max   : maximum frequency [Hz]\n"
@@ -3360,10 +3407,7 @@ PYBIND11_MODULE(_core, m)
         "Method: Argument Principle (gold standard for finding ALL roots)\n"
         "Guarantees: No missed modes, handles complex frequencies\n\n"
         "Example:\n"
-        "  >>> geom = cb.AnnularDuctGeometry()\n"
-        "  >>> geom.length = 1.0  # m\n"
-        "  >>> geom.radius_inner = 0.2  # m\n"
-        "  >>> geom.radius_outer = 0.5  # m\n"
+        "  >>> geom = cb.Annulus(L=1.0, D_inner=0.4, D_outer=1.0)\n"
         "  >>> geom.n_azimuthal_max = 5\n"
         "  >>> modes = cb.annular_duct_eigenmodes(geom, c=500, rho=1.2, f_max=1000)\n"
         "  >>> for mode in modes[:5]:\n"
