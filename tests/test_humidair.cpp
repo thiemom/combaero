@@ -102,28 +102,34 @@ TEST_F(HumidAirTest, StandardDryAirComposition) {
 
 // Test behavior at extreme temperatures
 TEST_F(HumidAirTest, ExtremeTemperatures) {
-    // Very low temperature (-100°C)
+    // At the validated lower boundary (-100°C = 173.15 K): should work
     double T_very_low = 173.15;
     double P_very_low = saturation_vapor_pressure(T_very_low);
-
-    // Should be positive but very small
     EXPECT_GT(P_very_low, 0.0);
     EXPECT_LT(P_very_low, 1.0);
 
-    // Very high temperature (200°C)
-    double T_very_high = 473.15;
-    double P_very_high = saturation_vapor_pressure(T_very_high);
+    // At the validated upper boundary (+100°C = 373.15 K): should work
+    double T_valid_high = 373.15;
+    double P_valid_high = saturation_vapor_pressure(T_valid_high);
+    EXPECT_GT(P_valid_high, 1.0e4);
 
-    // Should be positive and large
-    EXPECT_GT(P_very_high, 1.0e5);
+    // Within the 5% extrapolation band above upper boundary (~383 K): should work
+    double T_extrap = 380.0;
+    double P_extrap = saturation_vapor_pressure(T_extrap);
+    EXPECT_GT(P_extrap, P_valid_high);
+
+    // Well beyond the extrapolation limit (200°C = 473.15 K): should throw
+    EXPECT_THROW(saturation_vapor_pressure(473.15), std::out_of_range);
+    // Well below the extrapolation limit (-120°C = 153.15 K): should throw
+    EXPECT_THROW(saturation_vapor_pressure(153.15), std::out_of_range);
 }
 
 // Test monotonicity of the saturation vapor pressure function
 TEST_F(HumidAirTest, Monotonicity) {
     double prev_pressure = -1.0;
 
-    // Test that pressure increases with temperature
-    for (double T = 173.15; T <= 473.15; T += 10.0) {
+    // Test that pressure increases with temperature within the validated range
+    for (double T = 173.15; T <= 373.15; T += 10.0) {
         double P_sat = saturation_vapor_pressure(T);
 
         if (prev_pressure > 0.0) {

@@ -96,8 +96,14 @@ std::vector<double> mass_to_mole(const std::vector<double>& Y)
     return X;
 }
 
+// Relative extrapolation tolerance beyond NASA-9 range boundaries.
+// 5% of the range span is allowed silently (polynomial is smooth at boundaries).
+// Beyond that, throws std::out_of_range.
+static constexpr double NASA9_EXTRAP_TOL = 0.05;
+
 // Helper: find the correct interval for NASA-9 coefficients
-// Returns pointer to the 10-coefficient array for the given temperature
+// Returns pointer to the 10-coefficient array for the given temperature.
+// Clamps T to the boundary interval for small extrapolations; throws for large ones.
 static const std::array<double, 10>* find_nasa9_interval(
     const NASA_Coeffs& nasa, double& T, std::size_t species_idx) {
 
@@ -106,19 +112,25 @@ static const std::array<double, 10>* find_nasa9_interval(
         throw std::runtime_error("No NASA-9 intervals for species " + species_names[species_idx]);
     }
 
-    // Check bounds
-    double T_min = intervals.front().T_min;
-    double T_max = intervals.back().T_max;
+    const double T_min    = intervals.front().T_min;
+    const double T_max    = intervals.back().T_max;
+    const double tol_low  = NASA9_EXTRAP_TOL * T_min;   // 5% of 200 K = 10 K
+    const double tol_high = NASA9_EXTRAP_TOL * T_max;   // 5% of 6000 K = 300 K
 
-    if (T < T_min) {
-        std::cerr << "Warning: Temperature " << T << " K is below valid range (" << T_min
-                  << " K) for species " << species_names[species_idx] << std::endl;
-        T = T_min;
-    } else if (T > T_max) {
-        std::cerr << "Warning: Temperature " << T << " K is above valid range (" << T_max
-                  << " K) for species " << species_names[species_idx] << std::endl;
-        T = T_max;
+    if (T < T_min - tol_low) {
+        throw std::out_of_range(
+            "Temperature " + std::to_string(T) + " K is below extrapolation limit (" +
+            std::to_string(T_min - tol_low) + " K) for species " + species_names[species_idx]);
     }
+    if (T > T_max + tol_high) {
+        throw std::out_of_range(
+            "Temperature " + std::to_string(T) + " K is above extrapolation limit (" +
+            std::to_string(T_max + tol_high) + " K) for species " + species_names[species_idx]);
+    }
+
+    // Clamp to boundary for small extrapolations
+    T = std::max(T, T_min);
+    T = std::min(T, T_max);
 
     // Find the interval containing T
     for (const auto& interval : intervals) {
@@ -127,7 +139,7 @@ static const std::array<double, 10>* find_nasa9_interval(
         }
     }
 
-    // Fallback to last interval (shouldn't happen if bounds check worked)
+    // Fallback to last interval (shouldn't happen after clamping)
     return &intervals.back().coeffs;
 }
 

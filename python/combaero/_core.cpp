@@ -627,7 +627,118 @@ PYBIND11_MODULE(_core, m)
         py::arg("T"),
         py::arg("Tdp"),
         py::arg("P"),
-        "Relative humidity (0-1) from dry-bulb T [K], dewpoint Tdp [K], and pressure P [Pa]."
+        "Relative humidity (0-1) from dry-bulb T [K], dewpoint Tdp [K], and pressure P [Pa].\n\n"
+        "P is accepted for API symmetry but not used (dewpoint is pressure-independent\n"
+        "at atmospheric conditions)."
+    );
+
+    m.def(
+        "saturation_vapor_pressure",
+        &saturation_vapor_pressure,
+        py::arg("T"),
+        "Water vapor saturation pressure [Pa] using Huang (2018) formula.\n\n"
+        "Validated range: -100\u00b0C to +100\u00b0C (173.15\u2013373.15 K).\n"
+        "Extrapolation up to 5% of range span (~10 K) is allowed silently.\n"
+        "Raises RuntimeError beyond that.\n\n"
+        "T : temperature [K]\n\n"
+        "Returns: saturation vapor pressure [Pa]"
+    );
+
+    m.def(
+        "vapor_pressure",
+        &vapor_pressure,
+        py::arg("T"),
+        py::arg("RH"),
+        "Actual vapor pressure [Pa] from temperature and relative humidity.\n\n"
+        "T  : temperature [K]\n"
+        "RH : relative humidity (0-1)\n\n"
+        "Returns: vapor pressure [Pa]"
+    );
+
+    m.def(
+        "humidity_ratio",
+        &humidity_ratio,
+        py::arg("T"),
+        py::arg("P"),
+        py::arg("RH"),
+        "Humidity ratio (kg water vapor / kg dry air).\n\n"
+        "T  : temperature [K]\n"
+        "P  : total pressure [Pa]\n"
+        "RH : relative humidity (0-1)\n\n"
+        "Returns: humidity ratio W [-]"
+    );
+
+    m.def(
+        "water_vapor_mole_fraction",
+        &water_vapor_mole_fraction,
+        py::arg("T"),
+        py::arg("P"),
+        py::arg("RH"),
+        "Mole fraction of water vapor in humid air.\n\n"
+        "T  : temperature [K]\n"
+        "P  : total pressure [Pa]\n"
+        "RH : relative humidity (0-1)\n\n"
+        "Returns: mole fraction of H2O [-]"
+    );
+
+    m.def(
+        "wet_bulb_temperature",
+        &wet_bulb_temperature,
+        py::arg("T"),
+        py::arg("P"),
+        py::arg("RH"),
+        "Wet-bulb temperature [K] via Newton-Raphson on the psychrometric equation.\n\n"
+        "Solves: cp_air*(T - Twb) = hfg(Twb)*(Ws(Twb) - W)\n"
+        "where hfg(Twb) = 2501000 - 2381*(Twb - 273.15) J/kg (ASHRAE linear fit).\n\n"
+        "T  : dry-bulb temperature [K]\n"
+        "P  : total pressure [Pa]\n"
+        "RH : relative humidity (0-1)\n\n"
+        "Returns: wet-bulb temperature [K]"
+    );
+
+    m.def(
+        "humid_air_enthalpy",
+        &humid_air_enthalpy,
+        py::arg("T"),
+        py::arg("P"),
+        py::arg("RH"),
+        "Enthalpy of humid air [J/kg dry air] using ASHRAE psychrometric constants.\n\n"
+        "h = cp_air*(T - 273.15) + W*(2501000 + 1860*(T - 273.15))\n"
+        "where cp_air=1005, h_fg=2501000, cp_wv=1860 J/(kg\u00b7K).\n\n"
+        "T  : temperature [K]\n"
+        "P  : total pressure [Pa]\n"
+        "RH : relative humidity (0-1)\n\n"
+        "Returns: enthalpy [J/kg dry air]"
+    );
+
+    m.def(
+        "humid_air_enthalpy_nasa9",
+        &humid_air_enthalpy_nasa9,
+        py::arg("T"),
+        py::arg("P"),
+        py::arg("RH"),
+        "Enthalpy of humid air [J/kg dry air] using NASA-9 thermodynamic data.\n\n"
+        "More accurate than humid_air_enthalpy() at non-ambient temperatures.\n"
+        "Computes h(T, X) from the NASA-9 polynomial database and converts\n"
+        "to J/kg dry air basis.\n\n"
+        "T  : temperature [K] (valid range: 200-6000 K)\n"
+        "P  : total pressure [Pa]\n"
+        "RH : relative humidity (0-1)\n\n"
+        "Returns: enthalpy [J/kg dry air]"
+    );
+
+    m.def(
+        "humid_air_density",
+        &humid_air_density,
+        py::arg("T"),
+        py::arg("P"),
+        py::arg("RH"),
+        "Density of humid air [kg/m\u00b3] using ideal gas law.\n\n"
+        "R_ha = R_da * (1 + W/0.621945) / (1 + W), rho = P / (R_ha * T)\n\n"
+        "T  : temperature [K]\n"
+        "P  : total pressure [Pa]\n"
+        "RH : relative humidity (0-1)\n\n"
+        "Returns: density [kg/m\u00b3]"
     );
 
     // Composition conversion helpers

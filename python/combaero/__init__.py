@@ -173,6 +173,10 @@ try:
         htc_from_nusselt,
         htc_pipe,
         humid_air_composition,
+        humid_air_density,
+        humid_air_enthalpy,
+        humid_air_enthalpy_nasa9,
+        humidity_ratio,
         hydraulic_diameter,
         hydraulic_diameter_annulus,
         hydraulic_diameter_rect,
@@ -269,6 +273,7 @@ try:
         rib_friction_multiplier,
         s,
         s_mass,
+        saturation_vapor_pressure,
         set_equivalence_ratio_mass,
         set_equivalence_ratio_mole,
         set_fuel_stream_for_CO2,
@@ -310,10 +315,13 @@ try:
         tube_Q,
         u,
         u_mass,
+        vapor_pressure,
         velocity_from_q,
         viscosity,
         wall_temperature_profile,
+        water_vapor_mole_fraction,
         wavelength,
+        wet_bulb_temperature,
         wgs_equilibrium,
         wgs_equilibrium_adiabatic,
     )
@@ -358,6 +366,14 @@ except ModuleNotFoundError:
     solve_orifice_mdot = _core.solve_orifice_mdot
     standard_dry_air_composition = _core.standard_dry_air_composition
     humid_air_composition = _core.humid_air_composition
+    humid_air_density = _core.humid_air_density
+    humid_air_enthalpy = _core.humid_air_enthalpy
+    humid_air_enthalpy_nasa9 = _core.humid_air_enthalpy_nasa9
+    humidity_ratio = _core.humidity_ratio
+    saturation_vapor_pressure = _core.saturation_vapor_pressure
+    vapor_pressure = _core.vapor_pressure
+    water_vapor_mole_fraction = _core.water_vapor_mole_fraction
+    wet_bulb_temperature = _core.wet_bulb_temperature
     dewpoint = _core.dewpoint
     relative_humidity_from_dewpoint = _core.relative_humidity_from_dewpoint
     formula_to_name = _core.formula_to_name
@@ -605,6 +621,14 @@ __all__ = [
     "solve_orifice_mdot",
     "standard_dry_air_composition",
     "humid_air_composition",
+    "humid_air_density",
+    "humid_air_enthalpy",
+    "humid_air_enthalpy_nasa9",
+    "humidity_ratio",
+    "saturation_vapor_pressure",
+    "vapor_pressure",
+    "water_vapor_mole_fraction",
+    "wet_bulb_temperature",
     "dewpoint",
     "relative_humidity_from_dewpoint",
     "formula_to_name",

@@ -145,23 +145,14 @@ TEST_F(ThermoTransportTest, ConvertPureWaterVaporToDry) {
 
 // Test that temperature below valid range issues a warning but still returns a result
 TEST_F(ThermoTransportTest, TemperatureBelowValidRangeWarning) {
-    // Use 150 K which is below the 200 K minimum for NASA-9 polynomials
+    // T=150 K is below the 5% extrapolation limit (190 K) for NASA-9 polynomials.
+    // The new range policy throws std::out_of_range instead of issuing a cerr warning.
     double T = 150.0;
+    EXPECT_THROW(cp(T, air_composition), std::out_of_range);
 
-    // Redirect cerr to capture warning
-    testing::internal::CaptureStderr();
-
-    // Calculate cp - should still work but issue warning
-    double cp_value = cp(T, air_composition);
-
-    // Check that warning was issued
-    std::string output = testing::internal::GetCapturedStderr();
-    EXPECT_TRUE(output.find("Warning") != std::string::npos)
-        << "Expected temperature range warning for T=150 K";
-    EXPECT_TRUE(output.find("below valid range") != std::string::npos)
-        << "Warning should mention 'below valid range'";
-
-    // Result should still be reasonable (extrapolated from 200 K)
+    // T=195 K is within the 5% extrapolation band (190-200 K): should succeed silently.
+    double T_near = 195.0;
+    double cp_value = cp(T_near, air_composition);
     EXPECT_GT(cp_value, 20.0);
     EXPECT_LT(cp_value, 50.0);
 }
