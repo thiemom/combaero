@@ -2,10 +2,10 @@
 #define THERMO_TRANSPORT_DATA_H
 
 #include <array>
-#include <vector>
+#include <cstdint>
 #include <string>
 #include <unordered_map>
-#include <limits>
+#include <vector>
 
 // NASA polynomial format used in this build
 // NASA7: Cp/R = a1 + a2*T + a3*T^2 + a4*T^3 + a5*T^4
@@ -25,8 +25,10 @@ struct NASA9_Coeffs {
 
 using NASA_Coeffs = NASA9_Coeffs;
 
+enum class MolecularGeometry : std::uint8_t { Atom, Linear, Nonlinear };
+
 struct Transport_Props {
-    std::string geometry;
+    MolecularGeometry geometry;
     double well_depth;
     double diameter;
     double polarizability;
@@ -77,21 +79,22 @@ const std::vector<NASA_Coeffs> nasa_coeffs = {
 {{{200.0, 1000.0, {40783.2321, -800.918604, 8.21470201, -0.01269714457, 1.753605076e-05, -1.20286027e-08, 3.36809349e-12, 0.0, 2682.484665, -30.43788844}}, {1000.0, 6000.0, {560812.801, -837.150474, 2.975364532, 0.001252249124, -3.74071619e-07, 5.9366252e-11, -3.6069941e-15, 0.0, 5339.82441, -2.202774769}}, {6000.0, 20000.0, {496688412.0, -314754.7149, 79.8412188, -0.00841478921, 4.75324835e-07, -1.371873492e-11, 1.605461756e-16, 0.0, 2488433.516, -669.572811}}}}
 };
 
+using G = MolecularGeometry;
 const std::vector<Transport_Props> transport_props = {
-{"linear", 97.53, 3.621, 1.76},
-{"linear", 107.4, 3.458, 1.6},
-{"atom", 136.5, 3.33, 0.0},
-{"linear", 244.0, 3.763, 2.65},
-{"nonlinear", 572.4, 2.605, 0.0},
-{"nonlinear", 141.4, 3.746, 2.6},
-{"nonlinear", 252.3, 4.302, 0.0},
-{"nonlinear", 266.8, 4.982, 0.0},
-{"nonlinear", 357.0, 5.176, 0.0},
-{"nonlinear", 458.182, 5.445, 0.0},
-{"nonlinear", 512.225, 5.742, 0.0},
-{"nonlinear", 564.03, 6.004, 0.0},
-{"linear", 98.1, 3.65, 1.95},
-{"linear", 38.0, 2.92, 0.79}
+{G::Linear,    97.53,   3.621, 1.76},
+{G::Linear,   107.4,    3.458, 1.6},
+{G::Atom,     136.5,    3.33,  0.0},
+{G::Linear,   244.0,    3.763, 2.65},
+{G::Nonlinear, 572.4,   2.605, 0.0},
+{G::Nonlinear, 141.4,   3.746, 2.6},
+{G::Nonlinear, 252.3,   4.302, 0.0},
+{G::Nonlinear, 266.8,   4.982, 0.0},
+{G::Nonlinear, 357.0,   5.176, 0.0},
+{G::Nonlinear, 458.182, 5.445, 0.0},
+{G::Nonlinear, 512.225, 5.742, 0.0},
+{G::Nonlinear, 564.03,  6.004, 0.0},
+{G::Linear,    98.1,    3.65,  1.95},
+{G::Linear,    38.0,    2.92,  0.79}
 };
 
 const std::vector<Molecular_Structure> molecular_structures = {

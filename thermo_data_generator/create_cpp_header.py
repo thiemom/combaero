@@ -12,10 +12,11 @@ def generate_cpp_header(csv_file, output_header):
     header_content = """#ifndef THERMO_TRANSPORT_DATA_H
 #define THERMO_TRANSPORT_DATA_H
 
-#include <vector>
+#include <array>
+#include <cstdint>
 #include <string>
 #include <unordered_map>
-#include <limits>
+#include <vector>
 
 struct NASA_Coeffs {
     double T_low;
@@ -25,12 +26,16 @@ struct NASA_Coeffs {
     std::vector<double> high_coeffs;
 };
 
+enum class MolecularGeometry : std::uint8_t { Atom, Linear, Nonlinear };
+
 struct Transport_Props {
-    std::string geometry;
+    MolecularGeometry geometry;
     double well_depth;
     double diameter;
     double polarizability;
 };
+
+using G = MolecularGeometry;
 
 struct Molecular_Structure {
     std::size_t C;
@@ -113,8 +118,10 @@ const std::vector<std::string> species_names = {"""
         )
 
         polarizability_str = format_double(row["polarizability"])
+        geom_map = {"atom": "G::Atom", "linear": "G::Linear", "nonlinear": "G::Nonlinear"}
+        geom_cpp = geom_map.get(str(row["geometry"]).lower(), "G::Nonlinear")
         transport_props_list.append(
-            f'{{"{row["geometry"]}", {row["well-depth"]}, {row["diameter"]}, {polarizability_str}}}'
+            f"{{{geom_cpp}, {row['well-depth']}, {row['diameter']}, {polarizability_str}}}"
         )
 
         molar_masses_list.append(str(row["molar_mass"]))

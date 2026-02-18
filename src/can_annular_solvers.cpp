@@ -116,14 +116,11 @@ std::vector<BlochMode> solve_magnitude_minimization(
                     );
 
                     if (std::abs(D_refined) < 0.1) {
-                        bool is_duplicate = false;
-                        for (const auto& existing : modes) {
-                            if (existing.m_azimuthal == m &&
-                                std::abs(existing.frequency - f_refined) < 1.0) {
-                                is_duplicate = true;
-                                break;
-                            }
-                        }
+                        bool is_duplicate = std::any_of(modes.begin(), modes.end(),
+                            [&](const BlochMode& e) {
+                                return e.m_azimuthal == m &&
+                                       std::abs(e.frequency - f_refined) < 1.0;
+                            });
 
                         if (!is_duplicate) {
                             modes.push_back({m, f_refined, geom.n_cans});
@@ -289,15 +286,11 @@ std::vector<BlochMode> solve_argument_principle(
                 );
 
                 if (f_refined > 0.0 && f_refined < f_max) {
-                    // Check for duplicates
-                    bool is_duplicate = false;
-                    for (const auto& existing : modes) {
-                        if (existing.m_azimuthal == m &&
-                            std::abs(existing.frequency - f_refined) < 1.0) {
-                            is_duplicate = true;
-                            break;
-                        }
-                    }
+                    bool is_duplicate = std::any_of(modes.begin(), modes.end(),
+                        [&](const BlochMode& e) {
+                            return e.m_azimuthal == m &&
+                                   std::abs(e.frequency - f_refined) < 1.0;
+                        });
 
                     if (!is_duplicate) {
                         modes.push_back({m, f_refined, geom.n_cans});
@@ -497,15 +490,11 @@ std::vector<AnnularMode> annular_duct_eigenmodes(
                 if (min_mag < 0.1) {
                     n_axial++;
 
-                    // Check for duplicates
-                    bool is_duplicate = false;
-                    for (const auto& existing : modes) {
-                        if (existing.m_azimuthal == m &&
-                            std::abs(existing.frequency - f_best) < 1.0) {
-                            is_duplicate = true;
-                            break;
-                        }
-                    }
+                    bool is_duplicate = std::any_of(modes.begin(), modes.end(),
+                        [&](const AnnularMode& e) {
+                            return e.m_azimuthal == m &&
+                                   std::abs(e.frequency - f_best) < 1.0;
+                        });
 
                     if (!is_duplicate) {
                         modes.push_back({m, n_axial, f_best});

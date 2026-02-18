@@ -449,10 +449,10 @@ def generate_cpp_header(
 #define THERMO_TRANSPORT_DATA_H
 
 #include <array>
-#include <vector>
+#include <cstdint>
 #include <string>
 #include <unordered_map>
-#include <limits>
+#include <vector>
 
 // NASA polynomial format used in this build
 // NASA7: Cp/R = a1 + a2*T + a3*T^2 + a4*T^3 + a5*T^4
@@ -498,8 +498,10 @@ using NASA_Coeffs = NASA9_Coeffs;
         )
 
     output.write(
-        """struct Transport_Props {
-    std::string geometry;
+        """enum class MolecularGeometry : std::uint8_t { Atom, Linear, Nonlinear };
+
+struct Transport_Props {
+    MolecularGeometry geometry;
     double well_depth;
     double diameter;
     double polarizability;
@@ -511,6 +513,8 @@ struct Molecular_Structure {
     std::size_t O;
     std::size_t N;
 };
+
+using G = MolecularGeometry;
 
 """
     )
@@ -563,11 +567,15 @@ struct Molecular_Structure {
         if sp.transport:
             t = sp.transport
             pol_str = format_double(t.polarizability)
-            transport_entries.append(
-                f'{{"{t.geometry.value}", {t.well_depth}, {t.diameter}, {pol_str}}}'
-            )
+            geom_map = {
+                Geometry.ATOM: "G::Atom",
+                Geometry.LINEAR: "G::Linear",
+                Geometry.NONLINEAR: "G::Nonlinear",
+            }
+            geom_cpp = geom_map.get(t.geometry, "G::Nonlinear")
+            transport_entries.append(f"{{{geom_cpp}, {t.well_depth}, {t.diameter}, {pol_str}}}")
         else:
-            transport_entries.append('{"nonlinear", 0.0, 0.0, 0.0}')
+            transport_entries.append("{G::Nonlinear, 0.0, 0.0, 0.0}")
 
     output.write(",\n".join(transport_entries))
     output.write("\n};\n\n")

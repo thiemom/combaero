@@ -179,12 +179,10 @@ double thermal_conductivity(double T, double P, const std::vector<double>& X)
 
         // Determine rotational contribution based on geometry
         double f_rot = 0.0;
-        if (transport_props[i].geometry == "atom") {
-            f_rot = 0.0; // Monatomic
-        } else if (transport_props[i].geometry == "linear") {
-            f_rot = 1.0; // Linear molecule
-        } else {
-            f_rot = 1.5; // Nonlinear molecule
+        switch (transport_props[i].geometry) {
+            case MolecularGeometry::Atom:     f_rot = 0.0; break;
+            case MolecularGeometry::Linear:   f_rot = 1.0; break;
+            case MolecularGeometry::Nonlinear: f_rot = 1.5; break;
         }
 
         // Modified Eucken formula for thermal conductivity
