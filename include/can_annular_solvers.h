@@ -9,6 +9,49 @@
 namespace combaero {
 
 // -------------------------------------------------------------
+// Solver tuning constants
+// -------------------------------------------------------------
+// All magic numbers are collected here with physical justification.
+
+// Width of each frequency search window [Hz].
+// Narrower windows reduce the chance of two modes sharing a box;
+// 50 Hz is a safe default for combustor-scale geometries (L ~ 0.3–1 m).
+inline constexpr double kScanWindowHz = 50.0;
+
+// Minimum frequency to start scanning [Hz].
+// Avoids DC / near-zero numerical artefacts in the dispersion relation.
+inline constexpr double kScanStartHz = 10.0;
+
+// Imaginary-axis bounds for the Argument Principle contour [rad/s].
+// imag_min slightly below real axis to capture marginally stable modes.
+// imag_max large enough to enclose all physically relevant damped modes.
+inline constexpr double kContourImagMin = -10.0;
+inline constexpr double kContourImagMax = 200.0;
+
+// Number of contour steps along the frequency and imaginary axes.
+// Higher values reduce the chance of missing a winding due to coarse sampling.
+inline constexpr int kContourStepsFreq = 40;
+inline constexpr int kContourStepsImag = 20;
+
+// Acceptance threshold: |D(ω)| must be below this for a candidate to be
+// accepted as a genuine mode.  Dimensionless after normalisation by Y_char.
+inline constexpr double kDispersionTolerance = 0.1;
+
+// Duplicate-mode guard: two modes with the same m and |Δf| < this [Hz]
+// are considered identical.  Set to half the minimum expected mode spacing.
+inline constexpr double kDuplicateGuardHz = 1.0;
+
+// Maximum iterations for Muller root refinement.
+inline constexpr int kMullerMaxIter = 50;
+
+// Number of Muller restarts with frequency perturbations when a box contains
+// more than one zero (multi-zero case in Argument Principle solver).
+inline constexpr int kMullerMultiZoneRestarts = 4;
+
+// Perturbation fraction of box width used for multi-zero Muller restarts.
+inline constexpr double kMullerPerturbFraction = 0.25;
+
+// -------------------------------------------------------------
 // Annular Duct Geometry (Pure Annular, No Cans)
 // -------------------------------------------------------------
 

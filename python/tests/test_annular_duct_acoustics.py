@@ -320,6 +320,153 @@ class TestAnalyticalReference:
             assert rel_err < 0.2
 
 
+class TestNumericalReference:
+    """Numerical regression tests for the annular duct solver.
+
+    These tests pin the solver output against analytically-derived reference
+    values.  They are NOT golden truth — the solver uses approximate methods
+    (Argument Principle + Muller) — but they detect regressions caused by
+    refactoring.
+
+    Reference geometry: L=1.0 m, r_inner=0.2 m, r_outer=0.5 m, c=500 m/s
+      Analytical closed-closed axisymmetric resonances: f_n = n * c / (2*L) = n * 250 Hz
+      Tolerance: 5 Hz (2% of fundamental).
+
+    Analytical formula (thin-annulus, closed-closed):
+      f(m, n) = sqrt( (n*c/(2L))^2 + (m*c/(pi*d_mean))^2 )
+      d_mean = r_inner + r_outer = 0.7 m
+    """
+
+    FREQ_TOL_HZ = 5.0
+
+    def _geom(self, n_az: int = 3) -> cb.Annulus:
+        geom = cb.Annulus()
+        geom.length = 1.0
+        geom.radius_inner = 0.2
+        geom.radius_outer = 0.5
+        geom.n_azimuthal_max = n_az
+        return geom
+
+    def _f_analytical(
+        self, m: int, n: int, c: float, L: float, r_inner: float, r_outer: float
+    ) -> float:
+        """Thin-annulus analytical frequency [Hz], closed-closed."""
+        d_mean = r_inner + r_outer
+        f_axial = n * c / (2.0 * L)
+        f_az = 0.0 if m == 0 else (m * c) / (math.pi * d_mean)
+        return math.sqrt(f_axial**2 + f_az**2)
+
+    def test_axisymmetric_fundamental(self):
+        """m=0, n=1: f = c/(2L) = 250 Hz within 5 Hz."""
+        geom = self._geom()
+        c = 500.0
+        modes = cb.annular_duct_eigenmodes(geom, c, 1.2, f_max=300)
+
+        f_ref = self._f_analytical(0, 1, c, geom.length, geom.radius_inner, geom.radius_outer)
+        m0 = [m for m in modes if m.m_azimuthal == 0 and m.n_axial == 1]
+        assert len(m0) >= 1, (
+            f"m=0,n=1 mode not found; all modes: {[(m.m_azimuthal, m.n_axial, m.frequency) for m in modes]}"
+        )
+        assert abs(m0[0].frequency - f_ref) < self.FREQ_TOL_HZ, (
+            f"m=0,n=1: got {m0[0].frequency:.1f} Hz, expected {f_ref:.1f} Hz"
+        )
+
+    def test_axisymmetric_second_harmonic(self):
+        """m=0, n=2: f = c/L = 500 Hz within 5 Hz."""
+        geom = self._geom()
+        c = 500.0
+        modes = cb.annular_duct_eigenmodes(geom, c, 1.2, f_max=550)
+
+        f_ref = self._f_analytical(0, 2, c, geom.length, geom.radius_inner, geom.radius_outer)
+        m0n2 = [m for m in modes if m.m_azimuthal == 0 and m.n_axial == 2]
+        assert len(m0n2) >= 1, (
+            f"m=0,n=2 not found; modes: {[(m.m_azimuthal, m.n_axial, m.frequency) for m in modes]}"
+        )
+        assert abs(m0n2[0].frequency - f_ref) < self.FREQ_TOL_HZ
+
+    def test_analytical_vs_numerical_agreement(self):
+        """AP solver and analytical formula agree within 5 Hz for m=0,1,2 n=1."""
+        geom = self._geom(n_az=2)
+        c = 500.0
+        modes = cb.annular_duct_eigenmodes(geom, c, 1.2, f_max=800)
+
+        for m in range(3):
+            f_ref = self._f_analytical(m, 1, c, geom.length, geom.radius_inner, geom.radius_outer)
+            if f_ref > 800:
+                continue
+            match = [md for md in modes if md.m_azimuthal == m and abs(md.frequency - f_ref) < 30.0]
+            assert len(match) >= 1, (
+                f"m={m},n=1 not found near {f_ref:.1f} Hz; "
+                f"modes: {[(md.m_azimuthal, md.n_axial, md.frequency) for md in modes]}"
+            )
+            assert abs(match[0].frequency - f_ref) < self.FREQ_TOL_HZ, (
+                f"m={m},n=1: got {match[0].frequency:.1f} Hz, expected {f_ref:.1f} Hz"
+            )
+
+    def test_analytical_helper_exact_values(self):
+        """annular_duct_modes_analytical must return exact formula values."""
+        geom = self._geom(n_az=2)
+        c = 500.0
+        modes = cb.annular_duct_modes_analytical(geom, c, f_max=800)
+
+        for m in range(3):
+            for n in range(1, 4):
+                f_ref = self._f_analytical(
+                    m, n, c, geom.length, geom.radius_inner, geom.radius_outer
+                )
+                if f_ref > 800:
+                    continue
+                match = [md for md in modes if md.m_azimuthal == m and md.n_axial == n]
+                assert len(match) == 1, f"m={m},n={n} not found in analytical modes"
+                assert abs(match[0].frequency - f_ref) < 0.01, (
+                    f"Analytical m={m},n={n}: got {match[0].frequency:.4f}, expected {f_ref:.4f}"
+                )
+
+    def test_frequency_scales_with_sound_speed(self):
+        """All mode frequencies must scale linearly with c within 2%."""
+        geom = self._geom(n_az=1)
+        modes_500 = cb.annular_duct_modes_analytical(geom, 500.0, f_max=800)
+        modes_750 = cb.annular_duct_modes_analytical(geom, 750.0, f_max=1200)
+
+        for m500 in modes_500:
+            match = [
+                m
+                for m in modes_750
+                if m.m_azimuthal == m500.m_azimuthal and m.n_axial == m500.n_axial
+            ]
+            if not match:
+                continue
+            ratio = match[0].frequency / m500.frequency
+            assert abs(ratio - 1.5) < 0.03, (
+                f"m={m500.m_azimuthal},n={m500.n_axial}: ratio={ratio:.4f}, expected 1.5"
+            )
+
+    def test_open_bc_fundamental_half_wavelength(self):
+        """Open BC: fundamental at c/(4L) = 125 Hz within 5 Hz (quarter-wave)."""
+        geom = self._geom(n_az=0)
+        c = 500.0
+        modes = cb.annular_duct_eigenmodes(
+            geom, c, 1.2, f_max=200, bc_ends=cb.BoundaryCondition.Open
+        )
+        f_ref = c / (4.0 * geom.length)  # 125 Hz
+        assert len(modes) >= 1
+        assert abs(modes[0].frequency - f_ref) < self.FREQ_TOL_HZ, (
+            f"Open BC fundamental: got {modes[0].frequency:.1f} Hz, expected {f_ref:.1f} Hz"
+        )
+
+    def test_mode_count_matches_analytical(self):
+        """AP solver must find at least as many modes as the analytical formula predicts."""
+        geom = self._geom(n_az=2)
+        c = 500.0
+        f_max = 700.0
+        modes_ap = cb.annular_duct_eigenmodes(geom, c, 1.2, f_max=f_max)
+        modes_ref = cb.annular_duct_modes_analytical(geom, c, f_max=f_max)
+
+        assert len(modes_ap) >= len(modes_ref), (
+            f"AP found {len(modes_ap)} modes, analytical predicts {len(modes_ref)}"
+        )
+
+
 class TestComparisonWithCanAnnular:
     """Test consistency between annular duct and single-can solvers."""
 
