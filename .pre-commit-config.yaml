@@ -35,3 +35,11 @@ repos:
         always_run: false
         files: ^(src/|include/|python/)
         stages: [pre-commit]
+
+      - id: thermo-header-check
+        name: Thermo/Transport Header (generated file check)
+        entry: bash -c './scripts/check-thermo-header.sh'
+        language: system
+        pass_filenames: false
+        files: ^(thermo_data_generator/|include/thermo_transport_data\.h)
+        stages: [pre-commit]
