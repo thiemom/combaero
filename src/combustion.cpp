@@ -10,14 +10,8 @@
 
 namespace {
 
-std::vector<double> pure_species_mole_fractions(std::size_t idx) {
-    std::vector<double> X(species_names.size(), 0.0);
-    X[idx] = 1.0;
-    return X;
-}
-
 double pure_species_enthalpy(std::size_t idx, const double reference_temperature) {
-    return h(reference_temperature, pure_species_mole_fractions(idx));
+    return h_species(idx, reference_temperature);
 }
 
 void validate_fuel_mole_fractions(const std::vector<double>& X_fuel) {
@@ -829,6 +823,14 @@ double bilger_mixture_fraction_from_moles(
 // Stream-based equivalence ratio helpers
 // -------------------------------------------------------------
 
+// Stoichiometric mass flow ratio (mdot_fuel / mdot_ox at stoich)
+// Delegates to the mass-basis stoich F/O helper already in this file.
+static double stoich_fuel_ox_ratio(const std::vector<double>& X_fuel, const std::vector<double>& X_ox) {
+    const std::vector<double> Y_fuel = mole_to_mass(X_fuel);
+    const std::vector<double> Y_ox   = mole_to_mass(X_ox);
+    return stoich_f_over_o_mass(Y_fuel, Y_ox);
+}
+
 Stream set_fuel_stream_for_phi(double phi, const Stream& fuel, const Stream& oxidizer) {
     if (phi <= 0.0) {
         throw std::invalid_argument("set_fuel_stream_for_phi: phi must be positive");
@@ -837,45 +839,12 @@ Stream set_fuel_stream_for_phi(double phi, const Stream& fuel, const Stream& oxi
         throw std::invalid_argument("set_fuel_stream_for_phi: oxidizer.mdot must be positive");
     }
 
-    // Convert to mass fractions
-    std::vector<double> Y_fuel = mole_to_mass(fuel.X());
-    std::vector<double> Y_ox = mole_to_mass(oxidizer.X());
+    // mdot_fuel = phi * FAR_stoich * mdot_ox
+    // Works for any fuel/oxidizer combination including blended fuels where
+    // all species appear in both streams.
+    const double FAR_stoich = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
+    const double mdot_fuel = phi * FAR_stoich * oxidizer.mdot;
 
-    // Get mixture mass fractions for target phi
-    std::vector<double> Y_mix = set_equivalence_ratio_mass(phi, Y_fuel, Y_ox);
-
-    // Calculate fuel mass flow from mixture composition
-    // Y_mix = (mdot_fuel * Y_fuel + mdot_ox * Y_ox) / (mdot_fuel + mdot_ox)
-    //
-    // For a fuel-only species k (where Y_ox[k] = 0):
-    //   Y_mix[k] = mdot_fuel * Y_fuel[k] / (mdot_fuel + mdot_ox)
-    //   => mdot_fuel / (mdot_fuel + mdot_ox) = Y_mix[k] / Y_fuel[k]
-    //
-    // Find a fuel species (present in fuel but not in oxidizer)
-    double alpha = -1.0;
-    for (std::size_t i = 0; i < Y_fuel.size(); ++i) {
-        if (Y_fuel[i] > 1e-10 && Y_ox[i] < 1e-10) {
-            // This is a fuel-only species
-            alpha = Y_mix[i] / Y_fuel[i];
-            break;
-        }
-    }
-
-    if (alpha < 0.0) {
-        throw std::runtime_error(
-            "set_fuel_stream_for_phi: no fuel-only species found "
-            "(fuel must contain species not present in oxidizer)");
-    }
-
-    // mdot_fuel / (mdot_fuel + mdot_ox) = alpha
-    // => mdot_fuel = alpha * mdot_ox / (1 - alpha)
-    if (alpha >= 1.0 || alpha <= 0.0) {
-        throw std::runtime_error("set_fuel_stream_for_phi: invalid mass fraction ratio");
-    }
-
-    double mdot_fuel = alpha * oxidizer.mdot / (1.0 - alpha);
-
-    // Return fuel stream with computed mdot
     Stream result = fuel;
     result.mdot = mdot_fuel;
     return result;
@@ -887,63 +856,83 @@ Stream set_fuel_stream_for_phi(double phi, const Stream& fuel, const Stream& oxi
 
 namespace {
 
-// Bisection solver for monotonic functions
-// Finds x such that f(x) = target, given that f is monotonic on [x_lo, x_hi]
-// tol_f: tolerance on function value |f(x) - target|
-// tol_x_rel: relative tolerance on x, convergence when (x_hi - x_lo) < tol_x_rel * x_mid
+// Brent's method: finds x such that f(x) = target on [x_lo, x_hi].
+// Combines bisection safety with secant/inverse-quadratic interpolation speed.
+// Guaranteed to converge if f is continuous and target is bracketed.
+// tol_f: tolerance on |f(x) - target|
+// tol_x_rel: relative bracket width tolerance
 template<typename Func>
 double bisection_solve(Func f, double target, double x_lo, double x_hi,
                        double tol_f, std::size_t max_iter, double tol_x_rel = 1e-10) {
-    double f_lo = f(x_lo);
-    double f_hi = f(x_hi);
+    // Shift to root-finding: g(x) = f(x) - target
+    double a = x_lo, b = x_hi;
+    double fa = f(a) - target;
+    double fb = f(b) - target;
 
-    // Check if target is within range
-    double f_min = std::min(f_lo, f_hi);
-    double f_max = std::max(f_lo, f_hi);
-    if (target < f_min - tol_f || target > f_max + tol_f) {
+    if (std::abs(fa) < tol_f) return a;
+    if (std::abs(fb) < tol_f) return b;
+
+    if (fa * fb > 0.0) {
         throw std::runtime_error("bisection_solve: target outside achievable range");
     }
 
-    // Determine monotonicity direction
-    bool increasing = (f_hi > f_lo);
+    // Ensure |f(b)| <= |f(a)| (b is the best guess)
+    if (std::abs(fa) < std::abs(fb)) {
+        std::swap(a, b);
+        std::swap(fa, fb);
+    }
+
+    double c = a, fc = fa;
+    bool mflag = true;
+    double s = b, fs = fb;
+    double d = 0.0;
 
     for (std::size_t iter = 0; iter < max_iter; ++iter) {
-        double x_mid = 0.5 * (x_lo + x_hi);
-        double f_mid = f(x_mid);
+        if (std::abs(fb) < tol_f) return b;
+        if (std::abs(b - a) < tol_x_rel * std::abs(b)) return b;
 
-        // Check convergence on function value
-        if (std::abs(f_mid - target) < tol_f) {
-            return x_mid;
-        }
-
-        // Check convergence on x (relative)
-        if ((x_hi - x_lo) < tol_x_rel * x_mid) {
-            return x_mid;
-        }
-
-        bool mid_below_target = (f_mid < target);
-        if (increasing == mid_below_target) {
-            x_lo = x_mid;
+        if (fa != fc && fb != fc) {
+            // Inverse quadratic interpolation
+            s = a * fb * fc / ((fa - fb) * (fa - fc))
+              + b * fa * fc / ((fb - fa) * (fb - fc))
+              + c * fa * fb / ((fc - fa) * (fc - fb));
         } else {
-            x_hi = x_mid;
+            // Secant method
+            s = b - fb * (b - a) / (fb - fa);
+        }
+
+        // Conditions to fall back to bisection
+        const double b3 = (3.0 * a + b) / 4.0;
+        bool cond1 = !((s > std::min(b3, b) && s < std::max(b3, b)));
+        bool cond2 = mflag  && std::abs(s - b) >= std::abs(b - c) / 2.0;
+        bool cond3 = !mflag && std::abs(s - b) >= std::abs(c - d) / 2.0;
+        bool cond4 = mflag  && std::abs(b - c) < tol_x_rel * std::abs(b);
+        bool cond5 = !mflag && std::abs(c - d) < tol_x_rel * std::abs(b);
+
+        if (cond1 || cond2 || cond3 || cond4 || cond5) {
+            s = 0.5 * (a + b);
+            mflag = true;
+        } else {
+            mflag = false;
+        }
+
+        fs = f(s) - target;
+        d = c;
+        c = b; fc = fb;
+
+        if (fa * fs < 0.0) {
+            b = s; fb = fs;
+        } else {
+            a = s; fa = fs;
+        }
+
+        if (std::abs(fa) < std::abs(fb)) {
+            std::swap(a, b);
+            std::swap(fa, fb);
         }
     }
 
-    return 0.5 * (x_lo + x_hi);
-}
-
-// Estimate stoichiometric mass flow ratio (mdot_fuel / mdot_ox at stoich)
-double stoich_fuel_ox_ratio(const std::vector<double>& X_fuel, const std::vector<double>& X_ox) {
-    double O2_req_per_kg_fuel = oxygen_required_per_kg_mixture(X_fuel);
-    double X_O2_ox = X_ox[species_index.at("O2")];
-    double MW_ox = mwmix(X_ox);
-    double MW_O2 = molar_masses[species_index.at("O2")];
-    double Y_O2_ox = X_O2_ox * MW_O2 / MW_ox;
-
-    if (O2_req_per_kg_fuel > 0.0 && Y_O2_ox > 0.0) {
-        return Y_O2_ox / O2_req_per_kg_fuel;
-    }
-    return 0.05;  // fallback
+    return b;
 }
 
 // Helper: compute Tad for given fuel mdot (oxidizer mdot fixed)
@@ -982,32 +971,6 @@ double compute_species_burned(double mdot_var, const Stream& fuel, const Stream&
         X_burned = convert_to_dry_fractions(X_burned);
     }
     return X_burned[species_index.at(species)];
-}
-
-// Convenience wrappers for backward compatibility and readability
-double compute_O2_burned_fuel(double mdot, const Stream& f, const Stream& o) {
-    return compute_species_burned(mdot, f, o, "O2", true, false);
-}
-double compute_O2_burned_ox(double mdot, const Stream& f, const Stream& o) {
-    return compute_species_burned(mdot, f, o, "O2", false, false);
-}
-double compute_CO2_burned_fuel(double mdot, const Stream& f, const Stream& o) {
-    return compute_species_burned(mdot, f, o, "CO2", true, false);
-}
-double compute_CO2_burned_ox(double mdot, const Stream& f, const Stream& o) {
-    return compute_species_burned(mdot, f, o, "CO2", false, false);
-}
-double compute_O2_dry_burned_fuel(double mdot, const Stream& f, const Stream& o) {
-    return compute_species_burned(mdot, f, o, "O2", true, true);
-}
-double compute_O2_dry_burned_ox(double mdot, const Stream& f, const Stream& o) {
-    return compute_species_burned(mdot, f, o, "O2", false, true);
-}
-double compute_CO2_dry_burned_fuel(double mdot, const Stream& f, const Stream& o) {
-    return compute_species_burned(mdot, f, o, "CO2", true, true);
-}
-double compute_CO2_dry_burned_ox(double mdot, const Stream& f, const Stream& o) {
-    return compute_species_burned(mdot, f, o, "CO2", false, true);
 }
 
 }  // anonymous namespace
@@ -1095,7 +1058,7 @@ Stream set_fuel_stream_for_O2(double X_O2_target, const Stream& fuel, const Stre
     double mdot_lo = mdot_stoich * 0.001;
     double mdot_hi = mdot_stoich * 0.999;
 
-    auto f = [&](double mdot) { return compute_O2_burned_fuel(mdot, fuel, oxidizer); };
+    auto f = [&](double mdot) { return compute_species_burned(mdot, fuel, oxidizer, "O2", true, false); };
     double mdot_result = bisection_solve(f, X_O2_target, mdot_lo, mdot_hi, tol, max_iter);
 
     Stream result = fuel;
@@ -1122,7 +1085,7 @@ Stream set_fuel_stream_for_O2_dry(double X_O2_dry_target, const Stream& fuel, co
     double mdot_lo = mdot_stoich * 0.001;
     double mdot_hi = mdot_stoich * 0.999;
 
-    auto f = [&](double mdot) { return compute_O2_dry_burned_fuel(mdot, fuel, oxidizer); };
+    auto f = [&](double mdot) { return compute_species_burned(mdot, fuel, oxidizer, "O2", true, true); };
     double mdot_result = bisection_solve(f, X_O2_dry_target, mdot_lo, mdot_hi, tol, max_iter);
 
     Stream result = fuel;
@@ -1145,7 +1108,7 @@ Stream set_fuel_stream_for_CO2(double X_CO2_target, const Stream& fuel, const St
     double mdot_lo = mdot_stoich * 0.001;
     double mdot_hi = mdot_stoich * 0.999;
 
-    auto f = [&](double mdot) { return compute_CO2_burned_fuel(mdot, fuel, oxidizer); };
+    auto f = [&](double mdot) { return compute_species_burned(mdot, fuel, oxidizer, "CO2", true, false); };
     double mdot_result = bisection_solve(f, X_CO2_target, mdot_lo, mdot_hi, tol, max_iter);
 
     Stream result = fuel;
@@ -1168,7 +1131,7 @@ Stream set_fuel_stream_for_CO2_dry(double X_CO2_dry_target, const Stream& fuel, 
     double mdot_lo = mdot_stoich * 0.001;
     double mdot_hi = mdot_stoich * 0.999;
 
-    auto f = [&](double mdot) { return compute_CO2_dry_burned_fuel(mdot, fuel, oxidizer); };
+    auto f = [&](double mdot) { return compute_species_burned(mdot, fuel, oxidizer, "CO2", true, true); };
     double mdot_result = bisection_solve(f, X_CO2_dry_target, mdot_lo, mdot_hi, tol, max_iter);
 
     Stream result = fuel;
@@ -1260,7 +1223,7 @@ Stream set_oxidizer_stream_for_O2(double X_O2_target, const Stream& fuel, const 
     double mdot_hi = mdot_stoich * 100.0;  // very lean -> high O2
 
     // O2 increases with increasing oxidizer (on lean side)
-    auto f = [&](double mdot) { return compute_O2_burned_ox(mdot, fuel, oxidizer); };
+    auto f = [&](double mdot) { return compute_species_burned(mdot, fuel, oxidizer, "O2", false, false); };
     double mdot_result = bisection_solve(f, X_O2_target, mdot_lo, mdot_hi, tol, max_iter);
 
     Stream result = oxidizer;
@@ -1286,7 +1249,7 @@ Stream set_oxidizer_stream_for_O2_dry(double X_O2_dry_target, const Stream& fuel
     double mdot_lo = mdot_stoich * 1.001;
     double mdot_hi = mdot_stoich * 100.0;
 
-    auto f = [&](double mdot) { return compute_O2_dry_burned_ox(mdot, fuel, oxidizer); };
+    auto f = [&](double mdot) { return compute_species_burned(mdot, fuel, oxidizer, "O2", false, true); };
     double mdot_result = bisection_solve(f, X_O2_dry_target, mdot_lo, mdot_hi, tol, max_iter);
 
     Stream result = oxidizer;
@@ -1310,7 +1273,7 @@ Stream set_oxidizer_stream_for_CO2(double X_CO2_target, const Stream& fuel, cons
     double mdot_hi = mdot_stoich * 100.0;  // very lean -> low CO2
 
     // CO2 decreases with increasing oxidizer (dilution)
-    auto f = [&](double mdot) { return compute_CO2_burned_ox(mdot, fuel, oxidizer); };
+    auto f = [&](double mdot) { return compute_species_burned(mdot, fuel, oxidizer, "CO2", false, false); };
     double mdot_result = bisection_solve(f, X_CO2_target, mdot_lo, mdot_hi, tol, max_iter);
 
     Stream result = oxidizer;
@@ -1333,7 +1296,7 @@ Stream set_oxidizer_stream_for_CO2_dry(double X_CO2_dry_target, const Stream& fu
     double mdot_lo = mdot_stoich * 1.001;
     double mdot_hi = mdot_stoich * 100.0;
 
-    auto f = [&](double mdot) { return compute_CO2_dry_burned_ox(mdot, fuel, oxidizer); };
+    auto f = [&](double mdot) { return compute_species_burned(mdot, fuel, oxidizer, "CO2", false, true); };
     double mdot_result = bisection_solve(f, X_CO2_dry_target, mdot_lo, mdot_hi, tol, max_iter);
 
     Stream result = oxidizer;
@@ -1376,24 +1339,14 @@ State complete_combustion(const State& in) {
 // Combustion State Dataclass
 // -------------------------------------------------------------
 
-// Helper: Compute Bilger mixture fraction from compositions
+// Compute Bilger mixture fraction from mole fraction compositions.
+// Delegates to the correct mass-fraction-based implementation.
 static double compute_bilger_mixture_fraction(
     const std::vector<double>& X_mix,
     const std::vector<double>& X_fuel,
     const std::vector<double>& X_ox
 ) {
-    // Bilger mixture fraction based on elemental mass fractions
-    // Z = (beta - beta_ox) / (beta_fuel - beta_ox)
-    // where beta = 2*Y_C/M_C + Y_H/(2*M_H) - Y_O/M_O
-
-    // For now, use a simplified correlation based on equivalence ratio
-    double phi = equivalence_ratio_mole(X_mix, X_fuel, X_ox);
-
-    // Stoichiometric mixture fraction for typical hydrocarbon-air
-    double Z_st = 0.055;  // Approximate for CH4-air
-
-    // Bilger Z from phi: Z = Z_st * phi / (1 + Z_st * (phi - 1))
-    return Z_st * phi / (1.0 + Z_st * (phi - 1.0));
+    return bilger_mixture_fraction_from_moles(X_mix, X_fuel, X_ox);
 }
 
 // Variant 1: From equivalence ratio (phi as input)
@@ -1418,12 +1371,7 @@ CombustionState combustion_state(
     result.reactants = complete_state(T_reactants, P, X_reactants);
 
     // Compute products via complete combustion
-    State reactant_state;
-    reactant_state.T = T_reactants;
-    reactant_state.P = P;
-    reactant_state.X = X_reactants;
-
-    State product_state = complete_combustion(reactant_state);
+    State product_state = complete_combustion(State{T_reactants, P, X_reactants});
 
     // Compute product CompleteState
     result.products = complete_state(product_state.T, product_state.P, product_state.X);
@@ -1443,32 +1391,20 @@ CombustionState combustion_state_from_streams(
     const Stream& ox_stream,
     const std::string& fuel_name
 ) {
-    // Compute mass-weighted average temperature for reactants
-    double mdot_total = fuel_stream.mdot + ox_stream.mdot;
+    const double mdot_total = fuel_stream.mdot + ox_stream.mdot;
     if (mdot_total <= 0.0) {
         throw std::runtime_error("Total mass flow rate must be positive");
     }
 
-    double T_reactants = (fuel_stream.mdot * fuel_stream.T() +
-                         ox_stream.mdot * ox_stream.T()) / mdot_total;
+    // Mass-weighted average temperature
+    const double T_reactants = (fuel_stream.mdot * fuel_stream.T() +
+                                ox_stream.mdot  * ox_stream.T()) / mdot_total;
+    const double P = fuel_stream.P();
 
-    // Use pressure from fuel stream (could also average or use min)
-    double P = fuel_stream.P();
+    // Compute phi directly from mass flows — avoids a redundant mix() call.
+    // phi = (mdot_fuel / mdot_ox) / FAR_stoich
+    const double FAR_stoich = stoich_fuel_ox_ratio(fuel_stream.X(), ox_stream.X());
+    const double phi = (fuel_stream.mdot / ox_stream.mdot) / FAR_stoich;
 
-    // Mix the streams to get reactant composition
-    std::vector<Stream> streams = {fuel_stream, ox_stream};
-    Stream mixed = mix(streams, P);
-
-    // Compute equivalence ratio from the mixed composition
-    double phi = equivalence_ratio_mole(mixed.X(), fuel_stream.X(), ox_stream.X());
-
-    // Now call the main combustion_state function
-    return combustion_state(
-        fuel_stream.X(),
-        ox_stream.X(),
-        phi,
-        T_reactants,
-        P,
-        fuel_name
-    );
+    return combustion_state(fuel_stream.X(), ox_stream.X(), phi, T_reactants, P, fuel_name);
 }
