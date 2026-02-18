@@ -301,6 +301,9 @@ TransportState transport_state(double T, double P, const std::vector<double>& X)
     state.alpha = thermal_diffusivity(T, P, X);
     state.Pr = prandtl(T, P, X);
     state.cp = cp_mass(T, X);
+    state.cv = cv_mass(T, X);
+    state.gamma = isentropic_expansion_coefficient(T, X);
+    state.a = speed_of_sound(T, X);
 
     return state;
 }

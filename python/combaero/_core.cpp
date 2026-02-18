@@ -467,7 +467,10 @@ PYBIND11_MODULE(_core, m)
         "  nu    : Kinematic viscosity [m²/s]\n"
         "  alpha : Thermal diffusivity [m²/s]\n"
         "  Pr    : Prandtl number [-]\n"
-        "  cp    : Specific heat at constant pressure [J/(kg·K)]")
+        "  cp    : Specific heat at constant pressure [J/(kg·K)]\n"
+        "  cv    : Specific heat at constant volume [J/(kg·K)]\n"
+        "  gamma : Heat capacity ratio cp/cv [-]\n"
+        "  a     : Speed of sound [m/s]")
         .def_readonly("T", &TransportState::T, "Temperature [K]")
         .def_readonly("P", &TransportState::P, "Pressure [Pa]")
         .def_readonly("rho", &TransportState::rho, "Density [kg/m³]")
@@ -477,12 +480,17 @@ PYBIND11_MODULE(_core, m)
         .def_readonly("alpha", &TransportState::alpha, "Thermal diffusivity [m²/s]")
         .def_readonly("Pr", &TransportState::Pr, "Prandtl number [-]")
         .def_readonly("cp", &TransportState::cp, "Specific heat at constant pressure [J/(kg·K)]")
+        .def_readonly("cv", &TransportState::cv, "Specific heat at constant volume [J/(kg·K)]")
+        .def_readonly("gamma", &TransportState::gamma, "Heat capacity ratio cp/cv [-]")
+        .def_readonly("a", &TransportState::a, "Speed of sound [m/s]")
         .def("__repr__", [](const TransportState& s) {
             return "<TransportState: T=" + std::to_string(s.T) + " K, "
                    "P=" + std::to_string(s.P) + " Pa, "
                    "mu=" + std::to_string(s.mu) + " Pa·s, "
                    "k=" + std::to_string(s.k) + " W/(m·K), "
-                   "Pr=" + std::to_string(s.Pr) + ">";
+                   "Pr=" + std::to_string(s.Pr) + ", "
+                   "gamma=" + std::to_string(s.gamma) + ", "
+                   "a=" + std::to_string(s.a) + " m/s>";
         });
 
     m.def(
@@ -972,39 +980,9 @@ PYBIND11_MODULE(_core, m)
             return s;
         }, py::arg("X"), "Set mole fractions [-], returns self");
 
-    // AirProperties struct binding - Bundle of air properties
-    py::class_<AirProperties>(m, "AirProperties",
-        "Bundle of air properties computed from (T, P, humidity).\n\n"
-        "All properties are read-only attributes computed in a single call.\n"
-        "Provides IDE autocomplete and type safety.\n\n"
-        "Attributes:\n"
-        "  rho   : Density [kg/m³]\n"
-        "  mu    : Dynamic viscosity [Pa·s]\n"
-        "  k     : Thermal conductivity [W/(m·K)]\n"
-        "  cp    : Specific heat at constant pressure [J/(kg·K)]\n"
-        "  cv    : Specific heat at constant volume [J/(kg·K)]\n"
-        "  Pr    : Prandtl number [-]\n"
-        "  nu    : Kinematic viscosity [m²/s]\n"
-        "  alpha : Thermal diffusivity [m²/s]\n"
-        "  gamma : Heat capacity ratio [-]\n"
-        "  a     : Speed of sound [m/s]")
-        .def_readonly("rho", &AirProperties::rho, "Density [kg/m³]")
-        .def_readonly("mu", &AirProperties::mu, "Dynamic viscosity [Pa·s]")
-        .def_readonly("k", &AirProperties::k, "Thermal conductivity [W/(m·K)]")
-        .def_readonly("cp", &AirProperties::cp, "Specific heat at constant pressure [J/(kg·K)]")
-        .def_readonly("cv", &AirProperties::cv, "Specific heat at constant volume [J/(kg·K)]")
-        .def_readonly("Pr", &AirProperties::Pr, "Prandtl number [-]")
-        .def_readonly("nu", &AirProperties::nu, "Kinematic viscosity [m²/s]")
-        .def_readonly("alpha", &AirProperties::alpha, "Thermal diffusivity [m²/s]")
-        .def_readonly("gamma", &AirProperties::gamma, "Heat capacity ratio [-]")
-        .def_readonly("a", &AirProperties::a, "Speed of sound [m/s]")
-        .def("__repr__", [](const AirProperties& p) {
-            return "<AirProperties: rho=" + std::to_string(p.rho) + " kg/m³, "
-                   "mu=" + std::to_string(p.mu) + " Pa·s, "
-                   "k=" + std::to_string(p.k) + " W/(m·K), "
-                   "cp=" + std::to_string(p.cp) + " J/(kg·K), "
-                   "Pr=" + std::to_string(p.Pr) + ">";
-        });
+    // AirProperties is a type alias for TransportState (same C++ type).
+    // Expose as a module attribute for backward compatibility.
+    m.attr("AirProperties") = m.attr("TransportState");
 
     m.def(
         "air_properties",
@@ -1014,20 +992,20 @@ PYBIND11_MODULE(_core, m)
         py::arg("humidity") = 0.0,
         "Compute all air properties at once.\n\n"
         "Convenience function that computes all thermodynamic and transport\n"
-        "properties of air in a single call. Returns AirProperties struct\n"
-        "with read-only attributes for IDE autocomplete support.\n\n"
+        "properties of air in a single call. Returns a TransportState\n"
+        "(also accessible as AirProperties) with read-only attributes.\n\n"
         "Parameters:\n"
         "  T        : temperature [K]\n"
         "  P        : pressure [Pa]\n"
         "  humidity : relative humidity [0-1] (default: 0.0 = dry air)\n\n"
-        "Returns: AirProperties object with attributes:\n"
-        "  rho, mu, k, cp, cv, Pr, nu, alpha, gamma, a\n\n"
+        "Returns: TransportState with attributes:\n"
+        "  T, P, rho, mu, k, nu, alpha, Pr, cp, cv, gamma, a\n\n"
         "Example:\n"
         "  >>> props = cb.air_properties(T=300, P=101325, humidity=0.5)\n"
         "  >>> print(props.rho)  # IDE autocomplete works!\n"
         "  1.177\n"
-        "  >>> print(props.Pr)\n"
-        "  0.707"
+        "  >>> print(props.gamma)\n"
+        "  1.4"
     );
 
     // ThermoState struct binding - Bundle of thermodynamic properties

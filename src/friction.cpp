@@ -69,8 +69,8 @@ double friction_colebrook(double Re, double e_D, double tol, int max_iter) {
         throw std::invalid_argument("friction_colebrook: e_D must be non-negative");
     }
 
-    // Initial guess from Haaland
-    double f = friction_haaland(Re, e_D);
+    // Initial guess from Serghides (<0.3% error vs Colebrook, better than Haaland ~2-3%)
+    double f = friction_serghides(Re, e_D);
 
     // Newton-Raphson iteration on: F(x) = x + 2*log10(ε/D/3.7 + 2.51*x/Re) = 0
     // where x = 1/√f
