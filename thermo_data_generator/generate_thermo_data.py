@@ -724,7 +724,15 @@ def main() -> int:
     with open(args.output, "w") as f:
         generate_cpp_header(species_data, nasa_format, f)
 
+    species_names_out = [sp.name for sp in sorted(species_data, key=species_sort_key)]
     print("Done!")
+    print()
+    print("NOTE: If you added or removed species, update the pinned --species list in:")
+    print("  scripts/check-thermo-header.sh  (--species argument)")
+    print(
+        "  thermo_data_generator/generate_thermo_data.py  (banner comment in generate_cpp_header)"
+    )
+    print(f"  Current species ({len(species_names_out)}): {','.join(species_names_out)}")
     return 0
 
 

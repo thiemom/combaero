@@ -190,11 +190,11 @@ int count_zeros_argument_principle_improved(
     BoundaryCondition bc_top
 ) {
     // Increase resolution for reliability
-    int n_steps_f = 40;
-    int n_steps_i = 20;
+    const int n_steps_f = 40;
+    const int n_steps_i = 20;
 
     std::vector<std::complex<double>> contour;
-    contour.reserve(2 * (n_steps_f + n_steps_i));
+    contour.reserve(2U * (static_cast<std::size_t>(n_steps_f) + static_cast<std::size_t>(n_steps_i)));
 
     // Build rectangular contour (counter-clockwise)
     // Bottom edge (real axis approximation)
@@ -369,11 +369,11 @@ static int count_zeros_annular_duct(
     double rho,
     BoundaryCondition bc_ends
 ) {
-    int n_steps_f = 40;
-    int n_steps_i = 20;
+    const int n_steps_f = 40;
+    const int n_steps_i = 20;
 
     std::vector<std::complex<double>> contour;
-    contour.reserve(2 * (n_steps_f + n_steps_i));
+    contour.reserve(2U * (static_cast<std::size_t>(n_steps_f) + static_cast<std::size_t>(n_steps_i)));
 
     // Build rectangular contour
     for (int i = 0; i < n_steps_f; ++i) {
