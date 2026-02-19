@@ -43,5 +43,5 @@ force-single-line = false
 known-first-party = ["combaero"]
 
 [lint.per-file-ignores]
-# Allow unused imports in __init__.py files
-"__init__.py" = ["F401"]
+# Allow unused imports and post-try/except submodule imports in __init__.py
+"__init__.py" = ["F401", "E402", "I001"]

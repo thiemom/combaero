@@ -591,7 +591,15 @@ except ModuleNotFoundError:
     all_units = _core.all_units
 
 
+# Submodule imports — always available regardless of _core load path.
+from . import compressible
+from . import incompressible
+from ._flow_solution import FlowSolution
+
 __all__ = [
+    "FlowSolution",
+    "compressible",
+    "incompressible",
     "mixture_h",
     "adiabatic_T_wgs",
     "cp",
