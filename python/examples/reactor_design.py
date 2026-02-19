@@ -100,8 +100,8 @@ def main() -> None:
     print(f"  Volumetric flow: Q = {Q * 1000:.1f} L/s")
 
     print("\nResults:")
-    print(f"  Residence time:  τ = {tau:.2f} s = {tau / 60:.3f} min")
-    print(f"  Space velocity:  SV = {SV:.4f} s⁻¹ = {SV * 3600:.1f} h⁻¹")
+    print(f"  Residence time:  tau = {tau:.2f} s = {tau / 60:.3f} min")
+    print(f"  Space velocity:  SV = {SV:.4f} s^-^1 = {SV * 3600:.1f} h^-^1")
 
     # =========================================================================
     # Example 3: Residence time from mass flow rate
@@ -129,14 +129,14 @@ def main() -> None:
 
     print(f"\nReactor volume:  V = {V * 1000:.1f} L")
     print("\nAir flow:")
-    print(f"  Mass flow rate:  ṁ = {mdot:.2f} kg/s")
+    print(f"  Mass flow rate:  mdot = {mdot:.2f} kg/s")
     print(f"  Temperature:     T = {T:.0f} K")
-    print(f"  Density:         ρ = {rho:.3f} kg/m3")
+    print(f"  Density:         rho = {rho:.3f} kg/m3")
     print(f"  Volumetric flow: Q = {Q * 1000:.2f} L/s")
 
     print("\nResidence time:")
-    print(f"  From mass flow:  τ = {tau_mdot:.3f} s")
-    print(f"  From vol. flow:  τ = {tau_Q:.3f} s")
+    print(f"  From mass flow:  tau = {tau_mdot:.3f} s")
+    print(f"  From vol. flow:  tau = {tau_Q:.3f} s")
     print("  (Should be identical)")
 
     # =========================================================================
@@ -171,13 +171,13 @@ def main() -> None:
     Dh = ca.hydraulic_diameter_annulus(D_outer, D_inner)
 
     print("\nDesign requirements:")
-    print(f"  Target residence time: τ = {tau_target * 1000:.1f} ms")
-    print(f"  Air mass flow:         ṁ = {mdot_air:.1f} kg/s")
+    print(f"  Target residence time: tau = {tau_target * 1000:.1f} ms")
+    print(f"  Air mass flow:         mdot = {mdot_air:.1f} kg/s")
     print(f"  Operating pressure:    P = {P / 1e5:.0f} bar")
     print(f"  Average temperature:   T = {T_avg:.0f} K")
 
     print("\nAir properties:")
-    print(f"  Density:               ρ = {rho:.3f} kg/m3")
+    print(f"  Density:               rho = {rho:.3f} kg/m3")
 
     print("\nAnnular combustor:")
     print(f"  Outer diameter:        D_o = {D_outer * 1000:.0f} mm")
@@ -191,7 +191,7 @@ def main() -> None:
 
     # Verify
     tau_actual = ca.residence_time_mdot(V_required, mdot_air, rho)
-    print(f"  Actual residence time: τ = {tau_actual * 1000:.2f} ms ✓")
+    print(f"  Actual residence time: tau = {tau_actual * 1000:.2f} ms OK")
 
     # =========================================================================
     # Example 5: Reactor sizing for different flow rates
@@ -210,9 +210,9 @@ def main() -> None:
     rho = ca.density(T, P, X_air)
 
     print(f"\nFixed reactor volume: V = {V * 1000:.1f} L")
-    print(f"Air at {T:.0f} K, {P / 1000:.0f} kPa (ρ = {rho:.3f} kg/m3)")
+    print(f"Air at {T:.0f} K, {P / 1000:.0f} kPa (rho = {rho:.3f} kg/m3)")
 
-    print(f"\n{'ṁ [kg/s]':>12s}  {'Q [L/s]':>12s}  {'τ [s]':>12s}  {'SV [h⁻¹]':>12s}")
+    print(f"\n{'mdot [kg/s]':>12s}  {'Q [L/s]':>12s}  {'tau [s]':>12s}  {'SV [h^-^1]':>12s}")
     print("-" * 52)
 
     for mdot in [0.1, 0.5, 1.0, 2.0, 5.0]:
@@ -243,21 +243,21 @@ def main() -> None:
     print("\nReactor:")
     print(f"  Volume:          V = {V * 1000:.1f} L")
     print(f"  Flow rate:       Q = {Q * 1000:.1f} L/s")
-    print(f"  Residence time:  τ = {tau:.2f} s")
+    print(f"  Residence time:  tau = {tau:.2f} s")
 
     print("\nReaction:")
-    print(f"  Rate constant:   k = {k:.1f} s⁻¹")
-    print(f"  Reaction time:   τ_rxn = {tau_reaction:.3f} s")
+    print(f"  Rate constant:   k = {k:.1f} s^-^1")
+    print(f"  Reaction time:   tau_rxn = {tau_reaction:.3f} s")
 
     print("\nDamkohler number:")
-    print(f"  Da = τ/τ_rxn = {Da:.2f}")
+    print(f"  Da = tau/tau_rxn = {Da:.2f}")
 
     if Da > 10:
-        print("  → Reaction-limited (fast flow, slow reaction)")
+        print("  -> Reaction-limited (fast flow, slow reaction)")
     elif Da < 0.1:
-        print("  → Mixing-limited (slow flow, fast reaction)")
+        print("  -> Mixing-limited (slow flow, fast reaction)")
     else:
-        print("  → Intermediate regime")
+        print("  -> Intermediate regime")
 
     # =========================================================================
     # Example 7: Pipe flow residence time
@@ -279,7 +279,7 @@ def main() -> None:
     # Residence time
     tau = ca.residence_time(V, Q)
 
-    # Simple calculation: τ = L/v
+    # Simple calculation: tau = L/v
     tau_simple = L / v
 
     print("\nPipe:")
@@ -292,8 +292,8 @@ def main() -> None:
     print(f"  Volumetric flow: Q = {Q * 1000:.3f} L/s")
 
     print("\nResidence time:")
-    print(f"  τ = V/Q = {tau:.3f} s")
-    print(f"  τ = L/v = {tau_simple:.3f} s")
+    print(f"  tau = V/Q = {tau:.3f} s")
+    print(f"  tau = L/v = {tau_simple:.3f} s")
     print("  (Should be identical for constant area)")
 
 

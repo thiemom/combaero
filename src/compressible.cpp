@@ -3,9 +3,12 @@
 
 #include "compressible.h"
 #include "thermo.h"
+#include "friction.h"
+#include "transport.h"
 #include "math_constants.h"  // MSVC compatibility for M_PI
 #include <stdexcept>
 #include <algorithm>
+#include <string>
 
 using combaero::thermo::R_GAS;
 
@@ -512,6 +515,10 @@ FannoSolution fanno_pipe(
     double rho_in = sol.inlet.rho();
     sol.mdot = rho_in * u_in * A;
 
+    // Inlet Reynolds number (post-hoc, always populated)
+    sol.Re_in = reynolds(T_in, P_in, X, u_in, D);
+    sol.f_avg = f;  // constant-f overload: f_avg == f
+
     // Stagnation enthalpy (conserved): h0 = h + u²/2
     double h_in_mol = h(T_in, X);  // J/mol
     double h_in_mass = h_in_mol / mw_g * 1000.0;  // J/kg
@@ -527,14 +534,16 @@ FannoSolution fanno_pipe(
     // Store inlet profile point
     if (store_profile) {
         FannoStation st;
-        st.x = 0.0;
-        st.P = P_in;
-        st.T = T_in;
+        st.x  = 0.0;
+        st.P  = P_in;
+        st.T  = T_in;
         st.rho = rho_in;
-        st.u = u_in;
-        st.M = M_in;
-        st.h = h_in_mass;
-        st.s = sol.inlet.s() / mw_g * 1000.0;  // J/(kg·K)
+        st.u  = u_in;
+        st.M  = M_in;
+        st.h  = h_in_mass;
+        st.s  = sol.inlet.s() / mw_g * 1000.0;  // J/(kg·K)
+        st.f  = f;
+        st.Re = sol.Re_in;
         sol.profile.push_back(st);
     }
 
@@ -603,14 +612,16 @@ FannoSolution fanno_pipe(
         // Store profile point
         if (store_profile) {
             FannoStation st;
-            st.x = x;
-            st.P = P;
-            st.T = T;
+            st.x   = x;
+            st.P   = P;
+            st.T   = T;
             st.rho = rho;
-            st.u = u;
-            st.M = M;
-            st.h = h(T, X) / mw_g * 1000.0;
-            st.s = current.s() / mw_g * 1000.0;
+            st.u   = u;
+            st.M   = M;
+            st.h   = h(T, X) / mw_g * 1000.0;
+            st.s   = current.s() / mw_g * 1000.0;
+            st.f   = f;
+            st.Re  = rho * u * D / sol.inlet.mu();
             sol.profile.push_back(st);
         }
     }
@@ -630,6 +641,181 @@ FannoSolution fanno_pipe(
     bool store_profile)
 {
     return fanno_pipe(inlet.T, inlet.P, u_in, L, D, f, inlet.X, n_steps, store_profile);
+}
+
+// Helper: compute local friction factor from local state
+static double local_friction(double T, double P, double u, double D,
+                             double roughness, const std::vector<double>& X,
+                             const std::string& correlation)
+{
+    State s;
+    s.T = T; s.P = P; s.X = X;
+    const double Re_local = s.rho() * u * D / s.mu();
+    const double e_D = (D > 0.0) ? roughness / D : 0.0;
+    if (correlation == "haaland")   return friction_haaland(Re_local, e_D);
+    if (correlation == "serghides") return friction_serghides(Re_local, e_D);
+    if (correlation == "colebrook") return friction_colebrook(Re_local, e_D);
+    throw std::invalid_argument(
+        "fanno_pipe_rough: unknown correlation '" + correlation + "'. "
+        "Valid options: 'haaland', 'serghides', 'colebrook'");
+}
+
+FannoSolution fanno_pipe_rough(
+    double T_in, double P_in, double u_in,
+    double L, double D, double roughness,
+    const std::vector<double>& X,
+    const std::string& correlation,
+    std::size_t n_steps,
+    bool store_profile)
+{
+    if (T_in <= 0.0)
+        throw std::invalid_argument("fanno_pipe_rough: T_in must be positive");
+    if (P_in <= 0.0)
+        throw std::invalid_argument("fanno_pipe_rough: P_in must be positive");
+    if (L <= 0.0)
+        throw std::invalid_argument("fanno_pipe_rough: L must be positive");
+    if (D <= 0.0)
+        throw std::invalid_argument("fanno_pipe_rough: D must be positive");
+    if (roughness < 0.0)
+        throw std::invalid_argument("fanno_pipe_rough: roughness must be non-negative");
+    if (n_steps == 0)
+        throw std::invalid_argument("fanno_pipe_rough: n_steps must be positive");
+
+    FannoSolution sol;
+    sol.L = L;
+    sol.D = D;
+    sol.f = 0.0;  // not a constant-f solve; f_avg set at end
+
+    // Inlet state
+    sol.inlet.T = T_in;
+    sol.inlet.P = P_in;
+    sol.inlet.X = X;
+    const double mw_g  = sol.inlet.mw();       // g/mol
+    const double mw_kg = mw_g / 1000.0;        // kg/mol
+    const double A     = M_PI * D * D / 4.0;   // m²
+
+    const double rho_in = sol.inlet.rho();
+    sol.mdot = rho_in * u_in * A;
+
+    const double h_in_mol  = h(T_in, X);
+    const double h_in_mass = h_in_mol / mw_g * 1000.0;
+    sol.h0 = h_in_mass + 0.5 * u_in * u_in;
+
+    const double a_in = sol.inlet.a();
+    const double M_in = u_in / a_in;
+    if (M_in >= 1.0)
+        throw std::invalid_argument("fanno_pipe_rough: inlet flow is supersonic (M >= 1)");
+
+    sol.Re_in = reynolds(T_in, P_in, X, u_in, D);
+
+    // Compute inlet friction factor
+    const double f_in = local_friction(T_in, P_in, u_in, D, roughness, X, correlation);
+
+    if (store_profile) {
+        FannoStation st;
+        st.x   = 0.0;
+        st.P   = P_in;
+        st.T   = T_in;
+        st.rho = rho_in;
+        st.u   = u_in;
+        st.M   = M_in;
+        st.h   = h_in_mass;
+        st.s   = sol.inlet.s() / mw_g * 1000.0;
+        st.f   = f_in;
+        st.Re  = sol.Re_in;
+        sol.profile.push_back(st);
+    }
+
+    const double dx = L / static_cast<double>(n_steps);
+    double x   = 0.0;
+    double P   = P_in;
+    double T   = T_in;
+    double rho = rho_in;
+    double u   = u_in;
+    double f_sum = f_in;  // accumulate for f_avg
+
+    for (std::size_t step = 0; step < n_steps; ++step) {
+        // k1: local f at current state
+        const double f1 = local_friction(T, P, u, D, roughness, X, correlation);
+        const double k1 = dpdx_fanno(rho, u, f1, D);
+
+        // k2
+        const double P2 = P + 0.5 * k1 * dx;
+        if (P2 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
+        double T2, u2, rho2;
+        T2 = solve_T_from_energy(P2, sol.h0, sol.mdot, A, X, mw_kg, T, u2, rho2);
+        const double f2 = local_friction(T2, P2, u2, D, roughness, X, correlation);
+        const double k2 = dpdx_fanno(rho2, u2, f2, D);
+
+        // k3
+        const double P3 = P + 0.5 * k2 * dx;
+        if (P3 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
+        double T3, u3, rho3;
+        T3 = solve_T_from_energy(P3, sol.h0, sol.mdot, A, X, mw_kg, T, u3, rho3);
+        const double f3 = local_friction(T3, P3, u3, D, roughness, X, correlation);
+        const double k3 = dpdx_fanno(rho3, u3, f3, D);
+
+        // k4
+        const double P4 = P + k3 * dx;
+        if (P4 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
+        double T4, u4, rho4;
+        T4 = solve_T_from_energy(P4, sol.h0, sol.mdot, A, X, mw_kg, T, u4, rho4);
+        const double f4 = local_friction(T4, P4, u4, D, roughness, X, correlation);
+        const double k4 = dpdx_fanno(rho4, u4, f4, D);
+
+        const double P_new = P + dx * (k1 + 2.0*k2 + 2.0*k3 + k4) / 6.0;
+        if (P_new <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
+
+        x += dx;
+        P = P_new;
+        T = solve_T_from_energy(P, sol.h0, sol.mdot, A, X, mw_kg, T, u, rho);
+
+        // RK4-weighted local f for this step
+        const double f_step = (f1 + 2.0*f2 + 2.0*f3 + f4) / 6.0;
+        f_sum += f_step;
+
+        State current;
+        current.T = T; current.P = P; current.X = X;
+        const double a = current.a();
+        const double M = u / a;
+
+        if (M >= 0.999) { sol.choked = true; sol.L_choke = x; break; }
+
+        if (store_profile) {
+            FannoStation st;
+            st.x   = x;
+            st.P   = P;
+            st.T   = T;
+            st.rho = rho;
+            st.u   = u;
+            st.M   = M;
+            st.h   = h(T, X) / mw_g * 1000.0;
+            st.s   = current.s() / mw_g * 1000.0;
+            st.f   = local_friction(T, P, u, D, roughness, X, correlation);
+            st.Re  = rho * u * D / current.mu();
+            sol.profile.push_back(st);
+        }
+    }
+
+    sol.outlet.T = T;
+    sol.outlet.P = P;
+    sol.outlet.X = X;
+
+    // f_avg = mean over (n_steps + 1) samples (inlet + one per step)
+    sol.f_avg = f_sum / static_cast<double>(n_steps + 1);
+
+    return sol;
+}
+
+FannoSolution fanno_pipe_rough(
+    const State& inlet, double u_in,
+    double L, double D, double roughness,
+    const std::string& correlation,
+    std::size_t n_steps,
+    bool store_profile)
+{
+    return fanno_pipe_rough(inlet.T, inlet.P, u_in, L, D, roughness,
+                            inlet.X, correlation, n_steps, store_profile);
 }
 
 double fanno_max_length(

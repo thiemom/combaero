@@ -50,9 +50,9 @@ def main() -> None:
     print("\nOperating conditions:")
     print(f"  Pressure:          P = {P_combustor / 1e5:.0f} bar")
     print(f"  Air inlet temp:    T = {T_air_in:.0f} K")
-    print(f"  Air mass flow:     ṁ_air = {mdot_air:.1f} kg/s")
-    print(f"  Fuel mass flow:    ṁ_fuel = {mdot_fuel:.2f} kg/s")
-    print(f"  Equivalence ratio: φ = {phi:.2f}")
+    print(f"  Air mass flow:     mdot_air = {mdot_air:.1f} kg/s")
+    print(f"  Fuel mass flow:    mdot_fuel = {mdot_fuel:.2f} kg/s")
+    print(f"  Equivalence ratio: phi = {phi:.2f}")
 
     # Create streams
     air = ca.Stream()
@@ -72,7 +72,7 @@ def main() -> None:
 
     print("\nMixed stream before combustion:")
     print(f"  Temperature:       T = {mixed.T:.1f} K")
-    print(f"  Total mass flow:   ṁ = {mixed.mdot:.2f} kg/s")
+    print(f"  Total mass flow:   mdot = {mixed.mdot:.2f} kg/s")
 
     # Combustion with equilibrium
     burned = ca.combustion_equilibrium(mixed.T, mixed.X, mixed.P)
@@ -122,9 +122,9 @@ def main() -> None:
     print("\nFlow characteristics:")
     print(f"  Flame-zone fraction: flame = {flame_zone_fraction:.2f} of combustor length")
     print(f"  Average temp:      T_avg = {T_avg:.0f} K")
-    print(f"  Average density:   ρ_avg = {rho_avg:.3f} kg/m3")
-    print(f"  Residence time:    τ = {tau * 1000:.1f} ms")
-    print(f"  Space velocity:    SV = {SV * 3600:.0f} h⁻¹")
+    print(f"  Average density:   rho_avg = {rho_avg:.3f} kg/m3")
+    print(f"  Residence time:    tau = {tau * 1000:.1f} ms")
+    print(f"  Space velocity:    SV = {SV * 3600:.0f} h^-^1")
 
     # =========================================================================
     # Example 3: Pressure drop through combustor
@@ -152,7 +152,7 @@ def main() -> None:
     print("\nFlow conditions:")
     print(f"  Average velocity:  v = {v_avg:.1f} m/s")
     print(f"  Reynolds number:   Re = {Re:.2e}")
-    print(f"  Viscosity:         μ = {mu_avg * 1e6:.2f} μPa*s")
+    print(f"  Viscosity:         mu = {mu_avg * 1e6:.2f} muPa*s")
 
     print("\nPressure drop:")
     print(f"  Friction factor:   f = {f:.6f}")
@@ -260,7 +260,7 @@ def main() -> None:
     print(f"  Outlet temperature:    T_out = {burned.T:.0f} K")
     print(f"  Temperature rise:      DeltaT = {dT_combustion:.0f} K")
     print(f"  Pressure loss:         DeltaP/P = {pressure_loss_pct:.2f}%")
-    print(f"  Residence time:        τ = {tau * 1000:.1f} ms")
+    print(f"  Residence time:        tau = {tau * 1000:.1f} ms")
     print(f"  Heat release:          Q = {Q_combustion / 1e6:.1f} MW")
     print(f"  Fuel LHV (mixture):    LHV = {lhv_fuel / 1e6:.2f} MJ/kg")
     print(
@@ -269,7 +269,9 @@ def main() -> None:
     print(f"  Pattern factor:        PF = {pattern_factor:.2f}")
 
     print("\nDesign metrics:")
-    print(f"  Loading parameter:     ṁ√T/P = {mdot_air * np.sqrt(T_air_in) / P_combustor:.4f}")
+    print(
+        f"  Loading parameter:     mdotsqrtT/P = {mdot_air * np.sqrt(T_air_in) / P_combustor:.4f}"
+    )
     print(f"  Volumetric heat release: {Q_combustion / V_combustor / 1e9:.1f} GW/m3")
 
     # =========================================================================
@@ -279,7 +281,7 @@ def main() -> None:
     print("Example 6: Effect of Equivalence Ratio on Combustor Performance")
     print("=" * 80)
 
-    print(f"\n{'φ':>6s}  {'T_out [K]':>12s}  {'τ [ms]':>10s}  {'DeltaP/P [%]':>12s}")
+    print(f"\n{'phi':>6s}  {'T_out [K]':>12s}  {'tau [ms]':>10s}  {'DeltaP/P [%]':>12s}")
     print("-" * 45)
 
     for phi_test in [0.6, 0.7, 0.8, 0.9, 1.0]:
@@ -308,7 +310,7 @@ def main() -> None:
             f"{phi_test:6.2f}  {burned_test.T:12.1f}  {tau_test * 1000:10.2f}  {dP_test / P_combustor * 100:12.3f}"
         )
 
-    print("\nNote: Leaner mixtures → lower temperature, longer residence time")
+    print("\nNote: Leaner mixtures -> lower temperature, longer residence time")
 
 
 if __name__ == "__main__":

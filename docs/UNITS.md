@@ -158,10 +158,11 @@ All functions use consistent units to avoid conversion errors.
 
 #### Fanno Flow
 
-| Function           | Input Units                                                | Output Unit   |
-|--------------------|------------------------------------------------------------|---------------|
-| `fanno_pipe`       | T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, f: -, X: mol/mol | FannoSolution |
-| `fanno_max_length` | T_in: K, P_in: Pa, u_in: m/s, D: m, f: -, X: mol/mol       | m             |
+| Function           | Input Units                                                                          | Output Unit   |
+|--------------------|--------------------------------------------------------------------------------------|---------------|
+| `fanno_pipe`       | T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, f: -, X: mol/mol                           | FannoSolution |
+| `fanno_pipe_rough` | T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, roughness: m, X: mol/mol, correlation: str | FannoSolution |
+| `fanno_max_length` | T_in: K, P_in: Pa, u_in: m/s, D: m, f: -, X: mol/mol                                 | m             |
 
 #### Thrust
 
@@ -172,6 +173,15 @@ All functions use consistent units to avoid conversion errors.
 ---
 
 ### incompressible.h
+
+#### Thermo-Aware High-Level Functions
+
+| Function              | Input Units                                                                 | Output Unit                |
+|-----------------------|-----------------------------------------------------------------------------|----------------------------|
+| `pipe_flow`           | T: K, P: Pa, X: mol/mol, u: m/s, L: m, D: m, f: -                           | IncompressibleFlowSolution |
+| `pipe_flow_rough`     | T: K, P: Pa, X: mol/mol, u: m/s, L: m, D: m, roughness: m, correlation: str | IncompressibleFlowSolution |
+| `orifice_flow_thermo` | T: K, P: Pa, X: mol/mol, P_back: Pa, A: m^2, Cd: -                          | IncompressibleFlowSolution |
+| `pressure_drop_pipe`  | T: K, P: Pa, X: mol/mol, v: m/s, D: m, L: m, roughness: m, correlation: str | tuple(Pa, -, -)            |
 
 #### Bernoulli & Orifice
 
@@ -389,12 +399,6 @@ All functions use consistent units to avoid conversion errors.
 | `orifice_area_from_beta`     | D: m, beta: -                                                            | m^2                      |
 | `beta_from_diameters`        | d: m, D: m                                                               | -                        |
 | `orifice_Re_d_from_mdot`     | mdot: kg/s, d: m, mu: Pa*s                                               | - (Reynolds number)      |
-
-### pipe_flow.h - Composite Pipe Flow Functions
-
-| Function             | Input Units                                                                 | Output Unit     |
-|----------------------|-----------------------------------------------------------------------------|-----------------|
-| `pressure_drop_pipe` | T: K, P: Pa, X: mol/mol, v: m/s, D: m, L: m, roughness: m, correlation: str | tuple(Pa, -, -) |
 
 ### geometry.h - Geometric Utilities
 

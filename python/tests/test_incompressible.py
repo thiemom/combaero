@@ -38,7 +38,7 @@ class TestBernoulli:
 
         # P2 < P1 due to elevation
         assert P2 < P1
-        # ΔP ≈ ρgh = 998 * 9.81 * 10 ≈ 97.9 kPa
+        # DeltaP ~ rhogh = 998 * 9.81 * 10 ~ 97.9 kPa
         assert np.isclose(P1 - P2, rho * 9.80665 * dz)
 
     def test_bernoulli_v2_basic(self) -> None:
@@ -180,7 +180,7 @@ class TestHydraulic:
     """Tests for hydraulic utilities."""
 
     def test_dynamic_pressure(self) -> None:
-        """q = 0.5 * rho * v²."""
+        """q = 0.5 * rho * v^2."""
         v, rho = 10.0, RHO_WATER
 
         q = cb.dynamic_pressure(v, rho)

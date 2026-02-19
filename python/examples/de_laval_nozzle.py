@@ -36,9 +36,9 @@ def main() -> None:
     print("De Laval Nozzle Analysis")
     print("=" * 60)
     print("\nGeometry:")
-    print(f"  Inlet diameter:  {D_inlet * 100:.1f} cm  (A = {A_inlet * 1e4:.2f} cm²)")
-    print(f"  Throat diameter: {D_throat * 100:.1f} cm  (A = {A_throat * 1e4:.2f} cm²)")
-    print(f"  Exit diameter:   {D_exit * 100:.1f} cm  (A = {A_exit * 1e4:.2f} cm²)")
+    print(f"  Inlet diameter:  {D_inlet * 100:.1f} cm  (A = {A_inlet * 1e4:.2f} cm^2)")
+    print(f"  Throat diameter: {D_throat * 100:.1f} cm  (A = {A_throat * 1e4:.2f} cm^2)")
+    print(f"  Exit diameter:   {D_exit * 100:.1f} cm  (A = {A_exit * 1e4:.2f} cm^2)")
     print(f"  Area ratio A_exit/A_throat: {AR:.2f}")
 
     # =========================================================================
@@ -57,7 +57,7 @@ def main() -> None:
     # Get gas properties at stagnation
     gamma = cb.isentropic_expansion_coefficient(T0, X)
     a0 = cb.speed_of_sound(T0, X)
-    print(f"  γ = {gamma:.3f}")
+    print(f"  gamma = {gamma:.3f}")
     print(f"  a0 = {a0:.1f} m/s")
 
     # Critical pressure ratio
@@ -152,7 +152,7 @@ def main() -> None:
     ax.plot(x, A, "b-", linewidth=2)
     ax.axvline(x_throat * 100, color="r", linestyle="--", label="Throat")
     ax.set_xlabel("Axial position [cm]")
-    ax.set_ylabel("Area [cm²]")
+    ax.set_ylabel("Area [cm^2]")
     ax.set_title("Nozzle Area Profile")
     ax.legend()
     ax.grid(True, alpha=0.3)
@@ -171,7 +171,7 @@ def main() -> None:
     # Temperature
     ax = axes[1, 0]
     ax.plot(x, T, "r-", linewidth=2)
-    ax.axhline(T0, color="gray", linestyle="--", label=f"T₀ = {T0:.0f} K")
+    ax.axhline(T0, color="gray", linestyle="--", label=f"T0 = {T0:.0f} K")
     ax.axvline(x_throat * 100, color="gray", linestyle=":", alpha=0.5)
     ax.set_xlabel("Axial position [cm]")
     ax.set_ylabel("Temperature [K]")
@@ -182,7 +182,7 @@ def main() -> None:
     # Pressure
     ax = axes[1, 1]
     ax.plot(x, P, "m-", linewidth=2)
-    ax.axhline(P0 / 1e5, color="gray", linestyle="--", label=f"P₀ = {P0 / 1e5:.0f} bar")
+    ax.axhline(P0 / 1e5, color="gray", linestyle="--", label=f"P0 = {P0 / 1e5:.0f} bar")
     ax.axvline(x_throat * 100, color="gray", linestyle=":", alpha=0.5)
     ax.set_xlabel("Axial position [cm]")
     ax.set_ylabel("Pressure [bar]")

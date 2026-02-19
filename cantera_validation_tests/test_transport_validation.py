@@ -58,7 +58,7 @@ class TestTransportProperties:
 
         rel_diff = abs(mu_cb - mu_ct) / mu_ct
         assert rel_diff < tolerance_config["transport"], (
-            f"Viscosity [Pa·s]: CombAero={mu_cb:.2e}, Cantera={mu_ct:.2e}, "  # noqa: E501
+            f"Viscosity [Pa*s]: CombAero={mu_cb:.2e}, Cantera={mu_ct:.2e}, "  # noqa: E501
             f"diff={rel_diff * 100:.1f}%"
         )
 
@@ -103,7 +103,7 @@ class TestTransportProperties:
 
         rel_diff = abs(mu_cb - mu_ct) / mu_ct
         assert rel_diff < tolerance_config["transport"], (
-            f"Viscosity mismatch: CombAero={mu_cb:.2e} Pa·s, Cantera={mu_ct:.2e} Pa·s"
+            f"Viscosity mismatch: CombAero={mu_cb:.2e} Pa*s, Cantera={mu_ct:.2e} Pa*s"
         )
 
     def test_air_thermal_conductivity(
@@ -173,7 +173,7 @@ class TestTransportProperties:
 
         rel_diff = abs(k_cb - k_ct) / k_ct
         assert rel_diff < tolerance_config["transport"], (
-            f"Thermal conductivity mismatch: CombAero={k_cb:.4f} W/(m·K), Cantera={k_ct:.4f} W/(m·K)"
+            f"Thermal conductivity mismatch: CombAero={k_cb:.4f} W/(m*K), Cantera={k_ct:.4f} W/(m*K)"
         )  # noqa: E501
 
     def test_prandtl_number(self, combaero, cantera, gri30_gas, species_mapping, tolerance_config):
@@ -185,9 +185,9 @@ class TestTransportProperties:
         P = 101325.0
 
         # Compare Prandtl number [dimensionless]
-        # Pr = (Cp * μ) / k
-        # CombAero: Uses CombAero's Cp, μ, k
-        # Cantera: Uses Cantera's Cp, μ, k
+        # Pr = (Cp * mu) / k
+        # CombAero: Uses CombAero's Cp, mu, k
+        # Cantera: Uses Cantera's Cp, mu, k
         # Differences propagate from transport property differences
         Pr_cb = cb.prandtl(T, P, X_air)
 
@@ -234,10 +234,10 @@ class TestTransportProperties:
         k_rel_diff = abs(k_cb - k_ct) / k_ct
 
         assert mu_rel_diff < tolerance_config["transport"], (
-            f"Viscosity mismatch: CombAero={mu_cb:.2e} Pa·s, Cantera={mu_ct:.2e} Pa·s"
+            f"Viscosity mismatch: CombAero={mu_cb:.2e} Pa*s, Cantera={mu_ct:.2e} Pa*s"
         )
         assert k_rel_diff < tolerance_config["transport"], (
-            f"Thermal conductivity mismatch: CombAero={k_cb:.4f} W/(m·K), Cantera={k_ct:.4f} W/(m·K)"
+            f"Thermal conductivity mismatch: CombAero={k_cb:.4f} W/(m*K), Cantera={k_ct:.4f} W/(m*K)"
         )  # noqa: E501
 
     def test_high_temperature_transport(
@@ -330,7 +330,7 @@ class TestThermodynamicProperties:
 
         rel_diff = abs(cp_cb - cp_ct) / cp_ct
         assert rel_diff < tolerance_config["enthalpy"], (
-            f"Cp [J/(mol·K)]: CombAero={cp_cb:.2f}, Cantera={cp_ct:.2f}, diff={rel_diff * 100:.2f}%"
+            f"Cp [J/(mol*K)]: CombAero={cp_cb:.2f}, Cantera={cp_ct:.2f}, diff={rel_diff * 100:.2f}%"
         )
 
     def test_cp_temperature_variation(
@@ -351,7 +351,7 @@ class TestThermodynamicProperties:
 
             rel_diff = abs(cp_cb - cp_ct) / cp_ct
             assert rel_diff < tolerance_config["enthalpy"], (
-                f"T={T} K: CombAero={cp_cb:.2f} J/(mol·K), Cantera={cp_ct:.2f} J/(mol·K)"
+                f"T={T} K: CombAero={cp_cb:.2f} J/(mol*K), Cantera={cp_ct:.2f} J/(mol*K)"
             )
 
     def test_enthalpy(self, combaero, cantera, gri30_gas, species_mapping, tolerance_config):

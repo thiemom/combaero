@@ -32,7 +32,7 @@ def main() -> None:
     e_D = 0.0  # Smooth pipe (zero roughness)
 
     print(f"\nReynolds number: {Re:.0e}")
-    print(f"Relative roughness ε/D: {e_D}")
+    print(f"Relative roughness eps/D: {e_D}")
 
     # Compare different correlations
     f_haaland = ca.friction_haaland(Re, e_D)
@@ -66,7 +66,7 @@ def main() -> None:
         eps = ca.pipe_roughness(material)  # Get roughness from database
         e_D = eps / D
         f = ca.friction_haaland(Re, e_D)
-        print(f"  {material:25s}: f = {f:.6f}  (ε = {eps * 1e6:.1f} μm, ε/D = {e_D:.6f})")
+        print(f"  {material:25s}: f = {f:.6f}  (eps = {eps * 1e6:.1f} mum, eps/D = {e_D:.6f})")
 
     # =========================================================================
     # Example 3: Pressure drop calculation
@@ -89,7 +89,7 @@ def main() -> None:
     # Flow conditions
     v = 10.0  # Velocity [m/s]
 
-    # Use pressure_drop_pipe composite function (calculates Re, f, and ΔP)
+    # Use pressure_drop_pipe composite function (calculates Re, f, and DeltaP)
     dP, Re, f = ca.pressure_drop_pipe(T, P, X_air, v, D, L, eps, "haaland")
 
     # Also get density and viscosity for display
@@ -99,20 +99,20 @@ def main() -> None:
     print("\nPipe specifications:")
     print(f"  Diameter:        D = {D * 1000:.1f} mm")
     print(f"  Length:          L = {L:.1f} m")
-    print(f"  Roughness:       ε = {eps * 1e6:.1f} μm (commercial steel)")
-    print(f"  Relative rough:  ε/D = {e_D:.6f}")
+    print(f"  Roughness:       eps = {eps * 1e6:.1f} mum (commercial steel)")
+    print(f"  Relative rough:  eps/D = {e_D:.6f}")
 
     print("\nFlow conditions:")
     print(f"  Fluid:           Air at {T:.0f} K")
     print(f"  Velocity:        v = {v:.1f} m/s")
-    print(f"  Density:         ρ = {rho:.3f} kg/m³")
-    print(f"  Viscosity:       μ = {mu * 1e6:.2f} μPa·s")
+    print(f"  Density:         rho = {rho:.3f} kg/m^3")
+    print(f"  Viscosity:       mu = {mu * 1e6:.2f} muPa*s")
     print(f"  Reynolds number: Re = {Re:.2e}")
 
     print("\nResults:")
     print(f"  Friction factor: f = {f:.6f}")
-    print(f"  Pressure drop:   ΔP = {dP:.1f} Pa = {dP / 1000:.3f} kPa")
-    print(f"  Pressure drop:   ΔP/L = {dP / L:.2f} Pa/m")
+    print(f"  Pressure drop:   DeltaP = {dP:.1f} Pa = {dP / 1000:.3f} kPa")
+    print(f"  Pressure drop:   DeltaP/L = {dP / L:.2f} Pa/m")
 
     # =========================================================================
     # Example 4: Reynolds number sweep
@@ -124,7 +124,7 @@ def main() -> None:
     e_D = 0.001  # Moderate roughness
     Re_values = np.logspace(3.5, 6, 10)  # 3162 to 1e6
 
-    print(f"\nRelative roughness: ε/D = {e_D:.4f}")
+    print(f"\nRelative roughness: eps/D = {e_D:.4f}")
     print(f"\n{'Re':>12s}  {'f (Haaland)':>12s}  {'f (Serghides)':>12s}  {'Diff %':>10s}")
     print("-" * 50)
 
@@ -155,14 +155,14 @@ def main() -> None:
     mu = ca.viscosity(T, P, X_air)
 
     print("\nDesign requirements:")
-    print(f"  Mass flow rate:  ṁ = {mdot:.2f} kg/s")
+    print(f"  Mass flow rate:  mdot = {mdot:.2f} kg/s")
     print(f"  Pipe length:     L = {L:.1f} m")
-    print(f"  Max pressure drop: ΔP_max = {dP_max / 1000:.1f} kPa")
-    print(f"  Roughness:       ε = {eps * 1e6:.1f} μm (commercial steel)")
+    print(f"  Max pressure drop: DeltaP_max = {dP_max / 1000:.1f} kPa")
+    print(f"  Roughness:       eps = {eps * 1e6:.1f} mum (commercial steel)")
 
     # Try different diameters
     print(
-        f"\n{'D [mm]':>10s}  {'v [m/s]':>10s}  {'Re':>12s}  {'f':>10s}  {'ΔP [kPa]':>12s}  {'OK?':>6s}"
+        f"\n{'D [mm]':>10s}  {'v [m/s]':>10s}  {'Re':>12s}  {'f':>10s}  {'DeltaP [kPa]':>12s}  {'OK?':>6s}"
     )
     print("-" * 70)
 
@@ -172,11 +172,11 @@ def main() -> None:
         v = mdot / (rho * A)
         # Use pressure_drop_pipe composite function
         dP, Re, f = ca.pressure_drop_pipe(T, P, X_air, v, D, L, eps, "haaland")
-        ok = "✓" if dP <= dP_max else "✗"
+        ok = "OK" if dP <= dP_max else "FAIL"
         print(f"{D * 1000:10.1f}  {v:10.2f}  {Re:12.2e}  {f:10.6f}  {dP / 1000:12.3f}  {ok:>6s}")
 
-    print("\n✓ = Meets pressure drop requirement")
-    print("✗ = Exceeds pressure drop limit")
+    print("\nOK = Meets pressure drop requirement")
+    print("FAIL = Exceeds pressure drop limit")
 
     # =========================================================================
     # Example 6: Laminar vs Turbulent

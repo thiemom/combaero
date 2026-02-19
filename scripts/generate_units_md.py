@@ -171,6 +171,7 @@ def generate_markdown(entries: list[UnitEntry]) -> str:
         "compressible.h - Nozzle Flow",
         "compressible.h - Fanno Flow",
         "compressible.h - Thrust",
+        "incompressible.h - Thermo-Aware High-Level Functions",
         "incompressible.h - Bernoulli & Orifice",
         "incompressible.h - Pipe Flow",
         "friction.h - Friction Factor Correlations",
@@ -269,7 +270,10 @@ def generate_markdown(entries: list[UnitEntry]) -> str:
 
 
 def main() -> None:
-    # Determine paths relative to script location
+    # docs/UNITS.md is auto-generated from include/units_data.h by this script.
+    # Never edit UNITS.md manually -- run this script instead:
+    #   python scripts/generate_units_md.py
+    # To add a new section, edit units_data.h and update section_order above.
     script_dir = Path(__file__).parent
     project_root = script_dir.parent
 

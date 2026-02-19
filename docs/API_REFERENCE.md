@@ -962,7 +962,7 @@ Solves compressible pipe flow with wall friction using RK4 integration:
 - Momentum: dp/dx = -f/(2D)·ρu²
 
 ```cpp
-// Solve Fanno flow through a pipe segment
+// Constant friction factor (Darcy-Weisbach + Fanno)
 FannoSolution fanno_pipe(
     double T_in, double P_in,       // Inlet static conditions [K, Pa]
     double u_in,                    // Inlet velocity [m/s]
@@ -973,9 +973,17 @@ FannoSolution fanno_pipe(
     bool store_profile = false      // Store axial profile
 );
 
-// Convenience overload with State
-FannoSolution fanno_pipe(const State& inlet, double u_in, double L, double D, double f,
-                          std::size_t n_steps = 100, bool store_profile = false);
+// Variable friction factor from wall roughness (re-evaluated at each RK4 step)
+FannoSolution fanno_pipe_rough(
+    double T_in, double P_in,       // Inlet static conditions [K, Pa]
+    double u_in,                    // Inlet velocity [m/s]
+    double L, double D,             // Pipe length and diameter [m]
+    double roughness,               // Absolute wall roughness [m]
+    const std::vector<double>& X,   // Mole fractions
+    const std::string& correlation = "haaland",  // "haaland", "serghides", "colebrook"
+    std::size_t n_steps = 100,
+    bool store_profile = false
+);
 
 // Find maximum pipe length before choking (L*)
 double fanno_max_length(double T_in, double P_in, double u_in, double D, double f,
@@ -995,14 +1003,28 @@ struct CompressibleFlowSolution {
 };
 
 struct FannoStation {
-    double x, P, T, rho, u, M, h, s;  // Axial profile data
+    double x;    // Axial position [m]
+    double P;    // Static pressure [Pa]
+    double T;    // Static temperature [K]
+    double rho;  // Density [kg/m^3]
+    double u;    // Velocity [m/s]
+    double M;    // Mach number [-]
+    double h;    // Specific enthalpy [J/mol]
+    double s;    // Specific entropy [J/(mol*K)]
+    double f;    // Local Darcy friction factor [-] (fanno_pipe_rough only)
+    double Re;   // Local Reynolds number [-]  (fanno_pipe_rough only)
 };
 
 struct FannoSolution {
-    State inlet, outlet;              // Inlet/outlet states
-    double mdot, h0, L, D, f;         // Flow parameters
-    bool choked;                      // True if M reached 1
-    double L_choke;                   // Length to choking [m]
+    State inlet, outlet;               // Inlet/outlet states
+    double mdot;                       // Mass flow rate [kg/s]
+    double h0;                         // Stagnation enthalpy [J/kg]
+    double L, D;                       // Pipe length and diameter [m]
+    double f;                          // Constant friction factor (fanno_pipe) [-]
+    double f_avg;                      // Length-averaged friction factor [-]
+    double Re_in;                      // Inlet Reynolds number [-]
+    bool choked;                       // True if M reached 1
+    double L_choke;                    // Length to choking [m]
     std::vector<FannoStation> profile; // Axial profile (if requested)
 };
 ```
@@ -1150,6 +1172,117 @@ double Cd = 0.62;
 double dP_orifice = 50000.0;  // Pa
 double A_orifice = orifice_area(mdot, 200000.0, 150000.0, Cd, rho);
 ```
+
+## Python Symmetric Submodule API
+
+The `combaero.incompressible` and `combaero.compressible` submodules provide a
+symmetric high-level API.  Swapping the import is the only change needed to
+switch between flow regimes -- call signatures and return types are identical.
+
+```python
+# Regime swap: change only this line
+from combaero import incompressible as flow   # or: compressible
+import combaero as ca
+
+T, P = 400.0, 200_000.0   # K, Pa
+X = ca.standard_dry_air_composition()
+
+sol = flow.pipe_flow(T, P, X, u=10.0, L=2.0, D=0.05, f=0.02)
+sol = flow.pipe_flow_rough(T, P, X, u=10.0, L=2.0, D=0.05, roughness=1e-4)
+```
+
+### FlowSolution Dataclass
+
+All high-level functions return a frozen `FlowSolution` dataclass.
+Fields that are not applicable to a regime carry `math.nan` (floats) or
+`False` (bools).
+
+```python
+from combaero import FlowSolution
+
+@dataclass(frozen=True)
+class FlowSolution:
+    regime:   str    # "incompressible" or "compressible"
+    mdot:     float  # Mass flow rate [kg/s]
+    v:        float  # Bulk / exit velocity [m/s]
+    dP:       float  # Pressure drop P_in - P_out [Pa]   (nan: nozzle)
+    Re:       float  # Reynolds number [-]               (nan: nozzle)
+    rho:      float  # Inlet density [kg/m^3]            (nan: nozzle)
+    f:        float  # Darcy friction factor [-]         (nan: orifice/nozzle)
+    Cd:       float  # Discharge coefficient [-]         (nan: pipe/nozzle)
+    M:        float  # Outlet Mach number [-]            (nan: incompressible)
+    T_out:    float  # Outlet static temperature [K]     (nan: incompressible)
+    P_out:    float  # Outlet static pressure [Pa]       (nan: incompressible)
+    h0:       float  # Stagnation enthalpy [J/kg]        (nan: incompressible)
+    choked:   bool   # True if flow is choked
+    L_choke:  float  # Length to choking [m]             (nan: not Fanno)
+    profile:  list   # List of FannoStation (empty unless store_profile=True)
+```
+
+### combaero.incompressible
+
+```python
+import combaero.incompressible as incomp
+
+# Darcy-Weisbach pipe flow, constant f
+sol = incomp.pipe_flow(T, P, X, u=10.0, L=2.0, D=0.05, f=0.02)
+
+# Darcy-Weisbach pipe flow, roughness-based f
+sol = incomp.pipe_flow_rough(T, P, X, u=10.0, L=2.0, D=0.05,
+                              roughness=1e-4,
+                              correlation="haaland")  # or serghides/colebrook/petukhov
+
+# Incompressible orifice (Bernoulli + Cd)
+sol = incomp.orifice_flow(T, P, X, P_back=180_000.0, A=1e-4, Cd=0.65)
+```
+
+Populated fields: `mdot`, `v`, `dP`, `Re`, `rho`, `f` (and `Cd` for orifice).
+Fields `M`, `T_out`, `P_out`, `h0`, `L_choke` are `nan`; `choked` is `False`.
+
+### combaero.compressible
+
+```python
+import combaero.compressible as comp
+
+# Fanno (adiabatic compressible) pipe flow, constant f
+sol = comp.pipe_flow(T, P, X, u=10.0, L=2.0, D=0.05, f=0.02,
+                     n_steps=100, store_profile=False)
+
+# Fanno pipe flow, roughness-based variable f
+sol = comp.pipe_flow_rough(T, P, X, u=10.0, L=2.0, D=0.05,
+                            roughness=1e-4,
+                            correlation="haaland",
+                            n_steps=100, store_profile=False)
+
+# Isentropic nozzle flow
+sol = comp.nozzle_flow(T, P, X, P_back=100_000.0, A_eff=1e-4)
+```
+
+Populated fields: `mdot`, `v`, `M`, `T_out`, `P_out`, `h0`, `choked`.
+Pipe variants also populate `dP`, `Re`, `rho`, `f`.
+`Cd` is always `nan`; `L_choke` is populated when `choked=True`.
+
+### Regime Comparison Loop
+
+```python
+import combaero as ca
+import combaero.incompressible as incomp
+import combaero.compressible as comp
+
+T, P = 400.0, 200_000.0
+X = ca.standard_dry_air_composition()
+
+results = {}
+for module in [incomp, comp]:
+    sol = module.pipe_flow(T, P, X, u=10.0, L=2.0, D=0.05, f=0.02)
+    results[sol.regime] = sol
+
+print(results["incompressible"].dP)   # Darcy-Weisbach
+print(results["compressible"].dP)     # Fanno (agrees at low M)
+print(results["compressible"].M)      # Outlet Mach number
+```
+
+See `python/examples/flow_regime_comparison.py` for a full worked example.
 
 ## Orifice Cd Correlations (`orifice.h`)
 

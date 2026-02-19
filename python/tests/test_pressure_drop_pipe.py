@@ -242,7 +242,7 @@ class TestPressureDropPipeComposite:
         D = 0.1  # m
         L = 100.0  # m
 
-        with pytest.raises(ValueError, match="unknown correlation"):
+        with pytest.raises(ValueError, match="unknown friction correlation"):
             cb.pressure_drop_pipe(T, P, X_air, v, D, L, correlation="invalid")
 
     def test_zero_length(self):

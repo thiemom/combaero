@@ -315,7 +315,7 @@ class TestDensityCalculation:
 
         rel_diff = abs(rho_cb - rho_ct) / rho_ct
         assert rel_diff < tolerance_config["density"], (
-            f"Density [kg/m³]: CombAero={rho_cb:.4f}, Cantera={rho_ct:.4f}, diff={rel_diff * 100:.2f}%"
+            f"Density [kg/m^3]: CombAero={rho_cb:.4f}, Cantera={rho_ct:.4f}, diff={rel_diff * 100:.2f}%"
         )  # noqa: E501
 
     def test_methane_density(self, combaero, cantera, gri30_gas, species_mapping, tolerance_config):
@@ -335,7 +335,7 @@ class TestDensityCalculation:
 
         rel_diff = abs(rho_cb - rho_ct) / rho_ct
         assert rel_diff < tolerance_config["density"], (
-            f"Density mismatch: CombAero={rho_cb:.4f} kg/m³, Cantera={rho_ct:.4f} kg/m³"
+            f"Density mismatch: CombAero={rho_cb:.4f} kg/m^3, Cantera={rho_ct:.4f} kg/m^3"
         )
 
     def test_density_temperature_variation(
@@ -356,7 +356,7 @@ class TestDensityCalculation:
 
             rel_diff = abs(rho_cb - rho_ct) / rho_ct
             assert rel_diff < tolerance_config["density"], (
-                f"T={T} K: CombAero={rho_cb:.4f} kg/m³, Cantera={rho_ct:.4f} kg/m³"
+                f"T={T} K: CombAero={rho_cb:.4f} kg/m^3, Cantera={rho_ct:.4f} kg/m^3"
             )
 
     def test_density_pressure_variation(
@@ -377,5 +377,5 @@ class TestDensityCalculation:
 
             rel_diff = abs(rho_cb - rho_ct) / rho_ct
             assert rel_diff < tolerance_config["density"], (
-                f"P={P / 1e5:.1f} bar: CombAero={rho_cb:.4f} kg/m³, Cantera={rho_ct:.4f} kg/m³"
+                f"P={P / 1e5:.1f} bar: CombAero={rho_cb:.4f} kg/m^3, Cantera={rho_ct:.4f} kg/m^3"
             )
