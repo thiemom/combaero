@@ -146,6 +146,7 @@ inline constexpr Entry function_units[] = {
     // compressible.h - Fanno Flow
     // -------------------------------------------------------------------------
     {"fanno_pipe",              "T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, f: -, X: mol/mol", "FannoSolution"},
+    {"fanno_pipe_rough",        "T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, roughness: m, X: mol/mol, correlation: str", "FannoSolution"},
     {"fanno_max_length",        "T_in: K, P_in: Pa, u_in: m/s, D: m, f: -, X: mol/mol", "m"},
 
     // -------------------------------------------------------------------------
@@ -166,8 +167,11 @@ inline constexpr Entry function_units[] = {
     {"expansibility_factor",    "beta: -, dP: Pa, P_upstream: Pa, kappa: -", "-"},
 
     // -------------------------------------------------------------------------
-    // pipe_flow.h - Composite Pipe Flow Functions
+    // incompressible.h - Thermo-Aware High-Level Functions
     // -------------------------------------------------------------------------
+    {"pipe_flow",               "T: K, P: Pa, X: mol/mol, u: m/s, L: m, D: m, f: -", "IncompressibleFlowSolution"},
+    {"pipe_flow_rough",         "T: K, P: Pa, X: mol/mol, u: m/s, L: m, D: m, roughness: m, correlation: str", "IncompressibleFlowSolution"},
+    {"orifice_flow_thermo",     "T: K, P: Pa, X: mol/mol, P_back: Pa, A: m^2, Cd: -", "IncompressibleFlowSolution"},
     {"pressure_drop_pipe",      "T: K, P: Pa, X: mol/mol, v: m/s, D: m, L: m, roughness: m, correlation: str", "tuple(Pa, -, -)"},
     // -------------------------------------------------------------------------
     // geometry.h - Geometric Utilities
