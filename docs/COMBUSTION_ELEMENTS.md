@@ -7,34 +7,9 @@ and element design for the network solver's combustion and mixing elements.
 
 ## Supporting Types
 
-### `MixtureState`
-
-Minimal state carrier passed between network elements. All fields are mutable
-so the solver can update them during iteration.
-
-```python
-@dataclass
-class MixtureState:
-    T: float          # static temperature [K]
-    P: float          # static pressure [Pa]
-    m_dot: float      # mass flow rate [kg/s]
-    X: list[float]    # mole fractions [14 species]
-```
-
-### `NetworkElement` (base interface)
-
-```python
-from abc import ABC, abstractmethod
-
-class NetworkElement(ABC):
-    @abstractmethod
-    def residuals(self, *states: MixtureState) -> list[float]:
-        """Return residual vector (zeros at solution)."""
-
-    @abstractmethod
-    def n_equations(self) -> int:
-        """Number of scalar equations this element contributes."""
-```
+> **Canonical definitions** for `MixtureState` and `NetworkElement` live in
+> `NETWORK_ROADMAP.md`. The combustion functions use the Phase 1/2 subset:
+> `P`, `T`, `m_dot`, `X` — `P_total` and `T_total` are not required here.
 
 ---
 

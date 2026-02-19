@@ -52,7 +52,9 @@ mass flows, and compositions throughout the system.
 │  viscosity(), prandtl()  transport properties        │
 │  calc_T_from_h()         Newton inversion            │
 │  mole_to_mass()          composition conversion      │
-│  orifice_mass_flow()     Cd·A correlation            │
+│  orifice_mdot()          incompressible Cd·A          │
+│  pipe_flow()             Darcy-Weisbach + thermo       │
+│  fanno_pipe()            compressible Fanno flow       │
 │  cooling_correlations    Nusselt, friction factor    │
 │  can_annular_eigenmodes  acoustics (Phase 4)         │
 └──────────────────────────────────────────────────────┘
@@ -92,8 +94,9 @@ well-posedness. The solver validates this at setup.
 
 | Element | Residual | CombAero call |
 |---|---|---|
-| `OrificeElement` | `ṁ = Cd·A·√(2ρΔP)` | `density()` |
-| `PipeElement` | `ΔP = f·(L/D)·½ρv²` | `density()`, `viscosity()` |
+| `OrificeElement` | `ṁ = Cd·A·√(2ρΔP)` | `orifice_mdot()` or `orifice_flow_thermo()` |
+| `PipeElement` (incompressible) | `ΔP = f·(L/D)·½ρv²` | `pipe_flow()` / `pipe_flow_rough()` |
+| `PipeElement` (compressible) | Fanno adiabatic friction | `fanno_pipe()` / `fanno_pipe_rough()` |
 | `MomentumChamberElement` | Momentum + area change | `density()`, `speed_of_sound()` |
 
 ### Thermal Elements
@@ -101,7 +104,7 @@ well-posedness. The solver validates this at setup.
 | Element | Residual | CombAero call |
 |---|---|---|
 | `HeatExchangerElement` | `Q = h·A·ΔT_LM`, solves T_wall | `prandtl()`, `thermal_conductivity()` |
-| `AdiabticWallElement` | `Q = 0` | — |
+| `AdiabaticWallElement` | `Q = 0` | — |
 
 ### Reaction / Mixing Elements
 
@@ -120,7 +123,8 @@ well-posedness. The solver validates this at setup.
 
 ## MixtureState Dataclass
 
-The common currency between all nodes and elements:
+The common currency between all nodes and elements. This is the **canonical
+definition** — `COMBUSTION_ELEMENTS.md` uses a simplified subset for Phase 1.
 
 ```python
 from dataclasses import dataclass, field
@@ -128,20 +132,23 @@ from dataclasses import dataclass, field
 @dataclass
 class MixtureState:
     P: float                    # static pressure [Pa]
-    P_total: float              # total pressure [Pa]
+    P_total: float              # total pressure [Pa]  (= P for plenum nodes)
     T: float                    # static temperature [K]
-    T_total: float              # total temperature [K]
+    T_total: float              # total temperature [K]  (= T for plenum nodes)
     m_dot: float                # mass flow rate [kg/s]
     X: list[float]              # mole fractions [14 species]
 
     # Derived — computed on demand via CombAero
-    def density(self) -> float: ...
-    def enthalpy(self) -> float: ...
-    def speed_of_sound(self) -> float: ...
+    def density(self) -> float: ...        # combaero.density(T, P, X)
+    def enthalpy(self) -> float: ...       # combaero.h(T, X)
+    def speed_of_sound(self) -> float: ... # combaero.speed_of_sound(T, X)
 ```
 
 For a plenum node `P = P_total` and `T = T_total`. For a momentum chamber
 node they differ and the isentropic relation closes the system.
+
+**Phase 1** uses only `P` and `m_dot` (T and X are fixed, no composition
+tracking). `P_total` and `T_total` are introduced in Phase 2.
 
 ---
 
