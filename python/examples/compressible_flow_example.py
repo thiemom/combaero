@@ -66,7 +66,7 @@ def main() -> None:
 
     A_required = cb.solve_A_eff_from_mdot(T0, P0, P_back, mdot_target, X)
     print(f"Target mass flow: {mdot_target:.2f} kg/s")
-    print(f"Required effective area: {A_required * 1e4:.2f} cm²")
+    print(f"Required effective area: {A_required * 1e4:.2f} cm^2")
 
     # Verify
     sol_verify = cb.nozzle_flow(T0, P0, P_back, A_required, X)
@@ -93,8 +93,8 @@ def main() -> None:
         T0_cd, P0_cd, P_exit, A_inlet, A_throat, A_exit, x_throat, x_exit, X, n_stations=50
     )
 
-    print(f"Inlet: A = {A_inlet * 1e4:.1f} cm², Throat: A = {A_throat * 1e4:.1f} cm²")
-    print(f"Exit: A = {A_exit * 1e4:.1f} cm²")
+    print(f"Inlet: A = {A_inlet * 1e4:.1f} cm^2, Throat: A = {A_throat * 1e4:.1f} cm^2")
+    print(f"Exit: A = {A_exit * 1e4:.1f} cm^2")
     print(f"Stagnation: T0 = {sol_cd.T0:.1f} K, P0 = {sol_cd.P0 / 1000:.0f} kPa")
     print(f"Mass flow: {sol_cd.mdot:.4f} kg/s")
     print(f"Choked: {sol_cd.choked}")
@@ -102,7 +102,7 @@ def main() -> None:
 
     # Print a few stations from the profile
     print("\nAxial profile (selected stations):")
-    print(f"{'x [m]':>8} {'A [cm²]':>10} {'M [-]':>8} {'T [K]':>8} {'P [kPa]':>10}")
+    print(f"{'x [m]':>8} {'A [cm^2]':>10} {'M [-]':>8} {'T [K]':>8} {'P [kPa]':>10}")
     for i in range(0, len(sol_cd.profile), len(sol_cd.profile) // 5):
         st = sol_cd.profile[i]
         print(f"{st.x:8.3f} {st.A * 1e4:10.2f} {st.M:8.3f} {st.T:8.1f} {st.P / 1000:10.1f}")
@@ -157,7 +157,7 @@ def main() -> None:
     f_serghides = cb.friction_serghides(Re_test, e_D_test)
     f_colebrook = cb.friction_colebrook(Re_test, e_D_test)
 
-    print(f"Re = {Re_test:.0f}, ε/D = {e_D_test}")
+    print(f"Re = {Re_test:.0f}, eps/D = {e_D_test}")
     print(f"  Haaland:   f = {f_haaland:.6f}")
     print(f"  Serghides: f = {f_serghides:.6f}")
     print(f"  Colebrook: f = {f_colebrook:.6f} (reference)")

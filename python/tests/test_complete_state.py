@@ -182,7 +182,7 @@ class TestVariousConditions:
     """Test at various temperature and pressure conditions."""
 
     def test_ambient_conditions(self):
-        """Test at ambient conditions (20°C, 1 atm)."""
+        """Test at ambient conditions (20 degC, 1 atm)."""
         X = cb.standard_dry_air_composition()
         T = 293.15
         P = 101325
