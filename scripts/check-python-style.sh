@@ -13,7 +13,7 @@ set -euo pipefail
 #   --fix       Auto-fix issues where possible (ruff + ruff format)
 #
 # Checks:
-#   1. Non-ASCII characters outside comments and strings
+#   1. Non-ASCII characters in Python source files (*.py only; .md and other files are not checked)
 #   2. Code quality and import sorting (via ruff)
 #   3. Code formatting (via ruff format)
 #   5. Type hints (via mypy, if available)
@@ -83,7 +83,8 @@ echo "=========================================="
 echo ""
 
 # -----------------------------------------------------------------------------
-# Check 1: Non-ASCII characters outside comments and strings
+# Check 1: Non-ASCII characters in Python source files (*.py)
+# .md, .rst, .txt and other non-Python files are not checked.
 # -----------------------------------------------------------------------------
 echo "Check 1: Non-ASCII characters..."
 
