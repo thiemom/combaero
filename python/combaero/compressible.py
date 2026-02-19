@@ -108,7 +108,7 @@ def pipe_flow(
     P:
         Inlet static pressure [Pa].
     X:
-        Mole fractions [−].
+        Mole fractions [-].
     u:
         Inlet bulk velocity [m/s].
     L:
@@ -116,7 +116,7 @@ def pipe_flow(
     D:
         Pipe inner diameter [m].
     f:
-        Darcy friction factor [−] (constant along pipe).
+        Darcy friction factor [-] (constant along pipe).
     n_steps:
         Number of RK4 integration steps.
     store_profile:
@@ -158,7 +158,7 @@ def pipe_flow_rough(
     P:
         Inlet static pressure [Pa].
     X:
-        Mole fractions [−].
+        Mole fractions [-].
     u:
         Inlet bulk velocity [m/s].
     L:
@@ -216,11 +216,11 @@ def nozzle_flow(
     P:
         Stagnation pressure [Pa].
     X:
-        Mole fractions [−].
+        Mole fractions [-].
     P_back:
         Back (downstream) pressure [Pa].
     A_eff:
-        Effective throat area [m²].
+        Effective throat area [m^2].
     tol:
         Convergence tolerance for the Mach number iteration.
     max_iter:

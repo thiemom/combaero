@@ -42,17 +42,17 @@ class FlowSolution:
         Characteristic velocity (pipe bulk velocity or nozzle exit velocity)
         [m/s].
     dP:
-        Pressure drop P_in − P_out [Pa].  ``nan`` for nozzle flow.
+        Pressure drop P_in - P_out [Pa].  ``nan`` for nozzle flow.
     Re:
-        Reynolds number [−].  ``nan`` when not computed.
+        Reynolds number [-].  ``nan`` when not computed.
     rho:
-        Inlet density [kg/m³].  ``nan`` when not computed.
+        Inlet density [kg/m^3].  ``nan`` when not computed.
     f:
-        Darcy friction factor [−].  ``nan`` for orifice / nozzle.
+        Darcy friction factor [-].  ``nan`` for orifice / nozzle.
     Cd:
-        Discharge coefficient [−].  ``nan`` for pipe / nozzle.
+        Discharge coefficient [-].  ``nan`` for pipe / nozzle.
     M:
-        Outlet Mach number [−].  ``nan`` for incompressible.
+        Outlet Mach number [-].  ``nan`` for incompressible.
     T_out:
         Outlet static temperature [K].  ``nan`` for incompressible.
     P_out:

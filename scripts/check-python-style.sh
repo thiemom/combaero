@@ -102,25 +102,14 @@ if [ ${#PYTHON_FILES[@]} -eq 0 ]; then
 else
     NON_ASCII_FOUND=false
     for file in "${PYTHON_FILES[@]}"; do
-        # Check for non-ASCII bytes (0x80-0xFF)
-        # Exclude lines that are comments or inside strings
+        # Check every line for non-ASCII bytes (0x80-0xFF), including docstrings.
+        # The previous heuristic that skipped lines containing quotes was wrong:
+        # it silently ignored non-ASCII inside docstrings and string literals.
         if grep -P '[\x80-\xFF]' "$file" > /dev/null 2>&1; then
-            # Simple heuristic: skip lines starting with # or containing quotes
-            while IFS= read -r line; do
-                # Skip comment lines
-                if [[ "$line" =~ ^[[:space:]]*# ]]; then
-                    continue
-                fi
-                # Skip lines that look like string literals (contains quotes)
-                if [[ "$line" =~ [\"\'] ]]; then
-                    continue
-                fi
-                # If we get here, it's likely non-ASCII in code
-                if [ "$VERBOSE" = true ]; then
-                    echo -e "${RED}  Non-ASCII in $file:${NC}"
-                    echo "    $line"
-                fi
-                NON_ASCII_FOUND=true
+            NON_ASCII_FOUND=true
+            while IFS= read -r match; do
+                echo "  Non-ASCII in $file:"
+                echo "    $match"
             done < <(grep -n -P '[\x80-\xFF]' "$file" || true)
         fi
     done

@@ -77,7 +77,7 @@ def pipe_flow(
     P:
         Static pressure [Pa].
     X:
-        Mole fractions [−].
+        Mole fractions [-].
     u:
         Bulk flow velocity [m/s].
     L:
@@ -85,7 +85,7 @@ def pipe_flow(
     D:
         Pipe inner diameter [m].
     f:
-        Darcy friction factor [−].
+        Darcy friction factor [-].
 
     Returns
     -------
@@ -122,7 +122,7 @@ def pipe_flow_rough(
     P:
         Static pressure [Pa].
     X:
-        Mole fractions [−].
+        Mole fractions [-].
     u:
         Bulk flow velocity [m/s].
     L:
@@ -169,13 +169,13 @@ def orifice_flow(
     P:
         Upstream static pressure [Pa].
     X:
-        Mole fractions [−].
+        Mole fractions [-].
     P_back:
         Downstream static pressure [Pa].
     A:
-        Orifice (throat) area [m²].
+        Orifice (throat) area [m^2].
     Cd:
-        Discharge coefficient [−].  Default ``1.0``.
+        Discharge coefficient [-].  Default ``1.0``.
 
     Returns
     -------
