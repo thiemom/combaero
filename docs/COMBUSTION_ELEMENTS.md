@@ -5,6 +5,39 @@ and element design for the network solver's combustion and mixing elements.
 
 ---
 
+## Supporting Types
+
+### `MixtureState`
+
+Minimal state carrier passed between network elements. All fields are mutable
+so the solver can update them during iteration.
+
+```python
+@dataclass
+class MixtureState:
+    T: float          # static temperature [K]
+    P: float          # static pressure [Pa]
+    m_dot: float      # mass flow rate [kg/s]
+    X: list[float]    # mole fractions [14 species]
+```
+
+### `NetworkElement` (base interface)
+
+```python
+from abc import ABC, abstractmethod
+
+class NetworkElement(ABC):
+    @abstractmethod
+    def residuals(self, *states: MixtureState) -> list[float]:
+        """Return residual vector (zeros at solution)."""
+
+    @abstractmethod
+    def n_equations(self) -> int:
+        """Number of scalar equations this element contributes."""
+```
+
+---
+
 ## Core Dataclass: `CombustionResult`
 
 The single return type from all combustion and mixing functions. Contains the
@@ -44,6 +77,11 @@ class CombustionResult:
     T_adiabatic: float      # adiabatic flame temperature [K]
     eta: float              # combustion efficiency applied [-]
     Q_released: float       # heat released [J/s] = [W]
+
+    # Note: T_out = T_in + η·(T_adiabatic − T_in) is a linear blend
+    # approximation. It is not enthalpy-consistent for large η deviations
+    # from 1. For accurate off-design predictions, invert h_mix via
+    # calc_T_from_h() with a scaled Q_released instead.
 ```
 
 ---
@@ -97,7 +135,10 @@ def stoichiometric_products(
 2. Scale fuel stream by `phi * FAR_stoich`
 3. Combine fuel + oxidiser → reactant atom counts [C, H, O, N]
 4. Assign products: C→CO2, H→H2O (pairs), remaining O→O2, N→N2
-5. For rich (phi > 1): distribute excess C/H to CO and H2
+5. For rich (φ > 1): distribute excess fuel to CO and H₂ using the
+   water-gas shift assumption (all excess C → CO, all excess H → H₂).
+   This is an approximation — for accurate rich or high-T dissociation
+   use Cantera equilibrium chemistry.
 6. Normalise to mole fractions
 
 ---
@@ -232,7 +273,7 @@ solver calls `residuals()` — the element handles all chemistry internally.
 class CombustionElement(NetworkElement):
     eta: float = 1.0
     delta_P_frac: float = 0.04
-    fuel_bc: MassFlowBoundary = None  # fixed fuel stream
+    fuel_bc: MassFlowBoundary = field(default=None)  # fixed fuel stream; must be set before solve
 
     def residuals(self,
                   state_in: MixtureState,
@@ -300,6 +341,7 @@ CombAero functions:
 | Gamma | `combaero.isentropic_expansion_coefficient(T, X)` |
 | Mole → mass fractions | `combaero.mole_to_mass(X)` |
 | Molecular weight | `combaero.mwmix(X)` |
+| Equivalence ratio from composition | `combaero.equivalence_ratio_mole(X, X_fuel, X_ox)` |
 | Atomic composition | `molecular_structures` in `thermo_transport_data.h` |
 
 ---
@@ -313,11 +355,22 @@ This is the only function not yet in CombAero. It requires:
 2. Pure atom-balance arithmetic — no iteration, no equilibrium chemistry
 3. ~50–80 lines of Python
 
-It should live in a new module `combaero_network/combustion/stoichiometry.py`
-rather than in the C++ core, since it is pure bookkeeping with no
-performance requirement.
+**Module layout** (all network solver code lives outside the C++ core):
 
-For rich mixtures (phi > 1) or high-temperature dissociation, the atom-balance
+```
+combaero_network/
+    combustion/
+        stoichiometry.py      # stoichiometric_products()
+        combustion.py         # combustion_from_streams(), combustion_from_phi()
+        mixing.py             # mix_streams()
+    elements/
+        combustion_element.py # CombustionElement
+        mixing_element.py     # MixingElement
+    core/
+        network_element.py    # NetworkElement base class, MixtureState
+```
+
+For rich mixtures (φ > 1) or high-temperature dissociation, the atom-balance
 approximation breaks down. In those cases, delegate to Cantera's equilibrium
 solver via the existing `cantera_validation_tests` infrastructure.
 
