@@ -171,6 +171,7 @@ def generate_markdown(entries: list[UnitEntry]) -> str:
         "compressible.h - Nozzle Flow",
         "compressible.h - Fanno Flow",
         "compressible.h - Thrust",
+        "incompressible.h - Thermo-Aware High-Level Functions",
         "incompressible.h - Bernoulli & Orifice",
         "incompressible.h - Pipe Flow",
         "friction.h - Friction Factor Correlations",
