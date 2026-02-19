@@ -101,6 +101,144 @@ def test_fanno_pipe_basic() -> None:
     assert sol.mdot > 0
 
 
+def test_fanno_pipe_re_in_populated() -> None:
+    """fanno_pipe should populate Re_in and f_avg."""
+    X = cb.standard_dry_air_composition()
+    T_in = 400.0
+    P_in = 200000.0
+    u_in = 50.0
+    L = 1.0
+    D = 0.05
+    f = 0.02
+
+    sol = cb.fanno_pipe(T_in, P_in, u_in, L, D, f, X)
+
+    assert sol.Re_in > 0
+    # For constant-f overload, f_avg == f
+    assert np.isclose(sol.f_avg, f)
+    # f field should match input
+    assert np.isclose(sol.f, f)
+
+
+def test_fanno_pipe_profile_has_f_re() -> None:
+    """Profile stations should carry f and Re fields."""
+    X = cb.standard_dry_air_composition()
+    sol = cb.fanno_pipe(400.0, 200000.0, 50.0, 1.0, 0.05, 0.02, X, store_profile=True)
+
+    assert len(sol.profile) > 0
+    for st in sol.profile:
+        assert st.f >= 0.0
+        assert st.Re >= 0.0
+
+
+def test_fanno_pipe_rough_basic() -> None:
+    """fanno_pipe_rough: pressure drops, f_avg and Re_in populated."""
+    X = cb.standard_dry_air_composition()
+    T_in = 400.0
+    P_in = 200000.0
+    u_in = 50.0
+    L = 1.0
+    D = 0.05
+    roughness = 0.0  # smooth pipe
+
+    sol = cb.fanno_pipe_rough(T_in, P_in, u_in, L, D, roughness, X)
+
+    assert P_in > sol.outlet.P
+    assert sol.mdot > 0
+    assert sol.Re_in > 0
+    assert sol.f_avg > 0
+
+
+def test_fanno_pipe_rough_smooth_matches_constant_f() -> None:
+    """Smooth pipe (roughness=0): rough variant should be close to constant-f variant
+    when f is pre-computed from inlet Re."""
+    X = cb.standard_dry_air_composition()
+    T_in = 400.0
+    P_in = 200000.0
+    u_in = 50.0
+    L = 1.0
+    D = 0.05
+
+    # Compute inlet f from Re using Haaland
+    Re_in = cb.reynolds(T_in, P_in, X, u_in, D)
+    f_in = cb.friction_haaland(Re_in, 0.0)
+
+    sol_const = cb.fanno_pipe(T_in, P_in, u_in, L, D, f_in, X, n_steps=200)
+    sol_rough = cb.fanno_pipe_rough(T_in, P_in, u_in, L, D, 0.0, X, n_steps=200)
+
+    # Outlet pressure should be close (within 1% — Re varies slightly along pipe)
+    assert np.isclose(sol_const.outlet.P, sol_rough.outlet.P, rtol=0.01)
+    # f_avg should be close to f_in for smooth pipe
+    assert np.isclose(sol_rough.f_avg, f_in, rtol=0.05)
+
+
+def test_fanno_pipe_rough_increases_dP() -> None:
+    """Rough pipe should have higher pressure drop than smooth pipe."""
+    X = cb.standard_dry_air_composition()
+    T_in = 400.0
+    P_in = 200000.0
+    u_in = 50.0
+    L = 1.0
+    D = 0.05
+
+    sol_smooth = cb.fanno_pipe_rough(T_in, P_in, u_in, L, D, 0.0, X)
+    sol_rough = cb.fanno_pipe_rough(T_in, P_in, u_in, L, D, 1e-4, X)
+
+    dP_smooth = P_in - sol_smooth.outlet.P
+    dP_rough = P_in - sol_rough.outlet.P
+    assert dP_rough > dP_smooth
+
+
+def test_fanno_pipe_rough_profile() -> None:
+    """Profile stations should carry local f and Re."""
+    X = cb.standard_dry_air_composition()
+    sol = cb.fanno_pipe_rough(400.0, 200000.0, 50.0, 1.0, 0.05, 1e-4, X, store_profile=True)
+
+    assert len(sol.profile) > 0
+    for st in sol.profile:
+        assert st.f > 0.0
+        assert st.Re > 0.0
+
+
+def test_fanno_pipe_rough_correlations() -> None:
+    """All supported correlations should give similar results for smooth pipe."""
+    X = cb.standard_dry_air_composition()
+    T_in, P_in, u_in, L, D = 400.0, 200000.0, 50.0, 1.0, 0.05
+
+    sol_h = cb.fanno_pipe_rough(T_in, P_in, u_in, L, D, 0.0, X, correlation="haaland")
+    sol_s = cb.fanno_pipe_rough(T_in, P_in, u_in, L, D, 0.0, X, correlation="serghides")
+    sol_c = cb.fanno_pipe_rough(T_in, P_in, u_in, L, D, 0.0, X, correlation="colebrook")
+
+    # All three should give very close outlet pressures
+    assert np.isclose(sol_h.outlet.P, sol_s.outlet.P, rtol=0.005)
+    assert np.isclose(sol_h.outlet.P, sol_c.outlet.P, rtol=0.005)
+
+
+def test_fanno_pipe_rough_choked() -> None:
+    """Long rough pipe should choke: use a very long pipe so choking is certain."""
+    X = cb.standard_dry_air_composition()
+    T_in = 400.0
+    P_in = 200000.0
+    u_in = 250.0  # high subsonic velocity — short L* expected
+    D = 0.05
+    roughness = 1e-4
+
+    # With high velocity and roughness, L* is short; 1000 m is certainly beyond it
+    sol = cb.fanno_pipe_rough(T_in, P_in, u_in, 1000.0, D, roughness, X)
+
+    assert sol.choked
+    assert sol.L_choke < 1000.0  # choking happened before the end
+
+
+def test_fanno_pipe_rough_invalid_correlation() -> None:
+    """Unknown correlation should raise ValueError."""
+    import pytest
+
+    X = cb.standard_dry_air_composition()
+    with pytest.raises(ValueError, match="unknown correlation"):
+        cb.fanno_pipe_rough(400.0, 200000.0, 50.0, 1.0, 0.05, 0.0, X, correlation="invalid")
+
+
 def test_fanno_max_length() -> None:
     """Maximum pipe length before choking."""
     X = cb.standard_dry_air_composition()

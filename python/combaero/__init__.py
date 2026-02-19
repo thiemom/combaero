@@ -49,6 +49,7 @@ try:
         BoundaryCondition,
         CanAnnularFlowGeometry,
         CanAnnularGeometry,
+        Cd_from_zeta,
         Cd_orifice,
         Cd_rounded_entry,
         Cd_sharp_thin_plate,
@@ -61,6 +62,7 @@ try:
         EquilibriumResult,
         FannoSolution,
         FannoStation,
+        IncompressibleFlowSolution,
         LinerCavity,
         LinerFlowState,
         LinerOrificeGeometry,
@@ -143,6 +145,7 @@ try:
         expansibility_factor,
         fanno_max_length,
         fanno_pipe,
+        fanno_pipe_rough,
         film_cooling_effectiveness,
         film_cooling_effectiveness_avg,
         film_cooling_multirow_sellers,
@@ -228,6 +231,7 @@ try:
         orifice_dP_Cd,
         orifice_flow,
         orifice_flow_state,
+        orifice_flow_thermo,
         orifice_impedance_with_flow,
         orifice_K_from_Cd,
         orifice_mdot,
@@ -251,12 +255,15 @@ try:
         pipe_area,
         pipe_dP,
         pipe_dP_mdot,
+        pipe_flow,
+        pipe_flow_rough,
         pipe_mdot,
         pipe_roughness,
         pipe_velocity,
         pipe_volume,
         prandtl,
         pressure_drop_pipe,
+        pressure_loss,
         quarter_wave_frequency,
         quarter_wave_resonator_tmm,
         reforming_equilibrium,
@@ -316,6 +323,7 @@ try:
         u,
         u_mass,
         vapor_pressure,
+        velocity_from_pressure_loss,
         velocity_from_q,
         viscosity,
         wall_temperature_profile,
@@ -324,6 +332,7 @@ try:
         wet_bulb_temperature,
         wgs_equilibrium,
         wgs_equilibrium_adiabatic,
+        zeta_from_Cd,
     )
 except ModuleNotFoundError:
     # Fallback: attempt to import from an installed combaero package that
@@ -424,6 +433,7 @@ except ModuleNotFoundError:
     NozzleSolution = _core.NozzleSolution
     FannoStation = _core.FannoStation
     FannoSolution = _core.FannoSolution
+    IncompressibleFlowSolution = _core.IncompressibleFlowSolution
     nozzle_flow = _core.nozzle_flow
     solve_A_eff_from_mdot = _core.solve_A_eff_from_mdot
     solve_P_back_from_mdot = _core.solve_P_back_from_mdot
@@ -433,6 +443,7 @@ except ModuleNotFoundError:
     mass_flux_isentropic = _core.mass_flux_isentropic
     nozzle_cd = _core.nozzle_cd
     fanno_pipe = _core.fanno_pipe
+    fanno_pipe_rough = _core.fanno_pipe_rough
     fanno_max_length = _core.fanno_max_length
     # Thrust
     ThrustResult = _core.ThrustResult

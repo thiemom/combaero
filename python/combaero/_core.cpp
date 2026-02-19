@@ -18,7 +18,6 @@
 #include "acoustics.h"
 #include "can_annular_solvers.h"
 #include "orifice.h"
-#include "pipe_flow.h"
 #include "materials.h"
 #include "cooling_correlations.h"
 #include "units.h"
@@ -2044,26 +2043,30 @@ PYBIND11_MODULE(_core, m)
     // FannoStation struct
     py::class_<FannoStation>(m, "FannoStation")
         .def(py::init<>())
-        .def_readonly("x", &FannoStation::x, "Position [m]")
-        .def_readonly("P", &FannoStation::P, "Static pressure [Pa]")
-        .def_readonly("T", &FannoStation::T, "Static temperature [K]")
+        .def_readonly("x",   &FannoStation::x,   "Position [m]")
+        .def_readonly("P",   &FannoStation::P,   "Static pressure [Pa]")
+        .def_readonly("T",   &FannoStation::T,   "Static temperature [K]")
         .def_readonly("rho", &FannoStation::rho, "Density [kg/m³]")
-        .def_readonly("u", &FannoStation::u, "Velocity [m/s]")
-        .def_readonly("M", &FannoStation::M, "Mach number [-]")
-        .def_readonly("h", &FannoStation::h, "Specific enthalpy [J/kg]")
-        .def_readonly("s", &FannoStation::s, "Specific entropy [J/(kg·K)]");
+        .def_readonly("u",   &FannoStation::u,   "Velocity [m/s]")
+        .def_readonly("M",   &FannoStation::M,   "Mach number [-]")
+        .def_readonly("h",   &FannoStation::h,   "Specific enthalpy [J/kg]")
+        .def_readonly("s",   &FannoStation::s,   "Specific entropy [J/(kg·K)]")
+        .def_readonly("f",   &FannoStation::f,   "Local Darcy friction factor [-]")
+        .def_readonly("Re",  &FannoStation::Re,  "Local Reynolds number [-]");
 
     // FannoSolution struct
     py::class_<FannoSolution>(m, "FannoSolution")
         .def(py::init<>())
-        .def_readonly("inlet", &FannoSolution::inlet, "Inlet state")
-        .def_readonly("outlet", &FannoSolution::outlet, "Outlet state")
-        .def_readonly("mdot", &FannoSolution::mdot, "Mass flow rate [kg/s]")
-        .def_readonly("h0", &FannoSolution::h0, "Stagnation enthalpy [J/kg]")
-        .def_readonly("L", &FannoSolution::L, "Pipe length [m]")
-        .def_readonly("D", &FannoSolution::D, "Pipe diameter [m]")
-        .def_readonly("f", &FannoSolution::f, "Darcy friction factor [-]")
-        .def_readonly("choked", &FannoSolution::choked, "True if flow reached M=1")
+        .def_readonly("inlet",   &FannoSolution::inlet,   "Inlet state")
+        .def_readonly("outlet",  &FannoSolution::outlet,  "Outlet state")
+        .def_readonly("mdot",    &FannoSolution::mdot,    "Mass flow rate [kg/s]")
+        .def_readonly("h0",      &FannoSolution::h0,      "Stagnation enthalpy [J/kg]")
+        .def_readonly("L",       &FannoSolution::L,       "Pipe length [m]")
+        .def_readonly("D",       &FannoSolution::D,       "Pipe diameter [m]")
+        .def_readonly("f",       &FannoSolution::f,       "Darcy friction factor (constant-f) [-]")
+        .def_readonly("f_avg",   &FannoSolution::f_avg,   "Average Darcy friction factor [-]")
+        .def_readonly("Re_in",   &FannoSolution::Re_in,   "Inlet Reynolds number [-]")
+        .def_readonly("choked",  &FannoSolution::choked,  "True if flow reached M=1")
         .def_readonly("L_choke", &FannoSolution::L_choke, "Length to choking [m]")
         .def_readonly("profile", &FannoSolution::profile, "Axial profile");
 
@@ -4744,4 +4747,232 @@ PYBIND11_MODULE(_core, m)
         "Get all registered units as a dictionary.\n\n"
         "Returns: dict mapping function_name -> {'input': ..., 'output': ...}"
     );
+
+    // =========================================================================
+    // Incompressible flow — scalar primitives
+    // =========================================================================
+
+    m.def("orifice_mdot",
+        [](double P1, double P2, double A, double Cd, double rho) {
+            return orifice_mdot(P1, P2, A, Cd, rho);
+        },
+        py::arg("P1"), py::arg("P2"), py::arg("A"), py::arg("Cd"), py::arg("rho"),
+        "Incompressible orifice mass flow rate [kg/s].\n"
+        "mdot = Cd * A * sqrt(2 * rho * (P1 - P2))");
+
+    m.def("orifice_Q",
+        [](double P1, double P2, double A, double Cd, double rho) {
+            return orifice_Q(P1, P2, A, Cd, rho);
+        },
+        py::arg("P1"), py::arg("P2"), py::arg("A"), py::arg("Cd"), py::arg("rho"),
+        "Incompressible orifice volumetric flow rate [m^3/s].");
+
+    m.def("orifice_velocity",
+        [](double P1, double P2, double rho) {
+            return orifice_velocity(P1, P2, rho);
+        },
+        py::arg("P1"), py::arg("P2"), py::arg("rho"),
+        "Ideal orifice velocity v = sqrt(2*dP/rho) [m/s].");
+
+    m.def("orifice_area",
+        [](double mdot, double P1, double P2, double Cd, double rho) {
+            return orifice_area(mdot, P1, P2, Cd, rho);
+        },
+        py::arg("mdot"), py::arg("P1"), py::arg("P2"), py::arg("Cd"), py::arg("rho"),
+        "Orifice area for given mass flow [m^2].");
+
+    m.def("orifice_dP",
+        [](double mdot, double A, double Cd, double rho) {
+            return orifice_dP(mdot, A, Cd, rho);
+        },
+        py::arg("mdot"), py::arg("A"), py::arg("Cd"), py::arg("rho"),
+        "Pressure drop for given orifice mass flow [Pa].");
+
+    m.def("pipe_dP",
+        [](double v, double L, double D, double f, double rho) {
+            return pipe_dP(v, L, D, f, rho);
+        },
+        py::arg("v"), py::arg("L"), py::arg("D"), py::arg("f"), py::arg("rho"),
+        "Darcy-Weisbach pressure drop [Pa].\n"
+        "dP = f * (L/D) * (rho * v^2 / 2)");
+
+    m.def("pipe_dP_mdot",
+        [](double mdot, double L, double D, double f, double rho) {
+            return pipe_dP_mdot(mdot, L, D, f, rho);
+        },
+        py::arg("mdot"), py::arg("L"), py::arg("D"), py::arg("f"), py::arg("rho"),
+        "Darcy-Weisbach pressure drop from mass flow [Pa].");
+
+    m.def("pipe_velocity",
+        [](double mdot, double D, double rho) {
+            return pipe_velocity(mdot, D, rho);
+        },
+        py::arg("mdot"), py::arg("D"), py::arg("rho"),
+        "Pipe velocity from mass flow [m/s].");
+
+    m.def("pipe_mdot",
+        [](double v, double D, double rho) {
+            return pipe_mdot(v, D, rho);
+        },
+        py::arg("v"), py::arg("D"), py::arg("rho"),
+        "Pipe mass flow from velocity [kg/s].");
+
+    m.def("bernoulli_P2",
+        [](double P1, double v1, double v2, double rho, double dz, double g) {
+            return bernoulli_P2(P1, v1, v2, rho, dz, g);
+        },
+        py::arg("P1"), py::arg("v1"), py::arg("v2"), py::arg("rho"),
+        py::arg("dz") = 0.0, py::arg("g") = 9.80665,
+        "Bernoulli downstream pressure P2 [Pa].");
+
+    m.def("bernoulli_v2",
+        [](double P1, double P2, double v1, double rho, double dz, double g) {
+            return bernoulli_v2(P1, P2, v1, rho, dz, g);
+        },
+        py::arg("P1"), py::arg("P2"), py::arg("v1"), py::arg("rho"),
+        py::arg("dz") = 0.0, py::arg("g") = 9.80665,
+        "Bernoulli downstream velocity v2 [m/s].");
+
+    m.def("dynamic_pressure",
+        [](double v, double rho) { return dynamic_pressure(v, rho); },
+        py::arg("v"), py::arg("rho"),
+        "Dynamic pressure q = 0.5 * rho * v^2 [Pa].");
+
+    m.def("velocity_from_q",
+        [](double q, double rho) { return velocity_from_q(q, rho); },
+        py::arg("q"), py::arg("rho"),
+        "Velocity from dynamic pressure [m/s].");
+
+    m.def("pressure_loss",
+        [](double v, double rho, double zeta) { return pressure_loss(v, rho, zeta); },
+        py::arg("v"), py::arg("rho"), py::arg("zeta"),
+        "Pressure drop from loss coefficient: dP = zeta * 0.5 * rho * v^2 [Pa].");
+
+    m.def("velocity_from_pressure_loss",
+        [](double dP, double rho, double zeta) { return velocity_from_pressure_loss(dP, rho, zeta); },
+        py::arg("dP"), py::arg("rho"), py::arg("zeta"),
+        "Velocity from pressure drop and loss coefficient [m/s].");
+
+    m.def("zeta_from_Cd",
+        [](double Cd) { return zeta_from_Cd(Cd); },
+        py::arg("Cd"),
+        "Loss coefficient from discharge coefficient: zeta = 1/Cd^2 [-].");
+
+    m.def("Cd_from_zeta",
+        [](double zeta) { return Cd_from_zeta(zeta); },
+        py::arg("zeta"),
+        "Discharge coefficient from loss coefficient: Cd = 1/sqrt(zeta) [-].");
+
+    // =========================================================================
+    // Incompressible flow — thermo-aware high-level API
+    // =========================================================================
+
+    py::class_<IncompressibleFlowSolution>(m, "IncompressibleFlowSolution")
+        .def_readonly("mdot", &IncompressibleFlowSolution::mdot, "Mass flow rate [kg/s]")
+        .def_readonly("v",    &IncompressibleFlowSolution::v,    "Velocity [m/s]")
+        .def_readonly("dP",   &IncompressibleFlowSolution::dP,   "Pressure drop [Pa]")
+        .def_readonly("Re",   &IncompressibleFlowSolution::Re,   "Reynolds number [-]")
+        .def_readonly("rho",  &IncompressibleFlowSolution::rho,  "Inlet density [kg/m^3]")
+        .def_readonly("f",    &IncompressibleFlowSolution::f,    "Friction factor (pipe) or Cd (orifice) [-]")
+        .def("__repr__", [](const IncompressibleFlowSolution& s) {
+            return "IncompressibleFlowSolution(mdot=" + std::to_string(s.mdot)
+                + ", v=" + std::to_string(s.v)
+                + ", dP=" + std::to_string(s.dP)
+                + ", Re=" + std::to_string(s.Re) + ")";
+        });
+
+    m.def("orifice_flow_thermo",
+        [](double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double P_back, double A, double Cd) {
+            return orifice_flow_thermo(T, P, to_vec(X_arr), P_back, A, Cd);
+        },
+        py::arg("T"), py::arg("P"), py::arg("X"),
+        py::arg("P_back"), py::arg("A"), py::arg("Cd") = 1.0,
+        "Thermo-aware incompressible orifice flow.\n"
+        "Evaluates rho from (T, P, X) internally.\n"
+        "Returns IncompressibleFlowSolution.");
+
+    m.def("pipe_flow",
+        [](double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double u, double L, double D, double f) {
+            return pipe_flow(T, P, to_vec(X_arr), u, L, D, f);
+        },
+        py::arg("T"), py::arg("P"), py::arg("X"),
+        py::arg("u"), py::arg("L"), py::arg("D"), py::arg("f"),
+        "Thermo-aware incompressible pipe flow with explicit friction factor.\n"
+        "Returns IncompressibleFlowSolution.");
+
+    m.def("pipe_flow_rough",
+        [](double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double u, double L, double D,
+           double roughness, const std::string& correlation) {
+            return pipe_flow_rough(T, P, to_vec(X_arr), u, L, D, roughness, correlation);
+        },
+        py::arg("T"), py::arg("P"), py::arg("X"),
+        py::arg("u"), py::arg("L"), py::arg("D"),
+        py::arg("roughness") = 0.0, py::arg("correlation") = "haaland",
+        "Thermo-aware incompressible pipe flow with roughness-based friction factor.\n"
+        "Returns IncompressibleFlowSolution.");
+
+    m.def("pressure_drop_pipe",
+        [](double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double v, double D, double L,
+           double roughness, const std::string& correlation) {
+            return pressure_drop_pipe(T, P, to_vec(X_arr), v, D, L, roughness, correlation);
+        },
+        py::arg("T"), py::arg("P"), py::arg("X"),
+        py::arg("v"), py::arg("D"), py::arg("L"),
+        py::arg("roughness") = 0.0, py::arg("correlation") = "haaland",
+        "Composite pipe pressure drop.\n"
+        "Returns tuple (dP [Pa], Re [-], f [-]).");
+
+    // =========================================================================
+    // Compressible flow — new functions
+    // =========================================================================
+
+    m.def("fanno_pipe",
+        [](double T_in, double P_in, double u_in,
+           double L, double D, double f,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           std::size_t n_steps, bool store_profile) {
+            return fanno_pipe(T_in, P_in, u_in, L, D, f, to_vec(X_arr), n_steps, store_profile);
+        },
+        py::arg("T_in"), py::arg("P_in"), py::arg("u_in"),
+        py::arg("L"), py::arg("D"), py::arg("f"), py::arg("X"),
+        py::arg("n_steps") = 100, py::arg("store_profile") = false,
+        "Fanno flow (adiabatic compressible pipe flow with constant friction factor).\n"
+        "Returns FannoSolution.");
+
+    m.def("fanno_pipe_rough",
+        [](double T_in, double P_in, double u_in,
+           double L, double D, double roughness,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           const std::string& correlation,
+           std::size_t n_steps, bool store_profile) {
+            return fanno_pipe_rough(T_in, P_in, u_in, L, D, roughness,
+                                    to_vec(X_arr), correlation, n_steps, store_profile);
+        },
+        py::arg("T_in"), py::arg("P_in"), py::arg("u_in"),
+        py::arg("L"), py::arg("D"), py::arg("roughness"), py::arg("X"),
+        py::arg("correlation") = "haaland",
+        py::arg("n_steps") = 100, py::arg("store_profile") = false,
+        "Fanno flow with roughness-based variable friction factor f(x).\n"
+        "Recomputes f at each RK4 stage from local Re and roughness.\n"
+        "Returns FannoSolution with f_avg and Re_in populated.");
+
+    m.def("fanno_max_length",
+        [](double T_in, double P_in, double u_in,
+           double D, double f,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double tol, std::size_t max_iter) {
+            return fanno_max_length(T_in, P_in, u_in, D, f, to_vec(X_arr), tol, max_iter);
+        },
+        py::arg("T_in"), py::arg("P_in"), py::arg("u_in"),
+        py::arg("D"), py::arg("f"), py::arg("X"),
+        py::arg("tol") = 1e-6, py::arg("max_iter") = 100,
+        "Maximum pipe length before choking (Fanno L*) [m].");
 }

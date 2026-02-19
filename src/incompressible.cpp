@@ -1,4 +1,7 @@
 #include "incompressible.h"
+#include "friction.h"
+#include "transport.h"
+#include "thermo.h"
 
 #include <cmath>
 #include <stdexcept>
@@ -186,4 +189,153 @@ double Cd_from_zeta(double zeta)
     }
     // Cd = 1 / √ζ
     return 1.0 / std::sqrt(zeta);
+}
+
+// -------------------------------------------------------------
+// High-level thermo-aware API
+// -------------------------------------------------------------
+
+// Helper: dispatch friction factor from correlation name
+static double friction_from_correlation(double Re, double e_D,
+                                        const std::string& correlation)
+{
+    if (correlation == "haaland")  return friction_haaland(Re, e_D);
+    if (correlation == "serghides") return friction_serghides(Re, e_D);
+    if (correlation == "colebrook") return friction_colebrook(Re, e_D);
+    if (correlation == "petukhov")  return friction_petukhov(Re);
+    throw std::invalid_argument(
+        "incompressible: unknown friction correlation '" + correlation + "'. "
+        "Valid options: 'haaland', 'serghides', 'colebrook', 'petukhov'");
+}
+
+IncompressibleFlowSolution orifice_flow_thermo(
+    double T, double P, const std::vector<double>& X,
+    double P_back, double A, double Cd)
+{
+    if (T <= 0.0)
+        throw std::invalid_argument("orifice_flow: T must be positive");
+    if (P <= 0.0)
+        throw std::invalid_argument("orifice_flow: P must be positive");
+    if (P_back < 0.0)
+        throw std::invalid_argument("orifice_flow: P_back must be non-negative");
+    if (P < P_back)
+        throw std::invalid_argument("orifice_flow: P must be >= P_back");
+    if (A <= 0.0)
+        throw std::invalid_argument("orifice_flow: A must be positive");
+    if (Cd <= 0.0 || Cd > 1.0)
+        throw std::invalid_argument("orifice_flow: Cd must be in (0, 1]");
+
+    const double rho = density(T, P, X);
+    const double dP  = P - P_back;
+    const double v   = (dP > 0.0) ? std::sqrt(2.0 * dP / rho) : 0.0;
+    const double mdot = Cd * A * rho * v;
+
+    IncompressibleFlowSolution sol;
+    sol.mdot = mdot;
+    sol.v    = Cd * v;   // effective throat velocity (Cd * ideal velocity)
+    sol.dP   = dP;
+    sol.Re   = 0.0;      // not meaningful for an orifice (no length scale)
+    sol.rho  = rho;
+    sol.f    = Cd;       // store Cd in f field for orifice results
+    return sol;
+}
+
+IncompressibleFlowSolution pipe_flow(
+    double T, double P, const std::vector<double>& X,
+    double u, double L, double D, double f)
+{
+    if (T <= 0.0)
+        throw std::invalid_argument("pipe_flow: T must be positive");
+    if (P <= 0.0)
+        throw std::invalid_argument("pipe_flow: P must be positive");
+    if (u < 0.0)
+        throw std::invalid_argument("pipe_flow: u must be non-negative");
+    if (L < 0.0)
+        throw std::invalid_argument("pipe_flow: L must be non-negative");
+    if (D <= 0.0)
+        throw std::invalid_argument("pipe_flow: D must be positive");
+    if (f < 0.0)
+        throw std::invalid_argument("pipe_flow: f must be non-negative");
+
+    const double rho  = density(T, P, X);
+    const double mu   = viscosity(T, P, X);
+    const double Re   = (mu > 0.0) ? rho * u * D / mu : 0.0;
+    const double dP   = pipe_dP(u, L, D, f, rho);
+    const double A    = PI * D * D / 4.0;
+    const double mdot = rho * u * A;
+
+    IncompressibleFlowSolution sol;
+    sol.mdot = mdot;
+    sol.v    = u;
+    sol.dP   = dP;
+    sol.Re   = Re;
+    sol.rho  = rho;
+    sol.f    = f;
+    return sol;
+}
+
+IncompressibleFlowSolution pipe_flow_rough(
+    double T, double P, const std::vector<double>& X,
+    double u, double L, double D,
+    double roughness,
+    const std::string& correlation)
+{
+    if (T <= 0.0)
+        throw std::invalid_argument("pipe_flow_rough: T must be positive");
+    if (P <= 0.0)
+        throw std::invalid_argument("pipe_flow_rough: P must be positive");
+    if (u < 0.0)
+        throw std::invalid_argument("pipe_flow_rough: u must be non-negative");
+    if (L < 0.0)
+        throw std::invalid_argument("pipe_flow_rough: L must be non-negative");
+    if (D <= 0.0)
+        throw std::invalid_argument("pipe_flow_rough: D must be positive");
+    if (roughness < 0.0)
+        throw std::invalid_argument("pipe_flow_rough: roughness must be non-negative");
+
+    const double rho  = density(T, P, X);
+    const double mu   = viscosity(T, P, X);
+    const double Re   = (mu > 0.0) ? rho * u * D / mu : 0.0;
+    const double e_D  = roughness / D;
+    const double f    = friction_from_correlation(Re, e_D, correlation);
+    const double dP   = pipe_dP(u, L, D, f, rho);
+    const double A    = PI * D * D / 4.0;
+    const double mdot = rho * u * A;
+
+    IncompressibleFlowSolution sol;
+    sol.mdot = mdot;
+    sol.v    = u;
+    sol.dP   = dP;
+    sol.Re   = Re;
+    sol.rho  = rho;
+    sol.f    = f;
+    return sol;
+}
+
+std::tuple<double, double, double> pressure_drop_pipe(
+    double T, double P, const std::vector<double>& X,
+    double v, double D, double L,
+    double roughness,
+    const std::string& correlation)
+{
+    if (T <= 0.0)
+        throw std::invalid_argument("pressure_drop_pipe: T must be positive");
+    if (P <= 0.0)
+        throw std::invalid_argument("pressure_drop_pipe: P must be positive");
+    if (D <= 0.0)
+        throw std::invalid_argument("pressure_drop_pipe: D must be positive");
+    if (L < 0.0)
+        throw std::invalid_argument("pressure_drop_pipe: L must be non-negative");
+    if (v < 0.0)
+        throw std::invalid_argument("pressure_drop_pipe: v must be non-negative");
+    if (roughness < 0.0)
+        throw std::invalid_argument("pressure_drop_pipe: roughness must be non-negative");
+
+    const double rho = density(T, P, X);
+    const double Re  = reynolds(T, P, X, v, D);
+    const double e_D = roughness / D;
+    const double f   = friction_from_correlation(Re, e_D, correlation);
+    const double dP  = pipe_dP(v, L, D, f, rho);
+
+    return std::make_tuple(dP, Re, f);
 }

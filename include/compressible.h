@@ -209,26 +209,30 @@ NozzleSolution nozzle_cd(
 
 // Result of Fanno flow calculation at a single station
 struct FannoStation {
-    double x = 0.0;      // Position along pipe [m]
-    double P = 0.0;      // Static pressure [Pa]
-    double T = 0.0;      // Static temperature [K]
+    double x   = 0.0;    // Position along pipe [m]
+    double P   = 0.0;    // Static pressure [Pa]
+    double T   = 0.0;    // Static temperature [K]
     double rho = 0.0;    // Density [kg/m³]
-    double u = 0.0;      // Velocity [m/s]
-    double M = 0.0;      // Mach number [-]
-    double h = 0.0;      // Specific enthalpy [J/kg]
-    double s = 0.0;      // Specific entropy [J/(kg·K)]
+    double u   = 0.0;    // Velocity [m/s]
+    double M   = 0.0;    // Mach number [-]
+    double h   = 0.0;    // Specific enthalpy [J/kg]
+    double s   = 0.0;    // Specific entropy [J/(kg·K)]
+    double f   = 0.0;    // Local Darcy friction factor [-]
+    double Re  = 0.0;    // Local Reynolds number [-]
 };
 
 // Result of Fanno flow pipe segment calculation
 struct FannoSolution {
     State inlet;                        // Inlet thermodynamic state
     State outlet;                       // Outlet thermodynamic state
-    double mdot = 0.0;                  // Mass flow rate [kg/s]
-    double h0 = 0.0;                    // Stagnation enthalpy [J/kg]
-    double L = 0.0;                     // Pipe length [m]
-    double D = 0.0;                     // Pipe diameter [m]
-    double f = 0.0;                     // Darcy friction factor [-]
-    bool choked = false;                // True if flow reached M=1
+    double mdot    = 0.0;               // Mass flow rate [kg/s]
+    double h0      = 0.0;               // Stagnation enthalpy [J/kg]
+    double L       = 0.0;               // Pipe length [m]
+    double D       = 0.0;               // Pipe diameter [m]
+    double f       = 0.0;               // Darcy friction factor (constant-f overload) [-]
+    double f_avg   = 0.0;               // Average Darcy friction factor over pipe [-]
+    double Re_in   = 0.0;               // Inlet Reynolds number [-]
+    bool choked    = false;             // True if flow reached M=1
     double L_choke = 0.0;               // Length to choking (if choked) [m]
     std::vector<FannoStation> profile;  // Axial profile (optional)
 };
@@ -259,6 +263,43 @@ FannoSolution fanno_pipe(
 FannoSolution fanno_pipe(
     const State& inlet, double u_in,
     double L, double D, double f,
+    std::size_t n_steps = 100,
+    bool store_profile = false);
+
+// Solve Fanno flow with roughness-based variable friction factor.
+//
+// At each RK4 stage, the local friction factor is recomputed from the
+// local Reynolds number and wall roughness using the specified correlation.
+// This is more physical than a constant f when Re varies significantly
+// along the pipe (e.g., large temperature or density changes).
+//
+// Inputs:
+//   T_in        : Inlet static temperature [K]
+//   P_in        : Inlet static pressure [Pa]
+//   u_in        : Inlet velocity [m/s]
+//   L           : Pipe length [m]
+//   D           : Pipe diameter [m]
+//   roughness   : Absolute wall roughness [m]
+//   X           : Mole fractions [-]
+//   correlation : Friction correlation (default: "haaland")
+//                 Options: "haaland", "serghides", "colebrook"
+//   n_steps     : Number of integration steps (default: 100)
+//   store_profile : If true, store axial profile in solution
+//
+// Returns FannoSolution with f_avg and Re_in populated.
+FannoSolution fanno_pipe_rough(
+    double T_in, double P_in, double u_in,
+    double L, double D, double roughness,
+    const std::vector<double>& X,
+    const std::string& correlation = "haaland",
+    std::size_t n_steps = 100,
+    bool store_profile = false);
+
+// Convenience: solve given inlet State and velocity (roughness-based)
+FannoSolution fanno_pipe_rough(
+    const State& inlet, double u_in,
+    double L, double D, double roughness,
+    const std::string& correlation = "haaland",
     std::size_t n_steps = 100,
     bool store_profile = false);
 

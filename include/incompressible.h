@@ -3,9 +3,23 @@
 
 #include "geometry.h"  // Re-export hydraulic_diameter functions
 
+#include <string>
+#include <tuple>
+#include <vector>
+
 // Incompressible flow equations
 //
-// These functions assume constant density (incompressible flow).
+// This header provides two layers:
+//
+//   Layer 1 — scalar primitives (constant density):
+//     Bernoulli, orifice, Darcy-Weisbach, zeta/Cd conversions.
+//     Inputs: rho, v, P, A, Cd, f (user-supplied fluid properties).
+//
+//   Layer 2 — thermo-aware high-level API:
+//     Takes (T, P, X) and evaluates rho/mu internally.
+//     Returns IncompressibleFlowSolution with all relevant quantities.
+//     Mirrors the compressible.h API structure.
+//
 // Valid for:
 //   - Mach number < 0.3 (density change < 5%)
 //   - Pressure ratio close to 1 (ΔP/P << 1)
@@ -166,5 +180,104 @@ double zeta_from_Cd(double Cd);
 // Discharge coefficient from loss coefficient (throat area as reference).
 // Cd = 1 / √ζ
 double Cd_from_zeta(double zeta);
+
+// -------------------------------------------------------------
+// High-level thermo-aware API
+// -------------------------------------------------------------
+// These functions take (T, P, X) and evaluate density and viscosity
+// internally, returning a rich solution struct. They mirror the
+// structure of compressible.h (nozzle_flow, fanno_pipe) so that
+// the two regimes share a common calling convention.
+
+// Result of a thermo-aware incompressible flow calculation.
+struct IncompressibleFlowSolution {
+    double mdot = 0.0;   // Mass flow rate [kg/s]
+    double v    = 0.0;   // Velocity at throat / pipe cross-section [m/s]
+    double dP   = 0.0;   // Pressure drop P_in - P_out [Pa]
+    double Re   = 0.0;   // Reynolds number [-]
+    double rho  = 0.0;   // Inlet density [kg/m³]
+    double f    = 0.0;   // Darcy friction factor (pipe) or Cd (orifice) [-]
+};
+
+// Thermo-aware orifice flow.
+//
+// Evaluates rho from (T, P, X) internally, then applies the
+// incompressible orifice equation: mdot = Cd * A * sqrt(2 * rho * dP).
+//
+// Inputs:
+//   T      : temperature [K]
+//   P      : upstream pressure [Pa]
+//   X      : mole fractions [-]
+//   P_back : downstream pressure [Pa]  (dP = P - P_back)
+//   A      : orifice area [m²]
+//   Cd     : discharge coefficient [-] (default: 1.0)
+//
+// Returns: IncompressibleFlowSolution
+IncompressibleFlowSolution orifice_flow_thermo(
+    double T, double P, const std::vector<double>& X,
+    double P_back, double A, double Cd = 1.0);
+
+// Thermo-aware pipe flow with explicit friction factor.
+//
+// Evaluates rho from (T, P, X) internally, then applies Darcy-Weisbach.
+//
+// Inputs:
+//   T : temperature [K]
+//   P : pressure [Pa]
+//   X : mole fractions [-]
+//   u : flow velocity [m/s]
+//   L : pipe length [m]
+//   D : pipe diameter [m]
+//   f : Darcy friction factor [-]
+//
+// Returns: IncompressibleFlowSolution
+IncompressibleFlowSolution pipe_flow(
+    double T, double P, const std::vector<double>& X,
+    double u, double L, double D, double f);
+
+// Thermo-aware pipe flow with roughness-based friction factor.
+//
+// Evaluates rho and mu from (T, P, X) internally, computes Re and f
+// from the specified correlation, then applies Darcy-Weisbach.
+//
+// Inputs:
+//   T           : temperature [K]
+//   P           : pressure [Pa]
+//   X           : mole fractions [-]
+//   u           : flow velocity [m/s]
+//   L           : pipe length [m]
+//   D           : pipe diameter [m]
+//   roughness   : absolute wall roughness [m] (default: 0.0 = smooth)
+//   correlation : friction correlation (default: "haaland")
+//                 Options: "haaland", "serghides", "colebrook", "petukhov"
+//
+// Returns: IncompressibleFlowSolution
+IncompressibleFlowSolution pipe_flow_rough(
+    double T, double P, const std::vector<double>& X,
+    double u, double L, double D,
+    double roughness = 0.0,
+    const std::string& correlation = "haaland");
+
+// Composite pipe pressure drop (legacy / convenience).
+//
+// Combines density, viscosity, Reynolds number, friction factor, and
+// Darcy-Weisbach into a single call. Returns (dP, Re, f) tuple.
+//
+// Inputs:
+//   T           : temperature [K]
+//   P           : pressure [Pa]
+//   X           : mole fractions [-]
+//   v           : flow velocity [m/s]
+//   D           : pipe diameter [m]
+//   L           : pipe length [m]
+//   roughness   : absolute roughness [m] (default: 0.0)
+//   correlation : friction correlation (default: "haaland")
+//
+// Returns: tuple of (dP [Pa], Re [-], f [-])
+std::tuple<double, double, double> pressure_drop_pipe(
+    double T, double P, const std::vector<double>& X,
+    double v, double D, double L,
+    double roughness = 0.0,
+    const std::string& correlation = "haaland");
 
 #endif // INCOMPRESSIBLE_H
