@@ -318,3 +318,171 @@ class TestPhysicalConsistency:
 
         # Gamma should be lower for hot products than cold reactants
         assert state.products.thermo.gamma < state.reactants.thermo.gamma
+
+
+class TestPressureLossHook:
+    """Tests for user-supplied pressure-loss correlation hook."""
+
+    def _ch4_air(self):
+        X_CH4 = [0.0] * 14
+        X_CH4[5] = 1.0  # CH4 index
+        return X_CH4, cb.standard_dry_air_composition()
+
+    def test_fixed_hook_applies_correct_pressure_drop(self):
+        """Hook returning 0.05 must give P_out = 0.95 * P_in."""
+        X_fuel, X_ox = self._ch4_air()
+        P_in = 500_000.0
+        frac = 0.05
+
+        result = cb.combustion_state(
+            X_fuel, X_ox, phi=1.0, T_reactants=700.0, P=P_in,
+            pressure_loss=lambda c: frac,
+        )
+
+        assert result.products.thermo.P == pytest.approx(P_in * (1.0 - frac), rel=1e-6)
+
+    def test_zero_hook_preserves_pressure(self):
+        """Hook returning 0 must leave P_out == P_in."""
+        X_fuel, X_ox = self._ch4_air()
+        P_in = 300_000.0
+
+        result = cb.combustion_state(
+            X_fuel, X_ox, phi=0.8, T_reactants=700.0, P=P_in,
+            pressure_loss=lambda c: 0.0,
+        )
+
+        assert result.products.thermo.P == pytest.approx(P_in, rel=1e-6)
+
+    def test_context_theta_positive_for_exothermic(self):
+        """theta = T_ad/T_in - 1 must be > 0 for lean CH4/air."""
+        X_fuel, X_ox = self._ch4_air()
+        captured = {}
+
+        def hook(ctx):
+            captured["theta"] = ctx.theta
+            captured["T_ad"] = ctx.T_ad
+            captured["phi"] = ctx.phi
+            return 0.03
+
+        cb.combustion_state(
+            X_fuel, X_ox, phi=0.8, T_reactants=700.0, P=300_000.0,
+            pressure_loss=hook,
+        )
+
+        assert captured["theta"] > 0.0
+        assert captured["T_ad"] > 700.0
+        assert captured["phi"] == pytest.approx(0.8, rel=1e-6)
+
+    def test_context_has_inlet_conditions(self):
+        """ctx.T_in and ctx.P_in must match the call arguments."""
+        X_fuel, X_ox = self._ch4_air()
+        captured = {}
+
+        def hook(ctx):
+            captured["T_in"] = ctx.T_in
+            captured["P_in"] = ctx.P_in
+            return 0.04
+
+        cb.combustion_state(
+            X_fuel, X_ox, phi=1.0, T_reactants=800.0, P=400_000.0,
+            pressure_loss=hook,
+        )
+
+        assert captured["T_in"] == pytest.approx(800.0, rel=1e-6)
+        assert captured["P_in"] == pytest.approx(400_000.0, rel=1e-6)
+
+    def test_theta_based_hook_increases_loss_with_phi(self):
+        """Higher phi → higher T_ad → higher theta → higher loss."""
+        X_fuel, X_ox = self._ch4_air()
+
+        def theta_hook(ctx):
+            return 0.02 + 0.005 * ctx.theta
+
+        r_lean = cb.combustion_state(
+            X_fuel, X_ox, phi=0.5, T_reactants=700.0, P=300_000.0,
+            pressure_loss=theta_hook,
+        )
+        r_rich = cb.combustion_state(
+            X_fuel, X_ox, phi=1.0, T_reactants=700.0, P=300_000.0,
+            pressure_loss=theta_hook,
+        )
+
+        # Stoichiometric has higher T_ad → higher loss → lower P_out
+        assert r_rich.products.thermo.P < r_lean.products.thermo.P
+
+    def test_streams_hook_receives_mdot(self):
+        """combustion_state_from_streams hook must receive correct mdot_fuel/air."""
+        X_fuel, X_ox = self._ch4_air()
+        captured = {}
+
+        fuel = cb.Stream()
+        fuel.set_mdot(0.05).set_T(700.0).set_P(300_000.0).set_X(X_fuel)
+
+        air = cb.Stream()
+        air.set_mdot(1.0).set_T(700.0).set_P(300_000.0).set_X(X_ox)
+
+        def hook(ctx):
+            captured["mdot_fuel"] = ctx.mdot_fuel
+            captured["mdot_air"] = ctx.mdot_air
+            return 0.04
+
+        cb.combustion_state_from_streams(fuel, air, pressure_loss=hook)
+
+        assert captured["mdot_fuel"] == pytest.approx(0.05, rel=1e-10)
+        assert captured["mdot_air"] == pytest.approx(1.0, rel=1e-10)
+
+
+class TestIncompressibleHooks:
+    """Tests for CdFunction and KLossFunction callable overloads."""
+
+    def _air(self):
+        X = [0.0] * 14
+        X[1] = 0.21   # O2
+        X[0] = 0.79   # N2
+        return X
+
+    def test_orifice_cd_fn_constant_matches_fixed_cd(self):
+        """CdFunction returning constant Cd must match fixed-Cd overload."""
+        X = self._air()
+        T, P, P_back, A, Cd = 300.0, 200_000.0, 190_000.0, 1e-4, 0.72
+
+        sol_fixed = cb.orifice_flow_thermo(T, P, X, P_back, A, Cd=Cd)
+        sol_fn    = cb.orifice_flow_thermo(T, P, X, P_back, A,
+                                           cd_fn=lambda T_, P_, X_, Re: Cd)
+
+        assert sol_fn.mdot == pytest.approx(sol_fixed.mdot, rel=1e-9)
+        assert sol_fn.dP   == pytest.approx(sol_fixed.dP,   rel=1e-9)
+
+    def test_orifice_cd_fn_re_dependent(self):
+        """Re-dependent Cd must produce different mdot than constant Cd=0.7."""
+        X = self._air()
+        T, P, P_back, A = 300.0, 200_000.0, 190_000.0, 1e-4
+
+        sol_const = cb.orifice_flow_thermo(T, P, X, P_back, A, Cd=0.7)
+        # Cd increases with Re — at high Re returns 0.85
+        sol_fn = cb.orifice_flow_thermo(T, P, X, P_back, A,
+                                        cd_fn=lambda T_, P_, X_, Re: 0.85)
+
+        assert sol_fn.mdot > sol_const.mdot
+
+    def test_pipe_k_loss_zero_matches_base(self):
+        """K=0 callable must give same dP as base pipe_flow_rough."""
+        X = self._air()
+        T, P, u, L, D = 400.0, 300_000.0, 20.0, 2.0, 0.05
+
+        sol_base = cb.pipe_flow_rough(T, P, X, u, L, D)
+        sol_zero = cb.pipe_flow_rough(T, P, X, u, L, D,
+                                      k_loss_fn=lambda T_, P_, X_, Re: 0.0)
+
+        assert sol_zero.dP == pytest.approx(sol_base.dP, rel=1e-9)
+
+    def test_pipe_k_loss_nonzero_increases_dp(self):
+        """Positive K must increase dP above base friction."""
+        X = self._air()
+        T, P, u, L, D = 400.0, 300_000.0, 20.0, 2.0, 0.05
+
+        sol_base = cb.pipe_flow_rough(T, P, X, u, L, D)
+        sol_k    = cb.pipe_flow_rough(T, P, X, u, L, D,
+                                      k_loss_fn=lambda T_, P_, X_, Re: 1.5)
+
+        assert sol_k.dP > sol_base.dP

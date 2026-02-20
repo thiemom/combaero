@@ -156,6 +156,65 @@ def mix_streams(
 
 ---
 
+## Pressure-Loss Correlation Hook (C++ / Python)
+
+The C++ functions `combustion_state()` and `combustion_state_from_streams()` accept an
+optional user-supplied pressure-loss callable via `PressureLossCorrelation`.
+
+### Why a hook instead of a fixed `delta_P_frac`?
+
+Real combustors have pressure losses that depend on operating conditions (φ, T_ad,
+fuel splits). The hook lets the user supply any correlation without modifying CombAero.
+
+### Loop-free design
+
+All fields in `PressureLossContext` are **loop-free** — they depend only on inlet
+conditions and combustion outputs, never on the unknown outlet pressure. This makes
+the hook safe to call inside a Newton solver without creating an implicit loop.
+
+| Context field | Loop-free? | Reason |
+|---|---|---|
+| `state_in` (T, P, X) | ✅ | Upstream, known before solve |
+| `phi` | ✅ | From ṁ_fuel/ṁ_air, both known |
+| `T_ad` | ✅ | From h-balance, no P dependence (complete combustion) |
+| `X_products` | ✅ | From atom balance, no P dependence |
+| `theta = T_ad/T_in − 1` | ✅ | Dimensionless temperature rise, no P dependence |
+| `mdot_fuel`, `mdot_air` | ✅ | Fixed stream inputs |
+| Outlet P, ρ | ❌ | **Not provided** — would create a loop |
+
+For equilibrium combustion `T_ad` and `X_products` shift slightly with P (~1% for
+typical 4% ΔP/P). The hook uses P_in for the equilibrium call — this is acceptable
+for engineering accuracy.
+
+### C++ usage
+
+```cpp
+auto result = combustion_state(
+    X_fuel, X_ox, phi, T_reactants, P, "",
+    CombustionMethod::Complete,
+    [](const PressureLossContext& c) {
+        return 0.02 + 0.005 * c.theta;   // 2% base + 0.5% per unit θ
+    }
+);
+// result.products.thermo.P = P * (1 - hook_return_value)
+```
+
+### Python usage
+
+```python
+def my_loss(ctx):
+    return 0.02 + 0.005 * ctx.theta
+
+result = cb.combustion_state(X_fuel, X_ox, phi=0.8, T_reactants=700, P=500000,
+                              pressure_loss=my_loss)
+
+# Available context fields:
+# ctx.phi, ctx.T_ad, ctx.theta, ctx.T_in, ctx.P_in, ctx.X_in, ctx.X_products
+# ctx.mdot_fuel, ctx.mdot_air  (populated by combustion_state_from_streams)
+```
+
+---
+
 ## Function 3: `combustion_from_streams`
 
 The primary combustion function for the network solver. Takes a mixed inlet

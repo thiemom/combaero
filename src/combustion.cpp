@@ -1418,3 +1418,118 @@ CombustionState combustion_state_from_streams(
 
     return combustion_state(fuel_stream.X(), ox_stream.X(), phi, T_reactants, P, fuel_name, method);
 }
+
+// -------------------------------------------------------------
+// Overloads with user-supplied PressureLossCorrelation
+// -------------------------------------------------------------
+
+// Variant 1 with hook: from equivalence ratio
+CombustionState combustion_state(
+    const std::vector<double>& X_fuel,
+    const std::vector<double>& X_ox,
+    double phi,
+    double T_reactants,
+    double P,
+    const std::string& fuel_name,
+    CombustionMethod method,
+    const PressureLossCorrelation& pressure_loss
+) {
+    // Compute reactant mixture and product state (at inlet P)
+    const std::vector<double> X_reactants = set_equivalence_ratio_mole(phi, X_fuel, X_ox);
+    State reactant_state{T_reactants, P, X_reactants};
+
+    State product_state;
+    double fuel_burn_fraction = 1.0;
+    if (method == CombustionMethod::Equilibrium) {
+        EquilibriumResult eq = combustion_equilibrium(reactant_state);
+        product_state = eq.state;
+        fuel_burn_fraction = eq.converged ? 1.0 : 0.0;
+    } else {
+        product_state = complete_combustion(reactant_state);
+    }
+
+    // Build context — all fields are loop-free
+    const double T_ad = product_state.T;
+    const double theta = (T_reactants > 0.0) ? (T_ad / T_reactants - 1.0) : 0.0;
+    PressureLossContext ctx{
+        reactant_state,
+        phi,
+        T_ad,
+        product_state.X,
+        theta,
+        0.0,   // mdot_fuel not available in phi-based call
+        0.0    // mdot_air not available in phi-based call
+    };
+    const double delta_P_frac = pressure_loss(ctx);
+    const double P_out = P * (1.0 - delta_P_frac);
+
+    // Assemble result
+    CombustionState result;
+    result.phi = phi;
+    result.fuel_name = fuel_name;
+    result.method = method;
+    result.fuel_burn_fraction = fuel_burn_fraction;
+    result.reactants = complete_state(T_reactants, P, X_reactants);
+    result.products  = complete_state(product_state.T, P_out, product_state.X);
+    result.mixture_fraction = compute_bilger_mixture_fraction(X_reactants, X_fuel, X_ox);
+    return result;
+}
+
+// Variant 2 with hook: from streams
+CombustionState combustion_state_from_streams(
+    const Stream& fuel_stream,
+    const Stream& ox_stream,
+    const std::string& fuel_name,
+    CombustionMethod method,
+    const PressureLossCorrelation& pressure_loss
+) {
+    const double mdot_total = fuel_stream.mdot + ox_stream.mdot;
+    if (mdot_total <= 0.0) {
+        throw std::runtime_error("Total mass flow rate must be positive");
+    }
+
+    const double T_reactants = mix({fuel_stream, ox_stream}).state.T;
+    const double P = fuel_stream.P();
+    const double FAR_stoich = stoich_fuel_ox_ratio(fuel_stream.X(), ox_stream.X());
+    const double phi = (fuel_stream.mdot / ox_stream.mdot) / FAR_stoich;
+
+    // Compute products at inlet P to build the context
+    const std::vector<double> X_reactants =
+        set_equivalence_ratio_mole(phi, fuel_stream.X(), ox_stream.X());
+    State reactant_state{T_reactants, P, X_reactants};
+
+    State product_state;
+    double fuel_burn_fraction = 1.0;
+    if (method == CombustionMethod::Equilibrium) {
+        EquilibriumResult eq = combustion_equilibrium(reactant_state);
+        product_state = eq.state;
+        fuel_burn_fraction = eq.converged ? 1.0 : 0.0;
+    } else {
+        product_state = complete_combustion(reactant_state);
+    }
+
+    const double T_ad = product_state.T;
+    const double theta = (T_reactants > 0.0) ? (T_ad / T_reactants - 1.0) : 0.0;
+    PressureLossContext ctx{
+        reactant_state,
+        phi,
+        T_ad,
+        product_state.X,
+        theta,
+        fuel_stream.mdot,
+        ox_stream.mdot
+    };
+    const double delta_P_frac = pressure_loss(ctx);
+    const double P_out = P * (1.0 - delta_P_frac);
+
+    CombustionState result;
+    result.phi = phi;
+    result.fuel_name = fuel_name;
+    result.method = method;
+    result.fuel_burn_fraction = fuel_burn_fraction;
+    result.reactants = complete_state(T_reactants, P, X_reactants);
+    result.products  = complete_state(product_state.T, P_out, product_state.X);
+    result.mixture_fraction = compute_bilger_mixture_fraction(
+        X_reactants, fuel_stream.X(), ox_stream.X());
+    return result;
+}

@@ -3,6 +3,7 @@
 
 #include "geometry.h"  // Re-export hydraulic_diameter functions
 
+#include <functional>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -199,6 +200,18 @@ struct IncompressibleFlowSolution {
     double f    = 0.0;   // Darcy friction factor (pipe) or Cd (orifice) [-]
 };
 
+// User-supplied Cd function: f(T, P, X, Re) → Cd [-]
+// Re is computed internally from the inlet conditions and velocity.
+// Loop-free: uses only inlet state — safe for Newton solvers.
+using IncompressibleCdFn = std::function<double(double T, double P,
+    const std::vector<double>& X, double Re)>;
+
+// User-supplied additional K-loss function: f(T, P, X, Re) → K [-]
+// Applied as extra ΔP = K · ½ρv² on top of pipe friction.
+// Loop-free: uses only inlet state — safe for Newton solvers.
+using IncompressibleKLossFn = std::function<double(double T, double P,
+    const std::vector<double>& X, double Re)>;
+
 // Thermo-aware orifice flow.
 //
 // Evaluates rho from (T, P, X) internally, then applies the
@@ -216,6 +229,13 @@ struct IncompressibleFlowSolution {
 IncompressibleFlowSolution orifice_flow_thermo(
     double T, double P, const std::vector<double>& X,
     double P_back, double A, double Cd = 1.0);
+
+// Overload with user-supplied Cd correlation.
+// cd_fn(T, P, X, Re) is called with the inlet Re computed from the
+// velocity implied by the fixed pressure difference.
+IncompressibleFlowSolution orifice_flow_thermo(
+    double T, double P, const std::vector<double>& X,
+    double P_back, double A, const IncompressibleCdFn& cd_fn);
 
 // Thermo-aware pipe flow with explicit friction factor.
 //
@@ -257,6 +277,16 @@ IncompressibleFlowSolution pipe_flow_rough(
     double u, double L, double D,
     double roughness = 0.0,
     const std::string& correlation = "haaland");
+
+// Overload with additional K-loss correlation (bends, fittings, etc.).
+// k_loss_fn(T, P, X, Re) returns K [-]; extra ΔP = K · ½ρu² is added
+// to the Darcy-Weisbach friction loss.
+IncompressibleFlowSolution pipe_flow_rough(
+    double T, double P, const std::vector<double>& X,
+    double u, double L, double D,
+    double roughness,
+    const std::string& correlation,
+    const IncompressibleKLossFn& k_loss_fn);
 
 // Composite pipe pressure drop (legacy / convenience).
 //

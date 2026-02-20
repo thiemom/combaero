@@ -3,8 +3,43 @@
 
 #include "state.h"
 #include <cstddef>
+#include <functional>
 #include <vector>
 #include <string>
+
+// -------------------------------------------------------------
+// User-supplied pressure-loss correlation hook
+// -------------------------------------------------------------
+//
+// All fields in PressureLossContext are loop-free: they depend only on
+// inlet conditions and combustion outputs, never on the unknown outlet
+// pressure. This makes the hook safe to call inside a Newton solver
+// without creating an implicit loop.
+//
+// Return value: fractional total-pressure drop ΔP/P_in  [-]
+//   P_out = P_in * (1 - pressure_loss(ctx))
+//
+// Usage (C++):
+//   auto my_loss = [](const PressureLossContext& c) {
+//       return 0.02 + 0.01 * c.theta;   // 2% base + 1% per unit θ
+//   };
+//   auto result = combustion_state(X_fuel, X_ox, phi, T, P, "", method, my_loss);
+//
+// Usage (Python):
+//   result = cb.combustion_state(X_fuel, X_ox, phi, T, P,
+//                                pressure_loss=lambda c: 0.02 + 0.01*c.theta)
+
+struct PressureLossContext {
+    const State& state_in;                  // inlet T, P, X (static conditions)
+    double phi;                             // equivalence ratio [-]
+    double T_ad;                            // adiabatic flame temperature [K]
+    const std::vector<double>& X_products;  // burned gas mole fractions
+    double theta;                           // T_ad/T_in - 1  (dimensionless temperature rise)
+    double mdot_fuel;                       // fuel mass flow [kg/s]  (0 if phi-based call)
+    double mdot_air;                        // air mass flow [kg/s]   (0 if phi-based call)
+};
+
+using PressureLossCorrelation = std::function<double(const PressureLossContext&)>;
 
 // Combustion calculations - oxygen requirements
 double oxygen_required_per_mol_fuel(std::size_t fuel_index);
@@ -217,6 +252,7 @@ State complete_combustion_isothermal(const State& in);
 //   fuel_name    : optional fuel label (default: "")
 //   method       : product model — Complete (default, fast) or Equilibrium
 // Returns: CombustionState with reactants, products, phi, mixture_fraction
+// Note: products.thermo.P = P * (1 - delta_P_frac)  [fixed 4% drop]
 CombustionState combustion_state(
     const std::vector<double>& X_fuel,
     const std::vector<double>& X_ox,
@@ -225,6 +261,20 @@ CombustionState combustion_state(
     double P,
     const std::string& fuel_name = "",
     CombustionMethod method = CombustionMethod::Complete
+);
+
+// Overload with user-supplied pressure-loss correlation.
+// pressure_loss(ctx) returns fractional ΔP/P_in [-].
+// All fields in PressureLossContext are loop-free — safe for Newton solvers.
+CombustionState combustion_state(
+    const std::vector<double>& X_fuel,
+    const std::vector<double>& X_ox,
+    double phi,
+    double T_reactants,
+    double P,
+    const std::string& fuel_name,
+    CombustionMethod method,
+    const PressureLossCorrelation& pressure_loss
 );
 
 // Compute combustion state from measured streams (typical for lab data)
@@ -239,6 +289,17 @@ CombustionState combustion_state_from_streams(
     const Stream& ox_stream,
     const std::string& fuel_name = "",
     CombustionMethod method = CombustionMethod::Complete
+);
+
+// Overload with user-supplied pressure-loss correlation.
+// pressure_loss(ctx) returns fractional ΔP/P_in [-].
+// ctx.mdot_fuel and ctx.mdot_air are populated from the stream mass flows.
+CombustionState combustion_state_from_streams(
+    const Stream& fuel_stream,
+    const Stream& ox_stream,
+    const std::string& fuel_name,
+    CombustionMethod method,
+    const PressureLossCorrelation& pressure_loss
 );
 
 #endif // COMBUSTION_H

@@ -94,10 +94,12 @@ well-posedness. The solver validates this at setup.
 
 | Element | Residual | CombAero call |
 |---|---|---|
-| `OrificeElement` | `ṁ = Cd·A·√(2ρΔP)` | `orifice_mdot()` or `orifice_flow_thermo()` |
-| `PipeElement` (incompressible) | `ΔP = f·(L/D)·½ρv²` | `pipe_flow()` / `pipe_flow_rough()` |
+| `OrificeElement` | `ṁ = Cd·A·√(2ρΔP)` | `orifice_flow_thermo()` — accepts fixed `Cd` or `cd_fn(T,P,X,Re)→Cd` callable |
+| `PipeElement` (incompressible) | `ΔP = f·(L/D)·½ρv²` + K·½ρv² | `pipe_flow_rough()` — accepts optional `k_loss_fn(T,P,X,Re)→K` for fittings/bends |
 | `PipeElement` (compressible) | Fanno adiabatic friction | `fanno_pipe()` / `fanno_pipe_rough()` |
 | `MomentumChamberElement` | Momentum + area change | `density()`, `speed_of_sound()` |
+
+**User-correlation hooks for flow elements** are loop-free: `cd_fn` and `k_loss_fn` receive only inlet state `(T, P, X, Re)` — never outlet pressure — so they are safe inside Newton solvers.
 
 ### Thermal Elements
 

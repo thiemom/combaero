@@ -312,6 +312,67 @@ IncompressibleFlowSolution pipe_flow_rough(
     return sol;
 }
 
+// Orifice overload with user-supplied Cd correlation.
+// Re is computed from the ideal throat velocity (Cd=1) so the correlation
+// receives a meaningful Reynolds number without requiring iteration.
+IncompressibleFlowSolution orifice_flow_thermo(
+    double T, double P, const std::vector<double>& X,
+    double P_back, double A, const IncompressibleCdFn& cd_fn)
+{
+    if (T <= 0.0)
+        throw std::invalid_argument("orifice_flow: T must be positive");
+    if (P <= 0.0)
+        throw std::invalid_argument("orifice_flow: P must be positive");
+    if (P_back < 0.0)
+        throw std::invalid_argument("orifice_flow: P_back must be non-negative");
+    if (P < P_back)
+        throw std::invalid_argument("orifice_flow: P must be >= P_back");
+    if (A <= 0.0)
+        throw std::invalid_argument("orifice_flow: A must be positive");
+
+    const double rho = density(T, P, X);
+    const double mu  = viscosity(T, P, X);
+    const double dP  = P - P_back;
+    const double v_ideal = (dP > 0.0) ? std::sqrt(2.0 * dP / rho) : 0.0;
+
+    // Characteristic length: equivalent diameter from area
+    const double D_eq = std::sqrt(4.0 * A / PI);
+    const double Re   = (mu > 0.0) ? rho * v_ideal * D_eq / mu : 0.0;
+
+    const double Cd = cd_fn(T, P, X, Re);
+    if (Cd <= 0.0 || Cd > 1.0)
+        throw std::runtime_error("orifice_flow: Cd correlation returned value outside (0, 1]");
+
+    const double mdot = Cd * A * rho * v_ideal;
+
+    IncompressibleFlowSolution sol;
+    sol.mdot = mdot;
+    sol.v    = Cd * v_ideal;
+    sol.dP   = dP;
+    sol.Re   = Re;
+    sol.rho  = rho;
+    sol.f    = Cd;
+    return sol;
+}
+
+// Pipe overload with additional K-loss correlation (bends, fittings, etc.).
+IncompressibleFlowSolution pipe_flow_rough(
+    double T, double P, const std::vector<double>& X,
+    double u, double L, double D,
+    double roughness,
+    const std::string& correlation,
+    const IncompressibleKLossFn& k_loss_fn)
+{
+    // Compute base friction solution
+    IncompressibleFlowSolution sol = pipe_flow_rough(T, P, X, u, L, D, roughness, correlation);
+
+    // Evaluate additional K-loss at the computed Re (inlet state, loop-free)
+    const double K   = k_loss_fn(T, P, X, sol.Re);
+    const double dP_extra = K * 0.5 * sol.rho * u * u;
+    sol.dP += dP_extra;
+    return sol;
+}
+
 std::tuple<double, double, double> pressure_drop_pipe(
     double T, double P, const std::vector<double>& X,
     double v, double D, double L,

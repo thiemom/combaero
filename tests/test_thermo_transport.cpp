@@ -12,6 +12,7 @@
 #include "../include/math_constants.h"  // MSVC compatibility for M_PI
 #include "../include/heat_transfer.h"
 #include "../include/correlation_status.h"
+#include "../include/incompressible.h"
 #include <cmath>
 #include <vector>
 
@@ -4391,4 +4392,124 @@ TEST(AcousticsTest, Bandwidth) {
     // Δf = f0/Q = 4 Hz
     double df = bandwidth(f0, Q);
     EXPECT_NEAR(df, 4.0, 1e-10);
+}
+
+// =============================================================================
+// PressureLossCorrelation hook tests
+// =============================================================================
+
+TEST(PressureLossHookTest, CombustionStateFixedHookMatchesScaledP) {
+    // A fixed 4% pressure loss via hook must give P_out = 0.96 * P_in,
+    // matching the expected product pressure.
+    std::vector<double> X_fuel(species_names.size(), 0.0);
+    std::vector<double> X_ox(species_names.size(), 0.0);
+    X_fuel[species_index.at("CH4")] = 1.0;
+    X_ox[species_index.at("O2")]  = 0.21;
+    X_ox[species_index.at("N2")]  = 0.79;
+
+    const double P_in = 500000.0;
+    const double frac = 0.04;
+
+    auto result = combustion_state(
+        X_fuel, X_ox, 1.0, 700.0, P_in, "",
+        CombustionMethod::Complete,
+        [frac](const PressureLossContext&) { return frac; }
+    );
+
+    EXPECT_NEAR(result.products.thermo.P, P_in * (1.0 - frac), 1.0);
+    EXPECT_GT(result.products.thermo.T, 700.0);  // exothermic
+}
+
+TEST(PressureLossHookTest, ThetaIsPositiveForExothermicCombustion) {
+    // theta = T_ad/T_in - 1 must be > 0 for lean CH4/air combustion.
+    std::vector<double> X_fuel(species_names.size(), 0.0);
+    std::vector<double> X_ox(species_names.size(), 0.0);
+    X_fuel[species_index.at("CH4")] = 1.0;
+    X_ox[species_index.at("O2")]  = 0.21;
+    X_ox[species_index.at("N2")]  = 0.79;
+
+    double theta_captured = -1.0;
+    combustion_state(
+        X_fuel, X_ox, 0.8, 700.0, 300000.0, "",
+        CombustionMethod::Complete,
+        [&theta_captured](const PressureLossContext& ctx) {
+            theta_captured = ctx.theta;
+            return 0.03;
+        }
+    );
+
+    EXPECT_GT(theta_captured, 0.0);
+}
+
+TEST(PressureLossHookTest, CombustionStateFromStreamsPopulatesMdot) {
+    // combustion_state_from_streams hook must receive non-zero mdot_fuel/air.
+    std::vector<double> X_fuel(species_names.size(), 0.0);
+    std::vector<double> X_ox(species_names.size(), 0.0);
+    X_fuel[species_index.at("CH4")] = 1.0;
+    X_ox[species_index.at("O2")]  = 0.21;
+    X_ox[species_index.at("N2")]  = 0.79;
+
+    Stream fuel, air;
+    fuel.mdot = 0.05;
+    fuel.state = {700.0, 300000.0, X_fuel};
+    air.mdot  = 1.0;
+    air.state  = {700.0, 300000.0, X_ox};
+
+    double mdot_fuel_seen = 0.0;
+    double mdot_air_seen  = 0.0;
+    combustion_state_from_streams(
+        fuel, air, "", CombustionMethod::Complete,
+        [&](const PressureLossContext& ctx) {
+            mdot_fuel_seen = ctx.mdot_fuel;
+            mdot_air_seen  = ctx.mdot_air;
+            return 0.04;
+        }
+    );
+
+    EXPECT_NEAR(mdot_fuel_seen, 0.05, 1e-10);
+    EXPECT_NEAR(mdot_air_seen,  1.0,  1e-10);
+}
+
+TEST(PressureLossHookTest, OrificeFlowThermoCdFunction) {
+    // CdFunction overload must give same result as fixed Cd when callable
+    // returns a constant.
+    std::vector<double> X_air(species_names.size(), 0.0);
+    X_air[species_index.at("O2")] = 0.21;
+    X_air[species_index.at("N2")] = 0.79;
+
+    const double T = 300.0, P = 200000.0, P_back = 190000.0, A = 1e-4;
+    const double Cd_fixed = 0.72;
+
+    auto sol_fixed = orifice_flow_thermo(T, P, X_air, P_back, A, Cd_fixed);
+    auto sol_fn    = orifice_flow_thermo(T, P, X_air, P_back, A,
+        IncompressibleCdFn([Cd_fixed](double, double, const std::vector<double>&, double) {
+            return Cd_fixed;
+        }));
+
+    EXPECT_NEAR(sol_fn.mdot, sol_fixed.mdot, sol_fixed.mdot * 1e-10);
+    EXPECT_NEAR(sol_fn.dP,   sol_fixed.dP,   1e-6);
+}
+
+TEST(PressureLossHookTest, PipeFlowRoughKLossFunction) {
+    // KLossFunction overload with K=0 must match base pipe_flow_rough.
+    std::vector<double> X_air(species_names.size(), 0.0);
+    X_air[species_index.at("O2")] = 0.21;
+    X_air[species_index.at("N2")] = 0.79;
+
+    const double T = 400.0, P = 300000.0, u = 20.0, L = 2.0, D = 0.05;
+
+    auto sol_base = pipe_flow_rough(T, P, X_air, u, L, D);
+    auto sol_zero = pipe_flow_rough(T, P, X_air, u, L, D, 0.0, "haaland",
+        IncompressibleKLossFn([](double, double, const std::vector<double>&, double) {
+            return 0.0;
+        }));
+
+    EXPECT_NEAR(sol_zero.dP, sol_base.dP, sol_base.dP * 1e-10);
+
+    // Non-zero K must increase dP
+    auto sol_k = pipe_flow_rough(T, P, X_air, u, L, D, 0.0, "haaland",
+        IncompressibleKLossFn([](double, double, const std::vector<double>&, double) {
+            return 1.5;  // 1.5 velocity heads
+        }));
+    EXPECT_GT(sol_k.dP, sol_base.dP);
 }

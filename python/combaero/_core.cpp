@@ -1,4 +1,5 @@
 #include <pybind11/pybind11.h>
+#include <pybind11/functional.h>
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
 #include <vector>
@@ -2796,9 +2797,13 @@ PYBIND11_MODULE(_core, m)
                    (s.fuel_name.empty() ? "" : ", fuel='" + s.fuel_name + "'") + ">";
         });
 
+    using CombustionStateBaseFn = CombustionState(*)(
+        const std::vector<double>&, const std::vector<double>&,
+        double, double, double,
+        const std::string&, CombustionMethod);
     m.def(
         "combustion_state",
-        &combustion_state,
+        static_cast<CombustionStateBaseFn>(&combustion_state),
         py::arg("X_fuel"),
         py::arg("X_ox"),
         py::arg("phi"),
@@ -2822,9 +2827,12 @@ PYBIND11_MODULE(_core, m)
         "  ...                               method=cb.CombustionMethod.Equilibrium)"
     );
 
+    using CombustionStreamsBaseFn = CombustionState(*)(
+        const Stream&, const Stream&,
+        const std::string&, CombustionMethod);
     m.def(
         "combustion_state_from_streams",
-        &combustion_state_from_streams,
+        static_cast<CombustionStreamsBaseFn>(&combustion_state_from_streams),
         py::arg("fuel_stream"),
         py::arg("ox_stream"),
         py::arg("fuel_name") = "",
@@ -2837,6 +2845,88 @@ PYBIND11_MODULE(_core, m)
         "  fuel_name   : optional fuel label (default: '')\n"
         "  method      : CombustionMethod.Complete (default) or CombustionMethod.Equilibrium\n\n"
         "Returns: CombustionState with phi computed from flow rates"
+    );
+
+    // PressureLossContext — read-only view passed to user pressure-loss callables
+    py::class_<PressureLossContext>(m, "PressureLossContext",
+        "Context passed to user pressure-loss correlations.\n"
+        "All fields are loop-free (no dependence on unknown outlet pressure).\n"
+        "Return value of the callable: fractional dP/P_in [-].")
+        .def_readonly("phi",      &PressureLossContext::phi,
+            "Equivalence ratio [-]")
+        .def_readonly("T_ad",     &PressureLossContext::T_ad,
+            "Adiabatic flame temperature [K]")
+        .def_readonly("theta",    &PressureLossContext::theta,
+            "Dimensionless temperature rise T_ad/T_in - 1 [-]")
+        .def_readonly("mdot_fuel",&PressureLossContext::mdot_fuel,
+            "Fuel mass flow [kg/s] (0 for phi-based calls)")
+        .def_readonly("mdot_air", &PressureLossContext::mdot_air,
+            "Air mass flow [kg/s] (0 for phi-based calls)")
+        .def_property_readonly("T_in", [](const PressureLossContext& c) {
+            return c.state_in.T; }, "Inlet temperature [K]")
+        .def_property_readonly("P_in", [](const PressureLossContext& c) {
+            return c.state_in.P; }, "Inlet pressure [Pa]")
+        .def_property_readonly("X_in", [](const PressureLossContext& c) {
+            return c.state_in.X; }, "Inlet mole fractions [-]")
+        .def_property_readonly("X_products", [](const PressureLossContext& c) {
+            return c.X_products; }, "Burned gas mole fractions [-]");
+
+    // combustion_state with pressure-loss hook
+    // Use explicit function pointer cast to resolve overload ambiguity.
+    using CombustionStateHookFn = CombustionState(*)(
+        const std::vector<double>&, const std::vector<double>&,
+        double, double, double,
+        const std::string&, CombustionMethod,
+        const PressureLossCorrelation&);
+    m.def("combustion_state",
+        [](py::array_t<double, py::array::c_style | py::array::forcecast> X_fuel,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_ox,
+           double phi, double T_reactants, double P,
+           const std::string& fuel_name, CombustionMethod method,
+           py::function pressure_loss) {
+            PressureLossCorrelation fn = [pressure_loss](const PressureLossContext& ctx) {
+                return pressure_loss(ctx).cast<double>();
+            };
+            CombustionStateHookFn hook_fn = &combustion_state;
+            return hook_fn(to_vec(X_fuel), to_vec(X_ox), phi,
+                           T_reactants, P, fuel_name, method, fn);
+        },
+        py::arg("X_fuel"), py::arg("X_ox"), py::arg("phi"),
+        py::arg("T_reactants"), py::arg("P"),
+        py::arg("fuel_name") = "",
+        py::arg("method") = CombustionMethod::Complete,
+        py::arg("pressure_loss"),
+        "combustion_state with user-supplied pressure-loss callable.\n\n"
+        "pressure_loss(ctx: PressureLossContext) -> float\n"
+        "  Returns fractional dP/P_in [-]. All ctx fields are loop-free.\n\n"
+        "Example:\n"
+        "  result = cb.combustion_state(X_fuel, X_ox, phi=0.8, T_reactants=700,\n"
+        "      P=500000, pressure_loss=lambda c: 0.03 + 0.005*c.theta)"
+    );
+
+    // combustion_state_from_streams with pressure-loss hook
+    using CombustionStreamsHookFn = CombustionState(*)(
+        const Stream&, const Stream&,
+        const std::string&, CombustionMethod,
+        const PressureLossCorrelation&);
+    m.def("combustion_state_from_streams",
+        [](const Stream& fuel_stream, const Stream& ox_stream,
+           const std::string& fuel_name, CombustionMethod method,
+           py::function pressure_loss) {
+            PressureLossCorrelation fn = [pressure_loss](const PressureLossContext& ctx) {
+                return pressure_loss(ctx).cast<double>();
+            };
+            CombustionStreamsHookFn hook_fn = &combustion_state_from_streams;
+            return hook_fn(fuel_stream, ox_stream, fuel_name, method, fn);
+        },
+        py::arg("fuel_stream"), py::arg("ox_stream"),
+        py::arg("fuel_name") = "",
+        py::arg("method") = CombustionMethod::Complete,
+        py::arg("pressure_loss"),
+        "combustion_state_from_streams with user-supplied pressure-loss callable.\n\n"
+        "pressure_loss(ctx: PressureLossContext) -> float\n"
+        "  Returns fractional dP/P_in [-].\n"
+        "  ctx.mdot_fuel and ctx.mdot_air are populated from stream mass flows."
     );
 
     // =========================================================================
@@ -4948,6 +5038,24 @@ PYBIND11_MODULE(_core, m)
         "Evaluates rho from (T, P, X) internally.\n"
         "Returns IncompressibleFlowSolution.");
 
+    m.def("orifice_flow_thermo",
+        [](double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double P_back, double A, py::function cd_fn) {
+            auto vec = to_vec(X_arr);
+            IncompressibleCdFn fn = [cd_fn, vec](double T_, double P_,
+                                                  const std::vector<double>&, double Re) {
+                return cd_fn(T_, P_, vec, Re).cast<double>();
+            };
+            return orifice_flow_thermo(T, P, vec, P_back, A, fn);
+        },
+        py::arg("T"), py::arg("P"), py::arg("X"),
+        py::arg("P_back"), py::arg("A"), py::arg("cd_fn"),
+        "Thermo-aware orifice flow with user-supplied Cd callable.\n\n"
+        "cd_fn(T, P, X, Re) -> float  (must return Cd in (0, 1])\n"
+        "Re is computed from the ideal throat velocity (loop-free).\n"
+        "Returns IncompressibleFlowSolution.");
+
     m.def("pipe_flow",
         [](double T, double P,
            py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
@@ -4970,6 +5078,28 @@ PYBIND11_MODULE(_core, m)
         py::arg("u"), py::arg("L"), py::arg("D"),
         py::arg("roughness") = 0.0, py::arg("correlation") = "haaland",
         "Thermo-aware incompressible pipe flow with roughness-based friction factor.\n"
+        "Returns IncompressibleFlowSolution.");
+
+    m.def("pipe_flow_rough",
+        [](double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double u, double L, double D,
+           double roughness, const std::string& correlation,
+           py::function k_loss_fn) {
+            auto vec = to_vec(X_arr);
+            IncompressibleKLossFn fn = [k_loss_fn, vec](double T_, double P_,
+                                                         const std::vector<double>&, double Re) {
+                return k_loss_fn(T_, P_, vec, Re).cast<double>();
+            };
+            return pipe_flow_rough(T, P, vec, u, L, D, roughness, correlation, fn);
+        },
+        py::arg("T"), py::arg("P"), py::arg("X"),
+        py::arg("u"), py::arg("L"), py::arg("D"),
+        py::arg("roughness") = 0.0, py::arg("correlation") = "haaland",
+        py::arg("k_loss_fn"),
+        "Pipe flow with additional K-loss callable (bends, fittings, etc.).\n\n"
+        "k_loss_fn(T, P, X, Re) -> float  (returns K [-])\n"
+        "Extra dP = K * 0.5 * rho * u^2 is added to Darcy-Weisbach friction loss.\n"
         "Returns IncompressibleFlowSolution.");
 
     m.def("pressure_drop_pipe",
