@@ -66,214 +66,185 @@ double omega22(double T, double well_depth)
         0.922, 0.711, 0.567, 0.432, 0.364
     };
 
-    double k_B = BOLTZMANN;
-
-    double T_star = (k_B * T) / well_depth;
-
+    double T_star = (BOLTZMANN * T) / well_depth;
     double T_star_clamped = std::max(T_star_values.front(),
                                      std::min(T_star, T_star_values.back()));
-
     return linear_interp(T_star_clamped, T_star_values, omega_values);
 }
 
-// Dynamic viscosity [Pa·s] using kinetic theory with per-species transport data
-double viscosity(double T, double P, const std::vector<double>& X)
+// -------------------------------------------------------------
+// File-local helper: compute pure-species μᵢ and kᵢ in one pass.
+// omega22 and the kinetic-theory formula are called once per species,
+// not once per public function.
+// -------------------------------------------------------------
+
+namespace {
+
+struct PureSpeciesTransport {
+    std::vector<double> mu;  // pure-species dynamic viscosity [Pa·s]
+    std::vector<double> k;   // pure-species thermal conductivity [W/(m·K)]
+};
+
+PureSpeciesTransport pure_species_transport(double T, const std::vector<double>& X)
 {
-    (void)P; // Not used in the current simple model
+    const std::size_t N = X.size();
+    PureSpeciesTransport out;
+    out.mu.resize(N);
+    out.k.resize(N);
 
-    if (X.size() != species_names.size()) {
-        throw std::invalid_argument("viscosity: Mole fraction vector size does not match number of species");
+    for (std::size_t i = 0; i < N; ++i) {
+        const double mw_kg  = molar_masses[i] / 1000.0;           // kg/mol
+        const double diam   = transport_props[i].diameter * 1.0e-10; // m
+        const double eps    = transport_props[i].well_depth * BOLTZMANN; // J
+        const double omega  = omega22(T, eps);
+        const double m_mol  = mw_kg / AVOGADRO;                   // kg/molecule
+
+        // Kinetic theory viscosity: μ = (5/16) √(π m k T) / (π σ² Ω)
+        out.mu[i] = (5.0 / 16.0) * std::sqrt(M_PI * m_mol * BOLTZMANN * T) /
+                    (M_PI * diam * diam * omega);
+
+        // Eucken thermal conductivity: k = μ (cp_mass + f_rot R_specific)
+        const double cp_i       = cp_R(i, T) * R_GAS;             // J/(mol·K)
+        const double cp_mass_i  = cp_i / mw_kg;                   // J/(kg·K)
+        const double R_spec_i   = R_GAS / mw_kg;                  // J/(kg·K)
+
+        double f_rot = 0.0;
+        switch (transport_props[i].geometry) {
+            case MolecularGeometry::Atom:      f_rot = 0.0; break;
+            case MolecularGeometry::Linear:    f_rot = 1.0; break;
+            case MolecularGeometry::Nonlinear: f_rot = 1.5; break;
+        }
+
+        out.k[i] = out.mu[i] * (cp_mass_i + f_rot * R_spec_i);
     }
 
-    // Calculate pure species viscosities using kinetic theory
-    std::vector<double> pure_visc(X.size());
-    for (std::size_t i = 0; i < X.size(); ++i) {
-        // Get molecular weight in kg/mol
-        double mw_kg = molar_masses[i] / 1000.0;
+    return out;
+}
 
-        // Get collision diameter in meters (convert from Angstroms)
-        double diam = transport_props[i].diameter * 1.0e-10;
-
-        // Get well depth in Joules (convert from Kelvin)
-        double eps = transport_props[i].well_depth * BOLTZMANN;
-
-        // Calculate collision integral
-        double omega = omega22(T, eps);
-
-        // Calculate viscosity using kinetic theory formula
-        // μ = (5/16) * √(π*m*k*T) / (π*σ²*Ω(2,2))
-        // where m is mass of a molecule = MW/NA
-        double mass_molecule = mw_kg / AVOGADRO;
-        pure_visc[i] = (5.0 / 16.0) * std::sqrt(M_PI * mass_molecule * BOLTZMANN * T) /
-                       (M_PI * diam * diam * omega);
-    }
-
-    // Wilke's mixing rule for viscosity
+// Wilke mixing rule for viscosity given pre-computed pure-species μᵢ.
+double wilke_viscosity(const std::vector<double>& X,
+                       const std::vector<double>& pure_mu)
+{
+    const std::size_t N = X.size();
     double mix_visc = 0.0;
-    for (std::size_t i = 0; i < X.size(); ++i) {
+    for (std::size_t i = 0; i < N; ++i) {
         if (X[i] <= 0.0) continue;
-
         double denom = 0.0;
-        for (std::size_t j = 0; j < X.size(); ++j) {
+        for (std::size_t j = 0; j < N; ++j) {
             if (X[j] <= 0.0) continue;
-
             double phi_ij;
             if (i == j) {
                 phi_ij = 1.0;
             } else {
-                double M_i = molar_masses[i];
-                double M_j = molar_masses[j];
-
-                // Wilke's formula
-                double term1 = 1.0 / std::sqrt(8.0) / std::sqrt(1.0 + M_i / M_j);
-                double term2 = std::pow(1.0 + std::sqrt(pure_visc[i] / pure_visc[j]) *
-                               std::pow(M_j / M_i, 0.25), 2);
+                const double M_i   = molar_masses[i];
+                const double M_j   = molar_masses[j];
+                const double term1 = 1.0 / std::sqrt(8.0) / std::sqrt(1.0 + M_i / M_j);
+                const double term2 = std::pow(1.0 + std::sqrt(pure_mu[i] / pure_mu[j]) *
+                                     std::pow(M_j / M_i, 0.25), 2);
                 phi_ij = term1 * term2;
             }
-
             denom += X[j] * phi_ij;
         }
-
-        mix_visc += X[i] * pure_visc[i] / denom;
+        mix_visc += X[i] * pure_mu[i] / denom;
     }
-
     return mix_visc;
 }
 
-// Thermal conductivity [W/(m·K)] using Eucken formula with per-species data
+// Mixture thermal conductivity (average of upper/lower bounds) given pre-computed kᵢ.
+double mixture_conductivity(const std::vector<double>& X,
+                            const std::vector<double>& pure_k)
+{
+    double sum1 = 0.0;
+    double sum2 = 0.0;
+    for (std::size_t i = 0; i < X.size(); ++i) {
+        if (X[i] <= 0.0) continue;
+        sum1 += X[i] * pure_k[i];
+        sum2 += X[i] / pure_k[i];
+    }
+    return 0.5 * (sum1 + 1.0 / sum2);
+}
+
+}  // namespace
+
+// Dynamic viscosity [Pa·s]
+double viscosity(double T, double P, const std::vector<double>& X)
+{
+    (void)P;
+    if (X.size() != species_names.size()) {
+        throw std::invalid_argument("viscosity: Mole fraction vector size does not match number of species");
+    }
+    auto ps = pure_species_transport(T, X);
+    return wilke_viscosity(X, ps.mu);
+}
+
+// Thermal conductivity [W/(m·K)]
 double thermal_conductivity(double T, double P, const std::vector<double>& X)
 {
-    (void)P; // Not used in the current simple model
-
+    (void)P;
     if (X.size() != species_names.size()) {
         throw std::invalid_argument("thermal_conductivity: Mole fraction vector size does not match number of species");
     }
-
-    // Calculate pure species thermal conductivities using Eucken formula
-    std::vector<double> pure_cond(X.size());
-    for (std::size_t i = 0; i < X.size(); ++i) {
-        // Get molecular weight in kg/mol
-        double mw_kg = molar_masses[i] / 1000.0;
-
-        // Get collision diameter in meters (convert from Angstroms)
-        double diam = transport_props[i].diameter * 1.0e-10;
-
-        // Get well depth in Joules (convert from Kelvin)
-        double eps = transport_props[i].well_depth * BOLTZMANN;
-
-        // Calculate pure species viscosity
-        double omega = omega22(T, eps);
-        double mass_molecule = mw_kg / AVOGADRO;
-        double visc = (5.0 / 16.0) * std::sqrt(M_PI * mass_molecule * BOLTZMANN * T) /
-                      (M_PI * diam * diam * omega);
-
-        // Get specific heat capacity for the species in J/(mol·K)
-        double cp_species = cp_R(i, T) * R_GAS;
-
-        // Convert cp from J/(mol·K) to J/(kg·K)
-        // mw_kg is in kg/mol, so cp_species / mw_kg = J/(kg·K)
-        double cp_mass = cp_species / mw_kg;
-
-        // Specific gas constant R_specific = R / M [J/(kg·K)]
-        double R_specific = R_GAS / mw_kg;
-
-        // Determine rotational contribution based on geometry
-        double f_rot = 0.0;
-        switch (transport_props[i].geometry) {
-            case MolecularGeometry::Atom:     f_rot = 0.0; break;
-            case MolecularGeometry::Linear:   f_rot = 1.0; break;
-            case MolecularGeometry::Nonlinear: f_rot = 1.5; break;
-        }
-
-        // Modified Eucken formula for thermal conductivity
-        // k = mu * (Cv + 9/4 * R) for monatomic
-        // k = mu * (Cp + f_rot * R) is a simplified form
-        pure_cond[i] = visc * (cp_mass + f_rot * R_specific);
-    }
-
-    // Mixture rule (average of upper and lower bounds)
-    double sum1 = 0.0;
-    double sum2 = 0.0;
-
-    for (std::size_t i = 0; i < X.size(); ++i) {
-        if (X[i] <= 0.0) continue;
-
-        sum1 += X[i] * pure_cond[i];
-        sum2 += X[i] / pure_cond[i];
-    }
-
-    return 0.5 * (sum1 + 1.0 / sum2);
+    auto ps = pure_species_transport(T, X);
+    return mixture_conductivity(X, ps.k);
 }
 
 // Prandtl number (dimensionless)
 double prandtl(double T, double P, const std::vector<double>& X)
 {
-    double mu = viscosity(T, P, X);
-    double k = thermal_conductivity(T, P, X);
-
-    double Cp = cp(T, X);
-    double MW = mwmix(X) / 1000.0; // kg/mol
-    double Cp_mass = Cp / MW;      // J/(kg·K)
-
-    if (k <= 0.0) {
+    (void)P;
+    if (X.size() != species_names.size()) {
+        throw std::invalid_argument("prandtl: Mole fraction vector size does not match number of species");
+    }
+    auto ps  = pure_species_transport(T, X);
+    double mu_mix = wilke_viscosity(X, ps.mu);
+    double k_mix  = mixture_conductivity(X, ps.k);
+    if (k_mix <= 0.0) {
         throw std::runtime_error("prandtl: thermal conductivity must be positive");
     }
-
-    return (Cp_mass * mu) / k;
+    const double MW      = mwmix(X) / 1000.0;   // kg/mol
+    const double cp_mass = cp(T, X) / MW;        // J/(kg·K)
+    return (cp_mass * mu_mix) / k_mix;
 }
 
-// Kinematic viscosity [m^2/s]
+// Kinematic viscosity [m²/s]
 double kinematic_viscosity(double T, double P, const std::vector<double>& X)
 {
-    double visc_val = viscosity(T, P, X);
-    double rho_val = density(T, P, X);
-
-    return visc_val / rho_val;
+    return viscosity(T, P, X) / density(T, P, X);
 }
 
-// Thermal diffusivity [m^2/s]
-// α = k / (ρ * cp)
+// Thermal diffusivity [m²/s] — α = k / (ρ cp)
 double thermal_diffusivity(double T, double P, const std::vector<double>& X)
 {
-    double k = thermal_conductivity(T, P, X);
-    double rho_val = density(T, P, X);
-
-    double Cp = cp(T, X);
-    double MW = mwmix(X) / 1000.0;  // kg/mol
-    double Cp_mass = Cp / MW;       // J/(kg·K)
-
-    return k / (rho_val * Cp_mass);
+    const double k_mix   = thermal_conductivity(T, P, X);
+    const double rho     = density(T, P, X);
+    const double MW      = mwmix(X) / 1000.0;
+    const double cp_mass = cp(T, X) / MW;
+    return k_mix / (rho * cp_mass);
 }
 
-// Reynolds number (dimensionless)
-// Re = ρ * V * L / μ
+// Reynolds number — Re = ρ V L / μ
 double reynolds(double T, double P, const std::vector<double>& X, double V, double L)
 {
-    double rho_val = density(T, P, X);
-    double mu = viscosity(T, P, X);
-
+    const double rho_val = density(T, P, X);
+    const double mu      = viscosity(T, P, X);
     if (mu <= 0.0) {
         throw std::runtime_error("reynolds: viscosity must be positive");
     }
-
     return (rho_val * V * L) / mu;
 }
 
-// Peclet number (thermal, dimensionless)
-// Pe = V * L / α  (ratio of convective to conductive heat transfer)
+// Peclet number (thermal) — Pe = V L / α
 double peclet(double T, double P, const std::vector<double>& X, double V, double L)
 {
-    double alpha = thermal_diffusivity(T, P, X);
-
+    const double alpha = thermal_diffusivity(T, P, X);
     if (alpha <= 0.0) {
         throw std::runtime_error("peclet: thermal diffusivity must be positive");
     }
-
     return (V * L) / alpha;
 }
 
 // -------------------------------------------------------------
-// Transport State Bundle
+// Transport State Bundle — single-pass implementation
 // -------------------------------------------------------------
 
 TransportState transport_state(double T, double P, const std::vector<double>& X) {
@@ -286,24 +257,32 @@ TransportState transport_state(double T, double P, const std::vector<double>& X)
     if (X.empty()) {
         throw std::invalid_argument("transport_state: mole fractions vector cannot be empty");
     }
+    if (X.size() != species_names.size()) {
+        throw std::invalid_argument("transport_state: mole fraction vector size mismatch");
+    }
+
+    // Single species-loop pass — omega22 called N times total
+    auto ps = pure_species_transport(T, X);
+
+    const double mu  = wilke_viscosity(X, ps.mu);
+    const double k   = mixture_conductivity(X, ps.k);
+    const double rho = density(T, P, X);
+    const double MW  = mwmix(X) / 1000.0;   // kg/mol
+    const double cp_m = cp(T, X) / MW;      // J/(kg·K)
+    const double cv_m = cv(T, X) / MW;      // J/(kg·K)
 
     TransportState state;
-
-    // Echo back inputs
-    state.T = T;
-    state.P = P;
-
-    // Compute all transport properties
-    state.rho = density(T, P, X);
-    state.mu = viscosity(T, P, X);
-    state.k = thermal_conductivity(T, P, X);
-    state.nu = kinematic_viscosity(T, P, X);
-    state.alpha = thermal_diffusivity(T, P, X);
-    state.Pr = prandtl(T, P, X);
-    state.cp = cp_mass(T, X);
-    state.cv = cv_mass(T, X);
-    state.gamma = isentropic_expansion_coefficient(T, X);
-    state.a = speed_of_sound(T, X);
-
+    state.T     = T;
+    state.P     = P;
+    state.rho   = rho;
+    state.mu    = mu;
+    state.k     = k;
+    state.nu    = mu / rho;
+    state.alpha = k / (rho * cp_m);
+    state.Pr    = (cp_m * mu) / k;
+    state.cp    = cp_m;
+    state.cv    = cv_m;
+    state.gamma = cp_m / cv_m;
+    state.a     = speed_of_sound(T, X);
     return state;
 }

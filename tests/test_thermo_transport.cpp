@@ -297,6 +297,22 @@ TEST_F(ThermoTransportTest, TransportProperties) {
     EXPECT_LT(pr, 100.0);
 }
 
+TEST_F(ThermoTransportTest, TransportStateConsistency) {
+    // transport_state() must agree with individual scalar functions to 1e-10.
+    // This is a regression guard for the single-pass refactor.
+    const double T = 800.0;
+    const double P = 300000.0;
+
+    TransportState ts = transport_state(T, P, air_composition);
+
+    EXPECT_NEAR(ts.mu,    viscosity(T, P, air_composition),           ts.mu    * 1e-10);
+    EXPECT_NEAR(ts.k,     thermal_conductivity(T, P, air_composition), ts.k     * 1e-10);
+    EXPECT_NEAR(ts.Pr,    prandtl(T, P, air_composition),             ts.Pr    * 1e-10);
+    EXPECT_NEAR(ts.nu,    kinematic_viscosity(T, P, air_composition),  ts.nu    * 1e-10);
+    EXPECT_NEAR(ts.alpha, thermal_diffusivity(T, P, air_composition),  ts.alpha * 1e-10);
+    EXPECT_NEAR(ts.rho,   density(T, P, air_composition),             ts.rho   * 1e-10);
+}
+
 // Helper to build a CH4/O2 mixture (other species zero)
 static std::vector<double> make_CH4_O2_mixture(double n_CH4, double n_O2) {
     std::vector<double> X(species_names.size(), 0.0);
