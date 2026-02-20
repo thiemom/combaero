@@ -335,11 +335,15 @@ class TestPressureLossHook:
         frac = 0.05
 
         result = cb.combustion_state(
-            X_fuel, X_ox, phi=1.0, T_reactants=700.0, P=P_in,
+            X_fuel,
+            X_ox,
+            phi=1.0,
+            T_reactants=700.0,
+            P=P_in,
             pressure_loss=lambda c: frac,
         )
 
-        assert result.products.thermo.P == pytest.approx(P_in * (1.0 - frac), rel=1e-6)
+        assert pytest.approx(P_in * (1.0 - frac), rel=1e-6) == result.products.thermo.P
 
     def test_zero_hook_preserves_pressure(self):
         """Hook returning 0 must leave P_out == P_in."""
@@ -347,11 +351,15 @@ class TestPressureLossHook:
         P_in = 300_000.0
 
         result = cb.combustion_state(
-            X_fuel, X_ox, phi=0.8, T_reactants=700.0, P=P_in,
+            X_fuel,
+            X_ox,
+            phi=0.8,
+            T_reactants=700.0,
+            P=P_in,
             pressure_loss=lambda c: 0.0,
         )
 
-        assert result.products.thermo.P == pytest.approx(P_in, rel=1e-6)
+        assert pytest.approx(P_in, rel=1e-6) == result.products.thermo.P
 
     def test_context_theta_positive_for_exothermic(self):
         """theta = T_ad/T_in - 1 must be > 0 for lean CH4/air."""
@@ -365,7 +373,11 @@ class TestPressureLossHook:
             return 0.03
 
         cb.combustion_state(
-            X_fuel, X_ox, phi=0.8, T_reactants=700.0, P=300_000.0,
+            X_fuel,
+            X_ox,
+            phi=0.8,
+            T_reactants=700.0,
+            P=300_000.0,
             pressure_loss=hook,
         )
 
@@ -384,7 +396,11 @@ class TestPressureLossHook:
             return 0.04
 
         cb.combustion_state(
-            X_fuel, X_ox, phi=1.0, T_reactants=800.0, P=400_000.0,
+            X_fuel,
+            X_ox,
+            phi=1.0,
+            T_reactants=800.0,
+            P=400_000.0,
             pressure_loss=hook,
         )
 
@@ -399,11 +415,19 @@ class TestPressureLossHook:
             return 0.02 + 0.005 * ctx.theta
 
         r_lean = cb.combustion_state(
-            X_fuel, X_ox, phi=0.5, T_reactants=700.0, P=300_000.0,
+            X_fuel,
+            X_ox,
+            phi=0.5,
+            T_reactants=700.0,
+            P=300_000.0,
             pressure_loss=theta_hook,
         )
         r_rich = cb.combustion_state(
-            X_fuel, X_ox, phi=1.0, T_reactants=700.0, P=300_000.0,
+            X_fuel,
+            X_ox,
+            phi=1.0,
+            T_reactants=700.0,
+            P=300_000.0,
             pressure_loss=theta_hook,
         )
 
@@ -437,8 +461,8 @@ class TestIncompressibleHooks:
 
     def _air(self):
         X = [0.0] * 14
-        X[1] = 0.21   # O2
-        X[0] = 0.79   # N2
+        X[1] = 0.21  # O2
+        X[0] = 0.79  # N2
         return X
 
     def test_orifice_cd_fn_constant_matches_fixed_cd(self):
@@ -447,11 +471,10 @@ class TestIncompressibleHooks:
         T, P, P_back, A, Cd = 300.0, 200_000.0, 190_000.0, 1e-4, 0.72
 
         sol_fixed = cb.orifice_flow_thermo(T, P, X, P_back, A, Cd=Cd)
-        sol_fn    = cb.orifice_flow_thermo(T, P, X, P_back, A,
-                                           cd_fn=lambda T_, P_, X_, Re: Cd)
+        sol_fn = cb.orifice_flow_thermo(T, P, X, P_back, A, cd_fn=lambda T_, P_, X_, Re: Cd)
 
         assert sol_fn.mdot == pytest.approx(sol_fixed.mdot, rel=1e-9)
-        assert sol_fn.dP   == pytest.approx(sol_fixed.dP,   rel=1e-9)
+        assert sol_fn.dP == pytest.approx(sol_fixed.dP, rel=1e-9)
 
     def test_orifice_cd_fn_re_dependent(self):
         """Re-dependent Cd must produce different mdot than constant Cd=0.7."""
@@ -460,8 +483,7 @@ class TestIncompressibleHooks:
 
         sol_const = cb.orifice_flow_thermo(T, P, X, P_back, A, Cd=0.7)
         # Cd increases with Re — at high Re returns 0.85
-        sol_fn = cb.orifice_flow_thermo(T, P, X, P_back, A,
-                                        cd_fn=lambda T_, P_, X_, Re: 0.85)
+        sol_fn = cb.orifice_flow_thermo(T, P, X, P_back, A, cd_fn=lambda T_, P_, X_, Re: 0.85)
 
         assert sol_fn.mdot > sol_const.mdot
 
@@ -471,8 +493,7 @@ class TestIncompressibleHooks:
         T, P, u, L, D = 400.0, 300_000.0, 20.0, 2.0, 0.05
 
         sol_base = cb.pipe_flow_rough(T, P, X, u, L, D)
-        sol_zero = cb.pipe_flow_rough(T, P, X, u, L, D,
-                                      k_loss_fn=lambda T_, P_, X_, Re: 0.0)
+        sol_zero = cb.pipe_flow_rough(T, P, X, u, L, D, k_loss_fn=lambda T_, P_, X_, Re: 0.0)
 
         assert sol_zero.dP == pytest.approx(sol_base.dP, rel=1e-9)
 
@@ -482,7 +503,6 @@ class TestIncompressibleHooks:
         T, P, u, L, D = 400.0, 300_000.0, 20.0, 2.0, 0.05
 
         sol_base = cb.pipe_flow_rough(T, P, X, u, L, D)
-        sol_k    = cb.pipe_flow_rough(T, P, X, u, L, D,
-                                      k_loss_fn=lambda T_, P_, X_, Re: 1.5)
+        sol_k = cb.pipe_flow_rough(T, P, X, u, L, D, k_loss_fn=lambda T_, P_, X_, Re: 1.5)
 
         assert sol_k.dP > sol_base.dP
