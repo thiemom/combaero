@@ -223,13 +223,13 @@ def main() -> None:
     }
 
     print(f"\nMaterials: {ca.list_materials()}")
-    print(f"Inconel 718 k = {k_inconel:.2f} W/(m·K) @ 900 K")
+    print(f"Inconel 718 k = {k_inconel:.2f} W/(m*K) @ 900 K")
     print(
-        f"YSZ APS fresh k = {k_ysz_fresh:.3f}, aged k = {k_ysz_aged:.3f}, EB-PVD k = {k_ysz_ebpvd:.3f} W/(m·K) @ 1200 K"
+        f"YSZ APS fresh k = {k_ysz_fresh:.3f}, aged k = {k_ysz_aged:.3f}, EB-PVD k = {k_ysz_ebpvd:.3f} W/(m*K) @ 1200 K"
     )
-    print(f"Wall: {t_wall * 1e3:.1f} mm Inconel + {t_tbc * 1e6:.0f} µm TBC")
+    print(f"Wall: {t_wall * 1e3:.1f} mm Inconel + {t_tbc * 1e6:.0f} um TBC")
     print(
-        f"\nCOT target = {COT_target:.0f} K  |  dP_burner/P = {dP_burner_frac * 100:.0f}%  |  Metal limit = {T_metal_limit - 273.15:.0f} °C"
+        f"\nCOT target = {COT_target:.0f} K  |  dP_burner/P = {dP_burner_frac * 100:.0f}%  |  Metal limit = {T_metal_limit - 273.15:.0f} deg C"
     )
     print(f"Channels: {N_ch} parallel, D_h={D_ch * 1e3:.0f} mm, L={L_ch * 1e3:.0f} mm")
 
@@ -355,10 +355,10 @@ def main() -> None:
         color="red",
         ls="--",
         lw=1.5,
-        label=f"Limit {T_metal_limit - 273.15:.0f} °C",
+        label=f"Limit {T_metal_limit - 273.15:.0f} deg C",
     )
     ax.set_xlabel("Bypass fraction f_cool [-]")
-    ax.set_ylabel("Metal hot-face temperature [°C]")
+    ax.set_ylabel("Metal hot-face temperature [deg C]")
     ax.set_title("Metal Temperature vs Bypass Fraction")
     ax.legend()
     ax.grid(True, alpha=0.3)
@@ -390,7 +390,7 @@ def main() -> None:
         ax.plot(f_vals, far_vals, color=colors[ch_name], lw=2, label=ch_name)
     ax.set_xlabel("Bypass fraction f_cool [-]")
     ax.set_ylabel("Fuel/air ratio FAR [%]")
-    ax.set_title("Fuel Flow vs Bypass Fraction\n(more cooling → more fuel to maintain COT)")
+    ax.set_title("Fuel Flow vs Bypass Fraction\n(more cooling -> more fuel to maintain COT)")
     ax.legend()
     ax.grid(True, alpha=0.3)
 
@@ -410,15 +410,15 @@ def main() -> None:
         color="red",
         ls="--",
         lw=1.5,
-        label=f"Limit {T_metal_limit - 273.15:.0f} °C",
+        label=f"Limit {T_metal_limit - 273.15:.0f} deg C",
     )
     ax.set_xticks(x + width)
     ax.set_xticklabels(
         [c.replace(" + ", "\n+ ").replace(" (", "\n(") for c in cfg_names],
         fontsize=7,
     )
-    ax.set_ylabel("Metal temperature at f_min [°C]")
-    ax.set_title("Metal Temp at Minimum Bypass\n(per channel × wall config)")
+    ax.set_ylabel("Metal temperature at f_min [deg C]")
+    ax.set_title("Metal Temp at Minimum Bypass\n(per channel x wall config)")
     ax.legend(fontsize=8)
     ax.grid(True, alpha=0.3, axis="y")
 
