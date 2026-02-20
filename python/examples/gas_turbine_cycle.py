@@ -11,10 +11,16 @@ Models an ideal open Brayton cycle with real gas properties:
 Key combaero tools used:
   - set_fuel_stream_for_phi + mix + complete_combustion  (combustor)
   - s / calc_T_from_s  (isentropic compression/expansion)
-  - cp_mass  (isobaric work and heat via enthalpy integrals)
+  - h_mass  (open-system energy balance: w_net = h_in - h_out per kg air)
+  - cp_mass  (compressor work: same composition, sensible only)
   - s_mass   (entropy at each state for T-s diagram)
-  - density / specific_gas_constant  (thermodynamic state)
-  - isentropic_expansion_coefficient  (local gamma)
+  - density / isentropic_expansion_coefficient  (state properties)
+
+Energy balance (per kg air):
+  w_net = h_air(T1) + FAR*h_fuel(T_fuel) - (1+FAR)*h_exhaust(T4)
+  q_in  = (1+FAR)*h_exhaust(T3) - h_air(T2) - FAR*h_fuel(T_fuel)
+  w_c   = h_air(T2) - h_air(T1)   [compressor, same composition]
+  w_t   = w_net + w_c              [turbine, by difference]
 """
 
 from __future__ import annotations
@@ -28,8 +34,8 @@ import combaero as ca
 from combaero.species import SpeciesLocator
 
 
-def dh(T_a: float, T_b: float, X: list, n: int = 300) -> float:
-    """Isobaric enthalpy change [J/kg] via cp_mass integral."""
+def dh_same_X(T_a: float, T_b: float, X: list, n: int = 300) -> float:
+    """Isobaric enthalpy change [J/kg] via cp_mass integral (same composition)."""
     Ts = np.linspace(T_a, T_b, n)
     return float(np.trapz([ca.cp_mass(T, X) for T in Ts], Ts))
 
@@ -136,11 +142,19 @@ def main() -> None:
     # =========================================================================
     # Cycle performance
     # =========================================================================
-    w_c = dh(T1, T2, X_air)  # compressor work input [J/kg air]
-    w_t = -dh(T3, T4, X3)  # turbine work output   [J/kg gas]
-    q_in = dh(mixed.T, T3, mixed.X)  # heat added in combustor [J/kg]
+    far = fuel.mdot / air.mdot  # fuel/air mass ratio
 
-    w_net = w_t - w_c
+    # Open-system energy balance (per kg air): w_net = h_in - h_out
+    # h_mass uses NASA9 absolute enthalpies (incl. formation), valid across compositions
+    w_net = ca.h_mass(T1, X_air) + far * ca.h_mass(fuel.T, X_ch4) - (1.0 + far) * ca.h_mass(T4, X3)
+    # q_in = fuel chemical energy (LHV basis); complete_combustion is adiabatic so
+    # the combustor enthalpy difference is zero by construction
+    q_in = far * ca.fuel_lhv_mass(X_ch4)
+
+    # Compressor and turbine work by difference (same composition each)
+    w_c = dh_same_X(T1, T2, X_air)  # compressor: air only, sensible
+    w_t = w_net + w_c  # turbine: by energy balance
+
     eta_th = w_net / q_in
     bwr = w_c / w_t  # back-work ratio
 
@@ -184,10 +198,16 @@ def main() -> None:
         t3_ = burned_.T
         x3_ = burned_.X
         t4_ = isentropic_T(t3_, p2_, P1, x3_)
-        wc_ = dh(T1, t2_, X_air)
-        wt_ = -dh(t3_, t4_, x3_)
-        qin_ = dh(mixed_.T, t3_, mixed_.X)
-        eta_ = (wt_ - wc_) / qin_
+        far_ = fuel_.mdot / air_.mdot
+        wnet_ = (
+            ca.h_mass(T1, X_air)
+            + far_ * ca.h_mass(fuel_.T, X_ch4)
+            - (1.0 + far_) * ca.h_mass(t4_, x3_)
+        )
+        qin_ = far_ * ca.fuel_lhv_mass(X_ch4)
+        wc_ = dh_same_X(T1, t2_, X_air)
+        wt_ = wnet_ + wc_
+        eta_ = wnet_ / qin_
         bwr_ = wc_ / wt_
         pr_vals.append(pr)
         eta_vals.append(eta_ * 100)
