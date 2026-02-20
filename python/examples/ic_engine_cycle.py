@@ -10,8 +10,10 @@ Models an ideal Otto cycle using real gas properties:
 
 Key combaero tools used:
   - set_fuel_stream_for_phi + mix + complete_combustion  (heat addition)
-  - s / calc_T_from_s  (isentropic path with variable gamma)
-  - h / cp / density   (thermodynamic state)
+  - s / s_mass / calc_T_from_s  (isentropic path with variable gamma)
+  - u_mass  (constant-volume heat rejection: q_out = u4 - u1 at fixed composition)
+  - cv_mass  (constant-volume heat addition: q_in via integral, composition changes)
+  - density / specific_gas_constant  (thermodynamic state)
   - isentropic_expansion_coefficient  (local gamma along path)
 """
 
@@ -166,9 +168,9 @@ def main() -> None:
     # =========================================================================
     # Cycle performance
     # =========================================================================
-    # Heat rejected: constant-volume process 4->1
-    T_cv_out = np.linspace(T1, T4, 200)
-    q_out = np.trapz([ca.cv_mass(T, X3) for T in T_cv_out], T_cv_out)  # J/kg (positive)
+    # Heat rejected: constant-volume process 4->1, composition fixed at X3
+    # u_mass is valid here since both states share the same composition
+    q_out = ca.u_mass(T4, X3) - ca.u_mass(T1, X3)  # J/kg (positive)
 
     w_net = q_in - q_out  # net work [J/kg]
     eta_th = w_net / q_in  # thermal efficiency
