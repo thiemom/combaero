@@ -1,6 +1,7 @@
 #ifndef HEAT_TRANSFER_H
 #define HEAT_TRANSFER_H
 
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -482,5 +483,150 @@ std::tuple<double, double, double> htc_pipe(
     bool heating = true,
     double mu_ratio = 1.0,
     double roughness = 0.0);
+
+// -------------------------------------------------------------
+// Combined convective heat transfer + pressure loss result
+// -------------------------------------------------------------
+//
+// Returned by all channel_* functions below.
+// All properties are evaluated from (T, P, X) in a single pass.
+//
+// T_aw is always computed continuously for all M:
+//   T_aw = T_static + r * v² / (2 * cp)
+//   r = Pr^(1/3) turbulent, Pr^(1/2) laminar
+//   At v=0: T_aw = T_static exactly (no discontinuity, no threshold).
+//   This keeps the Jacobian smooth for network solvers.
+//
+// q is nan when T_wall is not supplied (flow-only or unknown wall T).
+//
+// f meaning depends on geometry:
+//   smooth / ribbed / dimpled : Darcy friction factor [-]
+//   pin_fin                   : pin-array friction coefficient [-]
+//                               (dP = N_rows * f * rho*v_max²/2)
+//   impingement               : jet-plate loss coefficient [-]
+//                               (dP = f * rho*v_jet²/2)
+struct ChannelResult {
+    double h;     // convective HTC [W/(m²·K)]
+    double Nu;    // Nusselt number [-]
+    double Re;    // Reynolds number [-]  (hydraulic D or pin D depending on geometry)
+    double Pr;    // Prandtl number [-]
+    double f;     // friction / loss coefficient [-]  (see note above)
+    double dP;    // pressure drop [Pa]
+    double M;     // Mach number [-]  (computed internally from v/a(T,X))
+    double T_aw;  // adiabatic wall temperature [K]  (always computed, see above)
+    double q;     // heat flux [W/m²]  (nan if T_wall not supplied)
+};
+
+// -------------------------------------------------------------
+// High-level channel functions — each returns a ChannelResult
+// -------------------------------------------------------------
+//
+// All functions:
+//   - evaluate fluid properties (rho, mu, k, Pr, cp) once from (T, P, X)
+//   - compute M = v / a(T, X) internally
+//   - compute T_aw = T_static + r*v²/(2*cp) continuously
+//   - set q = h*(T_aw - T_wall) if T_wall is finite, else q = nan
+//
+// User contract: choose the model that matches the geometry.
+// Do not mix models (e.g. do not apply rib multipliers to a smooth result).
+
+// Smooth pipe or duct (Gnielinski / Dittus-Boelter / Sieder-Tate / Petukhov)
+//
+// Parameters:
+//   T, P, X    : bulk static thermodynamic state
+//   velocity   : bulk velocity [m/s]
+//   diameter   : hydraulic diameter [m]
+//   length     : channel length [m]  (for dP)
+//   T_wall     : wall temperature [K]  (pass NaN to skip q computation)
+//   correlation: "gnielinski" (default), "dittus_boelter", "sieder_tate", "petukhov"
+//   heating    : true = fluid is heated (affects Dittus-Boelter exponent)
+//   mu_ratio   : mu_bulk / mu_wall for Sieder-Tate (default 1.0)
+//   roughness  : absolute wall roughness [m]  (default 0.0 = smooth)
+ChannelResult channel_smooth(
+    double T, double P, const std::vector<double>& X,
+    double velocity, double diameter, double length,
+    double T_wall = std::numeric_limits<double>::quiet_NaN(),
+    const std::string& correlation = "gnielinski",
+    bool heating = true,
+    double mu_ratio = 1.0,
+    double roughness = 0.0);
+
+// Rib-enhanced cooling channel (Han et al. 1988)
+//
+// Applies rib_enhancement_factor to Nu and rib_friction_multiplier to f
+// from a smooth-pipe baseline at the same Re.
+//
+// Parameters:
+//   e_D   : rib height / hydraulic diameter [-]  (valid: 0.02-0.1)
+//   P_e   : rib pitch / rib height [-]           (valid: 5-20)
+//   alpha : rib angle [degrees]                  (valid: 30-90)
+ChannelResult channel_ribbed(
+    double T, double P, const std::vector<double>& X,
+    double velocity, double diameter, double length,
+    double e_D, double P_e, double alpha,
+    double T_wall = std::numeric_limits<double>::quiet_NaN(),
+    bool heating = true);
+
+// Dimpled surface cooling channel (Chyu et al. 1997)
+//
+// Applies dimple_nusselt_enhancement to Nu and dimple_friction_multiplier to f
+// from a smooth-pipe baseline at the same Re.
+//
+// Parameters:
+//   d_Dh : dimple diameter / channel height [-]  (valid: 0.1-0.3)
+//   h_d  : dimple depth / diameter [-]           (valid: 0.1-0.3)
+//   S_d  : dimple spacing / diameter [-]         (valid: 1.5-3.0)
+ChannelResult channel_dimpled(
+    double T, double P, const std::vector<double>& X,
+    double velocity, double diameter, double length,
+    double d_Dh, double h_d, double S_d,
+    double T_wall = std::numeric_limits<double>::quiet_NaN(),
+    bool heating = true);
+
+// Pin-fin array cooling channel (Metzger et al. 1982)
+//
+// Re is based on pin diameter d.
+// h = Nu * k / d.
+// dP = N_rows * f_pin * (rho * v_max² / 2)
+//   where v_max = velocity * S_D / (S_D - 1)  (minimum cross-section velocity)
+//   and   f_pin from pin_fin_friction() in cooling_correlations.h
+//
+// Parameters:
+//   velocity       : approach (upstream) velocity [m/s]
+//   channel_height : pin length H [m]
+//   pin_diameter   : pin diameter d [m]
+//   S_D            : spanwise pitch / d [-]   (valid: 1.5-4.0)
+//   X_D            : streamwise pitch / d [-] (valid: 1.5-4.0)
+//   N_rows         : number of pin rows in streamwise direction
+//   is_staggered   : true = staggered array (default), false = inline
+ChannelResult channel_pin_fin(
+    double T, double P, const std::vector<double>& X,
+    double velocity, double channel_height, double pin_diameter,
+    double S_D, double X_D, int N_rows,
+    double T_wall = std::numeric_limits<double>::quiet_NaN(),
+    bool is_staggered = true);
+
+// Impingement jet array cooling (Florschuetz et al. 1981 / Martin 1977)
+//
+// Re is based on jet diameter d_jet.
+// h = Nu * k / d_jet.
+// dP = f * rho * v_jet² / 2  where f = 1/Cd_jet²  (jet-plate orifice loss)
+//   v_jet = mdot_jet / (rho * A_jet)
+//
+// Parameters:
+//   mdot_jet : jet mass flow rate [kg/s]  (total for all jets)
+//   d_jet    : jet hole diameter [m]
+//   z_D      : jet-to-target distance / d_jet [-]  (valid: 1-12)
+//   x_D      : streamwise jet spacing / d_jet [-]  (0 = single jet; valid array: 4-16)
+//   y_D      : spanwise jet spacing / d_jet [-]    (0 = single jet; valid array: 4-16)
+//   A_target : target surface area [m²]  (used to compute average h)
+//   Cd_jet   : jet hole discharge coefficient [-]  (default 0.65)
+ChannelResult channel_impingement(
+    double T, double P, const std::vector<double>& X,
+    double mdot_jet, double d_jet,
+    double z_D, double x_D, double y_D,
+    double A_target,
+    double T_wall = std::numeric_limits<double>::quiet_NaN(),
+    double Cd_jet = 0.65);
 
 #endif // HEAT_TRANSFER_H

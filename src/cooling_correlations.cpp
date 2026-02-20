@@ -2,6 +2,7 @@
 #include "heat_transfer.h"
 #include "math_constants.h"
 #include <cmath>
+#include <iostream>
 #include <stdexcept>
 #include <algorithm>
 #include <string>
@@ -38,11 +39,12 @@ void validate_rib_params(double e_D, double P_e, double alpha) {
 }
 
 void validate_impingement_params(double Re_jet, double z_D, double x_D, double y_D) {
+    // Re_jet: correlation is Nu = C*Re^0.7*Pr^0.42 (power law, smooth extrapolation).
+    // Warn rather than throw — the function is well-behaved outside [5000, 80000].
     if (Re_jet < 5000.0 || Re_jet > 80000.0) {
-        throw std::runtime_error(
-            "Jet Reynolds number Re_jet = " + std::to_string(Re_jet) +
-            " is outside valid range [5000, 80000]"
-        );
+        std::cerr << "[combaero] impingement_nusselt: Re_jet = " << Re_jet
+                  << " is outside validated range [5000, 80000]."
+                     " Extrapolating power-law correlation; check results.\n";
     }
     if (z_D < 1.0 || z_D > 12.0) {
         throw std::runtime_error(
@@ -414,8 +416,12 @@ double effusion_discharge_coefficient(
 
 // Validate pin fin parameters
 void validate_pin_fin_params(double Re_d, double L_D, double S_D, double X_D) {
+    // Re_d: correlation is Nu = C*Re^m (power law, smooth extrapolation).
+    // Warn rather than throw — the function is well-behaved outside [3000, 90000].
     if (Re_d < 3000.0 || Re_d > 90000.0) {
-        throw std::runtime_error("Pin fin Re_d must be in range [3000, 90000], got " + std::to_string(Re_d));
+        std::cerr << "[combaero] pin_fin_nusselt: Re_d = " << Re_d
+                  << " is outside validated range [3000, 90000]."
+                     " Extrapolating power-law correlation; check results.\n";
     }
     if (L_D < 0.5 || L_D > 4.0) {
         throw std::runtime_error("Pin fin L_D must be in range [0.5, 4.0], got " + std::to_string(L_D));
@@ -470,14 +476,35 @@ double pin_fin_nusselt(
     return Nu_base * f_length * f_spacing;
 }
 
+// Pin fin array pressure drop friction coefficient
+// dP = N_rows * f_pin * (rho * v_max^2 / 2)
+// Source: Metzger et al. (1982), Simoneau & VanFossen (1984)
+double pin_fin_friction(double Re_d, bool is_staggered) {
+    // Re_d: f = C*Re^(-0.25) is a smooth power law — warn, don't throw.
+    if (Re_d < 3000.0 || Re_d > 90000.0) {
+        std::cerr << "[combaero] pin_fin_friction: Re_d = " << Re_d
+                  << " is outside validated range [3000, 90000]."
+                     " Extrapolating power-law correlation; check results.\n";
+    }
+
+    // Metzger/Simoneau: f_pin = C_f * Re_d^(-0.25)
+    // C_f = 0.317 staggered, 0.228 inline
+    double C_f = is_staggered ? 0.317 : 0.228;
+    return C_f * std::pow(Re_d, -0.25);
+}
+
 // -------------------------------------------------------------
 // Dimpled Surfaces
 // -------------------------------------------------------------
 
 // Validate dimple parameters
 void validate_dimple_params(double Re_Dh, double d_Dh, double h_d) {
+    // Re_Dh: correlation is Nu_enh = C*Re^m (power law, smooth extrapolation).
+    // Warn rather than throw — the function is well-behaved outside [10000, 80000].
     if (Re_Dh < 10000.0 || Re_Dh > 80000.0) {
-        throw std::runtime_error("Dimple Re_Dh must be in range [10000, 80000], got " + std::to_string(Re_Dh));
+        std::cerr << "[combaero] dimple_nusselt_enhancement: Re_Dh = " << Re_Dh
+                  << " is outside validated range [10000, 80000]."
+                     " Extrapolating power-law correlation; check results.\n";
     }
     if (d_Dh < 0.1 || d_Dh > 0.3) {
         throw std::runtime_error("Dimple d_Dh must be in range [0.1, 0.3], got " + std::to_string(d_Dh));

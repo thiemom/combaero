@@ -103,8 +103,10 @@ well-posedness. The solver validates this at setup.
 
 | Element | Residual | CombAero call |
 |---|---|---|
-| `HeatExchangerElement` | `Q = h·A·(T_aw − T_wall)`, solves T_wall | `htc_pipe()`, `T_adiabatic_wall()` from `stagnation.h` |
+| `HeatExchangerElement` | `Q = h·A·(T_aw − T_wall)`, solves T_wall | `channel_smooth()` / `channel_ribbed()` / `channel_dimpled()` / `channel_pin_fin()` / `channel_impingement()` — all return `ChannelResult` with `h`, `dP`, `T_aw`, `q` in one call |
 | `AdiabaticWallElement` | `Q = 0` | — |
+
+**`ChannelResult` for network elements:** The `channel_*` functions compute HTC, pressure drop, Mach, and `T_aw` in a single pass from `(T, P, X, velocity, geometry)`. Use `sol.h` and `sol.T_aw` for the heat flux residual; use `sol.dP` for the momentum residual. `T_aw` is always continuous (no M threshold) — safe for Newton/CasADi Jacobians.
 
 ### Reaction / Mixing Elements
 
@@ -357,3 +359,17 @@ class NetworkElement(ABC):
 4. No isolated subgraphs
 
 The solver validates all four at setup before attempting Newton iteration.
+
+---
+
+## Pending: Global Extrapolation / Validity-Flag Refactor
+
+**Motivation:** Correlation validators currently either throw (hard error) or warn+extrapolate (for smooth power-law Re-based limits). For network solvers, throwing inside a Newton iteration is fatal — the solver cannot recover. The current partial fix (warn for Re, throw for geometry) is a step in the right direction but not yet systematic.
+
+**Proposed design (future scope, project-wide):**
+- Replace all `throw` validators with a `CorrelationResult<T>` wrapper that carries both the value and a `validity` flag (enum: `VALID`, `EXTRAPOLATED`, `INVALID`).
+- Network elements check `validity` after each call and either propagate a warning or mark the solution as non-physical.
+- Hard geometry errors (e_D, L_D, S_D out of range) remain throws since they indicate a modelling error, not an operating point excursion.
+- This mirrors the `FlowSolution` pattern already used for flow correlations.
+
+**Scope:** All correlations in `cooling_correlations.h`, `friction.h`, `heat_transfer.h`. Requires a coordinated refactor across C++ validators, Python bindings, and tests.

@@ -5095,4 +5095,205 @@ PYBIND11_MODULE(_core, m)
         py::arg("turbulent") = true,
         "Adiabatic wall temperature T_aw [K] from static T [K] and Mach number.\n"
         "Computes v = M * a(T, X) internally, then applies recovery factor correction.");
+
+    // -----------------------------------------------------------------
+    // ChannelResult struct
+    // -----------------------------------------------------------------
+    py::class_<ChannelResult>(m, "ChannelResult",
+        "Combined convective heat transfer + pressure loss result.\n\n"
+        "Returned by channel_smooth, channel_ribbed, channel_dimpled,\n"
+        "channel_pin_fin, and channel_impingement.\n\n"
+        "All fluid properties are evaluated in a single pass from (T, P, X).\n\n"
+        "T_aw is always computed continuously for all M:\n"
+        "  T_aw = T_static + r * v^2 / (2*cp)  (r = Pr^1/3 turbulent)\n"
+        "  At v=0: T_aw = T_static exactly. No threshold, no discontinuity.\n\n"
+        "q = h * (T_aw - T_wall) when T_wall is supplied, else nan.\n\n"
+        "f meaning depends on geometry:\n"
+        "  smooth/ribbed/dimpled : Darcy friction factor [-]\n"
+        "  pin_fin               : pin-array friction coefficient [-]\n"
+        "  impingement           : jet-plate loss coefficient 1/Cd^2 [-]")
+        .def_readonly("h",    &ChannelResult::h,    "Convective HTC [W/(m^2*K)]")
+        .def_readonly("Nu",   &ChannelResult::Nu,   "Nusselt number [-]")
+        .def_readonly("Re",   &ChannelResult::Re,   "Reynolds number [-]")
+        .def_readonly("Pr",   &ChannelResult::Pr,   "Prandtl number [-]")
+        .def_readonly("f",    &ChannelResult::f,    "Friction / loss coefficient [-]")
+        .def_readonly("dP",   &ChannelResult::dP,   "Pressure drop [Pa]")
+        .def_readonly("M",    &ChannelResult::M,    "Mach number [-]")
+        .def_readonly("T_aw", &ChannelResult::T_aw, "Adiabatic wall temperature [K]")
+        .def_readonly("q",    &ChannelResult::q,    "Heat flux [W/m^2] (nan if T_wall not supplied)")
+        .def("__repr__", [](const ChannelResult& r) {
+            auto fmt = [](double v) {
+                if (std::isnan(v)) return std::string("nan");
+                char buf[32];
+                std::snprintf(buf, sizeof(buf), "%.6g", v);
+                return std::string(buf);
+            };
+            return "ChannelResult(h=" + fmt(r.h) + ", Nu=" + fmt(r.Nu) +
+                   ", Re=" + fmt(r.Re) + ", dP=" + fmt(r.dP) +
+                   ", T_aw=" + fmt(r.T_aw) + ", q=" + fmt(r.q) + ")";
+        });
+
+    // -----------------------------------------------------------------
+    // channel_smooth
+    // -----------------------------------------------------------------
+    m.def("channel_smooth",
+        [](double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double velocity, double diameter, double length,
+           double T_wall,
+           const std::string& correlation,
+           bool heating,
+           double mu_ratio,
+           double roughness) {
+            return channel_smooth(T, P, to_vec(X_arr), velocity, diameter, length,
+                                  T_wall, correlation, heating, mu_ratio, roughness);
+        },
+        py::arg("T"), py::arg("P"), py::arg("X"),
+        py::arg("velocity"), py::arg("diameter"), py::arg("length"),
+        py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
+        py::arg("correlation") = "gnielinski",
+        py::arg("heating") = true,
+        py::arg("mu_ratio") = 1.0,
+        py::arg("roughness") = 0.0,
+        "Smooth pipe/duct: combined HTC + pressure drop.\n\n"
+        "Parameters:\n"
+        "  T, P, X    : bulk static thermodynamic state\n"
+        "  velocity   : bulk velocity [m/s]\n"
+        "  diameter   : hydraulic diameter [m]\n"
+        "  length     : channel length [m]\n"
+        "  T_wall     : wall temperature [K] (nan to skip q)\n"
+        "  correlation: 'gnielinski' (default), 'dittus_boelter', 'sieder_tate', 'petukhov'\n"
+        "  heating    : True = fluid heated\n"
+        "  mu_ratio   : mu_bulk/mu_wall for Sieder-Tate\n"
+        "  roughness  : absolute wall roughness [m]\n\n"
+        "Returns: ChannelResult");
+
+    // -----------------------------------------------------------------
+    // channel_ribbed
+    // -----------------------------------------------------------------
+    m.def("channel_ribbed",
+        [](double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double velocity, double diameter, double length,
+           double e_D, double P_e, double alpha,
+           double T_wall, bool heating) {
+            return channel_ribbed(T, P, to_vec(X_arr), velocity, diameter, length,
+                                  e_D, P_e, alpha, T_wall, heating);
+        },
+        py::arg("T"), py::arg("P"), py::arg("X"),
+        py::arg("velocity"), py::arg("diameter"), py::arg("length"),
+        py::arg("e_D"), py::arg("P_e"), py::arg("alpha"),
+        py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
+        py::arg("heating") = true,
+        "Rib-enhanced cooling channel (Han et al. 1988).\n\n"
+        "Applies rib_enhancement_factor to Nu and rib_friction_multiplier to f\n"
+        "from a smooth-pipe Gnielinski baseline.\n\n"
+        "Parameters:\n"
+        "  e_D   : rib height / hydraulic diameter [-]  (valid: 0.02-0.1)\n"
+        "  P_e   : rib pitch / rib height [-]           (valid: 5-20)\n"
+        "  alpha : rib angle [degrees]                  (valid: 30-90)\n\n"
+        "Returns: ChannelResult");
+
+    // -----------------------------------------------------------------
+    // channel_dimpled
+    // -----------------------------------------------------------------
+    m.def("channel_dimpled",
+        [](double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double velocity, double diameter, double length,
+           double d_Dh, double h_d, double S_d,
+           double T_wall, bool heating) {
+            return channel_dimpled(T, P, to_vec(X_arr), velocity, diameter, length,
+                                   d_Dh, h_d, S_d, T_wall, heating);
+        },
+        py::arg("T"), py::arg("P"), py::arg("X"),
+        py::arg("velocity"), py::arg("diameter"), py::arg("length"),
+        py::arg("d_Dh"), py::arg("h_d"), py::arg("S_d"),
+        py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
+        py::arg("heating") = true,
+        "Dimpled surface cooling channel (Chyu et al. 1997).\n\n"
+        "Applies dimple_nusselt_enhancement to Nu and dimple_friction_multiplier to f\n"
+        "from a smooth-pipe Gnielinski baseline.\n\n"
+        "Parameters:\n"
+        "  d_Dh : dimple diameter / channel height [-]  (valid: 0.1-0.3)\n"
+        "  h_d  : dimple depth / diameter [-]           (valid: 0.1-0.3)\n"
+        "  S_d  : dimple spacing / diameter [-]         (valid: 1.5-3.0)\n\n"
+        "Returns: ChannelResult");
+
+    // -----------------------------------------------------------------
+    // channel_pin_fin
+    // -----------------------------------------------------------------
+    m.def("channel_pin_fin",
+        [](double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double velocity, double channel_height, double pin_diameter,
+           double S_D, double X_D, int N_rows,
+           double T_wall, bool is_staggered) {
+            return channel_pin_fin(T, P, to_vec(X_arr), velocity, channel_height,
+                                   pin_diameter, S_D, X_D, N_rows, T_wall, is_staggered);
+        },
+        py::arg("T"), py::arg("P"), py::arg("X"),
+        py::arg("velocity"), py::arg("channel_height"), py::arg("pin_diameter"),
+        py::arg("S_D"), py::arg("X_D"), py::arg("N_rows"),
+        py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
+        py::arg("is_staggered") = true,
+        "Pin-fin array cooling channel (Metzger et al. 1982).\n\n"
+        "Re and Nu are based on pin diameter d.\n"
+        "dP = N_rows * f_pin * (rho * v_max^2 / 2)\n"
+        "  v_max = velocity * S_D / (S_D - 1)  (minimum cross-section)\n\n"
+        "Parameters:\n"
+        "  velocity       : approach velocity [m/s]\n"
+        "  channel_height : pin length H [m]\n"
+        "  pin_diameter   : pin diameter d [m]\n"
+        "  S_D            : spanwise pitch / d [-]   (valid: 1.5-4.0)\n"
+        "  X_D            : streamwise pitch / d [-] (valid: 1.5-4.0)\n"
+        "  N_rows         : number of pin rows\n"
+        "  is_staggered   : True = staggered (default), False = inline\n\n"
+        "Returns: ChannelResult");
+
+    // -----------------------------------------------------------------
+    // channel_impingement
+    // -----------------------------------------------------------------
+    m.def("channel_impingement",
+        [](double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double mdot_jet, double d_jet,
+           double z_D, double x_D, double y_D,
+           double A_target, double T_wall, double Cd_jet) {
+            return channel_impingement(T, P, to_vec(X_arr), mdot_jet, d_jet,
+                                       z_D, x_D, y_D, A_target, T_wall, Cd_jet);
+        },
+        py::arg("T"), py::arg("P"), py::arg("X"),
+        py::arg("mdot_jet"), py::arg("d_jet"),
+        py::arg("z_D"), py::arg("x_D") = 0.0, py::arg("y_D") = 0.0,
+        py::arg("A_target"),
+        py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
+        py::arg("Cd_jet") = 0.65,
+        "Impingement jet array cooling (Florschuetz et al. 1981 / Martin 1977).\n\n"
+        "Re and Nu are based on jet diameter d_jet.\n"
+        "dP = (1/Cd_jet^2) * rho * v_jet^2 / 2  (jet-plate orifice loss)\n\n"
+        "Parameters:\n"
+        "  mdot_jet : total jet mass flow [kg/s]\n"
+        "  d_jet    : jet hole diameter [m]\n"
+        "  z_D      : jet-to-target distance / d_jet [-]  (valid: 1-12)\n"
+        "  x_D      : streamwise jet spacing / d_jet [-]  (0 = single jet)\n"
+        "  y_D      : spanwise jet spacing / d_jet [-]    (0 = single jet)\n"
+        "  A_target : target surface area [m^2]\n"
+        "  Cd_jet   : jet hole discharge coefficient [-]  (default 0.65)\n\n"
+        "Returns: ChannelResult");
+
+    // -----------------------------------------------------------------
+    // pin_fin_friction (scalar, low-level)
+    // -----------------------------------------------------------------
+    m.def("pin_fin_friction",
+        &combaero::cooling::pin_fin_friction,
+        py::arg("Re_d"),
+        py::arg("is_staggered") = true,
+        "Pin-fin array pressure drop friction coefficient.\n\n"
+        "For use in: dP = N_rows * f_pin * (rho * v_max^2 / 2)\n\n"
+        "Parameters:\n"
+        "  Re_d         : Reynolds number based on pin diameter [-]\n"
+        "  is_staggered : True = staggered (default), False = inline\n\n"
+        "Returns: friction coefficient f_pin [-]\n\n"
+        "Source: Metzger et al. (1982), Simoneau & VanFossen (1984)");
 }
