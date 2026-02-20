@@ -331,6 +331,10 @@ print(state.mw)      # 28.97 g/mol
 
 ## Transport Properties
 
+The individual functions below each recompute from scratch and are suitable for
+one-off queries. **In solver inner loops**, use `transport_state()` or
+`complete_state()` instead — they compute all properties in a single pass.
+
 ```cpp
 double viscosity(double T, double P, const std::vector<double>& X);           // Pa·s
 double thermal_conductivity(double T, double P, const std::vector<double>& X); // W/(m·K)

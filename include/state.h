@@ -4,9 +4,10 @@
 #include <string>
 #include <vector>
 
-// NOTE: For better performance, consider making T, P, X private with
-// getter/setters that invalidate a transport cache. Currently transport
-// properties are recomputed on every call.
+// NOTE: Individual property getters (mu, k, Pr, ...) recompute on every call
+// and are intended for one-off queries.  In solver inner loops, use the bundle
+// types (TransportState, ThermoState, CompleteState) which compute all
+// properties in a single pass.
 
 // Thermodynamic state of a gas mixture at STATIC conditions (T, P).
 // All property getters (h, cp, s, rho, a, ...) are evaluated at the

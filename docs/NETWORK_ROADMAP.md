@@ -49,7 +49,7 @@ mass flows, and compositions throughout the system.
 │  h(), cp(), cv()         mixture enthalpy/heat cap   │
 │  density()               ideal gas law               │
 │  speed_of_sound()        isentropic                  │
-│  viscosity(), prandtl()  transport properties        │
+│  transport_state()       all transport props (bundle) │
 │  calc_T_from_h()         Newton inversion            │
 │  mole_to_mass()          composition conversion      │
 │  orifice_mdot()          incompressible Cd·A          │
