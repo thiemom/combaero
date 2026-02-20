@@ -185,6 +185,7 @@ def generate_markdown(entries: list[UnitEntry]) -> str:
         "equilibrium.h - Chemical Equilibrium",
         "state.h - State Properties",
         "state.h - Stream Properties",
+        "stagnation.h - Stagnation/Static Conversions",
     ]
 
     # Add sections in order, tracking current header to avoid repetition

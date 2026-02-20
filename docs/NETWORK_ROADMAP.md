@@ -103,7 +103,7 @@ well-posedness. The solver validates this at setup.
 
 | Element | Residual | CombAero call |
 |---|---|---|
-| `HeatExchangerElement` | `Q = h·A·ΔT_LM`, solves T_wall | `prandtl()`, `thermal_conductivity()` |
+| `HeatExchangerElement` | `Q = h·A·(T_aw − T_wall)`, solves T_wall | `htc_pipe()`, `T_adiabatic_wall()` from `stagnation.h` |
 | `AdiabaticWallElement` | `Q = 0` | — |
 
 ### Reaction / Mixing Elements
@@ -149,6 +149,47 @@ node they differ and the isentropic relation closes the system.
 
 **Phase 1** uses only `P` and `m_dot` (T and X are fixed, no composition
 tracking). `P_total` and `T_total` are introduced in Phase 2.
+
+---
+
+## Static vs Stagnation Convention
+
+`MixtureState` carries both static (`T`, `P`) and total (`T_total`, `P_total`).
+The distinction matters for each part of the network:
+
+| Context | Temperature to use | Notes |
+|---|---|---|
+| Element residuals (pipe ΔP, orifice ṁ) | static `T`, `P` | Darcy-Weisbach, Nusselt/Re/Pr all at bulk static conditions |
+| Boundary conditions | total `T_total`, `P_total` | Reservoir / compressor delivery are naturally total conditions |
+| Heat flux driving temperature | `T_aw` (adiabatic wall T) | **Not** T_static or T_total; use `combaero.T_adiabatic_wall()` |
+| Combustion / mixing enthalpy balance | static `h(T)` + v²/2 = h₀ | Stagnation enthalpy h₀ is conserved, not static h |
+| Isentropic elements (nozzle, momentum chamber) | convert via `combaero.T0_from_static()` / `P0_from_static()` | Requires known M at the element |
+
+**Why T_aw for heat transfer?**
+
+```
+q = h_conv · (T_aw − T_wall)          ← correct for all Mach numbers
+
+T_aw = T_static + r · v² / (2·cp)     r = Pr^(1/3) turbulent
+                                           r = Pr^(1/2) laminar
+
+T_static < T_aw < T_total  (since r < 1 for air)
+```
+
+- Using `T_static`: underestimates heat load at M > 0.3 (2–15% error for combustor liner / turbine cooling)
+- Using `T_total`: overcorrects — `T_aw < T_total` always since r < 1
+- Re and Pr for the Nusselt correlation are always evaluated at static `T` (correct)
+
+**CombAero utilities** (`stagnation.h`, available as `combaero.*`):
+
+```python
+T_aw = combaero.T_adiabatic_wall(T_static, v, T, P, X)      # from velocity
+T_aw = combaero.T_adiabatic_wall_mach(T_static, M, T, P, X) # from Mach number
+T0   = combaero.T0_from_static(T, M, X)
+P0   = combaero.P0_from_static(P, T, M, X)
+T    = combaero.T_from_stagnation(T0, M, X)
+P    = combaero.P_from_stagnation(P0, T0, M, X)
+```
 
 ---
 

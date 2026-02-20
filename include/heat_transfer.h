@@ -457,7 +457,13 @@ double htc_pipe(const State& s, double velocity, double diameter,
 // Returns: tuple (h [W/(m²·K)], Nu [-], Re [-])
 //
 // Parameters:
-//   T           : temperature [K]
+//   T           : bulk static temperature [K]
+//                 Re and Pr are always evaluated at static T (correct).
+//                 For the heat flux driving temperature:
+//                   M < 0.3 : pass T_static as T_hot to cooled_wall_heat_flux()
+//                   M > 0.3 : pass T_adiabatic_wall() from stagnation.h instead
+//                             (T_aw is between T_static and T_total; using T_total
+//                              overcorrects since recovery factor r < 1)
 //   P           : pressure [Pa]
 //   X           : mole fractions [mol/mol]
 //   velocity    : flow velocity [m/s]

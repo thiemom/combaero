@@ -25,8 +25,14 @@
 
 // Result of a compressible flow calculation
 struct CompressibleFlowSolution {
+    // Stagnation state at (T0, P0). This is the one place in CombAero where
+    // a State struct holds total rather than static conditions.
+    // stagnation.h() returns h(T0) = stagnation enthalpy [J/mol].
     State stagnation;    // Stagnation state (T0, P0, h0, s0, ...)
     State outlet;        // Outlet static state (T, P, rho, h, s, a)
+                         // For heat transfer at high Mach: use T_adiabatic_wall()
+                         // from stagnation.h, not outlet.T, as the hot-side
+                         // driving temperature in htc_pipe() / cooled_wall_heat_flux()
     double v = 0.0;      // Outlet velocity [m/s]
     double M = 0.0;      // Outlet Mach number [-]
     double mdot = 0.0;   // Mass flow rate [kg/s]

@@ -868,6 +868,104 @@ std::vector<double> humid_air_composition(double T, double P, double RH);
 double dewpoint(double T, double P, const std::vector<double>& X);
 ```
 
+## Stagnation / Static Conversions (`stagnation.h`)
+
+Isentropic stagnation ↔ static conversion utilities for a thermally perfect gas. All iterative functions use the variable-cp thermo backend (`thermo.h`) internally.
+
+**Convention:** `thermo.h` functions (`h`, `cp`, `s`, etc.) operate on **static** conditions. Stagnation enthalpy is `h0 = h(T_static) + v²/2` [J/kg].
+
+### Kinetic Energy and Stagnation Enthalpy
+
+```cpp
+// Specific kinetic energy v²/2 [J/kg]
+double kinetic_energy(double v);
+
+// Stagnation enthalpy from static enthalpy [J/kg] and velocity [m/s]
+// h0 = h_static + v²/2
+double h0_from_static(double h_static_J_per_kg, double v);
+
+// Velocity [m/s] from stagnation and static enthalpy [J/kg]
+// v = sqrt(2*(h0 - h_static)); returns 0 if h0 <= h_static
+double v_from_h0(double h0, double h_static_J_per_kg);
+```
+
+### Mach Number
+
+```cpp
+// Mach number from velocity [m/s] and static temperature [K]
+double mach_number(double v, double T, const std::vector<double>& X);
+```
+
+### Stagnation Temperature (iterative — variable cp)
+
+```cpp
+// T0 [K] from static T [K] and Mach number
+double T0_from_static(double T, double M, const std::vector<double>& X,
+                      double tol = 1e-8, std::size_t max_iter = 50);
+
+// T0 [K] from static T [K] and velocity v [m/s]
+double T0_from_static_v(double T, double v, const std::vector<double>& X,
+                        double tol = 1e-8, std::size_t max_iter = 50);
+
+// Static T [K] from stagnation T0 [K] and Mach number
+double T_from_stagnation(double T0, double M, const std::vector<double>& X,
+                         double tol = 1e-8, std::size_t max_iter = 50);
+```
+
+### Stagnation Pressure (isentropic — entropy conservation)
+
+```cpp
+// P0 [Pa] from static P [Pa], T [K], and Mach number
+double P0_from_static(double P, double T, double M,
+                      const std::vector<double>& X,
+                      double tol = 1e-8, std::size_t max_iter = 50);
+
+// Static P [Pa] from stagnation P0 [Pa], T0 [K], and Mach number
+double P_from_stagnation(double P0, double T0, double M,
+                         const std::vector<double>& X,
+                         double tol = 1e-8, std::size_t max_iter = 50);
+```
+
+### Adiabatic Wall Temperature
+
+For convective heat transfer the correct hot-side driving temperature is **T_aw**, not T_static or T_total:
+
+```
+q = h_conv · (T_aw - T_wall)
+
+T_aw = T_static + r · v² / (2·cp)
+r = Pr^(1/3)  turbulent (default)
+r = Pr^(1/2)  laminar
+```
+
+| Temperature | For Nusselt/Re/Pr | For heat flux driving T |
+|---|---|---|
+| T_static | ✓ always correct | ✓ M < 0.3 only |
+| T_total  | — | ✗ overcorrects (r < 1, T_aw < T0) |
+| T_aw     | — | ✓ always correct |
+
+Pass `T_aw` as `T_hot` to `htc_pipe()` and `cooled_wall_heat_flux()` for M > 0.3.
+
+```cpp
+// Recovery factor r = Pr^(1/3) turbulent, Pr^(1/2) laminar
+double recovery_factor(double Pr, bool turbulent = true);
+
+// T_aw [K] from static T [K] and velocity v [m/s]
+// T_aw = T_static + r * v² / (2*cp(T, X))
+double T_adiabatic_wall(double T_static, double v,
+                        double T, double P, const std::vector<double>& X,
+                        bool turbulent = true);
+
+// T_aw [K] from static T [K] and Mach number (v = M*a computed internally)
+double T_adiabatic_wall_mach(double T_static, double M,
+                              double T, double P, const std::vector<double>& X,
+                              bool turbulent = true);
+```
+
+**Python:** All functions available as `combaero.T0_from_static()`, `combaero.T_adiabatic_wall()`, etc.
+
+---
+
 ## Compressible Flow
 
 Compressible flow solvers for ideal gas with variable cp(T). Uses NASA polynomial fits for temperature-dependent properties.

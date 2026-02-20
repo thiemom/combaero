@@ -261,7 +261,11 @@ double adiabatic_wall_temperature(double T_hot, double T_coolant, double eta);
 // where U uses both convective sides and wall conduction.
 //
 // Parameters:
-//   T_hot      : mainstream hot-gas temperature [K]
+//   T_hot      : mainstream hot-gas driving temperature [K]
+//                For M < 0.3: pass static temperature T_static.
+//                For M > 0.3 (combustor liner, turbine cooling): pass
+//                T_adiabatic_wall() from stagnation.h as T_hot.
+//                Using T_total overcorrects (recovery factor r < 1, so T_aw < T0).
 //   T_coolant  : coolant supply temperature [K]
 //   h_hot      : hot-side HTC [W/(m^2*K)]
 //   h_coolant  : coolant-side HTC [W/(m^2*K)]

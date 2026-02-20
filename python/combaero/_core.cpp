@@ -21,6 +21,7 @@
 #include "materials.h"
 #include "cooling_correlations.h"
 #include "units.h"
+#include "stagnation.h"
 
 namespace py = pybind11;
 using namespace combaero;
@@ -4975,4 +4976,123 @@ PYBIND11_MODULE(_core, m)
         py::arg("D"), py::arg("f"), py::arg("X"),
         py::arg("tol") = 1e-6, py::arg("max_iter") = 100,
         "Maximum pipe length before choking (Fanno L*) [m].");
+
+    // =========================================================================
+    // Stagnation / static conversion utilities  (stagnation.h)
+    // =========================================================================
+
+    m.def("kinetic_energy",
+        &kinetic_energy,
+        py::arg("v"),
+        "Specific kinetic energy v^2/2 [J/kg].");
+
+    m.def("h0_from_static",
+        &h0_from_static,
+        py::arg("h_static_J_per_kg"), py::arg("v"),
+        "Stagnation enthalpy from static enthalpy [J/kg] and velocity [m/s].\n"
+        "h0 = h_static + v^2/2  [J/kg].");
+
+    m.def("v_from_h0",
+        &v_from_h0,
+        py::arg("h0"), py::arg("h_static_J_per_kg"),
+        "Velocity [m/s] from stagnation and static enthalpy [J/kg].\n"
+        "v = sqrt(2*(h0 - h_static)). Returns 0 if h0 <= h_static.");
+
+    m.def("mach_number",
+        [](double v, double T,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+            return mach_number(v, T, to_vec(X_arr));
+        },
+        py::arg("v"), py::arg("T"), py::arg("X"),
+        "Mach number from velocity [m/s] and static temperature [K].\n"
+        "M = v / a(T, X).");
+
+    m.def("T0_from_static",
+        [](double T, double M,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double tol, std::size_t max_iter) {
+            return T0_from_static(T, M, to_vec(X_arr), tol, max_iter);
+        },
+        py::arg("T"), py::arg("M"), py::arg("X"),
+        py::arg("tol") = 1e-8, py::arg("max_iter") = 50,
+        "Stagnation temperature T0 [K] from static T [K] and Mach number.\n"
+        "Iterative for variable cp(T) (thermally perfect gas).");
+
+    m.def("T0_from_static_v",
+        [](double T, double v,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double tol, std::size_t max_iter) {
+            return T0_from_static_v(T, v, to_vec(X_arr), tol, max_iter);
+        },
+        py::arg("T"), py::arg("v"), py::arg("X"),
+        py::arg("tol") = 1e-8, py::arg("max_iter") = 50,
+        "Stagnation temperature T0 [K] from static T [K] and velocity v [m/s].\n"
+        "Iterative for variable cp(T).");
+
+    m.def("T_from_stagnation",
+        [](double T0, double M,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double tol, std::size_t max_iter) {
+            return T_from_stagnation(T0, M, to_vec(X_arr), tol, max_iter);
+        },
+        py::arg("T0"), py::arg("M"), py::arg("X"),
+        py::arg("tol") = 1e-8, py::arg("max_iter") = 50,
+        "Static temperature T [K] from stagnation T0 [K] and Mach number.\n"
+        "Iterative for variable cp(T).");
+
+    m.def("P0_from_static",
+        [](double P, double T, double M,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double tol, std::size_t max_iter) {
+            return P0_from_static(P, T, M, to_vec(X_arr), tol, max_iter);
+        },
+        py::arg("P"), py::arg("T"), py::arg("M"), py::arg("X"),
+        py::arg("tol") = 1e-8, py::arg("max_iter") = 50,
+        "Stagnation pressure P0 [Pa] from static P [Pa], T [K] and Mach number.\n"
+        "Uses isentropic entropy conservation (variable cp).");
+
+    m.def("P_from_stagnation",
+        [](double P0, double T0, double M,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double tol, std::size_t max_iter) {
+            return P_from_stagnation(P0, T0, M, to_vec(X_arr), tol, max_iter);
+        },
+        py::arg("P0"), py::arg("T0"), py::arg("M"), py::arg("X"),
+        py::arg("tol") = 1e-8, py::arg("max_iter") = 50,
+        "Static pressure P [Pa] from stagnation P0 [Pa], T0 [K] and Mach number.\n"
+        "Uses isentropic entropy conservation (variable cp).");
+
+    m.def("recovery_factor",
+        &recovery_factor,
+        py::arg("Pr"), py::arg("turbulent") = true,
+        "Recovery factor r [-] for adiabatic wall temperature.\n"
+        "r = Pr^(1/3) for turbulent (default), Pr^(1/2) for laminar.");
+
+    m.def("T_adiabatic_wall",
+        [](double T_static, double v,
+           double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           bool turbulent) {
+            return T_adiabatic_wall(T_static, v, T, P, to_vec(X_arr), turbulent);
+        },
+        py::arg("T_static"), py::arg("v"),
+        py::arg("T"), py::arg("P"), py::arg("X"),
+        py::arg("turbulent") = true,
+        "Adiabatic wall temperature T_aw [K] from static T [K] and velocity v [m/s].\n"
+        "T_aw = T_static + r * v^2 / (2*cp)  where r = Pr^(1/3) turbulent.\n"
+        "Use T_aw (not T_static or T_total) as the hot-side driving temperature\n"
+        "in htc_pipe() and cooled_wall_heat_flux() for M > 0.3.");
+
+    m.def("T_adiabatic_wall_mach",
+        [](double T_static, double M,
+           double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           bool turbulent) {
+            return T_adiabatic_wall_mach(T_static, M, T, P, to_vec(X_arr), turbulent);
+        },
+        py::arg("T_static"), py::arg("M"),
+        py::arg("T"), py::arg("P"), py::arg("X"),
+        py::arg("turbulent") = true,
+        "Adiabatic wall temperature T_aw [K] from static T [K] and Mach number.\n"
+        "Computes v = M * a(T, X) internally, then applies recovery factor correction.");
 }

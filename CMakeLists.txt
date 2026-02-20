@@ -40,6 +40,7 @@ set(SOURCES
     src/orifice.cpp
     src/materials.cpp
     src/cooling_correlations.cpp
+    src/stagnation.cpp
 )
 
 # Core library

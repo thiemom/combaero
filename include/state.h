@@ -8,7 +8,16 @@
 // getter/setters that invalidate a transport cache. Currently transport
 // properties are recomputed on every call.
 
-// Thermodynamic state of a gas mixture
+// Thermodynamic state of a gas mixture at STATIC conditions (T, P).
+// All property getters (h, cp, s, rho, a, ...) are evaluated at the
+// given static temperature T and static pressure P.
+//
+// Exception: CompressibleFlowSolution::stagnation holds a State at
+// stagnation conditions (T0, P0) — the only deliberate use of State
+// to carry total rather than static values.
+//
+// For the network solver, use MixtureState (NETWORK_ROADMAP.md) which
+// carries both static (T, P) and total (T_total, P_total) explicitly.
 struct State {
     double T = 298.15;               // Temperature [K]
     double P = 101325.0;             // Pressure [Pa]

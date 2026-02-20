@@ -393,6 +393,22 @@ inline constexpr Entry function_units[] = {
     // state.h - Stream Properties
     // -------------------------------------------------------------------------
     {"Stream::mdot",    "-",    "kg/s"},
+
+    // -------------------------------------------------------------------------
+    // stagnation.h - Stagnation/Static Conversions
+    // -------------------------------------------------------------------------
+    {"kinetic_energy",          "v: m/s",                                   "J/kg"},
+    {"h0_from_static",          "h_static: J/kg, v: m/s",                   "J/kg"},
+    {"v_from_h0",               "h0: J/kg, h_static: J/kg",                 "m/s"},
+    {"mach_number",             "v: m/s, T: K, X: mol/mol",                 "- (M)"},
+    {"T0_from_static",          "T: K, M: -, X: mol/mol",                   "K"},
+    {"T0_from_static_v",        "T: K, v: m/s, X: mol/mol",                 "K"},
+    {"T_from_stagnation",       "T0: K, M: -, X: mol/mol",                  "K"},
+    {"P0_from_static",          "P: Pa, T: K, M: -, X: mol/mol",            "Pa"},
+    {"P_from_stagnation",       "P0: Pa, T0: K, M: -, X: mol/mol",          "Pa"},
+    {"recovery_factor",         "Pr: -",                                     "- (r)"},
+    {"T_adiabatic_wall",        "T_static: K, v: m/s, T: K, P: Pa, X: mol/mol", "K"},
+    {"T_adiabatic_wall_mach",   "T_static: K, M: -, T: K, P: Pa, X: mol/mol",   "K"},
 };
 
 inline constexpr std::size_t function_count = sizeof(function_units) / sizeof(Entry);

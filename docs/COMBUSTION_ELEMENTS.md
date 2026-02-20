@@ -35,9 +35,12 @@ class CombustionResult:
     Y: list[float]          # mass fractions [14 species], sums to 1
     mw: float               # mixture molecular weight [g/mol]
 
-    # Thermodynamic state
-    T: float                # temperature [K]
-    P: float                # pressure [Pa]
+    # Thermodynamic state — STATIC conditions (low-velocity plenum assumption)
+    # For high-velocity combustors (M > 0.3), convert to static via:
+    #   T_static = combaero.T_from_stagnation(T_total, M, X)
+    #   P_static = combaero.P_from_stagnation(P_total, T_total, M, X)
+    T: float                # static temperature [K]
+    P: float                # static pressure [Pa]
     m_dot: float            # total mass flow [kg/s]
 
     # Derived properties (computed via CombAero)
