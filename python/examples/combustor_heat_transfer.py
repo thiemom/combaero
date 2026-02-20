@@ -35,7 +35,6 @@ def main() -> None:
     P_combustor = 15e5  # Combustor pressure [Pa] = 15 bar
     T_air_in = 700.0  # Compressor exit temperature [K]
     mdot_air = 10.0  # Air mass flow [kg/s]
-    mdot_fuel = 0.2  # Fuel mass flow [kg/s]
     phi = 0.8  # Equivalence ratio (lean burn)
 
     # Fuel composition (natural gas)
@@ -46,13 +45,6 @@ def main() -> None:
 
     # Air composition
     X_air = ca.standard_dry_air_composition()
-
-    print("\nOperating conditions:")
-    print(f"  Pressure:          P = {P_combustor / 1e5:.0f} bar")
-    print(f"  Air inlet temp:    T = {T_air_in:.0f} K")
-    print(f"  Air mass flow:     mdot_air = {mdot_air:.1f} kg/s")
-    print(f"  Fuel mass flow:    mdot_fuel = {mdot_fuel:.2f} kg/s")
-    print(f"  Equivalence ratio: phi = {phi:.2f}")
 
     # Create streams
     air = ca.Stream()
@@ -65,7 +57,16 @@ def main() -> None:
     fuel.T = 300.0  # Fuel at ambient
     fuel.P = P_combustor
     fuel.X = X_fuel
-    fuel.mdot = mdot_fuel
+
+    # Set fuel flow for target phi, then mix
+    fuel = ca.set_fuel_stream_for_phi(phi, fuel, air)
+    mdot_fuel = fuel.mdot
+
+    print("\nOperating conditions:")
+    print(f"  Pressure:          P = {P_combustor / 1e5:.0f} bar")
+    print(f"  Air inlet temp:    T = {T_air_in:.0f} K")
+    print(f"  Air mass flow:     mdot_air = {mdot_air:.1f} kg/s")
+    print(f"  Fuel mass flow:    mdot_fuel = {mdot_fuel:.3f} kg/s  (phi={phi:.2f})")
 
     # Mix fuel and air
     mixed = ca.mix([fuel, air], P_out=P_combustor)

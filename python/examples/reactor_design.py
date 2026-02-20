@@ -14,6 +14,7 @@ from __future__ import annotations
 import numpy as np
 
 import combaero as ca
+from combaero.species import SpeciesLocator
 
 
 def main() -> None:
@@ -149,15 +150,30 @@ def main() -> None:
     # Design requirements
     tau_target = 0.015  # Target residence time [s] = 15 ms
     mdot_air = 10.0  # Air mass flow [kg/s]
+    P_comb = 15e5  # Pressure [Pa] = 15 bar
+    phi_comb = 0.6  # Lean primary zone
 
-    # Combustor conditions
-    T_avg = 1500.0  # Average temperature [K]
-    P = 15e5  # Pressure [Pa] = 15 bar
-    X_air = ca.standard_dry_air_composition()
-    rho = ca.density(T_avg, P, X_air)
+    # Build burned gas composition for realistic density
+    sp = SpeciesLocator.from_core()
+    X_air_c = ca.standard_dry_air_composition()
+    X_ch4 = sp.empty()
+    X_ch4[sp.indices["CH4"]] = 1.0
+
+    air_c = ca.Stream()
+    air_c.T, air_c.P, air_c.X, air_c.mdot = 700.0, P_comb, X_air_c, mdot_air
+
+    fuel_c = ca.Stream()
+    fuel_c.T, fuel_c.P, fuel_c.X = 300.0, P_comb, X_ch4
+
+    fuel_c = ca.set_fuel_stream_for_phi(phi_comb, fuel_c, air_c)
+    mixed_c = ca.mix([fuel_c, air_c])
+    burned_c = ca.complete_combustion(mixed_c.T, mixed_c.X, mixed_c.P)
+
+    mdot_total = mixed_c.mdot
+    rho = ca.density(burned_c.T, P_comb, burned_c.X)
 
     # Calculate required volume
-    V_required = tau_target * mdot_air / rho
+    V_required = tau_target * mdot_total / rho
 
     # Annular combustor geometry
     D_outer = 0.5  # Outer diameter [m]
@@ -172,12 +188,14 @@ def main() -> None:
 
     print("\nDesign requirements:")
     print(f"  Target residence time: tau = {tau_target * 1000:.1f} ms")
-    print(f"  Air mass flow:         mdot = {mdot_air:.1f} kg/s")
-    print(f"  Operating pressure:    P = {P / 1e5:.0f} bar")
-    print(f"  Average temperature:   T = {T_avg:.0f} K")
+    print(f"  Air mass flow:         mdot_air = {mdot_air:.1f} kg/s")
+    print(f"  Fuel mass flow:        mdot_fuel = {fuel_c.mdot:.3f} kg/s  (phi={phi_comb:.1f})")
+    print(f"  Total mass flow:       mdot = {mdot_total:.3f} kg/s")
+    print(f"  Operating pressure:    P = {P_comb / 1e5:.0f} bar")
+    print(f"  T_ad (burned):         T = {burned_c.T:.0f} K")
 
-    print("\nAir properties:")
-    print(f"  Density:               rho = {rho:.3f} kg/m3")
+    print("\nBurned gas properties:")
+    print(f"  Density:               rho = {rho:.4f} kg/m3  (burned gas at T_ad)")
 
     print("\nAnnular combustor:")
     print(f"  Outer diameter:        D_o = {D_outer * 1000:.0f} mm")
@@ -190,7 +208,7 @@ def main() -> None:
     print(f"  Required length:       L = {L_required * 1000:.0f} mm")
 
     # Verify
-    tau_actual = ca.residence_time_mdot(V_required, mdot_air, rho)
+    tau_actual = ca.residence_time_mdot(V_required, mdot_total, rho)
     print(f"  Actual residence time: tau = {tau_actual * 1000:.2f} ms OK")
 
     # =========================================================================

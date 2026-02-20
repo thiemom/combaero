@@ -6,13 +6,14 @@ Classical supersonic nozzle problem demonstrating:
 - Sonic conditions at throat (M=1)
 - Supersonic expansion in diverging section
 
-This example models a small rocket nozzle with hot combustion products.
+Chamber gas: real H2/air combustion products at phi=1.0.
 """
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 import combaero as cb
+from combaero.species import SpeciesLocator
 
 
 def main() -> None:
@@ -42,16 +43,30 @@ def main() -> None:
     print(f"  Area ratio A_exit/A_throat: {AR:.2f}")
 
     # =========================================================================
-    # Flow conditions (hot combustion products, simplified as air)
+    # Chamber gas: H2/air combustion products at phi=1.0, P0=20 bar
     # =========================================================================
-    # In reality, use burned gas composition. Here we use air for simplicity.
-    X = cb.standard_dry_air_composition()
+    sp = SpeciesLocator.from_core()
+    P0 = 2_000_000.0  # Pa  (20 bar chamber pressure)
 
-    T0 = 2000.0  # K (stagnation temperature - hot combustion gas)
-    P0 = 2000000.0  # Pa (stagnation pressure - 20 bar chamber pressure)
+    X_air = cb.standard_dry_air_composition()
+    X_h2 = sp.empty()
+    X_h2[sp.indices["H2"]] = 1.0
 
-    print("\nStagnation conditions:")
-    print(f"  T0 = {T0:.0f} K")
+    fuel = cb.Stream()
+    fuel.T, fuel.P, fuel.X = 300.0, P0, X_h2
+
+    air = cb.Stream()
+    air.T, air.P, air.X, air.mdot = 300.0, P0, X_air, 10.0
+
+    fuel_phi = cb.set_fuel_stream_for_phi(1.0, fuel, air)
+    mixed = cb.mix([fuel_phi, air])
+    burned = cb.complete_combustion(mixed.T, mixed.X, mixed.P)
+
+    T0 = burned.T  # adiabatic flame temperature = stagnation T
+    X = burned.X  # combustion products composition
+
+    print("\nChamber gas (H2/air, phi=1.0):")
+    print(f"  T0 = {T0:.0f} K  (adiabatic flame temperature)")
     print(f"  P0 = {P0 / 1e5:.1f} bar")
 
     # Get gas properties at stagnation
@@ -102,14 +117,14 @@ def main() -> None:
     print(f"  P = {exit_station.P / 1e5:.2f} bar")
     print(f"  u = {exit_station.u:.1f} m/s")
 
-    # Thrust calculation using nozzle_thrust
-    thrust_result = cb.nozzle_thrust(sol_design, P_exit_design)
-    print("\nThrust performance:")
-    print(f"  Thrust: {thrust_result.thrust:.1f} N")
-    print(f"  Specific impulse: {thrust_result.specific_impulse:.1f} s")
-    print(f"  Thrust coefficient: {thrust_result.thrust_coefficient:.3f}")
+    # Thrust at sea level: P_amb = 1 bar
+    thrust_sl = cb.nozzle_thrust(sol_design, P_exit_design)
+    print("\nThrust performance (sea level, P_amb=1 bar):")
+    print(f"  Thrust: {thrust_sl.thrust:.1f} N")
+    print(f"  Specific impulse: {thrust_sl.specific_impulse:.1f} s")
+    print(f"  Thrust coefficient: {thrust_sl.thrust_coefficient:.3f}")
 
-    # Vacuum thrust (space conditions)
+    # Vacuum thrust: reuse same nozzle solution, just change P_amb
     thrust_vac = cb.nozzle_thrust(sol_design, 0.0)
     print("\nVacuum performance (P_amb = 0):")
     print(f"  Thrust: {thrust_vac.thrust:.1f} N")

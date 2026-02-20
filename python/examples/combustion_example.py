@@ -67,32 +67,16 @@ def main() -> None:
     print(f"{'[-]':>6s} {'[kg/s]':>10s} {'[K]':>10s} {'[K]':>10s} {'[%]':>10s} {'[%]':>10s}")
     print("-" * 65)
 
-    # Pre-calculate stoichiometric ratio
-    Y_fuel = np.array(ca.mole_to_mass(list(X_fuel)))
-    Y_air = np.array(ca.mole_to_mass(list(X_air)))
-    stoich_ratio = ca.bilger_stoich_mixture_fraction_mass(list(Y_fuel), list(Y_air))
-
-    for phi in np.arange(0.5, 1.25, 0.1):
-        # Calculate fuel mass flow for target equivalence ratio
-        # Z = phi * Z_st / (1 + (phi - 1) * Z_st)
-        # Z = mdot_fuel / (mdot_fuel + mdot_air)
-        Z_target = phi * stoich_ratio / (1 + (phi - 1) * stoich_ratio)
-        mdot_fuel = Z_target * air.mdot / (1 - Z_target)
-
-        fuel.mdot = mdot_fuel
-
-        # Mix streams
-        mixed = ca.mix([fuel, air])
-
-        # One-step: combustion + reforming + WGS equilibrium
+    for phi in [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2]:
+        fuel_phi = ca.set_fuel_stream_for_phi(phi, fuel, air)
+        mixed = ca.mix([fuel_phi, air])
         eq = ca.combustion_equilibrium(mixed.T, mixed.X, mixed.P)
 
-        # Get CO and H2 mole fractions
-        X_CO = eq.X[sp.indices["CO"]] * 100
-        X_H2 = eq.X[sp.indices["H2"]] * 100
+        X_CO = eq.state.X[sp.indices["CO"]] * 100
+        X_H2 = eq.state.X[sp.indices["H2"]] * 100
 
         print(
-            f"{phi:6.2f} {mdot_fuel:10.4f} {mixed.T:10.2f} {eq.T:10.2f} {X_CO:10.4f} {X_H2:10.4f}"
+            f"{phi:6.2f} {fuel_phi.mdot:10.4f} {mixed.T:10.2f} {eq.state.T:10.2f} {X_CO:10.4f} {X_H2:10.4f}"
         )
 
     # =========================================================================
@@ -102,11 +86,7 @@ def main() -> None:
     print("Detailed Results at Stoichiometric (phi = 1.0)")
     print("=" * 75)
 
-    phi = 1.0
-    Z_target = phi * stoich_ratio / (1 + (phi - 1) * stoich_ratio)
-    fuel.mdot = Z_target * air.mdot / (1 - Z_target)
-
-    mixed = ca.mix([fuel, air])
+    mixed = ca.mix([ca.set_fuel_stream_for_phi(1.0, fuel, air), air])
 
     # One-step: combustion + reforming + WGS equilibrium
     eq = ca.combustion_equilibrium(mixed.T, mixed.X, mixed.P)
@@ -123,12 +103,12 @@ def main() -> None:
     print(f"  T_ad = {burned.T:.2f} K")
 
     print("\nCombustion + Equilibrium (one-step):")
-    print(f"  T_eq = {eq.T:.2f} K")
+    print(f"  T_eq = {eq.state.T:.2f} K")
 
     print("\nProduct Composition (mole fractions > 0.1%):")
     for i, name in enumerate(sp.names):
-        if eq.X[i] > 0.001:
-            print(f"  {name:>8s}: {eq.X[i] * 100:6.2f}%")
+        if eq.state.X[i] > 0.001:
+            print(f"  {name:>8s}: {eq.state.X[i] * 100:6.2f}%")
 
     # =========================================================================
     # Rich case (phi = 1.2) - Reforming converts hydrocarbons to CO + H2
@@ -137,11 +117,7 @@ def main() -> None:
     print("Rich Case (phi = 1.2) - Reforming + WGS Equilibrium")
     print("=" * 75)
 
-    phi = 1.2
-    Z_target = phi * stoich_ratio / (1 + (phi - 1) * stoich_ratio)
-    fuel.mdot = Z_target * air.mdot / (1 - Z_target)
-
-    mixed = ca.mix([fuel, air])
+    mixed = ca.mix([ca.set_fuel_stream_for_phi(1.2, fuel, air), air])
 
     # One-step: combustion + reforming + WGS equilibrium
     eq = ca.combustion_equilibrium(mixed.T, mixed.X, mixed.P)
@@ -157,11 +133,11 @@ def main() -> None:
             print(f"    {hc}: {burned.X[sp.indices[hc]] * 100:.4f}%")
 
     print("\nCombustion + Equilibrium (one-step, hydrocarbons reformed to CO + H2):")
-    print(f"  T_eq = {eq.T:.2f} K (dropped {burned.T - eq.T:.1f} K)")
+    print(f"  T_eq = {eq.state.T:.2f} K (dropped {burned.T - eq.state.T:.1f} K)")
     print("  Product composition:")
     for i, name in enumerate(sp.names):
-        if eq.X[i] > 0.001:
-            print(f"    {name:>8s}: {eq.X[i] * 100:6.2f}%")
+        if eq.state.X[i] > 0.001:
+            print(f"    {name:>8s}: {eq.state.X[i] * 100:6.2f}%")
 
 
 if __name__ == "__main__":
