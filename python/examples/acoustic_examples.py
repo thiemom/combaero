@@ -6,6 +6,7 @@ focusing on engineering metrics like Absorption Coefficient (alpha)
 and Transmission Loss (TL).
 """
 
+import pathlib
 import warnings
 
 import matplotlib.pyplot as plt
@@ -18,6 +19,15 @@ warnings.filterwarnings("ignore")
 
 def print_header(title):
     print(f"\n{'=' * 70}\n {title}\n{'=' * 70}")
+
+
+def _show_or_save(filename: str) -> None:
+    if plt.get_backend().lower() == "agg":
+        out = pathlib.Path(__file__).parent / filename
+        plt.savefig(out, dpi=150)
+        print(f"Plot saved to '{out}'")
+    else:
+        plt.show()
 
 
 # -------------------------------------------------------------------------
@@ -91,7 +101,7 @@ def demo_aero_annular():
     ax.set_title("Dispersion Relation: Annular Combustor")
     ax.legend()
     plt.tight_layout()
-    plt.show()
+    _show_or_save("acoustic_annular_dispersion.png")
 
 
 # -------------------------------------------------------------------------
@@ -139,7 +149,7 @@ def demo_industrial_can_annular():
     ax.set_ylabel("Frequency (Hz)")
     ax.set_xlim(-0.5, geom.n_cans / 2 + 0.5)
     plt.tight_layout()
-    plt.show()
+    _show_or_save("acoustic_can_annular_bloch.png")
 
 
 # -------------------------------------------------------------------------
@@ -179,7 +189,8 @@ def demo_damping_liner():
     ax.set_xlabel("Frequency (Hz)")
     ax.set_ylabel("Absorption Coefficient (alpha)")
     ax.legend()
-    plt.show()
+    plt.tight_layout()
+    _show_or_save("acoustic_liner_damping.png")
 
 
 # -------------------------------------------------------------------------
@@ -251,7 +262,7 @@ def demo_serial_dampers():
     ax.set_xlabel("Frequency (Hz)")
     ax.set_ylabel("Absorption Coefficient (alpha)")
     ax.legend()
-    plt.show()
+    _show_or_save("acoustic_serial_dampers.png")
 
 
 if __name__ == "__main__":

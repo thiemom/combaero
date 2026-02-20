@@ -209,10 +209,11 @@ def main() -> None:
 
     plt.suptitle("De Laval Nozzle - Design Condition (Supersonic Exit)", fontsize=14)
     plt.tight_layout()
-    out_path = pathlib.Path(__file__).parent / "de_laval_nozzle.png"
-    plt.savefig(out_path, dpi=150)
-    print(f"\nPlot saved to '{out_path}'")
-    if plt.get_backend().lower() != "agg":
+    if plt.get_backend().lower() == "agg":
+        out_path = pathlib.Path(__file__).parent / "de_laval_nozzle.png"
+        plt.savefig(out_path, dpi=150)
+        print(f"\nPlot saved to '{out_path}'")
+    else:
         plt.show()
 
 

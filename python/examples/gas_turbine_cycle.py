@@ -268,10 +268,11 @@ def main() -> None:
     ax_eta.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    out_path = pathlib.Path(__file__).parent / "gas_turbine_cycle.png"
-    plt.savefig(out_path, dpi=150)
-    print(f"\nPlot saved to '{out_path}'")
-    if plt.get_backend().lower() != "agg":
+    if plt.get_backend().lower() == "agg":
+        out_path = pathlib.Path(__file__).parent / "gas_turbine_cycle.png"
+        plt.savefig(out_path, dpi=150)
+        print(f"\nPlot saved to '{out_path}'")
+    else:
         plt.show()
 
 
