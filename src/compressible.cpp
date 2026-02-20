@@ -1038,8 +1038,15 @@ NozzleSolution nozzle_quasi1d(
     if (P0 <= 0.0) {
         throw std::invalid_argument("nozzle_quasi1d: P0 must be positive");
     }
-    if (P_exit <= 0.0 || P_exit >= P0) {
-        throw std::invalid_argument("nozzle_quasi1d: P_exit must be in (0, P0)");
+    if (P_exit >= P0) {
+        throw std::invalid_argument("nozzle_quasi1d: P_exit must be less than P0");
+    }
+    // Clamp near-zero P_exit (e.g. vacuum) to a small positive floor so the
+    // isentropic marcher can compute a finite Mach number.  The floor is
+    // 1e-6 * P0 which corresponds to M >> 1 and is well outside the range of
+    // any real nozzle; callers should pass a physically meaningful P_exit.
+    if (P_exit <= 0.0) {
+        P_exit = 1.0e-6 * P0;
     }
     if (n_stations < 2) {
         throw std::invalid_argument("nozzle_quasi1d: n_stations must be >= 2");
@@ -1405,14 +1412,16 @@ ThrustResult nozzle_thrust(const NozzleSolution& sol, double P_amb)
 }
 
 ThrustResult nozzle_thrust(
-    double T0, double P0, double P_amb,
+    double T0, double P0, double P_design, double P_amb,
     double A_inlet, double A_throat, double A_exit,
     double x_throat, double x_exit,
     const std::vector<double>& X,
     std::size_t n_stations,
     double tol, std::size_t max_iter)
 {
-    NozzleSolution sol = nozzle_cd(T0, P0, P_amb, A_inlet, A_throat, A_exit,
+    // P_design drives the nozzle Mach profile (must be > 0).
+    // P_amb is used only in the thrust equation and may be 0 for vacuum.
+    NozzleSolution sol = nozzle_cd(T0, P0, P_design, A_inlet, A_throat, A_exit,
                                     x_throat, x_exit, X, n_stations, tol, max_iter);
     return nozzle_thrust(sol, P_amb);
 }

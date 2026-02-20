@@ -67,28 +67,40 @@ add_custom_command(TARGET combaero_main POST_BUILD
 )
 
 # Examples
-add_executable(combaero_example examples/thermo_example.cpp)
-add_executable(humidair_example examples/humidair_example.cpp)
-add_executable(combustion_example examples/combustion_example.cpp)
-add_executable(cooling_example examples/cooling_example.cpp)
+add_executable(combaero_example          examples/thermo_example.cpp)
+add_executable(humidair_example          examples/humidair_example.cpp)
+add_executable(combustion_example        examples/combustion_example.cpp)
+add_executable(cooling_example           examples/cooling_example.cpp)
+add_executable(compressible_example      examples/compressible_example.cpp)
+add_executable(incompressible_example    examples/incompressible_example.cpp)
+add_executable(combustion_state_example  examples/combustion_state_example.cpp)
 
 # Add compiler warnings for examples
 if (MSVC)
-    target_compile_options(combaero_example PRIVATE /W4)
-    target_compile_options(humidair_example PRIVATE /W4)
-    target_compile_options(combustion_example PRIVATE /W4)
-    target_compile_options(cooling_example PRIVATE /W4)
+    target_compile_options(combaero_example         PRIVATE /W4)
+    target_compile_options(humidair_example         PRIVATE /W4)
+    target_compile_options(combustion_example       PRIVATE /W4)
+    target_compile_options(cooling_example          PRIVATE /W4)
+    target_compile_options(compressible_example     PRIVATE /W4)
+    target_compile_options(incompressible_example   PRIVATE /W4)
+    target_compile_options(combustion_state_example PRIVATE /W4)
 else()
-    target_compile_options(combaero_example PRIVATE -Wall -Wextra)
-    target_compile_options(humidair_example PRIVATE -Wall -Wextra)
-    target_compile_options(combustion_example PRIVATE -Wall -Wextra)
-    target_compile_options(cooling_example PRIVATE -Wall -Wextra)
+    target_compile_options(combaero_example         PRIVATE -Wall -Wextra)
+    target_compile_options(humidair_example         PRIVATE -Wall -Wextra)
+    target_compile_options(combustion_example       PRIVATE -Wall -Wextra)
+    target_compile_options(cooling_example          PRIVATE -Wall -Wextra)
+    target_compile_options(compressible_example     PRIVATE -Wall -Wextra)
+    target_compile_options(incompressible_example   PRIVATE -Wall -Wextra)
+    target_compile_options(combustion_state_example PRIVATE -Wall -Wextra)
 endif()
 
-target_link_libraries(combaero_example PRIVATE combaero_lib)
-target_link_libraries(humidair_example PRIVATE combaero_lib)
-target_link_libraries(combustion_example PRIVATE combaero_lib)
-target_link_libraries(cooling_example PRIVATE combaero_lib)
+target_link_libraries(combaero_example         PRIVATE combaero_lib)
+target_link_libraries(humidair_example         PRIVATE combaero_lib)
+target_link_libraries(combustion_example       PRIVATE combaero_lib)
+target_link_libraries(cooling_example          PRIVATE combaero_lib)
+target_link_libraries(compressible_example     PRIVATE combaero_lib)
+target_link_libraries(incompressible_example   PRIVATE combaero_lib)
+target_link_libraries(combustion_state_example PRIVATE combaero_lib)
 
 # Print message when examples are built
 add_custom_command(TARGET combaero_example POST_BUILD
@@ -105,6 +117,18 @@ add_custom_command(TARGET combustion_example POST_BUILD
 
 add_custom_command(TARGET cooling_example POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E echo "Cooling example built! Run with: ./cooling_example"
+)
+
+add_custom_command(TARGET compressible_example POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "Compressible flow example built! Run with: ./compressible_example"
+)
+
+add_custom_command(TARGET incompressible_example POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "Incompressible flow example built! Run with: ./incompressible_example"
+)
+
+add_custom_command(TARGET combustion_state_example POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "Combustion state example built! Run with: ./combustion_state_example"
 )
 
 # Optional Python bindings (enabled explicitly or via scikit-build-core)

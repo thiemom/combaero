@@ -3735,18 +3735,19 @@ PYBIND11_MODULE(_core, m)
     // Nozzle thrust (convenience, from parameters)
     m.def(
         "nozzle_thrust_cd",
-        [](double T0, double P0, double P_amb,
+        [](double T0, double P0, double P_design, double P_amb,
            double A_inlet, double A_throat, double A_exit,
            double x_throat, double x_exit,
            py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
            std::size_t n_stations, double tol, std::size_t max_iter)
         {
             auto X = to_vec(X_arr);
-            return nozzle_thrust(T0, P0, P_amb, A_inlet, A_throat, A_exit,
+            return nozzle_thrust(T0, P0, P_design, P_amb, A_inlet, A_throat, A_exit,
                                  x_throat, x_exit, X, n_stations, tol, max_iter);
         },
         py::arg("T0"),
         py::arg("P0"),
+        py::arg("P_design"),
         py::arg("P_amb"),
         py::arg("A_inlet"),
         py::arg("A_throat"),
@@ -3758,6 +3759,8 @@ PYBIND11_MODULE(_core, m)
         py::arg("tol") = 1e-8,
         py::arg("max_iter") = 50,
         "Calculate rocket nozzle thrust directly from geometry.\n\n"
+        "P_design: nozzle exit design pressure for Mach profile (must be > 0).\n"
+        "P_amb: ambient pressure for thrust equation (may be 0 for vacuum).\n"
         "Convenience function that calls nozzle_cd() then nozzle_thrust().\n\n"
         "Returns ThrustResult with thrust, Isp, and C_F."
     );

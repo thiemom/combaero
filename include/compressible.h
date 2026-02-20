@@ -344,9 +344,14 @@ struct ThrustResult {
 // Returns ThrustResult with thrust, Isp, and thrust coefficient.
 ThrustResult nozzle_thrust(const NozzleSolution& sol, double P_amb);
 
-// Convenience: calculate thrust directly from nozzle parameters
+// Convenience: calculate thrust directly from nozzle parameters.
+//
+// P_design is the nozzle exit design pressure used to compute the Mach profile
+// (must be > 0; use the nozzle exit pressure at the operating point).
+// P_amb is the ambient pressure used for the thrust equation (may be 0 for vacuum).
+// For a design-point calculation pass P_design == P_amb.
 ThrustResult nozzle_thrust(
-    double T0, double P0, double P_amb,
+    double T0, double P0, double P_design, double P_amb,
     double A_inlet, double A_throat, double A_exit,
     double x_throat, double x_exit,
     const std::vector<double>& X,
