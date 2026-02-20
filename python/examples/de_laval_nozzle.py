@@ -209,7 +209,8 @@ def main() -> None:
     plt.tight_layout()
     plt.savefig("de_laval_nozzle.png", dpi=150)
     print("\nPlot saved to 'de_laval_nozzle.png'")
-    plt.show()
+    if plt.get_backend().lower() != "agg":
+        plt.show()
 
 
 if __name__ == "__main__":
