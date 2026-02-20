@@ -24,6 +24,10 @@ namespace combaero::cooling {
 // Valid: e_D = 0.02-0.1, P_e = 5-20, alpha = 30-90 deg
 double rib_enhancement_factor(double e_D, double P_e, double alpha);
 
+// Re-dependent overload: uses roughness Reynolds number e+ for physically
+// correct Re-dependence (high enhancement at low Re, decays at high Re).
+double rib_enhancement_factor(double e_D, double P_e, double alpha, double Re);
+
 // Rib friction factor multiplier
 // Accounts for increased pressure drop from ribs
 //

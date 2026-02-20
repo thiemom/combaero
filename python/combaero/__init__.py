@@ -289,6 +289,7 @@ try:
         residence_time_tube,
         reynolds,
         rib_enhancement_factor,
+        rib_enhancement_factor_re,
         rib_friction_multiplier,
         s,
         s_mass,
@@ -758,6 +759,7 @@ __all__ = [
     "list_materials",
     # Advanced cooling correlations
     "rib_enhancement_factor",
+    "rib_enhancement_factor_re",
     "rib_friction_multiplier",
     "impingement_nusselt",
     "film_cooling_effectiveness",

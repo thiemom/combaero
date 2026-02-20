@@ -4509,19 +4509,40 @@ PYBIND11_MODULE(_core, m)
     // Rib-enhanced cooling
     m.def(
         "rib_enhancement_factor",
-        &combaero::cooling::rib_enhancement_factor,
+        static_cast<double(*)(double,double,double)>(
+            &combaero::cooling::rib_enhancement_factor),
         py::arg("e_D"),
         py::arg("P_e"),
         py::arg("alpha"),
-        "Rib enhancement factor for heat transfer [-].\n\n"
-        "Accounts for increased surface area and turbulence from ribs.\n\n"
+        "Rib enhancement factor for heat transfer [-] (geometry only, Re-independent).\n\n"
         "Parameters:\n"
         "  e_D   : rib height to hydraulic diameter ratio [-]\n"
         "  P_e   : rib pitch to rib height ratio [-]\n"
         "  alpha : rib angle [degrees]\n\n"
         "Valid range: e_D = 0.02-0.1, P_e = 5-20, alpha = 30-90 deg\n"
         "Source: Han et al. (1988)\n\n"
-        "Returns: Enhancement factor [-] (typically 1.5-4.0)"
+        "Returns: Enhancement factor [-]"
+    );
+
+    m.def(
+        "rib_enhancement_factor_re",
+        static_cast<double(*)(double,double,double,double)>(
+            &combaero::cooling::rib_enhancement_factor),
+        py::arg("e_D"),
+        py::arg("P_e"),
+        py::arg("alpha"),
+        py::arg("Re"),
+        "Rib enhancement factor for heat transfer [-] (Re-dependent, Han 1988).\n\n"
+        "Uses roughness Reynolds number e+ = (e/D)*Re*sqrt(f/8) for physically\n"
+        "correct Re-dependence: high enhancement at low Re, decays at high Re.\n\n"
+        "Parameters:\n"
+        "  e_D   : rib height to hydraulic diameter ratio [-]\n"
+        "  P_e   : rib pitch to rib height ratio [-]\n"
+        "  alpha : rib angle [degrees]\n"
+        "  Re    : channel Reynolds number [-]\n\n"
+        "Valid range: e_D = 0.02-0.1, P_e = 5-20, alpha = 30-90 deg\n"
+        "Source: Han et al. (1988)\n\n"
+        "Returns: Enhancement factor [-]"
     );
 
     m.def(
