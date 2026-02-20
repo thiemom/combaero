@@ -45,16 +45,6 @@ def isentropic_T(T_start: float, P_start: float, P_end: float, X: list) -> float
     return ca.calc_T_from_s(ca.s(T_start, X, P_start), P_end, X)
 
 
-def entropy_path(T_a: float, T_b: float, P: float, X: list, n: int = 200) -> np.ndarray:
-    """Specific entropy [J/(kg K)] along isobaric path from T_a to T_b."""
-    Ts = np.linspace(T_a, T_b, n)
-    s0 = ca.s_mass(T_a, X, P)
-    ds = np.array(
-        [np.trapz([ca.cp_mass(t, X) / t for t in Ts[: i + 1]], Ts[: i + 1]) for i in range(n)]
-    )
-    return s0 + ds
-
-
 def main() -> None:
     sp = SpeciesLocator.from_core()
 
@@ -225,11 +215,13 @@ def main() -> None:
     s3 = ca.s_mass(T3, X3, P3)
     s4 = ca.s_mass(T4, X3, P4)  # == s3 (isentropic)
 
-    # Isobaric paths for T-s
-    s_23 = entropy_path(mixed.T, T3, P2, mixed.X)
-    T_23 = np.linspace(mixed.T, T3, 200)
-    s_41 = entropy_path(T4, T1, P1, X3)
+    # Isobaric paths for T-s: interpolate s linearly between endpoint states.
+    # Composition changes along both paths (combustion, exhaust mixing with atmosphere),
+    # so anchoring to the exact s values at each state guarantees the cycle closes.
+    T_23 = np.linspace(T2, T3, 200)
+    s_23 = s2 + (s3 - s2) * (T_23 - T2) / (T3 - T2)
     T_41 = np.linspace(T4, T1, 200)
+    s_41 = s4 + (s1 - s4) * (T_41 - T4) / (T1 - T4)
 
     fig, (ax_ts, ax_eta) = plt.subplots(1, 2, figsize=(13, 5))
     fig.suptitle(
