@@ -2,6 +2,7 @@
 #include "../include/humidair.h"
 #include "../include/incompressible.h"
 
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <vector>
