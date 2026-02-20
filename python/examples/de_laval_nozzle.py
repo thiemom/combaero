@@ -9,6 +9,8 @@ Classical supersonic nozzle problem demonstrating:
 Chamber gas: real H2/air combustion products at phi=1.0.
 """
 
+import pathlib
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -207,8 +209,9 @@ def main() -> None:
 
     plt.suptitle("De Laval Nozzle - Design Condition (Supersonic Exit)", fontsize=14)
     plt.tight_layout()
-    plt.savefig("de_laval_nozzle.png", dpi=150)
-    print("\nPlot saved to 'de_laval_nozzle.png'")
+    out_path = pathlib.Path(__file__).parent / "de_laval_nozzle.png"
+    plt.savefig(out_path, dpi=150)
+    print(f"\nPlot saved to '{out_path}'")
     if plt.get_backend().lower() != "agg":
         plt.show()
 
