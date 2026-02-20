@@ -28,7 +28,7 @@ def main() -> None:
 
     X_air = ca.standard_dry_air_composition()
     print(
-        f"\n{'T [K]':>8} {'cp [J/mol·K]':>14} {'gamma':>8} {'a [m/s]':>10} {'mu [µPa·s]':>12} {'Pr':>8}"
+        f"\n{'T [K]':>8} {'cp [J/mol K]':>14} {'gamma':>8} {'a [m/s]':>10} {'mu [uPa s]':>12} {'Pr':>8}"
     )
     print("-" * 65)
     for T in (300, 600, 900, 1200, 1500, 2000):
@@ -51,8 +51,8 @@ def main() -> None:
     X_humid = ca.humid_air_composition(300.0, P0, 0.60)
     idx_h2o = sp.indices["H2O"]
     print(f"\n  H2O mole fraction : {X_humid[idx_h2o] * 100:.3f} %")
-    print(f"  cp                : {ca.cp(300.0, X_humid):.3f} J/(mol·K)")
-    print(f"  rho               : {ca.density(300.0, P0, X_humid):.4f} kg/m³")
+    print(f"  cp                : {ca.cp(300.0, X_humid):.3f} J/(mol K)")
+    print(f"  rho               : {ca.density(300.0, P0, X_humid):.4f} kg/m3")
 
     # -------------------------------------------------------------------------
     # 3. Fuel: pure CH4
@@ -68,8 +68,8 @@ def main() -> None:
     print(
         f"  O2 required       : {ca.oxygen_required_per_kg_fuel(sp.indices['CH4']):.4f} kg O2/kg fuel"
     )
-    print(f"  cp at 300 K       : {ca.cp(300.0, X_ch4):.3f} J/(mol·K)")
-    print(f"  cp at 800 K       : {ca.cp(800.0, X_ch4):.3f} J/(mol·K)")
+    print(f"  cp at 300 K       : {ca.cp(300.0, X_ch4):.3f} J/(mol K)")
+    print(f"  cp at 800 K       : {ca.cp(800.0, X_ch4):.3f} J/(mol K)")
 
     # -------------------------------------------------------------------------
     # 4. Combustion products: CH4/air at phi=0.8, mix + combust
@@ -94,10 +94,10 @@ def main() -> None:
     burned = ca.complete_combustion(mixed.T, mixed.X, mixed.P)
 
     print(f"\n  T_ad              : {burned.T:.1f} K")
-    print(f"  cp                : {ca.cp(burned.T, burned.X):.3f} J/(mol·K)")
+    print(f"  cp                : {ca.cp(burned.T, burned.X):.3f} J/(mol K)")
     print(f"  gamma             : {ca.isentropic_expansion_coefficient(burned.T, burned.X):.4f}")
     print(f"  a                 : {ca.speed_of_sound(burned.T, burned.X):.2f} m/s")
-    print(f"  mu                : {ca.viscosity(burned.T, P0, burned.X) * 1e6:.3f} µPa·s")
+    print(f"  mu                : {ca.viscosity(burned.T, P0, burned.X) * 1e6:.3f} uPa s")
     print(f"  Pr                : {ca.prandtl(burned.T, P0, burned.X):.4f}")
     print("\n  Major species (> 0.1 %):")
     for i, name in enumerate(sp.names):
