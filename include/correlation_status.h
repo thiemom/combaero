@@ -2,6 +2,7 @@
 #define CORRELATION_STATUS_H
 
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <string>
 

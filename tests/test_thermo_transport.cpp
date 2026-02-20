@@ -3170,10 +3170,11 @@ TEST(HeatTransferTest, GnielinskiHermiteBlend) {
     }
 
     // At Re=2300 the Hermite blend must match the Gnielinski formula exactly
-    // (C0 continuity).
-    double f2300 = friction_petukhov(2300.0);
+    // (C0 continuity).  The no-friction overload clamps Re to 3000 for the
+    // Petukhov friction call, so we must use the same f here.
+    double f_used = friction_petukhov(3000.0);
     double Nu_hermite = nusselt_gnielinski(2300.0, 0.7);
-    double f8 = f2300 / 8.0;
+    double f8 = f_used / 8.0;
     double denom = 1.0 + 12.7 * std::sqrt(f8) * (std::pow(0.7, 2.0/3.0) - 1.0);
     double Nu_formula = f8 * (2300.0 - 1000.0) * 0.7 / denom;
     EXPECT_NEAR(Nu_hermite, Nu_formula, Nu_formula * 0.001);  // 0.1% tolerance
