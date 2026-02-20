@@ -41,6 +41,7 @@ set(SOURCES
     src/materials.cpp
     src/cooling_correlations.cpp
     src/stagnation.cpp
+    src/correlation_status.cpp
 )
 
 # Core library

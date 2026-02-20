@@ -1,4 +1,5 @@
 #include "../include/heat_transfer.h"
+#include "../include/correlation_status.h"
 #include "../include/state.h"
 #include "../include/friction.h"           // friction_petukhov, friction_colebrook
 #include "../include/thermo.h"             // density, cp_mass, speed_of_sound
@@ -17,76 +18,178 @@
 // Internal Flow Correlations
 // -------------------------------------------------------------
 
-double nusselt_dittus_boelter(double Re, double Pr, bool heating) {
-    if (Re < 10000) {
-        throw std::invalid_argument("nusselt_dittus_boelter: Re must be > 10000 for turbulent flow");
+double nusselt_dittus_boelter(double Re, double Pr, bool heating,
+                              combaero::CorrelationStatus* status) {
+    bool extrapolated = false;
+    if (Re < 10000.0) {
+        extrapolated = true;
+        if (!status) {
+            combaero::warn("nusselt_dittus_boelter: Re = " + std::to_string(Re) +
+                           " is below validated range [10000, inf]."
+                           " Extrapolating power-law correlation; check results.");
+        }
     }
-    if (Pr < 0.6 || Pr > 160) {
-        throw std::invalid_argument("nusselt_dittus_boelter: Pr must be in range [0.6, 160]");
+    if (Pr < 0.6 || Pr > 160.0) {
+        extrapolated = true;
+        if (!status) {
+            combaero::warn("nusselt_dittus_boelter: Pr = " + std::to_string(Pr) +
+                           " is outside validated range [0.6, 160]."
+                           " Extrapolating; check results.");
+        }
     }
-
+    if (status) {
+        *status = extrapolated ? combaero::CorrelationStatus::Extrapolated
+                               : combaero::CorrelationStatus::Valid;
+    }
     double n = heating ? 0.4 : 0.3;
     return 0.023 * std::pow(Re, 0.8) * std::pow(Pr, n);
 }
 
-double nusselt_gnielinski(double Re, double Pr, double f) {
-    if (Re < 2300 || Re > 5e6) {
-        throw std::invalid_argument("nusselt_gnielinski: Re must be in range [2300, 5e6]");
-    }
-    if (Pr < 0.5 || Pr > 2000) {
-        throw std::invalid_argument("nusselt_gnielinski: Pr must be in range [0.5, 2000]");
-    }
-    if (f <= 0) {
+double nusselt_gnielinski(double Re, double Pr, double f,
+                          combaero::CorrelationStatus* status) {
+    if (f <= 0.0) {
         throw std::invalid_argument("nusselt_gnielinski: friction factor must be positive");
     }
 
+    bool extrapolated = false;
+
+    if (Re > 5.0e6) {
+        extrapolated = true;
+        if (!status) {
+            combaero::warn("nusselt_gnielinski: Re = " + std::to_string(Re) +
+                           " is above validated range [2300, 5e6]."
+                           " Extrapolating; check results.");
+        }
+    }
+    if (Pr < 0.5 || Pr > 2000.0) {
+        extrapolated = true;
+        if (!status) {
+            combaero::warn("nusselt_gnielinski: Pr = " + std::to_string(Pr) +
+                           " is outside validated range [0.5, 2000]."
+                           " Extrapolating; check results.");
+        }
+    }
+    if (status) {
+        *status = extrapolated ? combaero::CorrelationStatus::Extrapolated
+                               : combaero::CorrelationStatus::Valid;
+    }
+
     double f8 = f / 8.0;
     double sqrt_f8 = std::sqrt(f8);
     double Pr_23 = std::pow(Pr, 2.0/3.0);
+    double denom = 1.0 + 12.7 * sqrt_f8 * (Pr_23 - 1.0);
 
-    return f8 * (Re - 1000.0) * Pr / (1.0 + 12.7 * sqrt_f8 * (Pr_23 - 1.0));
+    if (Re >= 2300.0) {
+        return f8 * (Re - 1000.0) * Pr / denom;
+    }
+
+    // Below Re=2300 the raw Gnielinski formula goes negative at Re<1000.
+    // Use a C1-smooth cubic Hermite blend between Re=1000 (laminar Nu) and
+    // Re=2300 (Gnielinski value + slope), so the Jacobian is continuous.
+    if (status && *status == combaero::CorrelationStatus::Valid) {
+        *status = combaero::CorrelationStatus::Extrapolated;
+    }
+    if (!status) {
+        combaero::warn("nusselt_gnielinski: Re = " + std::to_string(Re) +
+                       " is below validated range [2300, 5e6]."
+                       " Using C1 Hermite blend to laminar Nu; check results.");
+    }
+
+    // Anchor points for the Hermite cubic
+    constexpr double Re0 = 1000.0;   // lower anchor: laminar Nu
+    constexpr double Re1 = 2300.0;   // upper anchor: Gnielinski
+    const double Nu0 = NU_LAMINAR_CONST_T;  // 3.66
+    const double dNu0 = 0.0;                // laminar: flat w.r.t. Re
+    const double Nu1 = f8 * (Re1 - 1000.0) * Pr / denom;
+    const double dNu1 = f8 * Pr / denom;   // d(Nu)/d(Re) at Re1
+
+    // Normalised coordinate t in [0, 1]
+    double h = Re1 - Re0;
+    double t = (Re - Re0) / h;
+    t = std::max(0.0, std::min(1.0, t));  // clamp outside [Re0, Re1]
+
+    // Cubic Hermite basis
+    double t2 = t * t;
+    double t3 = t2 * t;
+    double h00 =  2.0*t3 - 3.0*t2 + 1.0;
+    double h10 =      t3 - 2.0*t2 + t;
+    double h01 = -2.0*t3 + 3.0*t2;
+    double h11 =      t3 -     t2;
+
+    return h00*Nu0 + h10*h*dNu0 + h01*Nu1 + h11*h*dNu1;
 }
 
-double nusselt_gnielinski(double Re, double Pr) {
-    double f = friction_petukhov(Re);
-    return nusselt_gnielinski(Re, Pr, f);
+double nusselt_gnielinski(double Re, double Pr,
+                          combaero::CorrelationStatus* status) {
+    double f = friction_petukhov(std::max(Re, 3000.0));  // avoid log(0) in Petukhov
+    return nusselt_gnielinski(Re, Pr, f, status);
 }
 
-double nusselt_sieder_tate(double Re, double Pr, double mu_ratio) {
-    if (Re < 10000) {
-        throw std::invalid_argument("nusselt_sieder_tate: Re must be > 10000 for turbulent flow");
-    }
-    if (Pr < 0.7 || Pr > 16700) {
-        throw std::invalid_argument("nusselt_sieder_tate: Pr must be in range [0.7, 16700]");
-    }
-    if (mu_ratio <= 0) {
+double nusselt_sieder_tate(double Re, double Pr, double mu_ratio,
+                           combaero::CorrelationStatus* status) {
+    if (mu_ratio <= 0.0) {
         throw std::invalid_argument("nusselt_sieder_tate: mu_ratio must be positive");
     }
-
+    bool extrapolated = false;
+    if (Re < 10000.0) {
+        extrapolated = true;
+        if (!status) {
+            combaero::warn("nusselt_sieder_tate: Re = " + std::to_string(Re) +
+                           " is below validated range [10000, inf]."
+                           " Extrapolating power-law correlation; check results.");
+        }
+    }
+    if (Pr < 0.7 || Pr > 16700.0) {
+        extrapolated = true;
+        if (!status) {
+            combaero::warn("nusselt_sieder_tate: Pr = " + std::to_string(Pr) +
+                           " is outside validated range [0.7, 16700]."
+                           " Extrapolating; check results.");
+        }
+    }
+    if (status) {
+        *status = extrapolated ? combaero::CorrelationStatus::Extrapolated
+                               : combaero::CorrelationStatus::Valid;
+    }
     return 0.027 * std::pow(Re, 0.8) * std::pow(Pr, 1.0/3.0) * std::pow(mu_ratio, 0.14);
 }
 
-double nusselt_petukhov(double Re, double Pr, double f) {
-    if (Re < 1e4 || Re > 5e6) {
-        throw std::invalid_argument("nusselt_petukhov: Re must be in range [1e4, 5e6]");
-    }
-    if (Pr < 0.5 || Pr > 2000) {
-        throw std::invalid_argument("nusselt_petukhov: Pr must be in range [0.5, 2000]");
-    }
-    if (f <= 0) {
+double nusselt_petukhov(double Re, double Pr, double f,
+                        combaero::CorrelationStatus* status) {
+    if (f <= 0.0) {
         throw std::invalid_argument("nusselt_petukhov: friction factor must be positive");
     }
-
+    bool extrapolated = false;
+    if (Re < 1.0e4 || Re > 5.0e6) {
+        extrapolated = true;
+        if (!status) {
+            combaero::warn("nusselt_petukhov: Re = " + std::to_string(Re) +
+                           " is outside validated range [1e4, 5e6]."
+                           " Extrapolating; check results.");
+        }
+    }
+    if (Pr < 0.5 || Pr > 2000.0) {
+        extrapolated = true;
+        if (!status) {
+            combaero::warn("nusselt_petukhov: Pr = " + std::to_string(Pr) +
+                           " is outside validated range [0.5, 2000]."
+                           " Extrapolating; check results.");
+        }
+    }
+    if (status) {
+        *status = extrapolated ? combaero::CorrelationStatus::Extrapolated
+                               : combaero::CorrelationStatus::Valid;
+    }
     double f8 = f / 8.0;
     double sqrt_f8 = std::sqrt(f8);
     double Pr_23 = std::pow(Pr, 2.0/3.0);
-
     return f8 * Re * Pr / (1.07 + 12.7 * sqrt_f8 * (Pr_23 - 1.0));
 }
 
-double nusselt_petukhov(double Re, double Pr) {
-    double f = friction_petukhov(Re);
-    return nusselt_petukhov(Re, Pr, f);
+double nusselt_petukhov(double Re, double Pr,
+                        combaero::CorrelationStatus* status) {
+    double f = friction_petukhov(std::max(Re, 3000.0));  // avoid log(0) in Petukhov
+    return nusselt_petukhov(Re, Pr, f, status);
 }
 
 // -------------------------------------------------------------

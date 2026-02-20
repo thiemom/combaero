@@ -436,6 +436,14 @@ inline constexpr Entry function_units[] = {
     // cooling_correlations.h - Pin fin friction (new scalar)
     // -------------------------------------------------------------------------
     {"pin_fin_friction",    "Re_d: -",  "- (f_pin)"},
+
+    // -------------------------------------------------------------------------
+    // correlation_status.h - Extrapolation validity utilities
+    // -------------------------------------------------------------------------
+    {"is_well_behaved",       "v: any, lo: any, hi: any",  "bool"},
+    {"set_warning_handler",   "handler: callable(str)",    "-"},
+    {"get_warning_handler",   "-",                         "callable(str)"},
+    {"suppress_warnings",     "-",                         "context manager"},
 };
 
 inline constexpr std::size_t function_count = sizeof(function_units) / sizeof(Entry);

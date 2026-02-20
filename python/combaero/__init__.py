@@ -293,7 +293,10 @@ try:
         s,
         s_mass,
         saturation_vapor_pressure,
+        get_warning_handler,
+        is_well_behaved,
         set_equivalence_ratio_mass,
+        set_warning_handler,
         set_equivalence_ratio_mole,
         set_fuel_stream_for_CO2,
         set_fuel_stream_for_CO2_dry,
@@ -623,6 +626,39 @@ from . import compressible
 from . import heat_transfer
 from . import incompressible
 from ._flow_solution import FlowSolution
+
+# ---------------------------------------------------------------------------
+# suppress_warnings context manager
+# ---------------------------------------------------------------------------
+from collections.abc import Generator
+from contextlib import contextmanager
+
+
+@contextmanager
+def suppress_warnings() -> Generator[None, None, None]:
+    """Context manager that silences all combaero correlation warnings.
+
+    Useful for batch solver runs where out-of-range extrapolation warnings
+    would flood the output.  The original handler is restored on exit.
+
+    Example::
+
+        with combaero.suppress_warnings():
+            result = solver.run()
+    """
+    try:
+        original = get_warning_handler()
+    except Exception:
+        original = None
+    try:
+        set_warning_handler(lambda msg: None)
+        yield
+    finally:
+        if original is not None:
+            set_warning_handler(original)
+        else:
+            set_warning_handler(None)
+
 
 __all__ = [
     "FlowSolution",

@@ -6,6 +6,8 @@
 #include <utility>
 #include <vector>
 
+#include "correlation_status.h"
+
 // -------------------------------------------------------------
 // Heat Transfer Correlations for Forced Convection
 // -------------------------------------------------------------
@@ -41,7 +43,10 @@
 //   Re      : Reynolds number [-]
 //   Pr      : Prandtl number [-]
 //   heating : true if fluid is being heated, false if cooled
-double nusselt_dittus_boelter(double Re, double Pr, bool heating = true);
+//   status  : if non-null, set to Extrapolated when Re or Pr is outside the
+//             validated range; no warning is emitted in that case
+double nusselt_dittus_boelter(double Re, double Pr, bool heating = true,
+                              combaero::CorrelationStatus* status = nullptr);
 
 // Gnielinski correlation (1976)
 // Nu = (f/8) * (Re - 1000) * Pr / (1 + 12.7 * sqrt(f/8) * (Pr^(2/3) - 1))
@@ -52,14 +57,20 @@ double nusselt_dittus_boelter(double Re, double Pr, bool heating = true);
 //   - 0.5 < Pr < 2000
 //
 // Parameters:
-//   Re  : Reynolds number [-]
-//   Pr  : Prandtl number [-]
-//   f   : Darcy friction factor [-] (use friction_colebrook or similar)
-double nusselt_gnielinski(double Re, double Pr, double f);
+//   Re     : Reynolds number [-]
+//   Pr     : Prandtl number [-]
+//   f      : Darcy friction factor [-] (use friction_colebrook or similar)
+//   status : if non-null, set to Extrapolated when Re or Pr is outside the
+//            validated range; no warning is emitted in that case.
+//            Below Re=2300 a C1-smooth Hermite blend to laminar Nu is used
+//            (the raw formula goes negative at Re<1000).
+double nusselt_gnielinski(double Re, double Pr, double f,
+                          combaero::CorrelationStatus* status = nullptr);
 
 // Gnielinski with automatic friction factor (smooth pipe)
 // Uses Petukhov friction correlation: f = (0.790*ln(Re) - 1.64)^(-2)
-double nusselt_gnielinski(double Re, double Pr);
+double nusselt_gnielinski(double Re, double Pr,
+                          combaero::CorrelationStatus* status = nullptr);
 
 // Sieder-Tate correlation (1936)
 // Nu = 0.027 * Re^0.8 * Pr^(1/3) * (μ_bulk / μ_wall)^0.14
@@ -74,7 +85,10 @@ double nusselt_gnielinski(double Re, double Pr);
 //   Re       : Reynolds number at bulk temperature [-]
 //   Pr       : Prandtl number at bulk temperature [-]
 //   mu_ratio : μ_bulk / μ_wall [-] (typically 0.5-2.0)
-double nusselt_sieder_tate(double Re, double Pr, double mu_ratio = 1.0);
+//   status   : if non-null, set to Extrapolated when Re or Pr is outside the
+//              validated range; no warning is emitted in that case
+double nusselt_sieder_tate(double Re, double Pr, double mu_ratio = 1.0,
+                           combaero::CorrelationStatus* status = nullptr);
 
 // Petukhov correlation (1970)
 // Nu = (f/8) * Re * Pr / (1.07 + 12.7 * sqrt(f/8) * (Pr^(2/3) - 1))
@@ -85,13 +99,17 @@ double nusselt_sieder_tate(double Re, double Pr, double mu_ratio = 1.0);
 //   - 0.5 < Pr < 2000
 //
 // Parameters:
-//   Re  : Reynolds number [-]
-//   Pr  : Prandtl number [-]
-//   f   : Darcy friction factor [-]
-double nusselt_petukhov(double Re, double Pr, double f);
+//   Re     : Reynolds number [-]
+//   Pr     : Prandtl number [-]
+//   f      : Darcy friction factor [-]
+//   status : if non-null, set to Extrapolated when Re or Pr is outside the
+//            validated range; no warning is emitted in that case
+double nusselt_petukhov(double Re, double Pr, double f,
+                        combaero::CorrelationStatus* status = nullptr);
 
 // Petukhov with automatic friction factor (smooth pipe)
-double nusselt_petukhov(double Re, double Pr);
+double nusselt_petukhov(double Re, double Pr,
+                        combaero::CorrelationStatus* status = nullptr);
 
 // -------------------------------------------------------------
 // Laminar Flow (for completeness)
