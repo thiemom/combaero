@@ -175,15 +175,20 @@ class TestImpingementCooling:
         assert Nu_array < Nu_single
 
     def test_impingement_parameter_validation(self):
-        """Test parameter range validation for impingement."""
-        # Valid range: Re_jet = 5000-80000, z_D = 1-12, x_D/y_D = 4-16
+        """Test parameter range validation for impingement.
 
-        with pytest.raises(RuntimeError):
-            cb.impingement_nusselt(Re_jet=3000, Pr=0.7, z_D=6)
+        Re_jet out-of-range: warns and extrapolates (power-law correlation is
+        well-behaved outside [5000, 80000]).
+        Geometry params z_D, x_D, y_D: still raise RuntimeError (hard physical limits).
+        """
+        # Re out-of-range: should NOT raise, just warn to stderr
+        result_low_re = cb.impingement_nusselt(Re_jet=3000, Pr=0.7, z_D=6)
+        assert result_low_re > 0.0
 
-        with pytest.raises(RuntimeError):
-            cb.impingement_nusselt(Re_jet=100000, Pr=0.7, z_D=6)
+        result_high_re = cb.impingement_nusselt(Re_jet=100000, Pr=0.7, z_D=6)
+        assert result_high_re > 0.0
 
+        # Geometry params: still hard errors
         with pytest.raises(RuntimeError):
             cb.impingement_nusselt(Re_jet=20000, Pr=0.7, z_D=0.5)
 
@@ -628,13 +633,24 @@ class TestPinFinArrays:
         assert Nu_high > Nu_low
 
     def test_pin_fin_parameter_validation(self):
-        """Test parameter range validation."""
-        with pytest.raises(RuntimeError, match="Re_d"):
-            cb.pin_fin_nusselt(2000, 0.7, 2.0, 2.5, 2.5)
+        """Test parameter range validation.
 
+        Re_d out-of-range: warns and extrapolates (power-law Nu = C*Re^m is
+        well-behaved outside [3000, 90000]).
+        Geometry params L_D, S_D, X_D: still raise RuntimeError (hard physical limits).
+        """
+        # Re out-of-range: should NOT raise, just warn to stderr
+        result_low_re = cb.pin_fin_nusselt(2000, 0.7, 2.0, 2.5, 2.5)
+        assert result_low_re > 0.0
+
+        result_high_re = cb.pin_fin_nusselt(200000, 0.7, 2.0, 2.5, 2.5)
+        assert result_high_re > 0.0
+
+        # Prandtl still throws (correlation exponent only validated for gases)
         with pytest.raises(RuntimeError, match="Prandtl"):
             cb.pin_fin_nusselt(20000, 0.3, 2.0, 2.5, 2.5)
 
+        # Geometry params: still hard errors
         with pytest.raises(RuntimeError, match="L_D"):
             cb.pin_fin_nusselt(20000, 0.7, 0.3, 2.5, 2.5)
 
@@ -674,10 +690,20 @@ class TestDimpledSurfaces:
         assert 1.3 <= f_min <= 2.2
 
     def test_dimple_parameter_validation(self):
-        """Test parameter range validation."""
-        with pytest.raises(RuntimeError, match="Re_Dh"):
-            cb.dimple_nusselt_enhancement(5000, 0.2, 0.2, 2.0)
+        """Test parameter range validation.
 
+        Re_Dh out-of-range: warns and extrapolates (power-law enhancement is
+        well-behaved outside [10000, 80000]).
+        Geometry params d_Dh, h_d, S_d: still raise RuntimeError.
+        """
+        # Re out-of-range: should NOT raise, just warn to stderr
+        result_low_re = cb.dimple_nusselt_enhancement(5000, 0.2, 0.2, 2.0)
+        assert result_low_re > 0.0
+
+        result_high_re = cb.dimple_nusselt_enhancement(200000, 0.2, 0.2, 2.0)
+        assert result_high_re > 0.0
+
+        # Geometry params: still hard errors
         with pytest.raises(RuntimeError, match="d_Dh"):
             cb.dimple_nusselt_enhancement(30000, 0.05, 0.2, 2.0)
 

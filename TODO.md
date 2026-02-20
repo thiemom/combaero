@@ -1,6 +1,6 @@
 # CombAero TODO - Composite Dataclass States
 
-## Recent Completion: Thermal Cooling Refactor (Phases A & B)
+## Recent Completion: Thermal Cooling Refactor (Phases A, B & C)
 
 **Phase A: Materials Database** ✅ COMPLETE (Commit: 1e2246a)
 - Separated materials database from heat transfer correlations
@@ -15,6 +15,18 @@
 - 26 comprehensive tests (463 total tests pass)
 - Full documentation in API_REFERENCE.md
 - 5 new unit entries (224 total)
+
+**Phase C: Convective Heat Transfer Refactor (ChannelResult)** ✅ COMPLETE (Commit: pending)
+- `ChannelResult` C++ struct unifying HTC + pressure drop in one call
+- 5 new `channel_*` functions: `channel_smooth`, `channel_ribbed`, `channel_dimpled`, `channel_pin_fin`, `channel_impingement`
+- `pin_fin_friction` scalar correlation (Metzger/Simoneau power law)
+- Mach number computed internally; `T_aw` always continuous (no M threshold, smooth Jacobian)
+- pybind11 bindings for `ChannelResult` and all `channel_*` functions
+- `combaero.heat_transfer` submodule with keyword-argument API (`ht.smooth`, `ht.ribbed`, etc.)
+- Re-based correlation validators changed from throw → warn+extrapolate (power-law correlations are well-behaved); geometry ratio limits remain hard errors
+- 48 new tests in `python/tests/test_channel_flow.py` (736 total tests pass)
+- API_REFERENCE.md, NETWORK_ROADMAP.md, units_data.h updated; UNITS.md regenerated (283 entries)
+- Global `CorrelationResult<T>` validity-flag refactor noted in NETWORK_ROADMAP.md as pending future scope
 
 ---
 

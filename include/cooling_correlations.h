@@ -196,6 +196,21 @@ double pin_fin_nusselt(
     bool is_staggered = true
 );
 
+// Pin fin array pressure drop friction coefficient
+// For use in: dP = N_rows * f_pin * (rho * v_max² / 2)
+// where v_max is the velocity at the minimum cross-section.
+//
+// Parameters:
+//   Re_d         : Reynolds number based on pin diameter [-]
+//   is_staggered : true for staggered (default), false for inline
+//
+// Returns: friction coefficient f_pin [-]
+//
+// Source: Metzger et al. (1982), Simoneau & VanFossen (1984)
+// Valid: Re_d = 3000-90000
+// Accuracy: +/-20%
+double pin_fin_friction(double Re_d, bool is_staggered = true);
+
 // -------------------------------------------------------------
 // Dimpled Surfaces
 // -------------------------------------------------------------

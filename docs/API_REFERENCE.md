@@ -773,6 +773,65 @@ lmtd(dT1, dT2)  # [K]
 
 **Note:** `htc_pipe` automatically computes density, viscosity, thermal conductivity, Prandtl number, and Reynolds number from (T, P, X). Handles laminar flow (Re < 2300) with constant Nu.
 
+### ChannelResult — Combined HTC + Pressure Drop
+
+`ChannelResult` is the unified result type returned by all `channel_*` functions. It combines convective heat transfer and pressure loss in a single pass.
+
+```python
+from combaero import channel_smooth, channel_ribbed, channel_dimpled
+from combaero import channel_pin_fin, channel_impingement
+from combaero import heat_transfer as ht  # keyword-argument API
+
+# Smooth pipe
+sol = channel_smooth(T, P, X, velocity=20.0, diameter=0.01, length=0.5,
+                     T_wall=800.0)  # T_wall optional; omit to skip q
+
+# Rib-enhanced channel
+sol = channel_ribbed(T, P, X, velocity=20.0, diameter=0.01, length=0.5,
+                     e_D=0.05, P_e=10.0, alpha=90.0)
+
+# Dimpled channel
+sol = channel_dimpled(T, P, X, velocity=20.0, diameter=0.01, length=0.5,
+                      d_Dh=0.2, h_d=0.2, S_d=2.0)
+
+# Pin-fin array
+sol = channel_pin_fin(T, P, X, velocity=10.0, channel_height=0.015,
+                      pin_diameter=0.005, S_D=2.5, X_D=2.5, N_rows=5)
+
+# Impingement jet array
+sol = channel_impingement(T, P, X, mdot_jet=0.001, d_jet=0.005,
+                          z_D=6.0, A_target=0.01)
+
+# heat_transfer submodule (keyword-only API, cleaner for scripts)
+sol = ht.smooth(T, P, X, u=20.0, L=0.5, D=0.01, T_wall=800.0)
+sol = ht.ribbed(T, P, X, u=20.0, L=0.5, D=0.01, e_D=0.05, P_e=10.0, alpha=90.0)
+sol = ht.pin_fin(T, P, X, u=10.0, H=0.015, d=0.005, S_D=2.5, X_D=2.5, N_rows=5)
+sol = ht.impingement(T, P, X, mdot_jet=0.001, d_jet=0.005, z_D=6.0, A_target=0.01)
+```
+
+**ChannelResult fields:**
+
+| Field | Unit | Description |
+|-------|------|-------------|
+| `h` | W/(m²·K) | Convective heat transfer coefficient |
+| `Nu` | — | Nusselt number |
+| `Re` | — | Reynolds number (hydraulic D or pin D) |
+| `Pr` | — | Prandtl number |
+| `f` | — | Friction/loss coefficient (Darcy for smooth/rib/dimple; pin-array coeff for pin_fin; 1/Cd² for impingement) |
+| `dP` | Pa | Pressure drop |
+| `M` | — | Mach number (computed internally from v/a(T,X)) |
+| `T_aw` | K | Adiabatic wall temperature (always continuous, see below) |
+| `q` | W/m² | Heat flux = h·(T_aw − T_wall); `nan` if T_wall not supplied |
+
+**T_aw convention:** Always computed as `T_aw = T_static + r·v²/(2·cp)` with `r = Pr^(1/3)` (turbulent). At v=0 this gives `T_aw = T_static` exactly — no threshold, no discontinuity. This keeps the Jacobian smooth for network solvers.
+
+**Extrapolation policy:** Re-based limits are validated ranges from the original experimental data. When Re is outside the validated range, a warning is printed to stderr and the power-law correlation is extrapolated. Geometry ratio limits (e_D, L_D, S_D, etc.) are hard errors since they change the flow physics.
+
+**Pressure drop formulas:**
+- smooth/ribbed/dimpled: `dP = f · (L/D) · (ρ·v²/2)` (Darcy-Weisbach)
+- pin_fin: `dP = N_rows · f_pin · (ρ·v_max²/2)` where `v_max = v · S_D/(S_D−1)`
+- impingement: `dP = (1/Cd²) · ρ·v_jet²/2` (orifice model)
+
 ## Geometry Utilities
 
 Hydraulic diameter and residence time calculations for flow systems.

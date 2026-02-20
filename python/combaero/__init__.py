@@ -107,6 +107,12 @@ try:
         calc_T_from_s,
         can_annular_eigenmodes,
         capacity_ratio,
+        channel_dimpled,
+        channel_impingement,
+        channel_pin_fin,
+        channel_ribbed,
+        channel_smooth,
+        ChannelResult,
         closest_mode,
         combustion_equilibrium,
         combustion_state,
@@ -255,6 +261,7 @@ try:
         P0_from_static,
         P_from_stagnation,
         peclet,
+        pin_fin_friction,
         pin_fin_nusselt,
         pipe_area,
         pipe_dP,
@@ -601,10 +608,19 @@ except ModuleNotFoundError:
     has_units = _core.has_units
     list_functions_with_units = _core.list_functions_with_units
     all_units = _core.all_units
+    # Channel flow (HTC + pressure drop)
+    ChannelResult = _core.ChannelResult
+    channel_smooth = _core.channel_smooth
+    channel_ribbed = _core.channel_ribbed
+    channel_dimpled = _core.channel_dimpled
+    channel_pin_fin = _core.channel_pin_fin
+    channel_impingement = _core.channel_impingement
+    pin_fin_friction = _core.pin_fin_friction
 
 
 # Submodule imports — always available regardless of _core load path.
 from . import compressible
+from . import heat_transfer
 from . import incompressible
 from ._flow_solution import FlowSolution
 
@@ -711,10 +727,19 @@ __all__ = [
     "effusion_effectiveness",
     "effusion_discharge_coefficient",
     "pin_fin_nusselt",
+    "pin_fin_friction",
     "dimple_nusselt_enhancement",
     "dimple_friction_multiplier",
     "adiabatic_wall_temperature",
     "cooled_wall_heat_flux",
+    # Channel flow (HTC + pressure drop)
+    "ChannelResult",
+    "channel_smooth",
+    "channel_ribbed",
+    "channel_dimpled",
+    "channel_pin_fin",
+    "channel_impingement",
+    "heat_transfer",
     # Inverse solvers - find fuel stream
     "set_fuel_stream_for_Tad",
     "set_fuel_stream_for_phi",
