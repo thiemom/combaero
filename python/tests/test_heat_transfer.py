@@ -300,5 +300,131 @@ class TestIntegration:
         assert lmtd_val > 0
 
 
+class TestExtrapolationBehaviour:
+    """Verify warn+extrapolate policy for Re/Pr out-of-range inputs."""
+
+    def test_dittus_boelter_low_re_extrapolates(self):
+        """Re < 10000 should return finite positive Nu, not raise."""
+        Nu = cb.nusselt_dittus_boelter(5000, 0.7)
+        assert Nu > 0
+        assert isinstance(Nu, float)
+
+    def test_dittus_boelter_pr_out_of_range_extrapolates(self):
+        """Pr outside [0.6, 160] should return finite positive Nu, not raise."""
+        Nu_low = cb.nusselt_dittus_boelter(50000, 0.5)
+        Nu_high = cb.nusselt_dittus_boelter(50000, 200.0)
+        assert Nu_low > 0
+        assert Nu_high > 0
+
+    def test_gnielinski_low_re_hermite_blend(self):
+        """Below Re=2300 Gnielinski must return positive Nu via Hermite blend."""
+        for re in [100.0, 500.0, 1000.0, 1500.0, 2000.0, 2299.0]:
+            Nu = cb.nusselt_gnielinski(re, 0.7)
+            assert Nu > 0, f"Nu must be positive at Re={re}"
+            assert isinstance(Nu, float)
+
+    def test_gnielinski_c0_continuity_at_re2300(self):
+        """Gnielinski value must be continuous at Re=2300 (C0)."""
+        Nu_below = cb.nusselt_gnielinski(2299.9, 0.7)
+        Nu_at = cb.nusselt_gnielinski(2300.0, 0.7)
+        Nu_above = cb.nusselt_gnielinski(2300.1, 0.7)
+        assert abs(Nu_below - Nu_at) / Nu_at < 0.01
+        assert abs(Nu_above - Nu_at) / Nu_at < 0.01
+
+    def test_gnielinski_high_re_extrapolates(self):
+        """Re > 5e6 should return finite positive Nu, not raise."""
+        Nu = cb.nusselt_gnielinski(6e6, 0.7)
+        assert Nu > 0
+
+    def test_sieder_tate_low_re_extrapolates(self):
+        """Re < 10000 should return finite positive Nu, not raise."""
+        Nu = cb.nusselt_sieder_tate(5000, 0.7, 1.0)
+        assert Nu > 0
+
+    def test_petukhov_out_of_range_extrapolates(self):
+        """Re outside [1e4, 5e6] should return finite positive Nu, not raise."""
+        Nu_low = cb.nusselt_petukhov(5000, 0.7)
+        Nu_high = cb.nusselt_petukhov(6e6, 0.7)
+        assert Nu_low > 0
+        assert Nu_high > 0
+
+
+class TestIsWellBehaved:
+    """Tests for the is_well_behaved Jacobian-safety utility."""
+
+    def test_typical_nusselt_is_well_behaved(self):
+        """A typical Nu value should be well-behaved."""
+        Nu = cb.nusselt_dittus_boelter(50000, 0.7)
+        assert cb.is_well_behaved(Nu)
+
+    def test_zero_is_not_well_behaved(self):
+        """Zero fails the lower-bound check."""
+        assert not cb.is_well_behaved(0.0)
+
+    def test_negative_is_not_well_behaved(self):
+        """Negative value fails the lower-bound check."""
+        assert not cb.is_well_behaved(-1.0)
+
+    def test_inf_is_not_well_behaved(self):
+        """Infinity is not well-behaved."""
+        import math
+
+        assert not cb.is_well_behaved(math.inf)
+
+    def test_nan_is_not_well_behaved(self):
+        """NaN is not well-behaved."""
+        import math
+
+        assert not cb.is_well_behaved(math.nan)
+
+    def test_custom_bounds(self):
+        """Custom lo/hi bounds are respected."""
+        assert cb.is_well_behaved(5.0, lo=1.0, hi=10.0)
+        assert not cb.is_well_behaved(0.5, lo=1.0, hi=10.0)
+        assert not cb.is_well_behaved(15.0, lo=1.0, hi=10.0)
+
+
+class TestSuppressWarnings:
+    """Tests for the suppress_warnings context manager."""
+
+    def test_suppress_warnings_silences_output(self, capfd):
+        """suppress_warnings should prevent any stderr output."""
+        cb.set_warning_handler(None)  # ensure default handler
+        with cb.suppress_warnings():
+            cb.nusselt_dittus_boelter(100, 0.7)
+        captured = capfd.readouterr()
+        assert captured.err == ""
+
+    def test_suppress_warnings_restores_handler(self, capfd):
+        """Handler should be restored after the context exits."""
+        cb.set_warning_handler(None)  # ensure default handler
+        with cb.suppress_warnings():
+            pass
+        capfd.readouterr()  # clear any prior output
+        cb.nusselt_dittus_boelter(100, 0.7)
+        captured = capfd.readouterr()
+        assert "[combaero]" in captured.err
+
+    def test_set_warning_handler_custom(self):
+        """Custom handler should receive warning messages."""
+        messages = []
+        cb.set_warning_handler(lambda msg: messages.append(msg))
+        try:
+            cb.nusselt_dittus_boelter(100, 0.7)
+            assert len(messages) == 1
+            assert "Re" in messages[0]
+        finally:
+            cb.set_warning_handler(None)
+
+    def test_set_warning_handler_none_restores_default(self, capfd):
+        """Passing None to set_warning_handler restores stderr output."""
+        cb.set_warning_handler(lambda msg: None)
+        cb.set_warning_handler(None)
+        capfd.readouterr()  # clear any prior output
+        cb.nusselt_dittus_boelter(100, 0.7)
+        captured = capfd.readouterr()
+        assert "[combaero]" in captured.err
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

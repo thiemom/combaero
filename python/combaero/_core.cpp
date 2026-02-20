@@ -15,6 +15,7 @@
 #include "incompressible.h"
 #include "friction.h"
 #include "heat_transfer.h"
+#include "correlation_status.h"
 #include "acoustics.h"
 #include "can_annular_solvers.h"
 #include "orifice.h"
@@ -1663,7 +1664,9 @@ PYBIND11_MODULE(_core, m)
 
     m.def(
         "nusselt_dittus_boelter",
-        &nusselt_dittus_boelter,
+        [](double Re, double Pr, bool heating) {
+            return nusselt_dittus_boelter(Re, Pr, heating, nullptr);
+        },
         py::arg("Re"),
         py::arg("Pr"),
         py::arg("heating") = true,
@@ -1671,57 +1674,51 @@ PYBIND11_MODULE(_core, m)
         "Nu = 0.023 * Re^0.8 * Pr^n\n"
         "where n = 0.4 for heating, n = 0.3 for cooling.\n\n"
         "Parameters:\n"
-        "  Re      : Reynolds number [-] (must be > 10,000)\n"
-        "  Pr      : Prandtl number [-] (must be 0.6 < Pr < 160)\n"
+        "  Re      : Reynolds number [-] (validated: Re > 10,000; warns and extrapolates outside)\n"
+        "  Pr      : Prandtl number [-] (validated: 0.6 < Pr < 160; warns and extrapolates outside)\n"
         "  heating : True if fluid is being heated, False if cooled (default: True)\n\n"
         "Returns: Nusselt number Nu [-] (dimensionless)\n\n"
         "Valid for fully developed turbulent flow with L/D > 10.\n"
-        "Heat transfer coefficient: h = Nu * k / L [W/(m²·K)]"
+        "Heat transfer coefficient: h = Nu * k / L [W/(m^2*K)]"
     );
 
     m.def(
         "nusselt_gnielinski",
-        py::overload_cast<double, double, double>(&nusselt_gnielinski),
+        [](double Re, double Pr, double f) {
+            if (f < 0.0) {
+                return nusselt_gnielinski(Re, Pr, nullptr);
+            }
+            return nusselt_gnielinski(Re, Pr, f, nullptr);
+        },
         py::arg("Re"),
         py::arg("Pr"),
-        py::arg("f"),
-        "Gnielinski Nusselt number correlation (1976) with friction factor.\n\n"
+        py::arg("f") = -1.0,
+        "Gnielinski Nusselt number correlation (1976).\n\n"
         "Nu = (f/8) * (Re - 1000) * Pr / (1 + 12.7 * sqrt(f/8) * (Pr^(2/3) - 1))\n\n"
-        "More accurate than Dittus-Boelter, especially in transition region.\n\n"
+        "More accurate than Dittus-Boelter, especially in transition region.\n"
+        "Below Re=2300 uses a C1-smooth Hermite blend to laminar Nu (3.66).\n\n"
         "Parameters:\n"
-        "  Re : Reynolds number [-] (2300 < Re < 5x10^6)\n"
-        "  Pr : Prandtl number [-] (0.5 < Pr < 2000)\n"
-        "  f  : Darcy friction factor [-] (use friction_colebrook or similar)\n\n"
-        "Returns: Nusselt number Nu [-] (dimensionless)"
-    );
-
-    m.def(
-        "nusselt_gnielinski",
-        py::overload_cast<double, double>(&nusselt_gnielinski),
-        py::arg("Re"),
-        py::arg("Pr"),
-        "Gnielinski Nusselt number correlation (1976) with automatic friction.\n\n"
-        "Uses Petukhov friction correlation for smooth pipes:\n"
-        "f = [0.790 * ln(Re) - 1.64]^(-2)\n\n"
-        "Parameters:\n"
-        "  Re : Reynolds number [-] (2300 < Re < 5x10^6)\n"
-        "  Pr : Prandtl number [-] (0.5 < Pr < 2000)\n\n"
+        "  Re : Reynolds number [-] (validated: 2300-5e6; warns and extrapolates outside)\n"
+        "  Pr : Prandtl number [-] (validated: 0.5-2000; warns and extrapolates outside)\n"
+        "  f  : Darcy friction factor [-] (if < 0, uses Petukhov auto-friction)\n\n"
         "Returns: Nusselt number Nu [-] (dimensionless)"
     );
 
     m.def(
         "nusselt_sieder_tate",
-        &nusselt_sieder_tate,
+        [](double Re, double Pr, double mu_ratio) {
+            return nusselt_sieder_tate(Re, Pr, mu_ratio, nullptr);
+        },
         py::arg("Re"),
         py::arg("Pr"),
         py::arg("mu_ratio") = 1.0,
         "Sieder-Tate Nusselt number correlation (1936).\n\n"
-        "Nu = 0.027 * Re^0.8 * Pr^(1/3) * (μ_bulk / μ_wall)^0.14\n\n"
+        "Nu = 0.027 * Re^0.8 * Pr^(1/3) * (mu_bulk / mu_wall)^0.14\n\n"
         "Accounts for viscosity variation between bulk and wall temperatures.\n\n"
         "Parameters:\n"
-        "  Re       : Reynolds number at bulk temperature [-] (Re > 10,000)\n"
-        "  Pr       : Prandtl number at bulk temperature [-] (0.7 < Pr < 16,700)\n"
-        "  mu_ratio : μ_bulk / μ_wall [-] (default: 1.0, typically 0.5-2.0)\n\n"
+        "  Re       : Reynolds number at bulk temperature [-] (validated: Re > 10,000; warns outside)\n"
+        "  Pr       : Prandtl number at bulk temperature [-] (validated: 0.7-16700; warns outside)\n"
+        "  mu_ratio : mu_bulk / mu_wall [-] (default: 1.0, typically 0.5-2.0)\n\n"
         "Returns: Nusselt number Nu [-] (dimensionless)\n\n"
         "Valid for L/D > 10."
     );
@@ -2296,56 +2293,62 @@ PYBIND11_MODULE(_core, m)
 
     m.def(
         "nusselt_dittus_boelter",
-        &nusselt_dittus_boelter,
+        [](double Re, double Pr, bool heating) {
+            return nusselt_dittus_boelter(Re, Pr, heating, nullptr);
+        },
         py::arg("Re"),
         py::arg("Pr"),
         py::arg("heating") = true,
         "Dittus-Boelter correlation for turbulent pipe flow.\n\n"
         "Nu = 0.023 * Re^0.8 * Pr^n\n"
         "n = 0.4 (heating) or 0.3 (cooling)\n\n"
-        "Valid: Re > 10000, 0.6 < Pr < 160, L/D > 10"
+        "Warns and extrapolates outside validated range (Re > 10000, 0.6 < Pr < 160)."
     );
 
     m.def(
         "nusselt_gnielinski",
         [](double Re, double Pr, double f) {
-            if (f < 0) {
-                return nusselt_gnielinski(Re, Pr);
+            if (f < 0.0) {
+                return nusselt_gnielinski(Re, Pr, nullptr);
             }
-            return nusselt_gnielinski(Re, Pr, f);
+            return nusselt_gnielinski(Re, Pr, f, nullptr);
         },
         py::arg("Re"),
         py::arg("Pr"),
         py::arg("f") = -1.0,
         "Gnielinski correlation for transitional/turbulent pipe flow.\n\n"
-        "Valid: 3000 < Re < 5e6, 0.5 < Pr < 2000\n\n"
+        "Below Re=2300 uses C1-smooth Hermite blend to laminar Nu.\n"
+        "Warns and extrapolates outside validated range (2300 < Re < 5e6, 0.5 < Pr < 2000).\n\n"
         "f : friction factor (if < 0, uses Petukhov correlation)"
     );
 
     m.def(
         "nusselt_sieder_tate",
-        &nusselt_sieder_tate,
+        [](double Re, double Pr, double mu_ratio) {
+            return nusselt_sieder_tate(Re, Pr, mu_ratio, nullptr);
+        },
         py::arg("Re"),
         py::arg("Pr"),
-        py::arg("mu_ratio"),
+        py::arg("mu_ratio") = 1.0,
         "Sieder-Tate correlation with viscosity correction.\n\n"
-        "Nu = 0.027 * Re^0.8 * Pr^(1/3) * (μ/μ_w)^0.14\n\n"
-        "mu_ratio : μ_bulk / μ_wall"
+        "Nu = 0.027 * Re^0.8 * Pr^(1/3) * (mu/mu_w)^0.14\n\n"
+        "Warns and extrapolates outside validated range (Re > 10000, 0.7 < Pr < 16700).\n\n"
+        "mu_ratio : mu_bulk / mu_wall"
     );
 
     m.def(
         "nusselt_petukhov",
         [](double Re, double Pr, double f) {
-            if (f < 0) {
-                return nusselt_petukhov(Re, Pr);
+            if (f < 0.0) {
+                return nusselt_petukhov(Re, Pr, nullptr);
             }
-            return nusselt_petukhov(Re, Pr, f);
+            return nusselt_petukhov(Re, Pr, f, nullptr);
         },
         py::arg("Re"),
         py::arg("Pr"),
         py::arg("f") = -1.0,
         "Petukhov correlation for turbulent pipe flow.\n\n"
-        "Valid: 1e4 < Re < 5e6, 0.5 < Pr < 2000\n\n"
+        "Warns and extrapolates outside validated range (1e4 < Re < 5e6, 0.5 < Pr < 2000).\n\n"
         "f : friction factor (if < 0, uses Petukhov correlation)"
     );
 
@@ -2356,10 +2359,61 @@ PYBIND11_MODULE(_core, m)
         py::arg("k"),
         py::arg("L"),
         "Heat transfer coefficient from Nusselt number.\n\n"
-        "h = Nu * k / L  [W/(m²·K)]\n\n"
+        "h = Nu * k / L  [W/(m^2*K)]\n\n"
         "Nu : Nusselt number [-]\n"
-        "k  : thermal conductivity [W/(m·K)]\n"
+        "k  : thermal conductivity [W/(m*K)]\n"
         "L  : characteristic length [m]"
+    );
+
+    // Warning handler and validity utility
+    m.def(
+        "set_warning_handler",
+        [](py::object handler) {
+            if (handler.is_none()) {
+                combaero::set_warning_handler({});
+            } else {
+                combaero::set_warning_handler([handler](const std::string& msg) {
+                    py::gil_scoped_acquire gil;
+                    handler(msg);
+                });
+            }
+        },
+        py::arg("handler"),
+        "Set the global warning handler for out-of-range correlation extrapolations.\n\n"
+        "handler : callable(str) or None\n"
+        "  If None, resets to the default (prints to stderr).\n"
+        "  Pass a no-op lambda to suppress all warnings.\n\n"
+        "Example:\n"
+        "  import combaero\n"
+        "  combaero.set_warning_handler(lambda msg: None)  # suppress\n"
+        "  combaero.set_warning_handler(None)              # restore default"
+    );
+
+    m.def(
+        "get_warning_handler",
+        []() -> py::object {
+            // Return the current C++ handler wrapped as a Python callable.
+            // Used by suppress_warnings() to save/restore the handler.
+            auto h = combaero::get_warning_handler();
+            return py::cpp_function([h](const std::string& msg) { h(msg); });
+        },
+        "Return the current warning handler as a Python callable.\n\n"
+        "Used internally by suppress_warnings() to save and restore the handler."
+    );
+
+    m.def(
+        "is_well_behaved",
+        [](double v, double lo, double hi) {
+            return combaero::is_well_behaved(v, lo, hi);
+        },
+        py::arg("v"),
+        py::arg("lo") = 1e-12,
+        py::arg("hi") = 1e15,
+        "Check whether a correlation result is safe for use in a Jacobian-based solver.\n\n"
+        "Returns True if v is finite, v > lo, and v < hi.\n\n"
+        "v  : scalar result to check\n"
+        "lo : lower bound (default 1e-12)\n"
+        "hi : upper bound (default 1e15)"
     );
 
     m.def(

@@ -10,6 +10,9 @@
 #include "../include/acoustics.h"
 #include "../include/state.h"
 #include "../include/math_constants.h"  // MSVC compatibility for M_PI
+#include "../include/heat_transfer.h"
+#include "../include/correlation_status.h"
+#include <cmath>
 #include <vector>
 
 using namespace combaero;
@@ -3088,12 +3091,25 @@ TEST(HeatTransferTest, DittusBoelterBasic) {
 }
 
 TEST(HeatTransferTest, DittusBoelterValidRange) {
-    // Should throw for Re < 10000
-    EXPECT_THROW(nusselt_dittus_boelter(5000, 0.7), std::invalid_argument);
+    // Re < 10000: warns and extrapolates (power law — no divergence)
+    double Nu_low_Re;
+    EXPECT_NO_THROW(Nu_low_Re = nusselt_dittus_boelter(5000, 0.7));
+    EXPECT_GT(Nu_low_Re, 0.0);
+    EXPECT_TRUE(std::isfinite(Nu_low_Re));
 
-    // Should throw for Pr outside [0.6, 160]
-    EXPECT_THROW(nusselt_dittus_boelter(50000, 0.5), std::invalid_argument);
-    EXPECT_THROW(nusselt_dittus_boelter(50000, 200), std::invalid_argument);
+    // Pr outside [0.6, 160]: warns and extrapolates
+    double Nu_low_Pr, Nu_high_Pr;
+    EXPECT_NO_THROW(Nu_low_Pr = nusselt_dittus_boelter(50000, 0.5));
+    EXPECT_GT(Nu_low_Pr, 0.0);
+    EXPECT_NO_THROW(Nu_high_Pr = nusselt_dittus_boelter(50000, 200));
+    EXPECT_GT(Nu_high_Pr, 0.0);
+
+    // CorrelationStatus out-param: Extrapolated when outside range
+    combaero::CorrelationStatus st;
+    nusselt_dittus_boelter(5000, 0.7, true, &st);
+    EXPECT_EQ(st, combaero::CorrelationStatus::Extrapolated);
+    nusselt_dittus_boelter(50000, 0.7, true, &st);
+    EXPECT_EQ(st, combaero::CorrelationStatus::Valid);
 }
 
 TEST(HeatTransferTest, GnielinskiBasic) {
@@ -3120,13 +3136,57 @@ TEST(HeatTransferTest, GnielinskiWithFriction) {
 }
 
 TEST(HeatTransferTest, GnielinskiValidRange) {
-    // Should throw for Re outside [2300, 5e6]
-    EXPECT_THROW(nusselt_gnielinski(2000, 0.7), std::invalid_argument);
-    EXPECT_THROW(nusselt_gnielinski(6e6, 0.7), std::invalid_argument);
+    // Re outside [2300, 5e6]: warns and extrapolates (or uses Hermite blend)
+    double Nu_low_Re, Nu_high_Re;
+    EXPECT_NO_THROW(Nu_low_Re = nusselt_gnielinski(2000, 0.7));
+    EXPECT_GT(Nu_low_Re, 0.0);
+    EXPECT_TRUE(std::isfinite(Nu_low_Re));
+    EXPECT_NO_THROW(Nu_high_Re = nusselt_gnielinski(6e6, 0.7));
+    EXPECT_GT(Nu_high_Re, 0.0);
+    EXPECT_TRUE(std::isfinite(Nu_high_Re));
 
-    // Should throw for Pr outside [0.5, 2000]
-    EXPECT_THROW(nusselt_gnielinski(50000, 0.4), std::invalid_argument);
-    EXPECT_THROW(nusselt_gnielinski(50000, 3000), std::invalid_argument);
+    // Pr outside [0.5, 2000]: warns and extrapolates
+    double Nu_low_Pr, Nu_high_Pr;
+    EXPECT_NO_THROW(Nu_low_Pr = nusselt_gnielinski(50000, 0.4));
+    EXPECT_GT(Nu_low_Pr, 0.0);
+    EXPECT_NO_THROW(Nu_high_Pr = nusselt_gnielinski(50000, 3000));
+    EXPECT_GT(Nu_high_Pr, 0.0);
+
+    // CorrelationStatus out-param
+    combaero::CorrelationStatus st;
+    nusselt_gnielinski(2000, 0.7, &st);
+    EXPECT_EQ(st, combaero::CorrelationStatus::Extrapolated);
+    nusselt_gnielinski(50000, 0.7, &st);
+    EXPECT_EQ(st, combaero::CorrelationStatus::Valid);
+}
+
+TEST(HeatTransferTest, GnielinskiHermiteBlend) {
+    // Below Re=2300 the raw formula goes negative; Hermite blend must give
+    // positive, finite Nu for all Re in [0, 2300].
+    for (double Re : {100.0, 500.0, 1000.0, 1500.0, 2000.0, 2299.0}) {
+        double Nu = nusselt_gnielinski(Re, 0.7);
+        EXPECT_GT(Nu, 0.0) << "Nu must be positive at Re=" << Re;
+        EXPECT_TRUE(std::isfinite(Nu)) << "Nu must be finite at Re=" << Re;
+    }
+
+    // At Re=2300 the Hermite blend must match the Gnielinski formula exactly
+    // (C0 continuity).  The no-friction overload clamps Re to 3000 for the
+    // Petukhov friction call, so we must use the same f here.
+    double f_used = friction_petukhov(3000.0);
+    double Nu_hermite = nusselt_gnielinski(2300.0, 0.7);
+    double f8 = f_used / 8.0;
+    double denom = 1.0 + 12.7 * std::sqrt(f8) * (std::pow(0.7, 2.0/3.0) - 1.0);
+    double Nu_formula = f8 * (2300.0 - 1000.0) * 0.7 / denom;
+    EXPECT_NEAR(Nu_hermite, Nu_formula, Nu_formula * 0.001);  // 0.1% tolerance
+
+    // C1 continuity at Re=2300: numerical derivative from both sides must match
+    // within 1% (finite-difference step h=1).
+    double h_step = 1.0;
+    double dNu_below = (nusselt_gnielinski(2300.0, 0.7) -
+                        nusselt_gnielinski(2300.0 - h_step, 0.7)) / h_step;
+    double dNu_above = (nusselt_gnielinski(2300.0 + h_step, 0.7) -
+                        nusselt_gnielinski(2300.0, 0.7)) / h_step;
+    EXPECT_NEAR(dNu_below, dNu_above, std::abs(dNu_above) * 0.01);
 }
 
 TEST(HeatTransferTest, SiederTateBasic) {

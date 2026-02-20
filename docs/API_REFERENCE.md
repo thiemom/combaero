@@ -765,13 +765,49 @@ lmtd(dT1, dT2)  # [K]
 - **`htc_pipe`: tuple (h [W/(m²·K)], Nu [-], Re [-])**
 - `lmtd`: LMTD [K]
 
-**Valid ranges:**
+**Validated ranges (warn + extrapolate outside):**
 - Dittus-Boelter: Re > 10,000, 0.6 < Pr < 160
-- Gnielinski: 2300 < Re < 5x10^6, 0.5 < Pr < 2000 (best general-purpose)
+- Gnielinski: 2300 < Re < 5×10^6, 0.5 < Pr < 2000 (best general-purpose)
 - Sieder-Tate: Re > 10,000, 0.7 < Pr < 16,700
-- Petukhov: Re > 10,000, 0.5 < Pr < 2000
+- Petukhov: 10,000 < Re < 5×10^6, 0.5 < Pr < 2000
 
 **Note:** `htc_pipe` automatically computes density, viscosity, thermal conductivity, Prandtl number, and Reynolds number from (T, P, X). Handles laminar flow (Re < 2300) with constant Nu.
+
+### Extrapolation Policy
+
+All Re- and Pr-based limits in Nusselt correlations use **warn + extrapolate** (not throw). This is safe for Newton/CasADi Jacobian-based solvers:
+
+- **Power-law correlations** (`Nu = C·Re^m·Pr^n`): smooth and monotone everywhere — extrapolation is well-behaved.
+- **Gnielinski below Re=2300**: the raw formula goes negative at Re < 1000. A **C1-smooth cubic Hermite blend** from laminar Nu (3.66) to Gnielinski at Re=2300 is used, matching value and first derivative at the boundary. Gradient is continuous — safe for Newton.
+- **Geometry ratio limits** (`e_D`, `L_D`, `S_D`, etc.): still throw — these change the correlation form, not just the operating point.
+- **Physical impossibilities** (`f <= 0`, `mu_ratio <= 0`, zero diameter): still throw.
+
+```python
+import combaero as cb
+
+# Extrapolation emits a warning to stderr by default
+Nu = cb.nusselt_dittus_boelter(5000, 0.7)  # Re < 10000: warns, returns finite Nu
+
+# Suppress warnings for batch solver runs
+with cb.suppress_warnings():
+    Nu = cb.nusselt_dittus_boelter(5000, 0.7)  # silent
+
+# Custom handler (e.g. log to file)
+cb.set_warning_handler(lambda msg: my_logger.warning(msg))
+cb.set_warning_handler(None)  # restore default (stderr)
+
+# Post-check result for Jacobian safety
+assert cb.is_well_behaved(Nu)           # finite, > 1e-12, < 1e15
+assert cb.is_well_behaved(Nu, lo=1.0)  # custom lower bound
+```
+
+**`is_well_behaved(v, lo=1e-12, hi=1e15)`** — returns `True` if `v` is finite, `v > lo`, and `v < hi`. Use in network element residuals to detect divergence before it propagates to the solver.
+
+**`suppress_warnings()`** — context manager; saves and restores the handler on exit. Thread-safe for single-threaded solvers (global handler).
+
+**`set_warning_handler(callable | None)`** — replace the global handler. `None` resets to default stderr output.
+
+**`get_warning_handler()`** — returns the current handler as a Python callable (used internally by `suppress_warnings`).
 
 ### ChannelResult — Combined HTC + Pressure Drop
 
