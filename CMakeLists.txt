@@ -74,6 +74,9 @@ add_executable(cooling_example           examples/cooling_example.cpp)
 add_executable(compressible_example      examples/compressible_example.cpp)
 add_executable(incompressible_example    examples/incompressible_example.cpp)
 add_executable(combustion_state_example  examples/combustion_state_example.cpp)
+add_executable(acoustics_example         examples/acoustics_example.cpp)
+add_executable(orifice_example           examples/orifice_example.cpp)
+add_executable(stagnation_example        examples/stagnation_example.cpp)
 
 # Add compiler warnings for examples
 if (MSVC)
@@ -84,6 +87,9 @@ if (MSVC)
     target_compile_options(compressible_example     PRIVATE /W4)
     target_compile_options(incompressible_example   PRIVATE /W4)
     target_compile_options(combustion_state_example PRIVATE /W4)
+    target_compile_options(acoustics_example        PRIVATE /W4)
+    target_compile_options(orifice_example          PRIVATE /W4)
+    target_compile_options(stagnation_example       PRIVATE /W4)
 else()
     target_compile_options(combaero_example         PRIVATE -Wall -Wextra)
     target_compile_options(humidair_example         PRIVATE -Wall -Wextra)
@@ -92,6 +98,9 @@ else()
     target_compile_options(compressible_example     PRIVATE -Wall -Wextra)
     target_compile_options(incompressible_example   PRIVATE -Wall -Wextra)
     target_compile_options(combustion_state_example PRIVATE -Wall -Wextra)
+    target_compile_options(acoustics_example        PRIVATE -Wall -Wextra)
+    target_compile_options(orifice_example          PRIVATE -Wall -Wextra)
+    target_compile_options(stagnation_example       PRIVATE -Wall -Wextra)
 endif()
 
 target_link_libraries(combaero_example         PRIVATE combaero_lib)
@@ -101,6 +110,9 @@ target_link_libraries(cooling_example          PRIVATE combaero_lib)
 target_link_libraries(compressible_example     PRIVATE combaero_lib)
 target_link_libraries(incompressible_example   PRIVATE combaero_lib)
 target_link_libraries(combustion_state_example PRIVATE combaero_lib)
+target_link_libraries(acoustics_example        PRIVATE combaero_lib)
+target_link_libraries(orifice_example          PRIVATE combaero_lib)
+target_link_libraries(stagnation_example       PRIVATE combaero_lib)
 
 # Print message when examples are built
 add_custom_command(TARGET combaero_example POST_BUILD
@@ -129,6 +141,18 @@ add_custom_command(TARGET incompressible_example POST_BUILD
 
 add_custom_command(TARGET combustion_state_example POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E echo "Combustion state example built! Run with: ./combustion_state_example"
+)
+
+add_custom_command(TARGET acoustics_example POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "Acoustics example built! Run with: ./acoustics_example"
+)
+
+add_custom_command(TARGET orifice_example POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "Orifice example built! Run with: ./orifice_example"
+)
+
+add_custom_command(TARGET stagnation_example POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "Stagnation example built! Run with: ./stagnation_example"
 )
 
 # Optional Python bindings (enabled explicitly or via scikit-build-core)
