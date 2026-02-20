@@ -187,35 +187,82 @@ def main() -> None:
     print(f"  eta_Otto(ideal) : {eta_otto_ideal * 100:.2f} %  (avg gamma={gamma_avg:.3f})")
 
     # =========================================================================
-    # P-V diagram
+    # P-V and T-s diagrams
     # =========================================================================
-    # Isentropic paths
+    # --- isentropic paths (P-V) ---
     v_comp, P_comp = adiabatic_path(T1, P1, P2, X1)
     v_exp, P_exp = adiabatic_path(T3, P3, P4, X3)
 
-    fig, ax = plt.subplots(figsize=(7, 5))
+    # --- entropy at each state [J/(kg K)] ---
+    s1 = ca.s_mass(T1, X1, P1)
+    s2 = ca.s_mass(T2, X1, P2)  # == s1 (isentropic)
+    s3 = ca.s_mass(T3, X3, P3)
+    s4 = ca.s_mass(T4, X3, P4)  # == s3 (isentropic)
 
-    ax.plot(v_comp * 1e3, P_comp / 1e3, label="1-2 Compression")
-    ax.plot([v2 * 1e3, v3 * 1e3], [P2 / 1e3, P3 / 1e3], label="2-3 Combustion")
-    ax.plot(v_exp * 1e3, P_exp / 1e3, label="3-4 Expansion")
-    ax.plot([v4 * 1e3, v1 * 1e3], [P4 / 1e3, P1 / 1e3], label="4-1 Exhaust")
+    # isochoric heat addition 2->3: ds = cv/T dT  (variable composition approx: use X1)
+    n_ts = 200
+    T_23 = np.linspace(T2, T3, n_ts)
+    s_23 = s2 + np.array(
+        [
+            np.trapz([ca.cv_mass(t, X1) / t for t in T_23[: i + 1]], T_23[: i + 1])
+            for i in range(n_ts)
+        ]
+    )
 
-    for label, v, P in [("1", v1, P1), ("2", v2, P2), ("3", v3, P3), ("4", v4, P4)]:
-        ax.annotate(
-            label,
-            xy=(v * 1e3, P / 1e3),
+    # isochoric heat rejection 4->1: ds = cv/T dT (burned gas X3)
+    T_41 = np.linspace(T4, T1, n_ts)
+    s_41 = s4 + np.array(
+        [
+            np.trapz([ca.cv_mass(t, X3) / t for t in T_41[: i + 1]], T_41[: i + 1])
+            for i in range(n_ts)
+        ]
+    )
+
+    fig, (ax_pv, ax_ts) = plt.subplots(1, 2, figsize=(13, 5))
+    title = f"Otto Cycle  (CR={CR:.0f}, phi={phi:.2f}, eta={eta_th * 100:.1f} %)"
+    fig.suptitle(title, fontsize=13)
+
+    # --- P-V ---
+    ax_pv.plot(v_comp * 1e3, P_comp / 1e3, label="1-2 Compression")
+    ax_pv.plot([v2 * 1e3, v3 * 1e3], [P2 / 1e3, P3 / 1e3], label="2-3 Combustion")
+    ax_pv.plot(v_exp * 1e3, P_exp / 1e3, label="3-4 Expansion")
+    ax_pv.plot([v4 * 1e3, v1 * 1e3], [P4 / 1e3, P1 / 1e3], label="4-1 Exhaust")
+    for lbl, v, Ppt in [("1", v1, P1), ("2", v2, P2), ("3", v3, P3), ("4", v4, P4)]:
+        ax_pv.plot(v * 1e3, Ppt / 1e3, "ko", markersize=5)
+        ax_pv.annotate(
+            lbl,
+            xy=(v * 1e3, Ppt / 1e3),
             xytext=(4, 4),
             textcoords="offset points",
             fontsize=11,
             fontweight="bold",
         )
-        ax.plot(v * 1e3, P / 1e3, "ko", markersize=5)
+    ax_pv.set_xlabel("Specific volume [L/kg]")
+    ax_pv.set_ylabel("Pressure [kPa]")
+    ax_pv.set_title("P-V Diagram")
+    ax_pv.legend()
+    ax_pv.grid(True, alpha=0.3)
 
-    ax.set_xlabel("Specific volume [L/kg]")
-    ax.set_ylabel("Pressure [kPa]")
-    ax.set_title(f"Otto Cycle P-V Diagram  (CR={CR:.0f}, phi={phi:.2f}, eta={eta_th * 100:.1f} %)")
-    ax.legend()
-    ax.grid(True, alpha=0.3)
+    # --- T-s ---
+    ax_ts.plot([s1, s2], [T1, T2], label="1-2 Compression")  # vertical line (s=const)
+    ax_ts.plot(s_23, T_23, label="2-3 Combustion")
+    ax_ts.plot([s3, s4], [T3, T4], label="3-4 Expansion")  # vertical line (s=const)
+    ax_ts.plot(s_41, T_41, label="4-1 Exhaust")
+    for lbl, s_pt, T_pt in [("1", s1, T1), ("2", s2, T2), ("3", s3, T3), ("4", s4, T4)]:
+        ax_ts.plot(s_pt, T_pt, "ko", markersize=5)
+        ax_ts.annotate(
+            lbl,
+            xy=(s_pt, T_pt),
+            xytext=(4, 4),
+            textcoords="offset points",
+            fontsize=11,
+            fontweight="bold",
+        )
+    ax_ts.set_xlabel("Specific entropy [J/(kg K)]")
+    ax_ts.set_ylabel("Temperature [K]")
+    ax_ts.set_title("T-s Diagram")
+    ax_ts.legend()
+    ax_ts.grid(True, alpha=0.3)
 
     plt.tight_layout()
     out_path = pathlib.Path(__file__).parent / "ic_engine_cycle.png"
