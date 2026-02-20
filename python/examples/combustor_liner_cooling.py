@@ -1,32 +1,44 @@
 #!/usr/bin/env python3
-"""Combustor liner convective cooling design.
+"""Combustor liner convective cooling design with bypass sweep.
 
-Models a gas turbine combustor liner wall cooled by compressor delivery air
-flowing through internal channels. Compares three surface geometries:
+Flow topology (counterflow convective cooling):
 
-  - Smooth channel
-  - Rib-roughened channel  (Han et al. 1988)
-  - Dimpled channel        (Chyu et al. 1997)
+  Compressor exit (T2, P2)
+       |
+       +--[f_cool]--> liner cooling channels --> T_cool_exit
+       |
+       +--[1-f_cool]--> bypass
+       |
+       +--[fuel]
+       |
+       [mix: coolant_exit + bypass + fuel] --> combustor inlet
+                                                    |
+                                               complete_combustion
+                                                    |
+                                               COT, X_hot
+                                                    |
+                                               turbine inlet
 
-And two wall configurations:
+Counterflow pressure budget:
+  dP_total/P = dP_burner/P + dP_cool/P   (both in series)
 
-  - Bare Inconel 718 liner
-  - Inconel 718 + YSZ thermal barrier coating (APS, fresh and aged 1000 h)
+Design sweep: vary bypass fraction f_cool to find minimum cooling flow
+that keeps T_metal < 800 °C for three channel geometries:
+  - Smooth
+  - Rib-roughened  (Han et al. 1988, e/D=0.07, P/e=8, alpha=60°)
+  - Dimpled        (Chyu et al. 1997, d/Dh=0.2, h/d=0.2, S/d=2)
 
-Operating point: modern 20-bar gas turbine combustor.
-
-  Coolant : humid compressor delivery air (RH=60% at inlet, T2~667 K, P=20 bar)
-  Hot gas : combustion products at COT ~1758 K (phi~0.50, CH4/air)
-  Hot-side HTC : estimated from Dittus-Boelter on annular combustor passage
-  Burner dP/P  : 4 % (typical modern combustor)
+Wall configurations compared at the design point:
+  - Bare Inconel 718
+  - Inconel 718 + YSZ APS TBC (fresh and aged 1000 h)
+  - Inconel 718 + YSZ EB-PVD TBC
 
 Key combaero tools used:
   - humid_air_composition          (realistic coolant composition)
-  - complete_combustion            (hot-gas composition and temperature)
-  - channel_smooth / channel_ribbed / channel_dimpled  (coolant-side HTC + dP)
-  - wall_temperature_profile       (temperature through each wall layer)
-  - overall_htc_wall_multilayer    (U-value for wall stack)
-  - k_inconel718 / k_tbc_ysz      (temperature-dependent material properties)
+  - mix + complete_combustion      (coupled combustor inlet state)
+  - channel_smooth / channel_ribbed / channel_dimpled
+  - wall_temperature_profile       (multi-layer T profile)
+  - k_inconel718 / k_tbc_ysz      (temperature-dependent material k)
   - list_materials                 (material database)
   - nusselt_dittus_boelter / htc_from_nusselt  (hot-side HTC)
 """
@@ -42,12 +54,12 @@ import combaero as ca
 from combaero.species import SpeciesLocator
 
 # ---------------------------------------------------------------------------
-# Helper
+# Helpers
 # ---------------------------------------------------------------------------
 
 
 def hot_side_htc(T_hot: float, P: float, X: list, D_h: float, u: float) -> float:
-    """Estimate hot-gas-side HTC via Dittus-Boelter on the combustor annulus."""
+    """Hot-gas-side HTC via Dittus-Boelter on combustor annulus."""
     rho = ca.density(T_hot, P, X)
     mu = ca.viscosity(T_hot, P, X)
     k = ca.thermal_conductivity(T_hot, P, X)
@@ -56,21 +68,36 @@ def hot_side_htc(T_hot: float, P: float, X: list, D_h: float, u: float) -> float
     return ca.htc_from_nusselt(Nu, k, D_h)
 
 
-def wall_stack_temps(
+def wall_temps(
     T_hot: float,
     T_cool: float,
     h_hot: float,
     h_cool: float,
-    layers: list[tuple[float, float]],  # [(t, k), ...]
+    layers: list[tuple[float, float]],
 ) -> tuple[list[float], float]:
-    """Temperatures at each interface through the wall stack.
-
-    Returns (interface_temps, q) where interface_temps includes
-    T_hot_side_surface and T_cool_side_surface.
-    """
+    """Interface temperatures and heat flux through a multi-layer wall."""
     t_over_k = np.array([t / k for t, k in layers])
     temps, q = ca.wall_temperature_profile(T_hot, T_cool, h_hot, h_cool, t_over_k)
     return list(temps), float(q)
+
+
+def channel_result(
+    name: str,
+    T: float,
+    P: float,
+    X: list,
+    u: float,
+    D_h: float,
+    L: float,
+) -> ca.ChannelResult:
+    """Dispatch to the right channel function by name."""
+    if name == "Smooth":
+        return ca.channel_smooth(T, P, X, u, D_h, L)
+    if name == "Ribbed":
+        return ca.channel_ribbed(T, P, X, u, D_h, L, e_D=0.07, P_e=8.0, alpha=60.0)
+    if name == "Dimpled":
+        return ca.channel_dimpled(T, P, X, u, D_h, L, d_Dh=0.20, h_d=0.20, S_d=2.0)
+    raise ValueError(f"Unknown channel type: {name}")
 
 
 # ---------------------------------------------------------------------------
@@ -82,115 +109,54 @@ def main() -> None:
     sp = SpeciesLocator.from_core()
 
     print("=" * 70)
-    print("Combustor Liner Convective Cooling Design")
+    print("Combustor Liner Convective Cooling Design — Bypass Sweep")
     print("=" * 70)
 
     # -----------------------------------------------------------------------
-    # Materials
-    # -----------------------------------------------------------------------
-    print(f"\nAvailable materials: {ca.list_materials()}")
-
-    T_metal_limit = 1073.15  # K = 800 °C  (Inconel 718 oxidation limit)
-    T_ref_metal = 900.0  # K  representative Inconel temperature for k lookup
-    T_ref_tbc = 1200.0  # K  TBC outer surface temperature (hotter than metal)
-
-    k_inconel = ca.k_inconel718(T_ref_metal)
-    k_ysz_fresh = ca.k_tbc_ysz(T_ref_tbc, hours=0.0, is_ebpvd=False)  # APS as-sprayed
-    k_ysz_aged = ca.k_tbc_ysz(T_ref_tbc, hours=1000.0, is_ebpvd=False)  # APS after 1000 h
-    k_ysz_ebpvd = ca.k_tbc_ysz(T_ref_tbc, hours=0.0, is_ebpvd=True)
-
-    t_wall = 0.003  # m  Inconel liner thickness
-    t_tbc = 0.0003  # m  TBC thickness (300 µm typical APS)
-
-    print("\n--- Wall Materials ---")
-    print(f"  Inconel 718        : k = {k_inconel:.2f} W/(m·K)  @ {T_ref_metal:.0f} K")
-    print(f"  YSZ APS  (fresh)   : k = {k_ysz_fresh:.3f} W/(m·K)  @ {T_ref_tbc:.0f} K")
-    print(f"  YSZ APS  (1000 h)  : k = {k_ysz_aged:.3f} W/(m·K)  @ {T_ref_tbc:.0f} K")
-    print(f"  YSZ EB-PVD (fresh) : k = {k_ysz_ebpvd:.3f} W/(m·K)  @ {T_ref_tbc:.0f} K")
-    print(f"  Liner thickness    : {t_wall * 1e3:.1f} mm")
-    print(f"  TBC thickness      : {t_tbc * 1e6:.0f} µm")
-
-    # -----------------------------------------------------------------------
-    # Operating conditions
+    # Fixed operating conditions
     # -----------------------------------------------------------------------
     PR = 20.0
-    P_cool = PR * 101325.0  # Pa  compressor delivery pressure
-    T_cool = 667.0  # K   compressor exit temperature (isentropic, PR=20)
+    P2 = PR * 101325.0  # Pa  compressor delivery pressure
+    T2 = 667.0  # K   compressor exit (isentropic, PR=20)
     RH_in = 0.60  # relative humidity at compressor inlet
-    T_inlet = 288.15  # K   ISA sea level
-    P_inlet = 101325.0  # Pa
+    dP_burner_frac = 0.04  # burner dP/P (4 %, typical modern GT)
+    phi_overall = 0.50  # overall equivalence ratio -> COT ~1758 K
+    D_ann = 0.30  # m   combustor annulus hydraulic diameter
+    u_hot_ann = 25.0  # m/s mean hot-gas velocity in annulus
 
-    X_cool = ca.humid_air_composition(T_inlet, P_inlet, RH_in)
-
-    # Hot gas: CH4/air combustion at phi=0.50 -> COT ~1758 K
-    # (COT = Combustor Outlet Temperature; TIT is lower after dilution cooling)
-    phi_comb = 0.50
+    X_cool = ca.humid_air_composition(288.15, 101325.0, RH_in)
     X_air = ca.standard_dry_air_composition()
     X_ch4 = sp.empty()
     X_ch4[sp.indices["CH4"]] = 1.0
 
-    air = ca.Stream()
-    air.T, air.P, air.X, air.mdot = T_cool, P_cool, X_air, 1.0
-    fuel = ca.Stream()
-    fuel.T, fuel.P, fuel.X = 300.0, P_cool, X_ch4
-    fuel = ca.set_fuel_stream_for_phi(phi_comb, fuel, air)
-    mixed = ca.mix([fuel, air])
-    burned = ca.complete_combustion(mixed.T, mixed.X, mixed.P)
-
-    T_hot = burned.T
-    X_hot = burned.X
-    P_hot = P_cool * (1.0 - 0.04)  # 4% burner pressure loss
-
-    print("\n--- Operating Conditions ---")
-    print(f"  Compressor exit  : T = {T_cool:.1f} K,  P = {P_cool / 1e5:.1f} bar")
-    print(f"  Coolant          : humid air (RH={RH_in:.0%} at inlet)")
-    print(f"  Combustor exit   : T = {T_hot:.1f} K  (COT),  phi = {phi_comb:.2f}")
-    print(f"  Burner dP/P      : 4 %   ->  P_hot = {P_hot / 1e5:.2f} bar")
-    print(f"  Metal limit      : {T_metal_limit - 273.15:.0f} °C")
+    # Fuel flow fixed for phi_overall on total air (1 kg/s reference)
+    mdot_total = 1.0
+    air_ref = ca.Stream()
+    air_ref.T, air_ref.P, air_ref.X, air_ref.mdot = T2, P2, X_air, mdot_total
+    fuel_ref = ca.Stream()
+    fuel_ref.T, fuel_ref.P, fuel_ref.X = 300.0, P2, X_ch4
+    fuel_ref = ca.set_fuel_stream_for_phi(phi_overall, fuel_ref, air_ref)
+    mdot_fuel = fuel_ref.mdot
 
     # -----------------------------------------------------------------------
-    # Geometry
+    # Channel geometry
     # -----------------------------------------------------------------------
-    # Combustor annulus (hot side)
-    D_annulus = 0.30  # m  hydraulic diameter of combustor annulus
-    u_hot = 25.0  # m/s  mean hot-gas velocity in combustor
-
-    # Cooling channel geometry (per liner panel)
-    D_ch = 0.008  # m  hydraulic diameter of cooling channel
-    L_ch = 0.35  # m  channel length (liner axial extent)
-    u_cool = 60.0  # m/s  coolant velocity
+    D_ch = 0.008  # m   hydraulic diameter of each cooling channel
+    L_ch = 0.35  # m   channel length (liner axial extent)
+    N_ch = 8  # number of parallel channels per liner panel
+    A_ch_total = N_ch * np.pi * (D_ch / 2) ** 2  # total flow area
 
     # -----------------------------------------------------------------------
-    # Hot-side HTC
+    # Materials
     # -----------------------------------------------------------------------
-    h_hot = hot_side_htc(T_hot, P_hot, X_hot, D_annulus, u_hot)
-    print("\n--- Hot-Side Convection ---")
-    print(f"  D_annulus = {D_annulus * 1e3:.0f} mm,  u_hot = {u_hot:.0f} m/s")
-    print(f"  h_hot     = {h_hot:.1f} W/(m²·K)")
+    T_metal_limit = 1073.15  # K = 800 °C
+    k_inconel = ca.k_inconel718(900.0)
+    k_ysz_fresh = ca.k_tbc_ysz(1200.0, hours=0.0, is_ebpvd=False)
+    k_ysz_aged = ca.k_tbc_ysz(1200.0, hours=1000.0, is_ebpvd=False)
+    k_ysz_ebpvd = ca.k_tbc_ysz(1200.0, hours=0.0, is_ebpvd=True)
+    t_wall = 0.003  # m  Inconel liner thickness
+    t_tbc = 0.0003  # m  TBC thickness (300 µm)
 
-    # -----------------------------------------------------------------------
-    # Coolant-side channels
-    # -----------------------------------------------------------------------
-    channels = {
-        "Smooth": ca.channel_smooth(T_cool, P_cool, X_cool, u_cool, D_ch, L_ch),
-        "Ribbed (e/D=0.07, P/e=8, 60°)": ca.channel_ribbed(
-            T_cool, P_cool, X_cool, u_cool, D_ch, L_ch, e_D=0.07, P_e=8.0, alpha=60.0
-        ),
-        "Dimpled (d/Dh=0.2, h/d=0.2, S/d=2)": ca.channel_dimpled(
-            T_cool, P_cool, X_cool, u_cool, D_ch, L_ch, d_Dh=0.20, h_d=0.20, S_d=2.0
-        ),
-    }
-
-    print("\n--- Coolant Channel Performance ---")
-    print(f"  D_h = {D_ch * 1e3:.1f} mm,  L = {L_ch * 1e3:.0f} mm,  u = {u_cool:.0f} m/s")
-    print(f"\n  {'Channel':40s}  {'Re':>8}  {'Nu':>6}  {'h [W/m²K]':>11}  {'dP [kPa]':>9}")
-    print(f"  {'-' * 40}  {'-' * 8}  {'-' * 6}  {'-' * 11}  {'-' * 9}")
-    for name, r in channels.items():
-        print(f"  {name:40s}  {r.Re:8.0f}  {r.Nu:6.1f}  {r.h:11.1f}  {r.dP / 1e3:9.2f}")
-
-    # -----------------------------------------------------------------------
-    # Wall temperature analysis: 4 configurations per channel type
-    # -----------------------------------------------------------------------
     wall_configs = {
         "Inconel only": [(t_wall, k_inconel)],
         "Inconel + YSZ APS (fresh)": [(t_tbc, k_ysz_fresh), (t_wall, k_inconel)],
@@ -198,125 +164,217 @@ def main() -> None:
         "Inconel + YSZ EB-PVD": [(t_tbc, k_ysz_ebpvd), (t_wall, k_inconel)],
     }
 
-    print(f"\n--- Wall Temperature Analysis (T_hot={T_hot:.0f} K, T_cool={T_cool:.0f} K) ---")
-    print("  Layers listed hot-side first.")
-    print()
+    print(f"\nAvailable materials : {ca.list_materials()}")
+    print(f"Inconel 718  k      : {k_inconel:.2f} W/(m·K)  @ 900 K")
+    print(f"YSZ APS fresh k     : {k_ysz_fresh:.3f} W/(m·K)  @ 1200 K")
+    print(f"YSZ APS 1000h k     : {k_ysz_aged:.3f} W/(m·K)  @ 1200 K")
+    print(f"YSZ EB-PVD k        : {k_ysz_ebpvd:.3f} W/(m·K)  @ 1200 K")
+    print(f"\nLiner: {t_wall * 1e3:.1f} mm Inconel,  TBC: {t_tbc * 1e6:.0f} µm YSZ")
+    print(f"Channels: {N_ch} parallel, D_h={D_ch * 1e3:.1f} mm, L={L_ch * 1e3:.0f} mm")
+    print(f"Metal limit: {T_metal_limit - 273.15:.0f} °C")
 
-    # Store results for plotting
-    results: dict[str, dict] = {}
+    # -----------------------------------------------------------------------
+    # Bypass sweep: f_cool = 0.05 … 0.35
+    # -----------------------------------------------------------------------
+    f_cool_vals = np.linspace(0.05, 0.35, 25)
+    channel_names = ["Smooth", "Ribbed", "Dimpled"]
 
-    for ch_name, ch_res in channels.items():
-        h_cool = ch_res.h
-        results[ch_name] = {}
-        print(f"  Channel: {ch_name}")
-        print(
-            f"  {'Wall config':35s}  {'T_hot-surf [°C]':>16}  {'T_metal [°C]':>13}  {'q [kW/m²]':>10}  {'OK?':>5}"
-        )
-        print(f"  {'-' * 35}  {'-' * 16}  {'-' * 13}  {'-' * 10}  {'-' * 5}")
-        for cfg_name, layers in wall_configs.items():
-            temps, q = wall_stack_temps(T_hot, T_cool, h_hot, h_cool, layers)
-            # temps[0] = hot-gas-side wall surface, temps[-1] = coolant-side surface
-            T_hot_surf = temps[0]  # hot face (TBC outer surface if TBC present)
-            # temps layout: [T_hot_wall, ...interfaces..., T_cool_wall]
-            # With TBC: [T_tbc_hot, T_tbc_cool=T_metal_hot, T_metal_cool]
-            # Without:  [T_metal_hot, T_metal_cool]
-            T_metal_hot = temps[1] if len(temps) > 2 else temps[0]
-            ok = "OK" if T_metal_hot < T_metal_limit else "FAIL"
-            results[ch_name][cfg_name] = {
-                "temps": temps,
-                "q": q,
-                "T_hot_surf": T_hot_surf,
-                "T_metal_hot": T_metal_hot,
-            }
-            print(
-                f"  {cfg_name:35s}  {T_hot_surf - 273.15:16.1f}  "
-                f"{T_metal_hot - 273.15:13.1f}  {q / 1e3:10.2f}  {ok:>5}"
+    # Storage: [channel][f_cool_idx] -> dict
+    sweep: dict[str, list[dict]] = {n: [] for n in channel_names}
+
+    rho_cool = ca.density(T2, P2, X_cool)
+
+    for f_cool in f_cool_vals:
+        mdot_cool = f_cool * mdot_total
+        mdot_bypass = (1.0 - f_cool) * mdot_total
+        u_cool = mdot_cool / (rho_cool * A_ch_total)
+
+        # Combustor inlet: mix coolant exit (≈T2, small heating) + bypass + fuel
+        cool_s = ca.Stream()
+        cool_s.T, cool_s.P, cool_s.X, cool_s.mdot = T2, P2, X_cool, mdot_cool
+        byp_s = ca.Stream()
+        byp_s.T, byp_s.P, byp_s.X, byp_s.mdot = T2, P2, X_air, mdot_bypass
+        fuel_s = ca.Stream()
+        fuel_s.T, fuel_s.P, fuel_s.X, fuel_s.mdot = 300.0, P2, X_ch4, mdot_fuel
+        mixed_in = ca.mix([cool_s, byp_s, fuel_s])
+        burned = ca.complete_combustion(mixed_in.T, mixed_in.X, mixed_in.P)
+        T_hot = burned.T
+        X_hot = burned.X
+        P_hot = P2 * (1.0 - dP_burner_frac)
+
+        h_hot = hot_side_htc(T_hot, P_hot, X_hot, D_ann, u_hot_ann)
+
+        for ch_name in channel_names:
+            r = channel_result(ch_name, T2, P2, X_cool, u_cool, D_ch, L_ch)
+
+            # Wall temperatures for each wall config
+            wall_res = {}
+            for cfg_name, layers in wall_configs.items():
+                temps, q = wall_temps(T_hot, T2, h_hot, r.h, layers)
+                T_hot_surf = temps[0]
+                T_metal_hot = temps[1] if len(temps) > 2 else temps[0]
+                wall_res[cfg_name] = {
+                    "T_hot_surf": T_hot_surf,
+                    "T_metal_hot": T_metal_hot,
+                    "q": q,
+                }
+
+            dP_total_frac = (dP_burner_frac * P2 + r.dP) / P2 * 100.0
+
+            sweep[ch_name].append(
+                {
+                    "f_cool": f_cool,
+                    "u_cool": u_cool,
+                    "h_cool": r.h,
+                    "Re": r.Re,
+                    "Nu": r.Nu,
+                    "dP_cool": r.dP,
+                    "dP_total_frac": dP_total_frac,
+                    "T_hot": T_hot,
+                    "h_hot": h_hot,
+                    "wall": wall_res,
+                }
             )
-        print()
 
     # -----------------------------------------------------------------------
-    # Pressure budget
+    # Print summary table at f_cool = 0.10, 0.15, 0.20
     # -----------------------------------------------------------------------
-    dP_burner = 0.04 * P_cool
-    print("--- Pressure Budget ---")
-    print(f"  Burner dP/P = 4%  ->  dP_burner = {dP_burner / 1e3:.1f} kPa")
-    print(f"\n  {'Channel':40s}  {'dP_cool [kPa]':>14}  {'dP_cool/dP_burner':>18}")
-    print(f"  {'-' * 40}  {'-' * 14}  {'-' * 18}")
-    for name, r in channels.items():
-        frac = r.dP / dP_burner
-        print(f"  {name:40s}  {r.dP / 1e3:14.2f}  {frac:18.3f}")
+    print(f"\n{'=' * 70}")
+    print("Bypass Sweep Summary  (Inconel only, no TBC)")
+    print(f"{'=' * 70}")
+    hdr = f"  {'f_cool':>7}  {'u [m/s]':>8}  {'h_cool':>7}  {'COT [K]':>8}  "
+    hdr += f"{'T_metal [°C]':>13}  {'dP_cool [kPa]':>14}  {'dP_tot/P [%]':>13}"
+    print(hdr)
+    print("  " + "-" * (len(hdr) - 2))
+
+    for ch_name in channel_names:
+        print(f"\n  Channel: {ch_name}")
+        for pt in sweep[ch_name]:
+            T_m = pt["wall"]["Inconel only"]["T_metal_hot"]
+            ok = "" if T_m < T_metal_limit else " !"
+            print(
+                f"  {pt['f_cool']:7.2f}  {pt['u_cool']:8.1f}  {pt['h_cool']:7.0f}"
+                f"  {pt['T_hot']:8.1f}  {T_m - 273.15:13.1f}{ok}"
+                f"  {pt['dP_cool'] / 1e3:14.2f}  {pt['dP_total_frac']:13.2f}"
+            )
+
+    # -----------------------------------------------------------------------
+    # Find minimum f_cool to meet T_metal < 800 °C per channel × wall config
+    # -----------------------------------------------------------------------
+    print(f"\n{'=' * 70}")
+    print("Minimum bypass fraction to achieve T_metal < 800 °C")
+    print(f"{'=' * 70}")
+    print(f"  {'Channel':10s}  {'Wall config':35s}  {'f_cool_min':>10}  {'dP_tot/P [%]':>13}")
+    print(f"  {'-' * 10}  {'-' * 35}  {'-' * 10}  {'-' * 13}")
+
+    design_points: dict[str, dict[str, dict]] = {}
+    for ch_name in channel_names:
+        design_points[ch_name] = {}
+        for cfg_name in wall_configs:
+            f_min = None
+            for pt in sweep[ch_name]:
+                T_m = pt["wall"][cfg_name]["T_metal_hot"]
+                if T_m < T_metal_limit:
+                    f_min = pt["f_cool"]
+                    dp = pt["dP_total_frac"]
+                    design_points[ch_name][cfg_name] = pt
+                    break
+            if f_min is not None:
+                print(f"  {ch_name:10s}  {cfg_name:35s}  {f_min:10.2f}  {dp:13.2f}")
+            else:
+                print(f"  {ch_name:10s}  {cfg_name:35s}  {'NOT MET':>10}  {'---':>13}")
 
     # -----------------------------------------------------------------------
     # Plots
     # -----------------------------------------------------------------------
-    fig, axes = plt.subplots(1, 3, figsize=(16, 5))
+    colors = {"Smooth": "steelblue", "Ribbed": "darkorange", "Dimpled": "green"}
+    cfg_plot = "Inconel only"  # wall config shown in sweep plots
+
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     fig.suptitle(
-        f"Combustor Liner Cooling  (COT={T_hot:.0f} K, PR={PR:.0f}, phi={phi_comb:.2f})",
-        fontsize=13,
+        f"Combustor Liner Cooling — Bypass Sweep\n"
+        f"PR={PR:.0f}, phi={phi_overall:.2f}, {N_ch} channels D_h={D_ch * 1e3:.0f} mm, "
+        f"dP_burner/P={dP_burner_frac * 100:.0f}%",
+        fontsize=12,
     )
 
-    ch_names = list(channels.keys())
-    cfg_names = list(wall_configs.keys())
-    x_ch = np.arange(len(ch_names))
-    width = 0.2
-
-    # --- Plot 1: Metal hot-face temperature per channel × wall config ---
-    ax = axes[0]
-    for i, cfg in enumerate(cfg_names):
-        T_vals = [results[ch][cfg]["T_metal_hot"] - 273.15 for ch in ch_names]
-        ax.bar(x_ch + i * width, T_vals, width, label=cfg)
+    # --- Plot 1: T_metal vs f_cool ---
+    ax = axes[0, 0]
+    for ch_name in channel_names:
+        f_vals = [pt["f_cool"] for pt in sweep[ch_name]]
+        T_vals = [pt["wall"][cfg_plot]["T_metal_hot"] - 273.15 for pt in sweep[ch_name]]
+        ax.plot(f_vals, T_vals, color=colors[ch_name], label=ch_name)
     ax.axhline(
         T_metal_limit - 273.15,
         color="red",
         linestyle="--",
-        linewidth=1.5,
         label=f"Limit {T_metal_limit - 273.15:.0f} °C",
     )
-    ax.set_xticks(x_ch + width * 1.5)
-    ax.set_xticklabels([n.split("(")[0].strip() for n in ch_names], fontsize=9)
+    ax.set_xlabel("Bypass fraction f_cool [-]")
     ax.set_ylabel("Metal hot-face temperature [°C]")
-    ax.set_title("Metal Temperature")
-    ax.legend(fontsize=7)
-    ax.grid(True, alpha=0.3, axis="y")
+    ax.set_title(f"Metal Temperature ({cfg_plot})")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
 
-    # --- Plot 2: Heat flux per channel × wall config ---
-    ax = axes[1]
-    for i, cfg in enumerate(cfg_names):
-        q_vals = [results[ch][cfg]["q"] / 1e3 for ch in ch_names]
-        ax.bar(x_ch + i * width, q_vals, width, label=cfg)
-    ax.set_xticks(x_ch + width * 1.5)
-    ax.set_xticklabels([n.split("(")[0].strip() for n in ch_names], fontsize=9)
-    ax.set_ylabel("Wall heat flux [kW/m²]")
-    ax.set_title("Heat Flux Through Wall")
-    ax.legend(fontsize=7)
-    ax.grid(True, alpha=0.3, axis="y")
-
-    # --- Plot 3: Pressure drop comparison ---
-    ax = axes[2]
-    dP_vals = [channels[n].dP / 1e3 for n in ch_names]
-    bars = ax.bar(x_ch, dP_vals, 0.5, color=["steelblue", "darkorange", "green"])
+    # --- Plot 2: Total dP/P vs f_cool ---
+    ax = axes[0, 1]
+    for ch_name in channel_names:
+        f_vals = [pt["f_cool"] for pt in sweep[ch_name]]
+        dp_vals = [pt["dP_total_frac"] for pt in sweep[ch_name]]
+        ax.plot(f_vals, dp_vals, color=colors[ch_name], label=ch_name)
     ax.axhline(
-        dP_burner / 1e3,
+        dP_burner_frac * 100,
+        color="gray",
+        linestyle=":",
+        label=f"Burner only {dP_burner_frac * 100:.0f}%",
+    )
+    ax.set_xlabel("Bypass fraction f_cool [-]")
+    ax.set_ylabel("Total dP/P [%]")
+    ax.set_title("Counterflow Pressure Budget\n(dP_burner + dP_cool) / P")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+
+    # --- Plot 3: COT vs f_cool (coupling effect) ---
+    ax = axes[1, 0]
+    for ch_name in channel_names:
+        f_vals = [pt["f_cool"] for pt in sweep[ch_name]]
+        cot_vals = [pt["T_hot"] for pt in sweep[ch_name]]
+        ax.plot(f_vals, cot_vals, color=colors[ch_name], label=ch_name)
+    ax.set_xlabel("Bypass fraction f_cool [-]")
+    ax.set_ylabel("Combustor outlet temperature [K]")
+    ax.set_title("COT vs Bypass Fraction\n(more bypass → slightly lower COT)")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+
+    # --- Plot 4: T_metal at design f_cool_min per wall config ---
+    ax = axes[1, 1]
+    cfg_names = list(wall_configs.keys())
+    x = np.arange(len(cfg_names))
+    width = 0.25
+    for i, ch_name in enumerate(channel_names):
+        T_vals = []
+        for cfg_name in cfg_names:
+            if cfg_name in design_points[ch_name]:
+                pt = design_points[ch_name][cfg_name]
+                T_vals.append(pt["wall"][cfg_name]["T_metal_hot"] - 273.15)
+            else:
+                T_vals.append(float("nan"))
+        ax.bar(x + i * width, T_vals, width, color=colors[ch_name], label=ch_name, alpha=0.85)
+    ax.axhline(
+        T_metal_limit - 273.15,
         color="red",
         linestyle="--",
-        linewidth=1.5,
-        label=f"Burner dP = {dP_burner / 1e3:.1f} kPa",
+        label=f"Limit {T_metal_limit - 273.15:.0f} °C",
     )
-    ax.set_xticks(x_ch)
-    ax.set_xticklabels([n.split("(")[0].strip() for n in ch_names], fontsize=9)
-    ax.set_ylabel("Coolant channel dP [kPa]")
-    ax.set_title("Pressure Drop")
+    ax.set_xticks(x + width)
+    ax.set_xticklabels(
+        [c.replace(" + ", "\n+\n").replace(" (", "\n(") for c in cfg_names],
+        fontsize=7,
+    )
+    ax.set_ylabel("Metal temperature at f_cool_min [°C]")
+    ax.set_title("Metal Temp at Minimum Bypass\n(per channel × wall config)")
     ax.legend(fontsize=8)
     ax.grid(True, alpha=0.3, axis="y")
-    for bar, val in zip(bars, dP_vals, strict=True):
-        ax.text(
-            bar.get_x() + bar.get_width() / 2,
-            val + 0.5,
-            f"{val:.1f}",
-            ha="center",
-            va="bottom",
-            fontsize=8,
-        )
 
     plt.tight_layout()
     if plt.get_backend().lower() == "agg":
