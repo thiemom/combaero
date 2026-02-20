@@ -9,37 +9,47 @@ namespace combaero::cooling {
 // Rib-Enhanced Cooling
 // -------------------------------------------------------------
 
-// Rib enhancement factor for heat transfer
-// Accounts for increased surface area and turbulence from ribs
+// Rib enhancement factor for heat transfer (geometry-only, Re-independent)
+// Accounts for increased surface area and turbulence from ribs.
 //
 // Parameters:
-//   e_D   : rib height to hydraulic diameter ratio [-]
-//   P_e   : rib pitch to rib height ratio [-]
-//   alpha : rib angle [degrees]
+//   e_D            : rib height / hydraulic diameter [-]
+//   pitch_to_height: rib pitch / rib height [-]
+//   alpha_deg      : rib angle [deg]
 //
-// Returns: Enhancement factor [-] (typically 1.5-4.0)
+// Returns: Enhancement factor Nu_rib/Nu_smooth [-]
 //
 // Source: Han et al. (1988), "Heat Transfer and Friction in Channels
 //         with Two Opposite Rib-Roughened Walls"
-// Valid: e_D = 0.02-0.1, P_e = 5-20, alpha = 30-90 deg
-double rib_enhancement_factor(double e_D, double P_e, double alpha);
+// Valid: e_D = 0.02-0.1, pitch_to_height = 5-20, alpha_deg = 30-90 deg
+double rib_enhancement_factor(double e_D, double pitch_to_height, double alpha_deg);
 
-// Re-dependent overload: uses roughness Reynolds number e+ for physically
-// correct Re-dependence (high enhancement at low Re, decays at high Re).
-double rib_enhancement_factor(double e_D, double P_e, double alpha, double Re);
-
-// Rib friction factor multiplier
-// Accounts for increased pressure drop from ribs
+// Rib enhancement factor (Re-dependent, Han 1988 roughness-function method).
+// Uses Serghides friction factor, roughness Reynolds number e+ = (e/D)*Re*sqrt(f/8),
+// and Han's g(e+, Pr) heat transfer function with angle correction.
+// Physically correct Re-dependence: higher enhancement at lower Re.
 //
 // Parameters:
-//   e_D   : rib height to hydraulic diameter ratio [-]
-//   P_e   : rib pitch to rib height ratio [-]
+//   e_D            : rib height / hydraulic diameter [-]
+//   pitch_to_height: rib pitch / rib height [-]
+//   alpha_deg      : rib angle [deg]
+//   Re             : channel Reynolds number [-]
 //
-// Returns: Friction multiplier [-] (typically 2-10)
+// Valid: Re = 10000-100000, e_D = 0.02-0.1, pitch_to_height = 5-20, alpha_deg = 30-90
+double rib_enhancement_factor(double e_D, double pitch_to_height, double alpha_deg, double Re);
+
+// Rib friction factor multiplier
+// Accounts for increased pressure drop from ribs.
+//
+// Parameters:
+//   e_D            : rib height / hydraulic diameter [-]
+//   pitch_to_height: rib pitch / rib height [-]
+//
+// Returns: Friction multiplier f_rib/f_smooth [-]
 //
 // Source: Han et al. (1988)
-// Valid: e_D = 0.02-0.1, P_e = 5-20
-double rib_friction_multiplier(double e_D, double P_e);
+// Valid: e_D = 0.02-0.1, pitch_to_height = 5-20
+double rib_friction_multiplier(double e_D, double pitch_to_height);
 
 // -------------------------------------------------------------
 // Impingement Cooling
@@ -298,8 +308,8 @@ double cooled_wall_heat_flux(double T_hot, double T_coolant,
                              double eta,
                              double t_wall, double k_wall);
 
-void validate_rib_params(double e_D, double P_e);
-void validate_rib_params(double e_D, double P_e, double alpha);
+void validate_rib_params(double e_D, double pitch_to_height);
+void validate_rib_params(double e_D, double pitch_to_height, double alpha_deg);
 void validate_impingement_params(double Re_jet, double z_D, double x_D, double y_D);
 void validate_film_cooling_params(double M, double DR, double alpha_deg);
 void validate_effusion_params(double M, double DR, double porosity, double s_D, double alpha_deg);

@@ -83,8 +83,9 @@ inline constexpr Entry function_units[] = {
     // -------------------------------------------------------------------------
     // cooling_correlations.h - Advanced Cooling Correlations
     // -------------------------------------------------------------------------
-    {"rib_enhancement_factor",  "e_D: -, P_e: -, alpha: deg",           "-"},
-    {"rib_friction_multiplier", "e_D: -, P_e: -",                       "-"},
+    {"rib_enhancement_factor",    "e_D: -, pitch_to_height: -, alpha_deg: deg",        "-"},
+    {"rib_enhancement_factor_re", "e_D: -, pitch_to_height: -, alpha_deg: deg, Re: -", "-"},
+    {"rib_friction_multiplier",   "e_D: -, pitch_to_height: -",                        "-"},
     {"impingement_nusselt",     "Re_jet: -, Pr: -, z_D: -, x_D: - (default 0), y_D: - (default 0)", "-"},
     {"film_cooling_effectiveness", "x_D: -, M: -, DR: -, alpha_deg: deg", "-"},
     {"film_cooling_effectiveness_avg", "x_D: -, M: -, DR: -, alpha_deg: deg, s_D: - (default 3.0)", "-"},
@@ -427,7 +428,7 @@ inline constexpr Entry function_units[] = {
     // heat_transfer.h - Channel flow functions (HTC + pressure drop)
     // -------------------------------------------------------------------------
     {"channel_smooth",      "T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, T_wall: K", "ChannelResult"},
-    {"channel_ribbed",      "T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, e_D: -, P_e: -, alpha: deg, T_wall: K", "ChannelResult"},
+    {"channel_ribbed",      "T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, e_D: -, pitch_to_height: -, alpha_deg: deg, T_wall: K", "ChannelResult"},
     {"channel_dimpled",     "T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, d_Dh: -, h_d: -, S_d: -, T_wall: K", "ChannelResult"},
     {"channel_pin_fin",     "T: K, P: Pa, X: mol/mol, velocity: m/s, channel_height: m, pin_diameter: m, S_D: -, X_D: -, N_rows: -, T_wall: K", "ChannelResult"},
     {"channel_impingement", "T: K, P: Pa, X: mol/mol, mdot_jet: kg/s, d_jet: m, z_D: -, x_D: -, y_D: -, A_target: m^2, T_wall: K", "ChannelResult"},

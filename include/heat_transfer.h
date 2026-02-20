@@ -575,13 +575,13 @@ ChannelResult channel_smooth(
 // from a smooth-pipe baseline at the same Re.
 //
 // Parameters:
-//   e_D   : rib height / hydraulic diameter [-]  (valid: 0.02-0.1)
-//   P_e   : rib pitch / rib height [-]           (valid: 5-20)
-//   alpha : rib angle [degrees]                  (valid: 30-90)
+//   e_D            : rib height / hydraulic diameter [-]  (valid: 0.02-0.1)
+//   pitch_to_height: rib pitch / rib height [-]           (valid: 5-20)
+//   alpha_deg      : rib angle [deg]                      (valid: 30-90)
 ChannelResult channel_ribbed(
     double T, double P, const std::vector<double>& X,
     double velocity, double diameter, double length,
-    double e_D, double P_e, double alpha,
+    double e_D, double pitch_to_height, double alpha_deg,
     double T_wall = std::numeric_limits<double>::quiet_NaN(),
     bool heating = true);
 

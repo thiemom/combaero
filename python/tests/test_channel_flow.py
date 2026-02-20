@@ -159,7 +159,9 @@ class TestChannelRibbed:
         D = 0.01
         L = 0.5
         sol_smooth = cb.channel_smooth(T_AIR, P_AIR, X_AIR, v, D, L)
-        sol_ribbed = cb.channel_ribbed(T_AIR, P_AIR, X_AIR, v, D, L, e_D=0.05, P_e=10.0, alpha=90.0)
+        sol_ribbed = cb.channel_ribbed(
+            T_AIR, P_AIR, X_AIR, v, D, L, e_D=0.05, pitch_to_height=10.0, alpha_deg=90.0
+        )
         assert sol_ribbed.Nu > sol_smooth.Nu
         assert sol_ribbed.h > sol_smooth.h
 
@@ -169,14 +171,25 @@ class TestChannelRibbed:
         D = 0.01
         L = 0.5
         sol_smooth = cb.channel_smooth(T_AIR, P_AIR, X_AIR, v, D, L)
-        sol_ribbed = cb.channel_ribbed(T_AIR, P_AIR, X_AIR, v, D, L, e_D=0.05, P_e=10.0, alpha=90.0)
+        sol_ribbed = cb.channel_ribbed(
+            T_AIR, P_AIR, X_AIR, v, D, L, e_D=0.05, pitch_to_height=10.0, alpha_deg=90.0
+        )
         assert sol_ribbed.dP > sol_smooth.dP
         assert sol_ribbed.f > sol_smooth.f
 
     def test_q_with_T_wall(self):
         T_wall = 800.0
         sol = cb.channel_ribbed(
-            T_AIR, P_AIR, X_AIR, 20.0, 0.01, 0.5, e_D=0.05, P_e=10.0, alpha=90.0, T_wall=T_wall
+            T_AIR,
+            P_AIR,
+            X_AIR,
+            20.0,
+            0.01,
+            0.5,
+            e_D=0.05,
+            pitch_to_height=10.0,
+            alpha_deg=90.0,
+            T_wall=T_wall,
         )
         assert math.isfinite(sol.q)
         assert sol.q == pytest.approx(sol.h * (sol.T_aw - T_wall), rel=1e-9)
@@ -184,15 +197,21 @@ class TestChannelRibbed:
     def test_higher_rib_height_more_enhancement(self):
         """Higher e_D should give more Nu enhancement."""
         v, D, L = 20.0, 0.01, 0.5
-        sol_low = cb.channel_ribbed(T_AIR, P_AIR, X_AIR, v, D, L, e_D=0.03, P_e=10.0, alpha=90.0)
-        sol_high = cb.channel_ribbed(T_AIR, P_AIR, X_AIR, v, D, L, e_D=0.08, P_e=10.0, alpha=90.0)
+        sol_low = cb.channel_ribbed(
+            T_AIR, P_AIR, X_AIR, v, D, L, e_D=0.03, pitch_to_height=10.0, alpha_deg=90.0
+        )
+        sol_high = cb.channel_ribbed(
+            T_AIR, P_AIR, X_AIR, v, D, L, e_D=0.08, pitch_to_height=10.0, alpha_deg=90.0
+        )
         assert sol_high.Nu > sol_low.Nu
 
     def test_re_same_as_smooth(self):
         """Re should be the same as smooth-pipe baseline (same fluid, same velocity)."""
         v, D, L = 20.0, 0.01, 0.5
         sol_smooth = cb.channel_smooth(T_AIR, P_AIR, X_AIR, v, D, L)
-        sol_ribbed = cb.channel_ribbed(T_AIR, P_AIR, X_AIR, v, D, L, e_D=0.05, P_e=10.0, alpha=90.0)
+        sol_ribbed = cb.channel_ribbed(
+            T_AIR, P_AIR, X_AIR, v, D, L, e_D=0.05, pitch_to_height=10.0, alpha_deg=90.0
+        )
         assert sol_ribbed.Re == pytest.approx(sol_smooth.Re, rel=1e-6)
 
 
@@ -482,7 +501,17 @@ class TestHeatTransferSubmodule:
         assert sol_sub.q == pytest.approx(sol_direct.q, rel=1e-9)
 
     def test_ribbed_returns_channel_result(self):
-        sol = ht.ribbed(T_AIR, P_AIR, X_AIR, u=20.0, L=0.5, D=0.01, e_D=0.05, P_e=10.0, alpha=90.0)
+        sol = ht.ribbed(
+            T_AIR,
+            P_AIR,
+            X_AIR,
+            u=20.0,
+            L=0.5,
+            D=0.01,
+            e_D=0.05,
+            pitch_to_height=10.0,
+            alpha_deg=90.0,
+        )
         assert isinstance(sol, cb.ChannelResult)
 
     def test_dimpled_returns_channel_result(self):

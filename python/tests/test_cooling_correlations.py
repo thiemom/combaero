@@ -20,22 +20,28 @@ class TestRibEnhancedCooling:
     def test_rib_enhancement_baseline(self):
         """Test rib enhancement at baseline conditions."""
         e_D = 0.05
-        P_e = 10.0
-        alpha = 90.0
+        pitch_to_height = 10.0
+        alpha_deg = 90.0
 
-        enhancement = cb.rib_enhancement_factor(e_D, P_e, alpha)
+        enhancement = cb.rib_enhancement_factor(e_D, pitch_to_height, alpha_deg)
 
         # Should give enhancement > 1 (correlation gives ~1.0-3.5 range)
         assert 1.0 < enhancement < 4.0
 
     def test_rib_enhancement_increases_with_height(self):
         """Test that enhancement increases with rib height."""
-        P_e = 10.0
-        alpha = 90.0
+        pitch_to_height = 10.0
+        alpha_deg = 90.0
 
-        enh_low = cb.rib_enhancement_factor(e_D=0.02, P_e=P_e, alpha=alpha)
-        enh_mid = cb.rib_enhancement_factor(e_D=0.05, P_e=P_e, alpha=alpha)
-        enh_high = cb.rib_enhancement_factor(e_D=0.08, P_e=P_e, alpha=alpha)
+        enh_low = cb.rib_enhancement_factor(
+            e_D=0.02, pitch_to_height=pitch_to_height, alpha_deg=alpha_deg
+        )
+        enh_mid = cb.rib_enhancement_factor(
+            e_D=0.05, pitch_to_height=pitch_to_height, alpha_deg=alpha_deg
+        )
+        enh_high = cb.rib_enhancement_factor(
+            e_D=0.08, pitch_to_height=pitch_to_height, alpha_deg=alpha_deg
+        )
 
         assert enh_mid > enh_low
         assert enh_high > enh_mid
@@ -43,11 +49,11 @@ class TestRibEnhancedCooling:
     def test_rib_enhancement_angle_effect(self):
         """Test that 90-deg ribs are most effective."""
         e_D = 0.05
-        P_e = 10.0
+        pitch_to_height = 10.0
 
-        enh_30 = cb.rib_enhancement_factor(e_D, P_e, alpha=30)
-        enh_60 = cb.rib_enhancement_factor(e_D, P_e, alpha=60)
-        enh_90 = cb.rib_enhancement_factor(e_D, P_e, alpha=90)
+        enh_30 = cb.rib_enhancement_factor(e_D, pitch_to_height, alpha_deg=30)
+        enh_60 = cb.rib_enhancement_factor(e_D, pitch_to_height, alpha_deg=60)
+        enh_90 = cb.rib_enhancement_factor(e_D, pitch_to_height, alpha_deg=90)
 
         # 90-deg should be highest
         assert enh_90 > enh_60
@@ -58,40 +64,40 @@ class TestRibEnhancedCooling:
         # Valid range: e_D = 0.02-0.1, P_e = 5-20, alpha = 30-90
 
         with pytest.raises(RuntimeError):
-            cb.rib_enhancement_factor(e_D=0.01, P_e=10, alpha=90)
+            cb.rib_enhancement_factor(e_D=0.01, pitch_to_height=10, alpha_deg=90)
 
         with pytest.raises(RuntimeError):
-            cb.rib_enhancement_factor(e_D=0.15, P_e=10, alpha=90)
+            cb.rib_enhancement_factor(e_D=0.15, pitch_to_height=10, alpha_deg=90)
 
         with pytest.raises(RuntimeError):
-            cb.rib_enhancement_factor(e_D=0.05, P_e=3, alpha=90)
+            cb.rib_enhancement_factor(e_D=0.05, pitch_to_height=3, alpha_deg=90)
 
         with pytest.raises(RuntimeError):
-            cb.rib_enhancement_factor(e_D=0.05, P_e=25, alpha=90)
+            cb.rib_enhancement_factor(e_D=0.05, pitch_to_height=25, alpha_deg=90)
 
         with pytest.raises(RuntimeError):
-            cb.rib_enhancement_factor(e_D=0.05, P_e=10, alpha=20)
+            cb.rib_enhancement_factor(e_D=0.05, pitch_to_height=10, alpha_deg=20)
 
         with pytest.raises(RuntimeError):
-            cb.rib_enhancement_factor(e_D=0.05, P_e=10, alpha=100)
+            cb.rib_enhancement_factor(e_D=0.05, pitch_to_height=10, alpha_deg=100)
 
     def test_rib_friction_baseline(self):
         """Test rib friction multiplier at baseline conditions."""
         e_D = 0.05
-        P_e = 10.0
+        pitch_to_height = 10.0
 
-        multiplier = cb.rib_friction_multiplier(e_D, P_e)
+        multiplier = cb.rib_friction_multiplier(e_D, pitch_to_height)
 
         # Should give friction increase > 1 (correlation gives ~1.0-8.0 range)
         assert 1.0 < multiplier < 10.0
 
     def test_rib_friction_increases_with_height(self):
         """Test that friction increases with rib height."""
-        P_e = 10.0
+        pitch_to_height = 10.0
 
-        f_low = cb.rib_friction_multiplier(e_D=0.02, P_e=P_e)
-        f_mid = cb.rib_friction_multiplier(e_D=0.05, P_e=P_e)
-        f_high = cb.rib_friction_multiplier(e_D=0.08, P_e=P_e)
+        f_low = cb.rib_friction_multiplier(e_D=0.02, pitch_to_height=pitch_to_height)
+        f_mid = cb.rib_friction_multiplier(e_D=0.05, pitch_to_height=pitch_to_height)
+        f_high = cb.rib_friction_multiplier(e_D=0.08, pitch_to_height=pitch_to_height)
 
         assert f_mid > f_low
         assert f_high > f_mid
@@ -101,16 +107,16 @@ class TestRibEnhancedCooling:
         # Valid range: e_D = 0.02-0.1, P_e = 5-20
 
         with pytest.raises(RuntimeError):
-            cb.rib_friction_multiplier(e_D=0.01, P_e=10)
+            cb.rib_friction_multiplier(e_D=0.01, pitch_to_height=10)
 
         with pytest.raises(RuntimeError):
-            cb.rib_friction_multiplier(e_D=0.15, P_e=10)
+            cb.rib_friction_multiplier(e_D=0.15, pitch_to_height=10)
 
         with pytest.raises(RuntimeError):
-            cb.rib_friction_multiplier(e_D=0.05, P_e=3)
+            cb.rib_friction_multiplier(e_D=0.05, pitch_to_height=3)
 
         with pytest.raises(RuntimeError):
-            cb.rib_friction_multiplier(e_D=0.05, P_e=25)
+            cb.rib_friction_multiplier(e_D=0.05, pitch_to_height=25)
 
 
 class TestImpingementCooling:
@@ -577,11 +583,11 @@ class TestPhysicalConsistency:
     def test_rib_heat_vs_friction_tradeoff(self):
         """Test that ribs increase both heat transfer and friction."""
         e_D = 0.05
-        P_e = 10.0
-        alpha = 90.0
+        pitch_to_height = 10.0
+        alpha_deg = 90.0
 
-        enhancement = cb.rib_enhancement_factor(e_D, P_e, alpha)
-        friction = cb.rib_friction_multiplier(e_D, P_e)
+        enhancement = cb.rib_enhancement_factor(e_D, pitch_to_height, alpha_deg)
+        friction = cb.rib_friction_multiplier(e_D, pitch_to_height)
 
         # Both should be > 1 (increase from smooth channel)
         assert enhancement > 1.0

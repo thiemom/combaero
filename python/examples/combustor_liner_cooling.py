@@ -74,7 +74,7 @@ def channel_result(
     if name == "Smooth":
         return ca.channel_smooth(T, P, X, u, D_h, L)
     if name == "Ribbed":
-        return ca.channel_ribbed(T, P, X, u, D_h, L, e_D=0.07, P_e=8.0, alpha=60.0)
+        return ca.channel_ribbed(T, P, X, u, D_h, L, e_D=0.07, pitch_to_height=8.0, alpha_deg=60.0)
     if name == "Dimpled":
         return ca.channel_dimpled(T, P, X, u, D_h, L, d_Dh=0.20, h_d=0.20, S_d=2.0)
     raise ValueError(f"Unknown channel type: {name}")

@@ -880,7 +880,7 @@ ChannelResult channel_smooth(
 ChannelResult channel_ribbed(
     double T, double P, const std::vector<double>& X,
     double velocity, double diameter, double length,
-    double e_D, double P_e, double alpha,
+    double e_D, double pitch_to_height, double alpha_deg,
     double T_wall,
     bool heating)
 {
@@ -889,8 +889,8 @@ ChannelResult channel_ribbed(
                                         T_wall, "gnielinski", heating);
 
     // Apply rib multipliers
-    double enh = combaero::cooling::rib_enhancement_factor(e_D, P_e, alpha);
-    double fmul = combaero::cooling::rib_friction_multiplier(e_D, P_e);
+    double enh = combaero::cooling::rib_enhancement_factor(e_D, pitch_to_height, alpha_deg);
+    double fmul = combaero::cooling::rib_friction_multiplier(e_D, pitch_to_height);
 
     double Nu_rib = base.Nu * enh;
     double f_rib  = base.f  * fmul;

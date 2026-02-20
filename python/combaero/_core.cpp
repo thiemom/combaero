@@ -4512,16 +4512,16 @@ PYBIND11_MODULE(_core, m)
         static_cast<double(*)(double,double,double)>(
             &combaero::cooling::rib_enhancement_factor),
         py::arg("e_D"),
-        py::arg("P_e"),
-        py::arg("alpha"),
+        py::arg("pitch_to_height"),
+        py::arg("alpha_deg"),
         "Rib enhancement factor for heat transfer [-] (geometry only, Re-independent).\n\n"
         "Parameters:\n"
-        "  e_D   : rib height to hydraulic diameter ratio [-]\n"
-        "  P_e   : rib pitch to rib height ratio [-]\n"
-        "  alpha : rib angle [degrees]\n\n"
-        "Valid range: e_D = 0.02-0.1, P_e = 5-20, alpha = 30-90 deg\n"
+        "  e_D            : rib height / hydraulic diameter [-]\n"
+        "  pitch_to_height: rib pitch / rib height [-]\n"
+        "  alpha_deg      : rib angle [deg]\n\n"
+        "Valid range: e_D = 0.02-0.1, pitch_to_height = 5-20, alpha_deg = 30-90 deg\n"
         "Source: Han et al. (1988)\n\n"
-        "Returns: Enhancement factor [-]"
+        "Returns: Enhancement factor Nu_rib/Nu_smooth [-]"
     );
 
     m.def(
@@ -4529,35 +4529,35 @@ PYBIND11_MODULE(_core, m)
         static_cast<double(*)(double,double,double,double)>(
             &combaero::cooling::rib_enhancement_factor),
         py::arg("e_D"),
-        py::arg("P_e"),
-        py::arg("alpha"),
+        py::arg("pitch_to_height"),
+        py::arg("alpha_deg"),
         py::arg("Re"),
-        "Rib enhancement factor for heat transfer [-] (Re-dependent, Han 1988).\n\n"
-        "Uses roughness Reynolds number e+ = (e/D)*Re*sqrt(f/8) for physically\n"
-        "correct Re-dependence: high enhancement at low Re, decays at high Re.\n\n"
+        "Rib enhancement factor (Re-dependent, Han 1988 roughness-function method).\n\n"
+        "Uses Serghides f0, roughness Reynolds number e+ = (e/D)*Re*sqrt(f/8),\n"
+        "and Han's g(e+, Pr) heat transfer function with angle correction.\n\n"
         "Parameters:\n"
-        "  e_D   : rib height to hydraulic diameter ratio [-]\n"
-        "  P_e   : rib pitch to rib height ratio [-]\n"
-        "  alpha : rib angle [degrees]\n"
-        "  Re    : channel Reynolds number [-]\n\n"
-        "Valid range: e_D = 0.02-0.1, P_e = 5-20, alpha = 30-90 deg\n"
+        "  e_D            : rib height / hydraulic diameter [-]\n"
+        "  pitch_to_height: rib pitch / rib height [-]\n"
+        "  alpha_deg      : rib angle [deg]\n"
+        "  Re             : channel Reynolds number [-]\n\n"
+        "Valid range: Re = 10000-100000, e_D = 0.02-0.1, pitch_to_height = 5-20, alpha_deg = 30-90\n"
         "Source: Han et al. (1988)\n\n"
-        "Returns: Enhancement factor [-]"
+        "Returns: Enhancement factor Nu_rib/Nu_smooth [-]"
     );
 
     m.def(
         "rib_friction_multiplier",
         &combaero::cooling::rib_friction_multiplier,
         py::arg("e_D"),
-        py::arg("P_e"),
+        py::arg("pitch_to_height"),
         "Rib friction factor multiplier [-].\n\n"
         "Accounts for increased pressure drop from ribs.\n\n"
         "Parameters:\n"
-        "  e_D : rib height to hydraulic diameter ratio [-]\n"
-        "  P_e : rib pitch to rib height ratio [-]\n\n"
-        "Valid range: e_D = 0.02-0.1, P_e = 5-20\n"
+        "  e_D            : rib height / hydraulic diameter [-]\n"
+        "  pitch_to_height: rib pitch / rib height [-]\n\n"
+        "Valid range: e_D = 0.02-0.1, pitch_to_height = 5-20\n"
         "Source: Han et al. (1988)\n\n"
-        "Returns: Friction multiplier [-] (typically 2-10)"
+        "Returns: Friction multiplier f_rib/f_smooth [-]"
     );
 
     // Impingement cooling
@@ -5383,23 +5383,23 @@ PYBIND11_MODULE(_core, m)
         [](double T, double P,
            py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
            double velocity, double diameter, double length,
-           double e_D, double P_e, double alpha,
+           double e_D, double pitch_to_height, double alpha_deg,
            double T_wall, bool heating) {
             return channel_ribbed(T, P, to_vec(X_arr), velocity, diameter, length,
-                                  e_D, P_e, alpha, T_wall, heating);
+                                  e_D, pitch_to_height, alpha_deg, T_wall, heating);
         },
         py::arg("T"), py::arg("P"), py::arg("X"),
         py::arg("velocity"), py::arg("diameter"), py::arg("length"),
-        py::arg("e_D"), py::arg("P_e"), py::arg("alpha"),
+        py::arg("e_D"), py::arg("pitch_to_height"), py::arg("alpha_deg"),
         py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
         py::arg("heating") = true,
         "Rib-enhanced cooling channel (Han et al. 1988).\n\n"
         "Applies rib_enhancement_factor to Nu and rib_friction_multiplier to f\n"
         "from a smooth-pipe Gnielinski baseline.\n\n"
         "Parameters:\n"
-        "  e_D   : rib height / hydraulic diameter [-]  (valid: 0.02-0.1)\n"
-        "  P_e   : rib pitch / rib height [-]           (valid: 5-20)\n"
-        "  alpha : rib angle [degrees]                  (valid: 30-90)\n\n"
+        "  e_D            : rib height / hydraulic diameter [-]  (valid: 0.02-0.1)\n"
+        "  pitch_to_height: rib pitch / rib height [-]           (valid: 5-20)\n"
+        "  alpha_deg      : rib angle [deg]                      (valid: 30-90)\n\n"
         "Returns: ChannelResult");
 
     // -----------------------------------------------------------------

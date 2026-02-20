@@ -113,8 +113,8 @@ def ribbed(
     L: float,
     D: float,
     e_D: float,
-    P_e: float,
-    alpha: float,
+    pitch_to_height: float,
+    alpha_deg: float,
     T_wall: float = math.nan,
     heating: bool = True,
 ) -> ChannelResult:
@@ -135,10 +135,10 @@ def ribbed(
         Hydraulic diameter [m].
     e_D:
         Rib height / hydraulic diameter [-].  Valid: 0.02-0.1.
-    P_e:
+    pitch_to_height:
         Rib pitch / rib height [-].  Valid: 5-20.
-    alpha:
-        Rib angle [degrees].  Valid: 30-90.
+    alpha_deg:
+        Rib angle [deg].  Valid: 30-90.
     T_wall:
         Wall temperature [K].  ``nan`` to skip ``q``.
     heating:
@@ -148,7 +148,9 @@ def ribbed(
     -------
     ChannelResult
     """
-    return _channel_ribbed(T, P, list(X), u, D, L, e_D, P_e, alpha, T_wall=T_wall, heating=heating)
+    return _channel_ribbed(
+        T, P, list(X), u, D, L, e_D, pitch_to_height, alpha_deg, T_wall=T_wall, heating=heating
+    )
 
 
 def dimpled(
