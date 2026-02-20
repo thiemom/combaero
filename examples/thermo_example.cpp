@@ -1,11 +1,12 @@
+#include "../include/combustion.h"
+#include "../include/humidair.h"
 #include "../include/thermo.h"
 #include "../include/thermo_transport_data.h"
 #include "../include/transport.h"
-#include "../include/combustion.h"
 #include "../include/utils.h"
+#include <iomanip>
 #include <iostream>
 #include <vector>
-#include <iomanip>
 
 // Thermodynamic and Transport Properties Example
 //
@@ -20,58 +21,47 @@ int main() {
     double T = 300.0;    // K
     double P = 101325.0; // Pa (1 atm)
 
-    // Create a vector for mole fractions (initialize with zeros)
-    std::vector<double> X(species_names.size(), 0.0);
-
     // Get species indices
-    const std::size_t o2_idx  = species_index_from_name("O2");
-    const std::size_t n2_idx  = species_index_from_name("N2");
     const std::size_t ch4_idx = species_index_from_name("CH4");
     const std::size_t h2_idx  = species_index_from_name("H2");
+
+    // Standard dry air composition (N2, O2, Ar, CO2)
+    const std::vector<double> X_air = standard_dry_air_composition();
 
     std::cout << "=========================================" << std::endl;
     std::cout << "Thermodynamic and Transport Properties" << std::endl;
     std::cout << "=========================================" << std::endl;
 
-    // Example 1: Air mixture (O2 = 0.21, N2 = 0.79)
+    // Example 1: Air mixture
     std::cout << "\n1. Standard Air Mixture" << std::endl;
     std::cout << "----------------------" << std::endl;
 
-    X[o2_idx] = 0.21;
-    X[n2_idx] = 0.79;
+    print_mixture_properties(T, P, X_air);
 
-    // Print all properties of the air mixture
-    print_mixture_properties(T, P, X);
-
-    // Example 2: Air-fuel mixture
+    // Example 2: Air-fuel mixture (10% CH4 blended into air)
     std::cout << "\n\n2. Air-Fuel Mixture" << std::endl;
     std::cout << "-------------------" << std::endl;
 
-    // Reset mixture
-    std::fill(X.begin(), X.end(), 0.0);
+    // Blend 10% CH4 into air (renormalize)
+    std::vector<double> X_af = X_air;
+    for (auto& x : X_af) x *= 0.90;
+    X_af[ch4_idx] += 0.10;
 
-    // Create a mixture with methane and air
-    X[ch4_idx] = 0.10;  // 10% methane
-    X[o2_idx] = 0.19;   // 19% oxygen
-    X[n2_idx] = 0.71;   // 71% nitrogen
+    print_mixture_properties(T, P, X_af);
 
-    // Print all properties of the mixture
-    print_mixture_properties(T, P, X);
-
-    // Example 3: Temperature dependence of properties
+    // Example 3: Temperature dependence of properties (air)
     std::cout << "\n\n3. Temperature Dependence of Properties" << std::endl;
     std::cout << "------------------------------------" << std::endl;
     std::cout << "Temp (K)   Cp (J/mol·K)   Gamma   Sound Speed (m/s)   Viscosity (μPa·s)   Thermal Cond (W/m·K)" << std::endl;
     std::cout << "--------------------------------------------------------------------------------------------" << std::endl;
 
-    // Use temperature range valid for all species
     for (double temp = 300.0; temp <= 2600.0; temp += 300.0) {
         std::cout << std::setw(8) << temp << "   "
-                  << std::setw(12) << cp(temp, X) << "   "
-                  << std::setw(7) << isentropic_expansion_coefficient(temp, X) << "   "
-                  << std::setw(16) << speed_of_sound(temp, X) << "   "
-                  << std::setw(16) << viscosity(temp, P, X) * 1.0e6 << "   "
-                  << std::setw(20) << thermal_conductivity(temp, P, X) << std::endl;
+                  << std::setw(12) << cp(temp, X_air) << "   "
+                  << std::setw(7) << isentropic_expansion_coefficient(temp, X_air) << "   "
+                  << std::setw(16) << speed_of_sound(temp, X_air) << "   "
+                  << std::setw(16) << viscosity(temp, P, X_air) * 1.0e6 << "   "
+                  << std::setw(20) << thermal_conductivity(temp, P, X_air) << std::endl;
     }
 
     // Example 4: Fuel properties
@@ -98,36 +88,29 @@ int main() {
     std::cout << "------------------------" << std::endl;
 
     // Create a mixture with both fuels
-    std::fill(X.begin(), X.end(), 0.0);
-    X[ch4_idx] = 0.7;  // 70% methane
-    X[h2_idx] = 0.3;   // 30% hydrogen
+    std::vector<double> X_fuel(species_names.size(), 0.0);
+    X_fuel[ch4_idx] = 0.7;  // 70% methane
+    X_fuel[h2_idx]  = 0.3;  // 30% hydrogen
 
     std::cout << "Mixture: 70% CH4, 30% H2" << std::endl;
-    std::cout << "  Oxygen required: " << oxygen_required_per_mol_mixture(X)
+    std::cout << "  Oxygen required: " << oxygen_required_per_mol_mixture(X_fuel)
               << " mol O2/mol mixture" << std::endl;
-    std::cout << "  Oxygen required: " << oxygen_required_per_kg_mixture(X)
+    std::cout << "  Oxygen required: " << oxygen_required_per_kg_mixture(X_fuel)
               << " kg O2/kg mixture" << std::endl;
 
-    // Example 6: Inverse calculations
+    // Example 6: Inverse calculations (using air)
     std::cout << "\n6. Inverse Calculations (Finding Temperature)" << std::endl;
     std::cout << "--------------------------------------------" << std::endl;
 
-    // Select a reference temperature to test against
     double T_ref = 1200.0;
 
-    // Calculate properties at the reference temperature
-    double h_ref = h(T_ref, X);
-    double s_ref = s(T_ref, X, P);
-    double cp_ref = cp(T_ref, X);
+    double h_ref  = h(T_ref, X_air);
+    double s_ref  = s(T_ref, X_air, P);
+    double cp_ref = cp(T_ref, X_air);
 
-    // Solve for temperature given enthalpy
-    double T_from_h = calc_T_from_h(h_ref, X);
-
-    // Solve for temperature given entropy
-    double T_from_s = calc_T_from_s(s_ref, P, X);
-
-    // Solve for temperature given heat capacity
-    double T_from_cp = calc_T_from_cp(cp_ref, X);
+    double T_from_h  = calc_T_from_h(h_ref, X_air);
+    double T_from_s  = calc_T_from_s(s_ref, P, X_air);
+    double T_from_cp = calc_T_from_cp(cp_ref, X_air);
 
     std::cout << "Reference Temperature: " << T_ref << " K\n";
     std::cout << "Temperature calculated from enthalpy: " << T_from_h << " K\n";
