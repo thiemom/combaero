@@ -356,6 +356,8 @@ try:
         h0_from_static,
         v_from_h0,
     )
+
+    molar_mass = mwmix
 except ModuleNotFoundError:
     # Fallback: attempt to import from an installed combaero package that
     # already has _core available, then re-export the symbols.
@@ -374,6 +376,7 @@ except ModuleNotFoundError:
     specific_gas_constant = _core.specific_gas_constant
     isentropic_expansion_coefficient = _core.isentropic_expansion_coefficient
     speed_of_sound = _core.speed_of_sound
+    molar_mass = _core.mwmix
     molar_volume = _core.molar_volume
     viscosity = _core.viscosity
     thermal_conductivity = _core.thermal_conductivity
