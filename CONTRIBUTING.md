@@ -11,7 +11,7 @@ Thank you for your interest in contributing to the CombAero project! This docume
 - **ASCII only**: No non-ASCII characters in code (allowed in comments and string literals)
 - **Line comments only**: Use `//` comments, not `/* */` block comments
 
-These rules are enforced by `scripts/check-source-style.sh` which runs automatically during build.
+These rules are enforced by `scripts/check-source-style.sh` (C++) and `scripts/check-python-style.sh` (Python/ruff) which run as pre-commit hooks and in CI.
 
 ## Development Workflow
 
@@ -50,15 +50,20 @@ ctest --output-on-failure
 ./tests/test_water_equation_accuracy
 ```
 
-If you modify the Python bindings or packaging, run Python smoke tests from the
-repository root using the local `.venv` interpreter:
+If you modify the Python bindings or C++ source, rebuild and run the full Python test suite:
 
 ```bash
 ./scripts/bootstrap.sh
 ./.venv/bin/python scripts/ensure_venv.py
-./.venv/bin/python -m build --wheel
-./.venv/bin/python -m pip install --force-reinstall dist/combaero-*.whl
-./.venv/bin/python -m pytest python/tests/test_import.py
+# Rebuild the C++ extension (required after any src/ or include/ change)
+./.venv/bin/pip install -e . --no-build-isolation
+./.venv/bin/python -m pytest python/tests/
+```
+
+Pre-commit hooks run automatically on `git commit`. To run them manually:
+
+```bash
+./.venv/bin/pre-commit run --all-files
 ```
 
 ## Pull Request Process

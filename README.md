@@ -1,17 +1,22 @@
 # CombAero
 
-A C++ library for thermodynamic and combustion calculations for gas mixtures.
+A C++17 library for thermodynamic, combustion, and aerodynamic flow & heat-transfer calculations for gas mixtures, with full Python bindings.
 
 ## Overview
 
-This library provides tools for ideal-gas thermodynamic properties, combustion stoichiometry, transport properties, and humid air calculations. It includes functionality for:
+This library provides tools for ideal-gas thermodynamic properties, combustion stoichiometry, transport properties, compressible flow, heat transfer, and cooling correlations. It includes functionality for:
 
 - Thermodynamic property calculations for multi-species gas mixtures
-- Combustion utilities (stoichiometric O₂ demand, complete combustion products)
+- Combustion utilities (stoichiometric O₂ demand, complete combustion, equilibrium)
+- Inverse combustion solvers (find fuel/oxidizer flow for target Tad, O₂, or CO₂)
+- Compressible and incompressible flow analysis
+- Heat transfer correlations and integrated channel-flow solvers
+- Advanced cooling correlations (ribs, impingement, film, effusion, pin fins, dimples)
+- Materials database (superalloys, TBC coatings)
+- Acoustics (duct modes, Helmholtz resonators, Q-factor screening)
 - Saturation vapor pressure calculations for water and ice
 - Humid air composition and property calculations
-- Mole fraction utilities
-- Python bindings for these utilities via the `combaero` package
+- Python bindings via the `combaero` package
 
 ## Features
 
@@ -21,14 +26,23 @@ This library provides tools for ideal-gas thermodynamic properties, combustion s
 - Combustion tools: O₂ demand per fuel/mixture, complete combustion to CO₂/H₂O
 - Equivalence ratio and Bilger mixture fraction utilities
 - **Inverse combustion solvers**: find fuel or oxidizer flow for target Tad, O₂, or CO₂
-- **Compressible flow**: isentropic nozzle flow and Fanno flow (adiabatic pipe with friction)
-- **Friction factors**: Colebrook-White, Haaland, and Serghides correlations
+- **Chemical equilibrium**: WGS, steam methane reforming, general reforming, combustion equilibrium
+- **Compressible flow**: isentropic nozzle (converging and C-D), Fanno flow (adiabatic pipe with friction)
+- **Friction factors**: Colebrook-White, Haaland, Serghides, and Petukhov correlations
 - **Orifice Cd correlations**: ISO 5167, thick-plate, rounded-entry (Idelchik/Bohl)
 - **Heat transfer correlations**: Dittus-Boelter, Gnielinski, Sieder-Tate, Petukhov
-- **Acoustics**: Tube/annulus modes, Helmholtz resonators, Q factor screening
+- **Integrated channel-flow solvers** returning HTC, Nu, Re, Pr, f, dP, Mach, T_aw, and q in one call:
+  - `channel_smooth` — Gnielinski baseline with optional roughness
+  - `channel_ribbed` — Han et al. (1988) rib-roughened surface
+  - `channel_dimpled` — Chyu et al. (1997) dimpled surface
+  - `channel_pin_fin` — Metzger et al. (1982) pin-fin array
+  - `channel_impingement` — Martin (1977) / Florschuetz et al. (1981) jet impingement
+- **Advanced cooling correlations**: rib enhancement, impingement Nusselt, film cooling effectiveness (Baldauf 2002), effusion, pin-fin friction, dimple enhancement
+- **Materials database**: Inconel 718, Haynes 230, SS316, Al 6061, YSZ TBC (with sintering model)
+- **Acoustics**: tube/annulus modes, Helmholtz resonators, Q-factor screening
 - Accurate saturation vapor pressure using Hyland-Wexler equations
-  - For ice (-80°C to 0°C): maximum relative error ≤ 0.023%
-  - For water vapor (0°C to 80°C): maximum relative error ≤ 0.0057%
+  - For ice (-80 to 0 deg C): maximum relative error <= 0.023%
+  - For water vapor (0 to 80 deg C): maximum relative error <= 0.0057%
 - Dry air and humid air utilities (humidity ratio, compositions, dew point)
 - Mole fraction normalization and wet/dry conversion utilities
 - Transport properties: viscosity, thermal conductivity, Prandtl number
@@ -46,8 +60,9 @@ The library is organized into focused modules:
 | `equilibrium.h` | Chemical equilibrium solver (WGS partial equilibrium) |
 | `compressible.h` | Compressible flow (isentropic nozzle, Fanno pipe flow) |
 | `friction.h` | Darcy friction factor correlations (Colebrook, Haaland, Serghides) |
-| `heat_transfer.h` | Nusselt correlations, LMTD for heat exchangers |
-| `geometry.h` | Hydraulic diameter, Tube/Annulus geometry, residence time |
+| `heat_transfer.h` | Nusselt correlations, LMTD, integrated channel-flow solvers (`channel_smooth`, `channel_ribbed`, `channel_dimpled`, `channel_pin_fin`, `channel_impingement`) |
+| `cooling_correlations.h` | Advanced cooling: rib enhancement, impingement, film cooling, effusion, pin fins, dimples, materials |
+| `geometry.h` | Hydraulic diameter, tube/annulus geometry, residence time |
 | `incompressible.h` | Incompressible flow (Bernoulli, pipe flow, orifice) |
 | `orifice.h` | Orifice discharge coefficient (Cd) correlations |
 | `acoustics.h` | Acoustic modes, Helmholtz/quarter-wave resonators, Q factors |
@@ -154,17 +169,29 @@ make test
 
 ## Examples
 
-The `examples` directory contains sample applications demonstrating the library's functionality:
+The `examples/` directory contains C++ sample applications:
 
 - `thermo_example`: Basic thermodynamic calculations
 - `humidair_example`: Humid air property calculations
 - `cooling_example`: Simple C++ cooling workflow (convective + effusion correlations)
 
-The `python/examples` directory includes higher-level workflows such as:
+The `python/examples/` directory includes higher-level Python workflows:
 
+- `thermo_properties.py`: Thermodynamic property calculations and state bundles
+- `combustion_example.py`: Combustion, equivalence ratio, and equilibrium
+- `reactor_design.py`: Perfectly stirred reactor and residence time analysis
+- `compressible_flow_example.py`: Isentropic nozzle and Fanno pipe flow
+- `de_laval_nozzle.py`: Converging-diverging nozzle with axial profile
+- `friction_and_pressure_drop.py`: Friction factor correlations and pipe pressure drop
+- `flow_regime_comparison.py`: Laminar vs turbulent flow regime comparison
+- `heat_transfer_pipe_flow.py`: Nusselt correlations and HTC for pipe flow
+- `heat_transfer_measurement.py`: HTC from measured data and LMTD
+- `acoustic_examples.py`: Duct modes, Helmholtz resonators, Q-factor screening
+- `gas_turbine_cycle.py`: Brayton cycle T-s diagram and efficiency vs pressure ratio
+- `ic_engine_cycle.py`: Otto cycle T-s diagram and efficiency analysis
 - `combustor_heat_transfer.py`: Integrated combustor heat-transfer workflow
-- `counterflow_effusion_combustor.py`: Toy industrial combustor can with
-  counterflow convective cooling, effusion front plate, and burner-driven hot side
+- `combustor_liner_cooling.py`: Multi-channel combustor liner cooling design with bypass sweep (smooth, ribbed, dimpled channels; TBC wall configs; closed-loop COT control)
+- `counterflow_effusion_combustor.py`: Industrial combustor can with counterflow convective cooling and effusion front plate
 
 ## Development workflow
 

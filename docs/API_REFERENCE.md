@@ -575,26 +575,37 @@ High-temperature turbine cooling techniques with validated correlations from lit
 Ribs increase heat transfer through surface area and turbulence, but also increase pressure drop.
 
 ```python
-# Rib enhancement factor (Han et al. 1988)
+# Rib enhancement factor - geometry-only (Han et al. 1988)
 enhancement = cb.rib_enhancement_factor(
-    e_D=0.05,    # Rib height / hydraulic diameter [-]
-    P_e=10.0,    # Rib pitch / rib height [-]
-    alpha=90.0   # Rib angle [degrees]
+    e_D=0.05,            # Rib height / hydraulic diameter [-]
+    pitch_to_height=10.0, # Rib pitch / rib height [-]
+    alpha_deg=60.0        # Rib angle [deg]
 )
 # Returns: Nu/Nu_smooth [-] (typically 1.0-3.5)
 
+# Rib enhancement factor - Re-dependent (Han g-function, Serghides f0)
+enh_re = cb.rib_enhancement_factor_re(
+    e_D=0.05,
+    pitch_to_height=10.0,
+    alpha_deg=60.0,
+    Re=25000.0            # Reynolds number [-]
+)
+# Returns: St_rib/St_smooth [-]; clamped to [0.5, 4.0]
+# Note: at high e+ (e/D > 0.05, Re > 20k) sublayer resistance dominates
+# and enhancement may be < 1. Use geometry-only overload for channel_ribbed.
+
 # Rib friction multiplier (Han et al. 1988)
 friction = cb.rib_friction_multiplier(
-    e_D=0.05,    # Rib height / hydraulic diameter [-]
-    P_e=10.0     # Rib pitch / rib height [-]
+    e_D=0.05,            # Rib height / hydraulic diameter [-]
+    pitch_to_height=10.0  # Rib pitch / rib height [-]
 )
 # Returns: f/f_smooth [-] (typically 1.0-8.0)
 ```
 
 **Valid ranges:**
 - e_D = 0.02-0.1
-- P_e = 5-20
-- alpha = 30-90 deg
+- pitch_to_height = 5-20
+- alpha_deg = 30-90 deg
 
 **Design tradeoff:** Ribs increase both heat transfer and friction. Optimization required.
 

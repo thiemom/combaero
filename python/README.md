@@ -10,6 +10,11 @@ This package provides Python bindings for the core CombAero C++ library:
 - Compressible flow (isentropic nozzle, quasi-1D, Fanno flow)
 - Incompressible flow (Bernoulli, orifice, pipe pressure drop)
 - Friction factor correlations (Colebrook, Haaland, Serghides)
+- Heat transfer correlations (Dittus-Boelter, Gnielinski, Sieder-Tate)
+- Integrated channel-flow solvers (`channel_smooth`, `channel_ribbed`, `channel_dimpled`, `channel_pin_fin`, `channel_impingement`)
+- Advanced cooling correlations (rib enhancement, impingement, film cooling, effusion, pin fins, dimples)
+- Materials database (Inconel 718, Haynes 230, SS316, Al 6061, YSZ TBC)
+- Acoustics (duct modes, Helmholtz resonators, Q-factor screening)
 
 The bindings are implemented with [pybind11](https://pybind11.readthedocs.io/) and built via [scikit-build-core](https://scikit-build-core.readthedocs.io/).
 
@@ -265,7 +270,7 @@ For liquids and low-speed gas flows (Ma < 0.3):
 ```python
 import combaero as ca
 
-rho = 998.0  # Water density [kg/m³]
+rho = 998.0  # Water density [kg/m3]
 
 # Bernoulli equation
 P2 = ca.bernoulli_P2(P1=200000, v1=2.0, v2=5.0, rho=rho)
@@ -281,4 +286,88 @@ dP = ca.pipe_dP(v=2.0, L=10.0, D=0.05, f=f, rho=rho)
 
 # Hydraulic diameter
 Dh = ca.hydraulic_diameter_rect(a=0.1, b=0.05)  # Rectangular duct
+```
+
+### Channel Flow (Heat Transfer + Pressure Drop)
+
+Integrated solvers that return `ChannelResult` with h, Nu, Re, Pr, f, dP, Mach, T_aw, and q in one call:
+
+```python
+import combaero as ca
+
+X = ca.standard_dry_air_composition()
+T, P, u = 600.0, 20e5, 30.0  # K, Pa, m/s
+D, L = 0.008, 0.35           # m
+
+# Smooth pipe (Gnielinski baseline)
+sol = ca.channel_smooth(T, P, X, u, D, L)
+print(f"h = {sol.h:.0f} W/(m2*K), Nu = {sol.Nu:.1f}, dP = {sol.dP:.0f} Pa")
+
+# Rib-roughened (Han et al. 1988)
+sol_rib = ca.channel_ribbed(T, P, X, u, D, L,
+                             e_D=0.07, pitch_to_height=8.0, alpha_deg=60.0)
+print(f"Rib enhancement: Nu_rib/Nu_smooth = {sol_rib.Nu/sol.Nu:.2f}")
+
+# Dimpled surface (Chyu et al. 1997)
+sol_dim = ca.channel_dimpled(T, P, X, u, D, L, d_Dh=0.2, h_d=0.2, S_d=2.0)
+
+# Pin-fin array (Metzger et al. 1982)
+sol_pin = ca.channel_pin_fin(T, P, X, u,
+                              channel_height=0.01, pin_diameter=0.003,
+                              S_D=2.5, X_D=2.5, N_rows=4)
+
+# With wall temperature (enables q calculation)
+sol_q = ca.channel_smooth(T, P, X, u, D, L, T_wall=800.0)
+print(f"q = {sol_q.q/1000:.1f} kW/m2")
+```
+
+**`ChannelResult` attributes:** `h`, `Nu`, `Re`, `Pr`, `f`, `dP`, `M`, `T_aw`, `q`
+
+### Advanced Cooling Correlations
+
+```python
+import combaero as ca
+
+# Rib enhancement factor (geometry-only, Han et al. 1988)
+enh = ca.rib_enhancement_factor(e_D=0.05, pitch_to_height=10.0, alpha_deg=60.0)
+fmul = ca.rib_friction_multiplier(e_D=0.05, pitch_to_height=10.0)
+
+# Re-dependent rib enhancement (Han g-function, Serghides f0)
+enh_re = ca.rib_enhancement_factor_re(e_D=0.05, pitch_to_height=10.0,
+                                       alpha_deg=60.0, Re=25000.0)
+
+# Impingement Nusselt (Martin 1977 / Florschuetz 1981)
+Nu = ca.impingement_nusselt(Re_jet=20000, Pr=0.7, z_D=6.0)
+Nu_arr = ca.impingement_nusselt(Re_jet=20000, Pr=0.7, z_D=6.0, x_D=8.0, y_D=8.0)
+
+# Film cooling effectiveness (Baldauf et al. 2002)
+eta = ca.film_cooling_effectiveness(x_D=10.0, M=1.0, DR=1.5, alpha_deg=30.0)
+eta_avg = ca.film_cooling_effectiveness_avg(x_D=10.0, M=1.0, DR=1.5,
+                                             alpha_deg=30.0, s_D=3.0)
+
+# Effusion effectiveness
+eta_eff = ca.effusion_effectiveness(x_D=5.0, M=0.5, DR=1.5,
+                                    porosity=0.2, s_D=3.0, alpha_deg=30.0)
+```
+
+### Materials Database
+
+```python
+import combaero as ca
+
+# Superalloys
+k = ca.k_inconel718(T=900)      # W/(m*K), valid 300-1200 K
+k = ca.k_haynes230(T=1100)      # W/(m*K), valid 300-1400 K
+
+# Structural alloys
+k = ca.k_stainless_steel_316(T=600)  # W/(m*K)
+k = ca.k_aluminum_6061(T=400)        # W/(m*K)
+
+# Thermal barrier coating (YSZ) with sintering model
+k_fresh = ca.k_tbc_ysz(T=1200, hours=0)       # As-sprayed
+k_aged  = ca.k_tbc_ysz(T=1200, hours=1000)    # After 1000 h
+k_ebpvd = ca.k_tbc_ysz(T=1200, is_ebpvd=True) # EB-PVD process
+
+# List all available materials
+print(ca.list_materials())
 ```

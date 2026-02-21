@@ -46,18 +46,13 @@ Check Python code style and quality (PEP 8 compliance).
 
 **Checks:**
 1. Non-ASCII characters outside comments and strings
-2. PEP 8 compliance (flake8)
-3. Code formatting (black)
-4. Import sorting (isort)
-5. Type hints (mypy, optional)
+2. Code quality (ruff check)
+3. Code formatting (ruff format)
+4. Type hints (mypy, optional)
 
 **Scans:** `python/`, `cantera_validation_tests/`, `thermo_data_generator/`
 
-**Dependencies:**
-```bash
-pip install black isort flake8 mypy
-# or: uv pip install black isort flake8 mypy
-```
+**Dependencies:** `ruff` (included in `.venv` via `bootstrap.sh`)
 
 See [INSTALL.md](INSTALL.md) for detailed installation options (Poetry, uv, pre-commit).
 
@@ -115,9 +110,7 @@ Add to `.pre-commit-config.yaml`:
   run: ./scripts/check-source-style.sh
 
 - name: Check Python Style
-  run: |
-    pip install black isort flake8
-    ./scripts/check-python-style.sh
+  run: ./scripts/check-python-style.sh
 ```
 
 ## Quick Reference
