@@ -137,12 +137,26 @@ double rib_enhancement_factor(double e_D, double pitch_to_height, double alpha_d
     double e_plus = e_D * Re * std::sqrt(f_rib / 8.0);
 
     // 4. Han heat transfer roughness function g(e+, Pr)
-    //    Han (1988) Table 2: g = C * e+^m * Pr^n
-    //    For 90-deg transverse ribs: C=9.0, m=0.28, n=0.57
-    //    Angle correction: angled ribs (45-60 deg) reduce g (less sublayer
-    //    resistance) -> higher St. Normalise so g(90 deg) = g_90, g(60 deg) < g_90.
-    //    Han data: 60-deg ribs give ~10-20% more St than 90-deg at same e+.
-    //    Use: g(alpha) = g_90 * (sin(alpha))^0.15  (monotone, 90->1, 30->0.87)
+    //    g = C * e+^m * Pr^n  (Han 1988, Table 2, 90-deg transverse ribs)
+    //    C=9.0, m=0.28, n=0.57  (calibrated for Re = 10k-80k)
+    //
+    //    Physical note: at high e+ (large e/D or high Re), g grows large and
+    //    the denominator (1 + sqrt(f/8)*g) >> 1, so St_rib < St_smooth.
+    //    This is physically correct for the "fully rough" regime — ribs in
+    //    this regime increase friction without proportional heat transfer gain.
+    //    For engineering enhancement estimates at Re > 80k, use the
+    //    geometry-only rib_enhancement_factor() instead (used by channel_ribbed).
+    //
+    //    High-Re extension (Singh & Ekkad 2017, GT2016-56363; Re 100k-400k):
+    //    adjusted constants C~7.5, m~0.32 give slightly lower g but the
+    //    denominator remains >> 1 at practical e+ values, so the clamp floor
+    //    still dominates. A full high-Re calibration requires direct Nu/f data
+    //    from Singh & Ekkad (2017) or Taslim et al. (1994) for curve fitting.
+    //
+    //    References:
+    //      Han, J.C. et al. (1988) J. Eng. Gas Turbines Power 110(3), 555-560
+    //      Singh, P. & Ekkad (2017) ASME GT2016-56363 (Re 150k-400k)
+    //      Taslim, M.E. et al. (1994) J. Turbomachinery 116(3), 477-487
     double Pr = 0.7;
     double g_rib = 9.0 * std::pow(e_plus, 0.28) * std::pow(Pr, 0.57);
     double alpha_rad = alpha_deg * M_PI / 180.0;
