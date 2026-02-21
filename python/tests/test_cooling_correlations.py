@@ -119,6 +119,110 @@ class TestRibEnhancedCooling:
             cb.rib_friction_multiplier(e_D=0.05, pitch_to_height=25)
 
 
+class TestRibHighRe:
+    """Validate Singh & Ekkad (2017) high-Re correlations against tabulated data.
+
+    Reference geometry: e/D=0.0625, P/e=10, alpha=90 deg.
+    Source: ASME GT2016-56363, Table of Nu/Nu0, f/f0, eta vs Re.
+    """
+
+    @pytest.mark.parametrize(
+        "Re, expected_enh, tol",
+        [
+            (30_000, 2.45, 0.07),
+            (60_000, 2.15, 0.07),
+            (100_000, 1.95, 0.07),
+            (200_000, 1.75, 0.07),
+            (400_000, 1.55, 0.07),
+        ],
+    )
+    def test_nu_ratio_vs_table(self, Re, expected_enh, tol):
+        """Nu/Nu0 matches tabulated data within 7% for reference geometry."""
+        enh = cb.rib_enhancement_factor_high_re(
+            e_D=0.0625, pitch_to_height=10.0, alpha_deg=90.0, Re=float(Re)
+        )
+        assert abs(enh - expected_enh) / expected_enh < tol
+
+    def test_friction_ratio_reference(self):
+        """f/f0 ~ 6.3 at reference geometry (e/D=0.0625, P/e=10)."""
+        f = cb.rib_friction_multiplier_high_re(e_D=0.0625, pitch_to_height=10.0)
+        assert 5.8 < f < 7.2
+
+    def test_re_decay(self):
+        """Enhancement decreases with increasing Re."""
+        enh_low = cb.rib_enhancement_factor_high_re(0.0625, 10.0, 90.0, 30_000.0)
+        enh_high = cb.rib_enhancement_factor_high_re(0.0625, 10.0, 90.0, 400_000.0)
+        assert enh_low > enh_high
+
+    def test_angle_60_higher_than_90(self):
+        """60 deg angled ribs give higher Nu/Nu0 than 90 deg transverse ribs."""
+        enh_90 = cb.rib_enhancement_factor_high_re(0.0625, 10.0, 90.0, 100_000.0)
+        enh_60 = cb.rib_enhancement_factor_high_re(0.0625, 10.0, 60.0, 100_000.0)
+        assert enh_60 > enh_90
+
+    def test_e_D_sensitivity(self):
+        """Larger rib height gives higher enhancement."""
+        enh_lo = cb.rib_enhancement_factor_high_re(0.04, 10.0, 90.0, 100_000.0)
+        enh_hi = cb.rib_enhancement_factor_high_re(0.10, 10.0, 90.0, 100_000.0)
+        assert enh_hi > enh_lo
+
+    def test_friction_re_independent(self):
+        """High-Re friction multiplier is Re-independent (fully-rough regime)."""
+        f1 = cb.rib_friction_multiplier_high_re(e_D=0.0625, pitch_to_height=10.0)
+        f2 = cb.rib_friction_multiplier_high_re(e_D=0.0625, pitch_to_height=10.0)
+        assert f1 == f2
+
+
+class TestThermalPerformanceFactor:
+    """Validate Webb & Eckert (1972) thermal-hydraulic performance factor.
+
+    Cross-checked against Singh & Ekkad tabulated eta values.
+    """
+
+    @pytest.mark.parametrize(
+        "Nu_ratio, f_ratio, expected_eta, tol",
+        [
+            (2.45, 6.50, 1.31, 0.03),
+            (2.15, 6.35, 1.16, 0.03),
+            (1.95, 6.30, 1.05, 0.03),
+            (1.75, 6.25, 0.94, 0.03),
+            (1.55, 6.20, 0.84, 0.03),
+        ],
+    )
+    def test_eta_vs_table(self, Nu_ratio, f_ratio, expected_eta, tol):
+        """eta = Nu_ratio / f_ratio^(1/3) matches Singh & Ekkad table within 3%."""
+        eta = cb.thermal_performance_factor(Nu_ratio, f_ratio)
+        assert abs(eta - expected_eta) / expected_eta < tol
+
+    def test_smooth_surface_gives_one(self):
+        """Smooth surface (Nu_ratio=1, f_ratio=1) gives eta=1."""
+        eta = cb.thermal_performance_factor(Nu_ratio=1.0, f_ratio=1.0)
+        assert abs(eta - 1.0) < 1e-10
+
+    def test_eta_greater_than_one_for_good_surface(self):
+        """A surface with high Nu gain and modest friction gives eta > 1."""
+        eta = cb.thermal_performance_factor(Nu_ratio=2.0, f_ratio=4.0)
+        assert eta > 1.0
+
+    def test_eta_less_than_one_for_bad_surface(self):
+        """A surface with modest Nu gain and high friction gives eta < 1."""
+        eta = cb.thermal_performance_factor(Nu_ratio=1.2, f_ratio=8.0)
+        assert eta < 1.0
+
+    def test_crossover_at_high_re(self):
+        """eta crosses below 1.0 at high Re for standard rib geometry."""
+        enh_low = cb.rib_enhancement_factor_high_re(0.0625, 10.0, 90.0, 100_000.0)
+        fmul_low = cb.rib_friction_multiplier_high_re(0.0625, 10.0)
+        eta_100k = cb.thermal_performance_factor(enh_low, fmul_low)
+
+        enh_high = cb.rib_enhancement_factor_high_re(0.0625, 10.0, 90.0, 400_000.0)
+        fmul_high = cb.rib_friction_multiplier_high_re(0.0625, 10.0)
+        eta_400k = cb.thermal_performance_factor(enh_high, fmul_high)
+
+        assert eta_100k > eta_400k
+        assert eta_400k < 1.0
+
+
 class TestImpingementCooling:
     """Test impingement cooling correlations."""
 

@@ -24,10 +24,11 @@ namespace combaero::cooling {
 // Valid: e_D = 0.02-0.1, pitch_to_height = 5-20, alpha_deg = 30-90 deg
 double rib_enhancement_factor(double e_D, double pitch_to_height, double alpha_deg);
 
-// Rib enhancement factor (Re-dependent, Han 1988 roughness-function method).
-// Uses Serghides friction factor, roughness Reynolds number e+ = (e/D)*Re*sqrt(f/8),
-// and Han's g(e+, Pr) heat transfer function with angle correction.
-// Physically correct Re-dependence: higher enhancement at lower Re.
+// Rib enhancement factor - high-Re direct empirical fit (Singh & Ekkad 2017)
+// Nu/Nu0 = 40.0 * Re^(-0.12) * (e/D)^0.38 * (P/e)^(-0.11) * F(alpha)
+// Direct power-law fit; bypasses the roughness-function analogy which cannot
+// predict Nu/Nu0 > 1 at high e+. C=40.0 back-calculated from tabulated data
+// (source text has decimal-point error: 0.38 should be ~40).
 //
 // Parameters:
 //   e_D            : rib height / hydraulic diameter [-]
@@ -35,8 +36,41 @@ double rib_enhancement_factor(double e_D, double pitch_to_height, double alpha_d
 //   alpha_deg      : rib angle [deg]
 //   Re             : channel Reynolds number [-]
 //
-// Valid: Re = 10000-100000, e_D = 0.02-0.1, pitch_to_height = 5-20, alpha_deg = 30-90
-double rib_enhancement_factor(double e_D, double pitch_to_height, double alpha_deg, double Re);
+// Returns: Nu_rib/Nu_smooth [-]
+//
+// Source: Singh, P. & Ekkad, S. (2017) ASME GT2016-56363
+// Valid: Re = 30000-400000, e_D = 0.04-0.10, pitch_to_height = 8-12, alpha_deg = 45-90
+double rib_enhancement_factor_high_re(double e_D, double pitch_to_height,
+                                      double alpha_deg, double Re);
+
+// Rib friction multiplier - high-Re direct empirical fit (Singh & Ekkad 2017)
+// f/f0 = 125.0 * (e/D)^0.85 * (P/e)^(-0.25)  (Re-independent, fully-rough regime)
+// C=125.0 back-calculated from tabulated data (source text has decimal-point error).
+//
+// Parameters:
+//   e_D            : rib height / hydraulic diameter [-]
+//   pitch_to_height: rib pitch / rib height [-]
+//
+// Returns: f_rib/f_smooth [-]
+//
+// Source: Singh, P. & Ekkad, S. (2017) ASME GT2016-56363
+// Valid: e_D = 0.04-0.10, pitch_to_height = 8-12
+double rib_friction_multiplier_high_re(double e_D, double pitch_to_height);
+
+// Thermal-hydraulic performance factor (Webb & Eckert 1972)
+// eta = (Nu/Nu0) / (f/f0)^(1/3)
+// Compares heat transfer gain against pumping power penalty at equal velocity.
+// eta > 1: surface is a net improvement; eta < 1: pressure-drop generator.
+// Generic: works for ribs, dimples, pin fins, impingement, or any surface.
+//
+// Parameters:
+//   Nu_ratio: Nu_enhanced / Nu_smooth [-]
+//   f_ratio : f_enhanced  / f_smooth  [-]
+//
+// Returns: thermal-hydraulic performance factor eta [-]
+//
+// Source: Webb, R.L. & Eckert, E.R.G. (1972) Int. J. Heat Mass Transfer 15(8), 1647-1658
+double thermal_performance_factor(double Nu_ratio, double f_ratio);
 
 // Rib friction factor multiplier
 // Accounts for increased pressure drop from ribs.

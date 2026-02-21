@@ -1,5 +1,4 @@
 #include "cooling_correlations.h"
-#include "friction.h"
 #include "heat_transfer.h"
 #include "math_constants.h"
 #include <cmath>
@@ -105,78 +104,72 @@ double rib_enhancement_factor(double e_D, double pitch_to_height, double alpha_d
     return 3.5 * std::pow(e_D, 0.35) * pitch_factor * f_alpha;
 }
 
-double rib_enhancement_factor(double e_D, double pitch_to_height, double alpha_deg, double Re) {
-    // Han et al. (1988) heat transfer roughness-function approach.
+double rib_enhancement_factor_high_re(double e_D, double pitch_to_height,
+                                      double alpha_deg, double Re) {
+    // Singh & Ekkad (2017) direct empirical fit for Re = 30k-400k.
+    // Nu/Nu0 = C * Re^(-0.12) * (e/D)^0.38 * (P/e)^(-0.11) * F(alpha)
     //
-    // Method:
-    //   1. Smooth-tube friction factor f0 via Serghides (accurate, explicit)
-    //   2. Ribbed friction factor f_rib = f0 * rib_friction_multiplier
-    //   3. Roughness Reynolds number e+ = (e/D) * Re * sqrt(f_rib/8)
-    //      (factor f/8 from u_tau = U*sqrt(f/8), standard definition)
-    //   4. Han heat transfer roughness function g(e+, Pr):
-    //      g = C * e+^m * Pr^n  (Han 1988, Table 2, 90-deg baseline)
-    //      Angle correction: g *= sin(2*alpha)^0.35  (peaks at ~60 deg)
-    //   5. St_rib from heat-momentum analogy for rough surfaces:
-    //      St_rib = (f_rib/8) / (1 + sqrt(f_rib/8) * (g - g_smooth))
-    //      g_smooth = 1/St_smooth - 1/sqrt(f0/8)  (smooth-tube baseline)
-    //   6. Enhancement = St_rib / St_smooth
+    // C=54.9, n=-0.1755 fitted by least-squares to all 5 tabulated rows at
+    // reference geometry (e/D=0.0625, P/e=10, 90 deg): max error < 1%.
+    //   Re=30k->2.45, Re=60k->2.15, Re=100k->1.95, Re=200k->1.75, Re=400k->1.55
+    // Source text states C=0.38, n=-0.12 which has a decimal-point error in C
+    // and a slightly too-shallow Re exponent.
     //
-    // Reference: Han, J.C., Park, J.S., Lei, C.K. (1988)
-    //   "Heat Transfer Enhancement in Channels with Turbulence Promoters"
-    //   J. Engineering for Gas Turbines and Power, 110(3), 555-560.
-    // Valid: Re = 10000-100000, e_D = 0.02-0.1, pitch_to_height = 5-20, alpha_deg = 30-90
+    // Angle function F(alpha): 1.0 at 90 deg, ~1.13 at 60 deg (stronger secondary
+    // flows from angled ribs). Form: F = 1.0 + 0.15*sin(2*alpha).
+    //   90 deg -> sin(180 deg) = 0 -> F = 1.00
+    //   60 deg -> sin(120 deg) = 0.866 -> F = 1.13
+    //   45 deg -> sin(90 deg)  = 1.0   -> F = 1.15  (peak)
+    //
+    // Validated against all 5 tabulated rows within +/-1%.
+    //
+    // References:
+    //   Singh, P. & Ekkad, S. (2017) ASME GT2016-56363
+    //   Han, J.C. & Zhang, Y.M. (1992) J. Heat Transfer 114(1), 141-148
     validate_rib_params(e_D, pitch_to_height, alpha_deg);
 
-    // 1. Smooth-tube friction factor (Serghides, accurate for Re 4000-1e8)
-    double f0 = ::friction_serghides(Re, 0.0);
-
-    // 2. Ribbed friction factor
-    double f_rib = f0 * rib_friction_multiplier(e_D, pitch_to_height);
-
-    // 3. Roughness Reynolds number: e+ = (e/D) * Re * sqrt(f_rib/8)
-    double e_plus = e_D * Re * std::sqrt(f_rib / 8.0);
-
-    // 4. Han heat transfer roughness function g(e+, Pr)
-    //    g = C * e+^m * Pr^n  (Han 1988, Table 2, 90-deg transverse ribs)
-    //    C=9.0, m=0.28, n=0.57  (calibrated for Re = 10k-80k)
-    //
-    //    Physical note: at high e+ (large e/D or high Re), g grows large and
-    //    the denominator (1 + sqrt(f/8)*g) >> 1, so St_rib < St_smooth.
-    //    This is physically correct for the "fully rough" regime — ribs in
-    //    this regime increase friction without proportional heat transfer gain.
-    //    For engineering enhancement estimates at Re > 80k, use the
-    //    geometry-only rib_enhancement_factor() instead (used by channel_ribbed).
-    //
-    //    High-Re extension (Singh & Ekkad 2017, GT2016-56363; Re 100k-400k):
-    //    adjusted constants C~7.5, m~0.32 give slightly lower g but the
-    //    denominator remains >> 1 at practical e+ values, so the clamp floor
-    //    still dominates. A full high-Re calibration requires direct Nu/f data
-    //    from Singh & Ekkad (2017) or Taslim et al. (1994) for curve fitting.
-    //
-    //    References:
-    //      Han, J.C. et al. (1988) J. Eng. Gas Turbines Power 110(3), 555-560
-    //      Singh, P. & Ekkad (2017) ASME GT2016-56363 (Re 150k-400k)
-    //      Taslim, M.E. et al. (1994) J. Turbomachinery 116(3), 477-487
-    double Pr = 0.7;
-    double g_rib = 9.0 * std::pow(e_plus, 0.28) * std::pow(Pr, 0.57);
     double alpha_rad = alpha_deg * M_PI / 180.0;
-    // Lower alpha -> lower g -> higher St_rib (angled ribs more effective)
-    double f_alpha = std::pow(std::sin(alpha_rad), 0.15);  // 90°->1.0, 60°->0.96, 30°->0.87
-    g_rib *= f_alpha;
+    double F_alpha = 1.0 + 0.15 * std::sin(2.0 * alpha_rad);
+    double enhancement = 54.9
+        * std::pow(Re, -0.1755)
+        * std::pow(e_D, 0.38)
+        * std::pow(pitch_to_height, -0.11)
+        * F_alpha;
 
-    // 5. Smooth-tube Stanton number baseline: St_smooth = f0/8
-    //    (Han's analogy uses Pr implicitly in g; St here is the momentum-transfer proxy)
-    double st_smooth = f0 / 8.0;
+    return std::clamp(enhancement, 0.8, 4.0);
+}
 
-    // St_rib from Han rough-surface heat-momentum analogy:
-    //   St_rib = (f_rib/8) / (1 + sqrt(f_rib/8) * g_rib)
-    double denom = 1.0 + std::sqrt(f_rib / 8.0) * g_rib;
-    double st_rib = (f_rib / 8.0) / denom;
+double rib_friction_multiplier_high_re(double e_D, double pitch_to_height) {
+    // Singh & Ekkad (2017) friction correlation for the fully-rough regime.
+    // f/f0 = C * (e/D)^0.85 * (P/e)^(-0.25)   (Re-independent)
+    //
+    // C=125.0 back-calculated from tabulated data at reference geometry
+    // (e/D=0.0625, P/e=10): f/f0 ~ 6.3.
+    //   125 * 0.0625^0.85 * 10^(-0.25) = 125 * 0.0943 * 0.5623 = 6.63  (+5%)
+    // Source text states C=12.5 which is a decimal-point error (~10x too small).
+    //
+    // Reference: Singh, P. & Ekkad, S. (2017) ASME GT2016-56363
+    validate_rib_params(e_D, pitch_to_height);
 
-    // 6. Enhancement factor = St_rib / St_smooth
-    double enhancement = st_rib / st_smooth;
+    return 125.0
+        * std::pow(e_D, 0.85)
+        * std::pow(pitch_to_height, -0.25);
+}
 
-    return std::clamp(enhancement, 0.5, 4.0);
+double thermal_performance_factor(double Nu_ratio, double f_ratio) {
+    // Webb & Eckert (1972) thermal-hydraulic performance factor.
+    // eta = (Nu/Nu0) / (f/f0)^(1/3)
+    // Compares heat transfer gain against pumping power penalty at equal velocity.
+    // eta > 1: net improvement over smooth; eta < 1: pressure-drop generator.
+    //
+    // Cross-check against Singh & Ekkad tabulated data (e/D=0.0625, P/e=10, 90 deg):
+    //   Re=30k:  2.45 / 6.50^(1/3) = 2.45 / 1.866 = 1.31  (table: 1.31)
+    //   Re=100k: 1.95 / 6.30^(1/3) = 1.95 / 1.849 = 1.05  (table: 1.05)
+    //   Re=400k: 1.55 / 6.20^(1/3) = 1.55 / 1.838 = 0.84  (table: 0.84)
+    //
+    // Reference: Webb, R.L. & Eckert, E.R.G. (1972)
+    //   Int. J. Heat Mass Transfer 15(8), 1647-1658
+    return Nu_ratio / std::pow(f_ratio, 1.0 / 3.0);
 }
 
 double rib_friction_multiplier(double e_D, double pitch_to_height) {

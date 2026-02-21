@@ -328,13 +328,19 @@ print(f"q = {sol_q.q/1000:.1f} kW/m2")
 ```python
 import combaero as ca
 
-# Rib enhancement factor (geometry-only, Han et al. 1988)
+# Rib enhancement factor - geometry-only (Han et al. 1988, used by channel_ribbed)
 enh = ca.rib_enhancement_factor(e_D=0.05, pitch_to_height=10.0, alpha_deg=60.0)
 fmul = ca.rib_friction_multiplier(e_D=0.05, pitch_to_height=10.0)
 
-# Re-dependent rib enhancement (Han g-function, Serghides f0)
-enh_re = ca.rib_enhancement_factor_re(e_D=0.05, pitch_to_height=10.0,
-                                       alpha_deg=60.0, Re=25000.0)
+# High-Re direct empirical fit (Singh & Ekkad 2017, Re = 30k-400k)
+# Nu/Nu0 = 54.9 * Re^(-0.1755) * (e/D)^0.38 * (P/e)^(-0.11) * F(alpha)
+enh_hre = ca.rib_enhancement_factor_high_re(e_D=0.0625, pitch_to_height=10.0,
+                                             alpha_deg=60.0, Re=200_000.0)
+fmul_hre = ca.rib_friction_multiplier_high_re(e_D=0.0625, pitch_to_height=10.0)
+
+# Thermal-hydraulic performance factor (Webb & Eckert 1972)
+# eta = (Nu/Nu0) / (f/f0)^(1/3)  -- eta > 1: net improvement; eta < 1: pressure-drop generator
+eta = ca.thermal_performance_factor(Nu_ratio=enh_hre, f_ratio=fmul_hre)
 
 # Impingement Nusselt (Martin 1977 / Florschuetz 1981)
 Nu = ca.impingement_nusselt(Re_jet=20000, Pr=0.7, z_D=6.0)

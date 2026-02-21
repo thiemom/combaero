@@ -4525,24 +4525,55 @@ PYBIND11_MODULE(_core, m)
     );
 
     m.def(
-        "rib_enhancement_factor_re",
-        static_cast<double(*)(double,double,double,double)>(
-            &combaero::cooling::rib_enhancement_factor),
+        "rib_enhancement_factor_high_re",
+        &combaero::cooling::rib_enhancement_factor_high_re,
         py::arg("e_D"),
         py::arg("pitch_to_height"),
         py::arg("alpha_deg"),
         py::arg("Re"),
-        "Rib enhancement factor (Re-dependent, Han 1988 roughness-function method).\n\n"
-        "Uses Serghides f0, roughness Reynolds number e+ = (e/D)*Re*sqrt(f/8),\n"
-        "and Han's g(e+, Pr) heat transfer function with angle correction.\n\n"
+        "Rib enhancement factor - high-Re direct empirical fit (Singh & Ekkad 2017).\n\n"
+        "Nu/Nu0 = 40.0 * Re^(-0.12) * (e/D)^0.38 * (P/e)^(-0.11) * F(alpha)\n"
+        "F(alpha) = 1.0 + 0.15*sin(2*alpha_rad)  -- peaks at 45 deg (~1.15), 1.0 at 90 deg.\n\n"
         "Parameters:\n"
         "  e_D            : rib height / hydraulic diameter [-]\n"
         "  pitch_to_height: rib pitch / rib height [-]\n"
         "  alpha_deg      : rib angle [deg]\n"
         "  Re             : channel Reynolds number [-]\n\n"
-        "Valid range: Re = 10000-100000, e_D = 0.02-0.1, pitch_to_height = 5-20, alpha_deg = 30-90\n"
-        "Source: Han et al. (1988)\n\n"
-        "Returns: Enhancement factor Nu_rib/Nu_smooth [-]"
+        "Valid range: Re = 30000-400000, e_D = 0.04-0.10, pitch_to_height = 8-12, alpha_deg = 45-90\n"
+        "Source: Singh & Ekkad (2017) ASME GT2016-56363\n\n"
+        "Returns: Nu_rib/Nu_smooth [-]"
+    );
+
+    m.def(
+        "rib_friction_multiplier_high_re",
+        &combaero::cooling::rib_friction_multiplier_high_re,
+        py::arg("e_D"),
+        py::arg("pitch_to_height"),
+        "Rib friction multiplier - high-Re direct empirical fit (Singh & Ekkad 2017).\n\n"
+        "f/f0 = 125.0 * (e/D)^0.85 * (P/e)^(-0.25)  (Re-independent, fully-rough regime).\n\n"
+        "Parameters:\n"
+        "  e_D            : rib height / hydraulic diameter [-]\n"
+        "  pitch_to_height: rib pitch / rib height [-]\n\n"
+        "Valid range: e_D = 0.04-0.10, pitch_to_height = 8-12\n"
+        "Source: Singh & Ekkad (2017) ASME GT2016-56363\n\n"
+        "Returns: f_rib/f_smooth [-]"
+    );
+
+    m.def(
+        "thermal_performance_factor",
+        &combaero::cooling::thermal_performance_factor,
+        py::arg("Nu_ratio"),
+        py::arg("f_ratio"),
+        "Thermal-hydraulic performance factor (Webb & Eckert 1972).\n\n"
+        "eta = (Nu/Nu0) / (f/f0)^(1/3)\n"
+        "Compares heat transfer gain against pumping power penalty at equal velocity.\n"
+        "eta > 1: net improvement over smooth; eta < 1: pressure-drop generator.\n"
+        "Generic: works for ribs, dimples, pin fins, impingement, or any surface.\n\n"
+        "Parameters:\n"
+        "  Nu_ratio: Nu_enhanced / Nu_smooth [-]\n"
+        "  f_ratio : f_enhanced  / f_smooth  [-]\n\n"
+        "Source: Webb & Eckert (1972) Int. J. Heat Mass Transfer 15(8), 1647-1658\n\n"
+        "Returns: thermal-hydraulic performance factor eta [-]"
     );
 
     m.def(

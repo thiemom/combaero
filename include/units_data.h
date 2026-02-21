@@ -83,9 +83,11 @@ inline constexpr Entry function_units[] = {
     // -------------------------------------------------------------------------
     // cooling_correlations.h - Advanced Cooling Correlations
     // -------------------------------------------------------------------------
-    {"rib_enhancement_factor",    "e_D: -, pitch_to_height: -, alpha_deg: deg",        "-"},
-    {"rib_enhancement_factor_re", "e_D: -, pitch_to_height: -, alpha_deg: deg, Re: -", "-"},
-    {"rib_friction_multiplier",   "e_D: -, pitch_to_height: -",                        "-"},
+    {"rib_enhancement_factor",          "e_D: -, pitch_to_height: -, alpha_deg: deg",        "-"},
+    {"rib_enhancement_factor_high_re",  "e_D: -, pitch_to_height: -, alpha_deg: deg, Re: -", "-"},
+    {"rib_friction_multiplier",         "e_D: -, pitch_to_height: -",                        "-"},
+    {"rib_friction_multiplier_high_re", "e_D: -, pitch_to_height: -",                        "-"},
+    {"thermal_performance_factor",      "Nu_ratio: -, f_ratio: -",                           "-"},
     {"impingement_nusselt",     "Re_jet: -, Pr: -, z_D: -, x_D: - (default 0), y_D: - (default 0)", "-"},
     {"film_cooling_effectiveness", "x_D: -, M: -, DR: -, alpha_deg: deg", "-"},
     {"film_cooling_effectiveness_avg", "x_D: -, M: -, DR: -, alpha_deg: deg, s_D: - (default 3.0)", "-"},
