@@ -26,6 +26,9 @@ Design sweep: vary bypass fraction f_cool to find minimum cooling flow
 that keeps T_metal < 800 C for three channel geometries:
   - Smooth
   - Rib-roughened  (Han et al. 1988, e/D=0.07, P/e=8, alpha=60 deg)
+    Note: channel_ribbed uses the geometry-only rib_enhancement_factor internally.
+    For standalone high-Re Nu/Nu0 and f/f0 use rib_enhancement_factor_high_re
+    and rib_friction_multiplier_high_re (Singh & Ekkad 2017, Re=30k-400k).
   - Dimpled        (Chyu et al. 1997, d/Dh=0.2, h/d=0.2, S/d=2)
 
 Wall configurations compared:
@@ -37,6 +40,7 @@ Key combaero tools used:
   - humid_air_composition              (realistic coolant composition)
   - mix + set_fuel_stream_for_Tad      (closed energy loop at fixed COT)
   - channel_smooth / channel_ribbed / channel_dimpled
+  - thermal_performance_factor         (Webb & Eckert 1972 eta = Nu_r/f_r^(1/3))
   - wall_temperature_profile           (multi-layer T profile)
   - k_inconel718 / k_tbc_ysz          (temperature-dependent material k)
   - list_materials                     (material database)
@@ -119,6 +123,13 @@ def solve_operating_point(
     r_ch = channel_result(ch_name, T2, P2, X_cool, u_cool, D_ch, L_ch)
     h_cool = r_ch.h
 
+    # Smooth-channel baseline for thermal performance factor
+    r_smooth = ca.channel_smooth(T2, P2, X_cool, u_cool, D_ch, L_ch)
+    eta_thp = ca.thermal_performance_factor(
+        Nu_ratio=r_ch.Nu / r_smooth.Nu,
+        f_ratio=max(r_ch.f / r_smooth.f, 1.0),
+    )
+
     for _ in range(4):
         h_hot = hot_side_htc(T_hot_est, P_hot, X_air, D_ann, u_hot_ann)
 
@@ -163,6 +174,7 @@ def solve_operating_point(
         "q_wall": q_wall,
         "T_hot_surf": T_hot_surf,
         "T_metal_hot": T_metal_hot,
+        "eta_thp": eta_thp,
     }
 
 
@@ -273,7 +285,7 @@ def main() -> None:
     print(f"\n{'=' * 70}")
     print(f"Bypass Sweep  ({primary_cfg})")
     print(f"{'=' * 70}")
-    hdr = f"  {'f_cool':>6}  {'u[m/s]':>7}  {'h_cool':>7}  {'T_exit[K]':>9}  {'T_metal[C]':>11}  {'FAR':>7}  {'dP_tot/P%':>10}"
+    hdr = f"  {'f_cool':>6}  {'u[m/s]':>7}  {'h_cool':>7}  {'T_exit[K]':>9}  {'T_metal[C]':>11}  {'FAR':>7}  {'dP_tot/P%':>10}  {'eta_thp':>7}"
     print(hdr)
     print("  " + "-" * (len(hdr) - 2))
     for ch_name in channel_names:
@@ -283,7 +295,7 @@ def main() -> None:
             print(
                 f"  {pt['f_cool']:6.2f}  {pt['u_cool']:7.1f}  {pt['h_cool']:7.0f}"
                 f"  {pt['T_cool_exit']:9.1f}  {pt['T_metal_hot'] - 273.15:11.1f}{ok}"
-                f"  {pt['FAR']:7.5f}  {pt['dP_total_frac']:10.2f}"
+                f"  {pt['FAR']:7.5f}  {pt['dP_total_frac']:10.2f}  {pt['eta_thp']:7.3f}"
             )
 
     # -----------------------------------------------------------------------
