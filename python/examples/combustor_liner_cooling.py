@@ -49,10 +49,9 @@ Key combaero tools used:
 
 from __future__ import annotations
 
-import pathlib
-
 import matplotlib.pyplot as plt
 import numpy as np
+from plot_utils import show_or_save
 
 import combaero as ca
 from combaero.species import SpeciesLocator
@@ -435,12 +434,7 @@ def main() -> None:
     ax.grid(True, alpha=0.3, axis="y")
 
     plt.tight_layout()
-    if plt.get_backend().lower() == "agg":
-        out_path = pathlib.Path(__file__).parent / "combustor_liner_cooling.png"
-        plt.savefig(out_path, dpi=150)
-        print(f"\nPlot saved to '{out_path}'")
-    else:
-        plt.show()
+    show_or_save(fig, "combustor_liner_cooling.png")
 
 
 if __name__ == "__main__":

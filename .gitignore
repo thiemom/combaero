@@ -90,6 +90,9 @@ thermo_data_generator/*.csv
 examples/*.png
 examples/*.csv
 examples/*.dat
+python/examples/*.png
+python/examples/*.csv
+python/examples/*.dat
 
 # CTest
 Testing/
