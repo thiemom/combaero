@@ -2,6 +2,7 @@
 
 # Create a library target for the test sources
 set(TEST_SOURCES
+    test_state.cpp             # Thermodynamic State API setter tests
     test_thermo_transport.cpp  # Core thermodynamic property tests
     test_humidair.cpp          # Humid air calculation tests
     test_incompressible.cpp    # Incompressible flow tests (zeta, Cd, pressure loss)
