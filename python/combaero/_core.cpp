@@ -965,6 +965,33 @@ PYBIND11_MODULE(_core, m) {
            "Set mass entropy and mass enthalpy, returns self")
       // Pythonic tuple properties
       .def_property(
+          "TPX", [](const State &s) { return py::make_tuple(s.T, s.P, s.X); },
+          [](State &s, py::tuple t) {
+            if (t.size() != 3)
+              throw std::invalid_argument("TPX must be a 3-tuple (T, P, X)");
+            auto X_arr =
+                t[2].cast<py::array_t<double, py::array::c_style |
+                                                  py::array::forcecast>>();
+            s.set_TPX(t[0].cast<double>(), t[1].cast<double>(), to_vec(X_arr));
+          },
+          "Get/Set Temperature [K], Pressure [Pa], and Mole Fractions as a "
+          "tuple (T, P, X)")
+      .def_property(
+          "TPY",
+          [](const State &s) {
+            return py::make_tuple(s.T, s.P, mole_to_mass(s.X));
+          },
+          [](State &s, py::tuple t) {
+            if (t.size() != 3)
+              throw std::invalid_argument("TPY must be a 3-tuple (T, P, Y)");
+            auto Y_arr =
+                t[2].cast<py::array_t<double, py::array::c_style |
+                                                  py::array::forcecast>>();
+            s.set_TPY(t[0].cast<double>(), t[1].cast<double>(), to_vec(Y_arr));
+          },
+          "Get/Set Temperature [K], Pressure [Pa], and Mass Fractions as a "
+          "tuple (T, P, Y)")
+      .def_property(
           "TP", [](const State &s) { return py::make_tuple(s.T, s.P); },
           [](State &s, py::tuple t) {
             if (t.size() != 2)

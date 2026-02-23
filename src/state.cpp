@@ -137,6 +137,56 @@ State &State::set_SH_mass(double s_new, double h_new) {
 }
 
 // -------------------------------------------------------------
+// Joint Getters
+// -------------------------------------------------------------
+
+std::tuple<double, double, std::vector<double>> State::TPX() const {
+  return std::make_tuple(T, P, X);
+}
+
+std::tuple<double, double, std::vector<double>> State::TPY() const {
+  return std::make_tuple(T, P, mole_to_mass(X));
+}
+
+std::tuple<double, double> State::TP() const { return std::make_tuple(T, P); }
+
+std::tuple<double, double> State::DP_mass() const {
+  return std::make_tuple(rho(), P);
+}
+
+std::tuple<double, double> State::HP_mass() const {
+  return std::make_tuple(h() / mw() * 1000.0, P);
+}
+
+std::tuple<double, double> State::SP_mass() const {
+  return std::make_tuple(s() / mw() * 1000.0, P);
+}
+
+std::tuple<double, double> State::UV_mass() const {
+  return std::make_tuple(u() / mw() * 1000.0, 1.0 / rho());
+}
+
+std::tuple<double, double> State::SV_mass() const {
+  return std::make_tuple(s() / mw() * 1000.0, 1.0 / rho());
+}
+
+std::tuple<double, double> State::PV_mass() const {
+  return std::make_tuple(P, 1.0 / rho());
+}
+
+std::tuple<double, double> State::UP_mass() const {
+  return std::make_tuple(u() / mw() * 1000.0, P);
+}
+
+std::tuple<double, double> State::VH_mass() const {
+  return std::make_tuple(1.0 / rho(), h() / mw() * 1000.0);
+}
+
+std::tuple<double, double> State::SH_mass() const {
+  return std::make_tuple(s() / mw() * 1000.0, h() / mw() * 1000.0);
+}
+
+// -------------------------------------------------------------
 // Stream mixing
 // -------------------------------------------------------------
 

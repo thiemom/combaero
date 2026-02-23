@@ -2,6 +2,7 @@
 #define STATE_H
 
 #include <string>
+#include <tuple>
 #include <vector>
 
 // NOTE: Individual property getters (mu, k, Pr, ...) recompute on every call
@@ -70,6 +71,20 @@ struct State {
   State &set_UP_mass(double u_new, double P_new);
   State &set_VH_mass(double v_new, double h_new);
   State &set_SH_mass(double s_new, double h_new);
+
+  // Joint Getters
+  std::tuple<double, double, std::vector<double>> TPX() const;
+  std::tuple<double, double, std::vector<double>> TPY() const;
+  std::tuple<double, double> TP() const;
+  std::tuple<double, double> DP_mass() const;
+  std::tuple<double, double> HP_mass() const;
+  std::tuple<double, double> SP_mass() const;
+  std::tuple<double, double> UV_mass() const;
+  std::tuple<double, double> SV_mass() const;
+  std::tuple<double, double> PV_mass() const;
+  std::tuple<double, double> UP_mass() const;
+  std::tuple<double, double> VH_mass() const;
+  std::tuple<double, double> SH_mass() const;
 };
 
 // A stream is a state with a mass flow rate
