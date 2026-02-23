@@ -35,14 +35,15 @@ def adiabatic_path(
     T_start: float, P_start: float, P_end: float, X: list, n: int = 200
 ) -> tuple[np.ndarray, np.ndarray]:
     """Pressure-volume path for isentropic process (variable gamma)."""
-    # Use entropy conservation: at each P along the path, find T
-    s_ref = ca.s(T_start, X, P_start)  # molar entropy [J/(mol K)]
+    state = ca.State().set_TPX(T_start, P_start, X)
+    s_mass, _ = state.SP
+
     P_path = np.linspace(P_start, P_end, n)
     V_path = np.empty(n)
     for i, P in enumerate(P_path):
-        T = ca.calc_T_from_s(s_ref, P, X)
-        rho = ca.density(T, P, X)
-        V_path[i] = 1.0 / rho  # specific volume [m3/kg]
+        state.SP = s_mass, P
+        _, v = state.PV
+        V_path[i] = v
     return V_path, P_path
 
 
@@ -94,19 +95,15 @@ def main() -> None:
     # State 2: TDC after isentropic compression
     # =========================================================================
     # P2/P1 = CR^gamma  (first estimate with local gamma, then exact via s=const)
-    gamma1 = ca.isentropic_expansion_coefficient(T1, X1)
-    P2_est = P1 * CR**gamma1
-    s1 = ca.s(T1, X1, P1)  # molar entropy [J/(mol K)]
-    T2, P2 = ca.calc_T_from_s(s1, P2_est, X1), P2_est
-    # Refine: actual v2 = v1/CR, so iterate P2 until v2 = v1/CR at s=const
-    for _ in range(10):
-        rho2 = ca.density(T2, P2, X1)
-        v2_actual = 1.0 / rho2
-        v2_target = v1 / CR
-        P2 = P2 * (v2_actual / v2_target) ** ca.isentropic_expansion_coefficient(T2, X1)
-        T2 = ca.calc_T_from_s(s1, P2, X1)
+    state1 = ca.State().set_TPX(T1, P1, X1)
+    s1_mass, v1_mass = state1.SV
+    gamma1 = state1.gamma
 
-    rho2 = ca.density(T2, P2, X1)
+    state2 = ca.State().set_TPX(T1, P1, X1)
+    state2.SV = s1_mass, v1_mass / CR
+
+    T2, P2 = state2.TP
+    rho2 = state2.rho
     v2 = 1.0 / rho2
 
     print("\n--- State 2 (TDC, end of compression) ---")
@@ -145,18 +142,15 @@ def main() -> None:
     # =========================================================================
     # Expand back to v4 = v1 (same specific volume as State 1)
     # Mirror of compression: find P4 such that v4 = v1 at constant s
-    gamma3 = ca.isentropic_expansion_coefficient(T3, X3)
-    P4_est = P3 / CR**gamma3
-    s3 = ca.s(T3, X3, P3)  # molar entropy [J/(mol K)]
-    P4 = P4_est
-    T4 = ca.calc_T_from_s(s3, P4, X3)
-    for _ in range(10):
-        rho4 = ca.density(T4, P4, X3)
-        v4_actual = 1.0 / rho4
-        P4 = P4 * (v4_actual / v1) ** ca.isentropic_expansion_coefficient(T4, X3)
-        T4 = ca.calc_T_from_s(s3, P4, X3)
+    state3 = ca.State().set_TPX(T3, P3, X3)
+    s3_mass, _ = state3.SV
+    gamma3 = state3.gamma
 
-    rho4 = ca.density(T4, P4, X3)
+    state4 = ca.State().set_TPX(T3, P3, X3)
+    state4.SV = s3_mass, v1
+
+    T4, P4 = state4.TP
+    rho4 = state4.rho
     v4 = 1.0 / rho4
 
     print("\n--- State 4 (BDC, end of expansion) ---")

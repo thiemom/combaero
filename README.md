@@ -317,7 +317,7 @@ See [`cantera_validation_tests/README.md`](cantera_validation_tests/README.md) a
 
 ## Acknowledgments
 
-This library was developed with significant assistance from AI coding agents, including Claude (Anthropic) for the majority of implementation and testing, and ChatGPT (OpenAI) for early water-gas shift equilibrium guidance. These tools made it possible to build a comprehensive thermodynamic library in a fraction of the time it would otherwise require.
+This library was developed with significant assistance from AI coding agents, including Antigravity (Google DeepMind) for architectural changes and testing workflows, Claude (Anthropic) for the majority of implementation and testing, and ChatGPT (OpenAI) for early water-gas shift equilibrium guidance. These tools made it possible to build a comprehensive thermodynamic library in a fraction of the time it would otherwise require.
 
 ## License
 

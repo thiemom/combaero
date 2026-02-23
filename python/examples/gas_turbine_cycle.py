@@ -41,7 +41,10 @@ def dh_same_X(T_a: float, T_b: float, X: list, n: int = 300) -> float:
 
 def isentropic_T(T_start: float, P_start: float, P_end: float, X: list) -> float:
     """Temperature after isentropic process from P_start to P_end."""
-    return ca.calc_T_from_s(ca.s(T_start, X, P_start), P_end, X)
+    state = ca.State().set_TPX(T_start, P_start, X)
+    s_mass, _ = state.SP
+    state.SP = s_mass, P_end
+    return state.T
 
 
 def main() -> None:
@@ -94,10 +97,11 @@ def main() -> None:
     # State 3: After isobaric combustion
     # =========================================================================
     air = ca.Stream()
-    air.T, air.P, air.X, air.mdot = T2, P2, X_air, 1.0
+    air.state.TPX = T2, P2, X_air
+    air.mdot = 1.0
 
     fuel = ca.Stream()
-    fuel.T, fuel.P, fuel.X = 300.0, P2, X_ch4
+    fuel.state.TPX = 300.0, P2, X_ch4
 
     fuel = ca.set_fuel_stream_for_phi(phi, fuel, air)
     mixed = ca.mix([fuel, air])
@@ -178,9 +182,10 @@ def main() -> None:
         p2_ = P1 * pr
         t2_ = isentropic_T(T1, P1, p2_, X_air)
         air_ = ca.Stream()
-        air_.T, air_.P, air_.X, air_.mdot = t2_, p2_, X_air, 1.0
+        air_.state.TPX = t2_, p2_, X_air
+        air_.mdot = 1.0
         fuel_ = ca.Stream()
-        fuel_.T, fuel_.P, fuel_.X = 300.0, p2_, X_ch4
+        fuel_.state.TPX = 300.0, p2_, X_ch4
         fuel_ = ca.set_fuel_stream_for_phi(phi, fuel_, air_)
         mixed_ = ca.mix([fuel_, air_])
         burned_ = ca.complete_combustion(mixed_.T, mixed_.X, mixed_.P)

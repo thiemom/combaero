@@ -79,14 +79,10 @@ def main() -> None:
     print("=" * 65)
 
     fuel = ca.Stream()
-    fuel.T = 300.0
-    fuel.P = P0
-    fuel.X = X_ch4
+    fuel.state.TPX = 300.0, P0, X_ch4
 
     air = ca.Stream()
-    air.T = 300.0
-    air.P = P0
-    air.X = X_air
+    air.state.TPX = 300.0, P0, X_air
     air.mdot = 10.0
 
     fuel_phi = ca.set_fuel_stream_for_phi(0.8, fuel, air)
