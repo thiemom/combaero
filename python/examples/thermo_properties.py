@@ -7,6 +7,7 @@ Demonstrates:
 - Fuel (CH4) properties and stoichiometric oxygen requirement
 - Combustion products via mix + complete_combustion
 - Inverse solvers: find T from h, s, cp
+- Unit introspection: query expected API units
 """
 
 from __future__ import annotations
@@ -120,6 +121,23 @@ def main() -> None:
     print(f"  T from h          : {T_from_h:.6f} K  (err {abs(T_from_h - T_ref):.2e} K)")
     print(f"  T from s          : {T_from_s:.6f} K  (err {abs(T_from_s - T_ref):.2e} K)")
     print(f"  T from cp         : {T_from_cp:.6f} K  (err {abs(T_from_cp - T_ref):.2e} K)")
+
+    # -------------------------------------------------------------------------
+    # 6. Unit Introspection API
+    # -------------------------------------------------------------------------
+    print("\n" + "=" * 65)
+    print("6. Unit Introspection API")
+    print("=" * 65)
+
+    print("\n  Every API parameter and output is explicitly mapped:")
+    print(f"  ca.h outputs                      : {ca.output_units('h')} (molar basis)")
+    print(f"  ca.density outputs                : {ca.output_units('density')}")
+    print(f"  ca.dynamic_viscosity outputs      : {ca.output_units('viscosity')}")
+    print(f"  ca.fuel_lhv_mass outputs          : {ca.output_units('fuel_lhv_mass')}")
+    print()
+    print("  We can also query function input signatures:")
+    print(f"  ca.cp required inputs             : {ca.input_units('cp')}")
+    print(f"  ca.humid_air_composition inputs   : {ca.input_units('humid_air_composition')}")
 
 
 if __name__ == "__main__":
