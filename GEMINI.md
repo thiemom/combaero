@@ -9,8 +9,8 @@ This document outlines the hard rules, coding styles, and project conventions fo
 *   **Do not bypass checks:** Never bypass Git pre-commit hooks or GitHub Actions runner checks. All code must pass these checks cleanly.
 *   **Auto-generated files:** Do not manually edit auto-generated files. They will be overwritten. Use the designated scripts to regenerate them.
 *   **Cross-Platform CI Strictness:** GitHub Actions runs compilation and tests across macOS, Windows, and Linux. Ensure all standard library includes (e.g. `<cmath>`, `<vector>`) are explicitly defined. Code that compiles natively on macOS may still fail on Linux/Windows due to stricter compiler requirements.
-*   **API Documentation Synchronization:** If you add, remove, or modify any function signature, struct, property getter/setter, or unit, you **must autonomously** update `include/units_data.h` and `docs/API_REFERENCE.md` to stay in sync. Do not wait for a specific user request to do this. **Self-Check Trigger:** Before completing a designated task, ask yourself: *Did I modify any open-facing APIs or properties?* If yes, update the docs and unit headers immediately.
-
+*   **API Documentation Synchronization:** If you add, remove, or modify any function signature, struct, property getter/setter, or unit, you **must autonomously** update `include/units_data.h` and `docs/API_REFERENCE.md` to stay in sync. Do not wait for a specific user request to do this.
+*   **Unit Sync Enforcement:** The project strictly enforces that **all** exported Python API elements (functions, class methods/properties) have a corresponding metadata entry in `include/units_data.h`. This is enforced by `python/tests/test_units_sync.py`. If you add a new Python submodule, utility function without physical units, or a structural enum, you **must** add it to the `IGNORE_LIST` in `test_units_sync.py` to prevent CI failures. Conversely, if you add a calculation, you MUST map it in `units_data.h`.
 ## 2. Coding Style
 
 ### C++ (Modern C++17)

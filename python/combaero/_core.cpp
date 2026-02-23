@@ -1258,6 +1258,50 @@ PYBIND11_MODULE(_core, m) {
       .def("set_mdot", &Stream::set_mdot, py::arg("mdot"),
            "Set mass flow rate [kg/s], returns self");
 
+  // -------------------------------------------------------------
+  // HumidAir State Object
+  // -------------------------------------------------------------
+  py::class_<HumidAir>(m, "HumidAir")
+      .def(py::init<>())
+      .def_readwrite("state", &HumidAir::state,
+                     "Core CombAero thermodynamic state")
+      // Properties
+      .def_property(
+          "rh", &HumidAir::RH,
+          [](HumidAir &h, double rh) { h.set_TP_RH(h.state.T, h.state.P, rh); },
+          "Relative humidity [0-1]")
+      .def_property_readonly("dewpoint", &HumidAir::dewpoint,
+                             "Dewpoint temperature [K]")
+      .def_property_readonly("wet_bulb", &HumidAir::wet_bulb,
+                             "Wet-bulb temperature [K]")
+      .def_property_readonly("humidity_ratio", &HumidAir::humidity_ratio,
+                             "Humidity ratio [-]")
+      .def_property_readonly(
+          "h_mass", &HumidAir::h_mass,
+          "ASHRAE psychrometric specific enthalpy [J/kg dry air]")
+      // Tuple-like properties
+      .def_property(
+          "TP_RH", [](const HumidAir &h) { return h.TP_RH(); },
+          [](HumidAir &h, std::tuple<double, double, double> tp_rh) {
+            h.set_TP_RH(std::get<0>(tp_rh), std::get<1>(tp_rh),
+                        std::get<2>(tp_rh));
+          },
+          "Get/Set T, P, RH tuple")
+      .def_property(
+          "TP_dewpoint", [](const HumidAir &h) { return h.TP_dewpoint(); },
+          [](HumidAir &h, std::tuple<double, double, double> tp_tdp) {
+            h.set_TP_dewpoint(std::get<0>(tp_tdp), std::get<1>(tp_tdp),
+                              std::get<2>(tp_tdp));
+          },
+          "Get/Set T, P, dewpoint tuple")
+      // Fluent setters (return self for chaining)
+      .def("set_TP_RH", &HumidAir::set_TP_RH, py::arg("T"), py::arg("P"),
+           py::arg("RH"), "Set T, P, RH, returns self")
+      .def("set_TP_dewpoint", &HumidAir::set_TP_dewpoint, py::arg("T"),
+           py::arg("P"), py::arg("Tdp"), "Set T, P, dewpoint, returns self")
+      .def("set_TP_omega", &HumidAir::set_TP_omega, py::arg("T"), py::arg("P"),
+           py::arg("w"), "Set T, P, humidity ratio, returns self");
+
   // Stream mixing function
   m.def(
       "mix",

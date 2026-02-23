@@ -186,6 +186,7 @@ try:
         humid_air_enthalpy,
         humid_air_enthalpy_nasa9,
         humidity_ratio,
+        HumidAir,
         hydraulic_diameter,
         hydraulic_diameter_annulus,
         hydraulic_diameter_rect,
@@ -407,6 +408,7 @@ except ModuleNotFoundError:
     humid_air_enthalpy = _core.humid_air_enthalpy
     humid_air_enthalpy_nasa9 = _core.humid_air_enthalpy_nasa9
     humidity_ratio = _core.humidity_ratio
+    HumidAir = _core.HumidAir
     saturation_vapor_pressure = _core.saturation_vapor_pressure
     vapor_pressure = _core.vapor_pressure
     water_vapor_mole_fraction = _core.water_vapor_mole_fraction
@@ -738,6 +740,7 @@ __all__ = [
     # State-based API
     "State",
     "Stream",
+    "HumidAir",
     "AirProperties",
     "air_properties",
     "ThermoState",
