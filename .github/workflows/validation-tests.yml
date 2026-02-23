@@ -29,28 +29,8 @@ on:
       - 'Makefile'
 
 jobs:
-  python-style:
-    name: Python Code Style
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install style tools
-        run: |
-          pip install ruff mypy
-
-      - name: Check Python style
-        run: ./scripts/check-python-style.sh --verbose
-
   cantera-validation:
-    name: Cantera Validation Tests
+    name: Test Cantera Validation
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -128,7 +108,7 @@ jobs:
           path: cantera_validation_tests/test_summary.txt
 
   python-unit-tests:
-    name: Python Unit Tests
+    name: Test Python Unit
     runs-on: ${{ matrix.os }}
 
     strategy:

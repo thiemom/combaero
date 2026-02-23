@@ -7,8 +7,30 @@ on:
     branches: [ main, master ]
 
 jobs:
+  lint:
+    name: Lint & Style Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check C++ source code style
+        run: ./scripts/check-source-style.sh --verbose
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python style tools
+        run: pip install ruff mypy
+
+      - name: Check Python code style
+        run: ./scripts/check-python-style.sh --verbose
+
   build-and-test:
-    name: Build and test (${{ matrix.os }}, ${{ matrix.build_type }})
+    name: Build & Test C++ (${{ matrix.os }}, ${{ matrix.build_type }})
+    needs: lint
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -20,24 +42,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Check C++ source code style
-        if: runner.os != 'Windows'
-        run: ./scripts/check-source-style.sh --verbose
-
-      - name: Set up Python (for style check)
-        if: runner.os != 'Windows'
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install Python style tools
-        if: runner.os != 'Windows'
-        run: pip install ruff mypy
-
-      - name: Check Python code style
-        if: runner.os != 'Windows'
-        run: ./scripts/check-python-style.sh --verbose
 
       - name: Set up CMake
         uses: jwlawson/actions-setup-cmake@v1
@@ -56,8 +60,16 @@ jobs:
         run: |
           ctest --output-on-failure
 
+      - name: Run accuracy tests
+        working-directory: build
+        if: runner.os != 'Windows'
+        run: |
+          ./tests/test_ice_equation_accuracy
+          ./tests/test_water_equation_accuracy
+
   build-mingw:
-    name: Build (Ubuntu -> Windows MinGW)
+    name: Build MinGW
+    needs: lint
     runs-on: ubuntu-latest
 
     steps:
