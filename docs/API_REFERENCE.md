@@ -1083,6 +1083,48 @@ std::vector<double> humid_air_composition(double T, double P, double RH);
 double dewpoint(double T, double P, const std::vector<double>& X);
 ```
 
+### HumidAir State Object
+
+A convenient state wrapper that manages relative humidity, dewpoint, and the underlying thermodynamic state of humid air.
+
+```python
+import combaero as cb
+
+air = cb.HumidAir()
+
+# Fluent setters
+air.set_TP_RH(300.0, 101325.0, 0.5)
+
+# Or set using tuples
+air.TP_dewpoint = (300.0, 101325.0, 280.0)
+
+# Query meteorology properties
+print(f"RH: {air.rh}")
+print(f"Dewpoint: {air.dewpoint} K")
+print(f"Wet bulb: {air.wet_bulb} K")
+print(f"Humidity ratio: {air.humidity_ratio} kg_h2o/kg_da")
+print(f"Enthalpy: {air.h_mass} J/kg") # ASHRAE psychrometric specific enthalpy
+
+# Access underlying thermodynamic properties natively!
+print(f"Density: {air.state.rho} kg/m³")
+print(f"Specific heat: {air.state.cp} J/(mol·K)")
+print(f"Mole fractions: {air.state.X}")
+```
+
+**HumidAir Methods & Properties:**
+- `set_TP_RH(T, P, RH)` - Sets temperature [K], pressure [Pa], relative humidity [0-1]. Returns self.
+- `set_TP_dewpoint(T, P, Tdp)` - Sets T, P, and dewpoint [K]. Returns self.
+- `set_TP_omega(T, P, w)` - Sets T, P, and humidity ratio [-]. Returns self.
+- `rh` - Relative humidity property [0-1] (read/write).
+- `dewpoint` - Dewpoint temperature [K] (read-only).
+- `wet_bulb` - Wet-bulb temperature [K] (read-only).
+- `humidity_ratio` - Humidity ratio [-] (read-only).
+- `h_mass` - ASHRAE psychrometric specific enthalpy [J/kg dry air] (read-only).
+- `TP_RH` - Tuple of (T, P, RH) (read/write).
+- `TP_dewpoint` - Tuple of (T, P, Dewpoint) (read/write).
+- `state` - Underlying `State` object allowing access to `.T`, `.P`, `.X`, `.rho`, `.h`, `.cp`, etc.
+
+
 ## Stagnation / Static Conversions (`stagnation.h`)
 
 Isentropic stagnation ↔ static conversion utilities for a thermally perfect gas. All iterative functions use the variable-cp thermo backend (`thermo.h`) internally.
