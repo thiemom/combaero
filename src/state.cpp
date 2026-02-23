@@ -2,6 +2,7 @@
 #include "../include/thermo.h"
 #include "../include/transport.h"
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <stdexcept>
 
