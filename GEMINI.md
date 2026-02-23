@@ -8,6 +8,7 @@ This document outlines the hard rules, coding styles, and project conventions fo
 *   **Virtual Environment Only:** Always use the project-local virtual environment located at `.venv`. If activating a shell, use `source .venv/bin/activate`.
 *   **Do not bypass checks:** Never bypass Git pre-commit hooks or GitHub Actions runner checks. All code must pass these checks cleanly.
 *   **Auto-generated files:** Do not manually edit auto-generated files. They will be overwritten. Use the designated scripts to regenerate them.
+*   **API Documentation Synchronization:** If you add, remove, or modify any function signature, struct, property getter/setter, or unit, you **must autonomously** update `include/units_data.h` and `docs/API_REFERENCE.md` to stay in sync. Do not wait for a specific user request to do this. **Self-Check Trigger:** Before completing a designated task, ask yourself: *Did I modify any open-facing APIs or properties?* If yes, update the docs and unit headers immediately.
 
 ## 2. Coding Style
 
