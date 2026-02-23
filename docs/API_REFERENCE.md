@@ -64,6 +64,87 @@ The library uses **NASA-9 polynomials** for thermodynamic properties:
 
 **Note**: Always use `species_index_from_name("CH4")` rather than hardcoded indices for forward compatibility.
 
+## Core State and Stream Objects
+
+The `State` and `Stream` structs are the fundamental building blocks of CombAero.
+
+### C++ Interface
+
+The `State` struct provides a robust interface for defining thermodynamic states and querying physical properties. It supports Cantera-style fluent setters and joint getters.
+
+```cpp
+struct State {
+    // Basic data members
+    double T = 298.15;           // Temperature [K]
+    double P = 101325.0;         // Pressure [Pa]
+    std::vector<double> X;       // Mole fractions [-]
+
+    // Chainable Setters (Return State&)
+    State& set_T(double T);
+    State& set_P(double P);
+    State& set_X(const std::vector<double>& X);
+    State& set_TP(double T, double P);
+    State& set_TPX(double T, double P, const std::vector<double>& X);
+    State& set_TPY(double T, double P, const std::vector<double>& Y);
+    // Other available setters: set_DP, set_HP, set_SP, set_UV, set_SV, set_PV, set_UP, set_VH, set_SH, set_ST
+
+    // Joint Getters (Return std::tuple)
+    std::tuple<double, double, std::vector<double>> TPX() const; // (T, P, X)
+    std::tuple<double, double, std::vector<double>> TPY() const; // (T, P, mass_fractions)
+    std::tuple<double, double> TP() const;      // (T, P)
+    std::tuple<double, double> HP_mass() const; // (h_mass, P)
+    std::tuple<double, double> SP_mass() const; // (s_mass, P)
+    // Other available getters: DP_mass, UV_mass, SV_mass, PV_mass, UP_mass, VH_mass, SH_mass
+
+    // Read-only Property Getters (Evaluated lazily)
+    double mw() const;           // Molecular weight [g/mol]
+    double rho() const;          // Density [kg/m³]
+    double cp() const;           // Molar heat capacity [J/(mol·K)]
+    double h() const;            // Molar enthalpy [J/mol]
+    double s() const;            // Molar entropy [J/(mol·K)]
+    double u() const;            // Molar internal energy [J/mol]
+    double gamma() const;        // Heat capacity ratio [-]
+    double a() const;            // Speed of sound [m/s]
+    double mu() const;           // Dynamic viscosity [Pa·s]
+    double k() const;            // Thermal conductivity [W/(m·K)]
+    // ... plus mass-specific variants (cp_mass, h_mass, s_mass, u_mass) and more.
+};
+
+struct Stream {
+    State state;
+    double mdot = 0.0;           // Mass flow rate [kg/s]
+};
+```
+
+### Python Interface
+
+In Python, the `State` and `Stream` objects expose properties that behave seamlessly like Cantera items. Joint properties seamlessly map to Python tuples, allowing robust and fast assignment.
+
+```python
+import combaero as cb
+import numpy as np
+
+# Initialize a Stream and access its State
+fuel = cb.Stream()
+
+# Using individual properties
+fuel.state.T = 300.0
+fuel.state.P = 101325.0
+
+# Using tuple properties (Cantera-style)
+X_CH4 = np.zeros(14)
+X_CH4[cb.species_index_from_name("CH4")] = 1.0
+
+fuel.state.TPX = (300.0, 101325.0, X_CH4)
+# Or
+fuel.state.HP = (fuel.state.h_mass, 200000.0) # Adiabatic compression
+
+# Fetching properties via tuple getters
+s_mass, v_mass = fuel.state.SV
+```
+
+
+
 ## Inverse Combustion Solvers
 
 These functions find the fuel or oxidizer mass flow rate to achieve a target property in burned products. All use complete combustion to CO₂/H₂O (no WGS).

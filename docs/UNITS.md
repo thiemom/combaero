@@ -98,24 +98,23 @@ All functions use consistent units to avoid conversion errors.
 
 #### Mixture Properties (Mass/Other Basis)
 
-| Function                           | Input Units                                                                                | Output Unit            |
-|------------------------------------|--------------------------------------------------------------------------------------------|------------------------|
-| `density`                          | T: K, P: Pa, X: mol/mol                                                                    | kg/m^3                 |
-| `molar_volume`                     | T: K, P: Pa                                                                                | m^3/mol                |
-| `specific_gas_constant`            | X: mol/mol                                                                                 | J/(kg*K)               |
-| `isentropic_expansion_coefficient` | T: K, X: mol/mol                                                                           | - (gamma)              |
-| `speed_of_sound`                   | T: K, X: mol/mol                                                                           | m/s                    |
-| `cp_mass`                          | T: K, X: mol/mol                                                                           | J/(kg*K)               |
-| `cv_mass`                          | T: K, X: mol/mol                                                                           | J/(kg*K)               |
-| `h_mass`                           | T: K, X: mol/mol                                                                           | J/kg                   |
-| `s_mass`                           | T: K, X: mol/mol, P: Pa, P_ref: Pa                                                         | J/(kg*K)               |
-| `u_mass`                           | T: K, X: mol/mol                                                                           | J/kg                   |
-| `air_properties`                   | T: K, P: Pa, humidity: - (0-1)                                                             | AirProperties struct   |
-| `thermo_state`                     | T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325)                                        | ThermoState struct     |
-| `transport_state`                  | T: K, P: Pa, X: mol/mol                                                                    | TransportState struct  |
-| `complete_state`                   | T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325)                                        | CompleteState struct   |
-| `combustion_state`                 | X_fuel: mol/mol, X_ox: mol/mol, phi: -, T_reactants: K, P: Pa, fuel_name: str (default '') | CombustionState struct |
-| `combustion_state_from_streams`    | fuel_stream: Stream, ox_stream: Stream, fuel_name: str (default '')                        | CombustionState struct |
+| Function                           | Input Units                                                         | Output Unit            |
+|------------------------------------|---------------------------------------------------------------------|------------------------|
+| `density`                          | T: K, P: Pa, X: mol/mol                                             | kg/m^3                 |
+| `molar_volume`                     | T: K, P: Pa                                                         | m^3/mol                |
+| `specific_gas_constant`            | X: mol/mol                                                          | J/(kg*K)               |
+| `isentropic_expansion_coefficient` | T: K, X: mol/mol                                                    | - (gamma)              |
+| `speed_of_sound`                   | T: K, X: mol/mol                                                    | m/s                    |
+| `cp_mass`                          | T: K, X: mol/mol                                                    | J/(kg*K)               |
+| `cv_mass`                          | T: K, X: mol/mol                                                    | J/(kg*K)               |
+| `h_mass`                           | T: K, X: mol/mol                                                    | J/kg                   |
+| `s_mass`                           | T: K, X: mol/mol, P: Pa, P_ref: Pa                                  | J/(kg*K)               |
+| `u_mass`                           | T: K, X: mol/mol                                                    | J/kg                   |
+| `air_properties`                   | T: K, P: Pa, humidity: - (0-1)                                      | AirProperties struct   |
+| `thermo_state`                     | T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325)                 | ThermoState struct     |
+| `transport_state`                  | T: K, P: Pa, X: mol/mol                                             | TransportState struct  |
+| `complete_state`                   | T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325)                 | CompleteState struct   |
+| `combustion_state_from_streams`    | fuel_stream: Stream, ox_stream: Stream, fuel_name: str (default '') | CombustionState struct |
 
 #### Inverse Solvers
 
@@ -158,11 +157,10 @@ All functions use consistent units to avoid conversion errors.
 
 #### Fanno Flow
 
-| Function           | Input Units                                                                          | Output Unit   |
-|--------------------|--------------------------------------------------------------------------------------|---------------|
-| `fanno_pipe`       | T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, f: -, X: mol/mol                           | FannoSolution |
-| `fanno_pipe_rough` | T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, roughness: m, X: mol/mol, correlation: str | FannoSolution |
-| `fanno_max_length` | T_in: K, P_in: Pa, u_in: m/s, D: m, f: -, X: mol/mol                                 | m             |
+| Function           | Input Units                                                | Output Unit   |
+|--------------------|------------------------------------------------------------|---------------|
+| `fanno_pipe`       | T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, f: -, X: mol/mol | FannoSolution |
+| `fanno_max_length` | T_in: K, P_in: Pa, u_in: m/s, D: m, f: -, X: mol/mol       | m             |
 
 #### Thrust
 
@@ -176,12 +174,10 @@ All functions use consistent units to avoid conversion errors.
 
 #### Thermo-Aware High-Level Functions
 
-| Function              | Input Units                                                                 | Output Unit                |
-|-----------------------|-----------------------------------------------------------------------------|----------------------------|
-| `pipe_flow`           | T: K, P: Pa, X: mol/mol, u: m/s, L: m, D: m, f: -                           | IncompressibleFlowSolution |
-| `pipe_flow_rough`     | T: K, P: Pa, X: mol/mol, u: m/s, L: m, D: m, roughness: m, correlation: str | IncompressibleFlowSolution |
-| `orifice_flow_thermo` | T: K, P: Pa, X: mol/mol, P_back: Pa, A: m^2, Cd: -                          | IncompressibleFlowSolution |
-| `pressure_drop_pipe`  | T: K, P: Pa, X: mol/mol, v: m/s, D: m, L: m, roughness: m, correlation: str | tuple(Pa, -, -)            |
+| Function              | Input Units                                        | Output Unit                |
+|-----------------------|----------------------------------------------------|----------------------------|
+| `pipe_flow`           | T: K, P: Pa, X: mol/mol, u: m/s, L: m, D: m, f: -  | IncompressibleFlowSolution |
+| `orifice_flow_thermo` | T: K, P: Pa, X: mol/mol, P_back: Pa, A: m^2, Cd: - | IncompressibleFlowSolution |
 
 #### Bernoulli & Orifice
 
@@ -386,33 +382,31 @@ All functions use consistent units to avoid conversion errors.
 
 ### cooling_correlations.h - Advanced Cooling Correlations
 
-| Function                          | Input Units                                                               | Output Unit |
-|-----------------------------------|---------------------------------------------------------------------------|-------------|
-| `rib_enhancement_factor`          | e_D: -, pitch_to_height: -, alpha_deg: deg                                | -           |
-| `rib_enhancement_factor_high_re`  | e_D: -, pitch_to_height: -, alpha_deg: deg, Re: -                         | -           |
-| `rib_friction_multiplier`         | e_D: -, pitch_to_height: -                                                | -           |
-| `rib_friction_multiplier_high_re` | e_D: -, pitch_to_height: -                                                | -           |
-| `thermal_performance_factor`      | Nu_ratio: -, f_ratio: -                                                   | -           |
-| `impingement_nusselt`             | Re_jet: -, Pr: -, z_D: -, x_D: - (default 0), y_D: - (default 0)          | -           |
-| `film_cooling_effectiveness`      | x_D: -, M: -, DR: -, alpha_deg: deg                                       | -           |
-| `film_cooling_effectiveness_avg`  | x_D: -, M: -, DR: -, alpha_deg: deg, s_D: - (default 3.0)                 | -           |
-| `film_cooling_multirow_sellers`   | row_positions_xD: list[-], eval_xD: -, M: -, DR: -, alpha_deg: deg        | -           |
-| `effusion_effectiveness`          | x_D: -, M: -, DR: -, porosity: -, s_D: -, alpha_deg: deg                  | -           |
-| `pin_fin_nusselt`                 | Re_d: -, Pr: -, L_D: -, S_D: -, X_D: -, is_staggered: bool (default True) | -           |
-| `dimple_nusselt_enhancement`      | Re_Dh: -, d_Dh: -, h_d: -, S_d: -                                         | -           |
-| `dimple_friction_multiplier`      | Re_Dh: -, d_Dh: -, h_d: -                                                 | -           |
-| `effusion_discharge_coefficient`  | Re_d: -, P_ratio: -, alpha_deg: deg, L_D: - (default 4.0)                 | -           |
+| Function                          | Input Units                                                        | Output Unit |
+|-----------------------------------|--------------------------------------------------------------------|-------------|
+| `rib_enhancement_factor`          | e_D: -, pitch_to_height: -, alpha_deg: deg                         | -           |
+| `rib_enhancement_factor_high_re`  | e_D: -, pitch_to_height: -, alpha_deg: deg, Re: -                  | -           |
+| `rib_friction_multiplier`         | e_D: -, pitch_to_height: -                                         | -           |
+| `rib_friction_multiplier_high_re` | e_D: -, pitch_to_height: -                                         | -           |
+| `thermal_performance_factor`      | Nu_ratio: -, f_ratio: -                                            | -           |
+| `impingement_nusselt`             | Re_jet: -, Pr: -, z_D: -, x_D: - (default 0), y_D: - (default 0)   | -           |
+| `film_cooling_effectiveness`      | x_D: -, M: -, DR: -, alpha_deg: deg                                | -           |
+| `film_cooling_effectiveness_avg`  | x_D: -, M: -, DR: -, alpha_deg: deg, s_D: - (default 3.0)          | -           |
+| `film_cooling_multirow_sellers`   | row_positions_xD: list[-], eval_xD: -, M: -, DR: -, alpha_deg: deg | -           |
+| `effusion_effectiveness`          | x_D: -, M: -, DR: -, porosity: -, s_D: -, alpha_deg: deg           | -           |
+| `dimple_nusselt_enhancement`      | Re_Dh: -, d_Dh: -, h_d: -, S_d: -                                  | -           |
+| `dimple_friction_multiplier`      | Re_Dh: -, d_Dh: -, h_d: -                                          | -           |
+| `effusion_discharge_coefficient`  | Re_d: -, P_ratio: -, alpha_deg: deg, L_D: - (default 4.0)          | -           |
 
 ### acoustics.h - Acoustic Properties
 
-| Function                    | Input Units                                                                      | Output Unit               |
-|-----------------------------|----------------------------------------------------------------------------------|---------------------------|
-| `acoustic_properties`       | f: Hz, rho: kg/m^3, c: m/s, p_rms: Pa (default 20e-6), p_ref: Pa (default 20e-6) | AcousticProperties struct |
-| `wavelength`                | f: Hz, c: m/s                                                                    | m                         |
-| `frequency_from_wavelength` | lambda: m, c: m/s                                                                | Hz                        |
-| `acoustic_impedance`        | rho: kg/m^3, c: m/s                                                              | Pa*s/m                    |
-| `sound_pressure_level`      | p_rms: Pa, p_ref: Pa (default 20e-6)                                             | dB                        |
-| `particle_velocity`         | p: Pa, rho: kg/m^3, c: m/s                                                       | m/s                       |
+| Function                    | Input Units                          | Output Unit |
+|-----------------------------|--------------------------------------|-------------|
+| `wavelength`                | f: Hz, c: m/s                        | m           |
+| `frequency_from_wavelength` | lambda: m, c: m/s                    | Hz          |
+| `acoustic_impedance`        | rho: kg/m^3, c: m/s                  | Pa*s/m      |
+| `sound_pressure_level`      | p_rms: Pa, p_ref: Pa (default 20e-6) | dB          |
+| `particle_velocity`         | p: Pa, rho: kg/m^3, c: m/s           | m/s         |
 
 ### orifice.h - Orifice Flow Utilities
 
@@ -439,82 +433,68 @@ All functions use consistent units to avoid conversion errors.
 
 ### heat_transfer.h - Heat Transfer Correlations
 
-| Function                       | Input Units                                                                                                     | Output Unit               |
-|--------------------------------|-----------------------------------------------------------------------------------------------------------------|---------------------------|
-| `nusselt_dittus_boelter`       | Re: -, Pr: -, heating: bool                                                                                     | - (Nu)                    |
-| `nusselt_gnielinski`           | Re: -, Pr: -, f: - (optional)                                                                                   | - (Nu)                    |
-| `nusselt_sieder_tate`          | Re: -, Pr: -, mu_ratio: -                                                                                       | - (Nu)                    |
-| `nusselt_petukhov`             | Re: -, Pr: -, f: - (optional)                                                                                   | - (Nu)                    |
-| `htc_from_nusselt`             | Nu: -, k: W/(m*K), L: m                                                                                         | W/(m^2*K)                 |
-| `nusselt_pipe`                 | State, V: m/s, D: m                                                                                             | - (Nu)                    |
-| `htc_pipe`                     | State, V: m/s, D: m                                                                                             | W/(m^2*K)                 |
-| `htc_pipe`                     | T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, correlation: str, heating: bool, mu_ratio: -, roughness: m | tuple(W/(m^2*K), -, -)    |
-| `lmtd`                         | dT1: K, dT2: K                                                                                                  | K                         |
-| `lmtd_counterflow`             | T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K                                                          | K                         |
-| `lmtd_parallelflow`            | T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K                                                          | K                         |
-| `overall_htc`                  | h_values: W/(m^2*K), t_over_k: m^2*K/W                                                                          | W/(m^2*K)                 |
-| `overall_htc_wall`             | h_inner, h_outer: W/(m^2*K), t_over_k_layers: m^2*K/W                                                           | W/(m^2*K)                 |
-| `overall_htc_tube`             | h_inner, h_outer: W/(m^2*K), t_wall: m, k_wall: W/(m*K)                                                         | W/(m^2*K)                 |
-| `thermal_resistance`           | h: W/(m^2*K), A: m^2                                                                                            | K/W                       |
-| `thermal_resistance_wall`      | t: m, k: W/(m*K), A: m^2                                                                                        | K/W                       |
-| `heat_rate`                    | U: W/(m^2*K), A: m^2, dT: K                                                                                     | W                         |
-| `heat_flux`                    | U: W/(m^2*K), dT: K                                                                                             | W/m^2                     |
-| `heat_transfer_area`           | Q: W, U: W/(m^2*K), dT: K                                                                                       | m^2                       |
-| `heat_transfer_dT`             | Q: W, U: W/(m^2*K), A: m^2                                                                                      | K                         |
-| `wall_temperature_profile`     | T_hot: K, T_cold: K, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W                                                | K (vector)                |
-| `ntu`                          | U: W/(m^2*K), A: m^2, C_min: W/K                                                                                | -                         |
-| `capacity_ratio`               | C_min: W/K, C_max: W/K                                                                                          | -                         |
-| `effectiveness_counterflow`    | NTU: -, C_r: -                                                                                                  | -                         |
-| `effectiveness_parallelflow`   | NTU: -, C_r: -                                                                                                  | -                         |
-| `heat_rate_from_effectiveness` | epsilon: -, C_min: W/K, T_hot_in: K, T_cold_in: K                                                               | W                         |
-| `adiabatic_wall_temperature`   | T_hot: K, T_coolant: K, eta: -                                                                                  | K                         |
-| `cooled_wall_heat_flux`        | T_hot: K, T_coolant: K, h_hot: W/(m^2*K), h_coolant: W/(m^2*K), eta: -, t_wall: m, k_wall: W/(m*K)              | W/m^2                     |
-| `heat_flux_from_T_at_edge`     | T_measured: K, edge_idx, T_hot: K, T_cold: K, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W                       | W/m^2                     |
-| `heat_flux_from_T_at_depth`    | T_measured: K, depth: m, T_hot: K, T_cold: K, h_hot, h_cold: W/(m^2*K), thicknesses: m, conductivities: W/(m*K) | W/m^2                     |
-| `bulk_T_from_edge_T_and_q`     | T_measured: K, edge_idx, q: W/m^2, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W, solve_for: str                  | K                         |
-| `dT_edge_dT_hot`               | edge_idx, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W                                                           | - (dT_edge/dT_hot)        |
-| `dT_edge_dT_cold`              | edge_idx, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W                                                           | - (dT_edge/dT_cold)       |
-| `dT_edge_dT_bulk`              | edge_idx, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W                                                           | - (dT/dT_hot, dT/dT_cold) |
-| `dT_edge_dq`                   | edge_idx, h_hot: W/(m^2*K), t_over_k: m^2*K/W                                                                   | K*m^2/W (dT_edge/dq)      |
+| Function                       | Input Units                                                      | Output Unit               |
+|--------------------------------|------------------------------------------------------------------|---------------------------|
+| `nusselt_dittus_boelter`       | Re: -, Pr: -, heating: bool                                      | - (Nu)                    |
+| `nusselt_gnielinski`           | Re: -, Pr: -, f: - (optional)                                    | - (Nu)                    |
+| `nusselt_sieder_tate`          | Re: -, Pr: -, mu_ratio: -                                        | - (Nu)                    |
+| `nusselt_petukhov`             | Re: -, Pr: -, f: - (optional)                                    | - (Nu)                    |
+| `htc_from_nusselt`             | Nu: -, k: W/(m*K), L: m                                          | W/(m^2*K)                 |
+| `nusselt_pipe`                 | State, V: m/s, D: m                                              | - (Nu)                    |
+| `htc_pipe`                     | State, V: m/s, D: m                                              | W/(m^2*K)                 |
+| `lmtd`                         | dT1: K, dT2: K                                                   | K                         |
+| `lmtd_counterflow`             | T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K           | K                         |
+| `lmtd_parallelflow`            | T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K           | K                         |
+| `overall_htc`                  | h_values: W/(m^2*K), t_over_k: m^2*K/W                           | W/(m^2*K)                 |
+| `overall_htc_wall`             | h_inner, h_outer: W/(m^2*K), t_over_k_layers: m^2*K/W            | W/(m^2*K)                 |
+| `overall_htc_tube`             | h_inner, h_outer: W/(m^2*K), t_wall: m, k_wall: W/(m*K)          | W/(m^2*K)                 |
+| `thermal_resistance`           | h: W/(m^2*K), A: m^2                                             | K/W                       |
+| `thermal_resistance_wall`      | t: m, k: W/(m*K), A: m^2                                         | K/W                       |
+| `heat_rate`                    | U: W/(m^2*K), A: m^2, dT: K                                      | W                         |
+| `heat_flux`                    | U: W/(m^2*K), dT: K                                              | W/m^2                     |
+| `heat_transfer_area`           | Q: W, U: W/(m^2*K), dT: K                                        | m^2                       |
+| `heat_transfer_dT`             | Q: W, U: W/(m^2*K), A: m^2                                       | K                         |
+| `wall_temperature_profile`     | T_hot: K, T_cold: K, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W | K (vector)                |
+| `ntu`                          | U: W/(m^2*K), A: m^2, C_min: W/K                                 | -                         |
+| `capacity_ratio`               | C_min: W/K, C_max: W/K                                           | -                         |
+| `effectiveness_counterflow`    | NTU: -, C_r: -                                                   | -                         |
+| `effectiveness_parallelflow`   | NTU: -, C_r: -                                                   | -                         |
+| `heat_rate_from_effectiveness` | epsilon: -, C_min: W/K, T_hot_in: K, T_cold_in: K                | W                         |
+| `adiabatic_wall_temperature`   | T_hot: K, T_coolant: K, eta: -                                   | K                         |
+| `dT_edge_dT_hot`               | edge_idx, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W            | - (dT_edge/dT_hot)        |
+| `dT_edge_dT_cold`              | edge_idx, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W            | - (dT_edge/dT_cold)       |
+| `dT_edge_dT_bulk`              | edge_idx, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W            | - (dT/dT_hot, dT/dT_cold) |
+| `dT_edge_dq`                   | edge_idx, h_hot: W/(m^2*K), t_over_k: m^2*K/W                    | K*m^2/W (dT_edge/dq)      |
 
 ### acoustics.h - Acoustic Mode Analysis
 
-| Function                             | Input Units                                                                                                                                                                                          | Output Unit               |
-|--------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------|
-| `tube_axial_modes`                   | Tube (L: m, D: m), c: m/s, upstream: BC, downstream: BC, n_max                                                                                                                                       | Hz (vector)               |
-| `annulus_axial_modes`                | Annulus (L: m, D_inner: m, D_outer: m), c: m/s, upstream: BC, downstream: BC, n_max                                                                                                                  | Hz (vector)               |
-| `annulus_azimuthal_modes`            | Annulus, c: m/s, m_max                                                                                                                                                                               | Hz (vector)               |
-| `annulus_modes`                      | Annulus, c: m/s, upstream: BC, downstream: BC, n_max, m_max                                                                                                                                          | Hz (vector)               |
-| `modes_in_range`                     | modes, f_min: Hz, f_max: Hz                                                                                                                                                                          | Hz (vector)               |
-| `closest_mode`                       | modes, f_target: Hz                                                                                                                                                                                  | AcousticMode              |
-| `min_mode_separation`                | modes                                                                                                                                                                                                | Hz                        |
-| `axial_mode_upstream`                | f0: Hz, M: -                                                                                                                                                                                         | Hz                        |
-| `axial_mode_downstream`              | f0: Hz, M: -                                                                                                                                                                                         | Hz                        |
-| `axial_mode_split`                   | f0: Hz, M: -                                                                                                                                                                                         | (Hz, Hz)                  |
-| `helmholtz_frequency`                | V: m^3, A_neck: m^2, L_neck: m, c: m/s, end_correction: -                                                                                                                                            | Hz                        |
-| `strouhal`                           | f: Hz, L: m, u: m/s                                                                                                                                                                                  | - (St)                    |
-| `frequency_from_strouhal`            | St: -, L: m, u: m/s                                                                                                                                                                                  | Hz                        |
-| `quarter_wave_frequency`             | L: m, c: m/s                                                                                                                                                                                         | Hz                        |
-| `orifice_impedance_with_flow`        | freq: Hz, u_bias: m/s, u_grazing: m/s, d_orifice: m, l_orifice: m, porosity: -, Cd: -, rho: kg/m^3, c: m/s                                                                                           | complex [-]               |
-| `quarter_wave_resonator_tmm`         | freq: Hz, L_tube: m, A_duct: m^2, A_tube: m^2, d_orifice: m, l_orifice: m, porosity: -, Cd: -, u_bias: m/s, u_grazing: m/s, rho: kg/m^3, c: m/s                                                      | TransferMatrix            |
-| `absorption_from_impedance_norm`     | z_norm: complex [-]                                                                                                                                                                                  | - (alpha)                 |
-| `liner_sdof_impedance_norm`          | freq: Hz, orifice: LinerOrificeGeometry, cavity: LinerCavity, flow: LinerFlowState, medium: AcousticMedium                                                                                           | complex [-]               |
-| `liner_sdof_absorption`              | freq: Hz, orifice: LinerOrificeGeometry, cavity: LinerCavity, flow: LinerFlowState, medium: AcousticMedium                                                                                           | - (alpha)                 |
-| `sweep_liner_sdof_absorption`        | freqs: Hz (vector), orifice: LinerOrificeGeometry, cavity: LinerCavity, flow: LinerFlowState, medium: AcousticMedium                                                                                 | - (alpha vector)          |
-| `liner_2dof_serial_impedance_norm`   | freq: Hz, face_orifice: LinerOrificeGeometry, septum_orifice: LinerOrificeGeometry, depth_1: m, depth_2: m, face_flow: LinerFlowState, septum_flow: LinerFlowState, medium: AcousticMedium           | complex [-]               |
-| `liner_2dof_serial_absorption`       | freq: Hz, face_orifice: LinerOrificeGeometry, septum_orifice: LinerOrificeGeometry, depth_1: m, depth_2: m, face_flow: LinerFlowState, septum_flow: LinerFlowState, medium: AcousticMedium           | - (alpha)                 |
-| `sweep_liner_2dof_serial_absorption` | freqs: Hz (vector), face_orifice: LinerOrificeGeometry, septum_orifice: LinerOrificeGeometry, depth_1: m, depth_2: m, face_flow: LinerFlowState, septum_flow: LinerFlowState, medium: AcousticMedium | - (alpha vector)          |
-| `is_whistling_risk`                  | freq: Hz, u_bias: m/s, d_orifice: m                                                                                                                                                                  | bool                      |
-| `annular_duct_modes_analytical`      | geom: AnnularDuctGeometry, c: m/s, f_max: Hz, bc_ends: BoundaryCondition                                                                                                                             | AnnularMode vector        |
-| `to_acoustic_geometry`               | flow_geom: CanAnnularFlowGeometry, n_cans: -, L_can: m, D_can: m                                                                                                                                     | CanAnnularGeometry struct |
-| `half_wave_frequency`                | L: m, c: m/s                                                                                                                                                                                         | Hz                        |
-| `stokes_layer`                       | nu: m^2/s, f: Hz                                                                                                                                                                                     | m                         |
-| `thermal_layer`                      | alpha: m^2/s, f: Hz                                                                                                                                                                                  | m                         |
-| `effective_viscothermal_layer`       | delta_nu: m, delta_kappa: m, gamma: -                                                                                                                                                                | m                         |
-| `helmholtz_Q`                        | V: m^3, A_neck: m^2, L_neck: m, nu: m^2/s, alpha: m^2/s, gamma: -, f: Hz                                                                                                                             | - (Q)                     |
-| `tube_Q`                             | L: m, D: m, nu: m^2/s, alpha: m^2/s, gamma: -, f: Hz                                                                                                                                                 | - (Q)                     |
-| `damping_ratio`                      | Q: -                                                                                                                                                                                                 | - (zeta)                  |
-| `bandwidth`                          | f0: Hz, Q: -                                                                                                                                                                                         | Hz                        |
+| Function                         | Input Units                                                              | Output Unit               |
+|----------------------------------|--------------------------------------------------------------------------|---------------------------|
+| `tube_axial_modes`               | Tube (L: m, D: m), c: m/s, upstream: BC, downstream: BC, n_max           | Hz (vector)               |
+| `annulus_azimuthal_modes`        | Annulus, c: m/s, m_max                                                   | Hz (vector)               |
+| `annulus_modes`                  | Annulus, c: m/s, upstream: BC, downstream: BC, n_max, m_max              | Hz (vector)               |
+| `modes_in_range`                 | modes, f_min: Hz, f_max: Hz                                              | Hz (vector)               |
+| `closest_mode`                   | modes, f_target: Hz                                                      | AcousticMode              |
+| `min_mode_separation`            | modes                                                                    | Hz                        |
+| `axial_mode_upstream`            | f0: Hz, M: -                                                             | Hz                        |
+| `axial_mode_downstream`          | f0: Hz, M: -                                                             | Hz                        |
+| `axial_mode_split`               | f0: Hz, M: -                                                             | (Hz, Hz)                  |
+| `helmholtz_frequency`            | V: m^3, A_neck: m^2, L_neck: m, c: m/s, end_correction: -                | Hz                        |
+| `strouhal`                       | f: Hz, L: m, u: m/s                                                      | - (St)                    |
+| `frequency_from_strouhal`        | St: -, L: m, u: m/s                                                      | Hz                        |
+| `quarter_wave_frequency`         | L: m, c: m/s                                                             | Hz                        |
+| `absorption_from_impedance_norm` | z_norm: complex [-]                                                      | - (alpha)                 |
+| `is_whistling_risk`              | freq: Hz, u_bias: m/s, d_orifice: m                                      | bool                      |
+| `annular_duct_modes_analytical`  | geom: AnnularDuctGeometry, c: m/s, f_max: Hz, bc_ends: BoundaryCondition | AnnularMode vector        |
+| `to_acoustic_geometry`           | flow_geom: CanAnnularFlowGeometry, n_cans: -, L_can: m, D_can: m         | CanAnnularGeometry struct |
+| `half_wave_frequency`            | L: m, c: m/s                                                             | Hz                        |
+| `stokes_layer`                   | nu: m^2/s, f: Hz                                                         | m                         |
+| `thermal_layer`                  | alpha: m^2/s, f: Hz                                                      | m                         |
+| `effective_viscothermal_layer`   | delta_nu: m, delta_kappa: m, gamma: -                                    | m                         |
+| `helmholtz_Q`                    | V: m^3, A_neck: m^2, L_neck: m, nu: m^2/s, alpha: m^2/s, gamma: -, f: Hz | - (Q)                     |
+| `tube_Q`                         | L: m, D: m, nu: m^2/s, alpha: m^2/s, gamma: -, f: Hz                     | - (Q)                     |
+| `damping_ratio`                  | Q: -                                                                     | - (zeta)                  |
+| `bandwidth`                      | f0: Hz, Q: -                                                             | Hz                        |
 
 ### geometry.h - Residence Time
 
@@ -527,6 +507,23 @@ All functions use consistent units to avoid conversion errors.
 | `residence_time_mdot`             | V: m^3, mdot: kg/s, rho: kg/m^3                       | s           |
 | `residence_time_mdot_can_annular` | geom: CanAnnularFlowGeometry, mdot: kg/s, rho: kg/m^3 | s           |
 | `space_velocity`                  | Q: m^3/s, V: m^3                                      | 1/s         |
+
+### state.h - Joint Getters / Setters (C++ & Python tuples)
+
+| Function         | Input Units | Output Unit             |
+|------------------|-------------|-------------------------|
+| `State::TPX`     | -           | tuple(K, Pa, mol/mol)   |
+| `State::TPY`     | -           | tuple(K, Pa, kg/kg)     |
+| `State::TP`      | -           | tuple(K, Pa)            |
+| `State::DP_mass` | -           | tuple(kg/m^3, Pa)       |
+| `State::HP_mass` | -           | tuple(J/kg, Pa)         |
+| `State::SP_mass` | -           | tuple(J/(kg*K), Pa)     |
+| `State::UV_mass` | -           | tuple(J/kg, m^3/kg)     |
+| `State::SV_mass` | -           | tuple(J/(kg*K), m^3/kg) |
+| `State::PV_mass` | -           | tuple(Pa, m^3/kg)       |
+| `State::UP_mass` | -           | tuple(J/kg, Pa)         |
+| `State::VH_mass` | -           | tuple(m^3/kg, J/kg)     |
+| `State::SH_mass` | -           | tuple(J/(kg*K), J/kg)   |
 
 ### heat_transfer.h - ChannelResult fields
 
@@ -541,16 +538,6 @@ All functions use consistent units to avoid conversion errors.
 | `ChannelResult::M`    | -           | - (M)                   |
 | `ChannelResult::T_aw` | -           | K                       |
 | `ChannelResult::q`    | -           | W/m^2                   |
-
-### heat_transfer.h - Channel flow functions (HTC + pressure drop)
-
-| Function              | Input Units                                                                                                           | Output Unit   |
-|-----------------------|-----------------------------------------------------------------------------------------------------------------------|---------------|
-| `channel_smooth`      | T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, T_wall: K                                             | ChannelResult |
-| `channel_ribbed`      | T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, e_D: -, pitch_to_height: -, alpha_deg: deg, T_wall: K | ChannelResult |
-| `channel_dimpled`     | T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, d_Dh: -, h_d: -, S_d: -, T_wall: K                    | ChannelResult |
-| `channel_pin_fin`     | T: K, P: Pa, X: mol/mol, velocity: m/s, channel_height: m, pin_diameter: m, S_D: -, X_D: -, N_rows: -, T_wall: K      | ChannelResult |
-| `channel_impingement` | T: K, P: Pa, X: mol/mol, mdot_jet: kg/s, d_jet: m, z_D: -, x_D: -, y_D: -, A_target: m^2, T_wall: K                   | ChannelResult |
 
 ### cooling_correlations.h - Pin fin friction (new scalar)
 
