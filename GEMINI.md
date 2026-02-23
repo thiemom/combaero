@@ -20,7 +20,7 @@ This document outlines the hard rules, coding styles, and project conventions fo
 *   **Header Hygiene:** Use `#pragma once` in all header files. Keep includes sorted and minimal (include what you use).
 *   **Type Safety:** Use `auto` for complex iterator types, but keep variable types explicit where it aids readability.
 *   **Comments:** Use line comments (`//`) only. Block comments (`/* ... */`) are flagged by the style checker.
-*   **Math Constants:** Use `math_constants.h` instead of macros like `M_PI`.
+*   **Math Constants:** Use `math_constants.h` instead of macros like `M_PI` to ensure MSVC (Windows) does not fail compilation due to missing definitions.
 *   **Encoding:** Only ASCII characters are allowed outside of strings and comments.
 
 ### Python (Type-Safe & Clean)
