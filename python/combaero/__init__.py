@@ -44,10 +44,8 @@ try:
         AirProperties,
         AnnularDuctGeometry,
         AnnularMode,
-        Annulus,  # type: ignore[attr-defined]
         BlochMode,
         BoundaryCondition,
-        CanAnnularFlowGeometry,
         CanAnnularGeometry,
         Cd_from_zeta,
         Cd_orifice,
@@ -77,7 +75,6 @@ try:
         ThrustResult,
         TransferMatrix,
         TransportState,
-        Tube,
         UnitInfo,
         absorption_from_impedance_norm,
         acoustic_impedance,
@@ -357,11 +354,15 @@ try:
         wgs_equilibrium,
         wgs_equilibrium_adiabatic,
         zeta_from_Cd,
+        geometry,
         h0_from_static,
         v_from_h0,
     )
 
     molar_mass = mwmix
+    Tube = geometry.Tube
+    Annulus = geometry.Annulus
+    CanAnnularFlowGeometry = geometry.CanAnnularFlowGeometry
 except ModuleNotFoundError:
     # Fallback: attempt to import from an installed combaero package that
     # already has _core available, then re-export the symbols.
@@ -516,9 +517,9 @@ except ModuleNotFoundError:
     dT_edge_dT_bulk = _core.dT_edge_dT_bulk
     dT_edge_dq = _core.dT_edge_dq
     # Acoustics
-    Tube = _core.Tube
-    Annulus = _core.Annulus
-    CanAnnularFlowGeometry = _core.CanAnnularFlowGeometry
+    Tube = _core.geometry.Tube
+    Annulus = _core.geometry.Annulus
+    CanAnnularFlowGeometry = _core.geometry.CanAnnularFlowGeometry
     BoundaryCondition = _core.BoundaryCondition
     AcousticMode = _core.AcousticMode
     to_acoustic_geometry = _core.to_acoustic_geometry
@@ -627,6 +628,7 @@ except ModuleNotFoundError:
     channel_pin_fin = _core.channel_pin_fin
     channel_impingement = _core.channel_impingement
     pin_fin_friction = _core.pin_fin_friction
+    geometry = _core.geometry
 
 
 # Submodule imports — always available regardless of _core load path.
@@ -669,6 +671,7 @@ def suppress_warnings() -> Generator[None, None, None]:
 __all__ = [
     "FlowSolution",
     "compressible",
+    "geometry",
     "heat_transfer",
     "incompressible",
     "network",

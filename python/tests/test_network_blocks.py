@@ -70,3 +70,40 @@ def test_momentum_chamber_network():
     residuals = node_mc.residuals(state)
     assert len(residuals) == 1
     assert residuals[0] == 1.1e5 - 1e5
+
+
+def test_flownetwork_topology():
+    """
+    Test 3: Validates the FlowNetwork topological manager and auto-discovery.
+    Specifically checks that OrificeElement finds its upstream PipeElement diameter.
+    """
+    graph = cb.network.FlowNetwork()
+
+    inlet = cb.network.BoundaryNode("inlet")
+    node_1 = cb.network.PlenumNode("node_1")
+    outlet = cb.network.BoundaryNode("outlet")
+
+    pipe = cb.network.PipeElement(
+        id="pipe_1", from_node="inlet", to_node="node_1", length=2.0, diameter=0.15, roughness=1e-5
+    )
+
+    orifice = cb.network.OrificeElement(
+        id="orf_1", from_node="node_1", to_node="outlet", Cd=0.6, area=0.005
+    )
+
+    # 1. Register graph
+    graph.add_node(inlet)
+    graph.add_node(node_1)
+    graph.add_node(outlet)
+
+    graph.add_element(pipe)
+    graph.add_element(orifice)
+
+    # 2. Verify pre-resolution state
+    assert orifice.upstream_diameter is None
+
+    # 3. Resolve topology
+    graph.resolve_all_topology()
+
+    # 4. Verify post-resolution auto-discovery
+    assert orifice.upstream_diameter == 0.15
