@@ -2,7 +2,8 @@
 
 #include "friction.h"
 #include "heat_transfer.h"
-#include "math_constants.h"
+#include "thermo.h"
+#include "transport.h"
 #include <cmath>
 #include <stdexcept>
 
@@ -128,6 +129,76 @@ std::tuple<double, double> friction_and_jacobian_haaland(double Re,
   double jacobian = df_dU * dU_dRe;
 
   return {f, jacobian};
+}
+
+// -----------------------------------------------------------------------------
+// 3. Thermodynamic & Transport Components
+// -----------------------------------------------------------------------------
+
+std::tuple<double, double, double>
+density_and_jacobians(double T, double P, const std::vector<double> &X) {
+  if (T <= 0.0 || P <= 0.0) {
+    throw std::invalid_argument(
+        "solver_interface::density requires T > 0 and P > 0");
+  }
+
+  // Calculate base density natively
+  double rho = ::density(T, P, X);
+
+  // Ideal gas law: rho = P * W / (R * T)
+  // d(rho)/dT = - P * W / (R * T^2) = -rho / T
+  double d_rho_d_T = -rho / T;
+
+  // d(rho)/dP = W / (R * T) = rho / P
+  double d_rho_d_P = rho / P;
+
+  return {rho, d_rho_d_T, d_rho_d_P};
+}
+
+std::tuple<double, double> enthalpy_and_jacobian(double T,
+                                                 const std::vector<double> &X) {
+  if (T <= 0.0) {
+    throw std::invalid_argument("solver_interface::enthalpy requires T > 0");
+  }
+
+  // h(T) = base mass enthalpy
+  double h = ::h_mass(T, X);
+
+  // Analytical derivative of enthalpy with respect to temperature is Cp
+  double d_h_d_T = ::cp_mass(T, X);
+
+  return {h, d_h_d_T};
+}
+
+std::tuple<double, double, double>
+viscosity_and_jacobians(double T, double P, const std::vector<double> &X) {
+  if (T <= 0.0 || P <= 0.0) {
+    throw std::invalid_argument(
+        "solver_interface::viscosity requires T > 0 and P > 0");
+  }
+
+  // Base viscosity
+  double mu = ::viscosity(T, P, X);
+
+  // We utilize a highly constrained central finite difference inside the C++
+  // compiled kernel since the analytical collision integral derivations are
+  // excessively complex. This masks the iteration noise from the global solver.
+
+  // 1. Temperature Derivative
+  double dT = 1e-3; // 1 mK perturbation
+  double mu_T_plus = ::viscosity(T + dT, P, X);
+  double mu_T_minus = ::viscosity(T - dT, P, X);
+  double d_mu_d_T = (mu_T_plus - mu_T_minus) / (2.0 * dT);
+
+  // 2. Pressure Derivative
+  // Current models evaluate viscosity independently of pressure for ideal
+  // gases, but we provide the generalized interface for completeness.
+  double dP = 1.0; // 1 Pascal perturbation
+  double mu_P_plus = ::viscosity(T, P + dP, X);
+  double mu_P_minus = ::viscosity(T, P - dP, X);
+  double d_mu_d_P = (mu_P_plus - mu_P_minus) / (2.0 * dP);
+
+  return {mu, d_mu_d_T, d_mu_d_P};
 }
 
 } // namespace solver

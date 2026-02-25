@@ -9,11 +9,16 @@ IGNORE_LIST = {
     "compressible",
     "incompressible",
     "heat_transfer",
+    "network",
+    "species",
     # Internal Solver (f, J) Fast-Paths
     "orifice_mdot_and_jacobian",
     "pressure_loss_and_jacobian",
     "nusselt_and_jacobian_dittus_boelter",
     "friction_and_jacobian_haaland",
+    "density_and_jacobians",
+    "enthalpy_and_jacobian",
+    "viscosity_and_jacobians",
     # Utilities
     "get_warning_handler",
     "set_warning_handler",

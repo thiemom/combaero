@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import pytest
 import numpy as np
+
 import combaero as cb
+
 
 def central_difference(func, x, h=1e-6, *args):
     """Numerically evaluate df/dx using O(h^2) central difference."""
@@ -32,6 +33,7 @@ def test_orifice_jacobian():
         # The analytical derivative should perfectly match the central difference
         np.testing.assert_allclose(jac_analytic, jac_numeric, rtol=1e-6)
 
+
 def test_pressure_loss_jacobian():
     rho = 10.0
     K = 1.5
@@ -48,6 +50,7 @@ def test_pressure_loss_jacobian():
         assert jac_analytic > 0.0
         np.testing.assert_allclose(jac_analytic, jac_numeric, rtol=1e-6)
 
+
 def test_nusselt_jacobian():
     Pr_heating = 0.7  # Air
     Pr_cooling = 4.3  # Water
@@ -57,14 +60,21 @@ def test_nusselt_jacobian():
 
     for Re in [10000.0, 50000.0, 1e6]:
         # Heating
-        Nu_analytic, jac_analytic = cb._core.nusselt_and_jacobian_dittus_boelter(Re, Pr_heating, True)
-        jac_numeric = central_difference(nu_func, Re, 1e-4, Pr_heating, True) # slightly larger step for large Re
+        Nu_analytic, jac_analytic = cb._core.nusselt_and_jacobian_dittus_boelter(
+            Re, Pr_heating, True
+        )
+        jac_numeric = central_difference(
+            nu_func, Re, 1e-4, Pr_heating, True
+        )  # slightly larger step for large Re
         np.testing.assert_allclose(jac_analytic, jac_numeric, rtol=1e-5)
 
         # Cooling
-        Nu_analytic, jac_analytic = cb._core.nusselt_and_jacobian_dittus_boelter(Re, Pr_cooling, False)
+        Nu_analytic, jac_analytic = cb._core.nusselt_and_jacobian_dittus_boelter(
+            Re, Pr_cooling, False
+        )
         jac_numeric = central_difference(nu_func, Re, 1e-4, Pr_cooling, False)
         np.testing.assert_allclose(jac_analytic, jac_numeric, rtol=1e-5)
+
 
 def test_friction_haaland_jacobian():
     e_D = 1e-4
@@ -83,3 +93,67 @@ def test_friction_haaland_jacobian():
         # Friction factor decreases with Reynolds number
         assert jac_analytic < 0.0
         np.testing.assert_allclose(jac_analytic, jac_numeric, rtol=1e-5)
+
+
+def test_density_jacobians():
+    P = 101325.0
+    X = [0.0] * 14
+    X[11] = 0.79  # N2
+    X[12] = 0.21  # O2
+
+    def rho_T_func(T):
+        return cb._core.density_and_jacobians(T, P, X)[0]
+
+    def rho_P_func(P_val):
+        return cb._core.density_and_jacobians(300.0, P_val, X)[0]
+
+    for T in [300.0, 1200.0]:
+        rho_analytic, d_rho_dT_analytic, d_rho_dP_analytic = cb._core.density_and_jacobians(T, P, X)
+        d_rho_dT_numeric = central_difference(rho_T_func, T, 1e-3)
+        np.testing.assert_allclose(d_rho_dT_analytic, d_rho_dT_numeric, rtol=1e-5)
+
+    for P_val in [101325.0, 500000.0]:
+        rho_analytic, d_rho_dT_analytic, d_rho_dP_analytic = cb._core.density_and_jacobians(
+            300.0, P_val, X
+        )
+        d_rho_dP_numeric = central_difference(rho_P_func, P_val, 1e-1)
+        np.testing.assert_allclose(d_rho_dP_analytic, d_rho_dP_numeric, rtol=1e-5, atol=1e-12)
+
+
+def test_enthalpy_jacobian():
+    X = [0.0] * 14
+    X[11] = 0.79  # N2
+    X[12] = 0.21  # O2
+
+    def h_func(T):
+        return cb._core.enthalpy_and_jacobian(T, X)[0]
+
+    for T in [300.0, 1200.0]:
+        h_analytic, d_h_dT_analytic = cb._core.enthalpy_and_jacobian(T, X)
+        d_h_dT_numeric = central_difference(h_func, T, 1e-2)
+        np.testing.assert_allclose(d_h_dT_analytic, d_h_dT_numeric, rtol=1e-5)
+
+
+def test_viscosity_jacobians():
+    P = 101325.0
+    X = [0.0] * 14
+    X[11] = 0.79  # N2
+    X[12] = 0.21  # O2
+
+    def mu_T_func(T):
+        return cb._core.viscosity_and_jacobians(T, P, X)[0]
+
+    def mu_P_func(P_val):
+        return cb._core.viscosity_and_jacobians(300.0, P_val, X)[0]
+
+    for T in [300.0, 1200.0]:
+        mu_analytic, d_mu_dT_analytic, d_mu_dP_analytic = cb._core.viscosity_and_jacobians(T, P, X)
+        d_mu_dT_numeric = central_difference(mu_T_func, T, 1e-3)
+        np.testing.assert_allclose(d_mu_dT_analytic, d_mu_dT_numeric, rtol=1e-5)
+
+    for P_val in [101325.0, 500000.0]:
+        mu_analytic, d_mu_dT_analytic, d_mu_dP_analytic = cb._core.viscosity_and_jacobians(
+            300.0, P_val, X
+        )
+        d_mu_dP_numeric = central_difference(mu_P_func, P_val, 1e-1)
+        np.testing.assert_allclose(d_mu_dP_analytic, d_mu_dP_numeric, rtol=1e-5, atol=1e-12)

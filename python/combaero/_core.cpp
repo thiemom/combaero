@@ -4965,4 +4965,32 @@ PYBIND11_MODULE(_core, m) {
         "  Re  : Reynolds number [-]\n"
         "  e_D : Relative roughness eps/D [-]\n\n"
         "Returns: tuple(friction_factor [-], derivative [-])");
+  m.def("density_and_jacobians", &solver::density_and_jacobians, py::arg("T"),
+        py::arg("P"), py::arg("X"),
+        "Fast-path density and analytic derivatives (rho, d(rho)/d(T), "
+        "d(rho)/d(P)).\n\n"
+        "Parameters:\n"
+        "  T : Temperature [K]\n"
+        "  P : Pressure [Pa]\n"
+        "  X : Mole fractions [-]\n\n"
+        "Returns: tuple(rho [kg/m³], d_rho_d_T [(kg/m³)/K], d_rho_d_P "
+        "[(kg/m³)/Pa])");
+
+  m.def("enthalpy_and_jacobian", &solver::enthalpy_and_jacobian, py::arg("T"),
+        py::arg("X"),
+        "Fast-path enthalpy and analytic derivative (h, d(h)/d(T)).\n\n"
+        "Parameters:\n"
+        "  T : Temperature [K]\n"
+        "  X : Mole fractions [-]\n\n"
+        "Returns: tuple(h [J/kg], cp_mass [J/(kg*K)])");
+
+  m.def("viscosity_and_jacobians", &solver::viscosity_and_jacobians,
+        py::arg("T"), py::arg("P"), py::arg("X"),
+        "Fast-path viscosity and central difference derivatives (mu, "
+        "d(mu)/d(T), d(mu)/d(P)).\n\n"
+        "Parameters:\n"
+        "  T : Temperature [K]\n"
+        "  P : Pressure [Pa]\n"
+        "  X : Mole fractions [-]\n\n"
+        "Returns: tuple(mu [Pa*s], d_mu_d_T [(Pa*s)/K], d_mu_d_P [(Pa*s)/Pa])");
 }

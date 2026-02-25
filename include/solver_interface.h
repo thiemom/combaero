@@ -2,6 +2,7 @@
 #define SOLVER_INTERFACE_H
 
 #include <tuple>
+#include <vector>
 // -----------------------------------------------------------------------------
 // Network Solver Fast-Path Native Interface
 // -----------------------------------------------------------------------------
@@ -87,6 +88,53 @@ nusselt_and_jacobian_dittus_boelter(double Re, double Pr, bool heating = true);
 //   f        : Darcy friction factor [-]
 //   d_f_d_Re : Jacobian gradient [-]
 std::tuple<double, double> friction_and_jacobian_haaland(double Re, double e_D);
+
+// -----------------------------------------------------------------------------
+// 3. Thermodynamic & Transport Components
+// -----------------------------------------------------------------------------
+
+// Calculate Mass Density and its analytical derivatives w.r.t. T and P.
+// Method: Ideal Gas Law Analytical Chain Rule
+// Inputs:
+//   T : Temperature [K]
+//   P : Pressure [Pa]
+//   X : Mole fractions [-]
+//
+// Returns:
+//   tuple(rho, d_rho_d_T, d_rho_d_P)
+//   rho       : Density [kg/m³]
+//   d_rho_d_T : Jacobian gradient w.r.t Temperature [(kg/m³)/K]
+//   d_rho_d_P : Jacobian gradient w.r.t Pressure [(kg/m³)/Pa]
+std::tuple<double, double, double>
+density_and_jacobians(double T, double P, const std::vector<double> &X);
+
+// Calculate Mass Enthalpy and its analytical derivative w.r.t. T.
+// Method: dh/dT is identically the mass-specific heat capacity (cp_mass).
+// Inputs:
+//   T : Temperature [K]
+//   X : Mole fractions [-]
+//
+// Returns:
+//   tuple(h, d_h_d_T)
+//   h       : Mass Enthalpy [J/kg]
+//   d_h_d_T : Jacobian gradient w.r.t Temperature [J/(kg*K)]
+std::tuple<double, double> enthalpy_and_jacobian(double T,
+                                                 const std::vector<double> &X);
+
+// Calculate Dynamic Viscosity and its derivatives w.r.t. T and P.
+// Method: Central Finite Difference (tightly bracketed)
+// Inputs:
+//   T : Temperature [K]
+//   P : Pressure [Pa]
+//   X : Mole fractions [-]
+//
+// Returns:
+//   tuple(mu, d_mu_d_T, d_mu_d_P)
+//   mu       : Dynamic viscosity [Pa*s]
+//   d_mu_d_T : Jacobian gradient w.r.t Temperature [(Pa*s)/K]
+//   d_mu_d_P : Jacobian gradient w.r.t Pressure [(Pa*s)/Pa]
+std::tuple<double, double, double>
+viscosity_and_jacobians(double T, double P, const std::vector<double> &X);
 
 } // namespace solver
 } // namespace combaero
