@@ -65,6 +65,11 @@ def test_momentum_chamber_network():
     assert "chamber_1.P" in unknowns
     assert "chamber_1.P_total" in unknowns
 
+    # 1b. Verify directional flow vectors (angles)
+    assert node_mc.get_port_angle("pipe_in") == 0.0  # default
+    node_mc.set_port_angle("pipe_in", 45.0)
+    assert node_mc.get_port_angle("pipe_in") == 45.0
+
     # Placeholder residuals ensure conservation equations can later be injected
     state = cb.network.MixtureState(1e5, 1.1e5, 300.0, 300.0, 1.0, [0.0] * 14)
     residuals = node_mc.residuals(state)
