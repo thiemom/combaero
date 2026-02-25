@@ -170,42 +170,45 @@ if [[ ${#BLOCK_COMMENT_FILES[@]} -gt 0 ]]; then
     echo ""
 fi
 
-# Check for M_PI usage without math_constants.h include
-# M_PI is a POSIX extension not available on MSVC by default
-M_PI_VIOLATIONS=()
+# Check for POSIX math constants used without math_constants.h include.
+# These are undefined on MSVC by default: M_PI, M_PI_2, M_PI_4, M_SQRT2, M_LN10.
+# The list is derived directly from include/math_constants.h — keep in sync.
+MATH_CONST_PATTERN='M_PI\b|M_PI_2\b|M_PI_4\b|M_SQRT2\b|M_LN10\b'
+MATH_CONST_VIOLATIONS=()
 for dir in "${SCAN_DIRS[@]}"; do
     if [[ -d "$dir" ]]; then
         while IFS= read -r file; do
-            # Check if file uses M_PI
-            if grep -q 'M_PI' "$file" 2>/dev/null; then
+            # Skip math_constants.h itself
+            [[ "$file" == *"math_constants.h" ]] && continue
+            # Check if file uses any of the POSIX math constants
+            if grep -qE "$MATH_CONST_PATTERN" "$file" 2>/dev/null; then
                 # Check if it includes math_constants.h
                 if ! grep -q 'math_constants\.h' "$file" 2>/dev/null; then
-                    # Skip math_constants.h itself
-                    if [[ "$file" != *"math_constants.h" ]]; then
-                        M_PI_VIOLATIONS+=("$file")
-                    fi
+                    MATH_CONST_VIOLATIONS+=("$file")
                 fi
             fi
         done < <(find "$dir" -type f \( -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) 2>/dev/null)
     fi
 done
 
-if [[ ${#M_PI_VIOLATIONS[@]} -gt 0 ]]; then
+if [[ ${#MATH_CONST_VIOLATIONS[@]} -gt 0 ]]; then
     HAS_ERRORS=true
     echo ""
     echo "=========================================="
-    echo "ERROR: M_PI used without math_constants.h"
+    echo "ERROR: POSIX math constant used without math_constants.h"
     echo "=========================================="
-    echo "M_PI is a POSIX extension not available on MSVC."
-    echo "Include math_constants.h for cross-platform compatibility."
+    echo "M_PI, M_PI_2, M_PI_4, M_SQRT2, M_LN10 are POSIX extensions"
+    echo "not available on MSVC. Include math_constants.h for cross-platform compatibility."
     echo ""
     echo "Files missing include:"
-    for f in "${M_PI_VIOLATIONS[@]}"; do
-        echo "  - $f"
+    for f in "${MATH_CONST_VIOLATIONS[@]}"; do
+        # Show which constant(s) triggered the violation
+        consts=$(grep -oE "$MATH_CONST_PATTERN" "$f" | sort -u | tr '\n' ' ')
+        echo "  - $f  (uses: ${consts% })"
     done
     echo ""
     echo "Fix: Add this include to each file:"
-    echo '  #include "math_constants.h"  // MSVC compatibility for M_PI'
+    echo '  #include "math_constants.h"  // MSVC compatibility for M_PI, M_LN10, etc.'
     echo ""
 fi
 
