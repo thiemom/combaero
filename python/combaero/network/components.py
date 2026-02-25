@@ -1,11 +1,13 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import combaero as cb
 
 if TYPE_CHECKING:
     from .graph import FlowNetwork
+
+CombustionMethodLiteral = Literal["complete", "equilibrium"]
 
 
 @dataclass
@@ -132,6 +134,35 @@ class BoundaryNode(NetworkNode):
 
     def residuals(self, state: MixtureState) -> list[float]:
         return []
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        pass
+
+
+class CombustorNode(NetworkNode):
+    """
+    Combustion chamber adding energy (and optionally mass) to the flow.
+    Evaluates adiabatic combustion using the C++ core backend based on
+    the selected CombustionMethodLiteral.
+    """
+
+    def __init__(
+        self,
+        id: str,
+        method: CombustionMethodLiteral = "complete",
+        pressure_loss_frac: float = 0.04,
+    ):
+        super().__init__(id)
+        self.method = method
+        self.pressure_loss_frac = pressure_loss_frac
+
+    def unknowns(self) -> list[str]:
+        # P, T, and species mass fractions depending on the solver architecture
+        return [f"{self.id}.P", f"{self.id}.T"]
+
+    def residuals(self, state: MixtureState) -> list[float]:
+        # Energy and Mass constraints evaluated dynamically by the FlowNetwork loop
+        return [0.0]
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         pass

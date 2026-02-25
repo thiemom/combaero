@@ -19,6 +19,8 @@ NODE_FACTORIES = {
     "plenum": lambda id: PlenumNode(id),
     "momentum_chamber": lambda id: cb.network.MomentumChamberNode(id),
     "boundary": lambda id: BoundaryNode(id),
+    "combustor_complete": lambda id: cb.network.CombustorNode(id, method="complete"),
+    "combustor_eq": lambda id: cb.network.CombustorNode(id, method="equilibrium"),
 }
 
 ELEMENT_FACTORIES = {

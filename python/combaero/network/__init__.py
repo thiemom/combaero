@@ -1,5 +1,6 @@
 from .components import (
     BoundaryNode,
+    CombustorNode,
     LosslessConnectionElement,
     MixtureState,
     MomentumChamberNode,
@@ -13,6 +14,7 @@ __all__ = [
     "PlenumNode",
     "MomentumChamberNode",
     "BoundaryNode",
+    "CombustorNode",
     "PipeElement",
     "OrificeElement",
     "LosslessConnectionElement",
