@@ -1,3 +1,7 @@
+import itertools
+
+import pytest
+
 import combaero as cb
 from combaero.network.components import (
     BoundaryNode,
@@ -6,6 +10,25 @@ from combaero.network.components import (
     PipeElement,
     PlenumNode,
 )
+
+# ==============================================================================
+# COMBINATORIAL TEST HARNESS CONFIGURATION
+# ==============================================================================
+NODE_FACTORIES = {
+    "plenum": lambda id: PlenumNode(id),
+    "momentum_chamber": lambda id: cb.network.MomentumChamberNode(id),
+    "boundary": lambda id: BoundaryNode(id),
+}
+
+ELEMENT_FACTORIES = {
+    "pipe": lambda id, f, t: PipeElement(id, f, t, length=2.0, diameter=0.15, roughness=1e-5),
+    "orifice": lambda id, f, t: OrificeElement(id, f, t, Cd=0.6, area=0.005),
+}
+
+PERMUTATIONS = list(
+    itertools.product(NODE_FACTORIES.keys(), ELEMENT_FACTORIES.keys(), NODE_FACTORIES.keys())
+)
+# ==============================================================================
 
 
 def test_atomic_network_components():
@@ -112,3 +135,78 @@ def test_flownetwork_topology():
 
     # 4. Verify post-resolution auto-discovery
     assert orifice.upstream_diameter == 0.15
+
+
+@pytest.mark.parametrize("n_upstream_key, el_type_key, n_downstream_key", PERMUTATIONS)
+def test_all_topological_combinations(n_upstream_key, el_type_key, n_downstream_key):
+    """
+    Test 5: Scalable Matrix Runner.
+    Dynamically tests every registered Network Node against every Network Element.
+    Ensures safe instantiation and graph topology resolution across all possible architectures.
+    """
+    graph = cb.network.FlowNetwork()
+
+    # 1. Instantiate endpoints dynamically from factory keys
+    n_up = NODE_FACTORIES[n_upstream_key]("node_up")
+    n_down = NODE_FACTORIES[n_downstream_key]("node_down")
+
+    # 2. Instantiate intermediate element dynamically
+    element = ELEMENT_FACTORIES[el_type_key]("element_mid", "node_up", "node_down")
+
+    # 3. Assemble generic graph
+    graph.add_node(n_up)
+    graph.add_node(n_down)
+    graph.add_element(element)
+
+    # 4. Run global physics interface tests
+    assert isinstance(element.n_equations(), int)
+    assert isinstance(n_up.unknowns(), list)
+
+    # 5. Verify Topology doesn't crash on unfamiliar combinations
+    try:
+        graph.resolve_all_topology()
+    except Exception as e:
+        pytest.fail(
+            f"Topology auto-discovery crashed on {n_upstream_key} -> {el_type_key} -> {n_downstream_key}: {str(e)}"
+        )
+
+
+def test_flownetwork_multibranch():
+    """
+    Test 4: Validates that Plenums/Chambers can accept multiple inlets and outlets.
+    Verifies that Orifice auto-discovery safely aborts when upstream geometry is ambiguous.
+    """
+    graph = cb.network.FlowNetwork()
+
+    # Nodes
+    chamber = cb.network.MomentumChamberNode("chamber_main")
+    graph.add_node(chamber)
+    for i in range(1, 4):
+        graph.add_node(cb.network.BoundaryNode(f"bnd_{i}"))
+
+    # Elements: Two pipes entering the chamber
+    pipe_a = cb.network.PipeElement("pipe_a", "bnd_1", "chamber_main", 1.0, 0.1, 1e-5)
+    pipe_b = cb.network.PipeElement("pipe_b", "bnd_2", "chamber_main", 1.0, 0.2, 1e-5)
+
+    # Elements: One orifice leaving the chamber
+    orf_out = cb.network.OrificeElement("orf_out", "chamber_main", "bnd_3", 0.6, 0.05)
+
+    graph.add_element(pipe_a)
+    graph.add_element(pipe_b)
+    graph.add_element(orf_out)
+
+    # 1. Verify Topology Array Lengths
+    upstreams = graph.get_upstream_elements("chamber_main")
+    downstreams = graph.get_downstream_elements("chamber_main")
+
+    assert len(upstreams) == 2
+    assert len(downstreams) == 1
+    assert "pipe_a" in [e.id for e in upstreams]
+    assert "pipe_b" in [e.id for e in upstreams]
+
+    # 2. Verify Auto-Discovery Safety
+    # The orifice looks upstream, sees TWO pipes feeding the chamber,
+    # and should safely abort extracting a diameter instead of crashing or picking wrong.
+    assert orf_out.upstream_diameter is None
+    graph.resolve_all_topology()
+    assert orf_out.upstream_diameter is None
