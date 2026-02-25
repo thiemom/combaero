@@ -1,5 +1,7 @@
 #include "solver_interface.h"
 
+#include "friction.h"
+#include "heat_transfer.h"
 #include "math_constants.h"
 #include <cmath>
 #include <stdexcept>
@@ -59,20 +61,23 @@ std::tuple<double, double> pressure_loss_and_jacobian(double v, double rho,
 
 std::tuple<double, double>
 nusselt_and_jacobian_dittus_boelter(double Re, double Pr, bool heating) {
-  // Dittus-Boelter fundamental relation: Nu = 0.023 * Re^0.8 * Pr^n
-  double n = heating ? 0.4 : 0.3;
+  // Dittus-Boelter fundamental relation: Nu = coeff_outer *
+  // Re^coeff_reynolds_exp * Pr^n
+  double n = heating ? dittus_boelter::coeff_prandtl_heating_exp
+                     : dittus_boelter::coeff_prandtl_cooling_exp;
 
   if (Re <= 0.0) {
     return {0.0, 0.0};
   }
 
-  double constant = 0.023 * std::pow(Pr, n);
-  double Nu = constant * std::pow(Re, 0.8);
+  double constant = dittus_boelter::coeff_outer * std::pow(Pr, n);
+  double Nu = constant * std::pow(Re, dittus_boelter::coeff_reynolds_exp);
 
   // Analytical derivative via chain rule:
-  // d(Nu)/d(Re) = 0.023 * Pr^n * 0.8 * Re^(-0.2)
-  //             = (0.8 * Nu) / Re
-  double jacobian = (0.8 * Nu) / Re;
+  // d(Nu)/d(Re) = coeff_outer * Pr^n * coeff_reynolds_exp *
+  // Re^(coeff_reynolds_exp - 1)
+  //             = (coeff_reynolds_exp * Nu) / Re
+  double jacobian = (dittus_boelter::coeff_reynolds_exp * Nu) / Re;
 
   return {Nu, jacobian};
 }
@@ -80,7 +85,8 @@ nusselt_and_jacobian_dittus_boelter(double Re, double Pr, bool heating) {
 std::tuple<double, double> friction_and_jacobian_haaland(double Re,
                                                          double e_D) {
   // Explicit Haaland equation approximation of friction factor f (Darcy)
-  // 1/sqrt(f) = -1.8 * log10( (e_D/3.7)^1.11 + 6.9/Re )
+  // 1/sqrt(f) = coeff_outer * log10( (e_D/coeff_roughness)^coeff_exponent +
+  // coeff_reynolds/Re )
 
   if (Re <= 0.0) {
     // Fallback or explicit failure;
@@ -89,33 +95,32 @@ std::tuple<double, double> friction_and_jacobian_haaland(double Re,
   }
 
   // Isolate core logarithmic argument
-  double a = std::pow(e_D / 3.7, 1.11);
-  double b = 6.9 / Re;
+  double a = std::pow(e_D / haaland::coeff_roughness, haaland::coeff_exponent);
+  double b = haaland::coeff_reynolds / Re;
   double arg = a + b;
 
   // 1/sqrt(f)
-  double inv_sqrt_f = -1.8 * std::log10(arg);
+  double inv_sqrt_f = haaland::coeff_outer * std::log10(arg);
 
-  // f = [ -1.8 * log10( (e_D/3.7)^1.11 + 6.9/Re ) ]^(-2)
+  // f = [ coeff_outer * log10( (e_D/coeff_roughness)^coeff_exponent +
+  // coeff_reynolds/Re ) ]^(-2)
   double f = 1.0 / (inv_sqrt_f * inv_sqrt_f);
 
   // Analytical derivative via chain rule:
   // d(f)/d(Re)
-  // Let U = inv_sqrt_f = -1.8 * log10(arg) = (-1.8 / ln(10)) * ln(arg)
-  // f = U^(-2)
-  // df/dU = -2 * U^(-3)
+  // Let U = inv_sqrt_f = coeff_outer * log10(arg) = (coeff_outer / ln(10)) *
+  // ln(arg) f = U^(-2) df/dU = -2 * U^(-3)
   //
   // dU/dRe = dU/d(arg) * d(arg)/dRe
-  // dU/d(arg) = (-1.8 / ln(10)) * (1 / arg)
-  // d(arg)/dRe = -6.9 / Re^2
+  // dU/d(arg) = (coeff_outer / ln(10)) * (1 / arg)
+  // d(arg)/dRe = -coeff_reynolds / Re^2
   //
   // Combining:
-  // df/dRe = (-2 * U^(-3)) * (-1.8 / (ln(10) * arg)) * (-6.9 / Re^2)
-  //        = -3.14915... * (U^-3 / arg) * (-6.9 / Re^2) ...
-  //        = -(12.42 * U^(-3)) / (ln(10) * arg * Re^2)
+  // df/dRe = (-2 * U^(-3)) * (coeff_outer / (ln(10) * arg)) * (-coeff_reynolds
+  // / Re^2)
 
-  double dU_darg = -1.8 / (M_LN10 * arg);
-  double darg_dRe = -6.9 / (Re * Re);
+  double dU_darg = haaland::coeff_outer / (M_LN10 * arg);
+  double darg_dRe = -haaland::coeff_reynolds / (Re * Re);
 
   double dU_dRe = dU_darg * darg_dRe;
   double df_dU = -2.0 / (inv_sqrt_f * inv_sqrt_f * inv_sqrt_f);
