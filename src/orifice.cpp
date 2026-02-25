@@ -1,15 +1,8 @@
+#include "../include/math_constants.h"
 #include "../include/orifice.h"
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
-#include <algorithm>
-
-// -------------------------------------------------------------
-// Constants
-// -------------------------------------------------------------
-
-namespace {
-constexpr double PI = 3.14159265358979323846;
-} // namespace
 
 // -------------------------------------------------------------
 // OrificeGeometry implementation
@@ -23,7 +16,7 @@ double OrificeGeometry::beta() const {
 }
 
 double OrificeGeometry::area() const {
-    return PI * d * d / 4.0;
+    return M_PI * d * d / 4.0;
 }
 
 double OrificeGeometry::t_over_d() const {
@@ -90,35 +83,35 @@ double Cd_ReaderHarrisGallagher(double beta, double Re_D, double D) {
     // Convert D to mm for the correlation
     const double D_mm = D * 1000.0;
 
-    // Flange tap geometry (25.4 mm from plate face)
-    const double L1 = 25.4 / D_mm;  // Upstream tap distance ratio
-    const double L2 = 25.4 / D_mm;  // Downstream tap distance ratio
+    // Flange tap geometry
+    const double L1 = reader_harris::flange_mm / D_mm;
+    const double L2 = reader_harris::flange_mm / D_mm;
 
     // A parameter (small-bore correction)
-    const double A = std::pow(19000.0 * beta / Re_D, 0.8);
+    const double A = std::pow(reader_harris::A_coef * beta / Re_D, reader_harris::A_exp);
 
     // M2 parameter (downstream tap correction)
     const double M2 = 2.0 * L2 / (1.0 - beta);
 
     // Base coefficient
-    double C = 0.5961
-             + 0.0261 * beta2
-             - 0.216 * beta8;
+    double C = reader_harris::C0
+             + reader_harris::C1 * beta2
+             - reader_harris::C2 * beta8;
 
     // Reynolds number term
-    C += 0.000521 * std::pow(1.0e6 * beta / Re_D, 0.7);
+    C += reader_harris::C3 * std::pow(reader_harris::re_scale * beta / Re_D, reader_harris::C3_exp);
 
     // Small-bore correction
-    C += (0.0188 + 0.0063 * A) * std::pow(beta, 3.5) * std::pow(1.0e6 / Re_D, 0.3);
+    C += (reader_harris::C4a + reader_harris::C4b * A) * std::pow(beta, reader_harris::C4_beta) * std::pow(reader_harris::re_scale / Re_D, reader_harris::C4_re);
 
     // Upstream tap term
-    const double exp_term1 = std::exp(-10.0 * L1);
-    const double exp_term2 = std::exp(-7.0 * L1);
-    C += (0.043 + 0.080 * exp_term1 - 0.123 * exp_term2)
-       * (1.0 - 0.11 * A) * beta4 / (1.0 - beta4);
+    const double exp_term1 = std::exp(-reader_harris::C5_exp1 * L1);
+    const double exp_term2 = std::exp(-reader_harris::C5_exp2 * L1);
+    C += (reader_harris::C5a + reader_harris::C5b * exp_term1 - reader_harris::C5c * exp_term2)
+       * (1.0 - reader_harris::C5_A_coef * A) * beta4 / (1.0 - beta4);
 
     // Downstream tap term
-    C -= 0.031 * (M2 - 0.8 * std::pow(M2, 1.1)) * std::pow(beta, 1.3);
+    C -= reader_harris::C6 * (M2 - 0.8 * std::pow(M2, reader_harris::C6_M_exp)) * std::pow(beta, reader_harris::C6_beta);
 
     return C;
 }
@@ -132,10 +125,10 @@ double Cd_Stolz(double beta, double Re_D) {
 
     // Stolz equation (corner taps)
     // C = 0.5959 + 0.0312*beta^2.1 - 0.184*beta^8 + 91.71*beta^2.5/Re_D^0.75
-    double C = 0.5959
-             + 0.0312 * std::pow(beta, 2.1)
-             - 0.184 * std::pow(beta, 8.0)
-             + 91.71 * std::pow(beta, 2.5) / std::pow(Re_D, 0.75);
+    double C = stolz::C0
+             + stolz::C1 * std::pow(beta, stolz::C1_exp)
+             - stolz::C2 * std::pow(beta, stolz::C2_exp)
+             + stolz::C3 * std::pow(beta, stolz::C3_beta) / std::pow(Re_D, stolz::C3_re);
 
     return C;
 }
@@ -148,11 +141,11 @@ double Cd_Miller(double beta, double Re_D) {
     // With Reynolds correction
     const double beta2 = beta * beta;
 
-    double C = 0.596 + 0.031 * beta2;
+    double C = miller::C0 + miller::C1 * beta2;
 
     // Reynolds number correction (approximate)
-    if (Re_D < 1.0e6) {
-        C += 0.5 * std::pow(beta, 2.5) / std::pow(Re_D, 0.5);
+    if (Re_D < miller::re_cutoff) {
+        C += miller::C2 * std::pow(beta, miller::C2_beta_exp) / std::pow(Re_D, miller::C2_re_exp);
     }
 
     return C;
@@ -176,34 +169,26 @@ double Cd_Miller(double beta, double Re_D) {
 // Note: Smooth in Re_d for solver stability (t/d is constant per geometry)
 //
 double thickness_correction(double t_over_d, double beta, double Re_d) {
-    if (t_over_d <= 0.02) {
+    if (t_over_d <= thickness::thin_plate_limit) {
         return 1.0;  // Thin plate, no correction
     }
 
     // Ensure Re_d is positive for stability
-    Re_d = std::max(Re_d, 100.0);
+    Re_d = std::max(Re_d, thickness::re_floor);
 
     // Component 1: Reattachment benefit (independent of Re)
-    // Cd increases as flow reattaches to bore wall, reducing vena contracta
-    // Peak occurs at t/d ≈ 0.2-0.3, giving ~20% increase for beta=0.5
-    const double reattach_factor = 0.35 * (1.0 - std::exp(-8.0 * t_over_d));
+    const double reattach_factor = thickness::reattach_coef * (1.0 - std::exp(-thickness::reattach_exp * t_over_d));
     const double reattachment = reattach_factor * (1.0 - beta * beta);
 
     // Component 2: Friction penalty (smooth Re dependence)
-    // Use Blasius smooth turbulent friction: f = 0.316 / Re^0.25
-    // Friction loss in bore reduces effective Cd
-    // Coefficient calibrated to Idelchik data: k_t ≈ 0.96 at t/d=3.0, beta=0.5, Re=1e5
-    // Calculation: need friction_loss ≈ 0.30 at t/d=3.0 → coeff ≈ 5.67
-    const double f = 0.316 / std::pow(Re_d, 0.25);
-    const double friction_loss = 5.67 * f * t_over_d;
+    // Use Blasius smooth turbulent friction: f = blasius_coef / Re^blasius_exp
+    const double f = thickness::blasius_coef / std::pow(Re_d, thickness::blasius_exp);
+    const double friction_loss = thickness::friction_coef * f * t_over_d;
 
     // Combined correction: rise (reattachment) then fall (friction)
     const double correction = 1.0 + reattachment - friction_loss;
 
-    // Clamping with safety floor for extreme cases
-    // Lower bound: 0.5 (extremely thick/rough orifices approach pipe entrance)
-    // Upper bound: 1.3 (maximum reattachment benefit)
-    return std::max(0.5, std::min(correction, 1.3));
+    return std::max(thickness::correction_min, std::min(correction, thickness::correction_max));
 }
 
 // Rounded-entry Cd
@@ -224,13 +209,13 @@ double Cd_rounded(double r_over_d, double beta, double Re_D) {
     // Convert K to Cd using: Cd = 1 / sqrt(1 + K / (1 - beta^4))
 
     double K;
-    if (r_over_d >= 0.15) {
+    if (r_over_d >= rounded::radius_threshold) {
         // Well-rounded entry
-        K = 0.04;
+        K = rounded::K_well_rounded;
     } else {
         // Partially rounded
-        const double ratio = 1.0 - r_over_d / 0.15;
-        K = 0.5 * ratio * ratio;
+        const double ratio = 1.0 - r_over_d / rounded::radius_threshold;
+        K = rounded::K_sharp * ratio * ratio;
     }
 
     // Account for beta effect
@@ -239,8 +224,8 @@ double Cd_rounded(double r_over_d, double beta, double Re_D) {
 
     // Reynolds number correction for low Re
     double Re_correction = 1.0;
-    if (Re_D < 1.0e5) {
-        Re_correction = 1.0 - 0.1 * std::pow(1.0e5 / Re_D, 0.2);
+    if (Re_D < rounded::re_correction_ref) {
+        Re_correction = 1.0 - rounded::re_correction_coef * std::pow(rounded::re_correction_ref / Re_D, rounded::re_correction_exp);
     }
 
     return Cd * Re_correction;
@@ -596,7 +581,7 @@ double solve_orifice_mdot(
 
         // Update Reynolds number based on new mdot
         // Re_D = (4 * mdot) / (π * D * μ)
-        const double Re_D = (4.0 * mdot_new) / (PI * D * mu);
+        const double Re_D = (4.0 * mdot_new) / (M_PI * D * mu);
 
         // Update Cd based on new Reynolds number
         switch (correlation) {
@@ -729,8 +714,8 @@ OrificeFlowResult orifice_flow(
     // Calculate Reynolds numbers
     const double D = geom.D;
     const double d = geom.d;
-    const double Re_D = (4.0 * mdot) / (PI * D * mu);
-    const double Re_d = (4.0 * mdot) / (PI * d * mu);
+    const double Re_D = (4.0 * mdot) / (M_PI * D * mu);
+    const double Re_d = (4.0 * mdot) / (M_PI * d * mu);
 
     // Get discharge coefficient
     OrificeState state;
@@ -796,7 +781,7 @@ double orifice_velocity_from_mdot(double mdot, double rho, double d, double Z) {
     const double rho_corrected = rho / Z;
 
     // Calculate area
-    const double A = PI * d * d / 4.0;
+    const double A = M_PI * d * d / 4.0;
 
     // v = mdot / (rho_corrected * A)
     return mdot / (rho_corrected * A);
@@ -812,7 +797,7 @@ double orifice_area_from_beta(double D, double beta) {
 
     // A = π * (D * beta / 2)²
     const double d = D * beta;
-    return PI * d * d / 4.0;
+    return M_PI * d * d / 4.0;
 }
 
 double beta_from_diameters(double d, double D) {
@@ -842,5 +827,5 @@ double orifice_Re_d_from_mdot(double mdot, double d, double mu) {
     }
 
     // Re_d = 4 * mdot / (π * d * mu)
-    return (4.0 * mdot) / (PI * d * mu);
+    return (4.0 * mdot) / (M_PI * d * mu);
 }

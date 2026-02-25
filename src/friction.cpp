@@ -46,9 +46,9 @@ double friction_serghides(double Re, double e_D) {
 
   // Note: In Serghides, A/B/C are successive approximations to 1/√f
   // The term 2.51*A/Re corresponds to 2.51/(Re*√f) when √f ≈ 1/A
-  double A = -2.0 * std::log10(e_D / 3.7 + 12.0 / Re);
-  double B = -2.0 * std::log10(e_D / 3.7 + 2.51 * A / Re);
-  double C = -2.0 * std::log10(e_D / 3.7 + 2.51 * B / Re);
+  double A = -2.0 * std::log10(e_D / serghides::coeff_roughness + serghides::coeff_reynolds_A / Re);
+  double B = -2.0 * std::log10(e_D / serghides::coeff_roughness + serghides::coeff_reynolds_BC * A / Re);
+  double C = -2.0 * std::log10(e_D / serghides::coeff_roughness + serghides::coeff_reynolds_BC * B / Re);
 
   double denom = C - 2.0 * B + A;
 
@@ -84,12 +84,12 @@ double friction_colebrook(double Re, double e_D, double tol, int max_iter) {
   double x = 1.0 / std::sqrt(f);
 
   for (int iter = 0; iter < max_iter; ++iter) {
-    double arg = e_D / 3.7 + 2.51 * x / Re;
+    double arg = e_D / serghides::coeff_roughness + serghides::coeff_reynolds_BC * x / Re;
     double F = x + 2.0 * std::log10(arg);
 
     // dF/dx = 1 + 2/(ln10 * arg) * d(arg)/dx
-    // d(arg)/dx = 2.51/Re
-    double darg_dx = 2.51 / Re;
+    // d(arg)/dx = serghides::coeff_reynolds_BC / Re
+    double darg_dx = serghides::coeff_reynolds_BC / Re;
     double dF = 1.0 + 2.0 * darg_dx / (ln10 * arg);
 
     if (std::abs(dF) < 1e-30)
@@ -162,6 +162,6 @@ double friction_petukhov(double Re) {
   if (Re < 3000) {
     throw std::invalid_argument("friction_petukhov: Re must be > 3000");
   }
-  double x = 0.790 * std::log(Re) - 1.64;
+  double x = petukhov::coeff_a * std::log(Re) - petukhov::coeff_b;
   return 1.0 / (x * x);
 }

@@ -70,6 +70,10 @@ double nusselt_dittus_boelter(double Re, double Pr, bool heating = true,
 //            validated range; no warning is emitted in that case.
 //            Below Re=2300 a C1-smooth Hermite blend to laminar Nu is used
 //            (the raw formula goes negative at Re<1000).
+namespace gnielinski {
+constexpr double coeff_prandtl_factor = 12.7;  // 12.7 * sqrt(f/8) * (Pr^(2/3) - 1)
+constexpr double coeff_re_offset      = 1000.0; // (Re - 1000) in numerator
+} // namespace gnielinski
 double nusselt_gnielinski(double Re, double Pr, double f,
                           combaero::CorrelationStatus *status = nullptr);
 
@@ -93,13 +97,23 @@ double nusselt_gnielinski(double Re, double Pr,
 //   mu_ratio : μ_bulk / μ_wall [-] (typically 0.5-2.0)
 //   status   : if non-null, set to Extrapolated when Re or Pr is outside the
 //              validated range; no warning is emitted in that case
+namespace sieder_tate {
+constexpr double coeff_outer       = 0.027;
+constexpr double coeff_reynolds_exp = 0.8;
+constexpr double coeff_prandtl_exp  = 1.0 / 3.0;
+constexpr double coeff_viscosity_exp = 0.14;
+} // namespace sieder_tate
 double nusselt_sieder_tate(double Re, double Pr, double mu_ratio = 1.0,
                            combaero::CorrelationStatus *status = nullptr);
 
-// Petukhov correlation (1970)
-// Nu = (f/8) * Re * Pr / (1.07 + 12.7 * sqrt(f/8) * (Pr^(2/3) - 1))
+// Petukhov heat transfer correlation (1970)
+// Nu = (f/8) * Re * Pr / (coeff_offset + 12.7 * sqrt(f/8) * (Pr^(2/3) - 1))
 //
 // Basis for Gnielinski; valid for fully turbulent flow.
+namespace petukhov_ht {
+constexpr double coeff_offset        = 1.07;  // denominator offset (vs Gnielinski's 1.0)
+constexpr double coeff_prandtl_factor = 12.7; // same Prandtl correction as Gnielinski
+} // namespace petukhov_ht
 // Valid for:
 //   - 10^4 < Re < 5x10^6
 //   - 0.5 < Pr < 2000
