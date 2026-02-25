@@ -13,6 +13,7 @@
 #include "correlation_status.h"
 #include "equilibrium.h"
 #include "friction.h"
+#include "geometry.h"
 #include "heat_transfer.h"
 #include "humidair.h"
 #include "incompressible.h"
@@ -2716,11 +2717,15 @@ PYBIND11_MODULE(_core, m) {
       "  ctx.mdot_fuel and ctx.mdot_air are populated from stream mass flows.");
 
   // =========================================================================
-  // Acoustics
+  // Acoustics & Geometry
   // =========================================================================
 
+  py::module geom = m.def_submodule(
+      "geometry", "Geometric primitives representing flow areas and volumes.");
+
   // Tube struct
-  py::class_<Tube>(m, "Tube", "Cylindrical tube geometry for acoustic analysis")
+  py::class_<Tube>(geom, "Tube",
+                   "Cylindrical tube geometry for acoustic analysis")
       .def(py::init<double, double>(), py::arg("L"), py::arg("D"),
            "Create tube with length L [m] and diameter D [m]")
       .def_readwrite("L", &Tube::L, "Length [m]")
@@ -2738,7 +2743,7 @@ PYBIND11_MODULE(_core, m) {
       .value("Miller", CdCorrelation::Miller, "Miller (1996) simplified");
 
   // Annulus struct
-  py::class_<Annulus>(m, "Annulus",
+  py::class_<Annulus>(geom, "Annulus",
                       "Annular duct geometry for acoustic analysis")
       .def(py::init<>())
       .def(py::init<double, double, double>(), py::arg("L"), py::arg("D_inner"),
@@ -2770,7 +2775,7 @@ PYBIND11_MODULE(_core, m) {
           "Outer radius [m]");
 
   py::class_<CanAnnularFlowGeometry>(
-      m, "CanAnnularFlowGeometry",
+      geom, "CanAnnularFlowGeometry",
       "Parameterized can-annular flow geometry with primary, transition, and "
       "annular sections")
       .def(py::init<double, double, double, double, double, double>(),
@@ -3195,7 +3200,7 @@ PYBIND11_MODULE(_core, m) {
   // Annular Duct Geometry and Modes
   // AnnularDuctGeometry is a Python-level alias for Annulus (backward
   // compatibility)
-  m.attr("AnnularDuctGeometry") = m.attr("Annulus");
+  m.attr("AnnularDuctGeometry") = geom.attr("Annulus");
 
   py::class_<AnnularMode>(m, "AnnularMode")
       .def(py::init<>())

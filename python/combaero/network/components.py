@@ -1,7 +1,11 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import combaero as cb
+
+if TYPE_CHECKING:
+    from .graph import FlowNetwork
 
 
 @dataclass
@@ -37,6 +41,11 @@ class NetworkNode(ABC):
         """Returns zero when node equations are satisfied."""
         pass
 
+    @abstractmethod
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        """Called automatically by FlowNetwork to resolve neighbors."""
+        pass
+
 
 class NetworkElement(ABC):
     def __init__(self, id: str, from_node: str, to_node: str):
@@ -54,6 +63,11 @@ class NetworkElement(ABC):
         """Number of residual equations contributed."""
         pass
 
+    @abstractmethod
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        """Called automatically by FlowNetwork to resolve neighbors."""
+        pass
+
 
 class PlenumNode(NetworkNode):
     """
@@ -68,6 +82,9 @@ class PlenumNode(NetworkNode):
         # Residual equations will be governed dynamically by the solver network sum.
         # But locally, P_total must equal P_static.
         return [state.P_total - state.P]
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        pass
 
 
 class MomentumChamberNode(NetworkNode):
@@ -87,6 +104,9 @@ class MomentumChamberNode(NetworkNode):
             state.P_total - state.P
         ]  # Will be dynamically updated by solver with dynamic pressure
 
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        pass
+
 
 class BoundaryNode(NetworkNode):
     """
@@ -99,6 +119,9 @@ class BoundaryNode(NetworkNode):
     def residuals(self, state: MixtureState) -> list[float]:
         return []
 
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        pass
+
 
 class OrificeElement(NetworkElement):
     """
@@ -109,9 +132,20 @@ class OrificeElement(NetworkElement):
         super().__init__(id, from_node, to_node)
         self.Cd = Cd
         self.area = area
+        self.upstream_diameter: float | None = None
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        # Ask graph what element fed into our "from_node"
+        upstream_elements = graph.get_upstream_elements(self.from_node)
+
+        if len(upstream_elements) == 1:
+            upstream_element = upstream_elements[0]
+            # If the upstream element is a pipe, extract its diameter
+            if isinstance(upstream_element, PipeElement):
+                self.upstream_diameter = upstream_element.diameter
 
     def residuals(self, state_in: MixtureState, state_out: MixtureState) -> list[float]:
-        state_in.P_total - state_out.P_static  # wait, Orifice depends on topology upstream
+        state_in.P_total - state_out.P  # wait, Orifice depends on topology upstream
         # The phase 1 solver operates iteratively using the tuple interface.
         return []
 
@@ -145,3 +179,6 @@ class PipeElement(NetworkElement):
 
     def n_equations(self) -> int:
         return 1
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        pass

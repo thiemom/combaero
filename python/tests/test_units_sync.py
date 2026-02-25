@@ -11,6 +11,7 @@ IGNORE_LIST = {
     "heat_transfer",
     "network",
     "species",
+    "geometry",
     # Internal Solver (f, J) Fast-Paths
     "orifice_mdot_and_jacobian",
     "pressure_loss_and_jacobian",

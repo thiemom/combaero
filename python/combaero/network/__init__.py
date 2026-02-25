@@ -8,8 +8,9 @@ from .components import (
     PipeElement,
     PlenumNode,
 )
+from .graph import FlowNetwork
 
-__all__ = [
+__all__: list[str] = [
     "BoundaryNode",
     "MixtureState",
     "MomentumChamberNode",
@@ -18,4 +19,5 @@ __all__ = [
     "OrificeElement",
     "PipeElement",
     "PlenumNode",
+    "FlowNetwork",
 ]
