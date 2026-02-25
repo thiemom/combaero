@@ -91,7 +91,21 @@ class MomentumChamberNode(NetworkNode):
     """
     Similar to a plenum, but preserves dynamic pressure.
     Enforces P_total = P_static + 0.5 * rho * v^2 instead of P_total = P_static.
+    Supports directional flow vectors (port angles) for momentum conservation.
     """
+
+    def __init__(self, id: str, port_angles_deg: dict[str, float] | None = None):
+        super().__init__(id)
+        # Dictionary mapping connected element IDs to angle relative to chamber axis [deg]
+        self.port_angles_deg: dict[str, float] = port_angles_deg or {}
+
+    def set_port_angle(self, element_id: str, angle_deg: float) -> None:
+        """Set the angle of the flow for a specific connected element."""
+        self.port_angles_deg[element_id] = angle_deg
+
+    def get_port_angle(self, element_id: str) -> float:
+        """Get the angle of the flow for a specific connected element (defaults to 0.0)."""
+        return self.port_angles_deg.get(element_id, 0.0)
 
     def unknowns(self) -> list[str]:
         return [f"{self.id}.P", f"{self.id}.P_total"]
