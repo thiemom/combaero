@@ -24,7 +24,7 @@ The recommended workflow is from the repository root; see the top-level README f
 
 ```bash
 python -m build --wheel
-python -m pip install dist/combaero-0.0.1-*.whl
+python -m pip install dist/combaero-0.1.0-*.whl
 ```
 
 ## Usage
