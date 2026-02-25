@@ -4951,6 +4951,16 @@ PYBIND11_MODULE(_core, m) {
         "  K   : Loss coefficient [-]\n\n"
         "Returns: tuple(dP [Pa], derivative [Pa/(m/s)])");
 
+  m.def(
+      "lossless_pressure_and_jacobian", &solver::lossless_pressure_and_jacobian,
+      py::arg("P_in"), py::arg("P_out"),
+      "Fast-path lossless ideal connection total pressure preservation (dP=0) "
+      "and analytic derivative (dP, d(dP)/d(P_out)).\n\n"
+      "Parameters:\n"
+      "  P_in  : Total pressure entering [Pa]\n"
+      "  P_out : Total pressure exiting [Pa]\n\n"
+      "Returns: tuple(Residual [Pa], derivative [-])");
+
   m.def("nusselt_and_jacobian_dittus_boelter",
         &solver::nusselt_and_jacobian_dittus_boelter, py::arg("Re"),
         py::arg("Pr"), py::arg("heating") = true,

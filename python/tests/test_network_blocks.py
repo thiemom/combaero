@@ -5,6 +5,7 @@ import pytest
 import combaero as cb
 from combaero.network.components import (
     BoundaryNode,
+    LosslessConnectionElement,
     MixtureState,
     OrificeElement,
     PipeElement,
@@ -23,6 +24,7 @@ NODE_FACTORIES = {
 ELEMENT_FACTORIES = {
     "pipe": lambda id, f, t: PipeElement(id, f, t, length=2.0, diameter=0.15, roughness=1e-5),
     "orifice": lambda id, f, t: OrificeElement(id, f, t, Cd=0.6, area=0.005),
+    "lossless": lambda id, f, t: LosslessConnectionElement(id, f, t),
 }
 
 PERMUTATIONS = list(

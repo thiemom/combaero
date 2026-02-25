@@ -167,6 +167,31 @@ class OrificeElement(NetworkElement):
         return 1
 
 
+class LosslessConnectionElement(NetworkElement):
+    """
+    An ideal connection with no friction or momentum loss.
+    Inherently preserves total pressure: P_total_in = P_total_out.
+    Does not require geometric parameters.
+    """
+
+    def __init__(self, id: str, from_node: str, to_node: str):
+        super().__init__(id, from_node, to_node)
+        self.area: float | None = None
+        self.diameter: float | None = None
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        pass  # Zero-loss elements do not need upstream geometry
+
+    def residuals(self, state_in: MixtureState, state_out: MixtureState) -> list[float]:
+        # Evaluates the native C++ tuple (f, J) interface for lossless P_total conservation
+        import combaero as cb
+
+        return [cb.lossless_pressure_and_jacobian(state_in.P_total, state_out.P_total)[0]]
+
+    def n_equations(self) -> int:
+        return 1
+
+
 class PipeElement(NetworkElement):
     """
     Pipe element applying frictional pressure drop.

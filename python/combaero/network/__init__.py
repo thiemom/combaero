@@ -1,23 +1,21 @@
 from .components import (
     BoundaryNode,
+    LosslessConnectionElement,
     MixtureState,
     MomentumChamberNode,
-    NetworkElement,
-    NetworkNode,
     OrificeElement,
     PipeElement,
     PlenumNode,
 )
 from .graph import FlowNetwork
 
-__all__: list[str] = [
-    "BoundaryNode",
-    "MixtureState",
-    "MomentumChamberNode",
-    "NetworkElement",
-    "NetworkNode",
-    "OrificeElement",
-    "PipeElement",
+__all__ = [
     "PlenumNode",
+    "MomentumChamberNode",
+    "BoundaryNode",
+    "PipeElement",
+    "OrificeElement",
+    "LosslessConnectionElement",
+    "MixtureState",
     "FlowNetwork",
 ]
