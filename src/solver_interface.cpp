@@ -2,6 +2,7 @@
 
 #include "friction.h"
 #include "heat_transfer.h"
+#include "math_constants.h"
 #include "thermo.h"
 #include "transport.h"
 #include <cmath>
