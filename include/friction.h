@@ -34,7 +34,13 @@ double friction_haaland(double Re, double e_D);
 
 // Serghides correlation (1984) - explicit approximation
 // Uses Steffensen acceleration on Colebrook iteration.
+// 1/√f = A - (B-A)² / (C - 2B + A)
 // Accuracy: <0.3% vs Colebrook-White (very accurate)
+namespace serghides {
+constexpr double coeff_roughness = 3.7;    // ε/D divisor (same as Colebrook/Haaland)
+constexpr double coeff_reynolds_A = 12.0;  // 12/Re term in A
+constexpr double coeff_reynolds_BC = 2.51; // 2.51*A/Re term in B, C
+} // namespace serghides
 double friction_serghides(double Re, double e_D);
 
 // Colebrook-White equation (1939) - implicit, solved iteratively
@@ -45,10 +51,14 @@ double friction_colebrook(double Re, double e_D, double tol = 1e-10,
                           int max_iter = 20);
 
 // Petukhov correlation (1970) - smooth pipes only
-// f = (0.790 * ln(Re) - 1.64)^(-2)
+// f = (coeff_a * ln(Re) - coeff_b)^(-2)
 // Valid for 3000 < Re < 5x10^6
 // Often used with Gnielinski/Petukhov heat transfer correlations.
 // Reference: Petukhov (1970), Advances in Heat Transfer, 6, 503
+namespace petukhov {
+constexpr double coeff_a = 0.790; // ln(Re) coefficient
+constexpr double coeff_b = 1.64;  // offset
+} // namespace petukhov
 double friction_petukhov(double Re);
 
 // -------------------------------------------------------------

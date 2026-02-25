@@ -129,6 +129,77 @@ double Cd(const OrificeGeometry& geom, const OrificeState& state);
 
 namespace orifice {
 
+// Reader-Harris/Gallagher (1998) - ISO 5167-2 flange-tap constants
+namespace reader_harris {
+constexpr double C0        = 0.5961;   // base coefficient
+constexpr double C1        = 0.0261;   // beta^2 term
+constexpr double C2        = 0.216;    // beta^8 term
+constexpr double C3        = 0.000521; // Re-correction coefficient
+constexpr double C3_exp    = 0.7;      // Re-correction exponent
+constexpr double C4a       = 0.0188;   // small-bore base
+constexpr double C4b       = 0.0063;   // small-bore A coefficient
+constexpr double C4_beta   = 3.5;      // small-bore beta exponent
+constexpr double C4_re     = 0.3;      // small-bore Re exponent
+constexpr double C5a       = 0.043;    // tap term base
+constexpr double C5b       = 0.080;    // tap term exp1 coefficient
+constexpr double C5c       = 0.123;    // tap term exp2 coefficient
+constexpr double C5_exp1   = 10.0;     // exp(-10*L1) coefficient
+constexpr double C5_exp2   = 7.0;      // exp(-7*L1) coefficient
+constexpr double C5_A_coef = 0.11;     // (1 - 0.11*A) factor
+constexpr double C6        = 0.031;    // downstream tap coefficient
+constexpr double C6_M_exp  = 1.1;      // M2^1.1 exponent
+constexpr double C6_beta   = 1.3;      // beta^1.3 exponent
+constexpr double A_coef    = 19000.0;  // small-bore A parameter coefficient
+constexpr double A_exp     = 0.8;      // small-bore A parameter exponent
+constexpr double flange_mm = 25.4;     // flange tap distance [mm]
+constexpr double re_scale  = 1.0e6;    // 10^6 * beta / Re scaling
+} // namespace reader_harris
+
+// Stolz (1978) - ISO 5167:1980 corner taps
+namespace stolz {
+constexpr double C0      = 0.5959;
+constexpr double C1      = 0.0312;
+constexpr double C1_exp  = 2.1;
+constexpr double C2      = 0.184;
+constexpr double C2_exp  = 8.0;
+constexpr double C3      = 91.71;
+constexpr double C3_beta = 2.5;
+constexpr double C3_re   = 0.75;
+} // namespace stolz
+
+// Miller (1996) simplified
+namespace miller {
+constexpr double C0          = 0.596;
+constexpr double C1          = 0.031;
+constexpr double C2          = 0.5;    // Re-correction coefficient
+constexpr double C2_beta_exp = 2.5;
+constexpr double C2_re_exp   = 0.5;
+constexpr double re_cutoff   = 1.0e6;
+} // namespace miller
+
+// Thickness correction (Idelchik model)
+namespace thickness {
+constexpr double reattach_coef    = 0.35;   // reattachment benefit coefficient
+constexpr double reattach_exp     = 8.0;    // exp(-8*t_d) decay rate
+constexpr double blasius_coef     = 0.316;  // Blasius f = 0.316/Re^0.25
+constexpr double blasius_exp      = 0.25;
+constexpr double friction_coef    = 5.67;   // friction loss calibration factor
+constexpr double correction_min   = 0.5;
+constexpr double correction_max   = 1.3;
+constexpr double thin_plate_limit = 0.02;   // t/d <= this -> no correction
+constexpr double re_floor         = 100.0;
+} // namespace thickness
+
+// Rounded-entry (Idelchik)
+namespace rounded {
+constexpr double K_well_rounded   = 0.04;   // K for r/d >= 0.15
+constexpr double K_sharp          = 0.5;    // K for r/d = 0 (sharp)
+constexpr double radius_threshold = 0.15;   // r/d >= this -> well-rounded
+constexpr double re_correction_coef = 0.1;
+constexpr double re_correction_ref  = 1.0e5;
+constexpr double re_correction_exp  = 0.2;
+} // namespace rounded
+
 // Reader-Harris/Gallagher (1998) - ISO 5167-2
 // The standard correlation for sharp-edged orifices
 double Cd_ReaderHarrisGallagher(double beta, double Re_D, double D);

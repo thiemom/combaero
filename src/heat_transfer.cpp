@@ -80,10 +80,10 @@ double nusselt_gnielinski(double Re, double Pr, double f,
   double f8 = f / 8.0;
   double sqrt_f8 = std::sqrt(f8);
   double Pr_23 = std::pow(Pr, 2.0 / 3.0);
-  double denom = 1.0 + 12.7 * sqrt_f8 * (Pr_23 - 1.0);
+  double denom = 1.0 + gnielinski::coeff_prandtl_factor * sqrt_f8 * (Pr_23 - 1.0);
 
   if (Re >= 2300.0) {
-    return f8 * (Re - 1000.0) * Pr / denom;
+    return f8 * (Re - gnielinski::coeff_re_offset) * Pr / denom;
   }
 
   // Below Re=2300 the raw Gnielinski formula goes negative at Re<1000.
@@ -103,7 +103,7 @@ double nusselt_gnielinski(double Re, double Pr, double f,
   constexpr double Re1 = 2300.0;         // upper anchor: Gnielinski
   const double Nu0 = NU_LAMINAR_CONST_T; // 3.66
   const double dNu0 = 0.0;               // laminar: flat w.r.t. Re
-  const double Nu1 = f8 * (Re1 - 1000.0) * Pr / denom;
+  const double Nu1 = f8 * (Re1 - gnielinski::coeff_re_offset) * Pr / denom;
   const double dNu1 = f8 * Pr / denom; // d(Nu)/d(Re) at Re1
 
   // Normalised coordinate t in [0, 1]
@@ -156,8 +156,10 @@ double nusselt_sieder_tate(double Re, double Pr, double mu_ratio,
     *status = extrapolated ? combaero::CorrelationStatus::Extrapolated
                            : combaero::CorrelationStatus::Valid;
   }
-  return 0.027 * std::pow(Re, 0.8) * std::pow(Pr, 1.0 / 3.0) *
-         std::pow(mu_ratio, 0.14);
+  return sieder_tate::coeff_outer
+         * std::pow(Re, sieder_tate::coeff_reynolds_exp)
+         * std::pow(Pr, sieder_tate::coeff_prandtl_exp)
+         * std::pow(mu_ratio, sieder_tate::coeff_viscosity_exp);
 }
 
 double nusselt_petukhov(double Re, double Pr, double f,
@@ -190,7 +192,7 @@ double nusselt_petukhov(double Re, double Pr, double f,
   double f8 = f / 8.0;
   double sqrt_f8 = std::sqrt(f8);
   double Pr_23 = std::pow(Pr, 2.0 / 3.0);
-  return f8 * Re * Pr / (1.07 + 12.7 * sqrt_f8 * (Pr_23 - 1.0));
+  return f8 * Re * Pr / (petukhov_ht::coeff_offset + petukhov_ht::coeff_prandtl_factor * sqrt_f8 * (Pr_23 - 1.0));
 }
 
 double nusselt_petukhov(double Re, double Pr,
