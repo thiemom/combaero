@@ -42,6 +42,7 @@ set(SOURCES
     src/cooling_correlations.cpp
     src/stagnation.cpp
     src/correlation_status.cpp
+    src/solver_interface.cpp
 )
 
 # Core library

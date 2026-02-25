@@ -630,9 +630,7 @@ except ModuleNotFoundError:
 
 
 # Submodule imports — always available regardless of _core load path.
-from . import compressible
-from . import heat_transfer
-from . import incompressible
+from . import compressible, heat_transfer, incompressible, network, species
 from ._flow_solution import FlowSolution
 
 # ---------------------------------------------------------------------------
@@ -671,9 +669,11 @@ def suppress_warnings() -> Generator[None, None, None]:
 __all__ = [
     "FlowSolution",
     "compressible",
+    "heat_transfer",
     "incompressible",
-    "mixture_h",
-    "adiabatic_T_wgs",
+    "network",
+    "species",
+    # Core Constants
     "cp",
     "cp_mass",
     "h",

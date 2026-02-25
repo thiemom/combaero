@@ -24,6 +24,12 @@
 // Haaland correlation (1983) - explicit approximation
 // 1/√f = -1.8 * log10( (ε/D / 3.7)^1.11 + 6.9/Re )
 // Accuracy: ~2-3% vs Colebrook-White
+namespace haaland {
+constexpr double coeff_outer = -1.8;
+constexpr double coeff_roughness = 3.7;
+constexpr double coeff_exponent = 1.11;
+constexpr double coeff_reynolds = 6.9;
+} // namespace haaland
 double friction_haaland(double Re, double e_D);
 
 // Serghides correlation (1984) - explicit approximation
@@ -35,7 +41,8 @@ double friction_serghides(double Re, double e_D);
 // 1/√f = -2 * log10( ε/D/3.7 + 2.51/(Re*√f) )
 // The reference standard for turbulent friction factor.
 // Uses Haaland as initial guess, Newton-Raphson iteration.
-double friction_colebrook(double Re, double e_D, double tol = 1e-10, int max_iter = 20);
+double friction_colebrook(double Re, double e_D, double tol = 1e-10,
+                          int max_iter = 20);
 
 // Petukhov correlation (1970) - smooth pipes only
 // f = (0.790 * ln(Re) - 1.64)^(-2)
@@ -60,7 +67,7 @@ double friction_petukhov(double Re);
 // Material names are case-insensitive.
 // Throws std::invalid_argument if material not found.
 // Use standard_pipe_roughness() to list available materials.
-double pipe_roughness(const std::string& material);
+double pipe_roughness(const std::string &material);
 
 // Get all standard pipe roughness values.
 // Returns: map of material name -> roughness [m]

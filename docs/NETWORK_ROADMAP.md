@@ -7,6 +7,10 @@ CombAero's C++ physics kernels. Users draw networks of combustion system
 elements, specify boundary conditions, and solve for pressures, temperatures,
 mass flows, and compositions throughout the system.
 
+> **Architectural References:**
+> - [**METHODS_REFERENCE.md**](METHODS_REFERENCE.md): Physics kernel profiling and execution latencies.
+> - [**SOLVER.md**](SOLVER.md): Graph state data structures, Jacobian stability, and numerical framework options.
+
 ---
 
 ## Tech Stack
@@ -63,6 +67,23 @@ mass flows, and compositions throughout the system.
 **Rule:** C++ owns property evaluation and correlations. Python owns equation
 assembly, graph logic, and solver orchestration. The solver never calls C++
 directly — always through element `residuals()`.
+
+### The Analytical `(f, J)` Mandate
+
+As established, the solver requires tightly bounded Jacobians. While we have implemented `solver_interface` wrappers for flow and friction correlations (Orifice, K-Factor, Haaland, Dittus-Boelter), **Thermodynamic and Transport functions** currently lack this interface.
+*   **Missing API:** Methods such as `density(T, P, X)`, `viscosity(...)`, and `enthalpy(T, X)` must be wrapped into `(f, J)` tuple-returning functions within `solver_interface.h` before the global solver can successfully evaluate the network un-hindered by finite-difference noise.
+
+---
+
+## Incremental Component Testing Strategy
+
+Before diving into the full, generalized graph solver class, we will test basic combinations of standard network blocks to solidify the momentum, mass, and energy constraints iteratively:
+
+1.  **Block 1 (Mass/Pressure):** `Boundary Plenum` $\rightarrow$ `Pipe` $\rightarrow$ `Orifice` $\rightarrow$ `Sink Plenum`. Test with both rigid Pressure boundary conditions and rigid Mass Flow boundaries.
+2.  **Block 2 (Momentum Recovery):** Pass the flow through a `Momentum Chamber` (which must have an explicit cross-sectional area for momentum transport) and then into a `Plenum`. Plenums must recover static pressure to total pressure assuming zero discharge losses.
+3.  **Topology Discovery:** Orifice blocks must be coded to autonomously "discover" the pipe diameters upstream and downstream during network initialization to correctly evaluate dynamic pressure recovery.
+
+This modular, incremental approach will also be strictly followed when introducing highly complex new nodes, such as Combustion elements.
 
 ---
 
