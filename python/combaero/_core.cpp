@@ -18,6 +18,7 @@
 #include "incompressible.h"
 #include "materials.h"
 #include "orifice.h"
+#include "solver_interface.h"
 #include "stagnation.h"
 #include "state.h"
 #include "thermo.h"
@@ -4921,4 +4922,47 @@ PYBIND11_MODULE(_core, m) {
         "  is_staggered : True = staggered (default), False = inline\n\n"
         "Returns: friction coefficient f_pin [-]\n\n"
         "Source: Metzger et al. (1982), Simoneau & VanFossen (1984)");
+  // -----------------------------------------------------------------
+  // Internal Solver Tools (f, J) exact Jacobians
+  // -----------------------------------------------------------------
+  m.def("orifice_mdot_and_jacobian", &solver::orifice_mdot_and_jacobian,
+        py::arg("dP"), py::arg("rho"), py::arg("Cd"), py::arg("area"),
+        "Fast-path orifice flow and analytic derivative (mdot, "
+        "d(mdot)/d(dP)).\n\n"
+        "Parameters:\n"
+        "  dP   : Pressure drop [Pa]\n"
+        "  rho  : Density [kg/m³]\n"
+        "  Cd   : Discharge coefficient [-]\n"
+        "  area : Orifice area [m²]\n\n"
+        "Returns: tuple(mass_flow [kg/s], derivative [kg/(s*Pa)])");
+
+  m.def("pressure_loss_and_jacobian", &solver::pressure_loss_and_jacobian,
+        py::arg("v"), py::arg("rho"), py::arg("K"),
+        "Fast-path K-factor pressure loss and analytic derivative (dP, "
+        "d(dP)/d(v)).\n\n"
+        "Parameters:\n"
+        "  v   : Velocity [m/s]\n"
+        "  rho : Density [kg/m³]\n"
+        "  K   : Loss coefficient [-]\n\n"
+        "Returns: tuple(dP [Pa], derivative [Pa/(m/s)])");
+
+  m.def("nusselt_and_jacobian_dittus_boelter",
+        &solver::nusselt_and_jacobian_dittus_boelter, py::arg("Re"),
+        py::arg("Pr"), py::arg("heating") = true,
+        "Fast-path Dittus-Boelter HTC and analytic derivative (Nu, "
+        "d(Nu)/d(Re)).\n\n"
+        "Parameters:\n"
+        "  Re      : Reynolds number [-]\n"
+        "  Pr      : Prandtl number [-]\n"
+        "  heating : Heating/cooling flag (default: true)\n\n"
+        "Returns: tuple(Nu [-], derivative [-])");
+
+  m.def("friction_and_jacobian_haaland", &solver::friction_and_jacobian_haaland,
+        py::arg("Re"), py::arg("e_D"),
+        "Fast-path Haaland pipe friction and analytic derivative (f, "
+        "d(f)/d(Re)).\n\n"
+        "Parameters:\n"
+        "  Re  : Reynolds number [-]\n"
+        "  e_D : Relative roughness eps/D [-]\n\n"
+        "Returns: tuple(friction_factor [-], derivative [-])");
 }
