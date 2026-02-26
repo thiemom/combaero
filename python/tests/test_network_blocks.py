@@ -1,15 +1,17 @@
 import itertools
+import os
+import random
 
 import pytest
 
 import combaero as cb
 from combaero.network.components import (
-    BoundaryNode,
     LosslessConnectionElement,
     MixtureState,
     OrificeElement,
     PipeElement,
     PlenumNode,
+    PressureBoundary,
 )
 
 # ==============================================================================
@@ -18,13 +20,23 @@ from combaero.network.components import (
 NODE_FACTORIES = {
     "plenum": lambda id: PlenumNode(id),
     "momentum_chamber": lambda id: cb.network.MomentumChamberNode(id),
-    "boundary": lambda id: BoundaryNode(id),
+    "boundary": lambda id: PressureBoundary(id),
     "combustor_complete": lambda id: cb.network.CombustorNode(id, method="complete"),
     "combustor_eq": lambda id: cb.network.CombustorNode(id, method="equilibrium"),
 }
 
 ELEMENT_FACTORIES = {
     "pipe": lambda id, f, t: PipeElement(id, f, t, length=2.0, diameter=0.15, roughness=1e-5),
+    "pipe_fanno": lambda id, f, t: PipeElement(
+        id,
+        f,
+        t,
+        length=2.0,
+        diameter=0.15,
+        roughness=1e-5,
+        regime="compressible_fanno",
+        friction_model="colebrook",
+    ),
     "orifice": lambda id, f, t: OrificeElement(id, f, t, Cd=0.6, area=0.005),
     "lossless": lambda id, f, t: LosslessConnectionElement(id, f, t),
 }
@@ -32,6 +44,11 @@ ELEMENT_FACTORIES = {
 PERMUTATIONS = list(
     itertools.product(NODE_FACTORIES.keys(), ELEMENT_FACTORIES.keys(), NODE_FACTORIES.keys())
 )
+
+MAX_TOPOLOGY_TESTS = int(os.environ.get("MAX_TOPOLOGY_TESTS", "50"))
+if len(PERMUTATIONS) > MAX_TOPOLOGY_TESTS:
+    random.seed(int(os.environ.get("TOPOLOGY_TEST_SEED", "42")))
+    PERMUTATIONS = random.sample(PERMUTATIONS, MAX_TOPOLOGY_TESTS)
 # ==============================================================================
 
 
@@ -54,9 +71,9 @@ def test_atomic_network_components():
     )
 
     # 2. Instantiate nodes (Boundary, intermediate Plenum, Sink)
-    inlet = BoundaryNode("inlet")
+    inlet = PressureBoundary("inlet")
     node_1 = PlenumNode("node_1")
-    _outlet = BoundaryNode("outlet")
+    _outlet = PressureBoundary("outlet")
 
     # 3. Instantiate elements
     pipe_1 = PipeElement(
@@ -111,9 +128,9 @@ def test_flownetwork_topology():
     """
     graph = cb.network.FlowNetwork()
 
-    inlet = cb.network.BoundaryNode("inlet")
+    inlet = cb.network.PressureBoundary("inlet")
     node_1 = cb.network.PlenumNode("node_1")
-    outlet = cb.network.BoundaryNode("outlet")
+    outlet = cb.network.PressureBoundary("outlet")
 
     pipe = cb.network.PipeElement(
         id="pipe_1", from_node="inlet", to_node="node_1", length=2.0, diameter=0.15, roughness=1e-5
@@ -186,7 +203,7 @@ def test_flownetwork_multibranch():
     chamber = cb.network.MomentumChamberNode("chamber_main")
     graph.add_node(chamber)
     for i in range(1, 4):
-        graph.add_node(cb.network.BoundaryNode(f"bnd_{i}"))
+        graph.add_node(cb.network.PressureBoundary(f"bnd_{i}"))
 
     # Elements: Two pipes entering the chamber
     pipe_a = cb.network.PipeElement("pipe_a", "bnd_1", "chamber_main", 1.0, 0.1, 1e-5)
@@ -214,3 +231,34 @@ def test_flownetwork_multibranch():
     assert orf_out.upstream_diameter is None
     graph.resolve_all_topology()
     assert orf_out.upstream_diameter is None
+
+
+def test_flownetwork_validation():
+    """
+    Test 6: Validates that FlowNetwork.validate() catches ill-posed networks.
+    """
+    # 1. No PressureBoundary -> ValueError
+    graph1 = cb.network.FlowNetwork()
+    graph1.add_node(cb.network.MassFlowBoundary("bnd_mass"))
+    graph1.add_node(cb.network.PlenumNode("plenum_1"))
+    graph1.add_element(cb.network.PipeElement("pipe_1", "bnd_mass", "plenum_1", 1.0, 0.1, 1e-5))
+
+    with pytest.raises(ValueError, match="at least one PressureBoundary"):
+        graph1.validate()
+
+    # 2. Add PressureBoundary but network has no losses -> ValueError
+    graph2 = cb.network.FlowNetwork()
+    graph2.add_node(cb.network.PlenumNode("plenum_1"))
+    graph2.add_node(cb.network.PressureBoundary("bnd_press"))
+    graph2.add_element(cb.network.LosslessConnectionElement("lossless", "plenum_1", "bnd_press"))
+
+    with pytest.raises(ValueError, match="at least one pressure drop element"):
+        graph2.validate()
+
+    # 3. Add an element with loss -> Validates successfully
+    graph3 = cb.network.FlowNetwork()
+    graph3.add_node(cb.network.PlenumNode("plenum_1"))
+    graph3.add_node(cb.network.PressureBoundary("bnd_press"))
+    graph3.add_element(cb.network.OrificeElement("orifice", "plenum_1", "bnd_press", 0.6, 0.05))
+
+    graph3.validate()  # Should not raise

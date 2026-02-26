@@ -1,5 +1,6 @@
 from .components import (
-    BoundaryNode,
+    PressureBoundary,
+    MassFlowBoundary,
     CombustorNode,
     LosslessConnectionElement,
     MixtureState,
@@ -13,7 +14,8 @@ from .graph import FlowNetwork
 __all__ = [
     "PlenumNode",
     "MomentumChamberNode",
-    "BoundaryNode",
+    "PressureBoundary",
+    "MassFlowBoundary",
     "CombustorNode",
     "PipeElement",
     "OrificeElement",
