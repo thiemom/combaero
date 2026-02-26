@@ -63,6 +63,11 @@ class NetworkElement(ABC):
         self.to_node = to_node
 
     @abstractmethod
+    def unknowns(self) -> list[str]:
+        """Names of unknowns this element contributes to the solver."""
+        pass
+
+    @abstractmethod
     def residuals(self, state_in: MixtureState, state_out: MixtureState) -> list[float]:
         """Returns zero when element equations are satisfied."""
         pass
@@ -85,7 +90,7 @@ class PlenumNode(NetworkNode):
     """
 
     def unknowns(self) -> list[str]:
-        return [f"{self.id}.P"]
+        return [f"{self.id}.P", f"{self.id}.P_total"]
 
     def residuals(self, state: MixtureState) -> list[float]:
         # Residual equations will be governed dynamically by the solver network sum.
@@ -179,8 +184,8 @@ class CombustorNode(NetworkNode):
         self.pressure_loss_frac = pressure_loss_frac
 
     def unknowns(self) -> list[str]:
-        # P, T, and species mass fractions depending on the solver architecture
-        return [f"{self.id}.P", f"{self.id}.T"]
+        # P, P_total, and T
+        return [f"{self.id}.P", f"{self.id}.P_total", f"{self.id}.T"]
 
     def residuals(self, state: MixtureState) -> list[float]:
         # Energy and Mass constraints evaluated dynamically by the FlowNetwork loop
@@ -211,10 +216,25 @@ class OrificeElement(NetworkElement):
             if isinstance(upstream_element, PipeElement):
                 self.upstream_diameter = upstream_element.diameter
 
+    def unknowns(self) -> list[str]:
+        return [f"{self.id}.m_dot"]
+
     def residuals(self, state_in: MixtureState, state_out: MixtureState) -> list[float]:
-        state_in.P_total - state_out.P  # wait, Orifice depends on topology upstream
-        # The phase 1 solver operates iteratively using the tuple interface.
-        return []
+        import combaero as cb
+
+        dP = state_in.P_total - state_out.P
+        rho = state_in.density() if dP >= 0 else state_out.density()
+
+        # Determine actual flow direction and signed dP
+        sign = 1.0 if dP >= 0 else -1.0
+        abs_dP = abs(dP)
+
+        # Call the tuple interface for mass flow
+        m_dot_calc, _ = cb.orifice_mdot_and_jacobian(abs_dP, rho, self.Cd, self.area)
+        m_dot_calc *= sign
+
+        # Residual: guessed m_dot (carried by state_in/out) minus calculated m_dot
+        return [state_in.m_dot - m_dot_calc]
 
     def n_equations(self) -> int:
         return 1
@@ -234,6 +254,9 @@ class LosslessConnectionElement(NetworkElement):
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         pass  # Zero-loss elements do not need upstream geometry
+
+    def unknowns(self) -> list[str]:
+        return [f"{self.id}.m_dot"]
 
     def residuals(self, state_in: MixtureState, state_out: MixtureState) -> list[float]:
         # Evaluates the native C++ tuple (f, J) interface for lossless P_total conservation
@@ -297,9 +320,36 @@ class PipeElement(NetworkElement):
         self.htc_model = htc_model
         self.t_wall = t_wall
 
+    def unknowns(self) -> list[str]:
+        return [f"{self.id}.m_dot"]
+
     def residuals(self, state_in: MixtureState, state_out: MixtureState) -> list[float]:
-        # Phase 1 simple placeholder for now.
-        return []
+        import combaero as cb
+
+        # For phase 1, we use the simple pipe_dP_mdot since we aren't doing the
+        # full exact sparse jacobian tuple yet for pipes without heat transfer.
+        m_dot = state_in.m_dot
+        sign = 1.0 if m_dot >= 0 else -1.0
+        abs_mdot = abs(m_dot)
+
+        rho = state_in.density() if m_dot >= 0 else state_out.density()
+
+        # Calculate Re
+        velocity = cb.pipe_velocity(abs_mdot, self.diameter, rho)
+        Re = cb.reynolds(state_in.T, state_in.P, state_in.X, velocity, self.diameter)
+
+        # Use friction correlation
+        if self.friction_model == "haaland":
+            f = cb.friction_haaland(Re, self.roughness / self.diameter)
+        else:
+            f = 0.02  # fallback
+
+        dP_calc = cb.pipe_dP(velocity, self.length, self.diameter, f, rho)
+        dP_calc *= sign
+
+        # Residual: driving pressure difference minus frictional loss
+        dP_actual = state_in.P_total - state_out.P
+        return [dP_actual - dP_calc]
 
     def get_spatial_profile(self, n_steps: int = 100):
         """

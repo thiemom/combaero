@@ -12,9 +12,9 @@ IGNORE_LIST = {
     "network",
     "species",
     "geometry",
-    # Internal Solver (f, J) Fast-Paths
     "orifice_mdot_and_jacobian",
     "pressure_loss_and_jacobian",
+    "lossless_pressure_and_jacobian",
     "nusselt_and_jacobian_dittus_boelter",
     "friction_and_jacobian_haaland",
     "density_and_jacobians",

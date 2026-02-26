@@ -89,7 +89,7 @@ def test_atomic_network_components():
     assert orifice_1.n_equations() == 1
     assert pipe_1.n_equations() == 1
     assert len(inlet.unknowns()) == 0
-    assert len(node_1.unknowns()) == 1
+    assert len(node_1.unknowns()) == 2
 
     # 5. Verify mixture state wrappers
     rho = state_in.density()

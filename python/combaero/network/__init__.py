@@ -10,6 +10,7 @@ from .components import (
     PlenumNode,
 )
 from .graph import FlowNetwork
+from .solver import NetworkSolver
 
 __all__ = [
     "PlenumNode",
@@ -22,4 +23,5 @@ __all__ = [
     "LosslessConnectionElement",
     "MixtureState",
     "FlowNetwork",
+    "NetworkSolver",
 ]
