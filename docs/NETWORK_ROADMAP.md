@@ -73,6 +73,18 @@ directly — always through element `residuals()`.
 As established, the solver requires tightly bounded Jacobians. While we have implemented `solver_interface` wrappers for flow and friction correlations (Orifice, K-Factor, Haaland, Dittus-Boelter), **Thermodynamic and Transport functions** currently lack this interface.
 *   **Missing API:** Methods such as `density(T, P, X)`, `viscosity(...)`, and `enthalpy(T, X)` must be wrapped into `(f, J)` tuple-returning functions within `solver_interface.h` before the global solver can successfully evaluate the network un-hindered by finite-difference noise.
 
+### The Configuration `Literal` Mandate
+
+To preserve GUI introspectability while avoiding class fragmentation, **all configurable C++ backend physics models must be exposed to Python components via `typing.Literal`.** This permits the React GUI to programmatically read `typing.get_args()` and auto-generate dropdown menus without duplicating standard logic.
+
+**Identified Application Domains:**
+1.  **Combustion Models (`CombustorNode`):** `Literal["complete", "equilibrium"]` $\rightarrow$ `cb.CombustionMethod.Complete | Equilibrium`.
+2.  **Pipe Friction Models (`PipeElement`):** `Literal["haaland", "colebrook", "serghides", "petukhov"]` $\rightarrow$ Routes to respective `friction_*` C++ algorithms.
+3.  **Smooth Pipe Heat Transfer (`HeatExchangerElement`):** `Literal["gnielinski", "dittus_boelter", "sieder_tate", "petukhov"]` $\rightarrow$ Proxied dynamically into `cb.channel_smooth(..., correlation=X)`.
+4.  **Flow Compressibility Regimes:** `Literal["incompressible", "compressible_fanno"]` $\rightarrow$ Gates `pipe_flow_rough()` vs `fanno_pipe_rough()`.
+
+*DO NOT split an element into multiple Python classes just to swap an underlying empirical correlation.*
+
 ---
 
 ## Incremental Component Testing Strategy

@@ -1,7 +1,8 @@
 #ifndef INCOMPRESSIBLE_H
 #define INCOMPRESSIBLE_H
 
-#include "geometry.h"  // Re-export hydraulic_diameter functions
+#include "geometry.h" // Re-export hydraulic_diameter functions
+#include "thermo.h"   // Required for State struct in Solutions
 
 #include <functional>
 #include <string>
@@ -190,27 +191,42 @@ double Cd_from_zeta(double zeta);
 // structure of compressible.h (nozzle_flow, fanno_pipe) so that
 // the two regimes share a common calling convention.
 
+// Result of incompressible internal flow profile at a single station
+struct IncompressibleStation {
+  double x = 0.0;   // Position along pipe [m]
+  double P = 0.0;   // Static pressure [Pa]
+  double T = 0.0;   // Static temperature [K]
+  double rho = 0.0; // Density [kg/m³]
+  double v = 0.0;   // Velocity [m/s]
+  double M = 0.0;   // Mach number [-]
+  double h = 0.0;   // Specific enthalpy [J/kg]
+};
+
+// High-level wrapper for evaluating friction loss while fully respecting
+// thermodynamic state (T, P, X). Calculates density internally.
+// Function type for optional K-factor loss additions (bends, valves, etc.).
+using IncompressibleKLossFn = std::function<double(
+    double T, double P, const std::vector<double> &X, double Re)>;
+
 // Result of a thermo-aware incompressible flow calculation.
 struct IncompressibleFlowSolution {
-    double mdot = 0.0;   // Mass flow rate [kg/s]
-    double v    = 0.0;   // Velocity at throat / pipe cross-section [m/s]
-    double dP   = 0.0;   // Pressure drop P_in - P_out [Pa]
-    double Re   = 0.0;   // Reynolds number [-]
-    double rho  = 0.0;   // Inlet density [kg/m³]
-    double f    = 0.0;   // Darcy friction factor (pipe) or Cd (orifice) [-]
+  State inlet;       // Inlet thermodynamic state
+  State outlet;      // Outlet thermodynamic state
+  double mdot = 0.0; // Mass flow rate [kg/s]
+  double v = 0.0;    // Bulk velocity [m/s]
+  double dP = 0.0;   // Total pressure drop [Pa]
+  double Re = 0.0;   // Reynolds number [-]
+  double rho = 0.0;  // Inlet bulk density [kg/m³]
+  double f = 0.0;    // Darcy friction factor or Cd [-]
+  std::vector<IncompressibleStation>
+      profile; // Symmetric interpolated spatial array
 };
 
 // User-supplied Cd function: f(T, P, X, Re) → Cd [-]
 // Re is computed internally from the inlet conditions and velocity.
 // Loop-free: uses only inlet state — safe for Newton solvers.
-using IncompressibleCdFn = std::function<double(double T, double P,
-    const std::vector<double>& X, double Re)>;
-
-// User-supplied additional K-loss function: f(T, P, X, Re) → K [-]
-// Applied as extra ΔP = K · ½ρv² on top of pipe friction.
-// Loop-free: uses only inlet state — safe for Newton solvers.
-using IncompressibleKLossFn = std::function<double(double T, double P,
-    const std::vector<double>& X, double Re)>;
+using IncompressibleCdFn = std::function<double(
+    double T, double P, const std::vector<double> &X, double Re)>;
 
 // Thermo-aware orifice flow.
 //
@@ -226,16 +242,18 @@ using IncompressibleKLossFn = std::function<double(double T, double P,
 //   Cd     : discharge coefficient [-] (default: 1.0)
 //
 // Returns: IncompressibleFlowSolution
-IncompressibleFlowSolution orifice_flow_thermo(
-    double T, double P, const std::vector<double>& X,
-    double P_back, double A, double Cd = 1.0);
+IncompressibleFlowSolution orifice_flow_thermo(double T, double P,
+                                               const std::vector<double> &X,
+                                               double P_back, double A,
+                                               double Cd = 1.0);
 
 // Overload with user-supplied Cd correlation.
 // cd_fn(T, P, X, Re) is called with the inlet Re computed from the
 // velocity implied by the fixed pressure difference.
-IncompressibleFlowSolution orifice_flow_thermo(
-    double T, double P, const std::vector<double>& X,
-    double P_back, double A, const IncompressibleCdFn& cd_fn);
+IncompressibleFlowSolution orifice_flow_thermo(double T, double P,
+                                               const std::vector<double> &X,
+                                               double P_back, double A,
+                                               const IncompressibleCdFn &cd_fn);
 
 // Thermo-aware pipe flow with explicit friction factor.
 //
@@ -250,43 +268,27 @@ IncompressibleFlowSolution orifice_flow_thermo(
 //   D : pipe diameter [m]
 //   f : Darcy friction factor [-]
 //
-// Returns: IncompressibleFlowSolution
-IncompressibleFlowSolution pipe_flow(
-    double T, double P, const std::vector<double>& X,
-    double u, double L, double D, double f);
+// Returns IncompressibleFlowSolution including intermediate state structures.
+IncompressibleFlowSolution pipe_flow(double T, double P,
+                                     const std::vector<double> &X, double u,
+                                     double L, double D, double f,
+                                     std::size_t n_steps = 100,
+                                     bool store_profile = false);
 
-// Thermo-aware pipe flow with roughness-based friction factor.
-//
-// Evaluates rho and mu from (T, P, X) internally, computes Re and f
-// from the specified correlation, then applies Darcy-Weisbach.
-//
-// Inputs:
-//   T           : temperature [K]
-//   P           : pressure [Pa]
-//   X           : mole fractions [-]
-//   u           : flow velocity [m/s]
-//   L           : pipe length [m]
-//   D           : pipe diameter [m]
-//   roughness   : absolute wall roughness [m] (default: 0.0 = smooth)
-//   correlation : friction correlation (default: "haaland")
-//                 Options: "haaland", "serghides", "colebrook", "petukhov"
-//
-// Returns: IncompressibleFlowSolution
-IncompressibleFlowSolution pipe_flow_rough(
-    double T, double P, const std::vector<double>& X,
-    double u, double L, double D,
-    double roughness = 0.0,
-    const std::string& correlation = "haaland");
+// 2) With roughness-based variable friction factor:
+IncompressibleFlowSolution
+pipe_flow_rough(double T, double P, const std::vector<double> &X, double u,
+                double L, double D, double roughness = 0.0,
+                const std::string &correlation = "haaland",
+                std::size_t n_steps = 100, bool store_profile = false);
 
-// Overload with additional K-loss correlation (bends, fittings, etc.).
-// k_loss_fn(T, P, X, Re) returns K [-]; extra ΔP = K · ½ρu² is added
-// to the Darcy-Weisbach friction loss.
-IncompressibleFlowSolution pipe_flow_rough(
-    double T, double P, const std::vector<double>& X,
-    double u, double L, double D,
-    double roughness,
-    const std::string& correlation,
-    const IncompressibleKLossFn& k_loss_fn);
+// 3) With roughness-based friction + optional K-factor loss:
+IncompressibleFlowSolution
+pipe_flow_rough(double T, double P, const std::vector<double> &X, double u,
+                double L, double D, double roughness,
+                const std::string &correlation,
+                const IncompressibleKLossFn &k_loss_fn,
+                std::size_t n_steps = 10, bool store_profile = false);
 
 // Composite pipe pressure drop (legacy / convenience).
 //
@@ -304,10 +306,9 @@ IncompressibleFlowSolution pipe_flow_rough(
 //   correlation : friction correlation (default: "haaland")
 //
 // Returns: tuple of (dP [Pa], Re [-], f [-])
-std::tuple<double, double, double> pressure_drop_pipe(
-    double T, double P, const std::vector<double>& X,
-    double v, double D, double L,
-    double roughness = 0.0,
-    const std::string& correlation = "haaland");
+std::tuple<double, double, double>
+pressure_drop_pipe(double T, double P, const std::vector<double> &X, double v,
+                   double D, double L, double roughness = 0.0,
+                   const std::string &correlation = "haaland");
 
 #endif // INCOMPRESSIBLE_H
