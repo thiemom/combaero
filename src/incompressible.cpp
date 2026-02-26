@@ -5,6 +5,7 @@
 #include "math_constants.h" // Provides M_PI for MSVC
 #include "thermo.h"
 #include "transport.h"
+#include <stdexcept>
 
 // -------------------------------------------------------------
 // Bernoulli equation
