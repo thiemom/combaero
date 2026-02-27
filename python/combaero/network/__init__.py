@@ -1,5 +1,7 @@
 from .components import (
     BoundaryNode,
+    PressureBoundary,
+    MassFlowBoundary,
     MixtureState,
     MomentumChamberNode,
     NetworkElement,
@@ -12,6 +14,8 @@ from .graph import FlowNetwork
 
 __all__: list[str] = [
     "BoundaryNode",
+    "PressureBoundary",
+    "MassFlowBoundary",
     "MixtureState",
     "MomentumChamberNode",
     "NetworkElement",

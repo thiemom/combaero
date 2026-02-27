@@ -1,10 +1,10 @@
 import combaero as cb
 from combaero.network.components import (
-    BoundaryNode,
     MixtureState,
     OrificeElement,
     PipeElement,
     PlenumNode,
+    PressureBoundary,
 )
 
 
@@ -27,9 +27,9 @@ def test_atomic_network_components():
     )
 
     # 2. Instantiate nodes (Boundary, intermediate Plenum, Sink)
-    inlet = BoundaryNode("inlet")
+    inlet = PressureBoundary("inlet")
     node_1 = PlenumNode("node_1")
-    _outlet = BoundaryNode("outlet")
+    _outlet = PressureBoundary("outlet")
 
     # 3. Instantiate elements
     pipe_1 = PipeElement(
@@ -84,9 +84,9 @@ def test_flownetwork_topology():
     """
     graph = cb.network.FlowNetwork()
 
-    inlet = cb.network.BoundaryNode("inlet")
+    inlet = cb.network.PressureBoundary("inlet")
     node_1 = cb.network.PlenumNode("node_1")
-    outlet = cb.network.BoundaryNode("outlet")
+    outlet = cb.network.PressureBoundary("outlet")
 
     pipe = cb.network.PipeElement(
         id="pipe_1", from_node="inlet", to_node="node_1", length=2.0, diameter=0.15, roughness=1e-5
@@ -112,3 +112,57 @@ def test_flownetwork_topology():
 
     # 4. Verify post-resolution auto-discovery
     assert orifice.upstream_diameter == 0.15
+
+
+def test_flownetwork_validation():
+    """
+    Test 4: Validates the FlowNetwork boundary conditions checker.
+    """
+    import pytest
+
+    # Test invalid network (only MassFlowBoundary)
+    graph_invalid = cb.network.FlowNetwork()
+    inlet = cb.network.MassFlowBoundary("inlet_mf")
+    node_1 = cb.network.PlenumNode("node_1")
+    outlet = cb.network.MassFlowBoundary("outlet_mf")
+    pipe = cb.network.PipeElement(
+        id="pipe_1",
+        from_node="inlet_mf",
+        to_node="node_1",
+        length=2.0,
+        diameter=0.15,
+        roughness=1e-5,
+    )
+    orifice = cb.network.OrificeElement(
+        id="orf_1", from_node="node_1", to_node="outlet_mf", Cd=0.6, area=0.005
+    )
+
+    graph_invalid.add_node(inlet)
+    graph_invalid.add_node(node_1)
+    graph_invalid.add_node(outlet)
+    graph_invalid.add_element(pipe)
+    graph_invalid.add_element(orifice)
+
+    with pytest.raises(ValueError, match="at least one PressureBoundary"):
+        graph_invalid.validate()
+
+    # Test valid network (at least 1 PressureBoundary)
+    graph_valid = cb.network.FlowNetwork()
+    inlet_pb = cb.network.PressureBoundary("inlet_pb")
+    graph_valid.add_node(inlet_pb)
+    graph_valid.add_node(node_1)
+    graph_valid.add_node(outlet)
+
+    pipe_pb = cb.network.PipeElement(
+        id="pipe_pb",
+        from_node="inlet_pb",
+        to_node="node_1",
+        length=2.0,
+        diameter=0.15,
+        roughness=1e-5,
+    )
+    graph_valid.add_element(pipe_pb)
+    graph_valid.add_element(orifice)
+
+    # Should not raise any error
+    graph_valid.validate()

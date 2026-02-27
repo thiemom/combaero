@@ -124,7 +124,8 @@ class MomentumChamberNode(NetworkNode):
 
 class BoundaryNode(NetworkNode):
     """
-    Supplies fixed state values. Contributes no unknowns and no residuals.
+    Base class for nodes that supply fixed state values.
+    Contributes no unknowns and no residuals.
     """
 
     def unknowns(self) -> list[str]:
@@ -135,6 +136,24 @@ class BoundaryNode(NetworkNode):
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         pass
+
+
+class PressureBoundary(BoundaryNode):
+    """
+    A boundary node where pressure is fixed and known.
+    Essential as a reference pressure and absolute mass sink/source for the network.
+    """
+
+    pass
+
+
+class MassFlowBoundary(BoundaryNode):
+    """
+    A boundary node where mass flow is fixed and known.
+    Cannot exclusively define a network, a pressure reference is also required.
+    """
+
+    pass
 
 
 class OrificeElement(NetworkElement):

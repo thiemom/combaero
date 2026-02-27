@@ -72,3 +72,20 @@ class FlowNetwork:
             node.resolve_topology(self)
         for element in self.elements.values():
             element.resolve_topology(self)
+
+    def validate(self) -> None:
+        """
+        Validates the network topology.
+        Enforces that the network contains at least one PressureBoundary to act
+        as a pressure reference and mass sink/source.
+        """
+        from .components import PressureBoundary
+
+        has_pressure_boundary = any(
+            isinstance(node, PressureBoundary) for node in self.nodes.values()
+        )
+        if not has_pressure_boundary:
+            raise ValueError(
+                "FlowNetwork validation failed: The network must contain at least "
+                "one PressureBoundary to serve as a reference."
+            )
