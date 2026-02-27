@@ -12,7 +12,7 @@ from .components import (
 from .graph import FlowNetwork
 from .solver import NetworkSolver
 
-__all__ = [
+__all__: list[str] = [
     "PlenumNode",
     "MomentumChamberNode",
     "PressureBoundary",

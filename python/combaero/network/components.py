@@ -139,6 +139,7 @@ class MomentumChamberNode(NetworkNode):
 class PressureBoundary(NetworkNode):
     """
     Supplies fixed stagnation pressure and temperature. Contributes no unknowns and no residuals.
+    Essential as a reference pressure and absolute mass sink/source for the network.
     """
 
     def unknowns(self) -> list[str]:
@@ -154,6 +155,7 @@ class PressureBoundary(NetworkNode):
 class MassFlowBoundary(NetworkNode):
     """
     Supplies fixed mass flow and stagnation temperature. Contributes no unknowns and no residuals.
+    Cannot exclusively define a network, a pressure reference is also required.
     """
 
     def unknowns(self) -> list[str]:

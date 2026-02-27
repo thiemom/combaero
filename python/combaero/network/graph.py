@@ -84,7 +84,10 @@ class FlowNetwork:
 
         has_pressure_bc = any(isinstance(node, PressureBoundary) for node in self.nodes.values())
         if not has_pressure_bc:
-            raise ValueError("Network must contain at least one PressureBoundary node.")
+            raise ValueError(
+                "FlowNetwork validation failed: The network must contain at least "
+                "one PressureBoundary to serve as a reference."
+            )
 
         all_lossless = all(isinstance(e, LosslessConnectionElement) for e in self.elements.values())
         if self.elements and all_lossless:
