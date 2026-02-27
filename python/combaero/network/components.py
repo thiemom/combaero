@@ -326,54 +326,59 @@ class PipeElement(NetworkElement):
         return [f"{self.id}.m_dot"]
 
     def residuals(self, state_in: MixtureState, state_out: MixtureState) -> list[float]:
+        import math
+
         import combaero as cb
 
-        # For phase 1, we use the simple pipe_dP_mdot since we aren't doing the
-        # full exact sparse jacobian tuple yet for pipes without heat transfer.
         m_dot = state_in.m_dot
         sign = 1.0 if m_dot >= 0 else -1.0
         abs_mdot = abs(m_dot)
 
         rho = state_in.density() if m_dot >= 0 else state_out.density()
+        mu = cb.viscosity(state_in.T, state_in.P, state_in.X)
 
-        # Calculate Re
-        velocity = cb.pipe_velocity(abs_mdot, self.diameter, rho)
-        Re = cb.reynolds(state_in.T, state_in.P, state_in.X, velocity, self.diameter)
+        # Derived geometry
+        D = self.diameter
+        A = math.pi * (D / 2.0) ** 2
+        e_D = self.roughness / D
 
-        # Use friction correlation
-        if self.friction_model == "haaland":
-            f = cb.friction_haaland(Re, self.roughness / self.diameter)
-        else:
-            f = 0.02  # fallback
+        # Re = 4 * m_dot / (pi * D * mu)
+        Re = max(4.0 * abs_mdot / (math.pi * D * mu), 1.0)
 
-        dP_calc = cb.pipe_dP(velocity, self.length, self.diameter, f, rho)
-        dP_calc *= sign
+        # f and d(f)/d(Re) from the appropriate analytical (f, J) solver function
+        f, df_dRe = cb.friction_and_jacobian(self.friction_model, Re, e_D)
+
+        # dP = f * (L/D) * 0.5 * rho * v^2,  v = m_dot / (rho * A)
+        v = abs_mdot / (rho * A)
+        L_over_D = self.length / D
+        dP_calc = f * L_over_D * 0.5 * rho * v * v
 
         # Residual: driving pressure difference minus frictional loss
         dP_actual = state_in.P_total - state_out.P
-        return [dP_actual - dP_calc]
+        return [dP_actual - sign * dP_calc]
 
-    def get_spatial_profile(self, n_steps: int = 100):
+    def get_spatial_profile(
+        self,
+        state_in: MixtureState,
+        n_steps: int = 100,
+    ) -> list:
         """
         Compute and return the spatial flow profile array along the pipe length.
-        Queries the native C++ solvers with current state properties.
+        Requires the solved inlet MixtureState.
         """
         import combaero as cba
 
-        if not self.in_nodes:
-            return []
-
-        inlet = self.in_nodes[0]
+        rho = cba.density(state_in.T, state_in.P, state_in.X)
+        u = cba.pipe_velocity(state_in.m_dot, self.diameter, rho)
 
         if self.regime == "incompressible":
-            u = cba.pipe_velocity(inlet.mdot, self.D, cba.density(inlet.T, inlet.P, inlet.X))
             res = cba.pipe_flow_rough(
-                inlet.T,
-                inlet.P,
-                inlet.X,
+                state_in.T,
+                state_in.P,
+                state_in.X,
                 u,
-                self.L,
-                self.D,
+                self.length,
+                self.diameter,
                 self.roughness,
                 self.friction_model,
                 n_steps,
@@ -383,12 +388,12 @@ class PipeElement(NetworkElement):
 
         elif self.regime == "compressible_fanno":
             res = cba.pipe_fanno(
-                inlet.T,
-                inlet.P,
-                inlet.X,
-                inlet.mdot,
-                self.L,
-                self.D,
+                state_in.T,
+                state_in.P,
+                state_in.X,
+                state_in.m_dot,
+                self.length,
+                self.diameter,
                 self.roughness,
                 self.friction_model,
                 n_steps,

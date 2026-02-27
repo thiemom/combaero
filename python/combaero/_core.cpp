@@ -5009,6 +5009,46 @@ PYBIND11_MODULE(_core, m) {
         "  Re  : Reynolds number [-]\n"
         "  e_D : Relative roughness eps/D [-]\n\n"
         "Returns: tuple(friction_factor [-], derivative [-])");
+
+  m.def("friction_and_jacobian_serghides",
+        &solver::friction_and_jacobian_serghides,
+        py::arg("Re"), py::arg("e_D"),
+        "Fast-path Serghides pipe friction and analytic derivative (f, "
+        "d(f)/d(Re)).\n\n"
+        "Parameters:\n"
+        "  Re  : Reynolds number [-]\n"
+        "  e_D : Relative roughness eps/D [-]\n\n"
+        "Returns: tuple(friction_factor [-], derivative [-])");
+
+  m.def("friction_and_jacobian_colebrook",
+        &solver::friction_and_jacobian_colebrook,
+        py::arg("Re"), py::arg("e_D"),
+        "Fast-path Colebrook-White pipe friction and implicit derivative (f, "
+        "d(f)/d(Re)).\n\n"
+        "Parameters:\n"
+        "  Re  : Reynolds number [-]\n"
+        "  e_D : Relative roughness eps/D [-]\n\n"
+        "Returns: tuple(friction_factor [-], derivative [-])");
+
+  m.def("friction_and_jacobian_petukhov",
+        &solver::friction_and_jacobian_petukhov,
+        py::arg("Re"),
+        "Fast-path Petukhov smooth-pipe friction and analytic derivative (f, "
+        "d(f)/d(Re)).\n\n"
+        "Parameters:\n"
+        "  Re : Reynolds number [-]\n\n"
+        "Returns: tuple(friction_factor [-], derivative [-])");
+
+  m.def("friction_and_jacobian", &solver::friction_and_jacobian,
+        py::arg("tag"), py::arg("Re"), py::arg("e_D"),
+        "Dispatcher: selects friction_and_jacobian_* by tag string.\n\n"
+        "tag must be one of: 'haaland', 'serghides', 'colebrook', 'petukhov'\n\n"
+        "Parameters:\n"
+        "  tag : friction model name\n"
+        "  Re  : Reynolds number [-]\n"
+        "  e_D : Relative roughness eps/D [-]\n\n"
+        "Returns: tuple(friction_factor [-], d(f)/d(Re) [-])");
+
   m.def("density_and_jacobians", &solver::density_and_jacobians, py::arg("T"),
         py::arg("P"), py::arg("X"),
         "Fast-path density and analytic derivatives (rho, d(rho)/d(T), "
