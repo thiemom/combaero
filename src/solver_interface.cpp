@@ -140,6 +140,137 @@ std::tuple<double, double> friction_and_jacobian_haaland(double Re,
   return {f, jacobian};
 }
 
+std::tuple<double, double> friction_and_jacobian_serghides(double Re,
+                                                           double e_D) {
+  if (Re <= 0.0) {
+    throw std::invalid_argument(
+        "solver_interface::friction_serghides requires Re > 0");
+  }
+
+  // Serghides Steffensen form: 1/sqrt(f) = A - (B-A)^2 / (C - 2B + A)
+  // A = -2 log10(e_D/3.7 + 12/Re)
+  // B = -2 log10(e_D/3.7 + 2.51*A/Re)
+  // C = -2 log10(e_D/3.7 + 2.51*B/Re)
+  const double r = serghides::coeff_roughness;
+  const double cA = serghides::coeff_reynolds_A;
+  const double cBC = serghides::coeff_reynolds_BC;
+  const double ln10 = M_LN10;
+
+  double argA = e_D / r + cA / Re;
+  double A = -2.0 * std::log10(argA);
+
+  double argB = e_D / r + cBC * A / Re;
+  double B = -2.0 * std::log10(argB);
+
+  double argC = e_D / r + cBC * B / Re;
+  double C = -2.0 * std::log10(argC);
+
+  double denom = C - 2.0 * B + A;
+  double inv_sqrt_f = (std::abs(denom) < 1e-30)
+                          ? C
+                          : A - (B - A) * (B - A) / denom;
+  double f = 1.0 / (inv_sqrt_f * inv_sqrt_f);
+
+  // Analytical derivative via chain rule through A, B, C, inv_sqrt_f, f.
+  // dA/dRe = (2 / (ln10 * argA)) * (cA / Re^2)
+  double dA_dRe = (2.0 / (ln10 * argA)) * (cA / (Re * Re));
+
+  // dB/dRe = (2 / (ln10 * argB)) * (cBC/Re) * (A/Re - dA_dRe)
+  //        = (2 / (ln10 * argB)) * cBC * (A/Re^2 - dA_dRe/Re) ... expand:
+  // d(argB)/dRe = cBC * (dA_dRe * Re - A) / Re^2 = cBC * (dA_dRe/Re - A/Re^2)
+  double dargB_dRe = cBC * (dA_dRe / Re - A / (Re * Re));
+  double dB_dRe = (-2.0 / (ln10 * argB)) * dargB_dRe;
+
+  double dargC_dRe = cBC * (dB_dRe / Re - B / (Re * Re));
+  double dC_dRe = (-2.0 / (ln10 * argC)) * dargC_dRe;
+
+  // d(inv_sqrt_f)/dRe from Steffensen formula
+  double d_inv_sqrt_f_dRe;
+  if (std::abs(denom) < 1e-30) {
+    d_inv_sqrt_f_dRe = dC_dRe;
+  } else {
+    // inv_sqrt_f = A - (B-A)^2 / denom,  denom = C - 2B + A
+    double BmA = B - A;
+    double d_BmA_dRe = dB_dRe - dA_dRe;
+    double d_denom_dRe = dC_dRe - 2.0 * dB_dRe + dA_dRe;
+    // d((B-A)^2/denom)/dRe = (2*(B-A)*d(B-A) * denom - (B-A)^2 * d_denom) /
+    // denom^2
+    d_inv_sqrt_f_dRe =
+        dA_dRe -
+        (2.0 * BmA * d_BmA_dRe * denom - BmA * BmA * d_denom_dRe) /
+            (denom * denom);
+  }
+
+  // f = inv_sqrt_f^(-2)  => df/dRe = -2 * inv_sqrt_f^(-3) * d_inv_sqrt_f_dRe
+  double jacobian =
+      (-2.0 / (inv_sqrt_f * inv_sqrt_f * inv_sqrt_f)) * d_inv_sqrt_f_dRe;
+
+  return {f, jacobian};
+}
+
+std::tuple<double, double> friction_and_jacobian_colebrook(double Re,
+                                                           double e_D) {
+  if (Re <= 0.0) {
+    throw std::invalid_argument(
+        "solver_interface::friction_colebrook requires Re > 0");
+  }
+
+  // Colebrook converges internally; use Serghides as starting guess.
+  // After convergence, the implicit derivative is:
+  //   F(x, Re) = x + 2*log10(e_D/3.7 + 2.51*x/Re) = 0,  x = 1/sqrt(f)
+  //   dF/dx  = 1 + 2/(ln10 * arg) * 2.51/Re  = 1 + 2*2.51/(ln10*arg*Re)
+  //   dF/dRe = 2/(ln10 * arg) * (-2.51*x/Re^2)
+  //   dx/dRe = -(dF/dRe) / (dF/dx)
+  //   df/dRe = -2 * x^(-3) * dx/dRe
+
+  // Get converged x = 1/sqrt(f) from the colebrook scalar function
+  double f_val = ::friction_colebrook(Re, e_D);
+  double x = 1.0 / std::sqrt(f_val);
+
+  const double ln10 = M_LN10;
+  double arg = e_D / serghides::coeff_roughness +
+               serghides::coeff_reynolds_BC * x / Re;
+
+  double dF_dx =
+      1.0 + 2.0 * serghides::coeff_reynolds_BC / (ln10 * arg * Re);
+  double dF_dRe = (-2.0 / (ln10 * arg)) *
+                  (serghides::coeff_reynolds_BC * x / (Re * Re));
+
+  double dx_dRe = -dF_dRe / dF_dx;
+  double jacobian = (-2.0 / (x * x * x)) * dx_dRe;
+
+  return {f_val, jacobian};
+}
+
+std::tuple<double, double> friction_and_jacobian_petukhov(double Re) {
+  if (Re < 3000.0) {
+    throw std::invalid_argument(
+        "solver_interface::friction_petukhov requires Re >= 3000");
+  }
+
+  // f = (coeff_a * ln(Re) - coeff_b)^(-2)
+  double x = petukhov::coeff_a * std::log(Re) - petukhov::coeff_b;
+  double f = 1.0 / (x * x);
+
+  // df/dRe = -2 * x^(-3) * dx/dRe
+  // dx/dRe = coeff_a / Re
+  double dx_dRe = petukhov::coeff_a / Re;
+  double jacobian = (-2.0 / (x * x * x)) * dx_dRe;
+
+  return {f, jacobian};
+}
+
+std::tuple<double, double> friction_and_jacobian(const std::string &tag,
+                                                 double Re, double e_D) {
+  if (tag == "haaland")   return friction_and_jacobian_haaland(Re, e_D);
+  if (tag == "serghides") return friction_and_jacobian_serghides(Re, e_D);
+  if (tag == "colebrook") return friction_and_jacobian_colebrook(Re, e_D);
+  if (tag == "petukhov")  return friction_and_jacobian_petukhov(Re);
+  throw std::invalid_argument(
+      "friction_and_jacobian: unknown tag '" + tag +
+      "'. Must be haaland|serghides|colebrook|petukhov.");
+}
+
 // -----------------------------------------------------------------------------
 // 3. Thermodynamic & Transport Components
 // -----------------------------------------------------------------------------

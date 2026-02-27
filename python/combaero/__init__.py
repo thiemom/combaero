@@ -362,6 +362,10 @@ try:
         lossless_pressure_and_jacobian,
         nusselt_and_jacobian_dittus_boelter,
         friction_and_jacobian_haaland,
+        friction_and_jacobian_serghides,
+        friction_and_jacobian_colebrook,
+        friction_and_jacobian_petukhov,
+        friction_and_jacobian,
         density_and_jacobians,
         enthalpy_and_jacobian,
         viscosity_and_jacobians,
@@ -644,6 +648,10 @@ except ModuleNotFoundError:
     lossless_pressure_and_jacobian = _core.lossless_pressure_and_jacobian
     nusselt_and_jacobian_dittus_boelter = _core.nusselt_and_jacobian_dittus_boelter
     friction_and_jacobian_haaland = _core.friction_and_jacobian_haaland
+    friction_and_jacobian_serghides = _core.friction_and_jacobian_serghides
+    friction_and_jacobian_colebrook = _core.friction_and_jacobian_colebrook
+    friction_and_jacobian_petukhov = _core.friction_and_jacobian_petukhov
+    friction_and_jacobian = _core.friction_and_jacobian
     density_and_jacobians = _core.density_and_jacobians
     enthalpy_and_jacobian = _core.enthalpy_and_jacobian
     viscosity_and_jacobians = _core.viscosity_and_jacobians
@@ -822,6 +830,10 @@ __all__ = [
     "lossless_pressure_and_jacobian",
     "nusselt_and_jacobian_dittus_boelter",
     "friction_and_jacobian_haaland",
+    "friction_and_jacobian_serghides",
+    "friction_and_jacobian_colebrook",
+    "friction_and_jacobian_petukhov",
+    "friction_and_jacobian",
     "density_and_jacobians",
     "enthalpy_and_jacobian",
     "viscosity_and_jacobians",

@@ -1,6 +1,7 @@
 #ifndef SOLVER_INTERFACE_H
 #define SOLVER_INTERFACE_H
 
+#include <string>
 #include <tuple>
 #include <vector>
 // -----------------------------------------------------------------------------
@@ -101,6 +102,53 @@ nusselt_and_jacobian_dittus_boelter(double Re, double Pr, bool heating = true);
 //   f        : Darcy friction factor [-]
 //   d_f_d_Re : Jacobian gradient [-]
 std::tuple<double, double> friction_and_jacobian_haaland(double Re, double e_D);
+
+// Calculate Friction Factor and its derivative using the Serghides explicit
+// approximation to Colebrook-White (Steffensen acceleration).
+//
+// Method: Analytical Chain Rule through A, B, C intermediates
+// Inputs:
+//   Re  : Reynolds number [-]
+//   e_D : Relative roughness [-]
+//
+// Returns:
+//   tuple(f, d_f_d_Re)
+std::tuple<double, double> friction_and_jacobian_serghides(double Re,
+                                                           double e_D);
+
+// Calculate Friction Factor and its derivative using the Colebrook-White
+// implicit equation (Newton-Raphson converged internally).
+//
+// Method: Implicit differentiation of converged Colebrook root
+// Inputs:
+//   Re  : Reynolds number [-]
+//   e_D : Relative roughness [-]
+//
+// Returns:
+//   tuple(f, d_f_d_Re)
+std::tuple<double, double> friction_and_jacobian_colebrook(double Re,
+                                                           double e_D);
+
+// Calculate Friction Factor and its derivative using the Petukhov smooth-pipe
+// correlation: f = (coeff_a * ln(Re) - coeff_b)^(-2)
+//
+// Method: Analytical Chain Rule
+// Inputs:
+//   Re : Reynolds number [-]  (smooth pipe: e_D not used)
+//
+// Returns:
+//   tuple(f, d_f_d_Re)
+std::tuple<double, double> friction_and_jacobian_petukhov(double Re);
+
+// Convenience dispatcher: selects the correct friction_and_jacobian_* overload
+// based on a string tag matching FrictionModelLiteral from Python.
+//
+// tag must be one of: "haaland", "serghides", "colebrook", "petukhov"
+//
+// Returns:
+//   tuple(f, d_f_d_Re)
+std::tuple<double, double> friction_and_jacobian(const std::string &tag,
+                                                 double Re, double e_D);
 
 // -----------------------------------------------------------------------------
 // 3. Thermodynamic & Transport Components
