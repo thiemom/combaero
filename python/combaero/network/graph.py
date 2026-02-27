@@ -75,17 +75,23 @@ class FlowNetwork:
 
     def validate(self) -> None:
         """
-        Validates the network topology.
-        Enforces that the network contains at least one PressureBoundary to act
-        as a pressure reference and mass sink/source.
+        Validate the network topology.
+        - Must have at least one PressureBoundary.
+        - Must contain at least one element with losses (to prevent infinite flow).
+        - No isolated subgraphs (implicitly checked if Newton solver runs, but good practice).
         """
-        from .components import PressureBoundary
+        from .components import LosslessConnectionElement, PressureBoundary
 
-        has_pressure_boundary = any(
-            isinstance(node, PressureBoundary) for node in self.nodes.values()
-        )
-        if not has_pressure_boundary:
+        has_pressure_bc = any(isinstance(node, PressureBoundary) for node in self.nodes.values())
+        if not has_pressure_bc:
             raise ValueError(
                 "FlowNetwork validation failed: The network must contain at least "
                 "one PressureBoundary to serve as a reference."
+            )
+
+        all_lossless = all(isinstance(e, LosslessConnectionElement) for e in self.elements.values())
+        if self.elements and all_lossless:
+            raise ValueError(
+                "Network contains only lossless connection elements. "
+                "There must be at least one pressure drop element to solve flow."
             )

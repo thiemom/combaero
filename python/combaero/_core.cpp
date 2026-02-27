@@ -1962,6 +1962,46 @@ PYBIND11_MODULE(_core, m) {
   // Compressible flow
   // -------------------------------------------------------------
 
+  // Bind structures
+  py::class_<IncompressibleStation>(
+      m, "IncompressibleStation",
+      "Spatial state data point for incompressible pipe flow")
+      .def(py::init<>())
+      .def_readwrite("x", &IncompressibleStation::x, "Distance from inlet [m]")
+      .def_readwrite("P", &IncompressibleStation::P, "Static Pressure [Pa]")
+      .def_readwrite("T", &IncompressibleStation::T, "Static Temperature [K]")
+      .def_readwrite("rho", &IncompressibleStation::rho, "Density [kg/m³]")
+      .def_readwrite("u", &IncompressibleStation::v, "Velocity [m/s]")
+      .def_readwrite("M", &IncompressibleStation::M, "Mach Number [-]")
+      .def_readwrite("h", &IncompressibleStation::h, "Enthalpy [J/kg]")
+      .def("__repr__", [](const IncompressibleStation &s) {
+        std::ostringstream oss;
+        oss << "<IncompressibleStation x=" << s.x << "m P=" << s.P
+            << "Pa T=" << s.T << "K>";
+        return oss.str();
+      });
+
+  py::class_<IncompressibleFlowSolution>(m, "IncompressibleFlowSolution",
+                                         "Result of incompressible flow solver")
+      .def(py::init<>())
+      .def_readonly("mdot", &IncompressibleFlowSolution::mdot,
+                    "Mass flow rate [kg/s]")
+      .def_readonly("v", &IncompressibleFlowSolution::v, "Velocity [m/s]")
+      .def_readonly("dP", &IncompressibleFlowSolution::dP, "Pressure drop [Pa]")
+      .def_readonly("Re", &IncompressibleFlowSolution::Re,
+                    "Reynolds number [-]")
+      .def_readwrite("rho", &IncompressibleFlowSolution::rho, "Density [kg/m³]")
+      .def_readwrite("f", &IncompressibleFlowSolution::f,
+                     "Friction factor / Discharge coefficient [-]")
+      .def_readwrite("profile", &IncompressibleFlowSolution::profile,
+                     "Optional spatial profile along the pipe (props(L))")
+      .def("__repr__", [](const IncompressibleFlowSolution &s) {
+        std::ostringstream oss;
+        oss << "IncompressibleFlowSolution(mdot=" << s.mdot << ", v=" << s.v
+            << ", dP=" << s.dP << ", Re=" << s.Re << ")";
+        return oss.str();
+      });
+
   // CompressibleFlowSolution struct
   py::class_<CompressibleFlowSolution>(m, "CompressibleFlowSolution")
       .def(py::init<>())
@@ -4435,23 +4475,6 @@ PYBIND11_MODULE(_core, m) {
   // Incompressible flow — thermo-aware high-level API
   // =========================================================================
 
-  py::class_<IncompressibleFlowSolution>(m, "IncompressibleFlowSolution")
-      .def_readonly("mdot", &IncompressibleFlowSolution::mdot,
-                    "Mass flow rate [kg/s]")
-      .def_readonly("v", &IncompressibleFlowSolution::v, "Velocity [m/s]")
-      .def_readonly("dP", &IncompressibleFlowSolution::dP, "Pressure drop [Pa]")
-      .def_readonly("Re", &IncompressibleFlowSolution::Re,
-                    "Reynolds number [-]")
-      .def_readonly("rho", &IncompressibleFlowSolution::rho,
-                    "Inlet density [kg/m^3]")
-      .def_readonly("f", &IncompressibleFlowSolution::f,
-                    "Friction factor (pipe) or Cd (orifice) [-]")
-      .def("__repr__", [](const IncompressibleFlowSolution &s) {
-        return "IncompressibleFlowSolution(mdot=" + std::to_string(s.mdot) +
-               ", v=" + std::to_string(s.v) + ", dP=" + std::to_string(s.dP) +
-               ", Re=" + std::to_string(s.Re) + ")";
-      });
-
   m.def(
       "orifice_flow_thermo",
       [](double T, double P,
@@ -4489,10 +4512,14 @@ PYBIND11_MODULE(_core, m) {
       "pipe_flow",
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-         double u, double L, double D,
-         double f) { return pipe_flow(T, P, to_vec(X_arr), u, L, D, f); },
+         double u, double L, double D, double f, std::size_t n_steps,
+         bool store_profile) {
+        return pipe_flow(T, P, to_vec(X_arr), u, L, D, f, n_steps,
+                         store_profile);
+      },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("u"), py::arg("L"),
-      py::arg("D"), py::arg("f"),
+      py::arg("D"), py::arg("f"), py::arg("n_steps") = 10,
+      py::arg("store_profile") = false,
       "Thermo-aware incompressible pipe flow with explicit friction factor.\n"
       "Returns IncompressibleFlowSolution.");
 
@@ -4501,13 +4528,15 @@ PYBIND11_MODULE(_core, m) {
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double u, double L, double D, double roughness,
-         const std::string &correlation) {
+         const std::string &correlation, std::size_t n_steps,
+         bool store_profile) {
         return pipe_flow_rough(T, P, to_vec(X_arr), u, L, D, roughness,
-                               correlation);
+                               correlation, n_steps, store_profile);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("u"), py::arg("L"),
       py::arg("D"), py::arg("roughness") = 0.0,
-      py::arg("correlation") = "haaland",
+      py::arg("correlation") = "haaland", py::arg("n_steps") = 10,
+      py::arg("store_profile") = false,
       "Thermo-aware incompressible pipe flow with roughness-based friction "
       "factor.\n"
       "Returns IncompressibleFlowSolution.");
@@ -4950,6 +4979,16 @@ PYBIND11_MODULE(_core, m) {
         "  rho : Density [kg/m³]\n"
         "  K   : Loss coefficient [-]\n\n"
         "Returns: tuple(dP [Pa], derivative [Pa/(m/s)])");
+
+  m.def(
+      "lossless_pressure_and_jacobian", &solver::lossless_pressure_and_jacobian,
+      py::arg("P_in"), py::arg("P_out"),
+      "Fast-path lossless ideal connection total pressure preservation (dP=0) "
+      "and analytic derivative (dP, d(dP)/d(P_out)).\n\n"
+      "Parameters:\n"
+      "  P_in  : Total pressure entering [Pa]\n"
+      "  P_out : Total pressure exiting [Pa]\n\n"
+      "Returns: tuple(Residual [Pa], derivative [-])");
 
   m.def("nusselt_and_jacobian_dittus_boelter",
         &solver::nusselt_and_jacobian_dittus_boelter, py::arg("Re"),

@@ -357,6 +357,14 @@ try:
         geometry,
         h0_from_static,
         v_from_h0,
+        orifice_mdot_and_jacobian,
+        pressure_loss_and_jacobian,
+        lossless_pressure_and_jacobian,
+        nusselt_and_jacobian_dittus_boelter,
+        friction_and_jacobian_haaland,
+        density_and_jacobians,
+        enthalpy_and_jacobian,
+        viscosity_and_jacobians,
     )
 
     molar_mass = mwmix
@@ -630,6 +638,16 @@ except ModuleNotFoundError:
     pin_fin_friction = _core.pin_fin_friction
     geometry = _core.geometry
 
+    # Internal Solver Tools (f, J) exact Jacobians
+    orifice_mdot_and_jacobian = _core.orifice_mdot_and_jacobian
+    pressure_loss_and_jacobian = _core.pressure_loss_and_jacobian
+    lossless_pressure_and_jacobian = _core.lossless_pressure_and_jacobian
+    nusselt_and_jacobian_dittus_boelter = _core.nusselt_and_jacobian_dittus_boelter
+    friction_and_jacobian_haaland = _core.friction_and_jacobian_haaland
+    density_and_jacobians = _core.density_and_jacobians
+    enthalpy_and_jacobian = _core.enthalpy_and_jacobian
+    viscosity_and_jacobians = _core.viscosity_and_jacobians
+
 
 # Submodule imports — always available regardless of _core load path.
 from . import compressible, heat_transfer, incompressible, network, species
@@ -798,6 +816,15 @@ __all__ = [
     "set_fuel_stream_for_O2_dry",
     "set_fuel_stream_for_CO2",
     "set_fuel_stream_for_CO2_dry",
+    # Internal Solver Tools (f, J) exact Jacobians
+    "orifice_mdot_and_jacobian",
+    "pressure_loss_and_jacobian",
+    "lossless_pressure_and_jacobian",
+    "nusselt_and_jacobian_dittus_boelter",
+    "friction_and_jacobian_haaland",
+    "density_and_jacobians",
+    "enthalpy_and_jacobian",
+    "viscosity_and_jacobians",
     # Inverse solvers - find oxidizer stream
     "set_oxidizer_stream_for_Tad",
     "set_oxidizer_stream_for_O2",

@@ -1,27 +1,27 @@
 from .components import (
-    BoundaryNode,
     PressureBoundary,
     MassFlowBoundary,
+    CombustorNode,
+    LosslessConnectionElement,
     MixtureState,
     MomentumChamberNode,
-    NetworkElement,
-    NetworkNode,
     OrificeElement,
     PipeElement,
     PlenumNode,
 )
 from .graph import FlowNetwork
+from .solver import NetworkSolver
 
 __all__: list[str] = [
-    "BoundaryNode",
+    "PlenumNode",
+    "MomentumChamberNode",
     "PressureBoundary",
     "MassFlowBoundary",
-    "MixtureState",
-    "MomentumChamberNode",
-    "NetworkElement",
-    "NetworkNode",
-    "OrificeElement",
+    "CombustorNode",
     "PipeElement",
-    "PlenumNode",
+    "OrificeElement",
+    "LosslessConnectionElement",
+    "MixtureState",
     "FlowNetwork",
+    "NetworkSolver",
 ]

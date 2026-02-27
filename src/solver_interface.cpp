@@ -57,6 +57,14 @@ std::tuple<double, double> pressure_loss_and_jacobian(double v, double rho,
   return {dP, jacobian};
 }
 
+std::tuple<double, double> lossless_pressure_and_jacobian(double P_in,
+                                                          double P_out) {
+  // A lossless connection preserves total pressure natively.
+  // Residual: P_in - P_out = 0.
+  // Analytical derivative w.r.t P_out: -1.0
+  return {P_in - P_out, -1.0};
+}
+
 // -----------------------------------------------------------------------------
 // 2. Heat Transfer Components
 // -----------------------------------------------------------------------------

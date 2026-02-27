@@ -50,10 +50,23 @@ std::tuple<double, double> orifice_mdot_and_jacobian(double dP, double rho,
 //
 // Returns:
 //   tuple(dP, d_dP_d_v)
-//   dP       : Pressure drop [Pa]
 //   d_dP_d_v : Jacobian gradient [Pa/(m/s)]
 std::tuple<double, double> pressure_loss_and_jacobian(double v, double rho,
                                                       double K);
+
+// Calculate Lossless Connection Ideal Pressure and Jacobian
+//
+// Method: Analytical Difference
+// Inputs:
+//   P_in  : Total pressure entering the element [Pa]
+//   P_out : Total pressure exiting the element [Pa]
+//
+// Returns:
+//   tuple(Residual, d_Residual_d_P_out)
+//   Residual           : Difference between P_in and P_out [Pa]
+//   d_Residual_d_P_out : Jacobian gradient [-]
+std::tuple<double, double> lossless_pressure_and_jacobian(double P_in,
+                                                          double P_out);
 
 // -----------------------------------------------------------------------------
 // 2. Heat Transfer Components
