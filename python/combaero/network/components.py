@@ -207,16 +207,26 @@ class OrificeElement(NetworkElement):
         self.Cd = Cd
         self.area = area
         self.upstream_diameter: float | None = None
+        self.downstream_diameter: float | None = None
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
-        # Ask graph what element fed into our "from_node"
+        # Evaluate both sides of the node for geometry discovery
         upstream_elements = graph.get_upstream_elements(self.from_node)
+        downstream_elements = graph.get_downstream_elements(self.to_node)
 
-        if len(upstream_elements) == 1:
-            upstream_element = upstream_elements[0]
-            # If the upstream element is a pipe, extract its diameter
-            if isinstance(upstream_element, PipeElement):
-                self.upstream_diameter = upstream_element.diameter
+        # Ensure we don't pick ourselves if it's a tight chain
+        upstream_pipes = [
+            e for e in upstream_elements if isinstance(e, PipeElement) and e.id != self.id
+        ]
+        downstream_pipes = [
+            e for e in downstream_elements if isinstance(e, PipeElement) and e.id != self.id
+        ]
+
+        if len(upstream_pipes) == 1:
+            self.upstream_diameter = upstream_pipes[0].diameter
+
+        if len(downstream_pipes) == 1:
+            self.downstream_diameter = downstream_pipes[0].diameter
 
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
@@ -224,19 +234,34 @@ class OrificeElement(NetworkElement):
     def residuals(self, state_in: MixtureState, state_out: MixtureState) -> list[float]:
         import combaero as cb
 
-        dP = state_in.P_total - state_out.P
-        rho = state_in.density() if dP >= 0 else state_out.density()
+        m_dot = state_in.m_dot
 
-        # Determine actual flow direction and signed dP
-        sign = 1.0 if dP >= 0 else -1.0
-        abs_dP = abs(dP)
+        # Determine actual flow direction and valid upstream properties
+        dP_fwd = state_in.P_total - state_out.P
+
+        # If the pressure gradient physically forces reverse flow, or if the solver is
+        # testing negative m_dot when dP=0, we evaluate in reverse
+        if dP_fwd > 0 or (dP_fwd == 0 and m_dot > 0):
+            rho = state_in.density()
+            sign = 1.0
+            abs_dP = dP_fwd
+        else:
+            rho = state_out.density()
+            sign = -1.0
+            abs_dP = -dP_fwd
 
         # Call the tuple interface for mass flow
         m_dot_calc, _ = cb.orifice_mdot_and_jacobian(abs_dP, rho, self.Cd, self.area)
+
+        # In a real model, we would pass eff_upstream_D to cb.orifice_mdot_and_jacobian
+        # for approach velocity correction (Beta ratio).
+        # The current C++ interface doesn't yet support BETA correction or variable Cd,
+        # but the Python network topology is now inherently prepared for it.
+
         m_dot_calc *= sign
 
         # Residual: guessed m_dot (carried by state_in/out) minus calculated m_dot
-        return [state_in.m_dot - m_dot_calc]
+        return [m_dot - m_dot_calc]
 
     def n_equations(self) -> int:
         return 1
@@ -262,9 +287,10 @@ class LosslessConnectionElement(NetworkElement):
 
     def residuals(self, state_in: MixtureState, state_out: MixtureState) -> list[float]:
         # Evaluates the native C++ tuple (f, J) interface for lossless P_total conservation
-        import combaero as cb
 
-        return [cb.lossless_pressure_and_jacobian(state_in.P_total, state_out.P_total)[0]]
+        # It simply equates total pressure.
+        # But for numeric stability we return diff.
+        return [state_in.P_total - state_out.P_total]
 
     def get_spatial_profile(self, n_steps: int = 100):
         """
@@ -331,11 +357,20 @@ class PipeElement(NetworkElement):
         import combaero as cb
 
         m_dot = state_in.m_dot
-        sign = 1.0 if m_dot >= 0 else -1.0
-        abs_mdot = abs(m_dot)
+        dP_fwd = state_in.P_total - state_out.P
 
-        rho = state_in.density() if m_dot >= 0 else state_out.density()
-        mu = cb.viscosity(state_in.T, state_in.P, state_in.X)
+        if dP_fwd > 0 or (dP_fwd == 0 and m_dot > 0):
+            rho = state_in.density()
+            mu = cb.viscosity(state_in.T, state_in.P, state_in.X)
+            dP_actual = dP_fwd
+            sign = 1.0
+        else:
+            rho = state_out.density()
+            mu = cb.viscosity(state_out.T, state_out.P, state_out.X)
+            dP_actual = -dP_fwd
+            sign = -1.0
+
+        abs_mdot = abs(m_dot)
 
         # Derived geometry
         D = self.diameter
@@ -353,8 +388,18 @@ class PipeElement(NetworkElement):
         L_over_D = self.length / D
         dP_calc = f * L_over_D * 0.5 * rho * v * v
 
+        dP_calc = f * L_over_D * 0.5 * rho * v * v
+
         # Residual: driving pressure difference minus frictional loss
-        dP_actual = state_in.P_total - state_out.P
+        # Since dP_calc is positive scalar and dP_actual is evaluating Upstream(Total) - Downstream(Static)
+        # If m_dot >= 0 (Forward): Res = (in.P_tot - out.P) - dP_calc = 0
+        # If m_dot < 0  (Reverse): Res = (out.P_tot - in.P) - (-dP_actual_reverse)
+        # Actually solver evaluates dP_actual - dP_calc = 0. We'll simply enforce it with respect to current magnitude direction.
+
+        # We need residual to be signed back into the domain of the mass flow equation.
+        # Actually an easier way is to map the predicted flow from the analytical equation and subtract guessed mass flow,
+        # but Pipe computes dP(m_dot).
+        # We want predicted_dP - actual_dP = 0 where actual_dP is upstream P_tot - downstream P.
         return [dP_actual - sign * dP_calc]
 
     def get_spatial_profile(

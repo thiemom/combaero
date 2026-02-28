@@ -42,6 +42,12 @@ class FlowNetwork:
         if element.to_node not in self.nodes:
             raise ValueError(f"Unknown to_node '{element.to_node}' for element {element.id}.")
 
+        if element.from_node == element.to_node:
+            raise ValueError(
+                f"Element '{element.id}' has from_node == to_node ('{element.from_node}'). "
+                "Self-loops are not permitted."
+            )
+
         self.elements[element.id] = element
 
         # Element 'from_node' -> implies element is downstream of the from_node
@@ -73,25 +79,83 @@ class FlowNetwork:
         for element in self.elements.values():
             element.resolve_topology(self)
 
+    def _reachable_from(self, start_id: str) -> set[str]:
+        """BFS over undirected adjacency to find all node IDs reachable from start_id."""
+        visited: set[str] = set()
+        queue = [start_id]
+        while queue:
+            nid = queue.pop()
+            if nid in visited:
+                continue
+            visited.add(nid)
+            for eid in self._upstream_of_node[nid] + self._downstream_of_node[nid]:
+                elem = self.elements[eid]
+                neighbour = elem.from_node if elem.to_node == nid else elem.to_node
+                if neighbour not in visited:
+                    queue.append(neighbour)
+        return visited
+
     def validate(self) -> None:
         """
         Validate the network topology.
+        - Must have at least one node and one element.
         - Must have at least one PressureBoundary.
         - Must contain at least one element with losses (to prevent infinite flow).
-        - No isolated subgraphs (implicitly checked if Newton solver runs, but good practice).
+        - No isolated subgraphs (all nodes reachable from first node).
+        - Every interior node must be connected to at least one element.
         """
-        from .components import LosslessConnectionElement, PressureBoundary
+        from .components import PressureBoundary
+
+        if not self.nodes:
+            raise ValueError("FlowNetwork validation failed: the network contains no nodes.")
+
+        if len(self.elements) == 0:
+            raise ValueError("FlowNetwork validation failed: the network contains no elements.")
 
         has_pressure_bc = any(isinstance(node, PressureBoundary) for node in self.nodes.values())
         if not has_pressure_bc:
             raise ValueError(
-                "FlowNetwork validation failed: The network must contain at least "
+                "FlowNetwork validation failed: the network must contain at least "
                 "one PressureBoundary to serve as a reference."
             )
 
+        from .components import LosslessConnectionElement
+
         all_lossless = all(isinstance(e, LosslessConnectionElement) for e in self.elements.values())
-        if self.elements and all_lossless:
+        if all_lossless:
             raise ValueError(
                 "Network contains only lossless connection elements. "
                 "There must be at least one pressure drop element to solve flow."
             )
+
+        # Isolated subgraph check: all nodes must be reachable from *some* PressureBoundary.
+        # This prevents islands that have elements but no reference pressure.
+        reachable_from_bc = set()
+        for nid, node in self.nodes.items():
+            if isinstance(node, PressureBoundary):
+                reachable_from_bc.update(self._reachable_from(nid))
+
+        isolated = set(self.nodes) - reachable_from_bc
+        if isolated:
+            raise ValueError(
+                f"FlowNetwork validation failed: isolated node(s) detected: {sorted(isolated)}. "
+                "Every node must be reachable from a PressureBoundary."
+            )
+
+        # Every interior node must have at least 2 connected elements to satisfy continuity (in and out)
+        # Boundary nodes only need at least 1.
+        for node_id, node in self.nodes.items():
+            connected = self._upstream_of_node[node_id] + self._downstream_of_node[node_id]
+            is_boundary = type(node).__name__ in ("PressureBoundary", "MassFlowBoundary")
+
+            if not connected:
+                raise ValueError(
+                    f"FlowNetwork validation failed: node '{node_id}' has no connected elements."
+                )
+
+            if not is_boundary and len(connected) < 2:
+                raise ValueError(
+                    f"FlowNetwork validation failed: interior node '{node_id}' has only {len(connected)} "
+                    "connected element(s). Interior nodes must have at least 2 connections to satisfy "
+                    "mass conservation."
+                )
