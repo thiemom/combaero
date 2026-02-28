@@ -361,6 +361,21 @@ try:
         pressure_loss_and_jacobian,
         lossless_pressure_and_jacobian,
         nusselt_and_jacobian_dittus_boelter,
+        nusselt_and_jacobian_gnielinski,
+        nusselt_and_jacobian_sieder_tate,
+        nusselt_and_jacobian_petukhov,
+        pin_fin_nusselt_and_jacobian,
+        pin_fin_friction_and_jacobian,
+        dimple_nusselt_enhancement_and_jacobian,
+        dimple_friction_multiplier_and_jacobian,
+        rib_enhancement_factor_high_re_and_jacobian,
+        impingement_nusselt_and_jacobian,
+        film_cooling_effectiveness_and_jacobian,
+        effusion_effectiveness_and_jacobian,
+        mach_number_and_jacobian_v,
+        T_adiabatic_wall_and_jacobian_v,
+        T0_from_static_and_jacobian_M,
+        P0_from_static_and_jacobian_M,
         friction_and_jacobian_haaland,
         friction_and_jacobian_serghides,
         friction_and_jacobian_colebrook,
@@ -647,6 +662,21 @@ except ModuleNotFoundError:
     pressure_loss_and_jacobian = _core.pressure_loss_and_jacobian
     lossless_pressure_and_jacobian = _core.lossless_pressure_and_jacobian
     nusselt_and_jacobian_dittus_boelter = _core.nusselt_and_jacobian_dittus_boelter
+    nusselt_and_jacobian_gnielinski = _core.nusselt_and_jacobian_gnielinski
+    nusselt_and_jacobian_sieder_tate = _core.nusselt_and_jacobian_sieder_tate
+    nusselt_and_jacobian_petukhov = _core.nusselt_and_jacobian_petukhov
+    pin_fin_nusselt_and_jacobian = _core.pin_fin_nusselt_and_jacobian
+    pin_fin_friction_and_jacobian = _core.pin_fin_friction_and_jacobian
+    dimple_nusselt_enhancement_and_jacobian = _core.dimple_nusselt_enhancement_and_jacobian
+    dimple_friction_multiplier_and_jacobian = _core.dimple_friction_multiplier_and_jacobian
+    rib_enhancement_factor_high_re_and_jacobian = _core.rib_enhancement_factor_high_re_and_jacobian
+    impingement_nusselt_and_jacobian = _core.impingement_nusselt_and_jacobian
+    film_cooling_effectiveness_and_jacobian = _core.film_cooling_effectiveness_and_jacobian
+    effusion_effectiveness_and_jacobian = _core.effusion_effectiveness_and_jacobian
+    mach_number_and_jacobian_v = _core.mach_number_and_jacobian_v
+    T_adiabatic_wall_and_jacobian_v = _core.T_adiabatic_wall_and_jacobian_v
+    T0_from_static_and_jacobian_M = _core.T0_from_static_and_jacobian_M
+    P0_from_static_and_jacobian_M = _core.P0_from_static_and_jacobian_M
     friction_and_jacobian_haaland = _core.friction_and_jacobian_haaland
     friction_and_jacobian_serghides = _core.friction_and_jacobian_serghides
     friction_and_jacobian_colebrook = _core.friction_and_jacobian_colebrook

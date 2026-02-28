@@ -89,6 +89,27 @@ std::tuple<double, double> lossless_pressure_and_jacobian(double P_in,
 std::tuple<double, double>
 nusselt_and_jacobian_dittus_boelter(double Re, double Pr, bool heating = true);
 
+// Calculate Nusselt Number and its derivative with respect to Reynolds Number
+// using the Gnielinski correlation.
+//
+// Method: Finite Central Difference
+std::tuple<double, double> nusselt_and_jacobian_gnielinski(double Re, double Pr,
+                                                           double f);
+
+// Calculate Nusselt Number and its derivative with respect to Reynolds Number
+// using the Sieder-Tate correlation.
+//
+// Method: Analytical Chain Rule
+std::tuple<double, double>
+nusselt_and_jacobian_sieder_tate(double Re, double Pr, double mu_ratio);
+
+// Calculate Nusselt Number and its derivative with respect to Reynolds Number
+// using the Petukhov correlation.
+//
+// Method: Analytical Chain Rule
+std::tuple<double, double> nusselt_and_jacobian_petukhov(double Re, double Pr,
+                                                         double f);
+
 // Calculate Friction Factor and its derivative with respect to Reynolds Number.
 // Uses the Haaland explicit pipe friction relation.
 //
@@ -151,7 +172,51 @@ std::tuple<double, double> friction_and_jacobian(const std::string &tag,
                                                  double Re, double e_D);
 
 // -----------------------------------------------------------------------------
-// 3. Thermodynamic & Transport Components
+// 3. Cooling Correlations
+// -----------------------------------------------------------------------------
+
+// Pin Fin Nusselt Number and Jacobian wrt Re_d
+std::tuple<double, double>
+pin_fin_nusselt_and_jacobian(double Re_d, double Pr, double L_D, double S_D,
+                             double X_D, bool is_staggered = true);
+
+// Pin Fin Friction and Jacobian wrt Re_d
+std::tuple<double, double>
+pin_fin_friction_and_jacobian(double Re_d, bool is_staggered = true);
+
+// Dimple Nusselt Enhancement and Jacobian wrt Re_Dh
+std::tuple<double, double> dimple_nusselt_enhancement_and_jacobian(double Re_Dh,
+                                                                   double d_Dh,
+                                                                   double h_d,
+                                                                   double S_d);
+
+// Dimple Friction Multiplier and Jacobian wrt Re_Dh
+std::tuple<double, double>
+dimple_friction_multiplier_and_jacobian(double Re_Dh, double d_Dh, double h_d);
+
+// Rib Enhancement Factor (High-Re) and Jacobian wrt Re
+std::tuple<double, double>
+rib_enhancement_factor_high_re_and_jacobian(double e_D, double pitch_to_height,
+                                            double alpha_deg, double Re);
+
+// Impingement Nusselt Number and Jacobian wrt Re_jet
+std::tuple<double, double>
+impingement_nusselt_and_jacobian(double Re_jet, double Pr, double z_D,
+                                 double x_D = 0.0, double y_D = 0.0);
+
+// Film Cooling Effectiveness and Jacobian wrt Blowing Ratio M
+std::tuple<double, double>
+film_cooling_effectiveness_and_jacobian(double x_D, double M, double DR,
+                                        double alpha_deg);
+
+// Effusion Effectiveness and Jacobian wrt Blowing Ratio M
+std::tuple<double, double>
+effusion_effectiveness_and_jacobian(double x_D, double M, double DR,
+                                    double porosity, double s_D,
+                                    double alpha_deg);
+
+// -----------------------------------------------------------------------------
+// 4. Thermodynamic & Transport Components
 // -----------------------------------------------------------------------------
 
 // Calculate Mass Density and its analytical derivatives w.r.t. T and P.
@@ -196,6 +261,33 @@ std::tuple<double, double> enthalpy_and_jacobian(double T,
 //   d_mu_d_P : Jacobian gradient w.r.t Pressure [(Pa*s)/Pa]
 std::tuple<double, double, double>
 viscosity_and_jacobians(double T, double P, const std::vector<double> &X);
+
+// -----------------------------------------------------------------------------
+// 5. Stagnation State Conversions
+// -----------------------------------------------------------------------------
+
+// Calculate Mach number and its derivative wrt Velocity
+// Method: Analytical Chain Rule
+std::tuple<double, double>
+mach_number_and_jacobian_v(double v, double T, const std::vector<double> &X);
+
+// Calculate Adiabatic Wall Temperature and its derivative wrt Velocity
+// Method: Analytical Chain Rule
+std::tuple<double, double>
+T_adiabatic_wall_and_jacobian_v(double T_static, double v, double T, double P,
+                                const std::vector<double> &X,
+                                bool turbulent = true);
+
+// Calculate Stagnation Temperature from Static and its derivative wrt Mach
+// Method: Central Finite Difference
+std::tuple<double, double>
+T0_from_static_and_jacobian_M(double T, double M, const std::vector<double> &X);
+
+// Calculate Stagnation Pressure from Static and its derivative wrt Mach
+// Method: Central Finite Difference
+std::tuple<double, double>
+P0_from_static_and_jacobian_M(double P, double T, double M,
+                              const std::vector<double> &X);
 
 } // namespace solver
 } // namespace combaero
