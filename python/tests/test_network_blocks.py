@@ -166,16 +166,32 @@ def test_flownetwork_validation():
     graph1 = cb.network.FlowNetwork()
     graph1.add_node(cb.network.MassFlowBoundary("bnd_mass"))
     graph1.add_node(cb.network.PlenumNode("plenum_1"))
+
+    # We must add an outlet to plenum_1 otherwise it fails early on interior connection < 2 rule
+    graph1.add_node(cb.network.MassFlowBoundary("bnd_mass_out"))
+
     graph1.add_element(cb.network.PipeElement("pipe_1", "bnd_mass", "plenum_1", 1.0, 0.1, 1e-5))
+    graph1.add_element(cb.network.PipeElement("pipe_2", "plenum_1", "bnd_mass_out", 1.0, 0.1, 1e-5))
 
     with pytest.raises(ValueError, match="at least one PressureBoundary"):
         graph1.validate()
 
     # 2. Add PressureBoundary but network has no losses -> ValueError
     graph2 = cb.network.FlowNetwork()
-    graph2.add_node(cb.network.PlenumNode("plenum_1"))
-    graph2.add_node(cb.network.PressureBoundary("bnd_press"))
-    graph2.add_element(cb.network.LosslessConnectionElement("lossless", "plenum_1", "bnd_press"))
+    bnd_press_in = cb.network.PressureBoundary("bnd_press_in")
+    plenum = cb.network.PlenumNode("plenum_1")
+    bnd_press_out = cb.network.PressureBoundary("bnd_press_out")
+
+    graph2.add_node(plenum)
+    graph2.add_node(bnd_press_in)
+    graph2.add_node(bnd_press_out)
+
+    graph2.add_element(
+        cb.network.LosslessConnectionElement("lossless1", "bnd_press_in", "plenum_1")
+    )
+    graph2.add_element(
+        cb.network.LosslessConnectionElement("lossless2", "plenum_1", "bnd_press_out")
+    )
 
     with pytest.raises(ValueError, match="at least one pressure drop element"):
         graph2.validate()
@@ -183,7 +199,12 @@ def test_flownetwork_validation():
     # 3. Add an element with loss -> Validates successfully
     graph3 = cb.network.FlowNetwork()
     graph3.add_node(cb.network.PlenumNode("plenum_1"))
-    graph3.add_node(cb.network.PressureBoundary("bnd_press"))
-    graph3.add_element(cb.network.OrificeElement("orifice", "plenum_1", "bnd_press", 0.6, 0.05))
+    graph3.add_node(cb.network.PressureBoundary("bnd_press_in"))
+    graph3.add_node(cb.network.PressureBoundary("bnd_press_out"))
+
+    graph3.add_element(cb.network.OrificeElement("orifice", "bnd_press_in", "plenum_1", 0.6, 0.05))
+    graph3.add_element(
+        cb.network.OrificeElement("orifice2", "plenum_1", "bnd_press_out", 0.6, 0.05)
+    )
 
     graph3.validate()  # Should not raise

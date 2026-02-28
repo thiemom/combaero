@@ -65,25 +65,32 @@ class NetworkSolver:
 
     def _get_node_state(self, node: NetworkNode, x: np.ndarray) -> MixtureState:
         """Constructs a MixtureState for a given node based on the current solver vector x."""
-        # Baseline composition
+        # species_names order: N2=0, O2=1, AR=2, CO2=3, H2O=4, ...
+        # species names are exposed to python in python/combaero/species.py
         X_air = [0.0] * 14
-        X_air[11] = 0.79
-        X_air[12] = 0.21
+        X_air[0] = 0.79  # N2
+        X_air[1] = 0.21  # O2
 
         # Determine boundaries
         if isinstance(node, PressureBoundary):
-            # For PressureBoundary, defaults. A real implementation would extract from the node itself.
-            # Using hasattr to grab values if they exist, otherwise sensible defaults
-            P_tot = getattr(node, "P_total", 101325.0)
-            T_tot = getattr(node, "T_total", 300.0)
+            # For PressureBoundary, defaults.
+            # We first check if the test suite provided an initial_guess dict for external states
+            guess = getattr(node, "initial_guess", {})
+
+            P_tot = guess.get(f"{node.id}.P_total", getattr(node, "P_total", 101325.0))
+            P_stat = guess.get(f"{node.id}.P", P_tot)
+            T_tot = guess.get(f"{node.id}.T_total", getattr(node, "T_total", 300.0))
+            T_stat = guess.get(f"{node.id}.T", T_tot)
             X = getattr(node, "X", X_air)
-            return MixtureState(P=P_tot, P_total=P_tot, T=T_tot, T_total=T_tot, m_dot=0.0, X=X)
+            return MixtureState(P=P_stat, P_total=P_tot, T=T_stat, T_total=T_tot, m_dot=0.0, X=X)
 
         if isinstance(node, MassFlowBoundary):
+            guess = getattr(node, "initial_guess", {})
             m = getattr(node, "m_dot", 0.1)
-            T_tot = getattr(node, "T_total", 300.0)
+            T_tot = guess.get(f"{node.id}.T_total", getattr(node, "T_total", 300.0))
+            T_stat = guess.get(f"{node.id}.T", T_tot)
             X = getattr(node, "X", X_air)
-            return MixtureState(P=101325.0, P_total=101325.0, T=T_tot, T_total=T_tot, m_dot=m, X=X)
+            return MixtureState(P=101325.0, P_total=101325.0, T=T_stat, T_total=T_tot, m_dot=m, X=X)
 
         # For interior nodes, unpack from x
         indices = self._unknown_indices.get(node.id, [])
@@ -123,6 +130,7 @@ class NetworkSolver:
             res.extend(node_res)
 
             # Mass Conservation: Sum(m_dot_in) - Sum(m_dot_out) = 0
+            # Includes MassFlowBoundary contributions from adjacent boundary nodes.
             upstream_elems = self.network.get_upstream_elements(node_id)
             downstream_elems = self.network.get_downstream_elements(node_id)
 
@@ -130,30 +138,37 @@ class NetworkSolver:
             m_dot_out = 0.0
 
             for elem in upstream_elems:
-                # Get the element's m_dot from x
-                idx = self._unknown_indices[elem.id][0]  # Assuming first unknown is m_dot
-                m_dot_in += x[idx]
+                indices = self._unknown_indices.get(elem.id)
+                if indices:
+                    m_dot_in += x[indices[0]]
+                else:
+                    # Zero-DOF element: read m_dot from its from_node if it is a boundary
+                    from_node = self.network.nodes[elem.from_node]
+                    # Upstream boundary element: its flow goes into this node, so it adds to m_dot_in
+                    m_dot_in += getattr(from_node, "m_dot", 0.0)
 
             for elem in downstream_elems:
-                # Get the element's m_dot from x
-                idx = self._unknown_indices[elem.id][0]  # Assuming first unknown is m_dot
-                m_dot_out += x[idx]
+                indices = self._unknown_indices.get(elem.id)
+                if indices:
+                    m_dot_out += x[indices[0]]
+                else:
+                    # Downstream boundary element: its flow leaves this node, so it adds to m_dot_out
+                    to_node = self.network.nodes[elem.to_node]
+                    m_dot_out += getattr(to_node, "m_dot", 0.0)
 
             res.append(m_dot_in - m_dot_out)
 
         # 2. Element Residuals (Momentum Conservation)
         for elem_id, element in self.network.elements.items():
-            # Construct state_in from from_node, and state_out from to_node
-            # Note: For phase 1, we map the element's m_dot unknown into the states
-            # so the physics evaluate correctly using the current guess.
             state_in = self._get_node_state(self.network.nodes[element.from_node], x)
             state_out = self._get_node_state(self.network.nodes[element.to_node], x)
 
-            # Insert the element's current m_dot guess
-            m_dot_idx = self._unknown_indices[elem_id][0]
-            m_dot = x[m_dot_idx]
-            state_in.m_dot = m_dot
-            state_out.m_dot = m_dot
+            # Insert the element's current m_dot from x (if it has a DOF)
+            indices = self._unknown_indices.get(elem_id)
+            if indices:
+                m_dot = x[indices[0]]
+                state_in.m_dot = m_dot
+                state_out.m_dot = m_dot
 
             elem_res = element.residuals(state_in, state_out)
             res.extend(elem_res)
@@ -180,7 +195,13 @@ class NetworkSolver:
         sol = root(self._residuals, x0, method=method)
 
         if not sol.success:
-            # Maybe log or print intermediate? We still return what we have
-            pass
+            import warnings
+
+            warnings.warn(
+                f"NetworkSolver did not converge: {sol.message} "
+                f"(|F|={float(np.linalg.norm(sol.fun)):.3e}). "
+                "Returning best iterate.",
+                stacklevel=2,
+            )
 
         return dict(zip(self.unknown_names, sol.x, strict=False))

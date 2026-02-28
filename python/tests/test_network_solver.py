@@ -20,8 +20,8 @@ def test_network_solver_simple_orifice():
     inlet.P_total = 500000.0
     inlet.T_total = 300.0
     inlet.X = [0.0] * 14
-    inlet.X[11] = 0.79  # N2
-    inlet.X[12] = 0.21  # O2
+    inlet.X[0] = 0.79  # N2
+    inlet.X[1] = 0.21  # O2
 
     outlet = PressureBoundary("outlet")
     outlet.P_total = 101325.0
@@ -61,8 +61,8 @@ def test_network_solver_pipe_plenum_orifice():
     inlet.T_total = 300.0
 
     X_air = [0.0] * 14
-    X_air[11] = 0.79
-    X_air[12] = 0.21
+    X_air[0] = 0.79
+    X_air[1] = 0.21
     inlet.X = X_air
 
     plenum = PlenumNode("plenum")
