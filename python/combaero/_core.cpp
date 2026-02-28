@@ -4980,26 +4980,99 @@ PYBIND11_MODULE(_core, m) {
         "  K   : Loss coefficient [-]\n\n"
         "Returns: tuple(dP [Pa], derivative [Pa/(m/s)])");
 
-  m.def(
-      "lossless_pressure_and_jacobian", &solver::lossless_pressure_and_jacobian,
-      py::arg("P_in"), py::arg("P_out"),
-      "Fast-path lossless ideal connection total pressure preservation (dP=0) "
-      "and analytic derivative (dP, d(dP)/d(P_out)).\n\n"
-      "Parameters:\n"
-      "  P_in  : Total pressure entering [Pa]\n"
-      "  P_out : Total pressure exiting [Pa]\n\n"
-      "Returns: tuple(Residual [Pa], derivative [-])");
+  m.def("lossless_pressure_and_jacobian",
+        &solver::lossless_pressure_and_jacobian, py::arg("P_in"),
+        py::arg("P_out"),
+        "Calculate ideal lossless outlet pressure P_out = P_in and its "
+        "Jacobian dP_out/dP_in.");
 
+  // Heat Transfer (f, J) tuples
   m.def("nusselt_and_jacobian_dittus_boelter",
         &solver::nusselt_and_jacobian_dittus_boelter, py::arg("Re"),
         py::arg("Pr"), py::arg("heating") = true,
-        "Fast-path Dittus-Boelter HTC and analytic derivative (Nu, "
-        "d(Nu)/d(Re)).\n\n"
-        "Parameters:\n"
-        "  Re      : Reynolds number [-]\n"
-        "  Pr      : Prandtl number [-]\n"
-        "  heating : Heating/cooling flag (default: true)\n\n"
-        "Returns: tuple(Nu [-], derivative [-])");
+        "Calculate Nusselt number and its Jacobian w.r.t Re using "
+        "Dittus-Boelter.");
+
+  m.def("nusselt_and_jacobian_gnielinski",
+        &solver::nusselt_and_jacobian_gnielinski, py::arg("Re"), py::arg("Pr"),
+        py::arg("f"),
+        "Calculate Nusselt number and its Jacobian w.r.t Re using Gnielinski.");
+
+  m.def(
+      "nusselt_and_jacobian_sieder_tate",
+      &solver::nusselt_and_jacobian_sieder_tate, py::arg("Re"), py::arg("Pr"),
+      py::arg("mu_ratio"),
+      "Calculate Nusselt number and its Jacobian w.r.t Re using Sieder-Tate.");
+
+  m.def("nusselt_and_jacobian_petukhov", &solver::nusselt_and_jacobian_petukhov,
+        py::arg("Re"), py::arg("Pr"), py::arg("f"),
+        "Calculate Nusselt number and its Jacobian w.r.t Re using Petukhov.");
+
+  // Cooling Correlations (f, J) tuples
+  m.def("pin_fin_nusselt_and_jacobian", &solver::pin_fin_nusselt_and_jacobian,
+        py::arg("Re_d"), py::arg("Pr"), py::arg("L_D"), py::arg("S_D"),
+        py::arg("X_D"), py::arg("is_staggered") = true,
+        "Calculate Pin Fin Nusselt number and its Jacobian w.r.t Re_d.");
+
+  m.def("pin_fin_friction_and_jacobian", &solver::pin_fin_friction_and_jacobian,
+        py::arg("Re_d"), py::arg("is_staggered") = true,
+        "Calculate Pin Fin Friction factor and its Jacobian w.r.t Re_d.");
+
+  m.def("dimple_nusselt_enhancement_and_jacobian",
+        &solver::dimple_nusselt_enhancement_and_jacobian, py::arg("Re_Dh"),
+        py::arg("d_Dh"), py::arg("h_d"), py::arg("S_d"),
+        "Calculate Dimple Nusselt enhancement and its Jacobian w.r.t Re_Dh.");
+
+  m.def("dimple_friction_multiplier_and_jacobian",
+        &solver::dimple_friction_multiplier_and_jacobian, py::arg("Re_Dh"),
+        py::arg("d_Dh"), py::arg("h_d"),
+        "Calculate Dimple Friction multiplier and its Jacobian w.r.t Re_Dh.");
+
+  m.def("rib_enhancement_factor_high_re_and_jacobian",
+        &solver::rib_enhancement_factor_high_re_and_jacobian, py::arg("e_D"),
+        py::arg("pitch_to_height"), py::arg("alpha_deg"), py::arg("Re"),
+        "Calculate Rib enhancement factor and its Jacobian w.r.t Re.");
+
+  m.def("impingement_nusselt_and_jacobian",
+        &solver::impingement_nusselt_and_jacobian, py::arg("Re_jet"),
+        py::arg("Pr"), py::arg("z_D"), py::arg("x_D") = 0.0,
+        py::arg("y_D") = 0.0,
+        "Calculate Impingement Nusselt number and its Jacobian w.r.t Re_jet.");
+
+  m.def("film_cooling_effectiveness_and_jacobian",
+        &solver::film_cooling_effectiveness_and_jacobian, py::arg("x_D"),
+        py::arg("M"), py::arg("DR"), py::arg("alpha_deg"),
+        "Calculate Film cooling effectiveness and its Jacobian w.r.t Blowing "
+        "Ratio M.");
+
+  m.def("effusion_effectiveness_and_jacobian",
+        &solver::effusion_effectiveness_and_jacobian, py::arg("x_D"),
+        py::arg("M"), py::arg("DR"), py::arg("porosity"), py::arg("s_D"),
+        py::arg("alpha_deg"),
+        "Calculate Effusion effectiveness and its Jacobian w.r.t Blowing Ratio "
+        "M.");
+
+  // Stagnation (f, J) tuples
+  m.def("mach_number_and_jacobian_v", &solver::mach_number_and_jacobian_v,
+        py::arg("v"), py::arg("T"), py::arg("X"),
+        "Calculate Mach number and its Jacobian w.r.t Velocity.");
+
+  m.def(
+      "T_adiabatic_wall_and_jacobian_v",
+      &solver::T_adiabatic_wall_and_jacobian_v, py::arg("T_static"),
+      py::arg("v"), py::arg("T"), py::arg("P"), py::arg("X"),
+      py::arg("turbulent") = true,
+      "Calculate Adiabatic Wall Temperature and its Jacobian w.r.t Velocity.");
+
+  m.def("T0_from_static_and_jacobian_M", &solver::T0_from_static_and_jacobian_M,
+        py::arg("T"), py::arg("M"), py::arg("X"),
+        "Calculate Stagnation Temperature from Static and its Jacobian w.r.t "
+        "Mach.");
+
+  m.def(
+      "P0_from_static_and_jacobian_M", &solver::P0_from_static_and_jacobian_M,
+      py::arg("P"), py::arg("T"), py::arg("M"), py::arg("X"),
+      "Calculate Stagnation Pressure from Static and its Jacobian w.r.t Mach.");
 
   m.def("friction_and_jacobian_haaland", &solver::friction_and_jacobian_haaland,
         py::arg("Re"), py::arg("e_D"),
@@ -5011,8 +5084,7 @@ PYBIND11_MODULE(_core, m) {
         "Returns: tuple(friction_factor [-], derivative [-])");
 
   m.def("friction_and_jacobian_serghides",
-        &solver::friction_and_jacobian_serghides,
-        py::arg("Re"), py::arg("e_D"),
+        &solver::friction_and_jacobian_serghides, py::arg("Re"), py::arg("e_D"),
         "Fast-path Serghides pipe friction and analytic derivative (f, "
         "d(f)/d(Re)).\n\n"
         "Parameters:\n"
@@ -5021,9 +5093,9 @@ PYBIND11_MODULE(_core, m) {
         "Returns: tuple(friction_factor [-], derivative [-])");
 
   m.def("friction_and_jacobian_colebrook",
-        &solver::friction_and_jacobian_colebrook,
-        py::arg("Re"), py::arg("e_D"),
-        "Fast-path Colebrook-White pipe friction and implicit derivative (f, "
+        &solver::friction_and_jacobian_colebrook, py::arg("Re"), py::arg("e_D"),
+        "Fast-path Colebrook-White pipe friction and implicit derivative "
+        "(f, "
         "d(f)/d(Re)).\n\n"
         "Parameters:\n"
         "  Re  : Reynolds number [-]\n"
@@ -5031,18 +5103,19 @@ PYBIND11_MODULE(_core, m) {
         "Returns: tuple(friction_factor [-], derivative [-])");
 
   m.def("friction_and_jacobian_petukhov",
-        &solver::friction_and_jacobian_petukhov,
-        py::arg("Re"),
-        "Fast-path Petukhov smooth-pipe friction and analytic derivative (f, "
+        &solver::friction_and_jacobian_petukhov, py::arg("Re"),
+        "Fast-path Petukhov smooth-pipe friction and analytic derivative "
+        "(f, "
         "d(f)/d(Re)).\n\n"
         "Parameters:\n"
         "  Re : Reynolds number [-]\n\n"
         "Returns: tuple(friction_factor [-], derivative [-])");
 
-  m.def("friction_and_jacobian", &solver::friction_and_jacobian,
-        py::arg("tag"), py::arg("Re"), py::arg("e_D"),
+  m.def("friction_and_jacobian", &solver::friction_and_jacobian, py::arg("tag"),
+        py::arg("Re"), py::arg("e_D"),
         "Dispatcher: selects friction_and_jacobian_* by tag string.\n\n"
-        "tag must be one of: 'haaland', 'serghides', 'colebrook', 'petukhov'\n\n"
+        "tag must be one of: 'haaland', 'serghides', 'colebrook', "
+        "'petukhov'\n\n"
         "Parameters:\n"
         "  tag : friction model name\n"
         "  Re  : Reynolds number [-]\n"
@@ -5076,5 +5149,6 @@ PYBIND11_MODULE(_core, m) {
         "  T : Temperature [K]\n"
         "  P : Pressure [Pa]\n"
         "  X : Mole fractions [-]\n\n"
-        "Returns: tuple(mu [Pa*s], d_mu_d_T [(Pa*s)/K], d_mu_d_P [(Pa*s)/Pa])");
+        "Returns: tuple(mu [Pa*s], d_mu_d_T [(Pa*s)/K], d_mu_d_P "
+        "[(Pa*s)/Pa])");
 }

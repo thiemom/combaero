@@ -157,3 +157,178 @@ def test_viscosity_jacobians():
         )
         d_mu_dP_numeric = central_difference(mu_P_func, P_val, 1e-1)
         np.testing.assert_allclose(d_mu_dP_analytic, d_mu_dP_numeric, rtol=1e-5, atol=1e-12)
+
+
+def test_nusselt_gnielinski_jacobian():
+    Pr_val = 0.7
+    f_val = 0.05
+
+    def nu_func(Re):
+        return cb._core.nusselt_and_jacobian_gnielinski(Re, Pr_val, f_val)[0]
+
+    for Re in [3000.0, 10000.0, 1e6]:
+        Nu_analytic, jac_analytic = cb._core.nusselt_and_jacobian_gnielinski(Re, Pr_val, f_val)
+        jac_numeric = central_difference(nu_func, Re, 1e-4)
+        np.testing.assert_allclose(jac_analytic, jac_numeric, rtol=1e-5)
+
+
+def test_nusselt_sieder_tate_jacobian():
+    Pr_val = 0.7
+    mu_ratio = 1.1
+
+    def nu_func(Re):
+        return cb._core.nusselt_and_jacobian_sieder_tate(Re, Pr_val, mu_ratio)[0]
+
+    for Re in [3000.0, 10000.0, 1e6]:
+        Nu_analytic, jac_analytic = cb._core.nusselt_and_jacobian_sieder_tate(Re, Pr_val, mu_ratio)
+        jac_numeric = central_difference(nu_func, Re, 1e-4)
+        np.testing.assert_allclose(jac_analytic, jac_numeric, rtol=1e-5)
+
+
+def test_nusselt_petukhov_jacobian():
+    Pr_val = 0.7
+    f_val = 0.05
+
+    def nu_func(Re):
+        return cb._core.nusselt_and_jacobian_petukhov(Re, Pr_val, f_val)[0]
+
+    for Re in [10000.0, 50000.0, 1e6]:
+        Nu_analytic, jac_analytic = cb._core.nusselt_and_jacobian_petukhov(Re, Pr_val, f_val)
+        jac_numeric = central_difference(nu_func, Re, 1e-4)
+        np.testing.assert_allclose(jac_analytic, jac_numeric, rtol=1e-5)
+
+
+def test_pin_fin_jacobians():
+    Pr = 0.71
+    L_D = 1.5
+    S_D = 2.5
+    X_D = 2.5
+
+    def nu_func(Re_d):
+        return cb._core.pin_fin_nusselt_and_jacobian(Re_d, Pr, L_D, S_D, X_D, True)[0]
+
+    def f_func(Re_d):
+        return cb._core.pin_fin_friction_and_jacobian(Re_d, True)[0]
+
+    for Re_d in [1000.0, 10000.0, 50000.0]:
+        Nu_ana, dNu_ana = cb._core.pin_fin_nusselt_and_jacobian(Re_d, Pr, L_D, S_D, X_D, True)
+        dNu_num = central_difference(nu_func, Re_d, max(1e-4, Re_d * 1e-6))
+        np.testing.assert_allclose(dNu_ana, dNu_num, rtol=1e-5)
+
+        f_ana, df_ana = cb._core.pin_fin_friction_and_jacobian(Re_d, True)
+        df_num = central_difference(f_func, Re_d, max(1e-4, Re_d * 1e-6))
+        np.testing.assert_allclose(df_ana, df_num, rtol=1e-5)
+
+
+def test_dimple_jacobians():
+    d_Dh = 0.2
+    h_d = 0.1
+    S_d = 2.0  # Must be in [1.5, 3.0]
+
+    def nu_func(Re_Dh):
+        return cb._core.dimple_nusselt_enhancement_and_jacobian(Re_Dh, d_Dh, h_d, S_d)[0]
+
+    def f_func(Re_Dh):
+        return cb._core.dimple_friction_multiplier_and_jacobian(Re_Dh, d_Dh, h_d)[0]
+
+    for Re_Dh in [10000.0, 50000.0]:
+        Nu_ana, dNu_ana = cb._core.dimple_nusselt_enhancement_and_jacobian(Re_Dh, d_Dh, h_d, S_d)
+        dNu_num = central_difference(nu_func, Re_Dh, max(1e-4, Re_Dh * 1e-6))
+        np.testing.assert_allclose(dNu_ana, dNu_num, rtol=1e-5)
+
+        f_ana, df_ana = cb._core.dimple_friction_multiplier_and_jacobian(Re_Dh, d_Dh, h_d)
+        df_num = central_difference(f_func, Re_Dh, max(1e-4, Re_Dh * 1e-6))
+        np.testing.assert_allclose(df_ana, df_num, rtol=1e-5)
+
+
+def test_rib_enhancement_jacobian():
+    e_D = 0.05
+    pt_h = 10.0
+    alpha = 45.0
+
+    def f_func(Re):
+        return cb._core.rib_enhancement_factor_high_re_and_jacobian(e_D, pt_h, alpha, Re)[0]
+
+    for Re in [10000.0, 50000.0]:
+        f_ana, df_ana = cb._core.rib_enhancement_factor_high_re_and_jacobian(e_D, pt_h, alpha, Re)
+        df_num = central_difference(f_func, Re, max(1e-4, Re * 1e-6))
+        np.testing.assert_allclose(df_ana, df_num, rtol=1e-5)
+
+
+def test_impingement_jacobian():
+    Pr = 0.71
+    z_D = 3.0
+
+    def f_func(Re_jet):
+        return cb._core.impingement_nusselt_and_jacobian(Re_jet, Pr, z_D)[0]
+
+    for Re_jet in [10000.0, 50000.0]:
+        f_ana, df_ana = cb._core.impingement_nusselt_and_jacobian(Re_jet, Pr, z_D)
+        df_num = central_difference(f_func, Re_jet, max(1e-4, Re_jet * 1e-6))
+        np.testing.assert_allclose(df_ana, df_num, rtol=1e-5)
+
+
+def test_film_and_effusion_jacobians():
+    x_D = 10.0
+    DR = 1.5  # Must be in [1.2, 2.0] for film cooling
+    alpha = 30.0
+    porosity = 0.05
+    s_D = 5.0  # Must be in [4.0, 8.0]
+
+    def film_func(M):
+        return cb._core.film_cooling_effectiveness_and_jacobian(x_D, M, DR, alpha)[0]
+
+    def eff_func(M):
+        return cb._core.effusion_effectiveness_and_jacobian(x_D, M, DR, porosity, s_D, alpha)[0]
+
+    for M in [0.5, 1.0, 2.0]:
+        f_ana, df_ana = cb._core.film_cooling_effectiveness_and_jacobian(x_D, M, DR, alpha)
+        df_num = central_difference(film_func, M, 1e-5)
+        np.testing.assert_allclose(
+            df_ana, df_num, rtol=1e-4
+        )  # Slightly looser due to M-dependent finite differences
+
+    for M in [1.01, 2.0, 3.5]:
+        f_ana, df_ana = cb._core.effusion_effectiveness_and_jacobian(
+            x_D, M, DR, porosity, s_D, alpha
+        )
+        df_num = central_difference(
+            eff_func, M, 1e-4
+        )  # Slightly looser due to M-dependent finite differences
+        np.testing.assert_allclose(df_ana, df_num, rtol=1e-3)
+
+
+def test_stagnation_jacobians():
+    T = 300.0
+    P = 101325.0
+    X = cb.standard_dry_air_composition()
+
+    def mach_func(v):
+        return cb._core.mach_number_and_jacobian_v(v, T, X)[0]
+
+    def t_aw_func(v):
+        return cb._core.T_adiabatic_wall_and_jacobian_v(T, v, T, P, X)[0]
+
+    for v in [10.0, 100.0, 300.0]:
+        ana, dana = cb._core.mach_number_and_jacobian_v(v, T, X)
+        dnum = central_difference(mach_func, v, 1e-5)
+        np.testing.assert_allclose(dana, dnum, rtol=1e-5)
+
+        ana, dana = cb._core.T_adiabatic_wall_and_jacobian_v(T, v, T, P, X)
+        dnum = central_difference(t_aw_func, v, 1e-4)
+        np.testing.assert_allclose(dana, dnum, rtol=1e-5)
+
+    def t0_func(M):
+        return cb._core.T0_from_static_and_jacobian_M(T, M, X)[0]
+
+    def p0_func(M):
+        return cb._core.P0_from_static_and_jacobian_M(P, T, M, X)[0]
+
+    for M in [0.1, 0.5, 1.5]:
+        ana, dana = cb._core.T0_from_static_and_jacobian_M(T, M, X)
+        dnum = central_difference(t0_func, M, 1e-5)
+        np.testing.assert_allclose(dana, dnum, rtol=1e-5)
+
+        ana, dana = cb._core.P0_from_static_and_jacobian_M(P, T, M, X)
+        dnum = central_difference(p0_func, M, 1e-5)
+        np.testing.assert_allclose(dana, dnum, rtol=1e-4)
