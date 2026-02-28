@@ -68,10 +68,15 @@ mass flows, and compositions throughout the system.
 assembly, graph logic, and solver orchestration. The solver never calls C++
 directly — always through element `residuals()`.
 
-### The Analytical `(f, J)` Mandate
+### The Analytical `(f, J)` Mandate & Sparse Matrix Registry
 
-As established, the solver requires tightly bounded Jacobians. While we have implemented `solver_interface` wrappers for flow and friction correlations (Orifice, K-Factor, Haaland, Dittus-Boelter), **Thermodynamic and Transport functions** currently lack this interface.
-*   **Missing API:** Methods such as `density(T, P, X)`, `viscosity(...)`, and `enthalpy(T, X)` must be wrapped into `(f, J)` tuple-returning functions within `solver_interface.h` before the global solver can successfully evaluate the network un-hindered by finite-difference noise.
+As established, the solver requires tightly bounded Jacobians to avoid instability resulting from finite-difference numerical noise on empirical correlations. While we have implemented `solver_interface` wrappers for flow, friction, and basic thermodynamics (Orifice, K-Factor, Haaland, Density, Viscosity), **Stagnation conversions and complex Heat Transfer/Cooling correlations** currently lack this interface.
+*   **Missing API:** Methods passing into `stagnation.cpp`, `heat_transfer.cpp`, and `cooling_correlations.cpp` must be wrapped into `(f, J)` tuple-returning functions.
+
+**The C++ Registry & Sparse Assembly Strategy:**
+To fully leverage the `(f, J)` analytical gradients and scale the solver to massive networks, the project will implement a centralized C++ Function Registry (Phase 3):
+1. **Serialization:** Python components will string-address their underlying physics (e.g., `"friction_model": "haaland"`), making the network natively serializable into YAML/JSON without pickling Python objects.
+2. **Sparse Jacobians:** Python's `NetworkSolver` will query this registry to extract analytical local Jacobian blocks ($\mathbf{J}_{local}$) and construct a global `scipy.sparse.csr_matrix`. This eliminates dense $O(N^3)$ operations and allows SciPy root-finding algorithms to evaluate the global system exponentially faster.
 
 ### The Configuration `Literal` Mandate
 
@@ -330,18 +335,18 @@ class NetworkElement(ABC):
 
 ## Phased Roadmap
 
-### Phase 1 — Isothermal Flow Network
+### Phase 1 — Isothermal Flow Network (Completed ✅)
 
 **Goal:** solve P and ṁ throughout a network of orifices, pipes, and plenums.
 
 - `MixtureState`: P and ṁ only (T and X fixed, no composition tracking)
-- Nodes: `PlenumNode`, `JunctionNode`, `PressureBoundary`, `MassFlowBoundary`
-- Elements: `OrificeElement`, `PipeElement`
-- Solver: `scipy.optimize.root` with finite-difference Jacobian
-- Graph: NetworkX incidence matrix for equation assembly
+- Nodes: `PlenumNode`, `JunctionNode`, `PressureBoundary`, `MassFlowBoundary`, `MomentumChamberNode`
+- Elements: `OrificeElement`, `PipeElement`, `LosslessConnectionElement`
+- Solver: `scipy.optimize.root` with finite-difference Jacobian (Pre-registry)
+- Graph: Robust validation tracking unreachable graphs, isolated connections, and 0-DOF states.
 - Network described and validated via JSON
 - **No GUI** — JSON in, JSON out
-- Validation: orifices in series/parallel, known analytical solutions
+- Validation: Flow reversals bounded strictly positive against C++ limits, orifices intelligently extracting asymmetric topology diameters.
 
 ### Phase 2 — Combustion and Composition
 
