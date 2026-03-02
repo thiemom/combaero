@@ -142,6 +142,18 @@ class PressureBoundary(NetworkNode):
     Essential as a reference pressure and absolute mass sink/source for the network.
     """
 
+    def __init__(
+        self,
+        id: str,
+        P_total: float = 101325.0,
+        T_total: float = 300.0,
+        X: list[float] | None = None,
+    ) -> None:
+        super().__init__(id)
+        self.P_total = P_total
+        self.T_total = T_total
+        self.X = X
+
     def unknowns(self) -> list[str]:
         return []
 
@@ -154,15 +166,29 @@ class PressureBoundary(NetworkNode):
 
 class MassFlowBoundary(NetworkNode):
     """
-    Supplies fixed mass flow and stagnation temperature. Contributes no unknowns and no residuals.
+    Supplies fixed mass flow and stagnation temperature. Its pressure floats to satisfy the flow equations.
     Cannot exclusively define a network, a pressure reference is also required.
     """
 
+    def __init__(
+        self,
+        id: str,
+        m_dot: float = 0.1,
+        T_total: float = 300.0,
+        X: list[float] | None = None,
+    ) -> None:
+        super().__init__(id)
+        self.m_dot = m_dot
+        self.T_total = T_total
+        self.X = X
+
     def unknowns(self) -> list[str]:
-        return []
+        # Pressure floats to whatever is required to push the defined mass flow
+        return [f"{self.id}.P", f"{self.id}.P_total"]
 
     def residuals(self, state: MixtureState) -> list[float]:
-        return []
+        # Stagnation assumptions
+        return [state.P_total - state.P]
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         pass
