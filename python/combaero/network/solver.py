@@ -33,14 +33,16 @@ class NetworkSolver:
 
         # Iterate through interior nodes and gather unknowns
         for node_id, node in self.network.nodes.items():
-            if not isinstance(node, (PressureBoundary, MassFlowBoundary)):
+            if not isinstance(node, PressureBoundary):
                 unknowns = node.unknowns()
                 if unknowns:
                     start_idx = len(x0_list)
                     for unk in unknowns:
                         self.unknown_names.append(unk)
-                        # Very simple initial guess logic based on variable name
-                        if unk.endswith(".P") or unk.endswith(".P_total"):
+                        guess_dict = getattr(node, "initial_guess", {})
+                        if unk in guess_dict:
+                            x0_list.append(guess_dict[unk])
+                        elif unk.endswith(".P") or unk.endswith(".P_total"):
                             x0_list.append(101325.0)  # Default 1 atm
                         elif unk.endswith(".T") or unk.endswith(".T_total"):
                             x0_list.append(300.0)
@@ -81,7 +83,7 @@ class NetworkSolver:
             P_stat = guess.get(f"{node.id}.P", P_tot)
             T_tot = guess.get(f"{node.id}.T_total", getattr(node, "T_total", 300.0))
             T_stat = guess.get(f"{node.id}.T", T_tot)
-            X = getattr(node, "X", X_air)
+            X = getattr(node, "X", None) or X_air
             return MixtureState(P=P_stat, P_total=P_tot, T=T_stat, T_total=T_tot, m_dot=0.0, X=X)
 
         if isinstance(node, MassFlowBoundary):
@@ -89,8 +91,20 @@ class NetworkSolver:
             m = getattr(node, "m_dot", 0.1)
             T_tot = guess.get(f"{node.id}.T_total", getattr(node, "T_total", 300.0))
             T_stat = guess.get(f"{node.id}.T", T_tot)
-            X = getattr(node, "X", X_air)
-            return MixtureState(P=101325.0, P_total=101325.0, T=T_stat, T_total=T_tot, m_dot=m, X=X)
+            X = getattr(node, "X", None) or X_air
+
+            p_val = guess.get(f"{node.id}.P", 101325.0)
+            ptot_val = guess.get(f"{node.id}.P_total", 101325.0)
+
+            indices = self._unknown_indices.get(node.id, [])
+            unknowns = node.unknowns()
+            for i, unk in zip(indices, unknowns, strict=False):
+                if unk.endswith(".P"):
+                    p_val = x[i]
+                elif unk.endswith(".P_total"):
+                    ptot_val = x[i]
+
+            return MixtureState(P=p_val, P_total=ptot_val, T=T_stat, T_total=T_tot, m_dot=m, X=X)
 
         # For interior nodes, unpack from x
         indices = self._unknown_indices.get(node.id, [])
@@ -121,7 +135,7 @@ class NetworkSolver:
 
         # 1. Node Residuals (P_total constraint + Mass Conservation)
         for node_id, node in self.network.nodes.items():
-            if isinstance(node, (PressureBoundary, MassFlowBoundary)):
+            if isinstance(node, PressureBoundary):
                 continue
 
             # Node thermodynamic constraints
@@ -136,6 +150,9 @@ class NetworkSolver:
 
             m_dot_in = 0.0
             m_dot_out = 0.0
+
+            if isinstance(node, MassFlowBoundary):
+                m_dot_in += getattr(node, "m_dot", 0.0)
 
             for elem in upstream_elems:
                 indices = self._unknown_indices.get(elem.id)
@@ -175,11 +192,15 @@ class NetworkSolver:
 
         return np.array(res, dtype=float)
 
-    def solve(self, method="hybr") -> dict[str, float]:
+    def solve(self, method="hybr", options=None) -> dict[str, float]:
         """
         Executes the root finding algorithm to solve the network.
         Returns a dictionary mapping unknown names to their solved values.
         """
+        if options is None:
+            # Provide sensible defaults to avoid infinite loops on unphysical bounds
+            options = {"maxiter": 500}
+
         # Ensure topology is resolved before solving
         self.network.resolve_all_topology()
         self.network.validate()
@@ -192,7 +213,7 @@ class NetworkSolver:
             raise ValueError(f"System not square: {len(x0)} unknowns vs {len(res0)} equations.")
 
         # Solve
-        sol = root(self._residuals, x0, method=method)
+        sol = root(self._residuals, x0, method=method, options=options)
 
         if not sol.success:
             import warnings
