@@ -167,6 +167,19 @@ make
 make test
 ```
 
+## Network Solver
+
+CombAero includes a Python-based flow network solver for interconnected systems of pipes, orifices, and combustors. The solver uses `scipy.optimize.root` with analytical Jacobians to efficiently solve pressure and mass flow distributions across complex topologies.
+
+**Key features:**
+- Robust topology validation (detects isolated nodes, self-loops, zero-DOF states)
+- Support for compressible and incompressible flow
+- Automatic geometry discovery for pipe elements
+- Specialized elements: `OrificeElement`, `PipeElement`, `EffectiveAreaConnectionElement`, `LosslessConnectionElement`
+- Boundary conditions: `PressureBoundary`, `MassFlowBoundary`
+
+See `docs/NETWORK_ROADMAP.md` for detailed architecture and `python/examples/` for network solver examples.
+
 ## Examples
 
 The `examples/` directory contains C++ sample applications:
