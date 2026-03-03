@@ -7,8 +7,43 @@ on:
     branches: [ main, master ]
 
 jobs:
+  changes:
+    name: Detect Changed Paths
+    runs-on: ubuntu-latest
+    outputs:
+      source: ${{ steps.filter.outputs.source }}
+      documentation: ${{ steps.filter.outputs.documentation }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect source vs documentation changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            source:
+              - 'src/**'
+              - 'include/**'
+              - 'python/**'
+              - 'tests/**'
+              - 'scripts/**'
+              - 'examples/**'
+              - '.github/workflows/**'
+              - 'CMakeLists.txt'
+              - 'pyproject.toml'
+              - '.pre-commit-config.yaml'
+              - 'ruff.toml'
+              - 'Makefile'
+            documentation:
+              - 'docs/**'
+              - 'README.md'
+              - '**/*.md'
+
   lint:
     name: Lint & Style Checks
+    needs: changes
+    if: needs.changes.outputs.source == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -30,7 +65,8 @@ jobs:
 
   build-and-test:
     name: Build & Test C++ (${{ matrix.os }}, ${{ matrix.build_type }})
-    needs: lint
+    needs: [changes, lint]
+    if: needs.changes.outputs.source == 'true'
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -69,7 +105,8 @@ jobs:
 
   build-mingw:
     name: Build MinGW
-    needs: lint
+    needs: [changes, lint]
+    if: needs.changes.outputs.source == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -90,3 +127,35 @@ jobs:
 
       - name: Build Windows binaries
         run: cmake --build build-mingw --config Release
+
+  status-check:
+    name: status-check
+    needs: [changes, lint, build-and-test, build-mingw]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate CI outcomes
+        shell: bash
+        run: |
+          source_changed="${{ needs.changes.outputs.source }}"
+          lint_result="${{ needs.lint.result }}"
+          build_result="${{ needs.build-and-test.result }}"
+          mingw_result="${{ needs.build-mingw.result }}"
+
+          echo "source_changed=${source_changed}"
+          echo "lint_result=${lint_result}"
+          echo "build_result=${build_result}"
+          echo "mingw_result=${mingw_result}"
+
+          if [[ "${source_changed}" != "true" ]]; then
+            echo "Documentation-only (or non-source) change detected. Passing status-check."
+            exit 0
+          fi
+
+          if [[ "${lint_result}" == "success" && "${build_result}" == "success" && "${mingw_result}" == "success" ]]; then
+            echo "All source-related jobs succeeded."
+            exit 0
+          fi
+
+          echo "One or more source-related jobs failed or were cancelled."
+          exit 1
