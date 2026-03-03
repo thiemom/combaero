@@ -293,6 +293,73 @@ class OrificeElement(NetworkElement):
         return 1
 
 
+class EffectiveAreaConnectionElement(OrificeElement):
+    """
+    An orifice element with user-specified effective area (Cd * A product).
+
+    This element calculates orifice flow using the compressible flow equation:
+        m_dot = A_eff * sqrt(2 * rho * dP)
+
+    where A_eff is the effective area (the product Cd * A).
+
+    **Compressible Flow**: The solver uses the full compressible orifice equation via
+    `cb.orifice_mdot_and_jacobian()`, which accounts for density variations across the
+    pressure drop. This is valid for both subsonic and transonic flow regimes.
+
+    **Effective Area Interpretation**: The effective area represents the combined effect
+    of discharge coefficient and geometric area. For example:
+    - A_eff = 0.01 m^2 could represent Cd=1.0 * A=0.01 m^2
+    - Or equivalently: Cd=0.8 * A=0.0125 m^2
+    - The product (Cd * A) is what matters for flow calculation
+
+    Unlike LosslessConnectionElement, this element produces pressure drop proportional to flow rate.
+    Use this when you need a simple area-based flow restriction without detailed geometry modeling.
+
+    The effective area is user-specified and already accounts for all geometric effects
+    (entrance/exit losses, contraction, vena contracta, etc.), so upstream/downstream
+    geometry discovery is not performed.
+    """
+
+    def __init__(self, id: str, from_node: str, to_node: str, effective_area: float) -> None:
+        """
+        Initialize with effective area (Cd * A product).
+
+        Args:
+            id: Element identifier
+            from_node: Upstream node ID
+            to_node: Downstream node ID
+            effective_area: Effective area for flow calculation (m^2).
+                           This is the product Cd * A, where Cd is the discharge coefficient
+                           and A is the geometric area. Stored internally as self.area.
+
+        Example:
+            >>> conn = EffectiveAreaConnectionElement("conn1", "inlet", "outlet", 0.01)
+            >>> conn.area  # 0.01 m^2 (effective area = Cd * A)
+            >>> conn.Cd    # 1.0 (normalized discharge coefficient)
+
+        Note:
+            The effective area already includes all loss coefficients. For example, if you
+            have a sharp-edged orifice with geometric area 0.0125 m^2 and Cd=0.8, you would
+            specify effective_area=0.01 m^2 (0.8 * 0.0125).
+        """
+        super().__init__(id, from_node, to_node, Cd=1.0, area=effective_area)
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        """
+        Skip upstream/downstream geometry discovery.
+
+        Unlike OrificeElement, we do not discover upstream/downstream diameters because
+        the effective area is user-specified and already accounts for all geometric effects.
+        No Beta ratio correction is needed or applied.
+        """
+        # Intentionally empty - effective area is pre-computed by user
+        pass
+
+    def n_equations(self) -> int:
+        """Return the number of equations (1: mass flow balance)."""
+        return 1
+
+
 class LosslessConnectionElement(NetworkElement):
     """
     An ideal connection with no friction or momentum loss.
