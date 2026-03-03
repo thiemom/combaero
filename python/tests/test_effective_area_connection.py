@@ -27,7 +27,7 @@ class TestEffectiveAreaConnectionElement:
 
     def test_initialization(self):
         """Test that EffectiveAreaConnectionElement initializes correctly."""
-        effective_area = 0.1  # m²
+        effective_area = 0.1  # m^2
         connection = EffectiveAreaConnectionElement("conn1", "node1", "node2", effective_area)
 
         # Verify attributes
