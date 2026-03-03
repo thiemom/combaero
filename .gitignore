@@ -98,3 +98,4 @@ python/examples/*.dat
 Testing/
 tests/Testing/
 TODO.md
+.aider*

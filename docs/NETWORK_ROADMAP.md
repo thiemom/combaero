@@ -133,6 +133,7 @@ well-posedness. The solver validates this at setup.
 | Element | Residual | CombAero call |
 |---|---|---|
 | `OrificeElement` | `ṁ = Cd·A·√(2ρΔP)` | `orifice_flow_thermo()` — accepts fixed `Cd` or `cd_fn(T,P,X,Re)→Cd` callable |
+| `EffectiveAreaConnectionElement` | `ṁ = A_eff·√(2ρΔP)` (Cd=1.0) | `orifice_flow_thermo()` with `Cd=1.0` — user specifies effective area (Cd·A product) directly |
 | `PipeElement` (incompressible) | `ΔP = f·(L/D)·½ρv²` + K·½ρv² | `pipe_flow_rough()` — accepts optional `k_loss_fn(T,P,X,Re)→K` for fittings/bends |
 | `PipeElement` (compressible) | Fanno adiabatic friction | `fanno_pipe()` / `fanno_pipe_rough()` |
 | `MomentumChamberElement` | Momentum + area change | `density()`, `speed_of_sound()` |
@@ -341,7 +342,7 @@ class NetworkElement(ABC):
 
 - `MixtureState`: P and ṁ only (T and X fixed, no composition tracking)
 - Nodes: `PlenumNode`, `JunctionNode`, `PressureBoundary`, `MassFlowBoundary`, `MomentumChamberNode`
-- Elements: `OrificeElement`, `PipeElement`, `LosslessConnectionElement`
+- Elements: `OrificeElement`, `EffectiveAreaConnectionElement`, `PipeElement`, `LosslessConnectionElement`
 - Solver: `scipy.optimize.root` with finite-difference Jacobian (Pre-registry)
 - Graph: Robust validation tracking unreachable graphs, isolated connections, and 0-DOF states.
 - Network described and validated via JSON
