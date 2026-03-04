@@ -360,6 +360,99 @@ class EffectiveAreaConnectionElement(OrificeElement):
         return 1
 
 
+class AreaDischargeCoefficientConnectionElement(OrificeElement):
+    """
+    An orifice element with user-specified physical area and discharge coefficient or loss coefficient.
+
+    This element calculates orifice flow using the compressible flow equation:
+        m_dot = A * Cd * sqrt(2 * rho * dP)
+
+    where A is the physical area and Cd is the discharge coefficient.
+
+    **Parameters**: User provides either Cd (discharge coefficient) or zeta (loss coefficient).
+    The other parameter is calculated automatically using the relationship:
+        zeta = 1/Cd^2 - 1  or  Cd = 1/sqrt(zeta + 1)
+
+    **Effective Area**: The effective area is calculated as A_eff = A * Cd.
+
+    Unlike LosslessConnectionElement, this element produces pressure drop proportional to flow rate.
+    Use this when you have a physical area measurement and want to specify loss characteristics
+    via discharge coefficient or loss coefficient.
+    """
+
+    def __init__(
+        self,
+        id: str,
+        from_node: str,
+        to_node: str,
+        area: float,
+        Cd: float | None = None,
+        zeta: float | None = None,
+    ) -> None:
+        """
+        Initialize with physical area and either Cd or zeta.
+
+        Args:
+            id: Element identifier
+            from_node: Upstream node ID
+            to_node: Downstream node ID
+            area: Physical geometric area (m^2)
+            Cd: Discharge coefficient (optional, 0 < Cd <= 1)
+            zeta: Loss coefficient (optional, zeta >= 0)
+
+        Note:
+            Exactly one of Cd or zeta must be provided. If both are provided, zeta is ignored.
+            If Cd is provided, zeta is calculated as zeta = 1/Cd^2 - 1.
+            If zeta is provided, Cd is calculated as Cd = 1/sqrt(zeta + 1).
+
+        Example:
+            >>> # Using Cd
+            >>> conn = AreaDischargeCoefficientConnectionElement("conn1", "inlet", "outlet", 0.0125, Cd=0.8)
+            >>> conn.area  # 0.0125 m^2 (physical area)
+            >>> conn.Cd    # 0.8 (discharge coefficient)
+
+            >>> # Using zeta
+            >>> conn = AreaDischargeCoefficientConnectionElement("conn1", "inlet", "outlet", 0.0125, zeta=0.5625)
+            >>> conn.area  # 0.0125 m^2 (physical area)
+            >>> conn.Cd    # 0.8 (calculated from zeta)
+
+        Raises:
+            ValueError: If neither Cd nor zeta is provided, or if invalid values are given.
+        """
+        if Cd is not None and zeta is not None:
+            # If both are provided, use Cd and ignore zeta
+            zeta = None
+        elif Cd is None and zeta is None:
+            raise ValueError("Either Cd or zeta must be provided")
+
+        if Cd is not None:
+            if not (0 < Cd <= 1):
+                raise ValueError("Cd must be in range (0, 1]")
+        else:  # zeta is provided
+            if zeta < 0:
+                raise ValueError("zeta must be >= 0")
+            # Calculate Cd from zeta: Cd = 1/sqrt(zeta + 1)
+            Cd = 1.0 / (zeta + 1.0) ** 0.5
+
+        # Pass physical area and Cd directly to parent
+        # Parent will use A * Cd for flow calculation
+        super().__init__(id, from_node, to_node, Cd=Cd, area=area)
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        """
+        Skip upstream/downstream geometry discovery.
+
+        The physical area and discharge coefficient are user-specified and already account
+        for all geometric effects. No Beta ratio correction is needed or applied.
+        """
+        # Intentionally empty - area and Cd are pre-computed by user
+        pass
+
+    def n_equations(self) -> int:
+        """Return the number of equations (1: mass flow balance)."""
+        return 1
+
+
 class LosslessConnectionElement(NetworkElement):
     """
     An ideal connection with no friction or momentum loss.

@@ -2430,3 +2430,102 @@ nu, alpha, gamma = 3e-5, 4e-5, 1.3  # Hot gas properties
 Q = ca.tube_Q(L_damper, D=0.03, nu=nu, alpha=alpha, gamma=gamma, f=f_1T)
 print(f"Estimated Q ≈ {Q:.0f} (±50%, validate experimentally)")
 ```
+
+## Network Elements
+
+The Python network solver provides specialized flow elements for modeling interconnected systems. All elements inherit from `NetworkElement` and implement `residuals()`, `unknowns()`, and `n_equations()` methods.
+
+### OrificeElement
+
+Models compressible orifice flow with user-specified discharge coefficient.
+
+```python
+from combaero.network import OrificeElement, FlowNetwork, NetworkSolver
+
+# Create orifice with Cd=0.8 and area=0.01 m^2
+orifice = OrificeElement("orifice1", "inlet", "outlet", Cd=0.8, area=0.01)
+
+# Add to network and solve
+graph = FlowNetwork()
+graph.add_element(orifice)
+solver = NetworkSolver(graph)
+sol = solver.solve()
+
+# Access mass flow result
+m_dot = sol["orifice1.m_dot"]  # kg/s
+```
+
+**Physics:**
+- Uses compressible orifice equation: `m_dot = Cd * A * sqrt(2 * rho * dP)`
+- Accounts for density variations across pressure drop
+- Valid for subsonic and transonic flow regimes
+
+**Parameters:**
+- `Cd`: Discharge coefficient (0 < Cd ≤ 1)
+- `area`: Geometric area (m²)
+
+### EffectiveAreaConnectionElement
+
+Simplified orifice element where the user specifies the effective area directly (Cd * A product).
+
+```python
+from combaero.network import EffectiveAreaConnectionElement
+
+# Create connection with effective area = 0.008 m^2
+# (equivalent to Cd=0.8 * A=0.01 m^2)
+conn = EffectiveAreaConnectionElement("conn1", "inlet", "outlet", effective_area=0.008)
+
+# Cd is fixed at 1.0 internally
+assert conn.Cd == 1.0
+assert conn.area == 0.008
+```
+
+**Use case:** When you know the combined effect (Cd * A) but not the individual components.
+
+**Parameters:**
+- `effective_area`: Product of discharge coefficient and geometric area (m²)
+
+### AreaDischargeCoefficientConnectionElement
+
+Orifice element with separate physical area and discharge coefficient (or loss coefficient).
+
+```python
+from combaero.network import AreaDischargeCoefficientConnectionElement
+
+# Initialize with Cd
+conn = AreaDischargeCoefficientConnectionElement(
+    "conn1", "inlet", "outlet",
+    area=0.0125,  # Physical area (m^2)
+    Cd=0.8        # Discharge coefficient
+)
+
+# Or initialize with loss coefficient (zeta)
+conn = AreaDischargeCoefficientConnectionElement(
+    "conn1", "inlet", "outlet",
+    area=0.0125,
+    zeta=0.5625  # Equivalent to Cd=0.8
+)
+
+# Relationship: zeta = 1/Cd^2 - 1, or Cd = 1/sqrt(zeta + 1)
+```
+
+**Physics:**
+- Uses compressible orifice equation with `A * Cd` product
+- Accounts for density variations across pressure drop
+- Valid for subsonic and transonic flow regimes
+
+**Parameters:**
+- `area`: Physical geometric area (m²)
+- `Cd`: Discharge coefficient (0 < Cd ≤ 1) — optional if `zeta` provided
+- `zeta`: Loss coefficient (zeta ≥ 0) — optional if `Cd` provided
+
+**Precedence:** If both `Cd` and `zeta` are provided, `Cd` takes precedence and `zeta` is ignored.
+
+**Cd/Zeta Conversion:**
+```python
+# Convert Cd to zeta
+zeta = 1.0 / (Cd ** 2) - 1.0
+
+# Convert zeta to Cd
+Cd = 1.0 / (zeta + 1.0) ** 0.5
+```
