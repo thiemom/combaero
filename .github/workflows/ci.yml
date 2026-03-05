@@ -133,7 +133,7 @@ jobs:
         run: cmake --build build-mingw --config Release
 
   status-check:
-    name: status-check
+    name: ci-gatekeeper
     needs: [changes, lint, build-and-test, build-mingw]
     if: always()
     runs-on: ubuntu-latest
