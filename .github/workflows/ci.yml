@@ -83,22 +83,41 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Python (Windows Ninja dependency)
+        if: runner.os == 'Windows'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Ninja (Windows)
+        if: runner.os == 'Windows'
+        run: pip install ninja
+
       - name: Set up CMake
         uses: jwlawson/actions-setup-cmake@v1
 
-      - name: Configure
+      - name: Configure (Ninja on Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cmake -S . -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+
+      - name: Configure (default generator)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
 
       - name: Build
-        run: cmake --build build --config ${{ matrix.build_type }}
+        run: cmake --build build --config ${{ matrix.build_type }} --parallel
 
       - name: Run tests (ctest)
         working-directory: build
         run: |
-          ctest --output-on-failure
+          ctest --output-on-failure --parallel
 
       - name: Run accuracy tests
         working-directory: build
