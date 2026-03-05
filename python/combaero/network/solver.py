@@ -1,3 +1,7 @@
+import time
+import warnings
+from typing import Any
+
 import numpy as np
 from scipy.optimize import root
 
@@ -10,11 +14,30 @@ from .components import (
 from .graph import FlowNetwork
 
 
+class SolverTimeoutError(Exception):
+    """Raised when the solver exceeds the specified wall-clock timeout."""
+
+    pass
+
+
 class NetworkSolver:
     """
     Orchestrates the numerical solution of a fluid flow network using scipy.optimize.root.
     Translates the graph topology into a flat array of unknowns and residuals.
     """
+
+    SUPPORTED_METHODS = [
+        "hybr",
+        "lm",
+        "broyden1",
+        "broyden2",
+        "anderson",
+        "linearmixing",
+        "diagbroyden",
+        "excitingmixing",
+        "krylov",
+        "df-sane",
+    ]
 
     def __init__(self, network: FlowNetwork):
         self.network = network
@@ -192,14 +215,35 @@ class NetworkSolver:
 
         return np.array(res, dtype=float)
 
-    def solve(self, method="hybr", options=None) -> dict[str, float]:
+    def solve(
+        self,
+        method: str = "hybr",
+        timeout: float | None = None,
+        options: dict[str, Any] | None = None,
+    ) -> dict[str, float]:
         """
         Executes the root finding algorithm to solve the network.
         Returns a dictionary mapping unknown names to their solved values.
+
+        Args:
+            method: The scipy.optimize.root method to use.
+            timeout: Maximum wall-clock time in seconds before stopping and returning the best iterate.
+            options: Dictionary of solver options (e.g., maxiter, maxfev, xtol).
         """
+        if method not in self.SUPPORTED_METHODS:
+            raise ValueError(
+                f"Method '{method}' is not supported. Supported methods are: {', '.join(self.SUPPORTED_METHODS)}"
+            )
+
         if options is None:
-            # Provide sensible defaults to avoid infinite loops on unphysical bounds
-            options = {"maxiter": 500}
+            options = {}
+
+        # Default iteration limits to prevent infinite loops in C extensions
+        if method in ("hybr", "lm"):
+            if "maxfev" not in options:
+                options["maxfev"] = 500
+        elif "maxiter" not in options:
+            options["maxiter"] = 500
 
         # Ensure topology is resolved before solving
         self.network.resolve_all_topology()
@@ -212,17 +256,54 @@ class NetworkSolver:
         if len(x0) != len(res0):
             raise ValueError(f"System not square: {len(x0)} unknowns vs {len(res0)} equations.")
 
+        # State for timeout and best iterate tracking
+        start_time = time.perf_counter()
+        best_x = x0.copy()
+        best_res_norm = np.linalg.norm(res0)
+
+        def residuals_wrapper(x: np.ndarray) -> np.ndarray:
+            nonlocal best_x, best_res_norm
+
+            # Check timeout
+            if timeout is not None and (time.perf_counter() - start_time) > timeout:
+                raise SolverTimeoutError(f"Solver timed out after {timeout} seconds.")
+
+            # Evaluate residuals
+            res = self._residuals(x)
+
+            # Track best iterate
+            res_norm = np.linalg.norm(res)
+            if res_norm < best_res_norm:
+                best_res_norm = res_norm
+                best_x = x.copy()
+
+            return res
+
         # Solve
-        sol = root(self._residuals, x0, method=method, options=options)
+        try:
+            sol = root(residuals_wrapper, x0, method=method, options=options)
+            final_x = sol.x
+            success = sol.success
+            message = sol.message
+            final_norm = float(np.linalg.norm(sol.fun))
+        except SolverTimeoutError as e:
+            final_x = best_x
+            success = False
+            message = str(e)
+            final_norm = float(best_res_norm)
+        except Exception as e:
+            # Fallback for unexpected errors during residuals evaluation
+            final_x = best_x
+            success = False
+            message = f"Unexpected error during residual evaluation: {e}"
+            final_norm = float(best_res_norm)
 
-        if not sol.success:
-            import warnings
-
+        if not success:
             warnings.warn(
-                f"NetworkSolver did not converge: {sol.message} "
-                f"(|F|={float(np.linalg.norm(sol.fun)):.3e}). "
+                f"NetworkSolver did not converge: {message} "
+                f"(|F|={final_norm:.3e}). "
                 "Returning best iterate.",
                 stacklevel=2,
             )
 
-        return dict(zip(self.unknown_names, sol.x, strict=False))
+        return dict(zip(self.unknown_names, final_x, strict=False))

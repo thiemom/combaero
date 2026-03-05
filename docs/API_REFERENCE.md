@@ -2431,6 +2431,30 @@ Q = ca.tube_Q(L_damper, D=0.03, nu=nu, alpha=alpha, gamma=gamma, f=f_1T)
 print(f"Estimated Q ≈ {Q:.0f} (±50%, validate experimentally)")
 ```
 
+## Network Solver
+
+### NetworkSolver
+
+Orchestrates the numerical solution of a fluid flow network using `scipy.optimize.root`.
+
+```python
+from combaero.network import NetworkSolver
+
+solver = NetworkSolver(graph)
+# Solve with a 5-second safety timeout
+solution = solver.solve(method="hybr", timeout=5.0, options={"maxfev": 1000})
+
+# Access results
+m_dot = solution["element_id.m_dot"]
+P_tot = solution["node_id.P_total"]
+```
+
+**Methods:**
+- `solve(method: str = "hybr", timeout: float | None = None, options: dict | None = None)`:
+    - **method**: Root-finding algorithm. Supported: `hybr`, `lm`, `broyden1`, `broyden2`, `anderson`, `linearmixing`, `diagbroyden`, `excitingmixing`, `krylov`, `df-sane`.
+    - **timeout**: Wall-clock timeout in seconds. If exceeded, returns the best iterate found so far with a warning.
+    - **options**: Solver-specific options (e.g., `maxfev`, `xtol`).
+
 ## Network Elements
 
 The Python network solver provides specialized flow elements for modeling interconnected systems. All elements inherit from `NetworkElement` and implement `residuals()`, `unknowns()`, and `n_equations()` methods.
