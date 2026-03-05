@@ -46,8 +46,11 @@ class NetworkNode(ABC):
         pass
 
     @abstractmethod
-    def residuals(self, state: MixtureState) -> list[float]:
-        """Returns zero when node equations are satisfied."""
+    def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
+        """
+        Returns (residuals, local_jacobian).
+        local_jacobian is a dict mapping equation_index to a dict of {unknown_name: partial_derivative}.
+        """
         pass
 
     @abstractmethod
@@ -68,8 +71,13 @@ class NetworkElement(ABC):
         pass
 
     @abstractmethod
-    def residuals(self, state_in: MixtureState, state_out: MixtureState) -> list[float]:
-        """Returns zero when element equations are satisfied."""
+    def residuals(
+        self, state_in: MixtureState, state_out: MixtureState
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        """
+        Returns (residuals, local_jacobian).
+        local_jacobian is a dict mapping equation_index to a dict of {unknown_name: partial_derivative}.
+        """
         pass
 
     @abstractmethod
@@ -92,10 +100,11 @@ class PlenumNode(NetworkNode):
     def unknowns(self) -> list[str]:
         return [f"{self.id}.P", f"{self.id}.P_total"]
 
-    def residuals(self, state: MixtureState) -> list[float]:
-        # Residual equations will be governed dynamically by the solver network sum.
-        # But locally, P_total must equal P_static.
-        return [state.P_total - state.P]
+    def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
+        # Residual: P_total - P = 0
+        res = [state.P_total - state.P]
+        jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.P_total": 1.0}}
+        return res, jac
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         pass
@@ -124,13 +133,12 @@ class MomentumChamberNode(NetworkNode):
     def unknowns(self) -> list[str]:
         return [f"{self.id}.P", f"{self.id}.P_total"]
 
-    def residuals(self, state: MixtureState) -> list[float]:
+    def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
         # v = m_dot / (rho * A_chamber)
-        # For phase 1, we just return a placeholder. The network solver will dynamically
-        # inject the momentum conservation equation.
-        return [
-            state.P_total - state.P
-        ]  # Will be dynamically updated by solver with dynamic pressure
+        # For phase 1, we just return a placeholder.
+        res = [state.P_total - state.P]
+        jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.P_total": 1.0}}
+        return res, jac
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         pass
@@ -157,8 +165,8 @@ class PressureBoundary(NetworkNode):
     def unknowns(self) -> list[str]:
         return []
 
-    def residuals(self, state: MixtureState) -> list[float]:
-        return []
+    def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
+        return [], {}
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         pass
@@ -186,9 +194,11 @@ class MassFlowBoundary(NetworkNode):
         # Pressure floats to whatever is required to push the defined mass flow
         return [f"{self.id}.P", f"{self.id}.P_total"]
 
-    def residuals(self, state: MixtureState) -> list[float]:
-        # Stagnation assumptions
-        return [state.P_total - state.P]
+    def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
+        # Stagnation assumptions: P_total = P_static
+        res = [state.P_total - state.P]
+        jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.P_total": 1.0}}
+        return res, jac
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         pass
@@ -215,9 +225,9 @@ class CombustorNode(NetworkNode):
         # P, P_total, and T
         return [f"{self.id}.P", f"{self.id}.P_total", f"{self.id}.T"]
 
-    def residuals(self, state: MixtureState) -> list[float]:
-        # Energy and Mass constraints evaluated dynamically by the FlowNetwork loop
-        return [0.0]
+    def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
+        # Placeholder for Energy and Mass constraints
+        return [0.0], {}
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         pass
@@ -276,8 +286,7 @@ class OrificeElement(NetworkElement):
             sign = -1.0
             abs_dP = -dP_fwd
 
-        # Call the tuple interface for mass flow
-        m_dot_calc, _ = cb.orifice_mdot_and_jacobian(abs_dP, rho, self.Cd, self.area)
+        m_dot_calc, J_dP = cb.orifice_mdot_and_jacobian(abs_dP, rho, self.Cd, self.area)
 
         # In a real model, we would pass eff_upstream_D to cb.orifice_mdot_and_jacobian
         # for approach velocity correction (Beta ratio).
@@ -287,7 +296,39 @@ class OrificeElement(NetworkElement):
         m_dot_calc *= sign
 
         # Residual: guessed m_dot (carried by state_in/out) minus calculated m_dot
-        return [m_dot - m_dot_calc]
+        res = [m_dot - m_dot_calc]
+
+        # Jacobian calculation:
+        # R = m_dot - sign * f(abs_dP, rho)
+        # dR/d_mdot = 1.0
+        # dR/d_P_total_upstream = -sign * J_dP = -J_dP
+        # dR/d_P_static_downstream = -sign * (-J_dP) = J_dP
+        # SECONDARY: dR/d_P_static_upstream = -sign * d(f)/d_rho * d_rho/d_P
+        # For orifice: f ~ sqrt(rho), so df/d_rho = f / (2 * rho)
+        # d_rho/d_P = rho / P (ideal gas)
+        # dR/d_P_static_upstream = -sign * (f / (2 * rho)) * (rho / P) = -sign * f / (2 * P)
+        #                       = -m_dot_calc / (2 * P_upstream)
+
+        if dP_fwd >= 0:
+            upstream_id = self.from_node
+            downstream_id = self.to_node
+            P_upstream = state_in.P
+        else:
+            upstream_id = self.to_node
+            downstream_id = self.from_node
+            P_upstream = state_out.P
+
+        J_rho_p = -m_dot_calc / (2.0 * P_upstream)
+
+        jac = {
+            0: {
+                f"{self.id}.m_dot": 1.0,
+                f"{upstream_id}.P_total": -J_dP,
+                f"{downstream_id}.P": J_dP,
+                f"{upstream_id}.P": J_rho_p,
+            }
+        }
+        return res, jac
 
     def n_equations(self) -> int:
         return 1
@@ -471,12 +512,13 @@ class LosslessConnectionElement(NetworkElement):
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
 
-    def residuals(self, state_in: MixtureState, state_out: MixtureState) -> list[float]:
-        # Evaluates the native C++ tuple (f, J) interface for lossless P_total conservation
-
-        # It simply equates total pressure.
-        # But for numeric stability we return diff.
-        return [state_in.P_total - state_out.P_total]
+    def residuals(
+        self, state_in: MixtureState, state_out: MixtureState
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        # Residual: P_total_in - P_total_out = 0
+        res = [state_in.P_total - state_out.P_total]
+        jac = {0: {f"{self.from_node}.P_total": 1.0, f"{self.to_node}.P_total": -1.0}}
+        return res, jac
 
     def get_spatial_profile(self, n_steps: int = 100):
         """
@@ -549,12 +591,10 @@ class PipeElement(NetworkElement):
             rho = state_in.density()
             mu = cb.viscosity(state_in.T, state_in.P, state_in.X)
             dP_actual = dP_fwd
-            sign = 1.0
         else:
             rho = state_out.density()
             mu = cb.viscosity(state_out.T, state_out.P, state_out.X)
             dP_actual = -dP_fwd
-            sign = -1.0
 
         abs_mdot = abs(m_dot)
 
@@ -574,19 +614,52 @@ class PipeElement(NetworkElement):
         L_over_D = self.length / D
         dP_calc = f * L_over_D * 0.5 * rho * v * v
 
-        dP_calc = f * L_over_D * 0.5 * rho * v * v
-
         # Residual: driving pressure difference minus frictional loss
-        # Since dP_calc is positive scalar and dP_actual is evaluating Upstream(Total) - Downstream(Static)
-        # If m_dot >= 0 (Forward): Res = (in.P_tot - out.P) - dP_calc = 0
-        # If m_dot < 0  (Reverse): Res = (out.P_tot - in.P) - (-dP_actual_reverse)
-        # Actually solver evaluates dP_actual - dP_calc = 0. We'll simply enforce it with respect to current magnitude direction.
+        res = [dP_actual - dP_calc]
 
-        # We need residual to be signed back into the domain of the mass flow equation.
-        # Actually an easier way is to map the predicted flow from the analytical equation and subtract guessed mass flow,
-        # but Pipe computes dP(m_dot).
-        # We want predicted_dP - actual_dP = 0 where actual_dP is upstream P_tot - downstream P.
-        return [dP_actual - sign * dP_calc]
+        # Jacobian wrt m_dot:
+        # d(dP_calc)/d|mdot| = (L/D * 0.5 * rho * 1/(rho*A)^2) * [df/dRe * dRe/d|mdot| * |mdot|^2 + 2 * f * |mdot|]
+        #                    = (L / (2 * D * rho * A^2)) * [df/dRe * (4/(pi*D*mu)) * |mdot|^2 + 2 * f * |mdot|]
+
+        const = L_over_D / (2.0 * rho * A * A)
+        dRe_dabsmdot = 4.0 / (math.pi * D * mu)
+
+        ddPcalc_dabsmdot = const * (
+            df_dRe * dRe_dabsmdot * abs_mdot * abs_mdot + 2.0 * f * abs_mdot
+        )
+
+        # d(res)/d(m_dot) = d(dP_actual)/d(m_dot) - d(dP_calc)/d(m_dot)
+        # d(dP_actual)/d(m_dot) = 0
+        # d(dP_calc)/d(m_dot) = ddPcalc_dabsmdot * sign(m_dot)
+
+        dr_dmdot = -ddPcalc_dabsmdot * (1.0 if m_dot >= 0 else -1.0)
+
+        if dP_fwd >= 0:
+            upstream_id = self.from_node
+            downstream_id = self.to_node
+            P_upstream = state_in.P
+        else:
+            upstream_id = self.to_node
+            downstream_id = self.from_node
+            P_upstream = state_out.P
+
+        # SECONDARY: dR/d_P_static_upstream = -d(dP_calc)/d_rho * d_rho/d_P
+        # dP_calc ~ 1/rho, so d(dP_calc)/d_rho = -dP_calc/rho
+        # d_rho/d_P = rho/P
+        # dR/d_P_static_upstream = -(-dP_calc/rho) * (rho/P) = dP_calc / P
+
+        dr_dp_static = dP_calc / P_upstream
+
+        jac = {
+            0: {
+                f"{self.id}.m_dot": dr_dmdot,
+                f"{upstream_id}.P_total": 1.0,
+                f"{downstream_id}.P": -1.0,
+                f"{upstream_id}.P": dr_dp_static,
+            }
+        }
+
+        return res, jac
 
     def get_spatial_profile(
         self,

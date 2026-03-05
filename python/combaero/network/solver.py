@@ -44,6 +44,8 @@ class NetworkSolver:
         self.unknown_names: list[str] = []
         # Mapping from node/element ID to index in the flattened x array
         self._unknown_indices: dict[str, list[int]] = {}
+        # Mapping from unknown name to global index
+        self._name_to_index: dict[str, int] = {}
 
     def _build_x0(self) -> np.ndarray:
         """
@@ -85,6 +87,9 @@ class NetworkSolver:
                     else:
                         x0_list.append(1.0)
                 self._unknown_indices[elem_id] = list(range(start_idx, len(x0_list)))
+
+        # Build name to index mapping
+        self._name_to_index = {name: i for i, name in enumerate(self.unknown_names)}
 
         return np.array(x0_list, dtype=float)
 
@@ -150,24 +155,40 @@ class NetworkSolver:
 
         return MixtureState(**state_dict)
 
-    def _residuals(self, x: np.ndarray) -> np.ndarray:
+    def _residuals_and_jacobian(self, x: np.ndarray) -> tuple[np.ndarray, Any]:
         """
-        Evaluates the global residual vector given the current unknown vector x.
+        Evaluates the global residual vector and its sparse Jacobian.
         """
-        res = []
+        import scipy.sparse as sp
 
-        # 1. Node Residuals (P_total constraint + Mass Conservation)
+        res = []
+        rows = []
+        cols = []
+        data = []
+
+        # 1. Node Residuals
         for node_id, node in self.network.nodes.items():
             if isinstance(node, PressureBoundary):
                 continue
 
+            start_res_idx = len(res)
+
             # Node thermodynamic constraints
             state = self._get_node_state(node, x)
-            node_res = node.residuals(state)
+            node_res, node_jac = node.residuals(state)
             res.extend(node_res)
 
+            # Assemble node Jacobian entries
+            for eq_idx, var_derivs in node_jac.items():
+                row = start_res_idx + eq_idx
+                for unk_name, deriv in var_derivs.items():
+                    if unk_name in self._name_to_index:
+                        rows.append(row)
+                        cols.append(self._name_to_index[unk_name])
+                        data.append(deriv)
+
             # Mass Conservation: Sum(m_dot_in) - Sum(m_dot_out) = 0
-            # Includes MassFlowBoundary contributions from adjacent boundary nodes.
+            mass_res_idx = len(res)
             upstream_elems = self.network.get_upstream_elements(node_id)
             downstream_elems = self.network.get_downstream_elements(node_id)
 
@@ -181,39 +202,62 @@ class NetworkSolver:
                 indices = self._unknown_indices.get(elem.id)
                 if indices:
                     m_dot_in += x[indices[0]]
+                    # d(Res)/d(m_dot) = 1
+                    rows.append(mass_res_idx)
+                    cols.append(indices[0])
+                    data.append(1.0)
                 else:
-                    # Zero-DOF element: read m_dot from its from_node if it is a boundary
                     from_node = self.network.nodes[elem.from_node]
-                    # Upstream boundary element: its flow goes into this node, so it adds to m_dot_in
                     m_dot_in += getattr(from_node, "m_dot", 0.0)
 
             for elem in downstream_elems:
                 indices = self._unknown_indices.get(elem.id)
                 if indices:
                     m_dot_out += x[indices[0]]
+                    # d(Res)/d(m_dot) = -1
+                    rows.append(mass_res_idx)
+                    cols.append(indices[0])
+                    data.append(-1.0)
                 else:
-                    # Downstream boundary element: its flow leaves this node, so it adds to m_dot_out
                     to_node = self.network.nodes[elem.to_node]
                     m_dot_out += getattr(to_node, "m_dot", 0.0)
 
             res.append(m_dot_in - m_dot_out)
 
-        # 2. Element Residuals (Momentum Conservation)
+        # 2. Element Residuals
         for elem_id, element in self.network.elements.items():
             state_in = self._get_node_state(self.network.nodes[element.from_node], x)
             state_out = self._get_node_state(self.network.nodes[element.to_node], x)
 
-            # Insert the element's current m_dot from x (if it has a DOF)
             indices = self._unknown_indices.get(elem_id)
             if indices:
                 m_dot = x[indices[0]]
                 state_in.m_dot = m_dot
                 state_out.m_dot = m_dot
 
-            elem_res = element.residuals(state_in, state_out)
+            start_res_idx = len(res)
+            elem_res, elem_jac = element.residuals(state_in, state_out)
             res.extend(elem_res)
 
-        return np.array(res, dtype=float)
+            # Assemble element Jacobian entries
+            for eq_idx, var_derivs in elem_jac.items():
+                row = start_res_idx + eq_idx
+                for unk_name, deriv in var_derivs.items():
+                    if unk_name in self._name_to_index:
+                        rows.append(row)
+                        cols.append(self._name_to_index[unk_name])
+                        data.append(deriv)
+
+        # Convert to CSR for solver efficiency
+        jac_sparse = sp.coo_matrix((data, (rows, cols)), shape=(len(res), len(x))).tocsr()
+        return np.array(res, dtype=float), jac_sparse
+
+    def _residuals(self, x: np.ndarray) -> np.ndarray:
+        """
+        Evaluates the global residual vector given the current unknown vector x.
+        """
+        res, _ = self._residuals_and_jacobian(x)
+        return res
 
     def solve(
         self,
@@ -239,11 +283,13 @@ class NetworkSolver:
             options = {}
 
         # Default iteration limits to prevent infinite loops in C extensions
+        # Note: different methods in root use different names for iteration limits
         if method in ("hybr", "lm"):
             if "maxfev" not in options:
                 options["maxfev"] = 500
-        elif "maxiter" not in options:
-            options["maxiter"] = 500
+        else:
+            if "maxiter" not in options:
+                options["maxiter"] = 500
 
         # Ensure topology is resolved before solving
         self.network.resolve_all_topology()
@@ -261,15 +307,15 @@ class NetworkSolver:
         best_x = x0.copy()
         best_res_norm = np.linalg.norm(res0)
 
-        def residuals_wrapper(x: np.ndarray) -> np.ndarray:
+        def residuals_wrapper(x: np.ndarray) -> Any:
             nonlocal best_x, best_res_norm
 
             # Check timeout
             if timeout is not None and (time.perf_counter() - start_time) > timeout:
                 raise SolverTimeoutError(f"Solver timed out after {timeout} seconds.")
 
-            # Evaluate residuals
-            res = self._residuals(x)
+            # Evaluate residuals and jacobian
+            res, jac = self._residuals_and_jacobian(x)
 
             # Track best iterate
             res_norm = np.linalg.norm(res)
@@ -277,11 +323,19 @@ class NetworkSolver:
                 best_res_norm = res_norm
                 best_x = x.copy()
 
-            return res
+            if method in ("hybr", "lm"):
+                # Scipy's root (hybr, lm) does not support sparse Jacobians directly.
+                # Use toarray() to provide the expected dense format while still
+                # leveraging analytical calculation.
+                return res, jac.toarray()
+            else:
+                # Other methods might not support (f, J) or sparse J properly via the jac=True flag
+                return res
 
         # Solve
         try:
-            sol = root(residuals_wrapper, x0, method=method, options=options)
+            use_jac = method in ("hybr", "lm")
+            sol = root(residuals_wrapper, x0, method=method, options=options, jac=use_jac)
             final_x = sol.x
             success = sol.success
             message = sol.message
