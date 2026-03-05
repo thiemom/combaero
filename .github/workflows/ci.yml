@@ -133,7 +133,9 @@ jobs:
         run: cmake --build build-mingw --config Release
 
   status-check:
-    name: status-check
+    # IMPORTANT: Keep this literal name in sync with Iron ruleset required context:
+    # "CI / status-check". Ruleset matching is strict and relies on exact string equality.
+    name: CI / status-check
     needs: [changes, lint, build-and-test, build-mingw]
     if: always()
     runs-on: ubuntu-latest
