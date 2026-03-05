@@ -159,7 +159,7 @@ jobs:
           python -m pytest -v --tb=short
 
   status-check:
-    name: validation-gatekeeper
+    name: Validation Tests / status-check
     needs: [changes, cantera-validation, python-unit-tests]
     if: always()
     runs-on: ubuntu-latest
