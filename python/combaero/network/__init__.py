@@ -9,6 +9,8 @@ from .components import (
     OrificeElement,
     PipeElement,
     PlenumNode,
+    NetworkNode,
+    NetworkElement,
     AreaDischargeCoefficientConnectionElement,
 )
 from .graph import FlowNetwork
@@ -28,4 +30,6 @@ __all__: list[str] = [
     "MixtureState",
     "FlowNetwork",
     "NetworkSolver",
+    "NetworkNode",
+    "NetworkElement",
 ]
