@@ -159,7 +159,9 @@ jobs:
           python -m pytest -v --tb=short
 
   status-check:
-    name: status-check
+    # IMPORTANT: Keep this literal name in sync with Iron ruleset required context:
+    # "Validation Tests / status-check". Ruleset matching is strict and relies on exact string equality.
+    name: Validation Tests / status-check
     needs: [changes, cantera-validation, python-unit-tests]
     if: always()
     runs-on: ubuntu-latest
