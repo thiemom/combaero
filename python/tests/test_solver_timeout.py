@@ -36,14 +36,14 @@ def test_solver_timeout_trigger():
 
     solver = NetworkSolver(graph)
 
-    # Inject an artificial delay in _residuals to force a timeout
-    original_residuals = solver._residuals
+    # Inject an artificial delay in _residuals_and_jacobian to force a timeout
+    original_raj = solver._residuals_and_jacobian
 
-    def slow_residuals(x):
+    def slow_raj(x):
         time.sleep(0.2)
-        return original_residuals(x)
+        return original_raj(x)
 
-    solver._residuals = slow_residuals
+    solver._residuals_and_jacobian = slow_raj
 
     with pytest.warns(UserWarning, match="Solver timed out"):
         solution = solver.solve(timeout=0.1)  # 0.1s is shorter than one evaluation
@@ -56,9 +56,9 @@ def test_solver_timeout_trigger():
 def test_solver_maxfev_limit():
     """Verify solver respects maxfev for hybr method."""
     graph = FlowNetwork()
-    inlet = PressureBoundary("inlet", P_total=200000, T_total=300)
+    inlet = PressureBoundary("inlet", P_total=500000, T_total=300)
     outlet = PressureBoundary("outlet", P_total=100000, T_total=300)
-    orf = OrificeElement("orf", "inlet", "outlet", Cd=0.6, area=0.001)
+    orf = OrificeElement("orf", "inlet", "outlet", Cd=0.6, area=0.01)
 
     graph.add_node(inlet)
     graph.add_node(outlet)
@@ -67,7 +67,7 @@ def test_solver_maxfev_limit():
     solver = NetworkSolver(graph)
 
     # Force failure via low maxfev
-    with pytest.warns(UserWarning, match="The number of calls to function has reached maxfev"):
+    with pytest.warns(UserWarning, match="NetworkSolver did not converge"):
         solution = solver.solve(method="hybr", options={"maxfev": 1})
 
     assert "orf.m_dot" in solution
@@ -85,18 +85,17 @@ def test_solver_unexpected_error_graceful_exit():
     graph.add_element(orf)
 
     solver = NetworkSolver(graph)
-    original_residuals = solver._residuals
-
     call_count = 0
+    original_raj = solver._residuals_and_jacobian
 
-    def failing_residuals(x):
+    def failing_raj(x):
         nonlocal call_count
         call_count += 1
         if call_count > 1:
             raise RuntimeError("Unexpected failure")
-        return original_residuals(x)
+        return original_raj(x)
 
-    solver._residuals = failing_residuals
+    solver._residuals_and_jacobian = failing_raj
 
     with pytest.warns(UserWarning, match="Unexpected error during residual evaluation"):
         solution = solver.solve()

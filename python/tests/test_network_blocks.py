@@ -116,7 +116,7 @@ def test_momentum_chamber_network():
 
     # Placeholder residuals ensure conservation equations can later be injected
     state = cb.network.MixtureState(1e5, 1.1e5, 300.0, 300.0, 1.0, [0.0] * 14)
-    residuals = node_mc.residuals(state)
+    residuals, _ = node_mc.residuals(state)
     assert len(residuals) == 1
     assert residuals[0] == 1.1e5 - 1e5
 
