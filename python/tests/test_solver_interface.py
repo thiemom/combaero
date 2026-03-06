@@ -51,6 +51,19 @@ def test_pressure_loss_jacobian():
         np.testing.assert_allclose(jac_analytic, jac_numeric, rtol=1e-6)
 
 
+def test_lossless_pressure_jacobian():
+    def residual_func(P_out):
+        return cb._core.lossless_pressure_and_jacobian(150000.0, P_out)[0]
+
+    for P_out in [100000.0, 150000.0, 200000.0]:
+        residual, jac_analytic = cb._core.lossless_pressure_and_jacobian(150000.0, P_out)
+        jac_numeric = central_difference(residual_func, P_out, 1e-3)
+
+        assert residual == 150000.0 - P_out
+        np.testing.assert_allclose(jac_analytic, -1.0, rtol=0.0, atol=0.0)
+        np.testing.assert_allclose(jac_analytic, jac_numeric, rtol=1e-6, atol=1e-9)
+
+
 def test_nusselt_jacobian():
     Pr_heating = 0.7  # Air
     Pr_cooling = 4.3  # Water
@@ -93,6 +106,77 @@ def test_friction_haaland_jacobian():
         # Friction factor decreases with Reynolds number
         assert jac_analytic < 0.0
         np.testing.assert_allclose(jac_analytic, jac_numeric, rtol=1e-5)
+
+
+def test_friction_serghides_jacobian():
+    e_D = 1e-4
+
+    def f_func(Re):
+        return cb._core.friction_and_jacobian_serghides(Re, e_D).result[0]
+
+    for Re in [3000.0, 10000.0, 1e6]:
+        f_analytic, jac_analytic = cb._core.friction_and_jacobian_serghides(Re, e_D).result
+        h = max(1e-4, Re * 1e-6)
+        jac_numeric = central_difference(f_func, Re, h)
+
+        assert f_analytic > 0.0
+        assert jac_analytic < 0.0
+        np.testing.assert_allclose(jac_analytic, jac_numeric, rtol=1e-5)
+
+
+def test_friction_colebrook_jacobian():
+    e_D = 1e-4
+
+    def f_func(Re):
+        return cb._core.friction_and_jacobian_colebrook(Re, e_D).result[0]
+
+    for Re in [3000.0, 10000.0, 1e6]:
+        f_analytic, jac_analytic = cb._core.friction_and_jacobian_colebrook(Re, e_D).result
+        h = max(1e-4, Re * 1e-6)
+        jac_numeric = central_difference(f_func, Re, h)
+
+        assert f_analytic > 0.0
+        assert jac_analytic < 0.0
+        np.testing.assert_allclose(jac_analytic, jac_numeric, rtol=2e-5)
+
+
+def test_friction_petukhov_jacobian():
+    def f_func(Re):
+        return cb._core.friction_and_jacobian_petukhov(Re).result[0]
+
+    for Re in [5000.0, 10000.0, 1e6]:
+        result = cb._core.friction_and_jacobian_petukhov(Re)
+        f_analytic, jac_analytic = result.result
+        h = max(1e-4, Re * 1e-6)
+        jac_numeric = central_difference(f_func, Re, h)
+
+        assert result.status.name in ("VALID", "EXTRAPOLATED")
+        assert f_analytic > 0.0
+        assert jac_analytic < 0.0
+        np.testing.assert_allclose(jac_analytic, jac_numeric, rtol=1e-5)
+
+    boundary = cb._core.friction_and_jacobian_petukhov(3000.0)
+    assert boundary.status.name == "VALID"
+
+
+def test_friction_dispatcher_matches_direct_models():
+    Re = 50000.0
+    e_D = 1e-4
+
+    direct = {
+        "haaland": cb._core.friction_and_jacobian_haaland(Re, e_D).result,
+        "serghides": cb._core.friction_and_jacobian_serghides(Re, e_D).result,
+        "colebrook": cb._core.friction_and_jacobian_colebrook(Re, e_D).result,
+        "petukhov": cb._core.friction_and_jacobian_petukhov(Re).result,
+    }
+
+    for tag, expected in direct.items():
+        got = cb._core.friction_and_jacobian(tag, Re, e_D).result
+        np.testing.assert_allclose(got[0], expected[0], rtol=1e-12, atol=0.0)
+        np.testing.assert_allclose(got[1], expected[1], rtol=1e-12, atol=0.0)
+
+    invalid = cb._core.friction_and_jacobian("does-not-exist", Re, e_D)
+    assert invalid.status.name == "INVALID"
 
 
 def test_density_jacobians():
