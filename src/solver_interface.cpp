@@ -9,6 +9,7 @@
 #include "friction.h"
 #include "heat_transfer.h"
 #include "math_constants.h" // MSVC compatibility for M_PI, M_LN10, etc.
+#include "registry.h"
 #include "stagnation.h"
 #include "thermo.h"
 #include "transport.h"
@@ -318,18 +319,13 @@ friction_and_jacobian_petukhov(double Re) {
 
 CorrelationResult<std::tuple<double, double>>
 friction_and_jacobian(const std::string &tag, double Re, double e_D) {
-  if (tag == "haaland")
-    return friction_and_jacobian_haaland(Re, e_D);
-  if (tag == "serghides")
-    return friction_and_jacobian_serghides(Re, e_D);
-  if (tag == "colebrook")
-    return friction_and_jacobian_colebrook(Re, e_D);
-  if (tag == "petukhov")
-    return friction_and_jacobian_petukhov(Re);
+  if (Registry::get().has_friction_model(tag)) {
+    return Registry::get().get_friction_model(tag)(Re, e_D);
+  }
   return {{0.0, 0.0},
           CorrelationValidity::INVALID,
           "friction_and_jacobian: unknown tag '" + tag +
-              "'. Must be haaland|serghides|colebrook|petukhov."};
+              "'. Must be a registered friction model."};
 }
 
 // -----------------------------------------------------------------------------

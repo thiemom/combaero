@@ -73,6 +73,7 @@ try:
         OrificeState,
         State,
         Stream,
+        Registry,
         ThermoState,
         ThrustResult,
         TransferMatrix,
@@ -465,6 +466,7 @@ except ModuleNotFoundError:
     # State-based API
     State = _core.State
     Stream = _core.Stream
+    Registry = _core.Registry
     mix = _core.mix
     # Inverse solvers - find fuel stream
     set_fuel_stream_for_Tad = _core.set_fuel_stream_for_Tad

@@ -43,6 +43,7 @@ set(SOURCES
     src/stagnation.cpp
     src/correlation_status.cpp
     src/solver_interface.cpp
+    src/registry.cpp
 )
 
 # Core library
