@@ -5,6 +5,8 @@ from typing import Any
 import numpy as np
 from scipy.optimize import root
 
+import combaero as cb
+
 from .components import (
     MassFlowBoundary,
     MixtureState,
@@ -46,6 +48,8 @@ class NetworkSolver:
         self._unknown_indices: dict[str, list[int]] = {}
         # Mapping from unknown name to global index
         self._name_to_index: dict[str, int] = {}
+        # Canonical default composition from the public combaero Python interface.
+        self._default_X: list[float] = list(cb.standard_dry_air_composition())
 
     def _build_x0(self) -> np.ndarray:
         """
@@ -95,11 +99,7 @@ class NetworkSolver:
 
     def _get_node_state(self, node: NetworkNode, x: np.ndarray) -> MixtureState:
         """Constructs a MixtureState for a given node based on the current solver vector x."""
-        # species_names order: N2=0, O2=1, AR=2, CO2=3, H2O=4, ...
-        # species names are exposed to python in python/combaero/species.py
-        X_air = [0.0] * 14
-        X_air[0] = 0.79  # N2
-        X_air[1] = 0.21  # O2
+        default_X = self._default_X
 
         # Determine boundaries
         if isinstance(node, PressureBoundary):
@@ -111,7 +111,7 @@ class NetworkSolver:
             P_stat = guess.get(f"{node.id}.P", P_tot)
             T_tot = guess.get(f"{node.id}.T_total", getattr(node, "T_total", 300.0))
             T_stat = guess.get(f"{node.id}.T", T_tot)
-            X = getattr(node, "X", None) or X_air
+            X = getattr(node, "X", None) or default_X
             return MixtureState(P=P_stat, P_total=P_tot, T=T_stat, T_total=T_tot, m_dot=0.0, X=X)
 
         if isinstance(node, MassFlowBoundary):
@@ -119,14 +119,14 @@ class NetworkSolver:
             m = getattr(node, "m_dot", 0.1)
             T_tot = guess.get(f"{node.id}.T_total", getattr(node, "T_total", 300.0))
             T_stat = guess.get(f"{node.id}.T", T_tot)
-            X = getattr(node, "X", None) or X_air
+            X = getattr(node, "X", None) or default_X
 
             p_val = guess.get(f"{node.id}.P", 101325.0)
             ptot_val = guess.get(f"{node.id}.P_total", 101325.0)
 
             indices = self._unknown_indices.get(node.id, [])
             unknowns = node.unknowns()
-            for i, unk in zip(indices, unknowns, strict=False):
+            for i, unk in zip(indices, unknowns, strict=True):
                 if unk.endswith(".P"):
                     p_val = x[i]
                 elif unk.endswith(".P_total"):
@@ -145,10 +145,10 @@ class NetworkSolver:
             "T": 300.0,
             "T_total": 300.0,
             "m_dot": 0.0,
-            "X": X_air,
+            "X": default_X,
         }
 
-        for i, unk in zip(indices, unknowns, strict=False):
+        for i, unk in zip(indices, unknowns, strict=True):
             var_name = unk.split(".")[-1]
             if var_name in state_dict:
                 state_dict[var_name] = x[i]

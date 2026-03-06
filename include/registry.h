@@ -12,6 +12,9 @@ namespace combaero {
 
 class Registry {
 public:
+  // Unified signature for friction models used by the dispatcher.
+  // Note: smooth-pipe models (e.g., Petukhov) do not use e_D, but keep this
+  // parameter to avoid special casing in the registry and call sites.
   using FrictionFunc =
       std::function<solver::CorrelationResult<std::tuple<double, double>>(
           double Re, double e_D)>;
