@@ -19,6 +19,7 @@
 #include "incompressible.h"
 #include "materials.h"
 #include "orifice.h"
+#include "registry.h"
 #include "solver_interface.h"
 #include "stagnation.h"
 #include "state.h"
@@ -5186,4 +5187,14 @@ PYBIND11_MODULE(_core, m) {
         "  X : Mole fractions [-]\n\n"
         "Returns: tuple(mu [Pa*s], d_mu_d_T [(Pa*s)/K], d_mu_d_P "
         "[(Pa*s)/Pa])");
+
+  // Registry bindings
+  py::class_<Registry>(m, "Registry",
+                       "Global function registry for C++ physics models")
+      .def_static("get", &Registry::get, py::return_value_policy::reference,
+                  "Get the singleton registry instance")
+      .def("has_friction_model", &Registry::has_friction_model, py::arg("name"),
+           "Check if friction model is registered")
+      .def("available_friction_models", &Registry::available_friction_models,
+           "List all available friction models");
 }
