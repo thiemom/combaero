@@ -607,7 +607,18 @@ class PipeElement(NetworkElement):
         Re = max(4.0 * abs_mdot / (math.pi * D * mu), 1.0)
 
         # f and d(f)/d(Re) from the appropriate analytical (f, J) solver function
-        f, df_dRe = cb.friction_and_jacobian(self.friction_model, Re, e_D)
+        _corr = cb.friction_and_jacobian(self.friction_model, Re, e_D)
+
+        # Integrate Warning / Validity logic (TODO 3 implementation)
+        if _corr.status == cb.CorrelationValidity.INVALID:
+            import warnings
+
+            warnings.warn(
+                f"PipeElement {self.id} validity error: {_corr.message}",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+        f, df_dRe = _corr.result
 
         # dP = f * (L/D) * 0.5 * rho * v^2,  v = m_dot / (rho * A)
         v = abs_mdot / (rho * A)

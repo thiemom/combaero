@@ -62,6 +62,8 @@ IGNORE_LIST = {
     # Enums
     "CombustionMethod",
     "BoundaryCondition",
+    "CorrelationValidity",
+    "CorrelationResult",
 }
 
 # Special magic methods created by pybind11 that aren't public calculation points

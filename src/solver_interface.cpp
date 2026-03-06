@@ -74,10 +74,12 @@ std::tuple<double, double> lossless_pressure_and_jacobian(double P_in,
 // 2. Heat Transfer Components
 // -----------------------------------------------------------------------------
 
-std::tuple<double, double>
+CorrelationResult<std::tuple<double, double>>
 nusselt_and_jacobian_dittus_boelter(double Re, double Pr, bool heating) {
   if (Re <= 0.0) {
-    return {0.0, 0.0};
+    return {{0.0, 0.0},
+            CorrelationValidity::INVALID,
+            "nusselt_dittus_boelter requires Re > 0"};
   }
 
   double n = heating ? dittus_boelter::coeff_prandtl_heating_exp
@@ -91,11 +93,16 @@ nusselt_and_jacobian_dittus_boelter(double Re, double Pr, bool heating) {
   //         = coeff_reynolds_exp * Nu / Re
   double dNu_dRe = dittus_boelter::coeff_reynolds_exp * Nu / Re;
 
-  return {Nu, dNu_dRe};
+  return {{Nu, dNu_dRe}, CorrelationValidity::VALID, ""};
 }
 
-std::tuple<double, double> nusselt_and_jacobian_gnielinski(double Re, double Pr,
-                                                           double f) {
+CorrelationResult<std::tuple<double, double>>
+nusselt_and_jacobian_gnielinski(double Re, double Pr, double f) {
+  if (Re <= 0.0) {
+    return {{0.0, 0.0},
+            CorrelationValidity::INVALID,
+            "nusselt_gnielinski requires Re > 0"};
+  }
   // Gnielinski uses Hermite blending and is complex; use tight analytical-like
   // FD
   const double eps =
@@ -104,26 +111,30 @@ std::tuple<double, double> nusselt_and_jacobian_gnielinski(double Re, double Pr,
   double Nu_minus = nusselt_gnielinski(Re - eps, Pr, f);
   double dNu_dRe = (Nu_plus - Nu_minus) / (2.0 * eps);
   double Nu = nusselt_gnielinski(Re, Pr, f); // center evaluation
-  return {Nu, dNu_dRe};
+  return {{Nu, dNu_dRe}, CorrelationValidity::VALID, ""};
 }
 
-std::tuple<double, double>
+CorrelationResult<std::tuple<double, double>>
 nusselt_and_jacobian_sieder_tate(double Re, double Pr, double mu_ratio) {
   if (Re <= 0.0) {
-    return {0.0, 0.0};
+    return {{0.0, 0.0},
+            CorrelationValidity::INVALID,
+            "nusselt_sieder_tate requires Re > 0"};
   }
   double Nu = nusselt_sieder_tate(Re, Pr, mu_ratio);
 
   // Nu = 0.027 * Re^0.8 * Pr^(1/3) * mu_ratio^0.14
   // dNu/dRe = 0.8 * Nu / Re
   double dNu_dRe = sieder_tate::coeff_reynolds_exp * Nu / Re;
-  return {Nu, dNu_dRe};
+  return {{Nu, dNu_dRe}, CorrelationValidity::VALID, ""};
 }
 
-std::tuple<double, double> nusselt_and_jacobian_petukhov(double Re, double Pr,
-                                                         double f) {
+CorrelationResult<std::tuple<double, double>>
+nusselt_and_jacobian_petukhov(double Re, double Pr, double f) {
   if (Re <= 0.0) {
-    return {0.0, 0.0};
+    return {{0.0, 0.0},
+            CorrelationValidity::INVALID,
+            "nusselt_petukhov requires Re > 0"};
   }
   double Nu = nusselt_petukhov(Re, Pr, f);
 
@@ -132,19 +143,20 @@ std::tuple<double, double> nusselt_and_jacobian_petukhov(double Re, double Pr,
   // networks where friction and heat transfer are computed sequentially but
   // decoupled in the local element Jacobian block
   double dNu_dRe = Nu / Re;
-  return {Nu, dNu_dRe};
+  return {{Nu, dNu_dRe}, CorrelationValidity::VALID, ""};
 }
 
-std::tuple<double, double> friction_and_jacobian_haaland(double Re,
-                                                         double e_D) {
+CorrelationResult<std::tuple<double, double>>
+friction_and_jacobian_haaland(double Re, double e_D) {
   // Explicit Haaland equation approximation of friction factor f (Darcy)
   // 1/sqrt(f) = coeff_outer * log10( (e_D/coeff_roughness)^coeff_exponent +
   // coeff_reynolds/Re )
 
   if (Re <= 0.0) {
-    // Fallback or explicit failure;
-    throw std::invalid_argument(
-        "solver_interface::friction_haaland requires Re > 0");
+    // Graceful invalidation for unphysical states
+    return {{0.0, 0.0},
+            CorrelationValidity::INVALID,
+            "solver_interface::friction_haaland requires Re > 0"};
   }
 
   // Isolate core logarithmic argument
@@ -180,14 +192,15 @@ std::tuple<double, double> friction_and_jacobian_haaland(double Re,
 
   double jacobian = df_dU * dU_dRe;
 
-  return {f, jacobian};
+  return {{f, jacobian}, CorrelationValidity::VALID, ""};
 }
 
-std::tuple<double, double> friction_and_jacobian_serghides(double Re,
-                                                           double e_D) {
+CorrelationResult<std::tuple<double, double>>
+friction_and_jacobian_serghides(double Re, double e_D) {
   if (Re <= 0.0) {
-    throw std::invalid_argument(
-        "solver_interface::friction_serghides requires Re > 0");
+    return {{0.0, 0.0},
+            CorrelationValidity::INVALID,
+            "solver_interface::friction_serghides requires Re > 0"};
   }
 
   // Serghides Steffensen form: 1/sqrt(f) = A - (B-A)^2 / (C - 2B + A)
@@ -246,14 +259,15 @@ std::tuple<double, double> friction_and_jacobian_serghides(double Re,
   double jacobian =
       (-2.0 / (inv_sqrt_f * inv_sqrt_f * inv_sqrt_f)) * d_inv_sqrt_f_dRe;
 
-  return {f, jacobian};
+  return {{f, jacobian}, CorrelationValidity::VALID, ""};
 }
 
-std::tuple<double, double> friction_and_jacobian_colebrook(double Re,
-                                                           double e_D) {
+CorrelationResult<std::tuple<double, double>>
+friction_and_jacobian_colebrook(double Re, double e_D) {
   if (Re <= 0.0) {
-    throw std::invalid_argument(
-        "solver_interface::friction_colebrook requires Re > 0");
+    return {{0.0, 0.0},
+            CorrelationValidity::INVALID,
+            "solver_interface::friction_colebrook requires Re > 0"};
   }
 
   // Colebrook converges internally; use Serghides as starting guess.
@@ -279,13 +293,15 @@ std::tuple<double, double> friction_and_jacobian_colebrook(double Re,
   double dx_dRe = -dF_dRe / dF_dx;
   double jacobian = (-2.0 / (x * x * x)) * dx_dRe;
 
-  return {f_val, jacobian};
+  return {{f_val, jacobian}, CorrelationValidity::VALID, ""};
 }
 
-std::tuple<double, double> friction_and_jacobian_petukhov(double Re) {
+CorrelationResult<std::tuple<double, double>>
+friction_and_jacobian_petukhov(double Re) {
   if (Re < 3000.0) {
-    throw std::invalid_argument(
-        "solver_interface::friction_petukhov requires Re >= 3000");
+    return {{0.0, 0.0},
+            CorrelationValidity::EXTRAPOLATED,
+            "solver_interface::friction_petukhov requires Re >= 3000"};
   }
 
   // f = (coeff_a * ln(Re) - coeff_b)^(-2)
@@ -297,11 +313,11 @@ std::tuple<double, double> friction_and_jacobian_petukhov(double Re) {
   double dx_dRe = petukhov::coeff_a / Re;
   double jacobian = (-2.0 / (x * x * x)) * dx_dRe;
 
-  return {f, jacobian};
+  return {{f, jacobian}, CorrelationValidity::VALID, ""};
 }
 
-std::tuple<double, double> friction_and_jacobian(const std::string &tag,
-                                                 double Re, double e_D) {
+CorrelationResult<std::tuple<double, double>>
+friction_and_jacobian(const std::string &tag, double Re, double e_D) {
   if (tag == "haaland")
     return friction_and_jacobian_haaland(Re, e_D);
   if (tag == "serghides")
@@ -310,19 +326,19 @@ std::tuple<double, double> friction_and_jacobian(const std::string &tag,
     return friction_and_jacobian_colebrook(Re, e_D);
   if (tag == "petukhov")
     return friction_and_jacobian_petukhov(Re);
-  throw std::invalid_argument(
-      "friction_and_jacobian: unknown tag '" + tag +
-      "'. Must be haaland|serghides|colebrook|petukhov.");
+  return {{0.0, 0.0},
+          CorrelationValidity::INVALID,
+          "friction_and_jacobian: unknown tag '" + tag +
+              "'. Must be haaland|serghides|colebrook|petukhov."};
 }
 
 // -----------------------------------------------------------------------------
 // 3. Cooling Correlations
 // -----------------------------------------------------------------------------
 
-std::tuple<double, double> pin_fin_nusselt_and_jacobian(double Re_d, double Pr,
-                                                        double L_D, double S_D,
-                                                        double X_D,
-                                                        bool is_staggered) {
+CorrelationResult<std::tuple<double, double>>
+pin_fin_nusselt_and_jacobian(double Re_d, double Pr, double L_D, double S_D,
+                             double X_D, bool is_staggered) {
   const double eps = std::max(1e-6, Re_d * 1e-6);
   double Nu_plus =
       cooling::pin_fin_nusselt(Re_d + eps, Pr, L_D, S_D, X_D, is_staggered);
@@ -330,23 +346,22 @@ std::tuple<double, double> pin_fin_nusselt_and_jacobian(double Re_d, double Pr,
       cooling::pin_fin_nusselt(Re_d - eps, Pr, L_D, S_D, X_D, is_staggered);
   double dNu_dRe = (Nu_plus - Nu_minus) / (2.0 * eps);
   double Nu = cooling::pin_fin_nusselt(Re_d, Pr, L_D, S_D, X_D, is_staggered);
-  return {Nu, dNu_dRe};
+  return {{Nu, dNu_dRe}, CorrelationValidity::VALID, ""};
 }
 
-std::tuple<double, double> pin_fin_friction_and_jacobian(double Re_d,
-                                                         bool is_staggered) {
+CorrelationResult<std::tuple<double, double>>
+pin_fin_friction_and_jacobian(double Re_d, bool is_staggered) {
   const double eps = std::max(1e-6, Re_d * 1e-6);
   double f_plus = cooling::pin_fin_friction(Re_d + eps, is_staggered);
   double f_minus = cooling::pin_fin_friction(Re_d - eps, is_staggered);
   double df_dRe = (f_plus - f_minus) / (2.0 * eps);
   double f = cooling::pin_fin_friction(Re_d, is_staggered);
-  return {f, df_dRe};
+  return {{f, df_dRe}, CorrelationValidity::VALID, ""};
 }
 
-std::tuple<double, double> dimple_nusselt_enhancement_and_jacobian(double Re_Dh,
-                                                                   double d_Dh,
-                                                                   double h_d,
-                                                                   double S_d) {
+CorrelationResult<std::tuple<double, double>>
+dimple_nusselt_enhancement_and_jacobian(double Re_Dh, double d_Dh, double h_d,
+                                        double S_d) {
   const double eps = std::max(1e-6, Re_Dh * 1e-6);
   double Nu_plus =
       cooling::dimple_nusselt_enhancement(Re_Dh + eps, d_Dh, h_d, S_d);
@@ -354,20 +369,20 @@ std::tuple<double, double> dimple_nusselt_enhancement_and_jacobian(double Re_Dh,
       cooling::dimple_nusselt_enhancement(Re_Dh - eps, d_Dh, h_d, S_d);
   double dNu_dRe = (Nu_plus - Nu_minus) / (2.0 * eps);
   double Nu = cooling::dimple_nusselt_enhancement(Re_Dh, d_Dh, h_d, S_d);
-  return {Nu, dNu_dRe};
+  return {{Nu, dNu_dRe}, CorrelationValidity::VALID, ""};
 }
 
-std::tuple<double, double>
+CorrelationResult<std::tuple<double, double>>
 dimple_friction_multiplier_and_jacobian(double Re_Dh, double d_Dh, double h_d) {
   const double eps = std::max(1e-6, Re_Dh * 1e-6);
   double f_plus = cooling::dimple_friction_multiplier(Re_Dh + eps, d_Dh, h_d);
   double f_minus = cooling::dimple_friction_multiplier(Re_Dh - eps, d_Dh, h_d);
   double df_dRe = (f_plus - f_minus) / (2.0 * eps);
   double f = cooling::dimple_friction_multiplier(Re_Dh, d_Dh, h_d);
-  return {f, df_dRe};
+  return {{f, df_dRe}, CorrelationValidity::VALID, ""};
 }
 
-std::tuple<double, double>
+CorrelationResult<std::tuple<double, double>>
 rib_enhancement_factor_high_re_and_jacobian(double e_D, double pitch_to_height,
                                             double alpha_deg, double Re) {
   const double eps = std::max(1e-6, Re * 1e-6);
@@ -378,10 +393,10 @@ rib_enhancement_factor_high_re_and_jacobian(double e_D, double pitch_to_height,
   double dE_dRe = (E_plus - E_minus) / (2.0 * eps);
   double E = cooling::rib_enhancement_factor_high_re(e_D, pitch_to_height,
                                                      alpha_deg, Re);
-  return {E, dE_dRe};
+  return {{E, dE_dRe}, CorrelationValidity::VALID, ""};
 }
 
-std::tuple<double, double>
+CorrelationResult<std::tuple<double, double>>
 impingement_nusselt_and_jacobian(double Re_jet, double Pr, double z_D,
                                  double x_D, double y_D) {
   const double eps = std::max(1e-6, Re_jet * 1e-6);
@@ -391,10 +406,10 @@ impingement_nusselt_and_jacobian(double Re_jet, double Pr, double z_D,
       cooling::impingement_nusselt(Re_jet - eps, Pr, z_D, x_D, y_D);
   double dNu_dRe = (Nu_plus - Nu_minus) / (2.0 * eps);
   double Nu = cooling::impingement_nusselt(Re_jet, Pr, z_D, x_D, y_D);
-  return {Nu, dNu_dRe};
+  return {{Nu, dNu_dRe}, CorrelationValidity::VALID, ""};
 }
 
-std::tuple<double, double>
+CorrelationResult<std::tuple<double, double>>
 film_cooling_effectiveness_and_jacobian(double x_D, double M, double DR,
                                         double alpha_deg) {
   const double eps = std::max(1e-6, M * 1e-6); // wrt Blowing Ratio M
@@ -404,10 +419,10 @@ film_cooling_effectiveness_and_jacobian(double x_D, double M, double DR,
       cooling::film_cooling_effectiveness(x_D, M - eps, DR, alpha_deg);
   double deta_dM = (eta_plus - eta_minus) / (2.0 * eps);
   double eta = cooling::film_cooling_effectiveness(x_D, M, DR, alpha_deg);
-  return {eta, deta_dM};
+  return {{eta, deta_dM}, CorrelationValidity::VALID, ""};
 }
 
-std::tuple<double, double>
+CorrelationResult<std::tuple<double, double>>
 effusion_effectiveness_and_jacobian(double x_D, double M, double DR,
                                     double porosity, double s_D,
                                     double alpha_deg) {
@@ -419,7 +434,7 @@ effusion_effectiveness_and_jacobian(double x_D, double M, double DR,
   double deta_dM = (eta_plus - eta_minus) / (2.0 * eps);
   double eta =
       cooling::effusion_effectiveness(x_D, M, DR, porosity, s_D, alpha_deg);
-  return {eta, deta_dM};
+  return {{eta, deta_dM}, CorrelationValidity::VALID, ""};
 }
 
 // -----------------------------------------------------------------------------

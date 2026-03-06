@@ -53,6 +53,8 @@ try:
         Cd_sharp_thin_plate,
         Cd_thick_plate,
         CdCorrelation,
+        CorrelationValidity,
+        CorrelationResult,
         CombustionMethod,
         CombustionState,
         CompleteState,
@@ -621,6 +623,8 @@ except ModuleNotFoundError:
     OrificeGeometry = _core.OrificeGeometry
     OrificeState = _core.OrificeState
     CdCorrelation = _core.CdCorrelation
+    CorrelationValidity = _core.CorrelationValidity
+    CorrelationResult = _core.CorrelationResult
     Cd_sharp_thin_plate = _core.Cd_sharp_thin_plate
     Cd_thick_plate = _core.Cd_thick_plate
     Cd_rounded_entry = _core.Cd_rounded_entry
@@ -1037,6 +1041,8 @@ __all__ = [
     "OrificeGeometry",
     "OrificeState",
     "CdCorrelation",
+    "CorrelationValidity",
+    "CorrelationResult",
     "Cd_sharp_thin_plate",
     "Cd_thick_plate",
     "Cd_rounded_entry",
