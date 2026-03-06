@@ -42,6 +42,41 @@ to_vec(py::array_t<double, py::array::c_style | py::array::forcecast> arr) {
 PYBIND11_MODULE(_core, m) {
   m.doc() = "Python bindings for combaero core";
 
+  // Expose the CorrelationValidity enum
+  py::enum_<solver::CorrelationValidity>(
+      m, "CorrelationValidity", "Status flag for correlation evaluations.")
+      .value("VALID", solver::CorrelationValidity::VALID)
+      .value("EXTRAPOLATED", solver::CorrelationValidity::EXTRAPOLATED)
+      .value("INVALID", solver::CorrelationValidity::INVALID)
+      .export_values();
+
+  // Expose the CorrelationResult struct for (f, J) tuples
+  py::class_<solver::CorrelationResult<std::tuple<double, double>>>(
+      m, "CorrelationResult",
+      "Wrapper for correlation results, returning the (value, "
+      "jacobian) tuple alongside validity status.")
+      .def_readonly(
+          "result",
+          &solver::CorrelationResult<std::tuple<double, double>>::result)
+      .def_readonly(
+          "status",
+          &solver::CorrelationResult<std::tuple<double, double>>::status)
+      .def_readonly(
+          "message",
+          &solver::CorrelationResult<std::tuple<double, double>>::message)
+      .def("__repr__",
+           [](const solver::CorrelationResult<std::tuple<double, double>> &r) {
+             std::string status_str = "VALID";
+             if (r.status == solver::CorrelationValidity::EXTRAPOLATED)
+               status_str = "EXTRAPOLATED";
+             else if (r.status == solver::CorrelationValidity::INVALID)
+               status_str = "INVALID";
+             return "<CorrelationResult: (" +
+                    std::to_string(std::get<0>(r.result)) + ", " +
+                    std::to_string(std::get<1>(r.result)) +
+                    "), status=" + status_str + ">";
+           });
+
   // Species metadata helpers
   m.def("num_species", &num_species,
         "Number of thermo species in the internal tables.");

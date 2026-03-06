@@ -1,6 +1,7 @@
 #ifndef SOLVER_INTERFACE_H
 #define SOLVER_INTERFACE_H
 
+#include <cstdint>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -20,6 +21,14 @@
 
 namespace combaero {
 namespace solver {
+
+enum class CorrelationValidity : std::uint8_t { VALID, EXTRAPOLATED, INVALID };
+
+template <typename T> struct CorrelationResult {
+  T result;
+  CorrelationValidity status;
+  std::string message;
+};
 
 // -----------------------------------------------------------------------------
 // 1. Incompressible Flow Components
@@ -86,29 +95,29 @@ std::tuple<double, double> lossless_pressure_and_jacobian(double P_in,
 //   tuple(Nu, d_Nu_d_Re)
 //   Nu        : Nusselt number [-]
 //   d_Nu_d_Re : Jacobian gradient [-]
-std::tuple<double, double>
+CorrelationResult<std::tuple<double, double>>
 nusselt_and_jacobian_dittus_boelter(double Re, double Pr, bool heating = true);
 
 // Calculate Nusselt Number and its derivative with respect to Reynolds Number
 // using the Gnielinski correlation.
 //
 // Method: Finite Central Difference
-std::tuple<double, double> nusselt_and_jacobian_gnielinski(double Re, double Pr,
-                                                           double f);
+CorrelationResult<std::tuple<double, double>>
+nusselt_and_jacobian_gnielinski(double Re, double Pr, double f);
 
 // Calculate Nusselt Number and its derivative with respect to Reynolds Number
 // using the Sieder-Tate correlation.
 //
 // Method: Analytical Chain Rule
-std::tuple<double, double>
+CorrelationResult<std::tuple<double, double>>
 nusselt_and_jacobian_sieder_tate(double Re, double Pr, double mu_ratio);
 
 // Calculate Nusselt Number and its derivative with respect to Reynolds Number
 // using the Petukhov correlation.
 //
 // Method: Analytical Chain Rule
-std::tuple<double, double> nusselt_and_jacobian_petukhov(double Re, double Pr,
-                                                         double f);
+CorrelationResult<std::tuple<double, double>>
+nusselt_and_jacobian_petukhov(double Re, double Pr, double f);
 
 // Calculate Friction Factor and its derivative with respect to Reynolds Number.
 // Uses the Haaland explicit pipe friction relation.
@@ -122,7 +131,8 @@ std::tuple<double, double> nusselt_and_jacobian_petukhov(double Re, double Pr,
 //   tuple(f, d_f_d_Re)
 //   f        : Darcy friction factor [-]
 //   d_f_d_Re : Jacobian gradient [-]
-std::tuple<double, double> friction_and_jacobian_haaland(double Re, double e_D);
+CorrelationResult<std::tuple<double, double>>
+friction_and_jacobian_haaland(double Re, double e_D);
 
 // Calculate Friction Factor and its derivative using the Serghides explicit
 // approximation to Colebrook-White (Steffensen acceleration).
@@ -134,8 +144,8 @@ std::tuple<double, double> friction_and_jacobian_haaland(double Re, double e_D);
 //
 // Returns:
 //   tuple(f, d_f_d_Re)
-std::tuple<double, double> friction_and_jacobian_serghides(double Re,
-                                                           double e_D);
+CorrelationResult<std::tuple<double, double>>
+friction_and_jacobian_serghides(double Re, double e_D);
 
 // Calculate Friction Factor and its derivative using the Colebrook-White
 // implicit equation (Newton-Raphson converged internally).
@@ -147,8 +157,8 @@ std::tuple<double, double> friction_and_jacobian_serghides(double Re,
 //
 // Returns:
 //   tuple(f, d_f_d_Re)
-std::tuple<double, double> friction_and_jacobian_colebrook(double Re,
-                                                           double e_D);
+CorrelationResult<std::tuple<double, double>>
+friction_and_jacobian_colebrook(double Re, double e_D);
 
 // Calculate Friction Factor and its derivative using the Petukhov smooth-pipe
 // correlation: f = (coeff_a * ln(Re) - coeff_b)^(-2)
@@ -159,7 +169,8 @@ std::tuple<double, double> friction_and_jacobian_colebrook(double Re,
 //
 // Returns:
 //   tuple(f, d_f_d_Re)
-std::tuple<double, double> friction_and_jacobian_petukhov(double Re);
+CorrelationResult<std::tuple<double, double>>
+friction_and_jacobian_petukhov(double Re);
 
 // Convenience dispatcher: selects the correct friction_and_jacobian_* overload
 // based on a string tag matching FrictionModelLiteral from Python.
@@ -168,49 +179,48 @@ std::tuple<double, double> friction_and_jacobian_petukhov(double Re);
 //
 // Returns:
 //   tuple(f, d_f_d_Re)
-std::tuple<double, double> friction_and_jacobian(const std::string &tag,
-                                                 double Re, double e_D);
+CorrelationResult<std::tuple<double, double>>
+friction_and_jacobian(const std::string &tag, double Re, double e_D);
 
 // -----------------------------------------------------------------------------
 // 3. Cooling Correlations
 // -----------------------------------------------------------------------------
 
 // Pin Fin Nusselt Number and Jacobian wrt Re_d
-std::tuple<double, double>
+CorrelationResult<std::tuple<double, double>>
 pin_fin_nusselt_and_jacobian(double Re_d, double Pr, double L_D, double S_D,
                              double X_D, bool is_staggered = true);
 
 // Pin Fin Friction and Jacobian wrt Re_d
-std::tuple<double, double>
+CorrelationResult<std::tuple<double, double>>
 pin_fin_friction_and_jacobian(double Re_d, bool is_staggered = true);
 
 // Dimple Nusselt Enhancement and Jacobian wrt Re_Dh
-std::tuple<double, double> dimple_nusselt_enhancement_and_jacobian(double Re_Dh,
-                                                                   double d_Dh,
-                                                                   double h_d,
-                                                                   double S_d);
+CorrelationResult<std::tuple<double, double>>
+dimple_nusselt_enhancement_and_jacobian(double Re_Dh, double d_Dh, double h_d,
+                                        double S_d);
 
 // Dimple Friction Multiplier and Jacobian wrt Re_Dh
-std::tuple<double, double>
+CorrelationResult<std::tuple<double, double>>
 dimple_friction_multiplier_and_jacobian(double Re_Dh, double d_Dh, double h_d);
 
 // Rib Enhancement Factor (High-Re) and Jacobian wrt Re
-std::tuple<double, double>
+CorrelationResult<std::tuple<double, double>>
 rib_enhancement_factor_high_re_and_jacobian(double e_D, double pitch_to_height,
                                             double alpha_deg, double Re);
 
 // Impingement Nusselt Number and Jacobian wrt Re_jet
-std::tuple<double, double>
+CorrelationResult<std::tuple<double, double>>
 impingement_nusselt_and_jacobian(double Re_jet, double Pr, double z_D,
                                  double x_D = 0.0, double y_D = 0.0);
 
 // Film Cooling Effectiveness and Jacobian wrt Blowing Ratio M
-std::tuple<double, double>
+CorrelationResult<std::tuple<double, double>>
 film_cooling_effectiveness_and_jacobian(double x_D, double M, double DR,
                                         double alpha_deg);
 
 // Effusion Effectiveness and Jacobian wrt Blowing Ratio M
-std::tuple<double, double>
+CorrelationResult<std::tuple<double, double>>
 effusion_effectiveness_and_jacobian(double x_D, double M, double DR,
                                     double porosity, double s_D,
                                     double alpha_deg);

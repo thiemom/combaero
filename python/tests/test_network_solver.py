@@ -102,7 +102,7 @@ def test_network_solver_simple_pipe():
     v = m_dot_solved / (rho * A)
     Re = max(4.0 * m_dot_solved / (math.pi * 0.05 * mu), 1.0)
 
-    f, _ = cb.friction_and_jacobian("haaland", Re, 1e-5 / 0.05)
+    f, _ = cb.friction_and_jacobian("haaland", Re, 1e-5 / 0.05).result
 
     dP_analytical = f * (10.0 / 0.05) * 0.5 * rho * v**2
     dP_actual = inlet.P_total - outlet.P_total

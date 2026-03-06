@@ -56,13 +56,13 @@ def test_nusselt_jacobian():
     Pr_cooling = 4.3  # Water
 
     def nu_func(Re, Pr, heating):
-        return cb._core.nusselt_and_jacobian_dittus_boelter(Re, Pr, heating)[0]
+        return cb._core.nusselt_and_jacobian_dittus_boelter(Re, Pr, heating).result[0]
 
     for Re in [10000.0, 50000.0, 1e6]:
         # Heating
         Nu_analytic, jac_analytic = cb._core.nusselt_and_jacobian_dittus_boelter(
             Re, Pr_heating, True
-        )
+        ).result
         jac_numeric = central_difference(
             nu_func, Re, 1e-4, Pr_heating, True
         )  # slightly larger step for large Re
@@ -71,7 +71,7 @@ def test_nusselt_jacobian():
         # Cooling
         Nu_analytic, jac_analytic = cb._core.nusselt_and_jacobian_dittus_boelter(
             Re, Pr_cooling, False
-        )
+        ).result
         jac_numeric = central_difference(nu_func, Re, 1e-4, Pr_cooling, False)
         np.testing.assert_allclose(jac_analytic, jac_numeric, rtol=1e-5)
 
@@ -80,10 +80,10 @@ def test_friction_haaland_jacobian():
     e_D = 1e-4
 
     def f_func(Re):
-        return cb._core.friction_and_jacobian_haaland(Re, e_D)[0]
+        return cb._core.friction_and_jacobian_haaland(Re, e_D).result[0]
 
     for Re in [3000.0, 10000.0, 1e6]:
-        f_analytic, jac_analytic = cb._core.friction_and_jacobian_haaland(Re, e_D)
+        f_analytic, jac_analytic = cb._core.friction_and_jacobian_haaland(Re, e_D).result
 
         # Friction factor gradients are very small, adjust h scalar based on Re magnitude
         h = max(1e-4, Re * 1e-6)
@@ -164,10 +164,12 @@ def test_nusselt_gnielinski_jacobian():
     f_val = 0.05
 
     def nu_func(Re):
-        return cb._core.nusselt_and_jacobian_gnielinski(Re, Pr_val, f_val)[0]
+        return cb._core.nusselt_and_jacobian_gnielinski(Re, Pr_val, f_val).result[0]
 
     for Re in [3000.0, 10000.0, 1e6]:
-        Nu_analytic, jac_analytic = cb._core.nusselt_and_jacobian_gnielinski(Re, Pr_val, f_val)
+        Nu_analytic, jac_analytic = cb._core.nusselt_and_jacobian_gnielinski(
+            Re, Pr_val, f_val
+        ).result
         jac_numeric = central_difference(nu_func, Re, 1e-4)
         np.testing.assert_allclose(jac_analytic, jac_numeric, rtol=1e-5)
 
@@ -177,10 +179,12 @@ def test_nusselt_sieder_tate_jacobian():
     mu_ratio = 1.1
 
     def nu_func(Re):
-        return cb._core.nusselt_and_jacobian_sieder_tate(Re, Pr_val, mu_ratio)[0]
+        return cb._core.nusselt_and_jacobian_sieder_tate(Re, Pr_val, mu_ratio).result[0]
 
     for Re in [3000.0, 10000.0, 1e6]:
-        Nu_analytic, jac_analytic = cb._core.nusselt_and_jacobian_sieder_tate(Re, Pr_val, mu_ratio)
+        Nu_analytic, jac_analytic = cb._core.nusselt_and_jacobian_sieder_tate(
+            Re, Pr_val, mu_ratio
+        ).result
         jac_numeric = central_difference(nu_func, Re, 1e-4)
         np.testing.assert_allclose(jac_analytic, jac_numeric, rtol=1e-5)
 
@@ -190,10 +194,10 @@ def test_nusselt_petukhov_jacobian():
     f_val = 0.05
 
     def nu_func(Re):
-        return cb._core.nusselt_and_jacobian_petukhov(Re, Pr_val, f_val)[0]
+        return cb._core.nusselt_and_jacobian_petukhov(Re, Pr_val, f_val).result[0]
 
     for Re in [10000.0, 50000.0, 1e6]:
-        Nu_analytic, jac_analytic = cb._core.nusselt_and_jacobian_petukhov(Re, Pr_val, f_val)
+        Nu_analytic, jac_analytic = cb._core.nusselt_and_jacobian_petukhov(Re, Pr_val, f_val).result
         jac_numeric = central_difference(nu_func, Re, 1e-4)
         np.testing.assert_allclose(jac_analytic, jac_numeric, rtol=1e-5)
 
@@ -205,17 +209,19 @@ def test_pin_fin_jacobians():
     X_D = 2.5
 
     def nu_func(Re_d):
-        return cb._core.pin_fin_nusselt_and_jacobian(Re_d, Pr, L_D, S_D, X_D, True)[0]
+        return cb._core.pin_fin_nusselt_and_jacobian(Re_d, Pr, L_D, S_D, X_D, True).result[0]
 
     def f_func(Re_d):
-        return cb._core.pin_fin_friction_and_jacobian(Re_d, True)[0]
+        return cb._core.pin_fin_friction_and_jacobian(Re_d, True).result[0]
 
     for Re_d in [1000.0, 10000.0, 50000.0]:
-        Nu_ana, dNu_ana = cb._core.pin_fin_nusselt_and_jacobian(Re_d, Pr, L_D, S_D, X_D, True)
+        Nu_ana, dNu_ana = cb._core.pin_fin_nusselt_and_jacobian(
+            Re_d, Pr, L_D, S_D, X_D, True
+        ).result
         dNu_num = central_difference(nu_func, Re_d, max(1e-4, Re_d * 1e-6))
         np.testing.assert_allclose(dNu_ana, dNu_num, rtol=1e-5)
 
-        f_ana, df_ana = cb._core.pin_fin_friction_and_jacobian(Re_d, True)
+        f_ana, df_ana = cb._core.pin_fin_friction_and_jacobian(Re_d, True).result
         df_num = central_difference(f_func, Re_d, max(1e-4, Re_d * 1e-6))
         np.testing.assert_allclose(df_ana, df_num, rtol=1e-5)
 
@@ -226,17 +232,19 @@ def test_dimple_jacobians():
     S_d = 2.0  # Must be in [1.5, 3.0]
 
     def nu_func(Re_Dh):
-        return cb._core.dimple_nusselt_enhancement_and_jacobian(Re_Dh, d_Dh, h_d, S_d)[0]
+        return cb._core.dimple_nusselt_enhancement_and_jacobian(Re_Dh, d_Dh, h_d, S_d).result[0]
 
     def f_func(Re_Dh):
-        return cb._core.dimple_friction_multiplier_and_jacobian(Re_Dh, d_Dh, h_d)[0]
+        return cb._core.dimple_friction_multiplier_and_jacobian(Re_Dh, d_Dh, h_d).result[0]
 
     for Re_Dh in [10000.0, 50000.0]:
-        Nu_ana, dNu_ana = cb._core.dimple_nusselt_enhancement_and_jacobian(Re_Dh, d_Dh, h_d, S_d)
+        Nu_ana, dNu_ana = cb._core.dimple_nusselt_enhancement_and_jacobian(
+            Re_Dh, d_Dh, h_d, S_d
+        ).result
         dNu_num = central_difference(nu_func, Re_Dh, max(1e-4, Re_Dh * 1e-6))
         np.testing.assert_allclose(dNu_ana, dNu_num, rtol=1e-5)
 
-        f_ana, df_ana = cb._core.dimple_friction_multiplier_and_jacobian(Re_Dh, d_Dh, h_d)
+        f_ana, df_ana = cb._core.dimple_friction_multiplier_and_jacobian(Re_Dh, d_Dh, h_d).result
         df_num = central_difference(f_func, Re_Dh, max(1e-4, Re_Dh * 1e-6))
         np.testing.assert_allclose(df_ana, df_num, rtol=1e-5)
 
@@ -247,10 +255,12 @@ def test_rib_enhancement_jacobian():
     alpha = 45.0
 
     def f_func(Re):
-        return cb._core.rib_enhancement_factor_high_re_and_jacobian(e_D, pt_h, alpha, Re)[0]
+        return cb._core.rib_enhancement_factor_high_re_and_jacobian(e_D, pt_h, alpha, Re).result[0]
 
     for Re in [10000.0, 50000.0]:
-        f_ana, df_ana = cb._core.rib_enhancement_factor_high_re_and_jacobian(e_D, pt_h, alpha, Re)
+        f_ana, df_ana = cb._core.rib_enhancement_factor_high_re_and_jacobian(
+            e_D, pt_h, alpha, Re
+        ).result
         df_num = central_difference(f_func, Re, max(1e-4, Re * 1e-6))
         np.testing.assert_allclose(df_ana, df_num, rtol=1e-5)
 
@@ -260,10 +270,10 @@ def test_impingement_jacobian():
     z_D = 3.0
 
     def f_func(Re_jet):
-        return cb._core.impingement_nusselt_and_jacobian(Re_jet, Pr, z_D)[0]
+        return cb._core.impingement_nusselt_and_jacobian(Re_jet, Pr, z_D).result[0]
 
     for Re_jet in [10000.0, 50000.0]:
-        f_ana, df_ana = cb._core.impingement_nusselt_and_jacobian(Re_jet, Pr, z_D)
+        f_ana, df_ana = cb._core.impingement_nusselt_and_jacobian(Re_jet, Pr, z_D).result
         df_num = central_difference(f_func, Re_jet, max(1e-4, Re_jet * 1e-6))
         np.testing.assert_allclose(df_ana, df_num, rtol=1e-5)
 
@@ -276,13 +286,15 @@ def test_film_and_effusion_jacobians():
     s_D = 5.0  # Must be in [4.0, 8.0]
 
     def film_func(M):
-        return cb._core.film_cooling_effectiveness_and_jacobian(x_D, M, DR, alpha)[0]
+        return cb._core.film_cooling_effectiveness_and_jacobian(x_D, M, DR, alpha).result[0]
 
     def eff_func(M):
-        return cb._core.effusion_effectiveness_and_jacobian(x_D, M, DR, porosity, s_D, alpha)[0]
+        return cb._core.effusion_effectiveness_and_jacobian(
+            x_D, M, DR, porosity, s_D, alpha
+        ).result[0]
 
     for M in [0.5, 1.0, 2.0]:
-        f_ana, df_ana = cb._core.film_cooling_effectiveness_and_jacobian(x_D, M, DR, alpha)
+        f_ana, df_ana = cb._core.film_cooling_effectiveness_and_jacobian(x_D, M, DR, alpha).result
         df_num = central_difference(film_func, M, 1e-5)
         np.testing.assert_allclose(
             df_ana, df_num, rtol=1e-4
@@ -291,7 +303,7 @@ def test_film_and_effusion_jacobians():
     for M in [1.01, 2.0, 3.5]:
         f_ana, df_ana = cb._core.effusion_effectiveness_and_jacobian(
             x_D, M, DR, porosity, s_D, alpha
-        )
+        ).result
         df_num = central_difference(
             eff_func, M, 1e-4
         )  # Slightly looser due to M-dependent finite differences
