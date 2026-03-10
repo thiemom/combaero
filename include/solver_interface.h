@@ -31,6 +31,29 @@ template <typename T> struct CorrelationResult {
 };
 
 // -----------------------------------------------------------------------------
+// Stream Definitions for Network Solvers
+// -----------------------------------------------------------------------------
+
+struct Stream {
+  double m_dot;
+  double T;
+  std::vector<double> Y;
+};
+
+struct StreamJacobian {
+  double d_mdot;
+  double d_T;
+  std::vector<double> d_Y;
+};
+
+struct MixerResult {
+  double T_mix;
+  std::vector<double> Y_mix;
+  std::vector<StreamJacobian> dT_mix_d_stream;
+  std::vector<std::vector<StreamJacobian>> dY_mix_d_stream;
+};
+
+// -----------------------------------------------------------------------------
 // 1. Incompressible Flow Components
 // -----------------------------------------------------------------------------
 
@@ -298,6 +321,66 @@ T0_from_static_and_jacobian_M(double T, double M, const std::vector<double> &X);
 std::tuple<double, double>
 P0_from_static_and_jacobian_M(double P, double T, double M,
                               const std::vector<double> &X);
+
+// -----------------------------------------------------------------------------
+// 6. Combustion Interfaces
+// -----------------------------------------------------------------------------
+
+// Calculate Adiabatic Flame Temperature (Complete Combustion) and its
+// derivative wrt inlet temperature.
+// Method: Central Finite Difference tightly bracketed.
+// Inputs:
+//   T_in : Inlet temperature [K]
+//   P    : Pressure [Pa]
+//   X_in : Inlet mole fractions [-]
+// Returns:
+//   tuple(T_ad, dT_ad_dT_in, X_products)
+//   T_ad        : Adiabatic flame temperature [K]
+//   dT_ad_dT_in : Jacobian gradient [-]
+//   X_products  : Mole fractions of products [-]
+std::tuple<double, double, std::vector<double>>
+adiabatic_T_complete_and_jacobian_T(double T_in, double P,
+                                    const std::vector<double> &X_in);
+
+// Calculate Adiabatic Flame Temperature (Equilibrium Combustion) and its
+// derivatives wrt inlet temperature and pressure.
+// Method: Central Finite Difference tightly bracketed.
+// Inputs:
+//   T_in : Inlet temperature [K]
+//   P    : Pressure [Pa]
+//   X_in : Inlet mole fractions [-]
+// Returns:
+//   tuple(T_ad, dT_ad_dT_in, dT_ad_dP, X_products)
+//   T_ad        : Adiabatic flame temperature [K]
+//   dT_ad_dT_in : Jacobian gradient wrt Inlet Temperature [-]
+//   dT_ad_dP    : Jacobian gradient wrt Pressure [K/Pa]
+//   X_products  : Mole fractions of products [-]
+std::tuple<double, double, double, std::vector<double>>
+adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
+                                      const std::vector<double> &X_in);
+
+// -----------------------------------------------------------------------------
+// 7. Stream-Based Network Solvers
+// -----------------------------------------------------------------------------
+
+// Mix generalized non-reacting incoming streams into a single outgoing state,
+// and compute all analytical Jacobians w.r.t upstream mass flows, Temperatures,
+// and mass fractions (Y_i).
+MixerResult
+mixer_from_streams_and_jacobians(const std::vector<Stream> &streams);
+
+// Combust multiple generalized incoming streams to exactly complete
+// equilibrium, outputting the theoretical adiabatic flame temperature and
+// product mass fractions. Computes all exact analytical Jacobians w.r.t
+// upstream conditions.
+MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
+    const std::vector<Stream> &streams, double P);
+
+// Combust multiple generalized incoming streams to generalized equilibrium,
+// outputting the theoretical adiabatic flame temperature and product mass
+// fractions. Computes all exact analytical Jacobians w.r.t upstream conditions.
+MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
+    const std::vector<Stream> &streams, double P);
 
 } // namespace solver
 } // namespace combaero

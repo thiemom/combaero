@@ -313,12 +313,12 @@ class TestHtcPipeComposite:
         D = 0.05  # m
 
         # Air
-        X_air = cb.standard_dry_air_composition()
-        h_air, Nu_air, Re_air = cb.htc_pipe(T, P, X_air, v, D)
+        Y_air = cb.standard_dry_air_composition()
+        h_air, Nu_air, Re_air = cb.htc_pipe(T, P, Y_air, v, D)
 
         # Pure N2 (simplified - just use air, properties are similar)
         # In practice, N2 and air have very similar transport properties
-        h_N2, Nu_N2, Re_N2 = cb.htc_pipe(T, P, X_air, v, D)
+        h_N2, Nu_N2, Re_N2 = cb.htc_pipe(T, P, Y_air, v, D)
 
         # Both should be positive
         assert h_air > 0

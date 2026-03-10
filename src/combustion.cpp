@@ -11,163 +11,179 @@
 
 namespace {
 
-double pure_species_enthalpy(std::size_t idx, const double reference_temperature) {
-    return h_species(idx, reference_temperature);
+double pure_species_enthalpy(std::size_t idx,
+                             const double reference_temperature) {
+  return h_species(idx, reference_temperature);
 }
 
-void validate_fuel_mole_fractions(const std::vector<double>& X_fuel) {
-    if (X_fuel.size() != species_names.size()) {
-        throw std::runtime_error("fuel_lhv_*: mixture size does not match number of species");
-    }
-    const double sum = std::accumulate(X_fuel.begin(), X_fuel.end(), 0.0);
-    if (std::abs(sum - 1.0) > 1.0e-5) {
-        throw std::runtime_error("fuel_lhv_*: mole fractions must sum to 1.0");
-    }
+void validate_fuel_mole_fractions(const std::vector<double> &X_fuel) {
+  if (X_fuel.size() != species_names.size()) {
+    throw std::runtime_error(
+        "fuel_lhv_*: mixture size does not match number of species");
+  }
+  const double sum = std::accumulate(X_fuel.begin(), X_fuel.end(), 0.0);
+  if (std::abs(sum - 1.0) > 1.0e-5) {
+    throw std::runtime_error("fuel_lhv_*: mole fractions must sum to 1.0");
+  }
 }
 
-}  // namespace
-
+} // namespace
 
 // Calculate oxygen required for complete combustion [mol O2/mol fuel]
 double oxygen_required_per_mol_fuel(std::size_t fuel_index) {
-    // Validate fuel index
-    if (fuel_index >= molecular_structures.size()) {
-        throw std::runtime_error("Invalid fuel index");
-    }
+  // Validate fuel index
+  if (fuel_index >= molecular_structures.size()) {
+    throw std::runtime_error("Invalid fuel index");
+  }
 
-    // Get molecular structure
-    const Molecular_Structure& fuel = molecular_structures[fuel_index];
+  // Get molecular structure
+  const Molecular_Structure &fuel = molecular_structures[fuel_index];
 
-    // For complete combustion:
-    // C_x H_y O_z N_w + (x + y/4 - z/2) O2 -> x CO2 + (y/2) H2O + (w/2) N2
-    // Oxygen required = x + y/4 - z/2 [mol O2/mol fuel]
+  // For complete combustion:
+  // C_x H_y O_z N_w + (x + y/4 - z/2) O2 -> x CO2 + (y/2) H2O + (w/2) N2
+  // Oxygen required = x + y/4 - z/2 [mol O2/mol fuel]
 
-    double oxygen_required = static_cast<double>(fuel.C) + static_cast<double>(fuel.H) / 4.0 - static_cast<double>(fuel.O) / 2.0;
+  double oxygen_required = static_cast<double>(fuel.C) +
+                           static_cast<double>(fuel.H) / 4.0 -
+                           static_cast<double>(fuel.O) / 2.0;
 
-    // Ensure non-negative value (for cases where fuel already has excess oxygen)
-    return std::max(0.0, oxygen_required);
+  // Ensure non-negative value (for cases where fuel already has excess oxygen)
+  return std::max(0.0, oxygen_required);
 }
 
 // Calculate oxygen required for complete combustion [kg O2/kg fuel]
 double oxygen_required_per_kg_fuel(std::size_t fuel_index) {
-    // Validate fuel index
-    if (fuel_index >= molar_masses.size()) {
-        throw std::runtime_error("Invalid fuel index");
-    }
+  // Validate fuel index
+  if (fuel_index >= molar_masses.size()) {
+    throw std::runtime_error("Invalid fuel index");
+  }
 
-    // Get molar masses
-    double fuel_molar_mass = molar_masses[fuel_index];  // g/mol
-    double oxygen_molar_mass = molar_masses[species_index.at("O2")];  // g/mol
+  // Get molar masses
+  double fuel_molar_mass = molar_masses[fuel_index];               // g/mol
+  double oxygen_molar_mass = molar_masses[species_index.at("O2")]; // g/mol
 
-    // Calculate molar oxygen requirement
-    double molar_oxygen_required = oxygen_required_per_mol_fuel(fuel_index);  // mol O2/mol fuel
+  // Calculate molar oxygen requirement
+  double molar_oxygen_required =
+      oxygen_required_per_mol_fuel(fuel_index); // mol O2/mol fuel
 
-    // Convert to mass basis: (mol O2/mol fuel) * (g O2/mol O2) / (g fuel/mol fuel)
-    return molar_oxygen_required * oxygen_molar_mass / fuel_molar_mass;  // kg O2/kg fuel
+  // Convert to mass basis: (mol O2/mol fuel) * (g O2/mol O2) / (g fuel/mol
+  // fuel)
+  return molar_oxygen_required * oxygen_molar_mass /
+         fuel_molar_mass; // kg O2/kg fuel
 }
 
-// Calculate oxygen required for complete combustion of a mixture [mol O2/mol mixture]
-double oxygen_required_per_mol_mixture(const std::vector<double>& X) {
-    // Check if mole fractions sum to approximately 1.0
-    double sum = std::accumulate(X.begin(), X.end(), 0.0);
-    if (std::abs(sum - 1.0) > 1.0e-5) {
-        throw std::runtime_error("Mole fractions must sum to 1.0");
+// Calculate oxygen required for complete combustion of a mixture [mol O2/mol
+// mixture]
+double oxygen_required_per_mol_mixture(const std::vector<double> &X) {
+  // Check if mole fractions sum to approximately 1.0
+  double sum = std::accumulate(X.begin(), X.end(), 0.0);
+  if (std::abs(sum - 1.0) > 1.0e-5) {
+    throw std::runtime_error("Mole fractions must sum to 1.0");
+  }
+
+  double total_oxygen_required = 0.0;
+
+  // Calculate weighted sum of oxygen requirements for each fuel component
+  for (size_t i = 0; i < X.size(); ++i) {
+    // Skip if mole fraction is zero
+    if (X[i] <= 0.0)
+      continue;
+
+    // Check if this is a fuel (contains carbon or hydrogen)
+    if (molecular_structures[i].C > 0 || molecular_structures[i].H > 0) {
+      total_oxygen_required += X[i] * oxygen_required_per_mol_fuel(i);
     }
+  }
 
-    double total_oxygen_required = 0.0;
-
-    // Calculate weighted sum of oxygen requirements for each fuel component
-    for (size_t i = 0; i < X.size(); ++i) {
-        // Skip if mole fraction is zero
-        if (X[i] <= 0.0) continue;
-
-        // Check if this is a fuel (contains carbon or hydrogen)
-        if (molecular_structures[i].C > 0 || molecular_structures[i].H > 0) {
-            total_oxygen_required += X[i] * oxygen_required_per_mol_fuel(i);
-        }
-    }
-
-    return total_oxygen_required;  // mol O2/mol mixture
+  return total_oxygen_required; // mol O2/mol mixture
 }
 
-// Calculate oxygen required for complete combustion of a mixture [kg O2/kg mixture]
-double oxygen_required_per_kg_mixture(const std::vector<double>& X) {
-    // Check if mole fractions sum to approximately 1.0
-    double sum = std::accumulate(X.begin(), X.end(), 0.0);
-    if (std::abs(sum - 1.0) > 1.0e-5) {
-        throw std::runtime_error("Mole fractions must sum to 1.0");
-    }
+// Calculate oxygen required for complete combustion of a mixture [kg O2/kg
+// mixture]
+double oxygen_required_per_kg_mixture(const std::vector<double> &X) {
+  // Check if mole fractions sum to approximately 1.0
+  double sum = std::accumulate(X.begin(), X.end(), 0.0);
+  if (std::abs(sum - 1.0) > 1.0e-5) {
+    throw std::runtime_error("Mole fractions must sum to 1.0");
+  }
 
-    // Calculate mixture molecular weight
-    double mixture_mw = mwmix(X);  // g/mol
+  // Calculate mixture molecular weight
+  double mixture_mw = mwmix(X); // g/mol
 
-    // Get oxygen molecular weight
-    double oxygen_mw = molar_masses[species_index.at("O2")];  // g/mol
+  // Get oxygen molecular weight
+  double oxygen_mw = molar_masses[species_index.at("O2")]; // g/mol
 
-    // Calculate molar oxygen requirement for the mixture
-    double molar_oxygen_required = oxygen_required_per_mol_mixture(X);  // mol O2/mol mixture
+  // Calculate molar oxygen requirement for the mixture
+  double molar_oxygen_required =
+      oxygen_required_per_mol_mixture(X); // mol O2/mol mixture
 
-    // If no oxygen required (no fuel in mixture), return 0
-    if (molar_oxygen_required <= 0.0) {
-        return 0.0;
-    }
+  // If no oxygen required (no fuel in mixture), return 0
+  if (molar_oxygen_required <= 0.0) {
+    return 0.0;
+  }
 
-    // Convert to mass basis: (mol O2/mol mixture) * (g O2/mol O2) / (g mixture/mol mixture)
-    return molar_oxygen_required * oxygen_mw / mixture_mw;  // kg O2/kg mixture
+  // Convert to mass basis: (mol O2/mol mixture) * (g O2/mol O2) / (g
+  // mixture/mol mixture)
+  return molar_oxygen_required * oxygen_mw / mixture_mw; // kg O2/kg mixture
 }
 
-double fuel_lhv_molar(const std::vector<double>& X_fuel, const double reference_temperature) {
-    validate_fuel_mole_fractions(X_fuel);
+double fuel_lhv_molar(const std::vector<double> &X_fuel,
+                      const double reference_temperature) {
+  validate_fuel_mole_fractions(X_fuel);
 
-    if (reference_temperature <= 0.0) {
-        throw std::runtime_error("fuel_lhv_molar: reference_temperature must be positive");
+  if (reference_temperature <= 0.0) {
+    throw std::runtime_error(
+        "fuel_lhv_molar: reference_temperature must be positive");
+  }
+
+  const std::size_t idx_O2 = species_index.at("O2");
+  const std::size_t idx_CO2 = species_index.at("CO2");
+  const std::size_t idx_H2O = species_index.at("H2O");
+  const std::size_t idx_N2 = species_index.at("N2");
+
+  const double h_O2 = pure_species_enthalpy(idx_O2, reference_temperature);
+  const double h_CO2 = pure_species_enthalpy(idx_CO2, reference_temperature);
+  const double h_H2O = pure_species_enthalpy(idx_H2O, reference_temperature);
+  const double h_N2 = pure_species_enthalpy(idx_N2, reference_temperature);
+
+  double lhv_molar = 0.0;
+
+  for (std::size_t i = 0; i < X_fuel.size(); ++i) {
+    const double x_i = X_fuel[i];
+    if (x_i <= 0.0) {
+      continue;
     }
 
-    const std::size_t idx_O2 = species_index.at("O2");
-    const std::size_t idx_CO2 = species_index.at("CO2");
-    const std::size_t idx_H2O = species_index.at("H2O");
-    const std::size_t idx_N2 = species_index.at("N2");
-
-    const double h_O2 = pure_species_enthalpy(idx_O2, reference_temperature);
-    const double h_CO2 = pure_species_enthalpy(idx_CO2, reference_temperature);
-    const double h_H2O = pure_species_enthalpy(idx_H2O, reference_temperature);
-    const double h_N2 = pure_species_enthalpy(idx_N2, reference_temperature);
-
-    double lhv_molar = 0.0;
-
-    for (std::size_t i = 0; i < X_fuel.size(); ++i) {
-        const double x_i = X_fuel[i];
-        if (x_i <= 0.0) {
-            continue;
-        }
-
-        const double nu_O2 = oxygen_required_per_mol_fuel(i);
-        if (nu_O2 <= 0.0) {
-            continue;
-        }
-
-        const Molecular_Structure& s = molecular_structures[i];
-        const double h_fuel_i = pure_species_enthalpy(i, reference_temperature);
-
-        const double h_react = h_fuel_i + nu_O2 * h_O2;
-        const double h_prod = static_cast<double>(s.C) * h_CO2
-                              + 0.5 * static_cast<double>(s.H) * h_H2O
-                              + 0.5 * static_cast<double>(s.N) * h_N2;
-
-        const double delta_h_rxn = h_prod - h_react;  // [J/mol species i]
-        lhv_molar += x_i * (-delta_h_rxn);
+    const double nu_O2 = oxygen_required_per_mol_fuel(i);
+    if (nu_O2 <= 0.0) {
+      continue;
     }
 
-    return std::max(0.0, lhv_molar); // [J/mol fuel]
+    const Molecular_Structure &s = molecular_structures[i];
+    const double h_fuel_i = pure_species_enthalpy(i, reference_temperature);
+
+    const double h_react = h_fuel_i + nu_O2 * h_O2;
+    const double h_prod = static_cast<double>(s.C) * h_CO2 +
+                          0.5 * static_cast<double>(s.H) * h_H2O +
+                          0.5 * static_cast<double>(s.N) * h_N2;
+
+    const double delta_h_rxn = h_prod - h_react; // [J/mol species i]
+    lhv_molar += x_i * (-delta_h_rxn);
+  }
+
+  return std::max(0.0, lhv_molar); // [J/mol fuel]
 }
 
-double fuel_lhv_mass(const std::vector<double>& X_fuel, const double reference_temperature) {
-    validate_fuel_mole_fractions(X_fuel);
-    const double mw_fuel = mwmix(X_fuel);  // [g/mol]
-    if (mw_fuel <= 0.0) {
-        throw std::runtime_error("fuel_lhv_mass: fuel molecular weight must be positive");
-    }
-    return fuel_lhv_molar(X_fuel, reference_temperature) * 1000.0 / mw_fuel; // [J/kg fuel]
+double fuel_lhv_mass(const std::vector<double> &X_fuel,
+                     const double reference_temperature) {
+  validate_fuel_mole_fractions(X_fuel);
+  const double mw_fuel = mwmix(X_fuel); // [g/mol]
+  if (mw_fuel <= 0.0) {
+    throw std::runtime_error(
+        "fuel_lhv_mass: fuel molecular weight must be positive");
+  }
+  return fuel_lhv_molar(X_fuel, reference_temperature) * 1000.0 /
+         mw_fuel; // [J/kg fuel]
 }
 
 // -------------------------------------------------------------
@@ -176,132 +192,143 @@ double fuel_lhv_mass(const std::vector<double>& X_fuel, const double reference_t
 
 // Calculate dry air required for complete combustion [mol air/mol fuel]
 double dryair_required_per_mol_fuel(std::size_t fuel_index) {
-    double O2_required = oxygen_required_per_mol_fuel(fuel_index);
-    double X_O2_air = dry_air_composition.at("O2");
-    return O2_required / X_O2_air;
+  double O2_required = oxygen_required_per_mol_fuel(fuel_index);
+  double X_O2_air = dry_air_composition.at("O2");
+  return O2_required / X_O2_air;
 }
 
 // Calculate dry air required for complete combustion [kg air/kg fuel]
 double dryair_required_per_kg_fuel(std::size_t fuel_index) {
-    if (fuel_index >= molar_masses.size()) {
-        throw std::runtime_error("Invalid fuel index");
-    }
+  if (fuel_index >= molar_masses.size()) {
+    throw std::runtime_error("Invalid fuel index");
+  }
 
-    double fuel_mw = molar_masses[fuel_index];  // g/mol
-    std::vector<double> X_air = standard_dry_air_composition();
-    double air_mw = mwmix(X_air);  // g/mol
+  double fuel_mw = molar_masses[fuel_index]; // g/mol
+  std::vector<double> X_air = standard_dry_air_composition();
+  double air_mw = mwmix(X_air); // g/mol
 
-    double molar_air_required = dryair_required_per_mol_fuel(fuel_index);
-    return molar_air_required * air_mw / fuel_mw;
+  double molar_air_required = dryair_required_per_mol_fuel(fuel_index);
+  return molar_air_required * air_mw / fuel_mw;
 }
 
 // Calculate dry air required for complete combustion [mol air/mol mixture]
-double dryair_required_per_mol_mixture(const std::vector<double>& X) {
-    double O2_required = oxygen_required_per_mol_mixture(X);
-    double X_O2_air = dry_air_composition.at("O2");
-    return O2_required / X_O2_air;
+double dryair_required_per_mol_mixture(const std::vector<double> &X) {
+  double O2_required = oxygen_required_per_mol_mixture(X);
+  double X_O2_air = dry_air_composition.at("O2");
+  return O2_required / X_O2_air;
 }
 
 // Calculate dry air required for complete combustion [kg air/kg mixture]
-double dryair_required_per_kg_mixture(const std::vector<double>& X) {
-    double mixture_mw = mwmix(X);  // g/mol
-    std::vector<double> X_air = standard_dry_air_composition();
-    double air_mw = mwmix(X_air);  // g/mol
+double dryair_required_per_kg_mixture(const std::vector<double> &X) {
+  double mixture_mw = mwmix(X); // g/mol
+  std::vector<double> X_air = standard_dry_air_composition();
+  double air_mw = mwmix(X_air); // g/mol
 
-    double molar_air_required = dryair_required_per_mol_mixture(X);
-    return molar_air_required * air_mw / mixture_mw;
+  double molar_air_required = dryair_required_per_mol_mixture(X);
+  return molar_air_required * air_mw / mixture_mw;
 }
 
-std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double>& X, double& fuel_burn_fraction) {
-    const double tol_sum = 1.0e-5;
-    const double tol     = 1.0e-12;
+std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double> &X,
+                                                   double &fuel_burn_fraction) {
+  const double tol_sum = 1.0e-5;
+  const double tol = 1.0e-12;
 
-    double sum = std::accumulate(X.begin(), X.end(), 0.0);
-    if (std::abs(sum - 1.0) > tol_sum) {
-        throw std::runtime_error("Mole fractions must sum to 1.0");
-    }
+  double sum = std::accumulate(X.begin(), X.end(), 0.0);
+  if (std::abs(sum - 1.0) > tol_sum) {
+    throw std::runtime_error("Mole fractions must sum to 1.0");
+  }
 
-    if (X.size() != molecular_structures.size()) {
-        throw std::runtime_error("Mixture size does not match number of species");
-    }
+  if (X.size() != molecular_structures.size()) {
+    throw std::runtime_error("Mixture size does not match number of species");
+  }
 
-    // 1 mol of mixture as basis
-    std::vector<double> n = X;
+  // 1 mol of mixture as basis
+  std::vector<double> n = X;
 
-    const std::size_t idx_O2  = species_index.at("O2");
-    const std::size_t idx_CO2 = species_index.at("CO2");
-    const std::size_t idx_H2O = species_index.at("H2O");
-    const std::size_t idx_N2  = species_index.at("N2");
+  const std::size_t idx_O2 = species_index.at("O2");
+  const std::size_t idx_CO2 = species_index.at("CO2");
+  const std::size_t idx_H2O = species_index.at("H2O");
+  const std::size_t idx_N2 = species_index.at("N2");
 
-    double n_O2_available = n[idx_O2];
-    if (n_O2_available <= tol) {
-        // No oxygen --> no combustion
-        fuel_burn_fraction = 0.0;
-        return X;
-    }
+  double n_O2_available = n[idx_O2];
+  if (n_O2_available <= tol) {
+    // No oxygen --> no combustion
+    fuel_burn_fraction = 0.0;
+    return X;
+  }
 
-    // Total O2 needed to fully burn all fuels in this mixture (1 mol basis)
-    double n_O2_required_total = oxygen_required_per_mol_mixture(X);
-    if (n_O2_required_total <= tol) {
-        // No fuel --> nothing to burn
-        fuel_burn_fraction = 0.0;
-        return X;
-    }
+  // Total O2 needed to fully burn all fuels in this mixture (1 mol basis)
+  double n_O2_required_total = oxygen_required_per_mol_mixture(X);
+  if (n_O2_required_total <= tol) {
+    // No fuel --> nothing to burn
+    fuel_burn_fraction = 0.0;
+    return X;
+  }
 
-    // Fraction of fuel that can burn:
-    // f = 1 if O2 >= stoich, else f = O2_available / O2_required_total
-    double f = 1.0;
-    if (n_O2_available + tol < n_O2_required_total) {
-        f = n_O2_available / n_O2_required_total;  // 0 < f < 1
-    }
-    fuel_burn_fraction = f;
+  // Fraction of fuel that can burn:
+  // f = min(1.0, O2_available / O2_required_total)
+  // To ensure a continuous first derivative for the global network solver (no
+  // sharp kink at phi=1), we use a smooth softmin function. softmin(1.0, r, k)
+  // = -1/k * ln(exp(-k) + exp(-k*r)) We use a high stiffness parameter k to
+  // keep it close to the exact minimum but differentiable.
+  double f = 1.0;
+  double r = n_O2_available / n_O2_required_total;
+  if (r < 1.0 + 10.0 * tol) { // apply smoothing near and below stoich
+    const double k = 200.0;   // Stiffness parameter for softmin
+    f = -(1.0 / k) * std::log(std::exp(-k) + std::exp(-k * r));
+  }
+  fuel_burn_fraction = f;
 
-    double delta_CO2 = 0.0;
-    double delta_H2O = 0.0;
-    double delta_N2  = 0.0;
+  double delta_CO2 = 0.0;
+  double delta_H2O = 0.0;
+  double delta_N2 = 0.0;
 
-    // Loop over species and burn a fraction f of every O2-consuming fuel
-    for (size_t i = 0; i < n.size(); ++i) {
-        if (n[i] <= 0.0) continue;
+  // Loop over species and burn a fraction f of every O2-consuming fuel
+  for (size_t i = 0; i < n.size(); ++i) {
+    if (n[i] <= 0.0)
+      continue;
 
-        // Only treat species that actually require O2 (CO2/H2O have requirement=0)
-        double nu_O2 = oxygen_required_per_mol_fuel(i);
-        if (nu_O2 <= 0.0) continue;
+    // Only treat species that actually require O2 (CO2/H2O have requirement=0)
+    double nu_O2 = oxygen_required_per_mol_fuel(i);
+    if (nu_O2 <= 0.0)
+      continue;
 
-        const Molecular_Structure& sp = molecular_structures[i];
+    const Molecular_Structure &sp = molecular_structures[i];
 
-        double n_fuel_initial   = n[i];
-        double n_fuel_reacted   = f * n_fuel_initial;
-        double n_fuel_remaining = n_fuel_initial - n_fuel_reacted;
+    double n_fuel_initial = n[i];
+    double n_fuel_reacted = f * n_fuel_initial;
+    double n_fuel_remaining = n_fuel_initial - n_fuel_reacted;
 
-        n[i] = n_fuel_remaining;
+    n[i] = n_fuel_remaining;
 
-        // C_x H_y O_z N_w + ... -> x CO2 + (y/2) H2O + (w/2) N2
-        delta_CO2 += static_cast<double>(sp.C) * n_fuel_reacted;
-        delta_H2O += 0.5 * static_cast<double>(sp.H) * n_fuel_reacted;
-        delta_N2  += 0.5 * static_cast<double>(sp.N) * n_fuel_reacted;
-    }
+    // C_x H_y O_z N_w + ... -> x CO2 + (y/2) H2O + (w/2) N2
+    delta_CO2 += static_cast<double>(sp.C) * n_fuel_reacted;
+    delta_H2O += 0.5 * static_cast<double>(sp.H) * n_fuel_reacted;
+    delta_N2 += 0.5 * static_cast<double>(sp.N) * n_fuel_reacted;
+  }
 
-    // Consume O2: fully if O2-limited, partially if fuel-limited
-    if (f >= 1.0 - tol) {
-        n[idx_O2] -= n_O2_required_total;
-        if (n[idx_O2] < 0.0) n[idx_O2] = 0.0;  // numeric safety
-    } else {
-        n[idx_O2] = 0.0;  // all available O2 consumed
-    }
+  // Consume O2: fully if O2-limited, partially if fuel-limited
+  if (f >= 1.0 - tol) {
+    n[idx_O2] -= n_O2_required_total;
+    if (n[idx_O2] < 0.0)
+      n[idx_O2] = 0.0; // numeric safety
+  } else {
+    n[idx_O2] = 0.0; // all available O2 consumed
+  }
 
-    // Add products
-    n[idx_CO2] += delta_CO2;
-    n[idx_H2O] += delta_H2O;
-    n[idx_N2]  += delta_N2;
+  // Add products
+  n[idx_CO2] += delta_CO2;
+  n[idx_H2O] += delta_H2O;
+  n[idx_N2] += delta_N2;
 
-    // Back to mole fractions
-    return normalize_fractions(n);
+  // Back to mole fractions
+  return normalize_fractions(n);
 }
 
-std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double>& X) {
-    double fuel_burn_fraction = 0.0;
-    return complete_combustion_to_CO2_H2O(X, fuel_burn_fraction);
+std::vector<double>
+complete_combustion_to_CO2_H2O(const std::vector<double> &X) {
+  double fuel_burn_fraction = 0.0;
+  return complete_combustion_to_CO2_H2O(X, fuel_burn_fraction);
 }
 
 // -------------------------------------------------------------
@@ -317,33 +344,32 @@ std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double>& X)
 // Uses:
 //   - oxygen_required_per_mol_mixture(X_fuel): moles O2 per mole fuel mixture
 //   - O2 mole fraction in oxidizer stream X_ox[O2_index]
-static double stoich_f_over_o_mole(
-    const std::vector<double>& X_fuel,
-    const std::vector<double>& X_ox)
-{
-    if (X_fuel.size() != species_names.size() ||
-        X_ox.size()   != species_names.size()) {
-        throw std::invalid_argument("stoich_f_over_o_mole: size mismatch");
-    }
+static double stoich_f_over_o_mole(const std::vector<double> &X_fuel,
+                                   const std::vector<double> &X_ox) {
+  if (X_fuel.size() != species_names.size() ||
+      X_ox.size() != species_names.size()) {
+    throw std::invalid_argument("stoich_f_over_o_mole: size mismatch");
+  }
 
-    const double X_O2_ox = X_ox[species_index.at("O2")];
-    if (X_O2_ox <= 0.0) {
-        throw std::runtime_error(
-            "stoich_f_over_o_mole: oxidizer has zero O2 mole fraction");
-    }
+  const double X_O2_ox = X_ox[species_index.at("O2")];
+  if (X_O2_ox <= 0.0) {
+    throw std::runtime_error(
+        "stoich_f_over_o_mole: oxidizer has zero O2 mole fraction");
+  }
 
-    // moles O2 required per mole of fuel mixture
-    const double nu_O2_req = oxygen_required_per_mol_mixture(X_fuel);
-    if (nu_O2_req <= 0.0) {
-        throw std::runtime_error(
-            "stoich_f_over_o_mole: oxygen_required_per_mol_mixture returned non-positive");
-    }
+  // moles O2 required per mole of fuel mixture
+  const double nu_O2_req = oxygen_required_per_mol_mixture(X_fuel);
+  if (nu_O2_req <= 0.0) {
+    throw std::runtime_error(
+        "stoich_f_over_o_mole: oxygen_required_per_mol_mixture returned "
+        "non-positive");
+  }
 
-    // Let:
-    //   nu_O2_req = X_O2_ox * n_ox_st  ->  n_ox_st = nu_O2_req / X_O2_ox
-    // then stoich F/O (molar) = n_F / n_Ox = 1 / n_ox_st = X_O2_ox / nu_O2_req
-    const double r_st = X_O2_ox / nu_O2_req;
-    return r_st;
+  // Let:
+  //   nu_O2_req = X_O2_ox * n_ox_st  ->  n_ox_st = nu_O2_req / X_O2_ox
+  // then stoich F/O (molar) = n_F / n_Ox = 1 / n_ox_st = X_O2_ox / nu_O2_req
+  const double r_st = X_O2_ox / nu_O2_req;
+  return r_st;
 }
 
 // Given a mixture X_mix that is formed *only* by mixing:
@@ -359,116 +385,107 @@ static double stoich_f_over_o_mole(
 //   r = (X_ox[j] - X_mix[j]) / (X_mix[j] - X_fuel[j])
 //
 // We pick the first j with |X_fuel[j] - X_ox[j]| large enough.
-static double actual_f_over_o_mole(
-    const std::vector<double>& X_mix,
-    const std::vector<double>& X_fuel,
-    const std::vector<double>& X_ox)
-{
-    const std::size_t n = species_names.size();
-    if (X_mix.size()  != n ||
-        X_fuel.size() != n ||
-        X_ox.size()   != n) {
-        throw std::invalid_argument("actual_f_over_o_mole: size mismatch");
+static double actual_f_over_o_mole(const std::vector<double> &X_mix,
+                                   const std::vector<double> &X_fuel,
+                                   const std::vector<double> &X_ox) {
+  const std::size_t n = species_names.size();
+  if (X_mix.size() != n || X_fuel.size() != n || X_ox.size() != n) {
+    throw std::invalid_argument("actual_f_over_o_mole: size mismatch");
+  }
+
+  const double eps = 1e-12;
+  bool found = false;
+  double r = 0.0;
+
+  for (std::size_t j = 0; j < n; ++j) {
+    const double xf = X_fuel[j];
+    const double xo = X_ox[j];
+    const double xm = X_mix[j];
+
+    double denom = xm - xf;
+    if (std::abs(xf - xo) < eps) {
+      continue; // no contrast between fuel and oxidizer for this species
+    }
+    if (std::abs(denom) < eps) {
+      continue; // would be numerically unstable
     }
 
-    const double eps = 1e-12;
-    bool found = false;
-    double r = 0.0;
+    double r_j = (xo - xm) / denom;
 
-    for (std::size_t j = 0; j < n; ++j) {
-        const double xf = X_fuel[j];
-        const double xo = X_ox[j];
-        const double xm = X_mix[j];
-
-        double denom = xm - xf;
-        if (std::abs(xf - xo) < eps) {
-            continue; // no contrast between fuel and oxidizer for this species
-        }
-        if (std::abs(denom) < eps) {
-            continue; // would be numerically unstable
-        }
-
-        double r_j = (xo - xm) / denom;
-
-        // Sanity: r_j must be >= 0 for physical mixing
-        if (r_j < -1e-8) {
-            continue; // skip clearly unphysical projection
-        }
-
-        r = r_j;
-        found = true;
-        break;
+    // Sanity: r_j must be >= 0 for physical mixing
+    if (r_j < -1e-8) {
+      continue; // skip clearly unphysical projection
     }
 
-    if (!found) {
-        throw std::runtime_error(
-            "actual_f_over_o_mole: could not determine mixing ratio "
-            "from X_mix, X_fuel, X_ox (mixture not on mixing line?)");
-    }
+    r = r_j;
+    found = true;
+    break;
+  }
 
-    return r;
+  if (!found) {
+    throw std::runtime_error(
+        "actual_f_over_o_mole: could not determine mixing ratio "
+        "from X_mix, X_fuel, X_ox (mixture not on mixing line?)");
+  }
+
+  return r;
 }
 
-double equivalence_ratio_mole(
-    const std::vector<double>& X_mix,
-    const std::vector<double>& X_fuel,
-    const std::vector<double>& X_ox)
-{
-    const double r_act = actual_f_over_o_mole(X_mix, X_fuel, X_ox);
-    const double r_st  = stoich_f_over_o_mole(X_fuel, X_ox);
+double equivalence_ratio_mole(const std::vector<double> &X_mix,
+                              const std::vector<double> &X_fuel,
+                              const std::vector<double> &X_ox) {
+  const double r_act = actual_f_over_o_mole(X_mix, X_fuel, X_ox);
+  const double r_st = stoich_f_over_o_mole(X_fuel, X_ox);
 
-    return r_act / r_st; // φ = (F/O)_act / (F/O)_st
+  return r_act / r_st; // φ = (F/O)_act / (F/O)_st
 }
 
-std::vector<double> set_equivalence_ratio_mole(
-    double phi,
-    const std::vector<double>& X_fuel,
-    const std::vector<double>& X_ox)
-{
-    const std::size_t n = species_names.size();
-    if (X_fuel.size() != n || X_ox.size() != n) {
-        throw std::invalid_argument("set_equivalence_ratio_mole: size mismatch");
+std::vector<double>
+set_equivalence_ratio_mole(double phi, const std::vector<double> &X_fuel,
+                           const std::vector<double> &X_ox) {
+  const std::size_t n = species_names.size();
+  if (X_fuel.size() != n || X_ox.size() != n) {
+    throw std::invalid_argument("set_equivalence_ratio_mole: size mismatch");
+  }
+  if (phi <= 0.0) {
+    throw std::invalid_argument("set_equivalence_ratio_mole: phi must be > 0");
+  }
+
+  const double r_st = stoich_f_over_o_mole(X_fuel, X_ox);
+  const double r = phi * r_st; // actual F/O = φ * (F/O)_st
+
+  const double n_F = r;
+  const double n_Ox = 1.0;
+  const double n_tot = n_F + n_Ox;
+
+  std::vector<double> X_mix(n, 0.0);
+
+  // Fuel-stream contribution
+  for (std::size_t k = 0; k < n; ++k) {
+    if (X_fuel[k] != 0.0) {
+      X_mix[k] += (n_F * X_fuel[k]) / n_tot;
     }
-    if (phi <= 0.0) {
-        throw std::invalid_argument("set_equivalence_ratio_mole: phi must be > 0");
+  }
+
+  // Oxidizer-stream contribution
+  for (std::size_t k = 0; k < n; ++k) {
+    if (X_ox[k] != 0.0) {
+      X_mix[k] += (n_Ox * X_ox[k]) / n_tot;
     }
+  }
 
-    const double r_st = stoich_f_over_o_mole(X_fuel, X_ox);
-    const double r    = phi * r_st; // actual F/O = φ * (F/O)_st
+  // Renormalize to guard against small numerical drifts
+  double sum = std::accumulate(X_mix.begin(), X_mix.end(), 0.0);
+  if (sum <= 0.0) {
+    throw std::runtime_error(
+        "set_equivalence_ratio_mole: resulting mixture has non-positive sum");
+  }
+  for (double &x : X_mix) {
+    x /= sum;
+  }
 
-    const double n_F  = r;
-    const double n_Ox = 1.0;
-    const double n_tot = n_F + n_Ox;
-
-    std::vector<double> X_mix(n, 0.0);
-
-    // Fuel-stream contribution
-    for (std::size_t k = 0; k < n; ++k) {
-        if (X_fuel[k] != 0.0) {
-            X_mix[k] += (n_F * X_fuel[k]) / n_tot;
-        }
-    }
-
-    // Oxidizer-stream contribution
-    for (std::size_t k = 0; k < n; ++k) {
-        if (X_ox[k] != 0.0) {
-            X_mix[k] += (n_Ox * X_ox[k]) / n_tot;
-        }
-    }
-
-    // Renormalize to guard against small numerical drifts
-    double sum = std::accumulate(X_mix.begin(), X_mix.end(), 0.0);
-    if (sum <= 0.0) {
-        throw std::runtime_error(
-            "set_equivalence_ratio_mole: resulting mixture has non-positive sum");
-    }
-    for (double& x : X_mix) {
-        x /= sum;
-    }
-
-    return X_mix;
+  return X_mix;
 }
-
 
 // -------------------------------------------------------------
 // Stoichiometric F/O (mass basis)
@@ -480,38 +497,37 @@ std::vector<double> set_equivalence_ratio_mole(
 // Uses:
 //   - oxygen_required_per_kg_mixture(X_fuel): kg O2 per kg fuel mixture
 //   - O2 mass fraction in oxidizer stream Y_ox[O2_index]
-static double stoich_f_over_o_mass(
-    const std::vector<double>& Y_fuel,
-    const std::vector<double>& Y_ox)
-{
-    if (Y_fuel.size() != species_names.size() ||
-        Y_ox.size()   != species_names.size()) {
-        throw std::invalid_argument("stoich_f_over_o_mass: size mismatch");
-    }
+static double stoich_f_over_o_mass(const std::vector<double> &Y_fuel,
+                                   const std::vector<double> &Y_ox) {
+  if (Y_fuel.size() != species_names.size() ||
+      Y_ox.size() != species_names.size()) {
+    throw std::invalid_argument("stoich_f_over_o_mass: size mismatch");
+  }
 
-    const double Y_O2_ox = Y_ox[species_index.at("O2")];
-    if (Y_O2_ox <= 0.0) {
-        throw std::runtime_error(
-            "stoich_f_over_o_mass: oxidizer has zero O2 mass fraction");
-    }
+  const double Y_O2_ox = Y_ox[species_index.at("O2")];
+  if (Y_O2_ox <= 0.0) {
+    throw std::runtime_error(
+        "stoich_f_over_o_mass: oxidizer has zero O2 mass fraction");
+  }
 
-    // Convert fuel stream from mass fractions to mole fractions for use in
-    // oxygen_required_per_kg_mixture(X_fuel).
-    std::vector<double> X_fuel = mass_to_mole(Y_fuel);
+  // Convert fuel stream from mass fractions to mole fractions for use in
+  // oxygen_required_per_kg_mixture(X_fuel).
+  std::vector<double> X_fuel = mass_to_mole(Y_fuel);
 
-    // kg O2 per kg fuel mixture
-    const double m_O2_req = oxygen_required_per_kg_mixture(X_fuel);
-    if (m_O2_req <= 0.0) {
-        throw std::runtime_error(
-            "stoich_f_over_o_mass: oxygen_required_per_kg_mixture returned non-positive");
-    }
+  // kg O2 per kg fuel mixture
+  const double m_O2_req = oxygen_required_per_kg_mixture(X_fuel);
+  if (m_O2_req <= 0.0) {
+    throw std::runtime_error(
+        "stoich_f_over_o_mass: oxygen_required_per_kg_mixture returned "
+        "non-positive");
+  }
 
-    // Stoichiometric oxidizer mass (kg) per 1 kg fuel:
-    //   m_O2_req = Y_O2_ox * m_ox_st  ->  m_ox_st = m_O2_req / Y_O2_ox
-    // hence (F/O)_st (mass) = m_fuel / m_ox_st = 1 / (m_O2_req / Y_O2_ox)
-    //                        = Y_O2_ox / m_O2_req
-    const double r_st = Y_O2_ox / m_O2_req;
-    return r_st;
+  // Stoichiometric oxidizer mass (kg) per 1 kg fuel:
+  //   m_O2_req = Y_O2_ox * m_ox_st  ->  m_ox_st = m_O2_req / Y_O2_ox
+  // hence (F/O)_st (mass) = m_fuel / m_ox_st = 1 / (m_O2_req / Y_O2_ox)
+  //                        = Y_O2_ox / m_O2_req
+  const double r_st = Y_O2_ox / m_O2_req;
+  return r_st;
 }
 
 // -------------------------------------------------------------
@@ -527,193 +543,176 @@ static double stoich_f_over_o_mass(
 //   r = (Y_ox[j] - Y_mix[j]) / (Y_mix[j] - Y_fuel[j])
 //
 // We pick the first j that gives a numerically stable r.
-static double actual_f_over_o_mass(
-    const std::vector<double>& Y_mix,
-    const std::vector<double>& Y_fuel,
-    const std::vector<double>& Y_ox)
-{
-    const std::size_t n = species_names.size();
-    if (Y_mix.size()  != n ||
-        Y_fuel.size() != n ||
-        Y_ox.size()   != n) {
-        throw std::invalid_argument("actual_f_over_o_mass: size mismatch");
+static double actual_f_over_o_mass(const std::vector<double> &Y_mix,
+                                   const std::vector<double> &Y_fuel,
+                                   const std::vector<double> &Y_ox) {
+  const std::size_t n = species_names.size();
+  if (Y_mix.size() != n || Y_fuel.size() != n || Y_ox.size() != n) {
+    throw std::invalid_argument("actual_f_over_o_mass: size mismatch");
+  }
+
+  const double eps = 1e-12;
+  bool found = false;
+  double r = 0.0;
+
+  for (std::size_t j = 0; j < n; ++j) {
+    const double yf = Y_fuel[j];
+    const double yo = Y_ox[j];
+    const double ym = Y_mix[j];
+
+    if (std::abs(yf - yo) < eps) {
+      continue; // no contrast between fuel and oxidizer for this species
     }
 
-    const double eps = 1e-12;
-    bool found = false;
-    double r = 0.0;
-
-    for (std::size_t j = 0; j < n; ++j) {
-        const double yf = Y_fuel[j];
-        const double yo = Y_ox[j];
-        const double ym = Y_mix[j];
-
-        if (std::abs(yf - yo) < eps) {
-            continue; // no contrast between fuel and oxidizer for this species
-        }
-
-        const double denom = ym - yf;
-        if (std::abs(denom) < eps) {
-            continue; // numerically unstable
-        }
-
-        const double r_j = (yo - ym) / denom;
-
-        // Require physically reasonable (non-negative) r_j
-        if (r_j < -1e-8) {
-            continue;
-        }
-
-        r = r_j;
-        found = true;
-        break;
+    const double denom = ym - yf;
+    if (std::abs(denom) < eps) {
+      continue; // numerically unstable
     }
 
-    if (!found) {
-        throw std::runtime_error(
-            "actual_f_over_o_mass: could not determine mixing ratio "
-            "from Y_mix, Y_fuel, Y_ox (mixture not on mixing line?)");
+    const double r_j = (yo - ym) / denom;
+
+    // Require physically reasonable (non-negative) r_j
+    if (r_j < -1e-8) {
+      continue;
     }
 
-    return r;
+    r = r_j;
+    found = true;
+    break;
+  }
+
+  if (!found) {
+    throw std::runtime_error(
+        "actual_f_over_o_mass: could not determine mixing ratio "
+        "from Y_mix, Y_fuel, Y_ox (mixture not on mixing line?)");
+  }
+
+  return r;
 }
 
 // -------------------------------------------------------------
 // Public mass-basis φ functions
 // -------------------------------------------------------------
 
-double equivalence_ratio_mass(
-    const std::vector<double>& Y_mix,
-    const std::vector<double>& Y_fuel,
-    const std::vector<double>& Y_ox)
-{
-    const double r_act = actual_f_over_o_mass(Y_mix, Y_fuel, Y_ox);
-    const double r_st  = stoich_f_over_o_mass(Y_fuel, Y_ox);
+double equivalence_ratio_mass(const std::vector<double> &Y_mix,
+                              const std::vector<double> &Y_fuel,
+                              const std::vector<double> &Y_ox) {
+  const double r_act = actual_f_over_o_mass(Y_mix, Y_fuel, Y_ox);
+  const double r_st = stoich_f_over_o_mass(Y_fuel, Y_ox);
 
-    return r_act / r_st; // φ = (F/O)_act / (F/O)_st (mass basis)
+  return r_act / r_st; // φ = (F/O)_act / (F/O)_st (mass basis)
 }
 
-std::vector<double> set_equivalence_ratio_mass(
-    double phi,
-    const std::vector<double>& Y_fuel,
-    const std::vector<double>& Y_ox)
-{
-    const std::size_t n = species_names.size();
-    if (Y_fuel.size() != n || Y_ox.size() != n) {
-        throw std::invalid_argument("set_equivalence_ratio_mass: size mismatch");
+std::vector<double>
+set_equivalence_ratio_mass(double phi, const std::vector<double> &Y_fuel,
+                           const std::vector<double> &Y_ox) {
+  const std::size_t n = species_names.size();
+  if (Y_fuel.size() != n || Y_ox.size() != n) {
+    throw std::invalid_argument("set_equivalence_ratio_mass: size mismatch");
+  }
+  if (phi <= 0.0) {
+    throw std::invalid_argument("set_equivalence_ratio_mass: phi must be > 0");
+  }
+
+  const double r_st = stoich_f_over_o_mass(Y_fuel, Y_ox);
+  const double r = phi * r_st; // (F/O)_act = φ * (F/O)_st
+
+  const double m_F = r;
+  const double m_Ox = 1.0;
+  const double m_tot = m_F + m_Ox;
+
+  std::vector<double> Y_mix(n, 0.0);
+
+  // Fuel-stream contribution
+  for (std::size_t k = 0; k < n; ++k) {
+    if (Y_fuel[k] != 0.0) {
+      Y_mix[k] += (m_F * Y_fuel[k]) / m_tot;
     }
-    if (phi <= 0.0) {
-        throw std::invalid_argument("set_equivalence_ratio_mass: phi must be > 0");
+  }
+
+  // Oxidizer-stream contribution
+  for (std::size_t k = 0; k < n; ++k) {
+    if (Y_ox[k] != 0.0) {
+      Y_mix[k] += (m_Ox * Y_ox[k]) / m_tot;
     }
+  }
 
-    const double r_st = stoich_f_over_o_mass(Y_fuel, Y_ox);
-    const double r    = phi * r_st; // (F/O)_act = φ * (F/O)_st
+  // Renormalize to guard against any small numerical drift
+  double sum = std::accumulate(Y_mix.begin(), Y_mix.end(), 0.0);
+  if (sum <= 0.0) {
+    throw std::runtime_error(
+        "set_equivalence_ratio_mass: resulting mixture has non-positive sum");
+  }
+  for (double &y : Y_mix) {
+    y /= sum;
+  }
 
-    const double m_F  = r;
-    const double m_Ox = 1.0;
-    const double m_tot = m_F + m_Ox;
-
-    std::vector<double> Y_mix(n, 0.0);
-
-    // Fuel-stream contribution
-    for (std::size_t k = 0; k < n; ++k) {
-        if (Y_fuel[k] != 0.0) {
-            Y_mix[k] += (m_F * Y_fuel[k]) / m_tot;
-        }
-    }
-
-    // Oxidizer-stream contribution
-    for (std::size_t k = 0; k < n; ++k) {
-        if (Y_ox[k] != 0.0) {
-            Y_mix[k] += (m_Ox * Y_ox[k]) / m_tot;
-        }
-    }
-
-    // Renormalize to guard against any small numerical drift
-    double sum = std::accumulate(Y_mix.begin(), Y_mix.end(), 0.0);
-    if (sum <= 0.0) {
-        throw std::runtime_error(
-            "set_equivalence_ratio_mass: resulting mixture has non-positive sum");
-    }
-    for (double& y : Y_mix) {
-        y /= sum;
-    }
-
-    return Y_mix;
+  return Y_mix;
 }
 
-double bilger_stoich_mixture_fraction_mass(
-    const std::vector<double>& Y_F,
-    const std::vector<double>& Y_O)
-{
-    // r_st = (F/O)_st on a MASS basis
-    // already implemented as part of equivalence_ratio_mass helpers:
-    const double r_st = stoich_f_over_o_mass(Y_F, Y_O);
+double bilger_stoich_mixture_fraction_mass(const std::vector<double> &Y_F,
+                                           const std::vector<double> &Y_O) {
+  // r_st = (F/O)_st on a MASS basis
+  // already implemented as part of equivalence_ratio_mass helpers:
+  const double r_st = stoich_f_over_o_mass(Y_F, Y_O);
 
-    if (r_st <= 0.0) {
-        throw std::runtime_error(
-            "bilger_stoich_mixture_fraction_mass: r_st <= 0");
-    }
+  if (r_st <= 0.0) {
+    throw std::runtime_error("bilger_stoich_mixture_fraction_mass: r_st <= 0");
+  }
 
-    // For 2-stream fuel/oxidizer mixing we always have:
-    //
-    //     Z = m_F / (m_F + m_O)
-    //     r = m_F / m_O
-    //
-    //  =>  Z = r / (1 + r)
-    //
-    // At stoichiometry r = r_st, giving:
-    //
-    //     Z_st = r_st / (1 + r_st)
-    //
-    return r_st / (1.0 + r_st);
+  // For 2-stream fuel/oxidizer mixing we always have:
+  //
+  //     Z = m_F / (m_F + m_O)
+  //     r = m_F / m_O
+  //
+  //  =>  Z = r / (1 + r)
+  //
+  // At stoichiometry r = r_st, giving:
+  //
+  //     Z_st = r_st / (1 + r_st)
+  //
+  return r_st / (1.0 + r_st);
 }
 
-double bilger_Z_from_equivalence_ratio_mass(
-    double phi,
-    const std::vector<double>& Y_F,
-    const std::vector<double>& Y_O)
-{
-    if (phi <= 0.0) {
-        throw std::invalid_argument(
-            "bilger_Z_from_equivalence_ratio_mass: phi must be > 0");
-    }
+double bilger_Z_from_equivalence_ratio_mass(double phi,
+                                            const std::vector<double> &Y_F,
+                                            const std::vector<double> &Y_O) {
+  if (phi <= 0.0) {
+    throw std::invalid_argument(
+        "bilger_Z_from_equivalence_ratio_mass: phi must be > 0");
+  }
 
-    const double r_st = stoich_f_over_o_mass(Y_F, Y_O);
-    if (r_st <= 0.0) {
-        throw std::runtime_error(
-            "bilger_Z_from_equivalence_ratio_mass: r_st <= 0");
-    }
+  const double r_st = stoich_f_over_o_mass(Y_F, Y_O);
+  if (r_st <= 0.0) {
+    throw std::runtime_error("bilger_Z_from_equivalence_ratio_mass: r_st <= 0");
+  }
 
-    // r = (F/O)_act (mass) = phi * r_st
-    const double r = phi * r_st;
+  // r = (F/O)_act (mass) = phi * r_st
+  const double r = phi * r_st;
 
-    // Two-stream mixing relation on a mass basis:
-    //   Z = r / (1 + r)
-    return r / (1.0 + r);
+  // Two-stream mixing relation on a mass basis:
+  //   Z = r / (1 + r)
+  return r / (1.0 + r);
 }
 
-double equivalence_ratio_from_bilger_Z_mass(
-    double Z,
-    const std::vector<double>& Y_F,
-    const std::vector<double>& Y_O)
-{
-    if (Z <= 0.0 || Z >= 1.0) {
-        throw std::invalid_argument(
-            "equivalence_ratio_from_bilger_Z_mass: Z must be in (0, 1)");
-    }
+double equivalence_ratio_from_bilger_Z_mass(double Z,
+                                            const std::vector<double> &Y_F,
+                                            const std::vector<double> &Y_O) {
+  if (Z <= 0.0 || Z >= 1.0) {
+    throw std::invalid_argument(
+        "equivalence_ratio_from_bilger_Z_mass: Z must be in (0, 1)");
+  }
 
-    const double r_st = stoich_f_over_o_mass(Y_F, Y_O);
-    if (r_st <= 0.0) {
-        throw std::runtime_error(
-            "equivalence_ratio_from_bilger_Z_mass: r_st <= 0");
-    }
+  const double r_st = stoich_f_over_o_mass(Y_F, Y_O);
+  if (r_st <= 0.0) {
+    throw std::runtime_error("equivalence_ratio_from_bilger_Z_mass: r_st <= 0");
+  }
 
-    // Invert Z = r / (1 + r) -> r = Z / (1 - Z)
-    const double r = Z / (1.0 - Z);
+  // Invert Z = r / (1 + r) -> r = Z / (1 - Z)
+  const double r = Z / (1.0 - Z);
 
-    // phi = (F/O)_act / (F/O)_st = r / r_st
-    return r / r_st;
+  // phi = (F/O)_act / (F/O)_st = r / r_st
+  return r / r_st;
 }
 
 // ============================
@@ -731,93 +730,89 @@ double equivalence_ratio_from_bilger_Z_mass(
 //   beta = 2 * sum_k Y_k C_k / W_k
 //        + 0.5 * sum_k Y_k H_k / W_k
 //        -       sum_k Y_k O_k / W_k
-double bilger_beta(const std::vector<double>& Y)
-{
-    if (Y.size() != molar_masses.size() ||
-        Y.size() != molecular_structures.size()) {
-        throw std::invalid_argument(
-            "bilger_beta: mass-fraction vector size "
-            "does not match species data");
+double bilger_beta(const std::vector<double> &Y) {
+  if (Y.size() != molar_masses.size() ||
+      Y.size() != molecular_structures.size()) {
+    throw std::invalid_argument("bilger_beta: mass-fraction vector size "
+                                "does not match species data");
+  }
+
+  double sum_C = 0.0;
+  double sum_H = 0.0;
+  double sum_O = 0.0;
+
+  for (std::size_t k = 0; k < Y.size(); ++k) {
+    double Yk = Y[k];
+    if (Yk == 0.0)
+      continue;
+
+    const auto &ms = molecular_structures[k];
+    double Wk = molar_masses[k]; // g/mol
+
+    if (Wk <= 0.0) {
+      throw std::runtime_error("bilger_beta: non-positive molar mass");
     }
 
-    double sum_C = 0.0;
-    double sum_H = 0.0;
-    double sum_O = 0.0;
+    // Contributions to Z_e / W_e, see comment above
+    sum_C += Yk * static_cast<double>(ms.C) / Wk;
+    sum_H += Yk * static_cast<double>(ms.H) / Wk;
+    sum_O += Yk * static_cast<double>(ms.O) / Wk;
+  }
 
-    for (std::size_t k = 0; k < Y.size(); ++k) {
-        double Yk = Y[k];
-        if (Yk == 0.0) continue;
-
-        const auto& ms = molecular_structures[k];
-        double Wk = molar_masses[k]; // g/mol
-
-        if (Wk <= 0.0) {
-            throw std::runtime_error("bilger_beta: non-positive molar mass");
-        }
-
-        // Contributions to Z_e / W_e, see comment above
-        sum_C += Yk * static_cast<double>(ms.C) / Wk;
-        sum_H += Yk * static_cast<double>(ms.H) / Wk;
-        sum_O += Yk * static_cast<double>(ms.O) / Wk;
-    }
-
-    // Bilger's scalar (proportional to 2 Z_C/W_C + 0.5 Z_H/W_H - Z_O/W_O)
-    return 2.0 * sum_C + 0.5 * sum_H - sum_O;
+  // Bilger's scalar (proportional to 2 Z_C/W_C + 0.5 Z_H/W_H - Z_O/W_O)
+  return 2.0 * sum_C + 0.5 * sum_H - sum_O;
 }
 
 // Bilger mixture fraction Z in [0,1] between two streams F and O,
 // defined as a normalized Bilger scalar:
 //   Z = (beta - beta_O) / (beta_F - beta_O)
-double bilger_mixture_fraction(
-    const std::vector<double>& Y,
-    const std::vector<double>& Y_F,
-    const std::vector<double>& Y_O)
-{
-    if (Y.size() != Y_F.size() || Y.size() != Y_O.size()) {
-        throw std::invalid_argument(
-            "bilger_mixture_fraction: all mass-fraction vectors "
-            "must have the same size");
-    }
+double bilger_mixture_fraction(const std::vector<double> &Y,
+                               const std::vector<double> &Y_F,
+                               const std::vector<double> &Y_O) {
+  if (Y.size() != Y_F.size() || Y.size() != Y_O.size()) {
+    throw std::invalid_argument(
+        "bilger_mixture_fraction: all mass-fraction vectors "
+        "must have the same size");
+  }
 
-    const double beta   = bilger_beta(Y);
-    const double beta_F = bilger_beta(Y_F);
-    const double beta_O = bilger_beta(Y_O);
+  const double beta = bilger_beta(Y);
+  const double beta_F = bilger_beta(Y_F);
+  const double beta_O = bilger_beta(Y_O);
 
-    const double denom = beta_F - beta_O;
-    if (std::abs(denom) < 1e-16) {
-        throw std::runtime_error(
-            "bilger_mixture_fraction: fuel and oxidizer have "
-            "identical Bilger scalar (denominator ~ 0)");
-    }
+  const double denom = beta_F - beta_O;
+  if (std::abs(denom) < 1e-16) {
+    throw std::runtime_error("bilger_mixture_fraction: fuel and oxidizer have "
+                             "identical Bilger scalar (denominator ~ 0)");
+  }
 
-    double Z = (beta - beta_O) / denom;
+  double Z = (beta - beta_O) / denom;
 
-    // Clamp to [0,1] to handle small numerical overshoots
-    if (Z < 0.0)      Z = 0.0;
-    else if (Z > 1.0) Z = 1.0;
+  // Clamp to [0,1] to handle small numerical overshoots
+  if (Z < 0.0)
+    Z = 0.0;
+  else if (Z > 1.0)
+    Z = 1.0;
 
-    return Z;
+  return Z;
 }
 
 // Convenience wrapper: inputs are mole fractions X, X_F, X_O.
 // These are converted to mass fractions first and then passed to
 // the mass-fraction-based Bilger implementation above.
-double bilger_mixture_fraction_from_moles(
-    const std::vector<double>& X,
-    const std::vector<double>& X_F,
-    const std::vector<double>& X_O)
-{
-    if (X.size() != X_F.size() || X.size() != X_O.size()) {
-        throw std::invalid_argument(
-            "bilger_mixture_fraction_from_moles: all mole-fraction "
-            "vectors must have the same size");
-    }
+double bilger_mixture_fraction_from_moles(const std::vector<double> &X,
+                                          const std::vector<double> &X_F,
+                                          const std::vector<double> &X_O) {
+  if (X.size() != X_F.size() || X.size() != X_O.size()) {
+    throw std::invalid_argument(
+        "bilger_mixture_fraction_from_moles: all mole-fraction "
+        "vectors must have the same size");
+  }
 
-    const auto Y   = mole_to_mass(X);
-    const auto Y_F = mole_to_mass(X_F);
-    const auto Y_O = mole_to_mass(X_O);
+  const auto Y = mole_to_mass(X);
+  const auto Y_F = mole_to_mass(X_F);
+  const auto Y_O = mole_to_mass(X_O);
 
-    return bilger_mixture_fraction(Y, Y_F, Y_O);
+  return bilger_mixture_fraction(Y, Y_F, Y_O);
 }
 
 // -------------------------------------------------------------
@@ -826,29 +821,33 @@ double bilger_mixture_fraction_from_moles(
 
 // Stoichiometric mass flow ratio (mdot_fuel / mdot_ox at stoich)
 // Delegates to the mass-basis stoich F/O helper already in this file.
-static double stoich_fuel_ox_ratio(const std::vector<double>& X_fuel, const std::vector<double>& X_ox) {
-    const std::vector<double> Y_fuel = mole_to_mass(X_fuel);
-    const std::vector<double> Y_ox   = mole_to_mass(X_ox);
-    return stoich_f_over_o_mass(Y_fuel, Y_ox);
+static double stoich_fuel_ox_ratio(const std::vector<double> &X_fuel,
+                                   const std::vector<double> &X_ox) {
+  const std::vector<double> Y_fuel = mole_to_mass(X_fuel);
+  const std::vector<double> Y_ox = mole_to_mass(X_ox);
+  return stoich_f_over_o_mass(Y_fuel, Y_ox);
 }
 
-Stream set_fuel_stream_for_phi(double phi, const Stream& fuel, const Stream& oxidizer) {
-    if (phi <= 0.0) {
-        throw std::invalid_argument("set_fuel_stream_for_phi: phi must be positive");
-    }
-    if (oxidizer.mdot <= 0.0) {
-        throw std::invalid_argument("set_fuel_stream_for_phi: oxidizer.mdot must be positive");
-    }
+Stream set_fuel_stream_for_phi(double phi, const Stream &fuel,
+                               const Stream &oxidizer) {
+  if (phi <= 0.0) {
+    throw std::invalid_argument(
+        "set_fuel_stream_for_phi: phi must be positive");
+  }
+  if (oxidizer.mdot <= 0.0) {
+    throw std::invalid_argument(
+        "set_fuel_stream_for_phi: oxidizer.mdot must be positive");
+  }
 
-    // mdot_fuel = phi * FAR_stoich * mdot_ox
-    // Works for any fuel/oxidizer combination including blended fuels where
-    // all species appear in both streams.
-    const double FAR_stoich = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
-    const double mdot_fuel = phi * FAR_stoich * oxidizer.mdot;
+  // mdot_fuel = phi * FAR_stoich * mdot_ox
+  // Works for any fuel/oxidizer combination including blended fuels where
+  // all species appear in both streams.
+  const double FAR_stoich = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
+  const double mdot_fuel = phi * FAR_stoich * oxidizer.mdot;
 
-    Stream result = fuel;
-    result.mdot = mdot_fuel;
-    return result;
+  Stream result = fuel;
+  result.mdot = mdot_fuel;
+  return result;
 }
 
 // -------------------------------------------------------------
@@ -862,447 +861,533 @@ namespace {
 // Guaranteed to converge if f is continuous and target is bracketed.
 // tol_f: tolerance on |f(x) - target|
 // tol_x_rel: relative bracket width tolerance
-template<typename Func>
+template <typename Func>
 double bisection_solve(Func f, double target, double x_lo, double x_hi,
-                       double tol_f, std::size_t max_iter, double tol_x_rel = 1e-10) {
-    // Shift to root-finding: g(x) = f(x) - target
-    double a = x_lo, b = x_hi;
-    double fa = f(a) - target;
-    double fb = f(b) - target;
+                       double tol_f, std::size_t max_iter,
+                       double tol_x_rel = 1e-10) {
+  // Shift to root-finding: g(x) = f(x) - target
+  double a = x_lo, b = x_hi;
+  double fa = f(a) - target;
+  double fb = f(b) - target;
 
-    if (std::abs(fa) < tol_f) return a;
-    if (std::abs(fb) < tol_f) return b;
-
-    if (fa * fb > 0.0) {
-        throw std::runtime_error("bisection_solve: target outside achievable range");
-    }
-
-    // Ensure |f(b)| <= |f(a)| (b is the best guess)
-    if (std::abs(fa) < std::abs(fb)) {
-        std::swap(a, b);
-        std::swap(fa, fb);
-    }
-
-    double c = a, fc = fa;
-    bool mflag = true;
-    double s = b, fs = fb;
-    double d = 0.0;
-
-    for (std::size_t iter = 0; iter < max_iter; ++iter) {
-        if (std::abs(fb) < tol_f) return b;
-        if (std::abs(b - a) < tol_x_rel * std::abs(b)) return b;
-
-        if (fa != fc && fb != fc) {
-            // Inverse quadratic interpolation
-            s = a * fb * fc / ((fa - fb) * (fa - fc))
-              + b * fa * fc / ((fb - fa) * (fb - fc))
-              + c * fa * fb / ((fc - fa) * (fc - fb));
-        } else {
-            // Secant method
-            s = b - fb * (b - a) / (fb - fa);
-        }
-
-        // Conditions to fall back to bisection
-        const double b3 = (3.0 * a + b) / 4.0;
-        bool cond1 = !((s > std::min(b3, b) && s < std::max(b3, b)));
-        bool cond2 = mflag  && std::abs(s - b) >= std::abs(b - c) / 2.0;
-        bool cond3 = !mflag && std::abs(s - b) >= std::abs(c - d) / 2.0;
-        bool cond4 = mflag  && std::abs(b - c) < tol_x_rel * std::abs(b);
-        bool cond5 = !mflag && std::abs(c - d) < tol_x_rel * std::abs(b);
-
-        if (cond1 || cond2 || cond3 || cond4 || cond5) {
-            s = 0.5 * (a + b);
-            mflag = true;
-        } else {
-            mflag = false;
-        }
-
-        fs = f(s) - target;
-        d = c;
-        c = b; fc = fb;
-
-        if (fa * fs < 0.0) {
-            b = s; fb = fs;
-        } else {
-            a = s; fa = fs;
-        }
-
-        if (std::abs(fa) < std::abs(fb)) {
-            std::swap(a, b);
-            std::swap(fa, fb);
-        }
-    }
-
+  if (std::abs(fa) < tol_f)
+    return a;
+  if (std::abs(fb) < tol_f)
     return b;
+
+  if (fa * fb > 0.0) {
+    throw std::runtime_error(
+        "bisection_solve: target outside achievable range");
+  }
+
+  // Ensure |f(b)| <= |f(a)| (b is the best guess)
+  if (std::abs(fa) < std::abs(fb)) {
+    std::swap(a, b);
+    std::swap(fa, fb);
+  }
+
+  double c = a, fc = fa;
+  bool mflag = true;
+  double s = b, fs = fb;
+  double d = 0.0;
+
+  for (std::size_t iter = 0; iter < max_iter; ++iter) {
+    if (std::abs(fb) < tol_f)
+      return b;
+    if (std::abs(b - a) < tol_x_rel * std::abs(b))
+      return b;
+
+    if (fa != fc && fb != fc) {
+      // Inverse quadratic interpolation
+      s = a * fb * fc / ((fa - fb) * (fa - fc)) +
+          b * fa * fc / ((fb - fa) * (fb - fc)) +
+          c * fa * fb / ((fc - fa) * (fc - fb));
+    } else {
+      // Secant method
+      s = b - fb * (b - a) / (fb - fa);
+    }
+
+    // Conditions to fall back to bisection
+    const double b3 = (3.0 * a + b) / 4.0;
+    bool cond1 = !((s > std::min(b3, b) && s < std::max(b3, b)));
+    bool cond2 = mflag && std::abs(s - b) >= std::abs(b - c) / 2.0;
+    bool cond3 = !mflag && std::abs(s - b) >= std::abs(c - d) / 2.0;
+    bool cond4 = mflag && std::abs(b - c) < tol_x_rel * std::abs(b);
+    bool cond5 = !mflag && std::abs(c - d) < tol_x_rel * std::abs(b);
+
+    if (cond1 || cond2 || cond3 || cond4 || cond5) {
+      s = 0.5 * (a + b);
+      mflag = true;
+    } else {
+      mflag = false;
+    }
+
+    fs = f(s) - target;
+    d = c;
+    c = b;
+    fc = fb;
+
+    if (fa * fs < 0.0) {
+      b = s;
+      fb = fs;
+    } else {
+      a = s;
+      fa = fs;
+    }
+
+    if (std::abs(fa) < std::abs(fb)) {
+      std::swap(a, b);
+      std::swap(fa, fb);
+    }
+  }
+
+  return b;
 }
 
 // Helper: compute Tad for given fuel mdot (oxidizer mdot fixed)
-double compute_Tad_fuel(double mdot_fuel, const Stream& fuel, const Stream& oxidizer) {
-    Stream fuel_trial = fuel;
-    fuel_trial.mdot = mdot_fuel;
-    Stream mixed = mix({fuel_trial, oxidizer});
-    State burned = complete_combustion(mixed.state);
-    return burned.T;
+double compute_Tad_fuel(double mdot_fuel, const Stream &fuel,
+                        const Stream &oxidizer) {
+  Stream fuel_trial = fuel;
+  fuel_trial.mdot = mdot_fuel;
+  Stream mixed = mix({fuel_trial, oxidizer});
+  State burned = complete_combustion(mixed.state);
+  return burned.T;
 }
 
 // Helper: compute Tad for given oxidizer mdot (fuel mdot fixed)
-double compute_Tad_ox(double mdot_ox, const Stream& fuel, const Stream& oxidizer) {
-    Stream ox_trial = oxidizer;
-    ox_trial.mdot = mdot_ox;
-    Stream mixed = mix({fuel, ox_trial});
-    State burned = complete_combustion(mixed.state);
-    return burned.T;
+double compute_Tad_ox(double mdot_ox, const Stream &fuel,
+                      const Stream &oxidizer) {
+  Stream ox_trial = oxidizer;
+  ox_trial.mdot = mdot_ox;
+  Stream mixed = mix({fuel, ox_trial});
+  State burned = complete_combustion(mixed.state);
+  return burned.T;
 }
 
 // Helper: compute species mole fraction in burned products
 // vary_fuel: true = vary fuel mdot, false = vary oxidizer mdot
 // dry_basis: true = remove H2O before computing mole fraction
-double compute_species_burned(double mdot_var, const Stream& fuel, const Stream& oxidizer,
-                               const std::string& species, bool vary_fuel, bool dry_basis) {
-    Stream fuel_trial = fuel;
-    Stream ox_trial = oxidizer;
-    if (vary_fuel) {
-        fuel_trial.mdot = mdot_var;
-    } else {
-        ox_trial.mdot = mdot_var;
-    }
-    Stream mixed = mix({fuel_trial, ox_trial});
-    std::vector<double> X_burned = complete_combustion_to_CO2_H2O(mixed.state.X);
-    if (dry_basis) {
-        X_burned = convert_to_dry_fractions(X_burned);
-    }
-    return X_burned[species_index.at(species)];
+double compute_species_burned(double mdot_var, const Stream &fuel,
+                              const Stream &oxidizer,
+                              const std::string &species, bool vary_fuel,
+                              bool dry_basis) {
+  Stream fuel_trial = fuel;
+  Stream ox_trial = oxidizer;
+  if (vary_fuel) {
+    fuel_trial.mdot = mdot_var;
+  } else {
+    ox_trial.mdot = mdot_var;
+  }
+  Stream mixed = mix({fuel_trial, ox_trial});
+  std::vector<double> X_burned = complete_combustion_to_CO2_H2O(mixed.state.X);
+  if (dry_basis) {
+    X_burned = convert_to_dry_fractions(X_burned);
+  }
+  return X_burned[species_index.at(species)];
 }
 
-}  // anonymous namespace
+} // anonymous namespace
 
 // -------------------------------------------------------------
 // Find fuel stream for target property (oxidizer mdot fixed)
 // -------------------------------------------------------------
 
-Stream set_fuel_stream_for_Tad(double T_ad_target, const Stream& fuel, const Stream& oxidizer,
-                                double tol, std::size_t max_iter, bool lean, double phi_max) {
-    if (oxidizer.mdot <= 0.0) {
-        throw std::invalid_argument("set_fuel_stream_for_Tad: oxidizer.mdot must be positive");
-    }
-    if (phi_max <= 1.0) {
-        throw std::invalid_argument("set_fuel_stream_for_Tad: phi_max must be > 1.0");
-    }
+Stream set_fuel_stream_for_Tad(double T_ad_target, const Stream &fuel,
+                               const Stream &oxidizer, double tol,
+                               std::size_t max_iter, bool lean,
+                               double phi_max) {
+  if (oxidizer.mdot <= 0.0) {
+    throw std::invalid_argument(
+        "set_fuel_stream_for_Tad: oxidizer.mdot must be positive");
+  }
+  if (phi_max <= 1.0) {
+    throw std::invalid_argument(
+        "set_fuel_stream_for_Tad: phi_max must be > 1.0");
+  }
 
-    // Tad must be above oxidizer temperature (minimum achievable with zero fuel)
-    double T_min = oxidizer.T();
-    if (T_ad_target <= T_min) {
-        throw std::invalid_argument("set_fuel_stream_for_Tad: T_ad_target must be > oxidizer temperature");
-    }
-    if (T_ad_target > 5000.0) {
-        throw std::invalid_argument("set_fuel_stream_for_Tad: T_ad_target must be <= 5000 K");
-    }
+  // Tad must be above oxidizer temperature (minimum achievable with zero fuel)
+  double T_min = oxidizer.T();
+  if (T_ad_target <= T_min) {
+    throw std::invalid_argument(
+        "set_fuel_stream_for_Tad: T_ad_target must be > oxidizer temperature");
+  }
+  if (T_ad_target > 5000.0) {
+    throw std::invalid_argument(
+        "set_fuel_stream_for_Tad: T_ad_target must be <= 5000 K");
+  }
 
-    // Estimate stoichiometric fuel mass flow
-    double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
-    double mdot_stoich = oxidizer.mdot * ratio;
+  // Estimate stoichiometric fuel mass flow
+  double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
+  double mdot_stoich = oxidizer.mdot * ratio;
 
-    // Peak Tad is at stoichiometric
-    double mdot_peak = mdot_stoich;
-    double T_peak = compute_Tad_fuel(mdot_peak, fuel, oxidizer);
+  // Peak Tad is at stoichiometric
+  double mdot_peak = mdot_stoich;
+  double T_peak = compute_Tad_fuel(mdot_peak, fuel, oxidizer);
 
-    if (T_ad_target > T_peak + tol) {
-        throw std::runtime_error("set_fuel_stream_for_Tad: target T_ad exceeds maximum achievable (stoichiometric)");
-    }
+  if (T_ad_target > T_peak + tol) {
+    throw std::runtime_error("set_fuel_stream_for_Tad: target T_ad exceeds "
+                             "maximum achievable (stoichiometric)");
+  }
 
-    double mdot_result = 0.0;
-    auto f = [&](double mdot) { return compute_Tad_fuel(mdot, fuel, oxidizer); };
+  double mdot_result = 0.0;
+  auto f = [&](double mdot) { return compute_Tad_fuel(mdot, fuel, oxidizer); };
 
-    if (lean) {
-        // Search on lean side: low fuel to stoichiometric
-        // Tad increases with fuel on lean side
-        double mdot_lo = mdot_stoich * 0.01;
-        double T_lo = compute_Tad_fuel(mdot_lo, fuel, oxidizer);
+  if (lean) {
+    // Search on lean side: low fuel to stoichiometric
+    // Tad increases with fuel on lean side
+    double mdot_lo = mdot_stoich * 0.01;
+    double T_lo = compute_Tad_fuel(mdot_lo, fuel, oxidizer);
 
-        if (T_ad_target < T_lo - tol) {
-            throw std::runtime_error("set_fuel_stream_for_Tad: target T_ad below minimum achievable (lean)");
-        }
-
-        mdot_result = bisection_solve(f, T_ad_target, mdot_lo, mdot_peak, tol, max_iter);
-    } else {
-        // Search on rich side: stoichiometric to phi_max
-        // Tad decreases with fuel on rich side
-        double mdot_hi = mdot_stoich * phi_max;
-        double T_hi = compute_Tad_fuel(mdot_hi, fuel, oxidizer);
-
-        if (T_ad_target < T_hi - tol) {
-            throw std::runtime_error("set_fuel_stream_for_Tad: target T_ad below minimum achievable (rich)");
-        }
-
-        mdot_result = bisection_solve(f, T_ad_target, mdot_peak, mdot_hi, tol, max_iter);
+    if (T_ad_target < T_lo - tol) {
+      throw std::runtime_error("set_fuel_stream_for_Tad: target T_ad below "
+                               "minimum achievable (lean)");
     }
 
-    Stream result = fuel;
-    result.mdot = mdot_result;
-    return result;
+    mdot_result =
+        bisection_solve(f, T_ad_target, mdot_lo, mdot_peak, tol, max_iter);
+  } else {
+    // Search on rich side: stoichiometric to phi_max
+    // Tad decreases with fuel on rich side
+    double mdot_hi = mdot_stoich * phi_max;
+    double T_hi = compute_Tad_fuel(mdot_hi, fuel, oxidizer);
+
+    if (T_ad_target < T_hi - tol) {
+      throw std::runtime_error("set_fuel_stream_for_Tad: target T_ad below "
+                               "minimum achievable (rich)");
+    }
+
+    mdot_result =
+        bisection_solve(f, T_ad_target, mdot_peak, mdot_hi, tol, max_iter);
+  }
+
+  Stream result = fuel;
+  result.mdot = mdot_result;
+  return result;
 }
 
-Stream set_fuel_stream_for_O2(double X_O2_target, const Stream& fuel, const Stream& oxidizer,
-                               double tol, std::size_t max_iter) {
-    if (oxidizer.mdot <= 0.0) {
-        throw std::invalid_argument("set_fuel_stream_for_O2: oxidizer.mdot must be positive");
-    }
+Stream set_fuel_stream_for_O2(double X_O2_target, const Stream &fuel,
+                              const Stream &oxidizer, double tol,
+                              std::size_t max_iter) {
+  if (oxidizer.mdot <= 0.0) {
+    throw std::invalid_argument(
+        "set_fuel_stream_for_O2: oxidizer.mdot must be positive");
+  }
 
-    double X_O2_ox = oxidizer.X()[species_index.at("O2")];
-    if (X_O2_target <= 0.0 || X_O2_target >= X_O2_ox) {
-        throw std::invalid_argument("set_fuel_stream_for_O2: X_O2_target must be in (0, X_O2_oxidizer)");
-    }
+  double X_O2_ox = oxidizer.X()[species_index.at("O2")];
+  if (X_O2_target <= 0.0 || X_O2_target >= X_O2_ox) {
+    throw std::invalid_argument(
+        "set_fuel_stream_for_O2: X_O2_target must be in (0, X_O2_oxidizer)");
+  }
 
-    double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
-    double mdot_stoich = oxidizer.mdot * ratio;
+  double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
+  double mdot_stoich = oxidizer.mdot * ratio;
 
-    double mdot_lo = mdot_stoich * 0.001;
-    double mdot_hi = mdot_stoich * 0.999;
+  double mdot_lo = mdot_stoich * 0.001;
+  double mdot_hi = mdot_stoich * 0.999;
 
-    auto f = [&](double mdot) { return compute_species_burned(mdot, fuel, oxidizer, "O2", true, false); };
-    double mdot_result = bisection_solve(f, X_O2_target, mdot_lo, mdot_hi, tol, max_iter);
+  auto f = [&](double mdot) {
+    return compute_species_burned(mdot, fuel, oxidizer, "O2", true, false);
+  };
+  double mdot_result =
+      bisection_solve(f, X_O2_target, mdot_lo, mdot_hi, tol, max_iter);
 
-    Stream result = fuel;
-    result.mdot = mdot_result;
-    return result;
+  Stream result = fuel;
+  result.mdot = mdot_result;
+  return result;
 }
 
-Stream set_fuel_stream_for_O2_dry(double X_O2_dry_target, const Stream& fuel, const Stream& oxidizer,
-                                   double tol, std::size_t max_iter) {
-    if (oxidizer.mdot <= 0.0) {
-        throw std::invalid_argument("set_fuel_stream_for_O2_dry: oxidizer.mdot must be positive");
-    }
+Stream set_fuel_stream_for_O2_dry(double X_O2_dry_target, const Stream &fuel,
+                                  const Stream &oxidizer, double tol,
+                                  std::size_t max_iter) {
+  if (oxidizer.mdot <= 0.0) {
+    throw std::invalid_argument(
+        "set_fuel_stream_for_O2_dry: oxidizer.mdot must be positive");
+  }
 
-    // Dry O2 upper bound is from dry oxidizer composition
-    std::vector<double> X_ox_dry = convert_to_dry_fractions(oxidizer.X());
-    double X_O2_ox_dry = X_ox_dry[species_index.at("O2")];
-    if (X_O2_dry_target <= 0.0 || X_O2_dry_target >= X_O2_ox_dry) {
-        throw std::invalid_argument("set_fuel_stream_for_O2_dry: X_O2_dry_target must be in (0, X_O2_dry_oxidizer)");
-    }
+  // Dry O2 upper bound is from dry oxidizer composition
+  std::vector<double> X_ox_dry = convert_to_dry_fractions(oxidizer.X());
+  double X_O2_ox_dry = X_ox_dry[species_index.at("O2")];
+  if (X_O2_dry_target <= 0.0 || X_O2_dry_target >= X_O2_ox_dry) {
+    throw std::invalid_argument("set_fuel_stream_for_O2_dry: X_O2_dry_target "
+                                "must be in (0, X_O2_dry_oxidizer)");
+  }
 
-    double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
-    double mdot_stoich = oxidizer.mdot * ratio;
+  double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
+  double mdot_stoich = oxidizer.mdot * ratio;
 
-    double mdot_lo = mdot_stoich * 0.001;
-    double mdot_hi = mdot_stoich * 0.999;
+  double mdot_lo = mdot_stoich * 0.001;
+  double mdot_hi = mdot_stoich * 0.999;
 
-    auto f = [&](double mdot) { return compute_species_burned(mdot, fuel, oxidizer, "O2", true, true); };
-    double mdot_result = bisection_solve(f, X_O2_dry_target, mdot_lo, mdot_hi, tol, max_iter);
+  auto f = [&](double mdot) {
+    return compute_species_burned(mdot, fuel, oxidizer, "O2", true, true);
+  };
+  double mdot_result =
+      bisection_solve(f, X_O2_dry_target, mdot_lo, mdot_hi, tol, max_iter);
 
-    Stream result = fuel;
-    result.mdot = mdot_result;
-    return result;
+  Stream result = fuel;
+  result.mdot = mdot_result;
+  return result;
 }
 
-Stream set_fuel_stream_for_CO2(double X_CO2_target, const Stream& fuel, const Stream& oxidizer,
-                                double tol, std::size_t max_iter) {
-    if (oxidizer.mdot <= 0.0) {
-        throw std::invalid_argument("set_fuel_stream_for_CO2: oxidizer.mdot must be positive");
-    }
-    if (X_CO2_target <= 0.0) {
-        throw std::invalid_argument("set_fuel_stream_for_CO2: X_CO2_target must be positive");
-    }
+Stream set_fuel_stream_for_CO2(double X_CO2_target, const Stream &fuel,
+                               const Stream &oxidizer, double tol,
+                               std::size_t max_iter) {
+  if (oxidizer.mdot <= 0.0) {
+    throw std::invalid_argument(
+        "set_fuel_stream_for_CO2: oxidizer.mdot must be positive");
+  }
+  if (X_CO2_target <= 0.0) {
+    throw std::invalid_argument(
+        "set_fuel_stream_for_CO2: X_CO2_target must be positive");
+  }
 
-    double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
-    double mdot_stoich = oxidizer.mdot * ratio;
+  double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
+  double mdot_stoich = oxidizer.mdot * ratio;
 
-    double mdot_lo = mdot_stoich * 0.001;
-    double mdot_hi = mdot_stoich * 0.999;
+  double mdot_lo = mdot_stoich * 0.001;
+  double mdot_hi = mdot_stoich * 0.999;
 
-    auto f = [&](double mdot) { return compute_species_burned(mdot, fuel, oxidizer, "CO2", true, false); };
-    double mdot_result = bisection_solve(f, X_CO2_target, mdot_lo, mdot_hi, tol, max_iter);
+  auto f = [&](double mdot) {
+    return compute_species_burned(mdot, fuel, oxidizer, "CO2", true, false);
+  };
+  double mdot_result =
+      bisection_solve(f, X_CO2_target, mdot_lo, mdot_hi, tol, max_iter);
 
-    Stream result = fuel;
-    result.mdot = mdot_result;
-    return result;
+  Stream result = fuel;
+  result.mdot = mdot_result;
+  return result;
 }
 
-Stream set_fuel_stream_for_CO2_dry(double X_CO2_dry_target, const Stream& fuel, const Stream& oxidizer,
-                                    double tol, std::size_t max_iter) {
-    if (oxidizer.mdot <= 0.0) {
-        throw std::invalid_argument("set_fuel_stream_for_CO2_dry: oxidizer.mdot must be positive");
-    }
-    if (X_CO2_dry_target <= 0.0) {
-        throw std::invalid_argument("set_fuel_stream_for_CO2_dry: X_CO2_dry_target must be positive");
-    }
+Stream set_fuel_stream_for_CO2_dry(double X_CO2_dry_target, const Stream &fuel,
+                                   const Stream &oxidizer, double tol,
+                                   std::size_t max_iter) {
+  if (oxidizer.mdot <= 0.0) {
+    throw std::invalid_argument(
+        "set_fuel_stream_for_CO2_dry: oxidizer.mdot must be positive");
+  }
+  if (X_CO2_dry_target <= 0.0) {
+    throw std::invalid_argument(
+        "set_fuel_stream_for_CO2_dry: X_CO2_dry_target must be positive");
+  }
 
-    double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
-    double mdot_stoich = oxidizer.mdot * ratio;
+  double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
+  double mdot_stoich = oxidizer.mdot * ratio;
 
-    double mdot_lo = mdot_stoich * 0.001;
-    double mdot_hi = mdot_stoich * 0.999;
+  double mdot_lo = mdot_stoich * 0.001;
+  double mdot_hi = mdot_stoich * 0.999;
 
-    auto f = [&](double mdot) { return compute_species_burned(mdot, fuel, oxidizer, "CO2", true, true); };
-    double mdot_result = bisection_solve(f, X_CO2_dry_target, mdot_lo, mdot_hi, tol, max_iter);
+  auto f = [&](double mdot) {
+    return compute_species_burned(mdot, fuel, oxidizer, "CO2", true, true);
+  };
+  double mdot_result =
+      bisection_solve(f, X_CO2_dry_target, mdot_lo, mdot_hi, tol, max_iter);
 
-    Stream result = fuel;
-    result.mdot = mdot_result;
-    return result;
+  Stream result = fuel;
+  result.mdot = mdot_result;
+  return result;
 }
 
 // -------------------------------------------------------------
 // Find oxidizer stream for target property (fuel mdot fixed)
 // -------------------------------------------------------------
 
-Stream set_oxidizer_stream_for_Tad(double T_ad_target, const Stream& fuel, const Stream& oxidizer,
-                                    double tol, std::size_t max_iter, bool lean, double phi_max) {
-    if (fuel.mdot <= 0.0) {
-        throw std::invalid_argument("set_oxidizer_stream_for_Tad: fuel.mdot must be positive");
-    }
-    if (phi_max <= 1.0) {
-        throw std::invalid_argument("set_oxidizer_stream_for_Tad: phi_max must be > 1.0");
-    }
+Stream set_oxidizer_stream_for_Tad(double T_ad_target, const Stream &fuel,
+                                   const Stream &oxidizer, double tol,
+                                   std::size_t max_iter, bool lean,
+                                   double phi_max) {
+  if (fuel.mdot <= 0.0) {
+    throw std::invalid_argument(
+        "set_oxidizer_stream_for_Tad: fuel.mdot must be positive");
+  }
+  if (phi_max <= 1.0) {
+    throw std::invalid_argument(
+        "set_oxidizer_stream_for_Tad: phi_max must be > 1.0");
+  }
 
-    // Tad must be above fuel temperature (minimum achievable with infinite air)
-    double T_min = fuel.T();
-    if (T_ad_target <= T_min) {
-        throw std::invalid_argument("set_oxidizer_stream_for_Tad: T_ad_target must be > fuel temperature");
-    }
-    if (T_ad_target > 5000.0) {
-        throw std::invalid_argument("set_oxidizer_stream_for_Tad: T_ad_target must be <= 5000 K");
-    }
+  // Tad must be above fuel temperature (minimum achievable with infinite air)
+  double T_min = fuel.T();
+  if (T_ad_target <= T_min) {
+    throw std::invalid_argument(
+        "set_oxidizer_stream_for_Tad: T_ad_target must be > fuel temperature");
+  }
+  if (T_ad_target > 5000.0) {
+    throw std::invalid_argument(
+        "set_oxidizer_stream_for_Tad: T_ad_target must be <= 5000 K");
+  }
 
-    // Estimate stoichiometric oxidizer mass flow
-    double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
-    double mdot_stoich = (ratio > 0.0) ? fuel.mdot / ratio : fuel.mdot * 20.0;
+  // Estimate stoichiometric oxidizer mass flow
+  double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
+  double mdot_stoich = (ratio > 0.0) ? fuel.mdot / ratio : fuel.mdot * 20.0;
 
-    // Peak Tad is at stoichiometric
-    double mdot_peak = mdot_stoich;
-    double T_peak = compute_Tad_ox(mdot_peak, fuel, oxidizer);
+  // Peak Tad is at stoichiometric
+  double mdot_peak = mdot_stoich;
+  double T_peak = compute_Tad_ox(mdot_peak, fuel, oxidizer);
 
-    if (T_ad_target > T_peak + tol) {
-        throw std::runtime_error("set_oxidizer_stream_for_Tad: target T_ad exceeds maximum achievable (stoichiometric)");
-    }
+  if (T_ad_target > T_peak + tol) {
+    throw std::runtime_error("set_oxidizer_stream_for_Tad: target T_ad exceeds "
+                             "maximum achievable (stoichiometric)");
+  }
 
-    double mdot_result = 0.0;
-    auto f = [&](double mdot) { return compute_Tad_ox(mdot, fuel, oxidizer); };
+  double mdot_result = 0.0;
+  auto f = [&](double mdot) { return compute_Tad_ox(mdot, fuel, oxidizer); };
 
-    if (lean) {
-        // Search on lean side: stoichiometric to high oxidizer (1/phi_min factor)
-        // Tad decreases with oxidizer on lean side
-        double mdot_hi = mdot_stoich * phi_max;  // phi_max used as dilution factor
-        double T_hi = compute_Tad_ox(mdot_hi, fuel, oxidizer);
+  if (lean) {
+    // Search on lean side: stoichiometric to high oxidizer (1/phi_min factor)
+    // Tad decreases with oxidizer on lean side
+    double mdot_hi = mdot_stoich * phi_max; // phi_max used as dilution factor
+    double T_hi = compute_Tad_ox(mdot_hi, fuel, oxidizer);
 
-        if (T_ad_target < T_hi - tol) {
-            throw std::runtime_error("set_oxidizer_stream_for_Tad: target T_ad below minimum achievable (lean)");
-        }
-
-        mdot_result = bisection_solve(f, T_ad_target, mdot_peak, mdot_hi, tol, max_iter);
-    } else {
-        // Search on rich side: low oxidizer (1/phi_max) to stoichiometric
-        // Tad increases with oxidizer on rich side
-        double mdot_lo = mdot_stoich / phi_max;
-        double T_lo = compute_Tad_ox(mdot_lo, fuel, oxidizer);
-
-        if (T_ad_target < T_lo - tol) {
-            throw std::runtime_error("set_oxidizer_stream_for_Tad: target T_ad below minimum achievable (rich)");
-        }
-
-        mdot_result = bisection_solve(f, T_ad_target, mdot_lo, mdot_peak, tol, max_iter);
+    if (T_ad_target < T_hi - tol) {
+      throw std::runtime_error("set_oxidizer_stream_for_Tad: target T_ad below "
+                               "minimum achievable (lean)");
     }
 
-    Stream result = oxidizer;
-    result.mdot = mdot_result;
-    return result;
+    mdot_result =
+        bisection_solve(f, T_ad_target, mdot_peak, mdot_hi, tol, max_iter);
+  } else {
+    // Search on rich side: low oxidizer (1/phi_max) to stoichiometric
+    // Tad increases with oxidizer on rich side
+    double mdot_lo = mdot_stoich / phi_max;
+    double T_lo = compute_Tad_ox(mdot_lo, fuel, oxidizer);
+
+    if (T_ad_target < T_lo - tol) {
+      throw std::runtime_error("set_oxidizer_stream_for_Tad: target T_ad below "
+                               "minimum achievable (rich)");
+    }
+
+    mdot_result =
+        bisection_solve(f, T_ad_target, mdot_lo, mdot_peak, tol, max_iter);
+  }
+
+  Stream result = oxidizer;
+  result.mdot = mdot_result;
+  return result;
 }
 
-Stream set_oxidizer_stream_for_O2(double X_O2_target, const Stream& fuel, const Stream& oxidizer,
-                                   double tol, std::size_t max_iter) {
-    if (fuel.mdot <= 0.0) {
-        throw std::invalid_argument("set_oxidizer_stream_for_O2: fuel.mdot must be positive");
-    }
+Stream set_oxidizer_stream_for_O2(double X_O2_target, const Stream &fuel,
+                                  const Stream &oxidizer, double tol,
+                                  std::size_t max_iter) {
+  if (fuel.mdot <= 0.0) {
+    throw std::invalid_argument(
+        "set_oxidizer_stream_for_O2: fuel.mdot must be positive");
+  }
 
-    double X_O2_ox = oxidizer.X()[species_index.at("O2")];
-    if (X_O2_target <= 0.0 || X_O2_target >= X_O2_ox) {
-        throw std::invalid_argument("set_oxidizer_stream_for_O2: X_O2_target must be in (0, X_O2_oxidizer)");
-    }
+  double X_O2_ox = oxidizer.X()[species_index.at("O2")];
+  if (X_O2_target <= 0.0 || X_O2_target >= X_O2_ox) {
+    throw std::invalid_argument("set_oxidizer_stream_for_O2: X_O2_target must "
+                                "be in (0, X_O2_oxidizer)");
+  }
 
-    double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
-    double mdot_stoich = (ratio > 0.0) ? fuel.mdot / ratio : fuel.mdot * 20.0;
+  double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
+  double mdot_stoich = (ratio > 0.0) ? fuel.mdot / ratio : fuel.mdot * 20.0;
 
-    double mdot_lo = mdot_stoich * 1.001;  // just above stoich -> low O2
-    double mdot_hi = mdot_stoich * 100.0;  // very lean -> high O2
+  double mdot_lo = mdot_stoich * 1.001; // just above stoich -> low O2
+  double mdot_hi = mdot_stoich * 100.0; // very lean -> high O2
 
-    // O2 increases with increasing oxidizer (on lean side)
-    auto f = [&](double mdot) { return compute_species_burned(mdot, fuel, oxidizer, "O2", false, false); };
-    double mdot_result = bisection_solve(f, X_O2_target, mdot_lo, mdot_hi, tol, max_iter);
+  // O2 increases with increasing oxidizer (on lean side)
+  auto f = [&](double mdot) {
+    return compute_species_burned(mdot, fuel, oxidizer, "O2", false, false);
+  };
+  double mdot_result =
+      bisection_solve(f, X_O2_target, mdot_lo, mdot_hi, tol, max_iter);
 
-    Stream result = oxidizer;
-    result.mdot = mdot_result;
-    return result;
+  Stream result = oxidizer;
+  result.mdot = mdot_result;
+  return result;
 }
 
-Stream set_oxidizer_stream_for_O2_dry(double X_O2_dry_target, const Stream& fuel, const Stream& oxidizer,
-                                       double tol, std::size_t max_iter) {
-    if (fuel.mdot <= 0.0) {
-        throw std::invalid_argument("set_oxidizer_stream_for_O2_dry: fuel.mdot must be positive");
-    }
+Stream set_oxidizer_stream_for_O2_dry(double X_O2_dry_target,
+                                      const Stream &fuel,
+                                      const Stream &oxidizer, double tol,
+                                      std::size_t max_iter) {
+  if (fuel.mdot <= 0.0) {
+    throw std::invalid_argument(
+        "set_oxidizer_stream_for_O2_dry: fuel.mdot must be positive");
+  }
 
-    std::vector<double> X_ox_dry = convert_to_dry_fractions(oxidizer.X());
-    double X_O2_ox_dry = X_ox_dry[species_index.at("O2")];
-    if (X_O2_dry_target <= 0.0 || X_O2_dry_target >= X_O2_ox_dry) {
-        throw std::invalid_argument("set_oxidizer_stream_for_O2_dry: X_O2_dry_target must be in (0, X_O2_dry_oxidizer)");
-    }
+  std::vector<double> X_ox_dry = convert_to_dry_fractions(oxidizer.X());
+  double X_O2_ox_dry = X_ox_dry[species_index.at("O2")];
+  if (X_O2_dry_target <= 0.0 || X_O2_dry_target >= X_O2_ox_dry) {
+    throw std::invalid_argument(
+        "set_oxidizer_stream_for_O2_dry: X_O2_dry_target must be in (0, "
+        "X_O2_dry_oxidizer)");
+  }
 
-    double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
-    double mdot_stoich = (ratio > 0.0) ? fuel.mdot / ratio : fuel.mdot * 20.0;
+  double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
+  double mdot_stoich = (ratio > 0.0) ? fuel.mdot / ratio : fuel.mdot * 20.0;
 
-    double mdot_lo = mdot_stoich * 1.001;
-    double mdot_hi = mdot_stoich * 100.0;
+  double mdot_lo = mdot_stoich * 1.001;
+  double mdot_hi = mdot_stoich * 100.0;
 
-    auto f = [&](double mdot) { return compute_species_burned(mdot, fuel, oxidizer, "O2", false, true); };
-    double mdot_result = bisection_solve(f, X_O2_dry_target, mdot_lo, mdot_hi, tol, max_iter);
+  auto f = [&](double mdot) {
+    return compute_species_burned(mdot, fuel, oxidizer, "O2", false, true);
+  };
+  double mdot_result =
+      bisection_solve(f, X_O2_dry_target, mdot_lo, mdot_hi, tol, max_iter);
 
-    Stream result = oxidizer;
-    result.mdot = mdot_result;
-    return result;
+  Stream result = oxidizer;
+  result.mdot = mdot_result;
+  return result;
 }
 
-Stream set_oxidizer_stream_for_CO2(double X_CO2_target, const Stream& fuel, const Stream& oxidizer,
-                                    double tol, std::size_t max_iter) {
-    if (fuel.mdot <= 0.0) {
-        throw std::invalid_argument("set_oxidizer_stream_for_CO2: fuel.mdot must be positive");
-    }
-    if (X_CO2_target <= 0.0) {
-        throw std::invalid_argument("set_oxidizer_stream_for_CO2: X_CO2_target must be positive");
-    }
+Stream set_oxidizer_stream_for_CO2(double X_CO2_target, const Stream &fuel,
+                                   const Stream &oxidizer, double tol,
+                                   std::size_t max_iter) {
+  if (fuel.mdot <= 0.0) {
+    throw std::invalid_argument(
+        "set_oxidizer_stream_for_CO2: fuel.mdot must be positive");
+  }
+  if (X_CO2_target <= 0.0) {
+    throw std::invalid_argument(
+        "set_oxidizer_stream_for_CO2: X_CO2_target must be positive");
+  }
 
-    double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
-    double mdot_stoich = (ratio > 0.0) ? fuel.mdot / ratio : fuel.mdot * 20.0;
+  double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
+  double mdot_stoich = (ratio > 0.0) ? fuel.mdot / ratio : fuel.mdot * 20.0;
 
-    double mdot_lo = mdot_stoich * 1.001;  // just above stoich -> high CO2
-    double mdot_hi = mdot_stoich * 100.0;  // very lean -> low CO2
+  double mdot_lo = mdot_stoich * 1.001; // just above stoich -> high CO2
+  double mdot_hi = mdot_stoich * 100.0; // very lean -> low CO2
 
-    // CO2 decreases with increasing oxidizer (dilution)
-    auto f = [&](double mdot) { return compute_species_burned(mdot, fuel, oxidizer, "CO2", false, false); };
-    double mdot_result = bisection_solve(f, X_CO2_target, mdot_lo, mdot_hi, tol, max_iter);
+  // CO2 decreases with increasing oxidizer (dilution)
+  auto f = [&](double mdot) {
+    return compute_species_burned(mdot, fuel, oxidizer, "CO2", false, false);
+  };
+  double mdot_result =
+      bisection_solve(f, X_CO2_target, mdot_lo, mdot_hi, tol, max_iter);
 
-    Stream result = oxidizer;
-    result.mdot = mdot_result;
-    return result;
+  Stream result = oxidizer;
+  result.mdot = mdot_result;
+  return result;
 }
 
-Stream set_oxidizer_stream_for_CO2_dry(double X_CO2_dry_target, const Stream& fuel, const Stream& oxidizer,
-                                        double tol, std::size_t max_iter) {
-    if (fuel.mdot <= 0.0) {
-        throw std::invalid_argument("set_oxidizer_stream_for_CO2_dry: fuel.mdot must be positive");
-    }
-    if (X_CO2_dry_target <= 0.0) {
-        throw std::invalid_argument("set_oxidizer_stream_for_CO2_dry: X_CO2_dry_target must be positive");
-    }
+Stream set_oxidizer_stream_for_CO2_dry(double X_CO2_dry_target,
+                                       const Stream &fuel,
+                                       const Stream &oxidizer, double tol,
+                                       std::size_t max_iter) {
+  if (fuel.mdot <= 0.0) {
+    throw std::invalid_argument(
+        "set_oxidizer_stream_for_CO2_dry: fuel.mdot must be positive");
+  }
+  if (X_CO2_dry_target <= 0.0) {
+    throw std::invalid_argument(
+        "set_oxidizer_stream_for_CO2_dry: X_CO2_dry_target must be positive");
+  }
 
-    double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
-    double mdot_stoich = (ratio > 0.0) ? fuel.mdot / ratio : fuel.mdot * 20.0;
+  double ratio = stoich_fuel_ox_ratio(fuel.X(), oxidizer.X());
+  double mdot_stoich = (ratio > 0.0) ? fuel.mdot / ratio : fuel.mdot * 20.0;
 
-    double mdot_lo = mdot_stoich * 1.001;
-    double mdot_hi = mdot_stoich * 100.0;
+  double mdot_lo = mdot_stoich * 1.001;
+  double mdot_hi = mdot_stoich * 100.0;
 
-    auto f = [&](double mdot) { return compute_species_burned(mdot, fuel, oxidizer, "CO2", false, true); };
-    double mdot_result = bisection_solve(f, X_CO2_dry_target, mdot_lo, mdot_hi, tol, max_iter);
+  auto f = [&](double mdot) {
+    return compute_species_burned(mdot, fuel, oxidizer, "CO2", false, true);
+  };
+  double mdot_result =
+      bisection_solve(f, X_CO2_dry_target, mdot_lo, mdot_hi, tol, max_iter);
 
-    Stream result = oxidizer;
-    result.mdot = mdot_result;
-    return result;
+  Stream result = oxidizer;
+  result.mdot = mdot_result;
+  return result;
 }
 
 // -------------------------------------------------------------
@@ -1310,30 +1395,34 @@ Stream set_oxidizer_stream_for_CO2_dry(double X_CO2_dry_target, const Stream& fu
 // -------------------------------------------------------------
 
 // Complete combustion (isothermal) - keeps input temperature
-State complete_combustion_isothermal(const State& in) {
-    State out;
-    out.T = in.T;
-    out.P = in.P;
-    out.X = complete_combustion_to_CO2_H2O(in.X);
-    return out;
+State complete_combustion_isothermal(const State &in) {
+  State out;
+  out.T = in.T;
+  out.P = in.P;
+  out.X = complete_combustion_to_CO2_H2O(in.X);
+  return out;
 }
 
 // Complete combustion (adiabatic) - solves for flame temperature
-State complete_combustion(const State& in) {
-    // Get burned composition at constant T first
-    std::vector<double> X_burned = complete_combustion_to_CO2_H2O(in.X);
+State complete_combustion(const State &in) {
+  // Get burned composition at constant T first
+  std::vector<double> X_burned = complete_combustion_to_CO2_H2O(in.X);
 
-    // Calculate inlet enthalpy
-    double H_in = h(in.T, in.X);
+  // Calculate inlet enthalpy
+  double H_in = h(in.T, in.X);
 
-    // Solve for adiabatic flame temperature: h(T_ad, X_burned) = H_in
-    double T_ad = calc_T_from_h(H_in, X_burned, in.T);
+  // Convert H_in (J/mol_reactants) to J/mol_products to strictly conserve
+  // energy on a mass basis since chemical reactions do not conserve moles.
+  double H_target = H_in * (mwmix(X_burned) / mwmix(in.X));
 
-    State out;
-    out.T = T_ad;
-    out.P = in.P;
-    out.X = X_burned;
-    return out;
+  // Solve for adiabatic flame temperature: h(T_ad, X_burned) = H_target
+  double T_ad = calc_T_from_h(H_target, X_burned, in.T);
+
+  State out;
+  out.T = T_ad;
+  out.P = in.P;
+  out.X = X_burned;
+  return out;
 }
 
 // -------------------------------------------------------------
@@ -1342,81 +1431,78 @@ State complete_combustion(const State& in) {
 
 // Compute Bilger mixture fraction from mole fraction compositions.
 // Delegates to the correct mass-fraction-based implementation.
-static double compute_bilger_mixture_fraction(
-    const std::vector<double>& X_mix,
-    const std::vector<double>& X_fuel,
-    const std::vector<double>& X_ox
-) {
-    return bilger_mixture_fraction_from_moles(X_mix, X_fuel, X_ox);
+static double compute_bilger_mixture_fraction(const std::vector<double> &X_mix,
+                                              const std::vector<double> &X_fuel,
+                                              const std::vector<double> &X_ox) {
+  return bilger_mixture_fraction_from_moles(X_mix, X_fuel, X_ox);
 }
 
 // Variant 1: From equivalence ratio (phi as input)
-CombustionState combustion_state(
-    const std::vector<double>& X_fuel,
-    const std::vector<double>& X_ox,
-    double phi,
-    double T_reactants,
-    double P,
-    const std::string& fuel_name,
-    CombustionMethod method
-) {
-    CombustionState result;
+CombustionState combustion_state(const std::vector<double> &X_fuel,
+                                 const std::vector<double> &X_ox, double phi,
+                                 double T_reactants, double P,
+                                 const std::string &fuel_name,
+                                 CombustionMethod method) {
+  CombustionState result;
 
-    // Store phi, fuel name, and method
-    result.phi = phi;
-    result.fuel_name = fuel_name;
-    result.method = method;
+  // Store phi, fuel name, and method
+  result.phi = phi;
+  result.fuel_name = fuel_name;
+  result.method = method;
 
-    // Compute reactant mixture composition
-    std::vector<double> X_reactants = set_equivalence_ratio_mole(phi, X_fuel, X_ox);
+  // Compute reactant mixture composition
+  std::vector<double> X_reactants =
+      set_equivalence_ratio_mole(phi, X_fuel, X_ox);
 
-    // Compute reactant CompleteState
-    result.reactants = complete_state(T_reactants, P, X_reactants);
+  // Compute reactant CompleteState
+  result.reactants = complete_state(T_reactants, P, X_reactants);
 
-    // Compute products via selected method
-    State reactant_state{T_reactants, P, X_reactants};
-    State product_state;
-    if (method == CombustionMethod::Equilibrium) {
-        EquilibriumResult eq = combustion_equilibrium(reactant_state);
-        product_state = eq.state;
-        result.fuel_burn_fraction = eq.converged ? 1.0 : 0.0;
-    } else {
-        product_state = complete_combustion(reactant_state);
-        result.fuel_burn_fraction = 1.0;
-    }
+  // Compute products via selected method
+  State reactant_state{T_reactants, P, X_reactants};
+  State product_state;
+  if (method == CombustionMethod::Equilibrium) {
+    EquilibriumResult eq = combustion_equilibrium(reactant_state);
+    product_state = eq.state;
+    result.fuel_burn_fraction = eq.converged ? 1.0 : 0.0;
+  } else {
+    product_state = complete_combustion(reactant_state);
+    result.fuel_burn_fraction = 1.0;
+  }
 
-    // Compute product CompleteState
-    result.products = complete_state(product_state.T, product_state.P, product_state.X);
+  // Compute product CompleteState
+  result.products =
+      complete_state(product_state.T, product_state.P, product_state.X);
 
-    // Compute mixture fraction
-    result.mixture_fraction = compute_bilger_mixture_fraction(X_reactants, X_fuel, X_ox);
+  // Compute mixture fraction
+  result.mixture_fraction =
+      compute_bilger_mixture_fraction(X_reactants, X_fuel, X_ox);
 
-    return result;
+  return result;
 }
 
 // Variant 2: From streams (phi computed from mass flows)
-CombustionState combustion_state_from_streams(
-    const Stream& fuel_stream,
-    const Stream& ox_stream,
-    const std::string& fuel_name,
-    CombustionMethod method
-) {
-    const double mdot_total = fuel_stream.mdot + ox_stream.mdot;
-    if (mdot_total <= 0.0) {
-        throw std::runtime_error("Total mass flow rate must be positive");
-    }
+CombustionState combustion_state_from_streams(const Stream &fuel_stream,
+                                              const Stream &ox_stream,
+                                              const std::string &fuel_name,
+                                              CombustionMethod method) {
+  const double mdot_total = fuel_stream.mdot + ox_stream.mdot;
+  if (mdot_total <= 0.0) {
+    throw std::runtime_error("Total mass flow rate must be positive");
+  }
 
-    // Enthalpy-weighted mixed temperature via mix() — more accurate than
-    // a simple mass-weighted average, especially for large T differences.
-    const double T_reactants = mix({fuel_stream, ox_stream}).state.T;
-    const double P = fuel_stream.P();
+  // Enthalpy-weighted mixed temperature via mix() — more accurate than
+  // a simple mass-weighted average, especially for large T differences.
+  const double T_reactants = mix({fuel_stream, ox_stream}).state.T;
+  const double P = fuel_stream.P();
 
-    // Compute phi directly from mass flows — avoids a redundant mix() call.
-    // phi = (mdot_fuel / mdot_ox) / FAR_stoich
-    const double FAR_stoich = stoich_fuel_ox_ratio(fuel_stream.X(), ox_stream.X());
-    const double phi = (fuel_stream.mdot / ox_stream.mdot) / FAR_stoich;
+  // Compute phi directly from mass flows — avoids a redundant mix() call.
+  // phi = (mdot_fuel / mdot_ox) / FAR_stoich
+  const double FAR_stoich =
+      stoich_fuel_ox_ratio(fuel_stream.X(), ox_stream.X());
+  const double phi = (fuel_stream.mdot / ox_stream.mdot) / FAR_stoich;
 
-    return combustion_state(fuel_stream.X(), ox_stream.X(), phi, T_reactants, P, fuel_name, method);
+  return combustion_state(fuel_stream.X(), ox_stream.X(), phi, T_reactants, P,
+                          fuel_name, method);
 }
 
 // -------------------------------------------------------------
@@ -1424,112 +1510,102 @@ CombustionState combustion_state_from_streams(
 // -------------------------------------------------------------
 
 // Variant 1 with hook: from equivalence ratio
-CombustionState combustion_state(
-    const std::vector<double>& X_fuel,
-    const std::vector<double>& X_ox,
-    double phi,
-    double T_reactants,
-    double P,
-    const std::string& fuel_name,
-    CombustionMethod method,
-    const PressureLossCorrelation& pressure_loss
-) {
-    // Compute reactant mixture and product state (at inlet P)
-    const std::vector<double> X_reactants = set_equivalence_ratio_mole(phi, X_fuel, X_ox);
-    State reactant_state{T_reactants, P, X_reactants};
+CombustionState combustion_state(const std::vector<double> &X_fuel,
+                                 const std::vector<double> &X_ox, double phi,
+                                 double T_reactants, double P,
+                                 const std::string &fuel_name,
+                                 CombustionMethod method,
+                                 const PressureLossCorrelation &pressure_loss) {
+  // Compute reactant mixture and product state (at inlet P)
+  const std::vector<double> X_reactants =
+      set_equivalence_ratio_mole(phi, X_fuel, X_ox);
+  State reactant_state{T_reactants, P, X_reactants};
 
-    State product_state;
-    double fuel_burn_fraction = 1.0;
-    if (method == CombustionMethod::Equilibrium) {
-        EquilibriumResult eq = combustion_equilibrium(reactant_state);
-        product_state = eq.state;
-        fuel_burn_fraction = eq.converged ? 1.0 : 0.0;
-    } else {
-        product_state = complete_combustion(reactant_state);
-    }
+  State product_state;
+  double fuel_burn_fraction = 1.0;
+  if (method == CombustionMethod::Equilibrium) {
+    EquilibriumResult eq = combustion_equilibrium(reactant_state);
+    product_state = eq.state;
+    fuel_burn_fraction = eq.converged ? 1.0 : 0.0;
+  } else {
+    product_state = complete_combustion(reactant_state);
+  }
 
-    // Build context — all fields are loop-free
-    const double T_ad = product_state.T;
-    const double theta = (T_reactants > 0.0) ? (T_ad / T_reactants - 1.0) : 0.0;
-    PressureLossContext ctx{
-        reactant_state,
-        phi,
-        T_ad,
-        product_state.X,
-        theta,
-        0.0,   // mdot_fuel not available in phi-based call
-        0.0    // mdot_air not available in phi-based call
-    };
-    const double delta_P_frac = pressure_loss(ctx);
-    const double P_out = P * (1.0 - delta_P_frac);
+  // Build context — all fields are loop-free
+  const double T_ad = product_state.T;
+  const double theta = (T_reactants > 0.0) ? (T_ad / T_reactants - 1.0) : 0.0;
+  PressureLossContext ctx{
+      reactant_state,
+      phi,
+      T_ad,
+      product_state.X,
+      theta,
+      0.0, // mdot_fuel not available in phi-based call
+      0.0  // mdot_air not available in phi-based call
+  };
+  const double delta_P_frac = pressure_loss(ctx);
+  const double P_out = P * (1.0 - delta_P_frac);
 
-    // Assemble result
-    CombustionState result;
-    result.phi = phi;
-    result.fuel_name = fuel_name;
-    result.method = method;
-    result.fuel_burn_fraction = fuel_burn_fraction;
-    result.reactants = complete_state(T_reactants, P, X_reactants);
-    result.products  = complete_state(product_state.T, P_out, product_state.X);
-    result.mixture_fraction = compute_bilger_mixture_fraction(X_reactants, X_fuel, X_ox);
-    return result;
+  // Assemble result
+  CombustionState result;
+  result.phi = phi;
+  result.fuel_name = fuel_name;
+  result.method = method;
+  result.fuel_burn_fraction = fuel_burn_fraction;
+  result.reactants = complete_state(T_reactants, P, X_reactants);
+  result.products = complete_state(product_state.T, P_out, product_state.X);
+  result.mixture_fraction =
+      compute_bilger_mixture_fraction(X_reactants, X_fuel, X_ox);
+  return result;
 }
 
 // Variant 2 with hook: from streams
 CombustionState combustion_state_from_streams(
-    const Stream& fuel_stream,
-    const Stream& ox_stream,
-    const std::string& fuel_name,
-    CombustionMethod method,
-    const PressureLossCorrelation& pressure_loss
-) {
-    const double mdot_total = fuel_stream.mdot + ox_stream.mdot;
-    if (mdot_total <= 0.0) {
-        throw std::runtime_error("Total mass flow rate must be positive");
-    }
+    const Stream &fuel_stream, const Stream &ox_stream,
+    const std::string &fuel_name, CombustionMethod method,
+    const PressureLossCorrelation &pressure_loss) {
+  const double mdot_total = fuel_stream.mdot + ox_stream.mdot;
+  if (mdot_total <= 0.0) {
+    throw std::runtime_error("Total mass flow rate must be positive");
+  }
 
-    const double T_reactants = mix({fuel_stream, ox_stream}).state.T;
-    const double P = fuel_stream.P();
-    const double FAR_stoich = stoich_fuel_ox_ratio(fuel_stream.X(), ox_stream.X());
-    const double phi = (fuel_stream.mdot / ox_stream.mdot) / FAR_stoich;
+  const double T_reactants = mix({fuel_stream, ox_stream}).state.T;
+  const double P = fuel_stream.P();
+  const double FAR_stoich =
+      stoich_fuel_ox_ratio(fuel_stream.X(), ox_stream.X());
+  const double phi = (fuel_stream.mdot / ox_stream.mdot) / FAR_stoich;
 
-    // Compute products at inlet P to build the context
-    const std::vector<double> X_reactants =
-        set_equivalence_ratio_mole(phi, fuel_stream.X(), ox_stream.X());
-    State reactant_state{T_reactants, P, X_reactants};
+  // Compute products at inlet P to build the context
+  const std::vector<double> X_reactants =
+      set_equivalence_ratio_mole(phi, fuel_stream.X(), ox_stream.X());
+  State reactant_state{T_reactants, P, X_reactants};
 
-    State product_state;
-    double fuel_burn_fraction = 1.0;
-    if (method == CombustionMethod::Equilibrium) {
-        EquilibriumResult eq = combustion_equilibrium(reactant_state);
-        product_state = eq.state;
-        fuel_burn_fraction = eq.converged ? 1.0 : 0.0;
-    } else {
-        product_state = complete_combustion(reactant_state);
-    }
+  State product_state;
+  double fuel_burn_fraction = 1.0;
+  if (method == CombustionMethod::Equilibrium) {
+    EquilibriumResult eq = combustion_equilibrium(reactant_state);
+    product_state = eq.state;
+    fuel_burn_fraction = eq.converged ? 1.0 : 0.0;
+  } else {
+    product_state = complete_combustion(reactant_state);
+  }
 
-    const double T_ad = product_state.T;
-    const double theta = (T_reactants > 0.0) ? (T_ad / T_reactants - 1.0) : 0.0;
-    PressureLossContext ctx{
-        reactant_state,
-        phi,
-        T_ad,
-        product_state.X,
-        theta,
-        fuel_stream.mdot,
-        ox_stream.mdot
-    };
-    const double delta_P_frac = pressure_loss(ctx);
-    const double P_out = P * (1.0 - delta_P_frac);
+  const double T_ad = product_state.T;
+  const double theta = (T_reactants > 0.0) ? (T_ad / T_reactants - 1.0) : 0.0;
+  PressureLossContext ctx{reactant_state,  phi,   T_ad,
+                          product_state.X, theta, fuel_stream.mdot,
+                          ox_stream.mdot};
+  const double delta_P_frac = pressure_loss(ctx);
+  const double P_out = P * (1.0 - delta_P_frac);
 
-    CombustionState result;
-    result.phi = phi;
-    result.fuel_name = fuel_name;
-    result.method = method;
-    result.fuel_burn_fraction = fuel_burn_fraction;
-    result.reactants = complete_state(T_reactants, P, X_reactants);
-    result.products  = complete_state(product_state.T, P_out, product_state.X);
-    result.mixture_fraction = compute_bilger_mixture_fraction(
-        X_reactants, fuel_stream.X(), ox_stream.X());
-    return result;
+  CombustionState result;
+  result.phi = phi;
+  result.fuel_name = fuel_name;
+  result.method = method;
+  result.fuel_burn_fraction = fuel_burn_fraction;
+  result.reactants = complete_state(T_reactants, P, X_reactants);
+  result.products = complete_state(product_state.T, P_out, product_state.X);
+  result.mixture_fraction = compute_bilger_mixture_fraction(
+      X_reactants, fuel_stream.X(), ox_stream.X());
+  return result;
 }

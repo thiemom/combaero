@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cantera-validation-tests"
-version = "0.1.0"
+version = "0.2.0"
 description = "Cantera-based validation tests for CombAero combustion, mixing, and transport properties"
 readme = "README.md"
 package-mode = false

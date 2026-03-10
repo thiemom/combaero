@@ -213,6 +213,7 @@ try:
         mach_from_pressure_ratio,
         mach_number,
         mass_flux_isentropic,
+        MassStream,
         mass_to_mole,
         min_mode_separation,
         mix,
@@ -228,6 +229,7 @@ try:
         nozzle_thrust,
         nozzle_thrust_cd,
         ntu,
+        num_species,
         nusselt_dittus_boelter,
         nusselt_gnielinski,
         nusselt_petukhov,
@@ -434,6 +436,7 @@ except ModuleNotFoundError:
     expansibility_factor = _core.expansibility_factor
     solve_orifice_mdot = _core.solve_orifice_mdot
     standard_dry_air_composition = _core.standard_dry_air_composition
+    # TODO:make standard_dry_air_composition_mass in C++
     humid_air_composition = _core.humid_air_composition
     humid_air_density = _core.humid_air_density
     humid_air_enthalpy = _core.humid_air_enthalpy

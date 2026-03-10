@@ -78,6 +78,35 @@ PYBIND11_MODULE(_core, m) {
                     "), status=" + status_str + ">";
            });
 
+  // Stream Definitions
+  py::class_<solver::Stream>(m, "MassStream", "Mass stream descriptor")
+      .def(py::init<double, double, std::vector<double>>())
+      .def_readwrite("m_dot", &solver::Stream::m_dot)
+      .def_readwrite("T", &solver::Stream::T)
+      .def_readwrite("Y", &solver::Stream::Y);
+
+  py::class_<solver::StreamJacobian>(m, "StreamJacobian",
+                                     "Derivatives w.r.t a stream")
+      .def_readonly("d_mdot", &solver::StreamJacobian::d_mdot)
+      .def_readonly("d_T", &solver::StreamJacobian::d_T)
+      .def_readonly("d_Y", &solver::StreamJacobian::d_Y);
+
+  py::class_<solver::MixerResult>(
+      m, "MixerResult", "Output and internal gradients of stream mixes")
+      .def_readonly("T_mix", &solver::MixerResult::T_mix)
+      .def_readonly("Y_mix", &solver::MixerResult::Y_mix)
+      .def_readonly("dT_mix_d_stream", &solver::MixerResult::dT_mix_d_stream)
+      .def_readonly("dY_mix_d_stream", &solver::MixerResult::dY_mix_d_stream);
+
+  m.def("mixer_from_streams_and_jacobians",
+        &solver::mixer_from_streams_and_jacobians, py::arg("streams"));
+  m.def("adiabatic_T_complete_and_jacobian_T_from_streams",
+        &solver::adiabatic_T_complete_and_jacobian_T_from_streams,
+        py::arg("streams"), py::arg("P"));
+  m.def("adiabatic_T_equilibrium_and_jacobians_from_streams",
+        &solver::adiabatic_T_equilibrium_and_jacobians_from_streams,
+        py::arg("streams"), py::arg("P"));
+
   // Species metadata helpers
   m.def("num_species", &num_species,
         "Number of thermo species in the internal tables.");
@@ -111,6 +140,20 @@ PYBIND11_MODULE(_core, m) {
 
   m.def("formula", &combaero::formula, py::arg("name"),
         "Get formula from common name (e.g., 'Methane' -> 'CH4').");
+
+  m.def(
+      "mass_to_mole",
+      [](py::array_t<double, py::array::c_style | py::array::forcecast> Y_arr) {
+        return mass_to_mole(to_vec(Y_arr));
+      },
+      py::arg("Y"), "Convert mass fractions Y to mole fractions X");
+
+  m.def(
+      "mole_to_mass",
+      [](py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+        return mole_to_mass(to_vec(X_arr));
+      },
+      py::arg("X"), "Convert mole fractions X to mass fractions Y");
 
   m.def(
       "mixture_h",
@@ -795,8 +838,21 @@ PYBIND11_MODULE(_core, m) {
       },
       py::arg("h_target"), py::arg("X"), py::arg("T_guess") = 300.0,
       py::arg("tol") = 1.0e-6, py::arg("max_iter") = 50,
-      "Solve for temperature T given target enthalpy h_target and composition "
-      "X.");
+      "Solve for temperature T given target molar enthalpy h_target [J/mol] "
+      "and composition X.");
+
+  m.def(
+      "calc_T_from_h_mass",
+      [](double h_mass_target,
+         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+         double T_guess, double tol, std::size_t max_iter) {
+        auto X = to_vec(X_arr);
+        return calc_T_from_h_mass(h_mass_target, X, T_guess, tol, max_iter);
+      },
+      py::arg("h_mass_target"), py::arg("X"), py::arg("T_guess") = 300.0,
+      py::arg("tol") = 1.0e-6, py::arg("max_iter") = 50,
+      "Solve for temperature T given target mass enthalpy h_mass_target [J/kg] "
+      "and composition X.");
 
   m.def(
       "calc_T_from_s",
@@ -5187,6 +5243,29 @@ PYBIND11_MODULE(_core, m) {
         "  X : Mole fractions [-]\n\n"
         "Returns: tuple(mu [Pa*s], d_mu_d_T [(Pa*s)/K], d_mu_d_P "
         "[(Pa*s)/Pa])");
+
+  m.def("adiabatic_T_complete_and_jacobian_T",
+        &solver::adiabatic_T_complete_and_jacobian_T, py::arg("T_in"),
+        py::arg("P"), py::arg("X_in"),
+        "Fast-path adiabatic flame temperature (complete combustion) and "
+        "analytic derivative.\n\n"
+        "Parameters:\n"
+        "  T_in : Inlet Temperature [K]\n"
+        "  P    : Pressure [Pa]\n"
+        "  X_in : Inlet Mole fractions [-]\n\n"
+        "Returns: tuple(T_ad [K], dT_ad_dT_in [-], X_products [-])");
+
+  m.def("adiabatic_T_equilibrium_and_jacobians",
+        &solver::adiabatic_T_equilibrium_and_jacobians, py::arg("T_in"),
+        py::arg("P"), py::arg("X_in"),
+        "Fast-path adiabatic flame temperature (equilibrium combustion) and "
+        "analytic derivatives.\n\n"
+        "Parameters:\n"
+        "  T_in : Inlet Temperature [K]\n"
+        "  P    : Pressure [Pa]\n"
+        "  X_in : Inlet Mole fractions [-]\n\n"
+        "Returns: tuple(T_ad [K], dT_ad_dT_in [-], dT_ad_dP [K/Pa], X_products "
+        "[-])");
 
   // Registry bindings
   py::class_<Registry>(m, "Registry",

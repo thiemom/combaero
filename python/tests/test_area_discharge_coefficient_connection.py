@@ -14,12 +14,12 @@ from combaero.network import (
 )
 
 
-def _get_air_X():
+def _get_air_Y():
     """Helper to create standard air composition."""
-    X = [0.0] * 14
-    X[0] = 0.79  # N2
-    X[1] = 0.21  # O2
-    return X
+    Y = [0.0] * 14
+    Y[0] = 0.79  # N2
+    Y[1] = 0.21  # O2
+    return Y
 
 
 class TestAreaDischargeCoefficientConnectionElement:
@@ -201,11 +201,11 @@ class TestAreaDischargeCoefficientConnectionElement:
         inlet1 = PressureBoundary("inlet")
         inlet1.P_total = 150000.0
         inlet1.T_total = 300.0
-        inlet1.X = _get_air_X()
+        inlet1.Y = _get_air_Y()
         outlet1 = PressureBoundary("outlet")
         outlet1.P_total = 100000.0
         outlet1.T_total = 300.0
-        outlet1.X = _get_air_X()
+        outlet1.Y = _get_air_Y()
         conn1 = AreaDischargeCoefficientConnectionElement("conn", "inlet", "outlet", area, Cd=Cd)
 
         graph1.add_node(inlet1)
@@ -220,11 +220,11 @@ class TestAreaDischargeCoefficientConnectionElement:
         inlet2 = PressureBoundary("inlet")
         inlet2.P_total = 150000.0
         inlet2.T_total = 300.0
-        inlet2.X = _get_air_X()
+        inlet2.Y = _get_air_Y()
         outlet2 = PressureBoundary("outlet")
         outlet2.P_total = 100000.0
         outlet2.T_total = 300.0
-        outlet2.X = _get_air_X()
+        outlet2.Y = _get_air_Y()
         orf2 = OrificeElement("orf", "inlet", "outlet", Cd=Cd, area=area)
 
         graph2.add_node(inlet2)
@@ -247,11 +247,11 @@ class TestAreaDischargeCoefficientConnectionElement:
         inlet = PressureBoundary("inlet")
         inlet.P_total = 150000.0
         inlet.T_total = 300.0
-        inlet.X = _get_air_X()
+        inlet.Y = _get_air_Y()
         outlet = PressureBoundary("outlet")
         outlet.P_total = 100000.0
         outlet.T_total = 300.0
-        outlet.X = _get_air_X()
+        outlet.Y = _get_air_Y()
         conn = AreaDischargeCoefficientConnectionElement("conn", "inlet", "outlet", area, Cd=Cd)
 
         graph.add_node(inlet)
@@ -278,11 +278,11 @@ class TestAreaDischargeCoefficientConnectionElement:
             inlet = PressureBoundary("inlet")
             inlet.P_total = 150000.0
             inlet.T_total = 300.0
-            inlet.X = _get_air_X()
+            inlet.Y = _get_air_Y()
             outlet = PressureBoundary("outlet")
             outlet.P_total = 100000.0
             outlet.T_total = 300.0
-            outlet.X = _get_air_X()
+            outlet.Y = _get_air_Y()
             conn = AreaDischargeCoefficientConnectionElement("conn", "inlet", "outlet", area, Cd=Cd)
 
             graph.add_node(inlet)
@@ -307,11 +307,11 @@ class TestAreaDischargeCoefficientConnectionElement:
             inlet = PressureBoundary("inlet")
             inlet.P_total = 150000.0
             inlet.T_total = 300.0
-            inlet.X = _get_air_X()
+            inlet.Y = _get_air_Y()
             outlet = PressureBoundary("outlet")
             outlet.P_total = 100000.0
             outlet.T_total = 300.0
-            outlet.X = _get_air_X()
+            outlet.Y = _get_air_Y()
             conn = AreaDischargeCoefficientConnectionElement(
                 "conn", "inlet", "outlet", area, zeta=zeta
             )
@@ -386,11 +386,11 @@ class TestAreaDischargeCoefficientConnectionElement:
         inlet1 = PressureBoundary("inlet")
         inlet1.P_total = 200000.0
         inlet1.T_total = 300.0
-        inlet1.X = _get_air_X()
+        inlet1.Y = _get_air_Y()
         outlet1 = PressureBoundary("outlet")
         outlet1.P_total = 50000.0
         outlet1.T_total = 300.0
-        outlet1.X = _get_air_X()
+        outlet1.Y = _get_air_Y()
         conn1 = AreaDischargeCoefficientConnectionElement("conn", "inlet", "outlet", area, Cd=Cd)
 
         graph1.add_node(inlet1)
@@ -406,11 +406,11 @@ class TestAreaDischargeCoefficientConnectionElement:
         inlet2 = PressureBoundary("inlet")
         inlet2.P_total = 110000.0
         inlet2.T_total = 300.0
-        inlet2.X = _get_air_X()
+        inlet2.Y = _get_air_Y()
         outlet2 = PressureBoundary("outlet")
         outlet2.P_total = 100000.0
         outlet2.T_total = 300.0
-        outlet2.X = _get_air_X()
+        outlet2.Y = _get_air_Y()
         conn2 = AreaDischargeCoefficientConnectionElement("conn", "inlet", "outlet", area, Cd=Cd)
 
         graph2.add_node(inlet2)
