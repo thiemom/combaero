@@ -19,8 +19,8 @@ class CombustionResult:
 
     # Derived properties (computed via CombAero)
     h: float  # specific enthalpy [J/mol]
-    cp: float  # heat capacity [J/(mol·K)]
-    rho: float  # density [kg/m³]
+    cp: float  # heat capacity [J/(mol*K)]
+    rho: float  # density [kg/m^3]
     gamma: float  # isentropic expansion coefficient [-]
     a: float  # speed of sound [m/s]
 

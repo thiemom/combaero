@@ -27,7 +27,7 @@ def mix_streams(
     Mix two streams conserving mass, species, and enthalpy.
 
     The mixed temperature is found by solving:
-        h_mix = (m1·h1 + m2·h2) / (m1 + m2)
+        h_mix = (m1*h1 + m2*h2) / (m1 + m2)
     using combaero.calc_T_from_h().
 
     Parameters
