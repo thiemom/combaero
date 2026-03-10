@@ -272,10 +272,8 @@ std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double> &X,
   // = -1/k * ln(exp(-k) + exp(-k*r)) We use a high stiffness parameter k to
   // keep it close to the exact minimum but differentiable.
   double f = 1.0;
-  double r = n_O2_available / n_O2_required_total;
-  if (r < 1.0 + 10.0 * tol) { // apply smoothing near and below stoich
-    const double k = 200.0;   // Stiffness parameter for softmin
-    f = -(1.0 / k) * std::log(std::exp(-k) + std::exp(-k * r));
+  if (n_O2_available + tol < n_O2_required_total) {
+    f = n_O2_available / n_O2_required_total;
   }
   fuel_burn_fraction = f;
 
