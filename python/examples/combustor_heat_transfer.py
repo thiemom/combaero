@@ -79,8 +79,8 @@ def main() -> None:
     burned = ca.combustion_equilibrium(mixed.T, mixed.X, mixed.P)
 
     print("\nAfter combustion:")
-    print(f"  Temperature:       T = {burned.T:.1f} K (adiabatic flame temp)")
-    print(f"  Enthalpy:          h = {burned.h:.1f} J/mol")
+    print(f"  Temperature:       T = {burned.state.T:.1f} K (adiabatic flame temp)")
+    print(f"  Enthalpy:          h = {burned.state.h:.1f} J/mol")
 
     # =========================================================================
     # Example 2: Combustor geometry and residence time
@@ -102,11 +102,10 @@ def main() -> None:
     # Hydraulic diameter
     Dh = ca.hydraulic_diameter_annulus(D_outer, D_inner)
 
-    # Use a burned-dominant effective state for global pressure-drop/residence estimates.
     # Toy assumption: thin flame zone near inlet (~10% of length), remainder near burned state.
     flame_zone_fraction = 0.10
-    T_avg = flame_zone_fraction * mixed.T + (1.0 - flame_zone_fraction) * burned.T
-    rho_avg = ca.density(T_avg, P_combustor, burned.X)
+    T_avg = flame_zone_fraction * mixed.T + (1.0 - flame_zone_fraction) * burned.state.T
+    rho_avg = ca.density(T_avg, P_combustor, burned.state.X)
 
     # Residence time
     tau = ca.residence_time_mdot(V_combustor, mixed.mdot, rho_avg)
@@ -141,11 +140,11 @@ def main() -> None:
     # Note: Using cast_iron roughness as proxy for combustor liner
     eps = ca.pipe_roughness("cast_iron")
     dP_friction, Re, f = ca.pressure_drop_pipe(
-        T_avg, P_combustor, burned.X, v_avg, Dh, L_combustor, eps, "haaland"
+        T_avg, P_combustor, burned.state.X, v_avg, Dh, L_combustor, eps, "haaland"
     )
 
     # Also get viscosity for display
-    mu_avg = ca.viscosity(T_avg, P_combustor, burned.X)
+    mu_avg = ca.viscosity(T_avg, P_combustor, burned.state.X)
 
     # Total pressure drop (friction + other losses, typically 3-5%)
     dP_total = dP_friction * 1.5  # Account for additional losses
@@ -169,9 +168,9 @@ def main() -> None:
     print("=" * 80)
 
     # Hot gas side (inside combustor)
-    T_gas = burned.T  # Hot combustion products
-    k_gas = ca.thermal_conductivity(T_gas, P_combustor, burned.X)
-    Pr_gas = ca.prandtl(T_gas, P_combustor, burned.X)
+    T_gas = burned.state.T  # Hot combustion products
+    k_gas = ca.thermal_conductivity(T_gas, P_combustor, burned.state.X)
+    Pr_gas = ca.prandtl(T_gas, P_combustor, burned.state.X)
 
     # Calculate Nusselt number for hot gas
     Nu_gas = ca.nusselt_dittus_boelter(Re, Pr_gas, heating=False)  # Cooling the gas
@@ -248,7 +247,7 @@ def main() -> None:
     Q_combustion = mdot_fuel * lhv_fuel
 
     # Temperature rise
-    dT_combustion = burned.T - mixed.T
+    dT_combustion = burned.state.T - mixed.T
 
     # Pressure loss percentage
     pressure_loss_pct = dP_total / P_combustor * 100
@@ -258,7 +257,7 @@ def main() -> None:
 
     print("\nCombustor Performance:")
     print(f"  Inlet temperature:     T_in = {mixed.T:.0f} K")
-    print(f"  Outlet temperature:    T_out = {burned.T:.0f} K")
+    print(f"  Outlet temperature:    T_out = {burned.state.T:.0f} K")
     print(f"  Temperature rise:      DeltaT = {dT_combustion:.0f} K")
     print(f"  Pressure loss:         DeltaP/P = {pressure_loss_pct:.2f}%")
     print(f"  Residence time:        tau = {tau * 1000:.1f} ms")
@@ -295,20 +294,27 @@ def main() -> None:
 
         # Recalculate residence time and pressure drop
         T_avg_test = (
-            flame_zone_fraction * mixed_test.T + (1.0 - flame_zone_fraction) * burned_test.T
+            flame_zone_fraction * mixed_test.T + (1.0 - flame_zone_fraction) * burned_test.state.T
         )
-        rho_avg_test = ca.density(T_avg_test, P_combustor, burned_test.X)
+        rho_avg_test = ca.density(T_avg_test, P_combustor, burned_test.state.X)
         tau_test = ca.residence_time_mdot(V_combustor, mixed_test.mdot, rho_avg_test)
 
         v_avg_test = mixed_test.mdot / (rho_avg_test * A_annular)
         # Use pressure_drop_pipe composite function
         dP_friction_test, Re_test, f_test = ca.pressure_drop_pipe(
-            T_avg_test, P_combustor, burned_test.X, v_avg_test, Dh, L_combustor, eps, "haaland"
+            T_avg_test,
+            P_combustor,
+            burned_test.state.X,
+            v_avg_test,
+            Dh,
+            L_combustor,
+            eps,
+            "haaland",
         )
         dP_test = dP_friction_test * 1.5  # Account for additional losses
 
         print(
-            f"{phi_test:6.2f}  {burned_test.T:12.1f}  {tau_test * 1000:10.2f}  {dP_test / P_combustor * 100:12.3f}"
+            f"{phi_test:6.2f}  {burned_test.state.T:12.1f}  {tau_test * 1000:10.2f}  {dP_test / P_combustor * 100:12.3f}"
         )
 
     print("\nNote: Leaner mixtures -> lower temperature, longer residence time")

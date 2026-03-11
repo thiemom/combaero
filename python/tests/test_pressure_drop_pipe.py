@@ -22,12 +22,12 @@ class TestPressureDropPipeComposite:
         """Test basic pressure drop calculation with air."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X_air = cb.standard_dry_air_composition()
+        Y_air = cb.standard_dry_air_composition()
         v = 10.0  # m/s
         D = 0.1  # m
         L = 100.0  # m
 
-        dP, Re, f = cb.pressure_drop_pipe(T, P, X_air, v, D, L)
+        dP, Re, f = cb.pressure_drop_pipe(T, P, Y_air, v, D, L)
 
         # All outputs should be positive
         assert dP > 0
@@ -43,18 +43,18 @@ class TestPressureDropPipeComposite:
         """Verify composite function matches step-by-step manual calculation."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X_air = cb.standard_dry_air_composition()
+        Y_air = cb.standard_dry_air_composition()
         v = 15.0  # m/s
         D = 0.05  # m
         L = 50.0  # m
         roughness = 0.000045  # m (commercial steel)
 
         # Composite function
-        dP_comp, Re_comp, f_comp = cb.pressure_drop_pipe(T, P, X_air, v, D, L, roughness, "haaland")
+        dP_comp, Re_comp, f_comp = cb.pressure_drop_pipe(T, P, Y_air, v, D, L, roughness, "haaland")
 
         # Manual calculation
-        rho = cb.density(T, P, X_air)
-        Re_manual = cb.reynolds(T, P, X_air, v, D)
+        rho = cb.density(T, P, Y_air)
+        Re_manual = cb.reynolds(T, P, Y_air, v, D)
         e_D = roughness / D
         f_manual = cb.friction_haaland(Re_manual, e_D)
         dP_manual = cb.pipe_dP(v, L, D, f_manual, rho)
@@ -68,7 +68,7 @@ class TestPressureDropPipeComposite:
         """Test all friction factor correlations work."""
         T = 350.0  # K
         P = 200000.0  # Pa
-        X_air = cb.standard_dry_air_composition()
+        Y_air = cb.standard_dry_air_composition()
         v = 20.0  # m/s
         D = 0.08  # m
         L = 75.0  # m
@@ -78,7 +78,7 @@ class TestPressureDropPipeComposite:
         results = {}
 
         for corr in correlations:
-            dP, Re, f = cb.pressure_drop_pipe(T, P, X_air, v, D, L, roughness, corr)
+            dP, Re, f = cb.pressure_drop_pipe(T, P, Y_air, v, D, L, roughness, corr)
             results[corr] = (dP, Re, f)
 
             # All should give valid results
@@ -106,17 +106,17 @@ class TestPressureDropPipeComposite:
         """Test that rough pipes have higher friction factor."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X_air = cb.standard_dry_air_composition()
+        Y_air = cb.standard_dry_air_composition()
         v = 12.0  # m/s
         D = 0.1  # m
         L = 100.0  # m
 
         # Smooth pipe
-        dP_smooth, Re_smooth, f_smooth = cb.pressure_drop_pipe(T, P, X_air, v, D, L, roughness=0.0)
+        dP_smooth, Re_smooth, f_smooth = cb.pressure_drop_pipe(T, P, Y_air, v, D, L, roughness=0.0)
 
         # Rough pipe (commercial steel)
         dP_rough, Re_rough, f_rough = cb.pressure_drop_pipe(
-            T, P, X_air, v, D, L, roughness=0.000045
+            T, P, Y_air, v, D, L, roughness=0.000045
         )
 
         # Reynolds number should be identical
@@ -132,15 +132,15 @@ class TestPressureDropPipeComposite:
         """Test pressure drop scales with velocity squared."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X_air = cb.standard_dry_air_composition()
+        Y_air = cb.standard_dry_air_composition()
         D = 0.1  # m
         L = 100.0  # m
 
         v1 = 5.0  # m/s
         v2 = 10.0  # m/s (double velocity)
 
-        dP1, Re1, f1 = cb.pressure_drop_pipe(T, P, X_air, v1, D, L)
-        dP2, Re2, f2 = cb.pressure_drop_pipe(T, P, X_air, v2, D, L)
+        dP1, Re1, f1 = cb.pressure_drop_pipe(T, P, Y_air, v1, D, L)
+        dP2, Re2, f2 = cb.pressure_drop_pipe(T, P, Y_air, v2, D, L)
 
         # Reynolds number should double
         assert abs(Re2 / Re1 - 2.0) < 0.01
@@ -154,15 +154,15 @@ class TestPressureDropPipeComposite:
         """Test pressure drop scales linearly with length."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X_air = cb.standard_dry_air_composition()
+        Y_air = cb.standard_dry_air_composition()
         v = 10.0  # m/s
         D = 0.1  # m
 
         L1 = 50.0  # m
         L2 = 100.0  # m (double length)
 
-        dP1, Re1, f1 = cb.pressure_drop_pipe(T, P, X_air, v, D, L1)
-        dP2, Re2, f2 = cb.pressure_drop_pipe(T, P, X_air, v, D, L2)
+        dP1, Re1, f1 = cb.pressure_drop_pipe(T, P, Y_air, v, D, L1)
+        dP2, Re2, f2 = cb.pressure_drop_pipe(T, P, Y_air, v, D, L2)
 
         # Reynolds number should be identical
         assert abs(Re1 - Re2) < 1e-10
@@ -176,7 +176,7 @@ class TestPressureDropPipeComposite:
     def test_temperature_effect(self):
         """Test effect of temperature on pressure drop (via viscosity)."""
         P = 101325.0  # Pa
-        X_air = cb.standard_dry_air_composition()
+        Y_air = cb.standard_dry_air_composition()
         v = 10.0  # m/s
         D = 0.1  # m
         L = 100.0  # m
@@ -184,8 +184,8 @@ class TestPressureDropPipeComposite:
         T_cold = 250.0  # K
         T_hot = 400.0  # K
 
-        dP_cold, Re_cold, f_cold = cb.pressure_drop_pipe(T_cold, P, X_air, v, D, L)
-        dP_hot, Re_hot, f_hot = cb.pressure_drop_pipe(T_hot, P, X_air, v, D, L)
+        dP_cold, Re_cold, f_cold = cb.pressure_drop_pipe(T_cold, P, Y_air, v, D, L)
+        dP_hot, Re_hot, f_hot = cb.pressure_drop_pipe(T_hot, P, Y_air, v, D, L)
 
         # Higher temperature -> lower density, higher viscosity
         # Net effect: lower Re, higher f, but lower dP (density effect dominates)
@@ -195,7 +195,7 @@ class TestPressureDropPipeComposite:
     def test_pressure_effect(self):
         """Test effect of pressure on pressure drop (via density)."""
         T = 300.0  # K
-        X_air = cb.standard_dry_air_composition()
+        Y_air = cb.standard_dry_air_composition()
         v = 10.0  # m/s
         D = 0.1  # m
         L = 100.0  # m
@@ -203,8 +203,8 @@ class TestPressureDropPipeComposite:
         P_low = 50000.0  # Pa (0.5 atm)
         P_high = 200000.0  # Pa (2 atm)
 
-        dP_low, Re_low, f_low = cb.pressure_drop_pipe(T, P_low, X_air, v, D, L)
-        dP_high, Re_high, f_high = cb.pressure_drop_pipe(T, P_high, X_air, v, D, L)
+        dP_low, Re_low, f_low = cb.pressure_drop_pipe(T, P_low, Y_air, v, D, L)
+        dP_high, Re_high, f_high = cb.pressure_drop_pipe(T, P_high, Y_air, v, D, L)
 
         # Higher pressure -> higher density
         # Higher density -> higher Re, lower f, higher dP
@@ -215,17 +215,17 @@ class TestPressureDropPipeComposite:
         """Test default parameters (smooth pipe, haaland correlation)."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X_air = cb.standard_dry_air_composition()
+        Y_air = cb.standard_dry_air_composition()
         v = 10.0  # m/s
         D = 0.1  # m
         L = 100.0  # m
 
         # Call with defaults
-        dP_default, Re_default, f_default = cb.pressure_drop_pipe(T, P, X_air, v, D, L)
+        dP_default, Re_default, f_default = cb.pressure_drop_pipe(T, P, Y_air, v, D, L)
 
         # Call with explicit defaults
         dP_explicit, Re_explicit, f_explicit = cb.pressure_drop_pipe(
-            T, P, X_air, v, D, L, roughness=0.0, correlation="haaland"
+            T, P, Y_air, v, D, L, roughness=0.0, correlation="haaland"
         )
 
         # Should be identical
@@ -237,24 +237,24 @@ class TestPressureDropPipeComposite:
         """Test error handling for invalid correlation name."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X_air = cb.standard_dry_air_composition()
+        Y_air = cb.standard_dry_air_composition()
         v = 10.0  # m/s
         D = 0.1  # m
         L = 100.0  # m
 
         with pytest.raises(ValueError, match="unknown friction correlation"):
-            cb.pressure_drop_pipe(T, P, X_air, v, D, L, correlation="invalid")
+            cb.pressure_drop_pipe(T, P, Y_air, v, D, L, correlation="invalid")
 
     def test_zero_length(self):
         """Test zero length gives zero pressure drop."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X_air = cb.standard_dry_air_composition()
+        Y_air = cb.standard_dry_air_composition()
         v = 10.0  # m/s
         D = 0.1  # m
         L = 0.0  # m
 
-        dP, Re, f = cb.pressure_drop_pipe(T, P, X_air, v, D, L)
+        dP, Re, f = cb.pressure_drop_pipe(T, P, Y_air, v, D, L)
 
         # Zero length -> zero pressure drop
         assert dP == 0.0
@@ -267,7 +267,7 @@ class TestPressureDropPipeComposite:
         """Verify composite matches using existing functions separately."""
         T = 320.0  # K
         P = 150000.0  # Pa
-        X_air = cb.standard_dry_air_composition()
+        Y_air = cb.standard_dry_air_composition()
         v = 18.0  # m/s
         D = 0.12  # m
         L = 80.0  # m
@@ -275,12 +275,12 @@ class TestPressureDropPipeComposite:
 
         # Use composite function
         dP_comp, Re_comp, f_comp = cb.pressure_drop_pipe(
-            T, P, X_air, v, D, L, roughness, "serghides"
+            T, P, Y_air, v, D, L, roughness, "serghides"
         )
 
         # Use existing functions step by step
-        rho = cb.density(T, P, X_air)
-        Re_manual = cb.reynolds(T, P, X_air, v, D)
+        rho = cb.density(T, P, Y_air)
+        Re_manual = cb.reynolds(T, P, Y_air, v, D)
         e_D = roughness / D
         f_manual = cb.friction_serghides(Re_manual, e_D)
         dP_manual = cb.pipe_dP(v, L, D, f_manual, rho)

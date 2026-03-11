@@ -12,7 +12,7 @@ def test_flownetwork_serialization():
     network1 = FlowNetwork()
 
     # Nodes
-    n1 = PressureBoundary(" inlet ", P_total=150000.0, T_total=300.0, X=[0.0] * 14)
+    n1 = PressureBoundary(" inlet ", P_total=150000.0, T_total=300.0, Y=[0.0] * 14)
     n2 = PlenumNode(" plenum1")
     n3 = PressureBoundary(" outlet ", P_total=100000.0, T_total=300.0)
 

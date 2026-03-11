@@ -5,6 +5,39 @@ and element design for the network solver's combustion and mixing elements.
 
 ---
 
+## Solver Integration Design Rules
+
+> **Design Rule: Solver → pybind → `solver_interface.h`**
+>
+> All combustion element `residuals()` methods must call Python functions that interface
+> with C++ via `include/solver_interface.h`. This ensures:
+> 1. All physics evaluations return both value and analytical Jacobian `(f, J)` in a single call
+> 2. Derivative logic is centralized in C++, not duplicated in Python
+> 3. Finite-difference fallbacks are encapsulated at C++ speed
+>
+> See `docs/SOLVER.md` Section 4 for the complete design rule.
+
+### Derivative Requirements for Solver Stability
+
+All functions called within the solver loop must satisfy:
+
+1. **Smoothness**: Functions must be continuous and differentiable (C¹) over the
+   expected operating range. Discontinuities or kinks cause Newton solver divergence.
+
+2. **Non-throwing**: Functions must never throw exceptions during gradient probing.
+   The solver may evaluate at physically unrealistic states (e.g., T < 0, P < 0)
+   while computing finite-difference gradients. Return clamped/extrapolated values
+   instead of throwing.
+
+3. **Bounded gradients**: Avoid infinite or near-infinite derivatives. Clamp or
+   regularize near singularities (e.g., division by zero, log(0)).
+
+4. **Analytical Jacobians preferred**: Where possible, use `solver_interface.h`
+   functions that return `(value, derivative)` tuples. This eliminates finite-difference
+   noise and improves convergence.
+
+---
+
 ## Supporting Types
 
 > **Canonical definitions** for `MixtureState` and `NetworkElement` live in
@@ -127,6 +160,26 @@ Mixes two streams by mass flow weighting. No reaction — pure mixing of
 composition and enthalpy. Used by `MixingElement` and as the first step
 in `CombustionElement`.
 
+> **⚠️ Chamber Automatic Mixing Requirement**
+>
+> All chamber-type nodes (`PlenumNode`, `MomentumChamberNode`, and any future
+> chamber variants) with multiple upstream connections must **automatically**
+> act as mixing nodes. This is not optional — the solver must enforce:
+>
+> 1. **Species mass conservation**: $X_{\text{node},k} = \frac{\sum_{\text{in}} \dot{m}_i X_{i,k}}{\sum_{\text{in}} \dot{m}_i}$
+> 2. **Energy conservation**: $\sum_{\text{in}} \dot{m}_i h_i = \sum_{\text{out}} \dot{m}_j h_j$
+>
+> The C++ `cb.mix(streams)` function implements both balances correctly and should
+> be used for computing the mixed state. For solver residuals, decompose into
+> `cb.enthalpy_and_jacobian()` calls per the design rule (see SOLVER.md Section 4).
+>
+> **Implication**: Every interior chamber node with >1 upstream element implicitly
+> adds energy and species residuals to the system. The solver must detect this
+> topology and inject the appropriate conservation equations automatically.
+>
+> **Applies to**: `PlenumNode`, `MomentumChamberNode`, `CombustorNode`, and any
+> `NetworkNode` subclass representing a finite-volume chamber where streams mix.
+
 ```python
 def mix_streams(
     state_1: MixtureState,
@@ -171,6 +224,42 @@ fuel splits). The hook lets the user supply any correlation without modifying Co
 All fields in `PressureLossContext` are **loop-free** — they depend only on inlet
 conditions and combustion outputs, never on the unknown outlet pressure. This makes
 the hook safe to call inside a Newton solver without creating an implicit loop.
+
+### Derivative Requirements for User-Supplied Pressure Loss
+
+> **⚠️ Stability Warning**: User-supplied pressure-loss correlations are a primary
+> candidate for solver instability. The hook is called on every residual evaluation
+> (potentially thousands of times per solve).
+
+User-supplied `PressureLossCorrelation` callables **must** satisfy:
+
+1. **Smoothness (C¹)**: The correlation must be continuous and differentiable with
+   respect to all `PressureLossContext` fields. Avoid `if/else` branches that create
+   discontinuities — use smooth blending functions instead.
+
+2. **Non-throwing**: Never raise exceptions. The solver may probe extreme values
+   (e.g., θ < 0, φ > 10) during gradient estimation. Return clamped values:
+   ```python
+   def my_loss(ctx):
+       theta_safe = max(0.0, min(ctx.theta, 5.0))  # Clamp to valid range
+       return 0.02 + 0.005 * theta_safe
+   ```
+
+3. **Bounded output**: Return values must stay in [0, 1). Values ≥ 1 would imply
+   P_out ≤ 0, causing solver failure. Clamp explicitly:
+   ```python
+   def my_loss(ctx):
+       raw = 0.02 + 0.01 * ctx.theta
+       return min(raw, 0.5)  # Never exceed 50% loss
+   ```
+
+4. **Analytical derivative (recommended)**: If the solver requires Jacobians for
+   the pressure-loss term, the correlation should also return `∂(ΔP/P)/∂θ`,
+   `∂(ΔP/P)/∂φ`, etc. Future API may support a `(value, jacobian_dict)` return
+   signature for this purpose.
+
+5. **Performance**: The hook is called in the inner solver loop. Avoid expensive
+   operations (file I/O, network calls, large allocations). Pure arithmetic only.
 
 | Context field | Loop-free? | Reason |
 |---|---|---|
@@ -305,6 +394,15 @@ def combustion_from_phi(
 Wraps the combustion functions behind the `NetworkElement` interface. The
 solver calls `residuals()` — the element handles all chemistry internally.
 
+> **⚠️ Design Rule Compliance**: The example below shows the conceptual residual
+> structure. For actual solver integration, the implementation must:
+> 1. Use `solver_interface.h` functions (e.g., `cb.enthalpy_and_jacobian()`) for
+>    all thermodynamic evaluations
+> 2. Return both residuals and analytical Jacobians: `(list[float], dict[int, dict[str, float]])`
+> 3. Avoid calling high-level convenience functions like `combustion_from_streams()`
+>    directly in the residual evaluation — instead, decompose into primitive
+>    `solver_interface.h` calls that provide derivatives
+
 ```python
 @dataclass
 class CombustionElement(NetworkElement):
@@ -314,20 +412,30 @@ class CombustionElement(NetworkElement):
 
     def residuals(self,
                   state_in: MixtureState,
-                  state_out: MixtureState) -> list[float]:
-        result = combustion_from_streams(
-            state_air=state_in,
-            state_fuel=self.fuel_bc.state,
-            eta=self.eta,
-            delta_P_frac=self.delta_P_frac,
-        )
-        return [
-            state_out.T     - result.T,       # energy balance
-            state_out.P     - result.P,       # pressure drop
-            state_out.m_dot - result.m_dot,   # mass balance
-            *(state_out.X[i] - result.X[i]   # species balance
-              for i in range(14)),
+                  state_out: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
+        # Conceptual structure — actual implementation uses solver_interface.h
+        # functions with Jacobians (see SOLVER.md Section 4)
+
+        # Energy balance: h_in + Q_comb = h_out
+        h_in, dh_in_dT = cb.enthalpy_and_jacobian(state_in.T, state_in.X).result
+        h_out, dh_out_dT = cb.enthalpy_and_jacobian(state_out.T, state_out.X).result
+
+        # ... compute T_ad, X_products via C++ combustion functions ...
+
+        res = [
+            state_out.T     - T_ad,           # energy balance
+            state_out.P     - P_out,          # pressure drop
+            state_out.m_dot - m_dot_total,    # mass balance
+            # species balance residuals...
         ]
+
+        jac = {
+            0: {f"{self.to_node}.T": 1.0, ...},  # ∂R_energy/∂T_out, etc.
+            1: {f"{self.to_node}.P": 1.0, ...},
+            # ... Jacobian entries for all residuals ...
+        }
+
+        return res, jac
 
     def n_equations(self) -> int:
         return 3 + 14  # T, P, m_dot, 14 species
@@ -340,6 +448,11 @@ class CombustionElement(NetworkElement):
 Pure mixing, no reaction. Used for dilution air, cooling flow injection,
 stream merging.
 
+> **⚠️ Design Rule Compliance**: Same requirements as `CombustionElement` —
+> use `solver_interface.h` functions with Jacobians, not `mix_streams()`.
+> The C++ `cb.mix()` function can be used for post-processing but not in
+> the solver residual loop (see SOLVER.md Section 4).
+
 ```python
 @dataclass
 class MixingElement(NetworkElement):
@@ -348,14 +461,34 @@ class MixingElement(NetworkElement):
     def residuals(self,
                   state_in_1: MixtureState,
                   state_in_2: MixtureState,
-                  state_out: MixtureState) -> list[float]:
-        result = mix_streams(state_in_1, state_in_2)
-        return [
-            state_out.T     - result.T,
-            state_out.P     - result.P,
-            state_out.m_dot - result.m_dot,
-            *(state_out.X[i] - result.X[i] for i in range(14)),
+                  state_out: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
+        # Energy balance: m1*h1 + m2*h2 = m_out*h_out
+        h1, dh1_dT = cb.enthalpy_and_jacobian(state_in_1.T, state_in_1.X).result
+        h2, dh2_dT = cb.enthalpy_and_jacobian(state_in_2.T, state_in_2.X).result
+        h_out, dh_out_dT = cb.enthalpy_and_jacobian(state_out.T, state_out.X).result
+
+        m1, m2 = state_in_1.m_dot, state_in_2.m_dot
+        m_out = m1 + m2
+
+        # Energy residual
+        energy_res = m1 * h1 + m2 * h2 - m_out * h_out
+
+        res = [
+            energy_res,
+            state_out.P - min(state_in_1.P, state_in_2.P),  # pressure (simplified)
+            state_out.m_dot - m_out,
+            # species balance: m1*X1 + m2*X2 = m_out*X_out
         ]
+
+        jac = {
+            0: {
+                f"{self.to_node}.T": -m_out * dh_out_dT,
+                # ... other Jacobian entries ...
+            },
+            # ...
+        }
+
+        return res, jac
 
     def n_equations(self) -> int:
         return 3 + 14
@@ -366,7 +499,17 @@ class MixingElement(NetworkElement):
 ## What CombAero Already Provides
 
 All thermodynamic calls in the combustion functions map directly to existing
-CombAero functions:
+CombAero functions.
+
+### For Solver Residuals (with Jacobians via `solver_interface.h`)
+
+| Need | Solver function | Returns |
+|---|---|---|
+| Enthalpy + derivative | `cb.enthalpy_and_jacobian(T, X)` | `(h, ∂h/∂T)` |
+| Density + derivatives | `cb.density_and_jacobians(T, P, X)` | `(ρ, ∂ρ/∂T, ∂ρ/∂P)` |
+| Viscosity + derivative | `cb.viscosity_and_jacobians(T, P, X)` | `(μ, ∂μ/∂T)` |
+
+### For Convenience / Post-Processing
 
 | Need | CombAero function |
 |---|---|
@@ -379,6 +522,7 @@ CombAero functions:
 | Mole → mass fractions | `combaero.mole_to_mass(X)` |
 | Molecular weight | `combaero.mwmix(X)` |
 | Equivalence ratio from composition | `combaero.equivalence_ratio_mole(X, X_fuel, X_ox)` |
+| Stream mixing | `combaero.mix(streams, P_out)` |
 | Atomic composition | `molecular_structures` in `thermo_transport_data.h` |
 
 ---

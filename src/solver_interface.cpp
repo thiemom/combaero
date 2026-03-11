@@ -5,7 +5,9 @@
 #include <numeric>
 #include <stdexcept>
 
+#include "combustion.h"
 #include "cooling_correlations.h"
+#include "equilibrium.h"
 #include "friction.h"
 #include "heat_transfer.h"
 #include "math_constants.h" // MSVC compatibility for M_PI, M_LN10, etc.
@@ -587,6 +589,390 @@ P0_from_static_and_jacobian_M(double P, double T, double M,
 
   double P0 = P0_from_static(P, T, M, X);
   return {P0, dP0_dM};
+}
+
+// -----------------------------------------------------------------------------
+// 6. Combustion Interfaces
+// -----------------------------------------------------------------------------
+
+std::tuple<double, double, std::vector<double>>
+adiabatic_T_complete_and_jacobian_T(double T_in, double P,
+                                    const std::vector<double> &X_in) {
+  if (T_in <= 0.0 || P <= 0.0) {
+    throw std::invalid_argument(
+        "solver_interface::adiabatic_T_complete requires T_in > 0 and P > 0");
+  }
+
+  State in_state;
+  in_state.set_TPX(T_in, P, X_in);
+  State out_state = complete_combustion(in_state, true);
+  double T_ad = out_state.T;
+  std::vector<double> X_products = out_state.X;
+
+  // Jacobian wrt T_in via heavily bracketed Central Finite Difference
+  double dT_eps = std::max(1e-3, T_in * 1e-4);
+
+  State in_plus, in_minus;
+  in_plus.set_TPX(T_in + dT_eps, P, X_in);
+  in_minus.set_TPX(std::max(0.1, T_in - dT_eps), P, X_in);
+
+  double T_ad_plus = complete_combustion(in_plus, true).T;
+  double T_ad_minus = complete_combustion(in_minus, true).T;
+
+  double dT_ad_dT_in = (T_ad_plus - T_ad_minus) / (2.0 * dT_eps);
+
+  return {T_ad, dT_ad_dT_in, X_products};
+}
+
+std::tuple<double, double, double, std::vector<double>>
+adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
+                                      const std::vector<double> &X_in) {
+  if (T_in <= 0.0 || P <= 0.0) {
+    throw std::invalid_argument("solver_interface::adiabatic_T_equilibrium "
+                                "requires T_in > 0 and P > 0");
+  }
+
+  State in_state;
+  in_state.set_TPX(T_in, P, X_in);
+
+  // Combustion Equilibrium
+  EquilibriumResult eq_res = combustion_equilibrium(in_state, true);
+  double T_ad = eq_res.state.T;
+  std::vector<double> X_products = eq_res.state.X;
+
+  // Jacobians via heavily bracketed Central Finite Difference
+  double dT_eps = std::max(1e-3, T_in * 1e-4);
+  double dP_eps = std::max(1.0, P * 1e-4);
+
+  // wrt T_in
+  State in_T_plus, in_T_minus;
+  in_T_plus.set_TPX(T_in + dT_eps, P, X_in);
+  in_T_minus.set_TPX(std::max(0.1, T_in - dT_eps), P, X_in);
+
+  double T_ad_T_plus = combustion_equilibrium(in_T_plus, true).state.T;
+  double T_ad_T_minus = combustion_equilibrium(in_T_minus, true).state.T;
+  double dT_ad_dT_in = (T_ad_T_plus - T_ad_T_minus) / (2.0 * dT_eps);
+
+  // wrt P
+  State in_P_plus, in_P_minus;
+  in_P_plus.set_TPX(T_in, P + dP_eps, X_in);
+  in_P_minus.set_TPX(T_in, std::max(0.1, P - dP_eps), X_in);
+
+  double T_ad_P_plus = combustion_equilibrium(in_P_plus, true).state.T;
+  double T_ad_P_minus = combustion_equilibrium(in_P_minus, true).state.T;
+  double dT_ad_dP = (T_ad_P_plus - T_ad_P_minus) / (2.0 * dP_eps);
+
+  return {T_ad, dT_ad_dT_in, dT_ad_dP, X_products};
+}
+
+// -----------------------------------------------------------------------------
+// 7. Stream-Based Network Solvers
+// -----------------------------------------------------------------------------
+
+MixerResult
+mixer_from_streams_and_jacobians(const std::vector<Stream> &streams) {
+  std::size_t n_streams = streams.size();
+  std::size_t n_species = num_species();
+
+  double mdot_tot = 0.0;
+  std::vector<double> Y_mix(n_species, 0.0);
+  double H_tot = 0.0;
+
+  std::vector<double> h_stream(n_streams, 0.0);
+  std::vector<double> cp_stream(n_streams, 0.0);
+  std::vector<std::vector<double>> hk_mass(n_streams,
+                                           std::vector<double>(n_species, 0.0));
+
+  for (std::size_t i = 0; i < n_streams; ++i) {
+    mdot_tot += streams[i].m_dot;
+
+    for (std::size_t k = 0; k < n_species; ++k) {
+      Y_mix[k] += streams[i].m_dot * streams[i].Y[k];
+      hk_mass[i][k] = J_per_mol_to_J_per_kg(h_species(k, streams[i].T),
+                                            species_molar_mass(k));
+      h_stream[i] += streams[i].Y[k] * hk_mass[i][k];
+
+      double cpk_mass = J_per_mol_to_J_per_kg(cp_species(k, streams[i].T),
+                                              species_molar_mass(k));
+      cp_stream[i] += streams[i].Y[k] * cpk_mass;
+    }
+    H_tot += streams[i].m_dot * h_stream[i];
+  }
+
+  if (mdot_tot > 0.0) {
+    for (std::size_t k = 0; k < n_species; ++k) {
+      Y_mix[k] /= mdot_tot;
+    }
+  } else {
+    if (n_streams > 0) {
+      Y_mix = streams[0].Y;
+    }
+  }
+
+  double h_mix = (mdot_tot > 0.0) ? (H_tot / mdot_tot)
+                                  : (n_streams > 0 ? h_stream[0] : 0.0);
+
+  std::vector<double> X_mix = mass_to_mole(normalize_fractions(Y_mix));
+  double T_guess = 300.0;
+  if (n_streams > 0)
+    T_guess = streams[0].T;
+  double T_mix = calc_T_from_h_mass(h_mix, X_mix, T_guess);
+
+  std::vector<std::vector<StreamJacobian>> dY_mix_d_stream(
+      n_species, std::vector<StreamJacobian>(n_streams));
+  for (std::size_t k = 0; k < n_species; ++k) {
+    for (std::size_t i = 0; i < n_streams; ++i) {
+      StreamJacobian &jac = dY_mix_d_stream[k][i];
+      jac.d_Y.assign(n_species, 0.0);
+      if (mdot_tot > 0.0) {
+        jac.d_mdot = (streams[i].Y[k] - Y_mix[k]) / mdot_tot;
+        jac.d_T = 0.0;
+        jac.d_Y[k] = streams[i].m_dot / mdot_tot;
+      } else {
+        jac.d_mdot = 0.0;
+        jac.d_T = 0.0;
+      }
+    }
+  }
+
+  double cp_mix = 0.0;
+  std::vector<double> hk_mix(n_species, 0.0);
+  for (std::size_t k = 0; k < n_species; ++k) {
+    hk_mix[k] =
+        J_per_mol_to_J_per_kg(h_species(k, T_mix), species_molar_mass(k));
+    double cpk_mix =
+        J_per_mol_to_J_per_kg(cp_species(k, T_mix), species_molar_mass(k));
+    cp_mix += Y_mix[k] * cpk_mix;
+  }
+
+  std::vector<StreamJacobian> dT_mix_d_stream(n_streams);
+  for (std::size_t i = 0; i < n_streams; ++i) {
+    StreamJacobian &jac = dT_mix_d_stream[i];
+    jac.d_Y.assign(n_species, 0.0);
+
+    if (mdot_tot > 0.0) {
+      double dh_mix_d_mdot = (h_stream[i] - h_mix) / mdot_tot;
+      double dh_mix_d_Ti = (streams[i].m_dot * cp_stream[i]) / mdot_tot;
+
+      jac.d_T = dh_mix_d_Ti / cp_mix;
+
+      double sum_hk_dY = 0.0;
+      for (std::size_t k = 0; k < n_species; ++k) {
+        sum_hk_dY += hk_mix[k] * dY_mix_d_stream[k][i].d_mdot;
+      }
+      jac.d_mdot = (dh_mix_d_mdot - sum_hk_dY) / cp_mix;
+
+      for (std::size_t k = 0; k < n_species; ++k) {
+        double dh_mix_d_Yki = (streams[i].m_dot * hk_mass[i][k]) / mdot_tot;
+        double dY_mix_k_d_Yki = dY_mix_d_stream[k][i].d_Y[k];
+        jac.d_Y[k] = (dh_mix_d_Yki - hk_mix[k] * dY_mix_k_d_Yki) / cp_mix;
+      }
+    } else {
+      jac.d_mdot = 0.0;
+      jac.d_T = 0.0;
+    }
+  }
+
+  return {T_mix, Y_mix, dT_mix_d_stream, dY_mix_d_stream};
+}
+
+MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
+    const std::vector<Stream> &streams, double P) {
+  MixerResult mix = mixer_from_streams_and_jacobians(streams);
+
+  std::vector<double> X_mix = mass_to_mole(normalize_fractions(mix.Y_mix));
+  auto [T_ad, dT_ad_dT_mix, X_b] =
+      adiabatic_T_complete_and_jacobian_T(mix.T_mix, P, X_mix);
+  std::vector<double> Y_b = mole_to_mass(normalize_fractions(X_b));
+
+  std::size_t n_streams = streams.size();
+  std::size_t n_species = num_species();
+
+  std::vector<double> dT_ad_dY_mix(n_species, 0.0);
+  std::vector<std::vector<double>> dYb_dY_mix(
+      n_species, std::vector<double>(n_species, 0.0));
+  const double eps_Y = 1e-6;
+
+  for (std::size_t k = 0; k < n_species; ++k) {
+    std::vector<double> Y_p = mix.Y_mix;
+    Y_p[k] += eps_Y;
+    std::vector<double> X_p = mass_to_mole(normalize_fractions(Y_p));
+    auto [T_ad_p, dummy, X_b_p] =
+        adiabatic_T_complete_and_jacobian_T(mix.T_mix, P, X_p);
+    std::vector<double> Y_b_p = mole_to_mass(normalize_fractions(X_b_p));
+
+    dT_ad_dY_mix[k] = (T_ad_p - T_ad) / eps_Y;
+    for (std::size_t j = 0; j < n_species; ++j) {
+      dYb_dY_mix[j][k] = (Y_b_p[j] - Y_b[j]) / eps_Y;
+    }
+  }
+
+  std::vector<double> dYb_dT_mix(n_species, 0.0);
+
+  MixerResult res;
+  res.T_mix = T_ad;
+  res.Y_mix = Y_b;
+  res.dT_mix_d_stream.resize(n_streams);
+  res.dY_mix_d_stream.assign(n_species, std::vector<StreamJacobian>(n_streams));
+
+  for (std::size_t i = 0; i < n_streams; ++i) {
+    StreamJacobian &dT_stream = res.dT_mix_d_stream[i];
+    dT_stream.d_Y.assign(n_species, 0.0);
+
+    auto compute_chain = [&](double d_prop_T,
+                             const std::vector<double> &d_prop_Y) {
+      double sum = dT_ad_dT_mix * d_prop_T;
+      for (std::size_t k = 0; k < n_species; ++k) {
+        sum += dT_ad_dY_mix[k] * d_prop_Y[k];
+      }
+      return sum;
+    };
+
+    std::vector<double> dY_mix_dmdot(n_species), dY_mix_dT(n_species);
+    for (std::size_t k = 0; k < n_species; ++k) {
+      dY_mix_dmdot[k] = mix.dY_mix_d_stream[k][i].d_mdot;
+      dY_mix_dT[k] = mix.dY_mix_d_stream[k][i].d_T;
+    }
+
+    dT_stream.d_mdot =
+        compute_chain(mix.dT_mix_d_stream[i].d_mdot, dY_mix_dmdot);
+    dT_stream.d_T = compute_chain(mix.dT_mix_d_stream[i].d_T, dY_mix_dT);
+    for (std::size_t j = 0; j < n_species; ++j) {
+      std::vector<double> dY_j(n_species);
+      for (std::size_t k = 0; k < n_species; ++k)
+        dY_j[k] = mix.dY_mix_d_stream[k][i].d_Y[j];
+      dT_stream.d_Y[j] = compute_chain(mix.dT_mix_d_stream[i].d_Y[j], dY_j);
+    }
+
+    for (std::size_t tgt = 0; tgt < n_species; ++tgt) {
+      StreamJacobian &dY_stream = res.dY_mix_d_stream[tgt][i];
+      dY_stream.d_Y.assign(n_species, 0.0);
+
+      auto compute_Y_chain = [&](double d_prop_T,
+                                 const std::vector<double> &d_prop_Y) {
+        double sum = dYb_dT_mix[tgt] * d_prop_T;
+        for (std::size_t k = 0; k < n_species; ++k) {
+          sum += dYb_dY_mix[tgt][k] * d_prop_Y[k];
+        }
+        return sum;
+      };
+
+      dY_stream.d_mdot =
+          compute_Y_chain(mix.dT_mix_d_stream[i].d_mdot, dY_mix_dmdot);
+      dY_stream.d_T = compute_Y_chain(mix.dT_mix_d_stream[i].d_T, dY_mix_dT);
+      for (std::size_t j = 0; j < n_species; ++j) {
+        std::vector<double> dY_j(n_species);
+        for (std::size_t k = 0; k < n_species; ++k)
+          dY_j[k] = mix.dY_mix_d_stream[k][i].d_Y[j];
+        dY_stream.d_Y[j] = compute_Y_chain(mix.dT_mix_d_stream[i].d_Y[j], dY_j);
+      }
+    }
+  }
+  return res;
+}
+
+MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
+    const std::vector<Stream> &streams, double P) {
+  MixerResult mix = mixer_from_streams_and_jacobians(streams);
+
+  std::vector<double> X_mix = mass_to_mole(normalize_fractions(mix.Y_mix));
+  auto [T_ad, dT_ad_dT_mix, dT_ad_dP_mix, X_b] =
+      adiabatic_T_equilibrium_and_jacobians(mix.T_mix, P, X_mix);
+  std::vector<double> Y_b = mole_to_mass(normalize_fractions(X_b));
+
+  std::size_t n_streams = streams.size();
+  std::size_t n_species = num_species();
+
+  std::vector<double> dT_ad_dY_mix(n_species, 0.0);
+  std::vector<std::vector<double>> dYb_dY_mix(
+      n_species, std::vector<double>(n_species, 0.0));
+  std::vector<double> dYb_dT_mix(n_species, 0.0);
+  const double eps_Y = 1e-6;
+  const double eps_T = 1.0;
+
+  for (std::size_t k = 0; k < n_species; ++k) {
+    std::vector<double> Y_p = mix.Y_mix;
+    Y_p[k] += eps_Y;
+    std::vector<double> X_p = mass_to_mole(normalize_fractions(Y_p));
+    auto [T_ad_p, dummy, dummy2, X_b_p] =
+        adiabatic_T_equilibrium_and_jacobians(mix.T_mix, P, X_p);
+    std::vector<double> Y_b_p = mole_to_mass(normalize_fractions(X_b_p));
+
+    dT_ad_dY_mix[k] = (T_ad_p - T_ad) / eps_Y;
+    for (std::size_t j = 0; j < n_species; ++j) {
+      dYb_dY_mix[j][k] = (Y_b_p[j] - Y_b[j]) / eps_Y;
+    }
+  }
+
+  // Also compute dY_b/dT_mix for equilibrium! Equilibrium products shift with
+  // inlet enthalpy/temperature.
+  auto [T_ad_p_T, dummy_T, dummy2_T, X_b_p_T] =
+      adiabatic_T_equilibrium_and_jacobians(mix.T_mix + eps_T, P, X_mix);
+  std::vector<double> Y_b_p_T = mole_to_mass(normalize_fractions(X_b_p_T));
+  for (std::size_t j = 0; j < n_species; ++j) {
+    dYb_dT_mix[j] = (Y_b_p_T[j] - Y_b[j]) / eps_T;
+  }
+
+  MixerResult res;
+  res.T_mix = T_ad;
+  res.Y_mix = Y_b;
+  res.dT_mix_d_stream.resize(n_streams);
+  res.dY_mix_d_stream.assign(n_species, std::vector<StreamJacobian>(n_streams));
+
+  for (std::size_t i = 0; i < n_streams; ++i) {
+    StreamJacobian &dT_stream = res.dT_mix_d_stream[i];
+    dT_stream.d_Y.assign(n_species, 0.0);
+
+    auto compute_chain = [&](double d_prop_T,
+                             const std::vector<double> &d_prop_Y) {
+      double sum = dT_ad_dT_mix * d_prop_T;
+      for (std::size_t k = 0; k < n_species; ++k) {
+        sum += dT_ad_dY_mix[k] * d_prop_Y[k];
+      }
+      return sum;
+    };
+
+    std::vector<double> dY_mix_dmdot(n_species), dY_mix_dT(n_species);
+    for (std::size_t k = 0; k < n_species; ++k) {
+      dY_mix_dmdot[k] = mix.dY_mix_d_stream[k][i].d_mdot;
+      dY_mix_dT[k] = mix.dY_mix_d_stream[k][i].d_T;
+    }
+
+    dT_stream.d_mdot =
+        compute_chain(mix.dT_mix_d_stream[i].d_mdot, dY_mix_dmdot);
+    dT_stream.d_T = compute_chain(mix.dT_mix_d_stream[i].d_T, dY_mix_dT);
+    for (std::size_t j = 0; j < n_species; ++j) {
+      std::vector<double> dY_j(n_species);
+      for (std::size_t k = 0; k < n_species; ++k)
+        dY_j[k] = mix.dY_mix_d_stream[k][i].d_Y[j];
+      dT_stream.d_Y[j] = compute_chain(mix.dT_mix_d_stream[i].d_Y[j], dY_j);
+    }
+
+    for (std::size_t tgt = 0; tgt < n_species; ++tgt) {
+      StreamJacobian &dY_stream = res.dY_mix_d_stream[tgt][i];
+      dY_stream.d_Y.assign(n_species, 0.0);
+
+      auto compute_Y_chain = [&](double d_prop_T,
+                                 const std::vector<double> &d_prop_Y) {
+        double sum = dYb_dT_mix[tgt] * d_prop_T;
+        for (std::size_t k = 0; k < n_species; ++k) {
+          sum += dYb_dY_mix[tgt][k] * d_prop_Y[k];
+        }
+        return sum;
+      };
+
+      dY_stream.d_mdot =
+          compute_Y_chain(mix.dT_mix_d_stream[i].d_mdot, dY_mix_dmdot);
+      dY_stream.d_T = compute_Y_chain(mix.dT_mix_d_stream[i].d_T, dY_mix_dT);
+      for (std::size_t j = 0; j < n_species; ++j) {
+        std::vector<double> dY_j(n_species);
+        for (std::size_t k = 0; k < n_species; ++k)
+          dY_j[k] = mix.dY_mix_d_stream[k][i].d_Y[j];
+        dY_stream.d_Y[j] = compute_Y_chain(mix.dT_mix_d_stream[i].d_Y[j], dY_j);
+      }
+    }
+  }
+  return res;
 }
 
 } // namespace solver

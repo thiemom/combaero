@@ -213,6 +213,7 @@ try:
         mach_from_pressure_ratio,
         mach_number,
         mass_flux_isentropic,
+        MassStream,
         mass_to_mole,
         min_mode_separation,
         mix,
@@ -228,6 +229,11 @@ try:
         nozzle_thrust,
         nozzle_thrust_cd,
         ntu,
+        num_species,
+        species_name,
+        species_index_from_name,
+        species_molar_mass,
+        species_molar_mass_from_name,
         nusselt_dittus_boelter,
         nusselt_gnielinski,
         nusselt_petukhov,
@@ -434,6 +440,7 @@ except ModuleNotFoundError:
     expansibility_factor = _core.expansibility_factor
     solve_orifice_mdot = _core.solve_orifice_mdot
     standard_dry_air_composition = _core.standard_dry_air_composition
+    # TODO:make standard_dry_air_composition_mass in C++
     humid_air_composition = _core.humid_air_composition
     humid_air_density = _core.humid_air_density
     humid_air_enthalpy = _core.humid_air_enthalpy
@@ -453,6 +460,11 @@ except ModuleNotFoundError:
     calc_T_from_h = _core.calc_T_from_h
     calc_T_from_s = _core.calc_T_from_s
     calc_T_from_cp = _core.calc_T_from_cp
+    num_species = _core.num_species
+    species_name = _core.species_name
+    species_index_from_name = _core.species_index_from_name
+    species_molar_mass = _core.species_molar_mass
+    species_molar_mass_from_name = _core.species_molar_mass_from_name
     oxygen_required_per_mol_fuel = _core.oxygen_required_per_mol_fuel
     oxygen_required_per_kg_fuel = _core.oxygen_required_per_kg_fuel
     oxygen_required_per_mol_mixture = _core.oxygen_required_per_mol_mixture
@@ -912,6 +924,11 @@ __all__ = [
     "friction_colebrook",
     "friction_petukhov",
     "is_whistling_risk",
+    "num_species",
+    "species_name",
+    "species_index_from_name",
+    "species_molar_mass",
+    "species_molar_mass_from_name",
     # Heat transfer
     "nusselt_dittus_boelter",
     "nusselt_gnielinski",

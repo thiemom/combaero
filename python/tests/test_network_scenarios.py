@@ -11,18 +11,18 @@ from combaero.network import (
 )
 
 
-def _get_air_X():
+def _get_air_Y():
     """Helper to create standard air composition."""
-    X = [0.0] * 14
-    X[0] = 0.79  # N2
-    X[1] = 0.21  # O2
-    return X
+    Y = [0.0] * 14
+    Y[0] = 0.79  # N2
+    Y[1] = 0.21  # O2
+    return Y
 
 
 def build_pressure_bounds():
     """Create standard pressure boundaries."""
-    inlet = PressureBoundary("inlet", P_total=150000.0, T_total=300.0, X=_get_air_X())
-    outlet = PressureBoundary("outlet", P_total=100000.0, T_total=300.0, X=_get_air_X())
+    inlet = PressureBoundary("inlet", P_total=150000.0, T_total=300.0, Y=_get_air_Y())
+    outlet = PressureBoundary("outlet", P_total=100000.0, T_total=300.0, Y=_get_air_Y())
     return inlet, outlet
 
 
@@ -179,8 +179,8 @@ def test_network_validation_edge_cases():
 
     # Test self-loop rejection
     graph = FlowNetwork()
-    inlet = PressureBoundary("inlet", P_total=150000.0, T_total=300.0, X=_get_air_X())
-    outlet = PressureBoundary("outlet", P_total=100000.0, T_total=300.0, X=_get_air_X())
+    inlet = PressureBoundary("inlet", P_total=150000.0, T_total=300.0, Y=_get_air_Y())
+    outlet = PressureBoundary("outlet", P_total=100000.0, T_total=300.0, Y=_get_air_Y())
 
     graph.add_node(inlet)
     graph.add_node(outlet)
@@ -191,8 +191,8 @@ def test_network_validation_edge_cases():
 
     # Test isolated node detection
     graph2 = FlowNetwork()
-    inlet2 = PressureBoundary("inlet2", P_total=150000.0, T_total=300.0, X=_get_air_X())
-    outlet2 = PressureBoundary("outlet2", P_total=100000.0, T_total=300.0, X=_get_air_X())
+    inlet2 = PressureBoundary("inlet2", P_total=150000.0, T_total=300.0, Y=_get_air_Y())
+    outlet2 = PressureBoundary("outlet2", P_total=100000.0, T_total=300.0, Y=_get_air_Y())
     isolated = PlenumNode("isolated")
 
     graph2.add_node(inlet2)
@@ -208,8 +208,8 @@ def test_network_validation_edge_cases():
 def test_parallel_elements():
     """Test parallel elements between same nodes"""
     graph = FlowNetwork()
-    inlet = PressureBoundary("inlet", P_total=150000.0, T_total=300.0, X=_get_air_X())
-    outlet = PressureBoundary("outlet", P_total=100000.0, T_total=300.0, X=_get_air_X())
+    inlet = PressureBoundary("inlet", P_total=150000.0, T_total=300.0, Y=_get_air_Y())
+    outlet = PressureBoundary("outlet", P_total=100000.0, T_total=300.0, Y=_get_air_Y())
 
     graph.add_node(inlet)
     graph.add_node(outlet)

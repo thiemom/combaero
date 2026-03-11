@@ -15,11 +15,11 @@ from combaero.network import (
 )
 
 
-def _get_air_X():
-    X = [0.0] * 14
-    X[0] = 0.79  # N2
-    X[1] = 0.21  # O2
-    return X
+def _get_air_Y():
+    Y = [0.0] * 14
+    Y[0] = 0.79
+    Y[1] = 0.21
+    return Y
 
 
 def test_network_solver_simple_orifice():
@@ -32,12 +32,12 @@ def test_network_solver_simple_orifice():
     inlet = PressureBoundary("inlet")
     inlet.P_total = 500000.0
     inlet.T_total = 300.0
-    inlet.X = _get_air_X()
+    inlet.Y = _get_air_Y()
 
     outlet = PressureBoundary("outlet")
     outlet.P_total = 101325.0
     outlet.T_total = 300.0
-    outlet.X = inlet.X
+    outlet.Y = inlet.Y
 
     orf = OrificeElement("orf_1", "inlet", "outlet", Cd=0.6, area=0.005)
 
@@ -51,7 +51,7 @@ def test_network_solver_simple_orifice():
     assert "orf_1.m_dot" in solution
 
     # Analytical check
-    rho_in = cb.density(inlet.T_total, inlet.P_total, inlet.X)
+    rho_in = cb.density(inlet.T_total, inlet.P_total, cb.mass_to_mole(inlet.Y))
     dP = inlet.P_total - outlet.P_total
     # Orifice m_dot = Cd * A * sqrt(2 * rho * dP)
     m_dot_analytical, _ = cb.orifice_mdot_and_jacobian(dP, rho_in, 0.6, 0.005)
@@ -69,12 +69,12 @@ def test_network_solver_simple_pipe():
     inlet = PressureBoundary("inlet")
     inlet.P_total = 150000.0
     inlet.T_total = 300.0
-    inlet.X = _get_air_X()
+    inlet.Y = _get_air_Y()
 
     outlet = PressureBoundary("outlet")
     outlet.P_total = 100000.0
     outlet.T_total = 300.0
-    outlet.X = inlet.X
+    outlet.Y = inlet.Y
 
     pipe = PipeElement(
         "pipe_1",
@@ -96,8 +96,8 @@ def test_network_solver_simple_pipe():
     m_dot_solved = solution["pipe_1.m_dot"]
 
     # Analytical verification
-    rho = cb.density(inlet.T_total, inlet.P_total, inlet.X)
-    mu = cb.viscosity(inlet.T_total, inlet.P_total, inlet.X)
+    rho = cb.density(inlet.T_total, inlet.P_total, cb.mass_to_mole(inlet.Y))
+    mu = cb.viscosity(inlet.T_total, inlet.P_total, cb.mass_to_mole(inlet.Y))
     A = math.pi * (0.05 / 2) ** 2
     v = m_dot_solved / (rho * A)
     Re = max(4.0 * m_dot_solved / (math.pi * 0.05 * mu), 1.0)
@@ -125,12 +125,12 @@ def test_network_bc_swapping():
     inlet_m = MassFlowBoundary("inlet")
     inlet_m.m_dot = target_m_dot
     inlet_m.T_total = 300.0
-    inlet_m.X = _get_air_X()
+    inlet_m.Y = _get_air_Y()
 
     outlet_p = PressureBoundary("outlet")
     outlet_p.P_total = 100000.0
     outlet_p.T_total = 300.0
-    outlet_p.X = _get_air_X()
+    outlet_p.Y = _get_air_Y()
 
     # Direct connection: MassFlowBoundary natively supports floating its pressure to push flow!
     pipe1 = PipeElement("pipe_1", "inlet", "outlet", length=5.0, diameter=0.1, roughness=1e-4)
@@ -156,12 +156,12 @@ def test_network_bc_swapping():
     inlet_p = PressureBoundary("inlet")
     inlet_p.P_total = p_solved
     inlet_p.T_total = 300.0
-    inlet_p.X = _get_air_X()
+    inlet_p.Y = _get_air_Y()
 
     outlet2 = PressureBoundary("outlet")
     outlet2.P_total = 100000.0
     outlet2.T_total = 300.0
-    outlet2.X = _get_air_X()
+    outlet2.Y = _get_air_Y()
 
     pipe2 = PipeElement("pipe_1", "inlet", "outlet", length=5.0, diameter=0.1, roughness=1e-4)
 
@@ -186,14 +186,14 @@ def test_network_element_series():
     inlet = PressureBoundary("inlet")
     inlet.P_total = 110000.0
     inlet.T_total = 300.0
-    inlet.X = _get_air_X()
+    inlet.Y = _get_air_Y()
 
-    junc = PlenumNode("junc_1")
+    junc = PlenumNode("junc_1", enable_mixing=False)  # Phase 1: pressure-only
 
     outlet = PressureBoundary("outlet")
     outlet.P_total = 100000.0
     outlet.T_total = 300.0
-    outlet.X = _get_air_X()
+    outlet.Y = _get_air_Y()
 
     # Pipe 1 is larger, Pipe 2 is smaller
     pipe1 = PipeElement("p1", "inlet", "junc_1", length=5.0, diameter=0.1, roughness=0.0)
@@ -239,14 +239,14 @@ def test_network_lossless_connectors():
     inlet = PressureBoundary("inlet")
     inlet.P_total = 105000.0
     inlet.T_total = 300.0
-    inlet.X = _get_air_X()
+    inlet.Y = _get_air_Y()
 
-    plen = PlenumNode("plenum_idx")
+    plen = PlenumNode("plenum_idx", enable_mixing=False)  # Phase 1: pressure-only
 
     outlet = PressureBoundary("outlet")
     outlet.P_total = 100000.0
     outlet.T_total = 300.0
-    outlet.X = _get_air_X()
+    outlet.Y = _get_air_Y()
 
     conn1 = LosslessConnectionElement("l1", "inlet", "plenum_idx")
     orf1 = OrificeElement("o1", "plenum_idx", "outlet", Cd=0.65, area=0.01)

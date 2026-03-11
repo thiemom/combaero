@@ -1,0 +1,208 @@
+"""Tests for chamber mixing functionality in network solver."""
+
+from __future__ import annotations
+
+import combaero as cb
+from combaero.network.components import (
+    CombustorNode,
+    MassFlowBoundary,
+    MixtureState,
+    MomentumChamberNode,
+    PlenumNode,
+    PressureBoundary,
+)
+from combaero.network.graph import FlowNetwork
+
+
+def test_plenum_node_creation():
+    """Test PlenumNode creation and basic properties."""
+    plenum = PlenumNode("test_plenum", enable_mixing=True)
+
+    # Should have P, P_total, and T unknowns
+    unknowns = plenum.unknowns()
+    assert "test_plenum.P" in unknowns
+    assert "test_plenum.P_total" in unknowns
+    assert "test_plenum.T" in unknowns
+    assert len(unknowns) == 17
+
+
+def test_momentum_chamber_node_creation():
+    """Test MomentumChamberNode creation and basic properties."""
+    chamber = MomentumChamberNode("test_chamber", area=0.05, enable_mixing=True)
+
+    # Should have P, P_total, T, and 14 species unknowns
+    unknowns = chamber.unknowns()
+    assert "test_chamber.P" in unknowns
+    assert "test_chamber.P_total" in unknowns
+    assert "test_chamber.T" in unknowns
+    assert len(unknowns) == 17
+
+
+def test_combustor_node_creation():
+    """Test CombustorNode creation and basic properties."""
+    combustor = CombustorNode("test_combustor", method="complete", pressure_loss_frac=0.04)
+
+    # Should have P, P_total, and T unknowns
+    unknowns = combustor.unknowns()
+    assert "test_combustor.P" in unknowns
+    assert "test_combustor.P_total" in unknowns
+    assert "test_combustor.T" in unknowns
+    assert len(unknowns) == 17
+
+    # Check species unknown format
+    for i in range(14):
+        assert f"test_combustor.Y[{i}]" in unknowns
+
+    assert combustor.method == "complete"
+    assert combustor.pressure_loss_frac == 0.04
+
+
+def test_combustor_fuel_boundary():
+    """Test setting fuel boundary on combustor."""
+    combustor = CombustorNode("test_combustor")
+
+    # Create a fuel boundary
+    fuel_bc = MassFlowBoundary(
+        "fuel_injector",
+        m_dot=0.02,
+        T_total=300.0,
+        Y=cb.mole_to_mass(cb.standard_dry_air_composition()),
+    )
+
+    # Set fuel boundary
+    combustor.set_fuel_boundary(fuel_bc)
+
+    assert combustor.fuel_boundary is not None
+    assert combustor.fuel_boundary.id == "fuel_injector"
+
+
+def test_chamber_topology_resolution():
+    """Test that chambers properly resolve their topology."""
+    # Create a network with chambers
+    network = FlowNetwork()
+
+    # Add nodes
+    plenum = PlenumNode("plenum1")
+    chamber = MomentumChamberNode("chamber1", area=0.1)
+    combustor = CombustorNode("combustor1")
+
+    network.add_node(plenum)
+    network.add_node(chamber)
+    network.add_node(combustor)
+
+    # Resolve topology (this should be called automatically, but we'll test it explicitly)
+    plenum.resolve_topology(network)
+    chamber.resolve_topology(network)
+    combustor.resolve_topology(network)
+
+    # Initially, no upstream elements
+    assert len(plenum.upstream_elements) == 0
+    assert len(chamber.upstream_elements) == 0
+    assert len(combustor.upstream_elements) == 0
+
+
+def test_plenum_with_multiple_upstream():
+    """Test that plenum adds species unknowns when it has multiple upstream connections."""
+    plenum = PlenumNode("mixing_plenum", enable_mixing=True)
+
+    # Simulate multiple upstream connections by adding to upstream_elements
+    plenum.upstream_elements = ["elem1", "elem2"]  # Two upstream elements
+
+    # Now should have species unknowns
+    unknowns = plenum.unknowns()
+    assert "mixing_plenum.P" in unknowns
+    assert "mixing_plenum.P_total" in unknowns
+    assert "mixing_plenum.T" in unknowns
+
+    # Should have 14 species unknowns
+    species_unknowns = [u for u in unknowns if "Y[" in u]
+    assert len(species_unknowns) == 14
+
+    # Check species unknown format
+    for i in range(14):
+        assert f"mixing_plenum.Y[{i}]" in unknowns
+
+
+def test_chamber_pressure_relationship():
+    """Test that chamber nodes enforce proper pressure relationships."""
+    # Test PlenumNode: P_total = P_static
+    plenum = PlenumNode("plenum", enable_mixing=True)
+    state = MixtureState(
+        P=100000.0,
+        P_total=100000.0,
+        T=300.0,
+        T_total=300.0,
+        m_dot=0.1,
+        Y=cb.mole_to_mass(cb.standard_dry_air_composition()),
+    )
+
+    residuals, jac = plenum.residuals(state)
+
+    # Should have one residual: P_total - P = 0
+    assert len(residuals) == 1
+    assert residuals[0] == 0.0  # P_total - P = 100000 - 100000 = 0
+
+    # Test with mismatch
+    state_mismatch = MixtureState(
+        P=100000.0,
+        P_total=101000.0,
+        T=300.0,
+        T_total=300.0,
+        m_dot=0.1,
+        Y=cb.mole_to_mass(cb.standard_dry_air_composition()),
+    )
+    residuals_mismatch, jac_mismatch = plenum.residuals(state_mismatch)
+
+    assert len(residuals_mismatch) == 1
+    assert residuals_mismatch[0] == 1000.0  # P_total - P = 101000 - 100000 = 1000
+
+    # Removed test_momentum_chamber_velocity because 'v' is no longer an unknown
+
+
+def test_combustor_methods():
+    """Test different combustion methods."""
+    # Test complete combustion method
+    combustor_complete = CombustorNode("combustor1", method="complete")
+    assert combustor_complete.method == "complete"
+
+    # Test equilibrium method
+    combustor_equilibrium = CombustorNode("combustor2", method="equilibrium")
+    assert combustor_equilibrium.method == "equilibrium"
+
+    # Test different pressure loss fractions
+    combustor_low_loss = CombustorNode("combustor3", pressure_loss_frac=0.02)
+    assert combustor_low_loss.pressure_loss_frac == 0.02
+
+    combustor_high_loss = CombustorNode("combustor4", pressure_loss_frac=0.08)
+    assert combustor_high_loss.pressure_loss_frac == 0.08
+
+
+def test_chamber_integration_with_network():
+    """Test that chambers can be integrated into a network."""
+    network = FlowNetwork()
+
+    # Create nodes
+    inlet = PressureBoundary("inlet", P_total=500000.0, T_total=700.0)
+    plenum = PlenumNode("plenum")
+    chamber = MomentumChamberNode("chamber", area=0.1)
+    combustor = CombustorNode("combustor")
+    outlet = PressureBoundary("outlet", P_total=101325.0, T_total=400.0)
+
+    # Add to network
+    network.add_node(inlet)
+    network.add_node(plenum)
+    network.add_node(chamber)
+    network.add_node(combustor)
+    network.add_node(outlet)
+
+    # Verify all nodes are in the network
+    assert "inlet" in network.nodes
+    assert "plenum" in network.nodes
+    assert "chamber" in network.nodes
+    assert "combustor" in network.nodes
+    assert "outlet" in network.nodes
+
+    # Verify node types
+    assert isinstance(network.nodes["plenum"], PlenumNode)
+    assert isinstance(network.nodes["chamber"], MomentumChamberNode)
+    assert isinstance(network.nodes["combustor"], CombustorNode)

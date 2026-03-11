@@ -114,6 +114,23 @@ This modular, incremental approach will also be strictly followed when introduci
 | `MomentumChamberNode` | P_static, P_total, v | Isentropic total/static relation, momentum flux, requires flow area |
 | `JunctionNode` | P, T | Massless split/merge, Σṁ = 0 |
 
+> **⚠️ Chamber Automatic Mixing Requirement**
+>
+> All chamber-type nodes (`PlenumNode`, `MomentumChamberNode`, `CombustorNode`, and any
+> future chamber variants) with multiple upstream connections must **automatically**
+> act as mixing nodes. This is not optional — the solver must enforce:
+>
+> 1. **Species mass conservation**: $X_{\text{node},k} = \frac{\sum_{\text{in}} \dot{m}_i X_{i,k}}{\sum_{\text{in}} \dot{m}_i}$
+> 2. **Energy conservation**: $\sum_{\text{in}} \dot{m}_i h_i = \sum_{\text{out}} \dot{m}_j h_j$
+>
+> The C++ `cb.mix(streams)` function implements both balances correctly and should
+> be used for computing the mixed state. For solver residuals, decompose into
+> `cb.enthalpy_and_jacobian()` calls per the design rule (see SOLVER.md Section 4).
+>
+> **Implication**: Every interior chamber node with >1 upstream element implicitly
+> adds energy and species residuals to the system. The solver must detect this
+> topology and inject the appropriate conservation equations automatically.
+
 ### Boundary Nodes (fixed values, contribute no residuals)
 
 | BC | Fixed inputs | Free (solved) | Typical use |

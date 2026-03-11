@@ -24,16 +24,16 @@ class MixtureState:
     T: float  # static temperature [K]
     T_total: float  # total temperature [K]  (= T for plenum nodes)
     m_dot: float  # mass flow rate [kg/s]
-    X: list[float]  # mole fractions [14 species]
+    Y: list[float]  # mass fractions (dynamic size)
 
     def density(self) -> float:
-        return cb.density(self.T, self.P, self.X)
+        return cb.density(self.T, self.P, cb.mass_to_mole(self.Y))
 
     def enthalpy(self) -> float:
-        return cb.h_mass(self.T, self.X)
+        return cb.h_mass(self.T, cb.mass_to_mole(self.Y))
 
     def speed_of_sound(self) -> float:
-        return cb.speed_of_sound(self.T, self.X)
+        return cb.speed_of_sound(self.T, cb.mass_to_mole(self.Y))
 
 
 class NetworkNode(ABC):
@@ -94,20 +94,36 @@ class NetworkElement(ABC):
 class PlenumNode(NetworkNode):
     """
     A stagnation volume where v ~ 0, so P_total = P_static.
-    Enforces energy balance (not currently active for Phase 1 pressure networks).
+    For Phase 1: pressure-only node.
+    For Phase 2+: automatically handles mixing when multiple upstream connections exist.
     """
 
+    def __init__(self, id: str, enable_mixing: bool = False):
+        super().__init__(id)
+        self.enable_mixing = enable_mixing
+        self.upstream_elements = []
+
     def unknowns(self) -> list[str]:
-        return [f"{self.id}.P", f"{self.id}.P_total"]
+        # Base unknowns for Phase 1 (pressure only)
+        unknowns = [f"{self.id}.P", f"{self.id}.P_total"]
+
+        # Add temperature for Phase 2+ (energy conservation)
+        if self.enable_mixing:
+            unknowns.append(f"{self.id}.T")
+            for i in range(cb.num_species()):
+                unknowns.append(f"{self.id}.Y[{i}]")
+        return unknowns
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
-        # Residual: P_total - P = 0
+        # Base residual: P_total = P for plenum
         res = [state.P_total - state.P]
         jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.P_total": 1.0}}
         return res, jac
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
-        pass
+        # Store upstream elements for mixing calculations
+        if self.enable_mixing:
+            self.upstream_elements = graph.get_upstream_elements(self.id)
 
 
 class MomentumChamberNode(NetworkNode):
@@ -115,12 +131,22 @@ class MomentumChamberNode(NetworkNode):
     Similar to a plenum, but preserves dynamic pressure.
     Enforces P_total = P_static + 0.5 * rho * v^2 instead of P_total = P_static.
     Supports directional flow vectors (port angles) for momentum conservation.
+    Automatically handles mixing when multiple upstream connections exist.
     """
 
-    def __init__(self, id: str, port_angles_deg: dict[str, float] | None = None):
+    def __init__(
+        self,
+        id: str,
+        area: float = 0.1,
+        port_angles_deg: dict[str, float] | None = None,
+        enable_mixing: bool = False,
+    ):
         super().__init__(id)
+        self.area = area  # Cross-sectional area for momentum calculations
         # Dictionary mapping connected element IDs to angle relative to chamber axis [deg]
         self.port_angles_deg: dict[str, float] = port_angles_deg or {}
+        self.enable_mixing = enable_mixing
+        self.upstream_elements = []
 
     def set_port_angle(self, element_id: str, angle_deg: float) -> None:
         """Set the angle of the flow for a specific connected element."""
@@ -131,17 +157,35 @@ class MomentumChamberNode(NetworkNode):
         return self.port_angles_deg.get(element_id, 0.0)
 
     def unknowns(self) -> list[str]:
-        return [f"{self.id}.P", f"{self.id}.P_total"]
+        # P, P_total for momentum conservation placeholder
+        unknowns = [f"{self.id}.P", f"{self.id}.P_total"]
+        if self.enable_mixing:
+            unknowns.append(f"{self.id}.T")
+            import combaero as cb
+
+            for i in range(cb.num_species()):
+                unknowns.append(f"{self.id}.Y[{i}]")
+        return unknowns
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
-        # v = m_dot / (rho * A_chamber)
-        # For phase 1, we just return a placeholder.
+        """
+        TODO: This is a placeholder implementation.
+
+        For Phase 2+, this should implement proper energy and species conservation
+        using cb.solver.enthalpy_and_jacobian() and other solver_interface.h functions.
+
+        The network solver currently handles mixing residuals separately in
+        _residuals_and_jacobian() method, but this should eventually be
+        moved here for proper encapsulation.
+        """
+        # Base residual: P_total = P for plenum
         res = [state.P_total - state.P]
         jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.P_total": 1.0}}
         return res, jac
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
-        pass
+        # Store upstream elements for mixing calculations
+        self.upstream_elements = graph.get_upstream_elements(self.id)
 
 
 class PressureBoundary(NetworkNode):
@@ -155,12 +199,12 @@ class PressureBoundary(NetworkNode):
         id: str,
         P_total: float = 101325.0,
         T_total: float = 300.0,
-        X: list[float] | None = None,
+        Y: list[float] | None = None,
     ) -> None:
         super().__init__(id)
         self.P_total = P_total
         self.T_total = T_total
-        self.X = X
+        self.Y = Y
 
     def unknowns(self) -> list[str]:
         return []
@@ -183,12 +227,12 @@ class MassFlowBoundary(NetworkNode):
         id: str,
         m_dot: float = 0.1,
         T_total: float = 300.0,
-        X: list[float] | None = None,
+        Y: list[float] | None = None,
     ) -> None:
         super().__init__(id)
         self.m_dot = m_dot
         self.T_total = T_total
-        self.X = X
+        self.Y = Y
 
     def unknowns(self) -> list[str]:
         # Pressure floats to whatever is required to push the defined mass flow
@@ -209,6 +253,7 @@ class CombustorNode(NetworkNode):
     Combustion chamber adding energy (and optionally mass) to the flow.
     Evaluates adiabatic combustion using the C++ core backend based on
     the selected CombustionMethodLiteral.
+    Automatically handles mixing when multiple upstream connections exist.
     """
 
     def __init__(
@@ -220,17 +265,138 @@ class CombustorNode(NetworkNode):
         super().__init__(id)
         self.method = method
         self.pressure_loss_frac = pressure_loss_frac
+        self.upstream_elements = []
+        self.fuel_boundary = None
+
+    def set_fuel_boundary(self, fuel_bc: MassFlowBoundary) -> None:
+        """Set the fuel boundary condition for this combustor."""
+        self.fuel_boundary = fuel_bc
 
     def unknowns(self) -> list[str]:
-        # P, P_total, and T
-        return [f"{self.id}.P", f"{self.id}.P_total", f"{self.id}.T"]
+        import combaero as cb
+
+        # P, P_total, T, and dynamic species for combustion chamber
+        unknowns = [f"{self.id}.P", f"{self.id}.P_total", f"{self.id}.T"]
+        for i in range(cb.num_species()):
+            unknowns.append(f"{self.id}.Y[{i}]")
+        return unknowns
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
-        # Placeholder for Energy and Mass constraints
-        return [0.0], {}
+        # This standard residuals method is bypassed by solver_interface for CombustorNode,
+        # which calls combustor_residuals() instead to provide upstream dependencies.
+        return [], {}
+
+    def combustor_residuals(
+        self, state: MixtureState, up_states: list, name_to_index: dict
+    ) -> tuple[list[float], dict]:
+        import combaero as cb
+
+        res = []
+        jac = {}
+
+        streams = []
+        m_dot_total = 0.0
+        P_total_in_mix = 0.0
+
+        for _elem_id, _from_id, state_up, _idx_mdot in up_states:
+            m_dot = abs(float(state_up.m_dot)) + 1e-10
+            m_dot_total += m_dot
+            P_total_in_mix += m_dot * state_up.P_total
+            streams.append(cb.MassStream(m_dot, float(state_up.T), [float(y) for y in state_up.Y]))
+
+        if m_dot_total > 0:
+            P_total_in_mix /= m_dot_total
+        else:
+            P_total_in_mix = state.P_total
+
+        safe_P = max(float(state.P), 1000.0)
+
+        try:
+            if self.method == "equilibrium":
+                mix_res = cb._core.adiabatic_T_equilibrium_and_jacobians_from_streams(
+                    streams, safe_P
+                )
+            else:
+                mix_res = cb._core.adiabatic_T_complete_and_jacobian_T_from_streams(streams, safe_P)
+        except Exception:
+            # Fallback
+            mix_res = cb._core.adiabatic_T_complete_and_jacobian_T_from_streams(streams, safe_P)
+
+        T_ad = mix_res.T_mix
+        Y_burned = mix_res.Y_mix
+
+        if abs(state.T - T_ad) < 0.1:
+            print("--- COMBUSTOR NODE NEAR CONVERGENCE ---")
+            print(f"Y_burned: {[y for y in Y_burned if y > 1e-6]}")
+            print("---------------------------------------")
+
+        eq_energy = len(res)
+
+        # Add smooth penalty outside valid range to prevent crashes in the wild
+        if state.T > 6000.0:
+            res.append(6000.0 - T_ad + (state.T - 6000.0))
+        elif state.T < 200.0:
+            res.append(200.0 - T_ad + (state.T - 200.0))
+        else:
+            res.append(state.T - T_ad)
+
+        jac[eq_energy] = {}
+        if f"{self.id}.T" in name_to_index:
+            jac[eq_energy][f"{self.id}.T"] = 1.0
+
+        n_species = cb.num_species()
+
+        # Apply analytical cross-jacobians from C++ wrapper
+        for n, (_elem_id, from_id, state_up, idx_mdot) in enumerate(up_states):
+            stream_jac = mix_res.dT_mix_d_stream[n]
+
+            if idx_mdot is not None:
+                sign = 1.0 if state_up.m_dot >= 0 else -1.0
+                jac[eq_energy][idx_mdot] = -stream_jac.d_mdot * sign
+
+            if f"{from_id}.T" in name_to_index:
+                jac[eq_energy][f"{from_id}.T"] = -stream_jac.d_T
+
+            for k in range(n_species):
+                if f"{from_id}.Y[{k}]" in name_to_index:
+                    jac[eq_energy][f"{from_id}.Y[{k}]"] = -stream_jac.d_Y[k]
+
+        # Species Residuals
+        for i in range(n_species):
+            eq_idx = len(res)
+            res.append(state.Y[i] - Y_burned[i])
+            jac[eq_idx] = {}
+            if f"{self.id}.Y[{i}]" in name_to_index:
+                jac[eq_idx][f"{self.id}.Y[{i}]"] = 1.0
+
+            for n, (_elem_id, from_id, state_up, idx_mdot) in enumerate(up_states):
+                stream_Y_jac = mix_res.dY_mix_d_stream[i][n]
+
+                if idx_mdot is not None:
+                    sign = 1.0 if state_up.m_dot >= 0 else -1.0
+                    jac[eq_idx][idx_mdot] = -stream_Y_jac.d_mdot * sign
+
+                if f"{from_id}.T" in name_to_index:
+                    jac[eq_idx][f"{from_id}.T"] = -stream_Y_jac.d_T
+
+                for k in range(n_species):
+                    if f"{from_id}.Y[{k}]" in name_to_index:
+                        jac[eq_idx][f"{from_id}.Y[{k}]"] = -stream_Y_jac.d_Y[k]
+
+        # 4. Pressure Residuals
+        eq_pstat = len(res)
+        res.append(state.P_total - state.P)
+        jac[eq_pstat] = {}
+        if f"{self.id}.P_total" in name_to_index:
+            jac[eq_pstat][f"{self.id}.P_total"] = 1.0
+        if f"{self.id}.P" in name_to_index:
+            jac[eq_pstat][f"{self.id}.P"] = -1.0
+
+        return res, jac
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
-        pass
+        # Store upstream elements for mixing calculations
+        self.upstream_elements = graph.get_upstream_elements(self.id)
 
 
 class OrificeElement(NetworkElement):
@@ -311,23 +477,56 @@ class OrificeElement(NetworkElement):
 
         if dP_fwd >= 0:
             upstream_id = self.from_node
-            downstream_id = self.to_node
             P_upstream = state_in.P
+            T_upstream = state_in.T
         else:
             upstream_id = self.to_node
-            downstream_id = self.from_node
             P_upstream = state_out.P
+            T_upstream = state_out.T
 
+        # Ideal gas approximation for density derivatives:
+        # rho ~ P/T, so d(rho)/dP = rho/P, d(rho)/dT = -rho/T
+        # m_dot ~ sqrt(rho), so d(m_dot)/d(rho) = m_dot / (2 rho)
+        # Thus: d(m_dot)/dP = m_dot_calc / (2 P)
+        # And:  d(m_dot)/dT = -m_dot_calc / (2 T)
         J_rho_p = -m_dot_calc / (2.0 * P_upstream)
+        J_rho_T = m_dot_calc / (
+            2.0 * T_upstream
+        )  # Note: res = m_dot - calc, so d(res) = - d(calc), thus -(-m_dot/(2T)) = positive
+
+        # jacobian indices based on physical node IDs because res = m_dot - Calc(A->B)
+        P_A_id = self.from_node
+        P_B_id = self.to_node
 
         jac = {
             0: {
                 f"{self.id}.m_dot": 1.0,
-                f"{upstream_id}.P_total": -J_dP,
-                f"{downstream_id}.P": J_dP,
+                f"{P_A_id}.P_total": -J_dP,
+                f"{P_B_id}.P": J_dP,
+                # Density derivatives are based on the physical source node upstream
                 f"{upstream_id}.P": J_rho_p,
+                f"{upstream_id}.T": J_rho_T,
             }
         }
+
+        if hasattr(state_in, "Y") and state_in.Y is not None:
+            import combaero as cb
+
+            n_species = cb.num_species()
+
+            Y_eval = state_in.Y if dP_fwd >= 0 else state_out.Y
+            X_eval = cb.mass_to_mole(Y_eval)
+            base_rho = cb.density(T_upstream, P_upstream, X_eval)
+
+            for i in range(n_species):
+                Y_p = list(Y_eval)
+                Y_p[i] += 1e-6
+                rho_p = cb.density(T_upstream, P_upstream, cb.mass_to_mole(Y_p))
+                drho_dY = (rho_p - base_rho) / 1e-6
+
+                J_rho_Yi = -(m_dot_calc / (2.0 * base_rho)) * drho_dY if base_rho > 0 else 0.0
+                jac[0][f"{upstream_id}.Y[{i}]"] = J_rho_Yi
+
         return res, jac
 
     def n_equations(self) -> int:
@@ -589,11 +788,16 @@ class PipeElement(NetworkElement):
 
         if dP_fwd > 0 or (dP_fwd == 0 and m_dot > 0):
             rho = state_in.density()
-            mu = cb.viscosity(state_in.T, state_in.P, state_in.X)
+            import combaero as cb
+
+            # Use mass_to_mole for viscosity, since C++ expects mole fractions for transport currently
+            mu = cb.viscosity(state_in.T, state_in.P, cb.mass_to_mole(state_in.Y))
             dP_actual = dP_fwd
         else:
             rho = state_out.density()
-            mu = cb.viscosity(state_out.T, state_out.P, state_out.X)
+            import combaero as cb
+
+            mu = cb.viscosity(state_out.T, state_out.P, cb.mass_to_mole(state_out.Y))
             dP_actual = -dP_fwd
 
         abs_mdot = abs(m_dot)
@@ -683,14 +887,14 @@ class PipeElement(NetworkElement):
         """
         import combaero as cba
 
-        rho = cba.density(state_in.T, state_in.P, state_in.X)
+        rho = cba.density(state_in.T, state_in.P, state_in.Y)
         u = cba.pipe_velocity(state_in.m_dot, self.diameter, rho)
 
         if self.regime == "incompressible":
             res = cba.pipe_flow_rough(
                 state_in.T,
                 state_in.P,
-                state_in.X,
+                state_in.Y,
                 u,
                 self.length,
                 self.diameter,
@@ -705,7 +909,9 @@ class PipeElement(NetworkElement):
             res = cba.pipe_fanno(
                 state_in.T,
                 state_in.P,
-                state_in.X,
+                cba.mass_to_mole(
+                    state_in.Y
+                ),  # C++ expects mole fractions for Fanno solver currently
                 state_in.m_dot,
                 self.length,
                 self.diameter,

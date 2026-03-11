@@ -57,6 +57,11 @@ IGNORE_LIST = {
     "name_to_formula",
     "formula",
     "list_materials",
+    "num_species",
+    "species_name",
+    "species_index_from_name",
+    "species_molar_mass",
+    "species_molar_mass_from_name",
     # Mix is a special case function combining streams
     "mix",
     # Enums
