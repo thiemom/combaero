@@ -22,6 +22,10 @@ inline constexpr Entry function_units[] = {
     {"mwmix", "X: mol/mol", "g/mol"},
     {"mole_to_mass", "X: mol/mol", "kg/kg"},
     {"mass_to_mole", "Y: kg/kg", "mol/mol"},
+    {"species_name", "index: -", "str"},
+    {"species_index_from_name", "name: str", "-"},
+    {"species_molar_mass_from_name", "name: str", "g/mol"},
+    {"num_species", "-", "-"},
 
     // -------------------------------------------------------------------------
     // thermo.h - Dimensionless NASA Polynomials
@@ -72,10 +76,11 @@ inline constexpr Entry function_units[] = {
      "CompleteState struct"},
     {"combustion_state",
      "X_fuel: mol/mol, X_ox: mol/mol, phi: -, T_reactants: K, P: Pa, "
-     "fuel_name: str (default '')",
+     "fuel_name: str (default ''), smooth: bool (default False)",
      "CombustionState struct"},
     {"combustion_state_from_streams",
-     "fuel_stream: Stream, ox_stream: Stream, fuel_name: str (default '')",
+     "fuel_stream: Stream, ox_stream: Stream, fuel_name: str (default ''), "
+     "smooth: bool (default False)",
      "CombustionState struct"},
 
     // -------------------------------------------------------------------------
@@ -467,8 +472,10 @@ inline constexpr Entry function_units[] = {
     // combustion.h - Complete Combustion
     // -------------------------------------------------------------------------
     {"complete_combustion_to_CO2_H2O", "X: mol/mol", "mol/mol"},
-    {"complete_combustion", "State (T: K, P: Pa, X: mol/mol)", "State"},
-    {"complete_combustion_isothermal", "State", "State"},
+    {"complete_combustion",
+     "State (T: K, P: Pa, X: mol/mol), smooth: bool (default False)", "State"},
+    {"complete_combustion_isothermal", "State, smooth: bool (default False)",
+     "State"},
 
     // -------------------------------------------------------------------------
     // combustion.h - Stream Solvers
@@ -494,7 +501,7 @@ inline constexpr Entry function_units[] = {
     {"smr_wgs_equilibrium_adiabatic", "State", "State"},
     {"reforming_equilibrium", "State", "State"},
     {"reforming_equilibrium_adiabatic", "State", "State"},
-    {"combustion_equilibrium", "State", "State"},
+    {"combustion_equilibrium", "State, smooth: bool (default False)", "State"},
 
     // -------------------------------------------------------------------------
     // state.h - State Properties

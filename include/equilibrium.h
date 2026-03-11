@@ -9,23 +9,23 @@
 
 // WGS equilibrium (isothermal) - equilibrate at input temperature
 // CO + H2O <-> CO2 + H2
-EquilibriumResult wgs_equilibrium(const State& in);
+EquilibriumResult wgs_equilibrium(const State &in);
 
 // WGS equilibrium (adiabatic) - solve for equilibrium T and composition
-EquilibriumResult wgs_equilibrium_adiabatic(const State& in);
+EquilibriumResult wgs_equilibrium_adiabatic(const State &in);
 
 // -------------------------------------------------------------
 // SMR + WGS equilibrium (Steam Methane Reforming + Water-Gas Shift)
 // -------------------------------------------------------------
-// DEPRECATED: use reforming_equilibrium / reforming_equilibrium_adiabatic instead.
-// reforming_equilibrium handles CH4 (and all other CnHm) via the same
+// DEPRECATED: use reforming_equilibrium / reforming_equilibrium_adiabatic
+// instead. reforming_equilibrium handles CH4 (and all other CnHm) via the same
 // sequential solver and produces identical results for CH4-only inputs.
 
 // SMR+WGS equilibrium (isothermal) - equilibrate at input temperature
-EquilibriumResult smr_wgs_equilibrium(const State& in);
+EquilibriumResult smr_wgs_equilibrium(const State &in);
 
 // SMR+WGS equilibrium (adiabatic) - solve for equilibrium T and composition
-EquilibriumResult smr_wgs_equilibrium_adiabatic(const State& in);
+EquilibriumResult smr_wgs_equilibrium_adiabatic(const State &in);
 
 // -------------------------------------------------------------
 // General Reforming + WGS equilibrium (handles ALL hydrocarbons)
@@ -39,10 +39,10 @@ EquilibriumResult smr_wgs_equilibrium_adiabatic(const State& in);
 // CH4, C2H6, C3H8, iC4H10, nC5H12, nC6H14, nC7H16, etc.
 
 // General reforming + WGS equilibrium (isothermal)
-EquilibriumResult reforming_equilibrium(const State& in);
+EquilibriumResult reforming_equilibrium(const State &in);
 
 // General reforming + WGS equilibrium (adiabatic)
-EquilibriumResult reforming_equilibrium_adiabatic(const State& in);
+EquilibriumResult reforming_equilibrium_adiabatic(const State &in);
 
 // -------------------------------------------------------------
 // Combustion + Equilibrium (convenience functions)
@@ -60,6 +60,6 @@ EquilibriumResult reforming_equilibrium_adiabatic(const State& in);
 // Combustion + equilibrium (adiabatic)
 // Input: unburned fuel+air mixture at inlet temperature
 // Output: equilibrium products at adiabatic flame temperature
-EquilibriumResult combustion_equilibrium(const State& in);
+EquilibriumResult combustion_equilibrium(const State &in, bool smooth = false);
 
 #endif // EQUILIBRIUM_H

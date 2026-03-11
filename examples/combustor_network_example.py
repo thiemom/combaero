@@ -13,8 +13,9 @@ def main():
     # --- Boundaries ---
     # Air stream (standard air)
     X_air = cb.standard_dry_air_composition()
+    Y_air = cb.mole_to_mass(X_air)
     m_dot_air = 2.0
-    air_in = MassFlowBoundary("air_in", m_dot=m_dot_air, T_total=600.0, X=X_air)
+    air_in = MassFlowBoundary("air_in", m_dot=m_dot_air, T_total=600.0, Y=Y_air)
 
     # Fuel/air ratio
     FAR = 0.03
@@ -23,17 +24,18 @@ def main():
     PFF = 0.33
 
     # Fuel stream 1 (Pilot, pure CH4)
-    X_ch4 = [0.0] * 14
-    X_ch4[5] = 1.0 # CH4 (index 5)
+    X_ch4 = [0.0] * cb.num_species()
+    X_ch4[cb.species_index_from_name("CH4")] = 1.0
+    Y_ch4 = cb.mole_to_mass(X_ch4)
     m_dot_pilot = PFF * m_dot_air * FAR
-    fuel_pilot = MassFlowBoundary("fuel_pilot", m_dot=m_dot_pilot, T_total=300.0, X=X_ch4)
+    fuel_pilot = MassFlowBoundary("fuel_pilot", m_dot=m_dot_pilot, T_total=300.0, Y=Y_ch4)
 
     # Fuel stream 2 (Main, pure CH4)
     m_dot_main = (1 - PFF) * m_dot_air * FAR
-    fuel_main = MassFlowBoundary("fuel_main", m_dot=m_dot_main, T_total=300.0, X=X_ch4)
+    fuel_main = MassFlowBoundary("fuel_main", m_dot=m_dot_main, T_total=300.0, Y=Y_ch4)
 
     # Back pressure (discharge atmosphere)
-    p_out = PressureBoundary("exhaust", P_total=101325.0, T_total=300.0, X=X_air)
+    p_out = PressureBoundary("exhaust", P_total=101325.0, T_total=300.0, Y=Y_air)
 
     # --- Inner Nodes ---
     combustor = CombustorNode("combustor", method="complete", pressure_loss_frac=0.05)
@@ -90,15 +92,16 @@ def main():
     h_ch4, _ = cb._core.enthalpy_and_jacobian(300.0, X_ch4)
     H_in = m_dot_air * h_air + (m_dot_pilot + m_dot_main) * h_ch4
 
-    X_out = [sol[f"combustor.X[{i}]"] for i in range(14)]
+    Y_out = [sol[f"combustor.Y[{i}]"] for i in range(cb.num_species())]
+    X_out = cb.mass_to_mole(Y_out)
     h_out, _ = cb._core.enthalpy_and_jacobian(sol['combustor.T'], X_out)
     H_out = sol['nozzle.m_dot'] * h_out
 
     print(f"Energy Flux In:  {H_in/1e6:.4f} MW")
     print(f"Energy Flux Out: {H_out/1e6:.4f} MW")
 
-    print(f"\nDischarge CO2 Mol Frac: {X_out[3]:.4f}")
-    print(f"Discharge H2O Mol Frac: {X_out[4]:.4f}")
+    print(f"\nDischarge CO2 Mol Frac: {X_out[cb.species_index_from_name('CO2')]:.4f}")
+    print(f"Discharge H2O Mol Frac: {X_out[cb.species_index_from_name('H2O')]:.4f}")
 
 if __name__ == "__main__":
     main()

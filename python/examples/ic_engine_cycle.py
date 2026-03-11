@@ -129,7 +129,7 @@ def main() -> None:
 
     # Heat added per kg of charge: constant-volume process -> q = integral cv dT
     T_cv_in = np.linspace(T2, T3, 200)
-    q_in = np.trapz([ca.cv_mass(T, X1) for T in T_cv_in], T_cv_in)  # J/kg
+    q_in = np.trapezoid([ca.cv_mass(T, X1) for T in T_cv_in], T_cv_in)  # J/kg
 
     print("\n--- State 3 (TDC, after combustion) ---")
     print(f"  T3  = {T3:.1f} K")
@@ -199,7 +199,7 @@ def main() -> None:
     T_23 = np.linspace(T2, T3, n_ts)
     s_23 = s2 + np.array(
         [
-            np.trapz([ca.cv_mass(t, X1) / t for t in T_23[: i + 1]], T_23[: i + 1])
+            np.trapezoid([ca.cv_mass(t, X1) / t for t in T_23[: i + 1]], T_23[: i + 1])
             for i in range(n_ts)
         ]
     )
@@ -208,7 +208,7 @@ def main() -> None:
     T_41 = np.linspace(T4, T1, n_ts)
     s_41 = s4 + np.array(
         [
-            np.trapz([ca.cv_mass(t, X3) / t for t in T_41[: i + 1]], T_41[: i + 1])
+            np.trapezoid([ca.cv_mass(t, X3) / t for t in T_41[: i + 1]], T_41[: i + 1])
             for i in range(n_ts)
         ]
     )

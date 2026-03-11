@@ -200,7 +200,7 @@ def main() -> None:
     print(f"Pressure: {inputs.pressure_pa / 1e5:.2f} bar")
     print(f"Primary-zone phi: {inputs.phi_primary:.2f}")
     print(f"Primary mixed flow: {mdot_primary:.3f} kg/s")
-    print(f"Adiabatic flame temperature: {burned.T:.1f} K")
+    print(f"Adiabatic flame temperature: {burned.state.T:.1f} K")
     print()
 
     # Geometry for flow estimates
@@ -212,7 +212,7 @@ def main() -> None:
     cooling_area = perimeter * cooling_gap_m
 
     # Hot-gas and coolant velocities
-    rho_hot = ca.density(burned.T, inputs.pressure_pa, burned.X)
+    rho_hot = ca.density(burned.state.T, inputs.pressure_pa, burned.state.X)
     v_hot = mdot_primary / (rho_hot * hot_flow_area)
 
     t_cool_in = inputs.air_inlet_temperature_k + 40.0
@@ -220,9 +220,9 @@ def main() -> None:
     v_cool = mdot_cool_liner / (rho_cool * cooling_area)
 
     h_hot, re_hot, nu_hot = _hot_gas_side_htc(
-        burned.T,
+        burned.state.T,
         inputs.pressure_pa,
-        burned.X,
+        burned.state.X,
         v_hot,
         geom.can_diameter_m,
     )
@@ -248,7 +248,7 @@ def main() -> None:
     # Baseline front plate: bare Haynes 230 metal wall
     k_haynes = ca.k_haynes230(min(max(900.0, t_cool_in), 1400.0))
     q_front_bare = ca.cooled_wall_heat_flux(
-        T_hot=burned.T,
+        T_hot=burned.state.T,
         T_coolant=t_cool_in,
         h_hot=h_hot,
         h_coolant=h_cool,
@@ -257,7 +257,7 @@ def main() -> None:
         k_wall=k_haynes,
     )
 
-    taw_front = ca.adiabatic_wall_temperature(burned.T, t_cool_in, effusion_eta)
+    taw_front = ca.adiabatic_wall_temperature(burned.state.T, t_cool_in, effusion_eta)
 
     # If needed, upgrade wall with YSZ coating on top of Haynes substrate
     needs_upgrade = q_front_bare / 1e3 > 160.0
@@ -286,7 +286,7 @@ def main() -> None:
     )
 
     q_liner = ca.cooled_wall_heat_flux(
-        T_hot=burned.T,
+        T_hot=burned.state.T,
         T_coolant=t_cool_in,
         h_hot=h_hot,
         h_coolant=h_cool,
@@ -298,8 +298,8 @@ def main() -> None:
     dp_budget = _combustor_pressure_loss_budget(
         inputs=inputs,
         geom=geom,
-        gas_temperature_k=burned.T,
-        gas_x=burned.X,
+        gas_temperature_k=burned.state.T,
+        gas_x=burned.state.X,
         v_hot_m_s=v_hot,
         v_cool_m_s=v_cool,
         coolant_x=air.X,

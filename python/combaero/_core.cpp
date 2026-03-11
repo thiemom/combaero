@@ -936,23 +936,25 @@ PYBIND11_MODULE(_core, m) {
   // Complete combustion helper
   m.def(
       "complete_combustion_to_CO2_H2O",
-      [](py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+      [](py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+         bool smooth) {
         auto X = to_vec(X_arr);
-        return complete_combustion_to_CO2_H2O(X);
+        return complete_combustion_to_CO2_H2O(X, smooth);
       },
-      py::arg("X"),
+      py::arg("X"), py::arg("smooth") = false,
       "Complete combustion of mixture X to CO2 and H2O (returns product mole "
       "fractions).");
 
   m.def(
       "complete_combustion_to_CO2_H2O_with_fraction",
-      [](py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+      [](py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+         bool smooth) {
         auto X = to_vec(X_arr);
         double f = 0.0;
-        auto X_out = complete_combustion_to_CO2_H2O(X, f);
+        auto X_out = complete_combustion_to_CO2_H2O(X, f, smooth);
         return py::make_tuple(X_out, f);
       },
-      py::arg("X"),
+      py::arg("X"), py::arg("smooth") = false,
       "Complete combustion of mixture X to CO2 and H2O, returning (product "
       "mole fractions, fuel burn fraction f).");
 
@@ -1594,14 +1596,15 @@ PYBIND11_MODULE(_core, m) {
       "complete_combustion",
       [](double T,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-         double P) {
+         double P, bool smooth) {
         State in;
         in.T = T;
         in.P = P;
         in.X = to_vec(X_arr);
-        return complete_combustion(in);
+        return complete_combustion(in, smooth);
       },
       py::arg("T"), py::arg("X"), py::arg("P") = 101325.0,
+      py::arg("smooth") = false,
       "Adiabatic complete combustion to CO2 and H2O.\n\n"
       "Returns State with adiabatic flame temperature and burned composition.");
 
@@ -1609,16 +1612,17 @@ PYBIND11_MODULE(_core, m) {
       "complete_combustion_isothermal",
       [](double T,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-         double P) {
+         double P, bool smooth) {
         State in;
         in.T = T;
         in.P = P;
         in.X = to_vec(X_arr);
-        return complete_combustion_isothermal(in);
+        return complete_combustion_isothermal(in, smooth);
       },
       py::arg("T"), py::arg("X"), py::arg("P") = 101325.0,
+      py::arg("smooth") = false,
       "Isothermal complete combustion to CO2 and H2O.\n\n"
-      "Returns State with same temperature and burned composition.");
+      "Returns State with reactant temperature and burned composition.");
 
   // Helper: construct State from (T, P, X_arr) — avoids 4-line boilerplate in
   // every binding
@@ -2723,38 +2727,40 @@ PYBIND11_MODULE(_core, m) {
 
   using CombustionStateBaseFn = CombustionState (*)(
       const std::vector<double> &, const std::vector<double> &, double, double,
-      double, const std::string &, CombustionMethod);
-  m.def("combustion_state",
-        static_cast<CombustionStateBaseFn>(&combustion_state),
-        py::arg("X_fuel"), py::arg("X_ox"), py::arg("phi"),
-        py::arg("T_reactants"), py::arg("P"), py::arg("fuel_name") = "",
-        py::arg("method") = CombustionMethod::Complete,
-        "Compute combustion state from equivalence ratio.\n\n"
-        "Parameters:\n"
-        "  X_fuel       : fuel composition (mole fractions) [-]\n"
-        "  X_ox         : oxidizer composition (mole fractions) [-]\n"
-        "  phi          : equivalence ratio [-]\n"
-        "  T_reactants  : reactant temperature [K]\n"
-        "  P            : pressure [Pa]\n"
-        "  fuel_name    : optional fuel label (default: '')\n"
-        "  method       : CombustionMethod.Complete (default) or "
-        "CombustionMethod.Equilibrium\n\n"
-        "Returns: CombustionState with reactants, products, phi, "
-        "mixture_fraction\n\n"
-        "Example:\n"
-        "  >>> state = cb.combustion_state(X_CH4, X_air, phi=1.0, "
-        "T_reactants=300, P=101325)\n"
-        "  >>> state_eq = cb.combustion_state(X_CH4, X_air, phi=1.2, "
-        "T_reactants=300, P=101325,\n"
-        "  ...                               "
-        "method=cb.CombustionMethod.Equilibrium)");
+      double, const std::string &, CombustionMethod, bool);
+  m.def(
+      "combustion_state", static_cast<CombustionStateBaseFn>(&combustion_state),
+      py::arg("X_fuel"), py::arg("X_ox"), py::arg("phi"),
+      py::arg("T_reactants"), py::arg("P"), py::arg("fuel_name") = "",
+      py::arg("method") = CombustionMethod::Complete, py::arg("smooth") = false,
+      "Compute combustion state from equivalence ratio.\n\n"
+      "Parameters:\n"
+      "  X_fuel       : fuel composition (mole fractions) [-]\n"
+      "  X_ox         : oxidizer composition (mole fractions) [-]\n"
+      "  phi          : equivalence ratio [-]\n"
+      "  T_reactants  : reactant temperature [K]\n"
+      "  P            : pressure [Pa]\n"
+      "  fuel_name    : optional fuel label (default: '')\n"
+      "  method       : CombustionMethod.Complete (default) or "
+      "CombustionMethod.Equilibrium\n\n"
+      "Returns: CombustionState with reactants, products, phi, "
+      "mixture_fraction\n\n"
+      "Example:\n"
+      "  >>> state = cb.combustion_state(X_CH4, X_air, phi=1.0, "
+      "T_reactants=300, P=101325)\n"
+      "  >>> state_eq = cb.combustion_state(X_CH4, X_air, phi=1.2, "
+      "T_reactants=300, P=101325,\n"
+      "  ...                               "
+      "method=cb.CombustionMethod.Equilibrium)");
 
-  using CombustionStreamsBaseFn = CombustionState (*)(
-      const Stream &, const Stream &, const std::string &, CombustionMethod);
+  using CombustionStreamsBaseFn =
+      CombustionState (*)(const Stream &, const Stream &, const std::string &,
+                          CombustionMethod, bool);
   m.def("combustion_state_from_streams",
         static_cast<CombustionStreamsBaseFn>(&combustion_state_from_streams),
         py::arg("fuel_stream"), py::arg("ox_stream"), py::arg("fuel_name") = "",
         py::arg("method") = CombustionMethod::Complete,
+        py::arg("smooth") = false,
         "Compute combustion state from measured streams.\n\n"
         "Phi is COMPUTED from mass flow rates (output, not input).\n\n"
         "Parameters:\n"
@@ -2799,24 +2805,25 @@ PYBIND11_MODULE(_core, m) {
   using CombustionStateHookFn = CombustionState (*)(
       const std::vector<double> &, const std::vector<double> &, double, double,
       double, const std::string &, CombustionMethod,
-      const PressureLossCorrelation &);
+      const PressureLossCorrelation &, bool);
   m.def(
       "combustion_state",
       [](py::array_t<double, py::array::c_style | py::array::forcecast> X_fuel,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_ox,
          double phi, double T_reactants, double P, const std::string &fuel_name,
-         CombustionMethod method, py::function pressure_loss) {
+         CombustionMethod method, py::function pressure_loss, bool smooth) {
         PressureLossCorrelation fn =
             [pressure_loss](const PressureLossContext &ctx) {
               return pressure_loss(ctx).cast<double>();
             };
         CombustionStateHookFn hook_fn = &combustion_state;
         return hook_fn(to_vec(X_fuel), to_vec(X_ox), phi, T_reactants, P,
-                       fuel_name, method, fn);
+                       fuel_name, method, fn, smooth);
       },
       py::arg("X_fuel"), py::arg("X_ox"), py::arg("phi"),
       py::arg("T_reactants"), py::arg("P"), py::arg("fuel_name") = "",
       py::arg("method") = CombustionMethod::Complete, py::arg("pressure_loss"),
+      py::arg("smooth") = false,
       "combustion_state with user-supplied pressure-loss callable.\n\n"
       "pressure_loss(ctx: PressureLossContext) -> float\n"
       "  Returns fractional dP/P_in [-]. All ctx fields are loop-free.\n\n"
@@ -2825,23 +2832,24 @@ PYBIND11_MODULE(_core, m) {
       "      P=500000, pressure_loss=lambda c: 0.03 + 0.005*c.theta)");
 
   // combustion_state_from_streams with pressure-loss hook
-  using CombustionStreamsHookFn =
-      CombustionState (*)(const Stream &, const Stream &, const std::string &,
-                          CombustionMethod, const PressureLossCorrelation &);
+  using CombustionStreamsHookFn = CombustionState (*)(
+      const Stream &, const Stream &, const std::string &, CombustionMethod,
+      const PressureLossCorrelation &, bool);
   m.def(
       "combustion_state_from_streams",
       [](const Stream &fuel_stream, const Stream &ox_stream,
          const std::string &fuel_name, CombustionMethod method,
-         py::function pressure_loss) {
+         py::function pressure_loss, bool smooth) {
         PressureLossCorrelation fn =
             [pressure_loss](const PressureLossContext &ctx) {
               return pressure_loss(ctx).cast<double>();
             };
         CombustionStreamsHookFn hook_fn = &combustion_state_from_streams;
-        return hook_fn(fuel_stream, ox_stream, fuel_name, method, fn);
+        return hook_fn(fuel_stream, ox_stream, fuel_name, method, fn, smooth);
       },
       py::arg("fuel_stream"), py::arg("ox_stream"), py::arg("fuel_name") = "",
       py::arg("method") = CombustionMethod::Complete, py::arg("pressure_loss"),
+      py::arg("smooth") = false,
       "combustion_state_from_streams with user-supplied pressure-loss "
       "callable.\n\n"
       "pressure_loss(ctx: PressureLossContext) -> float\n"

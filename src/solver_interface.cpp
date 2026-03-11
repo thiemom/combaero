@@ -605,7 +605,7 @@ adiabatic_T_complete_and_jacobian_T(double T_in, double P,
 
   State in_state;
   in_state.set_TPX(T_in, P, X_in);
-  State out_state = complete_combustion(in_state);
+  State out_state = complete_combustion(in_state, true);
   double T_ad = out_state.T;
   std::vector<double> X_products = out_state.X;
 
@@ -616,8 +616,8 @@ adiabatic_T_complete_and_jacobian_T(double T_in, double P,
   in_plus.set_TPX(T_in + dT_eps, P, X_in);
   in_minus.set_TPX(std::max(0.1, T_in - dT_eps), P, X_in);
 
-  double T_ad_plus = complete_combustion(in_plus).T;
-  double T_ad_minus = complete_combustion(in_minus).T;
+  double T_ad_plus = complete_combustion(in_plus, true).T;
+  double T_ad_minus = complete_combustion(in_minus, true).T;
 
   double dT_ad_dT_in = (T_ad_plus - T_ad_minus) / (2.0 * dT_eps);
 
@@ -636,7 +636,7 @@ adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
   in_state.set_TPX(T_in, P, X_in);
 
   // Combustion Equilibrium
-  EquilibriumResult eq_res = combustion_equilibrium(in_state);
+  EquilibriumResult eq_res = combustion_equilibrium(in_state, true);
   double T_ad = eq_res.state.T;
   std::vector<double> X_products = eq_res.state.X;
 
@@ -649,8 +649,8 @@ adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
   in_T_plus.set_TPX(T_in + dT_eps, P, X_in);
   in_T_minus.set_TPX(std::max(0.1, T_in - dT_eps), P, X_in);
 
-  double T_ad_T_plus = combustion_equilibrium(in_T_plus).state.T;
-  double T_ad_T_minus = combustion_equilibrium(in_T_minus).state.T;
+  double T_ad_T_plus = combustion_equilibrium(in_T_plus, true).state.T;
+  double T_ad_T_minus = combustion_equilibrium(in_T_minus, true).state.T;
   double dT_ad_dT_in = (T_ad_T_plus - T_ad_T_minus) / (2.0 * dT_eps);
 
   // wrt P
@@ -658,8 +658,8 @@ adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
   in_P_plus.set_TPX(T_in, P + dP_eps, X_in);
   in_P_minus.set_TPX(T_in, std::max(0.1, P - dP_eps), X_in);
 
-  double T_ad_P_plus = combustion_equilibrium(in_P_plus).state.T;
-  double T_ad_P_minus = combustion_equilibrium(in_P_minus).state.T;
+  double T_ad_P_plus = combustion_equilibrium(in_P_plus, true).state.T;
+  double T_ad_P_minus = combustion_equilibrium(in_P_minus, true).state.T;
   double dT_ad_dP = (T_ad_P_plus - T_ad_P_minus) / (2.0 * dP_eps);
 
   return {T_ad, dT_ad_dT_in, dT_ad_dP, X_products};

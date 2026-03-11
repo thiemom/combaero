@@ -59,12 +59,16 @@ All functions use consistent units to avoid conversion errors.
 
 #### Species Data
 
-| Function             | Input Units | Output Unit |
-|----------------------|-------------|-------------|
-| `species_molar_mass` | -           | g/mol       |
-| `mwmix`              | X: mol/mol  | g/mol       |
-| `mole_to_mass`       | X: mol/mol  | kg/kg       |
-| `mass_to_mole`       | Y: kg/kg    | mol/mol     |
+| Function                       | Input Units | Output Unit |
+|--------------------------------|-------------|-------------|
+| `species_molar_mass`           | -           | g/mol       |
+| `mwmix`                        | X: mol/mol  | g/mol       |
+| `mole_to_mass`                 | X: mol/mol  | kg/kg       |
+| `mass_to_mole`                 | Y: kg/kg    | mol/mol     |
+| `species_name`                 | index: -    | str         |
+| `species_index_from_name`      | name: str   | -           |
+| `species_molar_mass_from_name` | name: str   | g/mol       |
+| `num_species`                  | -           | -           |
 
 #### Dimensionless NASA Polynomials
 
@@ -98,23 +102,22 @@ All functions use consistent units to avoid conversion errors.
 
 #### Mixture Properties (Mass/Other Basis)
 
-| Function                           | Input Units                                                         | Output Unit            |
-|------------------------------------|---------------------------------------------------------------------|------------------------|
-| `density`                          | T: K, P: Pa, X: mol/mol                                             | kg/m^3                 |
-| `molar_volume`                     | T: K, P: Pa                                                         | m^3/mol                |
-| `specific_gas_constant`            | X: mol/mol                                                          | J/(kg*K)               |
-| `isentropic_expansion_coefficient` | T: K, X: mol/mol                                                    | - (gamma)              |
-| `speed_of_sound`                   | T: K, X: mol/mol                                                    | m/s                    |
-| `cp_mass`                          | T: K, X: mol/mol                                                    | J/(kg*K)               |
-| `cv_mass`                          | T: K, X: mol/mol                                                    | J/(kg*K)               |
-| `h_mass`                           | T: K, X: mol/mol                                                    | J/kg                   |
-| `s_mass`                           | T: K, X: mol/mol, P: Pa, P_ref: Pa                                  | J/(kg*K)               |
-| `u_mass`                           | T: K, X: mol/mol                                                    | J/kg                   |
-| `air_properties`                   | T: K, P: Pa, humidity: - (0-1)                                      | AirProperties struct   |
-| `thermo_state`                     | T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325)                 | ThermoState struct     |
-| `transport_state`                  | T: K, P: Pa, X: mol/mol                                             | TransportState struct  |
-| `complete_state`                   | T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325)                 | CompleteState struct   |
-| `combustion_state_from_streams`    | fuel_stream: Stream, ox_stream: Stream, fuel_name: str (default '') | CombustionState struct |
+| Function                           | Input Units                                         | Output Unit           |
+|------------------------------------|-----------------------------------------------------|-----------------------|
+| `density`                          | T: K, P: Pa, X: mol/mol                             | kg/m^3                |
+| `molar_volume`                     | T: K, P: Pa                                         | m^3/mol               |
+| `specific_gas_constant`            | X: mol/mol                                          | J/(kg*K)              |
+| `isentropic_expansion_coefficient` | T: K, X: mol/mol                                    | - (gamma)             |
+| `speed_of_sound`                   | T: K, X: mol/mol                                    | m/s                   |
+| `cp_mass`                          | T: K, X: mol/mol                                    | J/(kg*K)              |
+| `cv_mass`                          | T: K, X: mol/mol                                    | J/(kg*K)              |
+| `h_mass`                           | T: K, X: mol/mol                                    | J/kg                  |
+| `s_mass`                           | T: K, X: mol/mol, P: Pa, P_ref: Pa                  | J/(kg*K)              |
+| `u_mass`                           | T: K, X: mol/mol                                    | J/kg                  |
+| `air_properties`                   | T: K, P: Pa, humidity: - (0-1)                      | AirProperties struct  |
+| `thermo_state`                     | T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325) | ThermoState struct    |
+| `transport_state`                  | T: K, P: Pa, X: mol/mol                             | TransportState struct |
+| `complete_state`                   | T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325) | CompleteState struct  |
 
 #### Inverse Solvers
 
@@ -287,11 +290,11 @@ All functions use consistent units to avoid conversion errors.
 
 #### Complete Combustion
 
-| Function                         | Input Units                     | Output Unit |
-|----------------------------------|---------------------------------|-------------|
-| `complete_combustion_to_CO2_H2O` | X: mol/mol                      | mol/mol     |
-| `complete_combustion`            | State (T: K, P: Pa, X: mol/mol) | State       |
-| `complete_combustion_isothermal` | State                           | State       |
+| Function                         | Input Units                                                   | Output Unit |
+|----------------------------------|---------------------------------------------------------------|-------------|
+| `complete_combustion_to_CO2_H2O` | X: mol/mol                                                    | mol/mol     |
+| `complete_combustion`            | State (T: K, P: Pa, X: mol/mol), smooth: bool (default False) | State       |
+| `complete_combustion_isothermal` | State, smooth: bool (default False)                           | State       |
 
 #### Stream Solvers
 
@@ -315,15 +318,15 @@ All functions use consistent units to avoid conversion errors.
 
 #### Chemical Equilibrium
 
-| Function                          | Input Units                     | Output Unit |
-|-----------------------------------|---------------------------------|-------------|
-| `wgs_equilibrium`                 | State (T: K, P: Pa, X: mol/mol) | State       |
-| `wgs_equilibrium_adiabatic`       | State                           | State       |
-| `smr_wgs_equilibrium`             | State                           | State       |
-| `smr_wgs_equilibrium_adiabatic`   | State                           | State       |
-| `reforming_equilibrium`           | State                           | State       |
-| `reforming_equilibrium_adiabatic` | State                           | State       |
-| `combustion_equilibrium`          | State                           | State       |
+| Function                          | Input Units                         | Output Unit |
+|-----------------------------------|-------------------------------------|-------------|
+| `wgs_equilibrium`                 | State (T: K, P: Pa, X: mol/mol)     | State       |
+| `wgs_equilibrium_adiabatic`       | State                               | State       |
+| `smr_wgs_equilibrium`             | State                               | State       |
+| `smr_wgs_equilibrium_adiabatic`   | State                               | State       |
+| `reforming_equilibrium`           | State                               | State       |
+| `reforming_equilibrium_adiabatic` | State                               | State       |
+| `combustion_equilibrium`          | State, smooth: bool (default False) | State       |
 
 ---
 

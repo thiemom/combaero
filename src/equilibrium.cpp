@@ -888,11 +888,11 @@ EquilibriumResult reforming_equilibrium_adiabatic(const State &in) {
 // Combustion + Equilibrium (convenience function)
 // -------------------------------------------------------------
 
-EquilibriumResult combustion_equilibrium(const State &in) {
+EquilibriumResult combustion_equilibrium(const State &in, bool smooth) {
   // Step 1: Complete combustion (adiabatic)
   // This burns fuel with available O2, producing CO2 + H2O
   // Excess fuel (rich) or O2 (lean) remains
-  State burned = complete_combustion(in);
+  State burned = complete_combustion(in, smooth);
 
   // Step 2: Reforming + WGS equilibrium on combustion products
   // For rich mixtures: unburned HC + H2O -> CO + H2
