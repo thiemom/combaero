@@ -1,4 +1,5 @@
 #include "../include/thermo.h"
+#include "../include/composition.h"
 #include "../include/humidair.h"
 #include "../include/thermo_transport_data.h"
 #include "../include/transport.h"
@@ -12,6 +13,11 @@
 using combaero::thermo::AVOGADRO;
 using combaero::thermo::BOLTZMANN;
 using combaero::thermo::R_GAS;
+using combaero::mwmix;
+using combaero::mole_to_mass;
+using combaero::mass_to_mole;
+using combaero::normalize_fractions;
+using combaero::convert_to_dry_fractions;
 
 // Conversion factor from J/mol to J/kg
 double J_per_mol_to_J_per_kg(double value, double molar_mass) {
@@ -35,65 +41,6 @@ std::size_t species_index_from_name(const std::string &name) {
   return static_cast<std::size_t>(it->second);
 }
 
-// Calculate mixture molecular weight [g/mol]
-double mwmix(const std::vector<double> &X) {
-  if (X.size() != species_names.size()) {
-    throw std::invalid_argument(
-        "Mole fraction vector size does not match number of species");
-  }
-
-  double sum = 0.0;
-  for (std::size_t i = 0; i < X.size(); ++i) {
-    sum += X[i] * molar_masses[i];
-  }
-  return sum;
-}
-
-// Convert mole fractions X_k to mass fractions Y_k using molar_masses.
-std::vector<double> mole_to_mass(const std::vector<double> &X) {
-  if (X.size() != molar_masses.size()) {
-    throw std::invalid_argument("mole_to_mass: size mismatch");
-  }
-
-  double denom = 0.0;
-  for (std::size_t k = 0; k < X.size(); ++k) {
-    denom += X[k] * molar_masses[k];
-  }
-  if (denom <= 0.0) {
-    throw std::runtime_error("mole_to_mass: non-positive denominator");
-  }
-
-  std::vector<double> Y(X.size());
-  for (std::size_t k = 0; k < X.size(); ++k) {
-    Y[k] = X[k] * molar_masses[k] / denom;
-  }
-  return Y;
-}
-
-// Convert mass fractions Y_k to mole fractions X_k using molar_masses.
-std::vector<double> mass_to_mole(const std::vector<double> &Y) {
-  if (Y.size() != molar_masses.size()) {
-    throw std::invalid_argument("mass_to_mole: size mismatch");
-  }
-
-  double denom = 0.0;
-  for (std::size_t k = 0; k < Y.size(); ++k) {
-    double Wk = molar_masses[k];
-    if (Wk <= 0.0) {
-      throw std::runtime_error("mass_to_mole: non-positive molar mass");
-    }
-    denom += Y[k] / Wk;
-  }
-  if (denom <= 0.0) {
-    throw std::runtime_error("mass_to_mole: non-positive denominator");
-  }
-
-  std::vector<double> X(Y.size());
-  for (std::size_t k = 0; k < Y.size(); ++k) {
-    X[k] = (Y[k] / molar_masses[k]) / denom;
-  }
-  return X;
-}
 
 // Relative extrapolation tolerance beyond NASA-9 range boundaries.
 // 5% of the range span is allowed silently (polynomial is smooth at
@@ -801,54 +748,6 @@ double calc_T_from_sh_mass(double s_mass_target, double h_mass_target,
   return T;
 }
 
-// Normalize a vector of fractions to sum to 1.0
-std::vector<double> normalize_fractions(const std::vector<double> &fractions) {
-  double sum = std::accumulate(fractions.begin(), fractions.end(), 0.0);
-  std::vector<double> normalized = fractions;
-
-  if (std::abs(sum) < 1.0e-10) {
-    std::cerr << "Warning: normalize_fractions received all zeros. Returning "
-                 "all zeros."
-              << std::endl;
-    return normalized;
-  }
-
-  for (double &value : normalized) {
-    value /= sum;
-  }
-
-  return normalized;
-}
-
-// Convert mole fractions to dry fractions (remove water vapor and normalize)
-std::vector<double>
-convert_to_dry_fractions(const std::vector<double> &mole_fractions) {
-  std::size_t h2o_idx = species_index_from_name("H2O");
-  std::vector<double> dry_fractions = mole_fractions;
-
-  double sum = 0.0;
-  for (std::size_t i = 0; i < dry_fractions.size(); ++i) {
-    if (i != h2o_idx) {
-      sum += dry_fractions[i];
-    }
-  }
-
-  if (std::abs(sum) < 1.0e-10) {
-    std::cerr << "Warning: convert_to_dry_fractions received only water vapor. "
-                 "Returning all zeros."
-              << std::endl;
-    std::fill(dry_fractions.begin(), dry_fractions.end(), 0.0);
-    return dry_fractions;
-  }
-
-  dry_fractions[h2o_idx] = 0.0;
-
-  for (double &value : dry_fractions) {
-    value /= sum;
-  }
-
-  return dry_fractions;
-}
 
 // -------------------------------------------------------------
 // State-based overloads

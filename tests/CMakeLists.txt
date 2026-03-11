@@ -8,6 +8,7 @@ set(TEST_SOURCES
     test_incompressible.cpp    # Incompressible flow tests (zeta, Cd, pressure loss)
     test_orifice.cpp           # Orifice Cd correlation tests
     test_acoustic_adapter.cpp  # Geometry-to-acoustics adapter tests
+    test_state_sync.cpp        # State mole/mass synchronization tests
 )
 
 # Link against Google Test and our library

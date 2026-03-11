@@ -2,6 +2,7 @@
 #define THERMO_H
 
 #include "state.h"
+#include "composition.h"
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -31,14 +32,7 @@ std::size_t num_species();
 double species_molar_mass(std::size_t species_index);
 double species_molar_mass_from_name(const std::string& name);
 
-// Convert mole fractions X_k to mass fractions Y_k using molar_masses.
-std::vector<double> mole_to_mass(const std::vector<double>& X);
-
-// Convert mass fractions Y_k to mole fractions X_k using molar_masses.
-std::vector<double> mass_to_mole(const std::vector<double>& Y);
-
-// Mixture properties
-double mwmix(const std::vector<double>& X);
+// Mixture properties (using mwmix from composition.h)
 
 // NASA polynomial evaluations (dimensionless)
 // cp_R  : dimensionless heat capacity Cp/R
@@ -134,17 +128,7 @@ double calc_T_from_u_mass(double u_mass_target, const std::vector<double>& X, do
 double calc_T_from_sv_mass(double s_mass_target, double v_mass_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 double calc_T_from_sh_mass(double s_mass_target, double h_mass_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 
-// Normalize a vector of fractions to sum to 1.0
-// Returns all zeros with a warning if input contains all zeros
-std::vector<double> normalize_fractions(const std::vector<double>& fractions);
-
-// Convert mole fractions to dry fractions (remove water vapor and normalize)
-// Returns all zeros with a warning if input contains only water vapor
-std::vector<double> convert_to_dry_fractions(const std::vector<double>& mole_fractions);
-
-// -------------------------------------------------------------
-// State-based overloads
-// -------------------------------------------------------------
+// State-based overloads (using composition.h utilities)
 
 double mwmix(const State& s);
 double cp(const State& s);

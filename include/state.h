@@ -4,6 +4,7 @@
 #include <string>
 #include <tuple>
 #include <vector>
+#include "composition.h"
 
 // NOTE: Individual property getters (mu, k, Pr, ...) recompute on every call
 // and are intended for one-off queries.  In solver inner loops, use the bundle
@@ -24,6 +25,7 @@ struct State {
   double T = 298.15;     // Temperature [K]
   double P = 101325.0;   // Pressure [Pa]
   std::vector<double> X; // Mole fractions [-]
+  std::vector<double> Y; // Mass fractions [-]
 
   // Property getters (implemented in state.cpp)
   double mw() const;
@@ -54,7 +56,18 @@ struct State {
     return *this;
   }
   State &set_X(const std::vector<double> &X_new) {
-    X = X_new;
+    // Normalize mole fractions first
+    X = combaero::normalize_fractions(X_new);
+    // Calculate mass fractions from normalized mole fractions
+    Y = combaero::mole_to_mass(X);
+    return *this;
+  }
+
+  State &set_Y(const std::vector<double> &Y_new) {
+    // Normalize mass fractions first
+    Y = combaero::normalize_fractions(Y_new);
+    // Calculate mole fractions from normalized mass fractions
+    X = combaero::mass_to_mole(Y);
     return *this;
   }
 
@@ -96,6 +109,7 @@ struct Stream {
   double T() const { return state.T; }
   double P() const { return state.P; }
   const std::vector<double> &X() const { return state.X; }
+  const std::vector<double> &Y() const { return state.Y; }
 
   // Property getters (delegate to state)
   double mw() const { return state.mw(); }
@@ -114,7 +128,11 @@ struct Stream {
     return *this;
   }
   Stream &set_X(const std::vector<double> &X_new) {
-    state.X = X_new;
+    state.set_X(X_new);
+    return *this;
+  }
+  Stream &set_Y(const std::vector<double> &Y_new) {
+    state.set_Y(Y_new);
     return *this;
   }
   Stream &set_mdot(double mdot_new) {

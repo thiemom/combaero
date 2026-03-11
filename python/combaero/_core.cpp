@@ -988,7 +988,18 @@ PYBIND11_MODULE(_core, m) {
       // Mutable state variables (read/write properties)
       .def_readwrite("T", &State::T, "Temperature [K]")
       .def_readwrite("P", &State::P, "Pressure [Pa]")
-      .def_readwrite("X", &State::X, "Mole fractions [-]")
+      .def_property("X",
+                     [](const State &s) { return s.X; },
+                     [](State &s, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+                         s.set_X(to_vec(X_arr));
+                     },
+                     "Mole fractions [-]")
+      .def_property("Y",
+                     [](const State &s) { return s.Y; },
+                     [](State &s, py::array_t<double, py::array::c_style | py::array::forcecast> Y_arr) {
+                         s.set_Y(to_vec(Y_arr));
+                     },
+                     "Mass fractions [-]")
       // Computed thermodynamic properties (read-only)
       .def_property_readonly("mw", &State::mw, "Molecular weight [g/mol]")
       .def_property_readonly("cp", &State::cp,
@@ -1020,11 +1031,14 @@ PYBIND11_MODULE(_core, m) {
           "set_X",
           [](State &s,
              py::array_t<double, py::array::c_style | py::array::forcecast>
-                 X_arr) -> State & {
-            s.X = to_vec(X_arr);
-            return s;
-          },
+                 X_arr) -> State & { return s.set_X(to_vec(X_arr)); },
           py::arg("X"), "Set mole fractions [-], returns self")
+      .def(
+          "set_Y",
+          [](State &s,
+             py::array_t<double, py::array::c_style | py::array::forcecast>
+                 Y_arr) -> State & { return s.set_Y(to_vec(Y_arr)); },
+          py::arg("Y"), "Set mass fractions [-], returns self")
       .def(
           "set_TPX",
           [](State &s, double T, double P,

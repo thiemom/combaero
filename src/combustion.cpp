@@ -2,12 +2,19 @@
 #include "../include/equilibrium.h"
 #include "../include/humidair.h"
 #include "../include/thermo.h"
+#include "../include/composition.h"
 #include "../include/thermo_transport_data.h"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <numeric>
 #include <stdexcept>
+
+using combaero::mwmix;
+using combaero::mole_to_mass;
+using combaero::mass_to_mole;
+using combaero::normalize_fractions;
+using combaero::convert_to_dry_fractions;
 
 namespace {
 

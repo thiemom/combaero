@@ -1,9 +1,15 @@
 #include "../include/humidair.h"
+#include "../include/composition.h"
 #include "../include/thermo.h"
 #include "../include/thermo_transport_data.h"
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+
+using combaero::mwmix;
+using combaero::mole_to_mass;
+using combaero::mass_to_mole;
+using combaero::normalize_fractions;
 
 // Constants for dry air composition (mole fractions)
 const std::unordered_map<std::string, double> dry_air_composition = {

@@ -2,6 +2,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include "../include/composition.h"
+using combaero::mwmix;
+using combaero::mole_to_mass;
+using combaero::mass_to_mole;
+using combaero::normalize_fractions;
 #include <numeric>
 #include <stdexcept>
 

@@ -1,9 +1,15 @@
 #include "../include/equilibrium.h"
 #include "../include/combustion.h"
-#include "../include/thermo.h"
-#include "../include/thermo_transport_data.h"
+#include "thermo.h"
+#include "composition.h"
+#include "thermo_transport_data.h"
 #include <algorithm>
-#include <cmath>
+#include <vector>
+
+using combaero::mwmix;
+using combaero::mole_to_mass;
+using combaero::mass_to_mole;
+using combaero::normalize_fractions;
 
 // -------------------------------------------------------------
 // Internal utilities

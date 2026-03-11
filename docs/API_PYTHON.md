@@ -23,6 +23,11 @@ import combaero as cb
 
 state = cb.State()
 state.TPX = (300.0, 101325.0, "O2:0.21, N2:0.79")
+# OR setting mass fractions directly
+state.Y = y_vector
+
+print(f"Mole fractions: {state.X}")
+print(f"Mass fractions: {state.Y}")
 
 print(f"Density: {state.rho} kg/m³")
 print(f"Enthalpy: {state.h} J/mol")

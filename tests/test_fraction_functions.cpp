@@ -1,5 +1,9 @@
 #include "../include/thermo.h"
+#include "../include/composition.h"
 #include "../include/thermo_transport_data.h"
+
+using combaero::normalize_fractions;
+using combaero::convert_to_dry_fractions;
 #include <iostream>
 #include <iomanip>
 #include <vector>

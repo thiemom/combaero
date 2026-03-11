@@ -2,10 +2,16 @@
 // Uses the variable-cp thermo backend (thermo.h) throughout.
 
 #include "../include/stagnation.h"
+#include "../include/composition.h"
 #include "../include/thermo.h"
 #include "../include/transport.h"
 #include <cmath>
 #include <stdexcept>
+
+using combaero::mwmix;
+using combaero::mole_to_mass;
+using combaero::mass_to_mole;
+using combaero::normalize_fractions;
 
 // -------------------------------------------------------------
 // Kinetic energy / stagnation enthalpy

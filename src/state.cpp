@@ -6,6 +6,11 @@
 #include <limits>
 #include <stdexcept>
 
+using combaero::mwmix;
+using combaero::mole_to_mass;
+using combaero::mass_to_mole;
+using combaero::normalize_fractions;
+
 // -------------------------------------------------------------
 // State property getters
 // -------------------------------------------------------------
@@ -39,7 +44,10 @@ State &State::set_TPX(double T_new, double P_new,
                       const std::vector<double> &X_new) {
   T = T_new;
   P = P_new;
-  X = X_new;
+  // Normalize mole fractions first
+  X = normalize_fractions(X_new);
+  // Calculate mass fractions from normalized mole fractions
+  Y = mole_to_mass(X);
   return *this;
 }
 
@@ -47,7 +55,10 @@ State &State::set_TPY(double T_new, double P_new,
                       const std::vector<double> &Y_new) {
   T = T_new;
   P = P_new;
-  X = mass_to_mole(Y_new);
+  // Normalize mass fractions first
+  Y = normalize_fractions(Y_new);
+  // Calculate mole fractions from normalized mass fractions
+  X = mass_to_mole(Y);
   return *this;
 }
 
@@ -146,7 +157,7 @@ std::tuple<double, double, std::vector<double>> State::TPX() const {
 }
 
 std::tuple<double, double, std::vector<double>> State::TPY() const {
-  return std::make_tuple(T, P, mole_to_mass(X));
+  return std::make_tuple(T, P, Y);
 }
 
 std::tuple<double, double> State::TP() const { return std::make_tuple(T, P); }
@@ -278,11 +289,9 @@ Stream mix(const std::vector<Stream> &streams, double P_out) {
 
   double T_out = calc_T_from_h(h_out_molar, X_out, T_guess);
 
-  // Build output stream
+  // Build output stream using setters for consistency
   Stream out;
-  out.state.T = T_out;
-  out.state.P = P_out;
-  out.state.X = X_out;
+  out.state.set_TPX(T_out, P_out, X_out);
   out.mdot = mdot_total;
 
   return out;

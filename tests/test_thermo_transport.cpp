@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "../include/thermo.h"
+#include "../include/composition.h"
 #include "../include/thermo_transport_data.h"
 #include "../include/transport.h"
 #include "../include/combustion.h"
@@ -15,6 +16,11 @@
 #include "../include/incompressible.h"
 #include <cmath>
 #include <vector>
+
+using combaero::mwmix;
+using combaero::mole_to_mass;
+using combaero::mass_to_mole;
+using combaero::normalize_fractions;
 
 using namespace combaero;
 

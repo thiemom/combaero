@@ -24,6 +24,7 @@ include_directories(include)
 # Core library sources
 set(SOURCES
     src/thermo.cpp
+    src/composition.cpp
     src/transport.cpp
     src/combustion.cpp
     src/compressible.cpp

@@ -61,12 +61,9 @@ All functions use consistent units to avoid conversion errors.
 
 | Function                       | Input Units | Output Unit |
 |--------------------------------|-------------|-------------|
-| `species_molar_mass`           | -           | g/mol       |
-| `mwmix`                        | X: mol/mol  | g/mol       |
-| `mole_to_mass`                 | X: mol/mol  | kg/kg       |
-| `mass_to_mole`                 | Y: kg/kg    | mol/mol     |
 | `species_name`                 | index: -    | str         |
 | `species_index_from_name`      | name: str   | -           |
+| `species_molar_mass`           | index: -    | g/mol       |
 | `species_molar_mass_from_name` | name: str   | g/mol       |
 | `num_species`                  | -           | -           |
 
@@ -339,6 +336,9 @@ All functions use consistent units to avoid conversion errors.
 | `State::T`     | -           | K           |
 | `State::P`     | -           | Pa          |
 | `State::X`     | -           | mol/mol     |
+| `State::Y`     | -           | kg/kg       |
+| `State::set_X` | X: mol/mol  | -           |
+| `State::set_Y` | Y: kg/kg    | -           |
 | `State::mw`    | -           | g/mol       |
 | `State::cp`    | -           | J/(mol*K)   |
 | `State::cv`    | -           | J/(mol*K)   |
@@ -357,9 +357,16 @@ All functions use consistent units to avoid conversion errors.
 
 #### Stream Properties
 
-| Function       | Input Units | Output Unit |
-|----------------|-------------|-------------|
-| `Stream::mdot` | -           | kg/s        |
+| Function           | Input Units | Output Unit |
+|--------------------|-------------|-------------|
+| `Stream::mdot`     | -           | kg/s        |
+| `Stream::T`        | -           | K           |
+| `Stream::P`        | -           | Pa          |
+| `Stream::X`        | -           | mol/mol     |
+| `Stream::set_mdot` | mdot: kg/s  | -           |
+| `Stream::set_T`    | T: K        | -           |
+| `Stream::set_P`    | P: Pa       | -           |
+| `Stream::set_X`    | X: mol/mol  | -           |
 
 ---
 
@@ -381,6 +388,16 @@ All functions use consistent units to avoid conversion errors.
 | `recovery_factor`       | Pr: -                                        | - (r)       |
 | `T_adiabatic_wall`      | T_static: K, v: m/s, T: K, P: Pa, X: mol/mol | K           |
 | `T_adiabatic_wall_mach` | T_static: K, M: -, T: K, P: Pa, X: mol/mol   | K           |
+
+### composition.h - Composition Utilities
+
+| Function                   | Input Units | Output Unit |
+|----------------------------|-------------|-------------|
+| `mwmix`                    | X: mol/mol  | g/mol       |
+| `mole_to_mass`             | X: mol/mol  | kg/kg       |
+| `mass_to_mole`             | Y: kg/kg    | mol/mol     |
+| `normalize_fractions`      | X: mol/mol  | mol/mol     |
+| `convert_to_dry_fractions` | X: mol/mol  | mol/mol     |
 
 ### materials.h - Material Thermal Conductivity
 
@@ -523,20 +540,32 @@ All functions use consistent units to avoid conversion errors.
 
 ### state.h - Joint Getters / Setters (C++ & Python tuples)
 
-| Function         | Input Units | Output Unit             |
-|------------------|-------------|-------------------------|
-| `State::TPX`     | -           | tuple(K, Pa, mol/mol)   |
-| `State::TPY`     | -           | tuple(K, Pa, kg/kg)     |
-| `State::TP`      | -           | tuple(K, Pa)            |
-| `State::DP_mass` | -           | tuple(kg/m^3, Pa)       |
-| `State::HP_mass` | -           | tuple(J/kg, Pa)         |
-| `State::SP_mass` | -           | tuple(J/(kg*K), Pa)     |
-| `State::UV_mass` | -           | tuple(J/kg, m^3/kg)     |
-| `State::SV_mass` | -           | tuple(J/(kg*K), m^3/kg) |
-| `State::PV_mass` | -           | tuple(Pa, m^3/kg)       |
-| `State::UP_mass` | -           | tuple(J/kg, Pa)         |
-| `State::VH_mass` | -           | tuple(m^3/kg, J/kg)     |
-| `State::SH_mass` | -           | tuple(J/(kg*K), J/kg)   |
+| Function             | Input Units             | Output Unit             |
+|----------------------|-------------------------|-------------------------|
+| `State::TPX`         | -                       | tuple(K, Pa, mol/mol)   |
+| `State::TPY`         | -                       | tuple(K, Pa, kg/kg)     |
+| `State::TP`          | -                       | tuple(K, Pa)            |
+| `State::set_TP`      | T: K, P: Pa             | -                       |
+| `State::set_TPX`     | T: K, P: Pa, X: mol/mol | -                       |
+| `State::set_TPY`     | T: K, P: Pa, Y: kg/kg   | -                       |
+| `State::DP_mass`     | -                       | tuple(kg/m^3, Pa)       |
+| `State::set_DP_mass` | rho: kg/m^3, P: Pa      | -                       |
+| `State::HP_mass`     | -                       | tuple(J/kg, Pa)         |
+| `State::set_HP_mass` | h: J/kg, P: Pa          | -                       |
+| `State::SP_mass`     | -                       | tuple(J/(kg*K), Pa)     |
+| `State::set_SP_mass` | s: J/(kg*K), P: Pa      | -                       |
+| `State::UP_mass`     | -                       | tuple(J/kg, Pa)         |
+| `State::set_UP_mass` | u: J/kg, Pa             | -                       |
+| `State::UV_mass`     | -                       | tuple(J/kg, m^3/kg)     |
+| `State::set_UV_mass` | u: J/kg, v: m^3/kg      | -                       |
+| `State::SV_mass`     | -                       | tuple(J/(kg*K), m^3/kg) |
+| `State::set_SV_mass` | s: J/(kg*K), v: m^3/kg  | -                       |
+| `State::PV_mass`     | -                       | tuple(Pa, m^3/kg)       |
+| `State::set_PV_mass` | P: Pa, v: m^3/kg        | -                       |
+| `State::VH_mass`     | -                       | tuple(m^3/kg, J/kg)     |
+| `State::set_VH_mass` | v: m^3/kg, h: J/kg      | -                       |
+| `State::SH_mass`     | -                       | tuple(J/(kg*K), J/kg)   |
+| `State::set_SH_mass` | s: J/(kg*K), h: J/kg    | -                       |
 
 ### heat_transfer.h - ChannelResult fields
 
@@ -570,43 +599,6 @@ All functions use consistent units to avoid conversion errors.
 | `standard_dry_air_composition`                 | -                        | float                      |
 | `humid_air_enthalpy_nasa9`                     | -                        | J/kg dry air               |
 | `complete_combustion_to_CO2_H2O_with_fraction` | -                        | -                          |
-| `State::DP`                                    | -                        | kg/m³                      |
-| `State::HP`                                    | -                        | J/kg                       |
-| `State::PV`                                    | -                        | Pa                         |
-| `State::SH`                                    | -                        | J/(kg K)                   |
-| `State::SP`                                    | -                        | J/(kg K)                   |
-| `State::SV`                                    | -                        | J/(kg K)                   |
-| `State::UP`                                    | -                        | J/kg                       |
-| `State::UV`                                    | -                        | J/kg                       |
-| `State::VH`                                    | -                        | m³/kg                      |
-| `State::set_DP_mass`                           | -                        | Pa                         |
-| `State::set_HP_mass`                           | -                        | Pa                         |
-| `State::set_P`                                 | -                        | Pa                         |
-| `State::set_PV_mass`                           | -                        | Pa                         |
-| `State::set_SH_mass`                           | -                        | -                          |
-| `State::set_SP_mass`                           | -                        | Pa                         |
-| `State::set_SV_mass`                           | -                        | -                          |
-| `State::set_T`                                 | -                        | K                          |
-| `State::set_TP`                                | -                        | K                          |
-| `State::set_TPX`                               | -                        | -                          |
-| `State::set_TPY`                               | -                        | -                          |
-| `State::set_UP_mass`                           | -                        | Pa                         |
-| `State::set_UV_mass`                           | -                        | -                          |
-| `State::set_VH_mass`                           | -                        | J/kg                       |
-| `State::set_X`                                 | -                        | -                          |
-| `Stream::P`                                    | -                        | Pa                         |
-| `Stream::T`                                    | -                        | K                          |
-| `Stream::X`                                    | -                        | -                          |
-| `Stream::cp`                                   | -                        | J/(mol·K)                  |
-| `Stream::h`                                    | -                        | J/mol                      |
-| `Stream::mw`                                   | -                        | g/mol                      |
-| `Stream::rho`                                  | -                        | kg/m³                      |
-| `Stream::s`                                    | -                        | J/(mol·K)                  |
-| `Stream::set_P`                                | -                        | Pa                         |
-| `Stream::set_T`                                | -                        | K                          |
-| `Stream::set_X`                                | -                        | -                          |
-| `Stream::set_mdot`                             | -                        | kg/s                       |
-| `Stream::state`                                | -                        | -                          |
 | `HumidAir::rh`                                 | -                        | 0-1                        |
 | `HumidAir::state`                              | -                        | -                          |
 | `AirProperties::P`                             | -                        | Pa                         |
