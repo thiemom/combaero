@@ -30,29 +30,22 @@ namespace solver {
 
 std::tuple<double, double> orifice_mdot_and_jacobian(double dP, double rho,
                                                      double Cd, double area) {
-  // Basic orifice equation: mdot = Cd * A * sqrt(2 * rho * dP)
-  // We strictly assume dP >= 0. For reverse flow, the solver wrapper handles
-  // sign direction.
-  if (dP < 0.0) {
-    throw std::invalid_argument(
-        "solver_interface::orifice_mdot requires dP >= 0");
-  }
-
-  // To cleanly avoid a divide-by-zero singularity in the gradient at dP = 0,
-  // we return standard limits (mdot=0, d_mdot = infinity/large number) or bound
-  // it. In practice, solvers rarely probe exactly at 0 if dP bounds are set.
-  if (dP < 1e-12) {
-    return {0.0, 1e12}; // Infinitely steep gradient at origin
-  }
-
+  // Regularized orifice equation: mdot = Cd * A * sign(dP) * sqrt(2 * rho * abs(dP))
+  // We use a smooth sqrt to avoid the infinite gradient at dP = 0.
+  // Suggested regularization: sqrt(dP^2 + eps^2)
   double constant = Cd * area * std::sqrt(2.0 * rho);
-  double mdot = constant * std::sqrt(dP);
+  const double eps2 = 1.0; // Transition pressure squared (1 Pa^2)
+  double dP2 = dP * dP;
+  double dP_eff_sq = std::sqrt(dP2 + eps2); // This is (dP^2 + eps^2)^0.5
+  double mdot = constant * dP / std::sqrt(dP_eff_sq); // constant * dP / (dP^2 + eps^2)^0.25
 
-  // Analytical derivative via chain rule:
-  // d(mdot)/d(dP) = (Cd * A * sqrt(2*rho)) / (2 * sqrt(dP))
-  //               = (Cd * A * sqrt(rho/2)) / sqrt(dP)
-  // Alternatively: d(mdot)/d(dP) = mdot / (2 * dP)
-  double jacobian = mdot / (2.0 * dP);
+  // Derivative: d(mdot)/d(dP) = constant * (0.5 * dP^2 + eps^2) / (dP^2 + eps^2)^1.25
+  // Let U = (dP^2 + eps^2). mdot = constant * dP * U^-0.25
+  // dmdot/ddP = constant * (U^-0.25 + dP * (-0.25) * U^-1.25 * 2dP)
+  //           = constant * (U - 0.5 * dP^2) * U^-1.25
+  //           = constant * (0.5 * dP^2 + eps^2) / (dP^2 + eps^2)^1.25
+  double U = dP2 + eps2;
+  double jacobian = constant * (0.5 * dP2 + eps2) / std::pow(U, 1.25);
 
   return {mdot, jacobian};
 }
@@ -160,16 +153,13 @@ friction_and_jacobian_haaland(double Re, double e_D) {
   // 1/sqrt(f) = coeff_outer * log10( (e_D/coeff_roughness)^coeff_exponent +
   // coeff_reynolds/Re )
 
-  if (Re <= 0.0) {
-    // Graceful invalidation for unphysical states
-    return {{0.0, 0.0},
-            CorrelationValidity::INVALID,
-            "solver_interface::friction_haaland requires Re > 0"};
-  }
+  // Regularized Re to avoid singularity at Re=0
+  const double re_eps = 10.0;
+  double Re_eff = std::sqrt(Re * Re + re_eps * re_eps);
 
   // Isolate core logarithmic argument
   double a = std::pow(e_D / haaland::coeff_roughness, haaland::coeff_exponent);
-  double b = haaland::coeff_reynolds / Re;
+  double b = haaland::coeff_reynolds / Re_eff;
   double arg = a + b;
 
   // 1/sqrt(f)
@@ -193,7 +183,9 @@ friction_and_jacobian_haaland(double Re, double e_D) {
   // / Re^2)
 
   double dU_darg = haaland::coeff_outer / (M_LN10 * arg);
-  double darg_dRe = -haaland::coeff_reynolds / (Re * Re);
+  // d(arg)/dRe = d(arg)/dRe_eff * dRe_eff/dRe
+  // dRe_eff/dRe = Re / Re_eff
+  double darg_dRe = (-haaland::coeff_reynolds / (Re_eff * Re_eff)) * (Re / Re_eff);
 
   double dU_dRe = dU_darg * darg_dRe;
   double df_dU = -2.0 / (inv_sqrt_f * inv_sqrt_f * inv_sqrt_f);
@@ -205,11 +197,8 @@ friction_and_jacobian_haaland(double Re, double e_D) {
 
 CorrelationResult<std::tuple<double, double>>
 friction_and_jacobian_serghides(double Re, double e_D) {
-  if (Re <= 0.0) {
-    return {{0.0, 0.0},
-            CorrelationValidity::INVALID,
-            "solver_interface::friction_serghides requires Re > 0"};
-  }
+  const double re_eps = 10.0;
+  double Re_eff = std::sqrt(Re * Re + re_eps * re_eps);
 
   // Serghides Steffensen form: 1/sqrt(f) = A - (B-A)^2 / (C - 2B + A)
   // A = -2 log10(e_D/3.7 + 12/Re)
@@ -220,13 +209,13 @@ friction_and_jacobian_serghides(double Re, double e_D) {
   const double cBC = serghides::coeff_reynolds_BC;
   const double ln10 = M_LN10;
 
-  double argA = e_D / r + cA / Re;
+  double argA = e_D / r + cA / Re_eff;
   double A = -2.0 * std::log10(argA);
 
-  double argB = e_D / r + cBC * A / Re;
+  double argB = e_D / r + cBC * A / Re_eff;
   double B = -2.0 * std::log10(argB);
 
-  double argC = e_D / r + cBC * B / Re;
+  double argC = e_D / r + cBC * B / Re_eff;
   double C = -2.0 * std::log10(argC);
 
   double denom = C - 2.0 * B + A;
@@ -236,15 +225,16 @@ friction_and_jacobian_serghides(double Re, double e_D) {
 
   // Analytical derivative via chain rule through A, B, C, inv_sqrt_f, f.
   // dA/dRe = (2 / (ln10 * argA)) * (cA / Re^2)
-  double dA_dRe = (2.0 / (ln10 * argA)) * (cA / (Re * Re));
+  // dA/dRe = dA/dRe_eff * dRe_eff/dRe
+  double dRe_eff_dRe = Re / Re_eff;
+  double dA_dRe = (2.0 / (ln10 * argA)) * (cA / (Re_eff * Re_eff)) * dRe_eff_dRe;
 
-  // dB/dRe = (2 / (ln10 * argB)) * (cBC/Re) * (A/Re - dA_dRe)
-  //        = (2 / (ln10 * argB)) * cBC * (A/Re^2 - dA_dRe/Re) ... expand:
-  // d(argB)/dRe = cBC * (dA_dRe * Re - A) / Re^2 = cBC * (dA_dRe/Re - A/Re^2)
-  double dargB_dRe = cBC * (dA_dRe / Re - A / (Re * Re));
+  // dB/dRe = dB/d(argB) * d(argB)/dRe
+  // d(argB)/dRe = cBC * d(A/Re_eff)/dRe = cBC * (dA/dRe * Re_eff - A * dRe_eff/dRe) / Re_eff^2
+  double dargB_dRe = cBC * (dA_dRe * Re_eff - A * dRe_eff_dRe) / (Re_eff * Re_eff);
   double dB_dRe = (-2.0 / (ln10 * argB)) * dargB_dRe;
 
-  double dargC_dRe = cBC * (dB_dRe / Re - B / (Re * Re));
+  double dargC_dRe = cBC * (dB_dRe * Re_eff - B * dRe_eff_dRe) / (Re_eff * Re_eff);
   double dC_dRe = (-2.0 / (ln10 * argC)) * dargC_dRe;
 
   // d(inv_sqrt_f)/dRe from Steffensen formula
@@ -272,11 +262,8 @@ friction_and_jacobian_serghides(double Re, double e_D) {
 
 CorrelationResult<std::tuple<double, double>>
 friction_and_jacobian_colebrook(double Re, double e_D) {
-  if (Re <= 0.0) {
-    return {{0.0, 0.0},
-            CorrelationValidity::INVALID,
-            "solver_interface::friction_colebrook requires Re > 0"};
-  }
+  const double re_eps = 10.0;
+  double Re_eff = std::sqrt(Re * Re + re_eps * re_eps);
 
   // Colebrook converges internally; use Serghides as starting guess.
   // After convergence, the implicit derivative is:
@@ -292,13 +279,14 @@ friction_and_jacobian_colebrook(double Re, double e_D) {
 
   const double ln10 = M_LN10;
   double arg =
-      e_D / serghides::coeff_roughness + serghides::coeff_reynolds_BC * x / Re;
+      e_D / serghides::coeff_roughness + serghides::coeff_reynolds_BC * x / Re_eff;
 
-  double dF_dx = 1.0 + 2.0 * serghides::coeff_reynolds_BC / (ln10 * arg * Re);
-  double dF_dRe =
-      (-2.0 / (ln10 * arg)) * (serghides::coeff_reynolds_BC * x / (Re * Re));
-
-  double dx_dRe = -dF_dRe / dF_dx;
+  double dF_dx = 1.0 + 2.0 * serghides::coeff_reynolds_BC / (ln10 * arg * Re_eff);
+  // dx/dRe = -(dF/dRe) / (dF/dx)
+  // dF/dRe = dF/dRe_eff * dRe_eff/dRe
+  // dF/dRe_eff = 2/(ln10 * arg) * (-t_BC * x / Re_eff^2)
+  double dF_dRe_eff = (-2.0 / (ln10 * arg)) * (serghides::coeff_reynolds_BC * x / (Re_eff * Re_eff));
+  double dx_dRe = -(dF_dRe_eff * (Re / Re_eff)) / dF_dx;
   double jacobian = (-2.0 / (x * x * x)) * dx_dRe;
 
   return {{f_val, jacobian}, CorrelationValidity::VALID, ""};
@@ -704,7 +692,8 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams) {
     H_tot += streams[i].m_dot * h_stream[i];
   }
 
-  if (mdot_tot > 0.0) {
+  const double mdot_eps = 1e-12;
+  if (std::abs(mdot_tot) > mdot_eps) {
     for (std::size_t k = 0; k < n_species; ++k) {
       Y_mix[k] /= mdot_tot;
     }
@@ -729,7 +718,7 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams) {
     for (std::size_t i = 0; i < n_streams; ++i) {
       StreamJacobian &jac = dY_mix_d_stream[k][i];
       jac.d_Y.assign(n_species, 0.0);
-      if (mdot_tot > 0.0) {
+      if (std::abs(mdot_tot) > mdot_eps) {
         jac.d_mdot = (streams[i].Y[k] - Y_mix[k]) / mdot_tot;
         jac.d_T = 0.0;
         jac.d_Y[k] = streams[i].m_dot / mdot_tot;
@@ -755,7 +744,7 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams) {
     StreamJacobian &jac = dT_mix_d_stream[i];
     jac.d_Y.assign(n_species, 0.0);
 
-    if (mdot_tot > 0.0) {
+    if (std::abs(mdot_tot) > mdot_eps) {
       double dh_mix_d_mdot = (h_stream[i] - h_mix) / mdot_tot;
       double dh_mix_d_Ti = (streams[i].m_dot * cp_stream[i]) / mdot_tot;
 
@@ -977,6 +966,114 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
       }
     }
   }
+  return res;
+}
+
+
+OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
+                                             double P_static_up, double T_up,
+                                             const std::vector<double> &Y_up,
+                                             double P_static_down, double Cd,
+                                             double area) {
+  // Use regularized dP to avoid singularity at dP=0
+  double dP = P_total_up - P_static_down;
+  const std::vector<double> X_up = mass_to_mole(normalize_fractions(Y_up));
+  auto [rho, drho_dT, drho_dP] = density_and_jacobians(T_up, P_static_up, X_up);
+
+  auto [mdot_calc, dmdot_ddP] = orifice_mdot_and_jacobian(dP, rho, Cd, area);
+
+  OrificeResult res;
+  res.m_dot_calc = mdot_calc;
+  res.d_mdot_dP_total_up = dmdot_ddP;
+  res.d_mdot_dP_static_down = -dmdot_ddP;
+
+  // d(mdot)/d(rho) = mdot / (2 * rho)
+  double dmdot_drho = mdot_calc / (2.0 * std::max(rho, 1e-6));
+  res.d_mdot_dP_static_up = dmdot_drho * drho_dP;
+  res.d_mdot_dT_up = dmdot_drho * drho_dT;
+
+  // Numerical perturbation for Y derivatives
+  res.d_mdot_dY_up.resize(Y_up.size(), 0.0);
+  const double eps_Y = 1e-6;
+  for (std::size_t i = 0; i < Y_up.size(); ++i) {
+    std::vector<double> Y_plus = Y_up;
+    Y_plus[i] += eps_Y;
+    auto X_plus = mass_to_mole(normalize_fractions(Y_plus));
+    double rho_plus = ::density(T_up, P_static_up, X_plus);
+    // Reuse orifice_mdot_and_jacobian for mdot_plus to ensure identical regularization
+    auto [mdot_plus, dummy] = orifice_mdot_and_jacobian(dP, rho_plus, Cd, area);
+    res.d_mdot_dY_up[i] = (mdot_plus - mdot_calc) / eps_Y;
+  }
+
+  return res;
+}
+
+PipeResult pipe_residuals_and_jacobian(double m_dot, double P_total_up,
+                                       double P_static_up, double T_up,
+                                       const std::vector<double> &Y_up,
+                                       double P_static_down, double L, double D,
+                                       double roughness,
+                                       const std::string &friction_model) {
+  const std::vector<double> X_up = mass_to_mole(normalize_fractions(Y_up));
+  auto [rho, drho_dT, drho_dP] = density_and_jacobians(T_up, P_static_up, X_up);
+  auto [mu, dmu_dT, dmu_dP] = viscosity_and_jacobians(T_up, P_static_up, X_up);
+
+  double area = 0.25 * M_PI * D * D;
+  double v = m_dot / (rho * area);
+  double abs_v = std::abs(v);
+  double Re = rho * abs_v * D / mu;
+
+  // Re_eff regularization is handled inside friction_and_jacobian_* functions
+  auto [f, df_dRe] = friction_and_jacobian(friction_model, Re, roughness / D).result;
+
+  double dP_calc = f * (L / D) * (0.5 * rho * v * abs_v);
+
+  PipeResult res;
+  res.dP_calc = dP_calc;
+
+  // Analytical derivative d(dP)/d(mdot)
+  // dP = f * (L/D) * (0.5 * mdot^2 / (rho * A^2)) * sign(mdot)
+  // d(dP)/d(mdot) = (L/D) * (1/(rho * A^2)) * mdot * sign(mdot) * (f + 0.5 * mdot * df/dmdot)
+  // dRe/dmdot = D / (mu * A)
+  double dRe_dmdot = D / (mu * area);
+  res.d_dP_d_mdot = (L / D) * (1.0 / (rho * area * area)) * m_dot * (f + 0.5 * m_dot * df_dRe * dRe_dmdot);
+
+  // d(dP)/d(P_static_up) via rho and mu
+  const double eps_P = 1.0;
+  auto [rho_p, drho_dT_p, drho_dP_p] = density_and_jacobians(T_up, P_static_up + eps_P, X_up);
+  auto [mu_p, dmu_dT_p, dmu_dP_p] = viscosity_and_jacobians(T_up, P_static_up + eps_P, X_up);
+  double v_p = m_dot / (rho_p * area);
+  double Re_p = rho_p * std::abs(v_p) * D / mu_p;
+  auto [f_p, df_dRe_p] = friction_and_jacobian(friction_model, Re_p, roughness / D).result;
+  double dP_p = f_p * (L / D) * (0.5 * rho_p * v_p * std::abs(v_p));
+  res.d_dP_dP_static_up = (dP_p - dP_calc) / eps_P;
+
+  // d(dP)/d(T_up) via rho and mu
+  const double eps_T = 1e-3;
+  auto [rho_T, drho_dT_T, drho_dP_T] = density_and_jacobians(T_up + eps_T, P_static_up, X_up);
+  auto [mu_T, dmu_dT_T, dmu_dP_T] = viscosity_and_jacobians(T_up + eps_T, P_static_up, X_up);
+  double v_T = m_dot / (rho_T * area);
+  double Re_T = rho_T * std::abs(v_T) * D / mu_T;
+  auto [f_T, df_dRe_T] = friction_and_jacobian(friction_model, Re_T, roughness / D).result;
+  double dP_T = f_T * (L / D) * (0.5 * rho_T * v_T * std::abs(v_T));
+  res.d_dP_dT_up = (dP_T - dP_calc) / eps_T;
+
+  // d(dP)/dY_up
+  res.d_dP_dY_up.resize(Y_up.size(), 0.0);
+  const double eps_Y = 1e-6;
+  for (std::size_t i = 0; i < Y_up.size(); ++i) {
+    std::vector<double> Y_plus = Y_up;
+    Y_plus[i] += eps_Y;
+    auto X_plus = mass_to_mole(normalize_fractions(Y_plus));
+    double rho_plus = ::density(T_up, P_static_up, X_plus);
+    double mu_plus = ::viscosity(T_up, P_static_up, X_plus);
+    double v_plus = m_dot / (rho_plus * area);
+    double Re_plus = rho_plus * std::abs(v_plus) * D / mu_plus;
+    auto [f_plus, dummy] = friction_and_jacobian(friction_model, Re_plus, roughness / D).result;
+    double dP_plus = f_plus * (L / D) * (0.5 * rho_plus * v_plus * std::abs(v_plus));
+    res.d_dP_dY_up[i] = (dP_plus - dP_calc) / eps_Y;
+  }
+
   return res;
 }
 

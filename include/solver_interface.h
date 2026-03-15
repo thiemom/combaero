@@ -411,15 +411,6 @@ adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
 // 7. Stream-Based Network Solvers
 // -----------------------------------------------------------------------------
 
-// Comprehensive residuals and Jacobians for a mixing chamber (Plenum).
-ChamberResult plenum_residuals_and_jacobian(const MixtureState &state,
-                                            const std::vector<Stream> &up_streams);
-
-// Comprehensive residuals and Jacobians for a combustion chamber.
-ChamberResult combustor_residuals_and_jacobian(const MixtureState &state,
-                                               const std::vector<Stream> &up_streams,
-                                               CombustionMethod method,
-                                               double pressure_loss_frac);
 
 // Mix generalized non-reacting incoming streams into a single outgoing state,
 // and compute all analytical Jacobians w.r.t upstream mass flows, Temperatures,

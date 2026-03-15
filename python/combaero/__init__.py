@@ -116,7 +116,6 @@ try:
         channel_smooth,
         ChannelResult,
         closest_mode,
-        combustor_residuals_and_jacobian,
         combustion_equilibrium,
         combustion_state,
         combustion_state_from_streams,
@@ -273,7 +272,6 @@ try:
         peclet,
         pin_fin_friction,
         pin_fin_nusselt,
-        plenum_residuals_and_jacobian,
         pipe_area,
         pipe_dP,
         pipe_dP_mdot,
@@ -431,7 +429,6 @@ except ModuleNotFoundError:
     viscosity = _core.viscosity
     thermal_conductivity = _core.thermal_conductivity
     pin_fin_nusselt = _core.pin_fin_nusselt
-    plenum_residuals_and_jacobian = _core.plenum_residuals_and_jacobian
     prandtl = _core.prandtl
     thermal_diffusivity = _core.thermal_diffusivity
     reynolds = _core.reynolds
@@ -504,7 +501,6 @@ except ModuleNotFoundError:
     set_oxidizer_stream_for_CO2_dry = _core.set_oxidizer_stream_for_CO2_dry
     CombustionMethod = _core.CombustionMethod
     CombustionState = _core.CombustionState
-    combustor_residuals_and_jacobian = _core.combustor_residuals_and_jacobian
     complete_combustion = _core.complete_combustion
     complete_combustion_isothermal = _core.complete_combustion_isothermal
     wgs_equilibrium = _core.wgs_equilibrium

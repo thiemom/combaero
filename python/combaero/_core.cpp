@@ -176,11 +176,6 @@ PYBIND11_MODULE(_core, m) {
         &solver::adiabatic_T_equilibrium_and_jacobians_from_streams,
         py::arg("streams"), py::arg("P"));
 
-  m.def("plenum_residuals_and_jacobian", &solver::plenum_residuals_and_jacobian,
-        py::arg("state"), py::arg("up_streams"));
-  m.def("combustor_residuals_and_jacobian",
-        &solver::combustor_residuals_and_jacobian, py::arg("state"),
-        py::arg("up_streams"), py::arg("method"), py::arg("pressure_loss_frac"));
 
   py::class_<solver::OrificeResult>(
       m, "OrificeResult", "Result of orifice residual and Jacobian evaluation")
