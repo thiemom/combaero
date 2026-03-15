@@ -111,9 +111,8 @@ class PlenumNode(NetworkNode):
     For Phase 2+: automatically handles mixing when multiple upstream connections exist.
     """
 
-    def __init__(self, id: str, enable_mixing: bool = False):
+    def __init__(self, id: str):
         super().__init__(id)
-        self.enable_mixing = enable_mixing
         self.upstream_elements = []
 
     def unknowns(self) -> list[str]:
@@ -129,9 +128,7 @@ class PlenumNode(NetworkNode):
         if not upstream_states:
             return 300.0, list(cb.mole_to_mass(cb.standard_dry_air_composition())), None
 
-        streams = [
-            cb.MassStream(abs(s.m_dot) + 1e-10, s.T_total, s.P_total, s.Y) for s in upstream_states
-        ]
+        streams = [cb.MassStream(s.m_dot, s.T_total, s.P_total, s.Y) for s in upstream_states]
         mix_res = cb.mixer_from_streams_and_jacobians(streams)
         return mix_res.T_mix, mix_res.Y_mix, mix_res
 
@@ -143,8 +140,7 @@ class PlenumNode(NetworkNode):
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         # Store upstream elements for mixing calculations
-        if self.enable_mixing:
-            self.upstream_elements = graph.get_upstream_elements(self.id)
+        self.upstream_elements = graph.get_upstream_elements(self.id)
 
 
 class MomentumChamberNode(NetworkNode):
@@ -160,13 +156,11 @@ class MomentumChamberNode(NetworkNode):
         id: str,
         area: float = 0.1,
         port_angles_deg: dict[str, float] | None = None,
-        enable_mixing: bool = False,
     ):
         super().__init__(id)
         self.area = area  # Cross-sectional area for momentum calculations
         # Dictionary mapping connected element IDs to angle relative to chamber axis [deg]
         self.port_angles_deg: dict[str, float] = port_angles_deg or {}
-        self.enable_mixing = enable_mixing
         self.upstream_elements = []
 
     def set_port_angle(self, element_id: str, angle_deg: float) -> None:
@@ -190,23 +184,11 @@ class MomentumChamberNode(NetworkNode):
         if not upstream_states:
             return 300.0, list(cb.mole_to_mass(cb.standard_dry_air_composition())), None
 
-        streams = [
-            cb.MassStream(abs(s.m_dot) + 1e-10, s.T_total, s.P_total, s.Y) for s in upstream_states
-        ]
+        streams = [cb.MassStream(s.m_dot, s.T_total, s.P_total, s.Y) for s in upstream_states]
         mix_res = cb.mixer_from_streams_and_jacobians(streams)
         return mix_res.T_mix, mix_res.Y_mix, mix_res
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
-        """
-        TODO: This is a placeholder implementation.
-
-        For Phase 2+, this should implement proper energy and species conservation
-        using cb.solver.enthalpy_and_jacobian() and other solver_interface.h functions.
-
-        The network solver currently handles mixing residuals separately in
-        _residuals_and_jacobian() method, but this should eventually be
-        moved here for proper encapsulation.
-        """
         # Base residual: P_total = P for plenum
         res = [state.P_total - state.P]
         jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.P_total": 1.0}}
@@ -315,11 +297,9 @@ class CombustorNode(NetworkNode):
         self,
         id: str,
         method: CombustionMethodLiteral = "complete",
-        pressure_loss_frac: float = 0.04,
     ):
         super().__init__(id)
         self.method = method
-        self.pressure_loss_frac = pressure_loss_frac
         self.upstream_elements = []
         self.fuel_boundary = None
 
@@ -341,9 +321,7 @@ class CombustorNode(NetworkNode):
             # Default fallback
             return 300.0, list(cb.mole_to_mass(cb.standard_dry_air_composition())), None
 
-        streams = [
-            cb.MassStream(abs(s.m_dot) + 1e-10, s.T_total, s.P_total, s.Y) for s in upstream_states
-        ]
+        streams = [cb.MassStream(s.m_dot, s.T_total, s.P_total, s.Y) for s in upstream_states]
         P_ref = upstream_states[0].P if upstream_states else 101325.0
 
         if self.method == "equilibrium":
@@ -691,10 +669,6 @@ class PipeElement(NetworkElement):
         import combaero as cb
 
         m_dot = state_in.m_dot
-        dP_fwd = state_in.P_total - state_out.P
-
-        if dP_fwd > 0 or (dP_fwd == 0 and m_dot > 0):
-            import combaero as cb
 
         res_cpp = cb.pipe_residuals_and_jacobian(
             m_dot,

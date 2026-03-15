@@ -1,13 +1,13 @@
-import numpy as np
 import combaero as cb
 from combaero.network import FlowNetwork, NetworkSolver
 from combaero.network.components import (
     CombustorNode,
+    EffectiveAreaConnectionElement,
     MassFlowBoundary,
     OrificeElement,
     PressureBoundary,
-    EffectiveAreaConnectionElement
 )
+
 
 def debug():
     net = FlowNetwork()
@@ -62,6 +62,7 @@ def debug():
     for i, r in enumerate(res):
         if abs(r) > 1e-6:
             print(f"  [{i}] residual too high: {r}")
+
 
 if __name__ == "__main__":
     debug()

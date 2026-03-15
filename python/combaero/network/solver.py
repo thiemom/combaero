@@ -26,38 +26,9 @@ class NetworkSolver:
     """
     Orchestrates the numerical solution of a fluid flow network using scipy.optimize.root.
     Translates the graph topology into a flat array of unknowns and residuals.
-
-    CRITICAL TODOs for Phase 2 Completion (Combustion & Mixing):
-    ================================================================
-
-    1. IMPLEMENT PROPER COMBUSTION RESIDUALS in CombustorNode:
-       - Replace placeholder with cb.solver.enthalpy_and_jacobian() calls
-       - Add species composition residuals using atom balancing
-       - Implement pressure drop residuals with analytical Jacobians
-       - Handle combustion efficiency properly
-
-    2. FIX STOICHIOMETRY IMPLEMENTATION:
-       - stoichiometric_products() needs access to molecular_structures
-       - Must properly handle rich/lean mixtures (φ ≠ 1)
-       - Implement water-gas shift for rich combustion
-
-    4. COMPLETE CHAMBER NODES:
-       - PlenumNode: Move mixing residuals from solver to node
-       - MomentumChamberNode: Add momentum conservation
-       - Both: Use cb.solver.* functions for analytical Jacobians
-
-    5. ADD COMPREHENSIVE TESTS:
-       - Jacobian accuracy tests (finite difference vs analytical)
-       - Cantera validation for combustion cases
-       - Energy conservation verification
-       - Species tracking tests
-
-    6. RESOLVE TECHNICAL DEBT:
-       - mix_streams() temperature calculation issues
-       - Circular import issues in combustion module
-       - Proper error handling for edge cases
-
-    See COMBUSTION_ELEMENTS.md and SOLVER.md for detailed requirements.
+    Nodes define their Pressure (P) and Total Pressure (P_total) as unknowns,
+    while Temperature (T) and Composition (Y) are forward-propagated using
+    topological ordering and automatic differentiation (chain-rule relay).
     """
 
     SUPPORTED_METHODS = [
@@ -198,39 +169,50 @@ class NetworkSolver:
             T, Y, mix_res = node.compute_derived_state(up_states)
             self._derived_states[nid] = (T, Y, mix_res)
 
-            if mix_res is None:
-                continue
-
             # Sensitivity Relay (Chain-Rule)
-            for i, elem in enumerate(up_elems):
-                from_nid = elem.from_node
-                t_jac = mix_res.dT_mix_d_stream[i]
-                y_jac_list = mix_res.dY_mix_d_stream[i]
-                # Direct dependency on upstream mass flow (if it's an unknown)
-                m_indices = self._unknown_indices.get(elem.id)
-                if m_indices:
-                    idx = m_indices[0]
-                    node_relay = relay[nid].setdefault(
-                        idx, {"T": 0.0, "Y": np.zeros(cb.num_species())}
-                    )
-                    node_relay["T"] += t_jac.d_mdot
-                    for k in range(len(y_jac_list)):
-                        node_relay["Y"][k] += y_jac_list[k].d_mdot
+            if mix_res:
+                for i, elem in enumerate(up_elems):
+                    from_nid = elem.from_node
+                    t_jac = mix_res.dT_mix_d_stream[i]
+                    y_jac_list = mix_res.dY_mix_d_stream[i]
 
-                # Recursive dependency on upstream P/T/Y via from_node relay
-                if from_nid in relay:
-                    for idx, sens_up in relay[from_nid].items():
+                    # 1. Direct dependency on upstream mass flow (if it's a solver unknown)
+                    m_indices = self._unknown_indices.get(elem.id)
+                    if m_indices:
+                        idx = m_indices[0]
                         node_relay = relay[nid].setdefault(
-                            idx, {"T": 0.0, "Y": np.zeros(cb.num_species())}
+                            idx, {"T": 0.0, "Y": np.zeros(cb.num_species()), "P_total": 0.0}
                         )
-                        # dT/dx = sum_i( (dT/dT_in_i * dT_in_i/dx) + (dT/dY_in_i * dY_in_i/dx) )
-                        node_relay["T"] += t_jac.d_T * sens_up["T"]
-                        node_relay["T"] += np.dot(t_jac.d_Y, sens_up["Y"])
-
-                        # dY_k/dx = sum_i( (dY_k/dT_in_i * dT_in_i/dx) + sum_j(dY_k/dY_in_j * dY_in_j/dx) )
+                        node_relay["T"] += t_jac.d_mdot
                         for k in range(len(y_jac_list)):
-                            node_relay["Y"][k] += y_jac_list[k].d_T * sens_up["T"]
-                            node_relay["Y"][k] += np.dot(y_jac_list[k].d_Y, sens_up["Y"])
+                            node_relay["Y"][k] += y_jac_list[k].d_mdot
+
+                    # 2. Recursive dependency on upstream P/T/Y via from_node relay
+                    if from_nid in relay:
+                        for idx, sens_up in relay[from_nid].items():
+                            node_relay = relay[nid].setdefault(
+                                idx, {"T": 0.0, "Y": np.zeros(cb.num_species()), "P_total": 0.0}
+                            )
+                            # dT/dx = sum_i( dT/dT_in_i * dT_in_i/dx + dT/dP_in_i * dP_in_i/dx + dT/dY_in_i * dY_in_i/dx )
+                            node_relay["T"] += t_jac.d_T * sens_up["T"]
+                            node_relay["T"] += t_jac.d_P_total * sens_up["P_total"]
+                            node_relay["T"] += np.dot(t_jac.d_Y, sens_up["Y"])
+
+                            # dY_k/dx = sum_i( dY_k/dT_in_i * dT_in_i/dx + dY_k/dP_in_i * dP_in_i/dx + sum_j(dY_k/dY_in_j * dY_in_j/dx) )
+                            for k in range(len(y_jac_list)):
+                                node_relay["Y"][k] += y_jac_list[k].d_T * sens_up["T"]
+                                node_relay["Y"][k] += y_jac_list[k].d_P_total * sens_up["P_total"]
+                                node_relay["Y"][k] += np.dot(y_jac_list[k].d_Y, sens_up["Y"])
+
+            # 3. Add own unknowns (P_total) to the relay
+            node_unks = self._unknown_indices.get(nid, [])
+            for unk_idx in node_unks:
+                unk_name = self.unknown_names[unk_idx]
+                if unk_name.endswith(".P_total"):
+                    node_relay = relay[nid].setdefault(
+                        unk_idx, {"T": 0.0, "Y": np.zeros(cb.num_species()), "P_total": 0.0}
+                    )
+                    node_relay["P_total"] = 1.0
 
         return relay
 
@@ -449,28 +431,6 @@ class NetworkSolver:
                                         data.append(deriv * sens_pkg["Y"][s_idx])
 
         jac_sparse = sp.coo_matrix((data, (rows, cols)), shape=(len(res), len(x))).tocsr()
-
-        # DEBUG ATTACH NAMES
-        if not hasattr(self, "_debug_eqn_names") or len(self._debug_eqn_names) != len(res):
-            names = []
-            for node in self.network.nodes.values():
-                names.append(f"{node.id} mass_con")
-            for node in self.network.nodes.values():
-                if isinstance(node, cb.network.components.CombustorNode):
-                    names.append(f"{node.id} t")
-                    for i in range(14):
-                        names.append(f"{node.id} X[{i}]")
-                    names.append(f"{node.id} p_tot")
-                    names.append(f"{node.id} p_stat")
-                else:
-                    s = self._get_node_state(node, x)
-                    node_res, _ = node.residuals(s)
-                    for k in range(len(node_res)):
-                        names.append(f"{node.id} intrinsic[{k}]")
-            for elem_id, element in self.network.elements.items():
-                for k in range(element.n_equations()):
-                    names.append(f"{elem_id} eq[{k}]")
-            self._debug_eqn_names = names
 
         return np.array(res, dtype=float), jac_sparse
 

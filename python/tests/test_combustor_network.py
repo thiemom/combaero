@@ -33,8 +33,8 @@ def test_combustor_network_conservation():
 
     p_out = PressureBoundary("out", P_total=101325.0, T_total=300.0)
 
-    # 5% pressure loss, complete combustion
-    combustor = CombustorNode("combustor", method="complete", pressure_loss_frac=0.05)
+    # complete combustion
+    combustor = CombustorNode("combustor", method="complete")
 
     # Provide an initial guess to avoid dP=0 singularity across the nozzle at x0
     combustor.initial_guess = {

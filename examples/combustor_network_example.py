@@ -1,6 +1,13 @@
 import combaero as cb
 from combaero.network import FlowNetwork, NetworkSolver
-from combaero.network.components import CombustorNode, MassFlowBoundary, PressureBoundary, LosslessConnectionElement, OrificeElement
+from combaero.network.components import (
+    CombustorNode,
+    LosslessConnectionElement,
+    MassFlowBoundary,
+    OrificeElement,
+    PressureBoundary,
+)
+
 
 def main():
     print("==============================================")
@@ -44,7 +51,7 @@ def main():
     combustor.initial_guess = {
         "combustor.P_total": 150000.0,
         "combustor.P": 140000.0,
-        "combustor.T": 1500.0
+        "combustor.T": 1500.0,
     }
 
     # --- Elements ---
@@ -80,7 +87,7 @@ def main():
 
     # Print results
     print("\n--- Combustor Results ---")
-    print(f"P_total: {sol['combustor.P_total']/1000.0:.1f} kPa")
+    print(f"P_total: {sol['combustor.P_total'] / 1000.0:.1f} kPa")
     print(f"T_out:   {sol['combustor.T']:.2f} K")
 
     print("\n--- Network Mass Balance ---")
@@ -94,14 +101,15 @@ def main():
 
     Y_out = [sol[f"combustor.Y[{i}]"] for i in range(cb.num_species())]
     X_out = cb.mass_to_mole(Y_out)
-    h_out, _ = cb._core.enthalpy_and_jacobian(sol['combustor.T'], X_out)
-    H_out = sol['nozzle.m_dot'] * h_out
+    h_out, _ = cb._core.enthalpy_and_jacobian(sol["combustor.T"], X_out)
+    H_out = sol["nozzle.m_dot"] * h_out
 
-    print(f"Energy Flux In:  {H_in/1e6:.4f} MW")
-    print(f"Energy Flux Out: {H_out/1e6:.4f} MW")
+    print(f"Energy Flux In:  {H_in / 1e6:.4f} MW")
+    print(f"Energy Flux Out: {H_out / 1e6:.4f} MW")
 
     print(f"\nDischarge CO2 Mol Frac: {X_out[cb.species_index_from_name('CO2')]:.4f}")
     print(f"Discharge H2O Mol Frac: {X_out[cb.species_index_from_name('H2O')]:.4f}")
+
 
 if __name__ == "__main__":
     main()

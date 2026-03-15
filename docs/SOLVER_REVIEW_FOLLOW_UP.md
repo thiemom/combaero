@@ -1,6 +1,6 @@
 # Network Solver Review — Follow-Up
 
-**Date:** 2026-03-15
+**Date:** 2026-03-15 (initial), **updated** 2026-03-15
 **Scope:** Re-review of implementation against `SOLVER_REVIEW.md` plan
 **Baseline:** 258/258 C++ tests, 916/916 Python tests passing
 
@@ -8,14 +8,17 @@
 
 ## Executive Summary
 
-The derived-state node architecture (Phases 2–3 of SOLVER_REVIEW.md) has been
-successfully implemented. All nodes return only `[P, P_total]` as solver unknowns,
-with `T` and `Y` derived via forward propagation with chain-rule relay. The
-combustor network test that was previously deselected now passes.
+The derived-state node architecture (Phases 2–3 of SOLVER_REVIEW.md) and the C++
+smoothness audit have been successfully implemented. All nodes return only
+`[P, P_total]` as solver unknowns, with `T` and `Y` derived via forward
+propagation with chain-rule relay. The C++ orifice now uses a regularized sqrt
+`dP / (dP² + ε²)^0.25` and all friction models use regularized Reynolds number
+`Re_eff = √(Re² + ε²)`. Unused C++ functions (`combustor_residuals_and_jacobian`,
+`plenum_residuals_and_jacobian`) have been removed.
 
-Key gaps remain: C++ smoothness fixes were not applied, the `Q` heat exchange
-parameter was not added, combustor pressure loss is dead code, and most of the
-prescribed test plan was not implemented.
+Remaining gaps are Python-side: dead code/stale docstrings in `solver.py` and
+`components.py`, the `abs(m_dot) + 1e-10` workaround, dead `pressure_loss_frac`,
+and the missing test plan.
 
 ---
 
@@ -40,22 +43,71 @@ prescribed test plan was not implemented.
 | **Phase 3:** Derived states exported in solution dict | `solver.py:591-597` |
 | **Orifice Python:** `if/else` branching removed | `components.py:402-438` |
 | **Pipe Python:** `if/else` branching removed | `components.py:689-735` |
+| **C++ Smoothness:** Regularized `√(dP)` for orifice | `solver_interface.cpp:31-51` |
+| **C++ Smoothness:** Regularized Re in all friction models | `solver_interface.cpp:157-158` (haaland), `:200-201` (serghides), `:265-266` (colebrook) |
+| **C++ Smoothness:** Orifice accepts signed dP (no throw) | `solver_interface.cpp:31-51` |
+| **C++ Cleanup:** `combustor_residuals_and_jacobian` removed | `solver_interface.cpp`, `solver_interface.h` |
+| **C++ Cleanup:** `plenum_residuals_and_jacobian` removed | `solver_interface.cpp`, `solver_interface.h` |
 
 ### Not Implemented ❌
 
 | Item | SOLVER_REVIEW Section | Impact |
 |------|----------------------|--------|
-| C++ regularized `√(dP)` for orifice | Smoothness Audit | Orifice Jacobian wrong for dP < 0 |
-| C++ bidirectional orifice interface | Smoothness Audit | Single-sided thermo only |
-| C++ `√(Re²+1)` for pipe Re floor | Smoothness Audit | Kink at Re = 1 |
-| Phase 1 C++ pressure-only residual functions | Implementation Plan §1 | Stagnation handled in Python instead |
+| C++ bidirectional orifice interface (both T/Y) | Smoothness Audit | Single-sided thermo only |
 | Node-level `Q` parameter | Design §Universal Node Model | No heat exchange capability |
-| Phase 4 cleanup (dead code removal) | Implementation Plan §4 | Stale code remains |
+| Python-side dead code cleanup | Implementation Plan §4 | Stale code remains |
 | 17 of 19 prescribed tests | Test Plan | See test gap table below |
 
 ---
 
-## New Issues Found
+## C++ Smoothness Audit — Verified
+
+### Orifice: Regularized `dP / (dP² + ε²)^0.25`
+
+The old code threw on `dP < 0` and had a `{0.0, 1e12}` discontinuity at `dP = 0`.
+The new code (`solver_interface.cpp:31-51`) implements:
+
+```
+f_reg(dP) = C · dP / (dP² + ε²)^0.25
+```
+
+with `ε² = 1.0` (1 Pa²). This is:
+- **C∞ smooth** everywhere, including at `dP = 0`
+- **Sign-preserving**: `f_reg(dP)` has the same sign as `dP`
+- **Asymptotically correct**: for `|dP| >> 1`, converges to `C · sign(dP) · √|dP|`
+
+The analytical derivative is also correctly implemented:
+```
+df_reg/d(dP) = C · (0.5·dP² + ε²) / (dP² + ε²)^1.25
+```
+
+The `orifice_residuals_and_jacobian` function (`solver_interface.cpp:973-1009`)
+now passes signed `dP` directly to `orifice_mdot_and_jacobian` — no `abs()`,
+no `sign()` multiply, no derivative sign flip. This eliminates the Jacobian
+inconsistency documented in SOLVER_REVIEW.md §Smoothness Layer 2.
+
+**Remaining issue:** The function still only accepts upstream thermo state
+(`T_up, Y_up`). A fully bidirectional interface would accept both sides and
+blend density. This is a minor accuracy issue (not a smoothness issue) since
+the regularized sqrt already handles the sign correctly.
+
+### Friction: Regularized Reynolds Number
+
+All explicit friction models (haaland, serghides, colebrook) now use:
+```
+Re_eff = √(Re² + ε_Re²)    with ε_Re = 10
+```
+
+This replaces the old `max(Re, 1.0)` hard floor. The derivative
+`dRe_eff/dRe = Re / Re_eff` is correctly propagated through the chain rule
+in all three models. The `1/Re` singularity at zero flow is eliminated smoothly.
+
+**Verified:** C++ Jacobian FD tests (`test_solver_jacobians.cpp`) pass for both
+orifice and pipe, confirming analytical derivatives match finite differences.
+
+---
+
+## Remaining Issues (Python-Side)
 
 ### 1. `abs(s.m_dot) + 1e-10` workaround (P0)
 
@@ -83,7 +135,7 @@ Defined at `components.py:322` but **never used**. The combustor residual is jus
 `P_total - P = 0` (same as plenum) — there is no pressure loss equation.
 
 Users setting `pressure_loss_frac=0.05` get zero effect. The old C++
-`combustor_residuals_and_jacobian` had pressure loss, but it's no longer called.
+`combustor_residuals_and_jacobian` had pressure loss, but it's been removed.
 
 **Fix:** Either:
 - (A) Add a pressure loss residual: `P_total_out = P_total_in_avg * (1 - loss_frac)`,
@@ -178,12 +230,6 @@ through `d_T` and `d_Y`, but **never propagates `d_P_total`** from the
 on P_total), but equilibrium combustion where `T_ad` depends on pressure has
 a missing chain-rule term.
 
-### 9. Unused C++ functions still compiled (P3)
-
-`combustor_residuals_and_jacobian` and `plenum_residuals_and_jacobian` in
-`solver_interface.cpp` are no longer called from Python. They consume compile
-time and maintenance attention.
-
 ---
 
 ## Test Gap Analysis
@@ -210,7 +256,7 @@ time and maintenance attention.
 | `test_equilibrium_combustor_convergence` | ❌ | method="equilibrium" network |
 | `test_heat_exchange_node` | ❌ | Q ≠ 0 test (blocked on Q) |
 | `test_combustor_network_convergence` | ✅ | `test_combustor_network_conservation` |
-| Smoothness tests (5 prescribed) | ❌ | Blocked on C++ regularization |
+| Smoothness tests (5 prescribed) | ⚠️ | C++ regularization done; Python-level smoothness tests not yet written |
 
 ### Existing Tests That Cover the Refactor
 
@@ -218,26 +264,28 @@ time and maintenance attention.
 |------|----------------|
 | `test_combustor_network_conservation` | Combustor derived state + chain-rule works end-to-end |
 | `test_jacobian_accuracy` | Analytical Jacobian matches FD for pressure-only network |
-| `test_flow_reversal_simple_orifice` | Negative m_dot converges |
+| `test_flow_reversal_simple_orifice` | Negative m_dot converges (now via smooth C++ orifice) |
 | `test_flow_reversal_momentum_chamber` | MomentumChamber with reversal converges |
 | `test_step_1..4_*` scenarios | Various topologies with derived state |
+| C++ `SolverJacobianTest.OrificeDerivatives` | Regularized orifice Jacobian matches FD |
+| C++ `SolverJacobianTest.PipeDerivatives` | Pipe Jacobian with regularized friction matches FD |
 
 ### Recommended Test Priority
 
 **High — should exist before further refactoring:**
 1. `test_chain_rule_orifice_through_combustor` — proves the relay is correct
-2. `test_plenum_temperature_passthrough` — proves Problem 2 is fixed
+2. `test_plenum_temperature_passthrough` — proves derived-state passthrough works
 3. `test_all_nodes_only_P_Ptotal_unknowns` — structural assertion
 4. `test_single_stream_passthrough` — proves identity chain rule
+5. `test_orifice_smoothness_at_zero_dP` — proves regularization works end-to-end
 
 **Medium — after cleanup:**
-5. `test_mixing_plenum_convergence`
-6. `test_equilibrium_combustor_convergence`
-7. `test_derived_state_jacobian_fd`
+6. `test_mixing_plenum_convergence`
+7. `test_equilibrium_combustor_convergence`
+8. `test_derived_state_jacobian_fd`
 
 **Blocked on features:**
-8–12. Q tests (blocked on Q implementation)
-13–17. Smoothness tests (blocked on C++ regularization)
+9–11. Q tests (blocked on Q implementation)
 
 ---
 
@@ -259,25 +307,24 @@ time and maintenance attention.
 | 5 | Remove vestigial `enable_mixing` flag | S | `components.py` |
 | 6 | Update `NetworkSolver` docstring (remove Phase 2 TODOs) | S | `solver.py:30-60` |
 | 7 | Update `MomentumChamberNode.residuals()` TODO | S | `components.py:199-208` |
-| 8 | Add high-priority tests (chain-rule, passthrough, system size) | M | `python/tests/` |
+| 8 | Add high-priority tests (chain-rule, passthrough, system size, smoothness) | M | `python/tests/` |
 
 ### P2 — Architecture Improvements
 
 | # | Item | Effort | Files |
 |---|------|--------|-------|
-| 9 | C++ regularized `√(dP)` for orifice | M | `solver_interface.cpp` |
-| 10 | C++ bidirectional orifice interface | M | `solver_interface.cpp`, `solver_interface.h`, `_core.cpp` |
-| 11 | Node-level `Q` parameter for heat exchange | M | `components.py`, `solver.py` |
-| 12 | Add `d_P_total` to relay propagation | S | `solver.py` |
+| 9 | C++ bidirectional orifice interface (both T/Y) | M | `solver_interface.cpp`, `solver_interface.h`, `_core.cpp` |
+| 10 | Node-level `Q` parameter for heat exchange | M | `components.py`, `solver.py` |
+| 11 | Add `d_P_total` to relay propagation | S | `solver.py` |
 
-### P3 — Cleanup
+### P3 — Future
 
 | # | Item | Effort | Files |
 |---|------|--------|-------|
-| 13 | Remove unused C++ `combustor_residuals_and_jacobian`, `plenum_residuals_and_jacobian` | S | `solver_interface.cpp`, `solver_interface.h`, `_core.cpp` |
-| 14 | Implement proper `MomentumChamberNode` with `P_total ≠ P` | M | `components.py` |
+| 12 | Implement proper `MomentumChamberNode` with `P_total ≠ P` | M | `components.py` |
 
 ---
 
-**Review completed:** 2026-03-15
+**Initial review:** 2026-03-15
+**Updated:** 2026-03-15 (C++ smoothness + cleanup verified)
 **Next steps:** Execute P0 items, then P1 cleanup + tests, then P2 architecture
