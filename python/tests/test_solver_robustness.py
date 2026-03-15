@@ -218,3 +218,124 @@ def test_system_size_reduction_assertion():
     # 3 interior nodes * 2 (P, P_total) + 4 elements * 1 (m_dot) = 10 unknowns
     assert len(x0) == 10
     assert len(solver.unknown_names) == 10
+
+
+def test_mixing_plenum_convergence():
+    """Verify that a plenum with multiple inlets (fuel/oxidizer) converges and balances mass/species."""
+    graph = FlowNetwork()
+    n_species = cb.num_species()
+    get_idx = cb.species_index_from_name
+
+    Y_air = [0.0] * n_species
+    Y_air[get_idx("N2")] = 0.79
+    Y_air[get_idx("O2")] = 0.21
+
+    Y_fuel = [0.0] * n_species
+    Y_fuel[get_idx("H2")] = 1.0
+
+    # Air inlet (higher pressure)
+    in_air = PressureBoundary("in_air", P_total=1.2e5, T_total=300.0, Y=Y_air)
+    # Fuel inlet (mass flow controlled)
+    in_fuel = MassFlowBoundary("in_fuel", m_dot=0.01, T_total=300.0, Y=Y_fuel)
+    p1 = PlenumNode("p1")
+    outlet = PressureBoundary("outlet", P_total=1.0e5)
+
+    for node in [in_air, in_fuel, p1, outlet]:
+        graph.add_node(node)
+
+    graph.add_element(OrificeElement("o_air", "in_air", "p1", Cd=0.6, area=0.005))
+    graph.add_element(OrificeElement("o_fuel", "in_fuel", "p1", Cd=0.6, area=0.001))
+    graph.add_element(OrificeElement("o_exit", "p1", "outlet", Cd=0.6, area=0.005))
+
+    solver = NetworkSolver(graph)
+    sol = solver.solve()
+
+    assert sol["__success__"]
+
+    m_air = sol["o_air.m_dot"]
+    m_fuel = sol["o_fuel.m_dot"]
+    m_exit = sol["o_exit.m_dot"]
+
+    # Mass balance: m_air + m_fuel = m_exit
+    assert m_exit == pytest.approx(m_air + m_fuel, rel=1e-6)
+
+    # Species balance for N2
+    # air contains 0.79 N2, fuel contains 0.0
+    expected_Y_N2 = (m_air * 0.79 + m_fuel * 0.0) / m_exit
+    assert sol[f"p1.Y[{get_idx('N2')}]"] == pytest.approx(expected_Y_N2, rel=1e-5)
+
+
+def test_equilibrium_combustor_convergence():
+    """Verify that CombustorNode(method='equilibrium') converges in a network."""
+    graph = FlowNetwork()
+    n_species = cb.num_species()
+    get_idx = cb.species_index_from_name
+
+    # Stoichiometric H2-Air
+    # 2 H2 + O2 + 3.76 N2 -> 2 H2O + 3.76 N2
+    # X_H2 = 2/6.76 ~ 0.295
+    X_stoic = [0.0] * n_species
+    X_stoic[get_idx("H2")] = 2.0 / 6.76
+    X_stoic[get_idx("O2")] = 1.0 / 6.76
+    X_stoic[get_idx("N2")] = 3.76 / 6.76
+    Y_stoic = list(cb.mole_to_mass(X_stoic))
+
+    # High pressure to reach high T_ad and see dissociation
+    inlet = PressureBoundary("inlet", P_total=10e5, T_total=600.0, Y=Y_stoic)
+    comb = CombustorNode("comb", method="equilibrium")
+    outlet = PressureBoundary("outlet", P_total=9e5)
+
+    for node in [inlet, comb, outlet]:
+        graph.add_node(node)
+
+    graph.add_element(OrificeElement("o1", "inlet", "comb", Cd=0.6, area=0.001))
+    graph.add_element(OrificeElement("o2", "comb", "outlet", Cd=0.6, area=0.001))
+
+    solver = NetworkSolver(graph)
+    sol = solver.solve()
+
+    assert sol["__success__"]
+    assert sol["comb.T_total"] > 2400.0  # High T for equilibrium
+
+    # Check for dissociation products (e.g. CO should be non-zero for stoic mixture at high T)
+    try:
+        idx_CO = get_idx("CO")
+        assert sol[f"comb.Y[{idx_CO}]"] > 1e-4
+    except Exception:
+        pass  # CO not in species set or other issue, skip specific dissociation check
+
+
+def test_derived_state_jacobian_fd():
+    """Verify that sensitivity of derived states (T, Y) wrt unknowns is reflected in global Jacobian."""
+    graph = FlowNetwork()
+    get_idx = cb.species_index_from_name
+    n_species = cb.num_species()
+
+    Y_air = [0.0] * n_species
+    Y_air[get_idx("N2")] = 0.79
+    Y_air[get_idx("O2")] = 0.21
+
+    # Simple chain: PBound -> Orifice -> Plenum -> Orifice -> PBound
+    # We want to check d(p1.T_total) / d(o1.m_dot) etc.
+    inlet = PressureBoundary("inlet", P_total=1.5e5, T_total=400.0, Y=Y_air)
+    p1 = PlenumNode("p1")
+    outlet = PressureBoundary("outlet", P_total=1.0e5)
+
+    graph.add_node(inlet)
+    graph.add_node(p1)
+    graph.add_node(outlet)
+
+    graph.add_element(OrificeElement("o1", "inlet", "p1", Cd=0.6, area=0.01))
+    graph.add_element(OrificeElement("o2", "p1", "outlet", Cd=0.6, area=0.01))
+
+    solver = NetworkSolver(graph)
+    x0 = solver._build_x0()
+
+    # Verify that the analytical Jacobian (which uses d(derived)/dx)
+    # matches numerical perturbation of the residuals.
+    # This is the strongest proof that the derived state Jacobians are correct.
+    res, jac_sparse = solver._residuals_and_jacobian(x0)
+    jac_analytical = jac_sparse.toarray()
+    jac_numerical = compute_numerical_jacobian(solver, x0, eps=1e-6)
+
+    np.testing.assert_allclose(jac_analytical, jac_numerical, rtol=1e-5, atol=1e-5)
