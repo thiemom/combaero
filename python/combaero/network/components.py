@@ -374,24 +374,33 @@ class OrificeElement(NetworkElement):
         if len(downstream_pipes) == 1:
             self.downstream_diameter = downstream_pipes[0].diameter
 
+        # Pre-compute beta for velocity-of-approach factor
+        self.beta = 0.0
+        if self.upstream_diameter and self.upstream_diameter > 0:
+            import math
+            import warnings
+
+            d_bore = math.sqrt(4.0 * self.area / math.pi)
+            if d_bore < self.upstream_diameter:
+                self.beta = d_bore / self.upstream_diameter
+            else:
+                warnings.warn(
+                    f"OrificeElement '{self.id}': inferred bore diameter "
+                    f"({d_bore:.4f} m) >= pipe diameter "
+                    f"({self.upstream_diameter:.4f} m). "
+                    f"Skipping velocity-of-approach correction (E=1).",
+                    stacklevel=2,
+                )
+
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
 
     def residuals(
         self, state_in: MixtureState, state_out: MixtureState
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
-
-        import math
-
         import combaero as cb
 
         m_dot = state_in.m_dot
-
-        # Compute beta ratio (d/D) if upstream pipe diameter is known
-        beta = 0.0
-        if self.upstream_diameter and self.upstream_diameter > 0:
-            d_bore = math.sqrt(4.0 * self.area / math.pi)
-            beta = d_bore / self.upstream_diameter
 
         # Call optimized C++ kernel with beta correction
         res_cpp = cb.orifice_residuals_and_jacobian(
@@ -403,7 +412,7 @@ class OrificeElement(NetworkElement):
             state_out.P,
             self.Cd,
             self.area,
-            beta=beta,
+            beta=getattr(self, "beta", 0.0),
         )
 
         res = [m_dot - res_cpp.m_dot_calc]

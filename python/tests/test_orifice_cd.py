@@ -126,7 +126,7 @@ class TestOrificeFlowCalculations:
         # The test geometry has D=0.100, d=0.050, so beta=0.5
         # This means the flow includes the velocity-of-approach factor
         # For a round-trip test, we need to use the same beta in both directions
-        assert Cd_calc == pytest.approx(Cd / 1.033)
+        assert Cd_calc == pytest.approx(Cd)  # Should return the original Cd
 
 
 class TestUtilityFunctions:

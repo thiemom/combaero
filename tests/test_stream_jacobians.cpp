@@ -390,7 +390,7 @@ TEST_F(AdiabaticEquilibriumJacobianTest, dYburned_d_Y) {
 // Plenum ChamberResult — local + stream Jacobian FD validation
 // ---------------------------------------------------------------------------
 
-/*
+#if 0
 class PlenumJacobianTest : public ::testing::Test {
   protected:
     void SetUp() override {
@@ -531,13 +531,13 @@ TEST_F(PlenumJacobianTest, StreamJacobian_Y) {
         }
     }
 }
-*/
+#endif
 
 // ---------------------------------------------------------------------------
 // Combustor ChamberResult — local + stream Jacobian FD validation
 // ---------------------------------------------------------------------------
 
-/*
+#if 0
 class CombustorJacobianTest : public ::testing::Test {
   protected:
     void SetUp() override {
@@ -706,13 +706,13 @@ TEST_F(CombustorJacobianTest, StreamJacobian_Y) {
         }
     }
 }
-*/
+#endif
 
 // ---------------------------------------------------------------------------
 // Combustor Equilibrium — verify same structure works
 // ---------------------------------------------------------------------------
 
-/*
+#if 0
 TEST(CombustorEquilibriumTest, StructureAndStreamJacobian_mdot) {
     auto streams = std::vector<solver::Stream>{
         make_air_stream(2.0, 600.0, 150000.0),
@@ -753,4 +753,4 @@ TEST(CombustorEquilibriumTest, StructureAndStreamJacobian_mdot) {
         }
     }
 }
-*/
+#endif

@@ -139,9 +139,17 @@ def test_step_4_adding_bypass():
     p4 = PipeElement("p4", "mc2", "outlet", length=2.0, diameter=0.1, roughness=1e-4)
 
     # Bypass branch
+    # Size the bypass orifice to be clearly more restrictive than the main
+    # branch from mc1 -> mc2. Using the incompressible series approximation,
+    # the main-branch effective conductance is
+    #   (sum((A_i * Cd_i)^-2))^-0.5
+    # which here reduces to A*Cd for o2 alone: 0.008 * 0.6 = 0.0048.
+    # Choose the bypass to be about 50% of that effective conductance:
+    #   A_bypass * Cd ~ 0.5 * 0.0048 = 0.0024
+    # so with Cd = 0.6, use A_bypass ~ 0.004 m2.
     n_bypass = PlenumNode("n_bypass")
     p_bypass = PipeElement("p_bypass", "mc1", "n_bypass", length=5.0, diameter=0.08, roughness=1e-4)
-    o_bypass = OrificeElement("o_bypass", "n_bypass", "mc2", Cd=0.6, area=0.005)
+    o_bypass = OrificeElement("o_bypass", "n_bypass", "mc2", Cd=0.6, area=0.004)
 
     # Add all nodes and elements
     for n in [inlet, outlet, n1, mc1, n2, plen, mc2, n_bypass]:
@@ -162,10 +170,10 @@ def test_step_4_adding_bypass():
 
     # Verify mass conservation at junctions
     # At mc1: p1.m_dot = p2.m_dot + p_bypass.m_dot
-    assert abs(sol["p1.m_dot"] - (sol["p2.m_dot"] + sol["p_bypass.m_dot"])) < 1e-4
+    assert abs(sol["p1.m_dot"] - (sol["p2.m_dot"] + sol["p_bypass.m_dot"])) < 1e-6
 
     # At mc2: p3.m_dot + bypass.m_dot = p4.m_dot (bypass joins here)
-    assert abs((sol["p3.m_dot"] + sol["p_bypass.m_dot"]) - sol["p4.m_dot"]) < 1e-4
+    assert abs((sol["p3.m_dot"] + sol["p_bypass.m_dot"]) - sol["p4.m_dot"]) < 1e-6
 
     # All flows should be positive
     assert all(sol[f"{e}.m_dot"] > 0 for e in ["p1", "p2", "p3", "p4", "p_bypass"])

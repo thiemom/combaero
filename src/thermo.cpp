@@ -253,7 +253,7 @@ double s(double T, const std::vector<double> &X, double P, double P_ref) {
 
   double P_eff = (P > 1.0) ? P : (1.0 + 0.1 * (P - 1.0));
   double P_ref_eff = (P_ref > 1.0) ? P_ref : (1.0 + 0.1 * (P_ref - 1.0));
-  
+
   // Calculate pure species entropies and mixing term
   for (std::size_t i = 0; i < X.size(); ++i) {
     if (X[i] > 1e-15) {

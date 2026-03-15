@@ -34,12 +34,15 @@ std::tuple<double, double> orifice_mdot_and_jacobian(double dP, double rho,
   // Regularized orifice equation: mdot = Cd * E * A * f_reg(dP, rho)
   // where E = 1/sqrt(1 - beta^4) is the velocity-of-approach factor.
   // We use a smooth sqrt to avoid the infinite gradient at dP = 0.
-  double E = (beta > 0.0) ? 1.0 / std::sqrt(1.0 - std::pow(beta, 4.0)) : 1.0;
-  
+  double E = 1.0;
+  if (beta > 0.0 && beta < 1.0) {
+    E = 1.0 / std::sqrt(1.0 - std::pow(beta, 4.0));
+  }
+
   // Robust rho clamping
-  double rho_eff = (rho > 1e-9) ? rho : 1e-9;
+  double rho_eff = std::max(rho, 1e-9);
   double constant = Cd * E * area * std::sqrt(2.0 * rho_eff);
-  
+
   const double eps2 = 1.0; // Transition pressure squared (1 Pa^2)
   double dP2 = dP * dP;
   double dP_eff_sq = std::sqrt(dP2 + eps2); // This is (dP^2 + eps^2)^0.5
@@ -482,14 +485,14 @@ viscosity_and_jacobians(double T, double P, const std::vector<double> &X) {
 
   // 1. Temperature Derivative
   double dT_p = 1e-3; // 1 mK perturbation
-  double mu_plus = std::get<0>(viscosity_and_jacobians(T_eff + dT_p, P_eff, X));
-  double mu_minus = std::get<0>(viscosity_and_jacobians(T_eff - dT_p, P_eff, X));
+  double mu_plus = ::viscosity(T_eff + dT_p, P_eff, X);
+  double mu_minus = ::viscosity(T_eff - dT_p, P_eff, X);
   double d_mu_d_T = ((mu_plus - mu_minus) / (2.0 * dT_p)) * dTeff_dT;
 
   // 2. Pressure Derivative
   double dP_p = 1.0; // 1 Pascal perturbation
-  double mu_P_plus = std::get<0>(viscosity_and_jacobians(T_eff, P_eff + dP_p, X));
-  double mu_P_minus = std::get<0>(viscosity_and_jacobians(T_eff, P_eff - dP_p, X));
+  double mu_P_plus = ::viscosity(T_eff, P_eff + dP_p, X);
+  double mu_P_minus = ::viscosity(T_eff, P_eff - dP_p, X);
   double d_mu_d_P = ((mu_P_plus - mu_P_minus) / (2.0 * dP_p)) * dPeff_dP;
 
   return {mu, d_mu_d_T, d_mu_d_P};
@@ -506,7 +509,7 @@ mach_number_and_jacobian_v(double v, double T, const std::vector<double> &X) {
   double M = v / a;
   // dM/dv = 1/a
   double dM_dv = 1.0 / a;
-  
+
   return {M, dM_dv};
 }
 
