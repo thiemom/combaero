@@ -707,7 +707,8 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams) {
                            ? (P_total_tot / mdot_tot)
                            : (n_streams > 0 ? streams[0].P_total : 0.0);
 
-  std::vector<double> X_mix = mass_to_mole(normalize_fractions(Y_mix));
+  std::vector<double> normalized_Y_mix = normalize_fractions(Y_mix);
+  std::vector<double> X_mix = mass_to_mole(normalized_Y_mix);
   double T_guess = 300.0;
   if (n_streams > 0)
     T_guess = streams[0].T;
@@ -716,7 +717,7 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams) {
   MixerResult res;
   res.T_mix = T_mix;
   res.P_total_mix = P_total_mix;
-  res.Y_mix = Y_mix;
+  res.Y_mix = normalized_Y_mix;
   res.dT_mix_d_stream.resize(n_streams);
   res.dP_total_mix_d_stream.resize(n_streams);
   res.dY_mix_d_stream.assign(n_species, std::vector<StreamJacobian>(n_streams));
@@ -756,19 +757,25 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams) {
       dT_jac.d_mdot = (h_diff - y_sum) / (mdot_tot * cp_mix);
 
       // d(T_mix)/d(Y_i,k)
+      // Normalization: Y'_mix = Y_mix / sum(Y_mix)
+      // dT/dY_i,k = (m_dot_i/mdot_tot) * (h_k(T_i) - h_k(T_mix) + h_mix) / cp_mix
       for (std::size_t k = 0; k < n_species; ++k) {
         dT_jac.d_Y[k] =
-            streams[i].m_dot * (hk_mass[i][k] - hk_mix[k]) / (mdot_tot * cp_mix);
+            streams[i].m_dot * (hk_mass[i][k] - hk_mix[k] + h_mix) / (mdot_tot * cp_mix);
       }
 
       // Y_mix sensitivities
       for (std::size_t k = 0; k < n_species; ++k) {
         StreamJacobian &dY_jac_k = res.dY_mix_d_stream[k][i];
-        dY_jac_k.d_Y.assign(n_species, 0.0);
+        dY_jac_k.d_Y.resize(n_species);
         dY_jac_k.d_mdot = (streams[i].Y[k] - Y_mix[k]) / mdot_tot;
         dY_jac_k.d_T = 0.0;
         dY_jac_k.d_P_total = 0.0;
-        dY_jac_k.d_Y[k] = streams[i].m_dot / mdot_tot;
+        for (std::size_t j = 0; j < n_species; ++j) {
+            // dY'_mix,k / dY_i,j = (m_dot_i/m_dot_tot) * (delta_kj - Y_mix,k)
+            double delta = (k == j) ? 1.0 : 0.0;
+            dY_jac_k.d_Y[j] = (streams[i].m_dot / mdot_tot) * (delta - Y_mix[k]);
+        }
       }
     } else {
       dT_jac.d_mdot = 0.0;

@@ -175,8 +175,10 @@ TEST_F(OrificeTest, OrificeMdot) {
     double Cd_val = 0.61;
     double mdot = orifice_mdot(geom, Cd_val, state.dP, state.rho);
 
-    // Expected: Cd * A * sqrt(2 * rho * dP)
-    double expected = Cd_val * geom.area() * std::sqrt(2.0 * state.rho * state.dP);
+    // Expected: Cd * E * A * sqrt(2 * rho * dP)
+    const double beta = geom.beta();
+    const double E = 1.0 / std::sqrt(1.0 - std::pow(beta, 4.0));
+    double expected = Cd_val * E * geom.area() * std::sqrt(2.0 * state.rho * state.dP);
     EXPECT_NEAR(mdot, expected, 1e-10);
 }
 
