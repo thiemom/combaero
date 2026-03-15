@@ -163,8 +163,11 @@ PYBIND11_MODULE(_core, m) {
   py::class_<solver::MixerResult>(
       m, "MixerResult", "Output and internal gradients of stream mixes")
       .def_readonly("T_mix", &solver::MixerResult::T_mix)
+      .def_readonly("P_total_mix", &solver::MixerResult::P_total_mix)
       .def_readonly("Y_mix", &solver::MixerResult::Y_mix)
       .def_readonly("dT_mix_d_stream", &solver::MixerResult::dT_mix_d_stream)
+      .def_readonly("dP_total_mix_d_stream",
+                    &solver::MixerResult::dP_total_mix_d_stream)
       .def_readonly("dY_mix_d_stream", &solver::MixerResult::dY_mix_d_stream);
 
   m.def("mixer_from_streams_and_jacobians",
@@ -200,7 +203,7 @@ PYBIND11_MODULE(_core, m) {
         &solver::orifice_residuals_and_jacobian, py::arg("m_dot"),
         py::arg("P_total_up"), py::arg("P_static_up"), py::arg("T_up"),
         py::arg("Y_up"), py::arg("P_static_down"), py::arg("Cd"),
-        py::arg("area"));
+        py::arg("area"), py::arg("beta") = 0.0);
 
   m.def("pipe_residuals_and_jacobian", &solver::pipe_residuals_and_jacobian,
         py::arg("m_dot"), py::arg("P_total_up"), py::arg("P_static_up"),
@@ -3839,26 +3842,28 @@ PYBIND11_MODULE(_core, m) {
   // Orifice flow calculations with Cd
   m.def(
       "orifice_mdot_Cd",
-      static_cast<double (*)(const OrificeGeometry &, double, double, double)>(
-          &orifice_mdot),
+      static_cast<double (*)(const OrificeGeometry &, double, double, double,
+                             double)>(&orifice_mdot),
       py::arg("geom"), py::arg("Cd"), py::arg("dP"), py::arg("rho"),
+      py::arg("epsilon") = 1.0,
       "Mass flow through orifice given Cd.\n\n"
-      "mdot = Cd * A * sqrt(2 * rho * dP)\n\n"
+      "mdot = Cd * E * epsilon * A * sqrt(2 * rho * dP)\n\n"
       "Returns: mass flow rate [kg/s]");
 
   m.def(
       "orifice_dP_Cd",
-      static_cast<double (*)(const OrificeGeometry &, double, double, double)>(
-          &orifice_dP),
+      static_cast<double (*)(const OrificeGeometry &, double, double, double,
+                             double)>(&orifice_dP),
       py::arg("geom"), py::arg("Cd"), py::arg("mdot"), py::arg("rho"),
+      py::arg("epsilon") = 1.0,
       "Pressure drop for given mass flow and Cd.\n\n"
-      "dP = (mdot / (Cd * A))² / (2 * rho)\n\n"
+      "dP = (mdot / (Cd * E * epsilon * A))² / (2 * rho)\n\n"
       "Returns: pressure drop [Pa]");
 
   m.def("orifice_Cd_from_measurement", &orifice_Cd_from_measurement,
         py::arg("geom"), py::arg("mdot"), py::arg("dP"), py::arg("rho"),
         "Solve for discharge coefficient from measurement.\n\n"
-        "Cd = mdot / (A * sqrt(2 * rho * dP))\n\n"
+        "Cd = mdot / (E * A * sqrt(2 * rho * dP))\n\n"
         "Parameters:\n"
         "  geom : OrificeGeometry\n"
         "  mdot : mass flow rate [kg/s]\n"
@@ -5175,13 +5180,15 @@ PYBIND11_MODULE(_core, m) {
   // -----------------------------------------------------------------
   m.def("orifice_mdot_and_jacobian", &solver::orifice_mdot_and_jacobian,
         py::arg("dP"), py::arg("rho"), py::arg("Cd"), py::arg("area"),
+        py::arg("beta") = 0.0,
         "Fast-path orifice flow and analytic derivative (mdot, "
         "d(mdot)/d(dP)).\n\n"
         "Parameters:\n"
         "  dP   : Pressure drop [Pa]\n"
         "  rho  : Density [kg/m³]\n"
         "  Cd   : Discharge coefficient [-]\n"
-        "  area : Orifice area [m²]\n\n"
+        "  area : Orifice area [m²]\n"
+        "  beta : Diameter ratio beta = d/D [-] (default 0.0)\n\n"
         "Returns: tuple(mass_flow [kg/s], derivative [kg/(s*Pa)])");
 
   m.def("pressure_loss_and_jacobian", &solver::pressure_loss_and_jacobian,

@@ -251,14 +251,17 @@ double s(double T, const std::vector<double> &X, double P, double P_ref) {
 
   double s_mix = 0.0;
 
+  double P_eff = (P > 1.0) ? P : (1.0 + 0.1 * (P - 1.0));
+  double P_ref_eff = (P_ref > 1.0) ? P_ref : (1.0 + 0.1 * (P_ref - 1.0));
+  
   // Calculate pure species entropies and mixing term
   for (std::size_t i = 0; i < X.size(); ++i) {
-    if (X[i] > 0.0) {
+    if (X[i] > 1e-15) {
       // Pure species entropy at reference pressure
       double s_i = s_R(i, T) * R_GAS;
 
       // Pressure correction: -R * ln(P/P_ref)
-      s_i -= R_GAS * std::log(P / P_ref);
+      s_i -= R_GAS * std::log(P_eff / P_ref_eff);
 
       // Mixing entropy: -R * ln(X_i)
       s_i -= R_GAS * std::log(X[i]);
@@ -404,12 +407,11 @@ double isentropic_expansion_coefficient(double T,
 
 // Calculate speed of sound [m/s] for an ideal gas
 double speed_of_sound(double T, const std::vector<double> &X) {
-  // c = sqrt(gamma * R_specific * T)
-  // gamma is dimensionless, R_specific in J/(kg·K), T in K
-  double gamma = isentropic_expansion_coefficient(T, X);
+  double T_eff = (T > 10.0) ? T : (10.0 + 0.1 * (T - 10.0));
+  double gamma = isentropic_expansion_coefficient(T_eff, X);
   double R_specific = specific_gas_constant(X);
 
-  return std::sqrt(gamma * R_specific * T);
+  return std::sqrt(std::max(0.001, gamma * R_specific * T_eff));
 }
 
 // Derivative of dimensionless Gibbs free energy with respect to temperature

@@ -53,8 +53,10 @@ struct StreamJacobian {
 
 struct MixerResult {
   double T_mix;
+  double P_total_mix;
   std::vector<double> Y_mix;
   std::vector<StreamJacobian> dT_mix_d_stream;
+  std::vector<StreamJacobian> dP_total_mix_d_stream;
   std::vector<std::vector<StreamJacobian>> dY_mix_d_stream;
 };
 
@@ -96,21 +98,22 @@ struct PipeResult {
 //   dP   : Differential pressure drop across the orifice [Pa]
 //   rho  : Fluid density [kg/m³]
 //   Cd   : Discharge coefficient [-]
-//   area : Orifice bore area [m²]
+//   beta : Orifice beta ratio (d/D) [-]
 //
 // Returns:
 //   tuple(mdot, d_mdot_d_dP)
 //   mdot        : Mass flow rate [kg/s]
 //   d_mdot_d_dP : Jacobian gradient [kg/(s*Pa)]
 std::tuple<double, double> orifice_mdot_and_jacobian(double dP, double rho,
-                                                     double Cd, double area);
+                                                     double Cd, double area,
+                                                     double beta);
 
 // Full orifice evaluation with all derivatives.
 OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
                                              double P_static_up, double T_up,
                                              const std::vector<double> &Y_up,
                                              double P_static_down, double Cd,
-                                             double area);
+                                             double area, double beta);
 
 // Calculate Pressure Drop and its derivative with respect to velocity.
 //

@@ -171,38 +171,47 @@ class NetworkSolver:
 
             # Sensitivity Relay (Chain-Rule)
             if mix_res:
+                n_species = cb.num_species()
                 for i, elem in enumerate(up_elems):
                     from_nid = elem.from_node
                     t_jac = mix_res.dT_mix_d_stream[i]
-                    y_jac_list = mix_res.dY_mix_d_stream[i]
+                    pt_jac = mix_res.dP_total_mix_d_stream[i]
+                    # dY_mix_d_stream is indexed by [species][stream]
+                    y_jacs = [mix_res.dY_mix_d_stream[k][i] for k in range(n_species)]
 
                     # 1. Direct dependency on upstream mass flow (if it's a solver unknown)
                     m_indices = self._unknown_indices.get(elem.id)
                     if m_indices:
                         idx = m_indices[0]
                         node_relay = relay[nid].setdefault(
-                            idx, {"T": 0.0, "Y": np.zeros(cb.num_species()), "P_total": 0.0}
+                            idx, {"T": 0.0, "Y": np.zeros(n_species), "P_total": 0.0}
                         )
                         node_relay["T"] += t_jac.d_mdot
-                        for k in range(len(y_jac_list)):
-                            node_relay["Y"][k] += y_jac_list[k].d_mdot
+                        node_relay["P_total"] += pt_jac.d_mdot
+                        for k in range(n_species):
+                            node_relay["Y"][k] += y_jacs[k].d_mdot
 
                     # 2. Recursive dependency on upstream P/T/Y via from_node relay
                     if from_nid in relay:
                         for idx, sens_up in relay[from_nid].items():
                             node_relay = relay[nid].setdefault(
-                                idx, {"T": 0.0, "Y": np.zeros(cb.num_species()), "P_total": 0.0}
+                                idx, {"T": 0.0, "Y": np.zeros(n_species), "P_total": 0.0}
                             )
                             # dT/dx = sum_i( dT/dT_in_i * dT_in_i/dx + dT/dP_in_i * dP_in_i/dx + dT/dY_in_i * dY_in_i/dx )
                             node_relay["T"] += t_jac.d_T * sens_up["T"]
                             node_relay["T"] += t_jac.d_P_total * sens_up["P_total"]
                             node_relay["T"] += np.dot(t_jac.d_Y, sens_up["Y"])
 
-                            # dY_k/dx = sum_i( dY_k/dT_in_i * dT_in_i/dx + dY_k/dP_in_i * dP_in_i/dx + sum_j(dY_k/dY_in_j * dY_in_j/dx) )
-                            for k in range(len(y_jac_list)):
-                                node_relay["Y"][k] += y_jac_list[k].d_T * sens_up["T"]
-                                node_relay["Y"][k] += y_jac_list[k].d_P_total * sens_up["P_total"]
-                                node_relay["Y"][k] += np.dot(y_jac_list[k].d_Y, sens_up["Y"])
+                            # dP_total/dx
+                            node_relay["P_total"] += pt_jac.d_T * sens_up["T"]
+                            node_relay["P_total"] += pt_jac.d_P_total * sens_up["P_total"]
+                            node_relay["P_total"] += np.dot(pt_jac.d_Y, sens_up["Y"])
+
+                            # dY_k/dx
+                            for k in range(n_species):
+                                node_relay["Y"][k] += y_jacs[k].d_T * sens_up["T"]
+                                node_relay["Y"][k] += y_jacs[k].d_P_total * sens_up["P_total"]
+                                node_relay["Y"][k] += np.dot(y_jacs[k].d_Y, sens_up["Y"])
 
             # 3. Add own unknowns (P_total) to the relay
             node_unks = self._unknown_indices.get(nid, [])
@@ -537,6 +546,9 @@ class NetworkSolver:
             success = False
             message = f"Unexpected error during residual evaluation: {e}"
             final_norm = float(best_res_norm)
+
+        if not success:
+            pass
 
         if not success:
             warnings.warn(

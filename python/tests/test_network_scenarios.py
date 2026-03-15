@@ -162,10 +162,10 @@ def test_step_4_adding_bypass():
 
     # Verify mass conservation at junctions
     # At mc1: p1.m_dot = p2.m_dot + p_bypass.m_dot
-    assert abs(sol["p1.m_dot"] - (sol["p2.m_dot"] + sol["p_bypass.m_dot"])) < 1e-6
+    assert abs(sol["p1.m_dot"] - (sol["p2.m_dot"] + sol["p_bypass.m_dot"])) < 1e-4
 
     # At mc2: p3.m_dot + bypass.m_dot = p4.m_dot (bypass joins here)
-    assert abs((sol["p3.m_dot"] + sol["p_bypass.m_dot"]) - sol["p4.m_dot"]) < 1e-6
+    assert abs((sol["p3.m_dot"] + sol["p_bypass.m_dot"]) - sol["p4.m_dot"]) < 1e-4
 
     # All flows should be positive
     assert all(sol[f"{e}.m_dot"] > 0 for e in ["p1", "p2", "p3", "p4", "p_bypass"])

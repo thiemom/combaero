@@ -25,30 +25,31 @@ TEST(SolverJacobianTest, OrificeDerivatives) {
     double Cd = 0.62;
     double area = 0.001;
 
-    OrificeResult res = orifice_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up, Y, P_static_down, Cd, area);
+    double beta = 0.5;
+    OrificeResult res = orifice_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up, Y, P_static_down, Cd, area, beta);
 
     // FD checks
     double eps = 1.0;
 
     // d_mdot_dP_total_up
-    auto res_p = orifice_residuals_and_jacobian(m_dot, P_total_up + eps, P_static_up, T_up, Y, P_static_down, Cd, area);
+    auto res_p = orifice_residuals_and_jacobian(m_dot, P_total_up + eps, P_static_up, T_up, Y, P_static_down, Cd, area, beta);
     double fd_dP_total_up = (res_p.m_dot_calc - res.m_dot_calc) / eps;
     EXPECT_NEAR(res.d_mdot_dP_total_up, fd_dP_total_up, std::abs(fd_dP_total_up) * 1e-4);
 
     // d_mdot_dP_static_down
-    auto res_down_p = orifice_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up, Y, P_static_down + eps, Cd, area);
+    auto res_down_p = orifice_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up, Y, P_static_down + eps, Cd, area, beta);
     double fd_dP_static_down = (res_down_p.m_dot_calc - res.m_dot_calc) / eps;
     EXPECT_NEAR(res.d_mdot_dP_static_down, fd_dP_static_down, std::abs(fd_dP_static_down) * 1e-4);
 
     // d_mdot_dP_static_up (via density)
-    auto res_up_p = orifice_residuals_and_jacobian(m_dot, P_total_up, P_static_up + eps, T_up, Y, P_static_down, Cd, area);
+    auto res_up_p = orifice_residuals_and_jacobian(m_dot, P_total_up, P_static_up + eps, T_up, Y, P_static_down, Cd, area, beta);
     double fd_dP_static_up = (res_up_p.m_dot_calc - res.m_dot_calc) / eps;
     EXPECT_NEAR(res.d_mdot_dP_static_up, fd_dP_static_up, std::abs(fd_dP_static_up) * 1e-4);
 
     // d_mdot_dT_up
     double eps_T = 1e-4;
-    auto res_T_p = orifice_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up + eps_T, Y, P_static_down, Cd, area);
-    auto res_T_m = orifice_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up - eps_T, Y, P_static_down, Cd, area);
+    auto res_T_p = orifice_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up + eps_T, Y, P_static_down, Cd, area, beta);
+    auto res_T_m = orifice_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up - eps_T, Y, P_static_down, Cd, area, beta);
     double fd_dT_up = (res_T_p.m_dot_calc - res_T_m.m_dot_calc) / (2.0 * eps_T);
     EXPECT_NEAR(res.d_mdot_dT_up, fd_dT_up, std::abs(fd_dT_up) * 1e-5);
 
@@ -57,7 +58,7 @@ TEST(SolverJacobianTest, OrificeDerivatives) {
     for (size_t i=0; i<ns; ++i) {
         std::vector<double> Y_p = Y;
         Y_p[i] += eps_Y;
-        auto res_Y_p = orifice_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up, Y_p, P_static_down, Cd, area);
+        auto res_Y_p = orifice_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up, Y_p, P_static_down, Cd, area, beta);
         double fd_dYi = (res_Y_p.m_dot_calc - res.m_dot_calc) / eps_Y;
         EXPECT_NEAR(res.d_mdot_dY_up[i], fd_dYi, std::abs(fd_dYi) * 1e-3 + 1e-8);
     }

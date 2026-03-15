@@ -481,21 +481,27 @@ std::unique_ptr<OrificeCorrelationBase> make_tabulated_correlation(
 // Flow calculations
 // -------------------------------------------------------------
 
-double orifice_mdot(const OrificeGeometry& geom, double Cd, double dP, double rho) {
+double orifice_mdot(const OrificeGeometry& geom, double Cd, double dP,
+                    double rho, double epsilon) {
     if (dP < 0.0 || rho <= 0.0 || Cd <= 0.0) {
         throw std::invalid_argument("orifice_mdot: invalid parameters");
     }
-    return Cd * geom.area() * std::sqrt(2.0 * rho * dP);
+    const double beta = geom.beta();
+    const double E = 1.0 / std::sqrt(1.0 - std::pow(beta, 4.0));
+    return Cd * E * epsilon * geom.area() * std::sqrt(2.0 * rho * dP);
 }
 
-double orifice_dP(const OrificeGeometry& geom, double Cd, double mdot, double rho) {
+double orifice_dP(const OrificeGeometry& geom, double Cd, double mdot,
+                  double rho, double epsilon) {
     if (mdot < 0.0 || rho <= 0.0 || Cd <= 0.0) {
         throw std::invalid_argument("orifice_dP: invalid parameters");
     }
-    // From mdot = Cd * A * sqrt(2 * rho * dP)
-    // Solve for dP: dP = (mdot / (Cd * A))^2 / (2 * rho)
+    // From mdot = Cd * E * epsilon * A * sqrt(2 * rho * dP)
+    // Solve for dP: dP = (mdot / (Cd * E * epsilon * A))^2 / (2 * rho)
     const double A = geom.area();
-    const double term = mdot / (Cd * A);
+    const double beta = geom.beta();
+    const double E = 1.0 / std::sqrt(1.0 - std::pow(beta, 4.0));
+    const double term = mdot / (Cd * E * epsilon * A);
     return term * term / (2.0 * rho);
 }
 
@@ -504,8 +510,10 @@ double orifice_Cd_from_measurement(const OrificeGeometry& geom,
     if (dP <= 0.0 || rho <= 0.0 || mdot <= 0.0) {
         throw std::invalid_argument("orifice_Cd_from_measurement: invalid parameters");
     }
+    const double beta = geom.beta();
+    const double E = 1.0 / std::sqrt(1.0 - std::pow(beta, 4.0));
     double A = geom.area();
-    return mdot / (A * std::sqrt(2.0 * rho * dP));
+    return mdot / (E * A * std::sqrt(2.0 * rho * dP));
 }
 
 // -------------------------------------------------------------
@@ -570,8 +578,11 @@ double solve_orifice_mdot(
             epsilon = expansibility_factor(beta, dP, P_upstream, kappa);
         }
 
-        // Calculate new mass flow rate using current Cd and epsilon
-        const double mdot_new = Cd * epsilon * area * std::sqrt(2.0 * rho * dP);
+        // Calculate velocity-of-approach factor (E)
+        const double E = 1.0 / std::sqrt(1.0 - std::pow(beta, 4.0));
+
+        // Calculate new mass flow rate using current Cd, E, and epsilon
+        const double mdot_new = Cd * E * epsilon * area * std::sqrt(2.0 * rho * dP);
 
         // Check convergence
         const double rel_error = std::abs(mdot_new - mdot) / (mdot + 1e-30);

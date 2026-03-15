@@ -29,21 +29,23 @@ namespace solver {
 // -----------------------------------------------------------------------------
 
 std::tuple<double, double> orifice_mdot_and_jacobian(double dP, double rho,
-                                                     double Cd, double area) {
-  // Regularized orifice equation: mdot = Cd * A * sign(dP) * sqrt(2 * rho * abs(dP))
+                                                     double Cd, double area,
+                                                     double beta) {
+  // Regularized orifice equation: mdot = Cd * E * A * f_reg(dP, rho)
+  // where E = 1/sqrt(1 - beta^4) is the velocity-of-approach factor.
   // We use a smooth sqrt to avoid the infinite gradient at dP = 0.
-  // Suggested regularization: sqrt(dP^2 + eps^2)
-  double constant = Cd * area * std::sqrt(2.0 * rho);
+  double E = (beta > 0.0) ? 1.0 / std::sqrt(1.0 - std::pow(beta, 4.0)) : 1.0;
+  
+  // Robust rho clamping
+  double rho_eff = (rho > 1e-9) ? rho : 1e-9;
+  double constant = Cd * E * area * std::sqrt(2.0 * rho_eff);
+  
   const double eps2 = 1.0; // Transition pressure squared (1 Pa^2)
   double dP2 = dP * dP;
   double dP_eff_sq = std::sqrt(dP2 + eps2); // This is (dP^2 + eps^2)^0.5
   double mdot = constant * dP / std::sqrt(dP_eff_sq); // constant * dP / (dP^2 + eps^2)^0.25
 
   // Derivative: d(mdot)/d(dP) = constant * (0.5 * dP^2 + eps^2) / (dP^2 + eps^2)^1.25
-  // Let U = (dP^2 + eps^2). mdot = constant * dP * U^-0.25
-  // dmdot/ddP = constant * (U^-0.25 + dP * (-0.25) * U^-1.25 * 2dP)
-  //           = constant * (U - 0.5 * dP^2) * U^-1.25
-  //           = constant * (0.5 * dP^2 + eps^2) / (dP^2 + eps^2)^1.25
   double U = dP2 + eps2;
   double jacobian = constant * (0.5 * dP2 + eps2) / std::pow(U, 1.25);
 
@@ -434,106 +436,97 @@ effusion_effectiveness_and_jacobian(double x_D, double M, double DR,
 
 std::tuple<double, double, double>
 density_and_jacobians(double T, double P, const std::vector<double> &X) {
-  if (T <= 0.0 || P <= 0.0) {
-    throw std::invalid_argument(
-        "solver_interface::density requires T > 0 and P > 0");
-  }
+  // Robust clamping with leaky gradient to avoid solver divergence into negative space
+  double T_eff = (T > 10.0) ? T : (10.0 + 0.1 * (T - 10.0));
+  double P_eff = (P > 1.0) ? P : (1.0 + 0.1 * (P - 1.0));
+  double dTeff_dT = (T > 10.0) ? 1.0 : 0.1;
+  double dPeff_dP = (P > 1.0) ? 1.0 : 0.1;
 
   // Calculate base density natively
-  double rho = ::density(T, P, X);
+  double rho = ::density(T_eff, P_eff, X);
 
   // Ideal gas law: rho = P * W / (R * T)
-  // d(rho)/dT = - P * W / (R * T^2) = -rho / T
-  double d_rho_d_T = -rho / T;
+  // d_rho_dT = d(rho)/d(T_eff) * d(T_eff)/dT
+  double d_rho_d_T = (-rho / T_eff) * dTeff_dT;
 
-  // d(rho)/dP = W / (R * T) = rho / P
-  double d_rho_d_P = rho / P;
+  // d_rho_dP = d(rho)/d(P_eff) * d(P_eff)/dP
+  double d_rho_d_P = (rho / P_eff) * dPeff_dP;
 
   return {rho, d_rho_d_T, d_rho_d_P};
 }
 
 std::tuple<double, double> enthalpy_and_jacobian(double T,
                                                  const std::vector<double> &X) {
-  if (T <= 0.0) {
-    throw std::invalid_argument("solver_interface::enthalpy requires T > 0");
-  }
+  double T_eff = (T > 10.0) ? T : (10.0 + 0.1 * (T - 10.0));
+  double dTeff_dT = (T > 10.0) ? 1.0 : 0.1;
 
   // h(T) = base mass enthalpy
-  double h = ::h_mass(T, X);
+  double h = ::h_mass(T_eff, X);
 
   // Analytical derivative of enthalpy with respect to temperature is Cp
-  double d_h_d_T = ::cp_mass(T, X);
+  double d_h_d_T = ::cp_mass(T_eff, X) * dTeff_dT;
 
   return {h, d_h_d_T};
 }
 
 std::tuple<double, double, double>
 viscosity_and_jacobians(double T, double P, const std::vector<double> &X) {
-  if (T <= 0.0 || P <= 0.0) {
-    throw std::invalid_argument(
-        "solver_interface::viscosity requires T > 0 and P > 0");
-  }
+
+  double T_eff = (T > 10.0) ? T : (10.0 + 0.1 * (T - 10.0));
+  double P_eff = (P > 1.0) ? P : (1.0 + 0.1 * (P - 1.0));
+  double dTeff_dT = (T > 10.0) ? 1.0 : 0.1;
+  double dPeff_dP = (P > 1.0) ? 1.0 : 0.1;
 
   // Base viscosity
-  double mu = ::viscosity(T, P, X);
-
-  // We utilize a highly constrained central finite difference inside the C++
-  // compiled kernel since the analytical collision integral derivations are
-  // excessively complex. This masks the iteration noise from the global solver.
+  double mu = ::viscosity(T_eff, P_eff, X);
 
   // 1. Temperature Derivative
-  double dT = 1e-3; // 1 mK perturbation
-  double mu_T_plus = ::viscosity(T + dT, P, X);
-  double mu_T_minus = ::viscosity(T - dT, P, X);
-  double d_mu_d_T = (mu_T_plus - mu_T_minus) / (2.0 * dT);
+  double dT_p = 1e-3; // 1 mK perturbation
+  double mu_plus = std::get<0>(viscosity_and_jacobians(T_eff + dT_p, P_eff, X));
+  double mu_minus = std::get<0>(viscosity_and_jacobians(T_eff - dT_p, P_eff, X));
+  double d_mu_d_T = ((mu_plus - mu_minus) / (2.0 * dT_p)) * dTeff_dT;
 
   // 2. Pressure Derivative
-  // Current models evaluate viscosity independently of pressure for ideal
-  // gases, but we provide the generalized interface for completeness.
-  double dP = 1.0; // 1 Pascal perturbation
-  double mu_P_plus = ::viscosity(T, P + dP, X);
-  double mu_P_minus = ::viscosity(T, P - dP, X);
-  double d_mu_d_P = (mu_P_plus - mu_P_minus) / (2.0 * dP);
+  double dP_p = 1.0; // 1 Pascal perturbation
+  double mu_P_plus = std::get<0>(viscosity_and_jacobians(T_eff, P_eff + dP_p, X));
+  double mu_P_minus = std::get<0>(viscosity_and_jacobians(T_eff, P_eff - dP_p, X));
+  double d_mu_d_P = ((mu_P_plus - mu_P_minus) / (2.0 * dP_p)) * dPeff_dP;
 
   return {mu, d_mu_d_T, d_mu_d_P};
 }
 
 std::tuple<double, double>
 mach_number_and_jacobian_v(double v, double T, const std::vector<double> &X) {
-  double a = speed_of_sound(T, X);
-  if (a <= 0.0) {
-    throw std::invalid_argument(
-        "mach_number_and_jacobian_v: speed of sound is non-positive");
-  }
+  double T_eff = (T > 10.0) ? T : (10.0 + 0.1 * (T - 10.0));
+  double dTeff_dT = (T > 10.0) ? 1.0 : 0.1;
+
+  double a = speed_of_sound(T_eff, X);
+  if (a <= 1.0) a = 1.0; // Minimal fallback
+
   double M = v / a;
+  // dM/dv = 1/a
   double dM_dv = 1.0 / a;
+  
   return {M, dM_dv};
 }
 
 std::tuple<double, double>
 T_adiabatic_wall_and_jacobian_v(double T_static, double v, double T, double P,
                                 const std::vector<double> &X, bool turbulent) {
-  if (T_static <= 0.0) {
-    throw std::invalid_argument(
-        "T_adiabatic_wall_and_jacobian_v: T_static must be positive");
-  }
-  if (v < 0.0) {
-    throw std::invalid_argument(
-        "T_adiabatic_wall_and_jacobian_v: v must be non-negative");
-  }
+  double T_s_eff = (T_static > 10.0) ? T_static : (10.0 + 0.1 * (T_static - 10.0));
+  double v_eff = (v >= 0.0) ? v : (0.1 * v);
+  double T_eff = (T > 10.0) ? T : (10.0 + 0.1 * (T - 10.0));
+  double P_eff = (P > 1.0) ? P : (1.0 + 0.1 * (P - 1.0));
 
-  double Pr = prandtl(T, P, X);
+  double Pr = prandtl(T_eff, P_eff, X);
   double r = turbulent ? std::cbrt(Pr) : std::sqrt(Pr);
 
-  // mwmix(X) is g/mol. cp(T,X) is J/(mol*K).
-  // cp_mass_at = cp(T, X) / mwmix(X) * 1000.0
   double mw_g = mwmix(X);
-  double cp_val = cp(T, X) / mw_g * 1000.0;
+  double cp_val = cp(T_eff, X) / mw_g * 1000.0;
 
-  // T_aw = T_static + r * 0.5 * v^2 / cp_val
-  // dT_aw_dv = r * v / cp_val
-  double T_aw = T_static + r * 0.5 * v * v / cp_val;
-  double dT_aw_dv = r * v / cp_val;
+  double T_aw = T_s_eff + r * 0.5 * v_eff * v_eff / cp_val;
+  // Use v_eff for derivative to keep it leaky
+  double dT_aw_dv = r * v_eff / cp_val;
 
   return {T_aw, dT_aw_dv};
 }
@@ -670,6 +663,7 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams) {
   double mdot_tot = 0.0;
   std::vector<double> Y_mix(n_species, 0.0);
   double H_tot = 0.0;
+  double P_total_tot = 0.0;
 
   std::vector<double> h_stream(n_streams, 0.0);
   std::vector<double> cp_stream(n_streams, 0.0);
@@ -690,6 +684,7 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams) {
       cp_stream[i] += streams[i].Y[k] * cpk_mass;
     }
     H_tot += streams[i].m_dot * h_stream[i];
+    P_total_tot += streams[i].m_dot * streams[i].P_total;
   }
 
   const double mdot_eps = 1e-12;
@@ -705,6 +700,9 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams) {
 
   double h_mix = (mdot_tot > 0.0) ? (H_tot / mdot_tot)
                                   : (n_streams > 0 ? h_stream[0] : 0.0);
+  double P_total_mix = (mdot_tot > 0.0)
+                           ? (P_total_tot / mdot_tot)
+                           : (n_streams > 0 ? streams[0].P_total : 0.0);
 
   std::vector<double> X_mix = mass_to_mole(normalize_fractions(Y_mix));
   double T_guess = 300.0;
@@ -712,22 +710,13 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams) {
     T_guess = streams[0].T;
   double T_mix = calc_T_from_h_mass(h_mix, X_mix, T_guess);
 
-  std::vector<std::vector<StreamJacobian>> dY_mix_d_stream(
-      n_species, std::vector<StreamJacobian>(n_streams));
-  for (std::size_t k = 0; k < n_species; ++k) {
-    for (std::size_t i = 0; i < n_streams; ++i) {
-      StreamJacobian &jac = dY_mix_d_stream[k][i];
-      jac.d_Y.assign(n_species, 0.0);
-      if (std::abs(mdot_tot) > mdot_eps) {
-        jac.d_mdot = (streams[i].Y[k] - Y_mix[k]) / mdot_tot;
-        jac.d_T = 0.0;
-        jac.d_Y[k] = streams[i].m_dot / mdot_tot;
-      } else {
-        jac.d_mdot = 0.0;
-        jac.d_T = 0.0;
-      }
-    }
-  }
+  MixerResult res;
+  res.T_mix = T_mix;
+  res.P_total_mix = P_total_mix;
+  res.Y_mix = Y_mix;
+  res.dT_mix_d_stream.resize(n_streams);
+  res.dP_total_mix_d_stream.resize(n_streams);
+  res.dY_mix_d_stream.assign(n_species, std::vector<StreamJacobian>(n_streams));
 
   double cp_mix = 0.0;
   std::vector<double> hk_mix(n_species, 0.0);
@@ -739,35 +728,63 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams) {
     cp_mix += Y_mix[k] * cpk_mix;
   }
 
-  std::vector<StreamJacobian> dT_mix_d_stream(n_streams);
   for (std::size_t i = 0; i < n_streams; ++i) {
-    StreamJacobian &jac = dT_mix_d_stream[i];
-    jac.d_Y.assign(n_species, 0.0);
+    StreamJacobian &dT_jac = res.dT_mix_d_stream[i];
+    StreamJacobian &dP_jac = res.dP_total_mix_d_stream[i];
+    dT_jac.d_Y.assign(n_species, 0.0);
+    dP_jac.d_Y.assign(n_species, 0.0);
 
     if (std::abs(mdot_tot) > mdot_eps) {
-      double dh_mix_d_mdot = (h_stream[i] - h_mix) / mdot_tot;
-      double dh_mix_d_Ti = (streams[i].m_dot * cp_stream[i]) / mdot_tot;
+      // P_total sensitivities
+      dT_jac.d_P_total = 0.0;
+      dP_jac.d_P_total = streams[i].m_dot / mdot_tot;
+      dP_jac.d_mdot = (streams[i].P_total - P_total_mix) / mdot_tot;
+      dP_jac.d_T = 0.0;
 
-      jac.d_T = dh_mix_d_Ti / cp_mix;
+      // d(T_mix)/d(T_i)
+      dT_jac.d_T = (streams[i].m_dot * cp_stream[i]) / (mdot_tot * cp_mix);
 
-      double sum_hk_dY = 0.0;
+      // d(T_mix)/d(m_dot_i)
+      double h_diff = (h_stream[i] - h_mix);
+      double y_sum = 0.0;
       for (std::size_t k = 0; k < n_species; ++k) {
-        sum_hk_dY += hk_mix[k] * dY_mix_d_stream[k][i].d_mdot;
+        y_sum += hk_mix[k] * (streams[i].Y[k] - Y_mix[k]);
       }
-      jac.d_mdot = (dh_mix_d_mdot - sum_hk_dY) / cp_mix;
+      dT_jac.d_mdot = (h_diff - y_sum) / (mdot_tot * cp_mix);
 
+      // d(T_mix)/d(Y_i,k)
       for (std::size_t k = 0; k < n_species; ++k) {
-        double dh_mix_d_Yki = (streams[i].m_dot * hk_mass[i][k]) / mdot_tot;
-        double dY_mix_k_d_Yki = dY_mix_d_stream[k][i].d_Y[k];
-        jac.d_Y[k] = (dh_mix_d_Yki - hk_mix[k] * dY_mix_k_d_Yki) / cp_mix;
+        dT_jac.d_Y[k] =
+            streams[i].m_dot * (hk_mass[i][k] - hk_mix[k]) / (mdot_tot * cp_mix);
+      }
+
+      // Y_mix sensitivities
+      for (std::size_t k = 0; k < n_species; ++k) {
+        StreamJacobian &dY_jac_k = res.dY_mix_d_stream[k][i];
+        dY_jac_k.d_Y.assign(n_species, 0.0);
+        dY_jac_k.d_mdot = (streams[i].Y[k] - Y_mix[k]) / mdot_tot;
+        dY_jac_k.d_T = 0.0;
+        dY_jac_k.d_P_total = 0.0;
+        dY_jac_k.d_Y[k] = streams[i].m_dot / mdot_tot;
       }
     } else {
-      jac.d_mdot = 0.0;
-      jac.d_T = 0.0;
+      dT_jac.d_mdot = 0.0;
+      dT_jac.d_T = 0.0;
+      dT_jac.d_P_total = 0.0;
+      dP_jac.d_mdot = 0.0;
+      dP_jac.d_T = 0.0;
+      dP_jac.d_P_total = 0.0;
+      for (std::size_t k = 0; k < n_species; ++k) {
+        StreamJacobian &dY_jac_k = res.dY_mix_d_stream[k][i];
+        dY_jac_k.d_mdot = 0.0;
+        dY_jac_k.d_T = 0.0;
+        dY_jac_k.d_P_total = 0.0;
+        dY_jac_k.d_Y.assign(n_species, 0.0);
+      }
     }
   }
 
-  return {T_mix, Y_mix, dT_mix_d_stream, dY_mix_d_stream};
+  return res;
 }
 
 MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
@@ -805,8 +822,10 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
 
   MixerResult res;
   res.T_mix = T_ad;
+  res.P_total_mix = mix.P_total_mix;
   res.Y_mix = Y_b;
   res.dT_mix_d_stream.resize(n_streams);
+  res.dP_total_mix_d_stream = mix.dP_total_mix_d_stream;
   res.dY_mix_d_stream.assign(n_species, std::vector<StreamJacobian>(n_streams));
 
   for (std::size_t i = 0; i < n_streams; ++i) {
@@ -822,15 +841,20 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
       return sum;
     };
 
-    std::vector<double> dY_mix_dmdot(n_species), dY_mix_dT(n_species);
+    std::vector<double> dY_mix_dmdot(n_species), dY_mix_dT(n_species),
+        dY_mix_dP_total(n_species);
     for (std::size_t k = 0; k < n_species; ++k) {
       dY_mix_dmdot[k] = mix.dY_mix_d_stream[k][i].d_mdot;
       dY_mix_dT[k] = mix.dY_mix_d_stream[k][i].d_T;
+      dY_mix_dP_total[k] = mix.dY_mix_d_stream[k][i].d_P_total;
     }
 
     dT_stream.d_mdot =
         compute_chain(mix.dT_mix_d_stream[i].d_mdot, dY_mix_dmdot);
     dT_stream.d_T = compute_chain(mix.dT_mix_d_stream[i].d_T, dY_mix_dT);
+    dT_stream.d_P_total =
+        compute_chain(mix.dT_mix_d_stream[i].d_P_total, dY_mix_dP_total);
+
     for (std::size_t j = 0; j < n_species; ++j) {
       std::vector<double> dY_j(n_species);
       for (std::size_t k = 0; k < n_species; ++k)
@@ -854,6 +878,9 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
       dY_stream.d_mdot =
           compute_Y_chain(mix.dT_mix_d_stream[i].d_mdot, dY_mix_dmdot);
       dY_stream.d_T = compute_Y_chain(mix.dT_mix_d_stream[i].d_T, dY_mix_dT);
+      dY_stream.d_P_total =
+          compute_Y_chain(mix.dT_mix_d_stream[i].d_P_total, dY_mix_dP_total);
+
       for (std::size_t j = 0; j < n_species; ++j) {
         std::vector<double> dY_j(n_species);
         for (std::size_t k = 0; k < n_species; ++k)
@@ -909,8 +936,10 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
 
   MixerResult res;
   res.T_mix = T_ad;
+  res.P_total_mix = mix.P_total_mix;
   res.Y_mix = Y_b;
   res.dT_mix_d_stream.resize(n_streams);
+  res.dP_total_mix_d_stream = mix.dP_total_mix_d_stream;
   res.dY_mix_d_stream.assign(n_species, std::vector<StreamJacobian>(n_streams));
 
   for (std::size_t i = 0; i < n_streams; ++i) {
@@ -926,15 +955,20 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
       return sum;
     };
 
-    std::vector<double> dY_mix_dmdot(n_species), dY_mix_dT(n_species);
+    std::vector<double> dY_mix_dmdot(n_species), dY_mix_dT(n_species),
+        dY_mix_dP_total(n_species);
     for (std::size_t k = 0; k < n_species; ++k) {
       dY_mix_dmdot[k] = mix.dY_mix_d_stream[k][i].d_mdot;
       dY_mix_dT[k] = mix.dY_mix_d_stream[k][i].d_T;
+      dY_mix_dP_total[k] = mix.dY_mix_d_stream[k][i].d_P_total;
     }
 
     dT_stream.d_mdot =
         compute_chain(mix.dT_mix_d_stream[i].d_mdot, dY_mix_dmdot);
     dT_stream.d_T = compute_chain(mix.dT_mix_d_stream[i].d_T, dY_mix_dT);
+    dT_stream.d_P_total =
+        compute_chain(mix.dT_mix_d_stream[i].d_P_total, dY_mix_dP_total);
+
     for (std::size_t j = 0; j < n_species; ++j) {
       std::vector<double> dY_j(n_species);
       for (std::size_t k = 0; k < n_species; ++k)
@@ -958,6 +992,9 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
       dY_stream.d_mdot =
           compute_Y_chain(mix.dT_mix_d_stream[i].d_mdot, dY_mix_dmdot);
       dY_stream.d_T = compute_Y_chain(mix.dT_mix_d_stream[i].d_T, dY_mix_dT);
+      dY_stream.d_P_total =
+          compute_Y_chain(mix.dT_mix_d_stream[i].d_P_total, dY_mix_dP_total);
+
       for (std::size_t j = 0; j < n_species; ++j) {
         std::vector<double> dY_j(n_species);
         for (std::size_t k = 0; k < n_species; ++k)
@@ -969,18 +1006,17 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
   return res;
 }
 
-
 OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
                                              double P_static_up, double T_up,
                                              const std::vector<double> &Y_up,
                                              double P_static_down, double Cd,
-                                             double area) {
+                                             double area, double beta) {
   // Use regularized dP to avoid singularity at dP=0
   double dP = P_total_up - P_static_down;
   const std::vector<double> X_up = mass_to_mole(normalize_fractions(Y_up));
   auto [rho, drho_dT, drho_dP] = density_and_jacobians(T_up, P_static_up, X_up);
 
-  auto [mdot_calc, dmdot_ddP] = orifice_mdot_and_jacobian(dP, rho, Cd, area);
+  auto [mdot_calc, dmdot_ddP] = orifice_mdot_and_jacobian(dP, rho, Cd, area, beta);
 
   OrificeResult res;
   res.m_dot_calc = mdot_calc;
@@ -999,9 +1035,9 @@ OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
     std::vector<double> Y_plus = Y_up;
     Y_plus[i] += eps_Y;
     auto X_plus = mass_to_mole(normalize_fractions(Y_plus));
-    double rho_plus = ::density(T_up, P_static_up, X_plus);
+    double rho_plus = std::get<0>(density_and_jacobians(T_up, P_static_up, X_plus));
     // Reuse orifice_mdot_and_jacobian for mdot_plus to ensure identical regularization
-    auto [mdot_plus, dummy] = orifice_mdot_and_jacobian(dP, rho_plus, Cd, area);
+    auto [mdot_plus, dummy] = orifice_mdot_and_jacobian(dP, rho_plus, Cd, area, beta);
     res.d_mdot_dY_up[i] = (mdot_plus - mdot_calc) / eps_Y;
   }
 
@@ -1065,8 +1101,8 @@ PipeResult pipe_residuals_and_jacobian(double m_dot, double P_total_up,
     std::vector<double> Y_plus = Y_up;
     Y_plus[i] += eps_Y;
     auto X_plus = mass_to_mole(normalize_fractions(Y_plus));
-    double rho_plus = ::density(T_up, P_static_up, X_plus);
-    double mu_plus = ::viscosity(T_up, P_static_up, X_plus);
+    double rho_plus = std::get<0>(density_and_jacobians(T_up, P_static_up, X_plus));
+    double mu_plus = std::get<0>(viscosity_and_jacobians(T_up, P_static_up, X_plus));
     double v_plus = m_dot / (rho_plus * area);
     double Re_plus = rho_plus * std::abs(v_plus) * D / mu_plus;
     auto [f_plus, dummy] = friction_and_jacobian(friction_model, Re_plus, roughness / D).result;
