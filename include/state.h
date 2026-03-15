@@ -100,6 +100,33 @@ struct State {
   std::tuple<double, double> SH_mass() const;
 };
 
+// High-level thermodynamic state for network nodes.
+// Carries both static (P, T) and total (P_total, T_total) conditions,
+// along with mass flow and composition.
+struct MixtureState {
+  double P = 101325.0;       // Static pressure [Pa]
+  double P_total = 101325.0; // Total pressure [Pa]
+  double T = 298.15;         // Static temperature [K]
+  double T_total = 298.15;   // Total temperature [K]
+  double m_dot = 0.0;        // Mass flow rate [kg/s]
+  std::vector<double> X;     // Mole fractions [-]
+  std::vector<double> Y;     // Mass fractions [-]
+
+  // Returns a standard State object at static conditions
+  State static_state() const {
+    State s;
+    s.set_TPX(T, P, X);
+    return s;
+  }
+
+  // Returns a standard State object at stagnation conditions
+  State total_state() const {
+    State s;
+    s.set_TPX(T_total, P_total, X);
+    return s;
+  }
+};
+
 // A stream is a state with a mass flow rate
 struct Stream {
   State state;
@@ -225,7 +252,7 @@ struct EquilibriumResult {
 //                 (slower, physically correct for rich or high-T conditions)
 // Designed for extension: a future WGS-only or full-Gibbs option can be added
 // here.
-enum class CombustionMethod {
+enum class CombustionMethod : std::uint8_t {
   Complete,
   Equilibrium,
 };

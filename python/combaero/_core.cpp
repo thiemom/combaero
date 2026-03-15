@@ -78,18 +78,87 @@ PYBIND11_MODULE(_core, m) {
                     "), status=" + status_str + ">";
            });
 
-  // Stream Definitions
   py::class_<solver::Stream>(m, "MassStream", "Mass stream descriptor")
-      .def(py::init<double, double, std::vector<double>>())
+      .def(py::init<double, double, double, std::vector<double>>())
       .def_readwrite("m_dot", &solver::Stream::m_dot)
       .def_readwrite("T", &solver::Stream::T)
+      .def_readwrite("P_total", &solver::Stream::P_total)
       .def_readwrite("Y", &solver::Stream::Y);
 
   py::class_<solver::StreamJacobian>(m, "StreamJacobian",
                                      "Derivatives w.r.t a stream")
       .def_readonly("d_mdot", &solver::StreamJacobian::d_mdot)
       .def_readonly("d_T", &solver::StreamJacobian::d_T)
+      .def_readonly("d_P_total", &solver::StreamJacobian::d_P_total)
       .def_readonly("d_Y", &solver::StreamJacobian::d_Y);
+
+  py::class_<MixtureState>(m, "MixtureState",
+                          "High-level state for network components")
+      .def(py::init([](double P, double P_total, double T, double T_total,
+                       double m_dot, const std::vector<double> &Y) {
+             MixtureState s;
+             s.P = P;
+             s.P_total = P_total;
+             s.T = T;
+             s.T_total = T_total;
+             s.m_dot = m_dot;
+             if (!Y.empty()) {
+               s.Y = Y;
+               double sum = 0.0;
+               for (double y : Y) sum += y;
+               if (sum > 0.0) {
+                 s.X = mass_to_mole(Y);
+               } else {
+                 s.X.assign(Y.size(), 0.0);
+               }
+             } else {
+               int n = num_species();
+               s.X.assign(n, 0.0);
+               s.Y.assign(n, 0.0);
+               if (n > 0) {
+                   s.X[0] = 1.0; // Default to first species (usually N2 or similar)
+                   s.Y[0] = 1.0;
+               }
+             }
+             return s;
+           }),
+           py::arg("P") = 101325.0, py::arg("P_total") = 101325.0,
+           py::arg("T") = 298.15, py::arg("T_total") = 298.15,
+           py::arg("m_dot") = 0.0, py::arg("Y") = std::vector<double>{})
+      .def_readwrite("P", &MixtureState::P)
+      .def_readwrite("P_total", &MixtureState::P_total)
+      .def_readwrite("T", &MixtureState::T)
+      .def_readwrite("T_total", &MixtureState::T_total)
+      .def_readwrite("m_dot", &MixtureState::m_dot)
+       .def_property("X",
+            [](const MixtureState &s) { return s.X; },
+            [](MixtureState &s, const std::vector<double> &v) {
+                s.X = v;
+                if (!v.empty()) s.Y = mole_to_mass(v);
+            })
+        .def_property("Y",
+            [](const MixtureState &s) { return s.Y; },
+            [](MixtureState &s, const std::vector<double> &v) {
+                s.Y = v;
+                if (!v.empty()) s.X = mass_to_mole(v);
+            })
+      .def("density", [](const MixtureState &s) { return s.static_state().rho(); })
+      .def("cp", [](const MixtureState &s) { return cp_mass(s.T, s.X); })
+      .def("specific_heat", [](const MixtureState &s) { return cp_mass(s.T, s.X); })
+      .def("h", [](const MixtureState &s) { return h_mass(s.T, s.X); })
+      .def("enthalpy", [](const MixtureState &s) { return h_mass(s.T, s.X); })
+      .def("mw", [](const MixtureState &s) { return s.static_state().mw(); })
+      .def("molecular_weight", [](const MixtureState &s) { return s.static_state().mw(); })
+      .def("static_state", &MixtureState::static_state)
+      .def("total_state", &MixtureState::total_state);
+
+
+  py::class_<solver::ChamberResult>(m, "ChamberResult",
+                                    "Analytical node residuals")
+      .def(py::init<>())
+      .def_readonly("residuals", &solver::ChamberResult::residuals)
+      .def_readonly("local_jacobian", &solver::ChamberResult::local_jacobian)
+      .def_readonly("stream_jacobian", &solver::ChamberResult::stream_jacobian);
 
   py::class_<solver::MixerResult>(
       m, "MixerResult", "Output and internal gradients of stream mixes")
@@ -106,6 +175,42 @@ PYBIND11_MODULE(_core, m) {
   m.def("adiabatic_T_equilibrium_and_jacobians_from_streams",
         &solver::adiabatic_T_equilibrium_and_jacobians_from_streams,
         py::arg("streams"), py::arg("P"));
+
+  m.def("plenum_residuals_and_jacobian", &solver::plenum_residuals_and_jacobian,
+        py::arg("state"), py::arg("up_streams"));
+  m.def("combustor_residuals_and_jacobian",
+        &solver::combustor_residuals_and_jacobian, py::arg("state"),
+        py::arg("up_streams"), py::arg("method"), py::arg("pressure_loss_frac"));
+
+  py::class_<solver::OrificeResult>(
+      m, "OrificeResult", "Result of orifice residual and Jacobian evaluation")
+      .def_readonly("m_dot_calc", &solver::OrificeResult::m_dot_calc)
+      .def_readonly("d_mdot_dP_total_up", &solver::OrificeResult::d_mdot_dP_total_up)
+      .def_readonly("d_mdot_dP_static_down",
+                    &solver::OrificeResult::d_mdot_dP_static_down)
+      .def_readonly("d_mdot_dP_static_up",
+                    &solver::OrificeResult::d_mdot_dP_static_up)
+      .def_readonly("d_mdot_dT_up", &solver::OrificeResult::d_mdot_dT_up)
+      .def_readonly("d_mdot_dY_up", &solver::OrificeResult::d_mdot_dY_up);
+
+  py::class_<solver::PipeResult>(
+      m, "PipeResult", "Result of pipe residual and Jacobian evaluation")
+      .def_readonly("dP_calc", &solver::PipeResult::dP_calc)
+      .def_readonly("d_dP_d_mdot", &solver::PipeResult::d_dP_d_mdot)
+      .def_readonly("d_dP_dP_static_up", &solver::PipeResult::d_dP_dP_static_up)
+      .def_readonly("d_dP_dT_up", &solver::PipeResult::d_dP_dT_up)
+      .def_readonly("d_dP_dY_up", &solver::PipeResult::d_dP_dY_up);
+
+  m.def("orifice_residuals_and_jacobian",
+        &solver::orifice_residuals_and_jacobian, py::arg("m_dot"),
+        py::arg("P_total_up"), py::arg("P_static_up"), py::arg("T_up"),
+        py::arg("Y_up"), py::arg("P_static_down"), py::arg("Cd"),
+        py::arg("area"));
+
+  m.def("pipe_residuals_and_jacobian", &solver::pipe_residuals_and_jacobian,
+        py::arg("m_dot"), py::arg("P_total_up"), py::arg("P_static_up"),
+        py::arg("T_up"), py::arg("Y_up"), py::arg("P_static_down"), py::arg("L"),
+        py::arg("D"), py::arg("roughness"), py::arg("friction_model"));
 
   // Species metadata helpers
   m.def("num_species", &num_species,

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import combaero as cb
 
@@ -47,11 +47,24 @@ class NetworkNode(ABC):
 
     @abstractmethod
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
-        """
-        Returns (residuals, local_jacobian).
-        local_jacobian is a dict mapping equation_index to a dict of {unknown_name: partial_derivative}.
-        """
+        """Returns (residuals, local_jacobian)."""
         pass
+
+    def compute_derived_state(
+        self, upstream_states: list[MixtureState]
+    ) -> tuple[float, list[float], Any]:
+        """
+        Computes (T_total, Y, Jac) for nodes based on upstream conditions.
+        Jac contains derivatives d(T_total)/d(stream_i) and d(Y)/d(stream_i).
+        By default, it just takes the first upstream state (pass-through).
+        """
+        if not upstream_states:
+            import combaero as cb
+
+            return 300.0, list(cb.mole_to_mass(cb.standard_dry_air_composition())), None
+
+        up = upstream_states[0]
+        return up.T_total, up.Y, None
 
     @abstractmethod
     def resolve_topology(self, graph: "FlowNetwork") -> None:
@@ -104,15 +117,23 @@ class PlenumNode(NetworkNode):
         self.upstream_elements = []
 
     def unknowns(self) -> list[str]:
-        # Base unknowns for Phase 1 (pressure only)
-        unknowns = [f"{self.id}.P", f"{self.id}.P_total"]
+        # Pure Pressure-Flow: Temperature and Composition are derived forward, not unknowns.
+        return [f"{self.id}.P", f"{self.id}.P_total"]
 
-        # Add temperature for Phase 2+ (energy conservation)
-        if self.enable_mixing:
-            unknowns.append(f"{self.id}.T")
-            for i in range(cb.num_species()):
-                unknowns.append(f"{self.id}.Y[{i}]")
-        return unknowns
+    def compute_derived_state(
+        self, upstream_states: list[MixtureState]
+    ) -> tuple[float, list[float], Any]:
+        """Derived T and Y for a plenum (simple mixing)."""
+        import combaero as cb
+
+        if not upstream_states:
+            return 300.0, list(cb.mole_to_mass(cb.standard_dry_air_composition())), None
+
+        streams = [
+            cb.MassStream(abs(s.m_dot) + 1e-10, s.T_total, s.P_total, s.Y) for s in upstream_states
+        ]
+        mix_res = cb.mixer_from_streams_and_jacobians(streams)
+        return mix_res.T_mix, mix_res.Y_mix, mix_res
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
         # Base residual: P_total = P for plenum
@@ -157,15 +178,23 @@ class MomentumChamberNode(NetworkNode):
         return self.port_angles_deg.get(element_id, 0.0)
 
     def unknowns(self) -> list[str]:
-        # P, P_total for momentum conservation placeholder
-        unknowns = [f"{self.id}.P", f"{self.id}.P_total"]
-        if self.enable_mixing:
-            unknowns.append(f"{self.id}.T")
-            import combaero as cb
+        # Pure Pressure-Flow: Temperature and Composition are derived forward, not unknowns.
+        return [f"{self.id}.P", f"{self.id}.P_total"]
 
-            for i in range(cb.num_species()):
-                unknowns.append(f"{self.id}.Y[{i}]")
-        return unknowns
+    def compute_derived_state(
+        self, upstream_states: list[MixtureState]
+    ) -> tuple[float, list[float], Any]:
+        """Derived T and Y for a momentum chamber (simple mixing for now)."""
+        import combaero as cb
+
+        if not upstream_states:
+            return 300.0, list(cb.mole_to_mass(cb.standard_dry_air_composition())), None
+
+        streams = [
+            cb.MassStream(abs(s.m_dot) + 1e-10, s.T_total, s.P_total, s.Y) for s in upstream_states
+        ]
+        mix_res = cb.mixer_from_streams_and_jacobians(streams)
+        return mix_res.T_mix, mix_res.Y_mix, mix_res
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
         """
@@ -212,6 +241,19 @@ class PressureBoundary(NetworkNode):
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
         return [], {}
 
+    def compute_derived_state(
+        self, upstream_states: list[MixtureState]
+    ) -> tuple[float, list[float], Any]:
+        # Boundary nodes define their own state
+        import combaero as cb
+
+        Y = (
+            self.Y
+            if self.Y is not None
+            else list(cb.mole_to_mass(cb.standard_dry_air_composition()))
+        )
+        return self.T_total, Y, None
+
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         pass
 
@@ -244,6 +286,19 @@ class MassFlowBoundary(NetworkNode):
         jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.P_total": 1.0}}
         return res, jac
 
+    def compute_derived_state(
+        self, upstream_states: list[MixtureState]
+    ) -> tuple[float, list[float], Any]:
+        # Boundary nodes define their own state
+        import combaero as cb
+
+        Y = (
+            self.Y
+            if self.Y is not None
+            else list(cb.mole_to_mass(cb.standard_dry_air_composition()))
+        )
+        return self.T_total, Y, None
+
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         pass
 
@@ -273,125 +328,36 @@ class CombustorNode(NetworkNode):
         self.fuel_boundary = fuel_bc
 
     def unknowns(self) -> list[str]:
+        # Pure Pressure-Flow: Temperature and Composition are derived forward, not unknowns.
+        return [f"{self.id}.P", f"{self.id}.P_total"]
+
+    def compute_derived_state(
+        self, upstream_states: list[MixtureState]
+    ) -> tuple[float, list[float], Any]:
+        """Derived T and Y for a combustor (Reaction + Mixing)."""
         import combaero as cb
 
-        # P, P_total, T, and dynamic species for combustion chamber
-        unknowns = [f"{self.id}.P", f"{self.id}.P_total", f"{self.id}.T"]
-        for i in range(cb.num_species()):
-            unknowns.append(f"{self.id}.Y[{i}]")
-        return unknowns
+        if not upstream_states:
+            # Default fallback
+            return 300.0, list(cb.mole_to_mass(cb.standard_dry_air_composition())), None
+
+        streams = [
+            cb.MassStream(abs(s.m_dot) + 1e-10, s.T_total, s.P_total, s.Y) for s in upstream_states
+        ]
+        P_ref = upstream_states[0].P if upstream_states else 101325.0
+
+        if self.method == "equilibrium":
+            mix_res = cb.adiabatic_T_equilibrium_and_jacobians_from_streams(streams, P_ref)
+        else:
+            mix_res = cb.adiabatic_T_complete_and_jacobian_T_from_streams(streams, P_ref)
+        return mix_res.T_mix, mix_res.Y_mix, mix_res
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
-        # This standard residuals method is bypassed by solver_interface for CombustorNode,
-        # which calls combustor_residuals() instead to provide upstream dependencies.
-        return [], {}
-
-    def combustor_residuals(
-        self, state: MixtureState, up_states: list, name_to_index: dict
-    ) -> tuple[list[float], dict]:
-        import combaero as cb
-
-        res = []
-        jac = {}
-
-        streams = []
-        m_dot_total = 0.0
-        P_total_in_mix = 0.0
-
-        for _elem_id, _from_id, state_up, _idx_mdot in up_states:
-            m_dot = abs(float(state_up.m_dot)) + 1e-10
-            m_dot_total += m_dot
-            P_total_in_mix += m_dot * state_up.P_total
-            streams.append(cb.MassStream(m_dot, float(state_up.T), [float(y) for y in state_up.Y]))
-
-        if m_dot_total > 0:
-            P_total_in_mix /= m_dot_total
-        else:
-            P_total_in_mix = state.P_total
-
-        safe_P = max(float(state.P), 1000.0)
-
-        try:
-            if self.method == "equilibrium":
-                mix_res = cb._core.adiabatic_T_equilibrium_and_jacobians_from_streams(
-                    streams, safe_P
-                )
-            else:
-                mix_res = cb._core.adiabatic_T_complete_and_jacobian_T_from_streams(streams, safe_P)
-        except Exception:
-            # Fallback
-            mix_res = cb._core.adiabatic_T_complete_and_jacobian_T_from_streams(streams, safe_P)
-
-        T_ad = mix_res.T_mix
-        Y_burned = mix_res.Y_mix
-
-        if abs(state.T - T_ad) < 0.1:
-            print("--- COMBUSTOR NODE NEAR CONVERGENCE ---")
-            print(f"Y_burned: {[y for y in Y_burned if y > 1e-6]}")
-            print("---------------------------------------")
-
-        eq_energy = len(res)
-
-        # Add smooth penalty outside valid range to prevent crashes in the wild
-        if state.T > 6000.0:
-            res.append(6000.0 - T_ad + (state.T - 6000.0))
-        elif state.T < 200.0:
-            res.append(200.0 - T_ad + (state.T - 200.0))
-        else:
-            res.append(state.T - T_ad)
-
-        jac[eq_energy] = {}
-        if f"{self.id}.T" in name_to_index:
-            jac[eq_energy][f"{self.id}.T"] = 1.0
-
-        n_species = cb.num_species()
-
-        # Apply analytical cross-jacobians from C++ wrapper
-        for n, (_elem_id, from_id, state_up, idx_mdot) in enumerate(up_states):
-            stream_jac = mix_res.dT_mix_d_stream[n]
-
-            if idx_mdot is not None:
-                sign = 1.0 if state_up.m_dot >= 0 else -1.0
-                jac[eq_energy][idx_mdot] = -stream_jac.d_mdot * sign
-
-            if f"{from_id}.T" in name_to_index:
-                jac[eq_energy][f"{from_id}.T"] = -stream_jac.d_T
-
-            for k in range(n_species):
-                if f"{from_id}.Y[{k}]" in name_to_index:
-                    jac[eq_energy][f"{from_id}.Y[{k}]"] = -stream_jac.d_Y[k]
-
-        # Species Residuals
-        for i in range(n_species):
-            eq_idx = len(res)
-            res.append(state.Y[i] - Y_burned[i])
-            jac[eq_idx] = {}
-            if f"{self.id}.Y[{i}]" in name_to_index:
-                jac[eq_idx][f"{self.id}.Y[{i}]"] = 1.0
-
-            for n, (_elem_id, from_id, state_up, idx_mdot) in enumerate(up_states):
-                stream_Y_jac = mix_res.dY_mix_d_stream[i][n]
-
-                if idx_mdot is not None:
-                    sign = 1.0 if state_up.m_dot >= 0 else -1.0
-                    jac[eq_idx][idx_mdot] = -stream_Y_jac.d_mdot * sign
-
-                if f"{from_id}.T" in name_to_index:
-                    jac[eq_idx][f"{from_id}.T"] = -stream_Y_jac.d_T
-
-                for k in range(n_species):
-                    if f"{from_id}.Y[{k}]" in name_to_index:
-                        jac[eq_idx][f"{from_id}.Y[{k}]"] = -stream_Y_jac.d_Y[k]
-
-        # 4. Pressure Residuals
-        eq_pstat = len(res)
-        res.append(state.P_total - state.P)
-        jac[eq_pstat] = {}
-        if f"{self.id}.P_total" in name_to_index:
-            jac[eq_pstat][f"{self.id}.P_total"] = 1.0
-        if f"{self.id}.P" in name_to_index:
-            jac[eq_pstat][f"{self.id}.P"] = -1.0
-
+        # Stagnation assumptions: P_total = P_static
+        # This provides the second equation matching [P, P_total] unknowns,
+        # while mass conservation provides the first.
+        res = [state.P_total - state.P]
+        jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.P_total": 1.0}}
         return res, jac
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
@@ -433,99 +399,41 @@ class OrificeElement(NetworkElement):
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
 
-    def residuals(self, state_in: MixtureState, state_out: MixtureState) -> list[float]:
+    def residuals(
+        self, state_in: MixtureState, state_out: MixtureState
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+
         import combaero as cb
 
         m_dot = state_in.m_dot
 
-        # Determine actual flow direction and valid upstream properties
-        dP_fwd = state_in.P_total - state_out.P
+        # Call optimized C++ kernel
+        res_cpp = cb.orifice_residuals_and_jacobian(
+            m_dot,
+            state_in.P_total,
+            state_in.P,
+            state_in.T,
+            state_in.Y,
+            state_out.P,
+            self.Cd,
+            self.area,
+        )
 
-        # If the pressure gradient physically forces reverse flow, or if the solver is
-        # testing negative m_dot when dP=0, we evaluate in reverse
-        if dP_fwd > 0 or (dP_fwd == 0 and m_dot > 0):
-            rho = state_in.density()
-            sign = 1.0
-            abs_dP = dP_fwd
-        else:
-            rho = state_out.density()
-            sign = -1.0
-            abs_dP = -dP_fwd
+        res = [m_dot - res_cpp.m_dot_calc]
 
-        m_dot_calc, J_dP = cb.orifice_mdot_and_jacobian(abs_dP, rho, self.Cd, self.area)
-
-        # In a real model, we would pass eff_upstream_D to cb.orifice_mdot_and_jacobian
-        # for approach velocity correction (Beta ratio).
-        # The current C++ interface doesn't yet support BETA correction or variable Cd,
-        # but the Python network topology is now inherently prepared for it.
-
-        m_dot_calc *= sign
-
-        # Residual: guessed m_dot (carried by state_in/out) minus calculated m_dot
-        res = [m_dot - m_dot_calc]
-
-        # Jacobian calculation:
-        # R = m_dot - sign * f(abs_dP, rho)
-        # dR/d_mdot = 1.0
-        # dR/d_P_total_upstream = -sign * J_dP = -J_dP
-        # dR/d_P_static_downstream = -sign * (-J_dP) = J_dP
-        # SECONDARY: dR/d_P_static_upstream = -sign * d(f)/d_rho * d_rho/d_P
-        # For orifice: f ~ sqrt(rho), so df/d_rho = f / (2 * rho)
-        # d_rho/d_P = rho / P (ideal gas)
-        # dR/d_P_static_upstream = -sign * (f / (2 * rho)) * (rho / P) = -sign * f / (2 * P)
-        #                       = -m_dot_calc / (2 * P_upstream)
-
-        if dP_fwd >= 0:
-            upstream_id = self.from_node
-            P_upstream = state_in.P
-            T_upstream = state_in.T
-        else:
-            upstream_id = self.to_node
-            P_upstream = state_out.P
-            T_upstream = state_out.T
-
-        # Ideal gas approximation for density derivatives:
-        # rho ~ P/T, so d(rho)/dP = rho/P, d(rho)/dT = -rho/T
-        # m_dot ~ sqrt(rho), so d(m_dot)/d(rho) = m_dot / (2 rho)
-        # Thus: d(m_dot)/dP = m_dot_calc / (2 P)
-        # And:  d(m_dot)/dT = -m_dot_calc / (2 T)
-        J_rho_p = -m_dot_calc / (2.0 * P_upstream)
-        J_rho_T = m_dot_calc / (
-            2.0 * T_upstream
-        )  # Note: res = m_dot - calc, so d(res) = - d(calc), thus -(-m_dot/(2T)) = positive
-
-        # jacobian indices based on physical node IDs because res = m_dot - Calc(A->B)
-        P_A_id = self.from_node
-        P_B_id = self.to_node
-
+        # Assemble Jacobian with respect to all node and element unknowns
         jac = {
             0: {
                 f"{self.id}.m_dot": 1.0,
-                f"{P_A_id}.P_total": -J_dP,
-                f"{P_B_id}.P": J_dP,
-                # Density derivatives are based on the physical source node upstream
-                f"{upstream_id}.P": J_rho_p,
-                f"{upstream_id}.T": J_rho_T,
+                f"{self.from_node}.P_total": -res_cpp.d_mdot_dP_total_up,
+                f"{self.from_node}.P": -res_cpp.d_mdot_dP_static_up,
+                f"{self.from_node}.T": -res_cpp.d_mdot_dT_up,
+                f"{self.to_node}.P": -res_cpp.d_mdot_dP_static_down,
             }
         }
-
-        if hasattr(state_in, "Y") and state_in.Y is not None:
-            import combaero as cb
-
-            n_species = cb.num_species()
-
-            Y_eval = state_in.Y if dP_fwd >= 0 else state_out.Y
-            X_eval = cb.mass_to_mole(Y_eval)
-            base_rho = cb.density(T_upstream, P_upstream, X_eval)
-
-            for i in range(n_species):
-                Y_p = list(Y_eval)
-                Y_p[i] += 1e-6
-                rho_p = cb.density(T_upstream, P_upstream, cb.mass_to_mole(Y_p))
-                drho_dY = (rho_p - base_rho) / 1e-6
-
-                J_rho_Yi = -(m_dot_calc / (2.0 * base_rho)) * drho_dY if base_rho > 0 else 0.0
-                jac[0][f"{upstream_id}.Y[{i}]"] = J_rho_Yi
+        # Add species sensitivities
+        for i, val in enumerate(res_cpp.d_mdot_dY_up):
+            jac[0][f"{self.from_node}.Y[{i}]"] = -val
 
         return res, jac
 
@@ -779,7 +687,6 @@ class PipeElement(NetworkElement):
         return [f"{self.id}.m_dot"]
 
     def residuals(self, state_in: MixtureState, state_out: MixtureState) -> list[float]:
-        import math
 
         import combaero as cb
 
@@ -787,92 +694,43 @@ class PipeElement(NetworkElement):
         dP_fwd = state_in.P_total - state_out.P
 
         if dP_fwd > 0 or (dP_fwd == 0 and m_dot > 0):
-            rho = state_in.density()
             import combaero as cb
 
-            # Use mass_to_mole for viscosity, since C++ expects mole fractions for transport currently
-            mu = cb.viscosity(state_in.T, state_in.P, cb.mass_to_mole(state_in.Y))
-            dP_actual = dP_fwd
-        else:
-            rho = state_out.density()
-            import combaero as cb
-
-            mu = cb.viscosity(state_out.T, state_out.P, cb.mass_to_mole(state_out.Y))
-            dP_actual = -dP_fwd
-
-        abs_mdot = abs(m_dot)
-
-        # Derived geometry
-        D = self.diameter
-        A = math.pi * (D / 2.0) ** 2
-        e_D = self.roughness / D
-
-        # Re = 4 * m_dot / (pi * D * mu)
-        Re = max(4.0 * abs_mdot / (math.pi * D * mu), 1.0)
-
-        # f and d(f)/d(Re) from the appropriate analytical (f, J) solver function
-        _corr = cb.friction_and_jacobian(self.friction_model, Re, e_D)
-
-        # Integrate Warning / Validity logic (TODO 3 implementation)
-        if _corr.status == cb.CorrelationValidity.INVALID:
-            import warnings
-
-            warnings.warn(
-                f"PipeElement {self.id} validity error: {_corr.message}",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-        f, df_dRe = _corr.result
-
-        # dP = f * (L/D) * 0.5 * rho * v^2,  v = m_dot / (rho * A)
-        v = abs_mdot / (rho * A)
-        L_over_D = self.length / D
-        dP_calc = f * L_over_D * 0.5 * rho * v * v
-
-        # Residual: driving pressure difference minus frictional loss
-        res = [dP_actual - dP_calc]
-
-        # Jacobian wrt m_dot:
-        # d(dP_calc)/d|mdot| = (L/D * 0.5 * rho * 1/(rho*A)^2) * [df/dRe * dRe/d|mdot| * |mdot|^2 + 2 * f * |mdot|]
-        #                    = (L / (2 * D * rho * A^2)) * [df/dRe * (4/(pi*D*mu)) * |mdot|^2 + 2 * f * |mdot|]
-
-        const = L_over_D / (2.0 * rho * A * A)
-        dRe_dabsmdot = 4.0 / (math.pi * D * mu)
-
-        ddPcalc_dabsmdot = const * (
-            df_dRe * dRe_dabsmdot * abs_mdot * abs_mdot + 2.0 * f * abs_mdot
+        res_cpp = cb.pipe_residuals_and_jacobian(
+            m_dot,
+            state_in.P_total,
+            state_in.P,
+            state_in.T,
+            state_in.Y,
+            state_out.P,
+            self.length,
+            self.diameter,
+            self.roughness,
+            self.friction_model,
         )
 
-        # d(res)/d(m_dot) = d(dP_actual)/d(m_dot) - d(dP_calc)/d(m_dot)
-        # d(dP_actual)/d(m_dot) = 0
-        # d(dP_calc)/d(m_dot) = ddPcalc_dabsmdot * sign(m_dot)
+        # Residual of P-node unknowns matching pipe drop
+        # C++ returns dP_calc = friction_loss
+        # In a stable network: P_total_up - P_static_down = dP_friction (for exit into plenum)
+        # Or more generally: P_total_up - P_total_down = dP_friction
 
-        dr_dmdot = -ddPcalc_dabsmdot * (1.0 if m_dot >= 0 else -1.0)
+        # Test suite currently expects P_total_up - P_static_down = dP_calc
+        res = [state_in.P_total - state_out.P - res_cpp.dP_calc]
 
-        if dP_fwd >= 0:
-            upstream_id = self.from_node
-            downstream_id = self.to_node
-            P_upstream = state_in.P
-        else:
-            upstream_id = self.to_node
-            downstream_id = self.from_node
-            P_upstream = state_out.P
-
-        # SECONDARY: dR/d_P_static_upstream = -d(dP_calc)/d_rho * d_rho/d_P
-        # dP_calc ~ 1/rho, so d(dP_calc)/d_rho = -dP_calc/rho
-        # d_rho/d_P = rho/P
-        # dR/d_P_static_upstream = -(-dP_calc/rho) * (rho/P) = dP_calc / P
-
-        dr_dp_static = dP_calc / P_upstream
+        upstream_id = self.from_node
+        downstream_id = self.to_node
 
         jac = {
             0: {
-                f"{self.id}.m_dot": dr_dmdot,
+                f"{self.id}.m_dot": -res_cpp.d_dP_d_mdot,
                 f"{upstream_id}.P_total": 1.0,
+                f"{upstream_id}.P": -res_cpp.d_dP_dP_static_up,
+                f"{upstream_id}.T": -res_cpp.d_dP_dT_up,
                 f"{downstream_id}.P": -1.0,
-                f"{upstream_id}.P": dr_dp_static,
             }
         }
+        for i, val in enumerate(res_cpp.d_dP_dY_up):
+            jac[0][f"{upstream_id}.Y[{i}]"] = -val
 
         return res, jac
 

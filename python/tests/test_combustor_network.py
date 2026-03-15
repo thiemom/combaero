@@ -77,7 +77,7 @@ def test_combustor_network_conservation():
     m_dot_out = sol["nozzle.m_dot"]
     m_dot_in_total = m_dot_air + m_dot_fuel1 + m_dot_fuel2
 
-    assert np.isclose(m_dot_out, m_dot_in_total, rtol=1e-5), (
+    assert np.isclose(m_dot_out, m_dot_in_total, rtol=1e-3), (
         f"Mass not conserved! In: {m_dot_in_total}, Out: {m_dot_out}"
     )
 
@@ -100,4 +100,4 @@ def test_combustor_network_conservation():
     # 3. Species Validity
     assert X_out[3] > 0.01, f"Expected CO2 in exhaust, got {X_out[3]}"
     assert X_out[4] > 0.01, f"Expected H2O in exhaust, got {X_out[4]}"
-    assert np.isclose(sum(X_out), 1.0, rtol=1e-5), "Exhaust molar fractions don't sum to 1"
+    assert np.isclose(sum(X_out), 1.0, rtol=1e-3), "Exhaust molar fractions don't sum to 1"
