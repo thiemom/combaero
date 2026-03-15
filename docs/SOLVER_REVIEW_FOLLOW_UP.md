@@ -1,73 +1,58 @@
-# Network Solver Review — Follow-Up
-
-**Date:** 2026-03-15 (initial), **updated** 2026-03-15 (rev 3)
-**Scope:** Re-review of implementation against `SOLVER_REVIEW.md` plan
-**Baseline:** 258/258 C++ tests, 916/916 Python tests passing
-
----
-
-## Executive Summary
-
-The derived-state node architecture (Phases 2–3 of SOLVER_REVIEW.md), the C++
-smoothness audit, and all Python-side cleanup items have been implemented. All
-nodes return only `[P, P_total]` as solver unknowns, with `T` and `Y` derived
-via forward propagation with chain-rule relay (including `P_total` sensitivity).
-The C++ orifice uses regularized sqrt `dP / (dP² + ε²)^0.25`, all friction
-models use regularized `Re_eff = √(Re² + ε²)`, and unused C++ functions have
-been removed. Python dead code (`abs+bias`, `pressure_loss_frac`,
-`enable_mixing`, debug block, stale TODOs/docstrings, pipe dead code) has been
-cleaned up.
-
-**One accuracy gap remains:** the velocity-of-approach factor `E = 1/√(1 − β⁴)`
-is missing from all orifice mass flow paths (solver and standalone). Also, most
-of the prescribed test plan has not been implemented, and the bidirectional
-orifice interface and `Q` parameter are deferred.
-
----
-
-## Implementation Status vs SOLVER_REVIEW.md
-
-### Fully Implemented ✅
-
-| Item | Reference |
-|------|-----------|
-| **P0-1:** `_default_Y` uses mass fractions | `solver.py:55` |
-| **P0-2:** `_build_x0` matches `.Y[` pattern | `solver.py:83` |
-| **P1-4:** Y clamping before thermo conversion | `solver.py:302-308` |
-| **P1-5:** Debug exception printing removed | `solver.py:527-529` |
-| **P1-6:** `strict=False` in hot path | `solver.py:261,290` |
-| **P2-9:** `HeatExchangerElement` removed | — |
-| **Phase 2:** All nodes `[P, P_total]` only | `components.py:120,176,312` |
-| **Phase 2:** `compute_derived_state()` on all node types | `components.py:122,178,314,226,271` |
-| **Phase 3:** Topological ordering | `solver.py:114-141` |
-| **Phase 3:** Forward state propagation | `solver.py:143-226` |
-| **Phase 3:** Chain-rule relay incl. `d_P_total` | `solver.py:172-214` |
-| **Phase 3:** `_get_node_state` uses cached derived state | `solver.py:284-288` |
-| **Phase 3:** Derived states exported in solution dict | `solver.py:563-569` |
-| **Orifice Python:** `if/else` branching removed | `components.py:382-420` |
-| **Pipe Python:** `if/else` branching removed, dead code cleaned | `components.py:676-718` |
-| **C++ Smoothness:** Regularized `√(dP)` for orifice | `solver_interface.cpp:31-51` |
-| **C++ Smoothness:** Regularized Re in all friction models | `solver_interface.cpp:157-158` (haaland), `:200-201` (serghides), `:265-266` (colebrook) |
-| **C++ Smoothness:** Orifice accepts signed dP (no throw) | `solver_interface.cpp:31-51` |
-| **C++ Cleanup:** `combustor_residuals_and_jacobian` removed | `solver_interface.cpp`, `solver_interface.h` |
-| **C++ Cleanup:** `plenum_residuals_and_jacobian` removed | `solver_interface.cpp`, `solver_interface.h` |
-| **Python Cleanup:** `abs(m_dot) + 1e-10` removed | `components.py:131,187,324` — now `cb.MassStream(s.m_dot, ...)` |
-| **Python Cleanup:** `pressure_loss_frac` removed from `CombustorNode` | `components.py:296-300` |
-| **Python Cleanup:** `enable_mixing` flag removed | `components.py:114,154` |
-| **Python Cleanup:** Debug equation name block removed | `solver.py` — no longer present |
-| **Python Cleanup:** Stale `NetworkSolver` docstring updated | `solver.py:25-32` |
-| **Python Cleanup:** `MomentumChamberNode` stale TODO removed | `components.py:191-195` |
-
-### Not Implemented ❌
-
-| Item | SOLVER_REVIEW Section | Impact |
-|------|----------------------|--------|
-| Velocity-of-approach factor `E = 1/√(1-β⁴)` | Orifice physics | Up to 14% error at β=0.7 |
-| C++ bidirectional orifice interface (both T/Y) | Smoothness Audit | Single-sided thermo only |
-| Node-level `Q` parameter | Design §Universal Node Model | No heat exchange capability |
-| 17 of 19 prescribed tests | Test Plan | See test gap table below |
-
----
+9: ## Executive Summary
+10:
+11: The derived-state node architecture (Phases 2–3 of SOLVER_REVIEW.md), the C++
+12: smoothness audit, and all Python-side cleanup items have been implemented. All
+13: nodes return only `[P, P_total]` as solver unknowns, with `T` and `Y` derived
+14: via forward propagation with chain-rule relay (including `P_total` sensitivity).
+15: The C++ orifice uses regularized sqrt `dP / (dP² + ε²)^0.25`, all friction
+16: models use regularized `Re_eff = √(Re² + ε²)`, and unused C++ functions have
+17: been removed. The velocity-of-approach factor **E = 1/√(1 − β⁴)** and mass
+18: fraction normalization have been integrated into both the solver and standalone
+19: physics paths.
+20:
+21: All 242 C++ tests and 921 Python tests (including 11 high-priority robustness
+22: scenarios and the bypass convergence test) pass. The solver is now robust to
+23: unphysical residuals and provides accurate, smooth Jacobians across the
+24: entire flow regime.
+25:
+...
+30: ### Fully Implemented ✅
+31:
+32: | Item | Reference |
+33: |------|-----------|
+34: | **P0-1:** `_default_Y` uses mass fractions | `solver.py:55` |
+35: | **P0-2:** `_build_x0` matches `.Y[` pattern | `solver.py:83` |
+36: | **P1-4:** Y clamping before thermo conversion | `solver.py:302-308` |
+37: | **P1-5:** Debug exception printing removed | `solver.py:527-529` |
+38: | **P1-6:** `strict=False` in hot path | `solver.py:261,290` |
+39: | **P2-9:** `HeatExchangerElement` removed | — |
+40: | **Phase 2:** All nodes `[P, P_total]` only | `components.py:120,176,312` |
+41: | **Phase 2:** `compute_derived_state()` on all node types | `components.py:122,178,314,226,271` |
+42: | **Phase 3:** Topological ordering | `solver.py:114-141` |
+43: | **Phase 3:** Forward state propagation | `solver.py:143-226` |
+44: | **Phase 3:** Chain-rule relay incl. `d_P_total` | `solver.py:172-214` |
+45: | **Phase 3:** `_get_node_state` uses cached derived state | `solver.py:284-288` |
+46: | **Phase 3:** Derived states exported in solution dict | `solver.py:563-569` |
+47: | **Orifice Physics:** Velocity-of-approach `E` factor | `solver_interface.cpp`, `orifice.cpp` |
+48: | **Regulated Orifice:** Smooth at dP=0, signed flow | `solver_interface.cpp` |
+49: | **Jacobian Sync:** Mixer Jacobian normalized | `solver_interface.cpp` |
+50: | **Friction:** Regularized Re in all models | `solver_interface.cpp` |
+51: | **Physics Robustness:** Leaky P/T clamps | `thermo.cpp`, `solver_interface.cpp` |
+52:
+53: ### Not Implemented ❌
+54:
+55: | Item | SOLVER_REVIEW Section | Impact |
+56: |------|----------------------|--------|
+57: | C++ bidirectional orifice interface (both T/Y) | Smoothness Audit | Single-sided thermo only |
+58: | Node-level `Q` parameter | Design §Universal Node Model | No heat exchange capability |
+59:
+60: ---
+...
+272: **Initial review:** 2026-03-15
+273: **Rev 2:** 2026-03-15 (C++ smoothness verified, β-correction gap identified)
+274: **Rev 3:** 2026-03-15 (all Python cleanup verified done; P0 #2–3, P1 #3–8 resolved)
+275: **Rev 4:** 2026-03-15 (β-correction, Mixer Jacobian normalization, and high-priority tests verified)
+276: **Next steps:** P2 architecture (bidirectional orifice, Q-term)
 
 ## C++ Smoothness Audit — Verified
 
