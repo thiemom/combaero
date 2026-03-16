@@ -10,11 +10,7 @@
 #include <numeric>
 #include <stdexcept>
 
-using combaero::mwmix;
-using combaero::mole_to_mass;
-using combaero::mass_to_mole;
-using combaero::normalize_fractions;
-using combaero::convert_to_dry_fractions;
+namespace combaero {
 
 namespace {
 
@@ -236,8 +232,19 @@ double dryair_required_per_kg_mixture(const std::vector<double> &X) {
 }
 
 std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double> &X,
+                                                   bool smooth_phi0,
+                                                   bool smooth_phi1, double k0,
+                                                   double k1) {
+  double fuel_burn_fraction = 1.0;
+  return complete_combustion_to_CO2_H2O(X, fuel_burn_fraction, smooth_phi0,
+                                        smooth_phi1, k0, k1);
+}
+
+std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double> &X,
                                                    double &fuel_burn_fraction,
-                                                   bool smooth) {
+                                                   bool smooth_phi0,
+                                                   bool smooth_phi1, double k0,
+                                                   double k1) {
   const double tol_sum = 1.0e-5;
   const double tol = 1.0e-12;
 
@@ -285,13 +292,13 @@ std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double> &X,
   //    point where accuracy matters.
   // -----------------------------------------------------------------
 
-  if (smooth) {
+  if (smooth_phi0) {
     // -----------------------------------------------------------------
     // Phi=0 kink smoothing: eta_eff = std::max(0.0,
     // (1/k)*[ln(1+exp(k*eta))-ln(2)]) This makes heat release smooth at zero
     // fuel (n_O2_required = 0).
     // -----------------------------------------------------------------
-    const double k_low = combaero::SMOOTHING_K_PHI0;
+    const double k_low = k0;
     if (n_O2_required_actual * k_low > 100.0) {
       // Linear regime to avoid exp overflow
       n_O2_required_total = n_O2_required_actual - std::log(2.0) / k_low;
@@ -321,13 +328,16 @@ std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double> &X,
   // Fraction of fuel that can burn:
   // f = min(1.0, O2_available / O2_required_total)
   double f = 1.0;
-  if (smooth) {
-    double r = n_O2_available / std::max(1e-15, n_O2_required_total);
-    if (r < 1.0 + 10.0 * tol) { // apply smoothing near and below stoich
-      const double k =
-          combaero::SMOOTHING_K_PHI1; // Stiffness parameter for softmin (see
-                                      // rationale above)
-      f = -(1.0 / k) * std::log(std::exp(-k) + std::exp(-k * r));
+  double r = n_O2_available / std::max(1e-15, n_O2_required_total);
+  if (smooth_phi1) {
+    if (r < 1.0 + 10.0 * tol) {
+      const double k = k1;
+      // Robust softmin(1, r) = -log(exp(-k) + exp(-k*r))/k
+      // Using log(exp(x) + exp(y)) = max(x, y) + log(1 + exp(-|x-y|))
+      double x = -k;
+      double y = -k * r;
+      double max_val = (x > y) ? x : y;
+      f = -(max_val + std::log(1.0 + std::exp(-std::abs(x - y)))) / k;
     }
   } else {
     if (n_O2_available + tol < n_O2_required_total) {
@@ -385,11 +395,9 @@ std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double> &X,
   return normalize_fractions(n);
 }
 
-std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double> &X,
-                                                   bool smooth) {
-  double fuel_burn_fraction = 0.0;
-  return complete_combustion_to_CO2_H2O(X, fuel_burn_fraction, smooth);
-}
+// This function is now redundant as it's merged into the other overload with default arguments,
+// but for internal consistency within the .cpp we can keep it if needed or just remove it.
+// I'll remove it to avoid ambiguity as the other one now has defaults.
 
 // -------------------------------------------------------------
 // Equivalence ratio helpers (mole basis, multi-species fuel)
@@ -1039,7 +1047,7 @@ double compute_species_burned(double mdot_var, const Stream &fuel,
     ox_trial.mdot = mdot_var;
   }
   Stream mixed = mix({fuel_trial, ox_trial});
-  std::vector<double> X_burned = complete_combustion_to_CO2_H2O(mixed.state.X);
+  std::vector<double> X_burned = complete_combustion_to_CO2_H2O(mixed.state.X, false, false);
   if (dry_basis) {
     X_burned = convert_to_dry_fractions(X_burned);
   }
@@ -1455,18 +1463,22 @@ Stream set_oxidizer_stream_for_CO2_dry(double X_CO2_dry_target,
 // -------------------------------------------------------------
 
 // Complete combustion (isothermal) - keeps input temperature
-State complete_combustion_isothermal(const State &in, bool smooth) {
+State complete_combustion_isothermal(const State &in, bool smooth_phi0,
+                                     bool smooth_phi1, double k0, double k1) {
   State out;
   out.T = in.T;
   out.P = in.P;
-  out.X = complete_combustion_to_CO2_H2O(in.X, smooth);
+  out.X = complete_combustion_to_CO2_H2O(in.X, smooth_phi0, smooth_phi1, k0, k1);
+  out.set_X(out.X); // Ensure Y is populated
   return out;
 }
 
 // Complete combustion (adiabatic) - solves for flame temperature
-State complete_combustion(const State &in, bool smooth) {
+State complete_combustion(const State &in, bool smooth_phi0, bool smooth_phi1,
+                         double k0, double k1) {
   // Get burned composition at constant T first
-  std::vector<double> X_burned = complete_combustion_to_CO2_H2O(in.X, smooth);
+  std::vector<double> X_burned =
+      complete_combustion_to_CO2_H2O(in.X, smooth_phi0, smooth_phi1, k0, k1);
 
   // Calculate inlet enthalpy
   double H_in = h(in.T, in.X);
@@ -1479,9 +1491,7 @@ State complete_combustion(const State &in, bool smooth) {
   double T_ad = calc_T_from_h(H_target, X_burned, in.T);
 
   State out;
-  out.T = T_ad;
-  out.P = in.P;
-  out.X = X_burned;
+  out.set_TPX(T_ad, in.P, X_burned);
   return out;
 }
 
@@ -1502,7 +1512,9 @@ CombustionState combustion_state(const std::vector<double> &X_fuel,
                                  const std::vector<double> &X_ox, double phi,
                                  double T_reactants, double P,
                                  const std::string &fuel_name,
-                                 CombustionMethod method, bool smooth) {
+                                 CombustionMethod method,
+                                 bool smooth_phi0, bool smooth_phi1,
+                                 double k0, double k1) {
   CombustionState result;
 
   // Store phi, fuel name, and method
@@ -1518,14 +1530,15 @@ CombustionState combustion_state(const std::vector<double> &X_fuel,
   result.reactants = complete_state(T_reactants, P, X_reactants);
 
   // Compute products via selected method
-  State reactant_state{T_reactants, P, X_reactants};
+  State reactant_state;
+  reactant_state.set_TPX(T_reactants, P, X_reactants);
   State product_state;
   if (method == CombustionMethod::Equilibrium) {
     EquilibriumResult eq = combustion_equilibrium(reactant_state);
     product_state = eq.state;
     result.fuel_burn_fraction = eq.converged ? 1.0 : 0.0;
   } else {
-    product_state = complete_combustion(reactant_state, smooth);
+    product_state = complete_combustion(reactant_state, smooth_phi0, smooth_phi1, k0, k1);
     result.fuel_burn_fraction = 1.0;
   }
 
@@ -1542,10 +1555,11 @@ CombustionState combustion_state(const std::vector<double> &X_fuel,
 
 // Variant 2: From streams (phi computed from mass flows)
 CombustionState combustion_state_from_streams(const Stream &fuel_stream,
-                                              const Stream &ox_stream,
-                                              const std::string &fuel_name,
-                                              CombustionMethod method,
-                                              bool smooth) {
+                                               const Stream &ox_stream,
+                                               const std::string &fuel_name,
+                                               CombustionMethod method,
+                                               bool smooth_phi0, bool smooth_phi1,
+                                               double k0, double k1) {
   const double mdot_total = fuel_stream.mdot + ox_stream.mdot;
   if (mdot_total <= 0.0) {
     throw std::runtime_error("Total mass flow rate must be positive");
@@ -1563,7 +1577,7 @@ CombustionState combustion_state_from_streams(const Stream &fuel_stream,
   const double phi = (fuel_stream.mdot / ox_stream.mdot) / FAR_stoich;
 
   return combustion_state(fuel_stream.X(), ox_stream.X(), phi, T_reactants, P,
-                          fuel_name, method, smooth);
+                          fuel_name, method, smooth_phi0, smooth_phi1, k0, k1);
 }
 
 // -------------------------------------------------------------
@@ -1577,11 +1591,13 @@ CombustionState combustion_state(const std::vector<double> &X_fuel,
                                  const std::string &fuel_name,
                                  CombustionMethod method,
                                  const PressureLossCorrelation &pressure_loss,
-                                 bool smooth) {
+                                 bool smooth_phi0, bool smooth_phi1,
+                                 double k0, double k1) {
   // Compute reactant mixture and product state (at inlet P)
   const std::vector<double> X_reactants =
       set_equivalence_ratio_mole(phi, X_fuel, X_ox);
-  State reactant_state{T_reactants, P, X_reactants};
+  State reactant_state;
+  reactant_state.set_TPX(T_reactants, P, X_reactants);
 
   State product_state;
   double fuel_burn_fraction = 1.0;
@@ -1590,7 +1606,7 @@ CombustionState combustion_state(const std::vector<double> &X_fuel,
     product_state = eq.state;
     fuel_burn_fraction = eq.converged ? 1.0 : 0.0;
   } else {
-    product_state = complete_combustion(reactant_state, smooth);
+    product_state = complete_combustion(reactant_state, smooth_phi0, smooth_phi1, k0, k1);
   }
 
   // Build context — all fields are loop-free
@@ -1625,7 +1641,8 @@ CombustionState combustion_state(const std::vector<double> &X_fuel,
 CombustionState combustion_state_from_streams(
     const Stream &fuel_stream, const Stream &ox_stream,
     const std::string &fuel_name, CombustionMethod method,
-    const PressureLossCorrelation &pressure_loss, bool smooth) {
+    const PressureLossCorrelation &pressure_loss, bool smooth_phi0,
+    bool smooth_phi1, double k0, double k1) {
   const double mdot_total = fuel_stream.mdot + ox_stream.mdot;
   if (mdot_total <= 0.0) {
     throw std::runtime_error("Total mass flow rate must be positive");
@@ -1640,7 +1657,8 @@ CombustionState combustion_state_from_streams(
   // Compute products at inlet P to build the context
   const std::vector<double> X_reactants =
       set_equivalence_ratio_mole(phi, fuel_stream.X(), ox_stream.X());
-  State reactant_state{T_reactants, P, X_reactants};
+  State reactant_state;
+  reactant_state.set_TPX(T_reactants, P, X_reactants);
 
   State product_state;
   double fuel_burn_fraction = 1.0;
@@ -1649,7 +1667,7 @@ CombustionState combustion_state_from_streams(
     product_state = eq.state;
     fuel_burn_fraction = eq.converged ? 1.0 : 0.0;
   } else {
-    product_state = complete_combustion(reactant_state);
+    product_state = complete_combustion(reactant_state, smooth_phi0, smooth_phi1, k0, k1);
   }
 
   const double T_ad = product_state.T;
@@ -1671,3 +1689,4 @@ CombustionState combustion_state_from_streams(
       X_reactants, fuel_stream.X(), ox_stream.X());
   return result;
 }
+} // namespace combaero

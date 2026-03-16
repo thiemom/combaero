@@ -340,11 +340,11 @@ All functions use consistent units to avoid conversion errors.
 | `State::set_X` | X: mol/mol  | -           |
 | `State::set_Y` | Y: kg/kg    | -           |
 | `State::mw`    | -           | g/mol       |
-| `State::cp`    | -           | J/(mol*K)   |
-| `State::cv`    | -           | J/(mol*K)   |
-| `State::h`     | -           | J/mol       |
-| `State::u`     | -           | J/mol       |
-| `State::s`     | -           | J/(mol*K)   |
+| `State::cp`    | -           | J/(kg*K)    |
+| `State::cv`    | -           | J/(kg*K)    |
+| `State::h`     | -           | J/kg        |
+| `State::u`     | -           | J/kg        |
+| `State::s`     | -           | J/(kg*K)    |
 | `State::rho`   | -           | kg/m^3      |
 | `State::R`     | -           | J/(kg*K)    |
 | `State::gamma` | -           | - (gamma)   |
@@ -616,19 +616,19 @@ All functions use consistent units to avoid conversion errors.
 | `ThermoState::P`                               | -                        | Pa                         |
 | `ThermoState::T`                               | -                        | K                          |
 | `ThermoState::a`                               | -                        | m/s                        |
-| `ThermoState::cp`                              | -                        | J/(mol·K)                  |
-| `ThermoState::cp_mass`                         | -                        | J/(kg·K)                   |
-| `ThermoState::cv`                              | -                        | J/(mol·K)                  |
-| `ThermoState::cv_mass`                         | -                        | J/(kg·K)                   |
+| `ThermoState::cp`                              | -                        | J/(kg·K)                   |
+| `ThermoState::cp_mole`                         | -                        | J/(mol·K)                  |
+| `ThermoState::cv`                              | -                        | J/(kg·K)                   |
+| `ThermoState::cv_mole`                         | -                        | J/(mol·K)                  |
 | `ThermoState::gamma`                           | -                        | -                          |
-| `ThermoState::h`                               | -                        | J/mol                      |
-| `ThermoState::h_mass`                          | -                        | J/kg                       |
+| `ThermoState::h`                               | -                        | J/kg                       |
+| `ThermoState::h_mole`                          | -                        | J/mol                      |
 | `ThermoState::mw`                              | -                        | g/mol                      |
 | `ThermoState::rho`                             | -                        | kg/m³                      |
-| `ThermoState::s`                               | -                        | J/(mol·K)                  |
-| `ThermoState::s_mass`                          | -                        | J/(kg·K)                   |
-| `ThermoState::u`                               | -                        | J/mol                      |
-| `ThermoState::u_mass`                          | -                        | J/kg                       |
+| `ThermoState::s`                               | -                        | J/(kg·K)                   |
+| `ThermoState::s_mole`                          | -                        | J/(mol·K)                  |
+| `ThermoState::u`                               | -                        | J/kg                       |
+| `ThermoState::u_mole`                          | -                        | J/mol                      |
 | `TransportState::P`                            | -                        | Pa                         |
 | `TransportState::Pr`                           | -                        | -                          |
 | `TransportState::T`                            | -                        | K                          |

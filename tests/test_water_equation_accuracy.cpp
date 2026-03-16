@@ -4,6 +4,8 @@
 #include <cmath>
 #include "../include/humidair.h"
 
+using namespace combaero;
+
 // Test for Water Equation Accuracy
 //
 // This test validates that the saturation vapor pressure calculation

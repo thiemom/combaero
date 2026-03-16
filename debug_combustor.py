@@ -23,7 +23,7 @@ def debug():
     fuel1 = MassFlowBoundary("f1", m_dot=m_dot_fuel1, T_total=300.0, Y=Y_ch4)
     fuel2 = MassFlowBoundary("f2", m_dot=m_dot_fuel2, T_total=300.0, Y=Y_ch4)
     p_out = PressureBoundary("out", P_total=101325.0, T_total=300.0)
-    combustor = CombustorNode("combustor", method="complete", pressure_loss_frac=0.05)
+    combustor = CombustorNode("combustor", method="equilibrium")
 
     net.add_node(air_in)
     net.add_node(fuel1)

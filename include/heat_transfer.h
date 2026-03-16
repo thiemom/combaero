@@ -39,6 +39,8 @@
 //   - 0.6 < Pr < 160
 //   - L/D > 10 (entrance effects negligible)
 //
+namespace combaero {
+
 namespace dittus_boelter {
 constexpr double coeff_outer = 0.023;
 constexpr double coeff_reynolds_exp = 0.8;
@@ -52,7 +54,7 @@ constexpr double coeff_prandtl_cooling_exp = 0.3;
 //   status  : if non-null, set to Extrapolated when Re or Pr is outside the
 //             validated range; no warning is emitted in that case
 double nusselt_dittus_boelter(double Re, double Pr, bool heating = true,
-                              combaero::CorrelationStatus *status = nullptr);
+                              CorrelationStatus *status = nullptr);
 
 // Gnielinski correlation (1976)
 // Nu = (f/8) * (Re - 1000) * Pr / (1 + 12.7 * sqrt(f/8) * (Pr^(2/3) - 1))
@@ -75,12 +77,12 @@ constexpr double coeff_prandtl_factor = 12.7;  // 12.7 * sqrt(f/8) * (Pr^(2/3) -
 constexpr double coeff_re_offset      = 1000.0; // (Re - 1000) in numerator
 } // namespace gnielinski
 double nusselt_gnielinski(double Re, double Pr, double f,
-                          combaero::CorrelationStatus *status = nullptr);
+                          CorrelationStatus *status = nullptr);
 
 // Gnielinski with automatic friction factor (smooth pipe)
 // Uses Petukhov friction correlation: f = (0.790*ln(Re) - 1.64)^(-2)
 double nusselt_gnielinski(double Re, double Pr,
-                          combaero::CorrelationStatus *status = nullptr);
+                          CorrelationStatus *status = nullptr);
 
 // Sieder-Tate correlation (1936)
 // Nu = 0.027 * Re^0.8 * Pr^(1/3) * (μ_bulk / μ_wall)^0.14
@@ -104,7 +106,7 @@ constexpr double coeff_prandtl_exp  = 1.0 / 3.0;
 constexpr double coeff_viscosity_exp = 0.14;
 } // namespace sieder_tate
 double nusselt_sieder_tate(double Re, double Pr, double mu_ratio = 1.0,
-                           combaero::CorrelationStatus *status = nullptr);
+                           CorrelationStatus *status = nullptr);
 
 // Petukhov heat transfer correlation (1970)
 // Nu = (f/8) * Re * Pr / (coeff_offset + 12.7 * sqrt(f/8) * (Pr^(2/3) - 1))
@@ -125,11 +127,11 @@ constexpr double coeff_prandtl_factor = 12.7; // same Prandtl correction as Gnie
 //   status : if non-null, set to Extrapolated when Re or Pr is outside the
 //            validated range; no warning is emitted in that case
 double nusselt_petukhov(double Re, double Pr, double f,
-                        combaero::CorrelationStatus *status = nullptr);
+                        CorrelationStatus *status = nullptr);
 
 // Petukhov with automatic friction factor (smooth pipe)
 double nusselt_petukhov(double Re, double Pr,
-                        combaero::CorrelationStatus *status = nullptr);
+                        CorrelationStatus *status = nullptr);
 
 // -------------------------------------------------------------
 // Laminar Flow (for completeness)
@@ -649,5 +651,7 @@ channel_impingement(double T, double P, const std::vector<double> &X,
                     double y_D, double A_target,
                     double T_wall = std::numeric_limits<double>::quiet_NaN(),
                     double Cd_jet = 0.65);
+
+} // namespace combaero
 
 #endif // HEAT_TRANSFER_H

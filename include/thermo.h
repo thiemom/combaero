@@ -20,6 +20,8 @@ constexpr double AVOGADRO = 6.02214076e23;
 
 } // namespace combaero::thermo
 
+namespace combaero {
+
 // Conversion factor from J/mol to J/kg
 double J_per_mol_to_J_per_kg(double value, double molar_mass);
 
@@ -32,13 +34,7 @@ std::size_t num_species();
 double species_molar_mass(std::size_t species_index);
 double species_molar_mass_from_name(const std::string& name);
 
-// Mixture properties (using mwmix from composition.h)
-
 // NASA polynomial evaluations (dimensionless)
-// cp_R  : dimensionless heat capacity Cp/R
-// h_RT  : dimensionless enthalpy  H/(R*T)
-// s_R   : dimensionless entropy   S/R at reference pressure and pure species
-// g_over_RT : dimensionless Gibbs free energy G/(R*T) = H/(R*T) - S/R
 double cp_R(std::size_t species_idx, double T);
 double h_RT(std::size_t species_idx, double T);
 double s_R(std::size_t species_idx, double T);
@@ -61,52 +57,20 @@ double specific_gas_constant(const std::vector<double>& X);
 double isentropic_expansion_coefficient(double T, const std::vector<double>& X);
 double speed_of_sound(double T, const std::vector<double>& X);
 
-// Mass-specific thermodynamic properties (symmetric interface to molar-basis functions)
-double cp_mass(double T, const std::vector<double>& X);  // [J/(kg·K)]
-double cv_mass(double T, const std::vector<double>& X);  // [J/(kg·K)]
-double h_mass(double T, const std::vector<double>& X);   // [J/kg]
-double s_mass(double T, const std::vector<double>& X, double P, double P_ref = 101325.0);  // [J/(kg·K)]
-double u_mass(double T, const std::vector<double>& X);   // [J/kg]
-
-// -------------------------------------------------------------
-// Air Properties Bundle
-// -------------------------------------------------------------
-// AirProperties is defined in state.h
+// Mass-specific thermodynamic properties
+double cp_mass(double T, const std::vector<double>& X);
+double cv_mass(double T, const std::vector<double>& X);
+double h_mass(double T, const std::vector<double>& X);
+double s_mass(double T, const std::vector<double>& X, double P, double P_ref = 101325.0);
+double u_mass(double T, const std::vector<double>& X);
 
 // Compute all air properties at once
-// Parameters:
-//   T        : temperature [K]
-//   P        : pressure [Pa]
-//   humidity : relative humidity [0-1] (default: 0.0 = dry air)
-// Returns: AirProperties struct with all properties
 AirProperties air_properties(double T, double P, double humidity = 0.0);
 
-// -------------------------------------------------------------
-// Thermodynamic State Bundle
-// -------------------------------------------------------------
-// ThermoState is defined in state.h
-
 // Compute all thermodynamic properties at once
-// Parameters:
-//   T     : temperature [K]
-//   P     : pressure [Pa]
-//   X     : mole fractions [-]
-//   P_ref : reference pressure for entropy [Pa] (default: 101325.0)
-// Returns: ThermoState struct with all properties
 ThermoState thermo_state(double T, double P, const std::vector<double>& X, double P_ref = 101325.0);
 
-// -------------------------------------------------------------
-// Complete State Bundle (Thermo + Transport)
-// -------------------------------------------------------------
-// CompleteState is defined in state.h
-
 // Compute all thermodynamic and transport properties at once
-// Parameters:
-//   T     : temperature [K]
-//   P     : pressure [Pa]
-//   X     : mole fractions [-]
-//   P_ref : reference pressure for entropy [Pa] (default: 101325.0)
-// Returns: CompleteState struct with nested thermo and transport states
 CompleteState complete_state(double T, double P, const std::vector<double>& X, double P_ref = 101325.0);
 
 // Derivatives of thermodynamic properties with respect to temperature
@@ -128,8 +92,7 @@ double calc_T_from_u_mass(double u_mass_target, const std::vector<double>& X, do
 double calc_T_from_sv_mass(double s_mass_target, double v_mass_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 double calc_T_from_sh_mass(double s_mass_target, double h_mass_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 
-// State-based overloads (using composition.h utilities)
-
+// State-based overloads
 double mwmix(const State& s);
 double cp(const State& s);
 double h(const State& s);
@@ -140,5 +103,7 @@ double density(const State& s);
 double specific_gas_constant(const State& s);
 double isentropic_expansion_coefficient(const State& s);
 double speed_of_sound(const State& s);
+
+} // namespace combaero
 
 #endif // THERMO_H

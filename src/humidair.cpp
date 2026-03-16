@@ -6,10 +6,7 @@
 #include <cmath>
 #include <stdexcept>
 
-using combaero::mwmix;
-using combaero::mole_to_mass;
-using combaero::mass_to_mole;
-using combaero::normalize_fractions;
+namespace combaero {
 
 // Constants for dry air composition (mole fractions)
 const std::unordered_map<std::string, double> dry_air_composition = {
@@ -162,11 +159,7 @@ std::vector<double> humid_air_composition(double T, double P, double RH) {
 }
 
 // Calculate dewpoint temperature from T, P, RH [K]
-// P is not used (dewpoint depends negligibly on pressure at atmospheric
-// conditions)
-double dewpoint(double T, double P, double RH) {
-  (void)P;
-
+double dewpoint(double T, [[maybe_unused]] double P, double RH) {
   if (RH <= 0.0) {
     throw std::invalid_argument("dewpoint: RH must be > 0");
   }
@@ -380,15 +373,15 @@ HumidAir &HumidAir::set_TP_omega(double T, double P, double w) {
 }
 
 double HumidAir::RH() const { return rh; }
-double HumidAir::dewpoint() const { return ::dewpoint(state.T, state.P, rh); }
+double HumidAir::dewpoint() const { return combaero::dewpoint(state.T, state.P, rh); }
 double HumidAir::wet_bulb() const {
-  return ::wet_bulb_temperature(state.T, state.P, rh);
+  return combaero::wet_bulb_temperature(state.T, state.P, rh);
 }
 double HumidAir::humidity_ratio() const {
-  return ::humidity_ratio(state.T, state.P, rh);
+  return combaero::humidity_ratio(state.T, state.P, rh);
 }
 double HumidAir::h_mass() const {
-  return ::humid_air_enthalpy(state.T, state.P, rh);
+  return combaero::humid_air_enthalpy(state.T, state.P, rh);
 }
 
 std::tuple<double, double, double> HumidAir::TP_RH() const {
@@ -398,3 +391,5 @@ std::tuple<double, double, double> HumidAir::TP_RH() const {
 std::tuple<double, double, double> HumidAir::TP_dewpoint() const {
   return std::make_tuple(state.T, state.P, dewpoint());
 }
+
+} // namespace combaero

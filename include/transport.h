@@ -4,6 +4,8 @@
 #include "state.h"
 #include <vector>
 
+namespace combaero {
+
 // Collision integral functions
 double linear_interp(double x, const std::vector<double>& x_values, const std::vector<double>& y_values);
 double omega22(double T, double well_depth);
@@ -20,14 +22,10 @@ double peclet(double T, double P, const std::vector<double>& X, double V, double
 // -------------------------------------------------------------
 // Transport State Bundle
 // -------------------------------------------------------------
-// TransportState is defined in state.h
 
 // Compute all transport properties at once
-// Parameters:
-//   T : temperature [K]
-//   P : pressure [Pa]
-//   X : mole fractions [-]
-// Returns: TransportState struct with all properties
 TransportState transport_state(double T, double P, const std::vector<double>& X);
+
+} // namespace combaero
 
 #endif // TRANSPORT_H

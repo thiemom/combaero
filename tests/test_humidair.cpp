@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+using namespace combaero;
+
 // Test fixture for humid air tests
 class HumidAirTest : public ::testing::Test {
 protected:

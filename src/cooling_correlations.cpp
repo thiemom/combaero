@@ -241,7 +241,7 @@ double film_cooling_effectiveness(double x_D, double M, double DR, double alpha_
     double alpha_rad = alpha_deg * M_PI / 180.0;
 
     // Momentum flux ratio I = (rho_c*v_c^2)/(rho_inf*v_inf^2) = M^2 / DR
-    double I = M * M / DR;
+    [[maybe_unused]] double I = M * M / DR;
 
     // Optimal blowing ratio (where effectiveness peaks)
     double M_opt = 0.6 * std::pow(DR, 0.5);
@@ -397,7 +397,7 @@ double effusion_effectiveness(
 
     // Effective blowing ratio accounting for hole density
     // Higher porosity → more coolant → higher effective coverage
-    double M_eff = M * std::sqrt(porosity / 0.05);  // Normalized to 5% porosity
+    [[maybe_unused]] double M_eff = M * std::sqrt(porosity / 0.05);  // Normalized to 5% porosity
 
     // Crossflow accumulation factor (L'Ecuyer & Matsuura 1985)
     // Effusion builds up crossflow, reducing effectiveness decay

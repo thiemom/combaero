@@ -21,6 +21,7 @@
 //
 // For the network solver, use MixtureState (NETWORK_ROADMAP.md) which
 // carries both static (T, P) and total (T_total, P_total) explicitly.
+namespace combaero {
 struct State {
   double T = 298.15;     // Temperature [K]
   double P = 101325.0;   // Pressure [Pa]
@@ -98,6 +99,9 @@ struct State {
   std::tuple<double, double> UP_mass() const;
   std::tuple<double, double> VH_mass() const;
   std::tuple<double, double> SH_mass() const;
+
+  // I/O
+  void print() const;
 };
 
 // High-level thermodynamic state for network nodes.
@@ -204,22 +208,22 @@ struct TransportState {
 // Bundle of thermodynamic properties for a gas mixture
 // All properties computed from (T, P, X) in a single call
 struct ThermoState {
-  double T;       // Temperature [K] (input, echoed back)
-  double P;       // Pressure [Pa] (input, echoed back)
-  double rho;     // Density [kg/m³]
-  double cp;      // Specific heat at constant pressure [J/(mol·K)]
-  double cv;      // Specific heat at constant volume [J/(mol·K)]
-  double h;       // Specific enthalpy [J/mol]
-  double s;       // Specific entropy [J/(mol·K)]
-  double u;       // Specific internal energy [J/mol]
-  double gamma;   // Isentropic expansion coefficient [-]
-  double a;       // Speed of sound [m/s]
-  double cp_mass; // Mass-specific cp [J/(kg·K)]
-  double cv_mass; // Mass-specific cv [J/(kg·K)]
-  double h_mass;  // Mass-specific enthalpy [J/kg]
-  double s_mass;  // Mass-specific entropy [J/(kg·K)]
-  double u_mass;  // Mass-specific internal energy [J/kg]
-  double mw;      // Molecular weight [g/mol]
+  double T;        // Temperature [K] (input, echoed back)
+  double P;        // Pressure [Pa] (input, echoed back)
+  double rho;      // Density [kg/m³]
+  double cp;       // Specific heat at constant pressure [J/(kg·K)]
+  double cv;       // Specific heat at constant volume [J/(kg·K)]
+  double h;        // Specific enthalpy [J/kg]
+  double s;        // Specific entropy [J/(kg·K)]
+  double u;        // Specific internal energy [J/kg]
+  double gamma;    // Isentropic expansion coefficient [-]
+  double a;        // Speed of sound [m/s]
+  double cp_mole;  // Molar cp [J/(mol·K)]
+  double cv_mole;  // Molar cv [J/(mol·K)]
+  double h_mole;   // Molar enthalpy [J/mol]
+  double s_mole;   // Molar entropy [J/(mol·K)]
+  double u_mole;   // Molar internal energy [J/mol]
+  double mw;       // Molecular weight [g/mol]
 };
 
 // AirProperties is an alias for TransportState.
@@ -278,5 +282,6 @@ struct CombustionState {
   double mixture_fraction; // Bilger mixture fraction [-]
   double fuel_burn_fraction; // Fraction of fuel burned [0-1]
 };
+} // namespace combaero
 
 #endif // STATE_H

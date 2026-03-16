@@ -6,10 +6,7 @@
 #include <algorithm>
 #include <vector>
 
-using combaero::mwmix;
-using combaero::mole_to_mass;
-using combaero::mass_to_mole;
-using combaero::normalize_fractions;
+namespace combaero {
 
 // -------------------------------------------------------------
 // Internal utilities
@@ -59,8 +56,8 @@ static inline void molefractions(const std::vector<double> &n,
 static inline double kp_wgs_from_indices(double T, std::size_t i_CO2,
                                          std::size_t i_H2, std::size_t i_CO,
                                          std::size_t i_H2O) {
-  double d_gRT = (::g_over_RT(i_CO2, T) + ::g_over_RT(i_H2, T)) -
-                 (::g_over_RT(i_CO, T) + ::g_over_RT(i_H2O, T));
+  double d_gRT = (g_over_RT(i_CO2, T) + g_over_RT(i_H2, T)) -
+                 (g_over_RT(i_CO, T) + g_over_RT(i_H2O, T));
   return std::exp(-d_gRT);
 }
 
@@ -291,10 +288,10 @@ static inline void composition_from_xi_smr_wgs(const std::vector<double> &n0,
 // For mole fractions at pressure P: Kp = (y_CO * y_H2^3) / (y_CH4 * y_H2O) *
 // (P/P0)^2
 static inline double Kp_SMR(double T, const SmrWgsConfig &cfg) {
-  double g_CO = ::g_over_RT(cfg.i_CO, T);
-  double g_H2 = ::g_over_RT(cfg.i_H2, T);
-  double g_CH4 = ::g_over_RT(cfg.i_CH4, T);
-  double g_H2O = ::g_over_RT(cfg.i_H2O, T);
+  double g_CO = g_over_RT(cfg.i_CO, T);
+  double g_H2 = g_over_RT(cfg.i_H2, T);
+  double g_CH4 = g_over_RT(cfg.i_CH4, T);
+  double g_H2O = g_over_RT(cfg.i_H2O, T);
 
   // ΔG/RT = (g_CO + 3*g_H2) - (g_CH4 + g_H2O)
   double d_gRT = (g_CO + 3.0 * g_H2) - (g_CH4 + g_H2O);
@@ -534,9 +531,7 @@ EquilibriumResult wgs_equilibrium(const State &in) {
   molefractions(n_out, X_out);
 
   State out;
-  out.T = in.T;
-  out.P = in.P;
-  out.X = X_out;
+  out.set_TPX(in.T, in.P, X_out);
   return EquilibriumResult{out, in.T, 0.0, true};
 }
 
@@ -552,9 +547,7 @@ EquilibriumResult wgs_equilibrium_adiabatic(const State &in) {
 
   // Get equilibrium composition at T_ad
   State at_T_ad;
-  at_T_ad.T = T_ad;
-  at_T_ad.P = in.P;
-  at_T_ad.X = in.X;
+  at_T_ad.set_TPX(T_ad, in.P, in.X);
 
   EquilibriumResult inner = wgs_equilibrium(at_T_ad);
   return EquilibriumResult{inner.state, in.T, inner.state.T - in.T, true};
@@ -588,9 +581,7 @@ EquilibriumResult smr_wgs_equilibrium(const State &in) {
   molefractions(n_out, X_out);
 
   State out;
-  out.T = in.T;
-  out.P = in.P;
-  out.X = X_out;
+  out.set_TPX(in.T, in.P, X_out);
   return EquilibriumResult{out, in.T, 0.0, conv};
 }
 
@@ -623,9 +614,7 @@ EquilibriumResult smr_wgs_equilibrium_adiabatic(const State &in) {
   molefractions(n_out, X_out);
 
   State out;
-  out.T = T_ad;
-  out.P = in.P;
-  out.X = X_out;
+  out.set_TPX(T_ad, in.P, X_out);
   return EquilibriumResult{out, in.T, T_ad - in.T, conv};
 }
 
@@ -639,10 +628,10 @@ EquilibriumResult smr_wgs_equilibrium_adiabatic(const State &in) {
 // + n
 static double Kp_reforming(double T, std::size_t i_hc, int n_C, int n_H,
                            const ReformingConfig &cfg) {
-  double g_hc = ::g_over_RT(i_hc, T);
-  double g_H2O = ::g_over_RT(cfg.i_H2O, T);
-  double g_CO = ::g_over_RT(cfg.i_CO, T);
-  double g_H2 = ::g_over_RT(cfg.i_H2, T);
+  double g_hc = g_over_RT(i_hc, T);
+  double g_H2O = g_over_RT(cfg.i_H2O, T);
+  double g_CO = g_over_RT(cfg.i_CO, T);
+  double g_H2 = g_over_RT(cfg.i_H2, T);
 
   // CnHm + n*H2O -> n*CO + (n + m/2)*H2
   double n_H2_prod = n_C + 0.5 * n_H; // n + m/2
@@ -845,9 +834,7 @@ EquilibriumResult reforming_equilibrium(const State &in) {
   molefractions(n_out, X_out);
 
   State out;
-  out.T = in.T;
-  out.P = in.P;
-  out.X = X_out;
+  out.set_TPX(in.T, in.P, X_out);
   return EquilibriumResult{out, in.T, 0.0, true};
 }
 
@@ -884,9 +871,7 @@ EquilibriumResult reforming_equilibrium_adiabatic(const State &in) {
   molefractions(n_out, X_out);
 
   State out;
-  out.T = T_ad;
-  out.P = in.P;
-  out.X = X_out;
+  out.set_TPX(T_ad, in.P, X_out);
   return EquilibriumResult{out, in.T, T_ad - in.T, true};
 }
 
@@ -894,11 +879,11 @@ EquilibriumResult reforming_equilibrium_adiabatic(const State &in) {
 // Combustion + Equilibrium (convenience function)
 // -------------------------------------------------------------
 
-EquilibriumResult combustion_equilibrium(const State &in, bool smooth) {
+EquilibriumResult combustion_equilibrium(const State &in, bool smooth_phi0, double k0) {
   // Step 1: Complete combustion (adiabatic)
-  // This burns fuel with available O2, producing CO2 + H2O
-  // Excess fuel (rich) or O2 (lean) remains
-  State burned = complete_combustion(in, smooth);
+  // We use Phi=0 smoothing (if requested) but NOT Phi=1 smoothing for equilibrium,
+  // as equilibrium is naturally smooth at Phi=1.
+  State burned = complete_combustion(in, smooth_phi0, false, k0, SMOOTHING_K_PHI1);
 
   // Step 2: Reforming + WGS equilibrium on combustion products
   // For rich mixtures: unburned HC + H2O -> CO + H2
@@ -907,3 +892,4 @@ EquilibriumResult combustion_equilibrium(const State &in, bool smooth) {
   return EquilibriumResult{result.state, in.T, result.state.T - in.T,
                            result.converged};
 }
+} // namespace combaero

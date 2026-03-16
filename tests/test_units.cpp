@@ -10,10 +10,12 @@ int main() {
     assert(cp_u.has_value());
     assert(cp_u->input == "T: K, X: mol/mol");
     assert(cp_u->output == "J/(mol*K)");
+    (void)cp_u;
 
     auto density_u = get_units("density");
     assert(density_u.has_value());
     assert(density_u->output == "kg/m^3");
+    (void)density_u;
 
     // Test convenience functions
     assert(input_units("viscosity") == "T: K, P: Pa, X: mol/mol");

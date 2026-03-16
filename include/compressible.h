@@ -23,6 +23,8 @@
 // Compressible flow solution
 // -------------------------------------------------------------
 
+namespace combaero {
+
 // Result of a compressible flow calculation
 struct CompressibleFlowSolution {
     // Stagnation state at (T0, P0). This is the one place in CombAero where
@@ -357,5 +359,7 @@ ThrustResult nozzle_thrust(
     const std::vector<double>& X,
     std::size_t n_stations = 100,
     double tol = 1e-8, std::size_t max_iter = 50);
+
+} // namespace combaero
 
 #endif // COMPRESSIBLE_H

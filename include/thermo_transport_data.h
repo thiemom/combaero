@@ -15,6 +15,8 @@
 #include <unordered_map>
 #include <vector>
 
+namespace combaero {
+
 // NASA polynomial format used in this build
 // NASA7: Cp/R = a1 + a2*T + a3*T^2 + a4*T^3 + a5*T^4
 // NASA9: Cp/R = a1/T^2 + a2/T + a3 + a4*T + a5*T^2 + a6*T^3 + a7*T^4
@@ -122,5 +124,7 @@ const std::vector<Molecular_Structure> molecular_structures = {
 {1, 0, 1, 0},
 {0, 2, 0, 0}
 };
+
+} // namespace combaero
 
 #endif // THERMO_TRANSPORT_DATA_H

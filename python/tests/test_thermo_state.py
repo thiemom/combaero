@@ -34,11 +34,11 @@ class TestThermoStateStructure:
         assert hasattr(state, "u")
         assert hasattr(state, "gamma")
         assert hasattr(state, "a")
-        assert hasattr(state, "cp_mass")
-        assert hasattr(state, "cv_mass")
-        assert hasattr(state, "h_mass")
-        assert hasattr(state, "s_mass")
-        assert hasattr(state, "u_mass")
+        assert hasattr(state, "cp_mole")
+        assert hasattr(state, "cv_mole")
+        assert hasattr(state, "h_mole")
+        assert hasattr(state, "s_mole")
+        assert hasattr(state, "u_mole")
         assert hasattr(state, "mw")
 
     def test_thermo_state_readonly(self):
@@ -94,12 +94,12 @@ class TestPropertyConsistency:
 
         state = cb.thermo_state(T=T, P=P, X=X)
 
-        # Compare with individual function calls
-        assert state.cp == pytest.approx(cb.cp(T, X), rel=1e-15)
-        assert state.cv == pytest.approx(cb.cv(T, X), rel=1e-15)
-        assert state.h == pytest.approx(cb.h(T, X), rel=1e-15)
-        assert state.s == pytest.approx(cb.s(T, X, P), rel=1e-15)
-        assert state.u == pytest.approx(cb.u(T, X), rel=1e-15)
+        # Compare with individual molar function calls
+        assert state.cp_mole == pytest.approx(cb.cp(T, X), rel=1e-15)
+        assert state.cv_mole == pytest.approx(cb.cv(T, X), rel=1e-15)
+        assert state.h_mole == pytest.approx(cb.h(T, X), rel=1e-15)
+        assert state.s_mole == pytest.approx(cb.s(T, X, P), rel=1e-15)
+        assert state.u_mole == pytest.approx(cb.u(T, X), rel=1e-15)
         assert state.gamma == pytest.approx(cb.isentropic_expansion_coefficient(T, X), rel=1e-15)
         assert state.a == pytest.approx(cb.speed_of_sound(T, X), rel=1e-15)
 
@@ -111,12 +111,12 @@ class TestPropertyConsistency:
 
         state = cb.thermo_state(T=T, P=P, X=X)
 
-        # Compare with individual function calls
-        assert state.cp_mass == pytest.approx(cb.cp_mass(T, X), rel=1e-15)
-        assert state.cv_mass == pytest.approx(cb.cv_mass(T, X), rel=1e-15)
-        assert state.h_mass == pytest.approx(cb.h_mass(T, X), rel=1e-15)
-        assert state.s_mass == pytest.approx(cb.s_mass(T, X, P), rel=1e-15)
-        assert state.u_mass == pytest.approx(cb.u_mass(T, X), rel=1e-15)
+        # Compare with individual mass-specific function calls
+        assert state.cp == pytest.approx(cb.cp_mass(T, X), rel=1e-15)
+        assert state.cv == pytest.approx(cb.cv_mass(T, X), rel=1e-15)
+        assert state.h == pytest.approx(cb.h_mass(T, X), rel=1e-15)
+        assert state.s == pytest.approx(cb.s_mass(T, X, P), rel=1e-15)
+        assert state.u == pytest.approx(cb.u_mass(T, X), rel=1e-15)
 
     def test_density_matches_individual_call(self):
         """Verify density matches individual function call."""
@@ -157,12 +157,12 @@ class TestPhysicalRelationships:
 
         mw_kg_per_mol = state.mw / 1000.0  # Convert g/mol to kg/mol
 
-        # cp_mass = cp / mw_kg_per_mol
-        assert state.cp_mass == pytest.approx(state.cp / mw_kg_per_mol, rel=1e-14)
-        assert state.cv_mass == pytest.approx(state.cv / mw_kg_per_mol, rel=1e-14)
-        assert state.h_mass == pytest.approx(state.h / mw_kg_per_mol, rel=1e-14)
-        assert state.s_mass == pytest.approx(state.s / mw_kg_per_mol, rel=1e-14)
-        assert state.u_mass == pytest.approx(state.u / mw_kg_per_mol, rel=1e-14)
+        # cp = cp_mole / mw_kg_per_mol
+        assert state.cp == pytest.approx(state.cp_mole / mw_kg_per_mol, rel=1e-14)
+        assert state.cv == pytest.approx(state.cv_mole / mw_kg_per_mol, rel=1e-14)
+        assert state.h == pytest.approx(state.h_mole / mw_kg_per_mol, rel=1e-14)
+        assert state.s == pytest.approx(state.s_mole / mw_kg_per_mol, rel=1e-14)
+        assert state.u == pytest.approx(state.u_mole / mw_kg_per_mol, rel=1e-14)
 
     def test_ideal_gas_law(self):
         """Verify ideal gas law: P = rho * R_specific * T."""
@@ -175,15 +175,15 @@ class TestPhysicalRelationships:
         assert pytest.approx(P_from_eos, rel=1e-14) == state.P
 
     def test_enthalpy_internal_energy_relationship(self):
-        """Verify h = u + P*V_molar where V_molar = RT/P."""
+        """Verify h_mole = u_mole + P*V_molar where V_molar = RT/P."""
         X = cb.standard_dry_air_composition()
         state = cb.thermo_state(T=300, P=101325, X=X)
 
         R = 8.31446261815324  # Universal gas constant [J/(mol*K)]
         V_molar = R * state.T / state.P
-        h_from_u = state.u + state.P * V_molar
+        h_from_u = state.u_mole + state.P * V_molar
 
-        assert state.h == pytest.approx(h_from_u, rel=1e-14)
+        assert state.h_mole == pytest.approx(h_from_u, rel=1e-14)
 
 
 class TestVariousCompositions:
@@ -292,7 +292,7 @@ class TestReferencePresssure:
         state = cb.thermo_state(T=300, P=101325, X=X)
 
         # Should match individual call with default P_ref
-        assert state.s == pytest.approx(cb.s(300, X, 101325), rel=1e-15)
+        assert state.s == pytest.approx(cb.s_mass(300, X, 101325), rel=1e-15)
 
     def test_custom_reference_pressure(self):
         """Test with custom reference pressure."""
@@ -301,7 +301,7 @@ class TestReferencePresssure:
         state = cb.thermo_state(T=300, P=101325, X=X, P_ref=P_ref)
 
         # Should match individual call with custom P_ref
-        assert state.s == pytest.approx(cb.s(300, X, 101325, P_ref), rel=1e-15)
+        assert state.s == pytest.approx(cb.s_mass(300, X, 101325, P_ref), rel=1e-15)
 
     def test_entropy_pressure_dependence(self):
         """Test that entropy depends on reference pressure."""

@@ -733,8 +733,6 @@ TEST_F(ThermoTransportTest, StreamMixing) {
 
 // Test Stream mixing with pressure override
 TEST_F(ThermoTransportTest, StreamMixingPressureOverride) {
-    const std::size_t n = species_names.size();
-
     Stream s1;
     s1.state.T = 400.0;
     s1.state.P = 100000.0;
@@ -756,8 +754,6 @@ TEST_F(ThermoTransportTest, StreamMixingPressureOverride) {
 
 // Test Stream mixing enthalpy conservation
 TEST_F(ThermoTransportTest, StreamMixingEnthalpyConservation) {
-    const std::size_t n = species_names.size();
-
     Stream s1;
     s1.state.T = 600.0;
     s1.state.P = 101325.0;
@@ -975,7 +971,9 @@ TEST_F(ThermoTransportTest, CompleteCombustionNaturalGas) {
     const std::size_t idx_N2 = species_index_from_name("N2");
     const std::size_t idx_CO2 = species_index_from_name("CO2");
     const std::size_t idx_H2O = species_index_from_name("H2O");
+    (void)idx_H2O;
     const std::size_t idx_O2 = species_index_from_name("O2");
+    (void)idx_O2;
     const std::size_t idx_AR = species_index_from_name("AR");
 
     // Natural gas fuel
@@ -1088,6 +1086,7 @@ TEST_F(ThermoTransportTest, CompleteCombustionLPG) {
     const std::size_t idx_CO2 = species_index_from_name("CO2");
     const std::size_t idx_H2O = species_index_from_name("H2O");
     const std::size_t idx_O2 = species_index_from_name("O2");
+    (void)idx_O2;
     const std::size_t idx_AR = species_index_from_name("AR");
 
     // LPG: ~60% propane, 40% butane
@@ -1141,6 +1140,7 @@ TEST_F(ThermoTransportTest, RichCombustionNaturalGasUnburnedHC) {
     const std::size_t idx_N2 = species_index_from_name("N2");
     const std::size_t idx_CO2 = species_index_from_name("CO2");
     const std::size_t idx_H2O = species_index_from_name("H2O");
+    (void)idx_H2O;
     const std::size_t idx_CO = species_index_from_name("CO");
     const std::size_t idx_H2 = species_index_from_name("H2");
 
@@ -3115,7 +3115,7 @@ TEST(HeatTransferTest, DittusBoelterBasic) {
 
 TEST(HeatTransferTest, DittusBoelterValidRange) {
     // Re < 10000: warns and extrapolates (power law — no divergence)
-    double Nu_low_Re;
+    double Nu_low_Re = 0.0;
     EXPECT_NO_THROW(Nu_low_Re = nusselt_dittus_boelter(5000, 0.7));
     EXPECT_GT(Nu_low_Re, 0.0);
     EXPECT_TRUE(std::isfinite(Nu_low_Re));
@@ -3160,7 +3160,7 @@ TEST(HeatTransferTest, GnielinskiWithFriction) {
 
 TEST(HeatTransferTest, GnielinskiValidRange) {
     // Re outside [2300, 5e6]: warns and extrapolates (or uses Hermite blend)
-    double Nu_low_Re, Nu_high_Re;
+    double Nu_low_Re = 0.0, Nu_high_Re = 0.0;
     EXPECT_NO_THROW(Nu_low_Re = nusselt_gnielinski(2000, 0.7));
     EXPECT_GT(Nu_low_Re, 0.0);
     EXPECT_TRUE(std::isfinite(Nu_low_Re));
@@ -4457,9 +4457,9 @@ TEST(PressureLossHookTest, CombustionStateFromStreamsPopulatesMdot) {
 
     Stream fuel, air;
     fuel.mdot = 0.05;
-    fuel.state = {700.0, 300000.0, X_fuel};
+    fuel.state = {700.0, 300000.0, X_fuel, mole_to_mass(X_fuel)};
     air.mdot  = 1.0;
-    air.state  = {700.0, 300000.0, X_ox};
+    air.state  = {700.0, 300000.0, X_ox, mole_to_mass(X_ox)};
 
     double mdot_fuel_seen = 0.0;
     double mdot_air_seen  = 0.0;

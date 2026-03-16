@@ -3,6 +3,8 @@
 #include <cmath>
 #include <stdexcept>
 
+using namespace combaero;
+
 // -------------------------------------------------------------
 // pressure_loss / velocity_from_pressure_loss
 // -------------------------------------------------------------

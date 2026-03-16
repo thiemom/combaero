@@ -121,7 +121,7 @@ double Cd_Stolz(double beta, double Re_D) {
     if (Re_D < 1.0) Re_D = 1.0;
 
     const double beta2 = beta * beta;
-    const double beta4 = beta2 * beta2;
+    [[maybe_unused]] const double beta4 = beta2 * beta2;
 
     // Stolz equation (corner taps)
     // C = 0.5959 + 0.0312*beta^2.1 - 0.184*beta^8 + 91.71*beta^2.5/Re_D^0.75
@@ -423,8 +423,8 @@ private:
                             (log_Re_values[i_Re + 1] - log_Re_values[i_Re]);
 
         // Clamp weights to [0, 1]
-        const double tb = std::clamp(t_beta, 0.0, 1.0);
-        const double tr = std::clamp(t_Re, 0.0, 1.0);
+        const double tb = std::max(0.0, std::min(t_beta, 1.0));
+        const double tr = std::max(0.0, std::min(t_Re, 1.0));
 
         // Bilinear interpolation
         const double c00 = Cd_table_[i_beta][i_Re];
@@ -674,7 +674,7 @@ OrificeFlowResult orifice_flow(
     double P,
     double mu,
     double Z,
-    const std::vector<double>& X,
+    [[maybe_unused]] const std::vector<double>& X,
     double kappa,
     CdCorrelation correlation)
 {

@@ -32,6 +32,8 @@
 // Bernoulli equation
 // -------------------------------------------------------------
 
+namespace combaero {
+
 // Bernoulli equation: P1 + ½ρv1² + ρgh1 = P2 + ½ρv2² + ρgh2
 //
 // Solve for P2 given P1, velocities, and elevation change.
@@ -310,5 +312,7 @@ std::tuple<double, double, double>
 pressure_drop_pipe(double T, double P, const std::vector<double> &X, double v,
                    double D, double L, double roughness = 0.0,
                    const std::string &correlation = "haaland");
+
+} // namespace combaero
 
 #endif // INCOMPRESSIBLE_H

@@ -5,7 +5,12 @@
 #include "math_constants.h" // Provides M_PI for MSVC
 #include "thermo.h"
 #include "transport.h"
+#include <cmath>
 #include <stdexcept>
+#include <string>
+#include <vector>
+
+namespace combaero {
 
 // -------------------------------------------------------------
 // Bernoulli equation
@@ -287,8 +292,8 @@ IncompressibleFlowSolution pipe_flow(double T, double P,
   const double h_val = h(T, X);
 
   IncompressibleFlowSolution sol;
-  sol.inlet = {T, P, X};
-  sol.outlet = {T, P - dP, X}; // Assume adiabatic for now
+  sol.inlet.set_TPX(T, P, X);
+  sol.outlet.set_TPX(T, P - dP, X); // Assume adiabatic for now
   sol.mdot = mdot;
   sol.v = u;
   sol.dP = dP;
@@ -334,8 +339,8 @@ pipe_flow_rough(double T, double P, const std::vector<double> &X, double u,
   const double h_val = h(T, X);
 
   IncompressibleFlowSolution sol;
-  sol.inlet = {T, P, X};
-  sol.outlet = {T, P - dP, X}; // Assume adiabatic for now
+  sol.inlet.set_TPX(T, P, X);
+  sol.outlet.set_TPX(T, P - dP, X); // Assume adiabatic for now
   sol.mdot = mdot;
   sol.v = u;
   sol.dP = dP;
@@ -437,3 +442,5 @@ pressure_drop_pipe(double T, double P, const std::vector<double> &X, double v,
 
   return std::make_tuple(dP, Re, f);
 }
+
+} // namespace combaero

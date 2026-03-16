@@ -4,6 +4,8 @@
 #include <iostream>
 #include <vector>
 
+using namespace combaero;
+
 // Humid Air Properties Example
 //
 // This example demonstrates the calculation of various properties

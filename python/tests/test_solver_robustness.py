@@ -295,14 +295,32 @@ def test_equilibrium_combustor_convergence():
     sol = solver.solve()
 
     assert sol["__success__"]
-    assert sol["comb.T_total"] > 2400.0  # High T for equilibrium
 
-    # Check for dissociation products (e.g. CO should be non-zero for stoic mixture at high T)
-    try:
-        idx_CO = get_idx("CO")
-        assert sol[f"comb.Y[{idx_CO}]"] > 1e-4
-    except Exception:
-        pass  # CO not in species set or other issue, skip specific dissociation check
+    # --- EXACT PHYSICS VALIDATION ---
+    # The combustor node sees the inlet state (P_total, T_total, Y).
+    # Since it's directly connected via an orifice at steady state with no other branches,
+    # the inlet properties to the combustion kernel are exactly P_total (comb.P_total), T_total (inlet), Y (inlet).
+    # Note: CombustorNode in equilibrium mode solve(P, T_in, Y_in) -> (T_ad, Y_ad).
+
+    T_in = 600.0
+    P_comb = sol["comb.P_total"]
+
+    eq_res = cb.combustion_equilibrium(T=T_in, X=X_stoic, P=P_comb, smooth=True)
+    assert eq_res.converged
+
+    T_expected = eq_res.state.T
+    Y_expected = eq_res.state.Y
+
+    print(f"DEBUG: n_species={n_species}, len(Y_expected)={len(Y_expected)}")
+    # Verify solver T matches equilibrium T
+    assert sol["comb.T_total"] == pytest.approx(T_expected, rel=1e-7)
+
+    # Verify species matching
+    for i in range(n_species):
+        key = f"comb.Y[{i}]"
+        if key not in sol:
+            print(f"DEBUG: missing key {key} in sol")
+        assert sol[key] == pytest.approx(Y_expected[i], abs=1e-8)
 
 
 def test_derived_state_jacobian_fd():

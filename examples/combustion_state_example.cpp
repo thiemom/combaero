@@ -8,6 +8,8 @@
 #include <iostream>
 #include <vector>
 
+using namespace combaero;
+
 // Combustion State Example
 //
 // Demonstrates:
@@ -19,6 +21,7 @@
 
 int main()
 {
+    using namespace combaero;
     std::cout << std::fixed << std::setprecision(4);
 
     const std::size_t n = species_names.size();

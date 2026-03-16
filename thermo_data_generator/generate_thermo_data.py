@@ -464,6 +464,8 @@ def generate_cpp_header(
 #include <unordered_map>
 #include <vector>
 
+namespace combaero {{
+
 // NASA polynomial format used in this build
 // NASA7: Cp/R = a1 + a2*T + a3*T^2 + a4*T^3 + a5*T^4
 // NASA9: Cp/R = a1/T^2 + a2/T + a3 + a4*T + a5*T^2 + a6*T^3 + a7*T^4
@@ -600,6 +602,7 @@ using G = MolecularGeometry;
     output.write(",\n".join(struct_entries))
     output.write("\n};\n\n")
 
+    output.write("} // namespace combaero\n\n")
     output.write("#endif // THERMO_TRANSPORT_DATA_H\n")
 
 

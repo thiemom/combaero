@@ -8,36 +8,16 @@
 #include <vector>
 
 namespace combaero {
+
 // -----------------------------------------------------------------
 // Global smoothing constants for combustion (see combustion.cpp for rationale)
 // -----------------------------------------------------------------
-constexpr double SMOOTHING_K_PHI0 = 30.0;
-constexpr double SMOOTHING_K_PHI1 = 200.0;
-} // namespace combaero
+constexpr double SMOOTHING_K_PHI0 = 20000.0;
+constexpr double SMOOTHING_K_PHI1 = 20000.0;
 
 // -------------------------------------------------------------
 // User-supplied pressure-loss correlation hook
 // -------------------------------------------------------------
-//
-// All fields in PressureLossContext are loop-free: they depend only on
-// inlet conditions and combustion outputs, never on the unknown outlet
-// pressure. This makes the hook safe to call inside a Newton solver
-// without creating an implicit loop.
-//
-// Return value: fractional total-pressure drop ΔP/P_in  [-]
-//   P_out = P_in * (1 - pressure_loss(ctx))
-//
-// Usage (C++):
-//   auto my_loss = [](const PressureLossContext& c) {
-//       return 0.02 + 0.01 * c.theta;   // 2% base + 1% per unit θ
-//   };
-//   auto result = combustion_state(X_fuel, X_ox, phi, T, P, "", method,
-//   my_loss);
-//
-// Usage (Python):
-//   result = cb.combustion_state(X_fuel, X_ox, phi, T, P,
-//                                pressure_loss=lambda c: 0.02 + 0.01*c.theta)
-
 struct PressureLossContext {
   const State &state_in;                 // inlet T, P, X (static conditions)
   double phi;                            // equivalence ratio [-]
@@ -58,270 +38,158 @@ double oxygen_required_per_mol_mixture(const std::vector<double> &X);
 double oxygen_required_per_kg_mixture(const std::vector<double> &X);
 
 // Fuel lower heating value (LHV) from complete combustion to CO2 + H2O(g)
-// X_fuel must be mole fractions over the global species set.
-double fuel_lhv_molar(
-    const std::vector<double> &X_fuel,
-    const double reference_temperature = 298.15); // [J/mol fuel mixture]
-double fuel_lhv_mass(
-    const std::vector<double> &X_fuel,
-    const double reference_temperature = 298.15); // [J/kg fuel mixture]
+double fuel_lhv_molar(const std::vector<double> &X_fuel,
+                      const double reference_temperature = 298.15);
+double fuel_lhv_mass(const std::vector<double> &X_fuel,
+                     const double reference_temperature = 298.15);
 
-// Combustion calculations - dry air requirements (using standard dry air
-// composition)
+// Combustion calculations - dry air requirements
 double dryair_required_per_mol_fuel(std::size_t fuel_index);
 double dryair_required_per_kg_fuel(std::size_t fuel_index);
 double dryair_required_per_mol_mixture(const std::vector<double> &X);
 double dryair_required_per_kg_mixture(const std::vector<double> &X);
 
-// Equivalence ratio (mole basis) for multi-species fuel + oxidizer.
-// X_* are mole fractions over the same species set as species_names.
-
-// Compute φ for a given unreacted mixture X_mix that is formed only by
-// mixing a fuel stream (X_fuel) and an oxidizer stream (X_ox).
+// Equivalence ratio (mole basis)
 double equivalence_ratio_mole(const std::vector<double> &X_mix,
-                              const std::vector<double> &X_fuel,
-                              const std::vector<double> &X_ox);
+                               const std::vector<double> &X_fuel,
+                               const std::vector<double> &X_ox);
 
-// Given target φ, and definitions of the fuel and oxidizer streams,
-// construct the unreacted mixture mole fractions X_mix.
 std::vector<double>
 set_equivalence_ratio_mole(double phi, const std::vector<double> &X_fuel,
                            const std::vector<double> &X_ox);
 
-// Equivalence ratio (mass basis) for multi-species fuel + oxidizer.
-// Y_* are mass fractions over the same species set as species_names.
-
-// Compute φ for a given unreacted mixture Y_mix that is formed only by
-// mixing a fuel stream (Y_fuel) and an oxidizer stream (Y_ox).
+// Equivalence ratio (mass basis)
 double equivalence_ratio_mass(const std::vector<double> &Y_mix,
-                              const std::vector<double> &Y_fuel,
-                              const std::vector<double> &Y_ox);
+                               const std::vector<double> &Y_fuel,
+                               const std::vector<double> &Y_ox);
 
-// Given target φ, and definitions of the fuel and oxidizer streams,
-// construct the unreacted mixture mass fractions Y_mix.
 std::vector<double>
 set_equivalence_ratio_mass(double phi, const std::vector<double> &Y_fuel,
                            const std::vector<double> &Y_ox);
 
-// Stoichiometric Bilger mixture fraction Z_st for given fuel & oxidizer streams
-// (mass fractions Y_F, Y_O).
+// Stoichiometric Bilger mixture fraction
 double bilger_stoich_mixture_fraction_mass(const std::vector<double> &Y_F,
-                                           const std::vector<double> &Y_O);
+                                            const std::vector<double> &Y_O);
 
-// Convert Bilger mixture fraction Z -> equivalence ratio φ (mass basis)
-// for given fuel & oxidizer streams.
 double equivalence_ratio_from_bilger_Z_mass(double Z,
-                                            const std::vector<double> &Y_F,
-                                            const std::vector<double> &Y_O);
+                                             const std::vector<double> &Y_F,
+                                             const std::vector<double> &Y_O);
 
-// Convert equivalence ratio φ (mass basis) -> Bilger mixture fraction Z
-// for given fuel & oxidizer streams.
 double bilger_Z_from_equivalence_ratio_mass(double phi,
-                                            const std::vector<double> &Y_F,
-                                            const std::vector<double> &Y_O);
+                                             const std::vector<double> &Y_F,
+                                             const std::vector<double> &Y_O);
 
 // Complete combustion to CO2 and H2O.
-// - If O2 >= stoich: all fuel burns, possible O2 left over.
-// - If 0 < O2 < stoich: all fuels burn with the same fraction f of their
-//   stoichiometric amount based on available O2, and O2 is fully consumed.
-// - If no fuel or no O2: mixture is returned unchanged.
 std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double> &X,
-                                                   bool smooth = false);
+                                                   bool smooth_phi0 = false,
+                                                   bool smooth_phi1 = false,
+                                                   double k0 = SMOOTHING_K_PHI0,
+                                                   double k1 = SMOOTHING_K_PHI1);
 
-// Overload that also returns the fuel-burn fraction f (0 <= f <= 1).
-// - f = 1 for fuel-limited cases (O2 in excess or exactly stoichiometric).
-// - 0 < f < 1 for O2-limited cases.
-// - f = 0 if no combustion occurs (no fuel or no O2).
 std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double> &X,
                                                    double &fuel_burn_fraction,
-                                                   bool smooth = false);
+                                                   bool smooth_phi0 = false,
+                                                   bool smooth_phi1 = false,
+                                                   double k0 = SMOOTHING_K_PHI0,
+                                                   double k1 = SMOOTHING_K_PHI1);
 
 // Mixture fraction (Bilger) utilities
-// All Y*, mass fractions over the same species set as species_names /
-// molar_masses.
 double bilger_beta(const std::vector<double> &Y);
-double bilger_mixture_fraction(
-    const std::vector<double> &Y,   // local composition
-    const std::vector<double> &Y_F, // pure fuel-stream composition
-    const std::vector<double> &Y_O  // pure oxidizer-stream composition
-);
+double bilger_mixture_fraction(const std::vector<double> &Y,
+                                const std::vector<double> &Y_F,
+                                const std::vector<double> &Y_O);
 
-// Convenience overload: Bilger mixture fraction from mole fractions X.
-// Internally converts X, X_F, X_O to mass fractions and calls
-// bilger_mixture_fraction(...) above.
 double bilger_mixture_fraction_from_moles(const std::vector<double> &X,
-                                          const std::vector<double> &X_F,
-                                          const std::vector<double> &X_O);
+                                           const std::vector<double> &X_F,
+                                           const std::vector<double> &X_O);
 
-// -------------------------------------------------------------
 // Stream-based equivalence ratio helpers
-// -------------------------------------------------------------
-
-// Given a target equivalence ratio phi, a fuel stream (composition only, mdot
-// ignored), and an oxidizer stream (with mdot set), return a copy of the fuel
-// stream with mdot set to achieve the target phi when mixed with the oxidizer.
-//
-// Example:
-//   Stream fuel, air;
-//   fuel.set_T(300).set_X(X_CH4);       // mdot not needed
-//   air.set_T(298).set_X(X_air).set_mdot(10.0);
-//   Stream fuel_phi = set_fuel_stream_for_phi(0.8, fuel, air);
-//   Stream mixed = mix({fuel_phi, air});
 Stream set_fuel_stream_for_phi(double phi, const Stream &fuel,
-                               const Stream &oxidizer);
+                                const Stream &oxidizer);
 
-// -------------------------------------------------------------
-// Inverse solvers for fuel/oxidizer streams (complete combustion only)
-// -------------------------------------------------------------
-// These functions find the fuel or oxidizer mass flow rate to achieve a target
-// property in the burned products (complete combustion to CO2/H2O, no WGS).
-//
-// For Tad solvers: The same Tad can be achieved on both lean (O2 excess) and
-// rich (fuel excess) sides of stoichiometric. Use the 'lean' parameter to
-// select which side to search (default: lean=true).
-//
-// For O2/CO2 solvers: Only lean combustion is supported (O2 > 0 in products).
-
-// --- Find fuel stream (oxidizer mdot fixed) ---
-
-// Find fuel mdot to achieve target adiabatic flame temperature [K].
-// T_ad_target must be in (T_oxidizer, T_ad_stoich] K.
-// lean: if true (default), search on lean side (O2 excess); if false, search on
-// rich side. phi_max: maximum equivalence ratio for rich side search
-// (default: 10.0).
+// Inverse solvers for fuel/oxidizer streams
 Stream set_fuel_stream_for_Tad(double T_ad_target, const Stream &fuel,
-                               const Stream &oxidizer, double tol = 1.0,
-                               std::size_t max_iter = 100, bool lean = true,
-                               double phi_max = 10.0);
+                                const Stream &oxidizer, double tol = 1.0,
+                                std::size_t max_iter = 100, bool lean = true,
+                                double phi_max = 10.0);
 
-// Find fuel mdot to achieve target O2 mole fraction in burned products (wet
-// basis).
 Stream set_fuel_stream_for_O2(double X_O2_target, const Stream &fuel,
-                              const Stream &oxidizer, double tol = 1e-6,
-                              std::size_t max_iter = 100);
-
-// Find fuel mdot to achieve target O2 mole fraction in burned products (dry
-// basis).
-Stream set_fuel_stream_for_O2_dry(double X_O2_dry_target, const Stream &fuel,
-                                  const Stream &oxidizer, double tol = 1e-6,
-                                  std::size_t max_iter = 100);
-
-// Find fuel mdot to achieve target CO2 mole fraction in burned products (wet
-// basis).
-Stream set_fuel_stream_for_CO2(double X_CO2_target, const Stream &fuel,
                                const Stream &oxidizer, double tol = 1e-6,
                                std::size_t max_iter = 100);
 
-// Find fuel mdot to achieve target CO2 mole fraction in burned products (dry
-// basis).
+Stream set_fuel_stream_for_O2_dry(double X_O2_dry_target, const Stream &fuel,
+                                   const Stream &oxidizer, double tol = 1e-6,
+                                   std::size_t max_iter = 100);
+
+Stream set_fuel_stream_for_CO2(double X_CO2_target, const Stream &fuel,
+                                const Stream &oxidizer, double tol = 1e-6,
+                                std::size_t max_iter = 100);
+
 Stream set_fuel_stream_for_CO2_dry(double X_CO2_dry_target, const Stream &fuel,
-                                   const Stream &oxidizer, double tol = 1e-6,
-                                   std::size_t max_iter = 100);
+                                    const Stream &oxidizer, double tol = 1e-6,
+                                    std::size_t max_iter = 100);
 
-// --- Find oxidizer stream (fuel mdot fixed) ---
-
-// Find oxidizer mdot to achieve target adiabatic flame temperature [K].
-// T_ad_target must be in (T_fuel, T_ad_stoich] K.
-// lean: if true (default), search on lean side (O2 excess); if false, search on
-// rich side. phi_max: maximum equivalence ratio for search range
-// (default: 10.0).
 Stream set_oxidizer_stream_for_Tad(double T_ad_target, const Stream &fuel,
-                                   const Stream &oxidizer, double tol = 1.0,
-                                   std::size_t max_iter = 100, bool lean = true,
-                                   double phi_max = 10.0);
+                                    const Stream &oxidizer, double tol = 1.0,
+                                    std::size_t max_iter = 100, bool lean = true,
+                                    double phi_max = 10.0);
 
-// Find oxidizer mdot to achieve target O2 mole fraction in burned products (wet
-// basis).
 Stream set_oxidizer_stream_for_O2(double X_O2_target, const Stream &fuel,
-                                  const Stream &oxidizer, double tol = 1e-6,
-                                  std::size_t max_iter = 100);
-
-// Find oxidizer mdot to achieve target O2 mole fraction in burned products (dry
-// basis).
-Stream set_oxidizer_stream_for_O2_dry(double X_O2_dry_target,
-                                      const Stream &fuel,
-                                      const Stream &oxidizer, double tol = 1e-6,
-                                      std::size_t max_iter = 100);
-
-// Find oxidizer mdot to achieve target CO2 mole fraction in burned products
-// (wet basis).
-Stream set_oxidizer_stream_for_CO2(double X_CO2_target, const Stream &fuel,
                                    const Stream &oxidizer, double tol = 1e-6,
                                    std::size_t max_iter = 100);
 
-// Find oxidizer mdot to achieve target CO2 mole fraction in burned products
-// (dry basis).
-Stream set_oxidizer_stream_for_CO2_dry(double X_CO2_dry_target,
+Stream set_oxidizer_stream_for_O2_dry(double X_O2_dry_target,
                                        const Stream &fuel,
-                                       const Stream &oxidizer,
-                                       double tol = 1e-6,
+                                       const Stream &oxidizer, double tol = 1e-6,
                                        std::size_t max_iter = 100);
 
-// -------------------------------------------------------------
+Stream set_oxidizer_stream_for_CO2(double X_CO2_target, const Stream &fuel,
+                                    const Stream &oxidizer, double tol = 1e-6,
+                                    std::size_t max_iter = 100);
+
+Stream set_oxidizer_stream_for_CO2_dry(double X_CO2_dry_target,
+                                        const Stream &fuel,
+                                        const Stream &oxidizer,
+                                        double tol = 1e-6,
+                                        std::size_t max_iter = 100);
+
 // State-based combustion functions
-// -------------------------------------------------------------
+State complete_combustion(const State &in, bool smooth_phi0 = false, bool smooth_phi1 = false,
+                         double k0 = SMOOTHING_K_PHI0, double k1 = SMOOTHING_K_PHI1);
+State complete_combustion_isothermal(const State &in, bool smooth_phi0 = false, bool smooth_phi1 = false,
+                                    double k0 = SMOOTHING_K_PHI0, double k1 = SMOOTHING_K_PHI1);
 
-// Complete combustion to CO2 and H2O (adiabatic)
-// Input: unburned state with T, P, X
-// Output: burned state with adiabatic flame temperature
-State complete_combustion(const State &in, bool smooth = false);
-
-// Complete combustion to CO2 and H2O (isothermal)
-// Input: unburned state with T, P, X
-// Output: burned state at same temperature
-State complete_combustion_isothermal(const State &in, bool smooth = false);
-
-// -------------------------------------------------------------
-// Combustion State Dataclass
-// -------------------------------------------------------------
-// CombustionState is defined in state.h
-
-// Compute combustion state from equivalence ratio (typical for calculations)
-// Parameters:
-//   X_fuel       : fuel composition (mole fractions) [-]
-//   X_ox         : oxidizer composition (mole fractions) [-]
-//   phi          : equivalence ratio [-] (INPUT)
-//   T_reactants  : reactant temperature [K]
-//   P            : pressure [Pa]
-//   fuel_name    : optional fuel label (default: "")
-//   method       : product model — Complete (default, fast) or Equilibrium
-// Returns: CombustionState with reactants, products, phi, mixture_fraction
-// Note: products.thermo.P = P * (1 - delta_P_frac)  [fixed 4% drop]
-// TODO: update fixed 4% to be a parameter or be removed
+// Compute combustion state
 CombustionState combustion_state(
     const std::vector<double> &X_fuel, const std::vector<double> &X_ox,
     double phi, double T_reactants, double P, const std::string &fuel_name = "",
-    CombustionMethod method = CombustionMethod::Complete, bool smooth = false);
+    CombustionMethod method = CombustionMethod::Complete,
+    bool smooth_phi0 = false, bool smooth_phi1 = false,
+    double k0 = SMOOTHING_K_PHI0, double k1 = SMOOTHING_K_PHI1);
 
-// Overload with user-supplied pressure-loss correlation.
-// pressure_loss(ctx) returns fractional ΔP/P_in [-].
-// All fields in PressureLossContext are loop-free — safe for Newton solvers.
 CombustionState combustion_state(const std::vector<double> &X_fuel,
                                  const std::vector<double> &X_ox, double phi,
                                  double T_reactants, double P,
                                  const std::string &fuel_name,
                                  CombustionMethod method,
                                  const PressureLossCorrelation &pressure_loss,
-                                 bool smooth = false);
+                                 bool smooth_phi0 = false, bool smooth_phi1 = false,
+                                 double k0 = SMOOTHING_K_PHI0, double k1 = SMOOTHING_K_PHI1);
 
-// Compute combustion state from measured streams (typical for lab data)
-// Parameters:
-//   fuel_stream : fuel stream with mdot, T, X
-//   ox_stream   : oxidizer stream with mdot, T, X
-//   fuel_name   : optional fuel label (default: "")
-//   method      : product model — Complete (default, fast) or Equilibrium
-// Returns: CombustionState with phi COMPUTED from mass flow rates
 CombustionState combustion_state_from_streams(
     const Stream &fuel_stream, const Stream &ox_stream,
     const std::string &fuel_name = "",
-    CombustionMethod method = CombustionMethod::Complete, bool smooth = false);
+    CombustionMethod method = CombustionMethod::Complete,
+    bool smooth_phi0 = false, bool smooth_phi1 = false,
+    double k0 = SMOOTHING_K_PHI0, double k1 = SMOOTHING_K_PHI1);
 
-// Overload with user-supplied pressure-loss correlation.
-// pressure_loss(ctx) returns fractional ΔP/P_in [-].
-// ctx.mdot_fuel and ctx.mdot_air are populated from the stream mass flows.
 CombustionState combustion_state_from_streams(
     const Stream &fuel_stream, const Stream &ox_stream,
     const std::string &fuel_name, CombustionMethod method,
-    const PressureLossCorrelation &pressure_loss, bool smooth = false);
+    const PressureLossCorrelation &pressure_loss,
+    bool smooth_phi0 = false, bool smooth_phi1 = false,
+    double k0 = SMOOTHING_K_PHI0, double k1 = SMOOTHING_K_PHI1);
+
+} // namespace combaero
 
 #endif // COMBUSTION_H

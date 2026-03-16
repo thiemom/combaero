@@ -1,24 +1,19 @@
-#include "solver_interface.h"
+#include "../include/solver_interface.h"
+#include "../include/composition.h"
+#include "../include/transport.h"
+#include "../include/combustion.h"
+#include "../include/cooling_correlations.h"
+#include "../include/equilibrium.h"
+#include "../include/friction.h"
+#include "../include/heat_transfer.h"
+#include "../include/registry.h"
+#include "../include/stagnation.h"
+#include "../include/thermo.h"
+#include "../include/math_constants.h"
 
 #include <algorithm>
 #include <cmath>
-#include "../include/composition.h"
-using combaero::mwmix;
-using combaero::mole_to_mass;
-using combaero::mass_to_mole;
-using combaero::normalize_fractions;
 #include <stdexcept>
-
-#include "combustion.h"
-#include "cooling_correlations.h"
-#include "equilibrium.h"
-#include "friction.h"
-#include "heat_transfer.h"
-#include "math_constants.h" // MSVC compatibility for M_PI, M_LN10, etc.
-#include "registry.h"
-#include "stagnation.h"
-#include "thermo.h"
-#include "transport.h"
 
 namespace combaero {
 namespace solver {
@@ -55,7 +50,7 @@ std::tuple<double, double> orifice_mdot_and_jacobian(double dP, double rho,
 }
 
 std::tuple<double, double> pressure_loss_and_jacobian(double v, double rho,
-                                                      double K) {
+                                                       double K) {
   // Standard K-factor loss: dP = K * 0.5 * rho * v^2
   double constant = K * 0.5 * rho;
   double dP = constant * v * v;
@@ -356,7 +351,7 @@ pin_fin_friction_and_jacobian(double Re_d, bool is_staggered) {
 
 CorrelationResult<std::tuple<double, double>>
 dimple_nusselt_enhancement_and_jacobian(double Re_Dh, double d_Dh, double h_d,
-                                        double S_d) {
+                                         double S_d) {
   const double eps = std::max(1e-6, Re_Dh * 1e-6);
   double Nu_plus =
       cooling::dimple_nusselt_enhancement(Re_Dh + eps, d_Dh, h_d, S_d);
@@ -379,21 +374,21 @@ dimple_friction_multiplier_and_jacobian(double Re_Dh, double d_Dh, double h_d) {
 
 CorrelationResult<std::tuple<double, double>>
 rib_enhancement_factor_high_re_and_jacobian(double e_D, double pitch_to_height,
-                                            double alpha_deg, double Re) {
+                                             double alpha_deg, double Re) {
   const double eps = std::max(1e-6, Re * 1e-6);
   double E_plus = cooling::rib_enhancement_factor_high_re(e_D, pitch_to_height,
-                                                          alpha_deg, Re + eps);
+                                                           alpha_deg, Re + eps);
   double E_minus = cooling::rib_enhancement_factor_high_re(e_D, pitch_to_height,
-                                                           alpha_deg, Re - eps);
+                                                            alpha_deg, Re - eps);
   double dE_dRe = (E_plus - E_minus) / (2.0 * eps);
   double E = cooling::rib_enhancement_factor_high_re(e_D, pitch_to_height,
-                                                     alpha_deg, Re);
+                                                      alpha_deg, Re);
   return {{E, dE_dRe}, CorrelationValidity::VALID, ""};
 }
 
 CorrelationResult<std::tuple<double, double>>
 impingement_nusselt_and_jacobian(double Re_jet, double Pr, double z_D,
-                                 double x_D, double y_D) {
+                                  double x_D, double y_D) {
   const double eps = std::max(1e-6, Re_jet * 1e-6);
   double Nu_plus =
       cooling::impingement_nusselt(Re_jet + eps, Pr, z_D, x_D, y_D);
@@ -406,7 +401,7 @@ impingement_nusselt_and_jacobian(double Re_jet, double Pr, double z_D,
 
 CorrelationResult<std::tuple<double, double>>
 film_cooling_effectiveness_and_jacobian(double x_D, double M, double DR,
-                                        double alpha_deg) {
+                                         double alpha_deg) {
   const double eps = std::max(1e-6, M * 1e-6); // wrt Blowing Ratio M
   double eta_plus =
       cooling::film_cooling_effectiveness(x_D, M + eps, DR, alpha_deg);
@@ -419,13 +414,13 @@ film_cooling_effectiveness_and_jacobian(double x_D, double M, double DR,
 
 CorrelationResult<std::tuple<double, double>>
 effusion_effectiveness_and_jacobian(double x_D, double M, double DR,
-                                    double porosity, double s_D,
-                                    double alpha_deg) {
+                                     double porosity, double s_D,
+                                     double alpha_deg) {
   const double eps = std::max(1e-6, M * 1e-6); // wrt Blowing Ratio M
   double eta_plus = cooling::effusion_effectiveness(x_D, M + eps, DR, porosity,
-                                                    s_D, alpha_deg);
-  double eta_minus = cooling::effusion_effectiveness(x_D, M - eps, DR, porosity,
                                                      s_D, alpha_deg);
+  double eta_minus = cooling::effusion_effectiveness(x_D, M - eps, DR, porosity,
+                                                      s_D, alpha_deg);
   double deta_dM = (eta_plus - eta_minus) / (2.0 * eps);
   double eta =
       cooling::effusion_effectiveness(x_D, M, DR, porosity, s_D, alpha_deg);
@@ -445,7 +440,7 @@ density_and_jacobians(double T, double P, const std::vector<double> &X) {
   double dPeff_dP = (P > 1.0) ? 1.0 : 0.1;
 
   // Calculate base density natively
-  double rho = ::density(T_eff, P_eff, X);
+  double rho = combaero::density(T_eff, P_eff, X);
 
   // Ideal gas law: rho = P * W / (R * T)
   // d_rho_dT = d(rho)/d(T_eff) * d(T_eff)/dT
@@ -458,17 +453,17 @@ density_and_jacobians(double T, double P, const std::vector<double> &X) {
 }
 
 std::tuple<double, double> enthalpy_and_jacobian(double T,
-                                                 const std::vector<double> &X) {
+                                                  const std::vector<double> &X) {
   double T_eff = (T > 10.0) ? T : (10.0 + 0.1 * (T - 10.0));
   double dTeff_dT = (T > 10.0) ? 1.0 : 0.1;
 
   // h(T) = base mass enthalpy
-  double h = ::h_mass(T_eff, X);
+  double h_val = combaero::h_mass(T_eff, X);
 
   // Analytical derivative of enthalpy with respect to temperature is Cp
-  double d_h_d_T = ::cp_mass(T_eff, X) * dTeff_dT;
+  double d_h_d_T = combaero::cp_mass(T_eff, X) * dTeff_dT;
 
-  return {h, d_h_d_T};
+  return {h_val, d_h_d_T};
 }
 
 std::tuple<double, double, double>
@@ -480,18 +475,18 @@ viscosity_and_jacobians(double T, double P, const std::vector<double> &X) {
   double dPeff_dP = (P > 1.0) ? 1.0 : 0.1;
 
   // Base viscosity
-  double mu = ::viscosity(T_eff, P_eff, X);
+  double mu = combaero::viscosity(T_eff, P_eff, X);
 
   // 1. Temperature Derivative
   double dT_p = 1e-3; // 1 mK perturbation
-  double mu_plus = ::viscosity(T_eff + dT_p, P_eff, X);
-  double mu_minus = ::viscosity(T_eff - dT_p, P_eff, X);
+  double mu_plus = combaero::viscosity(T_eff + dT_p, P_eff, X);
+  double mu_minus = combaero::viscosity(T_eff - dT_p, P_eff, X);
   double d_mu_d_T = ((mu_plus - mu_minus) / (2.0 * dT_p)) * dTeff_dT;
 
   // 2. Pressure Derivative
   double dP_p = 1.0; // 1 Pascal perturbation
-  double mu_P_plus = ::viscosity(T_eff, P_eff + dP_p, X);
-  double mu_P_minus = ::viscosity(T_eff, P_eff - dP_p, X);
+  double mu_P_plus = combaero::viscosity(T_eff, P_eff + dP_p, X);
+  double mu_P_minus = combaero::viscosity(T_eff, P_eff - dP_p, X);
   double d_mu_d_P = ((mu_P_plus - mu_P_minus) / (2.0 * dP_p)) * dPeff_dP;
 
   return {mu, d_mu_d_T, d_mu_d_P};
@@ -500,9 +495,8 @@ viscosity_and_jacobians(double T, double P, const std::vector<double> &X) {
 std::tuple<double, double>
 mach_number_and_jacobian_v(double v, double T, const std::vector<double> &X) {
   double T_eff = (T > 10.0) ? T : (10.0 + 0.1 * (T - 10.0));
-  double dTeff_dT = (T > 10.0) ? 1.0 : 0.1;
 
-  double a = speed_of_sound(T_eff, X);
+  double a = combaero::speed_of_sound(T_eff, X);
   if (a <= 1.0) a = 1.0; // Minimal fallback
 
   double M = v / a;
@@ -514,17 +508,17 @@ mach_number_and_jacobian_v(double v, double T, const std::vector<double> &X) {
 
 std::tuple<double, double>
 T_adiabatic_wall_and_jacobian_v(double T_static, double v, double T, double P,
-                                const std::vector<double> &X, bool turbulent) {
+                                 const std::vector<double> &X, bool turbulent) {
   double T_s_eff = (T_static > 10.0) ? T_static : (10.0 + 0.1 * (T_static - 10.0));
   double v_eff = (v >= 0.0) ? v : (0.1 * v);
   double T_eff = (T > 10.0) ? T : (10.0 + 0.1 * (T - 10.0));
   double P_eff = (P > 1.0) ? P : (1.0 + 0.1 * (P - 1.0));
 
-  double Pr = prandtl(T_eff, P_eff, X);
+  double Pr = combaero::prandtl(T_eff, P_eff, X);
   double r = turbulent ? std::cbrt(Pr) : std::sqrt(Pr);
 
-  double mw_g = mwmix(X);
-  double cp_val = cp(T_eff, X) / mw_g * 1000.0;
+  double mw_g = combaero::mwmix(X);
+  double cp_val = combaero::cp(T_eff, X) / mw_g * 1000.0;
 
   double T_aw = T_s_eff + r * 0.5 * v_eff * v_eff / cp_val;
   // Use v_eff for derivative to keep it leaky
@@ -535,7 +529,7 @@ T_adiabatic_wall_and_jacobian_v(double T_static, double v, double T, double P,
 
 std::tuple<double, double>
 T0_from_static_and_jacobian_M(double T, double M,
-                              const std::vector<double> &X) {
+                               const std::vector<double> &X) {
   if (M < 0.0) {
     throw std::invalid_argument(
         "T0_from_static_and_jacobian_M: M must be non-negative");
@@ -558,7 +552,7 @@ T0_from_static_and_jacobian_M(double T, double M,
 
 std::tuple<double, double>
 P0_from_static_and_jacobian_M(double P, double T, double M,
-                              const std::vector<double> &X) {
+                               const std::vector<double> &X) {
   if (M < 0.0) {
     throw std::invalid_argument(
         "P0_from_static_and_jacobian_M: M must be non-negative");
@@ -585,7 +579,7 @@ P0_from_static_and_jacobian_M(double P, double T, double M,
 
 std::tuple<double, double, std::vector<double>>
 adiabatic_T_complete_and_jacobian_T(double T_in, double P,
-                                    const std::vector<double> &X_in) {
+                                     const std::vector<double> &X_in) {
   if (T_in <= 0.0 || P <= 0.0) {
     throw std::invalid_argument(
         "solver_interface::adiabatic_T_complete requires T_in > 0 and P > 0");
@@ -593,7 +587,7 @@ adiabatic_T_complete_and_jacobian_T(double T_in, double P,
 
   State in_state;
   in_state.set_TPX(T_in, P, X_in);
-  State out_state = complete_combustion(in_state, true);
+  State out_state = combaero::complete_combustion(in_state, true, true);
   double T_ad = out_state.T;
   std::vector<double> X_products = out_state.X;
 
@@ -604,8 +598,8 @@ adiabatic_T_complete_and_jacobian_T(double T_in, double P,
   in_plus.set_TPX(T_in + dT_eps, P, X_in);
   in_minus.set_TPX(std::max(0.1, T_in - dT_eps), P, X_in);
 
-  double T_ad_plus = complete_combustion(in_plus, true).T;
-  double T_ad_minus = complete_combustion(in_minus, true).T;
+  double T_ad_plus = combaero::complete_combustion(in_plus, true, true).T;
+  double T_ad_minus = combaero::complete_combustion(in_minus, true, true).T;
 
   double dT_ad_dT_in = (T_ad_plus - T_ad_minus) / (2.0 * dT_eps);
 
@@ -614,7 +608,7 @@ adiabatic_T_complete_and_jacobian_T(double T_in, double P,
 
 std::tuple<double, double, double, std::vector<double>>
 adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
-                                      const std::vector<double> &X_in) {
+                                       const std::vector<double> &X_in) {
   if (T_in <= 0.0 || P <= 0.0) {
     throw std::invalid_argument("solver_interface::adiabatic_T_equilibrium "
                                 "requires T_in > 0 and P > 0");
@@ -622,9 +616,8 @@ adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
 
   State in_state;
   in_state.set_TPX(T_in, P, X_in);
-
   // Combustion Equilibrium
-  EquilibriumResult eq_res = combustion_equilibrium(in_state, true);
+  EquilibriumResult eq_res = combaero::combustion_equilibrium(in_state);
   double T_ad = eq_res.state.T;
   std::vector<double> X_products = eq_res.state.X;
 
@@ -637,8 +630,8 @@ adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
   in_T_plus.set_TPX(T_in + dT_eps, P, X_in);
   in_T_minus.set_TPX(std::max(0.1, T_in - dT_eps), P, X_in);
 
-  double T_ad_T_plus = combustion_equilibrium(in_T_plus, true).state.T;
-  double T_ad_T_minus = combustion_equilibrium(in_T_minus, true).state.T;
+  double T_ad_T_plus = combaero::combustion_equilibrium(in_T_plus).state.T;
+  double T_ad_T_minus = combaero::combustion_equilibrium(in_T_minus).state.T;
   double dT_ad_dT_in = (T_ad_T_plus - T_ad_T_minus) / (2.0 * dT_eps);
 
   // wrt P
@@ -646,8 +639,8 @@ adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
   in_P_plus.set_TPX(T_in, P + dP_eps, X_in);
   in_P_minus.set_TPX(T_in, std::max(0.1, P - dP_eps), X_in);
 
-  double T_ad_P_plus = combustion_equilibrium(in_P_plus, true).state.T;
-  double T_ad_P_minus = combustion_equilibrium(in_P_minus, true).state.T;
+  double T_ad_P_plus = combaero::combustion_equilibrium(in_P_plus).state.T;
+  double T_ad_P_minus = combaero::combustion_equilibrium(in_P_minus).state.T;
   double dT_ad_dP = (T_ad_P_plus - T_ad_P_minus) / (2.0 * dP_eps);
 
   return {T_ad, dT_ad_dT_in, dT_ad_dP, X_products};
@@ -660,7 +653,7 @@ adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
 MixerResult
 mixer_from_streams_and_jacobians(const std::vector<Stream> &streams) {
   std::size_t n_streams = streams.size();
-  std::size_t n_species = num_species();
+  std::size_t n_species = combaero::num_species();
 
   double mdot_tot = 0.0;
   std::vector<double> Y_mix(n_species, 0.0);
@@ -670,19 +663,19 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams) {
   std::vector<double> h_stream(n_streams, 0.0);
   std::vector<double> cp_stream(n_streams, 0.0);
   std::vector<std::vector<double>> hk_mass(n_streams,
-                                           std::vector<double>(n_species, 0.0));
+                                            std::vector<double>(n_species, 0.0));
 
   for (std::size_t i = 0; i < n_streams; ++i) {
     mdot_tot += streams[i].m_dot;
 
     for (std::size_t k = 0; k < n_species; ++k) {
       Y_mix[k] += streams[i].m_dot * streams[i].Y[k];
-      hk_mass[i][k] = J_per_mol_to_J_per_kg(h_species(k, streams[i].T),
-                                            species_molar_mass(k));
+      hk_mass[i][k] = J_per_mol_to_J_per_kg(combaero::h_species(k, streams[i].T),
+                                             combaero::species_molar_mass(k));
       h_stream[i] += streams[i].Y[k] * hk_mass[i][k];
 
-      double cpk_mass = J_per_mol_to_J_per_kg(cp_species(k, streams[i].T),
-                                              species_molar_mass(k));
+      double cpk_mass = J_per_mol_to_J_per_kg(combaero::cp_species(k, streams[i].T),
+                                               combaero::species_molar_mass(k));
       cp_stream[i] += streams[i].Y[k] * cpk_mass;
     }
     H_tot += streams[i].m_dot * h_stream[i];
@@ -701,17 +694,17 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams) {
   }
 
   double h_mix = (mdot_tot > 0.0) ? (H_tot / mdot_tot)
-                                  : (n_streams > 0 ? h_stream[0] : 0.0);
+                                   : (n_streams > 0 ? h_stream[0] : 0.0);
   double P_total_mix = (mdot_tot > 0.0)
-                           ? (P_total_tot / mdot_tot)
-                           : (n_streams > 0 ? streams[0].P_total : 0.0);
+                            ? (P_total_tot / mdot_tot)
+                            : (n_streams > 0 ? streams[0].P_total : 0.0);
 
-  std::vector<double> normalized_Y_mix = normalize_fractions(Y_mix);
-  std::vector<double> X_mix = mass_to_mole(normalized_Y_mix);
+  std::vector<double> normalized_Y_mix = combaero::normalize_fractions(Y_mix);
+  std::vector<double> X_mix = combaero::mass_to_mole(normalized_Y_mix);
   double T_guess = 300.0;
   if (n_streams > 0)
     T_guess = streams[0].T;
-  double T_mix = calc_T_from_h_mass(h_mix, X_mix, T_guess);
+  double T_mix = combaero::calc_T_from_h_mass(h_mix, X_mix, T_guess);
 
   MixerResult res;
   res.T_mix = T_mix;
@@ -725,9 +718,9 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams) {
   std::vector<double> hk_mix(n_species, 0.0);
   for (std::size_t k = 0; k < n_species; ++k) {
     hk_mix[k] =
-        J_per_mol_to_J_per_kg(h_species(k, T_mix), species_molar_mass(k));
+        J_per_mol_to_J_per_kg(combaero::h_species(k, T_mix), combaero::species_molar_mass(k));
     double cpk_mix =
-        J_per_mol_to_J_per_kg(cp_species(k, T_mix), species_molar_mass(k));
+        J_per_mol_to_J_per_kg(combaero::cp_species(k, T_mix), combaero::species_molar_mass(k));
     cp_mix += Y_mix[k] * cpk_mix;
   }
 
@@ -756,8 +749,6 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams) {
       dT_jac.d_mdot = (h_diff - y_sum) / (mdot_tot * cp_mix);
 
       // d(T_mix)/d(Y_i,k)
-      // Normalization: Y'_mix = Y_mix / sum(Y_mix)
-      // dT/dY_i,k = (m_dot_i/mdot_tot) * (h_k(T_i) - h_k(T_mix) + h_mix) / cp_mix
       for (std::size_t k = 0; k < n_species; ++k) {
         dT_jac.d_Y[k] =
             streams[i].m_dot * (hk_mass[i][k] - hk_mix[k] + h_mix) / (mdot_tot * cp_mix);
@@ -771,7 +762,6 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams) {
         dY_jac_k.d_T = 0.0;
         dY_jac_k.d_P_total = 0.0;
         for (std::size_t j = 0; j < n_species; ++j) {
-            // dY'_mix,k / dY_i,j = (m_dot_i/m_dot_tot) * (delta_kj - Y_mix,k)
             double delta = (k == j) ? 1.0 : 0.0;
             dY_jac_k.d_Y[j] = (streams[i].m_dot / mdot_tot) * (delta - Y_mix[k]);
         }
@@ -800,13 +790,16 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
     const std::vector<Stream> &streams, double P) {
   MixerResult mix = mixer_from_streams_and_jacobians(streams);
 
-  std::vector<double> X_mix = mass_to_mole(normalize_fractions(mix.Y_mix));
-  auto [T_ad, dT_ad_dT_mix, X_b] =
+  std::vector<double> X_mix = combaero::mass_to_mole(combaero::normalize_fractions(mix.Y_mix));
+  auto complete_res =
       adiabatic_T_complete_and_jacobian_T(mix.T_mix, P, X_mix);
-  std::vector<double> Y_b = mole_to_mass(normalize_fractions(X_b));
+  double T_ad = std::get<0>(complete_res);
+  double dT_ad_dT_mix = std::get<1>(complete_res);
+  std::vector<double> X_b = std::get<2>(complete_res);
+  std::vector<double> Y_b = combaero::mole_to_mass(combaero::normalize_fractions(X_b));
 
   std::size_t n_streams = streams.size();
-  std::size_t n_species = num_species();
+  std::size_t n_species = combaero::num_species();
 
   std::vector<double> dT_ad_dY_mix(n_species, 0.0);
   std::vector<std::vector<double>> dYb_dY_mix(
@@ -816,10 +809,12 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
   for (std::size_t k = 0; k < n_species; ++k) {
     std::vector<double> Y_p = mix.Y_mix;
     Y_p[k] += eps_Y;
-    std::vector<double> X_p = mass_to_mole(normalize_fractions(Y_p));
-    auto [T_ad_p, dummy, X_b_p] =
+    std::vector<double> X_p = combaero::mass_to_mole(combaero::normalize_fractions(Y_p));
+    auto cp_res =
         adiabatic_T_complete_and_jacobian_T(mix.T_mix, P, X_p);
-    std::vector<double> Y_b_p = mole_to_mass(normalize_fractions(X_b_p));
+    double T_ad_p = std::get<0>(cp_res);
+    std::vector<double> X_b_p = std::get<2>(cp_res);
+    std::vector<double> Y_b_p = combaero::mole_to_mass(combaero::normalize_fractions(X_b_p));
 
     dT_ad_dY_mix[k] = (T_ad_p - T_ad) / eps_Y;
     for (std::size_t j = 0; j < n_species; ++j) {
@@ -905,28 +900,33 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
     const std::vector<Stream> &streams, double P) {
   MixerResult mix = mixer_from_streams_and_jacobians(streams);
 
-  std::vector<double> X_mix = mass_to_mole(normalize_fractions(mix.Y_mix));
-  auto [T_ad, dT_ad_dT_mix, dT_ad_dP_mix, X_b] =
+  std::vector<double> X_mix = combaero::mass_to_mole(combaero::normalize_fractions(mix.Y_mix));
+  auto eq_base_res =
       adiabatic_T_equilibrium_and_jacobians(mix.T_mix, P, X_mix);
-  std::vector<double> Y_b = mole_to_mass(normalize_fractions(X_b));
+  double T_ad = std::get<0>(eq_base_res);
+  double dT_ad_dT_mix = std::get<1>(eq_base_res);
+  std::vector<double> X_b = std::get<3>(eq_base_res);
+  std::vector<double> Y_b = combaero::mole_to_mass(combaero::normalize_fractions(X_b));
 
   std::size_t n_streams = streams.size();
-  std::size_t n_species = num_species();
+  std::size_t n_species = combaero::num_species();
 
   std::vector<double> dT_ad_dY_mix(n_species, 0.0);
   std::vector<std::vector<double>> dYb_dY_mix(
       n_species, std::vector<double>(n_species, 0.0));
   std::vector<double> dYb_dT_mix(n_species, 0.0);
-  const double eps_Y = 1e-6;
-  const double eps_T = 1.0;
+  const double eps_Y = 1e-4;
+  const double eps_T = 2.0;
 
   for (std::size_t k = 0; k < n_species; ++k) {
     std::vector<double> Y_p = mix.Y_mix;
     Y_p[k] += eps_Y;
-    std::vector<double> X_p = mass_to_mole(normalize_fractions(Y_p));
-    auto [T_ad_p, dummy, dummy2, X_b_p] =
+    std::vector<double> X_p = combaero::mass_to_mole(combaero::normalize_fractions(Y_p));
+    auto eq_p_res =
         adiabatic_T_equilibrium_and_jacobians(mix.T_mix, P, X_p);
-    std::vector<double> Y_b_p = mole_to_mass(normalize_fractions(X_b_p));
+    double T_ad_p = std::get<0>(eq_p_res);
+    std::vector<double> X_b_p = std::get<3>(eq_p_res);
+    std::vector<double> Y_b_p = combaero::mole_to_mass(combaero::normalize_fractions(X_b_p));
 
     dT_ad_dY_mix[k] = (T_ad_p - T_ad) / eps_Y;
     for (std::size_t j = 0; j < n_species; ++j) {
@@ -934,11 +934,11 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
     }
   }
 
-  // Also compute dY_b/dT_mix for equilibrium! Equilibrium products shift with
-  // inlet enthalpy/temperature.
-  auto [T_ad_p_T, dummy_T, dummy2_T, X_b_p_T] =
+  // dY_b/dT_mix: equilibrium products shift with inlet enthalpy/temperature
+  auto eq_T_res =
       adiabatic_T_equilibrium_and_jacobians(mix.T_mix + eps_T, P, X_mix);
-  std::vector<double> Y_b_p_T = mole_to_mass(normalize_fractions(X_b_p_T));
+  std::vector<double> X_b_p_T = std::get<3>(eq_T_res);
+  std::vector<double> Y_b_p_T = combaero::mole_to_mass(combaero::normalize_fractions(X_b_p_T));
   for (std::size_t j = 0; j < n_species; ++j) {
     dYb_dT_mix[j] = (Y_b_p_T[j] - Y_b[j]) / eps_T;
   }
@@ -1020,9 +1020,9 @@ OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
                                              const std::vector<double> &Y_up,
                                              double P_static_down, double Cd,
                                              double area, double beta) {
-  // Use regularized dP to avoid singularity at dP=0
+  (void)m_dot;
   double dP = P_total_up - P_static_down;
-  const std::vector<double> X_up = mass_to_mole(normalize_fractions(Y_up));
+  const std::vector<double> X_up = combaero::mass_to_mole(combaero::normalize_fractions(Y_up));
   auto [rho, drho_dT, drho_dP] = density_and_jacobians(T_up, P_static_up, X_up);
 
   auto [mdot_calc, dmdot_ddP] = orifice_mdot_and_jacobian(dP, rho, Cd, area, beta);
@@ -1032,20 +1032,17 @@ OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
   res.d_mdot_dP_total_up = dmdot_ddP;
   res.d_mdot_dP_static_down = -dmdot_ddP;
 
-  // d(mdot)/d(rho) = mdot / (2 * rho)
   double dmdot_drho = mdot_calc / (2.0 * std::max(rho, 1e-6));
   res.d_mdot_dP_static_up = dmdot_drho * drho_dP;
   res.d_mdot_dT_up = dmdot_drho * drho_dT;
 
-  // Numerical perturbation for Y derivatives
   res.d_mdot_dY_up.resize(Y_up.size(), 0.0);
   const double eps_Y = 1e-6;
   for (std::size_t i = 0; i < Y_up.size(); ++i) {
     std::vector<double> Y_plus = Y_up;
     Y_plus[i] += eps_Y;
-    auto X_plus = mass_to_mole(normalize_fractions(Y_plus));
+    auto X_plus = combaero::mass_to_mole(combaero::normalize_fractions(Y_plus));
     double rho_plus = std::get<0>(density_and_jacobians(T_up, P_static_up, X_plus));
-    // Reuse orifice_mdot_and_jacobian for mdot_plus to ensure identical regularization
     auto [mdot_plus, dummy] = orifice_mdot_and_jacobian(dP, rho_plus, Cd, area, beta);
     res.d_mdot_dY_up[i] = (mdot_plus - mdot_calc) / eps_Y;
   }
@@ -1059,7 +1056,9 @@ PipeResult pipe_residuals_and_jacobian(double m_dot, double P_total_up,
                                        double P_static_down, double L, double D,
                                        double roughness,
                                        const std::string &friction_model) {
-  const std::vector<double> X_up = mass_to_mole(normalize_fractions(Y_up));
+  (void)P_total_up;
+  (void)P_static_down;
+  const std::vector<double> X_up = combaero::mass_to_mole(combaero::normalize_fractions(Y_up));
   auto [rho, drho_dT, drho_dP] = density_and_jacobians(T_up, P_static_up, X_up);
   auto [mu, dmu_dT, dmu_dP] = viscosity_and_jacobians(T_up, P_static_up, X_up);
 
@@ -1068,7 +1067,6 @@ PipeResult pipe_residuals_and_jacobian(double m_dot, double P_total_up,
   double abs_v = std::abs(v);
   double Re = rho * abs_v * D / mu;
 
-  // Re_eff regularization is handled inside friction_and_jacobian_* functions
   auto [f, df_dRe] = friction_and_jacobian(friction_model, Re, roughness / D).result;
 
   double dP_calc = f * (L / D) * (0.5 * rho * v * abs_v);
@@ -1076,14 +1074,9 @@ PipeResult pipe_residuals_and_jacobian(double m_dot, double P_total_up,
   PipeResult res;
   res.dP_calc = dP_calc;
 
-  // Analytical derivative d(dP)/d(mdot)
-  // dP = f * (L/D) * (0.5 * mdot^2 / (rho * A^2)) * sign(mdot)
-  // d(dP)/d(mdot) = (L/D) * (1/(rho * A^2)) * mdot * sign(mdot) * (f + 0.5 * mdot * df/dmdot)
-  // dRe/dmdot = D / (mu * A)
   double dRe_dmdot = D / (mu * area);
   res.d_dP_d_mdot = (L / D) * (1.0 / (rho * area * area)) * m_dot * (f + 0.5 * m_dot * df_dRe * dRe_dmdot);
 
-  // d(dP)/d(P_static_up) via rho and mu
   const double eps_P = 1.0;
   auto [rho_p, drho_dT_p, drho_dP_p] = density_and_jacobians(T_up, P_static_up + eps_P, X_up);
   auto [mu_p, dmu_dT_p, dmu_dP_p] = viscosity_and_jacobians(T_up, P_static_up + eps_P, X_up);
@@ -1093,7 +1086,6 @@ PipeResult pipe_residuals_and_jacobian(double m_dot, double P_total_up,
   double dP_p = f_p * (L / D) * (0.5 * rho_p * v_p * std::abs(v_p));
   res.d_dP_dP_static_up = (dP_p - dP_calc) / eps_P;
 
-  // d(dP)/d(T_up) via rho and mu
   const double eps_T = 1e-3;
   auto [rho_T, drho_dT_T, drho_dP_T] = density_and_jacobians(T_up + eps_T, P_static_up, X_up);
   auto [mu_T, dmu_dT_T, dmu_dP_T] = viscosity_and_jacobians(T_up + eps_T, P_static_up, X_up);
@@ -1103,13 +1095,12 @@ PipeResult pipe_residuals_and_jacobian(double m_dot, double P_total_up,
   double dP_T = f_T * (L / D) * (0.5 * rho_T * v_T * std::abs(v_T));
   res.d_dP_dT_up = (dP_T - dP_calc) / eps_T;
 
-  // d(dP)/dY_up
   res.d_dP_dY_up.resize(Y_up.size(), 0.0);
   const double eps_Y = 1e-6;
   for (std::size_t i = 0; i < Y_up.size(); ++i) {
     std::vector<double> Y_plus = Y_up;
     Y_plus[i] += eps_Y;
-    auto X_plus = mass_to_mole(normalize_fractions(Y_plus));
+    auto X_plus = combaero::mass_to_mole(combaero::normalize_fractions(Y_plus));
     double rho_plus = std::get<0>(density_and_jacobians(T_up, P_static_up, X_plus));
     double mu_plus = std::get<0>(viscosity_and_jacobians(T_up, P_static_up, X_plus));
     double v_plus = m_dot / (rho_plus * area);

@@ -10,6 +10,8 @@ using combaero::normalize_fractions;
 #include <iostream>
 #include <numeric>
 
+namespace combaero {
+
 // -------------------------------------------------------------
 // Utility Functions
 // -------------------------------------------------------------
@@ -47,3 +49,5 @@ void print_mixture_properties(double T, double P, const std::vector<double>& X) 
     std::cout << "ds/dT: " << ds_dT(T, X) << " J/(mol·K²)" << std::endl;
     std::cout << "dCp/dT: " << dcp_dT(T, X) << " J/(mol·K²)" << std::endl;
 }
+
+} // namespace combaero
