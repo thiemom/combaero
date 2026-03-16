@@ -18,6 +18,7 @@ file(GLOB_RECURSE CORE_SOURCES src/*.cpp)
 
 add_library(combaero_core STATIC ${CORE_SOURCES})
 target_include_directories(combaero_core PUBLIC include)
+set_target_properties(combaero_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # -----------------------------------------------------------------------------
 # Google Test Integration

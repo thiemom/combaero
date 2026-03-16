@@ -123,8 +123,8 @@ jobs:
         working-directory: build
         if: runner.os != 'Windows'
         run: |
-          ./tests/test_ice_equation_accuracy
-          ./tests/test_water_equation_accuracy
+          ./test_ice_equation_accuracy
+          ./test_water_equation_accuracy
 
   build-mingw:
     name: Build MinGW
