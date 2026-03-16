@@ -4,6 +4,7 @@
 #include "composition.h"
 #include "thermo_transport_data.h"
 #include <algorithm>
+#include <cmath>
 #include <vector>
 
 namespace combaero {

@@ -1,6 +1,7 @@
 #ifndef STATE_H
 #define STATE_H
 
+#include <cstdint>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -256,7 +257,7 @@ struct EquilibriumResult {
 //                 (slower, physically correct for rich or high-T conditions)
 // Designed for extension: a future WGS-only or full-Gibbs option can be added
 // here.
-enum class CombustionMethod : std::uint8_t {
+enum class CombustionMethod {
   Complete,
   Equilibrium,
 };
