@@ -16,45 +16,40 @@ from combaero.network.graph import FlowNetwork
 
 def test_plenum_node_creation():
     """Test PlenumNode creation and basic properties."""
-    plenum = PlenumNode("test_plenum", enable_mixing=True)
+    plenum = PlenumNode("test_plenum")
 
-    # Should have P, P_total, and T unknowns
+    # Should have P and P_total unknowns (Derived-State architecture)
     unknowns = plenum.unknowns()
     assert "test_plenum.P" in unknowns
     assert "test_plenum.P_total" in unknowns
-    assert "test_plenum.T" in unknowns
-    assert len(unknowns) == 17
+    assert "test_plenum.T" not in unknowns
+    assert len(unknowns) == 2
 
 
 def test_momentum_chamber_node_creation():
     """Test MomentumChamberNode creation and basic properties."""
-    chamber = MomentumChamberNode("test_chamber", area=0.05, enable_mixing=True)
+    chamber = MomentumChamberNode("test_chamber", area=0.05)
 
-    # Should have P, P_total, T, and 14 species unknowns
+    # Should have P and P_total unknowns (Derived-State architecture)
     unknowns = chamber.unknowns()
     assert "test_chamber.P" in unknowns
     assert "test_chamber.P_total" in unknowns
-    assert "test_chamber.T" in unknowns
-    assert len(unknowns) == 17
+    assert "test_chamber.T" not in unknowns
+    assert len(unknowns) == 2
 
 
 def test_combustor_node_creation():
     """Test CombustorNode creation and basic properties."""
-    combustor = CombustorNode("test_combustor", method="complete", pressure_loss_frac=0.04)
+    combustor = CombustorNode("test_combustor", method="complete")
 
-    # Should have P, P_total, and T unknowns
+    # Should have P and P_total unknowns (Derived-State architecture)
     unknowns = combustor.unknowns()
     assert "test_combustor.P" in unknowns
     assert "test_combustor.P_total" in unknowns
-    assert "test_combustor.T" in unknowns
-    assert len(unknowns) == 17
-
-    # Check species unknown format
-    for i in range(14):
-        assert f"test_combustor.Y[{i}]" in unknowns
+    assert "test_combustor.T" not in unknowns
+    assert len(unknowns) == 2
 
     assert combustor.method == "complete"
-    assert combustor.pressure_loss_frac == 0.04
 
 
 def test_combustor_fuel_boundary():
@@ -103,30 +98,26 @@ def test_chamber_topology_resolution():
 
 def test_plenum_with_multiple_upstream():
     """Test that plenum adds species unknowns when it has multiple upstream connections."""
-    plenum = PlenumNode("mixing_plenum", enable_mixing=True)
+    plenum = PlenumNode("mixing_plenum")
 
     # Simulate multiple upstream connections by adding to upstream_elements
     plenum.upstream_elements = ["elem1", "elem2"]  # Two upstream elements
 
-    # Now should have species unknowns
+    # Now should only have P and P_total unknowns (Pure Pressure-Flow)
     unknowns = plenum.unknowns()
     assert "mixing_plenum.P" in unknowns
     assert "mixing_plenum.P_total" in unknowns
-    assert "mixing_plenum.T" in unknowns
+    assert "mixing_plenum.T" not in unknowns
+    assert len([u for u in unknowns if "Y[" in u]) == 0
+    assert len(unknowns) == 2
 
-    # Should have 14 species unknowns
-    species_unknowns = [u for u in unknowns if "Y[" in u]
-    assert len(species_unknowns) == 14
-
-    # Check species unknown format
-    for i in range(14):
-        assert f"mixing_plenum.Y[{i}]" in unknowns
+    # Verification of species as global unknowns is no longer applicable in Phase 1
 
 
 def test_chamber_pressure_relationship():
     """Test that chamber nodes enforce proper pressure relationships."""
-    # Test PlenumNode: P_total = P_static
-    plenum = PlenumNode("plenum", enable_mixing=True)
+    # Test PlenumNode: P_total = P_static (Legacy path)
+    plenum = PlenumNode("plenum")
     state = MixtureState(
         P=100000.0,
         P_total=100000.0,
@@ -138,11 +129,11 @@ def test_chamber_pressure_relationship():
 
     residuals, jac = plenum.residuals(state)
 
-    # Should have one residual: P_total - P = 0
+    # Should have one residual: P_total - P = 0 (Legacy path)
     assert len(residuals) == 1
     assert residuals[0] == 0.0  # P_total - P = 100000 - 100000 = 0
 
-    # Test with mismatch
+    # Test with mismatch (Legacy path)
     state_mismatch = MixtureState(
         P=100000.0,
         P_total=101000.0,
@@ -169,12 +160,7 @@ def test_combustor_methods():
     combustor_equilibrium = CombustorNode("combustor2", method="equilibrium")
     assert combustor_equilibrium.method == "equilibrium"
 
-    # Test different pressure loss fractions
-    combustor_low_loss = CombustorNode("combustor3", pressure_loss_frac=0.02)
-    assert combustor_low_loss.pressure_loss_frac == 0.02
-
-    combustor_high_loss = CombustorNode("combustor4", pressure_loss_frac=0.08)
-    assert combustor_high_loss.pressure_loss_frac == 0.08
+    # Pressure loss fraction tests removed (dead code)
 
 
 def test_chamber_integration_with_network():

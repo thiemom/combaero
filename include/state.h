@@ -1,9 +1,11 @@
 #ifndef STATE_H
 #define STATE_H
 
+#include <cstdint>
 #include <string>
 #include <tuple>
 #include <vector>
+#include "composition.h"
 
 // NOTE: Individual property getters (mu, k, Pr, ...) recompute on every call
 // and are intended for one-off queries.  In solver inner loops, use the bundle
@@ -20,10 +22,12 @@
 //
 // For the network solver, use MixtureState (NETWORK_ROADMAP.md) which
 // carries both static (T, P) and total (T_total, P_total) explicitly.
+namespace combaero {
 struct State {
   double T = 298.15;     // Temperature [K]
   double P = 101325.0;   // Pressure [Pa]
   std::vector<double> X; // Mole fractions [-]
+  std::vector<double> Y; // Mass fractions [-]
 
   // Property getters (implemented in state.cpp)
   double mw() const;
@@ -54,7 +58,18 @@ struct State {
     return *this;
   }
   State &set_X(const std::vector<double> &X_new) {
-    X = X_new;
+    // Normalize mole fractions first
+    X = combaero::normalize_fractions(X_new);
+    // Calculate mass fractions from normalized mole fractions
+    Y = combaero::mole_to_mass(X);
+    return *this;
+  }
+
+  State &set_Y(const std::vector<double> &Y_new) {
+    // Normalize mass fractions first
+    Y = combaero::normalize_fractions(Y_new);
+    // Calculate mole fractions from normalized mass fractions
+    X = combaero::mass_to_mole(Y);
     return *this;
   }
 
@@ -85,6 +100,36 @@ struct State {
   std::tuple<double, double> UP_mass() const;
   std::tuple<double, double> VH_mass() const;
   std::tuple<double, double> SH_mass() const;
+
+  // I/O
+  void print() const;
+};
+
+// High-level thermodynamic state for network nodes.
+// Carries both static (P, T) and total (P_total, T_total) conditions,
+// along with mass flow and composition.
+struct MixtureState {
+  double P = 101325.0;       // Static pressure [Pa]
+  double P_total = 101325.0; // Total pressure [Pa]
+  double T = 298.15;         // Static temperature [K]
+  double T_total = 298.15;   // Total temperature [K]
+  double m_dot = 0.0;        // Mass flow rate [kg/s]
+  std::vector<double> X;     // Mole fractions [-]
+  std::vector<double> Y;     // Mass fractions [-]
+
+  // Returns a standard State object at static conditions
+  State static_state() const {
+    State s;
+    s.set_TPX(T, P, X);
+    return s;
+  }
+
+  // Returns a standard State object at stagnation conditions
+  State total_state() const {
+    State s;
+    s.set_TPX(T_total, P_total, X);
+    return s;
+  }
 };
 
 // A stream is a state with a mass flow rate
@@ -96,6 +141,7 @@ struct Stream {
   double T() const { return state.T; }
   double P() const { return state.P; }
   const std::vector<double> &X() const { return state.X; }
+  const std::vector<double> &Y() const { return state.Y; }
 
   // Property getters (delegate to state)
   double mw() const { return state.mw(); }
@@ -114,7 +160,11 @@ struct Stream {
     return *this;
   }
   Stream &set_X(const std::vector<double> &X_new) {
-    state.X = X_new;
+    state.set_X(X_new);
+    return *this;
+  }
+  Stream &set_Y(const std::vector<double> &Y_new) {
+    state.set_Y(Y_new);
     return *this;
   }
   Stream &set_mdot(double mdot_new) {
@@ -159,22 +209,22 @@ struct TransportState {
 // Bundle of thermodynamic properties for a gas mixture
 // All properties computed from (T, P, X) in a single call
 struct ThermoState {
-  double T;       // Temperature [K] (input, echoed back)
-  double P;       // Pressure [Pa] (input, echoed back)
-  double rho;     // Density [kg/m³]
-  double cp;      // Specific heat at constant pressure [J/(mol·K)]
-  double cv;      // Specific heat at constant volume [J/(mol·K)]
-  double h;       // Specific enthalpy [J/mol]
-  double s;       // Specific entropy [J/(mol·K)]
-  double u;       // Specific internal energy [J/mol]
-  double gamma;   // Isentropic expansion coefficient [-]
-  double a;       // Speed of sound [m/s]
-  double cp_mass; // Mass-specific cp [J/(kg·K)]
-  double cv_mass; // Mass-specific cv [J/(kg·K)]
-  double h_mass;  // Mass-specific enthalpy [J/kg]
-  double s_mass;  // Mass-specific entropy [J/(kg·K)]
-  double u_mass;  // Mass-specific internal energy [J/kg]
-  double mw;      // Molecular weight [g/mol]
+  double T;        // Temperature [K] (input, echoed back)
+  double P;        // Pressure [Pa] (input, echoed back)
+  double rho;      // Density [kg/m³]
+  double cp;       // Specific heat at constant pressure [J/(kg·K)]
+  double cv;       // Specific heat at constant volume [J/(kg·K)]
+  double h;        // Specific enthalpy [J/kg]
+  double s;        // Specific entropy [J/(kg·K)]
+  double u;        // Specific internal energy [J/kg]
+  double gamma;    // Isentropic expansion coefficient [-]
+  double a;        // Speed of sound [m/s]
+  double cp_mole;  // Molar cp [J/(mol·K)]
+  double cv_mole;  // Molar cv [J/(mol·K)]
+  double h_mole;   // Molar enthalpy [J/mol]
+  double s_mole;   // Molar entropy [J/(mol·K)]
+  double u_mole;   // Molar internal energy [J/mol]
+  double mw;       // Molecular weight [g/mol]
 };
 
 // AirProperties is an alias for TransportState.
@@ -233,5 +283,6 @@ struct CombustionState {
   double mixture_fraction; // Bilger mixture fraction [-]
   double fuel_burn_fraction; // Fraction of fuel burned [0-1]
 };
+} // namespace combaero
 
 #endif // STATE_H

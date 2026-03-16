@@ -40,11 +40,11 @@ class TestCompleteStateStructure:
         assert hasattr(state.thermo, "u")
         assert hasattr(state.thermo, "gamma")
         assert hasattr(state.thermo, "a")
-        assert hasattr(state.thermo, "cp_mass")
-        assert hasattr(state.thermo, "cv_mass")
-        assert hasattr(state.thermo, "h_mass")
-        assert hasattr(state.thermo, "s_mass")
-        assert hasattr(state.thermo, "u_mass")
+        assert hasattr(state.thermo, "cp_mole")
+        assert hasattr(state.thermo, "cv_mole")
+        assert hasattr(state.thermo, "h_mole")
+        assert hasattr(state.thermo, "s_mole")
+        assert hasattr(state.thermo, "u_mole")
         assert hasattr(state.thermo, "mw")
 
     def test_transport_state_has_all_attributes(self):

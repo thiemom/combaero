@@ -260,13 +260,15 @@ std::unique_ptr<OrificeCorrelationBase> make_tabulated_correlation(
 // Orifice flow calculations (uses incompressible.h internally)
 // -------------------------------------------------------------
 
-// Mass flow through orifice given Cd
-// mdot = Cd * A * sqrt(2 * rho * dP)
-double orifice_mdot(const OrificeGeometry& geom, double Cd, double dP, double rho);
+// Mass flow through orifice given Cd and expansibility factor epsilon
+// mdot = Cd * E * epsilon * A * sqrt(2 * rho * dP)
+double orifice_mdot(const OrificeGeometry& geom, double Cd, double dP,
+                    double rho, double epsilon = 1.0);
 
 // Pressure drop for given mass flow
-// dP = (mdot / (Cd * A))^2 / (2 * rho)
-double orifice_dP(const OrificeGeometry& geom, double Cd, double mdot, double rho);
+// dP = (mdot / (Cd * E * epsilon * A))^2 / (2 * rho)
+double orifice_dP(const OrificeGeometry& geom, double Cd, double mdot,
+                  double rho, double epsilon = 1.0);
 
 // Solve for Cd given measured mdot and dP
 // Cd = mdot / (A * sqrt(2 * rho * dP))

@@ -2,9 +2,12 @@
 #define SOLVER_INTERFACE_H
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <tuple>
 #include <vector>
+
+#include "state.h"
 // -----------------------------------------------------------------------------
 // Network Solver Fast-Path Native Interface
 // -----------------------------------------------------------------------------
@@ -37,20 +40,51 @@ template <typename T> struct CorrelationResult {
 struct Stream {
   double m_dot;
   double T;
+  double P_total;
   std::vector<double> Y;
 };
 
 struct StreamJacobian {
   double d_mdot;
   double d_T;
+  double d_P_total;
   std::vector<double> d_Y;
 };
 
 struct MixerResult {
   double T_mix;
+  double P_total_mix;
   std::vector<double> Y_mix;
   std::vector<StreamJacobian> dT_mix_d_stream;
+  std::vector<StreamJacobian> dP_total_mix_d_stream;
   std::vector<std::vector<StreamJacobian>> dY_mix_d_stream;
+};
+
+struct ChamberResult {
+  std::vector<double> residuals;
+  // Local Jacobian: map from eq_idx to {var_name: derivative}
+  // var_name is a string like "P", "P_total", "T", "Y[0]"...
+  std::vector<std::map<std::string, double>> local_jacobian;
+  // Stream Jacobian: map from eq_idx to list of StreamJacobian (one per
+  // upstream stream)
+  std::vector<std::vector<StreamJacobian>> stream_jacobian;
+};
+
+struct OrificeResult {
+  double m_dot_calc;
+  double d_mdot_dP_total_up;
+  double d_mdot_dP_static_down;
+  double d_mdot_dP_static_up;
+  double d_mdot_dT_up;
+  std::vector<double> d_mdot_dY_up;
+};
+
+struct PipeResult {
+  double dP_calc;
+  double d_dP_d_mdot;
+  double d_dP_dP_static_up;
+  double d_dP_dT_up;
+  std::vector<double> d_dP_dY_up;
 };
 
 // -----------------------------------------------------------------------------
@@ -64,14 +98,22 @@ struct MixerResult {
 //   dP   : Differential pressure drop across the orifice [Pa]
 //   rho  : Fluid density [kg/m³]
 //   Cd   : Discharge coefficient [-]
-//   area : Orifice bore area [m²]
+//   beta : Orifice beta ratio (d/D) [-]
 //
 // Returns:
 //   tuple(mdot, d_mdot_d_dP)
 //   mdot        : Mass flow rate [kg/s]
 //   d_mdot_d_dP : Jacobian gradient [kg/(s*Pa)]
 std::tuple<double, double> orifice_mdot_and_jacobian(double dP, double rho,
-                                                     double Cd, double area);
+                                                     double Cd, double area,
+                                                     double beta);
+
+// Full orifice evaluation with all derivatives.
+OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
+                                             double P_static_up, double T_up,
+                                             const std::vector<double> &Y_up,
+                                             double P_static_down, double Cd,
+                                             double area, double beta);
 
 // Calculate Pressure Drop and its derivative with respect to velocity.
 //
@@ -85,7 +127,16 @@ std::tuple<double, double> orifice_mdot_and_jacobian(double dP, double rho,
 //   tuple(dP, d_dP_d_v)
 //   d_dP_d_v : Jacobian gradient [Pa/(m/s)]
 std::tuple<double, double> pressure_loss_and_jacobian(double v, double rho,
-                                                      double K);
+                                                       double K);
+
+// Full pipe evaluation with all derivatives.
+PipeResult pipe_residuals_and_jacobian(double m_dot, double P_total_up,
+                                       double P_static_up, double T_up,
+                                       const std::vector<double> &Y_up,
+                                       double P_static_down, double L, double D,
+                                       double roughness,
+                                       const std::string &friction_model);
+
 
 // Calculate Lossless Connection Ideal Pressure and Jacobian
 //
@@ -362,6 +413,7 @@ adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
 // -----------------------------------------------------------------------------
 // 7. Stream-Based Network Solvers
 // -----------------------------------------------------------------------------
+
 
 // Mix generalized non-reacting incoming streams into a single outgoing state,
 // and compute all analytical Jacobians w.r.t upstream mass flows, Temperatures,

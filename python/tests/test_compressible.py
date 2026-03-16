@@ -61,7 +61,7 @@ def test_mach_from_pressure_ratio() -> None:
     M = cb.mach_from_pressure_ratio(T0, P0, P, X)
 
     assert M > 0
-    assert M < 1.0  # Subsonic for P/P0 = 0.8
+    assert M > 1.0  # Supersonic for P/P0 = 0.16 (below critical ~0.53)
 
 
 def test_solve_A_eff_from_mdot() -> None:

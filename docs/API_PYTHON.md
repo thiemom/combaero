@@ -23,10 +23,27 @@ import combaero as cb
 
 state = cb.State()
 state.TPX = (300.0, 101325.0, "O2:0.21, N2:0.79")
+# OR setting mass fractions directly
+state.Y = y_vector
+
+print(f"Mole fractions: {state.X}")
+print(f"Mass fractions: {state.Y}")
 
 print(f"Density: {state.rho} kg/m³")
 print(f"Enthalpy: {state.h} J/mol")
 print(f"Viscosity: {state.mu} Pa·s")
+```
+
+### MixtureState (Network Data)
+The `MixtureState` struct is used for network node properties and carries both static and stagnation conditions.
+
+```python
+# Constructor: MixtureState(P, P_total, T, T_total, m_dot, Y)
+node_state = cb.MixtureState(1e5, 1.1e5, 300, 300, 1.5, y_vec)
+
+print(node_state.P)       # Static [Pa]
+print(node_state.m_dot)   # Mass flow [kg/s]
+print(node_state.density()) # Static density [kg/m³]
 ```
 
 ### Species Lookup
@@ -126,6 +143,17 @@ graph.add_element(OrificeElement("ori1", "nodeA", "nodeB", Cd=0.6, area=1e-4))
 solver = NetworkSolver(graph)
 results = solver.solve(timeout=5.0)
 ```
+
+### Advanced (f, J) Interface
+High-accuracy analytical Jacobians are available for performance-critical solver loops.
+```python
+# Exact residuals and derivatives wrt (P_tot, P_static, T, Y)
+res_ori = cb.orifice_residuals_and_jacobian(m_dot, P_tot, P_stat, T, Y, P_down, Cd, area)
+res_comb = cb.combustor_residuals_and_jacobian(m_dot, P_tot, P_stat, T, Y, Q_comb, method, smooth)
+res_plen = cb.plenum_residuals_and_jacobian(m_dot_vec, P_target, T_target, Y_target)
+```
+
+Combustor results return mapping specific to `(m_dot, P_total, T, Y)` state vectors.
 
 ---
 

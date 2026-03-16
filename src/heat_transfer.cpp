@@ -14,6 +14,8 @@
 #include <string>
 #include <tuple>
 
+namespace combaero {
+
 // -------------------------------------------------------------
 // Internal Flow Correlations
 // -------------------------------------------------------------
@@ -422,8 +424,8 @@ double heat_flux_from_T_at_edge(double T_measured, std::size_t edge_idx,
 }
 
 double heat_flux_from_T_at_depth(double T_measured, double depth_from_hot,
-                                 double T_hot, double T_cold, double h_hot,
-                                 double h_cold,
+                                 double T_hot, [[maybe_unused]] double T_cold,
+                                 double h_hot, double h_cold,
                                  const std::vector<double> &thicknesses,
                                  const std::vector<double> &conductivities) {
 
@@ -708,7 +710,7 @@ htc_pipe(double T, double P, const std::vector<double> &X, double velocity,
   double rho = density(T, P, X);
   double mu = viscosity(T, P, X);
   double k = thermal_conductivity(T, P, X);
-  double cp = cp_mass(T, X);
+  [[maybe_unused]] double cp = cp_mass(T, X);
   double Pr = prandtl(T, P, X);
 
   // Reynolds number
@@ -793,6 +795,7 @@ static ChannelResult make_channel_result(double h, double Nu, double Re,
   }
   return ChannelResult{h, Nu, Re, Pr, f, dP, M, T_aw, q};
 }
+
 
 // -------------------------------------------------------------
 // channel_smooth
@@ -1061,3 +1064,5 @@ ChannelResult channel_impingement(double T, double P,
 
   return make_channel_result(h, Nu, Re_jet, Pr, f, dP, M, T_aw, T_wall);
 }
+
+} // namespace combaero

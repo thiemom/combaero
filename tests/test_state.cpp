@@ -3,6 +3,8 @@
 #include "../include/state.h"
 #include <cmath>
 
+using namespace combaero;
+
 // Helper to check fractional difference
 #define EXPECT_REL_ERR(val, ref, tol)                                          \
   EXPECT_LT(std::abs((val) - (ref)) / std::abs(ref), tol)

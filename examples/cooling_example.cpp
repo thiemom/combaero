@@ -7,6 +7,8 @@
 #include <iostream>
 #include <vector>
 
+using namespace combaero;
+
 // Cooling example: simple convective + effusion-cooled liner estimate.
 
 int main() {

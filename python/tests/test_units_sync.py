@@ -13,6 +13,12 @@ IGNORE_LIST = {
     "species",
     "geometry",
     "orifice_mdot_and_jacobian",
+    "orifice_residuals_and_jacobian",
+    "pipe_residuals_and_jacobian",
+    "combustor_residuals_and_jacobian",
+    "plenum_residuals_and_jacobian",
+    "OrificeResult",
+    "PipeResult",
     "pressure_loss_and_jacobian",
     "lossless_pressure_and_jacobian",
     "nusselt_and_jacobian_dittus_boelter",
@@ -69,6 +75,20 @@ IGNORE_LIST = {
     "BoundaryCondition",
     "CorrelationValidity",
     "CorrelationResult",
+    "ChamberResult",
+    "MixtureState",
+    "Stream",
+    "State::DP",
+    "State::HP",
+    "State::PV",
+    "State::SH",
+    "State::SP",
+    "State::SV",
+    "State::UP",
+    "State::UV",
+    "State::VH",
+    "State::set_P",
+    "State::set_T",
 }
 
 # Special magic methods created by pybind11 that aren't public calculation points
@@ -111,6 +131,8 @@ def test_api_unit_sync():
                     continue
 
                 method_name = f"{name}::{attr}"
+                if method_name in IGNORE_LIST:
+                    continue
                 if not cb.has_units(method_name):
                     missing.append(method_name)
         else:

@@ -6,6 +6,8 @@
 #include <vector>
 #include <iomanip>
 
+using namespace combaero;
+
 // CombAero Library Main Example
 //
 // This file provides a simple demonstration of the combaero library's capabilities.

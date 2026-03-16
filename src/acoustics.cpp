@@ -1,11 +1,11 @@
 #include "../include/acoustics.h"
 #include "../include/acoustics_internal.h"
 #include "../include/can_annular_solvers.h"
-#include "../include/math_constants.h"
 #include <algorithm>
 #include <cmath>
 #include <complex>
 #include <stdexcept>
+#include "../include/math_constants.h"
 
 namespace combaero {
 
@@ -393,21 +393,11 @@ double helmholtz_Q(double V, double A_neck, double L_neck,
     double delta_kappa = thermal_layer(alpha, f);
     double delta_eff = effective_viscothermal_layer(delta_nu, delta_kappa, gamma);
 
-    // Neck diameter and perimeter
+    // Neck diameter
     double d_neck = 2.0 * std::sqrt(A_neck / M_PI);
-    double perimeter = M_PI * d_neck;
 
     // Effective neck length (with standard end correction)
     double L_eff = L_neck + 0.85 * d_neck;
-
-    // Losses occur in the neck boundary layer
-    // Q ≈ (neck volume) / (boundary layer volume in neck)
-    // Q ≈ (A_neck * L_eff) / (perimeter * L_eff * delta_eff)
-    // Q ≈ A_neck / (perimeter * delta_eff)
-    // Q ≈ d_neck / (4 * delta_eff)  for circular neck
-    //
-    // But cavity also stores energy, so scale by V/(A_neck * L_eff)
-    // This gives the classic result: Q ~ V / (A_neck * delta_eff * factor)
 
     // Simplified model: Q ≈ d_neck / (4 * delta_eff) * sqrt(V / (A_neck * L_eff))
     // This captures both neck losses and cavity energy storage
@@ -461,7 +451,7 @@ double bandwidth(double f0, double Q) {
 
 AcousticProperties acoustic_properties(
     double f,
-    double rho,
+    [[maybe_unused]] double rho,
     double c,
     double p_rms,
     double p_ref)
@@ -516,7 +506,8 @@ double absorption_from_impedance_norm(const std::complex<double>& z_norm) {
 
     const std::complex<double> r = (z_norm - one) / denom;
     const double alpha = 1.0 - std::norm(r);
-    return std::clamp(alpha, 0.0, 1.0);
+    // Use manual clamp instead of std::clamp for maximum compatibility
+    return std::max(0.0, std::min(1.0, alpha));
 }
 
 std::complex<double> liner_sdof_impedance_norm(
@@ -623,7 +614,7 @@ std::complex<double> liner_2dof_serial_impedance_norm(
     const std::complex<double> tan_kL1 = std::tan(k * depth_1);
     std::complex<double> denom = 1.0 + i * z_load * tan_kL1;
     if (std::abs(denom) < 1e-12) {
-        denom = std::complex<double>(1e-12, 0.0);
+        denom = std::complex<double>(1e12, 0.0);
     }
     const std::complex<double> z_in_vol1 = (z_load + i * tan_kL1) / denom;
 
@@ -689,7 +680,7 @@ std::complex<double> orifice_impedance_with_flow(
     double l_orifice,
     double porosity,
     double Cd,
-    double rho,
+    [[maybe_unused]] double rho,
     double c
 ) {
     // Validate parameters
@@ -880,7 +871,7 @@ std::string BlochMode::symmetry_type() const {
 }
 
 // Internal helper: Can admittance (1D duct with boundary conditions)
-static std::complex<double> can_admittance(
+[[maybe_unused]] static std::complex<double> can_admittance(
     double omega,
     const CanAnnularGeometry& geom,
     double c,
@@ -905,7 +896,7 @@ static std::complex<double> can_admittance(
 }
 
 // Internal helper: Annulus admittance (Bloch-Floquet waveguide)
-static std::complex<double> annulus_admittance(
+[[maybe_unused]] static std::complex<double> annulus_admittance(
     double omega,
     int m,
     const CanAnnularGeometry& geom,
@@ -1029,76 +1020,6 @@ std::complex<double> dispersion_relation(
     );
 }
 
-// Internal helper: Robust Argument Principle using arg(ratio) method
-// Counts zeros inside rectangular contour: N = ΔArg[D(ω)] / 2π
-static int count_zeros_in_rect(
-    double f_min,
-    double f_max,
-    double imag_min,
-    double imag_max,
-    int m,
-    const CanAnnularGeometry& geom,
-    double c_can,
-    double c_plenum,
-    double rho_can,
-    double rho_plenum,
-    BoundaryCondition bc_top
-) {
-    int n_steps_f = 20;  // Steps along frequency axis
-    int n_steps_i = 10;  // Steps along imaginary axis
-
-    std::vector<std::complex<double>> contour;
-    contour.reserve(2 * (n_steps_f + n_steps_i));
-
-    // Create box (counter-clockwise) - avoid duplicate corners
-    // Bottom edge: (f_min, imag_min) to (f_max, imag_min)
-    for (int i = 0; i < n_steps_f; ++i) {
-        double f = f_min + (f_max - f_min) * i / (n_steps_f - 1);
-        contour.push_back(std::complex<double>(2.0 * M_PI * f, imag_min));
-    }
-    // Right edge: (f_max, imag_min) to (f_max, imag_max) - skip first point
-    for (int i = 1; i < n_steps_i; ++i) {
-        double imag = imag_min + (imag_max - imag_min) * i / (n_steps_i - 1);
-        contour.push_back(std::complex<double>(2.0 * M_PI * f_max, imag));
-    }
-    // Top edge: (f_max, imag_max) to (f_min, imag_max) - skip first point
-    for (int i = 1; i < n_steps_f; ++i) {
-        double f = f_max - (f_max - f_min) * i / (n_steps_f - 1);
-        contour.push_back(std::complex<double>(2.0 * M_PI * f, imag_max));
-    }
-    // Left edge: (f_min, imag_max) to (f_min, imag_min) - skip first and last
-    for (int i = 1; i < n_steps_i - 1; ++i) {
-        double imag = imag_max - (imag_max - imag_min) * i / (n_steps_i - 1);
-        contour.push_back(std::complex<double>(2.0 * M_PI * f_min, imag));
-    }
-
-    // Compute winding number using arg(ratio) for robust phase unwrapping
-    double total_phase_change = 0.0;
-    std::complex<double> prev_val = dispersion_relation_complex(
-        contour[0], m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top
-    );
-
-    for (size_t i = 1; i <= contour.size(); ++i) {
-        std::complex<double> curr_z = contour[i % contour.size()];
-        std::complex<double> curr_val = dispersion_relation_complex(
-            curr_z, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top
-        );
-
-        // Robust phase difference: d(theta) = Im(log(z2/z1)) = arg(z2/z1)
-        std::complex<double> ratio = curr_val / prev_val;
-        if (std::abs(ratio) == 0.0 || std::isnan(ratio.real())) {
-            return 0;  // Hit singularity, abort this box
-        }
-
-        double d_theta = std::arg(ratio);
-        total_phase_change += d_theta;
-
-        prev_val = curr_val;
-    }
-
-    return static_cast<int>(std::round(total_phase_change / (2.0 * M_PI)));
-}
-
 // Internal helper: Find approximate zero locations by scanning
 std::vector<double> find_zero_guesses(
     int m,
@@ -1120,7 +1041,7 @@ std::vector<double> find_zero_guesses(
     std::vector<double> mags;
 
     for (int i = 0; i < n_scan; ++i) {
-        double f = f_min + (f_max - f_min) * i / (n_scan - 1);
+        double f = f_min + (f_max - f_min) * static_cast<double>(i) / static_cast<double>(n_scan - 1);
         double omega = 2.0 * M_PI * f;
         auto D = dispersion_relation(omega, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_top);
 

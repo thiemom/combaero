@@ -1,12 +1,12 @@
 #include "../include/transport.h"
 #include "../include/thermo.h"
-#include "../include/thermo_transport_data.h"
+#include "thermo.h"
+#include "composition.h"
+#include "thermo_transport_data.h"
 #include "../include/math_constants.h"  // MSVC compatibility for M_PI
 #include <stdexcept>
 
-using combaero::thermo::R_GAS;
-using combaero::thermo::BOLTZMANN;
-using combaero::thermo::AVOGADRO;
+namespace combaero {
 
 // Transport-related helpers factored out of thermo_transport.cpp.
 
@@ -66,7 +66,7 @@ double omega22(double T, double well_depth)
         0.922, 0.711, 0.567, 0.432, 0.364
     };
 
-    double T_star = (BOLTZMANN * T) / well_depth;
+    double T_star = (thermo::BOLTZMANN * T) / well_depth;
     double T_star_clamped = std::max(T_star_values.front(),
                                      std::min(T_star, T_star_values.back()));
     return linear_interp(T_star_clamped, T_star_values, omega_values);
@@ -95,18 +95,18 @@ PureSpeciesTransport pure_species_transport(double T, const std::vector<double>&
     for (std::size_t i = 0; i < N; ++i) {
         const double mw_kg  = molar_masses[i] / 1000.0;           // kg/mol
         const double diam   = transport_props[i].diameter * 1.0e-10; // m
-        const double eps    = transport_props[i].well_depth * BOLTZMANN; // J
+        const double eps    = transport_props[i].well_depth * thermo::BOLTZMANN; // J
         const double omega  = omega22(T, eps);
-        const double m_mol  = mw_kg / AVOGADRO;                   // kg/molecule
+        const double m_mol  = mw_kg / thermo::AVOGADRO;                   // kg/molecule
 
         // Kinetic theory viscosity: μ = (5/16) √(π m k T) / (π σ² Ω)
-        out.mu[i] = (5.0 / 16.0) * std::sqrt(M_PI * m_mol * BOLTZMANN * T) /
+        out.mu[i] = (5.0 / 16.0) * std::sqrt(M_PI * m_mol * thermo::BOLTZMANN * T) /
                     (M_PI * diam * diam * omega);
 
         // Eucken thermal conductivity: k = μ (cp_mass + f_rot R_specific)
-        const double cp_i       = cp_R(i, T) * R_GAS;             // J/(mol·K)
+        const double cp_i       = cp_R(i, T) * thermo::R_GAS;             // J/(mol·K)
         const double cp_mass_i  = cp_i / mw_kg;                   // J/(kg·K)
-        const double R_spec_i   = R_GAS / mw_kg;                  // J/(kg·K)
+        const double R_spec_i   = thermo::R_GAS / mw_kg;                  // J/(kg·K)
 
         double f_rot = 0.0;
         switch (transport_props[i].geometry) {
@@ -286,3 +286,5 @@ TransportState transport_state(double T, double P, const std::vector<double>& X)
     state.a     = speed_of_sound(T, X);
     return state;
 }
+
+} // namespace combaero

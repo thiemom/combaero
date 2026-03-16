@@ -1,5 +1,8 @@
 #include "../include/thermo.h"
+#include "../include/composition.h"
 #include "../include/thermo_transport_data.h"
+
+using namespace combaero;
 #include <iostream>
 #include <iomanip>
 #include <vector>

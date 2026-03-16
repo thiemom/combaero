@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <vector>
 
+namespace combaero {
+
 // Constants for dry air composition (mole fractions)
 extern const std::unordered_map<std::string, double> dry_air_composition;
 
@@ -93,5 +95,7 @@ struct HumidAir {
   std::tuple<double, double, double> TP_RH() const;
   std::tuple<double, double, double> TP_dewpoint() const;
 };
+
+} // namespace combaero
 
 #endif // HUMIDAIR_H

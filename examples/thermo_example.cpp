@@ -8,6 +8,8 @@
 #include <iostream>
 #include <vector>
 
+using namespace combaero;
+
 // Thermodynamic and Transport Properties Example
 //
 // This example demonstrates the calculation of various thermodynamic

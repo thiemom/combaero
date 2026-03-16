@@ -188,7 +188,7 @@ def test_network_element_series():
     inlet.T_total = 300.0
     inlet.Y = _get_air_Y()
 
-    junc = PlenumNode("junc_1", enable_mixing=False)  # Phase 1: pressure-only
+    junc = PlenumNode("junc_1")  # Phase 1: pressure-only
 
     outlet = PressureBoundary("outlet")
     outlet.P_total = 100000.0
@@ -241,7 +241,7 @@ def test_network_lossless_connectors():
     inlet.T_total = 300.0
     inlet.Y = _get_air_Y()
 
-    plen = PlenumNode("plenum_idx", enable_mixing=False)  # Phase 1: pressure-only
+    plen = PlenumNode("plenum_idx")  # Phase 1: pressure-only
 
     outlet = PressureBoundary("outlet")
     outlet.P_total = 100000.0

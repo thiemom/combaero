@@ -71,6 +71,8 @@ try:
         OrificeFlowResult,
         OrificeGeometry,
         OrificeState,
+        OrificeResult,
+        PipeResult,
         State,
         Stream,
         Registry,
@@ -393,6 +395,11 @@ try:
         density_and_jacobians,
         enthalpy_and_jacobian,
         viscosity_and_jacobians,
+        orifice_residuals_and_jacobian,
+        pipe_residuals_and_jacobian,
+        mixer_from_streams_and_jacobians,
+        adiabatic_T_complete_and_jacobian_T_from_streams,
+        adiabatic_T_equilibrium_and_jacobians_from_streams,
     )
 
     molar_mass = mwmix
@@ -421,7 +428,7 @@ except ModuleNotFoundError:
     molar_volume = _core.molar_volume
     viscosity = _core.viscosity
     thermal_conductivity = _core.thermal_conductivity
-    kinematic_viscosity = _core.kinematic_viscosity
+    pin_fin_nusselt = _core.pin_fin_nusselt
     prandtl = _core.prandtl
     thermal_diffusivity = _core.thermal_diffusivity
     reynolds = _core.reynolds
@@ -492,6 +499,8 @@ except ModuleNotFoundError:
     set_oxidizer_stream_for_O2_dry = _core.set_oxidizer_stream_for_O2_dry
     set_oxidizer_stream_for_CO2 = _core.set_oxidizer_stream_for_CO2
     set_oxidizer_stream_for_CO2_dry = _core.set_oxidizer_stream_for_CO2_dry
+    CombustionMethod = _core.CombustionMethod
+    CombustionState = _core.CombustionState
     complete_combustion = _core.complete_combustion
     complete_combustion_isothermal = _core.complete_combustion_isothermal
     wgs_equilibrium = _core.wgs_equilibrium
@@ -703,6 +712,8 @@ except ModuleNotFoundError:
     density_and_jacobians = _core.density_and_jacobians
     enthalpy_and_jacobian = _core.enthalpy_and_jacobian
     viscosity_and_jacobians = _core.viscosity_and_jacobians
+    orifice_residuals_and_jacobian = _core.orifice_residuals_and_jacobian
+    pipe_residuals_and_jacobian = _core.pipe_residuals_and_jacobian
 
 
 # Submodule imports — always available regardless of _core load path.

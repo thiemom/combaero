@@ -8,6 +8,8 @@
 #include <iostream>
 #include <vector>
 
+using namespace combaero;
+
 // Combustion Example: Fuel + Humid Air -> Mix -> Combust -> Equilibrium
 //
 // Demonstrates:

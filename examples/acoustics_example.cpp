@@ -7,6 +7,8 @@
 #include <iostream>
 #include <vector>
 
+using namespace combaero;
+
 // Acoustics Example
 //
 // Demonstrates:

@@ -121,7 +121,7 @@ double Cd_Stolz(double beta, double Re_D) {
     if (Re_D < 1.0) Re_D = 1.0;
 
     const double beta2 = beta * beta;
-    const double beta4 = beta2 * beta2;
+    [[maybe_unused]] const double beta4 = beta2 * beta2;
 
     // Stolz equation (corner taps)
     // C = 0.5959 + 0.0312*beta^2.1 - 0.184*beta^8 + 91.71*beta^2.5/Re_D^0.75
@@ -423,8 +423,8 @@ private:
                             (log_Re_values[i_Re + 1] - log_Re_values[i_Re]);
 
         // Clamp weights to [0, 1]
-        const double tb = std::clamp(t_beta, 0.0, 1.0);
-        const double tr = std::clamp(t_Re, 0.0, 1.0);
+        const double tb = std::max(0.0, std::min(t_beta, 1.0));
+        const double tr = std::max(0.0, std::min(t_Re, 1.0));
 
         // Bilinear interpolation
         const double c00 = Cd_table_[i_beta][i_Re];
@@ -481,21 +481,27 @@ std::unique_ptr<OrificeCorrelationBase> make_tabulated_correlation(
 // Flow calculations
 // -------------------------------------------------------------
 
-double orifice_mdot(const OrificeGeometry& geom, double Cd, double dP, double rho) {
+double orifice_mdot(const OrificeGeometry& geom, double Cd, double dP,
+                    double rho, double epsilon) {
     if (dP < 0.0 || rho <= 0.0 || Cd <= 0.0) {
         throw std::invalid_argument("orifice_mdot: invalid parameters");
     }
-    return Cd * geom.area() * std::sqrt(2.0 * rho * dP);
+    const double beta = geom.beta();
+    const double E = 1.0 / std::sqrt(1.0 - std::pow(beta, 4.0));
+    return Cd * E * epsilon * geom.area() * std::sqrt(2.0 * rho * dP);
 }
 
-double orifice_dP(const OrificeGeometry& geom, double Cd, double mdot, double rho) {
+double orifice_dP(const OrificeGeometry& geom, double Cd, double mdot,
+                  double rho, double epsilon) {
     if (mdot < 0.0 || rho <= 0.0 || Cd <= 0.0) {
         throw std::invalid_argument("orifice_dP: invalid parameters");
     }
-    // From mdot = Cd * A * sqrt(2 * rho * dP)
-    // Solve for dP: dP = (mdot / (Cd * A))^2 / (2 * rho)
+    // From mdot = Cd * E * epsilon * A * sqrt(2 * rho * dP)
+    // Solve for dP: dP = (mdot / (Cd * E * epsilon * A))^2 / (2 * rho)
     const double A = geom.area();
-    const double term = mdot / (Cd * A);
+    const double beta = geom.beta();
+    const double E = 1.0 / std::sqrt(1.0 - std::pow(beta, 4.0));
+    const double term = mdot / (Cd * E * epsilon * A);
     return term * term / (2.0 * rho);
 }
 
@@ -504,8 +510,10 @@ double orifice_Cd_from_measurement(const OrificeGeometry& geom,
     if (dP <= 0.0 || rho <= 0.0 || mdot <= 0.0) {
         throw std::invalid_argument("orifice_Cd_from_measurement: invalid parameters");
     }
+    const double beta = geom.beta();
+    const double E = 1.0 / std::sqrt(1.0 - std::pow(beta, 4.0));
     double A = geom.area();
-    return mdot / (A * std::sqrt(2.0 * rho * dP));
+    return mdot / (E * A * std::sqrt(2.0 * rho * dP));
 }
 
 // -------------------------------------------------------------
@@ -570,8 +578,11 @@ double solve_orifice_mdot(
             epsilon = expansibility_factor(beta, dP, P_upstream, kappa);
         }
 
-        // Calculate new mass flow rate using current Cd and epsilon
-        const double mdot_new = Cd * epsilon * area * std::sqrt(2.0 * rho * dP);
+        // Calculate velocity-of-approach factor (E)
+        const double E = 1.0 / std::sqrt(1.0 - std::pow(beta, 4.0));
+
+        // Calculate new mass flow rate using current Cd, E, and epsilon
+        const double mdot_new = Cd * E * epsilon * area * std::sqrt(2.0 * rho * dP);
 
         // Check convergence
         const double rel_error = std::abs(mdot_new - mdot) / (mdot + 1e-30);
@@ -663,7 +674,7 @@ OrificeFlowResult orifice_flow(
     double P,
     double mu,
     double Z,
-    const std::vector<double>& X,
+    [[maybe_unused]] const std::vector<double>& X,
     double kappa,
     CdCorrelation correlation)
 {

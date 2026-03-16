@@ -11,9 +11,9 @@ Usage:
 from __future__ import annotations
 
 import re
-from pathlib import Path
-from dataclasses import dataclass
 from collections import defaultdict
+from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass
@@ -29,10 +29,9 @@ def parse_units_data(path: Path) -> list[UnitEntry]:
     content = path.read_text()
 
     entries: list[UnitEntry] = []
-    current_section = ""
 
     # Match section comments like: // thermo.h - Species Data
-    section_pattern = re.compile(r'//\s*[-]+\s*\n\s*//\s*(.+?)\s*\n\s*//\s*[-]+')
+    section_pattern = re.compile(r"//\s*[-]+\s*\n\s*//\s*(.+?)\s*\n\s*//\s*[-]+")
 
     # Match entries like: {"name", "input", "output"},
     entry_pattern = re.compile(r'\{"([^"]+)",\s*"([^"]*)",\s*"([^"]*)"\}')
@@ -84,13 +83,17 @@ def format_table(entries: list[UnitEntry]) -> str:
 
     lines = []
     # Header
-    lines.append(f"| {'Function':<{name_width}} | {'Input Units':<{input_width}} | {'Output Unit':<{output_width}} |")
+    lines.append(
+        f"| {'Function':<{name_width}} | {'Input Units':<{input_width}} | {'Output Unit':<{output_width}} |"
+    )
     lines.append(f"|{'-' * (name_width + 2)}|{'-' * (input_width + 2)}|{'-' * (output_width + 2)}|")
 
     # Rows
     for e in entries:
         name_col = f"`{e.name}`"
-        lines.append(f"| {name_col:<{name_width}} | {e.input:<{input_width}} | {e.output:<{output_width}} |")
+        lines.append(
+            f"| {name_col:<{name_width}} | {e.input:<{input_width}} | {e.output:<{output_width}} |"
+        )
 
     return "\n".join(lines)
 
@@ -222,50 +225,52 @@ def generate_markdown(entries: list[UnitEntry]) -> str:
             lines.append("")
 
     # Add dimensionless quantities section
-    lines.extend([
-        "---",
-        "",
-        "## Dimensionless Quantities",
-        "",
-        "| Quantity                | Symbol | Unit     | Definition                    |",
-        "|-------------------------|--------|----------|-------------------------------|",
-        "| Mach number             | M      | -        | v / a                         |",
-        "| Reynolds number         | Re     | -        | rho*V*L / mu                  |",
-        "| Prandtl number          | Pr     | -        | mu*Cp / k                     |",
-        "| Peclet number           | Pe     | -        | V*L / alpha                   |",
-        "| Isentropic exponent     | gamma  | -        | Cp / Cv                       |",
-        "| Equivalence ratio       | phi    | -        | (F/A) / (F/A)_stoich          |",
-        "| Mixture fraction        | Z      | -        | Bilger definition             |",
-        "| Discharge coefficient   | Cd     | -        | mdot_actual / mdot_ideal      |",
-        "| Friction factor (Darcy) | f      | -        | dP / (L/D * rho*v^2/2)        |",
-        "| Pressure ratio          | -      | -        | P / P0                        |",
-        "| Diameter ratio          | beta   | -        | d / D                         |",
-        "",
-        "---",
-        "",
-        "## Common Reference Values",
-        "",
-        "| Quantity                | Value          | Unit   | Notes                    |",
-        "|-------------------------|----------------|--------|--------------------------|",
-        "| Standard pressure       | 101325         | Pa     | 1 atm                    |",
-        "| Standard temperature    | 298.15         | K      | 25 C                     |",
-        "| Standard gravity        | 9.80665        | m/s^2  | Used for Isp             |",
-        "| Sea level air density   | ~1.225         | kg/m^3 | At 15 C, 101325 Pa       |",
-        "",
-        "---",
-        "",
-        "## Summary: Key Unit Conventions",
-        "",
-        "1. **Temperature**: Always Kelvin (K)",
-        "2. **Pressure**: Always Pascal (Pa)",
-        "3. **Molar mass**: g/mol (historical convention; convert to kg/mol for mass-basis calculations)",
-        "4. **Thermodynamic properties**: Molar basis (J/mol, J/(mol*K)) in thermo functions",
-        "5. **Compressible flow**: Mass basis (J/kg, J/(kg*K)) in flow solutions",
-        "6. **Fractions**: mole fractions X (mol/mol), mass fractions Y (kg/kg)",
-        "7. **Relative humidity**: Fraction (0-1), not percentage",
-        "8. **Angles**: Radians (rad)",
-        "",
-    ])
+    lines.extend(
+        [
+            "---",
+            "",
+            "## Dimensionless Quantities",
+            "",
+            "| Quantity                | Symbol | Unit     | Definition                    |",
+            "|-------------------------|--------|----------|-------------------------------|",
+            "| Mach number             | M      | -        | v / a                         |",
+            "| Reynolds number         | Re     | -        | rho*V*L / mu                  |",
+            "| Prandtl number          | Pr     | -        | mu*Cp / k                     |",
+            "| Peclet number           | Pe     | -        | V*L / alpha                   |",
+            "| Isentropic exponent     | gamma  | -        | Cp / Cv                       |",
+            "| Equivalence ratio       | phi    | -        | (F/A) / (F/A)_stoich          |",
+            "| Mixture fraction        | Z      | -        | Bilger definition             |",
+            "| Discharge coefficient   | Cd     | -        | mdot_actual / mdot_ideal      |",
+            "| Friction factor (Darcy) | f      | -        | dP / (L/D * rho*v^2/2)        |",
+            "| Pressure ratio          | -      | -        | P / P0                        |",
+            "| Diameter ratio          | beta   | -        | d / D                         |",
+            "",
+            "---",
+            "",
+            "## Common Reference Values",
+            "",
+            "| Quantity                | Value          | Unit   | Notes                    |",
+            "|-------------------------|----------------|--------|--------------------------|",
+            "| Standard pressure       | 101325         | Pa     | 1 atm                    |",
+            "| Standard temperature    | 298.15         | K      | 25 C                     |",
+            "| Standard gravity        | 9.80665        | m/s^2  | Used for Isp             |",
+            "| Sea level air density   | ~1.225         | kg/m^3 | At 15 C, 101325 Pa       |",
+            "",
+            "---",
+            "",
+            "## Summary: Key Unit Conventions",
+            "",
+            "1. **Temperature**: Always Kelvin (K)",
+            "2. **Pressure**: Always Pascal (Pa)",
+            "3. **Molar mass**: g/mol (historical convention; convert to kg/mol for mass-basis calculations)",
+            "4. **Thermodynamic properties**: Molar basis (J/mol, J/(mol*K)) in thermo functions",
+            "5. **Compressible flow**: Mass basis (J/kg, J/(kg*K)) in flow solutions",
+            "6. **Fractions**: mole fractions X (mol/mol), mass fractions Y (kg/kg)",
+            "7. **Relative humidity**: Fraction (0-1), not percentage",
+            "8. **Angles**: Radians (rad)",
+            "",
+        ]
+    )
 
     return "\n".join(lines)
 

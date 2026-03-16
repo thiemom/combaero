@@ -78,24 +78,96 @@ PYBIND11_MODULE(_core, m) {
                     "), status=" + status_str + ">";
            });
 
-  // Stream Definitions
   py::class_<solver::Stream>(m, "MassStream", "Mass stream descriptor")
-      .def(py::init<double, double, std::vector<double>>())
+      .def(py::init<double, double, double, std::vector<double>>())
       .def_readwrite("m_dot", &solver::Stream::m_dot)
       .def_readwrite("T", &solver::Stream::T)
+      .def_readwrite("P_total", &solver::Stream::P_total)
       .def_readwrite("Y", &solver::Stream::Y);
 
   py::class_<solver::StreamJacobian>(m, "StreamJacobian",
                                      "Derivatives w.r.t a stream")
       .def_readonly("d_mdot", &solver::StreamJacobian::d_mdot)
       .def_readonly("d_T", &solver::StreamJacobian::d_T)
+      .def_readonly("d_P_total", &solver::StreamJacobian::d_P_total)
       .def_readonly("d_Y", &solver::StreamJacobian::d_Y);
+
+  py::class_<MixtureState>(m, "MixtureState",
+                          "High-level state for network components")
+      .def(py::init([](double P, double P_total, double T, double T_total,
+                       double m_dot, const std::vector<double> &Y) {
+             MixtureState s;
+             s.P = P;
+             s.P_total = P_total;
+             s.T = T;
+             s.T_total = T_total;
+             s.m_dot = m_dot;
+             if (!Y.empty()) {
+               s.Y = Y;
+               double sum = 0.0;
+               for (double y : Y) sum += y;
+               if (sum > 0.0) {
+                 s.X = mass_to_mole(Y);
+               } else {
+                 s.X.assign(Y.size(), 0.0);
+               }
+             } else {
+               int n = num_species();
+               s.X.assign(n, 0.0);
+               s.Y.assign(n, 0.0);
+               if (n > 0) {
+                   s.X[0] = 1.0; // Default to first species (usually N2 or similar)
+                   s.Y[0] = 1.0;
+               }
+             }
+             return s;
+           }),
+           py::arg("P") = 101325.0, py::arg("P_total") = 101325.0,
+           py::arg("T") = 298.15, py::arg("T_total") = 298.15,
+           py::arg("m_dot") = 0.0, py::arg("Y") = std::vector<double>{})
+      .def_readwrite("P", &MixtureState::P)
+      .def_readwrite("P_total", &MixtureState::P_total)
+      .def_readwrite("T", &MixtureState::T)
+      .def_readwrite("T_total", &MixtureState::T_total)
+      .def_readwrite("m_dot", &MixtureState::m_dot)
+       .def_property("X",
+            [](const MixtureState &s) { return s.X; },
+            [](MixtureState &s, const std::vector<double> &v) {
+                s.X = v;
+                if (!v.empty()) s.Y = mole_to_mass(v);
+            })
+        .def_property("Y",
+            [](const MixtureState &s) { return s.Y; },
+            [](MixtureState &s, const std::vector<double> &v) {
+                s.Y = v;
+                if (!v.empty()) s.X = mass_to_mole(v);
+            })
+      .def("density", [](const MixtureState &s) { return s.static_state().rho(); })
+      .def("cp", [](const MixtureState &s) { return cp_mass(s.T, s.X); })
+      .def("specific_heat", [](const MixtureState &s) { return cp_mass(s.T, s.X); })
+      .def("h", [](const MixtureState &s) { return h_mass(s.T, s.X); })
+      .def("enthalpy", [](const MixtureState &s) { return h_mass(s.T, s.X); })
+      .def("mw", [](const MixtureState &s) { return s.static_state().mw(); })
+      .def("molecular_weight", [](const MixtureState &s) { return s.static_state().mw(); })
+      .def("static_state", &MixtureState::static_state)
+      .def("total_state", &MixtureState::total_state);
+
+
+  py::class_<solver::ChamberResult>(m, "ChamberResult",
+                                    "Analytical node residuals")
+      .def(py::init<>())
+      .def_readonly("residuals", &solver::ChamberResult::residuals)
+      .def_readonly("local_jacobian", &solver::ChamberResult::local_jacobian)
+      .def_readonly("stream_jacobian", &solver::ChamberResult::stream_jacobian);
 
   py::class_<solver::MixerResult>(
       m, "MixerResult", "Output and internal gradients of stream mixes")
       .def_readonly("T_mix", &solver::MixerResult::T_mix)
+      .def_readonly("P_total_mix", &solver::MixerResult::P_total_mix)
       .def_readonly("Y_mix", &solver::MixerResult::Y_mix)
       .def_readonly("dT_mix_d_stream", &solver::MixerResult::dT_mix_d_stream)
+      .def_readonly("dP_total_mix_d_stream",
+                    &solver::MixerResult::dP_total_mix_d_stream)
       .def_readonly("dY_mix_d_stream", &solver::MixerResult::dY_mix_d_stream);
 
   m.def("mixer_from_streams_and_jacobians",
@@ -106,6 +178,37 @@ PYBIND11_MODULE(_core, m) {
   m.def("adiabatic_T_equilibrium_and_jacobians_from_streams",
         &solver::adiabatic_T_equilibrium_and_jacobians_from_streams,
         py::arg("streams"), py::arg("P"));
+
+
+  py::class_<solver::OrificeResult>(
+      m, "OrificeResult", "Result of orifice residual and Jacobian evaluation")
+      .def_readonly("m_dot_calc", &solver::OrificeResult::m_dot_calc)
+      .def_readonly("d_mdot_dP_total_up", &solver::OrificeResult::d_mdot_dP_total_up)
+      .def_readonly("d_mdot_dP_static_down",
+                    &solver::OrificeResult::d_mdot_dP_static_down)
+      .def_readonly("d_mdot_dP_static_up",
+                    &solver::OrificeResult::d_mdot_dP_static_up)
+      .def_readonly("d_mdot_dT_up", &solver::OrificeResult::d_mdot_dT_up)
+      .def_readonly("d_mdot_dY_up", &solver::OrificeResult::d_mdot_dY_up);
+
+  py::class_<solver::PipeResult>(
+      m, "PipeResult", "Result of pipe residual and Jacobian evaluation")
+      .def_readonly("dP_calc", &solver::PipeResult::dP_calc)
+      .def_readonly("d_dP_d_mdot", &solver::PipeResult::d_dP_d_mdot)
+      .def_readonly("d_dP_dP_static_up", &solver::PipeResult::d_dP_dP_static_up)
+      .def_readonly("d_dP_dT_up", &solver::PipeResult::d_dP_dT_up)
+      .def_readonly("d_dP_dY_up", &solver::PipeResult::d_dP_dY_up);
+
+  m.def("orifice_residuals_and_jacobian",
+        &solver::orifice_residuals_and_jacobian, py::arg("m_dot"),
+        py::arg("P_total_up"), py::arg("P_static_up"), py::arg("T_up"),
+        py::arg("Y_up"), py::arg("P_static_down"), py::arg("Cd"),
+        py::arg("area"), py::arg("beta") = 0.0);
+
+  m.def("pipe_residuals_and_jacobian", &solver::pipe_residuals_and_jacobian,
+        py::arg("m_dot"), py::arg("P_total_up"), py::arg("P_static_up"),
+        py::arg("T_up"), py::arg("Y_up"), py::arg("P_static_down"), py::arg("L"),
+        py::arg("D"), py::arg("roughness"), py::arg("friction_model"));
 
   // Species metadata helpers
   m.def("num_species", &num_species,
@@ -988,19 +1091,30 @@ PYBIND11_MODULE(_core, m) {
       // Mutable state variables (read/write properties)
       .def_readwrite("T", &State::T, "Temperature [K]")
       .def_readwrite("P", &State::P, "Pressure [Pa]")
-      .def_readwrite("X", &State::X, "Mole fractions [-]")
+      .def_property("X",
+                     [](const State &s) { return s.X; },
+                     [](State &s, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+                         s.set_X(to_vec(X_arr));
+                     },
+                     "Mole fractions [-]")
+      .def_property("Y",
+                     [](const State &s) { return s.Y; },
+                     [](State &s, py::array_t<double, py::array::c_style | py::array::forcecast> Y_arr) {
+                         s.set_Y(to_vec(Y_arr));
+                     },
+                     "Mass fractions [-]")
       // Computed thermodynamic properties (read-only)
       .def_property_readonly("mw", &State::mw, "Molecular weight [g/mol]")
       .def_property_readonly("cp", &State::cp,
-                             "Specific heat at constant pressure [J/(mol·K)]")
-      .def_property_readonly("h", &State::h, "Specific enthalpy [J/mol]")
-      .def_property_readonly("s", &State::s, "Specific entropy [J/(mol·K)]")
+                             "Specific heat at constant pressure [J/(kg·K)]")
+      .def_property_readonly("h", &State::h, "Specific enthalpy [J/kg]")
+      .def_property_readonly("s", &State::s, "Specific entropy [J/(kg·K)]")
       .def_property_readonly("cv", &State::cv,
-                             "Specific heat at constant volume [J/(mol·K)]")
-      .def_property_readonly("u", &State::u, "Specific internal energy [J/mol]")
+                             "Specific heat at constant volume [J/(kg·K)]")
+      .def_property_readonly("u", &State::u, "Specific internal energy [J/kg]")
       .def_property_readonly("rho", &State::rho, "Density [kg/m³]")
       .def_property_readonly("R", &State::R,
-                             "Specific gas constant [J/(mol·K)]")
+                             "Specific gas constant [J/(kg·K)]")
       .def_property_readonly("gamma", &State::gamma,
                              "Isentropic expansion coefficient [-]")
       .def_property_readonly("a", &State::a, "Speed of sound [m/s]")
@@ -1020,11 +1134,14 @@ PYBIND11_MODULE(_core, m) {
           "set_X",
           [](State &s,
              py::array_t<double, py::array::c_style | py::array::forcecast>
-                 X_arr) -> State & {
-            s.X = to_vec(X_arr);
-            return s;
-          },
+                 X_arr) -> State & { return s.set_X(to_vec(X_arr)); },
           py::arg("X"), "Set mole fractions [-], returns self")
+      .def(
+          "set_Y",
+          [](State &s,
+             py::array_t<double, py::array::c_style | py::array::forcecast>
+                 Y_arr) -> State & { return s.set_Y(to_vec(Y_arr)); },
+          py::arg("Y"), "Set mass fractions [-], returns self")
       .def(
           "set_TPX",
           [](State &s, double T, double P,
@@ -1240,45 +1357,45 @@ PYBIND11_MODULE(_core, m) {
       "All properties are read-only attributes computed in a single call.\n"
       "Provides IDE autocomplete and type safety.\n\n"
       "Attributes:\n"
-      "  T       : Temperature [K] (input, echoed back)\n"
-      "  P       : Pressure [Pa] (input, echoed back)\n"
-      "  rho     : Density [kg/m³]\n"
-      "  cp      : Specific heat at constant pressure [J/(mol·K)]\n"
-      "  cv      : Specific heat at constant volume [J/(mol·K)]\n"
-      "  h       : Specific enthalpy [J/mol]\n"
-      "  s       : Specific entropy [J/(mol·K)]\n"
-      "  u       : Specific internal energy [J/mol]\n"
-      "  gamma   : Isentropic expansion coefficient [-]\n"
-      "  a       : Speed of sound [m/s]\n"
-      "  cp_mass : Mass-specific cp [J/(kg·K)]\n"
-      "  cv_mass : Mass-specific cv [J/(kg·K)]\n"
-      "  h_mass  : Mass-specific enthalpy [J/kg]\n"
-      "  s_mass  : Mass-specific entropy [J/(kg·K)]\n"
-      "  u_mass  : Mass-specific internal energy [J/kg]\n"
-      "  mw      : Molecular weight [g/mol]")
+      "  T        : Temperature [K] (input, echoed back)\n"
+      "  P        : Pressure [Pa] (input, echoed back)\n"
+      "  rho      : Density [kg/m³]\n"
+      "  cp       : Specific heat at constant pressure [J/(kg·K)]\n"
+      "  cv       : Specific heat at constant volume [J/(kg·K)]\n"
+      "  h        : Specific enthalpy [J/kg]\n"
+      "  s        : Specific entropy [J/(kg·K)]\n"
+      "  u        : Specific internal energy [J/kg]\n"
+      "  gamma    : Isentropic expansion coefficient [-]\n"
+      "  a        : Speed of sound [m/s]\n"
+      "  cp_mole  : Molar cp [J/(mol·K)]\n"
+      "  cv_mole  : Molar cv [J/(mol·K)]\n"
+      "  h_mole   : Molar enthalpy [J/mol]\n"
+      "  s_mole   : Molar entropy [J/(mol·K)]\n"
+      "  u_mole   : Molar internal energy [J/mol]\n"
+      "  mw       : Molecular weight [g/mol]")
       .def_readonly("T", &ThermoState::T, "Temperature [K]")
       .def_readonly("P", &ThermoState::P, "Pressure [Pa]")
       .def_readonly("rho", &ThermoState::rho, "Density [kg/m³]")
       .def_readonly("cp", &ThermoState::cp,
-                    "Specific heat at constant pressure [J/(mol·K)]")
+                    "Specific heat at constant pressure [J/(kg·K)]")
       .def_readonly("cv", &ThermoState::cv,
-                    "Specific heat at constant volume [J/(mol·K)]")
-      .def_readonly("h", &ThermoState::h, "Specific enthalpy [J/mol]")
-      .def_readonly("s", &ThermoState::s, "Specific entropy [J/(mol·K)]")
-      .def_readonly("u", &ThermoState::u, "Specific internal energy [J/mol]")
+                    "Specific heat at constant volume [J/(kg·K)]")
+      .def_readonly("h", &ThermoState::h, "Specific enthalpy [J/kg]")
+      .def_readonly("s", &ThermoState::s, "Specific entropy [J/(kg·K)]")
+      .def_readonly("u", &ThermoState::u, "Specific internal energy [J/kg]")
       .def_readonly("gamma", &ThermoState::gamma,
                     "Isentropic expansion coefficient [-]")
       .def_readonly("a", &ThermoState::a, "Speed of sound [m/s]")
-      .def_readonly("cp_mass", &ThermoState::cp_mass,
-                    "Mass-specific cp [J/(kg·K)]")
-      .def_readonly("cv_mass", &ThermoState::cv_mass,
-                    "Mass-specific cv [J/(kg·K)]")
-      .def_readonly("h_mass", &ThermoState::h_mass,
-                    "Mass-specific enthalpy [J/kg]")
-      .def_readonly("s_mass", &ThermoState::s_mass,
-                    "Mass-specific entropy [J/(kg·K)]")
-      .def_readonly("u_mass", &ThermoState::u_mass,
-                    "Mass-specific internal energy [J/kg]")
+      .def_readonly("cp_mole", &ThermoState::cp_mole,
+                    "Molar cp [J/(mol·K)]")
+      .def_readonly("cv_mole", &ThermoState::cv_mole,
+                    "Molar cv [J/(mol·K)]")
+      .def_readonly("h_mole", &ThermoState::h_mole,
+                    "Molar enthalpy [J/mol]")
+      .def_readonly("s_mole", &ThermoState::s_mole,
+                    "Molar entropy [J/(mol·K)]")
+      .def_readonly("u_mole", &ThermoState::u_mole,
+                    "Molar internal energy [J/mol]")
       .def_readonly("mw", &ThermoState::mw, "Molecular weight [g/mol]")
       .def("__repr__", [](const ThermoState &s) {
         return "<ThermoState: T=" + std::to_string(s.T) +
@@ -1303,7 +1420,7 @@ PYBIND11_MODULE(_core, m) {
         "  P_ref : reference pressure for entropy [Pa] (default: 101325.0)\n\n"
         "Returns: ThermoState object with attributes:\n"
         "  T, P, rho, cp, cv, h, s, u, gamma, a,\n"
-        "  cp_mass, cv_mass, h_mass, s_mass, u_mass, mw\n\n"
+        "  cp_mole, cv_mole, h_mole, s_mole, u_mole, mw\n\n"
         "Example:\n"
         "  >>> X = cb.standard_dry_air_composition()\n"
         "  >>> state = cb.thermo_state(T=300, P=101325, X=X)\n"
@@ -1327,15 +1444,15 @@ PYBIND11_MODULE(_core, m) {
           "X", [](const Stream &s) { return s.X(); },
           [](Stream &s,
              py::array_t<double, py::array::c_style | py::array::forcecast>
-                 X_arr) { s.state.X = to_vec(X_arr); },
+                 X_arr) { s.set_X(to_vec(X_arr)); },
           "Mole fractions [-]")
       .def_readwrite("mdot", &Stream::mdot, "Mass flow rate [kg/s]")
       // Computed properties (read-only)
       .def_property_readonly("mw", &Stream::mw, "Molecular weight [g/mol]")
       .def_property_readonly("cp", &Stream::cp,
-                             "Specific heat at constant pressure [J/(mol·K)]")
-      .def_property_readonly("h", &Stream::h, "Specific enthalpy [J/mol]")
-      .def_property_readonly("s", &Stream::s, "Specific entropy [J/(mol·K)]")
+                             "Specific heat at constant pressure [J/(kg·K)]")
+      .def_property_readonly("h", &Stream::h, "Specific enthalpy [J/kg]")
+      .def_property_readonly("s", &Stream::s, "Specific entropy [J/(kg·K)]")
       .def_property_readonly("rho", &Stream::rho, "Density [kg/m³]")
       // Fluent setters (return self for chaining)
       .def("set_T", &Stream::set_T, py::arg("T"),
@@ -1347,8 +1464,7 @@ PYBIND11_MODULE(_core, m) {
           [](Stream &s,
              py::array_t<double, py::array::c_style | py::array::forcecast>
                  X_arr) -> Stream & {
-            s.state.X = to_vec(X_arr);
-            return s;
+            return s.set_X(to_vec(X_arr));
           },
           py::arg("X"), "Set mole fractions [-], returns self")
       .def("set_mdot", &Stream::set_mdot, py::arg("mdot"),
@@ -1596,15 +1712,17 @@ PYBIND11_MODULE(_core, m) {
       "complete_combustion",
       [](double T,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-         double P, bool smooth) {
+         double P, bool smooth_phi0, bool smooth_phi1, double k0, double k1) {
         State in;
         in.T = T;
         in.P = P;
         in.X = to_vec(X_arr);
-        return complete_combustion(in, smooth);
+        return complete_combustion(in, smooth_phi0, smooth_phi1, k0, k1);
       },
       py::arg("T"), py::arg("X"), py::arg("P") = 101325.0,
-      py::arg("smooth") = false,
+      py::arg("smooth_phi0") = true, py::arg("smooth_phi1") = true,
+      py::arg("k0") = combaero::SMOOTHING_K_PHI0,
+      py::arg("k1") = combaero::SMOOTHING_K_PHI1,
       "Adiabatic complete combustion to CO2 and H2O.\n\n"
       "Returns State with adiabatic flame temperature and burned composition.");
 
@@ -1612,15 +1730,17 @@ PYBIND11_MODULE(_core, m) {
       "complete_combustion_isothermal",
       [](double T,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-         double P, bool smooth) {
+         double P, bool smooth_phi0, bool smooth_phi1, double k0, double k1) {
         State in;
         in.T = T;
         in.P = P;
         in.X = to_vec(X_arr);
-        return complete_combustion_isothermal(in, smooth);
+        return complete_combustion_isothermal(in, smooth_phi0, smooth_phi1, k0, k1);
       },
       py::arg("T"), py::arg("X"), py::arg("P") = 101325.0,
-      py::arg("smooth") = false,
+      py::arg("smooth_phi0") = true, py::arg("smooth_phi1") = true,
+      py::arg("k0") = combaero::SMOOTHING_K_PHI0,
+      py::arg("k1") = combaero::SMOOTHING_K_PHI1,
       "Isothermal complete combustion to CO2 and H2O.\n\n"
       "Returns State with reactant temperature and burned composition.");
 
@@ -1727,8 +1847,11 @@ PYBIND11_MODULE(_core, m) {
       [make_state](
           double T,
           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-          double P) { return combustion_equilibrium(make_state(T, P, X_arr)); },
+          double P, bool smooth, double k0) {
+        return combustion_equilibrium(make_state(T, P, X_arr), smooth, k0);
+      },
       py::arg("T"), py::arg("X"), py::arg("P") = 101325.0,
+      py::arg("smooth") = true, py::arg("k0") = combaero::SMOOTHING_K_PHI0,
       "Combustion + equilibrium in one step.\n\n"
       "Combines complete combustion with reforming + WGS equilibrium.\n"
       "Use this when starting from an unburned fuel+air mixture.\n\n"
@@ -2727,12 +2850,15 @@ PYBIND11_MODULE(_core, m) {
 
   using CombustionStateBaseFn = CombustionState (*)(
       const std::vector<double> &, const std::vector<double> &, double, double,
-      double, const std::string &, CombustionMethod, bool);
+      double, const std::string &, CombustionMethod, bool, bool, double, double);
   m.def(
       "combustion_state", static_cast<CombustionStateBaseFn>(&combustion_state),
       py::arg("X_fuel"), py::arg("X_ox"), py::arg("phi"),
       py::arg("T_reactants"), py::arg("P"), py::arg("fuel_name") = "",
-      py::arg("method") = CombustionMethod::Complete, py::arg("smooth") = false,
+      py::arg("method") = CombustionMethod::Complete,
+      py::arg("smooth_phi0") = false, py::arg("smooth_phi1") = false,
+      py::arg("k0") = combaero::SMOOTHING_K_PHI0,
+      py::arg("k1") = combaero::SMOOTHING_K_PHI1,
       "Compute combustion state from equivalence ratio.\n\n"
       "Parameters:\n"
       "  X_fuel       : fuel composition (mole fractions) [-]\n"
@@ -2755,12 +2881,14 @@ PYBIND11_MODULE(_core, m) {
 
   using CombustionStreamsBaseFn =
       CombustionState (*)(const Stream &, const Stream &, const std::string &,
-                          CombustionMethod, bool);
+                          CombustionMethod, bool, bool, double, double);
   m.def("combustion_state_from_streams",
         static_cast<CombustionStreamsBaseFn>(&combustion_state_from_streams),
         py::arg("fuel_stream"), py::arg("ox_stream"), py::arg("fuel_name") = "",
         py::arg("method") = CombustionMethod::Complete,
-        py::arg("smooth") = false,
+        py::arg("smooth_phi0") = false, py::arg("smooth_phi1") = false,
+        py::arg("k0") = combaero::SMOOTHING_K_PHI0,
+        py::arg("k1") = combaero::SMOOTHING_K_PHI1,
         "Compute combustion state from measured streams.\n\n"
         "Phi is COMPUTED from mass flow rates (output, not input).\n\n"
         "Parameters:\n"
@@ -2805,25 +2933,28 @@ PYBIND11_MODULE(_core, m) {
   using CombustionStateHookFn = CombustionState (*)(
       const std::vector<double> &, const std::vector<double> &, double, double,
       double, const std::string &, CombustionMethod,
-      const PressureLossCorrelation &, bool);
+      const PressureLossCorrelation &, bool, bool, double, double);
   m.def(
       "combustion_state",
       [](py::array_t<double, py::array::c_style | py::array::forcecast> X_fuel,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_ox,
          double phi, double T_reactants, double P, const std::string &fuel_name,
-         CombustionMethod method, py::function pressure_loss, bool smooth) {
+         CombustionMethod method, py::function pressure_loss,
+         bool smooth_phi0, bool smooth_phi1, double k0, double k1) {
         PressureLossCorrelation fn =
             [pressure_loss](const PressureLossContext &ctx) {
               return pressure_loss(ctx).cast<double>();
             };
         CombustionStateHookFn hook_fn = &combustion_state;
         return hook_fn(to_vec(X_fuel), to_vec(X_ox), phi, T_reactants, P,
-                       fuel_name, method, fn, smooth);
+                       fuel_name, method, fn, smooth_phi0, smooth_phi1, k0, k1);
       },
       py::arg("X_fuel"), py::arg("X_ox"), py::arg("phi"),
       py::arg("T_reactants"), py::arg("P"), py::arg("fuel_name") = "",
       py::arg("method") = CombustionMethod::Complete, py::arg("pressure_loss"),
-      py::arg("smooth") = false,
+      py::arg("smooth_phi0") = false, py::arg("smooth_phi1") = false,
+      py::arg("k0") = combaero::SMOOTHING_K_PHI0,
+      py::arg("k1") = combaero::SMOOTHING_K_PHI1,
       "combustion_state with user-supplied pressure-loss callable.\n\n"
       "pressure_loss(ctx: PressureLossContext) -> float\n"
       "  Returns fractional dP/P_in [-]. All ctx fields are loop-free.\n\n"
@@ -2834,22 +2965,26 @@ PYBIND11_MODULE(_core, m) {
   // combustion_state_from_streams with pressure-loss hook
   using CombustionStreamsHookFn = CombustionState (*)(
       const Stream &, const Stream &, const std::string &, CombustionMethod,
-      const PressureLossCorrelation &, bool);
+      const PressureLossCorrelation &, bool, bool, double, double);
   m.def(
       "combustion_state_from_streams",
       [](const Stream &fuel_stream, const Stream &ox_stream,
          const std::string &fuel_name, CombustionMethod method,
-         py::function pressure_loss, bool smooth) {
+         py::function pressure_loss, bool smooth_phi0, bool smooth_phi1,
+         double k0, double k1) {
         PressureLossCorrelation fn =
             [pressure_loss](const PressureLossContext &ctx) {
               return pressure_loss(ctx).cast<double>();
             };
         CombustionStreamsHookFn hook_fn = &combustion_state_from_streams;
-        return hook_fn(fuel_stream, ox_stream, fuel_name, method, fn, smooth);
+        return hook_fn(fuel_stream, ox_stream, fuel_name, method, fn,
+                       smooth_phi0, smooth_phi1, k0, k1);
       },
       py::arg("fuel_stream"), py::arg("ox_stream"), py::arg("fuel_name") = "",
       py::arg("method") = CombustionMethod::Complete, py::arg("pressure_loss"),
-      py::arg("smooth") = false,
+      py::arg("smooth_phi0") = false, py::arg("smooth_phi1") = false,
+      py::arg("k0") = combaero::SMOOTHING_K_PHI0,
+      py::arg("k1") = combaero::SMOOTHING_K_PHI1,
       "combustion_state_from_streams with user-supplied pressure-loss "
       "callable.\n\n"
       "pressure_loss(ctx: PressureLossContext) -> float\n"
@@ -3725,26 +3860,28 @@ PYBIND11_MODULE(_core, m) {
   // Orifice flow calculations with Cd
   m.def(
       "orifice_mdot_Cd",
-      static_cast<double (*)(const OrificeGeometry &, double, double, double)>(
-          &orifice_mdot),
+      static_cast<double (*)(const OrificeGeometry &, double, double, double,
+                             double)>(&orifice_mdot),
       py::arg("geom"), py::arg("Cd"), py::arg("dP"), py::arg("rho"),
+      py::arg("epsilon") = 1.0,
       "Mass flow through orifice given Cd.\n\n"
-      "mdot = Cd * A * sqrt(2 * rho * dP)\n\n"
+      "mdot = Cd * E * epsilon * A * sqrt(2 * rho * dP)\n\n"
       "Returns: mass flow rate [kg/s]");
 
   m.def(
       "orifice_dP_Cd",
-      static_cast<double (*)(const OrificeGeometry &, double, double, double)>(
-          &orifice_dP),
+      static_cast<double (*)(const OrificeGeometry &, double, double, double,
+                             double)>(&orifice_dP),
       py::arg("geom"), py::arg("Cd"), py::arg("mdot"), py::arg("rho"),
+      py::arg("epsilon") = 1.0,
       "Pressure drop for given mass flow and Cd.\n\n"
-      "dP = (mdot / (Cd * A))² / (2 * rho)\n\n"
+      "dP = (mdot / (Cd * E * epsilon * A))² / (2 * rho)\n\n"
       "Returns: pressure drop [Pa]");
 
   m.def("orifice_Cd_from_measurement", &orifice_Cd_from_measurement,
         py::arg("geom"), py::arg("mdot"), py::arg("dP"), py::arg("rho"),
         "Solve for discharge coefficient from measurement.\n\n"
-        "Cd = mdot / (A * sqrt(2 * rho * dP))\n\n"
+        "Cd = mdot / (E * A * sqrt(2 * rho * dP))\n\n"
         "Parameters:\n"
         "  geom : OrificeGeometry\n"
         "  mdot : mass flow rate [kg/s]\n"
@@ -5061,13 +5198,15 @@ PYBIND11_MODULE(_core, m) {
   // -----------------------------------------------------------------
   m.def("orifice_mdot_and_jacobian", &solver::orifice_mdot_and_jacobian,
         py::arg("dP"), py::arg("rho"), py::arg("Cd"), py::arg("area"),
+        py::arg("beta") = 0.0,
         "Fast-path orifice flow and analytic derivative (mdot, "
         "d(mdot)/d(dP)).\n\n"
         "Parameters:\n"
         "  dP   : Pressure drop [Pa]\n"
         "  rho  : Density [kg/m³]\n"
         "  Cd   : Discharge coefficient [-]\n"
-        "  area : Orifice area [m²]\n\n"
+        "  area : Orifice area [m²]\n"
+        "  beta : Diameter ratio beta = d/D [-] (default 0.0)\n\n"
         "Returns: tuple(mass_flow [kg/s], derivative [kg/(s*Pa)])");
 
   m.def("pressure_loss_and_jacobian", &solver::pressure_loss_and_jacobian,

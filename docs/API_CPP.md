@@ -21,7 +21,17 @@ This document provides the technical reference for the CombAero C++ library. For
 
 ## Thermodynamics (thermo.h)
 
-### Species and Mixture Metadata
+### Composition Utilities (composition.h)
+```cpp
+// Mass/Mole fraction conversions
+double mwmix(const std::vector<double>& X);
+std::vector<double> mole_to_mass(const std::vector<double>& X);
+std::vector<double> mass_to_mole(const std::vector<double>& Y);
+std::vector<double> normalize_fractions(const std::vector<double>& X);
+std::vector<double> convert_to_dry_fractions(const std::vector<double>& X);
+```
+
+### Species and Mixture Metadata (thermo.h)
 ```cpp
 // Get species metadata
 std::string species_name(std::size_t index);
@@ -29,12 +39,6 @@ std::size_t species_index_from_name(const std::string& name);
 double species_molar_mass(std::size_t index);
 double species_molar_mass_from_name(const std::string& name);
 std::size_t num_species();
-
-// Mass/Mole fraction conversions
-double mwmix(const std::vector<double>& X);
-std::vector<double> mole_to_mass(const std::vector<double>& X);
-std::vector<double> mass_to_mole(const std::vector<double>& Y);
-std::vector<double> normalize_fractions(const std::vector<double>& X);
 ```
 
 ### Thermodynamic Properties (Molar Basis)

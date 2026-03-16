@@ -1,8 +1,16 @@
 #include "../include/utils.h"
+#include "../include/composition.h"
 #include "../include/thermo.h"
+#include <vector>
+using combaero::mwmix;
+using combaero::mole_to_mass;
+using combaero::mass_to_mole;
+using combaero::normalize_fractions;
 #include <cmath>
 #include <iostream>
 #include <numeric>
+
+namespace combaero {
 
 // -------------------------------------------------------------
 // Utility Functions
@@ -41,3 +49,5 @@ void print_mixture_properties(double T, double P, const std::vector<double>& X) 
     std::cout << "ds/dT: " << ds_dT(T, X) << " J/(mol·K²)" << std::endl;
     std::cout << "dCp/dT: " << dcp_dT(T, X) << " J/(mol·K²)" << std::endl;
 }
+
+} // namespace combaero

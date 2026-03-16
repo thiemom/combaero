@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <vector>
 
+namespace combaero {
+
 // -------------------------------------------------------------
 // Isentropic stagnation / static conversion utilities
 // -------------------------------------------------------------
@@ -147,5 +149,7 @@ double T_adiabatic_wall_mach(double T_static, double M,
 // Recovery factor r [-]
 // r = Pr^(1/3) for turbulent, Pr^(1/2) for laminar
 double recovery_factor(double Pr, bool turbulent = true);
+
+} // namespace combaero
 
 #endif // STAGNATION_H

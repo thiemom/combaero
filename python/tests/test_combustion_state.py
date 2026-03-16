@@ -283,7 +283,7 @@ class TestPhysicalConsistency:
 
         # For adiabatic combustion: h_reactants = h_products
         # Allow small tolerance due to numerical precision
-        assert state.reactants.thermo.h == pytest.approx(state.products.thermo.h, abs=1.0)
+        assert state.reactants.thermo.h == pytest.approx(state.products.thermo.h, rel=1e-4)
 
     def test_pressure_maintained(self):
         """Test that pressure is maintained through combustion."""

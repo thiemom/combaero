@@ -2,10 +2,14 @@
 // Uses the variable-cp thermo backend (thermo.h) throughout.
 
 #include "../include/stagnation.h"
+#include "../include/composition.h"
 #include "../include/thermo.h"
 #include "../include/transport.h"
 #include <cmath>
 #include <stdexcept>
+#include <algorithm>
+
+namespace combaero {
 
 // -------------------------------------------------------------
 // Kinetic energy / stagnation enthalpy
@@ -49,7 +53,7 @@ static double cp_mass_at(double T, const std::vector<double>& X) {
 }
 
 double T0_from_static_v(double T, double v, const std::vector<double>& X,
-                        double tol, std::size_t max_iter) {
+                         double tol, std::size_t max_iter) {
     if (T <= 0.0) {
         throw std::invalid_argument("T0_from_static_v: T must be positive");
     }
@@ -89,7 +93,7 @@ double T0_from_static_v(double T, double v, const std::vector<double>& X,
 }
 
 double T0_from_static(double T, double M, const std::vector<double>& X,
-                      double tol, std::size_t max_iter) {
+                       double tol, std::size_t max_iter) {
     if (M < 0.0) {
         throw std::invalid_argument("T0_from_static: M must be non-negative");
     }
@@ -99,7 +103,7 @@ double T0_from_static(double T, double M, const std::vector<double>& X,
 }
 
 double T_from_stagnation(double T0, double M, const std::vector<double>& X,
-                         double tol, std::size_t max_iter) {
+                          double tol, std::size_t max_iter) {
     if (T0 <= 0.0) {
         throw std::invalid_argument("T_from_stagnation: T0 must be positive");
     }
@@ -120,11 +124,11 @@ double T_from_stagnation(double T0, double M, const std::vector<double>& X,
     constexpr double T_MAX = 6000.0;
 
     for (std::size_t it = 0; it < max_iter; ++it) {
-        double a = speed_of_sound(T, X);
-        double v = M * a;
+        double a_val = speed_of_sound(T, X);
+        double v = M * a_val;
         double F = h_mass_at(T, X) + 0.5 * v * v - h0;
-        // dF/dT ~ cp + M^2 * a * (a/(2T)) = cp + M^2 * a^2 / (2T)
-        double dF = cp_mass_at(T, X) + M * M * a * a / (2.0 * T);
+        // dF/dT ~ cp + M^2 * a^2 / (2T)
+        double dF = cp_mass_at(T, X) + M * M * a_val * a_val / (2.0 * T);
 
         if (std::abs(dF) < 1e-30) break;
 
@@ -148,8 +152,8 @@ double T_from_stagnation(double T0, double M, const std::vector<double>& X,
 // -------------------------------------------------------------
 
 double P0_from_static(double P, double T, double M,
-                      const std::vector<double>& X,
-                      double tol, std::size_t max_iter) {
+                       const std::vector<double>& X,
+                       double tol, std::size_t max_iter) {
     if (P <= 0.0) {
         throw std::invalid_argument("P0_from_static: P must be positive");
     }
@@ -158,26 +162,13 @@ double P0_from_static(double P, double T, double M,
     }
     if (M == 0.0) return P;
 
-    // Isentropic: s(T0, P0) = s(T, P)
-    // s0 = s(T, P)  (entropy at static conditions)
-    // T0 = T0_from_static(T, M, X)
-    // Solve for P0: s(T0, P0) = s0
-    // s(T, P) = s(T, P_ref) - R*ln(P/P_ref)  =>  s(T0, P0) = s0
-    // => s(T0, P_ref) - R*ln(P0/P_ref) = s0
-    // => P0 = P_ref * exp((s(T0, P_ref) - s0) / R_specific)
-
     constexpr double P_REF = 101325.0;
     double s0 = s(T, X, P, P_REF);
     double T0 = T0_from_static(T, M, X, tol, max_iter);
 
-    // specific_gas_constant(X) already returns R_mix [J/(kg*K)]
     double R_specific = specific_gas_constant(X);  // J/(kg*K)
-
-    // s() returns J/(mol*K); convert to mass basis [J/(kg*K)]
     double mw_kg = mwmix(X) / 1000.0;  // kg/mol
 
-    // s(T0, P0) = s(T0, P_ref) - R_specific * ln(P0/P_ref) = s0
-    // => ln(P0/P_ref) = (s(T0, P_ref) - s0) / R_specific
     double s_T0_Pref = s(T0, X, P_REF, P_REF) / mw_kg;  // J/(kg*K)
     double s0_mass   = s0 / mw_kg;                        // J/(kg*K)
     double ln_ratio = (s_T0_Pref - s0_mass) / R_specific;
@@ -185,8 +176,8 @@ double P0_from_static(double P, double T, double M,
 }
 
 double P_from_stagnation(double P0, double T0, double M,
-                         const std::vector<double>& X,
-                         double tol, std::size_t max_iter) {
+                          const std::vector<double>& X,
+                          double tol, std::size_t max_iter) {
     if (P0 <= 0.0) {
         throw std::invalid_argument("P_from_stagnation: P0 must be positive");
     }
@@ -220,8 +211,8 @@ double recovery_factor(double Pr, bool turbulent) {
 }
 
 double T_adiabatic_wall(double T_static, double v,
-                        double T, double P, const std::vector<double>& X,
-                        bool turbulent) {
+                         double T, double P, const std::vector<double>& X,
+                         bool turbulent) {
     if (T_static <= 0.0) {
         throw std::invalid_argument("T_adiabatic_wall: T_static must be positive");
     }
@@ -238,8 +229,8 @@ double T_adiabatic_wall(double T_static, double v,
 }
 
 double T_adiabatic_wall_mach(double T_static, double M,
-                              double T, double P, const std::vector<double>& X,
-                              bool turbulent) {
+                               double T, double P, const std::vector<double>& X,
+                               bool turbulent) {
     if (M < 0.0) {
         throw std::invalid_argument("T_adiabatic_wall_mach: M must be non-negative");
     }
@@ -249,3 +240,5 @@ double T_adiabatic_wall_mach(double T_static, double M,
     double v = M * a;
     return T_adiabatic_wall(T_static, v, T, P, X, turbulent);
 }
+
+} // namespace combaero

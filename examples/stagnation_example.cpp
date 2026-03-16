@@ -10,6 +10,8 @@
 #include <iostream>
 #include <vector>
 
+using namespace combaero;
+
 // Stagnation Example
 //
 // Demonstrates:

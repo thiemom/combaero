@@ -10,12 +10,11 @@
 #include <algorithm>
 #include <string>
 
-using combaero::thermo::R_GAS;
+
+namespace combaero {
+using thermo::R_GAS;
 
 namespace {
-
-// Reference pressure for entropy calculations
-constexpr double P_REF = 101325.0;
 
 // Solve for temperature at pressure P such that s(T, P) = s0 (isentropic)
 // Uses Newton iteration with ds/dT = cp/T
@@ -29,11 +28,11 @@ double solve_T_isentropic(double P, double s0, double T_init,
     constexpr double T_MAX = 6000.0;
 
     for (std::size_t it = 0; it < max_iter; ++it) {
-        double s_curr = s(T, X, P, P_REF);
+        double s_curr = s_mass(T, X, P);
         double F = s_curr - s0;
 
-        // ds/dT at constant P = cp/T
-        double dF = cp(T, X) / T;
+        // ds/dT at constant P = cp_mass/T
+        double dF = cp_mass(T, X) / T;
 
         if (std::abs(dF) < 1e-30) break;
 
@@ -67,7 +66,7 @@ double compute_mass_flux(double T0, double P0, double P, double s0, double h0,
 
     double T = solve_T_isentropic(P, s0, T0, X, tol, max_iter);
 
-    double h_curr = h(T, X);
+    double h_curr = h_mass(T, X);
     double dh = h0 - h_curr;
 
     if (dh <= 0.0) return 0.0;
@@ -152,7 +151,7 @@ CompressibleFlowSolution nozzle_flow(
 
     // Find critical pressure (where mass flux is maximum)
     double P_crit = find_critical_pressure(T0, P0, s0, h0, X, tol, max_iter);
-    double G_crit = compute_mass_flux(T0, P0, P_crit, s0, h0, X, tol, max_iter);
+    [[maybe_unused]] double G_crit = compute_mass_flux(T0, P0, P_crit, s0, h0, X, tol, max_iter);
 
     double P_outlet;
     if (P_back <= P_crit) {
@@ -210,7 +209,7 @@ double solve_A_eff_from_mdot(
 
     // Find critical conditions
     double P_crit = find_critical_pressure(T0, P0, s0, h0, X, tol, max_iter);
-    double G_crit = compute_mass_flux(T0, P0, P_crit, s0, h0, X, tol, max_iter);
+    [[maybe_unused]] double G_crit = compute_mass_flux(T0, P0, P_crit, s0, h0, X, tol, max_iter);
 
     double P_outlet = (P_back <= P_crit) ? P_crit : P_back;
     double G_outlet = compute_mass_flux(T0, P0, P_outlet, s0, h0, X, tol, max_iter);
@@ -368,7 +367,7 @@ double mach_from_pressure_ratio(
 
     double T = solve_T_isentropic(P, s0, T0, X, tol, max_iter);
 
-    double h_curr = h(T, X);
+    double h_curr = h_mass(T, X);
     double dh = h0 - h_curr;
 
     if (dh <= 0.0) return 0.0;
@@ -541,7 +540,7 @@ FannoSolution fanno_pipe(
         st.u  = u_in;
         st.M  = M_in;
         st.h  = h_in_mass;
-        st.s  = sol.inlet.s() / mw_g * 1000.0;  // J/(kg·K)
+        st.s  = sol.inlet.s();  // J/(kg·K)
         st.f  = f;
         st.Re = sol.Re_in;
         sol.profile.push_back(st);
@@ -563,21 +562,21 @@ FannoSolution fanno_pipe(
         // k2: evaluate at x + dx/2, P + k1*dx/2
         double P2 = P + 0.5 * k1 * dx;
         if (P2 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
-        double T2, u2, rho2;
+        [[maybe_unused]] double T2, u2, rho2;
         T2 = solve_T_from_energy(P2, sol.h0, sol.mdot, A, X, mw_kg, T, u2, rho2);
         double k2 = dpdx_fanno(rho2, u2, f, D);
 
         // k3: evaluate at x + dx/2, P + k2*dx/2
         double P3 = P + 0.5 * k2 * dx;
         if (P3 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
-        double T3, u3, rho3;
+        [[maybe_unused]] double T3, u3, rho3;
         T3 = solve_T_from_energy(P3, sol.h0, sol.mdot, A, X, mw_kg, T, u3, rho3);
         double k3 = dpdx_fanno(rho3, u3, f, D);
 
         // k4: evaluate at x + dx, P + k3*dx
         double P4 = P + k3 * dx;
         if (P4 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
-        double T4, u4, rho4;
+        [[maybe_unused]] double T4, u4, rho4;
         T4 = solve_T_from_energy(P4, sol.h0, sol.mdot, A, X, mw_kg, T, u4, rho4);
         double k4 = dpdx_fanno(rho4, u4, f, D);
 
@@ -619,7 +618,7 @@ FannoSolution fanno_pipe(
             st.u   = u;
             st.M   = M;
             st.h   = h(T, X) / mw_g * 1000.0;
-            st.s   = current.s() / mw_g * 1000.0;
+            st.s   = current.s();
             st.f   = f;
             st.Re  = rho * u * D / sol.inlet.mu();
             sol.profile.push_back(st);
@@ -720,7 +719,7 @@ FannoSolution fanno_pipe_rough(
         st.u   = u_in;
         st.M   = M_in;
         st.h   = h_in_mass;
-        st.s   = sol.inlet.s() / mw_g * 1000.0;
+        st.s   = sol.inlet.s();
         st.f   = f_in;
         st.Re  = sol.Re_in;
         sol.profile.push_back(st);
@@ -790,7 +789,7 @@ FannoSolution fanno_pipe_rough(
             st.u   = u;
             st.M   = M;
             st.h   = h(T, X) / mw_g * 1000.0;
-            st.s   = current.s() / mw_g * 1000.0;
+            st.s   = current.s();
             st.f   = local_friction(T, P, u, D, roughness, X, correlation);
             st.Re  = rho * u * D / current.mu();
             sol.profile.push_back(st);
@@ -894,7 +893,7 @@ namespace {
 //   2. Mass: rho(T,P) * u * A = mdot
 //
 // Returns true if converged, false otherwise.
-bool solve_station_state(
+[[maybe_unused]] bool solve_station_state(
     double P, double h0_mass, double mdot, double A,
     const std::vector<double>& X, double mw_kg, double mw_g,
     double T_guess,
@@ -1065,8 +1064,7 @@ NozzleSolution nozzle_quasi1d(
     double mw_kg = mw_g / 1000.0;  // kg/mol
 
     // Stagnation enthalpy [J/kg]
-    double h0_mol = stag.h();  // J/mol
-    sol.h0 = h0_mol / mw_g * 1000.0;  // J/kg
+    sol.h0 = stag.h();
 
     // Find throat location
     double x_throat = find_throat_x(area_func, x_start, x_end);
@@ -1081,7 +1079,7 @@ NozzleSolution nozzle_quasi1d(
     // Compute mass flow rate
     // For choked flow: mdot determined by throat conditions
     // For subsonic: mdot determined by exit conditions
-    double A_inlet = area_func(x_start);
+    [[maybe_unused]] double A_inlet = area_func(x_start);
     double A_exit = area_func(x_end);
 
     if (sol.choked) {
@@ -1185,14 +1183,15 @@ NozzleSolution nozzle_quasi1d(
         double P = P_guess;
 
         for (std::size_t iter = 0; iter < max_iter; ++iter) {
-            // Current thermodynamic state
-            double h_mol = h(T, X);
-            double cp_mol = cp(T, X);
-            double cv_mol = cv(T, X);
-            double gamma_local = cp_mol / cv_mol;
+            // Current thermodynamic state (mass basis)
+            double h_mass_val = h_mass(T, X);
+            double cp_mass_val = cp_mass(T, X);
+            double cv_mass_val = cv_mass(T, X);
+            double gamma_local = cp_mass_val / cv_mass_val;
+            double R_specific = R_GAS / mw_kg;  // J/(kg·K)
 
-            // Speed of sound: a² = gamma * R * T / mw_kg
-            double a2 = gamma_local * R_GAS * T / mw_kg;
+            // Speed of sound: a² = gamma * R_specific * T
+            double a2 = gamma_local * R_specific * T;
             double a = std::sqrt(a2);
 
             // Velocity from M_guess: u = M_guess * a
@@ -1201,34 +1200,30 @@ NozzleSolution nozzle_quasi1d(
             // Kinetic energy per unit mass [J/kg]
             double ke_mass = 0.5 * u * u;
 
-            // Enthalpy per unit mass [J/kg]
-            double h_mass = h_mol / mw_g * 1000.0;
+            // Entropy (mass basis)
+            double s_curr = s_mass(T, X, P);
 
-            // Entropy
-            double s_curr = ::s(T, X, P, P_REF);
-
-            // Residuals
-            double f1 = s_curr - s0;  // Entropy error [J/(mol·K)]
-            double f2 = h_mass + ke_mass - sol.h0;  // Energy error [J/kg]
+            // Residuals (all mass basis)
+            double f1 = s_curr - s0;  // Entropy error [J/(kg·K)]
+            double f2 = h_mass_val + ke_mass - sol.h0;  // Energy error [J/kg]
 
             if (std::abs(f1) < tol * std::abs(s0) && std::abs(f2) < tol * sol.h0) break;
 
             // Jacobian: df/d(T, P)
-            // df1/dT = cp/T, df1/dP = -R/P
-            double df1_dT = cp_mol / T;
-            double df1_dP = -R_GAS / P;
+            // df1/dT = cp_mass/T, df1/dP = -R_specific/P
+            double df1_dT = cp_mass_val / T;
+            double df1_dP = -R_specific / P;
 
             // df2/dT = dh_mass/dT + d(ke_mass)/dT
             // dh_mass/dT = cp_mass
             // d(ke_mass)/dT = u * du/dT = u * M_guess * da/dT
             // da/dT = a / (2*T) * (1 + T/gamma * dgamma/dT) ≈ a / (2*T) for slowly varying gamma
-            double cp_mass = cp_mol / mw_g * 1000.0;
             double da_dT = a / (2.0 * T);
             double du_dT = M_guess * da_dT;
-            double df2_dT = cp_mass + u * du_dT;
+            double df2_dT = cp_mass_val + u * du_dT;
 
             // df2/dP = 0 (h and a don't depend on P for ideal gas)
-            double df2_dP = 0.0;
+            [[maybe_unused]] double df2_dP = 0.0;
 
             // Solve 2x2 system: J * [dT, dP]^T = -[f1, f2]^T
             // Since df2_dP ≈ 0, solve sequentially:
@@ -1425,3 +1420,4 @@ ThrustResult nozzle_thrust(
                                     x_throat, x_exit, X, n_stations, tol, max_iter);
     return nozzle_thrust(sol, P_amb);
 }
+} // namespace combaero
