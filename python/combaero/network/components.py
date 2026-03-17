@@ -243,7 +243,7 @@ class MomentumChamberNode(NetworkNode):
         # Store upstream element IDs for Jacobian
         self._upstream_element_ids = []
         for s in upstream_states:
-            if hasattr(s, '_element_id'):
+            if hasattr(s, "_element_id"):
                 self._upstream_element_ids.append(s._element_id)
 
         if not upstream_states:
@@ -262,7 +262,7 @@ class MomentumChamberNode(NetworkNode):
 
         # Momentum chamber: P_total = P_static + 0.5 * rho * v^2
         # Use total mass flow computed during compute_derived_state
-        m_dot_total = getattr(self, '_total_m_dot', 0.0)
+        m_dot_total = getattr(self, "_total_m_dot", 0.0)
 
         # Use C++ function for residual and analytical Jacobian
         result = cb.momentum_chamber_residual_and_jacobian(
@@ -278,7 +278,7 @@ class MomentumChamberNode(NetworkNode):
         }
 
         # Add Jacobian entries for upstream element mass flows
-        upstream_elem_ids = getattr(self, '_upstream_element_ids', [])
+        upstream_elem_ids = getattr(self, "_upstream_element_ids", [])
         for elem_id in upstream_elem_ids:
             jac[0][f"{elem_id}.m_dot"] = result.d_res_dmdot
 

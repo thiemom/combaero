@@ -30,7 +30,9 @@ def test_momentum_chamber_dynamic_pressure():
 
     Y_air = _air_Y()
     inlet = MassFlowBoundary("inlet", m_dot=0.2, T_total=600.0, Y=Y_air)
-    chamber = MomentumChamberNode("chamber", area=0.02)  # 0.02 m^2, larger area for easier convergence
+    chamber = MomentumChamberNode(
+        "chamber", area=0.02
+    )  # 0.02 m^2, larger area for easier convergence
     outlet = PressureBoundary("outlet", P_total=101325.0)
 
     orf1 = OrificeElement("orf1", "inlet", "chamber", Cd=0.6, area=0.001)
@@ -128,7 +130,9 @@ def test_momentum_chamber_vs_plenum():
     assert q_dynamic > 10.0  # At least 10 Pa
 
     print("Plenum vs Momentum Chamber:")
-    print(f"  Plenum: P={P_ple:.1f} Pa, P_total={P_total_ple:.1f} Pa, ΔP={P_total_ple-P_ple:.1f} Pa")
+    print(
+        f"  Plenum: P={P_ple:.1f} Pa, P_total={P_total_ple:.1f} Pa, ΔP={P_total_ple - P_ple:.1f} Pa"
+    )
     print(f"  Momentum: P={P_mom:.1f} Pa, P_total={P_total_mom:.1f} Pa, ΔP={q_dynamic:.1f} Pa")
 
 
@@ -179,5 +183,7 @@ def test_momentum_chamber_with_heat_exchange():
     assert P_total == pytest.approx(P + q_dynamic, rel=1e-4)
 
     print("Momentum chamber with heat exchange:")
-    print(f"  T_in = {T_inlet:.1f} K → T_chamber = {T_chamber:.1f} K (ΔT = {T_chamber-T_inlet:.1f} K)")
+    print(
+        f"  T_in = {T_inlet:.1f} K → T_chamber = {T_chamber:.1f} K (ΔT = {T_chamber - T_inlet:.1f} K)"
+    )
     print(f"  P_total = P + q_dynamic: {P_total:.1f} = {P:.1f} + {q_dynamic:.1f} Pa")
