@@ -24,6 +24,10 @@ PYTHON="${ROOT_DIR}/.venv/bin/python"
 # Directories to scan
 SCAN_DIRS=("python" "cantera_validation_tests" "thermo_data_generator")
 
+# Directories to check for non-ASCII (subset of SCAN_DIRS)
+# Tests and examples can use Unicode for readability (Greek letters, arrows, etc.)
+NON_ASCII_CHECK_DIRS=("python/combaero")
+
 # Python file patterns
 INCLUDE_PATTERNS=("*.py")
 
@@ -88,13 +92,13 @@ echo ""
 # -----------------------------------------------------------------------------
 echo "Check 1: Non-ASCII characters..."
 
-# Find all Python files
+# Find Python files to check for non-ASCII (only main source code, not tests/examples)
 PYTHON_FILES=()
-for dir in "${SCAN_DIRS[@]}"; do
+for dir in "${NON_ASCII_CHECK_DIRS[@]}"; do
     if [ -d "$dir" ]; then
         while IFS= read -r -d '' file; do
             PYTHON_FILES+=("$file")
-        done < <(find "$dir" -name "*.py" -print0)
+        done < <(find "$dir" -type d -name ".venv" -prune -o -type f -name "*.py" -print0)
     fi
 done
 
@@ -104,14 +108,14 @@ else
     NON_ASCII_FOUND=false
     for file in "${PYTHON_FILES[@]}"; do
         # Check every line for non-ASCII bytes (0x80-0xFF), including docstrings.
-        # The previous heuristic that skipped lines containing quotes was wrong:
-        # it silently ignored non-ASCII inside docstrings and string literals.
-        if grep -P '[\x80-\xFF]' "$file" > /dev/null 2>&1; then
+        # Use LC_ALL=C grep for portability (works on both macOS BSD grep and Linux GNU grep)
+        # In C locale, grep treats bytes > 127 as non-text
+        if LC_ALL=C grep -q '[^[:print:][:space:]]' "$file" 2>/dev/null; then
             NON_ASCII_FOUND=true
-            while IFS= read -r match; do
-                echo "  Non-ASCII in $file:"
-                echo "    $match"
-            done < <(grep -n -P '[\x80-\xFF]' "$file" || true)
+            echo "  Non-ASCII in $file:"
+            LC_ALL=C grep -n '[^[:print:][:space:]]' "$file" 2>/dev/null | while IFS= read -r line; do
+                echo "    $line"
+            done
         fi
     done
 

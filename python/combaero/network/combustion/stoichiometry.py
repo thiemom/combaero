@@ -52,8 +52,8 @@ def stoichiometric_products(
     Compute burned gas mole fractions from atom balance.
 
     Assumes complete combustion:
-      - All C → CO2
-      - All H → H2O
+      - All C -> CO2
+      - All H -> H2O
       - Excess O2 remains
       - N2 passes through inert
 
@@ -104,7 +104,7 @@ def stoichiometric_products(
     X_products = cb.complete_combustion_to_CO2_H2O(X_mix)
 
     # TODO: Implement proper atom balancing for rich/lean mixtures
-    # For rich (φ > 1): distribute excess fuel to CO and H₂
-    # For lean (φ < 1): add excess O2
+    # For rich (phi > 1): distribute excess fuel to CO and H2
+    # For lean (phi < 1): add excess O2
 
     return X_products

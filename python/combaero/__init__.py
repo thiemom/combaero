@@ -716,7 +716,7 @@ except ModuleNotFoundError:
     pipe_residuals_and_jacobian = _core.pipe_residuals_and_jacobian
 
 
-# Submodule imports — always available regardless of _core load path.
+# Submodule imports - always available regardless of _core load path.
 from . import compressible, heat_transfer, incompressible, network, species
 from ._flow_solution import FlowSolution
 

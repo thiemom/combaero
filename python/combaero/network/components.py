@@ -25,7 +25,7 @@ class EnergyBoundary:
 
     Two additive modes:
       - Q [W]: absolute heat transfer rate
-      - fraction [-]: relative to total enthalpy flow (H_tot = Σ mdot_i * h_i)
+      - fraction [-]: relative to total enthalpy flow (H_tot = sum(mdot_i * h_i))
         e.g. fraction=-0.05 means 5% enthalpy loss
 
     Both can be set simultaneously; effective Q = Q + fraction * H_tot.
@@ -58,7 +58,7 @@ class MixtureState:
             return x
 
     def density(self) -> float:
-        """Static density [kg/m³]."""
+        """Static density [kg/m^3]."""
         return cb.density(self.T, self.P, self.X)
 
     def enthalpy(self) -> float:
@@ -70,7 +70,7 @@ class MixtureState:
         return cb.h_mass(self.T_total, self.X)
 
     def cp(self) -> float:
-        """Specific heat capacity at constant pressure [J/(kg·K)]."""
+        """Specific heat capacity at constant pressure [J/(kg*K)]."""
         return cb.cp_mass(self.T, self.X)
 
     def speed_of_sound(self) -> float:

@@ -24,7 +24,7 @@ Design notes
   (no heat transfer) elements.
 - ``T_aw`` is always computed continuously for all Mach numbers:
   ``T_aw = T_static + r * v^2 / (2*cp)`` with ``r = Pr^(1/3)`` (turbulent).
-  At ``v=0`` this reduces to ``T_static`` exactly — no threshold, no kink in
+  At ``v=0`` this reduces to ``T_static`` exactly - no threshold, no kink in
   the Jacobian.
 - ``q = h * (T_aw - T_wall)`` when ``T_wall`` is supplied, else ``nan``.
 """

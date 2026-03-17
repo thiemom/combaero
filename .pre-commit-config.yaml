@@ -51,3 +51,10 @@ repos:
         pass_filenames: false
         files: ^include/(thermo_transport_data|common_names)\.h$
         stages: [pre-commit]
+
+      - id: math-constants-check
+        name: Math constants portability check (MSVC compatibility)
+        entry: .pre-commit-hooks/check_math_constants.py
+        language: system
+        files: \.(cpp|h|hpp|cc|cxx)$
+        stages: [pre-commit]
