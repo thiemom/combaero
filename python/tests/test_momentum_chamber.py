@@ -66,7 +66,7 @@ def test_momentum_chamber_dynamic_pressure():
     # Verify dynamic pressure is non-zero (unlike plenum)
     assert q_dynamic > 1.0  # Should be several Pa
 
-    print(f"Momentum chamber test passed:")
+    print("Momentum chamber test passed:")
     print(f"  P = {P:.1f} Pa")
     print(f"  P_total = {P_total:.1f} Pa")
     print(f"  q_dynamic = {q_dynamic:.1f} Pa")
@@ -127,7 +127,7 @@ def test_momentum_chamber_vs_plenum():
     q_dynamic = P_total_mom - P_mom
     assert q_dynamic > 10.0  # At least 10 Pa
 
-    print(f"Plenum vs Momentum Chamber:")
+    print("Plenum vs Momentum Chamber:")
     print(f"  Plenum: P={P_ple:.1f} Pa, P_total={P_total_ple:.1f} Pa, ΔP={P_total_ple-P_ple:.1f} Pa")
     print(f"  Momentum: P={P_mom:.1f} Pa, P_total={P_total_mom:.1f} Pa, ΔP={q_dynamic:.1f} Pa")
 
@@ -178,6 +178,6 @@ def test_momentum_chamber_with_heat_exchange():
 
     assert P_total == pytest.approx(P + q_dynamic, rel=1e-4)
 
-    print(f"Momentum chamber with heat exchange:")
+    print("Momentum chamber with heat exchange:")
     print(f"  T_in = {T_inlet:.1f} K → T_chamber = {T_chamber:.1f} K (ΔT = {T_chamber-T_inlet:.1f} K)")
     print(f"  P_total = P + q_dynamic: {P_total:.1f} = {P:.1f} + {q_dynamic:.1f} Pa")
