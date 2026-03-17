@@ -174,15 +174,15 @@ PYBIND11_MODULE(_core, m) {
 
   m.def("mixer_from_streams_and_jacobians",
         &solver::mixer_from_streams_and_jacobians, py::arg("streams"),
-        py::arg("delta_h") = 0.0);
+        py::arg("Q") = 0.0, py::arg("fraction") = 0.0);
   m.def("adiabatic_T_complete_and_jacobian_T_from_streams",
         &solver::adiabatic_T_complete_and_jacobian_T_from_streams,
         py::arg("streams"), py::arg("P"),
-        py::arg("delta_h") = 0.0);
+        py::arg("Q") = 0.0, py::arg("fraction") = 0.0);
   m.def("adiabatic_T_equilibrium_and_jacobians_from_streams",
         &solver::adiabatic_T_equilibrium_and_jacobians_from_streams,
         py::arg("streams"), py::arg("P"),
-        py::arg("delta_h") = 0.0);
+        py::arg("Q") = 0.0, py::arg("fraction") = 0.0);
 
 
   py::class_<solver::OrificeResult>(

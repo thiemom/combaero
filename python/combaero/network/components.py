@@ -20,82 +20,62 @@ CombustionMethodLiteral = Literal["complete", "equilibrium"]
 class EnergyBoundary:
     """Energy source/sink that attaches to mixing nodes.
 
-    Convention: Q > 0 means heat **into** the fluid (heating),
-                Q < 0 means heat **out of** the fluid (cooling).
+    Convention: Q > 0 / fraction > 0 means heat **into** the fluid (heating),
+                Q < 0 / fraction < 0 means heat **out of** the fluid (cooling).
 
-    The boundary converts Q [W] to specific enthalpy delta_h [J/kg]
-    via delta_h = Q / mdot_total, which is passed to the C++ mixer.
+    Two additive modes:
+      - Q [W]: absolute heat transfer rate
+      - fraction [-]: relative to total enthalpy flow (H_tot = Σ mdot_i * h_i)
+        e.g. fraction=-0.05 means 5% enthalpy loss
+
+    Both can be set simultaneously; effective Q = Q + fraction * H_tot.
+    C++ functions handle the conversion to delta_h and all Jacobian corrections.
     """
 
-    def __init__(self, id: str, Q: float = 0.0) -> None:
+    def __init__(self, id: str, Q: float = 0.0, fraction: float = 0.0) -> None:
         self.id = id
         self.Q = Q  # [W]
-
-
-class _AdjustedStreamJacobian:
-    """Wraps a C++ StreamJacobian with an additive mdot correction.
-
-    When delta_h = Q / mdot_tot, the total derivative of T w.r.t. mdot_i
-    picks up an extra term:
-        dT/dmdot_i |total = dT/dmdot_i |delta_h_const
-                           + dT/d(delta_h) * d(delta_h)/d(mdot_i)
-    where d(delta_h)/d(mdot_i) = -Q / mdot_tot^2 = -delta_h / mdot_tot.
-    """
-
-    __slots__ = ("d_mdot", "d_T", "d_P_total", "d_Y")
-
-    def __init__(self, base, mdot_correction: float = 0.0) -> None:
-        self.d_mdot = base.d_mdot + mdot_correction
-        self.d_T = base.d_T
-        self.d_P_total = base.d_P_total
-        self.d_Y = base.d_Y
-
-
-class _AdjustedMixerResult:
-    """Wraps a C++ MixerResult, applying delta_h-mdot coupling corrections."""
-
-    __slots__ = (
-        "T_mix",
-        "P_total_mix",
-        "Y_mix",
-        "dT_mix_d_delta_h",
-        "dT_mix_d_stream",
-        "dP_total_mix_d_stream",
-        "dY_mix_d_stream",
-    )
-
-    def __init__(self, base, delta_h: float, mdot_tot: float) -> None:
-        self.T_mix = base.T_mix
-        self.P_total_mix = base.P_total_mix
-        self.Y_mix = base.Y_mix
-        self.dT_mix_d_delta_h = base.dT_mix_d_delta_h
-        self.dP_total_mix_d_stream = base.dP_total_mix_d_stream
-        self.dY_mix_d_stream = base.dY_mix_d_stream
-
-        if abs(delta_h) > 0.0 and abs(mdot_tot) > 1e-30:
-            corr = base.dT_mix_d_delta_h * (-delta_h / mdot_tot)
-            self.dT_mix_d_stream = [_AdjustedStreamJacobian(j, corr) for j in base.dT_mix_d_stream]
-        else:
-            self.dT_mix_d_stream = base.dT_mix_d_stream
+        self.fraction = fraction  # [-]
 
 
 @dataclass
 class MixtureState:
-    P: float  # static pressure [Pa]
-    P_total: float  # total pressure [Pa]  (= P for plenum nodes)
-    T: float  # static temperature [K]
-    T_total: float  # total temperature [K]  (= T for plenum nodes)
-    m_dot: float  # mass flow rate [kg/s]
-    Y: list[float]  # mass fractions (dynamic size)
+    P: float
+    P_total: float
+    T: float
+    T_total: float
+    m_dot: float
+    Y: list[float]
+
+    @property
+    def X(self) -> list[float]:
+        """Cached mole fractions converted from mass fractions."""
+        try:
+            return self._X  # type: ignore[return-value]
+        except AttributeError:
+            x = list(cb.mass_to_mole(self.Y))
+            object.__setattr__(self, "_X", x)
+            return x
 
     def density(self) -> float:
-        return cb.density(self.T, self.P, cb.mass_to_mole(self.Y))
+        """Static density [kg/m³]."""
+        return cb.density(self.T, self.P, self.X)
 
     def enthalpy(self) -> float:
-        return cb.h_mass(self.T, cb.mass_to_mole(self.Y))
+        """Static specific enthalpy [J/kg]."""
+        return cb.h_mass(self.T, self.X)
+
+    def total_enthalpy(self) -> float:
+        """Total (stagnation) specific enthalpy [J/kg]."""
+        return cb.h_mass(self.T_total, self.X)
+
+    def cp(self) -> float:
+        """Specific heat capacity at constant pressure [J/(kg·K)]."""
+        return cb.cp_mass(self.T, self.X)
 
     def speed_of_sound(self) -> float:
-        return cb.speed_of_sound(self.T, cb.mass_to_mole(self.Y))
+        """Speed of sound [m/s]."""
+        return cb.speed_of_sound(self.T, self.X)
 
 
 class NetworkNode(ABC):
@@ -197,13 +177,9 @@ class PlenumNode(NetworkNode):
 
         streams = [cb.MassStream(s.m_dot, s.T_total, s.P_total, s.Y) for s in upstream_states]
         Q_total = sum(eb.Q for eb in self.energy_boundaries)
-        mdot_tot = sum(s.m_dot for s in upstream_states)
-        delta_h = Q_total / mdot_tot if abs(mdot_tot) > 1e-30 else 0.0
+        fraction_total = sum(eb.fraction for eb in self.energy_boundaries)
 
-        mix_res = cb.mixer_from_streams_and_jacobians(streams, delta_h=delta_h)
-
-        if abs(delta_h) > 0.0:
-            mix_res = _AdjustedMixerResult(mix_res, delta_h, mdot_tot)
+        mix_res = cb.mixer_from_streams_and_jacobians(streams, Q=Q_total, fraction=fraction_total)
 
         return mix_res.T_mix, mix_res.Y_mix, mix_res
 
@@ -266,13 +242,9 @@ class MomentumChamberNode(NetworkNode):
 
         streams = [cb.MassStream(s.m_dot, s.T_total, s.P_total, s.Y) for s in upstream_states]
         Q_total = sum(eb.Q for eb in self.energy_boundaries)
-        mdot_tot = sum(s.m_dot for s in upstream_states)
-        delta_h = Q_total / mdot_tot if abs(mdot_tot) > 1e-30 else 0.0
+        fraction_total = sum(eb.fraction for eb in self.energy_boundaries)
 
-        mix_res = cb.mixer_from_streams_and_jacobians(streams, delta_h=delta_h)
-
-        if abs(delta_h) > 0.0:
-            mix_res = _AdjustedMixerResult(mix_res, delta_h, mdot_tot)
+        mix_res = cb.mixer_from_streams_and_jacobians(streams, Q=Q_total, fraction=fraction_total)
 
         return mix_res.T_mix, mix_res.Y_mix, mix_res
 
@@ -418,20 +390,16 @@ class CombustorNode(NetworkNode):
         P_ref = upstream_states[0].P if upstream_states else 101325.0
 
         Q_total = sum(eb.Q for eb in self.energy_boundaries)
-        mdot_tot = sum(s.m_dot for s in upstream_states)
-        delta_h = Q_total / mdot_tot if abs(mdot_tot) > 1e-30 else 0.0
+        fraction_total = sum(eb.fraction for eb in self.energy_boundaries)
 
         if self.method == "equilibrium":
             mix_res = cb.adiabatic_T_equilibrium_and_jacobians_from_streams(
-                streams, P_ref, delta_h=delta_h
+                streams, P_ref, Q=Q_total, fraction=fraction_total
             )
         else:
             mix_res = cb.adiabatic_T_complete_and_jacobian_T_from_streams(
-                streams, P_ref, delta_h=delta_h
+                streams, P_ref, Q=Q_total, fraction=fraction_total
             )
-
-        if abs(delta_h) > 0.0:
-            mix_res = _AdjustedMixerResult(mix_res, delta_h, mdot_tot)
 
         return mix_res.T_mix, mix_res.Y_mix, mix_res
 

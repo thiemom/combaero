@@ -652,7 +652,7 @@ adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
 
 MixerResult
 mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
-                                double delta_h) {
+                                double Q, double fraction) {
   std::size_t n_streams = streams.size();
   std::size_t n_species = combaero::num_species();
 
@@ -694,8 +694,16 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
     }
   }
 
-  double h_mix = (mdot_tot > 0.0) ? (H_tot / mdot_tot + delta_h)
-                                   : (n_streams > 0 ? h_stream[0] + delta_h : delta_h);
+  // Compute adiabatic mass-averaged enthalpy
+  double h_mix_base = (mdot_tot > 0.0) ? (H_tot / mdot_tot)
+                                        : (n_streams > 0 ? h_stream[0] : 0.0);
+
+  // Apply energy transfer: delta_h = Q/mdot + fraction * h_mix_base
+  double delta_h = 0.0;
+  if (mdot_tot > 1e-12) {
+    delta_h = Q / mdot_tot + fraction * h_mix_base;
+  }
+  double h_mix = h_mix_base + delta_h;
   double P_total_mix = (mdot_tot > 0.0)
                             ? (P_total_tot / mdot_tot)
                             : (n_streams > 0 ? streams[0].P_total : 0.0);
@@ -725,6 +733,7 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
     cp_mix += Y_mix[k] * cpk_mix;
   }
 
+  // Store dT/d(delta_h) for reference (not directly used in Jacobians)
   res.dT_mix_d_delta_h = (cp_mix > 0.0) ? (1.0 / cp_mix) : 0.0;
 
   for (std::size_t i = 0; i < n_streams; ++i) {
@@ -741,23 +750,44 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
       dP_jac.d_T = 0.0;
 
       // d(T_mix)/d(T_i)
-      dT_jac.d_T = (streams[i].m_dot * cp_stream[i]) / (mdot_tot * cp_mix);
+      // Base contribution
+      double dT_base_dT = (streams[i].m_dot * cp_stream[i]) / (mdot_tot * cp_mix);
+
+      // Fraction contribution: d(fraction * h_mix_base)/d(T_i)
+      // = fraction * (mdot_i / mdot_tot) * cp_i
+      double dT_frac_dT = (fraction * streams[i].m_dot * cp_stream[i]) / (mdot_tot * cp_mix);
+
+      dT_jac.d_T = dT_base_dT + dT_frac_dT;
 
       // d(T_mix)/d(m_dot_i)
-      // h_mix includes delta_h, but delta_h is constant w.r.t. mdot_i
-      // dh_mix/dmdot_i = (h_stream_i - H_tot/mdot_tot) / mdot_tot
-      //                = (h_stream_i - (h_mix - delta_h)) / mdot_tot
-      double h_diff = (h_stream[i] - h_mix + delta_h);
+      // Base contribution: d(h_mix_base)/d(mdot_i)
+      double h_diff = (h_stream[i] - h_mix_base);
       double y_sum = 0.0;
       for (std::size_t k = 0; k < n_species; ++k) {
         y_sum += hk_mix[k] * (streams[i].Y[k] - Y_mix[k]);
       }
-      dT_jac.d_mdot = (h_diff - y_sum) / (mdot_tot * cp_mix);
+      double dh_base_dmdot = (h_diff - y_sum) / mdot_tot;
+
+      // Q contribution: d(Q/mdot_tot)/d(mdot_i) = -Q/mdot_tot^2
+      double dh_Q_dmdot = (mdot_tot > 1e-12) ? (-Q / (mdot_tot * mdot_tot)) : 0.0;
+
+      // Fraction contribution: d(fraction * h_mix_base)/d(mdot_i)
+      // = fraction * d(h_mix_base)/d(mdot_i)
+      double dh_frac_dmdot = fraction * dh_base_dmdot;
+
+      // Total: dT/dmdot = (1/cp_mix) * (dh_base + dh_Q + dh_frac) / dmdot
+      dT_jac.d_mdot = (dh_base_dmdot + dh_Q_dmdot + dh_frac_dmdot) / cp_mix;
 
       // d(T_mix)/d(Y_i,k)
       for (std::size_t k = 0; k < n_species; ++k) {
-        dT_jac.d_Y[k] =
-            streams[i].m_dot * (hk_mass[i][k] - hk_mix[k] + h_mix) / (mdot_tot * cp_mix);
+        // Base contribution
+        double dT_base_dY = streams[i].m_dot * (hk_mass[i][k] - hk_mix[k] + h_mix_base) / (mdot_tot * cp_mix);
+
+        // Fraction contribution: d(fraction * h_mix_base)/d(Y_i,k)
+        // = fraction * (mdot_i / mdot_tot) * (hk_i - hk_mix + h_mix_base)
+        double dT_frac_dY = fraction * streams[i].m_dot * (hk_mass[i][k] - hk_mix[k] + h_mix_base) / (mdot_tot * cp_mix);
+
+        dT_jac.d_Y[k] = dT_base_dY + dT_frac_dY;
       }
 
       // Y_mix sensitivities
@@ -793,8 +823,31 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
 }
 
 MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
-    const std::vector<Stream> &streams, double P, double delta_h) {
+    const std::vector<Stream> &streams, double P, double Q, double fraction) {
+  // First mix adiabatically to get base state
   MixerResult mix = mixer_from_streams_and_jacobians(streams);
+
+  // Compute total enthalpy flow for fraction calculation
+  double mdot_tot = 0.0;
+  double H_tot = 0.0;
+  std::size_t n_species = combaero::num_species();
+  for (const auto &s : streams) {
+    mdot_tot += s.m_dot;
+    double h_stream = 0.0;
+    for (std::size_t k = 0; k < n_species; ++k) {
+      double hk = J_per_mol_to_J_per_kg(combaero::h_species(k, s.T),
+                                        combaero::species_molar_mass(k));
+      h_stream += s.Y[k] * hk;
+    }
+    H_tot += s.m_dot * h_stream;
+  }
+  double h_mix_base = (mdot_tot > 1e-12) ? (H_tot / mdot_tot) : 0.0;
+
+  // Compute delta_h from Q and fraction
+  double delta_h = 0.0;
+  if (mdot_tot > 1e-12) {
+    delta_h = Q / mdot_tot + fraction * h_mix_base;
+  }
 
   std::vector<double> X_mix = combaero::mass_to_mole(combaero::normalize_fractions(mix.Y_mix));
   auto complete_res =
@@ -818,7 +871,6 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
   T_ad = T_out;
 
   std::size_t n_streams = streams.size();
-  std::size_t n_species = combaero::num_species();
 
   std::vector<double> dT_ad_dY_mix(n_species, 0.0);
   std::vector<std::vector<double>> dYb_dY_mix(
@@ -923,8 +975,31 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
 }
 
 MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
-    const std::vector<Stream> &streams, double P, double delta_h) {
+    const std::vector<Stream> &streams, double P, double Q, double fraction) {
+  // First mix adiabatically to get base state
   MixerResult mix = mixer_from_streams_and_jacobians(streams);
+
+  // Compute total enthalpy flow for fraction calculation
+  double mdot_tot = 0.0;
+  double H_tot = 0.0;
+  std::size_t n_species = combaero::num_species();
+  for (const auto &s : streams) {
+    mdot_tot += s.m_dot;
+    double h_stream = 0.0;
+    for (std::size_t k = 0; k < n_species; ++k) {
+      double hk = J_per_mol_to_J_per_kg(combaero::h_species(k, s.T),
+                                        combaero::species_molar_mass(k));
+      h_stream += s.Y[k] * hk;
+    }
+    H_tot += s.m_dot * h_stream;
+  }
+  double h_mix_base = (mdot_tot > 1e-12) ? (H_tot / mdot_tot) : 0.0;
+
+  // Compute delta_h from Q and fraction
+  double delta_h = 0.0;
+  if (mdot_tot > 1e-12) {
+    delta_h = Q / mdot_tot + fraction * h_mix_base;
+  }
 
   std::vector<double> X_mix = combaero::mass_to_mole(combaero::normalize_fractions(mix.Y_mix));
   auto eq_base_res =
@@ -948,7 +1023,6 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
   T_ad = T_out;
 
   std::size_t n_streams = streams.size();
-  std::size_t n_species = combaero::num_species();
 
   std::vector<double> dT_ad_dY_mix(n_species, 0.0);
   std::vector<std::vector<double>> dYb_dY_mix(
