@@ -55,6 +55,7 @@ struct MixerResult {
   double T_mix;
   double P_total_mix;
   std::vector<double> Y_mix;
+  double dT_mix_d_delta_h = 0.0;
   std::vector<StreamJacobian> dT_mix_d_stream;
   std::vector<StreamJacobian> dP_total_mix_d_stream;
   std::vector<std::vector<StreamJacobian>> dY_mix_d_stream;
@@ -418,21 +419,28 @@ adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
 // Mix generalized non-reacting incoming streams into a single outgoing state,
 // and compute all analytical Jacobians w.r.t upstream mass flows, Temperatures,
 // and mass fractions (Y_i).
+// Q [W]: absolute heat transfer rate (positive = heating)
+// fraction [-]: relative to total enthalpy flow (positive = heating)
 MixerResult
-mixer_from_streams_and_jacobians(const std::vector<Stream> &streams);
+mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
+                                double Q = 0.0, double fraction = 0.0);
 
 // Combust multiple generalized incoming streams to exactly complete
 // equilibrium, outputting the theoretical adiabatic flame temperature and
 // product mass fractions. Computes all exact analytical Jacobians w.r.t
 // upstream conditions.
+// Q [W]: absolute heat transfer rate (positive = heating)
+// fraction [-]: relative to total enthalpy flow (positive = heating)
 MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
-    const std::vector<Stream> &streams, double P);
+    const std::vector<Stream> &streams, double P, double Q = 0.0, double fraction = 0.0);
 
 // Combust multiple generalized incoming streams to generalized equilibrium,
 // outputting the theoretical adiabatic flame temperature and product mass
 // fractions. Computes all exact analytical Jacobians w.r.t upstream conditions.
+// Q [W]: absolute heat transfer rate (positive = heating)
+// fraction [-]: relative to total enthalpy flow (positive = heating)
 MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
-    const std::vector<Stream> &streams, double P);
+    const std::vector<Stream> &streams, double P, double Q = 0.0, double fraction = 0.0);
 
 } // namespace solver
 } // namespace combaero

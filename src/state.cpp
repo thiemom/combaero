@@ -170,7 +170,7 @@ void State::print() const {
 // Stream implementation
 // -------------------------------------------------------------
 
-Stream mix(const std::vector<Stream> &streams, double P_out) {
+Stream mix(const std::vector<Stream> &streams, double P_out, double delta_h) {
   if (streams.empty()) {
     return Stream();
   }
@@ -197,7 +197,7 @@ Stream mix(const std::vector<Stream> &streams, double P_out) {
     for (std::size_t k = 0; k < n_spec; ++k) {
       Y_mix[k] /= mdot_tot;
     }
-    double h_mix = H_tot / mdot_tot;
+    double h_mix = H_tot / mdot_tot + delta_h;
     double P_res = (P_out < 0.0) ? P_min : P_out;
     res.state.set_Y(Y_mix);
     res.state.set_HP_mass(h_mix, P_res);

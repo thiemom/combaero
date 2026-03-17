@@ -12,7 +12,7 @@ class CombustionResult:
     Y: list[float]  # mass fractions [14 species], sums to 1
     mw: float  # mixture molecular weight [g/mol]
 
-    # Thermodynamic state — STATIC conditions (low-velocity plenum assumption)
+    # Thermodynamic state - STATIC conditions (low-velocity plenum assumption)
     T: float  # static temperature [K]
     P: float  # static pressure [Pa]
     m_dot: float  # total mass flow [kg/s]

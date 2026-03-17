@@ -17,23 +17,65 @@ if TYPE_CHECKING:
 CombustionMethodLiteral = Literal["complete", "equilibrium"]
 
 
+class EnergyBoundary:
+    """Energy source/sink that attaches to mixing nodes.
+
+    Convention: Q > 0 / fraction > 0 means heat **into** the fluid (heating),
+                Q < 0 / fraction < 0 means heat **out of** the fluid (cooling).
+
+    Two additive modes:
+      - Q [W]: absolute heat transfer rate
+      - fraction [-]: relative to total enthalpy flow (H_tot = sum(mdot_i * h_i))
+        e.g. fraction=-0.05 means 5% enthalpy loss
+
+    Both can be set simultaneously; effective Q = Q + fraction * H_tot.
+    C++ functions handle the conversion to delta_h and all Jacobian corrections.
+    """
+
+    def __init__(self, id: str, Q: float = 0.0, fraction: float = 0.0) -> None:
+        self.id = id
+        self.Q = Q  # [W]
+        self.fraction = fraction  # [-]
+
+
 @dataclass
 class MixtureState:
-    P: float  # static pressure [Pa]
-    P_total: float  # total pressure [Pa]  (= P for plenum nodes)
-    T: float  # static temperature [K]
-    T_total: float  # total temperature [K]  (= T for plenum nodes)
-    m_dot: float  # mass flow rate [kg/s]
-    Y: list[float]  # mass fractions (dynamic size)
+    P: float
+    P_total: float
+    T: float
+    T_total: float
+    m_dot: float
+    Y: list[float]
+
+    @property
+    def X(self) -> list[float]:
+        """Cached mole fractions converted from mass fractions."""
+        try:
+            return self._X  # type: ignore[return-value]
+        except AttributeError:
+            x = list(cb.mass_to_mole(self.Y))
+            object.__setattr__(self, "_X", x)
+            return x
 
     def density(self) -> float:
-        return cb.density(self.T, self.P, cb.mass_to_mole(self.Y))
+        """Static density [kg/m^3]."""
+        return cb.density(self.T, self.P, self.X)
 
     def enthalpy(self) -> float:
-        return cb.h_mass(self.T, cb.mass_to_mole(self.Y))
+        """Static specific enthalpy [J/kg]."""
+        return cb.h_mass(self.T, self.X)
+
+    def total_enthalpy(self) -> float:
+        """Total (stagnation) specific enthalpy [J/kg]."""
+        return cb.h_mass(self.T_total, self.X)
+
+    def cp(self) -> float:
+        """Specific heat capacity at constant pressure [J/(kg*K)]."""
+        return cb.cp_mass(self.T, self.X)
 
     def speed_of_sound(self) -> float:
-        return cb.speed_of_sound(self.T, cb.mass_to_mole(self.Y))
+        """Speed of sound [m/s]."""
+        return cb.speed_of_sound(self.T, self.X)
 
 
 class NetworkNode(ABC):
@@ -114,6 +156,11 @@ class PlenumNode(NetworkNode):
     def __init__(self, id: str):
         super().__init__(id)
         self.upstream_elements = []
+        self.energy_boundaries: list[EnergyBoundary] = []
+
+    def add_energy_boundary(self, eb: EnergyBoundary) -> None:
+        """Attach an energy source/sink to this plenum."""
+        self.energy_boundaries.append(eb)
 
     def unknowns(self) -> list[str]:
         # Pure Pressure-Flow: Temperature and Composition are derived forward, not unknowns.
@@ -122,14 +169,18 @@ class PlenumNode(NetworkNode):
     def compute_derived_state(
         self, upstream_states: list[MixtureState]
     ) -> tuple[float, list[float], Any]:
-        """Derived T and Y for a plenum (simple mixing)."""
+        """Derived T and Y for a plenum (simple mixing + energy boundaries)."""
         import combaero as cb
 
         if not upstream_states:
             return 300.0, list(cb.mole_to_mass(cb.standard_dry_air_composition())), None
 
         streams = [cb.MassStream(s.m_dot, s.T_total, s.P_total, s.Y) for s in upstream_states]
-        mix_res = cb.mixer_from_streams_and_jacobians(streams)
+        Q_total = sum(eb.Q for eb in self.energy_boundaries)
+        fraction_total = sum(eb.fraction for eb in self.energy_boundaries)
+
+        mix_res = cb.mixer_from_streams_and_jacobians(streams, Q=Q_total, fraction=fraction_total)
+
         return mix_res.T_mix, mix_res.Y_mix, mix_res
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
@@ -162,6 +213,11 @@ class MomentumChamberNode(NetworkNode):
         # Dictionary mapping connected element IDs to angle relative to chamber axis [deg]
         self.port_angles_deg: dict[str, float] = port_angles_deg or {}
         self.upstream_elements = []
+        self.energy_boundaries: list[EnergyBoundary] = []
+
+    def add_energy_boundary(self, eb: EnergyBoundary) -> None:
+        """Attach an energy source/sink to this momentum chamber."""
+        self.energy_boundaries.append(eb)
 
     def set_port_angle(self, element_id: str, angle_deg: float) -> None:
         """Set the angle of the flow for a specific connected element."""
@@ -178,14 +234,18 @@ class MomentumChamberNode(NetworkNode):
     def compute_derived_state(
         self, upstream_states: list[MixtureState]
     ) -> tuple[float, list[float], Any]:
-        """Derived T and Y for a momentum chamber (simple mixing for now)."""
+        """Derived T and Y for a momentum chamber (simple mixing + energy boundaries)."""
         import combaero as cb
 
         if not upstream_states:
             return 300.0, list(cb.mole_to_mass(cb.standard_dry_air_composition())), None
 
         streams = [cb.MassStream(s.m_dot, s.T_total, s.P_total, s.Y) for s in upstream_states]
-        mix_res = cb.mixer_from_streams_and_jacobians(streams)
+        Q_total = sum(eb.Q for eb in self.energy_boundaries)
+        fraction_total = sum(eb.fraction for eb in self.energy_boundaries)
+
+        mix_res = cb.mixer_from_streams_and_jacobians(streams, Q=Q_total, fraction=fraction_total)
+
         return mix_res.T_mix, mix_res.Y_mix, mix_res
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
@@ -302,6 +362,11 @@ class CombustorNode(NetworkNode):
         self.method = method
         self.upstream_elements = []
         self.fuel_boundary = None
+        self.energy_boundaries: list[EnergyBoundary] = []
+
+    def add_energy_boundary(self, eb: EnergyBoundary) -> None:
+        """Attach an energy source/sink to this combustor (post-combustion)."""
+        self.energy_boundaries.append(eb)
 
     def set_fuel_boundary(self, fuel_bc: MassFlowBoundary) -> None:
         """Set the fuel boundary condition for this combustor."""
@@ -314,7 +379,7 @@ class CombustorNode(NetworkNode):
     def compute_derived_state(
         self, upstream_states: list[MixtureState]
     ) -> tuple[float, list[float], Any]:
-        """Derived T and Y for a combustor (Reaction + Mixing)."""
+        """Derived T and Y for a combustor (Reaction + Mixing + energy boundaries)."""
         import combaero as cb
 
         if not upstream_states:
@@ -324,10 +389,18 @@ class CombustorNode(NetworkNode):
         streams = [cb.MassStream(s.m_dot, s.T_total, s.P_total, s.Y) for s in upstream_states]
         P_ref = upstream_states[0].P if upstream_states else 101325.0
 
+        Q_total = sum(eb.Q for eb in self.energy_boundaries)
+        fraction_total = sum(eb.fraction for eb in self.energy_boundaries)
+
         if self.method == "equilibrium":
-            mix_res = cb.adiabatic_T_equilibrium_and_jacobians_from_streams(streams, P_ref)
+            mix_res = cb.adiabatic_T_equilibrium_and_jacobians_from_streams(
+                streams, P_ref, Q=Q_total, fraction=fraction_total
+            )
         else:
-            mix_res = cb.adiabatic_T_complete_and_jacobian_T_from_streams(streams, P_ref)
+            mix_res = cb.adiabatic_T_complete_and_jacobian_T_from_streams(
+                streams, P_ref, Q=Q_total, fraction=fraction_total
+            )
+
         return mix_res.T_mix, mix_res.Y_mix, mix_res
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:

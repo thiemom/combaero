@@ -20,9 +20,10 @@ TEST(StateTest, SettersperfectlyRecoverConditions) {
 
   s.set_TPX(T_target, P_target, X_air);
 
-  double h_mass = s.h() / s.mw() * 1000.0;
-  double s_mass = s.s() / s.mw() * 1000.0;
-  double u_mass = s.u() / s.mw() * 1000.0;
+  // State property getters already return mass-specific values (J/kg, J/(kg·K))
+  double h_mass = s.h();  // J/kg
+  double s_mass = s.s();  // J/(kg·K)
+  double u_mass = s.u();  // J/kg
   double v_mass = 1.0 / s.rho();
 
   {
