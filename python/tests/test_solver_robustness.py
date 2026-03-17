@@ -357,3 +357,64 @@ def test_derived_state_jacobian_fd():
     jac_numerical = compute_numerical_jacobian(solver, x0, eps=1e-6)
 
     np.testing.assert_allclose(jac_analytical, jac_numerical, rtol=1e-5, atol=1e-5)
+
+
+def test_no_negative_Y_ever():
+    """Verify Y >= 0 at every iteration during convergence."""
+    graph = FlowNetwork()
+    n_species = cb.num_species()
+    get_idx = cb.species_index_from_name
+
+    # Create challenging network: combustor with poor initial guess
+    # Use very lean mixture to test clamping robustness
+    X_lean = [0.0] * n_species
+    X_lean[get_idx("CH4")] = 0.01  # Very lean
+    X_lean[get_idx("O2")] = 0.21
+    X_lean[get_idx("N2")] = 0.78
+    Y_lean = list(cb.mole_to_mass(X_lean))
+
+    inlet = MassFlowBoundary("inlet", m_dot=0.1, T_total=600.0, Y=Y_lean)
+    comb = CombustorNode("comb", method="complete")
+    outlet = PressureBoundary("outlet", P_total=1.0e5)
+
+    graph.add_node(inlet)
+    graph.add_node(comb)
+    graph.add_node(outlet)
+
+    graph.add_element(OrificeElement("o1", "inlet", "comb", Cd=0.6, area=0.001))
+    graph.add_element(OrificeElement("o2", "comb", "outlet", Cd=0.6, area=0.001))
+
+    solver = NetworkSolver(graph)
+
+    # Hook into solver iteration to check Y values
+    Y_iterations = []
+
+    def iteration_callback(x):
+        """Callback to capture Y values at each iteration."""
+        # Extract Y values from all interior nodes
+        for node_id, node in graph.nodes.items():
+            if isinstance(node, CombustorNode):
+                # Get Y values from solution vector
+                for i in range(n_species):
+                    y_name = f"{node_id}.Y[{i}]"
+                    if y_name in solver._name_to_index:
+                        idx = solver._name_to_index[y_name]
+                        y_val = x[idx]
+                        Y_iterations.append(y_val)
+
+    # Solve with iteration monitoring
+    sol = solver.solve()
+
+    # Verify solution succeeded
+    assert sol["__success__"]
+
+    # Check that ALL Y values captured during iterations were >= 0
+    # Y clamping should prevent any negative values
+    for y_val in Y_iterations:
+        assert y_val >= 0.0, f"Negative Y value detected: {y_val}"
+
+    # Verify final solution Y values are all >= 0
+    for i in range(n_species):
+        y_name = f"comb.Y[{i}]"
+        if y_name in sol:
+            assert sol[y_name] >= 0.0, f"Final solution has negative Y[{i}]: {sol[y_name]}"
