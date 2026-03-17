@@ -165,19 +165,24 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("T_mix", &solver::MixerResult::T_mix)
       .def_readonly("P_total_mix", &solver::MixerResult::P_total_mix)
       .def_readonly("Y_mix", &solver::MixerResult::Y_mix)
+      .def_readonly("dT_mix_d_delta_h",
+                    &solver::MixerResult::dT_mix_d_delta_h)
       .def_readonly("dT_mix_d_stream", &solver::MixerResult::dT_mix_d_stream)
       .def_readonly("dP_total_mix_d_stream",
                     &solver::MixerResult::dP_total_mix_d_stream)
       .def_readonly("dY_mix_d_stream", &solver::MixerResult::dY_mix_d_stream);
 
   m.def("mixer_from_streams_and_jacobians",
-        &solver::mixer_from_streams_and_jacobians, py::arg("streams"));
+        &solver::mixer_from_streams_and_jacobians, py::arg("streams"),
+        py::arg("delta_h") = 0.0);
   m.def("adiabatic_T_complete_and_jacobian_T_from_streams",
         &solver::adiabatic_T_complete_and_jacobian_T_from_streams,
-        py::arg("streams"), py::arg("P"));
+        py::arg("streams"), py::arg("P"),
+        py::arg("delta_h") = 0.0);
   m.def("adiabatic_T_equilibrium_and_jacobians_from_streams",
         &solver::adiabatic_T_equilibrium_and_jacobians_from_streams,
-        py::arg("streams"), py::arg("P"));
+        py::arg("streams"), py::arg("P"),
+        py::arg("delta_h") = 0.0);
 
 
   py::class_<solver::OrificeResult>(

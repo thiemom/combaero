@@ -15,6 +15,7 @@ endif()
 # Core Library: combaero_core
 # -----------------------------------------------------------------------------
 file(GLOB_RECURSE CORE_SOURCES src/*.cpp)
+list(FILTER CORE_SOURCES EXCLUDE REGEX "src/main\\.cpp$")
 
 add_library(combaero_core STATIC ${CORE_SOURCES})
 target_include_directories(combaero_core PUBLIC include)

@@ -179,7 +179,8 @@ struct Stream {
 
 // Mix multiple streams, solving mass and enthalpy balance
 // P_out: output pressure (default -1 means use minimum inlet pressure)
-Stream mix(const std::vector<Stream> &streams, double P_out = -1.0);
+Stream mix(const std::vector<Stream> &streams, double P_out = -1.0,
+           double delta_h = 0.0);
 
 // -------------------------------------------------------------
 // Transport State Bundle
