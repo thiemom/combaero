@@ -390,8 +390,7 @@ static MixtureState make_state(double P, double P_total, double T,
     s.T = T;
     s.T_total = T;
     s.m_dot = m_dot;
-    s.Y = Y;
-    s.X = mass_to_mole(Y);
+    s.set_Y(Y);
     return s;
 }
 
@@ -470,7 +469,7 @@ TEST_F(PlenumJacobianTest, LocalJacobian_Y) {
     for (std::size_t k = 0; k < ns; ++k) {
         MixtureState s_p = state;
         s_p.Y[k] += eps;
-        s_p.X = mass_to_mole(s_p.Y);
+        s_p.set_Y(s_p.Y);
         auto res_p = plenum_residuals_and_jacobian(s_p, streams);
 
         std::string key = "Y[" + std::to_string(k) + "]";
@@ -624,7 +623,7 @@ TEST_F(CombustorJacobianTest, LocalJacobian_Y) {
     for (std::size_t k = 0; k < ns; ++k) {
         MixtureState s_p = state;
         s_p.Y[k] += eps;
-        s_p.X = mass_to_mole(s_p.Y);
+        s_p.set_Y(s_p.Y);
         auto res_p = combustor_residuals_and_jacobian(
             s_p, streams, CombustionMethod::Complete, pressure_loss_frac);
 
