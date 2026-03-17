@@ -237,6 +237,15 @@ class MomentumChamberNode(NetworkNode):
         """Derived T and Y for a momentum chamber (simple mixing + energy boundaries)."""
         import combaero as cb
 
+        # Store total mass flow for use in residuals
+        self._total_m_dot = sum(s.m_dot for s in upstream_states) if upstream_states else 0.0
+
+        # Store upstream element IDs for Jacobian
+        self._upstream_element_ids = []
+        for s in upstream_states:
+            if hasattr(s, '_element_id'):
+                self._upstream_element_ids.append(s._element_id)
+
         if not upstream_states:
             return 300.0, list(cb.mole_to_mass(cb.standard_dry_air_composition())), None
 
@@ -249,9 +258,30 @@ class MomentumChamberNode(NetworkNode):
         return mix_res.T_mix, mix_res.Y_mix, mix_res
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
-        # Base residual: P_total = P for plenum
-        res = [state.P_total - state.P]
-        jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.P_total": 1.0}}
+        import combaero as cb
+
+        # Momentum chamber: P_total = P_static + 0.5 * rho * v^2
+        # Use total mass flow computed during compute_derived_state
+        m_dot_total = getattr(self, '_total_m_dot', 0.0)
+
+        # Use C++ function for residual and analytical Jacobian
+        result = cb.momentum_chamber_residual_and_jacobian(
+            state.P, state.P_total, m_dot_total, state.T, state.Y, self.area
+        )
+
+        res = [result.residual]
+        jac = {
+            0: {
+                f"{self.id}.P": result.d_res_dP,
+                f"{self.id}.P_total": result.d_res_dP_total,
+            }
+        }
+
+        # Add Jacobian entries for upstream element mass flows
+        upstream_elem_ids = getattr(self, '_upstream_element_ids', [])
+        for elem_id in upstream_elem_ids:
+            jac[0][f"{elem_id}.m_dot"] = result.d_res_dmdot
+
         return res, jac
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:

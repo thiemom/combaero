@@ -1233,5 +1233,62 @@ PipeResult pipe_residuals_and_jacobian(double m_dot, double P_total_up,
   return res;
 }
 
+MomentumChamberResult momentum_chamber_residual_and_jacobian(
+    double P, double P_total, double m_dot, double T,
+    const std::vector<double> &Y, double area) {
+  // Momentum chamber: P_total = P_static + 0.5 * rho * v^2
+  // where v = m_dot / (rho * A)
+  // Residual: P_total - P_static - 0.5 * rho * v^2 = 0
+
+  // Soft normalization to handle edge cases (all-zero Y)
+  std::vector<double> Y_safe = Y;
+  double sum_Y = 0.0;
+  for (double y : Y) {
+    sum_Y += y;
+  }
+  // Use softmax-like approach: if sum is too small, use standard air
+  const double eps = 1e-10;
+  if (sum_Y < eps) {
+    // Use standard dry air composition as fallback (N2=0.767, O2=0.233 mass fractions)
+    Y_safe = std::vector<double>(Y.size(), 0.0);
+    std::size_t n2_idx = combaero::species_index_from_name("N2");
+    std::size_t o2_idx = combaero::species_index_from_name("O2");
+    Y_safe[n2_idx] = 0.767;
+    Y_safe[o2_idx] = 0.233;
+  }
+
+  const std::vector<double> X = combaero::mass_to_mole(combaero::normalize_fractions(Y_safe));
+  auto [rho, drho_dT, drho_dP] = density_and_jacobians(T, P, X);
+
+  // Velocity from mass flow
+  double v = m_dot / (rho * area);
+
+  // Dynamic pressure
+  double q_dynamic = 0.5 * rho * v * v;
+
+  // Residual: P_total - (P + q_dynamic) = 0
+  MomentumChamberResult res;
+  res.residual = P_total - P - q_dynamic;
+
+  // Analytical Jacobians
+  // d(res)/d(P_total) = 1.0
+  res.d_res_dP_total = 1.0;
+
+  // d(res)/d(P) = -1.0 - d(q_dynamic)/d(P)
+  // q_dynamic = 0.5 * m_dot^2 / (rho * A^2)
+  // d(q_dynamic)/d(P) = d(q_dynamic)/d(rho) * d(rho)/d(P)
+  //                   = -0.5 * m_dot^2 / (rho^2 * A^2) * drho_dP
+  double dq_dP = -0.5 * m_dot * m_dot / (rho * rho * area * area) * drho_dP;
+  res.d_res_dP = -1.0 - dq_dP;
+
+  // d(res)/d(m_dot) = -d(q_dynamic)/d(m_dot)
+  // q_dynamic = 0.5 * m_dot^2 / (rho * A^2)
+  // d(q_dynamic)/d(m_dot) = m_dot / (rho * A^2)
+  double dq_dmdot = m_dot / (rho * area * area);
+  res.d_res_dmdot = -dq_dmdot;
+
+  return res;
+}
+
 } // namespace solver
 } // namespace combaero

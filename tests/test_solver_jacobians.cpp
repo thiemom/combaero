@@ -108,3 +108,45 @@ TEST(SolverJacobianTest, PipeDerivatives) {
         EXPECT_NEAR(res.d_dP_dY_up[i], fd_dYi, std::abs(fd_dYi) * 1e-2 + 1e-8);
     }
 }
+
+TEST(SolverJacobianTest, MomentumChamberDerivatives) {
+    // Test momentum chamber residual: P_total = P + 0.5 * rho * v^2
+    std::size_t ns = num_species();
+    std::vector<double> Y(ns, 0.0);
+    for(size_t i=0; i<ns; ++i) {
+        Y[i] = (i == species_index_from_name("N2")) ? 0.767 :
+               (i == species_index_from_name("O2")) ? 0.233 : 0.0;
+    }
+
+    double P = 101325.0;
+    double P_total = 105000.0;
+    double m_dot = 0.5;
+    double T = 600.0;
+    double area = 0.01;  // 0.01 m^2
+
+    MomentumChamberResult res = momentum_chamber_residual_and_jacobian(P, P_total, m_dot, T, Y, area);
+
+    // Finite difference checks
+    double eps_P = 1.0;
+    auto res_P_p = momentum_chamber_residual_and_jacobian(P + eps_P, P_total, m_dot, T, Y, area);
+    double fd_dP = (res_P_p.residual - res.residual) / eps_P;
+    EXPECT_NEAR(res.d_res_dP, fd_dP, std::abs(fd_dP) * 1e-4 + 1e-8);
+
+    auto res_Pt_p = momentum_chamber_residual_and_jacobian(P, P_total + eps_P, m_dot, T, Y, area);
+    double fd_dP_total = (res_Pt_p.residual - res.residual) / eps_P;
+    EXPECT_NEAR(res.d_res_dP_total, fd_dP_total, std::abs(fd_dP_total) * 1e-4 + 1e-8);
+
+    double eps_mdot = 1e-4;
+    auto res_mdot_p = momentum_chamber_residual_and_jacobian(P, P_total, m_dot + eps_mdot, T, Y, area);
+    auto res_mdot_m = momentum_chamber_residual_and_jacobian(P, P_total, m_dot - eps_mdot, T, Y, area);
+    double fd_dmdot = (res_mdot_p.residual - res_mdot_m.residual) / (2.0 * eps_mdot);
+    EXPECT_NEAR(res.d_res_dmdot, fd_dmdot, std::abs(fd_dmdot) * 1e-4 + 1e-8);
+
+    // Verify residual is correct: P_total - P - 0.5*rho*v^2 = 0
+    std::vector<double> X = mass_to_mole(normalize_fractions(Y));
+    double rho = density(T, P, X);
+    double v = m_dot / (rho * area);
+    double q_dynamic = 0.5 * rho * v * v;
+    double expected_residual = P_total - P - q_dynamic;
+    EXPECT_NEAR(res.residual, expected_residual, 1e-6);
+}

@@ -7,6 +7,7 @@ from combaero.network import (
     CombustorNode,
     EnergyBoundary,
     FlowNetwork,
+    MassFlowBoundary,
     MomentumChamberNode,
     NetworkSolver,
     OrificeElement,
@@ -448,3 +449,101 @@ class TestNetworkWithEnergyBoundary:
         assert solution is not None
         T_plenum = solver._derived_states["plenum"][0]
         assert T_plenum < 800.0
+
+        # Verify: delta_h = Q / mdot
+        mdot = solution["orf1.m_dot"]
+        expected_delta_h = -50000.0 / mdot
+        X_air = cb.mass_to_mole(cb.normalize_fractions(_air_Y()))
+        h_in = cb.h_mass(800.0, X_air)
+        h_out = cb.h_mass(T_plenum, X_air)
+        assert h_out == pytest.approx(h_in + expected_delta_h, rel=1e-4)
+
+
+def test_heat_exchange_node():
+    """Verify Q parameter changes outlet temperature correctly."""
+    graph = FlowNetwork()
+
+    # Simple network: MassFlowBoundary → Plenum(Q=1000W) → PressureBoundary
+    Y_air = _air_Y()
+    inlet = MassFlowBoundary("inlet", m_dot=0.1, T_total=600.0, Y=Y_air)
+    plenum = PlenumNode("plenum")
+    outlet = PressureBoundary("outlet", P_total=101325.0)
+
+    # Add heat exchange: 1000W heating
+    heater = EnergyBoundary("heater", Q=1000.0)
+    plenum.add_energy_boundary(heater)
+
+    orf1 = OrificeElement("orf1", "inlet", "plenum", Cd=0.6, area=0.001)
+    orf2 = OrificeElement("orf2", "plenum", "outlet", Cd=0.6, area=0.001)
+
+    graph.add_node(inlet)
+    graph.add_node(plenum)
+    graph.add_node(outlet)
+    graph.add_element(orf1)
+    graph.add_element(orf2)
+
+    solver = NetworkSolver(graph)
+    sol = solver.solve()
+
+    assert sol["__success__"]
+
+    # Debug: Check if EnergyBoundary is recognized
+    print(f"Number of energy boundaries on plenum: {len(plenum.energy_boundaries)}")
+    print(f"Heater Q: {plenum.energy_boundaries[0].Q}")
+
+    # Get inlet and outlet states
+    T_in = 600.0
+    mdot = 0.1
+    Q = 1000.0
+
+    # Get actual outlet temperature from derived state
+    T_out = solver._derived_states["plenum"][0]
+
+    # Verify exact energy balance: h_out = h_in + Q/mdot
+    X_air = cb.mass_to_mole(cb.normalize_fractions(Y_air))
+    h_in = cb.h_mass(T_in, X_air)
+    h_out_actual = cb.h_mass(T_out, X_air)
+
+    # Expected enthalpy after heat addition
+    expected_h_out = h_in + Q / mdot
+
+    # Verify enthalpy balance (this is the fundamental conservation law)
+    assert h_out_actual == pytest.approx(expected_h_out, rel=1e-3), (
+        f"Energy balance failed: h_out={h_out_actual:.1f} J/kg, expected={expected_h_out:.1f} J/kg"
+    )
+
+    # Also verify temperature increased (sanity check)
+    delta_T = T_out - T_in
+    assert delta_T > 0, f"Temperature should increase: ΔT = {delta_T:.1f}K"
+
+    print(f"Heat exchange test passed: T_in={T_in:.1f}K → T_out={T_out:.1f}K (ΔT={delta_T:.1f}K)")
+    print(
+        f"Energy balance verified: h_in={h_in:.1f} J/kg + Q/mdot={Q / mdot:.1f} J/kg = h_out={h_out_actual:.1f} J/kg"
+    )
+
+    # Test that Q parameter affects the solution by comparing with Q=0
+    # Create reference network with no heat exchange
+    ref_graph = FlowNetwork()
+    ref_inlet = MassFlowBoundary("inlet", m_dot=0.1, T_total=600.0, Y=Y_air)
+    ref_plenum = PlenumNode("plenum")
+    ref_outlet = PressureBoundary("outlet", P_total=101325.0)
+
+    ref_orf1 = OrificeElement("orf1", "inlet", "plenum", Cd=0.6, area=0.001)
+    ref_orf2 = OrificeElement("orf2", "plenum", "outlet", Cd=0.6, area=0.001)
+
+    ref_graph.add_node(ref_inlet)
+    ref_graph.add_node(ref_plenum)
+    ref_graph.add_node(ref_outlet)
+    ref_graph.add_element(ref_orf1)
+    ref_graph.add_element(ref_orf2)
+
+    ref_solver = NetworkSolver(ref_graph)
+    ref_solver.solve()
+    T_ref = ref_solver._derived_states["plenum"][0]
+
+    # Heated plenum should be hotter than reference
+    assert T_out > T_ref, (
+        f"Heated plenum ({T_out:.1f}K) should be hotter than reference ({T_ref:.1f}K)"
+    )
+
+    print(f"Reference test passed: Reference T={T_ref:.1f}K, Heated T={T_out:.1f}K")
