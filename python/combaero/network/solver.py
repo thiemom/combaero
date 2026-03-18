@@ -164,6 +164,8 @@ class NetworkSolver:
                 indices = self._unknown_indices.get(elem.id, [])
                 if indices:
                     state_up.m_dot = x[indices[0]]
+                    # Tag state with element ID for momentum chamber Jacobian
+                    state_up._element_id = elem.id
                 up_states.append(state_up)
 
             T, Y, mix_res = node.compute_derived_state(up_states)

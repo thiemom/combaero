@@ -442,6 +442,20 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
 MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
     const std::vector<Stream> &streams, double P, double Q = 0.0, double fraction = 0.0);
 
+// Momentum chamber residual: P_total = P_static + 0.5 * rho * v^2
+// where v = m_dot / (rho * A)
+// Returns residual and Jacobian entries for P, P_total, and m_dot
+struct MomentumChamberResult {
+  double residual;
+  double d_res_dP;
+  double d_res_dP_total;
+  double d_res_dmdot;
+};
+
+MomentumChamberResult momentum_chamber_residual_and_jacobian(
+    double P, double P_total, double m_dot, double T,
+    const std::vector<double> &Y, double area);
+
 } // namespace solver
 } // namespace combaero
 

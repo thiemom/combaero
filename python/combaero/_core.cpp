@@ -204,6 +204,14 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("d_dP_dT_up", &solver::PipeResult::d_dP_dT_up)
       .def_readonly("d_dP_dY_up", &solver::PipeResult::d_dP_dY_up);
 
+  py::class_<solver::MomentumChamberResult>(
+      m, "MomentumChamberResult",
+      "Result of momentum chamber residual and Jacobian evaluation")
+      .def_readonly("residual", &solver::MomentumChamberResult::residual)
+      .def_readonly("d_res_dP", &solver::MomentumChamberResult::d_res_dP)
+      .def_readonly("d_res_dP_total", &solver::MomentumChamberResult::d_res_dP_total)
+      .def_readonly("d_res_dmdot", &solver::MomentumChamberResult::d_res_dmdot);
+
   m.def("orifice_residuals_and_jacobian",
         &solver::orifice_residuals_and_jacobian, py::arg("m_dot"),
         py::arg("P_total_up"), py::arg("P_static_up"), py::arg("T_up"),
@@ -214,6 +222,12 @@ PYBIND11_MODULE(_core, m) {
         py::arg("m_dot"), py::arg("P_total_up"), py::arg("P_static_up"),
         py::arg("T_up"), py::arg("Y_up"), py::arg("P_static_down"), py::arg("L"),
         py::arg("D"), py::arg("roughness"), py::arg("friction_model"));
+
+  m.def("momentum_chamber_residual_and_jacobian",
+        &solver::momentum_chamber_residual_and_jacobian,
+        py::arg("P"), py::arg("P_total"), py::arg("m_dot"), py::arg("T"),
+        py::arg("Y"), py::arg("area"),
+        "Momentum chamber residual: P_total = P + 0.5*rho*v^2");
 
   // Species metadata helpers
   m.def("num_species", &num_species,
