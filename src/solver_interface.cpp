@@ -568,21 +568,23 @@ T_adiabatic_wall_and_jacobian_v(double T_static, double v, double T, double P,
 std::tuple<double, double>
 T0_from_static_and_jacobian_M(double T, double M,
                                const std::vector<double> &X) {
-  if (M < 0.0) {
-    throw std::invalid_argument(
-        "T0_from_static_and_jacobian_M: M must be non-negative");
-  }
-  const double eps = std::max(1e-6, M * 1e-6);
-  double T0_plus = T0_from_static(T, M + eps, X);
-  double T0_minus = T0_from_static(T, std::max(0.0, M - eps), X);
+  // Smooth floor for M to handle near-zero and reverse flow cases
+  // M can be negative for reverse flow, so use abs(M) for epsilon scaling
+  const double eps = std::max(1e-6, std::abs(M) * 1e-6);
 
-  double dT0_dM;
-  if (M - eps < 0.0) {
-    // Forward difference near zero
-    dT0_dM = (T0_plus - T0_from_static(T, 0.0, X)) / eps;
-  } else {
-    dT0_dM = (T0_plus - T0_minus) / (2.0 * eps);
-  }
+  // Smooth floor to avoid negative M issues (M_limit = 0.0)
+  constexpr double M_limit = 0.0;
+  constexpr double delta_M = 1e-6;
+  double M_target_minus = M - eps;
+  double diff_M = M_target_minus - M_limit;
+  double sq_dist_M = std::sqrt(diff_M * diff_M + delta_M);
+  double M_minus = 0.5 * (M_target_minus + M_limit + sq_dist_M);
+  double M_plus = M + eps;
+  double actual_dM = M_plus - M_minus;
+
+  double T0_plus = T0_from_static(T, M_plus, X);
+  double T0_minus = T0_from_static(T, M_minus, X);
+  double dT0_dM = (T0_plus - T0_minus) / actual_dM;
 
   double T0 = T0_from_static(T, M, X);
   return {T0, dT0_dM};
@@ -591,21 +593,23 @@ T0_from_static_and_jacobian_M(double T, double M,
 std::tuple<double, double>
 P0_from_static_and_jacobian_M(double P, double T, double M,
                                const std::vector<double> &X) {
-  if (M < 0.0) {
-    throw std::invalid_argument(
-        "P0_from_static_and_jacobian_M: M must be non-negative");
-  }
-  const double eps = std::max(1e-6, M * 1e-6);
-  double P0_plus = P0_from_static(P, T, M + eps, X);
-  double P0_minus = P0_from_static(P, T, std::max(0.0, M - eps), X);
+  // Smooth floor for M to handle near-zero and reverse flow cases
+  // M can be negative for reverse flow, so use abs(M) for epsilon scaling
+  const double eps = std::max(1e-6, std::abs(M) * 1e-6);
 
-  double dP0_dM;
-  if (M - eps < 0.0) {
-    // Forward difference near zero
-    dP0_dM = (P0_plus - P0_from_static(P, T, 0.0, X)) / eps;
-  } else {
-    dP0_dM = (P0_plus - P0_minus) / (2.0 * eps);
-  }
+  // Smooth floor to avoid negative M issues (M_limit = 0.0)
+  constexpr double M_limit = 0.0;
+  constexpr double delta_M = 1e-6;
+  double M_target_minus = M - eps;
+  double diff_M = M_target_minus - M_limit;
+  double sq_dist_M = std::sqrt(diff_M * diff_M + delta_M);
+  double M_minus = 0.5 * (M_target_minus + M_limit + sq_dist_M);
+  double M_plus = M + eps;
+  double actual_dM = M_plus - M_minus;
+
+  double P0_plus = P0_from_static(P, T, M_plus, X);
+  double P0_minus = P0_from_static(P, T, M_minus, X);
+  double dP0_dM = (P0_plus - P0_minus) / actual_dM;
 
   double P0 = P0_from_static(P, T, M, X);
   return {P0, dP0_dM};
