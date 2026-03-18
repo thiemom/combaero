@@ -130,22 +130,24 @@ jobs:
     name: Build MinGW
     needs: [changes, lint]
     if: needs.changes.outputs.source == 'true'
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install MinGW-w64
+      - name: Add MinGW to PATH
+        run: echo "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Verify MinGW
         run: |
-          sudo apt-get update
-          sudo apt-get install -y mingw-w64
+          gcc --version
+          g++ --version
 
       - name: Configure (CMake with MinGW)
         run: |
-          cmake -S . -B build-mingw \
-            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/.github/workflows/toolchain-mingw.cmake \
-            -DCMAKE_BUILD_TYPE=Release \
+          cmake -G "MinGW Makefiles" -S . -B build-mingw `
+            -DCMAKE_BUILD_TYPE=Release `
             -DCOMBAERO_ENABLE_TESTS=OFF
 
       - name: Build Windows binaries
