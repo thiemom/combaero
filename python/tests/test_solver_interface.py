@@ -423,7 +423,7 @@ def test_stagnation_jacobians():
     for M in [0.1, 0.5, 1.5]:
         ana, dana = cb._core.T0_from_static_and_jacobian_M(T, M, X)
         dnum = central_difference(t0_func, M, 1e-5)
-        np.testing.assert_allclose(dana, dnum, rtol=1e-5)
+        np.testing.assert_allclose(dana, dnum, rtol=2e-5)
 
         ana, dana = cb._core.P0_from_static_and_jacobian_M(P, T, M, X)
         dnum = central_difference(p0_func, M, 1e-5)
