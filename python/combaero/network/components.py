@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Literal
 import combaero as cb
 
 # Physics configuration types for network introspectability
-CompressibilityLiteral = Literal["incompressible", "compressible_fanno"]
+CompressibilityLiteral = Literal["incompressible", "compressible", "compressible_fanno"]
 FrictionModelLiteral = Literal["haaland", "colebrook", "serghides", "petukhov"]
 HeatTransferModelLiteral = Literal[
     "none", "gnielinski", "dittus_boelter", "sieder_tate", "petukhov"
@@ -448,13 +448,25 @@ class CombustorNode(NetworkNode):
 
 class OrificeElement(NetworkElement):
     """
-    Incompressible orifice flow. m_dot = Cd * A * sqrt(2 * rho * dP).
+    Orifice flow element with incompressible or compressible formulation.
+
+    - regime='incompressible': m_dot = Cd * A * sqrt(2 * rho * dP)
+    - regime='compressible': Uses isentropic nozzle flow with smooth choked transition
     """
 
-    def __init__(self, id: str, from_node: str, to_node: str, Cd: float, area: float):
+    def __init__(
+        self,
+        id: str,
+        from_node: str,
+        to_node: str,
+        Cd: float,
+        area: float,
+        regime: Literal["incompressible", "compressible"] = "incompressible",
+    ):
         super().__init__(id, from_node, to_node)
         self.Cd = Cd
         self.area = area
+        self.regime = regime
         self.upstream_diameter: float | None = None
         self.downstream_diameter: float | None = None
 
@@ -505,18 +517,31 @@ class OrificeElement(NetworkElement):
 
         m_dot = state_in.m_dot
 
-        # Call optimized C++ kernel with beta correction
-        res_cpp = cb.orifice_residuals_and_jacobian(
-            m_dot,
-            state_in.P_total,
-            state_in.P,
-            state_in.T,
-            state_in.Y,
-            state_out.P,
-            self.Cd,
-            self.area,
-            beta=getattr(self, "beta", 0.0),
-        )
+        if self.regime == "compressible":
+            # Use compressible isentropic nozzle flow with smooth choked transition
+            res_cpp = cb._core.orifice_compressible_residuals_and_jacobian(
+                m_dot,
+                state_in.P_total,
+                state_in.T,
+                state_in.Y,
+                state_out.P,
+                self.Cd,
+                self.area,
+                getattr(self, "beta", 0.0),
+            )
+        else:
+            # Use incompressible Bernoulli formulation
+            res_cpp = cb.orifice_residuals_and_jacobian(
+                m_dot,
+                state_in.P_total,
+                state_in.P,
+                state_in.T,
+                state_in.Y,
+                state_out.P,
+                self.Cd,
+                self.area,
+                beta=getattr(self, "beta", 0.0),
+            )
 
         res = [m_dot - res_cpp.m_dot_calc]
 
@@ -795,18 +820,33 @@ class PipeElement(NetworkElement):
 
         m_dot = state_in.m_dot
 
-        res_cpp = cb.pipe_residuals_and_jacobian(
-            m_dot,
-            state_in.P_total,
-            state_in.P,
-            state_in.T,
-            state_in.Y,
-            state_out.P,
-            self.length,
-            self.diameter,
-            self.roughness,
-            self.friction_model,
-        )
+        if self.regime == "compressible_fanno":
+            # Use compressible Fanno flow with friction
+            res_cpp = cb._core.pipe_compressible_residuals_and_jacobian(
+                m_dot,
+                state_in.P_total,
+                state_in.T,
+                state_in.Y,
+                state_out.P,
+                self.length,
+                self.diameter,
+                self.roughness,
+                self.friction_model,
+            )
+        else:
+            # Use incompressible Darcy-Weisbach formulation
+            res_cpp = cb.pipe_residuals_and_jacobian(
+                m_dot,
+                state_in.P_total,
+                state_in.P,
+                state_in.T,
+                state_in.Y,
+                state_out.P,
+                self.length,
+                self.diameter,
+                self.roughness,
+                self.friction_model,
+            )
 
         # Residual of P-node unknowns matching pipe drop
         # C++ returns dP_calc = friction_loss

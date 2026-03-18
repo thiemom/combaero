@@ -14,6 +14,7 @@ Does NOT include merging or branch cleanup - those are separate steps.
 
 ## Steps
 
+// turbo
 ### 1. Ensure branch is pushed
 ```bash
 git push -u origin $(git branch --show-current)
@@ -52,6 +53,7 @@ rm "$PR_BODY_FILE"
 - For complex descriptions, text editor is most reliable
 - `printf` works well for programmatic creation but requires escaping newlines as `\n`
 
+// turbo
 ### 3. Monitor checks until complete
 ```bash
 gh pr checks --watch

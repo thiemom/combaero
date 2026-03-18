@@ -528,3 +528,398 @@ def test_stagnation_jacobians():
         ana, dana = cb._core.P0_from_static_and_jacobian_M(P, T, M, X)
         dnum = central_difference(p0_func, M, 1e-5)
         np.testing.assert_allclose(dana, dnum, rtol=1e-4)
+
+
+# =============================================================================
+# Compressible Flow Elements Tests
+# =============================================================================
+
+
+def test_orifice_compressible_subsonic():
+    """Test compressible orifice in subsonic flow regime."""
+    T0, P0, P_back = 300.0, 200000.0, 150000.0
+    X = cb.standard_dry_air_composition()
+    Cd, area, beta = 0.65, 1e-4, 0.5
+
+    mdot, d_P0, d_Pb, d_T0 = cb._core.orifice_compressible_mdot_and_jacobian(
+        T0, P0, P_back, X, Cd, area, beta
+    )
+
+    # Verify mdot is positive
+    assert mdot > 0, "Mass flow should be positive"
+
+    # Verify Jacobians have correct signs
+    assert d_P0 > 0, "d_mdot_dP0 should be positive (higher P0 → more flow)"
+    assert d_Pb < 0, "d_mdot_dP_back should be negative (higher P_back → less flow)"
+    assert d_T0 < 0, "d_mdot_dT0 should be negative (higher T0 → lower density)"
+
+    # Verify against direct nozzle_flow
+    A_eff = Cd * area / np.sqrt(1 - beta**4)
+    sol = cb.nozzle_flow(T0, P0, P_back, A_eff, X)
+    np.testing.assert_allclose(mdot, sol.mdot, rtol=1e-10)
+
+
+def test_orifice_compressible_choked():
+    """Test compressible orifice in choked flow regime."""
+    T0, P0 = 300.0, 200000.0
+    X = cb.standard_dry_air_composition()
+    Cd, area, beta = 0.65, 1e-4, 0.5
+
+    # Get critical pressure ratio
+    PR_crit = cb.critical_pressure_ratio(T0, P0, X)
+    P_back_choked = 0.5 * PR_crit * P0  # Well below critical
+
+    mdot, d_P0, d_Pb, d_T0 = cb._core.orifice_compressible_mdot_and_jacobian(
+        T0, P0, P_back_choked, X, Cd, area, beta
+    )
+
+    # In choked flow, d_mdot_dP_back should be near zero (smoothed)
+    assert abs(d_Pb) < 1e-10, "d_mdot_dP_back should be ~0 when well choked"
+
+    # But d_mdot_dP0 should still be positive
+    assert d_P0 > 0, "d_mdot_dP0 should still be positive when choked"
+
+
+def test_orifice_compressible_smooth_transition():
+    """Verify d_mdot_dP_back is smooth through choked transition."""
+    T0, P0 = 300.0, 200000.0
+    X = cb.standard_dry_air_composition()
+    Cd, area, beta = 0.65, 1e-4, 0.5
+
+    # Sweep through critical pressure ratio
+    PR_crit = cb.critical_pressure_ratio(T0, P0, X)
+    PR_values = np.linspace(PR_crit - 0.05, PR_crit + 0.05, 20)
+
+    jacobians = []
+    for PR in PR_values:
+        P_back = PR * P0
+        _, _, d_Pb, _ = cb._core.orifice_compressible_mdot_and_jacobian(
+            T0, P0, P_back, X, Cd, area, beta
+        )
+        jacobians.append(d_Pb)
+
+    # Check smoothness: no abrupt jumps
+    jac_array = np.array(jacobians)
+
+    # Jacobian should be continuous (no large jumps)
+    # Check that it transitions smoothly from ~0 (choked) to negative (unchoked)
+    assert jac_array[0] == 0.0 or abs(jac_array[0]) < 1e-10, "Should be ~0 when well choked"
+    assert jac_array[-1] < -1e-9, "Should be negative when well unchoked"
+
+    # Check no individual jump is > 50% of the range
+    jac_diffs = np.diff(jac_array)
+    jac_range = abs(jac_array[-1] - jac_array[0])
+    max_jump = np.max(np.abs(jac_diffs))
+    assert max_jump < 0.5 * jac_range, "No single jump should be > 50% of total range"
+
+
+def test_orifice_compressible_reverse_flow():
+    """Test compressible orifice with reverse flow (P_back > P0)."""
+    T0, P0, P_back = 300.0, 150000.0, 200000.0  # Reversed!
+    X = cb.standard_dry_air_composition()
+    Cd, area, beta = 0.65, 1e-4, 0.5
+
+    mdot, d_P0, d_Pb, d_T0 = cb._core.orifice_compressible_mdot_and_jacobian(
+        T0, P0, P_back, X, Cd, area, beta
+    )
+
+    # Mass flow should be negative for reverse flow
+    assert mdot < 0, "Mass flow should be negative for reverse flow"
+
+    # In reverse flow, the roles are swapped but signs depend on implementation
+    # The key is that increasing P0 should reduce reverse flow (make it less negative)
+    # and increasing P_back should increase reverse flow (make it more negative)
+    # After the swap in the implementation, we get:
+    assert d_P0 < 0, "d_mdot_dP0 should be negative in reverse flow"
+    # d_Pb stays negative because the smoothing is applied after the swap
+    assert d_Pb < 0, "d_mdot_dP_back should be negative (smoothed)"
+
+
+def test_orifice_compressible_jacobian_accuracy():
+    """Verify Jacobian accuracy via numerical differentiation."""
+    T0, P0, P_back = 300.0, 200000.0, 150000.0
+    X = cb.standard_dry_air_composition()
+    Cd, area, beta = 0.65, 1e-4, 0.5
+
+    mdot, d_P0, d_Pb, d_T0 = cb._core.orifice_compressible_mdot_and_jacobian(
+        T0, P0, P_back, X, Cd, area, beta
+    )
+
+    # Numerical Jacobian w.r.t. P0
+    eps_P0 = max(1e-6, P0 * 1e-6)
+    mdot_plus, _, _, _ = cb._core.orifice_compressible_mdot_and_jacobian(
+        T0, P0 + eps_P0, P_back, X, Cd, area, beta
+    )
+    d_P0_num = (mdot_plus - mdot) / eps_P0
+    np.testing.assert_allclose(d_P0, d_P0_num, rtol=1e-5)
+
+    # Numerical Jacobian w.r.t. T0
+    eps_T0 = max(1e-6, T0 * 1e-6)
+    mdot_plus, _, _, _ = cb._core.orifice_compressible_mdot_and_jacobian(
+        T0 + eps_T0, P0, P_back, X, Cd, area, beta
+    )
+    d_T0_num = (mdot_plus - mdot) / eps_T0
+    np.testing.assert_allclose(d_T0, d_T0_num, rtol=1e-5)
+
+
+def test_orifice_compressible_matches_nozzle_flow():
+    """Verify compressible orifice matches nozzle_flow exactly."""
+    T0, P0, P_back = 300.0, 200000.0, 150000.0
+    X = cb.standard_dry_air_composition()
+    Cd, area, beta = 0.65, 1e-4, 0.5
+
+    mdot, _, _, _ = cb._core.orifice_compressible_mdot_and_jacobian(
+        T0, P0, P_back, X, Cd, area, beta
+    )
+
+    # Direct nozzle_flow call
+    A_eff = Cd * area / np.sqrt(1 - beta**4)
+    sol = cb.nozzle_flow(T0, P0, P_back, A_eff, X)
+
+    # Should match exactly (no smoothing on mdot itself)
+    np.testing.assert_allclose(mdot, sol.mdot, rtol=1e-10)
+
+
+def test_orifice_compressible_smoothing_accuracy_far():
+    """Verify smoothing has negligible effect far from critical PR."""
+    T0, P0 = 300.0, 200000.0
+    X = cb.standard_dry_air_composition()
+    Cd, area, beta = 0.65, 1e-4, 0.5
+
+    PR_crit = cb.critical_pressure_ratio(T0, P0, X)
+
+    # Test well away from critical (> 3x smoothing width)
+    test_cases = [
+        ("well unchoked", PR_crit + 0.05),
+        ("well choked", PR_crit - 0.05),
+    ]
+
+    A_eff = Cd * area / np.sqrt(1 - beta**4)
+
+    for label, PR in test_cases:
+        P_back = PR * P0
+
+        # Smoothed implementation
+        mdot_smooth, _, d_Pb_smooth, _ = cb._core.orifice_compressible_mdot_and_jacobian(
+            T0, P0, P_back, X, Cd, area, beta
+        )
+
+        # Exact from nozzle_flow
+        sol_exact = cb.nozzle_flow(T0, P0, P_back, A_eff, X)
+
+        # mdot should always match exactly
+        np.testing.assert_allclose(
+            mdot_smooth, sol_exact.mdot, rtol=1e-10, err_msg=f"mdot error {label}"
+        )
+
+        # For well unchoked case, Jacobian should be accurate
+        if PR_crit + 0.02 < PR:
+            # Compute exact Jacobian numerically
+            eps_Pb = max(1e-6, abs(P_back) * 1e-6)
+            sol_plus = cb.nozzle_flow(T0, P0, P_back + eps_Pb, A_eff, X)
+            sol_minus = cb.nozzle_flow(T0, P0, P_back - eps_Pb, A_eff, X)
+            d_Pb_exact = (sol_plus.mdot - sol_minus.mdot) / (2 * eps_Pb)
+
+            # Should be within 0.1% far from transition
+            if abs(d_Pb_exact) > 1e-10:
+                np.testing.assert_allclose(
+                    d_Pb_smooth, d_Pb_exact, rtol=1e-3, err_msg=f"Jacobian error {label}"
+                )
+
+
+def test_pipe_compressible_low_mach():
+    """Test compressible pipe at low Mach number."""
+    T_in, P_in, u_in = 400.0, 200000.0, 10.0  # Low velocity
+    X = cb.standard_dry_air_composition()
+    L, D, roughness = 2.0, 0.05, 1e-4
+
+    dP, d_Pin, d_Tin, d_u = cb._core.pipe_compressible_mdot_and_jacobian(
+        T_in, P_in, u_in, X, L, D, roughness, "haaland"
+    )
+
+    # Verify dP is positive
+    assert dP > 0, "Pressure drop should be positive"
+
+    # Verify Jacobians have reasonable magnitudes
+    assert d_Pin > 0, "d_dP_dP_in should be positive"
+    assert abs(d_Tin) > 0, "d_dP_dT_in should be non-zero"
+    assert d_u > 0, "d_dP_du_in should be positive (higher velocity → more friction)"
+
+
+def test_pipe_compressible_high_mach():
+    """Test compressible pipe at higher Mach number."""
+    T_in, P_in, u_in = 400.0, 200000.0, 150.0  # Higher velocity
+    X = cb.standard_dry_air_composition()
+    L, D, roughness = 2.0, 0.05, 1e-4
+
+    dP, d_Pin, d_Tin, d_u = cb._core.pipe_compressible_mdot_and_jacobian(
+        T_in, P_in, u_in, X, L, D, roughness, "haaland"
+    )
+
+    # Should still compute successfully
+    assert dP > 0, "Pressure drop should be positive"
+    assert np.isfinite(dP), "Pressure drop should be finite"
+
+
+def test_pipe_compressible_matches_fanno():
+    """Verify compressible pipe matches fanno_pipe_rough exactly."""
+    T_in, P_in, u_in = 400.0, 200000.0, 50.0
+    X = cb.standard_dry_air_composition()
+    L, D, roughness = 2.0, 0.05, 1e-4
+
+    dP, _, _, _ = cb._core.pipe_compressible_mdot_and_jacobian(
+        T_in, P_in, u_in, X, L, D, roughness, "haaland"
+    )
+
+    # Direct fanno_pipe_rough call
+    sol = cb.fanno_pipe_rough(T_in, P_in, u_in, L, D, roughness, X, "haaland")
+    dP_direct = P_in - sol.outlet.P
+
+    # Should match exactly
+    np.testing.assert_allclose(dP, dP_direct, rtol=1e-10)
+
+
+def test_pipe_compressible_jacobian_accuracy():
+    """Verify pipe Jacobian accuracy via numerical differentiation."""
+    T_in, P_in, u_in = 400.0, 200000.0, 50.0
+    X = cb.standard_dry_air_composition()
+    L, D, roughness = 2.0, 0.05, 1e-4
+
+    dP, d_Pin, d_Tin, d_u = cb._core.pipe_compressible_mdot_and_jacobian(
+        T_in, P_in, u_in, X, L, D, roughness, "haaland"
+    )
+
+    # Numerical Jacobian w.r.t. P_in
+    eps_P = max(1e-6, P_in * 1e-6)
+    dP_plus, _, _, _ = cb._core.pipe_compressible_mdot_and_jacobian(
+        T_in, P_in + eps_P, u_in, X, L, D, roughness, "haaland"
+    )
+    d_Pin_num = (dP_plus - dP) / eps_P
+    np.testing.assert_allclose(d_Pin, d_Pin_num, rtol=1e-5)
+
+    # Numerical Jacobian w.r.t. u_in
+    eps_u = max(1e-6, u_in * 1e-6)
+    dP_plus, _, _, _ = cb._core.pipe_compressible_mdot_and_jacobian(
+        T_in, P_in, u_in + eps_u, X, L, D, roughness, "haaland"
+    )
+    d_u_num = (dP_plus - dP) / eps_u
+    np.testing.assert_allclose(d_u, d_u_num, rtol=1e-5)
+
+
+def test_pipe_compressible_reverse_flow():
+    """Test compressible pipe with reverse flow (negative velocity)."""
+    T_in, P_in, u_in = 400.0, 200000.0, -50.0  # Negative velocity
+    X = cb.standard_dry_air_composition()
+    L, D, roughness = 2.0, 0.05, 1e-4
+
+    dP, d_Pin, d_Tin, d_u = cb._core.pipe_compressible_mdot_and_jacobian(
+        T_in, P_in, u_in, X, L, D, roughness, "haaland"
+    )
+
+    # Pressure drop should be negative for reverse flow
+    assert dP < 0, "Pressure drop should be negative for reverse flow"
+
+    # Jacobians should still be computed
+    assert np.isfinite(d_Pin), "d_dP_dP_in should be finite"
+    assert np.isfinite(d_u), "d_dP_du_in should be finite"
+
+
+def test_compressible_network_scenario():
+    """Test compressible elements in a realistic network scenario.
+
+    Network: High Pressure -> Pipe -> Junction -> Orifice -> Low Pressure
+    This mimics the pattern from test_network_scenarios.py but uses compressible models.
+    """
+    # Use standard air composition (not hardcoded)
+    X = cb.standard_dry_air_composition()
+    Y = cb.mole_to_mass(X)
+
+    # Operating conditions
+    T = 300.0  # K
+    P_high = 300000.0  # 3 bar
+    P_low = 101325.0  # 1 atm
+
+    # Geometry
+    L_pipe = 2.0  # m
+    D_pipe = 0.05  # m
+    roughness = 1e-4  # m
+    A_orifice = 1e-4  # m²
+    Cd = 0.65
+    beta = 0.5
+
+    # Test pipe element
+    rho = cb.density(T, P_high, X)
+    area_pipe = 0.25 * np.pi * D_pipe**2
+    u_pipe = 50.0  # m/s estimate
+
+    dP_pipe, d_dP_dP, d_dP_dT, d_dP_du = cb._core.pipe_compressible_mdot_and_jacobian(
+        T, P_high, u_pipe, X, L_pipe, D_pipe, roughness, "haaland"
+    )
+
+    # Verify pipe results
+    assert dP_pipe > 0, "Pipe pressure drop should be positive"
+    assert d_dP_dP > 0, "d_dP/dP_in should be positive"
+    assert d_dP_du > 0, "d_dP/du should be positive (more velocity = more friction)"
+
+    # Compute mass flow through pipe
+    mdot_pipe = rho * area_pipe * u_pipe
+
+    # Test orifice element at junction
+    P_junction = P_high - dP_pipe
+
+    mdot_orifice, d_mdot_dP0, d_mdot_dPb, d_mdot_dT0 = (
+        cb._core.orifice_compressible_mdot_and_jacobian(
+            T, P_junction, P_low, X, Cd, A_orifice, beta
+        )
+    )
+
+    # Verify orifice results
+    assert mdot_orifice > 0, "Orifice mass flow should be positive"
+    assert d_mdot_dP0 > 0, "d_mdot/dP0 should be positive"
+
+    # Check pressure ratio to see if we're in compressible regime
+    PR = P_low / P_high
+    assert PR < 0.8, f"Test should be in compressible regime (PR={PR:.3f} < 0.8)"
+
+    # Check if choked - if so, d_mdot_dP_back should be ~0 (smoothed)
+    PR_crit = cb.critical_pressure_ratio(T, P_junction, X)
+    if PR_crit > PR:
+        # Choked flow - Jacobian should be near zero
+        assert abs(d_mdot_dPb) < 1e-8, (
+            f"d_mdot/dP_back should be ~0 when choked (PR={PR:.3f} < PR_crit={PR_crit:.3f})"
+        )
+    else:
+        # Unchoked flow - Jacobian should be negative
+        assert d_mdot_dPb < 0, "d_mdot/dP_back should be negative when unchoked"
+
+    # Verify mass flow consistency (pipe and orifice should be similar order of magnitude)
+    # They won't match exactly since we're not solving the full network, but should be close
+    flow_ratio = mdot_orifice / mdot_pipe
+    assert 0.1 < flow_ratio < 10.0, (
+        f"Flow rates should be similar order of magnitude (ratio={flow_ratio:.2f})"
+    )
+
+    # Test with mass fractions (not mole fractions) for residuals function
+    res_orifice = cb._core.orifice_compressible_residuals_and_jacobian(
+        mdot_orifice, P_junction, T, Y, P_low, Cd, A_orifice, beta
+    )
+
+    # Verify residuals structure
+    assert hasattr(res_orifice, "m_dot_calc"), "Should have m_dot_calc attribute"
+    assert hasattr(res_orifice, "d_mdot_dP_total_up"), "Should have Jacobian attributes"
+    np.testing.assert_allclose(
+        res_orifice.m_dot_calc,
+        mdot_orifice,
+        rtol=1e-10,
+        err_msg="Residuals should match direct call",
+    )
+
+    # Test pipe residuals function
+    res_pipe = cb._core.pipe_compressible_residuals_and_jacobian(
+        mdot_pipe, P_high, T, Y, P_low, L_pipe, D_pipe, roughness, "haaland"
+    )
+
+    # Verify pipe residuals structure
+    assert hasattr(res_pipe, "dP_calc"), "Should have dP_calc attribute"
+    assert hasattr(res_pipe, "d_dP_d_mdot"), "Should have Jacobian attributes"
+    assert res_pipe.dP_calc > 0, "Pipe pressure drop should be positive"

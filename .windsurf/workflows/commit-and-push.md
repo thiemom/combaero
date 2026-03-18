@@ -6,22 +6,36 @@ This workflow automates the commit and push process with proper style checking a
 
 ## Steps
 
-### 1. Stage all changes
+// turbo
+### 1. Check for old commit message files
+```bash
+if [ -f COMMIT_MSG.md ]; then
+  echo "⚠️  Found existing COMMIT_MSG.md"
+  echo "This may be from a previous commit attempt."
+  echo "Please review and delete if stale, or keep if you want to reuse it."
+  exit 1
+fi
+```
+
+// turbo
+### 2. Stage all changes
 ```bash
 git add -A
 ```
 
-### 2. Run pre-commit style checks
+// turbo
+### 3. Run pre-commit style checks
 ```bash
 pre-commit run --all-files
 ```
 
-### 3. Re-stage any files modified by pre-commit hooks
+// turbo
+### 4. Re-stage any files modified by pre-commit hooks
 ```bash
 git add -A
 ```
 
-### 4. Fix any remaining issues that ruff couldn't auto-fix
+### 5. Fix any remaining issues that ruff couldn't auto-fix
 If pre-commit reported errors that couldn't be auto-fixed, review the output and fix them manually. Common issues:
 - Unused imports that need removal
 - Type errors requiring annotation fixes
@@ -33,7 +47,7 @@ pre-commit run --all-files
 git add -A
 ```
 
-### 5. Create commit message file
+### 6. Create commit message file
 Create a file named `COMMIT_MSG.md` in the project root with your commit message.
 
 The file should follow conventional commit format:
@@ -49,18 +63,19 @@ Can be multiple paragraphs.
 
 Common types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `style`
 
-### 6. Commit using message file
+### 7. Commit using message file
 // turbo
 ```bash
 git commit -F COMMIT_MSG.md
 ```
 
-### 7. Push to remote
+// turbo
+### 8. Push to remote
 ```bash
 git push
 ```
 
-### 8. Clean up message file
+### 9. Clean up message file
 // turbo
 ```bash
 rm COMMIT_MSG.md

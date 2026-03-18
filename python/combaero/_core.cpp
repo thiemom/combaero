@@ -223,6 +223,36 @@ PYBIND11_MODULE(_core, m) {
         py::arg("T_up"), py::arg("Y_up"), py::arg("P_static_down"), py::arg("L"),
         py::arg("D"), py::arg("roughness"), py::arg("friction_model"));
 
+  // Compressible flow elements
+  m.def("orifice_compressible_mdot_and_jacobian",
+        &solver::orifice_compressible_mdot_and_jacobian,
+        py::arg("T0"), py::arg("P0"), py::arg("P_back"), py::arg("X"),
+        py::arg("Cd"), py::arg("area"), py::arg("beta") = 0.0,
+        "Compressible orifice flow with smooth choked flow Jacobians.\n\n"
+        "Returns: (mdot, d_mdot_dP0, d_mdot_dP_back, d_mdot_dT0)");
+
+  m.def("orifice_compressible_residuals_and_jacobian",
+        &solver::orifice_compressible_residuals_and_jacobian,
+        py::arg("m_dot"), py::arg("P_total_up"), py::arg("T_up"),
+        py::arg("Y_up"), py::arg("P_static_down"), py::arg("Cd"),
+        py::arg("area"), py::arg("beta") = 0.0,
+        "Compressible orifice for network solver with all derivatives.");
+
+  m.def("pipe_compressible_mdot_and_jacobian",
+        &solver::pipe_compressible_mdot_and_jacobian,
+        py::arg("T_in"), py::arg("P_in"), py::arg("u_in"), py::arg("X"),
+        py::arg("L"), py::arg("D"), py::arg("roughness"),
+        py::arg("friction_model"),
+        "Compressible pipe flow using Fanno model with variable friction.\n\n"
+        "Returns: (dP, d_dP_dP_in, d_dP_dT_in, d_dP_du_in)");
+
+  m.def("pipe_compressible_residuals_and_jacobian",
+        &solver::pipe_compressible_residuals_and_jacobian,
+        py::arg("m_dot"), py::arg("P_total_up"), py::arg("T_up"),
+        py::arg("Y_up"), py::arg("P_static_down"), py::arg("L"),
+        py::arg("D"), py::arg("roughness"), py::arg("friction_model"),
+        "Compressible pipe for network solver with all derivatives.");
+
   m.def("momentum_chamber_residual_and_jacobian",
         &solver::momentum_chamber_residual_and_jacobian,
         py::arg("P"), py::arg("P_total"), py::arg("m_dot"), py::arg("T"),

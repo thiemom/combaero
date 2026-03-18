@@ -232,6 +232,26 @@ inline constexpr Entry function_units[] = {
      "T: K, P: Pa, X: mol/mol, v: m/s, D: m, L: m, roughness: m, correlation: "
      "str",
      "tuple(Pa, -, -)"},
+
+    // -------------------------------------------------------------------------
+    // solver_interface.h - Compressible Flow Elements
+    // -------------------------------------------------------------------------
+    {"orifice_compressible_mdot_and_jacobian",
+     "T0: K, P0: Pa, P_back: Pa, X: mol/mol, Cd: -, area: m^2, beta: -",
+     "tuple(kg/s, kg/(s*Pa), kg/(s*Pa), kg/(s*K))"},
+    {"orifice_compressible_residuals_and_jacobian",
+     "m_dot: kg/s, P_total_up: Pa, T_up: K, Y_up: kg/kg, P_static_down: Pa, "
+     "Cd: -, area: m^2, beta: -",
+     "OrificeResult"},
+    {"pipe_compressible_mdot_and_jacobian",
+     "T_in: K, P_in: Pa, u_in: m/s, X: mol/mol, L: m, D: m, roughness: m, "
+     "friction_model: str",
+     "tuple(Pa, -, Pa/K, Pa/(m/s))"},
+    {"pipe_compressible_residuals_and_jacobian",
+     "m_dot: kg/s, P_total_up: Pa, T_up: K, Y_up: kg/kg, P_static_down: Pa, "
+     "L: m, D: m, roughness: m, friction_model: str",
+     "PipeResult"},
+
     // -------------------------------------------------------------------------
     // geometry.h - Geometric Utilities
     // -------------------------------------------------------------------------

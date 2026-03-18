@@ -448,6 +448,12 @@ All functions use consistent units to avoid conversion errors.
 | `beta_from_diameters`        | d: m, D: m                                                               | -                        |
 | `orifice_Re_d_from_mdot`     | mdot: kg/s, d: m, mu: Pa*s                                               | - (Reynolds number)      |
 
+### solver_interface.h - Compressible Flow Elements
+
+| Function                                 | Input Units                                                      | Output Unit                                 |
+|------------------------------------------|------------------------------------------------------------------|---------------------------------------------|
+| `orifice_compressible_mdot_and_jacobian` | T0: K, P0: Pa, P_back: Pa, X: mol/mol, Cd: -, area: m^2, beta: - | tuple(kg/s, kg/(s*Pa), kg/(s*Pa), kg/(s*K)) |
+
 ### geometry.h - Geometric Utilities
 
 | Function                     | Input Units            | Output Unit  |
