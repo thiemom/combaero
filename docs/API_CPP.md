@@ -16,6 +16,7 @@ This document provides the technical reference for the CombAero C++ library. For
 - [Orifice Flow (orifice.h)](#orifice-flow-orificeh)
 - [Acoustics (acoustics.h)](#acoustics-acousticsh)
 - [Humid Air (humidair.h)](#humid-air-humidairh)
+- [Network Solver Interface (solver_interface.h)](#network-solver-interface-solver_interfaceh)
 
 ---
 
@@ -47,7 +48,7 @@ double cp(double T, const std::vector<double>& X);
 double cv(double T, const std::vector<double>& X);
 double h(double T, const std::vector<double>& X);
 double u(double T, const std::vector<double>& X);
-double s(double T, double P, const std::vector<double>& X, double P_ref = 101325.0);
+double s(double T, const std::vector<double>& X, double P, double P_ref = 101325.0);
 ```
 
 ### Thermodynamic Properties (Mass Basis)
@@ -64,8 +65,46 @@ double isentropic_expansion_coefficient(double T, const std::vector<double>& X);
 
 ### Inverse Solvers
 ```cpp
-double calc_T_from_h(double h_target, const std::vector<double>& X);
-double calc_T_from_s(double s_target, double P, const std::vector<double>& X);
+double calc_T_from_h(double h_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
+double calc_T_from_s(double s_target, double P, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
+double calc_T_from_cp(double cp_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
+double calc_T_from_u(double u_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
+double calc_T_from_h_mass(double h_mass_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
+double calc_T_from_s_mass(double s_mass_target, double P, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
+double calc_T_from_u_mass(double u_mass_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
+```
+
+### Complete State Functions
+```cpp
+struct AirProperties { /* air properties at once */ };
+struct ThermoState { /* thermodynamic properties */ };
+struct CompleteState { /* thermodynamic + transport properties */ };
+
+AirProperties air_properties(double T, double P, double humidity = 0.0);
+ThermoState thermo_state(double T, double P, const std::vector<double>& X, double P_ref = 101325.0);
+CompleteState complete_state(double T, double P, const std::vector<double>& X, double P_ref = 101325.0);
+```
+
+### Derivatives
+```cpp
+double dh_dT(double T, const std::vector<double>& X);
+double ds_dT(double T, const std::vector<double>& X);
+double dcp_dT(double T, const std::vector<double>& X);
+double dg_over_RT_dT(double T, const std::vector<double>& X);
+```
+
+### State-Based Overloads
+```cpp
+double mwmix(const State& s);
+double cp(const State& s);
+double h(const State& s);
+double s(const State& s);
+double cv(const State& s);
+double u(const State& s);
+double density(const State& s);
+double specific_gas_constant(const State& s);
+double isentropic_expansion_coefficient(const State& s);
+double speed_of_sound(const State& s);
 ```
 
 ---
@@ -165,14 +204,105 @@ struct FannoSolution {
 ### Solvers
 ```cpp
 CompressibleFlowSolution nozzle_flow(double T0, double P0, double P_back,
-                                     double A_eff, const std::vector<double>& X);
+                                     double A_eff, const std::vector<double>& X,
+                                     double tol = 1e-8, std::size_t max_iter = 50);
 
 FannoSolution fanno_pipe(double T_in, double P_in, double u_in, double L, double D,
-                         double f, const std::vector<double>& X);
+                         double f, const std::vector<double>& X,
+                         std::size_t n_steps = 100, bool store_profile = false);
 
 FannoSolution fanno_pipe_rough(double T_in, double P_in, double u_in, double L, double D,
                                double roughness, const std::vector<double>& X,
-                               const std::string& correlation = "haaland");
+                               const std::string& correlation = "haaland",
+                               std::size_t n_steps = 100, bool store_profile = false);
+```
+
+### Quasi-1D Nozzle Flow
+```cpp
+// Area function type: A(x) returning area [m²] at position x [m]
+using AreaFunction = std::function<double(double)>;
+
+struct NozzleStation {
+    double x, A, P, T, rho, u, M, h;
+};
+
+struct NozzleSolution {
+    State inlet, outlet;
+    double mdot, h0, T0, P0;
+    bool choked;
+    double x_throat, A_throat;
+    std::vector<NozzleStation> profile;
+};
+
+NozzleSolution nozzle_quasi1d(double T0, double P0, double P_exit,
+                             const AreaFunction& area_func,
+                             double x_start, double x_end,
+                             const std::vector<double>& X,
+                             std::size_t n_stations = 100);
+
+NozzleSolution nozzle_quasi1d(double T0, double P0, double P_exit,
+                             const std::vector<std::pair<double, double>>& area_profile,
+                             const std::vector<double>& X,
+                             std::size_t n_stations = 100);
+
+NozzleSolution nozzle_cd(double T0, double P0, double P_exit,
+                         double A_inlet, double A_throat, double A_exit,
+                         double x_throat, double x_exit,
+                         const std::vector<double>& X,
+                         std::size_t n_stations = 100);
+```
+
+### Inverse Solvers
+```cpp
+double solve_A_eff_from_mdot(double T0, double P0, double P_back, double mdot_target,
+                             const std::vector<double>& X,
+                             double tol = 1e-8, std::size_t max_iter = 50);
+
+double solve_P_back_from_mdot(double T0, double P0, double A_eff, double mdot_target,
+                             const std::vector<double>& X,
+                             double tol = 1e-8, std::size_t max_iter = 50);
+
+double solve_P0_from_mdot(double T0, double P_back, double A_eff, double mdot_target,
+                         const std::vector<double>& X,
+                         double tol = 1e-8, std::size_t max_iter = 50);
+```
+
+### Utility Functions
+```cpp
+double critical_pressure_ratio(double T0, double P0, const std::vector<double>& X,
+                               double tol = 1e-8, std::size_t max_iter = 50);
+
+double mach_from_pressure_ratio(double T0, double P0, double P,
+                               const std::vector<double>& X,
+                               double tol = 1e-8, std::size_t max_iter = 50);
+
+double mass_flux_isentropic(double T0, double P0, double P,
+                             const std::vector<double>& X,
+                             double tol = 1e-8, std::size_t max_iter = 50);
+
+double fanno_max_length(double T_in, double P_in, double u_in,
+                       double D, double f, const std::vector<double>& X,
+                       double tol = 1e-6, std::size_t max_iter = 100);
+```
+
+### Rocket Nozzle Thrust
+```cpp
+struct ThrustResult {
+    double thrust;
+    double specific_impulse;
+    double thrust_coefficient;
+    double mdot;
+    double u_exit;
+    double P_exit;
+};
+
+ThrustResult nozzle_thrust(const NozzleSolution& sol, double P_amb);
+
+ThrustResult nozzle_thrust(double T0, double P0, double P_design, double P_amb,
+                           double A_inlet, double A_throat, double A_exit,
+                           double x_throat, double x_exit,
+                           const std::vector<double>& X,
+                           std::size_t n_stations = 100);
 ```
 
 ---
@@ -229,20 +359,48 @@ double residence_time(double V, double Q);
 
 ## Orifice Flow (orifice.h)
 
+### Geometry and State
 ```cpp
+enum class OrificeType {
+    SharpThinPlate, ThickPlate, RoundedEntry, Conical, QuarterCircle, UserDefined
+};
+
 struct OrificeGeometry {
-    double d, D, t, r;
-    double beta() const;
-    double area() const;
+    double d, D, t, r, bevel;
+
+    double beta() const;          // Diameter ratio d/D [-]
+    double area() const;          // Orifice area [m²]
+    double t_over_d() const;      // Thickness ratio t/d [-]
+    double r_over_d() const;      // Radius ratio r/d [-]
+    bool is_valid() const;
 };
 
 struct OrificeState {
     double Re_D, dP, rho, mu;
+
+    double Re_d(double beta) const;  // Orifice Reynolds number (based on d)
+};
+```
+
+### Cd Correlations
+```cpp
+enum class CdCorrelation {
+    // Sharp thin-plate
+    ReaderHarrisGallagher, Stolz, Miller,
+    // Thick-plate corrections
+    IdelchikThick, BohlThick,
+    // Rounded-entry
+    IdelchikRounded, BohlRounded,
+    // Special
+    Constant, UserFunction
 };
 
+// Individual correlations
 double Cd_sharp_thin_plate(const OrificeGeometry& geom, const OrificeState& state);
 double Cd_thick_plate(const OrificeGeometry& geom, const OrificeState& state);
 double Cd_rounded_entry(const OrificeGeometry& geom, const OrificeState& state);
+
+// Auto-select correlation based on geometry
 double Cd(const OrificeGeometry& geom, const OrificeState& state);
 ```
 
@@ -278,4 +436,124 @@ public:
     double dewpoint() const;
     State& state();
 };
+```
+
+---
+
+## Network Solver Interface (solver_interface.h)
+
+Fast-path native interface for network solvers with combined residual and Jacobian evaluations.
+
+### Result Types
+```cpp
+enum class CorrelationValidity : std::uint8_t { VALID, EXTRAPOLATED, INVALID };
+
+template <typename T> struct CorrelationResult {
+    T result;
+    CorrelationValidity status;
+    std::string message;
+};
+
+struct Stream {
+    double m_dot;
+    double T;
+    double P_total;
+    std::vector<double> Y;
+};
+
+struct StreamJacobian {
+    double d_mdot;
+    double d_T;
+    double d_P_total;
+    std::vector<double> d_Y;
+};
+
+struct OrificeResult {
+    double m_dot_calc;
+    double d_mdot_dP_total_up;
+    double d_mdot_dP_static_down;
+    double d_mdot_dT_up;
+    std::vector<double> d_mdot_dY_up;
+};
+
+struct PipeResult {
+    double dP_calc;
+    double d_dP_d_mdot;
+    double d_dP_dP_static_up;
+    double d_dP_dT_up;
+    std::vector<double> d_dP_dY_up;
+};
+
+struct MixerResult {
+    std::vector<double> T_out;
+    std::vector<double> P_out;
+    std::vector<double> Y_out;
+    std::vector<std::vector<StreamJacobian>> stream_jacobian;
+};
+
+struct AdiabaticResult {
+    std::vector<double> T_out;
+    std::vector<double> P_out;
+    std::vector<double> Y_out;
+    std::vector<std::vector<StreamJacobian>> stream_jacobian;
+};
+```
+
+### Incompressible Flow Components
+```cpp
+// Orifice flow with discharge coefficient
+OrificeResult orifice_residuals_and_jacobian(
+    double m_dot, double P_total_up, double P_static_up, double T_up,
+    const std::vector<double>& Y_up, double P_static_down, double Cd,
+    double area, double beta = 0.0);
+
+// Pipe flow with Darcy friction
+PipeResult pipe_residuals_and_jacobian(
+    double m_dot, double P_total_up, double P_static_up, double T_up,
+    const std::vector<double>& Y_up, double P_static_down, double L, double D,
+    double roughness, const std::string& friction_model = "haaland");
+
+// Flow restriction (K-factor)
+PipeResult restriction_residuals_and_jacobian(
+    double m_dot, double P_total_up, double P_static_up, double T_up,
+    const std::vector<double>& Y_up, double P_static_down, double K);
+```
+
+### Compressible Flow Components
+```cpp
+// Compressible orifice flow using isentropic nozzle model
+std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobian(
+    double T0, double P0, double P_back, const std::vector<double>& X,
+    double Cd, double area, double beta);
+
+// Full compressible orifice evaluation for network solver
+OrificeResult orifice_compressible_residuals_and_jacobian(
+    double m_dot, double P_total_up, double T_up, const std::vector<double>& Y_up,
+    double P_static_down, double Cd, double area, double beta);
+
+// Compressible pipe flow using Fanno model with variable friction
+std::tuple<double, double, double, double> pipe_compressible_mdot_and_jacobian(
+    double T_in, double P_in, double u_in, const std::vector<double>& X,
+    double L, double D, double roughness, const std::string& friction_model);
+
+// Full compressible pipe evaluation for network solver
+PipeResult pipe_compressible_residuals_and_jacobian(
+    double m_dot, double P_total_up, double T_up, const std::vector<double>& Y_up,
+    double P_static_down, double L, double D, double roughness,
+    const std::string& friction_model);
+```
+
+### Mixing and Combustion Components
+```cpp
+// Stream mixing with optional heat transfer
+MixerResult mixer_from_streams_and_jacobians(
+    const std::vector<Stream>& streams, double Q = 0.0, double fraction = 0.0);
+
+// Adiabatic complete combustion
+AdiabaticResult adiabatic_T_complete_and_jacobian_T_from_streams(
+    const std::vector<Stream>& streams, double P, double Q = 0.0, double fraction = 0.0);
+
+// Adiabatic equilibrium combustion
+AdiabaticResult adiabatic_T_equilibrium_and_jacobians_from_streams(
+    const std::vector<Stream>& streams, double P, double Q = 0.0, double fraction = 0.0);
 ```
