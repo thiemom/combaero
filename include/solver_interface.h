@@ -155,6 +155,72 @@ std::tuple<double, double> lossless_pressure_and_jacobian(double P_in,
                                                           double P_out);
 
 // -----------------------------------------------------------------------------
+// 1b. Compressible Flow Components
+// -----------------------------------------------------------------------------
+
+// Compressible orifice flow using isentropic nozzle model.
+// Applies discharge coefficient and velocity-of-approach factor to nozzle_flow.
+//
+// Method: Finite Difference Jacobians (nozzle_flow is iterative)
+// Inputs:
+//   T0   : Stagnation temperature [K]
+//   P0   : Stagnation pressure [Pa]
+//   P_back : Back pressure [Pa]
+//   X    : Mole fractions [-]
+//   Cd   : Discharge coefficient [-]
+//   area : Geometric throat area [m²]
+//   beta : Orifice beta ratio (d/D) [-]
+//
+// Returns:
+//   tuple(mdot, d_mdot_dP0, d_mdot_dP_back, d_mdot_dT0)
+//   mdot           : Mass flow rate [kg/s]
+//   d_mdot_dP0     : Jacobian w.r.t. stagnation pressure [kg/(s*Pa)]
+//   d_mdot_dP_back : Jacobian w.r.t. back pressure [kg/(s*Pa)] (smooth through choked transition)
+//   d_mdot_dT0     : Jacobian w.r.t. stagnation temperature [kg/(s*K)]
+std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobian(
+    double T0, double P0, double P_back,
+    const std::vector<double>& X,
+    double Cd, double area, double beta);
+
+// Full compressible orifice evaluation with all derivatives for network solver.
+OrificeResult orifice_compressible_residuals_and_jacobian(
+    double m_dot, double P_total_up, double T_up,
+    const std::vector<double>& Y_up,
+    double P_static_down, double Cd, double area, double beta);
+
+// Compressible pipe flow using Fanno model with variable friction.
+//
+// Method: Finite Difference Jacobians (fanno_pipe_rough is iterative)
+// Inputs:
+//   T_in   : Inlet static temperature [K]
+//   P_in   : Inlet static pressure [Pa]
+//   u_in   : Inlet velocity [m/s]
+//   X      : Mole fractions [-]
+//   L      : Pipe length [m]
+//   D      : Pipe diameter [m]
+//   roughness : Absolute roughness [m]
+//   friction_model : Friction correlation name
+//
+// Returns:
+//   tuple(dP, d_dP_dP_in, d_dP_dT_in, d_dP_du_in)
+//   dP         : Pressure drop [Pa]
+//   d_dP_dP_in : Jacobian w.r.t. inlet pressure [Pa/Pa] = [-]
+//   d_dP_dT_in : Jacobian w.r.t. inlet temperature [Pa/K]
+//   d_dP_du_in : Jacobian w.r.t. inlet velocity [Pa/(m/s)]
+std::tuple<double, double, double, double> pipe_compressible_mdot_and_jacobian(
+    double T_in, double P_in, double u_in,
+    const std::vector<double>& X,
+    double L, double D, double roughness,
+    const std::string& friction_model);
+
+// Full compressible pipe evaluation with all derivatives for network solver.
+PipeResult pipe_compressible_residuals_and_jacobian(
+    double m_dot, double P_total_up, double T_up,
+    const std::vector<double>& Y_up,
+    double P_static_down, double L, double D, double roughness,
+    const std::string& friction_model);
+
+// -----------------------------------------------------------------------------
 // 2. Heat Transfer Components
 // -----------------------------------------------------------------------------
 
