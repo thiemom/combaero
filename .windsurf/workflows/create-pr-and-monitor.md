@@ -20,7 +20,10 @@ Does NOT include merging or branch cleanup - those are separate steps.
 git push -u origin $(git branch --show-current)
 ```
 
+// turbo
 ### 2. Create pull request
+
+The AI will generate an appropriate PR title and body based on recent commits and changes.
 
 **For simple PRs (single-line description):**
 ```bash
@@ -29,17 +32,7 @@ gh pr create --title "feat: brief description" --body "Simple one-line summary."
 
 **For complex PRs (multi-line description - RECOMMENDED):**
 
-Create a PR body file using one of these reliable methods:
-
-**Option 1: Text editor (most reliable, recommended)**
-```bash
-nano /tmp/pr_body.md
-# Write your PR description, save and exit
-gh pr create --title "TITLE_HERE" --body-file /tmp/pr_body.md
-rm /tmp/pr_body.md
-```
-
-**Option 2: printf for programmatic creation**
+Create a PR body file programmatically:
 ```bash
 PR_BODY_FILE="/tmp/pr_body_$(date +%s).md"
 printf "## Summary\n\nBrief description here\n\n## Changes\n- Change 1\n- Change 2\n\n## Testing\n- Test results\n" > "$PR_BODY_FILE"
@@ -47,11 +40,10 @@ gh pr create --title "TITLE_HERE" --body-file "$PR_BODY_FILE"
 rm "$PR_BODY_FILE"
 ```
 
-**Important Notes:**
-- Use unique filenames (`$(date +%s)`) to avoid conflicts with existing files
-- Avoid heredocs (`cat << EOF`) - they're unreliable in automated execution contexts
-- For complex descriptions, text editor is most reliable
-- `printf` works well for programmatic creation but requires escaping newlines as `\n`
+**Notes:**
+- AI-generated titles and descriptions are consistently good
+- Use unique filenames (`$(date +%s)`) to avoid conflicts
+- The AI will analyze commits to generate appropriate PR content
 
 // turbo
 ### 3. Monitor checks until complete
