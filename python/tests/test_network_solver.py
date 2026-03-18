@@ -54,7 +54,7 @@ def test_network_solver_simple_orifice():
     rho_in = cb.density(inlet.T_total, inlet.P_total, cb.mass_to_mole(inlet.Y))
     dP = inlet.P_total - outlet.P_total
     # Orifice m_dot = Cd * A * sqrt(2 * rho * dP)
-    m_dot_analytical, _ = cb.orifice_mdot_and_jacobian(dP, rho_in, 0.6, 0.005)
+    m_dot_analytical, _, _ = cb.orifice_mdot_and_jacobian(dP, rho_in, 0.6, 0.005)
 
     assert solution["orf_1.m_dot"] == pytest.approx(m_dot_analytical, rel=1e-4)
 

@@ -102,12 +102,13 @@ struct PipeResult {
 //   beta : Orifice beta ratio (d/D) [-]
 //
 // Returns:
-//   tuple(mdot, d_mdot_d_dP)
-//   mdot        : Mass flow rate [kg/s]
-//   d_mdot_d_dP : Jacobian gradient [kg/(s*Pa)]
-std::tuple<double, double> orifice_mdot_and_jacobian(double dP, double rho,
-                                                     double Cd, double area,
-                                                     double beta);
+//   tuple(mdot, d_mdot_d_dP, d_mdot_d_rho)
+//   mdot         : Mass flow rate [kg/s]
+//   d_mdot_d_dP  : Jacobian gradient w.r.t. pressure difference [kg/(s*Pa)]
+//   d_mdot_d_rho : Jacobian gradient w.r.t. density [kg*m³/(s*kg)] = [m³/s]
+std::tuple<double, double, double> orifice_mdot_and_jacobian(double dP, double rho,
+                                                              double Cd, double area,
+                                                              double beta);
 
 // Full orifice evaluation with all derivatives.
 OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
@@ -441,6 +442,20 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
 // fraction [-]: relative to total enthalpy flow (positive = heating)
 MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
     const std::vector<Stream> &streams, double P, double Q = 0.0, double fraction = 0.0);
+
+// Momentum chamber residual: P_total = P_static + 0.5 * rho * v^2
+// where v = m_dot / (rho * A)
+// Returns residual and Jacobian entries for P, P_total, and m_dot
+struct MomentumChamberResult {
+  double residual;
+  double d_res_dP;
+  double d_res_dP_total;
+  double d_res_dmdot;
+};
+
+MomentumChamberResult momentum_chamber_residual_and_jacobian(
+    double P, double P_total, double m_dot, double T,
+    const std::vector<double> &Y, double area);
 
 } // namespace solver
 } // namespace combaero

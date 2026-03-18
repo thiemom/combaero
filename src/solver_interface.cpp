@@ -22,31 +22,48 @@ namespace solver {
 // 1. Incompressible Flow Components
 // -----------------------------------------------------------------------------
 
-std::tuple<double, double> orifice_mdot_and_jacobian(double dP, double rho,
-                                                     double Cd, double area,
-                                                     double beta) {
+std::tuple<double, double, double> orifice_mdot_and_jacobian(double dP, double rho,
+                                                              double Cd, double area,
+                                                              double beta) {
   // Regularized orifice equation: mdot = Cd * E * A * f_reg(dP, rho)
   // where E = 1/sqrt(1 - beta^4) is the velocity-of-approach factor.
   // We use a smooth sqrt to avoid the infinite gradient at dP = 0.
   double E = 1.0;
   if (beta > 0.0 && beta < 1.0) {
-    E = 1.0 / std::sqrt(1.0 - std::pow(beta, 4.0));
+    double b2 = beta * beta;
+    E = 1.0 / std::sqrt(1.0 - b2 * b2);
   }
 
-  // Robust rho clamping
-  double rho_eff = std::max(rho, 1e-9);
-  double constant = Cd * E * area * std::sqrt(2.0 * rho_eff);
+  /// Smooth clamp: rho_eff ~ max(rho, L)
+  constexpr double L = 1e-9;
+  constexpr double delta = 1e-4;
+  double diff = rho - L;
+  double sq_dist = std::sqrt(diff * diff + delta);
+  double rho_eff = 0.5 * (rho + L + sq_dist);
+  double d_rho_eff_d_rho = 0.5 * (1.0 + diff / sq_dist);
 
-  const double eps2 = 1.0; // Transition pressure squared (1 Pa^2)
+  // Pressure regularization
+  constexpr double eps2 = 1.0; // Pa^2 (regularisation scale eps = 1 Pa)
   double dP2 = dP * dP;
-  double dP_eff_sq = std::sqrt(dP2 + eps2); // This is (dP^2 + eps^2)^0.5
-  double mdot = constant * dP / std::sqrt(dP_eff_sq); // constant * dP / (dP^2 + eps^2)^0.25
-
-  // Derivative: d(mdot)/d(dP) = constant * (0.5 * dP^2 + eps^2) / (dP^2 + eps^2)^1.25
   double U = dP2 + eps2;
-  double jacobian = constant * (0.5 * dP2 + eps2) / std::pow(U, 1.25);
+  double U_pow_025 = std::sqrt(std::sqrt(U));
+  double U_pow_125 = U * U_pow_025;
 
-  return {mdot, jacobian};
+  // Mass Flow Calculation
+  // mdot = (Cd * E * A * sqrt(2 * rho_eff)) * (dP / U^0.25)
+  double geom_const = Cd * E * area;
+  double sqrt_2rho = std::sqrt(2.0 * rho_eff);
+  double mdot = geom_const * sqrt_2rho * (dP / U_pow_025);
+
+  // Jacobian w.r.t dP
+  // d(mdot)/d(dP) = constant * (0.5 * dP^2 + eps^2) / (dP^2 + eps^2)^1.25
+  double d_mdot_dp = geom_const * sqrt_2rho * (0.5 * dP2 + eps2) / U_pow_125;
+
+  // Jacobian w.r.t rho
+  // d(mdot)/d(rho) = (mdot / (2 * rho_eff)) * d(rho_eff)/d(rho)
+  double d_mdot_rho = (mdot / (2.0 * rho_eff)) * d_rho_eff_d_rho;
+
+  return {mdot, d_mdot_dp, d_mdot_rho};
 }
 
 std::tuple<double, double> pressure_loss_and_jacobian(double v, double rho,
@@ -1145,17 +1162,20 @@ OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
   const std::vector<double> X_up = combaero::mass_to_mole(combaero::normalize_fractions(Y_up));
   auto [rho, drho_dT, drho_dP] = density_and_jacobians(T_up, P_static_up, X_up);
 
-  auto [mdot_calc, dmdot_ddP] = orifice_mdot_and_jacobian(dP, rho, Cd, area, beta);
+  // Get mass flow and analytical Jacobians from low-level function
+  auto [mdot_calc, dmdot_ddP, dmdot_drho] = orifice_mdot_and_jacobian(dP, rho, Cd, area, beta);
 
   OrificeResult res;
   res.m_dot_calc = mdot_calc;
   res.d_mdot_dP_total_up = dmdot_ddP;
   res.d_mdot_dP_static_down = -dmdot_ddP;
 
-  double dmdot_drho = mdot_calc / (2.0 * std::max(rho, 1e-6));
+  // Chain rule: d(mdot)/d(P_static_up) = d(mdot)/d(rho) * d(rho)/d(P)
   res.d_mdot_dP_static_up = dmdot_drho * drho_dP;
   res.d_mdot_dT_up = dmdot_drho * drho_dT;
 
+  // Analytical Y derivatives via chain rule: d(mdot)/d(Y[i]) = d(mdot)/d(rho) * d(rho)/d(Y[i])
+  // Compute d(rho)/d(Y[i]) using finite differences (no analytical drho_dY available)
   res.d_mdot_dY_up.resize(Y_up.size(), 0.0);
   const double eps_Y = 1e-6;
   for (std::size_t i = 0; i < Y_up.size(); ++i) {
@@ -1163,8 +1183,8 @@ OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
     Y_plus[i] += eps_Y;
     auto X_plus = combaero::mass_to_mole(combaero::normalize_fractions(Y_plus));
     double rho_plus = std::get<0>(density_and_jacobians(T_up, P_static_up, X_plus));
-    auto [mdot_plus, dummy] = orifice_mdot_and_jacobian(dP, rho_plus, Cd, area, beta);
-    res.d_mdot_dY_up[i] = (mdot_plus - mdot_calc) / eps_Y;
+    double drho_dY = (rho_plus - rho) / eps_Y;
+    res.d_mdot_dY_up[i] = dmdot_drho * drho_dY;
   }
 
   return res;
@@ -1229,6 +1249,63 @@ PipeResult pipe_residuals_and_jacobian(double m_dot, double P_total_up,
     double dP_plus = f_plus * (L / D) * (0.5 * rho_plus * v_plus * std::abs(v_plus));
     res.d_dP_dY_up[i] = (dP_plus - dP_calc) / eps_Y;
   }
+
+  return res;
+}
+
+MomentumChamberResult momentum_chamber_residual_and_jacobian(
+    double P, double P_total, double m_dot, double T,
+    const std::vector<double> &Y, double area) {
+  // Momentum chamber: P_total = P_static + 0.5 * rho * v^2
+  // where v = m_dot / (rho * A)
+  // Residual: P_total - P_static - 0.5 * rho * v^2 = 0
+
+  // Soft normalization to handle edge cases (all-zero Y)
+  std::vector<double> Y_safe = Y;
+  double sum_Y = 0.0;
+  for (double y : Y) {
+    sum_Y += y;
+  }
+  // Use softmax-like approach: if sum is too small, use standard air
+  const double eps = 1e-10;
+  if (sum_Y < eps) {
+    // Use standard dry air composition as fallback (N2=0.767, O2=0.233 mass fractions)
+    Y_safe = std::vector<double>(Y.size(), 0.0);
+    std::size_t n2_idx = combaero::species_index_from_name("N2");
+    std::size_t o2_idx = combaero::species_index_from_name("O2");
+    Y_safe[n2_idx] = 0.767;
+    Y_safe[o2_idx] = 0.233;
+  }
+
+  const std::vector<double> X = combaero::mass_to_mole(combaero::normalize_fractions(Y_safe));
+  auto [rho, drho_dT, drho_dP] = density_and_jacobians(T, P, X);
+
+  // Velocity from mass flow
+  double v = m_dot / (rho * area);
+
+  // Dynamic pressure
+  double q_dynamic = 0.5 * rho * v * v;
+
+  // Residual: P_total - (P + q_dynamic) = 0
+  MomentumChamberResult res;
+  res.residual = P_total - P - q_dynamic;
+
+  // Analytical Jacobians
+  // d(res)/d(P_total) = 1.0
+  res.d_res_dP_total = 1.0;
+
+  // d(res)/d(P) = -1.0 - d(q_dynamic)/d(P)
+  // q_dynamic = 0.5 * m_dot^2 / (rho * A^2)
+  // d(q_dynamic)/d(P) = d(q_dynamic)/d(rho) * d(rho)/d(P)
+  //                   = -0.5 * m_dot^2 / (rho^2 * A^2) * drho_dP
+  double dq_dP = -0.5 * m_dot * m_dot / (rho * rho * area * area) * drho_dP;
+  res.d_res_dP = -1.0 - dq_dP;
+
+  // d(res)/d(m_dot) = -d(q_dynamic)/d(m_dot)
+  // q_dynamic = 0.5 * m_dot^2 / (rho * A^2)
+  // d(q_dynamic)/d(m_dot) = m_dot / (rho * A^2)
+  double dq_dmdot = m_dot / (rho * area * area);
+  res.d_res_dmdot = -dq_dmdot;
 
   return res;
 }
