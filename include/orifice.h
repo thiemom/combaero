@@ -243,13 +243,42 @@ public:
 std::unique_ptr<OrificeCorrelationBase> make_correlation(CdCorrelation id);
 
 // User-defined correlation from function
+//
+// IMPORTANT: User-provided functions should be smooth (C1 continuous) for
+// best solver performance. Discontinuous derivatives can cause convergence issues.
+//
+// LIMITATIONS:
+// - Network solver Jacobians assume constant Cd
+// - If Cd depends on flow variables (Re, PR), Jacobians are incomplete
+// - For production use with variable Cd, analytical Jacobians needed (future work)
 using CdFunction = std::function<double(const OrificeGeometry&, const OrificeState&)>;
 std::unique_ptr<OrificeCorrelationBase> make_user_correlation(
     CdFunction fn,
     const std::string& name = "UserDefined");
 
 // User-defined correlation from tabulated data (beta, Re_D, Cd)
-// Interpolates linearly in beta and log(Re_D)
+// Interpolates bilinearly in beta and log(Re_D)
+//
+// IMPORTANT LIMITATIONS (current implementation):
+// 1. Bilinear interpolation is C0 continuous but NOT C1 continuous
+//    - Derivative discontinuities at grid points can cause solver issues
+//    - For production use, consider using smooth data or dense grids
+// 2. Network solver Jacobians assume constant Cd
+//    - When Cd = f(Re), Jacobians are incomplete (missing dCd/dRe terms)
+//    - May reduce convergence rate in network solvers
+// 3. Pressure-ratio dependent Cd creates circular dependency
+//    - If Cd = f(PR), iterative solution needed (see solve_orifice_mdot)
+//    - Jacobians not available for PR-dependent correlations
+//
+// BEST PRACTICES:
+// - Use sufficiently dense grids (Δbeta < 0.05, ΔlogRe < 0.2)
+// - Ensure smooth underlying data (avoid measurement noise)
+// - For critical applications, validate convergence with grid refinement
+//
+// FUTURE WORK (for production readiness):
+// - Implement C1-continuous interpolation (bicubic splines)
+// - Add analytical Jacobians with chain rule: d_mdot_ddP including dCd/dRe terms
+// - Support for Cd = f(PR) with consistent Jacobians
 std::unique_ptr<OrificeCorrelationBase> make_tabulated_correlation(
     const std::vector<double>& beta_values,
     const std::vector<double>& Re_values,
