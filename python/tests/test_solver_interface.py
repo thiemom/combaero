@@ -21,8 +21,8 @@ def test_orifice_jacobian():
         return cb._core.orifice_mdot_and_jacobian(dP, rho, Cd, area)[0]
 
     for dP in dP_test_points:
-        # C++ Analytical Tuple
-        mdot_analytic, jac_analytic = cb._core.orifice_mdot_and_jacobian(dP, rho, Cd, area)
+        # C++ Analytical Tuple (mdot, d_mdot_ddP, d_mdot_drho)
+        mdot_analytic, jac_analytic, _ = cb._core.orifice_mdot_and_jacobian(dP, rho, Cd, area)
 
         # Python Numerical Gradient
         h = max(1e-5, dP * 1e-6)

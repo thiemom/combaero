@@ -544,14 +544,15 @@ class EffectiveAreaConnectionElement(OrificeElement):
     """
     An orifice element with user-specified effective area (Cd * A product).
 
-    This element calculates orifice flow using the compressible flow equation:
+    This element calculates orifice flow using the incompressible flow equation:
         m_dot = A_eff * sqrt(2 * rho * dP)
 
     where A_eff is the effective area (the product Cd * A).
 
-    **Compressible Flow**: The solver uses the full compressible orifice equation via
-    `cb.orifice_mdot_and_jacobian()`, which accounts for density variations across the
-    pressure drop. This is valid for both subsonic and transonic flow regimes.
+    **Incompressible Formulation**: The solver uses `cb.orifice_mdot_and_jacobian()`,
+    which applies the incompressible Bernoulli equation with regularization for numerical
+    stability. Density is evaluated at upstream conditions. For compressible flows with
+    significant Mach number effects, use a nozzle element instead (future feature).
 
     **Effective Area Interpretation**: The effective area represents the combined effect
     of discharge coefficient and geometric area. For example:
@@ -611,10 +612,13 @@ class AreaDischargeCoefficientConnectionElement(OrificeElement):
     """
     An orifice element with user-specified physical area and discharge coefficient or loss coefficient.
 
-    This element calculates orifice flow using the compressible flow equation:
+    This element calculates orifice flow using the incompressible flow equation:
         m_dot = A * Cd * sqrt(2 * rho * dP)
 
     where A is the physical area and Cd is the discharge coefficient.
+
+    **Incompressible Formulation**: Uses the Bernoulli equation with density evaluated
+    at upstream conditions. Valid for low Mach number flows (M < 0.3 typically).
 
     **Parameters**: User provides either Cd (discharge coefficient) or zeta (loss coefficient).
     The other parameter is calculated automatically using the relationship:

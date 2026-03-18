@@ -22,31 +22,48 @@ namespace solver {
 // 1. Incompressible Flow Components
 // -----------------------------------------------------------------------------
 
-std::tuple<double, double> orifice_mdot_and_jacobian(double dP, double rho,
-                                                     double Cd, double area,
-                                                     double beta) {
+std::tuple<double, double, double> orifice_mdot_and_jacobian(double dP, double rho,
+                                                              double Cd, double area,
+                                                              double beta) {
   // Regularized orifice equation: mdot = Cd * E * A * f_reg(dP, rho)
   // where E = 1/sqrt(1 - beta^4) is the velocity-of-approach factor.
   // We use a smooth sqrt to avoid the infinite gradient at dP = 0.
   double E = 1.0;
   if (beta > 0.0 && beta < 1.0) {
-    E = 1.0 / std::sqrt(1.0 - std::pow(beta, 4.0));
+    double b2 = beta * beta;
+    E = 1.0 / std::sqrt(1.0 - b2 * b2);
   }
 
-  // Robust rho clamping
-  double rho_eff = std::max(rho, 1e-9);
-  double constant = Cd * E * area * std::sqrt(2.0 * rho_eff);
+  /// Smooth clamp: rho_eff ~ max(rho, L)
+  constexpr double L = 1e-9;
+  constexpr double delta = 1e-4;
+  double diff = rho - L;
+  double sq_dist = std::sqrt(diff * diff + delta);
+  double rho_eff = 0.5 * (rho + L + sq_dist);
+  double d_rho_eff_d_rho = 0.5 * (1.0 + diff / sq_dist);
 
-  const double eps2 = 1.0; // Transition pressure squared (1 Pa^2)
+  // Pressure regularization
+  constexpr double eps2 = 1.0; // Pa^2 (regularisation scale eps = 1 Pa)
   double dP2 = dP * dP;
-  double dP_eff_sq = std::sqrt(dP2 + eps2); // This is (dP^2 + eps^2)^0.5
-  double mdot = constant * dP / std::sqrt(dP_eff_sq); // constant * dP / (dP^2 + eps^2)^0.25
-
-  // Derivative: d(mdot)/d(dP) = constant * (0.5 * dP^2 + eps^2) / (dP^2 + eps^2)^1.25
   double U = dP2 + eps2;
-  double jacobian = constant * (0.5 * dP2 + eps2) / std::pow(U, 1.25);
+  double U_pow_025 = std::sqrt(std::sqrt(U));
+  double U_pow_125 = U * U_pow_025;
 
-  return {mdot, jacobian};
+  // Mass Flow Calculation
+  // mdot = (Cd * E * A * sqrt(2 * rho_eff)) * (dP / U^0.25)
+  double geom_const = Cd * E * area;
+  double sqrt_2rho = std::sqrt(2.0 * rho_eff);
+  double mdot = geom_const * sqrt_2rho * (dP / U_pow_025);
+
+  // Jacobian w.r.t dP
+  // d(mdot)/d(dP) = constant * (0.5 * dP^2 + eps^2) / (dP^2 + eps^2)^1.25
+  double d_mdot_dp = geom_const * sqrt_2rho * (0.5 * dP2 + eps2) / U_pow_125;
+
+  // Jacobian w.r.t rho
+  // d(mdot)/d(rho) = (mdot / (2 * rho_eff)) * d(rho_eff)/d(rho)
+  double d_mdot_rho = (mdot / (2.0 * rho_eff)) * d_rho_eff_d_rho;
+
+  return {mdot, d_mdot_dp, d_mdot_rho};
 }
 
 std::tuple<double, double> pressure_loss_and_jacobian(double v, double rho,
@@ -1145,17 +1162,20 @@ OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
   const std::vector<double> X_up = combaero::mass_to_mole(combaero::normalize_fractions(Y_up));
   auto [rho, drho_dT, drho_dP] = density_and_jacobians(T_up, P_static_up, X_up);
 
-  auto [mdot_calc, dmdot_ddP] = orifice_mdot_and_jacobian(dP, rho, Cd, area, beta);
+  // Get mass flow and analytical Jacobians from low-level function
+  auto [mdot_calc, dmdot_ddP, dmdot_drho] = orifice_mdot_and_jacobian(dP, rho, Cd, area, beta);
 
   OrificeResult res;
   res.m_dot_calc = mdot_calc;
   res.d_mdot_dP_total_up = dmdot_ddP;
   res.d_mdot_dP_static_down = -dmdot_ddP;
 
-  double dmdot_drho = mdot_calc / (2.0 * std::max(rho, 1e-6));
+  // Chain rule: d(mdot)/d(P_static_up) = d(mdot)/d(rho) * d(rho)/d(P)
   res.d_mdot_dP_static_up = dmdot_drho * drho_dP;
   res.d_mdot_dT_up = dmdot_drho * drho_dT;
 
+  // Analytical Y derivatives via chain rule: d(mdot)/d(Y[i]) = d(mdot)/d(rho) * d(rho)/d(Y[i])
+  // Compute d(rho)/d(Y[i]) using finite differences (no analytical drho_dY available)
   res.d_mdot_dY_up.resize(Y_up.size(), 0.0);
   const double eps_Y = 1e-6;
   for (std::size_t i = 0; i < Y_up.size(); ++i) {
@@ -1163,8 +1183,8 @@ OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
     Y_plus[i] += eps_Y;
     auto X_plus = combaero::mass_to_mole(combaero::normalize_fractions(Y_plus));
     double rho_plus = std::get<0>(density_and_jacobians(T_up, P_static_up, X_plus));
-    auto [mdot_plus, dummy] = orifice_mdot_and_jacobian(dP, rho_plus, Cd, area, beta);
-    res.d_mdot_dY_up[i] = (mdot_plus - mdot_calc) / eps_Y;
+    double drho_dY = (rho_plus - rho) / eps_Y;
+    res.d_mdot_dY_up[i] = dmdot_drho * drho_dY;
   }
 
   return res;

@@ -102,12 +102,13 @@ struct PipeResult {
 //   beta : Orifice beta ratio (d/D) [-]
 //
 // Returns:
-//   tuple(mdot, d_mdot_d_dP)
-//   mdot        : Mass flow rate [kg/s]
-//   d_mdot_d_dP : Jacobian gradient [kg/(s*Pa)]
-std::tuple<double, double> orifice_mdot_and_jacobian(double dP, double rho,
-                                                     double Cd, double area,
-                                                     double beta);
+//   tuple(mdot, d_mdot_d_dP, d_mdot_d_rho)
+//   mdot         : Mass flow rate [kg/s]
+//   d_mdot_d_dP  : Jacobian gradient w.r.t. pressure difference [kg/(s*Pa)]
+//   d_mdot_d_rho : Jacobian gradient w.r.t. density [kg*m³/(s*kg)] = [m³/s]
+std::tuple<double, double, double> orifice_mdot_and_jacobian(double dP, double rho,
+                                                              double Cd, double area,
+                                                              double beta);
 
 // Full orifice evaluation with all derivatives.
 OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
