@@ -3,6 +3,7 @@
 #include "../include/correlation_status.h"
 #include "../include/friction.h"       // friction_petukhov, friction_colebrook
 #include "../include/math_constants.h" // M_PI cross-platform
+#include "../include/solver_interface.h" // density_and_jacobians, viscosity_and_jacobians
 #include "../include/stagnation.h"     // T_adiabatic_wall
 #include "../include/state.h"
 #include "../include/thermo.h"    // density, cp_mass, speed_of_sound
@@ -804,7 +805,8 @@ static ChannelResult make_channel_result(double h, double Nu, double Re,
 ChannelResult channel_smooth(double T, double P, const std::vector<double> &X,
                              double velocity, double diameter, double length,
                              double T_wall, const std::string &correlation,
-                             bool heating, double mu_ratio, double roughness) {
+                             bool heating, double mu_ratio, double roughness,
+                             double Nu_multiplier, double f_multiplier) {
   if (velocity < 0.0) {
     throw std::invalid_argument(
         "channel_smooth: velocity must be non-negative");
@@ -816,9 +818,9 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double> &X,
     throw std::invalid_argument("channel_smooth: length must be non-negative");
   }
 
-  // Fluid properties — evaluated once
-  double rho = density(T, P, X);
-  double mu = viscosity(T, P, X);
+  // Fluid properties and their derivatives
+  auto [rho, drho_dT, drho_dP] = solver::density_and_jacobians(T, P, X);
+  auto [mu, dmu_dT, dmu_dP] = solver::viscosity_and_jacobians(T, P, X);
   double k = thermal_conductivity(T, P, X);
   double Pr = prandtl(T, P, X);
 
@@ -868,6 +870,10 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double> &X,
                                 correlation + "'");
   }
 
+  // Apply empirical multipliers
+  Nu *= Nu_multiplier;
+  f *= f_multiplier;
+
   double h = htc_from_nusselt(Nu, k, diameter);
   double dP = (velocity > 0.0)
                   ? f * (length / diameter) * (rho * velocity * velocity / 2.0)
@@ -879,7 +885,99 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double> &X,
   const bool turbulent_flow = true;
   double T_aw = T_adiabatic_wall(T, velocity, T, P, X, turbulent_flow);
 
-  return make_channel_result(h, Nu, Re, Pr, f, dP, M, T_aw, T_wall);
+  // Compute Jacobians
+  // Note: For network solver, mdot is the independent variable, not velocity
+  // velocity = mdot / (rho * A_cross), where A_cross = pi/4 * D^2
+  // We compute derivatives w.r.t. mdot and T
+
+  ChannelResult result = make_channel_result(h, Nu, Re, Pr, f, dP, M, T_aw, T_wall);
+
+  // Only compute Jacobians if flow exists
+  if (velocity > 0.0 && Re > 0.0) {
+    double A_cross = M_PI / 4.0 * diameter * diameter;
+    double mdot = rho * velocity * A_cross;
+
+    // Chain rule: dRe/dmdot and dRe/dT
+    // Re = rho * v * D / mu = mdot * D / (A_cross * mu)
+    double dRe_dmdot = diameter / (A_cross * mu);
+    double dRe_dT = Re * (drho_dT / rho - dmu_dT / mu);
+
+    // Get Nu and f derivatives w.r.t. Re (these depend on correlation)
+    double dNu_dRe = 0.0;
+    double df_dRe = 0.0;
+
+    if (Re >= 2300.0) {
+      // Friction factor derivative (needed first for Gnielinski/Petukhov)
+      if (e_D > 0.0 && Re > 4000.0) {
+        // Colebrook - use finite difference
+        double eps = std::max(1.0, Re * 1e-6);
+        double f_plus = friction_colebrook(Re + eps, e_D);
+        double f_minus = friction_colebrook(Re - eps, e_D);
+        df_dRe = (f_plus - f_minus) / (2.0 * eps) * f_multiplier;
+      } else {
+        // Petukhov: f = (0.79*ln(Re) - 1.64)^(-2)
+        // df/dRe = -2 * f^1.5 * 0.79 / Re
+        df_dRe = -2.0 * std::pow(f / f_multiplier, 1.5) * 0.79 / Re * f_multiplier;
+      }
+
+      // Turbulent correlations have Re derivatives
+      if (correlation == "gnielinski") {
+        // Gnielinski: Nu = Nu(Re, Pr, f), so dNu/dRe_total = ∂Nu/∂Re + ∂Nu/∂f · df/dRe
+        // Use finite difference for total derivative
+        double eps = std::max(1.0, Re * 1e-6);
+        double f_plus = (e_D > 0.0 && Re + eps > 4000.0) ? friction_colebrook(Re + eps, e_D) : friction_petukhov(Re + eps);
+        double f_minus = (e_D > 0.0 && Re - eps > 4000.0) ? friction_colebrook(Re - eps, e_D) : friction_petukhov(Re - eps);
+        f_plus *= f_multiplier;
+        f_minus *= f_multiplier;
+        double Nu_plus = nusselt_gnielinski(Re + eps, Pr, f_plus);
+        double Nu_minus = nusselt_gnielinski(Re - eps, Pr, f_minus);
+        dNu_dRe = (Nu_plus - Nu_minus) / (2.0 * eps) * Nu_multiplier;
+      } else if (correlation == "dittus_boelter") {
+        // Nu = 0.023 * Re^0.8 * Pr^n  =>  dNu/dRe = 0.8 * Nu / Re
+        dNu_dRe = 0.8 * Nu / Re;
+      } else if (correlation == "sieder_tate") {
+        // Nu = 0.027 * Re^0.8 * Pr^(1/3) * mu_ratio^0.14  =>  dNu/dRe = 0.8 * Nu / Re
+        dNu_dRe = 0.8 * Nu / Re;
+      } else if (correlation == "petukhov") {
+        // Petukhov: Nu = Nu(Re, Pr, f), so dNu/dRe_total = ∂Nu/∂Re + ∂Nu/∂f · df/dRe
+        double eps = std::max(1.0, Re * 1e-6);
+        double f_plus = friction_petukhov(Re + eps) * f_multiplier;
+        double f_minus = friction_petukhov(Re - eps) * f_multiplier;
+        double Nu_plus = nusselt_petukhov(Re + eps, Pr, f_plus);
+        double Nu_minus = nusselt_petukhov(Re - eps, Pr, f_minus);
+        dNu_dRe = (Nu_plus - Nu_minus) / (2.0 * eps) * Nu_multiplier;
+      }
+    }
+    // Laminar: Nu and f are constant or 1/Re (derivatives handled separately if needed)
+
+    // dh/dmdot = (dh/dNu) * (dNu/dRe) * (dRe/dmdot) = (k/D) * dNu/dRe * dRe/dmdot
+    result.dh_dmdot = (k / diameter) * dNu_dRe * dRe_dmdot;
+
+    // dh/dT = (dh/dNu) * (dNu/dRe) * (dRe/dT) = (k/D) * dNu/dRe * dRe/dT
+    result.dh_dT = (k / diameter) * dNu_dRe * dRe_dT;
+
+    // ddP/dmdot: dP = f * (L/D) * (rho * v^2 / 2)
+    // v = mdot / (rho * A), so v^2 = mdot^2 / (rho^2 * A^2)
+    // dP = f * (L/D) * mdot^2 / (2 * rho * A^2)
+    // d(dP)/dmdot = (df/dRe * dRe/dmdot) * (L/D) * mdot^2/(2*rho*A^2) + f*(L/D)*mdot/(rho*A^2)
+    double dP_factor = (length / diameter) / (2.0 * rho * A_cross * A_cross);
+    result.ddP_dmdot = df_dRe * dRe_dmdot * dP_factor * mdot * mdot
+                     + f * (length / diameter) * mdot / (rho * A_cross * A_cross);
+
+    // d(dP)/dT: includes df/dT and drho/dT terms
+    result.ddP_dT = df_dRe * dRe_dT * dP_factor * mdot * mdot
+                  - f * (length / diameter) * velocity * velocity / 2.0 * drho_dT / rho;
+
+    // dq/dmdot and dq/dT: q = h * (T_aw - T_wall)
+    if (std::isfinite(T_wall)) {
+      double dT_diff = T_aw - T_wall;
+      result.dq_dmdot = result.dh_dmdot * dT_diff;  // Simplified: ignoring dT_aw/dmdot
+      result.dq_dT = result.dh_dT * dT_diff;        // Simplified: ignoring dT_aw/dT
+      result.dq_dT_wall = -h;
+    }
+  }
+
+  return result;
 }
 
 // -------------------------------------------------------------

@@ -539,6 +539,16 @@ struct ChannelResult {
   double M;    // Mach number [-]  (computed internally from v/a(T,X))
   double T_aw; // adiabatic wall temperature [K]  (always computed, see above)
   double q;    // heat flux [W/m²]  (nan if T_wall not supplied)
+
+  // Jacobians — derivatives w.r.t. mass flow rate and temperature
+  // These enable network solver coupling with analytical gradients
+  double dh_dmdot = 0.0;     // ∂h/∂ṁ  [W/(m²·K·kg/s)]
+  double dh_dT = 0.0;        // ∂h/∂T  [W/(m²·K²)]
+  double ddP_dmdot = 0.0;    // ∂(dP)/∂ṁ [Pa·s/kg]
+  double ddP_dT = 0.0;       // ∂(dP)/∂T [Pa/K]
+  double dq_dmdot = 0.0;     // ∂q/∂ṁ  [W·s/(m²·kg)]
+  double dq_dT = 0.0;        // ∂q/∂T  [W/(m²·K)]
+  double dq_dT_wall = 0.0;   // ∂q/∂T_wall [W/(m²·K)]  (= -h when T_wall finite)
 };
 
 // -------------------------------------------------------------
@@ -566,13 +576,16 @@ struct ChannelResult {
 //   "petukhov" heating    : true = fluid is heated (affects Dittus-Boelter
 //   exponent) mu_ratio   : mu_bulk / mu_wall for Sieder-Tate (default 1.0)
 //   roughness  : absolute wall roughness [m]  (default 0.0 = smooth)
+//   Nu_multiplier : empirical correction factor on Nu (default 1.0)
+//   f_multiplier  : empirical correction factor on f (default 1.0)
 ChannelResult
 channel_smooth(double T, double P, const std::vector<double> &X,
                double velocity, double diameter, double length,
                double T_wall = std::numeric_limits<double>::quiet_NaN(),
                const std::string &correlation = "gnielinski",
                bool heating = true, double mu_ratio = 1.0,
-               double roughness = 0.0);
+               double roughness = 0.0,
+               double Nu_multiplier = 1.0, double f_multiplier = 1.0);
 
 // Rib-enhanced cooling channel (Han et al. 1988)
 //

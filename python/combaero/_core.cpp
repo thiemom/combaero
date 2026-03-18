@@ -5065,6 +5065,20 @@ PYBIND11_MODULE(_core, m) {
                     "Adiabatic wall temperature [K]")
       .def_readonly("q", &ChannelResult::q,
                     "Heat flux [W/m^2] (nan if T_wall not supplied)")
+      .def_readonly("dh_dmdot", &ChannelResult::dh_dmdot,
+                    "Jacobian: dh/dmdot [W/(m^2*K*kg/s)]")
+      .def_readonly("dh_dT", &ChannelResult::dh_dT,
+                    "Jacobian: dh/dT [W/(m^2*K^2)]")
+      .def_readonly("ddP_dmdot", &ChannelResult::ddP_dmdot,
+                    "Jacobian: d(dP)/dmdot [Pa*s/kg]")
+      .def_readonly("ddP_dT", &ChannelResult::ddP_dT,
+                    "Jacobian: d(dP)/dT [Pa/K]")
+      .def_readonly("dq_dmdot", &ChannelResult::dq_dmdot,
+                    "Jacobian: dq/dmdot [W*s/(m^2*kg)]")
+      .def_readonly("dq_dT", &ChannelResult::dq_dT,
+                    "Jacobian: dq/dT [W/(m^2*K)]")
+      .def_readonly("dq_dT_wall", &ChannelResult::dq_dT_wall,
+                    "Jacobian: dq/dT_wall [W/(m^2*K)]")
       .def("__repr__", [](const ChannelResult &r) {
         auto fmt = [](double v) {
           if (std::isnan(v))
@@ -5087,16 +5101,17 @@ PYBIND11_MODULE(_core, m) {
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double velocity, double diameter, double length, double T_wall,
          const std::string &correlation, bool heating, double mu_ratio,
-         double roughness) {
+         double roughness, double Nu_multiplier, double f_multiplier) {
         return channel_smooth(T, P, to_vec(X_arr), velocity, diameter, length,
                               T_wall, correlation, heating, mu_ratio,
-                              roughness);
+                              roughness, Nu_multiplier, f_multiplier);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
       py::arg("diameter"), py::arg("length"),
       py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
       py::arg("correlation") = "gnielinski", py::arg("heating") = true,
       py::arg("mu_ratio") = 1.0, py::arg("roughness") = 0.0,
+      py::arg("Nu_multiplier") = 1.0, py::arg("f_multiplier") = 1.0,
       "Smooth pipe/duct: combined HTC + pressure drop.\n\n"
       "Parameters:\n"
       "  T, P, X    : bulk static thermodynamic state\n"
@@ -5108,8 +5123,10 @@ PYBIND11_MODULE(_core, m) {
       "'petukhov'\n"
       "  heating    : True = fluid heated\n"
       "  mu_ratio   : mu_bulk/mu_wall for Sieder-Tate\n"
-      "  roughness  : absolute wall roughness [m]\n\n"
-      "Returns: ChannelResult");
+      "  roughness  : absolute wall roughness [m]\n"
+      "  Nu_multiplier : empirical correction factor on Nu (default 1.0)\n"
+      "  f_multiplier  : empirical correction factor on f (default 1.0)\n\n"
+      "Returns: ChannelResult with Jacobian fields populated");
 
   // -----------------------------------------------------------------
   // channel_ribbed
