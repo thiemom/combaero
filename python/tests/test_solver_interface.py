@@ -34,6 +34,106 @@ def test_orifice_jacobian():
         np.testing.assert_allclose(jac_analytic, jac_numeric, rtol=1e-6)
 
 
+def test_orifice_bidirectional_flow():
+    """Test that orifice handles bidirectional flow (positive and negative dP)."""
+    rho = 1.225
+    Cd = 0.6
+    area = 0.05
+
+    # Test positive, zero, and negative dP
+    dP_test_points = [-50000.0, -100.0, -10.0, 0.0, 10.0, 100.0, 50000.0]
+
+    def mdot_func(dP):
+        return cb._core.orifice_mdot_and_jacobian(dP, rho, Cd, area)[0]
+
+    for dP in dP_test_points:
+        mdot, d_mdot_ddP, _ = cb._core.orifice_mdot_and_jacobian(dP, rho, Cd, area)
+
+        # Sign consistency: mdot should have same sign as dP
+        if dP > 0:
+            assert mdot > 0.0, f"Positive dP={dP} should give positive mdot, got {mdot}"
+        elif dP < 0:
+            assert mdot < 0.0, f"Negative dP={dP} should give negative mdot, got {mdot}"
+        else:
+            assert abs(mdot) < 1e-10, f"Zero dP should give near-zero mdot, got {mdot}"
+
+        # Jacobian should always be positive (mdot increases with dP)
+        assert d_mdot_ddP > 0.0, f"Jacobian should be positive, got {d_mdot_ddP} at dP={dP}"
+
+        # Verify Jacobian accuracy with numerical derivative
+        if abs(dP) > 1e-3:  # Skip very small dP where numerical derivative is less accurate
+            h = max(1e-5, abs(dP) * 1e-6)
+            jac_numeric = central_difference(mdot_func, dP, h)
+            np.testing.assert_allclose(
+                d_mdot_ddP, jac_numeric, rtol=1e-5, err_msg=f"Jacobian mismatch at dP={dP}"
+            )
+
+
+def test_orifice_smooth_at_zero():
+    """Test that orifice flow is smooth through dP = 0 (regularization working)."""
+    rho = 1.225
+    Cd = 0.6
+    area = 0.05
+
+    # Test points very close to zero
+    dP_near_zero = [-1.0, -0.1, -0.01, 0.0, 0.01, 0.1, 1.0]
+
+    mdot_values = []
+    jac_values = []
+
+    for dP in dP_near_zero:
+        mdot, d_mdot_ddP, _ = cb._core.orifice_mdot_and_jacobian(dP, rho, Cd, area)
+        mdot_values.append(mdot)
+        jac_values.append(d_mdot_ddP)
+
+    # Check mdot is continuous (no jumps)
+    mdot_diffs = np.diff(mdot_values)
+    max_jump = np.max(np.abs(mdot_diffs))
+    assert max_jump < 0.1, f"mdot should be smooth near zero, max jump = {max_jump}"
+
+    # Check Jacobian is continuous and positive everywhere
+    for dP, jac in zip(dP_near_zero, jac_values, strict=True):
+        assert jac > 0.0, f"Jacobian should be positive at dP={dP}, got {jac}"
+
+    jac_diffs = np.diff(jac_values)
+    max_jac_jump = np.max(np.abs(jac_diffs))
+    # Jacobian should be relatively smooth (within order of magnitude)
+    assert max_jac_jump < 10.0 * np.mean(jac_values), (
+        f"Jacobian should be smooth near zero, max jump = {max_jac_jump}"
+    )
+
+
+def test_orifice_symmetry():
+    """Test that orifice flow is antisymmetric: mdot(-dP) = -mdot(dP)."""
+    rho = 1.225
+    Cd = 0.6
+    area = 0.05
+
+    dP_test_points = [10.0, 100.0, 1000.0, 50000.0]
+
+    for dP in dP_test_points:
+        mdot_pos, jac_pos, drho_pos = cb._core.orifice_mdot_and_jacobian(dP, rho, Cd, area)
+        mdot_neg, jac_neg, drho_neg = cb._core.orifice_mdot_and_jacobian(-dP, rho, Cd, area)
+
+        # Antisymmetry: mdot(-dP) = -mdot(dP)
+        np.testing.assert_allclose(
+            mdot_neg, -mdot_pos, rtol=1e-10, err_msg=f"mdot should be antisymmetric at dP={dP}"
+        )
+
+        # Jacobian should be symmetric: d_mdot_ddP is same for +dP and -dP
+        np.testing.assert_allclose(
+            jac_neg, jac_pos, rtol=1e-10, err_msg=f"Jacobian should be symmetric at dP={dP}"
+        )
+
+        # Density derivative should be antisymmetric (like mdot, since d_mdot_drho ∝ mdot)
+        np.testing.assert_allclose(
+            drho_neg,
+            -drho_pos,
+            rtol=1e-10,
+            err_msg=f"d_mdot_drho should be antisymmetric at dP={dP}",
+        )
+
+
 def test_pressure_loss_jacobian():
     rho = 10.0
     K = 1.5
