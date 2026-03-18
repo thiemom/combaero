@@ -822,3 +822,104 @@ def test_pipe_compressible_reverse_flow():
     # Jacobians should still be computed
     assert np.isfinite(d_Pin), "d_dP_dP_in should be finite"
     assert np.isfinite(d_u), "d_dP_du_in should be finite"
+
+
+def test_compressible_network_scenario():
+    """Test compressible elements in a realistic network scenario.
+
+    Network: High Pressure -> Pipe -> Junction -> Orifice -> Low Pressure
+    This mimics the pattern from test_network_scenarios.py but uses compressible models.
+    """
+    # Use standard air composition (not hardcoded)
+    X = cb.standard_dry_air_composition()
+    Y = cb.mole_to_mass(X)
+
+    # Operating conditions
+    T = 300.0  # K
+    P_high = 300000.0  # 3 bar
+    P_low = 101325.0  # 1 atm
+
+    # Geometry
+    L_pipe = 2.0  # m
+    D_pipe = 0.05  # m
+    roughness = 1e-4  # m
+    A_orifice = 1e-4  # m²
+    Cd = 0.65
+    beta = 0.5
+
+    # Test pipe element
+    rho = cb.density(T, P_high, X)
+    area_pipe = 0.25 * np.pi * D_pipe**2
+    u_pipe = 50.0  # m/s estimate
+
+    dP_pipe, d_dP_dP, d_dP_dT, d_dP_du = cb._core.pipe_compressible_mdot_and_jacobian(
+        T, P_high, u_pipe, X, L_pipe, D_pipe, roughness, "haaland"
+    )
+
+    # Verify pipe results
+    assert dP_pipe > 0, "Pipe pressure drop should be positive"
+    assert d_dP_dP > 0, "d_dP/dP_in should be positive"
+    assert d_dP_du > 0, "d_dP/du should be positive (more velocity = more friction)"
+
+    # Compute mass flow through pipe
+    mdot_pipe = rho * area_pipe * u_pipe
+
+    # Test orifice element at junction
+    P_junction = P_high - dP_pipe
+
+    mdot_orifice, d_mdot_dP0, d_mdot_dPb, d_mdot_dT0 = (
+        cb._core.orifice_compressible_mdot_and_jacobian(
+            T, P_junction, P_low, X, Cd, A_orifice, beta
+        )
+    )
+
+    # Verify orifice results
+    assert mdot_orifice > 0, "Orifice mass flow should be positive"
+    assert d_mdot_dP0 > 0, "d_mdot/dP0 should be positive"
+
+    # Check pressure ratio to see if we're in compressible regime
+    PR = P_low / P_high
+    assert PR < 0.8, f"Test should be in compressible regime (PR={PR:.3f} < 0.8)"
+
+    # Check if choked - if so, d_mdot_dP_back should be ~0 (smoothed)
+    PR_crit = cb.critical_pressure_ratio(T, P_junction, X)
+    if PR_crit > PR:
+        # Choked flow - Jacobian should be near zero
+        assert abs(d_mdot_dPb) < 1e-8, (
+            f"d_mdot/dP_back should be ~0 when choked (PR={PR:.3f} < PR_crit={PR_crit:.3f})"
+        )
+    else:
+        # Unchoked flow - Jacobian should be negative
+        assert d_mdot_dPb < 0, "d_mdot/dP_back should be negative when unchoked"
+
+    # Verify mass flow consistency (pipe and orifice should be similar order of magnitude)
+    # They won't match exactly since we're not solving the full network, but should be close
+    flow_ratio = mdot_orifice / mdot_pipe
+    assert 0.1 < flow_ratio < 10.0, (
+        f"Flow rates should be similar order of magnitude (ratio={flow_ratio:.2f})"
+    )
+
+    # Test with mass fractions (not mole fractions) for residuals function
+    res_orifice = cb._core.orifice_compressible_residuals_and_jacobian(
+        mdot_orifice, P_junction, T, Y, P_low, Cd, A_orifice, beta
+    )
+
+    # Verify residuals structure
+    assert hasattr(res_orifice, "m_dot_calc"), "Should have m_dot_calc attribute"
+    assert hasattr(res_orifice, "d_mdot_dP_total_up"), "Should have Jacobian attributes"
+    np.testing.assert_allclose(
+        res_orifice.m_dot_calc,
+        mdot_orifice,
+        rtol=1e-10,
+        err_msg="Residuals should match direct call",
+    )
+
+    # Test pipe residuals function
+    res_pipe = cb._core.pipe_compressible_residuals_and_jacobian(
+        mdot_pipe, P_high, T, Y, P_low, L_pipe, D_pipe, roughness, "haaland"
+    )
+
+    # Verify pipe residuals structure
+    assert hasattr(res_pipe, "dP_calc"), "Should have dP_calc attribute"
+    assert hasattr(res_pipe, "d_dP_d_mdot"), "Should have Jacobian attributes"
+    assert res_pipe.dP_calc > 0, "Pipe pressure drop should be positive"
