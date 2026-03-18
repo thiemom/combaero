@@ -10,13 +10,34 @@
 #include "../include/stagnation.h"
 #include "../include/thermo.h"
 #include "../include/math_constants.h"
+#include "../include/thermo_transport_data.h"
 
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <limits>
 
 namespace combaero {
 namespace solver {
+
+namespace {
+// Get global minimum temperature across all species from NASA9 thermo data
+// Used to derive smooth floor limits for finite difference calculations
+double get_global_thermo_T_min() {
+  double T_min = std::numeric_limits<double>::max();
+  for (const auto& nasa : nasa_coeffs) {
+    if (!nasa.intervals.empty()) {
+      T_min = std::min(T_min, nasa.intervals.front().T_min);
+    }
+  }
+  return T_min;
+}
+
+// Smooth floor limit for temperature finite differences
+// Set to 2/3 of global TMIN to provide large cushion (e.g., 200K for TMIN=300K)
+const double THERMO_T_MIN = get_global_thermo_T_min();
+const double T_SMOOTH_FLOOR_LIMIT = THERMO_T_MIN * 0.67;
+} // anonymous namespace
 
 // -----------------------------------------------------------------------------
 // 1. Incompressible Flow Components
@@ -608,17 +629,27 @@ adiabatic_T_complete_and_jacobian_T(double T_in, double P,
   double T_ad = out_state.T;
   std::vector<double> X_products = out_state.X;
 
-  // Jacobian wrt T_in via heavily bracketed Central Finite Difference
+  // Jacobian wrt T_in via Central Finite Difference with smooth floor
   double dT_eps = std::max(1e-3, T_in * 1e-4);
 
+  // Smooth floor to avoid thermo data limits
+  const double T_limit = T_SMOOTH_FLOOR_LIMIT;
+  constexpr double delta_T = 1e-3;
+  double T_target_minus = T_in - dT_eps;
+  double diff_T = T_target_minus - T_limit;
+  double sq_dist_T = std::sqrt(diff_T * diff_T + delta_T);
+  double T_minus = 0.5 * (T_target_minus + T_limit + sq_dist_T);
+  double T_plus = T_in + dT_eps;
+  double actual_dT = T_plus - T_minus;
+
   State in_plus, in_minus;
-  in_plus.set_TPX(T_in + dT_eps, P, X_in);
-  in_minus.set_TPX(std::max(0.1, T_in - dT_eps), P, X_in);
+  in_plus.set_TPX(T_plus, P, X_in);
+  in_minus.set_TPX(T_minus, P, X_in);
 
   double T_ad_plus = combaero::complete_combustion(in_plus, true, true).T;
   double T_ad_minus = combaero::complete_combustion(in_minus, true, true).T;
 
-  double dT_ad_dT_in = (T_ad_plus - T_ad_minus) / (2.0 * dT_eps);
+  double dT_ad_dT_in = (T_ad_plus - T_ad_minus) / actual_dT;
 
   return {T_ad, dT_ad_dT_in, X_products};
 }
@@ -638,27 +669,45 @@ adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
   double T_ad = eq_res.state.T;
   std::vector<double> X_products = eq_res.state.X;
 
-  // Jacobians via heavily bracketed Central Finite Difference
+  // Jacobians via Central Finite Difference with smooth floor clamping
   double dT_eps = std::max(1e-3, T_in * 1e-4);
   double dP_eps = std::max(1.0, P * 1e-4);
 
-  // wrt T_in
+  // wrt T_in: smooth floor to avoid thermo data limits
+  const double T_limit = T_SMOOTH_FLOOR_LIMIT;
+  constexpr double delta_T = 1e-3;
+  double T_target_minus = T_in - dT_eps;
+  double diff_T = T_target_minus - T_limit;
+  double sq_dist_T = std::sqrt(diff_T * diff_T + delta_T);
+  double T_minus = 0.5 * (T_target_minus + T_limit + sq_dist_T);
+  double T_plus = T_in + dT_eps;
+  double actual_dT = T_plus - T_minus;
+
   State in_T_plus, in_T_minus;
-  in_T_plus.set_TPX(T_in + dT_eps, P, X_in);
-  in_T_minus.set_TPX(std::max(0.1, T_in - dT_eps), P, X_in);
+  in_T_plus.set_TPX(T_plus, P, X_in);
+  in_T_minus.set_TPX(T_minus, P, X_in);
 
   double T_ad_T_plus = combaero::combustion_equilibrium(in_T_plus).state.T;
   double T_ad_T_minus = combaero::combustion_equilibrium(in_T_minus).state.T;
-  double dT_ad_dT_in = (T_ad_T_plus - T_ad_T_minus) / (2.0 * dT_eps);
+  double dT_ad_dT_in = (T_ad_T_plus - T_ad_T_minus) / actual_dT;
 
-  // wrt P
+  // wrt P: smooth floor to avoid negative pressure
+  constexpr double P_limit = 1.0;
+  constexpr double delta_P = 1e-3;
+  double P_target_minus = P - dP_eps;
+  double diff_P = P_target_minus - P_limit;
+  double sq_dist_P = std::sqrt(diff_P * diff_P + delta_P);
+  double P_minus = 0.5 * (P_target_minus + P_limit + sq_dist_P);
+  double P_plus = P + dP_eps;
+  double actual_dP = P_plus - P_minus;
+
   State in_P_plus, in_P_minus;
-  in_P_plus.set_TPX(T_in, P + dP_eps, X_in);
-  in_P_minus.set_TPX(T_in, std::max(0.1, P - dP_eps), X_in);
+  in_P_plus.set_TPX(T_in, P_plus, X_in);
+  in_P_minus.set_TPX(T_in, P_minus, X_in);
 
   double T_ad_P_plus = combaero::combustion_equilibrium(in_P_plus).state.T;
   double T_ad_P_minus = combaero::combustion_equilibrium(in_P_minus).state.T;
-  double dT_ad_dP = (T_ad_P_plus - T_ad_P_minus) / (2.0 * dP_eps);
+  double dT_ad_dP = (T_ad_P_plus - T_ad_P_minus) / actual_dP;
 
   return {T_ad, dT_ad_dT_in, dT_ad_dP, X_products};
 }
