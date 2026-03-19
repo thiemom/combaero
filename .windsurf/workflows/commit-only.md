@@ -6,18 +6,11 @@ This workflow automates the commit process with proper style checking and messag
 
 ## Steps
 
-// turbo
 ### 1. Check for old commit message files
 ```bash
-if [ -f COMMIT_MSG.md ]; then
-  echo "⚠️  Found existing COMMIT_MSG.md"
-  echo "This may be from a previous commit attempt."
-  echo "Please review and delete if stale, or keep if you want to reuse it."
-  exit 1
-fi
+./scripts/check-commit-msg.sh
 ```
-Note: keeping this file will commit it. Do not leave it.
-If a previous COMMIT_MSG.md exists in the repository: review it and delete if stale.
+Note: If a COMMIT_MSG.md exists, review it and delete if stale, or keep to reuse it.
 // turbo
 ### 2. Stage all changes
 ```bash
