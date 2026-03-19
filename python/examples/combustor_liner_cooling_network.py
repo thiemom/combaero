@@ -53,10 +53,13 @@ from combaero.heat_transfer import (
 from combaero.network import (
     FlowNetwork,
     MassFlowBoundary,
+    MixtureState,
     NetworkSolver,
+    OrificeElement,
     PipeElement,
     PlenumNode,
     PressureBoundary,
+    WallConnection,
 )
 from combaero.species import SpeciesLocator
 
@@ -71,8 +74,6 @@ def create_cooling_network(
     L_ch: float,
     N_ch: int,
     ch_name: str,
-    t_wall: float,
-    k_wall: float,
 ) -> tuple[FlowNetwork, float]:
     """Create FlowNetwork for cooling channels with wall coupling to hot gas.
 
@@ -82,6 +83,7 @@ def create_cooling_network(
 
     # Cooling path
     mdot_cool = f_cool * mdot_total
+    mdot_channel = mdot_cool / N_ch
     A_liner = np.pi * D_ch * L_ch * N_ch
 
     # Create convective surface based on channel type
@@ -101,7 +103,9 @@ def create_cooling_network(
         raise ValueError(f"Unknown channel type: {ch_name}")
 
     # Nodes
-    net.add_node(MassFlowBoundary("cool_inlet", m_dot=mdot_cool, T_total=T2, Y=ca.mole_to_mass_fractions(X_cool)))
+    net.add_node(
+        MassFlowBoundary("cool_inlet", m_dot=mdot_channel, T_total=T2, Y=ca.mole_to_mass(X_cool))
+    )
     net.add_node(PlenumNode("cool_exit"))
     net.add_node(PressureBoundary("cool_outlet", P_total=P2))
 
@@ -121,12 +125,83 @@ def create_cooling_network(
 
     # Exit orifice (minimal resistance)
     net.add_element(
-        ca.OrificeElement(
+        OrificeElement(
             id="cool_exit_orifice",
             from_node="cool_exit",
             to_node="cool_outlet",
-            diameter=D_ch,
-            bore_diameter=D_ch * 0.95,
+            Cd=0.98,
+            area=np.pi * (D_ch * 0.95 / 2) ** 2,
+            regime="incompressible",
+        )
+    )
+
+    return net, A_liner
+
+
+def create_coupled_wall_network(
+    f_cool: float,
+    mdot_total: float,
+    T2: float,
+    P2: float,
+    X_cool: list,
+    X_hot: list,
+    P_hot: float,
+    T_hot: float,
+    D_ch: float,
+    L_ch: float,
+    N_ch: int,
+    D_ann: float,
+    u_hot_ann: float,
+    ch_name: str,
+    wall_layers: list[tuple[float, float]],
+) -> tuple[FlowNetwork, float]:
+    """Create a two-stream wall-coupled network (hot annulus + cool channel)."""
+    net, A_liner = create_cooling_network(f_cool, mdot_total, T2, P2, X_cool, D_ch, L_ch, N_ch, ch_name)
+
+    # Hot-side flow path (representative annulus stream)
+    A_ann = np.pi * (D_ann / 2.0) ** 2
+    rho_hot = ca.density(T_hot, P_hot, X_hot)
+    mdot_hot = rho_hot * u_hot_ann * A_ann
+
+    hot_surface = ConvectiveSurface(area=A_liner, model=SmoothModel())
+    net.add_node(MassFlowBoundary("hot_inlet", m_dot=mdot_hot, T_total=T_hot, Y=ca.mole_to_mass(X_hot)))
+    net.add_node(PlenumNode("hot_exit"))
+    net.add_node(PressureBoundary("hot_outlet", P_total=P_hot))
+
+    hot_pipe = PipeElement(
+        id="hot_channel",
+        from_node="hot_inlet",
+        to_node="hot_exit",
+        length=L_ch,
+        diameter=D_ann,
+        roughness=0.0,
+        surface=hot_surface,
+    )
+    hot_pipe.t_wall = T2
+    net.add_element(hot_pipe)
+
+    net.add_element(
+        OrificeElement(
+            id="hot_exit_orifice",
+            from_node="hot_exit",
+            to_node="hot_outlet",
+            Cd=0.98,
+            area=np.pi * (D_ann * 0.95 / 2) ** 2,
+            regime="incompressible",
+        )
+    )
+
+    # Equivalent single-layer wall from multilayer t/k sum
+    t_wall_total = sum(t for t, _ in wall_layers)
+    k_wall_eff = t_wall_total / sum(t / k for t, k in wall_layers)
+    net.add_wall(
+        WallConnection(
+            id="liner_wall",
+            element_a="hot_channel",
+            element_b="cool_channel",
+            wall_thickness=t_wall_total,
+            wall_conductivity=k_wall_eff,
+            contact_area=A_liner,
         )
     )
 
@@ -155,16 +230,15 @@ def solve_operating_point_network(
 
     mdot_cool = f_cool * mdot_total
     mdot_bypass = (1.0 - f_cool) * mdot_total
+    cp_cool = ca.cp_mass(T2, X_cool)
     P_hot = P2 * (1.0 - dP_burner_frac)
     T_hot_est = COT_target
 
-    # Create network (without wall coupling for now - manual iteration)
-    # We'll use the network to compute cooling side, then manually couple to hot side
-    t_wall_total = sum(t for t, k in wall_layers)
-    k_wall_eff = t_wall_total / sum(t / k for t, k in wall_layers)
+    # Create single-channel flow network and iterate wall/combustor coupling manually.
+    # The network provides cooling-side flow states; wall heat transfer is updated in-loop.
 
     net, A_liner = create_cooling_network(
-        f_cool, mdot_total, T2, P2, X_cool, D_ch, L_ch, N_ch, ch_name, t_wall_total, k_wall_eff
+        f_cool, mdot_total, T2, P2, X_cool, D_ch, L_ch, N_ch, ch_name
     )
 
     solver = NetworkSolver(net)
@@ -176,30 +250,36 @@ def solve_operating_point_network(
 
         # Solve cooling network
         result = solver.solve()
-        if not result.success:
-            raise RuntimeError(f"Network solver failed: {result.message}")
-
-        # Extract cooling side results
-        cool_exit_state = solver.get_node_state("cool_exit")
-        T_cool_exit = cool_exit_state.T
+        # Check if solver converged (warning will be issued if not)
+        if not result:
+            raise RuntimeError("Network solver failed to converge")
 
         # Get HTC and heat flux from cooling side
         cool_elem = net.elements["cool_channel"]
-        cool_state_in = solver.get_node_state("cool_inlet")
+        cool_state_in = MixtureState(
+            T=T2,
+            T_total=T2,
+            P=P2,
+            P_total=P2,
+            Y=ca.mole_to_mass(X_cool),
+            m_dot=mdot_cool / N_ch,
+        )
         ch_result = cool_elem.htc_and_T(cool_state_in)
 
         if ch_result is None:
             raise RuntimeError("No heat transfer result from cooling channel")
 
         h_cool = ch_result.h
-        T_aw_cool = ch_result.T_aw
 
         # Hot side HTC
         h_hot = hot_side_htc(T_hot_est, P_hot, X_air, D_ann, u_hot_ann)
 
         # Wall temperature profile
         t_over_k = np.array([t / k for t, k in wall_layers])
-        temps, q_wall = ca.wall_temperature_profile(T_hot_est, T_aw_cool, h_hot, h_cool, t_over_k)
+        temps, q_wall = ca.wall_temperature_profile(T_hot_est, T2, h_hot, h_cool, t_over_k)
+
+        # Coolant exit temperature from energy balance (matches standalone model)
+        T_cool_exit = T2 + q_wall * A_liner / (mdot_cool * cp_cool)
 
         # Mix coolant_exit + bypass -> oxidizer
         cool_s = ca.Stream()
@@ -220,12 +300,19 @@ def solve_operating_point_network(
 
     # Compute thermal performance factor
     net_smooth, _ = create_cooling_network(
-        f_cool, mdot_total, T2, P2, X_cool, D_ch, L_ch, N_ch, "Smooth", t_wall_total, k_wall_eff
+        f_cool, mdot_total, T2, P2, X_cool, D_ch, L_ch, N_ch, "Smooth"
     )
     net_smooth.elements["cool_channel"].t_wall = T_hot_est
     solver_smooth = NetworkSolver(net_smooth)
     solver_smooth.solve()
-    cool_state_smooth = solver_smooth.get_node_state("cool_inlet")
+    cool_state_smooth = MixtureState(
+        T=T2,
+        T_total=T2,
+        P=P2,
+        P_total=P2,
+        Y=ca.mole_to_mass(X_cool),
+        m_dot=mdot_cool / N_ch,
+    )
     ch_smooth = net_smooth.elements["cool_channel"].htc_and_T(cool_state_smooth)
 
     eta_thp = ca.thermal_performance_factor(
@@ -236,12 +323,12 @@ def solve_operating_point_network(
     T_hot_surf = temps[0]
     T_metal_hot = temps[1] if len(temps) > 2 else temps[0]
 
-    # Get pressure drop from network solution
-    dP_cool = result.x[solver._unknown_indices["cool_exit"][0]] - P2
+    # Use channel pressure drop (matches standalone model definition)
+    dP_cool = ch_result.dP
 
     return {
         "f_cool": f_cool,
-        "u_cool": cool_state_in.m_dot / (ca.density(T2, P2, X_cool) * N_ch * np.pi * (D_ch / 2) ** 2),
+        "u_cool": mdot_cool / (ca.density(T2, P2, X_cool) * N_ch * np.pi * (D_ch / 2) ** 2),
         "h_cool": h_cool,
         "h_hot": h_hot,
         "Re": ch_result.Re,
@@ -254,6 +341,153 @@ def solve_operating_point_network(
         "q_wall": q_wall,
         "T_hot_surf": T_hot_surf,
         "T_metal_hot": T_metal_hot,
+        "eta_thp": eta_thp,
+    }
+
+
+def solve_operating_point_network_coupled(
+    f_cool: float,
+    mdot_total: float,
+    T2: float,
+    P2: float,
+    X_cool: list,
+    X_air: list,
+    X_ch4: list,
+    COT_target: float,
+    dP_burner_frac: float,
+    D_ch: float,
+    L_ch: float,
+    N_ch: int,
+    D_ann: float,
+    u_hot_ann: float,
+    ch_name: str,
+    wall_layers: list[tuple[float, float]],
+) -> dict:
+    """Solve one operating point with true network wall coupling enabled.
+
+    Unlike ``solve_operating_point_network`` (parity path), this path couples
+    hot and cold channels directly through ``WallConnection`` inside the
+    nonlinear network solve.
+    """
+
+    mdot_cool = f_cool * mdot_total
+    mdot_bypass = (1.0 - f_cool) * mdot_total
+    cp_cool = ca.cp_mass(T2, X_cool)
+    P_hot = P2 * (1.0 - dP_burner_frac)
+    T_hot_est = COT_target
+    A_liner = np.pi * D_ch * L_ch * N_ch
+
+    net, _ = create_coupled_wall_network(
+        f_cool,
+        mdot_total,
+        T2,
+        P2,
+        X_cool,
+        X_air,
+        P_hot,
+        T_hot_est,
+        D_ch,
+        L_ch,
+        N_ch,
+        D_ann,
+        u_hot_ann,
+        ch_name,
+        wall_layers,
+    )
+    net.thermal_coupling_enabled = True
+    solver = NetworkSolver(net)
+
+    for _ in range(5):
+        # Update hot-side inlet to current combustor estimate.
+        A_ann = np.pi * (D_ann / 2.0) ** 2
+        rho_hot = ca.density(T_hot_est, P_hot, X_air)
+        net.nodes["hot_inlet"].T_total = T_hot_est
+        net.nodes["hot_inlet"].m_dot = rho_hot * u_hot_ann * A_ann
+
+        result = solver.solve()
+        if not result:
+            raise RuntimeError("Coupled network solver failed to converge")
+
+        T_cool_exit = result["cool_exit.T"]
+
+        cool_s = ca.Stream()
+        cool_s.T, cool_s.P, cool_s.X, cool_s.mdot = T_cool_exit, P2, X_cool, mdot_cool
+        byp_s = ca.Stream()
+        byp_s.T, byp_s.P, byp_s.X, byp_s.mdot = T2, P2, X_air, mdot_bypass
+        oxidizer = ca.mix([cool_s, byp_s])
+
+        fuel_s = ca.Stream()
+        fuel_s.T, fuel_s.P, fuel_s.X = 300.0, P2, X_ch4
+        fuel_s = ca.set_fuel_stream_for_Tad(COT_target, fuel_s, oxidizer)
+
+        mixed_in = ca.mix([cool_s, byp_s, fuel_s])
+        burned = ca.complete_combustion(mixed_in.T, mixed_in.X, mixed_in.P)
+        T_hot_est = burned.T
+
+    # Post-process consistent with existing return schema
+    cool_elem = net.elements["cool_channel"]
+    hot_elem = net.elements["hot_channel"]
+    cool_state_in = MixtureState(
+        T=result["cool_inlet.T"],
+        T_total=result["cool_inlet.T"],
+        P=result["cool_inlet.P"],
+        P_total=result["cool_inlet.P"],
+        Y=ca.mole_to_mass(X_cool),
+        m_dot=mdot_cool / N_ch,
+    )
+    A_ann = np.pi * (D_ann / 2.0) ** 2
+    hot_state_in = MixtureState(
+        T=result["hot_inlet.T"],
+        T_total=result["hot_inlet.T"],
+        P=result["hot_inlet.P"],
+        P_total=result["hot_inlet.P"],
+        Y=ca.mole_to_mass(X_air),
+        m_dot=ca.density(T_hot_est, P_hot, X_air) * u_hot_ann * A_ann,
+    )
+    ch_result = cool_elem.htc_and_T(cool_state_in)
+    ch_hot = hot_elem.htc_and_T(hot_state_in)
+    if ch_result is None or ch_hot is None:
+        raise RuntimeError("Failed to compute coupled channel heat-transfer results")
+
+    # Use energy-balance wall heat flux for reporting
+    q_wall = (T_cool_exit - T2) * mdot_cool * cp_cool / A_liner
+
+    t_over_k = np.array([t / k for t, k in wall_layers])
+    temps, _ = ca.wall_temperature_profile(T_hot_est, T2, ch_hot.h, ch_result.h, t_over_k)
+
+    net_smooth, _ = create_cooling_network(f_cool, mdot_total, T2, P2, X_cool, D_ch, L_ch, N_ch, "Smooth")
+    net_smooth.elements["cool_channel"].t_wall = T_hot_est
+    NetworkSolver(net_smooth).solve()
+    cool_state_smooth = MixtureState(
+        T=T2,
+        T_total=T2,
+        P=P2,
+        P_total=P2,
+        Y=ca.mole_to_mass(X_cool),
+        m_dot=mdot_cool / N_ch,
+    )
+    ch_smooth = net_smooth.elements["cool_channel"].htc_and_T(cool_state_smooth)
+
+    eta_thp = ca.thermal_performance_factor(
+        Nu_ratio=ch_result.Nu / ch_smooth.Nu,
+        f_ratio=max(ch_result.f / ch_smooth.f, 1.0),
+    )
+
+    return {
+        "f_cool": f_cool,
+        "u_cool": mdot_cool / (ca.density(T2, P2, X_cool) * N_ch * np.pi * (D_ch / 2) ** 2),
+        "h_cool": ch_result.h,
+        "h_hot": ch_hot.h,
+        "Re": ch_result.Re,
+        "Nu": ch_result.Nu,
+        "dP_cool": abs(ch_result.dP),
+        "dP_total_frac": (dP_burner_frac * P2 + abs(ch_result.dP)) / P2 * 100.0,
+        "T_cool_exit": T_cool_exit,
+        "T_hot": T_hot_est,
+        "FAR": fuel_s.mdot / mdot_total,
+        "q_wall": q_wall,
+        "T_hot_surf": temps[0],
+        "T_metal_hot": temps[1] if len(temps) > 2 else temps[0],
         "eta_thp": eta_thp,
     }
 

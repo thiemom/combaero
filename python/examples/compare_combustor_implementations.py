@@ -7,12 +7,13 @@ Runs both implementations with identical inputs and verifies results match.
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 import combaero as ca
 from combaero.species import SpeciesLocator
 
 # Import solve functions from both implementations
-sys.path.insert(0, "/Users/thiemo/Projects/combaero/python/examples")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from combustor_liner_cooling_network import solve_operating_point_network as solve_network
 from combustor_liner_cooling_standalone import solve_operating_point as solve_standalone
 
@@ -76,7 +77,7 @@ def compare_results(standalone: dict, network: dict, tol_rel: float = 0.01) -> b
     return all_match
 
 
-def main() -> None:
+def main() -> int:
     sp = SpeciesLocator.from_core()
 
     print("=" * 80)

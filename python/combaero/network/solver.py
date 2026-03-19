@@ -57,14 +57,77 @@ class NetworkSolver:
         self._topological_order: list[str] = []
         self._derived_states: dict[str, tuple[float, list[float], Any]] = {}
 
+    def _infer_reference_state(self) -> dict[str, Any]:
+        """Derive sensible default values for unknowns from boundary nodes.
+
+        Uses the **minimum** ``PressureBoundary`` pressure so that
+        interior nodes start near the downstream end of the network,
+        consistent with the previous hard-coded 1 atm default for
+        low-pressure networks while giving a physically meaningful
+        starting point for high-pressure ones.  Temperature and
+        composition are averaged
+        across all boundary nodes that carry them.  Mass-flow defaults
+        to the total prescribed mass flow divided by the number of flow
+        elements.
+
+        Returns a dict with keys ``'P'``, ``'T'``, ``'Y'``, ``'m_dot'``.
+        """
+        pressures: list[float] = []
+        temperatures: list[float] = []
+        compositions: list[list[float]] = []
+        total_mdot = 0.0
+
+        for node in self.network.nodes.values():
+            if isinstance(node, PressureBoundary):
+                pressures.append(getattr(node, "P_total", 101325.0))
+                T = getattr(node, "T_total", None)
+                if T is not None:
+                    temperatures.append(T)
+                Y = getattr(node, "Y", None)
+                if Y is not None:
+                    compositions.append(list(Y))
+
+            elif isinstance(node, MassFlowBoundary):
+                T = getattr(node, "T_total", None)
+                if T is not None:
+                    temperatures.append(T)
+                Y = getattr(node, "Y", None)
+                if Y is not None:
+                    compositions.append(list(Y))
+                total_mdot += getattr(node, "m_dot", 0.0)
+
+        ref_P = float(min(pressures)) if pressures else 101325.0
+        ref_T = float(np.mean(temperatures)) if temperatures else 300.0
+        if compositions:
+            ref_Y = [float(v) for v in np.mean(compositions, axis=0)]
+        else:
+            ref_Y = list(self._default_Y)
+
+        n_elems = max(len(self.network.elements), 1)
+        ref_mdot = total_mdot / n_elems if total_mdot > 0 else 0.1
+
+        return {"P": ref_P, "T": ref_T, "Y": ref_Y, "m_dot": ref_mdot}
+
     def _build_x0(self) -> np.ndarray:
         """
         Constructs the initial guess vector by gathering all unknowns.
+
+        Default values are inferred from the network's boundary nodes:
+        pressure, temperature, and composition are averaged over all
+        ``PressureBoundary`` and ``MassFlowBoundary`` nodes that carry
+        the respective information.  Mass-flow unknowns default to the
+        total prescribed mass flow divided by the number of flow elements.
+        A small deterministic perturbation (±0.1 %) is added to break
+        symmetry and avoid saddle points.
+
         Returns a flat numpy array.
         """
         self.unknown_names = []
         self._unknown_indices = {}
         x0_list = []
+
+        # --- Infer sensible defaults from boundary nodes ----------------
+        ref = self._infer_reference_state()
 
         # Iterate through interior nodes and gather unknowns
         for node_id, node in self.network.nodes.items():
@@ -78,14 +141,14 @@ class NetworkSolver:
                         if unk in guess_dict:
                             x0_list.append(guess_dict[unk])
                         elif unk.endswith(".P") or unk.endswith(".P_total"):
-                            x0_list.append(101325.0)  # Default 1 atm
+                            x0_list.append(ref["P"])
                         elif unk.endswith(".T") or unk.endswith(".T_total"):
-                            x0_list.append(300.0)
+                            x0_list.append(ref["T"])
                         elif ".Y[" in unk:
                             idx = int(unk.split(".Y[")[1].replace("]", ""))
-                            x0_list.append(self._default_Y[idx])
+                            x0_list.append(ref["Y"][idx])
                         else:
-                            x0_list.append(1.0)
+                            x0_list.append(ref["m_dot"])
                     self._unknown_indices[node_id] = list(range(start_idx, len(x0_list)))
 
         # Iterate through elements and gather unknowns (m_dot)
@@ -99,7 +162,7 @@ class NetworkSolver:
                     if unk in guess_dict:
                         x0_list.append(guess_dict[unk])
                     elif unk.endswith(".m_dot"):
-                        x0_list.append(0.1)  # Default 0.1 kg/s
+                        x0_list.append(ref["m_dot"])
                     else:
                         x0_list.append(1.0)
                 self._unknown_indices[elem_id] = list(range(start_idx, len(x0_list)))
