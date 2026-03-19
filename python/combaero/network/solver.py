@@ -316,7 +316,8 @@ class NetworkSolver:
 
             # Store wall coupling debug info on the node
             if wall_contributions:
-                dT_mix_dQ = mix_res.dT_mix_d_delta_h if mix_res else 0.0
+                m_dot_total_dbg = sum(s.m_dot for s in up_states) or 1.0
+                dT_mix_dQ = (mix_res.dT_mix_d_delta_h / m_dot_total_dbg) if mix_res else 0.0
                 node._wall_couplings = []
                 for (
                     wall,
@@ -393,7 +394,10 @@ class NetworkSolver:
                 #   dQ/dmdot = dQ/dh_a * dh_a/dmdot + dQ/dT_aw_a * dT_aw_a/dmdot + (side B terms)
                 #   dQ/dT    = dQ/dh_a * dh_a/dT    + dQ/dT_aw_a * dT_aw_a/dT    + (side B terms)
                 if wall_contributions:
-                    dT_mix_dQ = mix_res.dT_mix_d_delta_h
+                    # dT_mix_d_delta_h = 1/cp_mix is dT/d(specific_h) [K/(J/kg)].
+                    # Wall Q is total heat rate [W], so dT/dQ = (1/cp) / m_dot_total.
+                    m_dot_total = sum(s.m_dot for s in up_states) or 1.0
+                    dT_mix_dQ = mix_res.dT_mix_d_delta_h / m_dot_total
                     for (
                         _wall,
                         _Qi,
@@ -412,11 +416,14 @@ class NetworkSolver:
 
                         # Temperature coupling: dT_node/dT_upstream_a
                         if from_a in relay:
-                            # dQ/dT_aw_a * dT_aw_a/dT (dominant, ~1) + dQ/dh_a * dh_a/dT
+                            # dQ/dT_aw_a * dT_aw_a/dT + dQ/dh_a * dh_a/dT
                             factor_T_a = (
                                 dT_mix_dQ
                                 * sign
-                                * (wall_result.dQ_dT_aw_a * 1.0 + wall_result.dQ_dh_a * ch_a.dh_dT)
+                                * (
+                                    wall_result.dQ_dT_aw_a * ch_a.dT_aw_dT
+                                    + wall_result.dQ_dh_a * ch_a.dh_dT
+                                )
                             )
                             for idx, sens_up in relay[from_a].items():
                                 nr = relay[nid].setdefault(
@@ -427,8 +434,15 @@ class NetworkSolver:
                         # Mass-flow coupling: dT_node/dmdot_a (direct)
                         if m_indices_a:
                             idx_mdot_a = m_indices_a[0]
-                            # dQ/dh_a * dh_a/dmdot (ignoring dT_aw_a/dmdot ~ small for low Mach)
-                            factor_mdot_a = dT_mix_dQ * sign * wall_result.dQ_dh_a * ch_a.dh_dmdot
+                            # dQ/dh_a * dh_a/dmdot + dQ/dT_aw_a * dT_aw_a/dmdot
+                            factor_mdot_a = (
+                                dT_mix_dQ
+                                * sign
+                                * (
+                                    wall_result.dQ_dh_a * ch_a.dh_dmdot
+                                    + wall_result.dQ_dT_aw_a * ch_a.dT_aw_dmdot
+                                )
+                            )
                             nr = relay[nid].setdefault(
                                 idx_mdot_a, {"T": 0.0, "Y": np.zeros(n_species), "P_total": 0.0}
                             )
@@ -443,7 +457,10 @@ class NetworkSolver:
                             factor_T_b = (
                                 dT_mix_dQ
                                 * sign
-                                * (wall_result.dQ_dT_aw_b * 1.0 + wall_result.dQ_dh_b * ch_b.dh_dT)
+                                * (
+                                    wall_result.dQ_dT_aw_b * ch_b.dT_aw_dT
+                                    + wall_result.dQ_dh_b * ch_b.dh_dT
+                                )
                             )
                             for idx, sens_up in relay[from_b].items():
                                 nr = relay[nid].setdefault(
@@ -454,7 +471,14 @@ class NetworkSolver:
                         # Mass-flow coupling: dT_node/dmdot_b (direct)
                         if m_indices_b:
                             idx_mdot_b = m_indices_b[0]
-                            factor_mdot_b = dT_mix_dQ * sign * wall_result.dQ_dh_b * ch_b.dh_dmdot
+                            factor_mdot_b = (
+                                dT_mix_dQ
+                                * sign
+                                * (
+                                    wall_result.dQ_dh_b * ch_b.dh_dmdot
+                                    + wall_result.dQ_dT_aw_b * ch_b.dT_aw_dmdot
+                                )
+                            )
                             nr = relay[nid].setdefault(
                                 idx_mdot_b, {"T": 0.0, "Y": np.zeros(n_species), "P_total": 0.0}
                             )

@@ -5073,6 +5073,10 @@ PYBIND11_MODULE(_core, m) {
                     "Jacobian: d(dP)/dmdot [Pa*s/kg]")
       .def_readonly("ddP_dT", &ChannelResult::ddP_dT,
                     "Jacobian: d(dP)/dT [Pa/K]")
+      .def_readonly("dT_aw_dmdot", &ChannelResult::dT_aw_dmdot,
+                    "Jacobian: dT_aw/dmdot [K*s/kg]")
+      .def_readonly("dT_aw_dT", &ChannelResult::dT_aw_dT,
+                    "Jacobian: dT_aw/dT [-] (approx 1 at low Mach)")
       .def_readonly("dq_dmdot", &ChannelResult::dq_dmdot,
                     "Jacobian: dq/dmdot [W*s/(m^2*kg)]")
       .def_readonly("dq_dT", &ChannelResult::dq_dT,

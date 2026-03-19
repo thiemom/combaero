@@ -16,7 +16,8 @@ if [ -f COMMIT_MSG.md ]; then
   exit 1
 fi
 ```
-
+Note: keeping this file will commit it. Do not leave it.
+If a previous COMMIT_MSG.md exists in the repository: review it and delete if stale.
 // turbo
 ### 2. Stage all changes
 ```bash

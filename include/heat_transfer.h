@@ -546,6 +546,8 @@ struct ChannelResult {
   double dh_dT = 0.0;        // ∂h/∂T  [W/(m²·K²)]
   double ddP_dmdot = 0.0;    // ∂(dP)/∂ṁ [Pa·s/kg]
   double ddP_dT = 0.0;       // ∂(dP)/∂T [Pa/K]
+  double dT_aw_dmdot = 0.0;  // ∂T_aw/∂ṁ [K·s/kg]
+  double dT_aw_dT = 0.0;     // ∂T_aw/∂T [-] (≈1 at low Mach)
   double dq_dmdot = 0.0;     // ∂q/∂ṁ  [W·s/(m²·kg)]
   double dq_dT = 0.0;        // ∂q/∂T  [W/(m²·K)]
   double dq_dT_wall = 0.0;   // ∂q/∂T_wall [W/(m²·K)]  (= -h when T_wall finite)
