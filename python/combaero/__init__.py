@@ -116,6 +116,8 @@ try:
         channel_ribbed,
         channel_smooth,
         ChannelResult,
+        WallCouplingResult,
+        wall_coupling_and_jacobian,
         closest_mode,
         combustion_equilibrium,
         combustion_state,

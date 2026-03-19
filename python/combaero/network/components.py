@@ -1,5 +1,6 @@
+import math
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
 import combaero as cb
@@ -15,6 +16,308 @@ if TYPE_CHECKING:
     from .graph import FlowNetwork
 
 CombustionMethodLiteral = Literal["complete", "equilibrium"]
+
+
+# ============================================================================
+# Convective Heat Transfer Models and Surface (Phase 3)
+# ============================================================================
+
+
+@dataclass
+class SmoothModel:
+    """Parameters for channel_smooth."""
+
+    correlation: str = "gnielinski"  # "gnielinski" | "dittus_boelter" | "sieder_tate" | "petukhov"
+    mu_ratio: float = 1.0  # mu_bulk / mu_wall (Sieder-Tate)
+    roughness: float = 0.0  # absolute roughness [m]
+
+
+@dataclass
+class RibbedModel:
+    """Parameters for channel_ribbed."""
+
+    e_D: float = 0.0  # rib height / hydraulic diameter  # noqa: N815
+    pitch_to_height: float = 0.0  # rib pitch / rib height
+    alpha_deg: float = 90.0  # rib angle [deg]
+
+
+@dataclass
+class DimpledModel:
+    """Parameters for channel_dimpled."""
+
+    d_Dh: float = 0.0  # dimple diameter / hydraulic diameter  # noqa: N815
+    h_d: float = 0.0  # dimple depth / dimple diameter
+    S_d: float = 0.0  # dimple pitch / dimple diameter
+
+
+@dataclass
+class PinFinModel:
+    """Parameters for channel_pin_fin."""
+
+    pin_diameter: float = 0.0  # pin diameter [m]
+    channel_height: float = 0.0  # channel height [m]
+    S_D: float = 2.0  # transverse pitch / pin diameter
+    X_D: float = 2.0  # streamwise pitch / pin diameter
+    N_rows: int = 1  # number of pin rows
+    is_staggered: bool = True
+
+
+@dataclass
+class ImpingementModel:
+    """Parameters for channel_impingement."""
+
+    d_jet: float = 0.0  # jet hole diameter [m]
+    z_D: float = 0.0  # jet-to-target distance / d_jet  # noqa: N815
+    x_D: float = 0.0  # streamwise pitch / d_jet  # noqa: N815
+    y_D: float = 0.0  # spanwise pitch / d_jet  # noqa: N815
+    A_target: float = 0.0  # target area [m^2]
+    Cd_jet: float = 0.8  # jet discharge coefficient
+
+
+ChannelModel = SmoothModel | RibbedModel | DimpledModel | PinFinModel | ImpingementModel
+
+
+@dataclass
+class ConvectiveSurface:
+    """Convective surface description attached to a NetworkElement.
+
+    Attributes
+    ----------
+    area : float
+        Wetted convective area [m^2]. Default 0.0 (disabled).
+    model : ChannelModel
+        Model-specific subclass holding geometry parameters.
+    heating : bool | None
+        True if fluid is being heated, False if cooled, None = auto-detect
+        from sign of (T_wall - T_fluid).
+    Nu_multiplier : float
+        Empirical correction factor on Nusselt number (default 1.0).
+    f_multiplier : float
+        Empirical correction factor on friction factor (default 1.0).
+    """
+
+    area: float = 0.0  # A_conv [m^2] - 0 disables
+    model: ChannelModel = field(default_factory=SmoothModel)
+    heating: bool | None = None  # None = auto-detect
+    Nu_multiplier: float = 1.0  # empirical correction on Nu
+    f_multiplier: float = 1.0  # empirical correction on f
+
+    def htc_and_T(
+        self,
+        T: float,
+        P: float,
+        X: list[float],
+        velocity: float,
+        diameter: float,
+        length: float,
+        T_wall: float = math.nan,
+    ):
+        """Compute heat transfer coefficient and adiabatic wall temperature.
+
+        Parameters
+        ----------
+        T : float
+            Bulk static temperature [K].
+        P : float
+            Bulk static pressure [Pa].
+        X : list[float]
+            Mole fractions [-].
+        velocity : float
+            Bulk flow velocity [m/s].
+        diameter : float
+            Hydraulic diameter [m].
+        length : float
+            Channel length [m].
+        T_wall : float, optional
+            Wall temperature [K]. Used for auto-detection of heating/cooling.
+
+        Returns
+        -------
+        ChannelResult | None
+            Full ChannelResult with h, T_aw, and Jacobians (dh_dmdot, dh_dT, etc.),
+            or None if area=0. Access convective area via ``self.area``.
+        """
+        import math
+
+        import combaero as cb
+
+        if self.area == 0.0 or velocity < 1e-12:
+            return None
+
+        # Auto-detect heating direction from T_wall - T sign
+        if self.heating is not None:
+            heating = self.heating
+        elif math.isfinite(T_wall):
+            heating = T_wall >= T
+        else:
+            heating = True  # default when T_wall unknown
+
+        # Dispatch to appropriate C++ channel_* function based on model type
+        if isinstance(self.model, SmoothModel):
+            result = cb.channel_smooth(
+                T,
+                P,
+                X,
+                velocity,
+                diameter,
+                length,
+                T_wall=T_wall,
+                correlation=self.model.correlation,
+                heating=heating,
+                mu_ratio=self.model.mu_ratio,
+                roughness=self.model.roughness,
+                Nu_multiplier=self.Nu_multiplier,
+                f_multiplier=self.f_multiplier,
+            )
+        elif isinstance(self.model, RibbedModel):
+            result = cb.channel_ribbed(
+                T,
+                P,
+                X,
+                velocity,
+                diameter,
+                length,
+                self.model.e_D,
+                self.model.pitch_to_height,
+                self.model.alpha_deg,
+                T_wall=T_wall,
+                heating=heating,
+                Nu_multiplier=self.Nu_multiplier,
+                f_multiplier=self.f_multiplier,
+            )
+        elif isinstance(self.model, DimpledModel):
+            result = cb.channel_dimpled(
+                T,
+                P,
+                X,
+                velocity,
+                diameter,
+                length,
+                self.model.d_Dh,
+                self.model.h_d,
+                self.model.S_d,
+                T_wall=T_wall,
+                heating=heating,
+                Nu_multiplier=self.Nu_multiplier,
+                f_multiplier=self.f_multiplier,
+            )
+        elif isinstance(self.model, PinFinModel):
+            result = cb.channel_pin_fin(
+                T,
+                P,
+                X,
+                velocity,
+                self.model.channel_height,
+                self.model.pin_diameter,
+                self.model.S_D,
+                self.model.X_D,
+                self.model.N_rows,
+                T_wall=T_wall,
+                is_staggered=self.model.is_staggered,
+                Nu_multiplier=self.Nu_multiplier,
+                f_multiplier=self.f_multiplier,
+            )
+        elif isinstance(self.model, ImpingementModel):
+            # For impingement, we need mdot_jet which requires computing from velocity
+            # This is a simplified version - full implementation would need element context
+            rho = cb.density(T, P, X)
+            A_cross = math.pi / 4 * diameter**2
+            mdot_jet = rho * velocity * A_cross
+
+            result = cb.channel_impingement(
+                T,
+                P,
+                X,
+                mdot_jet,
+                self.model.d_jet,
+                self.model.z_D,
+                self.model.x_D,
+                self.model.y_D,
+                self.model.A_target,
+                T_wall=T_wall,
+                Cd_jet=self.model.Cd_jet,
+                Nu_multiplier=self.Nu_multiplier,
+                f_multiplier=self.f_multiplier,
+            )
+        else:
+            raise TypeError(f"Unknown channel model type: {type(self.model)}")
+
+        return result
+
+
+# ============================================================================
+# WallConnection (Phase 4/5)
+# ============================================================================
+
+
+@dataclass
+class WallConnection:
+    """Thermal coupling between two elements through a shared wall.
+
+    Attributes
+    ----------
+    id : str
+        Unique identifier for this wall connection.
+    element_a : str
+        Element ID for side A.
+    element_b : str
+        Element ID for side B.
+    wall_thickness : float
+        Wall thickness [m].
+    wall_conductivity : float
+        Wall thermal conductivity [W/(m*K)].
+    contact_area : float | None
+        Override effective area [m^2]. If None, uses min(A_conv_a, A_conv_b).
+    """
+
+    id: str
+    element_a: str
+    element_b: str
+    wall_thickness: float
+    wall_conductivity: float
+    contact_area: float | None = None
+
+    def compute_coupling(
+        self,
+        h_a: float,
+        T_aw_a: float,
+        A_conv_a: float,
+        h_b: float,
+        T_aw_b: float,
+        A_conv_b: float,
+    ) -> tuple[float, float]:
+        """Compute heat transfer rate and wall temperature.
+
+        Parameters
+        ----------
+        h_a : float
+            Convective HTC on side A [W/(m^2*K)].
+        T_aw_a : float
+            Adiabatic wall temperature on side A [K].
+        A_conv_a : float
+            Convective area on side A [m^2].
+        h_b : float
+            Convective HTC on side B [W/(m^2*K)].
+        T_aw_b : float
+            Adiabatic wall temperature on side B [K].
+        A_conv_b : float
+            Convective area on side B [m^2].
+
+        Returns
+        -------
+        tuple[float, float]
+            (Q [W], T_wall [K]) where Q is positive when heat flows A->B.
+        """
+        # Effective area
+        A_eff = self.contact_area if self.contact_area is not None else min(A_conv_a, A_conv_b)
+
+        # Wall thermal resistance
+        t_over_k = self.wall_thickness / self.wall_conductivity
+
+        # Call C++ function
+        result = cb.wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b, t_over_k, A_eff)
+
+        return result.Q, result.T_wall
 
 
 class EnergyBoundary:
@@ -144,6 +447,24 @@ class NetworkElement(ABC):
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         """Called automatically by FlowNetwork to resolve neighbors."""
         pass
+
+    def htc_and_T(self, state: MixtureState):
+        """Compute heat transfer coefficient and adiabatic wall temperature.
+
+        Default implementation returns None (no heat transfer).
+        Subclasses can override to provide convective heat transfer.
+
+        Parameters
+        ----------
+        state : MixtureState
+            Flow state at the element inlet.
+
+        Returns
+        -------
+        ChannelResult | None
+            Full ChannelResult with h, T_aw, and Jacobians, or None if no heat transfer.
+        """
+        return None
 
 
 class PlenumNode(NetworkNode):
@@ -799,6 +1120,7 @@ class PipeElement(NetworkElement):
         friction_model: FrictionModelLiteral = "haaland",
         htc_model: HeatTransferModelLiteral = "none",
         t_wall: float | None = None,
+        surface: ConvectiveSurface | None = None,
     ):
         super().__init__(id, from_node, to_node)
         self.length = length
@@ -810,6 +1132,7 @@ class PipeElement(NetworkElement):
         self.friction_model = friction_model
         self.htc_model = htc_model
         self.t_wall = t_wall
+        self.surface = surface or ConvectiveSurface()
 
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
@@ -920,6 +1243,41 @@ class PipeElement(NetworkElement):
             return res.profile
 
         return []
+
+    def htc_and_T(self, state: MixtureState):
+        """Compute heat transfer coefficient and adiabatic wall temperature.
+
+        Uses the element's ConvectiveSurface to compute HTC and adiabatic wall temperature.
+
+        Parameters
+        ----------
+        state : MixtureState
+            Flow state at the element inlet.
+
+        Returns
+        -------
+        ChannelResult | None
+            Full ChannelResult with h, T_aw, and Jacobians (dh_dmdot, dh_dT, etc.),
+            or None if surface.area = 0. Access convective area via ``self.surface.area``.
+        """
+        if self.surface.area == 0.0:
+            return None
+
+        rho = state.density()
+        u = state.m_dot / (rho * self.area)
+
+        # Use nan for T_wall if not specified (matches C++ default)
+        T_wall = self.t_wall if self.t_wall is not None else math.nan
+
+        return self.surface.htc_and_T(
+            T=state.T,
+            P=state.P,
+            X=state.X,
+            velocity=u,
+            diameter=self.diameter,
+            length=self.length,
+            T_wall=T_wall,
+        )
 
     def n_equations(self) -> int:
         return 1

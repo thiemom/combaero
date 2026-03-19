@@ -4,7 +4,7 @@ import inspect
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .components import NetworkElement, NetworkNode
+    from .components import NetworkElement, NetworkNode, WallConnection
 
 
 class FlowNetwork:
@@ -16,6 +16,10 @@ class FlowNetwork:
     def __init__(self) -> None:
         self.nodes: dict[str, NetworkNode] = {}
         self.elements: dict[str, NetworkElement] = {}
+
+        # Thermal coupling walls dictionary
+        self.walls: dict[str, WallConnection] = {}
+        self.thermal_coupling_enabled: bool = True
 
         # Directed graph mapping: node_id -> list of element_ids
         self._upstream_of_node: dict[str, list[str]] = {}
@@ -56,6 +60,30 @@ class FlowNetwork:
 
         # Element 'to_node' -> implies element is upstream of the to_node
         self._upstream_of_node[element.to_node].append(element.id)
+
+    def add_wall(self, wall: WallConnection) -> None:
+        """Register a thermal coupling wall between two elements.
+
+        Parameters
+        ----------
+        wall : WallConnection
+            Wall connection defining thermal coupling between two elements.
+
+        Raises
+        ------
+        ValueError
+            If wall ID already exists or if element_a/element_b don't exist.
+        """
+        if wall.id in self.walls:
+            raise ValueError(f"Wall '{wall.id}' already exists in network.")
+
+        if wall.element_a not in self.elements:
+            raise ValueError(f"Unknown element_a '{wall.element_a}' for wall '{wall.id}'.")
+
+        if wall.element_b not in self.elements:
+            raise ValueError(f"Unknown element_b '{wall.element_b}' for wall '{wall.id}'.")
+
+        self.walls[wall.id] = wall
 
     def get_upstream_elements(self, node_id: str) -> list[NetworkElement]:
         """Return all elements feeding into the specified node."""
@@ -187,7 +215,22 @@ class FlowNetwork:
             }
             elements_data[eid] = {"type": type(element).__name__, "kwargs": args}
 
-        return {"nodes": nodes_data, "elements": elements_data}
+        walls_data = {}
+        for wid, wall in self.walls.items():
+            sig = inspect.signature(wall.__init__)
+            args = {
+                k: getattr(wall, k, getattr(wall, f"_{k}", None))
+                for k in sig.parameters
+                if k != "self" and k != "args" and k != "kwargs"
+            }
+            walls_data[wid] = {"type": type(wall).__name__, "kwargs": args}
+
+        return {
+            "nodes": nodes_data,
+            "elements": elements_data,
+            "walls": walls_data,
+            "thermal_coupling_enabled": self.thermal_coupling_enabled,
+        }
 
     @classmethod
     def from_dict(cls, data: dict) -> FlowNetwork:
@@ -197,6 +240,10 @@ class FlowNetwork:
         from . import components
 
         network = cls()
+
+        # Restore thermal coupling toggle
+        network.thermal_coupling_enabled = data.get("thermal_coupling_enabled", True)
+
         for _nid, n_data in data.get("nodes", {}).items():
             NodeClass = getattr(components, n_data["type"])
             network.add_node(NodeClass(**n_data["kwargs"]))
@@ -204,5 +251,9 @@ class FlowNetwork:
         for _eid, e_data in data.get("elements", {}).items():
             ElemClass = getattr(components, e_data["type"])
             network.add_element(ElemClass(**e_data["kwargs"]))
+
+        for _wid, w_data in data.get("walls", {}).items():
+            WallClass = getattr(components, w_data["type"])
+            network.add_wall(WallClass(**w_data["kwargs"]))
 
         return network

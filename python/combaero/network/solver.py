@@ -8,6 +8,7 @@ from scipy.optimize import root
 import combaero as cb
 
 from .components import (
+    EnergyBoundary,
     MassFlowBoundary,
     MixtureState,
     NetworkNode,
@@ -109,6 +110,11 @@ class NetworkSolver:
         # Pre-compute topological order for forward state propagation
         self._topological_order = self._compute_topological_order()
 
+        # Set up flow-dependent wall EnergyBoundaries for thermal coupling
+        self._wall_ebs: dict[str, EnergyBoundary] = {}
+        if self.network.thermal_coupling_enabled and self.network.walls:
+            self._setup_wall_energy_boundaries()
+
         return np.array(x0_list, dtype=float)
 
     def _compute_topological_order(self) -> list[str]:
@@ -140,14 +146,145 @@ class NetworkSolver:
                 order.append(nid)
         return order
 
+    def _setup_wall_energy_boundaries(self) -> None:
+        """Create flow-dependent EnergyBoundary objects for wall-coupled nodes.
+
+        For each node that has upstream elements participating in a WallConnection,
+        a dedicated EnergyBoundary is created and attached to the node.  Its Q is
+        updated every Newton iteration inside ``_propagate_states``.
+        """
+        # Build a mapping: node_id -> set of wall IDs that affect it
+        affected_nodes: dict[str, set[str]] = {}
+        for wall in self.network.walls.values():
+            elem_a = self.network.elements[wall.element_a]
+            elem_b = self.network.elements[wall.element_b]
+
+            # Skip walls where both sides feed the same node (net Q = 0)
+            if elem_a.to_node == elem_b.to_node:
+                continue
+
+            affected_nodes.setdefault(elem_a.to_node, set()).add(wall.id)
+            affected_nodes.setdefault(elem_b.to_node, set()).add(wall.id)
+
+        for nid in affected_nodes:
+            node = self.network.nodes[nid]
+            if not hasattr(node, "energy_boundaries"):
+                continue
+            eb = EnergyBoundary(id=f"_wall_{nid}", Q=0.0)
+            self._wall_ebs[nid] = eb
+            node.add_energy_boundary(eb)
+
+    def _evaluate_walls_for_node(
+        self,
+        nid: str,
+        up_elems: list,
+        x: np.ndarray,
+    ) -> list[tuple]:
+        """Evaluate all wall couplings affecting *nid* and return contributions.
+
+        Returns a list of ``(wall, Q_inject, wall_result, elem_a_id, elem_b_id,
+        is_side_a, ch_result_a, ch_result_b)`` tuples.  Also updates the wall
+        ``EnergyBoundary`` Q on the node so that ``compute_derived_state`` picks
+        it up.
+        """
+        wall_contributions: list[tuple] = []
+        processed_walls: set[str] = set()
+        up_elem_ids = {e.id for e in up_elems}
+
+        for wall in self.network.walls.values():
+            if wall.id in processed_walls:
+                continue
+
+            # Does this wall involve an upstream element of nid?
+            elem_a_id = wall.element_a
+            elem_b_id = wall.element_b
+            if elem_a_id not in up_elem_ids and elem_b_id not in up_elem_ids:
+                continue
+
+            elem_a = self.network.elements[elem_a_id]
+            elem_b = self.network.elements[elem_b_id]
+
+            # Skip if both elements feed the same node (net Q = 0)
+            if elem_a.to_node == elem_b.to_node:
+                continue
+
+            # Determine which side feeds the current node
+            is_side_a = elem_a_id in up_elem_ids
+
+            # Get states for both sides (previous-iteration fallback for back-edges)
+            state_a = self._get_node_state_with_prev(self.network.nodes[elem_a.from_node], x)
+            state_b = self._get_node_state_with_prev(self.network.nodes[elem_b.from_node], x)
+
+            # Set mass flow rates from solver vector
+            m_indices_a = self._unknown_indices.get(elem_a_id, [])
+            if m_indices_a:
+                state_a.m_dot = x[m_indices_a[0]]
+            m_indices_b = self._unknown_indices.get(elem_b_id, [])
+            if m_indices_b:
+                state_b.m_dot = x[m_indices_b[0]]
+
+            # Call htc_and_T() on both elements
+            ch_result_a = elem_a.htc_and_T(state_a)
+            ch_result_b = elem_b.htc_and_T(state_b)
+
+            # Only proceed if both elements have heat transfer surfaces
+            if ch_result_a is not None and ch_result_b is not None:
+                # Extract scalars from ChannelResult
+                h_a = ch_result_a.h
+                T_aw_a = ch_result_a.T_aw
+                h_b = ch_result_b.h
+                T_aw_b = ch_result_b.T_aw
+
+                # Get convective areas from element surfaces (safe: only elements
+                # with a ConvectiveSurface can return non-None ChannelResult)
+                A_conv_a = elem_a.surface.area
+                A_conv_b = elem_b.surface.area
+
+                A_eff = (
+                    wall.contact_area if wall.contact_area is not None else min(A_conv_a, A_conv_b)
+                )
+                t_over_k = wall.wall_thickness / wall.wall_conductivity
+
+                wall_result = cb.wall_coupling_and_jacobian(
+                    h_a, T_aw_a, h_b, T_aw_b, t_over_k, A_eff
+                )
+
+                # Convention: Q > 0 means heat flows A->B
+                Q_inject = -wall_result.Q if is_side_a else wall_result.Q
+
+                # Store ChannelResults for Jacobian relay
+                wall_contributions.append(
+                    (
+                        wall,
+                        Q_inject,
+                        wall_result,
+                        elem_a_id,
+                        elem_b_id,
+                        is_side_a,
+                        ch_result_a,
+                        ch_result_b,
+                    )
+                )
+                processed_walls.add(wall.id)
+
+        # Set accumulated wall Q on the node's wall EnergyBoundary
+        if nid in self._wall_ebs:
+            self._wall_ebs[nid].Q = sum(c[1] for c in wall_contributions)
+
+        return wall_contributions
+
     def _propagate_states(self, x: np.ndarray) -> dict:
         """
         Forward-propagate T and Y through the network graph in topological order.
         Also computes global sensitivities (relay) for the chain-rule.
         """
+        # Preserve previous iteration's derived states for back-edge wall coupling
+        self._prev_derived_states = getattr(self, "_derived_states", {})
         self._derived_states = {}
         # relay[node_id][global_unknown_index] = {'T': dT/dx, 'Y': [dY/dx]}
         relay = {nid: {} for nid in self.network.nodes}
+
+        has_walls = self.network.thermal_coupling_enabled and bool(self.network.walls)
 
         for nid in self._topological_order:
             node = self.network.nodes[nid]
@@ -168,8 +305,45 @@ class NetworkSolver:
                     state_up._element_id = elem.id
                 up_states.append(state_up)
 
+            # Wall Coupling: evaluate walls BEFORE compute_derived_state
+            # so that Q flows through the EnergyBoundary abstraction.
+            wall_contributions: list[tuple] = []
+            if has_walls:
+                wall_contributions = self._evaluate_walls_for_node(nid, up_elems, x)
+
             T, Y, mix_res = node.compute_derived_state(up_states)
             self._derived_states[nid] = (T, Y, mix_res)
+
+            # Store wall coupling debug info on the node
+            if wall_contributions:
+                m_dot_total_dbg = sum(s.m_dot for s in up_states) or 1.0
+                dT_mix_dQ = (mix_res.dT_mix_d_delta_h / m_dot_total_dbg) if mix_res else 0.0
+                node._wall_couplings = []
+                for (
+                    wall,
+                    Q_inject,
+                    wall_result,
+                    ea_id,
+                    eb_id,
+                    is_side_a,
+                    ch_a,
+                    ch_b,
+                ) in wall_contributions:
+                    # dQ_inject/dQ_wall = -1 if is_side_a, +1 otherwise
+                    dT_dQ_signed = -dT_mix_dQ if is_side_a else dT_mix_dQ
+                    node._wall_couplings.append(
+                        {
+                            "wall": wall,
+                            "wall_result": wall_result,
+                            "Q_inject": Q_inject,
+                            "is_side_a": is_side_a,
+                            "elem_a_id": ea_id,
+                            "elem_b_id": eb_id,
+                            "dT_mix_dQ": dT_dQ_signed,
+                            "ch_result_a": ch_a,
+                            "ch_result_b": ch_b,
+                        }
+                    )
 
             # Sensitivity Relay (Chain-Rule)
             if mix_res:
@@ -215,6 +389,101 @@ class NetworkSolver:
                                 node_relay["Y"][k] += y_jacs[k].d_P_total * sens_up["P_total"]
                                 node_relay["Y"][k] += np.dot(y_jacs[k].d_Y, sens_up["Y"])
 
+                # Wall coupling relay extension: dT_node/dx += dT_mix/dQ * dQ/dx
+                # Full chain rule with channel Jacobians:
+                #   dQ/dmdot = dQ/dh_a * dh_a/dmdot + dQ/dT_aw_a * dT_aw_a/dmdot + (side B terms)
+                #   dQ/dT    = dQ/dh_a * dh_a/dT    + dQ/dT_aw_a * dT_aw_a/dT    + (side B terms)
+                if wall_contributions:
+                    # dT_mix_d_delta_h = 1/cp_mix is dT/d(specific_h) [K/(J/kg)].
+                    # Wall Q is total heat rate [W], so dT/dQ = (1/cp) / m_dot_total.
+                    m_dot_total = sum(s.m_dot for s in up_states) or 1.0
+                    dT_mix_dQ = mix_res.dT_mix_d_delta_h / m_dot_total
+                    for (
+                        _wall,
+                        _Qi,
+                        wall_result,
+                        ea_id,
+                        eb_id,
+                        is_side_a,
+                        ch_a,
+                        ch_b,
+                    ) in wall_contributions:
+                        sign = -1.0 if is_side_a else 1.0
+
+                        # Side A contributions
+                        from_a = self.network.elements[ea_id].from_node
+                        m_indices_a = self._unknown_indices.get(ea_id, [])
+
+                        # Temperature coupling: dT_node/dT_upstream_a
+                        if from_a in relay:
+                            # dQ/dT_aw_a * dT_aw_a/dT + dQ/dh_a * dh_a/dT
+                            factor_T_a = (
+                                dT_mix_dQ
+                                * sign
+                                * (
+                                    wall_result.dQ_dT_aw_a * ch_a.dT_aw_dT
+                                    + wall_result.dQ_dh_a * ch_a.dh_dT
+                                )
+                            )
+                            for idx, sens_up in relay[from_a].items():
+                                nr = relay[nid].setdefault(
+                                    idx, {"T": 0.0, "Y": np.zeros(n_species), "P_total": 0.0}
+                                )
+                                nr["T"] += factor_T_a * sens_up["T"]
+
+                        # Mass-flow coupling: dT_node/dmdot_a (direct)
+                        if m_indices_a:
+                            idx_mdot_a = m_indices_a[0]
+                            # dQ/dh_a * dh_a/dmdot + dQ/dT_aw_a * dT_aw_a/dmdot
+                            factor_mdot_a = (
+                                dT_mix_dQ
+                                * sign
+                                * (
+                                    wall_result.dQ_dh_a * ch_a.dh_dmdot
+                                    + wall_result.dQ_dT_aw_a * ch_a.dT_aw_dmdot
+                                )
+                            )
+                            nr = relay[nid].setdefault(
+                                idx_mdot_a, {"T": 0.0, "Y": np.zeros(n_species), "P_total": 0.0}
+                            )
+                            nr["T"] += factor_mdot_a
+
+                        # Side B contributions
+                        from_b = self.network.elements[eb_id].from_node
+                        m_indices_b = self._unknown_indices.get(eb_id, [])
+
+                        # Temperature coupling: dT_node/dT_upstream_b
+                        if from_b in relay:
+                            factor_T_b = (
+                                dT_mix_dQ
+                                * sign
+                                * (
+                                    wall_result.dQ_dT_aw_b * ch_b.dT_aw_dT
+                                    + wall_result.dQ_dh_b * ch_b.dh_dT
+                                )
+                            )
+                            for idx, sens_up in relay[from_b].items():
+                                nr = relay[nid].setdefault(
+                                    idx, {"T": 0.0, "Y": np.zeros(n_species), "P_total": 0.0}
+                                )
+                                nr["T"] += factor_T_b * sens_up["T"]
+
+                        # Mass-flow coupling: dT_node/dmdot_b (direct)
+                        if m_indices_b:
+                            idx_mdot_b = m_indices_b[0]
+                            factor_mdot_b = (
+                                dT_mix_dQ
+                                * sign
+                                * (
+                                    wall_result.dQ_dh_b * ch_b.dh_dmdot
+                                    + wall_result.dQ_dT_aw_b * ch_b.dT_aw_dmdot
+                                )
+                            )
+                            nr = relay[nid].setdefault(
+                                idx_mdot_b, {"T": 0.0, "Y": np.zeros(n_species), "P_total": 0.0}
+                            )
+                            nr["T"] += factor_mdot_b
+
             # 3. Add own unknowns (P_total) to the relay
             node_unks = self._unknown_indices.get(nid, [])
             for unk_idx in node_unks:
@@ -226,6 +495,51 @@ class NetworkSolver:
                     node_relay["P_total"] = 1.0
 
         return relay
+
+    def _get_node_state_with_prev(self, node: NetworkNode, x: np.ndarray) -> MixtureState:
+        """
+        Constructs a MixtureState for a node, using previous iteration's derived state
+        for back-edges (nodes not yet visited in current topological pass).
+        This ensures wall coupling uses lagged values for cross-stream coupling.
+        """
+        default_Y = self._default_Y
+
+        # Boundaries always use current values
+        if isinstance(node, (PressureBoundary, MassFlowBoundary)):
+            return self._get_node_state(node, x)
+
+        # For interior nodes, check if already propagated in current iteration
+        if node.id in self._derived_states:
+            # Use current iteration's values
+            return self._get_node_state(node, x)
+
+        # Back-edge: use previous iteration's derived state
+        if node.id in self._prev_derived_states:
+            T_prev, Y_prev, _ = self._prev_derived_states[node.id]
+        else:
+            # First iteration: use defaults
+            T_prev = 300.0
+            Y_prev = default_Y
+
+        # Get pressure unknowns from current x vector
+        indices = self._unknown_indices.get(node.id, [])
+        unknowns = node.unknowns()
+
+        state_dict = {
+            "P": 101325.0,
+            "P_total": 101325.0,
+            "T": T_prev,
+            "T_total": T_prev,
+            "m_dot": 0.0,
+            "Y": Y_prev,
+        }
+
+        for i, unk in zip(indices, unknowns, strict=False):
+            var_name = unk.split(".")[-1]
+            if var_name in state_dict:
+                state_dict[var_name] = x[i]
+
+        return MixtureState(**state_dict)
 
     def _get_node_state(self, node: NetworkNode, x: np.ndarray) -> MixtureState:
         """Constructs a MixtureState for a given node based on the current solver vector x."""

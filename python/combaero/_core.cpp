@@ -5065,6 +5065,24 @@ PYBIND11_MODULE(_core, m) {
                     "Adiabatic wall temperature [K]")
       .def_readonly("q", &ChannelResult::q,
                     "Heat flux [W/m^2] (nan if T_wall not supplied)")
+      .def_readonly("dh_dmdot", &ChannelResult::dh_dmdot,
+                    "Jacobian: dh/dmdot [W/(m^2*K*kg/s)]")
+      .def_readonly("dh_dT", &ChannelResult::dh_dT,
+                    "Jacobian: dh/dT [W/(m^2*K^2)]")
+      .def_readonly("ddP_dmdot", &ChannelResult::ddP_dmdot,
+                    "Jacobian: d(dP)/dmdot [Pa*s/kg]")
+      .def_readonly("ddP_dT", &ChannelResult::ddP_dT,
+                    "Jacobian: d(dP)/dT [Pa/K]")
+      .def_readonly("dT_aw_dmdot", &ChannelResult::dT_aw_dmdot,
+                    "Jacobian: dT_aw/dmdot [K*s/kg]")
+      .def_readonly("dT_aw_dT", &ChannelResult::dT_aw_dT,
+                    "Jacobian: dT_aw/dT [-] (approx 1 at low Mach)")
+      .def_readonly("dq_dmdot", &ChannelResult::dq_dmdot,
+                    "Jacobian: dq/dmdot [W*s/(m^2*kg)]")
+      .def_readonly("dq_dT", &ChannelResult::dq_dT,
+                    "Jacobian: dq/dT [W/(m^2*K)]")
+      .def_readonly("dq_dT_wall", &ChannelResult::dq_dT_wall,
+                    "Jacobian: dq/dT_wall [W/(m^2*K)]")
       .def("__repr__", [](const ChannelResult &r) {
         auto fmt = [](double v) {
           if (std::isnan(v))
@@ -5079,6 +5097,50 @@ PYBIND11_MODULE(_core, m) {
       });
 
   // -----------------------------------------------------------------
+  // WallCouplingResult struct
+  // -----------------------------------------------------------------
+  py::class_<WallCouplingResult>(
+      m, "WallCouplingResult",
+      "Heat transfer through a wall between two elements.\n\n"
+      "Returned by wall_coupling_and_jacobian.\n\n"
+      "Q is positive when heat flows from side A to side B.\n"
+      "T_wall is the hot-side surface temperature.\n"
+      "Jacobians enable proper Newton coupling in the network solver.")
+      .def_readonly("Q", &WallCouplingResult::Q, "Heat transfer rate [W] (positive A->B)")
+      .def_readonly("T_wall", &WallCouplingResult::T_wall, "Wall temperature [K] (hot-side surface)")
+      .def_readonly("dQ_dh_a", &WallCouplingResult::dQ_dh_a, "Jacobian: dQ/dh_a [W*m^2*K/W]")
+      .def_readonly("dQ_dh_b", &WallCouplingResult::dQ_dh_b, "Jacobian: dQ/dh_b [W*m^2*K/W]")
+      .def_readonly("dQ_dT_aw_a", &WallCouplingResult::dQ_dT_aw_a, "Jacobian: dQ/dT_aw_a [W/K]")
+      .def_readonly("dQ_dT_aw_b", &WallCouplingResult::dQ_dT_aw_b, "Jacobian: dQ/dT_aw_b [W/K]")
+      .def("__repr__", [](const WallCouplingResult &r) {
+        auto fmt = [](double v) {
+          char buf[32];
+          std::snprintf(buf, sizeof(buf), "%.6g", v);
+          return std::string(buf);
+        };
+        return "WallCouplingResult(Q=" + fmt(r.Q) + ", T_wall=" + fmt(r.T_wall) + ")";
+      });
+
+  // -----------------------------------------------------------------
+  // wall_coupling_and_jacobian
+  // -----------------------------------------------------------------
+  m.def(
+      "wall_coupling_and_jacobian",
+      &wall_coupling_and_jacobian,
+      py::arg("h_a"), py::arg("T_aw_a"),
+      py::arg("h_b"), py::arg("T_aw_b"),
+      py::arg("t_over_k"), py::arg("A"),
+      "Compute heat transfer and Jacobians for wall coupling.\n\n"
+      "Parameters:\n"
+      "  h_a, h_b       : convective HTCs on sides A and B [W/(m^2*K)]\n"
+      "  T_aw_a, T_aw_b : adiabatic wall temperatures on sides A and B [K]\n"
+      "  t_over_k       : wall_thickness / wall_conductivity [m^2*K/W]\n"
+      "  A              : effective heat transfer area [m^2]\n\n"
+      "Returns: WallCouplingResult with Q and analytical Jacobians\n\n"
+      "Uses overall_htc_wall(h_a, h_b, t_over_k) internally.\n"
+      "Q = U * A * (T_aw_a - T_aw_b) where U = 1 / (1/h_a + t/k + 1/h_b)");
+
+  // -----------------------------------------------------------------
   // channel_smooth
   // -----------------------------------------------------------------
   m.def(
@@ -5087,16 +5149,17 @@ PYBIND11_MODULE(_core, m) {
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double velocity, double diameter, double length, double T_wall,
          const std::string &correlation, bool heating, double mu_ratio,
-         double roughness) {
+         double roughness, double Nu_multiplier, double f_multiplier) {
         return channel_smooth(T, P, to_vec(X_arr), velocity, diameter, length,
                               T_wall, correlation, heating, mu_ratio,
-                              roughness);
+                              roughness, Nu_multiplier, f_multiplier);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
       py::arg("diameter"), py::arg("length"),
       py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
       py::arg("correlation") = "gnielinski", py::arg("heating") = true,
       py::arg("mu_ratio") = 1.0, py::arg("roughness") = 0.0,
+      py::arg("Nu_multiplier") = 1.0, py::arg("f_multiplier") = 1.0,
       "Smooth pipe/duct: combined HTC + pressure drop.\n\n"
       "Parameters:\n"
       "  T, P, X    : bulk static thermodynamic state\n"
@@ -5108,8 +5171,10 @@ PYBIND11_MODULE(_core, m) {
       "'petukhov'\n"
       "  heating    : True = fluid heated\n"
       "  mu_ratio   : mu_bulk/mu_wall for Sieder-Tate\n"
-      "  roughness  : absolute wall roughness [m]\n\n"
-      "Returns: ChannelResult");
+      "  roughness  : absolute wall roughness [m]\n"
+      "  Nu_multiplier : empirical correction factor on Nu (default 1.0)\n"
+      "  f_multiplier  : empirical correction factor on f (default 1.0)\n\n"
+      "Returns: ChannelResult with Jacobian fields populated");
 
   // -----------------------------------------------------------------
   // channel_ribbed
@@ -5120,15 +5185,17 @@ PYBIND11_MODULE(_core, m) {
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double velocity, double diameter, double length, double e_D,
          double pitch_to_height, double alpha_deg, double T_wall,
-         bool heating) {
+         bool heating, double Nu_multiplier, double f_multiplier) {
         return channel_ribbed(T, P, to_vec(X_arr), velocity, diameter, length,
-                              e_D, pitch_to_height, alpha_deg, T_wall, heating);
+                              e_D, pitch_to_height, alpha_deg, T_wall, heating,
+                              Nu_multiplier, f_multiplier);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
       py::arg("diameter"), py::arg("length"), py::arg("e_D"),
       py::arg("pitch_to_height"), py::arg("alpha_deg"),
       py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
       py::arg("heating") = true,
+      py::arg("Nu_multiplier") = 1.0, py::arg("f_multiplier") = 1.0,
       "Rib-enhanced cooling channel (Han et al. 1988).\n\n"
       "Applies rib_enhancement_factor to Nu and rib_friction_multiplier to f\n"
       "from a smooth-pipe Gnielinski baseline.\n\n"
@@ -5148,15 +5215,18 @@ PYBIND11_MODULE(_core, m) {
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double velocity, double diameter, double length, double d_Dh,
-         double h_d, double S_d, double T_wall, bool heating) {
+         double h_d, double S_d, double T_wall, bool heating,
+         double Nu_multiplier, double f_multiplier) {
         return channel_dimpled(T, P, to_vec(X_arr), velocity, diameter, length,
-                               d_Dh, h_d, S_d, T_wall, heating);
+                               d_Dh, h_d, S_d, T_wall, heating,
+                               Nu_multiplier, f_multiplier);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
       py::arg("diameter"), py::arg("length"), py::arg("d_Dh"), py::arg("h_d"),
       py::arg("S_d"),
       py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
       py::arg("heating") = true,
+      py::arg("Nu_multiplier") = 1.0, py::arg("f_multiplier") = 1.0,
       "Dimpled surface cooling channel (Chyu et al. 1997).\n\n"
       "Applies dimple_nusselt_enhancement to Nu and dimple_friction_multiplier "
       "to f\n"
@@ -5175,16 +5245,18 @@ PYBIND11_MODULE(_core, m) {
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double velocity, double channel_height, double pin_diameter,
-         double S_D, double X_D, int N_rows, double T_wall, bool is_staggered) {
+         double S_D, double X_D, int N_rows, double T_wall, bool is_staggered,
+         double Nu_multiplier, double f_multiplier) {
         return channel_pin_fin(T, P, to_vec(X_arr), velocity, channel_height,
                                pin_diameter, S_D, X_D, N_rows, T_wall,
-                               is_staggered);
+                               is_staggered, Nu_multiplier, f_multiplier);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
       py::arg("channel_height"), py::arg("pin_diameter"), py::arg("S_D"),
       py::arg("X_D"), py::arg("N_rows"),
       py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
       py::arg("is_staggered") = true,
+      py::arg("Nu_multiplier") = 1.0, py::arg("f_multiplier") = 1.0,
       "Pin-fin array cooling channel (Metzger et al. 1982).\n\n"
       "Re and Nu are based on pin diameter d.\n"
       "dP = N_rows * f_pin * (rho * v_max^2 / 2)\n"
@@ -5207,15 +5279,18 @@ PYBIND11_MODULE(_core, m) {
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double mdot_jet, double d_jet, double z_D, double x_D, double y_D,
-         double A_target, double T_wall, double Cd_jet) {
+         double A_target, double T_wall, double Cd_jet,
+         double Nu_multiplier, double f_multiplier) {
         return channel_impingement(T, P, to_vec(X_arr), mdot_jet, d_jet, z_D,
-                                   x_D, y_D, A_target, T_wall, Cd_jet);
+                                   x_D, y_D, A_target, T_wall, Cd_jet,
+                                   Nu_multiplier, f_multiplier);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("mdot_jet"),
       py::arg("d_jet"), py::arg("z_D"), py::arg("x_D") = 0.0,
       py::arg("y_D") = 0.0, py::arg("A_target"),
       py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
       py::arg("Cd_jet") = 0.65,
+      py::arg("Nu_multiplier") = 1.0, py::arg("f_multiplier") = 1.0,
       "Impingement jet array cooling (Florschuetz et al. 1981 / Martin "
       "1977).\n\n"
       "Re and Nu are based on jet diameter d_jet.\n"

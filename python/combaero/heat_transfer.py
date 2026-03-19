@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from ._core import ChannelResult
 from ._core import channel_dimpled as _channel_dimpled
@@ -40,6 +41,9 @@ from ._core import channel_impingement as _channel_impingement
 from ._core import channel_pin_fin as _channel_pin_fin
 from ._core import channel_ribbed as _channel_ribbed
 from ._core import channel_smooth as _channel_smooth
+
+if TYPE_CHECKING:
+    pass
 
 
 def smooth(
@@ -299,3 +303,33 @@ def impingement(
     return _channel_impingement(
         T, P, list(X), mdot_jet, d_jet, z_D, x_D, y_D, A_target, T_wall=T_wall, Cd_jet=Cd_jet
     )
+
+
+# ============================================================================
+# Backward-compatible re-exports from network.components
+# ============================================================================
+
+# Re-export convective heat transfer classes for backward compatibility
+# ruff: noqa: E402  (import not at top of file - needed for circular import avoidance)
+from combaero.network.components import (
+    ChannelModel,
+    ConvectiveSurface,
+    DimpledModel,
+    ImpingementModel,
+    PinFinModel,
+    RibbedModel,
+    SmoothModel,
+    WallConnection,
+)
+
+# Mark as re-exported to prevent ruff F401 errors
+__all__ = [
+    "ChannelModel",
+    "ConvectiveSurface",
+    "DimpledModel",
+    "ImpingementModel",
+    "PinFinModel",
+    "RibbedModel",
+    "SmoothModel",
+    "WallConnection",
+]

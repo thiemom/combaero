@@ -11,6 +11,7 @@ set(TEST_SOURCES
     test_state_sync.cpp        # State mole/mass synchronization tests
     test_solver_jacobians.cpp  # C++ Solver Jacobian verification
     test_stream_jacobians.cpp  # Stream-based mixer/combustor/plenum Jacobian verification
+    test_heat_transfer_jacobians.cpp  # Heat transfer Jacobian verification
 )
 
 # Link against Google Test and our library

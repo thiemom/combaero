@@ -3,6 +3,7 @@
 #include "../include/correlation_status.h"
 #include "../include/friction.h"       // friction_petukhov, friction_colebrook
 #include "../include/math_constants.h" // M_PI cross-platform
+#include "../include/solver_interface.h" // density_and_jacobians, viscosity_and_jacobians
 #include "../include/stagnation.h"     // T_adiabatic_wall
 #include "../include/state.h"
 #include "../include/thermo.h"    // density, cp_mass, speed_of_sound
@@ -804,7 +805,8 @@ static ChannelResult make_channel_result(double h, double Nu, double Re,
 ChannelResult channel_smooth(double T, double P, const std::vector<double> &X,
                              double velocity, double diameter, double length,
                              double T_wall, const std::string &correlation,
-                             bool heating, double mu_ratio, double roughness) {
+                             bool heating, double mu_ratio, double roughness,
+                             double Nu_multiplier, double f_multiplier) {
   if (velocity < 0.0) {
     throw std::invalid_argument(
         "channel_smooth: velocity must be non-negative");
@@ -816,9 +818,9 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double> &X,
     throw std::invalid_argument("channel_smooth: length must be non-negative");
   }
 
-  // Fluid properties — evaluated once
-  double rho = density(T, P, X);
-  double mu = viscosity(T, P, X);
+  // Fluid properties and their derivatives
+  auto [rho, drho_dT, drho_dP] = solver::density_and_jacobians(T, P, X);
+  auto [mu, dmu_dT, dmu_dP] = solver::viscosity_and_jacobians(T, P, X);
   double k = thermal_conductivity(T, P, X);
   double Pr = prandtl(T, P, X);
 
@@ -835,6 +837,11 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double> &X,
   } else {
     f = friction_petukhov(std::max(Re, 3000.0));
   }
+
+  // Apply f_multiplier before Nu computation so that correlations where
+  // f appears in the Nu formula (Gnielinski, Petukhov) use the multiplied
+  // friction factor consistently with the Jacobian FD stencils.
+  f *= f_multiplier;
 
   // Nusselt number
   double Nu;
@@ -868,6 +875,9 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double> &X,
                                 correlation + "'");
   }
 
+  // Apply Nu multiplier
+  Nu *= Nu_multiplier;
+
   double h = htc_from_nusselt(Nu, k, diameter);
   double dP = (velocity > 0.0)
                   ? f * (length / diameter) * (rho * velocity * velocity / 2.0)
@@ -879,7 +889,154 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double> &X,
   const bool turbulent_flow = true;
   double T_aw = T_adiabatic_wall(T, velocity, T, P, X, turbulent_flow);
 
-  return make_channel_result(h, Nu, Re, Pr, f, dP, M, T_aw, T_wall);
+  // Compute Jacobians
+  // Note: For network solver, mdot is the independent variable, not velocity
+  // velocity = mdot / (rho * A_cross), where A_cross = pi/4 * D^2
+  // We compute derivatives w.r.t. mdot and T
+
+  ChannelResult result = make_channel_result(h, Nu, Re, Pr, f, dP, M, T_aw, T_wall);
+
+  // Only compute Jacobians if flow exists
+  if (velocity > 0.0 && Re > 0.0) {
+    double A_cross = M_PI / 4.0 * diameter * diameter;
+    double mdot = rho * velocity * A_cross;
+
+    // Thermal conductivity and Prandtl derivatives via central FD
+    const double eps_T_props = 1e-3;
+    double k_plus = thermal_conductivity(T + eps_T_props, P, X);
+    double k_minus = thermal_conductivity(T - eps_T_props, P, X);
+    double dk_dT = (k_plus - k_minus) / (2.0 * eps_T_props);
+
+    double Pr_plus = prandtl(T + eps_T_props, P, X);
+    double Pr_minus = prandtl(T - eps_T_props, P, X);
+    double dPr_dT = (Pr_plus - Pr_minus) / (2.0 * eps_T_props);
+
+    // Chain rule: dRe/dmdot and dRe/dT
+    // Re = rho * v * D / mu = mdot * D / (A_cross * mu)
+    // At constant mdot: dRe/dT = -Re * dmu/dT / mu (no rho dependence)
+    double dRe_dmdot = diameter / (A_cross * mu);
+    double dRe_dT = -Re * dmu_dT / mu;
+
+    // Get Nu and f derivatives w.r.t. Re and Pr (these depend on correlation)
+    double dNu_dRe = 0.0;
+    double dNu_dPr = 0.0;
+    double df_dRe = 0.0;
+
+    if (Re < 2300.0) {
+      // Laminar: f = 64/Re, so df/dRe = -64/Re^2 = -f/Re
+      if (Re > 0.0) {
+        df_dRe = -f / Re;
+      }
+      // Nu is constant in laminar regime, dNu/dRe = 0
+    } else {
+      // Friction factor derivative (needed first for Gnielinski/Petukhov)
+      if (e_D > 0.0 && Re > 4000.0) {
+        // Colebrook - use finite difference
+        double eps = std::max(1.0, Re * 1e-6);
+        double f_plus = friction_colebrook(Re + eps, e_D);
+        double f_minus = friction_colebrook(Re - eps, e_D);
+        df_dRe = (f_plus - f_minus) / (2.0 * eps) * f_multiplier;
+      } else {
+        // Petukhov: f_raw = (0.79*ln(Re) - 1.64)^(-2)
+        // df_raw/dRe = -2 * f_raw^1.5 * 0.79 / Re
+        // df/dRe = f_mult * df_raw/dRe  (f_raw = f / f_multiplier)
+        df_dRe = -2.0 * std::pow(f / f_multiplier, 1.5) * 0.79 / Re * f_multiplier;
+      }
+
+      // Turbulent correlations have Re and Pr derivatives
+      if (correlation == "gnielinski") {
+        // Gnielinski: Nu = Nu(Re, Pr, f), so dNu/dRe_total = ∂Nu/∂Re + ∂Nu/∂f · df/dRe
+        // Use finite difference for total derivative
+        double eps = std::max(1.0, Re * 1e-6);
+        double f_plus = (e_D > 0.0 && Re + eps > 4000.0) ? friction_colebrook(Re + eps, e_D) : friction_petukhov(Re + eps);
+        double f_minus = (e_D > 0.0 && Re - eps > 4000.0) ? friction_colebrook(Re - eps, e_D) : friction_petukhov(Re - eps);
+        f_plus *= f_multiplier;
+        f_minus *= f_multiplier;
+        double Nu_plus = nusselt_gnielinski(Re + eps, Pr, f_plus);
+        double Nu_minus = nusselt_gnielinski(Re - eps, Pr, f_minus);
+        dNu_dRe = (Nu_plus - Nu_minus) / (2.0 * eps) * Nu_multiplier;
+
+        // dNu/dPr via central FD (f already includes f_multiplier)
+        double eps_Pr = std::max(1e-6, Pr * 1e-6);
+        double Nu_Pr_plus = nusselt_gnielinski(Re, Pr + eps_Pr, f);
+        double Nu_Pr_minus = nusselt_gnielinski(Re, Pr - eps_Pr, f);
+        dNu_dPr = (Nu_Pr_plus - Nu_Pr_minus) / (2.0 * eps_Pr) * Nu_multiplier;
+      } else if (correlation == "dittus_boelter") {
+        // Nu = 0.023 * Re^0.8 * Pr^n  =>  dNu/dRe = 0.8 * Nu / Re, dNu/dPr = n * Nu / Pr
+        dNu_dRe = 0.8 * Nu / Re;
+        double n = heating ? 0.4 : 0.3;
+        dNu_dPr = n * Nu / Pr;
+      } else if (correlation == "sieder_tate") {
+        // Nu = 0.027 * Re^0.8 * Pr^(1/3) * mu_ratio^0.14  =>  dNu/dRe = 0.8 * Nu / Re, dNu/dPr = (1/3) * Nu / Pr
+        dNu_dRe = 0.8 * Nu / Re;
+        dNu_dPr = (1.0 / 3.0) * Nu / Pr;
+      } else if (correlation == "petukhov") {
+        // Petukhov: Nu = Nu(Re, Pr, f), so dNu/dRe_total = ∂Nu/∂Re + ∂Nu/∂f · df/dRe
+        double eps = std::max(1.0, Re * 1e-6);
+        double f_plus = friction_petukhov(Re + eps) * f_multiplier;
+        double f_minus = friction_petukhov(Re - eps) * f_multiplier;
+        double Nu_plus = nusselt_petukhov(Re + eps, Pr, f_plus);
+        double Nu_minus = nusselt_petukhov(Re - eps, Pr, f_minus);
+        dNu_dRe = (Nu_plus - Nu_minus) / (2.0 * eps) * Nu_multiplier;
+
+        // dNu/dPr via central FD (f already includes f_multiplier)
+        double eps_Pr = std::max(1e-6, Pr * 1e-6);
+        double Nu_Pr_plus = nusselt_petukhov(Re, Pr + eps_Pr, f);
+        double Nu_Pr_minus = nusselt_petukhov(Re, Pr - eps_Pr, f);
+        dNu_dPr = (Nu_Pr_plus - Nu_Pr_minus) / (2.0 * eps_Pr) * Nu_multiplier;
+      }
+    }
+    // Laminar: Nu and f are constant or 1/Re (derivatives handled separately if needed)
+
+    // dh/dmdot = (dh/dNu) * (dNu/dRe) * (dRe/dmdot) = (k/D) * dNu/dRe * dRe/dmdot
+    result.dh_dmdot = (k / diameter) * dNu_dRe * dRe_dmdot;
+
+    // dh/dT: Full chain rule h = Nu(Re, Pr) * k(T) / D
+    // dh/dT = (1/D) * [k * (dNu/dRe * dRe/dT + dNu/dPr * dPr/dT) + Nu * dk/dT]
+    result.dh_dT = (1.0 / diameter) * (k * (dNu_dRe * dRe_dT + dNu_dPr * dPr_dT) + Nu * dk_dT);
+
+    // ddP/dmdot: dP = f * (L/D) * (rho * v^2 / 2)
+    // v = mdot / (rho * A), so v^2 = mdot^2 / (rho^2 * A^2)
+    // dP = f * (L/D) * mdot^2 / (2 * rho * A^2)
+    // d(dP)/dmdot = (df/dRe * dRe/dmdot) * (L/D) * mdot^2/(2*rho*A^2) + f*(L/D)*mdot/(rho*A^2)
+    double dP_factor = (length / diameter) / (2.0 * rho * A_cross * A_cross);
+    result.ddP_dmdot = df_dRe * dRe_dmdot * dP_factor * mdot * mdot
+                     + f * (length / diameter) * mdot / (rho * A_cross * A_cross);
+
+    // d(dP)/dT: includes df/dT and drho/dT terms
+    // dP = f * (L/D) * mdot^2 / (2*rho*A^2), so d(dP)/dT has df/dT and d(1/rho)/dT = -drho/dT/rho^2
+    result.ddP_dT = df_dRe * dRe_dT * dP_factor * mdot * mdot
+                  - f * (length / diameter) * velocity * velocity / 2.0 * drho_dT;
+
+    // dq/dmdot and dq/dT: q = h * (T_aw - T_wall)
+    // Full product rule: dq/dx = dh/dx * (T_aw - T_wall) + h * dT_aw/dx
+    // T_aw derivatives — always computed so Python relay can use them
+    // T_aw = T + r * v^2 / (2*cp), where v = mdot/(rho*A), r = Pr^(1/3)
+    double cp_mass_val = cp_mass(T, X);
+    double r = std::cbrt(Pr);
+
+    // dT_aw/dmdot = r * v / (cp * rho * A)
+    result.dT_aw_dmdot = r * velocity / (cp_mass_val * rho * A_cross);
+
+    // dT_aw/dT at constant mdot via central FD
+    const double eps_T_aw = 0.5;
+    double rho_plus = density(T + eps_T_aw, P, X);
+    double rho_minus = density(T - eps_T_aw, P, X);
+    double v_plus = mdot / (rho_plus * A_cross);
+    double v_minus = mdot / (rho_minus * A_cross);
+    double T_aw_plus = T_adiabatic_wall(T + eps_T_aw, v_plus, T + eps_T_aw, P, X, turbulent_flow);
+    double T_aw_minus = T_adiabatic_wall(T - eps_T_aw, v_minus, T - eps_T_aw, P, X, turbulent_flow);
+    result.dT_aw_dT = (T_aw_plus - T_aw_minus) / (2.0 * eps_T_aw);
+
+    if (std::isfinite(T_wall)) {
+      double dT_diff = T_aw - T_wall;
+      result.dq_dmdot = result.dh_dmdot * dT_diff + h * result.dT_aw_dmdot;
+      result.dq_dT = result.dh_dT * dT_diff + h * result.dT_aw_dT;
+      result.dq_dT_wall = -h;
+    }
+  }
+
+  return result;
 }
 
 // -------------------------------------------------------------
@@ -889,17 +1046,21 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double> &X,
 ChannelResult channel_ribbed(double T, double P, const std::vector<double> &X,
                              double velocity, double diameter, double length,
                              double e_D, double pitch_to_height,
-                             double alpha_deg, double T_wall, bool heating) {
+                             double alpha_deg, double T_wall, bool heating,
+                             double Nu_multiplier, double f_multiplier) {
   // Get smooth-pipe baseline (Gnielinski, no roughness)
+  // Pass multipliers to baseline - they will be applied after rib factors
   ChannelResult base = channel_smooth(T, P, X, velocity, diameter, length,
-                                      T_wall, "gnielinski", heating);
+                                      T_wall, "gnielinski", heating, 1.0, 0.0,
+                                      Nu_multiplier, f_multiplier);
 
-  // Apply rib multipliers
+  // Apply rib multipliers to the baseline (before user multipliers)
   double enh = combaero::cooling::rib_enhancement_factor(e_D, pitch_to_height,
                                                          alpha_deg);
   double fmul =
       combaero::cooling::rib_friction_multiplier(e_D, pitch_to_height);
 
+  // Rib factors are applied to the smooth baseline, then user multipliers
   double Nu_rib = base.Nu * enh;
   double f_rib = base.f * fmul;
 
@@ -910,8 +1071,22 @@ ChannelResult channel_ribbed(double T, double P, const std::vector<double> &X,
                                          (rho * velocity * velocity / 2.0)
                                    : 0.0;
 
-  return make_channel_result(h_rib, Nu_rib, base.Re, base.Pr, f_rib, dP_rib,
+  ChannelResult result = make_channel_result(h_rib, Nu_rib, base.Re, base.Pr, f_rib, dP_rib,
                              base.M, base.T_aw, T_wall);
+
+  // Propagate Jacobians: scale by rib enhancement factors
+  // dh_rib/dmdot = enh * dh_base/dmdot
+  result.dh_dmdot = enh * base.dh_dmdot;
+  result.dh_dT = enh * base.dh_dT;
+  result.ddP_dmdot = fmul * base.ddP_dmdot;
+  result.ddP_dT = fmul * base.ddP_dT;
+  result.dT_aw_dmdot = base.dT_aw_dmdot;
+  result.dT_aw_dT = base.dT_aw_dT;
+  result.dq_dmdot = enh * base.dq_dmdot;
+  result.dq_dT = enh * base.dq_dT;
+  result.dq_dT_wall = base.dq_dT_wall * enh;  // = -h_rib
+
+  return result;
 }
 
 // -------------------------------------------------------------
@@ -921,10 +1096,12 @@ ChannelResult channel_ribbed(double T, double P, const std::vector<double> &X,
 ChannelResult channel_dimpled(double T, double P, const std::vector<double> &X,
                               double velocity, double diameter, double length,
                               double d_Dh, double h_d, double S_d,
-                              double T_wall, bool heating) {
+                              double T_wall, bool heating,
+                              double Nu_multiplier, double f_multiplier) {
   // Get smooth-pipe baseline
   ChannelResult base = channel_smooth(T, P, X, velocity, diameter, length,
-                                      T_wall, "gnielinski", heating);
+                                      T_wall, "gnielinski", heating, 1.0, 0.0,
+                                      Nu_multiplier, f_multiplier);
 
   // Apply dimple multipliers
   double enh =
@@ -942,8 +1119,21 @@ ChannelResult channel_dimpled(double T, double P, const std::vector<double> &X,
                                          (rho * velocity * velocity / 2.0)
                                    : 0.0;
 
-  return make_channel_result(h_dim, Nu_dim, base.Re, base.Pr, f_dim, dP_dim,
+  ChannelResult result = make_channel_result(h_dim, Nu_dim, base.Re, base.Pr, f_dim, dP_dim,
                              base.M, base.T_aw, T_wall);
+
+  // Propagate Jacobians: scale by dimple enhancement factors
+  result.dh_dmdot = enh * base.dh_dmdot;
+  result.dh_dT = enh * base.dh_dT;
+  result.ddP_dmdot = fmul * base.ddP_dmdot;
+  result.ddP_dT = fmul * base.ddP_dT;
+  result.dT_aw_dmdot = base.dT_aw_dmdot;
+  result.dT_aw_dT = base.dT_aw_dT;
+  result.dq_dmdot = enh * base.dq_dmdot;
+  result.dq_dT = enh * base.dq_dT;
+  result.dq_dT_wall = base.dq_dT_wall * enh;
+
+  return result;
 }
 
 // -------------------------------------------------------------
@@ -953,7 +1143,8 @@ ChannelResult channel_dimpled(double T, double P, const std::vector<double> &X,
 ChannelResult channel_pin_fin(double T, double P, const std::vector<double> &X,
                               double velocity, double channel_height,
                               double pin_diameter, double S_D, double X_D,
-                              int N_rows, double T_wall, bool is_staggered) {
+                              int N_rows, double T_wall, bool is_staggered,
+                              double Nu_multiplier, double f_multiplier) {
   if (velocity < 0.0) {
     throw std::invalid_argument(
         "channel_pin_fin: velocity must be non-negative");
@@ -974,9 +1165,9 @@ ChannelResult channel_pin_fin(double T, double P, const std::vector<double> &X,
         "channel_pin_fin: S_D must be > 1 (minimum cross-section constraint)");
   }
 
-  // Fluid properties
-  double rho = density(T, P, X);
-  double mu = viscosity(T, P, X);
+  // Fluid properties and their derivatives
+  auto [rho, drho_dT, drho_dP] = solver::density_and_jacobians(T, P, X);
+  auto [mu, dmu_dT, dmu_dP] = solver::viscosity_and_jacobians(T, P, X);
   double k = thermal_conductivity(T, P, X);
   double Pr = prandtl(T, P, X);
 
@@ -989,6 +1180,7 @@ ChannelResult channel_pin_fin(double T, double P, const std::vector<double> &X,
   // Nu from Metzger correlation
   double Nu =
       combaero::cooling::pin_fin_nusselt(Re_d, Pr, L_D, S_D, X_D, is_staggered);
+  Nu *= Nu_multiplier;
   double h = htc_from_nusselt(Nu, k, pin_diameter);
 
   // Pressure drop: dP = N_rows * f_pin * (rho * v_max^2 / 2)
@@ -997,6 +1189,7 @@ ChannelResult channel_pin_fin(double T, double P, const std::vector<double> &X,
   double f_pin = (Re_d > 0.0)
                      ? combaero::cooling::pin_fin_friction(Re_d, is_staggered)
                      : 0.0;
+  f_pin *= f_multiplier;
   double dP = static_cast<double>(N_rows) * f_pin * (rho * v_max * v_max / 2.0);
 
   // Mach and T_aw based on approach velocity
@@ -1005,7 +1198,68 @@ ChannelResult channel_pin_fin(double T, double P, const std::vector<double> &X,
   const bool turbulent_flow = true;
   double T_aw = T_adiabatic_wall(T, velocity, T, P, X, turbulent_flow);
 
-  return make_channel_result(h, Nu, Re_d, Pr, f_pin, dP, M, T_aw, T_wall);
+  ChannelResult result = make_channel_result(h, Nu, Re_d, Pr, f_pin, dP, M, T_aw, T_wall);
+
+  // Compute Jacobians (simplified - captures dominant Re dependence)
+  if (velocity > 0.0 && Re_d > 0.0) {
+    double A_cross = channel_height * pin_diameter * (S_D - 1.0) / S_D;  // Approx flow area
+    double mdot = rho * velocity * A_cross;
+
+    // Thermal conductivity and Prandtl derivatives via central FD
+    const double eps_T_props = 1e-3;
+    double k_plus = thermal_conductivity(T + eps_T_props, P, X);
+    double k_minus = thermal_conductivity(T - eps_T_props, P, X);
+    double dk_dT = (k_plus - k_minus) / (2.0 * eps_T_props);
+
+    double Pr_plus = prandtl(T + eps_T_props, P, X);
+    double Pr_minus = prandtl(T - eps_T_props, P, X);
+    double dPr_dT = (Pr_plus - Pr_minus) / (2.0 * eps_T_props);
+
+    // dRe/dmdot and dRe/dT
+    // At constant mdot: dRe/dT = -Re * dmu/dT / mu (no rho dependence)
+    double dRe_dmdot = pin_diameter / (A_cross * mu);
+    double dRe_dT = -Re_d * dmu_dT / mu;
+
+    // Simplified: assume Nu ~ Re^0.7 and f ~ Re^(-0.2) (typical for pin fins)
+    double dNu_dRe = 0.7 * Nu / Re_d;
+    double dNu_dPr = 0.4 * Nu / Pr;  // Typical Pr exponent for pin fins
+    double df_dRe = -0.2 * f_pin / Re_d;
+
+    result.dh_dmdot = (k / pin_diameter) * dNu_dRe * dRe_dmdot;
+    // Full chain rule: dh/dT = (1/D) * [k * (dNu/dRe * dRe/dT + dNu/dPr * dPr/dT) + Nu * dk/dT]
+    result.dh_dT = (1.0 / pin_diameter) * (k * (dNu_dRe * dRe_dT + dNu_dPr * dPr_dT) + Nu * dk_dT);
+
+    // ddP/dmdot for pin fins
+    double v_max_factor = S_D / (S_D - 1.0);
+    result.ddP_dmdot = static_cast<double>(N_rows) *
+                       (df_dRe * dRe_dmdot * rho * v_max * v_max / 2.0 +
+                        f_pin * v_max_factor * v_max_factor * mdot / (rho * A_cross * A_cross));
+    result.ddP_dT = static_cast<double>(N_rows) * df_dRe * dRe_dT * rho * v_max * v_max / 2.0;
+
+    // T_aw derivatives — always computed so Python relay can use them
+    double cp_mass_val = cp_mass(T, X);
+    double r = std::cbrt(Pr);
+    result.dT_aw_dmdot = r * velocity / (cp_mass_val * rho * A_cross);
+
+    const double eps_T_aw = 0.5;
+    double rho_plus = density(T + eps_T_aw, P, X);
+    double rho_minus = density(T - eps_T_aw, P, X);
+    double v_plus = mdot / (rho_plus * A_cross);
+    double v_minus = mdot / (rho_minus * A_cross);
+    const bool turbulent_flow = true;
+    double T_aw_plus = T_adiabatic_wall(T + eps_T_aw, v_plus, T + eps_T_aw, P, X, turbulent_flow);
+    double T_aw_minus = T_adiabatic_wall(T - eps_T_aw, v_minus, T - eps_T_aw, P, X, turbulent_flow);
+    result.dT_aw_dT = (T_aw_plus - T_aw_minus) / (2.0 * eps_T_aw);
+
+    if (std::isfinite(T_wall)) {
+      double dT_diff = T_aw - T_wall;
+      result.dq_dmdot = result.dh_dmdot * dT_diff + h * result.dT_aw_dmdot;
+      result.dq_dT = result.dh_dT * dT_diff + h * result.dT_aw_dT;
+      result.dq_dT_wall = -h;
+    }
+  }
+
+  return result;
 }
 
 // -------------------------------------------------------------
@@ -1016,7 +1270,8 @@ ChannelResult channel_impingement(double T, double P,
                                   const std::vector<double> &X, double mdot_jet,
                                   double d_jet, double z_D, double x_D,
                                   double y_D, double A_target, double T_wall,
-                                  double Cd_jet) {
+                                  double Cd_jet,
+                                  double Nu_multiplier, double f_multiplier) {
   if (mdot_jet < 0.0) {
     throw std::invalid_argument(
         "channel_impingement: mdot_jet must be non-negative");
@@ -1033,9 +1288,9 @@ ChannelResult channel_impingement(double T, double P,
         "channel_impingement: Cd_jet must be in (0, 1]");
   }
 
-  // Fluid properties
-  double rho = density(T, P, X);
-  double mu = viscosity(T, P, X);
+  // Fluid properties and their derivatives
+  auto [rho, drho_dT, drho_dP] = solver::density_and_jacobians(T, P, X);
+  auto [mu, dmu_dT, dmu_dP] = solver::viscosity_and_jacobians(T, P, X);
   double k = thermal_conductivity(T, P, X);
   double Pr = prandtl(T, P, X);
 
@@ -1046,6 +1301,7 @@ ChannelResult channel_impingement(double T, double P,
 
   // Nu from Florschuetz / Martin correlation
   double Nu = combaero::cooling::impingement_nusselt(Re_jet, Pr, z_D, x_D, y_D);
+  Nu *= Nu_multiplier;
 
   // h averaged over target area: h = Nu * k / d_jet
   // (Nu is already an area-averaged value from the correlation)
@@ -1054,6 +1310,7 @@ ChannelResult channel_impingement(double T, double P,
   // Pressure drop across jet plate: dP = (v_jet/Cd)^2 * rho/2
   // Equivalent loss coefficient f = 1/Cd^2
   double f = 1.0 / (Cd_jet * Cd_jet);
+  f *= f_multiplier;
   double dP = f * rho * v_jet * v_jet / 2.0;
 
   // Mach and T_aw based on jet velocity
@@ -1062,7 +1319,106 @@ ChannelResult channel_impingement(double T, double P,
   const bool turbulent_flow = true;
   double T_aw = T_adiabatic_wall(T, v_jet, T, P, X, turbulent_flow);
 
-  return make_channel_result(h, Nu, Re_jet, Pr, f, dP, M, T_aw, T_wall);
+  ChannelResult result = make_channel_result(h, Nu, Re_jet, Pr, f, dP, M, T_aw, T_wall);
+
+  // Compute Jacobians (simplified - captures dominant Re dependence)
+  if (mdot_jet > 0.0 && Re_jet > 0.0) {
+    // Thermal conductivity and Prandtl derivatives via central FD
+    const double eps_T_props = 1e-3;
+    double k_plus = thermal_conductivity(T + eps_T_props, P, X);
+    double k_minus = thermal_conductivity(T - eps_T_props, P, X);
+    double dk_dT = (k_plus - k_minus) / (2.0 * eps_T_props);
+
+    double Pr_plus = prandtl(T + eps_T_props, P, X);
+    double Pr_minus = prandtl(T - eps_T_props, P, X);
+    double dPr_dT = (Pr_plus - Pr_minus) / (2.0 * eps_T_props);
+
+    // dRe/dmdot: Re = mdot * d / (A_jet * mu)
+    // At constant mdot: dRe/dT = -Re * dmu/dT / mu (no rho dependence)
+    double dRe_dmdot = d_jet / (A_jet * mu);
+    double dRe_dT = -Re_jet * dmu_dT / mu;
+
+    // Simplified: assume Nu ~ Re^0.7 (typical for impingement)
+    double dNu_dRe = 0.7 * Nu / Re_jet;
+    double dNu_dPr = 0.4 * Nu / Pr;  // Typical Pr exponent for impingement
+
+    result.dh_dmdot = (k / d_jet) * dNu_dRe * dRe_dmdot;
+    // Full chain rule: dh/dT = (1/D) * [k * (dNu/dRe * dRe/dT + dNu/dPr * dPr/dT) + Nu * dk/dT]
+    result.dh_dT = (1.0 / d_jet) * (k * (dNu_dRe * dRe_dT + dNu_dPr * dPr_dT) + Nu * dk_dT);
+
+    // ddP/dmdot: dP = f * rho * (mdot/(rho*A_jet))^2 / 2 = f * mdot^2 / (2*rho*A_jet^2)
+    result.ddP_dmdot = f * mdot_jet / (rho * A_jet * A_jet);
+    // Fix: remove spurious /rho in ddP/dT
+    result.ddP_dT = -f * v_jet * v_jet / 2.0 * drho_dT;
+
+    // T_aw derivatives — always computed so Python relay can use them
+    double cp_mass_val = cp_mass(T, X);
+    double r = std::cbrt(Pr);
+    result.dT_aw_dmdot = r * v_jet / (cp_mass_val * rho * A_jet);
+
+    const double eps_T_aw = 0.5;
+    double rho_plus = density(T + eps_T_aw, P, X);
+    double rho_minus = density(T - eps_T_aw, P, X);
+    double v_plus = mdot_jet / (rho_plus * A_jet);
+    double v_minus = mdot_jet / (rho_minus * A_jet);
+    const bool turbulent_flow = true;
+    double T_aw_plus = T_adiabatic_wall(T + eps_T_aw, v_plus, T + eps_T_aw, P, X, turbulent_flow);
+    double T_aw_minus = T_adiabatic_wall(T - eps_T_aw, v_minus, T - eps_T_aw, P, X, turbulent_flow);
+    result.dT_aw_dT = (T_aw_plus - T_aw_minus) / (2.0 * eps_T_aw);
+
+    if (std::isfinite(T_wall)) {
+      double dT_diff = T_aw - T_wall;
+      result.dq_dmdot = result.dh_dmdot * dT_diff + h * result.dT_aw_dmdot;
+      result.dq_dT = result.dh_dT * dT_diff + h * result.dT_aw_dT;
+      result.dq_dT_wall = -h;
+    }
+  }
+
+  return result;
+}
+
+// -------------------------------------------------------------
+// wall_coupling_and_jacobian
+// -------------------------------------------------------------
+
+WallCouplingResult wall_coupling_and_jacobian(
+    double h_a, double T_aw_a,
+    double h_b, double T_aw_b,
+    double t_over_k,
+    double A) {
+  WallCouplingResult result;
+
+  // Overall HTC: U = 1 / (1/h_a + t/k + 1/h_b)
+  double R_total = 1.0 / h_a + t_over_k + 1.0 / h_b;
+  double U = 1.0 / R_total;
+
+  // Heat transfer rate: Q = U * A * (T_aw_a - T_aw_b)
+  double dT = T_aw_a - T_aw_b;
+  result.Q = U * A * dT;
+
+  // Wall temperature: T_wall = (h_a * T_aw_a + h_b * T_aw_b) / (h_a + h_b)
+  // This is the equilibrium temperature at the wall interface
+  result.T_wall = (h_a * T_aw_a + h_b * T_aw_b) / (h_a + h_b);
+
+  // Jacobians: dQ/dh_a, dQ/dh_b, dQ/dT_aw_a, dQ/dT_aw_b
+  //
+  // Q = U * A * dT  where U = 1 / (1/h_a + t/k + 1/h_b)
+  //
+  // dU/dh_a = -U^2 * (-1/h_a^2) = U^2 / h_a^2
+  // dU/dh_b = U^2 / h_b^2
+  //
+  // dQ/dh_a = dU/dh_a * A * dT = (U^2 / h_a^2) * A * dT
+  // dQ/dh_b = dU/dh_b * A * dT = (U^2 / h_b^2) * A * dT
+  // dQ/dT_aw_a = U * A
+  // dQ/dT_aw_b = -U * A
+
+  double U2 = U * U;
+  result.dQ_dh_a = (U2 / (h_a * h_a)) * A * dT;
+  result.dQ_dh_b = (U2 / (h_b * h_b)) * A * dT;
+  result.dQ_dT_aw_a = U * A;
+  result.dQ_dT_aw_b = -U * A;
+
+  return result;
 }
 
 } // namespace combaero
