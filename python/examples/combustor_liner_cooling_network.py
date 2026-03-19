@@ -39,9 +39,7 @@ Wall configurations compared:
 
 from __future__ import annotations
 
-import matplotlib.pyplot as plt
 import numpy as np
-from plot_utils import show_or_save
 
 import combaero as ca
 from combaero.heat_transfer import (
@@ -509,6 +507,9 @@ def hot_side_htc(T_hot: float, P: float, X: list, D_h: float, u: float) -> float
 
 
 def main() -> None:
+    import matplotlib.pyplot as plt
+    from plot_utils import show_or_save
+
     sp = SpeciesLocator.from_core()
 
     print("=" * 70)
