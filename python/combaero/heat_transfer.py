@@ -520,3 +520,80 @@ class ConvectiveSurface:
             raise TypeError(f"Unknown channel model type: {type(self.model)}")
 
         return result.h, result.T_aw, self.area
+
+
+# ============================================================================
+# WallConnection (Phase 5)
+# ============================================================================
+
+
+@dataclass
+class WallConnection:
+    """Thermal coupling between two elements through a shared wall.
+
+    Attributes
+    ----------
+    id : str
+        Unique identifier for this wall connection.
+    element_a : str
+        Element ID for side A.
+    element_b : str
+        Element ID for side B.
+    wall_thickness : float
+        Wall thickness [m].
+    wall_conductivity : float
+        Wall thermal conductivity [W/(m*K)].
+    contact_area : float | None
+        Override effective area [m^2]. If None, uses min(A_conv_a, A_conv_b).
+    """
+
+    id: str
+    element_a: str
+    element_b: str
+    wall_thickness: float
+    wall_conductivity: float
+    contact_area: float | None = None
+
+    def compute_coupling(
+        self,
+        h_a: float,
+        T_aw_a: float,
+        A_conv_a: float,
+        h_b: float,
+        T_aw_b: float,
+        A_conv_b: float,
+    ) -> tuple[float, float]:
+        """Compute heat transfer rate and wall temperature.
+
+        Parameters
+        ----------
+        h_a : float
+            Convective HTC on side A [W/(m^2*K)].
+        T_aw_a : float
+            Adiabatic wall temperature on side A [K].
+        A_conv_a : float
+            Convective area on side A [m^2].
+        h_b : float
+            Convective HTC on side B [W/(m^2*K)].
+        T_aw_b : float
+            Adiabatic wall temperature on side B [K].
+        A_conv_b : float
+            Convective area on side B [m^2].
+
+        Returns
+        -------
+        tuple[float, float]
+            (Q [W], T_wall [K]) where Q is positive when heat flows A->B.
+        """
+        import combaero as cb
+
+        # Effective area
+        A_eff = self.contact_area if self.contact_area is not None else min(A_conv_a, A_conv_b)
+
+        # Wall thermal resistance
+        t_over_k = self.wall_thickness / self.wall_conductivity
+
+        # Call C++ function
+        result = cb.wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b, t_over_k, A_eff)
+
+        return result.Q, result.T_wall
