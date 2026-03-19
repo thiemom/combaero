@@ -1,16 +1,21 @@
-feat(network): Step 2 - Add htc_and_T() to element hierarchy
+feat(network): Step 3 - Add FlowNetwork.add_wall() and thermal coupling toggle
 
-- Add htc_and_T() method to NetworkElement base class (returns None by default)
-- Add surface parameter to PipeElement constructor with ConvectiveSurface default
-- Override htc_and_T() in PipeElement to compute HTC using surface
-- Handle T_wall=None by passing math.nan to C++ functions
-- Add comprehensive test suite (test_pipe_element_htc.py) with 4 test cases:
-  * Default pipe (area=0 returns None)
-  * Pipe with custom surface (computes HTC)
-  * Pipe with specified wall temperature
-  * NetworkElement base class default behavior
-- All tests pass (22/22 total: 18 existing + 4 new)
-- Example script continues to work
+- Add walls: dict[str, WallConnection] to FlowNetwork.__init__
+- Add thermal_coupling_enabled: bool = True toggle for debug/fast-solve
+- Add add_wall() method with validation:
+  * Checks for duplicate wall IDs
+  * Validates element_a and element_b exist in network
+- Update to_dict() to serialize walls and thermal_coupling_enabled
+- Update from_dict() to deserialize walls and restore thermal toggle
+- Add comprehensive test suite (test_flow_network_walls.py) with 9 test cases:
+  * Default values
+  * Successful wall addition
+  * Error handling (duplicate ID, unknown elements)
+  * Thermal coupling toggle
+  * Serialization/deserialization with walls
+  * Default thermal coupling restoration
+- All tests pass (31/31 total: 22 existing + 9 new)
+- Error handling works correctly with descriptive messages
 
-This enables elements to compute convective heat transfer as specified
-in the design document, preparing for full solver integration.
+This enables thermal wall coupling management in the network,
+preparing for solver integration in Step 4.
