@@ -111,7 +111,7 @@ class ConvectiveSurface:
         diameter: float,
         length: float,
         T_wall: float = math.nan,
-    ) -> tuple[float, float, float] | None:
+    ):
         """Compute heat transfer coefficient and adiabatic wall temperature.
 
         Parameters
@@ -133,8 +133,9 @@ class ConvectiveSurface:
 
         Returns
         -------
-        tuple[float, float, float] | None
-            (h [W/(m^2*K)], T_aw [K], A_conv [m^2]) or None if area=0.
+        ChannelResult | None
+            Full ChannelResult with h, T_aw, and Jacobians (dh_dmdot, dh_dT, etc.),
+            or None if area=0. Access convective area via ``self.area``.
         """
         import math
 
@@ -233,7 +234,7 @@ class ConvectiveSurface:
         else:
             raise TypeError(f"Unknown channel model type: {type(self.model)}")
 
-        return result.h, result.T_aw, self.area
+        return result
 
 
 # ============================================================================
@@ -439,7 +440,7 @@ class NetworkElement(ABC):
         """Called automatically by FlowNetwork to resolve neighbors."""
         pass
 
-    def htc_and_T(self, state: MixtureState) -> tuple[float, float, float] | None:
+    def htc_and_T(self, state: MixtureState):
         """Compute heat transfer coefficient and adiabatic wall temperature.
 
         Default implementation returns None (no heat transfer).
@@ -452,8 +453,8 @@ class NetworkElement(ABC):
 
         Returns
         -------
-        tuple[float, float, float] | None
-            (h [W/(m^2*K)], T_aw [K], A_conv [m^2]) or None if no heat transfer.
+        ChannelResult | None
+            Full ChannelResult with h, T_aw, and Jacobians, or None if no heat transfer.
         """
         return None
 
@@ -1235,7 +1236,7 @@ class PipeElement(NetworkElement):
 
         return []
 
-    def htc_and_T(self, state: MixtureState) -> tuple[float, float, float] | None:
+    def htc_and_T(self, state: MixtureState):
         """Compute heat transfer coefficient and adiabatic wall temperature.
 
         Uses the element's ConvectiveSurface to compute HTC and adiabatic wall temperature.
@@ -1247,8 +1248,9 @@ class PipeElement(NetworkElement):
 
         Returns
         -------
-        tuple[float, float, float] | None
-            (h [W/(m^2*K)], T_aw [K], A_conv [m^2]) or None if surface.area = 0.
+        ChannelResult | None
+            Full ChannelResult with h, T_aw, and Jacobians (dh_dmdot, dh_dT, etc.),
+            or None if surface.area = 0. Access convective area via ``self.surface.area``.
         """
         if self.surface.area == 0.0:
             return None

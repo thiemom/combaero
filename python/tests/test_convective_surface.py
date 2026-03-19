@@ -87,7 +87,7 @@ def test_convective_surface_smooth_model():
     """Test ConvectiveSurface with SmoothModel."""
     surface = ConvectiveSurface(area=0.1, model=SmoothModel(correlation="gnielinski"), heating=True)
 
-    h, T_aw, A = surface.htc_and_T(
+    result = surface.htc_and_T(
         T=700.0,
         P=2e5,
         X=cb.standard_dry_air_composition(),
@@ -97,9 +97,9 @@ def test_convective_surface_smooth_model():
         T_wall=1000.0,
     )
 
-    assert h > 0.0
-    assert T_aw > 700.0  # Should be higher due to recovery
-    assert A == 0.1
+    assert result.h > 0.0
+    assert result.T_aw > 700.0  # Should be higher due to recovery
+    assert surface.area == 0.1
 
 
 def test_convective_surface_ribbed_model():
@@ -110,7 +110,7 @@ def test_convective_surface_ribbed_model():
         heating=True,
     )
 
-    h, T_aw, A = surface.htc_and_T(
+    result = surface.htc_and_T(
         T=700.0,
         P=2.5e5,
         X=cb.standard_dry_air_composition(),
@@ -120,9 +120,9 @@ def test_convective_surface_ribbed_model():
         T_wall=1100.0,
     )
 
-    assert h > 0.0
-    assert T_aw > 700.0
-    assert A == 0.15
+    assert result.h > 0.0
+    assert result.T_aw > 700.0
+    assert surface.area == 0.15
 
 
 def test_convective_surface_dimpled_model():
@@ -131,7 +131,7 @@ def test_convective_surface_dimpled_model():
         area=0.12, model=DimpledModel(d_Dh=0.2, h_d=0.2, S_d=2.0), heating=True
     )
 
-    h, T_aw, A = surface.htc_and_T(
+    result = surface.htc_and_T(
         T=650.0,
         P=2e5,
         X=cb.standard_dry_air_composition(),
@@ -141,9 +141,9 @@ def test_convective_surface_dimpled_model():
         T_wall=950.0,
     )
 
-    assert h > 0.0
-    assert T_aw > 650.0
-    assert A == 0.12
+    assert result.h > 0.0
+    assert result.T_aw > 650.0
+    assert surface.area == 0.12
 
 
 def test_convective_surface_pin_fin_model():
@@ -161,7 +161,7 @@ def test_convective_surface_pin_fin_model():
         heating=True,
     )
 
-    h, T_aw, A = surface.htc_and_T(
+    result = surface.htc_and_T(
         T=600.0,
         P=2e5,
         X=cb.standard_dry_air_composition(),
@@ -171,9 +171,9 @@ def test_convective_surface_pin_fin_model():
         T_wall=900.0,
     )
 
-    assert h > 0.0
-    assert T_aw > 600.0
-    assert A == 0.08
+    assert result.h > 0.0
+    assert result.T_aw > 600.0
+    assert surface.area == 0.08
 
 
 def test_convective_surface_multipliers():
@@ -182,7 +182,7 @@ def test_convective_surface_multipliers():
 
     surface_mult = ConvectiveSurface(area=0.1, model=SmoothModel(), heating=True, Nu_multiplier=1.2)
 
-    h_base, _, _ = surface_base.htc_and_T(
+    result_base = surface_base.htc_and_T(
         T=700.0,
         P=2e5,
         X=cb.standard_dry_air_composition(),
@@ -192,7 +192,7 @@ def test_convective_surface_multipliers():
         T_wall=1000.0,
     )
 
-    h_mult, _, _ = surface_mult.htc_and_T(
+    result_mult = surface_mult.htc_and_T(
         T=700.0,
         P=2e5,
         X=cb.standard_dry_air_composition(),
@@ -203,7 +203,7 @@ def test_convective_surface_multipliers():
     )
 
     # HTC should be scaled by Nu_multiplier
-    assert abs(h_mult / h_base - 1.2) < 1e-6
+    assert abs(result_mult.h / result_base.h - 1.2) < 1e-6
 
 
 def test_convective_surface_heating_auto_detect():
@@ -213,7 +213,7 @@ def test_convective_surface_heating_auto_detect():
     )
 
     # When heating=None, it defaults to True in the implementation
-    h, T_aw, A = surface.htc_and_T(
+    result = surface.htc_and_T(
         T=700.0,
         P=2e5,
         X=cb.standard_dry_air_composition(),
@@ -223,7 +223,7 @@ def test_convective_surface_heating_auto_detect():
         T_wall=1000.0,
     )
 
-    assert h > 0.0
+    assert result.h > 0.0
 
 
 if __name__ == "__main__":

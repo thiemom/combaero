@@ -97,7 +97,7 @@ def test_wall_connection_with_convective_surfaces():
     X_air = cb.standard_dry_air_composition()
 
     # Hot side
-    h_a, T_aw_a, A_a = hot_surface.htc_and_T(
+    ch_hot = hot_surface.htc_and_T(
         T=1000.0,
         P=2e5,
         X=X_air,
@@ -108,7 +108,7 @@ def test_wall_connection_with_convective_surfaces():
     )
 
     # Cold side
-    h_b, T_aw_b, A_b = cold_surface.htc_and_T(
+    ch_cold = cold_surface.htc_and_T(
         T=400.0,
         P=2.5e5,
         X=X_air,
@@ -128,11 +128,18 @@ def test_wall_connection_with_convective_surfaces():
     )
 
     # Compute coupling
-    Q, T_wall = wall.compute_coupling(h_a, T_aw_a, A_a, h_b, T_aw_b, A_b)
+    Q, T_wall = wall.compute_coupling(
+        ch_hot.h,
+        ch_hot.T_aw,
+        hot_surface.area,
+        ch_cold.h,
+        ch_cold.T_aw,
+        cold_surface.area,
+    )
 
     assert Q > 0.0  # Heat flows from hot to cold
-    assert T_wall > T_aw_b and T_wall < T_aw_a
-    assert h_a > 0.0 and h_b > 0.0
+    assert T_wall > ch_cold.T_aw and T_wall < ch_hot.T_aw
+    assert ch_hot.h > 0.0 and ch_cold.h > 0.0
 
 
 def test_wall_connection_zero_temperature_difference():

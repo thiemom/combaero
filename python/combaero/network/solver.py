@@ -183,8 +183,9 @@ class NetworkSolver:
         """Evaluate all wall couplings affecting *nid* and return contributions.
 
         Returns a list of ``(wall, Q_inject, wall_result, elem_a_id, elem_b_id,
-        is_side_a)`` tuples.  Also updates the wall ``EnergyBoundary`` Q on the
-        node so that ``compute_derived_state`` picks it up.
+        is_side_a, ch_result_a, ch_result_b)`` tuples.  Also updates the wall
+        ``EnergyBoundary`` Q on the node so that ``compute_derived_state`` picks
+        it up.
         """
         wall_contributions: list[tuple] = []
         processed_walls: set[str] = set()
@@ -223,13 +224,21 @@ class NetworkSolver:
                 state_b.m_dot = x[m_indices_b[0]]
 
             # Call htc_and_T() on both elements
-            htc_result_a = elem_a.htc_and_T(state_a)
-            htc_result_b = elem_b.htc_and_T(state_b)
+            ch_result_a = elem_a.htc_and_T(state_a)
+            ch_result_b = elem_b.htc_and_T(state_b)
 
             # Only proceed if both elements have heat transfer surfaces
-            if htc_result_a is not None and htc_result_b is not None:
-                h_a, T_aw_a, A_conv_a = htc_result_a
-                h_b, T_aw_b, A_conv_b = htc_result_b
+            if ch_result_a is not None and ch_result_b is not None:
+                # Extract scalars from ChannelResult
+                h_a = ch_result_a.h
+                T_aw_a = ch_result_a.T_aw
+                h_b = ch_result_b.h
+                T_aw_b = ch_result_b.T_aw
+
+                # Get convective areas from element surfaces (safe: only elements
+                # with a ConvectiveSurface can return non-None ChannelResult)
+                A_conv_a = elem_a.surface.area
+                A_conv_b = elem_b.surface.area
 
                 A_eff = (
                     wall.contact_area if wall.contact_area is not None else min(A_conv_a, A_conv_b)
@@ -243,8 +252,18 @@ class NetworkSolver:
                 # Convention: Q > 0 means heat flows A->B
                 Q_inject = -wall_result.Q if is_side_a else wall_result.Q
 
+                # Store ChannelResults for Jacobian relay
                 wall_contributions.append(
-                    (wall, Q_inject, wall_result, elem_a_id, elem_b_id, is_side_a)
+                    (
+                        wall,
+                        Q_inject,
+                        wall_result,
+                        elem_a_id,
+                        elem_b_id,
+                        is_side_a,
+                        ch_result_a,
+                        ch_result_b,
+                    )
                 )
                 processed_walls.add(wall.id)
 
@@ -299,7 +318,16 @@ class NetworkSolver:
             if wall_contributions:
                 dT_mix_dQ = mix_res.dT_mix_d_delta_h if mix_res else 0.0
                 node._wall_couplings = []
-                for wall, Q_inject, wall_result, ea_id, eb_id, is_side_a in wall_contributions:
+                for (
+                    wall,
+                    Q_inject,
+                    wall_result,
+                    ea_id,
+                    eb_id,
+                    is_side_a,
+                    ch_a,
+                    ch_b,
+                ) in wall_contributions:
                     # dQ_inject/dQ_wall = -1 if is_side_a, +1 otherwise
                     dT_dQ_signed = -dT_mix_dQ if is_side_a else dT_mix_dQ
                     node._wall_couplings.append(
@@ -311,6 +339,8 @@ class NetworkSolver:
                             "elem_a_id": ea_id,
                             "elem_b_id": eb_id,
                             "dT_mix_dQ": dT_dQ_signed,
+                            "ch_result_a": ch_a,
+                            "ch_result_b": ch_b,
                         }
                     )
 
@@ -359,34 +389,76 @@ class NetworkSolver:
                                 node_relay["Y"][k] += np.dot(y_jacs[k].d_Y, sens_up["Y"])
 
                 # Wall coupling relay extension: dT_node/dx += dT_mix/dQ * dQ/dx
-                # First-order approximation: dQ/dT_aw ~ dQ/dT (recovery factor ~ 1)
+                # Full chain rule with channel Jacobians:
+                #   dQ/dmdot = dQ/dh_a * dh_a/dmdot + dQ/dT_aw_a * dT_aw_a/dmdot + (side B terms)
+                #   dQ/dT    = dQ/dh_a * dh_a/dT    + dQ/dT_aw_a * dT_aw_a/dT    + (side B terms)
                 if wall_contributions:
                     dT_mix_dQ = mix_res.dT_mix_d_delta_h
-                    for _wall, _Qi, wall_result, ea_id, eb_id, is_side_a in wall_contributions:
+                    for (
+                        _wall,
+                        _Qi,
+                        wall_result,
+                        ea_id,
+                        eb_id,
+                        is_side_a,
+                        ch_a,
+                        ch_b,
+                    ) in wall_contributions:
                         sign = -1.0 if is_side_a else 1.0
 
-                        # Temperature coupling through side A's upstream node
+                        # Side A contributions
                         from_a = self.network.elements[ea_id].from_node
+                        m_indices_a = self._unknown_indices.get(ea_id, [])
+
+                        # Temperature coupling: dT_node/dT_upstream_a
                         if from_a in relay:
-                            factor_a = dT_mix_dQ * sign * wall_result.dQ_dT_aw_a
+                            # dQ/dT_aw_a * dT_aw_a/dT (dominant, ~1) + dQ/dh_a * dh_a/dT
+                            factor_T_a = (
+                                dT_mix_dQ
+                                * sign
+                                * (wall_result.dQ_dT_aw_a * 1.0 + wall_result.dQ_dh_a * ch_a.dh_dT)
+                            )
                             for idx, sens_up in relay[from_a].items():
                                 nr = relay[nid].setdefault(
                                     idx, {"T": 0.0, "Y": np.zeros(n_species), "P_total": 0.0}
                                 )
-                                nr["T"] += factor_a * sens_up["T"]
+                                nr["T"] += factor_T_a * sens_up["T"]
 
-                        # Temperature coupling through side B's upstream node
+                        # Mass-flow coupling: dT_node/dmdot_a (direct)
+                        if m_indices_a:
+                            idx_mdot_a = m_indices_a[0]
+                            # dQ/dh_a * dh_a/dmdot (ignoring dT_aw_a/dmdot ~ small for low Mach)
+                            factor_mdot_a = dT_mix_dQ * sign * wall_result.dQ_dh_a * ch_a.dh_dmdot
+                            nr = relay[nid].setdefault(
+                                idx_mdot_a, {"T": 0.0, "Y": np.zeros(n_species), "P_total": 0.0}
+                            )
+                            nr["T"] += factor_mdot_a
+
+                        # Side B contributions
                         from_b = self.network.elements[eb_id].from_node
+                        m_indices_b = self._unknown_indices.get(eb_id, [])
+
+                        # Temperature coupling: dT_node/dT_upstream_b
                         if from_b in relay:
-                            factor_b = dT_mix_dQ * sign * wall_result.dQ_dT_aw_b
+                            factor_T_b = (
+                                dT_mix_dQ
+                                * sign
+                                * (wall_result.dQ_dT_aw_b * 1.0 + wall_result.dQ_dh_b * ch_b.dh_dT)
+                            )
                             for idx, sens_up in relay[from_b].items():
                                 nr = relay[nid].setdefault(
                                     idx, {"T": 0.0, "Y": np.zeros(n_species), "P_total": 0.0}
                                 )
-                                nr["T"] += factor_b * sens_up["T"]
+                                nr["T"] += factor_T_b * sens_up["T"]
 
-                        # NOTE: Mass-flow coupling (dQ/dmdot via dh/dmdot) omitted --
-                        # requires channel Jacobians not yet returned by htc_and_T().
+                        # Mass-flow coupling: dT_node/dmdot_b (direct)
+                        if m_indices_b:
+                            idx_mdot_b = m_indices_b[0]
+                            factor_mdot_b = dT_mix_dQ * sign * wall_result.dQ_dh_b * ch_b.dh_dmdot
+                            nr = relay[nid].setdefault(
+                                idx_mdot_b, {"T": 0.0, "Y": np.zeros(n_species), "P_total": 0.0}
+                            )
+                            nr["T"] += factor_mdot_b
 
             # 3. Add own unknowns (P_total) to the relay
             node_unks = self._unknown_indices.get(nid, [])
