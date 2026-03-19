@@ -1,21 +1,27 @@
-feat(network): Step 3 - Add FlowNetwork.add_wall() and thermal coupling toggle
+feat(network): Step 4 - Solver wall coupling via EnergyBoundary + Jacobian relay
 
-- Add walls: dict[str, WallConnection] to FlowNetwork.__init__
-- Add thermal_coupling_enabled: bool = True toggle for debug/fast-solve
-- Add add_wall() method with validation:
-  * Checks for duplicate wall IDs
-  * Validates element_a and element_b exist in network
-- Update to_dict() to serialize walls and thermal_coupling_enabled
-- Update from_dict() to deserialize walls and restore thermal toggle
-- Add comprehensive test suite (test_flow_network_walls.py) with 9 test cases:
-  * Default values
-  * Successful wall addition
-  * Error handling (duplicate ID, unknown elements)
-  * Thermal coupling toggle
-  * Serialization/deserialization with walls
-  * Default thermal coupling restoration
-- All tests pass (31/31 total: 22 existing + 9 new)
-- Error handling works correctly with descriptive messages
+Architecture (per design document):
+- Evaluate walls BEFORE compute_derived_state() so Q flows through
+  the existing EnergyBoundary abstraction (single mixing pass)
+- Create dedicated wall EnergyBoundary per affected node during setup
+- Update wall EB Q each Newton iteration before mixing
 
-This enables thermal wall coupling management in the network,
-preparing for solver integration in Step 4.
+Wall evaluation (_evaluate_walls_for_node):
+- Calls htc_and_T() on both coupled elements
+- Calls wall_coupling_and_jacobian() (C++) for Q and Jacobians
+- Accumulates Q from multiple walls before setting on EnergyBoundary
+- Skips same-node walls (net Q = 0 by energy conservation)
+- Deduplicates walls via processed_walls set
+
+Back-edge handling (_get_node_state_with_prev):
+- Preserves _prev_derived_states from previous Newton iteration
+- Uses lagged T/Y for nodes not yet visited in current topological pass
+- Standard Newton behaviour for cross-stream coupling
+
+Jacobian relay (first-order temperature coupling):
+- dT_node/dx += dT_mix/dQ * sign * dQ/dT_aw_a * dT_A/dx
+- dT_node/dx += dT_mix/dQ * sign * dQ/dT_aw_b * dT_B/dx
+- Uses dQ/dT_aw ~ dQ/dT approximation (recovery factor ~ 1)
+- Mass-flow coupling (dQ/dmdot) deferred until channel Jacobians available
+
+All 1019 tests pass.
