@@ -439,6 +439,24 @@ class NetworkElement(ABC):
         """Called automatically by FlowNetwork to resolve neighbors."""
         pass
 
+    def htc_and_T(self, state: MixtureState) -> tuple[float, float, float] | None:
+        """Compute heat transfer coefficient and adiabatic wall temperature.
+
+        Default implementation returns None (no heat transfer).
+        Subclasses can override to provide convective heat transfer.
+
+        Parameters
+        ----------
+        state : MixtureState
+            Flow state at the element inlet.
+
+        Returns
+        -------
+        tuple[float, float, float] | None
+            (h [W/(m^2*K)], T_aw [K], A_conv [m^2]) or None if no heat transfer.
+        """
+        return None
+
 
 class PlenumNode(NetworkNode):
     """
@@ -1093,6 +1111,7 @@ class PipeElement(NetworkElement):
         friction_model: FrictionModelLiteral = "haaland",
         htc_model: HeatTransferModelLiteral = "none",
         t_wall: float | None = None,
+        surface: ConvectiveSurface | None = None,
     ):
         super().__init__(id, from_node, to_node)
         self.length = length
@@ -1104,6 +1123,7 @@ class PipeElement(NetworkElement):
         self.friction_model = friction_model
         self.htc_model = htc_model
         self.t_wall = t_wall
+        self.surface = surface or ConvectiveSurface()
 
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
@@ -1214,6 +1234,40 @@ class PipeElement(NetworkElement):
             return res.profile
 
         return []
+
+    def htc_and_T(self, state: MixtureState) -> tuple[float, float, float] | None:
+        """Compute heat transfer coefficient and adiabatic wall temperature.
+
+        Uses the element's ConvectiveSurface to compute HTC and adiabatic wall temperature.
+
+        Parameters
+        ----------
+        state : MixtureState
+            Flow state at the element inlet.
+
+        Returns
+        -------
+        tuple[float, float, float] | None
+            (h [W/(m^2*K)], T_aw [K], A_conv [m^2]) or None if surface.area = 0.
+        """
+        if self.surface.area == 0.0:
+            return None
+
+        rho = state.density()
+        u = state.m_dot / (rho * self.area)
+
+        # Use nan for T_wall if not specified (matches C++ default)
+        T_wall = self.t_wall if self.t_wall is not None else math.nan
+
+        return self.surface.htc_and_T(
+            T=state.T,
+            P=state.P,
+            X=state.X,
+            velocity=u,
+            diameter=self.diameter,
+            length=self.length,
+            T_wall=T_wall,
+        )
 
     def n_equations(self) -> int:
         return 1
