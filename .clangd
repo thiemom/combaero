@@ -1,12 +1,14 @@
 CompileFlags:
   Add: [-std=c++17]
 
-If:
-  PathMatch: python/combaero/_core.cpp
-Diagnostics:
-  Suppress: '*'
-
 Diagnostics:
   UnusedIncludes: None
   Suppress:
     - '-Wc++17-extensions'
+
+---
+
+If:
+  PathMatch: python/combaero/_core.cpp
+Diagnostics:
+  Suppress: '*'

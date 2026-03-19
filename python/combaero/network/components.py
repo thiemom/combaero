@@ -141,8 +141,16 @@ class ConvectiveSurface:
 
         import combaero as cb
 
-        if self.area == 0.0:
+        if self.area == 0.0 or velocity < 1e-12:
             return None
+
+        # Auto-detect heating direction from T_wall - T sign
+        if self.heating is not None:
+            heating = self.heating
+        elif math.isfinite(T_wall):
+            heating = T_wall >= T
+        else:
+            heating = True  # default when T_wall unknown
 
         # Dispatch to appropriate C++ channel_* function based on model type
         if isinstance(self.model, SmoothModel):
@@ -155,7 +163,7 @@ class ConvectiveSurface:
                 length,
                 T_wall=T_wall,
                 correlation=self.model.correlation,
-                heating=self.heating if self.heating is not None else True,
+                heating=heating,
                 mu_ratio=self.model.mu_ratio,
                 roughness=self.model.roughness,
                 Nu_multiplier=self.Nu_multiplier,
@@ -173,7 +181,7 @@ class ConvectiveSurface:
                 self.model.pitch_to_height,
                 self.model.alpha_deg,
                 T_wall=T_wall,
-                heating=self.heating if self.heating is not None else True,
+                heating=heating,
                 Nu_multiplier=self.Nu_multiplier,
                 f_multiplier=self.f_multiplier,
             )
@@ -189,7 +197,7 @@ class ConvectiveSurface:
                 self.model.h_d,
                 self.model.S_d,
                 T_wall=T_wall,
-                heating=self.heating if self.heating is not None else True,
+                heating=heating,
                 Nu_multiplier=self.Nu_multiplier,
                 f_multiplier=self.f_multiplier,
             )

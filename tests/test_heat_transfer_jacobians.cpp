@@ -82,6 +82,10 @@ TEST(HeatTransferJacobiansTest, ChannelSmoothFiniteDifference) {
   EXPECT_NEAR(base.dq_dmdot, fd_dq_dmdot,
               std::max(1e-6, std::abs(fd_dq_dmdot) * 1e-3));
 
+  double fd_dT_aw_dmdot = fd_mdot(&ChannelResult::T_aw);
+  EXPECT_NEAR(base.dT_aw_dmdot, fd_dT_aw_dmdot,
+              std::max(1e-6, std::abs(fd_dT_aw_dmdot) * 1e-3));
+
   // --- Temperature derivatives (constant mass flow) ---
   const double eps_T = 0.5;
   auto eval_at_T = [&](double T_eval) {
@@ -108,6 +112,10 @@ TEST(HeatTransferJacobiansTest, ChannelSmoothFiniteDifference) {
   double fd_dq_dT = fd_T(&ChannelResult::q);
   EXPECT_NEAR(base.dq_dT, fd_dq_dT,
               std::max(1e-6, std::abs(fd_dq_dT) * 1e-3));
+
+  double fd_dT_aw_dT = fd_T(&ChannelResult::T_aw);
+  EXPECT_NEAR(base.dT_aw_dT, fd_dT_aw_dT,
+              std::max(1e-6, std::abs(fd_dT_aw_dT) * 1e-3));
 
   // --- Wall temperature derivative ---
   const double eps_Twall = 0.5;

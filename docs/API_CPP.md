@@ -389,7 +389,8 @@ ChannelResult channel_impingement(double T, double P, const std::vector<double>&
 ```cpp
 WallCouplingResult wall_coupling_and_jacobian(
     double h_a, double T_aw_a, double h_b, double T_aw_b,
-    double wall_thickness, double wall_conductivity, double A = 1.0
+    double t_over_k,   // wall_thickness / wall_conductivity [m²·K/W]
+    double A = 1.0     // contact area [m²]
 );
 ```
 
