@@ -951,10 +951,11 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double> &X,
         double Nu_minus = nusselt_gnielinski(Re - eps, Pr, f_minus);
         dNu_dRe = (Nu_plus - Nu_minus) / (2.0 * eps) * Nu_multiplier;
 
-        // dNu/dPr via central FD
+        // dNu/dPr via central FD (use raw f to match base Nu calculation)
         double eps_Pr = std::max(1e-6, Pr * 1e-6);
-        double Nu_Pr_plus = nusselt_gnielinski(Re, Pr + eps_Pr, f);
-        double Nu_Pr_minus = nusselt_gnielinski(Re, Pr - eps_Pr, f);
+        double f_raw = f / f_multiplier;
+        double Nu_Pr_plus = nusselt_gnielinski(Re, Pr + eps_Pr, f_raw);
+        double Nu_Pr_minus = nusselt_gnielinski(Re, Pr - eps_Pr, f_raw);
         dNu_dPr = (Nu_Pr_plus - Nu_Pr_minus) / (2.0 * eps_Pr) * Nu_multiplier;
       } else if (correlation == "dittus_boelter") {
         // Nu = 0.023 * Re^0.8 * Pr^n  =>  dNu/dRe = 0.8 * Nu / Re, dNu/dPr = n * Nu / Pr
@@ -974,10 +975,11 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double> &X,
         double Nu_minus = nusselt_petukhov(Re - eps, Pr, f_minus);
         dNu_dRe = (Nu_plus - Nu_minus) / (2.0 * eps) * Nu_multiplier;
 
-        // dNu/dPr via central FD
+        // dNu/dPr via central FD (use raw f to match base Nu calculation)
         double eps_Pr = std::max(1e-6, Pr * 1e-6);
-        double Nu_Pr_plus = nusselt_petukhov(Re, Pr + eps_Pr, f);
-        double Nu_Pr_minus = nusselt_petukhov(Re, Pr - eps_Pr, f);
+        double f_raw = f / f_multiplier;
+        double Nu_Pr_plus = nusselt_petukhov(Re, Pr + eps_Pr, f_raw);
+        double Nu_Pr_minus = nusselt_petukhov(Re, Pr - eps_Pr, f_raw);
         dNu_dPr = (Nu_Pr_plus - Nu_Pr_minus) / (2.0 * eps_Pr) * Nu_multiplier;
       }
     }
