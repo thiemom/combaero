@@ -5093,6 +5093,50 @@ PYBIND11_MODULE(_core, m) {
       });
 
   // -----------------------------------------------------------------
+  // WallCouplingResult struct
+  // -----------------------------------------------------------------
+  py::class_<WallCouplingResult>(
+      m, "WallCouplingResult",
+      "Heat transfer through a wall between two elements.\n\n"
+      "Returned by wall_coupling_and_jacobian.\n\n"
+      "Q is positive when heat flows from side A to side B.\n"
+      "T_wall is the hot-side surface temperature.\n"
+      "Jacobians enable proper Newton coupling in the network solver.")
+      .def_readonly("Q", &WallCouplingResult::Q, "Heat transfer rate [W] (positive A->B)")
+      .def_readonly("T_wall", &WallCouplingResult::T_wall, "Wall temperature [K] (hot-side surface)")
+      .def_readonly("dQ_dh_a", &WallCouplingResult::dQ_dh_a, "Jacobian: dQ/dh_a [W*m^2*K/W]")
+      .def_readonly("dQ_dh_b", &WallCouplingResult::dQ_dh_b, "Jacobian: dQ/dh_b [W*m^2*K/W]")
+      .def_readonly("dQ_dT_aw_a", &WallCouplingResult::dQ_dT_aw_a, "Jacobian: dQ/dT_aw_a [W/K]")
+      .def_readonly("dQ_dT_aw_b", &WallCouplingResult::dQ_dT_aw_b, "Jacobian: dQ/dT_aw_b [W/K]")
+      .def("__repr__", [](const WallCouplingResult &r) {
+        auto fmt = [](double v) {
+          char buf[32];
+          std::snprintf(buf, sizeof(buf), "%.6g", v);
+          return std::string(buf);
+        };
+        return "WallCouplingResult(Q=" + fmt(r.Q) + ", T_wall=" + fmt(r.T_wall) + ")";
+      });
+
+  // -----------------------------------------------------------------
+  // wall_coupling_and_jacobian
+  // -----------------------------------------------------------------
+  m.def(
+      "wall_coupling_and_jacobian",
+      &wall_coupling_and_jacobian,
+      py::arg("h_a"), py::arg("T_aw_a"),
+      py::arg("h_b"), py::arg("T_aw_b"),
+      py::arg("t_over_k"), py::arg("A"),
+      "Compute heat transfer and Jacobians for wall coupling.\n\n"
+      "Parameters:\n"
+      "  h_a, h_b       : convective HTCs on sides A and B [W/(m^2*K)]\n"
+      "  T_aw_a, T_aw_b : adiabatic wall temperatures on sides A and B [K]\n"
+      "  t_over_k       : wall_thickness / wall_conductivity [m^2*K/W]\n"
+      "  A              : effective heat transfer area [m^2]\n\n"
+      "Returns: WallCouplingResult with Q and analytical Jacobians\n\n"
+      "Uses overall_htc_wall(h_a, h_b, t_over_k) internally.\n"
+      "Q = U * A * (T_aw_a - T_aw_b) where U = 1 / (1/h_a + t/k + 1/h_b)");
+
+  // -----------------------------------------------------------------
   // channel_smooth
   // -----------------------------------------------------------------
   m.def(

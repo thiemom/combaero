@@ -1257,4 +1257,48 @@ ChannelResult channel_impingement(double T, double P,
   return result;
 }
 
+// -------------------------------------------------------------
+// wall_coupling_and_jacobian
+// -------------------------------------------------------------
+
+WallCouplingResult wall_coupling_and_jacobian(
+    double h_a, double T_aw_a,
+    double h_b, double T_aw_b,
+    double t_over_k,
+    double A) {
+  WallCouplingResult result;
+
+  // Overall HTC: U = 1 / (1/h_a + t/k + 1/h_b)
+  double R_total = 1.0 / h_a + t_over_k + 1.0 / h_b;
+  double U = 1.0 / R_total;
+
+  // Heat transfer rate: Q = U * A * (T_aw_a - T_aw_b)
+  double dT = T_aw_a - T_aw_b;
+  result.Q = U * A * dT;
+
+  // Wall temperature: T_wall = (h_a * T_aw_a + h_b * T_aw_b) / (h_a + h_b)
+  // This is the equilibrium temperature at the wall interface
+  result.T_wall = (h_a * T_aw_a + h_b * T_aw_b) / (h_a + h_b);
+
+  // Jacobians: dQ/dh_a, dQ/dh_b, dQ/dT_aw_a, dQ/dT_aw_b
+  //
+  // Q = U * A * dT  where U = 1 / (1/h_a + t/k + 1/h_b)
+  //
+  // dU/dh_a = -U^2 * (-1/h_a^2) = U^2 / h_a^2
+  // dU/dh_b = U^2 / h_b^2
+  //
+  // dQ/dh_a = dU/dh_a * A * dT = (U^2 / h_a^2) * A * dT
+  // dQ/dh_b = dU/dh_b * A * dT = (U^2 / h_b^2) * A * dT
+  // dQ/dT_aw_a = U * A
+  // dQ/dT_aw_b = -U * A
+
+  double U2 = U * U;
+  result.dQ_dh_a = (U2 / (h_a * h_a)) * A * dT;
+  result.dQ_dh_b = (U2 / (h_b * h_b)) * A * dT;
+  result.dQ_dT_aw_a = U * A;
+  result.dQ_dT_aw_b = -U * A;
+
+  return result;
+}
+
 } // namespace combaero

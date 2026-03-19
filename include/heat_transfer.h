@@ -552,6 +552,38 @@ struct ChannelResult {
 };
 
 // -------------------------------------------------------------
+// WallCouplingResult — heat transfer through a wall between two elements
+// -------------------------------------------------------------
+
+struct WallCouplingResult {
+  double Q = 0.0;            // heat transfer rate [W] (positive A→B)
+  double T_wall = 0.0;       // wall temperature [K] (hot-side surface)
+  double dQ_dh_a = 0.0;      // ∂Q/∂h_a [W·m²·K/W]
+  double dQ_dh_b = 0.0;      // ∂Q/∂h_b [W·m²·K/W]
+  double dQ_dT_aw_a = 0.0;   // ∂Q/∂T_aw_a [W/K]
+  double dQ_dT_aw_b = 0.0;   // ∂Q/∂T_aw_b [W/K]
+};
+
+// Compute heat transfer and Jacobians for wall coupling between two elements
+//
+// Parameters:
+//   h_a, h_b    : convective HTCs on sides A and B [W/(m²·K)]
+//   T_aw_a, T_aw_b : adiabatic wall temperatures on sides A and B [K]
+//   t_over_k    : wall_thickness / wall_conductivity [m²·K/W]
+//   A           : effective heat transfer area [m²]
+//
+// Returns:
+//   WallCouplingResult with Q (positive = A→B) and analytical Jacobians
+//
+// Uses overall_htc_wall(h_a, h_b, t_over_k) internally.
+// Derivatives are analytical since U = 1 / (1/h_a + t/k + 1/h_b).
+WallCouplingResult wall_coupling_and_jacobian(
+    double h_a, double T_aw_a,
+    double h_b, double T_aw_b,
+    double t_over_k,
+    double A);
+
+// -------------------------------------------------------------
 // High-level channel functions — each returns a ChannelResult
 // -------------------------------------------------------------
 //
