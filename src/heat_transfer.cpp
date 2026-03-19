@@ -824,16 +824,6 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double> &X,
   double k = thermal_conductivity(T, P, X);
   double Pr = prandtl(T, P, X);
 
-  // Thermal conductivity and Prandtl derivatives via central FD
-  const double eps_T_props = 1e-3;
-  double k_plus = thermal_conductivity(T + eps_T_props, P, X);
-  double k_minus = thermal_conductivity(T - eps_T_props, P, X);
-  double dk_dT = (k_plus - k_minus) / (2.0 * eps_T_props);
-
-  double Pr_plus = prandtl(T + eps_T_props, P, X);
-  double Pr_minus = prandtl(T - eps_T_props, P, X);
-  double dPr_dT = (Pr_plus - Pr_minus) / (2.0 * eps_T_props);
-
   // Reynolds number
   double Re = (velocity > 0.0) ? rho * velocity * diameter / mu : 0.0;
 
@@ -907,6 +897,16 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double> &X,
     double A_cross = M_PI / 4.0 * diameter * diameter;
     double mdot = rho * velocity * A_cross;
 
+    // Thermal conductivity and Prandtl derivatives via central FD
+    const double eps_T_props = 1e-3;
+    double k_plus = thermal_conductivity(T + eps_T_props, P, X);
+    double k_minus = thermal_conductivity(T - eps_T_props, P, X);
+    double dk_dT = (k_plus - k_minus) / (2.0 * eps_T_props);
+
+    double Pr_plus = prandtl(T + eps_T_props, P, X);
+    double Pr_minus = prandtl(T - eps_T_props, P, X);
+    double dPr_dT = (Pr_plus - Pr_minus) / (2.0 * eps_T_props);
+
     // Chain rule: dRe/dmdot and dRe/dT
     // Re = rho * v * D / mu = mdot * D / (A_cross * mu)
     // At constant mdot: dRe/dT = -Re * dmu/dT / mu (no rho dependence)
@@ -918,7 +918,13 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double> &X,
     double dNu_dPr = 0.0;
     double df_dRe = 0.0;
 
-    if (Re >= 2300.0) {
+    if (Re < 2300.0) {
+      // Laminar: f = 64/Re, so df/dRe = -64/Re^2 = -f/Re
+      if (Re > 0.0) {
+        df_dRe = -f / Re * f_multiplier;
+      }
+      // Nu is constant in laminar regime, dNu/dRe = 0
+    } else {
       // Friction factor derivative (needed first for Gnielinski/Petukhov)
       if (e_D > 0.0 && Re > 4000.0) {
         // Colebrook - use finite difference
@@ -1157,16 +1163,6 @@ ChannelResult channel_pin_fin(double T, double P, const std::vector<double> &X,
   double k = thermal_conductivity(T, P, X);
   double Pr = prandtl(T, P, X);
 
-  // Thermal conductivity and Prandtl derivatives via central FD
-  const double eps_T_props = 1e-3;
-  double k_plus = thermal_conductivity(T + eps_T_props, P, X);
-  double k_minus = thermal_conductivity(T - eps_T_props, P, X);
-  double dk_dT = (k_plus - k_minus) / (2.0 * eps_T_props);
-
-  double Pr_plus = prandtl(T + eps_T_props, P, X);
-  double Pr_minus = prandtl(T - eps_T_props, P, X);
-  double dPr_dT = (Pr_plus - Pr_minus) / (2.0 * eps_T_props);
-
   // Re based on pin diameter and approach velocity
   double Re_d = (velocity > 0.0) ? rho * velocity * pin_diameter / mu : 0.0;
 
@@ -1200,6 +1196,16 @@ ChannelResult channel_pin_fin(double T, double P, const std::vector<double> &X,
   if (velocity > 0.0 && Re_d > 0.0) {
     double A_cross = channel_height * pin_diameter * (S_D - 1.0) / S_D;  // Approx flow area
     double mdot = rho * velocity * A_cross;
+
+    // Thermal conductivity and Prandtl derivatives via central FD
+    const double eps_T_props = 1e-3;
+    double k_plus = thermal_conductivity(T + eps_T_props, P, X);
+    double k_minus = thermal_conductivity(T - eps_T_props, P, X);
+    double dk_dT = (k_plus - k_minus) / (2.0 * eps_T_props);
+
+    double Pr_plus = prandtl(T + eps_T_props, P, X);
+    double Pr_minus = prandtl(T - eps_T_props, P, X);
+    double dPr_dT = (Pr_plus - Pr_minus) / (2.0 * eps_T_props);
 
     // dRe/dmdot and dRe/dT
     // At constant mdot: dRe/dT = -Re * dmu/dT / mu (no rho dependence)
@@ -1284,16 +1290,6 @@ ChannelResult channel_impingement(double T, double P,
   double k = thermal_conductivity(T, P, X);
   double Pr = prandtl(T, P, X);
 
-  // Thermal conductivity and Prandtl derivatives via central FD
-  const double eps_T_props = 1e-3;
-  double k_plus = thermal_conductivity(T + eps_T_props, P, X);
-  double k_minus = thermal_conductivity(T - eps_T_props, P, X);
-  double dk_dT = (k_plus - k_minus) / (2.0 * eps_T_props);
-
-  double Pr_plus = prandtl(T + eps_T_props, P, X);
-  double Pr_minus = prandtl(T - eps_T_props, P, X);
-  double dPr_dT = (Pr_plus - Pr_minus) / (2.0 * eps_T_props);
-
   // Jet area and velocity
   double A_jet = M_PI / 4.0 * d_jet * d_jet;
   double v_jet = (rho > 0.0 && A_jet > 0.0) ? mdot_jet / (rho * A_jet) : 0.0;
@@ -1323,6 +1319,16 @@ ChannelResult channel_impingement(double T, double P,
 
   // Compute Jacobians (simplified - captures dominant Re dependence)
   if (mdot_jet > 0.0 && Re_jet > 0.0) {
+    // Thermal conductivity and Prandtl derivatives via central FD
+    const double eps_T_props = 1e-3;
+    double k_plus = thermal_conductivity(T + eps_T_props, P, X);
+    double k_minus = thermal_conductivity(T - eps_T_props, P, X);
+    double dk_dT = (k_plus - k_minus) / (2.0 * eps_T_props);
+
+    double Pr_plus = prandtl(T + eps_T_props, P, X);
+    double Pr_minus = prandtl(T - eps_T_props, P, X);
+    double dPr_dT = (Pr_plus - Pr_minus) / (2.0 * eps_T_props);
+
     // dRe/dmdot: Re = mdot * d / (A_jet * mu)
     // At constant mdot: dRe/dT = -Re * dmu/dT / mu (no rho dependence)
     double dRe_dmdot = d_jet / (A_jet * mu);

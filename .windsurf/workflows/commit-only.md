@@ -1,8 +1,8 @@
 ---
-description: Run style checks, fix issues, commit with message file, and push
+description: Run style checks, fix issues, commit with message file, but NO push
 ---
 
-This workflow automates the commit and push process with proper style checking and message handling.
+This workflow automates the commit process with proper style checking and message handling.
 
 ## Steps
 
@@ -69,13 +69,7 @@ Common types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `style
 git commit -F COMMIT_MSG.md
 ```
 
-// turbo
-### 8. Push to remote
-```bash
-git push
-```
-
-### 9. Clean up message file
+### 8. Clean up message file
 // turbo
 ```bash
 rm COMMIT_MSG.md
@@ -84,7 +78,6 @@ rm COMMIT_MSG.md
 ## Usage
 
 When you run this workflow, Cascade will:
-When you run this workflow, Cascade will:
 1. Check for old commit message files
 2. Stage all changes
 3. Run pre-commit hooks (ruff, trailing whitespace, etc.)
@@ -92,7 +85,6 @@ When you run this workflow, Cascade will:
 5. Fix any remaining issues that ruff couldn't auto-fix
 6. Create commit message file
 7. Commit using that file (avoiding shell escaping issues)
-8. Push to remote
-9. Clean up the temporary file
+8. Clean up the temporary file
 
 This avoids issues with special characters, backticks, and multi-line messages in shell commands.
