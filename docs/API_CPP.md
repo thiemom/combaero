@@ -12,6 +12,11 @@ This document provides the technical reference for the CombAero C++ library. For
 - [Incompressible Flow (incompressible.h)](#incompressible-flow-incompressibleh)
 - [Friction Factor Correlations (friction.h)](#friction-factor-correlations-frictionh)
 - [Heat Transfer Correlations (heat_transfer.h)](#heat-transfer-correlations-heat_transferh)
+  - [Nusselt Numbers](#nusselt-numbers)
+  - [Overall Heat Transfer](#overall-heat-transfer)
+  - [Channel Flow Models](#channel-flow-models)
+  - [Wall Coupling](#wall-coupling)
+  - [Data Structures](#data-structures)
 - [Geometry Utilities (geometry.h)](#geometry-utilities-geometryh)
 - [Orifice Flow (orifice.h)](#orifice-flow-orificeh)
 - [Acoustics (acoustics.h)](#acoustics-acousticsh)
@@ -342,6 +347,85 @@ double nusselt_sieder_tate(double Re, double Pr, double mu_ratio);
 ```cpp
 double overall_htc(const std::vector<double>& h_values, const std::vector<double>& t_over_k);
 double overall_htc_wall(double h_inner, double h_outer, const std::vector<double>& t_over_k_layers);
+```
+
+### Channel Flow Models
+```cpp
+// Smooth pipe
+ChannelResult channel_smooth(double T, double P, const std::vector<double>& X,
+                              double velocity, double diameter, double length,
+                              double T_wall = std::numeric_limits<double>::quiet_NaN(),
+                              const std::string& correlation = "gnielinski",
+                              bool heating = true, double Nu_multiplier = 1.0,
+                              double f_multiplier = 1.0);
+
+// Enhanced surfaces
+ChannelResult channel_ribbed(double T, double P, const std::vector<double>& X,
+                             double velocity, double diameter, double length,
+                             double e_D, double p_e, double w_e,
+                             double T_wall = std::numeric_limits<double>::quiet_NaN(),
+                             double Nu_multiplier = 1.0, double f_multiplier = 1.0);
+
+ChannelResult channel_dimpled(double T, double P, const std::vector<double>& X,
+                              double velocity, double diameter, double length,
+                              double d_Dh, double h_d, double S_d,
+                              double T_wall = std::numeric_limits<double>::quiet_NaN(),
+                              double Nu_multiplier = 1.0, double f_multiplier = 1.0);
+
+ChannelResult channel_pin_fin(double T, double P, const std::vector<double>& X,
+                              double velocity, double diameter, double length,
+                              double L_H, double S_H, double S_L, double t_D,
+                              double T_wall = std::numeric_limits<double>::quiet_NaN(),
+                              double Nu_multiplier = 1.0, double f_multiplier = 1.0);
+
+ChannelResult channel_impingement(double T, double P, const std::vector<double>& X,
+                                  double velocity, double diameter, double length,
+                                  double H_D, double S_n, double d_j, double N_j,
+                                  double T_wall = std::numeric_limits<double>::quiet_NaN(),
+                                  double Nu_multiplier = 1.0, double f_multiplier = 1.0);
+```
+
+### Wall Coupling
+```cpp
+WallCouplingResult wall_coupling_and_jacobian(
+    double h_a, double T_aw_a, double h_b, double T_aw_b,
+    double wall_thickness, double wall_conductivity, double A = 1.0
+);
+```
+
+### Data Structures
+```cpp
+struct ChannelResult {
+    // Primary outputs
+    double h;              // Heat transfer coefficient [W/(m²·K)]
+    double Nu;             // Nusselt number [-]
+    double Re;             // Reynolds number [-]
+    double Pr;             // Prandtl number [-]
+    double f;              // Friction factor [-]
+    double dP;             // Pressure drop [Pa]
+    double M;              // Mach number [-]
+    double T_aw;           // Adiabatic wall temperature [K]
+    double q;              // Heat flux [W/m²] (nan if T_wall not supplied)
+
+    // Jacobians
+    double dh_dmdot;       // dh/dmdot [W/(m²·K·kg/s)]
+    double dh_dT;          // dh/dT [W/(m²·K²)]
+    double ddP_dmdot;      // d(dP)/dmdot [Pa·s/kg]
+    double ddP_dT;         // d(dP)/dT [Pa/K]
+    double dT_aw_dmdot;    // dT_aw/dmdot [K·s/kg]
+    double dT_aw_dT;       // dT_aw/dT [-] (approx 1 at low Mach)
+    double dq_dmdot;       // dq/dmdot [W·s/(m²·kg)]
+    double dq_dT;          // dq/dT [W/(m²·K)]
+    double dq_dT_wall;     // dq/dT_wall [W/(m²·K)]
+};
+
+struct WallCouplingResult {
+    double Q;              // Heat transfer rate [W]
+    double dQ_dh_a;        // ∂Q/∂h_a [m²·K/W]
+    double dQ_dh_b;        // ∂Q/∂h_b [m²·K/W]
+    double dQ_dT_aw_a;     // ∂Q/∂T_aw_a [W/K]
+    double dQ_dT_aw_b;     // ∂Q/∂T_aw_b [W/K]
+};
 ```
 
 ---

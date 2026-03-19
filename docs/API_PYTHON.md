@@ -9,6 +9,8 @@ This document provides the high-level reference for the `combaero` Python packag
 - [Advanced Flow Functions](#advanced-flow-functions)
 - [Comprehensive Orifice Functions](#comprehensive-orifice-functions)
 - [Heat Transfer](#heat-transfer)
+  - [Correlations](#correlations)
+  - [Network Heat Transfer](#network-heat-transfer)
 - [Acoustics](#acoustics)
 - [Network Solver](#network-solver)
 - [Geometry & Materials](#geometry--materials)
@@ -211,6 +213,94 @@ h = cb.htc_from_nusselt(Nu, k=0.026, L=0.05)
 
 # Multi-layer wall temperature profile
 temps, q = cb.wall_temperature_profile(T_hot=1200, T_cold=300, h_hot=200, h_cold=20, t_over_k=[0.01/50, 0.05/0.5])
+```
+
+### Network Heat Transfer
+
+#### ConvectiveSurface
+Defines convective heat transfer properties on network elements. Supports different channel models.
+
+```python
+from combaero.heat_transfer import ConvectiveSurface, SmoothModel, RibbedModel, DimpledModel, PinFinModel, ImpingementModel
+
+# Smooth pipe with Gnielinski correlation (default)
+surface = ConvectiveSurface(
+    area=np.pi * 0.04 * 1.0,  # Surface area [m²]
+    model=SmoothModel(correlation="gnielinski")
+)
+
+# Ribbed surface with geometry parameters
+ribbed = ConvectiveSurface(
+    area=2.5,
+    model=RibbedModel(
+        e_D=0.05,      # Rib height / hydraulic diameter
+        p_e=10.0,     # Pitch / height
+        w_e=0.5,      # Rib width / height
+        correlation="gnielinski"
+    )
+)
+
+# Pin fin array
+pin_fin = ConvectiveSurface(
+    area=3.0,
+    model=PinFinModel(
+        L_H=1.0,       # Fin height / hydraulic diameter
+        S_H=2.0,       # Spanwise spacing / height
+        S_L=2.0,       # Streamwise spacing / height
+        t_D=0.1,       # Fin thickness / diameter
+        correlation="gnielinski"
+    )
+)
+```
+
+#### WallConnection
+Thermal coupling between two network elements through a shared wall.
+
+```python
+from combaero.heat_transfer import WallConnection
+
+# Couple hot and cold pipes through a wall
+wall = WallConnection(
+    id="coupling_wall",
+    element_a="hot_pipe",      # First element ID
+    element_b="cold_pipe",     # Second element ID
+    wall_thickness=0.002,      # Wall thickness [m]
+    wall_conductivity=25.0,    # Wall thermal conductivity [W/(m·K)]
+    contact_area=None          # Optional: override surface area
+)
+
+# Add to network
+network.add_wall(wall)
+```
+
+#### Element Integration
+Elements with convective surfaces support heat transfer calculations.
+
+```python
+from combaero.network import PipeElement
+
+# Pipe with convective heat transfer
+pipe = PipeElement(
+    id="heated_pipe",
+    from_node="inlet",
+    to_node="outlet",
+    diameter=0.04,
+    length=1.0,
+    roughness=0.0,
+    surface=surface  # ConvectiveSurface instance
+)
+
+# Get heat transfer coefficient and temperature
+h, T = pipe.htc_and_T(state)  # Returns (htc [W/(m²·K)], T [K])
+```
+
+#### Thermal Coupling Toggle
+Enable/disable thermal coupling globally for debugging or fast solves.
+
+```python
+network = FlowNetwork()
+network.thermal_coupling_enabled = True   # Enable wall heat transfer
+network.thermal_coupling_enabled = False  # Disable (faster, no heat transfer)
 ```
 
 ---
