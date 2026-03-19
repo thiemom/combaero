@@ -112,8 +112,8 @@ class NetworkSolver:
         """Estimate per-node pressures by walking the graph from boundaries.
 
         Starting from every ``PressureBoundary``, pressures are propagated
-        both downstream (subtracting ΔP) and upstream (adding ΔP) per
-        element via BFS.  ``MassFlowBoundary`` nodes are *not* seeded —
+        both downstream (subtracting dP) and upstream (adding dP) per
+        element via BFS.  ``MassFlowBoundary`` nodes are *not* seeded -
         their pressure is discovered by reverse propagation from known
         outlets, ensuring the pressure gradient points in the correct
         flow direction.
@@ -121,13 +121,13 @@ class NetworkSolver:
         p_guess: dict[str, float] = {}
 
         # Seed only PressureBoundary nodes (known pressures).
-        # MassFlowBoundary nodes have unknown pressure — let BFS
+        # MassFlowBoundary nodes have unknown pressure - let BFS
         # discover them by propagating upstream from known outlets.
         for nid, node in self.network.nodes.items():
             if isinstance(node, PressureBoundary):
                 p_guess[nid] = getattr(node, "P_total", ref["P"])
 
-        # Estimated per-element ΔP: spread across elements, or 0.1 % of ref_P
+        # Estimated per-element dP: spread across elements, or 0.1 % of ref_P
         seed_pressures = list(p_guess.values())
         if len(seed_pressures) >= 2:
             dp_est = (max(seed_pressures) - min(seed_pressures)) / max(
@@ -905,17 +905,20 @@ class NetworkSolver:
                 f"Method '{method}' is not supported. Supported methods are: {', '.join(self.SUPPORTED_METHODS)}"
             )
 
-        if options is None:
-            options = {}
+        options = {} if options is None else dict(options)
 
-        # Default iteration limits to prevent infinite loops in C extensions
-        # Note: different methods in root use different names for iteration limits
-        if method in ("hybr", "lm"):
-            if "maxfev" not in options:
-                options["maxfev"] = 500
+        # Normalise caller option names across methods.
+        # scipy.root uses different names for the iteration limit:
+        # - hybr: maxfev
+        # - lm and quasi-Newton/fixed-point methods: maxiter
+        # Translate before applying defaults to avoid stale duplicates.
+        if method != "hybr" and "maxfev" in options:
+            options.setdefault("maxiter", options.pop("maxfev"))
+
+        if method == "hybr":
+            options.setdefault("maxfev", 500)
         else:
-            if "maxiter" not in options:
-                options["maxiter"] = 500
+            options.setdefault("maxiter", 500)
 
         # Ensure topology is resolved before solving
         self.network.resolve_all_topology()
@@ -992,12 +995,23 @@ class NetworkSolver:
             except Exception:
                 # Return a large penalty residual so the trust-region
                 # solver can shrink its step instead of terminating.
+                # Warn once so developers can trace unexpected failures.
+                if not getattr(self, "_penalty_warning_issued", False):
+                    warnings.warn(
+                        "NetworkSolver hit an unphysical intermediate state; "
+                        "returning penalty residual to allow step reduction. "
+                        "Enable debug logging to see the original exception.",
+                        RuntimeWarning,
+                        stacklevel=2,
+                    )
+                    self._penalty_warning_issued = True
                 penalty = np.full(len(x_scaled), 1e6)
                 if use_jac and method in ("hybr", "lm"):
                     return penalty, np.eye(len(x_scaled))
                 return penalty
 
         # Solve
+        _RESIDUAL_TOL = 1e-3
         try:
             sol = root(residuals_wrapper, x0_scaled, method=method, options=options, jac=use_jac)
             final_x = sol.x * D_x  # un-scale
@@ -1006,6 +1020,14 @@ class NetworkSolver:
             # Compute unscaled residual norm for reporting
             final_res = self._residuals(final_x)
             final_norm = float(np.linalg.norm(final_res))
+            # Guard against methods (e.g. lm) that report success at a
+            # non-zero local minimum of ||F||^2.
+            if success and final_norm > _RESIDUAL_TOL:
+                success = False
+                message = (
+                    f"Solver reported success but |F|={final_norm:.3e} "
+                    f"exceeds residual tolerance ({_RESIDUAL_TOL})."
+                )
         except SolverTimeoutError as e:
             final_x = best_x
             success = False
@@ -1017,6 +1039,23 @@ class NetworkSolver:
             success = False
             message = f"Unexpected error during residual evaluation: {e}"
             final_norm = float(best_res_norm)
+
+        # Automatic fallback: if the chosen method failed and isn't hybr,
+        # retry with hybr (Powell's method) which is more robust for square
+        # nonlinear systems.
+        if not success and method != "hybr":
+            try:
+                sol2 = root(residuals_wrapper, x0_scaled, method="hybr", jac=use_jac)
+                fallback_x = sol2.x * D_x
+                fallback_res = self._residuals(fallback_x)
+                fallback_norm = float(np.linalg.norm(fallback_res))
+                if sol2.success and fallback_norm < _RESIDUAL_TOL:
+                    final_x = fallback_x
+                    success = True
+                    message = f"Converged after fallback to hybr (original {method} failed)."
+                    final_norm = fallback_norm
+            except Exception:
+                pass  # keep original failure
 
         if not success:
             warnings.warn(

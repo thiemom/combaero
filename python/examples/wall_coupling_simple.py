@@ -65,7 +65,7 @@ h_hot, T_aw_hot, A_hot = hot_surface.htc_and_T(
     T=T_hot, P=P_hot, X=X_air, velocity=u_hot, diameter=D_hot, length=L_hot
 )
 
-print(f"Hot Side (Smooth Channel):")
+print("Hot Side (Smooth Channel):")
 print(f"  T_bulk = {T_hot:.1f} K")
 print(f"  T_aw   = {T_aw_hot:.1f} K")
 print(f"  h      = {h_hot:.1f} W/(m^2*K)")
@@ -77,7 +77,7 @@ h_cold, T_aw_cold, A_cold = cold_surface.htc_and_T(
     T=T_cold, P=P_cold, X=X_air, velocity=u_cold, diameter=D_cold, length=L_cold
 )
 
-print(f"Cold Side (Ribbed Channel):")
+print("Cold Side (Ribbed Channel):")
 print(f"  T_bulk = {T_cold:.1f} K")
 print(f"  T_aw   = {T_aw_cold:.1f} K")
 print(f"  h      = {h_cold:.1f} W/(m^2*K)")
@@ -98,8 +98,8 @@ wall = WallConnection(
 
 Q, T_wall = wall.compute_coupling(h_hot, T_aw_hot, A_hot, h_cold, T_aw_cold, A_cold)
 
-print(f"Wall Coupling:")
-print(f"  Wall thickness = {t_wall*1000:.1f} mm")
+print("Wall Coupling:")
+print(f"  Wall thickness = {t_wall * 1000:.1f} mm")
 print(f"  Wall conductivity = {k_wall:.1f} W/(m*K)")
 print(f"  Effective area = {min(A_hot, A_cold):.4f} m^2")
 print()
@@ -108,11 +108,11 @@ print()
 t_over_k = t_wall / k_wall
 U = 1.0 / (1.0 / h_hot + t_over_k + 1.0 / h_cold)
 
-print(f"Results:")
+print("Results:")
 print(f"  Overall HTC (U) = {U:.1f} W/(m^2*K)")
 print(f"  Wall temperature = {T_wall:.1f} K")
 print(f"  Heat transfer rate = {Q:.1f} W")
-print(f"  Heat flux = {Q/min(A_hot, A_cold):.1f} W/m^2")
+print(f"  Heat flux = {Q / min(A_hot, A_cold):.1f} W/m^2")
 print()
 
 # Temperature drops
@@ -120,7 +120,7 @@ dT_hot_side = T_aw_hot - T_wall
 dT_wall = T_wall - T_aw_cold  # Should be small for thin, conductive wall
 dT_cold_side = T_wall - T_aw_cold
 
-print(f"Temperature Drops:")
+print("Temperature Drops:")
 print(f"  Hot side (convection):  {dT_hot_side:.1f} K")
 print(f"  Wall (conduction):      {dT_wall:.1f} K")
 print(f"  Cold side (convection): {dT_cold_side:.1f} K")
@@ -133,10 +133,10 @@ R_wall = t_over_k / min(A_hot, A_cold)
 R_cold = 1.0 / (h_cold * min(A_hot, A_cold))
 R_total = R_hot + R_wall + R_cold
 
-print(f"Thermal Resistances:")
-print(f"  Hot side:  {R_hot:.4f} K/W ({R_hot/R_total*100:.1f}%)")
-print(f"  Wall:      {R_wall:.4f} K/W ({R_wall/R_total*100:.1f}%)")
-print(f"  Cold side: {R_cold:.4f} K/W ({R_cold/R_total*100:.1f}%)")
+print("Thermal Resistances:")
+print(f"  Hot side:  {R_hot:.4f} K/W ({R_hot / R_total * 100:.1f}%)")
+print(f"  Wall:      {R_wall:.4f} K/W ({R_wall / R_total * 100:.1f}%)")
+print(f"  Cold side: {R_cold:.4f} K/W ({R_cold / R_total * 100:.1f}%)")
 print(f"  Total:     {R_total:.4f} K/W")
 print()
 

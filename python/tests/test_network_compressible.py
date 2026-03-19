@@ -1,13 +1,19 @@
 """Tests for compressible flow elements in network solver."""
 
+import numpy as np
+import pytest
+
 import combaero as cb
+from combaero.heat_transfer import ConvectiveSurface, SmoothModel
 from combaero.network import (
     FlowNetwork,
+    MassFlowBoundary,
     NetworkSolver,
     OrificeElement,
     PipeElement,
     PlenumNode,
     PressureBoundary,
+    WallConnection,
 )
 
 
@@ -242,3 +248,222 @@ def test_compressible_pipe_high_mach():
     M = u / a
 
     assert M > 0.1, f"Mach number should be significant (M={M:.3f})"
+
+
+def _area(diameter: float) -> float:
+    return float(np.pi * (diameter / 2.0) ** 2)
+
+
+def _mdot_for_mach(mach: float, T: float, P_ref: float, X: list[float], area: float) -> float:
+    rho = cb.density(T, P_ref, X)
+    a = cb.speed_of_sound(T, X)
+    return float(mach * rho * a * area)
+
+
+# Constants matching the network builder; keep in sync
+_T_HOT = 740.0
+_T_COLD = 320.0
+_P_OUT = 2.0e5
+
+
+def _build_fully_coupled_network(regime: str, mach_target: float) -> FlowNetwork:
+    x_air = cb.standard_dry_air_composition()
+    y_air = list(cb.mole_to_mass(x_air))
+
+    t_hot = _T_HOT
+    t_cold = _T_COLD
+    p_out_hot = _P_OUT
+    p_out_cold = _P_OUT
+    d_hot = 0.018
+    d_cold = 0.014
+    length = 2.0
+
+    mdot_hot = _mdot_for_mach(mach_target, t_hot, p_out_hot, x_air, _area(d_hot))
+    mdot_cold = 0.65 * _mdot_for_mach(mach_target, t_cold, p_out_cold, x_air, _area(d_cold))
+
+    pipe_regime = "compressible_fanno" if regime == "compressible" else "incompressible"
+    orifice_regime = "compressible" if regime == "compressible" else "incompressible"
+
+    net = FlowNetwork()
+    net.add_node(MassFlowBoundary("hot_inlet", m_dot=mdot_hot, T_total=t_hot, Y=y_air))
+    net.add_node(PlenumNode("hot_plenum"))
+    net.add_node(PressureBoundary("hot_outlet", P_total=p_out_hot, T_total=t_hot, Y=y_air))
+
+    net.add_node(MassFlowBoundary("cold_inlet", m_dot=mdot_cold, T_total=t_cold, Y=y_air))
+    net.add_node(PlenumNode("cold_plenum"))
+    net.add_node(PressureBoundary("cold_outlet", P_total=p_out_cold, T_total=t_cold, Y=y_air))
+
+    hot_surface = ConvectiveSurface(area=np.pi * d_hot * length, model=SmoothModel())
+    cold_surface = ConvectiveSurface(area=np.pi * d_cold * length, model=SmoothModel())
+
+    net.add_element(
+        PipeElement(
+            id="hot_pipe",
+            from_node="hot_inlet",
+            to_node="hot_plenum",
+            length=length,
+            diameter=d_hot,
+            roughness=5.0e-5,
+            regime=pipe_regime,
+            surface=hot_surface,
+        )
+    )
+    net.add_element(
+        OrificeElement(
+            id="hot_orifice",
+            from_node="hot_plenum",
+            to_node="hot_outlet",
+            Cd=0.72,
+            area=_area(0.030),
+            regime=orifice_regime,
+        )
+    )
+
+    net.add_element(
+        PipeElement(
+            id="cold_pipe",
+            from_node="cold_inlet",
+            to_node="cold_plenum",
+            length=length,
+            diameter=d_cold,
+            roughness=5.0e-5,
+            regime=pipe_regime,
+            surface=cold_surface,
+        )
+    )
+    net.add_element(
+        OrificeElement(
+            id="cold_orifice",
+            from_node="cold_plenum",
+            to_node="cold_outlet",
+            Cd=0.72,
+            area=_area(0.025),
+            regime=orifice_regime,
+        )
+    )
+
+    net.add_wall(
+        WallConnection(
+            id="coupling_wall",
+            element_a="hot_pipe",
+            element_b="cold_pipe",
+            wall_thickness=0.002,
+            wall_conductivity=20.0,
+        )
+    )
+    net.thermal_coupling_enabled = True
+    return net
+
+
+def test_fully_coupled_compressible_vs_incompressible_mach_sweep():
+    """Fully coupled pressure-ratio sweep over target Mach: compressible vs incompressible."""
+    mach_values = np.array([0.20, 0.50, 0.90])
+
+    pr_comp: list[float] = []
+    pr_incomp: list[float] = []
+    thermal_hot_drop: list[float] = []
+    thermal_cold_rise: list[float] = []
+
+    for mach_target in mach_values:
+        net_comp = _build_fully_coupled_network("compressible", float(mach_target))
+        net_incomp = _build_fully_coupled_network("incompressible", float(mach_target))
+
+        solver_comp = NetworkSolver(net_comp)
+        solver_incomp = NetworkSolver(net_incomp)
+
+        sol_comp = solver_comp.solve(method="hybr")
+        sol_incomp = solver_incomp.solve(method="hybr")
+
+        assert sol_comp["__success__"], f"compressible solve failed at M={mach_target:.3f}"
+        assert sol_incomp["__success__"], f"incompressible solve failed at M={mach_target:.3f}"
+
+        pr_comp.append(_P_OUT / float(sol_comp["hot_inlet.P_total"]))
+        pr_incomp.append(_P_OUT / float(sol_incomp["hot_inlet.P_total"]))
+
+        t_hot_out = float(solver_comp._derived_states["hot_plenum"][0])
+        t_cold_out = float(solver_comp._derived_states["cold_plenum"][0])
+        thermal_hot_drop.append(_T_HOT - t_hot_out)
+        thermal_cold_rise.append(t_cold_out - _T_COLD)
+
+    pr_comp_arr = np.asarray(pr_comp)
+    pr_incomp_arr = np.asarray(pr_incomp)
+    pr_diff = np.abs(pr_incomp_arr - pr_comp_arr)
+
+    # PR should be monotonic non-increasing as target Mach increases.
+    # A tiny plateau at high Mach is acceptable near choking; end-point
+    # upturns are not.
+    tol = 1e-6
+    assert np.all(np.diff(pr_comp_arr) <= tol)
+    assert np.all(np.diff(pr_incomp_arr) <= tol)
+
+    # Compressible model predicts larger pressure drop (lower PR).
+    assert np.all(pr_comp_arr < pr_incomp_arr)
+
+    # Relative compressibility impact should grow with Mach.
+    rel_diff = pr_diff / pr_comp_arr
+    assert np.all(np.diff(rel_diff) > 0)
+
+    # Thermal coupling should remain active through the sweep.
+    assert np.min(thermal_hot_drop) > 0.0
+    assert np.min(thermal_cold_rise) > 0.0
+
+
+# ---------------------------------------------------------------------------
+# Convergence benchmark: high-Mach compressible Fanno pipe
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.xfail(
+    reason="Solver convergence benchmark — high-Mach compressible Fanno pipe. "
+    "Currently the solver cannot converge at M_target >= 1.15 with the "
+    "coupled thermal network.  When solver improvements make this pass, "
+    "remove the xfail to lock in the gain.",
+    strict=True,
+)
+def test_high_mach_compressible_convergence_benchmark():
+    """Benchmark: solver should converge for high-Mach coupled compressible network.
+
+    This test targets the regime where the Fanno pipe approaches choking
+    and the initial-guess propagation breaks down (M_target = 1.15 gives
+    actual pipe Mach ~ 0.67).  It exercises:
+
+    - High mass-flow initial-guess quality
+    - Compressible pipe + compressible orifice residuals near choking
+    - Thermal coupling at high velocity (large Re, strong HTC)
+
+    The sweep goes from easy (M=0.20) to hard (M=1.50) in fine steps.
+    Previous solutions are available as warm-start candidates.  A fully
+    robust solver should converge every point.
+
+    This is NOT a regression gate — it is an aspirational benchmark.
+    When it starts passing, tighten the xfail to ``strict=True`` (already
+    set) so that future regressions are caught.
+    """
+    mach_values = np.linspace(0.20, 1.50, 14)
+
+    pr_comp: list[float] = []
+    x0_prev: np.ndarray | None = None
+
+    for mach_target in mach_values:
+        net = _build_fully_coupled_network("compressible", float(mach_target))
+        solver = NetworkSolver(net)
+
+        # Try fresh, then warm-start from previous point.
+        sol = solver.solve(method="hybr")
+        if not sol["__success__"] and x0_prev is not None:
+            sol = solver.solve(method="hybr", x0=x0_prev)
+
+        assert sol["__success__"], (
+            f"compressible solve failed at M_target={mach_target:.3f}: "
+            f"|F|={sol['__final_norm__']:.3e}  {sol['__message__']}"
+        )
+        x0_prev = solver._last_x
+        pr_comp.append(_P_OUT / float(sol["hot_inlet.P_total"]))
+
+    pr_arr = np.asarray(pr_comp)
+
+    # Physical sanity: PR monotonically decreasing.
+    assert np.all(np.diff(pr_arr) < 0), "PR should decrease with increasing Mach"
+
+    # PR at the highest Mach should be well below 1.
+    assert pr_arr[-1] < 0.5, f"Expected PR < 0.5 at M=1.50, got {pr_arr[-1]:.3f}"

@@ -156,7 +156,9 @@ def create_coupled_wall_network(
     wall_layers: list[tuple[float, float]],
 ) -> tuple[FlowNetwork, float]:
     """Create a two-stream wall-coupled network (hot annulus + cool channel)."""
-    net, A_liner = create_cooling_network(f_cool, mdot_total, T2, P2, X_cool, D_ch, L_ch, N_ch, ch_name)
+    net, A_liner = create_cooling_network(
+        f_cool, mdot_total, T2, P2, X_cool, D_ch, L_ch, N_ch, ch_name
+    )
 
     # Hot-side flow path (representative annulus stream)
     A_ann = np.pi * (D_ann / 2.0) ** 2
@@ -164,7 +166,9 @@ def create_coupled_wall_network(
     mdot_hot = rho_hot * u_hot_ann * A_ann
 
     hot_surface = ConvectiveSurface(area=A_liner, model=SmoothModel())
-    net.add_node(MassFlowBoundary("hot_inlet", m_dot=mdot_hot, T_total=T_hot, Y=ca.mole_to_mass(X_hot)))
+    net.add_node(
+        MassFlowBoundary("hot_inlet", m_dot=mdot_hot, T_total=T_hot, Y=ca.mole_to_mass(X_hot))
+    )
     net.add_node(PlenumNode("hot_exit"))
     net.add_node(PressureBoundary("hot_outlet", P_total=P_hot))
 
@@ -455,7 +459,9 @@ def solve_operating_point_network_coupled(
     t_over_k = np.array([t / k for t, k in wall_layers])
     temps, _ = ca.wall_temperature_profile(T_hot_est, T2, ch_hot.h, ch_result.h, t_over_k)
 
-    net_smooth, _ = create_cooling_network(f_cool, mdot_total, T2, P2, X_cool, D_ch, L_ch, N_ch, "Smooth")
+    net_smooth, _ = create_cooling_network(
+        f_cool, mdot_total, T2, P2, X_cool, D_ch, L_ch, N_ch, "Smooth"
+    )
     net_smooth.elements["cool_channel"].t_wall = T_hot_est
     NetworkSolver(net_smooth).solve()
     cool_state_smooth = MixtureState(
