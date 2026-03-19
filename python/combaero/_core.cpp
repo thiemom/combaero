@@ -5137,15 +5137,17 @@ PYBIND11_MODULE(_core, m) {
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double velocity, double diameter, double length, double e_D,
          double pitch_to_height, double alpha_deg, double T_wall,
-         bool heating) {
+         bool heating, double Nu_multiplier, double f_multiplier) {
         return channel_ribbed(T, P, to_vec(X_arr), velocity, diameter, length,
-                              e_D, pitch_to_height, alpha_deg, T_wall, heating);
+                              e_D, pitch_to_height, alpha_deg, T_wall, heating,
+                              Nu_multiplier, f_multiplier);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
       py::arg("diameter"), py::arg("length"), py::arg("e_D"),
       py::arg("pitch_to_height"), py::arg("alpha_deg"),
       py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
       py::arg("heating") = true,
+      py::arg("Nu_multiplier") = 1.0, py::arg("f_multiplier") = 1.0,
       "Rib-enhanced cooling channel (Han et al. 1988).\n\n"
       "Applies rib_enhancement_factor to Nu and rib_friction_multiplier to f\n"
       "from a smooth-pipe Gnielinski baseline.\n\n"
@@ -5165,15 +5167,18 @@ PYBIND11_MODULE(_core, m) {
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double velocity, double diameter, double length, double d_Dh,
-         double h_d, double S_d, double T_wall, bool heating) {
+         double h_d, double S_d, double T_wall, bool heating,
+         double Nu_multiplier, double f_multiplier) {
         return channel_dimpled(T, P, to_vec(X_arr), velocity, diameter, length,
-                               d_Dh, h_d, S_d, T_wall, heating);
+                               d_Dh, h_d, S_d, T_wall, heating,
+                               Nu_multiplier, f_multiplier);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
       py::arg("diameter"), py::arg("length"), py::arg("d_Dh"), py::arg("h_d"),
       py::arg("S_d"),
       py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
       py::arg("heating") = true,
+      py::arg("Nu_multiplier") = 1.0, py::arg("f_multiplier") = 1.0,
       "Dimpled surface cooling channel (Chyu et al. 1997).\n\n"
       "Applies dimple_nusselt_enhancement to Nu and dimple_friction_multiplier "
       "to f\n"
@@ -5192,16 +5197,18 @@ PYBIND11_MODULE(_core, m) {
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double velocity, double channel_height, double pin_diameter,
-         double S_D, double X_D, int N_rows, double T_wall, bool is_staggered) {
+         double S_D, double X_D, int N_rows, double T_wall, bool is_staggered,
+         double Nu_multiplier, double f_multiplier) {
         return channel_pin_fin(T, P, to_vec(X_arr), velocity, channel_height,
                                pin_diameter, S_D, X_D, N_rows, T_wall,
-                               is_staggered);
+                               is_staggered, Nu_multiplier, f_multiplier);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
       py::arg("channel_height"), py::arg("pin_diameter"), py::arg("S_D"),
       py::arg("X_D"), py::arg("N_rows"),
       py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
       py::arg("is_staggered") = true,
+      py::arg("Nu_multiplier") = 1.0, py::arg("f_multiplier") = 1.0,
       "Pin-fin array cooling channel (Metzger et al. 1982).\n\n"
       "Re and Nu are based on pin diameter d.\n"
       "dP = N_rows * f_pin * (rho * v_max^2 / 2)\n"
@@ -5224,15 +5231,18 @@ PYBIND11_MODULE(_core, m) {
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double mdot_jet, double d_jet, double z_D, double x_D, double y_D,
-         double A_target, double T_wall, double Cd_jet) {
+         double A_target, double T_wall, double Cd_jet,
+         double Nu_multiplier, double f_multiplier) {
         return channel_impingement(T, P, to_vec(X_arr), mdot_jet, d_jet, z_D,
-                                   x_D, y_D, A_target, T_wall, Cd_jet);
+                                   x_D, y_D, A_target, T_wall, Cd_jet,
+                                   Nu_multiplier, f_multiplier);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("mdot_jet"),
       py::arg("d_jet"), py::arg("z_D"), py::arg("x_D") = 0.0,
       py::arg("y_D") = 0.0, py::arg("A_target"),
       py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
       py::arg("Cd_jet") = 0.65,
+      py::arg("Nu_multiplier") = 1.0, py::arg("f_multiplier") = 1.0,
       "Impingement jet array cooling (Florschuetz et al. 1981 / Martin "
       "1977).\n\n"
       "Re and Nu are based on jet diameter d_jet.\n"

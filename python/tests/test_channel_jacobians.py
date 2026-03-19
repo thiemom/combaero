@@ -165,5 +165,68 @@ def test_channel_smooth_zero_velocity():
     assert result.dq_dT == 0.0
 
 
+def test_channel_ribbed_jacobians():
+    """Verify channel_ribbed propagates Jacobians correctly."""
+    T = 700.0
+    P = 2.5e5
+    X = cb.standard_dry_air_composition()
+    velocity = 60.0
+    diameter = 0.025
+    length = 0.6
+    T_wall = 1100.0
+    e_D = 0.05
+    pitch_to_height = 10.0
+    alpha_deg = 60.0
+
+    result = cb.channel_ribbed(
+        T, P, X, velocity, diameter, length, e_D, pitch_to_height, alpha_deg, T_wall
+    )
+
+    # Verify Jacobian fields are populated
+    assert result.dh_dmdot != 0.0
+    assert result.ddP_dmdot != 0.0
+    assert result.dq_dT_wall == -result.h
+
+    # Verify multipliers work
+    Nu_mult = 1.1
+    result_mult = cb.channel_ribbed(
+        T,
+        P,
+        X,
+        velocity,
+        diameter,
+        length,
+        e_D,
+        pitch_to_height,
+        alpha_deg,
+        T_wall,
+        Nu_multiplier=Nu_mult,
+    )
+    assert abs(result_mult.h - result.h * Nu_mult) < 1e-6
+
+
+def test_channel_pin_fin_jacobians():
+    """Verify channel_pin_fin computes Jacobians."""
+    T = 600.0
+    P = 2e5
+    X = cb.standard_dry_air_composition()
+    velocity = 40.0
+    channel_height = 0.006  # H = 6mm
+    pin_diameter = 0.003  # d = 3mm -> L_D = 2.0 (valid range)
+    S_D = 2.5
+    X_D = 2.5
+    N_rows = 5
+    T_wall = 900.0
+
+    result = cb.channel_pin_fin(
+        T, P, X, velocity, channel_height, pin_diameter, S_D, X_D, N_rows, T_wall
+    )
+
+    # Verify Jacobian fields are populated
+    assert result.dh_dmdot != 0.0
+    assert result.ddP_dmdot != 0.0
+    assert result.dq_dT_wall == -result.h
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

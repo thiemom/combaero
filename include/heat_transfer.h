@@ -596,12 +596,15 @@ channel_smooth(double T, double P, const std::vector<double> &X,
 //   e_D            : rib height / hydraulic diameter [-]  (valid: 0.02-0.1)
 //   pitch_to_height: rib pitch / rib height [-]           (valid: 5-20)
 //   alpha_deg      : rib angle [deg]                      (valid: 30-90)
+//   Nu_multiplier  : empirical correction factor on Nu (default 1.0)
+//   f_multiplier   : empirical correction factor on f (default 1.0)
 ChannelResult
 channel_ribbed(double T, double P, const std::vector<double> &X,
                double velocity, double diameter, double length, double e_D,
                double pitch_to_height, double alpha_deg,
                double T_wall = std::numeric_limits<double>::quiet_NaN(),
-               bool heating = true);
+               bool heating = true,
+               double Nu_multiplier = 1.0, double f_multiplier = 1.0);
 
 // Dimpled surface cooling channel (Chyu et al. 1997)
 //
@@ -612,12 +615,15 @@ channel_ribbed(double T, double P, const std::vector<double> &X,
 //   d_Dh : dimple diameter / channel height [-]  (valid: 0.1-0.3)
 //   h_d  : dimple depth / diameter [-]           (valid: 0.1-0.3)
 //   S_d  : dimple spacing / diameter [-]         (valid: 1.5-3.0)
+//   Nu_multiplier : empirical correction factor on Nu (default 1.0)
+//   f_multiplier  : empirical correction factor on f (default 1.0)
 ChannelResult
 channel_dimpled(double T, double P, const std::vector<double> &X,
                 double velocity, double diameter, double length, double d_Dh,
                 double h_d, double S_d,
                 double T_wall = std::numeric_limits<double>::quiet_NaN(),
-                bool heating = true);
+                bool heating = true,
+                double Nu_multiplier = 1.0, double f_multiplier = 1.0);
 
 // Pin-fin array cooling channel (Metzger et al. 1982)
 //
@@ -635,12 +641,15 @@ channel_dimpled(double T, double P, const std::vector<double> &X,
 //   X_D            : streamwise pitch / d [-] (valid: 1.5-4.0)
 //   N_rows         : number of pin rows in streamwise direction
 //   is_staggered   : true = staggered array (default), false = inline
+//   Nu_multiplier  : empirical correction factor on Nu (default 1.0)
+//   f_multiplier   : empirical correction factor on f (default 1.0)
 ChannelResult
 channel_pin_fin(double T, double P, const std::vector<double> &X,
                 double velocity, double channel_height, double pin_diameter,
                 double S_D, double X_D, int N_rows,
                 double T_wall = std::numeric_limits<double>::quiet_NaN(),
-                bool is_staggered = true);
+                bool is_staggered = true,
+                double Nu_multiplier = 1.0, double f_multiplier = 1.0);
 
 // Impingement jet array cooling (Florschuetz et al. 1981 / Martin 1977)
 //
@@ -658,12 +667,15 @@ channel_pin_fin(double T, double P, const std::vector<double> &X,
 //   jet; valid array: 4-16) A_target : target surface area [m²]  (used to
 //   compute average h) Cd_jet   : jet hole discharge coefficient [-]  (default
 //   0.65)
+//   Nu_multiplier : empirical correction factor on Nu (default 1.0)
+//   f_multiplier  : empirical correction factor on f (default 1.0)
 ChannelResult
 channel_impingement(double T, double P, const std::vector<double> &X,
                     double mdot_jet, double d_jet, double z_D, double x_D,
                     double y_D, double A_target,
                     double T_wall = std::numeric_limits<double>::quiet_NaN(),
-                    double Cd_jet = 0.65);
+                    double Cd_jet = 0.65,
+                    double Nu_multiplier = 1.0, double f_multiplier = 1.0);
 
 } // namespace combaero
 
