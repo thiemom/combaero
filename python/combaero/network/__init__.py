@@ -13,6 +13,13 @@ from .components import (
     NetworkNode,
     NetworkElement,
     AreaDischargeCoefficientConnectionElement,
+    ConvectiveSurface,
+    SmoothModel,
+    RibbedModel,
+    DimpledModel,
+    PinFinModel,
+    ImpingementModel,
+    WallConnection,
 )
 from .combustion import (
     CombustionResult,
@@ -46,4 +53,11 @@ __all__: list[str] = [
     "NetworkSolver",
     "NetworkNode",
     "NetworkElement",
+    "ConvectiveSurface",
+    "SmoothModel",
+    "RibbedModel",
+    "DimpledModel",
+    "PinFinModel",
+    "ImpingementModel",
+    "WallConnection",
 ]
