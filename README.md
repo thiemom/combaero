@@ -1,6 +1,6 @@
 # CombAero
 
-A C++17 library for thermodynamic, combustion, and aerodynamic flow & heat-transfer calculations for gas mixtures, with full Python bindings.
+A C++17 library for thermodynamics, combustion, flow networks, and heat transfer for gas mixtures.
 
 ## Overview
 

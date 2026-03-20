@@ -72,8 +72,8 @@ def test_timeout_all_methods(method):
     duration = time.perf_counter() - start
 
     # Ensure it didn't take much longer than the timeout + 1 iteration
-    # 0.5s is a safe upper bound for a 0.1s timeout given 0.05s steps
-    assert duration < 0.6, f"Method {method} took too long: {duration:.2f}s"
+    # 0.65s is a safe upper bound for a 0.1s timeout given 0.2s steps + CI variance
+    assert duration < 0.65, f"Method {method} took too long: {duration:.2f}s"
     assert "bad_node.P" in solution
 
 

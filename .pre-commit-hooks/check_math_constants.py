@@ -19,12 +19,13 @@ MATH_CONSTANTS = [
     "M_LN10",
 ]
 
+
 def check_file(filepath: Path) -> list[str]:
     """Check if file uses math constants without including math_constants.h"""
     errors = []
 
     try:
-        content = filepath.read_text(encoding='utf-8')
+        content = filepath.read_text(encoding="utf-8")
     except (UnicodeDecodeError, FileNotFoundError):
         return errors
 
@@ -32,7 +33,7 @@ def check_file(filepath: Path) -> list[str]:
     constants_used = set()
     for const in MATH_CONSTANTS:
         # Match constant but not in comments or strings
-        if re.search(rf'\b{const}\b', content):
+        if re.search(rf"\b{const}\b", content):
             constants_used.add(const)
 
     if not constants_used:
@@ -44,10 +45,11 @@ def check_file(filepath: Path) -> list[str]:
     if not has_include:
         errors.append(
             f"{filepath}: Uses {', '.join(sorted(constants_used))} "
-            f"but missing #include \"math_constants.h\" (required for MSVC compatibility)"
+            f'but missing #include "math_constants.h" (required for MSVC compatibility)'
         )
 
     return errors
+
 
 def main():
     """Check all C++ files passed as arguments"""
@@ -57,11 +59,11 @@ def main():
         filepath = Path(arg)
 
         # Only check C++ source/header files
-        if filepath.suffix not in {'.cpp', '.h', '.hpp', '.cc', '.cxx'}:
+        if filepath.suffix not in {".cpp", ".h", ".hpp", ".cc", ".cxx"}:
             continue
 
         # Skip the math_constants.h file itself
-        if filepath.name == 'math_constants.h':
+        if filepath.name == "math_constants.h":
             continue
 
         errors.extend(check_file(filepath))
@@ -70,10 +72,13 @@ def main():
         print("\n❌ Math constants portability check failed:\n")
         for error in errors:
             print(f"  {error}")
-        print("\nMSVC does not define M_PI by default. Use #include \"math_constants.h\" for portability.")
+        print(
+            '\nMSVC does not define M_PI by default. Use #include "math_constants.h" for portability.'
+        )
         return 1
 
     return 0
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     sys.exit(main())

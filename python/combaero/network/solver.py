@@ -57,14 +57,123 @@ class NetworkSolver:
         self._topological_order: list[str] = []
         self._derived_states: dict[str, tuple[float, list[float], Any]] = {}
 
+    def _infer_reference_state(self) -> dict[str, Any]:
+        """Derive sensible default values for unknowns from boundary nodes.
+
+        Uses the **minimum** ``PressureBoundary`` pressure so that
+        interior nodes start near the downstream end of the network,
+        consistent with the previous hard-coded 1 atm default for
+        low-pressure networks while giving a physically meaningful
+        starting point for high-pressure ones.  Temperature and
+        composition are averaged
+        across all boundary nodes that carry them.  Mass-flow defaults
+        to the total prescribed mass flow divided by the number of flow
+        elements.
+
+        Returns a dict with keys ``'P'``, ``'T'``, ``'Y'``, ``'m_dot'``.
+        """
+        pressures: list[float] = []
+        temperatures: list[float] = []
+        compositions: list[list[float]] = []
+        total_mdot = 0.0
+
+        for node in self.network.nodes.values():
+            if isinstance(node, PressureBoundary):
+                pressures.append(getattr(node, "P_total", 101325.0))
+                T = getattr(node, "T_total", None)
+                if T is not None:
+                    temperatures.append(T)
+                Y = getattr(node, "Y", None)
+                if Y is not None:
+                    compositions.append(list(Y))
+
+            elif isinstance(node, MassFlowBoundary):
+                T = getattr(node, "T_total", None)
+                if T is not None:
+                    temperatures.append(T)
+                Y = getattr(node, "Y", None)
+                if Y is not None:
+                    compositions.append(list(Y))
+                total_mdot += getattr(node, "m_dot", 0.0)
+
+        ref_P = float(min(pressures)) if pressures else 101325.0
+        ref_T = float(np.mean(temperatures)) if temperatures else 300.0
+        if compositions:
+            ref_Y = [float(v) for v in np.mean(compositions, axis=0)]
+        else:
+            ref_Y = list(self._default_Y)
+
+        n_elems = max(len(self.network.elements), 1)
+        ref_mdot = total_mdot / n_elems if total_mdot > 0 else 0.1
+
+        return {"P": ref_P, "T": ref_T, "Y": ref_Y, "m_dot": ref_mdot}
+
+    def _propagate_pressure_guess(self, ref: dict[str, Any]) -> dict[str, float]:
+        """Estimate per-node pressures by walking the graph from boundaries.
+
+        Starting from every ``PressureBoundary``, pressures are propagated
+        both downstream (subtracting dP) and upstream (adding dP) per
+        element via BFS.  ``MassFlowBoundary`` nodes are *not* seeded -
+        their pressure is discovered by reverse propagation from known
+        outlets, ensuring the pressure gradient points in the correct
+        flow direction.
+        """
+        p_guess: dict[str, float] = {}
+
+        # Seed only PressureBoundary nodes (known pressures).
+        # MassFlowBoundary nodes have unknown pressure - let BFS
+        # discover them by propagating upstream from known outlets.
+        for nid, node in self.network.nodes.items():
+            if isinstance(node, PressureBoundary):
+                p_guess[nid] = getattr(node, "P_total", ref["P"])
+
+        # Estimated per-element dP: spread across elements, or 0.1 % of ref_P
+        seed_pressures = list(p_guess.values())
+        if len(seed_pressures) >= 2:
+            dp_est = (max(seed_pressures) - min(seed_pressures)) / max(
+                len(self.network.elements), 1
+            )
+        else:
+            dp_est = ref["P"] * 0.001
+
+        # BFS propagation from known nodes
+        visited = set(p_guess.keys())
+        queue = list(visited)
+        while queue:
+            nid = queue.pop(0)
+            for elem in self.network.get_downstream_elements(nid):
+                to_id = elem.to_node
+                if to_id not in visited:
+                    p_guess[to_id] = p_guess[nid] - dp_est
+                    visited.add(to_id)
+                    queue.append(to_id)
+            for elem in self.network.get_upstream_elements(nid):
+                from_id = elem.from_node
+                if from_id not in visited:
+                    p_guess[from_id] = p_guess[nid] + dp_est
+                    visited.add(from_id)
+                    queue.append(from_id)
+
+        return p_guess
+
     def _build_x0(self) -> np.ndarray:
         """
         Constructs the initial guess vector by gathering all unknowns.
+
+        Pressure unknowns are initialised via topological propagation
+        from boundary nodes with an estimated per-element drop.
+        Temperature and composition are averaged across boundaries.
+        Mass-flow defaults to total prescribed flow / number of elements.
+
         Returns a flat numpy array.
         """
         self.unknown_names = []
         self._unknown_indices = {}
         x0_list = []
+
+        # --- Infer sensible defaults from boundary nodes ----------------
+        ref = self._infer_reference_state()
+        p_guess = self._propagate_pressure_guess(ref)
 
         # Iterate through interior nodes and gather unknowns
         for node_id, node in self.network.nodes.items():
@@ -78,14 +187,14 @@ class NetworkSolver:
                         if unk in guess_dict:
                             x0_list.append(guess_dict[unk])
                         elif unk.endswith(".P") or unk.endswith(".P_total"):
-                            x0_list.append(101325.0)  # Default 1 atm
+                            x0_list.append(p_guess.get(node_id, ref["P"]))
                         elif unk.endswith(".T") or unk.endswith(".T_total"):
-                            x0_list.append(300.0)
+                            x0_list.append(ref["T"])
                         elif ".Y[" in unk:
                             idx = int(unk.split(".Y[")[1].replace("]", ""))
-                            x0_list.append(self._default_Y[idx])
+                            x0_list.append(ref["Y"][idx])
                         else:
-                            x0_list.append(1.0)
+                            x0_list.append(ref["m_dot"])
                     self._unknown_indices[node_id] = list(range(start_idx, len(x0_list)))
 
         # Iterate through elements and gather unknowns (m_dot)
@@ -99,7 +208,7 @@ class NetworkSolver:
                     if unk in guess_dict:
                         x0_list.append(guess_dict[unk])
                     elif unk.endswith(".m_dot"):
-                        x0_list.append(0.1)  # Default 0.1 kg/s
+                        x0_list.append(ref["m_dot"])
                     else:
                         x0_list.append(1.0)
                 self._unknown_indices[elem_id] = list(range(start_idx, len(x0_list)))
@@ -772,6 +881,7 @@ class NetworkSolver:
         timeout: float | None = None,
         options: dict[str, Any] | None = None,
         use_jac: bool = True,
+        x0: np.ndarray | None = None,
     ) -> dict[str, float]:
         """
         Executes the root finding algorithm to solve the network.
@@ -779,78 +889,145 @@ class NetworkSolver:
 
         Args:
             method: The scipy.optimize.root method to use.
-            timeout: Maximum wall-clock time in seconds before stopping and returning the best iterate.
-            options: Dictionary of solver options (e.g., maxiter, maxfev, xtol).
+            timeout: Maximum wall-clock time in seconds before stopping
+                and returning the best iterate.
+            options: Dictionary of solver options (e.g., maxiter, maxfev,
+                xtol).
+            use_jac: Whether to supply the analytical Jacobian to the
+                solver (default True).
+            x0: Optional initial guess vector.  When ``None`` (default),
+                an initial guess is built automatically.  Pass a
+                previous solution's ``_last_x`` for warm-starting
+                parameter sweeps.
         """
         if method not in self.SUPPORTED_METHODS:
             raise ValueError(
                 f"Method '{method}' is not supported. Supported methods are: {', '.join(self.SUPPORTED_METHODS)}"
             )
 
-        if options is None:
-            options = {}
+        options = {} if options is None else dict(options)
 
-        # Default iteration limits to prevent infinite loops in C extensions
-        # Note: different methods in root use different names for iteration limits
-        if method in ("hybr", "lm"):
-            if "maxfev" not in options:
-                options["maxfev"] = 500
+        # Normalise caller option names across methods.
+        # scipy.root uses different names for the iteration limit:
+        # - hybr: maxfev
+        # - lm and quasi-Newton/fixed-point methods: maxiter
+        # Translate before applying defaults to avoid stale duplicates.
+        if method != "hybr" and "maxfev" in options:
+            options.setdefault("maxiter", options.pop("maxfev"))
+
+        if method == "hybr":
+            options.setdefault("maxfev", 500)
         else:
-            if "maxiter" not in options:
-                options["maxiter"] = 500
+            options.setdefault("maxiter", 500)
 
         # Ensure topology is resolved before solving
         self.network.resolve_all_topology()
         self.network.validate()
 
-        x0 = self._build_x0()
+        # --- Initial guess: user-supplied (warm-start) or auto-built ----
+        x0_auto = self._build_x0()
+        if x0 is not None:
+            if len(x0) != len(x0_auto):
+                raise ValueError(
+                    f"Warm-start x0 length ({len(x0)}) does not match "
+                    f"number of unknowns ({len(x0_auto)})."
+                )
+            x0_use = np.asarray(x0, dtype=float)
+        else:
+            x0_use = x0_auto
 
         # Dimension check
-        res0 = self._residuals(x0)
-        if len(x0) != len(res0):
-            raise ValueError(f"System not square: {len(x0)} unknowns vs {len(res0)} equations.")
+        res0 = self._residuals(x0_use)
+        if len(x0_use) != len(res0):
+            raise ValueError(f"System not square: {len(x0_use)} unknowns vs {len(res0)} equations.")
 
-        # State for timeout and best iterate tracking
+        # --- Variable & residual scaling --------------------------------
+        # Scale unknowns so they are O(1): x_real = x_scaled * D_x
+        # Scale residuals so they are O(1): F_scaled = F_real * D_f
+        # This dramatically improves Jacobian conditioning when unknowns
+        # span different orders of magnitude (Pa vs kg/s).
+        D_x = np.abs(x0_use).copy()
+        D_x[D_x < 1e-12] = 1.0  # avoid division by zero for near-zero guesses
+        D_f = np.abs(res0).copy()
+        D_f[D_f < 1e-12] = 1.0
+        inv_D_x = 1.0 / D_x
+        inv_D_f = 1.0 / D_f
+
+        x0_scaled = x0_use * inv_D_x  # should be ~1.0
+
+        # State for timeout and best iterate tracking (in real space)
         start_time = time.perf_counter()
-        best_x = x0.copy()
+        best_x = x0_use.copy()
         best_res_norm = np.linalg.norm(res0)
 
-        def residuals_wrapper(x: np.ndarray) -> Any:
+        def residuals_wrapper(x_scaled: np.ndarray) -> Any:
             nonlocal best_x, best_res_norm
 
             # Check timeout
             if timeout is not None and (time.perf_counter() - start_time) > timeout:
                 raise SolverTimeoutError(f"Solver timed out after {timeout} seconds.")
 
+            # Un-scale to real space
+            x_real = x_scaled * D_x
+
             try:
                 # Evaluate residuals and jacobian
-                res, jac = self._residuals_and_jacobian(x)
+                res, jac = self._residuals_and_jacobian(x_real)
 
-                # Track best iterate
+                # Track best iterate (in real space, unscaled residual)
                 res_norm = np.linalg.norm(res)
                 if res_norm < best_res_norm:
                     best_res_norm = res_norm
-                    best_x = x.copy()
+                    best_x = x_real.copy()
+
+                # Scale residuals
+                res_scaled = res * inv_D_f
 
                 if use_jac and method in ("hybr", "lm"):
-                    # Scipy's root (hybr, lm) does not support sparse Jacobians directly.
-                    # Use toarray() to provide the expected dense format while still
-                    # leveraging analytical calculation.
-                    return res, jac.toarray()
+                    # J_scaled = diag(inv_D_f) @ J @ diag(D_x)
+                    jac_dense = jac.toarray()
+                    jac_scaled = (inv_D_f[:, None] * jac_dense) * D_x[None, :]
+                    return res_scaled, jac_scaled
                 else:
-                    # Other methods might not support (f, J) or sparse J properly via the jac=True flag
-                    return res
-            except Exception:
-                # P1-5: Avoid printing in hot path unless absolutely necessary
+                    return res_scaled
+            except SolverTimeoutError:
                 raise
+            except Exception:
+                # Return a large penalty residual so the trust-region
+                # solver can shrink its step instead of terminating.
+                # Warn once so developers can trace unexpected failures.
+                if not getattr(self, "_penalty_warning_issued", False):
+                    warnings.warn(
+                        "NetworkSolver hit an unphysical intermediate state; "
+                        "returning penalty residual to allow step reduction. "
+                        "Enable debug logging to see the original exception.",
+                        RuntimeWarning,
+                        stacklevel=2,
+                    )
+                    self._penalty_warning_issued = True
+                penalty = np.full(len(x_scaled), 1e6)
+                if use_jac and method in ("hybr", "lm"):
+                    return penalty, np.eye(len(x_scaled))
+                return penalty
 
         # Solve
+        _RESIDUAL_TOL = 1e-3
         try:
-            sol = root(residuals_wrapper, x0, method=method, options=options, jac=use_jac)
-            final_x = sol.x
+            sol = root(residuals_wrapper, x0_scaled, method=method, options=options, jac=use_jac)
+            final_x = sol.x * D_x  # un-scale
             success = sol.success
             message = sol.message
-            final_norm = float(np.linalg.norm(sol.fun))
+            # Compute unscaled residual norm for reporting
+            final_res = self._residuals(final_x)
+            final_norm = float(np.linalg.norm(final_res))
+            # Guard against methods (e.g. lm) that report success at a
+            # non-zero local minimum of ||F||^2.
+            if success and final_norm > _RESIDUAL_TOL:
+                success = False
+                message = (
+                    f"Solver reported success but |F|={final_norm:.3e} "
+                    f"exceeds residual tolerance ({_RESIDUAL_TOL})."
+                )
         except SolverTimeoutError as e:
             final_x = best_x
             success = False
@@ -863,8 +1040,22 @@ class NetworkSolver:
             message = f"Unexpected error during residual evaluation: {e}"
             final_norm = float(best_res_norm)
 
-        if not success:
-            pass
+        # Automatic fallback: if the chosen method failed and isn't hybr,
+        # retry with hybr (Powell's method) which is more robust for square
+        # nonlinear systems.
+        if not success and method != "hybr":
+            try:
+                sol2 = root(residuals_wrapper, x0_scaled, method="hybr", jac=use_jac)
+                fallback_x = sol2.x * D_x
+                fallback_res = self._residuals(fallback_x)
+                fallback_norm = float(np.linalg.norm(fallback_res))
+                if sol2.success and fallback_norm < _RESIDUAL_TOL:
+                    final_x = fallback_x
+                    success = True
+                    message = f"Converged after fallback to hybr (original {method} failed)."
+                    final_norm = fallback_norm
+            except Exception:
+                pass  # keep original failure
 
         if not success:
             warnings.warn(
@@ -873,6 +1064,9 @@ class NetworkSolver:
                 "Returning best iterate.",
                 stacklevel=2,
             )
+
+        # Store solution for warm-start reuse
+        self._last_x = final_x.copy()
 
         sol_dict = dict(zip(self.unknown_names, final_x, strict=False))
 

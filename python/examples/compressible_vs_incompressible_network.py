@@ -1,255 +1,261 @@
 #!/usr/bin/env python3
-"""
-Compressible vs Incompressible Flow Comparison in a Simple Network
+"""Fully coupled compressible vs incompressible pressure-ratio sweep.
 
-This example demonstrates the difference between compressible and incompressible
-flow models in a simple pipe-orifice network. It shows when compressibility
-effects become important and how the new compressible solver elements work.
+This example solves a wall-coupled two-stream network for a Mach sweep
+and compares the pressure ratio required by:
 
-Network topology:
-    [High Pressure] --[Pipe]-- [Junction] --[Orifice]-- [Low Pressure]
+- compressible elements (Fanno pipe + compressible orifice)
+- incompressible elements (Darcy/Bernoulli variants)
+
+Both models use the same fully coupled topology (hot/cold streams linked
+by ``WallConnection`` with ``thermal_coupling_enabled=True``).
 """
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Literal
 
 import matplotlib.pyplot as plt
 import numpy as np
+from plot_utils import show_or_save
 
 import combaero as cb
+from combaero.heat_transfer import ConvectiveSurface, SmoothModel
+from combaero.network import (
+    FlowNetwork,
+    MassFlowBoundary,
+    NetworkSolver,
+    OrificeElement,
+    PipeElement,
+    PlenumNode,
+    PressureBoundary,
+    WallConnection,
+)
+
+Regime = Literal["compressible", "incompressible"]
 
 
-def solve_incompressible_network(P_high, P_low, T, X, L, D, roughness, Cd, A_orifice, beta):
-    """Solve network using incompressible flow models."""
-    # For incompressible, we need to iterate to find the junction pressure
-    # that balances flow through pipe and orifice
+@dataclass(frozen=True)
+class SweepConfig:
+    t_hot_in: float = 750.0
+    t_cold_in: float = 320.0
+    p_out_hot: float = 2.0e5
+    p_out_cold: float = 2.0e5
+    d_pipe_hot: float = 0.018
+    d_pipe_cold: float = 0.014
+    l_pipe: float = 1.2
+    roughness: float = 1.0e-5
+    cd: float = 0.72
+    d_orifice_hot: float = 0.030
+    d_orifice_cold: float = 0.025
+    wall_thickness: float = 0.002
+    wall_k: float = 20.0
 
-    def residual(P_junction):
-        # Pipe flow (incompressible Darcy-Weisbach)
-        rho = cb.density(T, P_junction, X)
-        mu = cb.viscosity(T, P_junction, X)
 
-        # Guess velocity, iterate
-        area_pipe = 0.25 * np.pi * D**2
-        v_guess = 10.0  # m/s initial guess
+def _area_from_diameter(diameter: float) -> float:
+    return float(np.pi * (diameter / 2.0) ** 2)
 
-        for _ in range(10):  # Simple iteration
-            Re = rho * v_guess * D / mu
-            f = cb.friction_factor("haaland", Re, roughness / D)
-            v_new = np.sqrt(2 * (P_high - P_junction) / (rho * f * L / D))
-            if abs(v_new - v_guess) < 1e-6:
-                break
-            v_guess = v_new
 
-        mdot_pipe = rho * area_pipe * v_guess
+def _mdot_for_target_mach(
+    mach: float, T: float, P_ref: float, X_mole: list[float], area: float
+) -> float:
+    rho = cb.density(T, P_ref, X_mole)
+    a = cb.speed_of_sound(T, X_mole)
+    return float(mach * rho * a * area)
 
-        # Orifice flow (incompressible)
-        dP_orifice = P_junction - P_low
-        rho_orifice = cb.density(T, P_junction, X)
-        mdot_orifice, _, _ = cb._core.orifice_mdot_and_jacobian(
-            dP_orifice, rho_orifice, Cd, A_orifice, beta
+
+def _build_coupled_network(
+    regime: Regime, mach_target: float, cfg: SweepConfig
+) -> tuple[FlowNetwork, float]:
+    x_mole = cb.standard_dry_air_composition()
+    y_mass = list(cb.mole_to_mass(x_mole))
+
+    area_hot = _area_from_diameter(cfg.d_pipe_hot)
+    area_cold = _area_from_diameter(cfg.d_pipe_cold)
+    mdot_hot = _mdot_for_target_mach(mach_target, cfg.t_hot_in, cfg.p_out_hot, x_mole, area_hot)
+    mdot_cold = 0.65 * _mdot_for_target_mach(
+        mach_target, cfg.t_cold_in, cfg.p_out_cold, x_mole, area_cold
+    )
+
+    net = FlowNetwork()
+
+    net.add_node(MassFlowBoundary("hot_inlet", m_dot=mdot_hot, T_total=cfg.t_hot_in, Y=y_mass))
+    net.add_node(PlenumNode("hot_plenum"))
+    net.add_node(
+        PressureBoundary("hot_outlet", P_total=cfg.p_out_hot, T_total=cfg.t_hot_in, Y=y_mass)
+    )
+
+    net.add_node(MassFlowBoundary("cold_inlet", m_dot=mdot_cold, T_total=cfg.t_cold_in, Y=y_mass))
+    net.add_node(PlenumNode("cold_plenum"))
+    net.add_node(
+        PressureBoundary("cold_outlet", P_total=cfg.p_out_cold, T_total=cfg.t_cold_in, Y=y_mass)
+    )
+
+    pipe_regime = "compressible_fanno" if regime == "compressible" else "incompressible"
+    orifice_regime = "compressible" if regime == "compressible" else "incompressible"
+
+    hot_surface = ConvectiveSurface(area=np.pi * cfg.d_pipe_hot * cfg.l_pipe, model=SmoothModel())
+    cold_surface = ConvectiveSurface(area=np.pi * cfg.d_pipe_cold * cfg.l_pipe, model=SmoothModel())
+
+    net.add_element(
+        PipeElement(
+            id="hot_pipe",
+            from_node="hot_inlet",
+            to_node="hot_plenum",
+            length=cfg.l_pipe,
+            diameter=cfg.d_pipe_hot,
+            roughness=cfg.roughness,
+            regime=pipe_regime,
+            surface=hot_surface,
         )
+    )
+    net.add_element(
+        OrificeElement(
+            id="hot_orifice",
+            from_node="hot_plenum",
+            to_node="hot_outlet",
+            Cd=cfg.cd,
+            area=_area_from_diameter(cfg.d_orifice_hot),
+            regime=orifice_regime,
+        )
+    )
 
-        return mdot_pipe - mdot_orifice
+    net.add_element(
+        PipeElement(
+            id="cold_pipe",
+            from_node="cold_inlet",
+            to_node="cold_plenum",
+            length=cfg.l_pipe,
+            diameter=cfg.d_pipe_cold,
+            roughness=cfg.roughness,
+            regime=pipe_regime,
+            surface=cold_surface,
+        )
+    )
+    net.add_element(
+        OrificeElement(
+            id="cold_orifice",
+            from_node="cold_plenum",
+            to_node="cold_outlet",
+            Cd=cfg.cd,
+            area=_area_from_diameter(cfg.d_orifice_cold),
+            regime=orifice_regime,
+        )
+    )
 
-    # Find junction pressure
-    from scipy.optimize import brentq
+    net.add_wall(
+        WallConnection(
+            id="coupling_wall",
+            element_a="hot_pipe",
+            element_b="cold_pipe",
+            wall_thickness=cfg.wall_thickness,
+            wall_conductivity=cfg.wall_k,
+        )
+    )
+    net.thermal_coupling_enabled = True
 
-    P_junction = brentq(residual, P_low + 100, P_high - 100)
+    return net, mdot_hot
 
-    # Compute final flow
-    rho = cb.density(T, P_junction, X)
-    area_pipe = 0.25 * np.pi * D**2
-    v = np.sqrt(
-        2
-        * (P_high - P_junction)
-        / (
-            rho
-            * cb.friction_factor(
-                "haaland", rho * 10 * D / cb.viscosity(T, P_junction, X), roughness / D
+
+def run_sweep(mach_values: np.ndarray, regime: Regime, cfg: SweepConfig) -> dict[str, np.ndarray]:
+    pr_hot: list[float] = []
+    pr_cold: list[float] = []
+    mach_solved_hot: list[float] = []
+    delta_t_hot: list[float] = []
+    delta_t_cold: list[float] = []
+
+    x_mole = cb.standard_dry_air_composition()
+    area_hot = _area_from_diameter(cfg.d_pipe_hot)
+    x0_prev: np.ndarray | None = None
+
+    for m_target in mach_values:
+        net, mdot_hot = _build_coupled_network(regime=regime, mach_target=float(m_target), cfg=cfg)
+        solver = NetworkSolver(net)
+
+        # Try fresh solve; fall back to warm-start from the previous point.
+        sol = solver.solve(method="hybr")
+        if not sol.get("__success__", False) and x0_prev is not None:
+            sol = solver.solve(method="hybr", x0=x0_prev)
+        if not sol.get("__success__", False):
+            raise RuntimeError(
+                f"{regime} solve failed at target Mach={m_target:.3f}: "
+                f"|F|={sol.get('__final_norm__', '?'):.3e}  "
+                f"{sol.get('__message__', 'unknown')}"
             )
-            * L
-            / D
-        )
+        x0_prev = solver._last_x
+
+        p_in_hot = float(sol["hot_inlet.P_total"])
+        p_in_cold = float(sol["cold_inlet.P_total"])
+        pr_hot.append(cfg.p_out_hot / p_in_hot)
+        pr_cold.append(cfg.p_out_cold / p_in_cold)
+
+        rho_hot = cb.density(cfg.t_hot_in, p_in_hot, x_mole)
+        a_hot = cb.speed_of_sound(cfg.t_hot_in, x_mole)
+        mach_solved_hot.append(mdot_hot / (rho_hot * a_hot * area_hot))
+
+        t_hot_out = float(solver._derived_states["hot_plenum"][0])
+        t_cold_out = float(solver._derived_states["cold_plenum"][0])
+        delta_t_hot.append(cfg.t_hot_in - t_hot_out)
+        delta_t_cold.append(t_cold_out - cfg.t_cold_in)
+
+    return {
+        "mach_target": np.asarray(mach_values, dtype=float),
+        "mach_solved_hot": np.asarray(mach_solved_hot, dtype=float),
+        "pr_hot": np.asarray(pr_hot, dtype=float),
+        "pr_cold": np.asarray(pr_cold, dtype=float),
+        "delta_t_hot": np.asarray(delta_t_hot, dtype=float),
+        "delta_t_cold": np.asarray(delta_t_cold, dtype=float),
+    }
+
+
+def main() -> None:
+    cfg = SweepConfig()
+    mach_values = np.linspace(0.05, 1.0, 25)
+
+    data_incomp = run_sweep(mach_values, regime="incompressible", cfg=cfg)
+    data_comp = run_sweep(mach_values, regime="compressible", cfg=cfg)
+
+    pr_rel_diff_pct = 100.0 * (data_incomp["pr_hot"] - data_comp["pr_hot"]) / data_comp["pr_hot"]
+
+    fig, ax = plt.subplots(nrows=3, ncols=1, figsize=(10, 10), sharex=True)
+
+    ax[0].plot(
+        data_comp["mach_solved_hot"], data_comp["pr_hot"], "-", label="PR hot (compressible)"
     )
-    mdot = rho * area_pipe * v
+    ax[0].plot(
+        data_incomp["mach_solved_hot"],
+        data_incomp["pr_hot"],
+        "--",
+        label="PR hot (incompressible)",
+    )
+    ax[0].set_ylabel("P_out / P_in")
+    ax[0].set_title("Fully coupled network: pressure-ratio sweep")
+    ax[0].grid(True, alpha=0.3)
+    ax[0].legend()
 
-    return {"P_junction": P_junction, "mdot": mdot, "regime": "incompressible"}
+    ax[1].plot(data_comp["mach_solved_hot"], pr_rel_diff_pct, "-")
+    ax[1].axhline(0.0, color="k", linestyle="--", linewidth=1.0)
+    ax[1].set_ylabel("PR difference [%]\n(incomp - comp)")
+    ax[1].grid(True, alpha=0.3)
 
+    ax[2].plot(data_comp["mach_solved_hot"], data_comp["delta_t_hot"], "-", label="Hot cooling ΔT")
+    ax[2].plot(
+        data_comp["mach_solved_hot"], data_comp["delta_t_cold"], "-", label="Cold heating ΔT"
+    )
+    ax[2].set_xlabel("Mach number (hot stream)")
+    ax[2].set_ylabel("Thermal coupling ΔT [K]")
+    ax[2].grid(True, alpha=0.3)
+    ax[2].legend()
 
-def solve_compressible_network(P_high, P_low, T, X, L, D, roughness, Cd, A_orifice, beta):
-    """Solve network using compressible flow models."""
-    # For compressible, we also iterate to find junction pressure
+    fig.tight_layout()
+    show_or_save(fig, "compressible_vs_incompressible_coupled_sweep.png")
 
-    def residual(P_junction):
-        # Pipe flow (compressible Fanno)
-        rho = cb.density(T, P_high, X)
-        area_pipe = 0.25 * np.pi * D**2
-
-        # Estimate velocity from mass flow
-        v_guess = 50.0
-        for _ in range(10):
-            try:
-                sol_pipe = cb.fanno_pipe_rough(T, P_high, v_guess, L, D, roughness, X, "haaland")
-                P_out_pipe = sol_pipe.outlet.P
-                if abs(P_out_pipe - P_junction) < 100:
-                    break
-                v_guess *= np.sqrt(P_junction / P_out_pipe)
-            except Exception:
-                v_guess *= 0.9
-
-        mdot_pipe = rho * area_pipe * v_guess
-
-        # Orifice flow (compressible)
-        mdot_orifice, _, _, _ = cb._core.orifice_compressible_mdot_and_jacobian(
-            T, P_junction, P_low, X, Cd, A_orifice, beta
-        )
-
-        return mdot_pipe - mdot_orifice
-
-    # Find junction pressure
-    from scipy.optimize import brentq
-
-    try:
-        P_junction = brentq(residual, P_low + 1000, P_high - 1000)
-    except Exception:
-        # If brentq fails, use a simpler estimate
-        P_junction = 0.7 * P_high + 0.3 * P_low
-
-    # Compute final flow
-    rho = cb.density(T, P_high, X)
-    area_pipe = 0.25 * np.pi * D**2
-    v = 50.0  # Approximate
-    mdot = rho * area_pipe * v
-
-    return {"P_junction": P_junction, "mdot": mdot, "regime": "compressible"}
-
-
-def main():
-    """Run comparison study."""
-    print("=" * 80)
-    print("Compressible vs Incompressible Network Flow Comparison")
-    print("=" * 80)
-
-    # Network geometry
-    L = 2.0  # Pipe length [m]
-    D = 0.05  # Pipe diameter [m]
-    roughness = 1e-4  # Pipe roughness [m]
-    Cd = 0.65  # Orifice discharge coefficient
-    A_orifice = 1e-4  # Orifice area [m²]
-    beta = 0.5  # Orifice beta ratio
-
-    # Fluid properties
-    T = 300.0  # Temperature [K]
-    X = cb.standard_dry_air_composition()
-
-    # Pressure range study
-    P_low = 101325.0  # Atmospheric [Pa]
-    P_high_values = np.linspace(150000, 500000, 20)  # [Pa]
-
-    print("\nNetwork Configuration:")
-    print(f"  Pipe: L={L}m, D={D * 1000:.0f}mm, roughness={roughness * 1e6:.0f}μm")
-    print(f"  Orifice: Cd={Cd}, A={A_orifice * 1e4:.2f}cm², β={beta}")
-    print(f"  Fluid: Air at T={T}K")
-    print(f"  Outlet pressure: {P_low / 1e5:.2f} bar")
-    print()
-
-    # Solve for each pressure
-    results_incomp = []
-    results_comp = []
-
-    print("Solving network for various inlet pressures...")
-    for P_high in P_high_values:
-        # Simple direct calculation using compressible elements
-        # Pipe
-        u_in = 50.0  # Estimate
-
-        dP_pipe, _, _, _ = cb._core.pipe_compressible_mdot_and_jacobian(
-            T, P_high, u_in, X, L, D, roughness, "haaland"
-        )
-        P_junction_comp = P_high - dP_pipe
-
-        # Orifice
-        mdot_comp, _, _, _ = cb._core.orifice_compressible_mdot_and_jacobian(
-            T, P_junction_comp, P_low, X, Cd, A_orifice, beta
-        )
-
-        # Incompressible (simplified)
-        rho_avg = cb.density(T, 0.5 * (P_high + P_low), X)
-        dP_total = P_high - P_low
-        # Simplified: assume equal pressure drop
-        mdot_incomp = Cd * A_orifice * np.sqrt(2 * rho_avg * dP_total * 0.5)
-
-        results_comp.append(
-            {
-                "P_high": P_high,
-                "P_junction": P_junction_comp,
-                "mdot": mdot_comp,
-                "PR": P_low / P_high,
-            }
-        )
-
-        results_incomp.append({"P_high": P_high, "mdot": mdot_incomp, "PR": P_low / P_high})
-
-    # Convert to arrays
-    P_high_arr = np.array([r["P_high"] for r in results_comp])
-    mdot_comp_arr = np.array([r["mdot"] for r in results_comp])
-    mdot_incomp_arr = np.array([r["mdot"] for r in results_incomp])
-    PR_arr = np.array([r["PR"] for r in results_comp])
-
-    # Calculate error
-    error = 100 * (mdot_incomp_arr - mdot_comp_arr) / mdot_comp_arr
-
-    # Print summary
-    print("\nResults Summary:")
+    print("Rendered: compressible_vs_incompressible_coupled_sweep.png")
     print(
-        f"{'P_high [bar]':>12} {'PR':>8} {'mdot_comp [kg/s]':>18} {'mdot_incomp [kg/s]':>20} {'Error [%]':>12}"
+        "Hot-stream PR difference range [%]: "
+        f"{float(np.min(pr_rel_diff_pct)):.2f} .. {float(np.max(pr_rel_diff_pct)):.2f}"
     )
-    print("-" * 80)
-    for i in [0, len(results_comp) // 2, -1]:
-        print(
-            f"{P_high_arr[i] / 1e5:12.2f} {PR_arr[i]:8.3f} {mdot_comp_arr[i]:18.6f} "
-            f"{mdot_incomp_arr[i]:20.6f} {error[i]:12.1f}"
-        )
-
-    # Plotting
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
-
-    # Plot 1: Mass flow comparison
-    ax1.plot(P_high_arr / 1e5, mdot_comp_arr, "b-", linewidth=2, label="Compressible")
-    ax1.plot(P_high_arr / 1e5, mdot_incomp_arr, "r--", linewidth=2, label="Incompressible")
-    ax1.set_xlabel("Inlet Pressure [bar]")
-    ax1.set_ylabel("Mass Flow Rate [kg/s]")
-    ax1.set_title("Compressible vs Incompressible Flow Models")
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
-
-    # Plot 2: Error
-    ax2.plot(PR_arr, error, "g-", linewidth=2)
-    ax2.axhline(y=0, color="k", linestyle="--", alpha=0.5)
-    ax2.axhline(y=5, color="r", linestyle=":", alpha=0.5, label="±5% threshold")
-    ax2.axhline(y=-5, color="r", linestyle=":", alpha=0.5)
-    ax2.set_xlabel("Pressure Ratio (P_out / P_in)")
-    ax2.set_ylabel("Error [%]")
-    ax2.set_title("Incompressible Model Error vs Compressible")
-    ax2.legend()
-    ax2.grid(True, alpha=0.3)
-
-    plt.tight_layout()
-    plt.savefig("compressible_vs_incompressible_comparison.png", dpi=150)
-    print("\nPlot saved to: compressible_vs_incompressible_comparison.png")
-
-    # Key findings
-    print("\n" + "=" * 80)
-    print("Key Findings:")
-    print("=" * 80)
-    max_error_idx = np.argmax(np.abs(error))
-    print(f"  Maximum error: {error[max_error_idx]:.1f}% at PR={PR_arr[max_error_idx]:.3f}")
-    print(
-        f"  Incompressible model is accurate (< 5% error) for PR > {PR_arr[np.where(np.abs(error) < 5)[0][0]]:.3f}"
-    )
-    print(
-        f"  Compressibility effects become significant (> 10% error) for PR < {PR_arr[np.where(np.abs(error) > 10)[0][-1]]:.3f}"
-    )
-    print("\n  Recommendation: Use compressible models when PR < 0.8 or ΔP/P > 0.2")
-    print("=" * 80)
 
 
 if __name__ == "__main__":
