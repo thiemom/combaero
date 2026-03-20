@@ -1,0 +1,86 @@
+{
+  "run_utc": "2026-03-20T10:21:12.309858+00:00",
+  "repeats": 2,
+  "case_timeout_s": 90.0,
+  "solver_timeout_s": 25.0,
+  "cases": {
+    "simple_network": {
+      "success_count": 2,
+      "attempts": 2,
+      "timeout_count": 0,
+      "success_rate": 1.0,
+      "messages": [
+        "The solution converged.",
+        "The solution converged."
+      ],
+      "mean_s": 0.005220978999204817,
+      "median_s": 0.005220978999204817,
+      "min_s": 0.003497916000924306,
+      "max_s": 0.0069440419974853285,
+      "median_final_norm": 1.2208383850520477e-06,
+      "max_final_norm": 1.2208383850520477e-06
+    },
+    "fully_coupled_heat_transfer": {
+      "success_count": 2,
+      "attempts": 2,
+      "timeout_count": 0,
+      "success_rate": 1.0,
+      "messages": [
+        "The solution converged.",
+        "The solution converged."
+      ],
+      "mean_s": 0.008425208001426654,
+      "median_s": 0.008425208001426654,
+      "min_s": 0.008235500001319451,
+      "max_s": 0.008614916001533857,
+      "median_final_norm": 2.5160823271240517e-05,
+      "max_final_norm": 2.5160823271240517e-05
+    },
+    "compressible_flow_network": {
+      "success_count": 2,
+      "attempts": 2,
+      "timeout_count": 0,
+      "success_rate": 1.0,
+      "messages": [
+        "The solution converged.",
+        "The solution converged."
+      ],
+      "mean_s": 0.2554015834994061,
+      "median_s": 0.2554015834994061,
+      "min_s": 0.24930829200093285,
+      "max_s": 0.2614948749978794,
+      "median_final_norm": 5.238689482212598e-10,
+      "max_final_norm": 5.238689482212598e-10
+    },
+    "combustion_network": {
+      "success_count": 2,
+      "attempts": 2,
+      "timeout_count": 0,
+      "success_rate": 1.0,
+      "messages": [
+        "The solution converged.",
+        "The solution converged."
+      ],
+      "mean_s": 0.07151716649786977,
+      "median_s": 0.07151716649786977,
+      "min_s": 0.07086033299856354,
+      "max_s": 0.072173999997176,
+      "median_final_norm": 4.3244098047229007e-10,
+      "max_final_norm": 4.3244098047229007e-10
+    },
+    "fully_coupled_combustion_network": {
+      "success_count": 2,
+      "attempts": 2,
+      "timeout_count": 0,
+      "success_rate": 1.0,
+      "messages": [
+        "ok",
+        "ok"
+      ],
+      "mean_s": 0.050155208500655135,
+      "median_s": 0.050155208500655135,
+      "min_s": 0.049311250000755535,
+      "max_s": 0.050999167000554735
+    }
+  }
+}

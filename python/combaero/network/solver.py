@@ -9,9 +9,11 @@ import combaero as cb
 
 from .components import (
     EnergyBoundary,
+    LosslessConnectionElement,
     MassFlowBoundary,
     MixtureState,
     NetworkNode,
+    PipeElement,
     PressureBoundary,
 )
 from .graph import FlowNetwork
@@ -44,6 +46,70 @@ class NetworkSolver:
         "krylov",
         "df-sane",
     ]
+
+    @staticmethod
+    def _is_pressure_unknown(name: str) -> bool:
+        return name.endswith(".P") or name.endswith(".P_total")
+
+    @staticmethod
+    def _is_mdot_unknown(name: str) -> bool:
+        return name.endswith(".m_dot")
+
+    def _reference_scales(self, x0_use: np.ndarray) -> tuple[float, float]:
+        pressure_vals = [
+            abs(float(v))
+            for n, v in zip(self.unknown_names, x0_use, strict=False)
+            if self._is_pressure_unknown(n)
+        ]
+        mdot_vals = [
+            abs(float(v))
+            for n, v in zip(self.unknown_names, x0_use, strict=False)
+            if self._is_mdot_unknown(n)
+        ]
+
+        ref_p_abs = float(np.median(pressure_vals)) if pressure_vals else 1.0e5
+        ref_mdot = float(np.median(mdot_vals)) if mdot_vals else 1.0
+
+        # Pressure-residual scale: use boundary DP (not absolute P)
+        # to match actual residual magnitudes in pressure equations
+        if len(pressure_vals) >= 2:
+            p_spread = max(pressure_vals) - min(pressure_vals)
+            ref_p_residual = max(p_spread, ref_p_abs * 1e-4)
+        else:
+            ref_p_residual = ref_p_abs * 0.01
+
+        ref_p_residual = max(ref_p_residual, 1.0)
+        ref_mdot = max(ref_mdot, 1e-6)
+        return ref_p_residual, ref_mdot
+
+    def _build_residual_scales(self, x0_use: np.ndarray) -> np.ndarray:
+        """Build characteristic residual scales by equation type.
+
+        Pressure-like residuals use ``ref_p_residual`` [Pa] (based on boundary DP).
+        Mass-flow-like residuals use ``ref_mdot`` [kg/s].
+        """
+        ref_p, ref_mdot = self._reference_scales(x0_use)
+
+        scales: list[float] = []
+
+        for _node_id, node in self.network.nodes.items():
+            if isinstance(node, PressureBoundary):
+                continue
+
+            state = self._get_node_state(node, x0_use)
+            node_res, _ = node.residuals(state)
+            scales.extend([ref_p] * len(node_res))
+
+            # Node mass conservation equation appended in _residuals_and_jacobian
+            scales.append(ref_mdot)
+
+        for element in self.network.elements.values():
+            elem_scale = (
+                ref_p if isinstance(element, (PipeElement, LosslessConnectionElement)) else ref_mdot
+            )
+            scales.extend([elem_scale] * element.n_equations())
+
+        return np.asarray(scales, dtype=float)
 
     def __init__(self, network: FlowNetwork):
         self.network = network
@@ -948,8 +1014,7 @@ class NetworkSolver:
         # span different orders of magnitude (Pa vs kg/s).
         D_x = np.abs(x0_use).copy()
         D_x[D_x < 1e-12] = 1.0  # avoid division by zero for near-zero guesses
-        D_f = np.abs(res0).copy()
-        D_f[D_f < 1e-12] = 1.0
+        D_f = self._build_residual_scales(x0_use)
         inv_D_x = 1.0 / D_x
         inv_D_f = 1.0 / D_f
 
@@ -1005,7 +1070,7 @@ class NetworkSolver:
                         stacklevel=2,
                     )
                     self._penalty_warning_issued = True
-                penalty = np.full(len(x_scaled), 1e6)
+                penalty = np.full(len(x_scaled), 10.0, dtype=float)
                 if use_jac and method in ("hybr", "lm"):
                     return penalty, np.eye(len(x_scaled))
                 return penalty
