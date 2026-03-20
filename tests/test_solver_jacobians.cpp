@@ -86,17 +86,20 @@ TEST(SolverJacobianTest, PipeDerivatives) {
 
     double eps_m = 1e-4;
     auto res_m_p = pipe_residuals_and_jacobian(m_dot + eps_m, P_total_up, P_static_up, T_up, Y, P_static_down, L, D, roughness, model);
-    double fd_dmdot = (res_m_p.dP_calc - res.dP_calc) / eps_m;
+    auto res_m_m = pipe_residuals_and_jacobian(m_dot - eps_m, P_total_up, P_static_up, T_up, Y, P_static_down, L, D, roughness, model);
+    double fd_dmdot = (res_m_p.dP_calc - res_m_m.dP_calc) / (2.0 * eps_m);
     EXPECT_NEAR(res.d_dP_d_mdot, fd_dmdot, std::abs(fd_dmdot) * 1e-4);
 
     double eps_P = 1.0;
     auto res_P_p = pipe_residuals_and_jacobian(m_dot, P_total_up, P_static_up + eps_P, T_up, Y, P_static_down, L, D, roughness, model);
-    double fd_dP_static = (res_P_p.dP_calc - res.dP_calc) / eps_P;
+    auto res_P_m = pipe_residuals_and_jacobian(m_dot, P_total_up, P_static_up - eps_P, T_up, Y, P_static_down, L, D, roughness, model);
+    double fd_dP_static = (res_P_p.dP_calc - res_P_m.dP_calc) / (2.0 * eps_P);
     EXPECT_NEAR(res.d_dP_dP_static_up, fd_dP_static, std::abs(fd_dP_static) * 1e-4);
 
     double eps_T = 0.1;
     auto res_T_p = pipe_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up + eps_T, Y, P_static_down, L, D, roughness, model);
-    double fd_dT = (res_T_p.dP_calc - res.dP_calc) / eps_T;
+    auto res_T_m = pipe_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up - eps_T, Y, P_static_down, L, D, roughness, model);
+    double fd_dT = (res_T_p.dP_calc - res_T_m.dP_calc) / (2.0 * eps_T);
     EXPECT_NEAR(res.d_dP_dT_up, fd_dT, std::abs(fd_dT) * 1e-4);
 
     double eps_Y = 1e-6;
