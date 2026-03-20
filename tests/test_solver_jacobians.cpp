@@ -109,6 +109,94 @@ TEST(SolverJacobianTest, PipeDerivatives) {
     }
 }
 
+TEST(SolverJacobianTest, OrificeCompressibleDerivatives) {
+    std::size_t ns = num_species();
+    std::vector<double> Y(ns, 0.0);
+    for (size_t i = 0; i < ns; ++i) {
+        if (species_name(i) == "N2") Y[i] = 0.77;
+        else if (species_name(i) == "O2") Y[i] = 0.23;
+    }
+
+    double m_dot = 0.30;
+    double P_total_up = 200000.0;
+    double T_up = 300.0;
+    double P_static_down = 150000.0;
+    double Cd = 0.65;
+    double area = 1e-4;
+    double beta = 0.5;
+
+    OrificeResult res = orifice_compressible_residuals_and_jacobian(
+        m_dot, P_total_up, T_up, Y, P_static_down, Cd, area, beta);
+
+    double eps_P = 1.0;
+    auto res_P0_p = orifice_compressible_residuals_and_jacobian(
+        m_dot, P_total_up + eps_P, T_up, Y, P_static_down, Cd, area, beta);
+    auto res_P0_m = orifice_compressible_residuals_and_jacobian(
+        m_dot, P_total_up - eps_P, T_up, Y, P_static_down, Cd, area, beta);
+    double fd_dP0 = (res_P0_p.m_dot_calc - res_P0_m.m_dot_calc) / (2.0 * eps_P);
+    EXPECT_NEAR(res.d_mdot_dP_total_up, fd_dP0, std::abs(fd_dP0) * 5e-4 + 1e-10);
+
+    auto res_Pb_p = orifice_compressible_residuals_and_jacobian(
+        m_dot, P_total_up, T_up, Y, P_static_down + eps_P, Cd, area, beta);
+    auto res_Pb_m = orifice_compressible_residuals_and_jacobian(
+        m_dot, P_total_up, T_up, Y, P_static_down - eps_P, Cd, area, beta);
+    double fd_dPb = (res_Pb_p.m_dot_calc - res_Pb_m.m_dot_calc) / (2.0 * eps_P);
+    EXPECT_NEAR(res.d_mdot_dP_static_down, fd_dPb, std::abs(fd_dPb) * 2e-2 + 1e-10);
+
+    double eps_T = 1e-3;
+    auto res_T_p = orifice_compressible_residuals_and_jacobian(
+        m_dot, P_total_up, T_up + eps_T, Y, P_static_down, Cd, area, beta);
+    auto res_T_m = orifice_compressible_residuals_and_jacobian(
+        m_dot, P_total_up, T_up - eps_T, Y, P_static_down, Cd, area, beta);
+    double fd_dT = (res_T_p.m_dot_calc - res_T_m.m_dot_calc) / (2.0 * eps_T);
+    EXPECT_NEAR(res.d_mdot_dT_up, fd_dT, std::abs(fd_dT) * 5e-4 + 1e-10);
+}
+
+TEST(SolverJacobianTest, PipeCompressibleDerivatives) {
+    std::size_t ns = num_species();
+    std::vector<double> Y(ns, 0.0);
+    for (size_t i = 0; i < ns; ++i) {
+        if (species_name(i) == "N2") Y[i] = 0.77;
+        else if (species_name(i) == "O2") Y[i] = 0.23;
+    }
+
+    double m_dot = 0.4;
+    double P_total_up = 2.0e5;
+    double T_up = 400.0;
+    double P_static_down = 1.8e5;
+    double L = 2.0;
+    double D = 0.05;
+    double roughness = 1e-4;
+    std::string model = "haaland";
+
+    PipeResult res = pipe_compressible_residuals_and_jacobian(
+        m_dot, P_total_up, T_up, Y, P_static_down, L, D, roughness, model);
+
+    double eps_m = 1e-5;
+    auto res_m_p = pipe_compressible_residuals_and_jacobian(
+        m_dot + eps_m, P_total_up, T_up, Y, P_static_down, L, D, roughness, model);
+    auto res_m_m = pipe_compressible_residuals_and_jacobian(
+        m_dot - eps_m, P_total_up, T_up, Y, P_static_down, L, D, roughness, model);
+    double fd_dmdot = (res_m_p.dP_calc - res_m_m.dP_calc) / (2.0 * eps_m);
+    EXPECT_NEAR(res.d_dP_d_mdot, fd_dmdot, std::abs(fd_dmdot) * 2e-3 + 1e-8);
+
+    double eps_P = 1.0;
+    auto res_P_p = pipe_compressible_residuals_and_jacobian(
+        m_dot, P_total_up + eps_P, T_up, Y, P_static_down, L, D, roughness, model);
+    auto res_P_m = pipe_compressible_residuals_and_jacobian(
+        m_dot, P_total_up - eps_P, T_up, Y, P_static_down, L, D, roughness, model);
+    double fd_dP = (res_P_p.dP_calc - res_P_m.dP_calc) / (2.0 * eps_P);
+    EXPECT_NEAR(res.d_dP_dP_static_up, fd_dP, std::abs(fd_dP) * 2e-3 + 1e-8);
+
+    double eps_T = 1e-3;
+    auto res_T_p = pipe_compressible_residuals_and_jacobian(
+        m_dot, P_total_up, T_up + eps_T, Y, P_static_down, L, D, roughness, model);
+    auto res_T_m = pipe_compressible_residuals_and_jacobian(
+        m_dot, P_total_up, T_up - eps_T, Y, P_static_down, L, D, roughness, model);
+    double fd_dT = (res_T_p.dP_calc - res_T_m.dP_calc) / (2.0 * eps_T);
+    EXPECT_NEAR(res.d_dP_dT_up, fd_dT, std::abs(fd_dT) * 2e-3 + 1e-8);
+}
+
 TEST(SolverJacobianTest, MomentumChamberDerivatives) {
     // Test momentum chamber residual: P_total = P + 0.5 * rho * v^2
     std::size_t ns = num_species();

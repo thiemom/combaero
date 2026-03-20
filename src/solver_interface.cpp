@@ -177,11 +177,12 @@ nusselt_and_jacobian_petukhov(double Re, double Pr, double f) {
   }
   double Nu = nusselt_petukhov(Re, Pr, f);
 
-  // Nu = (f/8) * Re * Pr / D
-  // Approximating dNu/dRe by assuming f is constant, standard in sequenced
-  // networks where friction and heat transfer are computed sequentially but
-  // decoupled in the local element Jacobian block
-  double dNu_dRe = Nu / Re;
+  // Central finite difference in Re (holding f fixed), consistent with
+  // Gnielinski Jacobian treatment.
+  const double eps = std::max(1.0, std::abs(Re) * 1e-6);
+  double Nu_plus = nusselt_petukhov(Re + eps, Pr, f);
+  double Nu_minus = nusselt_petukhov(Re - eps, Pr, f);
+  double dNu_dRe = (Nu_plus - Nu_minus) / (2.0 * eps);
   return {{Nu, dNu_dRe}, CorrelationValidity::VALID, ""};
 }
 
@@ -1571,31 +1572,41 @@ PipeResult pipe_compressible_residuals_and_jacobian(
     double P_static_down, double L, double D, double roughness,
     const std::string& friction_model) {
 
-  (void)P_total_up;  // Not used in compressible pipe (uses static P and velocity)
   (void)P_static_down;  // Computed from Fanno flow, not an input
 
   const std::vector<double> X_up = combaero::mass_to_mole(combaero::normalize_fractions(Y_up));
 
-  // Compute static pressure and velocity from total conditions
-  // For now, use isentropic relations to get static P from total P
-  // This is an approximation - ideally we'd iterate
+  // Compute density at (T_up, P_total_up) and derive velocity from continuity.
+  // Uses P_total as proxy for P_static (low-Mach approximation).
+  // The Jacobians below include the full chain rule through rho(T,P) -> u -> dP
+  // so that Newton converges correctly even at moderate Mach numbers.
   auto [rho, drho_dT, drho_dP] = density_and_jacobians(T_up, P_total_up, X_up);
   double area = 0.25 * M_PI * D * D;
   double u_in = m_dot / (rho * area);
 
-  // Get pressure drop and Jacobians
+  // Get pressure drop and partial Jacobians w.r.t. (P_in, T_in, u_in)
   auto [dP_calc, d_dP_dP_in, d_dP_dT_in, d_dP_du_in] =
       pipe_compressible_mdot_and_jacobian(T_up, P_total_up, u_in, X_up, L, D, roughness, friction_model);
 
   PipeResult res;
   res.dP_calc = dP_calc;
 
-  // Chain rule: d(dP)/d(m_dot) = d(dP)/d(u) * d(u)/d(m_dot)
+  // --- Full chain rule through u = m_dot / (rho(T,P) * area) ---
+  // d(u)/d(m_dot) = 1 / (rho * area)
+  // d(u)/d(P)     = -m_dot / (rho^2 * area) * drho/dP
+  // d(u)/d(T)     = -m_dot / (rho^2 * area) * drho/dT
   double du_dmdot = 1.0 / (rho * area);
+  double du_dP = -m_dot / (rho * rho * area) * drho_dP;
+  double du_dT = -m_dot / (rho * rho * area) * drho_dT;
+
+  // d(dP)/d(m_dot) = d(dP)/d(u) * d(u)/d(m_dot)
   res.d_dP_d_mdot = d_dP_du_in * du_dmdot;
 
-  res.d_dP_dP_static_up = d_dP_dP_in;
-  res.d_dP_dT_up = d_dP_dT_in;
+  // d(dP)/d(P_total) = d(dP)/d(P_in) + d(dP)/d(u) * d(u)/d(P)
+  res.d_dP_dP_static_up = d_dP_dP_in + d_dP_du_in * du_dP;
+
+  // d(dP)/d(T) = d(dP)/d(T_in) + d(dP)/d(u) * d(u)/d(T)
+  res.d_dP_dT_up = d_dP_dT_in + d_dP_du_in * du_dT;
 
   // Compute d(dP)/d(Y[i]) using finite differences
   res.d_dP_dY_up.resize(Y_up.size(), 0.0);
