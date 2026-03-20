@@ -1,0 +1,202 @@
+{
+  "run_utc": "2026-03-20T19:31:46.747926Z",
+  "test_type": "jacobian_accuracy",
+  "total_tests": 24,
+  "max_absolute_diff": 0.050346142103,
+  "max_relative_diff": 6.0761032e-05,
+  "all_tests_passed": true,
+  "results": [
+    {
+      "test_name": "OrificeDerivatives",
+      "derivative": "d_mdot_dP_total_up",
+      "analytical": 4.745402e-06,
+      "finite_diff": 4.745343e-06,
+      "abs_diff": 5.9e-11,
+      "rel_diff": 1.2499853e-05
+    },
+    {
+      "test_name": "OrificeDerivatives",
+      "derivative": "d_mdot_dP_static_down",
+      "analytical": -4.745402e-06,
+      "finite_diff": -4.745461e-06,
+      "abs_diff": 5.9e-11,
+      "rel_diff": 1.2500164e-05
+    },
+    {
+      "test_name": "OrificeDerivatives",
+      "derivative": "d_mdot_dP_static_up",
+      "analytical": 4.99511e-07,
+      "finite_diff": 4.9951e-07,
+      "abs_diff": 1e-12,
+      "rel_diff": 1.315743e-06
+    },
+    {
+      "test_name": "OrificeDerivatives",
+      "derivative": "d_mdot_dT_up",
+      "analytical": -0.000316356847,
+      "finite_diff": -0.000316356848,
+      "abs_diff": 0.0,
+      "rel_diff": 3.84e-10
+    },
+    {
+      "test_name": "PipeDerivatives",
+      "derivative": "d_dP_d_mdot",
+      "analytical": 16957.450547559587,
+      "finite_diff": 16957.45054707004,
+      "abs_diff": 4.89548e-07,
+      "rel_diff": 2.9e-11
+    },
+    {
+      "test_name": "PipeDerivatives",
+      "derivative": "d_dP_dP_static_up",
+      "analytical": -0.023037495301,
+      "finite_diff": -0.023037495301,
+      "abs_diff": 0.0,
+      "rel_diff": 0.0
+    },
+    {
+      "test_name": "PipeDerivatives",
+      "derivative": "d_dP_dT_up",
+      "analytical": 15.332370452597,
+      "finite_diff": 15.332370467754,
+      "abs_diff": 1.5157e-08,
+      "rel_diff": 9.89e-10
+    },
+    {
+      "test_name": "OrificeCompressibleDerivatives",
+      "derivative": "d_mdot_dP_total_up",
+      "analytical": 2.69739e-07,
+      "finite_diff": 2.69739e-07,
+      "abs_diff": 0.0,
+      "rel_diff": 1.61e-10
+    },
+    {
+      "test_name": "OrificeCompressibleDerivatives",
+      "derivative": "d_mdot_dP_static_down",
+      "analytical": -1.75493e-07,
+      "finite_diff": -1.75493e-07,
+      "abs_diff": 0.0,
+      "rel_diff": 3.107e-09
+    },
+    {
+      "test_name": "OrificeCompressibleDerivatives",
+      "derivative": "d_mdot_dT_up",
+      "analytical": -4.6105132e-05,
+      "finite_diff": -4.6105133e-05,
+      "abs_diff": 1e-12,
+      "rel_diff": 1.5727e-08
+    },
+    {
+      "test_name": "PipeCompressibleDerivatives",
+      "derivative": "d_dP_d_mdot",
+      "analytical": 59907.338181801606,
+      "finite_diff": 59907.33827202347,
+      "abs_diff": 9.0221867e-05,
+      "rel_diff": 1.506e-09
+    },
+    {
+      "test_name": "PipeCompressibleDerivatives",
+      "derivative": "d_dP_dP_static_up",
+      "analytical": -0.062029828259,
+      "finite_diff": -0.062029828114,
+      "abs_diff": 1.46e-10,
+      "rel_diff": 2.346e-09
+    },
+    {
+      "test_name": "PipeCompressibleDerivatives",
+      "derivative": "d_dP_dT_up",
+      "analytical": 30.570989802072,
+      "finite_diff": 30.570989969419,
+      "abs_diff": 1.67347e-07,
+      "rel_diff": 5.474e-09
+    },
+    {
+      "test_name": "MomentumChamberDerivatives",
+      "derivative": "d_res_dP",
+      "analytical": -0.978947594989,
+      "finite_diff": -0.978947802757,
+      "abs_diff": 2.07769e-07,
+      "rel_diff": 2.12237e-07
+    },
+    {
+      "test_name": "MomentumChamberDerivatives",
+      "derivative": "d_res_dP_total",
+      "analytical": 1.0,
+      "finite_diff": 1.0,
+      "abs_diff": 0.0,
+      "rel_diff": 0.0
+    },
+    {
+      "test_name": "MomentumChamberDerivatives",
+      "derivative": "d_res_dmdot",
+      "analytical": -8532.539751031518,
+      "finite_diff": -8532.53975103371,
+      "abs_diff": 2.192e-09,
+      "rel_diff": 0.0
+    },
+    {
+      "test_name": "AdiabaticTCompleteDerivatives",
+      "derivative": "dT_ad_dT_in",
+      "analytical": 0.688841885665,
+      "finite_diff": 0.688841885221,
+      "abs_diff": 4.44e-10,
+      "rel_diff": 6.45e-10
+    },
+    {
+      "test_name": "AdiabaticTEquilibriumDerivatives",
+      "derivative": "dT_ad_dT_in",
+      "analytical": 0.708261943041,
+      "finite_diff": 0.708261943373,
+      "abs_diff": 3.32e-10,
+      "rel_diff": 4.68e-10
+    },
+    {
+      "test_name": "AdiabaticTEquilibriumDerivatives",
+      "derivative": "dT_ad_dP",
+      "analytical": -1.81e-10,
+      "finite_diff": -1.81e-10,
+      "abs_diff": 0.0,
+      "rel_diff": 6.0761032e-05
+    },
+    {
+      "test_name": "T0FromStaticDerivatives",
+      "derivative": "dT0_dM",
+      "analytical": 59.723648340189,
+      "finite_diff": 59.723618542762,
+      "abs_diff": 2.9797427e-05,
+      "rel_diff": 4.98922e-07
+    },
+    {
+      "test_name": "T0FromStaticDerivatives",
+      "derivative": "dT0_dM_high",
+      "analytical": 95.408295192119,
+      "finite_diff": 95.408276689568,
+      "abs_diff": 1.8502551e-05,
+      "rel_diff": 1.9393e-07
+    },
+    {
+      "test_name": "P0FromStaticDerivatives",
+      "derivative": "dP0_dM",
+      "analytical": 80043.94221149474,
+      "finite_diff": 80043.89186535263,
+      "abs_diff": 0.050346142103,
+      "rel_diff": 6.28982e-07
+    },
+    {
+      "test_name": "P0FromStaticDerivatives",
+      "derivative": "dP0_dM_high",
+      "analytical": 153223.15749023002,
+      "finite_diff": 153223.10943738557,
+      "abs_diff": 0.048052844446,
+      "rel_diff": 3.13614e-07
+    },
+    {
+      "test_name": "AdiabaticWallDerivatives",
+      "derivative": "dT_aw_dv",
+      "analytical": 0.136428206773,
+      "finite_diff": 0.136428206787,
+      "abs_diff": 1.3e-11,
+      "rel_diff": 9.8e-11
+    }
+  ]
+}

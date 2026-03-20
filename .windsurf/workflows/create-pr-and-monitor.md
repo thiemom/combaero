@@ -90,3 +90,4 @@ gh pr checks --watch
 - Checks continue running on GitHub even if you stop watching
 - Use `gh pr view` to see PR details and status
 - Merging and branch cleanup are intentionally separate workflows
+- There is a bug causing here-doc to fail when using the AI to generate the PR body; use the programmatic approach instead

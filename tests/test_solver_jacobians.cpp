@@ -14,8 +14,8 @@ using namespace combaero::solver;
 // Global flag to enable detailed difference reporting
 bool g_print_jacobian_differences = false;
 
-// File output settings
-std::string g_jacobian_output_file = "";
+// File output settings (empty string means no file output configured)
+std::string g_jacobian_output_file = "";  // Will be set by JACOBIAN_OUTPUT_FILE env var
 bool g_write_jacobian_to_file = false;
 
 // Helper to collect and report differences
