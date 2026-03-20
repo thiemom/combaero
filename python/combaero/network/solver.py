@@ -1,6 +1,6 @@
 import time
 import warnings
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 from scipy.optimize import root
@@ -54,6 +54,24 @@ class NetworkSolver:
     @staticmethod
     def _is_mdot_unknown(name: str) -> bool:
         return name.endswith(".m_dot")
+
+    @staticmethod
+    def _to_incompressible_regime(regime: str) -> str | None:
+        if regime in ("compressible", "compressible_fanno"):
+            return "incompressible"
+        return None
+
+    def _compressible_element_overrides(self) -> dict[str, str]:
+        """Map compressible element IDs to their incompressible fallback regimes."""
+        overrides: dict[str, str] = {}
+        for elem_id, element in self.network.elements.items():
+            regime = getattr(element, "regime", None)
+            if not isinstance(regime, str):
+                continue
+            fallback = self._to_incompressible_regime(regime)
+            if fallback is not None:
+                overrides[elem_id] = fallback
+        return overrides
 
     def _reference_scales(self, x0_use: np.ndarray) -> tuple[float, float]:
         pressure_vals = [
@@ -222,6 +240,68 @@ class NetworkSolver:
 
         return p_guess
 
+    def _propagate_mdot_guess(self, ref: dict[str, Any]) -> dict[str, float]:
+        """Estimate per-element mass flow by propagating boundary flows.
+
+        Mass flow is seeded from ``MassFlowBoundary`` nodes and propagated
+        in topological order. Merge nodes sum incoming flows; split nodes
+        divide the available flow equally among downstream elements.
+
+        For compressible elements, the propagated value is capped using
+        an isentropic estimate at a conservative target Mach number
+        (``M=0.3``), based on the element area and reference state.
+        This keeps startup states safely subsonic while preserving
+        topology-derived split behavior.
+
+        Returns a dict mapping element ID to estimated ``m_dot`` [kg/s].
+        """
+        mach_target = 0.3
+        mdot_guess: dict[str, float] = {}
+        node_flow: dict[str, float] = {
+            nid: float(getattr(node, "m_dot", 0.0))
+            for nid, node in self.network.nodes.items()
+            if isinstance(node, MassFlowBoundary)
+        }
+
+        ref_X = list(cb.mass_to_mole(ref["Y"]))
+        gamma_ref = float(cb.isentropic_expansion_coefficient(ref["T"], ref_X))
+        rho_ref = float(cb.density(ref["T"], ref["P"], ref_X))
+        a_ref = float(cb.speed_of_sound(ref["T"], ref_X))
+
+        term = 1.0 + 0.5 * (gamma_ref - 1.0) * mach_target**2
+        exponent = -(gamma_ref + 1.0) / (2.0 * (gamma_ref - 1.0))
+        mdot_ratio = mach_target * term**exponent
+
+        for nid in self._compute_topological_order():
+            node = self.network.nodes[nid]
+
+            if isinstance(node, MassFlowBoundary):
+                available = node_flow[nid]
+            else:
+                available = node_flow.get(nid, ref["m_dot"])
+
+            down_elems = self.network.get_downstream_elements(nid)
+            if not down_elems:
+                continue
+
+            share = available / len(down_elems)
+            if abs(share) < 1e-12:
+                share = ref["m_dot"]
+
+            for elem in down_elems:
+                elem_share = share
+                regime = getattr(elem, "regime", None)
+                if regime in ("compressible", "compressible_fanno"):
+                    area = getattr(elem, "area", None)
+                    if area is not None and area > 0.0:
+                        mdot_cap = rho_ref * a_ref * area * mdot_ratio
+                        elem_share = min(elem_share, mdot_cap)
+
+                mdot_guess[elem.id] = elem_share
+                node_flow[elem.to_node] = node_flow.get(elem.to_node, 0.0) + elem_share
+
+        return mdot_guess
+
     def _build_x0(self) -> np.ndarray:
         """
         Constructs the initial guess vector by gathering all unknowns.
@@ -229,7 +309,8 @@ class NetworkSolver:
         Pressure unknowns are initialised via topological propagation
         from boundary nodes with an estimated per-element drop.
         Temperature and composition are averaged across boundaries.
-        Mass-flow defaults to total prescribed flow / number of elements.
+        Mass-flow is propagated from ``MassFlowBoundary`` nodes through
+        the topology, with conservative capping for compressible elements.
 
         Returns a flat numpy array.
         """
@@ -240,6 +321,7 @@ class NetworkSolver:
         # --- Infer sensible defaults from boundary nodes ----------------
         ref = self._infer_reference_state()
         p_guess = self._propagate_pressure_guess(ref)
+        mdot_guess = self._propagate_mdot_guess(ref)
 
         # Iterate through interior nodes and gather unknowns
         for node_id, node in self.network.nodes.items():
@@ -274,7 +356,7 @@ class NetworkSolver:
                     if unk in guess_dict:
                         x0_list.append(guess_dict[unk])
                     elif unk.endswith(".m_dot"):
-                        x0_list.append(ref["m_dot"])
+                        x0_list.append(mdot_guess.get(elem_id, ref["m_dot"]))
                     else:
                         x0_list.append(1.0)
                 self._unknown_indices[elem_id] = list(range(start_idx, len(x0_list)))
@@ -948,6 +1030,8 @@ class NetworkSolver:
         options: dict[str, Any] | None = None,
         use_jac: bool = True,
         x0: np.ndarray | None = None,
+        init_strategy: Literal["default", "incompressible_warmstart"] = "default",
+        warmstart_maxfev: int = 150,
     ) -> dict[str, float]:
         """
         Executes the root finding algorithm to solve the network.
@@ -965,11 +1049,23 @@ class NetworkSolver:
                 an initial guess is built automatically.  Pass a
                 previous solution's ``_last_x`` for warm-starting
                 parameter sweeps.
+            init_strategy: Initialization strategy. ``default`` uses
+                direct x0 construction; ``incompressible_warmstart``
+                first solves an incompressible-regime proxy network and
+                uses that solution as x0.
+            warmstart_maxfev: Maximum function evaluations for the
+                incompressible proxy solve when
+                ``init_strategy='incompressible_warmstart'``.
         """
         if method not in self.SUPPORTED_METHODS:
             raise ValueError(
                 f"Method '{method}' is not supported. Supported methods are: {', '.join(self.SUPPORTED_METHODS)}"
             )
+
+        if init_strategy not in ("default", "incompressible_warmstart"):
+            raise ValueError("init_strategy must be one of: 'default', 'incompressible_warmstart'.")
+        if warmstart_maxfev <= 0:
+            raise ValueError("warmstart_maxfev must be > 0.")
 
         options = {} if options is None else dict(options)
 
@@ -990,6 +1086,46 @@ class NetworkSolver:
         self.network.resolve_all_topology()
         self.network.validate()
 
+        warmstart_x0: np.ndarray | None = None
+        if x0 is None and init_strategy == "incompressible_warmstart":
+            overrides = self._compressible_element_overrides()
+            if overrides:
+                original_regimes = {
+                    elem_id: getattr(self.network.elements[elem_id], "regime", None)
+                    for elem_id in overrides
+                }
+                try:
+                    for elem_id, fallback_regime in overrides.items():
+                        self.network.elements[elem_id].regime = fallback_regime
+
+                    self.network.resolve_all_topology()
+
+                    warm_options = {"maxfev": int(warmstart_maxfev)}
+                    warm_sol = self.solve(
+                        method="hybr",
+                        timeout=timeout,
+                        options=warm_options,
+                        use_jac=use_jac,
+                        x0=None,
+                        init_strategy="default",
+                    )
+
+                    if bool(warm_sol.get("__success__", False)):
+                        candidate = getattr(self, "_last_x", None)
+                        if candidate is not None:
+                            warmstart_x0 = np.asarray(candidate, dtype=float)
+                except Exception as e:
+                    warnings.warn(
+                        "Incompressible warmstart failed. Proceeding with default initialization: "
+                        f"{e}",
+                        RuntimeWarning,
+                        stacklevel=2,
+                    )
+                finally:
+                    for elem_id, regime in original_regimes.items():
+                        self.network.elements[elem_id].regime = regime
+                    self.network.resolve_all_topology()
+
         # --- Initial guess: user-supplied (warm-start) or auto-built ----
         x0_auto = self._build_x0()
         if x0 is not None:
@@ -999,8 +1135,25 @@ class NetworkSolver:
                     f"number of unknowns ({len(x0_auto)})."
                 )
             x0_use = np.asarray(x0, dtype=float)
+        elif warmstart_x0 is not None:
+            x0_use = warmstart_x0 if len(warmstart_x0) == len(x0_auto) else x0_auto
         else:
             x0_use = x0_auto
+
+        # Seed forward-propagated thermo/composition states once before the
+        # first residual/scaling pass. This lets the initial evaluation use
+        # derived T/Y (e.g., combustion-updated temperatures) rather than
+        # purely default placeholders.
+        try:
+            self._propagate_states(x0_use)
+        except Exception as e:
+            # pragma: no cover - defensive initialization fallback
+            warnings.warn(
+                "Initial state propagation failed. Proceeding with direct residual "
+                f"evaluation, but convergence may be affected: {e}",
+                category=RuntimeWarning,
+                stacklevel=2,
+            )
 
         # Dimension check
         res0 = self._residuals(x0_use)
