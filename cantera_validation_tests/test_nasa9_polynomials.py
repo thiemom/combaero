@@ -8,6 +8,8 @@ This provides polynomial-level validation, complementing the system-level
 validation in other test files (combustion, equilibrium, etc.).
 """
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -24,7 +26,8 @@ class TestNASA9Polynomials:
     @pytest.fixture
     def nasa9_gas(self, cantera):
         """Cantera gas with NASA-9 polynomials matching CombAero."""
-        return cantera.Solution("combaero_nasa9.yaml")
+        yaml_path = Path(__file__).parent / "combaero_nasa9.yaml"
+        return cantera.Solution(str(yaml_path))
 
     @pytest.fixture
     def test_species(self):
