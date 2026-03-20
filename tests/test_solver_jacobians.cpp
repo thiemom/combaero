@@ -371,3 +371,139 @@ TEST(SolverJacobianTest, P0FromStaticDerivatives) {
 
     EXPECT_NEAR(dP0_dM_high, fd_dP0_dM_high, std::abs(fd_dP0_dM_high) * 1e-3 + 1e-6);
 }
+
+TEST(SolverJacobianTest, OrificeCompressibleMdotDerivatives) {
+    std::size_t ns = num_species();
+    std::vector<double> X(ns, 0.0);
+    for (size_t i = 0; i < ns; ++i) {
+        if (species_name(i) == "N2") X[i] = 0.79;
+        else if (species_name(i) == "O2") X[i] = 0.21;
+    }
+
+    double T0 = 350.0;
+    double P0 = 200000.0;
+    double P_back = 150000.0;
+    double Cd = 0.65;
+    double area = 1e-4;
+    double beta = 0.5;
+
+    auto [mdot, dmdot_dP0, dmdot_dP_back, dmdot_dT0] = orifice_compressible_mdot_and_jacobian(
+        T0, P0, P_back, X, Cd, area, beta);
+
+    // Central FD for dmdot/dT0
+    double eps_T = 1e-3;
+    auto [mdot_T_plus, dummy1, dummy2, dummy3] = orifice_compressible_mdot_and_jacobian(
+        T0 + eps_T, P0, P_back, X, Cd, area, beta);
+    auto [mdot_T_minus, dummy4, dummy5, dummy6] = orifice_compressible_mdot_and_jacobian(
+        T0 - eps_T, P0, P_back, X, Cd, area, beta);
+    double fd_dT0 = (mdot_T_plus - mdot_T_minus) / (2.0 * eps_T);
+    EXPECT_NEAR(dmdot_dT0, fd_dT0, std::abs(fd_dT0) * 1e-6 + 1e-12);
+
+    // Central FD for dmdot/dP0
+    double eps_P = 1.0;
+    auto [mdot_P_plus, dummy7, dummy8, dummy9] = orifice_compressible_mdot_and_jacobian(
+        T0, P0 + eps_P, P_back, X, Cd, area, beta);
+    auto [mdot_P_minus, dummy10, dummy11, dummy12] = orifice_compressible_mdot_and_jacobian(
+        T0, P0 - eps_P, P_back, X, Cd, area, beta);
+    double fd_dP0 = (mdot_P_plus - mdot_P_minus) / (2.0 * eps_P);
+    EXPECT_NEAR(dmdot_dP0, fd_dP0, std::abs(fd_dP0) * 1e-6 + 1e-12);
+
+    // Central FD for dmdot/dP_back
+    auto [mdot_Pb_plus, dummy13, dummy14, dummy15] = orifice_compressible_mdot_and_jacobian(
+        T0, P0, P_back + eps_P, X, Cd, area, beta);
+    auto [mdot_Pb_minus, dummy16, dummy17, dummy18] = orifice_compressible_mdot_and_jacobian(
+        T0, P0, P_back - eps_P, X, Cd, area, beta);
+    double fd_dP_back = (mdot_Pb_plus - mdot_Pb_minus) / (2.0 * eps_P);
+    EXPECT_NEAR(dmdot_dP_back, fd_dP_back, std::abs(fd_dP_back) * 1e-6 + 1e-12);
+}
+
+TEST(SolverJacobianTest, PipeCompressibleMdotDerivatives) {
+    std::size_t ns = num_species();
+    std::vector<double> X(ns, 0.0);
+    for (size_t i = 0; i < ns; ++i) {
+        if (species_name(i) == "N2") X[i] = 0.79;
+        else if (species_name(i) == "O2") X[i] = 0.21;
+    }
+
+    double T_in = 400.0;
+    double P_in = 200000.0;
+    double u_in = 100.0;
+    double L = 2.0;
+    double D = 0.05;
+    double roughness = 1e-4;
+    std::string model = "haaland";
+
+    auto [dP, ddP_dP_in, ddP_dT_in, ddP_du_in] = pipe_compressible_mdot_and_jacobian(
+        T_in, P_in, u_in, X, L, D, roughness, model);
+
+    // Central FD for ddP/dT_in
+    double eps_T = 1e-3;
+    auto [dP_T_plus, dummy1, dummy2, dummy3] = pipe_compressible_mdot_and_jacobian(
+        T_in + eps_T, P_in, u_in, X, L, D, roughness, model);
+    auto [dP_T_minus, dummy4, dummy5, dummy6] = pipe_compressible_mdot_and_jacobian(
+        T_in - eps_T, P_in, u_in, X, L, D, roughness, model);
+    double fd_dT_in = (dP_T_plus - dP_T_minus) / (2.0 * eps_T);
+    EXPECT_NEAR(ddP_dT_in, fd_dT_in, std::abs(fd_dT_in) * 1e-6 + 1e-8);
+
+    // Central FD for ddP/dP_in
+    double eps_P = 1.0;
+    auto [dP_P_plus, dummy19, dummy20, dummy21] = pipe_compressible_mdot_and_jacobian(
+        T_in, P_in + eps_P, u_in, X, L, D, roughness, model);
+    auto [dP_P_minus, dummy22, dummy23, dummy24] = pipe_compressible_mdot_and_jacobian(
+        T_in, P_in - eps_P, u_in, X, L, D, roughness, model);
+    double fd_dP_in = (dP_P_plus - dP_P_minus) / (2.0 * eps_P);
+    EXPECT_NEAR(ddP_dP_in, fd_dP_in, std::abs(fd_dP_in) * 1e-6 + 1e-10);
+
+    // Central FD for ddP/du_in
+    double eps_u = 1e-2;
+    auto [dP_u_plus, dummy25, dummy26, dummy27] = pipe_compressible_mdot_and_jacobian(
+        T_in, P_in, u_in + eps_u, X, L, D, roughness, model);
+    auto [dP_u_minus, dummy28, dummy29, dummy30] = pipe_compressible_mdot_and_jacobian(
+        T_in, P_in, u_in - eps_u, X, L, D, roughness, model);
+    double fd_du_in = (dP_u_plus - dP_u_minus) / (2.0 * eps_u);
+    EXPECT_NEAR(ddP_du_in, fd_du_in, std::abs(fd_du_in) * 1e-6 + 1e-7);
+}
+
+TEST(SolverJacobianTest, MachNumberDerivatives) {
+    std::size_t ns = num_species();
+    std::vector<double> X(ns, 0.0);
+    for (size_t i = 0; i < ns; ++i) {
+        if (species_name(i) == "N2") X[i] = 0.79;
+        else if (species_name(i) == "O2") X[i] = 0.21;
+    }
+
+    double v = 200.0;
+    double T = 300.0;
+
+    auto [M, dM_dv] = mach_number_and_jacobian_v(v, T, X);
+
+    // Central FD for dM/dv
+    double eps_v = 1e-3;
+    auto [M_plus, dummy1] = mach_number_and_jacobian_v(v + eps_v, T, X);
+    auto [M_minus, dummy2] = mach_number_and_jacobian_v(v - eps_v, T, X);
+    double fd_dM_dv = (M_plus - M_minus) / (2.0 * eps_v);
+    EXPECT_NEAR(dM_dv, fd_dM_dv, std::abs(fd_dM_dv) * 1e-6 + 1e-14);
+}
+
+TEST(SolverJacobianTest, AdiabaticWallDerivatives) {
+    std::size_t ns = num_species();
+    std::vector<double> X(ns, 0.0);
+    for (size_t i = 0; i < ns; ++i) {
+        if (species_name(i) == "N2") X[i] = 0.79;
+        else if (species_name(i) == "O2") X[i] = 0.21;
+    }
+
+    double T_static = 350.0;
+    double v = 150.0;
+    double T = 300.0;
+    double P = 101325.0;
+
+    auto [T_aw, dT_aw_dv] = T_adiabatic_wall_and_jacobian_v(T_static, v, T, P, X);
+
+    // Central FD for dT_aw/dv
+    double eps_v = 1e-3;
+    auto [T_aw_plus, dummy1] = T_adiabatic_wall_and_jacobian_v(T_static, v + eps_v, T, P, X);
+    auto [T_aw_minus, dummy2] = T_adiabatic_wall_and_jacobian_v(T_static, v - eps_v, T, P, X);
+    double fd_dT_aw_dv = (T_aw_plus - T_aw_minus) / (2.0 * eps_v);
+    EXPECT_NEAR(dT_aw_dv, fd_dT_aw_dv, std::abs(fd_dT_aw_dv) * 1e-6 + 1e-11);
+}
