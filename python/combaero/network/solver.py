@@ -1066,6 +1066,19 @@ class NetworkSolver:
         else:
             x0_use = x0_auto
 
+        # Seed forward-propagated thermo/composition states once before the
+        # first residual/scaling pass. This lets the initial evaluation use
+        # derived T/Y (e.g., combustion-updated temperatures) rather than
+        # purely default placeholders.
+        try:
+            self._propagate_states(x0_use)
+        except Exception as e:  # pragma: no cover - defensive initialization fallback
+            warnings.warn(
+                "Initial state propagation failed before solve startup "
+                f"(continuing with direct residual evaluation): {e}",
+                stacklevel=2,
+            )
+
         # Dimension check
         res0 = self._residuals(x0_use)
         if len(x0_use) != len(res0):
