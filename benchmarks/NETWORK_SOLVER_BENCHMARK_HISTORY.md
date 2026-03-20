@@ -126,3 +126,24 @@
 ## Notes
 - This benchmark is informational and not part of default CI gating.
 - Timeouts are used to prevent hangs in difficult nonlinear regimes.
+
+## 2026-03-20T13:52:21.544965+00:00
+
+# Network Solver Benchmarks
+
+- Run UTC: `2026-03-20T13:52:21.544965+00:00`
+- Repeats per case: `3`
+- Case timeout: `90.0s`
+- Solver timeout: `25.0s`
+
+| Case | Success | Time median [s] | Time max [s] | Median |F| |
+|---|---:|---:|---:|---:|
+| `simple_network` | 3/3 | 0.0046 | 0.0067 | 2.600e-08 |
+| `fully_coupled_heat_transfer` | 3/3 | 0.0070 | 0.0135 | 5.483e-07 |
+| `compressible_flow_network` | 3/3 | 0.4405 | 0.4477 | 1.921e-09 |
+| `combustion_network` | 3/3 | 0.0674 | 0.0678 | 3.759e-07 |
+| `fully_coupled_combustion_network` | 3/3 | 0.0482 | 0.0486 | nan |
+
+## Notes
+- This benchmark is informational and not part of default CI gating.
+- Timeouts are used to prevent hangs in difficult nonlinear regimes.
