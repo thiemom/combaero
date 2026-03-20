@@ -238,3 +238,133 @@ TEST(SolverJacobianTest, MomentumChamberDerivatives) {
     double expected_residual = P_total - P - q_dynamic;
     EXPECT_NEAR(res.residual, expected_residual, 1e-6);
 }
+
+TEST(SolverJacobianTest, AdiabaticTCompleteDerivatives) {
+    std::size_t ns = num_species();
+    std::vector<double> X(ns, 0.0);
+
+    // Fuel-rich mixture (CH4 + air, phi > 1)
+    for (size_t i = 0; i < ns; ++i) {
+        if (species_name(i) == "CH4") X[i] = 0.12;
+        else if (species_name(i) == "O2") X[i] = 0.18;
+        else if (species_name(i) == "N2") X[i] = 0.70;
+    }
+
+    double T_in = 300.0;
+    double P = 101325.0;
+
+    auto [T_ad, dT_ad_dT_in, X_products] = adiabatic_T_complete_and_jacobian_T(T_in, P, X);
+
+    // Central FD for dT_ad/dT_in
+    double eps_T = 1e-3;
+    auto [T_ad_plus, dummy1, dummy2] = adiabatic_T_complete_and_jacobian_T(T_in + eps_T, P, X);
+    auto [T_ad_minus, dummy3, dummy4] = adiabatic_T_complete_and_jacobian_T(T_in - eps_T, P, X);
+    double fd_dT_ad_dT_in = (T_ad_plus - T_ad_minus) / (2.0 * eps_T);
+
+    EXPECT_NEAR(dT_ad_dT_in, fd_dT_ad_dT_in, std::abs(fd_dT_ad_dT_in) * 1e-3 + 1e-6);
+    EXPECT_GT(T_ad, T_in);  // Sanity: adiabatic T should be elevated
+}
+
+TEST(SolverJacobianTest, AdiabaticTEquilibriumDerivatives) {
+    std::size_t ns = num_species();
+    std::vector<double> X(ns, 0.0);
+
+    // Stoichiometric mixture (CH4 + air)
+    for (size_t i = 0; i < ns; ++i) {
+        if (species_name(i) == "CH4") X[i] = 0.095;
+        else if (species_name(i) == "O2") X[i] = 0.19;
+        else if (species_name(i) == "N2") X[i] = 0.715;
+    }
+
+    double T_in = 300.0;
+    double P = 101325.0;
+
+    auto [T_ad, dT_ad_dT_in, dT_ad_dP, X_products] =
+        adiabatic_T_equilibrium_and_jacobians(T_in, P, X);
+
+    // Central FD for dT_ad/dT_in
+    double eps_T = 1e-3;
+    auto [T_ad_T_plus, dummy1, dummy2, dummy3] =
+        adiabatic_T_equilibrium_and_jacobians(T_in + eps_T, P, X);
+    auto [T_ad_T_minus, dummy4, dummy5, dummy6] =
+        adiabatic_T_equilibrium_and_jacobians(T_in - eps_T, P, X);
+    double fd_dT_ad_dT_in = (T_ad_T_plus - T_ad_T_minus) / (2.0 * eps_T);
+
+    EXPECT_NEAR(dT_ad_dT_in, fd_dT_ad_dT_in, std::abs(fd_dT_ad_dT_in) * 1e-3 + 1e-6);
+
+    // Central FD for dT_ad/dP
+    double eps_P = 10.0;
+    auto [T_ad_P_plus, dummy7, dummy8, dummy9] =
+        adiabatic_T_equilibrium_and_jacobians(T_in, P + eps_P, X);
+    auto [T_ad_P_minus, dummy10, dummy11, dummy12] =
+        adiabatic_T_equilibrium_and_jacobians(T_in, P - eps_P, X);
+    double fd_dT_ad_dP = (T_ad_P_plus - T_ad_P_minus) / (2.0 * eps_P);
+
+    EXPECT_NEAR(dT_ad_dP, fd_dT_ad_dP, std::abs(fd_dT_ad_dP) * 1e-3 + 1e-8);
+    EXPECT_GT(T_ad, T_in);  // Sanity: adiabatic T should be elevated
+}
+
+TEST(SolverJacobianTest, T0FromStaticDerivatives) {
+    std::size_t ns = num_species();
+    std::vector<double> X(ns, 0.0);
+    for (size_t i = 0; i < ns; ++i) {
+        if (species_name(i) == "N2") X[i] = 0.79;
+        else if (species_name(i) == "O2") X[i] = 0.21;
+    }
+
+    double T = 300.0;
+    double M = 0.5;
+
+    auto [T0, dT0_dM] = T0_from_static_and_jacobian_M(T, M, X);
+
+    // Central FD for dT0/dM
+    double eps_M = 1e-5;
+    auto [T0_plus, dummy1] = T0_from_static_and_jacobian_M(T, M + eps_M, X);
+    auto [T0_minus, dummy2] = T0_from_static_and_jacobian_M(T, M - eps_M, X);
+    double fd_dT0_dM = (T0_plus - T0_minus) / (2.0 * eps_M);
+
+    EXPECT_NEAR(dT0_dM, fd_dT0_dM, std::abs(fd_dT0_dM) * 1e-3 + 1e-6);
+    EXPECT_GT(T0, T);  // Sanity: T0 > T for M > 0
+
+    // Test at higher Mach
+    M = 0.8;
+    auto [T0_high, dT0_dM_high] = T0_from_static_and_jacobian_M(T, M, X);
+    auto [T0_high_plus, dummy3] = T0_from_static_and_jacobian_M(T, M + eps_M, X);
+    auto [T0_high_minus, dummy4] = T0_from_static_and_jacobian_M(T, M - eps_M, X);
+    double fd_dT0_dM_high = (T0_high_plus - T0_high_minus) / (2.0 * eps_M);
+
+    EXPECT_NEAR(dT0_dM_high, fd_dT0_dM_high, std::abs(fd_dT0_dM_high) * 1e-3 + 1e-6);
+}
+
+TEST(SolverJacobianTest, P0FromStaticDerivatives) {
+    std::size_t ns = num_species();
+    std::vector<double> X(ns, 0.0);
+    for (size_t i = 0; i < ns; ++i) {
+        if (species_name(i) == "N2") X[i] = 0.79;
+        else if (species_name(i) == "O2") X[i] = 0.21;
+    }
+
+    double P = 101325.0;
+    double T = 300.0;
+    double M = 0.5;
+
+    auto [P0, dP0_dM] = P0_from_static_and_jacobian_M(P, T, M, X);
+
+    // Central FD for dP0/dM
+    double eps_M = 1e-5;
+    auto [P0_plus, dummy1] = P0_from_static_and_jacobian_M(P, T, M + eps_M, X);
+    auto [P0_minus, dummy2] = P0_from_static_and_jacobian_M(P, T, M - eps_M, X);
+    double fd_dP0_dM = (P0_plus - P0_minus) / (2.0 * eps_M);
+
+    EXPECT_NEAR(dP0_dM, fd_dP0_dM, std::abs(fd_dP0_dM) * 1e-3 + 1e-6);
+    EXPECT_GT(P0, P);  // Sanity: P0 > P for M > 0
+
+    // Test at higher Mach
+    M = 0.8;
+    auto [P0_high, dP0_dM_high] = P0_from_static_and_jacobian_M(P, T, M, X);
+    auto [P0_high_plus, dummy3] = P0_from_static_and_jacobian_M(P, T, M + eps_M, X);
+    auto [P0_high_minus, dummy4] = P0_from_static_and_jacobian_M(P, T, M - eps_M, X);
+    double fd_dP0_dM_high = (P0_high_plus - P0_high_minus) / (2.0 * eps_M);
+
+    EXPECT_NEAR(dP0_dM_high, fd_dP0_dM_high, std::abs(fd_dP0_dM_high) * 1e-3 + 1e-6);
+}
