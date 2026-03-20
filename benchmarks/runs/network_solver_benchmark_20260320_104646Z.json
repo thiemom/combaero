@@ -1,0 +1,101 @@
+{
+  "run_utc": "2026-03-20T10:46:46.139003+00:00",
+  "repeats": 5,
+  "case_timeout_s": 90.0,
+  "solver_timeout_s": 25.0,
+  "cases": {
+    "simple_network": {
+      "success_count": 5,
+      "attempts": 5,
+      "timeout_count": 0,
+      "success_rate": 1.0,
+      "messages": [
+        "The solution converged.",
+        "The solution converged.",
+        "The solution converged.",
+        "The solution converged.",
+        "The solution converged."
+      ],
+      "mean_s": 0.004007849799381802,
+      "median_s": 0.004034333000163315,
+      "min_s": 0.0037878330003877636,
+      "max_s": 0.0042573329992592335,
+      "median_final_norm": 2.6000634534285124e-08,
+      "max_final_norm": 2.6000634534285124e-08
+    },
+    "fully_coupled_heat_transfer": {
+      "success_count": 5,
+      "attempts": 5,
+      "timeout_count": 0,
+      "success_rate": 1.0,
+      "messages": [
+        "The solution converged.",
+        "The solution converged.",
+        "The solution converged.",
+        "The solution converged.",
+        "The solution converged."
+      ],
+      "mean_s": 0.00701298319909256,
+      "median_s": 0.007117416000255616,
+      "min_s": 0.006761790999007644,
+      "max_s": 0.007176374998380197,
+      "median_final_norm": 5.483192805231188e-07,
+      "max_final_norm": 5.483192805231188e-07
+    },
+    "compressible_flow_network": {
+      "success_count": 5,
+      "attempts": 5,
+      "timeout_count": 0,
+      "success_rate": 1.0,
+      "messages": [
+        "The solution converged.",
+        "The solution converged.",
+        "The solution converged.",
+        "The solution converged.",
+        "The solution converged."
+      ],
+      "mean_s": 0.4356193252009689,
+      "median_s": 0.43487337500118883,
+      "min_s": 0.4326101250007923,
+      "max_s": 0.4397977090011409,
+      "median_final_norm": 1.920852810144427e-09,
+      "max_final_norm": 1.920852810144427e-09
+    },
+    "combustion_network": {
+      "success_count": 5,
+      "attempts": 5,
+      "timeout_count": 0,
+      "success_rate": 1.0,
+      "messages": [
+        "The solution converged.",
+        "The solution converged.",
+        "The solution converged.",
+        "The solution converged.",
+        "The solution converged."
+      ],
+      "mean_s": 0.0652213750014198,
+      "median_s": 0.06470566600182792,
+      "min_s": 0.06448312500288012,
+      "max_s": 0.06720045900146943,
+      "median_final_norm": 3.758962048068239e-07,
+      "max_final_norm": 3.758962048068239e-07
+    },
+    "fully_coupled_combustion_network": {
+      "success_count": 5,
+      "attempts": 5,
+      "timeout_count": 0,
+      "success_rate": 1.0,
+      "messages": [
+        "ok",
+        "ok",
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "mean_s": 0.04524685840078746,
+      "median_s": 0.045174709001003066,
+      "min_s": 0.044967333000386134,
+      "max_s": 0.045601666999573354
+    }
+  }
+}

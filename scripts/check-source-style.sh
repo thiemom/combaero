@@ -56,7 +56,8 @@ trap 'rm -f "$TMPFILE"' EXIT
 # LC_ALL=C ensures byte-level matching
 # The pattern [^[:print:][:space:]] catches non-printable, but we want non-ASCII specifically
 # Using octal range: [\200-\377] matches bytes 0x80-0xFF
-if LC_ALL=C grep -r -n "${INCLUDE_ARGS[@]}" $'[\x80-\xff]' "${SCAN_DIRS[@]}" > "$TMPFILE" 2>/dev/null; then
+# Exclude CMakeFiles directories (CMake-generated code)
+if LC_ALL=C grep -r -n "${INCLUDE_ARGS[@]}" --exclude-dir=CMakeFiles $'[\x80-\xff]' "${SCAN_DIRS[@]}" > "$TMPFILE" 2>/dev/null; then
     HAS_MATCHES=true
 else
     HAS_MATCHES=false
@@ -103,7 +104,7 @@ done < "$TMPFILE"
 # Check for block comments (/* ... */)
 BLOCK_COMMENT_FILES=()
 BLOCK_TMPFILE=$(mktemp)
-if grep -r -l "${INCLUDE_ARGS[@]}" '/\*' "${SCAN_DIRS[@]}" > "$BLOCK_TMPFILE" 2>/dev/null; then
+if grep -r -l "${INCLUDE_ARGS[@]}" --exclude-dir=CMakeFiles '/\*' "${SCAN_DIRS[@]}" > "$BLOCK_TMPFILE" 2>/dev/null; then
     while IFS= read -r file; do
         BLOCK_COMMENT_FILES+=("$file")
     done < "$BLOCK_TMPFILE"

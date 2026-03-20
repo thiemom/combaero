@@ -11,12 +11,31 @@ from combaero.network import (
 )
 
 
+def _assert_jacobian_matches_fd(solver: NetworkSolver, max_rel_tol: float) -> None:
+    x0 = solver._build_x0()
+
+    _, jac_analytical = solver._residuals_and_jacobian(x0)
+    jac_analytical = jac_analytical.toarray()
+
+    rel_step = 1e-7
+    abs_step = np.maximum(np.abs(x0) * rel_step, 1e-10)
+    jac_numerical = approx_derivative(
+        lambda x: solver._residuals(x), x0, method="2-point", abs_step=abs_step
+    )
+
+    diff = np.abs(jac_analytical - jac_numerical)
+    mask = np.abs(jac_numerical) > 1e-5
+    if np.any(mask):
+        rel_diff = diff[mask] / np.abs(jac_numerical[mask])
+        max_rel_diff = np.max(rel_diff)
+        assert max_rel_diff < max_rel_tol, f"Jacobian mismatch! Max relative diff: {max_rel_diff}"
+    else:
+        max_diff = np.max(diff)
+        assert max_diff < 1e-5
+
+
 def test_jacobian_accuracy():
-    """
-    Verifies that the analytical sparse Jacobian assembled by NetworkSolver matches
-    numerical finite differences within a tight tolerance.
-    """
-    # 1. Setup a representative network with various components
+    """Global Jacobian FD check for a representative incompressible network."""
     net = FlowNetwork()
 
     # Nodes
@@ -38,34 +57,46 @@ def test_jacobian_accuracy():
     net.add_element(pipe)
 
     solver = NetworkSolver(net)
-    x0 = solver._build_x0()
+    _assert_jacobian_matches_fd(solver, max_rel_tol=0.01)
 
-    # 2. Get analytical Jacobian
-    res0, jac_analytical = solver._residuals_and_jacobian(x0)
-    jac_analytical = jac_analytical.toarray()
 
-    # 3. Compute numerical Jacobian
-    # Use *relative* step sizing so unknowns at different scales (Pa vs kg/s)
-    # all get an appropriately sized perturbation.
-    rel_step = 1e-7
-    abs_step = np.maximum(np.abs(x0) * rel_step, 1e-10)
-    jac_numerical = approx_derivative(
-        lambda x: solver._residuals(x), x0, method="2-point", abs_step=abs_step
+def test_jacobian_accuracy_compressible_network() -> None:
+    """Global Jacobian FD check for a compressible pipe-orifice network."""
+    net = FlowNetwork()
+
+    n_in = PressureBoundary("in", P_total=4.8e5, T_total=540.0)
+    n_mid = PlenumNode("mid")
+    n_out = PressureBoundary("out", P_total=1.9e5, T_total=520.0)
+
+    net.add_node(n_in)
+    net.add_node(n_mid)
+    net.add_node(n_out)
+
+    net.add_element(
+        PipeElement(
+            "pipe",
+            from_node="in",
+            to_node="mid",
+            length=3.2,
+            diameter=0.022,
+            roughness=8.0e-5,
+            regime="compressible_fanno",
+            friction_model="haaland",
+        )
+    )
+    net.add_element(
+        OrificeElement(
+            "orf",
+            from_node="mid",
+            to_node="out",
+            Cd=0.69,
+            area=1.2e-4,
+            regime="compressible",
+        )
     )
 
-    # 4. Compare
-    diff = np.abs(jac_analytical - jac_numerical)
-
-    # Relative difference where Jacobian is significant
-    mask = np.abs(jac_numerical) > 1e-5
-    if np.any(mask):
-        rel_diff = diff[mask] / np.abs(jac_numerical[mask])
-        max_rel_diff = np.max(rel_diff)
-        # We expect < 1% for most terms, allowing for non-linear density effects
-        assert max_rel_diff < 0.01, f"Jacobian mismatch! Max relative diff: {max_rel_diff}"
-    else:
-        max_diff = np.max(diff)
-        assert max_diff < 1e-5
+    solver = NetworkSolver(net)
+    _assert_jacobian_matches_fd(solver, max_rel_tol=0.05)
 
 
 if __name__ == "__main__":
