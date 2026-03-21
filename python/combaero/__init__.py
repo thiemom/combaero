@@ -527,6 +527,7 @@ except ModuleNotFoundError:
     solve_P0_from_mdot = _core.solve_P0_from_mdot
     critical_pressure_ratio = _core.critical_pressure_ratio
     mach_from_pressure_ratio = _core.mach_from_pressure_ratio
+    mach_number = _core.mach_number
     mass_flux_isentropic = _core.mass_flux_isentropic
     nozzle_cd = _core.nozzle_cd
     fanno_pipe = _core.fanno_pipe
