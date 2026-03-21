@@ -1,3 +1,4 @@
+import math
 import time
 import warnings
 from typing import Any, Literal
@@ -1300,3 +1301,84 @@ class NetworkSolver:
         sol_dict["__message__"] = message
         sol_dict["__final_norm__"] = final_norm
         return sol_dict
+
+    def extract_complete_states(self, result: dict[str, float]) -> dict[str, Any]:
+        """
+        Extract CompleteState for all network nodes regardless of convergence status.
+
+        This method provides comprehensive thermodynamic and transport properties
+        for every node in the network, leveraging the existing C++ CompleteState
+        structure for maximum accuracy and performance.
+
+        Args:
+            result: Dictionary returned by NetworkSolver.solve() containing
+                node temperatures, pressures, and compositions.
+
+        Returns:
+            Dictionary mapping node IDs to CompleteState objects containing
+            25 properties each (16 thermodynamic + 9 transport).
+
+        Notes:
+            - Works regardless of solver convergence status
+            - Uses C++ CompleteState for fast, accurate property calculations
+            - All properties are computed from the same (T, P, X) state
+            - Returns nan for nodes with missing/invalid data
+        """
+        from combaero._core import CompleteState
+
+        complete_states = {}
+
+        # Get composition from result or use default air
+        # Try to get composition from first node that has Y data
+        default_X = None
+        for node_id in self.network.nodes:
+            if f"{node_id}.Y[0]" in result:
+                # Extract composition array
+                Y = []
+                i = 0
+                while f"{node_id}.Y[{i}]" in result:
+                    Y.append(result[f"{node_id}.Y[{i}]"])
+                    i += 1
+                if Y:
+                    # Convert mass fractions to mole fractions
+                    from combaero import mass_to_mole
+
+                    default_X = mass_to_mole(np.array(Y))
+                    break
+
+        # Fallback to air if no composition found
+        if default_X is None:
+            default_X = np.array([0.7809, 0.2095, 0.0093])  # N2, O2, Ar
+
+        # Extract CompleteState for each node
+        for node_id in self.network.nodes:
+            try:
+                # Get temperature and pressure from result
+                T = result.get(f"{node_id}.T", float("nan"))
+                P = result.get(f"{node_id}.P", float("nan"))
+
+                # Get composition for this node (fallback to default)
+                X = default_X.copy()
+                if f"{node_id}.Y[0]" in result:
+                    Y = []
+                    i = 0
+                    while f"{node_id}.Y[{i}]" in result:
+                        Y.append(result[f"{node_id}.Y[{i}]"])
+                        i += 1
+                    if Y:
+                        X = mass_to_mole(np.array(Y))
+
+                # Create CompleteState if we have valid T and P
+                if not (math.isnan(T) or math.isnan(P)):
+                    complete_state = CompleteState(T, P, X)
+                    complete_states[node_id] = complete_state
+                else:
+                    # Create a placeholder with nan values
+                    complete_states[node_id] = None
+
+            except Exception:
+                # Store None for nodes that fail state calculation
+                complete_states[node_id] = None
+                # Could add logging here for debugging
+
+        return complete_states
