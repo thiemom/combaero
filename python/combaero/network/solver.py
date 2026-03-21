@@ -1324,7 +1324,7 @@ class NetworkSolver:
             - All properties are computed from the same (T, P, X) state
             - Returns nan for nodes with missing/invalid data
         """
-        from combaero._core import CompleteState
+        # CompleteState is accessed via complete_state function
 
         complete_states = {}
 
@@ -1348,7 +1348,7 @@ class NetworkSolver:
 
         # Fallback to air if no composition found
         if default_X is None:
-            default_X = np.array([0.7809, 0.2095, 0.0093])  # N2, O2, Ar
+            default_X = cb.humid_air_composition(300.0, 101325.0, 0.0)  # Dry air at STP
 
         # Extract CompleteState for each node
         for node_id in self.network.nodes:
@@ -1370,8 +1370,8 @@ class NetworkSolver:
 
                 # Create CompleteState if we have valid T and P
                 if not (math.isnan(T) or math.isnan(P)):
-                    complete_state = CompleteState(T, P, X)
-                    complete_states[node_id] = complete_state
+                    complete_state_obj = cb.complete_state(T, P, X)
+                    complete_states[node_id] = complete_state_obj
                 else:
                     # Create a placeholder with nan values
                     complete_states[node_id] = None
