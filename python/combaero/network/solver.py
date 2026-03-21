@@ -1316,7 +1316,7 @@ class NetworkSolver:
 
         Returns:
             Dictionary mapping node IDs to CompleteState objects containing
-            25 properties each (16 thermodynamic + 9 transport).
+            28 properties each (16 thermodynamic + 12 transport).
 
         Notes:
             - Works regardless of solver convergence status
