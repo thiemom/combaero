@@ -268,6 +268,39 @@ try:
                 f"   Network total: {len(complete_states) * (len(thermo_attrs) + len(transport_attrs))} property calculations"
             )
 
+        # Generate diagnostic report
+        print("\n=== Diagnostic Analysis ===")
+
+        try:
+            diagnostic_report = solver.get_diagnostic_report()
+
+            # Print summary
+            from combaero.network.diagnostics import (
+                create_grid_heatmaps,
+                export_diagnostic_report,
+                print_diagnostic_summary,
+            )
+
+            print_diagnostic_summary(diagnostic_report)
+
+            # Export JSON report
+            export_diagnostic_report(
+                diagnostic_report, "diagnostic_reports/grid_network_report.json"
+            )
+
+            # Create grid heatmaps
+            create_grid_heatmaps(solver, diagnostic_report, "diagnostic_plots")
+
+            print("\n✅ Diagnostic analysis complete!")
+            print("   JSON report: diagnostic_reports/grid_network_report.json")
+            print("   Heatmaps: diagnostic_plots/")
+
+        except Exception as e:
+            print(f"Diagnostic error: {e}")
+            import traceback
+
+            traceback.print_exc()
+
     except Exception as e:
         print(f"Property extraction error: {e}")
         import traceback
