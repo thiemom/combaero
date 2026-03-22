@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
 """Standalone network solver stability and timing benchmarks.
 
-This script is intentionally outside the regular pytest suite. It provides
-repeatable performance/stability snapshots for representative network classes:
-
-1. Simple incompressible network
-2. Fully coupled heat-transfer network
-3. Compressible flow network
-4. Combustion network
-5. Fully coupled combustion path (hot gas -> cooling -> combustor inlet)
+This script replaces the old bespoke benchmark networks with the highly
+parameterized "v3" grid logic. It evaluates solver robustness and speed
+across complex grids (e.g. 1x1 up to 10x10) tracking both fully
+incompressible boundary assumptions against highly unstable compressible bounds.
 """
 
 from __future__ import annotations
@@ -39,262 +35,158 @@ from combaero.network import (
 )
 from combaero.network.components import (
     CombustorNode,
-    EffectiveAreaConnectionElement,
+    MomentumChamberNode,
 )
 
 
-def _area(diameter: float) -> float:
-    return float(math.pi * (diameter / 2.0) ** 2)
+def _build_fully_coupled_grid(
+    m_dot_air: float,
+    T_ad: float,
+    n_serial: int,
+    n_parallel: int,
+    total_area: float,
+    total_ht_area: float,
+    use_compressible: bool,
+) -> FlowNetwork:
+    """Builds a highly parameterized recuperative combustor flow network."""
+    T_air = 560.0
+    P_ref = 101325.0
+    X_air = cb.humid_air_composition(288.16, P_ref, 0.6)
+    Y_air = cb.mole_to_mass(X_air)
 
+    Y_fuel = [0.0] * cb.num_species()
+    Y_fuel[cb.species_index_from_name("H2")] = 1.0
+    X_fuel = cb.mass_to_mole(Y_fuel)
 
-def _mdot_for_mach(mach: float, temperature: float, pressure: float, x: list[float], area: float) -> float:
-    rho = cb.density(temperature, pressure, x)
-    a = cb.speed_of_sound(temperature, x)
-    return float(mach * rho * a * area)
+    air_stream = cb.Stream()
+    air_stream.set_T(T_air).set_P(P_ref).set_X(X_air).set_mdot(m_dot_air)
 
+    fuel_stream = cb.Stream()
+    fuel_stream.set_T(300.0).set_P(P_ref).set_X(X_fuel)
 
-def _build_simple_network() -> FlowNetwork:
+    fuel_stream = cb.set_fuel_stream_for_Tad(T_ad, fuel_stream, air_stream)
+    m_dot_fuel = fuel_stream.mdot
+
     net = FlowNetwork()
-    inlet = PressureBoundary("inlet", P_total=2.8e5, T_total=420.0)
-    plenum = PlenumNode("plenum")
-    outlet = PressureBoundary("outlet", P_total=1.35e5, T_total=380.0)
 
-    net.add_node(inlet)
-    net.add_node(plenum)
+    inlet_air = MassFlowBoundary("inlet_air", m_dot=m_dot_air, T_total=T_air, Y=Y_air)
+    inlet_fuel = MassFlowBoundary("inlet_fuel", m_dot=m_dot_fuel, T_total=300.0, Y=Y_fuel)
+    outlet = PressureBoundary("outlet", P_total=101325.0, T_total=300.0, Y=Y_air)
+
+    net.add_node(inlet_air)
+    net.add_node(inlet_fuel)
     net.add_node(outlet)
 
-    net.add_element(OrificeElement("orifice", "inlet", "plenum", Cd=0.67, area=1.6e-4))
-    net.add_element(
-        PipeElement(
-            "pipe",
-            "plenum",
-            "outlet",
-            length=1.8,
-            diameter=0.028,
-            roughness=8.0e-5,
-            regime="incompressible",
-        )
-    )
-    return net
+    distributor = PlenumNode("distributor")
+    collector = PlenumNode("collector")
+    net.add_node(distributor)
+    net.add_node(collector)
 
+    pipe_regime = "compressible_fanno" if use_compressible else "incompressible"
+    ori_regime = "compressible" if use_compressible else "incompressible"
 
-def _build_fully_coupled_heat_network() -> FlowNetwork:
-    x_air = cb.standard_dry_air_composition()
-    y_air = list(cb.mole_to_mass(x_air))
+    net.add_element(OrificeElement("ori_air_in", "inlet_air", "distributor", Cd=0.8, area=total_area, regime=ori_regime))
 
-    t_hot = 920.0
-    t_cold = 360.0
-    p_out_hot = 2.3e5
-    p_out_cold = 2.1e5
-    d_hot = 0.020
-    d_cold = 0.016
-    length = 2.4
+    A_branch = total_area / n_parallel
+    D_branch = math.sqrt(4 * A_branch / math.pi)
 
-    mdot_hot = _mdot_for_mach(0.55, t_hot, p_out_hot, x_air, _area(d_hot))
-    mdot_cold = 0.70 * _mdot_for_mach(0.45, t_cold, p_out_cold, x_air, _area(d_cold))
+    A_ht_pipe = (total_ht_area / n_parallel) / max(1, n_serial)
+    L_pipe = 1.0
 
-    net = FlowNetwork()
-    net.add_node(MassFlowBoundary("hot_inlet", m_dot=mdot_hot, T_total=t_hot, Y=y_air))
-    net.add_node(PlenumNode("hot_plenum"))
-    net.add_node(PressureBoundary("hot_outlet", P_total=p_out_hot, T_total=t_hot, Y=y_air))
+    distributor_fuel = PlenumNode("distributor_fuel")
+    net.add_node(distributor_fuel)
+    net.add_element(OrificeElement("ori_fuel_in", "inlet_fuel", "distributor_fuel", Cd=0.6, area=A_branch * 0.1 * n_parallel, regime=ori_regime))
 
-    net.add_node(MassFlowBoundary("cold_inlet", m_dot=mdot_cold, T_total=t_cold, Y=y_air))
-    net.add_node(PlenumNode("cold_plenum"))
-    net.add_node(PressureBoundary("cold_outlet", P_total=p_out_cold, T_total=t_cold, Y=y_air))
+    for p in range(n_parallel):
+        mixing = PlenumNode(f"mixing_plenum_{p}")
+        combustor = CombustorNode(f"combustor_{p}", method="complete")
+        net.add_node(mixing)
+        net.add_node(combustor)
 
-    hot_surface = ConvectiveSurface(area=math.pi * d_hot * length, model=SmoothModel())
-    cold_surface = ConvectiveSurface(area=math.pi * d_cold * length, model=SmoothModel())
+        net.add_element(OrificeElement(f"ori_fuel_{p}", "distributor_fuel", f"mixing_plenum_{p}", Cd=0.6, area=A_branch * 0.1, regime=ori_regime))
 
-    net.add_element(
-        PipeElement(
-            id="hot_pipe",
-            from_node="hot_inlet",
-            to_node="hot_plenum",
-            length=length,
-            diameter=d_hot,
-            roughness=5.0e-5,
-            regime="incompressible",
-            surface=hot_surface,
-        )
-    )
-    net.add_element(
-        OrificeElement(
-            id="hot_orifice",
-            from_node="hot_plenum",
-            to_node="hot_outlet",
-            Cd=0.72,
-            area=_area(0.018),
-            regime="incompressible",
-        )
-    )
+        for i in range(n_serial + 1):
+            net.add_node(MomentumChamberNode(f"cold_chamber_{p}_{i}", area=A_branch))
+            net.add_node(MomentumChamberNode(f"hot_chamber_{p}_{i}", area=A_branch))
 
-    net.add_element(
-        PipeElement(
-            id="cold_pipe",
-            from_node="cold_inlet",
-            to_node="cold_plenum",
-            length=length,
-            diameter=d_cold,
-            roughness=5.0e-5,
-            regime="incompressible",
-            surface=cold_surface,
-        )
-    )
-    net.add_element(
-        OrificeElement(
-            id="cold_orifice",
-            from_node="cold_plenum",
-            to_node="cold_outlet",
-            Cd=0.72,
-            area=_area(0.015),
-            regime="incompressible",
-        )
-    )
+        net.add_element(OrificeElement(f"ori_cold_in_{p}", "distributor", f"cold_chamber_{p}_0", Cd=0.8, area=A_branch, regime=ori_regime))
+        for i in range(n_serial):
+            net.add_element(PipeElement(
+                f"cold_pipe_{p}_{i}", f"cold_chamber_{p}_{i}", f"cold_chamber_{p}_{i+1}",
+                length=L_pipe, diameter=D_branch, roughness=2e-5, regime=pipe_regime,
+                surface=ConvectiveSurface(area=A_ht_pipe, model=SmoothModel()) if A_ht_pipe > 0 else None
+            ))
 
-    net.add_wall(
-        WallConnection(
-            id="coupling_wall",
-            element_a="hot_pipe",
-            element_b="cold_pipe",
-            wall_thickness=0.0025,
-            wall_conductivity=19.0,
-        )
-    )
+        net.add_element(OrificeElement(f"ori_comb_in_{p}", f"cold_chamber_{p}_{n_serial}", f"mixing_plenum_{p}", Cd=0.8, area=A_branch, regime=ori_regime))
+        net.add_element(OrificeElement(f"ori_mix_to_comb_{p}", f"mixing_plenum_{p}", f"combustor_{p}", Cd=0.8, area=A_branch, regime=ori_regime))
+        net.add_element(OrificeElement(f"ori_comb_out_{p}", f"combustor_{p}", f"hot_chamber_{p}_0", Cd=0.8, area=A_branch, regime=ori_regime))
+
+        for i in range(n_serial):
+            net.add_element(PipeElement(
+                f"hot_pipe_{p}_{i}", f"hot_chamber_{p}_{i}", f"hot_chamber_{p}_{i+1}",
+                length=L_pipe, diameter=D_branch, roughness=2e-5, regime=pipe_regime,
+                surface=ConvectiveSurface(area=A_ht_pipe, model=SmoothModel()) if A_ht_pipe > 0 else None
+            ))
+
+            if A_ht_pipe > 0:
+                wall_cold_pipe_idx = n_serial - 1 - i
+                net.add_wall(WallConnection(
+                    id=f"wall_{p}_{i}",
+                    element_a=f"hot_pipe_{p}_{i}",
+                    element_b=f"cold_pipe_{p}_{wall_cold_pipe_idx}",
+                    wall_thickness=0.005,
+                    wall_conductivity=20.0,
+                    contact_area=A_ht_pipe
+                ))
+
+        net.add_element(OrificeElement(f"ori_hot_out_{p}", f"hot_chamber_{p}_{n_serial}", "collector", Cd=0.8, area=A_branch, regime=ori_regime))
+
+    net.add_element(OrificeElement("ori_exhaust", "collector", "outlet", Cd=0.8, area=total_area, regime=ori_regime))
+
     net.thermal_coupling_enabled = True
     return net
 
 
-def _build_compressible_network() -> FlowNetwork:
-    net = FlowNetwork()
-    inlet = PressureBoundary("inlet", P_total=4.8e5, T_total=540.0)
-    mid = PlenumNode("mid")
-    outlet = PressureBoundary("outlet", P_total=1.9e5, T_total=520.0)
+@dataclass(frozen=True)
+class BenchmarkCase:
+    name: str
+    timeout_s: float
+    m_dot_air: float
+    T_ad: float
+    n_serial: int
+    n_parallel: int
+    total_area: float
+    total_ht_area: float
+    use_compressible: bool
 
-    net.add_node(inlet)
-    net.add_node(mid)
-    net.add_node(outlet)
 
-    net.add_element(
-        PipeElement(
-            "fanno_pipe",
-            "inlet",
-            "mid",
-            length=3.2,
-            diameter=0.022,
-            roughness=8.0e-5,
-            regime="compressible_fanno",
-            friction_model="haaland",
-        )
+def _run_network_case(case: BenchmarkCase, solver_timeout_s: float) -> dict[str, Any]:
+    net = _build_fully_coupled_grid(
+        m_dot_air=case.m_dot_air,
+        T_ad=case.T_ad,
+        n_serial=case.n_serial,
+        n_parallel=case.n_parallel,
+        total_area=case.total_area,
+        total_ht_area=case.total_ht_area,
+        use_compressible=case.use_compressible,
     )
-    net.add_element(
-        OrificeElement(
-            "comp_orifice",
-            "mid",
-            "outlet",
-            Cd=0.69,
-            area=1.2e-4,
-            regime="compressible",
-        )
-    )
-    return net
 
-
-def _build_combustion_network() -> FlowNetwork:
-    net = FlowNetwork()
-
-    x_air = cb.standard_dry_air_composition()
-    y_air = cb.mole_to_mass(x_air)
-
-    x_ch4 = [0.0] * cb.num_species()
-    x_ch4[cb.species_index_from_name("CH4")] = 1.0
-    y_ch4 = cb.mole_to_mass(x_ch4)
-
-    air = MassFlowBoundary("air", m_dot=2.3, T_total=760.0, Y=y_air)
-    fuel = MassFlowBoundary("fuel", m_dot=0.068, T_total=340.0, Y=y_ch4)
-
-    combustor = CombustorNode("comb", method="equilibrium")
-    outlet = PressureBoundary("outlet", P_total=1.3e5, T_total=700.0)
-
-    net.add_node(air)
-    net.add_node(fuel)
-    net.add_node(combustor)
-    net.add_node(outlet)
-
-    e_air = EffectiveAreaConnectionElement("e_air", "air", "comb", effective_area=0.06)
-    e_fuel = EffectiveAreaConnectionElement("e_fuel", "fuel", "comb", effective_area=0.01)
-    nozzle = OrificeElement("nozzle", "comb", "outlet", Cd=0.8, area=0.018)
-
-    net.add_element(e_air)
-    net.add_element(e_fuel)
-    net.add_element(nozzle)
-    return net
-
-
-def _build_fully_coupled_combustion_network() -> FlowNetwork:
-    """Build a fully coupled combustion network for benchmarking.
-
-    This creates a realistic combustion network with proper coupling
-    that uses NetworkSolver.solve() directly for proper benchmarking.
-    The network represents a challenging but solvable combustion case.
-    """
-    # Species compositions
-    x_air = cb.standard_dry_air_composition()
-    y_air = list(cb.mole_to_mass(x_air))
-    x_ch4 = [0.0] * cb.num_species()
-    x_ch4[cb.species_index_from_name("CH4")] = 1.0
-    y_ch4 = list(cb.mole_to_mass(x_ch4))
-
-    # Network setup - realistic combustion parameters
-    net = FlowNetwork()
-
-    # Add boundary nodes with realistic conditions
-    air = MassFlowBoundary("air_inlet", m_dot=1.0, T_total=650.0, Y=y_air)
-    fuel = MassFlowBoundary("fuel_inlet", m_dot=0.04, T_total=300.0, Y=y_ch4)
-
-    # Use proper CombustorNode for combustion physics
-    combustor = CombustorNode("combustor", method="equilibrium")
-
-    net.add_node(PlenumNode("turbine_inlet"))
-    net.add_node(PressureBoundary("outlet", P_total=1.0e5, T_total=1500.0, Y=y_air))
-
-    net.add_node(air)
-    net.add_node(fuel)
-    net.add_node(combustor)
-
-    # Add realistic elements with proper coupling
-    # Air inlet restriction
-    net.add_element(OrificeElement("air_restrictor", "air_inlet", "combustor",
-                                   Cd=0.7, area=0.02, regime="incompressible"))
-
-    # Fuel injection
-    net.add_element(OrificeElement("fuel_injector", "fuel_inlet", "combustor",
-                                   Cd=0.6, area=0.005, regime="incompressible"))
-
-    # Combustor pressure drop (significant)
-    net.add_element(PipeElement("combustor", "combustor", "turbine_inlet",
-                                length=1.5, diameter=0.08, roughness=2e-5, regime="incompressible"))
-
-    # Turbine inlet restriction
-    net.add_element(OrificeElement("turbine_inlet", "turbine_inlet", "outlet",
-                                   Cd=0.8, area=0.025, regime="incompressible"))
-
-    return net
-
-
-def _run_network_case(case_name: str, solver_timeout_s: float) -> dict[str, Any]:
-    builders: dict[str, Any] = {
-        "simple_network": _build_simple_network,
-        "fully_coupled_heat_transfer": _build_fully_coupled_heat_network,
-        "compressible_flow_network": _build_compressible_network,
-        "combustion_network": _build_combustion_network,
-        "fully_coupled_combustion_network": _build_fully_coupled_combustion_network,
-    }
-
-    net = builders[case_name]()
     solver = NetworkSolver(net)
 
+    solver_options = {
+        "maxfev": 10000,
+        "xtol": 1e-4,
+        "ftol": 1e-6,
+    }
+
     t0 = perf_counter()
-    sol = solver.solve(method="hybr", timeout=solver_timeout_s)
+    sol = solver.solve(
+        method="lm",
+        timeout=solver_timeout_s,
+        options=solver_options,
+        robust=True,
+        init_strategy="incompressible_warmstart"
+    )
     elapsed = perf_counter() - t0
 
     return {
@@ -302,29 +194,42 @@ def _run_network_case(case_name: str, solver_timeout_s: float) -> dict[str, Any]
         "elapsed_s": elapsed,
         "final_norm": float(sol.get("__final_norm__", float("nan"))),
         "message": str(sol.get("__message__", "")),
+        "iterations": int(sol.get("__nfev__", 0)),
     }
-
-
-@dataclass(frozen=True)
-class BenchmarkCase:
-    name: str
-    timeout_s: float
 
 
 def _run_case_once(case: BenchmarkCase, solver_timeout_s: float) -> dict[str, Any]:
     with ProcessPoolExecutor(max_workers=1, mp_context=mp.get_context("spawn")) as pool:
-        fut = pool.submit(_run_network_case, case.name, solver_timeout_s)
+        fut = pool.submit(_run_network_case, case, solver_timeout_s)
         return fut.result(timeout=case.timeout_s)
 
 
 def run_benchmarks(repeats: int, case_timeout_s: float, solver_timeout_s: float) -> dict[str, Any]:
-    cases = [
-        BenchmarkCase("simple_network", case_timeout_s),
-        BenchmarkCase("fully_coupled_heat_transfer", case_timeout_s),
-        BenchmarkCase("compressible_flow_network", case_timeout_s),
-        BenchmarkCase("combustion_network", case_timeout_s),
-        BenchmarkCase("fully_coupled_combustion_network", case_timeout_s),
+    total_area = 0.25 * math.pi * (0.8)**2
+
+    grids = [
+        (1, 1),
+        (2, 2),
+        (5, 5),
+        (10, 10)
     ]
+
+    cases = []
+    for s, p in grids:
+        ht_area = max(50.0, float(s * p * 2.0))
+        for comp in [False, True]:
+            reg_str = "comp" if comp else "incomp"
+            cases.append(BenchmarkCase(
+                name=f"grid_{s}x{p}_{reg_str}",
+                timeout_s=case_timeout_s,
+                m_dot_air=10.0,
+                T_ad=1700.0,
+                n_serial=s,
+                n_parallel=p,
+                total_area=total_area,
+                total_ht_area=ht_area,
+                use_compressible=comp
+            ))
 
     run_stamp = datetime.now(timezone.utc).isoformat()
     results: dict[str, Any] = {
@@ -335,12 +240,16 @@ def run_benchmarks(repeats: int, case_timeout_s: float, solver_timeout_s: float)
         "cases": {},
     }
 
+    print(f"--- Running Network Solver Benchmarks ({len(cases)} cases, {repeats} repeats) ---")
+
     for case in cases:
         times: list[float] = []
         success_count = 0
         timeout_count = 0
         error_messages: list[str] = []
         final_norms: list[float] = []
+
+        print(f"Testing {case.name}...", flush=True)
 
         for _ in range(repeats):
             try:
@@ -410,7 +319,8 @@ def format_markdown(results: dict[str, Any]) -> str:
 
     lines.append("")
     lines.append("## Notes")
-    lines.append("- This benchmark is informational and not part of default CI gating.")
+    lines.append("- Tested heavily non-linear parameterized combustor grid arrays (from 1x1 up to 10x10).")
+    lines.append("- \"comp\" forces strict Fanno/Orifice compressibility, which frequently crashes generic non-damped Newton solvers.")
     lines.append("- Timeouts are used to prevent hangs in difficult nonlinear regimes.")
     return "\n".join(lines)
 
@@ -466,13 +376,13 @@ def main() -> None:
     parser.add_argument(
         "--case-timeout",
         type=float,
-        default=90.0,
+        default=300.0,
         help="Hard timeout (seconds) for each benchmark case process.",
     )
     parser.add_argument(
         "--solver-timeout",
         type=float,
-        default=25.0,
+        default=120.0,
         help="Timeout passed to NetworkSolver.solve() in seconds.",
     )
     parser.add_argument(
