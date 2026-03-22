@@ -97,5 +97,10 @@ python/examples/*.dat
 # CTest
 Testing/
 tests/Testing/
+
+# Diagnostic output
+diagnostic_plots/
+diagnostic_reports/
+
 TODO.md
 .aider*

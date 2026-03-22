@@ -152,6 +152,161 @@ try:
     else:
         print("Could not calculate Mach numbers - no valid data found")
 
+    # Comprehensive post-solve property extraction
+    print("\n=== Comprehensive Property Analysis ===")
+
+    try:
+        complete_states = solver.extract_complete_states(result)
+        print(f"Extracted CompleteState for {len(complete_states)} nodes")
+
+        # Analyze inlet conditions
+        inlet_state = complete_states.get("inlet")
+        if inlet_state is not None:
+            print("\n📊 Inlet CompleteState Analysis:")
+            print("   Thermodynamic Properties:")
+            print(f"     T: {inlet_state.thermo.T:.2f} K")
+            print(f"     P: {inlet_state.thermo.P:.0f} Pa ({inlet_state.thermo.P / 1e5:.3f} bar)")
+            print(f"     rho: {inlet_state.thermo.rho:.3f} kg/m³")
+            print(f"     cp: {inlet_state.thermo.cp:.1f} J/(kg·K)")
+            print(f"     h: {inlet_state.thermo.h:.0f} J/kg")
+            print(f"     s: {inlet_state.thermo.s:.1f} J/(kg·K)")
+            print(f"     u: {inlet_state.thermo.u:.0f} J/kg")
+            print(f"     a: {inlet_state.thermo.a:.1f} m/s")
+            print(f"     gamma: {inlet_state.thermo.gamma:.4f}")
+            print(f"     mw: {inlet_state.thermo.mw:.2f} g/mol")
+
+            print("   Transport Properties:")
+            print(f"     mu: {inlet_state.transport.mu:.2e} Pa·s")
+            print(f"     k: {inlet_state.transport.k:.4f} W/(m·K)")
+            print(f"     nu: {inlet_state.transport.nu:.2e} m²/s")
+            print(f"     alpha: {inlet_state.transport.alpha:.2e} m²/s")
+            print(f"     Pr: {inlet_state.transport.Pr:.4f}")
+
+        # Analyze outlet conditions
+        outlet_state = complete_states.get("outlet")
+        if outlet_state is not None:
+            print("\n📊 Outlet CompleteState Analysis:")
+            print(f"     T: {outlet_state.thermo.T:.2f} K")
+            print(f"     P: {outlet_state.thermo.P:.0f} Pa ({outlet_state.thermo.P / 1e5:.3f} bar)")
+            print(f"     rho: {outlet_state.thermo.rho:.3f} kg/m³")
+            print(f"     a: {outlet_state.thermo.a:.1f} m/s")
+
+        # Analyze momentum chamber distribution
+        chamber_temps = []
+        chamber_pressures = []
+        chamber_machs = []
+
+        for node_id, state in complete_states.items():
+            if node_id.startswith("momentum_chamber") and state is not None:
+                chamber_temps.append(state.thermo.T)
+                chamber_pressures.append(state.thermo.P)
+
+                # Calculate Mach for this chamber
+                # Find connected pipe to get mass flow
+                chamber_i, chamber_j = map(int, node_id.split("_")[2:])
+                pipe_id = f"pipe_{chamber_i}_{chamber_j}"
+                m_dot = result.get(f"{pipe_id}.m_dot", float("nan"))
+
+                if not math.isnan(m_dot):
+                    v = m_dot / (state.thermo.rho * area)
+                    mach = cb.mach_number(v, state.thermo.T, X_air)
+                    chamber_machs.append(mach)
+
+        if chamber_temps:
+            print(f"\n📊 Momentum Chamber Distribution ({len(chamber_temps)} chambers):")
+            print(
+                f"   Temperature: Min {min(chamber_temps):.1f} K, Max {max(chamber_temps):.1f} K, Mean {sum(chamber_temps) / len(chamber_temps):.1f} K"
+            )
+            print(
+                f"   Pressure: Min {min(chamber_pressures) / 1e5:.3f} bar, Max {max(chamber_pressures) / 1e5:.3f} bar, Mean {sum(chamber_pressures) / len(chamber_pressures) / 1e5:.3f} bar"
+            )
+
+            if chamber_machs:
+                print(
+                    f"   Mach: Min {min(chamber_machs):.4f}, Max {max(chamber_machs):.4f}, Mean {sum(chamber_machs) / len(chamber_machs):.4f}"
+                )
+
+                # Flow regime analysis
+                subsonic_count = sum(1 for m in chamber_machs if m < 1.0)
+                transonic_count = sum(1 for m in chamber_machs if 0.8 <= m <= 1.2)
+                supersonic_count = sum(1 for m in chamber_machs if m > 1.0)
+
+                print("   Flow Regimes:")
+                print(
+                    f"     Subsonic (M < 1.0): {subsonic_count} chambers ({100 * subsonic_count / len(chamber_machs):.1f}%)"
+                )
+                print(
+                    f"     Transonic (0.8 ≤ M ≤ 1.2): {transonic_count} chambers ({100 * transonic_count / len(chamber_machs):.1f}%)"
+                )
+                print(
+                    f"     Supersonic (M > 1.0): {supersonic_count} chambers ({100 * supersonic_count / len(chamber_machs):.1f}%)"
+                )
+
+                # Find extreme conditions
+                max_mach_idx = chamber_machs.index(max(chamber_machs))
+                min_mach_idx = chamber_machs.index(min(chamber_machs))
+
+                print("   Extreme Conditions:")
+                print(
+                    f"     Highest Mach: {max(chamber_machs):.4f} at T={chamber_temps[max_mach_idx]:.1f} K, P={chamber_pressures[max_mach_idx] / 1e5:.3f} bar"
+                )
+                print(
+                    f"     Lowest Mach: {min(chamber_machs):.4f} at T={chamber_temps[min_mach_idx]:.1f} K, P={chamber_pressures[min_mach_idx] / 1e5:.3f} bar"
+                )
+
+        # Property count verification
+        if inlet_state is not None:
+            thermo_attrs = [attr for attr in dir(inlet_state.thermo) if not attr.startswith("_")]
+            transport_attrs = [
+                attr for attr in dir(inlet_state.transport) if not attr.startswith("_")
+            ]
+            print("\n✅ CompleteState Property Access Verified:")
+            print(f"   Thermodynamic: {len(thermo_attrs)} properties")
+            print(f"   Transport: {len(transport_attrs)} properties")
+            print(f"   Total: {len(thermo_attrs) + len(transport_attrs)} properties per node")
+            print(
+                f"   Network total: {len(complete_states) * (len(thermo_attrs) + len(transport_attrs))} property calculations"
+            )
+
+        # Generate diagnostic report
+        print("\n=== Diagnostic Analysis ===")
+
+        try:
+            diagnostic_report = solver.get_diagnostic_report()
+
+            # Print summary
+            from combaero.network.diagnostics import (
+                create_grid_heatmaps,
+                export_diagnostic_report,
+                print_diagnostic_summary,
+            )
+
+            print_diagnostic_summary(diagnostic_report)
+
+            # Export JSON report
+            export_diagnostic_report(
+                diagnostic_report, "diagnostic_reports/grid_network_report.json"
+            )
+
+            # Create grid heatmaps
+            create_grid_heatmaps(solver, diagnostic_report, "diagnostic_plots")
+
+            print("\n✅ Diagnostic analysis complete!")
+            print("   JSON report: diagnostic_reports/grid_network_report.json")
+            print("   Heatmaps: diagnostic_plots/")
+
+        except Exception as e:
+            print(f"Diagnostic error: {e}")
+            import traceback
+
+            traceback.print_exc()
+
+    except Exception as e:
+        print(f"Property extraction error: {e}")
+        import traceback
+
+        traceback.print_exc()
+
 except Exception as e:
     print(f"Error: {e}")
     import traceback

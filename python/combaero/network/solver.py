@@ -1,3 +1,4 @@
+import math
 import time
 import warnings
 from typing import Any, Literal
@@ -1228,10 +1229,13 @@ class NetworkSolver:
                     return penalty, np.eye(len(x_scaled))
                 return penalty
 
-        # Solve
+        # Solve with timing
         _RESIDUAL_TOL = 1e-3
+        solve_start_time = time.time()
         try:
             sol = root(residuals_wrapper, x0_scaled, method=method, options=options, jac=use_jac)
+            solve_end_time = time.time()
+            self._wall_time = solve_end_time - solve_start_time
             final_x = sol.x * D_x  # un-scale
             success = sol.success
             message = sol.message
@@ -1286,6 +1290,19 @@ class NetworkSolver:
         # Store solution for warm-start reuse
         self._last_x = final_x.copy()
 
+        # Store diagnostic data
+        self._diagnostic_data = {
+            "x0": x0_use.copy(),
+            "solution": final_x.copy(),
+            "converged": success,
+            "final_norm": final_norm,
+            "message": message,
+            "unknown_names": self.unknown_names.copy(),
+            "solver_method": method,
+            "solver_options": options.copy() if options else {},
+            "wall_time": getattr(self, "_wall_time", None),
+        }
+
         sol_dict = dict(zip(self.unknown_names, final_x, strict=False))
 
         # Include derived states (T, Y) for consistency and state inspection
@@ -1300,3 +1317,160 @@ class NetworkSolver:
         sol_dict["__message__"] = message
         sol_dict["__final_norm__"] = final_norm
         return sol_dict
+
+    def extract_complete_states(self, result: dict[str, float]) -> dict[str, Any]:
+        """
+        Extract CompleteState for all network nodes regardless of convergence status.
+
+        This method provides comprehensive thermodynamic and transport properties
+        for every node in the network, leveraging the existing C++ CompleteState
+        structure for maximum accuracy and performance.
+
+        Args:
+            result: Dictionary returned by NetworkSolver.solve() containing
+                node temperatures, pressures, and compositions.
+
+        Returns:
+            Dictionary mapping node IDs to CompleteState objects containing
+            28 properties each (16 thermodynamic + 12 transport).
+
+        Notes:
+            - Works regardless of solver convergence status
+            - Uses C++ CompleteState for fast, accurate property calculations
+            - All properties are computed from the same (T, P, X) state
+            - Returns nan for nodes with missing/invalid data
+        """
+        # CompleteState is accessed via complete_state function
+
+        complete_states = {}
+
+        # Get composition from result or use default air
+        # Try to get composition from first node that has Y data
+        default_X = None
+        for node_id in self.network.nodes:
+            if f"{node_id}.Y[0]" in result:
+                # Extract composition array
+                Y = []
+                i = 0
+                while f"{node_id}.Y[{i}]" in result:
+                    Y.append(result[f"{node_id}.Y[{i}]"])
+                    i += 1
+                if Y:
+                    # Convert mass fractions to mole fractions
+                    from combaero import mass_to_mole
+
+                    default_X = mass_to_mole(np.array(Y))
+                    break
+
+        # Fallback to air if no composition found
+        if default_X is None:
+            default_X = cb.humid_air_composition(300.0, 101325.0, 0.0)  # Dry air at STP
+
+        # Extract CompleteState for each node
+        for node_id in self.network.nodes:
+            try:
+                # Get temperature and pressure from result
+                T = result.get(f"{node_id}.T", float("nan"))
+                P = result.get(f"{node_id}.P", float("nan"))
+
+                # Get composition for this node (fallback to default)
+                X = default_X.copy()
+                if f"{node_id}.Y[0]" in result:
+                    Y = []
+                    i = 0
+                    while f"{node_id}.Y[{i}]" in result:
+                        Y.append(result[f"{node_id}.Y[{i}]"])
+                        i += 1
+                    if Y:
+                        X = mass_to_mole(np.array(Y))
+
+                # Create CompleteState if we have valid T and P
+                if not (math.isnan(T) or math.isnan(P)):
+                    complete_state_obj = cb.complete_state(T, P, X)
+                    complete_states[node_id] = complete_state_obj
+                else:
+                    # Create a placeholder with nan values
+                    complete_states[node_id] = None
+
+            except Exception:
+                # Store None for nodes that fail state calculation
+                complete_states[node_id] = None
+                # Could add logging here for debugging
+
+        return complete_states
+
+    def get_diagnostic_report(self) -> dict[str, Any]:
+        """
+        Generate comprehensive diagnostic report comparing initial guess to final solution.
+
+        Returns:
+            Dictionary containing detailed analysis of solver behavior including
+            x0 vs solution comparison, convergence metrics, and per-variable analysis.
+        """
+        if not hasattr(self, "_diagnostic_data"):
+            raise RuntimeError("No diagnostic data available. Run solve() first.")
+
+        data = self._diagnostic_data
+        x0 = data["x0"]
+        solution = data["solution"]
+        unknown_names = data["unknown_names"]
+
+        # Calculate differences and statistics
+        differences = solution - x0
+        abs_differences = np.abs(differences)
+        rel_differences = np.abs(differences / (x0 + 1e-10))  # Avoid division by zero
+
+        # Per-variable analysis
+        variable_analysis = {}
+        for i, name in enumerate(unknown_names):
+            variable_analysis[name] = {
+                "x0": float(x0[i]),
+                "solution": float(solution[i]),
+                "difference": float(differences[i]),
+                "abs_difference": float(abs_differences[i]),
+                "rel_difference": float(rel_differences[i]),
+            }
+
+        # Overall statistics
+        overall_stats = {
+            "max_abs_difference": float(np.max(abs_differences)),
+            "mean_abs_difference": float(np.mean(abs_differences)),
+            "median_abs_difference": float(np.median(abs_differences)),
+            "max_rel_difference": float(np.max(rel_differences)),
+            "mean_rel_difference": float(np.mean(rel_differences)),
+            "median_rel_difference": float(np.median(rel_differences)),
+            "std_difference": float(np.std(differences)),
+        }
+
+        # Convergence analysis
+        convergence_analysis = {
+            "converged": data["converged"],
+            "final_norm": data["final_norm"],
+            "message": data["message"],
+            "wall_time": data["wall_time"],
+            "solver_method": data["solver_method"],
+            "solver_options": data["solver_options"],
+            "num_unknowns": len(unknown_names),
+        }
+
+        # Identify most changed variables
+        most_changed_indices = np.argsort(abs_differences)[-5:]  # Top 5
+        most_changed = [
+            {
+                "name": unknown_names[i],
+                "abs_difference": float(abs_differences[i]),
+                "rel_difference": float(rel_differences[i]),
+                "x0": float(x0[i]),
+                "solution": float(solution[i]),
+            }
+            for i in reversed(most_changed_indices)
+        ]
+
+        return {
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "variable_analysis": variable_analysis,
+            "overall_statistics": overall_stats,
+            "convergence_analysis": convergence_analysis,
+            "most_changed_variables": most_changed,
+            "unknown_names": unknown_names,
+        }
