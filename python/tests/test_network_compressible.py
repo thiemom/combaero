@@ -438,6 +438,3 @@ def test_homotopy_initialization_strategy():
 
     assert sol["__success__"], "Homotopy solve failed"
     assert sol["pipe.m_dot"] > 0, "Mass flow should be positive"
-
-    # Verify Mach number is significant
-    # Detailed check not needed here, just success.
