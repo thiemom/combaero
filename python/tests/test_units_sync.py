@@ -12,8 +12,6 @@ IGNORE_LIST = {
     "network",
     "species",
     "geometry",
-    "dry_air",
-    "standard_dry_air_composition",
     "orifice_mdot_and_jacobian",
     "orifice_residuals_and_jacobian",
     "pipe_residuals_and_jacobian",

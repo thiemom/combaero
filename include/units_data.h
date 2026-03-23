@@ -672,7 +672,6 @@ inline constexpr Entry function_units[] = {
     {"convert_to_dry_fractions", "-", "-"},
     {"solve_orifice_mdot", "-", "Pa"},
     {"dry_air", "-", "X: mol/mol"},
-    {"standard_dry_air_composition", "-", "X: mol/mol"},
     {"humid_air_enthalpy_nasa9", "-", "J/kg dry air"},
     {"complete_combustion_to_CO2_H2O_with_fraction", "-", "-"},
     {"HumidAir::rh", "-", "0-1"},
