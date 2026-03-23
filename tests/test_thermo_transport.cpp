@@ -2713,18 +2713,29 @@ TEST_F(ThermoTransportTest, FrictionCorrelationsConsistent) {
     EXPECT_NEAR(f_serghides, f_colebrook, 0.001 * f_colebrook);
 }
 
-// Test invalid inputs throw exceptions
+// Test invalid inputs throw exceptions for roughness only
 TEST_F(ThermoTransportTest, FrictionInvalidInputs) {
-    // Invalid Re
-    EXPECT_THROW(friction_haaland(0.0, 0.001), std::invalid_argument);
-    EXPECT_THROW(friction_haaland(-1000.0, 0.001), std::invalid_argument);
-    EXPECT_THROW(friction_serghides(0.0, 0.001), std::invalid_argument);
-    EXPECT_THROW(friction_colebrook(0.0, 0.001), std::invalid_argument);
-
     // Invalid e_D (negative)
     EXPECT_THROW(friction_haaland(10000.0, -0.001), std::invalid_argument);
     EXPECT_THROW(friction_serghides(10000.0, -0.001), std::invalid_argument);
     EXPECT_THROW(friction_colebrook(10000.0, -0.001), std::invalid_argument);
+}
+
+// Test soft minimum constraint for Re <= 0
+TEST_F(ThermoTransportTest, FrictionSoftMinimum) {
+    double f_haaland_zero   = friction_haaland(0.0, 0.0);
+    double f_haaland_neg    = friction_haaland(-1000.0, 0.0);
+    double f_haaland_min    = friction_haaland(100.0, 0.0);
+    double f_haaland_1000   = friction_haaland(1000.0, 0.0);
+    EXPECT_NEAR(f_haaland_zero, f_haaland_min, 1e-9);
+    EXPECT_NEAR(f_haaland_neg, f_haaland_1000, 1e-9);
+
+    double f_colebrook_zero = friction_colebrook(0.0, 0.0);
+    double f_colebrook_neg  = friction_colebrook(-1000.0, 0.0);
+    double f_colebrook_min  = friction_colebrook(100.0, 0.0);
+    double f_colebrook_1000 = friction_colebrook(1000.0, 0.0);
+    EXPECT_NEAR(f_colebrook_zero, f_colebrook_min, 1e-9);
+    EXPECT_NEAR(f_colebrook_neg, f_colebrook_1000, 1e-9);
 }
 
 // =============================================================================

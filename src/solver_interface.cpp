@@ -770,11 +770,13 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
   double h_mix_base = (mdot_tot > 0.0) ? (H_tot / mdot_tot)
                                         : (n_streams > 0 ? h_stream[0] : 0.0);
 
-  // Apply energy transfer: delta_h = Q/mdot + fraction * h_mix_base
-  double delta_h = 0.0;
-  if (mdot_tot > 1e-12) {
-    delta_h = Q / mdot_tot + fraction * h_mix_base;
-  }
+  // Use effective mass flow for heat addition to avoid singularity when mdot_tot -> 0
+  // mdot_eff is strictly positive and smooth through 0. Minimum bound is 1e-3 kg/s
+  double mdot_eff = std::sqrt(mdot_tot * mdot_tot + 1e-6);
+
+  // Apply energy transfer: delta_h = Q/mdot_eff + fraction * h_mix_base
+  double delta_h = Q / mdot_eff + fraction * h_mix_base;
+
   double h_mix = h_mix_base + delta_h;
   double P_total_mix = (mdot_tot > 0.0)
                             ? (P_total_tot / mdot_tot)
@@ -840,8 +842,9 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
       }
       double dh_base_dmdot = (h_diff - y_sum) / mdot_tot;
 
-      // Q contribution: d(Q/mdot_tot)/d(mdot_i) = -Q/mdot_tot^2
-      double dh_Q_dmdot = (mdot_tot > 1e-12) ? (-Q / (mdot_tot * mdot_tot)) : 0.0;
+      // Q contribution: d(Q/mdot_eff)/d(mdot_i) = -Q * mdot_tot / (mdot_eff^3)
+      double mdot_eff_3 = mdot_eff * mdot_eff * mdot_eff;
+      double dh_Q_dmdot = -Q * mdot_tot / mdot_eff_3;
 
       // Fraction contribution: d(fraction * h_mix_base)/d(mdot_i)
       // = fraction * d(h_mix_base)/d(mdot_i)
@@ -915,11 +918,11 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
   }
   double h_mix_base = (mdot_tot > 1e-12) ? (H_tot / mdot_tot) : 0.0;
 
+  // Use effective mass flow for heat addition to avoid singularity when mdot_tot -> 0
+  double mdot_eff = std::sqrt(mdot_tot * mdot_tot + 1e-6);
+
   // Compute delta_h from Q and fraction
-  double delta_h = 0.0;
-  if (mdot_tot > 1e-12) {
-    delta_h = Q / mdot_tot + fraction * h_mix_base;
-  }
+  double delta_h = Q / mdot_eff + fraction * h_mix_base;
 
   std::vector<double> X_mix = combaero::mass_to_mole(combaero::normalize_fractions(mix.Y_mix));
   auto complete_res =
@@ -1067,11 +1070,11 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
   }
   double h_mix_base = (mdot_tot > 1e-12) ? (H_tot / mdot_tot) : 0.0;
 
+  // Use effective mass flow for heat addition to avoid singularity when mdot_tot -> 0
+  double mdot_eff = std::sqrt(mdot_tot * mdot_tot + 1e-6);
+
   // Compute delta_h from Q and fraction
-  double delta_h = 0.0;
-  if (mdot_tot > 1e-12) {
-    delta_h = Q / mdot_tot + fraction * h_mix_base;
-  }
+  double delta_h = Q / mdot_eff + fraction * h_mix_base;
 
   std::vector<double> X_mix = combaero::mass_to_mole(combaero::normalize_fractions(mix.Y_mix));
   auto eq_base_res =
