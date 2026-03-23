@@ -57,7 +57,7 @@ def test_timeout_all_methods(method):
     original_residuals = solver._residuals
 
     def slow_residuals(x):
-        time.sleep(0.2)  # 200ms per evaluation
+        time.sleep(0.05)  # 50ms per evaluation
         return original_residuals(x)
 
     solver._residuals = slow_residuals

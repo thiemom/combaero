@@ -1,6 +1,5 @@
-fix: state property units mismatch and example runner automation
+per: optimize pytest suite by simplifying slow network tests
 
-- Fixed critical units mismatch in `_core.cpp` where `State` properties (SP, HP, etc.) were double-converting mass-based units.
-- Created `scripts/run_examples.py` for automated discovery and verification of Python examples.
-- Simplified `network_from_grid.py` and moved intensive Mach sweep to `benchmarks/mach_sweep_network.py`.
-- Fixed multiple API regressions in examples and corrected orifice dimensions.
+- Reduced Mach sweep resolution in `test_network_compressible.py` (benchmark: 14 -> 3 points, comparison: 3 -> 2 points).
+- Reduced `time.sleep` in solver timeout tests from 0.2s to 0.05s.
+- Reduced total `pytest` execution time from ~57s to ~24s on macOS.

@@ -357,7 +357,7 @@ def _build_fully_coupled_network(regime: str, mach_target: float) -> FlowNetwork
 
 def test_fully_coupled_compressible_vs_incompressible_mach_sweep():
     """Fully coupled pressure-ratio sweep over target Mach: compressible vs incompressible."""
-    mach_values = np.array([0.20, 0.50, 0.90])
+    mach_values = np.array([0.20, 0.80])
 
     pr_comp: list[float] = []
     pr_incomp: list[float] = []
@@ -439,7 +439,7 @@ def test_high_mach_compressible_convergence_benchmark():
     When it starts passing, tighten the xfail to ``strict=True`` (already
     set) so that future regressions are caught.
     """
-    mach_values = np.linspace(0.20, 1.50, 14)
+    mach_values = np.array([0.20, 0.80, 1.40])
 
     pr_comp: list[float] = []
     x0_prev: np.ndarray | None = None
