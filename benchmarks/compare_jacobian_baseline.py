@@ -5,16 +5,20 @@ Jacobian Baseline Comparison Tool
 This script compares current Jacobian test results against the baseline
 to detect accuracy regressions in the solver interface functions.
 
+It integrates functionality for detailed printing and record saving.
+
 Usage:
-    python scripts/compare_jacobian_baseline.py
-    python scripts/compare_jacobian_baseline.py --current new_results.csv
-    python scripts/compare_jacobian_baseline.py --baseline baseline_20260320.csv
+    python benchmarks/compare_jacobian_baseline.py
+    python benchmarks/compare_jacobian_baseline.py --verbose  # Show detailed diffs
+    python benchmarks/compare_jacobian_baseline.py --save     # Persist results to benchmarks/runs/
 """
 
 import argparse
 import pandas as pd
 import sys
 import os
+import subprocess
+import datetime
 from pathlib import Path
 
 def load_csv(filepath):
@@ -97,23 +101,28 @@ def print_summary(results):
 
 def main():
     parser = argparse.ArgumentParser(description='Compare Jacobian test results against baseline')
-    parser.add_argument('--baseline', default='jacobian_baseline_current.csv',
-                       help='Baseline CSV file (default: jacobian_baseline_current.csv)')
+    root_dir = Path(__file__).resolve().parent.parent
+    benchmarks_dir = root_dir / "benchmarks"
+    runs_dir = benchmarks_dir / "runs"
+
+    parser.add_argument('--baseline', default=str(benchmarks_dir / 'jacobian_baseline_current.csv'),
+                       help='Baseline CSV file')
     parser.add_argument('--current',
                        help='Current results CSV file (if not provided, will run tests)')
     parser.add_argument('--threshold', type=float, default=1e-10,
                        help='Minimum change to consider as regression (default: 1e-10)')
+    parser.add_argument('--verbose', '-v', action='store_true',
+                       help='Enable detailed difference reporting (PRINT_JACOBIAN_DIFFERENCES=1)')
+    parser.add_argument('--save', action='store_true',
+                       help='Save current results to benchmarks/runs/ instead of a temporary file')
 
     args = parser.parse_args()
 
     # Find baseline file
     baseline_path = Path(args.baseline)
     if not baseline_path.exists():
-        # Try in project root
-        baseline_path = Path(__file__).parent.parent / args.baseline
-        if not baseline_path.exists():
-            print(f"Baseline file not found: {args.baseline}")
-            return 1
+        print(f"Baseline file not found: {args.baseline}")
+        return 1
 
     # Load baseline
     print(f"Loading baseline: {baseline_path}")
@@ -127,35 +136,72 @@ def main():
         if current_df is None:
             return 1
     else:
-        print("Running current tests to get baseline comparison...")
-        import subprocess
-        import tempfile
-        import datetime
+        print("Running current tests...")
 
-        # Run tests and capture output
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        temp_file = f"jacobian_temp_{timestamp}.csv"
+        timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%SZ")
+        if args.save:
+            runs_dir.mkdir(parents=True, exist_ok=True)
+            output_file_name = f"jacobian_test_{timestamp}.csv"
+            output_path = runs_dir / output_file_name
+        else:
+            output_file_name = f"jacobian_temp_{timestamp}.csv"
+            output_path = root_dir / "build" / output_file_name
+
+        env = {**os.environ}
+        if args.verbose:
+            env["PRINT_JACOBIAN_DIFFERENCES"] = "1"
+        env["JACOBIAN_OUTPUT_FILE"] = str(output_path)
 
         try:
-            result = subprocess.run([
-                './test_solver_jacobians',
-                '--gtest_print_time=0'
-            ], env={**os.environ, 'JACOBIAN_OUTPUT_FILE': temp_file},
-               capture_output=True, text=True, cwd='build')
+            # Ensure we are in build directory or find the executable
+            build_dir = root_dir / "build"
+            exe_path = build_dir / "test_solver_jacobians"
 
-            if result.returncode != 0:
+            if not exe_path.exists():
+                print(f"Error: Executable not found at {exe_path}")
+                return 1
+
+            result = subprocess.run([
+                str(exe_path),
+                '--gtest_print_time=0'
+            ], env=env, capture_output=not args.verbose, text=True, cwd=str(build_dir))
+
+            if result.returncode != 0 and not args.verbose:
                 print(f"Error running tests: {result.stderr}")
                 return 1
 
-            current_df = load_csv(f"build/{temp_file}")
+            # If verbose, the output already went to stdout.
+            # If not verbose, we might want to see if there were any errors.
+
+            # The output file is written relative to the CWD of the process if it's just a filename.
+            # Our C++ code uses: char* val = getenv("JACOBIAN_OUTPUT_FILE"); if(val) ...
+            # I'll check both root and build just in case.
+
+            final_output_path = output_path
+            if not final_output_path.exists():
+                # Check relative to build
+                alt_path = build_dir / output_file_name
+                if alt_path.exists():
+                    final_output_path = alt_path
+                else:
+                    print(f"Error: Output file not produced at {output_path}")
+                    return 1
+
+            current_df = load_csv(final_output_path)
             if current_df is None:
                 return 1
 
+            if args.save:
+                print(f"Saved current results to: {final_output_path}")
+
         finally:
-            # Clean up temp file
-            temp_path = Path(f"build/{temp_file}")
-            if temp_path.exists():
-                temp_path.unlink()
+            # Clean up temp file if not saving
+            if not args.save and output_path.exists():
+                output_path.unlink()
+            elif not args.save:
+                alt_path = build_dir / output_file_name
+                if alt_path.exists():
+                    alt_path.unlink()
 
     # Compare results
     results = compare_differences(baseline_df, current_df)
