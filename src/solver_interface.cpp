@@ -193,7 +193,7 @@ friction_and_jacobian_haaland(double Re, double e_D) {
   // coeff_reynolds/Re )
 
   // Regularized Re to avoid singularity at Re=0 and sync with base friction evaluation
-  const double re_eps = 1e-4; // highly unrestrictive floor now
+  const double re_eps = 64.0;
   double Re_eff = std::sqrt(Re * Re + re_eps * re_eps);
 
   // Isolate core logarithmic argument
@@ -239,7 +239,7 @@ friction_and_jacobian_haaland(double Re, double e_D) {
 
 CorrelationResult<std::tuple<double, double>>
 friction_and_jacobian_serghides(double Re, double e_D) {
-  const double re_eps = 1e-4;
+  const double re_eps = 64.0;
   double Re_eff = std::sqrt(Re * Re + re_eps * re_eps);
 
   // Serghides Steffensen form: 1/sqrt(f) = A - (B-A)^2 / (C - 2B + A)
@@ -318,7 +318,7 @@ friction_and_jacobian_serghides(double Re, double e_D) {
 
 CorrelationResult<std::tuple<double, double>>
 friction_and_jacobian_colebrook(double Re, double e_D) {
-  const double re_eps = 10.0;
+  const double re_eps = 64.0;
   double Re_eff = std::sqrt(Re * Re + re_eps * re_eps);
 
   // Colebrook converges internally; use Serghides as starting guess.
