@@ -15,8 +15,9 @@
 // 1/√f = -1.8 * log10( (ε/D / 3.7)^1.11 + 6.9/Re )
 // Accuracy: ~2-3% vs Colebrook
 double friction_haaland(double Re, double e_D) {
-  // Soft minimum to safeguard Colebrook/Haaland against purely valid zero-crossing Newton steps
-  Re = std::max(100.0, std::abs(Re));
+  // Smooth minimum to safeguard Colebrook/Haaland against zero-crossing Newton
+  // steps while maintaining continuous derivatives (min ~64 for laminar bound)
+  Re = std::sqrt(Re * Re + 64.0 * 64.0);
   if (e_D < 0.0) {
     throw std::invalid_argument("friction_haaland: e_D must be non-negative");
   }
@@ -36,17 +37,21 @@ double friction_haaland(double Re, double e_D) {
 // 1/√f = A - (B-A)² / (C - 2B + A)
 // Accuracy: <0.3% vs Colebrook
 double friction_serghides(double Re, double e_D) {
-  // Soft minimum to safeguard Colebrook/Haaland against purely valid zero-crossing Newton steps
-  Re = std::max(100.0, std::abs(Re));
+  // Smooth minimum to safeguard Colebrook/Haaland against zero-crossing Newton
+  // steps while maintaining continuous derivatives (min ~64 for laminar bound)
+  Re = std::sqrt(Re * Re + 64.0 * 64.0);
   if (e_D < 0.0) {
     throw std::invalid_argument("friction_serghides: e_D must be non-negative");
   }
 
   // Note: In Serghides, A/B/C are successive approximations to 1/√f
   // The term 2.51*A/Re corresponds to 2.51/(Re*√f) when √f ≈ 1/A
-  double A = -2.0 * std::log10(e_D / serghides::coeff_roughness + serghides::coeff_reynolds_A / Re);
-  double B = -2.0 * std::log10(e_D / serghides::coeff_roughness + serghides::coeff_reynolds_BC * A / Re);
-  double C = -2.0 * std::log10(e_D / serghides::coeff_roughness + serghides::coeff_reynolds_BC * B / Re);
+  double A = -2.0 * std::log10(e_D / serghides::coeff_roughness +
+                               serghides::coeff_reynolds_A / Re);
+  double B = -2.0 * std::log10(e_D / serghides::coeff_roughness +
+                               serghides::coeff_reynolds_BC * A / Re);
+  double C = -2.0 * std::log10(e_D / serghides::coeff_roughness +
+                               serghides::coeff_reynolds_BC * B / Re);
 
   double denom = C - 2.0 * B + A;
 
@@ -64,8 +69,9 @@ double friction_serghides(double Re, double e_D) {
 // 1/√f = -2 * log10( ε/D/3.7 + 2.51/(Re*√f) )
 // Uses Serghides as initial guess, Newton-Raphson iteration.
 double friction_colebrook(double Re, double e_D, double tol, int max_iter) {
-  // Soft minimum to safeguard Colebrook/Haaland against purely valid zero-crossing Newton steps
-  Re = std::max(100.0, std::abs(Re));
+  // Smooth minimum to safeguard Colebrook/Haaland against zero-crossing Newton
+  // steps while maintaining continuous derivatives (min ~64 for laminar bound)
+  Re = std::sqrt(Re * Re + 64.0 * 64.0);
   if (e_D < 0.0) {
     throw std::invalid_argument("friction_colebrook: e_D must be non-negative");
   }
@@ -81,7 +87,8 @@ double friction_colebrook(double Re, double e_D, double tol, int max_iter) {
   double x = 1.0 / std::sqrt(f);
 
   for (int iter = 0; iter < max_iter; ++iter) {
-    double arg = e_D / serghides::coeff_roughness + serghides::coeff_reynolds_BC * x / Re;
+    double arg = e_D / serghides::coeff_roughness +
+                 serghides::coeff_reynolds_BC * x / Re;
     double F = x + 2.0 * std::log10(arg);
 
     // dF/dx = 1 + 2/(ln10 * arg) * d(arg)/dx

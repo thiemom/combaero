@@ -339,18 +339,19 @@ results = solver.solve(timeout=5.0)
 ```python
 from combaero.network import (
     PressureBoundary, MassFlowBoundary, PlenumNode,
-    CombustorNode, MomentumChamberNode, EnergyBoundary
+    CombustorNode, MomentumChamberNode, MomentumBoundary, EnergyBoundary
 )
 
 # Boundary conditions
 inlet = PressureBoundary("inlet", P_total=2e5, T_total=300)
 outlet = PressureBoundary("outlet", P_total=1e5, T_total=300)
 mass_in = MassFlowBoundary("mass_in", m_dot=0.1, T_total=400, Y=air)
+mom_in = MomentumBoundary("mom_in", P_total=2e5, T_total=300, area=1e-4)
 
 # Internal nodes
 junction = PlenumNode("junction", P=1.5e5, T=350, Y=air)
 combustor = CombustorNode("combustor", P=2e5, T=1800, Y=products)
-momentum = MomentumChamberNode("momentum", P=2e5, T=1800, Y=products)
+momentum = MomentumChamberNode("momentum", P=2e5, T=1800, Y=products, regime="compressible")
 energy = EnergyBoundary("energy", Q=50000)  # Heat addition [W]
 ```
 

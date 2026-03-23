@@ -192,8 +192,8 @@ friction_and_jacobian_haaland(double Re, double e_D) {
   // 1/sqrt(f) = coeff_outer * log10( (e_D/coeff_roughness)^coeff_exponent +
   // coeff_reynolds/Re )
 
-  // Regularized Re to avoid singularity at Re=0
-  const double re_eps = 10.0;
+  // Regularized Re to avoid singularity at Re=0 and sync with base friction evaluation
+  const double re_eps = 64.0;
   double Re_eff = std::sqrt(Re * Re + re_eps * re_eps);
 
   // Isolate core logarithmic argument
@@ -201,42 +201,45 @@ friction_and_jacobian_haaland(double Re, double e_D) {
   double b = haaland::coeff_reynolds / Re_eff;
   double arg = a + b;
 
-  // 1/sqrt(f)
+  // 1/sqrt(f) for turbulent branch
   double inv_sqrt_f = haaland::coeff_outer * std::log10(arg);
 
-  // f = [ coeff_outer * log10( (e_D/coeff_roughness)^coeff_exponent +
-  // coeff_reynolds/Re ) ]^(-2)
-  double f = 1.0 / (inv_sqrt_f * inv_sqrt_f);
-
-  // Analytical derivative via chain rule:
-  // d(f)/d(Re)
-  // Let U = inv_sqrt_f = coeff_outer * log10(arg) = (coeff_outer / ln(10)) *
-  // ln(arg) f = U^(-2) df/dU = -2 * U^(-3)
-  //
-  // dU/dRe = dU/d(arg) * d(arg)/dRe
-  // dU/d(arg) = (coeff_outer / ln(10)) * (1 / arg)
-  // d(arg)/dRe = -coeff_reynolds / Re^2
-  //
-  // Combining:
-  // df/dRe = (-2 * U^(-3)) * (coeff_outer / (ln(10) * arg)) * (-coeff_reynolds
-  // / Re^2)
-
+  // Analytical derivative via chain rule for turbulent branch:
+  // Let U = inv_sqrt_f = coeff_outer * log10(arg) = (coeff_outer / ln(10)) * ln(arg)
   double dU_darg = haaland::coeff_outer / (M_LN10 * arg);
-  // d(arg)/dRe = d(arg)/dRe_eff * dRe_eff/dRe
-  // dRe_eff/dRe = Re / Re_eff
-  double darg_dRe = (-haaland::coeff_reynolds / (Re_eff * Re_eff)) * (Re / Re_eff);
-
+  // d(arg)/dRe_eff = -coeff_reynolds / Re_eff^2
+  double darg_dRe_eff = -haaland::coeff_reynolds / (Re_eff * Re_eff);
+  double dRe_eff_dRe = Re / Re_eff;
+  double darg_dRe = darg_dRe_eff * dRe_eff_dRe;
   double dU_dRe = dU_darg * darg_dRe;
-  double df_dU = -2.0 / (inv_sqrt_f * inv_sqrt_f * inv_sqrt_f);
 
-  double jacobian = df_dU * dU_dRe;
+  // Laminar branch
+  double f_lam = 64.0 / Re_eff;
+  double df_lam_dRe = (-64.0 / (Re_eff * Re_eff)) * dRe_eff_dRe;
+
+  // Turbulent branch (Haaland)
+  double f_turb = 1.0 / (inv_sqrt_f * inv_sqrt_f);
+  double df_turb_dU = -2.0 / (inv_sqrt_f * inv_sqrt_f * inv_sqrt_f);
+  double df_turb_dRe = df_turb_dU * dU_dRe;
+
+  // Blending function
+  double w_arg = (Re_eff - 2300.0) / 400.0;
+  double w = 0.5 * (1.0 + std::tanh(w_arg));
+  double dw_dRe_eff = 0.5 * (1.0 - std::tanh(w_arg) * std::tanh(w_arg)) / 400.0;
+  double dw_dRe = dw_dRe_eff * dRe_eff_dRe;
+
+  // Blended friction
+  double f = (1.0 - w) * f_lam + w * f_turb;
+
+  // Blended Jacobian (Product Rule)
+  double jacobian = (1.0 - w) * df_lam_dRe + w * df_turb_dRe + dw_dRe * (f_turb - f_lam);
 
   return {{f, jacobian}, CorrelationValidity::VALID, ""};
 }
 
 CorrelationResult<std::tuple<double, double>>
 friction_and_jacobian_serghides(double Re, double e_D) {
-  const double re_eps = 10.0;
+  const double re_eps = 64.0;
   double Re_eff = std::sqrt(Re * Re + re_eps * re_eps);
 
   // Serghides Steffensen form: 1/sqrt(f) = A - (B-A)^2 / (C - 2B + A)
@@ -260,7 +263,6 @@ friction_and_jacobian_serghides(double Re, double e_D) {
   double denom = C - 2.0 * B + A;
   double inv_sqrt_f =
       (std::abs(denom) < 1e-30) ? C : A - (B - A) * (B - A) / denom;
-  double f = 1.0 / (inv_sqrt_f * inv_sqrt_f);
 
   // Analytical derivative via chain rule through A, B, C, inv_sqrt_f, f.
   // dA/dRe = (2 / (ln10 * argA)) * (cA / Re^2)
@@ -291,17 +293,32 @@ friction_and_jacobian_serghides(double Re, double e_D) {
         dA_dRe - (2.0 * BmA * d_BmA_dRe * denom - BmA * BmA * d_denom_dRe) /
                      (denom * denom);
   }
+  // Laminar branch
+  double f_lam = 64.0 / Re_eff;
+  double df_lam_dRe = (-64.0 / (Re_eff * Re_eff)) * dRe_eff_dRe;
 
-  // f = inv_sqrt_f^(-2)  => df/dRe = -2 * inv_sqrt_f^(-3) * d_inv_sqrt_f_dRe
-  double jacobian =
-      (-2.0 / (inv_sqrt_f * inv_sqrt_f * inv_sqrt_f)) * d_inv_sqrt_f_dRe;
+  // Turbulent branch (Serghides)
+  double f_turb = 1.0 / (inv_sqrt_f * inv_sqrt_f);
+  double df_turb_dRe = (-2.0 / (inv_sqrt_f * inv_sqrt_f * inv_sqrt_f)) * d_inv_sqrt_f_dRe;
+
+  // Blending function
+  double w_arg = (Re_eff - 2300.0) / 400.0;
+  double w = 0.5 * (1.0 + std::tanh(w_arg));
+  double dw_dRe_eff = 0.5 * (1.0 - std::tanh(w_arg) * std::tanh(w_arg)) / 400.0;
+  double dw_dRe = dw_dRe_eff * dRe_eff_dRe;
+
+  // Blended friction
+  double f = (1.0 - w) * f_lam + w * f_turb;
+
+  // Blended Jacobian (Product Rule)
+  double jacobian = (1.0 - w) * df_lam_dRe + w * df_turb_dRe + dw_dRe * (f_turb - f_lam);
 
   return {{f, jacobian}, CorrelationValidity::VALID, ""};
 }
 
 CorrelationResult<std::tuple<double, double>>
 friction_and_jacobian_colebrook(double Re, double e_D) {
-  const double re_eps = 10.0;
+  const double re_eps = 64.0;
   double Re_eff = std::sqrt(Re * Re + re_eps * re_eps);
 
   // Colebrook converges internally; use Serghides as starting guess.

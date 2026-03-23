@@ -1,314 +1,309 @@
 import math
 import time
 
-import numpy as np
-
 import combaero as cb
 from combaero.network import FlowNetwork, NetworkSolver
 from combaero.network.components import (
+    CombustorNode,
+    ConvectiveSurface,
     MassFlowBoundary,
     MomentumChamberNode,
     OrificeElement,
     PipeElement,
+    PlenumNode,
     PressureBoundary,
+    SmoothModel,
+    WallConnection,
 )
 
-net = FlowNetwork()
 
-# Inlet
-X_air = cb.humid_air_composition(288.16, 101325, 0.6)
-Y_air = cb.mole_to_mass(X_air)
-m_dot_air = 1.4 * 10
-T_air = 560.0
-inlet = MassFlowBoundary("inlet", m_dot=m_dot_air, T_total=T_air, Y=Y_air)
+def build_and_solve_network(
+    m_dot_air, T_ad, n_serial, n_parallel, total_area, total_ht_area, timeout=120, maxfev=10000
+):
+    T_air = 560.0
+    P_ref = 101325.0  # Standard reference pressure for initial stream properties
+    X_air = cb.humid_air_composition(288.16, P_ref, 0.6)
+    Y_air = cb.mole_to_mass(X_air)
 
-# Outlet
-outlet = PressureBoundary("outlet", P_total=101325.0, T_total=300.0, Y=Y_air)
+    Y_fuel = [0.0] * cb.num_species()
+    Y_fuel[cb.species_index_from_name("H2")] = 1.0
+    X_fuel = cb.mass_to_mole(Y_fuel)
 
-# Orifices
-Cd = 0.8
-d = 21.0  # mm
-A = 0.25 * np.pi * (d / 1000) ** 2
-orifice = OrificeElement("orifice", "outlet", "outlet", Cd=Cd, area=A)  # temp connection, will fix
+    air_stream = cb.Stream()
+    air_stream.set_T(T_air).set_P(P_ref).set_X(X_air).set_mdot(m_dot_air)
 
-# Pipe parameters
-L_pipe = 0.1
-D_pipe = 50e-3
-A_pipe = 0.25 * np.pi * D_pipe**2
+    fuel_stream = cb.Stream()
+    fuel_stream.set_T(300.0).set_P(P_ref).set_X(X_fuel)
 
-# Network topology
-n_series = 10
-n_parallel = 10
+    fuel_stream = cb.set_fuel_stream_for_Tad(T_ad, fuel_stream, air_stream)
+    m_dot_fuel = fuel_stream.mdot
 
-# Build pipe and chamber grids with string references
-pipe_grid = {}
-chamber_grid = {}
-orifice_grid = {}
-for i in range(n_series):
-    for j in range(n_parallel):
-        # For series-parallel grid: each chamber connects to the next one in same branch
-        from_node = "inlet" if i == 0 else f"momentum_chamber_{i - 1}_{j}"
-        to_node = f"momentum_chamber_{i}_{j}"
-        pipe_grid[(i, j)] = PipeElement(
-            f"pipe_{i}_{j}", from_node, to_node, length=L_pipe, diameter=D_pipe, roughness=2e-5
+    net = FlowNetwork()
+
+    inlet_air = MassFlowBoundary("inlet_air", m_dot=m_dot_air, T_total=T_air, Y=Y_air)
+    inlet_fuel = MassFlowBoundary("inlet_fuel", m_dot=m_dot_fuel, T_total=300.0, Y=Y_fuel)
+    outlet = PressureBoundary("outlet", P_total=101325.0, T_total=300.0, Y=Y_air)
+
+    net.add_node(inlet_air)
+    net.add_node(inlet_fuel)
+    net.add_node(outlet)
+
+    distributor = PlenumNode("distributor")
+    collector = PlenumNode("collector")
+    net.add_node(distributor)
+    net.add_node(collector)
+
+    net.add_element(
+        OrificeElement(
+            "ori_air_in", "inlet_air", "distributor", Cd=0.8, area=total_area, regime="compressible"
         )
-        chamber_grid[(i, j)] = MomentumChamberNode(f"momentum_chamber_{i}_{j}", area=A_pipe)
-
-# Create orifices - one for each parallel branch
-for j in range(n_parallel):
-    last_chamber_in_branch = f"momentum_chamber_{n_series - 1}_{j}"
-    orifice_grid[(j)] = OrificeElement(
-        f"orifice_{j}", last_chamber_in_branch, "outlet", Cd=Cd, area=A
     )
 
-# Now create all the nodes referenced in elements
-net.add_node(inlet)
-net.add_node(outlet)
+    A_branch = total_area / n_parallel
+    D_branch = math.sqrt(4 * A_branch / math.pi)
 
-# Create momentum chambers
-for chamber in chamber_grid.values():
-    net.add_node(chamber)
+    A_ht_pipe = (total_ht_area / n_parallel) / max(1, n_serial)
+    L_pipe = 1.0
 
-# Add all elements
-for pipe in pipe_grid.values():
-    net.add_element(pipe)
-for orifice in orifice_grid.values():
-    net.add_element(orifice)
-
-print(f"Network built: {len(net.nodes)} nodes, {len(net.elements)} elements")
-print(f"Node IDs: {list(net.nodes.keys())}")
-print(f"Element IDs: {list(net.elements.keys())}")
-
-# Solver options for tweaking SciPy parameters
-# Valid options vary by method:
-# 'hybr': maxfev, xtol, factor
-# 'lm': maxfev, xtol, ftol
-# 'broyden1': maxfev, xtol, ftol, gtol, alpha, reduce_method, max_step
-solver_options = {
-    "maxfev": 5000,  # More evaluations for large network
-    "xtol": 1e-4,  # Relaxed tolerance for faster convergence
-    "ftol": 1e-8,  # Function tolerance (lm method)
-}
-solver_method = "lm"
-solver_timeout = 120
-
-# Test the network
-try:
-    solver = NetworkSolver(net)
-
-    # Start wall time measurement
-    start_time = time.time()
-    result = solver.solve(method=solver_method, timeout=solver_timeout, options=solver_options)
-    end_time = time.time()
-
-    wall_time = end_time - start_time
-    print(f"Wall time: {wall_time:.2f} seconds")
-    print(f"Solver success: {result.get('__success__', False)}")
-    print(f"Message: {result.get('__message__', '')}")
-    print(f"Final norm: {result.get('__final_norm__', 'N/A')}")
-
-    # Always print diagnostics
-    print("\n=== Diagnostics ===")
-
-    # Inlet pressure
-    inlet_P = result.get("inlet.P_total", float("nan"))
-    inlet_P_static = result.get("inlet.P", float("nan"))
-    print(f"Inlet P_total: {inlet_P / 1e5:.3f} bar")
-    print(f"Inlet P_static: {inlet_P_static / 1e5:.3f} bar")
-
-    # Mach numbers in pipes
-    mach_numbers = []
-    print(f"Debug: Checking {len(pipe_grid)} pipes...")
-
-    # Check a few sample results
-    sample_keys = list(pipe_grid.keys())[:3]
-    for i, j in sample_keys:
-        pipe_element = pipe_grid[(i, j)]
-        m_dot = result.get(f"{pipe_element.id}.m_dot", "MISSING")
-        print(f"Debug: {pipe_element.id}.m_dot = {m_dot}")
-
-    for (i, j), pipe_element in pipe_grid.items():
-        # Get mass flow and properties
-        m_dot = result.get(f"{pipe_element.id}.m_dot", float("nan"))
-        if not math.isnan(m_dot):
-            # Get upstream conditions
-            from_node_id = "inlet" if i == 0 else f"momentum_chamber_{i - 1}_{j}"
-
-            P = result.get(f"{from_node_id}.P", float("nan"))
-            T = result.get(f"{from_node_id}.T", float("nan"))
-            area = math.pi * (D_pipe / 2) ** 2
-
-            if not math.isnan(P) and not math.isnan(T) and not math.isnan(area):
-                # Calculate properties using combaero core functions
-                rho = cb.density(T, P, Y_air)
-                v = m_dot / (rho * area)
-                mach = cb.mach_number(v, T, X_air)
-                mach_numbers.append(mach)
-
-    if mach_numbers:
-        print(
-            f"Mach in pipes - Min: {min(mach_numbers):.4f}, Mean: {sum(mach_numbers) / len(mach_numbers):.4f}, Max: {max(mach_numbers):.4f}"
+    distributor_fuel = PlenumNode("distributor_fuel")
+    net.add_node(distributor_fuel)
+    net.add_element(
+        OrificeElement(
+            "ori_fuel_in",
+            "inlet_fuel",
+            "distributor_fuel",
+            Cd=0.6,
+            area=A_branch * 0.1 * n_parallel,
+            regime="compressible",
         )
-    else:
-        print("Could not calculate Mach numbers - no valid data found")
+    )
 
-    # Comprehensive post-solve property extraction
-    print("\n=== Comprehensive Property Analysis ===")
+    for p in range(n_parallel):
+        mixing = PlenumNode(f"mixing_plenum_{p}")
+        combustor = CombustorNode(f"combustor_{p}", method="complete")
+        net.add_node(mixing)
+        net.add_node(combustor)
 
-    try:
-        complete_states = solver.extract_complete_states(result)
-        print(f"Extracted CompleteState for {len(complete_states)} nodes")
-
-        # Analyze inlet conditions
-        inlet_state = complete_states.get("inlet")
-        if inlet_state is not None:
-            print("\n📊 Inlet CompleteState Analysis:")
-            print("   Thermodynamic Properties:")
-            print(f"     T: {inlet_state.thermo.T:.2f} K")
-            print(f"     P: {inlet_state.thermo.P:.0f} Pa ({inlet_state.thermo.P / 1e5:.3f} bar)")
-            print(f"     rho: {inlet_state.thermo.rho:.3f} kg/m³")
-            print(f"     cp: {inlet_state.thermo.cp:.1f} J/(kg·K)")
-            print(f"     h: {inlet_state.thermo.h:.0f} J/kg")
-            print(f"     s: {inlet_state.thermo.s:.1f} J/(kg·K)")
-            print(f"     u: {inlet_state.thermo.u:.0f} J/kg")
-            print(f"     a: {inlet_state.thermo.a:.1f} m/s")
-            print(f"     gamma: {inlet_state.thermo.gamma:.4f}")
-            print(f"     mw: {inlet_state.thermo.mw:.2f} g/mol")
-
-            print("   Transport Properties:")
-            print(f"     mu: {inlet_state.transport.mu:.2e} Pa·s")
-            print(f"     k: {inlet_state.transport.k:.4f} W/(m·K)")
-            print(f"     nu: {inlet_state.transport.nu:.2e} m²/s")
-            print(f"     alpha: {inlet_state.transport.alpha:.2e} m²/s")
-            print(f"     Pr: {inlet_state.transport.Pr:.4f}")
-
-        # Analyze outlet conditions
-        outlet_state = complete_states.get("outlet")
-        if outlet_state is not None:
-            print("\n📊 Outlet CompleteState Analysis:")
-            print(f"     T: {outlet_state.thermo.T:.2f} K")
-            print(f"     P: {outlet_state.thermo.P:.0f} Pa ({outlet_state.thermo.P / 1e5:.3f} bar)")
-            print(f"     rho: {outlet_state.thermo.rho:.3f} kg/m³")
-            print(f"     a: {outlet_state.thermo.a:.1f} m/s")
-
-        # Analyze momentum chamber distribution
-        chamber_temps = []
-        chamber_pressures = []
-        chamber_machs = []
-
-        for node_id, state in complete_states.items():
-            if node_id.startswith("momentum_chamber") and state is not None:
-                chamber_temps.append(state.thermo.T)
-                chamber_pressures.append(state.thermo.P)
-
-                # Calculate Mach for this chamber
-                # Find connected pipe to get mass flow
-                chamber_i, chamber_j = map(int, node_id.split("_")[2:])
-                pipe_id = f"pipe_{chamber_i}_{chamber_j}"
-                m_dot = result.get(f"{pipe_id}.m_dot", float("nan"))
-
-                if not math.isnan(m_dot):
-                    v = m_dot / (state.thermo.rho * area)
-                    mach = cb.mach_number(v, state.thermo.T, X_air)
-                    chamber_machs.append(mach)
-
-        if chamber_temps:
-            print(f"\n📊 Momentum Chamber Distribution ({len(chamber_temps)} chambers):")
-            print(
-                f"   Temperature: Min {min(chamber_temps):.1f} K, Max {max(chamber_temps):.1f} K, Mean {sum(chamber_temps) / len(chamber_temps):.1f} K"
+        net.add_element(
+            OrificeElement(
+                f"ori_fuel_{p}",
+                "distributor_fuel",
+                f"mixing_plenum_{p}",
+                Cd=0.6,
+                area=A_branch * 0.1,
+                regime="compressible",
             )
-            print(
-                f"   Pressure: Min {min(chamber_pressures) / 1e5:.3f} bar, Max {max(chamber_pressures) / 1e5:.3f} bar, Mean {sum(chamber_pressures) / len(chamber_pressures) / 1e5:.3f} bar"
+        )
+
+        for i in range(n_serial + 1):
+            net.add_node(MomentumChamberNode(f"cold_chamber_{p}_{i}", area=A_branch))
+            net.add_node(MomentumChamberNode(f"hot_chamber_{p}_{i}", area=A_branch))
+
+        net.add_element(
+            OrificeElement(
+                f"ori_cold_in_{p}",
+                "distributor",
+                f"cold_chamber_{p}_0",
+                Cd=0.8,
+                area=A_branch,
+                regime="compressible",
+            )
+        )
+        for i in range(n_serial):
+            net.add_element(
+                PipeElement(
+                    f"cold_pipe_{p}_{i}",
+                    f"cold_chamber_{p}_{i}",
+                    f"cold_chamber_{p}_{i + 1}",
+                    length=L_pipe,
+                    diameter=D_branch,
+                    roughness=2e-5,
+                    regime="compressible_fanno",
+                    surface=ConvectiveSurface(area=A_ht_pipe, model=SmoothModel())
+                    if A_ht_pipe > 0
+                    else None,
+                )
             )
 
-            if chamber_machs:
-                print(
-                    f"   Mach: Min {min(chamber_machs):.4f}, Max {max(chamber_machs):.4f}, Mean {sum(chamber_machs) / len(chamber_machs):.4f}"
-                )
+        net.add_element(
+            OrificeElement(
+                f"ori_comb_in_{p}",
+                f"cold_chamber_{p}_{n_serial}",
+                f"mixing_plenum_{p}",
+                Cd=0.8,
+                area=A_branch,
+                regime="compressible",
+            )
+        )
+        net.add_element(
+            OrificeElement(
+                f"ori_mix_to_comb_{p}",
+                f"mixing_plenum_{p}",
+                f"combustor_{p}",
+                Cd=0.8,
+                area=A_branch,
+                regime="compressible",
+            )
+        )
+        net.add_element(
+            OrificeElement(
+                f"ori_comb_out_{p}",
+                f"combustor_{p}",
+                f"hot_chamber_{p}_0",
+                Cd=0.8,
+                area=A_branch,
+                regime="compressible",
+            )
+        )
 
-                # Flow regime analysis
-                subsonic_count = sum(1 for m in chamber_machs if m < 1.0)
-                transonic_count = sum(1 for m in chamber_machs if 0.8 <= m <= 1.2)
-                supersonic_count = sum(1 for m in chamber_machs if m > 1.0)
-
-                print("   Flow Regimes:")
-                print(
-                    f"     Subsonic (M < 1.0): {subsonic_count} chambers ({100 * subsonic_count / len(chamber_machs):.1f}%)"
+        for i in range(n_serial):
+            net.add_element(
+                PipeElement(
+                    f"hot_pipe_{p}_{i}",
+                    f"hot_chamber_{p}_{i}",
+                    f"hot_chamber_{p}_{i + 1}",
+                    length=L_pipe,
+                    diameter=D_branch,
+                    roughness=2e-5,
+                    regime="compressible_fanno",
+                    surface=ConvectiveSurface(area=A_ht_pipe, model=SmoothModel())
+                    if A_ht_pipe > 0
+                    else None,
                 )
-                print(
-                    f"     Transonic (0.8 ≤ M ≤ 1.2): {transonic_count} chambers ({100 * transonic_count / len(chamber_machs):.1f}%)"
-                )
-                print(
-                    f"     Supersonic (M > 1.0): {supersonic_count} chambers ({100 * supersonic_count / len(chamber_machs):.1f}%)"
-                )
-
-                # Find extreme conditions
-                max_mach_idx = chamber_machs.index(max(chamber_machs))
-                min_mach_idx = chamber_machs.index(min(chamber_machs))
-
-                print("   Extreme Conditions:")
-                print(
-                    f"     Highest Mach: {max(chamber_machs):.4f} at T={chamber_temps[max_mach_idx]:.1f} K, P={chamber_pressures[max_mach_idx] / 1e5:.3f} bar"
-                )
-                print(
-                    f"     Lowest Mach: {min(chamber_machs):.4f} at T={chamber_temps[min_mach_idx]:.1f} K, P={chamber_pressures[min_mach_idx] / 1e5:.3f} bar"
-                )
-
-        # Property count verification
-        if inlet_state is not None:
-            thermo_attrs = [attr for attr in dir(inlet_state.thermo) if not attr.startswith("_")]
-            transport_attrs = [
-                attr for attr in dir(inlet_state.transport) if not attr.startswith("_")
-            ]
-            print("\n✅ CompleteState Property Access Verified:")
-            print(f"   Thermodynamic: {len(thermo_attrs)} properties")
-            print(f"   Transport: {len(transport_attrs)} properties")
-            print(f"   Total: {len(thermo_attrs) + len(transport_attrs)} properties per node")
-            print(
-                f"   Network total: {len(complete_states) * (len(thermo_attrs) + len(transport_attrs))} property calculations"
             )
 
-        # Generate diagnostic report
-        print("\n=== Diagnostic Analysis ===")
+            if A_ht_pipe > 0:
+                wall_cold_pipe_idx = n_serial - 1 - i
+                net.add_wall(
+                    WallConnection(
+                        id=f"wall_{p}_{i}",
+                        element_a=f"hot_pipe_{p}_{i}",
+                        element_b=f"cold_pipe_{p}_{wall_cold_pipe_idx}",
+                        wall_thickness=0.005,
+                        wall_conductivity=20.0,
+                        contact_area=A_ht_pipe,
+                    )
+                )
 
+        net.add_element(
+            OrificeElement(
+                f"ori_hot_out_{p}",
+                f"hot_chamber_{p}_{n_serial}",
+                "collector",
+                Cd=0.8,
+                area=A_branch,
+                regime="compressible",
+            )
+        )
+
+    net.add_element(
+        OrificeElement(
+            "ori_exhaust", "collector", "outlet", Cd=0.8, area=total_area, regime="compressible"
+        )
+    )
+
+    solver_options = {
+        "maxfev": maxfev,
+        "xtol": 1e-4,
+        "ftol": 1e-6,
+    }
+
+    solver = NetworkSolver(net)
+    start_time = time.time()
+    result = solver.solve(
+        method="lm",
+        timeout=timeout,
+        options=solver_options,
+        init_strategy="incompressible_warmstart",
+    )
+    wall_time = time.time() - start_time
+
+    complete_states = solver.extract_complete_states(result)
+    max_hot_mach = 0.0
+
+    for p in range(n_parallel):
+        for i in range(n_serial + 1):
+            m_dot = result.get(f"ori_hot_out_{p}.m_dot", float("nan"))
+            state = complete_states.get(f"hot_chamber_{p}_{i}")
+            if state and not math.isnan(m_dot):
+                v = m_dot / (state.thermo.rho * A_branch)
+                mach = v / state.thermo.a
+                max_hot_mach = max(max_hot_mach, mach)
+
+    return {
+        "success": result.get("__success__", False),
+        "message": result.get("__message__", ""),
+        "time": wall_time,
+        "n_nodes": len(net.nodes),
+        "n_elems": len(net.elements),
+        "P_inlet_air": result.get("inlet_air.P_total", float("nan")) / 1e5,
+        "T_comb": result.get("combustor_0.T_total", float("nan")),
+        "T_hot_out": result.get("collector.T_total", float("nan")),
+        "max_hot_mach": max_hot_mach,
+        "residual": result.get("__f_norm__", float("nan")),
+    }
+
+
+def print_result(params, res):
+    s = "PASS" if res["success"] else "FAIL"
+    print(
+        f"{s} | m={params['m_dot_air']:4.1f} nP={params['n_parallel']} nS={params['n_serial']} HT={params['total_ht_area']:4.0f} Tad={params['T_ad']:4.0f} | "
+        + f"t={res['time']:5.1f}s P_in={res['P_inlet_air']:5.1f}b Tcmb={res['T_comb']:6.1f}K Thout={res['T_hot_out']:6.1f}K Mach={res['max_hot_mach']:4.2f}"
+    )
+
+
+def main():
+    total_area = 0.25 * math.pi * (0.8) ** 2  # Even safer Mach numbers, max total diameter 0.8m
+    tests = [
+        {"m_dot_air": 10.0, "T_ad": 1700.0, "n_parallel": 1, "n_serial": 1, "total_ht_area": 50.0},
+        {"m_dot_air": 10.0, "T_ad": 1700.0, "n_parallel": 2, "n_serial": 1, "total_ht_area": 50.0},
+        {"m_dot_air": 10.0, "T_ad": 1700.0, "n_parallel": 1, "n_serial": 5, "total_ht_area": 50.0},
+        {"m_dot_air": 10.0, "T_ad": 1700.0, "n_parallel": 2, "n_serial": 5, "total_ht_area": 50.0},
+        {"m_dot_air": 20.0, "T_ad": 1700.0, "n_parallel": 2, "n_serial": 2, "total_ht_area": 50.0},
+        {"m_dot_air": 20.0, "T_ad": 2200.0, "n_parallel": 2, "n_serial": 2, "total_ht_area": 50.0},
+        {
+            "m_dot_air": 10.0,
+            "T_ad": 1700.0,
+            "n_parallel": 1,
+            "n_serial": 10,
+            "total_ht_area": 100.0,
+        },
+        {"m_dot_air": 10.0, "T_ad": 1700.0, "n_parallel": 4, "n_serial": 4, "total_ht_area": 100.0},
+        {
+            "m_dot_air": 10.0,
+            "T_ad": 1700.0,
+            "n_parallel": 10,
+            "n_serial": 10,
+            "total_ht_area": 200.0,
+        },
+        {
+            "m_dot_air": 10.0,
+            "T_ad": 1700.0,
+            "n_parallel": 20,
+            "n_serial": 5,
+            "total_ht_area": 200.0,
+        },
+        {
+            "m_dot_air": 10.0,
+            "T_ad": 1700.0,
+            "n_parallel": 5,
+            "n_serial": 20,
+            "total_ht_area": 200.0,
+        },
+    ]
+
+    print(f"--- Running Combustor Full Coupling Limits ({len(tests)} cases) ---")
+    for params in tests:
         try:
-            diagnostic_report = solver.get_diagnostic_report()
-
-            # Print summary
-            from combaero.network.diagnostics import (
-                create_grid_heatmaps,
-                export_diagnostic_report,
-                print_diagnostic_summary,
-            )
-
-            print_diagnostic_summary(diagnostic_report)
-
-            # Export JSON report
-            export_diagnostic_report(
-                diagnostic_report, "diagnostic_reports/grid_network_report.json"
-            )
-
-            # Create grid heatmaps
-            create_grid_heatmaps(solver, diagnostic_report, "diagnostic_plots")
-
-            print("\n✅ Diagnostic analysis complete!")
-            print("   JSON report: diagnostic_reports/grid_network_report.json")
-            print("   Heatmaps: diagnostic_plots/")
-
+            res = build_and_solve_network(**params, total_area=total_area, timeout=300)
+            print_result(params, res)
+            if not res["success"]:
+                print(f"    FAIL REASON: {res['message']}")
         except Exception as e:
-            print(f"Diagnostic error: {e}")
-            import traceback
+            print(
+                f"ERROR | m={params['m_dot_air']:4.1f} nP={params['n_parallel']} nS={params['n_serial']} HT={params['total_ht_area']:4.0f} Tad={params['T_ad']:4.0f} | Exception: {str(e)}"
+            )
 
-            traceback.print_exc()
 
-    except Exception as e:
-        print(f"Property extraction error: {e}")
-        import traceback
-
-        traceback.print_exc()
-
-except Exception as e:
-    print(f"Error: {e}")
-    import traceback
-
-    traceback.print_exc()
+if __name__ == "__main__":
+    main()
