@@ -30,12 +30,12 @@ from combaero import FlowSolution
 
 def air() -> tuple:
     """Return (T, P, X) for dry air at 400 K, 2 bar — subsonic Fanno regime."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     return 400.0, 200_000.0, X
 
 
 def air_300() -> tuple:
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     return 300.0, 101_325.0, X
 
 

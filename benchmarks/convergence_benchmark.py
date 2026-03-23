@@ -32,8 +32,8 @@ _T_COLD = 320.0
 _P_OUT = 2.0e5
 
 def _build_fully_coupled_network(mach_target: float) -> FlowNetwork:
-    x_air = cb.standard_dry_air_composition()
-    y_air = list(cb.mole_to_mass(x_air))
+    x_air = cb.species.dry_air()
+    y_air = list(cb.species.dry_air_mass)
 
     t_hot = _T_HOT
     t_cold = _T_COLD
@@ -58,9 +58,9 @@ def _build_fully_coupled_network(mach_target: float) -> FlowNetwork:
     hot_surface = ConvectiveSurface(area=np.pi * d_hot * length, model=SmoothModel())
     cold_surface = ConvectiveSurface(area=np.pi * d_cold * length, model=SmoothModel())
 
-    net.add_element(PipeElement(id="hot_pipe", from_node="hot_inlet", to_node="hot_plenum", length=length, diameter=d_hot, roughness=5.0e-5, regime="compressible_fanno", surface=hot_surface))
+    net.add_element(PipeElement(id="hot_pipe", from_node="hot_inlet", to_node="hot_plenum", length=length, diameter=d_hot, roughness=5.0e-5, regime="compressible", surface=hot_surface))
     net.add_element(OrificeElement(id="hot_orifice", from_node="hot_plenum", to_node="hot_outlet", Cd=0.72, area=_area(0.030), regime="compressible"))
-    net.add_element(PipeElement(id="cold_pipe", from_node="cold_inlet", to_node="cold_plenum", length=length, diameter=d_cold, roughness=5.0e-5, regime="compressible_fanno", surface=cold_surface))
+    net.add_element(PipeElement(id="cold_pipe", from_node="cold_inlet", to_node="cold_plenum", length=length, diameter=d_cold, roughness=5.0e-5, regime="compressible", surface=cold_surface))
     net.add_element(OrificeElement(id="cold_orifice", from_node="cold_plenum", to_node="cold_outlet", Cd=0.72, area=_area(0.025), regime="compressible"))
 
     net.add_wall(WallConnection(id="coupling_wall", element_a="hot_pipe", element_b="cold_pipe", wall_thickness=0.002, wall_conductivity=20.0))

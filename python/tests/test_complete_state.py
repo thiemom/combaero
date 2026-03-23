@@ -17,7 +17,7 @@ class TestCompleteStateStructure:
 
     def test_complete_state_has_nested_states(self):
         """Verify CompleteState has thermo and transport attributes."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         state = cb.complete_state(T=300, P=101325, X=X)
 
         # Check nested states exist
@@ -26,7 +26,7 @@ class TestCompleteStateStructure:
 
     def test_thermo_state_has_all_attributes(self):
         """Verify nested ThermoState has all 16 properties."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         state = cb.complete_state(T=300, P=101325, X=X)
 
         # Check all thermo attributes
@@ -49,7 +49,7 @@ class TestCompleteStateStructure:
 
     def test_transport_state_has_all_attributes(self):
         """Verify nested TransportState has all 9 properties."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         state = cb.complete_state(T=300, P=101325, X=X)
 
         # Check all transport attributes
@@ -65,7 +65,7 @@ class TestCompleteStateStructure:
 
     def test_complete_state_readonly(self):
         """Verify CompleteState attributes are read-only."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         state = cb.complete_state(T=300, P=101325, X=X)
 
         # Attempt to modify should raise AttributeError
@@ -77,7 +77,7 @@ class TestCompleteStateStructure:
 
     def test_complete_state_repr(self):
         """Verify CompleteState has nice __repr__."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         state = cb.complete_state(T=300, P=101325, X=X)
 
         repr_str = repr(state)
@@ -91,7 +91,7 @@ class TestConsistencyWithIndividualFunctions:
 
     def test_thermo_matches_thermo_state(self):
         """Verify state.thermo matches thermo_state() call."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         T = 300
         P = 101325
 
@@ -113,7 +113,7 @@ class TestConsistencyWithIndividualFunctions:
 
     def test_transport_matches_transport_state(self):
         """Verify state.transport matches transport_state() call."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         T = 300
         P = 101325
 
@@ -137,7 +137,7 @@ class TestVariousCompositions:
 
     def test_dry_air(self):
         """Test with standard dry air."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         T = 300
         P = 101325
         state = cb.complete_state(T=T, P=P, X=X)
@@ -183,7 +183,7 @@ class TestVariousConditions:
 
     def test_ambient_conditions(self):
         """Test at ambient conditions (20 degC, 1 atm)."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         T = 293.15
         P = 101325
         state = cb.complete_state(T=T, P=P, X=X)
@@ -197,7 +197,7 @@ class TestVariousConditions:
 
     def test_high_temperature(self):
         """Test at high temperature (combustor conditions)."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         T = 1500
         P = 101325
         state = cb.complete_state(T=T, P=P, X=X)
@@ -211,7 +211,7 @@ class TestVariousConditions:
 
     def test_high_pressure(self):
         """Test at high pressure (compressor discharge)."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         T = 600
         P = 2e6
         state = cb.complete_state(T=T, P=P, X=X)
@@ -229,7 +229,7 @@ class TestReferencePresssure:
 
     def test_default_reference_pressure(self):
         """Test with default reference pressure (1 atm)."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         state = cb.complete_state(T=300, P=101325, X=X)
 
         # Should match thermo_state with default P_ref
@@ -238,7 +238,7 @@ class TestReferencePresssure:
 
     def test_custom_reference_pressure(self):
         """Test with custom reference pressure."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         P_ref = 200000.0
         state = cb.complete_state(T=300, P=101325, X=X, P_ref=P_ref)
 
@@ -252,21 +252,21 @@ class TestConsistencyBetweenNestedStates:
 
     def test_temperature_matches(self):
         """Verify T is same in both nested states."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         state = cb.complete_state(T=300, P=101325, X=X)
 
         assert state.thermo.T == state.transport.T
 
     def test_pressure_matches(self):
         """Verify P is same in both nested states."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         state = cb.complete_state(T=300, P=101325, X=X)
 
         assert state.thermo.P == state.transport.P
 
     def test_density_matches(self):
         """Verify rho is same in both nested states."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         state = cb.complete_state(T=300, P=101325, X=X)
 
         assert state.thermo.rho == pytest.approx(state.transport.rho, rel=1e-15)
@@ -277,25 +277,25 @@ class TestEdgeCases:
 
     def test_zero_temperature_raises_error(self):
         """Verify zero temperature raises error."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         with pytest.raises(ValueError):
             cb.complete_state(T=0, P=101325, X=X)
 
     def test_negative_temperature_raises_error(self):
         """Verify negative temperature raises error."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         with pytest.raises(ValueError):
             cb.complete_state(T=-100, P=101325, X=X)
 
     def test_zero_pressure_raises_error(self):
         """Verify zero pressure raises error."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         with pytest.raises(ValueError):
             cb.complete_state(T=300, P=0, X=X)
 
     def test_negative_pressure_raises_error(self):
         """Verify negative pressure raises error."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         with pytest.raises(ValueError):
             cb.complete_state(T=300, P=-101325, X=X)
 

@@ -13,8 +13,7 @@ from __future__ import annotations
 
 import numpy as np
 
-import combaero as ca
-from combaero.species import SpeciesLocator
+import combaero as cb
 
 
 def main() -> None:
@@ -31,9 +30,9 @@ def main() -> None:
 
     # Circular pipe
     D_pipe = 0.1  # Diameter [m]
-    A_pipe = ca.pipe_area(D_pipe)  # Use pipe_area helper
+    A_pipe = cb.pipe_area(D_pipe)  # Use pipe_area helper
     P_pipe = np.pi * D_pipe
-    Dh_pipe = ca.hydraulic_diameter(A_pipe, P_pipe)
+    Dh_pipe = cb.hydraulic_diameter(A_pipe, P_pipe)
 
     print("\nCircular pipe:")
     print(f"  Diameter:           D = {D_pipe * 1000:.1f} mm")
@@ -44,7 +43,7 @@ def main() -> None:
 
     # Square duct
     a = 0.1  # Side length [m]
-    Dh_square = ca.hydraulic_diameter_rect(a, a)
+    Dh_square = cb.hydraulic_diameter_rect(a, a)
 
     print("\nSquare duct:")
     print(f"  Side length:        a = {a * 1000:.1f} mm")
@@ -54,7 +53,7 @@ def main() -> None:
     # Rectangular duct
     a_rect = 0.2  # Width [m]
     b_rect = 0.1  # Height [m]
-    Dh_rect = ca.hydraulic_diameter_rect(a_rect, b_rect)
+    Dh_rect = cb.hydraulic_diameter_rect(a_rect, b_rect)
 
     print("\nRectangular duct:")
     print(f"  Width:              a = {a_rect * 1000:.1f} mm")
@@ -65,7 +64,7 @@ def main() -> None:
     # Annular duct
     D_outer = 0.15  # Outer diameter [m]
     D_inner = 0.10  # Inner diameter [m]
-    Dh_annulus = ca.hydraulic_diameter_annulus(D_outer, D_inner)
+    Dh_annulus = cb.hydraulic_diameter_annulus(D_outer, D_inner)
 
     print("\nAnnular duct:")
     print(f"  Outer diameter:     D_o = {D_outer * 1000:.1f} mm")
@@ -83,14 +82,14 @@ def main() -> None:
     # Reactor geometry
     D = 0.2  # Diameter [m]
     L = 2.0  # Length [m]
-    V = ca.pipe_volume(D, L)  # Use pipe_volume helper
+    V = cb.pipe_volume(D, L)  # Use pipe_volume helper
 
     # Flow conditions
     Q = 0.01  # Volumetric flow rate [m3/s]
 
     # Calculate residence time
-    tau = ca.residence_time(V, Q)
-    SV = ca.space_velocity(Q, V)
+    tau = cb.residence_time(V, Q)
+    SV = cb.space_velocity(Q, V)
 
     print("\nReactor geometry:")
     print(f"  Diameter:        D = {D * 1000:.0f} mm")
@@ -118,15 +117,15 @@ def main() -> None:
     mdot = 0.5  # Mass flow rate [kg/s]
     T = 300.0  # Temperature [K]
     P = 101325.0  # Pressure [Pa]
-    X_air = ca.standard_dry_air_composition()
-    rho = ca.density(T, P, X_air)
+    X_air = cb.species.dry_air()
+    rho = cb.density(T, P, X_air)
 
     # Calculate residence time
-    tau_mdot = ca.residence_time_mdot(V, mdot, rho)
+    tau_mdot = cb.residence_time_mdot(V, mdot, rho)
 
     # Also calculate from volumetric flow for comparison
     Q = mdot / rho
-    tau_Q = ca.residence_time(V, Q)
+    tau_Q = cb.residence_time(V, Q)
 
     print(f"\nReactor volume:  V = {V * 1000:.1f} L")
     print("\nAir flow:")
@@ -154,23 +153,23 @@ def main() -> None:
     phi_comb = 0.6  # Lean primary zone
 
     # Build burned gas composition for realistic density
-    sp = SpeciesLocator.from_core()
-    X_air_c = ca.standard_dry_air_composition()
-    X_ch4 = sp.empty()
-    X_ch4[sp.indices["CH4"]] = 1.0
 
-    air_c = ca.Stream()
+    X_air_c = cb.species.dry_air()
+    X_ch4 = cb.species.empty()
+    X_ch4[cb.species.indices["CH4"]] = 1.0
+
+    air_c = cb.Stream()
     air_c.T, air_c.P, air_c.X, air_c.mdot = 700.0, P_comb, X_air_c, mdot_air
 
-    fuel_c = ca.Stream()
+    fuel_c = cb.Stream()
     fuel_c.T, fuel_c.P, fuel_c.X = 300.0, P_comb, X_ch4
 
-    fuel_c = ca.set_fuel_stream_for_phi(phi_comb, fuel_c, air_c)
-    mixed_c = ca.mix([fuel_c, air_c])
-    burned_c = ca.complete_combustion(mixed_c.T, mixed_c.X, mixed_c.P)
+    fuel_c = cb.set_fuel_stream_for_phi(phi_comb, fuel_c, air_c)
+    mixed_c = cb.mix([fuel_c, air_c])
+    burned_c = cb.complete_combustion(mixed_c.T, mixed_c.X, mixed_c.P)
 
     mdot_total = mixed_c.mdot
-    rho = ca.density(burned_c.T, P_comb, burned_c.X)
+    rho = cb.density(burned_c.T, P_comb, burned_c.X)
 
     # Calculate required volume
     V_required = tau_target * mdot_total / rho
@@ -184,7 +183,7 @@ def main() -> None:
     L_required = V_required / A_annular
 
     # Hydraulic diameter
-    Dh = ca.hydraulic_diameter_annulus(D_outer, D_inner)
+    Dh = cb.hydraulic_diameter_annulus(D_outer, D_inner)
 
     print("\nDesign requirements:")
     print(f"  Target residence time: tau = {tau_target * 1000:.1f} ms")
@@ -208,7 +207,7 @@ def main() -> None:
     print(f"  Required length:       L = {L_required * 1000:.0f} mm")
 
     # Verify
-    tau_actual = ca.residence_time_mdot(V_required, mdot_total, rho)
+    tau_actual = cb.residence_time_mdot(V_required, mdot_total, rho)
     print(f"  Actual residence time: tau = {tau_actual * 1000:.2f} ms OK")
 
     # =========================================================================
@@ -224,8 +223,8 @@ def main() -> None:
     # Air properties
     T = 300.0
     P = 101325.0
-    X_air = ca.standard_dry_air_composition()
-    rho = ca.density(T, P, X_air)
+    X_air = cb.species.dry_air()
+    rho = cb.density(T, P, X_air)
 
     print(f"\nFixed reactor volume: V = {V * 1000:.1f} L")
     print(f"Air at {T:.0f} K, {P / 1000:.0f} kPa (rho = {rho:.3f} kg/m3)")
@@ -235,8 +234,8 @@ def main() -> None:
 
     for mdot in [0.1, 0.5, 1.0, 2.0, 5.0]:
         Q = mdot / rho
-        tau = ca.residence_time_mdot(V, mdot, rho)
-        SV = ca.space_velocity(Q, V)
+        tau = cb.residence_time_mdot(V, mdot, rho)
+        SV = cb.space_velocity(Q, V)
         print(f"{mdot:12.2f}  {Q * 1000:12.2f}  {tau:12.3f}  {SV * 3600:12.1f}")
 
     # =========================================================================
@@ -249,7 +248,7 @@ def main() -> None:
     # Reactor parameters
     V = 0.05  # Volume [m3]
     Q = 0.01  # Flow rate [m3/s]
-    tau = ca.residence_time(V, Q)
+    tau = cb.residence_time(V, Q)
 
     # Reaction time scale (example: first-order reaction)
     k = 10.0  # Reaction rate constant [1/s]
@@ -295,7 +294,7 @@ def main() -> None:
     Q = A * v
 
     # Residence time
-    tau = ca.residence_time(V, Q)
+    tau = cb.residence_time(V, Q)
 
     # Simple calculation: tau = L/v
     tau_simple = L / v

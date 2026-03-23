@@ -26,7 +26,7 @@ int main()
 {
     std::cout << std::fixed << std::setprecision(4);
 
-    const std::vector<double> X_air = standard_dry_air_composition();
+    const std::vector<double> X_air = dry_air();
 
     // =========================================================================
     // 1. Isentropic nozzle flow — forward problem
@@ -213,7 +213,7 @@ int main()
     Stream air_r;
     air_r.state.T = 300.0;
     air_r.state.P = P0_rocket;
-    air_r.state.X = standard_dry_air_composition();
+    air_r.state.X = dry_air();
     air_r.mdot    = 1.0;  // kg/s reference
 
     Stream fuel_stoich_r = set_fuel_stream_for_phi(1.0, fuel_r, air_r);

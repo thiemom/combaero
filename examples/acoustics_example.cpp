@@ -24,7 +24,7 @@ int main()
     std::cout << std::fixed << std::setprecision(2);
 
     // Representative combustor conditions
-    const std::vector<double> X_air = standard_dry_air_composition();
+    const std::vector<double> X_air = dry_air();
     const double T_hot = 1800.0;   // K  hot-gas temperature
     const double P_comb = 15.0e5;  // Pa combustor pressure
     const double c = speed_of_sound(T_hot, X_air);

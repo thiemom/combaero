@@ -23,7 +23,7 @@ species_mapping = {
 gri30_gas = ct.Solution("gri30.yaml")
 
 # Air composition
-X_air = cb.standard_dry_air_composition()
+X_air = cb.species.dry_air()
 P = 101325.0
 
 print("=" * 80)

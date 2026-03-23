@@ -32,15 +32,15 @@ int main() {
   std::cout << "\n1. Dry Air Composition" << std::endl;
   std::cout << "---------------------" << std::endl;
 
-  std::vector<double> dry_air = standard_dry_air_composition();
+  std::vector<double> dry_air_comp = dry_air();
 
   std::cout << "Component | Mole Fraction" << std::endl;
   std::cout << "----------------------" << std::endl;
 
   for (size_t i = 0; i < species_names.size(); i++) {
-    if (dry_air[i] > 0.0) {
+    if (dry_air_comp[i] > 0.0) {
       std::cout << std::setw(10) << species_names[i] << " | " << std::setw(12)
-                << dry_air[i] << std::endl;
+                << dry_air_comp[i] << std::endl;
     }
   }
 

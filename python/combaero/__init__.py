@@ -138,6 +138,7 @@ try:
         damping_ratio,
         density,
         dewpoint,
+        dry_air,
         dimple_friction_multiplier,
         dimple_nusselt_enhancement,
         dT_edge_dq,
@@ -450,7 +451,8 @@ except ModuleNotFoundError:
     equivalence_ratio_from_bilger_Z_mass = _core.equivalence_ratio_from_bilger_Z_mass
     expansibility_factor = _core.expansibility_factor
     solve_orifice_mdot = _core.solve_orifice_mdot
-    standard_dry_air_composition = _core.standard_dry_air_composition
+    dry_air = _core.dry_air
+    standard_dry_air_composition = dry_air
     # TODO:make standard_dry_air_composition_mass in C++
     humid_air_composition = _core.humid_air_composition
     humid_air_density = _core.humid_air_density
@@ -803,6 +805,7 @@ __all__ = [
     "bilger_Z_from_equivalence_ratio_mass",
     "expansibility_factor",
     "solve_orifice_mdot",
+    "dry_air",
     "standard_dry_air_composition",
     "humid_air_composition",
     "humid_air_density",

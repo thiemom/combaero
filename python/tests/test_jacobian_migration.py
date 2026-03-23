@@ -11,7 +11,7 @@ def test_orifice_jacobian_accuracy():
     Y_up = [1.0]  # Pure species or whatever num_species is
 
     # Ensure num_species matches
-    n_sp = cb.num_species()
+    n_sp = cb.species.num_species
     Y_up = [0.0] * n_sp
     Y_up[0] = 1.0  # Assume first species is major
 
@@ -74,7 +74,7 @@ def test_pipe_jacobian_accuracy():
     P_total_up = 2e5
     P_static_up = 1.9e5
     T_up = 300.0
-    n_sp = cb.num_species()
+    n_sp = cb.species.num_species
     Y_up = [0.0] * n_sp
     Y_up[0] = 1.0
     P_static_down = 1e5

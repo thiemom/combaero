@@ -58,7 +58,7 @@ class NetworkSolver:
 
     @staticmethod
     def _to_incompressible_regime(regime: str) -> str | None:
-        if regime in ("compressible", "compressible_fanno"):
+        if regime == "compressible":
             return "incompressible"
         return None
 
@@ -138,7 +138,7 @@ class NetworkSolver:
         # Mapping from unknown name to global index
         self._name_to_index: dict[str, int] = {}
         # Canonical default composition (Mass Fractions)
-        self._default_Y: list[float] = list(cb.mole_to_mass(cb.standard_dry_air_composition()))
+        self._default_Y: list[float] = list(cb.species.dry_air_mass())
         self._topological_order: list[str] = []
         self._derived_states: dict[str, tuple[float, list[float], Any]] = {}
 
@@ -292,7 +292,7 @@ class NetworkSolver:
             for elem in down_elems:
                 elem_share = share
                 regime = getattr(elem, "regime", None)
-                if regime in ("compressible", "compressible_fanno"):
+                if regime == "compressible":
                     area = getattr(elem, "area", None)
                     if area is not None and area > 0.0:
                         mdot_cap = rho_ref * a_ref * area * mdot_ratio
@@ -1031,7 +1031,7 @@ class NetworkSolver:
         options: dict[str, Any] | None = None,
         use_jac: bool = True,
         x0: np.ndarray | None = None,
-        init_strategy: Literal["default", "incompressible_warmstart"] = "default",
+        init_strategy: Literal["default", "incompressible_warmstart", "homotopy"] = "default",
         warmstart_maxfev: int = 150,
     ) -> dict[str, float]:
         """
@@ -1063,8 +1063,10 @@ class NetworkSolver:
                 f"Method '{method}' is not supported. Supported methods are: {', '.join(self.SUPPORTED_METHODS)}"
             )
 
-        if init_strategy not in ("default", "incompressible_warmstart"):
-            raise ValueError("init_strategy must be one of: 'default', 'incompressible_warmstart'.")
+        if init_strategy not in ("default", "incompressible_warmstart", "homotopy"):
+            raise ValueError(
+                "init_strategy must be one of: 'default', 'incompressible_warmstart', 'homotopy'."
+            )
         if warmstart_maxfev <= 0:
             raise ValueError("warmstart_maxfev must be > 0.")
 
@@ -1126,6 +1128,49 @@ class NetworkSolver:
                     for elem_id, regime in original_regimes.items():
                         self.network.elements[elem_id].regime = regime
                     self.network.resolve_all_topology()
+
+        if x0 is None and init_strategy == "homotopy":
+            from .components import MassFlowBoundary
+
+            # Identify all MassFlowBoundary nodes and their target m_dot
+            targets = {
+                nid: node.m_dot
+                for nid, node in self.network.nodes.items()
+                if isinstance(node, MassFlowBoundary)
+            }
+
+            if targets:
+                # Sequential solve loop with increasing mass flow lambda
+                lambda_steps = [0.2, 0.4, 0.6, 0.8, 1.0]
+                current_x0 = None
+                last_sol = {"__success__": False}
+
+                for lam in lambda_steps:
+                    # Update boundaries
+                    for nid, target_mdot in targets.items():
+                        self.network.nodes[nid].m_dot = lam * target_mdot
+
+                    # Solve intermediate step
+                    last_sol = self.solve(
+                        method=method,
+                        timeout=timeout,
+                        options=options,
+                        use_jac=use_jac,
+                        x0=current_x0,
+                        init_strategy="default",
+                    )
+
+                    if not last_sol["__success__"]:
+                        break
+                    current_x0 = self._last_x
+
+                # Restore original m_dot (lam=1.0 loop already did this if it reached it)
+                for nid, target_mdot in targets.items():
+                    self.network.nodes[nid].m_dot = target_mdot
+
+                # If homotopy reached the end successfully, return that solution
+                if last_sol["__success__"]:
+                    return last_sol
 
         # --- Initial guess: user-supplied (warm-start) or auto-built ----
         x0_auto = self._build_x0()

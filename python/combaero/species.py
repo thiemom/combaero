@@ -48,5 +48,105 @@ class SpeciesLocator:
             idx = self.indices.get(name)
             if idx is None:
                 idx = _core.species_index_from_name(name)
+            if idx < 0 or idx >= len(X):
+                raise ValueError(f"Invalid species index {idx} for name '{name}'")
             X[idx] = float(value)
         return X
+
+    def pure_species(self, name: str) -> np.ndarray:
+        """Return a composition vector of a pure species."""
+        X = self.empty()
+        idx = self.indices.get(name)
+        if idx is None:
+            idx = _core.species_index_from_name(name)
+        if idx < 0 or idx >= len(X):
+            raise ValueError(f"Invalid species index {idx} for name '{name}'")
+        X[idx] = 1.0
+        return X
+
+    def to_mass(self, X: np.ndarray) -> np.ndarray:
+        """Convert mole fractions to mass fractions."""
+        return _core.mole_to_mass(X)
+
+    def to_mole(self, Y: np.ndarray) -> np.ndarray:
+        """Convert mass fractions to mole fractions."""
+        return _core.mass_to_mole(Y)
+
+    def dry_air(self) -> np.ndarray:
+        """Return the standard dry air composition (mole fractions)."""
+        return _core.dry_air()
+
+    def dry_air_mass(self) -> np.ndarray:
+        """Return the standard dry air composition (mass fractions)."""
+        return self.to_mass(self.dry_air())
+
+    def humid_air(self, T: float, P: float, RH: float) -> np.ndarray:
+        """Return the humid air composition for T [K], P [Pa], and RH [0-1] (mole fractions)."""
+        return _core.humid_air_composition(T, P, RH)
+
+    def humid_air_mass(self, T: float, P: float, RH: float) -> np.ndarray:
+        """Return the humid air composition for T [K], P [Pa], and RH [0-1] (mass fractions)."""
+        return self.to_mass(self.humid_air(T, P, RH))
+
+
+# Create a default instance for the module-level API
+_default_locator = SpeciesLocator.from_core()
+
+
+# Module-level access to species metadata
+indices = _default_locator.indices
+names = _default_locator.names
+num_species = len(names)
+
+
+def species_index(name: str) -> int:
+    """Return the index of a species by name or alias."""
+    idx = indices.get(name)
+    if idx is None:
+        idx = _core.species_index_from_name(name)
+    return idx
+
+
+def empty() -> np.ndarray:
+    """Return an all-zero composition vector."""
+    return _default_locator.empty()
+
+
+def from_mapping(composition: Mapping[str, float]) -> np.ndarray:
+    """Create a composition vector from a mapping of species name to value."""
+    return _default_locator.from_mapping(composition)
+
+
+def to_mass(X: np.ndarray) -> np.ndarray:
+    """Convert mole fractions to mass fractions."""
+    return _default_locator.to_mass(X)
+
+
+def to_mole(Y: np.ndarray) -> np.ndarray:
+    """Convert mass fractions to mole fractions."""
+    return _default_locator.to_mole(Y)
+
+
+def pure_species(name: str) -> np.ndarray:
+    """Return a composition vector of a pure species."""
+    return _default_locator.pure_species(name)
+
+
+def dry_air() -> np.ndarray:
+    """Return the standard dry air composition (mole fractions)."""
+    return _default_locator.dry_air()
+
+
+def dry_air_mass() -> np.ndarray:
+    """Return the standard dry air composition (mass fractions)."""
+    return _default_locator.dry_air_mass()
+
+
+def humid_air(T: float, P: float, RH: float) -> np.ndarray:
+    """Return the humid air composition (mole fractions)."""
+    return _default_locator.humid_air(T, P, RH)
+
+
+def humid_air_mass(T: float, P: float, RH: float) -> np.ndarray:
+    """Return the humid air composition (mass fractions)."""
+    return _default_locator.humid_air_mass(T, P, RH)

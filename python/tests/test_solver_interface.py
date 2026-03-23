@@ -497,7 +497,7 @@ def test_film_and_effusion_jacobians():
 def test_stagnation_jacobians():
     T = 300.0
     P = 101325.0
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
 
     def mach_func(v):
         return cb._core.mach_number_and_jacobian_v(v, T, X)[0]
@@ -538,7 +538,7 @@ def test_stagnation_jacobians():
 def test_orifice_compressible_subsonic():
     """Test compressible orifice in subsonic flow regime."""
     T0, P0, P_back = 300.0, 200000.0, 150000.0
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     Cd, area, beta = 0.65, 1e-4, 0.5
 
     mdot, d_P0, d_Pb, d_T0 = cb._core.orifice_compressible_mdot_and_jacobian(
@@ -562,7 +562,7 @@ def test_orifice_compressible_subsonic():
 def test_orifice_compressible_choked():
     """Test compressible orifice in choked flow regime."""
     T0, P0 = 300.0, 200000.0
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     Cd, area, beta = 0.65, 1e-4, 0.5
 
     # Get critical pressure ratio
@@ -583,7 +583,7 @@ def test_orifice_compressible_choked():
 def test_orifice_compressible_smooth_transition():
     """Verify d_mdot_dP_back is smooth through choked transition."""
     T0, P0 = 300.0, 200000.0
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     Cd, area, beta = 0.65, 1e-4, 0.5
 
     # Sweep through critical pressure ratio
@@ -616,7 +616,7 @@ def test_orifice_compressible_smooth_transition():
 def test_orifice_compressible_reverse_flow():
     """Test compressible orifice with reverse flow (P_back > P0)."""
     T0, P0, P_back = 300.0, 150000.0, 200000.0  # Reversed!
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     Cd, area, beta = 0.65, 1e-4, 0.5
 
     mdot, d_P0, d_Pb, d_T0 = cb._core.orifice_compressible_mdot_and_jacobian(
@@ -638,7 +638,7 @@ def test_orifice_compressible_reverse_flow():
 def test_orifice_compressible_jacobian_accuracy():
     """Verify Jacobian accuracy via numerical differentiation."""
     T0, P0, P_back = 300.0, 200000.0, 150000.0
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     Cd, area, beta = 0.65, 1e-4, 0.5
 
     mdot, d_P0, d_Pb, d_T0 = cb._core.orifice_compressible_mdot_and_jacobian(
@@ -665,7 +665,7 @@ def test_orifice_compressible_jacobian_accuracy():
 def test_orifice_compressible_matches_nozzle_flow():
     """Verify compressible orifice matches nozzle_flow exactly."""
     T0, P0, P_back = 300.0, 200000.0, 150000.0
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     Cd, area, beta = 0.65, 1e-4, 0.5
 
     mdot, _, _, _ = cb._core.orifice_compressible_mdot_and_jacobian(
@@ -683,7 +683,7 @@ def test_orifice_compressible_matches_nozzle_flow():
 def test_orifice_compressible_smoothing_accuracy_far():
     """Verify smoothing has negligible effect far from critical PR."""
     T0, P0 = 300.0, 200000.0
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     Cd, area, beta = 0.65, 1e-4, 0.5
 
     PR_crit = cb.critical_pressure_ratio(T0, P0, X)
@@ -730,7 +730,7 @@ def test_orifice_compressible_smoothing_accuracy_far():
 def test_pipe_compressible_low_mach():
     """Test compressible pipe at low Mach number."""
     T_in, P_in, u_in = 400.0, 200000.0, 10.0  # Low velocity
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     L, D, roughness = 2.0, 0.05, 1e-4
 
     dP, d_Pin, d_Tin, d_u = cb._core.pipe_compressible_mdot_and_jacobian(
@@ -749,7 +749,7 @@ def test_pipe_compressible_low_mach():
 def test_pipe_compressible_high_mach():
     """Test compressible pipe at higher Mach number."""
     T_in, P_in, u_in = 400.0, 200000.0, 150.0  # Higher velocity
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     L, D, roughness = 2.0, 0.05, 1e-4
 
     dP, d_Pin, d_Tin, d_u = cb._core.pipe_compressible_mdot_and_jacobian(
@@ -764,7 +764,7 @@ def test_pipe_compressible_high_mach():
 def test_pipe_compressible_matches_fanno():
     """Verify compressible pipe matches fanno_pipe_rough exactly."""
     T_in, P_in, u_in = 400.0, 200000.0, 50.0
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     L, D, roughness = 2.0, 0.05, 1e-4
 
     dP, _, _, _ = cb._core.pipe_compressible_mdot_and_jacobian(
@@ -782,7 +782,7 @@ def test_pipe_compressible_matches_fanno():
 def test_pipe_compressible_jacobian_accuracy():
     """Verify pipe Jacobian accuracy via numerical differentiation."""
     T_in, P_in, u_in = 400.0, 200000.0, 50.0
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     L, D, roughness = 2.0, 0.05, 1e-4
 
     dP, d_Pin, d_Tin, d_u = cb._core.pipe_compressible_mdot_and_jacobian(
@@ -809,7 +809,7 @@ def test_pipe_compressible_jacobian_accuracy():
 def test_pipe_compressible_reverse_flow():
     """Test compressible pipe with reverse flow (negative velocity)."""
     T_in, P_in, u_in = 400.0, 200000.0, -50.0  # Negative velocity
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     L, D, roughness = 2.0, 0.05, 1e-4
 
     dP, d_Pin, d_Tin, d_u = cb._core.pipe_compressible_mdot_and_jacobian(
@@ -831,7 +831,7 @@ def test_compressible_network_scenario():
     This mimics the pattern from test_network_scenarios.py but uses compressible models.
     """
     # Use standard air composition (not hardcoded)
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     Y = cb.mole_to_mass(X)
 
     # Operating conditions

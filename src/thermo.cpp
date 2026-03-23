@@ -223,7 +223,7 @@ AirProperties air_properties(double T, double P, double humidity) {
   if (humidity > 0.0) {
     X = humid_air_composition(T, P, humidity);
   } else {
-    X = standard_dry_air_composition();
+    X = dry_air();
   }
   return transport_state(T, P, X);
 }

@@ -14,7 +14,6 @@ import numpy as np
 from plot_utils import show_or_save
 
 import combaero as cb
-from combaero.species import SpeciesLocator
 
 
 def main() -> None:
@@ -46,12 +45,10 @@ def main() -> None:
     # =========================================================================
     # Chamber gas: H2/air combustion products at phi=1.0, P0=20 bar
     # =========================================================================
-    sp = SpeciesLocator.from_core()
     P0 = 2_000_000.0  # Pa  (20 bar chamber pressure)
 
-    X_air = cb.standard_dry_air_composition()
-    X_h2 = sp.empty()
-    X_h2[sp.indices["H2"]] = 1.0
+    X_air = cb.species.dry_air()
+    X_h2 = cb.species.pure_species("H2")
 
     fuel = cb.Stream()
     fuel.T, fuel.P, fuel.X = 300.0, P0, X_h2

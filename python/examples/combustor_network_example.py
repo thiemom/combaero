@@ -19,8 +19,8 @@ def main():
 
     # --- Boundaries ---
     # Air stream (standard air)
-    X_air = cb.standard_dry_air_composition()
-    Y_air = cb.mole_to_mass(X_air)
+    X_air = cb.species.dry_air()
+    Y_air = cb.species.dry_air_mass()
     m_dot_air = 2.0
     air_in = MassFlowBoundary("air_in", m_dot=m_dot_air, T_total=600.0, Y=Y_air)
 

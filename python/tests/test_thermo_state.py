@@ -20,7 +20,7 @@ class TestThermoStateStructure:
 
     def test_thermo_state_has_all_attributes(self):
         """Verify ThermoState has all expected attributes."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         state = cb.thermo_state(T=300, P=101325, X=X)
 
         # Check all attributes exist
@@ -43,7 +43,7 @@ class TestThermoStateStructure:
 
     def test_thermo_state_readonly(self):
         """Verify ThermoState attributes are read-only."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         state = cb.thermo_state(T=300, P=101325, X=X)
 
         # Attempt to modify should raise AttributeError
@@ -55,7 +55,7 @@ class TestThermoStateStructure:
 
     def test_thermo_state_repr(self):
         """Verify ThermoState has nice __repr__."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         state = cb.thermo_state(T=300, P=101325, X=X)
 
         repr_str = repr(state)
@@ -70,14 +70,14 @@ class TestInputEchoing:
 
     def test_temperature_echoed(self):
         """Verify temperature is echoed back."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         T = 450.0
         state = cb.thermo_state(T=T, P=101325, X=X)
         assert state.T == T
 
     def test_pressure_echoed(self):
         """Verify pressure is echoed back."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         P = 200000.0
         state = cb.thermo_state(T=300, P=P, X=X)
         assert state.P == P
@@ -88,7 +88,7 @@ class TestPropertyConsistency:
 
     def test_molar_properties_match_individual_calls(self):
         """Verify molar properties match individual function calls."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         T = 300
         P = 101325
 
@@ -105,7 +105,7 @@ class TestPropertyConsistency:
 
     def test_mass_properties_match_individual_calls(self):
         """Verify mass-specific properties match individual function calls."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         T = 300
         P = 101325
 
@@ -120,7 +120,7 @@ class TestPropertyConsistency:
 
     def test_density_matches_individual_call(self):
         """Verify density matches individual function call."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         T = 300
         P = 101325
 
@@ -130,7 +130,7 @@ class TestPropertyConsistency:
 
     def test_molecular_weight_matches_individual_call(self):
         """Verify molecular weight matches individual function call."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         T = 300
         P = 101325
 
@@ -144,7 +144,7 @@ class TestPhysicalRelationships:
 
     def test_gamma_equals_cp_over_cv(self):
         """Verify gamma = cp / cv."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         state = cb.thermo_state(T=300, P=101325, X=X)
 
         gamma_from_ratio = state.cp / state.cv
@@ -152,7 +152,7 @@ class TestPhysicalRelationships:
 
     def test_mass_molar_conversion(self):
         """Verify mass-specific = molar / (mw/1000)."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         state = cb.thermo_state(T=300, P=101325, X=X)
 
         mw_kg_per_mol = state.mw / 1000.0  # Convert g/mol to kg/mol
@@ -166,7 +166,7 @@ class TestPhysicalRelationships:
 
     def test_ideal_gas_law(self):
         """Verify ideal gas law: P = rho * R_specific * T."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         state = cb.thermo_state(T=300, P=101325, X=X)
 
         R_specific = cb.specific_gas_constant(X)
@@ -176,7 +176,7 @@ class TestPhysicalRelationships:
 
     def test_enthalpy_internal_energy_relationship(self):
         """Verify h_mole = u_mole + P*V_molar where V_molar = RT/P."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         state = cb.thermo_state(T=300, P=101325, X=X)
 
         R = 8.31446261815324  # Universal gas constant [J/(mol*K)]
@@ -191,7 +191,7 @@ class TestVariousCompositions:
 
     def test_dry_air(self):
         """Test with standard dry air."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         T = 300
         P = 101325
         state = cb.thermo_state(T=T, P=P, X=X)
@@ -242,7 +242,7 @@ class TestVariousConditions:
 
     def test_ambient_conditions(self):
         """Test at ambient conditions (20degC, 1 atm)."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         T = 293.15
         P = 101325
         state = cb.thermo_state(T=T, P=P, X=X)
@@ -253,7 +253,7 @@ class TestVariousConditions:
 
     def test_high_temperature(self):
         """Test at high temperature (combustor conditions)."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         T = 1500
         P = 101325
         state = cb.thermo_state(T=T, P=P, X=X)
@@ -264,7 +264,7 @@ class TestVariousConditions:
 
     def test_high_pressure(self):
         """Test at high pressure (compressor discharge)."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         T = 600
         P = 2e6
         state = cb.thermo_state(T=T, P=P, X=X)
@@ -274,7 +274,7 @@ class TestVariousConditions:
 
     def test_low_temperature(self):
         """Test at low temperature (cryogenic)."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         T = 200
         P = 101325
         state = cb.thermo_state(T=T, P=P, X=X)
@@ -288,7 +288,7 @@ class TestReferencePresssure:
 
     def test_default_reference_pressure(self):
         """Test with default reference pressure (1 atm)."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         state = cb.thermo_state(T=300, P=101325, X=X)
 
         # Should match individual call with default P_ref
@@ -296,7 +296,7 @@ class TestReferencePresssure:
 
     def test_custom_reference_pressure(self):
         """Test with custom reference pressure."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         P_ref = 200000.0
         state = cb.thermo_state(T=300, P=101325, X=X, P_ref=P_ref)
 
@@ -305,7 +305,7 @@ class TestReferencePresssure:
 
     def test_entropy_pressure_dependence(self):
         """Test that entropy depends on reference pressure."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         state1 = cb.thermo_state(T=300, P=101325, X=X, P_ref=101325)
         state2 = cb.thermo_state(T=300, P=101325, X=X, P_ref=200000)
 
@@ -318,25 +318,25 @@ class TestEdgeCases:
 
     def test_zero_temperature_raises_error(self):
         """Verify zero temperature raises error."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         with pytest.raises(ValueError):
             cb.thermo_state(T=0, P=101325, X=X)
 
     def test_negative_temperature_raises_error(self):
         """Verify negative temperature raises error."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         with pytest.raises(ValueError):
             cb.thermo_state(T=-100, P=101325, X=X)
 
     def test_zero_pressure_raises_error(self):
         """Verify zero pressure raises error."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         with pytest.raises(ValueError):
             cb.thermo_state(T=300, P=0, X=X)
 
     def test_negative_pressure_raises_error(self):
         """Verify negative pressure raises error."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         with pytest.raises(ValueError):
             cb.thermo_state(T=300, P=-101325, X=X)
 
@@ -347,7 +347,7 @@ class TestEdgeCases:
 
     def test_zero_reference_pressure_raises_error(self):
         """Verify zero reference pressure raises error."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         with pytest.raises(ValueError):
             cb.thermo_state(T=300, P=101325, X=X, P_ref=0)
 
@@ -357,7 +357,7 @@ class TestTemperatureRange:
 
     def test_temperature_range_200_to_2000K(self):
         """Test across typical temperature range."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         temperatures = [200, 300, 500, 1000, 1500, 2000]
 
         for T in temperatures:
@@ -377,7 +377,7 @@ class TestPressureRange:
 
     def test_pressure_range_1kPa_to_10MPa(self):
         """Test across typical pressure range."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         pressures = [1e3, 1e4, 1e5, 1e6, 1e7]
 
         for P in pressures:
@@ -397,7 +397,7 @@ class TestConsistencyAcrossConditions:
 
     def test_gamma_always_greater_than_one(self):
         """Verify gamma > 1 for all conditions."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         conditions = [
             (200, 1e5),
             (300, 1e5),
@@ -412,7 +412,7 @@ class TestConsistencyAcrossConditions:
 
     def test_speed_of_sound_increases_with_temperature(self):
         """Verify speed of sound increases with temperature."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         state1 = cb.thermo_state(T=300, P=101325, X=X)
         state2 = cb.thermo_state(T=600, P=101325, X=X)
 
@@ -420,7 +420,7 @@ class TestConsistencyAcrossConditions:
 
     def test_density_inversely_proportional_to_temperature(self):
         """Verify density ~ 1/T at constant pressure."""
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         P = 101325
 
         state1 = cb.thermo_state(T=300, P=P, X=X)

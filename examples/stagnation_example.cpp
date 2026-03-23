@@ -25,7 +25,7 @@ int main()
 {
     std::cout << std::fixed << std::setprecision(4);
 
-    const std::vector<double> X_air = standard_dry_air_composition();
+    const std::vector<double> X_air = dry_air();
 
     // =========================================================================
     // 1. Static -> stagnation conversions over Mach sweep

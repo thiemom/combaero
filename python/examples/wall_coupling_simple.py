@@ -30,7 +30,7 @@ t_wall = 0.002  # m
 k_wall = 25.0  # W/(m*K)
 
 # Composition (air for both sides)
-X_air = cb.standard_dry_air_composition()
+X_air = cb.species.dry_air()
 
 # ============================================================================
 # Convective surfaces

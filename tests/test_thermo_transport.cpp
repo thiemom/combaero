@@ -819,7 +819,7 @@ TEST_F(ThermoTransportTest, SetFuelStreamForPhi) {
 
     // Oxidizer stream: dry air at 10 kg/s
     Stream air;
-    air.state.set_TPX(300.0, 101325.0, standard_dry_air_composition());
+    air.state.set_TPX(300.0, 101325.0, dry_air());
     air.mdot = 10.0;
 
     // Test at phi = 1.3 (rich)
@@ -1306,7 +1306,7 @@ TEST_F(ThermoTransportTest, SmrWgsRichCombustion) {
     fuel.state.set_TPX(300.0, 101325.0, X_fuel);
 
     Stream air;
-    air.state.set_TPX(300.0, 101325.0, standard_dry_air_composition());
+    air.state.set_TPX(300.0, 101325.0, dry_air());
     air.mdot = 10.0;
 
     // Rich mixture (phi = 1.2)

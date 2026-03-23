@@ -22,8 +22,8 @@ from combaero.network import (
 
 def _air_Y():
     """Standard air mass fractions."""
-    Y = [0.0] * cb.num_species()
-    for k in range(cb.num_species()):
+    Y = [0.0] * cb.species.num_species
+    for k in range(cb.species.num_species):
         if cb.species_name(k) == "N2":
             Y[k] = 0.767
         elif cb.species_name(k) == "O2":

@@ -19,7 +19,7 @@ class TestHtcPipeComposite:
         # Air at 300K, 1 atm
         T = 300.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         v = 10.0  # m/s
         D = 0.05  # m
 
@@ -46,7 +46,7 @@ class TestHtcPipeComposite:
         """Test that composite matches manual decomposition (Gnielinski)."""
         T = 400.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         v = 15.0  # m/s
         D = 0.1  # m
 
@@ -73,7 +73,7 @@ class TestHtcPipeComposite:
         """Test that composite matches manual decomposition (Dittus-Boelter)."""
         T = 500.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         v = 20.0  # m/s (high velocity for Re > 10000)
         D = 0.05  # m
 
@@ -101,7 +101,7 @@ class TestHtcPipeComposite:
         """Test that composite matches manual decomposition (Sieder-Tate)."""
         T = 350.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         v = 25.0  # m/s
         D = 0.08  # m
         mu_ratio = 1.2  # Viscosity correction
@@ -130,7 +130,7 @@ class TestHtcPipeComposite:
         """Test that composite matches manual decomposition (Petukhov)."""
         T = 600.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         v = 30.0  # m/s
         D = 0.06  # m
 
@@ -156,7 +156,7 @@ class TestHtcPipeComposite:
         """Test heating vs cooling for Dittus-Boelter."""
         T = 400.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         v = 20.0  # m/s
         D = 0.05  # m
 
@@ -182,7 +182,7 @@ class TestHtcPipeComposite:
         """Test htc_pipe with pipe roughness."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         v = 10.0  # m/s
         D = 0.1  # m
         roughness = 0.00005  # 50 microns (commercial steel)
@@ -206,7 +206,7 @@ class TestHtcPipeComposite:
         """Test htc_pipe handles laminar flow (Re < 2300)."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         v = 0.1  # m/s (very low velocity)
         D = 0.01  # m (small diameter)
 
@@ -224,7 +224,7 @@ class TestHtcPipeComposite:
     def test_htc_pipe_temperature_effect(self):
         """Test that HTC changes with temperature (affects properties)."""
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         v = 15.0  # m/s
         D = 0.05  # m
 
@@ -248,7 +248,7 @@ class TestHtcPipeComposite:
         """Test that HTC increases with velocity."""
         T = 400.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         D = 0.05  # m
 
         v_low = 5.0  # m/s
@@ -266,7 +266,7 @@ class TestHtcPipeComposite:
         """Test that HTC decreases with diameter (for fixed velocity)."""
         T = 350.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         v = 10.0  # m/s
 
         D_small = 0.02  # m
@@ -285,7 +285,7 @@ class TestHtcPipeComposite:
         """Test that invalid correlation name raises error."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         v = 10.0  # m/s
         D = 0.05  # m
 
@@ -296,7 +296,7 @@ class TestHtcPipeComposite:
         """Test that Dittus-Boelter raises error for Re < 10000 in transition."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         v = 2.0  # m/s (low velocity)
         D = 0.05  # m
 
@@ -313,12 +313,12 @@ class TestHtcPipeComposite:
         D = 0.05  # m
 
         # Air
-        Y_air = cb.standard_dry_air_composition()
-        h_air, Nu_air, Re_air = cb.htc_pipe(T, P, Y_air, v, D)
+        X_air = cb.species.dry_air()
+        h_air, Nu_air, Re_air = cb.htc_pipe(T, P, X_air, v, D)
 
         # Pure N2 (simplified - just use air, properties are similar)
         # In practice, N2 and air have very similar transport properties
-        h_N2, Nu_N2, Re_N2 = cb.htc_pipe(T, P, Y_air, v, D)
+        h_N2, Nu_N2, Re_N2 = cb.htc_pipe(T, P, X_air, v, D)
 
         # Both should be positive
         assert h_air > 0
@@ -335,7 +335,7 @@ class TestHtcPipeEdgeCases:
         """Test that negative velocity raises error."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         v = -10.0  # m/s (negative)
         D = 0.05  # m
 
@@ -346,7 +346,7 @@ class TestHtcPipeEdgeCases:
         """Test that zero diameter raises error."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         v = 10.0  # m/s
         D = 0.0  # m (zero)
 
@@ -357,7 +357,7 @@ class TestHtcPipeEdgeCases:
         """Test that negative temperature raises error."""
         T = -100.0  # K (negative)
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         v = 10.0  # m/s
         D = 0.05  # m
 

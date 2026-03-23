@@ -41,7 +41,7 @@ from __future__ import annotations
 
 import numpy as np
 
-import combaero as ca
+import combaero as cb
 from combaero.heat_transfer import (
     ConvectiveSurface,
     DimpledModel,
@@ -59,7 +59,6 @@ from combaero.network import (
     PressureBoundary,
     WallConnection,
 )
-from combaero.species import SpeciesLocator
 
 
 def create_cooling_network(
@@ -102,7 +101,7 @@ def create_cooling_network(
 
     # Nodes
     net.add_node(
-        MassFlowBoundary("cool_inlet", m_dot=mdot_channel, T_total=T2, Y=ca.mole_to_mass(X_cool))
+        MassFlowBoundary("cool_inlet", m_dot=mdot_channel, T_total=T2, Y=cb.mole_to_mass(X_cool))
     )
     net.add_node(PlenumNode("cool_exit"))
     net.add_node(PressureBoundary("cool_outlet", P_total=P2))
@@ -160,12 +159,12 @@ def create_coupled_wall_network(
 
     # Hot-side flow path (representative annulus stream)
     A_ann = np.pi * (D_ann / 2.0) ** 2
-    rho_hot = ca.density(T_hot, P_hot, X_hot)
+    rho_hot = cb.density(T_hot, P_hot, X_hot)
     mdot_hot = rho_hot * u_hot_ann * A_ann
 
     hot_surface = ConvectiveSurface(area=A_liner, model=SmoothModel())
     net.add_node(
-        MassFlowBoundary("hot_inlet", m_dot=mdot_hot, T_total=T_hot, Y=ca.mole_to_mass(X_hot))
+        MassFlowBoundary("hot_inlet", m_dot=mdot_hot, T_total=T_hot, Y=cb.mole_to_mass(X_hot))
     )
     net.add_node(PlenumNode("hot_exit"))
     net.add_node(PressureBoundary("hot_outlet", P_total=P_hot))
@@ -232,7 +231,7 @@ def solve_operating_point_network(
 
     mdot_cool = f_cool * mdot_total
     mdot_bypass = (1.0 - f_cool) * mdot_total
-    cp_cool = ca.cp_mass(T2, X_cool)
+    cp_cool = cb.cp_mass(T2, X_cool)
     P_hot = P2 * (1.0 - dP_burner_frac)
     T_hot_est = COT_target
 
@@ -263,7 +262,7 @@ def solve_operating_point_network(
             T_total=T2,
             P=P2,
             P_total=P2,
-            Y=ca.mole_to_mass(X_cool),
+            Y=cb.mole_to_mass(X_cool),
             m_dot=mdot_cool / N_ch,
         )
         ch_result = cool_elem.htc_and_T(cool_state_in)
@@ -278,26 +277,26 @@ def solve_operating_point_network(
 
         # Wall temperature profile
         t_over_k = np.array([t / k for t, k in wall_layers])
-        temps, q_wall = ca.wall_temperature_profile(T_hot_est, T2, h_hot, h_cool, t_over_k)
+        temps, q_wall = cb.wall_temperature_profile(T_hot_est, T2, h_hot, h_cool, t_over_k)
 
         # Coolant exit temperature from energy balance (matches standalone model)
         T_cool_exit = T2 + q_wall * A_liner / (mdot_cool * cp_cool)
 
         # Mix coolant_exit + bypass -> oxidizer
-        cool_s = ca.Stream()
+        cool_s = cb.Stream()
         cool_s.T, cool_s.P, cool_s.X, cool_s.mdot = T_cool_exit, P2, X_cool, mdot_cool
-        byp_s = ca.Stream()
+        byp_s = cb.Stream()
         byp_s.T, byp_s.P, byp_s.X, byp_s.mdot = T2, P2, X_air, mdot_bypass
-        oxidizer = ca.mix([cool_s, byp_s])
+        oxidizer = cb.mix([cool_s, byp_s])
 
         # Find fuel flow to hit COT_target
-        fuel_s = ca.Stream()
+        fuel_s = cb.Stream()
         fuel_s.T, fuel_s.P, fuel_s.X = 300.0, P2, X_ch4
-        fuel_s = ca.set_fuel_stream_for_Tad(COT_target, fuel_s, oxidizer)
+        fuel_s = cb.set_fuel_stream_for_Tad(COT_target, fuel_s, oxidizer)
 
         # Verify COT
-        mixed_in = ca.mix([cool_s, byp_s, fuel_s])
-        burned = ca.complete_combustion(mixed_in.T, mixed_in.X, mixed_in.P)
+        mixed_in = cb.mix([cool_s, byp_s, fuel_s])
+        burned = cb.complete_combustion(mixed_in.T, mixed_in.X, mixed_in.P)
         T_hot_est = burned.T
 
     # Compute thermal performance factor
@@ -312,12 +311,12 @@ def solve_operating_point_network(
         T_total=T2,
         P=P2,
         P_total=P2,
-        Y=ca.mole_to_mass(X_cool),
+        Y=cb.mole_to_mass(X_cool),
         m_dot=mdot_cool / N_ch,
     )
     ch_smooth = net_smooth.elements["cool_channel"].htc_and_T(cool_state_smooth)
 
-    eta_thp = ca.thermal_performance_factor(
+    eta_thp = cb.thermal_performance_factor(
         Nu_ratio=ch_result.Nu / ch_smooth.Nu,
         f_ratio=max(ch_result.f / ch_smooth.f, 1.0),
     )
@@ -330,7 +329,7 @@ def solve_operating_point_network(
 
     return {
         "f_cool": f_cool,
-        "u_cool": mdot_cool / (ca.density(T2, P2, X_cool) * N_ch * np.pi * (D_ch / 2) ** 2),
+        "u_cool": mdot_cool / (cb.density(T2, P2, X_cool) * N_ch * np.pi * (D_ch / 2) ** 2),
         "h_cool": h_cool,
         "h_hot": h_hot,
         "Re": ch_result.Re,
@@ -374,7 +373,7 @@ def solve_operating_point_network_coupled(
 
     mdot_cool = f_cool * mdot_total
     mdot_bypass = (1.0 - f_cool) * mdot_total
-    cp_cool = ca.cp_mass(T2, X_cool)
+    cp_cool = cb.cp_mass(T2, X_cool)
     P_hot = P2 * (1.0 - dP_burner_frac)
     T_hot_est = COT_target
     A_liner = np.pi * D_ch * L_ch * N_ch
@@ -402,7 +401,7 @@ def solve_operating_point_network_coupled(
     for _ in range(5):
         # Update hot-side inlet to current combustor estimate.
         A_ann = np.pi * (D_ann / 2.0) ** 2
-        rho_hot = ca.density(T_hot_est, P_hot, X_air)
+        rho_hot = cb.density(T_hot_est, P_hot, X_air)
         net.nodes["hot_inlet"].T_total = T_hot_est
         net.nodes["hot_inlet"].m_dot = rho_hot * u_hot_ann * A_ann
 
@@ -412,18 +411,18 @@ def solve_operating_point_network_coupled(
 
         T_cool_exit = result["cool_exit.T"]
 
-        cool_s = ca.Stream()
+        cool_s = cb.Stream()
         cool_s.T, cool_s.P, cool_s.X, cool_s.mdot = T_cool_exit, P2, X_cool, mdot_cool
-        byp_s = ca.Stream()
+        byp_s = cb.Stream()
         byp_s.T, byp_s.P, byp_s.X, byp_s.mdot = T2, P2, X_air, mdot_bypass
-        oxidizer = ca.mix([cool_s, byp_s])
+        oxidizer = cb.mix([cool_s, byp_s])
 
-        fuel_s = ca.Stream()
+        fuel_s = cb.Stream()
         fuel_s.T, fuel_s.P, fuel_s.X = 300.0, P2, X_ch4
-        fuel_s = ca.set_fuel_stream_for_Tad(COT_target, fuel_s, oxidizer)
+        fuel_s = cb.set_fuel_stream_for_Tad(COT_target, fuel_s, oxidizer)
 
-        mixed_in = ca.mix([cool_s, byp_s, fuel_s])
-        burned = ca.complete_combustion(mixed_in.T, mixed_in.X, mixed_in.P)
+        mixed_in = cb.mix([cool_s, byp_s, fuel_s])
+        burned = cb.complete_combustion(mixed_in.T, mixed_in.X, mixed_in.P)
         T_hot_est = burned.T
 
     # Post-process consistent with existing return schema
@@ -434,7 +433,7 @@ def solve_operating_point_network_coupled(
         T_total=result["cool_inlet.T"],
         P=result["cool_inlet.P"],
         P_total=result["cool_inlet.P"],
-        Y=ca.mole_to_mass(X_cool),
+        Y=cb.mole_to_mass(X_cool),
         m_dot=mdot_cool / N_ch,
     )
     A_ann = np.pi * (D_ann / 2.0) ** 2
@@ -443,8 +442,8 @@ def solve_operating_point_network_coupled(
         T_total=result["hot_inlet.T"],
         P=result["hot_inlet.P"],
         P_total=result["hot_inlet.P"],
-        Y=ca.mole_to_mass(X_air),
-        m_dot=ca.density(T_hot_est, P_hot, X_air) * u_hot_ann * A_ann,
+        Y=cb.mole_to_mass(X_air),
+        m_dot=cb.density(T_hot_est, P_hot, X_air) * u_hot_ann * A_ann,
     )
     ch_result = cool_elem.htc_and_T(cool_state_in)
     ch_hot = hot_elem.htc_and_T(hot_state_in)
@@ -455,7 +454,7 @@ def solve_operating_point_network_coupled(
     q_wall = (T_cool_exit - T2) * mdot_cool * cp_cool / A_liner
 
     t_over_k = np.array([t / k for t, k in wall_layers])
-    temps, _ = ca.wall_temperature_profile(T_hot_est, T2, ch_hot.h, ch_result.h, t_over_k)
+    temps, _ = cb.wall_temperature_profile(T_hot_est, T2, ch_hot.h, ch_result.h, t_over_k)
 
     net_smooth, _ = create_cooling_network(
         f_cool, mdot_total, T2, P2, X_cool, D_ch, L_ch, N_ch, "Smooth"
@@ -467,19 +466,19 @@ def solve_operating_point_network_coupled(
         T_total=T2,
         P=P2,
         P_total=P2,
-        Y=ca.mole_to_mass(X_cool),
+        Y=cb.mole_to_mass(X_cool),
         m_dot=mdot_cool / N_ch,
     )
     ch_smooth = net_smooth.elements["cool_channel"].htc_and_T(cool_state_smooth)
 
-    eta_thp = ca.thermal_performance_factor(
+    eta_thp = cb.thermal_performance_factor(
         Nu_ratio=ch_result.Nu / ch_smooth.Nu,
         f_ratio=max(ch_result.f / ch_smooth.f, 1.0),
     )
 
     return {
         "f_cool": f_cool,
-        "u_cool": mdot_cool / (ca.density(T2, P2, X_cool) * N_ch * np.pi * (D_ch / 2) ** 2),
+        "u_cool": mdot_cool / (cb.density(T2, P2, X_cool) * N_ch * np.pi * (D_ch / 2) ** 2),
         "h_cool": ch_result.h,
         "h_hot": ch_hot.h,
         "Re": ch_result.Re,
@@ -498,19 +497,17 @@ def solve_operating_point_network_coupled(
 
 def hot_side_htc(T_hot: float, P: float, X: list, D_h: float, u: float) -> float:
     """Hot-gas-side HTC via Dittus-Boelter on combustor annulus."""
-    rho = ca.density(T_hot, P, X)
-    mu = ca.viscosity(T_hot, P, X)
-    k = ca.thermal_conductivity(T_hot, P, X)
+    rho = cb.density(T_hot, P, X)
+    mu = cb.viscosity(T_hot, P, X)
+    k = cb.thermal_conductivity(T_hot, P, X)
     Re = rho * u * D_h / mu
-    Nu = ca.nusselt_dittus_boelter(Re, ca.prandtl(T_hot, P, X), heating=False)
-    return ca.htc_from_nusselt(Nu, k, D_h)
+    Nu = cb.nusselt_dittus_boelter(Re, cb.prandtl(T_hot, P, X), heating=False)
+    return cb.htc_from_nusselt(Nu, k, D_h)
 
 
 def main() -> None:
     import matplotlib.pyplot as plt
     from plot_utils import show_or_save
-
-    sp = SpeciesLocator.from_core()
 
     print("=" * 70)
     print("Combustor Liner Cooling — FlowNetwork Version")
@@ -526,10 +523,10 @@ def main() -> None:
     D_ann = 0.30  # m
     u_hot_ann = 25.0  # m/s
 
-    X_cool = ca.humid_air_composition(288.15, 101325.0, RH_in)
-    X_air = ca.standard_dry_air_composition()
-    X_ch4 = sp.empty()
-    X_ch4[sp.indices["CH4"]] = 1.0
+    X_cool = cb.species.humid_air(288.15, 101325.0, RH_in)
+    X_air = cb.species.dry_air()
+    X_ch4 = cb.species.empty()
+    X_ch4[cb.species.indices["CH4"]] = 1.0
 
     mdot_total = 1.0  # kg/s
 
@@ -540,10 +537,10 @@ def main() -> None:
 
     # Materials
     T_metal_limit = 1073.15  # K = 800 C
-    k_inconel = ca.k_inconel718(900.0)
-    k_ysz_fresh = ca.k_tbc_ysz(1200.0, hours=0.0, is_ebpvd=False)
-    k_ysz_aged = ca.k_tbc_ysz(1200.0, hours=1000.0, is_ebpvd=False)
-    k_ysz_ebpvd = ca.k_tbc_ysz(1200.0, hours=0.0, is_ebpvd=True)
+    k_inconel = cb.k_inconel718(900.0)
+    k_ysz_fresh = cb.k_tbc_ysz(1200.0, hours=0.0, is_ebpvd=False)
+    k_ysz_aged = cb.k_tbc_ysz(1200.0, hours=1000.0, is_ebpvd=False)
+    k_ysz_ebpvd = cb.k_tbc_ysz(1200.0, hours=0.0, is_ebpvd=True)
     t_wall = 0.003
     t_tbc = 0.0003
 
@@ -554,7 +551,7 @@ def main() -> None:
         "Inconel + YSZ EB-PVD": [(t_tbc, k_ysz_ebpvd), (t_wall, k_inconel)],
     }
 
-    print(f"\nMaterials: {ca.list_materials()}")
+    print(f"\nMaterials: {cb.list_materials()}")
     print(f"Inconel 718 k = {k_inconel:.2f} W/(m*K) @ 900 K")
     print(
         f"YSZ APS fresh k = {k_ysz_fresh:.3f}, aged k = {k_ysz_aged:.3f}, EB-PVD k = {k_ysz_ebpvd:.3f} W/(m*K) @ 1200 K"

@@ -82,7 +82,7 @@ def _build_fully_coupled_grid(
     net.add_node(distributor)
     net.add_node(collector)
 
-    pipe_regime = "compressible_fanno" if use_compressible else "incompressible"
+    pipe_regime = "compressible" if use_compressible else "incompressible"
     ori_regime = "compressible" if use_compressible else "incompressible"
 
     net.add_element(OrificeElement("ori_air_in", "inlet_air", "distributor", Cd=0.8, area=total_area, regime=ori_regime))

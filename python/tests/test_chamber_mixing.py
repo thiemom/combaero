@@ -61,7 +61,7 @@ def test_combustor_fuel_boundary():
         "fuel_injector",
         m_dot=0.02,
         T_total=300.0,
-        Y=cb.mole_to_mass(cb.standard_dry_air_composition()),
+        Y=cb.species.dry_air_mass(),
     )
 
     # Set fuel boundary
@@ -124,7 +124,7 @@ def test_chamber_pressure_relationship():
         T=300.0,
         T_total=300.0,
         m_dot=0.1,
-        Y=cb.mole_to_mass(cb.standard_dry_air_composition()),
+        Y=cb.species.dry_air_mass(),
     )
 
     residuals, jac = plenum.residuals(state)
@@ -140,7 +140,7 @@ def test_chamber_pressure_relationship():
         T=300.0,
         T_total=300.0,
         m_dot=0.1,
-        Y=cb.mole_to_mass(cb.standard_dry_air_composition()),
+        Y=cb.species.dry_air_mass(),
     )
     residuals_mismatch, jac_mismatch = plenum.residuals(state_mismatch)
 

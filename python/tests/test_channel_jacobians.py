@@ -11,7 +11,7 @@ def test_channel_smooth_jacobians_gnielinski():
     # Test conditions
     T = 800.0  # K
     P = 3e5  # Pa
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     velocity = 50.0  # m/s
     diameter = 0.02  # m
     length = 0.5  # m
@@ -73,7 +73,7 @@ def test_channel_smooth_jacobians_dittus_boelter():
     """Verify channel_smooth Jacobians for Dittus-Boelter correlation."""
     T = 600.0
     P = 2e5
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     velocity = 80.0  # High velocity for turbulent Re > 10000
     diameter = 0.03
     length = 1.0
@@ -113,7 +113,7 @@ def test_channel_smooth_multipliers():
     """Verify Nu_multiplier and f_multiplier affect results correctly."""
     T = 700.0
     P = 3e5
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     velocity = 60.0
     diameter = 0.025
     length = 0.8
@@ -149,7 +149,7 @@ def test_channel_smooth_zero_velocity():
     """Verify Jacobians are zero when velocity is zero."""
     T = 500.0
     P = 1e5
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     velocity = 0.0
     diameter = 0.01
     length = 0.5
@@ -169,7 +169,7 @@ def test_channel_ribbed_jacobians():
     """Verify channel_ribbed propagates Jacobians correctly."""
     T = 700.0
     P = 2.5e5
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     velocity = 60.0
     diameter = 0.025
     length = 0.6
@@ -209,7 +209,7 @@ def test_channel_pin_fin_jacobians():
     """Verify channel_pin_fin computes Jacobians."""
     T = 600.0
     P = 2e5
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     velocity = 40.0
     channel_height = 0.006  # H = 6mm
     pin_diameter = 0.003  # d = 3mm -> L_D = 2.0 (valid range)

@@ -7,7 +7,7 @@ import combaero as cb
 
 def test_nozzle_flow_subsonic() -> None:
     """Subsonic nozzle flow (P_back > P_critical)."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     T0 = 500.0  # K (high enough to stay above 300K after expansion)
     P0 = 200000.0  # Pa
     P_back = 150000.0  # Pa (subsonic)
@@ -24,7 +24,7 @@ def test_nozzle_flow_subsonic() -> None:
 
 def test_nozzle_flow_choked() -> None:
     """Choked nozzle flow (P_back < P_critical)."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     T0 = 600.0  # K (high enough for large expansion)
     P0 = 200000.0  # Pa
     P_back = 50000.0  # Pa (choked)
@@ -40,7 +40,7 @@ def test_nozzle_flow_choked() -> None:
 
 def test_critical_pressure_ratio() -> None:
     """Critical pressure ratio P*/P0."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     T0 = 500.0  # K
     P0 = 100000.0  # Pa
 
@@ -53,7 +53,7 @@ def test_critical_pressure_ratio() -> None:
 
 def test_mach_from_pressure_ratio() -> None:
     """Mach number from isentropic pressure ratio."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     T0 = 500.0  # K
     P0 = 500000.0  # Pa
     P = 80000.0  # Pa
@@ -66,7 +66,7 @@ def test_mach_from_pressure_ratio() -> None:
 
 def test_solve_A_eff_from_mdot() -> None:
     """Inverse problem: find area from mass flow."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     T0 = 500.0
     P0 = 200000.0
     P_back = 150000.0
@@ -84,7 +84,7 @@ def test_solve_A_eff_from_mdot() -> None:
 
 def test_fanno_pipe_basic() -> None:
     """Basic Fanno flow through a pipe."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     T_in = 400.0  # K
     P_in = 200000.0  # Pa
     u_in = 50.0  # m/s (subsonic)
@@ -103,7 +103,7 @@ def test_fanno_pipe_basic() -> None:
 
 def test_fanno_pipe_re_in_populated() -> None:
     """fanno_pipe should populate Re_in and f_avg."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     T_in = 400.0
     P_in = 200000.0
     u_in = 50.0
@@ -122,7 +122,7 @@ def test_fanno_pipe_re_in_populated() -> None:
 
 def test_fanno_pipe_profile_has_f_re() -> None:
     """Profile stations should carry f and Re fields."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     sol = cb.fanno_pipe(400.0, 200000.0, 50.0, 1.0, 0.05, 0.02, X, store_profile=True)
 
     assert len(sol.profile) > 0
@@ -133,7 +133,7 @@ def test_fanno_pipe_profile_has_f_re() -> None:
 
 def test_fanno_pipe_rough_basic() -> None:
     """fanno_pipe_rough: pressure drops, f_avg and Re_in populated."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     T_in = 400.0
     P_in = 200000.0
     u_in = 50.0
@@ -152,7 +152,7 @@ def test_fanno_pipe_rough_basic() -> None:
 def test_fanno_pipe_rough_smooth_matches_constant_f() -> None:
     """Smooth pipe (roughness=0): rough variant should be close to constant-f variant
     when f is pre-computed from inlet Re."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     T_in = 400.0
     P_in = 200000.0
     u_in = 50.0
@@ -174,7 +174,7 @@ def test_fanno_pipe_rough_smooth_matches_constant_f() -> None:
 
 def test_fanno_pipe_rough_increases_dP() -> None:
     """Rough pipe should have higher pressure drop than smooth pipe."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     T_in = 400.0
     P_in = 200000.0
     u_in = 50.0
@@ -191,7 +191,7 @@ def test_fanno_pipe_rough_increases_dP() -> None:
 
 def test_fanno_pipe_rough_profile() -> None:
     """Profile stations should carry local f and Re."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     sol = cb.fanno_pipe_rough(400.0, 200000.0, 50.0, 1.0, 0.05, 1e-4, X, store_profile=True)
 
     assert len(sol.profile) > 0
@@ -202,7 +202,7 @@ def test_fanno_pipe_rough_profile() -> None:
 
 def test_fanno_pipe_rough_correlations() -> None:
     """All supported correlations should give similar results for smooth pipe."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     T_in, P_in, u_in, L, D = 400.0, 200000.0, 50.0, 1.0, 0.05
 
     sol_h = cb.fanno_pipe_rough(T_in, P_in, u_in, L, D, 0.0, X, correlation="haaland")
@@ -216,7 +216,7 @@ def test_fanno_pipe_rough_correlations() -> None:
 
 def test_fanno_pipe_rough_choked() -> None:
     """Long rough pipe should choke: use a very long pipe so choking is certain."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     T_in = 400.0
     P_in = 200000.0
     u_in = 250.0  # high subsonic velocity — short L* expected
@@ -234,14 +234,14 @@ def test_fanno_pipe_rough_invalid_correlation() -> None:
     """Unknown correlation should raise ValueError."""
     import pytest
 
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     with pytest.raises(ValueError, match="unknown correlation"):
         cb.fanno_pipe_rough(400.0, 200000.0, 50.0, 1.0, 0.05, 0.0, X, correlation="invalid")
 
 
 def test_fanno_max_length() -> None:
     """Maximum pipe length before choking."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     T_in = 400.0
     P_in = 200000.0
     u_in = 100.0  # m/s
@@ -301,7 +301,7 @@ def test_friction_consistency() -> None:
 
 def test_de_laval_nozzle_supersonic() -> None:
     """De Laval nozzle: choked flow with supersonic exit."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
 
     # Nozzle geometry
     A_inlet = 0.002  # m^2
@@ -336,7 +336,7 @@ def test_de_laval_nozzle_supersonic() -> None:
 
 def test_de_laval_nozzle_subsonic() -> None:
     """De Laval nozzle: subsonic throughout (high back pressure)."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
 
     A_inlet = 0.002
     A_throat = 0.001
@@ -362,7 +362,7 @@ def test_de_laval_nozzle_subsonic() -> None:
 
 def test_nozzle_mass_conservation() -> None:
     """Mass flow should be constant along nozzle."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
 
     A_inlet = 0.002
     A_throat = 0.001
@@ -382,7 +382,7 @@ def test_nozzle_mass_conservation() -> None:
 
 def test_nozzle_thrust() -> None:
     """Rocket nozzle thrust calculation."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
 
     T0 = 2000.0  # K (hot combustion gas)
     P0 = 2000000.0  # Pa (20 bar chamber)
@@ -414,7 +414,7 @@ def test_nozzle_thrust() -> None:
 
 def test_nozzle_thrust_vacuum() -> None:
     """Thrust in vacuum (P_amb = 0)."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
 
     T0 = 2000.0
     P0 = 2000000.0

@@ -44,7 +44,7 @@ def test_compressible_orifice_network():
     assert PR < 0.8, f"Should be in compressible regime (PR={PR:.3f})"
 
     # Verify against direct compressible calculation
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     mdot_direct, _, _, _ = cb._core.orifice_compressible_mdot_and_jacobian(
         inlet.T_total, inlet.P_total, outlet.P_total, X, 0.65, 1e-4, 0.0
     )
@@ -71,7 +71,7 @@ def test_compressible_pipe_network():
         length=1.0,
         diameter=0.08,
         roughness=1e-4,
-        regime="compressible_fanno",
+        regime="compressible",
         friction_model="haaland",
     )
 
@@ -201,7 +201,7 @@ def test_compressible_choked_orifice():
     sol = solver.solve(method="lm")
 
     # Verify choked flow
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     PR_crit = cb.critical_pressure_ratio(inlet.T_total, inlet.P_total, X)
     PR_actual = outlet.P_total / inlet.P_total
 
@@ -229,7 +229,7 @@ def test_compressible_pipe_high_mach():
         length=5.0,
         diameter=0.03,
         roughness=1e-4,
-        regime="compressible_fanno",
+        regime="compressible",
     )
     net.add_element(pipe)
 
@@ -239,7 +239,7 @@ def test_compressible_pipe_high_mach():
     assert sol["pipe.m_dot"] > 0, "Mass flow should be positive"
 
     # Verify Mach number is significant
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     rho = cb.density(inlet.T_total, inlet.P_total, X)
     area = 3.14159 * (0.03 / 2) ** 2
     u = sol["pipe.m_dot"] / (rho * area)
@@ -266,7 +266,7 @@ _P_OUT = 2.0e5
 
 
 def _build_fully_coupled_network(regime: str, mach_target: float) -> FlowNetwork:
-    x_air = cb.standard_dry_air_composition()
+    x_air = cb.species.dry_air()
     y_air = list(cb.mole_to_mass(x_air))
 
     t_hot = _T_HOT
@@ -280,7 +280,7 @@ def _build_fully_coupled_network(regime: str, mach_target: float) -> FlowNetwork
     mdot_hot = _mdot_for_mach(mach_target, t_hot, p_out_hot, x_air, _area(d_hot))
     mdot_cold = 0.65 * _mdot_for_mach(mach_target, t_cold, p_out_cold, x_air, _area(d_cold))
 
-    pipe_regime = "compressible_fanno" if regime == "compressible" else "incompressible"
+    pipe_regime = "compressible" if regime == "compressible" else "incompressible"
     orifice_regime = "compressible" if regime == "compressible" else "incompressible"
 
     net = FlowNetwork()
@@ -405,3 +405,39 @@ def test_fully_coupled_compressible_vs_incompressible_mach_sweep():
     # Thermal coupling should remain active through the sweep.
     assert np.min(thermal_hot_drop) > 0.0
     assert np.min(thermal_cold_rise) > 0.0
+
+
+def test_homotopy_initialization_strategy():
+    """Verify that init_strategy='homotopy' converges for a high-flow network."""
+    net = FlowNetwork()
+
+    # Define a high-flow scenario that might struggle with cold start
+    # but should be easy for homotopy
+    inlet = MassFlowBoundary("inlet", m_dot=2.0, T_total=500.0)
+    outlet = PressureBoundary("outlet", P_total=101325.0, T_total=300.0)
+
+    net.add_node(inlet)
+    net.add_node(outlet)
+
+    # Long narrow pipe to create high pressure drop and high velocity
+    pipe = PipeElement(
+        "pipe",
+        "inlet",
+        "outlet",
+        length=5.0,
+        diameter=0.08,
+        roughness=1e-4,
+        regime="compressible",
+    )
+    net.add_element(pipe)
+
+    solver = NetworkSolver(net)
+
+    # Solve with homotopy
+    sol = solver.solve(method="hybr", init_strategy="homotopy")
+
+    assert sol["__success__"], "Homotopy solve failed"
+    assert sol["pipe.m_dot"] > 0, "Mass flow should be positive"
+
+    # Verify Mach number is significant
+    # Detailed check not needed here, just success.

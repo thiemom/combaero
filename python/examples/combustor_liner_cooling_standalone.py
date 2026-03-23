@@ -53,8 +53,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from plot_utils import show_or_save
 
-import combaero as ca
-from combaero.species import SpeciesLocator
+import combaero as cb
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -63,23 +62,23 @@ from combaero.species import SpeciesLocator
 
 def hot_side_htc(T_hot: float, P: float, X: list, D_h: float, u: float) -> float:
     """Hot-gas-side HTC via Dittus-Boelter on combustor annulus."""
-    rho = ca.density(T_hot, P, X)
-    mu = ca.viscosity(T_hot, P, X)
-    k = ca.thermal_conductivity(T_hot, P, X)
+    rho = cb.density(T_hot, P, X)
+    mu = cb.viscosity(T_hot, P, X)
+    k = cb.thermal_conductivity(T_hot, P, X)
     Re = rho * u * D_h / mu
-    Nu = ca.nusselt_dittus_boelter(Re, ca.prandtl(T_hot, P, X), heating=False)
-    return ca.htc_from_nusselt(Nu, k, D_h)
+    Nu = cb.nusselt_dittus_boelter(Re, cb.prandtl(T_hot, P, X), heating=False)
+    return cb.htc_from_nusselt(Nu, k, D_h)
 
 
 def channel_result(
     name: str, T: float, P: float, X: list, u: float, D_h: float, L: float
-) -> ca.ChannelResult:
+) -> cb.ChannelResult:
     if name == "Smooth":
-        return ca.channel_smooth(T, P, X, u, D_h, L)
+        return cb.channel_smooth(T, P, X, u, D_h, L)
     if name == "Ribbed":
-        return ca.channel_ribbed(T, P, X, u, D_h, L, e_D=0.07, pitch_to_height=8.0, alpha_deg=60.0)
+        return cb.channel_ribbed(T, P, X, u, D_h, L, e_D=0.07, pitch_to_height=8.0, alpha_deg=60.0)
     if name == "Dimpled":
-        return ca.channel_dimpled(T, P, X, u, D_h, L, d_Dh=0.20, h_d=0.20, S_d=2.0)
+        return cb.channel_dimpled(T, P, X, u, D_h, L, d_Dh=0.20, h_d=0.20, S_d=2.0)
     raise ValueError(f"Unknown channel type: {name}")
 
 
@@ -112,9 +111,9 @@ def solve_operating_point(
 
     mdot_cool = f_cool * mdot_total
     mdot_bypass = (1.0 - f_cool) * mdot_total
-    rho_cool = ca.density(T2, P2, X_cool)
+    rho_cool = cb.density(T2, P2, X_cool)
     u_cool = mdot_cool / (rho_cool * A_ch_total)
-    cp_cool = ca.cp_mass(T2, X_cool)
+    cp_cool = cb.cp_mass(T2, X_cool)
 
     P_hot = P2 * (1.0 - dP_burner_frac)
     T_hot_est = COT_target
@@ -123,8 +122,8 @@ def solve_operating_point(
     h_cool = r_ch.h
 
     # Smooth-channel baseline for thermal performance factor
-    r_smooth = ca.channel_smooth(T2, P2, X_cool, u_cool, D_ch, L_ch)
-    eta_thp = ca.thermal_performance_factor(
+    r_smooth = cb.channel_smooth(T2, P2, X_cool, u_cool, D_ch, L_ch)
+    eta_thp = cb.thermal_performance_factor(
         Nu_ratio=r_ch.Nu / r_smooth.Nu,
         f_ratio=max(r_ch.f / r_smooth.f, 1.0),
     )
@@ -133,26 +132,26 @@ def solve_operating_point(
         h_hot = hot_side_htc(T_hot_est, P_hot, X_air, D_ann, u_hot_ann)
 
         t_over_k = np.array([t / k for t, k in wall_layers])
-        temps, q_wall = ca.wall_temperature_profile(T_hot_est, T2, h_hot, h_cool, t_over_k)
+        temps, q_wall = cb.wall_temperature_profile(T_hot_est, T2, h_hot, h_cool, t_over_k)
 
         # Coolant exit temperature from energy balance
         T_cool_exit = T2 + q_wall * A_liner / (mdot_cool * cp_cool)
 
         # Mix coolant_exit + bypass -> oxidizer
-        cool_s = ca.Stream()
+        cool_s = cb.Stream()
         cool_s.T, cool_s.P, cool_s.X, cool_s.mdot = T_cool_exit, P2, X_cool, mdot_cool
-        byp_s = ca.Stream()
+        byp_s = cb.Stream()
         byp_s.T, byp_s.P, byp_s.X, byp_s.mdot = T2, P2, X_air, mdot_bypass
-        oxidizer = ca.mix([cool_s, byp_s])
+        oxidizer = cb.mix([cool_s, byp_s])
 
         # Find fuel flow to hit COT_target (closed energy loop)
-        fuel_s = ca.Stream()
+        fuel_s = cb.Stream()
         fuel_s.T, fuel_s.P, fuel_s.X = 300.0, P2, X_ch4
-        fuel_s = ca.set_fuel_stream_for_Tad(COT_target, fuel_s, oxidizer)
+        fuel_s = cb.set_fuel_stream_for_Tad(COT_target, fuel_s, oxidizer)
 
         # Verify COT
-        mixed_in = ca.mix([cool_s, byp_s, fuel_s])
-        burned = ca.complete_combustion(mixed_in.T, mixed_in.X, mixed_in.P)
+        mixed_in = cb.mix([cool_s, byp_s, fuel_s])
+        burned = cb.complete_combustion(mixed_in.T, mixed_in.X, mixed_in.P)
         T_hot_est = burned.T
 
     T_hot_surf = temps[0]
@@ -183,7 +182,6 @@ def solve_operating_point(
 
 
 def main() -> None:
-    sp = SpeciesLocator.from_core()
 
     print("=" * 70)
     print("Combustor Liner Convective Cooling — Bypass Sweep (COT = const)")
@@ -201,10 +199,10 @@ def main() -> None:
     D_ann = 0.30  # m  combustor annulus hydraulic diameter
     u_hot_ann = 25.0  # m/s
 
-    X_cool = ca.humid_air_composition(288.15, 101325.0, RH_in)
-    X_air = ca.standard_dry_air_composition()
-    X_ch4 = sp.empty()
-    X_ch4[sp.indices["CH4"]] = 1.0
+    X_cool = cb.species.humid_air(288.15, 101325.0, RH_in)
+    X_air = cb.species.dry_air()
+    X_ch4 = cb.species.empty()
+    X_ch4[cb.species.indices["CH4"]] = 1.0
 
     mdot_total = 1.0  # kg/s reference air flow
 
@@ -219,10 +217,10 @@ def main() -> None:
     # Materials
     # -----------------------------------------------------------------------
     T_metal_limit = 1073.15  # K = 800 C
-    k_inconel = ca.k_inconel718(900.0)
-    k_ysz_fresh = ca.k_tbc_ysz(1200.0, hours=0.0, is_ebpvd=False)
-    k_ysz_aged = ca.k_tbc_ysz(1200.0, hours=1000.0, is_ebpvd=False)
-    k_ysz_ebpvd = ca.k_tbc_ysz(1200.0, hours=0.0, is_ebpvd=True)
+    k_inconel = cb.k_inconel718(900.0)
+    k_ysz_fresh = cb.k_tbc_ysz(1200.0, hours=0.0, is_ebpvd=False)
+    k_ysz_aged = cb.k_tbc_ysz(1200.0, hours=1000.0, is_ebpvd=False)
+    k_ysz_ebpvd = cb.k_tbc_ysz(1200.0, hours=0.0, is_ebpvd=True)
     t_wall = 0.003
     t_tbc = 0.0003
 
@@ -233,7 +231,7 @@ def main() -> None:
         "Inconel + YSZ EB-PVD": [(t_tbc, k_ysz_ebpvd), (t_wall, k_inconel)],
     }
 
-    print(f"\nMaterials: {ca.list_materials()}")
+    print(f"\nMaterials: {cb.list_materials()}")
     print(f"Inconel 718 k = {k_inconel:.2f} W/(m*K) @ 900 K")
     print(
         f"YSZ APS fresh k = {k_ysz_fresh:.3f}, aged k = {k_ysz_aged:.3f}, EB-PVD k = {k_ysz_ebpvd:.3f} W/(m*K) @ 1200 K"

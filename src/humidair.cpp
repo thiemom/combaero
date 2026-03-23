@@ -114,7 +114,7 @@ double water_vapor_mole_fraction(double T, double P, double RH) {
 
 // Get standard dry air composition as a vector in the order defined by
 // species_index in thermo_transport_data.h
-std::vector<double> standard_dry_air_composition() {
+std::vector<double> dry_air() {
   // Initialize mole fractions vector with zeros
   std::vector<double> X(species_names.size(), 0.0);
 

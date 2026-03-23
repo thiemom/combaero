@@ -1,7 +1,6 @@
 import numpy as np
 
-from combaero import complete_combustion, set_equivalence_ratio_mole
-from combaero._core import num_species, species_index_from_name
+import combaero as cb
 
 
 def test_combustion_smoothing_impact_and_jacobian():
@@ -9,13 +8,13 @@ def test_combustion_smoothing_impact_and_jacobian():
     Verify smoothing impact on temperature (< 1K) and Jacobian continuity.
     Tests across equivalence ratio range [0, 2.0] including kinks at 0 and 1.
     """
-    n_sp = num_species()
+    n_sp = cb.species.num_species
     X_fuel = np.zeros(n_sp)
-    X_fuel[species_index_from_name("CH4")] = 1.0
+    X_fuel[cb.species.species_index("CH4")] = 1.0
 
     X_ox = np.zeros(n_sp)
-    X_ox[species_index_from_name("O2")] = 0.21
-    X_ox[species_index_from_name("N2")] = 0.79
+    X_ox[cb.species.species_index("O2")] = 0.21
+    X_ox[cb.species.species_index("N2")] = 0.79
 
     T_reactants = 300.0
     P = 101325.0
@@ -27,11 +26,11 @@ def test_combustion_smoothing_impact_and_jacobian():
     t_smooth = []
 
     for phi in phis:
-        X_mix = set_equivalence_ratio_mole(phi, X_fuel, X_ox)
-        s_raw = complete_combustion(T_reactants, X_mix, P, smooth_phi0=False, smooth_phi1=False)
+        X_mix = cb.set_equivalence_ratio_mole(phi, X_fuel, X_ox)
+        s_raw = cb.complete_combustion(T_reactants, X_mix, P, smooth_phi0=False, smooth_phi1=False)
         t_no_smooth.append(s_raw.T)
 
-        s_sm = complete_combustion(T_reactants, X_mix, P, smooth_phi0=True, smooth_phi1=True)
+        s_sm = cb.complete_combustion(T_reactants, X_mix, P, smooth_phi0=True, smooth_phi1=True)
         t_smooth.append(s_sm.T)
 
     t_no_smooth = np.array(t_no_smooth)

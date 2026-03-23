@@ -14,7 +14,7 @@ class TestMassSpecificThermodynamicProperties:
     def test_cp_mass_air(self):
         """Test mass-specific heat capacity for air."""
         T = 300.0  # K
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
 
         cp_molar = cb.cp(T, X_air)  # [J/(mol*K)]
         mw = cb.mwmix(X_air)  # [g/mol]
@@ -31,7 +31,7 @@ class TestMassSpecificThermodynamicProperties:
     def test_cv_mass_air(self):
         """Test mass-specific heat capacity at constant volume for air."""
         T = 300.0  # K
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
 
         cv_molar = cb.cv(T, X_air)  # [J/(mol*K)]
         mw = cb.mwmix(X_air)  # [g/mol]
@@ -48,7 +48,7 @@ class TestMassSpecificThermodynamicProperties:
     def test_h_mass_air(self):
         """Test mass-specific enthalpy for air."""
         T = 500.0  # K
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
 
         h_molar = cb.h(T, X_air)  # [J/mol]
         mw = cb.mwmix(X_air)  # [g/mol]
@@ -63,7 +63,7 @@ class TestMassSpecificThermodynamicProperties:
         """Test mass-specific entropy for air."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
 
         s_molar = cb.s(T, X_air, P)  # [J/(mol*K)]
         mw = cb.mwmix(X_air)  # [g/mol]
@@ -77,7 +77,7 @@ class TestMassSpecificThermodynamicProperties:
     def test_u_mass_air(self):
         """Test mass-specific internal energy for air."""
         T = 500.0  # K
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
 
         u_molar = cb.u(T, X_air)  # [J/mol]
         mw = cb.mwmix(X_air)  # [g/mol]
@@ -98,7 +98,7 @@ class TestMassSpecificThermodynamicProperties:
     def test_gamma_consistency(self):
         """Test that gamma = cp/cv is same for molar and mass basis."""
         T = 400.0  # K
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
 
         # Molar basis
         gamma_molar = cb.cp(T, X_air) / cb.cv(T, X_air)
@@ -115,7 +115,7 @@ class TestMassSpecificThermodynamicProperties:
     def test_cp_mass_high_temperature(self):
         """Test cp_mass at high temperature."""
         T = 1500.0  # K
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
 
         cp_molar = cb.cp(T, X_air)
         mw = cb.mwmix(X_air)
@@ -132,7 +132,7 @@ class TestMassSpecificThermodynamicProperties:
 
     def test_h_mass_temperature_dependence(self):
         """Test h_mass increases with temperature."""
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
 
         T1 = 300.0  # K
         T2 = 600.0  # K
@@ -154,7 +154,7 @@ class TestMassSpecificThermodynamicProperties:
     def test_s_mass_pressure_dependence(self):
         """Test s_mass decreases with pressure (at constant T)."""
         T = 300.0  # K
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
 
         P1 = 101325.0  # 1 atm
         P2 = 202650.0  # 2 atm
@@ -169,7 +169,7 @@ class TestMassSpecificThermodynamicProperties:
         """Test all 4 mass-specific functions work together."""
         T = 400.0  # K
         P = 200000.0  # Pa
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
 
         mw = cb.mwmix(X_air)
 
@@ -195,7 +195,7 @@ class TestMassSpecificThermodynamicProperties:
         """Verify units are in J/kg and J/(kg*K) not J/mol."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
 
         cp_mass = cb.cp_mass(T, X_air)
         cv_mass = cb.cv_mass(T, X_air)

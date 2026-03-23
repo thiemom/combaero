@@ -22,7 +22,7 @@ import numpy as np
 from plot_utils import show_or_save
 from scipy.optimize import brentq as _brentq
 
-import combaero as ca
+import combaero as cb
 import combaero.compressible as comp
 import combaero.incompressible as incomp
 from combaero.network import (
@@ -38,7 +38,7 @@ from combaero.network import (
 # ------------------------------------------------------------------------------
 # Shared conditions
 # ------------------------------------------------------------------------------
-X = ca.standard_dry_air_composition()
+X = cb.species.dry_air()
 T = 400.0  # K
 P = 200_000.0  # Pa  (2 bar)
 D = 0.05  # m   (50 mm pipe)
@@ -220,7 +220,7 @@ separator("Example 5: NetworkSolver pipe+orifice -- validate vs direct API")
 A_orif = 1e-4  # 1 cm² throat (same as Example 3)
 Cd_orif = 0.65
 P_low = 101_325.0  # atmospheric outlet
-Y = list(ca.mole_to_mass(X))
+Y = list(cb.mole_to_mass(X))
 area_pipe = 0.25 * math.pi * D**2
 
 velocities = [5.0, 20.0, 50.0, 100.0, 150.0, 200.0]
@@ -240,16 +240,16 @@ def _direct_incompressible(mdot: float) -> float:
 
     def _residual(P_junc: float) -> float:
         # Orifice: junction → outlet
-        rho_j = ca.density(T, P_junc, X)
-        mdot_orif = ca.orifice_mdot(P_junc, P_low, A_orif, Cd_orif, rho_j)
+        rho_j = cb.density(T, P_junc, X)
+        mdot_orif = cb.orifice_mdot(P_junc, P_low, A_orif, Cd_orif, rho_j)
         return mdot - mdot_orif
 
     P_junc = _brentq(_residual, P_low + 1.0, 1e8)
 
     # Pipe: inlet → junction
-    rho_in_est = ca.density(T, P_junc + 1.0, X)
+    rho_in_est = cb.density(T, P_junc + 1.0, X)
     v_pipe = mdot / (rho_in_est * area_pipe)
-    dP_pipe, _, _ = ca.pressure_drop_pipe(
+    dP_pipe, _, _ = cb.pressure_drop_pipe(
         T,
         P_junc,
         X,
@@ -271,7 +271,7 @@ def _direct_compressible(mdot: float) -> float:
 
     P_junc = _brentq(_residual, P_low + 1.0, 1e8)
 
-    rho_in_est = ca.density(T, P_junc, X)
+    rho_in_est = cb.density(T, P_junc, X)
     v_pipe = mdot / (rho_in_est * area_pipe)
     sol_p = comp.pipe_flow_rough(T, P_junc, X, u=v_pipe, L=L, D=D, roughness=roughness)
     return P_junc + sol_p.dP
@@ -285,13 +285,13 @@ plot_Pin_net_i: list[float] = []
 plot_Pin_net_c: list[float] = []
 
 for u_in in velocities:
-    rho_in = ca.density(T, P, X)
+    rho_in = cb.density(T, P, X)
     mdot = rho_in * area_pipe * u_in
     plot_u.append(u_in)
 
     for regime_label, pipe_regime, orif_regime, direct_fn in [
         ("incompressible", "incompressible", "incompressible", _direct_incompressible),
-        ("compressible", "compressible_fanno", "compressible", _direct_compressible),
+        ("compressible", "compressible", "compressible", _direct_compressible),
     ]:
         # --- Direct API (self-consistent via brentq) ---
         Pin_direct = direct_fn(mdot)

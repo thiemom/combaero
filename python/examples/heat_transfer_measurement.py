@@ -26,7 +26,7 @@ the heat flux through the wall.
 
 import numpy as np
 
-import combaero as ca
+import combaero as cb
 
 print("=" * 70)
 print("FURNACE WALL HEAT TRANSFER ANALYSIS")
@@ -76,16 +76,16 @@ print(f"  Ambient air: T = {T_amb - 273.15:.0f} degC, h = {h_amb:.0f} W/(m^2*K)"
 print("\n--- Theoretical Analysis ---")
 
 # Overall heat transfer coefficient
-U = ca.overall_htc(np.array([h_gas, h_amb]), t_over_k)
+U = cb.overall_htc(np.array([h_gas, h_amb]), t_over_k)
 print(f"  Overall HTC: U = {U:.3f} W/(m^2*K)")
 
 # Expected heat flux
 dT = T_gas - T_amb
-q_theory = ca.heat_flux(U, dT)
+q_theory = cb.heat_flux(U, dT)
 print(f"  Expected heat flux: q = {q_theory:.1f} W/m^2")
 
 # Temperature profile
-temps_theory, q_check = ca.wall_temperature_profile(T_gas, T_amb, h_gas, h_amb, t_over_k)
+temps_theory, q_check = cb.wall_temperature_profile(T_gas, T_amb, h_gas, h_amb, t_over_k)
 
 print("\n  Expected temperature profile:")
 edge_names = ["Steel liner (hot)", "Steel-ceramic", "Ceramic-casing", "Casing (cold)"]
@@ -127,9 +127,9 @@ print(f"    TC4 (cold surface):     {T_meas['TC4'] - 273.15:.1f} degC")
 print("\n--- Heat Flux Inference ---")
 
 # Method 1: From edge temperatures
-q_from_TC1 = ca.heat_flux_from_T_at_edge(T_meas["TC1"], 0, T_gas, T_amb, h_gas, h_amb, t_over_k)
-q_from_TC2 = ca.heat_flux_from_T_at_edge(T_meas["TC2"], 1, T_gas, T_amb, h_gas, h_amb, t_over_k)
-q_from_TC4 = ca.heat_flux_from_T_at_edge(T_meas["TC4"], 3, T_gas, T_amb, h_gas, h_amb, t_over_k)
+q_from_TC1 = cb.heat_flux_from_T_at_edge(T_meas["TC1"], 0, T_gas, T_amb, h_gas, h_amb, t_over_k)
+q_from_TC2 = cb.heat_flux_from_T_at_edge(T_meas["TC2"], 1, T_gas, T_amb, h_gas, h_amb, t_over_k)
+q_from_TC4 = cb.heat_flux_from_T_at_edge(T_meas["TC4"], 3, T_gas, T_amb, h_gas, h_amb, t_over_k)
 
 print("  From edge thermocouples:")
 print(
@@ -143,7 +143,7 @@ print(
 )
 
 # Method 2: From embedded thermocouple (TC3)
-q_from_TC3 = ca.heat_flux_from_T_at_depth(
+q_from_TC3 = cb.heat_flux_from_T_at_depth(
     T_meas["TC3"], depth_TC3, T_gas, T_amb, h_gas, h_amb, thicknesses, conductivities
 )
 print("\n  From embedded thermocouple:")

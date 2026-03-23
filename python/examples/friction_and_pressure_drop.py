@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import numpy as np
 
-import combaero as ca
+import combaero as cb
 
 
 def main() -> None:
@@ -35,10 +35,10 @@ def main() -> None:
     print(f"Relative roughness eps/D: {e_D}")
 
     # Compare different correlations
-    f_haaland = ca.friction_haaland(Re, e_D)
-    f_serghides = ca.friction_serghides(Re, e_D)
-    f_colebrook = ca.friction_colebrook(Re, e_D)
-    f_petukhov = ca.friction_petukhov(Re)
+    f_haaland = cb.friction_haaland(Re, e_D)
+    f_serghides = cb.friction_serghides(Re, e_D)
+    f_colebrook = cb.friction_colebrook(Re, e_D)
+    f_petukhov = cb.friction_petukhov(Re)
 
     print("\nFriction factors (smooth pipe):")
     print(f"  Haaland:    f = {f_haaland:.6f}")
@@ -63,9 +63,9 @@ def main() -> None:
     print(f"Pipe diameter: {D * 1000:.0f} mm")
     print("\nFriction factors for different pipe materials:")
     for material in materials:
-        eps = ca.pipe_roughness(material)  # Get roughness from database
+        eps = cb.pipe_roughness(material)  # Get roughness from database
         e_D = eps / D
-        f = ca.friction_haaland(Re, e_D)
+        f = cb.friction_haaland(Re, e_D)
         print(f"  {material:25s}: f = {f:.6f}  (eps = {eps * 1e6:.1f} mum, eps/D = {e_D:.6f})")
 
     # =========================================================================
@@ -78,23 +78,23 @@ def main() -> None:
     # Pipe geometry
     D = 0.1  # Diameter [m]
     L = 100.0  # Length [m]
-    eps = ca.pipe_roughness("commercial_steel")  # Get roughness from database
+    eps = cb.pipe_roughness("commercial_steel")  # Get roughness from database
     e_D = eps / D
 
     # Air properties at 300K
     T = 300.0  # Temperature [K]
     P = 101325.0  # Pressure [Pa]
-    X_air = ca.standard_dry_air_composition()
+    X_air = cb.species.dry_air()
 
     # Flow conditions
     v = 10.0  # Velocity [m/s]
 
     # Use pressure_drop_pipe composite function (calculates Re, f, and DeltaP)
-    dP, Re, f = ca.pressure_drop_pipe(T, P, X_air, v, D, L, eps, "haaland")
+    dP, Re, f = cb.pressure_drop_pipe(T, P, X_air, v, D, L, eps, "haaland")
 
     # Also get density and viscosity for display
-    rho = ca.density(T, P, X_air)
-    mu = ca.viscosity(T, P, X_air)
+    rho = cb.density(T, P, X_air)
+    mu = cb.viscosity(T, P, X_air)
 
     print("\nPipe specifications:")
     print(f"  Diameter:        D = {D * 1000:.1f} mm")
@@ -129,8 +129,8 @@ def main() -> None:
     print("-" * 50)
 
     for Re in Re_values:
-        f_h = ca.friction_haaland(Re, e_D)
-        f_s = ca.friction_serghides(Re, e_D)
+        f_h = cb.friction_haaland(Re, e_D)
+        f_s = cb.friction_serghides(Re, e_D)
         diff = abs(f_h - f_s) / f_s * 100
         print(f"{Re:12.2e}  {f_h:12.6f}  {f_s:12.6f}  {diff:10.4f}")
 
@@ -145,14 +145,14 @@ def main() -> None:
     mdot = 0.5  # Mass flow rate [kg/s]
     L = 50.0  # Pipe length [m]
     dP_max = 5000.0  # Maximum allowable pressure drop [Pa]
-    eps = ca.pipe_roughness("commercial_steel")  # Get roughness from database
+    eps = cb.pipe_roughness("commercial_steel")  # Get roughness from database
 
     # Air properties
     T = 300.0
     P = 101325.0
-    X_air = ca.standard_dry_air_composition()
-    rho = ca.density(T, P, X_air)
-    mu = ca.viscosity(T, P, X_air)
+    X_air = cb.species.dry_air()
+    rho = cb.density(T, P, X_air)
+    mu = cb.viscosity(T, P, X_air)
 
     print("\nDesign requirements:")
     print(f"  Mass flow rate:  mdot = {mdot:.2f} kg/s")
@@ -168,10 +168,10 @@ def main() -> None:
 
     for D in [0.05, 0.075, 0.1, 0.125, 0.15]:
         # Use pipe_area helper
-        A = ca.pipe_area(D)
+        A = cb.pipe_area(D)
         v = mdot / (rho * A)
         # Use pressure_drop_pipe composite function
-        dP, Re, f = ca.pressure_drop_pipe(T, P, X_air, v, D, L, eps, "haaland")
+        dP, Re, f = cb.pressure_drop_pipe(T, P, X_air, v, D, L, eps, "haaland")
         ok = "OK" if dP <= dP_max else "FAIL"
         print(f"{D * 1000:10.1f}  {v:10.2f}  {Re:12.2e}  {f:10.6f}  {dP / 1000:12.3f}  {ok:>6s}")
 
@@ -196,7 +196,7 @@ def main() -> None:
         else:
             regime = "Turbulent"
             f_formula = "N/A"
-            f_corr = f"{ca.friction_haaland(Re, 0.0):.6f}"
+            f_corr = f"{cb.friction_haaland(Re, 0.0):.6f}"
 
         f_formula_str = f"{f_formula:.6f}" if isinstance(f_formula, float) else f_formula
         print(f"{Re:10.0f}  {regime:>12s}  {f_formula_str:>15s}  {f_corr:>18s}")

@@ -52,13 +52,34 @@ print(node_state.m_dot)   # Mass flow [kg/s]
 print(node_state.density()) # Static density [kg/m³]
 ```
 
-### Species Lookup
+### Species Module
+The `combaero.species` module provides high-level helpers for composition vectors.
+
 ```python
-# Metadata
+import combaero as cb
+
+# Get standard compositions (returns numpy array)
+X_air = cb.species.dry_air()        # Mole fractions
+Y_air = cb.species.dry_air_mass()   # Mass fractions (standard for network)
+
+# Humid air at T [K], P [Pa], RH [0-1]
+Y_humid = cb.species.humid_air_mass(300, 101325, 0.5)
+
+# Pure species or from mapping
+Y_ch4 = cb.species.pure_species("CH4")
+Y_mix = cb.species.from_mapping({"O2": 0.20, "N2": 78, "AR": 0.02})
+
+# Explicit conversion
+Y = cb.species.to_mass(X_air)
+X = cb.species.to_mole(Y_air)
+```
+
+### Species Lookup (Legacy)
+```python
+# Low-level metadata from core
 num = cb.num_species()
 name = cb.species_name(0)
 idx = cb.species_index_from_name("H2O")
-mw = cb.species_molar_mass_from_name("CH4")
 ```
 
 ---
@@ -332,7 +353,8 @@ graph = FlowNetwork()
 graph.add_element(OrificeElement("ori1", "nodeA", "nodeB", Cd=0.6, area=1e-4))
 
 solver = NetworkSolver(graph)
-results = solver.solve(timeout=5.0)
+# init_strategy options: "default", "incompressible_warmstart", "homotopy"
+results = solver.solve(method="hybr", init_strategy="homotopy")
 ```
 
 ### Network Nodes

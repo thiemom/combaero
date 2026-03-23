@@ -22,7 +22,7 @@ def build_and_solve_network(
 ):
     T_air = 560.0
     P_ref = 101325.0  # Standard reference pressure for initial stream properties
-    X_air = cb.humid_air_composition(288.16, P_ref, 0.6)
+    X_air = cb.species.humid_air(288.16, P_ref, 0.6)
     Y_air = cb.mole_to_mass(X_air)
 
     Y_fuel = [0.0] * cb.num_species()
@@ -118,7 +118,7 @@ def build_and_solve_network(
                     length=L_pipe,
                     diameter=D_branch,
                     roughness=2e-5,
-                    regime="compressible_fanno",
+                    regime="compressible",
                     surface=ConvectiveSurface(area=A_ht_pipe, model=SmoothModel())
                     if A_ht_pipe > 0
                     else None,
@@ -165,7 +165,7 @@ def build_and_solve_network(
                     length=L_pipe,
                     diameter=D_branch,
                     roughness=2e-5,
-                    regime="compressible_fanno",
+                    regime="compressible",
                     surface=ConvectiveSurface(area=A_ht_pipe, model=SmoothModel())
                     if A_ht_pipe > 0
                     else None,

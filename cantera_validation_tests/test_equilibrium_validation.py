@@ -543,7 +543,7 @@ class TestCombustionEquilibrium:
         """phi=0.8 CH4/air: compare T_ad and major species vs Cantera HP equilibrium."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         X_fuel = np.zeros(num_species())
         X_fuel[species_index_from_name("CH4")] = 1.0
         X_mix = cb.set_equivalence_ratio_mole(0.8, X_fuel, X_air)
@@ -578,7 +578,7 @@ class TestCombustionEquilibrium:
         """phi=1.2 CH4/air: verify CO and H2 survive (complete combustion gives zero)."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         X_fuel = np.zeros(num_species())
         X_fuel[species_index_from_name("CH4")] = 1.0
         X_mix = cb.set_equivalence_ratio_mole(1.2, X_fuel, X_air)
@@ -605,7 +605,7 @@ class TestCombustionEquilibrium:
         """phi=1.0 CH4/air: T_ad within 30 K of Cantera HP equilibrium."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         X_fuel = np.zeros(num_species())
         X_fuel[species_index_from_name("CH4")] = 1.0
         X_mix = cb.set_equivalence_ratio_mole(1.0, X_fuel, X_air)

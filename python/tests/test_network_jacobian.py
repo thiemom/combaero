@@ -80,7 +80,7 @@ def test_jacobian_accuracy_compressible_network() -> None:
             length=3.2,
             diameter=0.022,
             roughness=8.0e-5,
-            regime="compressible_fanno",
+            regime="compressible",
             friction_model="haaland",
         )
     )

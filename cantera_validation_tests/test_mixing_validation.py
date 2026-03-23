@@ -44,7 +44,7 @@ class TestStreamMixing:
         """Test mixing two streams with equal mass flow rates."""
         cb = combaero
 
-        X_air = np.array(cb.standard_dry_air_composition())
+        X_air = np.array(cb.species.dry_air())
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("CH4")] = 1.0
 
@@ -102,7 +102,7 @@ class TestStreamMixing:
         """Test mixing two streams with different mass flow rates."""
         cb = combaero
 
-        X_air = np.array(cb.standard_dry_air_composition())
+        X_air = np.array(cb.species.dry_air())
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("CH4")] = 1.0
 
@@ -157,7 +157,7 @@ class TestStreamMixing:
         """Test mixing three streams."""
         cb = combaero
 
-        X_air = np.array(cb.standard_dry_air_composition())
+        X_air = np.array(cb.species.dry_air())
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("CH4")] = 1.0
         X_steam = np.zeros(len(X_air))
@@ -219,7 +219,7 @@ class TestStreamMixing:
         """Test that mixing conserves enthalpy."""
         cb = combaero
 
-        X_air = np.array(cb.standard_dry_air_composition())
+        X_air = np.array(cb.species.dry_air())
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("CH4")] = 1.0
 
@@ -298,7 +298,7 @@ class TestDensityCalculation:
         """Test air density at standard conditions."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         T = 300.0
         P = 101325.0
 
@@ -344,7 +344,7 @@ class TestDensityCalculation:
         """Test density at various temperatures."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         P = 101325.0
 
         for T in [300.0, 500.0, 1000.0, 1500.0, 2000.0]:
@@ -365,7 +365,7 @@ class TestDensityCalculation:
         """Test density at various pressures."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         T = 300.0
 
         for P in [101325.0, 200000.0, 500000.0, 1000000.0]:
