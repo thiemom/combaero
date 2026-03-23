@@ -256,40 +256,8 @@ def main():
     total_area = 0.25 * math.pi * (0.8) ** 2  # Even safer Mach numbers, max total diameter 0.8m
     tests = [
         {"m_dot_air": 10.0, "T_ad": 1700.0, "n_parallel": 1, "n_serial": 1, "total_ht_area": 50.0},
-        {"m_dot_air": 10.0, "T_ad": 1700.0, "n_parallel": 2, "n_serial": 1, "total_ht_area": 50.0},
-        {"m_dot_air": 10.0, "T_ad": 1700.0, "n_parallel": 1, "n_serial": 5, "total_ht_area": 50.0},
         {"m_dot_air": 10.0, "T_ad": 1700.0, "n_parallel": 2, "n_serial": 5, "total_ht_area": 50.0},
-        {"m_dot_air": 20.0, "T_ad": 1700.0, "n_parallel": 2, "n_serial": 2, "total_ht_area": 50.0},
-        {"m_dot_air": 20.0, "T_ad": 2200.0, "n_parallel": 2, "n_serial": 2, "total_ht_area": 50.0},
-        {
-            "m_dot_air": 10.0,
-            "T_ad": 1700.0,
-            "n_parallel": 1,
-            "n_serial": 10,
-            "total_ht_area": 100.0,
-        },
-        {"m_dot_air": 10.0, "T_ad": 1700.0, "n_parallel": 4, "n_serial": 4, "total_ht_area": 100.0},
-        {
-            "m_dot_air": 10.0,
-            "T_ad": 1700.0,
-            "n_parallel": 10,
-            "n_serial": 10,
-            "total_ht_area": 200.0,
-        },
-        {
-            "m_dot_air": 10.0,
-            "T_ad": 1700.0,
-            "n_parallel": 20,
-            "n_serial": 5,
-            "total_ht_area": 200.0,
-        },
-        {
-            "m_dot_air": 10.0,
-            "T_ad": 1700.0,
-            "n_parallel": 5,
-            "n_serial": 20,
-            "total_ht_area": 200.0,
-        },
+        {"m_dot_air": 20.0, "T_ad": 2200.0, "n_parallel": 4, "n_serial": 4, "total_ht_area": 100.0},
     ]
 
     print(f"--- Running Combustor Full Coupling Limits ({len(tests)} cases) ---")

@@ -47,8 +47,8 @@ class SweepConfig:
     l_pipe: float = 1.2
     roughness: float = 1.0e-5
     cd: float = 0.72
-    d_orifice_hot: float = 0.030
-    d_orifice_cold: float = 0.025
+    d_orifice_hot: float = 0.012
+    d_orifice_cold: float = 0.010
     wall_thickness: float = 0.002
     wall_k: float = 20.0
 
@@ -211,7 +211,9 @@ def run_sweep(mach_values: np.ndarray, regime: Regime, cfg: SweepConfig) -> dict
 
 def main() -> None:
     cfg = SweepConfig()
-    mach_values = np.linspace(0.05, 1.0, 25)
+    # Reduced sweep for fast demonstration.
+    # For a full Mach sweep (0.05 to 1.0), see benchmarks/mach_sweep_network.py
+    mach_values = np.array([0.1, 0.4, 0.7])
 
     data_incomp = run_sweep(mach_values, regime="incompressible", cfg=cfg)
     data_comp = run_sweep(mach_values, regime="compressible", cfg=cfg)
