@@ -1,0 +1,104 @@
+{
+  "run_utc": "2026-03-22T20:13:37.141409+00:00",
+  "repeats": 1,
+  "case_timeout_s": 300.0,
+  "solver_timeout_s": 120.0,
+  "cases": {
+    "grid_1x1_incomp": {
+      "success_count": 1,
+      "attempts": 1,
+      "timeout_count": 0,
+      "success_rate": 1.0,
+      "messages": [
+        "The relative error between two consecutive iterates is at most 0.000100"
+      ],
+      "mean_s": 0.07567500000004657,
+      "median_s": 0.07567500000004657,
+      "min_s": 0.07567500000004657,
+      "max_s": 0.07567500000004657,
+      "median_final_norm": 0.0004966403114238938,
+      "max_final_norm": 0.0004966403114238938
+    },
+    "grid_1x1_comp": {
+      "success_count": 0,
+      "attempts": 1,
+      "timeout_count": 0,
+      "success_rate": 0.0,
+      "messages": [
+        "friction_haaland: Re must be positive"
+      ]
+    },
+    "grid_2x2_incomp": {
+      "success_count": 1,
+      "attempts": 1,
+      "timeout_count": 0,
+      "success_rate": 1.0,
+      "messages": [
+        "The relative error between two consecutive iterates is at most 0.000100"
+      ],
+      "mean_s": 0.5012057500134688,
+      "median_s": 0.5012057500134688,
+      "min_s": 0.5012057500134688,
+      "max_s": 0.5012057500134688,
+      "median_final_norm": 0.0008480202225147203,
+      "max_final_norm": 0.0008480202225147203
+    },
+    "grid_2x2_comp": {
+      "success_count": 0,
+      "attempts": 1,
+      "timeout_count": 0,
+      "success_rate": 0.0,
+      "messages": [
+        "friction_haaland: Re must be positive"
+      ]
+    },
+    "grid_5x5_incomp": {
+      "success_count": 1,
+      "attempts": 1,
+      "timeout_count": 0,
+      "success_rate": 1.0,
+      "messages": [
+        "Converged after fallback to hybr (original lm failed)."
+      ],
+      "mean_s": 2.7881024579983205,
+      "median_s": 2.7881024579983205,
+      "min_s": 2.7881024579983205,
+      "max_s": 2.7881024579983205,
+      "median_final_norm": 1.457240194701126e-07,
+      "max_final_norm": 1.457240194701126e-07
+    },
+    "grid_5x5_comp": {
+      "success_count": 0,
+      "attempts": 1,
+      "timeout_count": 0,
+      "success_rate": 0.0,
+      "messages": [
+        "friction_haaland: Re must be positive"
+      ]
+    },
+    "grid_10x10_incomp": {
+      "success_count": 0,
+      "attempts": 1,
+      "timeout_count": 0,
+      "success_rate": 0.0,
+      "messages": [
+        "Solver reported success but |F|=8.355e+00 exceeds residual tolerance (0.001)."
+      ],
+      "mean_s": 34.27477054198971,
+      "median_s": 34.27477054198971,
+      "min_s": 34.27477054198971,
+      "max_s": 34.27477054198971,
+      "median_final_norm": 8.354848913102208,
+      "max_final_norm": 8.354848913102208
+    },
+    "grid_10x10_comp": {
+      "success_count": 0,
+      "attempts": 1,
+      "timeout_count": 0,
+      "success_rate": 0.0,
+      "messages": [
+        "friction_haaland: Re must be positive"
+      ]
+    }
+  }
+}
