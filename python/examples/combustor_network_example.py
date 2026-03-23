@@ -45,7 +45,7 @@ def main():
     p_out = PressureBoundary("exhaust", P_total=101325.0, T_total=300.0, Y=Y_air)
 
     # --- Inner Nodes ---
-    combustor = CombustorNode("combustor", method="complete", pressure_loss_frac=0.05)
+    combustor = CombustorNode("combustor", method="complete")
 
     # Provide an initial guess to avoid dP=0 singularity across the nozzle at x0
     combustor.initial_guess = {

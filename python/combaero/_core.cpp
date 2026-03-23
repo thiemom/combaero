@@ -1272,8 +1272,7 @@ PYBIND11_MODULE(_core, m) {
       .def_property(
           "HP",
           [](const State &s) {
-            double h_mass = s.h() / s.mw() * 1000.0;
-            return py::make_tuple(h_mass, s.P);
+            return py::make_tuple(s.h(), s.P);
           },
           [](State &s, py::tuple t) {
             if (t.size() != 2)
@@ -1284,8 +1283,7 @@ PYBIND11_MODULE(_core, m) {
       .def_property(
           "SP",
           [](const State &s) {
-            double s_mass = s.s() / s.mw() * 1000.0;
-            return py::make_tuple(s_mass, s.P);
+            return py::make_tuple(s.s(), s.P);
           },
           [](State &s, py::tuple t) {
             if (t.size() != 2)
@@ -1296,9 +1294,8 @@ PYBIND11_MODULE(_core, m) {
       .def_property(
           "UV",
           [](const State &s) {
-            double u_mass = s.u() / s.mw() * 1000.0;
             double v_mass = 1.0 / s.rho();
-            return py::make_tuple(u_mass, v_mass);
+            return py::make_tuple(s.u(), v_mass);
           },
           [](State &s, py::tuple t) {
             if (t.size() != 2)
@@ -1310,9 +1307,8 @@ PYBIND11_MODULE(_core, m) {
       .def_property(
           "SV",
           [](const State &s) {
-            double s_mass = s.s() / s.mw() * 1000.0;
             double v_mass = 1.0 / s.rho();
-            return py::make_tuple(s_mass, v_mass);
+            return py::make_tuple(s.s(), v_mass);
           },
           [](State &s, py::tuple t) {
             if (t.size() != 2)
@@ -1337,8 +1333,7 @@ PYBIND11_MODULE(_core, m) {
       .def_property(
           "UP",
           [](const State &s) {
-            double u_mass = s.u() / s.mw() * 1000.0;
-            return py::make_tuple(u_mass, s.P);
+            return py::make_tuple(s.u(), s.P);
           },
           [](State &s, py::tuple t) {
             if (t.size() != 2)
@@ -1351,8 +1346,7 @@ PYBIND11_MODULE(_core, m) {
           "VH",
           [](const State &s) {
             double v_mass = 1.0 / s.rho();
-            double h_mass = s.h() / s.mw() * 1000.0;
-            return py::make_tuple(v_mass, h_mass);
+            return py::make_tuple(v_mass, s.h());
           },
           [](State &s, py::tuple t) {
             if (t.size() != 2)
@@ -1364,9 +1358,7 @@ PYBIND11_MODULE(_core, m) {
       .def_property(
           "SH",
           [](const State &s) {
-            double s_mass = s.s() / s.mw() * 1000.0;
-            double h_mass = s.h() / s.mw() * 1000.0;
-            return py::make_tuple(s_mass, h_mass);
+            return py::make_tuple(s.s(), s.h());
           },
           [](State &s, py::tuple t) {
             if (t.size() != 2)

@@ -61,9 +61,10 @@ print("=" * 70)
 print()
 
 # Hot side
-h_hot, T_aw_hot, A_hot = hot_surface.htc_and_T(
+res_hot = hot_surface.htc_and_T(
     T=T_hot, P=P_hot, X=X_air, velocity=u_hot, diameter=D_hot, length=L_hot
 )
+h_hot, T_aw_hot, A_hot = res_hot.h, res_hot.T_aw, hot_surface.area
 
 print("Hot Side (Smooth Channel):")
 print(f"  T_bulk = {T_hot:.1f} K")
@@ -73,9 +74,10 @@ print(f"  A_conv = {A_hot:.4f} m^2")
 print()
 
 # Cold side
-h_cold, T_aw_cold, A_cold = cold_surface.htc_and_T(
+res_cold = cold_surface.htc_and_T(
     T=T_cold, P=P_cold, X=X_air, velocity=u_cold, diameter=D_cold, length=L_cold
 )
+h_cold, T_aw_cold, A_cold = res_cold.h, res_cold.T_aw, cold_surface.area
 
 print("Cold Side (Ribbed Channel):")
 print(f"  T_bulk = {T_cold:.1f} K")
