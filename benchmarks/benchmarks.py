@@ -184,7 +184,6 @@ def _run_network_case(case: BenchmarkCase, solver_timeout_s: float) -> dict[str,
         method="lm",
         timeout=solver_timeout_s,
         options=solver_options,
-        robust=True,
         init_strategy="incompressible_warmstart"
     )
     elapsed = perf_counter() - t0
@@ -240,7 +239,7 @@ def run_benchmarks(repeats: int, case_timeout_s: float, solver_timeout_s: float)
         "cases": {},
     }
 
-    print(f"--- Running Network Solver Benchmarks ({len(cases)} cases, {repeats} repeats) ---")
+    print(f"--- Running Network Solver Benchmarks ({len(cases)} cases, max {repeats} repeats) ---")
 
     for case in cases:
         times: list[float] = []
@@ -249,9 +248,12 @@ def run_benchmarks(repeats: int, case_timeout_s: float, solver_timeout_s: float)
         error_messages: list[str] = []
         final_norms: list[float] = []
 
-        print(f"Testing {case.name}...", flush=True)
+        # Speed up heavy cases
+        case_repeats = 1 if case.n_serial * case.n_parallel >= 25 else repeats
 
-        for _ in range(repeats):
+        print(f"Testing {case.name} ({case_repeats} repeats)...", flush=True)
+
+        for _ in range(case_repeats):
             try:
                 res = _run_case_once(case, solver_timeout_s)
                 times.append(float(res["elapsed_s"]))
@@ -270,9 +272,9 @@ def run_benchmarks(repeats: int, case_timeout_s: float, solver_timeout_s: float)
 
         stats: dict[str, Any] = {
             "success_count": success_count,
-            "attempts": repeats,
+            "attempts": case_repeats,
             "timeout_count": timeout_count,
-            "success_rate": success_count / repeats,
+            "success_rate": success_count / case_repeats,
             "messages": error_messages,
         }
 
@@ -299,7 +301,7 @@ def format_markdown(results: dict[str, Any]) -> str:
         "# Network Solver Benchmarks",
         "",
         f"- Run UTC: `{results['run_utc']}`",
-        f"- Repeats per case: `{results['repeats']}`",
+        f"- Repeats per case: `{results['repeats']}` (hard grids: `1`)",
         f"- Case timeout: `{results['case_timeout_s']:.1f}s`",
         f"- Solver timeout: `{results['solver_timeout_s']:.1f}s`",
         "",

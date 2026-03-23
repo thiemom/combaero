@@ -273,3 +273,53 @@
 ## Notes
 - This benchmark is informational and not part of default CI gating.
 - Timeouts are used to prevent hangs in difficult nonlinear regimes.
+
+## 2026-03-23T05:12:49.834352+00:00
+
+# Network Solver Benchmarks
+
+- Run UTC: `2026-03-23T05:12:49.834352+00:00`
+- Repeats per case: `3`
+- Case timeout: `300.0s`
+- Solver timeout: `120.0s`
+
+| Case | Success | Time median [s] | Time max [s] | Median |F| |
+|---|---:|---:|---:|---:|
+| `grid_1x1_incomp` | 3/3 | 0.1738 | 0.1743 | 2.773e-05 |
+| `grid_1x1_comp` | 3/3 | 1.5827 | 1.5858 | 4.942e-04 |
+| `grid_2x2_incomp` | 3/3 | 0.1257 | 0.1644 | 6.683e-05 |
+| `grid_2x2_comp` | 3/3 | 5.7538 | 5.7868 | 8.319e-04 |
+| `grid_5x5_incomp` | 3/3 | 0.8035 | 0.8084 | 3.103e-04 |
+| `grid_5x5_comp` | 0/3 | 129.6442 | 129.9220 | 3.495e-03 |
+| `grid_10x10_incomp` | 0/3 | 19.6531 | 19.8185 | 2.361e+00 |
+| `grid_10x10_comp` | 0/3 | 199.6100 | 200.5710 | 1.594e+00 |
+
+## Notes
+- Tested heavily non-linear parameterized combustor grid arrays (from 1x1 up to 10x10).
+- "comp" forces strict Fanno/Orifice compressibility, which frequently crashes generic non-damped Newton solvers.
+- Timeouts are used to prevent hangs in difficult nonlinear regimes.
+
+## 2026-03-23T07:33:19.692773+00:00
+
+# Network Solver Benchmarks
+
+- Run UTC: `2026-03-23T07:33:19.692773+00:00`
+- Repeats per case: `3` (hard grids: `1`)
+- Case timeout: `300.0s`
+- Solver timeout: `120.0s`
+
+| Case | Success | Time median [s] | Time max [s] | Median |F| |
+|---|---:|---:|---:|---:|
+| `grid_1x1_incomp` | 3/3 | 0.1667 | 0.1675 | 2.773e-05 |
+| `grid_1x1_comp` | 3/3 | 1.5235 | 1.5251 | 4.942e-04 |
+| `grid_2x2_incomp` | 3/3 | 0.1193 | 0.1203 | 6.683e-05 |
+| `grid_2x2_comp` | 3/3 | 5.5116 | 5.6720 | 8.319e-04 |
+| `grid_5x5_incomp` | 1/1 | 0.7408 | 0.7408 | 3.103e-04 |
+| `grid_5x5_comp` | 0/1 | 132.2849 | 132.2849 | 3.495e-03 |
+| `grid_10x10_incomp` | 0/1 | 19.5763 | 19.5763 | 2.361e+00 |
+| `grid_10x10_comp` | 0/1 | 193.4447 | 193.4447 | 1.594e+00 |
+
+## Notes
+- Tested heavily non-linear parameterized combustor grid arrays (from 1x1 up to 10x10).
+- "comp" forces strict Fanno/Orifice compressibility, which frequently crashes generic non-damped Newton solvers.
+- Timeouts are used to prevent hangs in difficult nonlinear regimes.
