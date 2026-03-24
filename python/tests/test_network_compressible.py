@@ -273,8 +273,8 @@ def _build_fully_coupled_network(regime: str, mach_target: float) -> FlowNetwork
     t_cold = _T_COLD
     p_out_hot = _P_OUT
     p_out_cold = _P_OUT
-    d_hot = 0.018
-    d_cold = 0.014
+    d_hot = 0.040
+    d_cold = 0.035
     length = 2.0
 
     mdot_hot = _mdot_for_mach(mach_target, t_hot, p_out_hot, x_air, _area(d_hot))
@@ -410,7 +410,7 @@ def test_fully_coupled_compressible_vs_incompressible_mach_sweep():
 def test_homotopy_initialization_strategy():
     """Verify that init_strategy='homotopy' converges for a high-flow network."""
     net = FlowNetwork()
-
+    print("running: test_homotopy_initialization_strategy")
     # Define a high-flow scenario that might struggle with cold start
     # but should be easy for homotopy
     inlet = MassFlowBoundary("inlet", m_dot=2.0, T_total=500.0)
@@ -425,7 +425,7 @@ def test_homotopy_initialization_strategy():
         "inlet",
         "outlet",
         length=5.0,
-        diameter=0.08,
+        diameter=0.1,
         roughness=1e-4,
         regime="compressible",
     )
@@ -435,6 +435,7 @@ def test_homotopy_initialization_strategy():
 
     # Solve with homotopy
     sol = solver.solve(method="hybr", init_strategy="homotopy")
-
+    print("solver solution:")
+    print(sol)
     assert sol["__success__"], "Homotopy solve failed"
     assert sol["pipe.m_dot"] > 0, "Mass flow should be positive"

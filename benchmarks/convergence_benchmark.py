@@ -33,7 +33,7 @@ _P_OUT = 2.0e5
 
 def _build_fully_coupled_network(mach_target: float) -> FlowNetwork:
     x_air = cb.species.dry_air()
-    y_air = list(cb.species.dry_air_mass)
+    y_air = cb.mole_to_mass(x_air)
 
     t_hot = _T_HOT
     t_cold = _T_COLD

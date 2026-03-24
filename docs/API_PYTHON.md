@@ -60,7 +60,7 @@ import combaero as cb
 
 # Get standard compositions (returns numpy array)
 X_air = cb.species.dry_air()        # Mole fractions
-Y_air = cb.species.dry_air_mass()   # Mass fractions (standard for network)
+Y_air = cb.mole_to_mass(X_air)   # Mass fractions (standard for network)
 
 # Humid air at T [K], P [Pa], RH [0-1]
 Y_humid = cb.species.humid_air_mass(300, 101325, 0.5)

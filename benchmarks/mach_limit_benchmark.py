@@ -28,7 +28,7 @@ def _mdot_for_mach(mach: float, T: float, P_ref: float, X: list[float], area: fl
 
 def build_network(regime: str, mach_target: float) -> FlowNetwork:
     x_air = cb.species.dry_air()
-    y_air = list(cb.species.dry_air_mass)
+    y_air = cb.mole_to_mass(x_air)
 
     t_in = 300.0
     p_out = 101325.0

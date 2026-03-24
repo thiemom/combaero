@@ -94,9 +94,7 @@ def main() -> int:
 
     X_cool = cb.species.humid_air(288.15, 101325.0, RH_in)
     X_air = cb.species.dry_air()
-    X_ch4 = cb.species.empty()
-    X_ch4[cb.species.indices["CH4"]] = 1.0
-
+    X_ch4 = cb.species.pure_species("CH4")
     mdot_total = 1.0  # kg/s
 
     # Channel geometry

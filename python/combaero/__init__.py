@@ -335,7 +335,7 @@ try:
         space_velocity,
         specific_gas_constant,
         speed_of_sound,
-        standard_dry_air_composition,
+        standard_dry_air_composition,  # deprecated: use species.dry_air
         standard_pipe_roughness,
         stokes_layer,
         strouhal,
@@ -452,7 +452,6 @@ except ModuleNotFoundError:
     expansibility_factor = _core.expansibility_factor
     solve_orifice_mdot = _core.solve_orifice_mdot
     dry_air = _core.dry_air
-    # TODO:make dry_air_mass in C++
     humid_air_composition = _core.humid_air_composition
     humid_air_density = _core.humid_air_density
     humid_air_enthalpy = _core.humid_air_enthalpy

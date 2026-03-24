@@ -1033,6 +1033,7 @@ class NetworkSolver:
         x0: np.ndarray | None = None,
         init_strategy: Literal["default", "incompressible_warmstart", "homotopy"] = "default",
         warmstart_maxfev: int = 150,
+        lambda_steps: list[float] | None = None,
     ) -> dict[str, float]:
         """
         Executes the root finding algorithm to solve the network.
@@ -1057,6 +1058,9 @@ class NetworkSolver:
             warmstart_maxfev: Maximum function evaluations for the
                 incompressible proxy solve when
                 ``init_strategy='incompressible_warmstart'``.
+            lambda_steps: Optional list of mass flow scaling factors for
+                ``init_strategy='homotopy'``. Defaults to 10 steps
+                from 0.1 to 1.0.
         """
         if method not in self.SUPPORTED_METHODS:
             raise ValueError(
@@ -1140,8 +1144,11 @@ class NetworkSolver:
             }
 
             if targets:
-                # Sequential solve loop with increasing mass flow lambda
-                lambda_steps = [0.2, 0.4, 0.6, 0.8, 1.0]
+                # Sequential solve loop with increasing mass flow lambda.
+                # Use more steps for better robustness near choking.
+                if lambda_steps is None:
+                    lambda_steps = [0.2, 0.4, 0.6, 0.8, 0.9, 1.0]
+
                 current_x0 = None
                 last_sol = {"__success__": False}
 
@@ -1150,27 +1157,45 @@ class NetworkSolver:
                     for nid, target_mdot in targets.items():
                         self.network.nodes[nid].m_dot = lam * target_mdot
 
-                    # Solve intermediate step
+                    # Solve intermediate step.
+                    # Limit maxfev/maxiter for intermediate steps to stay fast.
+                    # This is decremental to convergence: trade speed versus robustness near choking.
+                    step_options = dict(options)
+                    if method == "hybr":
+                        step_options["maxfev"] = step_options.get("maxfev", 500)
+                    else:
+                        step_options["maxiter"] = step_options.get("maxiter", 500)
+
                     last_sol = self.solve(
                         method=method,
                         timeout=timeout,
-                        options=options,
+                        options=step_options,
                         use_jac=use_jac,
                         x0=current_x0,
                         init_strategy="default",
                     )
 
-                    if not last_sol["__success__"]:
-                        break
+                    # Update x0 for next step anyway (best guess propagation)
                     current_x0 = self._last_x
+
+                    if not last_sol["__success__"]:
+                        # If an intermediate step fails badly, we might still
+                        # want to continue if progress was made, but for now
+                        # we stop to avoid compounding errors.
+                        # Note: we still use the failed result as x0 if it's the best we have.
+                        break
 
                 # Restore original m_dot (lam=1.0 loop already did this if it reached it)
                 for nid, target_mdot in targets.items():
                     self.network.nodes[nid].m_dot = target_mdot
 
-                # If homotopy reached the end successfully, return that solution
+                # If homotopy reached lam=1.0 and succeeded, return that solution
                 if last_sol["__success__"]:
                     return last_sol
+
+                # If it failed at lam=1.0 but current_x0 is much better than cold start,
+                # we will naturally use it as warmstart_x0 below.
+                warmstart_x0 = current_x0
 
         # --- Initial guess: user-supplied (warm-start) or auto-built ----
         x0_auto = self._build_x0()

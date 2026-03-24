@@ -52,7 +52,7 @@ def _mdot_for_target_mach(mach: float, T: float, P_ref: float, X_mole: list[floa
 
 def _build_coupled_network(regime: Regime, mach_target: float, cfg: SweepConfig) -> tuple[FlowNetwork, float]:
     x_mole = cb.species.dry_air()
-    y_mass = list(cb.species.dry_air_mass())
+    y_mass = cb.mole_to_mass(x_mole)
     area_hot = _area_from_diameter(cfg.d_pipe_hot)
     area_cold = _area_from_diameter(cfg.d_pipe_cold)
     mdot_hot = _mdot_for_target_mach(mach_target, cfg.t_hot_in, cfg.p_out_hot, x_mole, area_hot)
