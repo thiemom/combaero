@@ -13,22 +13,11 @@ from combaero.network import (
 )
 
 
-def _air_Y() -> list[float]:
-    ns = cb.num_species()
-    Y = [0.0] * ns
-    for k in range(ns):
-        if cb.species_name(k) == "N2":
-            Y[k] = 0.767
-        elif cb.species_name(k) == "O2":
-            Y[k] = 0.233
-    return Y
-
-
 def test_momentum_chamber_dynamic_pressure():
     """Verify MomentumChamberNode enforces P_total = P + 0.5*rho*v^2."""
     graph = FlowNetwork()
 
-    Y_air = _air_Y()
+    Y_air = cb.species.dry_air_mass()
     inlet = MassFlowBoundary("inlet", m_dot=0.2, T_total=600.0, Y=Y_air)
     chamber = MomentumChamberNode(
         "chamber", area=0.02
@@ -79,7 +68,7 @@ def test_momentum_chamber_vs_plenum():
     """Compare MomentumChamberNode to PlenumNode - should have different P_total."""
     from combaero.network import PlenumNode
 
-    Y_air = _air_Y()
+    Y_air = cb.species.dry_air_mass()
     m_dot = 1.0  # Higher flow for larger dynamic pressure
 
     # Test with momentum chamber
@@ -142,10 +131,13 @@ def test_momentum_chamber_with_heat_exchange():
 
     graph = FlowNetwork()
 
-    Y_air = _air_Y()
-    inlet = MassFlowBoundary("inlet", m_dot=0.5, T_total=600.0, Y=Y_air)
+    inlet = MassFlowBoundary("inlet", m_dot=0.5, T_total=600.0)
+    inlet.Y = cb.species.dry_air_mass()
     chamber = MomentumChamberNode("chamber", area=0.01)
-    outlet = PressureBoundary("outlet", P_total=101325.0)
+    outlet = PressureBoundary("outlet")
+    outlet.P_total = 101325.0
+    outlet.T_total = 300.0
+    outlet.Y = cb.species.dry_air_mass()
 
     # Add heat exchange to chamber
     chamber.add_energy_boundary(EnergyBoundary("heater", Q=5000.0))

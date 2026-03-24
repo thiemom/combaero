@@ -138,6 +138,7 @@ try:
         damping_ratio,
         density,
         dewpoint,
+        dry_air,
         dimple_friction_multiplier,
         dimple_nusselt_enhancement,
         dT_edge_dq,
@@ -334,7 +335,7 @@ try:
         space_velocity,
         specific_gas_constant,
         speed_of_sound,
-        standard_dry_air_composition,
+        standard_dry_air_composition,  # deprecated: use species.dry_air
         standard_pipe_roughness,
         stokes_layer,
         strouhal,
@@ -450,8 +451,7 @@ except ModuleNotFoundError:
     equivalence_ratio_from_bilger_Z_mass = _core.equivalence_ratio_from_bilger_Z_mass
     expansibility_factor = _core.expansibility_factor
     solve_orifice_mdot = _core.solve_orifice_mdot
-    standard_dry_air_composition = _core.standard_dry_air_composition
-    # TODO:make standard_dry_air_composition_mass in C++
+    dry_air = _core.dry_air
     humid_air_composition = _core.humid_air_composition
     humid_air_density = _core.humid_air_density
     humid_air_enthalpy = _core.humid_air_enthalpy
@@ -803,7 +803,7 @@ __all__ = [
     "bilger_Z_from_equivalence_ratio_mass",
     "expansibility_factor",
     "solve_orifice_mdot",
-    "standard_dry_air_composition",
+    "dry_air",
     "humid_air_composition",
     "humid_air_density",
     "humid_air_enthalpy",

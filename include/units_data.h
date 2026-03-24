@@ -671,7 +671,7 @@ inline constexpr Entry function_units[] = {
     {"normalize_fractions", "-", "-"},
     {"convert_to_dry_fractions", "-", "-"},
     {"solve_orifice_mdot", "-", "Pa"},
-    {"standard_dry_air_composition", "-", "float"},
+    {"dry_air", "-", "X: mol/mol"},
     {"humid_air_enthalpy_nasa9", "-", "J/kg dry air"},
     {"complete_combustion_to_CO2_H2O_with_fraction", "-", "-"},
     {"HumidAir::rh", "-", "0-1"},

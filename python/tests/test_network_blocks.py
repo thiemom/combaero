@@ -34,7 +34,7 @@ ELEMENT_FACTORIES = {
         length=2.0,
         diameter=0.15,
         roughness=1e-5,
-        regime="compressible_fanno",
+        regime="compressible",
         friction_model="colebrook",
     ),
     "orifice": lambda id, f, t: OrificeElement(id, f, t, Cd=0.6, area=0.005),

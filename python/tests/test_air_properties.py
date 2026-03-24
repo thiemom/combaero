@@ -72,7 +72,7 @@ class TestAirPropertiesDryAir:
         """Test that density matches individual function call."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
 
         props = cb.air_properties(T, P, humidity=0.0)
         rho_expected = cb.density(T, P, X)
@@ -84,7 +84,7 @@ class TestAirPropertiesDryAir:
         """Test that viscosity matches individual function call."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
 
         props = cb.air_properties(T, P, humidity=0.0)
         mu_expected = cb.viscosity(T, P, X)
@@ -96,7 +96,7 @@ class TestAirPropertiesDryAir:
         """Test that thermal conductivity matches individual function call."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
 
         props = cb.air_properties(T, P, humidity=0.0)
         k_expected = cb.thermal_conductivity(T, P, X)
@@ -108,7 +108,7 @@ class TestAirPropertiesDryAir:
         """Test that cp matches individual function call."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
 
         props = cb.air_properties(T, P, humidity=0.0)
         cp_expected = cb.cp_mass(T, X)
@@ -120,7 +120,7 @@ class TestAirPropertiesDryAir:
         """Test that cv matches individual function call."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
 
         props = cb.air_properties(T, P, humidity=0.0)
         cv_expected = cb.cv_mass(T, X)
@@ -132,7 +132,7 @@ class TestAirPropertiesDryAir:
         """Test that Prandtl number matches individual function call."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
 
         props = cb.air_properties(T, P, humidity=0.0)
         Pr_expected = cb.prandtl(T, P, X)
@@ -144,7 +144,7 @@ class TestAirPropertiesDryAir:
         """Test that speed of sound matches individual function call."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
 
         props = cb.air_properties(T, P, humidity=0.0)
         a_expected = cb.speed_of_sound(T, X)
@@ -361,7 +361,7 @@ class TestAirPropertiesTypical:
         props = cb.air_properties(T, P)
 
         # Verify all properties match individual calls
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         assert props.rho == pytest.approx(cb.density(T, P, X), rel=1e-15)
         assert props.mu == pytest.approx(cb.viscosity(T, P, X), rel=1e-15)
         assert props.k == pytest.approx(cb.thermal_conductivity(T, P, X), rel=1e-15)
@@ -391,7 +391,7 @@ class TestAirPropertiesTypical:
         props = cb.air_properties(T, P)
 
         # Verify all properties match individual calls
-        X = cb.standard_dry_air_composition()
+        X = cb.species.dry_air()
         assert props.rho == pytest.approx(cb.density(T, P, X), rel=1e-15)
         assert props.mu == pytest.approx(cb.viscosity(T, P, X), rel=1e-15)
         assert props.a == pytest.approx(cb.speed_of_sound(T, X), rel=1e-15)

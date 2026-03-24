@@ -49,8 +49,9 @@ def test_mix_streams_basic():
         T=300.0,
         T_total=300.0,
         m_dot=0.05,
-        Y=[1.0] + [0.0] * (cb.num_species() - 1),  # Pure species 0
+        Y=cb.species.empty(),  # Pure species 0
     )
+    state1.Y[0] = 1.0
 
     state2 = MixtureState(
         P=101325.0,
@@ -58,8 +59,9 @@ def test_mix_streams_basic():
         T=400.0,
         T_total=400.0,
         m_dot=0.05,
-        Y=[0.0] + [1.0] + [0.0] * (cb.num_species() - 2),  # Pure species 1
+        Y=cb.species.empty(),  # Pure species 1
     )
+    state2.Y[1] = 1.0
 
     # Mix the streams
     result = mix_streams(state1, state2)
@@ -83,7 +85,7 @@ def test_mix_streams_energy_conservation():
         T=300.0,
         T_total=300.0,
         m_dot=0.05,
-        Y=cb.mole_to_mass(cb.standard_dry_air_composition()),
+        Y=cb.species.dry_air_mass(),
     )
 
     state2 = MixtureState(
@@ -92,7 +94,7 @@ def test_mix_streams_energy_conservation():
         T=300.0,
         T_total=300.0,
         m_dot=0.05,
-        Y=cb.mole_to_mass(cb.standard_dry_air_composition()),
+        Y=cb.species.dry_air_mass(),
     )
 
     result = mix_streams(state1, state2)
@@ -105,15 +107,14 @@ def test_mix_streams_energy_conservation():
 def test_stoichiometric_products_basic():
     """Test stoichiometric products function."""
     # Use air as oxidizer and methane as fuel
-    Y_air = cb.standard_dry_air_composition()
-    X_ch4 = [0.0] * 14
-    X_ch4[5] = 1.0  # CH4 is species index 5
+    X_air = cb.species.dry_air()
+    X_ch4 = cb.species.pure_species("CH4")
 
     # Test stoichiometric case
-    X_products = stoichiometric_products(X_ch4, Y_air, phi=1.0)
+    X_products = stoichiometric_products(X_ch4, X_air, phi=1.0)
 
     # Should return valid mole fractions
-    assert len(X_products) == 14
+    assert len(X_products) == cb.species.num_species
     assert sum(X_products) == pytest.approx(1.0, abs=1e-6)
 
     # Should have significant CO2 and H2O for methane combustion
@@ -123,17 +124,16 @@ def test_stoichiometric_products_basic():
 
 def test_stoichiometric_products_validation():
     """Test input validation for stoichiometric_products."""
-    Y_air = cb.standard_dry_air_composition()
-    X_ch4 = [0.0] * 14
-    X_ch4[5] = 1.0
+    X_air = cb.species.dry_air()
+    X_ch4 = cb.species.pure_species("CH4")
 
     # Test invalid phi
     with pytest.raises(ValueError, match="phi must be positive"):
-        stoichiometric_products(X_ch4, Y_air, phi=0.0)
+        stoichiometric_products(X_ch4, X_air, phi=0.0)
 
     # Test wrong length
     with pytest.raises(ValueError, match="must have 14 species"):
-        stoichiometric_products(X_ch4[:10], Y_air, phi=1.0)
+        stoichiometric_products(X_ch4[:10], X_air, phi=1.0)
 
 
 def test_combustion_from_phi_basic():
@@ -145,12 +145,11 @@ def test_combustion_from_phi_basic():
         T=700.0,  # 700K
         T_total=700.0,
         m_dot=0.1,  # 0.1 kg/s air
-        Y=cb.mole_to_mass(cb.standard_dry_air_composition()),
+        Y=cb.species.dry_air_mass(),
     )
 
     # Methane fuel
-    X_ch4 = [0.0] * 14
-    X_ch4[5] = 1.0  # CH4
+    X_ch4 = cb.species.pure_species("CH4")
 
     # Test stoichiometric combustion
     result = combustion_from_phi(air_state, X_ch4, phi=1.0)
@@ -173,11 +172,10 @@ def test_combustion_from_phi_lean_vs_rich():
         T=700.0,
         T_total=700.0,
         m_dot=0.1,
-        Y=cb.mole_to_mass(cb.standard_dry_air_composition()),
+        Y=cb.species.dry_air_mass(),
     )
 
-    X_ch4 = [0.0] * 14
-    X_ch4[5] = 1.0
+    X_ch4 = cb.species.pure_species("CH4")
 
     # Lean combustion
     result_lean = combustion_from_phi(air_state, X_ch4, phi=0.8)
@@ -200,11 +198,10 @@ def test_combustion_efficiency():
         T=700.0,
         T_total=700.0,
         m_dot=0.1,
-        Y=cb.mole_to_mass(cb.standard_dry_air_composition()),
+        Y=cb.species.dry_air_mass(),
     )
 
-    X_ch4 = [0.0] * 14
-    X_ch4[5] = 1.0
+    X_ch4 = cb.species.pure_species("CH4")
 
     # Full efficiency
     result_full = combustion_from_phi(air_state, X_ch4, phi=1.0, eta=1.0)
@@ -226,11 +223,10 @@ def test_pressure_drop():
         T=700.0,
         T_total=700.0,
         m_dot=0.1,
-        Y=cb.mole_to_mass(cb.standard_dry_air_composition()),
+        Y=cb.species.dry_air_mass(),
     )
 
-    X_ch4 = [0.0] * 14
-    X_ch4[5] = 1.0
+    X_ch4 = cb.species.pure_species("CH4")
 
     # No pressure drop
     result_no_drop = combustion_from_phi(air_state, X_ch4, phi=1.0, delta_P_frac=0.0)

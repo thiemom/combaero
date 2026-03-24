@@ -18,7 +18,7 @@ def main() -> None:
     print("=" * 60)
 
     # Use standard dry air composition
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
 
     # -------------------------------------------------------------------------
     # 1. Isentropic Nozzle Flow

@@ -10,8 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import combaero as ca
-from combaero.species import SpeciesLocator
+import combaero as cb
 
 
 @dataclass(frozen=True)
@@ -39,22 +38,22 @@ class WallLayer:
     conductivity_w_mk: float
 
 
-def _make_air_stream(inputs: CombustorInputs) -> ca.Stream:
-    stream = ca.Stream()
+def _make_air_stream(inputs: CombustorInputs) -> cb.Stream:
+    stream = cb.Stream()
     stream.T = inputs.air_inlet_temperature_k
     stream.P = inputs.pressure_pa
-    stream.X = ca.standard_dry_air_composition()
+    stream.X = cb.species.dry_air()
     stream.mdot = inputs.mdot_air_total_kg_s
     return stream
 
 
-def _make_fuel_template(inputs: CombustorInputs, sp: SpeciesLocator) -> ca.Stream:
-    fuel_x = sp.empty()
-    fuel_x[sp.indices["CH4"]] = 0.92
-    fuel_x[sp.indices["C2H6"]] = 0.05
-    fuel_x[sp.indices["N2"]] = 0.03
+def _make_fuel_template(inputs: CombustorInputs) -> cb.Stream:
+    fuel_x = cb.species.empty()
+    fuel_x[cb.species.indices["CH4"]] = 0.92
+    fuel_x[cb.species.indices["C2H6"]] = 0.05
+    fuel_x[cb.species.indices["N2"]] = 0.03
 
-    stream = ca.Stream()
+    stream = cb.Stream()
     stream.T = inputs.fuel_inlet_temperature_k
     stream.P = inputs.pressure_pa
     stream.X = fuel_x
@@ -69,11 +68,11 @@ def _hot_gas_side_htc(
     velocity_m_s: float,
     hydraulic_diameter_m: float,
 ) -> tuple[float, float, float]:
-    re = ca.reynolds(gas_temperature_k, pressure_pa, gas_x, velocity_m_s, hydraulic_diameter_m)
-    pr = ca.prandtl(gas_temperature_k, pressure_pa, gas_x)
-    k = ca.thermal_conductivity(gas_temperature_k, pressure_pa, gas_x)
-    nu = ca.nusselt_dittus_boelter(re, pr, heating=False)
-    h = ca.htc_from_nusselt(nu, k, hydraulic_diameter_m)
+    re = cb.reynolds(gas_temperature_k, pressure_pa, gas_x, velocity_m_s, hydraulic_diameter_m)
+    pr = cb.prandtl(gas_temperature_k, pressure_pa, gas_x)
+    k = cb.thermal_conductivity(gas_temperature_k, pressure_pa, gas_x)
+    nu = cb.nusselt_dittus_boelter(re, pr, heating=False)
+    h = cb.htc_from_nusselt(nu, k, hydraulic_diameter_m)
     return h, re, nu
 
 
@@ -84,11 +83,11 @@ def _coolant_side_htc(
     velocity_m_s: float,
     channel_dh_m: float,
 ) -> tuple[float, float, float]:
-    re = ca.reynolds(coolant_temperature_k, pressure_pa, coolant_x, velocity_m_s, channel_dh_m)
-    pr = ca.prandtl(coolant_temperature_k, pressure_pa, coolant_x)
-    k = ca.thermal_conductivity(coolant_temperature_k, pressure_pa, coolant_x)
-    nu = ca.nusselt_dittus_boelter(re, pr, heating=True)
-    h = ca.htc_from_nusselt(nu, k, channel_dh_m)
+    re = cb.reynolds(coolant_temperature_k, pressure_pa, coolant_x, velocity_m_s, channel_dh_m)
+    pr = cb.prandtl(coolant_temperature_k, pressure_pa, coolant_x)
+    k = cb.thermal_conductivity(coolant_temperature_k, pressure_pa, coolant_x)
+    nu = cb.nusselt_dittus_boelter(re, pr, heating=True)
+    h = cb.htc_from_nusselt(nu, k, channel_dh_m)
     return h, re, nu
 
 
@@ -126,14 +125,14 @@ def _combustor_pressure_loss_budget(
     v_cool_m_s: float,
     coolant_x: list[float],
 ) -> dict[str, float]:
-    rho_hot = ca.density(gas_temperature_k, inputs.pressure_pa, gas_x)
+    rho_hot = cb.density(gas_temperature_k, inputs.pressure_pa, gas_x)
     q_dyn_hot = 0.5 * rho_hot * v_hot_m_s**2
 
     # Toy assumption: burner swirler/mixer local loss coefficient
     k_mixer = 3.2
     dp_burner_mixer = k_mixer * q_dyn_hot
 
-    dp_primary_friction, re_primary, f_primary = ca.pressure_drop_pipe(
+    dp_primary_friction, re_primary, f_primary = cb.pressure_drop_pipe(
         T=gas_temperature_k,
         P=inputs.pressure_pa,
         X=gas_x,
@@ -147,7 +146,7 @@ def _combustor_pressure_loss_budget(
     k_dilution = 0.8
     dp_dilution_entry = k_dilution * q_dyn_hot
 
-    dp_coolant_friction, re_cooling, f_cooling = ca.pressure_drop_pipe(
+    dp_coolant_friction, re_cooling, f_cooling = cb.pressure_drop_pipe(
         T=inputs.air_inlet_temperature_k + 40.0,
         P=inputs.pressure_pa,
         X=coolant_x,
@@ -178,16 +177,15 @@ def _combustor_pressure_loss_budget(
 def main() -> None:
     inputs = CombustorInputs()
     geom = LinerGeometry()
-    sp = SpeciesLocator.from_core()
 
     air = _make_air_stream(inputs)
-    fuel_template = _make_fuel_template(inputs, sp)
+    fuel_template = _make_fuel_template(inputs)
 
     # Burner block: direct phi-targeted fuel stream helper.
-    fuel = ca.set_fuel_stream_for_phi(inputs.phi_primary, fuel_template, air)
+    fuel = cb.set_fuel_stream_for_phi(inputs.phi_primary, fuel_template, air)
 
-    mixed = ca.mix([fuel, air], P_out=inputs.pressure_pa)
-    burned = ca.combustion_equilibrium(mixed.T, mixed.X, mixed.P)
+    mixed = cb.mix([fuel, air], P_out=inputs.pressure_pa)
+    burned = cb.combustion_equilibrium(mixed.T, mixed.X, mixed.P)
 
     # Toy airflow split
     mdot_cool_front = 0.06 * air.mdot  # front plate effusion
@@ -212,11 +210,11 @@ def main() -> None:
     cooling_area = perimeter * cooling_gap_m
 
     # Hot-gas and coolant velocities
-    rho_hot = ca.density(burned.state.T, inputs.pressure_pa, burned.state.X)
+    rho_hot = cb.density(burned.state.T, inputs.pressure_pa, burned.state.X)
     v_hot = mdot_primary / (rho_hot * hot_flow_area)
 
     t_cool_in = inputs.air_inlet_temperature_k + 40.0
-    rho_cool = ca.density(t_cool_in, inputs.pressure_pa, air.X)
+    rho_cool = cb.density(t_cool_in, inputs.pressure_pa, air.X)
     v_cool = mdot_cool_liner / (rho_cool * cooling_area)
 
     h_hot, re_hot, nu_hot = _hot_gas_side_htc(
@@ -236,7 +234,7 @@ def main() -> None:
 
     # Front-plate effusion estimate from burner-side jets
     # Use correlation-friendly representative design point
-    effusion_eta = ca.effusion_effectiveness(
+    effusion_eta = cb.effusion_effectiveness(
         x_D=8.0,
         M=2.0,
         DR=1.75,
@@ -246,8 +244,8 @@ def main() -> None:
     )
 
     # Baseline front plate: bare Haynes 230 metal wall
-    k_haynes = ca.k_haynes230(min(max(900.0, t_cool_in), 1400.0))
-    q_front_bare = ca.cooled_wall_heat_flux(
+    k_haynes = cb.k_haynes230(min(max(900.0, t_cool_in), 1400.0))
+    q_front_bare = cb.cooled_wall_heat_flux(
         T_hot=burned.state.T,
         T_coolant=t_cool_in,
         h_hot=h_hot,
@@ -257,13 +255,13 @@ def main() -> None:
         k_wall=k_haynes,
     )
 
-    taw_front = ca.adiabatic_wall_temperature(burned.state.T, t_cool_in, effusion_eta)
+    taw_front = cb.adiabatic_wall_temperature(burned.state.T, t_cool_in, effusion_eta)
 
     # If needed, upgrade wall with YSZ coating on top of Haynes substrate
     needs_upgrade = q_front_bare / 1e3 > 160.0
     front_layers: list[WallLayer]
     if needs_upgrade:
-        k_tbc = ca.k_tbc_ysz(T=min(taw_front, 1690.0), hours=2000.0, is_ebpvd=False)
+        k_tbc = cb.k_tbc_ysz(T=min(taw_front, 1690.0), hours=2000.0, is_ebpvd=False)
         front_layers = [
             WallLayer("YSZ coating (APS)", 0.00035, k_tbc),
             WallLayer("Haynes 230 substrate", geom.wall_thickness_m, k_haynes),
@@ -274,7 +272,7 @@ def main() -> None:
         ]
 
     t_over_k_front = [layer.thickness_m / layer.conductivity_w_mk for layer in front_layers]
-    wall_temps_front, q_front = ca.wall_temperature_profile(
+    wall_temps_front, q_front = cb.wall_temperature_profile(
         T_hot=taw_front,
         T_cold=t_cool_in,
         h_hot=h_hot,
@@ -285,7 +283,7 @@ def main() -> None:
         front_layers, wall_temps_front, slices_per_layer=4
     )
 
-    q_liner = ca.cooled_wall_heat_flux(
+    q_liner = cb.cooled_wall_heat_flux(
         T_hot=burned.state.T,
         T_coolant=t_cool_in,
         h_hot=h_hot,

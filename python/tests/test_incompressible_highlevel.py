@@ -18,7 +18,7 @@ import combaero as cb
 
 def air_at_300() -> tuple:
     """Return (T, P, X) for dry air at 300 K, 1 atm."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     return 300.0, 101325.0, X
 
 

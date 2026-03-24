@@ -12,12 +12,11 @@ Demonstrates:
 
 from __future__ import annotations
 
-import combaero as ca
-from combaero.species import SpeciesLocator
+import combaero as cb
 
 
 def main() -> None:
-    sp = SpeciesLocator.from_core()
+
     P0 = 101325.0
 
     # -------------------------------------------------------------------------
@@ -27,7 +26,7 @@ def main() -> None:
     print("1. Standard Dry Air -- Temperature Sweep")
     print("=" * 65)
 
-    X_air = ca.standard_dry_air_composition()
+    X_air = cb.species.dry_air()
     print(
         f"\n{'T [K]':>8} {'cp [J/mol K]':>14} {'gamma':>8} {'a [m/s]':>10} {'mu [uPa s]':>12} {'Pr':>8}"
     )
@@ -35,11 +34,11 @@ def main() -> None:
     for T in (300, 600, 900, 1200, 1500, 2000):
         print(
             f"{T:8.0f}"
-            f" {ca.cp(T, X_air):14.3f}"
-            f" {ca.isentropic_expansion_coefficient(T, X_air):8.4f}"
-            f" {ca.speed_of_sound(T, X_air):10.2f}"
-            f" {ca.viscosity(T, P0, X_air) * 1e6:12.3f}"
-            f" {ca.prandtl(T, P0, X_air):8.4f}"
+            f" {cb.cp(T, X_air):14.3f}"
+            f" {cb.isentropic_expansion_coefficient(T, X_air):8.4f}"
+            f" {cb.speed_of_sound(T, X_air):10.2f}"
+            f" {cb.viscosity(T, P0, X_air) * 1e6:12.3f}"
+            f" {cb.prandtl(T, P0, X_air):8.4f}"
         )
 
     # -------------------------------------------------------------------------
@@ -49,11 +48,11 @@ def main() -> None:
     print("2. Humid Air (60% RH, 300 K)")
     print("=" * 65)
 
-    X_humid = ca.humid_air_composition(300.0, P0, 0.60)
-    idx_h2o = sp.indices["H2O"]
+    X_humid = cb.species.humid_air(300.0, P0, 0.60)
+    idx_h2o = cb.species.indices["H2O"]
     print(f"\n  H2O mole fraction : {X_humid[idx_h2o] * 100:.3f} %")
-    print(f"  cp                : {ca.cp(300.0, X_humid):.3f} J/(mol K)")
-    print(f"  rho               : {ca.density(300.0, P0, X_humid):.4f} kg/m3")
+    print(f"  cp                : {cb.cp(300.0, X_humid):.3f} J/(mol K)")
+    print(f"  rho               : {cb.density(300.0, P0, X_humid):.4f} kg/m3")
 
     # -------------------------------------------------------------------------
     # 3. Fuel: pure CH4
@@ -62,15 +61,15 @@ def main() -> None:
     print("3. Fuel: Pure CH4")
     print("=" * 65)
 
-    X_ch4 = sp.empty()
-    X_ch4[sp.indices["CH4"]] = 1.0
+    X_ch4 = cb.species.empty()
+    X_ch4[cb.species.indices["CH4"]] = 1.0
 
-    print(f"\n  LHV (mass basis)  : {ca.fuel_lhv_mass(X_ch4) / 1e6:.3f} MJ/kg")
+    print(f"\n  LHV (mass basis)  : {cb.fuel_lhv_mass(X_ch4) / 1e6:.3f} MJ/kg")
     print(
-        f"  O2 required       : {ca.oxygen_required_per_kg_fuel(sp.indices['CH4']):.4f} kg O2/kg fuel"
+        f"  O2 required       : {cb.oxygen_required_per_kg_fuel(cb.species.indices['CH4']):.4f} kg O2/kg fuel"
     )
-    print(f"  cp at 300 K       : {ca.cp(300.0, X_ch4):.3f} J/(mol K)")
-    print(f"  cp at 800 K       : {ca.cp(800.0, X_ch4):.3f} J/(mol K)")
+    print(f"  cp at 300 K       : {cb.cp(300.0, X_ch4):.3f} J/(mol K)")
+    print(f"  cp at 800 K       : {cb.cp(800.0, X_ch4):.3f} J/(mol K)")
 
     # -------------------------------------------------------------------------
     # 4. Combustion products: CH4/air at phi=0.8, mix + combust
@@ -79,25 +78,25 @@ def main() -> None:
     print("4. Combustion Products (CH4/air, phi=0.8)")
     print("=" * 65)
 
-    fuel = ca.Stream()
+    fuel = cb.Stream()
     fuel.state.TPX = 300.0, P0, X_ch4
 
-    air = ca.Stream()
+    air = cb.Stream()
     air.state.TPX = 300.0, P0, X_air
     air.mdot = 10.0
 
-    fuel_phi = ca.set_fuel_stream_for_phi(0.8, fuel, air)
-    mixed = ca.mix([fuel_phi, air])
-    burned = ca.complete_combustion(mixed.T, mixed.X, mixed.P)
+    fuel_phi = cb.set_fuel_stream_for_phi(0.8, fuel, air)
+    mixed = cb.mix([fuel_phi, air])
+    burned = cb.complete_combustion(mixed.T, mixed.X, mixed.P)
 
     print(f"\n  T_ad              : {burned.T:.1f} K")
-    print(f"  cp                : {ca.cp(burned.T, burned.X):.3f} J/(mol K)")
-    print(f"  gamma             : {ca.isentropic_expansion_coefficient(burned.T, burned.X):.4f}")
-    print(f"  a                 : {ca.speed_of_sound(burned.T, burned.X):.2f} m/s")
-    print(f"  mu                : {ca.viscosity(burned.T, P0, burned.X) * 1e6:.3f} uPa s")
-    print(f"  Pr                : {ca.prandtl(burned.T, P0, burned.X):.4f}")
+    print(f"  cp                : {cb.cp(burned.T, burned.X):.3f} J/(mol K)")
+    print(f"  gamma             : {cb.isentropic_expansion_coefficient(burned.T, burned.X):.4f}")
+    print(f"  a                 : {cb.speed_of_sound(burned.T, burned.X):.2f} m/s")
+    print(f"  mu                : {cb.viscosity(burned.T, P0, burned.X) * 1e6:.3f} uPa s")
+    print(f"  Pr                : {cb.prandtl(burned.T, P0, burned.X):.4f}")
     print("\n  Major species (> 0.1 %):")
-    for i, name in enumerate(sp.names):
+    for i, name in enumerate(cb.species.names):
         if burned.X[i] > 0.001:
             print(f"    {name:>6s}: {burned.X[i] * 100:.2f} %")
 
@@ -109,13 +108,13 @@ def main() -> None:
     print("=" * 65)
 
     T_ref = 1200.0
-    h_ref = ca.h(T_ref, X_air)
-    s_ref = ca.s(T_ref, X_air, P0)
-    cp_ref = ca.cp(T_ref, X_air)
+    h_ref = cb.h(T_ref, X_air)
+    s_ref = cb.s(T_ref, X_air, P0)
+    cp_ref = cb.cp(T_ref, X_air)
 
-    T_from_h = ca.calc_T_from_h(h_ref, X_air)
-    T_from_s = ca.calc_T_from_s(s_ref, P0, X_air)
-    T_from_cp = ca.calc_T_from_cp(cp_ref, X_air)
+    T_from_h = cb.calc_T_from_h(h_ref, X_air)
+    T_from_s = cb.calc_T_from_s(s_ref, P0, X_air)
+    T_from_cp = cb.calc_T_from_cp(cp_ref, X_air)
 
     print(f"\n  T_ref             : {T_ref:.2f} K")
     print(f"  T from h          : {T_from_h:.6f} K  (err {abs(T_from_h - T_ref):.2e} K)")
@@ -130,14 +129,14 @@ def main() -> None:
     print("=" * 65)
 
     print("\n  Every API parameter and output is explicitly mapped:")
-    print(f"  ca.h outputs                      : {ca.output_units('h')} (molar basis)")
-    print(f"  ca.density outputs                : {ca.output_units('density')}")
-    print(f"  ca.dynamic_viscosity outputs      : {ca.output_units('viscosity')}")
-    print(f"  ca.fuel_lhv_mass outputs          : {ca.output_units('fuel_lhv_mass')}")
+    print(f"  cb.h outputs                      : {cb.output_units('h')} (molar basis)")
+    print(f"  cb.density outputs                : {cb.output_units('density')}")
+    print(f"  cb.dynamic_viscosity outputs      : {cb.output_units('viscosity')}")
+    print(f"  cb.fuel_lhv_mass outputs          : {cb.output_units('fuel_lhv_mass')}")
     print()
     print("  We can also query function input signatures:")
-    print(f"  ca.cp required inputs             : {ca.input_units('cp')}")
-    print(f"  ca.humid_air_composition inputs   : {ca.input_units('humid_air_composition')}")
+    print(f"  cb.cp required inputs             : {cb.input_units('cp')}")
+    print(f"  cb.species.humid_air inputs   : {cb.input_units('humid_air_composition')}")
 
 
 if __name__ == "__main__":

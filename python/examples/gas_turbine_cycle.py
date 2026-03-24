@@ -29,26 +29,24 @@ import matplotlib.pyplot as plt
 import numpy as np
 from plot_utils import show_or_save
 
-import combaero as ca
-from combaero.species import SpeciesLocator
+import combaero as cb
 
 
 def dh_same_X(T_a: float, T_b: float, X: list, n: int = 300) -> float:
     """Isobaric enthalpy change [J/kg] via cp_mass integral (same composition)."""
     Ts = np.linspace(T_a, T_b, n)
-    return float(np.trapezoid([ca.cp_mass(T, X) for T in Ts], Ts))
+    return float(np.trapezoid([cb.cp_mass(T, X) for T in Ts], Ts))
 
 
 def isentropic_T(T_start: float, P_start: float, P_end: float, X: list) -> float:
     """Temperature after isentropic process from P_start to P_end."""
-    state = ca.State().set_TPX(T_start, P_start, X)
+    state = cb.State().set_TPX(T_start, P_start, X)
     s_mass, _ = state.SP
     state.SP = s_mass, P_end
     return state.T
 
 
 def main() -> None:
-    sp = SpeciesLocator.from_core()
 
     # =========================================================================
     # Engine parameters
@@ -58,9 +56,9 @@ def main() -> None:
     T1 = 288.15  # K  compressor inlet (ISA sea level)
     P1 = 101325.0  # Pa
 
-    X_air = ca.standard_dry_air_composition()
-    X_ch4 = sp.empty()
-    X_ch4[sp.indices["CH4"]] = 1.0
+    X_air = cb.species.dry_air()
+    X_ch4 = cb.species.empty()
+    X_ch4[cb.species.indices["CH4"]] = 1.0
 
     print("=" * 65)
     print("Brayton Cycle -- Open-Cycle Gas Turbine")
@@ -72,8 +70,8 @@ def main() -> None:
     # =========================================================================
     # State 1: Compressor inlet
     # =========================================================================
-    rho1 = ca.density(T1, P1, X_air)
-    gamma1 = ca.isentropic_expansion_coefficient(T1, X_air)
+    rho1 = cb.density(T1, P1, X_air)
+    gamma1 = cb.isentropic_expansion_coefficient(T1, X_air)
 
     print("\n--- State 1 (Compressor inlet) ---")
     print(f"  T1    = {T1:.2f} K")
@@ -86,7 +84,7 @@ def main() -> None:
     # =========================================================================
     P2 = P1 * PR
     T2 = isentropic_T(T1, P1, P2, X_air)
-    rho2 = ca.density(T2, P2, X_air)
+    rho2 = cb.density(T2, P2, X_air)
 
     print("\n--- State 2 (Compressor exit) ---")
     print(f"  T2    = {T2:.1f} K")
@@ -96,22 +94,22 @@ def main() -> None:
     # =========================================================================
     # State 3: After isobaric combustion
     # =========================================================================
-    air = ca.Stream()
+    air = cb.Stream()
     air.state.TPX = T2, P2, X_air
     air.mdot = 1.0
 
-    fuel = ca.Stream()
+    fuel = cb.Stream()
     fuel.state.TPX = 300.0, P2, X_ch4
 
-    fuel = ca.set_fuel_stream_for_phi(phi, fuel, air)
-    mixed = ca.mix([fuel, air])
-    burned = ca.complete_combustion(mixed.T, mixed.X, mixed.P)
+    fuel = cb.set_fuel_stream_for_phi(phi, fuel, air)
+    mixed = cb.mix([fuel, air])
+    burned = cb.complete_combustion(mixed.T, mixed.X, mixed.P)
 
     T3 = burned.T
     X3 = burned.X
     P3 = P2  # isobaric combustor
-    rho3 = ca.density(T3, P3, X3)
-    gamma3 = ca.isentropic_expansion_coefficient(T3, X3)
+    rho3 = cb.density(T3, P3, X3)
+    gamma3 = cb.isentropic_expansion_coefficient(T3, X3)
 
     print("\n--- State 3 (Turbine inlet) ---")
     print(f"  T3    = {T3:.1f} K  (TIT)")
@@ -125,7 +123,7 @@ def main() -> None:
     # =========================================================================
     P4 = P1
     T4 = isentropic_T(T3, P3, P4, X3)
-    rho4 = ca.density(T4, P4, X3)
+    rho4 = cb.density(T4, P4, X3)
 
     print("\n--- State 4 (Turbine exit / exhaust) ---")
     print(f"  T4    = {T4:.1f} K")
@@ -139,10 +137,10 @@ def main() -> None:
 
     # Open-system energy balance (per kg air): w_net = h_in - h_out
     # h_mass uses NASA9 absolute enthalpies (incl. formation), valid across compositions
-    w_net = ca.h_mass(T1, X_air) + far * ca.h_mass(fuel.T, X_ch4) - (1.0 + far) * ca.h_mass(T4, X3)
+    w_net = cb.h_mass(T1, X_air) + far * cb.h_mass(fuel.T, X_ch4) - (1.0 + far) * cb.h_mass(T4, X3)
     # q_in = fuel chemical energy (LHV basis); complete_combustion is adiabatic so
     # the combustor enthalpy difference is zero by construction
-    q_in = far * ca.fuel_lhv_mass(X_ch4)
+    q_in = far * cb.fuel_lhv_mass(X_ch4)
 
     # Compressor and turbine work by difference (same composition each)
     w_c = dh_same_X(T1, T2, X_air)  # compressor: air only, sensible
@@ -181,24 +179,24 @@ def main() -> None:
     for pr in [5, 8, 10, 15, 20, 25, 30, 40]:
         p2_ = P1 * pr
         t2_ = isentropic_T(T1, P1, p2_, X_air)
-        air_ = ca.Stream()
+        air_ = cb.Stream()
         air_.state.TPX = t2_, p2_, X_air
         air_.mdot = 1.0
-        fuel_ = ca.Stream()
+        fuel_ = cb.Stream()
         fuel_.state.TPX = 300.0, p2_, X_ch4
-        fuel_ = ca.set_fuel_stream_for_phi(phi, fuel_, air_)
-        mixed_ = ca.mix([fuel_, air_])
-        burned_ = ca.complete_combustion(mixed_.T, mixed_.X, mixed_.P)
+        fuel_ = cb.set_fuel_stream_for_phi(phi, fuel_, air_)
+        mixed_ = cb.mix([fuel_, air_])
+        burned_ = cb.complete_combustion(mixed_.T, mixed_.X, mixed_.P)
         t3_ = burned_.T
         x3_ = burned_.X
         t4_ = isentropic_T(t3_, p2_, P1, x3_)
         far_ = fuel_.mdot / air_.mdot
         wnet_ = (
-            ca.h_mass(T1, X_air)
-            + far_ * ca.h_mass(fuel_.T, X_ch4)
-            - (1.0 + far_) * ca.h_mass(t4_, x3_)
+            cb.h_mass(T1, X_air)
+            + far_ * cb.h_mass(fuel_.T, X_ch4)
+            - (1.0 + far_) * cb.h_mass(t4_, x3_)
         )
-        qin_ = far_ * ca.fuel_lhv_mass(X_ch4)
+        qin_ = far_ * cb.fuel_lhv_mass(X_ch4)
         wc_ = dh_same_X(T1, t2_, X_air)
         wt_ = wnet_ + wc_
         eta_ = wnet_ / qin_
@@ -214,10 +212,10 @@ def main() -> None:
     # Plots: T-s diagram + eta vs PR
     # =========================================================================
     # Entropy at each state
-    s1 = ca.s_mass(T1, X_air, P1)
-    s2 = ca.s_mass(T2, X_air, P2)  # == s1 (isentropic)
-    s3 = ca.s_mass(T3, X3, P3)
-    s4 = ca.s_mass(T4, X3, P4)  # == s3 (isentropic)
+    s1 = cb.s_mass(T1, X_air, P1)
+    s2 = cb.s_mass(T2, X_air, P2)  # == s1 (isentropic)
+    s3 = cb.s_mass(T3, X3, P3)
+    s4 = cb.s_mass(T4, X3, P4)  # == s3 (isentropic)
 
     # Isobaric paths for T-s: interpolate s linearly between endpoint states.
     # Composition changes along both paths (combustion, exhaust mixing with atmosphere),

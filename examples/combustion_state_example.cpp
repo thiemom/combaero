@@ -34,7 +34,7 @@ int main()
     X_fuel[idx_H2]  = 0.2;
 
     // Oxidizer: standard dry air
-    const std::vector<double> X_air = standard_dry_air_composition();
+    const std::vector<double> X_air = dry_air();
 
     // =========================================================================
     // 1. combustion_state — phi sweep (complete combustion)

@@ -39,7 +39,7 @@ def compute_numerical_jacobian(solver, x, eps=1e-7):
 def test_numerical_jacobian_full_network():
     """Verify that analytical Jacobian matches central finite difference for a complex network."""
     graph = FlowNetwork()
-    n_species = cb.num_species()
+    n_species = cb.species.num_species
     get_idx = cb.species_index_from_name
 
     Y_air = [0.0] * n_species
@@ -86,7 +86,7 @@ def test_numerical_jacobian_full_network():
 def test_cascaded_derived_state_relay():
     """Verify that T and Y are correctly propagated through a long chain of nodes."""
     graph = FlowNetwork()
-    n_species = cb.num_species()
+    n_species = cb.species.num_species
     get_idx = cb.species_index_from_name
 
     # Lean composition
@@ -162,7 +162,7 @@ def test_orifice_smoothness_and_convergence_reversal():
 def test_mass_fraction_conservation_and_bounds():
     """Verify that mass fractions sum to 1.0 and remain in [0, 1]."""
     graph = FlowNetwork()
-    n_species = cb.num_species()
+    n_species = cb.species.num_species
     get_idx = cb.species_index_from_name
     Y1 = [0.0] * n_species
     Y1[get_idx("N2")] = 1.0
@@ -227,7 +227,7 @@ def test_system_size_reduction_assertion():
 def test_mixing_plenum_convergence():
     """Verify that a plenum with multiple inlets (fuel/oxidizer) converges and balances mass/species."""
     graph = FlowNetwork()
-    n_species = cb.num_species()
+    n_species = cb.species.num_species
     get_idx = cb.species_index_from_name
 
     Y_air = [0.0] * n_species
@@ -272,7 +272,7 @@ def test_mixing_plenum_convergence():
 def test_equilibrium_combustor_convergence():
     """Verify that CombustorNode(method='equilibrium') converges in a network."""
     graph = FlowNetwork()
-    n_species = cb.num_species()
+    n_species = cb.species.num_species
     get_idx = cb.species_index_from_name
 
     # Stoichiometric H2-Air
@@ -331,7 +331,7 @@ def test_derived_state_jacobian_fd():
     """Verify that sensitivity of derived states (T, Y) wrt unknowns is reflected in global Jacobian."""
     graph = FlowNetwork()
     get_idx = cb.species_index_from_name
-    n_species = cb.num_species()
+    n_species = cb.species.num_species
 
     Y_air = [0.0] * n_species
     Y_air[get_idx("N2")] = 0.79
@@ -366,7 +366,7 @@ def test_derived_state_jacobian_fd():
 def test_no_negative_Y_ever():
     """Verify Y >= 0 at every iteration during convergence."""
     graph = FlowNetwork()
-    n_species = cb.num_species()
+    n_species = cb.species.num_species
     get_idx = cb.species_index_from_name
 
     # Create challenging network: combustor with poor initial guess

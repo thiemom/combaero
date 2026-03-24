@@ -75,7 +75,7 @@ def test_convective_surface_disabled():
     result = surface.htc_and_T(
         T=700.0,
         P=2e5,
-        X=cb.standard_dry_air_composition(),
+        X=cb.species.dry_air(),
         velocity=50.0,
         diameter=0.02,
         length=0.5,
@@ -90,7 +90,7 @@ def test_convective_surface_smooth_model():
     result = surface.htc_and_T(
         T=700.0,
         P=2e5,
-        X=cb.standard_dry_air_composition(),
+        X=cb.species.dry_air(),
         velocity=50.0,
         diameter=0.02,
         length=0.5,
@@ -113,7 +113,7 @@ def test_convective_surface_ribbed_model():
     result = surface.htc_and_T(
         T=700.0,
         P=2.5e5,
-        X=cb.standard_dry_air_composition(),
+        X=cb.species.dry_air(),
         velocity=60.0,
         diameter=0.025,
         length=0.6,
@@ -134,7 +134,7 @@ def test_convective_surface_dimpled_model():
     result = surface.htc_and_T(
         T=650.0,
         P=2e5,
-        X=cb.standard_dry_air_composition(),
+        X=cb.species.dry_air(),
         velocity=45.0,
         diameter=0.022,
         length=0.55,
@@ -164,7 +164,7 @@ def test_convective_surface_pin_fin_model():
     result = surface.htc_and_T(
         T=600.0,
         P=2e5,
-        X=cb.standard_dry_air_composition(),
+        X=cb.species.dry_air(),
         velocity=40.0,
         diameter=0.003,  # Use pin diameter
         length=0.015,  # 5 rows * 2.5 * 0.003 = 0.0375m streamwise
@@ -185,7 +185,7 @@ def test_convective_surface_multipliers():
     result_base = surface_base.htc_and_T(
         T=700.0,
         P=2e5,
-        X=cb.standard_dry_air_composition(),
+        X=cb.species.dry_air(),
         velocity=50.0,
         diameter=0.02,
         length=0.5,
@@ -195,7 +195,7 @@ def test_convective_surface_multipliers():
     result_mult = surface_mult.htc_and_T(
         T=700.0,
         P=2e5,
-        X=cb.standard_dry_air_composition(),
+        X=cb.species.dry_air(),
         velocity=50.0,
         diameter=0.02,
         length=0.5,
@@ -216,7 +216,7 @@ def test_convective_surface_heating_auto_detect():
     result = surface.htc_and_T(
         T=700.0,
         P=2e5,
-        X=cb.standard_dry_air_composition(),
+        X=cb.species.dry_air(),
         velocity=50.0,
         diameter=0.02,
         length=0.5,

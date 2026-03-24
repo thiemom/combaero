@@ -22,7 +22,7 @@ class TestPressureDropPipeComposite:
         """Test basic pressure drop calculation with air."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        Y_air = cb.standard_dry_air_composition()
+        Y_air = cb.species.dry_air()
         v = 10.0  # m/s
         D = 0.1  # m
         L = 100.0  # m
@@ -43,7 +43,7 @@ class TestPressureDropPipeComposite:
         """Verify composite function matches step-by-step manual calculation."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        Y_air = cb.standard_dry_air_composition()
+        Y_air = cb.species.dry_air()
         v = 15.0  # m/s
         D = 0.05  # m
         L = 50.0  # m
@@ -68,7 +68,7 @@ class TestPressureDropPipeComposite:
         """Test all friction factor correlations work."""
         T = 350.0  # K
         P = 200000.0  # Pa
-        Y_air = cb.standard_dry_air_composition()
+        Y_air = cb.species.dry_air()
         v = 20.0  # m/s
         D = 0.08  # m
         L = 75.0  # m
@@ -106,7 +106,7 @@ class TestPressureDropPipeComposite:
         """Test that rough pipes have higher friction factor."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        Y_air = cb.standard_dry_air_composition()
+        Y_air = cb.species.dry_air()
         v = 12.0  # m/s
         D = 0.1  # m
         L = 100.0  # m
@@ -132,7 +132,7 @@ class TestPressureDropPipeComposite:
         """Test pressure drop scales with velocity squared."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        Y_air = cb.standard_dry_air_composition()
+        Y_air = cb.species.dry_air()
         D = 0.1  # m
         L = 100.0  # m
 
@@ -154,7 +154,7 @@ class TestPressureDropPipeComposite:
         """Test pressure drop scales linearly with length."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        Y_air = cb.standard_dry_air_composition()
+        Y_air = cb.species.dry_air()
         v = 10.0  # m/s
         D = 0.1  # m
 
@@ -176,7 +176,7 @@ class TestPressureDropPipeComposite:
     def test_temperature_effect(self):
         """Test effect of temperature on pressure drop (via viscosity)."""
         P = 101325.0  # Pa
-        Y_air = cb.standard_dry_air_composition()
+        Y_air = cb.species.dry_air()
         v = 10.0  # m/s
         D = 0.1  # m
         L = 100.0  # m
@@ -195,7 +195,7 @@ class TestPressureDropPipeComposite:
     def test_pressure_effect(self):
         """Test effect of pressure on pressure drop (via density)."""
         T = 300.0  # K
-        Y_air = cb.standard_dry_air_composition()
+        Y_air = cb.species.dry_air()
         v = 10.0  # m/s
         D = 0.1  # m
         L = 100.0  # m
@@ -215,7 +215,7 @@ class TestPressureDropPipeComposite:
         """Test default parameters (smooth pipe, haaland correlation)."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        Y_air = cb.standard_dry_air_composition()
+        Y_air = cb.species.dry_air()
         v = 10.0  # m/s
         D = 0.1  # m
         L = 100.0  # m
@@ -237,7 +237,7 @@ class TestPressureDropPipeComposite:
         """Test error handling for invalid correlation name."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        Y_air = cb.standard_dry_air_composition()
+        Y_air = cb.species.dry_air()
         v = 10.0  # m/s
         D = 0.1  # m
         L = 100.0  # m
@@ -249,7 +249,7 @@ class TestPressureDropPipeComposite:
         """Test zero length gives zero pressure drop."""
         T = 300.0  # K
         P = 101325.0  # Pa
-        Y_air = cb.standard_dry_air_composition()
+        Y_air = cb.species.dry_air()
         v = 10.0  # m/s
         D = 0.1  # m
         L = 0.0  # m
@@ -267,7 +267,7 @@ class TestPressureDropPipeComposite:
         """Verify composite matches using existing functions separately."""
         T = 320.0  # K
         P = 150000.0  # Pa
-        Y_air = cb.standard_dry_air_composition()
+        Y_air = cb.species.dry_air()
         v = 18.0  # m/s
         D = 0.12  # m
         L = 80.0  # m

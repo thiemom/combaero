@@ -26,7 +26,7 @@ def test_coupled_combustor_network_converges_without_warning() -> None:
     u_hot_ann = 25.0
 
     X_cool = ca.humid_air_composition(288.15, 101325.0, RH_in)
-    X_air = ca.standard_dry_air_composition()
+    X_air = ca.species.dry_air()
     X_ch4 = sp.empty()
     X_ch4[sp.indices["CH4"]] = 1.0
 

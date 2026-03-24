@@ -14,7 +14,7 @@ extern const std::unordered_map<std::string, double> dry_air_composition;
 
 // Get standard dry air composition as a vector in the order defined by
 // species_index in thermo_transport_data.h
-std::vector<double> standard_dry_air_composition();
+std::vector<double> dry_air();
 
 // Water vapor saturation pressure using Huang (2018) formula [Pa]
 // Validated range: -100°C ≤ T ≤ 100°C (173.15–373.15 K)

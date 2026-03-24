@@ -635,11 +635,11 @@ TEST(EnergyBoundaryTest, StreamMix_DeltaH) {
   // Stream mix() keeps delta_h parameter (no Jacobians, simpler use case)
   Stream s1;
   s1.mdot = 0.5;
-  s1.state.set_TPX(300.0, 101325.0, standard_dry_air_composition());
+  s1.state.set_TPX(300.0, 101325.0, dry_air());
 
   Stream s2;
   s2.mdot = 0.5;
-  s2.state.set_TPX(600.0, 101325.0, standard_dry_air_composition());
+  s2.state.set_TPX(600.0, 101325.0, dry_air());
 
   // Base mix (adiabatic)
   Stream mixed_base = mix({s1, s2});

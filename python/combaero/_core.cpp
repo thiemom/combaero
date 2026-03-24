@@ -93,7 +93,7 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("d_Y", &solver::StreamJacobian::d_Y);
 
   py::class_<MixtureState>(m, "MixtureState",
-                          "High-level state for network components")
+                           "High-level state for network components")
       .def(py::init([](double P, double P_total, double T, double T_total,
                        double m_dot, const std::vector<double> &Y) {
              MixtureState s;
@@ -105,7 +105,8 @@ PYBIND11_MODULE(_core, m) {
              if (!Y.empty()) {
                s.Y = Y;
                double sum = 0.0;
-               for (double y : Y) sum += y;
+               for (double y : Y)
+                 sum += y;
                if (sum > 0.0) {
                  s.X = mass_to_mole(Y);
                } else {
@@ -116,8 +117,9 @@ PYBIND11_MODULE(_core, m) {
                s.X.assign(n, 0.0);
                s.Y.assign(n, 0.0);
                if (n > 0) {
-                   s.X[0] = 1.0; // Default to first species (usually N2 or similar)
-                   s.Y[0] = 1.0;
+                 s.X[0] =
+                     1.0; // Default to first species (usually N2 or similar)
+                 s.Y[0] = 1.0;
                }
              }
              return s;
@@ -130,28 +132,32 @@ PYBIND11_MODULE(_core, m) {
       .def_readwrite("T", &MixtureState::T)
       .def_readwrite("T_total", &MixtureState::T_total)
       .def_readwrite("m_dot", &MixtureState::m_dot)
-       .def_property("X",
-            [](const MixtureState &s) { return s.X; },
-            [](MixtureState &s, const std::vector<double> &v) {
-                s.X = v;
-                if (!v.empty()) s.Y = mole_to_mass(v);
-            })
-        .def_property("Y",
-            [](const MixtureState &s) { return s.Y; },
-            [](MixtureState &s, const std::vector<double> &v) {
-                s.Y = v;
-                if (!v.empty()) s.X = mass_to_mole(v);
-            })
-      .def("density", [](const MixtureState &s) { return s.static_state().rho(); })
+      .def_property(
+          "X", [](const MixtureState &s) { return s.X; },
+          [](MixtureState &s, const std::vector<double> &v) {
+            s.X = v;
+            if (!v.empty())
+              s.Y = mole_to_mass(v);
+          })
+      .def_property(
+          "Y", [](const MixtureState &s) { return s.Y; },
+          [](MixtureState &s, const std::vector<double> &v) {
+            s.Y = v;
+            if (!v.empty())
+              s.X = mass_to_mole(v);
+          })
+      .def("density",
+           [](const MixtureState &s) { return s.static_state().rho(); })
       .def("cp", [](const MixtureState &s) { return cp_mass(s.T, s.X); })
-      .def("specific_heat", [](const MixtureState &s) { return cp_mass(s.T, s.X); })
+      .def("specific_heat",
+           [](const MixtureState &s) { return cp_mass(s.T, s.X); })
       .def("h", [](const MixtureState &s) { return h_mass(s.T, s.X); })
       .def("enthalpy", [](const MixtureState &s) { return h_mass(s.T, s.X); })
       .def("mw", [](const MixtureState &s) { return s.static_state().mw(); })
-      .def("molecular_weight", [](const MixtureState &s) { return s.static_state().mw(); })
+      .def("molecular_weight",
+           [](const MixtureState &s) { return s.static_state().mw(); })
       .def("static_state", &MixtureState::static_state)
       .def("total_state", &MixtureState::total_state);
-
 
   py::class_<solver::ChamberResult>(m, "ChamberResult",
                                     "Analytical node residuals")
@@ -165,8 +171,7 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("T_mix", &solver::MixerResult::T_mix)
       .def_readonly("P_total_mix", &solver::MixerResult::P_total_mix)
       .def_readonly("Y_mix", &solver::MixerResult::Y_mix)
-      .def_readonly("dT_mix_d_delta_h",
-                    &solver::MixerResult::dT_mix_d_delta_h)
+      .def_readonly("dT_mix_d_delta_h", &solver::MixerResult::dT_mix_d_delta_h)
       .def_readonly("dT_mix_d_stream", &solver::MixerResult::dT_mix_d_stream)
       .def_readonly("dP_total_mix_d_stream",
                     &solver::MixerResult::dP_total_mix_d_stream)
@@ -177,18 +182,18 @@ PYBIND11_MODULE(_core, m) {
         py::arg("Q") = 0.0, py::arg("fraction") = 0.0);
   m.def("adiabatic_T_complete_and_jacobian_T_from_streams",
         &solver::adiabatic_T_complete_and_jacobian_T_from_streams,
-        py::arg("streams"), py::arg("P"),
-        py::arg("Q") = 0.0, py::arg("fraction") = 0.0);
+        py::arg("streams"), py::arg("P"), py::arg("Q") = 0.0,
+        py::arg("fraction") = 0.0);
   m.def("adiabatic_T_equilibrium_and_jacobians_from_streams",
         &solver::adiabatic_T_equilibrium_and_jacobians_from_streams,
-        py::arg("streams"), py::arg("P"),
-        py::arg("Q") = 0.0, py::arg("fraction") = 0.0);
-
+        py::arg("streams"), py::arg("P"), py::arg("Q") = 0.0,
+        py::arg("fraction") = 0.0);
 
   py::class_<solver::OrificeResult>(
       m, "OrificeResult", "Result of orifice residual and Jacobian evaluation")
       .def_readonly("m_dot_calc", &solver::OrificeResult::m_dot_calc)
-      .def_readonly("d_mdot_dP_total_up", &solver::OrificeResult::d_mdot_dP_total_up)
+      .def_readonly("d_mdot_dP_total_up",
+                    &solver::OrificeResult::d_mdot_dP_total_up)
       .def_readonly("d_mdot_dP_static_down",
                     &solver::OrificeResult::d_mdot_dP_static_down)
       .def_readonly("d_mdot_dP_static_up",
@@ -209,7 +214,8 @@ PYBIND11_MODULE(_core, m) {
       "Result of momentum chamber residual and Jacobian evaluation")
       .def_readonly("residual", &solver::MomentumChamberResult::residual)
       .def_readonly("d_res_dP", &solver::MomentumChamberResult::d_res_dP)
-      .def_readonly("d_res_dP_total", &solver::MomentumChamberResult::d_res_dP_total)
+      .def_readonly("d_res_dP_total",
+                    &solver::MomentumChamberResult::d_res_dP_total)
       .def_readonly("d_res_dmdot", &solver::MomentumChamberResult::d_res_dmdot);
 
   m.def("orifice_residuals_and_jacobian",
@@ -220,43 +226,43 @@ PYBIND11_MODULE(_core, m) {
 
   m.def("pipe_residuals_and_jacobian", &solver::pipe_residuals_and_jacobian,
         py::arg("m_dot"), py::arg("P_total_up"), py::arg("P_static_up"),
-        py::arg("T_up"), py::arg("Y_up"), py::arg("P_static_down"), py::arg("L"),
-        py::arg("D"), py::arg("roughness"), py::arg("friction_model"));
+        py::arg("T_up"), py::arg("Y_up"), py::arg("P_static_down"),
+        py::arg("L"), py::arg("D"), py::arg("roughness"),
+        py::arg("friction_model"));
 
   // Compressible flow elements
   m.def("orifice_compressible_mdot_and_jacobian",
-        &solver::orifice_compressible_mdot_and_jacobian,
-        py::arg("T0"), py::arg("P0"), py::arg("P_back"), py::arg("X"),
-        py::arg("Cd"), py::arg("area"), py::arg("beta") = 0.0,
+        &solver::orifice_compressible_mdot_and_jacobian, py::arg("T0"),
+        py::arg("P0"), py::arg("P_back"), py::arg("X"), py::arg("Cd"),
+        py::arg("area"), py::arg("beta") = 0.0,
         "Compressible orifice flow with smooth choked flow Jacobians.\n\n"
         "Returns: (mdot, d_mdot_dP0, d_mdot_dP_back, d_mdot_dT0)");
 
   m.def("orifice_compressible_residuals_and_jacobian",
-        &solver::orifice_compressible_residuals_and_jacobian,
-        py::arg("m_dot"), py::arg("P_total_up"), py::arg("T_up"),
-        py::arg("Y_up"), py::arg("P_static_down"), py::arg("Cd"),
-        py::arg("area"), py::arg("beta") = 0.0,
+        &solver::orifice_compressible_residuals_and_jacobian, py::arg("m_dot"),
+        py::arg("P_total_up"), py::arg("T_up"), py::arg("Y_up"),
+        py::arg("P_static_down"), py::arg("Cd"), py::arg("area"),
+        py::arg("beta") = 0.0,
         "Compressible orifice for network solver with all derivatives.");
 
   m.def("pipe_compressible_mdot_and_jacobian",
-        &solver::pipe_compressible_mdot_and_jacobian,
-        py::arg("T_in"), py::arg("P_in"), py::arg("u_in"), py::arg("X"),
-        py::arg("L"), py::arg("D"), py::arg("roughness"),
-        py::arg("friction_model"),
+        &solver::pipe_compressible_mdot_and_jacobian, py::arg("T_in"),
+        py::arg("P_in"), py::arg("u_in"), py::arg("X"), py::arg("L"),
+        py::arg("D"), py::arg("roughness"), py::arg("friction_model"),
         "Compressible pipe flow using Fanno model with variable friction.\n\n"
         "Returns: (dP, d_dP_dP_in, d_dP_dT_in, d_dP_du_in)");
 
   m.def("pipe_compressible_residuals_and_jacobian",
-        &solver::pipe_compressible_residuals_and_jacobian,
-        py::arg("m_dot"), py::arg("P_total_up"), py::arg("T_up"),
-        py::arg("Y_up"), py::arg("P_static_down"), py::arg("L"),
-        py::arg("D"), py::arg("roughness"), py::arg("friction_model"),
+        &solver::pipe_compressible_residuals_and_jacobian, py::arg("m_dot"),
+        py::arg("P_total_up"), py::arg("T_up"), py::arg("Y_up"),
+        py::arg("P_static_down"), py::arg("L"), py::arg("D"),
+        py::arg("roughness"), py::arg("friction_model"),
         "Compressible pipe for network solver with all derivatives.");
 
   m.def("momentum_chamber_residual_and_jacobian",
-        &solver::momentum_chamber_residual_and_jacobian,
-        py::arg("P"), py::arg("P_total"), py::arg("m_dot"), py::arg("T"),
-        py::arg("Y"), py::arg("area"),
+        &solver::momentum_chamber_residual_and_jacobian, py::arg("P"),
+        py::arg("P_total"), py::arg("m_dot"), py::arg("T"), py::arg("Y"),
+        py::arg("area"),
         "Momentum chamber residual: P_total = P + 0.5*rho*v^2");
 
   // Species metadata helpers
@@ -669,7 +675,7 @@ PYBIND11_MODULE(_core, m) {
       "Returns: TransportState object with attributes:\n"
       "  T, P, rho, mu, k, nu, alpha, Pr, cp\n\n"
       "Example:\n"
-      "  >>> X = cb.standard_dry_air_composition()\n"
+      "  >>> X = cb.species.dry_air()\n"
       "  >>> state = cb.transport_state(T=300, P=101325, X=X)\n"
       "  >>> print(state.mu)  # IDE autocomplete works!\n"
       "  1.85e-05\n"
@@ -725,7 +731,7 @@ PYBIND11_MODULE(_core, m) {
       "properties)\n"
       "  transport.mu, transport.k, transport.Pr, etc. (9 properties)\n\n"
       "Example:\n"
-      "  >>> X = cb.standard_dry_air_composition()\n"
+      "  >>> X = cb.species.dry_air()\n"
       "  >>> state = cb.complete_state(T=300, P=101325, X=X)\n"
       "  >>> print(state.thermo.h)      # Thermodynamic property\n"
       "  -103.6\n"
@@ -733,9 +739,14 @@ PYBIND11_MODULE(_core, m) {
       "  1.68e-05");
 
   // Humid air utilities
-  m.def("standard_dry_air_composition", &standard_dry_air_composition,
-        "Standard dry air mole-fraction composition over the thermo species "
-        "set.");
+  m.def("dry_air", &dry_air,
+        "Get standard dry air composition (mole fractions) as a vector of size "
+        "num_species().\n\n"
+        "Orders determined by NASA-9 thermo data index.");
+
+  // Alias for backward compatibility
+  m.def("standard_dry_air_composition", &dry_air,
+        "Alias for dry_air(). Returns standard dry air mole fractions.");
 
   m.def("humid_air_composition", &humid_air_composition, py::arg("T"),
         py::arg("P"), py::arg("RH"),
@@ -1140,18 +1151,18 @@ PYBIND11_MODULE(_core, m) {
       // Mutable state variables (read/write properties)
       .def_readwrite("T", &State::T, "Temperature [K]")
       .def_readwrite("P", &State::P, "Pressure [Pa]")
-      .def_property("X",
-                     [](const State &s) { return s.X; },
-                     [](State &s, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
-                         s.set_X(to_vec(X_arr));
-                     },
-                     "Mole fractions [-]")
-      .def_property("Y",
-                     [](const State &s) { return s.Y; },
-                     [](State &s, py::array_t<double, py::array::c_style | py::array::forcecast> Y_arr) {
-                         s.set_Y(to_vec(Y_arr));
-                     },
-                     "Mass fractions [-]")
+      .def_property(
+          "X", [](const State &s) { return s.X; },
+          [](State &s,
+             py::array_t<double, py::array::c_style | py::array::forcecast>
+                 X_arr) { s.set_X(to_vec(X_arr)); },
+          "Mole fractions [-]")
+      .def_property(
+          "Y", [](const State &s) { return s.Y; },
+          [](State &s,
+             py::array_t<double, py::array::c_style | py::array::forcecast>
+                 Y_arr) { s.set_Y(to_vec(Y_arr)); },
+          "Mass fractions [-]")
       // Computed thermodynamic properties (read-only)
       .def_property_readonly("mw", &State::mw, "Molecular weight [g/mol]")
       .def_property_readonly("cp", &State::cp,
@@ -1162,8 +1173,7 @@ PYBIND11_MODULE(_core, m) {
                              "Specific heat at constant volume [J/(kg·K)]")
       .def_property_readonly("u", &State::u, "Specific internal energy [J/kg]")
       .def_property_readonly("rho", &State::rho, "Density [kg/m³]")
-      .def_property_readonly("R", &State::R,
-                             "Specific gas constant [J/(kg·K)]")
+      .def_property_readonly("R", &State::R, "Specific gas constant [J/(kg·K)]")
       .def_property_readonly("gamma", &State::gamma,
                              "Isentropic expansion coefficient [-]")
       .def_property_readonly("a", &State::a, "Speed of sound [m/s]")
@@ -1270,10 +1280,7 @@ PYBIND11_MODULE(_core, m) {
           },
           "Get/Set Density [kg/m³] and Pressure [Pa] as a tuple (rho, P)")
       .def_property(
-          "HP",
-          [](const State &s) {
-            return py::make_tuple(s.h(), s.P);
-          },
+          "HP", [](const State &s) { return py::make_tuple(s.h(), s.P); },
           [](State &s, py::tuple t) {
             if (t.size() != 2)
               throw std::invalid_argument("HP must be a 2-tuple (h, P)");
@@ -1281,10 +1288,7 @@ PYBIND11_MODULE(_core, m) {
           },
           "Get/Set Mass Enthalpy [J/kg] and Pressure [Pa] as a tuple (h, P)")
       .def_property(
-          "SP",
-          [](const State &s) {
-            return py::make_tuple(s.s(), s.P);
-          },
+          "SP", [](const State &s) { return py::make_tuple(s.s(), s.P); },
           [](State &s, py::tuple t) {
             if (t.size() != 2)
               throw std::invalid_argument("SP must be a 2-tuple (s, P)");
@@ -1331,10 +1335,7 @@ PYBIND11_MODULE(_core, m) {
           "Get/Set Pressure [Pa] and Mass Specific Volume [m³/kg] as a tuple "
           "(P, v)")
       .def_property(
-          "UP",
-          [](const State &s) {
-            return py::make_tuple(s.u(), s.P);
-          },
+          "UP", [](const State &s) { return py::make_tuple(s.u(), s.P); },
           [](State &s, py::tuple t) {
             if (t.size() != 2)
               throw std::invalid_argument("UP must be a 2-tuple (u, P)");
@@ -1356,10 +1357,7 @@ PYBIND11_MODULE(_core, m) {
           "Get/Set Mass Specific Volume [m³/kg] and Mass Enthalpy [J/kg] as a "
           "tuple (v, h)")
       .def_property(
-          "SH",
-          [](const State &s) {
-            return py::make_tuple(s.s(), s.h());
-          },
+          "SH", [](const State &s) { return py::make_tuple(s.s(), s.h()); },
           [](State &s, py::tuple t) {
             if (t.size() != 2)
               throw std::invalid_argument("SH must be a 2-tuple (s, h)");
@@ -1427,14 +1425,10 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("gamma", &ThermoState::gamma,
                     "Isentropic expansion coefficient [-]")
       .def_readonly("a", &ThermoState::a, "Speed of sound [m/s]")
-      .def_readonly("cp_mole", &ThermoState::cp_mole,
-                    "Molar cp [J/(mol·K)]")
-      .def_readonly("cv_mole", &ThermoState::cv_mole,
-                    "Molar cv [J/(mol·K)]")
-      .def_readonly("h_mole", &ThermoState::h_mole,
-                    "Molar enthalpy [J/mol]")
-      .def_readonly("s_mole", &ThermoState::s_mole,
-                    "Molar entropy [J/(mol·K)]")
+      .def_readonly("cp_mole", &ThermoState::cp_mole, "Molar cp [J/(mol·K)]")
+      .def_readonly("cv_mole", &ThermoState::cv_mole, "Molar cv [J/(mol·K)]")
+      .def_readonly("h_mole", &ThermoState::h_mole, "Molar enthalpy [J/mol]")
+      .def_readonly("s_mole", &ThermoState::s_mole, "Molar entropy [J/(mol·K)]")
       .def_readonly("u_mole", &ThermoState::u_mole,
                     "Molar internal energy [J/mol]")
       .def_readonly("mw", &ThermoState::mw, "Molecular weight [g/mol]")
@@ -1463,7 +1457,7 @@ PYBIND11_MODULE(_core, m) {
         "  T, P, rho, cp, cv, h, s, u, gamma, a,\n"
         "  cp_mole, cv_mole, h_mole, s_mole, u_mole, mw\n\n"
         "Example:\n"
-        "  >>> X = cb.standard_dry_air_composition()\n"
+        "  >>> X = cb.species.dry_air()\n"
         "  >>> state = cb.thermo_state(T=300, P=101325, X=X)\n"
         "  >>> print(state.h)  # IDE autocomplete works!\n"
         "  8682.5\n"
@@ -1504,9 +1498,7 @@ PYBIND11_MODULE(_core, m) {
           "set_X",
           [](Stream &s,
              py::array_t<double, py::array::c_style | py::array::forcecast>
-                 X_arr) -> Stream & {
-            return s.set_X(to_vec(X_arr));
-          },
+                 X_arr) -> Stream & { return s.set_X(to_vec(X_arr)); },
           py::arg("X"), "Set mole fractions [-], returns self")
       .def("set_mdot", &Stream::set_mdot, py::arg("mdot"),
            "Set mass flow rate [kg/s], returns self");
@@ -1776,7 +1768,8 @@ PYBIND11_MODULE(_core, m) {
         in.T = T;
         in.P = P;
         in.X = to_vec(X_arr);
-        return complete_combustion_isothermal(in, smooth_phi0, smooth_phi1, k0, k1);
+        return complete_combustion_isothermal(in, smooth_phi0, smooth_phi1, k0,
+                                              k1);
       },
       py::arg("T"), py::arg("X"), py::arg("P") = 101325.0,
       py::arg("smooth_phi0") = true, py::arg("smooth_phi1") = true,
@@ -2891,34 +2884,35 @@ PYBIND11_MODULE(_core, m) {
 
   using CombustionStateBaseFn = CombustionState (*)(
       const std::vector<double> &, const std::vector<double> &, double, double,
-      double, const std::string &, CombustionMethod, bool, bool, double, double);
-  m.def(
-      "combustion_state", static_cast<CombustionStateBaseFn>(&combustion_state),
-      py::arg("X_fuel"), py::arg("X_ox"), py::arg("phi"),
-      py::arg("T_reactants"), py::arg("P"), py::arg("fuel_name") = "",
-      py::arg("method") = CombustionMethod::Complete,
-      py::arg("smooth_phi0") = false, py::arg("smooth_phi1") = false,
-      py::arg("k0") = combaero::SMOOTHING_K_PHI0,
-      py::arg("k1") = combaero::SMOOTHING_K_PHI1,
-      "Compute combustion state from equivalence ratio.\n\n"
-      "Parameters:\n"
-      "  X_fuel       : fuel composition (mole fractions) [-]\n"
-      "  X_ox         : oxidizer composition (mole fractions) [-]\n"
-      "  phi          : equivalence ratio [-]\n"
-      "  T_reactants  : reactant temperature [K]\n"
-      "  P            : pressure [Pa]\n"
-      "  fuel_name    : optional fuel label (default: '')\n"
-      "  method       : CombustionMethod.Complete (default) or "
-      "CombustionMethod.Equilibrium\n\n"
-      "Returns: CombustionState with reactants, products, phi, "
-      "mixture_fraction\n\n"
-      "Example:\n"
-      "  >>> state = cb.combustion_state(X_CH4, X_air, phi=1.0, "
-      "T_reactants=300, P=101325)\n"
-      "  >>> state_eq = cb.combustion_state(X_CH4, X_air, phi=1.2, "
-      "T_reactants=300, P=101325,\n"
-      "  ...                               "
-      "method=cb.CombustionMethod.Equilibrium)");
+      double, const std::string &, CombustionMethod, bool, bool, double,
+      double);
+  m.def("combustion_state",
+        static_cast<CombustionStateBaseFn>(&combustion_state),
+        py::arg("X_fuel"), py::arg("X_ox"), py::arg("phi"),
+        py::arg("T_reactants"), py::arg("P"), py::arg("fuel_name") = "",
+        py::arg("method") = CombustionMethod::Complete,
+        py::arg("smooth_phi0") = false, py::arg("smooth_phi1") = false,
+        py::arg("k0") = combaero::SMOOTHING_K_PHI0,
+        py::arg("k1") = combaero::SMOOTHING_K_PHI1,
+        "Compute combustion state from equivalence ratio.\n\n"
+        "Parameters:\n"
+        "  X_fuel       : fuel composition (mole fractions) [-]\n"
+        "  X_ox         : oxidizer composition (mole fractions) [-]\n"
+        "  phi          : equivalence ratio [-]\n"
+        "  T_reactants  : reactant temperature [K]\n"
+        "  P            : pressure [Pa]\n"
+        "  fuel_name    : optional fuel label (default: '')\n"
+        "  method       : CombustionMethod.Complete (default) or "
+        "CombustionMethod.Equilibrium\n\n"
+        "Returns: CombustionState with reactants, products, phi, "
+        "mixture_fraction\n\n"
+        "Example:\n"
+        "  >>> state = cb.combustion_state(X_CH4, X_air, phi=1.0, "
+        "T_reactants=300, P=101325)\n"
+        "  >>> state_eq = cb.combustion_state(X_CH4, X_air, phi=1.2, "
+        "T_reactants=300, P=101325,\n"
+        "  ...                               "
+        "method=cb.CombustionMethod.Equilibrium)");
 
   using CombustionStreamsBaseFn =
       CombustionState (*)(const Stream &, const Stream &, const std::string &,
@@ -2980,8 +2974,8 @@ PYBIND11_MODULE(_core, m) {
       [](py::array_t<double, py::array::c_style | py::array::forcecast> X_fuel,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_ox,
          double phi, double T_reactants, double P, const std::string &fuel_name,
-         CombustionMethod method, py::function pressure_loss,
-         bool smooth_phi0, bool smooth_phi1, double k0, double k1) {
+         CombustionMethod method, py::function pressure_loss, bool smooth_phi0,
+         bool smooth_phi1, double k0, double k1) {
         PressureLossCorrelation fn =
             [pressure_loss](const PressureLossContext &ctx) {
               return pressure_loss(ctx).cast<double>();
@@ -3899,25 +3893,23 @@ PYBIND11_MODULE(_core, m) {
         "  >>> print(f'Mass flow: {mdot:.4f} kg/s')");
 
   // Orifice flow calculations with Cd
-  m.def(
-      "orifice_mdot_Cd",
-      static_cast<double (*)(const OrificeGeometry &, double, double, double,
-                             double)>(&orifice_mdot),
-      py::arg("geom"), py::arg("Cd"), py::arg("dP"), py::arg("rho"),
-      py::arg("epsilon") = 1.0,
-      "Mass flow through orifice given Cd.\n\n"
-      "mdot = Cd * E * epsilon * A * sqrt(2 * rho * dP)\n\n"
-      "Returns: mass flow rate [kg/s]");
+  m.def("orifice_mdot_Cd",
+        static_cast<double (*)(const OrificeGeometry &, double, double, double,
+                               double)>(&orifice_mdot),
+        py::arg("geom"), py::arg("Cd"), py::arg("dP"), py::arg("rho"),
+        py::arg("epsilon") = 1.0,
+        "Mass flow through orifice given Cd.\n\n"
+        "mdot = Cd * E * epsilon * A * sqrt(2 * rho * dP)\n\n"
+        "Returns: mass flow rate [kg/s]");
 
-  m.def(
-      "orifice_dP_Cd",
-      static_cast<double (*)(const OrificeGeometry &, double, double, double,
-                             double)>(&orifice_dP),
-      py::arg("geom"), py::arg("Cd"), py::arg("mdot"), py::arg("rho"),
-      py::arg("epsilon") = 1.0,
-      "Pressure drop for given mass flow and Cd.\n\n"
-      "dP = (mdot / (Cd * E * epsilon * A))² / (2 * rho)\n\n"
-      "Returns: pressure drop [Pa]");
+  m.def("orifice_dP_Cd",
+        static_cast<double (*)(const OrificeGeometry &, double, double, double,
+                               double)>(&orifice_dP),
+        py::arg("geom"), py::arg("Cd"), py::arg("mdot"), py::arg("rho"),
+        py::arg("epsilon") = 1.0,
+        "Pressure drop for given mass flow and Cd.\n\n"
+        "dP = (mdot / (Cd * E * epsilon * A))² / (2 * rho)\n\n"
+        "Returns: pressure drop [Pa]");
 
   m.def("orifice_Cd_from_measurement", &orifice_Cd_from_measurement,
         py::arg("geom"), py::arg("mdot"), py::arg("dP"), py::arg("rho"),
@@ -4079,7 +4071,7 @@ PYBIND11_MODULE(_core, m) {
       "  >>> geom = cb.OrificeGeometry()\n"
       "  >>> geom.d = 0.05\n"
       "  >>> geom.D = 0.1\n"
-      "  >>> X_air = cb.standard_dry_air_composition()\n"
+      "  >>> X_air = cb.species.dry_air()\n"
       "  >>> result = cb.orifice_flow_state(geom, dP=10000, T=300, P=101325, "
       "X=X_air)\n"
       "  >>> print(f'Mass flow: {result.mdot:.4f} kg/s')");
@@ -5098,39 +5090,43 @@ PYBIND11_MODULE(_core, m) {
       "Q is positive when heat flows from side A to side B.\n"
       "T_wall is the hot-side surface temperature.\n"
       "Jacobians enable proper Newton coupling in the network solver.")
-      .def_readonly("Q", &WallCouplingResult::Q, "Heat transfer rate [W] (positive A->B)")
-      .def_readonly("T_wall", &WallCouplingResult::T_wall, "Wall temperature [K] (hot-side surface)")
-      .def_readonly("dQ_dh_a", &WallCouplingResult::dQ_dh_a, "Jacobian: dQ/dh_a [W*m^2*K/W]")
-      .def_readonly("dQ_dh_b", &WallCouplingResult::dQ_dh_b, "Jacobian: dQ/dh_b [W*m^2*K/W]")
-      .def_readonly("dQ_dT_aw_a", &WallCouplingResult::dQ_dT_aw_a, "Jacobian: dQ/dT_aw_a [W/K]")
-      .def_readonly("dQ_dT_aw_b", &WallCouplingResult::dQ_dT_aw_b, "Jacobian: dQ/dT_aw_b [W/K]")
+      .def_readonly("Q", &WallCouplingResult::Q,
+                    "Heat transfer rate [W] (positive A->B)")
+      .def_readonly("T_wall", &WallCouplingResult::T_wall,
+                    "Wall temperature [K] (hot-side surface)")
+      .def_readonly("dQ_dh_a", &WallCouplingResult::dQ_dh_a,
+                    "Jacobian: dQ/dh_a [W*m^2*K/W]")
+      .def_readonly("dQ_dh_b", &WallCouplingResult::dQ_dh_b,
+                    "Jacobian: dQ/dh_b [W*m^2*K/W]")
+      .def_readonly("dQ_dT_aw_a", &WallCouplingResult::dQ_dT_aw_a,
+                    "Jacobian: dQ/dT_aw_a [W/K]")
+      .def_readonly("dQ_dT_aw_b", &WallCouplingResult::dQ_dT_aw_b,
+                    "Jacobian: dQ/dT_aw_b [W/K]")
       .def("__repr__", [](const WallCouplingResult &r) {
         auto fmt = [](double v) {
           char buf[32];
           std::snprintf(buf, sizeof(buf), "%.6g", v);
           return std::string(buf);
         };
-        return "WallCouplingResult(Q=" + fmt(r.Q) + ", T_wall=" + fmt(r.T_wall) + ")";
+        return "WallCouplingResult(Q=" + fmt(r.Q) +
+               ", T_wall=" + fmt(r.T_wall) + ")";
       });
 
   // -----------------------------------------------------------------
   // wall_coupling_and_jacobian
   // -----------------------------------------------------------------
-  m.def(
-      "wall_coupling_and_jacobian",
-      &wall_coupling_and_jacobian,
-      py::arg("h_a"), py::arg("T_aw_a"),
-      py::arg("h_b"), py::arg("T_aw_b"),
-      py::arg("t_over_k"), py::arg("A"),
-      "Compute heat transfer and Jacobians for wall coupling.\n\n"
-      "Parameters:\n"
-      "  h_a, h_b       : convective HTCs on sides A and B [W/(m^2*K)]\n"
-      "  T_aw_a, T_aw_b : adiabatic wall temperatures on sides A and B [K]\n"
-      "  t_over_k       : wall_thickness / wall_conductivity [m^2*K/W]\n"
-      "  A              : effective heat transfer area [m^2]\n\n"
-      "Returns: WallCouplingResult with Q and analytical Jacobians\n\n"
-      "Uses overall_htc_wall(h_a, h_b, t_over_k) internally.\n"
-      "Q = U * A * (T_aw_a - T_aw_b) where U = 1 / (1/h_a + t/k + 1/h_b)");
+  m.def("wall_coupling_and_jacobian", &wall_coupling_and_jacobian,
+        py::arg("h_a"), py::arg("T_aw_a"), py::arg("h_b"), py::arg("T_aw_b"),
+        py::arg("t_over_k"), py::arg("A"),
+        "Compute heat transfer and Jacobians for wall coupling.\n\n"
+        "Parameters:\n"
+        "  h_a, h_b       : convective HTCs on sides A and B [W/(m^2*K)]\n"
+        "  T_aw_a, T_aw_b : adiabatic wall temperatures on sides A and B [K]\n"
+        "  t_over_k       : wall_thickness / wall_conductivity [m^2*K/W]\n"
+        "  A              : effective heat transfer area [m^2]\n\n"
+        "Returns: WallCouplingResult with Q and analytical Jacobians\n\n"
+        "Uses overall_htc_wall(h_a, h_b, t_over_k) internally.\n"
+        "Q = U * A * (T_aw_a - T_aw_b) where U = 1 / (1/h_a + t/k + 1/h_b)");
 
   // -----------------------------------------------------------------
   // channel_smooth
@@ -5143,8 +5139,8 @@ PYBIND11_MODULE(_core, m) {
          const std::string &correlation, bool heating, double mu_ratio,
          double roughness, double Nu_multiplier, double f_multiplier) {
         return channel_smooth(T, P, to_vec(X_arr), velocity, diameter, length,
-                              T_wall, correlation, heating, mu_ratio,
-                              roughness, Nu_multiplier, f_multiplier);
+                              T_wall, correlation, heating, mu_ratio, roughness,
+                              Nu_multiplier, f_multiplier);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
       py::arg("diameter"), py::arg("length"),
@@ -5176,8 +5172,8 @@ PYBIND11_MODULE(_core, m) {
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double velocity, double diameter, double length, double e_D,
-         double pitch_to_height, double alpha_deg, double T_wall,
-         bool heating, double Nu_multiplier, double f_multiplier) {
+         double pitch_to_height, double alpha_deg, double T_wall, bool heating,
+         double Nu_multiplier, double f_multiplier) {
         return channel_ribbed(T, P, to_vec(X_arr), velocity, diameter, length,
                               e_D, pitch_to_height, alpha_deg, T_wall, heating,
                               Nu_multiplier, f_multiplier);
@@ -5186,8 +5182,8 @@ PYBIND11_MODULE(_core, m) {
       py::arg("diameter"), py::arg("length"), py::arg("e_D"),
       py::arg("pitch_to_height"), py::arg("alpha_deg"),
       py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
-      py::arg("heating") = true,
-      py::arg("Nu_multiplier") = 1.0, py::arg("f_multiplier") = 1.0,
+      py::arg("heating") = true, py::arg("Nu_multiplier") = 1.0,
+      py::arg("f_multiplier") = 1.0,
       "Rib-enhanced cooling channel (Han et al. 1988).\n\n"
       "Applies rib_enhancement_factor to Nu and rib_friction_multiplier to f\n"
       "from a smooth-pipe Gnielinski baseline.\n\n"
@@ -5210,15 +5206,15 @@ PYBIND11_MODULE(_core, m) {
          double h_d, double S_d, double T_wall, bool heating,
          double Nu_multiplier, double f_multiplier) {
         return channel_dimpled(T, P, to_vec(X_arr), velocity, diameter, length,
-                               d_Dh, h_d, S_d, T_wall, heating,
-                               Nu_multiplier, f_multiplier);
+                               d_Dh, h_d, S_d, T_wall, heating, Nu_multiplier,
+                               f_multiplier);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
       py::arg("diameter"), py::arg("length"), py::arg("d_Dh"), py::arg("h_d"),
       py::arg("S_d"),
       py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
-      py::arg("heating") = true,
-      py::arg("Nu_multiplier") = 1.0, py::arg("f_multiplier") = 1.0,
+      py::arg("heating") = true, py::arg("Nu_multiplier") = 1.0,
+      py::arg("f_multiplier") = 1.0,
       "Dimpled surface cooling channel (Chyu et al. 1997).\n\n"
       "Applies dimple_nusselt_enhancement to Nu and dimple_friction_multiplier "
       "to f\n"
@@ -5247,8 +5243,8 @@ PYBIND11_MODULE(_core, m) {
       py::arg("channel_height"), py::arg("pin_diameter"), py::arg("S_D"),
       py::arg("X_D"), py::arg("N_rows"),
       py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
-      py::arg("is_staggered") = true,
-      py::arg("Nu_multiplier") = 1.0, py::arg("f_multiplier") = 1.0,
+      py::arg("is_staggered") = true, py::arg("Nu_multiplier") = 1.0,
+      py::arg("f_multiplier") = 1.0,
       "Pin-fin array cooling channel (Metzger et al. 1982).\n\n"
       "Re and Nu are based on pin diameter d.\n"
       "dP = N_rows * f_pin * (rho * v_max^2 / 2)\n"
@@ -5271,8 +5267,8 @@ PYBIND11_MODULE(_core, m) {
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double mdot_jet, double d_jet, double z_D, double x_D, double y_D,
-         double A_target, double T_wall, double Cd_jet,
-         double Nu_multiplier, double f_multiplier) {
+         double A_target, double T_wall, double Cd_jet, double Nu_multiplier,
+         double f_multiplier) {
         return channel_impingement(T, P, to_vec(X_arr), mdot_jet, d_jet, z_D,
                                    x_D, y_D, A_target, T_wall, Cd_jet,
                                    Nu_multiplier, f_multiplier);
@@ -5281,8 +5277,8 @@ PYBIND11_MODULE(_core, m) {
       py::arg("d_jet"), py::arg("z_D"), py::arg("x_D") = 0.0,
       py::arg("y_D") = 0.0, py::arg("A_target"),
       py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
-      py::arg("Cd_jet") = 0.65,
-      py::arg("Nu_multiplier") = 1.0, py::arg("f_multiplier") = 1.0,
+      py::arg("Cd_jet") = 0.65, py::arg("Nu_multiplier") = 1.0,
+      py::arg("f_multiplier") = 1.0,
       "Impingement jet array cooling (Florschuetz et al. 1981 / Martin "
       "1977).\n\n"
       "Re and Nu are based on jet diameter d_jet.\n"

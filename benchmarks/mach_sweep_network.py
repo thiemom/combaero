@@ -51,8 +51,8 @@ def _mdot_for_target_mach(mach: float, T: float, P_ref: float, X_mole: list[floa
     return float(mach * rho * a * area)
 
 def _build_coupled_network(regime: Regime, mach_target: float, cfg: SweepConfig) -> tuple[FlowNetwork, float]:
-    x_mole = cb.standard_dry_air_composition()
-    y_mass = list(cb.mole_to_mass(x_mole))
+    x_mole = cb.species.dry_air()
+    y_mass = cb.mole_to_mass(x_mole)
     area_hot = _area_from_diameter(cfg.d_pipe_hot)
     area_cold = _area_from_diameter(cfg.d_pipe_cold)
     mdot_hot = _mdot_for_target_mach(mach_target, cfg.t_hot_in, cfg.p_out_hot, x_mole, area_hot)
@@ -64,7 +64,7 @@ def _build_coupled_network(regime: Regime, mach_target: float, cfg: SweepConfig)
     net.add_node(MassFlowBoundary("cold_inlet", m_dot=mdot_cold, T_total=cfg.t_cold_in, Y=y_mass))
     net.add_node(PlenumNode("cold_plenum"))
     net.add_node(PressureBoundary("cold_outlet", P_total=cfg.p_out_cold, T_total=cfg.t_cold_in, Y=y_mass))
-    pipe_regime = "compressible_fanno" if regime == "compressible" else "incompressible"
+    pipe_regime = "compressible" if regime == "compressible" else "incompressible"
     orifice_regime = "compressible" if regime == "compressible" else "incompressible"
     hot_surface = ConvectiveSurface(area=np.pi * cfg.d_pipe_hot * cfg.l_pipe, model=SmoothModel())
     cold_surface = ConvectiveSurface(area=np.pi * cfg.d_pipe_cold * cfg.l_pipe, model=SmoothModel())
@@ -78,7 +78,7 @@ def _build_coupled_network(regime: Regime, mach_target: float, cfg: SweepConfig)
 
 def run_sweep(mach_values: np.ndarray, regime: Regime, cfg: SweepConfig) -> dict[str, np.ndarray]:
     pr_hot, pr_cold, mach_solved_hot, delta_t_hot, delta_t_cold = [], [], [], [], []
-    x_mole = cb.standard_dry_air_composition()
+    x_mole = cb.species.dry_air()
     area_hot = _area_from_diameter(cfg.d_pipe_hot)
     x0_prev = None
     for m_target in mach_values:

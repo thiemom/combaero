@@ -207,7 +207,7 @@ double dryair_required_per_kg_fuel(std::size_t fuel_index) {
   }
 
   double fuel_mw = molar_masses[fuel_index]; // g/mol
-  std::vector<double> X_air = standard_dry_air_composition();
+  std::vector<double> X_air = dry_air();
   double air_mw = mwmix(X_air); // g/mol
 
   double molar_air_required = dryair_required_per_mol_fuel(fuel_index);
@@ -224,7 +224,7 @@ double dryair_required_per_mol_mixture(const std::vector<double> &X) {
 // Calculate dry air required for complete combustion [kg air/kg mixture]
 double dryair_required_per_kg_mixture(const std::vector<double> &X) {
   double mixture_mw = mwmix(X); // g/mol
-  std::vector<double> X_air = standard_dry_air_composition();
+  std::vector<double> X_air = dry_air();
   double air_mw = mwmix(X_air); // g/mol
 
   double molar_air_required = dryair_required_per_mol_mixture(X);

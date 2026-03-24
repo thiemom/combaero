@@ -23,7 +23,7 @@ int main()
 {
     std::cout << std::fixed << std::setprecision(5);
 
-    const std::vector<double> X_air = standard_dry_air_composition();
+    const std::vector<double> X_air = dry_air();
 
     // =========================================================================
     // 1. Cd correlations — sharp thin-plate sweep over beta and Re

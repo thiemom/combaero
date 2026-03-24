@@ -17,7 +17,7 @@ int main() {
 
     std::cout << std::fixed << std::setprecision(3);
 
-    const std::vector<double> x_air = standard_dry_air_composition();
+    const std::vector<double> x_air = dry_air();
 
     // Representative combustor conditions
     const double p = 15.0e5;        // Pa

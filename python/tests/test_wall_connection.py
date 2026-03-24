@@ -94,7 +94,7 @@ def test_wall_connection_with_convective_surfaces():
     )
 
     # Compute HTCs from flow conditions
-    X_air = cb.standard_dry_air_composition()
+    X_air = cb.species.dry_air()
 
     # Hot side
     ch_hot = hot_surface.htc_and_T(

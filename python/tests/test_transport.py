@@ -7,7 +7,7 @@ import combaero as cb
 
 def test_reynolds_air() -> None:
     """Reynolds number for air flow."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     T = 300.0  # K
     P = 101325.0  # Pa
     V = 10.0  # m/s
@@ -24,7 +24,7 @@ def test_reynolds_air() -> None:
 
 def test_peclet_air() -> None:
     """Peclet number for air flow."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     T = 300.0  # K
     P = 101325.0  # Pa
     V = 10.0  # m/s
@@ -42,7 +42,7 @@ def test_peclet_air() -> None:
 
 def test_thermal_diffusivity_air() -> None:
     """Thermal diffusivity for air."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     T = 300.0  # K
     P = 101325.0  # Pa
 
@@ -55,7 +55,7 @@ def test_thermal_diffusivity_air() -> None:
 
 def test_reynolds_peclet_consistency() -> None:
     """Pe = V*L/alpha and Re = rho*V*L/mu should satisfy Pe = Re*Pr."""
-    X = cb.standard_dry_air_composition()
+    X = cb.species.dry_air()
     T = 400.0  # K
     P = 200000.0  # Pa
     V = 50.0  # m/s

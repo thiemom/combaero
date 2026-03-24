@@ -23,8 +23,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from plot_utils import show_or_save
 
-import combaero as ca
-from combaero.species import SpeciesLocator
+import combaero as cb
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -35,7 +34,7 @@ def adiabatic_path(
     T_start: float, P_start: float, P_end: float, X: list, n: int = 200
 ) -> tuple[np.ndarray, np.ndarray]:
     """Pressure-volume path for isentropic process (variable gamma)."""
-    state = ca.State().set_TPX(T_start, P_start, X)
+    state = cb.State().set_TPX(T_start, P_start, X)
     s_mass, _ = state.SP
 
     P_path = np.linspace(P_start, P_end, n)
@@ -48,7 +47,6 @@ def adiabatic_path(
 
 
 def main() -> None:
-    sp = SpeciesLocator.from_core()
 
     # =========================================================================
     # Engine parameters
@@ -58,9 +56,9 @@ def main() -> None:
     T1 = 350.0  # K  intake temperature (slightly above ambient)
     P1 = 101325.0  # Pa intake pressure (naturally aspirated)
 
-    X_air = ca.standard_dry_air_composition()
-    X_ch4 = sp.empty()
-    X_ch4[sp.indices["CH4"]] = 1.0
+    X_air = cb.species.dry_air()
+    X_ch4 = cb.species.empty()
+    X_ch4[cb.species.indices["CH4"]] = 1.0
 
     print("=" * 65)
     print("Otto Cycle -- Spark-Ignition IC Engine")
@@ -72,17 +70,17 @@ def main() -> None:
     # =========================================================================
     # State 1: BDC after intake (fresh charge = premixed fuel + air)
     # =========================================================================
-    air = ca.Stream()
+    air = cb.Stream()
     air.T, air.P, air.X, air.mdot = T1, P1, X_air, 1.0
 
-    fuel = ca.Stream()
+    fuel = cb.Stream()
     fuel.T, fuel.P, fuel.X = T1, P1, X_ch4
 
-    fuel = ca.set_fuel_stream_for_phi(phi, fuel, air)
-    charge = ca.mix([fuel, air])
+    fuel = cb.set_fuel_stream_for_phi(phi, fuel, air)
+    charge = cb.mix([fuel, air])
 
     X1 = charge.X  # unburned mixture composition
-    rho1 = ca.density(T1, P1, X1)
+    rho1 = cb.density(T1, P1, X1)
     v1 = 1.0 / rho1  # specific volume [m3/kg]
 
     print("\n--- State 1 (BDC, unburned charge) ---")
@@ -95,11 +93,11 @@ def main() -> None:
     # State 2: TDC after isentropic compression
     # =========================================================================
     # P2/P1 = CR^gamma  (first estimate with local gamma, then exact via s=const)
-    state1 = ca.State().set_TPX(T1, P1, X1)
+    state1 = cb.State().set_TPX(T1, P1, X1)
     s1_mass, v1_mass = state1.SV
     gamma1 = state1.gamma
 
-    state2 = ca.State().set_TPX(T1, P1, X1)
+    state2 = cb.State().set_TPX(T1, P1, X1)
     state2.SV = s1_mass, v1_mass / CR
 
     T2, P2 = state2.TP
@@ -116,20 +114,20 @@ def main() -> None:
     # =========================================================================
     # Burn the compressed charge; volume (and thus density) stays constant.
     # complete_combustion gives T_ad at the post-compression pressure.
-    burned = ca.complete_combustion(T2, X1, P2)
+    burned = cb.complete_combustion(T2, X1, P2)
     T3 = burned.T
     X3 = burned.X
 
     # At constant volume: rho3 = rho2, so P3 = rho2 * R_specific(X3) * T3
     # Use density identity: rho = P / (R_sp * T)  =>  P3 = P2 * (T3/T2) * (R3/R2)
-    R2 = ca.specific_gas_constant(X1)
-    R3 = ca.specific_gas_constant(X3)
+    R2 = cb.specific_gas_constant(X1)
+    R3 = cb.specific_gas_constant(X3)
     P3 = P2 * (T3 / T2) * (R3 / R2)
     v3 = v2  # constant volume
 
     # Heat added per kg of charge: constant-volume process -> q = integral cv dT
     T_cv_in = np.linspace(T2, T3, 200)
-    q_in = np.trapezoid([ca.cv_mass(T, X1) for T in T_cv_in], T_cv_in)  # J/kg
+    q_in = np.trapezoid([cb.cv_mass(T, X1) for T in T_cv_in], T_cv_in)  # J/kg
 
     print("\n--- State 3 (TDC, after combustion) ---")
     print(f"  T3  = {T3:.1f} K")
@@ -142,11 +140,11 @@ def main() -> None:
     # =========================================================================
     # Expand back to v4 = v1 (same specific volume as State 1)
     # Mirror of compression: find P4 such that v4 = v1 at constant s
-    state3 = ca.State().set_TPX(T3, P3, X3)
+    state3 = cb.State().set_TPX(T3, P3, X3)
     s3_mass, _ = state3.SV
     gamma3 = state3.gamma
 
-    state4 = ca.State().set_TPX(T3, P3, X3)
+    state4 = cb.State().set_TPX(T3, P3, X3)
     state4.SV = s3_mass, v1
 
     T4, P4 = state4.TP
@@ -163,7 +161,7 @@ def main() -> None:
     # =========================================================================
     # Heat rejected: constant-volume process 4->1, composition fixed at X3
     # u_mass is valid here since both states share the same composition
-    q_out = ca.u_mass(T4, X3) - ca.u_mass(T1, X3)  # J/kg (positive)
+    q_out = cb.u_mass(T4, X3) - cb.u_mass(T1, X3)  # J/kg (positive)
 
     w_net = q_in - q_out  # net work [J/kg]
     eta_th = w_net / q_in  # thermal efficiency
@@ -189,17 +187,17 @@ def main() -> None:
     v_exp, P_exp = adiabatic_path(T3, P3, P4, X3)
 
     # --- entropy at each state [J/(kg K)] ---
-    s1 = ca.s_mass(T1, X1, P1)
-    s2 = ca.s_mass(T2, X1, P2)  # == s1 (isentropic)
-    s3 = ca.s_mass(T3, X3, P3)
-    s4 = ca.s_mass(T4, X3, P4)  # == s3 (isentropic)
+    s1 = cb.s_mass(T1, X1, P1)
+    s2 = cb.s_mass(T2, X1, P2)  # == s1 (isentropic)
+    s3 = cb.s_mass(T3, X3, P3)
+    s4 = cb.s_mass(T4, X3, P4)  # == s3 (isentropic)
 
     # isochoric heat addition 2->3: ds = cv/T dT  (variable composition approx: use X1)
     n_ts = 200
     T_23 = np.linspace(T2, T3, n_ts)
     s_23 = s2 + np.array(
         [
-            np.trapezoid([ca.cv_mass(t, X1) / t for t in T_23[: i + 1]], T_23[: i + 1])
+            np.trapezoid([cb.cv_mass(t, X1) / t for t in T_23[: i + 1]], T_23[: i + 1])
             for i in range(n_ts)
         ]
     )
@@ -208,7 +206,7 @@ def main() -> None:
     T_41 = np.linspace(T4, T1, n_ts)
     s_41 = s4 + np.array(
         [
-            np.trapezoid([ca.cv_mass(t, X3) / t for t in T_41[: i + 1]], T_41[: i + 1])
+            np.trapezoid([cb.cv_mass(t, X3) / t for t in T_41[: i + 1]], T_41[: i + 1])
             for i in range(n_ts)
         ]
     )

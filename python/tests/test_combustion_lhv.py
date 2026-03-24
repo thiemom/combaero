@@ -7,15 +7,9 @@ import pytest
 import combaero as cb
 
 
-def _methane_mole_fractions() -> list[float]:
-    x = [0.0] * 14
-    x[5] = 1.0  # CH4 in thermo_transport_data species ordering
-    return x
-
-
 def test_fuel_lhv_ch4_reasonable_reference_values() -> None:
     """Pure methane LHV should be close to canonical values."""
-    x_ch4 = _methane_mole_fractions()
+    x_ch4 = cb.species.pure_species("CH4")
 
     lhv_molar = cb.fuel_lhv_molar(x_ch4)  # J/mol
     lhv_mass = cb.fuel_lhv_mass(x_ch4)  # J/kg
@@ -26,7 +20,7 @@ def test_fuel_lhv_ch4_reasonable_reference_values() -> None:
 
 def test_fuel_lhv_mass_molar_consistency() -> None:
     """Mass and molar LHV outputs should be internally consistent."""
-    x_ch4 = _methane_mole_fractions()
+    x_ch4 = cb.species.pure_species("CH4")
 
     lhv_molar = cb.fuel_lhv_molar(x_ch4)
     lhv_mass = cb.fuel_lhv_mass(x_ch4)
@@ -38,7 +32,7 @@ def test_fuel_lhv_mass_molar_consistency() -> None:
 
 def test_fuel_lhv_reference_temperature_argument_changes_result() -> None:
     """Reference temperature input should affect LHV value."""
-    x_ch4 = _methane_mole_fractions()
+    x_ch4 = cb.species.pure_species("CH4")
 
     lhv_298 = cb.fuel_lhv_molar(x_ch4, reference_temperature=298.15)
     lhv_350 = cb.fuel_lhv_molar(x_ch4, reference_temperature=350.0)

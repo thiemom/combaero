@@ -48,7 +48,7 @@ def test_pipe_element_default_surface():
         P_total=101325.0,
         T_total=300.0,
         m_dot=0.1,
-        Y=cb.mole_to_mass(cb.standard_dry_air_composition()),
+        Y=cb.mole_to_mass(cb.species.dry_air()),
     )
 
     # htc_and_T should return None for area=0
@@ -84,7 +84,7 @@ def test_pipe_element_with_surface():
         P_total=101325.0,
         T_total=300.0,
         m_dot=0.1,
-        Y=cb.mole_to_mass(cb.standard_dry_air_composition()),
+        Y=cb.mole_to_mass(cb.species.dry_air()),
     )
 
     # htc_and_T should compute values
@@ -107,7 +107,7 @@ def _make_state(m_dot: float = 0.5) -> MixtureState:
         P_total=210000.0,
         T_total=610.0,
         m_dot=m_dot,
-        Y=cb.mole_to_mass(cb.standard_dry_air_composition()),
+        Y=cb.mole_to_mass(cb.species.dry_air()),
     )
 
 
@@ -213,7 +213,7 @@ def test_pipe_element_with_t_wall():
         P_total=101325.0,
         T_total=300.0,
         m_dot=0.1,
-        Y=cb.mole_to_mass(cb.standard_dry_air_composition()),
+        Y=cb.mole_to_mass(cb.species.dry_air()),
     )
 
     # htc_and_T should compute values with wall temperature
@@ -251,7 +251,7 @@ def test_network_element_default():
         P_total=101325.0,
         T_total=300.0,
         m_dot=0.1,
-        Y=cb.mole_to_mass(cb.standard_dry_air_composition()),
+        Y=cb.mole_to_mass(cb.species.dry_air()),
     )
 
     # Base class should return None

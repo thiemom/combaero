@@ -22,7 +22,7 @@ from combaero import heat_transfer as ht
 # Standard air at 600 K, 5 bar
 T_AIR = 600.0
 P_AIR = 5e5
-X_AIR = [0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+X_AIR = cb.species.dry_air()
 
 # Pin-fin geometry: keep Re_d = rho*v*d/mu within [3000, 90000].
 # At 600K/5bar air: rho~2.9 kg/m3, mu~3.0e-5 Pa.s

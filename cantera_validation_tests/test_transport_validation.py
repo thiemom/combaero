@@ -42,7 +42,7 @@ class TestTransportProperties:
         """Test air viscosity at standard conditions."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         T = 300.0
         P = 101325.0
 
@@ -68,7 +68,7 @@ class TestTransportProperties:
         """Test viscosity at various temperatures."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         P = 101325.0
 
         for T in [300.0, 500.0, 1000.0, 1500.0, 2000.0]:
@@ -112,7 +112,7 @@ class TestTransportProperties:
         """Test air thermal conductivity at standard conditions."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         T = 300.0
         P = 101325.0
 
@@ -138,7 +138,7 @@ class TestTransportProperties:
         """Test thermal conductivity at various temperatures."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         P = 101325.0
 
         for T in [300.0, 500.0, 1000.0, 1500.0, 2000.0]:
@@ -180,7 +180,7 @@ class TestTransportProperties:
         """Test Prandtl number calculation."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         T = 300.0
         P = 101325.0
 
@@ -212,7 +212,7 @@ class TestTransportProperties:
         cb = combaero
         from combaero._core import species_index_from_name
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("CH4")] = 1.0
 
@@ -246,7 +246,7 @@ class TestTransportProperties:
         """Test transport properties at high temperatures (post-combustion)."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("CH4")] = 1.0
 
@@ -314,7 +314,7 @@ class TestThermodynamicProperties:
         """Test air specific heat capacity."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         T = 300.0
         P = 101325.0
 
@@ -339,7 +339,7 @@ class TestThermodynamicProperties:
         """Test Cp at various temperatures."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         P = 101325.0
 
         for T in [300.0, 500.0, 1000.0, 1500.0, 2000.0]:
@@ -358,7 +358,7 @@ class TestThermodynamicProperties:
         """Test enthalpy calculation."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         T = 300.0
         P = 101325.0
 

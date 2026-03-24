@@ -28,7 +28,7 @@ int main() {
     const std::size_t h2_idx  = species_index_from_name("H2");
 
     // Standard dry air composition (N2, O2, Ar, CO2)
-    const std::vector<double> X_air = standard_dry_air_composition();
+    const std::vector<double> X_air = dry_air();
 
     std::cout << "=========================================" << std::endl;
     std::cout << "Thermodynamic and Transport Properties" << std::endl;

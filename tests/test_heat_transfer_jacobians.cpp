@@ -26,7 +26,7 @@ double velocity_from_mass_flow(double mdot, double rho, double diameter) {
 } // namespace
 
 TEST(HeatTransferJacobiansTest, ChannelSmoothFiniteDifference) {
-  const auto X = standard_dry_air_composition();
+  const auto X = dry_air();
 
   const double T = 800.0;
   const double P = 2.0e5;

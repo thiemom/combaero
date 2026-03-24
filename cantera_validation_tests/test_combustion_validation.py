@@ -77,7 +77,7 @@ class TestCompleteCombustion:
         """Test stoichiometric CH4 + air combustion using enthalpy balance."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("CH4")] = 1.0
 
@@ -121,7 +121,7 @@ class TestCompleteCombustion:
         """Test lean CH4 + air combustion (phi=0.8) using enthalpy balance."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("CH4")] = 1.0
 
@@ -160,7 +160,7 @@ class TestCompleteCombustion:
         """Test stoichiometric C3H8 + air combustion using enthalpy balance."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("C3H8")] = 1.0
 
@@ -194,7 +194,7 @@ class TestCompleteCombustion:
         """Test stoichiometric H2 + air combustion using enthalpy balance."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("H2")] = 1.0
 
@@ -233,7 +233,7 @@ class TestCompleteCombustion:
         """Test combustion at different inlet temperatures using enthalpy balance."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("CH4")] = 1.0
 
@@ -268,7 +268,7 @@ class TestCompleteCombustion:
         """Test combustion at different pressures using enthalpy balance."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("CH4")] = 1.0
 
@@ -336,7 +336,7 @@ class TestEquivalenceRatio:
         """Test that phi=1.0 produces stoichiometric mixture."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("CH4")] = 1.0
 
@@ -354,7 +354,7 @@ class TestEquivalenceRatio:
         """Test lean mixture (phi < 1)."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("CH4")] = 1.0
 
@@ -368,7 +368,7 @@ class TestEquivalenceRatio:
         """Test rich mixture (phi > 1)."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("CH4")] = 1.0
 
@@ -392,7 +392,7 @@ class TestCombustionState:
         """
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("CH4")] = 1.0
 
@@ -429,7 +429,7 @@ class TestCombustionState:
         """
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("CH4")] = 1.0
 
@@ -458,7 +458,7 @@ class TestCombustionState:
         """phi=1.3 CH4/air with Equilibrium method: products are hotter than 1000 K."""
         cb = combaero
 
-        X_air = cb.standard_dry_air_composition()
+        X_air = cb.species.dry_air()
         X_fuel = np.zeros(len(X_air))
         X_fuel[species_index_from_name("CH4")] = 1.0
 

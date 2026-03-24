@@ -58,7 +58,7 @@ class NetworkSolver:
 
     @staticmethod
     def _to_incompressible_regime(regime: str) -> str | None:
-        if regime in ("compressible", "compressible_fanno"):
+        if regime == "compressible":
             return "incompressible"
         return None
 
@@ -138,7 +138,7 @@ class NetworkSolver:
         # Mapping from unknown name to global index
         self._name_to_index: dict[str, int] = {}
         # Canonical default composition (Mass Fractions)
-        self._default_Y: list[float] = list(cb.mole_to_mass(cb.standard_dry_air_composition()))
+        self._default_Y: list[float] = list(cb.species.dry_air_mass())
         self._topological_order: list[str] = []
         self._derived_states: dict[str, tuple[float, list[float], Any]] = {}
 
@@ -292,7 +292,7 @@ class NetworkSolver:
             for elem in down_elems:
                 elem_share = share
                 regime = getattr(elem, "regime", None)
-                if regime in ("compressible", "compressible_fanno"):
+                if regime == "compressible":
                     area = getattr(elem, "area", None)
                     if area is not None and area > 0.0:
                         mdot_cap = rho_ref * a_ref * area * mdot_ratio
@@ -1031,8 +1031,9 @@ class NetworkSolver:
         options: dict[str, Any] | None = None,
         use_jac: bool = True,
         x0: np.ndarray | None = None,
-        init_strategy: Literal["default", "incompressible_warmstart"] = "default",
+        init_strategy: Literal["default", "incompressible_warmstart", "homotopy"] = "default",
         warmstart_maxfev: int = 150,
+        lambda_steps: list[float] | None = None,
     ) -> dict[str, float]:
         """
         Executes the root finding algorithm to solve the network.
@@ -1057,14 +1058,19 @@ class NetworkSolver:
             warmstart_maxfev: Maximum function evaluations for the
                 incompressible proxy solve when
                 ``init_strategy='incompressible_warmstart'``.
+            lambda_steps: Optional list of mass flow scaling factors for
+                ``init_strategy='homotopy'``. Defaults to 10 steps
+                from 0.1 to 1.0.
         """
         if method not in self.SUPPORTED_METHODS:
             raise ValueError(
                 f"Method '{method}' is not supported. Supported methods are: {', '.join(self.SUPPORTED_METHODS)}"
             )
 
-        if init_strategy not in ("default", "incompressible_warmstart"):
-            raise ValueError("init_strategy must be one of: 'default', 'incompressible_warmstart'.")
+        if init_strategy not in ("default", "incompressible_warmstart", "homotopy"):
+            raise ValueError(
+                "init_strategy must be one of: 'default', 'incompressible_warmstart', 'homotopy'."
+            )
         if warmstart_maxfev <= 0:
             raise ValueError("warmstart_maxfev must be > 0.")
 
@@ -1126,6 +1132,70 @@ class NetworkSolver:
                     for elem_id, regime in original_regimes.items():
                         self.network.elements[elem_id].regime = regime
                     self.network.resolve_all_topology()
+
+        if x0 is None and init_strategy == "homotopy":
+            from .components import MassFlowBoundary
+
+            # Identify all MassFlowBoundary nodes and their target m_dot
+            targets = {
+                nid: node.m_dot
+                for nid, node in self.network.nodes.items()
+                if isinstance(node, MassFlowBoundary)
+            }
+
+            if targets:
+                # Sequential solve loop with increasing mass flow lambda.
+                # Use more steps for better robustness near choking.
+                if lambda_steps is None:
+                    lambda_steps = [0.2, 0.4, 0.6, 0.8, 0.9, 1.0]
+
+                current_x0 = None
+                last_sol = {"__success__": False}
+
+                for lam in lambda_steps:
+                    # Update boundaries
+                    for nid, target_mdot in targets.items():
+                        self.network.nodes[nid].m_dot = lam * target_mdot
+
+                    # Solve intermediate step.
+                    # Limit maxfev/maxiter for intermediate steps to stay fast.
+                    # This is decremental to convergence: trade speed versus robustness near choking.
+                    step_options = dict(options)
+                    if method == "hybr":
+                        step_options["maxfev"] = step_options.get("maxfev", 500)
+                    else:
+                        step_options["maxiter"] = step_options.get("maxiter", 500)
+
+                    last_sol = self.solve(
+                        method=method,
+                        timeout=timeout,
+                        options=step_options,
+                        use_jac=use_jac,
+                        x0=current_x0,
+                        init_strategy="default",
+                    )
+
+                    # Update x0 for next step anyway (best guess propagation)
+                    current_x0 = self._last_x
+
+                    if not last_sol["__success__"]:
+                        # If an intermediate step fails badly, we might still
+                        # want to continue if progress was made, but for now
+                        # we stop to avoid compounding errors.
+                        # Note: we still use the failed result as x0 if it's the best we have.
+                        break
+
+                # Restore original m_dot (lam=1.0 loop already did this if it reached it)
+                for nid, target_mdot in targets.items():
+                    self.network.nodes[nid].m_dot = target_mdot
+
+                # If homotopy reached lam=1.0 and succeeded, return that solution
+                if last_sol["__success__"]:
+                    return last_sol
+
+                # If it failed at lam=1.0 but current_x0 is much better than cold start,
+                # we will naturally use it as warmstart_x0 below.
+                warmstart_x0 = current_x0
 
         # --- Initial guess: user-supplied (warm-start) or auto-built ----
         x0_auto = self._build_x0()

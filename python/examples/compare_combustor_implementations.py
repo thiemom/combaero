@@ -9,8 +9,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import combaero as ca
-from combaero.species import SpeciesLocator
+import combaero as cb
 
 # Import solve functions from both implementations
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -78,7 +77,6 @@ def compare_results(standalone: dict, network: dict, tol_rel: float = 0.01) -> b
 
 
 def main() -> int:
-    sp = SpeciesLocator.from_core()
 
     print("=" * 80)
     print("Combustor Liner Cooling — Implementation Comparison")
@@ -94,11 +92,9 @@ def main() -> int:
     D_ann = 0.30  # m
     u_hot_ann = 25.0  # m/s
 
-    X_cool = ca.humid_air_composition(288.15, 101325.0, RH_in)
-    X_air = ca.standard_dry_air_composition()
-    X_ch4 = sp.empty()
-    X_ch4[sp.indices["CH4"]] = 1.0
-
+    X_cool = cb.species.humid_air(288.15, 101325.0, RH_in)
+    X_air = cb.species.dry_air()
+    X_ch4 = cb.species.pure_species("CH4")
     mdot_total = 1.0  # kg/s
 
     # Channel geometry
@@ -107,7 +103,7 @@ def main() -> int:
     N_ch = 8
 
     # Materials
-    k_inconel = ca.k_inconel718(900.0)
+    k_inconel = cb.k_inconel718(900.0)
     t_wall = 0.003
     wall_layers = [(t_wall, k_inconel)]
 

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import numpy as np
 
-import combaero as ca
+import combaero as cb
 
 
 def main() -> None:
@@ -35,10 +35,10 @@ def main() -> None:
     print(f"Prandtl number:  Pr = {Pr:.2f}")
 
     # Compare correlations
-    Nu_db_heat = ca.nusselt_dittus_boelter(Re, Pr, heating=True)
-    Nu_db_cool = ca.nusselt_dittus_boelter(Re, Pr, heating=False)
-    Nu_gn = ca.nusselt_gnielinski(Re, Pr)
-    Nu_st = ca.nusselt_sieder_tate(Re, Pr, mu_ratio=1.0)
+    Nu_db_heat = cb.nusselt_dittus_boelter(Re, Pr, heating=True)
+    Nu_db_cool = cb.nusselt_dittus_boelter(Re, Pr, heating=False)
+    Nu_gn = cb.nusselt_gnielinski(Re, Pr)
+    Nu_st = cb.nusselt_sieder_tate(Re, Pr, mu_ratio=1.0)
 
     print("\nNusselt numbers:")
     print(f"  Dittus-Boelter (heating): Nu = {Nu_db_heat:.2f}")
@@ -60,21 +60,21 @@ def main() -> None:
     P = 101325.0  # Pressure [Pa]
 
     # Air properties
-    X_air = ca.standard_dry_air_composition()
-    rho = ca.density(T, P, X_air)
-    mu = ca.viscosity(T, P, X_air)
-    k = ca.thermal_conductivity(T, P, X_air)
-    cp = ca.cp(T, X_air)
-    Pr = ca.prandtl(T, P, X_air)
+    X_air = cb.species.dry_air()
+    rho = cb.density(T, P, X_air)
+    mu = cb.viscosity(T, P, X_air)
+    k = cb.thermal_conductivity(T, P, X_air)
+    cp = cb.cp(T, X_air)
+    Pr = cb.prandtl(T, P, X_air)
 
     # Calculate Reynolds number
     Re = rho * v * D / mu
 
     # Calculate Nusselt number
-    Nu = ca.nusselt_dittus_boelter(Re, Pr, heating=True)
+    Nu = cb.nusselt_dittus_boelter(Re, Pr, heating=True)
 
     # Calculate heat transfer coefficient
-    h = ca.htc_from_nusselt(Nu, k, D)
+    h = cb.htc_from_nusselt(Nu, k, D)
 
     print(f"\nPipe diameter:   D = {D * 1000:.1f} mm")
     print(f"Air velocity:    v = {v:.1f} m/s")
@@ -108,21 +108,21 @@ def main() -> None:
 
     # Air properties (average temperature)
     T_avg = (T_in + T_out) / 2
-    X_air = ca.standard_dry_air_composition()
-    rho = ca.density(T_avg, P, X_air)
-    mu = ca.viscosity(T_avg, P, X_air)
-    k = ca.thermal_conductivity(T_avg, P, X_air)
-    cp_mass = ca.cp_mass(T_avg, X_air)  # Use cp_mass convenience function
-    Pr = ca.prandtl(T_avg, P, X_air)
+    X_air = cb.species.dry_air()
+    rho = cb.density(T_avg, P, X_air)
+    mu = cb.viscosity(T_avg, P, X_air)
+    k = cb.thermal_conductivity(T_avg, P, X_air)
+    cp_mass = cb.cp_mass(T_avg, X_air)  # Use cp_mass convenience function
+    Pr = cb.prandtl(T_avg, P, X_air)
 
     # Flow velocity
-    A = ca.pipe_area(D)  # Use pipe_area helper
+    A = cb.pipe_area(D)  # Use pipe_area helper
     v = mdot / (rho * A)
     Re = rho * v * D / mu
 
     # Heat transfer coefficient
-    Nu = ca.nusselt_dittus_boelter(Re, Pr, heating=True)
-    h = ca.htc_from_nusselt(Nu, k, D)
+    Nu = cb.nusselt_dittus_boelter(Re, Pr, heating=True)
+    h = cb.htc_from_nusselt(Nu, k, D)
 
     # Heat transfer rate required
     Q = mdot * cp_mass * (T_out - T_in)
@@ -130,7 +130,7 @@ def main() -> None:
     # LMTD
     dT1 = T_wall - T_in  # Inlet end
     dT2 = T_wall - T_out  # Outlet end
-    LMTD = ca.lmtd(dT1, dT2)
+    LMTD = cb.lmtd(dT1, dT2)
 
     # Required length: Q = h * A_surface * LMTD
     # A_surface = π * D * L
@@ -171,7 +171,7 @@ def main() -> None:
     T_cold_out = 323.15  # 50degC
 
     # Use lmtd_counterflow convenience function
-    LMTD_counter = ca.lmtd_counterflow(T_hot_in, T_hot_out, T_cold_in, T_cold_out)
+    LMTD_counter = cb.lmtd_counterflow(T_hot_in, T_hot_out, T_cold_in, T_cold_out)
     dT1 = T_hot_in - T_cold_out  # For display
     dT2 = T_hot_out - T_cold_in
 
@@ -184,7 +184,7 @@ def main() -> None:
     # Parallel-flow heat exchanger
     print("\nParallel-flow heat exchanger (same temperatures):")
     # Use lmtd_parallelflow convenience function
-    LMTD_parallel = ca.lmtd_parallelflow(T_hot_in, T_hot_out, T_cold_in, T_cold_out)
+    LMTD_parallel = cb.lmtd_parallelflow(T_hot_in, T_hot_out, T_cold_in, T_cold_out)
     dT1_par = T_hot_in - T_cold_in  # For display
     dT2_par = T_hot_out - T_cold_out
 
@@ -213,10 +213,10 @@ def main() -> None:
     print(f"\n{'μ_bulk/μ_wall':>15s}  {'Nu (Sieder-Tate)':>20s}  {'Effect':>10s}")
     print("-" * 50)
 
-    Nu_base = ca.nusselt_sieder_tate(Re, Pr, mu_ratio=1.0)
+    Nu_base = cb.nusselt_sieder_tate(Re, Pr, mu_ratio=1.0)
 
     for mu_ratio in mu_ratios:
-        Nu = ca.nusselt_sieder_tate(Re, Pr, mu_ratio=mu_ratio)
+        Nu = cb.nusselt_sieder_tate(Re, Pr, mu_ratio=mu_ratio)
         effect = (Nu - Nu_base) / Nu_base * 100
         print(f"{mu_ratio:15.2f}  {Nu:20.2f}  {effect:+9.1f}%")
 
@@ -233,17 +233,17 @@ def main() -> None:
     Re = 5e4
     Pr = 0.7
     D = 0.1  # Pipe diameter [m]
-    eps = ca.pipe_roughness("commercial_steel")  # Use pipe_roughness database
+    eps = cb.pipe_roughness("commercial_steel")  # Use pipe_roughness database
     e_D = eps / D
 
     # Get friction factor
-    f = ca.friction_haaland(Re, e_D)
+    f = cb.friction_haaland(Re, e_D)
 
     # Use Gnielinski with explicit friction factor
-    Nu_with_f = ca.nusselt_gnielinski(Re, Pr, f)
+    Nu_with_f = cb.nusselt_gnielinski(Re, Pr, f)
 
     # Compare with auto friction (smooth pipe)
-    Nu_auto = ca.nusselt_gnielinski(Re, Pr)
+    Nu_auto = cb.nusselt_gnielinski(Re, Pr)
 
     print(f"\nReynolds number: Re = {Re:.0e}")
     print(f"Prandtl number:  Pr = {Pr:.2f}")

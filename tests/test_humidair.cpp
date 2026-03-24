@@ -73,14 +73,14 @@ TEST_F(HumidAirTest, ContinuityAtTransition) {
 // Test standard dry air composition
 TEST_F(HumidAirTest, StandardDryAirComposition) {
   // Get standard dry air composition
-  std::vector<double> dry_air = standard_dry_air_composition();
+  std::vector<double> dry_air_comp = dry_air();
 
   // Check that it has the correct size
-  EXPECT_EQ(dry_air.size(), species_names.size());
+  EXPECT_EQ(dry_air_comp.size(), species_names.size());
 
   // Check that the sum is 1.0
   double sum = 0.0;
-  for (double x : dry_air)
+  for (double x : dry_air_comp)
     sum += x;
   EXPECT_NEAR(sum, 1.0, 1e-6);
 
@@ -90,17 +90,17 @@ TEST_F(HumidAirTest, StandardDryAirComposition) {
     const std::size_t o2_idx = species_index_from_name("O2");
 
     // N2 should be the dominant component (~78%)
-    EXPECT_GT(dry_air[n2_idx], 0.7);
-    EXPECT_LT(dry_air[n2_idx], 0.8);
+    EXPECT_GT(dry_air_comp[n2_idx], 0.7);
+    EXPECT_LT(dry_air_comp[n2_idx], 0.8);
 
     // O2 should be second (~21%)
-    EXPECT_GT(dry_air[o2_idx], 0.19);
-    EXPECT_LT(dry_air[o2_idx], 0.22);
+    EXPECT_GT(dry_air_comp[o2_idx], 0.19);
+    EXPECT_LT(dry_air_comp[o2_idx], 0.22);
 
     // H2O should be zero for dry air
     if (species_index.count("H2O")) {
       const std::size_t h2o_idx = species_index_from_name("H2O");
-      EXPECT_NEAR(dry_air[h2o_idx], 0.0, 1e-6);
+      EXPECT_NEAR(dry_air_comp[h2o_idx], 0.0, 1e-6);
     }
   } catch (...) {
     // If species don't exist, just check sum is valid

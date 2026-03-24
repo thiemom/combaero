@@ -16,9 +16,8 @@ def test_combustor_network_conservation():
     """Validates that a CombustorNode embedded in a network conserves mass and energy precisely."""
     net = FlowNetwork()
 
-    Y_air = cb.standard_dry_air_composition()
-    Y_ch4 = [0.0] * 14
-    Y_ch4[5] = 1.0  # CH4 index
+    Y_air = cb.species.dry_air_mass()
+    Y_ch4 = cb.species.pure_species("CH4")
 
     m_dot_air = 2.0
     m_dot_fuel1 = 0.02

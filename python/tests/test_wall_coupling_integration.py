@@ -20,17 +20,6 @@ from combaero.network import (
 )
 
 
-def _air_Y():
-    """Standard air mass fractions."""
-    Y = [0.0] * cb.num_species()
-    for k in range(cb.num_species()):
-        if cb.species_name(k) == "N2":
-            Y[k] = 0.767
-        elif cb.species_name(k) == "O2":
-            Y[k] = 0.233
-    return Y
-
-
 def test_two_pipe_wall_coupling_convergence():
     """Test that wall-coupled two-pipe network converges to analytical solution.
 
@@ -41,7 +30,7 @@ def test_two_pipe_wall_coupling_convergence():
     - Both pipes: 0.04m diameter, 1m length, smooth
     """
     net = FlowNetwork()
-    Y_air = _air_Y()
+    Y_air = cb.species.from_mapping({"N2": 0.767, "O2": 0.233})
 
     # Hot side: Inlet -> Pipe -> Plenum -> Outlet
     hot_inlet = MassFlowBoundary("hot_inlet", m_dot=0.1, T_total=800.0, Y=Y_air)
@@ -139,7 +128,7 @@ def test_two_pipe_wall_coupling_convergence():
 def test_thermal_coupling_disabled_matches_no_wall():
     """Test that thermal_coupling_enabled=False gives same result as no wall."""
 
-    Y_air = _air_Y()
+    Y_air = cb.species.from_mapping({"N2": 0.767, "O2": 0.233})
 
     def create_network(add_wall: bool, enable_coupling: bool = False) -> FlowNetwork:
         net = FlowNetwork()
@@ -191,9 +180,9 @@ def test_thermal_coupling_disabled_matches_no_wall():
         net.add_element(cold_pipe)
 
         # Orifices
-        hot_orifice = OrificeElement("hot_orifice", "hot_plenum", "hot_outlet", Cd=0.8, area=0.005)
+        hot_orifice = OrificeElement("hot_orifice", "hot_plenum", "hot_outlet", Cd=0.8, area=0.0005)
         cold_orifice = OrificeElement(
-            "cold_orifice", "cold_plenum", "cold_outlet", Cd=0.8, area=0.005
+            "cold_orifice", "cold_plenum", "cold_outlet", Cd=0.8, area=0.0005
         )
         net.add_element(hot_orifice)
         net.add_element(cold_orifice)
@@ -244,7 +233,7 @@ def test_wall_coupling_jacobian_validation():
 
     This validates the full chain rule implementation in _propagate_states.
     """
-    Y_air = _air_Y()
+    Y_air = cb.species.from_mapping({"N2": 0.767, "O2": 0.233})
     net = FlowNetwork()
 
     # Nodes
@@ -293,8 +282,8 @@ def test_wall_coupling_jacobian_validation():
     net.add_element(cold_pipe)
 
     # Orifices
-    hot_orifice = OrificeElement("hot_orifice", "hot_plenum", "hot_outlet", Cd=0.8, area=0.005)
-    cold_orifice = OrificeElement("cold_orifice", "cold_plenum", "cold_outlet", Cd=0.8, area=0.005)
+    hot_orifice = OrificeElement("hot_orifice", "hot_plenum", "hot_outlet", Cd=0.8, area=0.001)
+    cold_orifice = OrificeElement("cold_orifice", "cold_plenum", "cold_outlet", Cd=0.8, area=0.001)
     net.add_element(hot_orifice)
     net.add_element(cold_orifice)
 

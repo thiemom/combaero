@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Literal
 import combaero as cb
 
 # Physics configuration types for network introspectability
-CompressibilityLiteral = Literal["incompressible", "compressible", "compressible_fanno"]
+CompressibilityLiteral = Literal["incompressible", "compressible"]
 FrictionModelLiteral = Literal["haaland", "colebrook", "serghides", "petukhov"]
 HeatTransferModelLiteral = Literal[
     "none", "gnielinski", "dittus_boelter", "sieder_tate", "petukhov"
@@ -406,7 +406,7 @@ class NetworkNode(ABC):
         if not upstream_states:
             import combaero as cb
 
-            return 300.0, list(cb.mole_to_mass(cb.standard_dry_air_composition())), None
+            return 300.0, list(cb.mole_to_mass(cb.species.dry_air())), None
 
         up = upstream_states[0]
         return up.T_total, up.Y, None
@@ -494,7 +494,7 @@ class PlenumNode(NetworkNode):
         import combaero as cb
 
         if not upstream_states:
-            return 300.0, list(cb.mole_to_mass(cb.standard_dry_air_composition())), None
+            return 300.0, list(cb.mole_to_mass(cb.species.dry_air())), None
 
         streams = [cb.MassStream(s.m_dot, s.T_total, s.P_total, s.Y) for s in upstream_states]
         Q_total = sum(eb.Q for eb in self.energy_boundaries)
@@ -568,7 +568,7 @@ class MomentumChamberNode(NetworkNode):
                 self._upstream_element_ids.append(s._element_id)
 
         if not upstream_states:
-            return 300.0, list(cb.mole_to_mass(cb.standard_dry_air_composition())), None
+            return 300.0, list(cb.mole_to_mass(cb.species.dry_air())), None
 
         streams = [cb.MassStream(s.m_dot, s.T_total, s.P_total, s.Y) for s in upstream_states]
         Q_total = sum(eb.Q for eb in self.energy_boundaries)
@@ -640,11 +640,7 @@ class PressureBoundary(NetworkNode):
         # Boundary nodes define their own state
         import combaero as cb
 
-        Y = (
-            self.Y
-            if self.Y is not None
-            else list(cb.mole_to_mass(cb.standard_dry_air_composition()))
-        )
+        Y = self.Y if self.Y is not None else list(cb.mole_to_mass(cb.species.dry_air()))
         return self.T_total, Y, None
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
@@ -685,11 +681,7 @@ class MassFlowBoundary(NetworkNode):
         # Boundary nodes define their own state
         import combaero as cb
 
-        Y = (
-            self.Y
-            if self.Y is not None
-            else list(cb.mole_to_mass(cb.standard_dry_air_composition()))
-        )
+        Y = self.Y if self.Y is not None else list(cb.mole_to_mass(cb.species.dry_air()))
         return self.T_total, Y, None
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
@@ -735,7 +727,7 @@ class CombustorNode(NetworkNode):
 
         if not upstream_states:
             # Default fallback
-            return 300.0, list(cb.mole_to_mass(cb.standard_dry_air_composition())), None
+            return 300.0, list(cb.mole_to_mass(cb.species.dry_air())), None
 
         streams = [cb.MassStream(s.m_dot, s.T_total, s.P_total, s.Y) for s in upstream_states]
         P_ref = upstream_states[0].P if upstream_states else 101325.0
@@ -1143,7 +1135,7 @@ class PipeElement(NetworkElement):
 
         m_dot = state_in.m_dot
 
-        if self.regime == "compressible_fanno":
+        if self.regime == "compressible":
             # Use compressible Fanno flow with friction
             res_cpp = cb._core.pipe_compressible_residuals_and_jacobian(
                 m_dot,
@@ -1225,7 +1217,7 @@ class PipeElement(NetworkElement):
             )
             return res.profile
 
-        elif self.regime == "compressible_fanno":
+        elif self.regime == "compressible":
             res = cba.pipe_fanno(
                 state_in.T,
                 state_in.P,

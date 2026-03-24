@@ -17,7 +17,7 @@ from combaero.network import (
 
 
 def _air_Y() -> list[float]:
-    ns = cb.num_species()
+    ns = cb.species.num_species
     Y = [0.0] * ns
     for k in range(ns):
         if cb.species_name(k) == "N2":
@@ -28,7 +28,7 @@ def _air_Y() -> list[float]:
 
 
 def _ch4_Y() -> list[float]:
-    ns = cb.num_species()
+    ns = cb.species.num_species
     Y = [0.0] * ns
     for k in range(ns):
         if cb.species_name(k) == "CH4":

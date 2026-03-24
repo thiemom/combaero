@@ -13,17 +13,10 @@ from __future__ import annotations
 
 import numpy as np
 
-import combaero as ca
-from combaero.species import SpeciesLocator
+import combaero as cb
 
 
 def main() -> None:
-    print("=" * 80)
-    print("INTEGRATED COMBUSTOR DESIGN WITH HEAT TRANSFER")
-    print("=" * 80)
-
-    sp = SpeciesLocator.from_core()
-
     # =========================================================================
     # Example 1: Combustor design workflow
     # =========================================================================
@@ -38,28 +31,25 @@ def main() -> None:
     phi = 0.8  # Equivalence ratio (lean burn)
 
     # Fuel composition (natural gas)
-    X_fuel = sp.empty()
-    X_fuel[sp.indices["CH4"]] = 0.95
-    X_fuel[sp.indices["C2H6"]] = 0.03
-    X_fuel[sp.indices["N2"]] = 0.02
+    X_fuel = cb.species.from_mapping({"CH4": 0.95, "C2H6": 0.03, "N2": 0.02})
 
     # Air composition
-    X_air = ca.standard_dry_air_composition()
+    X_air = cb.species.dry_air()
 
     # Create streams
-    air = ca.Stream()
+    air = cb.Stream()
     air.T = T_air_in
     air.P = P_combustor
     air.X = X_air
     air.mdot = mdot_air
 
-    fuel = ca.Stream()
+    fuel = cb.Stream()
     fuel.T = 300.0  # Fuel at ambient
     fuel.P = P_combustor
     fuel.X = X_fuel
 
     # Set fuel flow for target phi, then mix
-    fuel = ca.set_fuel_stream_for_phi(phi, fuel, air)
+    fuel = cb.set_fuel_stream_for_phi(phi, fuel, air)
     mdot_fuel = fuel.mdot
 
     print("\nOperating conditions:")
@@ -69,14 +59,14 @@ def main() -> None:
     print(f"  Fuel mass flow:    mdot_fuel = {mdot_fuel:.3f} kg/s  (phi={phi:.2f})")
 
     # Mix fuel and air
-    mixed = ca.mix([fuel, air], P_out=P_combustor)
+    mixed = cb.mix([fuel, air], P_out=P_combustor)
 
     print("\nMixed stream before combustion:")
     print(f"  Temperature:       T = {mixed.T:.1f} K")
     print(f"  Total mass flow:   mdot = {mixed.mdot:.2f} kg/s")
 
     # Combustion with equilibrium
-    burned = ca.combustion_equilibrium(mixed.T, mixed.X, mixed.P)
+    burned = cb.combustion_equilibrium(mixed.T, mixed.X, mixed.P)
 
     print("\nAfter combustion:")
     print(f"  Temperature:       T = {burned.state.T:.1f} K (adiabatic flame temp)")
@@ -95,21 +85,21 @@ def main() -> None:
     L_combustor = 0.4  # Length [m]
 
     # Combustor area/volume from geometry helper
-    annulus = ca.Annulus(L_combustor, D_inner, D_outer)
+    annulus = cb.Annulus(L_combustor, D_inner, D_outer)
     A_annular = annulus.area()
     V_combustor = annulus.volume()
 
     # Hydraulic diameter
-    Dh = ca.hydraulic_diameter_annulus(D_outer, D_inner)
+    Dh = cb.hydraulic_diameter_annulus(D_outer, D_inner)
 
     # Toy assumption: thin flame zone near inlet (~10% of length), remainder near burned state.
     flame_zone_fraction = 0.10
     T_avg = flame_zone_fraction * mixed.T + (1.0 - flame_zone_fraction) * burned.state.T
-    rho_avg = ca.density(T_avg, P_combustor, burned.state.X)
+    rho_avg = cb.density(T_avg, P_combustor, burned.state.X)
 
     # Residence time
-    tau = ca.residence_time_mdot(V_combustor, mixed.mdot, rho_avg)
-    SV = ca.space_velocity(mixed.mdot / rho_avg, V_combustor)
+    tau = cb.residence_time_mdot(V_combustor, mixed.mdot, rho_avg)
+    SV = cb.space_velocity(mixed.mdot / rho_avg, V_combustor)
 
     print("\nCombustor geometry:")
     print(f"  Outer diameter:    D_o = {D_outer * 1000:.0f} mm")
@@ -138,13 +128,13 @@ def main() -> None:
 
     # Use pressure_drop_pipe composite function
     # Note: Using cast_iron roughness as proxy for combustor liner
-    eps = ca.pipe_roughness("cast_iron")
-    dP_friction, Re, f = ca.pressure_drop_pipe(
+    eps = cb.pipe_roughness("cast_iron")
+    dP_friction, Re, f = cb.pressure_drop_pipe(
         T_avg, P_combustor, burned.state.X, v_avg, Dh, L_combustor, eps, "haaland"
     )
 
     # Also get viscosity for display
-    mu_avg = ca.viscosity(T_avg, P_combustor, burned.state.X)
+    mu_avg = cb.viscosity(T_avg, P_combustor, burned.state.X)
 
     # Total pressure drop (friction + other losses, typically 3-5%)
     dP_total = dP_friction * 1.5  # Account for additional losses
@@ -169,12 +159,12 @@ def main() -> None:
 
     # Hot gas side (inside combustor)
     T_gas = burned.state.T  # Hot combustion products
-    k_gas = ca.thermal_conductivity(T_gas, P_combustor, burned.state.X)
-    Pr_gas = ca.prandtl(T_gas, P_combustor, burned.state.X)
+    k_gas = cb.thermal_conductivity(T_gas, P_combustor, burned.state.X)
+    Pr_gas = cb.prandtl(T_gas, P_combustor, burned.state.X)
 
     # Calculate Nusselt number for hot gas
-    Nu_gas = ca.nusselt_dittus_boelter(Re, Pr_gas, heating=False)  # Cooling the gas
-    h_gas = ca.htc_from_nusselt(Nu_gas, k_gas, Dh)
+    Nu_gas = cb.nusselt_dittus_boelter(Re, Pr_gas, heating=False)  # Cooling the gas
+    h_gas = cb.htc_from_nusselt(Nu_gas, k_gas, Dh)
 
     # Cooling air side (outside liner, simplified)
     T_cool = 600.0  # Cooling air temperature [K]
@@ -182,14 +172,14 @@ def main() -> None:
     D_cool = 0.01  # Cooling passage hydraulic diameter [m]
 
     # Cooling air properties
-    rho_cool = ca.density(T_cool, P_combustor, X_air)
-    mu_cool = ca.viscosity(T_cool, P_combustor, X_air)
-    k_cool = ca.thermal_conductivity(T_cool, P_combustor, X_air)
-    Pr_cool = ca.prandtl(T_cool, P_combustor, X_air)
+    rho_cool = cb.density(T_cool, P_combustor, X_air)
+    mu_cool = cb.viscosity(T_cool, P_combustor, X_air)
+    k_cool = cb.thermal_conductivity(T_cool, P_combustor, X_air)
+    Pr_cool = cb.prandtl(T_cool, P_combustor, X_air)
 
     Re_cool = rho_cool * v_cool * D_cool / mu_cool
-    Nu_cool = ca.nusselt_dittus_boelter(Re_cool, Pr_cool, heating=True)  # Heating the cooling air
-    h_cool = ca.htc_from_nusselt(Nu_cool, k_cool, D_cool)
+    Nu_cool = cb.nusselt_dittus_boelter(Re_cool, Pr_cool, heating=True)  # Heating the cooling air
+    h_cool = cb.htc_from_nusselt(Nu_cool, k_cool, D_cool)
 
     # Liner wall (assume thermal barrier coating + metal)
     #
@@ -243,7 +233,7 @@ def main() -> None:
     print("=" * 80)
 
     # Fuel chemical power using mixture LHV API [J/kg fuel]
-    lhv_fuel = ca.fuel_lhv_mass(X_fuel)
+    lhv_fuel = cb.fuel_lhv_mass(X_fuel)
     Q_combustion = mdot_fuel * lhv_fuel
 
     # Temperature rise
@@ -286,22 +276,22 @@ def main() -> None:
 
     for phi_test in [0.6, 0.7, 0.8, 0.9, 1.0]:
         # Set fuel flow consistently from target equivalence ratio
-        fuel_test = ca.set_fuel_stream_for_phi(phi_test, fuel, air)
+        fuel_test = cb.set_fuel_stream_for_phi(phi_test, fuel, air)
 
         # Mix and burn
-        mixed_test = ca.mix([fuel_test, air], P_out=P_combustor)
-        burned_test = ca.combustion_equilibrium(mixed_test.T, mixed_test.X, mixed_test.P)
+        mixed_test = cb.mix([fuel_test, air], P_out=P_combustor)
+        burned_test = cb.combustion_equilibrium(mixed_test.T, mixed_test.X, mixed_test.P)
 
         # Recalculate residence time and pressure drop
         T_avg_test = (
             flame_zone_fraction * mixed_test.T + (1.0 - flame_zone_fraction) * burned_test.state.T
         )
-        rho_avg_test = ca.density(T_avg_test, P_combustor, burned_test.state.X)
-        tau_test = ca.residence_time_mdot(V_combustor, mixed_test.mdot, rho_avg_test)
+        rho_avg_test = cb.density(T_avg_test, P_combustor, burned_test.state.X)
+        tau_test = cb.residence_time_mdot(V_combustor, mixed_test.mdot, rho_avg_test)
 
         v_avg_test = mixed_test.mdot / (rho_avg_test * A_annular)
         # Use pressure_drop_pipe composite function
-        dP_friction_test, Re_test, f_test = ca.pressure_drop_pipe(
+        dP_friction_test, Re_test, f_test = cb.pressure_drop_pipe(
             T_avg_test,
             P_combustor,
             burned_test.state.X,
