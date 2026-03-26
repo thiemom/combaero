@@ -1,11 +1,13 @@
 #ifndef COMBUSTION_H
 #define COMBUSTION_H
 
-#include "state.h"
-#include <cstddef>
-#include <functional>
 #include <string>
 #include <vector>
+#include <tuple>
+#include <functional>
+#include <cstddef>
+
+#include "state.h"
 
 namespace combaero {
 
@@ -23,13 +25,14 @@ struct PressureLossContext {
   double phi;                            // equivalence ratio [-]
   double T_ad;                           // adiabatic flame temperature [K]
   const std::vector<double> &X_products; // burned gas mole fractions
+  const std::vector<double> &Y_products; // burned gas mass fractions
   double theta;     // T_ad/T_in - 1  (dimensionless temperature rise)
   double mdot_fuel; // fuel mass flow [kg/s]  (0 if phi-based call)
   double mdot_air;  // air mass flow [kg/s]   (0 if phi-based call)
 };
 
 using PressureLossCorrelation =
-    std::function<double(const PressureLossContext &)>;
+    std::function<std::tuple<double, double>(const PressureLossContext &)>;
 
 // Combustion calculations - oxygen requirements
 double oxygen_required_per_mol_fuel(std::size_t fuel_index);

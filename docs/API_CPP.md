@@ -150,6 +150,17 @@ double fuel_lhv_mass(const std::vector<double>& X_fuel, double T_ref = 298.15);
 State complete_combustion(const State& in, bool smooth = false);
 State complete_combustion_isothermal(const State& in, bool smooth = false);
 std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double>& X);
+
+struct PressureLossContext {
+    double m_dot;
+    double P;
+    double T;
+    const std::vector<double>& Y;
+    const std::vector<double>& Y_products;
+    double theta;
+};
+
+using PressureLossCorrelation = std::function<std::tuple<double, double>(const PressureLossContext &)>;
 ```
 
 ---
@@ -570,17 +581,22 @@ struct PipeResult {
 };
 
 struct MixerResult {
-    std::vector<double> T_out;
-    std::vector<double> P_out;
-    std::vector<double> Y_out;
-    std::vector<std::vector<StreamJacobian>> stream_jacobian;
+    double T_mix;
+    double P_total_mix;
+    std::vector<double> Y_mix;
+    double dT_mix_d_delta_h;
+    std::vector<StreamJacobian> dT_mix_d_stream;
+    std::vector<StreamJacobian> dP_total_mix_d_stream;
+    std::vector<std::vector<StreamJacobian>> dY_mix_d_stream;
 };
 
 struct AdiabaticResult {
-    std::vector<double> T_out;
-    std::vector<double> P_out;
-    std::vector<double> Y_out;
-    std::vector<std::vector<StreamJacobian>> stream_jacobian;
+    double T_mix;
+    double P_total_mix;
+    std::vector<double> Y_mix;
+    std::vector<StreamJacobian> dT_mix_d_stream;
+    std::vector<StreamJacobian> dP_total_mix_d_stream;
+    std::vector<std::vector<StreamJacobian>> dY_mix_d_stream;
 };
 ```
 
@@ -641,4 +657,11 @@ AdiabaticResult adiabatic_T_complete_and_jacobian_T_from_streams(
 // Adiabatic equilibrium combustion
 AdiabaticResult adiabatic_T_equilibrium_and_jacobians_from_streams(
     const std::vector<Stream>& streams, double P, double Q = 0.0, double fraction = 0.0);
+
+// Combined combustion with analytical pressure loss
+ChamberResult combustor_residuals_and_jacobians(
+    double m_dot, double P_total_up, double P_static_up, double T_up,
+    const std::vector<double>& Y_up, double Q_comb,
+    CombustionMethod method, bool smooth,
+    const PressureLossCorrelation& pressure_loss);
 ```

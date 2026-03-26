@@ -700,9 +700,11 @@ class CombustorNode(NetworkNode):
         self,
         id: str,
         method: CombustionMethodLiteral = "complete",
+        pressure_loss: Any = None,
     ):
         super().__init__(id)
         self.method = method
+        self.pressure_loss = pressure_loss
         self.upstream_elements = []
         self.fuel_boundary = None
         self.energy_boundaries: list[EnergyBoundary] = []
@@ -735,7 +737,17 @@ class CombustorNode(NetworkNode):
         Q_total = sum(eb.Q for eb in self.energy_boundaries)
         fraction_total = sum(eb.fraction for eb in self.energy_boundaries)
 
-        if self.method == "equilibrium":
+        # Use new combustor C++ fast-path if available
+        if self.pressure_loss is not None:
+            mix_res = cb.combustor_residuals_and_jacobians(
+                streams,
+                P_ref,
+                Q=Q_total,
+                fraction=fraction_total,
+                pressure_loss=self.pressure_loss,
+                use_equilibrium=(self.method == "equilibrium"),
+            )
+        elif self.method == "equilibrium":
             mix_res = cb.adiabatic_T_equilibrium_and_jacobians_from_streams(
                 streams, P_ref, Q=Q_total, fraction=fraction_total
             )
@@ -743,16 +755,11 @@ class CombustorNode(NetworkNode):
             mix_res = cb.adiabatic_T_complete_and_jacobian_T_from_streams(
                 streams, P_ref, Q=Q_total, fraction=fraction_total
             )
-
         return mix_res.T_mix, mix_res.Y_mix, mix_res
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
-        # Stagnation assumptions: P_total = P_static
-        # This provides the second equation matching [P, P_total] unknowns,
-        # while mass conservation provides the first.
-        res = [state.P_total - state.P]
-        jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.P_total": 1.0}}
-        return res, jac
+        # Stagnation constraint: P_total = P
+        return [state.P_total - state.P], {0: {f"{self.id}.P": -1.0, f"{self.id}.P_total": 1.0}}
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         # Store upstream elements for mixing calculations

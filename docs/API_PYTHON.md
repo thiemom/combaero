@@ -430,7 +430,7 @@ High-accuracy analytical Jacobians are available for performance-critical solver
 ```python
 # Exact residuals and derivatives wrt (P_tot, P_static, T, Y)
 res_ori = cb.orifice_residuals_and_jacobian(m_dot, P_tot, P_stat, T, Y, P_down, Cd, area)
-res_comb = cb.combustor_residuals_and_jacobian(m_dot, P_tot, P_stat, T, Y, Q_comb, method, smooth)
+res_comb = cb.combustor_residuals_and_jacobians(m_dot, P_tot, P_stat, T, Y, Q_comb, method, smooth, pressure_loss_func)
 res_plen = cb.plenum_residuals_and_jacobian(m_dot_vec, P_target, T_target, Y_target)
 ```
 

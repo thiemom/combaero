@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "state.h"
+#include "combustion.h"
 // -----------------------------------------------------------------------------
 // Network Solver Fast-Path Native Interface
 // -----------------------------------------------------------------------------
@@ -508,6 +509,10 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
 // fraction [-]: relative to total enthalpy flow (positive = heating)
 MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
     const std::vector<Stream> &streams, double P, double Q = 0.0, double fraction = 0.0);
+// Full combustor evaluation including pressure loss analytical chain rule.
+MixerResult combustor_residuals_and_jacobians(
+    const std::vector<Stream> &streams, double P, double Q, double fraction,
+    const PressureLossCorrelation &pressure_loss, bool use_equilibrium = false);
 
 // Momentum chamber residual: P_total = P_static + 0.5 * rho * v^2
 // where v = m_dot / (rho * A)

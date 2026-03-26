@@ -757,3 +757,38 @@ TEST(CombustorEquilibriumTest, StructureAndStreamJacobian_mdot) {
     }
 }
 #endif
+
+// ---------------------------------------------------------------------------
+// Combustor Pressure Loss Analytical Jacobian FD validation
+// ---------------------------------------------------------------------------
+
+TEST(CombustorPressureLossJacobianTest, mdot_chain_rule) {
+    auto streams = std::vector<solver::Stream>{
+        make_air_stream(2.0, 600.0, 150000.0),
+        make_fuel_stream(0.06, 300.0, 150000.0),
+    };
+    double P_out = 140000.0;
+
+    // Define a benchmark linear correlation: zeta = k*theta + c
+    const double k_zeta = 0.5;
+    const double c_zeta = 0.02;
+    auto linear_loss = [k_zeta, c_zeta](const PressureLossContext &ctx) -> std::tuple<double, double> {
+        return {k_zeta * ctx.theta + c_zeta, k_zeta};
+    };
+
+    auto base = combustor_residuals_and_jacobians(streams, P_out, 0.0, 0.0, linear_loss, false);
+
+    const double eps = 1e-5;
+    for (std::size_t i = 0; i < streams.size(); ++i) {
+        auto streams_p = streams;
+        streams_p[i].m_dot += eps;
+
+        auto res_p = combustor_residuals_and_jacobians(streams_p, P_out, 0.0, 0.0, linear_loss, false);
+
+        double analytical = base.dP_total_mix_d_stream[i].d_mdot;
+        double fd = (res_p.P_total_mix - base.P_total_mix) / eps;
+
+        EXPECT_NEAR(analytical, fd, std::abs(fd) * 1e-4 + 1e-6)
+            << "stream " << i << " mdot derivative check failed";
+    }
+}

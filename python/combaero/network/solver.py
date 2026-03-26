@@ -539,7 +539,7 @@ class NetworkSolver:
         # Preserve previous iteration's derived states for back-edge wall coupling
         self._prev_derived_states = getattr(self, "_derived_states", {})
         self._derived_states = {}
-        # relay[node_id][global_unknown_index] = {'T': dT/dx, 'Y': [dY/dx]}
+        # relay[node_id][global_unknown_index] = {'T': dT/dx, 'Y': [dY/dx], 'P_total_mix': dP_total_mix/dx}
         relay = {nid: {} for nid in self.network.nodes}
 
         has_walls = self.network.thermal_coupling_enabled and bool(self.network.walls)
@@ -550,6 +550,15 @@ class NetworkSolver:
             if isinstance(node, (PressureBoundary, MassFlowBoundary)):
                 T, Y, _ = node.compute_derived_state([])
                 self._derived_states[nid] = (T, Y, None)
+                # Seed relay for boundary's own unknowns
+                node_indices = self._unknown_indices.get(nid, [])
+                unknown_names = self.unknown_names
+                for _, global_idx in enumerate(node_indices):
+                    name = unknown_names[global_idx]
+                    if name.endswith(".P_total"):
+                        relay[nid].setdefault(
+                            global_idx, {"T": 0.0, "Y": np.zeros(cb.num_species())}
+                        )["P_total"] = 1.0
                 continue
 
             up_elems = self.network.get_upstream_elements(nid)
@@ -618,10 +627,10 @@ class NetworkSolver:
                     if m_indices:
                         idx = m_indices[0]
                         node_relay = relay[nid].setdefault(
-                            idx, {"T": 0.0, "Y": np.zeros(n_species), "P_total": 0.0}
+                            idx, {"T": 0.0, "Y": np.zeros(n_species), "P_total_mix": 0.0}
                         )
                         node_relay["T"] += t_jac.d_mdot
-                        node_relay["P_total"] += pt_jac.d_mdot
+                        node_relay["P_total_mix"] += pt_jac.d_mdot
                         for k in range(n_species):
                             node_relay["Y"][k] += y_jacs[k].d_mdot
 
@@ -629,22 +638,27 @@ class NetworkSolver:
                     if from_nid in relay:
                         for idx, sens_up in relay[from_nid].items():
                             node_relay = relay[nid].setdefault(
-                                idx, {"T": 0.0, "Y": np.zeros(n_species), "P_total": 0.0}
+                                idx, {"T": 0.0, "Y": np.zeros(n_species), "P_total_mix": 0.0}
                             )
                             # dT/dx = sum_i( dT/dT_in_i * dT_in_i/dx + dT/dP_in_i * dP_in_i/dx + dT/dY_in_i * dY_in_i/dx )
                             node_relay["T"] += t_jac.d_T * sens_up["T"]
-                            node_relay["T"] += t_jac.d_P_total * sens_up["P_total"]
+                            # Note: stagnation P_total doesn't usually have T/Y dependency, but we relay it if present
+                            node_relay["T"] += t_jac.d_P_total * sens_up.get("P_total", 0.0)
                             node_relay["T"] += np.dot(t_jac.d_Y, sens_up["Y"])
 
-                            # dP_total/dx
-                            node_relay["P_total"] += pt_jac.d_T * sens_up["T"]
-                            node_relay["P_total"] += pt_jac.d_P_total * sens_up["P_total"]
-                            node_relay["P_total"] += np.dot(pt_jac.d_Y, sens_up["Y"])
+                            # dP_total_mix/dx
+                            node_relay["P_total_mix"] += pt_jac.d_T * sens_up["T"]
+                            node_relay["P_total_mix"] += pt_jac.d_P_total * sens_up.get(
+                                "P_total", 0.0
+                            )
+                            node_relay["P_total_mix"] += np.dot(pt_jac.d_Y, sens_up["Y"])
 
                             # dY_k/dx
                             for k in range(n_species):
                                 node_relay["Y"][k] += y_jacs[k].d_T * sens_up["T"]
-                                node_relay["Y"][k] += y_jacs[k].d_P_total * sens_up["P_total"]
+                                node_relay["Y"][k] += y_jacs[k].d_P_total * sens_up.get(
+                                    "P_total", 0.0
+                                )
                                 node_relay["Y"][k] += np.dot(y_jacs[k].d_Y, sens_up["Y"])
 
                 # Wall coupling relay extension: dT_node/dx += dT_mix/dQ * dQ/dx
@@ -934,6 +948,10 @@ class NetworkSolver:
                                         rows.append(row)
                                         cols.append(unk_idx)
                                         data.append(deriv * sens_pkg["Y"][s_idx])
+                                elif prop == "P_total_mix" and "P_total_mix" in sens_pkg:
+                                    rows.append(row)
+                                    cols.append(unk_idx)
+                                    data.append(deriv * sens_pkg["P_total_mix"])
 
             # Mass Conservation: Sum(m_dot_in) - Sum(m_dot_out) = 0
             mass_res_idx = len(res)
@@ -1012,6 +1030,14 @@ class NetworkSolver:
                                         rows.append(row)
                                         cols.append(unk_idx)
                                         data.append(deriv * sens_pkg["Y"][s_idx])
+                                elif prop == "P_total_mix" and "P_total_mix" in sens_pkg:
+                                    rows.append(row)
+                                    cols.append(unk_idx)
+                                    data.append(deriv * sens_pkg["P_total_mix"])
+                                elif prop == "P_total" and "P_total" in sens_pkg:
+                                    rows.append(row)
+                                    cols.append(unk_idx)
+                                    data.append(deriv * sens_pkg["P_total"])
 
         jac_sparse = sp.coo_matrix((data, (rows, cols)), shape=(len(res), len(x))).tocsr()
 
