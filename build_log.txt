@@ -1,0 +1,247 @@
+Obtaining file:///Users/thiemo/Projects/combaero
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Checking if build backend supports build_editable: started
+  Checking if build backend supports build_editable: finished with status 'done'
+  Getting requirements to build editable: started
+  Getting requirements to build editable: finished with status 'done'
+  Installing backend dependencies: started
+  Installing backend dependencies: finished with status 'done'
+  Preparing editable metadata (pyproject.toml): started
+  Preparing editable metadata (pyproject.toml): finished with status 'done'
+Requirement already satisfied: numpy>=1.24 in ./.venv/lib/python3.12/site-packages (from combaero==0.2.0) (2.4.2)
+Requirement already satisfied: scipy>=1.10 in ./.venv/lib/python3.12/site-packages (from combaero==0.2.0) (1.17.1)
+Building wheels for collected packages: combaero
+  Building editable for combaero (pyproject.toml): started
+  Building editable for combaero (pyproject.toml): finished with status 'error'
+  error: subprocess-exited-with-error
+
+  × Building editable for combaero (pyproject.toml) did not run successfully.
+  │ exit code: 1
+  ╰─> [217 lines of output]
+      *** scikit-build-core 0.12.2 using CMake 4.3.0 (editable)
+      *** Configuring CMake...
+      loading initial cache file /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/CMakeInit.txt
+      -- The CXX compiler identification is AppleClang 21.0.0.21000099
+      -- Detecting CXX compiler ABI info
+      -- Detecting CXX compiler ABI info - done
+      -- Check for working CXX compiler: /usr/bin/c++ - skipped
+      -- Detecting CXX compile features
+      -- Detecting CXX compile features - done
+      CMake Warning (dev) at /private/var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/pip-build-env-0hqjunkm/normal/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/FetchContent.cmake:1386 (message):
+        The DOWNLOAD_EXTRACT_TIMESTAMP option was not given and policy CMP0135 is
+        not set.  The policy's OLD behavior will be used.  When using a URL
+        download, the timestamps of extracted files should preferably be that of
+        the time of extraction, otherwise code that depends on the extracted
+        contents might not be rebuilt if the URL changes.  The OLD behavior
+        preserves the timestamps from the archive instead, but this is usually not
+        what you want.  Update your project to the NEW behavior or specify the
+        DOWNLOAD_EXTRACT_TIMESTAMP option with a value of true to avoid this
+        robustness issue.
+      Call Stack (most recent call first):
+        CMakeLists.txt:30 (FetchContent_Declare)
+      This warning is for project developers.  Use -Wno-dev to suppress it.
+
+      -- The C compiler identification is AppleClang 21.0.0.21000099
+      -- Detecting C compiler ABI info
+      -- Detecting C compiler ABI info - done
+      -- Check for working C compiler: /usr/bin/cc - skipped
+      -- Detecting C compile features
+      -- Detecting C compile features - done
+      -- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+      -- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+      -- Found Threads: TRUE
+      -- Found Python: /Users/thiemo/Projects/combaero/.venv/bin/python (found suitable version "3.12.11", minimum required is "3.8") found components: Interpreter Development.Module Development.Embed
+      -- Performing Test HAS_FLTO_THIN
+      -- Performing Test HAS_FLTO_THIN - Success
+      -- Performing Test HAS_FLTO
+      -- Performing Test HAS_FLTO - Success
+      -- Found pybind11: /Users/thiemo/Projects/combaero/.venv/lib/python3.12/site-packages/pybind11/include (found version "3.0.1")
+      -- Configuring done (1.8s)
+      -- Generating done (0.0s)
+      CMake Warning:
+        Manually-specified variables were not used by the project:
+
+          COMBAERO_ENABLE_TESTS
+
+
+      -- Build files have been written to: /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build
+      *** Building project with Ninja...
+      Change Dir: '/var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build'
+
+      Run Build Command(s): /opt/homebrew/bin/ninja -v
+      [1/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/geometry.cpp.o -MF CMakeFiles/combaero_core.dir/src/geometry.cpp.o.d -o CMakeFiles/combaero_core.dir/src/geometry.cpp.o -c /Users/thiemo/Projects/combaero/src/geometry.cpp
+      [2/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/friction.cpp.o -MF CMakeFiles/combaero_core.dir/src/friction.cpp.o.d -o CMakeFiles/combaero_core.dir/src/friction.cpp.o -c /Users/thiemo/Projects/combaero/src/friction.cpp
+      [3/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/correlation_status.cpp.o -MF CMakeFiles/combaero_core.dir/src/correlation_status.cpp.o.d -o CMakeFiles/combaero_core.dir/src/correlation_status.cpp.o -c /Users/thiemo/Projects/combaero/src/correlation_status.cpp
+      [4/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/incompressible.cpp.o -MF CMakeFiles/combaero_core.dir/src/incompressible.cpp.o.d -o CMakeFiles/combaero_core.dir/src/incompressible.cpp.o -c /Users/thiemo/Projects/combaero/src/incompressible.cpp
+      [5/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/cooling_correlations.cpp.o -MF CMakeFiles/combaero_core.dir/src/cooling_correlations.cpp.o.d -o CMakeFiles/combaero_core.dir/src/cooling_correlations.cpp.o -c /Users/thiemo/Projects/combaero/src/cooling_correlations.cpp
+      [6/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/materials.cpp.o -MF CMakeFiles/combaero_core.dir/src/materials.cpp.o.d -o CMakeFiles/combaero_core.dir/src/materials.cpp.o -c /Users/thiemo/Projects/combaero/src/materials.cpp
+      [7/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/heat_transfer.cpp.o -MF CMakeFiles/combaero_core.dir/src/heat_transfer.cpp.o.d -o CMakeFiles/combaero_core.dir/src/heat_transfer.cpp.o -c /Users/thiemo/Projects/combaero/src/heat_transfer.cpp
+      [8/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/compressible.cpp.o -MF CMakeFiles/combaero_core.dir/src/compressible.cpp.o.d -o CMakeFiles/combaero_core.dir/src/compressible.cpp.o -c /Users/thiemo/Projects/combaero/src/compressible.cpp
+      [9/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/composition.cpp.o -MF CMakeFiles/combaero_core.dir/src/composition.cpp.o.d -o CMakeFiles/combaero_core.dir/src/composition.cpp.o -c /Users/thiemo/Projects/combaero/src/composition.cpp
+      [10/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/humidair.cpp.o -MF CMakeFiles/combaero_core.dir/src/humidair.cpp.o.d -o CMakeFiles/combaero_core.dir/src/humidair.cpp.o -c /Users/thiemo/Projects/combaero/src/humidair.cpp
+      [11/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/stagnation.cpp.o -MF CMakeFiles/combaero_core.dir/src/stagnation.cpp.o.d -o CMakeFiles/combaero_core.dir/src/stagnation.cpp.o -c /Users/thiemo/Projects/combaero/src/stagnation.cpp
+      [12/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/acoustics.cpp.o -MF CMakeFiles/combaero_core.dir/src/acoustics.cpp.o.d -o CMakeFiles/combaero_core.dir/src/acoustics.cpp.o -c /Users/thiemo/Projects/combaero/src/acoustics.cpp
+      [13/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/registry.cpp.o -MF CMakeFiles/combaero_core.dir/src/registry.cpp.o.d -o CMakeFiles/combaero_core.dir/src/registry.cpp.o -c /Users/thiemo/Projects/combaero/src/registry.cpp
+      [14/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/state.cpp.o -MF CMakeFiles/combaero_core.dir/src/state.cpp.o.d -o CMakeFiles/combaero_core.dir/src/state.cpp.o -c /Users/thiemo/Projects/combaero/src/state.cpp
+      [15/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/orifice.cpp.o -MF CMakeFiles/combaero_core.dir/src/orifice.cpp.o.d -o CMakeFiles/combaero_core.dir/src/orifice.cpp.o -c /Users/thiemo/Projects/combaero/src/orifice.cpp
+      [16/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/equilibrium.cpp.o -MF CMakeFiles/combaero_core.dir/src/equilibrium.cpp.o.d -o CMakeFiles/combaero_core.dir/src/equilibrium.cpp.o -c /Users/thiemo/Projects/combaero/src/equilibrium.cpp
+      [17/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/can_annular_solvers.cpp.o -MF CMakeFiles/combaero_core.dir/src/can_annular_solvers.cpp.o.d -o CMakeFiles/combaero_core.dir/src/can_annular_solvers.cpp.o -c /Users/thiemo/Projects/combaero/src/can_annular_solvers.cpp
+      [18/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/combustion.cpp.o -MF CMakeFiles/combaero_core.dir/src/combustion.cpp.o.d -o CMakeFiles/combaero_core.dir/src/combustion.cpp.o -c /Users/thiemo/Projects/combaero/src/combustion.cpp
+      [19/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/utils.cpp.o -MF CMakeFiles/combaero_core.dir/src/utils.cpp.o.d -o CMakeFiles/combaero_core.dir/src/utils.cpp.o -c /Users/thiemo/Projects/combaero/src/utils.cpp
+      [20/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/transport.cpp.o -MF CMakeFiles/combaero_core.dir/src/transport.cpp.o.d -o CMakeFiles/combaero_core.dir/src/transport.cpp.o -c /Users/thiemo/Projects/combaero/src/transport.cpp
+      [21/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/thermo.cpp.o -MF CMakeFiles/combaero_core.dir/src/thermo.cpp.o.d -o CMakeFiles/combaero_core.dir/src/thermo.cpp.o -c /Users/thiemo/Projects/combaero/src/thermo.cpp
+      [22/83] /usr/bin/c++  -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest -O3 -DNDEBUG -std=c++17 -arch arm64  -DGTEST_HAS_PTHREAD=1   -Wall -Wextra -Wpedantic -Werror -MD -MT _deps/googletest-build/googletest/CMakeFiles/gtest_main.dir/src/gtest_main.cc.o -MF _deps/googletest-build/googletest/CMakeFiles/gtest_main.dir/src/gtest_main.cc.o.d -o _deps/googletest-build/googletest/CMakeFiles/gtest_main.dir/src/gtest_main.cc.o -c /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/src/gtest_main.cc
+      [23/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/test_ice_equation_accuracy.dir/tests/test_ice_equation_accuracy.cpp.o -MF CMakeFiles/test_ice_equation_accuracy.dir/tests/test_ice_equation_accuracy.cpp.o.d -o CMakeFiles/test_ice_equation_accuracy.dir/tests/test_ice_equation_accuracy.cpp.o -c /Users/thiemo/Projects/combaero/tests/test_ice_equation_accuracy.cpp
+      [24/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/test_heat_transfer_jacobians.dir/tests/test_heat_transfer_jacobians.cpp.o -MF CMakeFiles/test_heat_transfer_jacobians.dir/tests/test_heat_transfer_jacobians.cpp.o.d -o CMakeFiles/test_heat_transfer_jacobians.dir/tests/test_heat_transfer_jacobians.cpp.o -c /Users/thiemo/Projects/combaero/tests/test_heat_transfer_jacobians.cpp
+      [25/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/test_fraction_functions.dir/tests/test_fraction_functions.cpp.o -MF CMakeFiles/test_fraction_functions.dir/tests/test_fraction_functions.cpp.o.d -o CMakeFiles/test_fraction_functions.dir/tests/test_fraction_functions.cpp.o -c /Users/thiemo/Projects/combaero/tests/test_fraction_functions.cpp
+      [26/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/test_acoustic_adapter.dir/tests/test_acoustic_adapter.cpp.o -MF CMakeFiles/test_acoustic_adapter.dir/tests/test_acoustic_adapter.cpp.o.d -o CMakeFiles/test_acoustic_adapter.dir/tests/test_acoustic_adapter.cpp.o -c /Users/thiemo/Projects/combaero/tests/test_acoustic_adapter.cpp
+      [27/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combaero_core.dir/src/solver_interface.cpp.o -MF CMakeFiles/combaero_core.dir/src/solver_interface.cpp.o.d -o CMakeFiles/combaero_core.dir/src/solver_interface.cpp.o -c /Users/thiemo/Projects/combaero/src/solver_interface.cpp
+      [28/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/test_incompressible.dir/tests/test_incompressible.cpp.o -MF CMakeFiles/test_incompressible.dir/tests/test_incompressible.cpp.o.d -o CMakeFiles/test_incompressible.dir/tests/test_incompressible.cpp.o -c /Users/thiemo/Projects/combaero/tests/test_incompressible.cpp
+      [29/83] : && /private/var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/pip-build-env-0hqjunkm/normal/lib/python3.12/site-packages/cmake/data/bin/cmake -E rm -f libcombaero_core.a && /usr/bin/ar qc libcombaero_core.a  CMakeFiles/combaero_core.dir/src/acoustics.cpp.o CMakeFiles/combaero_core.dir/src/can_annular_solvers.cpp.o CMakeFiles/combaero_core.dir/src/combustion.cpp.o CMakeFiles/combaero_core.dir/src/composition.cpp.o CMakeFiles/combaero_core.dir/src/compressible.cpp.o CMakeFiles/combaero_core.dir/src/cooling_correlations.cpp.o CMakeFiles/combaero_core.dir/src/correlation_status.cpp.o CMakeFiles/combaero_core.dir/src/equilibrium.cpp.o CMakeFiles/combaero_core.dir/src/friction.cpp.o CMakeFiles/combaero_core.dir/src/geometry.cpp.o CMakeFiles/combaero_core.dir/src/heat_transfer.cpp.o CMakeFiles/combaero_core.dir/src/humidair.cpp.o CMakeFiles/combaero_core.dir/src/incompressible.cpp.o CMakeFiles/combaero_core.dir/src/materials.cpp.o CMakeFiles/combaero_core.dir/src/orifice.cpp.o CMakeFiles/combaero_core.dir/src/registry.cpp.o CMakeFiles/combaero_core.dir/src/solver_interface.cpp.o CMakeFiles/combaero_core.dir/src/stagnation.cpp.o CMakeFiles/combaero_core.dir/src/state.cpp.o CMakeFiles/combaero_core.dir/src/thermo.cpp.o CMakeFiles/combaero_core.dir/src/transport.cpp.o CMakeFiles/combaero_core.dir/src/utils.cpp.o && /usr/bin/ranlib libcombaero_core.a && /private/var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/pip-build-env-0hqjunkm/normal/lib/python3.12/site-packages/cmake/data/bin/cmake -E touch libcombaero_core.a && :
+      [30/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/test_units.dir/tests/test_units.cpp.o -MF CMakeFiles/test_units.dir/tests/test_units.cpp.o.d -o CMakeFiles/test_units.dir/tests/test_units.cpp.o -c /Users/thiemo/Projects/combaero/tests/test_units.cpp
+      [31/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/test_orifice.dir/tests/test_orifice.cpp.o -MF CMakeFiles/test_orifice.dir/tests/test_orifice.cpp.o.d -o CMakeFiles/test_orifice.dir/tests/test_orifice.cpp.o -c /Users/thiemo/Projects/combaero/tests/test_orifice.cpp
+      [32/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/test_state.dir/tests/test_state.cpp.o -MF CMakeFiles/test_state.dir/tests/test_state.cpp.o.d -o CMakeFiles/test_state.dir/tests/test_state.cpp.o -c /Users/thiemo/Projects/combaero/tests/test_state.cpp
+      [33/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/test_water_equation_accuracy.dir/tests/test_water_equation_accuracy.cpp.o -MF CMakeFiles/test_water_equation_accuracy.dir/tests/test_water_equation_accuracy.cpp.o.d -o CMakeFiles/test_water_equation_accuracy.dir/tests/test_water_equation_accuracy.cpp.o -c /Users/thiemo/Projects/combaero/tests/test_water_equation_accuracy.cpp
+      [34/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/test_state_sync.dir/tests/test_state_sync.cpp.o -MF CMakeFiles/test_state_sync.dir/tests/test_state_sync.cpp.o.d -o CMakeFiles/test_state_sync.dir/tests/test_state_sync.cpp.o -c /Users/thiemo/Projects/combaero/tests/test_state_sync.cpp
+      [35/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/test_energy_boundary.dir/tests/test_energy_boundary.cpp.o -MF CMakeFiles/test_energy_boundary.dir/tests/test_energy_boundary.cpp.o.d -o CMakeFiles/test_energy_boundary.dir/tests/test_energy_boundary.cpp.o -c /Users/thiemo/Projects/combaero/tests/test_energy_boundary.cpp
+      [36/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/test_humidair.dir/tests/test_humidair.cpp.o -MF CMakeFiles/test_humidair.dir/tests/test_humidair.cpp.o.d -o CMakeFiles/test_humidair.dir/tests/test_humidair.cpp.o -c /Users/thiemo/Projects/combaero/tests/test_humidair.cpp
+      [37/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/acoustics_example.dir/examples/acoustics_example.cpp.o -MF CMakeFiles/acoustics_example.dir/examples/acoustics_example.cpp.o.d -o CMakeFiles/acoustics_example.dir/examples/acoustics_example.cpp.o -c /Users/thiemo/Projects/combaero/examples/acoustics_example.cpp
+      [38/83] /usr/bin/c++  -I/var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googlemock/include -I/var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googlemock -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest -O3 -DNDEBUG -std=c++17 -arch arm64  -DGTEST_HAS_PTHREAD=1   -Wall -Wextra -Wpedantic -Werror -MD -MT _deps/googletest-build/googlemock/CMakeFiles/gmock.dir/src/gmock-all.cc.o -MF _deps/googletest-build/googlemock/CMakeFiles/gmock.dir/src/gmock-all.cc.o.d -o _deps/googletest-build/googlemock/CMakeFiles/gmock.dir/src/gmock-all.cc.o -c /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googlemock/src/gmock-all.cc
+      [39/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combustion_state_example.dir/examples/combustion_state_example.cpp.o -MF CMakeFiles/combustion_state_example.dir/examples/combustion_state_example.cpp.o.d -o CMakeFiles/combustion_state_example.dir/examples/combustion_state_example.cpp.o -c /Users/thiemo/Projects/combaero/examples/combustion_state_example.cpp
+      FAILED: [code=1] CMakeFiles/combustion_state_example.dir/examples/combustion_state_example.cpp.o
+      /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combustion_state_example.dir/examples/combustion_state_example.cpp.o -MF CMakeFiles/combustion_state_example.dir/examples/combustion_state_example.cpp.o.d -o CMakeFiles/combustion_state_example.dir/examples/combustion_state_example.cpp.o -c /Users/thiemo/Projects/combaero/examples/combustion_state_example.cpp
+      /Users/thiemo/Projects/combaero/examples/combustion_state_example.cpp:117:29: error: no viable conversion from '(lambda at /Users/thiemo/Projects/combaero/examples/combustion_state_example.cpp:117:39)' to 'PressureLossCorrelation' (aka 'function<std::tuple<double, double> (const PressureLossContext &)>')
+        117 |     PressureLossCorrelation loss_fn = [](const PressureLossContext& ctx) {
+            |                             ^         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        118 |         return 0.03 + 0.005 * ctx.theta;
+            |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        119 |     };
+            |     ~
+      /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__functional/function.h:639:25: note: candidate constructor not viable: no known conversion from '(lambda at /Users/thiemo/Projects/combaero/examples/combustion_state_example.cpp:117:39)' to 'nullptr_t' (aka 'std::nullptr_t') for 1st argument
+        639 |   _LIBCPP_HIDE_FROM_ABI function(nullptr_t) _NOEXCEPT {}
+            |                         ^        ~~~~~~~~~
+      /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__functional/function.h:640:25: note: candidate constructor not viable: no known conversion from '(lambda at /Users/thiemo/Projects/combaero/examples/combustion_state_example.cpp:117:39)' to 'const function<std::tuple<double, double> (const combaero::PressureLossContext &)> &' for 1st argument
+        640 |   _LIBCPP_HIDE_FROM_ABI function(const function&);
+            |                         ^        ~~~~~~~~~~~~~~~
+      /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__functional/function.h:641:25: note: candidate constructor not viable: no known conversion from '(lambda at /Users/thiemo/Projects/combaero/examples/combustion_state_example.cpp:117:39)' to 'function<std::tuple<double, double> (const combaero::PressureLossContext &)> &&' for 1st argument
+        641 |   _LIBCPP_HIDE_FROM_ABI function(function&&) _NOEXCEPT;
+            |                         ^        ~~~~~~~~~~
+      /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__functional/function.h:643:25: note: candidate template ignored: requirement '__callable<(lambda at /Users/thiemo/Projects/combaero/examples/combustion_state_example.cpp:117:39) &, true>::value' was not satisfied [with _Fp = (lambda at /Users/thiemo/Projects/combaero/examples/combustion_state_example.cpp:117:39)]
+        643 |   _LIBCPP_HIDE_FROM_ABI function(_Fp);
+            |                         ^
+      /Users/thiemo/Projects/combaero/examples/combustion_state_example.cpp:117:39: note: candidate function
+        117 |     PressureLossCorrelation loss_fn = [](const PressureLossContext& ctx) {
+            |                                       ^
+      /Users/thiemo/Projects/combaero/examples/combustion_state_example.cpp:146:29: error: no viable conversion from '(lambda at /Users/thiemo/Projects/combaero/examples/combustion_state_example.cpp:146:46)' to 'PressureLossCorrelation' (aka 'function<std::tuple<double, double> (const PressureLossContext &)>')
+        146 |     PressureLossCorrelation loss_with_mdot = [](const PressureLossContext& ctx) {
+            |                             ^                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        147 |         // Could use ctx.mdot_fuel / ctx.mdot_air for fuel-split-dependent losses
+            |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        148 |         return 0.04 + 0.002 * ctx.theta;
+            |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        149 |     };
+            |     ~
+      /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__functional/function.h:639:25: note: candidate constructor not viable: no known conversion from '(lambda at /Users/thiemo/Projects/combaero/examples/combustion_state_example.cpp:146:46)' to 'nullptr_t' (aka 'std::nullptr_t') for 1st argument
+        639 |   _LIBCPP_HIDE_FROM_ABI function(nullptr_t) _NOEXCEPT {}
+            |                         ^        ~~~~~~~~~
+      /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__functional/function.h:640:25: note: candidate constructor not viable: no known conversion from '(lambda at /Users/thiemo/Projects/combaero/examples/combustion_state_example.cpp:146:46)' to 'const function<std::tuple<double, double> (const combaero::PressureLossContext &)> &' for 1st argument
+        640 |   _LIBCPP_HIDE_FROM_ABI function(const function&);
+            |                         ^        ~~~~~~~~~~~~~~~
+      /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__functional/function.h:641:25: note: candidate constructor not viable: no known conversion from '(lambda at /Users/thiemo/Projects/combaero/examples/combustion_state_example.cpp:146:46)' to 'function<std::tuple<double, double> (const combaero::PressureLossContext &)> &&' for 1st argument
+        641 |   _LIBCPP_HIDE_FROM_ABI function(function&&) _NOEXCEPT;
+            |                         ^        ~~~~~~~~~~
+      /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__functional/function.h:643:25: note: candidate template ignored: requirement '__callable<(lambda at /Users/thiemo/Projects/combaero/examples/combustion_state_example.cpp:146:46) &, true>::value' was not satisfied [with _Fp = (lambda at /Users/thiemo/Projects/combaero/examples/combustion_state_example.cpp:146:46)]
+        643 |   _LIBCPP_HIDE_FROM_ABI function(_Fp);
+            |                         ^
+      /Users/thiemo/Projects/combaero/examples/combustion_state_example.cpp:146:46: note: candidate function
+        146 |     PressureLossCorrelation loss_with_mdot = [](const PressureLossContext& ctx) {
+            |                                              ^
+      2 errors generated.
+      [40/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/test_thermo_transport.dir/tests/test_thermo_transport.cpp.o -MF CMakeFiles/test_thermo_transport.dir/tests/test_thermo_transport.cpp.o.d -o CMakeFiles/test_thermo_transport.dir/tests/test_thermo_transport.cpp.o -c /Users/thiemo/Projects/combaero/tests/test_thermo_transport.cpp
+      FAILED: [code=1] CMakeFiles/test_thermo_transport.dir/tests/test_thermo_transport.cpp.o
+      /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/test_thermo_transport.dir/tests/test_thermo_transport.cpp.o -MF CMakeFiles/test_thermo_transport.dir/tests/test_thermo_transport.cpp.o.d -o CMakeFiles/test_thermo_transport.dir/tests/test_thermo_transport.cpp.o -c /Users/thiemo/Projects/combaero/tests/test_thermo_transport.cpp
+      /Users/thiemo/Projects/combaero/tests/test_thermo_transport.cpp:4445:19: error: no matching function for call to 'combustion_state'
+       4445 |     auto result = combustion_state(
+            |                   ^~~~~~~~~~~~~~~~
+      /Users/thiemo/Projects/combaero/tests/../include/combustion.h:166:17: note: candidate function not viable: no known conversion from '(lambda at /Users/thiemo/Projects/combaero/tests/test_thermo_transport.cpp:4448:9)' to 'bool' for 8th argument
+        166 | CombustionState combustion_state(
+            |                 ^
+        167 |     const std::vector<double> &X_fuel, const std::vector<double> &X_ox,
+        168 |     double phi, double T_reactants, double P, const std::string &fuel_name = "",
+        169 |     CombustionMethod method = CombustionMethod::Complete,
+        170 |     bool smooth_phi0 = false, bool smooth_phi1 = false,
+            |     ~~~~~~~~~~~~~~~~~~~~~~~~
+      /Users/thiemo/Projects/combaero/tests/../include/combustion.h:173:17: note: candidate function not viable: no known conversion from '(lambda at /Users/thiemo/Projects/combaero/tests/test_thermo_transport.cpp:4448:9)' to 'const PressureLossCorrelation' (aka 'const function<std::tuple<double, double> (const PressureLossContext &)>') for 8th argument
+        173 | CombustionState combustion_state(const std::vector<double> &X_fuel,
+            |                 ^
+        174 |                                  const std::vector<double> &X_ox, double phi,
+        175 |                                  double T_reactants, double P,
+        176 |                                  const std::string &fuel_name,
+        177 |                                  CombustionMethod method,
+        178 |                                  const PressureLossCorrelation &pressure_loss,
+            |                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      /Users/thiemo/Projects/combaero/tests/test_thermo_transport.cpp:4464:5: error: no matching function for call to 'combustion_state'
+       4464 |     combustion_state(
+            |     ^~~~~~~~~~~~~~~~
+      /Users/thiemo/Projects/combaero/tests/../include/combustion.h:166:17: note: candidate function not viable: no known conversion from '(lambda at /Users/thiemo/Projects/combaero/tests/test_thermo_transport.cpp:4467:9)' to 'bool' for 8th argument
+        166 | CombustionState combustion_state(
+            |                 ^
+        167 |     const std::vector<double> &X_fuel, const std::vector<double> &X_ox,
+        168 |     double phi, double T_reactants, double P, const std::string &fuel_name = "",
+        169 |     CombustionMethod method = CombustionMethod::Complete,
+        170 |     bool smooth_phi0 = false, bool smooth_phi1 = false,
+            |     ~~~~~~~~~~~~~~~~~~~~~~~~
+      /Users/thiemo/Projects/combaero/tests/../include/combustion.h:173:17: note: candidate function not viable: no known conversion from '(lambda at /Users/thiemo/Projects/combaero/tests/test_thermo_transport.cpp:4467:9)' to 'const PressureLossCorrelation' (aka 'const function<std::tuple<double, double> (const PressureLossContext &)>') for 8th argument
+        173 | CombustionState combustion_state(const std::vector<double> &X_fuel,
+            |                 ^
+        174 |                                  const std::vector<double> &X_ox, double phi,
+        175 |                                  double T_reactants, double P,
+        176 |                                  const std::string &fuel_name,
+        177 |                                  CombustionMethod method,
+        178 |                                  const PressureLossCorrelation &pressure_loss,
+            |                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      /Users/thiemo/Projects/combaero/tests/test_thermo_transport.cpp:4492:5: error: no matching function for call to 'combustion_state_from_streams'
+       4492 |     combustion_state_from_streams(
+            |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      /Users/thiemo/Projects/combaero/tests/../include/combustion.h:182:17: note: candidate function not viable: no known conversion from '(lambda at /Users/thiemo/Projects/combaero/tests/test_thermo_transport.cpp:4494:9)' to 'bool' for 5th argument
+        182 | CombustionState combustion_state_from_streams(
+            |                 ^
+        183 |     const Stream &fuel_stream, const Stream &ox_stream,
+        184 |     const std::string &fuel_name = "",
+        185 |     CombustionMethod method = CombustionMethod::Complete,
+        186 |     bool smooth_phi0 = false, bool smooth_phi1 = false,
+            |     ~~~~~~~~~~~~~~~~~~~~~~~~
+      /Users/thiemo/Projects/combaero/tests/../include/combustion.h:189:17: note: candidate function not viable: no known conversion from '(lambda at /Users/thiemo/Projects/combaero/tests/test_thermo_transport.cpp:4494:9)' to 'const PressureLossCorrelation' (aka 'const function<std::tuple<double, double> (const PressureLossContext &)>') for 5th argument
+        189 | CombustionState combustion_state_from_streams(
+            |                 ^
+        190 |     const Stream &fuel_stream, const Stream &ox_stream,
+        191 |     const std::string &fuel_name, CombustionMethod method,
+        192 |     const PressureLossCorrelation &pressure_loss,
+            |     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      3 errors generated.
+      [41/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/cooling_example.dir/examples/cooling_example.cpp.o -MF CMakeFiles/cooling_example.dir/examples/cooling_example.cpp.o.d -o CMakeFiles/cooling_example.dir/examples/cooling_example.cpp.o -c /Users/thiemo/Projects/combaero/examples/cooling_example.cpp
+      [42/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/test_solver_jacobians.dir/tests/test_solver_jacobians.cpp.o -MF CMakeFiles/test_solver_jacobians.dir/tests/test_solver_jacobians.cpp.o.d -o CMakeFiles/test_solver_jacobians.dir/tests/test_solver_jacobians.cpp.o -c /Users/thiemo/Projects/combaero/tests/test_solver_jacobians.cpp
+      [43/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/incompressible_example.dir/examples/incompressible_example.cpp.o -MF CMakeFiles/incompressible_example.dir/examples/incompressible_example.cpp.o.d -o CMakeFiles/incompressible_example.dir/examples/incompressible_example.cpp.o -c /Users/thiemo/Projects/combaero/examples/incompressible_example.cpp
+      [44/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/orifice_example.dir/examples/orifice_example.cpp.o -MF CMakeFiles/orifice_example.dir/examples/orifice_example.cpp.o.d -o CMakeFiles/orifice_example.dir/examples/orifice_example.cpp.o -c /Users/thiemo/Projects/combaero/examples/orifice_example.cpp
+      [45/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/include -isystem /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/test_stream_jacobians.dir/tests/test_stream_jacobians.cpp.o -MF CMakeFiles/test_stream_jacobians.dir/tests/test_stream_jacobians.cpp.o.d -o CMakeFiles/test_stream_jacobians.dir/tests/test_stream_jacobians.cpp.o -c /Users/thiemo/Projects/combaero/tests/test_stream_jacobians.cpp
+      [46/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/combustion_example.dir/examples/combustion_example.cpp.o -MF CMakeFiles/combustion_example.dir/examples/combustion_example.cpp.o.d -o CMakeFiles/combustion_example.dir/examples/combustion_example.cpp.o -c /Users/thiemo/Projects/combaero/examples/combustion_example.cpp
+      [47/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/humidair_example.dir/examples/humidair_example.cpp.o -MF CMakeFiles/humidair_example.dir/examples/humidair_example.cpp.o.d -o CMakeFiles/humidair_example.dir/examples/humidair_example.cpp.o -c /Users/thiemo/Projects/combaero/examples/humidair_example.cpp
+      [48/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/compressible_example.dir/examples/compressible_example.cpp.o -MF CMakeFiles/compressible_example.dir/examples/compressible_example.cpp.o.d -o CMakeFiles/compressible_example.dir/examples/compressible_example.cpp.o -c /Users/thiemo/Projects/combaero/examples/compressible_example.cpp
+      [49/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/stagnation_example.dir/examples/stagnation_example.cpp.o -MF CMakeFiles/stagnation_example.dir/examples/stagnation_example.cpp.o.d -o CMakeFiles/stagnation_example.dir/examples/stagnation_example.cpp.o -c /Users/thiemo/Projects/combaero/examples/stagnation_example.cpp
+      [50/83] /usr/bin/c++  -I/Users/thiemo/Projects/combaero/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -Wall -Wextra -Wpedantic -Werror -MD -MT CMakeFiles/thermo_example.dir/examples/thermo_example.cpp.o -MF CMakeFiles/thermo_example.dir/examples/thermo_example.cpp.o.d -o CMakeFiles/thermo_example.dir/examples/thermo_example.cpp.o -c /Users/thiemo/Projects/combaero/examples/thermo_example.cpp
+      [51/83] /usr/bin/c++  -I/var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/include -I/var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest -O3 -DNDEBUG -std=c++17 -arch arm64  -DGTEST_HAS_PTHREAD=1   -Wall -Wextra -Wpedantic -Werror -MD -MT _deps/googletest-build/googletest/CMakeFiles/gtest.dir/src/gtest-all.cc.o -MF _deps/googletest-build/googletest/CMakeFiles/gtest.dir/src/gtest-all.cc.o.d -o _deps/googletest-build/googletest/CMakeFiles/gtest.dir/src/gtest-all.cc.o -c /var/folders/_r/qy8brv913yj292rx7zm237x40000gn/T/tmpynko5796/build/_deps/googletest-src/googletest/src/gtest-all.cc
+      [52/83] /usr/bin/c++ -D_core_EXPORTS -I/Users/thiemo/Projects/combaero/include -isystem /Users/thiemo/.local/share/uv/python/cpython-3.12.11-macos-aarch64-none/include/python3.12 -isystem /Users/thiemo/Projects/combaero/.venv/lib/python3.12/site-packages/pybind11/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -fPIC -fvisibility=hidden -Wall -Wextra -Wpedantic -Werror -flto -MD -MT CMakeFiles/_core.dir/python/combaero/_core.cpp.o -MF CMakeFiles/_core.dir/python/combaero/_core.cpp.o.d -o CMakeFiles/_core.dir/python/combaero/_core.cpp.o -c /Users/thiemo/Projects/combaero/python/combaero/_core.cpp
+      ninja: build stopped: subcommand failed.
+
+
+      *** CMake build failed
+      [end of output]
+
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+  ERROR: Failed building editable for combaero
+Failed to build combaero
+error: failed-wheel-build-for-install
+
+× Failed to build installable wheels for some pyproject.toml based projects
+╰─> combaero

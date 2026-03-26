@@ -1227,6 +1227,89 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
   return res;
 }
 
+MixerResult combustor_residuals_and_jacobians(
+    const std::vector<Stream> &streams, double P, double Q, double fraction,
+    const PressureLossCorrelation &pressure_loss, bool use_equilibrium) {
+
+  // 1. Get unburned mixture state (T_in, P_in)
+  MixerResult mix_in = mixer_from_streams_and_jacobians(streams);
+  double T_in = mix_in.T_mix;
+
+  // 2. Get burned state (T_ad, Y_products) including all stream jacobians
+  MixerResult res = use_equilibrium
+      ? adiabatic_T_equilibrium_and_jacobians_from_streams(streams, P, Q, fraction)
+      : adiabatic_T_complete_and_jacobian_T_from_streams(streams, P, Q, fraction);
+
+  double T_ad = res.T_mix;
+  double theta = (T_in > 0.0) ? (T_ad / T_in - 1.0) : 0.0;
+
+  // 3. Form Context and evaluate Hook
+  State reactant_state;
+  std::vector<double> X_in = mass_to_mole(mix_in.Y_mix);
+  reactant_state.set_TPX(T_in, P, X_in);
+
+  // Compute X_products from Y_products for the context
+  std::vector<double> X_products = mass_to_mole(res.Y_mix);
+
+  PressureLossContext ctx{
+      reactant_state,
+      0.0, // phi
+      T_ad,
+      X_products,
+      res.Y_mix, // Y_products
+      theta,
+      0.0, 0.0 // mdot fuel/air
+  };
+
+  auto loss_res = pressure_loss(ctx);
+  double zeta = std::get<0>(loss_res);
+  double dzeta_dtheta = std::get<1>(loss_res);
+
+  // 4. Update Result with P_out
+  double P_out = P * (1.0 - zeta);
+  res.P_total_mix = P_out;
+
+  // 5. Analytical Chain Rule for dP_out/d_stream
+  // dP_out/dx = dP/dx * (1 - zeta) - P * dzeta/dx
+  // dzeta/dx = dzeta/dtheta * dtheta/dx
+  // dtheta/dx = d(T_ad/T_in - 1)/dx = (1/T_in) * dT_ad/dx - (T_ad/T_in^2) * dT_in/dx
+
+  std::size_t n_streams = streams.size();
+  std::size_t n_species = num_species();
+
+  for (std::size_t i = 0; i < n_streams; ++i) {
+      auto update_jac = [&](StreamJacobian& dP_out_jac,
+                          const StreamJacobian& dT_ad_jac,
+                          const StreamJacobian& dT_in_jac,
+                          const StreamJacobian& dP_in_jac) {
+
+          auto compute_dtheta = [&](double d_Tad, double d_Tin) {
+              return (T_in > 0.0) ? (d_Tad / T_in - (T_ad / (T_in * T_in)) * d_Tin) : 0.0;
+          };
+
+          double dtheta_dmdot = compute_dtheta(dT_ad_jac.d_mdot, dT_in_jac.d_mdot);
+          double dtheta_dT = compute_dtheta(dT_ad_jac.d_T, dT_in_jac.d_T);
+          double dtheta_dP = compute_dtheta(dT_ad_jac.d_P_total, dT_in_jac.d_P_total);
+
+          dP_out_jac.d_mdot = dP_in_jac.d_mdot * (1.0 - zeta) - P * dzeta_dtheta * dtheta_dmdot;
+          dP_out_jac.d_T = dP_in_jac.d_T * (1.0 - zeta) - P * dzeta_dtheta * dtheta_dT;
+          dP_out_jac.d_P_total = dP_in_jac.d_P_total * (1.0 - zeta) - P * dzeta_dtheta * dtheta_dP;
+
+          for (std::size_t k = 0; k < n_species; ++k) {
+              double dtheta_dY = compute_dtheta(dT_ad_jac.d_Y[k], dT_in_jac.d_Y[k]);
+              dP_out_jac.d_Y[k] = dP_in_jac.d_Y[k] * (1.0 - zeta) - P * dzeta_dtheta * dtheta_dY;
+          }
+      };
+
+      update_jac(res.dP_total_mix_d_stream[i],
+                res.dT_mix_d_stream[i], // dT_ad
+                mix_in.dT_mix_d_stream[i], // dT_in
+                mix_in.dP_total_mix_d_stream[i]); // dP_in
+  }
+
+  return res;
+}
+
 OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
                                              double P_static_up, double T_up,
                                              const std::vector<double> &Y_up,

@@ -4445,7 +4445,7 @@ TEST(PressureLossHookTest, CombustionStateFixedHookMatchesScaledP) {
     auto result = combustion_state(
         X_fuel, X_ox, 1.0, 700.0, P_in, "",
         CombustionMethod::Complete,
-        [frac](const PressureLossContext&) { return frac; }
+        [frac](const PressureLossContext&) -> std::tuple<double, double> { return {frac, 0.0}; }
     );
 
     EXPECT_NEAR(result.products.thermo.P, P_in * (1.0 - frac), 1.0);
@@ -4464,9 +4464,9 @@ TEST(PressureLossHookTest, ThetaIsPositiveForExothermicCombustion) {
     combustion_state(
         X_fuel, X_ox, 0.8, 700.0, 300000.0, "",
         CombustionMethod::Complete,
-        [&theta_captured](const PressureLossContext& ctx) {
+        [&theta_captured](const PressureLossContext& ctx) -> std::tuple<double, double> {
             theta_captured = ctx.theta;
-            return 0.03;
+            return {0.03, 0.0};
         }
     );
 
@@ -4491,10 +4491,10 @@ TEST(PressureLossHookTest, CombustionStateFromStreamsPopulatesMdot) {
     double mdot_air_seen  = 0.0;
     combustion_state_from_streams(
         fuel, air, "", CombustionMethod::Complete,
-        [&](const PressureLossContext& ctx) {
+        [&](const PressureLossContext& ctx) -> std::tuple<double, double> {
             mdot_fuel_seen = ctx.mdot_fuel;
             mdot_air_seen  = ctx.mdot_air;
-            return 0.04;
+            return {0.04, 0.0};
         }
     );
 

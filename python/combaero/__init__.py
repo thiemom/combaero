@@ -405,6 +405,7 @@ try:
         mixer_from_streams_and_jacobians,
         adiabatic_T_complete_and_jacobian_T_from_streams,
         adiabatic_T_equilibrium_and_jacobians_from_streams,
+        combustor_residuals_and_jacobians,
     )
 
     molar_mass = mwmix
@@ -514,6 +515,7 @@ except ModuleNotFoundError:
     reforming_equilibrium = _core.reforming_equilibrium
     reforming_equilibrium_adiabatic = _core.reforming_equilibrium_adiabatic
     combustion_equilibrium = _core.combustion_equilibrium
+    combustor_residuals_and_jacobians = _core.combustor_residuals_and_jacobians
     # Compressible flow
     CompressibleFlowSolution = _core.CompressibleFlowSolution
     NozzleStation = _core.NozzleStation
@@ -901,6 +903,7 @@ __all__ = [
     "density_and_jacobians",
     "enthalpy_and_jacobian",
     "viscosity_and_jacobians",
+    "combustor_residuals_and_jacobians",
     # Inverse solvers - find oxidizer stream
     "set_oxidizer_stream_for_Tad",
     "set_oxidizer_stream_for_O2",

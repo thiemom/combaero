@@ -1617,11 +1617,12 @@ CombustionState combustion_state(const std::vector<double> &X_fuel,
       phi,
       T_ad,
       product_state.X,
+      product_state.Y,
       theta,
       0.0, // mdot_fuel not available in phi-based call
       0.0  // mdot_air not available in phi-based call
   };
-  const double delta_P_frac = pressure_loss(ctx);
+  const double delta_P_frac = std::get<0>(pressure_loss(ctx));
   const double P_out = P * (1.0 - delta_P_frac);
 
   // Assemble result
@@ -1672,10 +1673,10 @@ CombustionState combustion_state_from_streams(
 
   const double T_ad = product_state.T;
   const double theta = (T_reactants > 0.0) ? (T_ad / T_reactants - 1.0) : 0.0;
-  PressureLossContext ctx{reactant_state,  phi,   T_ad,
-                          product_state.X, theta, fuel_stream.mdot,
-                          ox_stream.mdot};
-  const double delta_P_frac = pressure_loss(ctx);
+  PressureLossContext ctx{reactant_state,   phi,             T_ad,
+                          product_state.X, product_state.Y, theta,
+                          fuel_stream.mdot, ox_stream.mdot};
+  const double delta_P_frac = std::get<0>(pressure_loss(ctx));
   const double P_out = P * (1.0 - delta_P_frac);
 
   CombustionState result;

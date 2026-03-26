@@ -16,6 +16,7 @@ IGNORE_LIST = {
     "orifice_residuals_and_jacobian",
     "pipe_residuals_and_jacobian",
     "combustor_residuals_and_jacobian",
+    "combustor_residuals_and_jacobians",
     "plenum_residuals_and_jacobian",
     "momentum_chamber_residual_and_jacobian",
     "OrificeResult",

@@ -114,8 +114,8 @@ int main()
     // Hook: 3% base loss + 0.5% per unit dimensionless temperature rise theta
     // theta = T_ad/T_in - 1  (0 for cold flow, ~2-3 for typical combustion)
     // All fields in PressureLossContext are loop-free — safe for Newton solvers.
-    PressureLossCorrelation loss_fn = [](const PressureLossContext& ctx) {
-        return 0.03 + 0.005 * ctx.theta;
+    PressureLossCorrelation loss_fn = [](const PressureLossContext& ctx) -> std::tuple<double, double> {
+        return {0.03 + 0.005 * ctx.theta, 0.005};
     };
 
     std::cout << "Hook: dP/P = 0.03 + 0.005 * theta\n\n";
@@ -143,9 +143,9 @@ int main()
     std::cout << "\n";
 
     // Hook also works with streams — mdot_fuel and mdot_air are populated
-    PressureLossCorrelation loss_with_mdot = [](const PressureLossContext& ctx) {
+    PressureLossCorrelation loss_with_mdot = [](const PressureLossContext& ctx) -> std::tuple<double, double> {
         // Could use ctx.mdot_fuel / ctx.mdot_air for fuel-split-dependent losses
-        return 0.04 + 0.002 * ctx.theta;
+        return {0.04 + 0.002 * ctx.theta, 0.002};
     };
 
     CombustionState cs_hook_streams = combustion_state_from_streams(

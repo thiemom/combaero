@@ -188,6 +188,10 @@ PYBIND11_MODULE(_core, m) {
         &solver::adiabatic_T_equilibrium_and_jacobians_from_streams,
         py::arg("streams"), py::arg("P"), py::arg("Q") = 0.0,
         py::arg("fraction") = 0.0);
+  m.def("combustor_residuals_and_jacobians",
+        &solver::combustor_residuals_and_jacobians, py::arg("streams"),
+        py::arg("P"), py::arg("Q") = 0.0, py::arg("fraction") = 0.0,
+        py::arg("pressure_loss"), py::arg("use_equilibrium") = false);
 
   py::class_<solver::OrificeResult>(
       m, "OrificeResult", "Result of orifice residual and Jacobian evaluation")
@@ -2949,6 +2953,8 @@ PYBIND11_MODULE(_core, m) {
                     "Fuel mass flow [kg/s] (0 for phi-based calls)")
       .def_readonly("mdot_air", &PressureLossContext::mdot_air,
                     "Air mass flow [kg/s] (0 for phi-based calls)")
+      .def_property_readonly("Y_products", [](const PressureLossContext &c) { return c.Y_products; },
+                            "Burned gas mass fractions [-]")
       .def_property_readonly(
           "T_in", [](const PressureLossContext &c) { return c.state_in.T; },
           "Inlet temperature [K]")
@@ -2977,8 +2983,13 @@ PYBIND11_MODULE(_core, m) {
          CombustionMethod method, py::function pressure_loss, bool smooth_phi0,
          bool smooth_phi1, double k0, double k1) {
         PressureLossCorrelation fn =
-            [pressure_loss](const PressureLossContext &ctx) {
-              return pressure_loss(ctx).cast<double>();
+            [pressure_loss](const PressureLossContext &ctx) -> std::tuple<double, double> {
+              py::object res = pressure_loss(ctx);
+              try {
+                return res.cast<std::tuple<double, double>>();
+              } catch (...) {
+                return {res.cast<double>(), 0.0};
+              }
             };
         CombustionStateHookFn hook_fn = &combustion_state;
         return hook_fn(to_vec(X_fuel), to_vec(X_ox), phi, T_reactants, P,
@@ -3008,8 +3019,13 @@ PYBIND11_MODULE(_core, m) {
          py::function pressure_loss, bool smooth_phi0, bool smooth_phi1,
          double k0, double k1) {
         PressureLossCorrelation fn =
-            [pressure_loss](const PressureLossContext &ctx) {
-              return pressure_loss(ctx).cast<double>();
+            [pressure_loss](const PressureLossContext &ctx) -> std::tuple<double, double> {
+              py::object res = pressure_loss(ctx);
+              try {
+                return res.cast<std::tuple<double, double>>();
+              } catch (...) {
+                return {res.cast<double>(), 0.0};
+              }
             };
         CombustionStreamsHookFn hook_fn = &combustion_state_from_streams;
         return hook_fn(fuel_stream, ox_stream, fuel_name, method, fn,
@@ -3025,6 +3041,13 @@ PYBIND11_MODULE(_core, m) {
       "pressure_loss(ctx: PressureLossContext) -> float\n"
       "  Returns fractional dP/P_in [-].\n"
       "  ctx.mdot_fuel and ctx.mdot_air are populated from stream mass flows.");
+
+  m.def("linear_pressure_loss", [](double k, double c) {
+    return py::cpp_function(
+        [k, c](const PressureLossContext &ctx) -> std::tuple<double, double> {
+          return {k * ctx.theta + c, k};
+        });
+  });
 
   // =========================================================================
   // Acoustics & Geometry
