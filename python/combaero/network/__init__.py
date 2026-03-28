@@ -30,6 +30,7 @@ from .combustion import (
 )
 from .graph import FlowNetwork
 from .solver import NetworkSolver
+from .utils import results_to_dataframe
 
 __all__: list[str] = [
     "PlenumNode",
@@ -53,6 +54,7 @@ __all__: list[str] = [
     "NetworkSolver",
     "NetworkNode",
     "NetworkElement",
+    "results_to_dataframe",
     "ConvectiveSurface",
     "SmoothModel",
     "RibbedModel",

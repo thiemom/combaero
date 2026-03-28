@@ -5,11 +5,13 @@ import time
 from pathlib import Path
 from typing import TypedDict
 
+
 class ExampleResult(TypedDict):
     name: str
     success: bool
     duration: float
     error: str | None
+
 
 def run_example(example_path: Path, timeout: int = 120) -> ExampleResult:
     """Run a single example script and return the result."""
@@ -58,6 +60,7 @@ def run_example(example_path: Path, timeout: int = 120) -> ExampleResult:
             "error": str(e),
         }
 
+
 def main() -> None:
     """Discover and run all Python examples."""
     examples_dir = Path("python/examples")
@@ -66,10 +69,7 @@ def main() -> None:
         sys.exit(1)
 
     # Discover all .py files, excluding utilities
-    example_files = sorted([
-        f for f in examples_dir.glob("*.py")
-        if f.name != "plot_utils.py"
-    ])
+    example_files = sorted([f for f in examples_dir.glob("*.py") if f.name != "plot_utils.py"])
 
     print(f"Found {len(example_files)} examples in {examples_dir}")
     print("-" * 60)
@@ -111,6 +111,7 @@ def main() -> None:
     else:
         print("\nAll examples ran successfully!")
         sys.exit(0)
+
 
 if __name__ == "__main__":
     main()
