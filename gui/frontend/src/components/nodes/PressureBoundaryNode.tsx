@@ -18,9 +18,29 @@ const PressureBoundaryNode = ({ data }: { data: any }) => {
 				</div>
 			</div>
 
+			{/* Cardinal Target Handles */}
 			<Handle
 				type="target"
 				position={Position.Top}
+				id="t-top"
+				className="w-2 h-2 !bg-blue-500"
+			/>
+			<Handle
+				type="target"
+				position={Position.Bottom}
+				id="t-bottom"
+				className="w-2 h-2 !bg-blue-500"
+			/>
+			<Handle
+				type="target"
+				position={Position.Left}
+				id="t-left"
+				className="w-2 h-2 !bg-blue-500"
+			/>
+			<Handle
+				type="target"
+				position={Position.Right}
+				id="t-right"
 				className="w-2 h-2 !bg-blue-500"
 			/>
 		</div>

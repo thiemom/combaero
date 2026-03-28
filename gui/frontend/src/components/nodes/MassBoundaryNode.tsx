@@ -18,9 +18,29 @@ const MassBoundaryNode = ({ data }: { data: any }) => {
 				</div>
 			</div>
 
+			{/* Cardinal Source Handles */}
+			<Handle
+				type="source"
+				position={Position.Top}
+				id="s-top"
+				className="w-2 h-2 !bg-orange-500"
+			/>
 			<Handle
 				type="source"
 				position={Position.Bottom}
+				id="s-bottom"
+				className="w-2 h-2 !bg-orange-500"
+			/>
+			<Handle
+				type="source"
+				position={Position.Left}
+				id="s-left"
+				className="w-2 h-2 !bg-orange-500"
+			/>
+			<Handle
+				type="source"
+				position={Position.Right}
+				id="s-right"
 				className="w-2 h-2 !bg-orange-500"
 			/>
 		</div>

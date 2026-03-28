@@ -25,15 +25,69 @@ const PlenumNode = ({ data }: { data: any }) => {
 				</div>
 			)}
 
+			{/* Four Cardinal Handles (Source & Target on each side) */}
+			{/* Top */}
 			<Handle
 				type="target"
 				position={Position.Top}
-				className="w-2 h-2 !bg-stone-500"
+				id="t-top"
+				style={{ left: "30%", background: "#78716c" }}
+				className="w-2 h-2"
+			/>
+			<Handle
+				type="source"
+				position={Position.Top}
+				id="s-top"
+				style={{ left: "70%", background: "#78716c" }}
+				className="w-2 h-2"
+			/>
+
+			{/* Bottom */}
+			<Handle
+				type="target"
+				position={Position.Bottom}
+				id="t-bottom"
+				style={{ left: "30%", background: "#78716c" }}
+				className="w-2 h-2"
 			/>
 			<Handle
 				type="source"
 				position={Position.Bottom}
-				className="w-2 h-2 !bg-stone-500"
+				id="s-bottom"
+				style={{ left: "70%", background: "#78716c" }}
+				className="w-2 h-2"
+			/>
+
+			{/* Left */}
+			<Handle
+				type="target"
+				position={Position.Left}
+				id="t-left"
+				style={{ top: "30%", background: "#78716c" }}
+				className="w-2 h-2"
+			/>
+			<Handle
+				type="source"
+				position={Position.Left}
+				id="s-left"
+				style={{ top: "70%", background: "#78716c" }}
+				className="w-2 h-2"
+			/>
+
+			{/* Right */}
+			<Handle
+				type="target"
+				position={Position.Right}
+				id="t-right"
+				style={{ top: "30%", background: "#78716c" }}
+				className="w-2 h-2"
+			/>
+			<Handle
+				type="source"
+				position={Position.Right}
+				id="s-right"
+				style={{ top: "70%", background: "#78716c" }}
+				className="w-2 h-2"
 			/>
 		</div>
 	);
