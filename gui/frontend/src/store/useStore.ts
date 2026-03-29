@@ -69,13 +69,21 @@ const useStore = create<RFState>((set, get) => ({
 		set({ solveResults: results });
 
 		// Also inject results into node data for reactive UI
-		if (results && results.node_results) {
+		if (results) {
 			set({
 				nodes: get().nodes.map((node) => {
-					if (results.node_results[node.id]) {
+					// Check for node results
+					if (results.node_results?.[node.id]) {
 						return {
 							...node,
 							data: { ...node.data, result: results.node_results[node.id] },
+						};
+					}
+					// Check for element results (since elements are nodes now)
+					if (results.element_results?.[node.id]) {
+						return {
+							...node,
+							data: { ...node.data, result: results.element_results[node.id] },
 						};
 					}
 					return node;

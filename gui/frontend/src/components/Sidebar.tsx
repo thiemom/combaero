@@ -1,4 +1,10 @@
-import { Database, LogIn, LogOut } from "lucide-react";
+import {
+	ArrowRight,
+	ChevronRight,
+	Database,
+	LogIn,
+	LogOut,
+} from "lucide-react";
 import type React from "react";
 
 const Sidebar = () => {
@@ -47,9 +53,25 @@ const Sidebar = () => {
 				Elements
 			</div>
 
-			<div className="text-xs text-gray-400 italic">
-				(Connect nodes to create Pipe/Orifice)
-			</div>
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "pipe")}
+				draggable
+			>
+				<ArrowRight size={18} className="text-stone-500" />
+				<span>Pipe</span>
+			</button>
+
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "orifice")}
+				draggable
+			>
+				<ChevronRight size={18} className="text-orange-400" />
+				<span>Orifice</span>
+			</button>
 		</aside>
 	);
 };

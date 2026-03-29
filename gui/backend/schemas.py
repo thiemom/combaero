@@ -12,9 +12,7 @@ class MassBoundaryData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     m_dot: float = 1.0
     T_total: float = 300.0
-    Y: list[float] = Field(
-        default_factory=lambda: [1.0]
-    )  # Default to single species if not specified
+    Y: list[float] | None = None
 
 
 class PressureBoundaryData(BaseModel):
@@ -58,14 +56,14 @@ class ReactFlowNode(BaseModel):
     id: str
     type: str
     position: NodePosition
-    data: PlenumData | MassBoundaryData | PressureBoundaryData | MomentumChamberData
+    data: dict
 
 
 class ReactFlowEdge(BaseModel):
     id: str
     source: str
     target: str
-    data: PipeData | OrificeData | LosslessConnectionData
+    data: dict | None = None
 
 
 class NetworkGraphSchema(BaseModel):
@@ -83,7 +81,13 @@ class NodeResult(BaseModel):
     success: bool = True
 
 
+class ElementResult(BaseModel):
+    m_dot: float
+    success: bool = True
+
+
 class SolveResponse(BaseModel):
     success: bool
     message: str = ""
     node_results: dict[str, NodeResult] = {}
+    element_results: dict[str, ElementResult] = {}

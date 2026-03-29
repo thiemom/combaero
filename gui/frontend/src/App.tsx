@@ -1,3 +1,4 @@
+import axios from "axios";
 import { Download, Play, Zap } from "lucide-react";
 import type React from "react";
 import { useCallback, useRef } from "react";
@@ -35,6 +36,10 @@ const App = () => {
 				data = { ...data, m_dot: 1.0, T_total: 300 } as any;
 			} else if (type === "pressure_boundary") {
 				data = { ...data, P_total: 101325 } as any;
+			} else if (type === "pipe") {
+				data = { ...data, L: 1.0, D: 0.1, roughness: 1e-5 } as any;
+			} else if (type === "orifice") {
+				data = { ...data, area: 0.01, Cd: 0.6 } as any;
 			}
 
 			const newNode = {
@@ -55,6 +60,15 @@ const App = () => {
 			setSolveResults(results);
 		} catch (err) {
 			console.error("Solve failed:", err);
+			if (axios.isAxiosError(err)) {
+				const detail = err.response?.data?.detail;
+				alert(
+					detail
+						? `Solve failed: ${detail}`
+						: "Solve failed. Check console for details.",
+				);
+				return;
+			}
 			alert("Solve failed. Check console for details.");
 		}
 	};
