@@ -83,6 +83,7 @@ thermo_data_generator/thermo_transport_data.h
 thermo_data_generator/*.yaml
 thermo_data_generator/*.txt
 thermo_data_generator/*.json
+!thermo_data_generator/.generator_state.json
 thermo_data_generator/*.csv
 
 # Example output (plots, data)
