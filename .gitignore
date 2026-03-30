@@ -83,7 +83,6 @@ thermo_data_generator/thermo_transport_data.h
 thermo_data_generator/*.yaml
 thermo_data_generator/*.txt
 thermo_data_generator/*.json
-!thermo_data_generator/.generator_state.json
 thermo_data_generator/*.csv
 
 # Example output (plots, data)
@@ -104,3 +103,7 @@ diagnostic_reports/
 
 TODO.md
 .aider*
+
+# Benchmark run outputs (auto-generated, not for tracking)
+benchmarks/runs/
+benchmarks/network_solver_benchmark_latest.json
