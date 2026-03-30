@@ -1,7 +1,16 @@
-import ReactFlow, { Background, Controls, MiniMap } from "reactflow";
+import ReactFlow, {
+	Background,
+	Controls,
+	MiniMap,
+	useReactFlow,
+} from "reactflow";
 import "reactflow/dist/style.css";
+import { useCallback } from "react";
 import useStore from "../store/useStore";
+import CombustorNode from "./nodes/CombustorNode";
+import LosslessNode from "./nodes/LosslessNode";
 import MassBoundaryNode from "./nodes/MassBoundaryNode";
+import MomentumChamberNode from "./nodes/MomentumChamberNode";
 import OrificeNode from "./nodes/OrificeNode";
 import PipeNode from "./nodes/PipeNode";
 import PlenumNode from "./nodes/PlenumNode";
@@ -13,13 +22,90 @@ const NODE_TYPES = Object.freeze({
 	pressure_boundary: PressureBoundaryNode,
 	pipe: PipeNode,
 	orifice: OrificeNode,
+	combustor: CombustorNode,
+	momentum_chamber: MomentumChamberNode,
+	lossless_connection: LosslessNode,
 });
 
 const NetworkCanvas = () => {
-	const { nodes, edges, onNodesChange, onEdgesChange, onConnect } = useStore();
+	const { nodes, edges, setNodes, onNodesChange, onEdgesChange, onConnect } =
+		useStore();
+	const { screenToFlowPosition } = useReactFlow();
+
+	const onDragOver = useCallback((event: React.DragEvent) => {
+		event.preventDefault();
+		event.dataTransfer.dropEffect = "move";
+	}, []);
+
+	const onDrop = useCallback(
+		(event: React.DragEvent) => {
+			event.preventDefault();
+
+			const type = event.dataTransfer.getData("application/reactflow");
+
+			if (typeof type === "undefined" || !type) {
+				return;
+			}
+
+			// Map client drop position to flow coordinates based on current zoom/pan panning
+			const position = screenToFlowPosition({
+				x: event.clientX,
+				y: event.clientY,
+			});
+
+			const id = `node_${Date.now()}`;
+			let data = { id };
+
+			if (type === "mass_boundary") {
+				data = {
+					...data,
+					m_dot: 1.0,
+					T_total: 300,
+					composition: {
+						source: "dry_air",
+						mode: "mole",
+						relative_humidity: 0.0,
+					},
+				} as any;
+			} else if (type === "pressure_boundary") {
+				data = {
+					...data,
+					P_total: 101325,
+					T_total: 300,
+					composition: {
+						source: "dry_air",
+						mode: "mole",
+						relative_humidity: 0.0,
+					},
+				} as any;
+			} else if (type === "pipe") {
+				data = { ...data, L: 1.0, D: 0.1, roughness: 1e-5 } as any;
+			} else if (type === "orifice") {
+				data = { ...data, area: 0.01, Cd: 0.6 } as any;
+			} else if (type === "combustor") {
+				data = { ...data, method: "complete" } as any;
+			} else if (type === "momentum_chamber") {
+				data = { ...data, area: 0.1 } as any;
+			}
+
+			const newNode = {
+				id,
+				type,
+				position,
+				data,
+			};
+
+			setNodes(nodes.concat(newNode));
+		},
+		[nodes, setNodes, screenToFlowPosition],
+	);
 
 	return (
-		<div className="flex-grow h-full bg-stone-50">
+		<main
+			className="flex-grow h-full bg-stone-50"
+			onDragOver={onDragOver}
+			onDrop={onDrop}
+		>
 			<ReactFlow
 				nodes={nodes}
 				edges={edges}
@@ -28,12 +114,13 @@ const NetworkCanvas = () => {
 				onConnect={onConnect}
 				nodeTypes={NODE_TYPES}
 				fitView
+				fitViewOptions={{ padding: 0.5, maxZoom: 1.0 }}
 			>
 				<Background />
 				<Controls />
 				<MiniMap />
 			</ReactFlow>
-		</div>
+		</main>
 	);
 };
 

@@ -18,6 +18,19 @@ const MassBoundaryNode = ({ data }: { data: any }) => {
 				</div>
 			</div>
 
+			{data.result?.state && (
+				<div className="mt-2 text-xs font-mono bg-green-50 p-1 rounded border border-green-200">
+					<div className="flex justify-between">
+						<span className="text-green-600">P:</span>
+						<span>{(data.result.state.P / 1e5).toFixed(2)} bar</span>
+					</div>
+					<div className="flex justify-between">
+						<span className="text-green-600">T:</span>
+						<span>{data.result.state.T.toFixed(1)} K</span>
+					</div>
+				</div>
+			)}
+
 			{/* Cardinal Source Handles */}
 			<Handle
 				type="source"

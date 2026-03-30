@@ -380,6 +380,12 @@ class MixtureState:
         """Speed of sound [m/s]."""
         return cb.speed_of_sound(self.T, self.X)
 
+    def gamma(self) -> float:
+        """Ratio of specific heats (cp/cv) [-]."""
+        cp = self.cp()
+        cv = cb.cv_mass(self.T, self.X)
+        return cp / cv if cv > 0 else 1.4
+
 
 class NetworkNode(ABC):
     def __init__(self, id: str):
@@ -416,6 +422,25 @@ class NetworkNode(ABC):
         """Called automatically by FlowNetwork to resolve neighbors."""
         pass
 
+    def mach(self, state: MixtureState) -> float:
+        """Returns the local Mach number at this node. Default 0.0 (stagnation)."""
+        return 0.0
+
+    def diagnostics(self, state: MixtureState) -> dict[str, float]:
+        """Compute generalized node-level diagnostics (e.g., thermo properties)."""
+        import combaero as cb
+
+        cp = cb.cp_mass(state.T, state.X)
+        cv = cb.cv_mass(state.T, state.X)
+        gamma = cp / cv if cv > 0.0 else 1.4
+        a = cb.speed_of_sound(state.T, state.X)
+        return {
+            "cp": cp,
+            "cv": cv,
+            "gamma": gamma,
+            "a": a,
+        }
+
 
 class NetworkElement(ABC):
     def __init__(self, id: str, from_node: str, to_node: str):
@@ -449,22 +474,12 @@ class NetworkElement(ABC):
         pass
 
     def htc_and_T(self, state: MixtureState):
-        """Compute heat transfer coefficient and adiabatic wall temperature.
-
-        Default implementation returns None (no heat transfer).
-        Subclasses can override to provide convective heat transfer.
-
-        Parameters
-        ----------
-        state : MixtureState
-            Flow state at the element inlet.
-
-        Returns
-        -------
-        ChannelResult | None
-            Full ChannelResult with h, T_aw, and Jacobians, or None if no heat transfer.
-        """
+        """Compute heat transfer coefficient and adiabatic wall temperature."""
         return None
+
+    def diagnostics(self, state_in: MixtureState, state_out: MixtureState) -> dict[str, float]:
+        """Compute diagnostic properties for this element (e.g. Mach, P_ratio)."""
+        return {}
 
 
 class PlenumNode(NetworkNode):
@@ -604,6 +619,32 @@ class MomentumChamberNode(NetworkNode):
             jac[0][f"{elem_id}.m_dot"] = result.d_res_dmdot
 
         return res, jac
+
+    def mach(self, state: MixtureState) -> float:
+        """Computes Mach number using internal total mass flow and area."""
+        import combaero as cb
+
+        m_dot_total = getattr(self, "_total_m_dot", 0.0)
+        if self.area <= 0 or m_dot_total <= 1e-12:
+            return 0.0
+
+        rho = state.density()
+        velocity = m_dot_total / (rho * self.area)
+        return float(cb.mach_number(velocity, state.T, state.X))
+
+    def diagnostics(self, state: MixtureState) -> dict[str, float]:
+        import combaero as cb
+
+        base = super().diagnostics(state)
+        ts = cb.transport_state(state.T, state.P, state.X)
+        base.update(
+            {
+                "mu": ts.mu,
+                "k": ts.k,
+                "Pr": ts.Pr,
+            }
+        )
+        return base
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         # Store upstream elements for mixing calculations
@@ -883,6 +924,37 @@ class OrificeElement(NetworkElement):
 
     def n_equations(self) -> int:
         return 1
+
+    def diagnostics(self, state_in: MixtureState, state_out: MixtureState) -> dict[str, float]:
+
+        import combaero as cb
+
+        p_ratio = state_out.P / state_in.P_total if state_in.P_total > 0 else 1.0
+
+        # Estimate throat Mach number
+        gamma = state_in.gamma()
+        # Critical pressure ratio for choking
+        pr_crit = (2.0 / (gamma + 1.0)) ** (gamma / (gamma - 1.0))
+
+        if p_ratio <= pr_crit:
+            mach_throat = 1.0
+        else:
+            mach_throat = float(
+                cb.mach_from_pressure_ratio(
+                    state_in.T_total, state_in.P_total, state_out.P, state_in.X
+                )
+            )
+
+        # Transport properties
+        ts = cb.transport_state(state_in.T, state_in.P, state_in.X)
+
+        return {
+            "mach": mach_throat,
+            "p_ratio": p_ratio,
+            "mu": ts.mu,
+            "k": ts.k,
+            "Pr": ts.Pr,
+        }
 
 
 class EffectiveAreaConnectionElement(OrificeElement):
@@ -1194,6 +1266,34 @@ class PipeElement(NetworkElement):
             jac[0][f"{upstream_id}.Y[{i}]"] = -val
 
         return res, jac
+
+    def diagnostics(self, state_in: MixtureState, state_out: MixtureState) -> dict[str, float]:
+        """Compute inlet/outlet Mach numbers and pressure ratio."""
+        import combaero as cb
+
+        # Inlet Mach
+        rho_in = state_in.density()
+        v_in = state_in.m_dot / (rho_in * self.area) if self.area > 0 and rho_in > 0 else 0.0
+        mach_in = float(cb.mach_number(v_in, state_in.T, state_in.X))
+
+        # Outlet Mach (at static pressure P_out)
+        rho_out = cb.density(state_out.T, state_out.P, state_out.X)
+        v_out = state_out.m_dot / (rho_out * self.area) if self.area > 0 and rho_out > 0 else 0.0
+        mach_out = float(cb.mach_number(v_out, state_out.T, state_out.X))
+
+        p_ratio_total = state_out.P_total / state_in.P_total if state_in.P_total > 0 else 1.0
+
+        # Transport properties
+        ts = cb.transport_state(state_in.T, state_in.P, state_in.X)
+
+        return {
+            "mach_in": mach_in,
+            "mach_out": mach_out,
+            "p_ratio_total": p_ratio_total,
+            "mu": ts.mu,
+            "k": ts.k,
+            "Pr": ts.Pr,
+        }
 
     def get_spatial_profile(
         self,

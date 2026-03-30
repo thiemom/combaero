@@ -1409,6 +1409,23 @@ class NetworkSolver:
             for i, yi in enumerate(Y):
                 sol_dict[f"{nid}.Y[{i}]"] = float(yi)
 
+            # Node-specific diagnostics (e.g. mach, transport/thermo properties)
+            node = self.network.nodes[nid]
+            state = self._get_node_state(node, final_x)
+            sol_dict[f"{nid}.mach"] = node.mach(state)
+            if hasattr(node, "diagnostics"):
+                diag = node.diagnostics(state)
+                for key, val in diag.items():
+                    sol_dict[f"{nid}.{key}"] = val
+
+        # Element-specific diagnostics (e.g. throat Mach, P-ratio)
+        for eid, element in self.network.elements.items():
+            state_in = self._get_node_state(self.network.nodes[element.from_node], final_x)
+            state_out = self._get_node_state(self.network.nodes[element.to_node], final_x)
+            diag = element.diagnostics(state_in, state_out)
+            for key, val in diag.items():
+                sol_dict[f"{eid}.{key}"] = val
+
         sol_dict["__success__"] = success
         sol_dict["__message__"] = message
         sol_dict["__final_norm__"] = final_norm

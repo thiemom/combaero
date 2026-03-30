@@ -1,7 +1,70 @@
 import useStore from "../store/useStore";
+import CompositionEditor from "./CompositionEditor";
+import NumericInput from "./NumericInput";
+import UnitInput from "./UnitInput";
 
 const Inspector = () => {
-	const { nodes, edges, updateNodeData } = useStore();
+	const { nodes, edges, updateNodeData, unitPreferences, speciesMetadata } =
+		useStore();
+
+	const handleExport = async () => {
+		try {
+			const res = await fetch("http://localhost:8000/export", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ nodes, edges }),
+			});
+			const blob = await res.blob();
+			const url = window.URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = "results.csv";
+			a.click();
+		} catch (error) {
+			console.error("Export failed:", error);
+		}
+	};
+
+	const validateNetwork = () => {
+		const errors: string[] = [];
+		for (const node of nodes) {
+			if (node.type === "pressure_boundary" || node.type === "mass_boundary") {
+				if (
+					(node.data.P_total || 0) <= 0 &&
+					node.type === "pressure_boundary"
+				) {
+					errors.push(`${node.id}: Total Pressure must be > 0`);
+				}
+				if ((node.data.T_total || 0) <= 0) {
+					errors.push(`${node.id}: Temperature must be > 0`);
+				}
+				if (node.data.composition?.source === "custom") {
+					const values = Object.values(
+						node.data.composition.custom_fractions || {},
+					) as number[];
+					const sum = values.reduce((a: number, b: number) => a + (b || 0), 0);
+					if (Math.abs(sum - 1.0) > 1e-3) {
+						errors.push(
+							`${node.id}: Custom composition sum is ${sum.toFixed(3)} (expected 1.0)`,
+						);
+					}
+				}
+			}
+			if (node.type === "pipe") {
+				if ((node.data.D || 0) <= 0)
+					errors.push(`${node.id}: Diameter must be > 0`);
+				if ((node.data.L || 0) <= 0)
+					errors.push(`${node.id}: Length must be > 0`);
+			}
+			if (node.type === "orifice") {
+				if ((node.data.area || 0) <= 0)
+					errors.push(`${node.id}: Area must be > 0`);
+			}
+		}
+		return errors;
+	};
+
+	const validationErrors = validateNetwork();
 
 	// Get selected node
 	const selectedNode = nodes.find((n) => n.selected);
@@ -18,8 +81,25 @@ const Inspector = () => {
 	if (selectedNode) {
 		return (
 			<aside className="w-80 border-l bg-white p-4 flex flex-col gap-4 overflow-y-auto">
-				<h2 className="text-lg font-bold border-b pb-2 capitalize">
-					{selectedNode.type} Node
+				{validationErrors.length > 0 && (
+					<div className="bg-amber-50 border border-amber-200 p-2 rounded text-[10px] text-amber-800 flex flex-col gap-1">
+						<div className="font-bold uppercase">Network Warnings</div>
+						<ul className="list-disc pl-3">
+							{validationErrors.map((err, i) => (
+								<li key={i}>{err}</li>
+							))}
+						</ul>
+					</div>
+				)}
+				<h2 className="text-lg font-bold border-b pb-2 capitalize flex justify-between items-center">
+					<span>{(selectedNode.type || "unknown").replace("_", " ")} Node</span>
+					<button
+						type="button"
+						onClick={handleExport}
+						className="text-[10px] bg-stone-100 hover:bg-stone-200 px-2 py-1 rounded border border-stone-300 transition-colors uppercase font-bold"
+					>
+						Export CSV
+					</button>
 				</h2>
 
 				<div className="flex flex-col gap-2">
@@ -47,13 +127,12 @@ const Inspector = () => {
 							>
 								Mass Flow (kg/s)
 							</label>
-							<input
+							<NumericInput
 								id={`m_dot_${selectedNode.id}`}
-								type="number"
 								value={selectedNode.data.m_dot || 1.0}
-								onChange={(e) =>
+								onChange={(val) =>
 									updateNodeData(selectedNode.id, {
-										m_dot: parseFloat(e.target.value),
+										m_dot: val,
 									})
 								}
 								className="p-2 border rounded"
@@ -61,46 +140,63 @@ const Inspector = () => {
 						</div>
 						<div className="flex flex-col gap-2">
 							<label
-								htmlFor={`T_total_${selectedNode.id}`}
+								htmlFor={`T_total_mb_${selectedNode.id}`}
 								className="text-xs font-bold text-gray-500 uppercase"
 							>
 								T_total (K)
 							</label>
-							<input
-								id={`T_total_${selectedNode.id}`}
-								type="number"
+							<NumericInput
+								id={`T_total_mb_${selectedNode.id}`}
 								value={selectedNode.data.T_total || 300}
-								onChange={(e) =>
+								onChange={(val) =>
 									updateNodeData(selectedNode.id, {
-										T_total: parseFloat(e.target.value),
+										T_total: val,
 									})
 								}
 								className="p-2 border rounded"
 							/>
 						</div>
+						<CompositionEditor
+							key={selectedNode.id}
+							nodeId={selectedNode.id}
+							data={selectedNode.data}
+						/>
 					</>
 				)}
 
 				{selectedNode.type === "pressure_boundary" && (
-					<div className="flex flex-col gap-2">
-						<label
-							htmlFor={`P_total_${selectedNode.id}`}
-							className="text-xs font-bold text-gray-500 uppercase"
-						>
-							P_total (Pa)
-						</label>
-						<input
-							id={`P_total_${selectedNode.id}`}
-							type="number"
+					<>
+						<UnitInput
+							label="P_total"
 							value={selectedNode.data.P_total || 101325}
-							onChange={(e) =>
-								updateNodeData(selectedNode.id, {
-									P_total: parseFloat(e.target.value),
-								})
+							onChange={(val) =>
+								updateNodeData(selectedNode.id, { P_total: val })
 							}
-							className="p-2 border rounded"
 						/>
-					</div>
+						<div className="flex flex-col gap-2">
+							<label
+								htmlFor={`T_total_pb_${selectedNode.id}`}
+								className="text-xs font-bold text-gray-500 uppercase"
+							>
+								T_total (K)
+							</label>
+							<NumericInput
+								id={`T_total_pb_${selectedNode.id}`}
+								value={selectedNode.data.T_total || 300}
+								onChange={(val) =>
+									updateNodeData(selectedNode.id, {
+										T_total: val,
+									})
+								}
+								className="p-2 border rounded"
+							/>
+						</div>
+						<CompositionEditor
+							key={selectedNode.id}
+							nodeId={selectedNode.id}
+							data={selectedNode.data}
+						/>
+					</>
 				)}
 
 				{selectedNode.type === "pipe" && (
@@ -112,14 +208,12 @@ const Inspector = () => {
 							>
 								Length (m)
 							</label>
-							<input
+							<NumericInput
 								id={`L_${selectedNode.id}`}
-								type="number"
-								step="0.1"
 								value={selectedNode.data.L || 1.0}
-								onChange={(e) =>
+								onChange={(val) =>
 									updateNodeData(selectedNode.id, {
-										L: parseFloat(e.target.value),
+										L: val,
 									})
 								}
 								className="p-2 border rounded"
@@ -132,14 +226,12 @@ const Inspector = () => {
 							>
 								Diameter (m)
 							</label>
-							<input
+							<NumericInput
 								id={`D_${selectedNode.id}`}
-								type="number"
-								step="0.01"
 								value={selectedNode.data.D || 0.1}
-								onChange={(e) =>
+								onChange={(val) =>
 									updateNodeData(selectedNode.id, {
-										D: parseFloat(e.target.value),
+										D: val,
 									})
 								}
 								className="p-2 border rounded"
@@ -152,14 +244,12 @@ const Inspector = () => {
 							>
 								Roughness (m)
 							</label>
-							<input
+							<NumericInput
 								id={`roughness_${selectedNode.id}`}
-								type="number"
-								step="1e-6"
 								value={selectedNode.data.roughness || 1e-5}
-								onChange={(e) =>
+								onChange={(val) =>
 									updateNodeData(selectedNode.id, {
-										roughness: parseFloat(e.target.value),
+										roughness: val,
 									})
 								}
 								className="p-2 border rounded"
@@ -177,14 +267,12 @@ const Inspector = () => {
 							>
 								Area (m²)
 							</label>
-							<input
+							<NumericInput
 								id={`area_${selectedNode.id}`}
-								type="number"
-								step="0.001"
 								value={selectedNode.data.area || 0.01}
-								onChange={(e) =>
+								onChange={(val) =>
 									updateNodeData(selectedNode.id, {
-										area: parseFloat(e.target.value),
+										area: val,
 									})
 								}
 								className="p-2 border rounded"
@@ -197,14 +285,12 @@ const Inspector = () => {
 							>
 								Discharge Coeff (Cd)
 							</label>
-							<input
+							<NumericInput
 								id={`Cd_${selectedNode.id}`}
-								type="number"
-								step="0.01"
 								value={selectedNode.data.Cd || 0.6}
-								onChange={(e) =>
+								onChange={(val) =>
 									updateNodeData(selectedNode.id, {
-										Cd: parseFloat(e.target.value),
+										Cd: val,
 									})
 								}
 								className="p-2 border rounded"
@@ -213,28 +299,299 @@ const Inspector = () => {
 					</>
 				)}
 
+				{selectedNode.type === "combustor" && (
+					<div className="flex flex-col gap-2">
+						<label
+							htmlFor={`method_${selectedNode.id}`}
+							className="text-xs font-bold text-gray-500 uppercase"
+						>
+							Combustion Method
+						</label>
+						<select
+							id={`method_${selectedNode.id}`}
+							className="p-2 border rounded bg-white"
+							value={selectedNode.data.method || "complete"}
+							onChange={(e) =>
+								updateNodeData(selectedNode.id, {
+									method: e.target.value,
+								})
+							}
+						>
+							<option value="complete">Complete (Fast)</option>
+							<option value="equilibrium">Chemical Equilibrium</option>
+						</select>
+					</div>
+				)}
+
+				{selectedNode.type === "momentum_chamber" && (
+					<div className="flex flex-col gap-2">
+						<label
+							htmlFor={`area_${selectedNode.id}`}
+							className="text-xs font-bold text-gray-500 uppercase"
+						>
+							Cross Section Area (m²)
+						</label>
+						<NumericInput
+							id={`area_${selectedNode.id}`}
+							value={selectedNode.data.area || 0.1}
+							onChange={(val) =>
+								updateNodeData(selectedNode.id, {
+									area: val,
+								})
+							}
+							className="p-2 border rounded"
+						/>
+					</div>
+				)}
+
 				{selectedNode.data.result && (
-					<div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-						<h3 className="text-sm font-bold text-blue-700 mb-2">
-							Live Telemetry
-						</h3>
-						{selectedNode.data.result.P !== undefined ? (
-							<div className="text-xs grid grid-cols-2 gap-y-1">
-								<span className="text-blue-600">Pressure:</span>
-								<span className="font-mono">
-									{(selectedNode.data.result.P / 1e5).toFixed(4)} bar
-								</span>
-								<span className="text-blue-600">Temperature:</span>
-								<span className="font-mono">
-									{selectedNode.data.result.T.toFixed(2)} K
-								</span>
+					<div className="mt-4 p-3 bg-stone-50 border border-stone-200 rounded">
+						<div className="flex justify-between items-center mb-3">
+							<h3 className="text-xs font-bold text-stone-500 uppercase">
+								Live Telemetry
+							</h3>
+						</div>
+
+						{selectedNode.data.result.state ? (
+							<div className="flex flex-col gap-3">
+								<div className="grid grid-cols-2 gap-y-2 text-xs">
+									<div className="flex flex-col">
+										<span className="text-stone-400 text-[10px] uppercase font-bold text-nowrap">
+											{selectedNode.data.result.state.P_total !== undefined &&
+											Math.abs(
+												selectedNode.data.result.state.P -
+													selectedNode.data.result.state.P_total,
+											) > 1e-1
+												? "St/Tot Pressure"
+												: "Pressure"}
+										</span>
+										<span className="font-mono font-bold flex gap-1 items-baseline">
+											{unitPreferences.pressure === "Pa" &&
+												`${selectedNode.data.result.state.P.toFixed(0)} Pa`}
+											{unitPreferences.pressure === "kPa" &&
+												`${(selectedNode.data.result.state.P / 1e3).toFixed(2)} kPa`}
+											{unitPreferences.pressure === "MPa" &&
+												`${(selectedNode.data.result.state.P / 1e6).toFixed(4)} MPa`}
+
+											{selectedNode.data.result.state.P_total !== undefined &&
+												Math.abs(
+													selectedNode.data.result.state.P -
+														selectedNode.data.result.state.P_total,
+												) > 1e-1 && (
+													<span className="text-[10px] text-stone-500 font-normal">
+														/{" "}
+														{unitPreferences.pressure === "Pa" &&
+															`${selectedNode.data.result.state.P_total.toFixed(0)}`}
+														{unitPreferences.pressure === "kPa" &&
+															`${(selectedNode.data.result.state.P_total / 1e3).toFixed(2)}`}
+														{unitPreferences.pressure === "MPa" &&
+															`${(selectedNode.data.result.state.P_total / 1e6).toFixed(4)}`}
+													</span>
+												)}
+										</span>
+									</div>
+									<div className="flex flex-col">
+										<span className="text-stone-400 text-[10px] uppercase font-bold">
+											Temperature
+										</span>
+										<span className="font-mono font-bold">
+											{selectedNode.data.result.state.T.toFixed(2)} K
+										</span>
+									</div>
+									<div className="flex flex-col">
+										<span className="text-stone-400 text-[10px] uppercase font-bold">
+											Density
+										</span>
+										<span className="font-mono">
+											{selectedNode.data.result.state.rho?.toFixed(4)} kg/m³
+										</span>
+									</div>
+									<div className="flex flex-col">
+										{selectedNode.type !== "plenum" && (
+											<div className="flex flex-col gap-1">
+												<span className="text-stone-400 text-[10px] uppercase font-bold">
+													Mach
+												</span>
+												<span className="font-mono">
+													{selectedNode.data.result.state.mach?.toFixed(4) ||
+														"0.0000"}
+												</span>
+											</div>
+										)}
+									</div>
+								</div>
+
+								<div className="border-t border-stone-200 pt-3">
+									<div className="text-[10px] font-bold text-stone-400 uppercase mb-2">
+										Thermodynamics
+									</div>
+									<div className="grid grid-cols-2 gap-y-1 text-xs font-mono">
+										<span className="text-stone-500">h:</span>
+										<span className="text-right">
+											{(selectedNode.data.result.state.h / 1e3).toFixed(2)}{" "}
+											kJ/kg
+										</span>
+										<span className="text-stone-500">s:</span>
+										<span className="text-right">
+											{(selectedNode.data.result.state.s / 1e3).toFixed(4)}{" "}
+											kJ/kg-K
+										</span>
+										{selectedNode.data.result.state.cp !== undefined && (
+											<>
+												<span className="text-stone-500">Cp:</span>
+												<span className="text-right">
+													{selectedNode.data.result.state.cp.toFixed(2)} J/kg-K
+												</span>
+												<span className="text-stone-500">gamma:</span>
+												<span className="text-right">
+													{selectedNode.data.result.state.gamma.toFixed(4)}
+												</span>
+												<span className="text-stone-500">a (sos):</span>
+												<span className="text-right">
+													{selectedNode.data.result.state.a.toFixed(2)} m/s
+												</span>
+											</>
+										)}
+									</div>
+								</div>
+
+								{selectedNode.data.result.state.mu !== undefined && (
+									<div className="border-t border-stone-200 pt-3">
+										<div className="text-[10px] font-bold text-stone-400 uppercase mb-2">
+											Transport
+										</div>
+										<div className="grid grid-cols-2 gap-y-1 text-xs font-mono">
+											<span className="text-stone-500">μ (viscosity):</span>
+											<span className="text-right">
+												{selectedNode.data.result.state.mu.toExponential(2)}{" "}
+												Pa·s
+											</span>
+											<span className="text-stone-500">k (conductivity):</span>
+											<span className="text-right">
+												{selectedNode.data.result.state.k.toExponential(2)}{" "}
+												W/m-K
+											</span>
+											<span className="text-stone-500">Pr:</span>
+											<span className="text-right">
+												{selectedNode.data.result.state.Pr.toFixed(3)}
+											</span>
+										</div>
+									</div>
+								)}
+
+								{selectedNode.data.result.state.X && (
+									<div className="border-t border-stone-200 pt-3">
+										<div className="text-[10px] font-bold text-stone-400 uppercase mb-2">
+											Composition (Mole %)
+										</div>
+										<div className="max-h-40 overflow-y-auto pr-1 flex flex-col gap-1">
+											{selectedNode.data.result.state.X.map(
+												(x: number, i: number) => ({
+													x,
+													name: speciesMetadata?.names[i] || `Species ${i}`,
+												}),
+											)
+												.filter((item: any) => item.x > 1e-6)
+												.map((item: any, i: number) => (
+													<div
+														key={i}
+														className="flex justify-between font-mono text-[10px] bg-white p-1 rounded border border-stone-100"
+													>
+														<span className="text-stone-500">{item.name}</span>
+														<span className="font-bold">
+															{(item.x * 100).toFixed(4)}%
+														</span>
+													</div>
+												))}
+										</div>
+									</div>
+								)}
 							</div>
 						) : (
-							<div className="text-xs grid grid-cols-2 gap-y-1">
-								<span className="text-blue-600">Mass Flow:</span>
-								<span className="font-mono">
-									{selectedNode.data.result.m_dot?.toFixed(4)} kg/s
-								</span>
+							<div className="flex flex-col gap-3">
+								<div className="flex flex-col gap-1">
+									<span className="text-stone-400 text-[10px] uppercase font-bold">
+										Mass Flow
+									</span>
+									<span className="font-mono text-lg font-bold">
+										{selectedNode.data.result.m_dot?.toFixed(4)} kg/s
+									</span>
+								</div>
+
+								{/* Element Diagnostics (Mach, P-ratio) */}
+								<div className="border-t border-stone-200 pt-3 flex flex-col gap-2">
+									<div className="text-[10px] font-bold text-stone-400 uppercase">
+										Diagnostics
+									</div>
+									<div className="grid grid-cols-2 gap-2">
+										{selectedNode.data.result.mach !== undefined && (
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[8px] uppercase">
+													Mach (Throat)
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{selectedNode.data.result.mach.toFixed(4)}
+												</span>
+											</div>
+										)}
+										{selectedNode.data.result.mach_in !== undefined && (
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[8px] uppercase">
+													Mach In
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{selectedNode.data.result.mach_in.toFixed(4)}
+												</span>
+											</div>
+										)}
+										{selectedNode.data.result.mach_out !== undefined && (
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[8px] uppercase">
+													Mach Out
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{selectedNode.data.result.mach_out.toFixed(4)}
+												</span>
+											</div>
+										)}
+										{(selectedNode.data.result.p_ratio !== undefined ||
+											selectedNode.data.result.p_ratio_total !== undefined) && (
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[8px] uppercase">
+													P Ratio
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{(
+														selectedNode.data.result.p_ratio ||
+														selectedNode.data.result.p_ratio_total
+													).toFixed(4)}
+												</span>
+											</div>
+										)}
+									</div>
+								</div>
+
+								{selectedNode.data.result.mu !== undefined && (
+									<div className="border-t border-stone-200 pt-3 flex flex-col gap-2">
+										<div className="text-[10px] font-bold text-stone-400 uppercase">
+											Transport
+										</div>
+										<div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs font-mono">
+											<div className="text-stone-500">μ (viscosity):</div>
+											<div className="text-right font-bold">
+												{selectedNode.data.result.mu.toExponential(2)} Pa·s
+											</div>
+											<div className="text-stone-500">k:</div>
+											<div className="text-right font-bold">
+												{selectedNode.data.result.k.toExponential(2)} W/m-K
+											</div>
+											<div className="text-stone-500">Pr (Prandtl):</div>
+											<div className="text-right font-bold">
+												{selectedNode.data.result.Pr.toFixed(3)}
+											</div>
+										</div>
+									</div>
+								)}
 							</div>
 						)}
 					</div>

@@ -21,6 +21,12 @@ export interface RFState {
 	setEdges: (edges: Edge[]) => void;
 	updateNodeData: (nodeId: string, data: any) => void;
 	setSolveResults: (results: any) => void;
+	speciesMetadata: { names: string[]; molar_masses: number[] } | null;
+	fetchSpeciesMetadata: () => Promise<void>;
+	displaySettings: string[];
+	setDisplaySettings: (settings: string[]) => void;
+	unitPreferences: { pressure: "Pa" | "kPa" | "MPa" };
+	setPressureUnit: (unit: "Pa" | "kPa" | "MPa") => void;
 }
 
 const useStore = create<RFState>((set, get) => ({
@@ -90,6 +96,27 @@ const useStore = create<RFState>((set, get) => ({
 				}),
 			});
 		}
+	},
+
+	speciesMetadata: null,
+	fetchSpeciesMetadata: async () => {
+		try {
+			const res = await fetch("http://localhost:8000/metadata/species");
+			const data = await res.json();
+			set({ speciesMetadata: data });
+		} catch (error) {
+			console.error("Failed to fetch species metadata:", error);
+		}
+	},
+
+	displaySettings: ["T", "P", "m_dot", "rho"],
+	setDisplaySettings: (settings: string[]) => {
+		set({ displaySettings: settings });
+	},
+
+	unitPreferences: { pressure: "kPa" },
+	setPressureUnit: (unit: "Pa" | "kPa" | "MPa") => {
+		set({ unitPreferences: { pressure: unit } });
 	},
 }));
 

@@ -7,6 +7,8 @@ from combaero.network import (
     PipeElement,
     PlenumNode,
     PressureBoundary,
+    CombustorNode,
+    MomentumChamberNode,
 )
 
 from .schemas import (
@@ -18,7 +20,38 @@ from .schemas import (
     PipeData,
     PlenumData,
     PressureBoundaryData,
+    CompositionData,
+    CombustorData,
+    MomentumChamberData,
 )
+
+
+def resolve_composition(comp: CompositionData, T: float, P: float) -> list[float]:
+    """
+    Converts UI CompositionData into a mass fraction list (Y)
+    using combaero.species utilities.
+    """
+    import combaero as cb
+
+    if comp.source == "dry_air":
+        Y = cb.species.dry_air_mass()
+    elif comp.source == "humid_air":
+        # humid_air_mass takes ambient T, P, RH
+        Y = cb.species.humid_air_mass(comp.ambient_T, comp.ambient_P, comp.relative_humidity)
+    elif comp.source == "fuel":
+        # Default fuel to CH4 for now, or use a specific fuel if provided
+        Y = cb.species.pure_species("CH4")
+        Y = cb.species.to_mass(Y)
+    elif comp.source == "custom" and comp.custom_fractions:
+        vec = cb.species.from_mapping(comp.custom_fractions)
+        if comp.mode == "mole":
+            Y = cb.species.to_mass(vec)
+        else:
+            Y = vec
+    else:
+        Y = cb.species.dry_air_mass()
+
+    return [float(y) for y in Y]
 
 
 def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
@@ -39,18 +72,26 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             nodes_map[node_id] = node
         elif node_type == "mass_boundary":
             data = MassBoundaryData(**node_data)
-            node = MassFlowBoundary(
-                node_id, m_dot=data.m_dot, T_total=data.T_total, Y=data.Y
-            )
+            Y = resolve_composition(data.composition, data.T_total, 101325.0)
+            node = MassFlowBoundary(node_id, m_dot=data.m_dot, T_total=data.T_total, Y=Y)
             net.add_node(node)
             nodes_map[node_id] = node
         elif node_type == "pressure_boundary":
             data = PressureBoundaryData(**node_data)
-            node = PressureBoundary(node_id, P_total=data.P_total)
+            Y = resolve_composition(data.composition, data.T_total, data.P_total)
+            node = PressureBoundary(
+                node_id, P_total=data.P_total, T_total=data.T_total, Y=Y
+            )
+            net.add_node(node)
+            nodes_map[node_id] = node
+        elif node_type == "combustor":
+            data = CombustorData(**node_data)
+            node = CombustorNode(node_id, method=data.method)
             net.add_node(node)
             nodes_map[node_id] = node
         elif node_type == "momentum_chamber":
-            node = MomentumChamberNode(node_id)
+            data = MomentumChamberData(**node_data)
+            node = MomentumChamberNode(node_id, area=data.area)
             net.add_node(node)
             nodes_map[node_id] = node
         else:
@@ -156,5 +197,17 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         elif elem_type == "lossless_connection":
             elem = LosslessConnectionElement(elem_id, from_node=source_id, to_node=target_id)
             net.add_element(elem)
+
+    # 3. Third Pass: Handle implicit node-to-node links (auto-connection)
+    # If there is a visual edge between two physical nodes (not element nodes),
+    # insert a LosslessConnectionElement automatically.
+    for edge in schema.edges:
+        if edge.source in nodes_map and edge.target in nodes_map:
+            auto_id = f"__auto_link__{edge.source}__{edge.target}"
+            if auto_id not in net.elements:
+                elem = LosslessConnectionElement(
+                    auto_id, from_node=edge.source, to_node=edge.target
+                )
+                net.add_element(elem)
 
     return net

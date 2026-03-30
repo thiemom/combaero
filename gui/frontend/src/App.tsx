@@ -1,7 +1,6 @@
 import axios from "axios";
 import { Download, Play, Zap } from "lucide-react";
-import type React from "react";
-import { useCallback, useRef } from "react";
+import { useRef } from "react";
 import { ReactFlowProvider } from "reactflow";
 import { exportResults, solveNetwork } from "./api";
 import Inspector from "./components/Inspector";
@@ -11,50 +10,56 @@ import useStore from "./store/useStore";
 
 const App = () => {
 	const reactFlowWrapper = useRef<HTMLDivElement>(null);
-	const { nodes, edges, setNodes, setSolveResults } = useStore();
+	const { nodes, edges, setSolveResults } = useStore();
 
-	const onDragOver = useCallback((event: React.DragEvent) => {
-		event.preventDefault();
-		event.dataTransfer.dropEffect = "move";
-	}, []);
-
-	const onDrop = useCallback(
-		(event: React.DragEvent) => {
-			event.preventDefault();
-
-			const type = event.dataTransfer.getData("application/reactflow");
-
-			if (typeof type === "undefined" || !type) {
-				return;
+	const validateNetwork = () => {
+		const errors: string[] = [];
+		for (const node of nodes) {
+			if (node.type === "pressure_boundary" || node.type === "mass_boundary") {
+				if (
+					node.type === "pressure_boundary" &&
+					(node.data.P_total || 0) <= 0
+				) {
+					errors.push(`${node.id}: Total Pressure must be > 0`);
+				}
+				if ((node.data.T_total || 0) <= 0) {
+					errors.push(`${node.id}: Temperature must be > 0`);
+				}
+				if (node.data.composition?.source === "custom") {
+					const values = Object.values(
+						node.data.composition.custom_fractions || {},
+					) as number[];
+					const sum = values.reduce((a: number, b: number) => a + (b || 0), 0);
+					if (Math.abs(sum - 1.0) > 1e-3) {
+						errors.push(
+							`${node.id}: Custom composition sum is ${sum.toFixed(3)} (expected 1.0)`,
+						);
+					}
+				}
 			}
-
-			const position = { x: event.clientX - 300, y: event.clientY - 100 };
-			const id = `node_${Date.now()}`;
-			let data = { id };
-
-			if (type === "mass_boundary") {
-				data = { ...data, m_dot: 1.0, T_total: 300 } as any;
-			} else if (type === "pressure_boundary") {
-				data = { ...data, P_total: 101325 } as any;
-			} else if (type === "pipe") {
-				data = { ...data, L: 1.0, D: 0.1, roughness: 1e-5 } as any;
-			} else if (type === "orifice") {
-				data = { ...data, area: 0.01, Cd: 0.6 } as any;
+			if (node.type === "pipe") {
+				if ((node.data.D || 0) <= 0)
+					errors.push(`${node.id}: Pipe diameter must be > 0`);
+				if ((node.data.L || 0) <= 0)
+					errors.push(`${node.id}: Pipe length must be > 0`);
 			}
-
-			const newNode = {
-				id,
-				type,
-				position,
-				data,
-			};
-
-			setNodes(nodes.concat(newNode));
-		},
-		[nodes, setNodes],
-	);
+			if (node.type === "orifice") {
+				if ((node.data.area || 0) <= 0)
+					errors.push(`${node.id}: Orifice area must be > 0`);
+			}
+		}
+		return errors;
+	};
 
 	const handleSolve = async () => {
+		const errors = validateNetwork();
+		if (errors.length > 0) {
+			alert(
+				`Please fix the following errors before solving:\n\n${errors.join("\n")}`,
+			);
+			return;
+		}
+
 		try {
 			const results = await solveNetwork({ nodes, edges });
 			setSolveResults(results);
@@ -115,14 +120,7 @@ const App = () => {
 			<div className="flex flex-grow overflow-hidden" ref={reactFlowWrapper}>
 				<Sidebar />
 				<ReactFlowProvider>
-					<section
-						className="flex-grow h-full"
-						onDragOver={onDragOver}
-						onDrop={onDrop}
-						aria-label="Flow Network Canvas"
-					>
-						<NetworkCanvas />
-					</section>
+					<NetworkCanvas />
 				</ReactFlowProvider>
 				<Inspector />
 			</div>
