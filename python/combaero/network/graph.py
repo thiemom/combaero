@@ -77,11 +77,11 @@ class FlowNetwork:
         if wall.id in self.walls:
             raise ValueError(f"Wall '{wall.id}' already exists in network.")
 
-        if wall.element_a not in self.elements:
-            raise ValueError(f"Unknown element_a '{wall.element_a}' for wall '{wall.id}'.")
+        if wall.element_a not in self.elements and wall.element_a not in self.nodes:
+            raise ValueError(f"Unknown element_a/node_a '{wall.element_a}' for wall '{wall.id}'.")
 
-        if wall.element_b not in self.elements:
-            raise ValueError(f"Unknown element_b '{wall.element_b}' for wall '{wall.id}'.")
+        if wall.element_b not in self.elements and wall.element_b not in self.nodes:
+            raise ValueError(f"Unknown element_b/node_b '{wall.element_b}' for wall '{wall.id}'.")
 
         self.walls[wall.id] = wall
 

@@ -11,7 +11,9 @@ const PressureBoundaryNode = ({ data }: { data: any }) => {
 					<LogOut size={20} className="text-blue-600" />
 				</div>
 				<div className="ml-2">
-					<div className="text-sm font-bold">Pressure Boundary</div>
+					<div className="text-sm font-bold">
+						{data.label ? `${data.label} (Pressure)` : "Pressure Boundary"}
+					</div>
 					<div className="text-xs text-gray-400">
 						P_total: {(data.P_total / 1e5).toFixed(2)} bar
 					</div>

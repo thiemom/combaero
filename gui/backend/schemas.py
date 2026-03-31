@@ -6,7 +6,8 @@ from pydantic import BaseModel, Field, ConfigDict
 
 class PlenumData(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    pass  # Standard plenum just takes connections
+    initial_guess: dict[str, float] = Field(default_factory=dict)
+    label: str | None = None
 
 
 class CompositionData(BaseModel):
@@ -24,6 +25,8 @@ class MassBoundaryData(BaseModel):
     m_dot: float = 1.0
     T_total: float = 300.0
     composition: CompositionData = Field(default_factory=CompositionData)
+    initial_guess: dict[str, float] = Field(default_factory=dict)
+    label: str | None = None
 
 
 class PressureBoundaryData(BaseModel):
@@ -31,35 +34,55 @@ class PressureBoundaryData(BaseModel):
     P_total: float = 101325.0
     T_total: float = 300.0
     composition: CompositionData = Field(default_factory=CompositionData)
+    initial_guess: dict[str, float] = Field(default_factory=dict)
+    label: str | None = None
 
 
 class CombustorData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     method: Literal["complete", "equilibrium"] = "complete"
     pressure_loss: float | None = None
+    initial_guess: dict[str, float] = Field(default_factory=dict)
+    label: str | None = None
 
 
 class MomentumChamberData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     area: float = 0.1
+    initial_guess: dict[str, float] = Field(default_factory=dict)
+    label: str | None = None
 
 
 # --- Element Data Definitions ---
 
 
 class PipeData(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     L: float = 1.0
     D: float = 0.1
     roughness: float = 1e-5
+    regime: Literal["default", "incompressible", "compressible"] = "default"
+    initial_guess: dict[str, float] = Field(default_factory=dict)
+    label: str | None = None
 
 
 class OrificeData(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     area: float = 0.01
     Cd: float = 0.6
+    regime: Literal["default", "incompressible", "compressible"] = "default"
+    initial_guess: dict[str, float] = Field(default_factory=dict)
+    label: str | None = None
 
 
 class LosslessConnectionData(BaseModel):
     pass
+
+
+class SolverSettings(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    global_regime: Literal["incompressible", "compressible"] = "incompressible"
+    init_strategy: Literal["default", "incompressible_warmstart", "homotopy"] = "default"
 
 
 # --- React Flow Wrapper Schemas ---
@@ -88,6 +111,7 @@ class ReactFlowEdge(BaseModel):
 class NetworkGraphSchema(BaseModel):
     nodes: list[ReactFlowNode]
     edges: list[ReactFlowEdge]
+    solver_settings: SolverSettings = Field(default_factory=SolverSettings)
 
 
 # --- Results Schemas ---
@@ -123,3 +147,4 @@ class SolveResponse(BaseModel):
     message: str = ""
     node_results: dict[str, NodeResult] = {}
     element_results: dict[str, ElementResult] = {}
+    edge_results: dict[str, dict] = {}

@@ -20,13 +20,21 @@ export interface RFState {
 	setNodes: (nodes: Node[]) => void;
 	setEdges: (edges: Edge[]) => void;
 	updateNodeData: (nodeId: string, data: any) => void;
+	updateEdgeData: (edgeId: string, data: any) => void;
 	setSolveResults: (results: any) => void;
 	speciesMetadata: { names: string[]; molar_masses: number[] } | null;
 	fetchSpeciesMetadata: () => Promise<void>;
 	displaySettings: string[];
 	setDisplaySettings: (settings: string[]) => void;
+	solverSettings: {
+		global_regime: "incompressible" | "compressible";
+		init_strategy: "default" | "incompressible_warmstart" | "homotopy";
+	};
+	updateSolverSettings: (settings: Partial<RFState["solverSettings"]>) => void;
 	unitPreferences: { pressure: "Pa" | "kPa" | "MPa" };
 	setPressureUnit: (unit: "Pa" | "kPa" | "MPa") => void;
+	saveNetwork: (filename?: string) => void;
+	loadNetwork: (data: any) => void;
 }
 
 const useStore = create<RFState>((set, get) => ({
@@ -47,8 +55,21 @@ const useStore = create<RFState>((set, get) => ({
 	},
 
 	onConnect: (connection: Connection) => {
+		const isThermal =
+			connection.sourceHandle?.includes("thermal") ||
+			connection.targetHandle?.includes("thermal");
+
+		const edge: Edge = {
+			...connection,
+			id: `edge_${Date.now()}`,
+			type: isThermal ? "thermal" : "default",
+			data: isThermal
+				? { type: "thermal", thickness: 0.003, conductivity: 20.0, area: 0.05 }
+				: null,
+		} as Edge;
+
 		set({
-			edges: addEdge(connection, get().edges),
+			edges: addEdge(edge, get().edges),
 		});
 	},
 
@@ -67,6 +88,16 @@ const useStore = create<RFState>((set, get) => ({
 					return { ...node, data: { ...node.data, ...data } };
 				}
 				return node;
+			}),
+		});
+	},
+	updateEdgeData: (edgeId: string, data: any) => {
+		set({
+			edges: get().edges.map((edge) => {
+				if (edge.id === edgeId) {
+					return { ...edge, data: { ...edge.data, ...data } };
+				}
+				return edge;
 			}),
 		});
 	},
@@ -94,6 +125,15 @@ const useStore = create<RFState>((set, get) => ({
 					}
 					return node;
 				}),
+				edges: get().edges.map((edge) => {
+					if (results.edge_results?.[edge.id]) {
+						return {
+							...edge,
+							data: { ...edge.data, result: results.edge_results[edge.id] },
+						};
+					}
+					return edge;
+				}),
 			});
 		}
 	},
@@ -113,10 +153,51 @@ const useStore = create<RFState>((set, get) => ({
 	setDisplaySettings: (settings: string[]) => {
 		set({ displaySettings: settings });
 	},
+	solverSettings: {
+		global_regime: "compressible",
+		init_strategy: "default",
+	},
+	updateSolverSettings: (settings: Partial<RFState["solverSettings"]>) => {
+		set({
+			solverSettings: { ...get().solverSettings, ...settings },
+		});
+	},
 
 	unitPreferences: { pressure: "kPa" },
 	setPressureUnit: (unit: "Pa" | "kPa" | "MPa") => {
 		set({ unitPreferences: { pressure: unit } });
+	},
+
+	saveNetwork: (filename?: string) => {
+		const { nodes, edges, solverSettings } = get();
+		const data = { nodes, edges, solverSettings, version: "1.1" };
+		const blob = new Blob([JSON.stringify(data, null, 2)], {
+			type: "application/json",
+		});
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement("a");
+		link.href = url;
+		link.download = filename
+			? `${filename}.json`
+			: `combaero_network_${new Date().toISOString().split("T")[0]}.json`;
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+		URL.revokeObjectURL(url);
+	},
+
+	loadNetwork: (data: any) => {
+		if (data.nodes && data.edges) {
+			set({
+				nodes: data.nodes.map((n: any) => ({
+					...n,
+					data: { ...n.data, result: undefined },
+				})),
+				edges: data.edges,
+				solverSettings: data.solverSettings || get().solverSettings,
+				solveResults: null,
+			});
+		}
 	},
 }));
 

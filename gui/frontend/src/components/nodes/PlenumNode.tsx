@@ -13,8 +13,10 @@ const PlenumNode = ({ data }: { data: any }) => {
 					<Database size={20} className="text-stone-600" />
 				</div>
 				<div className="ml-2">
-					<div className="text-lg font-bold">Plenum</div>
-					<div className="text-gray-500">ID: {data.id}</div>
+					<div className="text-lg font-bold">
+						{data.label ? `${data.label} (Plenum)` : "Plenum"}
+					</div>
+					<div className="text-gray-500 text-xs">ID: {data.id}</div>
 				</div>
 			</div>
 
@@ -36,15 +38,22 @@ const PlenumNode = ({ data }: { data: any }) => {
 			<Handle
 				type="target"
 				position={Position.Top}
-				id="t-top"
-				style={{ left: "30%", background: "#78716c" }}
+				id="t-top-1"
+				style={{ left: "20%", background: "#78716c" }}
+				className="w-2 h-2"
+			/>
+			<Handle
+				type="target"
+				position={Position.Top}
+				id="t-top-2"
+				style={{ left: "50%", background: "#78716c" }}
 				className="w-2 h-2"
 			/>
 			<Handle
 				type="source"
 				position={Position.Top}
-				id="s-top"
-				style={{ left: "70%", background: "#78716c" }}
+				id="s-top-3"
+				style={{ left: "80%", background: "#78716c" }}
 				className="w-2 h-2"
 			/>
 
@@ -52,15 +61,22 @@ const PlenumNode = ({ data }: { data: any }) => {
 			<Handle
 				type="target"
 				position={Position.Bottom}
-				id="t-bottom"
-				style={{ left: "30%", background: "#78716c" }}
+				id="t-bottom-1"
+				style={{ left: "20%", background: "#78716c" }}
+				className="w-2 h-2"
+			/>
+			<Handle
+				type="target"
+				position={Position.Bottom}
+				id="t-bottom-2"
+				style={{ left: "50%", background: "#78716c" }}
 				className="w-2 h-2"
 			/>
 			<Handle
 				type="source"
 				position={Position.Bottom}
-				id="s-bottom"
-				style={{ left: "70%", background: "#78716c" }}
+				id="s-bottom-3"
+				style={{ left: "80%", background: "#78716c" }}
 				className="w-2 h-2"
 			/>
 
@@ -69,14 +85,21 @@ const PlenumNode = ({ data }: { data: any }) => {
 				type="target"
 				position={Position.Left}
 				id="t-left"
-				style={{ top: "30%", background: "#78716c" }}
+				style={{ top: "25%", background: "#78716c" }}
+				className="w-2 h-2"
+			/>
+			<Handle
+				type="target"
+				position={Position.Left}
+				id="t-left-center"
+				style={{ top: "50%", background: "#78716c" }}
 				className="w-2 h-2"
 			/>
 			<Handle
 				type="source"
 				position={Position.Left}
 				id="s-left"
-				style={{ top: "70%", background: "#78716c" }}
+				style={{ top: "75%", background: "#78716c" }}
 				className="w-2 h-2"
 			/>
 
@@ -85,14 +108,21 @@ const PlenumNode = ({ data }: { data: any }) => {
 				type="target"
 				position={Position.Right}
 				id="t-right"
-				style={{ top: "30%", background: "#78716c" }}
+				style={{ top: "25%", background: "#78716c" }}
+				className="w-2 h-2"
+			/>
+			<Handle
+				type="source"
+				position={Position.Right}
+				id="s-right-center"
+				style={{ top: "50%", background: "#78716c" }}
 				className="w-2 h-2"
 			/>
 			<Handle
 				type="source"
 				position={Position.Right}
 				id="s-right"
-				style={{ top: "70%", background: "#78716c" }}
+				style={{ top: "75%", background: "#78716c" }}
 				className="w-2 h-2"
 			/>
 		</div>

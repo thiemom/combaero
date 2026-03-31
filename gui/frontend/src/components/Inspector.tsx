@@ -4,8 +4,14 @@ import NumericInput from "./NumericInput";
 import UnitInput from "./UnitInput";
 
 const Inspector = () => {
-	const { nodes, edges, updateNodeData, unitPreferences, speciesMetadata } =
-		useStore();
+	const {
+		nodes,
+		edges,
+		updateNodeData,
+		updateEdgeData,
+		unitPreferences,
+		speciesMetadata,
+	} = useStore();
 
 	const handleExport = async () => {
 		try {
@@ -102,7 +108,28 @@ const Inspector = () => {
 					</button>
 				</h2>
 
-				<div className="flex flex-col gap-2">
+				<div className="flex flex-col gap-2 mb-4">
+					<label
+						htmlFor={`node_label_${selectedNode.id}`}
+						className="text-xs font-bold text-stone-500 uppercase"
+					>
+						Label / Name
+					</label>
+					<input
+						id={`node_label_${selectedNode.id}`}
+						type="text"
+						value={selectedNode.data.label || ""}
+						onChange={(e) =>
+							updateNodeData(selectedNode.id, {
+								label: e.target.value,
+							})
+						}
+						placeholder="e.g. Compressor Outlet"
+						className="p-2 border rounded border-stone-200 outline-none focus:ring-2 focus:ring-blue-100"
+					/>
+				</div>
+
+				<div className="flex flex-col gap-2 opacity-60">
 					<label
 						htmlFor={`node_id_${selectedNode.id}`}
 						className="text-xs font-bold text-gray-500 uppercase"
@@ -113,10 +140,13 @@ const Inspector = () => {
 						id={`node_id_${selectedNode.id}`}
 						type="text"
 						value={selectedNode.id}
-						className="p-2 border rounded bg-gray-50 cursor-not-allowed"
+						className="p-1 border rounded bg-gray-50 cursor-not-allowed text-xs"
 						disabled
 					/>
 				</div>
+				{selectedNode.type === "plenum" && (
+					<InitialGuessEditor node={selectedNode} />
+				)}
 
 				{selectedNode.type === "mass_boundary" && (
 					<>
@@ -161,6 +191,7 @@ const Inspector = () => {
 							nodeId={selectedNode.id}
 							data={selectedNode.data}
 						/>
+						<InitialGuessEditor node={selectedNode} />
 					</>
 				)}
 
@@ -196,6 +227,7 @@ const Inspector = () => {
 							nodeId={selectedNode.id}
 							data={selectedNode.data}
 						/>
+						<InitialGuessEditor node={selectedNode} />
 					</>
 				)}
 
@@ -255,6 +287,23 @@ const Inspector = () => {
 								className="p-2 border rounded"
 							/>
 						</div>
+						<div className="flex flex-col gap-2">
+							<label className="text-xs font-bold text-gray-500 uppercase">
+								Regime
+							</label>
+							<select
+								className="p-2 border rounded bg-white text-xs"
+								value={selectedNode.data.regime || "default"}
+								onChange={(e) =>
+									updateNodeData(selectedNode.id, { regime: e.target.value })
+								}
+							>
+								<option value="default">Default (Global)</option>
+								<option value="incompressible">Forced Incompressible</option>
+								<option value="compressible">Forced Compressible</option>
+							</select>
+						</div>
+						<InitialGuessEditor node={selectedNode} />
 					</>
 				)}
 
@@ -296,6 +345,23 @@ const Inspector = () => {
 								className="p-2 border rounded"
 							/>
 						</div>
+						<div className="flex flex-col gap-2">
+							<label className="text-xs font-bold text-gray-500 uppercase">
+								Regime
+							</label>
+							<select
+								className="p-2 border rounded bg-white text-xs"
+								value={selectedNode.data.regime || "default"}
+								onChange={(e) =>
+									updateNodeData(selectedNode.id, { regime: e.target.value })
+								}
+							>
+								<option value="default">Default (Global)</option>
+								<option value="incompressible">Forced Incompressible</option>
+								<option value="compressible">Forced Compressible</option>
+							</select>
+						</div>
+						<InitialGuessEditor node={selectedNode} />
 					</>
 				)}
 
@@ -320,6 +386,7 @@ const Inspector = () => {
 							<option value="complete">Complete (Fast)</option>
 							<option value="equilibrium">Chemical Equilibrium</option>
 						</select>
+						<InitialGuessEditor node={selectedNode} />
 					</div>
 				)}
 
@@ -341,6 +408,7 @@ const Inspector = () => {
 							}
 							className="p-2 border rounded"
 						/>
+						<InitialGuessEditor node={selectedNode} />
 					</div>
 				)}
 
@@ -601,10 +669,94 @@ const Inspector = () => {
 	}
 
 	// Edge Inspector
+	if (selectedEdge && selectedEdge.data?.type === "thermal") {
+		return (
+			<aside className="w-80 border-l bg-white p-4 flex flex-col gap-4 overflow-y-auto">
+				<h2 className="text-lg font-bold border-b pb-2 uppercase text-orange-600">
+					Thermal Wall
+				</h2>
+				<div className="flex flex-col gap-4">
+					<div className="flex flex-col gap-2">
+						<label className="text-xs font-bold text-gray-500 uppercase">
+							Thickness (m)
+						</label>
+						<NumericInput
+							value={selectedEdge.data.thickness || 0.003}
+							onChange={(val) =>
+								updateEdgeData(selectedEdge.id, { thickness: val })
+							}
+							className="p-2 border rounded"
+						/>
+					</div>
+					<div className="flex flex-col gap-2">
+						<label className="text-xs font-bold text-gray-500 uppercase">
+							Conductivity (W/mK)
+						</label>
+						<NumericInput
+							value={selectedEdge.data.conductivity || 20.0}
+							onChange={(val) =>
+								updateEdgeData(selectedEdge.id, { conductivity: val })
+							}
+							className="p-2 border rounded"
+						/>
+					</div>
+					<div className="flex flex-col gap-2">
+						<label className="text-xs font-bold text-gray-500 uppercase">
+							Area (m²)
+						</label>
+						<NumericInput
+							value={selectedEdge.data.area || 0.05}
+							onChange={(val) => updateEdgeData(selectedEdge.id, { area: val })}
+							className="p-2 border rounded"
+						/>
+					</div>
+				</div>
+			</aside>
+		);
+	}
+
 	return (
 		<aside className="w-80 border-l bg-white p-4 flex flex-col gap-4 italic text-gray-400">
 			Connection is structural. Topographic link only.
 		</aside>
+	);
+};
+
+const InitialGuessEditor = ({ node }: { node: any }) => {
+	const { updateNodeData } = useStore();
+	const initialGuess = node.data.initial_guess || {};
+
+	const updateGuess = (key: string, val: number | undefined) => {
+		const newGuess = { ...initialGuess };
+		if (val === undefined || Number.isNaN(val)) {
+			delete newGuess[key];
+		} else {
+			newGuess[key] = val;
+		}
+		updateNodeData(node.id, { initial_guess: newGuess });
+	};
+
+	const guessKeys = ["P", "T", "m_dot"];
+
+	return (
+		<div className="mt-4 border-t pt-4">
+			<h3 className="text-xs font-bold text-stone-500 uppercase mb-2">
+				Initial Guess Overrides
+			</h3>
+			<div className="flex flex-col gap-2">
+				{guessKeys.map((key) => (
+					<div key={key} className="flex items-center justify-between gap-2">
+						<span className="text-[10px] font-mono text-gray-500">{key}</span>
+						<NumericInput
+							placeholder="Auto"
+							value={initialGuess[key]}
+							onChange={(val) => updateGuess(key, val || undefined)}
+							className="p-1 border rounded text-xs w-24"
+						/>
+					</div>
+				))}
+			</div>
+		</div>
 	);
 };
 

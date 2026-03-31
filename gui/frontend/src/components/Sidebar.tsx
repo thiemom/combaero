@@ -6,19 +6,78 @@ import {
 	Link,
 	LogIn,
 	LogOut,
+	Save,
+	Upload,
 	Wind,
 } from "lucide-react";
 import type React from "react";
+import { useRef, useState } from "react";
+import useStore from "../store/useStore";
 
 const Sidebar = () => {
+	const fileInputRef = useRef<HTMLInputElement>(null);
+	const [filename, setFilename] = useState("network");
+
+	const { saveNetwork, loadNetwork, solverSettings, updateSolverSettings } =
+		useStore();
+
+	const onSave = () => saveNetwork(filename);
+
 	const onDragStart = (event: React.DragEvent, nodeType: string) => {
 		event.dataTransfer.setData("application/reactflow", nodeType);
 		event.dataTransfer.effectAllowed = "move";
 	};
 
+	const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+		const file = event.target.files?.[0];
+		if (file) {
+			const reader = new FileReader();
+			reader.onload = (e) => {
+				try {
+					const json = JSON.parse(e.target?.result as string);
+					loadNetwork(json);
+				} catch (error) {
+					console.error("Failed to parse network JSON:", error);
+					alert("Invalid network file");
+				}
+			};
+			reader.readAsText(file);
+		}
+	};
+
 	return (
-		<aside className="w-64 border-r bg-white p-4 flex flex-col gap-4">
+		<aside className="w-64 border-r bg-white p-4 flex flex-col gap-4 overflow-y-auto">
 			<div className="text-sm font-bold text-gray-500 uppercase tracking-wider">
+				Project
+			</div>
+
+			<div className="flex gap-2">
+				<button
+					type="button"
+					onClick={onSave}
+					className="flex-1 flex items-center justify-center gap-2 p-2 border rounded hover:bg-stone-50 transition-colors text-sm bg-white"
+				>
+					<Save size={16} className="text-blue-600" />
+					<span>Save</span>
+				</button>
+				<button
+					type="button"
+					onClick={() => fileInputRef.current?.click()}
+					className="flex-1 flex items-center justify-center gap-2 p-2 border rounded hover:bg-stone-50 transition-colors text-sm bg-white"
+				>
+					<Upload size={16} className="text-emerald-600" />
+					<span>Load</span>
+				</button>
+				<input
+					type="file"
+					ref={fileInputRef}
+					onChange={handleFileChange}
+					className="hidden"
+					accept=".json"
+				/>
+			</div>
+
+			<div className="mt-4 text-sm font-bold text-gray-500 uppercase tracking-wider">
 				Nodes
 			</div>
 
@@ -105,6 +164,69 @@ const Sidebar = () => {
 				<Link size={18} className="text-slate-400" />
 				<span>Lossless Connection</span>
 			</button>
+
+			<div className="mt-auto pt-6 border-t border-stone-200">
+				<div className="flex flex-col gap-2 mb-4">
+					<label className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
+						Filename
+					</label>
+					<div className="flex gap-1">
+						<input
+							type="text"
+							value={filename || "network"}
+							onChange={(e) => setFilename(e.target.value)}
+							className="p-1 border rounded text-xs w-full bg-white outline-none focus:ring-1 focus:ring-stone-200"
+							placeholder="MyNetwork"
+						/>
+						<span className="text-gray-400 text-xs self-center">.json</span>
+					</div>
+				</div>
+				<button
+					type="button"
+					onClick={onSave}
+					className="flex items-center justify-center gap-2 p-2 bg-stone-800 text-white rounded hover:bg-stone-700 transition-colors w-full"
+				>
+					<Save size={18} />
+					<span>Save Network</span>
+				</button>
+			</div>
+
+			<div className="mt-6 text-sm font-bold text-gray-500 uppercase tracking-wider">
+				Solver Configuration
+			</div>
+			<div className="flex flex-col gap-4 mt-2 p-3 bg-stone-50 rounded border border-stone-200">
+				<div className="flex flex-col gap-1">
+					<label className="text-[10px] font-bold text-gray-400 uppercase">
+						Global Regime
+					</label>
+					<select
+						className="p-1 border rounded text-xs bg-white"
+						value={solverSettings.global_regime}
+						onChange={(e) =>
+							updateSolverSettings({ global_regime: e.target.value as any })
+						}
+					>
+						<option value="compressible">Compressible (Full)</option>
+						<option value="incompressible">Incompressible (Fast)</option>
+					</select>
+				</div>
+				<div className="flex flex-col gap-1">
+					<label className="text-[10px] font-bold text-gray-400 uppercase">
+						Init Strategy
+					</label>
+					<select
+						className="p-1 border rounded text-xs bg-white"
+						value={solverSettings.init_strategy}
+						onChange={(e) =>
+							updateSolverSettings({ init_strategy: e.target.value as any })
+						}
+					>
+						<option value="default">Default Cold Start</option>
+						<option value="incompressible_warmstart">Incomp. Warmstart</option>
+						<option value="homotopy">Load-Stepping (Homotopy)</option>
+					</select>
+				</div>
+			</div>
 		</aside>
 	);
 };

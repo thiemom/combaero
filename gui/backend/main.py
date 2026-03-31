@@ -66,7 +66,9 @@ def _solve_sync(schema: NetworkGraphSchema):
     """
     net = build_network_from_schema(schema)
     solver = NetworkSolver(net)
-    result = solver.solve()
+    result = solver.solve(
+        init_strategy=schema.solver_settings.init_strategy
+    )
     success = bool(result.get("__success__", False))
 
     node_results = {}
@@ -131,20 +133,31 @@ def _solve_sync(schema: NetworkGraphSchema):
         m_dot = float(result.get(f"{elem_id}.m_dot", 0.0))
         element_results[elem_id] = ElementResult(m_dot=m_dot, success=success, **elem_keys)
 
-    return result, node_results, element_results, net
+    edge_results = {}
+    for edge_id in net.walls:
+        edge_keys = {
+            k.split(".", 1)[1]: float(v)
+            for k, v in result.items()
+            if k.startswith(f"{edge_id}.")
+        }
+        if edge_keys:
+            edge_results[edge_id] = edge_keys
+
+    return result, node_results, element_results, edge_results, net
 
 
 @app.post("/solve", response_model=SolveResponse)
 async def solve(schema: NetworkGraphSchema):
     try:
         # Offload CPU-bound C++ solver to a worker thread
-        result, node_results, element_results, _ = await asyncio.to_thread(_solve_sync, schema)
+        result, node_results, element_results, edge_results, _ = await asyncio.to_thread(_solve_sync, schema)
 
         return SolveResponse(
             success=result.get("__success__", False),
             message=result.get("__message__", "Solve completed"),
             node_results=node_results,
             element_results=element_results,
+            edge_results=edge_results,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -156,7 +169,7 @@ async def solve(schema: NetworkGraphSchema):
 async def export_results(schema: NetworkGraphSchema):
     try:
         # Solve quickly to get states
-        _, node_results, element_results, _ = await asyncio.to_thread(_solve_sync, schema)
+        _, node_results, element_results, _, _ = await asyncio.to_thread(_solve_sync, schema)
 
         # Convert to DataFrame
         import pandas as pd

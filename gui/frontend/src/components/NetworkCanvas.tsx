@@ -7,14 +7,15 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { useCallback } from "react";
 import useStore from "../store/useStore";
-import CombustorNode from "./nodes/CombustorNode";
+import CombustorNode from "./nodes/CombustorNode.tsx";
 import LosslessNode from "./nodes/LosslessNode";
 import MassBoundaryNode from "./nodes/MassBoundaryNode";
-import MomentumChamberNode from "./nodes/MomentumChamberNode";
+import MomentumChamberNode from "./nodes/MomentumChamberNode.tsx";
 import OrificeNode from "./nodes/OrificeNode";
 import PipeNode from "./nodes/PipeNode";
 import PlenumNode from "./nodes/PlenumNode";
 import PressureBoundaryNode from "./nodes/PressureBoundaryNode";
+import ThermalEdge from "./ThermalEdge";
 
 const NODE_TYPES = Object.freeze({
 	plenum: PlenumNode,
@@ -25,6 +26,10 @@ const NODE_TYPES = Object.freeze({
 	combustor: CombustorNode,
 	momentum_chamber: MomentumChamberNode,
 	lossless_connection: LosslessNode,
+});
+
+const EDGE_TYPES = Object.freeze({
+	thermal: ThermalEdge,
 });
 
 const NetworkCanvas = () => {
@@ -113,6 +118,7 @@ const NetworkCanvas = () => {
 				onEdgesChange={onEdgesChange}
 				onConnect={onConnect}
 				nodeTypes={NODE_TYPES}
+				edgeTypes={EDGE_TYPES}
 				fitView
 				fitViewOptions={{ padding: 0.5, maxZoom: 1.0 }}
 			>

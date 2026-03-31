@@ -1,4 +1,3 @@
-import { LogIn } from "lucide-react";
 import { Handle, Position } from "reactflow";
 
 const MassBoundaryNode = ({ data }: { data: any }) => {
@@ -8,10 +7,27 @@ const MassBoundaryNode = ({ data }: { data: any }) => {
 		>
 			<div className="flex items-center">
 				<div className="rounded-full w-10 h-10 flex justify-center items-center bg-orange-100">
-					<LogIn size={20} className="text-orange-600" />
+					<svg
+						width="24"
+						height="24"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="2"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+						className="text-orange-600"
+					>
+						<title>Mass Boundary Icon</title>
+						<path d="M2 12h20" />
+						<path d="M19 9l3 3-3 3" />
+						<circle cx="5" cy="12" r="3" />
+					</svg>
 				</div>
 				<div className="ml-2">
-					<div className="text-sm font-bold">Mass Boundary</div>
+					<div className="text-sm font-bold">
+						{data.label ? `${data.label} (Mass)` : "Mass Boundary"}
+					</div>
 					<div className="text-xs text-gray-400">
 						Fixed Mdot: {data.m_dot} kg/s
 					</div>

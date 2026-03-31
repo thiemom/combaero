@@ -543,9 +543,15 @@ class MomentumChamberNode(NetworkNode):
         id: str,
         area: float = 0.1,
         port_angles_deg: dict[str, float] | None = None,
+        length: float | None = None,
+        surface: ConvectiveSurface | None = None,
+        t_wall: float | None = None,
     ):
         super().__init__(id)
         self.area = area  # Cross-sectional area for momentum calculations
+        self.length = length
+        self.surface = surface or ConvectiveSurface()
+        self.t_wall = t_wall
         # Dictionary mapping connected element IDs to angle relative to chamber axis [deg]
         self.port_angles_deg: dict[str, float] = port_angles_deg or {}
         self.upstream_elements = []
@@ -592,6 +598,31 @@ class MomentumChamberNode(NetworkNode):
         mix_res = cb.mixer_from_streams_and_jacobians(streams, Q=Q_total, fraction=fraction_total)
 
         return mix_res.T_mix, mix_res.Y_mix, mix_res
+
+    def htc_and_T(self, state: MixtureState):
+        """Compute heat transfer coefficient for the momentum chamber."""
+        if self.surface.area == 0.0:
+            return None
+
+        import math
+
+        T_wall = self.t_wall if self.t_wall is not None else math.nan
+        m_dot_total = getattr(self, "_total_m_dot", 0.0)
+        rho = state.density()
+        u = m_dot_total / (rho * self.area) if rho > 0 and self.area > 0 else 0.0
+
+        diameter = math.sqrt(4.0 * self.area / math.pi)
+        length = self.length if self.length is not None else diameter
+
+        return self.surface.htc_and_T(
+            T=state.T,
+            P=state.P,
+            X=state.X,
+            velocity=u,
+            diameter=diameter,
+            length=length,
+            T_wall=T_wall,
+        )
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
         import combaero as cb

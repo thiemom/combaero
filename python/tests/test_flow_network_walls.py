@@ -82,7 +82,9 @@ def test_add_wall_unknown_element_a():
 
     # Try to add wall with unknown element_a
     wall = WallConnection("wall2", "unknown_pipe", "pipe1", 0.002, 25.0)
-    with pytest.raises(ValueError, match="Unknown element_a 'unknown_pipe' for wall 'wall2'"):
+    with pytest.raises(
+        ValueError, match="Unknown element_a/node_a 'unknown_pipe' for wall 'wall2'"
+    ):
         network.add_wall(wall)
 
 
@@ -101,7 +103,9 @@ def test_add_wall_unknown_element_b():
 
     # Try to add wall with unknown element_b
     wall = WallConnection("wall3", "pipe1", "unknown_pipe", 0.002, 25.0)
-    with pytest.raises(ValueError, match="Unknown element_b 'unknown_pipe' for wall 'wall3'"):
+    with pytest.raises(
+        ValueError, match="Unknown element_b/node_b 'unknown_pipe' for wall 'wall3'"
+    ):
         network.add_wall(wall)
 
 

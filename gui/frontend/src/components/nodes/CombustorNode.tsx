@@ -13,7 +13,9 @@ const CombustorNode = ({ data }: { data: any }) => {
 					<Flame size={20} className="text-red-600" />
 				</div>
 				<div className="ml-2">
-					<div className="text-sm font-bold">Combustor</div>
+					<div className="text-sm font-bold">
+						{data.label ? `${data.label} (Combustor)` : "Combustor"}
+					</div>
 					<div className="text-xs text-gray-500">
 						Method: {data.method || "complete"}
 					</div>

@@ -453,37 +453,52 @@ class NetworkSolver:
             if wall.id in processed_walls:
                 continue
 
-            # Does this wall involve an upstream element of nid?
+            # Does this wall involve an upstream element of nid, or nid itself?
             elem_a_id = wall.element_a
             elem_b_id = wall.element_b
-            if elem_a_id not in up_elem_ids and elem_b_id not in up_elem_ids:
+
+            is_a_upstream = elem_a_id in up_elem_ids
+            is_b_upstream = elem_b_id in up_elem_ids
+            is_a_node = elem_a_id == nid
+            is_b_node = elem_b_id == nid
+
+            if not any((is_a_upstream, is_b_upstream, is_a_node, is_b_node)):
                 continue
 
-            elem_a = self.network.elements[elem_a_id]
-            elem_b = self.network.elements[elem_b_id]
+            obj_a = self.network.elements.get(elem_a_id) or self.network.nodes.get(elem_a_id)
+            obj_b = self.network.elements.get(elem_b_id) or self.network.nodes.get(elem_b_id)
 
-            # Skip if both elements feed the same node (net Q = 0)
-            if elem_a.to_node == elem_b.to_node:
+            # Find the actual target node for side A and side B
+            target_node_a = nid if is_a_node else obj_a.to_node
+            target_node_b = nid if is_b_node else obj_b.to_node
+
+            # Skip if both sides feed/are the same node (net Q = 0)
+            if target_node_a == target_node_b:
                 continue
 
             # Determine which side feeds the current node
-            is_side_a = elem_a_id in up_elem_ids
+            is_side_a = is_a_upstream or is_a_node
 
             # Get states for both sides (previous-iteration fallback for back-edges)
-            state_a = self._get_node_state_with_prev(self.network.nodes[elem_a.from_node], x)
-            state_b = self._get_node_state_with_prev(self.network.nodes[elem_b.from_node], x)
+            node_feeding_a = obj_a if is_a_node else self.network.nodes[obj_a.from_node]
+            node_feeding_b = obj_b if is_b_node else self.network.nodes[obj_b.from_node]
 
-            # Set mass flow rates from solver vector
-            m_indices_a = self._unknown_indices.get(elem_a_id, [])
-            if m_indices_a:
-                state_a.m_dot = x[m_indices_a[0]]
-            m_indices_b = self._unknown_indices.get(elem_b_id, [])
-            if m_indices_b:
-                state_b.m_dot = x[m_indices_b[0]]
+            state_a = self._get_node_state_with_prev(node_feeding_a, x)
+            state_b = self._get_node_state_with_prev(node_feeding_b, x)
 
-            # Call htc_and_T() on both elements
-            ch_result_a = elem_a.htc_and_T(state_a)
-            ch_result_b = elem_b.htc_and_T(state_b)
+            # Set mass flow rates from solver vector for elements
+            if not is_a_node:
+                m_indices_a = self._unknown_indices.get(elem_a_id, [])
+                if m_indices_a:
+                    state_a.m_dot = x[m_indices_a[0]]
+            if not is_b_node:
+                m_indices_b = self._unknown_indices.get(elem_b_id, [])
+                if m_indices_b:
+                    state_b.m_dot = x[m_indices_b[0]]
+
+            # Call htc_and_T() on both objects
+            ch_result_a = obj_a.htc_and_T(state_a) if hasattr(obj_a, "htc_and_T") else None
+            ch_result_b = obj_b.htc_and_T(state_b) if hasattr(obj_b, "htc_and_T") else None
 
             # Only proceed if both elements have heat transfer surfaces
             if ch_result_a is not None and ch_result_b is not None:
@@ -493,10 +508,10 @@ class NetworkSolver:
                 h_b = ch_result_b.h
                 T_aw_b = ch_result_b.T_aw
 
-                # Get convective areas from element surfaces (safe: only elements
+                # Get convective areas from surfaces (safe: only objects
                 # with a ConvectiveSurface can return non-None ChannelResult)
-                A_conv_a = elem_a.surface.area
-                A_conv_b = elem_b.surface.area
+                A_conv_a = obj_a.surface.area
+                A_conv_b = obj_b.surface.area
 
                 A_eff = (
                     wall.contact_area if wall.contact_area is not None else min(A_conv_a, A_conv_b)
@@ -683,7 +698,8 @@ class NetworkSolver:
                         sign = -1.0 if is_side_a else 1.0
 
                         # Side A contributions
-                        from_a = self.network.elements[ea_id].from_node
+                        obj_a = self.network.elements.get(ea_id) or self.network.nodes.get(ea_id)
+                        from_a = ea_id if ea_id in self.network.nodes else obj_a.from_node
                         m_indices_a = self._unknown_indices.get(ea_id, [])
 
                         # Temperature coupling: dT_node/dT_upstream_a
@@ -721,7 +737,8 @@ class NetworkSolver:
                             nr["T"] += factor_mdot_a
 
                         # Side B contributions
-                        from_b = self.network.elements[eb_id].from_node
+                        obj_b = self.network.elements.get(eb_id) or self.network.nodes.get(eb_id)
+                        from_b = eb_id if eb_id in self.network.nodes else obj_b.from_node
                         m_indices_b = self._unknown_indices.get(eb_id, [])
 
                         # Temperature coupling: dT_node/dT_upstream_b
@@ -1425,6 +1442,63 @@ class NetworkSolver:
             diag = element.diagnostics(state_in, state_out)
             for key, val in diag.items():
                 sol_dict[f"{eid}.{key}"] = val
+
+        # Wall-specific thermodynamics
+        import combaero as cb
+
+        for wid, wall in self.network.walls.items():
+            obj_a = self.network.elements.get(wall.element_a) or self.network.nodes.get(
+                wall.element_a
+            )
+            obj_b = self.network.elements.get(wall.element_b) or self.network.nodes.get(
+                wall.element_b
+            )
+
+            node_feeding_a = (
+                obj_a
+                if wall.element_a in self.network.nodes
+                else self.network.nodes[obj_a.from_node]
+            )
+            node_feeding_b = (
+                obj_b
+                if wall.element_b in self.network.nodes
+                else self.network.nodes[obj_b.from_node]
+            )
+
+            state_a = self._get_node_state(node_feeding_a, final_x)
+            state_b = self._get_node_state(node_feeding_b, final_x)
+
+            if wall.element_a in self.network.elements:
+                m_indices_a = self._unknown_indices.get(wall.element_a, [])
+                if m_indices_a:
+                    state_a.m_dot = final_x[m_indices_a[0]]
+            if wall.element_b in self.network.elements:
+                m_indices_b = self._unknown_indices.get(wall.element_b, [])
+                if m_indices_b:
+                    state_b.m_dot = final_x[m_indices_b[0]]
+
+            ch_result_a = obj_a.htc_and_T(state_a) if hasattr(obj_a, "htc_and_T") else None
+            ch_result_b = obj_b.htc_and_T(state_b) if hasattr(obj_b, "htc_and_T") else None
+
+            if ch_result_a and ch_result_b:
+                A_conv_a = obj_a.surface.area
+                A_conv_b = obj_b.surface.area
+                A_eff = (
+                    wall.contact_area if wall.contact_area is not None else min(A_conv_a, A_conv_b)
+                )
+                t_over_k = wall.wall_thickness / wall.wall_conductivity
+                wall_res = cb.wall_coupling_and_jacobian(
+                    ch_result_a.h,
+                    ch_result_a.T_aw,
+                    ch_result_b.h,
+                    ch_result_b.T_aw,
+                    t_over_k,
+                    A_eff,
+                )
+                sol_dict[f"{wid}.Q"] = float(wall_res.Q)
+                sol_dict[f"{wid}.T_wall"] = float(wall_res.T_wall)
+                sol_dict[f"{wid}.h_a"] = float(ch_result_a.h)
+                sol_dict[f"{wid}.h_b"] = float(ch_result_b.h)
 
         sol_dict["__success__"] = success
         sol_dict["__message__"] = message

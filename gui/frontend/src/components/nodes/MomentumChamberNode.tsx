@@ -13,7 +13,9 @@ const MomentumChamberNode = ({ data }: { data: any }) => {
 					<Wind size={20} className="text-indigo-600" />
 				</div>
 				<div className="ml-2">
-					<div className="text-sm font-bold">Momentum</div>
+					<div className="text-sm font-bold">
+						{data.label ? `${data.label} (Momentum)` : "Momentum"}
+					</div>
 					<div className="text-xs text-gray-500">
 						Area: {data.area?.toFixed(4)} m²
 					</div>
@@ -44,6 +46,20 @@ const MomentumChamberNode = ({ data }: { data: any }) => {
 				position={Position.Right}
 				id="s-right"
 				className="w-2 h-2 !bg-indigo-500"
+			/>
+
+			{/* Thermal handles */}
+			<Handle
+				type="target"
+				position={Position.Top}
+				id="t-top"
+				className="w-2 h-2 !bg-orange-500 rounded-none transform rotate-45"
+			/>
+			<Handle
+				type="source"
+				position={Position.Bottom}
+				id="s-bottom"
+				className="w-2 h-2 !bg-orange-500 rounded-none transform rotate-45"
 			/>
 		</div>
 	);

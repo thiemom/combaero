@@ -21,7 +21,7 @@ const OrificeNode = ({ data }: { data: any }) => {
 
 			<div className="flex flex-col">
 				<div className="text-[10px] font-bold text-gray-400 uppercase leading-none">
-					Orifice
+					{data.label ? data.label : "Orifice"}
 				</div>
 				<div className="text-xs font-semibold">Cd: {data.Cd}</div>
 			</div>
@@ -30,6 +30,22 @@ const OrificeNode = ({ data }: { data: any }) => {
 				type="source"
 				position={Position.Right}
 				className="w-2 h-2 !bg-stone-400"
+			/>
+
+			{/* Thermal Handles */}
+			<Handle
+				type="target"
+				position={Position.Top}
+				id="thermal-target"
+				style={{ left: "30%", background: "#ff9800" }}
+				className="w-2 h-2"
+			/>
+			<Handle
+				type="source"
+				position={Position.Top}
+				id="thermal-source"
+				style={{ left: "70%", background: "#ff9800" }}
+				className="w-2 h-2"
 			/>
 		</div>
 	);
