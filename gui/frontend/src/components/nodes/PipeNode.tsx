@@ -5,16 +5,14 @@ import { getHandlePosition } from "../../utils/nodeUtils";
 const PipeNode = ({ data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
 	const isSolved = !!data.result;
+	const isVertical = rotation === 90 || rotation === 270;
 
-	// Rotation 0 -> world 0 (H L-R)
-	// Rotation 90 -> world 270 (V B-T)
-	// Rotation 180 -> world 360/0 (H L-R)
-	// Rotation 270 -> world 270 (V B-T)
+	// Orientation logic: keeps text readable
 	const textRotation = rotation === 90 || rotation === 180 ? 180 : 0;
 
 	return (
 		<div
-			className={`px-4 py-2 shadow-md rounded border-2 bg-white transition-colors flex flex-col items-center justify-center ${
+			className={`px-4 py-2 shadow-md rounded border-2 bg-white transition-colors flex items-center justify-center ${
 				selected
 					? "border-blue-500 shadow-blue-100"
 					: isSolved
@@ -22,7 +20,9 @@ const PipeNode = ({ data, selected }: NodeProps) => {
 						: "border-stone-300"
 			}`}
 			style={{
-				minWidth: "120px",
+				flexDirection: isVertical ? "row" : "column",
+				minHeight: isVertical ? 32 : data.label ? 64 : 48,
+				minWidth: isVertical ? (data.label ? 64 : 48) : data.label ? 128 : 96,
 			}}
 		>
 			<div

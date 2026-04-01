@@ -5,19 +5,25 @@ import { getHandlePosition } from "../../utils/nodeUtils";
 const MomentumChamberNode = ({ data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
 	const isSolved = !!data.result;
+	const isVertical = rotation === 90 || rotation === 270;
 
 	// Orientation logic
 	const textRotation = rotation === 90 || rotation === 180 ? 180 : 0;
 
 	return (
 		<div
-			className={`px-4 py-2 shadow-md rounded border-2 bg-white transition-colors ${
+			className={`px-4 py-2 shadow-md rounded border-2 bg-white transition-colors flex items-center justify-center ${
 				selected
 					? "border-blue-500 shadow-blue-100"
 					: isSolved
 						? "border-blue-500"
 						: "border-stone-300"
 			}`}
+			style={{
+				flexDirection: isVertical ? "row" : "column",
+				minHeight: isVertical ? 64 : 80,
+				minWidth: isVertical ? 80 : 140,
+			}}
 		>
 			<div
 				className="flex items-center gap-2 pointer-events-none"
