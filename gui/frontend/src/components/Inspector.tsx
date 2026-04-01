@@ -1,3 +1,4 @@
+import { Activity, RotateCw } from "lucide-react";
 import useStore from "../store/useStore";
 import CompositionEditor from "./CompositionEditor";
 import NumericInput from "./NumericInput";
@@ -99,13 +100,29 @@ const Inspector = () => {
 				)}
 				<h2 className="text-lg font-bold border-b pb-2 capitalize flex justify-between items-center">
 					<span>{(selectedNode.type || "unknown").replace("_", " ")} Node</span>
-					<button
-						type="button"
-						onClick={handleExport}
-						className="text-[10px] bg-stone-100 hover:bg-stone-200 px-2 py-1 rounded border border-stone-300 transition-colors uppercase font-bold"
-					>
-						Export CSV
-					</button>
+					<div className="flex gap-2">
+						<button
+							type="button"
+							onClick={() => {
+								const currentRotation = selectedNode.data.rotation || 0;
+								updateNodeData(selectedNode.id, {
+									rotation: (currentRotation + 90) % 360,
+								});
+							}}
+							className="flex items-center gap-1 text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-600 px-2 py-1 rounded border border-blue-200 transition-colors uppercase font-bold"
+							title="Rotate node 90° clockwise"
+						>
+							<RotateCw size={12} />
+							Rotate
+						</button>
+						<button
+							type="button"
+							onClick={handleExport}
+							className="text-[10px] bg-stone-100 hover:bg-stone-200 px-2 py-1 rounded border border-stone-300 transition-colors uppercase font-bold"
+						>
+							Export CSV
+						</button>
+					</div>
 				</h2>
 
 				<div className="flex flex-col gap-2 mb-4">
@@ -488,7 +505,8 @@ const Inspector = () => {
 				{selectedNode.data.result && (
 					<div className="mt-4 p-3 bg-stone-50 border border-stone-200 rounded">
 						<div className="flex justify-between items-center mb-3">
-							<h3 className="text-xs font-bold text-stone-500 uppercase">
+							<h3 className="text-xs font-bold text-stone-500 uppercase flex items-center gap-2">
+								<Activity size={14} />
 								Live Telemetry
 							</h3>
 						</div>

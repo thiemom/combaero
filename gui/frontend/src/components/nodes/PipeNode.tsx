@@ -1,53 +1,84 @@
-import { ArrowRight } from "lucide-react";
-import { Handle, Position } from "reactflow";
+import { Settings2 } from "lucide-react";
+import { Handle, type NodeProps, Position } from "reactflow";
+import { getHandlePosition } from "../../utils/nodeUtils";
 
-const PipeNode = ({ data }: { data: any }) => {
+const PipeNode = ({ data, selected }: NodeProps) => {
+	const rotation = data.rotation || 0;
 	const isSolved = !!data.result;
+
+	// Rotation 0 -> world 0 (H L-R)
+	// Rotation 90 -> world 270 (V B-T)
+	// Rotation 180 -> world 360/0 (H L-R)
+	// Rotation 270 -> world 270 (V B-T)
+	const textRotation = rotation === 90 || rotation === 180 ? 180 : 0;
 
 	return (
 		<div
-			className={`px-3 py-1 shadow-sm rounded bg-stone-50 border-2 flex items-center gap-2 ${isSolved ? "border-green-400" : "border-stone-300"}`}
-			style={{ minWidth: "120px" }}
+			className={`px-4 py-2 shadow-md rounded border-2 bg-white transition-colors flex flex-col items-center justify-center ${
+				selected
+					? "border-blue-500 shadow-blue-100"
+					: isSolved
+						? "border-green-400"
+						: "border-stone-300"
+			}`}
+			style={{
+				minWidth: "120px",
+			}}
 		>
+			<div
+				className="flex items-center gap-3 pointer-events-none"
+				style={{
+					transform: `rotate(${rotation}deg)`,
+				}}
+			>
+				<div
+					className="flex flex-col items-center"
+					style={{ transform: `rotate(${textRotation}deg)` }}
+				>
+					<div className="flex items-center gap-2">
+						<div className="p-1 bg-stone-100 rounded">
+							<Settings2 size={16} className="text-stone-600" />
+						</div>
+						<div className="flex flex-col">
+							<span className="text-[10px] font-bold text-gray-400 uppercase leading-tight">
+								{data.label ? data.label : "Pipe"}
+							</span>
+							<span className="text-xs font-bold">
+								L: {data.L}m | D: {data.D}m
+							</span>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			{/* Flow Handles */}
 			<Handle
 				type="target"
-				position={Position.Left}
-				className="w-2 h-2 !bg-stone-400"
+				position={getHandlePosition(Position.Left, rotation)}
+				id="flow-target"
+				className="w-2 h-2 !bg-blue-500"
 			/>
-
-			<div className="flex flex-col items-center justify-center p-1 bg-white rounded border border-stone-200">
-				<ArrowRight size={14} className="text-stone-500" />
-			</div>
-
-			<div className="flex flex-col">
-				<div className="text-[10px] font-bold text-gray-400 uppercase leading-none">
-					{data.label ? data.label : "Pipe"}
-				</div>
-				<div className="text-xs font-semibold truncate max-w-[80px]">
-					{data.L}m / {data.D}m
-				</div>
-			</div>
-
 			<Handle
 				type="source"
-				position={Position.Right}
-				className="w-2 h-2 !bg-stone-400"
+				position={getHandlePosition(Position.Right, rotation)}
+				id="flow-source"
+				className="w-2 h-2 !bg-blue-500"
 			/>
 
 			{/* Thermal Handles */}
 			<Handle
 				type="target"
-				position={Position.Top}
+				position={getHandlePosition(Position.Top, rotation)}
 				id="thermal-target"
-				style={{ left: "30%", background: "#ff9800" }}
-				className="w-2 h-2"
+				style={{ background: "#ff9800" }}
+				className="w-2 h-2 border-none"
 			/>
 			<Handle
 				type="source"
-				position={Position.Top}
+				position={getHandlePosition(Position.Bottom, rotation)}
 				id="thermal-source"
-				style={{ left: "70%", background: "#ff9800" }}
-				className="w-2 h-2"
+				style={{ background: "#ff9800" }}
+				className="w-2 h-2 border-none"
 			/>
 		</div>
 	);

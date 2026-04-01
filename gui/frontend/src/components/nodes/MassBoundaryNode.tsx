@@ -1,76 +1,45 @@
-import { Handle, Position } from "reactflow";
+import { ArrowRightToLine } from "lucide-react";
+import { Handle, type NodeProps, Position } from "reactflow";
+import { getHandlePosition } from "../../utils/nodeUtils";
 
-const MassBoundaryNode = ({ data }: { data: any }) => {
+const MassBoundaryNode = ({ data, selected }: NodeProps) => {
+	const rotation = data.rotation || 0;
+
+	// Orientation logic
+	const textRotation = rotation === 90 || rotation === 180 ? 180 : 0;
+
 	return (
 		<div
-			className={`px-4 py-2 shadow-md rounded-md bg-white border-2 border-orange-400`}
+			className={`w-36 px-4 py-2 shadow-md rounded border-2 bg-stone-50 transition-colors flex flex-col items-center justify-center ${
+				selected ? "border-blue-500 shadow-blue-100" : "border-stone-400"
+			}`}
+			style={{ minHeight: "80px" }}
 		>
-			<div className="flex items-center">
-				<div className="rounded-full w-10 h-10 flex justify-center items-center bg-orange-100">
-					<svg
-						width="24"
-						height="24"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						strokeWidth="2"
-						strokeLinecap="round"
-						strokeLinejoin="round"
-						className="text-orange-600"
-					>
-						<title>Mass Boundary Icon</title>
-						<path d="M2 12h20" />
-						<path d="M19 9l3 3-3 3" />
-						<circle cx="5" cy="12" r="3" />
-					</svg>
-				</div>
-				<div className="ml-2">
-					<div className="text-sm font-bold">
-						{data.label ? `${data.label} (Mass)` : "Mass Boundary"}
+			<div
+				className="flex items-center justify-center pointer-events-none mb-2"
+				style={{
+					transform: `rotate(${rotation}deg)`,
+				}}
+			>
+				<div
+					className="flex flex-col items-center"
+					style={{ transform: `rotate(${textRotation}deg)` }}
+				>
+					<ArrowRightToLine size={24} className="text-blue-600 mb-1" />
+					<div className="text-xs font-bold text-center">
+						{data.label ? data.label : "Mass Flow"}
 					</div>
-					<div className="text-xs text-gray-400">
-						Fixed Mdot: {data.m_dot} kg/s
+					<div className="text-[10px] text-gray-500 font-mono">
+						{data.m_dot} kg/s
 					</div>
 				</div>
 			</div>
 
-			{data.result?.state && (
-				<div className="mt-2 text-xs font-mono bg-green-50 p-1 rounded border border-green-200">
-					<div className="flex justify-between">
-						<span className="text-green-600">P:</span>
-						<span>{(data.result.state.P / 1e5).toFixed(2)} bar</span>
-					</div>
-					<div className="flex justify-between">
-						<span className="text-green-600">T:</span>
-						<span>{data.result.state.T.toFixed(1)} K</span>
-					</div>
-				</div>
-			)}
-
-			{/* Cardinal Source Handles */}
 			<Handle
 				type="source"
-				position={Position.Top}
-				id="s-top"
-				className="w-2 h-2 !bg-orange-500"
-			/>
-			<Handle
-				type="source"
-				position={Position.Bottom}
-				id="s-bottom"
-				className="w-2 h-2 !bg-orange-500"
-			/>
-			<Handle
-				type="source"
-				position={Position.Left}
-				id="s-left"
-				className="w-2 h-2 !bg-orange-500"
-			/>
-			<Handle
-				type="source"
-				position={Position.Right}
-				id="s-right"
-				className="w-2 h-2 !bg-orange-500"
+				position={getHandlePosition(Position.Right, rotation)}
+				id="flow-source"
+				className="w-2 h-2 !bg-blue-600"
 			/>
 		</div>
 	);
