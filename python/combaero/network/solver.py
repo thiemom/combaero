@@ -469,8 +469,8 @@ class NetworkSolver:
             obj_b = self.network.elements.get(elem_b_id) or self.network.nodes.get(elem_b_id)
 
             # Find the actual target node for side A and side B
-            target_node_a = nid if is_a_node else obj_a.to_node
-            target_node_b = nid if is_b_node else obj_b.to_node
+            target_node_a = nid if is_a_node else getattr(obj_a, "to_node", obj_a.id)
+            target_node_b = nid if is_b_node else getattr(obj_b, "to_node", obj_b.id)
 
             # Skip if both sides feed/are the same node (net Q = 0)
             if target_node_a == target_node_b:

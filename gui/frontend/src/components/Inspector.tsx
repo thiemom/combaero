@@ -366,48 +366,121 @@ const Inspector = () => {
 				)}
 
 				{selectedNode.type === "combustor" && (
-					<div className="flex flex-col gap-2">
-						<label
-							htmlFor={`method_${selectedNode.id}`}
-							className="text-xs font-bold text-gray-500 uppercase"
-						>
-							Combustion Method
-						</label>
-						<select
-							id={`method_${selectedNode.id}`}
-							className="p-2 border rounded bg-white"
-							value={selectedNode.data.method || "complete"}
-							onChange={(e) =>
-								updateNodeData(selectedNode.id, {
-									method: e.target.value,
-								})
-							}
-						>
-							<option value="complete">Complete (Fast)</option>
-							<option value="equilibrium">Chemical Equilibrium</option>
-						</select>
+					<div className="flex flex-col gap-4">
+						<div className="flex flex-col gap-2">
+							<label
+								htmlFor={`method_${selectedNode.id}`}
+								className="text-xs font-bold text-gray-500 uppercase"
+							>
+								Combustion Method
+							</label>
+							<select
+								id={`method_${selectedNode.id}`}
+								className="p-2 border rounded bg-white text-sm"
+								value={selectedNode.data.method || "complete"}
+								onChange={(e) =>
+									updateNodeData(selectedNode.id, {
+										method: e.target.value,
+									})
+								}
+							>
+								<option value="complete">Complete (Fast)</option>
+								<option value="equilibrium">Chemical Equilibrium</option>
+							</select>
+						</div>
+
+						<div className="grid grid-cols-2 gap-3">
+							<div className="flex flex-col gap-2">
+								<label
+									htmlFor={`area_comb_${selectedNode.id}`}
+									className="text-xs font-bold text-gray-500 uppercase"
+								>
+									Area (m²)
+								</label>
+								<NumericInput
+									id={`area_comb_${selectedNode.id}`}
+									value={selectedNode.data.area || 0.1}
+									onChange={(val) =>
+										updateNodeData(selectedNode.id, {
+											area: val,
+										})
+									}
+									className="p-2 border rounded"
+								/>
+							</div>
+							<div className="flex flex-col gap-2">
+								<label
+									htmlFor={`Dh_comb_${selectedNode.id}`}
+									className="text-xs font-bold text-gray-500 uppercase"
+								>
+									Dh (m)
+								</label>
+								<NumericInput
+									id={`Dh_comb_${selectedNode.id}`}
+									value={selectedNode.data.Dh}
+									placeholder="Auto"
+									onChange={(val) =>
+										updateNodeData(selectedNode.id, {
+											Dh: val || undefined,
+										})
+									}
+									className="p-2 border rounded"
+								/>
+							</div>
+						</div>
+						<p className="text-[9px] text-gray-400 italic -mt-2">
+							Dh defaults to sqrt(4*Area/π) if omitted.
+						</p>
+
 						<InitialGuessEditor node={selectedNode} />
 					</div>
 				)}
 
 				{selectedNode.type === "momentum_chamber" && (
-					<div className="flex flex-col gap-2">
-						<label
-							htmlFor={`area_${selectedNode.id}`}
-							className="text-xs font-bold text-gray-500 uppercase"
-						>
-							Cross Section Area (m²)
-						</label>
-						<NumericInput
-							id={`area_${selectedNode.id}`}
-							value={selectedNode.data.area || 0.1}
-							onChange={(val) =>
-								updateNodeData(selectedNode.id, {
-									area: val,
-								})
-							}
-							className="p-2 border rounded"
-						/>
+					<div className="flex flex-col gap-4">
+						<div className="grid grid-cols-2 gap-3">
+							<div className="flex flex-col gap-2">
+								<label
+									htmlFor={`area_mom_${selectedNode.id}`}
+									className="text-xs font-bold text-gray-500 uppercase"
+								>
+									Area (m²)
+								</label>
+								<NumericInput
+									id={`area_mom_${selectedNode.id}`}
+									value={selectedNode.data.area || 0.1}
+									onChange={(val) =>
+										updateNodeData(selectedNode.id, {
+											area: val,
+										})
+									}
+									className="p-2 border rounded"
+								/>
+							</div>
+							<div className="flex flex-col gap-2">
+								<label
+									htmlFor={`Dh_mom_${selectedNode.id}`}
+									className="text-xs font-bold text-gray-500 uppercase"
+								>
+									Dh (m)
+								</label>
+								<NumericInput
+									id={`Dh_mom_${selectedNode.id}`}
+									value={selectedNode.data.Dh}
+									placeholder="Auto"
+									onChange={(val) =>
+										updateNodeData(selectedNode.id, {
+											Dh: val || undefined,
+										})
+									}
+									className="p-2 border rounded"
+								/>
+							</div>
+						</div>
+						<p className="text-[9px] text-gray-400 italic -mt-2">
+							Dh defaults to sqrt(4*Area/π) if omitted.
+						</p>
+
 						<InitialGuessEditor node={selectedNode} />
 					</div>
 				)}

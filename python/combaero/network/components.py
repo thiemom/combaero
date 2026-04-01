@@ -546,14 +546,15 @@ class MomentumChamberNode(NetworkNode):
         length: float | None = None,
         surface: ConvectiveSurface | None = None,
         t_wall: float | None = None,
+        Dh: float | None = None,
     ):
         super().__init__(id)
         self.area = area  # Cross-sectional area for momentum calculations
+        self.port_angles_deg: dict[str, float] = port_angles_deg or {}
         self.length = length
+        self.Dh = Dh
         self.surface = surface or ConvectiveSurface()
         self.t_wall = t_wall
-        # Dictionary mapping connected element IDs to angle relative to chamber axis [deg]
-        self.port_angles_deg: dict[str, float] = port_angles_deg or {}
         self.upstream_elements = []
         self.energy_boundaries: list[EnergyBoundary] = []
 
@@ -611,7 +612,7 @@ class MomentumChamberNode(NetworkNode):
         rho = state.density()
         u = m_dot_total / (rho * self.area) if rho > 0 and self.area > 0 else 0.0
 
-        diameter = math.sqrt(4.0 * self.area / math.pi)
+        diameter = self.Dh if self.Dh is not None else math.sqrt(4.0 * self.area / math.pi)
         length = self.length if self.length is not None else diameter
 
         return self.surface.htc_and_T(
@@ -664,15 +665,27 @@ class MomentumChamberNode(NetworkNode):
         return float(cb.mach_number(velocity, state.T, state.X))
 
     def diagnostics(self, state: MixtureState) -> dict[str, float]:
+        import math
+
         import combaero as cb
 
         base = super().diagnostics(state)
+        m_dot_total = getattr(self, "_total_m_dot", 0.0)
+        rho = state.density()
+        u = m_dot_total / (rho * self.area) if rho > 0 and self.area > 0 else 0.0
+        diameter = self.Dh if self.Dh is not None else math.sqrt(4.0 * self.area / math.pi)
+
         ts = cb.transport_state(state.T, state.P, state.X)
+        re = (rho * u * diameter / ts.mu) if ts.mu > 0 else 0.0
+
         base.update(
             {
                 "mu": ts.mu,
                 "k": ts.k,
                 "Pr": ts.Pr,
+                "Re": re,
+                "Dh": diameter,
+                "velocity": u,
             }
         )
         return base
@@ -773,10 +786,18 @@ class CombustorNode(NetworkNode):
         id: str,
         method: CombustionMethodLiteral = "complete",
         pressure_loss: Any = None,
+        area: float = 0.1,
+        Dh: float | None = None,
+        surface: ConvectiveSurface | None = None,
+        t_wall: float | None = None,
     ):
         super().__init__(id)
         self.method = method
         self.pressure_loss = pressure_loss
+        self.area = area
+        self.Dh = Dh
+        self.surface = surface or ConvectiveSurface()
+        self.t_wall = t_wall
         self.upstream_elements = []
         self.fuel_boundary = None
         self.energy_boundaries: list[EnergyBoundary] = []
@@ -798,6 +819,9 @@ class CombustorNode(NetworkNode):
     ) -> tuple[float, list[float], Any]:
         """Derived T and Y for a combustor (Reaction + Mixing + energy boundaries)."""
         import combaero as cb
+
+        # Store total mass flow for use in diagnostics
+        self._total_m_dot = sum(s.m_dot for s in upstream_states) if upstream_states else 0.0
 
         if not upstream_states:
             # Default fallback
@@ -832,6 +856,32 @@ class CombustorNode(NetworkNode):
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
         # Stagnation constraint: P_total = P
         return [state.P_total - state.P], {0: {f"{self.id}.P": -1.0, f"{self.id}.P_total": 1.0}}
+
+    def diagnostics(self, state: MixtureState) -> dict[str, float]:
+        import math
+
+        import combaero as cb
+
+        base = super().diagnostics(state)
+        m_dot_total = getattr(self, "_total_m_dot", 0.0)
+        rho = state.density()
+        u = m_dot_total / (rho * self.area) if rho > 0 and self.area > 0 else 0.0
+        diameter = self.Dh if self.Dh is not None else math.sqrt(4.0 * self.area / math.pi)
+
+        ts = cb.transport_state(state.T, state.P, state.X)
+        re = (rho * u * diameter / ts.mu) if ts.mu > 0 else 0.0
+
+        base.update(
+            {
+                "mu": ts.mu,
+                "k": ts.k,
+                "Pr": ts.Pr,
+                "Re": re,
+                "Dh": diameter,
+                "velocity": u,
+            }
+        )
+        return base
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         # Store upstream elements for mixing calculations
