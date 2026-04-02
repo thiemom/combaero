@@ -1,5 +1,6 @@
 from typing import Literal
-from pydantic import BaseModel, Field, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field
 
 # --- Node Data Definitions ---
 
@@ -71,8 +72,8 @@ class OrificeData(BaseModel):
     area: float = 0.01
     Cd: float = 0.6
     auto_Cd: bool = True
-    plate_thickness: float = 0.0   # t [m]: > 0 enables thick-plate correction
-    edge_radius: float = 0.0       # r [m]: > 0 enables rounded-entry correction
+    plate_thickness: float = 0.0  # t [m]: > 0 enables thick-plate correction
+    edge_radius: float = 0.0  # r [m]: > 0 enables rounded-entry correction
     regime: Literal["default", "incompressible", "compressible"] = "default"
     initial_guess: dict[str, float] = Field(default_factory=dict)
     label: str | None = None

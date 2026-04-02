@@ -1,19 +1,20 @@
 from combaero.network import (
+    CombustorNode,
+    ConvectiveSurface,
     FlowNetwork,
     LosslessConnectionElement,
     MassFlowBoundary,
+    MomentumChamberNode,
     OrificeElement,
     PipeElement,
     PlenumNode,
     PressureBoundary,
-    CombustorNode,
-    MomentumChamberNode,
     WallConnection,
-    ConvectiveSurface,
 )
 
 from .schemas import (
-    LosslessConnectionData,
+    CombustorData,
+    CompositionData,
     MassBoundaryData,
     MomentumChamberData,
     NetworkGraphSchema,
@@ -21,10 +22,6 @@ from .schemas import (
     PipeData,
     PlenumData,
     PressureBoundaryData,
-    CompositionData,
-    CombustorData,
-    SolverSettings,
-    ReactFlowEdge,
 )
 
 
@@ -46,10 +43,7 @@ def resolve_composition(comp: CompositionData, T: float, P: float) -> list[float
         Y = cb.species.to_mass(Y)
     elif comp.source == "custom" and comp.custom_fractions:
         vec = cb.species.from_mapping(comp.custom_fractions)
-        if comp.mode == "mole":
-            Y = cb.species.to_mass(vec)
-        else:
-            Y = vec
+        Y = cb.species.to_mass(vec) if comp.mode == "mole" else vec
     else:
         Y = cb.species.dry_air_mass()
 
@@ -83,9 +77,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         elif node_type == "pressure_boundary":
             data = PressureBoundaryData(**node_data)
             Y = resolve_composition(data.composition, data.T_total, data.P_total)
-            node = PressureBoundary(
-                node_id, P_total=data.P_total, T_total=data.T_total, Y=Y
-            )
+            node = PressureBoundary(node_id, P_total=data.P_total, T_total=data.T_total, Y=Y)
             node.initial_guess = data.initial_guess
             net.add_node(node)
             nodes_map[node_id] = node
@@ -101,6 +93,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             node.initial_guess = data.initial_guess
             net.add_node(node)
             nodes_map[node_id] = node
+        elif node_type == "probe":
+            pass  # Display-only diagnostic nodes -- not part of the solver graph
         else:
             # This is an element node (Pipe, Orifice, etc.)
             element_nodes.append(node_schema)
@@ -158,24 +152,35 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             data = PipeData(**elem_data)
             conv_area = 3.1415926535 * data.D * data.L
             elem = PipeElement(
-                elem_id, from_node=source_id, to_node=target_id,
-                length=data.L, diameter=data.D, roughness=data.roughness,
-                surface=ConvectiveSurface(area=conv_area)
+                elem_id,
+                from_node=source_id,
+                to_node=target_id,
+                length=data.L,
+                diameter=data.D,
+                roughness=data.roughness,
+                surface=ConvectiveSurface(area=conv_area),
             )
-            regime = data.regime if data.regime != "default" else schema.solver_settings.global_regime
+            regime = (
+                data.regime if data.regime != "default" else schema.solver_settings.global_regime
+            )
             elem.regime = regime
             elem.initial_guess = data.initial_guess
             net.add_element(elem)
         elif elem_type == "orifice":
             data = OrificeData(**elem_data)
             elem = OrificeElement(
-                elem_id, from_node=source_id, to_node=target_id,
-                area=data.area, Cd=data.Cd,
+                elem_id,
+                from_node=source_id,
+                to_node=target_id,
+                area=data.area,
+                Cd=data.Cd,
                 auto_Cd=data.auto_Cd,
                 plate_thickness=data.plate_thickness,
                 edge_radius=data.edge_radius,
             )
-            regime = data.regime if data.regime != "default" else schema.solver_settings.global_regime
+            regime = (
+                data.regime if data.regime != "default" else schema.solver_settings.global_regime
+            )
             elem.regime = regime
             elem.initial_guess = data.initial_guess
             net.add_element(elem)
@@ -188,7 +193,9 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         if edge.source in nodes_map and edge.target in nodes_map and edge.data is None:
             auto_id = f"__auto_link__{edge.source}__{edge.target}"
             if auto_id not in net.elements:
-                elem = LosslessConnectionElement(auto_id, from_node=edge.source, to_node=edge.target)
+                elem = LosslessConnectionElement(
+                    auto_id, from_node=edge.source, to_node=edge.target
+                )
                 net.add_element(elem)
 
     # 4. Fourth Pass: Thermal Walls
@@ -199,10 +206,16 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             t = edge.data.get("thickness", 0.003)
             k = edge.data.get("conductivity", 20.0)
             a = edge.data.get("area", 0.05)
-            net.add_wall(WallConnection(
-                id=wall_id, element_a=edge.source, element_b=edge.target,
-                wall_thickness=t, wall_conductivity=k, contact_area=a
-            ))
+            net.add_wall(
+                WallConnection(
+                    id=wall_id,
+                    element_a=edge.source,
+                    element_b=edge.target,
+                    wall_thickness=t,
+                    wall_conductivity=k,
+                    contact_area=a,
+                )
+            )
             net.thermal_coupling_enabled = True
 
     return net

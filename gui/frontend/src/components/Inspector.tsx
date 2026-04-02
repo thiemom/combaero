@@ -1,4 +1,4 @@
-import { Activity, RotateCw } from "lucide-react";
+import { Activity, Crosshair, RotateCw } from "lucide-react";
 import useStore from "../store/useStore";
 import CompositionEditor from "./CompositionEditor";
 import NumericInput from "./NumericInput";
@@ -81,6 +81,133 @@ const Inspector = () => {
 		return (
 			<aside className="w-80 border-l bg-white p-4 flex flex-col gap-4 italic text-gray-400">
 				Select a node or edge to edit properties
+			</aside>
+		);
+	}
+
+	// ── Probe Inspector ──────────────────────────────────────────
+	if (selectedNode?.type === "probe") {
+		const probeData = selectedNode.data;
+		const targetNode = nodes.find((n) => n.id === probeData.target_id);
+		const result = targetNode?.data?.result;
+
+		// Build available quantity list from target's result keys
+		const availableKeys: string[] = [];
+		if (result) {
+			if (result.state) {
+				for (const k of Object.keys(result.state)) {
+					if (typeof result.state[k] === "number")
+						availableKeys.push(`state.${k}`);
+				}
+			}
+			for (const k of Object.keys(result)) {
+				if (k !== "state" && typeof result[k] === "number")
+					availableKeys.push(k);
+			}
+		}
+
+		const slotSelect = (
+			slot: "slot1_key" | "slot2_key",
+			current: string | undefined,
+		) => (
+			<select
+				className="p-1.5 border rounded text-xs bg-white w-full"
+				value={current ?? ""}
+				onChange={(e) =>
+					updateNodeData(selectedNode.id, {
+						[slot]: e.target.value || undefined,
+					})
+				}
+			>
+				<option value="">— select quantity —</option>
+				{availableKeys.map((k) => (
+					<option key={k} value={k}>
+						{k}
+					</option>
+				))}
+			</select>
+		);
+
+		return (
+			<aside className="w-80 border-l bg-white p-4 flex flex-col gap-4 overflow-y-auto">
+				<h2 className="text-lg font-bold border-b pb-2 flex items-center gap-2 text-blue-600">
+					<Crosshair size={18} />
+					<span>Probe</span>
+				</h2>
+
+				{/* Label */}
+				<div className="flex flex-col gap-1">
+					<label className="text-xs font-bold text-gray-500 uppercase">
+						Label
+					</label>
+					<input
+						type="text"
+						value={probeData.label ?? "Probe"}
+						onChange={(e) =>
+							updateNodeData(selectedNode.id, { label: e.target.value })
+						}
+						className="p-1.5 border rounded text-xs w-full"
+					/>
+				</div>
+
+				{/* Target */}
+				<div className="flex flex-col gap-1">
+					<label className="text-xs font-bold text-gray-500 uppercase">
+						Target Node / Element
+					</label>
+					<select
+						className="p-1.5 border rounded text-xs bg-white w-full"
+						value={probeData.target_id ?? ""}
+						onChange={(e) =>
+							updateNodeData(selectedNode.id, {
+								target_id: e.target.value || undefined,
+							})
+						}
+					>
+						<option value="">— select target —</option>
+						{nodes
+							.filter((n) => n.id !== selectedNode.id && n.type !== "probe")
+							.map((n) => (
+								<option key={n.id} value={n.id}>
+									{n.data?.label || n.type?.replace(/_/g, " ") || n.id}
+								</option>
+							))}
+					</select>
+					{probeData.target_id && !targetNode && (
+						<span className="text-amber-500 text-[10px]">
+							⚠ Target not found
+						</span>
+					)}
+				</div>
+
+				{/* Slot selectors */}
+				<div className="flex flex-col gap-3 border-t pt-3">
+					<div className="text-[10px] font-bold text-stone-400 uppercase">
+						Display Slots
+					</div>
+					{!probeData.target_id && (
+						<p className="text-[10px] text-stone-400 italic">
+							Select a target first to see available quantities.
+						</p>
+					)}
+					{probeData.target_id && (
+						<>
+							<div className="flex flex-col gap-1">
+								<label className="text-[10px] text-stone-500">Slot 1</label>
+								{slotSelect("slot1_key", probeData.slot1_key)}
+							</div>
+							<div className="flex flex-col gap-1">
+								<label className="text-[10px] text-stone-500">Slot 2</label>
+								{slotSelect("slot2_key", probeData.slot2_key)}
+							</div>
+						</>
+					)}
+					{probeData.target_id && availableKeys.length === 0 && (
+						<p className="text-[10px] text-stone-400 italic">
+							Run Solve to populate available quantities.
+						</p>
+					)}
+				</div>
 			</aside>
 		);
 	}

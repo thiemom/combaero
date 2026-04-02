@@ -1,6 +1,7 @@
 import {
 	ArrowRight,
 	ChevronRight,
+	Crosshair,
 	Database,
 	Flame,
 	Link,
@@ -163,6 +164,20 @@ const Sidebar = () => {
 			>
 				<Link size={18} className="text-slate-400" />
 				<span>Lossless Connection</span>
+			</button>
+
+			{/* Diagnostics divider */}
+			<div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mt-2 mb-0.5">
+				Diagnostics
+			</div>
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border border-blue-200 rounded cursor-grab hover:bg-blue-50 transition-colors w-full text-left bg-white text-blue-700"
+				onDragStart={(event) => onDragStart(event, "probe")}
+				draggable
+			>
+				<Crosshair size={18} className="text-blue-400" />
+				<span>Probe</span>
 			</button>
 
 			<div className="mt-auto pt-6 border-t border-stone-200">

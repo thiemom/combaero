@@ -1098,17 +1098,26 @@ class OrificeElement(NetworkElement):
         # Effective Cd actually used in this solve
         effective_cd = self._effective_Cd(state_in, state_out)
 
-        # Transport properties
-        ts = cb.transport_state(state_in.T, state_in.P, state_in.X)
+        # Full thermo + transport bundle at inlet static conditions (mole fractions X)
+        cs = cb.complete_state(state_in.T, state_in.P, state_in.X)
 
         return {
             "mach": mach_throat,
             "p_ratio": p_ratio,
             "Cd": effective_cd,
             "auto_Cd": float(self.auto_Cd),  # 1.0 = computed from correlation, 0.0 = user-supplied
-            "mu": ts.mu,
-            "k": ts.k,
-            "Pr": ts.Pr,
+            # Thermo
+            "h": cs.thermo.h,
+            "s": cs.thermo.s,
+            "u": cs.thermo.u,
+            "rho": cs.thermo.rho,
+            "gamma": cs.thermo.gamma,
+            "a": cs.thermo.a,
+            # Transport
+            "mu": cs.transport.mu,
+            "k": cs.transport.k,
+            "Pr": cs.transport.Pr,
+            "nu": cs.transport.nu,
         }
 
 
@@ -1438,20 +1447,29 @@ class PipeElement(NetworkElement):
 
         p_ratio_total = state_out.P_total / state_in.P_total if state_in.P_total > 0 else 1.0
 
-        # Transport properties
-        ts = cb.transport_state(state_in.T, state_in.P, state_in.X)
+        # Full thermo + transport bundle at inlet static conditions (mole fractions X)
+        cs = cb.complete_state(state_in.T, state_in.P, state_in.X)
 
         # Reynolds number at inlet: Re = rho * v * D / mu
-        re_in = (rho_in * v_in * self.diameter / ts.mu) if ts.mu > 0 else 0.0
+        re_in = (rho_in * v_in * self.diameter / cs.transport.mu) if cs.transport.mu > 0 else 0.0
 
         return {
             "mach_in": mach_in,
             "mach_out": mach_out,
             "p_ratio_total": p_ratio_total,
             "Re": re_in,
-            "mu": ts.mu,
-            "k": ts.k,
-            "Pr": ts.Pr,
+            # Thermo
+            "h": cs.thermo.h,
+            "s": cs.thermo.s,
+            "u": cs.thermo.u,
+            "rho": cs.thermo.rho,
+            "gamma": cs.thermo.gamma,
+            "a": cs.thermo.a,
+            # Transport
+            "mu": cs.transport.mu,
+            "k": cs.transport.k,
+            "Pr": cs.transport.Pr,
+            "nu": cs.transport.nu,
         }
 
     def get_spatial_profile(

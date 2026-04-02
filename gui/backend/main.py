@@ -1,11 +1,11 @@
 import asyncio
 import io
 
-import combaero as cb
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
+import combaero as cb
 from combaero.network import NetworkSolver
 
 from .graph_builder import build_network_from_schema
@@ -66,9 +66,7 @@ def _solve_sync(schema: NetworkGraphSchema):
     """
     net = build_network_from_schema(schema)
     solver = NetworkSolver(net)
-    result = solver.solve(
-        init_strategy=schema.solver_settings.init_strategy
-    )
+    result = solver.solve(init_strategy=schema.solver_settings.init_strategy)
     success = bool(result.get("__success__", False))
 
     node_results = {}
@@ -77,7 +75,9 @@ def _solve_sync(schema: NetworkGraphSchema):
         node_keys = {
             k.split(".", 1)[1]: v
             for k, v in result.items()
-            if k.startswith(f"{node_id}.") and k.split(".", 1)[1] not in ["T", "P", "T_total", "P_total", "mach"] and not k.split(".", 1)[1].startswith("Y[")
+            if k.startswith(f"{node_id}.")
+            and k.split(".", 1)[1] not in ["T", "P", "T_total", "P_total", "mach"]
+            and not k.split(".", 1)[1].startswith("Y[")
         }
 
         # P and T extraction
@@ -129,16 +129,18 @@ def _solve_sync(schema: NetworkGraphSchema):
 
     element_results = {}
     for elem_id in net.elements:
-        elem_keys = {k.split(".", 1)[1]: v for k, v in result.items() if k.startswith(f"{elem_id}.") and k != f"{elem_id}.m_dot"}
+        elem_keys = {
+            k.split(".", 1)[1]: v
+            for k, v in result.items()
+            if k.startswith(f"{elem_id}.") and k != f"{elem_id}.m_dot"
+        }
         m_dot = float(result.get(f"{elem_id}.m_dot", 0.0))
         element_results[elem_id] = ElementResult(m_dot=m_dot, success=success, **elem_keys)
 
     edge_results = {}
     for edge_id in net.walls:
         edge_keys = {
-            k.split(".", 1)[1]: float(v)
-            for k, v in result.items()
-            if k.startswith(f"{edge_id}.")
+            k.split(".", 1)[1]: float(v) for k, v in result.items() if k.startswith(f"{edge_id}.")
         }
         if edge_keys:
             edge_results[edge_id] = edge_keys
@@ -150,7 +152,9 @@ def _solve_sync(schema: NetworkGraphSchema):
 async def solve(schema: NetworkGraphSchema):
     try:
         # Offload CPU-bound C++ solver to a worker thread
-        result, node_results, element_results, edge_results, _ = await asyncio.to_thread(_solve_sync, schema)
+        result, node_results, element_results, edge_results, _ = await asyncio.to_thread(
+            _solve_sync, schema
+        )
 
         return SolveResponse(
             success=result.get("__success__", False),
@@ -183,7 +187,7 @@ async def export_results(schema: NetworkGraphSchema):
                 "P": res.state.P,
                 "P_total": res.state.P_total,
                 "m_dot": getattr(res.state, "m_dot", None),
-                "mach": res.state.mach
+                "mach": res.state.mach,
             }
             if hasattr(res.state, "Y") and res.state.Y:
                 for i, y_val in enumerate(res.state.Y):

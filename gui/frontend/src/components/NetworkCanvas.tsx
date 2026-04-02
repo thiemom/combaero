@@ -15,6 +15,7 @@ import OrificeNode from "./nodes/OrificeNode";
 import PipeNode from "./nodes/PipeNode";
 import PlenumNode from "./nodes/PlenumNode";
 import PressureBoundaryNode from "./nodes/PressureBoundaryNode";
+import ProbeNode from "./nodes/ProbeNode";
 import ThermalEdge from "./ThermalEdge";
 
 const NODE_TYPES = Object.freeze({
@@ -26,6 +27,7 @@ const NODE_TYPES = Object.freeze({
 	combustor: CombustorNode,
 	momentum_chamber: MomentumChamberNode,
 	lossless_connection: LosslessNode,
+	probe: ProbeNode,
 });
 
 const EDGE_TYPES = Object.freeze({
