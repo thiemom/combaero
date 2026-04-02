@@ -5,6 +5,7 @@ const API_BASE_URL = "http://localhost:8000";
 export interface NetworkGraph {
 	nodes: any[];
 	edges: any[];
+	solver_settings?: Record<string, any>;
 }
 
 export interface NodeResult {

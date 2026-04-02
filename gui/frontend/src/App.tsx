@@ -1,6 +1,6 @@
 import axios from "axios";
 import { Download, Play, Zap } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { ReactFlowProvider } from "reactflow";
 import { exportResults, solveNetwork } from "./api";
 import Inspector from "./components/Inspector";
@@ -10,7 +10,8 @@ import useStore from "./store/useStore";
 
 const App = () => {
 	const reactFlowWrapper = useRef<HTMLDivElement>(null);
-	const { nodes, edges, setSolveResults } = useStore();
+	const { nodes, edges, solverSettings, setSolveResults } = useStore();
+	const [isSolving, setIsSolving] = useState(false);
 
 	const validateNetwork = () => {
 		const errors: string[] = [];
@@ -60,8 +61,13 @@ const App = () => {
 			return;
 		}
 
+		setIsSolving(true);
 		try {
-			const results = await solveNetwork({ nodes, edges });
+			const results = await solveNetwork({
+				nodes,
+				edges,
+				solver_settings: solverSettings,
+			});
 			setSolveResults(results);
 		} catch (err) {
 			console.error("Solve failed:", err);
@@ -75,12 +81,14 @@ const App = () => {
 				return;
 			}
 			alert("Solve failed. Check console for details.");
+		} finally {
+			setIsSolving(false);
 		}
 	};
 
 	const handleExport = async () => {
 		try {
-			await exportResults({ nodes, edges });
+			await exportResults({ nodes, edges, solver_settings: solverSettings });
 		} catch (err) {
 			console.error("Export failed:", err);
 		}
@@ -109,9 +117,33 @@ const App = () => {
 					<button
 						type="button"
 						onClick={handleSolve}
-						className="flex items-center gap-2 px-6 py-1.5 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors shadow-sm text-sm font-bold"
+						disabled={isSolving}
+						className="flex items-center gap-2 px-6 py-1.5 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors shadow-sm text-sm font-bold disabled:opacity-60 disabled:cursor-not-allowed"
 					>
-						<Play size={16} fill="white" /> Solve Network
+						{isSolving ? (
+							<>
+								<svg
+									aria-label="Solving"
+									role="img"
+									className="animate-spin"
+									width={16}
+									height={16}
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									strokeWidth={2.5}
+								>
+									<title>Solving</title>
+									<circle cx="12" cy="12" r="10" strokeOpacity={0.25} />
+									<path d="M12 2a10 10 0 0 1 10 10" />
+								</svg>
+								Solving…
+							</>
+						) : (
+							<>
+								<Play size={16} fill="white" /> Solve Network
+							</>
+						)}
 					</button>
 				</div>
 			</header>
@@ -127,8 +159,10 @@ const App = () => {
 
 			{/* Footer / Status Bar */}
 			<footer className="h-8 border-t bg-stone-100 flex items-center px-4 text-[10px] text-stone-500 uppercase tracking-widest font-bold">
-				Engine Solver Status: Idle | Nodes: {nodes.length} | Elements:{" "}
-				{edges.length}
+				{isSolving
+					? "Engine Solver Status: Running…"
+					: "Engine Solver Status: Idle"}{" "}
+				| Nodes: {nodes.length} | Elements: {edges.length}
 			</footer>
 		</div>
 	);

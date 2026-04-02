@@ -108,4 +108,4 @@ TODO.md
 # Benchmark run outputs (auto-generated, not for tracking)
 benchmarks/runs/
 benchmarks/network_solver_benchmark_latest.json
-gui/nw_test.json
+gui/nw_*.json
