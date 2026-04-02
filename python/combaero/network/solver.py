@@ -1439,6 +1439,12 @@ class NetworkSolver:
         for eid, element in self.network.elements.items():
             state_in = self._get_node_state(self.network.nodes[element.from_node], final_x)
             state_out = self._get_node_state(self.network.nodes[element.to_node], final_x)
+            # Inject solved m_dot so velocity-dependent diagnostics (e.g. Mach) are correct
+            m_indices = self._unknown_indices.get(eid, [])
+            if m_indices:
+                m_solved = float(final_x[m_indices[0]])
+                state_in.m_dot = m_solved
+                state_out.m_dot = m_solved
             diag = element.diagnostics(state_in, state_out)
             for key, val in diag.items():
                 sol_dict[f"{eid}.{key}"] = val
