@@ -170,7 +170,10 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             data = OrificeData(**elem_data)
             elem = OrificeElement(
                 elem_id, from_node=source_id, to_node=target_id,
-                area=data.area, Cd=data.Cd
+                area=data.area, Cd=data.Cd,
+                auto_Cd=data.auto_Cd,
+                plate_thickness=data.plate_thickness,
+                edge_radius=data.edge_radius,
             )
             regime = data.regime if data.regime != "default" else schema.solver_settings.global_regime
             elem.regime = regime

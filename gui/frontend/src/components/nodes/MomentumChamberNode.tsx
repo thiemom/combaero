@@ -47,11 +47,13 @@ const MomentumChamberNode = ({ id, data, selected }: NodeProps) => {
 				</div>
 				{isSolved && data.result.state && (
 					<>
+						{data.result.state.P_total !== undefined && (
+							<div className="text-[9px] text-gray-500 font-mono whitespace-nowrap">
+								Pt {(data.result.state.P_total / 1e5).toFixed(2)} bar
+							</div>
+						)}
 						<div className="text-[9px] text-gray-500 font-mono whitespace-nowrap">
-							{data.result.state.T.toFixed(0)} K
-						</div>
-						<div className="text-[9px] text-gray-500 font-mono whitespace-nowrap">
-							{(data.result.state.P / 1e5).toFixed(2)} bar
+							P&nbsp;&nbsp;{(data.result.state.P / 1e5).toFixed(2)} bar
 						</div>
 					</>
 				)}

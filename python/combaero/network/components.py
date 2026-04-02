@@ -894,6 +894,17 @@ class OrificeElement(NetworkElement):
 
     - regime='incompressible': m_dot = Cd * A * sqrt(2 * rho * dP)
     - regime='compressible': Uses isentropic nozzle flow with smooth choked transition
+
+    When auto_Cd=True (default), the discharge coefficient is computed from the
+    CombAero orifice correlations (cb.Cd_orifice) using the orifice bore diameter
+    (derived from area) and the upstream pipe diameter (discovered via resolve_topology).
+    The correlation is auto-selected based on geometry:
+      - edge_radius > 0  -> rounded-entry (Idelchik)
+      - plate_thickness > 0 -> thick-plate (Idelchik)
+      - otherwise        -> sharp thin-plate (Reader-Harris/Gallagher, ISO 5167-2)
+    When no upstream pipe is found (e.g. direct plenum connection, beta -> 0),
+    the RHG formula extrapolates to Cd ~ 0.597. The user-supplied Cd is always
+    used as fallback when auto_Cd=False.
     """
 
     def __init__(
@@ -904,13 +915,21 @@ class OrificeElement(NetworkElement):
         Cd: float,
         area: float,
         regime: Literal["incompressible", "compressible"] = "incompressible",
+        auto_Cd: bool = False,
+        plate_thickness: float = 0.0,
+        edge_radius: float = 0.0,
     ):
         super().__init__(id, from_node, to_node)
         self.Cd = Cd
         self.area = area
         self.regime = regime
+        self.auto_Cd = auto_Cd
+        self.plate_thickness = plate_thickness
+        self.edge_radius = edge_radius
         self.upstream_diameter: float | None = None
         self.downstream_diameter: float | None = None
+        # OrificeGeometry built in resolve_topology (if auto_Cd)
+        self._orifice_geom: object | None = None
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         # Evaluate both sides of the node for geometry discovery
@@ -932,12 +951,14 @@ class OrificeElement(NetworkElement):
             self.downstream_diameter = downstream_pipes[0].diameter
 
         # Pre-compute beta for velocity-of-approach factor
-        self.beta = 0.0
-        if self.upstream_diameter and self.upstream_diameter > 0:
-            import math
-            import warnings
+        import math
+        import warnings
 
-            d_bore = math.sqrt(4.0 * self.area / math.pi)
+        d_bore = math.sqrt(4.0 * self.area / math.pi)
+        self.beta = 0.0
+        self._orifice_geom = None
+
+        if self.upstream_diameter and self.upstream_diameter > 0:
             if d_bore < self.upstream_diameter:
                 self.beta = d_bore / self.upstream_diameter
             else:
@@ -949,15 +970,63 @@ class OrificeElement(NetworkElement):
                     stacklevel=2,
                 )
 
+        if self.auto_Cd:
+            import combaero as cb
+
+            # Build geometry descriptor for Cd correlation.
+            # D=0 when no upstream pipe known (plenum connection) -> beta=0 -> RHG extrapolates to ~0.597.
+            D_up = (
+                self.upstream_diameter
+                if self.upstream_diameter and self.upstream_diameter > 0
+                else 0.0
+            )
+            geom = cb.OrificeGeometry()
+            geom.d = d_bore
+            geom.D = D_up
+            geom.t = self.plate_thickness
+            geom.r = self.edge_radius
+            self._orifice_geom = geom
+
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
 
+    def _effective_Cd(self, state_in: "MixtureState", state_out: "MixtureState") -> float:
+        """Return effective Cd: from correlation when auto_Cd=True, else user-supplied."""
+        if not self.auto_Cd or self._orifice_geom is None:
+            return self.Cd
+
+        import combaero as cb
+
+        # Estimate Re_D from current m_dot and upstream viscosity.
+        # When D=0 (no upstream pipe), Re_D is set to a typical mid-range value.
+        D_up = self._orifice_geom.D
+        if D_up > 0.0:
+            ts = cb.transport_state(state_in.T, state_in.P, state_in.X)
+            mu = ts.mu if ts.mu > 0.0 else 1.8e-5
+            m_dot_abs = abs(state_in.m_dot)
+            Re_D = (4.0 * m_dot_abs) / (3.14159265358979 * D_up * mu) if m_dot_abs > 1e-12 else 1e4
+        else:
+            Re_D = 1e5  # typical reference when no upstream pipe
+
+        flow_state = cb.OrificeState()
+        flow_state.Re_D = Re_D
+        flow_state.dP = max(state_in.P_total - state_out.P, 1.0)
+        flow_state.rho = cb.density(state_in.T, state_in.P, state_in.X)
+        flow_state.mu = cb.transport_state(state_in.T, state_in.P, state_in.X).mu
+
+        # cb.Cd_orifice auto-selects RHG / thick-plate / rounded based on geometry flags.
+        try:
+            return float(cb.Cd_orifice(self._orifice_geom, flow_state))
+        except Exception:
+            return self.Cd  # fallback to user value on any C++ error
+
     def residuals(
-        self, state_in: MixtureState, state_out: MixtureState
+        self, state_in: "MixtureState", state_out: "MixtureState"
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
         import combaero as cb
 
         m_dot = state_in.m_dot
+        effective_cd = self._effective_Cd(state_in, state_out)
 
         if self.regime == "compressible":
             # Use compressible isentropic nozzle flow with smooth choked transition
@@ -967,7 +1036,7 @@ class OrificeElement(NetworkElement):
                 state_in.T,
                 state_in.Y,
                 state_out.P,
-                self.Cd,
+                effective_cd,
                 self.area,
                 getattr(self, "beta", 0.0),
             )
@@ -980,7 +1049,7 @@ class OrificeElement(NetworkElement):
                 state_in.T,
                 state_in.Y,
                 state_out.P,
-                self.Cd,
+                effective_cd,
                 self.area,
                 beta=getattr(self, "beta", 0.0),
             )

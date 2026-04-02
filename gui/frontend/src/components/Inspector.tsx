@@ -605,7 +605,7 @@ const Inspector = () => {
 												<span className="text-right">
 													{selectedNode.data.result.state.gamma.toFixed(4)}
 												</span>
-												<span className="text-stone-500">a (sos):</span>
+												<span className="text-stone-500">a:</span>
 												<span className="text-right">
 													{selectedNode.data.result.state.a.toFixed(2)} m/s
 												</span>
