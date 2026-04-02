@@ -1441,10 +1441,14 @@ class PipeElement(NetworkElement):
         # Transport properties
         ts = cb.transport_state(state_in.T, state_in.P, state_in.X)
 
+        # Reynolds number at inlet: Re = rho * v * D / mu
+        re_in = (rho_in * v_in * self.diameter / ts.mu) if ts.mu > 0 else 0.0
+
         return {
             "mach_in": mach_in,
             "mach_out": mach_out,
             "p_ratio_total": p_ratio_total,
+            "Re": re_in,
             "mu": ts.mu,
             "k": ts.k,
             "Pr": ts.Pr,

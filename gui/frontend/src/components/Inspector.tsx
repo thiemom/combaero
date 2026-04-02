@@ -770,6 +770,16 @@ const Inspector = () => {
 											Transport
 										</div>
 										<div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs font-mono">
+											{selectedNode.data.result.Re !== undefined && (
+												<>
+													<div className="text-stone-500">Re:</div>
+													<div className="text-right font-bold">
+														{selectedNode.data.result.Re.toLocaleString("en", {
+															maximumFractionDigits: 0,
+														})}
+													</div>
+												</>
+											)}
 											<div className="text-stone-500">μ (viscosity):</div>
 											<div className="text-right font-bold">
 												{selectedNode.data.result.mu.toExponential(2)} Pa·s
