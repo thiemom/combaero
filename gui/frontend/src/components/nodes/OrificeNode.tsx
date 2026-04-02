@@ -7,43 +7,57 @@ const OrificeNode = ({ data, selected }: NodeProps) => {
 	const isSolved = !!data.result;
 	const isVertical = rotation === 90 || rotation === 270;
 
-	// Text rotation to keep labels upright
-	const textRotation = rotation === 90 || rotation === 180 ? 180 : 0;
+	// Orientation logic: Vertical text stays Bottom-to-Top
+	const textRotation = isVertical ? 270 : 0;
+
+	// Layout sizing and flex direction
+	const containerStyle = {
+		display: "flex",
+		alignItems: "center",
+		justifyContent: "center",
+		gap: "4px",
+		minHeight: isVertical ? 120 : 48,
+		minWidth: isVertical ? 48 : 120,
+		flexDirection:
+			rotation === 90
+				? ("column" as const)
+				: rotation === 180
+					? ("row-reverse" as const)
+					: rotation === 270
+						? ("column-reverse" as const)
+						: ("row" as const),
+	};
 
 	return (
 		<div
-			className={`px-3 py-1 shadow-sm rounded bg-stone-50 border-2 flex items-center transition-colors ${
+			className={`px-3 py-1 shadow-sm rounded bg-stone-50 border-2 transition-all ${
 				selected
 					? "border-blue-500 shadow-blue-100"
 					: isSolved
 						? "border-green-400"
 						: "border-stone-300"
 			}`}
-			style={{
-				flexDirection: isVertical ? "row" : "column",
-				minHeight: isVertical ? 32 : 48,
-				minWidth: isVertical ? 48 : 120,
-			}}
+			style={containerStyle}
 		>
+			{/* Icon: Rotates with node */}
 			<div
-				className="flex items-center gap-2 pointer-events-none"
-				style={{
-					transform: `rotate(${rotation}deg)`,
-				}}
+				className="flex items-center justify-center p-1 bg-white rounded border border-stone-200 pointer-events-none"
+				style={{ transform: `rotate(${rotation}deg)` }}
 			>
-				<div className="flex flex-col items-center justify-center p-1 bg-white rounded border border-stone-200">
-					<ChevronRight size={14} className="text-orange-400" />
-				</div>
+				<ChevronRight size={14} className="text-orange-400" />
 			</div>
 
+			{/* Text: Stays upright or vertical B-T */}
 			<div
-				className="flex flex-col items-center gap-0 ml-1"
+				className="flex flex-col items-center pointer-events-none"
 				style={{ transform: `rotate(${textRotation}deg)` }}
 			>
 				<div className="text-[10px] font-bold text-gray-400 uppercase leading-none">
 					{data.label ? data.label : "Orifice"}
 				</div>
-				<div className="text-xs font-semibold">Cd: {data.Cd}</div>
+				<div className="text-xs font-semibold whitespace-nowrap">
+					Cd: {data.Cd}
+				</div>
 			</div>
 
 			{/* Flow Handles */}

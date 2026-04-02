@@ -7,48 +7,57 @@ const PipeNode = ({ data, selected }: NodeProps) => {
 	const isSolved = !!data.result;
 	const isVertical = rotation === 90 || rotation === 270;
 
-	// Orientation logic: keeps text readable
-	const textRotation = rotation === 90 || rotation === 180 ? 180 : 0;
+	// Orientation logic: Vertical text stays Bottom-to-Top
+	const textRotation = isVertical ? 270 : 0;
+
+	// Layout sizing
+	const containerStyle = {
+		display: "flex",
+		alignItems: "center",
+		justifyContent: "center",
+		gap: "8px",
+		minHeight: isVertical ? 120 : 48,
+		minWidth: isVertical ? 48 : 120,
+		flexDirection:
+			rotation === 90
+				? ("column" as const)
+				: rotation === 180
+					? ("row-reverse" as const)
+					: rotation === 270
+						? ("column-reverse" as const)
+						: ("row" as const),
+	};
 
 	return (
 		<div
-			className={`px-4 py-2 shadow-md rounded border-2 bg-white transition-colors flex items-center justify-center ${
+			className={`px-4 py-2 shadow-md rounded border-2 bg-white transition-all ${
 				selected
 					? "border-blue-500 shadow-blue-100"
 					: isSolved
 						? "border-green-400"
 						: "border-stone-300"
 			}`}
-			style={{
-				flexDirection: isVertical ? "row" : "column",
-				minHeight: isVertical ? 32 : data.label ? 64 : 48,
-				minWidth: isVertical ? (data.label ? 64 : 48) : data.label ? 128 : 96,
-			}}
+			style={containerStyle}
 		>
+			{/* Icon: Rotates with node */}
 			<div
-				className="flex items-center gap-3 pointer-events-none"
-				style={{
-					transform: `rotate(${rotation}deg)`,
-				}}
+				className="flex items-center justify-center p-1 bg-stone-100 rounded pointer-events-none"
+				style={{ transform: `rotate(${rotation}deg)` }}
 			>
-				<div
-					className="flex flex-col items-center"
-					style={{ transform: `rotate(${textRotation}deg)` }}
-				>
-					<div className="flex items-center gap-2">
-						<div className="p-1 bg-stone-100 rounded">
-							<Settings2 size={16} className="text-stone-600" />
-						</div>
-						<div className="flex flex-col">
-							<span className="text-[10px] font-bold text-gray-400 uppercase leading-tight">
-								{data.label ? data.label : "Pipe"}
-							</span>
-							<span className="text-xs font-bold">
-								L: {data.L}m | D: {data.D}m
-							</span>
-						</div>
-					</div>
-				</div>
+				<Settings2 size={16} className="text-stone-600" />
+			</div>
+
+			{/* Text: Stays upright or vertical B-T */}
+			<div
+				className="flex flex-col items-center pointer-events-none"
+				style={{ transform: `rotate(${textRotation}deg)` }}
+			>
+				<span className="text-[10px] font-bold text-gray-400 uppercase leading-none">
+					{data.label ? data.label : "Pipe"}
+				</span>
+				<span className="text-xs font-bold whitespace-nowrap">
+					L: {data.L}m | D: {data.D}m
+				</span>
 			</div>
 
 			{/* Flow Handles */}
