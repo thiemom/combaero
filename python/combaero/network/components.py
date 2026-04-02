@@ -1465,14 +1465,14 @@ class PipeElement(NetworkElement):
         """
         import combaero as cba
 
-        rho = cba.density(state_in.T, state_in.P, state_in.Y)
+        rho = cba.density(state_in.T, state_in.P, state_in.X)
         u = cba.pipe_velocity(state_in.m_dot, self.diameter, rho)
 
         if self.regime == "incompressible":
             res = cba.pipe_flow_rough(
                 state_in.T,
                 state_in.P,
-                state_in.Y,
+                state_in.X,
                 u,
                 self.length,
                 self.diameter,
