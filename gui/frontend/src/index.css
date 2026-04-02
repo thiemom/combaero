@@ -23,9 +23,120 @@ body {
 	min-height: 100vh;
 }
 
-/* React Flow overrrides for Tailwind compatibility */
+/* React Flow overrides for Tailwind compatibility */
 .react-flow__node {
 	border-radius: 0;
 	border: none;
 	background: none;
+}
+
+/* --- Handle triangle markers (inlet/outlet indicators) --- */
+
+/* Flow-target handles: triangle pointing INTO the node */
+.react-flow__handle[data-handleid="flow-target"] {
+	width: 0 !important;
+	height: 0 !important;
+	min-width: 0 !important;
+	min-height: 0 !important;
+	background: transparent !important;
+	border: none !important;
+	border-radius: 0 !important;
+}
+.react-flow__handle-left[data-handleid="flow-target"] {
+	border-top: 5px solid transparent;
+	border-bottom: 5px solid transparent;
+	border-left: 7px solid #3b82f6;
+}
+.react-flow__handle-right[data-handleid="flow-target"] {
+	border-top: 5px solid transparent;
+	border-bottom: 5px solid transparent;
+	border-right: 7px solid #3b82f6;
+}
+.react-flow__handle-top[data-handleid="flow-target"] {
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;
+	border-top: 7px solid #3b82f6;
+}
+.react-flow__handle-bottom[data-handleid="flow-target"] {
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;
+	border-bottom: 7px solid #3b82f6;
+}
+
+/* Flow-source handles: triangle pointing AWAY from the node */
+.react-flow__handle[data-handleid="flow-source"] {
+	width: 0 !important;
+	height: 0 !important;
+	min-width: 0 !important;
+	min-height: 0 !important;
+	background: transparent !important;
+	border: none !important;
+	border-radius: 0 !important;
+}
+.react-flow__handle-left[data-handleid="flow-source"] {
+	border-top: 5px solid transparent;
+	border-bottom: 5px solid transparent;
+	border-right: 7px solid #22c55e;
+}
+.react-flow__handle-right[data-handleid="flow-source"] {
+	border-top: 5px solid transparent;
+	border-bottom: 5px solid transparent;
+	border-left: 7px solid #22c55e;
+}
+.react-flow__handle-top[data-handleid="flow-source"] {
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;
+	border-bottom: 7px solid #22c55e;
+}
+.react-flow__handle-bottom[data-handleid="flow-source"] {
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;
+	border-top: 7px solid #22c55e;
+}
+
+/* Thermal handles: small orange dots */
+.react-flow__handle[data-handleid^="thermal-"] {
+	width: 6px !important;
+	height: 6px !important;
+	min-width: 6px !important;
+	min-height: 6px !important;
+	background: #ff9800 !important;
+	border: none !important;
+	border-radius: 50% !important;
+}
+
+/* Plenum multi-flow handles */
+.react-flow__handle[data-handleid^="flow-left"],
+.react-flow__handle[data-handleid^="flow-right"],
+.react-flow__handle[data-handleid^="flow-top"],
+.react-flow__handle[data-handleid^="flow-bottom"] {
+	width: 0 !important;
+	height: 0 !important;
+	min-width: 0 !important;
+	min-height: 0 !important;
+	background: transparent !important;
+	border: none !important;
+	border-radius: 0 !important;
+}
+/* Plenum target handles (left, top): triangle pointing in */
+.react-flow__handle-left[data-handleid="flow-left"] {
+	border-top: 5px solid transparent;
+	border-bottom: 5px solid transparent;
+	border-left: 7px solid #3b82f6;
+}
+.react-flow__handle-top[data-handleid="flow-top"] {
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;
+	border-top: 7px solid #3b82f6;
+}
+/* Plenum source handles (right, bottom): triangle pointing out */
+.react-flow__handle-right[data-handleid="flow-right"] {
+	border-top: 5px solid transparent;
+	border-bottom: 5px solid transparent;
+	border-left: 7px solid #22c55e;
+}
+.react-flow__handle-bottom[data-handleid="flow-bottom"] {
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;
+	border-top: 7px solid #22c55e;
 }

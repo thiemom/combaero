@@ -1,19 +1,18 @@
 import { Position } from "reactflow";
 
 /**
- * Returns the actual React Flow Position based on the node's rotation.
- * This ensures that a handle defined as "Left" stays on the visually left side
- * even when the content inside is rotated.
+ * Maps a base handle position through a clockwise rotation.
  *
- * However, the user wants the handles to ROTATE WITH the content.
- * So if we rotate 90 deg, the "Left" handle (target) should move to "Top".
+ * At 0° (unrotated), the canonical positions are:
+ *   Left = Inlet, Right = Outlet, Top/Bottom = Thermal
+ *
+ * Rotating 90° CW maps:  Left→Top, Top→Right, Right→Bottom, Bottom→Left
  */
 export const getHandlePosition = (
 	basePosition: Position,
 	rotation: number,
 ): Position => {
 	const normRotation = ((rotation % 360) + 360) % 360;
-
 	if (normRotation === 0) return basePosition;
 
 	const positions = [
@@ -23,10 +22,14 @@ export const getHandlePosition = (
 		Position.Left,
 	];
 	const currentIndex = positions.indexOf(basePosition);
-
-	// Rotate clockwise: 90 deg = +1 index
 	const steps = normRotation / 90;
 	const newIndex = (currentIndex + steps) % 4;
 
 	return positions[newIndex];
 };
+
+/**
+ * Returns the wrapper square size needed for a node with given width/height.
+ * The square side = max(w, h) so the rotated inner box always fits.
+ */
+export const getWrapperSize = (w: number, h: number): number => Math.max(w, h);

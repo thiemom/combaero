@@ -1,23 +1,40 @@
 import { CircleDot } from "lucide-react";
-import { Handle, type NodeProps, Position } from "reactflow";
-import { getHandlePosition } from "../../utils/nodeUtils";
+import { useEffect } from "react";
+import {
+	Handle,
+	type NodeProps,
+	Position,
+	useUpdateNodeInternals,
+} from "reactflow";
+import { getHandlePosition, getWrapperSize } from "../../utils/nodeUtils";
 
-const MomentumChamberNode = ({ data, selected }: NodeProps) => {
+const NODE_W = 140;
+const NODE_H = 80;
+const WRAPPER = getWrapperSize(NODE_W, NODE_H);
+
+const MomentumChamberNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
 	const isSolved = !!data.result;
-	const isVertical = rotation === 90 || rotation === 270;
+	const updateNodeInternals = useUpdateNodeInternals();
 
-	// Inner shape dimensions
-	const innerWidth = isVertical ? 80 : 140;
-	const innerHeight = isVertical ? 140 : 80;
-
-	// Orientation logic: Vertical text stays Bottom-to-Top
-	const textRotation = isVertical ? 270 : 0;
+	// biome-ignore lint/correctness/useExhaustiveDependencies: rotation triggers handle re-measurement
+	useEffect(() => {
+		updateNodeInternals(id);
+	}, [id, rotation, updateNodeInternals]);
 
 	return (
-		<div className="relative flex items-center justify-center w-[140px] h-[140px]">
+		<div
+			className="relative"
+			style={{
+				width: WRAPPER,
+				height: WRAPPER,
+				display: "flex",
+				alignItems: "center",
+				justifyContent: "center",
+			}}
+		>
 			<div
-				className={`relative shadow-md rounded border-2 bg-white transition-all flex items-center justify-center ${
+				className={`shadow-md rounded border-2 bg-white flex items-center justify-center gap-2 px-4 py-2 ${
 					selected
 						? "border-blue-500 shadow-blue-100"
 						: isSolved
@@ -25,33 +42,21 @@ const MomentumChamberNode = ({ data, selected }: NodeProps) => {
 							: "border-stone-300"
 				}`}
 				style={{
-					width: innerWidth,
-					height: innerHeight,
-					gap: "8px",
-					flexDirection:
-						rotation === 90
-							? ("column" as const)
-							: rotation === 180
-								? ("row-reverse" as const)
-								: rotation === 270
-									? ("column-reverse" as const)
-									: ("row" as const),
+					width: NODE_W,
+					height: NODE_H,
+					transform: `rotate(${rotation}deg)`,
+					transformOrigin: "center center",
 				}}
 			>
-				{/* Icon: Rotates with node */}
-				<div
-					className="flex items-center justify-center rounded-full w-10 h-10 bg-blue-50 p-2 pointer-events-none"
-					style={{ transform: `rotate(${rotation}deg)` }}
-				>
+				<div className="flex items-center justify-center rounded-full w-10 h-10 bg-blue-50 p-2 shrink-0">
 					<CircleDot size={20} className="text-blue-600" />
 				</div>
 
-				{/* Text: Stays upright or vertical B-T */}
 				<div
-					className="flex flex-col items-center pointer-events-none"
-					style={{ transform: `rotate(${textRotation}deg)` }}
+					className="flex flex-col items-start"
+					style={{ transform: `rotate(${-rotation}deg)` }}
 				>
-					<div className="text-sm font-bold text-center">
+					<div className="text-sm font-bold whitespace-nowrap">
 						{data.label ? data.label : "Mom. Chamber"}
 					</div>
 					{isSolved && data.result.state && (
@@ -61,21 +66,18 @@ const MomentumChamberNode = ({ data, selected }: NodeProps) => {
 						</div>
 					)}
 				</div>
-
-				{/* Flow Handles */}
-				<Handle
-					type="target"
-					position={getHandlePosition(Position.Left, rotation)}
-					id="flow-target"
-					className="w-2 h-2 !bg-blue-500"
-				/>
-				<Handle
-					type="source"
-					position={getHandlePosition(Position.Right, rotation)}
-					id="flow-source"
-					className="w-2 h-2 !bg-blue-500"
-				/>
 			</div>
+
+			<Handle
+				type="target"
+				position={getHandlePosition(Position.Left, rotation)}
+				id="flow-target"
+			/>
+			<Handle
+				type="source"
+				position={getHandlePosition(Position.Right, rotation)}
+				id="flow-source"
+			/>
 		</div>
 	);
 };
