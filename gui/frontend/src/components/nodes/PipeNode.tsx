@@ -6,19 +6,17 @@ import {
 	Position,
 	useUpdateNodeInternals,
 } from "reactflow";
-import { getHandlePosition, getWrapperSize } from "../../utils/nodeUtils";
-
-// Base dimensions of the Pipe node (unrotated)
-const NODE_W = 140;
-const NODE_H = 56;
-const WRAPPER = getWrapperSize(NODE_W, NODE_H);
 
 const PipeNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
 	const isSolved = !!data.result;
 	const updateNodeInternals = useUpdateNodeInternals();
 
-	// Re-measure handles whenever rotation changes
+	// Text counter-rotation: L→R for horizontal nodes, bottom→top for vertical
+	// Node 0° → text 0° (L→R), Node 90° → text 180° (net 270° = B→T)
+	// Node 180° → text 180° (net 0° = L→R), Node 270° → text 0° (net 270° = B→T)
+	const textRotation = rotation === 90 || rotation === 180 ? 180 : 0;
+
 	// biome-ignore lint/correctness/useExhaustiveDependencies: rotation triggers handle re-measurement
 	useEffect(() => {
 		updateNodeInternals(id);
@@ -26,71 +24,41 @@ const PipeNode = ({ id, data, selected }: NodeProps) => {
 
 	return (
 		<div
-			className="relative"
+			className={`shadow-md rounded border-2 bg-white flex items-center gap-2 px-3 py-1 ${
+				selected
+					? "border-blue-500 shadow-blue-100"
+					: isSolved
+						? "border-green-400"
+						: "border-stone-300"
+			}`}
 			style={{
-				width: WRAPPER,
-				height: WRAPPER,
-				display: "flex",
-				alignItems: "center",
-				justifyContent: "center",
+				width: 140,
+				height: 56,
+				transform: `rotate(${rotation}deg)`,
+				transformOrigin: "center center",
 			}}
 		>
-			{/* Inner visible box — rotates as a unit */}
-			<div
-				className={`shadow-md rounded border-2 bg-white flex items-center gap-2 px-3 py-1 ${
-					selected
-						? "border-blue-500 shadow-blue-100"
-						: isSolved
-							? "border-green-400"
-							: "border-stone-300"
-				}`}
-				style={{
-					width: NODE_W,
-					height: NODE_H,
-					transform: `rotate(${rotation}deg)`,
-					transformOrigin: "center center",
-				}}
-			>
-				{/* Icon */}
-				<div className="flex items-center justify-center p-1 bg-stone-100 rounded shrink-0">
-					<Settings2 size={16} className="text-stone-600" />
-				</div>
-
-				{/* Text: counter-rotate to stay horizontal */}
-				<div
-					className="flex flex-col items-start"
-					style={{ transform: `rotate(${-rotation}deg)` }}
-				>
-					<span className="text-[10px] font-bold text-gray-400 uppercase leading-none whitespace-nowrap">
-						{data.label ? data.label : "Pipe"}
-					</span>
-					<span className="text-[10px] font-mono text-gray-500 whitespace-nowrap">
-						L:{data.L}m D:{data.D}m
-					</span>
-				</div>
+			<div className="flex items-center justify-center p-1 bg-stone-100 rounded shrink-0">
+				<Settings2 size={16} className="text-stone-600" />
 			</div>
 
-			{/* Handles — on OUTER wrapper, unaffected by inner rotation */}
-			<Handle
-				type="target"
-				position={getHandlePosition(Position.Left, rotation)}
-				id="flow-target"
-			/>
-			<Handle
-				type="source"
-				position={getHandlePosition(Position.Right, rotation)}
-				id="flow-source"
-			/>
-			<Handle
-				type="target"
-				position={getHandlePosition(Position.Top, rotation)}
-				id="thermal-target"
-			/>
-			<Handle
-				type="source"
-				position={getHandlePosition(Position.Bottom, rotation)}
-				id="thermal-source"
-			/>
+			<div
+				className="flex flex-col items-start"
+				style={{ transform: `rotate(${textRotation}deg)` }}
+			>
+				<span className="text-[10px] font-bold text-gray-400 uppercase leading-none whitespace-nowrap">
+					{data.label ? data.label : "Pipe"}
+				</span>
+				<span className="text-[10px] font-mono text-gray-500 whitespace-nowrap">
+					L:{data.L}m D:{data.D}m
+				</span>
+			</div>
+
+			{/* Handles: FIXED positions. CSS rotation moves them visually. */}
+			<Handle type="target" position={Position.Left} id="flow-target" />
+			<Handle type="source" position={Position.Right} id="flow-source" />
+			<Handle type="target" position={Position.Top} id="thermal-target" />
+			<Handle type="source" position={Position.Bottom} id="thermal-source" />
 		</div>
 	);
 };
