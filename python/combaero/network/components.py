@@ -1095,12 +1095,17 @@ class OrificeElement(NetworkElement):
                 )
             )
 
+        # Effective Cd actually used in this solve
+        effective_cd = self._effective_Cd(state_in, state_out)
+
         # Transport properties
         ts = cb.transport_state(state_in.T, state_in.P, state_in.X)
 
         return {
             "mach": mach_throat,
             "p_ratio": p_ratio,
+            "Cd": effective_cd,
+            "auto_Cd": float(self.auto_Cd),  # 1.0 = computed from correlation, 0.0 = user-supplied
             "mu": ts.mu,
             "k": ts.k,
             "Pr": ts.Pr,

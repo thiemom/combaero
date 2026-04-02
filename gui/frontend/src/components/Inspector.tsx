@@ -344,12 +344,31 @@ const Inspector = () => {
 								className="p-2 border rounded"
 							/>
 						</div>
+						<div className="flex items-center justify-between gap-2">
+							<label className="text-xs font-bold text-gray-500 uppercase">
+								Auto Cd (correlation)
+							</label>
+							<input
+								type="checkbox"
+								id={`auto_Cd_${selectedNode.id}`}
+								checked={selectedNode.data.auto_Cd !== false}
+								onChange={(e) =>
+									updateNodeData(selectedNode.id, { auto_Cd: e.target.checked })
+								}
+								className="w-4 h-4 accent-blue-500"
+							/>
+						</div>
 						<div className="flex flex-col gap-2">
 							<label
 								htmlFor={`Cd_${selectedNode.id}`}
 								className="text-xs font-bold text-gray-500 uppercase"
+								title={
+									selectedNode.data.auto_Cd !== false
+										? "Used as fallback when correlation is unavailable"
+										: ""
+								}
 							>
-								Discharge Coeff (Cd)
+								{selectedNode.data.auto_Cd !== false ? "Cd (fallback)" : "Cd"}
 							</label>
 							<NumericInput
 								id={`Cd_${selectedNode.id}`}
@@ -724,6 +743,21 @@ const Inspector = () => {
 														selectedNode.data.result.p_ratio ||
 														selectedNode.data.result.p_ratio_total
 													).toFixed(4)}
+												</span>
+											</div>
+										)}
+										{selectedNode.data.result.Cd !== undefined && (
+											<div className="flex flex-col col-span-2">
+												<span className="text-stone-400 text-[8px] uppercase">
+													Cd (used)
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{selectedNode.data.result.Cd.toFixed(4)}
+													{selectedNode.data.result.auto_Cd === 1 && (
+														<span className="ml-1 text-[8px] text-blue-500 font-normal">
+															(corr.)
+														</span>
+													)}
 												</span>
 											</div>
 										)}
