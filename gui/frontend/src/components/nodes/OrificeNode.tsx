@@ -20,7 +20,7 @@ const OrificeNode = ({ id, data, selected }: NodeProps) => {
 
 	return (
 		<div
-			className={`shadow-sm rounded bg-stone-50 border-2 flex items-center gap-2 px-3 py-1 ${
+			className={`shadow-sm rounded bg-stone-50 border-2 flex items-center gap-2 px-3 py-1 overflow-hidden ${
 				selected
 					? "border-blue-500 shadow-blue-100"
 					: isSolved
@@ -35,18 +35,18 @@ const OrificeNode = ({ id, data, selected }: NodeProps) => {
 			}}
 		>
 			<div className="flex items-center justify-center p-1 bg-white rounded border border-stone-200 shrink-0">
-				<ChevronRight size={14} className="text-orange-400" />
+				<ChevronRight size={12} className="text-orange-400" />
 			</div>
 
 			<div
-				className="flex flex-col items-start"
+				className="flex flex-col items-center flex-1 min-w-0"
 				style={{ transform: `rotate(${textRotation}deg)` }}
 			>
 				<div className="text-[10px] font-bold text-gray-400 uppercase leading-none whitespace-nowrap">
 					{data.label ? data.label : "Orifice"}
 				</div>
-				<div className="text-[10px] font-semibold whitespace-nowrap">
-					Cd: {data.Cd}
+				<div className="text-[9px] font-semibold whitespace-nowrap">
+					Cd:{data.Cd}
 				</div>
 			</div>
 

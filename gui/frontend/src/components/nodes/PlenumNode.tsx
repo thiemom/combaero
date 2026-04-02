@@ -20,7 +20,7 @@ const PlenumNode = ({ id, data, selected }: NodeProps) => {
 
 	return (
 		<div
-			className={`shadow-md rounded border-2 bg-stone-50 flex items-center justify-center gap-2 px-4 py-2 ${
+			className={`shadow-md rounded border-2 bg-stone-50 flex items-center gap-2 px-3 py-2 overflow-hidden ${
 				selected
 					? "border-blue-500 shadow-blue-100"
 					: isSolved
@@ -28,28 +28,32 @@ const PlenumNode = ({ id, data, selected }: NodeProps) => {
 						: "border-stone-300"
 			}`}
 			style={{
-				width: 140,
-				height: 80,
+				width: 160,
+				height: 72,
 				transform: `rotate(${rotation}deg)`,
 				transformOrigin: "center center",
 			}}
 		>
-			<div className="flex items-center justify-center rounded-full w-10 h-10 bg-amber-100 p-2 shrink-0">
-				<Database size={20} className="text-amber-600" />
+			<div className="flex items-center justify-center rounded-full w-8 h-8 bg-amber-100 p-1.5 shrink-0">
+				<Database size={16} className="text-amber-600" />
 			</div>
 
 			<div
-				className="flex flex-col items-start"
+				className="flex flex-col items-center flex-1 min-w-0"
 				style={{ transform: `rotate(${textRotation}deg)` }}
 			>
-				<div className="text-sm font-bold whitespace-nowrap">
+				<div className="text-xs font-bold whitespace-nowrap">
 					{data.label ? data.label : "Plenum"}
 				</div>
 				{isSolved && data.result.state && (
-					<div className="text-[10px] text-gray-500 font-mono whitespace-nowrap">
-						{data.result.state.T.toFixed(1)} K |{" "}
-						{(data.result.state.P / 1e5).toFixed(2)} bar
-					</div>
+					<>
+						<div className="text-[9px] text-gray-500 font-mono whitespace-nowrap">
+							{data.result.state.T.toFixed(0)} K
+						</div>
+						<div className="text-[9px] text-gray-500 font-mono whitespace-nowrap">
+							{(data.result.state.P / 1e5).toFixed(2)} bar
+						</div>
+					</>
 				)}
 			</div>
 
