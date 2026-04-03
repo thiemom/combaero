@@ -73,6 +73,7 @@ try:
         OrificeState,
         OrificeResult,
         PipeResult,
+        MixtureState,
         MomentumChamberResult,
         State,
         Stream,
@@ -488,6 +489,7 @@ except ModuleNotFoundError:
         _core.complete_combustion_to_CO2_H2O_with_fraction
     )
     # State-based API
+    MixtureState = _core.MixtureState
     State = _core.State
     Stream = _core.Stream
     Registry = _core.Registry
@@ -834,6 +836,7 @@ __all__ = [
     "complete_combustion_to_CO2_H2O_with_fraction",
     # State-based API
     "State",
+    "MixtureState",
     "Stream",
     "HumidAir",
     "AirProperties",

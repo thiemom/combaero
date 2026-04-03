@@ -70,26 +70,13 @@ def _solve_sync(schema: NetworkGraphSchema):
     success = bool(result.get("__success__", False))
 
     node_results = {}
-    for node_id in net.nodes:
-        # Extract any extra node variables for diagnostics (e.g. transport properties)
-        node_keys = {
-            k.split(".", 1)[1]: v
-            for k, v in result.items()
-            if k.startswith(f"{node_id}.")
-            and k.split(".", 1)[1] not in ["T", "P", "T_total", "P_total", "mach"]
-            and not k.split(".", 1)[1].startswith("Y[")
-        }
-
-        # P and T extraction
+    for node_id, node in net.nodes.items():
+        # P and T extraction from raw solver result
         t_val = float(result.get(f"{node_id}.T", result.get(f"{node_id}.T_total", 300.0)))
         p_val = float(result.get(f"{node_id}.P", result.get(f"{node_id}.P_total", 101325.0)))
-
-        # Check if actual total pressure is explicitly defined
         p_total_val = result.get(f"{node_id}.P_total")
         if p_total_val is not None:
             p_total_val = float(p_total_val)
-        elif "P_total" in node_keys:
-            p_total_val = float(node_keys.pop("P_total"))
 
         # Composition extraction
         y_vals = []
@@ -97,45 +84,45 @@ def _solve_sync(schema: NetworkGraphSchema):
         while f"{node_id}.Y[{y_idx}]" in result:
             y_vals.append(float(result[f"{node_id}.Y[{y_idx}]"]))
             y_idx += 1
-
         if not y_vals:
-            # Fallback to dry air if not found (shouldn't happen in solved network)
             y_vals = list(cb.species.dry_air_mass())
 
-        # Thermodynamics extraction using combaero utilities
+        # Construct a MixtureState for the diagnostics call
+        # This matches the state the node saw during the last residual evaluation
+        m_dot = float(result.get(f"{node_id}.m_dot", 0.0))  # Some nodes might have m_dot
+        state_obj = cb.MixtureState(P=p_val, P_total=p_total_val or p_val, T=t_val, T_total=t_val, Y=y_vals, m_dot=m_dot)
+
+        # New Single-Pass: Call diagnostics once
+        # This returns all thermo/transport properties (h, s, rho, mu, k, Re, phi, etc.)
+        diag = node.diagnostics(state_obj)
+
         x_vals = [float(x) for x in cb.mass_to_mole(y_vals)]
-        rho = float(cb.density(t_val, p_val, x_vals))
-        h = float(cb.h_mass(t_val, x_vals))
-        s = float(cb.s_mass(t_val, x_vals, p_val))
 
-        # Mach extraction if available (common for momentum chambers)
-        mach = result.get(f"{node_id}.mach")
-        if mach is not None:
-            mach = float(mach)
-
-        state = StateResult(
+        state_res = StateResult(
             T=t_val,
             P=p_val,
             P_total=p_total_val,
-            rho=rho,
-            h=h,
-            s=s,
-            mach=mach,
             Y=y_vals,
             X=x_vals,
-            **node_keys,
+            **diag,
         )
-        node_results[node_id] = NodeResult(state=state, success=success)
+        node_results[node_id] = NodeResult(state=state_res, success=success)
 
     element_results = {}
-    for elem_id in net.elements:
-        elem_keys = {
-            k.split(".", 1)[1]: v
-            for k, v in result.items()
-            if k.startswith(f"{elem_id}.") and k != f"{elem_id}.m_dot"
-        }
+    for elem_id, elem in net.elements.items():
         m_dot = float(result.get(f"{elem_id}.m_dot", 0.0))
-        element_results[elem_id] = ElementResult(m_dot=m_dot, success=success, **elem_keys)
+
+        # Element diagnostics (Inlet and Outlet states)
+        # For now we use the states of the connected nodes
+        state_in = node_results[elem.from_node].state
+        state_out = node_results[elem.to_node].state
+
+        mix_in = cb.MixtureState(P=state_in.P, P_total=state_in.P_total or state_in.P, T=state_in.T, Y=state_in.Y, m_dot=m_dot)
+        mix_out = cb.MixtureState(P=state_out.P, P_total=state_out.P_total or state_out.P, T=state_out.T, Y=state_out.Y, m_dot=m_dot)
+
+        diag = elem.diagnostics(mix_in, mix_out)
+
+        element_results[elem_id] = ElementResult(m_dot=m_dot, success=success, **diag)
 
     edge_results = {}
     for edge_id in net.walls:

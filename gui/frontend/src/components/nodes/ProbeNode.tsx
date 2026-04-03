@@ -32,11 +32,17 @@ const QUANTITY_CATALOGUE: Record<
 		format: (v) => v.toLocaleString("en", { maximumFractionDigits: 0 }),
 	},
 	"state.velocity": { label: "v", unit: "m/s", format: (v) => v.toFixed(3) },
+	"state.phi": { label: "Φ", unit: "—", format: (v) => v.toFixed(3) },
+	"state.mw": { label: "MW", unit: "g/mol", format: (v) => v.toFixed(2) },
+	"state.nu": { label: "ν", unit: "m²/s", format: (v) => v.toExponential(2) },
+	"state.u": { label: "u", unit: "J/kg", format: (v) => v.toFixed(0) },
+	"state.cv": { label: "cv", unit: "J/kg·K", format: (v) => v.toFixed(2) },
 	// Element result keys (accessed via result.*)
 	m_dot: { label: "ṁ", unit: "kg/s", format: (v) => v.toFixed(4) },
 	mach: { label: "Ma", unit: "—", format: (v) => v.toFixed(4) },
 	mach_in: { label: "Ma in", unit: "—", format: (v) => v.toFixed(4) },
 	mach_out: { label: "Ma out", unit: "—", format: (v) => v.toFixed(4) },
+	phi: { label: "Φ", unit: "—", format: (v) => v.toFixed(3) },
 	p_ratio_total: { label: "P ratio", unit: "—", format: (v) => v.toFixed(4) },
 	p_ratio: { label: "P ratio", unit: "—", format: (v) => v.toFixed(4) },
 	Re: {

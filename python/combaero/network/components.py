@@ -430,16 +430,42 @@ class NetworkNode(ABC):
         """Compute generalized node-level diagnostics (e.g., thermo properties)."""
         import combaero as cb
 
-        cp = cb.cp_mass(state.T, state.X)
-        cv = cb.cv_mass(state.T, state.X)
-        gamma = cp / cv if cv > 0.0 else 1.4
-        a = cb.speed_of_sound(state.T, state.X)
-        return {
-            "cp": cp,
-            "cv": cv,
-            "gamma": gamma,
-            "a": a,
-        }
+        # Robustness check: state must be physically valid (P > 0)
+        if state.P <= 0:
+            return {}
+
+        # Robust fallback using CompleteState
+        try:
+            cs = cb.complete_state(state.T, state.P, state.X)
+            return {
+                "h": cs.thermo.h,
+                "s": cs.thermo.s,
+                "u": cs.thermo.u,
+                "rho": cs.thermo.rho,
+                "gamma": cs.thermo.gamma,
+                "a": cs.thermo.a,
+                "cp": cs.thermo.cp,
+                "cv": cs.thermo.cv,
+                "mw": cs.thermo.mw,
+                "mu": cs.transport.mu,
+                "k": cs.transport.k,
+                "Pr": cs.transport.Pr,
+                "nu": cs.transport.nu,
+            }
+        except Exception:
+            # Fallback to pure thermo if transport fails or is unsupported
+            ts = cb.thermo_state(state.T, state.P, state.X)
+            return {
+                "h": ts.h,
+                "s": ts.s,
+                "u": ts.u,
+                "rho": ts.rho,
+                "gamma": ts.gamma,
+                "a": ts.a,
+                "cp": ts.cp,
+                "cv": ts.cv,
+                "mw": ts.mw,
+            }
 
 
 class NetworkElement(ABC):
@@ -524,6 +550,23 @@ class PlenumNode(NetworkNode):
         res = [state.P_total - state.P]
         jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.P_total": 1.0}}
         return res, jac
+
+    def diagnostics(self, state: MixtureState) -> dict[str, float]:
+        import combaero as cb
+
+        # Plenums don't have transport properties (per user request / stationary reservoir model)
+        ts = cb.thermo_state(state.T, state.P, state.X)
+        return {
+            "h": ts.h,
+            "s": ts.s,
+            "u": ts.u,
+            "rho": ts.rho,
+            "gamma": ts.gamma,
+            "a": ts.a,
+            "cp": ts.cp,
+            "cv": ts.cv,
+            "mw": ts.mw,
+        }
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         # Store upstream elements for mixing calculations
@@ -669,26 +712,35 @@ class MomentumChamberNode(NetworkNode):
 
         import combaero as cb
 
-        base = super().diagnostics(state)
+        # Momentum chambers use rich CompleteState
+        cs = cb.complete_state(state.T, state.P, state.X)
+
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
-        rho = state.density()
+        rho = cs.thermo.rho
         u = m_dot_total / (rho * self.area) if rho > 0 and self.area > 0 else 0.0
         diameter = self.Dh if self.Dh is not None else math.sqrt(4.0 * self.area / math.pi)
 
-        ts = cb.transport_state(state.T, state.P, state.X)
-        re = (rho * u * diameter / ts.mu) if ts.mu > 0 else 0.0
+        re = (rho * u * diameter / cs.transport.mu) if cs.transport.mu > 0 else 0.0
 
-        base.update(
-            {
-                "mu": ts.mu,
-                "k": ts.k,
-                "Pr": ts.Pr,
-                "Re": re,
-                "Dh": diameter,
-                "velocity": u,
-            }
-        )
-        return base
+        return {
+            "h": cs.thermo.h,
+            "s": cs.thermo.s,
+            "u": cs.thermo.u,
+            "rho": rho,
+            "gamma": cs.thermo.gamma,
+            "a": cs.thermo.a,
+            "cp": cs.thermo.cp,
+            "cv": cs.thermo.cv,
+            "mw": cs.thermo.mw,
+            "mu": cs.transport.mu,
+            "k": cs.transport.k,
+            "Pr": cs.transport.Pr,
+            "nu": cs.transport.nu,
+            "Re": re,
+            "Dh": diameter,
+            "velocity": u,
+            "mach": u / cs.thermo.a if cs.thermo.a > 0 else 0.0,
+        }
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         # Store upstream elements for mixing calculations
@@ -862,26 +914,61 @@ class CombustorNode(NetworkNode):
 
         import combaero as cb
 
-        base = super().diagnostics(state)
+        # Combustors use rich CompleteState
+        cs = cb.complete_state(state.T, state.P, state.X)
+
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
-        rho = state.density()
+        rho = cs.thermo.rho
         u = m_dot_total / (rho * self.area) if rho > 0 and self.area > 0 else 0.0
         diameter = self.Dh if self.Dh is not None else math.sqrt(4.0 * self.area / math.pi)
 
-        ts = cb.transport_state(state.T, state.P, state.X)
-        re = (rho * u * diameter / ts.mu) if ts.mu > 0 else 0.0
+        re = (rho * u * diameter / cs.transport.mu) if cs.transport.mu > 0 else 0.0
 
-        base.update(
-            {
-                "mu": ts.mu,
-                "k": ts.k,
-                "Pr": ts.Pr,
-                "Re": re,
-                "Dh": diameter,
-                "velocity": u,
-            }
-        )
-        return base
+        diag = {
+            "h": cs.thermo.h,
+            "s": cs.thermo.s,
+            "u": cs.thermo.u,
+            "rho": rho,
+            "gamma": cs.thermo.gamma,
+            "a": cs.thermo.a,
+            "cp": cs.thermo.cp,
+            "cv": cs.thermo.cv,
+            "mw": cs.thermo.mw,
+            "mu": cs.transport.mu,
+            "k": cs.transport.k,
+            "Pr": cs.transport.Pr,
+            "nu": cs.transport.nu,
+            "Re": re,
+            "Dh": diameter,
+            "velocity": u,
+            "mach": u / cs.thermo.a if cs.thermo.a > 0 else 0.0,
+        }
+
+        # Add equivalence ratio (phi) if fuel boundary is known
+        if hasattr(self, "fuel_boundary") and self.fuel_boundary is not None:
+            try:
+                # Sum all non-fuel upstream mass flows as 'oxidizer'
+                Y_fuel = self.fuel_boundary.Y
+
+                # Sum other streams
+                m_dot_ox = 0.0
+                Y_ox_sum = [0.0] * len(Y_fuel)
+
+                for s in self.upstream_elements:
+                    # Identify if this upstream element is the fuel boundary
+                    if s.id != self.fuel_boundary.id:
+                        m_dot_ox += s.m_dot
+                        for i, y in enumerate(s.Y):
+                            Y_ox_sum[i] += y * s.m_dot
+
+                if m_dot_ox > 0:
+                    Y_ox = [y / m_dot_ox for y in Y_ox_sum]
+                    phi_val = float(cb.equivalence_ratio_mass(state.Y, Y_fuel, Y_ox))
+                    diag["phi"] = phi_val
+            except Exception:
+                diag["phi"] = 0.0  # Robustness: don't crash on phi error
+
+        return diag
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         # Store upstream elements for mixing calculations
@@ -1079,10 +1166,13 @@ class OrificeElement(NetworkElement):
 
         import combaero as cb
 
+        # Full thermo + transport bundle at inlet static conditions (mole fractions X)
+        cs = cb.complete_state(state_in.T, state_in.P, state_in.X)
+
         p_ratio = state_out.P / state_in.P_total if state_in.P_total > 0 else 1.0
 
         # Estimate throat Mach number
-        gamma = state_in.gamma()
+        gamma = cs.thermo.gamma
         # Critical pressure ratio for choking
         pr_crit = (2.0 / (gamma + 1.0)) ** (gamma / (gamma - 1.0))
 
@@ -1097,9 +1187,6 @@ class OrificeElement(NetworkElement):
 
         # Effective Cd actually used in this solve
         effective_cd = self._effective_Cd(state_in, state_out)
-
-        # Full thermo + transport bundle at inlet static conditions (mole fractions X)
-        cs = cb.complete_state(state_in.T, state_in.P, state_in.X)
 
         return {
             "mach": mach_throat,
