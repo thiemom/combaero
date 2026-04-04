@@ -5526,6 +5526,31 @@ PYBIND11_MODULE(_core, m) {
         "Returns: tuple(mu [Pa*s], d_mu_d_T [(Pa*s)/K], d_mu_d_P "
         "[(Pa*s)/Pa])");
 
+  m.def(
+      "equivalence_ratio",
+      [](py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+        return equivalence_ratio(to_vec(X_arr));
+      },
+      py::arg("X"),
+      "Calculate the equivalence ratio (phi) of a mixture based on its "
+      "elemental composition.\n\n"
+      "Phi = O2_required / O2_available\n\n"
+      "Parameters:\n"
+      "  X : Mole fractions [-]\n\n"
+      "Returns: Phi [-]");
+
+  m.def(
+      "equivalence_ratio_mass",
+      [](py::array_t<double, py::array::c_style | py::array::forcecast> Y_arr) {
+        return equivalence_ratio_mass(to_vec(Y_arr));
+      },
+      py::arg("Y"),
+      "Calculate the equivalence ratio (phi) of a mixture based on its "
+      "elemental composition (mass basis).\n\n"
+      "Parameters:\n"
+      "  Y : Mass fractions [-]\n\n"
+      "Returns: Phi [-]");
+
   m.def("adiabatic_T_complete_and_jacobian_T",
         &solver::adiabatic_T_complete_and_jacobian_T, py::arg("T_in"),
         py::arg("P"), py::arg("X_in"),

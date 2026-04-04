@@ -872,8 +872,9 @@ class CombustorNode(NetworkNode):
         """Derived T and Y for a combustor (Reaction + Mixing + energy boundaries)."""
         import combaero as cb
 
-        # Store total mass flow for use in diagnostics
+        # Store total mass flow and unburned temperature for use in diagnostics
         self._total_m_dot = sum(s.m_dot for s in upstream_states) if upstream_states else 0.0
+        self._T_unburned = sum(s.m_dot * s.T_total for s in upstream_states) / self._total_m_dot if self._total_m_dot > 0 else 300.0
 
         if not upstream_states:
             # Default fallback
@@ -944,29 +945,21 @@ class CombustorNode(NetworkNode):
             "mach": u / cs.thermo.a if cs.thermo.a > 0 else 0.0,
         }
 
-        # Add equivalence ratio (phi) if fuel boundary is known
-        if hasattr(self, "fuel_boundary") and self.fuel_boundary is not None:
-            try:
-                # Sum all non-fuel upstream mass flows as 'oxidizer'
-                Y_fuel = self.fuel_boundary.Y
+        # --- Combustion Diagnostics ---
+        # 1. Equivalence Ratio (phi) via elemental analysis in C++
+        try:
+            phi = cb.equivalence_ratio(cs.thermo.X)
+            diag["phi"] = phi
+        except Exception:
+            # Fallback for purely inert/oxidizer or pure fuel cases
+            diag["phi"] = 0.0
 
-                # Sum other streams
-                m_dot_ox = 0.0
-                Y_ox_sum = [0.0] * len(Y_fuel)
-
-                for s in self.upstream_elements:
-                    # Identify if this upstream element is the fuel boundary
-                    if s.id != self.fuel_boundary.id:
-                        m_dot_ox += s.m_dot
-                        for i, y in enumerate(s.Y):
-                            Y_ox_sum[i] += y * s.m_dot
-
-                if m_dot_ox > 0:
-                    Y_ox = [y / m_dot_ox for y in Y_ox_sum]
-                    phi_val = float(cb.equivalence_ratio_mass(state.Y, Y_fuel, Y_ox))
-                    diag["phi"] = phi_val
-            except Exception:
-                diag["phi"] = 0.0  # Robustness: don't crash on phi error
+        # 2. Temperature Rise Ratio (theta) = (T_burned / T_unburned) - 1
+        T_u = getattr(self, "_T_unburned", state.T_total)
+        if T_u > 0:
+            diag["theta"] = (state.T_total / T_u) - 1.0
+        else:
+            diag["theta"] = 0.0
 
         return diag
 

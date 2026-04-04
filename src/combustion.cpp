@@ -130,6 +130,27 @@ double oxygen_required_per_kg_mixture(const std::vector<double> &X) {
   return molar_oxygen_required * oxygen_mw / mixture_mw; // kg O2/kg mixture
 }
 
+double equivalence_ratio(const std::vector<double> &X) {
+  // O2 required to burn all fuel in 1 mol of mixture
+  const double O2_needed = oxygen_required_per_mol_mixture(X);
+
+  if (O2_needed < 1e-15)
+    throw std::runtime_error("No combustible species in mixture");
+
+  // O2 actually present in mixture
+  const double O2_available = X[species_index.at("O2")];
+
+  if (O2_available < 1e-15)
+    throw std::runtime_error("No O2 in mixture");
+
+  return O2_needed / O2_available;
+}
+
+double equivalence_ratio_mass(const std::vector<double> &Y) {
+  // Convert mass Y to molar X and call the molar version
+  return equivalence_ratio(mass_to_mole(Y));
+}
+
 double fuel_lhv_molar(const std::vector<double> &X_fuel,
                       const double reference_temperature) {
   validate_fuel_mole_fractions(X_fuel);

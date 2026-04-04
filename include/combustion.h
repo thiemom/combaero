@@ -40,6 +40,10 @@ double oxygen_required_per_kg_fuel(std::size_t fuel_index);
 double oxygen_required_per_mol_mixture(const std::vector<double> &X);
 double oxygen_required_per_kg_mixture(const std::vector<double> &X);
 
+// Equivalence ratio based on elemental analysis (Phi = O2_needed / O2_available)
+double equivalence_ratio(const std::vector<double> &X);
+double equivalence_ratio_mass(const std::vector<double> &Y);
+
 // Fuel lower heating value (LHV) from complete combustion to CO2 + H2O(g)
 double fuel_lhv_molar(const std::vector<double> &X_fuel,
                       const double reference_temperature = 298.15);

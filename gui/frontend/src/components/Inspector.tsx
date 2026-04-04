@@ -659,6 +659,41 @@ const Inspector = () => {
 
 						{selectedNode.data.result.state ? (
 							<div className="flex flex-col gap-3">
+								{selectedNode.data.result.state.phi !== undefined && (
+									<div className="mb-1 pb-3 border-b border-stone-200">
+										<p className="text-[10px] uppercase font-bold text-stone-400 mb-2 mt-[-2px]">
+											Combustion
+										</p>
+										<div className="grid grid-cols-2 gap-y-2 text-xs">
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[10px] uppercase font-bold text-nowrap">
+													Equivalence Ratio
+												</span>
+												<span
+													className={`font-mono font-bold ${
+														selectedNode.data.result.state.phi > 1.05
+															? "text-orange-600"
+															: selectedNode.data.result.state.phi < 0.95
+															? "text-blue-600"
+															: "text-green-600"
+													}`}
+												>
+													Φ = {selectedNode.data.result.state.phi.toFixed(3)}
+												</span>
+											</div>
+											{selectedNode.data.result.state.theta !== undefined && (
+												<div className="flex flex-col">
+													<span className="text-stone-400 text-[10px] uppercase font-bold text-nowrap">
+														Temp Rise Ratio
+													</span>
+													<span className="font-mono font-bold">
+														θ = {selectedNode.data.result.state.theta.toFixed(3)}
+													</span>
+												</div>
+											)}
+										</div>
+									</div>
+								)}
 								<div className="grid grid-cols-2 gap-y-2 text-xs">
 									<div className="flex flex-col">
 										<span className="text-stone-400 text-[10px] uppercase font-bold text-nowrap">

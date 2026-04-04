@@ -152,6 +152,7 @@ try:
         effectiveness_parallelflow,
         effusion_discharge_coefficient,
         effusion_effectiveness,
+        equivalence_ratio,
         equivalence_ratio_from_bilger_Z_mass,
         equivalence_ratio_mass,
         equivalence_ratio_mole,
@@ -445,7 +446,8 @@ except ModuleNotFoundError:
     normalize_fractions = _core.normalize_fractions
     convert_to_dry_fractions = _core.convert_to_dry_fractions
     equivalence_ratio_mole = _core.equivalence_ratio_mole
-    set_equivalence_ratio_mole = _core.set_equivalence_ratio_mole
+    equivalence_ratio = _core.equivalence_ratio
+    equivalence_ratio_mole = _core.equivalence_ratio_mole
     equivalence_ratio_mass = _core.equivalence_ratio_mass
     set_equivalence_ratio_mass = _core.set_equivalence_ratio_mass
     bilger_stoich_mixture_fraction_mass = _core.bilger_stoich_mixture_fraction_mass
@@ -799,7 +801,8 @@ __all__ = [
     "normalize_fractions",
     "convert_to_dry_fractions",
     "equivalence_ratio_mole",
-    "set_equivalence_ratio_mole",
+    "equivalence_ratio",
+    "equivalence_ratio_mole",
     "equivalence_ratio_mass",
     "set_equivalence_ratio_mass",
     "equivalence_ratio_from_bilger_Z_mass",

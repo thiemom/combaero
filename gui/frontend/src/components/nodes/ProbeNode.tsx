@@ -33,6 +33,7 @@ const QUANTITY_CATALOGUE: Record<
 	},
 	"state.velocity": { label: "v", unit: "m/s", format: (v) => v.toFixed(3) },
 	"state.phi": { label: "Φ", unit: "—", format: (v) => v.toFixed(3) },
+	"state.theta": { label: "θ", unit: "—", format: (v) => v.toFixed(3) },
 	"state.mw": { label: "MW", unit: "g/mol", format: (v) => v.toFixed(2) },
 	"state.nu": { label: "ν", unit: "m²/s", format: (v) => v.toExponential(2) },
 	"state.u": { label: "u", unit: "J/kg", format: (v) => v.toFixed(0) },

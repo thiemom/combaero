@@ -109,3 +109,4 @@ TODO.md
 benchmarks/runs/
 benchmarks/network_solver_benchmark_latest.json
 gui/nw_*.json
+gui/tmp/
