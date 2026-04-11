@@ -64,9 +64,9 @@ function resolveQuantity(result: any, key: string): number | undefined {
 	if (!result) return undefined;
 	if (key.startsWith("state.")) {
 		const subKey = key.slice(6);
-		return result.state?.[subKey];
+		return result.state?.[subKey] ?? result[subKey];
 	}
-	return result[key];
+	return result[key] ?? result.state?.[key];
 }
 
 function ProbeSlot({

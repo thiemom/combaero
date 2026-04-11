@@ -23,6 +23,7 @@ inline constexpr Entry function_units[] = {
     {"mass_to_mole", "Y: kg/kg", "mol/mol"},
     {"normalize_fractions", "X: mol/mol", "mol/mol"},
     {"convert_to_dry_fractions", "X: mol/mol", "mol/mol"},
+    {"equivalence_ratio", "mole_fractions: mol/mol", "[-]"},
 
     // -------------------------------------------------------------------------
     // thermo.h - Species Data

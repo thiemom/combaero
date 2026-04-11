@@ -131,19 +131,42 @@ double oxygen_required_per_kg_mixture(const std::vector<double> &X) {
 }
 
 double equivalence_ratio(const std::vector<double> &X) {
-  // O2 required to burn all fuel in 1 mol of mixture
-  const double O2_needed = oxygen_required_per_mol_mixture(X);
+  // Guard for malformed input vector size
+  if (X.size() != molecular_structures.size()) {
+    throw std::runtime_error("equivalence_ratio: input vector size (" +
+                             std::to_string(X.size()) +
+                             ") does not match species table (" +
+                             std::to_string(molecular_structures.size()) + ")");
+  }
 
-  if (O2_needed < 1e-15)
-    throw std::runtime_error("No combustible species in mixture");
+  double n_C = 0.0;
+  double n_H = 0.0;
+  double n_O = 0.0;
 
-  // O2 actually present in mixture
-  const double O2_available = X[species_index.at("O2")];
+  for (size_t i = 0; i < X.size(); ++i) {
+    const double X_k = X[i];
+    if (X_k <= 1e-15)
+      continue;
+    const auto &ms = molecular_structures[i];
+    n_C += X_k * static_cast<double>(ms.C);
+    n_H += X_k * static_cast<double>(ms.H);
+    n_O += X_k * static_cast<double>(ms.O);
+  }
 
-  if (O2_available < 1e-15)
-    throw std::runtime_error("No O2 in mixture");
+  const double n_O_stoich = 2.0 * n_C + 0.5 * n_H;
 
-  return O2_needed / O2_available;
+  // Guard: Non-combustible mixture (Pure oxidizer or inert)
+  if (n_O_stoich <= 1e-15) {
+    return 0.0;
+  }
+
+  // Guard: Zero oxygen present (Pure fuel or fuel+inert)
+  // Return a large number to indicate extreme rich condition without crashing
+  if (n_O <= 1e-15) {
+    return 1.0e9;
+  }
+
+  return n_O_stoich / n_O;
 }
 
 double equivalence_ratio_mass(const std::vector<double> &Y) {

@@ -114,6 +114,7 @@ const Inspector = () => {
 				className="p-1.5 border rounded text-xs bg-white w-full"
 				value={current ?? ""}
 				onChange={(e) =>
+					selectedNode &&
 					updateNodeData(selectedNode.id, {
 						[slot]: e.target.value || undefined,
 					})
@@ -166,7 +167,7 @@ const Inspector = () => {
 					>
 						<option value="">— select target —</option>
 						{nodes
-							.filter((n) => n.id !== selectedNode.id && n.type !== "probe")
+							.filter((n) => n.id !== selectedNode?.id && n.type !== "probe")
 							.map((n) => (
 								<option key={n.id} value={n.id}>
 									{n.data?.label || n.type?.replace(/_/g, " ") || n.id}
@@ -659,7 +660,8 @@ const Inspector = () => {
 
 						{selectedNode.data.result.state ? (
 							<div className="flex flex-col gap-3">
-								{selectedNode.data.result.state.phi !== undefined && (
+								{(selectedNode.data.result.state?.phi !== undefined ||
+									selectedNode.data.result.phi !== undefined) && (
 									<div className="mb-1 pb-3 border-b border-stone-200">
 										<p className="text-[10px] uppercase font-bold text-stone-400 mb-2 mt-[-2px]">
 											Combustion
@@ -671,23 +673,36 @@ const Inspector = () => {
 												</span>
 												<span
 													className={`font-mono font-bold ${
-														selectedNode.data.result.state.phi > 1.05
+														(
+															selectedNode.data.result.state?.phi ||
+																selectedNode.data.result.phi
+														) > 1.05
 															? "text-orange-600"
-															: selectedNode.data.result.state.phi < 0.95
-															? "text-blue-600"
-															: "text-green-600"
+															: (selectedNode.data.result.state?.phi ||
+																		selectedNode.data.result.phi) < 0.95
+																? "text-blue-600"
+																: "text-green-600"
 													}`}
 												>
-													Φ = {selectedNode.data.result.state.phi.toFixed(3)}
+													Φ ={" "}
+													{(
+														selectedNode.data.result.state?.phi ??
+														selectedNode.data.result.phi
+													).toFixed(3)}
 												</span>
 											</div>
-											{selectedNode.data.result.state.theta !== undefined && (
+											{(selectedNode.data.result.state?.theta !== undefined ||
+												selectedNode.data.result.theta !== undefined) && (
 												<div className="flex flex-col">
 													<span className="text-stone-400 text-[10px] uppercase font-bold text-nowrap">
 														Temp Rise Ratio
 													</span>
 													<span className="font-mono font-bold">
-														θ = {selectedNode.data.result.state.theta.toFixed(3)}
+														θ ={" "}
+														{(
+															selectedNode.data.result.state?.theta ??
+															selectedNode.data.result.theta
+														).toFixed(3)}
 													</span>
 												</div>
 											)}
@@ -858,11 +873,41 @@ const Inspector = () => {
 									</span>
 								</div>
 
-								{/* Element Diagnostics (Mach, P-ratio) */}
+								{/* Element Diagnostics (Phi, Theta, Mach, P-ratio) */}
 								<div className="border-t border-stone-200 pt-3 flex flex-col gap-2">
 									<div className="text-[10px] font-bold text-stone-400 uppercase">
 										Diagnostics
 									</div>
+									{selectedNode.data.result.phi !== undefined && (
+										<div className="grid grid-cols-2 gap-2 text-[10px] font-mono font-bold mb-1">
+											<div className="flex flex-col">
+												<span className="text-stone-400 uppercase text-[8px]">
+													Phi (Φ)
+												</span>
+												<span
+													className={
+														selectedNode.data.result.phi > 1.05
+															? "text-orange-600"
+															: selectedNode.data.result.phi < 0.95
+																? "text-blue-600"
+																: "text-green-600"
+													}
+												>
+													{selectedNode.data.result.phi.toFixed(3)}
+												</span>
+											</div>
+											{selectedNode.data.result.theta !== undefined && (
+												<div className="flex flex-col">
+													<span className="text-stone-400 uppercase text-[8px]">
+														Ratio (θ)
+													</span>
+													<span>
+														{selectedNode.data.result.theta.toFixed(3)}
+													</span>
+												</div>
+											)}
+										</div>
+									)}
 									<div className="grid grid-cols-2 gap-2">
 										{selectedNode.data.result.mach !== undefined && (
 											<div className="flex flex-col">

@@ -391,13 +391,14 @@ All functions use consistent units to avoid conversion errors.
 
 ### composition.h - Composition Utilities
 
-| Function                   | Input Units | Output Unit |
-|----------------------------|-------------|-------------|
-| `mwmix`                    | X: mol/mol  | g/mol       |
-| `mole_to_mass`             | X: mol/mol  | kg/kg       |
-| `mass_to_mole`             | Y: kg/kg    | mol/mol     |
-| `normalize_fractions`      | X: mol/mol  | mol/mol     |
-| `convert_to_dry_fractions` | X: mol/mol  | mol/mol     |
+| Function                   | Input Units             | Output Unit |
+|----------------------------|-------------------------|-------------|
+| `mwmix`                    | X: mol/mol              | g/mol       |
+| `mole_to_mass`             | X: mol/mol              | kg/kg       |
+| `mass_to_mole`             | Y: kg/kg                | mol/mol     |
+| `normalize_fractions`      | X: mol/mol              | mol/mol     |
+| `convert_to_dry_fractions` | X: mol/mol              | mol/mol     |
+| `equivalence_ratio`        | mole_fractions: mol/mol | [-]         |
 
 ### materials.h - Material Thermal Conductivity
 
@@ -575,17 +576,26 @@ All functions use consistent units to avoid conversion errors.
 
 ### heat_transfer.h - ChannelResult fields
 
-| Function              | Input Units | Output Unit             |
-|-----------------------|-------------|-------------------------|
-| `ChannelResult::h`    | -           | W/(m^2*K)               |
-| `ChannelResult::Nu`   | -           | - (Nu)                  |
-| `ChannelResult::Re`   | -           | - (Re)                  |
-| `ChannelResult::Pr`   | -           | - (Pr)                  |
-| `ChannelResult::f`    | -           | - (friction/loss coeff) |
-| `ChannelResult::dP`   | -           | Pa                      |
-| `ChannelResult::M`    | -           | - (M)                   |
-| `ChannelResult::T_aw` | -           | K                       |
-| `ChannelResult::q`    | -           | W/m^2                   |
+| Function                     | Input Units | Output Unit             |
+|------------------------------|-------------|-------------------------|
+| `ChannelResult::h`           | -           | W/(m^2*K)               |
+| `ChannelResult::Nu`          | -           | - (Nu)                  |
+| `ChannelResult::Re`          | -           | - (Re)                  |
+| `ChannelResult::Pr`          | -           | - (Pr)                  |
+| `ChannelResult::f`           | -           | - (friction/loss coeff) |
+| `ChannelResult::dP`          | -           | Pa                      |
+| `ChannelResult::M`           | -           | - (M)                   |
+| `ChannelResult::T_aw`        | -           | K                       |
+| `ChannelResult::q`           | -           | W/m^2                   |
+| `ChannelResult::dh_dmdot`    | -           | W/(m^2*K*kg/s)          |
+| `ChannelResult::dh_dT`       | -           | W/(m^2*K^2)             |
+| `ChannelResult::ddP_dmdot`   | -           | Pa*s/kg                 |
+| `ChannelResult::ddP_dT`      | -           | Pa/K                    |
+| `ChannelResult::dT_aw_dmdot` | -           | K*s/kg                  |
+| `ChannelResult::dT_aw_dT`    | -           | - (dimensionless)       |
+| `ChannelResult::dq_dmdot`    | -           | W*s/(m^2*kg)            |
+| `ChannelResult::dq_dT`       | -           | W/(m^2*K)               |
+| `ChannelResult::dq_dT_wall`  | -           | W/(m^2*K)               |
 
 ### cooling_correlations.h - Pin fin friction (new scalar)
 
@@ -602,7 +612,7 @@ All functions use consistent units to avoid conversion errors.
 | `normalize_fractions`                          | -                        | -                          |
 | `convert_to_dry_fractions`                     | -                        | -                          |
 | `solve_orifice_mdot`                           | -                        | Pa                         |
-| `standard_dry_air_composition`                 | -                        | float                      |
+| `dry_air`                                      | -                        | X: mol/mol                 |
 | `humid_air_enthalpy_nasa9`                     | -                        | J/kg dry air               |
 | `complete_combustion_to_CO2_H2O_with_fraction` | -                        | -                          |
 | `HumidAir::rh`                                 | -                        | 0-1                        |

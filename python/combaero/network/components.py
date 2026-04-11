@@ -874,7 +874,11 @@ class CombustorNode(NetworkNode):
 
         # Store total mass flow and unburned temperature for use in diagnostics
         self._total_m_dot = sum(s.m_dot for s in upstream_states) if upstream_states else 0.0
-        self._T_unburned = sum(s.m_dot * s.T_total for s in upstream_states) / self._total_m_dot if self._total_m_dot > 0 else 300.0
+        self._T_unburned = (
+            sum(s.m_dot * s.T_total for s in upstream_states) / self._total_m_dot
+            if self._total_m_dot > 0
+            else 300.0
+        )
 
         if not upstream_states:
             # Default fallback
@@ -948,10 +952,13 @@ class CombustorNode(NetworkNode):
         # --- Combustion Diagnostics ---
         # 1. Equivalence Ratio (phi) via elemental analysis in C++
         try:
-            phi = cb.equivalence_ratio(cs.thermo.X)
+            phi = cb.equivalence_ratio(state.X)
             diag["phi"] = phi
-        except Exception:
-            # Fallback for purely inert/oxidizer or pure fuel cases
+        except Exception as e:
+            # Reveal the root cause of the diagnostic failure
+            import sys
+
+            print(f"DEBUG: CombustorNode.diagnostics phi calculation failed: {e}", file=sys.stderr)
             diag["phi"] = 0.0
 
         # 2. Temperature Rise Ratio (theta) = (T_burned / T_unburned) - 1
