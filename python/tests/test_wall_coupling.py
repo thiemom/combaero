@@ -116,11 +116,10 @@ def test_wall_coupling_asymmetric_htcs():
     U_expected = 1.0 / (1.0 / h_a + t_over_k + 1.0 / h_b)
     assert U_expected < h_a * 1.1  # U should be close to h_a
 
-    # Wall temperature is weighted average: T_wall = (h_a*T_a + h_b*T_b)/(h_a + h_b)
-    # With h_b >> h_a, T_wall should be much closer to cold side
-    T_wall_expected = (h_a * T_aw_a + h_b * T_aw_b) / (h_a + h_b)
-    assert abs(result.T_wall - T_wall_expected) < 1.0
-    assert result.T_wall < 400.0  # Much closer to cold side due to high h_b
+    # T_wall is the hot-side surface temperature: T_aw_a - Q / (h_a * A)
+    T_wall_expected = T_aw_a - result.Q / (h_a * A)
+    assert abs(result.T_wall - T_wall_expected) < 1e-6
+    assert result.T_wall < T_aw_a  # Below the hot-side adiabatic wall temperature
 
 
 def test_wall_coupling_repr():

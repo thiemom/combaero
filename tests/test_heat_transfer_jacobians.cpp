@@ -186,25 +186,51 @@ TEST(HeatTransferJacobiansTest, WallCouplingMultiLayerFiniteDifference) {
   const double R_fouling = 0.0001;
   const double A = 0.12;
 
-  auto evaluate = [&](double h_eval, double T_aw_eval) {
-    return wall_coupling_and_jacobian(h_eval, T_aw_eval, h_b, T_aw_b, t_over_k, A, R_fouling);
+  auto evaluate = [&](double hA, double hB, double TawA, double TawB) {
+    return wall_coupling_and_jacobian(hA, TawA, hB, TawB, t_over_k, A, R_fouling);
   };
 
-  WallCouplingResult base = evaluate(h_a, T_aw_a);
+  WallCouplingResult base = evaluate(h_a, h_b, T_aw_a, T_aw_b);
 
+  auto fd = [&](auto perturb, double base_value, double eps) {
+    auto plus = perturb(base_value + eps);
+    auto minus = perturb(base_value - eps);
+    return (plus.Q - minus.Q) / (2.0 * eps);
+  };
+
+  // dQ/dh_a
   const double eps_h = 1e-4 * h_a;
-  auto perturb_h = [&](double val) { return evaluate(val, T_aw_a); };
-  double h_plus = (perturb_h(h_a + eps_h)).Q;
-  double h_minus = (perturb_h(h_a - eps_h)).Q;
-  double fd_dQ_dh = (h_plus - h_minus) / (2.0 * eps_h);
-  EXPECT_NEAR(base.dQ_dh_a, fd_dQ_dh, std::max(1e-6, std::abs(fd_dQ_dh) * 1e-6));
+  auto perturb_h_a = [&](double val) {
+    return evaluate(val, h_b, T_aw_a, T_aw_b);
+  };
+  double fd_dQ_dh_a = fd(perturb_h_a, h_a, eps_h);
+  EXPECT_NEAR(base.dQ_dh_a, fd_dQ_dh_a,
+              std::max(1e-6, std::abs(fd_dQ_dh_a) * 1e-6));
 
+  // dQ/dh_b
+  auto perturb_h_b = [&](double val) {
+    return evaluate(h_a, val, T_aw_a, T_aw_b);
+  };
+  double fd_dQ_dh_b = fd(perturb_h_b, h_b, 1e-4 * h_b);
+  EXPECT_NEAR(base.dQ_dh_b, fd_dQ_dh_b,
+              std::max(1e-6, std::abs(fd_dQ_dh_b) * 1e-6));
+
+  // dQ/dT_aw_a
   const double eps_T = 0.1;
-  auto perturb_T = [&](double val) { return evaluate(h_a, val); };
-  double T_plus = (perturb_T(T_aw_a + eps_T)).Q;
-  double T_minus = (perturb_T(T_aw_a - eps_T)).Q;
-  double fd_dQ_dT = (T_plus - T_minus) / (2.0 * eps_T);
-  EXPECT_NEAR(base.dQ_dT_aw_a, fd_dQ_dT, std::max(1e-6, std::abs(fd_dQ_dT) * 1e-6));
+  auto perturb_Taw_a = [&](double val) {
+    return evaluate(h_a, h_b, val, T_aw_b);
+  };
+  double fd_dQ_dT_aw_a = fd(perturb_Taw_a, T_aw_a, eps_T);
+  EXPECT_NEAR(base.dQ_dT_aw_a, fd_dQ_dT_aw_a,
+              std::max(1e-6, std::abs(fd_dQ_dT_aw_a) * 1e-6));
+
+  // dQ/dT_aw_b
+  auto perturb_Taw_b = [&](double val) {
+    return evaluate(h_a, h_b, T_aw_a, val);
+  };
+  double fd_dQ_dT_aw_b = fd(perturb_Taw_b, T_aw_b, eps_T);
+  EXPECT_NEAR(base.dQ_dT_aw_b, fd_dQ_dT_aw_b,
+              std::max(1e-6, std::abs(fd_dQ_dT_aw_b) * 1e-6));
 }
 
 TEST(HeatTransferJacobiansTest, WallTemperatureProfileTest) {
@@ -220,7 +246,7 @@ TEST(HeatTransferJacobiansTest, WallTemperatureProfileTest) {
 
   // Profile points: [T_surf_hot, T_interface, T_surf_cold]
   ASSERT_EQ(profile.size(), 3);
-  
+
   // Monotonicity
   EXPECT_LT(profile[0], T_hot);
   EXPECT_GT(profile[0], profile[1]);

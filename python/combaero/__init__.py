@@ -116,6 +116,7 @@ try:
         channel_pin_fin,
         channel_ribbed,
         channel_smooth,
+        ChannelResult,
         WallCouplingResult,
         wall_coupling_and_jacobian,
         wall_coupling_and_jacobian_multilayer,
