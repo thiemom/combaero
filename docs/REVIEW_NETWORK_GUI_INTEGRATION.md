@@ -341,8 +341,8 @@ Jacobian structure is unchanged because layer count only affects the scalar `R_t
 2. [x] **M1** — Add `_residuals_only` method (Completed in 837cda2)
 
 ### Phase 2 — GUI state extraction
-3. **H2 + H3 + M5** — Refactor GUI to use solver results directly
-4. **M2** — Integrate `extract_complete_states` into post-solve path
+3. [x] **H2 + H3 + M5** — Refactor GUI to use solver results directly (Completed in 13d2842)
+4. [x] **M2** — Integrate `extract_complete_states` into post-solve path (Completed in 13d2842, fix in 1c2c2e3)
 
 ### Phase 3 — Robustness fixes
 5. **M4** — Add `rho > 0` guard to `PipeElement.htc_and_T`
