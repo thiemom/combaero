@@ -6,10 +6,13 @@ from combaero.network import (
     MassFlowBoundary,
     MomentumChamberNode,
     OrificeElement,
+    NetworkElement,
     PipeElement,
     PlenumNode,
     PressureBoundary,
+    ThermalWall,
     WallConnection,
+    WallLayer,
 )
 
 from .schemas import (
@@ -22,6 +25,7 @@ from .schemas import (
     PipeData,
     PlenumData,
     PressureBoundaryData,
+    ThermalWallData,
 )
 
 
@@ -202,18 +206,30 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
     for edge in schema.edges:
         if edge.data and edge.data.get("type") == "thermal":
             wall_id = edge.id
+            data = ThermalWallData(**edge.data)
 
-            t = edge.data.get("thickness", 0.003)
-            k = edge.data.get("conductivity", 20.0)
-            a = edge.data.get("area", 0.05)
+            # Build layers list
+            layers = []
+            if data.layers:
+                # New multi-layer format
+                layers = [
+                    WallLayer(thickness=L.thickness, conductivity=L.conductivity, material=L.material)
+                    for L in data.layers
+                ]
+            else:
+                # Legacy scalar format
+                t = data.thickness if data.thickness is not None else 0.003
+                k = data.conductivity if data.conductivity is not None else 20.0
+                layers = [WallLayer(thickness=t, conductivity=k)]
+
             net.add_wall(
-                WallConnection(
+                ThermalWall(
                     id=wall_id,
                     element_a=edge.source,
                     element_b=edge.target,
-                    wall_thickness=t,
-                    wall_conductivity=k,
-                    contact_area=a,
+                    layers=layers,
+                    contact_area=data.area,
+                    R_fouling=data.R_fouling,
                 )
             )
             net.thermal_coupling_enabled = True

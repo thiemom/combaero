@@ -116,9 +116,9 @@ try:
         channel_pin_fin,
         channel_ribbed,
         channel_smooth,
-        ChannelResult,
         WallCouplingResult,
         wall_coupling_and_jacobian,
+        wall_coupling_and_jacobian_multilayer,
         closest_mode,
         combustion_equilibrium,
         combustion_state,
@@ -566,6 +566,8 @@ except ModuleNotFoundError:
     heat_flux = _core.heat_flux
     heat_transfer_area = _core.heat_transfer_area
     heat_transfer_dT = _core.heat_transfer_dT
+    wall_coupling_and_jacobian = _core.wall_coupling_and_jacobian
+    wall_coupling_and_jacobian_multilayer = _core.wall_coupling_and_jacobian_multilayer
     wall_temperature_profile = _core.wall_temperature_profile
     ntu = _core.ntu
     capacity_ratio = _core.capacity_ratio

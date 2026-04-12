@@ -19,6 +19,8 @@ from .components import (
     DimpledModel,
     PinFinModel,
     ImpingementModel,
+    WallLayer,
+    ThermalWall,
     WallConnection,
 )
 from .combustion import (
@@ -61,5 +63,7 @@ __all__: list[str] = [
     "DimpledModel",
     "PinFinModel",
     "ImpingementModel",
+    "WallLayer",
+    "ThermalWall",
     "WallConnection",
 ]

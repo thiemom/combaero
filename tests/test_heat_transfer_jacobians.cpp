@@ -176,3 +176,66 @@ TEST(HeatTransferJacobiansTest, WallCouplingFiniteDifference) {
   EXPECT_NEAR(base.dQ_dT_aw_b, fd_dQ_dT_aw_b,
               std::max(1e-6, std::abs(fd_dQ_dT_aw_b) * 1e-6));
 }
+
+TEST(HeatTransferJacobiansTest, WallCouplingMultiLayerFiniteDifference) {
+  const double h_a = 1500.0;
+  const double h_b = 2200.0;
+  const double T_aw_a = 850.0;
+  const double T_aw_b = 500.0;
+  const std::vector<double> t_over_k = {0.001 / 50.0, 0.002 / 1.0}; // Steel + Insulation
+  const double R_fouling = 0.0001;
+  const double A = 0.12;
+
+  auto evaluate = [&](double h_eval, double T_aw_eval) {
+    return wall_coupling_and_jacobian(h_eval, T_aw_eval, h_b, T_aw_b, t_over_k, A, R_fouling);
+  };
+
+  WallCouplingResult base = evaluate(h_a, T_aw_a);
+
+  const double eps_h = 1e-4 * h_a;
+  auto perturb_h = [&](double val) { return evaluate(val, T_aw_a); };
+  double h_plus = (perturb_h(h_a + eps_h)).Q;
+  double h_minus = (perturb_h(h_a - eps_h)).Q;
+  double fd_dQ_dh = (h_plus - h_minus) / (2.0 * eps_h);
+  EXPECT_NEAR(base.dQ_dh_a, fd_dQ_dh, std::max(1e-6, std::abs(fd_dQ_dh) * 1e-6));
+
+  const double eps_T = 0.1;
+  auto perturb_T = [&](double val) { return evaluate(h_a, val); };
+  double T_plus = (perturb_T(T_aw_a + eps_T)).Q;
+  double T_minus = (perturb_T(T_aw_a - eps_T)).Q;
+  double fd_dQ_dT = (T_plus - T_minus) / (2.0 * eps_T);
+  EXPECT_NEAR(base.dQ_dT_aw_a, fd_dQ_dT, std::max(1e-6, std::abs(fd_dQ_dT) * 1e-6));
+}
+
+TEST(HeatTransferJacobiansTest, WallTemperatureProfileTest) {
+  const double T_hot = 1000.0;
+  const double T_cold = 300.0;
+  const double h_hot = 500.0;
+  const double h_cold = 50.0;
+  const std::vector<double> t_over_k = {0.002 / 50.0, 0.010 / 0.1}; // Steel + Insulation
+  const double R_fouling = 0.002;
+
+  double q_calc;
+  std::vector<double> profile = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, R_fouling, q_calc);
+
+  // Profile points: [T_surf_hot, T_interface, T_surf_cold]
+  ASSERT_EQ(profile.size(), 3);
+  
+  // Monotonicity
+  EXPECT_LT(profile[0], T_hot);
+  EXPECT_GT(profile[0], profile[1]);
+  EXPECT_GT(profile[1], profile[2]);
+  EXPECT_GT(profile[2], T_cold);
+
+  // Check consistency: Q = h_hot * (T_hot - T_surf_hot)
+  double q_hot = h_hot * (T_hot - profile[0]);
+  EXPECT_NEAR(q_calc, q_hot, 1e-7);
+
+  // Check interface drop: delta T = q * R_layer1
+  double dT_layer1 = profile[0] - profile[1];
+  EXPECT_NEAR(dT_layer1, q_calc * t_over_k[0], 1e-7);
+
+  // Check cold surface consistency: Q = (T_surf_cold - T_cold) / (R_fouling + 1/h_cold)
+  double q_cold = (profile[2] - T_cold) / (R_fouling + 1.0 / h_cold);
+  EXPECT_NEAR(q_calc, q_cold, 1e-7);
+}

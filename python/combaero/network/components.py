@@ -273,8 +273,32 @@ class ConvectiveSurface:
 
 
 @dataclass
-class WallConnection:
-    """Thermal coupling between two elements through a shared wall.
+class WallLayer:
+    """Description of a single physical layer in a multi-layer ThermalWall.
+
+    Attributes
+    ----------
+    thickness : float
+        Thickness of the layer [m].
+    conductivity : float
+        Thermal conductivity of the material [W/(m*C)].
+    material : str
+        Material name (optional, for future material-lookup support).
+    """
+
+    thickness: float
+    conductivity: float
+    material: str = "generic"
+
+    @property
+    def r_val(self) -> float:
+        """Thermal resistance per unit area [m^2*K/W]."""
+        return self.thickness / self.conductivity
+
+
+@dataclass
+class ThermalWall:
+    """Thermal coupling between two elements through a shared multi-layer wall.
 
     Attributes
     ----------
@@ -284,20 +308,20 @@ class WallConnection:
         Element ID for side A.
     element_b : str
         Element ID for side B.
-    wall_thickness : float
-        Wall thickness [m].
-    wall_conductivity : float
-        Wall thermal conductivity [W/(m*K)].
+    layers : list[WallLayer]
+        Stack of wall layers ordered from side A to side B.
     contact_area : float | None
         Override effective area [m^2]. If None, uses min(A_conv_a, A_conv_b).
+    R_fouling : float
+        Additional fouling resistance [m^2*K/W] (applied to cold side).
     """
 
     id: str
     element_a: str
     element_b: str
-    wall_thickness: float
-    wall_conductivity: float
+    layers: list[WallLayer] = field(default_factory=list)
     contact_area: float | None = None
+    R_fouling: float = 0.0
 
     def compute_coupling(
         self,
@@ -307,39 +331,66 @@ class WallConnection:
         h_b: float,
         T_aw_b: float,
         A_conv_b: float,
-    ) -> tuple[float, float]:
-        """Compute heat transfer rate and wall temperature.
+    ) -> cb.WallCouplingResult:
+        """Compute heat transfer rate and wall temperature using analytical Jacobians.
 
         Parameters
         ----------
-        h_a : float
-            Convective HTC on side A [W/(m^2*K)].
-        T_aw_a : float
-            Adiabatic wall temperature on side A [K].
-        A_conv_a : float
-            Convective area on side A [m^2].
-        h_b : float
-            Convective HTC on side B [W/(m^2*K)].
-        T_aw_b : float
-            Adiabatic wall temperature on side B [K].
-        A_conv_b : float
-            Convective area on side B [m^2].
+        h_a, h_b : float
+            Convective HTCs on sides A and B [W/(m^2*K)].
+        T_aw_a, T_aw_b : float
+            Adiabatic wall temperatures on sides A and B [K].
+        A_conv_a, A_conv_b : float
+            Convective areas on both sides [m^2].
 
         Returns
         -------
-        tuple[float, float]
-            (Q [W], T_wall [K]) where Q is positive when heat flows A->B.
+        WallCouplingResult
+            Object containing Q [W], T_wall [K], and analytical Jacobians.
         """
         # Effective area
         A_eff = self.contact_area if self.contact_area is not None else min(A_conv_a, A_conv_b)
 
-        # Wall thermal resistance
-        t_over_k = self.wall_thickness / self.wall_conductivity
+        # Multi-layer R values (thickness / conductivity)
+        t_over_k_layers = [L.r_val for L in self.layers]
 
         # Call C++ function
-        result = cb.wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b, t_over_k, A_eff)
+        return cb.wall_coupling_and_jacobian_multilayer(
+            h_a, T_aw_a, h_b, T_aw_b, t_over_k_layers, A_eff, self.R_fouling
+        )
 
-        return result.Q, result.T_wall
+
+# Backward Compatibility Alias (Deprecated: use ThermalWall instead)
+class WallConnection(ThermalWall):
+    """Legacy alias for ThermalWall to support older network definitions.
+
+    Translates scalar thickness/conductivity into a single-layer ThermalWall.
+    """
+
+    def __init__(
+        self,
+        id: str,
+        element_a: str,
+        element_b: str,
+        wall_thickness: float,
+        wall_conductivity: float,
+        contact_area: float | None = None,
+    ):
+        super().__init__(
+            id=id,
+            element_a=element_a,
+            element_b=element_b,
+            layers=[WallLayer(thickness=wall_thickness, conductivity=wall_conductivity)],
+            contact_area=contact_area,
+        )
+
+    @property
+    def wall_thickness(self) -> float:
+        return self.layers[0].thickness if self.layers else 0.0
+
+    @property
+    def wall_conductivity(self) -> float:
+        return self.layers[0].conductivity if self.layers else 1.0
 
 
 class EnergyBoundary:

@@ -301,21 +301,22 @@ inline double heat_transfer_dT(double Q, double U, double A) {
 std::vector<double>
 wall_temperature_profile(double T_hot, double T_cold, double h_hot,
                          double h_cold, const std::vector<double> &t_over_k,
-                         double &q);
+                         double R_fouling, double &q);
 
-// Simplified version without heat flux output
 std::vector<double>
 wall_temperature_profile(double T_hot, double T_cold, double h_hot,
-                         double h_cold, const std::vector<double> &t_over_k);
+                         double h_cold, const std::vector<double> &t_over_k,
+                         double R_fouling = 0.0);
 
 // Single-layer wall convenience function
 // Returns: {T_hot_surface, T_cold_surface}
 inline std::vector<double> wall_temperature_profile(double T_hot, double T_cold,
                                                     double h_hot, double h_cold,
                                                     double t_wall,
-                                                    double k_wall) {
+                                                    double k_wall,
+                                                    double R_fouling = 0.0) {
   return wall_temperature_profile(T_hot, T_cold, h_hot, h_cold,
-                                  std::vector<double>{t_wall / k_wall});
+                                  std::vector<double>{t_wall / k_wall}, R_fouling);
 }
 
 // -------------------------------------------------------------
@@ -584,6 +585,17 @@ WallCouplingResult wall_coupling_and_jacobian(
     double h_b, double T_aw_b,
     double t_over_k,
     double A);
+
+// Multi-layer wall coupling
+// Parameters:
+//   t_over_k_layers : thicknesses / conductivities for each layer [m²·K/W]
+//   R_fouling : additional fouling resistance [m²·K/W]
+WallCouplingResult wall_coupling_and_jacobian(
+    double h_a, double T_aw_a,
+    double h_b, double T_aw_b,
+    const std::vector<double> &t_over_k_layers,
+    double A,
+    double R_fouling = 0.0);
 
 // -------------------------------------------------------------
 // High-level channel functions — each returns a ChannelResult

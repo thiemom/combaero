@@ -508,18 +508,9 @@ class NetworkSolver:
                 h_b = ch_result_b.h
                 T_aw_b = ch_result_b.T_aw
 
-                # Get convective areas from surfaces (safe: only objects
-                # with a ConvectiveSurface can return non-None ChannelResult)
-                A_conv_a = obj_a.surface.area
-                A_conv_b = obj_b.surface.area
-
-                A_eff = (
-                    wall.contact_area if wall.contact_area is not None else min(A_conv_a, A_conv_b)
-                )
-                t_over_k = wall.wall_thickness / wall.wall_conductivity
-
-                wall_result = cb.wall_coupling_and_jacobian(
-                    h_a, T_aw_a, h_b, T_aw_b, t_over_k, A_eff
+                # Call multi-layer coupling logic
+                wall_result = wall.compute_coupling(
+                    h_a, T_aw_a, obj_a.surface.area, h_b, T_aw_b, obj_b.surface.area
                 )
 
                 # Convention: Q > 0 means heat flows A->B
@@ -1497,24 +1488,33 @@ class NetworkSolver:
             ch_result_b = obj_b.htc_and_T(state_b) if hasattr(obj_b, "htc_and_T") else None
 
             if ch_result_a and ch_result_b:
-                A_conv_a = obj_a.surface.area
-                A_conv_b = obj_b.surface.area
-                A_eff = (
-                    wall.contact_area if wall.contact_area is not None else min(A_conv_a, A_conv_b)
-                )
-                t_over_k = wall.wall_thickness / wall.wall_conductivity
-                wall_res = cb.wall_coupling_and_jacobian(
+                # Call multi-layer coupling logic (same as in residual evaluation)
+                wall_res = wall.compute_coupling(
                     ch_result_a.h,
                     ch_result_a.T_aw,
+                    obj_a.surface.area,
                     ch_result_b.h,
                     ch_result_b.T_aw,
-                    t_over_k,
-                    A_eff,
+                    obj_b.surface.area,
                 )
+
                 sol_dict[f"{wid}.Q"] = float(wall_res.Q)
                 sol_dict[f"{wid}.T_wall"] = float(wall_res.T_wall)
                 sol_dict[f"{wid}.h_a"] = float(ch_result_a.h)
                 sol_dict[f"{wid}.h_b"] = float(ch_result_b.h)
+
+                # Detailed temperature profile [K] (diagnostics)
+                # Ensure profile uses correct side-A/side-B ordering
+                t_over_k_layers = [L.r_val for L in wall.layers]
+                profile, _q = cb.wall_temperature_profile(
+                    ch_result_a.T_aw,
+                    ch_result_b.T_aw,
+                    ch_result_a.h,
+                    ch_result_b.h,
+                    t_over_k_layers,
+                    wall.R_fouling,
+                )
+                sol_dict[f"{wid}.T_interface"] = [float(tp) for tp in profile]
 
         sol_dict["__complete_states__"] = self.extract_complete_states(sol_dict)
         sol_dict["__success__"] = success

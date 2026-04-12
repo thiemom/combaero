@@ -83,6 +83,24 @@ class LosslessConnectionData(BaseModel):
     pass
 
 
+class WallLayerData(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    thickness: float = 0.003
+    conductivity: float = 20.0
+    material: str = "generic"
+
+
+class ThermalWallData(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    type: Literal["thermal"] = "thermal"
+    # Support both single-layer (legacy) and multi-layer
+    thickness: float | None = None
+    conductivity: float | None = None
+    layers: list[WallLayerData] | None = None
+    area: float | None = 0.05
+    R_fouling: float = 0.0
+
+
 class SolverSettings(BaseModel):
     model_config = ConfigDict(extra="ignore")
     global_regime: Literal["incompressible", "compressible"] = "incompressible"

@@ -3524,9 +3524,9 @@ TEST(HeatTransferTest, WallTemperatureProfileSingleLayer) {
     double t_wall = 0.01;   // m
     double k_wall = 50.0;   // W/(m·K)
 
-    double q;
+    double q = 0.0;
     std::vector<double> layers = {t_wall / k_wall};
-    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, layers, q);
+    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, layers, 0.0, q);
 
     // Total R = 1/500 + 0.01/50 + 1/100 = 0.002 + 0.0002 + 0.01 = 0.0122 m²·K/W
     // q = 100 / 0.0122 ≈ 8197 W/m²
@@ -3557,9 +3557,9 @@ TEST(HeatTransferTest, WallTemperatureProfileMultiLayer) {
     double t_insul = 0.05;    // m
     double k_insul = 0.04;    // W/(m·K)
 
-    double q;
+    double q = 0.0;
     auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold,
-                                          {t_steel / k_steel, t_insul / k_insul}, q);
+                                          {t_steel / k_steel, t_insul / k_insul}, 0.0, q);
 
     // Should have 3 interface temperatures
     ASSERT_EQ(temps.size(), 3u);
@@ -3659,8 +3659,8 @@ TEST(HeatTransferTest, HeatFluxFromTAtEdge) {
     std::vector<double> t_over_k = {0.01 / 50.0};  // 10mm steel
 
     // First, compute the actual temperature profile
-    double q_expected;
-    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_expected);
+    double q_expected = 0.0;
+    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, 0.0, q_expected);
 
     // Now verify we can recover q from each edge temperature
     double q0 = heat_flux_from_T_at_edge(temps[0], 0, T_hot, T_cold, h_hot, h_cold, t_over_k);
@@ -3679,8 +3679,8 @@ TEST(HeatTransferTest, HeatFluxFromTAtEdgeMultiLayer) {
     // Steel + insulation
     std::vector<double> t_over_k = {0.005 / 50.0, 0.05 / 0.04};
 
-    double q_expected;
-    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_expected);
+    double q_expected = 0.0;
+    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, 0.0, q_expected);
 
     // Verify all edges
     for (std::size_t i = 0; i < temps.size(); ++i) {
@@ -3699,8 +3699,8 @@ TEST(HeatTransferTest, HeatFluxFromTAtDepth) {
     std::vector<double> conductivities = {50.0};  // steel
     std::vector<double> t_over_k = {0.01 / 50.0};
 
-    double q_expected;
-    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_expected);
+    double q_expected = 0.0;
+    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, 0.0, q_expected);
 
     // At depth 0 (hot surface)
     double q0 = heat_flux_from_T_at_depth(temps[0], 0.0, T_hot, T_cold, h_hot, h_cold,
@@ -3727,8 +3727,8 @@ TEST(HeatTransferTest, BulkTFromEdgeTAndQ) {
     double h_cold = 100.0;
     std::vector<double> t_over_k = {0.01 / 50.0};
 
-    double q;
-    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q);
+    double q = 0.0;
+    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, 0.0, q);
 
     // From hot surface temperature, recover T_hot
     double T_hot_calc = bulk_T_from_edge_T_and_q(temps[0], 0, q, h_hot, h_cold, t_over_k, "hot");
@@ -3763,8 +3763,8 @@ TEST(HeatTransferTest, HeatFluxRoundTrip) {
     double q_original = heat_flux(U, dT);
 
     // Step 2: Get temperature profile
-    double q_profile;
-    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_profile);
+    double q_profile = 0.0;
+    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, 0.0, q_profile);
 
     // Verify heat flux from profile matches
     EXPECT_NEAR(q_profile, q_original, 0.01);
@@ -3790,8 +3790,8 @@ TEST(HeatTransferTest, HeatFluxFromDepthRoundTrip) {
     std::vector<double> t_over_k = {0.010/50.0, 0.050/0.04};
 
     // Get reference heat flux
-    double q_ref;
-    wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_ref);
+    double q_ref = 0.0;
+    wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, 0.0, q_ref);
 
     // Test at various depths (simulating embedded thermocouples)
     std::vector<double> test_depths = {0.0, 0.005, 0.010, 0.025, 0.060};
@@ -3877,13 +3877,13 @@ TEST(HeatTransferTest, TemperatureSensitivityVerifyWithFiniteDiff) {
         auto [dT_dT_hot_anal, dT_dT_cold_anal] = dT_edge_dT_bulk(edge, h_hot, h_cold, t_over_k);
 
         // Finite difference for T_hot
-        double q1, q2;
-        auto temps1 = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q1);
-        auto temps2 = wall_temperature_profile(T_hot + dT, T_cold, h_hot, h_cold, t_over_k, q2);
+        double q1 = 0.0, q2 = 0.0;
+        auto temps1 = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, 0.0, q1);
+        auto temps2 = wall_temperature_profile(T_hot + dT, T_cold, h_hot, h_cold, t_over_k, 0.0, q2);
         double dT_dT_hot_fd = (temps2[edge] - temps1[edge]) / dT;
 
         // Finite difference for T_cold
-        auto temps3 = wall_temperature_profile(T_hot, T_cold + dT, h_hot, h_cold, t_over_k, q1);
+        auto temps3 = wall_temperature_profile(T_hot, T_cold + dT, h_hot, h_cold, t_over_k, 0.0, q1);
         double dT_dT_cold_fd = (temps3[edge] - temps1[edge]) / dT;
 
         EXPECT_NEAR(dT_dT_hot_anal, dT_dT_hot_fd, 1e-6) << "Edge " << edge;

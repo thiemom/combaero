@@ -2689,16 +2689,16 @@ PYBIND11_MODULE(_core, m) {
   m.def(
       "wall_temperature_profile",
       [](double T_hot, double T_cold, double h_hot, double h_cold,
-         py::array_t<double, py::array::c_style | py::array::forcecast>
-             tk_arr) {
+         py::array_t<double, py::array::c_style | py::array::forcecast> tk_arr,
+         double R_fouling) {
         auto t_over_k = to_vec(tk_arr);
-        double q;
+        double q = 0.0;
         auto temps =
-            wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q);
+            wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, R_fouling, q);
         return py::make_tuple(temps, q);
       },
       py::arg("T_hot"), py::arg("T_cold"), py::arg("h_hot"), py::arg("h_cold"),
-      py::arg("t_over_k"),
+      py::arg("t_over_k"), py::arg("R_fouling") = 0.0,
       "Temperature profile through multi-layer wall.\n\n"
       "Returns (temps, q) where:\n"
       "  temps : interface temperatures [K]\n"
@@ -5133,23 +5133,41 @@ PYBIND11_MODULE(_core, m) {
         };
         return "WallCouplingResult(Q=" + fmt(r.Q) +
                ", T_wall=" + fmt(r.T_wall) + ")";
+      })
+      .def("__iter__", [](const WallCouplingResult &r) {
+        return py::iter(py::make_tuple(r.Q, r.T_wall));
       });
 
   // -----------------------------------------------------------------
   // wall_coupling_and_jacobian
   // -----------------------------------------------------------------
-  m.def("wall_coupling_and_jacobian", &wall_coupling_and_jacobian,
+  m.def("wall_coupling_and_jacobian",
+        py::overload_cast<double, double, double, double, double, double>(
+            &wall_coupling_and_jacobian),
         py::arg("h_a"), py::arg("T_aw_a"), py::arg("h_b"), py::arg("T_aw_b"),
         py::arg("t_over_k"), py::arg("A"),
-        "Compute heat transfer and Jacobians for wall coupling.\n\n"
+        "Compute heat transfer and Jacobians for single-layer wall coupling.\n\n"
         "Parameters:\n"
         "  h_a, h_b       : convective HTCs on sides A and B [W/(m^2*K)]\n"
         "  T_aw_a, T_aw_b : adiabatic wall temperatures on sides A and B [K]\n"
         "  t_over_k       : wall_thickness / wall_conductivity [m^2*K/W]\n"
         "  A              : effective heat transfer area [m^2]\n\n"
-        "Returns: WallCouplingResult with Q and analytical Jacobians\n\n"
-        "Uses overall_htc_wall(h_a, h_b, t_over_k) internally.\n"
-        "Q = U * A * (T_aw_a - T_aw_b) where U = 1 / (1/h_a + t/k + 1/h_b)");
+        "Returns: WallCouplingResult with Q and analytical Jacobians");
+
+  m.def("wall_coupling_and_jacobian_multilayer",
+        py::overload_cast<double, double, double, double,
+                          const std::vector<double> &, double, double>(
+            &wall_coupling_and_jacobian),
+        py::arg("h_a"), py::arg("T_aw_a"), py::arg("h_b"), py::arg("T_aw_b"),
+        py::arg("t_over_k_layers"), py::arg("A"), py::arg("R_fouling") = 0.0,
+        "Compute heat transfer and Jacobians for multi-layer wall coupling.\n\n"
+        "Parameters:\n"
+        "  h_a, h_b       : convective HTCs on sides A and B [W/(m^2*K)]\n"
+        "  T_aw_a, T_aw_b : adiabatic wall temperatures on sides A and B [K]\n"
+        "  t_over_k_layers: thicknesses / conductivities for each layer [m^2*K/W]\n"
+        "  A              : effective heat transfer area [m^2]\n"
+        "  R_fouling      : additional fouling resistance [m^2*K/W]\n\n"
+        "Returns: WallCouplingResult with Q and analytical Jacobians");
 
   // -----------------------------------------------------------------
   // channel_smooth

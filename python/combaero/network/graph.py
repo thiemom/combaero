@@ -4,7 +4,7 @@ import inspect
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .components import NetworkElement, NetworkNode, WallConnection
+    from .components import NetworkElement, NetworkNode, ThermalWall
 
 
 class FlowNetwork:
@@ -18,7 +18,7 @@ class FlowNetwork:
         self.elements: dict[str, NetworkElement] = {}
 
         # Thermal coupling walls dictionary
-        self.walls: dict[str, WallConnection] = {}
+        self.walls: dict[str, ThermalWall] = {}
         self.thermal_coupling_enabled: bool = True
 
         # Directed graph mapping: node_id -> list of element_ids
@@ -61,12 +61,12 @@ class FlowNetwork:
         # Element 'to_node' -> implies element is upstream of the to_node
         self._upstream_of_node[element.to_node].append(element.id)
 
-    def add_wall(self, wall: WallConnection) -> None:
+    def add_wall(self, wall: ThermalWall) -> None:
         """Register a thermal coupling wall between two elements.
 
         Parameters
         ----------
-        wall : WallConnection
+        wall : ThermalWall
             Wall connection defining thermal coupling between two elements.
 
         Raises
