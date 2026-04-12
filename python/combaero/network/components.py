@@ -37,6 +37,8 @@ def _safe_rho(rho_raw: float, rho_min: float = 0.01) -> tuple[float, float]:
     z = (rho_raw - rho_min) / rho_min
     if z > 20.0:  # overflow guard
         return rho_raw, 1.0
+    if z < -20.0:  # underflow guard
+        return rho_min, 0.0
     exp_z = math.exp(z)
     rho_safe = rho_min + rho_min * math.log1p(exp_z)
     d_safe = exp_z / (1.0 + exp_z)  # sigmoid - always in (0, 1)
@@ -678,7 +680,7 @@ class MomentumChamberNode(NetworkNode):
         T_wall = self.t_wall if self.t_wall is not None else math.nan
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
         rho, _ = _safe_rho(state.density())
-        u = m_dot_total / (rho * self.area) if rho > 0 and self.area > 0 else 0.0
+        u = m_dot_total / (rho * self.area) if self.area > 0 else 0.0
 
         diameter = self.Dh if self.Dh is not None else math.sqrt(4.0 * self.area / math.pi)
         length = self.length if self.length is not None else diameter
@@ -1652,7 +1654,7 @@ class PipeElement(NetworkElement):
             return None
 
         rho, _ = _safe_rho(state.density())
-        u = state.m_dot / (rho * self.area)
+        u = state.m_dot / (rho * self.area) if self.area > 0 else 0.0
 
         # Use nan for T_wall if not specified (matches C++ default)
         T_wall = self.t_wall if self.t_wall is not None else math.nan
