@@ -920,8 +920,6 @@ class NetworkSolver:
         """
         Evaluates the global residual vector and its sparse Jacobian.
         """
-        import scipy.sparse as sp
-
         # Pure Pressure-Flow: Propagate states forward first
         relay = self._propagate_states(x)
 
@@ -1064,6 +1062,8 @@ class NetworkSolver:
 
         jac_sparse = None
         if compute_jacobian:
+            import scipy.sparse as sp
+
             jac_sparse = sp.coo_matrix((data, (rows, cols)), shape=(len(res), len(x))).tocsr()
 
         return np.array(res, dtype=float), jac_sparse

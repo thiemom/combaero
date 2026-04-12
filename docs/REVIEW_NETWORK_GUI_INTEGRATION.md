@@ -338,7 +338,7 @@ Jacobian structure is unchanged because layer count only affects the scalar `R_t
 
 ### Phase 1 — Solver efficiency (no API change)
 1. [x] **H1 + L4** — Eliminate redundant evaluations in solver (Completed in 4e1b2d0, fix in 1340974)
-2. **M1** — Add `_residuals_only` method
+2. [x] **M1** — Add `_residuals_only` method (Completed in 837cda2)
 
 ### Phase 2 — GUI state extraction
 3. **H2 + H3 + M5** — Refactor GUI to use solver results directly
