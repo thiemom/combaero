@@ -1531,7 +1531,7 @@ class NetworkSolver:
         states populated during solve().
 
         Args:
-            result: Optional dictionary containing node T, P, and Y. If omitted,
+            result: Optional dictionary containing node T, P, X and Y. If omitted,
                 uses internal solver state from the last solve() call.
 
         Returns:
@@ -1544,26 +1544,38 @@ class NetworkSolver:
 
         if result is None:
             # OPTIMIZED: Use cached derived states from _propagate_states
+            # Note: This is primarily for manual diagnostic exploration after solve()
             if not self._derived_states:
                 return {}
 
             for nid, (T, Y, _) in self._derived_states.items():
-                # Pressure was not part of mass-energy propagation, pull from unknown vector x or result
-                # In NetworkSolver, node.P is always an unknown or a fixed boundary P
-                P = result.get(f"{nid}.P", result.get(f"{nid}.P_total", 101325.0))
+                # For P, we rely on node.P or total P if defined in the network
+                node = self.network.nodes[nid]
+                P = getattr(node, "P", getattr(node, "P_total", 101325.0))
                 X = mass_to_mole(np.array(Y))
                 complete_states[nid] = cb.complete_state(T, P, X)
             return complete_states
 
-        # FALLBACK: Parse from dict (backward compatibility)
+        # DICT PATH: Consumption from solve() result (as used in the GUI)
+        # Try to get composition from first node that has data to use as default
         default_X = None
         for node_id in self.network.nodes:
-            if f"{node_id}.Y[0]" in result:
+            # Prefer pre-computed X if available
+            if f"{node_id}.X[0]" in result:
+                X_list = []
+                idx = 0
+                while f"{node_id}.X[{idx}]" in result:
+                    X_list.append(result[f"{node_id}.X[{idx}]"])
+                    idx += 1
+                if X_list:
+                    default_X = np.array(X_list)
+                    break
+            elif f"{node_id}.Y[0]" in result:
                 Y_list = []
-                i = 0
-                while f"{node_id}.Y[{i}]" in result:
-                    Y_list.append(result[f"{node_id}.Y[{i}]"])
-                    i += 1
+                idx = 0
+                while f"{node_id}.Y[{idx}]" in result:
+                    Y_list.append(result[f"{node_id}.Y[{idx}]"])
+                    idx += 1
                 if Y_list:
                     default_X = mass_to_mole(np.array(Y_list))
                     break
@@ -1576,15 +1588,27 @@ class NetworkSolver:
                 T = result.get(f"{node_id}.T", result.get(f"{node_id}.T_total", 300.0))
                 P = result.get(f"{node_id}.P", result.get(f"{node_id}.P_total", 101325.0))
 
-                X = default_X.copy()
-                if f"{node_id}.Y[0]" in result:
+                # Use pre-computed X if available, otherwise fallback to Y-parsing
+                X = None
+                if f"{node_id}.X[0]" in result:
+                    X_list = []
+                    idx = 0
+                    while f"{node_id}.X[{idx}]" in result:
+                        X_list.append(result[f"{node_id}.X[{idx}]"])
+                        idx += 1
+                    if X_list:
+                        X = np.array(X_list)
+
+                if X is None and f"{node_id}.Y[0]" in result:
                     Y_list = []
-                    i = 0
-                    while f"{node_id}.Y[{i}]" in result:
-                        Y_list.append(result[f"{node_id}.Y[{i}]"])
-                        i += 1
+                    idx = 0
+                    while f"{node_id}.Y[{idx}]" in result:
+                        Y_list.append(result[f"{node_id}.Y[{idx}]"])
+                        idx += 1
                     if Y_list:
                         X = mass_to_mole(np.array(Y_list))
+
+                X = X if X is not None else default_X
 
                 if not (math.isnan(T) or math.isnan(P)):
                     complete_states[node_id] = cb.complete_state(T, P, X)
