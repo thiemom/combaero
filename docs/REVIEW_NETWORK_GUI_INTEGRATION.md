@@ -354,7 +354,7 @@ Jacobian structure is unchanged because layer count only affects the scalar `R_t
 9. [x] **C.2** — C++ multi-layer `wall_coupling_and_jacobian` overload + pybind (Completed in eb3dd21, fix in cc249c2)
 10. [x] **C.4** — Solver wiring for multi-layer walls (Completed in eb3dd21, fix in cc249c2)
 11. [x] **C.5** — Post-solve wall temperature profile (Completed in eb3dd21, fix in cc249c2)
-12. [x] **C.3** — Explicit `has_convective_surface` property (Completed in next commit)
+12. [x] **C.3** — Explicit `has_convective_surface` property (Completed in 2b0289e)
 13. [x] **C.6** — GUI schema + graph builder for wall layers (Completed in eb3dd21, fix in cc249c2)
 
 ### Phase 5 — Tuning factor completeness (Part E)

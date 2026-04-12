@@ -948,7 +948,9 @@ class CombustorNode(NetworkNode):
 
     @property
     def has_convective_surface(self) -> bool:
-        return True
+        # CombustorNode has a surface attribute but no htc_and_T implementation yet.
+        # Return False until htc_and_T is added (planned for a future phase).
+        return False
 
     def add_energy_boundary(self, eb: EnergyBoundary) -> None:
         """Attach an energy source/sink to this combustor (post-combustion)."""
