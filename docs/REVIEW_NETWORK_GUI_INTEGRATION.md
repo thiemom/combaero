@@ -345,9 +345,9 @@ Jacobian structure is unchanged because layer count only affects the scalar `R_t
 4. [x] **M2** — Integrate `extract_complete_states` into post-solve path (Completed in 13d2842, fix in 1c2c2e3)
 
 ### Phase 3 — Robustness fixes
-5. **M4** — Add `rho > 0` guard to `PipeElement.htc_and_T`
-6. **T1** — Fix hardcoded pi
-7. **L3** — Add defensive guard to `MixtureState.X`
+5. [x] **M4** — Add `rho > 0` guard to `PipeElement.htc_and_T` (Completed in dafa6d3, polish in 045763c)
+6. [x] **T1** — Standardize Pi constants (Completed in dafa6d3)
+7. [x] **L3** — Add defensive guard to `MixtureState.X` (Completed in dafa6d3)
 
 ### Phase 4 — Thermal wall refactor (Part C)
 8. **C.1** — `WallLayer` + `ThermalWall` Python dataclasses

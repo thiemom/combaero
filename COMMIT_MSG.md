@@ -1,9 +1,7 @@
-refactor(gui): consume solver diagnostics directly and eliminate redundant evaluations
+fix(robustness): implement safe density barrier, standardized pi, and species guards
 
-- Integrated extract_complete_states into the post-solve path of NetworkSolver.
-- Optimized extract_complete_states to reuse internal solver state and avoid redundant mass-to-mole conversions.
-- Refactored GUI backend (_solve_sync) to consume pre-calculated diagnostics directly from sol_dict.
-- Eliminated redundant cb.MixtureState construction and duplicate node/element diagnostic calls in the backend.
-- verified with full test suite and scratch verification scripts.
-
-Phase 2 completion (Items 3 & 4) of REVIEW_NETWORK_GUI_INTEGRATION.md.
+- Added _safe_rho utility with a softplus barrier (and symmetric underflow guard) to ensure numerical robustness in heat transfer models.
+- Integrated _safe_rho into PipeElement and MomentumChamberNode htc_and_T methods.
+- Standardized PI constants across all components to use math.pi for precision and consistency.
+- Implemented defensive clamping guard in MixtureState.X property to handle unphysical mass fractions gracefully during solver iteration.
+- updated REVIEW_NETWORK_GUI_INTEGRATION.md (Phase 3 completion).
