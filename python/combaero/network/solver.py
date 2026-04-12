@@ -914,7 +914,9 @@ class NetworkSolver:
 
         return MixtureState(**state_dict)
 
-    def _residuals_and_jacobian(self, x: np.ndarray) -> tuple[np.ndarray, Any]:
+    def _residuals_and_jacobian(
+        self, x: np.ndarray, *, compute_jacobian: bool = True
+    ) -> tuple[np.ndarray, Any]:
         """
         Evaluates the global residual vector and its sparse Jacobian.
         """
@@ -924,9 +926,9 @@ class NetworkSolver:
         relay = self._propagate_states(x)
 
         res = []
-        rows = []
-        cols = []
-        data = []
+        rows = [] if compute_jacobian else None
+        cols = [] if compute_jacobian else None
+        data = [] if compute_jacobian else None
 
         # 1. Node Residuals
         for node_id, node in self.network.nodes.items():
@@ -941,34 +943,35 @@ class NetworkSolver:
             res.extend(node_res)
 
             # Assemble node Jacobian entries
-            for eq_idx, var_derivs in node_jac.items():
-                row = start_res_idx + eq_idx
-                for unk_name, deriv in var_derivs.items():
-                    if unk_name in self._name_to_index:
-                        rows.append(row)
-                        cols.append(self._name_to_index[unk_name])
-                        data.append(deriv)
-                    elif "." in unk_name:
-                        # Relay for derived properties (T, Y) in node residuals
-                        parts = unk_name.split(".")
-                        nid, prop = parts[0], parts[1]
-                        if nid in relay:
-                            for unk_idx, sens_pkg in relay[nid].items():
-                                if prop == "T" and "T" in sens_pkg:
-                                    rows.append(row)
-                                    cols.append(unk_idx)
-                                    data.append(deriv * sens_pkg["T"])
-                                elif prop.startswith("Y") and "Y" in sens_pkg:
-                                    # Handle species composition relay
-                                    if "[" in prop:
-                                        s_idx = int(prop.split("[")[1].replace("]", ""))
+            if compute_jacobian:
+                for eq_idx, var_derivs in node_jac.items():
+                    row = start_res_idx + eq_idx
+                    for unk_name, deriv in var_derivs.items():
+                        if unk_name in self._name_to_index:
+                            rows.append(row)
+                            cols.append(self._name_to_index[unk_name])
+                            data.append(deriv)
+                        elif "." in unk_name:
+                            # Relay for derived properties (T, Y) in node residuals
+                            parts = unk_name.split(".")
+                            nid, prop = parts[0], parts[1]
+                            if nid in relay:
+                                for unk_idx, sens_pkg in relay[nid].items():
+                                    if prop == "T" and "T" in sens_pkg:
                                         rows.append(row)
                                         cols.append(unk_idx)
-                                        data.append(deriv * sens_pkg["Y"][s_idx])
-                                elif prop == "P_total_mix" and "P_total_mix" in sens_pkg:
-                                    rows.append(row)
-                                    cols.append(unk_idx)
-                                    data.append(deriv * sens_pkg["P_total_mix"])
+                                        data.append(deriv * sens_pkg["T"])
+                                    elif prop.startswith("Y") and "Y" in sens_pkg:
+                                        # Handle species composition relay
+                                        if "[" in prop:
+                                            s_idx = int(prop.split("[")[1].replace("]", ""))
+                                            rows.append(row)
+                                            cols.append(unk_idx)
+                                            data.append(deriv * sens_pkg["Y"][s_idx])
+                                    elif prop == "P_total_mix" and "P_total_mix" in sens_pkg:
+                                        rows.append(row)
+                                        cols.append(unk_idx)
+                                        data.append(deriv * sens_pkg["P_total_mix"])
 
             # Mass Conservation: Sum(m_dot_in) - Sum(m_dot_out) = 0
             mass_res_idx = len(res)
@@ -985,9 +988,10 @@ class NetworkSolver:
                 indices = self._unknown_indices.get(elem.id)
                 if indices:
                     m_dot_in += x[indices[0]]
-                    rows.append(mass_res_idx)
-                    cols.append(indices[0])
-                    data.append(1.0)
+                    if compute_jacobian:
+                        rows.append(mass_res_idx)
+                        cols.append(indices[0])
+                        data.append(1.0)
                 else:
                     from_node = self.network.nodes[elem.from_node]
                     m_dot_in += getattr(from_node, "m_dot", 0.0)
@@ -996,9 +1000,10 @@ class NetworkSolver:
                 indices = self._unknown_indices.get(elem.id)
                 if indices:
                     m_dot_out += x[indices[0]]
-                    rows.append(mass_res_idx)
-                    cols.append(indices[0])
-                    data.append(-1.0)
+                    if compute_jacobian:
+                        rows.append(mass_res_idx)
+                        cols.append(indices[0])
+                        data.append(-1.0)
                 else:
                     to_node = self.network.nodes[elem.to_node]
                     m_dot_out += getattr(to_node, "m_dot", 0.0)
@@ -1024,39 +1029,42 @@ class NetworkSolver:
             elem_res, elem_jac = element.residuals(state_in, state_out)
             res.extend(elem_res)
 
-            for eq_idx, var_derivs in elem_jac.items():
-                row = start_res_idx + eq_idx
-                for unk_name, deriv in var_derivs.items():
-                    if unk_name in self._name_to_index:
-                        rows.append(row)
-                        cols.append(self._name_to_index[unk_name])
-                        data.append(deriv)
-                    elif "." in unk_name:
-                        # Relay for derived properties (T, Y) in element residuals
-                        parts = unk_name.split(".")
-                        nid, prop = parts[0], parts[1]
-                        if nid in relay:
-                            for unk_idx, sens_pkg in relay[nid].items():
-                                if prop == "T" and "T" in sens_pkg:
-                                    rows.append(row)
-                                    cols.append(unk_idx)
-                                    data.append(deriv * sens_pkg["T"])
-                                elif prop.startswith("Y") and "Y" in sens_pkg:
-                                    if "[" in prop:
-                                        s_idx = int(prop.split("[")[1].replace("]", ""))
+            if compute_jacobian:
+                for eq_idx, var_derivs in elem_jac.items():
+                    row = start_res_idx + eq_idx
+                    for unk_name, deriv in var_derivs.items():
+                        if unk_name in self._name_to_index:
+                            rows.append(row)
+                            cols.append(self._name_to_index[unk_name])
+                            data.append(deriv)
+                        elif "." in unk_name:
+                            # Relay for derived properties (T, Y) in element residuals
+                            parts = unk_name.split(".")
+                            nid, prop = parts[0], parts[1]
+                            if nid in relay:
+                                for unk_idx, sens_pkg in relay[nid].items():
+                                    if prop == "T" and "T" in sens_pkg:
                                         rows.append(row)
                                         cols.append(unk_idx)
-                                        data.append(deriv * sens_pkg["Y"][s_idx])
-                                elif prop == "P_total_mix" and "P_total_mix" in sens_pkg:
-                                    rows.append(row)
-                                    cols.append(unk_idx)
-                                    data.append(deriv * sens_pkg["P_total_mix"])
-                                elif prop == "P_total" and "P_total" in sens_pkg:
-                                    rows.append(row)
-                                    cols.append(unk_idx)
-                                    data.append(deriv * sens_pkg["P_total"])
+                                        data.append(deriv * sens_pkg["T"])
+                                    elif prop.startswith("Y") and "Y" in sens_pkg:
+                                        if "[" in prop:
+                                            s_idx = int(prop.split("[")[1].replace("]", ""))
+                                            rows.append(row)
+                                            cols.append(unk_idx)
+                                            data.append(deriv * sens_pkg["Y"][s_idx])
+                                    elif prop == "P_total_mix" and "P_total_mix" in sens_pkg:
+                                        rows.append(row)
+                                        cols.append(unk_idx)
+                                        data.append(deriv * sens_pkg["P_total_mix"])
+                                    elif prop == "P_total" and "P_total" in sens_pkg:
+                                        rows.append(row)
+                                        cols.append(unk_idx)
+                                        data.append(deriv * sens_pkg["P_total"])
 
-        jac_sparse = sp.coo_matrix((data, (rows, cols)), shape=(len(res), len(x))).tocsr()
+        jac_sparse = None
+        if compute_jacobian:
+            jac_sparse = sp.coo_matrix((data, (rows, cols)), shape=(len(res), len(x))).tocsr()
 
         return np.array(res, dtype=float), jac_sparse
 
@@ -1064,7 +1072,7 @@ class NetworkSolver:
         """
         Evaluates the global residual vector given the current unknown vector x.
         """
-        res, _ = self._residuals_and_jacobian(x)
+        res, _ = self._residuals_and_jacobian(x, compute_jacobian=False)
         return res
 
     def solve(
