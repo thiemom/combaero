@@ -350,12 +350,12 @@ Jacobian structure is unchanged because layer count only affects the scalar `R_t
 7. [x] **L3** — Add defensive guard to `MixtureState.X` (Completed in dafa6d3)
 
 ### Phase 4 — Thermal wall refactor (Part C)
-8. [x] **C.1** — `WallLayer` + `ThermalWall` Python dataclasses (Completed in eb3dd21)
-9. [x] **C.2** — C++ multi-layer `wall_coupling_and_jacobian` overload + pybind (Completed in eb3dd21)
-10. [x] **C.4** — Solver wiring for multi-layer walls (Completed in eb3dd21)
-11. [x] **C.5** — Post-solve wall temperature profile (Completed in eb3dd21)
-12. [ ] **C.3** — Explicit `has_convective_surface` property
-13. [x] **C.6** — GUI schema + graph builder for wall layers (Completed in eb3dd21)
+8. [x] **C.1** — `WallLayer` + `ThermalWall` Python dataclasses (Completed in eb3dd21, fix in cc249c2)
+9. [x] **C.2** — C++ multi-layer `wall_coupling_and_jacobian` overload + pybind (Completed in eb3dd21, fix in cc249c2)
+10. [x] **C.4** — Solver wiring for multi-layer walls (Completed in eb3dd21, fix in cc249c2)
+11. [x] **C.5** — Post-solve wall temperature profile (Completed in eb3dd21, fix in cc249c2)
+12. [x] **C.3** — Explicit `has_convective_surface` property (Completed in next commit)
+13. [x] **C.6** — GUI schema + graph builder for wall layers (Completed in eb3dd21, fix in cc249c2)
 
 ### Phase 5 — Tuning factor completeness (Part E)
 14. **E.2.1** — Add `Nu_multiplier`/`f_multiplier` to `heat_transfer.py` wrappers

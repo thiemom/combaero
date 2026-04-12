@@ -469,6 +469,11 @@ class NetworkNode(ABC):
     def __init__(self, id: str):
         self.id = id
 
+    @property
+    def has_convective_surface(self) -> bool:
+        """True if this node has a convective heat transfer surface."""
+        return False
+
     @abstractmethod
     def unknowns(self) -> list[str]:
         """Names of unknowns this node contributes to the solver."""
@@ -551,6 +556,11 @@ class NetworkElement(ABC):
         self.id = id
         self.from_node = from_node
         self.to_node = to_node
+
+    @property
+    def has_convective_surface(self) -> bool:
+        """True if this element has a convective heat transfer surface."""
+        return False
 
     @abstractmethod
     def unknowns(self) -> list[str]:
@@ -678,6 +688,10 @@ class MomentumChamberNode(NetworkNode):
         self.t_wall = t_wall
         self.upstream_elements = []
         self.energy_boundaries: list[EnergyBoundary] = []
+
+    @property
+    def has_convective_surface(self) -> bool:
+        return True
 
     def add_energy_boundary(self, eb: EnergyBoundary) -> None:
         """Attach an energy source/sink to this momentum chamber."""
@@ -931,6 +945,10 @@ class CombustorNode(NetworkNode):
         self.upstream_elements = []
         self.fuel_boundary = None
         self.energy_boundaries: list[EnergyBoundary] = []
+
+    @property
+    def has_convective_surface(self) -> bool:
+        return True
 
     def add_energy_boundary(self, eb: EnergyBoundary) -> None:
         """Attach an energy source/sink to this combustor (post-combustion)."""
@@ -1533,6 +1551,10 @@ class PipeElement(NetworkElement):
         self.htc_model = htc_model
         self.t_wall = t_wall
         self.surface = surface or ConvectiveSurface()
+
+    @property
+    def has_convective_surface(self) -> bool:
+        return True
 
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]

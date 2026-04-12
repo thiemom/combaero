@@ -497,8 +497,8 @@ class NetworkSolver:
                     state_b.m_dot = x[m_indices_b[0]]
 
             # Call htc_and_T() on both objects
-            ch_result_a = obj_a.htc_and_T(state_a) if hasattr(obj_a, "htc_and_T") else None
-            ch_result_b = obj_b.htc_and_T(state_b) if hasattr(obj_b, "htc_and_T") else None
+            ch_result_a = obj_a.htc_and_T(state_a) if obj_a.has_convective_surface else None
+            ch_result_b = obj_b.htc_and_T(state_b) if obj_b.has_convective_surface else None
 
             # Only proceed if both elements have heat transfer surfaces
             if ch_result_a is not None and ch_result_b is not None:
@@ -1484,8 +1484,8 @@ class NetworkSolver:
                 if m_indices_b:
                     state_b.m_dot = final_x[m_indices_b[0]]
 
-            ch_result_a = obj_a.htc_and_T(state_a) if hasattr(obj_a, "htc_and_T") else None
-            ch_result_b = obj_b.htc_and_T(state_b) if hasattr(obj_b, "htc_and_T") else None
+            ch_result_a = obj_a.htc_and_T(state_a) if obj_a.has_convective_surface else None
+            ch_result_b = obj_b.htc_and_T(state_b) if obj_b.has_convective_surface else None
 
             if ch_result_a and ch_result_b:
                 # Call multi-layer coupling logic (same as in residual evaluation)
