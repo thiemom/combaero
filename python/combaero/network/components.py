@@ -23,6 +23,26 @@ CombustionMethodLiteral = Literal["complete", "equilibrium"]
 # ============================================================================
 
 
+def _safe_rho(rho_raw: float, rho_min: float = 0.01) -> tuple[float, float]:
+    """Smooth lower bound on density for numerical robustness.
+
+    Returns (rho_safe, d_rho_safe / d_rho_raw) for Jacobian chain rule.
+
+    Uses softplus: rho_safe = rho_min + rho_min * ln(1 + exp((rho_raw - rho_min) / rho_min))
+    - When rho_raw >> rho_min: rho_safe ~= rho_raw  (transparent)
+    - When rho_raw -> 0:        rho_safe -> rho_min * (1 + ln2)  (bounded)
+    - When rho_raw -> -inf:     rho_safe -> rho_min  (floor)
+    - Derivative is always in (0, 1]: solver always sees a gradient.
+    """
+    z = (rho_raw - rho_min) / rho_min
+    if z > 20.0:  # overflow guard
+        return rho_raw, 1.0
+    exp_z = math.exp(z)
+    rho_safe = rho_min + rho_min * math.log1p(exp_z)
+    d_safe = exp_z / (1.0 + exp_z)  # sigmoid - always in (0, 1)
+    return rho_safe, d_safe
+
+
 @dataclass
 class SmoothModel:
     """Parameters for channel_smooth."""
@@ -352,11 +372,16 @@ class MixtureState:
 
     @property
     def X(self) -> list[float]:
-        """Cached mole fractions converted from mass fractions."""
+        """Cached mole fractions converted from mass fractions with defensive clamping."""
         try:
             return self._X  # type: ignore[return-value]
         except AttributeError:
-            x = list(cb.mass_to_mole(self.Y))
+            # Defensive guard against unphysical intermediate solver states
+            Y_safe = [max(1e-12, min(1.0, float(yi))) for yi in self.Y]
+            y_sum = sum(Y_safe)
+            if y_sum > 0:
+                Y_safe = [yi / y_sum for yi in Y_safe]
+            x = list(cb.mass_to_mole(Y_safe))
             object.__setattr__(self, "_X", x)
             return x
 
@@ -652,7 +677,7 @@ class MomentumChamberNode(NetworkNode):
 
         T_wall = self.t_wall if self.t_wall is not None else math.nan
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
-        rho = state.density()
+        rho, _ = _safe_rho(state.density())
         u = m_dot_total / (rho * self.area) if rho > 0 and self.area > 0 else 0.0
 
         diameter = self.Dh if self.Dh is not None else math.sqrt(4.0 * self.area / math.pi)
@@ -1091,7 +1116,7 @@ class OrificeElement(NetworkElement):
             ts = cb.transport_state(state_in.T, state_in.P, state_in.X)
             mu = ts.mu if ts.mu > 0.0 else 1.8e-5
             m_dot_abs = abs(state_in.m_dot)
-            Re_D = (4.0 * m_dot_abs) / (3.14159265358979 * D_up * mu) if m_dot_abs > 1e-12 else 1e4
+            Re_D = (4.0 * m_dot_abs) / (math.pi * D_up * mu) if m_dot_abs > 1e-12 else 1e4
         else:
             Re_D = 1e5  # typical reference when no upstream pipe
 
@@ -1448,7 +1473,7 @@ class PipeElement(NetworkElement):
         self.length = length
         self.diameter = diameter
         self.roughness = roughness
-        self.area = 3.1415926535 * (diameter / 2) ** 2
+        self.area = math.pi * (diameter / 2) ** 2
 
         self.regime = regime
         self.friction_model = friction_model
@@ -1626,7 +1651,7 @@ class PipeElement(NetworkElement):
         if self.surface.area == 0.0:
             return None
 
-        rho = state.density()
+        rho, _ = _safe_rho(state.density())
         u = state.m_dot / (rho * self.area)
 
         # Use nan for T_wall if not specified (matches C++ default)
