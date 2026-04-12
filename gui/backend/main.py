@@ -70,58 +70,40 @@ def _solve_sync(schema: NetworkGraphSchema):
     success = bool(result.get("__success__", False))
 
     node_results = {}
-    for node_id, node in net.nodes.items():
-        # P and T extraction from raw solver result
-        t_val = float(result.get(f"{node_id}.T", result.get(f"{node_id}.T_total", 300.0)))
-        p_val = float(result.get(f"{node_id}.P", result.get(f"{node_id}.P_total", 101325.0)))
-        p_total_val = result.get(f"{node_id}.P_total")
-        if p_total_val is not None:
-            p_total_val = float(p_total_val)
+    for node_id in net.nodes:
+        # Pull all node diagnostics and state variables directly from sol_dict
+        # flat keys are like node_id.T, node_id.P, node_id.mach, node_id.rho, etc.
+        prefix = f"{node_id}."
+        node_vals = {
+            k[len(prefix) :]: v for k, v in result.items() if k.startswith(prefix)
+        }
 
-        # Composition extraction
+        # Handle composition lists (Y and X)
         y_vals = []
-        y_idx = 0
-        while f"{node_id}.Y[{y_idx}]" in result:
-            y_vals.append(float(result[f"{node_id}.Y[{y_idx}]"]))
-            y_idx += 1
-        if not y_vals:
-            y_vals = list(cb.species.dry_air_mass())
-
-        # Construct a MixtureState for the diagnostics call
-        # This matches the state the node saw during the last residual evaluation
-        m_dot = float(result.get(f"{node_id}.m_dot", 0.0))  # Some nodes might have m_dot
-        state_obj = cb.MixtureState(P=p_val, P_total=p_total_val or p_val, T=t_val, T_total=t_val, Y=y_vals, m_dot=m_dot)
-
-        # New Single-Pass: Call diagnostics once
-        # This returns all thermo/transport properties (h, s, rho, mu, k, Re, phi, etc.)
-        diag = node.diagnostics(state_obj)
-
-        x_vals = [float(x) for x in cb.mass_to_mole(y_vals)]
+        x_vals = []
+        i = 0
+        while f"Y[{i}]" in node_vals:
+            y_vals.append(float(node_vals.pop(f"Y[{i}]")))
+            if f"X[{i}]" in node_vals:
+                x_vals.append(float(node_vals.pop(f"X[{i}]")))
+            i += 1
 
         state_res = StateResult(
-            T=t_val,
-            P=p_val,
-            P_total=p_total_val,
+            T=float(node_vals.pop("T", 300.0)),
+            P=float(node_vals.pop("P", 101325.0)),
+            P_total=node_vals.pop("P_total", None),
             Y=y_vals,
-            X=x_vals,
-            **diag,
+            X=x_vals or None,
+            **node_vals,  # All remaining diagnostics (rho, mach, mu, k, etc.)
         )
         node_results[node_id] = NodeResult(state=state_res, success=success)
 
     element_results = {}
-    for elem_id, elem in net.elements.items():
+    elem_diags = result.get("__element_diag__", {})
+    for elem_id in net.elements:
         m_dot = float(result.get(f"{elem_id}.m_dot", 0.0))
-
-        # Element diagnostics (Inlet and Outlet states)
-        # For now we use the states of the connected nodes
-        state_in = node_results[elem.from_node].state
-        state_out = node_results[elem.to_node].state
-
-        mix_in = cb.MixtureState(P=state_in.P, P_total=state_in.P_total or state_in.P, T=state_in.T, Y=state_in.Y, m_dot=m_dot)
-        mix_out = cb.MixtureState(P=state_out.P, P_total=state_out.P_total or state_out.P, T=state_out.T, Y=state_out.Y, m_dot=m_dot)
-
-        diag = elem.diagnostics(mix_in, mix_out)
-
+        # Pull element diagnostics from the structured dict aggregated by solve()
+        diag = elem_diags.get(elem_id, {})
         element_results[elem_id] = ElementResult(m_dot=m_dot, success=success, **diag)
 
     edge_results = {}

@@ -1421,11 +1421,18 @@ class NetworkSolver:
         # last trial point the solver happened to evaluate.  This is cheap:
         # forward T/Y propagation only, no residuals or Jacobian.
         self._propagate_states(final_x)
+        from combaero import mass_to_mole
+
         for nid, (T, Y, _) in self._derived_states.items():
             sol_dict[f"{nid}.T"] = T
             sol_dict[f"{nid}.T_total"] = T  # Canonical total T
             for i, yi in enumerate(Y):
                 sol_dict[f"{nid}.Y[{i}]"] = float(yi)
+
+            # Store mole fractions as well (cheap, prevents redundant conversions)
+            X = mass_to_mole(np.array(Y))
+            for i, xi in enumerate(X):
+                sol_dict[f"{nid}.X[{i}]"] = float(xi)
 
             # Node-specific diagnostics (e.g. mach, transport/thermo properties)
             node = self.network.nodes[nid]
@@ -1437,6 +1444,7 @@ class NetworkSolver:
                     sol_dict[f"{nid}.{key}"] = val
 
         # Element-specific diagnostics (e.g. throat Mach, P-ratio)
+        sol_dict["__element_diag__"] = {}
         for eid, element in self.network.elements.items():
             state_in = self._get_node_state(self.network.nodes[element.from_node], final_x)
             state_out = self._get_node_state(self.network.nodes[element.to_node], final_x)
@@ -1447,6 +1455,7 @@ class NetworkSolver:
                 state_in.m_dot = m_solved
                 state_out.m_dot = m_solved
             diag = element.diagnostics(state_in, state_out)
+            sol_dict["__element_diag__"][eid] = diag
             for key, val in diag.items():
                 sol_dict[f"{eid}.{key}"] = val
 
@@ -1507,89 +1516,82 @@ class NetworkSolver:
                 sol_dict[f"{wid}.h_a"] = float(ch_result_a.h)
                 sol_dict[f"{wid}.h_b"] = float(ch_result_b.h)
 
+        sol_dict["__complete_states__"] = self.extract_complete_states(sol_dict)
         sol_dict["__success__"] = success
         sol_dict["__message__"] = message
         sol_dict["__final_norm__"] = final_norm
         return sol_dict
 
-    def extract_complete_states(self, result: dict[str, float]) -> dict[str, Any]:
+    def extract_complete_states(self, result: dict[str, float] | None = None) -> dict[str, Any]:
         """
-        Extract CompleteState for all network nodes regardless of convergence status.
+        Extract CompleteState for all network nodes.
 
-        This method provides comprehensive thermodynamic and transport properties
-        for every node in the network, leveraging the existing C++ CompleteState
-        structure for maximum accuracy and performance.
+        Leverages the existing C++ CompleteState structure for maximum accuracy
+        and performance. By default, it uses the solver's internal cached derived
+        states populated during solve().
 
         Args:
-            result: Dictionary returned by NetworkSolver.solve() containing
-                node temperatures, pressures, and compositions.
+            result: Optional dictionary containing node T, P, and Y. If omitted,
+                uses internal solver state from the last solve() call.
 
         Returns:
-            Dictionary mapping node IDs to CompleteState objects containing
-            28 properties each (16 thermodynamic + 12 transport).
-
-        Notes:
-            - Works regardless of solver convergence status
-            - Uses C++ CompleteState for fast, accurate property calculations
-            - All properties are computed from the same (T, P, X) state
-            - Returns nan for nodes with missing/invalid data
+            Dictionary mapping node IDs to CompleteState objects.
         """
-        # CompleteState is accessed via complete_state function
+        import combaero as cb
+        from combaero import mass_to_mole
 
         complete_states = {}
 
-        # Get composition from result or use default air
-        # Try to get composition from first node that has Y data
+        if result is None:
+            # OPTIMIZED: Use cached derived states from _propagate_states
+            if not self._derived_states:
+                return {}
+
+            for nid, (T, Y, _) in self._derived_states.items():
+                # Pressure was not part of mass-energy propagation, pull from unknown vector x or result
+                # In NetworkSolver, node.P is always an unknown or a fixed boundary P
+                P = result.get(f"{nid}.P", result.get(f"{nid}.P_total", 101325.0))
+                X = mass_to_mole(np.array(Y))
+                complete_states[nid] = cb.complete_state(T, P, X)
+            return complete_states
+
+        # FALLBACK: Parse from dict (backward compatibility)
         default_X = None
         for node_id in self.network.nodes:
             if f"{node_id}.Y[0]" in result:
-                # Extract composition array
-                Y = []
+                Y_list = []
                 i = 0
                 while f"{node_id}.Y[{i}]" in result:
-                    Y.append(result[f"{node_id}.Y[{i}]"])
+                    Y_list.append(result[f"{node_id}.Y[{i}]"])
                     i += 1
-                if Y:
-                    # Convert mass fractions to mole fractions
-                    from combaero import mass_to_mole
-
-                    default_X = mass_to_mole(np.array(Y))
+                if Y_list:
+                    default_X = mass_to_mole(np.array(Y_list))
                     break
 
-        # Fallback to air if no composition found
         if default_X is None:
-            default_X = cb.humid_air_composition(300.0, 101325.0, 0.0)  # Dry air at STP
+            default_X = cb.humid_air_composition(350.0, 101325.0, 0.0)
 
-        # Extract CompleteState for each node
         for node_id in self.network.nodes:
             try:
-                # Get temperature and pressure from result
-                T = result.get(f"{node_id}.T", float("nan"))
-                P = result.get(f"{node_id}.P", float("nan"))
+                T = result.get(f"{node_id}.T", result.get(f"{node_id}.T_total", 300.0))
+                P = result.get(f"{node_id}.P", result.get(f"{node_id}.P_total", 101325.0))
 
-                # Get composition for this node (fallback to default)
                 X = default_X.copy()
                 if f"{node_id}.Y[0]" in result:
-                    Y = []
+                    Y_list = []
                     i = 0
                     while f"{node_id}.Y[{i}]" in result:
-                        Y.append(result[f"{node_id}.Y[{i}]"])
+                        Y_list.append(result[f"{node_id}.Y[{i}]"])
                         i += 1
-                    if Y:
-                        X = mass_to_mole(np.array(Y))
+                    if Y_list:
+                        X = mass_to_mole(np.array(Y_list))
 
-                # Create CompleteState if we have valid T and P
                 if not (math.isnan(T) or math.isnan(P)):
-                    complete_state_obj = cb.complete_state(T, P, X)
-                    complete_states[node_id] = complete_state_obj
+                    complete_states[node_id] = cb.complete_state(T, P, X)
                 else:
-                    # Create a placeholder with nan values
                     complete_states[node_id] = None
-
             except Exception:
-                # Store None for nodes that fail state calculation
                 complete_states[node_id] = None
-                # Could add logging here for debugging
 
         return complete_states
 
