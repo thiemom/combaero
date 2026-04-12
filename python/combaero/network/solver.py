@@ -1255,19 +1255,8 @@ class NetworkSolver:
             x0_use = x0_auto
 
         # Seed forward-propagated thermo/composition states once before the
-        # first residual/scaling pass. This lets the initial evaluation use
-        # derived T/Y (e.g., combustion-updated temperatures) rather than
-        # purely default placeholders.
-        try:
-            self._propagate_states(x0_use)
-        except Exception as e:
-            # pragma: no cover - defensive initialization fallback
-            warnings.warn(
-                "Initial state propagation failed. Proceeding with direct residual "
-                f"evaluation, but convergence may be affected: {e}",
-                category=RuntimeWarning,
-                stacklevel=2,
-            )
+        # first residual/scaling pass by ensuring the first residual evaluation
+        # triggers the propagation internally.
 
         # Dimension check
         res0 = self._residuals(x0_use)
@@ -1291,9 +1280,10 @@ class NetworkSolver:
         start_time = time.perf_counter()
         best_x = x0_use.copy()
         best_res_norm = np.linalg.norm(res0)
+        last_exception: Exception | None = None
 
         def residuals_wrapper(x_scaled: np.ndarray) -> Any:
-            nonlocal best_x, best_res_norm
+            nonlocal best_x, best_res_norm, last_exception
 
             # Check timeout
             if timeout is not None and (time.perf_counter() - start_time) > timeout:
@@ -1324,7 +1314,8 @@ class NetworkSolver:
                     return res_scaled
             except SolverTimeoutError:
                 raise
-            except Exception:
+            except Exception as e:
+                last_exception = e
                 # Return a large penalty residual so the trust-region
                 # solver can shrink its step instead of terminating.
                 # Warn once so developers can trace unexpected failures.
@@ -1349,12 +1340,11 @@ class NetworkSolver:
             sol = root(residuals_wrapper, x0_scaled, method=method, options=options, jac=use_jac)
             solve_end_time = time.time()
             self._wall_time = solve_end_time - solve_start_time
-            final_x = sol.x * D_x  # un-scale
+            final_x = best_x
             success = sol.success
             message = sol.message
-            # Compute unscaled residual norm for reporting
-            final_res = self._residuals(final_x)
-            final_norm = float(np.linalg.norm(final_res))
+            # Efficiently use tracked norm instead of re-evaluating
+            final_norm = float(best_res_norm)
             # Guard against methods (e.g. lm) that report success at a
             # non-zero local minimum of ||F||^2.
             if success and final_norm > _RESIDUAL_TOL:
@@ -1363,6 +1353,8 @@ class NetworkSolver:
                     f"Solver reported success but |F|={final_norm:.3e} "
                     f"exceeds residual tolerance ({_RESIDUAL_TOL})."
                 )
+            if not success and last_exception:
+                raise last_exception
         except SolverTimeoutError as e:
             final_x = best_x
             success = False
@@ -1381,9 +1373,8 @@ class NetworkSolver:
         if not success and method != "hybr":
             try:
                 sol2 = root(residuals_wrapper, x0_scaled, method="hybr", jac=use_jac)
-                fallback_x = sol2.x * D_x
-                fallback_res = self._residuals(fallback_x)
-                fallback_norm = float(np.linalg.norm(fallback_res))
+                fallback_x = best_x
+                fallback_norm = float(best_res_norm)
                 if sol2.success and fallback_norm < _RESIDUAL_TOL:
                     final_x = fallback_x
                     success = True
@@ -1418,8 +1409,7 @@ class NetworkSolver:
 
         sol_dict = dict(zip(self.unknown_names, final_x, strict=False))
 
-        # Include derived states (T, Y) for consistency and state inspection
-        self._propagate_states(final_x)
+        # sol_dict assembly uses states already populated by the last evaluation
         for nid, (T, Y, _) in self._derived_states.items():
             sol_dict[f"{nid}.T"] = T
             sol_dict[f"{nid}.T_total"] = T  # Canonical total T
