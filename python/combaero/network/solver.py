@@ -1409,7 +1409,10 @@ class NetworkSolver:
 
         sol_dict = dict(zip(self.unknown_names, final_x, strict=False))
 
-        # sol_dict assembly uses states already populated by the last evaluation
+        # Ensure _derived_states matches final_x (best iterate), not the
+        # last trial point the solver happened to evaluate.  This is cheap:
+        # forward T/Y propagation only, no residuals or Jacobian.
+        self._propagate_states(final_x)
         for nid, (T, Y, _) in self._derived_states.items():
             sol_dict[f"{nid}.T"] = T
             sol_dict[f"{nid}.T_total"] = T  # Canonical total T
