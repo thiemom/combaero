@@ -358,8 +358,8 @@ Jacobian structure is unchanged because layer count only affects the scalar `R_t
 13. [x] **C.6** — GUI schema + graph builder for wall layers (Completed in eb3dd21, fix in cc249c2)
 
 ### Phase 5 — Tuning factor completeness (Part E)
-14. **E.2.1** — Add `Nu_multiplier`/`f_multiplier` to `heat_transfer.py` wrappers
-15. **E.2.2** — Wire multipliers through GUI schemas + graph builder
+14. [x] **E.2.1** — Add `Nu_multiplier`/`f_multiplier` to `heat_transfer.py` wrappers (Completed in 1878894)
+15. [x] **E.2.2** — Wire multipliers through GUI schemas + graph builder (Completed in 1878894)
 
 ### Phase 6 — Thermal wall refactor advanced (Parts C + F)
 16. **F.2.1** — `FilmCoolingModifier` on `ThermalWall` hot side
