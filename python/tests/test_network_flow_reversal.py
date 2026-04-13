@@ -78,7 +78,9 @@ def test_flow_reversal_momentum_chamber():
     graph_a.add_node(outlet_a)
 
     graph_a.add_element(LosslessConnectionElement("in_pipe", "inlet_a", "chamber"))
-    graph_a.add_element(OrificeElement("out_pipe", "chamber", "outlet_a", Cd=0.6, diameter=0.112838))
+    graph_a.add_element(
+        OrificeElement("out_pipe", "chamber", "outlet_a", Cd=0.6, diameter=0.112838)
+    )
 
     graph_a.validate()
     sol_a = NetworkSolver(graph_a).solve()
@@ -114,7 +116,9 @@ def test_flow_reversal_momentum_chamber():
 
     # Elements defined as inlet_b -> chamber -> outlet_b
     graph_b.add_element(LosslessConnectionElement("in_pipe", "inlet_b", "chamber"))
-    graph_b.add_element(OrificeElement("out_pipe", "chamber", "outlet_b", Cd=0.6, diameter=0.112838))
+    graph_b.add_element(
+        OrificeElement("out_pipe", "chamber", "outlet_b", Cd=0.6, diameter=0.112838)
+    )
 
     graph_b.validate()
     sol_b = NetworkSolver(graph_b).solve()

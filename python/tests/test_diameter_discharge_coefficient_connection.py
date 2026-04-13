@@ -199,7 +199,9 @@ class TestDiameterDischargeCoefficientConnectionElement:
         outlet1.P_total = 100000.0
         outlet1.T_total = 300.0
         outlet1.Y = cb.species.dry_air_mass()
-        conn1 = DiameterDischargeCoefficientConnectionElement("conn", "inlet", "outlet", diameter, Cd=Cd)
+        conn1 = DiameterDischargeCoefficientConnectionElement(
+            "conn", "inlet", "outlet", diameter, Cd=Cd
+        )
 
         graph1.add_node(inlet1)
         graph1.add_node(outlet1)
@@ -245,7 +247,9 @@ class TestDiameterDischargeCoefficientConnectionElement:
         outlet.P_total = 100000.0
         outlet.T_total = 300.0
         outlet.Y = cb.species.dry_air_mass()
-        conn = DiameterDischargeCoefficientConnectionElement("conn", "inlet", "outlet", diameter, Cd=Cd)
+        conn = DiameterDischargeCoefficientConnectionElement(
+            "conn", "inlet", "outlet", diameter, Cd=Cd
+        )
 
         graph.add_node(inlet)
         graph.add_node(outlet)
@@ -276,7 +280,9 @@ class TestDiameterDischargeCoefficientConnectionElement:
             outlet.P_total = 100000.0
             outlet.T_total = 300.0
             outlet.Y = cb.species.dry_air_mass()
-            conn = DiameterDischargeCoefficientConnectionElement("conn", "inlet", "outlet", diameter, Cd=Cd)
+            conn = DiameterDischargeCoefficientConnectionElement(
+                "conn", "inlet", "outlet", diameter, Cd=Cd
+            )
 
             graph.add_node(inlet)
             graph.add_node(outlet)
@@ -362,7 +368,9 @@ class TestDiameterDischargeCoefficientConnectionElement:
     def test_error_invalid_zeta_range(self):
         """Test error when zeta is negative."""
         with pytest.raises(ValueError, match="zeta must be >= 0"):
-            DiameterDischargeCoefficientConnectionElement("conn1", "node1", "node2", 0.01, zeta=-0.1)
+            DiameterDischargeCoefficientConnectionElement(
+                "conn1", "node1", "node2", 0.01, zeta=-0.1
+            )
 
     def test_compressible_flow_behavior(self):
         """Verify that DiameterDischargeCoefficientConnectionElement uses compressible flow equation.
@@ -384,7 +392,9 @@ class TestDiameterDischargeCoefficientConnectionElement:
         outlet1.P_total = 50000.0
         outlet1.T_total = 300.0
         outlet1.Y = cb.species.dry_air_mass()
-        conn1 = DiameterDischargeCoefficientConnectionElement("conn", "inlet", "outlet", diameter, Cd=Cd)
+        conn1 = DiameterDischargeCoefficientConnectionElement(
+            "conn", "inlet", "outlet", diameter, Cd=Cd
+        )
 
         graph1.add_node(inlet1)
         graph1.add_node(outlet1)
@@ -404,7 +414,9 @@ class TestDiameterDischargeCoefficientConnectionElement:
         outlet2.P_total = 100000.0
         outlet2.T_total = 300.0
         outlet2.Y = cb.species.dry_air()
-        conn2 = DiameterDischargeCoefficientConnectionElement("conn", "inlet", "outlet", diameter, Cd=Cd)
+        conn2 = DiameterDischargeCoefficientConnectionElement(
+            "conn", "inlet", "outlet", diameter, Cd=Cd
+        )
 
         graph2.add_node(inlet2)
         graph2.add_node(outlet2)

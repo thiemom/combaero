@@ -16,8 +16,8 @@ import PipeNode from "./nodes/PipeNode";
 import PlenumNode from "./nodes/PlenumNode";
 import PressureBoundaryNode from "./nodes/PressureBoundaryNode";
 import ProbeNode from "./nodes/ProbeNode";
-import ThermalEdge from "./ThermalEdge";
 import SolverStatusBadge from "./SolverStatusBadge";
+import ThermalEdge from "./ThermalEdge";
 
 const NODE_TYPES = Object.freeze({
 	plenum: PlenumNode,

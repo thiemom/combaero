@@ -127,7 +127,7 @@ def create_cooling_network(
             from_node="cool_exit",
             to_node="cool_outlet",
             Cd=0.98,
-            area=np.pi * (D_ch * 0.95 / 2) ** 2,
+            diameter=D_ch * 0.95,
             regime="incompressible",
         )
     )
@@ -187,7 +187,7 @@ def create_coupled_wall_network(
             from_node="hot_exit",
             to_node="hot_outlet",
             Cd=0.98,
-            area=np.pi * (D_ann * 0.95 / 2) ** 2,
+            diameter=D_ann * 0.95,
             regime="incompressible",
         )
     )

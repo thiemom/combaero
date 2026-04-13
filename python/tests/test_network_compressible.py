@@ -114,7 +114,9 @@ def test_mixed_compressible_incompressible_network():
     )
 
     # Compressible orifice in middle (high pressure drop)
-    orifice = OrificeElement("orifice", "j1", "j2", Cd=0.65, diameter=0.011284, regime="compressible")
+    orifice = OrificeElement(
+        "orifice", "j1", "j2", Cd=0.65, diameter=0.011284, regime="compressible"
+    )
 
     # Incompressible pipe at end
     pipe2 = PipeElement(
@@ -158,7 +160,9 @@ def test_compressible_vs_incompressible_comparison():
         net.add_node(inlet)
         net.add_node(outlet)
 
-        orifice = OrificeElement("orifice", "inlet", "outlet", Cd=0.65, diameter=0.015958, regime=regime)
+        orifice = OrificeElement(
+            "orifice", "inlet", "outlet", Cd=0.65, diameter=0.015958, regime=regime
+        )
         net.add_element(orifice)
         return net
 
@@ -313,7 +317,7 @@ def _build_fully_coupled_network(regime: str, mach_target: float) -> FlowNetwork
             from_node="hot_plenum",
             to_node="hot_outlet",
             Cd=0.72,
-            area=_area(0.030),
+            diameter=0.030,
             regime=orifice_regime,
         )
     )
@@ -336,7 +340,7 @@ def _build_fully_coupled_network(regime: str, mach_target: float) -> FlowNetwork
             from_node="cold_plenum",
             to_node="cold_outlet",
             Cd=0.72,
-            area=_area(0.025),
+            diameter=0.025,
             regime=orifice_regime,
         )
     )

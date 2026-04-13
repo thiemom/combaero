@@ -1106,6 +1106,7 @@ class OrificeElement(NetworkElement):
     ):
         super().__init__(id, from_node, to_node)
         import math
+
         self.Cd = Cd
         self.diameter = diameter
         self.area = math.pi * (diameter / 2.0) ** 2
@@ -1358,7 +1359,14 @@ class EffectiveAreaConnectionElement(OrificeElement):
             have a sharp-edged orifice with geometric area 0.0125 m^2 and Cd=0.8, you would
             specify effective_area=0.01 m^2 (0.8 * 0.0125).
         """
-        super().__init__(id, from_node, to_node, Cd=1.0, area=effective_area)
+        import math
+
+        diameter = math.sqrt(4.0 * effective_area / math.pi)
+        super().__init__(id, from_node, to_node, Cd=1.0, diameter=diameter)
+
+        # Force self.area to be precisely the effective area
+        # (to remove any floating point math.sqrt / pi precision issues)
+        self.area = effective_area
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         """
