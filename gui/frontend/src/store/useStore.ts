@@ -35,6 +35,7 @@ export interface RFState {
 	setPressureUnit: (unit: "Pa" | "kPa" | "MPa") => void;
 	saveNetwork: (filename?: string) => void;
 	loadNetwork: (data: any) => void;
+	dismissSolveStatus: () => void;
 }
 
 const useStore = create<RFState>((set, get) => ({
@@ -198,6 +199,10 @@ const useStore = create<RFState>((set, get) => ({
 				solveResults: null,
 			});
 		}
+	},
+
+	dismissSolveStatus: () => {
+		set({ solveResults: null });
 	},
 }));
 

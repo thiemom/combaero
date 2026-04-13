@@ -17,6 +17,7 @@ import PlenumNode from "./nodes/PlenumNode";
 import PressureBoundaryNode from "./nodes/PressureBoundaryNode";
 import ProbeNode from "./nodes/ProbeNode";
 import ThermalEdge from "./ThermalEdge";
+import SolverStatusBadge from "./SolverStatusBadge";
 
 const NODE_TYPES = Object.freeze({
 	plenum: PlenumNode,
@@ -109,10 +110,11 @@ const NetworkCanvas = () => {
 
 	return (
 		<main
-			className="flex-grow h-full bg-stone-50"
+			className="flex-grow h-full bg-stone-50 relative"
 			onDragOver={onDragOver}
 			onDrop={onDrop}
 		>
+			<SolverStatusBadge />
 			<ReactFlow
 				nodes={nodes}
 				edges={edges}

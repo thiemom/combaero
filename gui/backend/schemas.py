@@ -167,6 +167,7 @@ class ElementResult(BaseModel):
 class SolveResponse(BaseModel):
     success: bool
     message: str = ""
+    final_norm: float | None = None
     node_results: dict[str, NodeResult] = {}
     element_results: dict[str, ElementResult] = {}
     edge_results: dict[str, dict] = {}

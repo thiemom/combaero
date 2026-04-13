@@ -128,6 +128,7 @@ async def solve(schema: NetworkGraphSchema):
         return SolveResponse(
             success=result.get("__success__", False),
             message=result.get("__message__", "Solve completed"),
+            final_norm=result.get("__final_norm__"),
             node_results=node_results,
             element_results=element_results,
             edge_results=edge_results,
