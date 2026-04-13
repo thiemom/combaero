@@ -65,7 +65,7 @@ def test_combustor_network_conservation():
     net.add_element(e_f2)
 
     # Discharge orifice
-    nozzle = OrificeElement("nozzle", "combustor", "out", Cd=0.8, area=0.02)
+    nozzle = OrificeElement("nozzle", "combustor", "out", Cd=0.8, diameter=0.159577)
     nozzle.initial_guess = {"nozzle.m_dot": 2.06}
     net.add_element(nozzle)
 

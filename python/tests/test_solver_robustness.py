@@ -59,11 +59,11 @@ def test_numerical_jacobian_full_network():
     for node in [inlet_air, inlet_fuel, p1, comb, p2, outlet]:
         graph.add_node(node)
 
-    graph.add_element(OrificeElement("o_air", "inlet_air", "p1", Cd=0.6, area=0.01))
-    graph.add_element(OrificeElement("o_fuel", "inlet_fuel", "p1", Cd=0.6, area=0.001))
-    graph.add_element(OrificeElement("o_mix", "p1", "comb", Cd=0.6, area=0.01))
-    graph.add_element(OrificeElement("o_to_p2", "comb", "p2", Cd=0.6, area=0.01))
-    graph.add_element(OrificeElement("o_exit", "p2", "outlet", Cd=0.6, area=0.01))
+    graph.add_element(OrificeElement("o_air", "inlet_air", "p1", Cd=0.6, diameter=0.112838))
+    graph.add_element(OrificeElement("o_fuel", "inlet_fuel", "p1", Cd=0.6, diameter=0.035682))
+    graph.add_element(OrificeElement("o_mix", "p1", "comb", Cd=0.6, diameter=0.112838))
+    graph.add_element(OrificeElement("o_to_p2", "comb", "p2", Cd=0.6, diameter=0.112838))
+    graph.add_element(OrificeElement("o_exit", "p2", "outlet", Cd=0.6, diameter=0.112838))
 
     solver = NetworkSolver(graph)
     # Trigger build of unknown names and indices
@@ -104,10 +104,10 @@ def test_cascaded_derived_state_relay():
     for node in [inlet, p1, comb, p2, outlet]:
         graph.add_node(node)
 
-    graph.add_element(OrificeElement("o1", "inlet", "p1", Cd=0.6, area=0.01))
-    graph.add_element(OrificeElement("o2", "p1", "comb", Cd=0.6, area=0.01))
-    graph.add_element(OrificeElement("o3", "comb", "p2", Cd=0.6, area=0.01))
-    graph.add_element(OrificeElement("o4", "p2", "outlet", Cd=0.6, area=0.01))
+    graph.add_element(OrificeElement("o1", "inlet", "p1", Cd=0.6, diameter=0.112838))
+    graph.add_element(OrificeElement("o2", "p1", "comb", Cd=0.6, diameter=0.112838))
+    graph.add_element(OrificeElement("o3", "comb", "p2", Cd=0.6, diameter=0.112838))
+    graph.add_element(OrificeElement("o4", "p2", "outlet", Cd=0.6, diameter=0.112838))
 
     solver = NetworkSolver(graph)
     sol = solver.solve()
@@ -139,8 +139,8 @@ def test_orifice_smoothness_and_convergence_reversal():
     for node in [inlet, p1, outlet]:
         graph.add_node(node)
 
-    o1 = OrificeElement("o1", "inlet", "p1", Cd=0.6, area=0.01)
-    o2 = OrificeElement("o2", "p1", "outlet", Cd=0.6, area=0.01)
+    o1 = OrificeElement("o1", "inlet", "p1", Cd=0.6, diameter=0.112838)
+    o2 = OrificeElement("o2", "p1", "outlet", Cd=0.6, diameter=0.112838)
 
     # Force initial guess for m_dot to be positive (wrong direction)
     o1.initial_guess = {"o1.m_dot": 1.0}
@@ -178,10 +178,10 @@ def test_mass_fraction_conservation_and_bounds():
     for node in [in1, in2, p1, comb, outlet]:
         graph.add_node(node)
 
-    graph.add_element(OrificeElement("o1", "in1", "p1", Cd=0.6, area=0.01))
-    graph.add_element(OrificeElement("o2", "in2", "p1", Cd=0.6, area=0.01))
-    graph.add_element(OrificeElement("o3", "p1", "comb", Cd=0.6, area=0.01))
-    graph.add_element(OrificeElement("o4", "comb", "outlet", Cd=0.6, area=0.01))
+    graph.add_element(OrificeElement("o1", "in1", "p1", Cd=0.6, diameter=0.112838))
+    graph.add_element(OrificeElement("o2", "in2", "p1", Cd=0.6, diameter=0.112838))
+    graph.add_element(OrificeElement("o3", "p1", "comb", Cd=0.6, diameter=0.112838))
+    graph.add_element(OrificeElement("o4", "comb", "outlet", Cd=0.6, diameter=0.112838))
 
     solver = NetworkSolver(graph)
     sol = solver.solve()
@@ -247,9 +247,9 @@ def test_mixing_plenum_convergence():
     for node in [in_air, in_fuel, p1, outlet]:
         graph.add_node(node)
 
-    graph.add_element(OrificeElement("o_air", "in_air", "p1", Cd=0.6, area=0.005))
-    graph.add_element(OrificeElement("o_fuel", "in_fuel", "p1", Cd=0.6, area=0.001))
-    graph.add_element(OrificeElement("o_exit", "p1", "outlet", Cd=0.6, area=0.005))
+    graph.add_element(OrificeElement("o_air", "in_air", "p1", Cd=0.6, diameter=0.079788))
+    graph.add_element(OrificeElement("o_fuel", "in_fuel", "p1", Cd=0.6, diameter=0.035682))
+    graph.add_element(OrificeElement("o_exit", "p1", "outlet", Cd=0.6, diameter=0.079788))
 
     solver = NetworkSolver(graph)
     sol = solver.solve()
@@ -292,8 +292,8 @@ def test_equilibrium_combustor_convergence():
     for node in [inlet, comb, outlet]:
         graph.add_node(node)
 
-    graph.add_element(OrificeElement("o1", "inlet", "comb", Cd=0.6, area=0.001))
-    graph.add_element(OrificeElement("o2", "comb", "outlet", Cd=0.6, area=0.001))
+    graph.add_element(OrificeElement("o1", "inlet", "comb", Cd=0.6, diameter=0.035682))
+    graph.add_element(OrificeElement("o2", "comb", "outlet", Cd=0.6, diameter=0.035682))
 
     solver = NetworkSolver(graph)
     sol = solver.solve()
@@ -347,8 +347,8 @@ def test_derived_state_jacobian_fd():
     graph.add_node(p1)
     graph.add_node(outlet)
 
-    graph.add_element(OrificeElement("o1", "inlet", "p1", Cd=0.6, area=0.01))
-    graph.add_element(OrificeElement("o2", "p1", "outlet", Cd=0.6, area=0.01))
+    graph.add_element(OrificeElement("o1", "inlet", "p1", Cd=0.6, diameter=0.112838))
+    graph.add_element(OrificeElement("o2", "p1", "outlet", Cd=0.6, diameter=0.112838))
 
     solver = NetworkSolver(graph)
     x0 = solver._build_x0()
@@ -385,8 +385,8 @@ def test_no_negative_Y_ever():
     graph.add_node(comb)
     graph.add_node(outlet)
 
-    graph.add_element(OrificeElement("o1", "inlet", "comb", Cd=0.6, area=0.001))
-    graph.add_element(OrificeElement("o2", "comb", "outlet", Cd=0.6, area=0.001))
+    graph.add_element(OrificeElement("o1", "inlet", "comb", Cd=0.6, diameter=0.035682))
+    graph.add_element(OrificeElement("o2", "comb", "outlet", Cd=0.6, diameter=0.035682))
 
     solver = NetworkSolver(graph)
 

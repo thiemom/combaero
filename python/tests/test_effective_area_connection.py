@@ -140,7 +140,7 @@ class TestEffectiveAreaConnectionElement:
         outlet2.P_total = 100000.0
         outlet2.T_total = 300.0
         outlet2.Y = cb.species.dry_air_mass()
-        orf2 = OrificeElement("orf", "inlet", "outlet", Cd=1.0, area=effective_area)
+        orf2 = OrificeElement("orf", "inlet", "outlet", Cd=1.0, diameter=effective_area)
 
         graph2.add_node(inlet2)
         graph2.add_node(outlet2)

@@ -395,8 +395,8 @@ class TestNetworkWithEnergyBoundary:
         plenum = PlenumNode("plenum")
         plenum.add_energy_boundary(EnergyBoundary("heater", Q=50000.0))
 
-        orf1 = OrificeElement("orf1", "inlet", "plenum", Cd=0.8, area=0.01)
-        orf2 = OrificeElement("orf2", "plenum", "outlet", Cd=0.8, area=0.01)
+        orf1 = OrificeElement("orf1", "inlet", "plenum", Cd=0.8, diameter=0.112838)
+        orf2 = OrificeElement("orf2", "plenum", "outlet", Cd=0.8, diameter=0.112838)
 
         graph.add_node(inlet)
         graph.add_node(plenum)
@@ -434,8 +434,8 @@ class TestNetworkWithEnergyBoundary:
         # Use moderate Q relative to expected mdot (~10 kg/s with large orifice)
         plenum.add_energy_boundary(EnergyBoundary("cooler", Q=-50000.0))
 
-        orf1 = OrificeElement("orf1", "inlet", "plenum", Cd=0.8, area=0.02)
-        orf2 = OrificeElement("orf2", "plenum", "outlet", Cd=0.8, area=0.02)
+        orf1 = OrificeElement("orf1", "inlet", "plenum", Cd=0.8, diameter=0.159577)
+        orf2 = OrificeElement("orf2", "plenum", "outlet", Cd=0.8, diameter=0.159577)
 
         graph.add_node(inlet)
         graph.add_node(plenum)
@@ -473,8 +473,8 @@ def test_heat_exchange_node():
     heater = EnergyBoundary("heater", Q=1000.0)
     plenum.add_energy_boundary(heater)
 
-    orf1 = OrificeElement("orf1", "inlet", "plenum", Cd=0.6, area=0.001)
-    orf2 = OrificeElement("orf2", "plenum", "outlet", Cd=0.6, area=0.001)
+    orf1 = OrificeElement("orf1", "inlet", "plenum", Cd=0.6, diameter=0.035682)
+    orf2 = OrificeElement("orf2", "plenum", "outlet", Cd=0.6, diameter=0.035682)
 
     graph.add_node(inlet)
     graph.add_node(plenum)
@@ -528,8 +528,8 @@ def test_heat_exchange_node():
     ref_plenum = PlenumNode("plenum")
     ref_outlet = PressureBoundary("outlet", P_total=101325.0)
 
-    ref_orf1 = OrificeElement("orf1", "inlet", "plenum", Cd=0.6, area=0.001)
-    ref_orf2 = OrificeElement("orf2", "plenum", "outlet", Cd=0.6, area=0.001)
+    ref_orf1 = OrificeElement("orf1", "inlet", "plenum", Cd=0.6, diameter=0.035682)
+    ref_orf2 = OrificeElement("orf2", "plenum", "outlet", Cd=0.6, diameter=0.035682)
 
     ref_graph.add_node(ref_inlet)
     ref_graph.add_node(ref_plenum)

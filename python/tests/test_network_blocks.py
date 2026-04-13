@@ -37,7 +37,7 @@ ELEMENT_FACTORIES = {
         regime="compressible",
         friction_model="colebrook",
     ),
-    "orifice": lambda id, f, t: OrificeElement(id, f, t, Cd=0.6, area=0.005),
+    "orifice": lambda id, f, t: OrificeElement(id, f, t, Cd=0.6, diameter=0.079788),
     "lossless": lambda id, f, t: LosslessConnectionElement(id, f, t),
 }
 
@@ -81,7 +81,7 @@ def test_atomic_network_components():
     )
 
     orifice_1 = OrificeElement(
-        id="orifice_1", from_node="node_1", to_node="outlet", Cd=0.6, area=0.005
+        id="orifice_1", from_node="node_1", to_node="outlet", Cd=0.6, diameter=0.079788
     )
 
     # 4. Verify basic properties
@@ -137,7 +137,7 @@ def test_flownetwork_topology():
     )
 
     orifice = cb.network.OrificeElement(
-        id="orf_1", from_node="node_1", to_node="outlet", Cd=0.6, area=0.005
+        id="orf_1", from_node="node_1", to_node="outlet", Cd=0.6, diameter=0.079788
     )
 
     # 1. Register graph

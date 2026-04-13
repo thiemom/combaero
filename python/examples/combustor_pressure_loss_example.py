@@ -49,7 +49,7 @@ def test_combustor_pressure_loss():
     )
 
     # Large area orifice
-    orifice = OrificeElement("Orifice", from_node="PreOutlet", to_node="Outlet", Cd=0.8, area=0.1)
+    orifice = OrificeElement("Orifice", from_node="PreOutlet", to_node="Outlet", Cd=0.8, diameter=0.356825)
     net.add_element(orifice)
 
     solver = NetworkSolver(net)

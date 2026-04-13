@@ -350,7 +350,7 @@ modes = cb.tube_axial_modes(tube, c=340, bc1=cb.BoundaryCondition.Closed, bc2=cb
 from combaero.network import FlowNetwork, NetworkSolver, OrificeElement
 
 graph = FlowNetwork()
-graph.add_element(OrificeElement("ori1", "nodeA", "nodeB", Cd=0.6, area=1e-4))
+graph.add_element(OrificeElement("ori1", "nodeA", "nodeB", Cd=0.6, diameter=0.011284))
 
 solver = NetworkSolver(graph)
 # init_strategy options: "default", "incompressible_warmstart", "homotopy"
@@ -381,17 +381,17 @@ energy = EnergyBoundary("energy", Q=50000)  # Heat addition [W]
 ```python
 from combaero.network import (
     OrificeElement, PipeElement, EffectiveAreaConnectionElement,
-    LosslessConnectionElement, AreaDischargeCoefficientConnectionElement
+    LosslessConnectionElement, DiameterDischargeCoefficientConnectionElement
 )
 
 # Flow elements
-orifice = OrificeElement("orifice", "node1", "node2", Cd=0.65, area=1e-4, regime="compressible")
+orifice = OrificeElement("orifice", "node1", "node2", Cd=0.65, diameter=0.011284, regime="compressible")
 pipe = PipeElement("pipe", "node2", "node3", length=2.0, diameter=0.05, roughness=1e-4, regime="compressible_fanno")
 
 # Connection elements
-effective_area = EffectiveAreaConnectionElement("ea", "node3", "node4", area=2e-4)
+effective_area = EffectiveAreaConnectionElement("ea", "node3", "node4", diameter=0.015958)
 lossless = LosslessConnectionElement("lossless", "node4", "node5")
-area_cd = AreaDischargeCoefficientConnectionElement("area_cd", "node5", "node6", area=1e-4, Cd=0.7)
+area_cd = DiameterDischargeCoefficientConnectionElement("area_cd", "node5", "node6", diameter=0.011284, Cd=0.7)
 ```
 
 ### Combustion Integration

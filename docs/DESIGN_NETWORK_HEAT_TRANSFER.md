@@ -509,9 +509,9 @@ net.add_node(PressureBoundary("turbine_inlet", P_total=2.8e6))
 # --- Hot gas path ---
 net.add_node(CombustionNode("combustor", method="equilibrium"))
 net.add_element(OrificeElement("primary_air", "air_supply", "combustor",
-                               Cd=0.7, area=1e-3))
+                               Cd=0.7, diameter=0.035682))
 net.add_element(OrificeElement("fuel_injector", "fuel_supply", "combustor",
-                               Cd=0.6, area=2e-4))
+                               Cd=0.6, diameter=0.015958))
 net.add_element(PipeElement(
     "hot_liner", "combustor", "turbine_inlet",
     length=0.4, diameter=0.15, roughness=1e-4,
@@ -524,7 +524,7 @@ net.add_element(PipeElement(
 # --- Cooling path ---
 net.add_node(PlenumNode("cool_plenum"))
 net.add_element(OrificeElement("bleed_orifice", "air_supply", "cool_plenum",
-                               Cd=0.65, area=5e-4))
+                               Cd=0.65, diameter=0.025231))
 net.add_node(MomentumChamberNode("cool_exit", area=pi/4 * 0.005**2))
 net.add_element(PipeElement(
     "cooling_passage", "cool_plenum", "cool_exit",
@@ -538,7 +538,7 @@ net.add_element(PipeElement(
 
 # Heated coolant feeds back as dilution air
 net.add_element(OrificeElement("dilution_holes", "cool_exit", "combustor",
-                               Cd=0.7, area=8e-4))
+                               Cd=0.7, diameter=0.031915))
 
 # --- Wall coupling ---
 net.add_wall(WallConnection(

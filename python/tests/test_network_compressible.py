@@ -29,7 +29,7 @@ def test_compressible_orifice_network():
 
     # Compressible orifice
     orifice = OrificeElement(
-        "orifice", "inlet", "outlet", Cd=0.65, area=1e-4, regime="compressible"
+        "orifice", "inlet", "outlet", Cd=0.65, diameter=0.011284, regime="compressible"
     )
     net.add_element(orifice)
 
@@ -114,7 +114,7 @@ def test_mixed_compressible_incompressible_network():
     )
 
     # Compressible orifice in middle (high pressure drop)
-    orifice = OrificeElement("orifice", "j1", "j2", Cd=0.65, area=1e-4, regime="compressible")
+    orifice = OrificeElement("orifice", "j1", "j2", Cd=0.65, diameter=0.011284, regime="compressible")
 
     # Incompressible pipe at end
     pipe2 = PipeElement(
@@ -158,7 +158,7 @@ def test_compressible_vs_incompressible_comparison():
         net.add_node(inlet)
         net.add_node(outlet)
 
-        orifice = OrificeElement("orifice", "inlet", "outlet", Cd=0.65, area=2e-4, regime=regime)
+        orifice = OrificeElement("orifice", "inlet", "outlet", Cd=0.65, diameter=0.015958, regime=regime)
         net.add_element(orifice)
         return net
 
@@ -193,7 +193,7 @@ def test_compressible_choked_orifice():
     net.add_node(outlet)
 
     orifice = OrificeElement(
-        "orifice", "inlet", "outlet", Cd=0.65, area=5e-5, regime="compressible"
+        "orifice", "inlet", "outlet", Cd=0.65, diameter=0.007979, regime="compressible"
     )
     net.add_element(orifice)
 

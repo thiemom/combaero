@@ -48,7 +48,7 @@ def test_jacobian_accuracy():
     net.add_node(n_out)
 
     # Elements
-    orf = OrificeElement("orf", from_node="in", to_node="n1", Cd=0.6, area=0.01)
+    orf = OrificeElement("orf", from_node="in", to_node="n1", Cd=0.6, diameter=0.112838)
     pipe = PipeElement(
         "pipe", from_node="n1", to_node="out", length=1.0, diameter=0.1, roughness=1e-5
     )
@@ -90,7 +90,7 @@ def test_jacobian_accuracy_compressible_network() -> None:
             from_node="mid",
             to_node="out",
             Cd=0.69,
-            area=1.2e-4,
+            diameter=0.012361,
             regime="compressible",
         )
     )

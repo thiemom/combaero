@@ -66,7 +66,7 @@ def main():
     e_main.initial_guess = {"e_main.m_dot": 0.045}
 
     # Connect to exhaust via nozzle
-    nozzle = OrificeElement("nozzle", "combustor", "exhaust", Cd=0.8, area=0.03)
+    nozzle = OrificeElement("nozzle", "combustor", "exhaust", Cd=0.8, diameter=0.195441)
     nozzle.initial_guess = {"nozzle.m_dot": 2.06}
 
     net.add_node(air_in)

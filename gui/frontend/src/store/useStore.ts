@@ -31,8 +31,9 @@ export interface RFState {
 		init_strategy: "default" | "incompressible_warmstart" | "homotopy";
 	};
 	updateSolverSettings: (settings: Partial<RFState["solverSettings"]>) => void;
-	unitPreferences: { pressure: "Pa" | "kPa" | "MPa" };
+	unitPreferences: { pressure: "Pa" | "kPa" | "MPa"; length: "m" | "mm" };
 	setPressureUnit: (unit: "Pa" | "kPa" | "MPa") => void;
+	setLengthUnit: (unit: "m" | "mm") => void;
 	saveNetwork: (filename?: string) => void;
 	loadNetwork: (data: any) => void;
 	dismissSolveStatus: () => void;
@@ -164,9 +165,16 @@ const useStore = create<RFState>((set, get) => ({
 		});
 	},
 
-	unitPreferences: { pressure: "kPa" },
+	unitPreferences: { pressure: "kPa", length: "m" },
 	setPressureUnit: (unit: "Pa" | "kPa" | "MPa") => {
-		set({ unitPreferences: { pressure: unit } });
+		set((state) => ({
+			unitPreferences: { ...state.unitPreferences, pressure: unit },
+		}));
+	},
+	setLengthUnit: (unit: "m" | "mm") => {
+		set((state) => ({
+			unitPreferences: { ...state.unitPreferences, length: unit },
+		}));
 	},
 
 	saveNetwork: (filename?: string) => {

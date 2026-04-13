@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # --- Node Data Definitions ---
 
@@ -69,7 +69,7 @@ class PipeData(BaseModel):
 
 class OrificeData(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    area: float = 0.01
+    diameter: float = 0.08
     Cd: float = 0.6
     auto_Cd: bool = True
     plate_thickness: float = 0.0  # t [m]: > 0 enables thick-plate correction
@@ -77,6 +77,16 @@ class OrificeData(BaseModel):
     regime: Literal["default", "incompressible", "compressible"] = "default"
     initial_guess: dict[str, float] = Field(default_factory=dict)
     label: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_area_to_diameter(cls, data: dict) -> dict:
+        if isinstance(data, dict) and "area" in data and "diameter" not in data:
+            import math
+            area_val = data.pop("area")
+            if area_val > 0:
+                data["diameter"] = math.sqrt(4.0 * area_val / math.pi)
+        return data
 
 
 class LosslessConnectionData(BaseModel):

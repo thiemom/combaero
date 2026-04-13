@@ -1,6 +1,7 @@
 import { Activity, Crosshair, RotateCw } from "lucide-react";
 import useStore from "../store/useStore";
 import CompositionEditor from "./CompositionEditor";
+import LengthInput from "./LengthInput";
 import NumericInput from "./NumericInput";
 import UnitInput from "./UnitInput";
 
@@ -64,8 +65,8 @@ const Inspector = () => {
 					errors.push(`${node.id}: Length must be > 0`);
 			}
 			if (node.type === "orifice") {
-				if ((node.data.area || 0) <= 0)
-					errors.push(`${node.id}: Area must be > 0`);
+				if ((node.data.diameter || 0) <= 0)
+					errors.push(`${node.id}: Diameter must be > 0`);
 			}
 		}
 		return errors;
@@ -378,60 +379,26 @@ const Inspector = () => {
 
 				{selectedNode.type === "pipe" && (
 					<>
-						<div className="flex flex-col gap-2">
-							<label
-								htmlFor={`L_${selectedNode.id}`}
-								className="text-xs font-bold text-gray-500 uppercase"
-							>
-								Length (m)
-							</label>
-							<NumericInput
-								id={`L_${selectedNode.id}`}
-								value={selectedNode.data.L || 1.0}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, {
-										L: val,
-									})
-								}
-								className="p-2 border rounded"
-							/>
-						</div>
-						<div className="flex flex-col gap-2">
-							<label
-								htmlFor={`D_${selectedNode.id}`}
-								className="text-xs font-bold text-gray-500 uppercase"
-							>
-								Diameter (m)
-							</label>
-							<NumericInput
-								id={`D_${selectedNode.id}`}
-								value={selectedNode.data.D || 0.1}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, {
-										D: val,
-									})
-								}
-								className="p-2 border rounded"
-							/>
-						</div>
-						<div className="flex flex-col gap-2">
-							<label
-								htmlFor={`roughness_${selectedNode.id}`}
-								className="text-xs font-bold text-gray-500 uppercase"
-							>
-								Roughness (m)
-							</label>
-							<NumericInput
-								id={`roughness_${selectedNode.id}`}
-								value={selectedNode.data.roughness || 1e-5}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, {
-										roughness: val,
-									})
-								}
-								className="p-2 border rounded"
-							/>
-						</div>
+						<LengthInput
+							id={`L_${selectedNode.id}`}
+							label="Length Flow Path"
+							value={selectedNode.data.L || 1.0}
+							onChange={(val) => updateNodeData(selectedNode.id, { L: val })}
+						/>
+						<LengthInput
+							id={`D_${selectedNode.id}`}
+							label="Pipe Inner Diameter"
+							value={selectedNode.data.D || 0.1}
+							onChange={(val) => updateNodeData(selectedNode.id, { D: val })}
+						/>
+						<LengthInput
+							id={`roughness_${selectedNode.id}`}
+							label="Surface Roughness"
+							value={selectedNode.data.roughness || 1e-5}
+							onChange={(val) =>
+								updateNodeData(selectedNode.id, { roughness: val })
+							}
+						/>
 						<div className="flex flex-col gap-2">
 							<label className="text-xs font-bold text-gray-500 uppercase">
 								Regime
@@ -454,24 +421,14 @@ const Inspector = () => {
 
 				{selectedNode.type === "orifice" && (
 					<>
-						<div className="flex flex-col gap-2">
-							<label
-								htmlFor={`area_${selectedNode.id}`}
-								className="text-xs font-bold text-gray-500 uppercase"
-							>
-								Area (m²)
-							</label>
-							<NumericInput
-								id={`area_${selectedNode.id}`}
-								value={selectedNode.data.area || 0.01}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, {
-										area: val,
-									})
-								}
-								className="p-2 border rounded"
-							/>
-						</div>
+						<LengthInput
+							id={`diameter_${selectedNode.id}`}
+							label="Bore Diameter"
+							value={selectedNode.data.diameter || 0.08}
+							onChange={(val) =>
+								updateNodeData(selectedNode.id, { diameter: val })
+							}
+						/>
 						<div className="flex items-center justify-between gap-2">
 							<label className="text-xs font-bold text-gray-500 uppercase">
 								Auto Cd (correlation)
@@ -573,22 +530,16 @@ const Inspector = () => {
 								/>
 							</div>
 							<div className="flex flex-col gap-2">
-								<label
-									htmlFor={`Dh_comb_${selectedNode.id}`}
-									className="text-xs font-bold text-gray-500 uppercase"
-								>
-									Dh (m)
-								</label>
-								<NumericInput
+								<LengthInput
 									id={`Dh_comb_${selectedNode.id}`}
-									value={selectedNode.data.Dh}
+									label="Dh"
+									value={selectedNode.data.Dh || 0}
 									placeholder="Auto"
 									onChange={(val) =>
 										updateNodeData(selectedNode.id, {
 											Dh: val || undefined,
 										})
 									}
-									className="p-2 border rounded"
 								/>
 							</div>
 						</div>
@@ -622,22 +573,16 @@ const Inspector = () => {
 								/>
 							</div>
 							<div className="flex flex-col gap-2">
-								<label
-									htmlFor={`Dh_mom_${selectedNode.id}`}
-									className="text-xs font-bold text-gray-500 uppercase"
-								>
-									Dh (m)
-								</label>
-								<NumericInput
+								<LengthInput
 									id={`Dh_mom_${selectedNode.id}`}
-									value={selectedNode.data.Dh}
+									label="Dh"
+									value={selectedNode.data.Dh || 0}
 									placeholder="Auto"
 									onChange={(val) =>
 										updateNodeData(selectedNode.id, {
 											Dh: val || undefined,
 										})
 									}
-									className="p-2 border rounded"
 								/>
 							</div>
 						</div>
@@ -1019,15 +964,12 @@ const Inspector = () => {
 				</h2>
 				<div className="flex flex-col gap-4">
 					<div className="flex flex-col gap-2">
-						<label className="text-xs font-bold text-gray-500 uppercase">
-							Thickness (m)
-						</label>
-						<NumericInput
+						<LengthInput
+							label="Wall Thickness"
 							value={selectedEdge.data.thickness || 0.003}
 							onChange={(val) =>
 								updateEdgeData(selectedEdge.id, { thickness: val })
 							}
-							className="p-2 border rounded"
 						/>
 					</div>
 					<div className="flex flex-col gap-2">

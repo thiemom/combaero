@@ -49,9 +49,9 @@ def test_chain_rule_orifice_through_combustor():
     net.add_node(CombustorNode("BURN", method="complete"))
     net.add_node(PressureBoundary("OUT", P_total=100000.0, T_total=300.0))
 
-    net.add_element(OrificeElement("E_AIR", "AIR_IN", "BURN", Cd=0.6, area=0.1))
-    net.add_element(OrificeElement("E_FUEL", "FUEL_IN", "BURN", Cd=0.6, area=0.01))
-    net.add_element(OrificeElement("E_OUT", "BURN", "OUT", Cd=0.6, area=0.1))
+    net.add_element(OrificeElement("E_AIR", "AIR_IN", "BURN", Cd=0.6, diameter=0.356825))
+    net.add_element(OrificeElement("E_FUEL", "FUEL_IN", "BURN", Cd=0.6, diameter=0.112838))
+    net.add_element(OrificeElement("E_OUT", "BURN", "OUT", Cd=0.6, diameter=0.356825))
 
     solver = NetworkSolver(net)
 
@@ -85,9 +85,9 @@ def test_chain_rule_single_stream_passthrough():
     net.add_node(PlenumNode("N2"))
     net.add_node(PressureBoundary("OUT", P_total=100000.0, T_total=300.0))
 
-    net.add_element(OrificeElement("E1", "IN", "N1", Cd=0.6, area=0.01))
-    net.add_element(OrificeElement("E2", "N1", "N2", Cd=0.6, area=0.01))
-    net.add_element(OrificeElement("E3", "N2", "OUT", Cd=0.6, area=0.01))
+    net.add_element(OrificeElement("E1", "IN", "N1", Cd=0.6, diameter=0.112838))
+    net.add_element(OrificeElement("E2", "N1", "N2", Cd=0.6, diameter=0.112838))
+    net.add_element(OrificeElement("E3", "N2", "OUT", Cd=0.6, diameter=0.112838))
 
     solver = NetworkSolver(net)
     sol = solver.solve()

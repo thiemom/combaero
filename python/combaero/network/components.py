@@ -1098,15 +1098,17 @@ class OrificeElement(NetworkElement):
         from_node: str,
         to_node: str,
         Cd: float,
-        area: float,
+        diameter: float,
         regime: Literal["incompressible", "compressible"] = "incompressible",
         auto_Cd: bool = False,
         plate_thickness: float = 0.0,
         edge_radius: float = 0.0,
     ):
         super().__init__(id, from_node, to_node)
+        import math
         self.Cd = Cd
-        self.area = area
+        self.diameter = diameter
+        self.area = math.pi * (diameter / 2.0) ** 2
         self.regime = regime
         self.auto_Cd = auto_Cd
         self.plate_thickness = plate_thickness
@@ -1374,14 +1376,14 @@ class EffectiveAreaConnectionElement(OrificeElement):
         return 1
 
 
-class AreaDischargeCoefficientConnectionElement(OrificeElement):
+class DiameterDischargeCoefficientConnectionElement(OrificeElement):
     """
-    An orifice element with user-specified physical area and discharge coefficient or loss coefficient.
+    An orifice element with user-specified physical diameter and discharge coefficient or loss coefficient.
 
     This element calculates orifice flow using the incompressible flow equation:
         m_dot = A * Cd * sqrt(2 * rho * dP)
 
-    where A is the physical area and Cd is the discharge coefficient.
+    where A is the computed physical area and Cd is the discharge coefficient.
 
     **Incompressible Formulation**: Uses the Bernoulli equation with density evaluated
     at upstream conditions. Valid for low Mach number flows (M < 0.3 typically).
@@ -1393,7 +1395,7 @@ class AreaDischargeCoefficientConnectionElement(OrificeElement):
     **Effective Area**: The effective area is calculated as A_eff = A * Cd.
 
     Unlike LosslessConnectionElement, this element produces pressure drop proportional to flow rate.
-    Use this when you have a physical area measurement and want to specify loss characteristics
+    Use this when you have a physical diameter measurement and want to specify loss characteristics
     via discharge coefficient or loss coefficient.
     """
 
@@ -1402,18 +1404,18 @@ class AreaDischargeCoefficientConnectionElement(OrificeElement):
         id: str,
         from_node: str,
         to_node: str,
-        area: float,
+        diameter: float,
         Cd: float | None = None,
         zeta: float | None = None,
     ) -> None:
         """
-        Initialize with physical area and either Cd or zeta.
+        Initialize with physical diameter and either Cd or zeta.
 
         Args:
             id: Element identifier
             from_node: Upstream node ID
             to_node: Downstream node ID
-            area: Physical geometric area (m^2)
+            diameter: Physical geometric diameter (m)
             Cd: Discharge coefficient (optional, 0 < Cd <= 1)
             zeta: Loss coefficient (optional, zeta >= 0)
 
@@ -1424,13 +1426,13 @@ class AreaDischargeCoefficientConnectionElement(OrificeElement):
 
         Example:
             >>> # Using Cd
-            >>> conn = AreaDischargeCoefficientConnectionElement("conn1", "inlet", "outlet", 0.0125, Cd=0.8)
-            >>> conn.area  # 0.0125 m^2 (physical area)
+            >>> conn = DiameterDischargeCoefficientConnectionElement("conn1", "inlet", "outlet", 0.1, Cd=0.8)
+            >>> conn.diameter  # 0.1 m (physical diameter)
             >>> conn.Cd    # 0.8 (discharge coefficient)
 
             >>> # Using zeta
-            >>> conn = AreaDischargeCoefficientConnectionElement("conn1", "inlet", "outlet", 0.0125, zeta=0.5625)
-            >>> conn.area  # 0.0125 m^2 (physical area)
+            >>> conn = DiameterDischargeCoefficientConnectionElement("conn1", "inlet", "outlet", 0.1, zeta=0.5625)
+            >>> conn.diameter  # 0.1 m (physical diameter)
             >>> conn.Cd    # 0.8 (calculated from zeta)
 
         Raises:
@@ -1451,9 +1453,8 @@ class AreaDischargeCoefficientConnectionElement(OrificeElement):
             # Calculate Cd from zeta: Cd = 1/sqrt(zeta + 1)
             Cd = 1.0 / (zeta + 1.0) ** 0.5
 
-        # Pass physical area and Cd directly to parent
-        # Parent will use A * Cd for flow calculation
-        super().__init__(id, from_node, to_node, Cd=Cd, area=area)
+        # Pass physical diameter and Cd directly to parent
+        super().__init__(id, from_node, to_node, Cd=Cd, diameter=diameter)
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         """
