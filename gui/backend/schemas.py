@@ -62,6 +62,8 @@ class PipeData(BaseModel):
     L: float = 1.0
     D: float = 0.1
     roughness: float = 1e-5
+    Nu_multiplier: float = 1.0
+    f_multiplier: float = 1.0
     regime: Literal["default", "incompressible", "compressible"] = "default"
     initial_guess: dict[str, float] = Field(default_factory=dict)
     label: str | None = None

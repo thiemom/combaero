@@ -500,6 +500,94 @@ class TestHeatTransferSubmodule:
         assert sol_sub.dP == pytest.approx(sol_direct.dP, rel=1e-9)
         assert sol_sub.q == pytest.approx(sol_direct.q, rel=1e-9)
 
+    def test_smooth_multiplier_forwarding(self):
+        sol_sub = ht.smooth(
+            T_AIR,
+            P_AIR,
+            X_AIR,
+            u=20.0,
+            L=0.5,
+            D=0.01,
+            Nu_multiplier=2.0,
+            f_multiplier=2.0,
+        )
+        sol_direct = cb.channel_smooth(
+            T_AIR,
+            P_AIR,
+            X_AIR,
+            20.0,
+            0.01,
+            0.5,
+            Nu_multiplier=2.0,
+            f_multiplier=2.0,
+        )
+        assert sol_sub.h == pytest.approx(sol_direct.h, rel=1e-9)
+        assert sol_sub.dP == pytest.approx(sol_direct.dP, rel=1e-9)
+
+    def test_smooth_multiplier_scaling(self):
+        # For Dittus-Boelter, Nu does not depend on f; this isolates exact scaling.
+        base = ht.smooth(
+            T_AIR,
+            P_AIR,
+            X_AIR,
+            u=20.0,
+            L=0.5,
+            D=0.01,
+            correlation="dittus_boelter",
+        )
+        nu2 = ht.smooth(
+            T_AIR,
+            P_AIR,
+            X_AIR,
+            u=20.0,
+            L=0.5,
+            D=0.01,
+            correlation="dittus_boelter",
+            Nu_multiplier=2.0,
+        )
+        f2 = ht.smooth(
+            T_AIR,
+            P_AIR,
+            X_AIR,
+            u=20.0,
+            L=0.5,
+            D=0.01,
+            correlation="dittus_boelter",
+            f_multiplier=2.0,
+        )
+        assert nu2.h == pytest.approx(2.0 * base.h, rel=1e-6)
+        assert f2.dP == pytest.approx(2.0 * base.dP, rel=1e-6)
+
+    def test_ribbed_multiplier_forwarding(self):
+        sol_sub = ht.ribbed(
+            T_AIR,
+            P_AIR,
+            X_AIR,
+            u=20.0,
+            L=0.5,
+            D=0.01,
+            e_D=0.05,
+            pitch_to_height=10.0,
+            alpha_deg=90.0,
+            Nu_multiplier=2.0,
+            f_multiplier=2.0,
+        )
+        sol_direct = cb.channel_ribbed(
+            T_AIR,
+            P_AIR,
+            X_AIR,
+            20.0,
+            0.01,
+            0.5,
+            0.05,
+            10.0,
+            90.0,
+            Nu_multiplier=2.0,
+            f_multiplier=2.0,
+        )
+        assert sol_sub.h == pytest.approx(sol_direct.h, rel=1e-9)
+        assert sol_sub.dP == pytest.approx(sol_direct.dP, rel=1e-9)
+
     def test_ribbed_returns_channel_result(self):
         sol = ht.ribbed(
             T_AIR,

@@ -162,7 +162,11 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 length=data.L,
                 diameter=data.D,
                 roughness=data.roughness,
-                surface=ConvectiveSurface(area=conv_area),
+                surface=ConvectiveSurface(
+                    area=conv_area,
+                    Nu_multiplier=data.Nu_multiplier,
+                    f_multiplier=data.f_multiplier,
+                ),
             )
             regime = (
                 data.regime if data.regime != "default" else schema.solver_settings.global_regime

@@ -59,6 +59,8 @@ def smooth(
     heating: bool = True,
     mu_ratio: float = 1.0,
     roughness: float = 0.0,
+    Nu_multiplier: float = 1.0,
+    f_multiplier: float = 1.0,
 ) -> ChannelResult:
     """Smooth pipe or duct: combined HTC + pressure drop.
 
@@ -105,6 +107,8 @@ def smooth(
         heating=heating,
         mu_ratio=mu_ratio,
         roughness=roughness,
+        Nu_multiplier=Nu_multiplier,
+        f_multiplier=f_multiplier,
     )
 
 
@@ -121,6 +125,8 @@ def ribbed(
     alpha_deg: float,
     T_wall: float = math.nan,
     heating: bool = True,
+    Nu_multiplier: float = 1.0,
+    f_multiplier: float = 1.0,
 ) -> ChannelResult:
     """Rib-enhanced cooling channel (Han et al. 1988).
 
@@ -153,7 +159,19 @@ def ribbed(
     ChannelResult
     """
     return _channel_ribbed(
-        T, P, list(X), u, D, L, e_D, pitch_to_height, alpha_deg, T_wall=T_wall, heating=heating
+        T,
+        P,
+        list(X),
+        u,
+        D,
+        L,
+        e_D,
+        pitch_to_height,
+        alpha_deg,
+        T_wall=T_wall,
+        heating=heating,
+        Nu_multiplier=Nu_multiplier,
+        f_multiplier=f_multiplier,
     )
 
 
@@ -170,6 +188,8 @@ def dimpled(
     S_d: float,
     T_wall: float = math.nan,
     heating: bool = True,
+    Nu_multiplier: float = 1.0,
+    f_multiplier: float = 1.0,
 ) -> ChannelResult:
     """Dimpled surface cooling channel (Chyu et al. 1997).
 
@@ -201,7 +221,21 @@ def dimpled(
     -------
     ChannelResult
     """
-    return _channel_dimpled(T, P, list(X), u, D, L, d_Dh, h_d, S_d, T_wall=T_wall, heating=heating)
+    return _channel_dimpled(
+        T,
+        P,
+        list(X),
+        u,
+        D,
+        L,
+        d_Dh,
+        h_d,
+        S_d,
+        T_wall=T_wall,
+        heating=heating,
+        Nu_multiplier=Nu_multiplier,
+        f_multiplier=f_multiplier,
+    )
 
 
 def pin_fin(
@@ -217,6 +251,8 @@ def pin_fin(
     N_rows: int,
     T_wall: float = math.nan,
     is_staggered: bool = True,
+    Nu_multiplier: float = 1.0,
+    f_multiplier: float = 1.0,
 ) -> ChannelResult:
     """Pin-fin array cooling channel (Metzger et al. 1982).
 
@@ -250,7 +286,19 @@ def pin_fin(
     ChannelResult
     """
     return _channel_pin_fin(
-        T, P, list(X), u, H, d, S_D, X_D, N_rows, T_wall=T_wall, is_staggered=is_staggered
+        T,
+        P,
+        list(X),
+        u,
+        H,
+        d,
+        S_D,
+        X_D,
+        N_rows,
+        T_wall=T_wall,
+        is_staggered=is_staggered,
+        Nu_multiplier=Nu_multiplier,
+        f_multiplier=f_multiplier,
     )
 
 
@@ -267,6 +315,8 @@ def impingement(
     A_target: float,
     T_wall: float = math.nan,
     Cd_jet: float = 0.65,
+    Nu_multiplier: float = 1.0,
+    f_multiplier: float = 1.0,
 ) -> ChannelResult:
     """Impingement jet array cooling (Florschuetz et al. 1981 / Martin 1977).
 
@@ -301,7 +351,19 @@ def impingement(
     ChannelResult
     """
     return _channel_impingement(
-        T, P, list(X), mdot_jet, d_jet, z_D, x_D, y_D, A_target, T_wall=T_wall, Cd_jet=Cd_jet
+        T,
+        P,
+        list(X),
+        mdot_jet,
+        d_jet,
+        z_D,
+        x_D,
+        y_D,
+        A_target,
+        T_wall=T_wall,
+        Cd_jet=Cd_jet,
+        Nu_multiplier=Nu_multiplier,
+        f_multiplier=f_multiplier,
     )
 
 
