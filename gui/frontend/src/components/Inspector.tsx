@@ -840,12 +840,8 @@ const Inspector = () => {
 	// Edge Inspector
 	if (selectedEdge && selectedEdge.data?.type === "thermal") {
 		let probeTemp: number | null = null;
-		if (
-			selectedEdge.data.probe_depth !== undefined &&
-			selectedEdge.data.result?.T_interface &&
-			selectedEdge.data.layers
-		) {
-			const targetX = selectedEdge.data.probe_depth;
+		if (selectedEdge.data.result?.T_interface && selectedEdge.data.layers) {
+			const targetX = selectedEdge.data.probe_depth ?? 0;
 			const tInt = selectedEdge.data.result.T_interface as number[];
 			let currentX = 0;
 
@@ -982,7 +978,7 @@ const Inspector = () => {
 									<span className="text-[10px] text-orange-600 font-bold uppercase tracking-wider">
 										Probe Temp @{" "}
 										{(
-											selectedEdge.data.probe_depth *
+											(selectedEdge.data.probe_depth ?? 0) *
 											(unitPreferences.length === "mm" ? 1000 : 1)
 										).toFixed(unitPreferences.length === "mm" ? 1 : 3)}{" "}
 										{unitPreferences.length}
@@ -990,26 +986,6 @@ const Inspector = () => {
 									<span className="font-mono text-sm font-black text-orange-600">
 										{probeTemp.toFixed(1)} K
 									</span>
-								</div>
-							)}
-
-							{selectedEdge.data.result.T_interface && (
-								<div className="mt-2 pt-2 border-t border-stone-100 flex flex-col gap-1">
-									<span className="text-[8px] text-stone-400 font-bold uppercase">
-										Temp Profile (K, Hot &rarr; Cold)
-									</span>
-									<div className="flex flex-wrap gap-1">
-										{selectedEdge.data.result.T_interface.map(
-											(t: number, i: number) => (
-												<span
-													key={i}
-													className="text-[9px] bg-white border px-1 rounded font-mono"
-												>
-													{t.toFixed(1)}
-												</span>
-											),
-										)}
-									</div>
 								</div>
 							)}
 						</div>

@@ -28,7 +28,6 @@ export default function ThermalEdge({
 	});
 
 	let labelText = "Thermal";
-	let profileText = "";
 	let probeText = "";
 	if (data?.result?.Q !== undefined) {
 		const Q = data.result.Q;
@@ -37,33 +36,32 @@ export default function ThermalEdge({
 			absQ >= 1000 ? `${(Q / 1000).toFixed(1)} kW` : `${Q.toFixed(1)} W`;
 		labelText = formattedValue;
 	}
-	if (data?.result?.T_interface) {
+	if (data?.result?.T_interface && data.layers) {
 		const temps = data.result.T_interface as number[];
-		profileText = temps.map((t) => `${Math.round(t)}K`).join(" → ");
+		const targetX = data.probe_depth ?? 0;
+		let currentX = 0;
+		let pTemp: number | null = null;
 
-		if (data.probe_depth !== undefined && data.layers) {
-			const targetX = data.probe_depth;
-			let currentX = 0;
-			let pTemp: number | null = null;
-			if (targetX <= 0) pTemp = temps[0];
-			else {
-				let found = false;
-				for (let i = 0; i < data.layers.length; i++) {
-					const t = data.layers[i].thickness;
-					const nextX = currentX + t;
-					if (targetX <= nextX) {
-						const frac = (targetX - currentX) / t;
-						pTemp = temps[i] + frac * (temps[i + 1] - temps[i]);
-						found = true;
-						break;
-					}
-					currentX = nextX;
+		if (targetX <= 0) {
+			pTemp = temps[0];
+		} else {
+			let found = false;
+			for (let i = 0; i < data.layers.length; i++) {
+				const t = data.layers[i].thickness;
+				const nextX = currentX + t;
+				if (targetX <= nextX) {
+					const frac = (targetX - currentX) / t;
+					pTemp = temps[i] + frac * (temps[i + 1] - temps[i]);
+					found = true;
+					break;
 				}
-				if (!found) pTemp = temps[temps.length - 1];
+				currentX = nextX;
 			}
-			if (pTemp !== null) {
-				probeText = `@${targetX * scale}${unit}: ${pTemp.toFixed(1)}K`;
-			}
+			if (!found) pTemp = temps[temps.length - 1];
+		}
+
+		if (pTemp !== null) {
+			probeText = `@${(targetX * scale).toFixed(unit === "mm" ? 1 : 3)}${unit}: ${pTemp.toFixed(1)}K`;
 		}
 	}
 
@@ -112,11 +110,7 @@ export default function ThermalEdge({
 					className="nodrag nopan flex flex-col items-center"
 				>
 					<span>{labelText}</span>
-					{profileText && (
-						<span className="text-[8px] text-stone-500 font-mono tracking-tighter mt-0.5">
-							{profileText}
-						</span>
-					)}
+
 					{probeText && (
 						<span className="text-[9px] text-orange-600 border border-orange-200 bg-orange-50 font-bold px-1 rounded tracking-tighter mt-0.5">
 							{probeText}
