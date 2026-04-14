@@ -14,8 +14,14 @@ import UnitInput from "./UnitInput";
 import WallLayersEditor from "./WallLayersEditor";
 
 const Inspector = () => {
-	const { nodes, edges, updateNodeData, updateEdgeData, speciesMetadata } =
-		useStore();
+	const {
+		nodes,
+		edges,
+		updateNodeData,
+		updateEdgeData,
+		speciesMetadata,
+		unitPreferences,
+	} = useStore();
 
 	const handleExport = async () => {
 		try {
@@ -974,7 +980,12 @@ const Inspector = () => {
 							{probeTemp !== null && (
 								<div className="flex justify-between items-center pt-2 mt-2 border-t border-stone-200 bg-orange-50/50 p-2 rounded border">
 									<span className="text-[10px] text-orange-600 font-bold uppercase tracking-wider">
-										Probe Temp @ {selectedEdge.data.probe_depth}m
+										Probe Temp @{" "}
+										{(
+											selectedEdge.data.probe_depth *
+											(unitPreferences.length === "mm" ? 1000 : 1)
+										).toFixed(unitPreferences.length === "mm" ? 1 : 3)}{" "}
+										{unitPreferences.length}
 									</span>
 									<span className="font-mono text-sm font-black text-orange-600">
 										{probeTemp.toFixed(1)} K
