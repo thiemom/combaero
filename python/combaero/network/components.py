@@ -1352,6 +1352,7 @@ class OrificeElement(NetworkElement):
         effective_cd = self._effective_Cd(state_in, state_out)
 
         return {
+            "v": mach_throat * cs.thermo.a,
             "mach": mach_throat,
             "p_ratio": p_ratio,
             "Cd": effective_cd,
