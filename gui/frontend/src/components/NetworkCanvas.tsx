@@ -5,7 +5,7 @@ import ReactFlow, {
 	useReactFlow,
 } from "reactflow";
 import "reactflow/dist/style.css";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import useStore from "../store/useStore";
 import ChannelNode from "./nodes/ChannelNode";
 import CombustorNode from "./nodes/CombustorNode.tsx";
@@ -19,26 +19,32 @@ import ProbeNode from "./nodes/ProbeNode";
 import SolverStatusBadge from "./SolverStatusBadge";
 import ThermalEdge from "./ThermalEdge";
 
-const NODE_TYPES = Object.freeze({
-	plenum: PlenumNode,
-	mass_boundary: MassBoundaryNode,
-	pressure_boundary: PressureBoundaryNode,
-	channel: ChannelNode,
-	orifice: OrificeNode,
-	combustor: CombustorNode,
-	momentum_chamber: MomentumChamberNode,
-	lossless_connection: LosslessNode,
-	probe: ProbeNode,
-});
-
-const EDGE_TYPES = Object.freeze({
-	thermal: ThermalEdge,
-});
-
 const NetworkCanvas = () => {
 	const { nodes, edges, setNodes, onNodesChange, onEdgesChange, onConnect } =
 		useStore();
 	const { screenToFlowPosition } = useReactFlow();
+
+	const nodeTypes = useMemo(
+		() => ({
+			plenum: PlenumNode,
+			mass_boundary: MassBoundaryNode,
+			pressure_boundary: PressureBoundaryNode,
+			channel: ChannelNode,
+			orifice: OrificeNode,
+			combustor: CombustorNode,
+			momentum_chamber: MomentumChamberNode,
+			lossless_connection: LosslessNode,
+			probe: ProbeNode,
+		}),
+		[],
+	);
+
+	const edgeTypes = useMemo(
+		() => ({
+			thermal: ThermalEdge,
+		}),
+		[],
+	);
 
 	const onDragOver = useCallback((event: React.DragEvent) => {
 		event.preventDefault();
@@ -133,8 +139,8 @@ const NetworkCanvas = () => {
 				onNodesChange={onNodesChange}
 				onEdgesChange={onEdgesChange}
 				onConnect={onConnect}
-				nodeTypes={NODE_TYPES}
-				edgeTypes={EDGE_TYPES}
+				nodeTypes={nodeTypes}
+				edgeTypes={edgeTypes}
 				fitView
 				fitViewOptions={{ padding: 0.5, maxZoom: 1.0 }}
 			>
