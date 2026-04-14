@@ -1,0 +1,155 @@
+import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import type React from "react";
+import LengthInput from "./LengthInput";
+import NumericInput from "./NumericInput";
+
+interface WallLayer {
+	thickness: number;
+	conductivity: number;
+	material: string;
+}
+
+interface WallLayersEditorProps {
+	layers: WallLayer[];
+	onChange: (layers: WallLayer[]) => void;
+}
+
+const WallLayersEditor: React.FC<WallLayersEditorProps> = ({
+	layers,
+	onChange,
+}) => {
+	const addLayer = () => {
+		const newLayer: WallLayer = {
+			thickness: 0.001,
+			conductivity: 20.0,
+			material: "generic",
+		};
+		onChange([...layers, newLayer]);
+	};
+
+	const removeLayer = (index: number) => {
+		const newLayers = layers.filter((_, i) => i !== index);
+		onChange(newLayers);
+	};
+
+	const updateLayer = (index: number, updates: Partial<WallLayer>) => {
+		const newLayers = layers.map((layer, i) =>
+			i === index ? { ...layer, ...updates } : layer,
+		);
+		onChange(newLayers);
+	};
+
+	const moveLayer = (index: number, direction: "up" | "down") => {
+		const newLayers = [...layers];
+		const targetIndex = direction === "up" ? index - 1 : index + 1;
+		if (targetIndex >= 0 && targetIndex < newLayers.length) {
+			[newLayers[index], newLayers[targetIndex]] = [
+				newLayers[targetIndex],
+				newLayers[index],
+			];
+			onChange(newLayers);
+		}
+	};
+
+	return (
+		<div className="flex flex-col gap-3">
+			<div className="flex justify-between items-center">
+				<label className="text-xs font-bold text-stone-500 uppercase">
+					Wall Layers
+				</label>
+				<button
+					type="button"
+					onClick={addLayer}
+					className="p-1 rounded hover:bg-stone-100 text-stone-600 flex items-center gap-1 text-[10px] font-bold uppercase transition-colors"
+					title="Add layer"
+				>
+					<Plus size={14} /> Add Layer
+				</button>
+			</div>
+
+			<div className="flex flex-col gap-4">
+				{layers.map((layer, index) => (
+					<div
+						key={index}
+						className="p-3 border rounded-lg bg-stone-50/50 flex flex-col gap-3 relative group"
+					>
+						<div className="flex justify-between items-center pb-2 border-b border-stone-100">
+							<div className="flex items-center gap-2">
+								<span className="text-[10px] font-bold text-stone-400 bg-white border px-1.5 py-0.5 rounded shadow-sm">
+									LAYER {index + 1}
+								</span>
+								<input
+									type="text"
+									value={layer.material}
+									onChange={(e) =>
+										updateLayer(index, { material: e.target.value })
+									}
+									placeholder="Material Name"
+									className="text-[10px] bg-transparent border-none outline-none font-bold text-stone-600 focus:text-orange-600 w-32"
+								/>
+							</div>
+							<div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+								<button
+									type="button"
+									onClick={() => moveLayer(index, "up")}
+									disabled={index === 0}
+									className="p-1 h-6 w-6 flex items-center justify-center rounded hover:bg-white disabled:opacity-30"
+								>
+									<ArrowUp size={12} />
+								</button>
+								<button
+									type="button"
+									onClick={() => moveLayer(index, "down")}
+									disabled={index === layers.length - 1}
+									className="p-1 h-6 w-6 flex items-center justify-center rounded hover:bg-white disabled:opacity-30"
+								>
+									<ArrowDown size={12} />
+								</button>
+								<button
+									type="button"
+									onClick={() => removeLayer(index)}
+									className="p-1 h-6 w-6 flex items-center justify-center rounded hover:bg-red-50 text-red-500"
+								>
+									<Trash2 size={12} />
+								</button>
+							</div>
+						</div>
+
+						<div className="grid grid-cols-1 gap-3">
+							<LengthInput
+								label="Thickness"
+								value={layer.thickness}
+								onChange={(val) => updateLayer(index, { thickness: val })}
+							/>
+							<div className="flex flex-col gap-1">
+								<label className="text-[10px] font-medium text-stone-500">
+									Conductivity (W/mK)
+								</label>
+								<NumericInput
+									value={layer.conductivity}
+									onChange={(val) => updateLayer(index, { conductivity: val })}
+									className="p-1.5 border rounded text-sm bg-white focus:ring-1 focus:ring-orange-500 outline-none"
+								/>
+							</div>
+						</div>
+					</div>
+				))}
+
+				{layers.length === 0 && (
+					<div className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-stone-200 rounded-lg text-stone-400 gap-2">
+						<span className="text-xs italic">No layers defined</span>
+						<button
+							type="button"
+							onClick={addLayer}
+							className="text-[10px] font-bold text-orange-600 hover:text-orange-700 underline"
+						>
+							Initialize with a default layer
+						</button>
+					</div>
+				)}
+			</div>
+		</div>
+	);
+};
+
+export default WallLayersEditor;

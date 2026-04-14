@@ -112,6 +112,20 @@ class ThermalWallData(BaseModel):
     area: float | None = 0.05
     R_fouling: float = 0.0
 
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_legacy_fields(cls, data: dict) -> dict:
+        if isinstance(data, dict):
+            # If we have legacy fields but no layers, migrate them
+            if "layers" not in data or data["layers"] is None:
+                t = data.get("thickness", 0.003)
+                k = data.get("conductivity", 20.0)
+                # Ensure they are not None
+                t = t if t is not None else 0.003
+                k = k if k is not None else 20.0
+                data["layers"] = [{"thickness": t, "conductivity": k}]
+        return data
+
 
 class SolverSettings(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -139,6 +153,7 @@ class ReactFlowEdge(BaseModel):
     id: str
     source: str
     target: str
+    type: str | None = None
     data: dict | None = None
 
 

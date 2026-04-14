@@ -5,6 +5,7 @@ import {
 	type Connection,
 	type Edge,
 	type EdgeChange,
+	MarkerType,
 	type Node,
 	type NodeChange,
 } from "reactflow";
@@ -65,6 +66,12 @@ const useStore = create<RFState>((set, get) => ({
 			...connection,
 			id: `edge_${Date.now()}`,
 			type: isThermal ? "thermal" : "default",
+			markerEnd: isThermal
+				? {
+						type: MarkerType.Arrow,
+						color: "#ff9800",
+					}
+				: undefined,
 			data: isThermal
 				? { type: "thermal", thickness: 0.003, conductivity: 20.0, area: 0.05 }
 				: null,

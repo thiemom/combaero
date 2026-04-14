@@ -107,9 +107,19 @@ def _solve_sync(schema: NetworkGraphSchema):
         element_results[elem_id] = ElementResult(m_dot=m_dot, success=success, **diag)
 
     edge_results = {}
+    def _safe_float(v):
+        try:
+            if isinstance(v, (list, tuple, dict)):
+                return v
+            return float(v)
+        except (TypeError, ValueError):
+            return v
+
     for edge_id in net.walls:
         edge_keys = {
-            k.split(".", 1)[1]: float(v) for k, v in result.items() if k.startswith(f"{edge_id}.")
+            k.split(".", 1)[1]: _safe_float(v)
+            for k, v in result.items()
+            if k.startswith(f"{edge_id}.")
         }
         if edge_keys:
             edge_results[edge_id] = edge_keys

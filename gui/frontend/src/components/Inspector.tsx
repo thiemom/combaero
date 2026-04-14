@@ -4,6 +4,7 @@ import CompositionEditor from "./CompositionEditor";
 import LengthInput from "./LengthInput";
 import NumericInput from "./NumericInput";
 import UnitInput from "./UnitInput";
+import WallLayersEditor from "./WallLayersEditor";
 
 const Inspector = () => {
 	const {
@@ -962,39 +963,108 @@ const Inspector = () => {
 				<h2 className="text-lg font-bold border-b pb-2 uppercase text-orange-600">
 					Thermal Wall
 				</h2>
-				<div className="flex flex-col gap-4">
-					<div className="flex flex-col gap-2">
-						<LengthInput
-							label="Wall Thickness"
-							value={selectedEdge.data.thickness || 0.003}
-							onChange={(val) =>
-								updateEdgeData(selectedEdge.id, { thickness: val })
-							}
-						/>
-					</div>
-					<div className="flex flex-col gap-2">
-						<label className="text-xs font-bold text-gray-500 uppercase">
-							Conductivity (W/mK)
-						</label>
-						<NumericInput
-							value={selectedEdge.data.conductivity || 20.0}
-							onChange={(val) =>
-								updateEdgeData(selectedEdge.id, { conductivity: val })
-							}
-							className="p-2 border rounded"
-						/>
-					</div>
-					<div className="flex flex-col gap-2">
-						<label className="text-xs font-bold text-gray-500 uppercase">
-							Area (m²)
-						</label>
-						<NumericInput
-							value={selectedEdge.data.area || 0.05}
-							onChange={(val) => updateEdgeData(selectedEdge.id, { area: val })}
-							className="p-2 border rounded"
-						/>
-					</div>
+				<div className="flex flex-col gap-2">
+					<label className="text-xs font-bold text-gray-500 uppercase">
+						Contact Area (m²)
+					</label>
+					<NumericInput
+						value={selectedEdge.data.area || 0.05}
+						onChange={(val) => updateEdgeData(selectedEdge.id, { area: val })}
+						className="p-1.5 border rounded text-sm bg-stone-50 focus:bg-white"
+					/>
 				</div>
+
+				<div className="flex flex-col gap-2">
+					<label className="text-xs font-bold text-gray-500 uppercase">
+						Fouling Resistance (m²K/W)
+					</label>
+					<NumericInput
+						value={selectedEdge.data.R_fouling || 0}
+						onChange={(val) =>
+							updateEdgeData(selectedEdge.id, { R_fouling: val })
+						}
+						className="p-1.5 border rounded text-sm bg-stone-50 focus:bg-white"
+					/>
+				</div>
+
+				<div className="border-t pt-4">
+					<WallLayersEditor
+						layers={
+							selectedEdge.data.layers || [
+								{
+									thickness: selectedEdge.data.thickness || 0.003,
+									conductivity: selectedEdge.data.conductivity || 20.0,
+									material: "generic",
+								},
+							]
+						}
+						onChange={(layers) => updateEdgeData(selectedEdge.id, { layers })}
+					/>
+				</div>
+
+				{selectedEdge.data.result && (
+					<div className="mt-4 border-t pt-4 flex flex-col gap-3">
+						<h3 className="text-xs font-bold text-orange-600 uppercase">
+							Solve Results
+						</h3>
+						<div className="bg-stone-50 rounded p-3 flex flex-col gap-2 border border-stone-100 shadow-sm">
+							<div className="flex justify-between items-center">
+								<span className="text-[10px] text-stone-500 font-bold uppercase">
+									Heat Flow (Q)
+								</span>
+								<span className="font-mono text-xs font-black text-orange-700">
+									{selectedEdge.data.result.Q?.toLocaleString()} W
+								</span>
+							</div>
+							<div className="flex justify-between items-center">
+								<span className="text-[10px] text-stone-500 font-bold uppercase">
+									Mean Wall Temp
+								</span>
+								<span className="font-mono text-xs font-black">
+									{selectedEdge.data.result.T_wall?.toFixed(1)} K
+								</span>
+							</div>
+							<div className="grid grid-cols-2 gap-2 pt-2 border-t border-stone-100">
+								<div className="flex flex-col">
+									<span className="text-[8px] text-stone-400 uppercase">
+										h (Side A)
+									</span>
+									<span className="text-[10px] font-mono font-bold">
+										{selectedEdge.data.result.h_a?.toFixed(1)}
+									</span>
+								</div>
+								<div className="flex flex-col">
+									<span className="text-[8px] text-stone-400 uppercase">
+										h (Side B)
+									</span>
+									<span className="text-[10px] font-mono font-bold">
+										{selectedEdge.data.result.h_b?.toFixed(1)}
+									</span>
+								</div>
+							</div>
+
+							{selectedEdge.data.result.T_interface && (
+								<div className="mt-2 pt-2 border-t border-stone-100 flex flex-col gap-1">
+									<span className="text-[8px] text-stone-400 font-bold uppercase">
+										Temp Profile (K)
+									</span>
+									<div className="flex flex-wrap gap-1">
+										{selectedEdge.data.result.T_interface.map(
+											(t: number, i: number) => (
+												<span
+													key={i}
+													className="text-[9px] bg-white border px-1 rounded font-mono"
+												>
+													{t.toFixed(1)}
+												</span>
+											),
+										)}
+									</div>
+								</div>
+							)}
+						</div>
+					</div>
+				)}
 			</aside>
 		);
 	}

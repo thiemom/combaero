@@ -24,12 +24,28 @@ export default function ThermalEdge({
 
 	let labelText = "Thermal";
 	if (data?.result?.Q !== undefined) {
-		const qValue = Math.abs(data.result.Q);
-		labelText = `${qValue >= 1000 ? `${(qValue / 1000).toFixed(1)} kW` : `${qValue.toFixed(1)} W`}`;
+		const Q = data.result.Q;
+		const absQ = Math.abs(Q);
+		const formattedValue =
+			absQ >= 1000 ? `${(Q / 1000).toFixed(1)} kW` : `${Q.toFixed(1)} W`;
+		labelText = formattedValue;
 	}
 
 	return (
 		<>
+			{/* Transparent path to carry the solid marker without inheriting the dash array */}
+			<path
+				style={{
+					stroke: "transparent",
+					strokeWidth: 4,
+					fill: "none",
+					pointerEvents: "none",
+				}}
+				className="react-flow__edge-path"
+				d={edgePath}
+				markerEnd={markerEnd}
+			/>
+			{/* Visible dashed path for the connection line */}
 			<path
 				id={id}
 				style={{
@@ -38,10 +54,10 @@ export default function ThermalEdge({
 					stroke: "#ff9800",
 					strokeDasharray: "5,5",
 					opacity: 0.8,
+					fill: "none",
 				}}
 				className="react-flow__edge-path"
 				d={edgePath}
-				markerEnd={markerEnd}
 			/>
 			<EdgeLabelRenderer>
 				<div
