@@ -42,7 +42,6 @@ async def root():
 @app.get("/metadata/species")
 async def get_species():
     """Returns available species metadata from the C++ core."""
-    import combaero as cb
 
     return {
         "names": cb.species.names,
@@ -74,9 +73,7 @@ def _solve_sync(schema: NetworkGraphSchema):
         # Pull all node diagnostics and state variables directly from sol_dict
         # flat keys are like node_id.T, node_id.P, node_id.mach, node_id.rho, etc.
         prefix = f"{node_id}."
-        node_vals = {
-            k[len(prefix) :]: v for k, v in result.items() if k.startswith(prefix)
-        }
+        node_vals = {k[len(prefix) :]: v for k, v in result.items() if k.startswith(prefix)}
 
         # Handle composition lists (Y and X)
         y_vals = []
@@ -107,6 +104,7 @@ def _solve_sync(schema: NetworkGraphSchema):
         element_results[elem_id] = ElementResult(m_dot=m_dot, success=success, **diag)
 
     edge_results = {}
+
     def _safe_float(v):
         try:
             if isinstance(v, (list, tuple, dict)):

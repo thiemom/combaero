@@ -38,11 +38,11 @@ const App = () => {
 					}
 				}
 			}
-			if (node.type === "pipe") {
+			if (node.type === "channel") {
 				if ((node.data.D || 0) <= 0)
-					errors.push(`${node.id}: Pipe diameter must be > 0`);
+					errors.push(`${node.id}: Channel diameter must be > 0`);
 				if ((node.data.L || 0) <= 0)
-					errors.push(`${node.id}: Pipe length must be > 0`);
+					errors.push(`${node.id}: Channel length must be > 0`);
 			}
 			if (node.type === "orifice") {
 				if ((node.data.area || 0) <= 0)

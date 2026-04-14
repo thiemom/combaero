@@ -43,7 +43,7 @@ const PipeNode = ({ id, data, selected }: NodeProps) => {
 				style={{ transform: `rotate(${textRotation}deg)` }}
 			>
 				<span className="text-[10px] font-bold text-gray-400 uppercase leading-none whitespace-nowrap">
-					{data.label ? data.label : "Pipe"}
+					{data.label ? data.label : "Channel"}
 				</span>
 				<span className="text-[9px] font-mono text-gray-500 whitespace-nowrap">
 					L:{data.L} D:{data.D}

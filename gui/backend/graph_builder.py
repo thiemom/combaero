@@ -1,26 +1,25 @@
 from combaero.network import (
     CombustorNode,
     ConvectiveSurface,
+    DimpledModel,
     FlowNetwork,
+    ImpingementModel,
     LosslessConnectionElement,
     MassFlowBoundary,
     MomentumChamberNode,
     OrificeElement,
-    NetworkElement,
+    PinFinModel,
     PipeElement,
     PlenumNode,
     PressureBoundary,
-    ThermalWall,
-    WallConnection,
-    WallLayer,
-    SmoothModel,
     RibbedModel,
-    DimpledModel,
-    PinFinModel,
-    ImpingementModel,
+    SmoothModel,
+    ThermalWall,
+    WallLayer,
 )
 
 from .schemas import (
+    ChannelData,
     CombustorData,
     CompositionData,
     DimpledModelData,
@@ -30,7 +29,6 @@ from .schemas import (
     NetworkGraphSchema,
     OrificeData,
     PinFinModelData,
-    PipeData,
     PlenumData,
     PressureBoundaryData,
     RibbedModelData,
@@ -58,6 +56,7 @@ def map_surface_model(data):
     elif isinstance(data, PinFinModelData) or data.type == "pin_fin":
         return PinFinModel(
             pin_diameter=data.pin_diameter,
+            channel_height=data.channel_height,
             S_D=data.S_D,
             X_D=data.X_D,
             N_rows=data.N_rows,
@@ -70,6 +69,7 @@ def map_surface_model(data):
             x_D=data.x_D,
             y_D=data.y_D,
             A_target=data.A_target,
+            Cd_jet=data.Cd_jet,
         )
     return SmoothModel()
 
@@ -210,8 +210,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             raise ValueError(f"Element '{elem_id}' is not fully connected.")
 
         elem_type = elem_node_schema.type
-        if elem_type == "pipe":
-            data = PipeData(**elem_data)
+        if elem_type == "channel":
+            data = ChannelData(**elem_data)
             conv_area = 3.1415926535 * data.D * data.L
             elem = PipeElement(
                 elem_id,
@@ -278,7 +278,9 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             if data.layers:
                 # New multi-layer format
                 layers = [
-                    WallLayer(thickness=L.thickness, conductivity=L.conductivity, material=L.material)
+                    WallLayer(
+                        thickness=L.thickness, conductivity=L.conductivity, material=L.material
+                    )
                     for L in data.layers
                 ]
             else:

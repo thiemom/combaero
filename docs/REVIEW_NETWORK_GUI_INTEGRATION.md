@@ -1714,7 +1714,61 @@ All C++ functions with Jacobians already exist (see Part F inventory).
 - Hole geometry: diameter, angle, spacing, porosity (model-dependent)
 - Row positions (film only): streamwise x/D of each row
 
-### I.10 — Implementation Scope
+### I.10 — Classical Network Model for Effusion
+
+In established 1D effusion network models (Krewinkel 2013, Jackowski 2016), the
+cooled panel is discretized into a node–branch network:
+
+```
+         hot gas path
+    ═══════╤═══════╤═══════╤═══════
+           │ hole  │ hole  │ hole
+    ───●───┼───●───┼───●───┼───●───  cold passage
+    plenum  N1      N2      N3   exit
+```
+
+- **Nodes** represent pressure and temperature at discrete stations along the cold
+  passage (plenum inlet, hole midpoints, passage exit). Each node carries the
+  cumulative thermal state — how much heat the coolant has absorbed upstream.
+
+- **Branches** (holes) are the physics-carrying elements. Each hole is characterized
+  by its discharge coefficient Cd(Re, P_ratio, α, L/D) and the local blowing
+  ratio M = ρ_c·v_c / (ρ_hot·v_hot). The mass flow through each hole is
+  pressure-driven: `m_dot_hole = Cd · A_hole · f(ΔP_cold_to_hot)`.
+
+- **Advection** (coolant history): the model tracks how the coolant heats up as it
+  flows along the cold passage. Upstream holes see colder coolant; downstream holes
+  see warmer coolant that has already absorbed heat. This thermal "history" couples
+  all holes — the effectiveness of downstream holes depends on upstream heat pickup.
+
+This maps directly onto the `CooledPanelElement` design. The **baseline approach is
+chaining**: each `CooledPanelElement` represents one zone (one or a few hole rows)
+with a single bleed port. Multi-zone coverage is achieved by chaining panels along
+the cold passage:
+
+```
+    cold_in → [Panel_1] → [Panel_2] → [Panel_3] → cold_out
+                 ↓ bleed     ↓ bleed     ↓ bleed
+              hot_node_1  hot_node_2  hot_node_3
+```
+
+Advection is handled naturally by the existing solver: each panel's `cold_out`
+feeds the next panel's `cold_in`, so downstream panels automatically see warmer
+coolant. No special treatment needed — this is the same temperature propagation
+that chained `PipeElement`s already use.
+
+**Why chaining over internal discretization:** simpler per-element (fixed 3 ports),
+composable (mix film and effusion zones), and the solver already supports chained
+elements. Internal multi-row discretization could be added later as an optimization
+for dense arrays, but is not required for the initial implementation.
+
+**Fidelity ceiling:** a 1D chained network captures the dominant physics (pressure-
+driven bleed, coolant history, film effectiveness decay) but cannot resolve 3D
+effects (jet–crossflow interaction, lateral spreading, vortex structures). For
+higher fidelity, the natural next step is coupled 1D-network ↔ CFD
+(cf. Mefferd et al. 2022), which is outside the scope of this framework.
+
+### I.11 — Implementation Scope
 
 This feature requires `MultiPortElement` infrastructure which is a significant
 extension of the solver core. It should be implemented on a **dedicated feature
@@ -1731,7 +1785,7 @@ branch** after the current branch (Phases 1–6) is complete.
 The same `MultiPortElement` infrastructure also unblocks future components like
 bleed valves, multi-stream mixers, and intercoolers.
 
-### I.11 — References
+### I.12 — References
 
 - Aumeier, T., & Behrendt, T. (2015). Application of an aerothermal model for
   effusion cooling systems and finite rate chemistry in aero-engine combustors.

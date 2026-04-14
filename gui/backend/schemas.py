@@ -28,6 +28,7 @@ class PinFinModelData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     type: Literal["pin_fin"] = "pin_fin"
     pin_diameter: float = 0.005
+    channel_height: float = 0.01  # [m]
     S_D: float = 2.5
     X_D: float = 2.5
     N_rows: int = 10
@@ -42,14 +43,11 @@ class ImpingementModelData(BaseModel):
     x_D: float = 6.0
     y_D: float = 6.0
     A_target: float = 0.01
+    Cd_jet: float = 0.8
 
 
 SurfaceModelData = (
-    SmoothModelData
-    | RibbedModelData
-    | DimpledModelData
-    | PinFinModelData
-    | ImpingementModelData
+    SmoothModelData | RibbedModelData | DimpledModelData | PinFinModelData | ImpingementModelData
 )
 
 
@@ -112,7 +110,7 @@ class MomentumChamberData(BaseModel):
 # --- Element Data Definitions ---
 
 
-class PipeData(BaseModel):
+class ChannelData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     L: float = 1.0
     D: float = 0.1
@@ -141,6 +139,7 @@ class OrificeData(BaseModel):
     def migrate_area_to_diameter(cls, data: dict) -> dict:
         if isinstance(data, dict) and "area" in data and "diameter" not in data:
             import math
+
             area_val = data.pop("area")
             if area_val > 0:
                 data["diameter"] = math.sqrt(4.0 * area_val / math.pi)
@@ -171,15 +170,14 @@ class ThermalWallData(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def migrate_legacy_fields(cls, data: dict) -> dict:
-        if isinstance(data, dict):
+        if isinstance(data, dict) and ("layers" not in data or data["layers"] is None):
             # If we have legacy fields but no layers, migrate them
-            if "layers" not in data or data["layers"] is None:
-                t = data.get("thickness", 0.003)
-                k = data.get("conductivity", 20.0)
-                # Ensure they are not None
-                t = t if t is not None else 0.003
-                k = k if k is not None else 20.0
-                data["layers"] = [{"thickness": t, "conductivity": k}]
+            t = data.get("thickness", 0.003)
+            k = data.get("conductivity", 20.0)
+            # Ensure they are not None
+            t = t if t is not None else 0.003
+            k = k if k is not None else 20.0
+            data["layers"] = [{"thickness": t, "conductivity": k}]
         return data
 
 

@@ -23,7 +23,7 @@ const NODE_TYPES = Object.freeze({
 	plenum: PlenumNode,
 	mass_boundary: MassBoundaryNode,
 	pressure_boundary: PressureBoundaryNode,
-	pipe: PipeNode,
+	channel: PipeNode,
 	orifice: OrificeNode,
 	combustor: CombustorNode,
 	momentum_chamber: MomentumChamberNode,
@@ -86,7 +86,7 @@ const NetworkCanvas = () => {
 						relative_humidity: 0.0,
 					},
 				} as any;
-			} else if (type === "pipe") {
+			} else if (type === "channel") {
 				data = {
 					...data,
 					L: 1.0,

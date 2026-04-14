@@ -60,7 +60,7 @@ const Inspector = () => {
 					}
 				}
 			}
-			if (node.type === "pipe") {
+			if (node.type === "channel") {
 				if ((node.data.D || 0) <= 0)
 					errors.push(`${node.id}: Diameter must be > 0`);
 				if ((node.data.L || 0) <= 0)
@@ -379,7 +379,7 @@ const Inspector = () => {
 					</>
 				)}
 
-				{selectedNode.type === "pipe" && (
+				{selectedNode.type === "channel" && (
 					<>
 						<LengthInput
 							id={`L_${selectedNode.id}`}
@@ -389,7 +389,7 @@ const Inspector = () => {
 						/>
 						<LengthInput
 							id={`D_${selectedNode.id}`}
-							label="Pipe Inner Diameter"
+							label="Channel Inner Diameter"
 							value={selectedNode.data.D || 0.1}
 							onChange={(val) => updateNodeData(selectedNode.id, { D: val })}
 						/>

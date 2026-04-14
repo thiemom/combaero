@@ -139,11 +139,11 @@ const Sidebar = () => {
 			<button
 				type="button"
 				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
-				onDragStart={(event) => onDragStart(event, "pipe")}
+				onDragStart={(event) => onDragStart(event, "channel")}
 				draggable
 			>
 				<ArrowRight size={18} className="text-stone-500" />
-				<span>Pipe</span>
+				<span>Channel</span>
 			</button>
 
 			<button

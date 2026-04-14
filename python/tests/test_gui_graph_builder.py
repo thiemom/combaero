@@ -19,7 +19,7 @@ def test_plenum_thermal_edges_are_ignored_silently():
             },
             {
                 "id": "pipe_1",
-                "type": "pipe",
+                "type": "channel",
                 "position": {"x": 200.0, "y": 0.0},
                 "data": {"L": 1.0, "D": 0.1},
             },
@@ -69,7 +69,7 @@ def test_momentum_chamber_thermal_wall_is_built_and_multipliers_forwarded():
             },
             {
                 "id": "pipe_1",
-                "type": "pipe",
+                "type": "channel",
                 "position": {"x": 400.0, "y": 0.0},
                 "data": {"L": 1.0, "D": 0.1, "Nu_multiplier": 1.2, "f_multiplier": 0.9},
             },

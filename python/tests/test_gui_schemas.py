@@ -1,7 +1,7 @@
-from gui.backend.schemas import MomentumChamberData, PipeData, PlenumData
+from gui.backend.schemas import ChannelData, MomentumChamberData, PlenumData
 
 
-def test_pipe_data_serialization():
+def test_channel_data_serialization():
     # Test data reflecting what the frontend sends
     test_data = {
         "L": 5.0,
@@ -11,22 +11,22 @@ def test_pipe_data_serialization():
         "f_multiplier": 0.9,
         "regime": "compressible",
         "initial_guess": {"m_dot": 1.5},
-        "label": "Main Supply Pipe",
+        "label": "Main Supply Channel",
     }
 
-    pipe = PipeData(**test_data)
-    assert pipe.L == 5.0
-    assert pipe.D == 0.2
-    assert pipe.Nu_multiplier == 1.25
-    assert pipe.f_multiplier == 0.9
-    assert pipe.label == "Main Supply Pipe"
-    print("PipeData validation successful")
+    channel = ChannelData(**test_data)
+    assert channel.L == 5.0
+    assert channel.D == 0.2
+    assert channel.Nu_multiplier == 1.25
+    assert channel.f_multiplier == 0.9
+    assert channel.label == "Main Supply Channel"
+    print("ChannelData validation successful")
 
 
-def test_pipe_data_multiplier_defaults():
-    pipe = PipeData()
-    assert pipe.Nu_multiplier == 1.0
-    assert pipe.f_multiplier == 1.0
+def test_channel_data_multiplier_defaults():
+    channel = ChannelData()
+    assert channel.Nu_multiplier == 1.0
+    assert channel.f_multiplier == 1.0
 
 
 def test_momentum_chamber_multiplier_defaults():
@@ -48,6 +48,6 @@ def test_plenum_data_label():
 
 
 if __name__ == "__main__":
-    test_pipe_data_serialization()
+    test_channel_data_serialization()
     test_plenum_data_label()
     print("All GUI schema tests passed!")

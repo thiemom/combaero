@@ -240,11 +240,20 @@ class ConvectiveSurface:
                 f_multiplier=self.f_multiplier,
             )
         elif isinstance(self.model, ImpingementModel):
-            # For impingement, we need mdot_jet which requires computing from velocity
-            # This is a simplified version - full implementation would need element context
+            # Impingement requires mdot_jet (flow PER JET).
+            # The total mass flow in the channel is rho * velocity * A_channel.
+            # The number of jets is A_target / (x * y), where x, y are pitches.
             rho = cb.density(T, P, X)
-            A_cross = math.pi / 4 * diameter**2
-            mdot_jet = rho * velocity * A_cross
+            mdot_total = rho * velocity * (math.pi / 4 * diameter**2)
+
+            x = self.model.x_D * self.model.d_jet
+            y = self.model.y_D * self.model.d_jet
+            A_per_jet = x * y
+            if A_per_jet > 0 and self.model.A_target > 0:
+                N_jets = self.model.A_target / A_per_jet
+                mdot_jet = mdot_total / max(1.0, N_jets)
+            else:
+                mdot_jet = mdot_total  # fallback
 
             result = cb.channel_impingement(
                 T,

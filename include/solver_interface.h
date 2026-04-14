@@ -14,6 +14,8 @@
 // -----------------------------------------------------------------------------
 // Functions in this module execute highly optimized `(f, J)` combined
 // evaluations required by the global Python `scipy.optimize.root` solver.
+// Note: Concepts currently named "Pipe" are scheduled for renaming to "Channel"
+// to account for advanced non-circular geometries and aerospace cooling applications.
 //
 // Every function returns a `std::tuple<double, double>`, corresponding to:
 //    (Value, Exact Analytical Jacobian / Derivative)
@@ -81,7 +83,7 @@ struct OrificeResult {
   std::vector<double> d_mdot_dY_up;
 };
 
-struct PipeResult {
+struct PipeResult { // TODO: Rename to ChannelResult
   double dP_calc;
   double d_dP_d_mdot;
   double d_dP_dP_static_up;
@@ -132,7 +134,7 @@ OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
 std::tuple<double, double> pressure_loss_and_jacobian(double v, double rho,
                                                        double K);
 
-// Full pipe evaluation with all derivatives.
+// Full pipe evaluation with all derivatives. (TODO: Rename to channel_*)
 PipeResult pipe_residuals_and_jacobian(double m_dot, double P_total_up,
                                        double P_static_up, double T_up,
                                        const std::vector<double> &Y_up,
@@ -214,7 +216,7 @@ std::tuple<double, double, double, double> pipe_compressible_mdot_and_jacobian(
     double L, double D, double roughness,
     const std::string& friction_model);
 
-// Full compressible pipe evaluation with all derivatives for network solver.
+// Full compressible pipe evaluation with all derivatives for network solver. (TODO: Rename to channel_*)
 PipeResult pipe_compressible_residuals_and_jacobian(
     double m_dot, double P_total_up, double T_up,
     const std::vector<double>& Y_up,

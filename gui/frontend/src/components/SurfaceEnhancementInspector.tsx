@@ -16,11 +16,13 @@ interface SurfaceModelData {
 	X_D?: number;
 	N_rows?: number;
 	is_staggered?: boolean;
+	channel_height?: number;
 	d_jet?: number;
 	z_D?: number;
 	x_D?: number;
 	y_D?: number;
 	A_target?: number;
+	Cd_jet?: number;
 }
 
 interface Props {
@@ -47,6 +49,7 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 			pin_fin: {
 				type: "pin_fin",
 				pin_diameter: 0.005,
+				channel_height: 0.01,
 				S_D: 2.5,
 				X_D: 2.5,
 				N_rows: 10,
@@ -59,6 +62,7 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 				x_D: 6.0,
 				y_D: 6.0,
 				A_target: 0.01,
+				Cd_jet: 0.8,
 			},
 		};
 		onChange(defaults[type]);
@@ -85,9 +89,9 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 						handleTypeChange(e.target.value as SurfaceModelData["type"])
 					}
 				>
-					<option value="smooth">Smooth (Baseline)</option>
-					<option value="ribbed">Ribbed (Internal Cooling)</option>
-					<option value="dimpled">Dimpled (High Tech)</option>
+					<option value="smooth">Smooth (Default)</option>
+					<option value="ribbed">Ribbed</option>
+					<option value="dimpled">Dimpled</option>
 					<option value="pin_fin">Pin Fin Array</option>
 					<option value="impingement">Jet Impingement</option>
 				</select>
@@ -198,6 +202,11 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 							className="p-1 border rounded text-xs"
 						/>
 					</div>
+					<LengthInput
+						label="Channel Height"
+						value={surface.channel_height || 0.01}
+						onChange={(val) => updateFields({ channel_height: val })}
+					/>
 					<div className="flex items-center justify-between gap-2 mt-1 px-1">
 						<label className="text-[10px] font-bold text-gray-500 uppercase">
 							Staggered
@@ -251,6 +260,14 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 						<NumericInput
 							value={surface.y_D || 6.0}
 							onChange={(val) => updateFields({ y_D: val })}
+							className="p-1 border rounded text-xs"
+						/>
+					</div>
+					<div className="flex flex-col gap-1">
+						<label className="text-[10px] text-stone-500">Cd (Discharge)</label>
+						<NumericInput
+							value={surface.Cd_jet || 0.8}
+							onChange={(val) => updateFields({ Cd_jet: val })}
 							className="p-1 border rounded text-xs"
 						/>
 					</div>
