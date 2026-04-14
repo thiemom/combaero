@@ -864,6 +864,23 @@ const Inspector = () => {
 			}
 		}
 
+		// Calculate derived HTCs for diagnostics
+		const layers = selectedEdge.data.layers || [];
+		const R_wall =
+			layers.reduce(
+				(acc: number, l: any) =>
+					acc + (l.thickness || 0) / (l.conductivity || 1),
+				0,
+			) + (selectedEdge.data.R_fouling || 0);
+
+		const h_wall = R_wall > 0 ? 1 / R_wall : Infinity;
+		const h_a = selectedEdge.data.result?.h_a ?? Infinity;
+		const h_b = selectedEdge.data.result?.h_b ?? Infinity;
+
+		const h_total_inv =
+			(h_a > 0 ? 1 / h_a : 0) + R_wall + (h_b > 0 ? 1 / h_b : 0);
+		const h_total = h_total_inv > 0 ? 1 / h_total_inv : 0;
+
 		return (
 			<aside className="w-80 border-l bg-white p-4 flex flex-col gap-4 overflow-y-auto">
 				<h2 className="text-lg font-bold border-b pb-2 uppercase text-orange-600">
@@ -954,25 +971,40 @@ const Inspector = () => {
 									{selectedEdge.data.result.T_wall?.toFixed(1)} K
 								</span>
 							</div>
-							<div className="grid grid-cols-2 gap-2 pt-2 border-t border-stone-100">
+							<div className="grid grid-cols-4 gap-1 pt-2 border-t border-stone-100">
 								<div className="flex flex-col">
-									<span className="text-[8px] text-stone-400 uppercase">
+									<span className="text-[7px] text-stone-400 uppercase">
 										h (Side A)
 									</span>
 									<span className="text-[10px] font-mono font-bold">
-										{selectedEdge.data.result.h_a?.toFixed(1)}
+										{h_a < 1e6 ? h_a.toFixed(1) : "∞"}
 									</span>
 								</div>
 								<div className="flex flex-col">
-									<span className="text-[8px] text-stone-400 uppercase">
+									<span className="text-[7px] text-stone-400 uppercase">
+										h (Wall)
+									</span>
+									<span className="text-[10px] font-mono font-bold text-orange-600">
+										{h_wall < 1e6 ? h_wall.toFixed(1) : "∞"}
+									</span>
+								</div>
+								<div className="flex flex-col">
+									<span className="text-[7px] text-stone-400 uppercase">
 										h (Side B)
 									</span>
 									<span className="text-[10px] font-mono font-bold">
-										{selectedEdge.data.result.h_b?.toFixed(1)}
+										{h_b < 1e6 ? h_b.toFixed(1) : "∞"}
+									</span>
+								</div>
+								<div className="flex flex-col">
+									<span className="text-[7px] text-stone-400 uppercase">
+										h (Total)
+									</span>
+									<span className="text-[10px] font-mono font-bold text-blue-600">
+										{h_total.toFixed(1)}
 									</span>
 								</div>
 							</div>
-
 							{probeTemp !== null && (
 								<div className="flex justify-between items-center pt-2 mt-2 border-t border-stone-200 bg-orange-50/50 p-2 rounded border">
 									<span className="text-[10px] text-orange-600 font-bold uppercase tracking-wider">
