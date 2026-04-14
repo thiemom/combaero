@@ -46,7 +46,7 @@ const OrificeNode = ({ id, data, selected }: NodeProps) => {
 					{data.label ? data.label : "Orifice"}
 				</div>
 				<div className="text-[9px] font-semibold whitespace-nowrap">
-					Cd:{data.Cd}
+					Cd: {(data.result?.Cd ?? data.Cd ?? 0.6).toFixed(3)}
 				</div>
 			</div>
 

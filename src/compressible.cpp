@@ -126,15 +126,9 @@ CompressibleFlowSolution nozzle_flow(
     const std::vector<double>& X,
     double tol, std::size_t max_iter) {
 
-    if (T0 <= 0.0) {
-        throw std::invalid_argument("nozzle_flow: T0 must be positive");
-    }
-    if (P0 <= 0.0) {
-        throw std::invalid_argument("nozzle_flow: P0 must be positive");
-    }
-    if (P_back <= 0.0) {
-        throw std::invalid_argument("nozzle_flow: P_back must be positive");
-    }
+    T0 = std::max(T0, 10.0);
+    P0 = std::max(P0, 1.0);
+    P_back = std::max(P_back, 1.0);
     if (A_eff <= 0.0) {
         throw std::invalid_argument("nozzle_flow: A_eff must be positive");
     }
@@ -195,9 +189,9 @@ double solve_A_eff_from_mdot(
     const std::vector<double>& X,
     double tol, std::size_t max_iter) {
 
-    if (mdot_target <= 0.0) {
-        throw std::invalid_argument("solve_A_eff_from_mdot: mdot_target must be positive");
-    }
+    T0 = std::max(T0, 10.0);
+    P0 = std::max(P0, 1.0);
+    P_back = std::max(P_back, 1.0);
 
     // Compute mass flux at operating conditions
     State stag;
@@ -226,6 +220,8 @@ double solve_P_back_from_mdot(
     const std::vector<double>& X,
     double tol, std::size_t max_iter) {
 
+    T0 = std::max(T0, 10.0);
+    P0 = std::max(P0, 1.0);
     if (mdot_target <= 0.0) {
         throw std::invalid_argument("solve_P_back_from_mdot: mdot_target must be positive");
     }
@@ -287,14 +283,10 @@ double solve_P0_from_mdot(
     const std::vector<double>& X,
     double tol, std::size_t max_iter) {
 
+    T0 = std::max(T0, 10.0);
+    P_back = std::max(P_back, 1.0);
     if (mdot_target <= 0.0) {
         throw std::invalid_argument("solve_P0_from_mdot: mdot_target must be positive");
-    }
-    if (A_eff <= 0.0) {
-        throw std::invalid_argument("solve_P0_from_mdot: A_eff must be positive");
-    }
-    if (P_back <= 0.0) {
-        throw std::invalid_argument("solve_P0_from_mdot: P_back must be positive");
     }
 
     // Bisection search for P0

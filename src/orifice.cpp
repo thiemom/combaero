@@ -58,6 +58,10 @@ double OrificeState::Re_d(double beta) const {
 
 namespace orifice {
 
+// Clamping helpers for numerical stability near d -> D
+inline double clamp_beta(double b) { return std::min(b, 0.98); }
+inline double clamp_Cd(double c) { return std::min(c, 1.5); }
+
 // Reader-Harris/Gallagher (1998) correlation
 // ISO 5167-2:2003, also ASME MFC-3M
 // Valid for: 0.1 <= beta <= 0.75, Re_D >= 5000 (preferably >= 10000)
@@ -66,19 +70,12 @@ double Cd_ReaderHarrisGallagher(double beta, double Re_D, double D) {
     // Ensure minimum Reynolds number
     if (Re_D < 1.0) Re_D = 1.0;
 
-    const double beta2 = beta * beta;
-    const double beta4 = beta2 * beta2;
-    const double beta8 = beta4 * beta4;
-
-    // Coefficient of discharge (Reader-Harris/Gallagher equation)
-    // C = 0.5961 + 0.0261*beta^2 - 0.216*beta^8
-    //     + 0.000521*(10^6*beta/Re_D)^0.7
-    //     + (0.0188 + 0.0063*A)*beta^3.5*(10^6/Re_D)^0.3
-    //     + (0.043 + 0.080*exp(-10*L1) - 0.123*exp(-7*L1))*(1 - 0.11*A)*beta^4/(1 - beta^4)
-    //     - 0.031*(M2 - 0.8*M2^1.1)*beta^1.3
-    //
-    // For flange taps (most common):
-    //   L1 = L2 = 25.4/D (mm), A = (19000*beta/Re_D)^0.8
+    // Limit beta to 0.98 for correlation stability (ISO valid to 0.75)
+    // d ~ D is handled separately or via smooth cap to prevent division by zero
+    const double beta_corr = std::min(beta, 0.98);
+    const double b2 = beta_corr * beta_corr;
+    const double b4 = b2 * b2;
+    const double b8 = b4 * b4;
 
     // Convert D to mm for the correlation
     const double D_mm = D * 1000.0;
@@ -88,67 +85,66 @@ double Cd_ReaderHarrisGallagher(double beta, double Re_D, double D) {
     const double L2 = reader_harris::flange_mm / D_mm;
 
     // A parameter (small-bore correction)
-    const double A = std::pow(reader_harris::A_coef * beta / Re_D, reader_harris::A_exp);
+    const double A = std::pow(reader_harris::A_coef * beta_corr / Re_D, reader_harris::A_exp);
 
     // M2 parameter (downstream tap correction)
-    const double M2 = 2.0 * L2 / (1.0 - beta);
+    const double M2 = 2.0 * L2 / (1.0 - beta_corr);
 
     // Base coefficient
     double C = reader_harris::C0
-             + reader_harris::C1 * beta2
-             - reader_harris::C2 * beta8;
+             + reader_harris::C1 * b2
+             - reader_harris::C2 * b8;
 
     // Reynolds number term
-    C += reader_harris::C3 * std::pow(reader_harris::re_scale * beta / Re_D, reader_harris::C3_exp);
+    C += reader_harris::C3 * std::pow(reader_harris::re_scale * beta_corr / Re_D, reader_harris::C3_exp);
 
     // Small-bore correction
-    C += (reader_harris::C4a + reader_harris::C4b * A) * std::pow(beta, reader_harris::C4_beta) * std::pow(reader_harris::re_scale / Re_D, reader_harris::C4_re);
+    C += (reader_harris::C4a + reader_harris::C4b * A) * std::pow(beta_corr, reader_harris::C4_beta) * std::pow(reader_harris::re_scale / Re_D, reader_harris::C4_re);
 
     // Upstream tap term
     const double exp_term1 = std::exp(-reader_harris::C5_exp1 * L1);
     const double exp_term2 = std::exp(-reader_harris::C5_exp2 * L1);
     C += (reader_harris::C5a + reader_harris::C5b * exp_term1 - reader_harris::C5c * exp_term2)
-       * (1.0 - reader_harris::C5_A_coef * A) * beta4 / (1.0 - beta4);
+       * (1.0 - reader_harris::C5_A_coef * A) * b4 / (1.0 - b4);
 
     // Downstream tap term
-    C -= reader_harris::C6 * (M2 - 0.8 * std::pow(M2, reader_harris::C6_M_exp)) * std::pow(beta, reader_harris::C6_beta);
+    C -= reader_harris::C6 * (M2 - 0.8 * std::pow(M2, reader_harris::C6_M_exp)) * std::pow(beta_corr, reader_harris::C6_beta);
 
-    return C;
+    // Final smooth cap (physical orifices rarely exceed 1.0;
+    // numerical stability capped at 1.5 to allow lossless bypass recovery)
+    return std::min(C, 1.5);
 }
 
 // Stolz (1978) correlation - older ISO 5167
 double Cd_Stolz(double beta, double Re_D) {
     if (Re_D < 1.0) Re_D = 1.0;
-
-    const double beta2 = beta * beta;
-    [[maybe_unused]] const double beta4 = beta2 * beta2;
+    const double b = clamp_beta(beta);
 
     // Stolz equation (corner taps)
     // C = 0.5959 + 0.0312*beta^2.1 - 0.184*beta^8 + 91.71*beta^2.5/Re_D^0.75
     double C = stolz::C0
-             + stolz::C1 * std::pow(beta, stolz::C1_exp)
-             - stolz::C2 * std::pow(beta, stolz::C2_exp)
-             + stolz::C3 * std::pow(beta, stolz::C3_beta) / std::pow(Re_D, stolz::C3_re);
+             + stolz::C1 * std::pow(b, stolz::C1_exp)
+             - stolz::C2 * std::pow(b, stolz::C2_exp)
+             + stolz::C3 * std::pow(b, stolz::C3_beta) / std::pow(Re_D, stolz::C3_re);
 
-    return C;
+    return clamp_Cd(C);
 }
 
 // Miller (1996) simplified correlation
 double Cd_Miller(double beta, double Re_D) {
     if (Re_D < 1.0) Re_D = 1.0;
+    const double b = clamp_beta(beta);
 
     // Simplified form: C ≈ 0.596 + 0.031*beta^2 for high Re
-    // With Reynolds correction
-    const double beta2 = beta * beta;
-
-    double C = miller::C0 + miller::C1 * beta2;
+    const double b2 = b * b;
+    double C = miller::C0 + miller::C1 * b2;
 
     // Reynolds number correction (approximate)
     if (Re_D < miller::re_cutoff) {
-        C += miller::C2 * std::pow(beta, miller::C2_beta_exp) / std::pow(Re_D, miller::C2_re_exp);
+        C += miller::C2 * std::pow(b, miller::C2_beta_exp) / std::pow(Re_D, miller::C2_re_exp);
     }
 
-    return C;
+    return clamp_Cd(C);
 }
 
 // Thickness correction factor for thick plates
@@ -196,18 +192,14 @@ double thickness_correction(double t_over_d, double beta, double Re_d) {
 // Based on Idelchik contraction loss coefficients
 double Cd_rounded(double r_over_d, double beta, double Re_D) {
     if (Re_D < 1.0) Re_D = 1.0;
+    const double b = clamp_beta(beta);
 
     // For r/d = 0: sharp edge, use thin-plate correlation
     if (r_over_d <= 0.0) {
-        return Cd_Stolz(beta, Re_D);
+        return Cd_Stolz(b, Re_D);
     }
 
     // Idelchik: loss coefficient K for rounded entry
-    // K = 0.5 * (1 - r/d/0.15)^2 for r/d < 0.15
-    // K ≈ 0.03 - 0.05 for r/d >= 0.15 (well-rounded)
-    //
-    // Convert K to Cd using: Cd = 1 / sqrt(1 + K / (1 - beta^4))
-
     double K;
     if (r_over_d >= rounded::radius_threshold) {
         // Well-rounded entry
@@ -219,8 +211,8 @@ double Cd_rounded(double r_over_d, double beta, double Re_D) {
     }
 
     // Account for beta effect
-    const double beta4 = std::pow(beta, 4.0);
-    const double Cd = 1.0 / std::sqrt(1.0 + K / (1.0 - beta4));
+    const double b4 = std::pow(b, 4.0);
+    const double Cd = 1.0 / std::sqrt(1.0 + K / (1.0 - b4));
 
     // Reynolds number correction for low Re
     double Re_correction = 1.0;
@@ -228,15 +220,16 @@ double Cd_rounded(double r_over_d, double beta, double Re_D) {
         Re_correction = 1.0 - rounded::re_correction_coef * std::pow(rounded::re_correction_ref / Re_D, rounded::re_correction_exp);
     }
 
-    return Cd * Re_correction;
+    return clamp_Cd(Cd * Re_correction);
 }
 
 // Convert between Cd and loss coefficient K
 double K_from_Cd(double Cd, double beta) {
-    if (Cd <= 0.0 || Cd > 1.0) {
-        throw std::invalid_argument("Cd must be in (0, 1]");
+    if (Cd <= 0.0 || Cd > 1.5) {
+        throw std::invalid_argument("Cd must be in (0, 1.5]");
     }
-    const double beta4 = std::pow(beta, 4.0);
+    const double b = clamp_beta(beta);
+    const double beta4 = std::pow(b, 4.0);
     return (1.0 / (Cd * Cd) - 1.0) * (1.0 - beta4);
 }
 
@@ -244,8 +237,9 @@ double Cd_from_K(double K, double beta) {
     if (K < 0.0) {
         throw std::invalid_argument("K must be >= 0");
     }
-    const double beta4 = std::pow(beta, 4.0);
-    return 1.0 / std::sqrt(1.0 + K / (1.0 - beta4));
+    const double b = clamp_beta(beta);
+    const double beta4 = std::pow(b, 4.0);
+    return clamp_Cd(1.0 / std::sqrt(1.0 + K / (1.0 - beta4)));
 }
 
 } // namespace orifice

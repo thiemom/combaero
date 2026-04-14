@@ -2627,18 +2627,12 @@ TEST_F(ThermoTransportTest, CompressibleInvalidInputs) {
     X_air[species_index_from_name("O2")] = 0.21;
     X_air[species_index_from_name("N2")] = 0.79;
 
-    // Invalid T0
-    EXPECT_THROW(nozzle_flow(0.0, 200000.0, 100000.0, 0.001, X_air), std::invalid_argument);
-    EXPECT_THROW(nozzle_flow(-100.0, 200000.0, 100000.0, 0.001, X_air), std::invalid_argument);
+    // Pressures and temperatures <= 0 are now clamped for solver robustness
+    EXPECT_NO_THROW(nozzle_flow(0.0, 200000.0, 100000.0, 0.001, X_air));
+    EXPECT_NO_THROW(nozzle_flow(500.0, 0.0, 100000.0, 0.001, X_air));
+    EXPECT_NO_THROW(nozzle_flow(500.0, 200000.0, 0.0, 0.001, X_air));
 
-    // Invalid P0
-    EXPECT_THROW(nozzle_flow(500.0, 0.0, 100000.0, 0.001, X_air), std::invalid_argument);
-    EXPECT_THROW(nozzle_flow(500.0, -100000.0, 100000.0, 0.001, X_air), std::invalid_argument);
-
-    // Invalid P_back
-    EXPECT_THROW(nozzle_flow(500.0, 200000.0, 0.0, 0.001, X_air), std::invalid_argument);
-
-    // Invalid A_eff
+    // Invalid A_eff (geometry) should still throw
     EXPECT_THROW(nozzle_flow(500.0, 200000.0, 100000.0, 0.0, X_air), std::invalid_argument);
     EXPECT_THROW(nozzle_flow(500.0, 200000.0, 100000.0, -0.001, X_air), std::invalid_argument);
 }
@@ -2898,11 +2892,9 @@ TEST_F(ThermoTransportTest, FannoFlowInvalidInputs) {
     X_air[species_index_from_name("O2")] = 0.21;
     X_air[species_index_from_name("N2")] = 0.79;
 
-    // Invalid T_in
-    EXPECT_THROW(fanno_channel(0.0, 200000.0, 50.0, 10.0, 0.05, 0.02, X_air), std::invalid_argument);
-
-    // Invalid P_in
-    EXPECT_THROW(fanno_channel(400.0, 0.0, 50.0, 10.0, 0.05, 0.02, X_air), std::invalid_argument);
+    // T_in <= 0 and P_in <= 0 are now clamped for solver robustness rather than throwing
+    EXPECT_NO_THROW(fanno_channel(0.0, 200000.0, 50.0, 10.0, 0.05, 0.02, X_air));
+    EXPECT_NO_THROW(fanno_channel(400.0, 0.0, 50.0, 10.0, 0.05, 0.02, X_air));
 
     // Invalid L
     EXPECT_THROW(fanno_channel(400.0, 200000.0, 50.0, 0.0, 0.05, 0.02, X_air), std::invalid_argument);

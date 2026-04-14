@@ -1,4 +1,4 @@
-import { Activity, Crosshair, RotateCw } from "lucide-react";
+import { Activity, Crosshair, Info, RotateCw } from "lucide-react";
 import useStore from "../store/useStore";
 import {
 	BASIC_STATE_KEYS,
@@ -477,17 +477,26 @@ const Inspector = () => {
 								className="w-4 h-4 accent-blue-500"
 							/>
 						</div>
-						<div className="flex flex-col gap-2">
+						{selectedNode.data.auto_Cd !== false && (
+							<div className="flex flex-col gap-1 mb-2 bg-blue-50/50 p-2 rounded border border-blue-100/50">
+								<label className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">
+									Calculated Cd
+								</label>
+								<div className="text-sm font-mono font-bold text-blue-700">
+									{selectedNode.data.result?.Cd?.toFixed(4) ||
+										"— (Pending Solve)"}
+								</div>
+							</div>
+						)}
+
+						<div className="flex flex-col gap-1.5 opacity-80 scale-95 origin-top-left border-l-2 border-slate-200 pl-3 mt-1 py-1">
 							<label
 								htmlFor={`Cd_${selectedNode.id}`}
-								className="text-xs font-bold text-gray-500 uppercase"
-								title={
-									selectedNode.data.auto_Cd !== false
-										? "Used as fallback when correlation is unavailable"
-										: ""
-								}
+								className="text-[10px] font-bold text-slate-500 uppercase tracking-tight"
 							>
-								{selectedNode.data.auto_Cd !== false ? "Cd (fallback)" : "Cd"}
+								{selectedNode.data.auto_Cd !== false
+									? "Manual Fallback Value"
+									: "Fixed Cd Value"}
 							</label>
 							<NumericInput
 								id={`Cd_${selectedNode.id}`}
@@ -497,8 +506,14 @@ const Inspector = () => {
 										Cd: val,
 									})
 								}
-								className="p-2 border rounded"
+								className="p-1 h-7 text-xs border rounded bg-slate-50/50 focus:bg-white transition-colors"
+								placeholder="0.6"
 							/>
+							<p className="text-[9px] text-slate-400 italic leading-snug max-w-[180px]">
+								{selectedNode.data.auto_Cd !== false
+									? "This value is only used if the correlation Reynolds number is out-of-range."
+									: "The solver will ignore correlations and use this fixed value."}
+							</p>
 						</div>
 						<div className="flex flex-col gap-2">
 							<label className="text-xs font-bold text-gray-500 uppercase">

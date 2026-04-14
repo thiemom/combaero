@@ -256,3 +256,42 @@ TEST_F(OrificeTest, ThicknessCorrection) {
     EXPECT_LT(corr_long, corr_peak);  // Falls at large t/d
     EXPECT_LT(corr_long, 1.0);  // Long-tube behavior
 }
+// -------------------------------------------------------------
+// Hardening and Numerical Stability tests
+// -------------------------------------------------------------
+
+TEST_F(OrificeTest, HardeningHighBeta) {
+    // Test that Cd remains finite for beta -> 1.0 (approaching pipe diameter)
+    OrificeGeometry geom_extreme;
+    geom_extreme.D = 0.100;
+    geom_extreme.d = 0.0999999; // beta = 0.9999999
+
+    double Cd_val = Cd_sharp_thin_plate(geom_extreme, state);
+    // Should be capped at 1.5, not 500,000
+    EXPECT_LE(Cd_val, 1.5);
+    EXPECT_GT(Cd_val, 0.5);
+}
+
+TEST_F(OrificeTest, KFromCdHighBeta) {
+    // Test that K_from_Cd and Cd_from_K are stable and self-consistent near beta = 1.0
+    double beta_extreme = 0.99999;
+    double Cd_val = 0.95;
+
+    double K = orifice::K_from_Cd(Cd_val, beta_extreme);
+    EXPECT_TRUE(std::isfinite(K));
+    EXPECT_GE(K, 0.0);
+
+    // Round-trip should be exact even with clamping because both use the same internal clamp
+    double Cd_back = orifice::Cd_from_K(K, beta_extreme);
+    EXPECT_NEAR(Cd_back, Cd_val, 1e-10);
+}
+
+TEST_F(OrificeTest, CdRoundedHighBetaStability) {
+    // Test that Rounded-entry correlation doesn't divide by zero at d=D
+    double beta_extreme = 0.99999;
+    geom.r = 0.005; // Rounded
+
+    double Cd_val = orifice::Cd_rounded(geom.r / (geom.D * beta_extreme), beta_extreme, state.Re_D);
+    EXPECT_TRUE(std::isfinite(Cd_val));
+    EXPECT_LE(Cd_val, 1.5);
+}
