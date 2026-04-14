@@ -1213,7 +1213,8 @@ class OrificeElement(NetworkElement):
     def _effective_Cd(self, state_in: "MixtureState", state_out: "MixtureState") -> float:
         """Return effective Cd: from correlation or user-supplied fixed value."""
         if not self.use_correlation or self._orifice_geom is None:
-            return self.Cd
+            # Clamp manual Cd to prevent solver matrix ill-conditioning (negative pressure steps)
+            return max(1e-4, min(self.Cd, 1e6))
 
         import combaero as cb
 
