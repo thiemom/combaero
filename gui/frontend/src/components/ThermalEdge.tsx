@@ -23,12 +23,17 @@ export default function ThermalEdge({
 	});
 
 	let labelText = "Thermal";
+	let profileText = "";
 	if (data?.result?.Q !== undefined) {
 		const Q = data.result.Q;
 		const absQ = Math.abs(Q);
 		const formattedValue =
 			absQ >= 1000 ? `${(Q / 1000).toFixed(1)} kW` : `${Q.toFixed(1)} W`;
 		labelText = formattedValue;
+	}
+	if (data?.result?.T_interface) {
+		const temps = data.result.T_interface as number[];
+		profileText = temps.map((t) => `${Math.round(t)}K`).join(" → ");
 	}
 
 	return (
@@ -73,9 +78,14 @@ export default function ThermalEdge({
 						border: "1px solid #ff9800",
 						pointerEvents: "all",
 					}}
-					className="nodrag nopan"
+					className="nodrag nopan flex flex-col items-center"
 				>
-					{labelText}
+					<span>{labelText}</span>
+					{profileText && (
+						<span className="text-[8px] text-stone-500 font-mono tracking-tighter mt-0.5">
+							{profileText}
+						</span>
+					)}
 				</div>
 			</EdgeLabelRenderer>
 		</>
