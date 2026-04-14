@@ -361,31 +361,25 @@ Jacobian structure is unchanged because layer count only affects the scalar `R_t
 14. [x] **E.2.1** — Add `Nu_multiplier`/`f_multiplier` to `heat_transfer.py` wrappers (Completed in 1878894)
 15. [x] **E.2.2** — Wire multipliers through GUI schemas + graph builder (Completed in 1878894)
 
-### Phase 6 — Thermal wall refactor advanced (Parts C + F)
-16. **F.2.1** — `FilmCoolingModifier` on `ThermalWall` hot side
-17. **F.2.2** — `EffusionCoolingModifier` (T_aw + flow coupling)
-18. **F.3** — Expose non-smooth channel models in GUI (schema + builder)
+### Phase 6 — Pybind wrappers + materials (Part G)
+16. **G.8a** — Wrap `get_material` for generic k(T) lookup by name (enables material-based wall layers)
+17. **G.2b** — Bind `calc_T_from_s_mass` (isentropic process solver — future-proofs Part H)
+18. **G.2c-d** — Bind `calc_T_from_u_mass`, `calc_T_from_sv_mass`, `calc_T_from_sh_mass`
+19. **G.2a** — Bind `dh_dT`, `ds_dT`, `dcp_dT` (thermo derivatives)
 
-### Phase 7 — Missing pybind wrappers (Part G)
-19. **G.2b** — Bind `calc_T_from_s_mass` (isentropic process solver — **unblocks H**)
-20. **G.2c-d** — Bind `calc_T_from_u_mass`, `calc_T_from_sv_mass`, `calc_T_from_sh_mass`
-21. **G.2a** — Bind `dh_dT`, `ds_dT`, `dcp_dT` (thermo derivatives)
-22. **G.8a** — Wrap `get_material` for generic k(T) lookup by name
+### Future feature branches (after this branch)
 
-### Phase 8 — Turbomachinery stages (Part H)
-23. **H.1a** — C++ `compressor_stage_pr_and_jacobian` + `turbine_stage_pr_and_jacobian`
-24. **H.1b** — C++ `compressor_stage_capacity_and_jacobian` + `turbine_stage_capacity_and_jacobian`
-25. **H.2** — C++ central-FD accuracy tests for all 4 functions (8 test cases, tol < 1e-6)
-26. **H.3** — Pybind bindings for `StageResult` + `StageCapacityResult` structs
-27. **H.4** — Python `CompressorStageElement` + `TurbineStageElement` (both modes)
-28. **H.5** — C++ `shaft_balance_residual_and_jacobian` + central-FD test
-29. **H.6** — Python `ShaftConnection`
-30. **H.7** — GUI schemas + graph builder (mode dropdown)
+**Cooled Panel Element** (Part I) — Film/effusion cooling as a multi-port flow element
+with pressure-driven bleed. Requires `MultiPortElement` base class and solver
+generalization to N-port elements. See Part I for full design.
 
-### Phase 9 — Cleanup
-31. **M3** — Document or fix auto_Cd Jacobian truncation
-32. **L1 + L2** — Deprecate legacy combustion functions
-33. **L5** — Guard legacy combustion raises (only if they become solver-facing)
+**Turbomachinery Stages** (Part H) — Compressor/turbine stage elements with
+prescribed-PR and capacity modes, shaft coupling. Same architectural challenge as
+cooled panels (new element types requiring C++ residuals + Jacobians). See Part H
+for full design. Unblocked by G.2b (`calc_T_from_s_mass`).
+
+**Cleanup** — M3 (auto_Cd Jacobian truncation), L1+L2 (legacy combustion deprecation),
+L5 (legacy combustion guards), F.3 (non-smooth channel models in GUI).
 
 ---
 
@@ -772,6 +766,11 @@ And `solver_interface.h` Jacobian-equipped versions:
 | `effusion_effectiveness_and_jacobian` | YES | **NOT used in network** |
 
 ### F.2 — Missing Network Models (Not Yet Wired)
+
+> **Note**: Film and effusion cooling network integration is superseded by the
+> `CooledPanelElement` design in **Part I**. The wall-modifier approach described
+> below (F.2.1, F.2.2) was found to be insufficient — film/effusion require
+> multi-port flow elements with pressure-driven bleed, not `T_aw` modifiers.
 
 Five C++ correlation families are exposed via pybind but have **no** corresponding
 `ChannelModel` subclass in the network:
@@ -1503,3 +1502,269 @@ cycle analysis. The prescribed-PR mode alone is only a teaching tool.
 This would make the network solver capable of modelling complete gas turbine cycles,
 which is high-value for both students (thermodynamic cycle analysis) and engineers
 (secondary air system + engine cycle coupling).
+
+---
+
+## Part I — Cooled Panel Element (Film / Effusion Cooling)
+
+Film and effusion cooling fundamentally differ from convective walls: they involve
+**mass transfer** (coolant injected through holes into the hot gas) in addition to
+conduction and convection. This makes them flow elements, not wall modifiers.
+
+### I.1 — Physical Picture
+
+A film- or effusion-cooled wall panel sits **in-line on the cold (coolant) passage**
+and bleeds a fraction of coolant through the wall into the hot gas path:
+
+```
+                      hot_element (pipe/chamber in hot-gas path)
+                           │
+                      ─────┼───── hot-gas flow direction ──►
+                           │
+                    ╔══════╧══════╗
+                    ║  Wall layers ║  ← conduction (hot → cold)
+                    ╠═════════════╣
+                    ║ CooledPanel  ║  ← cold-side convective surface
+       cold_in ───►║  (element)   ╠───► cold_out  (main coolant continues)
+                    ║             ║
+                    ╚══════╤══════╝
+                           │
+                           ▼ bleed (film/effusion holes)
+                      hot_gas_node  (injected coolant mixes into hot path)
+```
+
+**Three flow ports:**
+
+| Port | Role |
+|------|------|
+| `cold_in` (`from_node`) | Coolant enters the panel |
+| `cold_out` (`to_node`) | Bulk coolant continues downstream in cold passage |
+| `bleed_out` | Fraction of coolant exits through holes into hot-gas path |
+
+The panel is a **pipe section with a pressure-driven side-bleed**. Most coolant flows
+through and picks up heat from the wall; a fraction exits through discrete holes
+providing film/effusion protection on the hot side.
+
+**Heat flow:**
+
+1. **Hot gas → wall**: convection from hot element (h_hot, T_aw_hot)
+2. **Wall → coolant (in-passage)**: convection from cold-side surface (h_cold, T_aw_cold)
+   — panel computes this from its own internal flow, like a pipe's `ConvectiveSurface`
+3. **Film effect**: injected coolant modifies the effective hot-side adiabatic wall
+   temperature: `T_aw_eff = T_aw_hot − η · (T_aw_hot − T_coolant_exit)`
+
+The cooling flow absorbs most of the heat — both via in-passage convection and via
+the mass exiting through holes (which carries enthalpy away from the wall).
+
+### I.2 — Why Not a Wall Modifier
+
+The original plan (Part F) proposed `FilmCoolingModifier` / `EffusionCoolingModifier`
+as `T_aw` modifiers on `ThermalWall`. This is insufficient because:
+
+1. **Mass transfer**: coolant mass leaves one flow path and enters another. A
+   `ThermalWall` is a pure thermal edge — it cannot carry flow.
+2. **Pressure coupling**: bleed flow rate is pressure-driven:
+   `m_dot_bleed = Cd · A_holes · f(ΔP_across_wall)`. This couples cold-path pressure
+   to hot-path pressure — a flow residual, not a thermal one.
+3. **Mass conservation**: the bleed node on the hot-gas path receives mass from the
+   cold path. The solver must account for this in nodal mass balance.
+
+A wall modifier could handle the `T_aw` correction alone, but misses the flow coupling
+that makes film/effusion cooling physically meaningful in a network context.
+
+### I.3 — Multi-Port Element (Option A)
+
+After evaluating three integration strategies, the chosen approach is a **true
+multi-port element** — a new `NetworkElement` subclass with 3+ flow ports.
+
+**Alternatives considered:**
+
+| Option | Approach | Pro | Con |
+|--------|----------|-----|-----|
+| **A** (chosen) | Multi-port `NetworkElement` | Clean abstraction, generalizes | Touches solver core |
+| B | Decompose into 2 elements + internal node | Works today, no solver changes | One component = 3 elements + hidden node; GUI bundling overhead; extra unknowns |
+| C | 2-port element + `MassBoundary` side-effect | Minimal graph changes | New `MassBoundary` concept needed; cross-path Jacobians still required |
+
+**Why Option A**: the decomposition (B) becomes limiting when panels need tight
+intra-component coupling (in-hole convection feedback) or when many panels inflate
+the Jacobian with plumbing unknowns. Option A avoids these issues and also
+generalizes to future multi-port components (splitters, bleed valves, multi-stream
+mixers).
+
+### I.4 — Required Infrastructure Changes
+
+The current `NetworkElement` assumes exactly 2 flow ports (`from_node`, `to_node`).
+A multi-port element requires changes across several layers:
+
+**Graph (`graph.py`):**
+- `add_element` currently registers exactly 2 adjacency edges. Must support N ports.
+- BFS reachability (`_reachable_from`) must traverse all ports.
+
+**Solver (`solver.py`):**
+- Element residuals receive `(state_in, state_out)` — must generalize to N port states.
+- Jacobian assembly assumes 2-node connectivity — must handle cross-path entries
+  (bleed flow couples cold-path pressure to hot-path node).
+- Mass conservation at bleed node must include the bleed mass source.
+
+**Base class (`components.py`):**
+```python
+class MultiPortElement(NetworkElement):
+    """Element with N named flow ports (generalizes 2-port NetworkElement)."""
+
+    def __init__(self, id: str, ports: dict[str, str]):
+        # ports maps role → node_id, e.g. {"cold_in": "n1", "cold_out": "n2", "bleed": "n3"}
+        self.id = id
+        self.ports = ports
+        # Backward compat: from_node / to_node point to primary flow path
+        self.from_node = ports.get("cold_in", "")
+        self.to_node = ports.get("cold_out", "")
+```
+
+### I.5 — `CooledPanelElement` Design
+
+```python
+@dataclass
+class CooledPanelElement(MultiPortElement):
+    """Film/effusion cooled wall panel.
+
+    Flow: cold_in → cold_out (main coolant), bleed → hot-gas node
+    Thermal: hot_ref identifies the hot-side convective element/node
+    Wall: built-in layers for conduction
+    Convective: built-in ConvectiveSurface for cold-side HTC
+    """
+    # --- thermal references ---
+    hot_ref: str                           # element/node ID providing hot-side h, T_aw
+    layers: list[WallLayer]                # wall conduction layers
+    contact_area: float | None = None      # override area [m^2]
+
+    # --- cold-side convection (panel IS the cold channel) ---
+    surface: ConvectiveSurface             # cold-side HTC model
+    diameter: float = 0.01                 # hydraulic diameter of cold channel [m]
+    length: float = 0.1                    # channel length [m]
+
+    # --- cooling model ---
+    cooling: FilmModel | EffusionModel | None = None   # None = pure wall
+    hole_diameter: float = 0.001           # [m]
+    hole_angle: float = 30.0               # injection angle [deg]
+    porosity: float = 0.0                  # hole open area fraction (effusion)
+    hole_spacing_D: float = 3.0            # s/D (film)
+    row_positions_xD: list[float] | None = None  # multi-row positions (film)
+```
+
+### I.6 — Residuals Contributed
+
+1. **Momentum (cold passage)**: ΔP from friction in the cold channel — like a pipe
+2. **Mass split**: `m_dot_in = m_dot_out + m_dot_bleed`
+3. **Bleed flow** (pressure-driven): `m_dot_bleed = Cd · A_holes · f(ΔP_cold_to_hot)`
+   using `effusion_discharge_coefficient(Re_d, P_ratio, α, L/D)`
+4. **Wall coupling**: Q computed from wall layers + modified hot-side T_aw_eff
+
+**Cross-path Jacobians**: the bleed residual couples `P_cold` (cold passage) to
+`P_hot` (hot-gas node), creating off-diagonal Jacobian blocks between otherwise
+independent flow paths. The chain rule through blowing ratio M connects to solver
+unknowns: `M = ρ_c · v_c / (ρ_hot · v_hot)`.
+
+### I.7 — Graceful Degradation
+
+| Condition | Behavior |
+|-----------|----------|
+| `bleed_out` unconnected | m_dot_bleed = 0, η = 0, no film effect |
+| `cooling = None` | Pure conductive wall with cold-side convection |
+| `hot_ref` unconnected | Cold-side-only convection (no wall coupling) |
+| All unconnected | No thermal or flow effect (dormant element) |
+
+This lets engineers start with a convective wall and incrementally add cooling.
+
+### I.8 — Cooling Sub-Models
+
+Both film and effusion share the 3-port topology but differ in physics:
+
+| Property | Film | Effusion |
+|----------|------|----------|
+| Hole density | Sparse (discrete rows) | Dense (many holes) |
+| Effectiveness | `film_cooling_effectiveness_and_jacobian` | `effusion_effectiveness_and_jacobian` |
+| Key params | x/D, M, DR, α, row positions | x/D, M, DR, porosity, s/D, α |
+| Cd model | Simple orifice Cd | `effusion_discharge_coefficient` |
+| In-hole cooling | Negligible | Significant (coolant cools wall in-hole) |
+
+All C++ functions with Jacobians already exist (see Part F inventory).
+
+### I.9 — GUI Representation
+
+```
+         thermal-hot (top handle) ← connects to hot-gas pipe/chamber
+              │
+    ┌─────────┴─────────┐
+    │                    │
+ ●──┤   Cooled Panel     ├──●   cold_in / cold_out (left/right)
+    │  Film / Effusion   │
+    └─────────┬─────────┘
+              │
+         bleed-out (bottom handle) ← connects to hot-gas node
+```
+
+- **Left/Right handles**: flow (coolant in → coolant out, main path)
+- **Top handle**: thermal reference (hot-side element)
+- **Bottom handle**: bleed flow (mass injection into hot-gas node)
+- When bleed handle is unconnected: element is dormant for bleed, acts as convective wall
+
+**Inspector controls:**
+- Wall layers (reuse existing `WallLayersEditor`)
+- Cooling model selector: None / Film / Effusion
+- Hole geometry: diameter, angle, spacing, porosity (model-dependent)
+- Row positions (film only): streamwise x/D of each row
+
+### I.10 — Implementation Scope
+
+This feature requires `MultiPortElement` infrastructure which is a significant
+extension of the solver core. It should be implemented on a **dedicated feature
+branch** after the current branch (Phases 1–6) is complete.
+
+**Dependency chain:**
+1. `MultiPortElement` base class + graph registration (N-port adjacency)
+2. Solver generalization (N-port residuals + Jacobian assembly)
+3. `CooledPanelElement` implementation (flow + thermal + cooling model)
+4. C++ `cooled_panel_residuals_and_jacobian` + FD accuracy tests
+5. GUI schema + graph builder + 4-handle node component
+6. Integration tests (single panel, multi-zone combustor liner)
+
+The same `MultiPortElement` infrastructure also unblocks future components like
+bleed valves, multi-stream mixers, and intercoolers.
+
+### I.11 — References
+
+- Aumeier, T., & Behrendt, T. (2015). Application of an aerothermal model for
+  effusion cooling systems and finite rate chemistry in aero-engine combustors.
+  *Proc. THMT-15*, doi:10.1615/ichmt.2015.thmt-15.1930
+- Xia, H., Chen, X., & Ellis, C. D. (2024). Modelling and simulation of effusion
+  cooling — A review of recent progress. *Energies*, 17(17), 4480.
+  doi:10.3390/en17174480
+- Yi, B., Liu, Z., Xiong, Y., Liu, Y., & Wei, X. (2023). Influence of blowing
+  ratio on double-wall cooling characteristics under high-temperature flue gas.
+  *Proc. GPPS*, doi:10.33737/gpps23-tc-126
+- Numerical investigation of gas turbine combustor cooling performance with Bézier
+  effusion holes. (2026). *J. Thermophys. Heat Transfer*.
+  https://arc.aiaa.org/doi/10.2514/1.T7282
+- Parametric and correlation study of effusion cooling applied to gas turbine
+  blades. (2024). *Applied Sciences*, 15(17), 9778.
+  https://www.mdpi.com/2076-3417/15/17/9778
+- Bunker, R. S. (2005). A review of shaped hole turbine film cooling technology.
+  *J. Heat Transfer*, 127(4). — Definitive reference on hole geometry effects
+  (square, fan, conical) on film physics.
+- Bogard, D. G., & Thole, K. A. (2006). Gas turbine film cooling.
+  *J. Propulsion and Power*, 22(2). — Seminal review defining standard
+  dimensionless parameters (M, DR) used throughout modern film cooling research.
+- Dorrington, I., et al. (2018). The effect of trench geometry on film cooling.
+  *J. Turbomachinery*. — Surface modifications for enhanced film stability.
+- Ling, Y., et al. (2023). Optimization of film cooling performance via additive
+  manufacturing. — Internal turbulators inside film holes enabled by 3D printing.
+- Mefferd, L., et al. (2022). Coupled 1D network–CFD for turbine airfoil effusion
+  cooling. — 1D plenum flow network coupled to 3D CFD for film development.
+- Krewinkel, R. (2013). A design tool for effusion cooling. — Thermal resistance
+  network for predicting wall temperatures in aero-engine combustor liners.
+- Jackowski, T., et al. (2016). Flow network modelling of double-wall effusion
+  systems. — Identifies coolant starvation zones from pressure-driven flow
+  distribution.
+- Scrittore, J. J., et al. (2007). Experimental validation of 1D effusion models.
+  — Provides Cd calibration data for flow network models of large-scale effusion
+  arrays.

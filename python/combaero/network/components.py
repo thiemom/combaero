@@ -814,6 +814,17 @@ class MomentumChamberNode(NetworkNode):
 
         re = (rho * u * diameter / cs.transport.mu) if cs.transport.mu > 0 else 0.0
 
+        # Detailed heat transfer diagnostics if surface is active
+        nu_val = 0.0
+        htc_val = 0.0
+        t_aw_val = cs.thermo.T
+        if self.has_convective_surface:
+            h_res = self.htc_and_T(state)
+            if h_res is not None:
+                nu_val = h_res.Nu
+                htc_val = h_res.h
+                t_aw_val = h_res.T_aw
+
         return {
             "h": cs.thermo.h,
             "s": cs.thermo.s,
@@ -831,7 +842,10 @@ class MomentumChamberNode(NetworkNode):
             "Re": re,
             "Dh": diameter,
             "velocity": u,
-            "mach": u / cs.thermo.a if cs.thermo.a > 0 else 0.0,
+            "mach": (u / cs.thermo.a) if cs.thermo.a > 0 else 0.0,
+            "Nu": nu_val,
+            "htc": htc_val,
+            "T_aw": t_aw_val,
         }
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
@@ -1651,24 +1665,42 @@ class PipeElement(NetworkElement):
         # Reynolds number at inlet: Re = rho * v * D / mu
         re_in = (rho_in * v_in * self.diameter / cs.transport.mu) if cs.transport.mu > 0 else 0.0
 
-        return {
+        res_dict = {
             "mach_in": mach_in,
             "mach_out": mach_out,
             "p_ratio_total": p_ratio_total,
             "Re": re_in,
-            # Thermo
-            "h": cs.thermo.h,
-            "s": cs.thermo.s,
-            "u": cs.thermo.u,
-            "rho": cs.thermo.rho,
-            "gamma": cs.thermo.gamma,
-            "a": cs.thermo.a,
-            # Transport
-            "mu": cs.transport.mu,
-            "k": cs.transport.k,
-            "Pr": cs.transport.Pr,
-            "nu": cs.transport.nu,
+            "dP": max(0.0, state_in.P_total - state_out.P_total),
         }
+
+        # Heat Transfer diagnostics
+        h_res = self.htc_and_T(state_in)
+        if h_res is not None:
+            res_dict["Nu"] = h_res.Nu
+            res_dict["htc"] = h_res.h
+            res_dict["T_aw"] = h_res.T_aw
+        else:
+            res_dict["Nu"] = 0.0
+            res_dict["htc"] = 0.0
+            res_dict["T_aw"] = state_in.T
+
+        # Thermo
+        res_dict.update(
+            {
+                "h": cs.thermo.h,
+                "s": cs.thermo.s,
+                "u": cs.thermo.u,
+                "rho": cs.thermo.rho,
+                "gamma": cs.thermo.gamma,
+                "a": cs.thermo.a,
+                # Transport
+                "mu": cs.transport.mu,
+                "k": cs.transport.k,
+                "Pr": cs.transport.Pr,
+                "nu": cs.transport.nu,
+            }
+        )
+        return res_dict
 
     def get_spatial_profile(
         self,

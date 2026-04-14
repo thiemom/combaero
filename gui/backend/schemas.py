@@ -2,6 +2,57 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+
+class SmoothModelData(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    type: Literal["smooth"] = "smooth"
+
+
+class RibbedModelData(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    type: Literal["ribbed"] = "ribbed"
+    e_D: float = 0.05
+    pitch_to_height: float = 10.0
+    alpha_deg: float = 90.0
+
+
+class DimpledModelData(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    type: Literal["dimpled"] = "dimpled"
+    d_Dh: float = 0.2
+    h_d: float = 0.15
+    S_d: float = 2.0
+
+
+class PinFinModelData(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    type: Literal["pin_fin"] = "pin_fin"
+    pin_diameter: float = 0.005
+    S_D: float = 2.5
+    X_D: float = 2.5
+    N_rows: int = 10
+    is_staggered: bool = True
+
+
+class ImpingementModelData(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    type: Literal["impingement"] = "impingement"
+    d_jet: float = 0.002
+    z_D: float = 4.0
+    x_D: float = 6.0
+    y_D: float = 6.0
+    A_target: float = 0.01
+
+
+SurfaceModelData = (
+    SmoothModelData
+    | RibbedModelData
+    | DimpledModelData
+    | PinFinModelData
+    | ImpingementModelData
+)
+
+
 # --- Node Data Definitions ---
 
 
@@ -50,6 +101,8 @@ class CombustorData(BaseModel):
 class MomentumChamberData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     area: float = 0.1
+    Dh: float = 0.1
+    surface: SurfaceModelData = Field(default_factory=SmoothModelData)
     Nu_multiplier: float = 1.0
     f_multiplier: float = 1.0
     initial_guess: dict[str, float] = Field(default_factory=dict)
@@ -64,6 +117,7 @@ class PipeData(BaseModel):
     L: float = 1.0
     D: float = 0.1
     roughness: float = 1e-5
+    surface: SurfaceModelData = Field(default_factory=SmoothModelData)
     Nu_multiplier: float = 1.0
     f_multiplier: float = 1.0
     regime: Literal["default", "incompressible", "compressible"] = "default"

@@ -1123,16 +1123,31 @@ ChannelResult channel_dimpled(double T, double P, const std::vector<double> &X,
   ChannelResult result = make_channel_result(h_dim, Nu_dim, base.Re, base.Pr, f_dim, dP_dim,
                              base.M, base.T_aw, T_wall);
 
-  // Propagate Jacobians: scale by dimple enhancement factors
-  result.dh_dmdot = enh * base.dh_dmdot;
-  result.dh_dT = enh * base.dh_dT;
-  result.ddP_dmdot = fmul * base.ddP_dmdot;
-  result.ddP_dT = fmul * base.ddP_dT;
-  result.dT_aw_dmdot = base.dT_aw_dmdot;
-  result.dT_aw_dT = base.dT_aw_dT;
-  result.dq_dmdot = enh * base.dq_dmdot;
-  result.dq_dT = enh * base.dq_dT;
-  result.dq_dT_wall = base.dq_dT_wall * enh;
+  // Propagate Jacobians: h = h_smooth * enh(Re), dP = dP_smooth * fmul
+  // dh/dx = dh_smooth/dx * enh + h_smooth * (denh/dRe * dRe/dx)
+  // denh/dRe = 0.1 * enh / base.Re
+  if (velocity > 0.0 && base.Re > 0.0) {
+    double A_cross = M_PI / 4.0 * diameter * diameter;
+    auto [mu, dmu_dT, dmu_dP] = solver::viscosity_and_jacobians(T, P, X);
+    double dRe_dmdot = diameter / (A_cross * mu);
+    double dRe_dT = -base.Re * dmu_dT / mu;
+    double denh_dRe = 0.1 * enh / base.Re;
+
+    result.dh_dmdot = enh * base.dh_dmdot + base.h * denh_dRe * dRe_dmdot;
+    result.dh_dT = enh * base.dh_dT + base.h * denh_dRe * dRe_dT;
+    result.ddP_dmdot = fmul * base.ddP_dmdot; // fmul is Re-independent in this model
+    result.ddP_dT = fmul * base.ddP_dT;
+    result.dT_aw_dmdot = base.dT_aw_dmdot;
+    result.dT_aw_dT = base.dT_aw_dT;
+
+    if (std::isfinite(T_wall)) {
+      double h_dim = result.h;
+      double T_aw = result.T_aw;
+      result.dq_dmdot = result.dh_dmdot * (T_aw - T_wall) + h_dim * result.dT_aw_dmdot;
+      result.dq_dT = result.dh_dT * (T_aw - T_wall) + h_dim * result.dT_aw_dT;
+      result.dq_dT_wall = -h_dim;
+    }
+  }
 
   return result;
 }
@@ -1221,10 +1236,11 @@ ChannelResult channel_pin_fin(double T, double P, const std::vector<double> &X,
     double dRe_dmdot = pin_diameter / (A_cross * mu);
     double dRe_dT = -Re_d * dmu_dT / mu;
 
-    // Simplified: assume Nu ~ Re^0.7 and f ~ Re^(-0.2) (typical for pin fins)
-    double dNu_dRe = 0.7 * Nu / Re_d;
-    double dNu_dPr = 0.4 * Nu / Pr;  // Typical Pr exponent for pin fins
-    double df_dRe = -0.2 * f_pin / Re_d;
+    // Use exponents from Metzger correlation
+    double m = is_staggered ? 0.69 : 0.675;
+    double dNu_dRe = m * Nu / Re_d;
+    double dNu_dPr = 0.4 * Nu / Pr;
+    double df_dRe = -0.25 * f_pin / Re_d;
 
     result.dh_dmdot = (k / pin_diameter) * dNu_dRe * dRe_dmdot;
     // Full chain rule: dh/dT = (1/D) * [k * (dNu/dRe * dRe/dT + dNu/dPr * dPr/dT) + Nu * dk/dT]
@@ -1235,7 +1251,13 @@ ChannelResult channel_pin_fin(double T, double P, const std::vector<double> &X,
     result.ddP_dmdot = static_cast<double>(N_rows) *
                        (df_dRe * dRe_dmdot * rho * v_max * v_max / 2.0 +
                         f_pin * v_max_factor * v_max_factor * mdot / (rho * A_cross * A_cross));
-    result.ddP_dT = static_cast<double>(N_rows) * df_dRe * dRe_dT * rho * v_max * v_max / 2.0;
+
+    // ddP/dT: includes df/dT and drho/dT terms
+    // dP = N * f * mdot^2 / (2 * rho * A_min^2)
+    // d(dP)/dT = N * [ (df/dRe * dRe/dT) * (mdot^2 / (2 * rho * A_min^2)) - (f * mdot^2 / (2 * rho^2 * A_min^2)) * drho/dT ]
+    double dP_dynamic_val = rho * v_max * v_max / 2.0;
+    result.ddP_dT = static_cast<double>(N_rows) *
+                    (df_dRe * dRe_dT * dP_dynamic_val - f_pin * (v_max * v_max / 2.0) * drho_dT);
 
     // T_aw derivatives — always computed so Python relay can use them
     double cp_mass_val = cp_mass(T, X);
@@ -1339,8 +1361,8 @@ ChannelResult channel_impingement(double T, double P,
     double dRe_dmdot = d_jet / (A_jet * mu);
     double dRe_dT = -Re_jet * dmu_dT / mu;
 
-    // Simplified: assume Nu ~ Re^0.7 (typical for impingement)
-    double dNu_dRe = 0.7 * Nu / Re_jet;
+    // Use exponents from Florschuetz (1981) / Martin (1977)
+    double dNu_dRe = 0.55 * Nu / Re_jet;
     double dNu_dPr = 0.4 * Nu / Pr;  // Typical Pr exponent for impingement
 
     result.dh_dmdot = (k / d_jet) * dNu_dRe * dRe_dmdot;

@@ -9,6 +9,7 @@ import AreaInput from "./AreaInput";
 import CompositionEditor from "./CompositionEditor";
 import LengthInput from "./LengthInput";
 import NumericInput from "./NumericInput";
+import SurfaceEnhancementInspector from "./SurfaceEnhancementInspector";
 import UnitInput from "./UnitInput";
 import WallLayersEditor from "./WallLayersEditor";
 
@@ -442,6 +443,12 @@ const Inspector = () => {
 								<option value="compressible">Forced Compressible</option>
 							</select>
 						</div>
+						<SurfaceEnhancementInspector
+							surface={selectedNode.data.surface || { type: "smooth" }}
+							onChange={(surface) =>
+								updateNodeData(selectedNode.id, { surface })
+							}
+						/>
 						<InitialGuessEditor node={selectedNode} />
 					</>
 				)}
@@ -615,6 +622,12 @@ const Inspector = () => {
 								className="p-2 border rounded"
 							/>
 						</div>
+						<SurfaceEnhancementInspector
+							surface={selectedNode.data.surface || { type: "smooth" }}
+							onChange={(surface) =>
+								updateNodeData(selectedNode.id, { surface })
+							}
+						/>
 
 						<InitialGuessEditor node={selectedNode} />
 					</div>

@@ -13,20 +13,65 @@ from combaero.network import (
     ThermalWall,
     WallConnection,
     WallLayer,
+    SmoothModel,
+    RibbedModel,
+    DimpledModel,
+    PinFinModel,
+    ImpingementModel,
 )
 
 from .schemas import (
     CombustorData,
     CompositionData,
+    DimpledModelData,
+    ImpingementModelData,
     MassBoundaryData,
     MomentumChamberData,
     NetworkGraphSchema,
     OrificeData,
+    PinFinModelData,
     PipeData,
     PlenumData,
     PressureBoundaryData,
+    RibbedModelData,
+    SmoothModelData,
     ThermalWallData,
 )
+
+
+def map_surface_model(data):
+    """Maps UI SurfaceModelData to combaero.network models."""
+    if isinstance(data, SmoothModelData) or data.type == "smooth":
+        return SmoothModel()
+    elif isinstance(data, RibbedModelData) or data.type == "ribbed":
+        return RibbedModel(
+            e_D=data.e_D,
+            pitch_to_height=data.pitch_to_height,
+            alpha_deg=data.alpha_deg,
+        )
+    elif isinstance(data, DimpledModelData) or data.type == "dimpled":
+        return DimpledModel(
+            d_Dh=data.d_Dh,
+            h_d=data.h_d,
+            S_d=data.S_d,
+        )
+    elif isinstance(data, PinFinModelData) or data.type == "pin_fin":
+        return PinFinModel(
+            pin_diameter=data.pin_diameter,
+            S_D=data.S_D,
+            X_D=data.X_D,
+            N_rows=data.N_rows,
+            is_staggered=data.is_staggered,
+        )
+    elif isinstance(data, ImpingementModelData) or data.type == "impingement":
+        return ImpingementModel(
+            d_jet=data.d_jet,
+            z_D=data.z_D,
+            x_D=data.x_D,
+            y_D=data.y_D,
+            A_target=data.A_target,
+        )
+    return SmoothModel()
 
 
 def resolve_composition(comp: CompositionData, T: float, P: float) -> list[float]:
@@ -100,6 +145,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 area=data.area,
                 surface=ConvectiveSurface(
                     area=data.area,
+                    model=map_surface_model(data.surface),
                     Nu_multiplier=data.Nu_multiplier,
                     # MomentumChamberNode is modeled as lossless for pressure-flow,
                     # so friction multiplier is fixed to 1.0 by design.
@@ -176,6 +222,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 roughness=data.roughness,
                 surface=ConvectiveSurface(
                     area=conv_area,
+                    model=map_surface_model(data.surface),
                     Nu_multiplier=data.Nu_multiplier,
                     f_multiplier=data.f_multiplier,
                 ),
