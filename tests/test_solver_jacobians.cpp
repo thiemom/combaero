@@ -206,25 +206,25 @@ TEST(SolverJacobianTest, PipeDerivatives) {
     double roughness = 1e-5;
     std::string model = "haaland";
 
-    PipeResult res = pipe_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up, Y, P_static_down, L, D, roughness, model);
+    PipeResult res = channel_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up, Y, P_static_down, L, D, roughness, model);
 
     double eps_m = 1e-4;
-    auto res_m_p = pipe_residuals_and_jacobian(m_dot + eps_m, P_total_up, P_static_up, T_up, Y, P_static_down, L, D, roughness, model);
-    auto res_m_m = pipe_residuals_and_jacobian(m_dot - eps_m, P_total_up, P_static_up, T_up, Y, P_static_down, L, D, roughness, model);
+    auto res_m_p = channel_residuals_and_jacobian(m_dot + eps_m, P_total_up, P_static_up, T_up, Y, P_static_down, L, D, roughness, model);
+    auto res_m_m = channel_residuals_and_jacobian(m_dot - eps_m, P_total_up, P_static_up, T_up, Y, P_static_down, L, D, roughness, model);
     double fd_dmdot = (res_m_p.dP_calc - res_m_m.dP_calc) / (2.0 * eps_m);
     report_jacobian_difference("PipeDerivatives", "d_dP_d_mdot", res.d_dP_d_mdot, fd_dmdot);
     EXPECT_NEAR(res.d_dP_d_mdot, fd_dmdot, std::abs(fd_dmdot) * 1e-8);
 
     double eps_P = 1.0;
-    auto res_P_p = pipe_residuals_and_jacobian(m_dot, P_total_up, P_static_up + eps_P, T_up, Y, P_static_down, L, D, roughness, model);
-    auto res_P_m = pipe_residuals_and_jacobian(m_dot, P_total_up, P_static_up - eps_P, T_up, Y, P_static_down, L, D, roughness, model);
+    auto res_P_p = channel_residuals_and_jacobian(m_dot, P_total_up, P_static_up + eps_P, T_up, Y, P_static_down, L, D, roughness, model);
+    auto res_P_m = channel_residuals_and_jacobian(m_dot, P_total_up, P_static_up - eps_P, T_up, Y, P_static_down, L, D, roughness, model);
     double fd_dP_static = (res_P_p.dP_calc - res_P_m.dP_calc) / (2.0 * eps_P);
     report_jacobian_difference("PipeDerivatives", "d_dP_dP_static_up", res.d_dP_dP_static_up, fd_dP_static);
     EXPECT_NEAR(res.d_dP_dP_static_up, fd_dP_static, std::abs(fd_dP_static) * 1e-8);
 
     double eps_T = 0.1;
-    auto res_T_p = pipe_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up + eps_T, Y, P_static_down, L, D, roughness, model);
-    auto res_T_m = pipe_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up - eps_T, Y, P_static_down, L, D, roughness, model);
+    auto res_T_p = channel_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up + eps_T, Y, P_static_down, L, D, roughness, model);
+    auto res_T_m = channel_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up - eps_T, Y, P_static_down, L, D, roughness, model);
     double fd_dT = (res_T_p.dP_calc - res_T_m.dP_calc) / (2.0 * eps_T);
     report_jacobian_difference("PipeDerivatives", "d_dP_dT_up", res.d_dP_dT_up, fd_dT);
     EXPECT_NEAR(res.d_dP_dT_up, fd_dT, std::abs(fd_dT) * 1e-8);
@@ -233,7 +233,7 @@ TEST(SolverJacobianTest, PipeDerivatives) {
     for (size_t i=0; i<ns; ++i) {
         std::vector<double> Y_p = Y;
         Y_p[i] += eps_Y;
-        auto res_Y_p = pipe_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up, Y_p, P_static_down, L, D, roughness, model);
+        auto res_Y_p = channel_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up, Y_p, P_static_down, L, D, roughness, model);
         double fd_dYi = (res_Y_p.dP_calc - res.dP_calc) / eps_Y;
         EXPECT_NEAR(res.d_dP_dY_up[i], fd_dYi, std::abs(fd_dYi) * 1e-2 + 1e-8);
     }
@@ -302,31 +302,31 @@ TEST(SolverJacobianTest, PipeCompressibleDerivatives) {
     double roughness = 1e-4;
     std::string model = "haaland";
 
-    PipeResult res = pipe_compressible_residuals_and_jacobian(
+    PipeResult res = channel_compressible_residuals_and_jacobian(
         m_dot, P_total_up, T_up, Y, P_static_down, L, D, roughness, model);
 
     double eps_m = 1e-5;
-    auto res_m_p = pipe_compressible_residuals_and_jacobian(
+    auto res_m_p = channel_compressible_residuals_and_jacobian(
         m_dot + eps_m, P_total_up, T_up, Y, P_static_down, L, D, roughness, model);
-    auto res_m_m = pipe_compressible_residuals_and_jacobian(
+    auto res_m_m = channel_compressible_residuals_and_jacobian(
         m_dot - eps_m, P_total_up, T_up, Y, P_static_down, L, D, roughness, model);
     double fd_dmdot = (res_m_p.dP_calc - res_m_m.dP_calc) / (2.0 * eps_m);
     report_jacobian_difference("PipeCompressibleDerivatives", "d_dP_d_mdot", res.d_dP_d_mdot, fd_dmdot);
     EXPECT_NEAR(res.d_dP_d_mdot, fd_dmdot, std::abs(fd_dmdot) * 1e-8 + 1e-12);
 
     double eps_P = 1.0;
-    auto res_P_p = pipe_compressible_residuals_and_jacobian(
+    auto res_P_p = channel_compressible_residuals_and_jacobian(
         m_dot, P_total_up + eps_P, T_up, Y, P_static_down, L, D, roughness, model);
-    auto res_P_m = pipe_compressible_residuals_and_jacobian(
+    auto res_P_m = channel_compressible_residuals_and_jacobian(
         m_dot, P_total_up - eps_P, T_up, Y, P_static_down, L, D, roughness, model);
     double fd_dP = (res_P_p.dP_calc - res_P_m.dP_calc) / (2.0 * eps_P);
     report_jacobian_difference("PipeCompressibleDerivatives", "d_dP_dP_static_up", res.d_dP_dP_static_up, fd_dP);
     EXPECT_NEAR(res.d_dP_dP_static_up, fd_dP, std::abs(fd_dP) * 1e-8 + 1e-12);
 
     double eps_T = 1e-3;
-    auto res_T_p = pipe_compressible_residuals_and_jacobian(
+    auto res_T_p = channel_compressible_residuals_and_jacobian(
         m_dot, P_total_up, T_up + eps_T, Y, P_static_down, L, D, roughness, model);
-    auto res_T_m = pipe_compressible_residuals_and_jacobian(
+    auto res_T_m = channel_compressible_residuals_and_jacobian(
         m_dot, P_total_up, T_up - eps_T, Y, P_static_down, L, D, roughness, model);
     double fd_dT = (res_T_p.dP_calc - res_T_m.dP_calc) / (2.0 * eps_T);
     report_jacobian_difference("PipeCompressibleDerivatives", "d_dP_dT_up", res.d_dP_dT_up, fd_dT);
@@ -577,32 +577,32 @@ TEST(SolverJacobianTest, PipeCompressibleMdotDerivatives) {
     double roughness = 1e-4;
     std::string model = "haaland";
 
-    auto [dP, ddP_dP_in, ddP_dT_in, ddP_du_in] = pipe_compressible_mdot_and_jacobian(
+    auto [dP, ddP_dP_in, ddP_dT_in, ddP_du_in] = channel_compressible_mdot_and_jacobian(
         T_in, P_in, u_in, X, L, D, roughness, model);
 
     // Central FD for ddP/dT_in
     double eps_T = 1e-3;
-    auto [dP_T_plus, dummy1, dummy2, dummy3] = pipe_compressible_mdot_and_jacobian(
+    auto [dP_T_plus, dummy1, dummy2, dummy3] = channel_compressible_mdot_and_jacobian(
         T_in + eps_T, P_in, u_in, X, L, D, roughness, model);
-    auto [dP_T_minus, dummy4, dummy5, dummy6] = pipe_compressible_mdot_and_jacobian(
+    auto [dP_T_minus, dummy4, dummy5, dummy6] = channel_compressible_mdot_and_jacobian(
         T_in - eps_T, P_in, u_in, X, L, D, roughness, model);
     double fd_dT_in = (dP_T_plus - dP_T_minus) / (2.0 * eps_T);
     EXPECT_NEAR(ddP_dT_in, fd_dT_in, std::abs(fd_dT_in) * 1e-6 + 1e-8);
 
     // Central FD for ddP/dP_in
     double eps_P = 1.0;
-    auto [dP_P_plus, dummy19, dummy20, dummy21] = pipe_compressible_mdot_and_jacobian(
+    auto [dP_P_plus, dummy19, dummy20, dummy21] = channel_compressible_mdot_and_jacobian(
         T_in, P_in + eps_P, u_in, X, L, D, roughness, model);
-    auto [dP_P_minus, dummy22, dummy23, dummy24] = pipe_compressible_mdot_and_jacobian(
+    auto [dP_P_minus, dummy22, dummy23, dummy24] = channel_compressible_mdot_and_jacobian(
         T_in, P_in - eps_P, u_in, X, L, D, roughness, model);
     double fd_dP_in = (dP_P_plus - dP_P_minus) / (2.0 * eps_P);
     EXPECT_NEAR(ddP_dP_in, fd_dP_in, std::abs(fd_dP_in) * 1e-6 + 1e-10);
 
     // Central FD for ddP/du_in
     double eps_u = 1e-2;
-    auto [dP_u_plus, dummy25, dummy26, dummy27] = pipe_compressible_mdot_and_jacobian(
+    auto [dP_u_plus, dummy25, dummy26, dummy27] = channel_compressible_mdot_and_jacobian(
         T_in, P_in, u_in + eps_u, X, L, D, roughness, model);
-    auto [dP_u_minus, dummy28, dummy29, dummy30] = pipe_compressible_mdot_and_jacobian(
+    auto [dP_u_minus, dummy28, dummy29, dummy30] = channel_compressible_mdot_and_jacobian(
         T_in, P_in, u_in - eps_u, X, L, D, roughness, model);
     double fd_du_in = (dP_u_plus - dP_u_minus) / (2.0 * eps_u);
     EXPECT_NEAR(ddP_du_in, fd_du_in, std::abs(fd_du_in) * 1e-6 + 1e-7);

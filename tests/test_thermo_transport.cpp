@@ -2756,7 +2756,7 @@ TEST_F(ThermoTransportTest, FannoFlowBasic) {
     double D = 0.05;          // m (5 cm pipe)
     double f = 0.02;          // Darcy friction factor
 
-    auto sol = fanno_pipe(T_in, P_in, u_in, L, D, f, X_air);
+    auto sol = fanno_channel(T_in, P_in, u_in, L, D, f, X_air);
 
     // Pressure should drop due to friction
     EXPECT_LT(sol.outlet.P, P_in);
@@ -2792,7 +2792,7 @@ TEST_F(ThermoTransportTest, FannoFlowEnergyConservation) {
     double D = 0.1;
     double f = 0.015;
 
-    auto sol = fanno_pipe(T_in, P_in, u_in, L, D, f, X_air, 200, true);
+    auto sol = fanno_channel(T_in, P_in, u_in, L, D, f, X_air, 200, true);
 
     // Stagnation enthalpy should be conserved
     // Note: State.h() returns J/kg (mass-specific), not J/mol
@@ -2824,7 +2824,7 @@ TEST_F(ThermoTransportTest, FannoFlowEnergyConvergence) {
     double f = 0.015;
 
     // Test with 200 steps (coarse)
-    auto sol_200 = fanno_pipe(T_in, P_in, u_in, L, D, f, X_air, 200, false);
+    auto sol_200 = fanno_channel(T_in, P_in, u_in, L, D, f, X_air, 200, false);
     double h_in = sol_200.inlet.h();  // J/kg
     double h0_in = h_in + 0.5 * u_in * u_in;
     double A = M_PI * D * D / 4.0;
@@ -2834,7 +2834,7 @@ TEST_F(ThermoTransportTest, FannoFlowEnergyConvergence) {
     double error_200 = std::abs(h0_out_200 - h0_in) / h0_in;
 
     // Test with 2000 steps (fine)
-    auto sol_2000 = fanno_pipe(T_in, P_in, u_in, L, D, f, X_air, 2000, false);
+    auto sol_2000 = fanno_channel(T_in, P_in, u_in, L, D, f, X_air, 2000, false);
     double u_out_2000 = sol_2000.mdot / (sol_2000.outlet.rho() * A);
     double h_out_2000 = sol_2000.outlet.h();  // J/kg
     double h0_out_2000 = h_out_2000 + 0.5 * u_out_2000 * u_out_2000;
@@ -2870,7 +2870,7 @@ TEST_F(ThermoTransportTest, FannoFlowProfile) {
     double D = 0.05;
     double f = 0.02;
 
-    auto sol = fanno_pipe(T_in, P_in, u_in, L, D, f, X_air, 50, true);
+    auto sol = fanno_channel(T_in, P_in, u_in, L, D, f, X_air, 50, true);
 
     // Profile should have entries
     EXPECT_GT(sol.profile.size(), 0u);
@@ -2899,19 +2899,19 @@ TEST_F(ThermoTransportTest, FannoFlowInvalidInputs) {
     X_air[species_index_from_name("N2")] = 0.79;
 
     // Invalid T_in
-    EXPECT_THROW(fanno_pipe(0.0, 200000.0, 50.0, 10.0, 0.05, 0.02, X_air), std::invalid_argument);
+    EXPECT_THROW(fanno_channel(0.0, 200000.0, 50.0, 10.0, 0.05, 0.02, X_air), std::invalid_argument);
 
     // Invalid P_in
-    EXPECT_THROW(fanno_pipe(400.0, 0.0, 50.0, 10.0, 0.05, 0.02, X_air), std::invalid_argument);
+    EXPECT_THROW(fanno_channel(400.0, 0.0, 50.0, 10.0, 0.05, 0.02, X_air), std::invalid_argument);
 
     // Invalid L
-    EXPECT_THROW(fanno_pipe(400.0, 200000.0, 50.0, 0.0, 0.05, 0.02, X_air), std::invalid_argument);
+    EXPECT_THROW(fanno_channel(400.0, 200000.0, 50.0, 0.0, 0.05, 0.02, X_air), std::invalid_argument);
 
     // Invalid D
-    EXPECT_THROW(fanno_pipe(400.0, 200000.0, 50.0, 10.0, 0.0, 0.02, X_air), std::invalid_argument);
+    EXPECT_THROW(fanno_channel(400.0, 200000.0, 50.0, 10.0, 0.0, 0.02, X_air), std::invalid_argument);
 
     // Invalid f (negative)
-    EXPECT_THROW(fanno_pipe(400.0, 200000.0, 50.0, 10.0, 0.05, -0.02, X_air), std::invalid_argument);
+    EXPECT_THROW(fanno_channel(400.0, 200000.0, 50.0, 10.0, 0.05, -0.02, X_air), std::invalid_argument);
 }
 
 // =============================================================================
@@ -3322,8 +3322,8 @@ TEST(HeatTransferTest, StateBased) {
     double velocity = 10.0;  // m/s
     double diameter = 0.05;  // m
 
-    double Nu = nusselt_pipe(s, velocity, diameter);
-    double h = htc_pipe(s, velocity, diameter);
+    double Nu = nusselt_circular_channel(s, velocity, diameter);
+    double h = htc_circular_channel(s, velocity, diameter);
 
     // Check reasonable values
     EXPECT_GT(Nu, 10);
@@ -3405,7 +3405,7 @@ TEST(HeatTransferTest, OverallHtcWithWall) {
     double t_wall = 0.003;    // 3 mm
     double k_wall = 50.0;     // W/(m·K), steel
 
-    double U = overall_htc_tube(h_inner, h_outer, t_wall, k_wall);
+    double U = overall_htc_wall(h_inner, h_outer, t_wall, k_wall);
 
     // 1/U = 1/500 + 0.003/50 + 1/50 = 0.002 + 0.00006 + 0.02 = 0.02206
     // U ≈ 45.3 W/(m²·K)
@@ -3419,8 +3419,8 @@ TEST(HeatTransferTest, OverallHtcWithFouling) {
     double k_wall = 50.0;
     double R_fouling = 0.0002;  // m²·K/W, typical fouling
 
-    double U_clean = overall_htc_tube(h_inner, h_outer, t_wall, k_wall);
-    double U_fouled = overall_htc_tube(h_inner, h_outer, t_wall, k_wall, R_fouling);
+    double U_clean = overall_htc_wall(h_inner, h_outer, t_wall, k_wall);
+    double U_fouled = overall_htc_wall(h_inner, h_outer, t_wall, k_wall, R_fouling);
 
     // Fouling should reduce U
     EXPECT_LT(U_fouled, U_clean);

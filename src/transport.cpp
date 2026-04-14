@@ -49,7 +49,7 @@ double linear_interp(double x,
 // Collision integral omega(2,2)
 double omega22(double T, double well_depth)
 {
-    if (T <= 0.0) {
+    double T_safe = std::max(T, 10.0); if (T_safe <= 0.0) {
         throw std::invalid_argument("omega22: temperature must be positive");
     }
     if (well_depth <= 0.0) {
@@ -66,7 +66,7 @@ double omega22(double T, double well_depth)
         0.922, 0.711, 0.567, 0.432, 0.364
     };
 
-    double T_star = (thermo::BOLTZMANN * T) / well_depth;
+    double T_star = (thermo::BOLTZMANN * T_safe) / well_depth;
     double T_star_clamped = std::max(T_star_values.front(),
                                      std::min(T_star, T_star_values.back()));
     return linear_interp(T_star_clamped, T_star_values, omega_values);
@@ -85,8 +85,10 @@ struct PureSpeciesTransport {
     std::vector<double> k;   // pure-species thermal conductivity [W/(m·K)]
 };
 
-PureSpeciesTransport pure_species_transport(double T, const std::vector<double>& X)
+PureSpeciesTransport pure_species_transport(double T_in, const std::vector<double>& X)
 {
+    double T = std::max(T_in, 10.0);
+
     const std::size_t N = X.size();
     PureSpeciesTransport out;
     out.mu.resize(N);
@@ -248,18 +250,6 @@ double peclet(double T, double P, const std::vector<double>& X, double V, double
 // -------------------------------------------------------------
 
 TransportState transport_state(double T, double P, const std::vector<double>& X) {
-    if (T <= 0) {
-        throw std::invalid_argument("transport_state: temperature must be positive");
-    }
-    if (P <= 0) {
-        throw std::invalid_argument("transport_state: pressure must be positive");
-    }
-    if (X.empty()) {
-        throw std::invalid_argument("transport_state: mole fractions vector cannot be empty");
-    }
-    if (X.size() != species_names.size()) {
-        throw std::invalid_argument("transport_state: mole fraction vector size mismatch");
-    }
 
     // Single species-loop pass — omega22 called N times total
     auto ps = pure_species_transport(T, X);

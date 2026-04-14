@@ -153,7 +153,7 @@ int main()
     const double D     = 0.02;    // m  pipe diameter
     const double rough = 5.0e-5;  // m  wall roughness (commercial steel)
 
-    FannoSolution fanno = fanno_pipe_rough(T_in, P_in, u_in, L, D, rough, X_air,
+    FannoSolution fanno = fanno_channel_rough(T_in, P_in, u_in, L, D, rough, X_air,
                                            "haaland", 200, true);
 
     std::cout << "Fanno pipe (L=" << L << " m, D=" << D * 1e3 << " mm, rough="

@@ -15,6 +15,8 @@
 #include <string>
 #include <tuple>
 
+
+
 namespace combaero {
 
 // -------------------------------------------------------------
@@ -254,11 +256,11 @@ double overall_htc(const std::vector<double> &h_values,
 }
 
 double overall_htc_wall(double h_inner, double h_outer, double t_wall,
-                        double k_wall) {
+                        double k_wall, double R_fouling) {
   if (k_wall <= 0) {
     throw std::invalid_argument("overall_htc_wall: k_wall must be positive");
   }
-  return overall_htc({h_inner, h_outer}, {t_wall / k_wall});
+  return overall_htc_wall(h_inner, h_outer, std::vector<double>{t_wall / k_wall}, R_fouling);
 }
 
 double overall_htc_wall(double h_inner, double h_outer,
@@ -1237,9 +1239,9 @@ ChannelResult channel_pin_fin(double T, double P, const std::vector<double> &X,
 
     // Use exponents from Metzger correlation
     double m = is_staggered ? 0.69 : 0.675;
-    double dNu_dRe = m * Nu / Re_d;
-    double dNu_dPr = 0.4 * Nu / Pr;
-    double df_dRe = -0.25 * f_pin / Re_d;
+    double dNu_dRe = (Re_d > 1e-6) ? m * Nu / Re_d : 0.0;
+    double dNu_dPr = (Pr > 1e-6) ? 0.4 * Nu / Pr : 0.0;
+    double df_dRe = (Re_d > 1e-6) ? -0.25 * f_pin / Re_d : 0.0;
 
     result.dh_dmdot = (k / pin_diameter) * dNu_dRe * dRe_dmdot;
     // Full chain rule: dh/dT = (1/D) * [k * (dNu/dRe * dRe/dT + dNu/dPr * dPr/dT) + Nu * dk/dT]
@@ -1311,7 +1313,7 @@ ChannelResult channel_impingement(double T, double P,
   }
 
   // Fluid properties and their derivatives
-  auto [rho, drho_dT, drho_dP] = solver::density_and_jacobians(T, P, X);
+  auto [rho_val, drho_dT, drho_dP] = solver::density_and_jacobians(T, P, X); const double rho = std::max(rho_val, 1e-6);
   auto [mu, dmu_dT, dmu_dP] = solver::viscosity_and_jacobians(T, P, X);
   double k = thermal_conductivity(T, P, X);
   double Pr = prandtl(T, P, X);
@@ -1341,6 +1343,7 @@ ChannelResult channel_impingement(double T, double P,
   const bool turbulent_flow = true;
   double T_aw = T_adiabatic_wall(T, v_jet, T, P, X, turbulent_flow);
 
+
   ChannelResult result = make_channel_result(h, Nu, Re_jet, Pr, f, dP, M, T_aw, T_wall);
 
   // Compute Jacobians (simplified - captures dominant Re dependence)
@@ -1361,22 +1364,22 @@ ChannelResult channel_impingement(double T, double P,
     double dRe_dT = -Re_jet * dmu_dT / mu;
 
     // Use exponents from Florschuetz (1981) / Martin (1977)
-    double dNu_dRe = 0.55 * Nu / Re_jet;
-    double dNu_dPr = 0.4 * Nu / Pr;  // Typical Pr exponent for impingement
+    double dNu_dRe = (Re_jet > 1e-6) ? 0.55 * Nu / Re_jet : 0.0;
+    double dNu_dPr = (Pr > 1e-6) ? 0.4 * Nu / Pr : 0.0;  // Typical Pr exponent for impingement
 
     result.dh_dmdot = (k / d_jet) * dNu_dRe * dRe_dmdot;
     // Full chain rule: dh/dT = (1/D) * [k * (dNu/dRe * dRe/dT + dNu/dPr * dPr/dT) + Nu * dk/dT]
     result.dh_dT = (1.0 / d_jet) * (k * (dNu_dRe * dRe_dT + dNu_dPr * dPr_dT) + Nu * dk_dT);
 
     // ddP/dmdot: dP = f * rho * (mdot/(rho*A_jet))^2 / 2 = f * mdot^2 / (2*rho*A_jet^2)
-    result.ddP_dmdot = f * mdot_jet / (rho * A_jet * A_jet);
+    result.ddP_dmdot = f * mdot_jet / (std::max(rho, 1e-6) * A_jet * A_jet);
     // Fix: remove spurious /rho in ddP/dT
     result.ddP_dT = -f * v_jet * v_jet / 2.0 * drho_dT;
 
     // T_aw derivatives — always computed so Python relay can use them
     double cp_mass_val = cp_mass(T, X);
     double r = std::cbrt(Pr);
-    result.dT_aw_dmdot = r * v_jet / (cp_mass_val * rho * A_jet);
+    result.dT_aw_dmdot = r * v_jet / (cp_mass_val * std::max(rho, 1e-6) * A_jet);
 
     const double eps_T_aw = 0.5;
     double rho_plus = density(T + eps_T_aw, P, X);
@@ -1411,23 +1414,25 @@ WallCouplingResult wall_coupling_and_jacobian(
   WallCouplingResult result;
 
   // Overall HTC: U = 1 / (1/h_a + t/k + 1/h_b)
-  double R_total = 1.0 / h_a + t_over_k + 1.0 / h_b;
+  double R_a = (h_a > 1e-10) ? 1.0 / h_a : 1e15;
+  double R_b = (h_b > 1e-10) ? 1.0 / h_b : 1e15;
+  double R_total = R_a + t_over_k + R_b;
   double U = 1.0 / R_total;
 
   // Heat transfer rate: Q = U * A * (T_aw_a - T_aw_b)
   double dT = T_aw_a - T_aw_b;
   result.Q = U * A * dT;
 
-  // Wall temperature: hot-side surface temperature [K]
-  if (T_aw_a >= T_aw_b) {
-    result.T_wall = T_aw_a - result.Q / (h_a * A);
-  } else {
-    result.T_wall = T_aw_b - (-result.Q) / (h_b * A);
-  }
+  // Wall temperature on side A (surface temperature)
+  // Safely handled via resistance ratio to avoid 0/0
+  result.T_wall = T_aw_a - dT * (R_a / R_total);
 
-  double U2 = U * U;
-  result.dQ_dh_a = (U2 / (h_a * h_a)) * A * dT;
-  result.dQ_dh_b = (U2 / (h_b * h_b)) * A * dT;
+  // Jacobians: dQ/dh = A * dT * dU/dh
+  // dU/dh_a = 1 / (R_total * h_a)^2
+  double factor_a = 1.0 / (1.0 + (R_total - R_a) * h_a);
+  double factor_b = 1.0 / (1.0 + (R_total - R_b) * h_b);
+  result.dQ_dh_a = (factor_a * factor_a) * A * dT;
+  result.dQ_dh_b = (factor_b * factor_b) * A * dT;
   result.dQ_dT_aw_a = U * A;
   result.dQ_dT_aw_b = -U * A;
 
@@ -1448,21 +1453,26 @@ WallCouplingResult wall_coupling_and_jacobian(
     R_wall += tk;
   }
 
-  // Overall HTC: U = 1 / (1/h_a + R_wall + 1/h_b)
-  double R_total = 1.0 / h_a + R_wall + 1.0 / h_b;
+  double R_a = (h_a > 1e-10) ? 1.0 / h_a : 1e15;
+  double R_b = (h_b > 1e-10) ? 1.0 / h_b : 1e15;
+  double R_total = R_a + R_wall + R_b;
   double U = 1.0 / R_total;
 
   // Heat transfer rate: Q = U * A * (T_aw_a - T_aw_b)
   double dT = T_aw_a - T_aw_b;
   result.Q = U * A * dT;
 
-  // T_wall on side A (hot-side surface)
-  result.T_wall = T_aw_a - (result.Q / (h_a * A));
+  // T_wall on side A (surface temperature)
+  result.T_wall = T_aw_a - dT * (R_a / R_total);
 
-  double U2 = U * U;
-  result.dQ_dh_a = (U2 / (h_a * h_a)) * A * dT;
-  result.dQ_dh_b = (U2 / (h_b * h_b)) * A * dT;
+  // Jacobians
+  double factor_a = 1.0 / (1.0 + (R_total - R_a) * h_a);
+  double factor_b = 1.0 / (1.0 + (R_total - R_b) * h_b);
   result.dQ_dT_aw_a = U * A;
+
+  result.dQ_dh_a = (factor_a * factor_a) * A * dT;
+  result.dQ_dh_b = (factor_b * factor_b) * A * dT;
+
   result.dQ_dT_aw_b = -U * A;
 
   return result;

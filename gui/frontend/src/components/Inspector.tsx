@@ -652,7 +652,7 @@ const Inspector = () => {
 										const meta = QUANTITY_CATALOGUE[key];
 										return (
 											<div key={key} className="flex flex-col">
-												<span className="text-stone-400 text-[9px] uppercase font-bold">
+												<span className="text-stone-400 text-[9px] font-bold">
 													{meta?.label || key}
 												</span>
 												<span className="font-mono text-xs font-bold whitespace-nowrap">
@@ -763,7 +763,7 @@ const Inspector = () => {
 
 											return (
 												<div key={key} className="flex flex-col">
-													<span className="text-stone-400 text-[9px] uppercase font-bold">
+													<span className="text-stone-400 text-[9px] font-bold">
 														{meta?.label || key}
 													</span>
 													<span className="font-mono text-xs font-bold whitespace-nowrap">

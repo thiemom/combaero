@@ -286,6 +286,14 @@ channel_flow_rough(double T, double P, const std::vector<double> &X, double u,
 
 inline IncompressibleFlowSolution
 pipe_flow_rough(double T, double P, const std::vector<double> &X, double u,
+                double L, double D, double roughness = 0.0,
+                const std::string &correlation = "haaland",
+                std::size_t n_steps = 100, bool store_profile = false) {
+  return channel_flow_rough(T, P, X, u, L, D, roughness, correlation, n_steps, store_profile);
+}
+
+inline IncompressibleFlowSolution
+pipe_flow_rough(double T, double P, const std::vector<double> &X, double u,
                 double L, double D, double roughness,
                 const std::string &correlation,
                 const IncompressibleKLossFn &k_loss_fn,

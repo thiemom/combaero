@@ -243,7 +243,7 @@ class ConvectiveSurface:
             # Impingement requires mdot_jet (flow PER JET).
             # The total mass flow in the channel is rho * velocity * A_channel.
             # The number of jets is A_target / (x * y), where x, y are pitches.
-            rho = cb.density(T, P, X)
+            rho, _ = _safe_rho(cb.density(T, P, X))
             mdot_total = rho * velocity * (math.pi / 4 * diameter**2)
 
             x = self.model.x_D * self.model.d_jet

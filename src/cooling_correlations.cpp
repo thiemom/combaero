@@ -130,8 +130,9 @@ double rib_enhancement_factor_high_re(double e_D, double pitch_to_height,
 
     double alpha_rad = alpha_deg * M_PI / 180.0;
     double F_alpha = 1.0 + 0.15 * std::sin(2.0 * alpha_rad);
+    double abs_Re = std::abs(Re);
     double enhancement = 54.9
-        * std::pow(Re, -0.1755)
+        * std::pow(std::max(abs_Re, 1.0), -0.1755)
         * std::pow(e_D, 0.38)
         * std::pow(pitch_to_height, -0.11)
         * F_alpha;
@@ -197,7 +198,7 @@ double impingement_nusselt(double Re_jet, double Pr, double z_D,
 
     if (!is_array) {
         // Single jet correlation (Martin 1977)
-        double Nu = 0.42 * std::pow(Re_jet, 0.55) * std::pow(Pr, 0.4) *
+        double Nu = 0.42 * std::pow(std::abs(Re_jet), 0.55) * std::pow(Pr, 0.4) *
                     std::pow(z_D, -0.05);
         return Nu;
     } else {
@@ -211,7 +212,7 @@ double impingement_nusselt(double Re_jet, double Pr, double z_D,
         double f_crossflow = 1.0 / (1.0 + 0.6 * std::pow(G / z_D, 0.7));
 
         // Base Nusselt number (lower than single jet)
-        double Nu_base = 0.38 * std::pow(Re_jet, 0.55) * std::pow(Pr, 0.4);
+        double Nu_base = 0.38 * std::pow(std::abs(Re_jet), 0.55) * std::pow(Pr, 0.4);
 
         // Height correction
         double f_height = std::pow(z_D / 6.0, -0.05);
@@ -527,7 +528,7 @@ double pin_fin_nusselt(
     }
 
     // Base Nusselt number
-    double Nu_base = C * std::pow(Re_d, m) * std::pow(Pr, 0.4);
+    double Nu_base = C * std::pow(std::abs(Re_d), m) * std::pow(Pr, 0.4);
 
     // Length effect: longer pins have lower average Nu due to boundary layer growth
     double f_length = std::pow(L_D, -0.11);
@@ -553,7 +554,7 @@ double pin_fin_friction(double Re_d, bool is_staggered) {
     // Metzger/Simoneau: f_pin = C_f * Re_d^(-0.25)
     // C_f = 0.317 staggered, 0.228 inline
     double C_f = is_staggered ? 0.317 : 0.228;
-    return C_f * std::pow(Re_d, -0.25);
+    return C_f * std::pow(std::max(std::abs(Re_d), 1.0), -0.25);
 }
 
 // -------------------------------------------------------------

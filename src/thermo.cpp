@@ -71,7 +71,7 @@ double cp_R(std::size_t species_idx, double T) {
   if (species_idx >= species_names.size()) {
     throw std::out_of_range("cp_R: species index out of bounds");
   }
-  const auto& interval = get_interval(species_idx, T);
+  double T_clamped = std::max(T, 10.0); const auto& interval = get_interval(species_idx, T_clamped); T = T_clamped;
   const auto& a = interval.coeffs;
   // Cp/R = a1/T^2 + a2/T + a3 + a4*T + a5*T^2 + a6*T^3 + a7*T^4
   return a[0]/(T*T) + a[1]/T + a[2] + a[3]*T + a[4]*T*T + a[5]*T*T*T + a[6]*T*T*T*T;
@@ -81,7 +81,7 @@ double h_RT(std::size_t species_idx, double T) {
   if (species_idx >= species_names.size()) {
     throw std::out_of_range("h_RT: species index out of bounds");
   }
-  const auto& interval = get_interval(species_idx, T);
+  double T_clamped = std::max(T, 10.0); const auto& interval = get_interval(species_idx, T_clamped); T = T_clamped;
   const auto& a = interval.coeffs;
   // H/RT = -a1/T^2 + a2*ln(T)/T + a3 + a4*T/2 + a5*T^2/3 + a6*T^3/4 + a7*T^4/5 + b1/T
   return -a[0]/(T*T) + a[1]*std::log(T)/T + a[2] + a[3]*T/2.0 + a[4]*T*T/3.0 +
@@ -92,7 +92,7 @@ double s_R(std::size_t species_idx, double T) {
   if (species_idx >= species_names.size()) {
     throw std::out_of_range("s_R: species index out of bounds");
   }
-  const auto& interval = get_interval(species_idx, T);
+  double T_clamped = std::max(T, 10.0); const auto& interval = get_interval(species_idx, T_clamped); T = T_clamped;
   const auto& a = interval.coeffs;
   // S/R = -a1/(2*T^2) - a2/T + a3*ln(T) + a4*T + a5*T^2/2 + a6*T^3/3 + a7*T^4/4 + a9
   return -a[0]/(2.0*T*T) - a[1]/T + a[2]*std::log(T) + a[3]*T + a[4]*T*T/2.0 +

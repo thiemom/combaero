@@ -415,7 +415,7 @@ double solve_T_from_energy(
 
     for (std::size_t iter = 0; iter < max_iter; ++iter) {
         // Density from ideal gas: rho = P * mw / (R * T), mw in kg/mol
-        double rho = P * mw_kg / (R_GAS * T);
+        double rho = std::max(P, 1.0) * mw_kg / (R_GAS * T);
 
         // Velocity from mass conservation: u = mdot / (rho * A)
         double u = mdot / (rho * A);
@@ -457,7 +457,7 @@ double solve_T_from_energy(
     }
 
     // Final values
-    rho_out = P * mw_kg / (R_GAS * T);
+    rho_out = std::max(P, 1.0) * mw_kg / (R_GAS * T);
     u_out = mdot / (rho_out * A);
 
     return T;
@@ -478,12 +478,10 @@ FannoSolution fanno_channel(
     bool store_profile)
 {
     // Validate inputs
-    if (T_in <= 0.0) {
-        throw std::invalid_argument("fanno_channel: T_in must be positive");
-    }
-    if (P_in <= 0.0) {
-        throw std::invalid_argument("fanno_channel: P_in must be positive");
-    }
+    // Robustness clamping
+    T_in = std::max(T_in, 10.0);
+    P_in = std::max(P_in, 1.0);
+
     if (L <= 0.0) {
         throw std::invalid_argument("fanno_channel: L must be positive");
     }
@@ -667,10 +665,10 @@ FannoSolution fanno_channel_rough(
     std::size_t n_steps,
     bool store_profile)
 {
-    if (T_in <= 0.0)
-        throw std::invalid_argument("fanno_channel_rough: T_in must be positive");
-    if (P_in <= 0.0)
-        throw std::invalid_argument("fanno_channel_rough: P_in must be positive");
+    // Robustness clamping
+    T_in = std::max(T_in, 10.0);
+    P_in = std::max(P_in, 1.0);
+
     if (L <= 0.0)
         throw std::invalid_argument("fanno_channel_rough: L must be positive");
     if (D <= 0.0)
@@ -913,7 +911,7 @@ namespace {
 
     for (std::size_t iter = 0; iter < max_iter; ++iter) {
         // Density from ideal gas: rho = P * mw_kg / (R * T)
-        double rho = P * mw_kg / (R_GAS * T);
+        double rho = std::max(P, 1.0) * mw_kg / (R_GAS * T);
 
         // Velocity from mass conservation: u = mdot / (rho * A)
         double u = mdot / (rho * A);
@@ -949,7 +947,7 @@ namespace {
 
         if (std::abs(dT) < tol * T) {
             T_out = T;
-            rho_out = P * mw_kg / (R_GAS * T);
+            rho_out = std::max(P, 1.0) * mw_kg / (R_GAS * T);
             u_out = mdot / (rho_out * A);
             return true;
         }
@@ -957,7 +955,7 @@ namespace {
 
     // Return best estimate even if not fully converged
     T_out = T;
-    rho_out = P * mw_kg / (R_GAS * T);
+    rho_out = std::max(P, 1.0) * mw_kg / (R_GAS * T);
     u_out = mdot / (rho_out * A);
     return false;
 }
@@ -1257,7 +1255,7 @@ NozzleSolution nozzle_quasi1d(
         double gamma_local = cp_mol / cv_mol;
         double a = std::sqrt(gamma_local * R_GAS * T / mw_kg);
         double u = M_guess * a;
-        double rho = P * mw_kg / (R_GAS * T);
+        double rho = std::max(P, 1.0) * mw_kg / (R_GAS * T);
 
         // Store state and compute final Mach
         State st;

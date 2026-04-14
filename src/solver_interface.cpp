@@ -1618,8 +1618,8 @@ std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobia
   bool reverse_flow = (u_in < 0.0);
   double u_fwd = std::abs(u_in);
 
-  // Call fanno_pipe_rough for forward direction
-  auto sol = combaero::fanno_pipe_rough(T_in, P_in, u_fwd, L, D, roughness, X, friction_model);
+  // Call fanno_channel_rough for forward direction
+  auto sol = combaero::fanno_channel_rough(T_in, P_in, u_fwd, L, D, roughness, X, friction_model);
   double dP = P_in - sol.outlet.P;
 
   // For reverse flow, negate dP to maintain sign convention
@@ -1633,8 +1633,8 @@ std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobia
   const double eps_u = std::max(1e-6, std::abs(u_in) * 1e-6);
 
   // Jacobian w.r.t. P_in
-  auto sol_P_plus = combaero::fanno_pipe_rough(T_in, P_in + eps_P, u_fwd, L, D, roughness, X, friction_model);
-  auto sol_P_minus = combaero::fanno_pipe_rough(T_in, P_in - eps_P, u_fwd, L, D, roughness, X, friction_model);
+  auto sol_P_plus = combaero::fanno_channel_rough(T_in, P_in + eps_P, u_fwd, L, D, roughness, X, friction_model);
+  auto sol_P_minus = combaero::fanno_channel_rough(T_in, P_in - eps_P, u_fwd, L, D, roughness, X, friction_model);
   double dP_P_plus = (P_in + eps_P) - sol_P_plus.outlet.P;
   double dP_P_minus = (P_in - eps_P) - sol_P_minus.outlet.P;
   if (reverse_flow) dP_P_plus = -dP_P_plus;
@@ -1642,8 +1642,8 @@ std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobia
   double d_dP_dP_in = (dP_P_plus - dP_P_minus) / (2.0 * eps_P);
 
   // Jacobian w.r.t. T_in
-  auto sol_T_plus = combaero::fanno_pipe_rough(T_in + eps_T, P_in, u_fwd, L, D, roughness, X, friction_model);
-  auto sol_T_minus = combaero::fanno_pipe_rough(T_in - eps_T, P_in, u_fwd, L, D, roughness, X, friction_model);
+  auto sol_T_plus = combaero::fanno_channel_rough(T_in + eps_T, P_in, u_fwd, L, D, roughness, X, friction_model);
+  auto sol_T_minus = combaero::fanno_channel_rough(T_in - eps_T, P_in, u_fwd, L, D, roughness, X, friction_model);
   double dP_T_plus = P_in - sol_T_plus.outlet.P;
   double dP_T_minus = P_in - sol_T_minus.outlet.P;
   if (reverse_flow) dP_T_plus = -dP_T_plus;
@@ -1651,8 +1651,8 @@ std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobia
   double d_dP_dT_in = (dP_T_plus - dP_T_minus) / (2.0 * eps_T);
 
   // Jacobian w.r.t. u_in (note: u_in is signed, but we use u_fwd for Fanno)
-  auto sol_u_plus = combaero::fanno_pipe_rough(T_in, P_in, u_fwd + eps_u, L, D, roughness, X, friction_model);
-  auto sol_u_minus = combaero::fanno_pipe_rough(T_in, P_in, std::max(1e-9, u_fwd - eps_u), L, D, roughness, X, friction_model);
+  auto sol_u_plus = combaero::fanno_channel_rough(T_in, P_in, u_fwd + eps_u, L, D, roughness, X, friction_model);
+  auto sol_u_minus = combaero::fanno_channel_rough(T_in, P_in, std::max(1e-9, u_fwd - eps_u), L, D, roughness, X, friction_model);
   double dP_u_plus = P_in - sol_u_plus.outlet.P;
   double dP_u_minus = P_in - sol_u_minus.outlet.P;
   if (reverse_flow) dP_u_plus = -dP_u_plus;

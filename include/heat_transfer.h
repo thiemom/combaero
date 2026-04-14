@@ -176,7 +176,7 @@ double overall_htc(const std::vector<double> &h_values,
 // Convenience: overall HTC for wall with inner/outer convection and single
 // layer 1/U = 1/h_inner + t_wall/k_wall + 1/h_outer
 double overall_htc_wall(double h_inner, double h_outer, double t_wall,
-                        double k_wall);
+                        double k_wall, double R_fouling = 0.0);
 
 // Multi-layer wall: h_in, [t1/k1, t2/k2, ...], h_out
 // 1/U = 1/h_inner + Σ(t_i/k_i) + 1/h_outer

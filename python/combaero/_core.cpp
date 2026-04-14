@@ -2663,9 +2663,9 @@ PYBIND11_MODULE(_core, m) {
       "t_over_k : thickness/conductivity ratios [m²·K/W]");
 
   m.def("overall_htc_wall",
-        py::overload_cast<double, double, double, double>(&overall_htc_wall),
+        py::overload_cast<double, double, double, double, double>(&overall_htc_wall),
         py::arg("h_inner"), py::arg("h_outer"), py::arg("t_wall"),
-        py::arg("k_wall"),
+        py::arg("k_wall"), py::arg("R_fouling") = 0.0,
         "Overall HTC for single-layer wall.\n\n"
         "1/U = 1/h_inner + t_wall/k_wall + 1/h_outer");
 
