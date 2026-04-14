@@ -115,7 +115,7 @@ CombAero provides symmetric submodules for incompressible and compressible flow.
 ```python
 from combaero import incompressible as flow   # OR: from combaero import compressible as flow
 
-sol = flow.pipe_flow(T=400, P=2e5, X=air, u=10.0, L=2.0, D=0.05, f=0.02)
+sol = flow.channel_flow(T=400, P=2e5, X=air, u=10.0, L=2.0, D=0.05, f=0.02)
 print(f"Pressure drop: {sol.dP} Pa")
 print(f"Outlet Mach: {sol.M}") # nan for incompressible
 ```
@@ -298,10 +298,10 @@ network.add_wall(wall)
 Elements with convective surfaces support heat transfer calculations.
 
 ```python
-from combaero.network import PipeElement
+from combaero.network import ChannelElement
 
-# Pipe with convective heat transfer
-pipe = PipeElement(
+# Channel with convective heat transfer
+pipe = ChannelElement(
     id="heated_pipe",
     from_node="inlet",
     to_node="outlet",
@@ -380,13 +380,13 @@ energy = EnergyBoundary("energy", Q=50000)  # Heat addition [W]
 ### Network Elements
 ```python
 from combaero.network import (
-    OrificeElement, PipeElement, EffectiveAreaConnectionElement,
+    OrificeElement, ChannelElement, EffectiveAreaConnectionElement,
     LosslessConnectionElement, DiameterDischargeCoefficientConnectionElement
 )
 
 # Flow elements
 orifice = OrificeElement("orifice", "node1", "node2", Cd=0.65, diameter=0.011284, regime="compressible")
-pipe = PipeElement("pipe", "node2", "node3", length=2.0, diameter=0.05, roughness=1e-4, regime="compressible_fanno")
+pipe = ChannelElement("pipe", "node2", "node3", length=2.0, diameter=0.05, roughness=1e-4, regime="compressible")
 
 # Connection elements
 effective_area = EffectiveAreaConnectionElement("ea", "node3", "node4", diameter=0.015958)
@@ -430,6 +430,7 @@ High-accuracy analytical Jacobians are available for performance-critical solver
 ```python
 # Exact residuals and derivatives wrt (P_tot, P_static, T, Y)
 res_ori = cb.orifice_residuals_and_jacobian(m_dot, P_tot, P_stat, T, Y, P_down, Cd, area)
+res_chan = cb.channel_residuals_and_jacobian(m_dot, P_tot, P_stat, T, Y, P_down, L, D, roughness, correlation)
 res_comb = cb.combustor_residuals_and_jacobians(m_dot, P_tot, P_stat, T, Y, Q_comb, method, smooth, pressure_loss_func)
 res_plen = cb.plenum_residuals_and_jacobian(m_dot_vec, P_target, T_target, Y_target)
 ```

@@ -17,7 +17,7 @@
 // Includes:
 // - Isentropic nozzle flow (solved numerically since gamma varies with T)
 // - Quasi-1D nozzle flow with variable area A(x)
-// - Fanno flow (adiabatic pipe flow with friction)
+// - Fanno flow (adiabatic channel flow with friction)
 
 // -------------------------------------------------------------
 // Compressible flow solution
@@ -217,7 +217,7 @@ NozzleSolution nozzle_cd(
 
 // Result of Fanno flow calculation at a single station
 struct FannoStation {
-    double x   = 0.0;    // Position along pipe [m]
+    double x   = 0.0;    // Position along channel [m]
     double P   = 0.0;    // Static pressure [Pa]
     double T   = 0.0;    // Static temperature [K]
     double rho = 0.0;    // Density [kg/m³]
@@ -229,64 +229,81 @@ struct FannoStation {
     double Re  = 0.0;    // Local Reynolds number [-]
 };
 
-// Result of Fanno flow pipe segment calculation
+// Result of Fanno flow channel segment calculation
 struct FannoSolution {
     State inlet;                        // Inlet thermodynamic state
     State outlet;                       // Outlet thermodynamic state
     double mdot    = 0.0;               // Mass flow rate [kg/s]
     double h0      = 0.0;               // Stagnation enthalpy [J/kg]
-    double L       = 0.0;               // Pipe length [m]
-    double D       = 0.0;               // Pipe diameter [m]
+    double L       = 0.0;               // Channel length [m]
+    double D       = 0.0;               // Channel diameter [m]
     double f       = 0.0;               // Darcy friction factor (constant-f overload) [-]
-    double f_avg   = 0.0;               // Average Darcy friction factor over pipe [-]
+    double f_avg   = 0.0;               // Average Darcy friction factor over channel [-]
     double Re_in   = 0.0;               // Inlet Reynolds number [-]
     bool choked    = false;             // True if flow reached M=1
     double L_choke = 0.0;               // Length to choking (if choked) [m]
     std::vector<FannoStation> profile;  // Axial profile (optional)
 };
 
-// Solve Fanno flow through a pipe segment.
+// Solve Fanno flow through a channel segment.
 //
 // Inputs:
 //   T_in    : Inlet static temperature [K]
 //   P_in    : Inlet static pressure [Pa]
 //   u_in    : Inlet velocity [m/s]
-//   L       : Pipe length [m]
-//   D       : Pipe diameter [m]
-//   f       : Darcy friction factor [-] (constant along pipe)
+//   L       : Channel length [m]
+//   D       : Channel diameter [m]
+//   f       : Darcy friction factor [-] (constant along channel)
 //   X       : Mole fractions [-]
 //   n_steps : Number of integration steps (default: 100)
 //   store_profile : If true, store axial profile in solution
 //
 // Returns FannoSolution with outlet conditions.
 // If flow chokes (M→1) before reaching L, integration stops and choked=true.
-FannoSolution fanno_pipe(
+FannoSolution fanno_channel(
     double T_in, double P_in, double u_in,
     double L, double D, double f,
     const std::vector<double>& X,
     std::size_t n_steps = 100,
     bool store_profile = false);
 
+inline FannoSolution fanno_pipe(
+    double T_in, double P_in, double u_in,
+    double L, double D, double f,
+    const std::vector<double>& X,
+    std::size_t n_steps = 100,
+    bool store_profile = false) {
+  return fanno_channel(T_in, P_in, u_in, L, D, f, X, n_steps, store_profile);
+}
+
 // Convenience: solve given inlet State and velocity
-FannoSolution fanno_pipe(
+FannoSolution fanno_channel(
     const State& inlet, double u_in,
     double L, double D, double f,
     std::size_t n_steps = 100,
     bool store_profile = false);
+
+inline FannoSolution fanno_pipe(
+    const State& inlet, double u_in,
+    double L, double D, double f,
+    std::size_t n_steps = 100,
+    bool store_profile = false) {
+  return fanno_channel(inlet, u_in, L, D, f, n_steps, store_profile);
+}
 
 // Solve Fanno flow with roughness-based variable friction factor.
 //
 // At each RK4 stage, the local friction factor is recomputed from the
 // local Reynolds number and wall roughness using the specified correlation.
 // This is more physical than a constant f when Re varies significantly
-// along the pipe (e.g., large temperature or density changes).
+// along the channel (e.g., large temperature or density changes).
 //
 // Inputs:
 //   T_in        : Inlet static temperature [K]
 //   P_in        : Inlet static pressure [Pa]
 //   u_in        : Inlet velocity [m/s]
-//   L           : Pipe length [m]
-//   D           : Pipe diameter [m]
+//   L           : Channel length [m]
+//   D           : Channel diameter [m]
 //   roughness   : Absolute wall roughness [m]
 //   X           : Mole fractions [-]
 //   correlation : Friction correlation (default: "haaland")
@@ -295,7 +312,7 @@ FannoSolution fanno_pipe(
 //   store_profile : If true, store axial profile in solution
 //
 // Returns FannoSolution with f_avg and Re_in populated.
-FannoSolution fanno_pipe_rough(
+FannoSolution fanno_channel_rough(
     double T_in, double P_in, double u_in,
     double L, double D, double roughness,
     const std::vector<double>& X,
@@ -303,15 +320,36 @@ FannoSolution fanno_pipe_rough(
     std::size_t n_steps = 100,
     bool store_profile = false);
 
+inline FannoSolution fanno_pipe_rough(
+    double T_in, double P_in, double u_in,
+    double L, double D, double roughness,
+    const std::vector<double>& X,
+    const std::string& correlation = "haaland",
+    std::size_t n_steps = 100,
+    bool store_profile = false) {
+  return fanno_channel_rough(T_in, P_in, u_in, L, D, roughness, X, correlation,
+                             n_steps, store_profile);
+}
+
 // Convenience: solve given inlet State and velocity (roughness-based)
-FannoSolution fanno_pipe_rough(
+FannoSolution fanno_channel_rough(
     const State& inlet, double u_in,
     double L, double D, double roughness,
     const std::string& correlation = "haaland",
     std::size_t n_steps = 100,
     bool store_profile = false);
 
-// Compute maximum pipe length before choking (L*) for given inlet conditions.
+inline FannoSolution fanno_pipe_rough(
+    const State& inlet, double u_in,
+    double L, double D, double roughness,
+    const std::string& correlation = "haaland",
+    std::size_t n_steps = 100,
+    bool store_profile = false) {
+  return fanno_channel_rough(inlet, u_in, L, D, roughness, correlation, n_steps,
+                             store_profile);
+}
+
+// Compute maximum channel length before choking (L*) for given inlet conditions.
 // Returns the length at which M would reach 1.0.
 double fanno_max_length(
     double T_in, double P_in, double u_in,

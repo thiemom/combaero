@@ -3,10 +3,10 @@
 
 This example demonstrates:
 - Friction factor correlations (Haaland, Serghides, Colebrook, Petukhov)
-- Pressure drop calculations in pipes
+- Pressure drop calculations in channels
 - Effect of roughness on friction
 - Comparison of different correlations
-- Practical pipe flow design
+- Practical channel flow design
 """
 
 from __future__ import annotations
@@ -22,14 +22,14 @@ def main() -> None:
     print("=" * 80)
 
     # =========================================================================
-    # Example 1: Smooth pipe friction factors
+    # Example 1: Smooth channel friction factors
     # =========================================================================
     print("\n" + "=" * 80)
-    print("Example 1: Smooth Pipe Friction Factors")
+    print("Example 1: Smooth Channel Friction Factors")
     print("=" * 80)
 
     Re = 1e5  # Reynolds number
-    e_D = 0.0  # Smooth pipe (zero roughness)
+    e_D = 0.0  # Smooth channel (zero roughness)
 
     print(f"\nReynolds number: {Re:.0e}")
     print(f"Relative roughness eps/D: {e_D}")
@@ -40,7 +40,7 @@ def main() -> None:
     f_colebrook = cb.friction_colebrook(Re, e_D)
     f_petukhov = cb.friction_petukhov(Re)
 
-    print("\nFriction factors (smooth pipe):")
+    print("\nFriction factors (smooth channel):")
     print(f"  Haaland:    f = {f_haaland:.6f}")
     print(f"  Serghides:  f = {f_serghides:.6f}")
     print(f"  Colebrook:  f = {f_colebrook:.6f}")
@@ -50,20 +50,20 @@ def main() -> None:
     # Example 2: Effect of roughness
     # =========================================================================
     print("\n" + "=" * 80)
-    print("Example 2: Effect of Pipe Roughness")
+    print("Example 2: Effect of Channel Roughness")
     print("=" * 80)
 
     Re = 1e5
-    D = 0.1  # Pipe diameter [m]
+    D = 0.1  # Channel diameter [m]
 
-    # Use pipe_roughness database for standard materials
+    # Use channel_roughness database for standard materials
     materials = ["drawn_tubing", "commercial_steel", "galvanized_iron", "cast_iron"]
 
     print(f"\nReynolds number: {Re:.0e}")
-    print(f"Pipe diameter: {D * 1000:.0f} mm")
-    print("\nFriction factors for different pipe materials:")
+    print(f"Channel diameter: {D * 1000:.0f} mm")
+    print("\nFriction factors for different channel materials:")
     for material in materials:
-        eps = cb.pipe_roughness(material)  # Get roughness from database
+        eps = cb.channel_roughness(material)  # Get roughness from database
         e_D = eps / D
         f = cb.friction_haaland(Re, e_D)
         print(f"  {material:25s}: f = {f:.6f}  (eps = {eps * 1e6:.1f} mum, eps/D = {e_D:.6f})")
@@ -72,13 +72,13 @@ def main() -> None:
     # Example 3: Pressure drop calculation
     # =========================================================================
     print("\n" + "=" * 80)
-    print("Example 3: Pressure Drop in Pipe")
+    print("Example 3: Pressure Drop in Channel")
     print("=" * 80)
 
-    # Pipe geometry
+    # Channel geometry
     D = 0.1  # Diameter [m]
     L = 100.0  # Length [m]
-    eps = cb.pipe_roughness("commercial_steel")  # Get roughness from database
+    eps = cb.channel_roughness("commercial_steel")  # Get roughness from database
     e_D = eps / D
 
     # Air properties at 300K
@@ -89,14 +89,14 @@ def main() -> None:
     # Flow conditions
     v = 10.0  # Velocity [m/s]
 
-    # Use pressure_drop_pipe composite function (calculates Re, f, and DeltaP)
-    dP, Re, f = cb.pressure_drop_pipe(T, P, X_air, v, D, L, eps, "haaland")
+    # Use pressure_drop_channel composite function (calculates Re, f, and DeltaP)
+    dP, Re, f = cb.pressure_drop_channel(T, P, X_air, v, D, L, eps, "haaland")
 
     # Also get density and viscosity for display
     rho = cb.density(T, P, X_air)
     mu = cb.viscosity(T, P, X_air)
 
-    print("\nPipe specifications:")
+    print("\nChannel specifications:")
     print(f"  Diameter:        D = {D * 1000:.1f} mm")
     print(f"  Length:          L = {L:.1f} m")
     print(f"  Roughness:       eps = {eps * 1e6:.1f} mum (commercial steel)")
@@ -135,17 +135,17 @@ def main() -> None:
         print(f"{Re:12.2e}  {f_h:12.6f}  {f_s:12.6f}  {diff:10.4f}")
 
     # =========================================================================
-    # Example 5: Practical design - sizing a pipe
+    # Example 5: Practical design - sizing a channel
     # =========================================================================
     print("\n" + "=" * 80)
-    print("Example 5: Pipe Sizing for Maximum Pressure Drop")
+    print("Example 5: Channel Sizing for Maximum Pressure Drop")
     print("=" * 80)
 
     # Design requirements
     mdot = 0.5  # Mass flow rate [kg/s]
-    L = 50.0  # Pipe length [m]
+    L = 50.0  # Channel length [m]
     dP_max = 5000.0  # Maximum allowable pressure drop [Pa]
-    eps = cb.pipe_roughness("commercial_steel")  # Get roughness from database
+    eps = cb.channel_roughness("commercial_steel")  # Get roughness from database
 
     # Air properties
     T = 300.0
@@ -156,7 +156,7 @@ def main() -> None:
 
     print("\nDesign requirements:")
     print(f"  Mass flow rate:  mdot = {mdot:.2f} kg/s")
-    print(f"  Pipe length:     L = {L:.1f} m")
+    print(f"  Channel length:     L = {L:.1f} m")
     print(f"  Max pressure drop: DeltaP_max = {dP_max / 1000:.1f} kPa")
     print(f"  Roughness:       eps = {eps * 1e6:.1f} mum (commercial steel)")
 
@@ -167,11 +167,11 @@ def main() -> None:
     print("-" * 70)
 
     for D in [0.05, 0.075, 0.1, 0.125, 0.15]:
-        # Use pipe_area helper
-        A = cb.pipe_area(D)
+        # Use channel_area helper
+        A = cb.channel_area(D)
         v = mdot / (rho * A)
-        # Use pressure_drop_pipe composite function
-        dP, Re, f = cb.pressure_drop_pipe(T, P, X_air, v, D, L, eps, "haaland")
+        # Use pressure_drop_channel composite function
+        dP, Re, f = cb.pressure_drop_channel(T, P, X_air, v, D, L, eps, "haaland")
         ok = "OK" if dP <= dP_max else "FAIL"
         print(f"{D * 1000:10.1f}  {v:10.2f}  {Re:12.2e}  {f:10.6f}  {dP / 1000:12.3f}  {ok:>6s}")
 

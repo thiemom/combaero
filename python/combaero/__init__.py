@@ -403,12 +403,29 @@ try:
         enthalpy_and_jacobian,
         viscosity_and_jacobians,
         orifice_residuals_and_jacobian,
+        channel_residuals_and_jacobian,
         pipe_residuals_and_jacobian,
         momentum_chamber_residual_and_jacobian,
         mixer_from_streams_and_jacobians,
         adiabatic_T_complete_and_jacobian_T_from_streams,
         adiabatic_T_equilibrium_and_jacobians_from_streams,
         combustor_residuals_and_jacobians,
+        # Channel/circular functions
+        htc_circular_channel,
+        nusselt_circular_channel,
+        nusselt_pipe,
+        channel_dP,
+        channel_dP_mdot,
+        channel_velocity,
+        channel_mdot,
+        channel_area,
+        channel_volume,
+        channel_roughness,
+        standard_channel_roughness,
+        circular_area,
+        cylinder_volume,
+        channel_pressure_drop,
+        pressure_drop_channel,
     )
 
     molar_mass = mwmix
@@ -641,6 +658,12 @@ except ModuleNotFoundError:
     orifice_velocity = _core.orifice_velocity
     orifice_area = _core.orifice_area
     orifice_dP = _core.orifice_dP
+    channel_dP = _core.pipe_dP
+    channel_dP_mdot = _core.pipe_dP_mdot
+    channel_velocity = _core.pipe_velocity
+    channel_mdot = _core.pipe_mdot
+    channel_pressure_drop = _core.pressure_drop_pipe
+    pressure_drop_channel = _core.pressure_drop_pipe
     pipe_dP = _core.pipe_dP
     pipe_dP_mdot = _core.pipe_dP_mdot
     pipe_velocity = _core.pipe_velocity
@@ -651,6 +674,10 @@ except ModuleNotFoundError:
     hydraulic_diameter = _core.hydraulic_diameter
     hydraulic_diameter_rect = _core.hydraulic_diameter_rect
     hydraulic_diameter_annulus = _core.hydraulic_diameter_annulus
+    channel_area = _core.pipe_area
+    channel_volume = _core.pipe_volume
+    channel_roughness = _core.pipe_roughness
+    standard_channel_roughness = _core.standard_pipe_roughness
     pipe_area = _core.pipe_area
     annular_area = _core.annular_area
     pipe_volume = _core.pipe_volume
@@ -727,6 +754,7 @@ except ModuleNotFoundError:
     enthalpy_and_jacobian = _core.enthalpy_and_jacobian
     viscosity_and_jacobians = _core.viscosity_and_jacobians
     orifice_residuals_and_jacobian = _core.orifice_residuals_and_jacobian
+    channel_residuals_and_jacobian = _core.channel_residuals_and_jacobian
     pipe_residuals_and_jacobian = _core.pipe_residuals_and_jacobian
 
 
@@ -765,6 +793,13 @@ def suppress_warnings() -> Generator[None, None, None]:
             set_warning_handler(original)
         else:
             set_warning_handler(None)
+
+
+# Terminology aliases
+htc_channel = htc_circular_channel
+htc_pipe = htc_circular_channel
+nusselt_channel = nusselt_circular_channel
+nusselt_pipe = nusselt_circular_channel
 
 
 __all__ = [
@@ -962,7 +997,12 @@ __all__ = [
     "nusselt_gnielinski",
     "nusselt_sieder_tate",
     "nusselt_petukhov",
+    "nusselt_circular_channel",
+    "nusselt_channel",
+    "nusselt_pipe",
     "htc_from_nusselt",
+    "htc_circular_channel",
+    "htc_channel",
     "htc_pipe",
     "orifice_impedance_with_flow",
     "quarter_wave_resonator_tmm",
@@ -1069,6 +1109,18 @@ __all__ = [
     "orifice_velocity",
     "orifice_area",
     "orifice_dP",
+    "channel_dP",
+    "channel_dP_mdot",
+    "channel_velocity",
+    "channel_mdot",
+    "channel_pressure_drop",
+    "pressure_drop_channel",
+    "channel_area",
+    "channel_volume",
+    "channel_roughness",
+    "standard_channel_roughness",
+    "circular_area",
+    "cylinder_volume",
     "pipe_dP",
     "pipe_dP_mdot",
     "pipe_velocity",

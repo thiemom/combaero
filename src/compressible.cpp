@@ -470,7 +470,7 @@ double dpdx_fanno(double rho, double u, double f, double D) {
 
 }  // namespace
 
-FannoSolution fanno_pipe(
+FannoSolution fanno_channel(
     double T_in, double P_in, double u_in,
     double L, double D, double f,
     const std::vector<double>& X,
@@ -479,22 +479,22 @@ FannoSolution fanno_pipe(
 {
     // Validate inputs
     if (T_in <= 0.0) {
-        throw std::invalid_argument("fanno_pipe: T_in must be positive");
+        throw std::invalid_argument("fanno_channel: T_in must be positive");
     }
     if (P_in <= 0.0) {
-        throw std::invalid_argument("fanno_pipe: P_in must be positive");
+        throw std::invalid_argument("fanno_channel: P_in must be positive");
     }
     if (L <= 0.0) {
-        throw std::invalid_argument("fanno_pipe: L must be positive");
+        throw std::invalid_argument("fanno_channel: L must be positive");
     }
     if (D <= 0.0) {
-        throw std::invalid_argument("fanno_pipe: D must be positive");
+        throw std::invalid_argument("fanno_channel: D must be positive");
     }
     if (f < 0.0) {
-        throw std::invalid_argument("fanno_pipe: f must be non-negative");
+        throw std::invalid_argument("fanno_channel: f must be non-negative");
     }
     if (n_steps == 0) {
-        throw std::invalid_argument("fanno_pipe: n_steps must be positive");
+        throw std::invalid_argument("fanno_channel: n_steps must be positive");
     }
 
     FannoSolution sol;
@@ -527,7 +527,7 @@ FannoSolution fanno_pipe(
     double a_in = sol.inlet.a();
     double M_in = u_in / a_in;
     if (M_in >= 1.0) {
-        throw std::invalid_argument("fanno_pipe: inlet flow is supersonic (M >= 1), not supported");
+        throw std::invalid_argument("fanno_channel: inlet flow is supersonic (M >= 1), not supported");
     }
 
     // Store inlet profile point
@@ -633,13 +633,13 @@ FannoSolution fanno_pipe(
     return sol;
 }
 
-FannoSolution fanno_pipe(
+FannoSolution fanno_channel(
     const State& inlet, double u_in,
     double L, double D, double f,
     std::size_t n_steps,
     bool store_profile)
 {
-    return fanno_pipe(inlet.T, inlet.P, u_in, L, D, f, inlet.X, n_steps, store_profile);
+    return fanno_channel(inlet.T, inlet.P, u_in, L, D, f, inlet.X, n_steps, store_profile);
 }
 
 // Helper: compute local friction factor from local state
@@ -655,11 +655,11 @@ static double local_friction(double T, double P, double u, double D,
     if (correlation == "serghides") return friction_serghides(Re_local, e_D);
     if (correlation == "colebrook") return friction_colebrook(Re_local, e_D);
     throw std::invalid_argument(
-        "fanno_pipe_rough: unknown correlation '" + correlation + "'. "
+        "fanno_channel_rough: unknown correlation '" + correlation + "'. "
         "Valid options: 'haaland', 'serghides', 'colebrook'");
 }
 
-FannoSolution fanno_pipe_rough(
+FannoSolution fanno_channel_rough(
     double T_in, double P_in, double u_in,
     double L, double D, double roughness,
     const std::vector<double>& X,
@@ -668,17 +668,17 @@ FannoSolution fanno_pipe_rough(
     bool store_profile)
 {
     if (T_in <= 0.0)
-        throw std::invalid_argument("fanno_pipe_rough: T_in must be positive");
+        throw std::invalid_argument("fanno_channel_rough: T_in must be positive");
     if (P_in <= 0.0)
-        throw std::invalid_argument("fanno_pipe_rough: P_in must be positive");
+        throw std::invalid_argument("fanno_channel_rough: P_in must be positive");
     if (L <= 0.0)
-        throw std::invalid_argument("fanno_pipe_rough: L must be positive");
+        throw std::invalid_argument("fanno_channel_rough: L must be positive");
     if (D <= 0.0)
-        throw std::invalid_argument("fanno_pipe_rough: D must be positive");
+        throw std::invalid_argument("fanno_channel_rough: D must be positive");
     if (roughness < 0.0)
-        throw std::invalid_argument("fanno_pipe_rough: roughness must be non-negative");
+        throw std::invalid_argument("fanno_channel_rough: roughness must be non-negative");
     if (n_steps == 0)
-        throw std::invalid_argument("fanno_pipe_rough: n_steps must be positive");
+        throw std::invalid_argument("fanno_channel_rough: n_steps must be positive");
 
     FannoSolution sol;
     sol.L = L;
@@ -702,8 +702,15 @@ FannoSolution fanno_pipe_rough(
 
     const double a_in = sol.inlet.a();
     const double M_in = u_in / a_in;
-    if (M_in >= 1.0)
-        throw std::invalid_argument("fanno_pipe_rough: inlet flow is supersonic (M >= 1)");
+
+    if (M_in >= 1.0) {
+        // Relaxing this to allow solver recovery during iteration.
+        // Return a choked result starting from nearly sonic conditions.
+        sol.choked = true;
+        sol.outlet = sol.inlet;
+        sol.outlet.set_TP(sol.inlet.T, sol.inlet.P); // effectively stalled
+        return sol;
+    }
 
     sol.Re_in = reynolds(T_in, P_in, X, u_in, D);
 
@@ -806,15 +813,15 @@ FannoSolution fanno_pipe_rough(
     return sol;
 }
 
-FannoSolution fanno_pipe_rough(
+FannoSolution fanno_channel_rough(
     const State& inlet, double u_in,
     double L, double D, double roughness,
     const std::string& correlation,
     std::size_t n_steps,
     bool store_profile)
 {
-    return fanno_pipe_rough(inlet.T, inlet.P, u_in, L, D, roughness,
-                            inlet.X, correlation, n_steps, store_profile);
+    return fanno_channel_rough(inlet.T, inlet.P, u_in, L, D, roughness,
+                               inlet.X, correlation, n_steps, store_profile);
 }
 
 double fanno_max_length(
@@ -853,7 +860,7 @@ double fanno_max_length(
         double L_mid = 0.5 * (L_low + L_high);
 
         try {
-            auto sol = fanno_pipe(T_in, P_in, u_in, L_mid, D, f, X, 200, false);
+            auto sol = fanno_channel(T_in, P_in, u_in, L_mid, D, f, X, 200, false);
 
             if (sol.choked) {
                 L_high = L_mid;

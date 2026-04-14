@@ -137,7 +137,7 @@ double nusselt_petukhov(double Re, double Pr,
 // Laminar Flow (for completeness)
 // -------------------------------------------------------------
 
-// Fully developed laminar flow in circular pipe
+// Fully developed laminar flow in circular channel (pipe)
 // Nu = 3.66 (constant wall temperature)
 // Nu = 4.36 (constant heat flux)
 constexpr double NU_LAMINAR_CONST_T = 3.66;
@@ -153,7 +153,7 @@ constexpr double NU_LAMINAR_CONST_Q = 4.36;
 // Parameters:
 //   Nu : Nusselt number [-]
 //   k  : thermal conductivity [W/(m·K)]
-//   L  : characteristic length [m] (diameter for pipe flow)
+//   L  : characteristic length [m] (diameter for channel flow)
 double htc_from_nusselt(double Nu, double k, double L);
 
 // -------------------------------------------------------------
@@ -470,14 +470,24 @@ inline double heat_rate_from_effectiveness(double epsilon, double C_min,
 
 struct State; // Forward declaration
 
-// Nusselt number for pipe flow using State
+// Nusselt number for circular channel flow using State
 // Automatically computes Re, Pr from state and velocity/diameter
-double nusselt_pipe(const State &s, double velocity, double diameter,
-                    bool heating = true, double roughness = 0.0);
+double nusselt_circular_channel(const State &s, double velocity, double diameter,
+                                bool heating = true, double roughness = 0.0);
 
-// Heat transfer coefficient for pipe flow [W/(m²·K)]
-double htc_pipe(const State &s, double velocity, double diameter,
-                bool heating = true, double roughness = 0.0);
+inline double nusselt_pipe(const State &s, double velocity, double diameter,
+                           bool heating = true, double roughness = 0.0) {
+  return nusselt_circular_channel(s, velocity, diameter, heating, roughness);
+}
+
+// Heat transfer coefficient for circular channel flow [W/(m²·K)]
+double htc_circular_channel(const State &s, double velocity, double diameter,
+                            bool heating = true, double roughness = 0.0);
+
+inline double htc_pipe(const State &s, double velocity, double diameter,
+                       bool heating = true, double roughness = 0.0) {
+  return htc_circular_channel(s, velocity, diameter, heating, roughness);
+}
 
 // Composite function: compute HTC, Nu, and Re from thermodynamic state
 // Returns: tuple (h [W/(m²·K)], Nu [-], Re [-])
@@ -503,10 +513,23 @@ double htc_pipe(const State &s, double velocity, double diameter,
 //
 // Automatically computes: ρ, μ, k, Pr, Re from (T, P, X)
 // Selects appropriate correlation and handles laminar flow (Re < 2300)
+// Selects appropriate correlation and handles laminar flow (Re < 2300)
 std::tuple<double, double, double>
-htc_pipe(double T, double P, const std::vector<double> &X, double velocity,
-         double diameter, const std::string &correlation = "gnielinski",
-         bool heating = true, double mu_ratio = 1.0, double roughness = 0.0);
+htc_circular_channel(double T, double P, const std::vector<double> &X,
+                     double velocity, double diameter,
+                     const std::string &correlation = "gnielinski",
+                     bool heating = true, double mu_ratio = 1.0,
+                     double roughness = 0.0);
+
+inline std::tuple<double, double, double, double> htc_pipe(
+    double T, double P, const std::vector<double> &X, double velocity,
+    double diameter, const std::string &correlation = "gnielinski",
+    bool heating = true, double mu_ratio = 1.0, double roughness = 0.0) {
+  auto [h, Nu, Re] = htc_circular_channel(T, P, X, velocity, diameter,
+                                          correlation, heating, mu_ratio,
+                                          roughness);
+  return {h, Nu, Re, 0.0}; // Note: legacy htc_pipe returned a tuple, but here it's 3 items in htc_circular_channel
+}
 
 // -------------------------------------------------------------
 // Combined convective heat transfer + pressure loss result

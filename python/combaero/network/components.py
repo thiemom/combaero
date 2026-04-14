@@ -1105,12 +1105,12 @@ class OrificeElement(NetworkElement):
 
     When auto_Cd=True (default), the discharge coefficient is computed from the
     CombAero orifice correlations (cb.Cd_orifice) using the orifice bore diameter
-    (derived from area) and the upstream pipe diameter (discovered via resolve_topology).
+    (derived from area) and the upstream channel diameter (discovered via resolve_topology).
     The correlation is auto-selected based on geometry:
       - edge_radius > 0  -> rounded-entry (Idelchik)
       - plate_thickness > 0 -> thick-plate (Idelchik)
       - otherwise        -> sharp thin-plate (Reader-Harris/Gallagher, ISO 5167-2)
-    When no upstream pipe is found (e.g. direct plenum connection, beta -> 0),
+    When no upstream channel is found (e.g. direct plenum connection, beta -> 0),
     the RHG formula extrapolates to Cd ~ 0.597. The user-supplied Cd is always
     used as fallback when auto_Cd=False.
     """
@@ -1148,18 +1148,18 @@ class OrificeElement(NetworkElement):
         downstream_elements = graph.get_downstream_elements(self.to_node)
 
         # Ensure we don't pick ourselves if it's a tight chain
-        upstream_pipes = [
-            e for e in upstream_elements if isinstance(e, PipeElement) and e.id != self.id
+        upstream_channels = [
+            e for e in upstream_elements if isinstance(e, ChannelElement) and e.id != self.id
         ]
-        downstream_pipes = [
-            e for e in downstream_elements if isinstance(e, PipeElement) and e.id != self.id
+        downstream_channels = [
+            e for e in downstream_elements if isinstance(e, ChannelElement) and e.id != self.id
         ]
 
-        if len(upstream_pipes) == 1:
-            self.upstream_diameter = upstream_pipes[0].diameter
+        if len(upstream_channels) == 1:
+            self.upstream_diameter = upstream_channels[0].diameter
 
-        if len(downstream_pipes) == 1:
-            self.downstream_diameter = downstream_pipes[0].diameter
+        if len(downstream_channels) == 1:
+            self.downstream_diameter = downstream_channels[0].diameter
 
         # Pre-compute beta for velocity-of-approach factor
         import math
@@ -1175,7 +1175,7 @@ class OrificeElement(NetworkElement):
             else:
                 warnings.warn(
                     f"OrificeElement '{self.id}': inferred bore diameter "
-                    f"({d_bore:.4f} m) >= pipe diameter "
+                    f"({d_bore:.4f} m) >= channel diameter "
                     f"({self.upstream_diameter:.4f} m). "
                     f"Skipping velocity-of-approach correction (E=1).",
                     stacklevel=2,
@@ -1185,7 +1185,7 @@ class OrificeElement(NetworkElement):
             import combaero as cb
 
             # Build geometry descriptor for Cd correlation.
-            # D=0 when no upstream pipe known (plenum connection) -> beta=0 -> RHG extrapolates to ~0.597.
+            # D=0 when no upstream channel known (plenum connection) -> beta=0 -> RHG extrapolates to ~0.597.
             D_up = (
                 self.upstream_diameter
                 if self.upstream_diameter and self.upstream_diameter > 0
@@ -1209,7 +1209,7 @@ class OrificeElement(NetworkElement):
         import combaero as cb
 
         # Estimate Re_D from current m_dot and upstream viscosity.
-        # When D=0 (no upstream pipe), Re_D is set to a typical mid-range value.
+        # When D=0 (no upstream channel), Re_D is set to a typical mid-range value.
         D_up = self._orifice_geom.D
         if D_up > 0.0:
             ts = cb.transport_state(state_in.T, state_in.P, state_in.X)
@@ -1217,7 +1217,7 @@ class OrificeElement(NetworkElement):
             m_dot_abs = abs(state_in.m_dot)
             Re_D = (4.0 * m_dot_abs) / (math.pi * D_up * mu) if m_dot_abs > 1e-12 else 1e4
         else:
-            Re_D = 1e5  # typical reference when no upstream pipe
+            Re_D = 1e5  # typical reference when no upstream channel
 
         flow_state = cb.OrificeState()
         flow_state.Re_D = Re_D
@@ -1240,11 +1240,10 @@ class OrificeElement(NetworkElement):
         effective_cd = self._effective_Cd(state_in, state_out)
 
         if self.regime == "compressible":
-            # Use compressible isentropic nozzle flow with smooth choked transition
             res_cpp = cb._core.orifice_compressible_residuals_and_jacobian(
                 m_dot,
                 state_in.P_total,
-                state_in.T,
+                state_in.T_total,
                 state_in.Y,
                 state_out.P,
                 effective_cd,
@@ -1555,9 +1554,9 @@ class LosslessConnectionElement(NetworkElement):
         return 1
 
 
-class PipeElement(NetworkElement):
+class ChannelElement(NetworkElement):
     """
-    Pipe element applying frictional pressure drop.
+    Channel element applying frictional pressure drop.
     """
 
     def __init__(
@@ -1601,10 +1600,10 @@ class PipeElement(NetworkElement):
 
         if self.regime == "compressible":
             # Use compressible Fanno flow with friction
-            res_cpp = cb._core.pipe_compressible_residuals_and_jacobian(
+            res_cpp = cb._core.channel_compressible_residuals_and_jacobian(
                 m_dot,
                 state_in.P_total,
-                state_in.T,
+                state_in.T_total,
                 state_in.Y,
                 state_out.P,
                 self.length,
@@ -1614,7 +1613,7 @@ class PipeElement(NetworkElement):
             )
         else:
             # Use incompressible Darcy-Weisbach formulation
-            res_cpp = cb.pipe_residuals_and_jacobian(
+            res_cpp = cb.channel_residuals_and_jacobian(
                 m_dot,
                 state_in.P_total,
                 state_in.P,
@@ -1627,7 +1626,7 @@ class PipeElement(NetworkElement):
                 self.friction_model,
             )
 
-        # Residual of P-node unknowns matching pipe drop
+        # Residual of P-node unknowns matching channel drop
         # C++ returns dP_calc = friction_loss
         # In a stable network: P_total_up - P_static_down = dP_friction (for exit into plenum)
         # Or more generally: P_total_up - P_total_down = dP_friction
@@ -1717,16 +1716,16 @@ class PipeElement(NetworkElement):
         n_steps: int = 100,
     ) -> list:
         """
-        Compute and return the spatial flow profile array along the pipe length.
+        Compute and return the spatial flow profile array along the channel length.
         Requires the solved inlet MixtureState.
         """
         import combaero as cba
 
         rho = cba.density(state_in.T, state_in.P, state_in.X)
-        u = cba.pipe_velocity(state_in.m_dot, self.diameter, rho)
+        u = cba.channel_velocity(state_in.m_dot, self.diameter, rho)
 
         if self.regime == "incompressible":
-            res = cba.pipe_flow_rough(
+            res = cba.channel_flow_rough(
                 state_in.T,
                 state_in.P,
                 state_in.X,
@@ -1741,7 +1740,7 @@ class PipeElement(NetworkElement):
             return res.profile
 
         elif self.regime == "compressible":
-            res = cba.pipe_fanno(
+            res = cba.fanno_channel(
                 state_in.T,
                 state_in.P,
                 cba.mass_to_mole(
@@ -1799,3 +1798,7 @@ class PipeElement(NetworkElement):
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         pass
+
+
+# Alias for backward compatibility
+PipeElement = ChannelElement

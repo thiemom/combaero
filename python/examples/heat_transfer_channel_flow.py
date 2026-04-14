@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Heat transfer in pipe flow.
+"""Heat transfer in channel flow.
 
 This example demonstrates:
 - Nusselt number correlations (Dittus-Boelter, Gnielinski, Sieder-Tate)
 - Heat transfer coefficient calculations
-- Pipe heating/cooling design
+- Channel heating/cooling design
 - LMTD for heat exchangers
 - Integration with friction factors
 """
@@ -18,7 +18,7 @@ import combaero as cb
 
 def main() -> None:
     print("=" * 80)
-    print("HEAT TRANSFER IN PIPE FLOW")
+    print("HEAT TRANSFER IN CHANNEL FLOW")
     print("=" * 80)
 
     # =========================================================================
@@ -47,13 +47,13 @@ def main() -> None:
     print(f"  Sieder-Tate:              Nu = {Nu_st:.2f}")
 
     # =========================================================================
-    # Example 2: Heat transfer coefficient for air in a pipe
+    # Example 2: Heat transfer coefficient for air in a channel
     # =========================================================================
     print("\n" + "=" * 80)
-    print("Example 2: Heat Transfer Coefficient - Air in Pipe")
+    print("Example 2: Heat Transfer Coefficient - Air in Channel")
     print("=" * 80)
 
-    # Pipe and flow conditions
+    # Channel and flow conditions
     D = 0.05  # Diameter [m]
     v = 10.0  # Velocity [m/s]
     T = 300.0  # Air temperature [K]
@@ -76,7 +76,7 @@ def main() -> None:
     # Calculate heat transfer coefficient
     h = cb.htc_from_nusselt(Nu, k, D)
 
-    print(f"\nPipe diameter:   D = {D * 1000:.1f} mm")
+    print(f"\nChannel diameter:   D = {D * 1000:.1f} mm")
     print(f"Air velocity:    v = {v:.1f} m/s")
     print(f"Air temperature: T = {T:.0f} K")
 
@@ -93,10 +93,10 @@ def main() -> None:
     print(f"  Heat transfer coeff:  h = {h:.2f} W/(m2*K)")
 
     # =========================================================================
-    # Example 3: Pipe heating design
+    # Example 3: Channel heating design
     # =========================================================================
     print("\n" + "=" * 80)
-    print("Example 3: Pipe Heating Design")
+    print("Example 3: Channel Heating Design")
     print("=" * 80)
 
     # Design problem: Heat air from 300K to 400K
@@ -104,7 +104,7 @@ def main() -> None:
     T_out = 400.0  # Outlet temperature [K]
     T_wall = 450.0  # Wall temperature [K]
     mdot = 0.1  # Mass flow rate [kg/s]
-    D = 0.05  # Pipe diameter [m]
+    D = 0.05  # Channel diameter [m]
 
     # Air properties (average temperature)
     T_avg = (T_in + T_out) / 2
@@ -116,7 +116,7 @@ def main() -> None:
     Pr = cb.prandtl(T_avg, P, X_air)
 
     # Flow velocity
-    A = cb.pipe_area(D)  # Use pipe_area helper
+    A = cb.channel_area(D)  # Use channel_area helper
     v = mdot / (rho * A)
     Re = rho * v * D / mu
 
@@ -140,7 +140,7 @@ def main() -> None:
     print(f"  Heat air from {T_in:.0f} K to {T_out:.0f} K")
     print(f"  Mass flow rate:  ṁ = {mdot:.3f} kg/s")
     print(f"  Wall temperature: T_wall = {T_wall:.0f} K")
-    print(f"  Pipe diameter:    D = {D * 1000:.1f} mm")
+    print(f"  Channel diameter:    D = {D * 1000:.1f} mm")
 
     print(f"\nFlow conditions (at T_avg = {T_avg:.0f} K):")
     print(f"  Velocity:         v = {v:.2f} m/s")
@@ -232,8 +232,8 @@ def main() -> None:
 
     Re = 5e4
     Pr = 0.7
-    D = 0.1  # Pipe diameter [m]
-    eps = cb.pipe_roughness("commercial_steel")  # Use pipe_roughness database
+    D = 0.1  # Channel diameter [m]
+    eps = cb.channel_roughness("commercial_steel")  # Use channel_roughness database
     e_D = eps / D
 
     # Get friction factor
@@ -242,19 +242,19 @@ def main() -> None:
     # Use Gnielinski with explicit friction factor
     Nu_with_f = cb.nusselt_gnielinski(Re, Pr, f)
 
-    # Compare with auto friction (smooth pipe)
+    # Compare with auto friction (smooth channel)
     Nu_auto = cb.nusselt_gnielinski(Re, Pr)
 
     print(f"\nReynolds number: Re = {Re:.0e}")
     print(f"Prandtl number:  Pr = {Pr:.2f}")
-    print(f"Pipe diameter:   D = {D * 1000:.0f} mm")
+    print(f"Channel diameter:   D = {D * 1000:.0f} mm")
     print(f"Roughness:       ε = {eps * 1e6:.1f} μm (commercial steel)")
     print(f"Relative rough:  ε/D = {e_D:.6f}")
 
     print("\nResults:")
     print(f"  Friction factor:          f = {f:.6f}")
     print(f"  Nu (with friction):       Nu = {Nu_with_f:.2f}")
-    print(f"  Nu (auto, smooth pipe):   Nu = {Nu_auto:.2f}")
+    print(f"  Nu (auto, smooth channel):   Nu = {Nu_auto:.2f}")
     print(f"  Difference:               {(Nu_with_f - Nu_auto) / Nu_auto * 100:+.2f}%")
 
     print("\nNote: Roughness affects both friction and heat transfer!")

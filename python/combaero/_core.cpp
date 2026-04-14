@@ -205,13 +205,17 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("d_mdot_dT_up", &solver::OrificeResult::d_mdot_dT_up)
       .def_readonly("d_mdot_dY_up", &solver::OrificeResult::d_mdot_dY_up);
 
-  py::class_<solver::PipeResult>(
-      m, "PipeResult", "Result of pipe residual and Jacobian evaluation")
-      .def_readonly("dP_calc", &solver::PipeResult::dP_calc)
-      .def_readonly("d_dP_d_mdot", &solver::PipeResult::d_dP_d_mdot)
-      .def_readonly("d_dP_dP_static_up", &solver::PipeResult::d_dP_dP_static_up)
-      .def_readonly("d_dP_dT_up", &solver::PipeResult::d_dP_dT_up)
-      .def_readonly("d_dP_dY_up", &solver::PipeResult::d_dP_dY_up);
+  py::class_<solver::ChannelResult>(
+      m, "ChannelSolverResult", "Result of channel residual and Jacobian evaluation")
+      .def(py::init<>())
+      .def_readonly("dP_calc", &solver::ChannelResult::dP_calc)
+      .def_readonly("d_dP_d_mdot", &solver::ChannelResult::d_dP_d_mdot)
+      .def_readonly("d_dP_dP_static_up", &solver::ChannelResult::d_dP_dP_static_up)
+      .def_readonly("d_dP_dT_up", &solver::ChannelResult::d_dP_dT_up)
+      .def_readonly("d_dP_dY_up", &solver::ChannelResult::d_dP_dY_up);
+
+  // Aliases for backward compatibility
+  m.attr("PipeResult") = m.attr("ChannelSolverResult");
 
   py::class_<solver::MomentumChamberResult>(
       m, "MomentumChamberResult",
@@ -228,11 +232,17 @@ PYBIND11_MODULE(_core, m) {
         py::arg("Y_up"), py::arg("P_static_down"), py::arg("Cd"),
         py::arg("area"), py::arg("beta") = 0.0);
 
-  m.def("pipe_residuals_and_jacobian", &solver::pipe_residuals_and_jacobian,
+  m.def("channel_residuals_and_jacobian",
+        &solver::channel_residuals_and_jacobian, py::arg("m_dot"),
+        py::arg("P_total_up"), py::arg("P_static_up"), py::arg("T_up"),
+        py::arg("Y_up"), py::arg("P_static_down"), py::arg("L"), py::arg("D"),
+        py::arg("roughness"), py::arg("friction_model"));
+
+  // Alias for backward compatibility
+  m.def("pipe_residuals_and_jacobian", &solver::channel_residuals_and_jacobian,
         py::arg("m_dot"), py::arg("P_total_up"), py::arg("P_static_up"),
-        py::arg("T_up"), py::arg("Y_up"), py::arg("P_static_down"),
-        py::arg("L"), py::arg("D"), py::arg("roughness"),
-        py::arg("friction_model"));
+        py::arg("T_up"), py::arg("Y_up"), py::arg("P_static_down"), py::arg("L"),
+        py::arg("D"), py::arg("roughness"), py::arg("friction_model"));
 
   // Compressible flow elements
   m.def("orifice_compressible_mdot_and_jacobian",
@@ -249,15 +259,31 @@ PYBIND11_MODULE(_core, m) {
         py::arg("beta") = 0.0,
         "Compressible orifice for network solver with all derivatives.");
 
+  m.def("channel_compressible_mdot_and_jacobian",
+        &solver::channel_compressible_mdot_and_jacobian, py::arg("T_in"),
+        py::arg("P_in"), py::arg("u_in"), py::arg("X"), py::arg("L"),
+        py::arg("D"), py::arg("roughness"), py::arg("friction_model"),
+        "Compressible channel flow using Fanno model with variable friction.\n\n"
+        "Returns: (dP, d_dP_dP_in, d_dP_dT_in, d_dP_du_in)");
+
+  // Alias for backward compatibility
   m.def("pipe_compressible_mdot_and_jacobian",
-        &solver::pipe_compressible_mdot_and_jacobian, py::arg("T_in"),
+        &solver::channel_compressible_mdot_and_jacobian, py::arg("T_in"),
         py::arg("P_in"), py::arg("u_in"), py::arg("X"), py::arg("L"),
         py::arg("D"), py::arg("roughness"), py::arg("friction_model"),
         "Compressible pipe flow using Fanno model with variable friction.\n\n"
         "Returns: (dP, d_dP_dP_in, d_dP_dT_in, d_dP_du_in)");
 
+  m.def("channel_compressible_residuals_and_jacobian",
+        &solver::channel_compressible_residuals_and_jacobian, py::arg("m_dot"),
+        py::arg("P_total_up"), py::arg("T_up"), py::arg("Y_up"),
+        py::arg("P_static_down"), py::arg("L"), py::arg("D"),
+        py::arg("roughness"), py::arg("friction_model"),
+        "Compressible channel for network solver with all derivatives.");
+
+  // Alias for backward compatibility
   m.def("pipe_compressible_residuals_and_jacobian",
-        &solver::pipe_compressible_residuals_and_jacobian, py::arg("m_dot"),
+        &solver::channel_compressible_residuals_and_jacobian, py::arg("m_dot"),
         py::arg("P_total_up"), py::arg("T_up"), py::arg("Y_up"),
         py::arg("P_static_down"), py::arg("L"), py::arg("D"),
         py::arg("roughness"), py::arg("friction_model"),
@@ -1941,7 +1967,7 @@ PYBIND11_MODULE(_core, m) {
 
   m.def("friction_petukhov", &friction_petukhov, py::arg("Re"),
         "Petukhov friction factor correlation (1970).\n\n"
-        "For smooth pipes only (zero roughness).\n"
+        "For smooth channels only (zero roughness).\n"
         "f = [0.790 * ln(Re) - 1.64]^(-2)\n\n"
         "Parameters:\n"
         "  Re : Reynolds number [-] (must be > 0)\n\n"
@@ -2021,24 +2047,58 @@ PYBIND11_MODULE(_core, m) {
         "Parameters:\n"
         "  Nu : Nusselt number [-] (dimensionless)\n"
         "  k  : thermal conductivity [W/(m·K)]\n"
-        "  L  : characteristic length [m] (diameter for pipe flow)\n\n"
+        "  L  : characteristic length [m] (diameter for circular channel flow)\n\n"
         "Returns: heat transfer coefficient h [W/(m²·K)]");
 
   m.def(
-      "htc_pipe",
+      "nusselt_circular_channel",
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double velocity, double diameter, const std::string &correlation,
          bool heating, double mu_ratio, double roughness) {
         auto X = to_vec(X_arr);
-        return htc_pipe(T, P, X, velocity, diameter, correlation, heating,
-                        mu_ratio, roughness);
+        auto [h, Nu, Re] = htc_circular_channel(T, P, X, velocity, diameter,
+                                                correlation, heating, mu_ratio,
+                                                roughness);
+        return Nu;
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
       py::arg("diameter"), py::arg("correlation") = "gnielinski",
       py::arg("heating") = true, py::arg("mu_ratio") = 1.0,
       py::arg("roughness") = 0.0,
-      "Composite heat transfer coefficient for pipe flow.\n\n"
+      "Composite Nusselt number for circular channel flow [-].");
+
+  m.def("nusselt_pipe",
+        [](double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double velocity, double diameter, const std::string &correlation,
+           bool heating, double mu_ratio, double roughness) {
+          auto X = to_vec(X_arr);
+          auto [h, Nu, Re] = htc_circular_channel(T, P, X, velocity, diameter,
+                                                  correlation, heating,
+                                                  mu_ratio, roughness);
+          return Nu;
+        },
+        py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
+        py::arg("diameter"), py::arg("correlation") = "gnielinski",
+        py::arg("heating") = true, py::arg("mu_ratio") = 1.0,
+        py::arg("roughness") = 0.0);
+
+  m.def(
+      "htc_circular_channel",
+      [](double T, double P,
+         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+         double velocity, double diameter, const std::string &correlation,
+         bool heating, double mu_ratio, double roughness) {
+        auto X = to_vec(X_arr);
+        return htc_circular_channel(T, P, X, velocity, diameter, correlation,
+                                    heating, mu_ratio, roughness);
+      },
+      py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
+      py::arg("diameter"), py::arg("correlation") = "gnielinski",
+      py::arg("heating") = true, py::arg("mu_ratio") = 1.0,
+      py::arg("roughness") = 0.0,
+      "Composite heat transfer coefficient for circular channel flow.\n\n"
       "Computes HTC, Nusselt number, and Reynolds number from thermodynamic "
       "state.\n"
       "Automatically calculates density, viscosity, thermal conductivity, and "
@@ -2048,14 +2108,14 @@ PYBIND11_MODULE(_core, m) {
       "  P           : pressure [Pa]\n"
       "  X           : mole fractions [mol/mol]\n"
       "  velocity    : flow velocity [m/s]\n"
-      "  diameter    : pipe diameter [m]\n"
+      "  diameter    : channel diameter [m]\n"
       "  correlation : 'gnielinski' (default), 'dittus_boelter', "
       "'sieder_tate', 'petukhov'\n"
       "  heating     : True for heating, False for cooling (affects "
       "Dittus-Boelter)\n"
       "  mu_ratio    : μ_bulk / μ_wall for Sieder-Tate viscosity correction "
       "(default: 1.0)\n"
-      "  roughness   : absolute roughness [m] (default: 0.0 = smooth pipe)\n\n"
+      "  roughness   : absolute roughness [m] (default: 0.0 = smooth channel)\n\n"
       "Returns: tuple (h, Nu, Re)\n"
       "  h  : heat transfer coefficient [W/(m²·K)]\n"
       "  Nu : Nusselt number [-]\n"
@@ -2068,6 +2128,20 @@ PYBIND11_MODULE(_core, m) {
       "correction)\n"
       "  - petukhov      : Re > 10000, 0.5 < Pr < 2000 (high accuracy)\n\n"
       "Automatically handles laminar flow (Re < 2300) with constant Nu.");
+
+  m.def("htc_pipe",
+        [](double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double velocity, double diameter, const std::string &correlation,
+           bool heating, double mu_ratio, double roughness) {
+          auto X = to_vec(X_arr);
+          return htc_circular_channel(T, P, X, velocity, diameter, correlation,
+                                      heating, mu_ratio, roughness);
+        },
+        py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
+        py::arg("diameter"), py::arg("correlation") = "gnielinski",
+        py::arg("heating") = true, py::arg("mu_ratio") = 1.0,
+        py::arg("roughness") = 0.0);
 
   m.def("lmtd", &lmtd, py::arg("dT1"), py::arg("dT2"),
         "Log mean temperature difference (LMTD) for heat exchangers.\n\n"
@@ -2108,7 +2182,7 @@ PYBIND11_MODULE(_core, m) {
 
   m.def("hydraulic_diameter_annulus", &hydraulic_diameter_annulus,
         py::arg("D_outer"), py::arg("D_inner"),
-        "Hydraulic diameter for annular duct (concentric pipes).\n\n"
+        "Hydraulic diameter for annular duct (concentric cylinders).\n\n"
         "Dh = D_outer - D_inner\n\n"
         "Parameters:\n"
         "  D_outer : outer diameter [m]\n"
@@ -2137,8 +2211,9 @@ PYBIND11_MODULE(_core, m) {
         "  rho  : density [kg/m³]\n\n"
         "Returns: residence time τ [s]");
 
-  m.def("pipe_mdot", &pipe_mdot, py::arg("v"), py::arg("D"), py::arg("rho"),
-        "Pipe mass flow rate from velocity.\n\n"
+  m.def("channel_mdot", &channel_mdot, py::arg("v"), py::arg("D"),
+        py::arg("rho"),
+        "Channel mass flow rate from velocity.\n\n"
         "mdot = rho * v * pi * D^2 / 4\n\n"
         "Parameters:\n"
         "  v   : velocity [m/s]\n"
@@ -2146,20 +2221,23 @@ PYBIND11_MODULE(_core, m) {
         "  rho : density [kg/m^3]\n\n"
         "Returns: mass flow rate [kg/s]");
 
+  // Alias for backward compatibility
+  m.def("pipe_mdot", &channel_mdot, py::arg("v"), py::arg("D"), py::arg("rho"));
+
   // Composite pipe flow function
   m.def(
-      "pressure_drop_pipe",
+      "pressure_drop_channel",
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double v, double D, double L, double roughness,
          const std::string &correlation) {
         auto X = to_vec(X_arr);
-        return pressure_drop_pipe(T, P, X, v, D, L, roughness, correlation);
+        return channel_pressure_drop(T, P, X, v, D, L, roughness, correlation);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("v"), py::arg("D"),
       py::arg("L"), py::arg("roughness") = 0.0,
       py::arg("correlation") = "haaland",
-      "Composite pressure drop calculation for pipe flow.\n\n"
+      "Composite pressure drop calculation for channel flow.\n\n"
       "Combines thermodynamic properties, Reynolds number, friction factor,\n"
       "and Darcy-Weisbach equation in one call.\n\n"
       "Steps:\n"
@@ -2180,9 +2258,34 @@ PYBIND11_MODULE(_core, m) {
       "'petukhov'\n\n"
       "Returns: tuple of (dP [Pa], Re [-], f [-])\n\n"
       "Example:\n"
-      "  >>> dP, Re, f = pressure_drop_pipe(300, 101325, X_air, 10.0, 0.1, "
+      "  >>> dP, Re, f = channel_pressure_drop(300, 101325, X_air, 10.0, 0.1, "
       "100.0)\n"
       "  >>> print(f'Pressure drop: {dP:.1f} Pa, Re: {Re:.0f}, f: {f:.4f}')");
+
+  m.def("channel_pressure_drop",
+        [](double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double v, double D, double L, double roughness,
+           const std::string &correlation) {
+          auto X = to_vec(X_arr);
+          return channel_pressure_drop(T, P, X, v, D, L, roughness, correlation);
+        },
+        py::arg("T"), py::arg("P"), py::arg("X"), py::arg("v"), py::arg("D"),
+        py::arg("L"), py::arg("roughness") = 0.0,
+        py::arg("correlation") = "haaland");
+
+  // Alias for backward compatibility
+  m.def("pressure_drop_pipe",
+        [](double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double v, double D, double L, double roughness,
+           const std::string &correlation) {
+          auto X = to_vec(X_arr);
+          return channel_pressure_drop(T, P, X, v, D, L, roughness, correlation);
+        },
+        py::arg("T"), py::arg("P"), py::arg("X"), py::arg("v"), py::arg("D"),
+        py::arg("L"), py::arg("roughness") = 0.0,
+        py::arg("correlation") = "haaland");
 
   m.def("space_velocity", &space_velocity, py::arg("Q"), py::arg("V"),
         "Space velocity (inverse of residence time).\n\n"
@@ -2192,12 +2295,15 @@ PYBIND11_MODULE(_core, m) {
         "  V : volume [m³]\n\n"
         "Returns: space velocity SV [1/s]");
 
-  m.def("pipe_area", &pipe_area, py::arg("D"),
-        "Circular pipe cross-sectional area.\n\n"
+  m.def("circular_area", &circular_area, py::arg("D"),
+        "Circular cross-sectional area.\n\n"
         "A = π * (D/2)²\n\n"
         "Parameters:\n"
         "  D : diameter [m]\n\n"
         "Returns: area [m²]");
+
+  // Alias for backward compatibility
+  m.def("pipe_area", &circular_area, py::arg("D"));
 
   m.def("annular_area", &annular_area, py::arg("D_outer"), py::arg("D_inner"),
         "Annular cross-sectional area.\n\n"
@@ -2207,13 +2313,16 @@ PYBIND11_MODULE(_core, m) {
         "  D_inner : inner diameter [m]\n\n"
         "Returns: area [m²]");
 
-  m.def("pipe_volume", &pipe_volume, py::arg("D"), py::arg("L"),
-        "Cylindrical pipe volume.\n\n"
+  m.def("cylinder_volume", &cylinder_volume, py::arg("D"), py::arg("L"),
+        "Cylindrical volume.\n\n"
         "V = π * (D/2)² * L\n\n"
         "Parameters:\n"
         "  D : diameter [m]\n"
         "  L : length [m]\n\n"
         "Returns: volume [m³]");
+
+  // Alias for backward compatibility
+  m.def("pipe_volume", &cylinder_volume, py::arg("D"), py::arg("L"));
 
   // -------------------------------------------------------------
   // Compressible flow
@@ -2222,7 +2331,7 @@ PYBIND11_MODULE(_core, m) {
   // Bind structures
   py::class_<IncompressibleStation>(
       m, "IncompressibleStation",
-      "Spatial state data point for incompressible pipe flow")
+      "Spatial state data point for incompressible channel flow")
       .def(py::init<>())
       .def_readwrite("x", &IncompressibleStation::x, "Distance from inlet [m]")
       .def_readwrite("P", &IncompressibleStation::P, "Static Pressure [Pa]")
@@ -2251,7 +2360,7 @@ PYBIND11_MODULE(_core, m) {
       .def_readwrite("f", &IncompressibleFlowSolution::f,
                      "Friction factor / Discharge coefficient [-]")
       .def_readwrite("profile", &IncompressibleFlowSolution::profile,
-                     "Optional spatial profile along the pipe (props(L))")
+                     "Optional spatial profile along the channel (props(L))")
       .def("__repr__", [](const IncompressibleFlowSolution &s) {
         std::ostringstream oss;
         oss << "IncompressibleFlowSolution(mdot=" << s.mdot << ", v=" << s.v
@@ -2334,8 +2443,8 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("outlet", &FannoSolution::outlet, "Outlet state")
       .def_readonly("mdot", &FannoSolution::mdot, "Mass flow rate [kg/s]")
       .def_readonly("h0", &FannoSolution::h0, "Stagnation enthalpy [J/kg]")
-      .def_readonly("L", &FannoSolution::L, "Pipe length [m]")
-      .def_readonly("D", &FannoSolution::D, "Pipe diameter [m]")
+      .def_readonly("L", &FannoSolution::L, "Channel length [m]")
+      .def_readonly("D", &FannoSolution::D, "Channel diameter [m]")
       .def_readonly("f", &FannoSolution::f,
                     "Darcy friction factor (constant-f) [-]")
       .def_readonly("f_avg", &FannoSolution::f_avg,
@@ -2463,24 +2572,38 @@ PYBIND11_MODULE(_core, m) {
 
   // Fanno flow
   m.def(
-      "fanno_pipe",
+      "fanno_channel",
       [](double T_in, double P_in, double u_in, double L, double D, double f,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          std::size_t n_steps, bool store_profile) {
         auto X = to_vec(X_arr);
-        return fanno_pipe(T_in, P_in, u_in, L, D, f, X, n_steps, store_profile);
+        return fanno_channel(T_in, P_in, u_in, L, D, f, X, n_steps,
+                             store_profile);
       },
       py::arg("T_in"), py::arg("P_in"), py::arg("u_in"), py::arg("L"),
       py::arg("D"), py::arg("f"), py::arg("X"), py::arg("n_steps") = 100,
       py::arg("store_profile") = false,
-      "Fanno flow (adiabatic pipe with friction).\n\n"
+      "Fanno flow (adiabatic channel with friction).\n\n"
       "T_in : inlet temperature [K]\n"
       "P_in : inlet pressure [Pa]\n"
       "u_in : inlet velocity [m/s]\n"
-      "L    : pipe length [m]\n"
-      "D    : pipe diameter [m]\n"
+      "L    : channel length [m]\n"
+      "D    : channel diameter [m]\n"
       "f    : Darcy friction factor [-]\n\n"
       "Returns FannoSolution.");
+
+  // Alias for backward compatibility
+  m.def("fanno_pipe",
+        [](double T_in, double P_in, double u_in, double L, double D, double f,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           std::size_t n_steps, bool store_profile) {
+          auto X = to_vec(X_arr);
+          return fanno_channel(T_in, P_in, u_in, L, D, f, X, n_steps,
+                               store_profile);
+        },
+        py::arg("T_in"), py::arg("P_in"), py::arg("u_in"), py::arg("L"),
+        py::arg("D"), py::arg("f"), py::arg("X"), py::arg("n_steps") = 100,
+        py::arg("store_profile") = false);
 
   m.def(
       "fanno_max_length",
@@ -2492,7 +2615,7 @@ PYBIND11_MODULE(_core, m) {
       },
       py::arg("T_in"), py::arg("P_in"), py::arg("u_in"), py::arg("D"),
       py::arg("f"), py::arg("X"), py::arg("tol") = 1e-6,
-      py::arg("max_iter") = 100, "Maximum pipe length before choking (L*).");
+      py::arg("max_iter") = 100, "Maximum channel length before choking (L*).");
 
   // -------------------------------------------------------------
   // Heat transfer correlations
@@ -2504,7 +2627,7 @@ PYBIND11_MODULE(_core, m) {
         return nusselt_dittus_boelter(Re, Pr, heating, nullptr);
       },
       py::arg("Re"), py::arg("Pr"), py::arg("heating") = true,
-      "Dittus-Boelter correlation for turbulent pipe flow.\n\n"
+      "Dittus-Boelter correlation for turbulent channel flow.\n\n"
       "Nu = 0.023 * Re^0.8 * Pr^n\n"
       "n = 0.4 (heating) or 0.3 (cooling)\n\n"
       "Warns and extrapolates outside validated range (Re > 10000, 0.6 < Pr < "
@@ -2519,7 +2642,7 @@ PYBIND11_MODULE(_core, m) {
         return nusselt_gnielinski(Re, Pr, f, nullptr);
       },
       py::arg("Re"), py::arg("Pr"), py::arg("f") = -1.0,
-      "Gnielinski correlation for transitional/turbulent pipe flow.\n\n"
+      "Gnielinski correlation for transitional/turbulent channel flow.\n\n"
       "Below Re=2300 uses C1-smooth Hermite blend to laminar Nu.\n"
       "Warns and extrapolates outside validated range (2300 < Re < 5e6, 0.5 < "
       "Pr < 2000).\n\n"
@@ -2546,7 +2669,7 @@ PYBIND11_MODULE(_core, m) {
         return nusselt_petukhov(Re, Pr, f, nullptr);
       },
       py::arg("Re"), py::arg("Pr"), py::arg("f") = -1.0,
-      "Petukhov correlation for turbulent pipe flow.\n\n"
+      "Petukhov correlation for turbulent channel flow.\n\n"
       "Warns and extrapolates outside validated range (1e4 < Re < 5e6, 0.5 < "
       "Pr < 2000).\n\n"
       "f : friction factor (if < 0, uses Petukhov correlation)");
@@ -3759,33 +3882,52 @@ PYBIND11_MODULE(_core, m) {
         "ΔP = (ṁ / (Cd · A))² / (2 · ρ)\n\n"
         "Returns: pressure drop P1-P2 [Pa]");
 
-  // Pipe flow
-  m.def("pipe_dP", &pipe_dP, py::arg("v"), py::arg("L"), py::arg("D"),
+  // Channel flow
+  m.def("channel_dP", &channel_dP, py::arg("v"), py::arg("L"), py::arg("D"),
         py::arg("f"), py::arg("rho"),
-        "Pipe pressure drop (Darcy-Weisbach).\n\n"
+        "Channel pressure drop (Darcy-Weisbach).\n\n"
         "ΔP = f · (L/D) · (ρ · v² / 2)\n\n"
         "v   : flow velocity [m/s]\n"
-        "L   : pipe length [m]\n"
-        "D   : pipe diameter [m]\n"
+        "L   : channel length [m]\n"
+        "D   : channel diameter [m]\n"
         "f   : Darcy friction factor [-]\n"
         "rho : fluid density [kg/m³]\n\n"
         "Returns: pressure drop [Pa]");
 
-  m.def("pipe_dP_mdot", &pipe_dP_mdot, py::arg("mdot"), py::arg("L"),
+  m.def("channel_dP", &channel_dP, py::arg("v"), py::arg("L"), py::arg("D"),
+        py::arg("f"), py::arg("rho"), "Channel pressure drop [Pa].");
+
+  // Alias for backward compatibility
+  m.def("pipe_dP", &channel_dP, py::arg("v"), py::arg("L"), py::arg("D"),
+        py::arg("f"), py::arg("rho"));
+
+  m.def("channel_dP_mdot", &channel_dP_mdot, py::arg("mdot"), py::arg("L"),
         py::arg("D"), py::arg("f"), py::arg("rho"),
-        "Pipe pressure drop from mass flow rate.\n\n"
+        "Channel pressure drop from mass flow rate.\n\n"
         "Returns: pressure drop [Pa]");
 
-  m.def("pipe_velocity", &pipe_velocity, py::arg("mdot"), py::arg("D"),
+  // Alias for backward compatibility
+  m.def("pipe_dP_mdot", &channel_dP_mdot, py::arg("mdot"), py::arg("L"),
+        py::arg("D"), py::arg("f"), py::arg("rho"));
+
+  m.def("channel_velocity", &channel_velocity, py::arg("mdot"), py::arg("D"),
         py::arg("rho"),
-        "Pipe velocity from mass flow rate.\n\n"
+        "Channel velocity from mass flow rate.\n\n"
         "v = ṁ / (ρ · π · D² / 4)\n\n"
         "Returns: velocity [m/s]");
 
-  m.def("pipe_mdot", &pipe_mdot, py::arg("v"), py::arg("D"), py::arg("rho"),
-        "Pipe mass flow from velocity.\n\n"
+  // Alias for backward compatibility
+  m.def("pipe_velocity", &channel_velocity, py::arg("mdot"), py::arg("D"),
+        py::arg("rho"));
+
+  m.def("channel_mdot", &channel_mdot, py::arg("v"), py::arg("D"),
+        py::arg("rho"),
+        "Channel mass flow from velocity.\n\n"
         "ṁ = ρ · v · π · D² / 4\n\n"
         "Returns: mass flow rate [kg/s]");
+
+  // Alias for backward compatibility
+  m.def("pipe_mdot", &channel_mdot, py::arg("v"), py::arg("D"), py::arg("rho"));
 
   // Hydraulic utilities
   m.def("dynamic_pressure", &dynamic_pressure, py::arg("v"), py::arg("rho"),
@@ -3827,12 +3969,12 @@ PYBIND11_MODULE(_core, m) {
                               "Orifice geometry for Cd correlations.\n\n"
                               "Attributes:\n"
                               "  d : orifice bore diameter [m]\n"
-                              "  D : pipe diameter [m]\n"
+                              "  D : channel diameter [m]\n"
                               "  t : plate thickness [m] (for thick plate)\n"
                               "  r : inlet edge radius [m] (for rounded entry)")
       .def(py::init<>())
       .def_readwrite("d", &OrificeGeometry::d, "Orifice bore diameter [m]")
-      .def_readwrite("D", &OrificeGeometry::D, "Pipe diameter [m]")
+      .def_readwrite("D", &OrificeGeometry::D, "Channel diameter [m]")
       .def_readwrite("t", &OrificeGeometry::t, "Plate thickness [m]")
       .def_readwrite("r", &OrificeGeometry::r, "Inlet edge radius [m]")
       .def_readwrite("bevel", &OrificeGeometry::bevel, "Bevel angle [rad]")
@@ -3851,12 +3993,12 @@ PYBIND11_MODULE(_core, m) {
   py::class_<OrificeState>(m, "OrificeState",
                            "Flow state at orifice for Cd correlations.\n\n"
                            "Attributes:\n"
-                           "  Re_D : pipe Reynolds number (based on D) [-]\n"
+                           "  Re_D : channel Reynolds number (based on D) [-]\n"
                            "  dP   : differential pressure [Pa]\n"
                            "  rho  : fluid density [kg/m³]\n"
                            "  mu   : dynamic viscosity [Pa·s]")
       .def(py::init<>())
-      .def_readwrite("Re_D", &OrificeState::Re_D, "Pipe Reynolds number [-]")
+      .def_readwrite("Re_D", &OrificeState::Re_D, "Channel Reynolds number [-]")
       .def_readwrite("dP", &OrificeState::dP, "Differential pressure [Pa]")
       .def_readwrite("rho", &OrificeState::rho, "Fluid density [kg/m³]")
       .def_readwrite("mu", &OrificeState::mu, "Dynamic viscosity [Pa·s]")
@@ -3988,7 +4130,7 @@ PYBIND11_MODULE(_core, m) {
       "Attributes:\n"
       "  mdot          : Mass flow rate [kg/s]\n"
       "  v             : Velocity through orifice throat [m/s]\n"
-      "  Re_D          : Pipe Reynolds number (based on D) [-]\n"
+      "  Re_D          : Channel Reynolds number (based on D) [-]\n"
       "  Re_d          : Orifice Reynolds number (based on d) [-]\n"
       "  Cd            : Discharge coefficient [-]\n"
       "  epsilon       : Expansibility factor [-] (1.0 for incompressible)\n"
@@ -3997,7 +4139,7 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("v", &OrificeFlowResult::v,
                     "Velocity through orifice throat [m/s]")
       .def_readonly("Re_D", &OrificeFlowResult::Re_D,
-                    "Pipe Reynolds number (based on D) [-]")
+                    "Channel Reynolds number (based on D) [-]")
       .def_readonly("Re_d", &OrificeFlowResult::Re_d,
                     "Orifice Reynolds number (based on d) [-]")
       .def_readonly("Cd", &OrificeFlowResult::Cd, "Discharge coefficient [-]")
@@ -4113,12 +4255,17 @@ PYBIND11_MODULE(_core, m) {
         "  Z    : compressibility factor [-] (default: 1.0 = ideal gas)\n\n"
         "Returns: velocity [m/s]");
 
+  // Aliases for backward compatibility in roughness DB
+  m.def("channel_roughness", &channel_roughness, py::arg("material"),
+        "Lookup absolute roughness [m] from material name.");
+  m.def("pipe_roughness", &channel_roughness, py::arg("material"));
+
   m.def("orifice_area_from_beta", &orifice_area_from_beta, py::arg("D"),
         py::arg("beta"),
         "Orifice area from beta ratio.\n\n"
         "A = π·(D·beta/2)²\n\n"
         "Parameters:\n"
-        "  D    : pipe diameter [m]\n"
+        "  D    : channel diameter [m]\n"
         "  beta : diameter ratio d/D [-]\n\n"
         "Returns: orifice area [m²]");
 
@@ -4127,7 +4274,7 @@ PYBIND11_MODULE(_core, m) {
         "beta = d / D\n\n"
         "Parameters:\n"
         "  d : orifice diameter [m]\n"
-        "  D : pipe diameter [m]\n\n"
+        "  D : channel diameter [m]\n\n"
         "Returns: beta ratio [-]");
 
   m.def("orifice_Re_d_from_mdot", &orifice_Re_d_from_mdot, py::arg("mdot"),
@@ -4141,15 +4288,15 @@ PYBIND11_MODULE(_core, m) {
         "Returns: Reynolds number [-]");
 
   // =========================================================================
-  // Pipe Roughness Database
+  // Channel Roughness Database
   // =========================================================================
 
-  m.def("pipe_roughness", &pipe_roughness, py::arg("material"),
-        "Get absolute roughness for a standard pipe material.\n\n"
-        "Returns the absolute roughness ε [m] for common pipe materials.\n"
+  m.def("channel_roughness", &channel_roughness, py::arg("material"),
+        "Get absolute roughness for a standard channel material.\n\n"
+        "Returns the absolute roughness ε [m] for common channel materials.\n"
         "Material names are case-insensitive.\n\n"
         "Parameters:\n"
-        "  material : pipe material name (str)\n\n"
+        "  material : channel material name (str)\n\n"
         "Returns: absolute roughness ε [m]\n\n"
         "Available materials:\n"
         "  - 'smooth', 'drawn_tubing', 'pvc', 'plastic'\n"
@@ -4166,15 +4313,19 @@ PYBIND11_MODULE(_core, m) {
         "  >>> eps = pipe_roughness('commercial_steel')\n"
         "  >>> print(f'Roughness: {eps*1e6:.1f} μm')  # 45.0 μm");
 
-  m.def("standard_pipe_roughness", &standard_pipe_roughness,
-        "Get all standard pipe roughness values.\n\n"
+  m.def("standard_channel_roughness", &standard_channel_roughness,
+        "Get all standard channel roughness values.\n\n"
         "Returns a dictionary mapping material names to absolute\n"
         "roughness values [m].\n\n"
         "Returns: dict[str, float] - material -> roughness [m]\n\n"
         "Example:\n"
-        "  >>> roughness_db = standard_pipe_roughness()\n"
+        "  >>> roughness_db = standard_channel_roughness()\n"
         "  >>> for material, eps in sorted(roughness_db.items()):\n"
         "  ...     print(f'{material:20s}: {eps*1e6:8.2f} μm')");
+
+  m.def("standard_channel_roughness", &standard_channel_roughness,
+        "Returns the map of standard material roughness values.");
+  m.def("standard_pipe_roughness", &standard_channel_roughness);
 
   // =========================================================================
   // Materials Database
@@ -4697,18 +4848,37 @@ PYBIND11_MODULE(_core, m) {
       "Darcy-Weisbach pressure drop from mass flow [Pa].");
 
   m.def(
-      "pipe_velocity",
-      [](double mdot, double D, double rho) {
-        return pipe_velocity(mdot, D, rho);
-      },
-      py::arg("mdot"), py::arg("D"), py::arg("rho"),
-      "Pipe velocity from mass flow [m/s].");
+      "channel_area", [](double D) { return circular_area(D); },
+      py::arg("D"), "Channel cross-sectional area [m^2].");
 
   m.def(
-      "pipe_mdot",
-      [](double v, double D, double rho) { return pipe_mdot(v, D, rho); },
+      "channel_velocity",
+      [](double mdot, double D, double rho) { return channel_velocity(mdot, D, rho); },
+      py::arg("mdot"), py::arg("D"), py::arg("rho"),
+      "Channel velocity from mass flow [m/s].");
+
+  // Alias for backward compatibility
+  m.def("pipe_velocity",
+        [](double mdot, double D, double rho) {
+          return channel_velocity(mdot, D, rho);
+        },
+        py::arg("mdot"), py::arg("D"), py::arg("rho"));
+
+  m.def(
+      "channel_volume",
+      [](double D, double L) { return cylinder_volume(D, L); },
+      py::arg("D"), py::arg("L"), "Channel volume [m^3].");
+
+  m.def(
+      "channel_mdot",
+      [](double v, double D, double rho) { return channel_mdot(v, D, rho); },
       py::arg("v"), py::arg("D"), py::arg("rho"),
-      "Pipe mass flow from velocity [kg/s].");
+      "Channel mass flow from velocity [kg/s].");
+
+  // Alias for backward compatibility
+  m.def("pipe_mdot",
+        [](double v, double D, double rho) { return channel_mdot(v, D, rho); },
+        py::arg("v"), py::arg("D"), py::arg("rho"));
 
   m.def(
       "bernoulli_P2",
@@ -4802,40 +4972,69 @@ PYBIND11_MODULE(_core, m) {
       "Returns IncompressibleFlowSolution.");
 
   m.def(
-      "pipe_flow",
+      "channel_flow",
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double u, double L, double D, double f, std::size_t n_steps,
          bool store_profile) {
-        return pipe_flow(T, P, to_vec(X_arr), u, L, D, f, n_steps,
-                         store_profile);
+        return channel_flow(T, P, to_vec(X_arr), u, L, D, f, n_steps,
+                            store_profile);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("u"), py::arg("L"),
       py::arg("D"), py::arg("f"), py::arg("n_steps") = 10,
       py::arg("store_profile") = false,
-      "Thermo-aware incompressible pipe flow with explicit friction factor.\n"
+      "Thermo-aware incompressible channel flow with explicit friction "
+      "factor.\n"
       "Returns IncompressibleFlowSolution.");
 
+  // Alias for backward compatibility
+  m.def("pipe_flow",
+        [](double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double u, double L, double D, double f, std::size_t n_steps,
+           bool store_profile) {
+          return channel_flow(T, P, to_vec(X_arr), u, L, D, f, n_steps,
+                              store_profile);
+        },
+        py::arg("T"), py::arg("P"), py::arg("X"), py::arg("u"), py::arg("L"),
+        py::arg("D"), py::arg("f"), py::arg("n_steps") = 10,
+        py::arg("store_profile") = false);
+
   m.def(
-      "pipe_flow_rough",
+      "channel_flow_rough",
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double u, double L, double D, double roughness,
          const std::string &correlation, std::size_t n_steps,
          bool store_profile) {
-        return pipe_flow_rough(T, P, to_vec(X_arr), u, L, D, roughness,
-                               correlation, n_steps, store_profile);
+        return channel_flow_rough(T, P, to_vec(X_arr), u, L, D, roughness,
+                                  correlation, n_steps, store_profile);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("u"), py::arg("L"),
       py::arg("D"), py::arg("roughness") = 0.0,
       py::arg("correlation") = "haaland", py::arg("n_steps") = 10,
       py::arg("store_profile") = false,
-      "Thermo-aware incompressible pipe flow with roughness-based friction "
+      "Thermo-aware incompressible channel flow with roughness-based friction "
       "factor.\n"
       "Returns IncompressibleFlowSolution.");
 
+  // Alias for backward compatibility
+  m.def("pipe_flow_rough",
+        [](double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double u, double L, double D, double roughness,
+           const std::string &correlation, std::size_t n_steps,
+           bool store_profile) {
+          return channel_flow_rough(T, P, to_vec(X_arr), u, L, D, roughness,
+                                    correlation, n_steps, store_profile);
+        },
+        py::arg("T"), py::arg("P"), py::arg("X"), py::arg("u"), py::arg("L"),
+        py::arg("D"), py::arg("roughness") = 0.0,
+        py::arg("correlation") = "haaland", py::arg("n_steps") = 10,
+        py::arg("store_profile") = false);
+
   m.def(
-      "pipe_flow_rough",
+      "channel_flow_rough",
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double u, double L, double D, double roughness,
@@ -4846,61 +5045,108 @@ PYBIND11_MODULE(_core, m) {
                                                     double Re) {
           return k_loss_fn(T_, P_, vec, Re).cast<double>();
         };
-        return pipe_flow_rough(T, P, vec, u, L, D, roughness, correlation, fn);
+        return channel_flow_rough(T, P, vec, u, L, D, roughness, correlation,
+                                  fn);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("u"), py::arg("L"),
       py::arg("D"), py::arg("roughness") = 0.0,
       py::arg("correlation") = "haaland", py::arg("k_loss_fn"),
-      "Pipe flow with additional K-loss callable (bends, fittings, etc.).\n\n"
+      "Channel flow with additional K-loss callable (bends, fittings, "
+      "etc.).\n\n"
       "k_loss_fn(T, P, X, Re) -> float  (returns K [-])\n"
       "Extra dP = K * 0.5 * rho * u^2 is added to Darcy-Weisbach friction "
       "loss.\n"
       "Returns IncompressibleFlowSolution.");
 
+  // Alias for backward compatibility
+  m.def("pipe_flow_rough",
+        [](double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double u, double L, double D, double roughness,
+           const std::string &correlation, py::function k_loss_fn) {
+          auto vec = to_vec(X_arr);
+          IncompressibleKLossFn fn = [k_loss_fn, vec](double T_, double P_,
+                                                      const std::vector<double> &,
+                                                      double Re) {
+            return k_loss_fn(T_, P_, vec, Re).cast<double>();
+          };
+          return channel_flow_rough(T, P, vec, u, L, D, roughness, correlation,
+                                    fn);
+        },
+        py::arg("T"), py::arg("P"), py::arg("X"), py::arg("u"), py::arg("L"),
+        py::arg("D"), py::arg("roughness") = 0.0,
+        py::arg("correlation") = "haaland", py::arg("k_loss_fn"));
+
+
   m.def(
-      "pressure_drop_pipe",
+      "channel_pressure_drop",
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double v, double D, double L, double roughness,
          const std::string &correlation) {
-        return pressure_drop_pipe(T, P, to_vec(X_arr), v, D, L, roughness,
-                                  correlation);
+        return channel_pressure_drop(T, P, to_vec(X_arr), v, D, L, roughness,
+                                     correlation);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("v"), py::arg("D"),
       py::arg("L"), py::arg("roughness") = 0.0,
       py::arg("correlation") = "haaland",
-      "Composite pipe pressure drop.\n"
+      "Composite channel pressure drop.\n"
       "Returns tuple (dP [Pa], Re [-], f [-]).");
+
+  // Alias for backward compatibility
+  m.def("pressure_drop_pipe",
+        [](double T, double P,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           double v, double D, double L, double roughness,
+           const std::string &correlation) {
+          return channel_pressure_drop(T, P, to_vec(X_arr), v, D, L, roughness,
+                                       correlation);
+        },
+        py::arg("T"), py::arg("P"), py::arg("X"), py::arg("v"), py::arg("D"),
+        py::arg("L"), py::arg("roughness") = 0.0,
+        py::arg("correlation") = "haaland");
 
   // =========================================================================
   // Compressible flow — new functions
   // =========================================================================
 
   m.def(
-      "fanno_pipe",
+      "fanno_channel",
       [](double T_in, double P_in, double u_in, double L, double D, double f,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          std::size_t n_steps, bool store_profile) {
-        return fanno_pipe(T_in, P_in, u_in, L, D, f, to_vec(X_arr), n_steps,
-                          store_profile);
+        return fanno_channel(T_in, P_in, u_in, L, D, f, to_vec(X_arr), n_steps,
+                             store_profile);
       },
       py::arg("T_in"), py::arg("P_in"), py::arg("u_in"), py::arg("L"),
       py::arg("D"), py::arg("f"), py::arg("X"), py::arg("n_steps") = 100,
       py::arg("store_profile") = false,
-      "Fanno flow (adiabatic compressible pipe flow with constant friction "
+      "Fanno flow (adiabatic compressible channel flow with constant friction "
       "factor).\n"
       "Returns FannoSolution.");
 
+  // Alias for backward compatibility
+  m.def("fanno_pipe",
+        [](double T_in, double P_in, double u_in, double L, double D, double f,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           std::size_t n_steps, bool store_profile) {
+          return fanno_channel(T_in, P_in, u_in, L, D, f, to_vec(X_arr), n_steps,
+                               store_profile);
+        },
+        py::arg("T_in"), py::arg("P_in"), py::arg("u_in"), py::arg("L"),
+        py::arg("D"), py::arg("f"), py::arg("X"), py::arg("n_steps") = 100,
+        py::arg("store_profile") = false);
+
   m.def(
-      "fanno_pipe_rough",
+      "fanno_channel_rough",
       [](double T_in, double P_in, double u_in, double L, double D,
          double roughness,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          const std::string &correlation, std::size_t n_steps,
          bool store_profile) {
-        return fanno_pipe_rough(T_in, P_in, u_in, L, D, roughness,
-                                to_vec(X_arr), correlation, n_steps,
-                                store_profile);
+        return fanno_channel_rough(T_in, P_in, u_in, L, D, roughness,
+                                   to_vec(X_arr), correlation, n_steps,
+                                   store_profile);
       },
       py::arg("T_in"), py::arg("P_in"), py::arg("u_in"), py::arg("L"),
       py::arg("D"), py::arg("roughness"), py::arg("X"),
@@ -4909,6 +5155,22 @@ PYBIND11_MODULE(_core, m) {
       "Fanno flow with roughness-based variable friction factor f(x).\n"
       "Recomputes f at each RK4 stage from local Re and roughness.\n"
       "Returns FannoSolution with f_avg and Re_in populated.");
+
+  // Alias for backward compatibility
+  m.def("fanno_pipe_rough",
+        [](double T_in, double P_in, double u_in, double L, double D,
+           double roughness,
+           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+           const std::string &correlation, std::size_t n_steps,
+           bool store_profile) {
+          return fanno_channel_rough(T_in, P_in, u_in, L, D, roughness,
+                                     to_vec(X_arr), correlation, n_steps,
+                                     store_profile);
+        },
+        py::arg("T_in"), py::arg("P_in"), py::arg("u_in"), py::arg("L"),
+        py::arg("D"), py::arg("roughness"), py::arg("X"),
+        py::arg("correlation") = "haaland", py::arg("n_steps") = 100,
+        py::arg("store_profile") = false);
 
   m.def(
       "fanno_max_length",
@@ -4921,7 +5183,7 @@ PYBIND11_MODULE(_core, m) {
       py::arg("T_in"), py::arg("P_in"), py::arg("u_in"), py::arg("D"),
       py::arg("f"), py::arg("X"), py::arg("tol") = 1e-6,
       py::arg("max_iter") = 100,
-      "Maximum pipe length before choking (Fanno L*) [m].");
+      "Maximum channel length before choking (Fanno L*) [m].");
 
   // =========================================================================
   // Stagnation / static conversion utilities  (stagnation.h)
@@ -5028,7 +5290,7 @@ PYBIND11_MODULE(_core, m) {
       "[m/s].\n"
       "T_aw = T_static + r * v^2 / (2*cp)  where r = Pr^(1/3) turbulent.\n"
       "Use T_aw (not T_static or T_total) as the hot-side driving temperature\n"
-      "in htc_pipe() and cooled_wall_heat_flux() for M > 0.3.");
+      "in channel evaluations and cooled_wall_heat_flux() for M > 0.3.");
 
   m.def(
       "T_adiabatic_wall_mach",
@@ -5061,6 +5323,7 @@ PYBIND11_MODULE(_core, m) {
       "  smooth/ribbed/dimpled : Darcy friction factor [-]\n"
       "  pin_fin               : pin-array friction coefficient [-]\n"
       "  impingement           : jet-plate loss coefficient 1/Cd^2 [-]")
+      .def(py::init<>())
       .def_readonly("h", &ChannelResult::h, "Convective HTC [W/(m^2*K)]")
       .def_readonly("Nu", &ChannelResult::Nu, "Nusselt number [-]")
       .def_readonly("Re", &ChannelResult::Re, "Reynolds number [-]")
@@ -5189,7 +5452,7 @@ PYBIND11_MODULE(_core, m) {
       py::arg("correlation") = "gnielinski", py::arg("heating") = true,
       py::arg("mu_ratio") = 1.0, py::arg("roughness") = 0.0,
       py::arg("Nu_multiplier") = 1.0, py::arg("f_multiplier") = 1.0,
-      "Smooth pipe/duct: combined HTC + pressure drop.\n\n"
+      "Smooth channel/duct: combined HTC + pressure drop.\n\n"
       "Parameters:\n"
       "  T, P, X    : bulk static thermodynamic state\n"
       "  velocity   : bulk velocity [m/s]\n"
@@ -5227,7 +5490,7 @@ PYBIND11_MODULE(_core, m) {
       py::arg("f_multiplier") = 1.0,
       "Rib-enhanced cooling channel (Han et al. 1988).\n\n"
       "Applies rib_enhancement_factor to Nu and rib_friction_multiplier to f\n"
-      "from a smooth-pipe Gnielinski baseline.\n\n"
+      "from a smooth-channel Gnielinski baseline.\n\n"
       "Parameters:\n"
       "  e_D            : rib height / hydraulic diameter [-]  (valid: "
       "0.02-0.1)\n"
@@ -5259,7 +5522,7 @@ PYBIND11_MODULE(_core, m) {
       "Dimpled surface cooling channel (Chyu et al. 1997).\n\n"
       "Applies dimple_nusselt_enhancement to Nu and dimple_friction_multiplier "
       "to f\n"
-      "from a smooth-pipe Gnielinski baseline.\n\n"
+      "from a smooth-channel Gnielinski baseline.\n\n"
       "Parameters:\n"
       "  d_Dh : dimple diameter / channel height [-]  (valid: 0.1-0.3)\n"
       "  h_d  : dimple depth / diameter [-]           (valid: 0.1-0.3)\n"
@@ -5468,7 +5731,7 @@ PYBIND11_MODULE(_core, m) {
 
   m.def("friction_and_jacobian_haaland", &solver::friction_and_jacobian_haaland,
         py::arg("Re"), py::arg("e_D"),
-        "Fast-path Haaland pipe friction and analytic derivative (f, "
+        "Fast-path Haaland channel friction and analytic derivative (f, "
         "d(f)/d(Re)).\n\n"
         "Parameters:\n"
         "  Re  : Reynolds number [-]\n"
@@ -5477,7 +5740,7 @@ PYBIND11_MODULE(_core, m) {
 
   m.def("friction_and_jacobian_serghides",
         &solver::friction_and_jacobian_serghides, py::arg("Re"), py::arg("e_D"),
-        "Fast-path Serghides pipe friction and analytic derivative (f, "
+        "Fast-path Serghides channel friction and analytic derivative (f, "
         "d(f)/d(Re)).\n\n"
         "Parameters:\n"
         "  Re  : Reynolds number [-]\n"
@@ -5486,7 +5749,7 @@ PYBIND11_MODULE(_core, m) {
 
   m.def("friction_and_jacobian_colebrook",
         &solver::friction_and_jacobian_colebrook, py::arg("Re"), py::arg("e_D"),
-        "Fast-path Colebrook-White pipe friction and implicit derivative "
+        "Fast-path Colebrook-White channel friction and implicit derivative "
         "(f, "
         "d(f)/d(Re)).\n\n"
         "Parameters:\n"
@@ -5496,7 +5759,7 @@ PYBIND11_MODULE(_core, m) {
 
   m.def("friction_and_jacobian_petukhov",
         &solver::friction_and_jacobian_petukhov, py::arg("Re"),
-        "Fast-path Petukhov smooth-pipe friction and analytic derivative "
+        "Fast-path Petukhov smooth-channel friction and analytic derivative "
         "(f, "
         "d(f)/d(Re)).\n\n"
         "Parameters:\n"

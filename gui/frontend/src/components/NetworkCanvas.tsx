@@ -7,12 +7,12 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { useCallback } from "react";
 import useStore from "../store/useStore";
+import ChannelNode from "./nodes/ChannelNode";
 import CombustorNode from "./nodes/CombustorNode.tsx";
 import LosslessNode from "./nodes/LosslessNode";
 import MassBoundaryNode from "./nodes/MassBoundaryNode";
 import MomentumChamberNode from "./nodes/MomentumChamberNode.tsx";
 import OrificeNode from "./nodes/OrificeNode";
-import PipeNode from "./nodes/PipeNode";
 import PlenumNode from "./nodes/PlenumNode";
 import PressureBoundaryNode from "./nodes/PressureBoundaryNode";
 import ProbeNode from "./nodes/ProbeNode";
@@ -23,7 +23,7 @@ const NODE_TYPES = Object.freeze({
 	plenum: PlenumNode,
 	mass_boundary: MassBoundaryNode,
 	pressure_boundary: PressureBoundaryNode,
-	channel: PipeNode,
+	channel: ChannelNode,
 	orifice: OrificeNode,
 	combustor: CombustorNode,
 	momentum_chamber: MomentumChamberNode,

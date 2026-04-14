@@ -7,7 +7,7 @@ import {
 	useUpdateNodeInternals,
 } from "reactflow";
 
-const PipeNode = ({ id, data, selected }: NodeProps) => {
+const ChannelNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
 	const isSolved = !!data.result;
 	const updateNodeInternals = useUpdateNodeInternals();
@@ -58,4 +58,4 @@ const PipeNode = ({ id, data, selected }: NodeProps) => {
 	);
 };
 
-export default PipeNode;
+export default ChannelNode;

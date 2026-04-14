@@ -97,34 +97,50 @@ double orifice_dP(double mdot, double A, double Cd, double rho);
 // Pipe flow (Darcy-Weisbach)
 // -------------------------------------------------------------
 
-// Pipe pressure drop using Darcy-Weisbach equation.
+// Channel pressure drop using Darcy-Weisbach equation.
 //
 // ΔP = f · (L/D) · (ρ · v² / 2)
 //
 // Inputs:
 //   v   : flow velocity [m/s]
-//   L   : pipe length [m]
-//   D   : pipe diameter [m]
+//   L   : length [m]
+//   D   : diameter [m]
 //   f   : Darcy friction factor [-] (use friction_colebrook etc.)
 //   rho : fluid density [kg/m³]
 //
 // Returns: pressure drop [Pa]
-double pipe_dP(double v, double L, double D, double f, double rho);
+double channel_dP(double v, double L, double D, double f, double rho);
 
-// Pipe pressure drop from mass flow rate.
+inline double pipe_dP(double v, double L, double D, double f, double rho) {
+  return channel_dP(v, L, D, f, rho);
+}
+
+// Channel pressure drop from mass flow rate.
 // v = ṁ / (ρ · A) where A = π·D²/4
 // Returns: pressure drop [Pa]
-double pipe_dP_mdot(double mdot, double L, double D, double f, double rho);
+double channel_dP_mdot(double mdot, double L, double D, double f, double rho);
 
-// Pipe velocity from mass flow rate.
+inline double pipe_dP_mdot(double mdot, double L, double D, double f, double rho) {
+  return channel_dP_mdot(mdot, L, D, f, rho);
+}
+
+// Channel velocity from mass flow rate.
 // v = ṁ / (ρ · π · D² / 4)
 // Returns: velocity [m/s]
-double pipe_velocity(double mdot, double D, double rho);
+double channel_velocity(double mdot, double D, double rho);
 
-// Pipe mass flow from velocity.
+inline double pipe_velocity(double mdot, double D, double rho) {
+  return channel_velocity(mdot, D, rho);
+}
+
+// Channel mass flow from velocity.
 // ṁ = ρ · v · π · D² / 4
 // Returns: mass flow rate [kg/s]
-double pipe_mdot(double v, double D, double rho);
+double channel_mdot(double v, double D, double rho);
+
+inline double pipe_mdot(double v, double D, double rho) {
+  return channel_mdot(v, D, rho);
+}
 
 // -------------------------------------------------------------
 // Hydraulic utilities
@@ -195,7 +211,7 @@ double Cd_from_zeta(double zeta);
 
 // Result of incompressible internal flow profile at a single station
 struct IncompressibleStation {
-  double x = 0.0;   // Position along pipe [m]
+  double x = 0.0;   // Position along channel [m]
   double P = 0.0;   // Static pressure [Pa]
   double T = 0.0;   // Static temperature [K]
   double rho = 0.0; // Density [kg/m³]
@@ -257,42 +273,54 @@ IncompressibleFlowSolution orifice_flow_thermo(double T, double P,
                                                double P_back, double A,
                                                const IncompressibleCdFn &cd_fn);
 
-// Thermo-aware pipe flow with explicit friction factor.
-//
-// Evaluates rho from (T, P, X) internally, then applies Darcy-Weisbach.
-//
-// Inputs:
-//   T : temperature [K]
-//   P : pressure [Pa]
-//   X : mole fractions [-]
-//   u : flow velocity [m/s]
-//   L : pipe length [m]
-//   D : pipe diameter [m]
-//   f : Darcy friction factor [-]
-//
-// Returns IncompressibleFlowSolution including intermediate state structures.
-IncompressibleFlowSolution pipe_flow(double T, double P,
-                                     const std::vector<double> &X, double u,
-                                     double L, double D, double f,
-                                     std::size_t n_steps = 100,
-                                     bool store_profile = false);
+IncompressibleFlowSolution channel_flow(double T, double P,
+                                        const std::vector<double> &X, double u,
+                                        double L, double D, double f,
+                                        std::size_t n_steps = 100,
+                                        bool store_profile = false);
+
+inline IncompressibleFlowSolution
+pipe_flow(double T, double P, const std::vector<double> &X, double u, double L,
+          double D, double f, std::size_t n_steps = 100,
+          bool store_profile = false) {
+  return channel_flow(T, P, X, u, L, D, f, n_steps, store_profile);
+}
 
 // 2) With roughness-based variable friction factor:
 IncompressibleFlowSolution
+channel_flow_rough(double T, double P, const std::vector<double> &X, double u,
+                   double L, double D, double roughness = 0.0,
+                   const std::string &correlation = "haaland",
+                   std::size_t n_steps = 100, bool store_profile = false);
+
+inline IncompressibleFlowSolution
 pipe_flow_rough(double T, double P, const std::vector<double> &X, double u,
                 double L, double D, double roughness = 0.0,
                 const std::string &correlation = "haaland",
-                std::size_t n_steps = 100, bool store_profile = false);
+                std::size_t n_steps = 100, bool store_profile = false) {
+  return channel_flow_rough(T, P, X, u, L, D, roughness, correlation, n_steps,
+                            store_profile);
+}
 
 // 3) With roughness-based friction + optional K-factor loss:
 IncompressibleFlowSolution
+channel_flow_rough(double T, double P, const std::vector<double> &X, double u,
+                   double L, double D, double roughness,
+                   const std::string &correlation,
+                   const IncompressibleKLossFn &k_loss_fn,
+                   std::size_t n_steps = 10, bool store_profile = false);
+
+inline IncompressibleFlowSolution
 pipe_flow_rough(double T, double P, const std::vector<double> &X, double u,
                 double L, double D, double roughness,
                 const std::string &correlation,
                 const IncompressibleKLossFn &k_loss_fn,
-                std::size_t n_steps = 10, bool store_profile = false);
+                std::size_t n_steps = 10, bool store_profile = false) {
+  return channel_flow_rough(T, P, X, u, L, D, roughness, correlation, k_loss_fn,
+                            n_steps, store_profile);
+}
 
-// Composite pipe pressure drop (legacy / convenience).
+// Composite channel pressure drop (legacy / convenience).
 //
 // Combines density, viscosity, Reynolds number, friction factor, and
 // Darcy-Weisbach into a single call. Returns (dP, Re, f) tuple.
@@ -302,16 +330,23 @@ pipe_flow_rough(double T, double P, const std::vector<double> &X, double u,
 //   P           : pressure [Pa]
 //   X           : mole fractions [-]
 //   v           : flow velocity [m/s]
-//   D           : pipe diameter [m]
-//   L           : pipe length [m]
+//   D           : diameter [m]
+//   L           : length [m]
 //   roughness   : absolute roughness [m] (default: 0.0)
 //   correlation : friction correlation (default: "haaland")
 //
 // Returns: tuple of (dP [Pa], Re [-], f [-])
 std::tuple<double, double, double>
+channel_pressure_drop(double T, double P, const std::vector<double> &X, double v,
+                      double D, double L, double roughness = 0.0,
+                      const std::string &correlation = "haaland");
+
+inline std::tuple<double, double, double>
 pressure_drop_pipe(double T, double P, const std::vector<double> &X, double v,
                    double D, double L, double roughness = 0.0,
-                   const std::string &correlation = "haaland");
+                   const std::string &correlation = "haaland") {
+  return channel_pressure_drop(T, P, X, v, D, L, roughness, correlation);
+}
 
 } // namespace combaero
 

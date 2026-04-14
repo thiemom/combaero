@@ -142,11 +142,11 @@ static const std::unordered_map<std::string, double> ROUGHNESS_DATA = {
     {"corrugated_metal", 4.5e-2},
 };
 
-std::unordered_map<std::string, double> standard_pipe_roughness() {
+std::unordered_map<std::string, double> standard_channel_roughness() {
   return ROUGHNESS_DATA;
 }
 
-double pipe_roughness(const std::string &material) {
+double channel_roughness(const std::string &material) {
   std::string key = material;
   std::transform(key.begin(), key.end(), key.begin(), ::tolower);
   auto it = ROUGHNESS_DATA.find(key);
@@ -154,9 +154,9 @@ double pipe_roughness(const std::string &material) {
     return it->second;
   }
   throw std::invalid_argument(
-      "pipe_roughness: unknown material '" + material +
+      "channel_roughness: unknown material '" + material +
       "'. "
-      "Use standard_pipe_roughness() to see available materials.");
+      "Use standard_channel_roughness() to see available materials.");
 }
 
 // Petukhov correlation (1970) - smooth pipes only

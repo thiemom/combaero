@@ -646,14 +646,14 @@ double effectiveness_parallelflow(double NTU, double C_r) {
 // State-based convenience functions
 // -------------------------------------------------------------
 
-double nusselt_pipe(const State &s, double velocity, double diameter,
-                    bool heating, double roughness) {
-  if (velocity <= 0) {
-    throw std::invalid_argument("nusselt_pipe: velocity must be positive");
-  }
-  if (diameter <= 0) {
-    throw std::invalid_argument("nusselt_pipe: diameter must be positive");
-  }
+double nusselt_circular_channel(const State &s, double velocity, double diameter,
+                                bool heating, double roughness) {
+    if (velocity <= 0) {
+        throw std::invalid_argument("nusselt_circular_channel: velocity must be positive");
+    }
+    if (diameter <= 0) {
+        throw std::invalid_argument("nusselt_circular_channel: diameter must be positive");
+    }
 
   // Re = ρ * V * D / μ
   double rho = s.rho();
@@ -682,31 +682,30 @@ double nusselt_pipe(const State &s, double velocity, double diameter,
   return nusselt_gnielinski(Re, Pr, f);
 }
 
-double htc_pipe(const State &s, double velocity, double diameter, bool heating,
-                double roughness) {
-  double Nu = nusselt_pipe(s, velocity, diameter, heating, roughness);
-  double k = s.k();
-  return htc_from_nusselt(Nu, k, diameter);
+double htc_circular_channel(const State &s, double velocity, double diameter,
+                            bool heating, double roughness) {
+    double Nu = nusselt_circular_channel(s, velocity, diameter, heating, roughness);
+    double k = s.k();
+    return htc_from_nusselt(Nu, k, diameter);
 }
 
-// Composite function: compute HTC from thermodynamic state
-// Returns: (h [W/(m²·K)], Nu [-], Re [-])
 std::tuple<double, double, double>
-htc_pipe(double T, double P, const std::vector<double> &X, double velocity,
-         double diameter, const std::string &correlation, bool heating,
-         double mu_ratio, double roughness) {
-  if (velocity <= 0) {
-    throw std::invalid_argument("htc_pipe: velocity must be positive");
-  }
-  if (diameter <= 0) {
-    throw std::invalid_argument("htc_pipe: diameter must be positive");
-  }
-  if (T <= 0) {
-    throw std::invalid_argument("htc_pipe: temperature must be positive");
-  }
-  if (P <= 0) {
-    throw std::invalid_argument("htc_pipe: pressure must be positive");
-  }
+htc_circular_channel(double T, double P, const std::vector<double> &X,
+                     double velocity, double diameter,
+                     const std::string &correlation, bool heating,
+                     double mu_ratio, double roughness) {
+    if (velocity <= 0) {
+        throw std::invalid_argument("htc_circular_channel: velocity must be positive");
+    }
+    if (diameter <= 0) {
+        throw std::invalid_argument("htc_circular_channel: diameter must be positive");
+    }
+    if (T <= 0) {
+        throw std::invalid_argument("htc_circular_channel: temperature must be positive");
+    }
+    if (P <= 0) {
+        throw std::invalid_argument("htc_circular_channel: pressure must be positive");
+    }
 
   // Compute thermodynamic and transport properties
   double rho = density(T, P, X);
@@ -743,7 +742,7 @@ htc_pipe(double T, double P, const std::vector<double> &X, double velocity,
       Nu = heating ? NU_LAMINAR_CONST_T : NU_LAMINAR_CONST_Q;
     } else if (Re < 10000) {
       throw std::invalid_argument(
-          "htc_pipe: Dittus-Boelter requires Re > 10000 (got Re=" +
+          "htc_circular_channel: Dittus-Boelter requires Re > 10000 (got Re=" +
           std::to_string(Re) + "). Use 'gnielinski' for transition region.");
     } else {
       Nu = nusselt_dittus_boelter(Re, Pr, heating);
@@ -754,7 +753,7 @@ htc_pipe(double T, double P, const std::vector<double> &X, double velocity,
       Nu = heating ? NU_LAMINAR_CONST_T : NU_LAMINAR_CONST_Q;
     } else if (Re < 10000) {
       throw std::invalid_argument(
-          "htc_pipe: Sieder-Tate requires Re > 10000 (got Re=" +
+          "htc_circular_channel: Sieder-Tate requires Re > 10000 (got Re=" +
           std::to_string(Re) + "). Use 'gnielinski' for transition region.");
     } else {
       Nu = nusselt_sieder_tate(Re, Pr, mu_ratio);
@@ -765,14 +764,14 @@ htc_pipe(double T, double P, const std::vector<double> &X, double velocity,
       Nu = heating ? NU_LAMINAR_CONST_T : NU_LAMINAR_CONST_Q;
     } else if (Re < 1e4) {
       throw std::invalid_argument(
-          "htc_pipe: Petukhov requires Re > 10000 (got Re=" +
+          "htc_circular_channel: Petukhov requires Re > 10000 (got Re=" +
           std::to_string(Re) + "). Use 'gnielinski' for transition region.");
     } else {
       double f = friction_petukhov(Re);
       Nu = nusselt_petukhov(Re, Pr, f);
     }
   } else {
-    throw std::invalid_argument("htc_pipe: unknown correlation '" +
+    throw std::invalid_argument("htc_circular_channel: unknown correlation '" +
                                 correlation + "'. " +
                                 "Valid options: 'gnielinski', "
                                 "'dittus_boelter', 'sieder_tate', 'petukhov'");

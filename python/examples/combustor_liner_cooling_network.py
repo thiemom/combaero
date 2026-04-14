@@ -49,12 +49,12 @@ from combaero.heat_transfer import (
     SmoothModel,
 )
 from combaero.network import (
+    ChannelElement,
     FlowNetwork,
     MassFlowBoundary,
     MixtureState,
     NetworkSolver,
     OrificeElement,
-    PipeElement,
     PlenumNode,
     PressureBoundary,
     WallConnection,
@@ -107,7 +107,7 @@ def create_cooling_network(
     net.add_node(PressureBoundary("cool_outlet", P_total=P2))
 
     # Cooling channel element with convective surface
-    cool_pipe = PipeElement(
+    cool_channel = ChannelElement(
         id="cool_channel",
         from_node="cool_inlet",
         to_node="cool_exit",
@@ -117,8 +117,8 @@ def create_cooling_network(
         surface=surface,
     )
     # Set wall temperature (will be updated iteratively)
-    cool_pipe.t_wall = T2  # initial guess
-    net.add_element(cool_pipe)
+    cool_channel.t_wall = T2  # initial guess
+    net.add_element(cool_channel)
 
     # Exit orifice (minimal resistance)
     net.add_element(
@@ -169,7 +169,7 @@ def create_coupled_wall_network(
     net.add_node(PlenumNode("hot_exit"))
     net.add_node(PressureBoundary("hot_outlet", P_total=P_hot))
 
-    hot_pipe = PipeElement(
+    hot_channel = ChannelElement(
         id="hot_channel",
         from_node="hot_inlet",
         to_node="hot_exit",
@@ -178,8 +178,8 @@ def create_coupled_wall_network(
         roughness=0.0,
         surface=hot_surface,
     )
-    hot_pipe.t_wall = T2
-    net.add_element(hot_pipe)
+    hot_channel.t_wall = T2
+    net.add_element(hot_channel)
 
     net.add_element(
         OrificeElement(

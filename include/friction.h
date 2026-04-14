@@ -62,9 +62,9 @@ constexpr double coeff_b = 1.64;  // offset
 double friction_petukhov(double Re);
 
 // -------------------------------------------------------------
-// Pipe Roughness Database
+// Channel Roughness Database
 // -------------------------------------------------------------
-// Absolute roughness ε [m] for common pipe materials.
+// Absolute roughness ε [m] for common channel materials.
 // Used as e_D = ε/D in friction factor correlations.
 //
 // References:
@@ -73,14 +73,22 @@ double friction_petukhov(double Re);
 // - Munson et al. (2013): Fundamentals of Fluid Mechanics (7th ed.), Table 8.1
 // - Crane Co. (2009): Technical Paper No. 410, Table A-24
 
-// Get absolute roughness for a standard pipe material [m].
+// Get absolute roughness for a standard channel material [m].
 // Material names are case-insensitive.
 // Throws std::invalid_argument if material not found.
-// Use standard_pipe_roughness() to list available materials.
-double pipe_roughness(const std::string &material);
+// Use standard_channel_roughness() to list available materials.
+double channel_roughness(const std::string &material);
 
-// Get all standard pipe roughness values.
+inline double pipe_roughness(const std::string &material) {
+  return channel_roughness(material);
+}
+
+// Get all standard channel roughness values.
 // Returns: map of material name -> roughness [m]
-std::unordered_map<std::string, double> standard_pipe_roughness();
+std::unordered_map<std::string, double> standard_channel_roughness();
+
+inline std::unordered_map<std::string, double> standard_pipe_roughness() {
+  return standard_channel_roughness();
+}
 
 #endif // FRICTION_H

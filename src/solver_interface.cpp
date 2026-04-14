@@ -1348,7 +1348,7 @@ OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
   return res;
 }
 
-PipeResult pipe_residuals_and_jacobian(double m_dot, double P_total_up,
+ChannelResult channel_residuals_and_jacobian(double m_dot, double P_total_up,
                                        double P_static_up, double T_up,
                                        const std::vector<double> &Y_up,
                                        double P_static_down, double L, double D,
@@ -1369,7 +1369,7 @@ PipeResult pipe_residuals_and_jacobian(double m_dot, double P_total_up,
 
   double dP_calc = f * (L / D) * (0.5 * rho * v * abs_v);
 
-  PipeResult res;
+  ChannelResult res;
   res.dP_calc = dP_calc;
 
   double dRe_dmdot = D / (mu * area);
@@ -1608,7 +1608,7 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
   return res;
 }
 
-std::tuple<double, double, double, double> pipe_compressible_mdot_and_jacobian(
+std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobian(
     double T_in, double P_in, double u_in,
     const std::vector<double>& X,
     double L, double D, double roughness,
@@ -1669,7 +1669,7 @@ std::tuple<double, double, double, double> pipe_compressible_mdot_and_jacobian(
   return {dP, d_dP_dP_in, d_dP_dT_in, d_dP_du_in};
 }
 
-PipeResult pipe_compressible_residuals_and_jacobian(
+ChannelResult channel_compressible_residuals_and_jacobian(
     double m_dot, double P_total_up, double T_up,
     const std::vector<double>& Y_up,
     double P_static_down, double L, double D, double roughness,
@@ -1689,9 +1689,9 @@ PipeResult pipe_compressible_residuals_and_jacobian(
 
   // Get pressure drop and partial Jacobians w.r.t. (P_in, T_in, u_in)
   auto [dP_calc, d_dP_dP_in, d_dP_dT_in, d_dP_du_in] =
-      pipe_compressible_mdot_and_jacobian(T_up, P_total_up, u_in, X_up, L, D, roughness, friction_model);
+      channel_compressible_mdot_and_jacobian(T_up, P_total_up, u_in, X_up, L, D, roughness, friction_model);
 
-  PipeResult res;
+  ChannelResult res;
   res.dP_calc = dP_calc;
 
   // --- Full chain rule through u = m_dot / (rho(T,P) * area) ---
@@ -1721,7 +1721,7 @@ PipeResult pipe_compressible_residuals_and_jacobian(
     auto [rho_plus, dummy1, dummy2] = density_and_jacobians(T_up, P_total_up, X_plus);
     double u_plus = m_dot / (rho_plus * area);
     auto [dP_plus, dummy3, dummy4, dummy5] =
-        pipe_compressible_mdot_and_jacobian(T_up, P_total_up, u_plus, X_plus, L, D, roughness, friction_model);
+        channel_compressible_mdot_and_jacobian(T_up, P_total_up, u_plus, X_plus, L, D, roughness, friction_model);
     res.d_dP_dY_up[i] = (dP_plus - dP_calc) / eps_Y;
   }
 

@@ -223,14 +223,14 @@ CompressibleFlowSolution nozzle_flow(double T0, double P0, double P_back,
                                      double A_eff, const std::vector<double>& X,
                                      double tol = 1e-8, std::size_t max_iter = 50);
 
-FannoSolution fanno_pipe(double T_in, double P_in, double u_in, double L, double D,
-                         double f, const std::vector<double>& X,
-                         std::size_t n_steps = 100, bool store_profile = false);
+FannoSolution fanno_channel(double T_in, double P_in, double u_in, double L, double D,
+                          double f, const std::vector<double>& X,
+                          std::size_t n_steps = 100, bool store_profile = false);
 
-FannoSolution fanno_pipe_rough(double T_in, double P_in, double u_in, double L, double D,
-                               double roughness, const std::vector<double>& X,
-                               const std::string& correlation = "haaland",
-                               std::size_t n_steps = 100, bool store_profile = false);
+FannoSolution fanno_channel_rough(double T_in, double P_in, double u_in, double L, double D,
+                                double roughness, const std::vector<double>& X,
+                                const std::string& correlation = "haaland",
+                                std::size_t n_steps = 100, bool store_profile = false);
 ```
 
 ### Quasi-1D Nozzle Flow
@@ -328,7 +328,7 @@ ThrustResult nozzle_thrust(double T0, double P0, double P_design, double P_amb,
 ```cpp
 double bernoulli_P2(double P1, double v1, double v2, double rho, double dz = 0.0);
 double orifice_mdot(double P1, double P2, double A, double Cd, double rho);
-double pipe_dP(double v, double L, double D, double f, double rho);
+double channel_dP(double v, double L, double D, double f, double rho);
 ```
 
 ---
@@ -445,9 +445,9 @@ struct WallCouplingResult {
 ## Geometry Utilities (geometry.h)
 
 ```cpp
-double pipe_area(double D);
+double channel_area(double D);
 double hydraulic_diameter(double A, double P_wetted);
-double pipe_roughness(const std::string& material);
+double channel_roughness(const std::string& material);
 double residence_time(double V, double Q);
 ```
 
@@ -572,7 +572,7 @@ struct OrificeResult {
     std::vector<double> d_mdot_dY_up;
 };
 
-struct PipeResult {
+struct ChannelResult {
     double dP_calc;
     double d_dP_d_mdot;
     double d_dP_dP_static_up;
@@ -608,14 +608,14 @@ OrificeResult orifice_residuals_and_jacobian(
     const std::vector<double>& Y_up, double P_static_down, double Cd,
     double area, double beta = 0.0);
 
-// Pipe flow with Darcy friction
-PipeResult pipe_residuals_and_jacobian(
+// Channel flow with Darcy friction
+ChannelResult channel_residuals_and_jacobian(
     double m_dot, double P_total_up, double P_static_up, double T_up,
     const std::vector<double>& Y_up, double P_static_down, double L, double D,
     double roughness, const std::string& friction_model = "haaland");
 
 // Flow restriction (K-factor)
-PipeResult restriction_residuals_and_jacobian(
+ChannelResult restriction_residuals_and_jacobian(
     double m_dot, double P_total_up, double P_static_up, double T_up,
     const std::vector<double>& Y_up, double P_static_down, double K);
 ```
@@ -632,13 +632,13 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
     double m_dot, double P_total_up, double T_up, const std::vector<double>& Y_up,
     double P_static_down, double Cd, double area, double beta);
 
-// Compressible pipe flow using Fanno model with variable friction
-std::tuple<double, double, double, double> pipe_compressible_mdot_and_jacobian(
+// Compressible channel flow using Fanno model with variable friction
+std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobian(
     double T_in, double P_in, double u_in, const std::vector<double>& X,
     double L, double D, double roughness, const std::string& friction_model);
 
-// Full compressible pipe evaluation for network solver
-PipeResult pipe_compressible_residuals_and_jacobian(
+// Full compressible channel evaluation for network solver
+ChannelResult channel_compressible_residuals_and_jacobian(
     double m_dot, double P_total_up, double T_up, const std::vector<double>& Y_up,
     double P_static_down, double L, double D, double roughness,
     const std::string& friction_model);

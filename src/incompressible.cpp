@@ -92,31 +92,31 @@ double orifice_dP(double mdot, double A, double Cd, double rho) {
 // Pipe flow (Darcy-Weisbach)
 // -------------------------------------------------------------
 
-double pipe_dP(double v, double L, double D, double f, double rho) {
+double channel_dP(double v, double L, double D, double f, double rho) {
   if (D <= 0.0 || L < 0.0 || f < 0.0 || rho <= 0.0) {
-    throw std::invalid_argument("pipe_dP: invalid parameters");
+    throw std::invalid_argument("channel_dP: invalid parameters");
   }
   // ΔP = f · (L/D) · (ρ · v² / 2)
   return f * (L / D) * 0.5 * rho * v * v;
 }
 
-double pipe_dP_mdot(double mdot, double L, double D, double f, double rho) {
-  double v = pipe_velocity(mdot, D, rho);
-  return pipe_dP(v, L, D, f, rho);
+double channel_dP_mdot(double mdot, double L, double D, double f, double rho) {
+  double v = channel_velocity(mdot, D, rho);
+  return channel_dP(v, L, D, f, rho);
 }
 
-double pipe_velocity(double mdot, double D, double rho) {
+double channel_velocity(double mdot, double D, double rho) {
   if (D <= 0.0 || rho <= 0.0) {
-    throw std::invalid_argument("pipe_velocity: D and rho must be positive");
+    throw std::invalid_argument("channel_velocity: D and rho must be positive");
   }
   // v = ṁ / (ρ · A) where A = π·D²/4
   double A = M_PI * D * D / 4.0;
   return mdot / (rho * A);
 }
 
-double pipe_mdot(double v, double D, double rho) {
+double channel_mdot(double v, double D, double rho) {
   if (D <= 0.0 || rho <= 0.0) {
-    throw std::invalid_argument("pipe_mdot: D and rho must be positive");
+    throw std::invalid_argument("channel_mdot: D and rho must be positive");
   }
   // ṁ = ρ · v · A where A = π·D²/4
   double A = M_PI * D * D / 4.0;
@@ -265,27 +265,27 @@ build_incompressible_profile(double L, double P_in, double dP, double T,
   return profile;
 }
 
-IncompressibleFlowSolution pipe_flow(double T, double P,
-                                     const std::vector<double> &X, double u,
-                                     double L, double D, double f,
-                                     std::size_t n_steps, bool store_profile) {
+IncompressibleFlowSolution
+channel_flow(double T, double P, const std::vector<double> &X, double u,
+             double L, double D, double f, std::size_t n_steps,
+             bool store_profile) {
   if (T <= 0.0)
-    throw std::invalid_argument("pipe_flow: T must be positive");
+    throw std::invalid_argument("channel_flow: T must be positive");
   if (P <= 0.0)
-    throw std::invalid_argument("pipe_flow: P must be positive");
+    throw std::invalid_argument("channel_flow: P must be positive");
   if (u < 0.0)
-    throw std::invalid_argument("pipe_flow: u must be non-negative");
+    throw std::invalid_argument("channel_flow: u must be non-negative");
   if (L < 0.0)
-    throw std::invalid_argument("pipe_flow: L must be non-negative");
+    throw std::invalid_argument("channel_flow: L must be non-negative");
   if (D <= 0.0)
-    throw std::invalid_argument("pipe_flow: D must be positive");
+    throw std::invalid_argument("channel_flow: D must be positive");
   if (f < 0.0)
-    throw std::invalid_argument("pipe_flow: f must be non-negative");
+    throw std::invalid_argument("channel_flow: f must be non-negative");
 
   const double rho = density(T, P, X);
   const double mu = viscosity(T, P, X);
   const double Re = (mu > 0.0) ? rho * u * D / mu : 0.0;
-  const double dP = pipe_dP(u, L, D, f, rho);
+  const double dP = channel_dP(u, L, D, f, rho);
   const double A = M_PI * D * D / 4.0;
   const double mdot = rho * u * A;
 
@@ -309,30 +309,30 @@ IncompressibleFlowSolution pipe_flow(double T, double P,
 }
 
 IncompressibleFlowSolution
-pipe_flow_rough(double T, double P, const std::vector<double> &X, double u,
-                double L, double D, double roughness,
-                const std::string &correlation, std::size_t n_steps,
-                bool store_profile) {
+channel_flow_rough(double T, double P, const std::vector<double> &X, double u,
+                   double L, double D, double roughness,
+                   const std::string &correlation, std::size_t n_steps,
+                   bool store_profile) {
   if (T <= 0.0)
-    throw std::invalid_argument("pipe_flow_rough: T must be positive");
+    throw std::invalid_argument("channel_flow_rough: T must be positive");
   if (P <= 0.0)
-    throw std::invalid_argument("pipe_flow_rough: P must be positive");
+    throw std::invalid_argument("channel_flow_rough: P must be positive");
   if (u < 0.0)
-    throw std::invalid_argument("pipe_flow_rough: u must be non-negative");
+    throw std::invalid_argument("channel_flow_rough: u must be non-negative");
   if (L < 0.0)
-    throw std::invalid_argument("pipe_flow_rough: L must be non-negative");
+    throw std::invalid_argument("channel_flow_rough: L must be non-negative");
   if (D <= 0.0)
-    throw std::invalid_argument("pipe_flow_rough: D must be positive");
+    throw std::invalid_argument("channel_flow_rough: D must be positive");
   if (roughness < 0.0)
     throw std::invalid_argument(
-        "pipe_flow_rough: roughness must be non-negative");
+        "channel_flow_rough: roughness must be non-negative");
 
   const double rho = density(T, P, X);
   const double mu = viscosity(T, P, X);
   const double Re = (mu > 0.0) ? rho * u * D / mu : 0.0;
   const double e_D = roughness / D;
   const double f = friction_from_correlation(Re, e_D, correlation);
-  const double dP = pipe_dP(u, L, D, f, rho);
+  const double dP = channel_dP(u, L, D, f, rho);
   const double A = M_PI * D * D / 4.0;
   const double mdot = rho * u * A;
 
@@ -398,15 +398,15 @@ orifice_flow_thermo(double T, double P, const std::vector<double> &X,
   return sol;
 }
 
-// Pipe overload with additional K-loss correlation (bends, fittings, etc.).
+// Channel overload with additional K-loss correlation (bends, fittings, etc.).
 IncompressibleFlowSolution
-pipe_flow_rough(double T, double P, const std::vector<double> &X, double u,
-                double L, double D, double roughness,
-                const std::string &correlation,
-                const IncompressibleKLossFn &k_loss_fn, std::size_t n_steps,
-                bool store_profile) {
+channel_flow_rough(double T, double P, const std::vector<double> &X, double u,
+                   double L, double D, double roughness,
+                   const std::string &correlation,
+                   const IncompressibleKLossFn &k_loss_fn, std::size_t n_steps,
+                   bool store_profile) {
   // Compute base friction solution
-  IncompressibleFlowSolution sol = pipe_flow_rough(
+  IncompressibleFlowSolution sol = channel_flow_rough(
       T, P, X, u, L, D, roughness, correlation, n_steps, store_profile);
 
   // Evaluate additional K-loss at the computed Re (inlet state, loop-free)
@@ -417,28 +417,28 @@ pipe_flow_rough(double T, double P, const std::vector<double> &X, double u,
 }
 
 std::tuple<double, double, double>
-pressure_drop_pipe(double T, double P, const std::vector<double> &X, double v,
-                   double D, double L, double roughness,
-                   const std::string &correlation) {
+channel_pressure_drop(double T, double P, const std::vector<double> &X, double v,
+                      double D, double L, double roughness,
+                      const std::string &correlation) {
   if (T <= 0.0)
-    throw std::invalid_argument("pressure_drop_pipe: T must be positive");
+    throw std::invalid_argument("channel_pressure_drop: T must be positive");
   if (P <= 0.0)
-    throw std::invalid_argument("pressure_drop_pipe: P must be positive");
+    throw std::invalid_argument("channel_pressure_drop: P must be positive");
   if (D <= 0.0)
-    throw std::invalid_argument("pressure_drop_pipe: D must be positive");
+    throw std::invalid_argument("channel_pressure_drop: D must be positive");
   if (L < 0.0)
-    throw std::invalid_argument("pressure_drop_pipe: L must be non-negative");
+    throw std::invalid_argument("channel_pressure_drop: L must be non-negative");
   if (v < 0.0)
-    throw std::invalid_argument("pressure_drop_pipe: v must be non-negative");
+    throw std::invalid_argument("channel_pressure_drop: v must be non-negative");
   if (roughness < 0.0)
     throw std::invalid_argument(
-        "pressure_drop_pipe: roughness must be non-negative");
+        "channel_pressure_drop: roughness must be non-negative");
 
   const double rho = density(T, P, X);
   const double Re = reynolds(T, P, X, v, D);
   const double e_D = roughness / D;
   const double f = friction_from_correlation(Re, e_D, correlation);
-  const double dP = pipe_dP(v, L, D, f, rho);
+  const double dP = channel_dP(v, L, D, f, rho);
 
   return std::make_tuple(dP, Re, f);
 }

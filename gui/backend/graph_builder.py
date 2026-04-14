@@ -9,6 +9,7 @@ from combaero.network import (
     MomentumChamberNode,
     OrificeElement,
     PinFinModel,
+    ChannelElement,
     PipeElement,
     PlenumNode,
     PressureBoundary,
@@ -213,7 +214,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         if elem_type == "channel":
             data = ChannelData(**elem_data)
             conv_area = 3.1415926535 * data.D * data.L
-            elem = PipeElement(
+            elem = ChannelElement(
                 elem_id,
                 from_node=source_id,
                 to_node=target_id,

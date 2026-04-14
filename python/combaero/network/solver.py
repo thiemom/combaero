@@ -9,6 +9,7 @@ from scipy.optimize import root
 import combaero as cb
 
 from .components import (
+    ChannelElement,
     EnergyBoundary,
     LosslessConnectionElement,
     MassFlowBoundary,
@@ -124,7 +125,9 @@ class NetworkSolver:
 
         for element in self.network.elements.values():
             elem_scale = (
-                ref_p if isinstance(element, (PipeElement, LosslessConnectionElement)) else ref_mdot
+                ref_p
+                if isinstance(element, (ChannelElement, PipeElement, LosslessConnectionElement))
+                else ref_mdot
             )
             scales.extend([elem_scale] * element.n_equations())
 

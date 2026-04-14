@@ -83,13 +83,15 @@ struct OrificeResult {
   std::vector<double> d_mdot_dY_up;
 };
 
-struct PipeResult { // TODO: Rename to ChannelResult
+struct ChannelResult {
   double dP_calc;
   double d_dP_d_mdot;
   double d_dP_dP_static_up;
   double d_dP_dT_up;
   std::vector<double> d_dP_dY_up;
 };
+
+using PipeResult = ChannelResult;
 
 // -----------------------------------------------------------------------------
 // 1. Incompressible Flow Components
@@ -134,13 +136,24 @@ OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
 std::tuple<double, double> pressure_loss_and_jacobian(double v, double rho,
                                                        double K);
 
-// Full pipe evaluation with all derivatives. (TODO: Rename to channel_*)
-PipeResult pipe_residuals_and_jacobian(double m_dot, double P_total_up,
-                                       double P_static_up, double T_up,
-                                       const std::vector<double> &Y_up,
-                                       double P_static_down, double L, double D,
-                                       double roughness,
-                                       const std::string &friction_model);
+// Full channel evaluation with all derivatives.
+ChannelResult channel_residuals_and_jacobian(double m_dot, double P_total_up,
+                                             double P_static_up, double T_up,
+                                             const std::vector<double> &Y_up,
+                                             double P_static_down, double L,
+                                             double D, double roughness,
+                                             const std::string &friction_model);
+
+inline ChannelResult
+pipe_residuals_and_jacobian(double m_dot, double P_total_up, double P_static_up,
+                            double T_up, const std::vector<double> &Y_up,
+                            double P_static_down, double L, double D,
+                            double roughness,
+                            const std::string &friction_model) {
+  return channel_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up,
+                                        Y_up, P_static_down, L, D, roughness,
+                                        friction_model);
+}
 
 
 // Calculate Lossless Connection Ideal Pressure and Jacobian
@@ -210,18 +223,36 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
 //   d_dP_dP_in : Jacobian w.r.t. inlet pressure [Pa/Pa] = [-]
 //   d_dP_dT_in : Jacobian w.r.t. inlet temperature [Pa/K]
 //   d_dP_du_in : Jacobian w.r.t. inlet velocity [Pa/(m/s)]
-std::tuple<double, double, double, double> pipe_compressible_mdot_and_jacobian(
+std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobian(
     double T_in, double P_in, double u_in,
     const std::vector<double>& X,
     double L, double D, double roughness,
     const std::string& friction_model);
 
-// Full compressible pipe evaluation with all derivatives for network solver. (TODO: Rename to channel_*)
-PipeResult pipe_compressible_residuals_and_jacobian(
+inline std::tuple<double, double, double, double>
+pipe_compressible_mdot_and_jacobian(double T_in, double P_in, double u_in,
+                                    const std::vector<double> &X, double L,
+                                    double D, double roughness,
+                                    const std::string &friction_model) {
+  return channel_compressible_mdot_and_jacobian(
+      T_in, P_in, u_in, X, L, D, roughness, friction_model);
+}
+
+// Full compressible channel evaluation with all derivatives for network solver.
+ChannelResult channel_compressible_residuals_and_jacobian(
     double m_dot, double P_total_up, double T_up,
     const std::vector<double>& Y_up,
     double P_static_down, double L, double D, double roughness,
     const std::string& friction_model);
+
+inline ChannelResult pipe_compressible_residuals_and_jacobian(
+    double m_dot, double P_total_up, double T_up,
+    const std::vector<double> &Y_up, double P_static_down, double L, double D,
+    double roughness, const std::string &friction_model) {
+  return channel_compressible_residuals_and_jacobian(
+      m_dot, P_total_up, T_up, Y_up, P_static_down, L, D, roughness,
+      friction_model);
+}
 
 // -----------------------------------------------------------------------------
 // 2. Heat Transfer Components

@@ -176,7 +176,7 @@ All functions use consistent units to avoid conversion errors.
 
 | Function              | Input Units                                        | Output Unit                |
 |-----------------------|----------------------------------------------------|----------------------------|
-| `pipe_flow`           | T: K, P: Pa, X: mol/mol, u: m/s, L: m, D: m, f: -  | IncompressibleFlowSolution |
+| `channel_flow`        | T: K, P: Pa, X: mol/mol, u: m/s, L: m, D: m, f: -  | IncompressibleFlowSolution |
 | `orifice_flow_thermo` | T: K, P: Pa, X: mol/mol, P_back: Pa, A: m^2, Cd: - | IncompressibleFlowSolution |
 
 #### Bernoulli & Orifice
@@ -459,11 +459,11 @@ All functions use consistent units to avoid conversion errors.
 
 | Function                     | Input Units            | Output Unit  |
 |------------------------------|------------------------|--------------|
-| `pipe_area`                  | D: m                   | m^2          |
+| `circular_area`              | D: m                   | m^2          |
 | `annular_area`               | D_outer: m, D_inner: m | m^2          |
-| `pipe_volume`                | D: m, L: m             | m^3          |
-| `pipe_roughness`             | material: str          | m            |
-| `standard_pipe_roughness`    | -                      | dict[str, m] |
+| `cylinder_volume`            | D: m, L: m             | m^3          |
+| `channel_roughness`          | material: str          | m            |
+| `standard_channel_roughness` | -                      | dict[str, m] |
 | `hydraulic_diameter`         | A: m^2, P_wetted: m    | m            |
 | `hydraulic_diameter_rect`    | a: m, b: m             | m            |
 | `hydraulic_diameter_annulus` | D_outer: m, D_inner: m | m            |
@@ -477,8 +477,8 @@ All functions use consistent units to avoid conversion errors.
 | `nusselt_sieder_tate`          | Re: -, Pr: -, mu_ratio: -                                        | - (Nu)                    |
 | `nusselt_petukhov`             | Re: -, Pr: -, f: - (optional)                                    | - (Nu)                    |
 | `htc_from_nusselt`             | Nu: -, k: W/(m*K), L: m                                          | W/(m^2*K)                 |
-| `nusselt_pipe`                 | State, V: m/s, D: m                                              | - (Nu)                    |
-| `htc_pipe`                     | State, V: m/s, D: m                                              | W/(m^2*K)                 |
+| `nusselt_circular_channel`     | State, V: m/s, D: m                                              | - (Nu)                    |
+| `htc_circular_channel`         | State, V: m/s, D: m                                              | W/(m^2*K)                 |
 | `lmtd`                         | dT1: K, dT2: K                                                   | K                         |
 | `lmtd_counterflow`             | T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K           | K                         |
 | `lmtd_parallelflow`            | T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K           | K                         |
@@ -809,10 +809,27 @@ All functions use consistent units to avoid conversion errors.
 | `AcousticProperties::particle_velocity`        | -                        | m/s                        |
 | `AcousticProperties::spl`                      | -                        | dB                         |
 | `AcousticProperties::wavelength`               | -                        | m                          |
-| `pipe_dP`                                      | -                        | m/s                        |
+| `channel_dP`                                   | -                        | Pa                         |
+| `channel_dP_mdot`                              | -                        | Pa                         |
+| `channel_velocity`                             | -                        | m/s                        |
+| `channel_mdot`                                 | -                        | kg/s                       |
+| `channel_area`                                 | -                        | m²                         |
+| `channel_volume`                               | -                        | m³                         |
+| `channel_roughness`                            | -                        | m                          |
+| `pressure_drop_channel`                        | -                        | Pa                         |
+| `nusselt_channel`                              | -                        | -                          |
+| `nusselt_pipe`                                 | -                        | -                          |
+| `htc_channel`                                  | -                        | W/(m²·K)                   |
+| `htc_pipe`                                     | -                        | W/(m²·K)                   |
+| `pipe_dP`                                      | -                        | Pa                         |
 | `pipe_dP_mdot`                                 | -                        | Pa                         |
 | `pipe_velocity`                                | -                        | m/s                        |
-| `pipe_mdot`                                    | -                        | m/s                        |
+| `pipe_mdot`                                    | -                        | kg/s                       |
+| `pressure_drop_pipe`                           | -                        | Pa                         |
+| `pipe_area`                                    | -                        | m²                         |
+| `pipe_volume`                                  | -                        | m³                         |
+| `pipe_roughness`                               | -                        | m                          |
+| `standard_pipe_roughness`                      | -                        | m                          |
 | `dynamic_pressure`                             | -                        | Pa                         |
 | `velocity_from_q`                              | -                        | m/s                        |
 | `OrificeGeometry::D`                           | -                        | m                          |
