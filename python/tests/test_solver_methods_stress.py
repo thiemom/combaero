@@ -43,7 +43,9 @@ def test_timeout_all_methods(method):
     outlet = PressureBoundary("outlet", P_total=101325.0, T_total=300.0)
     node = DivergentNode("bad_node")
 
-    conn1 = OrificeElement("orf1", "inlet", "bad_node", Cd=0.6, diameter=0.035682)
+    conn1 = OrificeElement(
+        "orf1", "inlet", "bad_node", Cd=0.6, diameter=0.035682, correlation="fixed"
+    )
     conn2 = LosslessConnectionElement("c2", "bad_node", "outlet")
 
     graph.add_node(inlet)

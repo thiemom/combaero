@@ -37,7 +37,9 @@ ELEMENT_FACTORIES = {
         regime="compressible",
         friction_model="colebrook",
     ),
-    "orifice": lambda id, f, t: OrificeElement(id, f, t, Cd=0.6, diameter=0.079788),
+    "orifice": lambda id, f, t: OrificeElement(
+        id, f, t, Cd=0.6, diameter=0.079788, correlation="fixed"
+    ),
     "lossless": lambda id, f, t: LosslessConnectionElement(id, f, t),
 }
 
@@ -86,7 +88,12 @@ def test_atomic_network_components():
     )
 
     orifice_1 = OrificeElement(
-        id="orifice_1", from_node="node_1", to_node="outlet", Cd=0.6, diameter=0.079788
+        id="orifice_1",
+        from_node="node_1",
+        to_node="outlet",
+        Cd=0.6,
+        diameter=0.079788,
+        correlation="fixed",
     )
 
     # 4. Verify basic properties
@@ -147,7 +154,12 @@ def test_flownetwork_topology():
     )
 
     orifice = cb.network.OrificeElement(
-        id="orf_1", from_node="node_1", to_node="outlet", Cd=0.6, diameter=0.079788
+        id="orf_1",
+        from_node="node_1",
+        to_node="outlet",
+        Cd=0.6,
+        diameter=0.079788,
+        correlation="fixed",
     )
 
     # 1. Register graph
@@ -216,9 +228,15 @@ def test_flownetwork_validation():
     graph3.add_node(cb.network.PressureBoundary("bnd_press_in"))
     graph3.add_node(cb.network.PressureBoundary("bnd_press_out"))
 
-    graph3.add_element(cb.network.OrificeElement("orifice", "bnd_press_in", "plenum_1", 0.6, 0.05))
     graph3.add_element(
-        cb.network.OrificeElement("orifice2", "plenum_1", "bnd_press_out", 0.6, 0.05)
+        cb.network.OrificeElement(
+            "orifice", "bnd_press_in", "plenum_1", 0.6, 0.05, correlation="fixed"
+        )
+    )
+    graph3.add_element(
+        cb.network.OrificeElement(
+            "orifice2", "plenum_1", "bnd_press_out", 0.6, 0.05, correlation="fixed"
+        )
     )
 
     graph3.validate()  # Should not raise

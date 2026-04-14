@@ -395,7 +395,7 @@ class WallConnection(ThermalWall):
 
     @property
     def wall_thickness(self) -> float:
-        return self.layers[0].thickness if self.layers else 0.0
+        return self.layers[0].thickness if self.layers else 1.0
 
     @property
     def wall_conductivity(self) -> float:
@@ -725,7 +725,7 @@ class MomentumChamberNode(NetworkNode):
         import combaero as cb
 
         # Store total mass flow for use in residuals
-        self._total_m_dot = sum(s.m_dot for s in upstream_states) if upstream_states else 0.0
+        self._total_m_dot = sum(s.m_dot for s in upstream_states) if upstream_states else 1.0
 
         # Store upstream element IDs for Jacobian
         self._upstream_element_ids = []
@@ -754,7 +754,7 @@ class MomentumChamberNode(NetworkNode):
         T_wall = self.t_wall if self.t_wall is not None else math.nan
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
         rho, _ = _safe_rho(state.density())
-        u = m_dot_total / (rho * self.area) if self.area > 0 else 0.0
+        u = m_dot_total / (rho * self.area) if self.area > 0 else 1.0
 
         diameter = self.Dh if self.Dh is not None else math.sqrt(4.0 * self.area / math.pi)
         length = self.length if self.length is not None else diameter
@@ -818,10 +818,10 @@ class MomentumChamberNode(NetworkNode):
 
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
         rho = cs.thermo.rho
-        u = m_dot_total / (rho * self.area) if rho > 0 and self.area > 0 else 0.0
+        u = m_dot_total / (rho * self.area) if rho > 0 and self.area > 0 else 1.0
         diameter = self.Dh if self.Dh is not None else math.sqrt(4.0 * self.area / math.pi)
 
-        re = (rho * u * diameter / cs.transport.mu) if cs.transport.mu > 0 else 0.0
+        re = (rho * u * diameter / cs.transport.mu) if cs.transport.mu > 0 else 1.0
 
         # Detailed heat transfer diagnostics if surface is active
         nu_val = 0.0
@@ -851,7 +851,7 @@ class MomentumChamberNode(NetworkNode):
             "Re": re,
             "Dh": diameter,
             "velocity": u,
-            "mach": (u / cs.thermo.a) if cs.thermo.a > 0 else 0.0,
+            "mach": (u / cs.thermo.a) if cs.thermo.a > 0 else 1.0,
             "Nu": nu_val,
             "htc": htc_val,
             "T_aw": t_aw_val,
@@ -994,7 +994,7 @@ class CombustorNode(NetworkNode):
         import combaero as cb
 
         # Store total mass flow and unburned temperature for use in diagnostics
-        self._total_m_dot = sum(s.m_dot for s in upstream_states) if upstream_states else 0.0
+        self._total_m_dot = sum(s.m_dot for s in upstream_states) if upstream_states else 1.0
         self._T_unburned = (
             sum(s.m_dot * s.T_total for s in upstream_states) / self._total_m_dot
             if self._total_m_dot > 0
@@ -1045,10 +1045,10 @@ class CombustorNode(NetworkNode):
 
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
         rho = cs.thermo.rho
-        u = m_dot_total / (rho * self.area) if rho > 0 and self.area > 0 else 0.0
+        u = m_dot_total / (rho * self.area) if rho > 0 and self.area > 0 else 1.0
         diameter = self.Dh if self.Dh is not None else math.sqrt(4.0 * self.area / math.pi)
 
-        re = (rho * u * diameter / cs.transport.mu) if cs.transport.mu > 0 else 0.0
+        re = (rho * u * diameter / cs.transport.mu) if cs.transport.mu > 0 else 1.0
 
         diag = {
             "h": cs.thermo.h,
@@ -1067,7 +1067,7 @@ class CombustorNode(NetworkNode):
             "Re": re,
             "Dh": diameter,
             "velocity": u,
-            "mach": u / cs.thermo.a if cs.thermo.a > 0 else 0.0,
+            "mach": u / cs.thermo.a if cs.thermo.a > 0 else 1.0,
         }
 
         # --- Combustion Diagnostics ---
@@ -1103,16 +1103,13 @@ class OrificeElement(NetworkElement):
     - regime='incompressible': m_dot = Cd * A * sqrt(2 * rho * dP)
     - regime='compressible': Uses isentropic nozzle flow with smooth choked transition
 
-    When auto_Cd=True (default), the discharge coefficient is computed from the
-    CombAero orifice correlations (cb.Cd_orifice) using the orifice bore diameter
-    (derived from area) and the upstream channel diameter (discovered via resolve_topology).
-    The correlation is auto-selected based on geometry:
-      - edge_radius > 0  -> rounded-entry (Idelchik)
-      - plate_thickness > 0 -> thick-plate (Idelchik)
-      - otherwise        -> sharp thin-plate (Reader-Harris/Gallagher, ISO 5167-2)
-    When no upstream channel is found (e.g. direct plenum connection, beta -> 0),
-    the RHG formula extrapolates to Cd ~ 0.597. The user-supplied Cd is always
-    used as fallback when auto_Cd=False.
+    The discharge coefficient Cd is determined by the 'correlation' parameter:
+      - 'fixed': Uses the user-supplied Cd value directly.
+      - 'ReaderHarrisGallagher': Sharp thin-plate (ISO 5167-2 / RHG).
+      - 'Stolz': ISO 5167:1980 (Corner taps).
+      - 'Miller': Miller (1996) simplified correlation.
+      - 'ThickPlate': Thick-plate sharp-edged orifice (requires plate_thickness).
+      - 'RoundedEntry': Rounded-entry orifice (requires edge_radius).
     """
 
     def __init__(
@@ -1120,10 +1117,10 @@ class OrificeElement(NetworkElement):
         id: str,
         from_node: str,
         to_node: str,
-        Cd: float,
+        Cd: float = 0.6,
         diameter: float | None = None,
         regime: Literal["incompressible", "compressible"] = "incompressible",
-        auto_Cd: bool = False,
+        correlation: str = "ReaderHarrisGallagher",
         plate_thickness: float = 0.0,
         edge_radius: float = 0.0,
         area: float | None = None,
@@ -1143,12 +1140,13 @@ class OrificeElement(NetworkElement):
 
         self.Cd = Cd
         self.regime = regime
-        self.auto_Cd = auto_Cd
+        self.correlation = correlation
+        self.use_correlation = correlation != "fixed"
         self.plate_thickness = plate_thickness
         self.edge_radius = edge_radius
         self.upstream_diameter: float | None = None
         self.downstream_diameter: float | None = None
-        # OrificeGeometry built in resolve_topology (if auto_Cd)
+        # OrificeGeometry built in resolve_topology
         self._orifice_geom: object | None = None
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
@@ -1190,7 +1188,7 @@ class OrificeElement(NetworkElement):
                     stacklevel=2,
                 )
 
-        if self.auto_Cd:
+        if self.use_correlation:
             import combaero as cb
 
             # Build geometry descriptor for Cd correlation.
@@ -1198,8 +1196,10 @@ class OrificeElement(NetworkElement):
             D_up = (
                 self.upstream_diameter
                 if self.upstream_diameter and self.upstream_diameter > 0
-                else 0.0
+                else 1.0
             )
+            if D_up <= d_bore:
+                D_up = d_bore * 10.0
             geom = cb.OrificeGeometry()
             geom.d = d_bore
             geom.D = D_up
@@ -1211,14 +1211,13 @@ class OrificeElement(NetworkElement):
         return [f"{self.id}.m_dot"]
 
     def _effective_Cd(self, state_in: "MixtureState", state_out: "MixtureState") -> float:
-        """Return effective Cd: from correlation when auto_Cd=True, else user-supplied."""
-        if not self.auto_Cd or self._orifice_geom is None:
+        """Return effective Cd: from correlation or user-supplied fixed value."""
+        if not self.use_correlation or self._orifice_geom is None:
             return self.Cd
 
         import combaero as cb
 
         # Estimate Re_D from current m_dot and upstream viscosity.
-        # When D=0 (no upstream channel), Re_D is set to a typical mid-range value.
         D_up = self._orifice_geom.D
         if D_up > 0.0:
             ts = cb.transport_state(state_in.T, state_in.P, state_in.X)
@@ -1234,11 +1233,42 @@ class OrificeElement(NetworkElement):
         flow_state.rho = cb.density(state_in.T, state_in.P, state_in.X)
         flow_state.mu = cb.transport_state(state_in.T, state_in.P, state_in.X).mu
 
-        # cb.Cd_orifice auto-selects RHG / thick-plate / rounded based on geometry flags.
-        try:
+        # Correlation selection logic
+        if self.correlation == "ReaderHarrisGallagher":
+            return float(cb.Cd_sharp_thin_plate(self._orifice_geom, flow_state))
+        elif self.correlation == "Stolz":
+            b = self._orifice_geom.beta
+            b2 = b * b
+            b8 = b2 * b2 * b2 * b2
+            cd = (
+                0.5961
+                + 0.0261 * b2
+                - 0.216 * b8
+                + 0.000521 * math.pow(1e6 * b / max(flow_state.Re_D, 1.0), 0.7)
+            )
+            return float(cd)
+        elif self.correlation == "Miller":
+            b = self._orifice_geom.beta
+            b2 = b * b
+            b8 = b2 * b2 * b2 * b2
+            cd = (
+                0.5959
+                + 0.0312 * math.pow(b, 2.1)
+                - 0.184 * b8
+                + 91.71 * math.pow(b, 2.5) * math.pow(max(flow_state.Re_D, 1.0), -0.75)
+            )
+            return float(cd)
+        elif self.correlation == "ThickPlate":
+            if self._orifice_geom.t <= 0:
+                return float(cb.Cd_sharp_thin_plate(self._orifice_geom, flow_state))
+            return float(cb.Cd_thick_plate(self._orifice_geom, flow_state))
+        elif self.correlation == "RoundedEntry":
+            if self._orifice_geom.r <= 0:
+                return float(cb.Cd_sharp_thin_plate(self._orifice_geom, flow_state))
+            return float(cb.Cd_rounded_entry(self._orifice_geom, flow_state))
+        else:
+            # Default/Auto
             return float(cb.Cd_orifice(self._orifice_geom, flow_state))
-        except Exception:
-            return self.Cd  # fallback to user value on any C++ error
 
     def residuals(
         self, state_in: "MixtureState", state_out: "MixtureState"
@@ -1324,7 +1354,7 @@ class OrificeElement(NetworkElement):
             "mach": mach_throat,
             "p_ratio": p_ratio,
             "Cd": effective_cd,
-            "auto_Cd": float(self.auto_Cd),  # 1.0 = computed from correlation, 0.0 = user-supplied
+            "is_correlation": float(self.use_correlation),
             # Thermo
             "h": cs.thermo.h,
             "s": cs.thermo.s,
@@ -1393,7 +1423,7 @@ class EffectiveAreaConnectionElement(OrificeElement):
         import math
 
         diameter = math.sqrt(4.0 * effective_area / math.pi)
-        super().__init__(id, from_node, to_node, Cd=1.0, diameter=diameter)
+        super().__init__(id, from_node, to_node, Cd=1.0, diameter=diameter, correlation="fixed")
 
         # Force self.area to be precisely the effective area
         # (to remove any floating point math.sqrt / pi precision issues)
@@ -1493,7 +1523,7 @@ class DiameterDischargeCoefficientConnectionElement(OrificeElement):
             Cd = 1.0 / (zeta + 1.0) ** 0.5
 
         # Pass physical diameter and Cd directly to parent
-        super().__init__(id, from_node, to_node, Cd=Cd, diameter=diameter)
+        super().__init__(id, from_node, to_node, Cd=Cd, diameter=diameter, correlation="fixed")
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         """
@@ -1666,12 +1696,12 @@ class ChannelElement(NetworkElement):
 
         # Inlet Mach
         rho_in = state_in.density()
-        v_in = state_in.m_dot / (rho_in * self.area) if self.area > 0 and rho_in > 0 else 0.0
+        v_in = state_in.m_dot / (rho_in * self.area) if self.area > 0 and rho_in > 0 else 1.0
         mach_in = float(cb.mach_number(v_in, state_in.T, state_in.X))
 
         # Outlet Mach (at static pressure P_out)
         rho_out = cb.density(state_out.T, state_out.P, state_out.X)
-        v_out = state_out.m_dot / (rho_out * self.area) if self.area > 0 and rho_out > 0 else 0.0
+        v_out = state_out.m_dot / (rho_out * self.area) if self.area > 0 and rho_out > 0 else 1.0
         mach_out = float(cb.mach_number(v_out, state_out.T, state_out.X))
 
         p_ratio_total = state_out.P_total / state_in.P_total if state_in.P_total > 0 else 1.0
@@ -1680,7 +1710,7 @@ class ChannelElement(NetworkElement):
         cs = cb.complete_state(state_in.T, state_in.P, state_in.X)
 
         # Reynolds number at inlet: Re = rho * v * D / mu
-        re_in = (rho_in * v_in * self.diameter / cs.transport.mu) if cs.transport.mu > 0 else 0.0
+        re_in = (rho_in * v_in * self.diameter / cs.transport.mu) if cs.transport.mu > 0 else 1.0
 
         res_dict = {
             "mach_in": mach_in,
@@ -1787,7 +1817,7 @@ class ChannelElement(NetworkElement):
             return None
 
         rho, _ = _safe_rho(state.density())
-        u = state.m_dot / (rho * self.area) if self.area > 0 else 0.0
+        u = state.m_dot / (rho * self.area) if self.area > 0 else 1.0
 
         # Use nan for T_wall if not specified (matches C++ default)
         T_wall = self.t_wall if self.t_wall is not None else math.nan

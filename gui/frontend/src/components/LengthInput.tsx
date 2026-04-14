@@ -39,7 +39,7 @@ const LengthInput: React.FC<LengthInputProps> = ({
 				<select
 					value={unit}
 					onChange={(e) => setLengthUnit(e.target.value as "m" | "mm")}
-					className="w-10 h-[30px] border rounded text-[9px] bg-white outline-none shrink-0"
+					className="w-14 h-[30px] border rounded text-[9px] bg-white outline-none shrink-0"
 				>
 					<option value="m">m</option>
 					<option value="mm">mm</option>

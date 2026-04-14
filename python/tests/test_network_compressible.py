@@ -29,7 +29,13 @@ def test_compressible_orifice_network():
 
     # Compressible orifice
     orifice = OrificeElement(
-        "orifice", "inlet", "outlet", Cd=0.65, diameter=0.011284, regime="compressible"
+        "orifice",
+        "inlet",
+        "outlet",
+        Cd=0.65,
+        diameter=0.011284,
+        regime="compressible",
+        correlation="fixed",
     )
     net.add_element(orifice)
 
@@ -115,7 +121,13 @@ def test_mixed_compressible_incompressible_network():
 
     # Compressible orifice in middle (high pressure drop)
     orifice = OrificeElement(
-        "orifice", "j1", "j2", Cd=0.65, diameter=0.011284, regime="compressible"
+        "orifice",
+        "j1",
+        "j2",
+        Cd=0.65,
+        diameter=0.011284,
+        regime="compressible",
+        correlation="fixed",
     )
 
     # Incompressible channel at end
@@ -161,7 +173,13 @@ def test_compressible_vs_incompressible_comparison():
         net.add_node(outlet)
 
         orifice = OrificeElement(
-            "orifice", "inlet", "outlet", Cd=0.65, diameter=0.015958, regime=regime
+            "orifice",
+            "inlet",
+            "outlet",
+            Cd=0.65,
+            diameter=0.015958,
+            regime=regime,
+            correlation="fixed",
         )
         net.add_element(orifice)
         return net
@@ -197,7 +215,13 @@ def test_compressible_choked_orifice():
     net.add_node(outlet)
 
     orifice = OrificeElement(
-        "orifice", "inlet", "outlet", Cd=0.65, diameter=0.007979, regime="compressible"
+        "orifice",
+        "inlet",
+        "outlet",
+        Cd=0.65,
+        diameter=0.007979,
+        regime="compressible",
+        correlation="fixed",
     )
     net.add_element(orifice)
 
@@ -319,6 +343,7 @@ def _build_fully_coupled_network(regime: str, mach_target: float) -> FlowNetwork
             Cd=0.72,
             diameter=0.030,
             regime=orifice_regime,
+            correlation="fixed",
         )
     )
 
@@ -342,6 +367,7 @@ def _build_fully_coupled_network(regime: str, mach_target: float) -> FlowNetwork
             Cd=0.72,
             diameter=0.025,
             regime=orifice_regime,
+            correlation="fixed",
         )
     )
 

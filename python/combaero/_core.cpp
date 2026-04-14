@@ -668,6 +668,8 @@ PYBIND11_MODULE(_core, m) {
       "transport_state",
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+        if (T <= 0.0) throw std::invalid_argument("Temperature must be strictly positive");
+        if (P <= 0.0) throw std::invalid_argument("Pressure must be strictly positive");
         auto X = to_vec(X_arr);
         return transport_state(T, P, X);
       },

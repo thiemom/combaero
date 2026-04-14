@@ -81,10 +81,10 @@ def test_two_channel_wall_coupling_convergence():
 
     # Connect plenums to outlets with orifices
     hot_orifice = OrificeElement(
-        "hot_orifice", "hot_plenum", "hot_outlet", Cd=0.8, diameter=0.079788
+        "hot_orifice", "hot_plenum", "hot_outlet", Cd=0.8, diameter=0.079788, correlation="fixed"
     )
     cold_orifice = OrificeElement(
-        "cold_orifice", "cold_plenum", "cold_outlet", Cd=0.8, diameter=0.079788
+        "cold_orifice", "cold_plenum", "cold_outlet", Cd=0.8, diameter=0.079788, correlation="fixed"
     )
     net.add_element(hot_orifice)
     net.add_element(cold_orifice)
@@ -185,10 +185,20 @@ def test_thermal_coupling_disabled_matches_no_wall():
 
         # Orifices
         hot_orifice = OrificeElement(
-            "hot_orifice", "hot_plenum", "hot_outlet", Cd=0.8, diameter=0.025231
+            "hot_orifice",
+            "hot_plenum",
+            "hot_outlet",
+            Cd=0.8,
+            diameter=0.025231,
+            correlation="fixed",
         )
         cold_orifice = OrificeElement(
-            "cold_orifice", "cold_plenum", "cold_outlet", Cd=0.8, diameter=0.025231
+            "cold_orifice",
+            "cold_plenum",
+            "cold_outlet",
+            Cd=0.8,
+            diameter=0.025231,
+            correlation="fixed",
         )
         net.add_element(hot_orifice)
         net.add_element(cold_orifice)
@@ -289,10 +299,10 @@ def test_wall_coupling_jacobian_validation():
 
     # Orifices
     hot_orifice = OrificeElement(
-        "hot_orifice", "hot_plenum", "hot_outlet", Cd=0.8, diameter=0.035682
+        "hot_orifice", "hot_plenum", "hot_outlet", Cd=0.8, diameter=0.035682, correlation="fixed"
     )
     cold_orifice = OrificeElement(
-        "cold_orifice", "cold_plenum", "cold_outlet", Cd=0.8, diameter=0.035682
+        "cold_orifice", "cold_plenum", "cold_outlet", Cd=0.8, diameter=0.035682, correlation="fixed"
     )
     net.add_element(hot_orifice)
     net.add_element(cold_orifice)

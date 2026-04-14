@@ -39,7 +39,7 @@ def test_network_solver_simple_orifice():
     outlet.T_total = 300.0
     outlet.Y = inlet.Y
 
-    orf = OrificeElement("orf_1", "inlet", "outlet", Cd=0.6, diameter=0.079788)
+    orf = OrificeElement("orf_1", "inlet", "outlet", Cd=0.6, diameter=0.079788, correlation="fixed")
 
     graph.add_node(inlet)
     graph.add_node(outlet)
@@ -253,7 +253,9 @@ def test_network_lossless_connectors():
     outlet.Y = _get_air_Y()
 
     conn1 = LosslessConnectionElement("l1", "inlet", "plenum_idx")
-    orf1 = OrificeElement("o1", "plenum_idx", "outlet", Cd=0.65, diameter=0.112838)
+    orf1 = OrificeElement(
+        "o1", "plenum_idx", "outlet", Cd=0.65, diameter=0.112838, correlation="fixed"
+    )
 
     graph.add_node(inlet)
     graph.add_node(plen)

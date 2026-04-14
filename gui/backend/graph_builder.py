@@ -241,7 +241,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 to_node=target_id,
                 diameter=data.diameter,
                 Cd=data.Cd,
-                auto_Cd=data.auto_Cd,
+                correlation=data.correlation,
                 plate_thickness=data.plate_thickness,
                 edge_radius=data.edge_radius,
             )

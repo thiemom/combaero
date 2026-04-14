@@ -59,7 +59,7 @@ def test_validation_isolated_nodes():
     graph.add_node(outlet)
     graph.add_node(isolated)
 
-    elem = OrificeElement("conn", "inlet", "outlet", Cd=0.6, diameter=1.128379)
+    elem = OrificeElement("conn", "inlet", "outlet", Cd=0.6, diameter=1.128379, correlation="fixed")
     graph.add_element(elem)
 
     with pytest.raises(ValueError, match="Every node must be reachable from a PressureBoundary"):
@@ -84,7 +84,9 @@ def test_validation_unreachable_from_bc():
     # Actually wait, node 'inlet' has no connections. Let's fix that.
     outlet = PressureBoundary("outlet")
     graph.add_node(outlet)
-    elem1 = OrificeElement("conn1", "inlet", "outlet", Cd=0.6, diameter=1.128379)
+    elem1 = OrificeElement(
+        "conn1", "inlet", "outlet", Cd=0.6, diameter=1.128379, correlation="fixed"
+    )
     graph.add_element(elem1)
 
     with pytest.raises(ValueError, match="Every node must be reachable from a PressureBoundary"):
@@ -106,7 +108,9 @@ def test_validation_interior_node_connections():
     graph.add_element(conn)
 
     # outlet is connected to inlet
-    conn2 = OrificeElement("conn2", "inlet", "outlet", Cd=0.6, diameter=1.128379)
+    conn2 = OrificeElement(
+        "conn2", "inlet", "outlet", Cd=0.6, diameter=1.128379, correlation="fixed"
+    )
     graph.add_element(conn2)
 
     with pytest.raises(ValueError, match="Interior nodes must have at least 2 connections"):

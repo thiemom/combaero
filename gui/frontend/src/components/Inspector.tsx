@@ -463,21 +463,56 @@ const Inspector = () => {
 								updateNodeData(selectedNode.id, { diameter: val })
 							}
 						/>
-						<div className="flex items-center justify-between gap-2">
+
+						<div className="flex flex-col gap-2">
 							<label className="text-xs font-bold text-gray-500 uppercase">
-								Auto Cd (correlation)
+								Discharge Model (Cd)
 							</label>
-							<input
-								type="checkbox"
-								id={`auto_Cd_${selectedNode.id}`}
-								checked={selectedNode.data.auto_Cd !== false}
+							<select
+								className="p-2 border rounded bg-white text-xs border-stone-200"
+								value={selectedNode.data.correlation || "ReaderHarrisGallagher"}
 								onChange={(e) =>
-									updateNodeData(selectedNode.id, { auto_Cd: e.target.checked })
+									updateNodeData(selectedNode.id, {
+										correlation: e.target.value,
+									})
 								}
-								className="w-4 h-4 accent-blue-500"
-							/>
+							>
+								<option value="ReaderHarrisGallagher">
+									Reader-Harris/Gallagher (Sharp)
+								</option>
+								<option value="Stolz">Stolz (Corner Taps)</option>
+								<option value="Miller">Miller (Simplified)</option>
+								<option value="ThickPlate">Thick Plate (Sharp Edge)</option>
+								<option value="RoundedEntry">Rounded Entry</option>
+								<option value="fixed">Manual / Fixed Value</option>
+							</select>
 						</div>
-						{selectedNode.data.auto_Cd !== false && (
+
+						{/* Conditional Inputs based on correlation */}
+						{selectedNode.data.correlation === "ThickPlate" && (
+							<LengthInput
+								id={`plate_thickness_${selectedNode.id}`}
+								label="Plate Thickness (t)"
+								value={selectedNode.data.plate_thickness || 0.0}
+								onChange={(val) =>
+									updateNodeData(selectedNode.id, { plate_thickness: val })
+								}
+							/>
+						)}
+
+						{selectedNode.data.correlation === "RoundedEntry" && (
+							<LengthInput
+								id={`edge_radius_${selectedNode.id}`}
+								label="Inlet Edge Radius (r)"
+								value={selectedNode.data.edge_radius || 0.0}
+								onChange={(val) =>
+									updateNodeData(selectedNode.id, { edge_radius: val })
+								}
+							/>
+						)}
+
+						{/* Calculated Result (for correlation models) */}
+						{selectedNode.data.correlation !== "fixed" && (
 							<div className="flex flex-col gap-1 mb-2 bg-blue-50/50 p-2 rounded border border-blue-100/50">
 								<label className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">
 									Calculated Cd
@@ -489,38 +524,35 @@ const Inspector = () => {
 							</div>
 						)}
 
-						<div className="flex flex-col gap-1.5 opacity-80 scale-95 origin-top-left border-l-2 border-slate-200 pl-3 mt-1 py-1">
-							<label
-								htmlFor={`Cd_${selectedNode.id}`}
-								className="text-[10px] font-bold text-slate-500 uppercase tracking-tight"
-							>
-								{selectedNode.data.auto_Cd !== false
-									? "Manual Fallback Value"
-									: "Fixed Cd Value"}
-							</label>
-							<NumericInput
-								id={`Cd_${selectedNode.id}`}
-								value={selectedNode.data.Cd || 0.6}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, {
-										Cd: val,
-									})
-								}
-								className="p-1 h-7 text-xs border rounded bg-slate-50/50 focus:bg-white transition-colors"
-								placeholder="0.6"
-							/>
-							<p className="text-[9px] text-slate-400 italic leading-snug max-w-[180px]">
-								{selectedNode.data.auto_Cd !== false
-									? "This value is only used if the correlation Reynolds number is out-of-range."
-									: "The solver will ignore correlations and use this fixed value."}
-							</p>
-						</div>
-						<div className="flex flex-col gap-2">
-							<label className="text-xs font-bold text-gray-500 uppercase">
-								Regime
+						{/* Manual Entry (only for Fixed model) */}
+						{selectedNode.data.correlation === "fixed" && (
+							<div className="flex flex-col gap-1 mt-1">
+								<label
+									htmlFor={`Cd_${selectedNode.id}`}
+									className="text-xs font-bold text-gray-500 uppercase"
+								>
+									Fixed Cd Value
+								</label>
+								<NumericInput
+									id={`Cd_${selectedNode.id}`}
+									value={selectedNode.data.Cd || 0.6}
+									onChange={(val) =>
+										updateNodeData(selectedNode.id, {
+											Cd: val,
+										})
+									}
+									className="p-1.5 h-8 text-sm border rounded bg-white"
+									placeholder="0.6"
+								/>
+							</div>
+						)}
+
+						<div className="flex flex-col gap-2 mt-2">
+							<label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+								Flow Regime
 							</label>
 							<select
-								className="p-2 border rounded bg-white text-xs"
+								className="p-2 border rounded bg-white text-xs border-stone-200"
 								value={selectedNode.data.regime || "default"}
 								onChange={(e) =>
 									updateNodeData(selectedNode.id, { regime: e.target.value })

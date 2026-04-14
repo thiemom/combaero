@@ -127,9 +127,11 @@ class OrificeData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     diameter: float = 0.08
     Cd: float = 0.6
-    auto_Cd: bool = True
-    plate_thickness: float = 0.0  # t [m]: > 0 enables thick-plate correction
-    edge_radius: float = 0.0  # r [m]: > 0 enables rounded-entry correction
+    correlation: Literal[
+        "ReaderHarrisGallagher", "Stolz", "Miller", "ThickPlate", "RoundedEntry", "fixed"
+    ] = "ReaderHarrisGallagher"
+    plate_thickness: float = 0.0  # t [m]
+    edge_radius: float = 0.0  # r [m]
     regime: Literal["default", "incompressible", "compressible"] = "default"
     initial_guess: dict[str, float] = Field(default_factory=dict)
     label: str | None = None

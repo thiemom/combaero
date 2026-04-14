@@ -40,7 +40,7 @@ const AreaInput: React.FC<AreaInputProps> = ({
 				<select
 					value={unit}
 					onChange={(e) => setAreaUnit(e.target.value as "m²" | "mm²")}
-					className="w-10 h-[30px] border rounded text-[9px] bg-white outline-none shrink-0"
+					className="w-14 h-[30px] border rounded text-[9px] bg-white outline-none shrink-0"
 				>
 					<option value="m²">m²</option>
 					<option value="mm²">mm²</option>

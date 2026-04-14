@@ -31,7 +31,9 @@ def test_flow_reversal_simple_orifice():
     graph.add_node(p1)
     graph.add_node(p2)
     # The element is defined as flowing from p1 to p2
-    graph.add_element(OrificeElement("orf", "p1", "p2", Cd=0.6, diameter=0.252313))
+    graph.add_element(
+        OrificeElement("orf", "p1", "p2", Cd=0.6, diameter=0.252313, correlation="fixed")
+    )
 
     graph.validate()
     solver = NetworkSolver(graph)
@@ -79,7 +81,9 @@ def test_flow_reversal_momentum_chamber():
 
     graph_a.add_element(LosslessConnectionElement("in_channel", "inlet_a", "chamber"))
     graph_a.add_element(
-        OrificeElement("out_channel", "chamber", "outlet_a", Cd=0.6, diameter=0.112838)
+        OrificeElement(
+            "out_channel", "chamber", "outlet_a", Cd=0.6, diameter=0.112838, correlation="fixed"
+        )
     )
 
     graph_a.validate()
@@ -117,7 +121,9 @@ def test_flow_reversal_momentum_chamber():
     # Elements defined as inlet_b -> chamber -> outlet_b
     graph_b.add_element(LosslessConnectionElement("in_channel", "inlet_b", "chamber"))
     graph_b.add_element(
-        OrificeElement("out_channel", "chamber", "outlet_b", Cd=0.6, diameter=0.112838)
+        OrificeElement(
+            "out_channel", "chamber", "outlet_b", Cd=0.6, diameter=0.112838, correlation="fixed"
+        )
     )
 
     graph_b.validate()

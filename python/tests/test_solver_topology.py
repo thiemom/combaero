@@ -28,9 +28,15 @@ def test_all_nodes_only_P_Ptotal_unknowns():
     net.add_node(PlenumNode("N2"))
 
     # Elements (1 unknown each: m_dot)
-    net.add_element(OrificeElement("E1", "B1", "N1", Cd=0.6, diameter=0.035682))
-    net.add_element(OrificeElement("E2", "N1", "N2", Cd=0.6, diameter=0.035682))
-    net.add_element(OrificeElement("E3", "N2", "B2", Cd=0.6, diameter=0.035682))
+    net.add_element(
+        OrificeElement("E1", "B1", "N1", Cd=0.6, diameter=0.035682, correlation="fixed")
+    )
+    net.add_element(
+        OrificeElement("E2", "N1", "N2", Cd=0.6, diameter=0.035682, correlation="fixed")
+    )
+    net.add_element(
+        OrificeElement("E3", "N2", "B2", Cd=0.6, diameter=0.035682, correlation="fixed")
+    )
 
     solver = NetworkSolver(net)
     x0 = solver._build_x0()
@@ -67,8 +73,12 @@ def test_single_stream_passthrough():
     net.add_node(PlenumNode("MID"))
     net.add_node(PressureBoundary("OUT", P_total=100000.0, T_total=300.0))
 
-    net.add_element(OrificeElement("E1", "IN", "MID", Cd=0.6, diameter=0.112838))
-    net.add_element(OrificeElement("E2", "MID", "OUT", Cd=0.6, diameter=0.112838))
+    net.add_element(
+        OrificeElement("E1", "IN", "MID", Cd=0.6, diameter=0.112838, correlation="fixed")
+    )
+    net.add_element(
+        OrificeElement("E2", "MID", "OUT", Cd=0.6, diameter=0.112838, correlation="fixed")
+    )
 
     solver = NetworkSolver(net)
     sol = solver.solve()
@@ -97,9 +107,15 @@ def test_plenum_temperature_passthrough():
     net.add_node(PressureBoundary("OUT", P_total=100000.0, T_total=400.0))
 
     # Connect both to MIX
-    net.add_element(OrificeElement("E1", "MF1", "MIX", Cd=0.8, diameter=0.356825))
-    net.add_element(OrificeElement("E2", "MF2", "MIX", Cd=0.8, diameter=0.356825))
-    net.add_element(OrificeElement("E3", "MIX", "OUT", Cd=0.8, diameter=0.356825))
+    net.add_element(
+        OrificeElement("E1", "MF1", "MIX", Cd=0.8, diameter=0.356825, correlation="fixed")
+    )
+    net.add_element(
+        OrificeElement("E2", "MF2", "MIX", Cd=0.8, diameter=0.356825, correlation="fixed")
+    )
+    net.add_element(
+        OrificeElement("E3", "MIX", "OUT", Cd=0.8, diameter=0.356825, correlation="fixed")
+    )
 
     solver = NetworkSolver(net)
     sol = solver.solve()
