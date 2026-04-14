@@ -1680,15 +1680,7 @@ class ChannelElement(NetworkElement):
                     )
                 elif isinstance(self.surface.model, (PinFinModel, ImpingementModel)):
                     # Explicit geometry drop from localized array physics
-                    h_res = self.surface.htc_and_T(
-                        state_in.T,
-                        state_in.P_total,
-                        state_in.X,
-                        v,
-                        self.diameter,
-                        self.length,
-                        self.surface.t_wall if self.surface.t_wall is not None else math.nan,
-                    )
+                    h_res = self.htc_and_T(state_in)
                     if h_res is not None:
                         dP_target = h_res.dP
                         dynamic_head = 0.5 * rho * v**2
@@ -1787,10 +1779,24 @@ class ChannelElement(NetworkElement):
             res_dict["Nu"] = h_res.Nu
             res_dict["htc"] = h_res.h
             res_dict["T_aw"] = h_res.T_aw
+            res_dict["f"] = h_res.f
         else:
             res_dict["Nu"] = 0.0
             res_dict["htc"] = 0.0
             res_dict["T_aw"] = state_in.T
+
+            import math
+
+            e_D = self.roughness / self.diameter if self.diameter > 0 else 0.0
+            if re_in < 2300:
+                res_dict["f"] = 64.0 / re_in if re_in > 0 else 0.0
+            else:
+                if e_D > 1e-8:
+                    res_dict["f"] = (
+                        1.0 / (-1.8 * math.log10((e_D / 3.7) ** 1.11 + 6.9 / re_in)) ** 2
+                    )
+                else:
+                    res_dict["f"] = (0.79 * math.log(re_in) - 1.64) ** -2
 
         # Thermo
         res_dict.update(
