@@ -889,7 +889,7 @@ const Inspector = () => {
 							</div>
 							<div className="flex justify-between items-center">
 								<span className="text-[10px] text-stone-500 font-bold uppercase">
-									Mean Wall Temp
+									Hot Side Wall Temp
 								</span>
 								<span className="font-mono text-xs font-black">
 									{selectedEdge.data.result.T_wall?.toFixed(1)} K
@@ -917,7 +917,7 @@ const Inspector = () => {
 							{selectedEdge.data.result.T_interface && (
 								<div className="mt-2 pt-2 border-t border-stone-100 flex flex-col gap-1">
 									<span className="text-[8px] text-stone-400 font-bold uppercase">
-										Temp Profile (K)
+										Temp Profile (K, Hot &rarr; Cold)
 									</span>
 									<div className="flex flex-wrap gap-1">
 										{selectedEdge.data.result.T_interface.map(
