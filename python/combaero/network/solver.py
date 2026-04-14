@@ -411,18 +411,29 @@ class NetworkSolver:
         a dedicated EnergyBoundary is created and attached to the node.  Its Q is
         updated every Newton iteration inside ``_propagate_states``.
         """
+
+        def _endpoint_to_node_id(endpoint_id: str) -> str | None:
+            if endpoint_id in self.network.elements:
+                return self.network.elements[endpoint_id].to_node
+            if endpoint_id in self.network.nodes:
+                return endpoint_id
+            return None
+
         # Build a mapping: node_id -> set of wall IDs that affect it
         affected_nodes: dict[str, set[str]] = {}
         for wall in self.network.walls.values():
-            elem_a = self.network.elements[wall.element_a]
-            elem_b = self.network.elements[wall.element_b]
+            node_a = _endpoint_to_node_id(wall.element_a)
+            node_b = _endpoint_to_node_id(wall.element_b)
 
-            # Skip walls where both sides feed the same node (net Q = 0)
-            if elem_a.to_node == elem_b.to_node:
+            if node_a is None or node_b is None:
                 continue
 
-            affected_nodes.setdefault(elem_a.to_node, set()).add(wall.id)
-            affected_nodes.setdefault(elem_b.to_node, set()).add(wall.id)
+            # Skip walls where both sides feed the same node (net Q = 0)
+            if node_a == node_b:
+                continue
+
+            affected_nodes.setdefault(node_a, set()).add(wall.id)
+            affected_nodes.setdefault(node_b, set()).add(wall.id)
 
         for nid in affected_nodes:
             node = self.network.nodes[nid]
@@ -447,51 +458,60 @@ class NetworkSolver:
         """
         wall_contributions: list[tuple] = []
         processed_walls: set[str] = set()
-        up_elem_ids = {e.id for e in up_elems}
 
         for wall in self.network.walls.values():
             if wall.id in processed_walls:
                 continue
 
-            # Does this wall involve an upstream element of nid, or nid itself?
+            # Endpoints may be elements or nodes
             elem_a_id = wall.element_a
             elem_b_id = wall.element_b
 
-            is_a_upstream = elem_a_id in up_elem_ids
-            is_b_upstream = elem_b_id in up_elem_ids
-            is_a_node = elem_a_id == nid
-            is_b_node = elem_b_id == nid
-
-            if not any((is_a_upstream, is_b_upstream, is_a_node, is_b_node)):
-                continue
+            endpoint_a_is_node = elem_a_id in self.network.nodes
+            endpoint_b_is_node = elem_b_id in self.network.nodes
 
             obj_a = self.network.elements.get(elem_a_id) or self.network.nodes.get(elem_a_id)
             obj_b = self.network.elements.get(elem_b_id) or self.network.nodes.get(elem_b_id)
 
+            if obj_a is None or obj_b is None:
+                continue
+
             # Find the actual target node for side A and side B
-            target_node_a = nid if is_a_node else getattr(obj_a, "to_node", obj_a.id)
-            target_node_b = nid if is_b_node else getattr(obj_b, "to_node", obj_b.id)
+            target_node_a = obj_a.id if endpoint_a_is_node else obj_a.to_node
+            target_node_b = obj_b.id if endpoint_b_is_node else obj_b.to_node
+
+            # This wall does not affect the current node
+            if nid not in (target_node_a, target_node_b):
+                continue
 
             # Skip if both sides feed/are the same node (net Q = 0)
             if target_node_a == target_node_b:
                 continue
 
             # Determine which side feeds the current node
-            is_side_a = is_a_upstream or is_a_node
+            is_side_a = target_node_a == nid
 
             # Get states for both sides (previous-iteration fallback for back-edges)
-            node_feeding_a = obj_a if is_a_node else self.network.nodes[obj_a.from_node]
-            node_feeding_b = obj_b if is_b_node else self.network.nodes[obj_b.from_node]
+            node_feeding_a = (
+                self.network.nodes[obj_a.id]
+                if endpoint_a_is_node
+                else self.network.nodes[obj_a.from_node]
+            )
+            node_feeding_b = (
+                self.network.nodes[obj_b.id]
+                if endpoint_b_is_node
+                else self.network.nodes[obj_b.from_node]
+            )
 
             state_a = self._get_node_state_with_prev(node_feeding_a, x)
             state_b = self._get_node_state_with_prev(node_feeding_b, x)
 
             # Set mass flow rates from solver vector for elements
-            if not is_a_node:
+            if not endpoint_a_is_node:
                 m_indices_a = self._unknown_indices.get(elem_a_id, [])
                 if m_indices_a:
                     state_a.m_dot = x[m_indices_a[0]]
-            if not is_b_node:
+            if not endpoint_b_is_node:
                 m_indices_b = self._unknown_indices.get(elem_b_id, [])
                 if m_indices_b:
                     state_b.m_dot = x[m_indices_b[0]]

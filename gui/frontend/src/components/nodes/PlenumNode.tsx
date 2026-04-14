@@ -62,20 +62,6 @@ const PlenumNode = ({ id, data, selected }: NodeProps) => {
 			<Handle type="source" position={Position.Right} id="flow-right" />
 			<Handle type="target" position={Position.Top} id="flow-top" />
 			<Handle type="source" position={Position.Bottom} id="flow-bottom" />
-
-			{/* Thermal Handles */}
-			<Handle
-				type="target"
-				position={Position.Top}
-				id="thermal-target"
-				style={{ left: "25%" }}
-			/>
-			<Handle
-				type="source"
-				position={Position.Bottom}
-				id="thermal-source"
-				style={{ left: "25%" }}
-			/>
 		</div>
 	);
 };

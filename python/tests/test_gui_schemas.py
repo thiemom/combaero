@@ -1,4 +1,4 @@
-from gui.backend.schemas import PipeData, PlenumData
+from gui.backend.schemas import MomentumChamberData, PipeData, PlenumData
 
 
 def test_pipe_data_serialization():
@@ -27,6 +27,19 @@ def test_pipe_data_multiplier_defaults():
     pipe = PipeData()
     assert pipe.Nu_multiplier == 1.0
     assert pipe.f_multiplier == 1.0
+
+
+def test_momentum_chamber_multiplier_defaults():
+    data = MomentumChamberData()
+    assert data.Nu_multiplier == 1.0
+    assert data.f_multiplier == 1.0
+
+
+def test_momentum_chamber_multiplier_serialization():
+    data = MomentumChamberData(area=0.2, Nu_multiplier=1.4, f_multiplier=0.85)
+    assert data.area == 0.2
+    assert data.Nu_multiplier == 1.4
+    assert data.f_multiplier == 0.85
 
 
 def test_plenum_data_label():

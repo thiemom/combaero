@@ -87,13 +87,25 @@ const NetworkCanvas = () => {
 					},
 				} as any;
 			} else if (type === "pipe") {
-				data = { ...data, L: 1.0, D: 0.1, roughness: 1e-5 } as any;
+				data = {
+					...data,
+					L: 1.0,
+					D: 0.1,
+					roughness: 1e-5,
+					Nu_multiplier: 1.0,
+					f_multiplier: 1.0,
+				} as any;
 			} else if (type === "orifice") {
 				data = { ...data, diameter: 0.08, Cd: 0.6 } as any;
 			} else if (type === "combustor") {
 				data = { ...data, method: "complete" } as any;
 			} else if (type === "momentum_chamber") {
-				data = { ...data, area: 0.1 } as any;
+				data = {
+					...data,
+					area: 0.1,
+					Nu_multiplier: 1.0,
+					f_multiplier: 1.0,
+				} as any;
 			}
 
 			const newNode = {

@@ -57,6 +57,7 @@ def resolve_composition(comp: CompositionData, T: float, P: float) -> list[float
 def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
     net = FlowNetwork()
     nodes_map = {}  # ID -> Physical Node
+    plenum_node_ids: set[str] = set()
     element_nodes = []  # List of node schemas that are actually elements
 
     # 1. First Pass: Create Physical Nodes
@@ -71,6 +72,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             node.initial_guess = data.initial_guess
             net.add_node(node)
             nodes_map[node_id] = node
+            plenum_node_ids.add(node_id)
         elif node_type == "mass_boundary":
             data = MassBoundaryData(**node_data)
             Y = resolve_composition(data.composition, data.T_total, 101325.0)
@@ -93,7 +95,17 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             nodes_map[node_id] = node
         elif node_type == "momentum_chamber":
             data = MomentumChamberData(**node_data)
-            node = MomentumChamberNode(node_id, area=data.area)
+            node = MomentumChamberNode(
+                node_id,
+                area=data.area,
+                surface=ConvectiveSurface(
+                    area=data.area,
+                    Nu_multiplier=data.Nu_multiplier,
+                    # MomentumChamberNode is modeled as lossless for pressure-flow,
+                    # so friction multiplier is fixed to 1.0 by design.
+                    f_multiplier=1.0,
+                ),
+            )
             node.initial_guess = data.initial_guess
             net.add_node(node)
             nodes_map[node_id] = node
@@ -209,6 +221,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
     # 4. Fourth Pass: Thermal Walls
     for edge in schema.edges:
         if edge.data and edge.data.get("type") == "thermal":
+            if edge.source in plenum_node_ids or edge.target in plenum_node_ids:
+                continue
             wall_id = edge.id
             data = ThermalWallData(**edge.data)
 

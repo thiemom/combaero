@@ -50,6 +50,8 @@ class CombustorData(BaseModel):
 class MomentumChamberData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     area: float = 0.1
+    Nu_multiplier: float = 1.0
+    f_multiplier: float = 1.0
     initial_guess: dict[str, float] = Field(default_factory=dict)
     label: str | None = None
 

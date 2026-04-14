@@ -1,7 +1,0 @@
-feat(gui): Implement multi-layer thermal wall support and bug fixes
-
-- Fixed crash in backend solve extraction due to multi-layer temperature lists.
-- Implemented automatic legacy migration for thermal wall data (scalar -> list).
-- Added WallLayersEditor component for dynamic layer management in the GUI.
-- Enhanced thermal edge visualization with directional arrows and sign-aware labels.
-- Resolved Biome linting issues in frontend components.

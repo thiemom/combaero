@@ -400,6 +400,32 @@ const Inspector = () => {
 								updateNodeData(selectedNode.id, { roughness: val })
 							}
 						/>
+						<div className="grid grid-cols-2 gap-3">
+							<div className="flex flex-col gap-2">
+								<label className="text-xs font-bold text-gray-500 uppercase">
+									Nu Multiplier
+								</label>
+								<NumericInput
+									value={selectedNode.data.Nu_multiplier ?? 1.0}
+									onChange={(val) =>
+										updateNodeData(selectedNode.id, { Nu_multiplier: val })
+									}
+									className="p-2 border rounded"
+								/>
+							</div>
+							<div className="flex flex-col gap-2">
+								<label className="text-xs font-bold text-gray-500 uppercase">
+									F Multiplier
+								</label>
+								<NumericInput
+									value={selectedNode.data.f_multiplier ?? 1.0}
+									onChange={(val) =>
+										updateNodeData(selectedNode.id, { f_multiplier: val })
+									}
+									className="p-2 border rounded"
+								/>
+							</div>
+						</div>
 						<div className="flex flex-col gap-2">
 							<label className="text-xs font-bold text-gray-500 uppercase">
 								Regime
@@ -590,6 +616,21 @@ const Inspector = () => {
 						<p className="text-[9px] text-gray-400 italic -mt-2">
 							Dh defaults to sqrt(4*Area/π) if omitted.
 						</p>
+						<div className="flex flex-col gap-2">
+							<label className="text-xs font-bold text-gray-500 uppercase">
+								Nu Multiplier
+							</label>
+							<NumericInput
+								id={`Nu_multiplier_mom_${selectedNode.id}`}
+								value={selectedNode.data.Nu_multiplier ?? 1.0}
+								onChange={(val) =>
+									updateNodeData(selectedNode.id, {
+										Nu_multiplier: val,
+									})
+								}
+								className="p-2 border rounded"
+							/>
+						</div>
 
 						<InitialGuessEditor node={selectedNode} />
 					</div>
