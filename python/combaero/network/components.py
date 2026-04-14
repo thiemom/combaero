@@ -1121,18 +1121,27 @@ class OrificeElement(NetworkElement):
         from_node: str,
         to_node: str,
         Cd: float,
-        diameter: float,
+        diameter: float | None = None,
         regime: Literal["incompressible", "compressible"] = "incompressible",
         auto_Cd: bool = False,
         plate_thickness: float = 0.0,
         edge_radius: float = 0.0,
+        area: float | None = None,
     ):
         super().__init__(id, from_node, to_node)
         import math
 
+        if diameter is None and area is None:
+            raise ValueError("OrificeElement requires either 'diameter' or 'area'.")
+
+        if diameter is not None:
+            self.diameter = diameter
+            self.area = math.pi * (diameter / 2.0) ** 2
+        else:
+            self.area = area
+            self.diameter = math.sqrt(4.0 * area / math.pi)
+
         self.Cd = Cd
-        self.diameter = diameter
-        self.area = math.pi * (diameter / 2.0) ** 2
         self.regime = regime
         self.auto_Cd = auto_Cd
         self.plate_thickness = plate_thickness
@@ -1798,7 +1807,3 @@ class ChannelElement(NetworkElement):
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         pass
-
-
-# Alias for backward compatibility
-PipeElement = ChannelElement

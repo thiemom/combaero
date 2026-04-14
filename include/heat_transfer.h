@@ -15,7 +15,7 @@
 //   h = Nu * k / L   [W/(m²·K)]
 // where k is thermal conductivity [W/(m·K)] and L is characteristic length [m].
 //
-// For pipe flow: L = D (diameter)
+// For channel flow: L = D (diameter)
 // For flat plate: L = x (distance from leading edge) or plate length
 //
 // References:
@@ -25,7 +25,7 @@
 // - Petukhov (1970): Advances in Heat Transfer, 6, 503
 
 // -------------------------------------------------------------
-// Internal Flow (Pipe/Duct)
+// Internal Flow (Channel/Duct)
 // -------------------------------------------------------------
 
 // Dittus-Boelter correlation (1930)
@@ -137,7 +137,7 @@ double nusselt_petukhov(double Re, double Pr,
 // Laminar Flow (for completeness)
 // -------------------------------------------------------------
 
-// Fully developed laminar flow in circular channel (pipe)
+// Fully developed laminar flow in circular channel
 // Nu = 3.66 (constant wall temperature)
 // Nu = 4.36 (constant heat flux)
 constexpr double NU_LAMINAR_CONST_T = 3.66;
@@ -181,7 +181,7 @@ double overall_htc_wall(double h_inner, double h_outer, double t_wall,
 // Multi-layer wall: h_in, [t1/k1, t2/k2, ...], h_out
 // 1/U = 1/h_inner + Σ(t_i/k_i) + 1/h_outer
 //
-// Example: insulated pipe with steel + insulation
+// Example: insulated channel with steel + insulation
 //   overall_htc_wall(500, 10, {0.003/50, 0.05/0.04})
 //   = h_in=500, h_out=10, steel 3mm @ k=50, insulation 50mm @ k=0.04
 double overall_htc_wall(double h_inner, double h_outer,
@@ -193,16 +193,6 @@ double overall_htc_wall(double h_inner, double h_outer,
                         double R_fouling);
 
 // Legacy alias for single-layer wall
-inline double overall_htc_tube(double h_inner, double h_outer, double t_wall,
-                               double k_wall) {
-  return overall_htc_wall(h_inner, h_outer, t_wall, k_wall);
-}
-
-inline double overall_htc_tube(double h_inner, double h_outer, double t_wall,
-                               double k_wall, double R_fouling) {
-  std::vector<double> layers = {t_wall / k_wall};
-  return overall_htc_wall(h_inner, h_outer, layers, R_fouling);
-}
 
 // Thermal resistance from HTC and area
 // R = 1 / (h * A)  [K/W]
@@ -475,19 +465,11 @@ struct State; // Forward declaration
 double nusselt_circular_channel(const State &s, double velocity, double diameter,
                                 bool heating = true, double roughness = 0.0);
 
-inline double nusselt_pipe(const State &s, double velocity, double diameter,
-                           bool heating = true, double roughness = 0.0) {
-  return nusselt_circular_channel(s, velocity, diameter, heating, roughness);
-}
 
 // Heat transfer coefficient for circular channel flow [W/(m²·K)]
 double htc_circular_channel(const State &s, double velocity, double diameter,
                             bool heating = true, double roughness = 0.0);
 
-inline double htc_pipe(const State &s, double velocity, double diameter,
-                       bool heating = true, double roughness = 0.0) {
-  return htc_circular_channel(s, velocity, diameter, heating, roughness);
-}
 
 // Composite function: compute HTC, Nu, and Re from thermodynamic state
 // Returns: tuple (h [W/(m²·K)], Nu [-], Re [-])
@@ -504,12 +486,12 @@ inline double htc_pipe(const State &s, double velocity, double diameter,
 //   P           : pressure [Pa]
 //   X           : mole fractions [mol/mol]
 //   velocity    : flow velocity [m/s]
-//   diameter    : pipe diameter [m]
+//   diameter    : channel diameter [m]
 //   correlation : "gnielinski" (default), "dittus_boelter", "sieder_tate",
 //   "petukhov" heating     : true for heating, false for cooling (affects
 //   Dittus-Boelter) mu_ratio    : μ_bulk / μ_wall for Sieder-Tate viscosity
 //   correction (default: 1.0) roughness   : absolute roughness [m] (default:
-//   0.0 = smooth pipe)
+//   0.0 = smooth channel)
 //
 // Automatically computes: ρ, μ, k, Pr, Re from (T, P, X)
 // Selects appropriate correlation and handles laminar flow (Re < 2300)
@@ -521,15 +503,6 @@ htc_circular_channel(double T, double P, const std::vector<double> &X,
                      bool heating = true, double mu_ratio = 1.0,
                      double roughness = 0.0);
 
-inline std::tuple<double, double, double, double> htc_pipe(
-    double T, double P, const std::vector<double> &X, double velocity,
-    double diameter, const std::string &correlation = "gnielinski",
-    bool heating = true, double mu_ratio = 1.0, double roughness = 0.0) {
-  auto [h, Nu, Re] = htc_circular_channel(T, P, X, velocity, diameter,
-                                          correlation, heating, mu_ratio,
-                                          roughness);
-  return {h, Nu, Re, 0.0}; // Note: legacy htc_pipe returned a tuple, but here it's 3 items in htc_circular_channel
-}
 
 // -------------------------------------------------------------
 // Combined convective heat transfer + pressure loss result

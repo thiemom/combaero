@@ -6,10 +6,10 @@ import pytest
 
 import combaero as cb
 from combaero.network.components import (
+    ChannelElement,
     LosslessConnectionElement,
     MixtureState,
     OrificeElement,
-    PipeElement,
     PlenumNode,
     PressureBoundary,
 )
@@ -26,8 +26,8 @@ NODE_FACTORIES = {
 }
 
 ELEMENT_FACTORIES = {
-    "pipe": lambda id, f, t: PipeElement(id, f, t, length=2.0, diameter=0.15, roughness=1e-5),
-    "pipe_fanno": lambda id, f, t: PipeElement(
+    "channel": lambda id, f, t: ChannelElement(id, f, t, length=2.0, diameter=0.15, roughness=1e-5),
+    "channel_fanno": lambda id, f, t: ChannelElement(
         id,
         f,
         t,
@@ -54,7 +54,7 @@ if len(PERMUTATIONS) > MAX_TOPOLOGY_TESTS:
 
 def test_atomic_network_components():
     """
-    Test 1: Simple Boundary -> Pipe -> Orifice -> Sink configuration.
+    Test 1: Simple Boundary -> Channel -> Orifice -> Sink configuration.
     Currently only validates instantiation and topological property storage.
     """
     # 1. Initialize states
@@ -76,8 +76,13 @@ def test_atomic_network_components():
     _outlet = PressureBoundary("outlet")
 
     # 3. Instantiate elements
-    pipe_1 = PipeElement(
-        id="pipe_1", from_node="inlet", to_node="node_1", length=2.0, diameter=0.05, roughness=1e-5
+    channel_1 = ChannelElement(
+        id="channel_1",
+        from_node="inlet",
+        to_node="node_1",
+        length=2.0,
+        diameter=0.05,
+        roughness=1e-5,
     )
 
     orifice_1 = OrificeElement(
@@ -85,9 +90,9 @@ def test_atomic_network_components():
     )
 
     # 4. Verify basic properties
-    assert pipe_1.area > 0.0
+    assert channel_1.area > 0.0
     assert orifice_1.n_equations() == 1
-    assert pipe_1.n_equations() == 1
+    assert channel_1.n_equations() == 1
     assert len(inlet.unknowns()) == 0
     assert len(node_1.unknowns()) >= 2  # P, P_total, and possibly T or X
 
@@ -98,7 +103,7 @@ def test_atomic_network_components():
 
 def test_momentum_chamber_network():
     """
-    Test 2: Momentum Chamber -> Pipe -> Orifice.
+    Test 2: Momentum Chamber -> Channel -> Orifice.
     Validates instantiation of the MomentumChamberNode and its topological footprint.
     """
     node_mc = cb.network.MomentumChamberNode("chamber_1", area=0.1)
@@ -110,9 +115,9 @@ def test_momentum_chamber_network():
     assert "chamber_1.P_total" in unknowns
 
     # 1b. Verify directional flow vectors (angles)
-    assert node_mc.get_port_angle("pipe_in") == 0.0  # default
-    node_mc.set_port_angle("pipe_in", 45.0)
-    assert node_mc.get_port_angle("pipe_in") == 45.0
+    assert node_mc.get_port_angle("channel_in") == 0.0  # default
+    node_mc.set_port_angle("channel_in", 45.0)
+    assert node_mc.get_port_angle("channel_in") == 45.0
 
     # Placeholder residuals ensure conservation equations can later be injected
     state = cb.network.MixtureState(1e5, 1.1e5, 300.0, 300.0, 1.0, [0.0] * 14)
@@ -124,7 +129,7 @@ def test_momentum_chamber_network():
 def test_flownetwork_topology():
     """
     Test 3: Validates the FlowNetwork topological manager and auto-discovery.
-    Specifically checks that OrificeElement finds its upstream PipeElement diameter.
+    Specifically checks that OrificeElement finds its upstream ChannelElement diameter.
     """
     graph = cb.network.FlowNetwork()
 
@@ -132,8 +137,13 @@ def test_flownetwork_topology():
     node_1 = cb.network.PlenumNode("node_1")
     outlet = cb.network.PressureBoundary("outlet")
 
-    pipe = cb.network.PipeElement(
-        id="pipe_1", from_node="inlet", to_node="node_1", length=2.0, diameter=0.15, roughness=1e-5
+    channel = cb.network.ChannelElement(
+        id="channel_1",
+        from_node="inlet",
+        to_node="node_1",
+        length=2.0,
+        diameter=0.15,
+        roughness=1e-5,
     )
 
     orifice = cb.network.OrificeElement(
@@ -145,7 +155,7 @@ def test_flownetwork_topology():
     graph.add_node(node_1)
     graph.add_node(outlet)
 
-    graph.add_element(pipe)
+    graph.add_element(channel)
     graph.add_element(orifice)
 
     # 2. Verify pre-resolution state
@@ -170,8 +180,12 @@ def test_flownetwork_validation():
     # We must add an outlet to plenum_1 otherwise it fails early on interior connection < 2 rule
     graph1.add_node(cb.network.MassFlowBoundary("bnd_mass_out"))
 
-    graph1.add_element(cb.network.PipeElement("pipe_1", "bnd_mass", "plenum_1", 1.0, 0.1, 1e-5))
-    graph1.add_element(cb.network.PipeElement("pipe_2", "plenum_1", "bnd_mass_out", 1.0, 0.1, 1e-5))
+    graph1.add_element(
+        cb.network.ChannelElement("channel_1", "bnd_mass", "plenum_1", 1.0, 0.1, 1e-5)
+    )
+    graph1.add_element(
+        cb.network.ChannelElement("channel_2", "plenum_1", "bnd_mass_out", 1.0, 0.1, 1e-5)
+    )
 
     with pytest.raises(ValueError, match="at least one PressureBoundary"):
         graph1.validate()

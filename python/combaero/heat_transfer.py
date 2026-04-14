@@ -7,7 +7,7 @@ and return a :class:`ChannelResult`.
 Available models
 ----------------
 smooth
-    Smooth pipe or duct (Gnielinski / Dittus-Boelter / Sieder-Tate / Petukhov).
+    Smooth channel or duct (Gnielinski / Dittus-Boelter / Sieder-Tate / Petukhov).
 ribbed
     Rib-enhanced cooling channel (Han et al. 1988).
 dimpled
@@ -62,7 +62,7 @@ def smooth(
     Nu_multiplier: float = 1.0,
     f_multiplier: float = 1.0,
 ) -> ChannelResult:
-    """Smooth pipe or duct: combined HTC + pressure drop.
+    """Smooth channel or duct: combined HTC + pressure drop.
 
     Parameters
     ----------
@@ -131,7 +131,7 @@ def ribbed(
     """Rib-enhanced cooling channel (Han et al. 1988).
 
     Applies ``rib_enhancement_factor`` to Nu and ``rib_friction_multiplier``
-    to f from a smooth-pipe Gnielinski baseline.
+    to f from a smooth-channel Gnielinski baseline.
 
     Parameters
     ----------
@@ -194,7 +194,7 @@ def dimpled(
     """Dimpled surface cooling channel (Chyu et al. 1997).
 
     Applies ``dimple_nusselt_enhancement`` to Nu and
-    ``dimple_friction_multiplier`` to f from a smooth-pipe Gnielinski baseline.
+    ``dimple_friction_multiplier`` to f from a smooth-channel Gnielinski baseline.
 
     Parameters
     ----------

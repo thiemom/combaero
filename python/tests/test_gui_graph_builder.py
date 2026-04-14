@@ -18,7 +18,7 @@ def test_plenum_thermal_edges_are_ignored_silently():
                 "data": {},
             },
             {
-                "id": "pipe_1",
+                "id": "channel_1",
                 "type": "channel",
                 "position": {"x": 200.0, "y": 0.0},
                 "data": {"L": 1.0, "D": 0.1},
@@ -28,19 +28,19 @@ def test_plenum_thermal_edges_are_ignored_silently():
             {
                 "id": "edge_flow_1",
                 "source": "plenum_in",
-                "target": "pipe_1",
+                "target": "channel_1",
                 "data": {},
             },
             {
                 "id": "edge_flow_2",
-                "source": "pipe_1",
+                "source": "channel_1",
                 "target": "plenum_out",
                 "data": {},
             },
             {
-                "id": "edge_thermal_plenum_pipe",
+                "id": "edge_thermal_plenum_channel",
                 "source": "plenum_in",
-                "target": "pipe_1",
+                "target": "channel_1",
                 "type": "thermal",
                 "data": {"type": "thermal", "thickness": 0.003, "conductivity": 20.0},
             },
@@ -68,7 +68,7 @@ def test_momentum_chamber_thermal_wall_is_built_and_multipliers_forwarded():
                 "data": {"area": 0.2, "Nu_multiplier": 1.3, "f_multiplier": 0.8},
             },
             {
-                "id": "pipe_1",
+                "id": "channel_1",
                 "type": "channel",
                 "position": {"x": 400.0, "y": 0.0},
                 "data": {"L": 1.0, "D": 0.1, "Nu_multiplier": 1.2, "f_multiplier": 0.9},
@@ -78,19 +78,19 @@ def test_momentum_chamber_thermal_wall_is_built_and_multipliers_forwarded():
             {
                 "id": "edge_flow_1",
                 "source": "plenum_in",
-                "target": "pipe_1",
+                "target": "channel_1",
                 "data": {},
             },
             {
                 "id": "edge_flow_2",
-                "source": "pipe_1",
+                "source": "channel_1",
                 "target": "mom_1",
                 "data": {},
             },
             {
-                "id": "edge_thermal_mom_pipe",
+                "id": "edge_thermal_mom_channel",
                 "source": "mom_1",
-                "target": "pipe_1",
+                "target": "channel_1",
                 "type": "thermal",
                 "data": {"type": "thermal", "thickness": 0.003, "conductivity": 20.0},
             },
@@ -99,12 +99,12 @@ def test_momentum_chamber_thermal_wall_is_built_and_multipliers_forwarded():
 
     net = build_network_from_schema(schema)
 
-    assert "edge_thermal_mom_pipe" in net.walls
+    assert "edge_thermal_mom_channel" in net.walls
     mom = net.nodes["mom_1"]
-    pipe = net.elements["pipe_1"]
+    channel = net.elements["channel_1"]
 
     assert mom.surface.Nu_multiplier == 1.3
     # Momentum chamber is lossless by design; friction multiplier is fixed.
     assert mom.surface.f_multiplier == 1.0
-    assert pipe.surface.Nu_multiplier == 1.2
-    assert pipe.surface.f_multiplier == 0.9
+    assert channel.surface.Nu_multiplier == 1.2
+    assert channel.surface.f_multiplier == 0.9

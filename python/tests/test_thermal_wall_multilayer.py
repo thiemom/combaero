@@ -1,8 +1,8 @@
 from combaero.network import (
+    ChannelElement,
     ConvectiveSurface,
     FlowNetwork,
     NetworkSolver,
-    PipeElement,
     PressureBoundary,
     ThermalWall,
     WallLayer,
@@ -61,7 +61,7 @@ def test_solver_interface_temperature():
     out_a = PressureBoundary("out_a", P_total=150000, T_total=1000)
     net.add_node(in_a)
     net.add_node(out_a)
-    p_hot = PipeElement(
+    p_hot = ChannelElement(
         "p_hot", from_node="in_a", to_node="out_a", length=1.0, diameter=0.05, roughness=1e-5
     )
     p_hot.surface = ConvectiveSurface(area=0.1)
@@ -72,7 +72,7 @@ def test_solver_interface_temperature():
     out_b = PressureBoundary("out_b", P_total=150000, T_total=300)
     net.add_node(in_b)
     net.add_node(out_b)
-    p_cold = PipeElement(
+    p_cold = ChannelElement(
         "p_cold", from_node="in_b", to_node="out_b", length=1.0, diameter=0.05, roughness=1e-5
     )
     p_cold.surface = ConvectiveSurface(area=0.1)

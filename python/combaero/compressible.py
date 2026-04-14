@@ -7,18 +7,18 @@ Swapping the import is sufficient to switch flow regimes::
 
     # compressible
     from combaero import compressible as flow
-    sol = flow.pipe_flow(T, P, X, u=10.0, L=1.0, D=0.05)
+    sol = flow.channel_flow(T, P, X, u=10.0, L=1.0, D=0.05)
 
     # incompressible (same call signature)
     from combaero import incompressible as flow
-    sol = flow.pipe_flow(T, P, X, u=10.0, L=1.0, D=0.05)
+    sol = flow.channel_flow(T, P, X, u=10.0, L=1.0, D=0.05)
 
 Functions
 ---------
-pipe_flow
-    Fanno (adiabatic compressible) pipe flow with a constant friction factor.
-pipe_flow_rough
-    Fanno pipe flow with friction factor from roughness + local Re.
+channel_flow
+    Fanno (adiabatic compressible) channel flow with a constant friction factor.
+channel_flow_rough
+    Fanno channel flow with friction factor from roughness + local Re.
 nozzle_flow
     Isentropic nozzle flow.
 """
@@ -33,10 +33,10 @@ from ._core import (
     FannoSolution,
 )
 from ._core import (
-    fanno_pipe as _fanno_pipe,
+    fanno_channel as _fanno_channel,
 )
 from ._core import (
-    fanno_pipe_rough as _fanno_pipe_rough,
+    fanno_channel_rough as _fanno_channel_rough,
 )
 from ._core import (
     nozzle_flow as _nozzle_flow,
@@ -84,7 +84,7 @@ def _nozzle_to_flow_solution(sol: CompressibleFlowSolution) -> FlowSolution:
     )
 
 
-def pipe_flow(
+def channel_flow(
     T: float,
     P: float,
     X: Sequence[float],
@@ -96,10 +96,10 @@ def pipe_flow(
     n_steps: int = 100,
     store_profile: bool = False,
 ) -> FlowSolution:
-    """Compressible (Fanno) pipe flow with a constant Darcy friction factor.
+    """Compressible (Fanno) channel flow with a constant Darcy friction factor.
 
     Integrates the Fanno flow equations (mass + energy + momentum) along the
-    pipe using RK4.  The friction factor is held constant throughout.
+    channel using RK4.  The friction factor is held constant throughout.
 
     Parameters
     ----------
@@ -112,16 +112,16 @@ def pipe_flow(
     u:
         Inlet bulk velocity [m/s].
     L:
-        Pipe length [m].
+        Channel length [m].
     D:
-        Pipe inner diameter [m].
+        Channel inner diameter [m].
     f:
-        Darcy friction factor [-] (constant along pipe).
+        Darcy friction factor [-] (constant along channel).
     n_steps:
         Number of RK4 integration steps.
     store_profile:
         If ``True``, the returned ``FlowSolution.profile`` contains a list of
-        ``FannoStation`` objects along the pipe axis.
+        ``FannoStation`` objects along the channel axis.
 
     Returns
     -------
@@ -129,11 +129,11 @@ def pipe_flow(
         ``regime="compressible"``.  ``Cd`` is not applicable and carries
         ``nan``.
     """
-    sol = _fanno_pipe(T, P, u, L, D, f, list(X), n_steps=n_steps, store_profile=True)
+    sol = _fanno_channel(T, P, u, L, D, f, list(X), n_steps=n_steps, store_profile=True)
     return _fanno_to_flow_solution(sol, store_profile=store_profile)
 
 
-def pipe_flow_rough(
+def channel_flow_rough(
     T: float,
     P: float,
     X: Sequence[float],
@@ -146,7 +146,7 @@ def pipe_flow_rough(
     n_steps: int = 100,
     store_profile: bool = False,
 ) -> FlowSolution:
-    """Compressible (Fanno) pipe flow with roughness-based variable friction.
+    """Compressible (Fanno) channel flow with roughness-based variable friction.
 
     At each RK4 stage the local friction factor is recomputed from the local
     Reynolds number and wall roughness using the specified correlation.
@@ -162,11 +162,11 @@ def pipe_flow_rough(
     u:
         Inlet bulk velocity [m/s].
     L:
-        Pipe length [m].
+        Channel length [m].
     D:
-        Pipe inner diameter [m].
+        Channel inner diameter [m].
     roughness:
-        Absolute wall roughness [m].  ``0.0`` for a hydraulically smooth pipe.
+        Absolute wall roughness [m].  ``0.0`` for a hydraulically smooth channel.
     correlation:
         Friction factor correlation.  One of ``"haaland"`` (default),
         ``"serghides"``, ``"colebrook"``.
@@ -174,7 +174,7 @@ def pipe_flow_rough(
         Number of RK4 integration steps.
     store_profile:
         If ``True``, the returned ``FlowSolution.profile`` contains a list of
-        ``FannoStation`` objects along the pipe axis.
+        ``FannoStation`` objects along the channel axis.
 
     Returns
     -------
@@ -182,7 +182,7 @@ def pipe_flow_rough(
         ``regime="compressible"``.  ``f`` carries the length-averaged friction
         factor.  ``Re`` carries the inlet Reynolds number.
     """
-    sol = _fanno_pipe_rough(
+    sol = _fanno_channel_rough(
         T,
         P,
         u,

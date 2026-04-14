@@ -1,7 +1,7 @@
 """Tests for the thermo-aware incompressible high-level API.
 
-Covers IncompressibleFlowSolution, orifice_flow_thermo, pipe_flow,
-pipe_flow_rough, and pressure_drop_pipe (moved from pipe_flow.h).
+Covers IncompressibleFlowSolution, orifice_flow_thermo, channel_flow,
+channel_flow_rough, and pressure_drop_channel (moved from channel_flow.h).
 """
 
 import math
@@ -28,14 +28,14 @@ def air_at_300() -> tuple:
 
 
 class TestIncompressibleFlowSolution:
-    def test_pipe_flow_returns_solution(self) -> None:
+    def test_channel_flow_returns_solution(self) -> None:
         T, P, X = air_at_300()
-        sol = cb.pipe_flow(T, P, X, u=10.0, L=1.0, D=0.05, f=0.02)
+        sol = cb.channel_flow(T, P, X, u=10.0, L=1.0, D=0.05, f=0.02)
         assert isinstance(sol, cb.IncompressibleFlowSolution)
 
-    def test_pipe_flow_rough_returns_solution(self) -> None:
+    def test_channel_flow_rough_returns_solution(self) -> None:
         T, P, X = air_at_300()
-        sol = cb.pipe_flow_rough(T, P, X, u=10.0, L=1.0, D=0.05, roughness=0.0)
+        sol = cb.channel_flow_rough(T, P, X, u=10.0, L=1.0, D=0.05, roughness=0.0)
         assert isinstance(sol, cb.IncompressibleFlowSolution)
 
     def test_orifice_flow_thermo_returns_solution(self) -> None:
@@ -45,44 +45,44 @@ class TestIncompressibleFlowSolution:
 
 
 # ---------------------------------------------------------------------------
-# pipe_flow (constant f)
+# channel_flow (constant f)
 # ---------------------------------------------------------------------------
 
 
-class TestPipeFlow:
+class TestChannelFlow:
     def test_basic_pressure_drop(self) -> None:
         T, P, X = air_at_300()
-        sol = cb.pipe_flow(T, P, X, u=10.0, L=1.0, D=0.05, f=0.02)
+        sol = cb.channel_flow(T, P, X, u=10.0, L=1.0, D=0.05, f=0.02)
         assert sol.dP > 0.0
 
     def test_zero_velocity_zero_dP(self) -> None:
         T, P, X = air_at_300()
-        sol = cb.pipe_flow(T, P, X, u=0.0, L=1.0, D=0.05, f=0.02)
+        sol = cb.channel_flow(T, P, X, u=0.0, L=1.0, D=0.05, f=0.02)
         assert sol.dP == 0.0
         assert sol.mdot == 0.0
 
     def test_re_populated(self) -> None:
         T, P, X = air_at_300()
-        sol = cb.pipe_flow(T, P, X, u=10.0, L=1.0, D=0.05, f=0.02)
+        sol = cb.channel_flow(T, P, X, u=10.0, L=1.0, D=0.05, f=0.02)
         assert sol.Re > 0.0
 
     def test_rho_matches_density(self) -> None:
         T, P, X = air_at_300()
-        sol = cb.pipe_flow(T, P, X, u=10.0, L=1.0, D=0.05, f=0.02)
+        sol = cb.channel_flow(T, P, X, u=10.0, L=1.0, D=0.05, f=0.02)
         rho_ref = cb.density(T, P, X)
         assert np.isclose(sol.rho, rho_ref, rtol=1e-6)
 
     def test_f_matches_input(self) -> None:
         T, P, X = air_at_300()
         f_in = 0.025
-        sol = cb.pipe_flow(T, P, X, u=10.0, L=1.0, D=0.05, f=f_in)
+        sol = cb.channel_flow(T, P, X, u=10.0, L=1.0, D=0.05, f=f_in)
         assert np.isclose(sol.f, f_in)
 
     def test_mdot_consistent_with_velocity(self) -> None:
         T, P, X = air_at_300()
         u = 10.0
         D = 0.05
-        sol = cb.pipe_flow(T, P, X, u=u, L=1.0, D=D, f=0.02)
+        sol = cb.channel_flow(T, P, X, u=u, L=1.0, D=D, f=0.02)
         A = math.pi * D**2 / 4.0
         mdot_ref = sol.rho * u * A
         assert np.isclose(sol.mdot, mdot_ref, rtol=1e-6)
@@ -90,74 +90,74 @@ class TestPipeFlow:
     def test_dP_matches_darcy_weisbach(self) -> None:
         T, P, X = air_at_300()
         u, L, D, f = 10.0, 1.0, 0.05, 0.02
-        sol = cb.pipe_flow(T, P, X, u=u, L=L, D=D, f=f)
-        dP_ref = cb.pipe_dP(u, L, D, f, sol.rho)
+        sol = cb.channel_flow(T, P, X, u=u, L=L, D=D, f=f)
+        dP_ref = cb.channel_dP(u, L, D, f, sol.rho)
         assert np.isclose(sol.dP, dP_ref, rtol=1e-6)
 
-    def test_longer_pipe_higher_dP(self) -> None:
+    def test_longer_channel_higher_dP(self) -> None:
         T, P, X = air_at_300()
-        sol1 = cb.pipe_flow(T, P, X, u=10.0, L=1.0, D=0.05, f=0.02)
-        sol2 = cb.pipe_flow(T, P, X, u=10.0, L=2.0, D=0.05, f=0.02)
+        sol1 = cb.channel_flow(T, P, X, u=10.0, L=1.0, D=0.05, f=0.02)
+        sol2 = cb.channel_flow(T, P, X, u=10.0, L=2.0, D=0.05, f=0.02)
         assert sol2.dP > sol1.dP
 
     def test_invalid_T(self) -> None:
         _, P, X = air_at_300()
         with pytest.raises((ValueError, RuntimeError)):
-            cb.pipe_flow(-1.0, P, X, u=10.0, L=1.0, D=0.05, f=0.02)
+            cb.channel_flow(-1.0, P, X, u=10.0, L=1.0, D=0.05, f=0.02)
 
 
 # ---------------------------------------------------------------------------
-# pipe_flow_rough (roughness-based f)
+# channel_flow_rough (roughness-based f)
 # ---------------------------------------------------------------------------
 
 
-class TestPipeFlowRough:
+class TestChannelFlowRough:
     def test_basic_pressure_drop(self) -> None:
         T, P, X = air_at_300()
-        sol = cb.pipe_flow_rough(T, P, X, u=10.0, L=1.0, D=0.05, roughness=0.0)
+        sol = cb.channel_flow_rough(T, P, X, u=10.0, L=1.0, D=0.05, roughness=0.0)
         assert sol.dP > 0.0
 
     def test_re_populated(self) -> None:
         T, P, X = air_at_300()
-        sol = cb.pipe_flow_rough(T, P, X, u=10.0, L=1.0, D=0.05, roughness=0.0)
+        sol = cb.channel_flow_rough(T, P, X, u=10.0, L=1.0, D=0.05, roughness=0.0)
         assert sol.Re > 0.0
 
     def test_f_positive(self) -> None:
         T, P, X = air_at_300()
-        sol = cb.pipe_flow_rough(T, P, X, u=10.0, L=1.0, D=0.05, roughness=0.0)
+        sol = cb.channel_flow_rough(T, P, X, u=10.0, L=1.0, D=0.05, roughness=0.0)
         assert sol.f > 0.0
 
     def test_rough_higher_dP_than_smooth(self) -> None:
         T, P, X = air_at_300()
-        sol_s = cb.pipe_flow_rough(T, P, X, u=10.0, L=1.0, D=0.05, roughness=0.0)
-        sol_r = cb.pipe_flow_rough(T, P, X, u=10.0, L=1.0, D=0.05, roughness=1e-4)
+        sol_s = cb.channel_flow_rough(T, P, X, u=10.0, L=1.0, D=0.05, roughness=0.0)
+        sol_r = cb.channel_flow_rough(T, P, X, u=10.0, L=1.0, D=0.05, roughness=1e-4)
         assert sol_r.dP > sol_s.dP
 
-    def test_smooth_matches_pipe_flow_with_haaland_f(self) -> None:
-        """pipe_flow_rough(roughness=0) should match pipe_flow(f=haaland(Re))."""
+    def test_smooth_matches_channel_flow_with_haaland_f(self) -> None:
+        """channel_flow_rough(roughness=0) should match channel_flow(f=haaland(Re))."""
         T, P, X = air_at_300()
         u, L, D = 10.0, 1.0, 0.05
         Re = cb.reynolds(T, P, X, u, D)
         f_ref = cb.friction_haaland(Re, 0.0)
 
-        sol_f = cb.pipe_flow(T, P, X, u=u, L=L, D=D, f=f_ref)
-        sol_r = cb.pipe_flow_rough(T, P, X, u=u, L=L, D=D, roughness=0.0)
+        sol_f = cb.channel_flow(T, P, X, u=u, L=L, D=D, f=f_ref)
+        sol_r = cb.channel_flow_rough(T, P, X, u=u, L=L, D=D, roughness=0.0)
 
         assert np.isclose(sol_f.dP, sol_r.dP, rtol=1e-6)
 
     def test_correlations_consistent(self) -> None:
         T, P, X = air_at_300()
         kw = {"u": 10.0, "L": 1.0, "D": 0.05, "roughness": 0.0}
-        sol_h = cb.pipe_flow_rough(T, P, X, **kw, correlation="haaland")
-        sol_s = cb.pipe_flow_rough(T, P, X, **kw, correlation="serghides")
-        sol_c = cb.pipe_flow_rough(T, P, X, **kw, correlation="colebrook")
+        sol_h = cb.channel_flow_rough(T, P, X, **kw, correlation="haaland")
+        sol_s = cb.channel_flow_rough(T, P, X, **kw, correlation="serghides")
+        sol_c = cb.channel_flow_rough(T, P, X, **kw, correlation="colebrook")
         assert np.isclose(sol_h.dP, sol_s.dP, rtol=0.01)
         assert np.isclose(sol_h.dP, sol_c.dP, rtol=0.01)
 
     def test_invalid_correlation(self) -> None:
         T, P, X = air_at_300()
         with pytest.raises(ValueError, match="unknown friction correlation"):
-            cb.pipe_flow_rough(T, P, X, u=10.0, L=1.0, D=0.05, roughness=0.0, correlation="bad")
+            cb.channel_flow_rough(T, P, X, u=10.0, L=1.0, D=0.05, roughness=0.0, correlation="bad")
 
 
 # ---------------------------------------------------------------------------
@@ -210,24 +210,24 @@ class TestOrificeFlowThermo:
 
 
 # ---------------------------------------------------------------------------
-# pressure_drop_pipe (legacy tuple API, now in incompressible.cpp)
+# pressure_drop_channel (legacy tuple API, now in incompressible.cpp)
 # ---------------------------------------------------------------------------
 
 
-class TestPressureDropPipeRelocated:
+class TestPressureDropChannelRelocated:
     def test_returns_tuple(self) -> None:
         T, P, X = air_at_300()
-        result = cb.pressure_drop_pipe(T, P, X, v=10.0, D=0.05, L=1.0)
+        result = cb.pressure_drop_channel(T, P, X, v=10.0, D=0.05, L=1.0)
         dP, Re, f = result
         assert dP > 0.0
         assert Re > 0.0
         assert f > 0.0
 
-    def test_matches_pipe_flow_rough(self) -> None:
+    def test_matches_channel_flow_rough(self) -> None:
         T, P, X = air_at_300()
         u, D, L = 10.0, 0.05, 1.0
-        dP_tuple, Re_tuple, f_tuple = cb.pressure_drop_pipe(T, P, X, v=u, D=D, L=L)
-        sol = cb.pipe_flow_rough(T, P, X, u=u, L=L, D=D, roughness=0.0)
+        dP_tuple, Re_tuple, f_tuple = cb.pressure_drop_channel(T, P, X, v=u, D=D, L=L)
+        sol = cb.channel_flow_rough(T, P, X, u=u, L=L, D=D, roughness=0.0)
         assert np.isclose(dP_tuple, sol.dP, rtol=1e-6)
         assert np.isclose(Re_tuple, sol.Re, rtol=1e-6)
         assert np.isclose(f_tuple, sol.f, rtol=1e-6)

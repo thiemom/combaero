@@ -6,11 +6,11 @@ every attribute without branching on the flow regime.
 
 Regime mapping
 --------------
-Incompressible pipe / orifice
+Incompressible channel / orifice
     mdot, v, dP, Re, rho, f, Cd, regime="incompressible"
     choked=False, M=nan, T_out=nan, P_out=nan, h0=nan, L_choke=nan
 
-Compressible Fanno pipe
+Compressible Fanno channel
     mdot, v, dP, Re, rho, f, M, T_out, P_out, h0, choked, L_choke
     regime="compressible", Cd=nan
 
@@ -39,7 +39,7 @@ class FlowSolution:
     mdot:
         Mass flow rate [kg/s].
     v:
-        Characteristic velocity (pipe bulk velocity or nozzle exit velocity)
+        Characteristic velocity (channel bulk velocity or nozzle exit velocity)
         [m/s].
     dP:
         Pressure drop P_in - P_out [Pa].  ``nan`` for nozzle flow.
@@ -50,7 +50,7 @@ class FlowSolution:
     f:
         Darcy friction factor [-].  ``nan`` for orifice / nozzle.
     Cd:
-        Discharge coefficient [-].  ``nan`` for pipe / nozzle.
+        Discharge coefficient [-].  ``nan`` for channel / nozzle.
     M:
         Outlet Mach number [-].  ``nan`` for incompressible.
     T_out:

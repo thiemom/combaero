@@ -137,41 +137,41 @@ class TestOrifice:
             cb.orifice_mdot(P1=100000, P2=200000, A=0.001, Cd=0.62, rho=RHO_WATER)
 
 
-class TestPipe:
-    """Tests for pipe flow."""
+class TestChannel:
+    """Tests for channel flow."""
 
-    def test_pipe_dP_basic(self) -> None:
-        """Basic pipe pressure drop."""
+    def test_channel_dP_basic(self) -> None:
+        """Basic channel pressure drop."""
         v = 2.0  # m/s
         L = 10.0  # m
         D = 0.05  # m
         f = 0.02
         rho = RHO_WATER
 
-        dP = cb.pipe_dP(v, L, D, f, rho)
+        dP = cb.channel_dP(v, L, D, f, rho)
 
         # Check formula: dP = f * (L/D) * (rho * v^2 / 2)
         expected = f * (L / D) * 0.5 * rho * v**2
         assert np.isclose(dP, expected)
 
-    def test_pipe_dP_mdot_consistency(self) -> None:
-        """pipe_dP and pipe_dP_mdot should agree."""
+    def test_channel_dP_mdot_consistency(self) -> None:
+        """channel_dP and channel_dP_mdot should agree."""
         L, D, f, rho = 10.0, 0.05, 0.02, RHO_WATER
         v = 2.0
 
-        mdot = cb.pipe_mdot(v, D, rho)
-        dP_from_v = cb.pipe_dP(v, L, D, f, rho)
-        dP_from_mdot = cb.pipe_dP_mdot(mdot, L, D, f, rho)
+        mdot = cb.channel_mdot(v, D, rho)
+        dP_from_v = cb.channel_dP(v, L, D, f, rho)
+        dP_from_mdot = cb.channel_dP_mdot(mdot, L, D, f, rho)
 
         assert np.isclose(dP_from_v, dP_from_mdot)
 
-    def test_pipe_velocity_mdot_roundtrip(self) -> None:
+    def test_channel_velocity_mdot_roundtrip(self) -> None:
         """velocity -> mdot -> velocity roundtrip."""
         D, rho = 0.05, RHO_WATER
         v = 3.0
 
-        mdot = cb.pipe_mdot(v, D, rho)
-        v_back = cb.pipe_velocity(mdot, D, rho)
+        mdot = cb.channel_mdot(v, D, rho)
+        v_back = cb.channel_velocity(mdot, D, rho)
 
         assert np.isclose(v_back, v)
 

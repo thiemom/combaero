@@ -78,13 +78,13 @@
   document the Jacobian truncation as a known limitation. Impact on convergence is
   typically small (Cd varies slowly with Re).
 
-#### M4 — `PipeElement.htc_and_T` missing `rho > 0` guard
+#### M4 — `ChannelElement.htc_and_T` missing `rho > 0` guard
 - **File**: `components.py:1629-1630`
 - **Issue**: `rho = state.density(); u = state.m_dot / (rho * self.area)` will throw
   `ZeroDivisionError` if rho <= 0 during non-physical intermediate states. The penalty
   wrapper catches this, but `MomentumChamberNode.htc_and_T` (line 655-656) already has
   the correct guard pattern: `u = m_dot / (rho * self.area) if rho > 0 and self.area > 0 else 0.0`.
-- **Fix**: Add same guard to `PipeElement.htc_and_T`.
+- **Fix**: Add same guard to `ChannelElement.htc_and_T`.
 
 #### M5 — `mass_to_mole` called repeatedly for the same composition
 - **File**: `gui/backend/main.py:99`, `components.py:358-361`
@@ -132,7 +132,7 @@
 
 ### TRIVIAL
 
-#### T1 — Hardcoded pi in `PipeElement.__init__`
+#### T1 — Hardcoded pi in `ChannelElement.__init__`
 - **File**: `components.py:1451`
 - **Issue**: `self.area = 3.1415926535 * (diameter / 2) ** 2` — should use `math.pi`.
 - **Fix**: Replace with `math.pi`.
@@ -150,7 +150,7 @@ The current `WallConnection` is a **single-layer** coupler:
   uses `U = 1 / (1/h_a + t/k + 1/h_b)` — a single resistance layer
 
 The convective HTC comes from `ConvectiveSurface.htc_and_T()` on elements that have
-a `surface` attribute (`PipeElement`, `MomentumChamberNode`, `CombustorNode`). The
+a `surface` attribute (`ChannelElement`, `MomentumChamberNode`, `CombustorNode`). The
 base `NetworkElement.htc_and_T()` returns `None`.
 
 ### Desired State
@@ -161,7 +161,7 @@ base `NetworkElement.htc_and_T()` returns `None`.
 2. **Walls as network building blocks** — analogous to flow elements that connect
    between nodes. A wall connects a hot-side element to a cold-side element.
 3. **Convective HTC only from physically meaningful elements** — only elements that
-   have transport states and velocity (pipe, orifice, momentum chamber, combustor)
+   have transport states and velocity (channel, orifice, momentum chamber, combustor)
    contribute convective boundary conditions. Plenums and boundaries do not.
 
 ### C++ Already Supports Multi-Layer
@@ -247,7 +247,7 @@ post-solve diagnostics, using the existing `wall_temperature_profile` C++ functi
 
 #### C.3 — Restrict convective HTC to transport-capable components
 
-Currently `NetworkElement.htc_and_T()` returns `None` by default and only `PipeElement`,
+Currently `NetworkElement.htc_and_T()` returns `None` by default and only `ChannelElement`,
 `MomentumChamberNode`, and `CombustorNode` override it. This already provides the
 correct restriction — elements without transport states return `None` and walls skip
 them.
@@ -345,7 +345,7 @@ Jacobian structure is unchanged because layer count only affects the scalar `R_t
 4. [x] **M2** — Integrate `extract_complete_states` into post-solve path (Completed in 13d2842, fix in 1c2c2e3)
 
 ### Phase 3 — Robustness fixes
-5. [x] **M4** — Add `rho > 0` guard to `PipeElement.htc_and_T` (Completed in dafa6d3, polish in 045763c)
+5. [x] **M4** — Add `rho > 0` guard to `ChannelElement.htc_and_T` (Completed in dafa6d3, polish in 045763c)
 6. [x] **T1** — Standardize Pi constants (Completed in dafa6d3)
 7. [x] **L3** — Add defensive guard to `MixtureState.X` (Completed in dafa6d3)
 
@@ -638,7 +638,7 @@ Jacobians correctly.
 | pybind `_core.cpp` | **YES** | **YES** | All 5 channel functions bound with both params |
 | Python `ConvectiveSurface.htc_and_T()` | **YES** | **YES** | Passed from `self.Nu_multiplier`/`self.f_multiplier` |
 | Python `heat_transfer.py` wrappers | **NO** | **NO** | `smooth()`, `ribbed()`, `dimpled()`, `pin_fin()`, `impingement()` do not accept multipliers |
-| `PipeElement.htc_and_T()` | **YES** | **YES** | Delegates to `self.surface.htc_and_T()` |
+| `ChannelElement.htc_and_T()` | **YES** | **YES** | Delegates to `self.surface.htc_and_T()` |
 | `MomentumChamberNode.htc_and_T()` | **YES** | **YES** | Delegates to `self.surface.htc_and_T()` |
 | `CombustorNode.htc_and_T()` | Implicit | Implicit | Uses `self.surface` which carries multipliers |
 | Solver `_evaluate_walls_for_node` | **YES** | **YES** | Calls `obj.htc_and_T(state)` → `ConvectiveSurface` |
@@ -671,7 +671,7 @@ args to all 5 wrapper functions and forward them.
 
 #### E.2.2 — GUI does not expose multipliers (LOW — future work)
 
-The GUI `PipeData`/`OrificeData` schemas and `graph_builder.py` do not wire
+The GUI `ChannelData`/`OrificeData` schemas and `graph_builder.py` do not wire
 `Nu_multiplier`/`f_multiplier`. The `ConvectiveSurface` is constructed with defaults:
 
 ```python
@@ -684,7 +684,7 @@ This is acceptable for the initial GUI (no heat transfer tuning exposed yet). Wh
 thermal coupling is fully exposed in the GUI, add:
 
 ```python
-class PipeData(BaseModel):
+class ChannelData(BaseModel):
     Nu_multiplier: float = 1.0
     f_multiplier: float = 1.0
 ```
@@ -713,7 +713,7 @@ the design doc. **No Jacobian issue.**
 
 #### E.2.4 — Channel model selection not exposed in GUI (LOW)
 
-The GUI hardcodes `SmoothModel()` for pipes. Users cannot select ribbed, dimpled,
+The GUI hardcodes `SmoothModel()` for channels. Users cannot select ribbed, dimpled,
 pin-fin, or impingement models from the GUI. This is future GUI work (Part F overlap).
 
 ### E.3 — Summary
@@ -869,9 +869,9 @@ if self.hot_side_modifier:
 
 #### Phase F-II: Expose channel model selection in GUI
 
-Add `htc_model` selection to pipe/element schemas:
+Add `htc_model` selection to channel/element schemas:
 ```python
-class PipeData(BaseModel):
+class ChannelData(BaseModel):
     htc_model: str = "smooth"  # "smooth"|"ribbed"|"dimpled"|"pin_fin"|"impingement"
     htc_params: dict = {}      # model-specific parameters
     Nu_multiplier: float = 1.0
@@ -914,10 +914,10 @@ Jacobian-equipped correlation functions, all of which are already bound.
 |----------|:---:|:---:|:---:|:---:|------------|
 | `orifice_mdot_and_jacobian` | YES | YES | Solver-internal | — | Correct: internal |
 | `orifice_residuals_and_jacobian` | YES | YES | Solver-internal | — | Correct: internal |
-| `pipe_residuals_and_jacobian` | YES | YES | Solver-internal | — | Correct: internal |
+| `channel_residuals_and_jacobian` | YES | YES | Solver-internal | — | Correct: internal |
 | `lossless_pressure_and_jacobian` | YES | YES | Solver-internal | — | Correct: internal |
 | `orifice_compressible_*` | YES | YES | Solver-internal | — | Correct: internal |
-| `pipe_compressible_*` | YES | YES | Solver-internal | — | Correct: internal |
+| `channel_compressible_*` | YES | YES | Solver-internal | — | Correct: internal |
 | `nusselt_and_jacobian_*` (4 variants) | YES | YES | — | — | OK: useful for advanced users |
 | `friction_and_jacobian_*` (5 variants) | YES | YES | — | — | OK: useful for advanced users |
 | `pin_fin_nusselt_and_jacobian` | YES | YES | — | — | OK |
@@ -961,7 +961,7 @@ Jacobian-equipped correlation functions, all of which are already bound.
 | `calc_T_from_u_mass` | **NO** | **NO** | **MISSING** — isochoric process solver |
 | `calc_T_from_sv_mass` | **NO** | **NO** | **MISSING** — (s, v) flash |
 | `calc_T_from_sh_mass` | **NO** | **NO** | **MISSING** — (s, h) flash |
-| `nusselt_pipe` (State-based overload) | **NO** | **NO** | Low value (htc_pipe covers this) |
+| `nusselt_channel` (State-based overload) | **NO** | **NO** | Low value (htc_channel covers this) |
 | State-based overloads (`cp(State&)` etc.) | **NO** | **NO** | Low value (internal convenience) |
 
 **Key gaps:**
@@ -998,8 +998,8 @@ Jacobian-equipped correlation functions, all of which are already bound.
 | `friction_serghides` | YES | YES | OK |
 | `friction_colebrook` | YES | YES | OK |
 | `friction_petukhov` | YES | YES | OK |
-| `pipe_roughness` | YES | YES | OK |
-| `standard_pipe_roughness` | YES | YES | OK |
+| `channel_roughness` | YES | YES | OK |
+| `standard_channel_roughness` | YES | YES | OK |
 
 **Verdict: friction.h — fully wired, no gaps.**
 
@@ -1067,9 +1067,9 @@ notable gap for users with empirical test data.**
 | `WallCouplingResult` struct | YES | YES | OK |
 | `wall_coupling_and_jacobian` | YES | YES | OK |
 | `channel_smooth/ribbed/dimpled/pin_fin/impingement` | YES | YES | OK |
-| `htc_pipe` (composite tuple overload) | YES | YES | OK |
-| `nusselt_pipe` (State-based) | **NO** | **NO** | Low value — `htc_pipe` covers the use case |
-| `htc_pipe` (State-based) | YES | YES | OK |
+| `htc_channel` (composite tuple overload) | YES | YES | OK |
+| `nusselt_channel` (State-based) | **NO** | **NO** | Low value — `htc_channel` covers the use case |
+| `htc_channel` (State-based) | YES | YES | OK |
 | Laminar constants `NU_LAMINAR_CONST_T/Q` | **NO** | **NO** | Low: trivial constants (3.66, 4.36) |
 
 **Verdict: heat_transfer.h — fully wired. No meaningful gaps.**
@@ -1211,7 +1211,7 @@ pressure difference the network provides.
 
 ### H.2b — Network Element Design
 
-Following the existing `NetworkElement` pattern (cf. `PipeElement`, `OrificeElement`):
+Following the existing `NetworkElement` pattern (cf. `ChannelElement`, `OrificeElement`):
 
 ```python
 class CompressorStageElement(NetworkElement):
@@ -1303,7 +1303,7 @@ making it a solver unknown.
 
 **Architecture rule**: every element wired into the Newton solver must provide its
 residuals and analytical Jacobians from C++, with a matching C++ finite-difference
-accuracy test (cf. `PipeCompressibleDerivatives`, `OrificeDerivatives` patterns in
+accuracy test (cf. `ChannelCompressibleDerivatives`, `OrificeDerivatives` patterns in
 `tests/test_solver_interface.cpp`). Python-side FD Jacobians are not acceptable for
 production solver elements.
 
@@ -1417,7 +1417,7 @@ All analytically tractable — no FD needed for the Jacobians themselves.
 
 **Simple turbojet** (student exercise):
 ```
-PressureBoundary(inlet) → Pipe → CompressorStage → CombustorNode → TurbineStage → Nozzle → PressureBoundary(exit)
+PressureBoundary(inlet) → Channel → CompressorStage → CombustorNode → TurbineStage → Nozzle → PressureBoundary(exit)
                                       ↑                                  ↓
                                       └──────── ShaftConnection ─────────┘
                                               (W_compressor = W_turbine)
@@ -1517,7 +1517,7 @@ A film- or effusion-cooled wall panel sits **in-line on the cold (coolant) passa
 and bleeds a fraction of coolant through the wall into the hot gas path:
 
 ```
-                      hot_element (pipe/chamber in hot-gas path)
+                      hot_element (channel/chamber in hot-gas path)
                            │
                       ─────┼───── hot-gas flow direction ──►
                            │
@@ -1541,7 +1541,7 @@ and bleeds a fraction of coolant through the wall into the hot gas path:
 | `cold_out` (`to_node`) | Bulk coolant continues downstream in cold passage |
 | `bleed_out` | Fraction of coolant exits through holes into hot-gas path |
 
-The panel is a **pipe section with a pressure-driven side-bleed**. Most coolant flows
+The panel is a **channel section with a pressure-driven side-bleed**. Most coolant flows
 through and picks up heat from the wall; a fraction exits through discrete holes
 providing film/effusion protection on the hot side.
 
@@ -1549,7 +1549,7 @@ providing film/effusion protection on the hot side.
 
 1. **Hot gas → wall**: convection from hot element (h_hot, T_aw_hot)
 2. **Wall → coolant (in-passage)**: convection from cold-side surface (h_cold, T_aw_cold)
-   — panel computes this from its own internal flow, like a pipe's `ConvectiveSurface`
+   — panel computes this from its own internal flow, like a channel's `ConvectiveSurface`
 3. **Film effect**: injected coolant modifies the effective hot-side adiabatic wall
    temperature: `T_aw_eff = T_aw_hot − η · (T_aw_hot − T_coolant_exit)`
 
@@ -1653,7 +1653,7 @@ class CooledPanelElement(MultiPortElement):
 
 ### I.6 — Residuals Contributed
 
-1. **Momentum (cold passage)**: ΔP from friction in the cold channel — like a pipe
+1. **Momentum (cold passage)**: ΔP from friction in the cold channel — like a channel
 2. **Mass split**: `m_dot_in = m_dot_out + m_dot_bleed`
 3. **Bleed flow** (pressure-driven): `m_dot_bleed = Cd · A_holes · f(ΔP_cold_to_hot)`
    using `effusion_discharge_coefficient(Re_d, P_ratio, α, L/D)`
@@ -1692,7 +1692,7 @@ All C++ functions with Jacobians already exist (see Part F inventory).
 ### I.9 — GUI Representation
 
 ```
-         thermal-hot (top handle) ← connects to hot-gas pipe/chamber
+         thermal-hot (top handle) ← connects to hot-gas channel/chamber
               │
     ┌─────────┴─────────┐
     │                    │
@@ -1755,7 +1755,7 @@ the cold passage:
 Advection is handled naturally by the existing solver: each panel's `cold_out`
 feeds the next panel's `cold_in`, so downstream panels automatically see warmer
 coolant. No special treatment needed — this is the same temperature propagation
-that chained `PipeElement`s already use.
+that chained `ChannelElement`s already use.
 
 **Why chaining over internal discretization:** simpler per-element (fixed 3 ports),
 composable (mix film and effusion zones), and the solver already supports chained

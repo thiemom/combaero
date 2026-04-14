@@ -5,7 +5,7 @@
 #include <unordered_map>
 
 // -------------------------------------------------------------
-// Darcy friction factor correlations for turbulent pipe flow
+// Darcy friction factor correlations for turbulent channel flow
 // -------------------------------------------------------------
 // All functions compute the Darcy friction factor f for use in:
 //   ΔP = f * (L/D) * (ρ * v²/2)
@@ -50,7 +50,7 @@ double friction_serghides(double Re, double e_D);
 double friction_colebrook(double Re, double e_D, double tol = 1e-10,
                           int max_iter = 20);
 
-// Petukhov correlation (1970) - smooth pipes only
+// Petukhov correlation (1970) - smooth channels only
 // f = (coeff_a * ln(Re) - coeff_b)^(-2)
 // Valid for 3000 < Re < 5x10^6
 // Often used with Gnielinski/Petukhov heat transfer correlations.
@@ -79,16 +79,10 @@ double friction_petukhov(double Re);
 // Use standard_channel_roughness() to list available materials.
 double channel_roughness(const std::string &material);
 
-inline double pipe_roughness(const std::string &material) {
-  return channel_roughness(material);
-}
 
 // Get all standard channel roughness values.
 // Returns: map of material name -> roughness [m]
 std::unordered_map<std::string, double> standard_channel_roughness();
 
-inline std::unordered_map<std::string, double> standard_pipe_roughness() {
-  return standard_channel_roughness();
-}
 
 #endif // FRICTION_H

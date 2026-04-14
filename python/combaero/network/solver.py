@@ -15,7 +15,6 @@ from .components import (
     MassFlowBoundary,
     MixtureState,
     NetworkNode,
-    PipeElement,
     PressureBoundary,
 )
 from .graph import FlowNetwork
@@ -126,7 +125,7 @@ class NetworkSolver:
         for element in self.network.elements.values():
             elem_scale = (
                 ref_p
-                if isinstance(element, (ChannelElement, PipeElement, LosslessConnectionElement))
+                if isinstance(element, (ChannelElement, LosslessConnectionElement))
                 else ref_mdot
             )
             scales.extend([elem_scale] * element.n_equations())

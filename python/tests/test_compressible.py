@@ -82,8 +82,8 @@ def test_solve_A_eff_from_mdot() -> None:
     assert np.isclose(A_eff_solved, A_eff_orig, rtol=1e-4)
 
 
-def test_fanno_pipe_basic() -> None:
-    """Basic Fanno flow through a pipe."""
+def test_fanno_channel_basic() -> None:
+    """Basic Fanno flow through a channel."""
     X = cb.species.dry_air()
     T_in = 400.0  # K
     P_in = 200000.0  # Pa
@@ -92,7 +92,7 @@ def test_fanno_pipe_basic() -> None:
     D = 0.05  # m
     f = 0.02  # Darcy friction factor
 
-    sol = cb.fanno_pipe(T_in, P_in, u_in, L, D, f, X)
+    sol = cb.fanno_channel(T_in, P_in, u_in, L, D, f, X)
 
     # Pressure should drop due to friction
     assert P_in > sol.outlet.P
@@ -101,8 +101,8 @@ def test_fanno_pipe_basic() -> None:
     assert sol.mdot > 0
 
 
-def test_fanno_pipe_re_in_populated() -> None:
-    """fanno_pipe should populate Re_in and f_avg."""
+def test_fanno_channel_re_in_populated() -> None:
+    """fanno_channel should populate Re_in and f_avg."""
     X = cb.species.dry_air()
     T_in = 400.0
     P_in = 200000.0
@@ -111,7 +111,7 @@ def test_fanno_pipe_re_in_populated() -> None:
     D = 0.05
     f = 0.02
 
-    sol = cb.fanno_pipe(T_in, P_in, u_in, L, D, f, X)
+    sol = cb.fanno_channel(T_in, P_in, u_in, L, D, f, X)
 
     assert sol.Re_in > 0
     # For constant-f overload, f_avg == f
@@ -120,10 +120,10 @@ def test_fanno_pipe_re_in_populated() -> None:
     assert np.isclose(sol.f, f)
 
 
-def test_fanno_pipe_profile_has_f_re() -> None:
+def test_fanno_channel_profile_has_f_re() -> None:
     """Profile stations should carry f and Re fields."""
     X = cb.species.dry_air()
-    sol = cb.fanno_pipe(400.0, 200000.0, 50.0, 1.0, 0.05, 0.02, X, store_profile=True)
+    sol = cb.fanno_channel(400.0, 200000.0, 50.0, 1.0, 0.05, 0.02, X, store_profile=True)
 
     assert len(sol.profile) > 0
     for st in sol.profile:
@@ -131,17 +131,17 @@ def test_fanno_pipe_profile_has_f_re() -> None:
         assert st.Re >= 0.0
 
 
-def test_fanno_pipe_rough_basic() -> None:
-    """fanno_pipe_rough: pressure drops, f_avg and Re_in populated."""
+def test_fanno_channel_rough_basic() -> None:
+    """fanno_channel_rough: pressure drops, f_avg and Re_in populated."""
     X = cb.species.dry_air()
     T_in = 400.0
     P_in = 200000.0
     u_in = 50.0
     L = 1.0
     D = 0.05
-    roughness = 0.0  # smooth pipe
+    roughness = 0.0  # smooth channel
 
-    sol = cb.fanno_pipe_rough(T_in, P_in, u_in, L, D, roughness, X)
+    sol = cb.fanno_channel_rough(T_in, P_in, u_in, L, D, roughness, X)
 
     assert P_in > sol.outlet.P
     assert sol.mdot > 0
@@ -149,8 +149,8 @@ def test_fanno_pipe_rough_basic() -> None:
     assert sol.f_avg > 0
 
 
-def test_fanno_pipe_rough_smooth_matches_constant_f() -> None:
-    """Smooth pipe (roughness=0): rough variant should be close to constant-f variant
+def test_fanno_channel_rough_smooth_matches_constant_f() -> None:
+    """Smooth channel (roughness=0): rough variant should be close to constant-f variant
     when f is pre-computed from inlet Re."""
     X = cb.species.dry_air()
     T_in = 400.0
@@ -163,17 +163,17 @@ def test_fanno_pipe_rough_smooth_matches_constant_f() -> None:
     Re_in = cb.reynolds(T_in, P_in, X, u_in, D)
     f_in = cb.friction_haaland(Re_in, 0.0)
 
-    sol_const = cb.fanno_pipe(T_in, P_in, u_in, L, D, f_in, X, n_steps=200)
-    sol_rough = cb.fanno_pipe_rough(T_in, P_in, u_in, L, D, 0.0, X, n_steps=200)
+    sol_const = cb.fanno_channel(T_in, P_in, u_in, L, D, f_in, X, n_steps=200)
+    sol_rough = cb.fanno_channel_rough(T_in, P_in, u_in, L, D, 0.0, X, n_steps=200)
 
-    # Outlet pressure should be close (within 1% — Re varies slightly along pipe)
+    # Outlet pressure should be close (within 1% — Re varies slightly along channel)
     assert np.isclose(sol_const.outlet.P, sol_rough.outlet.P, rtol=0.01)
-    # f_avg should be close to f_in for smooth pipe
+    # f_avg should be close to f_in for smooth channel
     assert np.isclose(sol_rough.f_avg, f_in, rtol=0.05)
 
 
-def test_fanno_pipe_rough_increases_dP() -> None:
-    """Rough pipe should have higher pressure drop than smooth pipe."""
+def test_fanno_channel_rough_increases_dP() -> None:
+    """Rough channel should have higher pressure drop than smooth channel."""
     X = cb.species.dry_air()
     T_in = 400.0
     P_in = 200000.0
@@ -181,18 +181,18 @@ def test_fanno_pipe_rough_increases_dP() -> None:
     L = 1.0
     D = 0.05
 
-    sol_smooth = cb.fanno_pipe_rough(T_in, P_in, u_in, L, D, 0.0, X)
-    sol_rough = cb.fanno_pipe_rough(T_in, P_in, u_in, L, D, 1e-4, X)
+    sol_smooth = cb.fanno_channel_rough(T_in, P_in, u_in, L, D, 0.0, X)
+    sol_rough = cb.fanno_channel_rough(T_in, P_in, u_in, L, D, 1e-4, X)
 
     dP_smooth = P_in - sol_smooth.outlet.P
     dP_rough = P_in - sol_rough.outlet.P
     assert dP_rough > dP_smooth
 
 
-def test_fanno_pipe_rough_profile() -> None:
+def test_fanno_channel_rough_profile() -> None:
     """Profile stations should carry local f and Re."""
     X = cb.species.dry_air()
-    sol = cb.fanno_pipe_rough(400.0, 200000.0, 50.0, 1.0, 0.05, 1e-4, X, store_profile=True)
+    sol = cb.fanno_channel_rough(400.0, 200000.0, 50.0, 1.0, 0.05, 1e-4, X, store_profile=True)
 
     assert len(sol.profile) > 0
     for st in sol.profile:
@@ -200,22 +200,22 @@ def test_fanno_pipe_rough_profile() -> None:
         assert st.Re > 0.0
 
 
-def test_fanno_pipe_rough_correlations() -> None:
-    """All supported correlations should give similar results for smooth pipe."""
+def test_fanno_channel_rough_correlations() -> None:
+    """All supported correlations should give similar results for smooth channel."""
     X = cb.species.dry_air()
     T_in, P_in, u_in, L, D = 400.0, 200000.0, 50.0, 1.0, 0.05
 
-    sol_h = cb.fanno_pipe_rough(T_in, P_in, u_in, L, D, 0.0, X, correlation="haaland")
-    sol_s = cb.fanno_pipe_rough(T_in, P_in, u_in, L, D, 0.0, X, correlation="serghides")
-    sol_c = cb.fanno_pipe_rough(T_in, P_in, u_in, L, D, 0.0, X, correlation="colebrook")
+    sol_h = cb.fanno_channel_rough(T_in, P_in, u_in, L, D, 0.0, X, correlation="haaland")
+    sol_s = cb.fanno_channel_rough(T_in, P_in, u_in, L, D, 0.0, X, correlation="serghides")
+    sol_c = cb.fanno_channel_rough(T_in, P_in, u_in, L, D, 0.0, X, correlation="colebrook")
 
     # All three should give very close outlet pressures
     assert np.isclose(sol_h.outlet.P, sol_s.outlet.P, rtol=0.005)
     assert np.isclose(sol_h.outlet.P, sol_c.outlet.P, rtol=0.005)
 
 
-def test_fanno_pipe_rough_choked() -> None:
-    """Long rough pipe should choke: use a very long pipe so choking is certain."""
+def test_fanno_channel_rough_choked() -> None:
+    """Long rough channel should choke: use a very long channel so choking is certain."""
     X = cb.species.dry_air()
     T_in = 400.0
     P_in = 200000.0
@@ -224,23 +224,23 @@ def test_fanno_pipe_rough_choked() -> None:
     roughness = 1e-4
 
     # With high velocity and roughness, L* is short; 1000 m is certainly beyond it
-    sol = cb.fanno_pipe_rough(T_in, P_in, u_in, 1000.0, D, roughness, X)
+    sol = cb.fanno_channel_rough(T_in, P_in, u_in, 1000.0, D, roughness, X)
 
     assert sol.choked
     assert sol.L_choke < 1000.0  # choking happened before the end
 
 
-def test_fanno_pipe_rough_invalid_correlation() -> None:
+def test_fanno_channel_rough_invalid_correlation() -> None:
     """Unknown correlation should raise ValueError."""
     import pytest
 
     X = cb.species.dry_air()
     with pytest.raises(ValueError, match="unknown correlation"):
-        cb.fanno_pipe_rough(400.0, 200000.0, 50.0, 1.0, 0.05, 0.0, X, correlation="invalid")
+        cb.fanno_channel_rough(400.0, 200000.0, 50.0, 1.0, 0.05, 0.0, X, correlation="invalid")
 
 
 def test_fanno_max_length() -> None:
-    """Maximum pipe length before choking."""
+    """Maximum channel length before choking."""
     X = cb.species.dry_air()
     T_in = 400.0
     P_in = 200000.0

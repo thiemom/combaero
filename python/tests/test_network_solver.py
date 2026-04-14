@@ -4,12 +4,12 @@ import pytest
 
 import combaero as cb
 from combaero.network import (
+    ChannelElement,
     FlowNetwork,
     LosslessConnectionElement,
     MassFlowBoundary,
     NetworkSolver,
     OrificeElement,
-    PipeElement,
     PlenumNode,
     PressureBoundary,
 )
@@ -59,9 +59,9 @@ def test_network_solver_simple_orifice():
     assert solution["orf_1.m_dot"] == pytest.approx(m_dot_analytical, rel=1e-4)
 
 
-def test_network_solver_simple_pipe():
+def test_network_solver_simple_channel():
     """
-    Scenario A (part 2): Simple PressureBoundary -> Pipe -> PressureBoundary.
+    Scenario A (part 2): Simple PressureBoundary -> Channel -> PressureBoundary.
     Verifies exact Darcy-Weisbach flow scaling.
     """
     graph = FlowNetwork()
@@ -76,8 +76,8 @@ def test_network_solver_simple_pipe():
     outlet.T_total = 300.0
     outlet.Y = inlet.Y
 
-    pipe = PipeElement(
-        "pipe_1",
+    channel = ChannelElement(
+        "channel_1",
         "inlet",
         "outlet",
         length=10.0,
@@ -88,12 +88,12 @@ def test_network_solver_simple_pipe():
 
     graph.add_node(inlet)
     graph.add_node(outlet)
-    graph.add_element(pipe)
+    graph.add_element(channel)
 
     solver = NetworkSolver(graph)
     solution = solver.solve()
 
-    m_dot_solved = solution["pipe_1.m_dot"]
+    m_dot_solved = solution["channel_1.m_dot"]
 
     # Analytical verification
     rho = cb.density(inlet.T_total, inlet.P_total, cb.mass_to_mole(inlet.Y))
@@ -113,8 +113,8 @@ def test_network_solver_simple_pipe():
 def test_network_bc_swapping():
     """
     Scenario B: Boundary Condition Swapping (Reverse Lookup).
-    1. MassFlowBoundary -> Pipe -> PressureBoundary. Solve for P at inlet.
-    2. PressureBoundary(P=P_solved) -> Pipe -> PressureBoundary. Solve for m_dot.
+    1. MassFlowBoundary -> Channel -> PressureBoundary. Solve for P at inlet.
+    2. PressureBoundary(P=P_solved) -> Channel -> PressureBoundary. Solve for m_dot.
     m_dot should precisely equal the original MassFlowBoundary input.
     """
 
@@ -133,11 +133,13 @@ def test_network_bc_swapping():
     outlet_p.Y = _get_air_Y()
 
     # Direct connection: MassFlowBoundary natively supports floating its pressure to push flow!
-    pipe1 = PipeElement("pipe_1", "inlet", "outlet", length=5.0, diameter=0.1, roughness=1e-4)
+    channel1 = ChannelElement(
+        "channel_1", "inlet", "outlet", length=5.0, diameter=0.1, roughness=1e-4
+    )
 
     graph1.add_node(inlet_m)
     graph1.add_node(outlet_p)
-    graph1.add_element(pipe1)
+    graph1.add_element(channel1)
 
     solver1 = NetworkSolver(graph1)
     # Hint the inlet pressure for a faster Newton step
@@ -146,7 +148,7 @@ def test_network_bc_swapping():
     sol1 = solver1.solve()
 
     # Assert mass flow is conserved
-    assert sol1["pipe_1.m_dot"] == pytest.approx(target_m_dot, rel=1e-6)
+    assert sol1["channel_1.m_dot"] == pytest.approx(target_m_dot, rel=1e-6)
 
     # Store the solved pressure that the MFB had to rise to
     p_solved = sol1["inlet.P_total"]
@@ -163,23 +165,25 @@ def test_network_bc_swapping():
     outlet2.T_total = 300.0
     outlet2.Y = _get_air_Y()
 
-    pipe2 = PipeElement("pipe_1", "inlet", "outlet", length=5.0, diameter=0.1, roughness=1e-4)
+    channel2 = ChannelElement(
+        "channel_1", "inlet", "outlet", length=5.0, diameter=0.1, roughness=1e-4
+    )
 
     graph2.add_node(inlet_p)
     graph2.add_node(outlet2)
-    graph2.add_element(pipe2)
+    graph2.add_element(channel2)
 
     solver2 = NetworkSolver(graph2)
     sol2 = solver2.solve()
 
     # Verify the mass flows match mapping the reverse lookup
-    assert sol2["pipe_1.m_dot"] == pytest.approx(target_m_dot, rel=1e-6)
+    assert sol2["channel_1.m_dot"] == pytest.approx(target_m_dot, rel=1e-6)
 
 
 def test_network_element_series():
     """
     Scenario C: Simple Element Series and Junction Mass Conservation.
-    Boundary -> Pipe1 -> Junction -> Pipe2 -> Boundary
+    Boundary -> Channel1 -> Junction -> Channel2 -> Boundary
     """
     graph = FlowNetwork()
 
@@ -195,15 +199,15 @@ def test_network_element_series():
     outlet.T_total = 300.0
     outlet.Y = _get_air_Y()
 
-    # Pipe 1 is larger, Pipe 2 is smaller
-    pipe1 = PipeElement("p1", "inlet", "junc_1", length=5.0, diameter=0.1, roughness=0.0)
-    pipe2 = PipeElement("p2", "junc_1", "outlet", length=5.0, diameter=0.05, roughness=0.0)
+    # Channel 1 is larger, Channel 2 is smaller
+    channel1 = ChannelElement("p1", "inlet", "junc_1", length=5.0, diameter=0.1, roughness=0.0)
+    channel2 = ChannelElement("p2", "junc_1", "outlet", length=5.0, diameter=0.05, roughness=0.0)
 
     graph.add_node(inlet)
     graph.add_node(junc)
     graph.add_node(outlet)
-    graph.add_element(pipe1)
-    graph.add_element(pipe2)
+    graph.add_element(channel1)
+    graph.add_element(channel2)
 
     solver = NetworkSolver(graph)
     # The initial guesses for default boundary variables starts at 101325
@@ -221,7 +225,7 @@ def test_network_element_series():
     dP2 = sol["junc_1.P"] - outlet.P_total
 
     assert (dP1 + dP2) == pytest.approx(inlet.P_total - outlet.P_total, abs=1e-4)
-    # Pipe 2 (smaller) should drop much more pressure than Pipe 1
+    # Channel 2 (smaller) should drop much more pressure than Channel 1
     assert dP2 > dP1 * 10
 
 

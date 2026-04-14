@@ -10,15 +10,15 @@ def test_wall_connection_basic():
     """Test basic WallConnection instantiation and compute_coupling."""
     wall = WallConnection(
         id="test_wall",
-        element_a="hot_pipe",
-        element_b="cold_pipe",
+        element_a="hot_channel",
+        element_b="cold_channel",
         wall_thickness=0.002,
         wall_conductivity=25.0,
     )
 
     assert wall.id == "test_wall"
-    assert wall.element_a == "hot_pipe"
-    assert wall.element_b == "cold_pipe"
+    assert wall.element_a == "hot_channel"
+    assert wall.element_b == "cold_channel"
     assert wall.wall_thickness == 0.002
     assert wall.wall_conductivity == 25.0
     assert wall.contact_area is None
@@ -28,8 +28,8 @@ def test_wall_connection_compute_coupling():
     """Test WallConnection.compute_coupling method."""
     wall = WallConnection(
         id="test_wall",
-        element_a="hot_pipe",
-        element_b="cold_pipe",
+        element_a="hot_channel",
+        element_b="cold_channel",
         wall_thickness=0.002,
         wall_conductivity=25.0,
     )
@@ -60,8 +60,8 @@ def test_wall_connection_with_contact_area():
     """Test WallConnection with explicit contact_area override."""
     wall = WallConnection(
         id="test_wall",
-        element_a="hot_pipe",
-        element_b="cold_pipe",
+        element_a="hot_channel",
+        element_b="cold_channel",
         wall_thickness=0.002,
         wall_conductivity=25.0,
         contact_area=0.05,  # Override area
@@ -121,8 +121,8 @@ def test_wall_connection_with_convective_surfaces():
     # Create wall connection
     wall = WallConnection(
         id="test_wall",
-        element_a="hot_pipe",
-        element_b="cold_pipe",
+        element_a="hot_channel",
+        element_b="cold_channel",
         wall_thickness=0.002,
         wall_conductivity=25.0,
     )
@@ -146,8 +146,8 @@ def test_wall_connection_zero_temperature_difference():
     """Test WallConnection with equal temperatures on both sides."""
     wall = WallConnection(
         id="test_wall",
-        element_a="pipe_a",
-        element_b="pipe_b",
+        element_a="channel_a",
+        element_b="channel_b",
         wall_thickness=0.002,
         wall_conductivity=25.0,
     )

@@ -13,10 +13,10 @@ import combaero as cb
 class TestSimpleGeometryHelpers:
     """Test simple geometry helper functions (Phase 1)."""
 
-    def test_pipe_area_basic(self):
-        """Test pipe area calculation."""
+    def test_channel_area_basic(self):
+        """Test channel area calculation."""
         D = 0.1  # Diameter [m]
-        A = cb.pipe_area(D)
+        A = cb.channel_area(D)
 
         # A = π * (D/2)2
         expected = np.pi * (D / 2) ** 2
@@ -26,31 +26,31 @@ class TestSimpleGeometryHelpers:
         assert A > 0
         assert isinstance(A, float)
 
-    def test_pipe_area_matches_manual(self):
-        """Test pipe area matches manual calculation exactly."""
+    def test_channel_area_matches_manual(self):
+        """Test channel area matches manual calculation exactly."""
         D = 0.05  # 50 mm diameter
-        A = cb.pipe_area(D)
+        A = cb.channel_area(D)
 
         # Manual calculation
         A_manual = np.pi * 0.025**2
         assert abs(A - A_manual) < 1e-15  # Machine precision
 
-    def test_pipe_area_various_sizes(self):
-        """Test pipe area for various diameters."""
+    def test_channel_area_various_sizes(self):
+        """Test channel area for various diameters."""
         for D in [0.01, 0.05, 0.1, 0.5, 1.0]:
-            A = cb.pipe_area(D)
+            A = cb.channel_area(D)
             expected = np.pi * (D / 2) ** 2
             assert abs(A - expected) / expected < 1e-14
 
-    def test_pipe_area_error_on_zero(self):
-        """Test pipe area raises error for zero diameter."""
+    def test_channel_area_error_on_zero(self):
+        """Test channel area raises error for zero diameter."""
         with pytest.raises(ValueError):  # C++ invalid_argument → ValueError
-            cb.pipe_area(0.0)
+            cb.channel_area(0.0)
 
-    def test_pipe_area_error_on_negative(self):
-        """Test pipe area raises error for negative diameter."""
+    def test_channel_area_error_on_negative(self):
+        """Test channel area raises error for negative diameter."""
         with pytest.raises(ValueError):
-            cb.pipe_area(-0.1)
+            cb.channel_area(-0.1)
 
     def test_annular_area_basic(self):
         """Test annular area calculation."""
@@ -98,11 +98,11 @@ class TestSimpleGeometryHelpers:
         with pytest.raises(ValueError):
             cb.annular_area(0.15, -0.1)
 
-    def test_pipe_volume_basic(self):
-        """Test pipe volume calculation."""
+    def test_channel_volume_basic(self):
+        """Test channel volume calculation."""
         D = 0.1  # Diameter [m]
         L = 2.0  # Length [m]
-        V = cb.pipe_volume(D, L)
+        V = cb.channel_volume(D, L)
 
         # V = π * (D/2)2 * L
         expected = np.pi * (D / 2) ** 2 * L
@@ -112,65 +112,65 @@ class TestSimpleGeometryHelpers:
         assert V > 0
         assert isinstance(V, float)
 
-    def test_pipe_volume_matches_manual(self):
-        """Test pipe volume matches manual calculation exactly."""
+    def test_channel_volume_matches_manual(self):
+        """Test channel volume matches manual calculation exactly."""
         D = 0.05  # 50 mm diameter
         L = 10.0  # 10 m length
-        V = cb.pipe_volume(D, L)
+        V = cb.channel_volume(D, L)
 
         # Manual calculation
         V_manual = np.pi * 0.025**2 * 10.0
         assert abs(V - V_manual) < 1e-15  # Machine precision
 
-    def test_pipe_volume_various_sizes(self):
-        """Test pipe volume for various dimensions."""
+    def test_channel_volume_various_sizes(self):
+        """Test channel volume for various dimensions."""
         test_cases = [(0.01, 1.0), (0.05, 5.0), (0.1, 10.0), (0.2, 2.0)]
         for D, L in test_cases:
-            V = cb.pipe_volume(D, L)
+            V = cb.channel_volume(D, L)
             expected = np.pi * (D / 2) ** 2 * L
             assert abs(V - expected) / expected < 1e-14
 
-    def test_pipe_volume_consistency_with_area(self):
-        """Test pipe volume is consistent with pipe area."""
+    def test_channel_volume_consistency_with_area(self):
+        """Test channel volume is consistent with channel area."""
         D = 0.1
         L = 5.0
 
-        A = cb.pipe_area(D)
-        V = cb.pipe_volume(D, L)
+        A = cb.channel_area(D)
+        V = cb.channel_volume(D, L)
 
         # V should equal A * L
         assert abs(V - A * L) < 1e-15  # Machine precision
 
-    def test_pipe_volume_error_on_zero(self):
-        """Test pipe volume raises error for zero dimensions."""
+    def test_channel_volume_error_on_zero(self):
+        """Test channel volume raises error for zero dimensions."""
         with pytest.raises(ValueError):
-            cb.pipe_volume(0.0, 1.0)
+            cb.channel_volume(0.0, 1.0)
 
         with pytest.raises(ValueError):
-            cb.pipe_volume(0.1, 0.0)
+            cb.channel_volume(0.1, 0.0)
 
-    def test_pipe_volume_error_on_negative(self):
-        """Test pipe volume raises error for negative dimensions."""
+    def test_channel_volume_error_on_negative(self):
+        """Test channel volume raises error for negative dimensions."""
         with pytest.raises(ValueError):
-            cb.pipe_volume(-0.1, 1.0)
+            cb.channel_volume(-0.1, 1.0)
 
         with pytest.raises(ValueError):
-            cb.pipe_volume(0.1, -1.0)
+            cb.channel_volume(0.1, -1.0)
 
 
 class TestHydraulicDiameter:
     """Test hydraulic diameter calculations."""
 
-    def test_hydraulic_diameter_circular_pipe(self):
-        """Test hydraulic diameter for circular pipe."""
-        # For circular pipe: Dh = D
+    def test_hydraulic_diameter_circular_channel(self):
+        """Test hydraulic diameter for circular channel."""
+        # For circular channel: Dh = D
         D = 0.1  # Diameter [m]
         A = 3.14159 * (D / 2) ** 2  # Area [m2]
         P = 3.14159 * D  # Perimeter [m]
 
         Dh = cb.hydraulic_diameter(A, P)
 
-        # Should equal diameter for circular pipe
+        # Should equal diameter for circular channel
         assert abs(Dh - D) < 0.001
 
         # Units check: should be in meters
@@ -387,9 +387,9 @@ class TestSpaceVelocity:
 class TestIntegration:
     """Integration tests combining multiple geometry functions."""
 
-    def test_pipe_flow_residence_time(self):
-        """Test complete pipe flow residence time calculation."""
-        # Circular pipe
+    def test_channel_flow_residence_time(self):
+        """Test complete channel flow residence time calculation."""
+        # Circular channel
         D = 0.05  # Diameter [m]
         L = 2.0  # Length [m]
         v = 5.0  # Velocity [m/s]
@@ -404,7 +404,7 @@ class TestIntegration:
         # Calculate residence time
         tau = cb.residence_time(V, Q)
 
-        # τ = L/v (for constant area pipe)
+        # τ = L/v (for constant area channel)
         expected_tau = L / v
         assert abs(tau - expected_tau) < 0.001
 

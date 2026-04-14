@@ -2,7 +2,7 @@
 Tests for combined convective heat transfer + pressure loss channel functions.
 
 Tests verify:
-- channel_smooth: consistency with htc_pipe and Darcy-Weisbach
+- channel_smooth: consistency with htc_channel and Darcy-Weisbach
 - channel_ribbed: Nu and dP exceed smooth baseline
 - channel_dimpled: Nu enhanced, dP lower than ribbed
 - channel_pin_fin: dP scales with N_rows, Nu increases with Re
@@ -57,12 +57,12 @@ class TestChannelSmooth:
         sol = cb.channel_smooth(T_AIR, P_AIR, X_AIR, 20.0, 0.01, 0.5)
         assert isinstance(sol, cb.ChannelResult)
 
-    def test_h_matches_htc_pipe(self):
-        """channel_smooth h should match htc_pipe for same conditions."""
+    def test_h_matches_htc_channel(self):
+        """channel_smooth h should match htc_channel for same conditions."""
         v = 20.0
         D = 0.01
         sol = cb.channel_smooth(T_AIR, P_AIR, X_AIR, v, D, 0.5)
-        h_ref, Nu_ref, Re_ref = cb.htc_pipe(T_AIR, P_AIR, X_AIR, v, D)
+        h_ref, Nu_ref, Re_ref = cb.htc_channel(T_AIR, P_AIR, X_AIR, v, D)
         assert sol.h == pytest.approx(h_ref, rel=1e-6)
         assert sol.Nu == pytest.approx(Nu_ref, rel=1e-6)
         assert sol.Re == pytest.approx(Re_ref, rel=1e-6)
@@ -154,7 +154,7 @@ class TestChannelRibbed:
     """Tests for channel_ribbed."""
 
     def test_nu_exceeds_smooth(self):
-        """Ribbed Nu should be higher than smooth-pipe Nu at same Re."""
+        """Ribbed Nu should be higher than smooth-channel Nu at same Re."""
         v = 20.0
         D = 0.01
         L = 0.5
@@ -166,7 +166,7 @@ class TestChannelRibbed:
         assert sol_ribbed.h > sol_smooth.h
 
     def test_dP_exceeds_smooth(self):
-        """Ribbed dP should be higher than smooth-pipe dP."""
+        """Ribbed dP should be higher than smooth-channel dP."""
         v = 20.0
         D = 0.01
         L = 0.5
@@ -206,7 +206,7 @@ class TestChannelRibbed:
         assert sol_high.Nu > sol_low.Nu
 
     def test_re_same_as_smooth(self):
-        """Re should be the same as smooth-pipe baseline (same fluid, same velocity)."""
+        """Re should be the same as smooth-channel baseline (same fluid, same velocity)."""
         v, D, L = 20.0, 0.01, 0.5
         sol_smooth = cb.channel_smooth(T_AIR, P_AIR, X_AIR, v, D, L)
         sol_ribbed = cb.channel_ribbed(

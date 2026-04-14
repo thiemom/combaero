@@ -49,7 +49,7 @@ def test_validation_disjoint_boundaries():
 
 def test_validation_multiple_edges_between_same_nodes():
     # Adding two elements between the exact same nodes.
-    # E.g. parallel pipes without intermediate plenums.
+    # E.g. parallel channels without intermediate plenums.
     graph = FlowNetwork()
     inlet = PressureBoundary("inlet")
     outlet = PressureBoundary("outlet")

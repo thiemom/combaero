@@ -25,11 +25,11 @@ The following table details the execution time per call (in microseconds) for fu
 | `cb.transport_state(T, P, X)` | 1.318 μs | 1318 ns | Combined bundle evaluated at once |
 | **Incompressible Flow Elements** | | | |
 | `cb.orifice_flow_thermo(Cd)` | 1.382 μs | 1382 ns | Ideal equation + internal Density |
-| `cb.pipe_flow_rough(Haaland)` | 1.458 μs | 1458 ns | Explicit friction factor + Density/Viscosity |
-| `cb.pipe_flow_rough(Colebrook)` | 1.678 μs | 1678 ns | Iterative Implicit friction + Density/Viscosity |
+| `cb.channel_flow_rough(Haaland)` | 1.458 μs | 1458 ns | Explicit friction factor + Density/Viscosity |
+| `cb.channel_flow_rough(Colebrook)` | 1.678 μs | 1678 ns | Iterative Implicit friction + Density/Viscosity |
 | **Compressible ODE Integration** | | | |
-| `cb.fanno_pipe_rough(10 steps)`| 30.480 μs | 30480 ns | Heavy due to repeated `solve_T_from_energy` Newton sub-loop |
-| `cb.fanno_pipe_rough(100 steps)`| 290.194 μs | 290194 ns| Far too slow for dense finite-differences |
+| `cb.fanno_channel_rough(10 steps)`| 30.480 μs | 30480 ns | Heavy due to repeated `solve_T_from_energy` Newton sub-loop |
+| `cb.fanno_channel_rough(100 steps)`| 290.194 μs | 290194 ns| Far too slow for dense finite-differences |
 
 ## 2. API Architectural Implications
 
@@ -48,9 +48,9 @@ When designing the custom solver C++ API, the structure of the data returned acr
 | **Tuple (`float`, `float`, `list`)** | `state.TPX` | 0.214 μs | Packing a C++ `std::tuple` into a Python `tuple` is blazingly fast. |
 | **Pass-by-ref (numpy array)** | `test_pass_by_ref` | 0.257 μs | Mutating a pre-allocated numpy `py::array_t` requires buffer locking/unlocking, making it slightly slower than pure tuple creation. |
 | **List (`std::vector`)** | `mole_to_mass` | 0.766 μs | Array copying incurs slight latency. |
-| **Object (Custom Struct)**| `pipe_flow_rough` | 1.449 μs | Binding and returning custom C++ classes/structs (`IncompressibleFlowSolution`) adds over 1.2 μs of pure overhead. |
+| **Object (Custom Struct)**| `channel_flow_rough` | 1.449 μs | Binding and returning custom C++ classes/structs (`IncompressibleFlowSolution`) adds over 1.2 μs of pure overhead. |
 
 **API Implication:** The dedicated solver C++ methods must return `std::tuple<double, double>` representing `(f, J)` (value and exact jacobian). Attempting to wrap these results into a custom 'SolverElementResult' class object or dictionary drops the API performance by ~600% due to pybind11 conversion overheads. Interestingly, pure tuple returns actually beat pass-by-reference `py::array_t` mutations due to numpy's buffer lifecycle overheads.
 
 ### 2.3 Incompressible vs Compressible Cost Scaling
-Incompressible calculations (`pipe_flow_rough`, `orifice_flow_thermo`) are highly optimized. Because they utilize `v_ideal` rather than iterative Newton loops to find friction factors, they execute in **~1.5 μs** (including the heavy object return overhead noted above). A network containing 100 incompressible pipes requires less than `0.2` milliseconds to evaluate its total residuals once.
+Incompressible calculations (`channel_flow_rough`, `orifice_flow_thermo`) are highly optimized. Because they utilize `v_ideal` rather than iterative Newton loops to find friction factors, they execute in **~1.5 μs** (including the heavy object return overhead noted above). A network containing 100 incompressible channels requires less than `0.2` milliseconds to evaluate its total residuals once.

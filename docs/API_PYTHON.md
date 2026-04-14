@@ -244,7 +244,7 @@ Defines convective heat transfer properties on network elements. Supports differ
 ```python
 from combaero.heat_transfer import ConvectiveSurface, SmoothModel, RibbedModel, DimpledModel, PinFinModel, ImpingementModel
 
-# Smooth pipe with Gnielinski correlation (default)
+# Smooth channel with Gnielinski correlation (default)
 surface = ConvectiveSurface(
     area=np.pi * 0.04 * 1.0,  # Surface area [m²]
     model=SmoothModel(correlation="gnielinski")
@@ -280,11 +280,11 @@ Thermal coupling between two network elements through a shared wall.
 ```python
 from combaero.heat_transfer import WallConnection
 
-# Couple hot and cold pipes through a wall
+# Couple hot and cold channels through a wall
 wall = WallConnection(
     id="coupling_wall",
-    element_a="hot_pipe",      # First element ID
-    element_b="cold_pipe",     # Second element ID
+    element_a="hot_channel",      # First element ID
+    element_b="cold_channel",     # Second element ID
     wall_thickness=0.002,      # Wall thickness [m]
     wall_conductivity=25.0,    # Wall thermal conductivity [W/(m·K)]
     contact_area=None          # Optional: override surface area
@@ -301,8 +301,8 @@ Elements with convective surfaces support heat transfer calculations.
 from combaero.network import ChannelElement
 
 # Channel with convective heat transfer
-pipe = ChannelElement(
-    id="heated_pipe",
+channel = ChannelElement(
+    id="heated_channel",
     from_node="inlet",
     to_node="outlet",
     diameter=0.04,
@@ -312,7 +312,7 @@ pipe = ChannelElement(
 )
 
 # Get heat transfer coefficient and temperature
-h, T = pipe.htc_and_T(state)  # Returns (htc [W/(m²·K)], T [K])
+h, T = channel.htc_and_T(state)  # Returns (htc [W/(m²·K)], T [K])
 ```
 
 #### Thermal Coupling Toggle
@@ -386,7 +386,7 @@ from combaero.network import (
 
 # Flow elements
 orifice = OrificeElement("orifice", "node1", "node2", Cd=0.65, diameter=0.011284, regime="compressible")
-pipe = ChannelElement("pipe", "node2", "node3", length=2.0, diameter=0.05, roughness=1e-4, regime="compressible")
+channel = ChannelElement("channel", "node2", "node3", length=2.0, diameter=0.05, roughness=1e-4, regime="compressible")
 
 # Connection elements
 effective_area = EffectiveAreaConnectionElement("ea", "node3", "node4", diameter=0.015958)

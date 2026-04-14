@@ -2,7 +2,13 @@
 
 import pytest
 
-from combaero.network import FlowNetwork, PipeElement, PlenumNode, PressureBoundary, WallConnection
+from combaero.network import (
+    ChannelElement,
+    FlowNetwork,
+    PlenumNode,
+    PressureBoundary,
+    WallConnection,
+)
 
 
 def test_flow_network_defaults():
@@ -21,19 +27,19 @@ def test_add_wall_success():
     # Add nodes and elements
     pb = PressureBoundary("pb", P_total=101325, T_total=300)
     plenum = PlenumNode("plenum")
-    pipe1 = PipeElement("pipe1", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
-    pipe2 = PipeElement("pipe2", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
+    channel1 = ChannelElement("channel1", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
+    channel2 = ChannelElement("channel2", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
 
     network.add_node(pb)
     network.add_node(plenum)
-    network.add_element(pipe1)
-    network.add_element(pipe2)
+    network.add_element(channel1)
+    network.add_element(channel2)
 
     # Add wall
     wall = WallConnection(
         id="wall1",
-        element_a="pipe1",
-        element_b="pipe2",
+        element_a="channel1",
+        element_b="channel2",
         wall_thickness=0.002,
         wall_conductivity=25.0,
     )
@@ -51,18 +57,18 @@ def test_add_wall_duplicate_id():
     # Add nodes and elements
     pb = PressureBoundary("pb", P_total=101325, T_total=300)
     plenum = PlenumNode("plenum")
-    pipe1 = PipeElement("pipe1", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
+    channel1 = ChannelElement("channel1", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
 
     network.add_node(pb)
     network.add_node(plenum)
-    network.add_element(pipe1)
+    network.add_element(channel1)
 
     # Add first wall
-    wall1 = WallConnection("wall1", "pipe1", "pipe1", 0.002, 25.0)
+    wall1 = WallConnection("wall1", "channel1", "channel1", 0.002, 25.0)
     network.add_wall(wall1)
 
     # Try to add duplicate
-    wall1_dup = WallConnection("wall1", "pipe1", "pipe1", 0.002, 25.0)
+    wall1_dup = WallConnection("wall1", "channel1", "channel1", 0.002, 25.0)
     with pytest.raises(ValueError, match="Wall 'wall1' already exists in network"):
         network.add_wall(wall1_dup)
 
@@ -74,16 +80,16 @@ def test_add_wall_unknown_element_a():
     # Add nodes and elements
     pb = PressureBoundary("pb", P_total=101325, T_total=300)
     plenum = PlenumNode("plenum")
-    pipe1 = PipeElement("pipe1", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
+    channel1 = ChannelElement("channel1", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
 
     network.add_node(pb)
     network.add_node(plenum)
-    network.add_element(pipe1)
+    network.add_element(channel1)
 
     # Try to add wall with unknown element_a
-    wall = WallConnection("wall2", "unknown_pipe", "pipe1", 0.002, 25.0)
+    wall = WallConnection("wall2", "unknown_channel", "channel1", 0.002, 25.0)
     with pytest.raises(
-        ValueError, match="Unknown element_a/node_a 'unknown_pipe' for wall 'wall2'"
+        ValueError, match="Unknown element_a/node_a 'unknown_channel' for wall 'wall2'"
     ):
         network.add_wall(wall)
 
@@ -95,16 +101,16 @@ def test_add_wall_unknown_element_b():
     # Add nodes and elements
     pb = PressureBoundary("pb", P_total=101325, T_total=300)
     plenum = PlenumNode("plenum")
-    pipe1 = PipeElement("pipe1", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
+    channel1 = ChannelElement("channel1", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
 
     network.add_node(pb)
     network.add_node(plenum)
-    network.add_element(pipe1)
+    network.add_element(channel1)
 
     # Try to add wall with unknown element_b
-    wall = WallConnection("wall3", "pipe1", "unknown_pipe", 0.002, 25.0)
+    wall = WallConnection("wall3", "channel1", "unknown_channel", 0.002, 25.0)
     with pytest.raises(
-        ValueError, match="Unknown element_b/node_b 'unknown_pipe' for wall 'wall3'"
+        ValueError, match="Unknown element_b/node_b 'unknown_channel' for wall 'wall3'"
     ):
         network.add_wall(wall)
 
@@ -132,19 +138,19 @@ def test_to_dict_with_walls():
     # Add nodes and elements
     pb = PressureBoundary("pb", P_total=101325, T_total=300)
     plenum = PlenumNode("plenum")
-    pipe1 = PipeElement("pipe1", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
-    pipe2 = PipeElement("pipe2", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
+    channel1 = ChannelElement("channel1", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
+    channel2 = ChannelElement("channel2", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
 
     network.add_node(pb)
     network.add_node(plenum)
-    network.add_element(pipe1)
-    network.add_element(pipe2)
+    network.add_element(channel1)
+    network.add_element(channel2)
 
     # Add wall
     wall = WallConnection(
         id="wall1",
-        element_a="pipe1",
-        element_b="pipe2",
+        element_a="channel1",
+        element_b="channel2",
         wall_thickness=0.002,
         wall_conductivity=25.0,
         contact_area=0.05,
@@ -167,8 +173,8 @@ def test_to_dict_with_walls():
     # Check wall data
     wall_data = data["walls"]["wall1"]
     assert wall_data["type"] == "WallConnection"
-    assert wall_data["kwargs"]["element_a"] == "pipe1"
-    assert wall_data["kwargs"]["element_b"] == "pipe2"
+    assert wall_data["kwargs"]["element_a"] == "channel1"
+    assert wall_data["kwargs"]["element_b"] == "channel2"
     assert wall_data["kwargs"]["wall_thickness"] == 0.002
     assert wall_data["kwargs"]["wall_conductivity"] == 25.0
     assert wall_data["kwargs"]["contact_area"] == 0.05
@@ -182,19 +188,19 @@ def test_from_dict_with_walls():
     # Add nodes and elements
     pb = PressureBoundary("pb", P_total=101325, T_total=300)
     plenum = PlenumNode("plenum")
-    pipe1 = PipeElement("pipe1", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
-    pipe2 = PipeElement("pipe2", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
+    channel1 = ChannelElement("channel1", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
+    channel2 = ChannelElement("channel2", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
 
     network1.add_node(pb)
     network1.add_node(plenum)
-    network1.add_element(pipe1)
-    network1.add_element(pipe2)
+    network1.add_element(channel1)
+    network1.add_element(channel2)
 
     # Add wall
     wall = WallConnection(
         id="wall1",
-        element_a="pipe1",
-        element_b="pipe2",
+        element_a="channel1",
+        element_b="channel2",
         wall_thickness=0.002,
         wall_conductivity=25.0,
     )
@@ -213,8 +219,8 @@ def test_from_dict_with_walls():
     assert "wall1" in network2.walls
 
     restored_wall = network2.walls["wall1"]
-    assert restored_wall.element_a == "pipe1"
-    assert restored_wall.element_b == "pipe2"
+    assert restored_wall.element_a == "channel1"
+    assert restored_wall.element_b == "channel2"
     assert restored_wall.wall_thickness == 0.002
     assert restored_wall.wall_conductivity == 25.0
 

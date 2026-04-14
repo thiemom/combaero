@@ -206,16 +206,15 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("d_mdot_dY_up", &solver::OrificeResult::d_mdot_dY_up);
 
   py::class_<solver::ChannelResult>(
-      m, "ChannelSolverResult", "Result of channel residual and Jacobian evaluation")
+      m, "ChannelSolverResult",
+      "Result of channel residual and Jacobian evaluation")
       .def(py::init<>())
       .def_readonly("dP_calc", &solver::ChannelResult::dP_calc)
       .def_readonly("d_dP_d_mdot", &solver::ChannelResult::d_dP_d_mdot)
-      .def_readonly("d_dP_dP_static_up", &solver::ChannelResult::d_dP_dP_static_up)
+      .def_readonly("d_dP_dP_static_up",
+                    &solver::ChannelResult::d_dP_dP_static_up)
       .def_readonly("d_dP_dT_up", &solver::ChannelResult::d_dP_dT_up)
       .def_readonly("d_dP_dY_up", &solver::ChannelResult::d_dP_dY_up);
-
-  // Aliases for backward compatibility
-  m.attr("PipeResult") = m.attr("ChannelSolverResult");
 
   py::class_<solver::MomentumChamberResult>(
       m, "MomentumChamberResult",
@@ -238,12 +237,6 @@ PYBIND11_MODULE(_core, m) {
         py::arg("Y_up"), py::arg("P_static_down"), py::arg("L"), py::arg("D"),
         py::arg("roughness"), py::arg("friction_model"));
 
-  // Alias for backward compatibility
-  m.def("pipe_residuals_and_jacobian", &solver::channel_residuals_and_jacobian,
-        py::arg("m_dot"), py::arg("P_total_up"), py::arg("P_static_up"),
-        py::arg("T_up"), py::arg("Y_up"), py::arg("P_static_down"), py::arg("L"),
-        py::arg("D"), py::arg("roughness"), py::arg("friction_model"));
-
   // Compressible flow elements
   m.def("orifice_compressible_mdot_and_jacobian",
         &solver::orifice_compressible_mdot_and_jacobian, py::arg("T0"),
@@ -259,20 +252,13 @@ PYBIND11_MODULE(_core, m) {
         py::arg("beta") = 0.0,
         "Compressible orifice for network solver with all derivatives.");
 
-  m.def("channel_compressible_mdot_and_jacobian",
-        &solver::channel_compressible_mdot_and_jacobian, py::arg("T_in"),
-        py::arg("P_in"), py::arg("u_in"), py::arg("X"), py::arg("L"),
-        py::arg("D"), py::arg("roughness"), py::arg("friction_model"),
-        "Compressible channel flow using Fanno model with variable friction.\n\n"
-        "Returns: (dP, d_dP_dP_in, d_dP_dT_in, d_dP_du_in)");
-
-  // Alias for backward compatibility
-  m.def("pipe_compressible_mdot_and_jacobian",
-        &solver::channel_compressible_mdot_and_jacobian, py::arg("T_in"),
-        py::arg("P_in"), py::arg("u_in"), py::arg("X"), py::arg("L"),
-        py::arg("D"), py::arg("roughness"), py::arg("friction_model"),
-        "Compressible pipe flow using Fanno model with variable friction.\n\n"
-        "Returns: (dP, d_dP_dP_in, d_dP_dT_in, d_dP_du_in)");
+  m.def(
+      "channel_compressible_mdot_and_jacobian",
+      &solver::channel_compressible_mdot_and_jacobian, py::arg("T_in"),
+      py::arg("P_in"), py::arg("u_in"), py::arg("X"), py::arg("L"),
+      py::arg("D"), py::arg("roughness"), py::arg("friction_model"),
+      "Compressible channel flow using Fanno model with variable friction.\n\n"
+      "Returns: (dP, d_dP_dP_in, d_dP_dT_in, d_dP_du_in)");
 
   m.def("channel_compressible_residuals_and_jacobian",
         &solver::channel_compressible_residuals_and_jacobian, py::arg("m_dot"),
@@ -280,14 +266,6 @@ PYBIND11_MODULE(_core, m) {
         py::arg("P_static_down"), py::arg("L"), py::arg("D"),
         py::arg("roughness"), py::arg("friction_model"),
         "Compressible channel for network solver with all derivatives.");
-
-  // Alias for backward compatibility
-  m.def("pipe_compressible_residuals_and_jacobian",
-        &solver::channel_compressible_residuals_and_jacobian, py::arg("m_dot"),
-        py::arg("P_total_up"), py::arg("T_up"), py::arg("Y_up"),
-        py::arg("P_static_down"), py::arg("L"), py::arg("D"),
-        py::arg("roughness"), py::arg("friction_model"),
-        "Compressible pipe for network solver with all derivatives.");
 
   m.def("momentum_chamber_residual_and_jacobian",
         &solver::momentum_chamber_residual_and_jacobian, py::arg("P"),
@@ -2047,7 +2025,8 @@ PYBIND11_MODULE(_core, m) {
         "Parameters:\n"
         "  Nu : Nusselt number [-] (dimensionless)\n"
         "  k  : thermal conductivity [W/(m·K)]\n"
-        "  L  : characteristic length [m] (diameter for circular channel flow)\n\n"
+        "  L  : characteristic length [m] (diameter for circular channel "
+        "flow)\n\n"
         "Returns: heat transfer coefficient h [W/(m²·K)]");
 
   m.def(
@@ -2057,9 +2036,9 @@ PYBIND11_MODULE(_core, m) {
          double velocity, double diameter, const std::string &correlation,
          bool heating, double mu_ratio, double roughness) {
         auto X = to_vec(X_arr);
-        auto [h, Nu, Re] = htc_circular_channel(T, P, X, velocity, diameter,
-                                                correlation, heating, mu_ratio,
-                                                roughness);
+        auto [h, Nu, Re] =
+            htc_circular_channel(T, P, X, velocity, diameter, correlation,
+                                 heating, mu_ratio, roughness);
         return Nu;
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
@@ -2067,22 +2046,6 @@ PYBIND11_MODULE(_core, m) {
       py::arg("heating") = true, py::arg("mu_ratio") = 1.0,
       py::arg("roughness") = 0.0,
       "Composite Nusselt number for circular channel flow [-].");
-
-  m.def("nusselt_pipe",
-        [](double T, double P,
-           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-           double velocity, double diameter, const std::string &correlation,
-           bool heating, double mu_ratio, double roughness) {
-          auto X = to_vec(X_arr);
-          auto [h, Nu, Re] = htc_circular_channel(T, P, X, velocity, diameter,
-                                                  correlation, heating,
-                                                  mu_ratio, roughness);
-          return Nu;
-        },
-        py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
-        py::arg("diameter"), py::arg("correlation") = "gnielinski",
-        py::arg("heating") = true, py::arg("mu_ratio") = 1.0,
-        py::arg("roughness") = 0.0);
 
   m.def(
       "htc_circular_channel",
@@ -2115,7 +2078,8 @@ PYBIND11_MODULE(_core, m) {
       "Dittus-Boelter)\n"
       "  mu_ratio    : μ_bulk / μ_wall for Sieder-Tate viscosity correction "
       "(default: 1.0)\n"
-      "  roughness   : absolute roughness [m] (default: 0.0 = smooth channel)\n\n"
+      "  roughness   : absolute roughness [m] (default: 0.0 = smooth "
+      "channel)\n\n"
       "Returns: tuple (h, Nu, Re)\n"
       "  h  : heat transfer coefficient [W/(m²·K)]\n"
       "  Nu : Nusselt number [-]\n"
@@ -2128,20 +2092,6 @@ PYBIND11_MODULE(_core, m) {
       "correction)\n"
       "  - petukhov      : Re > 10000, 0.5 < Pr < 2000 (high accuracy)\n\n"
       "Automatically handles laminar flow (Re < 2300) with constant Nu.");
-
-  m.def("htc_pipe",
-        [](double T, double P,
-           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-           double velocity, double diameter, const std::string &correlation,
-           bool heating, double mu_ratio, double roughness) {
-          auto X = to_vec(X_arr);
-          return htc_circular_channel(T, P, X, velocity, diameter, correlation,
-                                      heating, mu_ratio, roughness);
-        },
-        py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
-        py::arg("diameter"), py::arg("correlation") = "gnielinski",
-        py::arg("heating") = true, py::arg("mu_ratio") = 1.0,
-        py::arg("roughness") = 0.0);
 
   m.def("lmtd", &lmtd, py::arg("dT1"), py::arg("dT2"),
         "Log mean temperature difference (LMTD) for heat exchangers.\n\n"
@@ -2221,10 +2171,7 @@ PYBIND11_MODULE(_core, m) {
         "  rho : density [kg/m^3]\n\n"
         "Returns: mass flow rate [kg/s]");
 
-  // Alias for backward compatibility
-  m.def("pipe_mdot", &channel_mdot, py::arg("v"), py::arg("D"), py::arg("rho"));
-
-  // Composite pipe flow function
+  // Composite channel flow function
   m.def(
       "pressure_drop_channel",
       [](double T, double P,
@@ -2262,30 +2209,18 @@ PYBIND11_MODULE(_core, m) {
       "100.0)\n"
       "  >>> print(f'Pressure drop: {dP:.1f} Pa, Re: {Re:.0f}, f: {f:.4f}')");
 
-  m.def("channel_pressure_drop",
-        [](double T, double P,
-           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-           double v, double D, double L, double roughness,
-           const std::string &correlation) {
-          auto X = to_vec(X_arr);
-          return channel_pressure_drop(T, P, X, v, D, L, roughness, correlation);
-        },
-        py::arg("T"), py::arg("P"), py::arg("X"), py::arg("v"), py::arg("D"),
-        py::arg("L"), py::arg("roughness") = 0.0,
-        py::arg("correlation") = "haaland");
-
-  // Alias for backward compatibility
-  m.def("pressure_drop_pipe",
-        [](double T, double P,
-           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-           double v, double D, double L, double roughness,
-           const std::string &correlation) {
-          auto X = to_vec(X_arr);
-          return channel_pressure_drop(T, P, X, v, D, L, roughness, correlation);
-        },
-        py::arg("T"), py::arg("P"), py::arg("X"), py::arg("v"), py::arg("D"),
-        py::arg("L"), py::arg("roughness") = 0.0,
-        py::arg("correlation") = "haaland");
+  m.def(
+      "channel_pressure_drop",
+      [](double T, double P,
+         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+         double v, double D, double L, double roughness,
+         const std::string &correlation) {
+        auto X = to_vec(X_arr);
+        return channel_pressure_drop(T, P, X, v, D, L, roughness, correlation);
+      },
+      py::arg("T"), py::arg("P"), py::arg("X"), py::arg("v"), py::arg("D"),
+      py::arg("L"), py::arg("roughness") = 0.0,
+      py::arg("correlation") = "haaland");
 
   m.def("space_velocity", &space_velocity, py::arg("Q"), py::arg("V"),
         "Space velocity (inverse of residence time).\n\n"
@@ -2302,9 +2237,6 @@ PYBIND11_MODULE(_core, m) {
         "  D : diameter [m]\n\n"
         "Returns: area [m²]");
 
-  // Alias for backward compatibility
-  m.def("pipe_area", &circular_area, py::arg("D"));
-
   m.def("annular_area", &annular_area, py::arg("D_outer"), py::arg("D_inner"),
         "Annular cross-sectional area.\n\n"
         "A = π * ((D_outer/2)² - (D_inner/2)²)\n\n"
@@ -2320,9 +2252,6 @@ PYBIND11_MODULE(_core, m) {
         "  D : diameter [m]\n"
         "  L : length [m]\n\n"
         "Returns: volume [m³]");
-
-  // Alias for backward compatibility
-  m.def("pipe_volume", &cylinder_volume, py::arg("D"), py::arg("L"));
 
   // -------------------------------------------------------------
   // Compressible flow
@@ -2592,19 +2521,6 @@ PYBIND11_MODULE(_core, m) {
       "f    : Darcy friction factor [-]\n\n"
       "Returns FannoSolution.");
 
-  // Alias for backward compatibility
-  m.def("fanno_pipe",
-        [](double T_in, double P_in, double u_in, double L, double D, double f,
-           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-           std::size_t n_steps, bool store_profile) {
-          auto X = to_vec(X_arr);
-          return fanno_channel(T_in, P_in, u_in, L, D, f, X, n_steps,
-                               store_profile);
-        },
-        py::arg("T_in"), py::arg("P_in"), py::arg("u_in"), py::arg("L"),
-        py::arg("D"), py::arg("f"), py::arg("X"), py::arg("n_steps") = 100,
-        py::arg("store_profile") = false);
-
   m.def(
       "fanno_max_length",
       [](double T_in, double P_in, double u_in, double D, double f,
@@ -2816,8 +2732,8 @@ PYBIND11_MODULE(_core, m) {
          double R_fouling) {
         auto t_over_k = to_vec(tk_arr);
         double q = 0.0;
-        auto temps =
-            wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, R_fouling, q);
+        auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold,
+                                              t_over_k, R_fouling, q);
         return py::make_tuple(temps, q);
       },
       py::arg("T_hot"), py::arg("T_cold"), py::arg("h_hot"), py::arg("h_cold"),
@@ -3076,8 +2992,10 @@ PYBIND11_MODULE(_core, m) {
                     "Fuel mass flow [kg/s] (0 for phi-based calls)")
       .def_readonly("mdot_air", &PressureLossContext::mdot_air,
                     "Air mass flow [kg/s] (0 for phi-based calls)")
-      .def_property_readonly("Y_products", [](const PressureLossContext &c) { return c.Y_products; },
-                            "Burned gas mass fractions [-]")
+      .def_property_readonly(
+          "Y_products",
+          [](const PressureLossContext &c) { return c.Y_products; },
+          "Burned gas mass fractions [-]")
       .def_property_readonly(
           "T_in", [](const PressureLossContext &c) { return c.state_in.T; },
           "Inlet temperature [K]")
@@ -3106,14 +3024,15 @@ PYBIND11_MODULE(_core, m) {
          CombustionMethod method, py::function pressure_loss, bool smooth_phi0,
          bool smooth_phi1, double k0, double k1) {
         PressureLossCorrelation fn =
-            [pressure_loss](const PressureLossContext &ctx) -> std::tuple<double, double> {
-              py::object res = pressure_loss(ctx);
-              try {
-                return res.cast<std::tuple<double, double>>();
-              } catch (...) {
-                return {res.cast<double>(), 0.0};
-              }
-            };
+            [pressure_loss](
+                const PressureLossContext &ctx) -> std::tuple<double, double> {
+          py::object res = pressure_loss(ctx);
+          try {
+            return res.cast<std::tuple<double, double>>();
+          } catch (...) {
+            return {res.cast<double>(), 0.0};
+          }
+        };
         CombustionStateHookFn hook_fn = &combustion_state;
         return hook_fn(to_vec(X_fuel), to_vec(X_ox), phi, T_reactants, P,
                        fuel_name, method, fn, smooth_phi0, smooth_phi1, k0, k1);
@@ -3142,14 +3061,15 @@ PYBIND11_MODULE(_core, m) {
          py::function pressure_loss, bool smooth_phi0, bool smooth_phi1,
          double k0, double k1) {
         PressureLossCorrelation fn =
-            [pressure_loss](const PressureLossContext &ctx) -> std::tuple<double, double> {
-              py::object res = pressure_loss(ctx);
-              try {
-                return res.cast<std::tuple<double, double>>();
-              } catch (...) {
-                return {res.cast<double>(), 0.0};
-              }
-            };
+            [pressure_loss](
+                const PressureLossContext &ctx) -> std::tuple<double, double> {
+          py::object res = pressure_loss(ctx);
+          try {
+            return res.cast<std::tuple<double, double>>();
+          } catch (...) {
+            return {res.cast<double>(), 0.0};
+          }
+        };
         CombustionStreamsHookFn hook_fn = &combustion_state_from_streams;
         return hook_fn(fuel_stream, ox_stream, fuel_name, method, fn,
                        smooth_phi0, smooth_phi1, k0, k1);
@@ -3897,18 +3817,10 @@ PYBIND11_MODULE(_core, m) {
   m.def("channel_dP", &channel_dP, py::arg("v"), py::arg("L"), py::arg("D"),
         py::arg("f"), py::arg("rho"), "Channel pressure drop [Pa].");
 
-  // Alias for backward compatibility
-  m.def("pipe_dP", &channel_dP, py::arg("v"), py::arg("L"), py::arg("D"),
-        py::arg("f"), py::arg("rho"));
-
   m.def("channel_dP_mdot", &channel_dP_mdot, py::arg("mdot"), py::arg("L"),
         py::arg("D"), py::arg("f"), py::arg("rho"),
         "Channel pressure drop from mass flow rate.\n\n"
         "Returns: pressure drop [Pa]");
-
-  // Alias for backward compatibility
-  m.def("pipe_dP_mdot", &channel_dP_mdot, py::arg("mdot"), py::arg("L"),
-        py::arg("D"), py::arg("f"), py::arg("rho"));
 
   m.def("channel_velocity", &channel_velocity, py::arg("mdot"), py::arg("D"),
         py::arg("rho"),
@@ -3916,18 +3828,11 @@ PYBIND11_MODULE(_core, m) {
         "v = ṁ / (ρ · π · D² / 4)\n\n"
         "Returns: velocity [m/s]");
 
-  // Alias for backward compatibility
-  m.def("pipe_velocity", &channel_velocity, py::arg("mdot"), py::arg("D"),
-        py::arg("rho"));
-
   m.def("channel_mdot", &channel_mdot, py::arg("v"), py::arg("D"),
         py::arg("rho"),
         "Channel mass flow from velocity.\n\n"
         "ṁ = ρ · v · π · D² / 4\n\n"
         "Returns: mass flow rate [kg/s]");
-
-  // Alias for backward compatibility
-  m.def("pipe_mdot", &channel_mdot, py::arg("v"), py::arg("D"), py::arg("rho"));
 
   // Hydraulic utilities
   m.def("dynamic_pressure", &dynamic_pressure, py::arg("v"), py::arg("rho"),
@@ -4196,7 +4101,7 @@ PYBIND11_MODULE(_core, m) {
       "Example:\n"
       "  >>> geom = cb.OrificeGeometry()\n"
       "  >>> geom.d = 0.05  # 50 mm orifice\n"
-      "  >>> geom.D = 0.1   # 100 mm pipe\n"
+      "  >>> geom.D = 0.1   # 100 mm channel\n"
       "  >>> result = cb.orifice_flow(geom, dP=50000, T=300, P=10e6, "
       "mu=1.1e-5, Z=0.85)\n"
       "  >>> print(f'Mass flow: {result.mdot:.3f} kg/s')\n"
@@ -4258,7 +4163,6 @@ PYBIND11_MODULE(_core, m) {
   // Aliases for backward compatibility in roughness DB
   m.def("channel_roughness", &channel_roughness, py::arg("material"),
         "Lookup absolute roughness [m] from material name.");
-  m.def("pipe_roughness", &channel_roughness, py::arg("material"));
 
   m.def("orifice_area_from_beta", &orifice_area_from_beta, py::arg("D"),
         py::arg("beta"),
@@ -4310,7 +4214,7 @@ PYBIND11_MODULE(_core, m) {
         "  - Moody (1944), Colebrook (1939), White (2011),\n"
         "    Munson (2013), Crane (2009)\n\n"
         "Example:\n"
-        "  >>> eps = pipe_roughness('commercial_steel')\n"
+        "  >>> eps = channel_roughness('commercial_steel')\n"
         "  >>> print(f'Roughness: {eps*1e6:.1f} μm')  # 45.0 μm");
 
   m.def("standard_channel_roughness", &standard_channel_roughness,
@@ -4325,7 +4229,6 @@ PYBIND11_MODULE(_core, m) {
 
   m.def("standard_channel_roughness", &standard_channel_roughness,
         "Returns the map of standard material roughness values.");
-  m.def("standard_pipe_roughness", &standard_channel_roughness);
 
   // =========================================================================
   // Materials Database
@@ -4831,54 +4734,27 @@ PYBIND11_MODULE(_core, m) {
       "Pressure drop for given orifice mass flow [Pa].");
 
   m.def(
-      "pipe_dP",
-      [](double v, double L, double D, double f, double rho) {
-        return pipe_dP(v, L, D, f, rho);
-      },
-      py::arg("v"), py::arg("L"), py::arg("D"), py::arg("f"), py::arg("rho"),
-      "Darcy-Weisbach pressure drop [Pa].\n"
-      "dP = f * (L/D) * (rho * v^2 / 2)");
-
-  m.def(
-      "pipe_dP_mdot",
-      [](double mdot, double L, double D, double f, double rho) {
-        return pipe_dP_mdot(mdot, L, D, f, rho);
-      },
-      py::arg("mdot"), py::arg("L"), py::arg("D"), py::arg("f"), py::arg("rho"),
-      "Darcy-Weisbach pressure drop from mass flow [Pa].");
-
-  m.def(
-      "channel_area", [](double D) { return circular_area(D); },
-      py::arg("D"), "Channel cross-sectional area [m^2].");
+      "channel_area", [](double D) { return circular_area(D); }, py::arg("D"),
+      "Channel cross-sectional area [m^2].");
 
   m.def(
       "channel_velocity",
-      [](double mdot, double D, double rho) { return channel_velocity(mdot, D, rho); },
+      [](double mdot, double D, double rho) {
+        return channel_velocity(mdot, D, rho);
+      },
       py::arg("mdot"), py::arg("D"), py::arg("rho"),
       "Channel velocity from mass flow [m/s].");
 
-  // Alias for backward compatibility
-  m.def("pipe_velocity",
-        [](double mdot, double D, double rho) {
-          return channel_velocity(mdot, D, rho);
-        },
-        py::arg("mdot"), py::arg("D"), py::arg("rho"));
-
   m.def(
       "channel_volume",
-      [](double D, double L) { return cylinder_volume(D, L); },
-      py::arg("D"), py::arg("L"), "Channel volume [m^3].");
+      [](double D, double L) { return cylinder_volume(D, L); }, py::arg("D"),
+      py::arg("L"), "Channel volume [m^3].");
 
   m.def(
       "channel_mdot",
       [](double v, double D, double rho) { return channel_mdot(v, D, rho); },
       py::arg("v"), py::arg("D"), py::arg("rho"),
       "Channel mass flow from velocity [kg/s].");
-
-  // Alias for backward compatibility
-  m.def("pipe_mdot",
-        [](double v, double D, double rho) { return channel_mdot(v, D, rho); },
-        py::arg("v"), py::arg("D"), py::arg("rho"));
 
   m.def(
       "bernoulli_P2",
@@ -4987,19 +4863,6 @@ PYBIND11_MODULE(_core, m) {
       "factor.\n"
       "Returns IncompressibleFlowSolution.");
 
-  // Alias for backward compatibility
-  m.def("pipe_flow",
-        [](double T, double P,
-           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-           double u, double L, double D, double f, std::size_t n_steps,
-           bool store_profile) {
-          return channel_flow(T, P, to_vec(X_arr), u, L, D, f, n_steps,
-                              store_profile);
-        },
-        py::arg("T"), py::arg("P"), py::arg("X"), py::arg("u"), py::arg("L"),
-        py::arg("D"), py::arg("f"), py::arg("n_steps") = 10,
-        py::arg("store_profile") = false);
-
   m.def(
       "channel_flow_rough",
       [](double T, double P,
@@ -5017,21 +4880,6 @@ PYBIND11_MODULE(_core, m) {
       "Thermo-aware incompressible channel flow with roughness-based friction "
       "factor.\n"
       "Returns IncompressibleFlowSolution.");
-
-  // Alias for backward compatibility
-  m.def("pipe_flow_rough",
-        [](double T, double P,
-           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-           double u, double L, double D, double roughness,
-           const std::string &correlation, std::size_t n_steps,
-           bool store_profile) {
-          return channel_flow_rough(T, P, to_vec(X_arr), u, L, D, roughness,
-                                    correlation, n_steps, store_profile);
-        },
-        py::arg("T"), py::arg("P"), py::arg("X"), py::arg("u"), py::arg("L"),
-        py::arg("D"), py::arg("roughness") = 0.0,
-        py::arg("correlation") = "haaland", py::arg("n_steps") = 10,
-        py::arg("store_profile") = false);
 
   m.def(
       "channel_flow_rough",
@@ -5058,26 +4906,6 @@ PYBIND11_MODULE(_core, m) {
       "loss.\n"
       "Returns IncompressibleFlowSolution.");
 
-  // Alias for backward compatibility
-  m.def("pipe_flow_rough",
-        [](double T, double P,
-           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-           double u, double L, double D, double roughness,
-           const std::string &correlation, py::function k_loss_fn) {
-          auto vec = to_vec(X_arr);
-          IncompressibleKLossFn fn = [k_loss_fn, vec](double T_, double P_,
-                                                      const std::vector<double> &,
-                                                      double Re) {
-            return k_loss_fn(T_, P_, vec, Re).cast<double>();
-          };
-          return channel_flow_rough(T, P, vec, u, L, D, roughness, correlation,
-                                    fn);
-        },
-        py::arg("T"), py::arg("P"), py::arg("X"), py::arg("u"), py::arg("L"),
-        py::arg("D"), py::arg("roughness") = 0.0,
-        py::arg("correlation") = "haaland", py::arg("k_loss_fn"));
-
-
   m.def(
       "channel_pressure_drop",
       [](double T, double P,
@@ -5092,19 +4920,6 @@ PYBIND11_MODULE(_core, m) {
       py::arg("correlation") = "haaland",
       "Composite channel pressure drop.\n"
       "Returns tuple (dP [Pa], Re [-], f [-]).");
-
-  // Alias for backward compatibility
-  m.def("pressure_drop_pipe",
-        [](double T, double P,
-           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-           double v, double D, double L, double roughness,
-           const std::string &correlation) {
-          return channel_pressure_drop(T, P, to_vec(X_arr), v, D, L, roughness,
-                                       correlation);
-        },
-        py::arg("T"), py::arg("P"), py::arg("X"), py::arg("v"), py::arg("D"),
-        py::arg("L"), py::arg("roughness") = 0.0,
-        py::arg("correlation") = "haaland");
 
   // =========================================================================
   // Compressible flow — new functions
@@ -5125,18 +4940,6 @@ PYBIND11_MODULE(_core, m) {
       "factor).\n"
       "Returns FannoSolution.");
 
-  // Alias for backward compatibility
-  m.def("fanno_pipe",
-        [](double T_in, double P_in, double u_in, double L, double D, double f,
-           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-           std::size_t n_steps, bool store_profile) {
-          return fanno_channel(T_in, P_in, u_in, L, D, f, to_vec(X_arr), n_steps,
-                               store_profile);
-        },
-        py::arg("T_in"), py::arg("P_in"), py::arg("u_in"), py::arg("L"),
-        py::arg("D"), py::arg("f"), py::arg("X"), py::arg("n_steps") = 100,
-        py::arg("store_profile") = false);
-
   m.def(
       "fanno_channel_rough",
       [](double T_in, double P_in, double u_in, double L, double D,
@@ -5155,22 +4958,6 @@ PYBIND11_MODULE(_core, m) {
       "Fanno flow with roughness-based variable friction factor f(x).\n"
       "Recomputes f at each RK4 stage from local Re and roughness.\n"
       "Returns FannoSolution with f_avg and Re_in populated.");
-
-  // Alias for backward compatibility
-  m.def("fanno_pipe_rough",
-        [](double T_in, double P_in, double u_in, double L, double D,
-           double roughness,
-           py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-           const std::string &correlation, std::size_t n_steps,
-           bool store_profile) {
-          return fanno_channel_rough(T_in, P_in, u_in, L, D, roughness,
-                                     to_vec(X_arr), correlation, n_steps,
-                                     store_profile);
-        },
-        py::arg("T_in"), py::arg("P_in"), py::arg("u_in"), py::arg("L"),
-        py::arg("D"), py::arg("roughness"), py::arg("X"),
-        py::arg("correlation") = "haaland", py::arg("n_steps") = 100,
-        py::arg("store_profile") = false);
 
   m.def(
       "fanno_max_length",
@@ -5388,15 +5175,16 @@ PYBIND11_MODULE(_core, m) {
                     "Jacobian: dQ/dT_aw_a [W/K]")
       .def_readonly("dQ_dT_aw_b", &WallCouplingResult::dQ_dT_aw_b,
                     "Jacobian: dQ/dT_aw_b [W/K]")
-      .def("__repr__", [](const WallCouplingResult &r) {
-        auto fmt = [](double v) {
-          char buf[32];
-          std::snprintf(buf, sizeof(buf), "%.6g", v);
-          return std::string(buf);
-        };
-        return "WallCouplingResult(Q=" + fmt(r.Q) +
-               ", T_wall=" + fmt(r.T_wall) + ")";
-      })
+      .def("__repr__",
+           [](const WallCouplingResult &r) {
+             auto fmt = [](double v) {
+               char buf[32];
+               std::snprintf(buf, sizeof(buf), "%.6g", v);
+               return std::string(buf);
+             };
+             return "WallCouplingResult(Q=" + fmt(r.Q) +
+                    ", T_wall=" + fmt(r.T_wall) + ")";
+           })
       .def("__iter__", [](const WallCouplingResult &r) {
         return py::iter(py::make_tuple(r.Q, r.T_wall));
       });
@@ -5404,18 +5192,19 @@ PYBIND11_MODULE(_core, m) {
   // -----------------------------------------------------------------
   // wall_coupling_and_jacobian
   // -----------------------------------------------------------------
-  m.def("wall_coupling_and_jacobian",
-        py::overload_cast<double, double, double, double, double, double>(
-            &wall_coupling_and_jacobian),
-        py::arg("h_a"), py::arg("T_aw_a"), py::arg("h_b"), py::arg("T_aw_b"),
-        py::arg("t_over_k"), py::arg("A"),
-        "Compute heat transfer and Jacobians for single-layer wall coupling.\n\n"
-        "Parameters:\n"
-        "  h_a, h_b       : convective HTCs on sides A and B [W/(m^2*K)]\n"
-        "  T_aw_a, T_aw_b : adiabatic wall temperatures on sides A and B [K]\n"
-        "  t_over_k       : wall_thickness / wall_conductivity [m^2*K/W]\n"
-        "  A              : effective heat transfer area [m^2]\n\n"
-        "Returns: WallCouplingResult with Q and analytical Jacobians");
+  m.def(
+      "wall_coupling_and_jacobian",
+      py::overload_cast<double, double, double, double, double, double>(
+          &wall_coupling_and_jacobian),
+      py::arg("h_a"), py::arg("T_aw_a"), py::arg("h_b"), py::arg("T_aw_b"),
+      py::arg("t_over_k"), py::arg("A"),
+      "Compute heat transfer and Jacobians for single-layer wall coupling.\n\n"
+      "Parameters:\n"
+      "  h_a, h_b       : convective HTCs on sides A and B [W/(m^2*K)]\n"
+      "  T_aw_a, T_aw_b : adiabatic wall temperatures on sides A and B [K]\n"
+      "  t_over_k       : wall_thickness / wall_conductivity [m^2*K/W]\n"
+      "  A              : effective heat transfer area [m^2]\n\n"
+      "Returns: WallCouplingResult with Q and analytical Jacobians");
 
   m.def("wall_coupling_and_jacobian_multilayer",
         py::overload_cast<double, double, double, double,
@@ -5427,7 +5216,8 @@ PYBIND11_MODULE(_core, m) {
         "Parameters:\n"
         "  h_a, h_b       : convective HTCs on sides A and B [W/(m^2*K)]\n"
         "  T_aw_a, T_aw_b : adiabatic wall temperatures on sides A and B [K]\n"
-        "  t_over_k_layers: thicknesses / conductivities for each layer [m^2*K/W]\n"
+        "  t_over_k_layers: thicknesses / conductivities for each layer "
+        "[m^2*K/W]\n"
         "  A              : effective heat transfer area [m^2]\n"
         "  R_fouling      : additional fouling resistance [m^2*K/W]\n\n"
         "Returns: WallCouplingResult with Q and analytical Jacobians");

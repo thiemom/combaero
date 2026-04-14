@@ -362,7 +362,7 @@ double overall_htc_wall(double h_inner, double h_outer, const std::vector<double
 
 ### Channel Flow Models
 ```cpp
-// Smooth pipe
+// Smooth channel
 ChannelResult channel_smooth(double T, double P, const std::vector<double>& X,
                               double velocity, double diameter, double length,
                               double T_wall = std::numeric_limits<double>::quiet_NaN(),

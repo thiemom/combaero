@@ -40,7 +40,7 @@ mass flows, and compositions throughout the system.
 │  NetworkGraph       topology, validation, assembly   │
 │  NetworkNode ABC    PlenumNode, MomentumChamber,     │
 │                     JunctionNode, BoundaryNode       │
-│  NetworkElement ABC OrificeElement, PipeElement,     │
+│  NetworkElement ABC OrificeElement, ChannelElement,     │
 │                     CombustionElement, HeatExchanger,│
 │                     RegressionElement, MixingElement │
 │  BoundaryCondition  PressureBC, MassFlowBC           │
@@ -57,8 +57,8 @@ mass flows, and compositions throughout the system.
 │  calc_T_from_h()         Newton inversion            │
 │  mole_to_mass()          composition conversion      │
 │  orifice_mdot()          incompressible Cd·A          │
-│  pipe_flow()             Darcy-Weisbach + thermo       │
-│  fanno_pipe()            compressible Fanno flow       │
+│  channel_flow()             Darcy-Weisbach + thermo       │
+│  fanno_channel()            compressible Fanno flow       │
 │  cooling_correlations    Nusselt, friction factor    │
 │  can_annular_eigenmodes  acoustics (Phase 4)         │
 └──────────────────────────────────────────────────────┘
@@ -84,9 +84,9 @@ To preserve GUI introspectability while avoiding class fragmentation, **all conf
 
 **Identified Application Domains:**
 1.  **Combustion Models (`CombustorNode`):** `Literal["complete", "equilibrium"]` $\rightarrow$ `cb.CombustionMethod.Complete | Equilibrium`.
-2.  **Pipe Friction Models (`PipeElement`):** `Literal["haaland", "colebrook", "serghides", "petukhov"]` $\rightarrow$ Routes to respective `friction_*` C++ algorithms.
-3.  **Smooth Pipe Heat Transfer (`HeatExchangerElement`):** `Literal["gnielinski", "dittus_boelter", "sieder_tate", "petukhov"]` $\rightarrow$ Proxied dynamically into `cb.channel_smooth(..., correlation=X)`.
-4.  **Flow Compressibility Regimes:** `Literal["incompressible", "compressible_fanno"]` $\rightarrow$ Gates `pipe_flow_rough()` vs `fanno_pipe_rough()`.
+2.  **Channel Friction Models (`ChannelElement`):** `Literal["haaland", "colebrook", "serghides", "petukhov"]` $\rightarrow$ Routes to respective `friction_*` C++ algorithms.
+3.  **Smooth Channel Heat Transfer (`HeatExchangerElement`):** `Literal["gnielinski", "dittus_boelter", "sieder_tate", "petukhov"]` $\rightarrow$ Proxied dynamically into `cb.channel_smooth(..., correlation=X)`.
+4.  **Flow Compressibility Regimes:** `Literal["incompressible", "compressible_fanno"]` $\rightarrow$ Gates `channel_flow_rough()` vs `fanno_channel_rough()`.
 
 *DO NOT split an element into multiple Python classes just to swap an underlying empirical correlation.*
 
@@ -96,9 +96,9 @@ To preserve GUI introspectability while avoiding class fragmentation, **all conf
 
 Before diving into the full, generalized graph solver class, we will test basic combinations of standard network blocks to solidify the momentum, mass, and energy constraints iteratively:
 
-1.  **Block 1 (Mass/Pressure):** `Boundary Plenum` $\rightarrow$ `Pipe` $\rightarrow$ `Orifice` $\rightarrow$ `Sink Plenum`. Test with both rigid Pressure boundary conditions and rigid Mass Flow boundaries.
+1.  **Block 1 (Mass/Pressure):** `Boundary Plenum` $\rightarrow$ `Channel` $\rightarrow$ `Orifice` $\rightarrow$ `Sink Plenum`. Test with both rigid Pressure boundary conditions and rigid Mass Flow boundaries.
 2.  **Block 2 (Momentum Recovery):** Pass the flow through a `Momentum Chamber` (which must have an explicit cross-sectional area for momentum transport) and then into a `Plenum`. Plenums must recover static pressure to total pressure assuming zero discharge losses.
-3.  **Topology Discovery:** Orifice blocks must be coded to autonomously "discover" the pipe diameters upstream and downstream during network initialization to correctly evaluate dynamic pressure recovery.
+3.  **Topology Discovery:** Orifice blocks must be coded to autonomously "discover" the channel diameters upstream and downstream during network initialization to correctly evaluate dynamic pressure recovery.
 
 This modular, incremental approach will also be strictly followed when introducing highly complex new nodes, such as Combustion elements.
 
@@ -151,8 +151,8 @@ well-posedness. The solver validates this at setup.
 |---|---|---|
 | `OrificeElement` | `ṁ = Cd·A·√(2ρΔP)` | `orifice_flow_thermo()` — accepts fixed `Cd` or `cd_fn(T,P,X,Re)→Cd` callable |
 | `EffectiveAreaConnectionElement` | `ṁ = A_eff·√(2ρΔP)` (Cd=1.0) | `orifice_flow_thermo()` with `Cd=1.0` — user specifies effective area (Cd·A product) directly |
-| `PipeElement` (incompressible) | `ΔP = f·(L/D)·½ρv²` + K·½ρv² | `pipe_flow_rough()` — accepts optional `k_loss_fn(T,P,X,Re)→K` for fittings/bends |
-| `PipeElement` (compressible) | Fanno adiabatic friction | `fanno_pipe()` / `fanno_pipe_rough()` |
+| `ChannelElement` (incompressible) | `ΔP = f·(L/D)·½ρv²` + K·½ρv² | `channel_flow_rough()` — accepts optional `k_loss_fn(T,P,X,Re)→K` for fittings/bends |
+| `ChannelElement` (compressible) | Fanno adiabatic friction | `fanno_channel()` / `fanno_channel_rough()` |
 | `MomentumChamberElement` | Momentum + area change | `density()`, `speed_of_sound()` |
 
 **User-correlation hooks for flow elements** are loop-free: `cd_fn` and `k_loss_fn` receive only inlet state `(T, P, X, Re)` — never outlet pressure — so they are safe inside Newton solvers.
@@ -219,7 +219,7 @@ The distinction matters for each part of the network:
 
 | Context | Temperature to use | Notes |
 |---|---|---|
-| Element residuals (pipe ΔP, orifice ṁ) | static `T`, `P` | Darcy-Weisbach, Nusselt/Re/Pr all at bulk static conditions |
+| Element residuals (channel ΔP, orifice ṁ) | static `T`, `P` | Darcy-Weisbach, Nusselt/Re/Pr all at bulk static conditions |
 | Boundary conditions | total `T_total`, `P_total` | Reservoir / compressor delivery are naturally total conditions |
 | Heat flux driving temperature | `T_aw` (adiabatic wall T) | **Not** T_static or T_total; use `combaero.T_adiabatic_wall()` |
 | Combustion / mixing enthalpy balance | static `h(T)` + v²/2 = h₀ | Stagnation enthalpy h₀ is conserved, not static h |
@@ -355,11 +355,11 @@ class NetworkElement(ABC):
 
 ### Phase 1 — Isothermal Flow Network (Completed ✅)
 
-**Goal:** solve P and ṁ throughout a network of orifices, pipes, and plenums.
+**Goal:** solve P and ṁ throughout a network of orifices, channels, and plenums.
 
 - `MixtureState`: P and ṁ only (T and X fixed, no composition tracking)
 - Nodes: `PlenumNode`, `JunctionNode`, `PressureBoundary`, `MassFlowBoundary`, `MomentumChamberNode`
-- Elements: `OrificeElement`, `EffectiveAreaConnectionElement`, `PipeElement`, `LosslessConnectionElement`
+- Elements: `OrificeElement`, `EffectiveAreaConnectionElement`, `ChannelElement`, `LosslessConnectionElement`
 - Solver: `scipy.optimize.root` with finite-difference Jacobian (Pre-registry)
 - Graph: Robust validation tracking unreachable graphs, isolated connections, and 0-DOF states.
 - Network described and validated via JSON

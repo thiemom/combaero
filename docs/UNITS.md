@@ -159,7 +159,7 @@ All functions use consistent units to avoid conversion errors.
 
 | Function           | Input Units                                                | Output Unit   |
 |--------------------|------------------------------------------------------------|---------------|
-| `fanno_pipe`       | T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, f: -, X: mol/mol | FannoSolution |
+| `fanno_channel`    | T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, f: -, X: mol/mol | FannoSolution |
 | `fanno_max_length` | T_in: K, P_in: Pa, u_in: m/s, D: m, f: -, X: mol/mol       | m             |
 
 #### Thrust
@@ -818,18 +818,7 @@ All functions use consistent units to avoid conversion errors.
 | `channel_roughness`                            | -                        | m                          |
 | `pressure_drop_channel`                        | -                        | Pa                         |
 | `nusselt_channel`                              | -                        | -                          |
-| `nusselt_pipe`                                 | -                        | -                          |
 | `htc_channel`                                  | -                        | W/(m²·K)                   |
-| `htc_pipe`                                     | -                        | W/(m²·K)                   |
-| `pipe_dP`                                      | -                        | Pa                         |
-| `pipe_dP_mdot`                                 | -                        | Pa                         |
-| `pipe_velocity`                                | -                        | m/s                        |
-| `pipe_mdot`                                    | -                        | kg/s                       |
-| `pressure_drop_pipe`                           | -                        | Pa                         |
-| `pipe_area`                                    | -                        | m²                         |
-| `pipe_volume`                                  | -                        | m³                         |
-| `pipe_roughness`                               | -                        | m                          |
-| `standard_pipe_roughness`                      | -                        | m                          |
 | `dynamic_pressure`                             | -                        | Pa                         |
 | `velocity_from_q`                              | -                        | m/s                        |
 | `OrificeGeometry::D`                           | -                        | m                          |

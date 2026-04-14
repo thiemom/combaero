@@ -4,12 +4,12 @@ import time
 import combaero as cb
 from combaero.network import FlowNetwork, NetworkSolver
 from combaero.network.components import (
+    ChannelElement,
     CombustorNode,
     ConvectiveSurface,
     MassFlowBoundary,
     MomentumChamberNode,
     OrificeElement,
-    PipeElement,
     PlenumNode,
     PressureBoundary,
     SmoothModel,
@@ -62,8 +62,8 @@ def build_and_solve_network(
     A_branch = total_area / n_parallel
     D_branch = math.sqrt(4 * A_branch / math.pi)
 
-    A_ht_pipe = (total_ht_area / n_parallel) / max(1, n_serial)
-    L_pipe = 1.0
+    A_ht_channel = (total_ht_area / n_parallel) / max(1, n_serial)
+    L_channel = 1.0
 
     distributor_fuel = PlenumNode("distributor_fuel")
     net.add_node(distributor_fuel)
@@ -111,16 +111,16 @@ def build_and_solve_network(
         )
         for i in range(n_serial):
             net.add_element(
-                PipeElement(
-                    f"cold_pipe_{p}_{i}",
+                ChannelElement(
+                    f"cold_channel_{p}_{i}",
                     f"cold_chamber_{p}_{i}",
                     f"cold_chamber_{p}_{i + 1}",
-                    length=L_pipe,
+                    length=L_channel,
                     diameter=D_branch,
                     roughness=2e-5,
                     regime="compressible",
-                    surface=ConvectiveSurface(area=A_ht_pipe, model=SmoothModel())
-                    if A_ht_pipe > 0
+                    surface=ConvectiveSurface(area=A_ht_channel, model=SmoothModel())
+                    if A_ht_channel > 0
                     else None,
                 )
             )
@@ -158,30 +158,30 @@ def build_and_solve_network(
 
         for i in range(n_serial):
             net.add_element(
-                PipeElement(
-                    f"hot_pipe_{p}_{i}",
+                ChannelElement(
+                    f"hot_channel_{p}_{i}",
                     f"hot_chamber_{p}_{i}",
                     f"hot_chamber_{p}_{i + 1}",
-                    length=L_pipe,
+                    length=L_channel,
                     diameter=D_branch,
                     roughness=2e-5,
                     regime="compressible",
-                    surface=ConvectiveSurface(area=A_ht_pipe, model=SmoothModel())
-                    if A_ht_pipe > 0
+                    surface=ConvectiveSurface(area=A_ht_channel, model=SmoothModel())
+                    if A_ht_channel > 0
                     else None,
                 )
             )
 
-            if A_ht_pipe > 0:
-                wall_cold_pipe_idx = n_serial - 1 - i
+            if A_ht_channel > 0:
+                wall_cold_channel_idx = n_serial - 1 - i
                 net.add_wall(
                     WallConnection(
                         id=f"wall_{p}_{i}",
-                        element_a=f"hot_pipe_{p}_{i}",
-                        element_b=f"cold_pipe_{p}_{wall_cold_pipe_idx}",
+                        element_a=f"hot_channel_{p}_{i}",
+                        element_b=f"cold_channel_{p}_{wall_cold_channel_idx}",
                         wall_thickness=0.005,
                         wall_conductivity=20.0,
-                        contact_area=A_ht_pipe,
+                        contact_area=A_ht_channel,
                     )
                 )
 

@@ -10,7 +10,6 @@ from combaero.network import (
     OrificeElement,
     PinFinModel,
     ChannelElement,
-    PipeElement,
     PlenumNode,
     PressureBoundary,
     RibbedModel,
@@ -159,7 +158,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         elif node_type == "probe":
             pass  # Display-only diagnostic nodes -- not part of the solver graph
         else:
-            # This is an element node (Pipe, Orifice, etc.)
+            # This is an element node (Channel, Orifice, etc.)
             element_nodes.append(node_schema)
 
     element_ids = {node.id for node in element_nodes}

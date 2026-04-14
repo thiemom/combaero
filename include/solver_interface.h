@@ -144,16 +144,6 @@ ChannelResult channel_residuals_and_jacobian(double m_dot, double P_total_up,
                                              double D, double roughness,
                                              const std::string &friction_model);
 
-inline ChannelResult
-pipe_residuals_and_jacobian(double m_dot, double P_total_up, double P_static_up,
-                            double T_up, const std::vector<double> &Y_up,
-                            double P_static_down, double L, double D,
-                            double roughness,
-                            const std::string &friction_model) {
-  return channel_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up,
-                                        Y_up, P_static_down, L, D, roughness,
-                                        friction_model);
-}
 
 
 // Calculate Lossless Connection Ideal Pressure and Jacobian
@@ -204,9 +194,9 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
     const std::vector<double>& Y_up,
     double P_static_down, double Cd, double area, double beta);
 
-// Compressible pipe flow using Fanno model with variable friction.
+// Compressible channel flow using Fanno model with variable friction.
 //
-// Method: Finite Difference Jacobians (fanno_pipe_rough is iterative)
+// Method: Finite Difference Jacobians (fanno_channel_rough is iterative)
 // Inputs:
 //   T_in   : Inlet static temperature [K]
 //   P_in   : Inlet static pressure [Pa]
@@ -229,14 +219,6 @@ std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobia
     double L, double D, double roughness,
     const std::string& friction_model);
 
-inline std::tuple<double, double, double, double>
-pipe_compressible_mdot_and_jacobian(double T_in, double P_in, double u_in,
-                                    const std::vector<double> &X, double L,
-                                    double D, double roughness,
-                                    const std::string &friction_model) {
-  return channel_compressible_mdot_and_jacobian(
-      T_in, P_in, u_in, X, L, D, roughness, friction_model);
-}
 
 // Full compressible channel evaluation with all derivatives for network solver.
 ChannelResult channel_compressible_residuals_and_jacobian(
@@ -245,14 +227,6 @@ ChannelResult channel_compressible_residuals_and_jacobian(
     double P_static_down, double L, double D, double roughness,
     const std::string& friction_model);
 
-inline ChannelResult pipe_compressible_residuals_and_jacobian(
-    double m_dot, double P_total_up, double T_up,
-    const std::vector<double> &Y_up, double P_static_down, double L, double D,
-    double roughness, const std::string &friction_model) {
-  return channel_compressible_residuals_and_jacobian(
-      m_dot, P_total_up, T_up, Y_up, P_static_down, L, D, roughness,
-      friction_model);
-}
 
 // -----------------------------------------------------------------------------
 // 2. Heat Transfer Components

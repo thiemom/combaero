@@ -77,17 +77,17 @@ def test_flow_reversal_momentum_chamber():
     graph_a.add_node(chamber_a)
     graph_a.add_node(outlet_a)
 
-    graph_a.add_element(LosslessConnectionElement("in_pipe", "inlet_a", "chamber"))
+    graph_a.add_element(LosslessConnectionElement("in_channel", "inlet_a", "chamber"))
     graph_a.add_element(
-        OrificeElement("out_pipe", "chamber", "outlet_a", Cd=0.6, diameter=0.112838)
+        OrificeElement("out_channel", "chamber", "outlet_a", Cd=0.6, diameter=0.112838)
     )
 
     graph_a.validate()
     sol_a = NetworkSolver(graph_a).solve()
 
     # Flow should be positive for both
-    assert sol_a["in_pipe.m_dot"] > 0
-    assert sol_a["out_pipe.m_dot"] > 0
+    assert sol_a["in_channel.m_dot"] > 0
+    assert sol_a["out_channel.m_dot"] > 0
 
     # CASE B: Reversal! The boundary is higher than the chamber.
     graph_b = FlowNetwork()
@@ -115,9 +115,9 @@ def test_flow_reversal_momentum_chamber():
     graph_b.add_node(outlet_b)
 
     # Elements defined as inlet_b -> chamber -> outlet_b
-    graph_b.add_element(LosslessConnectionElement("in_pipe", "inlet_b", "chamber"))
+    graph_b.add_element(LosslessConnectionElement("in_channel", "inlet_b", "chamber"))
     graph_b.add_element(
-        OrificeElement("out_pipe", "chamber", "outlet_b", Cd=0.6, diameter=0.112838)
+        OrificeElement("out_channel", "chamber", "outlet_b", Cd=0.6, diameter=0.112838)
     )
 
     graph_b.validate()
@@ -125,5 +125,5 @@ def test_flow_reversal_momentum_chamber():
 
     # Because outlet > inlet, flow is pushed backwards.
     # The elements are defined 1->2 but flow is 2->1.
-    assert sol_b["in_pipe.m_dot"] < 0
-    assert sol_b["out_pipe.m_dot"] < 0
+    assert sol_b["in_channel.m_dot"] < 0
+    assert sol_b["out_channel.m_dot"] < 0

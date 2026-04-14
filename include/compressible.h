@@ -267,14 +267,6 @@ FannoSolution fanno_channel(
     std::size_t n_steps = 100,
     bool store_profile = false);
 
-inline FannoSolution fanno_pipe(
-    double T_in, double P_in, double u_in,
-    double L, double D, double f,
-    const std::vector<double>& X,
-    std::size_t n_steps = 100,
-    bool store_profile = false) {
-  return fanno_channel(T_in, P_in, u_in, L, D, f, X, n_steps, store_profile);
-}
 
 // Convenience: solve given inlet State and velocity
 FannoSolution fanno_channel(
@@ -283,13 +275,6 @@ FannoSolution fanno_channel(
     std::size_t n_steps = 100,
     bool store_profile = false);
 
-inline FannoSolution fanno_pipe(
-    const State& inlet, double u_in,
-    double L, double D, double f,
-    std::size_t n_steps = 100,
-    bool store_profile = false) {
-  return fanno_channel(inlet, u_in, L, D, f, n_steps, store_profile);
-}
 
 // Solve Fanno flow with roughness-based variable friction factor.
 //
@@ -320,16 +305,6 @@ FannoSolution fanno_channel_rough(
     std::size_t n_steps = 100,
     bool store_profile = false);
 
-inline FannoSolution fanno_pipe_rough(
-    double T_in, double P_in, double u_in,
-    double L, double D, double roughness,
-    const std::vector<double>& X,
-    const std::string& correlation = "haaland",
-    std::size_t n_steps = 100,
-    bool store_profile = false) {
-  return fanno_channel_rough(T_in, P_in, u_in, L, D, roughness, X, correlation,
-                             n_steps, store_profile);
-}
 
 // Convenience: solve given inlet State and velocity (roughness-based)
 FannoSolution fanno_channel_rough(
@@ -339,15 +314,6 @@ FannoSolution fanno_channel_rough(
     std::size_t n_steps = 100,
     bool store_profile = false);
 
-inline FannoSolution fanno_pipe_rough(
-    const State& inlet, double u_in,
-    double L, double D, double roughness,
-    const std::string& correlation = "haaland",
-    std::size_t n_steps = 100,
-    bool store_profile = false) {
-  return fanno_channel_rough(inlet, u_in, L, D, roughness, correlation, n_steps,
-                             store_profile);
-}
 
 // Compute maximum channel length before choking (L*) for given inlet conditions.
 // Returns the length at which M would reach 1.0.

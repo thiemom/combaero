@@ -72,36 +72,36 @@ class TestFlowSolution:
 
 
 # ---------------------------------------------------------------------------
-# Symmetric pipe_flow — same kwargs, different module
+# Symmetric channel_flow — same kwargs, different module
 # ---------------------------------------------------------------------------
 
 
-class TestSymmetricPipeFlow:
+class TestSymmetricChannelFlow:
     KWARGS = {"u": 10.0, "L": 1.0, "D": 0.05, "f": 0.02}
 
     def test_incompressible_returns_flow_solution(self) -> None:
         T, P, X = air_300()
-        sol = incomp.pipe_flow(T, P, X, **self.KWARGS)
+        sol = incomp.channel_flow(T, P, X, **self.KWARGS)
         assert isinstance(sol, FlowSolution)
 
     def test_compressible_returns_flow_solution(self) -> None:
         T, P, X = air()
-        sol = comp.pipe_flow(T, P, X, **self.KWARGS)
+        sol = comp.channel_flow(T, P, X, **self.KWARGS)
         assert isinstance(sol, FlowSolution)
 
     def test_incompressible_regime(self) -> None:
         T, P, X = air_300()
-        sol = incomp.pipe_flow(T, P, X, **self.KWARGS)
+        sol = incomp.channel_flow(T, P, X, **self.KWARGS)
         assert sol.regime == "incompressible"
 
     def test_compressible_regime(self) -> None:
         T, P, X = air()
-        sol = comp.pipe_flow(T, P, X, **self.KWARGS)
+        sol = comp.channel_flow(T, P, X, **self.KWARGS)
         assert sol.regime == "compressible"
 
     def test_incompressible_inapplicable_fields(self) -> None:
         T, P, X = air_300()
-        sol = incomp.pipe_flow(T, P, X, **self.KWARGS)
+        sol = incomp.channel_flow(T, P, X, **self.KWARGS)
         assert math.isnan(sol.M)
         assert math.isnan(sol.T_out)
         assert math.isnan(sol.P_out)
@@ -112,12 +112,12 @@ class TestSymmetricPipeFlow:
 
     def test_compressible_inapplicable_fields(self) -> None:
         T, P, X = air()
-        sol = comp.pipe_flow(T, P, X, **self.KWARGS)
+        sol = comp.channel_flow(T, P, X, **self.KWARGS)
         assert math.isnan(sol.Cd)
 
     def test_incompressible_applicable_fields(self) -> None:
         T, P, X = air_300()
-        sol = incomp.pipe_flow(T, P, X, **self.KWARGS)
+        sol = incomp.channel_flow(T, P, X, **self.KWARGS)
         assert sol.mdot > 0.0
         assert sol.v > 0.0
         assert sol.dP > 0.0
@@ -127,7 +127,7 @@ class TestSymmetricPipeFlow:
 
     def test_compressible_applicable_fields(self) -> None:
         T, P, X = air()
-        sol = comp.pipe_flow(T, P, X, **self.KWARGS)
+        sol = comp.channel_flow(T, P, X, **self.KWARGS)
         assert sol.mdot > 0.0
         assert sol.v > 0.0
         assert sol.dP > 0.0
@@ -142,76 +142,76 @@ class TestSymmetricPipeFlow:
     def test_both_pressure_drops(self) -> None:
         """Both regimes should give positive dP for the same conditions."""
         T, P, X = air()
-        sol_i = incomp.pipe_flow(T, P, X, **self.KWARGS)
-        sol_c = comp.pipe_flow(T, P, X, **self.KWARGS)
+        sol_i = incomp.channel_flow(T, P, X, **self.KWARGS)
+        sol_c = comp.channel_flow(T, P, X, **self.KWARGS)
         assert sol_i.dP > 0.0
         assert sol_c.dP > 0.0
 
     def test_compressible_dP_higher_than_incompressible(self) -> None:
         """Compressible friction losses are slightly higher due to density change."""
         T, P, X = air()
-        sol_i = incomp.pipe_flow(T, P, X, **self.KWARGS)
-        sol_c = comp.pipe_flow(T, P, X, **self.KWARGS)
+        sol_i = incomp.channel_flow(T, P, X, **self.KWARGS)
+        sol_c = comp.channel_flow(T, P, X, **self.KWARGS)
         # Both positive; compressible dP >= incompressible dP (density drops)
         assert sol_c.dP >= sol_i.dP * 0.9  # within 10% — just check sign
 
 
 # ---------------------------------------------------------------------------
-# Symmetric pipe_flow_rough — same kwargs, different module
+# Symmetric channel_flow_rough — same kwargs, different module
 # ---------------------------------------------------------------------------
 
 
-class TestSymmetricPipeFlowRough:
+class TestSymmetricChannelFlowRough:
     KWARGS = {"u": 10.0, "L": 1.0, "D": 0.05, "roughness": 0.0}
 
     def test_incompressible_returns_flow_solution(self) -> None:
         T, P, X = air_300()
-        sol = incomp.pipe_flow_rough(T, P, X, **self.KWARGS)
+        sol = incomp.channel_flow_rough(T, P, X, **self.KWARGS)
         assert isinstance(sol, FlowSolution)
 
     def test_compressible_returns_flow_solution(self) -> None:
         T, P, X = air()
-        sol = comp.pipe_flow_rough(T, P, X, **self.KWARGS)
+        sol = comp.channel_flow_rough(T, P, X, **self.KWARGS)
         assert isinstance(sol, FlowSolution)
 
     def test_regimes(self) -> None:
         T, P, X = air_300()
-        assert incomp.pipe_flow_rough(T, P, X, **self.KWARGS).regime == "incompressible"
+        assert incomp.channel_flow_rough(T, P, X, **self.KWARGS).regime == "incompressible"
         T, P, X = air()
-        assert comp.pipe_flow_rough(T, P, X, **self.KWARGS).regime == "compressible"
+        assert comp.channel_flow_rough(T, P, X, **self.KWARGS).regime == "compressible"
 
     def test_rough_increases_dP_both_regimes(self) -> None:
         T_i, P_i, X = air_300()
-        sol_smooth_i = incomp.pipe_flow_rough(T_i, P_i, X, **self.KWARGS)
-        sol_rough_i = incomp.pipe_flow_rough(T_i, P_i, X, u=10.0, L=1.0, D=0.05, roughness=1e-4)
+        sol_smooth_i = incomp.channel_flow_rough(T_i, P_i, X, **self.KWARGS)
+        sol_rough_i = incomp.channel_flow_rough(T_i, P_i, X, u=10.0, L=1.0, D=0.05, roughness=1e-4)
         assert sol_rough_i.dP > sol_smooth_i.dP
 
         T_c, P_c, X = air()
-        sol_smooth_c = comp.pipe_flow_rough(T_c, P_c, X, **self.KWARGS)
-        sol_rough_c = comp.pipe_flow_rough(T_c, P_c, X, u=10.0, L=1.0, D=0.05, roughness=1e-4)
+        sol_smooth_c = comp.channel_flow_rough(T_c, P_c, X, **self.KWARGS)
+        sol_rough_c = comp.channel_flow_rough(T_c, P_c, X, u=10.0, L=1.0, D=0.05, roughness=1e-4)
         assert sol_rough_c.dP > sol_smooth_c.dP
 
     def test_correlation_kwarg_accepted_both(self) -> None:
         T_i, P_i, X = air_300()
-        sol = incomp.pipe_flow_rough(
+        sol = incomp.channel_flow_rough(
             T_i, P_i, X, u=10.0, L=1.0, D=0.05, roughness=0.0, correlation="serghides"
         )
         assert isinstance(sol, FlowSolution)
 
         T_c, P_c, X = air()
-        sol = comp.pipe_flow_rough(
+        sol = comp.channel_flow_rough(
             T_c, P_c, X, u=10.0, L=1.0, D=0.05, roughness=0.0, correlation="serghides"
         )
         assert isinstance(sol, FlowSolution)
 
     def test_profile_empty_by_default(self) -> None:
         T, P, X = air()
-        sol = comp.pipe_flow_rough(T, P, X, **self.KWARGS)
+        sol = comp.channel_flow_rough(T, P, X, **self.KWARGS)
         assert sol.profile == []
 
     def test_profile_populated_when_requested(self) -> None:
         T, P, X = air()
-        sol = comp.pipe_flow_rough(
+        sol = comp.channel_flow_rough(
             T, P, X, u=10.0, L=1.0, D=0.05, roughness=0.0, store_profile=True
         )
         assert len(sol.profile) > 0
@@ -315,25 +315,25 @@ class TestCompressibleNozzleFlow:
 
 
 # ---------------------------------------------------------------------------
-# Choked Fanno pipe
+# Choked Fanno channel
 # ---------------------------------------------------------------------------
 
 
-class TestCompressiblePipeChoked:
+class TestCompressibleChannelChoked:
     def test_choked_flag_set(self) -> None:
         T, P, X = air()
-        sol = comp.pipe_flow(T, P, X, u=250.0, L=1000.0, D=0.05, f=0.02)
+        sol = comp.channel_flow(T, P, X, u=250.0, L=1000.0, D=0.05, f=0.02)
         assert sol.choked
 
     def test_L_choke_finite_when_choked(self) -> None:
         T, P, X = air()
-        sol = comp.pipe_flow(T, P, X, u=250.0, L=1000.0, D=0.05, f=0.02)
+        sol = comp.channel_flow(T, P, X, u=250.0, L=1000.0, D=0.05, f=0.02)
         assert not math.isnan(sol.L_choke)
         assert sol.L_choke < 1000.0
 
-    def test_not_choked_short_pipe(self) -> None:
+    def test_not_choked_short_channel(self) -> None:
         T, P, X = air()
-        sol = comp.pipe_flow(T, P, X, u=10.0, L=0.1, D=0.05, f=0.02)
+        sol = comp.channel_flow(T, P, X, u=10.0, L=0.1, D=0.05, f=0.02)
         assert not sol.choked
         assert math.isnan(sol.L_choke)
 
@@ -347,7 +347,7 @@ class TestRegimeSwap:
     """Verify that swapping the module import is the only change needed."""
 
     def _run(self, module, T: float, P: float, X) -> FlowSolution:
-        return module.pipe_flow(T, P, X, u=10.0, L=1.0, D=0.05, f=0.02)
+        return module.channel_flow(T, P, X, u=10.0, L=1.0, D=0.05, f=0.02)
 
     def test_swap_returns_flow_solution(self) -> None:
         T, P, X = air()
@@ -368,9 +368,9 @@ class TestRegimeSwap:
             sol = self._run(module, T, P, X)
             assert sol.dP > 0.0
 
-    def test_pipe_flow_rough_swap(self) -> None:
+    def test_channel_flow_rough_swap(self) -> None:
         T, P, X = air()
         for module in (incomp, comp):
-            sol = module.pipe_flow_rough(T, P, X, u=10.0, L=1.0, D=0.05, roughness=0.0)
+            sol = module.channel_flow_rough(T, P, X, u=10.0, L=1.0, D=0.05, roughness=0.0)
             assert isinstance(sol, FlowSolution)
             assert sol.dP > 0.0

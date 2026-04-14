@@ -41,7 +41,7 @@ class TestCdCorrelations:
 
     @pytest.fixture
     def standard_geom(self):
-        """Standard test geometry: 50mm orifice in 100mm pipe."""
+        """Standard test geometry: 50mm orifice in 100mm channel."""
         geom = cb.OrificeGeometry()
         geom.d = 0.050
         geom.D = 0.100

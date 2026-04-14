@@ -149,10 +149,10 @@ class NetworkElement(ABC):
         return None   # default: no convective surface
 ```
 
-### `PipeElement` override
+### `ChannelElement` override
 
 ```python
-class PipeElement(NetworkElement):
+class ChannelElement(NetworkElement):
     def __init__(self, ..., surface: ConvectiveSurface | None = None):
         ...
         self.surface = surface or ConvectiveSurface()  # default: area=0
@@ -435,13 +435,13 @@ function of h_a, h_b.
 
 ## 8. User-Facing API Examples
 
-### Simple pipe-to-pipe wall coupling
+### Simple channel-to-channel wall coupling
 
 ```python
 import combaero as cb
 from combaero.network import (
     FlowNetwork, PressureBoundary, PlenumNode,
-    PipeElement, WallConnection, ConvectiveSurface,
+    ChannelElement, WallConnection, ConvectiveSurface,
     SmoothModel, RibbedModel,
 )
 from math import pi
@@ -453,8 +453,8 @@ net.add_node(PressureBoundary("hot_in",  P_total=500e3, T_total=1200.0))
 net.add_node(PlenumNode("hot_out_plenum"))
 net.add_node(PressureBoundary("hot_out", P_total=480e3, T_total=1200.0))
 
-net.add_element(PipeElement(
-    "hot_pipe", "hot_in", "hot_out_plenum",
+net.add_element(ChannelElement(
+    "hot_channel", "hot_in", "hot_out_plenum",
     length=0.3, diameter=0.05, roughness=1e-4,
     surface=ConvectiveSurface(
         area=pi * 0.05 * 0.3,
@@ -467,8 +467,8 @@ net.add_node(PressureBoundary("cold_in",  P_total=600e3, T_total=400.0))
 net.add_node(PlenumNode("cold_out_plenum"))
 net.add_node(PressureBoundary("cold_out", P_total=580e3, T_total=400.0))
 
-net.add_element(PipeElement(
-    "cold_pipe", "cold_in", "cold_out_plenum",
+net.add_element(ChannelElement(
+    "cold_channel", "cold_in", "cold_out_plenum",
     length=0.3, diameter=0.005, roughness=1e-5,
     surface=ConvectiveSurface(
         area=pi * 0.005 * 0.3,
@@ -480,8 +480,8 @@ net.add_element(PipeElement(
 # Wall coupling
 net.add_wall(WallConnection(
     "liner_wall",
-    element_a="hot_pipe",
-    element_b="cold_pipe",
+    element_a="hot_channel",
+    element_b="cold_channel",
     wall_thickness=0.002,
     wall_conductivity=25.0,   # Hastelloy X
 ))
@@ -494,7 +494,7 @@ result = net.solve()
 ```python
 from combaero.network import (
     FlowNetwork, PressureBoundary, PlenumNode, MomentumChamberNode,
-    CombustionNode, PipeElement, OrificeElement,
+    CombustionNode, ChannelElement, OrificeElement,
     WallConnection, ConvectiveSurface, SmoothModel, RibbedModel,
 )
 from math import pi
@@ -512,7 +512,7 @@ net.add_element(OrificeElement("primary_air", "air_supply", "combustor",
                                Cd=0.7, diameter=0.035682))
 net.add_element(OrificeElement("fuel_injector", "fuel_supply", "combustor",
                                Cd=0.6, diameter=0.015958))
-net.add_element(PipeElement(
+net.add_element(ChannelElement(
     "hot_liner", "combustor", "turbine_inlet",
     length=0.4, diameter=0.15, roughness=1e-4,
     surface=ConvectiveSurface(
@@ -526,7 +526,7 @@ net.add_node(PlenumNode("cool_plenum"))
 net.add_element(OrificeElement("bleed_orifice", "air_supply", "cool_plenum",
                                Cd=0.65, diameter=0.025231))
 net.add_node(MomentumChamberNode("cool_exit", area=pi/4 * 0.005**2))
-net.add_element(PipeElement(
+net.add_element(ChannelElement(
     "cooling_passage", "cool_plenum", "cool_exit",
     length=0.4, diameter=0.005, roughness=1e-5,
     surface=ConvectiveSurface(
@@ -590,7 +590,7 @@ bindings, C++ and Python unit tests.
 ### Phase 3 — Python `ConvectiveSurface` + `htc_and_T()`
 
 **Scope**: Implement `ConvectiveSurface`, model subclasses, `htc_and_T()`
-method on `NetworkElement` and `PipeElement`.  Post-processing mode only (no
+method on `NetworkElement` and `ChannelElement`.  Post-processing mode only (no
 solver coupling yet).
 
 **Deliverables**:
@@ -608,7 +608,7 @@ integration with flow-dependent `EnergyBoundary`, Jacobian relay extension.
 - `graph.py`: `add_wall()`, serialization support
 - `solver.py`: wall evaluation during `_propagate_states()`, relay extension
 - `thermal_coupling_enabled` global toggle
-- Integration tests: two-pipe wall coupling converges to correct Q
+- Integration tests: two-channel wall coupling converges to correct Q
 - Integration tests: verify Jacobian accuracy (analytical vs FD)
 
 ### Phase 5 — Combustor counterflow demo + documentation
@@ -632,7 +632,7 @@ benchmarking, API documentation update.
 | **C++ unit** | `wall_coupling_and_jacobian` | Validate against known analytical solution |
 | **Python unit** | `ConvectiveSurface` + `htc_and_T()` | Verify correct dispatch to C++ channel functions |
 | **Python unit** | `A_conv = 0` returns `None` | No C++ call made |
-| **Python integration** | Two-pipe wall coupling | Converged Q matches analytical solution within tolerance |
+| **Python integration** | Two-channel wall coupling | Converged Q matches analytical solution within tolerance |
 | **Python integration** | Combustor thermal loop | Newton converges, T_wall in expected range |
 | **Python integration** | `thermal_coupling_enabled = False` | Identical to no-wall solve |
 | **Jacobian validation** | Full network Jacobian | Compare assembled J vs column-wise FD perturbation |

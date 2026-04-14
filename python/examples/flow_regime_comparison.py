@@ -7,8 +7,8 @@ identically against both modules and the results are compared side-by-side.
 
 Topics covered:
 - Regime-swap pattern (identical call signatures, different physics)
-- pipe_flow: Darcy-Weisbach vs Fanno (adiabatic compressible) friction
-- pipe_flow_rough: roughness-based friction in both regimes
+- channel_flow: Darcy-Weisbach vs Fanno (adiabatic compressible) friction
+- channel_flow_rough: roughness-based friction in both regimes
 - orifice_flow (incompressible) vs nozzle_flow (compressible)
 - Validity range: when do the two regimes agree / diverge?
 """
@@ -26,11 +26,11 @@ import combaero as cb
 import combaero.compressible as comp
 import combaero.incompressible as incomp
 from combaero.network import (
+    ChannelElement,
     FlowNetwork,
     MassFlowBoundary,
     NetworkSolver,
     OrificeElement,
-    PipeElement,
     PlenumNode,
     PressureBoundary,
 )
@@ -41,7 +41,7 @@ from combaero.network import (
 X = cb.species.dry_air()
 T = 400.0  # K
 P = 200_000.0  # Pa  (2 bar)
-D = 0.05  # m   (50 mm pipe)
+D = 0.05  # m   (50 mm channel)
 L = 2.0  # m
 f = 0.02  # Darcy friction factor
 
@@ -62,9 +62,9 @@ def row(label: str, incomp_val: float, comp_val: float, unit: str = "") -> None:
 
 
 # ------------------------------------------------------------------------------
-# Example 1: pipe_flow -- identical call, two regimes
+# Example 1: channel_flow -- identical call, two regimes
 # ------------------------------------------------------------------------------
-separator("Example 1: pipe_flow -- same call, two regimes")
+separator("Example 1: channel_flow -- same call, two regimes")
 
 print(f"\n  Conditions: T={T} K, P={P / 1e5:.1f} bar, D={D * 1e3:.0f} mm, L={L} m, f={f}")
 print(f"\n  {'Field':<22} {'incompressible':>18}  {'compressible':>18}  {'diff':>8}")
@@ -73,13 +73,13 @@ print(f"  {'-' * 22} {'-' * 18}  {'-' * 18}  {'-' * 8}")
 MODULES = [incomp, comp]
 
 # The regime-swap loop: identical call, results keyed by sol.regime
-results_pipe = {}
+results_channel = {}
 for module in MODULES:
-    sol = module.pipe_flow(T, P, X, u=10.0, L=L, D=D, f=f)
-    results_pipe[sol.regime] = sol
+    sol = module.channel_flow(T, P, X, u=10.0, L=L, D=D, f=f)
+    results_channel[sol.regime] = sol
 
-sol_i = results_pipe["incompressible"]
-sol_c = results_pipe["compressible"]
+sol_i = results_channel["incompressible"]
+sol_c = results_channel["compressible"]
 
 row("mdot", sol_i.mdot, sol_c.mdot, "kg/s")
 row("v_out", sol_i.v, sol_c.v, "m/s")
@@ -102,9 +102,9 @@ print(
 )
 
 # ------------------------------------------------------------------------------
-# Example 2: pipe_flow_rough -- velocity sweep, both regimes
+# Example 2: channel_flow_rough -- velocity sweep, both regimes
 # ------------------------------------------------------------------------------
-separator("Example 2: pipe_flow_rough -- velocity sweep (roughness = 0.1 mm)")
+separator("Example 2: channel_flow_rough -- velocity sweep (roughness = 0.1 mm)")
 
 roughness = 1e-4  # 0.1 mm absolute roughness
 
@@ -115,7 +115,7 @@ for u in [5.0, 20.0, 50.0, 100.0, 150.0, 200.0]:
     # regime-swap loop
     results = {}
     for module in MODULES:
-        sol = module.pipe_flow_rough(T, P, X, u=u, L=L, D=D, roughness=roughness)
+        sol = module.channel_flow_rough(T, P, X, u=u, L=L, D=D, roughness=roughness)
         results[sol.regime] = sol
 
     si = results["incompressible"]
@@ -130,7 +130,7 @@ print(
     "  At low velocities (u < 50 m/s, M < 0.15) the two models agree within ~1 %.\n"
     "  Above u = 100 m/s (M ~ 0.3) compressibility causes the models to diverge\n"
     "  noticeably -- the incompressible model underestimates pressure drop.\n"
-    "  At very high velocities the Fanno pipe chokes (M -> 1).\n"
+    "  At very high velocities the Fanno channel chokes (M -> 1).\n"
 )
 
 # ------------------------------------------------------------------------------
@@ -171,8 +171,8 @@ print(
 # ------------------------------------------------------------------------------
 separator("Example 4: FlowSolution field contract -- nan for inapplicable fields")
 
-sol_i = incomp.pipe_flow(T, P, X, u=10.0, L=1.0, D=D, f=f)
-sol_c = comp.pipe_flow(T, P, X, u=10.0, L=1.0, D=D, f=f)
+sol_i = incomp.channel_flow(T, P, X, u=10.0, L=1.0, D=D, f=f)
+sol_c = comp.channel_flow(T, P, X, u=10.0, L=1.0, D=D, f=f)
 
 print(f"\n  {'Field':<12} {'incompressible':>18}  {'compressible':>18}")
 print(f"  {'-' * 12} {'-' * 18}  {'-' * 18}")
@@ -206,27 +206,27 @@ for field in FIELDS:
     print(f"  {field:<12} {_fmt(vi):>18}  {_fmt(vc):>18}")
 
 print(
-    "\n  Fields that are not meaningful for a regime carry math.nan (floats) or\n"
-    "  False (bools).  Downstream code can always access every attribute without\n"
-    "  branching on the regime -- just check math.isnan(sol.M) if needed.\n"
+    "\n    Fields that are not meaningful for a regime carry math.nan (floats) or\n"
+    "    False (bools).  Downstream code can always access every attribute without\n"
+    "    branching on the regime -- just check math.isnan(sol.M) if needed.\n"
 )
 
 # ------------------------------------------------------------------------------
 # Example 5: Network solver -- validate against direct API
 # ------------------------------------------------------------------------------
-separator("Example 5: NetworkSolver pipe+orifice -- validate vs direct API")
+separator("Example 5: NetworkSolver channel+orifice -- validate vs direct API")
 
 # Same geometry as Examples 2/3.
 A_orif = 1e-4  # 1 cm² throat (same as Example 3)
 Cd_orif = 0.65
 P_low = 101_325.0  # atmospheric outlet
 Y = list(cb.mole_to_mass(X))
-area_pipe = 0.25 * math.pi * D**2
+area_channel = 0.25 * math.pi * D**2
 
 velocities = [5.0, 20.0, 50.0, 100.0, 150.0, 200.0]
 
 print(
-    f"\n  Network: MassFlowBoundary -> Pipe(L={L}m, D={D * 1e3:.0f}mm, ε={roughness * 1e3:.1f}mm)"
+    f"\n  Network: MassFlowBoundary -> Channel(L={L}m, D={D * 1e3:.0f}mm, ε={roughness * 1e3:.1f}mm)"
     f" -> Plenum -> Orifice(A={A_orif * 1e4:.0f}cm², Cd={Cd_orif})"
     f" -> PressureBoundary({P_low / 1e5:.1f}bar)"
 )
@@ -246,24 +246,24 @@ def _direct_incompressible(mdot: float) -> float:
 
     P_junc = _brentq(_residual, P_low + 1.0, 1e8)
 
-    # Pipe: inlet → junction
+    # Channel: inlet → junction
     rho_in_est = cb.density(T, P_junc + 1.0, X)
-    v_pipe = mdot / (rho_in_est * area_pipe)
-    dP_pipe, _, _ = cb.pressure_drop_pipe(
+    v_channel = mdot / (rho_in_est * area_channel)
+    dP_channel, _, _ = cb.channel_pressure_drop(
         T,
         P_junc,
         X,
-        v_pipe,
+        v_channel,
         D,
         L,
         roughness,
         "haaland",
     )
-    return P_junc + dP_pipe
+    return P_junc + dP_channel
 
 
 def _direct_compressible(mdot: float) -> float:
-    """Self-consistent P_in using compressible pipe + nozzle."""
+    """Self-consistent P_in using compressible channel + nozzle."""
 
     def _residual(P_junc: float) -> float:
         sol_n = comp.nozzle_flow(T, P_junc, X, P_back=P_low, A_eff=A_orif * Cd_orif)
@@ -272,8 +272,8 @@ def _direct_compressible(mdot: float) -> float:
     P_junc = _brentq(_residual, P_low + 1.0, 1e8)
 
     rho_in_est = cb.density(T, P_junc, X)
-    v_pipe = mdot / (rho_in_est * area_pipe)
-    sol_p = comp.pipe_flow_rough(T, P_junc, X, u=v_pipe, L=L, D=D, roughness=roughness)
+    v_channel = mdot / (rho_in_est * area_channel)
+    sol_p = comp.channel_flow_rough(T, P_junc, X, u=v_channel, L=L, D=D, roughness=roughness)
     return P_junc + sol_p.dP
 
 
@@ -286,7 +286,7 @@ plot_Pin_net_c: list[float] = []
 
 for u_in in velocities:
     rho_in = cb.density(T, P, X)
-    mdot = rho_in * area_pipe * u_in
+    mdot = rho_in * area_channel * u_in
     plot_u.append(u_in)
 
     for regime_label, pipe_regime, orif_regime, direct_fn in [
@@ -302,8 +302,8 @@ for u_in in velocities:
         net.add_node(PlenumNode("junction"))
         net.add_node(PressureBoundary("outlet", P_total=P_low, T_total=T, Y=Y))
         net.add_element(
-            PipeElement(
-                id="pipe",
+            ChannelElement(
+                id="channel",
                 from_node="inlet",
                 to_node="junction",
                 length=L,
@@ -318,7 +318,7 @@ for u_in in velocities:
                 from_node="junction",
                 to_node="outlet",
                 Cd=Cd_orif,
-                area=A_orif,
+                diameter=math.sqrt(4.0 * A_orif / math.pi),
                 regime=orif_regime,
             )
         )
@@ -344,9 +344,9 @@ for u_in in velocities:
 print(
     "\n  Interpretation\n"
     "  --------------\n"
-    "  The network solver (pipe + orifice coupled through a plenum) reproduces\n"
+    "  The network solver (channel + orifice coupled through a plenum) reproduces\n"
     "  the self-consistent brentq reference solution.  Differences arise from\n"
-    "  the orifice velocity-of-approach correction and the pipe evaluation\n"
+    "  the orifice velocity-of-approach correction and the channel evaluation\n"
     "  point (inlet vs junction conditions).\n"
 )
 

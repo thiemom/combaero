@@ -189,9 +189,9 @@ inline constexpr Entry function_units[] = {
     // -------------------------------------------------------------------------
     // compressible.h - Fanno Flow
     // -------------------------------------------------------------------------
-    {"fanno_pipe", "T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, f: -, X: mol/mol",
+    {"fanno_channel", "T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, f: -, X: mol/mol",
      "FannoSolution"},
-    {"fanno_pipe_rough",
+    {"fanno_channel_rough",
      "T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, roughness: m, X: mol/mol, "
      "correlation: str",
      "FannoSolution"},
@@ -878,18 +878,7 @@ inline constexpr Entry function_units[] = {
     {"channel_roughness", "-", "m"},
     {"pressure_drop_channel", "-", "Pa"},
     {"nusselt_channel", "-", "-"},
-    {"nusselt_pipe", "-", "-"},
     {"htc_channel", "-", "W/(m²·K)"},
-    {"htc_pipe", "-", "W/(m²·K)"},
-    {"pipe_dP", "-", "Pa"},
-    {"pipe_dP_mdot", "-", "Pa"},
-    {"pipe_velocity", "-", "m/s"},
-    {"pipe_mdot", "-", "kg/s"},
-    {"pressure_drop_pipe", "-", "Pa"},
-    {"pipe_area", "-", "m²"},
-    {"pipe_volume", "-", "m³"},
-    {"pipe_roughness", "-", "m"},
-    {"standard_pipe_roughness", "-", "m"},
     {"dynamic_pressure", "-", "Pa"},
     {"velocity_from_q", "-", "m/s"},
     {"OrificeGeometry::D", "-", "m"},
