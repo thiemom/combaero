@@ -1644,10 +1644,57 @@ class ChannelElement(NetworkElement):
         return [f"{self.id}.m_dot"]
 
     def residuals(self, state_in: MixtureState, state_out: MixtureState) -> list[float]:
+        import math
 
         import combaero as cb
 
         m_dot = state_in.m_dot
+
+        f_mult = self.surface.f_multiplier if self.surface else 1.0
+
+        if self.surface and not isinstance(self.surface.model, SmoothModel):
+            cs = cb.complete_state(state_in.T, state_in.P_total, state_in.X)
+            rho = state_in.density() if state_in.density() > 0 else 1.2
+            mu = cs.transport.mu if cs.transport.mu > 0 else 1.8e-5
+            v = abs(m_dot) / (rho * self.area) if self.area > 0.0 else 0.0
+            Re = rho * v * self.diameter / mu if mu > 0 else 1.0
+
+            # Base pure pipe friction calculation
+            if Re < 2300:
+                f_base = 64.0 / Re if Re > 0 else 0.0
+            else:
+                e_D = self.roughness / self.diameter if self.diameter > 0 else 0.0
+                if e_D > 1e-8:
+                    f_base = 1.0 / (-1.8 * math.log10((e_D / 3.7) ** 1.11 + 6.9 / Re)) ** 2
+                else:
+                    f_base = (0.79 * math.log(Re) - 1.64) ** -2
+
+            if f_base > 0 and self.length > 0:
+                if isinstance(self.surface.model, RibbedModel):
+                    f_mult *= cb._core.rib_friction_multiplier(
+                        self.surface.model.e_D, self.surface.model.pitch_to_height
+                    )
+                elif isinstance(self.surface.model, DimpledModel):
+                    f_mult *= cb._core.dimple_friction_multiplier(
+                        Re, self.surface.model.d_Dh, self.surface.model.h_d
+                    )
+                elif isinstance(self.surface.model, (PinFinModel, ImpingementModel)):
+                    # Explicit geometry drop from localized array physics
+                    h_res = self.surface.htc_and_T(
+                        state_in.T,
+                        state_in.P_total,
+                        state_in.X,
+                        v,
+                        self.diameter,
+                        self.length,
+                        self.surface.t_wall if self.surface.t_wall is not None else math.nan,
+                    )
+                    if h_res is not None:
+                        dP_target = h_res.dP
+                        dynamic_head = 0.5 * rho * v**2
+                        if dynamic_head > 0:
+                            f_total = dP_target / ((self.length / self.diameter) * dynamic_head)
+                            f_mult *= f_total / f_base
 
         if self.regime == "compressible":
             # Use compressible Fanno flow with friction
@@ -1661,7 +1708,7 @@ class ChannelElement(NetworkElement):
                 self.diameter,
                 self.roughness,
                 self.friction_model,
-                self.surface.f_multiplier if self.surface else 1.0,
+                f_mult,
             )
         else:
             # Use incompressible Darcy-Weisbach formulation
@@ -1676,7 +1723,7 @@ class ChannelElement(NetworkElement):
                 self.diameter,
                 self.roughness,
                 self.friction_model,
-                self.surface.f_multiplier if self.surface else 1.0,
+                f_mult,
             )
 
         # Residual of P-node unknowns matching channel drop
