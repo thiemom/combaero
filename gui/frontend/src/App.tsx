@@ -45,8 +45,8 @@ const App = () => {
 					errors.push(`${node.id}: Channel length must be > 0`);
 			}
 			if (node.type === "orifice") {
-				if ((node.data.area || 0) <= 0)
-					errors.push(`${node.id}: Orifice area must be > 0`);
+				if ((node.data.area || 0) <= 0 && (node.data.diameter || 0) <= 0)
+					errors.push(`${node.id}: Orifice area or diameter must be > 0`);
 			}
 		}
 		return errors;
