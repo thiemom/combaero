@@ -833,6 +833,35 @@ const Inspector = () => {
 
 	// Edge Inspector
 	if (selectedEdge && selectedEdge.data?.type === "thermal") {
+		let probeTemp: number | null = null;
+		if (
+			selectedEdge.data.probe_depth !== undefined &&
+			selectedEdge.data.result?.T_interface &&
+			selectedEdge.data.layers
+		) {
+			const targetX = selectedEdge.data.probe_depth;
+			const tInt = selectedEdge.data.result.T_interface as number[];
+			let currentX = 0;
+
+			if (targetX <= 0) {
+				probeTemp = tInt[0];
+			} else {
+				let found = false;
+				for (let i = 0; i < selectedEdge.data.layers.length; i++) {
+					const t = selectedEdge.data.layers[i].thickness;
+					const nextX = currentX + t;
+					if (targetX <= nextX) {
+						const frac = (targetX - currentX) / t;
+						probeTemp = tInt[i] + frac * (tInt[i + 1] - tInt[i]);
+						found = true;
+						break;
+					}
+					currentX = nextX;
+				}
+				if (!found) probeTemp = tInt[tInt.length - 1]; // Beyond cold side
+			}
+		}
+
 		return (
 			<aside className="w-80 border-l bg-white p-4 flex flex-col gap-4 overflow-y-auto">
 				<h2 className="text-lg font-bold border-b pb-2 uppercase text-orange-600">
@@ -871,6 +900,28 @@ const Inspector = () => {
 						}
 						onChange={(layers) => updateEdgeData(selectedEdge.id, { layers })}
 					/>
+				</div>
+
+				<div className="flex flex-col gap-2 pt-4 border-t border-stone-100">
+					<label className="text-xs font-bold text-gray-500 uppercase flex justify-between items-end">
+						<span>
+							Probe Depth{" "}
+							<span className="normal-case tracking-normal">x (m)</span>
+						</span>
+						<span className="text-[9px] text-gray-400 font-normal italic">
+							0 = Hot, L = Cold
+						</span>
+					</label>
+					<div className="flex gap-2 items-center">
+						<NumericInput
+							value={selectedEdge.data.probe_depth ?? undefined}
+							onChange={(val) =>
+								updateEdgeData(selectedEdge.id, { probe_depth: val })
+							}
+							placeholder="Optional depth..."
+							className="p-1.5 border rounded text-sm bg-stone-50 focus:bg-white flex-1"
+						/>
+					</div>
 				</div>
 
 				{selectedEdge.data.result && (
@@ -913,6 +964,17 @@ const Inspector = () => {
 									</span>
 								</div>
 							</div>
+
+							{probeTemp !== null && (
+								<div className="flex justify-between items-center pt-2 mt-2 border-t border-stone-200 bg-orange-50/50 p-2 rounded border">
+									<span className="text-[10px] text-orange-600 font-bold uppercase tracking-wider">
+										Probe Temp @ {selectedEdge.data.probe_depth}m
+									</span>
+									<span className="font-mono text-sm font-black text-orange-600">
+										{probeTemp.toFixed(1)} K
+									</span>
+								</div>
+							)}
 
 							{selectedEdge.data.result.T_interface && (
 								<div className="mt-2 pt-2 border-t border-stone-100 flex flex-col gap-1">
