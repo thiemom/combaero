@@ -1351,9 +1351,15 @@ class OrificeElement(NetworkElement):
         # Effective Cd actually used in this solve
         effective_cd = self._effective_Cd(state_in, state_out)
 
+        # Calculate macro physical velocity strictly based on the geometric area
+        # This prevents physical velocity and Mach from artificially zeroing out when tuning Cd ~ infinity
+        v_physical = abs(state_in.m_dot) / (cs.thermo.rho * self.area) if self.area > 0 and cs.thermo.rho > 0 else 0.0
+        mach_physical = v_physical / cs.thermo.a if cs.thermo.a > 0 else 0.0
+
         return {
-            "v": mach_throat * cs.thermo.a,
-            "mach": mach_throat,
+            "v": v_physical,
+            "mach": mach_physical,
+            "mach_throat": mach_throat,
             "p_ratio": p_ratio,
             "Cd": effective_cd,
             "is_correlation": float(self.use_correlation),
