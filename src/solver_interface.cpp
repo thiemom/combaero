@@ -1353,7 +1353,8 @@ ChannelResult channel_residuals_and_jacobian(double m_dot, double P_total_up,
                                        const std::vector<double> &Y_up,
                                        double P_static_down, double L, double D,
                                        double roughness,
-                                       const std::string &friction_model) {
+                                       const std::string &friction_model,
+                                       double f_multiplier) {
   (void)P_total_up;
   (void)P_static_down;
   const std::vector<double> X_up = combaero::mass_to_mole(combaero::normalize_fractions(Y_up));
@@ -1366,6 +1367,8 @@ ChannelResult channel_residuals_and_jacobian(double m_dot, double P_total_up,
   double Re = rho * abs_v * D / mu;
 
   auto [f, df_dRe] = friction_and_jacobian(friction_model, Re, roughness / D).result;
+  f *= f_multiplier;
+  df_dRe *= f_multiplier;
 
   double dP_calc = f * (L / D) * (0.5 * rho * v * abs_v);
 
@@ -1386,6 +1389,8 @@ ChannelResult channel_residuals_and_jacobian(double m_dot, double P_total_up,
   double Re_m = rho_m * std::abs(v_m) * D / mu_m;
   auto [f_p, df_dRe_p] = friction_and_jacobian(friction_model, Re_p, roughness / D).result;
   auto [f_m, df_dRe_m] = friction_and_jacobian(friction_model, Re_m, roughness / D).result;
+  f_p *= f_multiplier;
+  f_m *= f_multiplier;
   double dP_p = f_p * (L / D) * (0.5 * rho_p * v_p * std::abs(v_p));
   double dP_m = f_m * (L / D) * (0.5 * rho_m * v_m * std::abs(v_m));
   res.d_dP_dP_static_up = (dP_p - dP_m) / (2.0 * eps_P);
@@ -1401,6 +1406,8 @@ ChannelResult channel_residuals_and_jacobian(double m_dot, double P_total_up,
   double Re_T_m = rho_T_m * std::abs(v_T_m) * D / mu_T_m;
   auto [f_T_p, df_dRe_T_p] = friction_and_jacobian(friction_model, Re_T_p, roughness / D).result;
   auto [f_T_m, df_dRe_T_m] = friction_and_jacobian(friction_model, Re_T_m, roughness / D).result;
+  f_T_p *= f_multiplier;
+  f_T_m *= f_multiplier;
   double dP_T_p = f_T_p * (L / D) * (0.5 * rho_T_p * v_T_p * std::abs(v_T_p));
   double dP_T_m = f_T_m * (L / D) * (0.5 * rho_T_m * v_T_m * std::abs(v_T_m));
   res.d_dP_dT_up = (dP_T_p - dP_T_m) / (2.0 * eps_T);
@@ -1416,6 +1423,7 @@ ChannelResult channel_residuals_and_jacobian(double m_dot, double P_total_up,
     double v_plus = m_dot / (rho_plus * area);
     double Re_plus = rho_plus * std::abs(v_plus) * D / mu_plus;
     auto [f_plus, dummy] = friction_and_jacobian(friction_model, Re_plus, roughness / D).result;
+    f_plus *= f_multiplier;
     double dP_plus = f_plus * (L / D) * (0.5 * rho_plus * v_plus * std::abs(v_plus));
     res.d_dP_dY_up[i] = (dP_plus - dP_calc) / eps_Y;
   }
@@ -1612,14 +1620,15 @@ std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobia
     double T_in, double P_in, double u_in,
     const std::vector<double>& X,
     double L, double D, double roughness,
-    const std::string& friction_model) {
+    const std::string& friction_model,
+    double f_multiplier) {
 
   // Handle reverse flow by swapping direction
   bool reverse_flow = (u_in < 0.0);
   double u_fwd = std::abs(u_in);
 
   // Call fanno_channel_rough for forward direction
-  auto sol = combaero::fanno_channel_rough(T_in, P_in, u_fwd, L, D, roughness, X, friction_model);
+  auto sol = combaero::fanno_channel_rough(T_in, P_in, u_fwd, L, D, roughness, X, friction_model, f_multiplier);
   double dP = P_in - sol.outlet.P;
 
   // For reverse flow, negate dP to maintain sign convention
@@ -1633,8 +1642,8 @@ std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobia
   const double eps_u = std::max(1e-6, std::abs(u_in) * 1e-6);
 
   // Jacobian w.r.t. P_in
-  auto sol_P_plus = combaero::fanno_channel_rough(T_in, P_in + eps_P, u_fwd, L, D, roughness, X, friction_model);
-  auto sol_P_minus = combaero::fanno_channel_rough(T_in, P_in - eps_P, u_fwd, L, D, roughness, X, friction_model);
+  auto sol_P_plus = combaero::fanno_channel_rough(T_in, P_in + eps_P, u_fwd, L, D, roughness, X, friction_model, f_multiplier);
+  auto sol_P_minus = combaero::fanno_channel_rough(T_in, P_in - eps_P, u_fwd, L, D, roughness, X, friction_model, f_multiplier);
   double dP_P_plus = (P_in + eps_P) - sol_P_plus.outlet.P;
   double dP_P_minus = (P_in - eps_P) - sol_P_minus.outlet.P;
   if (reverse_flow) dP_P_plus = -dP_P_plus;
@@ -1642,8 +1651,8 @@ std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobia
   double d_dP_dP_in = (dP_P_plus - dP_P_minus) / (2.0 * eps_P);
 
   // Jacobian w.r.t. T_in
-  auto sol_T_plus = combaero::fanno_channel_rough(T_in + eps_T, P_in, u_fwd, L, D, roughness, X, friction_model);
-  auto sol_T_minus = combaero::fanno_channel_rough(T_in - eps_T, P_in, u_fwd, L, D, roughness, X, friction_model);
+  auto sol_T_plus = combaero::fanno_channel_rough(T_in + eps_T, P_in, u_fwd, L, D, roughness, X, friction_model, f_multiplier);
+  auto sol_T_minus = combaero::fanno_channel_rough(T_in - eps_T, P_in, u_fwd, L, D, roughness, X, friction_model, f_multiplier);
   double dP_T_plus = P_in - sol_T_plus.outlet.P;
   double dP_T_minus = P_in - sol_T_minus.outlet.P;
   if (reverse_flow) dP_T_plus = -dP_T_plus;
@@ -1651,8 +1660,8 @@ std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobia
   double d_dP_dT_in = (dP_T_plus - dP_T_minus) / (2.0 * eps_T);
 
   // Jacobian w.r.t. u_in (note: u_in is signed, but we use u_fwd for Fanno)
-  auto sol_u_plus = combaero::fanno_channel_rough(T_in, P_in, u_fwd + eps_u, L, D, roughness, X, friction_model);
-  auto sol_u_minus = combaero::fanno_channel_rough(T_in, P_in, std::max(1e-9, u_fwd - eps_u), L, D, roughness, X, friction_model);
+  auto sol_u_plus = combaero::fanno_channel_rough(T_in, P_in, u_fwd + eps_u, L, D, roughness, X, friction_model, f_multiplier);
+  auto sol_u_minus = combaero::fanno_channel_rough(T_in, P_in, std::max(1e-9, u_fwd - eps_u), L, D, roughness, X, friction_model, f_multiplier);
   double dP_u_plus = P_in - sol_u_plus.outlet.P;
   double dP_u_minus = P_in - sol_u_minus.outlet.P;
   if (reverse_flow) dP_u_plus = -dP_u_plus;
@@ -1673,7 +1682,8 @@ ChannelResult channel_compressible_residuals_and_jacobian(
     double m_dot, double P_total_up, double T_up,
     const std::vector<double>& Y_up,
     double P_static_down, double L, double D, double roughness,
-    const std::string& friction_model) {
+    const std::string& friction_model,
+    double f_multiplier) {
 
   (void)P_static_down;  // Computed from Fanno flow, not an input
 
@@ -1689,7 +1699,7 @@ ChannelResult channel_compressible_residuals_and_jacobian(
 
   // Get pressure drop and partial Jacobians w.r.t. (P_in, T_in, u_in)
   auto [dP_calc, d_dP_dP_in, d_dP_dT_in, d_dP_du_in] =
-      channel_compressible_mdot_and_jacobian(T_up, P_total_up, u_in, X_up, L, D, roughness, friction_model);
+      channel_compressible_mdot_and_jacobian(T_up, P_total_up, u_in, X_up, L, D, roughness, friction_model, f_multiplier);
 
   ChannelResult res;
   res.dP_calc = dP_calc;
@@ -1721,7 +1731,7 @@ ChannelResult channel_compressible_residuals_and_jacobian(
     auto [rho_plus, dummy1, dummy2] = density_and_jacobians(T_up, P_total_up, X_plus);
     double u_plus = m_dot / (rho_plus * area);
     auto [dP_plus, dummy3, dummy4, dummy5] =
-        channel_compressible_mdot_and_jacobian(T_up, P_total_up, u_plus, X_plus, L, D, roughness, friction_model);
+        channel_compressible_mdot_and_jacobian(T_up, P_total_up, u_plus, X_plus, L, D, roughness, friction_model, f_multiplier);
     res.d_dP_dY_up[i] = (dP_plus - dP_calc) / eps_Y;
   }
 

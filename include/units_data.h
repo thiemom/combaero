@@ -193,7 +193,7 @@ inline constexpr Entry function_units[] = {
      "FannoSolution"},
     {"fanno_channel_rough",
      "T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, roughness: m, X: mol/mol, "
-     "correlation: str",
+     "correlation: str, f_multiplier: - (default 1.0)",
      "FannoSolution"},
     {"fanno_max_length", "T_in: K, P_in: Pa, u_in: m/s, D: m, f: -, X: mol/mol",
      "m"},
@@ -246,11 +246,11 @@ inline constexpr Entry function_units[] = {
      "OrificeResult"},
     {"channel_compressible_mdot_and_jacobian",
      "T_in: K, P_in: Pa, u_in: m/s, X: mol/mol, L: m, D: m, roughness: m, "
-     "friction_model: str",
+     "friction_model: str, f_multiplier: - (default 1.0)",
      "tuple(Pa, -, Pa/K, Pa/(m/s))"},
     {"channel_compressible_residuals_and_jacobian",
      "m_dot: kg/s, P_total_up: Pa, T_up: K, Y_up: kg/kg, P_static_down: Pa, "
-     "L: m, D: m, roughness: m, friction_model: str",
+     "L: m, D: m, roughness: m, friction_model: str, f_multiplier: - (default 1.0)",
      "ChannelResult"},
 
     // -------------------------------------------------------------------------

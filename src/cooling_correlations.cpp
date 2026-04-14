@@ -191,6 +191,11 @@ double impingement_nusselt(double Re_jet, double Pr, double z_D,
                           double x_D, double y_D) {
     validate_impingement_params(Re_jet, z_D, x_D, y_D);
 
+    // Smooth pseudo-Huber absolute value to prevent infinite Jacobian
+    // gradients at Re_jet ~ 0: sqrt(Re^2 + e^2). e=10.0 provides a soft
+    // differentiable landing and handles negative/reverse flow gracefully.
+    double Re_safe = std::sqrt(Re_jet * Re_jet + 100.0);
+
     // Florschuetz et al. (1981) correlation
     // For jet array with crossflow
 
@@ -198,7 +203,7 @@ double impingement_nusselt(double Re_jet, double Pr, double z_D,
 
     if (!is_array) {
         // Single jet correlation (Martin 1977)
-        double Nu = 0.42 * std::pow(std::abs(Re_jet), 0.55) * std::pow(Pr, 0.4) *
+        double Nu = 0.42 * std::pow(Re_safe, 0.55) * std::pow(Pr, 0.4) *
                     std::pow(z_D, -0.05);
         return Nu;
     } else {
@@ -212,7 +217,7 @@ double impingement_nusselt(double Re_jet, double Pr, double z_D,
         double f_crossflow = 1.0 / (1.0 + 0.6 * std::pow(G / z_D, 0.7));
 
         // Base Nusselt number (lower than single jet)
-        double Nu_base = 0.38 * std::pow(std::abs(Re_jet), 0.55) * std::pow(Pr, 0.4);
+        double Nu_base = 0.38 * std::pow(Re_safe, 0.55) * std::pow(Pr, 0.4);
 
         // Height correction
         double f_height = std::pow(z_D / 6.0, -0.05);

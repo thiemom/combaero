@@ -302,6 +302,7 @@ FannoSolution fanno_channel_rough(
     double L, double D, double roughness,
     const std::vector<double>& X,
     const std::string& correlation = "haaland",
+    double f_multiplier = 1.0,
     std::size_t n_steps = 100,
     bool store_profile = false);
 
@@ -311,6 +312,7 @@ FannoSolution fanno_channel_rough(
     const State& inlet, double u_in,
     double L, double D, double roughness,
     const std::string& correlation = "haaland",
+    double f_multiplier = 1.0,
     std::size_t n_steps = 100,
     bool store_profile = false);
 

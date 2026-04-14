@@ -142,7 +142,8 @@ ChannelResult channel_residuals_and_jacobian(double m_dot, double P_total_up,
                                              const std::vector<double> &Y_up,
                                              double P_static_down, double L,
                                              double D, double roughness,
-                                             const std::string &friction_model);
+                                             const std::string &friction_model,
+                                             double f_multiplier = 1.0);
 
 
 
@@ -217,7 +218,8 @@ std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobia
     double T_in, double P_in, double u_in,
     const std::vector<double>& X,
     double L, double D, double roughness,
-    const std::string& friction_model);
+    const std::string& friction_model,
+    double f_multiplier = 1.0);
 
 
 // Full compressible channel evaluation with all derivatives for network solver.
@@ -225,7 +227,8 @@ ChannelResult channel_compressible_residuals_and_jacobian(
     double m_dot, double P_total_up, double T_up,
     const std::vector<double>& Y_up,
     double P_static_down, double L, double D, double roughness,
-    const std::string& friction_model);
+    const std::string& friction_model,
+    double f_multiplier = 1.0);
 
 
 // -----------------------------------------------------------------------------

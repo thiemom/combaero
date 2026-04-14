@@ -235,7 +235,8 @@ PYBIND11_MODULE(_core, m) {
         &solver::channel_residuals_and_jacobian, py::arg("m_dot"),
         py::arg("P_total_up"), py::arg("P_static_up"), py::arg("T_up"),
         py::arg("Y_up"), py::arg("P_static_down"), py::arg("L"), py::arg("D"),
-        py::arg("roughness"), py::arg("friction_model"));
+        py::arg("roughness"), py::arg("friction_model"),
+        py::arg("f_multiplier") = 1.0);
 
   // Compressible flow elements
   m.def("orifice_compressible_mdot_and_jacobian",
@@ -257,6 +258,7 @@ PYBIND11_MODULE(_core, m) {
       &solver::channel_compressible_mdot_and_jacobian, py::arg("T_in"),
       py::arg("P_in"), py::arg("u_in"), py::arg("X"), py::arg("L"),
       py::arg("D"), py::arg("roughness"), py::arg("friction_model"),
+      py::arg("f_multiplier") = 1.0,
       "Compressible channel flow using Fanno model with variable friction.\n\n"
       "Returns: (dP, d_dP_dP_in, d_dP_dT_in, d_dP_du_in)");
 
@@ -265,6 +267,7 @@ PYBIND11_MODULE(_core, m) {
         py::arg("P_total_up"), py::arg("T_up"), py::arg("Y_up"),
         py::arg("P_static_down"), py::arg("L"), py::arg("D"),
         py::arg("roughness"), py::arg("friction_model"),
+        py::arg("f_multiplier") = 1.0,
         "Compressible channel for network solver with all derivatives.");
 
   m.def("momentum_chamber_residual_and_jacobian",
@@ -4947,16 +4950,16 @@ PYBIND11_MODULE(_core, m) {
       [](double T_in, double P_in, double u_in, double L, double D,
          double roughness,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-         const std::string &correlation, std::size_t n_steps,
-         bool store_profile) {
+         const std::string &correlation, double f_multiplier,
+         std::size_t n_steps, bool store_profile) {
         return fanno_channel_rough(T_in, P_in, u_in, L, D, roughness,
-                                   to_vec(X_arr), correlation, n_steps,
-                                   store_profile);
+                                   to_vec(X_arr), correlation, f_multiplier,
+                                   n_steps, store_profile);
       },
       py::arg("T_in"), py::arg("P_in"), py::arg("u_in"), py::arg("L"),
       py::arg("D"), py::arg("roughness"), py::arg("X"),
-      py::arg("correlation") = "haaland", py::arg("n_steps") = 100,
-      py::arg("store_profile") = false,
+      py::arg("correlation") = "haaland", py::arg("f_multiplier") = 1.0,
+      py::arg("n_steps") = 100, py::arg("store_profile") = false,
       "Fanno flow with roughness-based variable friction factor f(x).\n"
       "Recomputes f at each RK4 stage from local Re and roughness.\n"
       "Returns FannoSolution with f_avg and Re_in populated.");

@@ -163,7 +163,7 @@ class ConvectiveSurface:
 
         import combaero as cb
 
-        if self.area == 0.0 or velocity < 1e-12:
+        if self.area == 0.0 or abs(velocity) < 1e-12:
             return None
 
         # Auto-detect heating direction from T_wall - T sign
@@ -1353,7 +1353,11 @@ class OrificeElement(NetworkElement):
 
         # Calculate macro physical velocity strictly based on the geometric area
         # This prevents physical velocity and Mach from artificially zeroing out when tuning Cd ~ infinity
-        v_physical = abs(state_in.m_dot) / (cs.thermo.rho * self.area) if self.area > 0 and cs.thermo.rho > 0 else 0.0
+        v_physical = (
+            abs(state_in.m_dot) / (cs.thermo.rho * self.area)
+            if self.area > 0 and cs.thermo.rho > 0
+            else 0.0
+        )
         mach_physical = v_physical / cs.thermo.a if cs.thermo.a > 0 else 0.0
 
         return {
@@ -1657,6 +1661,7 @@ class ChannelElement(NetworkElement):
                 self.diameter,
                 self.roughness,
                 self.friction_model,
+                self.surface.f_multiplier if self.surface else 1.0,
             )
         else:
             # Use incompressible Darcy-Weisbach formulation
@@ -1671,6 +1676,7 @@ class ChannelElement(NetworkElement):
                 self.diameter,
                 self.roughness,
                 self.friction_model,
+                self.surface.f_multiplier if self.surface else 1.0,
             )
 
         # Residual of P-node unknowns matching channel drop

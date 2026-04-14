@@ -635,18 +635,20 @@ FannoSolution fanno_channel(
 // Helper: compute local friction factor from local state
 static double local_friction(double T, double P, double u, double D,
                              double roughness, const std::vector<double>& X,
-                             const std::string& correlation)
+                             const std::string& correlation, double f_multiplier)
 {
     State s;
     s.T = T; s.P = P; s.X = X;
     const double Re_local = s.rho() * u * D / s.mu();
     const double e_D = (D > 0.0) ? roughness / D : 0.0;
-    if (correlation == "haaland")   return friction_haaland(Re_local, e_D);
-    if (correlation == "serghides") return friction_serghides(Re_local, e_D);
-    if (correlation == "colebrook") return friction_colebrook(Re_local, e_D);
-    throw std::invalid_argument(
+    double f = 0.0;
+    if (correlation == "haaland")   f = friction_haaland(Re_local, e_D);
+    else if (correlation == "serghides") f = friction_serghides(Re_local, e_D);
+    else if (correlation == "colebrook") f = friction_colebrook(Re_local, e_D);
+    else throw std::invalid_argument(
         "fanno_channel_rough: unknown correlation '" + correlation + "'. "
         "Valid options: 'haaland', 'serghides', 'colebrook'");
+    return f * f_multiplier;
 }
 
 FannoSolution fanno_channel_rough(
@@ -654,6 +656,7 @@ FannoSolution fanno_channel_rough(
     double L, double D, double roughness,
     const std::vector<double>& X,
     const std::string& correlation,
+    double f_multiplier,
     std::size_t n_steps,
     bool store_profile)
 {
@@ -705,7 +708,7 @@ FannoSolution fanno_channel_rough(
     sol.Re_in = reynolds(T_in, P_in, X, u_in, D);
 
     // Compute inlet friction factor
-    const double f_in = local_friction(T_in, P_in, u_in, D, roughness, X, correlation);
+    const double f_in = local_friction(T_in, P_in, u_in, D, roughness, X, correlation, f_multiplier);
 
     if (store_profile) {
         FannoStation st;
@@ -732,7 +735,7 @@ FannoSolution fanno_channel_rough(
 
     for (std::size_t step = 0; step < n_steps; ++step) {
         // k1: local f at current state
-        const double f1 = local_friction(T, P, u, D, roughness, X, correlation);
+        const double f1 = local_friction(T, P, u, D, roughness, X, correlation, f_multiplier);
         const double k1 = dpdx_fanno(rho, u, f1, D);
 
         // k2
@@ -740,7 +743,7 @@ FannoSolution fanno_channel_rough(
         if (P2 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
         double T2, u2, rho2;
         T2 = solve_T_from_energy(P2, sol.h0, sol.mdot, A, X, mw_kg, T, u2, rho2);
-        const double f2 = local_friction(T2, P2, u2, D, roughness, X, correlation);
+        const double f2 = local_friction(T2, P2, u2, D, roughness, X, correlation, f_multiplier);
         const double k2 = dpdx_fanno(rho2, u2, f2, D);
 
         // k3
@@ -748,7 +751,7 @@ FannoSolution fanno_channel_rough(
         if (P3 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
         double T3, u3, rho3;
         T3 = solve_T_from_energy(P3, sol.h0, sol.mdot, A, X, mw_kg, T, u3, rho3);
-        const double f3 = local_friction(T3, P3, u3, D, roughness, X, correlation);
+        const double f3 = local_friction(T3, P3, u3, D, roughness, X, correlation, f_multiplier);
         const double k3 = dpdx_fanno(rho3, u3, f3, D);
 
         // k4
@@ -756,7 +759,7 @@ FannoSolution fanno_channel_rough(
         if (P4 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
         double T4, u4, rho4;
         T4 = solve_T_from_energy(P4, sol.h0, sol.mdot, A, X, mw_kg, T, u4, rho4);
-        const double f4 = local_friction(T4, P4, u4, D, roughness, X, correlation);
+        const double f4 = local_friction(T4, P4, u4, D, roughness, X, correlation, f_multiplier);
         const double k4 = dpdx_fanno(rho4, u4, f4, D);
 
         const double P_new = P + dx * (k1 + 2.0*k2 + 2.0*k3 + k4) / 6.0;
@@ -787,7 +790,7 @@ FannoSolution fanno_channel_rough(
             st.M   = M;
             st.h   = h(T, X) / mw_g * 1000.0;
             st.s   = current.s();
-            st.f   = local_friction(T, P, u, D, roughness, X, correlation);
+            st.f   = local_friction(T, P, u, D, roughness, X, correlation, f_multiplier);
             st.Re  = rho * u * D / current.mu();
             sol.profile.push_back(st);
         }
@@ -807,11 +810,12 @@ FannoSolution fanno_channel_rough(
     const State& inlet, double u_in,
     double L, double D, double roughness,
     const std::string& correlation,
+    double f_multiplier,
     std::size_t n_steps,
     bool store_profile)
 {
     return fanno_channel_rough(inlet.T, inlet.P, u_in, L, D, roughness,
-                               inlet.X, correlation, n_steps, store_profile);
+                               inlet.X, correlation, f_multiplier, n_steps, store_profile);
 }
 
 double fanno_max_length(

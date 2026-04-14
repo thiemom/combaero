@@ -1296,10 +1296,8 @@ ChannelResult channel_impingement(double T, double P,
                                   double y_D, double A_target, double T_wall,
                                   double Cd_jet,
                                   double Nu_multiplier, double f_multiplier) {
-  if (mdot_jet < 0.0) {
-    throw std::invalid_argument(
-        "channel_impingement: mdot_jet must be non-negative");
-  }
+  // mdot_jet can be negative during network solver reversed flow testing.
+  // The Re_safe guard handles this securely inside the correlations.
   if (d_jet <= 0.0) {
     throw std::invalid_argument("channel_impingement: d_jet must be positive");
   }
