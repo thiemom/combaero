@@ -902,26 +902,32 @@ const Inspector = () => {
 					/>
 				</div>
 
-				<div className="flex flex-col gap-2 pt-4 border-t border-stone-100">
-					<label className="text-xs font-bold text-gray-500 uppercase flex justify-between items-end">
-						<span>
-							Probe Depth{" "}
-							<span className="normal-case tracking-normal">x (m)</span>
-						</span>
-						<span className="text-[9px] text-gray-400 font-normal italic">
-							0 = Hot, L = Cold
-						</span>
-					</label>
-					<div className="flex gap-2 items-center">
-						<NumericInput
-							value={selectedEdge.data.probe_depth ?? undefined}
-							onChange={(val) =>
-								updateEdgeData(selectedEdge.id, { probe_depth: val })
-							}
-							placeholder="Optional depth..."
-							className="p-1.5 border rounded text-sm bg-stone-50 focus:bg-white flex-1"
-						/>
-					</div>
+				<div className="flex flex-col gap-1 pt-4 border-t border-stone-100">
+					<LengthInput
+						id={`probe_depth_${selectedEdge.id}`}
+						label="Probe Depth x"
+						value={
+							selectedEdge.data.probe_depth !== undefined
+								? selectedEdge.data.probe_depth
+								: 0
+						}
+						onChange={(val) => {
+							const totalThickness = selectedEdge.data.layers
+								? selectedEdge.data.layers.reduce(
+										(acc: number, l: any) => acc + (l.thickness || 0),
+										0,
+									)
+								: 0.003;
+							let clamped = Math.max(0, val);
+							if (totalThickness > 0)
+								clamped = Math.min(clamped, totalThickness);
+							updateEdgeData(selectedEdge.id, { probe_depth: clamped });
+						}}
+						placeholder="0.00"
+					/>
+					<span className="text-[9px] text-gray-400 font-normal italic text-right -mt-1">
+						0 = Hot, L = Cold
+					</span>
 				</div>
 
 				{selectedEdge.data.result && (
