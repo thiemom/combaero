@@ -2,7 +2,7 @@ import type React from "react";
 import useStore from "../store/useStore";
 import NumericInput from "./NumericInput";
 
-interface LengthInputProps {
+interface AreaInputProps {
 	label: string;
 	value: number;
 	onChange: (val: number) => void;
@@ -10,18 +10,19 @@ interface LengthInputProps {
 	placeholder?: string;
 }
 
-const LengthInput: React.FC<LengthInputProps> = ({
+const AreaInput: React.FC<AreaInputProps> = ({
 	label,
 	value,
 	onChange,
 	id,
 	placeholder = "0.00",
 }) => {
-	const { unitPreferences, setLengthUnit } = useStore();
-	const unit = unitPreferences.length;
+	const { unitPreferences, setAreaUnit } = useStore();
+	const unit = unitPreferences.area;
 
-	// Scale factor to convert internal (m) to display (m or mm)
-	const displayScale = unit === "mm" ? 1000 : 1;
+	// Scale factor to convert internal (m2) to display (m2 or mm2)
+	// 1 m2 = 1,000,000 mm2
+	const displayScale = unit === "mm²" ? 1000000 : 1;
 
 	return (
 		<div className="flex flex-col gap-1">
@@ -38,15 +39,15 @@ const LengthInput: React.FC<LengthInputProps> = ({
 				/>
 				<select
 					value={unit}
-					onChange={(e) => setLengthUnit(e.target.value as "m" | "mm")}
+					onChange={(e) => setAreaUnit(e.target.value as "m²" | "mm²")}
 					className="w-10 h-[30px] border rounded text-[9px] bg-white outline-none shrink-0"
 				>
-					<option value="m">m</option>
-					<option value="mm">mm</option>
+					<option value="m²">m²</option>
+					<option value="mm²">mm²</option>
 				</select>
 			</div>
 		</div>
 	);
 };
 
-export default LengthInput;
+export default AreaInput;

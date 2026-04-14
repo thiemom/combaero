@@ -1,5 +1,11 @@
 import { Activity, Crosshair, RotateCw } from "lucide-react";
 import useStore from "../store/useStore";
+import {
+	BASIC_STATE_KEYS,
+	QUANTITY_CATALOGUE,
+	TRANSPORT_KEYS,
+} from "../utils/quantities";
+import AreaInput from "./AreaInput";
 import CompositionEditor from "./CompositionEditor";
 import LengthInput from "./LengthInput";
 import NumericInput from "./NumericInput";
@@ -7,14 +13,8 @@ import UnitInput from "./UnitInput";
 import WallLayersEditor from "./WallLayersEditor";
 
 const Inspector = () => {
-	const {
-		nodes,
-		edges,
-		updateNodeData,
-		updateEdgeData,
-		unitPreferences,
-		speciesMetadata,
-	} = useStore();
+	const { nodes, edges, updateNodeData, updateEdgeData, speciesMetadata } =
+		useStore();
 
 	const handleExport = async () => {
 		try {
@@ -537,26 +537,18 @@ const Inspector = () => {
 							</select>
 						</div>
 
-						<div className="grid grid-cols-2 gap-3">
-							<div className="flex flex-col gap-2">
-								<label
-									htmlFor={`area_comb_${selectedNode.id}`}
-									className="text-xs font-bold text-gray-500 uppercase"
-								>
-									Area (m²)
-								</label>
-								<NumericInput
-									id={`area_comb_${selectedNode.id}`}
-									value={selectedNode.data.area || 0.1}
-									onChange={(val) =>
-										updateNodeData(selectedNode.id, {
-											area: val,
-										})
-									}
-									className="p-2 border rounded"
-								/>
-							</div>
-							<div className="flex flex-col gap-2">
+						<div className="grid grid-cols-2 gap-2 pb-2">
+							<AreaInput
+								id={`area_comb_${selectedNode.id}`}
+								label="Area"
+								value={selectedNode.data.area || 0.1}
+								onChange={(val) =>
+									updateNodeData(selectedNode.id, {
+										area: val,
+									})
+								}
+							/>
+							<div className="flex flex-col gap-1">
 								<LengthInput
 									id={`Dh_comb_${selectedNode.id}`}
 									label="Dh"
@@ -570,7 +562,7 @@ const Inspector = () => {
 								/>
 							</div>
 						</div>
-						<p className="text-[9px] text-gray-400 italic -mt-2">
+						<p className="text-[9px] text-gray-400 italic -mt-2 mb-2">
 							Dh defaults to sqrt(4*Area/π) if omitted.
 						</p>
 
@@ -580,26 +572,18 @@ const Inspector = () => {
 
 				{selectedNode.type === "momentum_chamber" && (
 					<div className="flex flex-col gap-4">
-						<div className="grid grid-cols-2 gap-3">
-							<div className="flex flex-col gap-2">
-								<label
-									htmlFor={`area_mom_${selectedNode.id}`}
-									className="text-xs font-bold text-gray-500 uppercase"
-								>
-									Area (m²)
-								</label>
-								<NumericInput
-									id={`area_mom_${selectedNode.id}`}
-									value={selectedNode.data.area || 0.1}
-									onChange={(val) =>
-										updateNodeData(selectedNode.id, {
-											area: val,
-										})
-									}
-									className="p-2 border rounded"
-								/>
-							</div>
-							<div className="flex flex-col gap-2">
+						<div className="grid grid-cols-2 gap-2 pb-2">
+							<AreaInput
+								id={`area_mom_${selectedNode.id}`}
+								label="Area"
+								value={selectedNode.data.area || 0.1}
+								onChange={(val) =>
+									updateNodeData(selectedNode.id, {
+										area: val,
+									})
+								}
+							/>
+							<div className="flex flex-col gap-1">
 								<LengthInput
 									id={`Dh_mom_${selectedNode.id}`}
 									label="Dh"
@@ -613,7 +597,7 @@ const Inspector = () => {
 								/>
 							</div>
 						</div>
-						<p className="text-[9px] text-gray-400 italic -mt-2">
+						<p className="text-[9px] text-gray-400 italic -mt-2 mb-2">
 							Dh defaults to sqrt(4*Area/π) if omitted.
 						</p>
 						<div className="flex flex-col gap-2">
@@ -647,182 +631,62 @@ const Inspector = () => {
 
 						{selectedNode.data.result.state ? (
 							<div className="flex flex-col gap-3">
-								{(selectedNode.data.result.state?.phi !== undefined ||
-									selectedNode.data.result.phi !== undefined) && (
-									<div className="mb-1 pb-3 border-b border-stone-200">
-										<p className="text-[10px] uppercase font-bold text-stone-400 mb-2 mt-[-2px]">
-											Combustion
-										</p>
-										<div className="grid grid-cols-2 gap-y-2 text-xs">
-											<div className="flex flex-col">
-												<span className="text-stone-400 text-[10px] uppercase font-bold text-nowrap">
-													Equivalence Ratio
+								{/* 1. Basic State Section (Always visible) */}
+								<div className="grid grid-cols-2 gap-x-2 gap-y-3">
+									{BASIC_STATE_KEYS.map((key) => {
+										const val = selectedNode.data.result.state[key];
+										if (val === undefined || val === null) return null;
+										const meta = QUANTITY_CATALOGUE[key];
+										return (
+											<div key={key} className="flex flex-col">
+												<span className="text-stone-400 text-[9px] uppercase font-bold">
+													{meta?.label || key}
 												</span>
-												<span
-													className={`font-mono font-bold ${
-														(
-															selectedNode.data.result.state?.phi ||
-																selectedNode.data.result.phi
-														) > 1.05
-															? "text-orange-600"
-															: (selectedNode.data.result.state?.phi ||
-																		selectedNode.data.result.phi) < 0.95
-																? "text-blue-600"
-																: "text-green-600"
-													}`}
-												>
-													Φ ={" "}
-													{(
-														selectedNode.data.result.state?.phi ??
-														selectedNode.data.result.phi
-													).toFixed(3)}
+												<span className="font-mono text-xs font-bold whitespace-nowrap">
+													{meta?.format(val) || val.toFixed(4)}{" "}
+													<span className="text-[9px] font-normal text-stone-400 ml-0.5">
+														{meta?.unit}
+													</span>
 												</span>
 											</div>
-											{(selectedNode.data.result.state?.theta !== undefined ||
-												selectedNode.data.result.theta !== undefined) && (
-												<div className="flex flex-col">
-													<span className="text-stone-400 text-[10px] uppercase font-bold text-nowrap">
-														Temp Rise Ratio
-													</span>
-													<span className="font-mono font-bold">
-														θ ={" "}
-														{(
-															selectedNode.data.result.state?.theta ??
-															selectedNode.data.result.theta
-														).toFixed(3)}
-													</span>
-												</div>
-											)}
-										</div>
-									</div>
-								)}
-								<div className="grid grid-cols-2 gap-y-2 text-xs">
-									<div className="flex flex-col">
-										<span className="text-stone-400 text-[10px] uppercase font-bold text-nowrap">
-											{selectedNode.data.result.state.P_total !== undefined &&
-											Math.abs(
-												selectedNode.data.result.state.P -
-													selectedNode.data.result.state.P_total,
-											) > 1e-1
-												? "St/Tot Pressure"
-												: "Pressure"}
-										</span>
-										<span className="font-mono font-bold flex gap-1 items-baseline">
-											{unitPreferences.pressure === "Pa" &&
-												`${selectedNode.data.result.state.P.toFixed(0)} Pa`}
-											{unitPreferences.pressure === "kPa" &&
-												`${(selectedNode.data.result.state.P / 1e3).toFixed(2)} kPa`}
-											{unitPreferences.pressure === "MPa" &&
-												`${(selectedNode.data.result.state.P / 1e6).toFixed(4)} MPa`}
-
-											{selectedNode.data.result.state.P_total !== undefined &&
-												Math.abs(
-													selectedNode.data.result.state.P -
-														selectedNode.data.result.state.P_total,
-												) > 1e-1 && (
-													<span className="text-[10px] text-stone-500 font-normal">
-														/{" "}
-														{unitPreferences.pressure === "Pa" &&
-															`${selectedNode.data.result.state.P_total.toFixed(0)}`}
-														{unitPreferences.pressure === "kPa" &&
-															`${(selectedNode.data.result.state.P_total / 1e3).toFixed(2)}`}
-														{unitPreferences.pressure === "MPa" &&
-															`${(selectedNode.data.result.state.P_total / 1e6).toFixed(4)}`}
-													</span>
-												)}
-										</span>
-									</div>
-									<div className="flex flex-col">
-										<span className="text-stone-400 text-[10px] uppercase font-bold">
-											Temperature
-										</span>
-										<span className="font-mono font-bold">
-											{selectedNode.data.result.state.T.toFixed(2)} K
-										</span>
-									</div>
-									<div className="flex flex-col">
-										<span className="text-stone-400 text-[10px] uppercase font-bold">
-											Density
-										</span>
-										<span className="font-mono">
-											{selectedNode.data.result.state.rho?.toFixed(4)} kg/m³
-										</span>
-									</div>
-									<div className="flex flex-col">
-										{selectedNode.type !== "plenum" && (
-											<div className="flex flex-col gap-1">
-												<span className="text-stone-400 text-[10px] uppercase font-bold">
-													Mach
-												</span>
-												<span className="font-mono">
-													{selectedNode.data.result.state.mach?.toFixed(4) ||
-														"0.0000"}
-												</span>
-											</div>
-										)}
-									</div>
+										);
+									})}
 								</div>
 
-								<div className="border-t border-stone-200 pt-3">
-									<div className="text-[10px] font-bold text-stone-400 uppercase mb-2">
-										Thermodynamics
-									</div>
-									<div className="grid grid-cols-2 gap-y-1 text-xs font-mono">
-										<span className="text-stone-500">h:</span>
-										<span className="text-right">
-											{(selectedNode.data.result.state.h / 1e3).toFixed(2)}{" "}
-											kJ/kg
-										</span>
-										<span className="text-stone-500">s:</span>
-										<span className="text-right">
-											{(selectedNode.data.result.state.s / 1e3).toFixed(4)}{" "}
-											kJ/kg-K
-										</span>
-										{selectedNode.data.result.state.cp !== undefined && (
-											<>
-												<span className="text-stone-500">Cp:</span>
-												<span className="text-right">
-													{selectedNode.data.result.state.cp.toFixed(2)} J/kg-K
-												</span>
-												<span className="text-stone-500">gamma:</span>
-												<span className="text-right">
-													{selectedNode.data.result.state.gamma.toFixed(4)}
-												</span>
-												<span className="text-stone-500">a:</span>
-												<span className="text-right">
-													{selectedNode.data.result.state.a.toFixed(2)} m/s
-												</span>
-											</>
-										)}
-									</div>
-								</div>
-
-								{selectedNode.data.result.state.mu !== undefined && (
-									<div className="border-t border-stone-200 pt-3">
+								{/* 2. Advanced/Transport Section (Conditional) */}
+								{TRANSPORT_KEYS.some(
+									(k) => selectedNode.data.result.state[k] !== undefined,
+								) && (
+									<div className="border-t border-stone-100 pt-3">
 										<div className="text-[10px] font-bold text-stone-400 uppercase mb-2">
-											Transport
+											Advanced Properties
 										</div>
-										<div className="grid grid-cols-2 gap-y-1 text-xs font-mono">
-											<span className="text-stone-500">μ (viscosity):</span>
-											<span className="text-right">
-												{selectedNode.data.result.state.mu.toExponential(2)}{" "}
-												Pa·s
-											</span>
-											<span className="text-stone-500">k (conductivity):</span>
-											<span className="text-right">
-												{selectedNode.data.result.state.k.toExponential(2)}{" "}
-												W/m-K
-											</span>
-											<span className="text-stone-500">Pr:</span>
-											<span className="text-right">
-												{selectedNode.data.result.state.Pr.toFixed(3)}
-											</span>
+										<div className="grid grid-cols-2 gap-x-2 gap-y-2">
+											{TRANSPORT_KEYS.map((key) => {
+												const val = selectedNode.data.result.state[key];
+												if (val === undefined || val === null) return null;
+												const meta = QUANTITY_CATALOGUE[key];
+												return (
+													<div
+														key={key}
+														className="flex justify-between items-baseline border-b border-dotted border-stone-100 pb-1"
+													>
+														<span className="text-stone-500 text-[10px]">
+															{meta?.label || key}
+														</span>
+														<span className="font-mono text-[10px] font-bold">
+															{meta?.format(val) || val.toFixed(4)}
+														</span>
+													</div>
+												);
+											})}
 										</div>
 									</div>
 								)}
 
+								{/* 3. Composition Section */}
 								{selectedNode.data.result.state.X && (
-									<div className="border-t border-stone-200 pt-3">
+									<div className="border-t border-stone-100 pt-3">
 										<div className="text-[10px] font-bold text-stone-400 uppercase mb-2">
 											Composition (Mole %)
 										</div>
@@ -837,10 +701,12 @@ const Inspector = () => {
 												.map((item: any, i: number) => (
 													<div
 														key={i}
-														className="flex justify-between font-mono text-[10px] bg-white p-1 rounded border border-stone-100"
+														className="flex justify-between font-mono text-[9px] bg-white p-1 rounded border border-stone-50"
 													>
-														<span className="text-stone-500">{item.name}</span>
-														<span className="font-bold">
+														<span className="text-stone-500 text-ellipsis overflow-hidden shrink pr-2">
+															{item.name}
+														</span>
+														<span className="font-bold flex-shrink-0">
 															{(item.x * 100).toFixed(4)}%
 														</span>
 													</div>
@@ -851,144 +717,52 @@ const Inspector = () => {
 							</div>
 						) : (
 							<div className="flex flex-col gap-3">
-								<div className="flex flex-col gap-1">
-									<span className="text-stone-400 text-[10px] uppercase font-bold">
-										Mass Flow
-									</span>
-									<span className="font-mono text-lg font-bold">
-										{selectedNode.data.result.m_dot?.toFixed(4)} kg/s
-									</span>
+								<div className="text-[10px] font-bold text-stone-400 uppercase mb-1">
+									Element Diagnostics
 								</div>
+								<div className="grid grid-cols-2 gap-x-2 gap-y-3">
+									{Object.keys(QUANTITY_CATALOGUE)
+										.filter((k) => !k.startsWith("state."))
+										.map((key) => {
+											const val = selectedNode.data.result[key];
+											if (val === undefined || val === null) return null;
+											const meta = QUANTITY_CATALOGUE[key];
 
-								{/* Element Diagnostics (Phi, Theta, Mach, P-ratio) */}
-								<div className="border-t border-stone-200 pt-3 flex flex-col gap-2">
-									<div className="text-[10px] font-bold text-stone-400 uppercase">
-										Diagnostics
-									</div>
-									{selectedNode.data.result.phi !== undefined && (
-										<div className="grid grid-cols-2 gap-2 text-[10px] font-mono font-bold mb-1">
-											<div className="flex flex-col">
-												<span className="text-stone-400 uppercase text-[8px]">
-													Phi (Φ)
-												</span>
-												<span
-													className={
-														selectedNode.data.result.phi > 1.05
-															? "text-orange-600"
-															: selectedNode.data.result.phi < 0.95
-																? "text-blue-600"
-																: "text-green-600"
-													}
-												>
-													{selectedNode.data.result.phi.toFixed(3)}
-												</span>
-											</div>
-											{selectedNode.data.result.theta !== undefined && (
-												<div className="flex flex-col">
-													<span className="text-stone-400 uppercase text-[8px]">
-														Ratio (θ)
+											// Special styling for primary metrics like m_dot
+											if (key === "m_dot") {
+												return (
+													<div
+														key={key}
+														className="col-span-2 flex flex-col mb-1 border-b border-stone-100 pb-2"
+													>
+														<span className="text-stone-400 text-[10px] uppercase font-bold">
+															{meta.label}
+														</span>
+														<span className="font-mono text-lg font-bold text-orange-600">
+															{meta.format(val)}{" "}
+															<span className="text-xs font-normal text-stone-400">
+																{meta.unit}
+															</span>
+														</span>
+													</div>
+												);
+											}
+
+											return (
+												<div key={key} className="flex flex-col">
+													<span className="text-stone-400 text-[9px] uppercase font-bold">
+														{meta?.label || key}
 													</span>
-													<span>
-														{selectedNode.data.result.theta.toFixed(3)}
+													<span className="font-mono text-xs font-bold whitespace-nowrap">
+														{meta?.format(val) || val.toFixed(4)}{" "}
+														<span className="text-[9px] font-normal text-stone-400 ml-0.5">
+															{meta?.unit}
+														</span>
 													</span>
 												</div>
-											)}
-										</div>
-									)}
-									<div className="grid grid-cols-2 gap-2">
-										{selectedNode.data.result.mach !== undefined && (
-											<div className="flex flex-col">
-												<span className="text-stone-400 text-[8px] uppercase">
-													Mach (Throat)
-												</span>
-												<span className="font-mono text-xs font-bold">
-													{selectedNode.data.result.mach.toFixed(4)}
-												</span>
-											</div>
-										)}
-										{selectedNode.data.result.mach_in !== undefined && (
-											<div className="flex flex-col">
-												<span className="text-stone-400 text-[8px] uppercase">
-													Mach In
-												</span>
-												<span className="font-mono text-xs font-bold">
-													{selectedNode.data.result.mach_in.toFixed(4)}
-												</span>
-											</div>
-										)}
-										{selectedNode.data.result.mach_out !== undefined && (
-											<div className="flex flex-col">
-												<span className="text-stone-400 text-[8px] uppercase">
-													Mach Out
-												</span>
-												<span className="font-mono text-xs font-bold">
-													{selectedNode.data.result.mach_out.toFixed(4)}
-												</span>
-											</div>
-										)}
-										{(selectedNode.data.result.p_ratio !== undefined ||
-											selectedNode.data.result.p_ratio_total !== undefined) && (
-											<div className="flex flex-col">
-												<span className="text-stone-400 text-[8px] uppercase">
-													P Ratio
-												</span>
-												<span className="font-mono text-xs font-bold">
-													{(
-														selectedNode.data.result.p_ratio ||
-														selectedNode.data.result.p_ratio_total
-													).toFixed(4)}
-												</span>
-											</div>
-										)}
-										{selectedNode.data.result.Cd !== undefined && (
-											<div className="flex flex-col col-span-2">
-												<span className="text-stone-400 text-[8px] uppercase">
-													Cd (used)
-												</span>
-												<span className="font-mono text-xs font-bold">
-													{selectedNode.data.result.Cd.toFixed(4)}
-													{selectedNode.data.result.auto_Cd === 1 && (
-														<span className="ml-1 text-[8px] text-blue-500 font-normal">
-															(corr.)
-														</span>
-													)}
-												</span>
-											</div>
-										)}
-									</div>
+											);
+										})}
 								</div>
-
-								{selectedNode.data.result.mu !== undefined && (
-									<div className="border-t border-stone-200 pt-3 flex flex-col gap-2">
-										<div className="text-[10px] font-bold text-stone-400 uppercase">
-											Transport
-										</div>
-										<div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs font-mono">
-											{selectedNode.data.result.Re !== undefined && (
-												<>
-													<div className="text-stone-500">Re:</div>
-													<div className="text-right font-bold">
-														{selectedNode.data.result.Re.toLocaleString("en", {
-															maximumFractionDigits: 0,
-														})}
-													</div>
-												</>
-											)}
-											<div className="text-stone-500">μ (viscosity):</div>
-											<div className="text-right font-bold">
-												{selectedNode.data.result.mu.toExponential(2)} Pa·s
-											</div>
-											<div className="text-stone-500">k:</div>
-											<div className="text-right font-bold">
-												{selectedNode.data.result.k.toExponential(2)} W/m-K
-											</div>
-											<div className="text-stone-500">Pr (Prandtl):</div>
-											<div className="text-right font-bold">
-												{selectedNode.data.result.Pr.toFixed(3)}
-											</div>
-										</div>
-									</div>
-								)}
 							</div>
 						)}
 					</div>
@@ -1004,16 +778,12 @@ const Inspector = () => {
 				<h2 className="text-lg font-bold border-b pb-2 uppercase text-orange-600">
 					Thermal Wall
 				</h2>
-				<div className="flex flex-col gap-2">
-					<label className="text-xs font-bold text-gray-500 uppercase">
-						Contact Area (m²)
-					</label>
-					<NumericInput
-						value={selectedEdge.data.area || 0.05}
-						onChange={(val) => updateEdgeData(selectedEdge.id, { area: val })}
-						className="p-1.5 border rounded text-sm bg-stone-50 focus:bg-white"
-					/>
-				</div>
+				<AreaInput
+					id={`area_edge_${selectedEdge.id}`}
+					label="Contact Area"
+					value={selectedEdge.data.area || 0.05}
+					onChange={(val) => updateEdgeData(selectedEdge.id, { area: val })}
+				/>
 
 				<div className="flex flex-col gap-2">
 					<label className="text-xs font-bold text-gray-500 uppercase">

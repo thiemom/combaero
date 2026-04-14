@@ -32,9 +32,14 @@ export interface RFState {
 		init_strategy: "default" | "incompressible_warmstart" | "homotopy";
 	};
 	updateSolverSettings: (settings: Partial<RFState["solverSettings"]>) => void;
-	unitPreferences: { pressure: "Pa" | "kPa" | "MPa"; length: "m" | "mm" };
+	unitPreferences: {
+		pressure: "Pa" | "kPa" | "MPa";
+		length: "m" | "mm";
+		area: "m²" | "mm²";
+	};
 	setPressureUnit: (unit: "Pa" | "kPa" | "MPa") => void;
 	setLengthUnit: (unit: "m" | "mm") => void;
+	setAreaUnit: (unit: "m²" | "mm²") => void;
 	saveNetwork: (filename?: string) => void;
 	loadNetwork: (data: any) => void;
 	dismissSolveStatus: () => void;
@@ -48,12 +53,14 @@ const useStore = create<RFState>((set, get) => ({
 	onNodesChange: (changes: NodeChange[]) => {
 		set({
 			nodes: applyNodeChanges(changes, get().nodes),
+			solveResults: null,
 		});
 	},
 
 	onEdgesChange: (changes: EdgeChange[]) => {
 		set({
 			edges: applyEdgeChanges(changes, get().edges),
+			solveResults: null,
 		});
 	},
 
@@ -79,6 +86,7 @@ const useStore = create<RFState>((set, get) => ({
 
 		set({
 			edges: addEdge(edge, get().edges),
+			solveResults: null,
 		});
 	},
 
@@ -98,6 +106,7 @@ const useStore = create<RFState>((set, get) => ({
 				}
 				return node;
 			}),
+			solveResults: null,
 		});
 	},
 	updateEdgeData: (edgeId: string, data: any) => {
@@ -108,6 +117,7 @@ const useStore = create<RFState>((set, get) => ({
 				}
 				return edge;
 			}),
+			solveResults: null,
 		});
 	},
 
@@ -172,7 +182,7 @@ const useStore = create<RFState>((set, get) => ({
 		});
 	},
 
-	unitPreferences: { pressure: "kPa", length: "m" },
+	unitPreferences: { pressure: "kPa", length: "m", area: "m²" },
 	setPressureUnit: (unit: "Pa" | "kPa" | "MPa") => {
 		set((state) => ({
 			unitPreferences: { ...state.unitPreferences, pressure: unit },
@@ -181,6 +191,11 @@ const useStore = create<RFState>((set, get) => ({
 	setLengthUnit: (unit: "m" | "mm") => {
 		set((state) => ({
 			unitPreferences: { ...state.unitPreferences, length: unit },
+		}));
+	},
+	setAreaUnit: (unit: "m²" | "mm²") => {
+		set((state) => ({
+			unitPreferences: { ...state.unitPreferences, area: unit },
 		}));
 	},
 

@@ -61,6 +61,7 @@ const App = () => {
 			return;
 		}
 
+		setSolveResults(null);
 		setIsSolving(true);
 		try {
 			const results = await solveNetwork({

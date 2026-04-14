@@ -2,63 +2,7 @@ import { memo, useMemo } from "react";
 import { Handle, Position } from "reactflow";
 import useStore from "../../store/useStore";
 
-// Quantity catalogue: key → {label, unit, format}
-const QUANTITY_CATALOGUE: Record<
-	string,
-	{ label: string; unit: string; format: (v: number) => string }
-> = {
-	// Node state keys (accessed via result.state.*)
-	"state.m_dot": { label: "ṁ", unit: "kg/s", format: (v) => v.toFixed(4) },
-	"state.P": { label: "P", unit: "Pa", format: (v) => v.toFixed(0) },
-	"state.P_total": {
-		label: "Pt",
-		unit: "Pa",
-		format: (v) => v.toFixed(0),
-	},
-	"state.T": { label: "T", unit: "K", format: (v) => v.toFixed(2) },
-	"state.T_total": { label: "Tt", unit: "K", format: (v) => v.toFixed(2) },
-	"state.mach": { label: "Ma", unit: "—", format: (v) => v.toFixed(4) },
-	"state.a": { label: "a", unit: "m/s", format: (v) => v.toFixed(2) },
-	"state.rho": { label: "ρ", unit: "kg/m³", format: (v) => v.toFixed(4) },
-	"state.h": { label: "h", unit: "J/kg", format: (v) => v.toFixed(0) },
-	"state.s": { label: "s", unit: "J/kg·K", format: (v) => v.toFixed(2) },
-	"state.cp": { label: "cp", unit: "J/kg·K", format: (v) => v.toFixed(2) },
-	"state.gamma": { label: "γ", unit: "—", format: (v) => v.toFixed(4) },
-	"state.mu": { label: "μ", unit: "Pa·s", format: (v) => v.toExponential(2) },
-	"state.Pr": { label: "Pr", unit: "—", format: (v) => v.toFixed(3) },
-	"state.Re": {
-		label: "Re",
-		unit: "—",
-		format: (v) => v.toLocaleString("en", { maximumFractionDigits: 0 }),
-	},
-	"state.velocity": { label: "v", unit: "m/s", format: (v) => v.toFixed(3) },
-	"state.phi": { label: "Φ", unit: "—", format: (v) => v.toFixed(3) },
-	"state.theta": { label: "θ", unit: "—", format: (v) => v.toFixed(3) },
-	"state.mw": { label: "MW", unit: "g/mol", format: (v) => v.toFixed(2) },
-	"state.nu": { label: "ν", unit: "m²/s", format: (v) => v.toExponential(2) },
-	"state.u": { label: "u", unit: "J/kg", format: (v) => v.toFixed(0) },
-	"state.cv": { label: "cv", unit: "J/kg·K", format: (v) => v.toFixed(2) },
-	// Element result keys (accessed via result.*)
-	m_dot: { label: "ṁ", unit: "kg/s", format: (v) => v.toFixed(4) },
-	mach: { label: "Ma", unit: "—", format: (v) => v.toFixed(4) },
-	mach_in: { label: "Ma in", unit: "—", format: (v) => v.toFixed(4) },
-	mach_out: { label: "Ma out", unit: "—", format: (v) => v.toFixed(4) },
-	phi: { label: "Φ", unit: "—", format: (v) => v.toFixed(3) },
-	p_ratio_total: { label: "P ratio", unit: "—", format: (v) => v.toFixed(4) },
-	p_ratio: { label: "P ratio", unit: "—", format: (v) => v.toFixed(4) },
-	Re: {
-		label: "Re",
-		unit: "—",
-		format: (v) => v.toLocaleString("en", { maximumFractionDigits: 0 }),
-	},
-	Cd: { label: "Cd", unit: "—", format: (v) => v.toFixed(4) },
-	h: { label: "h", unit: "J/kg", format: (v) => v.toFixed(0) },
-	s: { label: "s", unit: "J/kg·K", format: (v) => v.toFixed(2) },
-	rho: { label: "ρ", unit: "kg/m³", format: (v) => v.toFixed(4) },
-	a: { label: "a", unit: "m/s", format: (v) => v.toFixed(2) },
-	mu: { label: "μ", unit: "Pa·s", format: (v) => v.toExponential(2) },
-	Pr: { label: "Pr", unit: "—", format: (v) => v.toFixed(3) },
-};
+import { QUANTITY_CATALOGUE } from "../../utils/quantities";
 
 function resolveQuantity(result: any, key: string): number | undefined {
 	if (!result) return undefined;
