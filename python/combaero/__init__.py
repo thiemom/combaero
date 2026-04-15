@@ -108,7 +108,15 @@ try:
         bulk_T_from_edge_T_and_q,
         calc_T_from_cp,
         calc_T_from_h,
+        calc_T_from_h_mass,
         calc_T_from_s,
+        calc_T_from_s_mass,
+        calc_T_from_u_mass,
+        calc_T_from_sv_mass,
+        calc_T_from_sh_mass,
+        dh_dT,
+        ds_dT,
+        dcp_dT,
         can_annular_eigenmodes,
         capacity_ratio,
         channel_dimpled,
@@ -480,8 +488,15 @@ except (ModuleNotFoundError, ImportError) as e:
     common_name = _core.common_name
     formula = _core.formula
     calc_T_from_h = _core.calc_T_from_h
+    calc_T_from_h_mass = _core.calc_T_from_h_mass
     calc_T_from_s = _core.calc_T_from_s
-    calc_T_from_cp = _core.calc_T_from_cp
+    calc_T_from_s_mass = _core.calc_T_from_s_mass
+    calc_T_from_u_mass = _core.calc_T_from_u_mass
+    calc_T_from_sv_mass = _core.calc_T_from_sv_mass
+    calc_T_from_sh_mass = _core.calc_T_from_sh_mass
+    dh_dT = _core.dh_dT
+    ds_dT = _core.ds_dT
+    dcp_dT = _core.dcp_dT
     num_species = _core.num_species
     species_name = _core.species_name
     species_index_from_name = _core.species_index_from_name

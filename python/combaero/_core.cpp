@@ -1056,6 +1056,92 @@ PYBIND11_MODULE(_core, m) {
       py::arg("tol") = 1.0e-6, py::arg("max_iter") = 50,
       "Solve for temperature T given target Cp cp_target and composition X.");
 
+  m.def(
+      "calc_T_from_s_mass",
+      [](double s_mass_target, double P,
+         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+         double T_guess, double tol, std::size_t max_iter) {
+        auto X = to_vec(X_arr);
+        return calc_T_from_s_mass(s_mass_target, P, X, T_guess, tol, max_iter);
+      },
+      py::arg("s_mass_target"), py::arg("P"), py::arg("X"),
+      py::arg("T_guess") = 300.0, py::arg("tol") = 1.0e-6,
+      py::arg("max_iter") = 50,
+      "Solve for temperature T given target mass entropy s_mass_target [J/(kg*K)], "
+      "pressure P [Pa], and composition X.");
+
+  m.def(
+      "calc_T_from_u_mass",
+      [](double u_mass_target,
+         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+         double T_guess, double tol, std::size_t max_iter) {
+        auto X = to_vec(X_arr);
+        return calc_T_from_u_mass(u_mass_target, X, T_guess, tol, max_iter);
+      },
+      py::arg("u_mass_target"), py::arg("X"), py::arg("T_guess") = 300.0,
+      py::arg("tol") = 1.0e-6, py::arg("max_iter") = 50,
+      "Solve for temperature T given target mass internal energy u_mass_target [J/kg] "
+      "and composition X.");
+
+  m.def(
+      "calc_T_from_sv_mass",
+      [](double s_mass_target, double v_mass_target,
+         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+         double T_guess, double tol, std::size_t max_iter) {
+        auto X = to_vec(X_arr);
+        return calc_T_from_sv_mass(s_mass_target, v_mass_target, X, T_guess, tol, max_iter);
+      },
+      py::arg("s_mass_target"), py::arg("v_mass_target"), py::arg("X"),
+      py::arg("T_guess") = 300.0, py::arg("tol") = 1.0e-6,
+      py::arg("max_iter") = 50,
+      "Solve for temperature T given target mass entropy s_mass_target [J/(kg*K)], "
+      "mass specific volume v_mass_target [m^3/kg], and composition X.");
+
+  m.def(
+      "calc_T_from_sh_mass",
+      [](double s_mass_target, double h_mass_target,
+         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+         double T_guess, double tol, std::size_t max_iter) {
+        auto X = to_vec(X_arr);
+        return calc_T_from_sh_mass(s_mass_target, h_mass_target, X, T_guess, tol, max_iter);
+      },
+      py::arg("s_mass_target"), py::arg("h_mass_target"), py::arg("X"),
+      py::arg("T_guess") = 300.0, py::arg("tol") = 1.0e-6,
+      py::arg("max_iter") = 50,
+      "Solve for temperature T given target mass entropy s_mass_target [J/(kg*K)], "
+      "mass enthalpy h_mass_target [J/kg], and composition X.");
+
+  // Thermodynamic derivatives
+  m.def(
+      "dh_dT",
+      [](double T,
+         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+        auto X = to_vec(X_arr);
+        return dh_dT(T, X);
+      },
+      py::arg("T"), py::arg("X"),
+      "Mass enthalpy derivative dh/dT [J/(kg*K)] at temperature T and composition X.");
+
+  m.def(
+      "ds_dT",
+      [](double T,
+         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+        auto X = to_vec(X_arr);
+        return ds_dT(T, X);
+      },
+      py::arg("T"), py::arg("X"),
+      "Mass entropy derivative ds/dT [J/(kg*K^2)] at temperature T and composition X.");
+
+  m.def(
+      "dcp_dT",
+      [](double T,
+         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+        auto X = to_vec(X_arr);
+        return dcp_dT(T, X);
+      },
+      py::arg("T"), py::arg("X"),
+      "Mass specific heat derivative dcp/dT [J/(kg*K^2)] at temperature T and composition X.");
+
   // Oxygen requirement helpers (scalar fuel index and mixtures)
   m.def("oxygen_required_per_mol_fuel", &oxygen_required_per_mol_fuel,
         py::arg("fuel_index"),

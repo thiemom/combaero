@@ -362,7 +362,7 @@ Jacobian structure is unchanged because layer count only affects the scalar `R_t
 15. [x] **E.2.2** — Wire multipliers through GUI schemas + graph builder (Completed in 1878894)
 
 ### Phase 6 — Pybind wrappers + materials (Part G)
-16. **G.8a** — Wrap `get_material` for generic k(T) lookup by name (enables material-based wall layers)
+16. [x] **G.8a** — Wrap `get_material` for generic k(T) lookup by name (enables material-based wall layers) (Completed in 30e8edf)
 17. **G.2b** — Bind `calc_T_from_s_mass` (isentropic process solver — future-proofs Part H)
 18. **G.2c-d** — Bind `calc_T_from_u_mass`, `calc_T_from_sv_mass`, `calc_T_from_sh_mass`
 19. **G.2a** — Bind `dh_dT`, `ds_dT`, `dcp_dT` (thermo derivatives)
