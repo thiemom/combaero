@@ -188,10 +188,25 @@ PYBIND11_MODULE(_core, m) {
         &solver::adiabatic_T_equilibrium_and_jacobians_from_streams,
         py::arg("streams"), py::arg("P"), py::arg("Q") = 0.0,
         py::arg("fraction") = 0.0);
-  m.def("combustor_residuals_and_jacobians",
-        &solver::combustor_residuals_and_jacobians, py::arg("streams"),
-        py::arg("P"), py::arg("Q") = 0.0, py::arg("fraction") = 0.0,
-        py::arg("pressure_loss"), py::arg("use_equilibrium") = false);
+  m.def(
+      "combustor_residuals_and_jacobians",
+      [](const std::vector<solver::Stream> &streams, double P, double Q,
+         double fraction, py::function py_loss, bool use_equilibrium) {
+        PressureLossCorrelation cpp_loss =
+            [py_loss](const PressureLossContext &ctx) -> std::tuple<double, double> {
+          py::object res = py_loss(ctx);
+          try {
+            return res.cast<std::tuple<double, double>>();
+          } catch (...) {
+            return {res.cast<double>(), 0.0};
+          }
+        };
+        return solver::combustor_residuals_and_jacobians(
+            streams, P, Q, fraction, cpp_loss, use_equilibrium);
+      },
+      py::arg("streams"), py::arg("P"), py::arg("Q") = 0.0,
+      py::arg("fraction") = 0.0, py::arg("pressure_loss"),
+      py::arg("use_equilibrium") = false);
 
   py::class_<solver::OrificeResult>(
       m, "OrificeResult", "Result of orifice residual and Jacobian evaluation")

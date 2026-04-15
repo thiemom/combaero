@@ -88,10 +88,26 @@ class PressureBoundaryData(BaseModel):
     label: str | None = None
 
 
+class ConstantLossData(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    type: Literal["constant"] = "constant"
+    zeta0: float = 0.03
+
+
+class LinearThetaLossData(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    type: Literal["linear_theta"] = "linear_theta"
+    k: float = 0.5
+    zeta0: float = 0.02
+
+
+PressureLossData = ConstantLossData | LinearThetaLossData
+
+
 class CombustorData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     method: Literal["complete", "equilibrium"] = "complete"
-    pressure_loss: float | None = None
+    pressure_loss: PressureLossData | None = None
     area: float = 0.1
     Dh: float | None = None
     surface: SurfaceModelData = Field(default_factory=SmoothModelData)

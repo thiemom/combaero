@@ -1,15 +1,17 @@
 from combaero.network import (
+    ChannelElement,
     CombustorNode,
+    ConstantLoss,
     ConvectiveSurface,
     DimpledModel,
     FlowNetwork,
     ImpingementModel,
+    LinearThetaLoss,
     LosslessConnectionElement,
     MassFlowBoundary,
     MomentumChamberNode,
     OrificeElement,
     PinFinModel,
-    ChannelElement,
     PlenumNode,
     PressureBoundary,
     RibbedModel,
@@ -22,8 +24,10 @@ from .schemas import (
     ChannelData,
     CombustorData,
     CompositionData,
+    ConstantLossData,
     DimpledModelData,
     ImpingementModelData,
+    LinearThetaLossData,
     MassBoundaryData,
     MomentumChamberData,
     NetworkGraphSchema,
@@ -35,6 +39,17 @@ from .schemas import (
     SmoothModelData,
     ThermalWallData,
 )
+
+
+def build_pressure_loss(data):
+    """Converts PressureLossData schema to a ConstantLoss or LinearThetaLoss callable."""
+    if data is None:
+        return None
+    if isinstance(data, ConstantLossData) or getattr(data, "type", None) == "constant":
+        return ConstantLoss(zeta0=data.zeta0)
+    if isinstance(data, LinearThetaLossData) or getattr(data, "type", None) == "linear_theta":
+        return LinearThetaLoss(k=data.k, zeta0=data.zeta0)
+    return None
 
 
 def map_surface_model(data):
@@ -137,7 +152,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             node = CombustorNode(
                 node_id,
                 method=data.method,
-                pressure_loss=data.pressure_loss,
+                pressure_loss=build_pressure_loss(data.pressure_loss),
                 area=data.area,
                 Dh=data.Dh,
                 surface=ConvectiveSurface(
