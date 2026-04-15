@@ -26,9 +26,10 @@ struct PressureLossContext {
   double T_ad;                           // adiabatic flame temperature [K]
   const std::vector<double> &X_products; // burned gas mole fractions
   const std::vector<double> &Y_products; // burned gas mass fractions
-  double theta;     // T_ad/T_in - 1  (dimensionless temperature rise)
-  double mdot_fuel; // fuel mass flow [kg/s]  (0 if phi-based call)
-  double mdot_air;  // air mass flow [kg/s]   (0 if phi-based call)
+  double theta;      // T_ad/T_in - 1  (dimensionless temperature rise)
+  double mdot_fuel;  // fuel mass flow [kg/s]  (0 if phi-based call)
+  double mdot_air;   // air mass flow [kg/s]   (0 if phi-based call)
+  double mdot_total; // total inlet mass flow [kg/s]
 };
 
 using PressureLossCorrelation =

@@ -3098,6 +3098,8 @@ PYBIND11_MODULE(_core, m) {
                     "Fuel mass flow [kg/s] (0 for phi-based calls)")
       .def_readonly("mdot_air", &PressureLossContext::mdot_air,
                     "Air mass flow [kg/s] (0 for phi-based calls)")
+      .def_readonly("mdot_total", &PressureLossContext::mdot_total,
+                    "Total inlet mass flow [kg/s]")
       .def_property_readonly(
           "Y_products",
           [](const PressureLossContext &c) { return c.Y_products; },

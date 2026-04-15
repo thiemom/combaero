@@ -33,8 +33,10 @@ from .combustion import (
 from .graph import FlowNetwork
 from .pressure_loss import (
     ConstantFractionLoss,
+    ConstantHeadLoss,
     ConstantLoss,
     LinearThetaFractionLoss,
+    LinearThetaHeadLoss,
     LinearThetaLoss,
 )
 from .solver import NetworkSolver
@@ -74,6 +76,8 @@ __all__: list[str] = [
     "WallConnection",
     "ConstantLoss",
     "ConstantFractionLoss",
+    "ConstantHeadLoss",
     "LinearThetaLoss",
     "LinearThetaFractionLoss",
+    "LinearThetaHeadLoss",
 ]

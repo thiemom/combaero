@@ -174,3 +174,24 @@ class TestCombustorNodeWithPressureLoss:
         T_loss, _, _ = node_loss.compute_derived_state([fuel, air])
 
         assert T_loss == pytest.approx(T_base, rel=1e-6)
+
+    def test_constant_head_loss_reduces_P_total(self) -> None:
+        from combaero.network import CombustorNode, ConstantHeadLoss
+
+        fuel, air = self._make_streams()
+        node = CombustorNode(
+            "head", method="complete", pressure_loss=ConstantHeadLoss(zeta=5.0, area=0.1)
+        )
+        _, _, mix_res = node.compute_derived_state([fuel, air])
+        assert mix_res.P_total_mix < 150000.0
+
+    def test_head_loss_smaller_than_full_p_in(self) -> None:
+        """Head loss with realistic zeta should not exceed P_in."""
+        from combaero.network import CombustorNode, ConstantHeadLoss
+
+        fuel, air = self._make_streams()
+        node = CombustorNode(
+            "head", method="complete", pressure_loss=ConstantHeadLoss(zeta=10.0, area=0.05)
+        )
+        _, _, mix_res = node.compute_derived_state([fuel, air])
+        assert mix_res.P_total_mix > 0.0

@@ -1251,6 +1251,10 @@ MixerResult combustor_residuals_and_jacobians(
   // Compute X_products from Y_products for the context
   std::vector<double> X_products = mass_to_mole(res.Y_mix);
 
+  double mdot_total = 0.0;
+  for (const auto &s : streams)
+    mdot_total += s.m_dot;
+
   PressureLossContext ctx{
       reactant_state,
       0.0, // phi
@@ -1258,7 +1262,8 @@ MixerResult combustor_residuals_and_jacobians(
       X_products,
       res.Y_mix, // Y_products
       theta,
-      0.0, 0.0 // mdot fuel/air
+      0.0, 0.0, // mdot fuel/air
+      mdot_total,
   };
 
   auto loss_res = pressure_loss(ctx);
