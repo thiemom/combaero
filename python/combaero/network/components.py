@@ -734,7 +734,7 @@ class MomentumChamberNode(NetworkNode):
 
     @property
     def has_convective_surface(self) -> bool:
-        return True
+        return self.surface.area > 0.0
 
     def add_energy_boundary(self, eb: EnergyBoundary) -> None:
         """Attach an energy source/sink to this momentum chamber."""
@@ -1005,9 +1005,7 @@ class CombustorNode(NetworkNode):
 
     @property
     def has_convective_surface(self) -> bool:
-        # CombustorNode has a surface attribute but no htc_and_T implementation yet.
-        # Return False until htc_and_T is added (planned for a future phase).
-        return False
+        return self.surface.area > 0.0
 
     def add_energy_boundary(self, eb: EnergyBoundary) -> None:
         """Attach an energy source/sink to this combustor (post-combustion)."""
@@ -1104,6 +1102,20 @@ class CombustorNode(NetworkNode):
             "mach": u / cs.thermo.a if cs.thermo.a > 0 else 1.0,
         }
 
+        # --- Heat Transfer Diagnostics ---
+        nu_val = 0.0
+        htc_val = 0.0
+        t_aw_val = cs.thermo.T
+        if self.has_convective_surface:
+            h_res = self.htc_and_T(state)
+            if h_res is not None:
+                nu_val = h_res.Nu
+                htc_val = h_res.h
+                t_aw_val = h_res.T_aw
+        diag["Nu"] = nu_val
+        diag["htc"] = htc_val
+        diag["T_aw"] = t_aw_val
+
         # --- Combustion Diagnostics ---
         # 1. Equivalence Ratio (phi) via elemental analysis in C++
         try:
@@ -1124,6 +1136,31 @@ class CombustorNode(NetworkNode):
             diag["theta"] = 0.0
 
         return diag
+
+    def htc_and_T(self, state: MixtureState):
+        """Compute heat transfer coefficient for the combustor wall."""
+        if self.surface.area == 0.0:
+            return None
+
+        import math
+
+        T_wall = self.t_wall if self.t_wall is not None else math.nan
+        m_dot_total = getattr(self, "_total_m_dot", 0.0)
+        rho, _ = _safe_rho(state.density())
+        u = m_dot_total / (rho * self.area) if self.area > 0 else 1.0
+
+        diameter = self.Dh if self.Dh is not None else math.sqrt(4.0 * self.area / math.pi)
+        length = diameter  # Combustors are modelled as a single zone
+
+        return self.surface.htc_and_T(
+            T=state.T,
+            P=state.P,
+            X=state.X,
+            velocity=u,
+            diameter=diameter,
+            length=length,
+            T_wall=T_wall,
+        )
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         # Store upstream elements for mixing calculations

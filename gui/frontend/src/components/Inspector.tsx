@@ -625,6 +625,27 @@ const Inspector = () => {
 						<p className="text-[9px] text-gray-400 italic -mt-2 mb-2">
 							Dh defaults to sqrt(4*Area/π) if omitted.
 						</p>
+						<div className="flex flex-col gap-2">
+							<label className="text-xs font-bold text-gray-500 uppercase">
+								Nu Multiplier
+							</label>
+							<NumericInput
+								id={`Nu_multiplier_comb_${selectedNode.id}`}
+								value={selectedNode.data.Nu_multiplier ?? 1.0}
+								onChange={(val) =>
+									updateNodeData(selectedNode.id, {
+										Nu_multiplier: val,
+									})
+								}
+								className="p-2 border rounded"
+							/>
+						</div>
+						<SurfaceEnhancementInspector
+							surface={selectedNode.data.surface || { type: "smooth" }}
+							onChange={(surface) =>
+								updateNodeData(selectedNode.id, { surface })
+							}
+						/>
 
 						<InitialGuessEditor node={selectedNode} />
 					</div>

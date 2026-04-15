@@ -57,9 +57,11 @@ const CombustorNode = ({ id, data, selected }: NodeProps) => {
 				)}
 			</div>
 
-			{/* Flow handles only — no thermal support for this node type yet */}
+			{/* Flow handles */}
 			<Handle type="target" position={Position.Left} id="flow-target" />
 			<Handle type="source" position={Position.Right} id="flow-source" />
+			<Handle type="target" position={Position.Top} id="thermal-target" />
+			<Handle type="source" position={Position.Bottom} id="thermal-source" />
 		</div>
 	);
 };

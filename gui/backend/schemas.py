@@ -92,6 +92,10 @@ class CombustorData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     method: Literal["complete", "equilibrium"] = "complete"
     pressure_loss: float | None = None
+    area: float = 0.1
+    Dh: float | None = None
+    surface: SurfaceModelData = Field(default_factory=SmoothModelData)
+    Nu_multiplier: float = 1.0
     initial_guess: dict[str, float] = Field(default_factory=dict)
     label: str | None = None
 

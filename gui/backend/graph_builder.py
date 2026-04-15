@@ -134,7 +134,19 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             nodes_map[node_id] = node
         elif node_type == "combustor":
             data = CombustorData(**node_data)
-            node = CombustorNode(node_id, method=data.method)
+            node = CombustorNode(
+                node_id,
+                method=data.method,
+                pressure_loss=data.pressure_loss,
+                area=data.area,
+                Dh=data.Dh,
+                surface=ConvectiveSurface(
+                    area=data.area,
+                    model=map_surface_model(data.surface),
+                    Nu_multiplier=data.Nu_multiplier,
+                    f_multiplier=1.0,
+                ),
+            )
             node.initial_guess = data.initial_guess
             net.add_node(node)
             nodes_map[node_id] = node
