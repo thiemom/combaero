@@ -1294,7 +1294,7 @@ const Inspector = () => {
 									Hot Side Wall Temp
 								</span>
 								<span className="font-mono text-xs font-black">
-									{selectedEdge.data.result.T_wall?.toFixed(1)} K
+									{selectedEdge.data.result.T_hot?.toFixed(1)} K
 								</span>
 							</div>
 							<div className="grid grid-cols-4 gap-1 pt-2 border-t border-stone-100">

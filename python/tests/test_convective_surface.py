@@ -94,7 +94,7 @@ def test_convective_surface_smooth_model():
         velocity=50.0,
         diameter=0.02,
         length=0.5,
-        T_wall=1000.0,
+        T_hot=1000.0,
     )
 
     assert result.h > 0.0
@@ -117,7 +117,7 @@ def test_convective_surface_ribbed_model():
         velocity=60.0,
         diameter=0.025,
         length=0.6,
-        T_wall=1100.0,
+        T_hot=1100.0,
     )
 
     assert result.h > 0.0
@@ -138,7 +138,7 @@ def test_convective_surface_dimpled_model():
         velocity=45.0,
         diameter=0.022,
         length=0.55,
-        T_wall=950.0,
+        T_hot=950.0,
     )
 
     assert result.h > 0.0
@@ -168,7 +168,7 @@ def test_convective_surface_pin_fin_model():
         velocity=40.0,
         diameter=0.003,  # Use pin diameter
         length=0.015,  # 5 rows * 2.5 * 0.003 = 0.0375m streamwise
-        T_wall=900.0,
+        T_hot=900.0,
     )
 
     assert result.h > 0.0
@@ -189,7 +189,7 @@ def test_convective_surface_multipliers():
         velocity=50.0,
         diameter=0.02,
         length=0.5,
-        T_wall=1000.0,
+        T_hot=1000.0,
     )
 
     result_mult = surface_mult.htc_and_T(
@@ -199,7 +199,7 @@ def test_convective_surface_multipliers():
         velocity=50.0,
         diameter=0.02,
         length=0.5,
-        T_wall=1000.0,
+        T_hot=1000.0,
     )
 
     # HTC should be scaled by Nu_multiplier
@@ -220,7 +220,7 @@ def test_convective_surface_heating_auto_detect():
         velocity=50.0,
         diameter=0.02,
         length=0.5,
-        T_wall=1000.0,
+        T_hot=1000.0,
     )
 
     assert result.h > 0.0

@@ -50,7 +50,8 @@ export const QUANTITY_CATALOGUE: Record<
 	Tt_in: { label: "Tti", unit: "K", format: (v) => v.toFixed(2) },
 	Tt_out: { label: "Tto", unit: "K", format: (v) => v.toFixed(2) },
 	// Thermal diagnostics
-	T_wall: { label: "Tw", unit: "K", format: (v) => v.toFixed(1) },
+	T_hot: { label: "Th", unit: "K", format: (v) => v.toFixed(1) },
+	T_aw: { label: "Taw", unit: "K", format: (v) => v.toFixed(1) },
 };
 
 export const BASIC_STATE_KEYS = [
@@ -62,6 +63,15 @@ export const BASIC_STATE_KEYS = [
 	"rho",
 	"mach",
 	"velocity",
+	"T_aw",
+	"P_in",
+	"P_out",
+	"T_in",
+	"T_out",
+	"Pt_in",
+	"Pt_out",
+	"Tt_in",
+	"Tt_out",
 ];
 export const TRANSPORT_KEYS = [
 	"mu",

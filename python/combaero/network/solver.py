@@ -1521,7 +1521,7 @@ class NetworkSolver:
                 )
 
                 sol_dict[f"{wid}.Q"] = float(wall_res.Q)
-                sol_dict[f"{wid}.T_wall"] = float(wall_res.T_wall)
+                sol_dict[f"{wid}.T_hot"] = float(wall_res.T_hot)
                 sol_dict[f"{wid}.h_a"] = float(ch_result_a.h)
                 sol_dict[f"{wid}.h_b"] = float(ch_result_b.h)
 

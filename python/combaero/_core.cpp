@@ -5229,7 +5229,7 @@ PYBIND11_MODULE(_core, m) {
       "T_aw is always computed continuously for all M:\n"
       "  T_aw = T_static + r * v^2 / (2*cp)  (r = Pr^1/3 turbulent)\n"
       "  At v=0: T_aw = T_static exactly. No threshold, no discontinuity.\n\n"
-      "q = h * (T_aw - T_wall) when T_wall is supplied, else nan.\n\n"
+      "q = h * (T_aw - T_hot) when T_hot is supplied, else nan.\n\n"
       "f meaning depends on geometry:\n"
       "  smooth/ribbed/dimpled : Darcy friction factor [-]\n"
       "  pin_fin               : pin-array friction coefficient [-]\n"
@@ -5245,7 +5245,7 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("T_aw", &ChannelResult::T_aw,
                     "Adiabatic wall temperature [K]")
       .def_readonly("q", &ChannelResult::q,
-                    "Heat flux [W/m^2] (nan if T_wall not supplied)")
+                    "Heat flux [W/m^2] (nan if T_hot not supplied)")
       .def_readonly("dh_dmdot", &ChannelResult::dh_dmdot,
                     "Jacobian: dh/dmdot [W/(m^2*K*kg/s)]")
       .def_readonly("dh_dT", &ChannelResult::dh_dT,
@@ -5262,8 +5262,8 @@ PYBIND11_MODULE(_core, m) {
                     "Jacobian: dq/dmdot [W*s/(m^2*kg)]")
       .def_readonly("dq_dT", &ChannelResult::dq_dT,
                     "Jacobian: dq/dT [W/(m^2*K)]")
-      .def_readonly("dq_dT_wall", &ChannelResult::dq_dT_wall,
-                    "Jacobian: dq/dT_wall [W/(m^2*K)]")
+      .def_readonly("dq_dT_hot", &ChannelResult::dq_dT_hot,
+                    "Jacobian: dq/dT_hot [W/(m^2*K)]")
       .def("__repr__", [](const ChannelResult &r) {
         auto fmt = [](double v) {
           if (std::isnan(v))
@@ -5285,12 +5285,12 @@ PYBIND11_MODULE(_core, m) {
       "Heat transfer through a wall between two elements.\n\n"
       "Returned by wall_coupling_and_jacobian.\n\n"
       "Q is positive when heat flows from side A to side B.\n"
-      "T_wall is the hot-side surface temperature.\n"
+      "T_hot is the hot-side surface temperature.\n"
       "Jacobians enable proper Newton coupling in the network solver.")
       .def_readonly("Q", &WallCouplingResult::Q,
                     "Heat transfer rate [W] (positive A->B)")
-      .def_readonly("T_wall", &WallCouplingResult::T_wall,
-                    "Wall temperature [K] (hot-side surface)")
+      .def_readonly("T_hot", &WallCouplingResult::T_hot,
+                    "Hot-side wall surface temperature [K].")
       .def_readonly("dQ_dh_a", &WallCouplingResult::dQ_dh_a,
                     "Jacobian: dQ/dh_a [W*m^2*K/W]")
       .def_readonly("dQ_dh_b", &WallCouplingResult::dQ_dh_b,
@@ -5307,10 +5307,10 @@ PYBIND11_MODULE(_core, m) {
                return std::string(buf);
              };
              return "WallCouplingResult(Q=" + fmt(r.Q) +
-                    ", T_wall=" + fmt(r.T_wall) + ")";
+                    ", T_hot=" + fmt(r.T_hot) + ")";
            })
       .def("__iter__", [](const WallCouplingResult &r) {
-        return py::iter(py::make_tuple(r.Q, r.T_wall));
+        return py::iter(py::make_tuple(r.Q, r.T_hot));
       });
 
   // -----------------------------------------------------------------
@@ -5353,16 +5353,16 @@ PYBIND11_MODULE(_core, m) {
       "channel_smooth",
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-         double velocity, double diameter, double length, double T_wall,
+         double velocity, double diameter, double length, double T_hot,
          const std::string &correlation, bool heating, double mu_ratio,
          double roughness, double Nu_multiplier, double f_multiplier) {
         return channel_smooth(T, P, to_vec(X_arr), velocity, diameter, length,
-                              T_wall, correlation, heating, mu_ratio, roughness,
+                              T_hot, correlation, heating, mu_ratio, roughness,
                               Nu_multiplier, f_multiplier);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
       py::arg("diameter"), py::arg("length"),
-      py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
+      py::arg("T_hot") = std::numeric_limits<double>::quiet_NaN(),
       py::arg("correlation") = "gnielinski", py::arg("heating") = true,
       py::arg("mu_ratio") = 1.0, py::arg("roughness") = 0.0,
       py::arg("Nu_multiplier") = 1.0, py::arg("f_multiplier") = 1.0,
@@ -5372,7 +5372,7 @@ PYBIND11_MODULE(_core, m) {
       "  velocity   : bulk velocity [m/s]\n"
       "  diameter   : hydraulic diameter [m]\n"
       "  length     : channel length [m]\n"
-      "  T_wall     : wall temperature [K] (nan to skip q)\n"
+      "  T_hot      : wall temperature [K] (nan to skip q)\n"
       "  correlation: 'gnielinski' (default), 'dittus_boelter', 'sieder_tate', "
       "'petukhov'\n"
       "  heating    : True = fluid heated\n"
@@ -5390,16 +5390,16 @@ PYBIND11_MODULE(_core, m) {
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double velocity, double diameter, double length, double e_D,
-         double pitch_to_height, double alpha_deg, double T_wall, bool heating,
+         double pitch_to_height, double alpha_deg, double T_hot, bool heating,
          double Nu_multiplier, double f_multiplier) {
         return channel_ribbed(T, P, to_vec(X_arr), velocity, diameter, length,
-                              e_D, pitch_to_height, alpha_deg, T_wall, heating,
+                              e_D, pitch_to_height, alpha_deg, T_hot, heating,
                               Nu_multiplier, f_multiplier);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
       py::arg("diameter"), py::arg("length"), py::arg("e_D"),
       py::arg("pitch_to_height"), py::arg("alpha_deg"),
-      py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
+      py::arg("T_hot") = std::numeric_limits<double>::quiet_NaN(),
       py::arg("heating") = true, py::arg("Nu_multiplier") = 1.0,
       py::arg("f_multiplier") = 1.0,
       "Rib-enhanced cooling channel (Han et al. 1988).\n\n"
@@ -5421,16 +5421,16 @@ PYBIND11_MODULE(_core, m) {
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double velocity, double diameter, double length, double d_Dh,
-         double h_d, double S_d, double T_wall, bool heating,
+         double h_d, double S_d, double T_hot, bool heating,
          double Nu_multiplier, double f_multiplier) {
         return channel_dimpled(T, P, to_vec(X_arr), velocity, diameter, length,
-                               d_Dh, h_d, S_d, T_wall, heating, Nu_multiplier,
+                               d_Dh, h_d, S_d, T_hot, heating, Nu_multiplier,
                                f_multiplier);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
       py::arg("diameter"), py::arg("length"), py::arg("d_Dh"), py::arg("h_d"),
       py::arg("S_d"),
-      py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
+      py::arg("T_hot") = std::numeric_limits<double>::quiet_NaN(),
       py::arg("heating") = true, py::arg("Nu_multiplier") = 1.0,
       py::arg("f_multiplier") = 1.0,
       "Dimpled surface cooling channel (Chyu et al. 1997).\n\n"
@@ -5451,16 +5451,16 @@ PYBIND11_MODULE(_core, m) {
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double velocity, double channel_height, double pin_diameter,
-         double S_D, double X_D, int N_rows, double T_wall, bool is_staggered,
+         double S_D, double X_D, int N_rows, double T_hot, bool is_staggered,
          double Nu_multiplier, double f_multiplier) {
         return channel_pin_fin(T, P, to_vec(X_arr), velocity, channel_height,
-                               pin_diameter, S_D, X_D, N_rows, T_wall,
+                               pin_diameter, S_D, X_D, N_rows, T_hot,
                                is_staggered, Nu_multiplier, f_multiplier);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
       py::arg("channel_height"), py::arg("pin_diameter"), py::arg("S_D"),
       py::arg("X_D"), py::arg("N_rows"),
-      py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
+      py::arg("T_hot") = std::numeric_limits<double>::quiet_NaN(),
       py::arg("is_staggered") = true, py::arg("Nu_multiplier") = 1.0,
       py::arg("f_multiplier") = 1.0,
       "Pin-fin array cooling channel (Metzger et al. 1982).\n\n"
@@ -5485,16 +5485,16 @@ PYBIND11_MODULE(_core, m) {
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double mdot_jet, double d_jet, double z_D, double x_D, double y_D,
-         double A_target, double T_wall, double Cd_jet, double Nu_multiplier,
+         double A_target, double T_hot, double Cd_jet, double Nu_multiplier,
          double f_multiplier) {
         return channel_impingement(T, P, to_vec(X_arr), mdot_jet, d_jet, z_D,
-                                   x_D, y_D, A_target, T_wall, Cd_jet,
+                                   x_D, y_D, A_target, T_hot, Cd_jet,
                                    Nu_multiplier, f_multiplier);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("mdot_jet"),
       py::arg("d_jet"), py::arg("z_D"), py::arg("x_D") = 0.0,
       py::arg("y_D") = 0.0, py::arg("A_target"),
-      py::arg("T_wall") = std::numeric_limits<double>::quiet_NaN(),
+      py::arg("T_hot") = std::numeric_limits<double>::quiet_NaN(),
       py::arg("Cd_jet") = 0.65, py::arg("Nu_multiplier") = 1.0,
       py::arg("f_multiplier") = 1.0,
       "Impingement jet array cooling (Florschuetz et al. 1981 / Martin "

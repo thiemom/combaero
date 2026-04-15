@@ -26,7 +26,7 @@ Design notes
   ``T_aw = T_static + r * v^2 / (2*cp)`` with ``r = Pr^(1/3)`` (turbulent).
   At ``v=0`` this reduces to ``T_static`` exactly - no threshold, no kink in
   the Jacobian.
-- ``q = h * (T_aw - T_wall)`` when ``T_wall`` is supplied, else ``nan``.
+- ``q = h * (T_aw - T_hot)`` when ``T_hot`` is supplied, else ``nan``.
 """
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ def smooth(
     u: float,
     L: float,
     D: float,
-    T_wall: float = math.nan,
+    T_hot: float = math.nan,
     correlation: str = "gnielinski",
     heating: bool = True,
     mu_ratio: float = 1.0,
@@ -78,7 +78,7 @@ def smooth(
         Channel length [m].
     D:
         Hydraulic diameter [m].
-    T_wall:
+    T_hot:
         Wall temperature [K].  Supply to obtain ``q``; omit (``nan``) for
         flow-only or when wall temperature is unknown.
     correlation:
@@ -102,7 +102,7 @@ def smooth(
         u,
         D,
         L,
-        T_wall=T_wall,
+        T_hot=T_hot,
         correlation=correlation,
         heating=heating,
         mu_ratio=mu_ratio,
@@ -123,7 +123,7 @@ def ribbed(
     e_D: float,
     pitch_to_height: float,
     alpha_deg: float,
-    T_wall: float = math.nan,
+    T_hot: float = math.nan,
     heating: bool = True,
     Nu_multiplier: float = 1.0,
     f_multiplier: float = 1.0,
@@ -149,7 +149,7 @@ def ribbed(
         Rib pitch / rib height [-].  Valid: 5-20.
     alpha_deg:
         Rib angle [deg].  Valid: 30-90.
-    T_wall:
+    T_hot:
         Wall temperature [K].  ``nan`` to skip ``q``.
     heating:
         ``True`` if the fluid is being heated.
@@ -168,7 +168,7 @@ def ribbed(
         e_D,
         pitch_to_height,
         alpha_deg,
-        T_wall=T_wall,
+        T_hot=T_hot,
         heating=heating,
         Nu_multiplier=Nu_multiplier,
         f_multiplier=f_multiplier,
@@ -186,7 +186,7 @@ def dimpled(
     d_Dh: float,
     h_d: float,
     S_d: float,
-    T_wall: float = math.nan,
+    T_hot: float = math.nan,
     heating: bool = True,
     Nu_multiplier: float = 1.0,
     f_multiplier: float = 1.0,
@@ -212,7 +212,7 @@ def dimpled(
         Dimple depth / diameter [-].  Valid: 0.1-0.3.
     S_d:
         Dimple spacing / diameter [-].  Valid: 1.5-3.0.
-    T_wall:
+    T_hot:
         Wall temperature [K].  ``nan`` to skip ``q``.
     heating:
         ``True`` if the fluid is being heated.
@@ -231,7 +231,7 @@ def dimpled(
         d_Dh,
         h_d,
         S_d,
-        T_wall=T_wall,
+        T_hot=T_hot,
         heating=heating,
         Nu_multiplier=Nu_multiplier,
         f_multiplier=f_multiplier,
@@ -249,7 +249,7 @@ def pin_fin(
     S_D: float,
     X_D: float,
     N_rows: int,
-    T_wall: float = math.nan,
+    T_hot: float = math.nan,
     is_staggered: bool = True,
     Nu_multiplier: float = 1.0,
     f_multiplier: float = 1.0,
@@ -276,7 +276,7 @@ def pin_fin(
         Streamwise pitch / d [-].  Valid: 1.5-4.0.
     N_rows:
         Number of pin rows in the streamwise direction.
-    T_wall:
+    T_hot:
         Wall temperature [K].  ``nan`` to skip ``q``.
     is_staggered:
         ``True`` for staggered array (default), ``False`` for inline.
@@ -295,7 +295,7 @@ def pin_fin(
         S_D,
         X_D,
         N_rows,
-        T_wall=T_wall,
+        T_hot=T_hot,
         is_staggered=is_staggered,
         Nu_multiplier=Nu_multiplier,
         f_multiplier=f_multiplier,
@@ -313,7 +313,7 @@ def impingement(
     x_D: float = 0.0,
     y_D: float = 0.0,
     A_target: float,
-    T_wall: float = math.nan,
+    T_hot: float = math.nan,
     Cd_jet: float = 0.65,
     Nu_multiplier: float = 1.0,
     f_multiplier: float = 1.0,
@@ -341,7 +341,7 @@ def impingement(
         Valid for arrays: 4-16.
     A_target:
         Target surface area [m^2].
-    T_wall:
+    T_hot:
         Wall temperature [K].  ``nan`` to skip ``q``.
     Cd_jet:
         Jet hole discharge coefficient [-].  Default ``0.65``.
@@ -360,7 +360,7 @@ def impingement(
         x_D,
         y_D,
         A_target,
-        T_wall=T_wall,
+        T_hot=T_hot,
         Cd_jet=Cd_jet,
         Nu_multiplier=Nu_multiplier,
         f_multiplier=f_multiplier,

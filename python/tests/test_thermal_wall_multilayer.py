@@ -30,7 +30,7 @@ def test_thermal_wall_multilayer_compute():
     assert abs(res.Q - 13320.647) < 0.1
 
     # T_surf_a = T0 - Q/(h_a*A) = 1000 - 13320.6 / 500 = 1000 - 26.64 = 973.36
-    assert abs(res.T_wall - 973.358) < 0.1
+    assert abs(res.T_hot - 973.358) < 0.1
 
 
 def test_thermal_wall_fouling():

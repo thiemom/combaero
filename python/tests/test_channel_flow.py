@@ -8,7 +8,7 @@ Tests verify:
 - channel_pin_fin: dP scales with N_rows, Nu increases with Re
 - channel_impingement: Nu from correlation, dP from orifice model
 - T_aw continuity: no threshold discontinuity at any Mach
-- q = nan when T_wall not supplied
+- q = nan when T_hot not supplied
 - heat_transfer submodule API
 """
 
@@ -77,17 +77,17 @@ class TestChannelSmooth:
         dP_ref = sol.f * (L / D) * (rho * v * v / 2.0)
         assert sol.dP == pytest.approx(dP_ref, rel=1e-6)
 
-    def test_q_nan_without_T_wall(self):
-        """q should be nan when T_wall is not supplied."""
+    def test_q_nan_without_T_hot(self):
+        """q should be nan when T_hot is not supplied."""
         sol = cb.channel_smooth(T_AIR, P_AIR, X_AIR, 20.0, 0.01, 0.5)
         assert math.isnan(sol.q)
 
-    def test_q_finite_with_T_wall(self):
-        """q should be finite and equal h*(T_aw - T_wall) when T_wall given."""
-        T_wall = 800.0
-        sol = cb.channel_smooth(T_AIR, P_AIR, X_AIR, 20.0, 0.01, 0.5, T_wall=T_wall)
+    def test_q_finite_with_T_hot(self):
+        """q should be finite and equal h*(T_aw - T_hot) when T_hot given."""
+        T_hot = 800.0
+        sol = cb.channel_smooth(T_AIR, P_AIR, X_AIR, 20.0, 0.01, 0.5, T_hot=T_hot)
         assert math.isfinite(sol.q)
-        assert sol.q == pytest.approx(sol.h * (sol.T_aw - T_wall), rel=1e-9)
+        assert sol.q == pytest.approx(sol.h * (sol.T_aw - T_hot), rel=1e-9)
 
     def test_T_aw_equals_T_at_zero_velocity(self):
         """At v=0, T_aw should equal T_static (recovery factor formula gives 0 correction)."""
@@ -177,8 +177,8 @@ class TestChannelRibbed:
         assert sol_ribbed.dP > sol_smooth.dP
         assert sol_ribbed.f > sol_smooth.f
 
-    def test_q_with_T_wall(self):
-        T_wall = 800.0
+    def test_q_with_T_hot(self):
+        T_hot = 800.0
         sol = cb.channel_ribbed(
             T_AIR,
             P_AIR,
@@ -189,10 +189,10 @@ class TestChannelRibbed:
             e_D=0.05,
             pitch_to_height=10.0,
             alpha_deg=90.0,
-            T_wall=T_wall,
+            T_hot=T_hot,
         )
         assert math.isfinite(sol.q)
-        assert sol.q == pytest.approx(sol.h * (sol.T_aw - T_wall), rel=1e-9)
+        assert sol.q == pytest.approx(sol.h * (sol.T_aw - T_hot), rel=1e-9)
 
     def test_higher_rib_height_more_enhancement(self):
         """Higher e_D should give more Nu enhancement."""
@@ -245,7 +245,7 @@ class TestChannelDimpled:
         f_deep = cb.dimple_friction_multiplier(Re, d_Dh=0.2, h_d=0.25)
         assert f_deep > f_shallow
 
-    def test_q_nan_without_T_wall(self):
+    def test_q_nan_without_T_hot(self):
         sol = cb.channel_dimpled(T_AIR, P_AIR, X_AIR, 20.0, 0.01, 0.5, d_Dh=0.2, h_d=0.2, S_d=2.0)
         assert math.isnan(sol.q)
 
@@ -333,8 +333,8 @@ class TestChannelPinFin:
         sol_inline = cb.channel_pin_fin(**kwargs, is_staggered=False)
         assert sol_stag.dP > sol_inline.dP
 
-    def test_q_with_T_wall(self):
-        T_wall = 800.0
+    def test_q_with_T_hot(self):
+        T_hot = 800.0
         sol = cb.channel_pin_fin(
             T_AIR,
             P_AIR,
@@ -345,10 +345,10 @@ class TestChannelPinFin:
             S_D=PIN_SD,
             X_D=PIN_XD,
             N_rows=PIN_N,
-            T_wall=T_wall,
+            T_hot=T_hot,
         )
         assert math.isfinite(sol.q)
-        assert sol.q == pytest.approx(sol.h * (sol.T_aw - T_wall), rel=1e-9)
+        assert sol.q == pytest.approx(sol.h * (sol.T_aw - T_hot), rel=1e-9)
 
     def test_re_based_on_pin_diameter(self):
         """Re should be rho*v*d/mu (pin diameter, not hydraulic diameter)."""
@@ -434,8 +434,8 @@ class TestChannelImpingement:
         sol_array = cb.channel_impingement(**kwargs, x_D=8.0, y_D=8.0)
         assert sol_array.Nu < sol_single.Nu
 
-    def test_q_with_T_wall(self):
-        T_wall = 800.0
+    def test_q_with_T_hot(self):
+        T_hot = 800.0
         sol = cb.channel_impingement(
             T_AIR,
             P_AIR,
@@ -444,10 +444,10 @@ class TestChannelImpingement:
             d_jet=IMP_D,
             z_D=IMP_ZD,
             A_target=IMP_A,
-            T_wall=T_wall,
+            T_hot=T_hot,
         )
         assert math.isfinite(sol.q)
-        assert sol.q == pytest.approx(sol.h * (sol.T_aw - T_wall), rel=1e-9)
+        assert sol.q == pytest.approx(sol.h * (sol.T_aw - T_hot), rel=1e-9)
 
     def test_higher_mdot_increases_nu(self):
         """Higher jet mass flow → higher Re → higher Nu."""
@@ -494,8 +494,8 @@ class TestHeatTransferSubmodule:
 
     def test_smooth_matches_direct_call(self):
         """ht.smooth should give identical result to cb.channel_smooth."""
-        sol_sub = ht.smooth(T_AIR, P_AIR, X_AIR, u=20.0, L=0.5, D=0.01, T_wall=800.0)
-        sol_direct = cb.channel_smooth(T_AIR, P_AIR, X_AIR, 20.0, 0.01, 0.5, T_wall=800.0)
+        sol_sub = ht.smooth(T_AIR, P_AIR, X_AIR, u=20.0, L=0.5, D=0.01, T_hot=800.0)
+        sol_direct = cb.channel_smooth(T_AIR, P_AIR, X_AIR, 20.0, 0.01, 0.5, T_hot=800.0)
         assert sol_sub.h == pytest.approx(sol_direct.h, rel=1e-9)
         assert sol_sub.dP == pytest.approx(sol_direct.dP, rel=1e-9)
         assert sol_sub.q == pytest.approx(sol_direct.q, rel=1e-9)
@@ -620,8 +620,8 @@ class TestHeatTransferSubmodule:
 
     def test_network_solver_pattern(self):
         """Demonstrate the intended network solver usage pattern."""
-        T_wall = 850.0
-        sol = ht.smooth(T_AIR, P_AIR, X_AIR, u=25.0, L=0.3, D=0.008, T_wall=T_wall)
+        T_hot = 850.0
+        sol = ht.smooth(T_AIR, P_AIR, X_AIR, u=25.0, L=0.3, D=0.008, T_hot=T_hot)
         assert sol.h > 0.0
         assert sol.dP > 0.0
         assert math.isfinite(sol.q)

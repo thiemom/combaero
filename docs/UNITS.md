@@ -596,7 +596,7 @@ All functions use consistent units to avoid conversion errors.
 | `ChannelResult::dT_aw_dT`    | -           | - (dimensionless)       |
 | `ChannelResult::dq_dmdot`    | -           | W*s/(m^2*kg)            |
 | `ChannelResult::dq_dT`       | -           | W/(m^2*K)               |
-| `ChannelResult::dq_dT_wall`  | -           | W/(m^2*K)               |
+| `ChannelResult::dq_dT_hot`   | -           | W/(m^2*K)               |
 
 ### cooling_correlations.h - Pin fin friction (new scalar)
 

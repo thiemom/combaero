@@ -219,22 +219,22 @@ def test_thermal_coupling_disabled_matches_no_wall():
 
     # Solve both networks
     net_with_wall_disabled = create_network(add_wall=True, enable_coupling=False)
-    net_without_wall = create_network(add_wall=False, enable_coupling=False)
+    net_without_hot = create_network(add_wall=False, enable_coupling=False)
 
     solver_with_wall = NetworkSolver(net_with_wall_disabled)
-    solver_without_wall = NetworkSolver(net_without_wall)
+    solver_without_hot = NetworkSolver(net_without_hot)
 
     result_with_wall = solver_with_wall.solve(method="hybr", options={"xtol": 1e-8})
-    result_without_wall = solver_without_wall.solve(method="hybr", options={"xtol": 1e-8})
+    result_without_hot = solver_without_hot.solve(method="hybr", options={"xtol": 1e-8})
 
     assert result_with_wall is not None
-    assert result_without_wall is not None
+    assert result_without_hot is not None
 
     # Compare plenum temperatures - should be identical
     T_hot_with = solver_with_wall._derived_states["hot_plenum"][0]
-    T_hot_without = solver_without_wall._derived_states["hot_plenum"][0]
+    T_hot_without = solver_without_hot._derived_states["hot_plenum"][0]
     T_cold_with = solver_with_wall._derived_states["cold_plenum"][0]
-    T_cold_without = solver_without_wall._derived_states["cold_plenum"][0]
+    T_cold_without = solver_without_hot._derived_states["cold_plenum"][0]
 
     assert abs(T_hot_with - T_hot_without) < 1e-6, (
         f"Hot T mismatch: {T_hot_with} vs {T_hot_without}"
@@ -244,7 +244,7 @@ def test_thermal_coupling_disabled_matches_no_wall():
     )
 
 
-def test_wall_coupling_jacobian_validation():
+def test_hot_coupling_jacobian_validation():
     """Test that assembled Jacobian matches column-wise finite difference.
 
     This validates the full chain rule implementation in _propagate_states.

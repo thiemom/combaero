@@ -317,7 +317,7 @@ sol_pin = cb.channel_pin_fin(T, P, X, u,
                               S_D=2.5, X_D=2.5, N_rows=4)
 
 # With wall temperature (enables q calculation)
-sol_q = cb.channel_smooth(T, P, X, u, D, L, T_wall=800.0)
+sol_q = cb.channel_smooth(T, P, X, u, D, L, T_hot=800.0)
 print(f"q = {sol_q.q/1000:.1f} kW/m2")
 ```
 

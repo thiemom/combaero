@@ -365,7 +365,7 @@ double overall_htc_wall(double h_inner, double h_outer, const std::vector<double
 // Smooth channel
 ChannelResult channel_smooth(double T, double P, const std::vector<double>& X,
                               double velocity, double diameter, double length,
-                              double T_wall = std::numeric_limits<double>::quiet_NaN(),
+                              double T_hot = std::numeric_limits<double>::quiet_NaN(),
                               const std::string& correlation = "gnielinski",
                               bool heating = true, double Nu_multiplier = 1.0,
                               double f_multiplier = 1.0);
@@ -374,25 +374,25 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double>& X,
 ChannelResult channel_ribbed(double T, double P, const std::vector<double>& X,
                              double velocity, double diameter, double length,
                              double e_D, double p_e, double w_e,
-                             double T_wall = std::numeric_limits<double>::quiet_NaN(),
+                             double T_hot = std::numeric_limits<double>::quiet_NaN(),
                              double Nu_multiplier = 1.0, double f_multiplier = 1.0);
 
 ChannelResult channel_dimpled(double T, double P, const std::vector<double>& X,
                               double velocity, double diameter, double length,
                               double d_Dh, double h_d, double S_d,
-                              double T_wall = std::numeric_limits<double>::quiet_NaN(),
+                              double T_hot = std::numeric_limits<double>::quiet_NaN(),
                               double Nu_multiplier = 1.0, double f_multiplier = 1.0);
 
 ChannelResult channel_pin_fin(double T, double P, const std::vector<double>& X,
                               double velocity, double diameter, double length,
                               double L_H, double S_H, double S_L, double t_D,
-                              double T_wall = std::numeric_limits<double>::quiet_NaN(),
+                              double T_hot = std::numeric_limits<double>::quiet_NaN(),
                               double Nu_multiplier = 1.0, double f_multiplier = 1.0);
 
 ChannelResult channel_impingement(double T, double P, const std::vector<double>& X,
                                   double velocity, double diameter, double length,
                                   double H_D, double S_n, double d_j, double N_j,
-                                  double T_wall = std::numeric_limits<double>::quiet_NaN(),
+                                  double T_hot = std::numeric_limits<double>::quiet_NaN(),
                                   double Nu_multiplier = 1.0, double f_multiplier = 1.0);
 ```
 
@@ -417,7 +417,7 @@ struct ChannelResult {
     double dP;             // Pressure drop [Pa]
     double M;              // Mach number [-]
     double T_aw;           // Adiabatic wall temperature [K]
-    double q;              // Heat flux [W/m²] (nan if T_wall not supplied)
+    double q;              // Heat flux [W/m²] (nan if T_hot not supplied)
 
     // Jacobians
     double dh_dmdot;       // dh/dmdot [W/(m²·K·kg/s)]
@@ -428,7 +428,7 @@ struct ChannelResult {
     double dT_aw_dT;       // dT_aw/dT [-] (approx 1 at low Mach)
     double dq_dmdot;       // dq/dmdot [W·s/(m²·kg)]
     double dq_dT;          // dq/dT [W/(m²·K)]
-    double dq_dT_wall;     // dq/dT_wall [W/(m²·K)]
+    double dq_dT_hot;     // dq/dT_hot [W/(m²·K)]
 };
 
 struct WallCouplingResult {

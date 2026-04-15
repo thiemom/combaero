@@ -15,11 +15,11 @@ def test_channel_smooth_jacobians_gnielinski():
     velocity = 50.0  # m/s
     diameter = 0.02  # m
     length = 0.5  # m
-    T_wall = 1200.0  # K
+    T_hot = 1200.0  # K
 
     # Get baseline result
     result = cb.channel_smooth(
-        T, P, X, velocity, diameter, length, T_wall=T_wall, correlation="gnielinski"
+        T, P, X, velocity, diameter, length, T_hot=T_hot, correlation="gnielinski"
     )
 
     # Verify Jacobian fields exist and are non-zero
@@ -29,7 +29,7 @@ def test_channel_smooth_jacobians_gnielinski():
     assert hasattr(result, "ddP_dT")
     assert hasattr(result, "dq_dmdot")
     assert hasattr(result, "dq_dT")
-    assert hasattr(result, "dq_dT_wall")
+    assert hasattr(result, "dq_dT_hot")
 
     # Compute mass flow rate
     rho = cb.density(T, P, X)
@@ -41,8 +41,8 @@ def test_channel_smooth_jacobians_gnielinski():
     v_plus = (mdot + eps_mdot) / (rho * A_cross)
     v_minus = (mdot - eps_mdot) / (rho * A_cross)
 
-    h_plus = cb.channel_smooth(T, P, X, v_plus, diameter, length, T_wall, "gnielinski").h
-    h_minus = cb.channel_smooth(T, P, X, v_minus, diameter, length, T_wall, "gnielinski").h
+    h_plus = cb.channel_smooth(T, P, X, v_plus, diameter, length, T_hot, "gnielinski").h
+    h_minus = cb.channel_smooth(T, P, X, v_minus, diameter, length, T_hot, "gnielinski").h
     dh_dmdot_fd = (h_plus - h_minus) / (2 * eps_mdot)
 
     # Check relative error
@@ -65,8 +65,8 @@ def test_channel_smooth_jacobians_gnielinski():
         # Just verify it's non-zero and computed
         assert result.dh_dT != 0.0, "dh/dT should be non-zero"
 
-    # Verify dq/dT_wall = -h
-    assert abs(result.dq_dT_wall + result.h) < 1e-6, "dq/dT_wall should equal -h"
+    # Verify dq/dT_hot = -h
+    assert abs(result.dq_dT_hot + result.h) < 1e-6, "dq/dT_hot should equal -h"
 
 
 def test_channel_smooth_jacobians_dittus_boelter():
@@ -77,7 +77,7 @@ def test_channel_smooth_jacobians_dittus_boelter():
     velocity = 80.0  # High velocity for turbulent Re > 10000
     diameter = 0.03
     length = 1.0
-    T_wall = 900.0
+    T_hot = 900.0
 
     result = cb.channel_smooth(
         T,
@@ -86,7 +86,7 @@ def test_channel_smooth_jacobians_dittus_boelter():
         velocity,
         diameter,
         length,
-        T_wall=T_wall,
+        T_hot=T_hot,
         correlation="dittus_boelter",
         heating=True,
     )
@@ -117,22 +117,20 @@ def test_channel_smooth_multipliers():
     velocity = 60.0
     diameter = 0.025
     length = 0.8
-    T_wall = 1000.0
+    T_hot = 1000.0
 
     # Baseline
-    base = cb.channel_smooth(T, P, X, velocity, diameter, length, T_wall)
+    base = cb.channel_smooth(T, P, X, velocity, diameter, length, T_hot)
 
     # With Nu multiplier
     Nu_mult = 1.2
-    result_Nu = cb.channel_smooth(
-        T, P, X, velocity, diameter, length, T_wall, Nu_multiplier=Nu_mult
-    )
+    result_Nu = cb.channel_smooth(T, P, X, velocity, diameter, length, T_hot, Nu_multiplier=Nu_mult)
     assert abs(result_Nu.h - base.h * Nu_mult) < 1e-6, "Nu_multiplier should scale h linearly"
     assert abs(result_Nu.Nu - base.Nu * Nu_mult) < 1e-6, "Nu_multiplier should scale Nu linearly"
 
     # With f multiplier
     f_mult = 0.9
-    result_f = cb.channel_smooth(T, P, X, velocity, diameter, length, T_wall, f_multiplier=f_mult)
+    result_f = cb.channel_smooth(T, P, X, velocity, diameter, length, T_hot, f_multiplier=f_mult)
     assert abs(result_f.f - base.f * f_mult) < 1e-6, "f_multiplier should scale f linearly"
     assert abs(result_f.dP - base.dP * f_mult) < 1e-6, "f_multiplier should scale dP linearly"
 
@@ -173,19 +171,19 @@ def test_channel_ribbed_jacobians():
     velocity = 60.0
     diameter = 0.025
     length = 0.6
-    T_wall = 1100.0
+    T_hot = 1100.0
     e_D = 0.05
     pitch_to_height = 10.0
     alpha_deg = 60.0
 
     result = cb.channel_ribbed(
-        T, P, X, velocity, diameter, length, e_D, pitch_to_height, alpha_deg, T_wall
+        T, P, X, velocity, diameter, length, e_D, pitch_to_height, alpha_deg, T_hot
     )
 
     # Verify Jacobian fields are populated
     assert result.dh_dmdot != 0.0
     assert result.ddP_dmdot != 0.0
-    assert result.dq_dT_wall == -result.h
+    assert result.dq_dT_hot == -result.h
 
     # Verify multipliers work
     Nu_mult = 1.1
@@ -199,7 +197,7 @@ def test_channel_ribbed_jacobians():
         e_D,
         pitch_to_height,
         alpha_deg,
-        T_wall,
+        T_hot,
         Nu_multiplier=Nu_mult,
     )
     assert abs(result_mult.h - result.h * Nu_mult) < 1e-6
@@ -216,16 +214,16 @@ def test_channel_pin_fin_jacobians():
     S_D = 2.5
     X_D = 2.5
     N_rows = 5
-    T_wall = 900.0
+    T_hot = 900.0
 
     result = cb.channel_pin_fin(
-        T, P, X, velocity, channel_height, pin_diameter, S_D, X_D, N_rows, T_wall
+        T, P, X, velocity, channel_height, pin_diameter, S_D, X_D, N_rows, T_hot
     )
 
     # Verify Jacobian fields are populated
     assert result.dh_dmdot != 0.0
     assert result.ddP_dmdot != 0.0
-    assert result.dq_dT_wall == -result.h
+    assert result.dq_dT_hot == -result.h
 
 
 if __name__ == "__main__":

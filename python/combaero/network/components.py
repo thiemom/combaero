@@ -117,7 +117,7 @@ class ConvectiveSurface:
         Model-specific subclass holding geometry parameters.
     heating : bool | None
         True if fluid is being heated, False if cooled, None = auto-detect
-        from sign of (T_wall - T_fluid).
+        from sign of (T_hot - T_fluid).
     Nu_multiplier : float
         Empirical correction factor on Nusselt number (default 1.0).
     f_multiplier : float
@@ -138,7 +138,7 @@ class ConvectiveSurface:
         velocity: float,
         diameter: float,
         length: float,
-        T_wall: float = math.nan,
+        T_hot: float = math.nan,
     ):
         """Compute heat transfer coefficient and adiabatic wall temperature.
 
@@ -156,7 +156,7 @@ class ConvectiveSurface:
             Hydraulic diameter [m].
         length : float
             Channel length [m].
-        T_wall : float, optional
+        T_hot : float, optional
             Wall temperature [K]. Used for auto-detection of heating/cooling.
 
         Returns
@@ -172,13 +172,13 @@ class ConvectiveSurface:
         if self.area == 0.0 or abs(velocity) < 1e-12:
             return None
 
-        # Auto-detect heating direction from T_wall - T sign
+        # Auto-detect heating direction from T_hot - T sign
         if self.heating is not None:
             heating = self.heating
-        elif math.isfinite(T_wall):
-            heating = T_wall >= T
+        elif math.isfinite(T_hot):
+            heating = T_hot >= T
         else:
-            heating = True  # default when T_wall unknown
+            heating = True  # default when T_hot unknown
 
         # Dispatch to appropriate C++ channel_* function based on model type
         if isinstance(self.model, SmoothModel):
@@ -189,7 +189,7 @@ class ConvectiveSurface:
                 velocity,
                 diameter,
                 length,
-                T_wall=T_wall,
+                T_hot=T_hot,
                 correlation=self.model.correlation,
                 heating=heating,
                 mu_ratio=self.model.mu_ratio,
@@ -208,7 +208,7 @@ class ConvectiveSurface:
                 self.model.e_D,
                 self.model.pitch_to_height,
                 self.model.alpha_deg,
-                T_wall=T_wall,
+                T_hot=T_hot,
                 heating=heating,
                 Nu_multiplier=self.Nu_multiplier,
                 f_multiplier=self.f_multiplier,
@@ -224,7 +224,7 @@ class ConvectiveSurface:
                 self.model.d_Dh,
                 self.model.h_d,
                 self.model.S_d,
-                T_wall=T_wall,
+                T_hot=T_hot,
                 heating=heating,
                 Nu_multiplier=self.Nu_multiplier,
                 f_multiplier=self.f_multiplier,
@@ -240,7 +240,7 @@ class ConvectiveSurface:
                 self.model.S_D,
                 self.model.X_D,
                 self.model.N_rows,
-                T_wall=T_wall,
+                T_hot=T_hot,
                 is_staggered=self.model.is_staggered,
                 Nu_multiplier=self.Nu_multiplier,
                 f_multiplier=self.f_multiplier,
@@ -271,7 +271,7 @@ class ConvectiveSurface:
                 self.model.x_D,
                 self.model.y_D,
                 self.model.A_target,
-                T_wall=T_wall,
+                T_hot=T_hot,
                 Cd_jet=self.model.Cd_jet,
                 Nu_multiplier=self.Nu_multiplier,
                 f_multiplier=self.f_multiplier,
@@ -378,7 +378,7 @@ class ThermalWall:
         Returns
         -------
         WallCouplingResult
-            Object containing Q [W], T_wall [K], and analytical Jacobians.
+            Object containing Q [W], T_hot [K], and analytical Jacobians.
         """
         # 1. Update layer conductivities using temperatures from previous solve iteration
         # This implement the "lagged" k(T) update for stability.
@@ -725,7 +725,7 @@ class MomentumChamberNode(NetworkNode):
         port_angles_deg: dict[str, float] | None = None,
         length: float | None = None,
         surface: ConvectiveSurface | None = None,
-        t_wall: float | None = None,
+        t_hot: float | None = None,
         Dh: float | None = None,
     ):
         super().__init__(id)
@@ -734,7 +734,7 @@ class MomentumChamberNode(NetworkNode):
         self.length = length
         self.Dh = Dh
         self.surface = surface or ConvectiveSurface()
-        self.t_wall = t_wall
+        self.t_hot = t_hot
         self.upstream_elements = []
         self.energy_boundaries: list[EnergyBoundary] = []
 
@@ -791,7 +791,7 @@ class MomentumChamberNode(NetworkNode):
 
         import math
 
-        T_wall = self.t_wall if self.t_wall is not None else math.nan
+        T_hot = self.t_hot if self.t_hot is not None else math.nan
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
         rho, _ = _safe_rho(state.density())
         u = m_dot_total / (rho * self.area) if self.area > 0 else 1.0
@@ -806,7 +806,7 @@ class MomentumChamberNode(NetworkNode):
             velocity=u,
             diameter=diameter,
             length=length,
-            T_wall=T_wall,
+            T_hot=T_hot,
         )
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
@@ -1000,7 +1000,7 @@ class CombustorNode(NetworkNode):
         area: float = 0.1,
         Dh: float | None = None,
         surface: ConvectiveSurface | None = None,
-        t_wall: float | None = None,
+        t_hot: float | None = None,
     ):
         super().__init__(id)
         self.method = method
@@ -1008,7 +1008,7 @@ class CombustorNode(NetworkNode):
         self.area = area
         self.Dh = Dh
         self.surface = surface or ConvectiveSurface()
-        self.t_wall = t_wall
+        self.t_hot = t_hot
         self.upstream_elements = []
         self.fuel_boundary = None
         self.energy_boundaries: list[EnergyBoundary] = []
@@ -1161,13 +1161,13 @@ class CombustorNode(NetworkNode):
 
         import math
 
-        T_wall = self.t_wall if self.t_wall is not None else math.nan
+        T_hot = self.t_hot if self.t_hot is not None else math.nan
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
         rho, _ = _safe_rho(state.density())
         u = m_dot_total / (rho * self.area) if self.area > 0 else 1.0
 
-        diameter = self.Dh if self.Dh is not None else math.sqrt(4.0 * self.area / math.pi)
-        length = diameter  # Combustors are modelled as a single zone
+        diameter = self.Dh if self.Dh is not None else 0.01
+        length = 0.1  # Combustors are modelled as a single zone
 
         return self.surface.htc_and_T(
             T=state.T,
@@ -1176,7 +1176,7 @@ class CombustorNode(NetworkNode):
             velocity=u,
             diameter=diameter,
             length=length,
-            T_wall=T_wall,
+            T_hot=T_hot,
         )
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
@@ -1453,6 +1453,14 @@ class OrificeElement(NetworkElement):
             "mach": mach_physical,
             "mach_throat": mach_throat,
             "p_ratio": p_ratio,
+            "P_in": state_in.P,
+            "P_out": state_out.P,
+            "T_in": state_in.T,
+            "T_out": state_out.T,
+            "Pt_in": state_in.P_total,
+            "Pt_out": state_out.P_total,
+            "Tt_in": state_in.T_total,
+            "Tt_out": state_out.T_total,
             "Cd": effective_cd,
             "is_correlation": float(self.use_correlation),
             # Thermo
@@ -1709,7 +1717,7 @@ class ChannelElement(NetworkElement):
         regime: CompressibilityLiteral = "incompressible",
         friction_model: FrictionModelLiteral = "haaland",
         htc_model: HeatTransferModelLiteral = "none",
-        t_wall: float | None = None,
+        t_hot: float | None = None,
         surface: ConvectiveSurface | None = None,
     ):
         super().__init__(id, from_node, to_node)
@@ -1721,7 +1729,7 @@ class ChannelElement(NetworkElement):
         self.regime = regime
         self.friction_model = friction_model
         self.htc_model = htc_model
-        self.t_wall = t_wall
+        self.t_hot = t_hot
         self.surface = surface or ConvectiveSurface()
 
     @property
@@ -1859,6 +1867,14 @@ class ChannelElement(NetworkElement):
             "p_ratio_total": p_ratio_total,
             "Re": re_in,
             "dP": max(0.0, state_in.P_total - state_out.P_total),
+            "P_in": state_in.P,
+            "P_out": state_out.P,
+            "T_in": state_in.T,
+            "T_out": state_out.T,
+            "Pt_in": state_in.P_total,
+            "Pt_out": state_out.P_total,
+            "Tt_in": state_in.T_total,
+            "Tt_out": state_out.T_total,
         }
 
         # Heat Transfer diagnostics
@@ -1974,8 +1990,8 @@ class ChannelElement(NetworkElement):
         rho, _ = _safe_rho(state.density())
         u = state.m_dot / (rho * self.area) if self.area > 0 else 1.0
 
-        # Use nan for T_wall if not specified (matches C++ default)
-        T_wall = self.t_wall if self.t_wall is not None else math.nan
+        # Use nan for T_hot if not specified (matches C++ default)
+        T_hot = self.t_hot if self.t_hot is not None else math.nan
 
         return self.surface.htc_and_T(
             T=state.T,
@@ -1984,7 +2000,7 @@ class ChannelElement(NetworkElement):
             velocity=u,
             diameter=self.diameter,
             length=self.length,
-            T_wall=T_wall,
+            T_hot=T_hot,
         )
 
     def n_equations(self) -> int:

@@ -33,9 +33,9 @@ TEST(HeatTransferJacobiansTest, ChannelSmoothFiniteDifference) {
   const double diameter = 0.04;
   const double length = 1.0;
   const double velocity = 25.0;
-  const double T_wall = 900.0;
+  const double T_hot = 900.0;
 
-  auto evaluate = [&](double T_eval, double velocity_eval, double T_wall_eval) {
+  auto evaluate = [&](double T_eval, double velocity_eval, double T_hot_eval) {
     return channel_smooth(
         T_eval,
         P,
@@ -43,7 +43,7 @@ TEST(HeatTransferJacobiansTest, ChannelSmoothFiniteDifference) {
         velocity_eval,
         diameter,
         length,
-        T_wall_eval,
+        T_hot_eval,
         "gnielinski",
         true,
         1.0,
@@ -52,7 +52,7 @@ TEST(HeatTransferJacobiansTest, ChannelSmoothFiniteDifference) {
         1.0);
   };
 
-  ChannelResult base = evaluate(T, velocity, T_wall);
+  ChannelResult base = evaluate(T, velocity, T_hot);
   ASSERT_TRUE(std::isfinite(base.h));
   ASSERT_TRUE(std::isfinite(base.q));
 
@@ -63,8 +63,8 @@ TEST(HeatTransferJacobiansTest, ChannelSmoothFiniteDifference) {
   // --- Mass-flow derivatives ---
   const double eps_mdot = 1e-4 * mdot;
   const double delta_v = eps_mdot / (rho * area);
-  ChannelResult plus_m = evaluate(T, velocity + delta_v, T_wall);
-  ChannelResult minus_m = evaluate(T, velocity - delta_v, T_wall);
+  ChannelResult plus_m = evaluate(T, velocity + delta_v, T_hot);
+  ChannelResult minus_m = evaluate(T, velocity - delta_v, T_hot);
 
   auto fd_mdot = [&](double ChannelResult::*member) {
     return (plus_m.*member - minus_m.*member) / (2.0 * eps_mdot);
@@ -91,7 +91,7 @@ TEST(HeatTransferJacobiansTest, ChannelSmoothFiniteDifference) {
   auto eval_at_T = [&](double T_eval) {
     double rho_eval = density(T_eval, P, X);
     double velocity_eval = velocity_from_mass_flow(mdot, rho_eval, diameter);
-    return evaluate(T_eval, velocity_eval, T_wall);
+    return evaluate(T_eval, velocity_eval, T_hot);
   };
 
   ChannelResult plus_T = eval_at_T(T + eps_T);
@@ -119,11 +119,11 @@ TEST(HeatTransferJacobiansTest, ChannelSmoothFiniteDifference) {
 
   // --- Wall temperature derivative ---
   const double eps_Twall = 0.5;
-  ChannelResult plus_Tw = evaluate(T, velocity, T_wall + eps_Twall);
-  ChannelResult minus_Tw = evaluate(T, velocity, T_wall - eps_Twall);
-  double fd_dq_dT_wall = (plus_Tw.q - minus_Tw.q) / (2.0 * eps_Twall);
-  EXPECT_NEAR(base.dq_dT_wall, fd_dq_dT_wall,
-              std::max(1e-6, std::abs(fd_dq_dT_wall) * 1e-3));
+  ChannelResult plus_Tw = evaluate(T, velocity, T_hot + eps_Twall);
+  ChannelResult minus_Tw = evaluate(T, velocity, T_hot - eps_Twall);
+  double fd_dq_dT_hot = (plus_Tw.q - minus_Tw.q) / (2.0 * eps_Twall);
+  EXPECT_NEAR(base.dq_dT_hot, fd_dq_dT_hot,
+              std::max(1e-6, std::abs(fd_dq_dT_hot) * 1e-3));
 }
 
 TEST(HeatTransferJacobiansTest, WallCouplingFiniteDifference) {
@@ -273,7 +273,7 @@ TEST(HeatTransferJacobiansTest, ChannelRibbedFiniteDifference) {
   const double diameter = 0.05;
   const double length = 1.2;
   const double velocity = 35.0;
-  const double T_wall = 800.0;
+  const double T_hot = 800.0;
   const double e_D = 0.06;
   const double pitch_to_height = 10.0;
   const double alpha_deg = 45.0;
@@ -281,7 +281,7 @@ TEST(HeatTransferJacobiansTest, ChannelRibbedFiniteDifference) {
   auto evaluate = [&](double T_eval, double velocity_eval) {
     return channel_ribbed(
         T_eval, P, X, velocity_eval, diameter, length,
-        e_D, pitch_to_height, alpha_deg, T_wall, true, 1.0, 1.0);
+        e_D, pitch_to_height, alpha_deg, T_hot, true, 1.0, 1.0);
   };
 
   ChannelResult base = evaluate(T, velocity);
@@ -323,7 +323,7 @@ TEST(HeatTransferJacobiansTest, ChannelDimpledFiniteDifference) {
   const double diameter = 0.03;
   const double length = 0.8;
   const double velocity = 40.0;
-  const double T_wall = 700.0;
+  const double T_hot = 700.0;
   const double d_Dh = 0.2;
   const double h_d = 0.15;
   const double S_d = 2.0;
@@ -331,7 +331,7 @@ TEST(HeatTransferJacobiansTest, ChannelDimpledFiniteDifference) {
   auto evaluate = [&](double T_eval, double velocity_eval) {
     return channel_dimpled(
         T_eval, P, X, velocity_eval, diameter, length,
-        d_Dh, h_d, S_d, T_wall, true, 1.0, 1.0);
+        d_Dh, h_d, S_d, T_hot, true, 1.0, 1.0);
   };
 
   ChannelResult base = evaluate(T, velocity);
@@ -376,12 +376,12 @@ TEST(HeatTransferJacobiansTest, ChannelPinFinFiniteDifference) {
   const double S_D = 2.5;
   const double X_D = 2.5;
   const int N_rows = 10;
-  const double T_wall = 600.0;
+  const double T_hot = 600.0;
 
   auto evaluate = [&](double T_eval, double velocity_eval) {
     return channel_pin_fin(
         T_eval, P, X, velocity_eval, channel_height, pin_diameter,
-        S_D, X_D, N_rows, T_wall, true, 1.0, 1.0);
+        S_D, X_D, N_rows, T_hot, true, 1.0, 1.0);
   };
 
   ChannelResult base = evaluate(T, velocity);
@@ -426,11 +426,11 @@ TEST(HeatTransferJacobiansTest, ChannelImpingementFiniteDifference) {
   const double x_D = 6.0;
   const double y_D = 6.0;
   const double A_target = 0.01;
-  const double T_wall = 550.0;
+  const double T_hot = 550.0;
 
   auto evaluate = [&](double T_eval, double mdot_eval) {
     return channel_impingement(
-        T_eval, P, X, mdot_eval, d_jet, z_D, x_D, y_D, A_target, T_wall, 0.8, 1.0, 1.0);
+        T_eval, P, X, mdot_eval, d_jet, z_D, x_D, y_D, A_target, T_hot, 0.8, 1.0, 1.0);
   };
 
   ChannelResult base = evaluate(T, mdot_jet);

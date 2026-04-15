@@ -791,10 +791,10 @@ htc_circular_channel(double T, double P, const std::vector<double> &X,
 
 static ChannelResult make_channel_result(double h, double Nu, double Re,
                                          double Pr, double f, double dP,
-                                         double M, double T_aw, double T_wall) {
+                                         double M, double T_aw, double T_hot) {
   double q = std::numeric_limits<double>::quiet_NaN();
-  if (std::isfinite(T_wall)) {
-    q = h * (T_aw - T_wall);
+  if (std::isfinite(T_hot)) {
+    q = h * (T_aw - T_hot);
   }
   return ChannelResult{h, Nu, Re, Pr, f, dP, M, T_aw, q};
 }
@@ -804,9 +804,10 @@ static ChannelResult make_channel_result(double h, double Nu, double Re,
 // channel_smooth
 // -------------------------------------------------------------
 
-ChannelResult channel_smooth(double T, double P, const std::vector<double> &X,
-                             double velocity, double diameter, double length,
-                             double T_wall, const std::string &correlation,
+ChannelResult
+channel_smooth(double T, double P, const std::vector<double> &X,
+               double velocity, double diameter, double length,
+               double T_hot, const std::string &correlation,
                              bool heating, double mu_ratio, double roughness,
                              double Nu_multiplier, double f_multiplier) {
   if (velocity < 0.0) {
@@ -896,7 +897,7 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double> &X,
   // velocity = mdot / (rho * A_cross), where A_cross = pi/4 * D^2
   // We compute derivatives w.r.t. mdot and T
 
-  ChannelResult result = make_channel_result(h, Nu, Re, Pr, f, dP, M, T_aw, T_wall);
+  ChannelResult result = make_channel_result(h, Nu, Re, Pr, f, dP, M, T_aw, T_hot);
 
   // Only compute Jacobians if flow exists
   if (velocity > 0.0 && Re > 0.0) {
@@ -1010,8 +1011,8 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double> &X,
     result.ddP_dT = df_dRe * dRe_dT * dP_factor * mdot * mdot
                   - f * (length / diameter) * velocity * velocity / 2.0 * drho_dT;
 
-    // dq/dmdot and dq/dT: q = h * (T_aw - T_wall)
-    // Full product rule: dq/dx = dh/dx * (T_aw - T_wall) + h * dT_aw/dx
+    // dq/dmdot and dq/dT: q = h * (T_aw - T_hot)
+    // Full product rule: dq/dx = dh/dx * (T_aw - T_hot) + h * dT_aw/dx
     // T_aw derivatives — always computed so Python relay can use them
     // T_aw = T + r * v^2 / (2*cp), where v = mdot/(rho*A), r = Pr^(1/3)
     double cp_mass_val = cp_mass(T, X);
@@ -1030,11 +1031,11 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double> &X,
     double T_aw_minus = T_adiabatic_wall(T - eps_T_aw, v_minus, T - eps_T_aw, P, X, turbulent_flow);
     result.dT_aw_dT = (T_aw_plus - T_aw_minus) / (2.0 * eps_T_aw);
 
-    if (std::isfinite(T_wall)) {
-      double dT_diff = T_aw - T_wall;
+    if (std::isfinite(T_hot)) {
+      double dT_diff = result.T_aw - T_hot;
       result.dq_dmdot = result.dh_dmdot * dT_diff + h * result.dT_aw_dmdot;
       result.dq_dT = result.dh_dT * dT_diff + h * result.dT_aw_dT;
-      result.dq_dT_wall = -h;
+      result.dq_dT_hot = -h;
     }
   }
 
@@ -1048,12 +1049,12 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double> &X,
 ChannelResult channel_ribbed(double T, double P, const std::vector<double> &X,
                              double velocity, double diameter, double length,
                              double e_D, double pitch_to_height,
-                             double alpha_deg, double T_wall, bool heating,
+                             double alpha_deg, double T_hot, bool heating,
                              double Nu_multiplier, double f_multiplier) {
   // Get smooth-pipe baseline (Gnielinski, no roughness)
   // Pass multipliers to baseline - they will be applied after rib factors
   ChannelResult base = channel_smooth(T, P, X, velocity, diameter, length,
-                                      T_wall, "gnielinski", heating, 1.0, 0.0,
+                                      T_hot, "gnielinski", heating, 1.0, 0.0,
                                       Nu_multiplier, f_multiplier);
 
   // Apply rib multipliers to the baseline (before user multipliers)
@@ -1074,7 +1075,7 @@ ChannelResult channel_ribbed(double T, double P, const std::vector<double> &X,
                                    : 0.0;
 
   ChannelResult result = make_channel_result(h_rib, Nu_rib, base.Re, base.Pr, f_rib, dP_rib,
-                             base.M, base.T_aw, T_wall);
+                             base.M, base.T_aw, T_hot);
 
   // Propagate Jacobians: scale by rib enhancement factors
   // dh_rib/dmdot = enh * dh_base/dmdot
@@ -1086,7 +1087,7 @@ ChannelResult channel_ribbed(double T, double P, const std::vector<double> &X,
   result.dT_aw_dT = base.dT_aw_dT;
   result.dq_dmdot = enh * base.dq_dmdot;
   result.dq_dT = enh * base.dq_dT;
-  result.dq_dT_wall = base.dq_dT_wall * enh;  // = -h_rib
+  result.dq_dT_hot = base.dq_dT_hot * enh;  // = -h_rib
 
   return result;
 }
@@ -1098,11 +1099,11 @@ ChannelResult channel_ribbed(double T, double P, const std::vector<double> &X,
 ChannelResult channel_dimpled(double T, double P, const std::vector<double> &X,
                               double velocity, double diameter, double length,
                               double d_Dh, double h_d, double S_d,
-                              double T_wall, bool heating,
+                              double T_hot, bool heating,
                               double Nu_multiplier, double f_multiplier) {
   // Get smooth-pipe baseline
   ChannelResult base = channel_smooth(T, P, X, velocity, diameter, length,
-                                      T_wall, "gnielinski", heating, 1.0, 0.0,
+                                      T_hot, "gnielinski", heating, 1.0, 0.0,
                                       Nu_multiplier, f_multiplier);
 
   // Apply dimple multipliers
@@ -1122,7 +1123,7 @@ ChannelResult channel_dimpled(double T, double P, const std::vector<double> &X,
                                    : 0.0;
 
   ChannelResult result = make_channel_result(h_dim, Nu_dim, base.Re, base.Pr, f_dim, dP_dim,
-                             base.M, base.T_aw, T_wall);
+                             base.M, base.T_aw, T_hot);
 
   // Propagate Jacobians: h = h_smooth * enh(Re), dP = dP_smooth * fmul
   // dh/dx = dh_smooth/dx * enh + h_smooth * (denh/dRe * dRe/dx)
@@ -1141,12 +1142,11 @@ ChannelResult channel_dimpled(double T, double P, const std::vector<double> &X,
     result.dT_aw_dmdot = base.dT_aw_dmdot;
     result.dT_aw_dT = base.dT_aw_dT;
 
-    if (std::isfinite(T_wall)) {
-      double h_dim = result.h;
-      double T_aw = result.T_aw;
-      result.dq_dmdot = result.dh_dmdot * (T_aw - T_wall) + h_dim * result.dT_aw_dmdot;
-      result.dq_dT = result.dh_dT * (T_aw - T_wall) + h_dim * result.dT_aw_dT;
-      result.dq_dT_wall = -h_dim;
+    if (std::isfinite(T_hot)) {
+      double dT_diff = result.T_aw - T_hot;
+      result.dq_dmdot = result.dh_dmdot * dT_diff + h_dim * result.dT_aw_dmdot;
+      result.dq_dT = result.dh_dT * dT_diff + h_dim * result.dT_aw_dT;
+      result.dq_dT_hot = -h_dim;
     }
   }
 
@@ -1160,7 +1160,7 @@ ChannelResult channel_dimpled(double T, double P, const std::vector<double> &X,
 ChannelResult channel_pin_fin(double T, double P, const std::vector<double> &X,
                               double velocity, double channel_height,
                               double pin_diameter, double S_D, double X_D,
-                              int N_rows, double T_wall, bool is_staggered,
+                              int N_rows, double T_hot, bool is_staggered,
                               double Nu_multiplier, double f_multiplier) {
   if (velocity < 0.0) {
     throw std::invalid_argument(
@@ -1215,7 +1215,7 @@ ChannelResult channel_pin_fin(double T, double P, const std::vector<double> &X,
   const bool turbulent_flow = true;
   double T_aw = T_adiabatic_wall(T, velocity, T, P, X, turbulent_flow);
 
-  ChannelResult result = make_channel_result(h, Nu, Re_d, Pr, f_pin, dP, M, T_aw, T_wall);
+  ChannelResult result = make_channel_result(h, Nu, Re_d, Pr, f_pin, dP, M, T_aw, T_hot);
 
   // Compute Jacobians (simplified - captures dominant Re dependence)
   if (velocity > 0.0 && Re_d > 0.0) {
@@ -1275,11 +1275,11 @@ ChannelResult channel_pin_fin(double T, double P, const std::vector<double> &X,
     double T_aw_minus = T_adiabatic_wall(T - eps_T_aw, v_minus, T - eps_T_aw, P, X, turbulent_flow);
     result.dT_aw_dT = (T_aw_plus - T_aw_minus) / (2.0 * eps_T_aw);
 
-    if (std::isfinite(T_wall)) {
-      double dT_diff = T_aw - T_wall;
+    if (std::isfinite(T_hot)) {
+      double dT_diff = result.T_aw - T_hot;
       result.dq_dmdot = result.dh_dmdot * dT_diff + h * result.dT_aw_dmdot;
       result.dq_dT = result.dh_dT * dT_diff + h * result.dT_aw_dT;
-      result.dq_dT_wall = -h;
+      result.dq_dT_hot = -h;
     }
   }
 
@@ -1293,7 +1293,7 @@ ChannelResult channel_pin_fin(double T, double P, const std::vector<double> &X,
 ChannelResult channel_impingement(double T, double P,
                                   const std::vector<double> &X, double mdot_jet,
                                   double d_jet, double z_D, double x_D,
-                                  double y_D, double A_target, double T_wall,
+                                  double y_D, double A_target, double T_hot,
                                   double Cd_jet,
                                   double Nu_multiplier, double f_multiplier) {
   // mdot_jet can be negative during network solver reversed flow testing.
@@ -1342,7 +1342,7 @@ ChannelResult channel_impingement(double T, double P,
   double T_aw = T_adiabatic_wall(T, v_jet, T, P, X, turbulent_flow);
 
 
-  ChannelResult result = make_channel_result(h, Nu, Re_jet, Pr, f, dP, M, T_aw, T_wall);
+  ChannelResult result = make_channel_result(h, Nu, Re_jet, Pr, f, dP, M, T_aw, T_hot);
 
   // Compute Jacobians (simplified - captures dominant Re dependence)
   if (mdot_jet > 0.0 && Re_jet > 0.0) {
@@ -1389,11 +1389,11 @@ ChannelResult channel_impingement(double T, double P,
     double T_aw_minus = T_adiabatic_wall(T - eps_T_aw, v_minus, T - eps_T_aw, P, X, turbulent_flow);
     result.dT_aw_dT = (T_aw_plus - T_aw_minus) / (2.0 * eps_T_aw);
 
-    if (std::isfinite(T_wall)) {
-      double dT_diff = T_aw - T_wall;
+    if (std::isfinite(T_hot)) {
+      double dT_diff = result.T_aw - T_hot;
       result.dq_dmdot = result.dh_dmdot * dT_diff + h * result.dT_aw_dmdot;
       result.dq_dT = result.dh_dT * dT_diff + h * result.dT_aw_dT;
-      result.dq_dT_wall = -h;
+      result.dq_dT_hot = -h;
     }
   }
 
@@ -1423,7 +1423,7 @@ WallCouplingResult wall_coupling_and_jacobian(
 
   // Wall temperature on side A (surface temperature)
   // Safely handled via resistance ratio to avoid 0/0
-  result.T_wall = T_aw_a - dT * (R_a / R_total);
+  result.T_hot = T_aw_a - dT * (R_a / R_total);
 
   // Jacobians: dQ/dh = A * dT * dU/dh
   // dU/dh_a = 1 / (R_total * h_a)^2
@@ -1460,8 +1460,8 @@ WallCouplingResult wall_coupling_and_jacobian(
   double dT = T_aw_a - T_aw_b;
   result.Q = U * A * dT;
 
-  // T_wall on side A (surface temperature)
-  result.T_wall = T_aw_a - dT * (R_a / R_total);
+  // T_hot on side A (surface temperature)
+  result.T_hot = T_aw_a - dT * (R_a / R_total);
 
   // Jacobians
   double factor_a = 1.0 / (1.0 + (R_total - R_a) * h_a);

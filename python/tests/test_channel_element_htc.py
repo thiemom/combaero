@@ -23,7 +23,7 @@ CHANNEL_RESULT_JACOBIANS = {
     "ddP_dT",
     "dq_dmdot",
     "dq_dT",
-    "dq_dT_wall",
+    "dq_dT_hot",
 }
 
 
@@ -154,7 +154,7 @@ def test_convective_surface_exposes_jacobians(model_name: str, model: object) ->
         velocity=velocity,
         diameter=0.04,
         length=1.2,
-        T_wall=math.nan,
+        T_hot=math.nan,
     )
     _assert_jacobians_not_discarded(result, f"ConvectiveSurface({model_name})")
 
@@ -188,7 +188,7 @@ def test_channel_element_exposes_jacobians(model_name: str, model: object) -> No
     _assert_jacobians_not_discarded(result, f"ChannelElement({model_name})")
 
 
-def test_channel_element_with_t_wall():
+def test_channel_element_with_t_hot():
     """Test ChannelElement with specified wall temperature."""
     surface = ConvectiveSurface(
         area=0.1,
@@ -203,7 +203,7 @@ def test_channel_element_with_t_wall():
         diameter=0.05,
         roughness=1e-5,
         surface=surface,
-        t_wall=400.0,  # Wall temperature specified
+        t_hot=400.0,  # Wall temperature specified
     )
 
     # Create test state

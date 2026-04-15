@@ -633,7 +633,7 @@ inline constexpr Entry function_units[] = {
     {"ChannelResult::dT_aw_dT", "-", "- (dimensionless)"},
     {"ChannelResult::dq_dmdot", "-", "W*s/(m^2*kg)"},
     {"ChannelResult::dq_dT", "-", "W/(m^2*K)"},
-    {"ChannelResult::dq_dT_wall", "-", "W/(m^2*K)"},
+    {"ChannelResult::dq_dT_hot", "-", "W/(m^2*K)"},
 
     // -------------------------------------------------------------------------
     // heat_transfer.h - Channel flow functions (HTC + pressure drop)
@@ -644,19 +644,19 @@ inline constexpr Entry function_units[] = {
      "ChannelResult"},
     {"channel_ribbed",
      "T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, e_D: -, "
-     "pitch_to_height: -, alpha_deg: deg, T_wall: K",
+     "pitch_to_height: -, alpha_deg: deg, T_hot: K",
      "ChannelResult"},
     {"channel_dimpled",
      "T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, d_Dh: -, "
-     "h_d: -, S_d: -, T_wall: K",
+     "h_d: -, S_d: -, T_hot: K",
      "ChannelResult"},
     {"channel_pin_fin",
      "T: K, P: Pa, X: mol/mol, velocity: m/s, channel_height: m, pin_diameter: "
-     "m, S_D: -, X_D: -, N_rows: -, T_wall: K",
+     "m, S_D: -, X_D: -, N_rows: -, T_hot: K",
      "ChannelResult"},
     {"channel_impingement",
      "T: K, P: Pa, X: mol/mol, mdot_jet: kg/s, d_jet: m, z_D: -, x_D: -, y_D: "
-     "-, A_target: m^2, T_wall: K",
+     "-, A_target: m^2, T_hot: K",
      "ChannelResult"},
 
     // -------------------------------------------------------------------------
