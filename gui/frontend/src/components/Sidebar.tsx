@@ -22,11 +22,17 @@ const Sidebar = () => {
 	const { saveNetwork, loadNetwork, solverSettings, updateSolverSettings } =
 		useStore();
 
-	const onSave = () => saveNetwork(filename);
+	const onSave = () => saveNetwork(filename.trim() || "network");
 
 	const onDragStart = (event: React.DragEvent, nodeType: string) => {
 		event.dataTransfer.setData("application/reactflow", nodeType);
 		event.dataTransfer.effectAllowed = "move";
+	};
+
+	const handleBlur = () => {
+		if (!filename.trim()) {
+			setFilename("network");
+		}
 	};
 
 	const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -188,8 +194,9 @@ const Sidebar = () => {
 					<div className="flex gap-1">
 						<input
 							type="text"
-							value={filename || "network"}
+							value={filename}
 							onChange={(e) => setFilename(e.target.value)}
+							onBlur={handleBlur}
 							className="p-1 border rounded text-xs w-full bg-white outline-none focus:ring-1 focus:ring-stone-200"
 							placeholder="MyNetwork"
 						/>
