@@ -980,6 +980,10 @@ class MassFlowBoundary(NetworkNode):
         pass
 
 
+def _zero_loss(ctx: object) -> tuple[float, float]:
+    return 0.0, 0.0
+
+
 class CombustorNode(NetworkNode):
     """
     Combustion chamber adding energy (and optionally mass) to the flow.
@@ -1044,33 +1048,40 @@ class CombustorNode(NetworkNode):
             return 300.0, list(cb.mole_to_mass(cb.species.dry_air())), None
 
         streams = [cb.MassStream(s.m_dot, s.T_total, s.P_total, s.Y) for s in upstream_states]
-        P_ref = upstream_states[0].P if upstream_states else 101325.0
+        if self._total_m_dot > 0.0:
+            P_ref = sum(s.m_dot * s.P_total for s in upstream_states) / self._total_m_dot
+        else:
+            P_ref = upstream_states[0].P_total
 
         Q_total = sum(eb.Q for eb in self.energy_boundaries)
         fraction_total = sum(eb.fraction for eb in self.energy_boundaries)
 
-        # Use new combustor C++ fast-path if available
-        if self.pressure_loss is not None:
-            mix_res = cb.combustor_residuals_and_jacobians(
-                streams,
-                P_ref,
-                Q=Q_total,
-                fraction=fraction_total,
-                pressure_loss=self.pressure_loss,
-                use_equilibrium=(self.method == "equilibrium"),
-            )
-        elif self.method == "equilibrium":
-            mix_res = cb.adiabatic_T_equilibrium_and_jacobians_from_streams(
-                streams, P_ref, Q=Q_total, fraction=fraction_total
-            )
-        else:
-            mix_res = cb.adiabatic_T_complete_and_jacobian_T_from_streams(
-                streams, P_ref, Q=Q_total, fraction=fraction_total
-            )
+        # Always use combustor_residuals_and_jacobians so P_total_mix Jacobian
+        # is populated correctly for the relay mechanism (even when no loss is set).
+        _loss_fn = self.pressure_loss if self.pressure_loss is not None else _zero_loss
+        mix_res = cb.combustor_residuals_and_jacobians(
+            streams,
+            P_ref,
+            Q=Q_total,
+            fraction=fraction_total,
+            pressure_loss=_loss_fn,
+            use_equilibrium=(self.method == "equilibrium"),
+        )
+        self._last_mix_res = mix_res
         return mix_res.T_mix, mix_res.Y_mix, mix_res
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
-        # Stagnation constraint: P_total = P
+        mix_res = getattr(self, "_last_mix_res", None)
+        if mix_res is not None:
+            # Enforce P_total == P_total_mix (computed value includes pressure loss).
+            # The P unknown is handled by the element residuals (pressure drop across elements).
+            # Jacobian: direct sensitivity to P_total unknown = 1;
+            # sensitivity to upstream unknowns via the relay (P_total_mix key).
+            p_total_computed = mix_res.P_total_mix
+            return [state.P_total - p_total_computed], {
+                0: {f"{self.id}.P_total": 1.0, f"{self.id}.P_total_mix": -1.0},
+            }
+        # Fallback: no loss computed yet, treat as lossless
         return [state.P_total - state.P], {0: {f"{self.id}.P": -1.0, f"{self.id}.P_total": 1.0}}
 
     def diagnostics(self, state: MixtureState) -> dict[str, float]:
