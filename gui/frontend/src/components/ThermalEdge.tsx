@@ -98,13 +98,12 @@ export default function ThermalEdge({
 					style={{
 						position: "absolute",
 						transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-						background: "#fff",
+						background: "rgba(255, 255, 255, 0.8)",
 						padding: "2px 4px",
 						borderRadius: "4px",
 						fontSize: "10px",
 						fontWeight: 700,
 						color: "#ff9800",
-						border: "1px solid #ff9800",
 						pointerEvents: "all",
 					}}
 					className="nodrag nopan flex flex-col items-center"
@@ -112,7 +111,7 @@ export default function ThermalEdge({
 					<span>{labelText}</span>
 
 					{probeText && (
-						<span className="text-[9px] text-gray-500 font-mono whitespace-nowrap">
+						<span className="text-[10px] text-gray-500 font-mono whitespace-nowrap">
 							{probeText}
 						</span>
 					)}

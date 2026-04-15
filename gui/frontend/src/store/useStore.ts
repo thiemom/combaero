@@ -40,7 +40,7 @@ export interface RFState {
 	setPressureUnit: (unit: "Pa" | "kPa" | "MPa") => void;
 	setLengthUnit: (unit: "m" | "mm") => void;
 	setAreaUnit: (unit: "m²" | "mm²") => void;
-	saveNetwork: (filename?: string) => void;
+	saveNetwork: (filename?: string) => void | Promise<void>;
 	loadNetwork: (data: any) => void;
 	dismissSolveStatus: () => void;
 }
@@ -199,18 +199,63 @@ const useStore = create<RFState>((set, get) => ({
 		}));
 	},
 
-	saveNetwork: (filename?: string) => {
+	saveNetwork: async (filename?: string) => {
 		const { nodes, edges, solverSettings } = get();
 		const data = { nodes, edges, solverSettings, version: "1.1" };
-		const blob = new Blob([JSON.stringify(data, null, 2)], {
+		const content = JSON.stringify(data, null, 2);
+
+		// Try File System Access API (Native "Save As" Dialog)
+		if ("showSaveFilePicker" in window) {
+			try {
+				const handle = await (window as any).showSaveFilePicker({
+					suggestedName: filename
+						? `${filename.trim()}.json`
+						: `combaero_network_${new Date().toISOString().split("T")[0]}.json`,
+					types: [
+						{
+							description: "CombAero Network JSON",
+							accept: { "application/json": [".json"] },
+						},
+					],
+				});
+				const writable = await handle.createWritable();
+				await writable.write(content);
+				await writable.close();
+				return;
+			} catch (err) {
+				// AbortError is perfectly normal (user clicked Cancel)
+				if ((err as Error).name === "AbortError") return;
+				console.warn(
+					"Native Save Picker failed, falling back to legacy download",
+					err,
+				);
+			}
+		} else {
+			console.info(
+				"File System Access API not supported in this browser. Using legacy download mode.",
+			);
+		}
+
+		// Fallback: the classic <a download> method
+		const blob = new Blob([content], {
 			type: "application/json",
 		});
 		const url = URL.createObjectURL(blob);
 		const link = document.createElement("a");
 		link.href = url;
+
+		// Smarter filename for sorting in legacy mode (adds timestamp if collision likely)
+		const timestamp = new Date()
+			.toLocaleTimeString("en-GB", {
+				hour: "2-digit",
+				minute: "2-digit",
+				second: "2-digit",
+			})
+			.replace(/:/g, "-");
+
 		link.download = filename
-			? `${filename}.json`
-			: `combaero_network_${new Date().toISOString().split("T")[0]}.json`;
+			? `${filename.trim()}.json`
+			: `combaero_network_${new Date().toISOString().split("T")[0]}_${timestamp}.json`;
 		document.body.appendChild(link);
 		link.click();
 		document.body.removeChild(link);
