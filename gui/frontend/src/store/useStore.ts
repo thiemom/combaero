@@ -75,8 +75,8 @@ const useStore = create<RFState>((set, get) => ({
 			type: isThermal ? "thermal" : "default",
 			markerEnd: isThermal
 				? {
-						type: MarkerType.Arrow,
-						color: "#ff9800",
+						type: MarkerType.ArrowClosed,
+						color: "rgba(255, 152, 0, 0.45)",
 					}
 				: undefined,
 			data: isThermal

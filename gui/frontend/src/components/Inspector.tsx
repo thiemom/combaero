@@ -1,4 +1,4 @@
-import { Activity, Crosshair, Info, RotateCw } from "lucide-react";
+import { Activity, Crosshair, RotateCw } from "lucide-react";
 import useStore from "../store/useStore";
 import {
 	BASIC_STATE_KEYS,

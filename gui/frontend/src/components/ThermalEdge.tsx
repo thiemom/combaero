@@ -61,7 +61,7 @@ export default function ThermalEdge({
 		}
 
 		if (pTemp !== null) {
-			probeText = `@${(targetX * scale).toFixed(unit === "mm" ? 1 : 3)}${unit}: ${pTemp.toFixed(1)}K`;
+			probeText = `WALL t=${(targetX * scale).toFixed(unit === "mm" ? 1 : 3)}${unit}: ${pTemp.toFixed(1)}K`;
 		}
 	}
 
@@ -71,7 +71,7 @@ export default function ThermalEdge({
 			<path
 				style={{
 					stroke: "transparent",
-					strokeWidth: 4,
+					strokeWidth: 3,
 					fill: "none",
 					pointerEvents: "none",
 				}}
@@ -84,7 +84,7 @@ export default function ThermalEdge({
 				id={id}
 				style={{
 					...style,
-					strokeWidth: 4,
+					strokeWidth: 3,
 					stroke: "#ff9800",
 					strokeDasharray: "5,5",
 					opacity: 0.8,
@@ -112,7 +112,7 @@ export default function ThermalEdge({
 					<span>{labelText}</span>
 
 					{probeText && (
-						<span className="text-[9px] text-orange-600 border border-orange-200 bg-orange-50 font-bold px-1 rounded tracking-tighter mt-0.5">
+						<span className="text-[9px] text-gray-500 font-mono whitespace-nowrap">
 							{probeText}
 						</span>
 					)}
