@@ -218,6 +218,7 @@ try:
         liner_sdof_impedance_norm,
         list_functions_with_units,
         list_materials,
+        get_material_conductivity,
         lmtd,
         lmtd_counterflow,
         lmtd_parallelflow,

@@ -35,7 +35,7 @@ async def root():
         "message": "CombAero Network GUI API is running",
         "docs": "/docs",
         "health": "/health",
-        "metadata": ["/metadata/species", "/metadata/presets"],
+        "metadata": ["/metadata/species", "/metadata/presets", "/metadata/materials"],
     }
 
 
@@ -55,6 +55,14 @@ async def get_presets():
     return {
         "sources": ["dry_air", "humid_air", "fuel", "custom"],
         "modes": ["mole", "mass"],
+    }
+
+
+@app.get("/metadata/materials")
+async def get_materials():
+    """Returns available wall materials from the database."""
+    return {
+        "names": cb.list_materials(),
     }
 
 

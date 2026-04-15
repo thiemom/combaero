@@ -290,19 +290,33 @@ class WallLayer:
     thickness : float
         Thickness of the layer [m].
     conductivity : float
-        Thermal conductivity of the material [W/(m*C)].
+        Thermal conductivity of the material [W/(m*K)].
     material : str
-        Material name (optional, for future material-lookup support).
+        Material name (e.g., 'inconel718', 'haynes230', or 'custom').
     """
 
     thickness: float
     conductivity: float
-    material: str = "generic"
+    material: str = "custom"
+
+    def update_conductivity(self, T: float) -> None:
+        """Update conductivity based on temperature if a database material is selected."""
+        import combaero as cb
+
+        # 'generic' is legacy, 'custom' is new name for manual input
+        if self.material.lower() not in ("generic", "custom"):
+            import contextlib
+
+            with contextlib.suppress(RuntimeError, ValueError):
+                # The C++ binding handles T-clamping and k-clamping internally
+                self.conductivity = cb.get_material_conductivity(self.material, T)
 
     @property
     def r_val(self) -> float:
         """Thermal resistance per unit area [m^2*K/W]."""
-        return self.thickness / self.conductivity
+        # Defensive k-clamping to prevent division by zero/near-zero
+        k_safe = max(1e-3, self.conductivity)
+        return self.thickness / k_safe
 
 
 @dataclass
@@ -332,6 +346,9 @@ class ThermalWall:
     contact_area: float | None = None
     R_fouling: float = 0.0
 
+    # Internal cache for temperature-dependent property iteration
+    _last_profile: list[float] | None = field(default=None, init=False, repr=False)
+
     def compute_coupling(
         self,
         h_a: float,
@@ -357,16 +374,33 @@ class ThermalWall:
         WallCouplingResult
             Object containing Q [W], T_wall [K], and analytical Jacobians.
         """
-        # Effective area
+        # 1. Update layer conductivities using temperatures from previous solve iteration
+        # This implement the "lagged" k(T) update for stability.
+        if self._last_profile and len(self._last_profile) == len(self.layers) + 1:
+            for i, layer in enumerate(self.layers):
+                # profile index [i] is hot-side of layer, [i+1] is cold-side
+                t_avg = 0.5 * (self._last_profile[i] + self._last_profile[i + 1])
+                layer.update_conductivity(t_avg)
+
+        # 2. Effective area
         A_eff = self.contact_area if self.contact_area is not None else min(A_conv_a, A_conv_b)
 
-        # Multi-layer R values (thickness / conductivity)
+        # 3. Multi-layer R values (thickness / conductivity)
         t_over_k_layers = [L.r_val for L in self.layers]
 
-        # Call C++ function
-        return cb.wall_coupling_and_jacobian_multilayer(
+        # 4. Call C++ solver function
+        res = cb.wall_coupling_and_jacobian_multilayer(
             h_a, T_aw_a, h_b, T_aw_b, t_over_k_layers, A_eff, self.R_fouling
         )
+
+        # 5. Update cached temperature profile for next iteration
+        # We compute the profile here using the current solution HTCs and updated k values.
+        profile, _q = cb.wall_temperature_profile(
+            T_aw_a, T_aw_b, h_a, h_b, t_over_k_layers, self.R_fouling
+        )
+        self._last_profile = [float(tp) for tp in profile]
+
+        return res
 
 
 # Backward Compatibility Alias (Deprecated: use ThermalWall instead)

@@ -100,6 +100,7 @@ inline constexpr Entry function_units[] = {
     {"k_tbc_ysz", "T: K, hours: h (default 0), is_ebpvd: bool (default False)",
      "W/(m*K)"},
     {"list_materials", "-", "list[str]"},
+    {"get_material_conductivity", "name: str, T: K", "W/(m*K)"},
 
     // -------------------------------------------------------------------------
     // cooling_correlations.h - Advanced Cooling Correlations

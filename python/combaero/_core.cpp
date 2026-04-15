@@ -4303,6 +4303,22 @@ PYBIND11_MODULE(_core, m) {
         "  >>> print(materials)\n"
         "  ['inconel718', 'haynes230', 'ss316', 'al6061', 'ysz']");
 
+  m.def(
+      "get_material_conductivity",
+      [](const std::string &name, double T) {
+        const auto &mat = combaero::materials::get_material(name);
+        // Clamp temperature to material valid range for solver robustness
+        double T_clamped = std::clamp(T, mat.T_min, mat.T_max);
+        // Evaluate k(T) and clamp to physically positive value
+        double k = mat.k_func(T_clamped);
+        return std::max(1e-3, k);
+      },
+      py::arg("name"), py::arg("T"),
+      "Get thermal conductivity [W/(m·K)] for a named material at temperature T "
+      "[K].\n"
+      "Automatically clamps T to the material's valid range and ensures k > 0 "
+      "for numerical stability.");
+
   // =========================================================================
   // Advanced Cooling Correlations
   // =========================================================================
