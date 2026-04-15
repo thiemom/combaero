@@ -47,19 +47,22 @@ function ProbeSlot({
 }
 
 function ProbeNode({ data, selected }: { data: any; selected?: boolean }) {
-	const { nodes } = useStore();
+	const { nodes, edges } = useStore();
 
-	const targetNode = useMemo(
-		() => nodes.find((n) => n.id === data.target_id),
-		[nodes, data.target_id],
+	const targetElement = useMemo(
+		() =>
+			nodes.find((n) => n.id === data.target_id) ||
+			edges.find((e) => e.id === data.target_id),
+		[nodes, edges, data.target_id],
 	);
 
-	const result = targetNode?.data?.result;
+	const result = targetElement?.data?.result;
 	const label = data.label || "Probe";
 	const targetLabel =
-		targetNode?.data?.label ||
-		targetNode?.type?.replace(/_/g, " ") ||
-		(data.target_id ? "Unknown target" : "No target");
+		targetElement?.data?.label || (targetElement as any)?.type === "thermal"
+			? "Thermal Wall"
+			: targetElement?.type?.replace(/_/g, " ") ||
+				(data.target_id ? "Unknown target" : "No target");
 	const hasTarget = !!data.target_id;
 
 	return (

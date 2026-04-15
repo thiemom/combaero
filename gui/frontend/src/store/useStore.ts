@@ -88,6 +88,8 @@ const useStore = create<RFState>((set, get) => ({
 						layers: [
 							{ thickness: 0.003, conductivity: 20.0, material: "generic" },
 						],
+						probe_mode: "preset",
+						probe_preset: { type: "hot", index: 0 },
 					}
 				: null,
 		} as Edge;

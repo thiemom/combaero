@@ -1,4 +1,5 @@
 import { Activity, Crosshair, RotateCw } from "lucide-react";
+import React from "react";
 import useStore from "../store/useStore";
 import {
 	BASIC_STATE_KEYS,
@@ -97,8 +98,10 @@ const Inspector = () => {
 	// ── Probe Inspector ──────────────────────────────────────────
 	if (selectedNode?.type === "probe") {
 		const probeData = selectedNode.data;
-		const targetNode = nodes.find((n) => n.id === probeData.target_id);
-		const result = targetNode?.data?.result;
+		const targetElement =
+			nodes.find((n) => n.id === probeData.target_id) ||
+			edges.find((e) => e.id === probeData.target_id);
+		const result = targetElement?.data?.result;
 
 		// Build available quantity list from target's result keys
 		const availableKeys: string[] = [];
@@ -156,17 +159,17 @@ const Inspector = () => {
 						onChange={(e) =>
 							updateNodeData(selectedNode.id, { label: e.target.value })
 						}
-						className="p-1.5 border rounded text-xs w-full"
+						className="p-1.5 border rounded text-xs w-full focus:ring-1 focus:ring-blue-500 outline-none"
 					/>
 				</div>
 
 				{/* Target */}
 				<div className="flex flex-col gap-1">
 					<label className="text-xs font-bold text-gray-500 uppercase">
-						Target Node / Element
+						Target Element
 					</label>
 					<select
-						className="p-1.5 border rounded text-xs bg-white w-full"
+						className="p-1.5 border rounded text-xs bg-white w-full focus:ring-1 focus:ring-blue-500 outline-none"
 						value={probeData.target_id ?? ""}
 						onChange={(e) =>
 							updateNodeData(selectedNode.id, {
@@ -174,16 +177,27 @@ const Inspector = () => {
 							})
 						}
 					>
-						<option value="">— select target —</option>
-						{nodes
-							.filter((n) => n.id !== selectedNode?.id && n.type !== "probe")
-							.map((n) => (
-								<option key={n.id} value={n.id}>
-									{n.data?.label || n.type?.replace(/_/g, " ") || n.id}
-								</option>
-							))}
+						<optgroup label="Network Nodes">
+							<option value="">— select target —</option>
+							{nodes
+								.filter((n) => n.id !== selectedNode?.id && n.type !== "probe")
+								.map((n) => (
+									<option key={n.id} value={n.id}>
+										{n.data?.label || n.type?.replace(/_/g, " ") || n.id}
+									</option>
+								))}
+						</optgroup>
+						<optgroup label="Thermal Walls">
+							{edges
+								.filter((e) => e.data?.type === "thermal")
+								.map((e) => (
+									<option key={e.id} value={e.id}>
+										{e.data?.label || `Thermal Wall (${e.id})`}
+									</option>
+								))}
+						</optgroup>
 					</select>
-					{probeData.target_id && !targetNode && (
+					{probeData.target_id && !targetElement && (
 						<span className="text-amber-500 text-[10px]">
 							⚠ Target not found
 						</span>
@@ -1049,10 +1063,11 @@ const Inspector = () => {
 	// Edge Inspector
 	if (selectedEdge && selectedEdge.data?.type === "thermal") {
 		let probeTemp: number | null = null;
+		let probeLabel = "Probe Temp";
 		if (selectedEdge.data.result?.T_interface) {
-			const targetX = selectedEdge.data.probe_depth ?? 0;
+			const targetX_manual = selectedEdge.data.probe_depth ?? 0;
 			const tInt = selectedEdge.data.result.T_interface as number[];
-			let currentX = 0;
+			const currentX = 0;
 
 			// Fallback layers for legacy/initial elements
 			const layers = selectedEdge.data.layers || [
@@ -1062,22 +1077,59 @@ const Inspector = () => {
 				},
 			];
 
-			if (targetX <= 0) {
-				probeTemp = tInt[0];
-			} else {
-				let found = false;
-				for (let i = 0; i < layers.length; i++) {
-					const t = layers[i].thickness;
-					const nextX = currentX + t;
-					if (targetX <= nextX) {
-						const frac = (targetX - currentX) / t;
-						probeTemp = tInt[i] + frac * (tInt[i + 1] - tInt[i]);
-						found = true;
-						break;
-					}
-					currentX = nextX;
+			let targetX = targetX_manual;
+			if (
+				selectedEdge.data.probe_mode === "preset" &&
+				selectedEdge.data.probe_preset
+			) {
+				const { type, index } = selectedEdge.data.probe_preset;
+				// Ensure index is valid for current layers
+				const safeIndex = Math.min(index, layers.length - 1);
+				const layer = layers[safeIndex];
+
+				let runningX = 0;
+				for (let i = 0; i < safeIndex; i++) {
+					runningX += layers[i].thickness;
 				}
-				if (!found) probeTemp = tInt[tInt.length - 1]; // Beyond cold side
+
+				const L = layer?.thickness || 0;
+				if (type === "hot") {
+					targetX = runningX;
+					probeLabel = `L${safeIndex + 1} Hot Side`;
+				} else if (type === "avg") {
+					targetX = runningX + L / 2;
+					probeLabel = `L${safeIndex + 1} Average`;
+				} else {
+					targetX = runningX + L;
+					probeLabel = `L${safeIndex + 1} Cold Side`;
+				}
+			} else {
+				const scale = unitPreferences.length === "mm" ? 1000 : 1;
+				probeLabel = `Custom Depth d=${(targetX * scale).toFixed(unitPreferences.length === "mm" ? 1 : 3)}${unitPreferences.length}`;
+			}
+
+			if (tInt.length === layers.length + 1) {
+				if (targetX <= 0) {
+					probeTemp = tInt[0];
+				} else {
+					let found = false;
+					let iterX = 0;
+					for (let i = 0; i < layers.length; i++) {
+						const t = layers[i].thickness;
+						const nextX = iterX + t;
+						if (targetX <= nextX + 1e-9) {
+							const frac = t > 0 ? (targetX - iterX) / t : 0;
+							probeTemp = tInt[i] + frac * (tInt[i + 1] - tInt[i]);
+							found = true;
+							break;
+						}
+						iterX = nextX;
+					}
+					if (!found) probeTemp = tInt[tInt.length - 1]; // Beyond cold side
+				}
+			} else {
+				probeLabel = "(solve needed)";
+				probeTemp = null;
 			}
 		}
 
@@ -1103,6 +1155,22 @@ const Inspector = () => {
 				<h2 className="text-lg font-bold border-b pb-2 uppercase text-orange-600">
 					Thermal Wall
 				</h2>
+
+				{/* Wall Name Label */}
+				<div className="flex flex-col gap-1">
+					<label className="text-xs font-bold text-gray-500 uppercase">
+						Wall Name
+					</label>
+					<input
+						type="text"
+						value={selectedEdge.data.label ?? ""}
+						onChange={(e) =>
+							updateEdgeData(selectedEdge.id, { label: e.target.value })
+						}
+						placeholder="e.g. Inner Liner"
+						className="p-1.5 border rounded text-xs w-full focus:ring-1 focus:ring-orange-500 outline-none"
+					/>
+				</div>
 				<AreaInput
 					id={`area_edge_${selectedEdge.id}`}
 					label="Contact Area"
@@ -1138,29 +1206,70 @@ const Inspector = () => {
 					/>
 				</div>
 
-				<div className="flex flex-col gap-1 pt-4 border-t border-stone-100">
-					<LengthInput
-						id={`probe_depth_${selectedEdge.id}`}
-						label="Probe Depth x"
-						value={
-							selectedEdge.data.probe_depth !== undefined
-								? selectedEdge.data.probe_depth
-								: 0
-						}
-						onChange={(val) => {
-							const totalThickness = selectedEdge.data.layers
-								? selectedEdge.data.layers.reduce(
+				<div className="flex flex-col gap-3 pt-4 border-t border-stone-100">
+					<div className="flex flex-col gap-1">
+						<label className="text-xs font-bold text-gray-500 uppercase">
+							Probe Location
+						</label>
+						<select
+							className="p-1.5 border rounded text-xs bg-white w-full border-stone-200 outline-none focus:ring-1 focus:ring-orange-500"
+							value={
+								selectedEdge.data.probe_mode === "preset" &&
+								selectedEdge.data.probe_preset
+									? `preset:${selectedEdge.data.probe_preset.type}:${selectedEdge.data.probe_preset.index}`
+									: "custom"
+							}
+							onChange={(e) => {
+								const val = e.target.value;
+								if (val === "custom") {
+									updateEdgeData(selectedEdge.id, { probe_mode: "custom" });
+								} else {
+									const [_, type, idx] = val.split(":");
+									updateEdgeData(selectedEdge.id, {
+										probe_mode: "preset",
+										probe_preset: { type, index: Number.parseInt(idx) },
+									});
+								}
+							}}
+						>
+							<option value="custom">Custom Position (d=x)</option>
+							{/* Predefined locations for Layer 1 */}
+							<option value="preset:hot:0">L1 Hot Side</option>
+							<option value="preset:avg:0">L1 Average</option>
+							<option value="preset:cold:0">L1 Cold Side</option>
+							{/* Dynamic locations for additional layers */}
+							{(selectedEdge.data.layers || [])
+								.slice(1)
+								.map((_: any, i: number) => (
+									<React.Fragment key={i + 1}>
+										<option value={`preset:avg:${i + 1}`}>
+											L{i + 2} Average
+										</option>
+										<option value={`preset:cold:${i + 1}`}>
+											L{i + 2} Cold Side
+										</option>
+									</React.Fragment>
+								))}
+						</select>
+					</div>
+
+					{selectedEdge.data.probe_mode === "custom" && (
+						<LengthInput
+							id={`probe_depth_${selectedEdge.id}`}
+							label="Custom Depth d"
+							value={selectedEdge.data.probe_depth ?? 0}
+							onChange={(val) => {
+								const totalThickness =
+									(selectedEdge.data.layers || []).reduce(
 										(acc: number, l: any) => acc + (l.thickness || 0),
 										0,
-									)
-								: 0.003;
-							let clamped = Math.max(0, val);
-							if (totalThickness > 0)
-								clamped = Math.min(clamped, totalThickness);
-							updateEdgeData(selectedEdge.id, { probe_depth: clamped });
-						}}
-						placeholder="0.00"
-					/>
+									) || 0.003;
+								const clamped = Math.min(Math.max(0, val), totalThickness);
+								updateEdgeData(selectedEdge.id, { probe_depth: clamped });
+							}}
+							placeholder="0.00"
+						/>
+					)}
 					<span className="text-[9px] text-gray-400 font-normal italic text-right -mt-1">
 						0 = Hot, L = Cold
 					</span>
@@ -1225,12 +1334,7 @@ const Inspector = () => {
 							{probeTemp !== null && (
 								<div className="flex justify-between items-center pt-2 mt-2 border-t border-stone-200 bg-orange-50/50 p-2 rounded border">
 									<span className="text-[10px] text-orange-600 font-bold uppercase tracking-wider">
-										Probe Temp @{" "}
-										{(
-											(selectedEdge.data.probe_depth ?? 0) *
-											(unitPreferences.length === "mm" ? 1000 : 1)
-										).toFixed(unitPreferences.length === "mm" ? 1 : 3)}{" "}
-										{unitPreferences.length}
+										{probeLabel}
 									</span>
 									<span className="font-mono text-sm font-black text-orange-600">
 										{probeTemp.toFixed(1)} K

@@ -39,6 +39,18 @@ export const QUANTITY_CATALOGUE: Record<
 	mw: { label: "mw", unit: "g/mol", format: (v) => v.toFixed(2) },
 	nu: { label: "nu", unit: "m²/s", format: (v) => v.toExponential(2) },
 	u: { label: "u", unit: "J/kg", format: (v) => v.toFixed(0) },
+	// Element-specific diagnostics (Static)
+	P_in: { label: "Pi", unit: "Pa", format: (v) => v.toFixed(0) },
+	P_out: { label: "Po", unit: "Pa", format: (v) => v.toFixed(0) },
+	T_in: { label: "Ti", unit: "K", format: (v) => v.toFixed(2) },
+	T_out: { label: "To", unit: "K", format: (v) => v.toFixed(2) },
+	// Element-specific diagnostics (Total)
+	Pt_in: { label: "Pti", unit: "Pa", format: (v) => v.toFixed(0) },
+	Pt_out: { label: "Pto", unit: "Pa", format: (v) => v.toFixed(0) },
+	Tt_in: { label: "Tti", unit: "K", format: (v) => v.toFixed(2) },
+	Tt_out: { label: "Tto", unit: "K", format: (v) => v.toFixed(2) },
+	// Thermal diagnostics
+	T_wall: { label: "Tw", unit: "K", format: (v) => v.toFixed(1) },
 };
 
 export const BASIC_STATE_KEYS = [

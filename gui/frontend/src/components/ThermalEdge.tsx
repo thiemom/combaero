@@ -38,11 +38,6 @@ export default function ThermalEdge({
 	}
 	if (data?.result?.T_interface) {
 		const temps = data.result.T_interface as number[];
-		const targetX = data.probe_depth ?? 0;
-		let currentX = 0;
-		let probeTemp: number | null = null;
-
-		// Fallback layers for legacy/initial elements
 		const layers = data.layers || [
 			{
 				thickness: data.thickness || 0.003,
@@ -50,26 +45,64 @@ export default function ThermalEdge({
 			},
 		];
 
-		if (targetX <= 0) {
-			probeTemp = temps[0];
-		} else {
-			let found = false;
-			for (let i = 0; i < layers.length; i++) {
-				const t = layers[i].thickness;
-				const nextX = currentX + t;
-				if (targetX <= nextX) {
-					const frac = (targetX - currentX) / t;
-					probeTemp = temps[i] + frac * (temps[i + 1] - temps[i]);
-					found = true;
-					break;
-				}
-				currentX = nextX;
+		let targetX = data.probe_depth ?? 0;
+		let displayLabel = `d=${(targetX * scale).toFixed(unit === "mm" ? 1 : 3)}${unit}`;
+
+		// 1. Resolve Preset to Depth and Label
+		if (data.probe_mode === "preset" && data.probe_preset) {
+			const { type, index } = data.probe_preset;
+			// Ensure index is valid for current layers
+			const safeIndex = Math.min(index, layers.length - 1);
+			const layer = layers[safeIndex];
+
+			let runningX = 0;
+			for (let i = 0; i < safeIndex; i++) {
+				runningX += layers[i].thickness;
 			}
-			if (!found) probeTemp = temps[temps.length - 1];
+
+			const L = layer?.thickness || 0;
+			if (type === "hot") {
+				targetX = runningX;
+				displayLabel = `L${safeIndex + 1} hot`;
+			} else if (type === "avg") {
+				targetX = runningX + L / 2;
+				displayLabel = `L${safeIndex + 1} avg`;
+			} else {
+				targetX = runningX + L;
+				displayLabel = `L${safeIndex + 1} cold`;
+			}
 		}
 
-		if (probeTemp !== null) {
-			probeText = `t=${(targetX * scale).toFixed(unit === "mm" ? 1 : 3)}${unit}: ${probeTemp.toFixed(1)}K`;
+		// 2. DIMENSION SAFETY GUARD
+		// For N layers, we expect N+1 interface temperatures.
+		// If structure changed but solve hasn't run, temps array will be the wrong size.
+		if (temps.length !== layers.length + 1) {
+			probeText = `${displayLabel}: (solve needed)`;
+		} else {
+			let probeTemp: number | null = null;
+			if (targetX <= 0) {
+				probeTemp = temps[0];
+			} else {
+				let found = false;
+				let iterX = 0;
+				for (let i = 0; i < layers.length; i++) {
+					const t = layers[i].thickness;
+					const nextX = iterX + t;
+					if (targetX <= nextX + 1e-9) {
+						// Add small epsilon to handle precision issues at interfaces
+						const frac = t > 0 ? (targetX - iterX) / t : 0;
+						probeTemp = temps[i] + frac * (temps[i + 1] - temps[i]);
+						found = true;
+						break;
+					}
+					iterX = nextX;
+				}
+				if (!found) probeTemp = temps[temps.length - 1];
+			}
+
+			if (probeTemp !== null) {
+				probeText = `${displayLabel}: ${probeTemp.toFixed(1)}K`;
+			}
 		}
 	}
 
@@ -116,6 +149,11 @@ export default function ThermalEdge({
 					}}
 					className="nodrag nopan flex flex-col items-center shadow-sm"
 				>
+					{data?.label && (
+						<span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider leading-none mb-1">
+							{data.label}
+						</span>
+					)}
 					<span style={{ fontWeight: 700 }}>{labelText}</span>
 
 					{probeText && (
