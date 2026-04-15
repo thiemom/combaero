@@ -278,7 +278,7 @@ const Inspector = () => {
 								label: e.target.value,
 							})
 						}
-						placeholder="e.g. Compressor Outlet"
+						placeholder="e.g. Custom Label"
 						className="p-2 border rounded border-stone-200 outline-none focus:ring-2 focus:ring-blue-100"
 					/>
 				</div>
