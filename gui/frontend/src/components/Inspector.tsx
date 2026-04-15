@@ -659,52 +659,61 @@ const Inspector = () => {
 									const t = e.target.value;
 									if (t === "none") {
 										updateNodeData(selectedNode.id, { pressure_loss: null });
-									} else if (t === "constant") {
-										updateNodeData(selectedNode.id, {
-											pressure_loss: { type: "constant", zeta0: 0.03 },
-										});
-									} else if (t === "linear_theta") {
+									} else if (t === "constant_fraction") {
 										updateNodeData(selectedNode.id, {
 											pressure_loss: {
-												type: "linear_theta",
+												type: "constant_fraction",
+												xi: 0.03,
+											},
+										});
+									} else if (t === "linear_theta_fraction") {
+										updateNodeData(selectedNode.id, {
+											pressure_loss: {
+												type: "linear_theta_fraction",
 												k: 0.5,
-												zeta0: 0.02,
+												xi0: 0.02,
 											},
 										});
 									}
 								}}
 							>
 								<option value="none">None</option>
-								<option value="constant">Constant (ζ₀)</option>
-								<option value="linear_theta">Linear (k·Θ + ζ₀)</option>
+								<option value="constant_fraction">
+									Constant fraction — dP/P = xi
+								</option>
+								<option value="linear_theta_fraction">
+									Linear fraction — dP/P = k*Theta + xi0
+								</option>
 							</select>
-							{selectedNode.data.pressure_loss?.type === "constant" && (
+							{selectedNode.data.pressure_loss?.type ===
+								"constant_fraction" && (
 								<div className="flex flex-col gap-1">
 									<label className="text-xs text-gray-500">
-										ζ₀ — base loss fraction
+										xi — loss fraction [-]
 									</label>
 									<NumericInput
-										id={`pl_zeta0_${selectedNode.id}`}
-										value={selectedNode.data.pressure_loss.zeta0 ?? 0.03}
+										id={`pl_xi_${selectedNode.id}`}
+										value={selectedNode.data.pressure_loss.xi ?? 0.03}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, {
 												pressure_loss: {
 													...selectedNode.data.pressure_loss,
-													zeta0: val,
+													xi: val,
 												},
 											})
 										}
 										className="p-2 border rounded"
 									/>
 									<p className="text-[9px] text-gray-400 italic">
-										e.g. 0.03 = 3% of inlet total pressure
+										P_out = P_in * (1 - xi). e.g. 0.03 = 3%
 									</p>
 								</div>
 							)}
-							{selectedNode.data.pressure_loss?.type === "linear_theta" && (
+							{selectedNode.data.pressure_loss?.type ===
+								"linear_theta_fraction" && (
 								<div className="flex flex-col gap-2">
 									<label className="text-xs text-gray-500">
-										k — Θ sensitivity
+										k — Theta sensitivity [-/-]
 									</label>
 									<NumericInput
 										id={`pl_k_${selectedNode.id}`}
@@ -720,23 +729,23 @@ const Inspector = () => {
 										className="p-2 border rounded"
 									/>
 									<label className="text-xs text-gray-500">
-										ζ₀ — cold-flow base loss
+										xi0 — cold-flow base fraction [-]
 									</label>
 									<NumericInput
-										id={`pl_zeta0_lin_${selectedNode.id}`}
-										value={selectedNode.data.pressure_loss.zeta0 ?? 0.02}
+										id={`pl_xi0_${selectedNode.id}`}
+										value={selectedNode.data.pressure_loss.xi0 ?? 0.02}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, {
 												pressure_loss: {
 													...selectedNode.data.pressure_loss,
-													zeta0: val,
+													xi0: val,
 												},
 											})
 										}
 										className="p-2 border rounded"
 									/>
 									<p className="text-[9px] text-gray-400 italic">
-										Θ = T_ad / T_in − 1 (dimensionless temp. rise)
+										Theta = T_ad/T_in - 1. P_out = P_in*(1 - k*Theta - xi0)
 									</p>
 								</div>
 							)}

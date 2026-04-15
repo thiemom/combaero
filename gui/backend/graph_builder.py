@@ -1,12 +1,12 @@
 from combaero.network import (
     ChannelElement,
     CombustorNode,
-    ConstantLoss,
+    ConstantFractionLoss,
     ConvectiveSurface,
     DimpledModel,
     FlowNetwork,
     ImpingementModel,
-    LinearThetaLoss,
+    LinearThetaFractionLoss,
     LosslessConnectionElement,
     MassFlowBoundary,
     MomentumChamberNode,
@@ -24,10 +24,10 @@ from .schemas import (
     ChannelData,
     CombustorData,
     CompositionData,
-    ConstantLossData,
+    ConstantFractionLossData,
     DimpledModelData,
     ImpingementModelData,
-    LinearThetaLossData,
+    LinearThetaFractionLossData,
     MassBoundaryData,
     MomentumChamberData,
     NetworkGraphSchema,
@@ -42,13 +42,14 @@ from .schemas import (
 
 
 def build_pressure_loss(data):
-    """Converts PressureLossData schema to a ConstantLoss or LinearThetaLoss callable."""
+    """Converts PressureLossData schema to a pressure-loss callable."""
     if data is None:
         return None
-    if isinstance(data, ConstantLossData) or getattr(data, "type", None) == "constant":
-        return ConstantLoss(zeta0=data.zeta0)
-    if isinstance(data, LinearThetaLossData) or getattr(data, "type", None) == "linear_theta":
-        return LinearThetaLoss(k=data.k, zeta0=data.zeta0)
+    t = getattr(data, "type", None)
+    if isinstance(data, ConstantFractionLossData) or t == "constant_fraction":
+        return ConstantFractionLoss(xi=data.xi)
+    if isinstance(data, LinearThetaFractionLossData) or t == "linear_theta_fraction":
+        return LinearThetaFractionLoss(k=data.k, xi0=data.xi0)
     return None
 
 

@@ -14,7 +14,12 @@ HeatTransferModelLiteral = Literal[
 
 if TYPE_CHECKING:
     from .graph import FlowNetwork
-    from .pressure_loss import ConstantLoss, LinearThetaLoss
+    from .pressure_loss import (
+        ConstantFractionLoss,
+        ConstantLoss,
+        LinearThetaFractionLoss,
+        LinearThetaLoss,
+    )
 
 CombustionMethodLiteral = Literal["complete", "equilibrium"]
 
@@ -987,7 +992,7 @@ class CombustorNode(NetworkNode):
         self,
         id: str,
         method: CombustionMethodLiteral = "complete",
-        pressure_loss: "ConstantLoss | LinearThetaLoss | None" = None,
+        pressure_loss: "ConstantFractionLoss | LinearThetaFractionLoss | ConstantLoss | LinearThetaLoss | None" = None,
         area: float = 0.1,
         Dh: float | None = None,
         surface: ConvectiveSurface | None = None,

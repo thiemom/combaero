@@ -31,7 +31,12 @@ from .combustion import (
     mix_streams,
 )
 from .graph import FlowNetwork
-from .pressure_loss import ConstantLoss, LinearThetaLoss
+from .pressure_loss import (
+    ConstantFractionLoss,
+    ConstantLoss,
+    LinearThetaFractionLoss,
+    LinearThetaLoss,
+)
 from .solver import NetworkSolver
 from .utils import results_to_dataframe
 
@@ -68,5 +73,7 @@ __all__: list[str] = [
     "ThermalWall",
     "WallConnection",
     "ConstantLoss",
+    "ConstantFractionLoss",
     "LinearThetaLoss",
+    "LinearThetaFractionLoss",
 ]

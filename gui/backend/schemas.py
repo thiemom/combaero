@@ -88,20 +88,20 @@ class PressureBoundaryData(BaseModel):
     label: str | None = None
 
 
-class ConstantLossData(BaseModel):
+class ConstantFractionLossData(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    type: Literal["constant"] = "constant"
-    zeta0: float = 0.03
+    type: Literal["constant_fraction"] = "constant_fraction"
+    xi: float = 0.03
 
 
-class LinearThetaLossData(BaseModel):
+class LinearThetaFractionLossData(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    type: Literal["linear_theta"] = "linear_theta"
+    type: Literal["linear_theta_fraction"] = "linear_theta_fraction"
     k: float = 0.5
-    zeta0: float = 0.02
+    xi0: float = 0.02
 
 
-PressureLossData = ConstantLossData | LinearThetaLossData
+PressureLossData = ConstantFractionLossData | LinearThetaFractionLossData
 
 
 class CombustorData(BaseModel):
