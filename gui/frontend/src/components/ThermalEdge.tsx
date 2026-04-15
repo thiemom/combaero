@@ -36,32 +36,40 @@ export default function ThermalEdge({
 			absQ >= 1000 ? `${(Q / 1000).toFixed(1)} kW` : `${Q.toFixed(1)} W`;
 		labelText = formattedValue;
 	}
-	if (data?.result?.T_interface && data.layers) {
+	if (data?.result?.T_interface) {
 		const temps = data.result.T_interface as number[];
 		const targetX = data.probe_depth ?? 0;
 		let currentX = 0;
-		let pTemp: number | null = null;
+		let probeTemp: number | null = null;
+
+		// Fallback layers for legacy/initial elements
+		const layers = data.layers || [
+			{
+				thickness: data.thickness || 0.003,
+				conductivity: data.conductivity || 20.0,
+			},
+		];
 
 		if (targetX <= 0) {
-			pTemp = temps[0];
+			probeTemp = temps[0];
 		} else {
 			let found = false;
-			for (let i = 0; i < data.layers.length; i++) {
-				const t = data.layers[i].thickness;
+			for (let i = 0; i < layers.length; i++) {
+				const t = layers[i].thickness;
 				const nextX = currentX + t;
 				if (targetX <= nextX) {
 					const frac = (targetX - currentX) / t;
-					pTemp = temps[i] + frac * (temps[i + 1] - temps[i]);
+					probeTemp = temps[i] + frac * (temps[i + 1] - temps[i]);
 					found = true;
 					break;
 				}
 				currentX = nextX;
 			}
-			if (!found) pTemp = temps[temps.length - 1];
+			if (!found) probeTemp = temps[temps.length - 1];
 		}
 
-		if (pTemp !== null) {
-			probeText = `WALL t=${(targetX * scale).toFixed(unit === "mm" ? 1 : 3)}${unit}: ${pTemp.toFixed(1)}K`;
+		if (probeTemp !== null) {
+			probeText = `t=${(targetX * scale).toFixed(unit === "mm" ? 1 : 3)}${unit}: ${probeTemp.toFixed(1)}K`;
 		}
 	}
 
@@ -98,20 +106,23 @@ export default function ThermalEdge({
 					style={{
 						position: "absolute",
 						transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-						background: "rgba(255, 255, 255, 0.8)",
-						padding: "2px 4px",
+						background: "#fff",
+						padding: "2px 6px",
 						borderRadius: "4px",
-						fontSize: "10px",
-						fontWeight: 700,
+						fontSize: "12px",
 						color: "#ff9800",
+						border: "2px solid #ff9800",
 						pointerEvents: "all",
 					}}
-					className="nodrag nopan flex flex-col items-center"
+					className="nodrag nopan flex flex-col items-center shadow-sm"
 				>
-					<span>{labelText}</span>
+					<span style={{ fontWeight: 700 }}>{labelText}</span>
 
 					{probeText && (
-						<span className="text-[10px] text-gray-500 font-mono whitespace-nowrap">
+						<span
+							style={{ fontWeight: 400 }}
+							className="text-[10px] text-gray-500 font-mono whitespace-nowrap"
+						>
 							{probeText}
 						</span>
 					)}

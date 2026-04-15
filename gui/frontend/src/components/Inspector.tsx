@@ -1049,17 +1049,25 @@ const Inspector = () => {
 	// Edge Inspector
 	if (selectedEdge && selectedEdge.data?.type === "thermal") {
 		let probeTemp: number | null = null;
-		if (selectedEdge.data.result?.T_interface && selectedEdge.data.layers) {
+		if (selectedEdge.data.result?.T_interface) {
 			const targetX = selectedEdge.data.probe_depth ?? 0;
 			const tInt = selectedEdge.data.result.T_interface as number[];
 			let currentX = 0;
+
+			// Fallback layers for legacy/initial elements
+			const layers = selectedEdge.data.layers || [
+				{
+					thickness: selectedEdge.data.thickness || 0.003,
+					conductivity: selectedEdge.data.conductivity || 20.0,
+				},
+			];
 
 			if (targetX <= 0) {
 				probeTemp = tInt[0];
 			} else {
 				let found = false;
-				for (let i = 0; i < selectedEdge.data.layers.length; i++) {
-					const t = selectedEdge.data.layers[i].thickness;
+				for (let i = 0; i < layers.length; i++) {
+					const t = layers[i].thickness;
 					const nextX = currentX + t;
 					if (targetX <= nextX) {
 						const frac = (targetX - currentX) / t;

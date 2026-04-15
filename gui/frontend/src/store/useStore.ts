@@ -80,7 +80,15 @@ const useStore = create<RFState>((set, get) => ({
 					}
 				: undefined,
 			data: isThermal
-				? { type: "thermal", thickness: 0.003, conductivity: 20.0, area: 0.05 }
+				? {
+						type: "thermal",
+						thickness: 0.003,
+						conductivity: 20.0,
+						area: 0.05,
+						layers: [
+							{ thickness: 0.003, conductivity: 20.0, material: "generic" },
+						],
+					}
 				: null,
 		} as Edge;
 
