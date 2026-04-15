@@ -674,6 +674,21 @@ const Inspector = () => {
 												xi0: 0.02,
 											},
 										});
+									} else if (t === "constant_head") {
+										updateNodeData(selectedNode.id, {
+											pressure_loss: {
+												type: "constant_head",
+												zeta: 5.0,
+											},
+										});
+									} else if (t === "linear_theta_head") {
+										updateNodeData(selectedNode.id, {
+											pressure_loss: {
+												type: "linear_theta_head",
+												k: 1.0,
+												zeta0: 3.0,
+											},
+										});
 									}
 								}}
 							>
@@ -683,6 +698,12 @@ const Inspector = () => {
 								</option>
 								<option value="linear_theta_fraction">
 									Linear fraction — dP/P = k*Theta + xi0
+								</option>
+								<option value="constant_head">
+									Constant head — dP = zeta * q_in
+								</option>
+								<option value="linear_theta_head">
+									Linear head — dP = (k*Theta + zeta0) * q_in
 								</option>
 							</select>
 							{selectedNode.data.pressure_loss?.type ===
@@ -746,6 +767,69 @@ const Inspector = () => {
 									/>
 									<p className="text-[9px] text-gray-400 italic">
 										Theta = T_ad/T_in - 1. P_out = P_in*(1 - k*Theta - xi0)
+									</p>
+								</div>
+							)}
+							{selectedNode.data.pressure_loss?.type === "constant_head" && (
+								<div className="flex flex-col gap-1">
+									<label className="text-xs text-gray-500">
+										zeta — Euler loss coefficient [-]
+									</label>
+									<NumericInput
+										id={`pl_zeta_${selectedNode.id}`}
+										value={selectedNode.data.pressure_loss.zeta ?? 5.0}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, {
+												pressure_loss: {
+													...selectedNode.data.pressure_loss,
+													zeta: val,
+												},
+											})
+										}
+										className="p-2 border rounded"
+									/>
+									<p className="text-[9px] text-gray-400 italic">
+										dP = zeta * 0.5*rho*v^2. Area from node geometry.
+									</p>
+								</div>
+							)}
+							{selectedNode.data.pressure_loss?.type ===
+								"linear_theta_head" && (
+								<div className="flex flex-col gap-2">
+									<label className="text-xs text-gray-500">
+										k — Theta sensitivity [-/-]
+									</label>
+									<NumericInput
+										id={`pl_k_head_${selectedNode.id}`}
+										value={selectedNode.data.pressure_loss.k ?? 1.0}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, {
+												pressure_loss: {
+													...selectedNode.data.pressure_loss,
+													k: val,
+												},
+											})
+										}
+										className="p-2 border rounded"
+									/>
+									<label className="text-xs text-gray-500">
+										zeta0 — cold-flow Euler loss coefficient [-]
+									</label>
+									<NumericInput
+										id={`pl_zeta0_head_${selectedNode.id}`}
+										value={selectedNode.data.pressure_loss.zeta0 ?? 3.0}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, {
+												pressure_loss: {
+													...selectedNode.data.pressure_loss,
+													zeta0: val,
+												},
+											})
+										}
+										className="p-2 border rounded"
+									/>
+									<p className="text-[9px] text-gray-400 italic">
+										dP = (k*Theta+zeta0)*0.5*rho*v^2. Theta=T_ad/T_in-1
 									</p>
 								</div>
 							)}

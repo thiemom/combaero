@@ -101,7 +101,25 @@ class LinearThetaFractionLossData(BaseModel):
     xi0: float = 0.02
 
 
-PressureLossData = ConstantFractionLossData | LinearThetaFractionLossData
+class ConstantHeadLossData(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    type: Literal["constant_head"] = "constant_head"
+    zeta: float = 5.0
+
+
+class LinearThetaHeadLossData(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    type: Literal["linear_theta_head"] = "linear_theta_head"
+    k: float = 1.0
+    zeta0: float = 3.0
+
+
+PressureLossData = (
+    ConstantFractionLossData
+    | LinearThetaFractionLossData
+    | ConstantHeadLossData
+    | LinearThetaHeadLossData
+)
 
 
 class CombustorData(BaseModel):

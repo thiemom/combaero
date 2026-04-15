@@ -2,11 +2,13 @@ from combaero.network import (
     ChannelElement,
     CombustorNode,
     ConstantFractionLoss,
+    ConstantHeadLoss,
     ConvectiveSurface,
     DimpledModel,
     FlowNetwork,
     ImpingementModel,
     LinearThetaFractionLoss,
+    LinearThetaHeadLoss,
     LosslessConnectionElement,
     MassFlowBoundary,
     MomentumChamberNode,
@@ -25,9 +27,11 @@ from .schemas import (
     CombustorData,
     CompositionData,
     ConstantFractionLossData,
+    ConstantHeadLossData,
     DimpledModelData,
     ImpingementModelData,
     LinearThetaFractionLossData,
+    LinearThetaHeadLossData,
     MassBoundaryData,
     MomentumChamberData,
     NetworkGraphSchema,
@@ -41,7 +45,7 @@ from .schemas import (
 )
 
 
-def build_pressure_loss(data):
+def build_pressure_loss(data, area: float = 0.1):
     """Converts PressureLossData schema to a pressure-loss callable."""
     if data is None:
         return None
@@ -50,6 +54,10 @@ def build_pressure_loss(data):
         return ConstantFractionLoss(xi=data.xi)
     if isinstance(data, LinearThetaFractionLossData) or t == "linear_theta_fraction":
         return LinearThetaFractionLoss(k=data.k, xi0=data.xi0)
+    if isinstance(data, ConstantHeadLossData) or t == "constant_head":
+        return ConstantHeadLoss(zeta=data.zeta, area=area)
+    if isinstance(data, LinearThetaHeadLossData) or t == "linear_theta_head":
+        return LinearThetaHeadLoss(k=data.k, zeta0=data.zeta0, area=area)
     return None
 
 
@@ -153,7 +161,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             node = CombustorNode(
                 node_id,
                 method=data.method,
-                pressure_loss=build_pressure_loss(data.pressure_loss),
+                pressure_loss=build_pressure_loss(data.pressure_loss, area=data.area),
                 area=data.area,
                 Dh=data.Dh,
                 surface=ConvectiveSurface(
