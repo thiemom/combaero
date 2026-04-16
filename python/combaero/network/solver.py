@@ -288,7 +288,10 @@ class NetworkSolver:
                 continue
 
             share = available / len(down_elems)
-            if abs(share) < 1e-12:
+            # Only substitute a nonzero reference guess for elements whose
+            # source is unknown.  If the share is zero because an upstream
+            # MassFlowBoundary is genuinely OFF (m_dot=0), keep zero.
+            if abs(share) < 1e-12 and not isinstance(node, MassFlowBoundary):
                 share = ref["m_dot"]
 
             for elem in down_elems:
@@ -298,7 +301,9 @@ class NetworkSolver:
                     area = getattr(elem, "area", None)
                     if area is not None and area > 0.0:
                         mdot_cap = rho_ref * a_ref * area * mdot_ratio
-                        elem_share = min(elem_share, mdot_cap)
+                        elem_share = min(abs(elem_share), mdot_cap)
+                        if share < 0:
+                            elem_share = -elem_share
 
                 mdot_guess[elem.id] = elem_share
                 node_flow[elem.to_node] = node_flow.get(elem.to_node, 0.0) + elem_share

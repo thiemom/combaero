@@ -2,7 +2,7 @@ import axios from "axios";
 import { Download, Play, Zap } from "lucide-react";
 import { useRef, useState } from "react";
 import { ReactFlowProvider } from "reactflow";
-import { exportResults, solveNetwork } from "./api";
+import { solveNetwork } from "./api";
 import Inspector from "./components/Inspector";
 import NetworkCanvas from "./components/NetworkCanvas";
 import Sidebar from "./components/Sidebar";
@@ -10,9 +10,15 @@ import useStore from "./store/useStore";
 
 const App = () => {
 	const reactFlowWrapper = useRef<HTMLDivElement>(null);
-	const { nodes, edges, solverSettings, setSolveResults } = useStore();
+	const {
+		nodes,
+		edges,
+		solverSettings,
+		setSolveResults,
+		isExporting,
+		exportNetworkResults,
+	} = useStore();
 	const [isSolving, setIsSolving] = useState(false);
-	const [isExporting, setIsExporting] = useState(false);
 
 	const validateNetwork = () => {
 		const errors: string[] = [];
@@ -48,6 +54,20 @@ const App = () => {
 			if (node.type === "orifice") {
 				if ((node.data.area || 0) <= 0 && (node.data.diameter || 0) <= 0)
 					errors.push(`${node.id}: Orifice area or diameter must be > 0`);
+			}
+			if (node.type === "momentum_chamber") {
+				if ((node.data.area ?? 0) <= 0)
+					errors.push(`${node.id}: Momentum Chamber area must be > 0`);
+				if (node.data.Dh !== undefined && node.data.Dh < 0)
+					errors.push(
+						`${node.id}: Momentum Chamber Dh must be > 0 (or 0 for auto)`,
+					);
+			}
+			if (node.type === "combustor") {
+				if ((node.data.area ?? 0) <= 0)
+					errors.push(`${node.id}: Combustor area must be > 0`);
+				if (node.data.Dh !== undefined && node.data.Dh < 0)
+					errors.push(`${node.id}: Combustor Dh must be > 0 (or 0 for auto)`);
 			}
 		}
 		return errors;
@@ -88,55 +108,6 @@ const App = () => {
 		}
 	};
 
-	const handleExport = async () => {
-		setIsExporting(true);
-		try {
-			const blob = await exportResults({
-				nodes,
-				edges,
-				solver_settings: solverSettings,
-			});
-			const filename = `combaero_results_${new Date().toISOString().split("T")[0]}.csv`;
-
-			// Try File System Access API (Native "Save As" Dialog)
-			if ("showSaveFilePicker" in window) {
-				try {
-					const handle = await (window as any).showSaveFilePicker({
-						suggestedName: filename,
-						types: [
-							{
-								description: "CSV Results File",
-								accept: { "text/csv": [".csv"] },
-							},
-						],
-					});
-					const writable = await handle.createWritable();
-					await writable.write(blob);
-					await writable.close();
-					return;
-				} catch (err) {
-					if ((err as Error).name === "AbortError") return;
-					console.warn("Native Save Picker failed, falling back", err);
-				}
-			}
-
-			// Fallback: legacy download
-			const url = URL.createObjectURL(blob);
-			const link = document.createElement("a");
-			link.href = url;
-			link.download = filename;
-			document.body.appendChild(link);
-			link.click();
-			document.body.removeChild(link);
-			URL.revokeObjectURL(url);
-		} catch (err) {
-			console.error("Export failed:", err);
-			alert("Export failed. Check console for details.");
-		} finally {
-			setIsExporting(false);
-		}
-	};
-
 	return (
 		<div className="flex flex-col h-screen w-screen overflow-hidden text-slate-900">
 			{/* Header */}
@@ -152,7 +123,7 @@ const App = () => {
 				<div className="flex items-center gap-3">
 					<button
 						type="button"
-						onClick={handleExport}
+						onClick={exportNetworkResults}
 						disabled={isExporting}
 						className="flex items-center gap-2 px-4 py-1.5 border rounded-md hover:bg-slate-50 transition-colors text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed min-w-[124px] justify-center"
 					>

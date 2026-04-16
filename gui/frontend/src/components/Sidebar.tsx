@@ -84,6 +84,23 @@ const Sidebar = () => {
 				/>
 			</div>
 
+			<div className="flex flex-col gap-1">
+				<label className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
+					Filename
+				</label>
+				<div className="flex gap-1">
+					<input
+						type="text"
+						value={filename}
+						onChange={(e) => setFilename(e.target.value)}
+						onBlur={handleBlur}
+						className="p-1 border rounded text-xs w-full bg-white outline-none focus:ring-1 focus:ring-stone-200"
+						placeholder="MyNetwork"
+					/>
+					<span className="text-gray-400 text-xs self-center">.json</span>
+				</div>
+			</div>
+
 			<div className="mt-4 text-sm font-bold text-gray-500 uppercase tracking-wider">
 				Nodes
 			</div>
@@ -185,33 +202,6 @@ const Sidebar = () => {
 				<Crosshair size={18} className="text-blue-400" />
 				<span>Probe</span>
 			</button>
-
-			<div className="mt-auto pt-6 border-t border-stone-200">
-				<div className="flex flex-col gap-2 mb-4">
-					<label className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
-						Filename
-					</label>
-					<div className="flex gap-1">
-						<input
-							type="text"
-							value={filename}
-							onChange={(e) => setFilename(e.target.value)}
-							onBlur={handleBlur}
-							className="p-1 border rounded text-xs w-full bg-white outline-none focus:ring-1 focus:ring-stone-200"
-							placeholder="MyNetwork"
-						/>
-						<span className="text-gray-400 text-xs self-center">.json</span>
-					</div>
-				</div>
-				<button
-					type="button"
-					onClick={onSave}
-					className="flex items-center justify-center gap-2 p-2 bg-stone-800 text-white rounded hover:bg-stone-700 transition-colors w-full"
-				>
-					<Save size={18} />
-					<span>Save Network</span>
-				</button>
-			</div>
 
 			<div className="mt-6 text-sm font-bold text-gray-500 uppercase tracking-wider">
 				Solver Configuration

@@ -22,25 +22,9 @@ const Inspector = () => {
 		updateEdgeData,
 		speciesMetadata,
 		unitPreferences,
+		isExporting,
+		exportNetworkResults,
 	} = useStore();
-
-	const handleExport = async () => {
-		try {
-			const res = await fetch("http://localhost:8000/export", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ nodes, edges }),
-			});
-			const blob = await res.blob();
-			const url = window.URL.createObjectURL(blob);
-			const a = document.createElement("a");
-			a.href = url;
-			a.download = "results.csv";
-			a.click();
-		} catch (error) {
-			console.error("Export failed:", error);
-		}
-	};
 
 	const validateNetwork = () => {
 		const errors: string[] = [];
@@ -69,13 +53,27 @@ const Inspector = () => {
 			}
 			if (node.type === "channel") {
 				if ((node.data.D || 0) <= 0)
-					errors.push(`${node.id}: Diameter must be > 0`);
+					errors.push(`${node.id}: Channel diameter must be > 0`);
 				if ((node.data.L || 0) <= 0)
-					errors.push(`${node.id}: Length must be > 0`);
+					errors.push(`${node.id}: Channel length must be > 0`);
 			}
 			if (node.type === "orifice") {
-				if ((node.data.diameter || 0) <= 0)
-					errors.push(`${node.id}: Diameter must be > 0`);
+				if ((node.data.area || 0) <= 0 && (node.data.diameter || 0) <= 0)
+					errors.push(`${node.id}: Orifice area or diameter must be > 0`);
+			}
+			if (node.type === "momentum_chamber") {
+				if ((node.data.area ?? 0) <= 0)
+					errors.push(`${node.id}: Momentum Chamber area must be > 0`);
+				if (node.data.Dh !== undefined && node.data.Dh < 0)
+					errors.push(
+						`${node.id}: Momentum Chamber Dh must be > 0 (or 0 for auto)`,
+					);
+			}
+			if (node.type === "combustor") {
+				if ((node.data.area ?? 0) <= 0)
+					errors.push(`${node.id}: Combustor area must be > 0`);
+				if (node.data.Dh !== undefined && node.data.Dh < 0)
+					errors.push(`${node.id}: Combustor Dh must be > 0 (or 0 for auto)`);
 			}
 		}
 		return errors;
@@ -268,10 +266,11 @@ const Inspector = () => {
 						</button>
 						<button
 							type="button"
-							onClick={handleExport}
-							className="text-[10px] bg-stone-100 hover:bg-stone-200 px-2 py-1 rounded border border-stone-300 transition-colors uppercase font-bold"
+							onClick={exportNetworkResults}
+							disabled={isExporting}
+							className="text-[10px] bg-stone-100 hover:bg-stone-200 px-2 py-1 rounded border border-stone-300 transition-colors uppercase font-bold disabled:opacity-50 min-w-[80px]"
 						>
-							Export CSV
+							{isExporting ? "Exporting..." : "Export CSV"}
 						</button>
 					</div>
 				</h2>
@@ -327,7 +326,7 @@ const Inspector = () => {
 							</label>
 							<NumericInput
 								id={`m_dot_${selectedNode.id}`}
-								value={selectedNode.data.m_dot || 1.0}
+								value={selectedNode.data.m_dot ?? 1.0}
 								onChange={(val) =>
 									updateNodeData(selectedNode.id, {
 										m_dot: val,
@@ -345,7 +344,7 @@ const Inspector = () => {
 							</label>
 							<NumericInput
 								id={`T_total_mb_${selectedNode.id}`}
-								value={selectedNode.data.T_total || 300}
+								value={selectedNode.data.T_total ?? 300}
 								onChange={(val) =>
 									updateNodeData(selectedNode.id, {
 										T_total: val,
@@ -367,7 +366,7 @@ const Inspector = () => {
 					<>
 						<UnitInput
 							label="P_total"
-							value={selectedNode.data.P_total || 101325}
+							value={selectedNode.data.P_total ?? 101325}
 							onChange={(val) =>
 								updateNodeData(selectedNode.id, { P_total: val })
 							}
@@ -381,7 +380,7 @@ const Inspector = () => {
 							</label>
 							<NumericInput
 								id={`T_total_pb_${selectedNode.id}`}
-								value={selectedNode.data.T_total || 300}
+								value={selectedNode.data.T_total ?? 300}
 								onChange={(val) =>
 									updateNodeData(selectedNode.id, {
 										T_total: val,
@@ -404,19 +403,19 @@ const Inspector = () => {
 						<LengthInput
 							id={`L_${selectedNode.id}`}
 							label="Length Flow Path"
-							value={selectedNode.data.L || 1.0}
+							value={selectedNode.data.L ?? 1.0}
 							onChange={(val) => updateNodeData(selectedNode.id, { L: val })}
 						/>
 						<LengthInput
 							id={`D_${selectedNode.id}`}
 							label="Channel Inner Diameter"
-							value={selectedNode.data.D || 0.1}
+							value={selectedNode.data.D ?? 0.1}
 							onChange={(val) => updateNodeData(selectedNode.id, { D: val })}
 						/>
 						<LengthInput
 							id={`roughness_${selectedNode.id}`}
 							label="Surface Roughness"
-							value={selectedNode.data.roughness || 1e-5}
+							value={selectedNode.data.roughness ?? 1e-5}
 							onChange={(val) =>
 								updateNodeData(selectedNode.id, { roughness: val })
 							}
@@ -478,7 +477,7 @@ const Inspector = () => {
 						<LengthInput
 							id={`diameter_${selectedNode.id}`}
 							label="Bore Diameter"
-							value={selectedNode.data.diameter || 0.08}
+							value={selectedNode.data.diameter ?? 0.08}
 							onChange={(val) =>
 								updateNodeData(selectedNode.id, { diameter: val })
 							}
@@ -513,7 +512,7 @@ const Inspector = () => {
 							<LengthInput
 								id={`plate_thickness_${selectedNode.id}`}
 								label="Plate Thickness (t)"
-								value={selectedNode.data.plate_thickness || 0.0}
+								value={selectedNode.data.plate_thickness ?? 0.0}
 								onChange={(val) =>
 									updateNodeData(selectedNode.id, { plate_thickness: val })
 								}
@@ -524,7 +523,7 @@ const Inspector = () => {
 							<LengthInput
 								id={`edge_radius_${selectedNode.id}`}
 								label="Inlet Edge Radius (r)"
-								value={selectedNode.data.edge_radius || 0.0}
+								value={selectedNode.data.edge_radius ?? 0.0}
 								onChange={(val) =>
 									updateNodeData(selectedNode.id, { edge_radius: val })
 								}
@@ -555,7 +554,7 @@ const Inspector = () => {
 								</label>
 								<NumericInput
 									id={`Cd_${selectedNode.id}`}
-									value={selectedNode.data.Cd || 0.6}
+									value={selectedNode.data.Cd ?? 0.6}
 									onChange={(val) =>
 										updateNodeData(selectedNode.id, {
 											Cd: val,
@@ -615,7 +614,7 @@ const Inspector = () => {
 							<AreaInput
 								id={`area_comb_${selectedNode.id}`}
 								label="Area"
-								value={selectedNode.data.area || 0.1}
+								value={selectedNode.data.area ?? 0.1}
 								onChange={(val) =>
 									updateNodeData(selectedNode.id, {
 										area: val,
@@ -626,8 +625,10 @@ const Inspector = () => {
 								<LengthInput
 									id={`Dh_comb_${selectedNode.id}`}
 									label="Dh"
-									value={selectedNode.data.Dh || 0}
-									placeholder="Auto"
+									value={selectedNode.data.Dh}
+									placeholder={Math.sqrt(
+										(4 * (selectedNode.data.area ?? 0.1)) / Math.PI,
+									)}
 									onChange={(val) =>
 										updateNodeData(selectedNode.id, {
 											Dh: val || undefined,
@@ -859,7 +860,7 @@ const Inspector = () => {
 							<AreaInput
 								id={`area_mom_${selectedNode.id}`}
 								label="Area"
-								value={selectedNode.data.area || 0.1}
+								value={selectedNode.data.area ?? 0.1}
 								onChange={(val) =>
 									updateNodeData(selectedNode.id, {
 										area: val,
@@ -870,8 +871,10 @@ const Inspector = () => {
 								<LengthInput
 									id={`Dh_mom_${selectedNode.id}`}
 									label="Dh"
-									value={selectedNode.data.Dh || 0}
-									placeholder="Auto"
+									value={selectedNode.data.Dh}
+									placeholder={Math.sqrt(
+										(4 * (selectedNode.data.area ?? 0.1)) / Math.PI,
+									)}
 									onChange={(val) =>
 										updateNodeData(selectedNode.id, {
 											Dh: val || undefined,
@@ -1067,7 +1070,6 @@ const Inspector = () => {
 		if (selectedEdge.data.result?.T_interface) {
 			const targetX_manual = selectedEdge.data.probe_depth ?? 0;
 			const tInt = selectedEdge.data.result.T_interface as number[];
-			const currentX = 0;
 
 			// Fallback layers for legacy/initial elements
 			const layers = selectedEdge.data.layers || [
@@ -1187,7 +1189,7 @@ const Inspector = () => {
 				<AreaInput
 					id={`area_edge_${selectedEdge.id}`}
 					label="Contact Area"
-					value={selectedEdge.data.area || 0.05}
+					value={selectedEdge.data.area ?? 0.05}
 					onChange={(val) => updateEdgeData(selectedEdge.id, { area: val })}
 				/>
 
@@ -1196,7 +1198,7 @@ const Inspector = () => {
 						Fouling Resistance (m²K/W)
 					</label>
 					<NumericInput
-						value={selectedEdge.data.R_fouling || 0}
+						value={selectedEdge.data.R_fouling ?? 0}
 						onChange={(val) =>
 							updateEdgeData(selectedEdge.id, { R_fouling: val })
 						}
@@ -1209,8 +1211,8 @@ const Inspector = () => {
 						layers={
 							selectedEdge.data.layers || [
 								{
-									thickness: selectedEdge.data.thickness || 0.003,
-									conductivity: selectedEdge.data.conductivity || 20.0,
+									thickness: selectedEdge.data.thickness ?? 0.003,
+									conductivity: selectedEdge.data.conductivity ?? 20.0,
 									material: "generic",
 								},
 							]
@@ -1240,7 +1242,7 @@ const Inspector = () => {
 									const [_, type, idx] = val.split(":");
 									updateEdgeData(selectedEdge.id, {
 										probe_mode: "preset",
-										probe_preset: { type, index: Number.parseInt(idx) },
+										probe_preset: { type, index: Number.parseInt(idx, 10) },
 									});
 								}
 							}}

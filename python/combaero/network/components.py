@@ -1845,12 +1845,14 @@ class ChannelElement(NetworkElement):
 
         # Inlet Mach
         rho_in = state_in.density()
-        v_in = state_in.m_dot / (rho_in * self.area) if self.area > 0 and rho_in > 0 else 1.0
+        v_in = abs(state_in.m_dot) / (rho_in * self.area) if self.area > 0 and rho_in > 0 else 1.0
         mach_in = float(cb.mach_number(v_in, state_in.T, state_in.X))
 
         # Outlet Mach (at static pressure P_out)
         rho_out = cb.density(state_out.T, state_out.P, state_out.X)
-        v_out = state_out.m_dot / (rho_out * self.area) if self.area > 0 and rho_out > 0 else 1.0
+        v_out = (
+            abs(state_out.m_dot) / (rho_out * self.area) if self.area > 0 and rho_out > 0 else 1.0
+        )
         mach_out = float(cb.mach_number(v_out, state_out.T, state_out.X))
 
         p_ratio_total = state_out.P_total / state_in.P_total if state_in.P_total > 0 else 1.0
@@ -1988,7 +1990,7 @@ class ChannelElement(NetworkElement):
             return None
 
         rho, _ = _safe_rho(state.density())
-        u = state.m_dot / (rho * self.area) if self.area > 0 else 1.0
+        u = abs(state.m_dot) / (rho * self.area) if self.area > 0 else 1.0
 
         # Use nan for T_hot if not specified (matches C++ default)
         T_hot = self.t_hot if self.t_hot is not None else math.nan

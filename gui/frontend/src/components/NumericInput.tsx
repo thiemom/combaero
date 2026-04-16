@@ -2,7 +2,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 
 interface NumericInputProps {
-	value: number;
+	value?: number | null;
 	onChange: (val: number) => void;
 	id?: string;
 	className?: string;
@@ -18,14 +18,18 @@ const NumericInput: React.FC<NumericInputProps> = ({
 	placeholder,
 }) => {
 	const [localValue, setLocalValue] = useState(
-		value !== undefined && value !== null ? value.toString() : "0",
+		value !== undefined && value !== null ? value.toString() : "",
 	);
 	const [isFocused, setIsFocused] = useState(false);
 
 	// Update local state if the external value changes, but ONLY when not focused
 	useEffect(() => {
 		if (isFocused) return;
-		const safeValue = value ?? 0;
+		if (value === undefined || value === null) {
+			setLocalValue("");
+			return;
+		}
+		const safeValue = value;
 		const currentLocal = Number.parseFloat(localValue);
 		if (
 			Number.isNaN(currentLocal) ||

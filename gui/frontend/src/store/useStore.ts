@@ -10,6 +10,7 @@ import {
 	type NodeChange,
 } from "reactflow";
 import { create } from "zustand";
+import { exportResults } from "../api";
 
 export interface RFState {
 	nodes: Node[];
@@ -43,12 +44,15 @@ export interface RFState {
 	saveNetwork: (filename?: string) => void | Promise<void>;
 	loadNetwork: (data: any) => void;
 	dismissSolveStatus: () => void;
+	isExporting: boolean;
+	exportNetworkResults: () => Promise<void>;
 }
 
 const useStore = create<RFState>((set, get) => ({
 	nodes: [],
 	edges: [],
 	solveResults: null,
+	isExporting: false,
 
 	onNodesChange: (changes: NodeChange[]) => {
 		set({
@@ -279,7 +283,10 @@ const useStore = create<RFState>((set, get) => ({
 					...n,
 					data: { ...n.data, result: undefined },
 				})),
-				edges: data.edges,
+				edges: data.edges.map((e: any) => ({
+					...e,
+					data: e.data ? { ...e.data, result: undefined } : e.data,
+				})),
 				solverSettings: data.solverSettings || get().solverSettings,
 				solveResults: null,
 			});
@@ -288,6 +295,64 @@ const useStore = create<RFState>((set, get) => ({
 
 	dismissSolveStatus: () => {
 		set({ solveResults: null });
+	},
+
+	exportNetworkResults: async () => {
+		const { nodes, edges, solverSettings } = get();
+		set({ isExporting: true, solveResults: null });
+
+		try {
+			const blob = await exportResults({
+				nodes,
+				edges,
+				solver_settings: solverSettings,
+			});
+
+			// 1. Try Native "Save As" Dialog (Chrome/Edge)
+			if ("showSaveFilePicker" in window) {
+				try {
+					const handle = await (window as any).showSaveFilePicker({
+						suggestedName: `combaero_results_${new Date().toISOString().split("T")[0]}.csv`,
+						types: [
+							{
+								description: "CSV File",
+								accept: { "text/csv": [".csv"] },
+							},
+						],
+					});
+					const writable = await handle.createWritable();
+					await writable.write(blob);
+					await writable.close();
+					return;
+				} catch (err) {
+					if ((err as Error).name === "AbortError") return;
+					console.warn(
+						"Native Save Picker failed, falling back to legacy",
+						err,
+					);
+				}
+			}
+
+			// 2. Fallback to classic link download
+			const url = window.URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = `combaero_results_${new Date().toISOString().split("T")[0]}.csv`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			window.URL.revokeObjectURL(url);
+		} catch (error) {
+			console.error("Export failed:", error);
+			set({
+				solveResults: {
+					success: false,
+					message: "Export failed. Check console for details.",
+				},
+			});
+		} finally {
+			set({ isExporting: false });
+		}
 	},
 }));
 

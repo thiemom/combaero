@@ -810,10 +810,10 @@ channel_smooth(double T, double P, const std::vector<double> &X,
                double T_hot, const std::string &correlation,
                              bool heating, double mu_ratio, double roughness,
                              double Nu_multiplier, double f_multiplier) {
-  if (velocity < 0.0) {
-    throw std::invalid_argument(
-        "channel_smooth: velocity must be non-negative");
-  }
+  // Use absolute velocity: Re, Nu, f, and dP are sign-independent.
+  // Negative velocity can arise from reversed flow during Newton iteration
+  // or from negative mass-flow boundary conditions.
+  velocity = std::abs(velocity);
   if (diameter <= 0.0) {
     throw std::invalid_argument("channel_smooth: diameter must be positive");
   }
@@ -1162,10 +1162,8 @@ ChannelResult channel_pin_fin(double T, double P, const std::vector<double> &X,
                               double pin_diameter, double S_D, double X_D,
                               int N_rows, double T_hot, bool is_staggered,
                               double Nu_multiplier, double f_multiplier) {
-  if (velocity < 0.0) {
-    throw std::invalid_argument(
-        "channel_pin_fin: velocity must be non-negative");
-  }
+  // Use absolute velocity for sign-independent correlations (see channel_smooth).
+  velocity = std::abs(velocity);
   if (pin_diameter <= 0.0) {
     throw std::invalid_argument(
         "channel_pin_fin: pin_diameter must be positive");

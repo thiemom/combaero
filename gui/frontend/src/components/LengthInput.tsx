@@ -4,10 +4,10 @@ import NumericInput from "./NumericInput";
 
 interface LengthInputProps {
 	label: string;
-	value: number;
+	value?: number | null;
 	onChange: (val: number) => void;
 	id?: string;
-	placeholder?: string;
+	placeholder?: string | number;
 }
 
 const LengthInput: React.FC<LengthInputProps> = ({
@@ -23,6 +23,14 @@ const LengthInput: React.FC<LengthInputProps> = ({
 	// Scale factor to convert internal (m) to display (m or mm)
 	const displayScale = unit === "mm" ? 1000 : 1;
 
+	const scaledValue =
+		value !== undefined && value !== null ? value * displayScale : undefined;
+
+	const scaledPlaceholder =
+		typeof placeholder === "number"
+			? (placeholder * displayScale).toFixed(unit === "mm" ? 1 : 3)
+			: placeholder;
+
 	return (
 		<div className="flex flex-col gap-1">
 			<label htmlFor={id} className="text-xs font-medium text-stone-500">
@@ -31,10 +39,10 @@ const LengthInput: React.FC<LengthInputProps> = ({
 			<div className="flex gap-1">
 				<NumericInput
 					id={id}
-					value={value * displayScale}
+					value={scaledValue}
 					onChange={(v) => onChange(v / displayScale)}
 					className="min-w-0 w-full p-1.5 border rounded text-xs bg-stone-50 focus:bg-white focus:ring-1 focus:ring-orange-500 outline-none"
-					placeholder={placeholder}
+					placeholder={scaledPlaceholder.toString()}
 				/>
 				<select
 					value={unit}
