@@ -28,19 +28,11 @@ export const solveNetwork = async (
 	return response.data;
 };
 
-export const exportResults = async (graph: NetworkGraph): Promise<void> => {
+export const exportResults = async (graph: NetworkGraph): Promise<Blob> => {
 	const response = await axios.post(`${API_BASE_URL}/export`, graph, {
 		responseType: "blob",
 	});
-
-	// Create a download link
-	const url = window.URL.createObjectURL(new Blob([response.data]));
-	const link = document.createElement("a");
-	link.href = url;
-	link.setAttribute("download", "combaero_results.csv");
-	document.body.appendChild(link);
-	link.click();
-	link.remove();
+	return response.data;
 };
 
 export const fetchMaterials = async (): Promise<string[]> => {

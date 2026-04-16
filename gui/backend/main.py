@@ -159,50 +159,71 @@ async def solve(schema: NetworkGraphSchema):
 async def export_results(schema: NetworkGraphSchema):
     try:
         # Solve quickly to get states
-        _, node_results, element_results, _, _ = await asyncio.to_thread(_solve_sync, schema)
+        _, node_results, element_results, edge_results, _ = await asyncio.to_thread(_solve_sync, schema)
 
         # Convert to DataFrame
         import pandas as pd
 
-        # Build label lookup from schema: id -> user label
-        node_labels = {n.id: (n.data.get("label") or "") for n in schema.nodes}
-        edge_labels: dict[str, str] = {}
+        # Build unified id_to_label map from nodes, edges, and auto-links
+        id_to_label = {}
+        for n in schema.nodes:
+            id_to_label[n.id] = n.data.get("label") or ""
         for e in schema.edges:
             lbl = (e.data or {}).get("label") or ""
-            edge_labels[e.id] = lbl
-            # Also map the auto-link ID used by the solver back to the edge label
+            id_to_label[e.id] = lbl
+            # Also map solver auto-link IDs
             auto_id = f"__auto_link__{e.source}__{e.target}"
-            edge_labels[auto_id] = lbl
+            id_to_label[auto_id] = lbl
 
         data = []
+
+        # 1. Process Nodes
         for node_id, res in node_results.items():
+            # Include all fields from StateResult (rho, mach, k, etc.)
+            state_data = res.state.model_dump()
+            # Handle Y/X list expansion
+            Y = state_data.pop("Y", [])
+            X = state_data.pop("X", None)
+
             base_data = {
                 "type": "node",
                 "id": node_id,
-                "label": node_labels.get(node_id, ""),
-                "T": res.state.T,
-                "P": res.state.P,
-                "P_total": res.state.P_total,
-                "m_dot": getattr(res.state, "m_dot", None),
-                "mach": res.state.mach,
+                "label": id_to_label.get(node_id, ""),
+                **state_data,
             }
-            if hasattr(res.state, "Y") and res.state.Y:
-                for i, y_val in enumerate(res.state.Y):
-                    base_data[f"Y[{i}]"] = y_val
+            # Flatten species fractions
+            for i, y_val in enumerate(Y):
+                base_data[f"Y[{i}]"] = y_val
+            if X:
+                for i, x_val in enumerate(X):
+                    base_data[f"X[{i}]"] = x_val
+
             data.append(base_data)
 
+        # 2. Process Flow Elements
         for elem_id, res in element_results.items():
-            base_data = {
-                "type": "element",
-                "id": elem_id,
-                "label": edge_labels.get(elem_id, ""),
-                "m_dot": res.m_dot,
-            }
-            if hasattr(res, "mach"):
-                base_data["mach"] = res.mach
-            if hasattr(res, "p_ratio"):
-                base_data["p_ratio"] = res.p_ratio
-            data.append(base_data)
+            # Include all analytic/diagnostic fields (Re, Nu, h, q_dot, f, etc.)
+            elem_data = res.model_dump()
+            data.append(
+                {
+                    "type": "element",
+                    "id": elem_id,
+                    "label": id_to_label.get(elem_id, ""),
+                    **elem_data,
+                }
+            )
+
+        # 3. Process Thermal Walls (edge_results)
+        for wall_id, res in edge_results.items():
+            # thermal wall results are already a dict from _solve_sync
+            data.append(
+                {
+                    "type": "thermal_wall",
+                    "id": wall_id,
+                    "label": id_to_label.get(wall_id, ""),
+                    **res,
+                }
+            )
 
         df = pd.DataFrame(data)
 

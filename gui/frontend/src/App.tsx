@@ -12,6 +12,7 @@ const App = () => {
 	const reactFlowWrapper = useRef<HTMLDivElement>(null);
 	const { nodes, edges, solverSettings, setSolveResults } = useStore();
 	const [isSolving, setIsSolving] = useState(false);
+	const [isExporting, setIsExporting] = useState(false);
 
 	const validateNetwork = () => {
 		const errors: string[] = [];
@@ -88,10 +89,51 @@ const App = () => {
 	};
 
 	const handleExport = async () => {
+		setIsExporting(true);
 		try {
-			await exportResults({ nodes, edges, solver_settings: solverSettings });
+			const blob = await exportResults({
+				nodes,
+				edges,
+				solver_settings: solverSettings,
+			});
+			const filename = `combaero_results_${new Date().toISOString().split("T")[0]}.csv`;
+
+			// Try File System Access API (Native "Save As" Dialog)
+			if ("showSaveFilePicker" in window) {
+				try {
+					const handle = await (window as any).showSaveFilePicker({
+						suggestedName: filename,
+						types: [
+							{
+								description: "CSV Results File",
+								accept: { "text/csv": [".csv"] },
+							},
+						],
+					});
+					const writable = await handle.createWritable();
+					await writable.write(blob);
+					await writable.close();
+					return;
+				} catch (err) {
+					if ((err as Error).name === "AbortError") return;
+					console.warn("Native Save Picker failed, falling back", err);
+				}
+			}
+
+			// Fallback: legacy download
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement("a");
+			link.href = url;
+			link.download = filename;
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+			URL.revokeObjectURL(url);
 		} catch (err) {
 			console.error("Export failed:", err);
+			alert("Export failed. Check console for details.");
+		} finally {
+			setIsExporting(false);
 		}
 	};
 
@@ -111,9 +153,33 @@ const App = () => {
 					<button
 						type="button"
 						onClick={handleExport}
-						className="flex items-center gap-2 px-4 py-1.5 border rounded-md hover:bg-slate-50 transition-colors text-sm font-medium"
+						disabled={isExporting}
+						className="flex items-center gap-2 px-4 py-1.5 border rounded-md hover:bg-slate-50 transition-colors text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed min-w-[124px] justify-center"
 					>
-						<Download size={16} /> Export CSV
+						{isExporting ? (
+							<>
+								<svg
+									aria-label="Exporting"
+									role="img"
+									className="animate-spin text-slate-400"
+									width={16}
+									height={16}
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									strokeWidth={2.5}
+								>
+									<title>Exporting</title>
+									<circle cx="12" cy="12" r="10" strokeOpacity={0.25} />
+									<path d="M12 2a10 10 0 0 1 10 10" />
+								</svg>
+								Exporting…
+							</>
+						) : (
+							<>
+								<Download size={16} /> Export CSV
+							</>
+						)}
 					</button>
 					<button
 						type="button"
@@ -162,7 +228,9 @@ const App = () => {
 			<footer className="h-8 border-t bg-stone-100 flex items-center px-4 text-[10px] text-stone-500 uppercase tracking-widest font-bold">
 				{isSolving
 					? "Engine Solver Status: Running…"
-					: "Engine Solver Status: Idle"}{" "}
+					: isExporting
+						? "Engine Solver Status: Exporting Data…"
+						: "Engine Solver Status: Idle"}{" "}
 				| Nodes: {nodes.length} | Elements: {edges.length}
 			</footer>
 		</div>
