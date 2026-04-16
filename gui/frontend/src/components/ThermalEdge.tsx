@@ -149,7 +149,7 @@ export default function ThermalEdge({
 					}}
 					className="nodrag nopan flex flex-col items-center shadow-sm"
 				>
-					{data?.label && (
+					{data?.label && data?.show_label && (
 						<span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider leading-none mb-1">
 							{data.label}
 						</span>

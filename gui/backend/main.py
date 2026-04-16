@@ -164,11 +164,22 @@ async def export_results(schema: NetworkGraphSchema):
         # Convert to DataFrame
         import pandas as pd
 
+        # Build label lookup from schema: id -> user label
+        node_labels = {n.id: (n.data.get("label") or "") for n in schema.nodes}
+        edge_labels: dict[str, str] = {}
+        for e in schema.edges:
+            lbl = (e.data or {}).get("label") or ""
+            edge_labels[e.id] = lbl
+            # Also map the auto-link ID used by the solver back to the edge label
+            auto_id = f"__auto_link__{e.source}__{e.target}"
+            edge_labels[auto_id] = lbl
+
         data = []
         for node_id, res in node_results.items():
             base_data = {
                 "type": "node",
                 "id": node_id,
+                "label": node_labels.get(node_id, ""),
                 "T": res.state.T,
                 "P": res.state.P,
                 "P_total": res.state.P_total,
@@ -184,6 +195,7 @@ async def export_results(schema: NetworkGraphSchema):
             base_data = {
                 "type": "element",
                 "id": elem_id,
+                "label": edge_labels.get(elem_id, ""),
                 "m_dot": res.m_dot,
             }
             if hasattr(res, "mach"):

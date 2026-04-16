@@ -293,7 +293,11 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
 
     # 3. Third Pass: Auto-connections
     for edge in schema.edges:
-        if edge.source in nodes_map and edge.target in nodes_map and edge.data is None:
+        if (
+            edge.source in nodes_map
+            and edge.target in nodes_map
+            and not (edge.data or {}).get("type")
+        ):
             auto_id = f"__auto_link__{edge.source}__{edge.target}"
             if auto_id not in net.elements:
                 elem = LosslessConnectionElement(

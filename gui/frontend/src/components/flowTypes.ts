@@ -1,3 +1,4 @@
+import FlowEdge from "./FlowEdge";
 import ChannelNode from "./nodes/ChannelNode";
 import CombustorNode from "./nodes/CombustorNode.tsx";
 import LosslessNode from "./nodes/LosslessNode";
@@ -23,4 +24,5 @@ export const nodeTypes = {
 
 export const edgeTypes = {
 	thermal: ThermalEdge,
+	default: FlowEdge,
 };

@@ -91,7 +91,7 @@ const useStore = create<RFState>((set, get) => ({
 						probe_mode: "preset",
 						probe_preset: { type: "hot", index: 0 },
 					}
-				: null,
+				: {},
 		} as Edge;
 
 		set({
