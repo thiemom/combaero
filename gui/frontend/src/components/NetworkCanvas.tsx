@@ -73,7 +73,12 @@ const NetworkCanvas = () => {
 			} else if (type === "orifice") {
 				data = { ...data, diameter: 0.08, Cd: 0.6 } as any;
 			} else if (type === "combustor") {
-				data = { ...data, method: "complete" } as any;
+				data = {
+					...data,
+					method: "complete",
+					area: 0.1,
+					Nu_multiplier: 1.0,
+				} as any;
 			} else if (type === "momentum_chamber") {
 				data = {
 					...data,

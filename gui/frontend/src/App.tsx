@@ -64,7 +64,7 @@ const App = () => {
 					);
 			}
 			if (node.type === "combustor") {
-				if ((node.data.area ?? 0) <= 0)
+				if ((node.data.area ?? 0.1) <= 0)
 					errors.push(`${node.id}: Combustor area must be > 0`);
 				if (node.data.Dh !== undefined && node.data.Dh < 0)
 					errors.push(`${node.id}: Combustor Dh must be > 0 (or 0 for auto)`);
