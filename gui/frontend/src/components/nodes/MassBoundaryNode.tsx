@@ -44,6 +44,7 @@ const MassBoundaryNode = ({ id, data, selected }: NodeProps) => {
 			</div>
 
 			<Handle type="source" position={Position.Right} id="flow-source" />
+			<Handle type="target" position={Position.Left} id="flow-target" />
 		</div>
 	);
 };

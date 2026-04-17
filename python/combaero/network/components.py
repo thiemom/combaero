@@ -970,9 +970,21 @@ class MassFlowBoundary(NetworkNode):
     def compute_derived_state(
         self, upstream_states: list[MixtureState]
     ) -> tuple[float, list[float], Any]:
-        # Boundary nodes define their own state
+        """
+        Computes (T_total, Y, Jac) for a MassFlowBoundary.
+        - If upstream_states exists, it acts as a SINK (Outlet): inherits state via mixing.
+        - If upstream_states is empty, it acts as a SOURCE (Inlet): uses user settings.
+        """
         import combaero as cb
 
+        if upstream_states:
+            # SINK behavior: Automatically mix upstream streams using C++ core logic
+            # This ensures energy conservation and correct species transport at outlets.
+            streams = [cb.MassStream(s.m_dot, s.T_total, s.P_total, s.Y) for s in upstream_states]
+            mix_res = cb.mixer_from_streams_and_jacobians(streams)
+            return mix_res.T_mix, mix_res.Y_mix, mix_res
+
+        # SOURCE behavior: Use developer/user-defined boundary constants
         Y = self.Y if self.Y is not None else list(cb.mole_to_mass(cb.species.dry_air()))
         return self.T_total, Y, None
 

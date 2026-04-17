@@ -580,21 +580,23 @@ class NetworkSolver:
         for nid in self._topological_order:
             node = self.network.nodes[nid]
 
-            if isinstance(node, (PressureBoundary, MassFlowBoundary)):
+            up_elems = self.network.get_upstream_elements(nid)
+
+            # Boundaries with NO upstream connections are pure sources
+            if isinstance(node, (PressureBoundary, MassFlowBoundary)) and not up_elems:
                 T, Y, _ = node.compute_derived_state([])
                 self._derived_states[nid] = (T, Y, None)
                 # Seed relay for boundary's own unknowns
                 node_indices = self._unknown_indices.get(nid, [])
                 unknown_names = self.unknown_names
-                for _, global_idx in enumerate(node_indices):
+                for global_idx in node_indices:
                     name = unknown_names[global_idx]
                     if name.endswith(".P_total"):
                         relay[nid].setdefault(
-                            global_idx, {"T": 0.0, "Y": np.zeros(cb.num_species())}
+                            global_idx, {"T": 0.0, "Y": np.zeros(cb.num_species()), "P_total": 0.0}
                         )["P_total"] = 1.0
                 continue
 
-            up_elems = self.network.get_upstream_elements(nid)
             up_states = []
             for elem in up_elems:
                 state_up = self._get_node_state(self.network.nodes[elem.from_node], x)
@@ -854,10 +856,7 @@ class NetworkSolver:
 
         # Determine boundaries
         if isinstance(node, PressureBoundary):
-            # For PressureBoundary, defaults.
-            # We first check if the test suite provided an initial_guess dict for external states
             guess = getattr(node, "initial_guess", {})
-
             P_tot = guess.get(f"{node.id}.P_total", getattr(node, "P_total", 101325.0))
             P_stat = guess.get(f"{node.id}.P", P_tot)
             T_tot = guess.get(f"{node.id}.T_total", getattr(node, "T_total", 300.0))
@@ -869,13 +868,20 @@ class NetworkSolver:
 
         if isinstance(node, MassFlowBoundary):
             guess = getattr(node, "initial_guess", {})
-            m = getattr(node, "m_dot", 0.1)
+            m = getattr(node, "m_dot", 0.0)
             T_tot = guess.get(f"{node.id}.T_total", getattr(node, "T_total", 300.0))
-            T_stat = guess.get(f"{node.id}.T", T_tot)
             Y = getattr(node, "Y", None)
+
+            # If this boundary has upstream connections (sink), use derived mixed state
+            if node.id in self._derived_states:
+                T_tot_derived, Y_derived, _ = self._derived_states[node.id]
+                T_tot = T_tot_derived
+                Y = Y_derived
+
             if Y is None:
                 Y = default_Y
 
+            T_stat = guess.get(f"{node.id}.T", T_tot)
             p_val = guess.get(f"{node.id}.P", 101325.0)
             ptot_val = guess.get(f"{node.id}.P_total", 101325.0)
 
@@ -998,7 +1004,12 @@ class NetworkSolver:
             m_dot_out = 0.0
 
             if isinstance(node, MassFlowBoundary):
-                m_dot_in += getattr(node, "m_dot", 0.0)
+                # If connected as a sink (has upstream, no downstream), subtract from balance.
+                # Otherwise (source or injection) add to balance.
+                if upstream_elems and not downstream_elems:
+                    m_dot_out += getattr(node, "m_dot", 0.0)
+                else:
+                    m_dot_in += getattr(node, "m_dot", 0.0)
 
             for elem in upstream_elems:
                 indices = self._unknown_indices.get(elem.id)
