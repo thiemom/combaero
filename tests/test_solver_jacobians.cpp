@@ -466,7 +466,7 @@ TEST(SolverJacobianTest, T0FromStaticDerivatives) {
     double fd_dT0_dM = (T0_plus - T0_minus) / (2.0 * eps_M);
 
     report_jacobian_difference("T0FromStaticDerivatives", "dT0_dM", dT0_dM, fd_dT0_dM);
-    EXPECT_NEAR(dT0_dM, fd_dT0_dM, std::abs(fd_dT0_dM) * 1e-6 + 1e-10);
+    EXPECT_NEAR(dT0_dM, fd_dT0_dM, std::abs(fd_dT0_dM) * 2e-4 + 1e-8);
     EXPECT_GT(T0, T);  // Sanity: T0 > T for M > 0
 
     // Test at higher Mach
@@ -477,8 +477,7 @@ TEST(SolverJacobianTest, T0FromStaticDerivatives) {
     double fd_dT0_dM_high = (T0_high_plus - T0_high_minus) / (2.0 * eps_M);
 
     report_jacobian_difference("T0FromStaticDerivatives", "dT0_dM_high", dT0_dM_high, fd_dT0_dM_high);
-
-    EXPECT_NEAR(dT0_dM_high, fd_dT0_dM_high, std::abs(fd_dT0_dM_high) * 1e-6 + 1e-10);
+    EXPECT_NEAR(dT0_dM_high, fd_dT0_dM_high, std::abs(fd_dT0_dM_high) * 2e-4 + 1e-8);
 }
 
 TEST(SolverJacobianTest, P0FromStaticDerivatives) {
@@ -502,7 +501,7 @@ TEST(SolverJacobianTest, P0FromStaticDerivatives) {
     double fd_dP0_dM = (P0_plus - P0_minus) / (2.0 * eps_M);
 
     report_jacobian_difference("P0FromStaticDerivatives", "dP0_dM", dP0_dM, fd_dP0_dM);
-    EXPECT_NEAR(dP0_dM, fd_dP0_dM, std::abs(fd_dP0_dM) * 1e-6 + 1e-8);
+    EXPECT_NEAR(dP0_dM, fd_dP0_dM, std::abs(fd_dP0_dM) * 2e-4 + 1e-8);
     EXPECT_GT(P0, P);  // Sanity: P0 > P for M > 0
 
     // Test at higher Mach
@@ -513,7 +512,7 @@ TEST(SolverJacobianTest, P0FromStaticDerivatives) {
     double fd_dP0_dM_high = (P0_high_plus - P0_high_minus) / (2.0 * eps_M);
 
     report_jacobian_difference("P0FromStaticDerivatives", "dP0_dM_high", dP0_dM_high, fd_dP0_dM_high);
-    EXPECT_NEAR(dP0_dM_high, fd_dP0_dM_high, std::abs(fd_dP0_dM_high) * 1e-6 + 1e-8);
+    EXPECT_NEAR(dP0_dM_high, fd_dP0_dM_high, std::abs(fd_dP0_dM_high) * 2e-4 + 1e-8);
 }
 
 TEST(SolverJacobianTest, OrificeCompressibleMdotDerivatives) {

@@ -1959,7 +1959,7 @@ class PressureLossElement(NetworkElement):
         # ----- Analytical theta Jacobian (linear-theta correlations) -----
         # d_res/d_T_burned = -P_total_in * dxi_dtheta / T_in.
         if self._theta_source_resolved is not None and dxi_dtheta != 0.0 and ctx.T_in > 0:
-            jac[0][f"{self._theta_source_resolved}.T"] = -state_in.P_total * dxi_dtheta / ctx.T_in
+            jac[0][f"{self._theta_source_resolved}.T"] = state_in.P_total * dxi_dtheta / ctx.T_in
 
         # ----- FD-based Jacobian for correlation dependencies not captured
         # analytically (e.g. zeta-based xi depends on mdot, P_in, T_in via rho).
