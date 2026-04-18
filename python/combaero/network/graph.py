@@ -148,7 +148,7 @@ class FlowNetwork:
                 "one PressureBoundary to serve as a reference."
             )
 
-        from .components import LosslessConnectionElement
+        from .components import LosslessConnectionElement, PressureLossElement
 
         all_lossless = all(isinstance(e, LosslessConnectionElement) for e in self.elements.values())
         if all_lossless:
@@ -156,6 +156,17 @@ class FlowNetwork:
                 "Network contains only lossless connection elements. "
                 "There must be at least one pressure drop element to solve flow."
             )
+
+        # PressureLossElement ambiguity: both endpoints have has_theta=True and no
+        # explicit theta_source override.  Requires user disambiguation.
+        for eid, elem in self.elements.items():
+            if isinstance(elem, PressureLossElement) and elem._both_endpoints_theta:
+                raise ValueError(
+                    f"FlowNetwork validation failed: PressureLossElement '{eid}' has "
+                    f"has_theta=True nodes on both endpoints "
+                    f"('{elem.from_node}' and '{elem.to_node}'). "
+                    f"Pass theta_source='<node_id>' to disambiguate."
+                )
 
         # Isolated subgraph check: all nodes must be reachable from *some* PressureBoundary.
         # This prevents islands that have elements but no reference pressure.

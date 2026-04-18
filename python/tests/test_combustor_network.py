@@ -4,12 +4,19 @@ import numpy as np
 import pytest
 
 import combaero as cb
-from combaero.network import ConstantFractionLoss, FlowNetwork, NetworkSolver
+from combaero.network import (
+    ConstantFractionLoss,
+    FlowNetwork,
+    LosslessConnectionElement,
+    NetworkSolver,
+    PressureLossElement,
+)
 from combaero.network.components import (
     CombustorNode,
     EffectiveAreaConnectionElement,
     MassFlowBoundary,
     OrificeElement,
+    PlenumNode,
     PressureBoundary,
 )
 
@@ -105,7 +112,13 @@ def test_combustor_network_conservation():
 
 
 def _make_simple_combustor_net(xi: float | None):
-    """Helper: simple network with mass-flow in -> combustor -> pressure-out."""
+    """Helper: simple network with mass-flow in -> combustor -> post_plenum -> pressure-out.
+
+    When ``xi`` is provided, a :class:`PressureLossElement` sits between the
+    combustor and the post-combustor plenum; otherwise a
+    :class:`LosslessConnectionElement` is used.  This exposes the loss as a
+    regular edge (new API).
+    """
     net = FlowNetwork()
     Y_air = cb.species.dry_air_mass()
     Y_ch4 = cb.species.pure_species("CH4")
@@ -116,20 +129,32 @@ def _make_simple_combustor_net(xi: float | None):
     fuel_in.initial_guess = {"fuel.P_total": 160000.0, "fuel.P": 160000.0}
     p_out = PressureBoundary("out", P_total=101325.0, T_total=300.0)
 
-    loss = ConstantFractionLoss(xi=xi) if xi is not None else None
-    combustor = CombustorNode("comb", method="complete", pressure_loss=loss)
+    combustor = CombustorNode("comb", method="complete")
     combustor.initial_guess = {"comb.P_total": 150000.0, "comb.P": 140000.0}
+    post = PlenumNode("post")
+    post.initial_guess = {"post.P_total": 140000.0, "post.P": 140000.0}
 
     net.add_node(air_in)
     net.add_node(fuel_in)
     net.add_node(combustor)
+    net.add_node(post)
     net.add_node(p_out)
 
     e_air = EffectiveAreaConnectionElement("e_air", "air", "comb", effective_area=0.05)
     e_air.initial_guess = {"e_air.m_dot": 1.0}
     e_fuel = EffectiveAreaConnectionElement("e_fuel", "fuel", "comb", effective_area=0.005)
     e_fuel.initial_guess = {"e_fuel.m_dot": 0.03}
-    nozzle = OrificeElement("nozzle", "comb", "out", Cd=0.8, diameter=0.12, correlation="fixed")
+
+    if xi is not None:
+        loss = PressureLossElement("loss", "comb", "post", correlation=ConstantFractionLoss(xi=xi))
+        loss.initial_guess = {"loss.m_dot": 1.03}
+        net.add_element(loss)
+    else:
+        link = LosslessConnectionElement("loss", "comb", "post")
+        link.initial_guess = {"loss.m_dot": 1.03}
+        net.add_element(link)
+
+    nozzle = OrificeElement("nozzle", "post", "out", Cd=0.8, diameter=0.12, correlation="fixed")
     nozzle.initial_guess = {"nozzle.m_dot": 1.03}
     net.add_element(e_air)
     net.add_element(e_fuel)
@@ -141,24 +166,18 @@ def _make_simple_combustor_net(xi: float | None):
 def test_pressure_loss_applied_in_network():
     """Regression: ConstantFractionLoss must apply exactly P_out = P_in * (1 - xi).
 
-    The key invariant: combustor.P_total / upstream_P_total == (1 - xi).
-    The upstream pressure floats (MassFlowBoundary); verify the ratio is exact.
+    With the new API, the loss is a ``PressureLossElement`` between the
+    combustor and a downstream plenum. The invariant
+    ``post.P_total / comb.P_total == 1 - xi`` must hold exactly.
     """
     xi = 0.05
-    net_loss, combustor = _make_simple_combustor_net(xi=xi)
+    net_loss, _ = _make_simple_combustor_net(xi=xi)
     sol = NetworkSolver(net_loss).solve(method="hybr", use_jac=True)
 
-    mr = combustor._last_mix_res
-    P_total_out = mr.P_total_mix
-
-    # upstream P_total (MassFlowBoundary satisfies P_total = P, both floats together)
-    P_in_air = sol["air.P"]  # air boundary P_total == P
-    P_in_fuel = sol["fuel.P"]
-    mdot_air, mdot_fuel = 1.0, 0.03
-    P_in_combustor = (mdot_air * P_in_air + mdot_fuel * P_in_fuel) / (mdot_air + mdot_fuel)
-
-    ratio = P_total_out / P_in_combustor
+    P_comb = sol["comb.P_total"]
+    P_post = sol["post.P_total"]
+    ratio = P_post / P_comb
     assert ratio == pytest.approx(1 - xi, rel=1e-4), (
-        f"Loss ratio wrong: P_out/P_in={ratio:.6f}, expected {1 - xi:.6f}"
+        f"Loss ratio wrong: post/comb={ratio:.6f}, expected {1 - xi:.6f}"
     )
-    assert P_total_out < P_in_combustor, "P_total must drop across combustor"
+    assert P_post < P_comb, "P_total must drop across the loss element"

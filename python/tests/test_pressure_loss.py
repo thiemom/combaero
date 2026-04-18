@@ -101,97 +101,95 @@ class TestLinearThetaFractionLoss:
 
 
 # ---------------------------------------------------------------------------
-# Integration test: CombustorNode + LinearThetaFractionLoss reduces P_total
+# Integration test: PressureLossElement residual enforces correct ratio
 # ---------------------------------------------------------------------------
 
 
-class TestCombustorNodeWithPressureLoss:
-    def _make_streams(self):
+class TestPressureLossElementResidual:
+    """Unit-level checks on ``PressureLossElement.residuals`` for each correlation.
+
+    Verifies the element residual ``P_total_out - P_total_in * (1 - xi) = 0``
+    vanishes at the physically correct P ratio, for every supported correlation.
+    """
+
+    def _make_air_state(self, P_total: float = 150000.0, T: float = 700.0, m_dot: float = 1.0):
+        """Helper: build an air-composition MixtureState."""
         import combaero as cb
         from combaero.network import MixtureState
 
         ns = cb.species.num_species
-        fuel_Y = [0.0] * ns
-        air_Y = [0.0] * ns
+        Y = [0.0] * ns
         for k in range(ns):
             name = cb.species_name(k)
-            if name == "CH4":
-                fuel_Y[k] = 1.0
-            elif name == "N2":
-                air_Y[k] = 0.767
+            if name == "N2":
+                Y[k] = 0.767
             elif name == "O2":
-                air_Y[k] = 0.233
+                Y[k] = 0.233
+        return MixtureState(P=P_total, P_total=P_total, T=T, T_total=T, m_dot=m_dot, Y=Y)
 
-        fuel = MixtureState(
-            P=150000.0, P_total=150000.0, T=300.0, T_total=300.0, m_dot=0.05, Y=fuel_Y
+    def test_constant_fraction_residual_zero_at_exact_ratio(self) -> None:
+        """res == 0 iff P_total_out / P_total_in == (1 - xi)."""
+        from combaero.network import PressureLossElement
+
+        xi = 0.05
+        P_in = 150000.0
+        state_in = self._make_air_state(P_total=P_in)
+        state_out = self._make_air_state(P_total=P_in * (1.0 - xi))
+
+        elem = PressureLossElement("loss", "a", "b", correlation=ConstantFractionLoss(xi=xi))
+        res, _ = elem.residuals(state_in, state_out)
+        assert res[0] == pytest.approx(0.0, abs=1e-6)
+
+    def test_constant_fraction_residual_nonzero_off_ratio(self) -> None:
+        from combaero.network import PressureLossElement
+
+        xi = 0.05
+        P_in = 150000.0
+        state_in = self._make_air_state(P_total=P_in)
+        state_out = self._make_air_state(P_total=P_in)  # no drop
+
+        elem = PressureLossElement("loss", "a", "b", correlation=ConstantFractionLoss(xi=xi))
+        res, _ = elem.residuals(state_in, state_out)
+        assert res[0] == pytest.approx(P_in * xi, rel=1e-6)
+
+    def test_linear_theta_residual_uses_cold_flow_without_source(self) -> None:
+        """Without a theta source, linear-theta correlation degrades to xi0."""
+        import warnings as _w
+
+        from combaero.network import PressureLossElement
+
+        k, xi0 = 0.5, 0.02
+        P_in = 150000.0
+        state_in = self._make_air_state(P_total=P_in)
+        state_out = self._make_air_state(P_total=P_in * (1.0 - xi0))
+
+        elem = PressureLossElement(
+            "loss", "a", "b", correlation=LinearThetaFractionLoss(k=k, xi0=xi0)
         )
-        air = MixtureState(P=150000.0, P_total=150000.0, T=600.0, T_total=600.0, m_dot=1.0, Y=air_Y)
-        return fuel, air
+        # residuals() itself does not warn (warning fires in resolve_topology);
+        # here we bypass resolve_topology and hit the no-graph path.
+        with _w.catch_warnings():
+            _w.simplefilter("ignore")
+            res, _ = elem.residuals(state_in, state_out)
+        assert res[0] == pytest.approx(0.0, abs=1e-6)
 
-    def test_no_loss_baseline(self) -> None:
-        from combaero.network import CombustorNode
+    def test_constant_head_residual_xi_from_dynamic_head(self) -> None:
+        """ConstantHeadLoss: xi = zeta * 0.5 * rho * v^2 / P_in."""
+        from combaero.network import ConstantHeadLoss, PressureLossElement
 
-        fuel, air = self._make_streams()
-        node = CombustorNode("comb", method="complete")
-        _, _, mix_res = node.compute_derived_state([fuel, air])
-        assert mix_res is not None
-        assert mix_res.P_total_mix == pytest.approx(150000.0, rel=1e-6)
+        zeta = 5.0
+        area = 0.1
+        P_in = 150000.0
+        mdot = 1.0
+        state_in = self._make_air_state(P_total=P_in, m_dot=mdot)
 
-    def test_constant_loss_reduces_P_total(self) -> None:
-        from combaero.network import CombustorNode
+        corr = ConstantHeadLoss(zeta=zeta, area=area)
+        elem = PressureLossElement("loss", "a", "b", correlation=corr)
+        # Evaluate xi manually via the same ctx builder used by the element
+        ctx = elem._build_ctx(state_in, state_in, None)
+        xi, _ = corr(ctx)
+        assert 0.0 < xi < 1.0
 
-        fuel, air = self._make_streams()
-        node = CombustorNode("comb", method="complete", pressure_loss=ConstantFractionLoss(xi=0.05))
-        _, _, mix_res = node.compute_derived_state([fuel, air])
-        assert mix_res.P_total_mix == pytest.approx(150000.0 * (1.0 - 0.05), rel=1e-4)
-
-    def test_linear_theta_loss_reduces_P_total(self) -> None:
-        from combaero.network import CombustorNode
-
-        fuel, air = self._make_streams()
-        node_base = CombustorNode("base", method="complete")
-        _, _, mix_base = node_base.compute_derived_state([fuel, air])
-
-        node_loss = CombustorNode(
-            "loss", method="complete", pressure_loss=LinearThetaFractionLoss(k=0.5, xi0=0.02)
-        )
-        _, _, mix_loss = node_loss.compute_derived_state([fuel, air])
-
-        assert mix_loss.P_total_mix < 150000.0
-        assert mix_loss.P_total_mix < mix_base.P_total_mix
-
-    def test_outlet_T_unchanged_by_pressure_loss(self) -> None:
-        """Pressure loss does not affect outlet temperature (ideal gas)."""
-        from combaero.network import CombustorNode
-
-        fuel, air = self._make_streams()
-        node_base = CombustorNode("base", method="complete")
-        T_base, _, _ = node_base.compute_derived_state([fuel, air])
-
-        node_loss = CombustorNode(
-            "loss", method="complete", pressure_loss=LinearThetaFractionLoss(k=0.5, xi0=0.02)
-        )
-        T_loss, _, _ = node_loss.compute_derived_state([fuel, air])
-
-        assert T_loss == pytest.approx(T_base, rel=1e-6)
-
-    def test_constant_head_loss_reduces_P_total(self) -> None:
-        from combaero.network import CombustorNode, ConstantHeadLoss
-
-        fuel, air = self._make_streams()
-        node = CombustorNode(
-            "head", method="complete", pressure_loss=ConstantHeadLoss(zeta=5.0, area=0.1)
-        )
-        _, _, mix_res = node.compute_derived_state([fuel, air])
-        assert mix_res.P_total_mix < 150000.0
-
-    def test_head_loss_smaller_than_full_p_in(self) -> None:
-        """Head loss with realistic zeta should not exceed P_in."""
-        from combaero.network import CombustorNode, ConstantHeadLoss
-
-        fuel, air = self._make_streams()
-        node = CombustorNode(
-            "head", method="complete", pressure_loss=ConstantHeadLoss(zeta=10.0, area=0.05)
-        )
-        _, _, mix_res = node.compute_derived_state([fuel, air])
-        assert mix_res.P_total_mix > 0.0
+        state_out = self._make_air_state(P_total=P_in * (1.0 - xi), m_dot=mdot)
+        res, _ = elem.residuals(state_in, state_out)
+        assert res[0] == pytest.approx(0.0, abs=1e-6)

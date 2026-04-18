@@ -1,6 +1,9 @@
 import math
+import warnings
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Literal
 
 import combaero as cb
@@ -14,12 +17,6 @@ HeatTransferModelLiteral = Literal[
 
 if TYPE_CHECKING:
     from .graph import FlowNetwork
-    from .pressure_loss import (
-        ConstantFractionLoss,
-        ConstantLoss,
-        LinearThetaFractionLoss,
-        LinearThetaLoss,
-    )
 
 CombustionMethodLiteral = Literal["complete", "equilibrium"]
 
@@ -515,6 +512,14 @@ class MixtureState:
 
 
 class NetworkNode(ABC):
+    #: True when this node supplies a meaningful temperature-rise ratio theta
+    #: (T_burned / T_unburned - 1).  Read by ``PressureLossElement`` with
+    #: theta-aware correlations.  Overridden on combustion-capable nodes
+    #: (``CombustorNode``).  Nodes advertising ``has_theta = True`` must
+    #: expose ``_T_unburned`` and ``_T_burned`` float attributes after
+    #: ``compute_derived_state`` has been called.
+    has_theta: bool = False
+
     def __init__(self, id: str):
         self.id = id
 
@@ -1002,13 +1007,21 @@ class CombustorNode(NetworkNode):
     Evaluates adiabatic combustion using the C++ core backend based on
     the selected CombustionMethodLiteral.
     Automatically handles mixing when multiple upstream connections exist.
+
+    Pressure loss is **not** a property of the combustor node.  Attach a
+    :class:`PressureLossElement` on an adjacent edge (upstream diffuser or
+    downstream liner exit) to apply combustor pressure loss; theta-aware
+    correlations (``LinearThetaFractionLoss`` / ``LinearThetaHeadLoss``)
+    automatically pick up ``_T_unburned`` / ``_T_burned`` from this node.
     """
+
+    # Supplies theta = T_burned / T_unburned - 1 to adjacent PressureLossElement.
+    has_theta: bool = True
 
     def __init__(
         self,
         id: str,
         method: CombustionMethodLiteral = "complete",
-        pressure_loss: "ConstantFractionLoss | LinearThetaFractionLoss | ConstantLoss | LinearThetaLoss | None" = None,
         area: float = 0.1,
         Dh: float | None = None,
         surface: ConvectiveSurface | None = None,
@@ -1016,7 +1029,6 @@ class CombustorNode(NetworkNode):
     ):
         super().__init__(id)
         self.method = method
-        self.pressure_loss = pressure_loss
         self.area = area
         self.Dh = Dh
         self.surface = surface or ConvectiveSurface()
@@ -1024,6 +1036,9 @@ class CombustorNode(NetworkNode):
         self.upstream_elements = []
         self.fuel_boundary = None
         self.energy_boundaries: list[EnergyBoundary] = []
+        # Populated by compute_derived_state so PressureLossElement can read theta.
+        self._T_unburned: float = 300.0
+        self._T_burned: float = 300.0
 
     @property
     def has_convective_surface(self) -> bool:
@@ -1073,28 +1088,25 @@ class CombustorNode(NetworkNode):
         Q_total = sum(eb.Q for eb in self.energy_boundaries)
         fraction_total = sum(eb.fraction for eb in self.energy_boundaries)
 
-        # Always use combustor_residuals_and_jacobians so P_total_mix Jacobian
-        # is populated correctly for the relay mechanism (even when no loss is set).
-        _loss_fn = self.pressure_loss if self.pressure_loss is not None else _zero_loss
+        # Combustor only: mixing + combustion, NO pressure loss (that's on the edge).
         mix_res = cb.combustor_residuals_and_jacobians(
             streams,
             P_ref,
             Q=Q_total,
             fraction=fraction_total,
-            pressure_loss=_loss_fn,
+            pressure_loss=_zero_loss,
             use_equilibrium=(self.method == "equilibrium"),
         )
         self._last_mix_res = mix_res
+        # Expose burned temperature for adjacent PressureLossElement (theta source).
+        self._T_burned = float(mix_res.T_mix)
         return mix_res.T_mix, mix_res.Y_mix, mix_res
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
         # Stagnation constraint: P_total = P (combustor is a large-area, low-velocity volume).
         # The dynamic pressure 0.5*rho*v^2 is negligible compared to P at combustor scales,
         # so P ~= P_total is an excellent approximation (same as PlenumNode).
-        # Pressure losses shift P_total via the relay Jacobian on P_total_mix so Newton
-        # adjusts upstream boundary pressures to satisfy the loss constraint.
-        # NOTE: there is a known bug where pressure loss via LosslessConnectionElement
-        # inlets is not enforced - see test_combustor_pressure_loss_regression.py.
+        # Pressure loss is applied by an adjacent PressureLossElement, not here.
         res = [state.P_total - state.P]
         jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.P_total": 1.0}}
         return res, jac
@@ -1714,6 +1726,254 @@ class LosslessConnectionElement(NetworkElement):
 
     def n_equations(self) -> int:
         return 1
+
+
+# ---------------------------------------------------------------------------
+# Discrete pressure loss element: combustor-theta aware or plain cold-flow.
+# ---------------------------------------------------------------------------
+
+
+def _correlation_is_linear_theta(correlation: Callable) -> bool:
+    """True if the correlation's value depends on ``ctx.theta``.
+
+    Detected by invoking the correlation twice with different theta values on
+    a throwaway context and checking whether the returned xi differs, or by
+    checking the ``dxi_dtheta`` return.  The callable is also considered
+    theta-aware if its returned ``dxi_dtheta`` is nonzero.
+    """
+    try:
+        ctx_zero = SimpleNamespace(
+            theta=0.0,
+            T_in=300.0,
+            P_in=101325.0,
+            X_in=[1.0],
+            T_ad=300.0,
+            phi=0.0,
+            mdot_total=1.0,
+            mdot_fuel=0.0,
+            mdot_air=0.0,
+            X_products=[],
+            Y_products=[],
+        )
+        xi0, dxi_dtheta = correlation(ctx_zero)
+    except Exception:
+        return False
+    if dxi_dtheta != 0.0:
+        return True
+    ctx_one = SimpleNamespace(**vars(ctx_zero))
+    ctx_one.theta = 1.0
+    try:
+        xi1, _ = correlation(ctx_one)
+    except Exception:
+        return False
+    return abs(xi1 - xi0) > 1e-12
+
+
+class PressureLossElement(NetworkElement):
+    """
+    Discrete pressure-loss edge.  Enforces ``P_total_out = P_total_in * (1 - xi)``
+    where ``xi`` is supplied by a user correlation callable.
+
+    Four standard correlations are provided in :mod:`combaero.network.pressure_loss`:
+
+    - :class:`ConstantFractionLoss` -- fixed fractional total-pressure drop.
+    - :class:`ConstantHeadLoss` -- Euler loss coefficient (dynamic head).
+    - :class:`LinearThetaFractionLoss` -- ``xi = k * theta + xi0``.
+    - :class:`LinearThetaHeadLoss` -- ``xi = (k * theta + zeta0) * q / P_in``.
+
+    Theta-aware correlations need a reference node with ``has_theta = True``
+    (e.g. :class:`CombustorNode`).  Discovery precedence:
+
+    1. ``theta_source=<node_id>`` constructor kwarg (explicit override).
+    2. ``to_node`` endpoint if it has ``has_theta = True``.
+    3. ``from_node`` endpoint if it has ``has_theta = True``.
+    4. Cold-flow fallback: ``theta = 0``.  If the correlation is linear-theta
+       a :class:`UserWarning` is emitted at resolution time.
+
+    Placing the element between two ``has_theta = True`` nodes without an
+    explicit ``theta_source`` raises ``ValueError`` during
+    :meth:`FlowNetwork.validate`.
+    """
+
+    def __init__(
+        self,
+        id: str,
+        from_node: str,
+        to_node: str,
+        correlation: Callable[[Any], tuple[float, float]],
+        theta_source: str | None = None,
+        area: float | None = None,
+    ):
+        super().__init__(id, from_node, to_node)
+        self.correlation = correlation
+        self.theta_source = theta_source
+        self.area = area
+        # Resolved during resolve_topology.  Empty string sentinel disallowed
+        # so callers can cleanly test ``if self._theta_source_resolved is not None``.
+        self._theta_source_resolved: str | None = None
+        self._both_endpoints_theta: bool = False
+
+    def unknowns(self) -> list[str]:
+        return [f"{self.id}.m_dot"]
+
+    def n_equations(self) -> int:
+        return 1
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        # Stash a graph reference so residuals/diagnostics can read the theta
+        # source node's burned/unburned temperatures without a re-pass.
+        self._graph_ref = graph
+
+        # 1. Explicit override wins.
+        if self.theta_source is not None:
+            src = graph.nodes.get(self.theta_source)
+            if src is None:
+                raise ValueError(
+                    f"PressureLossElement '{self.id}': theta_source "
+                    f"'{self.theta_source}' is not in the network."
+                )
+            if not getattr(src, "has_theta", False):
+                raise ValueError(
+                    f"PressureLossElement '{self.id}': theta_source "
+                    f"'{self.theta_source}' is a '{type(src).__name__}' which "
+                    f"does not provide theta (has_theta=False)."
+                )
+            self._theta_source_resolved = self.theta_source
+            return
+
+        to_has_theta = getattr(graph.nodes[self.to_node], "has_theta", False)
+        from_has_theta = getattr(graph.nodes[self.from_node], "has_theta", False)
+
+        if to_has_theta and from_has_theta:
+            # Ambiguous: raised at validate() for a cleaner user-facing error.
+            self._both_endpoints_theta = True
+            return
+        if to_has_theta:
+            self._theta_source_resolved = self.to_node
+            return
+        if from_has_theta:
+            self._theta_source_resolved = self.from_node
+            return
+
+        # 4. Cold-flow fallback.  Warn if the correlation depends on theta.
+        if _correlation_is_linear_theta(self.correlation):
+            warnings.warn(
+                f"PressureLossElement '{self.id}' uses a linear-theta "
+                f"correlation ({type(self.correlation).__name__}) but neither "
+                f"endpoint ('{self.from_node}' upstream, '{self.to_node}' "
+                f"downstream) has has_theta=True. The k-term will have no "
+                f"effect; xi falls back to cold-flow (theta=0).",
+                UserWarning,
+                stacklevel=2,
+            )
+
+    def _build_ctx(
+        self, state_in: MixtureState, state_out: MixtureState, graph: "FlowNetwork | None"
+    ) -> SimpleNamespace:
+        """Build a duck-typed PressureLossContext from the current states."""
+        # Theta sourcing: read the reference node's burned/unburned temperatures.
+        if self._theta_source_resolved is not None and graph is not None:
+            src = graph.nodes[self._theta_source_resolved]
+            T_unburned = float(getattr(src, "_T_unburned", state_in.T))
+            T_burned = float(getattr(src, "_T_burned", state_in.T))
+            theta = (T_burned / T_unburned - 1.0) if T_unburned > 0 else 0.0
+            T_ctx = T_unburned
+            T_ad = T_burned
+        else:
+            theta = 0.0
+            T_ctx = float(state_in.T)
+            T_ad = float(state_in.T)
+
+        return SimpleNamespace(
+            theta=theta,
+            T_in=T_ctx,
+            P_in=float(state_in.P),
+            X_in=list(state_in.X),
+            T_ad=T_ad,
+            phi=0.0,
+            mdot_total=float(state_in.m_dot),
+            mdot_fuel=0.0,
+            mdot_air=0.0,
+            X_products=[],
+            Y_products=[],
+        )
+
+    def residuals(
+        self, state_in: MixtureState, state_out: MixtureState
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        # Graph reference is stashed on the element by the solver pre-pass;
+        # fall back to ctx without theta sourcing if unavailable.
+        graph = getattr(self, "_graph_ref", None)
+        ctx = self._build_ctx(state_in, state_out, graph)
+        try:
+            xi, dxi_dtheta = self.correlation(ctx)
+        except Exception as exc:
+            raise RuntimeError(
+                f"PressureLossElement '{self.id}' correlation raised: {exc}"
+            ) from exc
+
+        # Residual: P_total_out - P_total_in * (1 - xi) = 0.
+        res = [state_out.P_total - state_in.P_total * (1.0 - xi)]
+
+        jac: dict[int, dict[str, float]] = {
+            0: {
+                f"{self.from_node}.P_total": -(1.0 - xi),
+                f"{self.to_node}.P_total": 1.0,
+            }
+        }
+
+        # ----- Analytical theta Jacobian (linear-theta correlations) -----
+        # d_res/d_T_burned = -P_total_in * dxi_dtheta / T_in.
+        if self._theta_source_resolved is not None and dxi_dtheta != 0.0 and ctx.T_in > 0:
+            jac[0][f"{self._theta_source_resolved}.T"] = -state_in.P_total * dxi_dtheta / ctx.T_in
+
+        # ----- FD-based Jacobian for correlation dependencies not captured
+        # analytically (e.g. zeta-based xi depends on mdot, P_in, T_in via rho).
+        # One extra correlation call per variable; cheap and robust.
+        def _dxi_dvar(attr: str, val: float, step_scale: float) -> float:
+            eps = step_scale if val == 0.0 else max(abs(val) * 1e-6, step_scale)
+            saved = getattr(ctx, attr)
+            try:
+                setattr(ctx, attr, saved + eps)
+                xi_p, _ = self.correlation(ctx)
+                setattr(ctx, attr, saved - eps)
+                xi_m, _ = self.correlation(ctx)
+            finally:
+                setattr(ctx, attr, saved)
+            return (xi_p - xi_m) / (2.0 * eps)
+
+        # Only bother if xi actually varies with the velocity/density variables
+        # (skip for constant fraction to avoid unneeded correlation calls).
+        dxi_dmdot = _dxi_dvar("mdot_total", ctx.mdot_total, 1e-6)
+        if dxi_dmdot != 0.0:
+            jac[0][f"{self.id}.m_dot"] = state_in.P_total * dxi_dmdot
+
+        dxi_dP_in = _dxi_dvar("P_in", ctx.P_in, 1.0)
+        if dxi_dP_in != 0.0:
+            # P_in = state_in.P.  Static P is driven by the node's P unknown.
+            jac[0][f"{self.from_node}.P"] = state_in.P_total * dxi_dP_in
+
+        if self._theta_source_resolved is None:
+            # When no theta source, ctx.T_in = state_in.T (a derived state).
+            # Emit a relay-routable T Jacobian on the upstream node.
+            dxi_dT_in = _dxi_dvar("T_in", ctx.T_in, 0.01)
+            if dxi_dT_in != 0.0:
+                jac[0][f"{self.from_node}.T"] = state_in.P_total * dxi_dT_in
+
+        return res, jac
+
+    def diagnostics(self, state_in: MixtureState, state_out: MixtureState) -> dict[str, float]:
+        graph = getattr(self, "_graph_ref", None)
+        ctx = self._build_ctx(state_in, state_out, graph)
+        try:
+            xi, _ = self.correlation(ctx)
+        except Exception:
+            xi = 0.0
+        return {
+            "xi": float(xi),
+            "theta": float(ctx.theta),
+            "P_ratio": float(state_out.P_total / state_in.P_total) if state_in.P_total > 0 else 0.0,
+        }
 
 
 class ChannelElement(NetworkElement):
