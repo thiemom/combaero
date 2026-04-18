@@ -461,3 +461,21 @@ def test_combustor_channel_outlet_network_converges():
     m_total = sol["l_air.m_dot"] + sol["l_fuel.m_dot"]
     assert abs(m_total - sol["chan.m_dot"]) < 1e-6
     assert abs(m_total - 1.03) < 1e-6
+
+
+def test_combustor_diagnostics_exposes_m_dot():
+    """CombustorNode.diagnostics must expose the total mass flow as ``m_dot``.
+
+    The GUI's Live Telemetry panel renders `state.m_dot` in a prominent slot;
+    without this field combustor nodes would silently display ṁ = 0.
+    """
+    net, _ = _make_lossless_inlet_network(xi=None)
+    sol = NetworkSolver(net).solve(method="hybr", use_jac=True)
+    assert sol["__success__"], f"|F|={sol['__final_norm__']:.2e}"
+
+    # Flat diagnostic key exists and equals the expected mass flow.
+    assert "comb.m_dot" in sol, "CombustorNode.diagnostics must expose 'm_dot'"
+    m_comb = sol["comb.m_dot"]
+    m_in = sol["l_air.m_dot"] + sol["l_fuel.m_dot"]
+    assert abs(m_comb - m_in) < 1e-6, f"Combustor m_dot {m_comb:.6f} != inlet sum {m_in:.6f}"
+    assert abs(m_comb - 1.03) < 1e-6

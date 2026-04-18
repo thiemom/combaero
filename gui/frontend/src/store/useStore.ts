@@ -115,21 +115,32 @@ const useStore = create<RFState>((set, get) => ({
 	updateNodeData: (nodeId: string, data: any) => {
 		set({
 			nodes: get().nodes.map((node) => {
+				// Clear stale result on every node when any edit invalidates the solve
+				const { result: _r, ...rest } = node.data ?? {};
 				if (node.id === nodeId) {
-					return { ...node, data: { ...node.data, ...data } };
+					return { ...node, data: { ...rest, ...data } };
 				}
-				return node;
+				return { ...node, data: rest };
+			}),
+			edges: get().edges.map((edge) => {
+				const { result: _r, ...rest } = edge.data ?? {};
+				return { ...edge, data: rest };
 			}),
 			solveResults: null,
 		});
 	},
 	updateEdgeData: (edgeId: string, data: any) => {
 		set({
+			nodes: get().nodes.map((node) => {
+				const { result: _r, ...rest } = node.data ?? {};
+				return { ...node, data: rest };
+			}),
 			edges: get().edges.map((edge) => {
+				const { result: _r, ...rest } = edge.data ?? {};
 				if (edge.id === edgeId) {
-					return { ...edge, data: { ...edge.data, ...data } };
+					return { ...edge, data: { ...rest, ...data } };
 				}
-				return edge;
+				return { ...edge, data: rest };
 			}),
 			solveResults: null,
 		});

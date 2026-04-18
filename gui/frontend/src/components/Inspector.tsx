@@ -6,6 +6,7 @@ import {
 	QUANTITY_CATALOGUE,
 	TRANSPORT_KEYS,
 } from "../utils/quantities";
+import { validateNetwork } from "../utils/validation";
 import AreaInput from "./AreaInput";
 import CompositionEditor from "./CompositionEditor";
 import LengthInput from "./LengthInput";
@@ -26,60 +27,7 @@ const Inspector = () => {
 		exportNetworkResults,
 	} = useStore();
 
-	const validateNetwork = () => {
-		const errors: string[] = [];
-		for (const node of nodes) {
-			if (node.type === "pressure_boundary" || node.type === "mass_boundary") {
-				if (
-					(node.data.P_total || 0) <= 0 &&
-					node.type === "pressure_boundary"
-				) {
-					errors.push(`${node.id}: Total Pressure must be > 0`);
-				}
-				if ((node.data.T_total || 0) <= 0) {
-					errors.push(`${node.id}: Temperature must be > 0`);
-				}
-				if (node.data.composition?.source === "custom") {
-					const values = Object.values(
-						node.data.composition.custom_fractions || {},
-					) as number[];
-					const sum = values.reduce((a: number, b: number) => a + (b || 0), 0);
-					if (Math.abs(sum - 1.0) > 1e-3) {
-						errors.push(
-							`${node.id}: Custom composition sum is ${sum.toFixed(3)} (expected 1.0)`,
-						);
-					}
-				}
-			}
-			if (node.type === "channel") {
-				if ((node.data.D || 0) <= 0)
-					errors.push(`${node.id}: Channel diameter must be > 0`);
-				if ((node.data.L || 0) <= 0)
-					errors.push(`${node.id}: Channel length must be > 0`);
-			}
-			if (node.type === "orifice") {
-				if ((node.data.area || 0) <= 0 && (node.data.diameter || 0) <= 0)
-					errors.push(`${node.id}: Orifice area or diameter must be > 0`);
-			}
-			if (node.type === "momentum_chamber") {
-				if ((node.data.area ?? 0) <= 0)
-					errors.push(`${node.id}: Momentum Chamber area must be > 0`);
-				if (node.data.Dh !== undefined && node.data.Dh < 0)
-					errors.push(
-						`${node.id}: Momentum Chamber Dh must be > 0 (or 0 for auto)`,
-					);
-			}
-			if (node.type === "combustor") {
-				if ((node.data.area ?? 0.1) <= 0)
-					errors.push(`${node.id}: Combustor area must be > 0`);
-				if (node.data.Dh !== undefined && node.data.Dh < 0)
-					errors.push(`${node.id}: Combustor Dh must be > 0 (or 0 for auto)`);
-			}
-		}
-		return errors;
-	};
-
-	const validationErrors = validateNetwork();
+	const validationErrors = validateNetwork(nodes);
 
 	// Get selected node
 	const selectedNode = nodes.find((n) => n.selected);
@@ -586,6 +534,314 @@ const Inspector = () => {
 					</>
 				)}
 
+				{selectedNode.type === "discrete_loss" &&
+					(() => {
+						// Compute default area from upstream node
+						const upstreamEdge = edges.find(
+							(e) => e.target === selectedNode.id && !e.data?.type,
+						);
+						const upstreamNode = upstreamEdge
+							? nodes.find((n) => n.id === upstreamEdge.source)
+							: undefined;
+						const inheritedArea: number | undefined = upstreamNode?.data?.area;
+
+						const userSetArea =
+							selectedNode.data.area !== null &&
+							selectedNode.data.area !== undefined;
+						const displayArea: number = userSetArea
+							? selectedNode.data.area
+							: (inheritedArea ?? 0.1);
+
+						// Compute available has_theta nodes (combustors)
+						const thetaNodes = nodes.filter(
+							(n) => n.type === "combustor" && n.id !== selectedNode.id,
+						);
+
+						// Determine auto-default: first downstream combustor, then upstream
+						const downstreamEdge = edges.find(
+							(e) => e.source === selectedNode.id && !e.data?.type,
+						);
+						const downstreamNode = downstreamEdge
+							? nodes.find((n) => n.id === downstreamEdge.target)
+							: undefined;
+						const autoDefault =
+							downstreamNode?.type === "combustor"
+								? downstreamNode.id
+								: upstreamNode?.type === "combustor"
+									? upstreamNode.id
+									: null;
+
+						const thetaSource: string | null =
+							selectedNode.data.theta_source ?? null;
+						const hasThetaSource =
+							thetaSource !== null && thetaSource !== "none";
+						const corrType: string =
+							selectedNode.data.correlation_type ?? "constant_fraction";
+						const isThetaCorr =
+							corrType === "linear_theta_fraction" ||
+							corrType === "linear_theta_head";
+
+						const areaWarning =
+							(userSetArea ? selectedNode.data.area : inheritedArea) != null &&
+							(userSetArea ? selectedNode.data.area : inheritedArea) <= 0;
+
+						return (
+							<div className="flex flex-col gap-4">
+								{/* Correlation type */}
+								<div className="flex flex-col gap-2">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Correlation Type
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-sm"
+										value={corrType}
+										onChange={(e) => {
+											const t = e.target.value;
+											const needsTheta =
+												t === "linear_theta_fraction" ||
+												t === "linear_theta_head";
+											if (
+												needsTheta &&
+												!hasThetaSource &&
+												thetaNodes.length > 0
+											) {
+												updateNodeData(selectedNode.id, {
+													correlation_type: t,
+													theta_source: autoDefault ?? thetaNodes[0].id,
+												});
+											} else if (needsTheta && thetaNodes.length === 0) {
+												return;
+											} else {
+												updateNodeData(selectedNode.id, {
+													correlation_type: t,
+												});
+											}
+										}}
+									>
+										<option value="constant_fraction">
+											Constant fraction — dP/P = ξ
+										</option>
+										<option value="constant_head">
+											Constant head — dP = ζ · q
+										</option>
+										{thetaNodes.length > 0 || hasThetaSource ? (
+											<option value="linear_theta_fraction">
+												Linear Θ fraction — dP/P = k·Θ + ξ₀
+											</option>
+										) : null}
+										{thetaNodes.length > 0 || hasThetaSource ? (
+											<option value="linear_theta_head">
+												Linear Θ head — dP = (k·Θ + ζ₀) · q
+											</option>
+										) : null}
+									</select>
+									{isThetaCorr && !hasThetaSource && (
+										<p className="text-[9px] text-amber-500 italic">
+											Select a theta source below to enable this correlation.
+										</p>
+									)}
+								</div>
+
+								{/* Flow Area — always shown, inherited from upstream by default */}
+								<div className="flex flex-col gap-2">
+									<div className="flex items-center justify-between">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Flow Area (m²)
+										</label>
+										{userSetArea && (
+											<button
+												type="button"
+												className="text-[9px] text-blue-500 hover:underline"
+												onClick={() =>
+													updateNodeData(selectedNode.id, { area: null })
+												}
+											>
+												Reset to inherited
+											</button>
+										)}
+									</div>
+									<NumericInput
+										value={displayArea}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { area: val })
+										}
+										onClear={() =>
+											// Clearing the field is semantically the same as clicking
+											// "Reset to inherited": we drop the user override so the
+											// backend auto-infers from the upstream node again.
+											updateNodeData(selectedNode.id, { area: null })
+										}
+										min={0}
+										className={`p-2 border rounded ${
+											userSetArea
+												? "text-gray-900 font-semibold"
+												: "text-gray-400"
+										}`}
+										placeholder={
+											inheritedArea != null
+												? `${inheritedArea.toFixed(4)} (from upstream)`
+												: "0.1"
+										}
+									/>
+									{!userSetArea && inheritedArea != null && (
+										<p className="text-[9px] text-gray-400 italic -mt-1">
+											Inherited from upstream ({upstreamNode?.id}). Edit to
+											override.
+										</p>
+									)}
+									{!userSetArea && inheritedArea == null && (
+										<p className="text-[9px] text-gray-400 italic -mt-1">
+											Connect an upstream node to auto-discover area.
+										</p>
+									)}
+									{areaWarning && (
+										<div className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+											⚠ Area ≤ 0 — head loss will be undefined.
+										</div>
+									)}
+								</div>
+
+								{/* Parameters */}
+								{(corrType === "constant_fraction" ||
+									corrType === "linear_theta_fraction") && (
+									<div className="flex flex-col gap-2">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											{corrType === "constant_fraction"
+												? "ξ — loss fraction [−]"
+												: "ξ₀ — cold-flow base fraction [−]"}
+										</label>
+										<NumericInput
+											value={
+												corrType === "constant_fraction"
+													? (selectedNode.data.xi ?? 0.03)
+													: (selectedNode.data.xi0 ?? 0.02)
+											}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, {
+													[corrType === "constant_fraction" ? "xi" : "xi0"]:
+														val,
+												})
+											}
+											min={0}
+											className="p-2 border rounded"
+										/>
+										{corrType === "linear_theta_fraction" && (
+											<>
+												<label className="text-xs font-bold text-gray-500 uppercase">
+													k — Theta sensitivity [−/−]
+												</label>
+												<NumericInput
+													value={selectedNode.data.k ?? 0.001}
+													onChange={(val) =>
+														updateNodeData(selectedNode.id, { k: val })
+													}
+													min={0}
+													className="p-2 border rounded"
+												/>
+												<p className="text-[9px] text-gray-400 italic">
+													P_out = P_in · (1 − k·Θ − ξ₀). Θ = T_burned/T_in − 1
+												</p>
+											</>
+										)}
+										{corrType === "constant_fraction" && (
+											<p className="text-[9px] text-gray-400 italic">
+												P_out = P_in · (1 − ξ). e.g. 0.03 = 3%
+											</p>
+										)}
+									</div>
+								)}
+
+								{(corrType === "constant_head" ||
+									corrType === "linear_theta_head") && (
+									<div className="flex flex-col gap-2">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											{corrType === "constant_head"
+												? "ζ — Euler loss coeff. [−]"
+												: "ζ₀ — cold-flow Euler coeff. [−]"}
+										</label>
+										<NumericInput
+											value={
+												corrType === "constant_head"
+													? (selectedNode.data.zeta ?? 1.0)
+													: (selectedNode.data.zeta0 ?? 1.0)
+											}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, {
+													[corrType === "constant_head" ? "zeta" : "zeta0"]:
+														val,
+												})
+											}
+											min={0}
+											className="p-2 border rounded"
+										/>
+										{corrType === "linear_theta_head" && (
+											<>
+												<label className="text-xs font-bold text-gray-500 uppercase">
+													k — Theta sensitivity [−/−]
+												</label>
+												<NumericInput
+													value={selectedNode.data.k ?? 0.001}
+													onChange={(val) =>
+														updateNodeData(selectedNode.id, { k: val })
+													}
+													min={0}
+													className="p-2 border rounded"
+												/>
+												<p className="text-[9px] text-gray-400 italic">
+													dP = (k·Θ + ζ₀) · ½ρv². Θ = T_burned/T_in − 1
+												</p>
+											</>
+										)}
+									</div>
+								)}
+
+								{/* Theta Source */}
+								<div className="flex flex-col gap-2 border-t pt-3">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Theta Source
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-sm"
+										value={thetaSource ?? ""}
+										onChange={(e) => {
+											const val = e.target.value || null;
+											updateNodeData(selectedNode.id, { theta_source: val });
+										}}
+									>
+										<option value="">
+											Auto{autoDefault ? ` (→ ${autoDefault})` : " (cold-flow)"}
+										</option>
+										<option value="none">None (cold-flow)</option>
+										{thetaNodes.map((n) => (
+											<option key={n.id} value={n.id}>
+												{n.data?.label
+													? `${n.data.label} (${n.id})`
+													: `Combustor: ${n.id}`}
+											</option>
+										))}
+									</select>
+									{thetaNodes.length === 0 && (
+										<p className="text-[9px] text-gray-400 italic">
+											No combustor nodes in network. Only ξ/ζ correlations
+											available.
+										</p>
+									)}
+								</div>
+
+								<div className="border-t pt-3">
+									<SurfaceEnhancementInspector
+										surface={selectedNode.data.surface || { type: "smooth" }}
+										onChange={(surface) =>
+											updateNodeData(selectedNode.id, { surface })
+										}
+									/>
+								</div>
+
+								<InitialGuessEditor node={selectedNode} />
+							</div>
+						);
+					})()}
+
 				{selectedNode.type === "combustor" && (
 					<div className="flex flex-col gap-4">
 						<div className="flex flex-col gap-2">
@@ -661,194 +917,6 @@ const Inspector = () => {
 								updateNodeData(selectedNode.id, { surface })
 							}
 						/>
-
-						<div className="flex flex-col gap-2 pt-1 border-t border-stone-100">
-							<label className="text-xs font-bold text-gray-500 uppercase">
-								Pressure Loss
-							</label>
-							<select
-								id={`pl_type_${selectedNode.id}`}
-								className="p-2 border rounded bg-white text-sm"
-								value={selectedNode.data.pressure_loss?.type ?? "none"}
-								onChange={(e) => {
-									const t = e.target.value;
-									if (t === "none") {
-										updateNodeData(selectedNode.id, { pressure_loss: null });
-									} else if (t === "constant_fraction") {
-										updateNodeData(selectedNode.id, {
-											pressure_loss: {
-												type: "constant_fraction",
-												xi: 0.03,
-											},
-										});
-									} else if (t === "linear_theta_fraction") {
-										updateNodeData(selectedNode.id, {
-											pressure_loss: {
-												type: "linear_theta_fraction",
-												k: 0.5,
-												xi0: 0.02,
-											},
-										});
-									} else if (t === "constant_head") {
-										updateNodeData(selectedNode.id, {
-											pressure_loss: {
-												type: "constant_head",
-												zeta: 5.0,
-											},
-										});
-									} else if (t === "linear_theta_head") {
-										updateNodeData(selectedNode.id, {
-											pressure_loss: {
-												type: "linear_theta_head",
-												k: 1.0,
-												zeta0: 3.0,
-											},
-										});
-									}
-								}}
-							>
-								<option value="none">None</option>
-								<option value="constant_fraction">
-									Constant fraction — dP/P = xi
-								</option>
-								<option value="linear_theta_fraction">
-									Linear fraction — dP/P = k*Theta + xi0
-								</option>
-								<option value="constant_head">
-									Constant head — dP = zeta * q_in
-								</option>
-								<option value="linear_theta_head">
-									Linear head — dP = (k*Theta + zeta0) * q_in
-								</option>
-							</select>
-							{selectedNode.data.pressure_loss?.type ===
-								"constant_fraction" && (
-								<div className="flex flex-col gap-1">
-									<label className="text-xs text-gray-500">
-										xi — loss fraction [-]
-									</label>
-									<NumericInput
-										id={`pl_xi_${selectedNode.id}`}
-										value={selectedNode.data.pressure_loss.xi ?? 0.03}
-										onChange={(val) =>
-											updateNodeData(selectedNode.id, {
-												pressure_loss: {
-													...selectedNode.data.pressure_loss,
-													xi: val,
-												},
-											})
-										}
-										className="p-2 border rounded"
-									/>
-									<p className="text-[9px] text-gray-400 italic">
-										P_out = P_in * (1 - xi). e.g. 0.03 = 3%
-									</p>
-								</div>
-							)}
-							{selectedNode.data.pressure_loss?.type ===
-								"linear_theta_fraction" && (
-								<div className="flex flex-col gap-2">
-									<label className="text-xs text-gray-500">
-										k — Theta sensitivity [-/-]
-									</label>
-									<NumericInput
-										id={`pl_k_${selectedNode.id}`}
-										value={selectedNode.data.pressure_loss.k ?? 0.5}
-										onChange={(val) =>
-											updateNodeData(selectedNode.id, {
-												pressure_loss: {
-													...selectedNode.data.pressure_loss,
-													k: val,
-												},
-											})
-										}
-										className="p-2 border rounded"
-									/>
-									<label className="text-xs text-gray-500">
-										xi0 — cold-flow base fraction [-]
-									</label>
-									<NumericInput
-										id={`pl_xi0_${selectedNode.id}`}
-										value={selectedNode.data.pressure_loss.xi0 ?? 0.02}
-										onChange={(val) =>
-											updateNodeData(selectedNode.id, {
-												pressure_loss: {
-													...selectedNode.data.pressure_loss,
-													xi0: val,
-												},
-											})
-										}
-										className="p-2 border rounded"
-									/>
-									<p className="text-[9px] text-gray-400 italic">
-										Theta = T_ad/T_in - 1. P_out = P_in*(1 - k*Theta - xi0)
-									</p>
-								</div>
-							)}
-							{selectedNode.data.pressure_loss?.type === "constant_head" && (
-								<div className="flex flex-col gap-1">
-									<label className="text-xs text-gray-500">
-										zeta — Euler loss coefficient [-]
-									</label>
-									<NumericInput
-										id={`pl_zeta_${selectedNode.id}`}
-										value={selectedNode.data.pressure_loss.zeta ?? 5.0}
-										onChange={(val) =>
-											updateNodeData(selectedNode.id, {
-												pressure_loss: {
-													...selectedNode.data.pressure_loss,
-													zeta: val,
-												},
-											})
-										}
-										className="p-2 border rounded"
-									/>
-									<p className="text-[9px] text-gray-400 italic">
-										dP = zeta * 0.5*rho*v^2. Area from node geometry.
-									</p>
-								</div>
-							)}
-							{selectedNode.data.pressure_loss?.type ===
-								"linear_theta_head" && (
-								<div className="flex flex-col gap-2">
-									<label className="text-xs text-gray-500">
-										k — Theta sensitivity [-/-]
-									</label>
-									<NumericInput
-										id={`pl_k_head_${selectedNode.id}`}
-										value={selectedNode.data.pressure_loss.k ?? 1.0}
-										onChange={(val) =>
-											updateNodeData(selectedNode.id, {
-												pressure_loss: {
-													...selectedNode.data.pressure_loss,
-													k: val,
-												},
-											})
-										}
-										className="p-2 border rounded"
-									/>
-									<label className="text-xs text-gray-500">
-										zeta0 — cold-flow Euler loss coefficient [-]
-									</label>
-									<NumericInput
-										id={`pl_zeta0_head_${selectedNode.id}`}
-										value={selectedNode.data.pressure_loss.zeta0 ?? 3.0}
-										onChange={(val) =>
-											updateNodeData(selectedNode.id, {
-												pressure_loss: {
-													...selectedNode.data.pressure_loss,
-													zeta0: val,
-												},
-											})
-										}
-										className="p-2 border rounded"
-									/>
-									<p className="text-[9px] text-gray-400 italic">
-										dP = (k*Theta+zeta0)*0.5*rho*v^2. Theta=T_ad/T_in-1
-									</p>
-								</div>
-							)}
-						</div>
 
 						<InitialGuessEditor node={selectedNode} />
 					</div>
@@ -1427,7 +1495,36 @@ const InitialGuessEditor = ({ node }: { node: any }) => {
 		updateNodeData(node.id, { initial_guess: newGuess });
 	};
 
-	const guessKeys = ["P", "T", "m_dot"];
+	// Type-aware guess field selection. Elements carry only a solvable m_dot
+	// unknown; nodes carry P / T. Pressure-boundary nodes are fully specified
+	// (no unknowns) and are handled by returning an empty field list below.
+	const FIELDS_BY_TYPE: Record<string, { key: string; unit: string }[]> = {
+		// Volume nodes (P and T are solver unknowns)
+		plenum: [
+			{ key: "P", unit: "Pa" },
+			{ key: "T", unit: "K" },
+		],
+		combustor: [
+			{ key: "P", unit: "Pa" },
+			{ key: "T", unit: "K" },
+		],
+		momentum_chamber: [
+			{ key: "P", unit: "Pa" },
+			{ key: "T", unit: "K" },
+		],
+		// Boundaries: P_total is solved (mass-flow inlet) or fixed (pressure
+		// inlet). Short key "P" is broadcast to both by the backend; we show
+		// it only where at least one of the two is actually an unknown.
+		mass_boundary: [{ key: "P", unit: "Pa" }],
+		// Elements (edges in React Flow but still nodes here): m_dot only.
+		channel: [{ key: "m_dot", unit: "kg/s" }],
+		orifice: [{ key: "m_dot", unit: "kg/s" }],
+		discrete_loss: [{ key: "m_dot", unit: "kg/s" }],
+	};
+	const guessFields = FIELDS_BY_TYPE[node.type as string] ?? [];
+	if (guessFields.length === 0) {
+		return null;
+	}
 
 	return (
 		<div className="mt-4 border-t pt-4">
@@ -1435,9 +1532,14 @@ const InitialGuessEditor = ({ node }: { node: any }) => {
 				Initial Guess Overrides
 			</h3>
 			<div className="flex flex-col gap-2">
-				{guessKeys.map((key) => (
+				{guessFields.map(({ key, unit }) => (
 					<div key={key} className="flex items-center justify-between gap-2">
-						<span className="text-[10px] font-mono text-gray-500">{key}</span>
+						<span className="text-[10px] font-mono text-gray-500">
+							{key}{" "}
+							<span className="text-[9px] text-gray-400 font-normal">
+								[{unit}]
+							</span>
+						</span>
 						<NumericInput
 							placeholder="Auto"
 							value={initialGuess[key]}

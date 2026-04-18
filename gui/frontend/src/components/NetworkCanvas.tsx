@@ -72,6 +72,18 @@ const NetworkCanvas = () => {
 				} as any;
 			} else if (type === "orifice") {
 				data = { ...data, diameter: 0.08, Cd: 0.6 } as any;
+			} else if (type === "discrete_loss") {
+				data = {
+					...data,
+					correlation_type: "constant_fraction",
+					xi: 0.03,
+					zeta: 1.0,
+					k: 0.001,
+					xi0: 0.02,
+					zeta0: 1.0,
+					area: null,
+					theta_source: null,
+				} as any;
 			} else if (type === "combustor") {
 				data = {
 					...data,

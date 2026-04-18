@@ -166,14 +166,34 @@ async def export_results(schema: NetworkGraphSchema):
 
         # Build unified id_to_label map from nodes, edges, and auto-links
         id_to_label = {}
+        # Map each schema node/edge id to its declared ``type`` so the CSV can
+        # preserve specific-kind information (plenum vs combustor vs
+        # discrete_loss, …) needed for later round-trips or sweep workflows.
+        id_to_kind: dict[str, str] = {}
         for n in schema.nodes:
             id_to_label[n.id] = n.data.get("label") or ""
+            id_to_kind[n.id] = n.type
         for e in schema.edges:
             lbl = (e.data or {}).get("label") or ""
             id_to_label[e.id] = lbl
+            id_to_kind[e.id] = (e.data or {}).get("type") or "flow"
             # Also map solver auto-link IDs
             auto_id = f"__auto_link__{e.source}__{e.target}"
             id_to_label[auto_id] = lbl
+            id_to_kind[auto_id] = "lossless_connection"
+
+        _BOUNDARY_KINDS = {"mass_boundary", "pressure_boundary"}
+
+        # Per-node combustion method (empty string for non-combustor rows).
+        id_to_method: dict[str, str] = {}
+        for n in schema.nodes:
+            if n.type == "combustor":
+                id_to_method[n.id] = n.data.get("method", "complete")
+
+        # Species labels for composition column headers (``Y[N2]`` not ``Y[0]``).
+        import combaero as cb
+
+        species_labels: list[str] = list(cb.species.names)
 
         data = []
 
@@ -185,18 +205,24 @@ async def export_results(schema: NetworkGraphSchema):
             Y = state_data.pop("Y", [])
             X = state_data.pop("X", None)
 
+            kind = id_to_kind.get(node_id, "")
             base_data = {
                 "type": "node",
+                "kind": kind,
+                "is_boundary": kind in _BOUNDARY_KINDS,
+                "combustion_method": id_to_method.get(node_id, ""),
                 "id": node_id,
                 "label": id_to_label.get(node_id, ""),
                 **state_data,
             }
-            # Flatten species fractions
+            # Flatten species fractions with species-name indexing.
             for i, y_val in enumerate(Y):
-                base_data[f"Y[{i}]"] = y_val
+                name = species_labels[i] if i < len(species_labels) else str(i)
+                base_data[f"Y[{name}]"] = y_val
             if X:
                 for i, x_val in enumerate(X):
-                    base_data[f"X[{i}]"] = x_val
+                    name = species_labels[i] if i < len(species_labels) else str(i)
+                    base_data[f"X[{name}]"] = x_val
 
             data.append(base_data)
 
@@ -207,6 +233,9 @@ async def export_results(schema: NetworkGraphSchema):
             data.append(
                 {
                     "type": "element",
+                    "kind": id_to_kind.get(elem_id, ""),
+                    "is_boundary": False,
+                    "combustion_method": "",
                     "id": elem_id,
                     "label": id_to_label.get(elem_id, ""),
                     **elem_data,
@@ -219,6 +248,9 @@ async def export_results(schema: NetworkGraphSchema):
             data.append(
                 {
                     "type": "thermal_wall",
+                    "kind": "thermal_wall",
+                    "is_boundary": False,
+                    "combustion_method": "",
                     "id": wall_id,
                     "label": id_to_label.get(wall_id, ""),
                     **res,
@@ -226,6 +258,13 @@ async def export_results(schema: NetworkGraphSchema):
             )
 
         df = pd.DataFrame(data)
+
+        # Rename columns with unit annotations (e.g. ``P`` -> ``P [Pa]``).
+        # Meta columns (``id``, ``type``, ``kind``, ``is_boundary``, ...) are
+        # passed through unchanged; unknown columns also remain untouched.
+        from gui.backend.units import label_with_unit
+
+        df = df.rename(columns={col: label_with_unit(col) for col in df.columns})
 
         # Stream as CSV
         stream = io.StringIO()

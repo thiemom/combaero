@@ -125,7 +125,6 @@ PressureLossData = (
 class CombustorData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     method: Literal["complete", "equilibrium"] = "complete"
-    pressure_loss: PressureLossData | None = None
     area: float = 0.1
     Dh: float | None = None
     surface: SurfaceModelData = Field(default_factory=SmoothModelData)
@@ -188,6 +187,25 @@ class OrificeData(BaseModel):
 
 class LosslessConnectionData(BaseModel):
     pass
+
+
+class DiscreteLossData(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    correlation_type: Literal[
+        "constant_fraction", "constant_head", "linear_theta_fraction", "linear_theta_head"
+    ] = "constant_fraction"
+    xi: float = 0.03
+    k: float = 0.001
+    xi0: float = 0.02
+    zeta: float = 1.0
+    zeta0: float = 1.0
+    area: float | None = None
+    theta_source: str | None = None
+    surface: SurfaceModelData = Field(default_factory=SmoothModelData)
+    Nu_multiplier: float = 1.0
+    f_multiplier: float = 1.0
+    label: str | None = None
+    initial_guess: dict[str, float] = Field(default_factory=dict)
 
 
 class WallLayerData(BaseModel):

@@ -1127,6 +1127,7 @@ class CombustorNode(NetworkNode):
         re = (rho * u * diameter / cs.transport.mu) if cs.transport.mu > 0 else 1.0
 
         diag = {
+            "m_dot": m_dot_total,
             "h": cs.thermo.h,
             "s": cs.thermo.s,
             "u": cs.thermo.u,
@@ -1803,15 +1804,48 @@ class PressureLossElement(NetworkElement):
         correlation: Callable[[Any], tuple[float, float]],
         theta_source: str | None = None,
         area: float | None = None,
+        surface: ConvectiveSurface | None = None,
     ):
         super().__init__(id, from_node, to_node)
         self.correlation = correlation
         self.theta_source = theta_source
         self.area = area
+        self.surface = surface or ConvectiveSurface()
         # Resolved during resolve_topology.  Empty string sentinel disallowed
         # so callers can cleanly test ``if self._theta_source_resolved is not None``.
         self._theta_source_resolved: str | None = None
         self._both_endpoints_theta: bool = False
+
+    @property
+    def has_convective_surface(self) -> bool:
+        return self.surface.area > 0.0
+
+    def htc_and_T(self, state: MixtureState):
+        """Convective HTC on the discrete loss element.
+
+        Treats the element as a short duct of length ``L = Dh`` (L/D = 1),
+        where ``Dh = sqrt(4*A/pi)`` is derived from the flow area. Returns
+        ``None`` if either the convective surface or the flow area is missing.
+        """
+        import math
+
+        if self.surface.area == 0.0 or not self.area or self.area <= 0.0:
+            return None
+
+        rho, _ = _safe_rho(state.density())
+        velocity = abs(state.m_dot) / (rho * self.area) if self.area > 0 else 0.0
+        diameter = math.sqrt(4.0 * self.area / math.pi)
+        length = diameter  # Short duct approximation: L/D = 1
+
+        return self.surface.htc_and_T(
+            T=state.T,
+            P=state.P,
+            X=state.X,
+            velocity=velocity,
+            diameter=diameter,
+            length=length,
+            T_hot=math.nan,
+        )
 
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
@@ -1963,17 +1997,87 @@ class PressureLossElement(NetworkElement):
         return res, jac
 
     def diagnostics(self, state_in: MixtureState, state_out: MixtureState) -> dict[str, float]:
+        import math
+
+        import combaero as cb
+
         graph = getattr(self, "_graph_ref", None)
         ctx = self._build_ctx(state_in, state_out, graph)
         try:
             xi, _ = self.correlation(ctx)
         except Exception:
             xi = 0.0
-        return {
+
+        # Prefer area attached to the element (e.g. by GUI / graph builder);
+        # fall back to head-loss correlation area; else None.
+        area = getattr(self, "area", None) or getattr(self.correlation, "area", None)
+
+        cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
+        rho_in = cs_in.thermo.rho
+        mu_in = cs_in.transport.mu
+
+        # Velocity / Mach only meaningful when area is known.
+        v_in = abs(state_in.m_dot) / (rho_in * area) if area and area > 0 and rho_in > 0 else 0.0
+        mach_in = float(cb.mach_number(v_in, state_in.T, state_in.X)) if v_in > 0 else 0.0
+
+        rho_out = cb.density(state_out.T, state_out.P, state_out.X)
+        v_out = (
+            abs(state_out.m_dot) / (rho_out * area) if area and area > 0 and rho_out > 0 else 0.0
+        )
+        mach_out = float(cb.mach_number(v_out, state_out.T, state_out.X)) if v_out > 0 else 0.0
+
+        # Reynolds at inlet using Dh = sqrt(4*A/pi)
+        if area and area > 0 and mu_in > 0 and v_in > 0:
+            Dh = math.sqrt(4.0 * area / math.pi)
+            re_in = rho_in * v_in * Dh / mu_in
+        else:
+            re_in = 0.0
+
+        p_ratio_total = state_out.P_total / state_in.P_total if state_in.P_total > 0 else 0.0
+
+        diag: dict[str, float] = {
             "xi": float(xi),
             "theta": float(ctx.theta),
-            "P_ratio": float(state_out.P_total / state_in.P_total) if state_in.P_total > 0 else 0.0,
+            "dP_total": float(state_in.P_total - state_out.P_total),
+            "P_in": float(state_in.P),
+            "P_out": float(state_out.P),
+            "T_in": float(state_in.T),
+            "T_out": float(state_out.T),
+            "Pt_in": float(state_in.P_total),
+            "Pt_out": float(state_out.P_total),
+            "Tt_in": float(state_in.T_total),
+            "Tt_out": float(state_out.T_total),
+            "mach_in": mach_in,
+            "mach_out": mach_out,
+            "p_ratio_total": float(p_ratio_total),
+            "p_ratio": float(p_ratio_total),
+            "Re": float(re_in),
+            "rho": float(rho_in),
+            # Thermo + transport at inlet static conditions
+            "h": float(cs_in.thermo.h),
+            "s": float(cs_in.thermo.s),
+            "u": float(cs_in.thermo.u),
+            "gamma": float(cs_in.thermo.gamma),
+            "a": float(cs_in.thermo.a),
+            "cp": float(cs_in.thermo.cp),
+            "cv": float(cs_in.thermo.cv),
+            "mw": float(cs_in.thermo.mw),
+            "mu": float(cs_in.transport.mu),
+            "k": float(cs_in.transport.k),
+            "Pr": float(cs_in.transport.Pr),
+            "nu": float(cs_in.transport.nu),
         }
+
+        # Heat transfer diagnostics (only when a convective surface is attached)
+        if self.has_convective_surface:
+            h_res = self.htc_and_T(state_in)
+            if h_res is not None:
+                diag["Nu"] = float(h_res.Nu)
+                diag["htc"] = float(h_res.h)
+                diag["T_aw"] = float(h_res.T_aw)
+                diag["f"] = float(h_res.f)
+
+        return diag
 
 
 class ChannelElement(NetworkElement):

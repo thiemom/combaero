@@ -1,4 +1,4 @@
-import { ChevronRight } from "lucide-react";
+import { Activity } from "lucide-react";
 import { useEffect } from "react";
 import {
 	Handle,
@@ -7,11 +7,24 @@ import {
 	useUpdateNodeInternals,
 } from "reactflow";
 
-const OrificeNode = ({ id, data, selected }: NodeProps) => {
+const DiscreteLossNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
 	const isSolved = !!data.result;
 	const updateNodeInternals = useUpdateNodeInternals();
 	const textRotation = rotation === 90 || rotation === 180 ? 180 : 0;
+
+	const dPBar =
+		data.result?.dP_total != null
+			? `ΔP ${(data.result.dP_total / 1e5).toFixed(4)} bar`
+			: null;
+
+	const formulaByType: Record<string, string> = {
+		constant_fraction: "ΔP = ξ·P",
+		constant_head: "ΔP = ζ·½ρv²",
+		linear_theta_fraction: "ξ = k·Θ + ξ₀",
+		linear_theta_head: "ζ = k·Θ + ζ₀",
+	};
+	const formula = formulaByType[data.correlation_type] ?? "ΔP = ξ·P";
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: rotation triggers handle re-measurement
 	useEffect(() => {
@@ -20,7 +33,7 @@ const OrificeNode = ({ id, data, selected }: NodeProps) => {
 
 	return (
 		<div
-			className={`shadow-sm rounded bg-stone-50 border-2 flex items-center gap-2 px-3 py-1 overflow-hidden ${
+			className={`shadow-sm rounded bg-white border-2 flex items-center gap-2 px-3 py-1 overflow-hidden ${
 				selected
 					? "border-blue-500 shadow-blue-100"
 					: isSolved
@@ -28,14 +41,18 @@ const OrificeNode = ({ id, data, selected }: NodeProps) => {
 						: "border-stone-300"
 			}`}
 			style={{
-				width: 120,
-				height: 48,
+				width: 144,
+				height: 58,
 				transform: `rotate(${rotation}deg)`,
 				transformOrigin: "center center",
 			}}
 		>
-			<div className="flex items-center justify-center p-1 bg-white rounded border border-stone-200 shrink-0">
-				<ChevronRight size={12} className="text-orange-400" />
+			<div className="flex items-center justify-center p-1 bg-stone-100 rounded shrink-0">
+				<Activity
+					size={14}
+					className="text-stone-600"
+					style={{ transform: "rotate(90deg)" }}
+				/>
 			</div>
 
 			<div
@@ -43,10 +60,10 @@ const OrificeNode = ({ id, data, selected }: NodeProps) => {
 				style={{ transform: `rotate(${textRotation}deg)` }}
 			>
 				<div className="text-[10px] font-bold uppercase leading-none whitespace-nowrap">
-					{data.label ? data.label : "Orifice"}
+					{data.label ? data.label : "Discrete Loss"}
 				</div>
 				<div className="text-[9px] font-mono text-gray-500 whitespace-nowrap">
-					Cd: {(data.result?.Cd ?? data.Cd ?? 0.6).toFixed(3)}
+					{dPBar ?? formula}
 				</div>
 			</div>
 
@@ -58,4 +75,4 @@ const OrificeNode = ({ id, data, selected }: NodeProps) => {
 	);
 };
 
-export default OrificeNode;
+export default DiscreteLossNode;

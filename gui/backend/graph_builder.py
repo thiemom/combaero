@@ -1,5 +1,3 @@
-from typing import Any
-
 from combaero.network import (
     ChannelElement,
     CombustorNode,
@@ -32,6 +30,7 @@ from .schemas import (
     ConstantFractionLossData,
     ConstantHeadLossData,
     DimpledModelData,
+    DiscreteLossData,
     ImpingementModelData,
     LinearThetaFractionLossData,
     LinearThetaHeadLossData,
@@ -126,11 +125,66 @@ def resolve_composition(comp: CompositionData, T: float, P: float) -> list[float
     return [float(y) for y in Y]
 
 
+def _expand_initial_guess(short_guess: dict, prefix: str) -> dict:
+    """Translate short GUI guess keys (``P``, ``T``, ``m_dot``) into the fully
+    qualified solver unknown names (e.g. ``"plenum1.P"``). ``P`` and ``T`` are
+    broadcast to both static and total variants because the solver exposes
+    them as separate unknowns on some node types; the solver silently ignores
+    entries that do not correspond to an actual unknown.
+    Any key already containing a ``.`` is passed through unchanged so that
+    hand-authored qualified guesses still work. Explicit short keys
+    (e.g. ``P_total``) take precedence over broadcast values from ``P``/``T``.
+    """
+    if not short_guess:
+        return {}
+    result: dict = {}
+    # Pass 1 — broadcast P and T to both static and total variants.
+    for key, val in short_guess.items():
+        if "." in key:
+            continue
+        if key == "P":
+            result[f"{prefix}.P"] = val
+            result[f"{prefix}.P_total"] = val
+        elif key == "T":
+            result[f"{prefix}.T"] = val
+            result[f"{prefix}.T_total"] = val
+    # Pass 2 — explicit short keys (P_total, T_total, m_dot, X[i], etc.)
+    # are applied after the broadcast so they win on conflict.
+    for key, val in short_guess.items():
+        if "." in key:
+            result[key] = val
+            continue
+        if key in ("P", "T"):
+            continue  # already handled in pass 1
+        result[f"{prefix}.{key}"] = val
+    return result
+
+
+def _build_discrete_loss_correlation(
+    corr_type: str,
+    xi: float,
+    k: float,
+    xi0: float,
+    zeta: float,
+    zeta0: float,
+    area: float,
+):
+    """Build a pressure loss correlation object from discrete loss params."""
+    if corr_type == "constant_fraction":
+        return ConstantFractionLoss(xi=xi)
+    if corr_type == "linear_theta_fraction":
+        return LinearThetaFractionLoss(k=k, xi0=xi0)
+    if corr_type == "constant_head":
+        return ConstantHeadLoss(zeta=zeta, area=area)
+    if corr_type == "linear_theta_head":
+        return LinearThetaHeadLoss(k=k, zeta0=zeta0, area=area)
+    return ConstantFractionLoss(xi=xi)
+
+
 def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
     net = FlowNetwork()
     nodes_map = {}  # ID -> Physical Node
     plenum_node_ids: set[str] = set()
-    combustor_pressure_loss: dict[str, Any] = {}  # node_id -> pressure_loss data
     element_nodes = []  # List of node schemas that are actually elements
 
     # 1. First Pass: Create Physical Nodes
@@ -142,7 +196,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         if node_type == "plenum":
             data = PlenumData(**node_data)
             node = PlenumNode(node_id)
-            node.initial_guess = data.initial_guess
+            node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
             net.add_node(node)
             nodes_map[node_id] = node
             plenum_node_ids.add(node_id)
@@ -150,14 +204,14 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             data = MassBoundaryData(**node_data)
             Y = resolve_composition(data.composition, data.T_total, 101325.0)
             node = MassFlowBoundary(node_id, m_dot=data.m_dot, T_total=data.T_total, Y=Y)
-            node.initial_guess = data.initial_guess
+            node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
             net.add_node(node)
             nodes_map[node_id] = node
         elif node_type == "pressure_boundary":
             data = PressureBoundaryData(**node_data)
             Y = resolve_composition(data.composition, data.T_total, data.P_total)
             node = PressureBoundary(node_id, P_total=data.P_total, T_total=data.T_total, Y=Y)
-            node.initial_guess = data.initial_guess
+            node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
             net.add_node(node)
             nodes_map[node_id] = node
         elif node_type == "combustor":
@@ -174,12 +228,9 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                     f_multiplier=1.0,
                 ),
             )
-            node.initial_guess = data.initial_guess
+            node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
             net.add_node(node)
             nodes_map[node_id] = node
-            # Track pressure loss config for edge element creation
-            if data.pressure_loss is not None:
-                combustor_pressure_loss[node_id] = data.pressure_loss
         elif node_type == "momentum_chamber":
             data = MomentumChamberData(**node_data)
             node = MomentumChamberNode(
@@ -194,7 +245,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                     f_multiplier=1.0,
                 ),
             )
-            node.initial_guess = data.initial_guess
+            node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
             net.add_node(node)
             nodes_map[node_id] = node
         elif node_type == "probe":
@@ -273,7 +324,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 data.regime if data.regime != "default" else schema.solver_settings.global_regime
             )
             elem.regime = regime
-            elem.initial_guess = data.initial_guess
+            elem.initial_guess = _expand_initial_guess(data.initial_guess, elem_id)
             net.add_element(elem)
         elif elem_type == "orifice":
             data = OrificeData(**elem_data)
@@ -291,10 +342,38 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 data.regime if data.regime != "default" else schema.solver_settings.global_regime
             )
             elem.regime = regime
-            elem.initial_guess = data.initial_guess
+            elem.initial_guess = _expand_initial_guess(data.initial_guess, elem_id)
             net.add_element(elem)
         elif elem_type == "lossless_connection":
             elem = LosslessConnectionElement(elem_id, from_node=source_id, to_node=target_id)
+            net.add_element(elem)
+        elif elem_type == "discrete_loss":
+            data = DiscreteLossData(**elem_data)
+            # Infer area from upstream node if not explicitly set
+            area = data.area
+            if area is None and source_id in nodes_map:
+                area = getattr(nodes_map[source_id], "area", 0.1)
+            area = area if area and area > 0 else 0.1
+            correlation = _build_discrete_loss_correlation(
+                data.correlation_type, data.xi, data.k, data.xi0, data.zeta, data.zeta0, area
+            )
+            theta_source = data.theta_source if data.theta_source not in (None, "none") else None
+            surface = ConvectiveSurface(
+                area=area,
+                model=map_surface_model(data.surface),
+                Nu_multiplier=data.Nu_multiplier,
+                f_multiplier=data.f_multiplier,
+            )
+            elem = PressureLossElement(
+                elem_id,
+                from_node=source_id,
+                to_node=target_id,
+                correlation=correlation,
+                theta_source=theta_source,
+                area=area,
+                surface=surface,
+            )
+            elem.initial_guess = _expand_initial_guess(data.initial_guess, elem_id)
             net.add_element(elem)
 
     # 3. Third Pass: Auto-connections
@@ -306,25 +385,9 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         ):
             auto_id = f"__auto_link__{edge.source}__{edge.target}"
             if auto_id not in net.elements:
-                # Check if target is a combustor with pressure loss configured
-                if edge.target in combustor_pressure_loss:
-                    pl_data = combustor_pressure_loss[edge.target]
-                    pl_callable = build_pressure_loss(pl_data)
-                    if pl_callable is not None:
-                        elem = PressureLossElement(
-                            auto_id,
-                            from_node=edge.source,
-                            to_node=edge.target,
-                            correlation=pl_callable,
-                        )
-                    else:
-                        elem = LosslessConnectionElement(
-                            auto_id, from_node=edge.source, to_node=edge.target
-                        )
-                else:
-                    elem = LosslessConnectionElement(
-                        auto_id, from_node=edge.source, to_node=edge.target
-                    )
+                elem = LosslessConnectionElement(
+                    auto_id, from_node=edge.source, to_node=edge.target
+                )
                 net.add_element(elem)
 
     # 4. Fourth Pass: Thermal Walls

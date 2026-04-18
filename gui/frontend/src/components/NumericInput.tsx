@@ -4,18 +4,28 @@ import { useEffect, useState } from "react";
 interface NumericInputProps {
 	value?: number | null;
 	onChange: (val: number) => void;
+	/**
+	 * Optional callback invoked when the user leaves the field empty on blur.
+	 * When provided, the cleared state is propagated to the parent instead of
+	 * silently snapping back to the last ``value`` prop. Use this for inputs
+	 * where "empty" is a meaningful state (e.g. auto-inferred from topology).
+	 */
+	onClear?: () => void;
 	id?: string;
 	className?: string;
 	placeholder?: string;
 	step?: string;
+	min?: number;
 }
 
 const NumericInput: React.FC<NumericInputProps> = ({
 	value,
 	onChange,
+	onClear,
 	id,
 	className,
 	placeholder,
+	min,
 }) => {
 	const [localValue, setLocalValue] = useState(
 		value !== undefined && value !== null ? value.toString() : "",
@@ -41,8 +51,12 @@ const NumericInput: React.FC<NumericInputProps> = ({
 
 	const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const raw = e.target.value;
-		// Allow typing decimal points and negative signs
-		if (raw === "" || raw === "-" || raw === "." || raw === "-.") {
+		// Allow typing decimal points; only allow negative sign if no min constraint
+		if (
+			raw === "" ||
+			raw === "." ||
+			(min === undefined && (raw === "-" || raw === "-."))
+		) {
 			setLocalValue(raw);
 			return;
 		}
@@ -51,18 +65,25 @@ const NumericInput: React.FC<NumericInputProps> = ({
 
 		const parsed = Number.parseFloat(raw);
 		if (!Number.isNaN(parsed) && /^-?\d*\.?\d*$/.test(raw)) {
+			if (min !== undefined && parsed < min) return;
 			onChange(parsed);
 		}
 	};
 
 	const handleBlur = () => {
 		setIsFocused(false);
+		// Intentional clear: empty input + parent accepts cleared state.
+		if (localValue === "" && onClear) {
+			onClear();
+			return;
+		}
 		const parsed = Number.parseFloat(localValue);
 		if (Number.isNaN(parsed)) {
-			setLocalValue(value.toString());
+			setLocalValue(value != null ? value.toString() : "");
 		} else {
-			onChange(parsed);
-			setLocalValue(parsed.toString()); // Force clean format on blur
+			const clamped = min !== undefined && parsed < min ? min : parsed;
+			onChange(clamped);
+			setLocalValue(clamped.toString());
 		}
 	};
 

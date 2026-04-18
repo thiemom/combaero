@@ -1,4 +1,4 @@
-from gui.backend.graph_builder import build_network_from_schema
+from gui.backend.graph_builder import _expand_initial_guess, build_network_from_schema
 from gui.backend.schemas import NetworkGraphSchema
 
 
@@ -108,3 +108,66 @@ def test_momentum_chamber_thermal_wall_is_built_and_multipliers_forwarded():
     assert mom.surface.f_multiplier == 1.0
     assert channel.surface.Nu_multiplier == 1.2
     assert channel.surface.f_multiplier == 0.9
+
+
+# ---------------------------------------------------------------------------
+# _expand_initial_guess: short-key translation for solver unknown names
+# ---------------------------------------------------------------------------
+
+
+def test_expand_initial_guess_empty_returns_empty():
+    assert _expand_initial_guess({}, "node1") == {}
+
+
+def test_expand_initial_guess_P_broadcasts_to_static_and_total():
+    out = _expand_initial_guess({"P": 150000.0}, "plenum1")
+    assert out == {"plenum1.P": 150000.0, "plenum1.P_total": 150000.0}
+
+
+def test_expand_initial_guess_T_broadcasts_to_static_and_total():
+    out = _expand_initial_guess({"T": 600.0}, "comb")
+    assert out == {"comb.T": 600.0, "comb.T_total": 600.0}
+
+
+def test_expand_initial_guess_m_dot_maps_without_broadcast():
+    out = _expand_initial_guess({"m_dot": 1.5}, "loss_elem")
+    assert out == {"loss_elem.m_dot": 1.5}
+
+
+def test_expand_initial_guess_qualified_key_passthrough():
+    # Already-qualified keys (hand-authored) must be preserved verbatim.
+    out = _expand_initial_guess({"other_node.P": 200000.0}, "this_node")
+    assert out == {"other_node.P": 200000.0}
+
+
+def test_expand_initial_guess_explicit_Ptotal_wins_over_P_broadcast():
+    """Regression: ensure explicit `P_total` overrides the `P -> P_total`
+    broadcast regardless of dict iteration order."""
+    # P first in dict
+    out1 = _expand_initial_guess({"P": 100000.0, "P_total": 101325.0}, "n")
+    assert out1["n.P"] == 100000.0
+    assert out1["n.P_total"] == 101325.0
+
+    # P_total first in dict
+    out2 = _expand_initial_guess({"P_total": 101325.0, "P": 100000.0}, "n")
+    assert out2["n.P"] == 100000.0
+    assert out2["n.P_total"] == 101325.0
+
+
+def test_expand_initial_guess_explicit_Ttotal_wins_over_T_broadcast():
+    out = _expand_initial_guess({"T": 500.0, "T_total": 520.0}, "n")
+    assert out["n.T"] == 500.0
+    assert out["n.T_total"] == 520.0
+
+
+def test_expand_initial_guess_mixed_short_and_qualified():
+    out = _expand_initial_guess(
+        {"P": 150000.0, "m_dot": 1.2, "other.X[0]": 0.767},
+        "comb",
+    )
+    assert out == {
+        "comb.P": 150000.0,
+        "comb.P_total": 150000.0,
+        "comb.m_dot": 1.2,
+        "other.X[0]": 0.767,
+    }

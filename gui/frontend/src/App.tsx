@@ -7,6 +7,7 @@ import Inspector from "./components/Inspector";
 import NetworkCanvas from "./components/NetworkCanvas";
 import Sidebar from "./components/Sidebar";
 import useStore from "./store/useStore";
+import { validateNetwork } from "./utils/validation";
 
 const App = () => {
 	const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -20,61 +21,8 @@ const App = () => {
 	} = useStore();
 	const [isSolving, setIsSolving] = useState(false);
 
-	const validateNetwork = () => {
-		const errors: string[] = [];
-		for (const node of nodes) {
-			if (node.type === "pressure_boundary" || node.type === "mass_boundary") {
-				if (
-					node.type === "pressure_boundary" &&
-					(node.data.P_total || 0) <= 0
-				) {
-					errors.push(`${node.id}: Total Pressure must be > 0`);
-				}
-				if ((node.data.T_total || 0) <= 0) {
-					errors.push(`${node.id}: Temperature must be > 0`);
-				}
-				if (node.data.composition?.source === "custom") {
-					const values = Object.values(
-						node.data.composition.custom_fractions || {},
-					) as number[];
-					const sum = values.reduce((a: number, b: number) => a + (b || 0), 0);
-					if (Math.abs(sum - 1.0) > 1e-3) {
-						errors.push(
-							`${node.id}: Custom composition sum is ${sum.toFixed(3)} (expected 1.0)`,
-						);
-					}
-				}
-			}
-			if (node.type === "channel") {
-				if ((node.data.D || 0) <= 0)
-					errors.push(`${node.id}: Channel diameter must be > 0`);
-				if ((node.data.L || 0) <= 0)
-					errors.push(`${node.id}: Channel length must be > 0`);
-			}
-			if (node.type === "orifice") {
-				if ((node.data.area || 0) <= 0 && (node.data.diameter || 0) <= 0)
-					errors.push(`${node.id}: Orifice area or diameter must be > 0`);
-			}
-			if (node.type === "momentum_chamber") {
-				if ((node.data.area ?? 0) <= 0)
-					errors.push(`${node.id}: Momentum Chamber area must be > 0`);
-				if (node.data.Dh !== undefined && node.data.Dh < 0)
-					errors.push(
-						`${node.id}: Momentum Chamber Dh must be > 0 (or 0 for auto)`,
-					);
-			}
-			if (node.type === "combustor") {
-				if ((node.data.area ?? 0.1) <= 0)
-					errors.push(`${node.id}: Combustor area must be > 0`);
-				if (node.data.Dh !== undefined && node.data.Dh < 0)
-					errors.push(`${node.id}: Combustor Dh must be > 0 (or 0 for auto)`);
-			}
-		}
-		return errors;
-	};
-
 	const handleSolve = async () => {
-		const errors = validateNetwork();
+		const errors = validateNetwork(nodes);
 		if (errors.length > 0) {
 			alert(
 				`Please fix the following errors before solving:\n\n${errors.join("\n")}`,

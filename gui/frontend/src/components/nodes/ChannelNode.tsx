@@ -39,10 +39,10 @@ const ChannelNode = ({ id, data, selected }: NodeProps) => {
 			</div>
 
 			<div
-				className="flex flex-col items-center flex-1 min-w-0"
+				className="flex flex-col items-start flex-1 min-w-0"
 				style={{ transform: `rotate(${textRotation}deg)` }}
 			>
-				<span className="text-[10px] font-bold text-gray-400 uppercase leading-none whitespace-nowrap">
+				<span className="text-[10px] font-bold uppercase leading-none whitespace-nowrap">
 					{data.label ? data.label : "Channel"}
 				</span>
 				<span className="text-[9px] font-mono text-gray-500 whitespace-nowrap">

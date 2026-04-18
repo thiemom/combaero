@@ -1,4 +1,5 @@
 import {
+	Activity,
 	ArrowRight,
 	ChevronRight,
 	Crosshair,
@@ -19,8 +20,31 @@ const Sidebar = () => {
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [filename, setFilename] = useState("network");
 
-	const { saveNetwork, loadNetwork, solverSettings, updateSolverSettings } =
-		useStore();
+	const {
+		saveNetwork,
+		loadNetwork,
+		solverSettings,
+		updateSolverSettings,
+		nodes,
+		setNodes,
+	} = useStore();
+
+	const resetAllInitialGuesses = () => {
+		let touched = 0;
+		const next = nodes.map((n) => {
+			if (
+				n.data?.initial_guess &&
+				Object.keys(n.data.initial_guess).length > 0
+			) {
+				touched += 1;
+				const { initial_guess: _ig, ...rest } = n.data;
+				return { ...n, data: { ...rest, initial_guess: {} } };
+			}
+			return n;
+		});
+		if (touched === 0) return;
+		setNodes(next);
+	};
 
 	const onSave = () => saveNetwork(filename.trim() || "network");
 
@@ -182,6 +206,16 @@ const Sidebar = () => {
 			<button
 				type="button"
 				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "discrete_loss")}
+				draggable
+			>
+				<Activity size={18} className="text-purple-500" />
+				<span>Discrete Loss</span>
+			</button>
+
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
 				onDragStart={(event) => onDragStart(event, "lossless_connection")}
 				draggable
 			>
@@ -237,6 +271,17 @@ const Sidebar = () => {
 						<option value="incompressible_warmstart">Incomp. Warmstart</option>
 						<option value="homotopy">Load-Stepping (Homotopy)</option>
 					</select>
+				</div>
+
+				<div className="border-t border-stone-200 pt-2">
+					<button
+						type="button"
+						onClick={resetAllInitialGuesses}
+						className="w-full text-[10px] font-bold uppercase tracking-wider bg-white hover:bg-amber-50 text-amber-700 border border-amber-200 rounded px-2 py-1.5 transition-colors"
+						title="Clear initial-guess overrides on every node and element; solver reverts to auto-seeding"
+					>
+						Reset All Initial Guesses
+					</button>
 				</div>
 			</div>
 		</aside>

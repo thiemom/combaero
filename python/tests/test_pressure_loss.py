@@ -193,3 +193,300 @@ class TestPressureLossElementResidual:
         state_out = self._make_air_state(P_total=P_in * (1.0 - xi), m_dot=mdot)
         res, _ = elem.residuals(state_in, state_out)
         assert res[0] == pytest.approx(0.0, abs=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# PressureLossElement convective surface + heat transfer
+# ---------------------------------------------------------------------------
+
+
+def _air_mixture_state(P: float = 150000.0, T: float = 700.0, m_dot: float = 1.0):
+    """Helper: 76.7/23.3 N2/O2 air MixtureState at requested conditions."""
+    import combaero as cb
+    from combaero.network import MixtureState
+
+    ns = cb.species.num_species
+    Y = [0.0] * ns
+    for k in range(ns):
+        name = cb.species_name(k)
+        if name == "N2":
+            Y[k] = 0.767
+        elif name == "O2":
+            Y[k] = 0.233
+    return MixtureState(P=P, P_total=P, T=T, T_total=T, m_dot=m_dot, Y=Y)
+
+
+class TestPressureLossElementConvectiveSurface:
+    """Covers the convective-surface extension of :class:`PressureLossElement`."""
+
+    def test_default_has_no_convective_surface(self) -> None:
+        """Without a surface kwarg, element remains thermally passive."""
+        from combaero.network import PressureLossElement
+
+        elem = PressureLossElement("loss", "a", "b", correlation=ConstantFractionLoss(xi=0.03))
+        assert elem.has_convective_surface is False
+        assert elem.htc_and_T(_air_mixture_state()) is None
+
+    def test_surface_with_zero_area_disabled(self) -> None:
+        """A surface with ``area == 0`` must behave as disabled."""
+        from combaero.heat_transfer import ConvectiveSurface, SmoothModel
+        from combaero.network import PressureLossElement
+
+        elem = PressureLossElement(
+            "loss",
+            "a",
+            "b",
+            correlation=ConstantFractionLoss(xi=0.03),
+            area=0.01,
+            surface=ConvectiveSurface(area=0.0, model=SmoothModel()),
+        )
+        assert elem.has_convective_surface is False
+        assert elem.htc_and_T(_air_mixture_state()) is None
+
+    def test_surface_with_area_enables_htc(self) -> None:
+        """With ``surface.area > 0`` and a flow area, HTC must be positive and finite."""
+        from combaero.heat_transfer import ConvectiveSurface, SmoothModel
+        from combaero.network import PressureLossElement
+
+        flow_area = 0.01  # [m^2]
+        elem = PressureLossElement(
+            "loss",
+            "a",
+            "b",
+            correlation=ConstantFractionLoss(xi=0.03),
+            area=flow_area,
+            surface=ConvectiveSurface(area=flow_area, model=SmoothModel()),
+        )
+        assert elem.has_convective_surface is True
+
+        res = elem.htc_and_T(_air_mixture_state(P=150000.0, T=700.0, m_dot=1.0))
+        assert res is not None
+        # Sanity ranges: forced convection in a short hot duct at 1 kg/s.
+        assert res.h > 0.0 and res.h < 1e6
+        assert res.Nu > 0.0
+        # T_aw close to recovery temperature (≈ static T for Pr≈0.7 at low Mach).
+        assert 600.0 < res.T_aw < 900.0
+
+    def test_htc_none_when_flow_area_missing(self) -> None:
+        """Flow area unset ⇒ velocity undefined ⇒ htc_and_T returns None."""
+        from combaero.heat_transfer import ConvectiveSurface, SmoothModel
+        from combaero.network import PressureLossElement
+
+        elem = PressureLossElement(
+            "loss",
+            "a",
+            "b",
+            correlation=ConstantFractionLoss(xi=0.03),
+            area=None,
+            surface=ConvectiveSurface(area=0.02, model=SmoothModel()),
+        )
+        # has_convective_surface is True (surface.area > 0) but htc returns None
+        # because flow area is missing. Intentional degrade-gracefully behavior.
+        assert elem.has_convective_surface is True
+        assert elem.htc_and_T(_air_mixture_state()) is None
+
+
+# ---------------------------------------------------------------------------
+# PressureLossElement diagnostics: verify enriched key set
+# ---------------------------------------------------------------------------
+
+
+class TestPressureLossElementDiagnostics:
+    """Locks in the key set exposed via :meth:`diagnostics`.
+
+    Protects the GUI ``Live Telemetry`` panel (which discovers fields through
+    ``QUANTITY_CATALOGUE``) from silent regressions.
+    """
+
+    @staticmethod
+    def _expected_common_keys() -> set[str]:
+        return {
+            # Loss / pressure
+            "xi",
+            "theta",
+            "dP_total",
+            "P_in",
+            "P_out",
+            "T_in",
+            "T_out",
+            "Pt_in",
+            "Pt_out",
+            "Tt_in",
+            "Tt_out",
+            "mach_in",
+            "mach_out",
+            "p_ratio_total",
+            "p_ratio",
+            "Re",
+            "rho",
+            # Thermo + transport at inlet
+            "h",
+            "s",
+            "u",
+            "gamma",
+            "a",
+            "cp",
+            "cv",
+            "mw",
+            "mu",
+            "k",
+            "Pr",
+            "nu",
+        }
+
+    def test_constant_fraction_exposes_all_common_keys(self) -> None:
+        from combaero.network import PressureLossElement
+
+        state_in = _air_mixture_state(P=150000.0, T=700.0, m_dot=1.0)
+        state_out = _air_mixture_state(P=150000.0 * 0.97, T=700.0, m_dot=1.0)
+        elem = PressureLossElement(
+            "loss",
+            "a",
+            "b",
+            correlation=ConstantFractionLoss(xi=0.03),
+            area=0.01,
+        )
+        diag = elem.diagnostics(state_in, state_out)
+        missing = self._expected_common_keys() - diag.keys()
+        assert not missing, f"Missing diagnostic keys: {sorted(missing)}"
+        # All values finite floats
+        for k, v in diag.items():
+            assert isinstance(v, float), f"{k} is not float: {v!r}"
+
+    def test_head_loss_exposes_common_keys_including_htc(self) -> None:
+        """With a convective surface, diagnostics must also include Nu/htc/T_aw/f."""
+        from combaero.heat_transfer import ConvectiveSurface, SmoothModel
+        from combaero.network import ConstantHeadLoss, PressureLossElement
+
+        flow_area = 0.01
+        state_in = _air_mixture_state(P=150000.0, T=700.0, m_dot=1.0)
+        state_out = _air_mixture_state(P=140000.0, T=700.0, m_dot=1.0)
+        elem = PressureLossElement(
+            "loss",
+            "a",
+            "b",
+            correlation=ConstantHeadLoss(zeta=5.0, area=flow_area),
+            area=flow_area,
+            surface=ConvectiveSurface(area=flow_area, model=SmoothModel()),
+        )
+        diag = elem.diagnostics(state_in, state_out)
+        missing = self._expected_common_keys() - diag.keys()
+        assert not missing, f"Missing diagnostic keys: {sorted(missing)}"
+        for key in ("Nu", "htc", "T_aw", "f"):
+            assert key in diag, f"Expected HTC key {key!r} missing"
+            assert diag[key] >= 0.0
+
+    def test_diagnostics_no_htc_without_surface(self) -> None:
+        """Sanity: Nu/htc/T_aw/f must be absent when no surface attached."""
+        from combaero.network import PressureLossElement
+
+        state = _air_mixture_state()
+        elem = PressureLossElement(
+            "loss",
+            "a",
+            "b",
+            correlation=ConstantFractionLoss(xi=0.03),
+            area=0.01,
+        )
+        diag = elem.diagnostics(state, state)
+        for key in ("Nu", "htc", "T_aw", "f"):
+            assert key not in diag
+
+
+# ---------------------------------------------------------------------------
+# End-to-end wall coupling with PressureLossElement on both sides
+# ---------------------------------------------------------------------------
+
+
+class TestPressureLossElementWallCoupling:
+    """Guards that two wall-coupled PressureLossElements exchange heat.
+
+    Was the root symptom behind the session: discrete loss could be connected
+    via a thermal wall, but ``has_convective_surface`` defaulted to False so
+    the wall silently no-op'd. This regression locks the fix in place.
+    """
+
+    def test_hot_and_cold_discrete_losses_exchange_heat(self) -> None:
+        import numpy as np
+
+        import combaero as cb
+        from combaero.heat_transfer import ConvectiveSurface, SmoothModel, WallConnection
+        from combaero.network import (
+            ConstantFractionLoss,
+            FlowNetwork,
+            MassFlowBoundary,
+            NetworkSolver,
+            PlenumNode,
+            PressureBoundary,
+            PressureLossElement,
+        )
+
+        Y_air = cb.species.dry_air_mass()
+
+        # Hot side: inlet -> loss -> outlet
+        hot_in = MassFlowBoundary("hot_in", m_dot=0.1, T_total=800.0, Y=Y_air)
+        hot_out = PressureBoundary("hot_out", P_total=2e5, T_total=800.0, Y=Y_air)
+        # Cold side: inlet -> loss -> outlet
+        cold_in = MassFlowBoundary("cold_in", m_dot=0.05, T_total=400.0, Y=Y_air)
+        cold_out = PressureBoundary("cold_out", P_total=2e5, T_total=400.0, Y=Y_air)
+
+        # Intermediate plenums allow the solver to settle P_total freely.
+        hot_mid = PlenumNode("hot_mid")
+        cold_mid = PlenumNode("cold_mid")
+
+        area = float(np.pi * 0.04**2 / 4.0)  # 0.04 m Dh
+        surf_area = float(np.pi * 0.04 * 0.04)  # A_conv = π·D·L with L=D
+
+        hot_loss = PressureLossElement(
+            "hot_loss",
+            from_node="hot_in",
+            to_node="hot_mid",
+            correlation=ConstantFractionLoss(xi=0.02),
+            area=area,
+            surface=ConvectiveSurface(area=surf_area, model=SmoothModel()),
+        )
+        cold_loss = PressureLossElement(
+            "cold_loss",
+            from_node="cold_in",
+            to_node="cold_mid",
+            correlation=ConstantFractionLoss(xi=0.02),
+            area=area,
+            surface=ConvectiveSurface(area=surf_area, model=SmoothModel()),
+        )
+
+        # Outlet connections (lossless link from mid plenum to pressure boundary)
+        from combaero.network import LosslessConnectionElement
+
+        hot_exit = LosslessConnectionElement("hot_exit", "hot_mid", "hot_out")
+        cold_exit = LosslessConnectionElement("cold_exit", "cold_mid", "cold_out")
+
+        net = FlowNetwork()
+        for n in (hot_in, hot_mid, hot_out, cold_in, cold_mid, cold_out):
+            net.add_node(n)
+        for e in (hot_loss, cold_loss, hot_exit, cold_exit):
+            net.add_element(e)
+
+        wall = WallConnection(
+            id="coupling_wall",
+            element_a="hot_loss",
+            element_b="cold_loss",
+            wall_thickness=0.002,
+            wall_conductivity=25.0,
+        )
+        net.add_wall(wall)
+
+        net.thermal_coupling_enabled = True
+        solver = NetworkSolver(net)
+        sol = solver.solve(method="hybr", options={"xtol": 1e-8})
+
+        assert sol["__success__"], f"Did not converge: |F|={sol['__final_norm__']:.2e}"
+
+        # Wall must carry non-trivial heat.
+        Q = abs(float(sol["coupling_wall.Q"]))
+        assert Q > 1.0, f"Expected non-negligible Q through wall, got {Q:.3e} W"
+
+        # Hot-side plenum should cool, cold-side should heat.
+        T_hot_mid = solver._derived_states["hot_mid"][0]
+        T_cold_mid = solver._derived_states["cold_mid"][0]
+        assert T_hot_mid < 800.0, f"Hot-side should cool: T_hot_mid={T_hot_mid:.1f} K"
+        assert T_cold_mid > 400.0, f"Cold-side should heat: T_cold_mid={T_cold_mid:.1f} K"
