@@ -587,50 +587,62 @@ T_adiabatic_wall_and_jacobian_v(double T_static, double v, double T, double P,
 std::tuple<double, double>
 T0_from_static_and_jacobian_M(double T, double M,
                                const std::vector<double> &X) {
-  // Smooth floor for M to handle near-zero and reverse flow cases
-  // M can be negative for reverse flow, so use abs(M) for epsilon scaling
-  const double eps = std::max(1e-6, std::abs(M) * 1e-6);
+  // Enforce non-negative M (T0_from_static requires M >= 0).
+  // Use a smooth floor so the derivative remains informative near M = 0.
+  // For solver purposes the useful range is M >= 0; negative values are
+  // mapped to zero with a leaky 0.01 gradient.
+  double M_eff = (M >= 0.0) ? M : 0.01 * M;
+  double dMeff_dM = (M >= 0.0) ? 1.0 : 0.01;
 
-  // Smooth floor to avoid negative M issues (M_limit = 0.0)
-  constexpr double M_limit = 0.0;
-  constexpr double delta_M = 1e-6;
-  double M_target_minus = M - eps;
-  double diff_M = M_target_minus - M_limit;
-  double sq_dist_M = std::sqrt(diff_M * diff_M + delta_M);
-  double M_minus = 0.5 * (M_target_minus + M_limit + sq_dist_M);
-  double M_plus = M + eps;
-  double actual_dM = M_plus - M_minus;
+  double T0 = T0_from_static(T, M_eff, X);
 
-  double T0_plus = T0_from_static(T, M_plus, X);
-  double T0_minus = T0_from_static(T, M_minus, X);
-  double dT0_dM = (T0_plus - T0_minus) / actual_dM;
+  // Analytical derivative via the definition h(T0, X) = h(T, X) + 0.5 * v^2
+  // where v = M_eff * a(T, X).  Differentiating w.r.t. M_eff:
+  //   cp_mass(T0) * dT0/dM_eff = M_eff * a(T)^2
+  // => dT0/dM_eff = M_eff * a^2 / cp_mass(T0)
+  double a = combaero::speed_of_sound(T, X);
+  double cp_T0 = combaero::cp_mass(T0, X);
+  double dT0_dMeff = (cp_T0 > 1.0) ? (M_eff * a * a / cp_T0) : 0.0;
 
-  double T0 = T0_from_static(T, M, X);
+  double dT0_dM = dT0_dMeff * dMeff_dM;
+
   return {T0, dT0_dM};
 }
 
 std::tuple<double, double>
 P0_from_static_and_jacobian_M(double P, double T, double M,
                                const std::vector<double> &X) {
-  // Smooth floor for M to handle near-zero and reverse flow cases
-  // M can be negative for reverse flow, so use abs(M) for epsilon scaling
-  const double eps = std::max(1e-6, std::abs(M) * 1e-6);
+  // Enforce non-negative M with a leaky floor for differentiability.
+  double M_eff = (M >= 0.0) ? M : 0.01 * M;
+  double dMeff_dM = (M >= 0.0) ? 1.0 : 0.01;
 
-  // Smooth floor to avoid negative M issues (M_limit = 0.0)
-  constexpr double M_limit = 0.0;
-  constexpr double delta_M = 1e-6;
-  double M_target_minus = M - eps;
-  double diff_M = M_target_minus - M_limit;
-  double sq_dist_M = std::sqrt(diff_M * diff_M + delta_M);
-  double M_minus = 0.5 * (M_target_minus + M_limit + sq_dist_M);
-  double M_plus = M + eps;
-  double actual_dM = M_plus - M_minus;
+  double P0 = P0_from_static(P, T, M_eff, X);
 
-  double P0_plus = P0_from_static(P, T, M_plus, X);
-  double P0_minus = P0_from_static(P, T, M_minus, X);
-  double dP0_dM = (P0_plus - P0_minus) / actual_dM;
+  // Chain rule: P0 = P * exp((s(T0) - s(T,P)) / R_specific)
+  // where s(T0) = s(T0, X, P_REF) and T0 = T0_from_static(T, M_eff, X).
+  //
+  // dP0/dM_eff = P0 * d/dM_eff [ln(P0 / P)]
+  //            = P0 * d/dT0 [(s(T0) - const) / R_specific] * dT0/dM_eff
+  //            = P0 * [cp_mass(T0) / T0 / R_specific] * (dT0/dM_eff)
+  //
+  // The positive sign comes from: s increases with T (at const P_ref) for ideal
+  // gas, so raising T0 increases the entropy difference, increasing P0/P.
+  //
+  // dT0/dM_eff (analytical, from T0 definition): M_eff * a(T)^2 / cp_mass(T0)
+  double a = combaero::speed_of_sound(T, X);
+  double T0_val = T0_from_static(T, M_eff, X);
+  double cp_T0 = combaero::cp_mass(T0_val, X);
+  double R_spec = combaero::specific_gas_constant(X); // J/(kg*K)
 
-  double P0 = P0_from_static(P, T, M, X);
+  double dT0_dMeff = (cp_T0 > 1.0) ? (M_eff * a * a / cp_T0) : 0.0;
+
+  // dP0/dT0 = P0 * (+cp_mass(T0) / T0) / R_specific
+  double dP0_dT0 = (T0_val > 1.0 && R_spec > 1.0)
+                       ? P0 * (cp_T0 / T0_val) / R_spec
+                       : 0.0;
+
+  double dP0_dM = dP0_dT0 * dT0_dMeff * dMeff_dM;
+
   return {P0, dP0_dM};
 }
 
