@@ -1,3 +1,5 @@
+from typing import Any
+
 from combaero.network import (
     ChannelElement,
     CombustorNode,
@@ -16,6 +18,7 @@ from combaero.network import (
     PinFinModel,
     PlenumNode,
     PressureBoundary,
+    PressureLossElement,
     RibbedModel,
     SmoothModel,
     ThermalWall,
@@ -127,6 +130,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
     net = FlowNetwork()
     nodes_map = {}  # ID -> Physical Node
     plenum_node_ids: set[str] = set()
+    combustor_pressure_loss: dict[str, Any] = {}  # node_id -> pressure_loss data
     element_nodes = []  # List of node schemas that are actually elements
 
     # 1. First Pass: Create Physical Nodes
@@ -161,7 +165,6 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             node = CombustorNode(
                 node_id,
                 method=data.method,
-                pressure_loss=build_pressure_loss(data.pressure_loss, area=data.area),
                 area=data.area,
                 Dh=data.Dh,
                 surface=ConvectiveSurface(
@@ -174,6 +177,9 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             node.initial_guess = data.initial_guess
             net.add_node(node)
             nodes_map[node_id] = node
+            # Track pressure loss config for edge element creation
+            if data.pressure_loss is not None:
+                combustor_pressure_loss[node_id] = data.pressure_loss
         elif node_type == "momentum_chamber":
             data = MomentumChamberData(**node_data)
             node = MomentumChamberNode(
@@ -300,9 +306,25 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         ):
             auto_id = f"__auto_link__{edge.source}__{edge.target}"
             if auto_id not in net.elements:
-                elem = LosslessConnectionElement(
-                    auto_id, from_node=edge.source, to_node=edge.target
-                )
+                # Check if target is a combustor with pressure loss configured
+                if edge.target in combustor_pressure_loss:
+                    pl_data = combustor_pressure_loss[edge.target]
+                    pl_callable = build_pressure_loss(pl_data)
+                    if pl_callable is not None:
+                        elem = PressureLossElement(
+                            auto_id,
+                            from_node=edge.source,
+                            to_node=edge.target,
+                            correlation=pl_callable,
+                        )
+                    else:
+                        elem = LosslessConnectionElement(
+                            auto_id, from_node=edge.source, to_node=edge.target
+                        )
+                else:
+                    elem = LosslessConnectionElement(
+                        auto_id, from_node=edge.source, to_node=edge.target
+                    )
                 net.add_element(elem)
 
     # 4. Fourth Pass: Thermal Walls
