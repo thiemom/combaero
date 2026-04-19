@@ -1586,11 +1586,14 @@ std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobia
   double d_mdot_dP_back = d_mdot_dP_back_fwd;
   double d_mdot_dT0 = d_mdot_dT0_fwd;
 
-  // For reverse flow, swap Jacobian signs appropriately
+  // For reverse flow, swap Jacobian signs appropriately.
+  // mdot = -mdot_fwd(P_back, P0), so all three derivatives are negated,
+  // and P0/P_back roles are swapped.
   if (reverse_flow) {
     std::swap(d_mdot_dP0, d_mdot_dP_back);
     d_mdot_dP0 = -d_mdot_dP0;
     d_mdot_dP_back = -d_mdot_dP_back;
+    d_mdot_dT0 = -d_mdot_dT0;
   }
 
   return {mdot, d_mdot_dP0, d_mdot_dP_back, d_mdot_dT0};

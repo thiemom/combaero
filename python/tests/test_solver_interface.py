@@ -626,13 +626,39 @@ def test_orifice_compressible_reverse_flow():
     # Mass flow should be negative for reverse flow
     assert mdot < 0, "Mass flow should be negative for reverse flow"
 
-    # In reverse flow, the roles are swapped but signs depend on implementation
-    # The key is that increasing P0 should reduce reverse flow (make it less negative)
-    # and increasing P_back should increase reverse flow (make it more negative)
-    # After the swap in the implementation, we get:
-    assert d_P0 < 0, "d_mdot_dP0 should be negative in reverse flow"
-    # d_Pb stays negative because the smoothing is applied after the swap
-    assert d_Pb < 0, "d_mdot_dP_back should be negative (smoothed)"
+    # Increasing P0 reduces the pressure difference -> less reverse flow (less negative)
+    assert d_P0 > 0, "d_mdot_dP0 should be positive in reverse flow"
+    # Increasing P_back increases the pressure difference -> more reverse flow (more negative)
+    assert d_Pb < 0, "d_mdot_dP_back should be negative in reverse flow"
+    # Increasing T0 reduces density -> less reverse flow (less negative)
+    assert d_T0 > 0, "d_mdot_dT0 should be positive in reverse flow"
+
+    # Validate all three Jacobians against central FD
+    eps_P = 1.0
+    mp, _, _, _ = cb._core.orifice_compressible_mdot_and_jacobian(
+        T0, P0 + eps_P, P_back, X, Cd, area, beta
+    )
+    mm, _, _, _ = cb._core.orifice_compressible_mdot_and_jacobian(
+        T0, P0 - eps_P, P_back, X, Cd, area, beta
+    )
+    np.testing.assert_allclose(d_P0, (mp - mm) / (2 * eps_P), rtol=1e-4)
+
+    mp2, _, _, _ = cb._core.orifice_compressible_mdot_and_jacobian(
+        T0, P0, P_back + eps_P, X, Cd, area, beta
+    )
+    mm2, _, _, _ = cb._core.orifice_compressible_mdot_and_jacobian(
+        T0, P0, P_back - eps_P, X, Cd, area, beta
+    )
+    np.testing.assert_allclose(d_Pb, (mp2 - mm2) / (2 * eps_P), rtol=1e-4)
+
+    eps_T = 1e-3
+    mp3, _, _, _ = cb._core.orifice_compressible_mdot_and_jacobian(
+        T0 + eps_T, P0, P_back, X, Cd, area, beta
+    )
+    mm3, _, _, _ = cb._core.orifice_compressible_mdot_and_jacobian(
+        T0 - eps_T, P0, P_back, X, Cd, area, beta
+    )
+    np.testing.assert_allclose(d_T0, (mp3 - mm3) / (2 * eps_T), rtol=1e-4)
 
 
 def test_orifice_compressible_jacobian_accuracy():
