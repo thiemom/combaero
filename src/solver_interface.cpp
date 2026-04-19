@@ -1532,62 +1532,59 @@ std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobia
   auto sol = combaero::nozzle_flow(T0_fwd, P0_fwd, P_back_fwd, A_eff, X);
   double mdot = reverse_flow ? -sol.mdot : sol.mdot;
 
-  // Compute Jacobians via finite differences with smooth perturbations
-  const double eps_P0 = std::max(1e-6, std::abs(P0) * 1e-6);
-  const double eps_Pb = std::max(1e-6, std::abs(P_back) * 1e-6);
-  const double eps_T0 = std::max(1e-6, std::abs(T0) * 1e-6);
+  // Compute Jacobians analytically using isentropic relations
+  // G = rho * v = (P/RT) * sqrt(2*(h0 - h))
+  // For isentropic flow: dT/dP = 1/(rho*cp), d_rho/dP = 1/a^2
+  // dG/dP = 1/v * (M^2 - 1)
 
-  // Jacobian w.r.t. P0
-  double P0_plus = reverse_flow ? P_back : (P0 + eps_P0);
-  double P_back_plus_P0 = reverse_flow ? (P0 + eps_P0) : P_back;
-  double P0_minus = reverse_flow ? P_back : (P0 - eps_P0);
-  double P_back_minus_P0 = reverse_flow ? (P0 - eps_P0) : P_back;
-  auto sol_P0_plus = combaero::nozzle_flow(T0_fwd, P0_plus, P_back_plus_P0, A_eff, X);
-  auto sol_P0_minus = combaero::nozzle_flow(T0_fwd, P0_minus, P_back_minus_P0, A_eff, X);
-  double mdot_P0_plus = reverse_flow ? -sol_P0_plus.mdot : sol_P0_plus.mdot;
-  double mdot_P0_minus = reverse_flow ? -sol_P0_minus.mdot : sol_P0_minus.mdot;
-  double d_mdot_dP0 = (mdot_P0_plus - mdot_P0_minus) / (2.0 * eps_P0);
+  double T_outlet = sol.outlet.T;
+  double v_outlet = sol.v;
+  double rho_outlet = sol.outlet.rho();
+  double M_outlet = sol.M;
+  double cp_outlet = combaero::cp_mass(T_outlet, X);
+  double cp0 = combaero::cp_mass(T0, X);
 
-  // Jacobian w.r.t. P_back with smooth choked flow transition
-  // Compute critical pressure ratio for smooth transition
-  double PR = P_back_fwd / P0_fwd;
-  double PR_crit = combaero::critical_pressure_ratio(T0_fwd, P0_fwd, X);
-
-  // Smooth step function for choked flow transition
-  const double delta_PR = 0.01;  // Transition width (1% of pressure ratio)
-  double t = (PR - PR_crit) / delta_PR;
-  double choke_factor = 1.0;
-  if (t >= 1.0) {
-    choke_factor = 1.0;  // Well unchoked
-  } else if (t <= -1.0) {
-    choke_factor = 0.0;  // Well choked
-  } else {
-    // Cubic Hermite interpolation for smooth C1 transition
-    choke_factor = 0.5 * (1.0 + t * (3.0 - t * t));
+  // Unchoked derivatives (subsonic branch)
+  double dmdot_dP_back_sub = 0.0;
+  if (v_outlet > 1e-6) {
+    dmdot_dP_back_sub = A_eff * (1.0 / v_outlet) * (M_outlet * M_outlet - 1.0);
   }
 
-  // Compute raw Jacobian via central difference
-  double P_back_minus = reverse_flow ? (P0 - eps_Pb) : (P_back - eps_Pb);
-  double P0_minus_Pb = reverse_flow ? P_back : P0;
-  double P_back_plus = reverse_flow ? (P0 + eps_Pb) : (P_back + eps_Pb);
-  double P0_plus_Pb = reverse_flow ? P_back : P0;
+  // Choked derivatives (constant mass flow)
+  // mdot_choked = A_eff * G_crit
+  // G_crit ~ P0 / sqrt(T0)
+  double dmdot_dP_back_choked = 0.0;
 
-  auto sol_Pb_minus = combaero::nozzle_flow(T0_fwd, P0_minus_Pb, P_back_minus, A_eff, X);
-  auto sol_Pb_plus = combaero::nozzle_flow(T0_fwd, P0_plus_Pb, P_back_plus, A_eff, X);
-  double mdot_Pb_minus = reverse_flow ? -sol_Pb_minus.mdot : sol_Pb_minus.mdot;
-  double mdot_Pb_plus = reverse_flow ? -sol_Pb_plus.mdot : sol_Pb_plus.mdot;
+  // Apply smooth transition (C1 continuous)
+  double PR = P_back_fwd / P0_fwd;
+  double PR_crit = combaero::critical_pressure_ratio(T0_fwd, P0_fwd, X);
+  const double delta_PR = 0.01;
+  double t = (PR - PR_crit) / delta_PR;
+  double choke_factor = 1.0;
+  if (t >= 1.0) choke_factor = 1.0;
+  else if (t <= -1.0) choke_factor = 0.0;
+  else choke_factor = 0.5 * (1.0 + t * (3.0 - t * t));
 
-  double d_mdot_dP_back_raw = (mdot_Pb_plus - mdot_Pb_minus) / (2.0 * eps_Pb);
+  double d_mdot_dP_back_fwd = dmdot_dP_back_sub * choke_factor + dmdot_dP_back_choked * (1.0 - choke_factor);
 
-  // Apply smooth transition factor
-  double d_mdot_dP_back = d_mdot_dP_back_raw * choke_factor;
+  // Upstream pressure derivative: P0 only affects PR and scales G linearly if choked
+  // dmdot/dP0 = mdot/P0 - (Pb/P0) * dmdot/dPb
+  double d_mdot_dP0_fwd = (P0_fwd > 1e-6) ? (sol.mdot / P0_fwd - PR * d_mdot_dP_back_fwd) : 0.0;
 
-  // Jacobian w.r.t. T0
-  auto sol_T0_plus = combaero::nozzle_flow(T0_fwd + eps_T0, P0_fwd, P_back_fwd, A_eff, X);
-  auto sol_T0_minus = combaero::nozzle_flow(T0_fwd - eps_T0, P0_fwd, P_back_fwd, A_eff, X);
-  double mdot_T0_plus = reverse_flow ? -sol_T0_plus.mdot : sol_T0_plus.mdot;
-  double mdot_T0_minus = reverse_flow ? -sol_T0_minus.mdot : sol_T0_minus.mdot;
-  double d_mdot_dT0 = (mdot_T0_plus - mdot_T0_minus) / (2.0 * eps_T0);
+  // Upstream temperature derivative: mdot ~ 1/sqrt(T0) roughly
+  // More precisely: dG/dT0 = rho * cp0 / v * [(1 - T/T0) - v^2/(cp*T0)]
+  double d_mdot_dT0_fwd = 0.0;
+  if (v_outlet > 1e-6 && T0 > 1e-6) {
+    d_mdot_dT0_fwd = A_eff * rho_outlet * cp0 / v_outlet * ((1.0 - T_outlet / T0) - v_outlet * v_outlet / (cp_outlet * T0));
+  } else if (T0 > 1e-6) {
+    // Choked limit: dG/dT0 = -G / (2*T0)
+    d_mdot_dT0_fwd = -sol.mdot / (2.0 * T0);
+  }
+
+  // Assign results
+  double d_mdot_dP0 = d_mdot_dP0_fwd;
+  double d_mdot_dP_back = d_mdot_dP_back_fwd;
+  double d_mdot_dT0 = d_mdot_dT0_fwd;
 
   // For reverse flow, swap Jacobian signs appropriately
   if (reverse_flow) {
