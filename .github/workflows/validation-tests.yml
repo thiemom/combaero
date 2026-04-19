@@ -155,6 +155,8 @@ jobs:
 
       - name: Run Python unit tests
         working-directory: python/tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           python -m pytest -v --tb=short
 
