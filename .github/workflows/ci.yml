@@ -94,7 +94,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install build dependencies
-        run: uv sync --all-extras --all-groups
+        run: uv sync --no-install-workspace --all-extras --all-groups
 
       - name: Set up CMake
         uses: jwlawson/actions-setup-cmake@v2
