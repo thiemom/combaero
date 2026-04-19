@@ -13,30 +13,42 @@ These tests ensure that CombAero's complete combustion, stream mixing, and trans
 
 ## Setup
 
-Install dependencies using Poetry:
+Install dependencies using `uv` (from the repository root):
 
 ```bash
-cd cantera_validation_tests
-poetry install
+uv sync --all-extras --all-groups
 ```
 
-## Running Tests
+### Running Tests
+
+Run the full suite (using the root-managed `uv` environment):
 
 ```bash
-# Run all tests
-poetry run pytest
+uv run --project cantera_validation_tests pytest
+```
 
-# Run with verbose output
-poetry run pytest -v
+Verbose output:
 
-# Run specific test file
-poetry run pytest test_combustion_validation.py -v
+```bash
+uv run --project cantera_validation_tests pytest -v
+```
 
-# Run in parallel
-poetry run pytest -n auto
+Specific test file:
 
-# Run with coverage
-poetry run pytest --cov=. --cov-report=html
+```bash
+uv run --project cantera_validation_tests pytest test_combustion_validation.py -v
+```
+
+Parallel execution (using pytest-xdist):
+
+```bash
+uv run --project cantera_validation_tests pytest -n auto
+```
+
+Running with coverage:
+
+```bash
+uv run --project cantera_validation_tests pytest --cov=. --cov-report=html
 ```
 
 ## Validation Methodology

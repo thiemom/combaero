@@ -36,4 +36,4 @@ package = true
 dev-dependencies = ["pytest-cov"]
 
 [tool.uv.workspace]
-members = ["cantera_validation_tests"]
+members = ["cantera_validation_tests", "thermo_data_generator"]
