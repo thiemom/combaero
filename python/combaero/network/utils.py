@@ -1,12 +1,12 @@
 from typing import TYPE_CHECKING
 
-import pandas as pd
-
 if TYPE_CHECKING:
+    import pandas as pd
+
     from .graph import FlowNetwork
 
 
-def results_to_dataframe(net: "FlowNetwork") -> pd.DataFrame:
+def results_to_dataframe(net: "FlowNetwork") -> "pd.DataFrame":
     """
     Extracts the current state of a solved network into a pandas DataFrame.
 
@@ -16,6 +16,8 @@ def results_to_dataframe(net: "FlowNetwork") -> pd.DataFrame:
     Returns:
         pd.DataFrame containing thermodynamics and flow results for nodes and elements.
     """
+    import pandas as pd
+
     data = []
 
     # 1. Process Nodes
