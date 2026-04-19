@@ -56,16 +56,17 @@ jobs:
       - name: Check C++ source code style
         run: ./scripts/check-source-style.sh --verbose
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
+          enable-cache: true
           python-version: '3.12'
 
-      - name: Install Python style tools
-        run: pip install ruff mypy
+      - name: Install dependencies
+        run: uv sync --all-extras --all-groups
 
       - name: Check Python code style
-        run: ./scripts/check-python-style.sh --verbose
+        run: uv run ./scripts/check-python-style.sh --verbose
 
   build-and-test:
     name: Build & Test C++ (${{ matrix.os }}, ${{ matrix.build_type }})
@@ -83,15 +84,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python (Windows Ninja dependency)
-        if: runner.os == 'Windows'
-        uses: actions/setup-python@v5
+      - name: Set up uv (Build dependencies)
+        uses: astral-sh/setup-uv@v5
         with:
+          enable-cache: true
           python-version: '3.12'
 
       - name: Install Ninja (Windows)
         if: runner.os == 'Windows'
-        run: pip install ninja
+        run: uv pip install ninja
 
       - name: Set up CMake
         uses: jwlawson/actions-setup-cmake@v1

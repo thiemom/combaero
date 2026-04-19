@@ -1,3 +1,0 @@
-1. TBC Aging: The YSZ material supports 'hours' (aging) and 'is_ebpvd'. Should I add these as extra settings, or just use as-sprayed APS defaults?
-2. Conductivity UX: If a material is selected, should the numeric conductivity input be hidden or read-only (showing the current k)?
-3. Naming: Is it okay to rename "generic" to "Custom" in the dropdown for clarity?
