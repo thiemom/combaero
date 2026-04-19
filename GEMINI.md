@@ -5,7 +5,7 @@ This document outlines the hard rules, coding styles, and project conventions fo
 ## 1. Hard Rules & Constraints
 
 *   **No system Python installs:** Agents **must never** install packages into the system Python or use global `pip`.
-*   **Virtual Environment Only:** Always use the project-local virtual environment located at `.venv`. If activating a shell, use `source .venv/bin/activate`.
+*   **Virtual Environment Only:** Always use the project-local virtual environment. `uv` handles this automatically. If you must use a shell, use `uv run` or ensure `.venv` is activated.
 *   **Do not bypass checks:** Never bypass Git pre-commit hooks or GitHub Actions runner checks. All code must pass these checks cleanly.
 *   **Auto-generated files:** Do not manually edit auto-generated files. They will be overwritten. Use the designated scripts to regenerate them.
 *   **Cross-Platform CI Strictness:** GitHub Actions runs compilation and tests across macOS, Windows, and Linux. Ensure all standard library includes (e.g. `<cmath>`, `<vector>`) are explicitly defined. Code that compiles natively on macOS may still fail on Linux/Windows due to stricter compiler requirements.
@@ -40,8 +40,7 @@ Several critical files in this project are auto-generated. **Do not modify the t
 
 ### Units Documentation (`docs/UNITS.md`)
 *   **Source:** `include/units_data.h`
-*   **Script:** `python scripts/generate_units_md.py`
-*   **Action:** If fixing a unit description or adding a section, modify the C++ header, then run the python script to regenerate the markdown.
+*   **Action:** If fixing a unit description or adding a section, modify the C++ header, then run `uv run scripts/generate_units_md.py` to regenerate the markdown.
 
 ### Thermodynamic & Transport Data (`include/thermo_transport_data.h`)
 *   **Source:** NASA CEA output text files and Cantera YAML mechanisms (external), combined into a local JSON cache.
@@ -60,7 +59,8 @@ The root `.venv` is the single source of truth for all Python operations in this
 **To ensure the environment is correct:**
 ```bash
 ./scripts/bootstrap.sh
-source .venv/bin/activate
+# Then use uv run for any command
+uv run <command>
 ```
 
 ### Script Execution and Verification
@@ -71,8 +71,8 @@ Before committing code, verify it locally using the provided scripts:
 *   **Run Clang-Tidy:** `./scripts/run-clang-tidy.sh` (requires a CMake build directory with `compile_commands.json`)
 *   **Run Test Suites:**
     *   C++: `cd build && ctest`
-    *   Python: `./.venv/bin/python -m pytest python/tests`
-    *   Cantera Validation: `CANTERA_DATA="$PWD/cantera_validation_tests" ./.venv/bin/python -m pytest cantera_validation_tests -v`
+    *   Python: `uv run pytest python/tests`
+    *   Cantera Validation: `CANTERA_DATA="$PWD/cantera_validation_tests" uv run --project cantera_validation_tests pytest -v`
 
 ### Version Synchronization
 When updating tool versions or Python targets, ensure the following files remain synchronized:

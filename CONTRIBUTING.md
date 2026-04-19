@@ -54,16 +54,16 @@ If you modify the Python bindings or C++ source, rebuild and run the full Python
 
 ```bash
 ./scripts/bootstrap.sh
-./.venv/bin/python scripts/ensure_venv.py
+uv run scripts/ensure_venv.py
 # Rebuild the C++ extension (required after any src/ or include/ change)
-./.venv/bin/pip install -e . --no-build-isolation
-./.venv/bin/python -m pytest python/tests/
+uv pip install -e .
+uv run pytest python/tests/
 ```
 
 Pre-commit hooks run automatically on `git commit`. To run them manually:
 
 ```bash
-./.venv/bin/pre-commit run --all-files
+uv run pre-commit run --all-files
 ```
 
 ## Pull Request Process

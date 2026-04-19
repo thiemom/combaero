@@ -9,6 +9,7 @@ resolution-markers = [
 members = [
     "cantera-validation-tests",
     "combaero",
+    "combaero-gui",
     "thermo-data-generator",
 ]
 
@@ -174,10 +175,7 @@ generator = [
     { name = "pyyaml" },
 ]
 gui = [
-    { name = "fastapi" },
-    { name = "pandas" },
-    { name = "pydantic" },
-    { name = "uvicorn" },
+    { name = "combaero-gui" },
 ]
 
 [package.dev-dependencies]
@@ -188,23 +186,41 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.2.0" },
-    { name = "fastapi", marker = "extra == 'gui'" },
+    { name = "combaero-gui", marker = "extra == 'gui'", editable = "gui" },
     { name = "matplotlib", marker = "extra == 'examples'", specifier = ">=3.8" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.12.0" },
     { name = "numpy", specifier = ">=1.24" },
     { name = "pandas", marker = "extra == 'generator'", specifier = ">=2.2.3" },
-    { name = "pandas", marker = "extra == 'gui'" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "pydantic", marker = "extra == 'gui'" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pyyaml", marker = "extra == 'generator'", specifier = ">=6.0.2" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
     { name = "scipy", specifier = ">=1.10" },
-    { name = "uvicorn", marker = "extra == 'gui'" },
 ]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest-cov" }]
+
+[[package]]
+name = "combaero-gui"
+version = "0.2.0"
+source = { editable = "gui" }
+dependencies = [
+    { name = "combaero" },
+    { name = "fastapi" },
+    { name = "pandas" },
+    { name = "pydantic" },
+    { name = "uvicorn" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "combaero", editable = "." },
+    { name = "fastapi" },
+    { name = "pandas" },
+    { name = "pydantic" },
+    { name = "uvicorn" },
+]
 
 [[package]]
 name = "contourpy"

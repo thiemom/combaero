@@ -1,7 +1,7 @@
 # CombAero — Claude Code Instructions
 
 ## Hard Rules
-- **Virtual environment only:** use `.venv/bin/python` and `.venv/bin/pip`. Never install into system Python.
+- **Virtual environment only:** use `uv run` and `uv pip`. Never install into system Python or use global `pip`.
 - **Never bypass pre-commit hooks** or CI checks. All code must pass cleanly before pushing.
 - **No manual edits to auto-generated files** (`docs/UNITS.md`, `include/thermo_transport_data.h`). Use the scripts below.
 - **API sync is mandatory:** adding/removing/changing any function or property requires updating `include/units_data.h` and `docs/API_REFERENCE.md` in the same commit.
@@ -23,18 +23,18 @@
 
 ## Key Scripts
 ```bash
-./scripts/check-source-style.sh          # C++ style
-./scripts/check-python-style.sh --fix    # Python lint + format
-.venv/bin/pip install -e . --no-build-isolation  # rebuild C++ extension
-.venv/bin/pytest python/tests/           # Python tests
-cd build && ctest                        # C++ tests
-python scripts/generate_units_md.py      # regenerate docs/UNITS.md
+./scripts/check-source-style.sh             # C++ style
+./scripts/check-python-style.sh --fix       # Python lint + format
+uv pip install -e .                         # rebuild C++ extension
+uv run pytest python/tests/                 # Python tests
+cd build && ctest                           # C++ tests
+uv run scripts/generate_units_md.py         # regenerate docs/UNITS.md
 ```
 
 ## Auto-Generated Files
 | Target | Source | Regenerate with |
 |--------|--------|-----------------|
-| `docs/UNITS.md` | `include/units_data.h` | `python scripts/generate_units_md.py` |
+| `docs/UNITS.md` | `include/units_data.h` | `uv run scripts/generate_units_md.py` |
 | `include/thermo_transport_data.h` | `thermo_data_generator/` | see `thermo_data_generator/README.md` |
 
 ## Version Sync Checklist

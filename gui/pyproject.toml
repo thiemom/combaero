@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools_scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "combaero-gui"
+version = "0.2.0"
+description = "CombAero Network GUI Backend"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "pandas",
+    "combaero",
+]
+requires-python = ">=3.9"
+
+[tool.setuptools]
+package-dir = {gui = "."}
+packages = ["gui", "gui.backend"]
+
+[tool.uv]
+managed = true
+package = true
+
+[tool.uv.sources]
+combaero = { workspace = true }
