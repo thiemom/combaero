@@ -130,6 +130,50 @@ double oxygen_required_per_kg_mixture(const std::vector<double> &X) {
   return molar_oxygen_required * oxygen_mw / mixture_mw; // kg O2/kg mixture
 }
 
+double equivalence_ratio(const std::vector<double> &X) {
+  // Guard for malformed input vector size
+  if (X.size() != molecular_structures.size()) {
+    throw std::runtime_error("equivalence_ratio: input vector size (" +
+                             std::to_string(X.size()) +
+                             ") does not match species table (" +
+                             std::to_string(molecular_structures.size()) + ")");
+  }
+
+  double n_C = 0.0;
+  double n_H = 0.0;
+  double n_O = 0.0;
+
+  for (size_t i = 0; i < X.size(); ++i) {
+    const double X_k = X[i];
+    if (X_k <= 1e-15)
+      continue;
+    const auto &ms = molecular_structures[i];
+    n_C += X_k * static_cast<double>(ms.C);
+    n_H += X_k * static_cast<double>(ms.H);
+    n_O += X_k * static_cast<double>(ms.O);
+  }
+
+  const double n_O_stoich = 2.0 * n_C + 0.5 * n_H;
+
+  // Guard: Non-combustible mixture (Pure oxidizer or inert)
+  if (n_O_stoich <= 1e-15) {
+    return 0.0;
+  }
+
+  // Guard: Zero oxygen present (Pure fuel or fuel+inert)
+  // Return a large number to indicate extreme rich condition without crashing
+  if (n_O <= 1e-15) {
+    return 1.0e9;
+  }
+
+  return n_O_stoich / n_O;
+}
+
+double equivalence_ratio_mass(const std::vector<double> &Y) {
+  // Convert mass Y to molar X and call the molar version
+  return equivalence_ratio(mass_to_mole(Y));
+}
+
 double fuel_lhv_molar(const std::vector<double> &X_fuel,
                       const double reference_temperature) {
   validate_fuel_mole_fractions(X_fuel);
@@ -1620,7 +1664,8 @@ CombustionState combustion_state(const std::vector<double> &X_fuel,
       product_state.Y,
       theta,
       0.0, // mdot_fuel not available in phi-based call
-      0.0  // mdot_air not available in phi-based call
+      0.0, // mdot_air not available in phi-based call
+      0.0, // mdot_total not available in phi-based call
   };
   const double delta_P_frac = std::get<0>(pressure_loss(ctx));
   const double P_out = P * (1.0 - delta_P_frac);
@@ -1673,9 +1718,15 @@ CombustionState combustion_state_from_streams(
 
   const double T_ad = product_state.T;
   const double theta = (T_reactants > 0.0) ? (T_ad / T_reactants - 1.0) : 0.0;
-  PressureLossContext ctx{reactant_state,   phi,             T_ad,
-                          product_state.X, product_state.Y, theta,
-                          fuel_stream.mdot, ox_stream.mdot};
+  PressureLossContext ctx{reactant_state,
+                          phi,
+                          T_ad,
+                          product_state.X,
+                          product_state.Y,
+                          theta,
+                          fuel_stream.mdot,
+                          ox_stream.mdot,
+                          fuel_stream.mdot + ox_stream.mdot};
   const double delta_P_frac = std::get<0>(pressure_loss(ctx));
   const double P_out = P * (1.0 - delta_P_frac);
 

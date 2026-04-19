@@ -69,7 +69,7 @@ def test_orifice_jacobian_accuracy():
     assert res_obj.d_mdot_dP_static_down == pytest.approx(d_down_num, rel=1e-4)
 
 
-def test_pipe_jacobian_accuracy():
+def test_channel_jacobian_accuracy():
     m_dot = 0.5
     P_total_up = 2e5
     P_static_up = 1.9e5
@@ -84,7 +84,7 @@ def test_pipe_jacobian_accuracy():
     friction_model = "haaland"
 
     # C++ Calculation
-    res_obj = cb.pipe_residuals_and_jacobian(
+    res_obj = cb.channel_residuals_and_jacobian(
         m_dot, P_total_up, P_static_up, T_up, Y_up, P_static_down, L, D, roughness, friction_model
     )
 
@@ -93,7 +93,7 @@ def test_pipe_jacobian_accuracy():
         eps = 1e-7  # Better precision near zero
 
     def get_dp(m, p_tot, p_stat, t, y, p_down):
-        r = cb.pipe_residuals_and_jacobian(
+        r = cb.channel_residuals_and_jacobian(
             m, p_tot, p_stat, t, y, p_down, L, D, roughness, friction_model
         )
         return r.dP_calc
@@ -116,7 +116,7 @@ def test_pipe_jacobian_accuracy():
         - get_dp(m_dot, P_total_up, P_static_up, T_up - eps, Y_up, P_static_down)
     ) / (2 * eps)
 
-    print("\nPipe Comparison:")
+    print("\nChannel Comparison:")
     print(f"m_dot: Analytical={res_obj.d_dP_d_mdot:.6e}, Numerical={d_mdot_num:.6e}")
     print(f"Static Up: Analytical={res_obj.d_dP_dP_static_up:.6e}, Numerical={d_stat_num:.6e}")
     print(f"Temp Up: Analytical={res_obj.d_dP_dT_up:.6e}, Numerical={d_temp_num:.6e}")

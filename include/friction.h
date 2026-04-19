@@ -5,7 +5,7 @@
 #include <unordered_map>
 
 // -------------------------------------------------------------
-// Darcy friction factor correlations for turbulent pipe flow
+// Darcy friction factor correlations for turbulent channel flow
 // -------------------------------------------------------------
 // All functions compute the Darcy friction factor f for use in:
 //   ΔP = f * (L/D) * (ρ * v²/2)
@@ -50,7 +50,7 @@ double friction_serghides(double Re, double e_D);
 double friction_colebrook(double Re, double e_D, double tol = 1e-10,
                           int max_iter = 20);
 
-// Petukhov correlation (1970) - smooth pipes only
+// Petukhov correlation (1970) - smooth channels only
 // f = (coeff_a * ln(Re) - coeff_b)^(-2)
 // Valid for 3000 < Re < 5x10^6
 // Often used with Gnielinski/Petukhov heat transfer correlations.
@@ -62,9 +62,9 @@ constexpr double coeff_b = 1.64;  // offset
 double friction_petukhov(double Re);
 
 // -------------------------------------------------------------
-// Pipe Roughness Database
+// Channel Roughness Database
 // -------------------------------------------------------------
-// Absolute roughness ε [m] for common pipe materials.
+// Absolute roughness ε [m] for common channel materials.
 // Used as e_D = ε/D in friction factor correlations.
 //
 // References:
@@ -73,14 +73,16 @@ double friction_petukhov(double Re);
 // - Munson et al. (2013): Fundamentals of Fluid Mechanics (7th ed.), Table 8.1
 // - Crane Co. (2009): Technical Paper No. 410, Table A-24
 
-// Get absolute roughness for a standard pipe material [m].
+// Get absolute roughness for a standard channel material [m].
 // Material names are case-insensitive.
 // Throws std::invalid_argument if material not found.
-// Use standard_pipe_roughness() to list available materials.
-double pipe_roughness(const std::string &material);
+// Use standard_channel_roughness() to list available materials.
+double channel_roughness(const std::string &material);
 
-// Get all standard pipe roughness values.
+
+// Get all standard channel roughness values.
 // Returns: map of material name -> roughness [m]
-std::unordered_map<std::string, double> standard_pipe_roughness();
+std::unordered_map<std::string, double> standard_channel_roughness();
+
 
 #endif // FRICTION_H

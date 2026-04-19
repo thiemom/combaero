@@ -26,9 +26,10 @@ struct PressureLossContext {
   double T_ad;                           // adiabatic flame temperature [K]
   const std::vector<double> &X_products; // burned gas mole fractions
   const std::vector<double> &Y_products; // burned gas mass fractions
-  double theta;     // T_ad/T_in - 1  (dimensionless temperature rise)
-  double mdot_fuel; // fuel mass flow [kg/s]  (0 if phi-based call)
-  double mdot_air;  // air mass flow [kg/s]   (0 if phi-based call)
+  double theta;      // T_ad/T_in - 1  (dimensionless temperature rise)
+  double mdot_fuel;  // fuel mass flow [kg/s]  (0 if phi-based call)
+  double mdot_air;   // air mass flow [kg/s]   (0 if phi-based call)
+  double mdot_total; // total inlet mass flow [kg/s]
 };
 
 using PressureLossCorrelation =
@@ -39,6 +40,10 @@ double oxygen_required_per_mol_fuel(std::size_t fuel_index);
 double oxygen_required_per_kg_fuel(std::size_t fuel_index);
 double oxygen_required_per_mol_mixture(const std::vector<double> &X);
 double oxygen_required_per_kg_mixture(const std::vector<double> &X);
+
+// Equivalence ratio based on elemental analysis (Phi = O2_needed / O2_available)
+double equivalence_ratio(const std::vector<double> &X);
+double equivalence_ratio_mass(const std::vector<double> &Y);
 
 // Fuel lower heating value (LHV) from complete combustion to CO2 + H2O(g)
 double fuel_lhv_molar(const std::vector<double> &X_fuel,

@@ -2,6 +2,8 @@
 Test EffectiveAreaConnectionElement functionality.
 """
 
+import math
+
 import pytest
 
 import combaero as cb
@@ -104,7 +106,7 @@ class TestEffectiveAreaConnectionElement:
         assert callable(connection.resolve_topology)
 
     def test_flow_calculation_matches_orifice(self):
-        """Verify EffectiveAreaConnectionElement produces same flow as OrificeElement(Cd=1.0).
+        """Verify EffectiveAreaConnectionElement produces same flow as OrificeElement(Cd=1.0, correlation="fixed").
 
         Both use the compressible flow equation via cb.orifice_mdot_and_jacobian(),
         which accounts for density variations across the pressure drop.
@@ -140,7 +142,14 @@ class TestEffectiveAreaConnectionElement:
         outlet2.P_total = 100000.0
         outlet2.T_total = 300.0
         outlet2.Y = cb.species.dry_air_mass()
-        orf2 = OrificeElement("orf", "inlet", "outlet", Cd=1.0, area=effective_area)
+        orf2 = OrificeElement(
+            "orf",
+            "inlet",
+            "outlet",
+            Cd=1.0,
+            diameter=math.sqrt(4.0 * effective_area / math.pi),
+            correlation="fixed",
+        )
 
         graph2.add_node(inlet2)
         graph2.add_node(outlet2)

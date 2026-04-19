@@ -4,7 +4,7 @@ import inspect
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .components import NetworkElement, NetworkNode, WallConnection
+    from .components import NetworkElement, NetworkNode, ThermalWall
 
 
 class FlowNetwork:
@@ -18,7 +18,7 @@ class FlowNetwork:
         self.elements: dict[str, NetworkElement] = {}
 
         # Thermal coupling walls dictionary
-        self.walls: dict[str, WallConnection] = {}
+        self.walls: dict[str, ThermalWall] = {}
         self.thermal_coupling_enabled: bool = True
 
         # Directed graph mapping: node_id -> list of element_ids
@@ -61,12 +61,12 @@ class FlowNetwork:
         # Element 'to_node' -> implies element is upstream of the to_node
         self._upstream_of_node[element.to_node].append(element.id)
 
-    def add_wall(self, wall: WallConnection) -> None:
+    def add_wall(self, wall: ThermalWall) -> None:
         """Register a thermal coupling wall between two elements.
 
         Parameters
         ----------
-        wall : WallConnection
+        wall : ThermalWall
             Wall connection defining thermal coupling between two elements.
 
         Raises
@@ -77,11 +77,11 @@ class FlowNetwork:
         if wall.id in self.walls:
             raise ValueError(f"Wall '{wall.id}' already exists in network.")
 
-        if wall.element_a not in self.elements:
-            raise ValueError(f"Unknown element_a '{wall.element_a}' for wall '{wall.id}'.")
+        if wall.element_a not in self.elements and wall.element_a not in self.nodes:
+            raise ValueError(f"Unknown element_a/node_a '{wall.element_a}' for wall '{wall.id}'.")
 
-        if wall.element_b not in self.elements:
-            raise ValueError(f"Unknown element_b '{wall.element_b}' for wall '{wall.id}'.")
+        if wall.element_b not in self.elements and wall.element_b not in self.nodes:
+            raise ValueError(f"Unknown element_b/node_b '{wall.element_b}' for wall '{wall.id}'.")
 
         self.walls[wall.id] = wall
 
@@ -148,7 +148,7 @@ class FlowNetwork:
                 "one PressureBoundary to serve as a reference."
             )
 
-        from .components import LosslessConnectionElement
+        from .components import LosslessConnectionElement, PressureLossElement
 
         all_lossless = all(isinstance(e, LosslessConnectionElement) for e in self.elements.values())
         if all_lossless:
@@ -156,6 +156,17 @@ class FlowNetwork:
                 "Network contains only lossless connection elements. "
                 "There must be at least one pressure drop element to solve flow."
             )
+
+        # PressureLossElement ambiguity: both endpoints have has_theta=True and no
+        # explicit theta_source override.  Requires user disambiguation.
+        for eid, elem in self.elements.items():
+            if isinstance(elem, PressureLossElement) and elem._both_endpoints_theta:
+                raise ValueError(
+                    f"FlowNetwork validation failed: PressureLossElement '{eid}' has "
+                    f"has_theta=True nodes on both endpoints "
+                    f"('{elem.from_node}' and '{elem.to_node}'). "
+                    f"Pass theta_source='<node_id>' to disambiguate."
+                )
 
         # Isolated subgraph check: all nodes must be reachable from *some* PressureBoundary.
         # This prevents islands that have elements but no reference pressure.

@@ -17,7 +17,7 @@ class TestSolveOrificeMdot:
         # Create orifice geometry
         geom = cb.OrificeGeometry()
         geom.d = 0.05  # 50 mm orifice
-        geom.D = 0.1  # 100 mm pipe
+        geom.D = 0.1  # 100 mm channel
 
         # Flow conditions (air at standard conditions)
         dP = 10000.0  # Pa (10 kPa)
@@ -191,7 +191,7 @@ class TestSolveOrificeMdot:
     def test_invalid_geometry(self):
         """Test error handling for invalid geometry."""
         geom = cb.OrificeGeometry()
-        geom.d = 0.15  # Larger than pipe!
+        geom.d = 0.15  # Larger than channel!
         geom.D = 0.1
 
         with pytest.raises(ValueError, match="invalid geometry"):

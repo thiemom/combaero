@@ -9,12 +9,12 @@ from scipy.optimize import root
 import combaero as cb
 
 from .components import (
+    ChannelElement,
     EnergyBoundary,
     LosslessConnectionElement,
     MassFlowBoundary,
     MixtureState,
     NetworkNode,
-    PipeElement,
     PressureBoundary,
 )
 from .graph import FlowNetwork
@@ -124,7 +124,9 @@ class NetworkSolver:
 
         for element in self.network.elements.values():
             elem_scale = (
-                ref_p if isinstance(element, (PipeElement, LosslessConnectionElement)) else ref_mdot
+                ref_p
+                if isinstance(element, (ChannelElement, LosslessConnectionElement))
+                else ref_mdot
             )
             scales.extend([elem_scale] * element.n_equations())
 
@@ -286,7 +288,10 @@ class NetworkSolver:
                 continue
 
             share = available / len(down_elems)
-            if abs(share) < 1e-12:
+            # Only substitute a nonzero reference guess for elements whose
+            # source is unknown.  If the share is zero because an upstream
+            # MassFlowBoundary is genuinely OFF (m_dot=0), keep zero.
+            if abs(share) < 1e-12 and not isinstance(node, MassFlowBoundary):
                 share = ref["m_dot"]
 
             for elem in down_elems:
@@ -296,7 +301,9 @@ class NetworkSolver:
                     area = getattr(elem, "area", None)
                     if area is not None and area > 0.0:
                         mdot_cap = rho_ref * a_ref * area * mdot_ratio
-                        elem_share = min(elem_share, mdot_cap)
+                        elem_share = min(abs(elem_share), mdot_cap)
+                        if share < 0:
+                            elem_share = -elem_share
 
                 mdot_guess[elem.id] = elem_share
                 node_flow[elem.to_node] = node_flow.get(elem.to_node, 0.0) + elem_share
@@ -411,18 +418,29 @@ class NetworkSolver:
         a dedicated EnergyBoundary is created and attached to the node.  Its Q is
         updated every Newton iteration inside ``_propagate_states``.
         """
+
+        def _endpoint_to_node_id(endpoint_id: str) -> str | None:
+            if endpoint_id in self.network.elements:
+                return self.network.elements[endpoint_id].to_node
+            if endpoint_id in self.network.nodes:
+                return endpoint_id
+            return None
+
         # Build a mapping: node_id -> set of wall IDs that affect it
         affected_nodes: dict[str, set[str]] = {}
         for wall in self.network.walls.values():
-            elem_a = self.network.elements[wall.element_a]
-            elem_b = self.network.elements[wall.element_b]
+            node_a = _endpoint_to_node_id(wall.element_a)
+            node_b = _endpoint_to_node_id(wall.element_b)
 
-            # Skip walls where both sides feed the same node (net Q = 0)
-            if elem_a.to_node == elem_b.to_node:
+            if node_a is None or node_b is None:
                 continue
 
-            affected_nodes.setdefault(elem_a.to_node, set()).add(wall.id)
-            affected_nodes.setdefault(elem_b.to_node, set()).add(wall.id)
+            # Skip walls where both sides feed the same node (net Q = 0)
+            if node_a == node_b:
+                continue
+
+            affected_nodes.setdefault(node_a, set()).add(wall.id)
+            affected_nodes.setdefault(node_b, set()).add(wall.id)
 
         for nid in affected_nodes:
             node = self.network.nodes[nid]
@@ -447,43 +465,67 @@ class NetworkSolver:
         """
         wall_contributions: list[tuple] = []
         processed_walls: set[str] = set()
-        up_elem_ids = {e.id for e in up_elems}
 
         for wall in self.network.walls.values():
             if wall.id in processed_walls:
                 continue
 
-            # Does this wall involve an upstream element of nid?
+            # Endpoints may be elements or nodes
             elem_a_id = wall.element_a
             elem_b_id = wall.element_b
-            if elem_a_id not in up_elem_ids and elem_b_id not in up_elem_ids:
+
+            endpoint_a_is_node = elem_a_id in self.network.nodes
+            endpoint_b_is_node = elem_b_id in self.network.nodes
+
+            obj_a = self.network.elements.get(elem_a_id) or self.network.nodes.get(elem_a_id)
+            obj_b = self.network.elements.get(elem_b_id) or self.network.nodes.get(elem_b_id)
+
+            if obj_a is None or obj_b is None:
                 continue
 
-            elem_a = self.network.elements[elem_a_id]
-            elem_b = self.network.elements[elem_b_id]
+            # Find the actual target node for side A and side B
+            target_node_a = obj_a.id if endpoint_a_is_node else obj_a.to_node
+            target_node_b = obj_b.id if endpoint_b_is_node else obj_b.to_node
 
-            # Skip if both elements feed the same node (net Q = 0)
-            if elem_a.to_node == elem_b.to_node:
+            # This wall does not affect the current node
+            if nid not in (target_node_a, target_node_b):
+                continue
+
+            # Skip if both sides feed/are the same node (net Q = 0)
+            if target_node_a == target_node_b:
                 continue
 
             # Determine which side feeds the current node
-            is_side_a = elem_a_id in up_elem_ids
+            is_side_a = target_node_a == nid
 
             # Get states for both sides (previous-iteration fallback for back-edges)
-            state_a = self._get_node_state_with_prev(self.network.nodes[elem_a.from_node], x)
-            state_b = self._get_node_state_with_prev(self.network.nodes[elem_b.from_node], x)
+            node_feeding_a = (
+                self.network.nodes[obj_a.id]
+                if endpoint_a_is_node
+                else self.network.nodes[obj_a.from_node]
+            )
+            node_feeding_b = (
+                self.network.nodes[obj_b.id]
+                if endpoint_b_is_node
+                else self.network.nodes[obj_b.from_node]
+            )
 
-            # Set mass flow rates from solver vector
-            m_indices_a = self._unknown_indices.get(elem_a_id, [])
-            if m_indices_a:
-                state_a.m_dot = x[m_indices_a[0]]
-            m_indices_b = self._unknown_indices.get(elem_b_id, [])
-            if m_indices_b:
-                state_b.m_dot = x[m_indices_b[0]]
+            state_a = self._get_node_state_with_prev(node_feeding_a, x)
+            state_b = self._get_node_state_with_prev(node_feeding_b, x)
 
-            # Call htc_and_T() on both elements
-            ch_result_a = elem_a.htc_and_T(state_a)
-            ch_result_b = elem_b.htc_and_T(state_b)
+            # Set mass flow rates from solver vector for elements
+            if not endpoint_a_is_node:
+                m_indices_a = self._unknown_indices.get(elem_a_id, [])
+                if m_indices_a:
+                    state_a.m_dot = x[m_indices_a[0]]
+            if not endpoint_b_is_node:
+                m_indices_b = self._unknown_indices.get(elem_b_id, [])
+                if m_indices_b:
+                    state_b.m_dot = x[m_indices_b[0]]
+
+            # Call htc_and_T() on both objects
+            ch_result_a = obj_a.htc_and_T(state_a) if obj_a.has_convective_surface else None
+            ch_result_b = obj_b.htc_and_T(state_b) if obj_b.has_convective_surface else None
 
             # Only proceed if both elements have heat transfer surfaces
             if ch_result_a is not None and ch_result_b is not None:
@@ -493,18 +535,9 @@ class NetworkSolver:
                 h_b = ch_result_b.h
                 T_aw_b = ch_result_b.T_aw
 
-                # Get convective areas from element surfaces (safe: only elements
-                # with a ConvectiveSurface can return non-None ChannelResult)
-                A_conv_a = elem_a.surface.area
-                A_conv_b = elem_b.surface.area
-
-                A_eff = (
-                    wall.contact_area if wall.contact_area is not None else min(A_conv_a, A_conv_b)
-                )
-                t_over_k = wall.wall_thickness / wall.wall_conductivity
-
-                wall_result = cb.wall_coupling_and_jacobian(
-                    h_a, T_aw_a, h_b, T_aw_b, t_over_k, A_eff
+                # Call multi-layer coupling logic
+                wall_result = wall.compute_coupling(
+                    h_a, T_aw_a, obj_a.surface.area, h_b, T_aw_b, obj_b.surface.area
                 )
 
                 # Convention: Q > 0 means heat flows A->B
@@ -547,21 +580,23 @@ class NetworkSolver:
         for nid in self._topological_order:
             node = self.network.nodes[nid]
 
-            if isinstance(node, (PressureBoundary, MassFlowBoundary)):
+            up_elems = self.network.get_upstream_elements(nid)
+
+            # Boundaries with NO upstream connections are pure sources
+            if isinstance(node, (PressureBoundary, MassFlowBoundary)) and not up_elems:
                 T, Y, _ = node.compute_derived_state([])
                 self._derived_states[nid] = (T, Y, None)
                 # Seed relay for boundary's own unknowns
                 node_indices = self._unknown_indices.get(nid, [])
                 unknown_names = self.unknown_names
-                for _, global_idx in enumerate(node_indices):
+                for global_idx in node_indices:
                     name = unknown_names[global_idx]
                     if name.endswith(".P_total"):
                         relay[nid].setdefault(
-                            global_idx, {"T": 0.0, "Y": np.zeros(cb.num_species())}
+                            global_idx, {"T": 0.0, "Y": np.zeros(cb.num_species()), "P_total": 0.0}
                         )["P_total"] = 1.0
                 continue
 
-            up_elems = self.network.get_upstream_elements(nid)
             up_states = []
             for elem in up_elems:
                 state_up = self._get_node_state(self.network.nodes[elem.from_node], x)
@@ -683,7 +718,8 @@ class NetworkSolver:
                         sign = -1.0 if is_side_a else 1.0
 
                         # Side A contributions
-                        from_a = self.network.elements[ea_id].from_node
+                        obj_a = self.network.elements.get(ea_id) or self.network.nodes.get(ea_id)
+                        from_a = ea_id if ea_id in self.network.nodes else obj_a.from_node
                         m_indices_a = self._unknown_indices.get(ea_id, [])
 
                         # Temperature coupling: dT_node/dT_upstream_a
@@ -721,7 +757,8 @@ class NetworkSolver:
                             nr["T"] += factor_mdot_a
 
                         # Side B contributions
-                        from_b = self.network.elements[eb_id].from_node
+                        obj_b = self.network.elements.get(eb_id) or self.network.nodes.get(eb_id)
+                        from_b = eb_id if eb_id in self.network.nodes else obj_b.from_node
                         m_indices_b = self._unknown_indices.get(eb_id, [])
 
                         # Temperature coupling: dT_node/dT_upstream_b
@@ -819,10 +856,7 @@ class NetworkSolver:
 
         # Determine boundaries
         if isinstance(node, PressureBoundary):
-            # For PressureBoundary, defaults.
-            # We first check if the test suite provided an initial_guess dict for external states
             guess = getattr(node, "initial_guess", {})
-
             P_tot = guess.get(f"{node.id}.P_total", getattr(node, "P_total", 101325.0))
             P_stat = guess.get(f"{node.id}.P", P_tot)
             T_tot = guess.get(f"{node.id}.T_total", getattr(node, "T_total", 300.0))
@@ -834,13 +868,20 @@ class NetworkSolver:
 
         if isinstance(node, MassFlowBoundary):
             guess = getattr(node, "initial_guess", {})
-            m = getattr(node, "m_dot", 0.1)
+            m = getattr(node, "m_dot", 0.0)
             T_tot = guess.get(f"{node.id}.T_total", getattr(node, "T_total", 300.0))
-            T_stat = guess.get(f"{node.id}.T", T_tot)
             Y = getattr(node, "Y", None)
+
+            # If this boundary has upstream connections (sink), use derived mixed state
+            if node.id in self._derived_states:
+                T_tot_derived, Y_derived, _ = self._derived_states[node.id]
+                T_tot = T_tot_derived
+                Y = Y_derived
+
             if Y is None:
                 Y = default_Y
 
+            T_stat = guess.get(f"{node.id}.T", T_tot)
             p_val = guess.get(f"{node.id}.P", 101325.0)
             ptot_val = guess.get(f"{node.id}.P_total", 101325.0)
 
@@ -897,19 +938,19 @@ class NetworkSolver:
 
         return MixtureState(**state_dict)
 
-    def _residuals_and_jacobian(self, x: np.ndarray) -> tuple[np.ndarray, Any]:
+    def _residuals_and_jacobian(
+        self, x: np.ndarray, *, compute_jacobian: bool = True
+    ) -> tuple[np.ndarray, Any]:
         """
         Evaluates the global residual vector and its sparse Jacobian.
         """
-        import scipy.sparse as sp
-
         # Pure Pressure-Flow: Propagate states forward first
         relay = self._propagate_states(x)
 
         res = []
-        rows = []
-        cols = []
-        data = []
+        rows = [] if compute_jacobian else None
+        cols = [] if compute_jacobian else None
+        data = [] if compute_jacobian else None
 
         # 1. Node Residuals
         for node_id, node in self.network.nodes.items():
@@ -924,34 +965,35 @@ class NetworkSolver:
             res.extend(node_res)
 
             # Assemble node Jacobian entries
-            for eq_idx, var_derivs in node_jac.items():
-                row = start_res_idx + eq_idx
-                for unk_name, deriv in var_derivs.items():
-                    if unk_name in self._name_to_index:
-                        rows.append(row)
-                        cols.append(self._name_to_index[unk_name])
-                        data.append(deriv)
-                    elif "." in unk_name:
-                        # Relay for derived properties (T, Y) in node residuals
-                        parts = unk_name.split(".")
-                        nid, prop = parts[0], parts[1]
-                        if nid in relay:
-                            for unk_idx, sens_pkg in relay[nid].items():
-                                if prop == "T" and "T" in sens_pkg:
-                                    rows.append(row)
-                                    cols.append(unk_idx)
-                                    data.append(deriv * sens_pkg["T"])
-                                elif prop.startswith("Y") and "Y" in sens_pkg:
-                                    # Handle species composition relay
-                                    if "[" in prop:
-                                        s_idx = int(prop.split("[")[1].replace("]", ""))
+            if compute_jacobian:
+                for eq_idx, var_derivs in node_jac.items():
+                    row = start_res_idx + eq_idx
+                    for unk_name, deriv in var_derivs.items():
+                        if unk_name in self._name_to_index:
+                            rows.append(row)
+                            cols.append(self._name_to_index[unk_name])
+                            data.append(deriv)
+                        elif "." in unk_name:
+                            # Relay for derived properties (T, Y) in node residuals
+                            parts = unk_name.split(".")
+                            nid, prop = parts[0], parts[1]
+                            if nid in relay:
+                                for unk_idx, sens_pkg in relay[nid].items():
+                                    if prop == "T" and "T" in sens_pkg:
                                         rows.append(row)
                                         cols.append(unk_idx)
-                                        data.append(deriv * sens_pkg["Y"][s_idx])
-                                elif prop == "P_total_mix" and "P_total_mix" in sens_pkg:
-                                    rows.append(row)
-                                    cols.append(unk_idx)
-                                    data.append(deriv * sens_pkg["P_total_mix"])
+                                        data.append(deriv * sens_pkg["T"])
+                                    elif prop.startswith("Y") and "Y" in sens_pkg:
+                                        # Handle species composition relay
+                                        if "[" in prop:
+                                            s_idx = int(prop.split("[")[1].replace("]", ""))
+                                            rows.append(row)
+                                            cols.append(unk_idx)
+                                            data.append(deriv * sens_pkg["Y"][s_idx])
+                                    elif prop == "P_total_mix" and "P_total_mix" in sens_pkg:
+                                        rows.append(row)
+                                        cols.append(unk_idx)
+                                        data.append(deriv * sens_pkg["P_total_mix"])
 
             # Mass Conservation: Sum(m_dot_in) - Sum(m_dot_out) = 0
             mass_res_idx = len(res)
@@ -962,15 +1004,21 @@ class NetworkSolver:
             m_dot_out = 0.0
 
             if isinstance(node, MassFlowBoundary):
-                m_dot_in += getattr(node, "m_dot", 0.0)
+                # If connected as a sink (has upstream, no downstream), subtract from balance.
+                # Otherwise (source or injection) add to balance.
+                if upstream_elems and not downstream_elems:
+                    m_dot_out += getattr(node, "m_dot", 0.0)
+                else:
+                    m_dot_in += getattr(node, "m_dot", 0.0)
 
             for elem in upstream_elems:
                 indices = self._unknown_indices.get(elem.id)
                 if indices:
                     m_dot_in += x[indices[0]]
-                    rows.append(mass_res_idx)
-                    cols.append(indices[0])
-                    data.append(1.0)
+                    if compute_jacobian:
+                        rows.append(mass_res_idx)
+                        cols.append(indices[0])
+                        data.append(1.0)
                 else:
                     from_node = self.network.nodes[elem.from_node]
                     m_dot_in += getattr(from_node, "m_dot", 0.0)
@@ -979,9 +1027,10 @@ class NetworkSolver:
                 indices = self._unknown_indices.get(elem.id)
                 if indices:
                     m_dot_out += x[indices[0]]
-                    rows.append(mass_res_idx)
-                    cols.append(indices[0])
-                    data.append(-1.0)
+                    if compute_jacobian:
+                        rows.append(mass_res_idx)
+                        cols.append(indices[0])
+                        data.append(-1.0)
                 else:
                     to_node = self.network.nodes[elem.to_node]
                     m_dot_out += getattr(to_node, "m_dot", 0.0)
@@ -1007,39 +1056,44 @@ class NetworkSolver:
             elem_res, elem_jac = element.residuals(state_in, state_out)
             res.extend(elem_res)
 
-            for eq_idx, var_derivs in elem_jac.items():
-                row = start_res_idx + eq_idx
-                for unk_name, deriv in var_derivs.items():
-                    if unk_name in self._name_to_index:
-                        rows.append(row)
-                        cols.append(self._name_to_index[unk_name])
-                        data.append(deriv)
-                    elif "." in unk_name:
-                        # Relay for derived properties (T, Y) in element residuals
-                        parts = unk_name.split(".")
-                        nid, prop = parts[0], parts[1]
-                        if nid in relay:
-                            for unk_idx, sens_pkg in relay[nid].items():
-                                if prop == "T" and "T" in sens_pkg:
-                                    rows.append(row)
-                                    cols.append(unk_idx)
-                                    data.append(deriv * sens_pkg["T"])
-                                elif prop.startswith("Y") and "Y" in sens_pkg:
-                                    if "[" in prop:
-                                        s_idx = int(prop.split("[")[1].replace("]", ""))
+            if compute_jacobian:
+                for eq_idx, var_derivs in elem_jac.items():
+                    row = start_res_idx + eq_idx
+                    for unk_name, deriv in var_derivs.items():
+                        if unk_name in self._name_to_index:
+                            rows.append(row)
+                            cols.append(self._name_to_index[unk_name])
+                            data.append(deriv)
+                        elif "." in unk_name:
+                            # Relay for derived properties (T, Y) in element residuals
+                            parts = unk_name.split(".")
+                            nid, prop = parts[0], parts[1]
+                            if nid in relay:
+                                for unk_idx, sens_pkg in relay[nid].items():
+                                    if prop == "T" and "T" in sens_pkg:
                                         rows.append(row)
                                         cols.append(unk_idx)
-                                        data.append(deriv * sens_pkg["Y"][s_idx])
-                                elif prop == "P_total_mix" and "P_total_mix" in sens_pkg:
-                                    rows.append(row)
-                                    cols.append(unk_idx)
-                                    data.append(deriv * sens_pkg["P_total_mix"])
-                                elif prop == "P_total" and "P_total" in sens_pkg:
-                                    rows.append(row)
-                                    cols.append(unk_idx)
-                                    data.append(deriv * sens_pkg["P_total"])
+                                        data.append(deriv * sens_pkg["T"])
+                                    elif prop.startswith("Y") and "Y" in sens_pkg:
+                                        if "[" in prop:
+                                            s_idx = int(prop.split("[")[1].replace("]", ""))
+                                            rows.append(row)
+                                            cols.append(unk_idx)
+                                            data.append(deriv * sens_pkg["Y"][s_idx])
+                                    elif prop == "P_total_mix" and "P_total_mix" in sens_pkg:
+                                        rows.append(row)
+                                        cols.append(unk_idx)
+                                        data.append(deriv * sens_pkg["P_total_mix"])
+                                    elif prop == "P_total" and "P_total" in sens_pkg:
+                                        rows.append(row)
+                                        cols.append(unk_idx)
+                                        data.append(deriv * sens_pkg["P_total"])
 
-        jac_sparse = sp.coo_matrix((data, (rows, cols)), shape=(len(res), len(x))).tocsr()
+        jac_sparse = None
+        if compute_jacobian:
+            import scipy.sparse as sp
+
+            jac_sparse = sp.coo_matrix((data, (rows, cols)), shape=(len(res), len(x))).tocsr()
 
         return np.array(res, dtype=float), jac_sparse
 
@@ -1047,7 +1101,7 @@ class NetworkSolver:
         """
         Evaluates the global residual vector given the current unknown vector x.
         """
-        res, _ = self._residuals_and_jacobian(x)
+        res, _ = self._residuals_and_jacobian(x, compute_jacobian=False)
         return res
 
     def solve(
@@ -1238,19 +1292,8 @@ class NetworkSolver:
             x0_use = x0_auto
 
         # Seed forward-propagated thermo/composition states once before the
-        # first residual/scaling pass. This lets the initial evaluation use
-        # derived T/Y (e.g., combustion-updated temperatures) rather than
-        # purely default placeholders.
-        try:
-            self._propagate_states(x0_use)
-        except Exception as e:
-            # pragma: no cover - defensive initialization fallback
-            warnings.warn(
-                "Initial state propagation failed. Proceeding with direct residual "
-                f"evaluation, but convergence may be affected: {e}",
-                category=RuntimeWarning,
-                stacklevel=2,
-            )
+        # first residual/scaling pass by ensuring the first residual evaluation
+        # triggers the propagation internally.
 
         # Dimension check
         res0 = self._residuals(x0_use)
@@ -1274,9 +1317,10 @@ class NetworkSolver:
         start_time = time.perf_counter()
         best_x = x0_use.copy()
         best_res_norm = np.linalg.norm(res0)
+        last_exception: Exception | None = None
 
         def residuals_wrapper(x_scaled: np.ndarray) -> Any:
-            nonlocal best_x, best_res_norm
+            nonlocal best_x, best_res_norm, last_exception
 
             # Check timeout
             if timeout is not None and (time.perf_counter() - start_time) > timeout:
@@ -1307,7 +1351,8 @@ class NetworkSolver:
                     return res_scaled
             except SolverTimeoutError:
                 raise
-            except Exception:
+            except Exception as e:
+                last_exception = e
                 # Return a large penalty residual so the trust-region
                 # solver can shrink its step instead of terminating.
                 # Warn once so developers can trace unexpected failures.
@@ -1332,12 +1377,11 @@ class NetworkSolver:
             sol = root(residuals_wrapper, x0_scaled, method=method, options=options, jac=use_jac)
             solve_end_time = time.time()
             self._wall_time = solve_end_time - solve_start_time
-            final_x = sol.x * D_x  # un-scale
+            final_x = best_x
             success = sol.success
             message = sol.message
-            # Compute unscaled residual norm for reporting
-            final_res = self._residuals(final_x)
-            final_norm = float(np.linalg.norm(final_res))
+            # Efficiently use tracked norm instead of re-evaluating
+            final_norm = float(best_res_norm)
             # Guard against methods (e.g. lm) that report success at a
             # non-zero local minimum of ||F||^2.
             if success and final_norm > _RESIDUAL_TOL:
@@ -1346,6 +1390,8 @@ class NetworkSolver:
                     f"Solver reported success but |F|={final_norm:.3e} "
                     f"exceeds residual tolerance ({_RESIDUAL_TOL})."
                 )
+            if not success and last_exception:
+                raise last_exception
         except SolverTimeoutError as e:
             final_x = best_x
             success = False
@@ -1364,9 +1410,8 @@ class NetworkSolver:
         if not success and method != "hybr":
             try:
                 sol2 = root(residuals_wrapper, x0_scaled, method="hybr", jac=use_jac)
-                fallback_x = sol2.x * D_x
-                fallback_res = self._residuals(fallback_x)
-                fallback_norm = float(np.linalg.norm(fallback_res))
+                fallback_x = best_x
+                fallback_norm = float(best_res_norm)
                 if sol2.success and fallback_norm < _RESIDUAL_TOL:
                     final_x = fallback_x
                     success = True
@@ -1401,97 +1446,214 @@ class NetworkSolver:
 
         sol_dict = dict(zip(self.unknown_names, final_x, strict=False))
 
-        # Include derived states (T, Y) for consistency and state inspection
+        # Ensure _derived_states matches final_x (best iterate), not the
+        # last trial point the solver happened to evaluate.  This is cheap:
+        # forward T/Y propagation only, no residuals or Jacobian.
         self._propagate_states(final_x)
+        from combaero import mass_to_mole
+
         for nid, (T, Y, _) in self._derived_states.items():
             sol_dict[f"{nid}.T"] = T
             sol_dict[f"{nid}.T_total"] = T  # Canonical total T
             for i, yi in enumerate(Y):
                 sol_dict[f"{nid}.Y[{i}]"] = float(yi)
 
+            # Store mole fractions as well (cheap, prevents redundant conversions)
+            X = mass_to_mole(np.array(Y))
+            for i, xi in enumerate(X):
+                sol_dict[f"{nid}.X[{i}]"] = float(xi)
+
+            # Node-specific diagnostics (e.g. mach, transport/thermo properties)
+            node = self.network.nodes[nid]
+            state = self._get_node_state(node, final_x)
+            sol_dict[f"{nid}.mach"] = node.mach(state)
+            if hasattr(node, "diagnostics"):
+                diag = node.diagnostics(state)
+                for key, val in diag.items():
+                    sol_dict[f"{nid}.{key}"] = val
+
+        # Element-specific diagnostics (e.g. throat Mach, P-ratio)
+        sol_dict["__element_diag__"] = {}
+        for eid, element in self.network.elements.items():
+            state_in = self._get_node_state(self.network.nodes[element.from_node], final_x)
+            state_out = self._get_node_state(self.network.nodes[element.to_node], final_x)
+            # Inject solved m_dot so velocity-dependent diagnostics (e.g. Mach) are correct
+            m_indices = self._unknown_indices.get(eid, [])
+            if m_indices:
+                m_solved = float(final_x[m_indices[0]])
+                state_in.m_dot = m_solved
+                state_out.m_dot = m_solved
+            diag = element.diagnostics(state_in, state_out)
+            sol_dict["__element_diag__"][eid] = diag
+            for key, val in diag.items():
+                sol_dict[f"{eid}.{key}"] = val
+
+        # Wall-specific thermodynamics
+        import combaero as cb
+
+        for wid, wall in self.network.walls.items():
+            obj_a = self.network.elements.get(wall.element_a) or self.network.nodes.get(
+                wall.element_a
+            )
+            obj_b = self.network.elements.get(wall.element_b) or self.network.nodes.get(
+                wall.element_b
+            )
+
+            node_feeding_a = (
+                obj_a
+                if wall.element_a in self.network.nodes
+                else self.network.nodes[obj_a.from_node]
+            )
+            node_feeding_b = (
+                obj_b
+                if wall.element_b in self.network.nodes
+                else self.network.nodes[obj_b.from_node]
+            )
+
+            state_a = self._get_node_state(node_feeding_a, final_x)
+            state_b = self._get_node_state(node_feeding_b, final_x)
+
+            if wall.element_a in self.network.elements:
+                m_indices_a = self._unknown_indices.get(wall.element_a, [])
+                if m_indices_a:
+                    state_a.m_dot = final_x[m_indices_a[0]]
+            if wall.element_b in self.network.elements:
+                m_indices_b = self._unknown_indices.get(wall.element_b, [])
+                if m_indices_b:
+                    state_b.m_dot = final_x[m_indices_b[0]]
+
+            ch_result_a = obj_a.htc_and_T(state_a) if obj_a.has_convective_surface else None
+            ch_result_b = obj_b.htc_and_T(state_b) if obj_b.has_convective_surface else None
+
+            if ch_result_a and ch_result_b:
+                # Call multi-layer coupling logic (same as in residual evaluation)
+                wall_res = wall.compute_coupling(
+                    ch_result_a.h,
+                    ch_result_a.T_aw,
+                    obj_a.surface.area,
+                    ch_result_b.h,
+                    ch_result_b.T_aw,
+                    obj_b.surface.area,
+                )
+
+                sol_dict[f"{wid}.Q"] = float(wall_res.Q)
+                sol_dict[f"{wid}.T_hot"] = float(wall_res.T_hot)
+                sol_dict[f"{wid}.h_a"] = float(ch_result_a.h)
+                sol_dict[f"{wid}.h_b"] = float(ch_result_b.h)
+
+                # Detailed temperature profile [K] (diagnostics)
+                # Ensure profile uses correct side-A/side-B ordering
+                t_over_k_layers = [L.r_val for L in wall.layers]
+                profile, _q = cb.wall_temperature_profile(
+                    ch_result_a.T_aw,
+                    ch_result_b.T_aw,
+                    ch_result_a.h,
+                    ch_result_b.h,
+                    t_over_k_layers,
+                    wall.R_fouling,
+                )
+                sol_dict[f"{wid}.T_interface"] = [float(tp) for tp in profile]
+
+        sol_dict["__complete_states__"] = self.extract_complete_states(sol_dict)
         sol_dict["__success__"] = success
         sol_dict["__message__"] = message
         sol_dict["__final_norm__"] = final_norm
         return sol_dict
 
-    def extract_complete_states(self, result: dict[str, float]) -> dict[str, Any]:
+    def extract_complete_states(self, result: dict[str, float] | None = None) -> dict[str, Any]:
         """
-        Extract CompleteState for all network nodes regardless of convergence status.
+        Extract CompleteState for all network nodes.
 
-        This method provides comprehensive thermodynamic and transport properties
-        for every node in the network, leveraging the existing C++ CompleteState
-        structure for maximum accuracy and performance.
+        Leverages the existing C++ CompleteState structure for maximum accuracy
+        and performance. By default, it uses the solver's internal cached derived
+        states populated during solve().
 
         Args:
-            result: Dictionary returned by NetworkSolver.solve() containing
-                node temperatures, pressures, and compositions.
+            result: Optional dictionary containing node T, P, X and Y. If omitted,
+                uses internal solver state from the last solve() call.
 
         Returns:
-            Dictionary mapping node IDs to CompleteState objects containing
-            28 properties each (16 thermodynamic + 12 transport).
-
-        Notes:
-            - Works regardless of solver convergence status
-            - Uses C++ CompleteState for fast, accurate property calculations
-            - All properties are computed from the same (T, P, X) state
-            - Returns nan for nodes with missing/invalid data
+            Dictionary mapping node IDs to CompleteState objects.
         """
-        # CompleteState is accessed via complete_state function
+        import combaero as cb
+        from combaero import mass_to_mole
 
         complete_states = {}
 
-        # Get composition from result or use default air
-        # Try to get composition from first node that has Y data
+        if result is None:
+            # OPTIMIZED: Use cached derived states from _propagate_states
+            # Note: This is primarily for manual diagnostic exploration after solve()
+            if not self._derived_states:
+                return {}
+
+            for nid, (T, Y, _) in self._derived_states.items():
+                # For P, we rely on node.P or total P if defined in the network
+                node = self.network.nodes[nid]
+                P = getattr(node, "P", getattr(node, "P_total", 101325.0))
+                X = mass_to_mole(np.array(Y))
+                complete_states[nid] = cb.complete_state(T, P, X)
+            return complete_states
+
+        # DICT PATH: Consumption from solve() result (as used in the GUI)
+        # Try to get composition from first node that has data to use as default
         default_X = None
         for node_id in self.network.nodes:
-            if f"{node_id}.Y[0]" in result:
-                # Extract composition array
-                Y = []
-                i = 0
-                while f"{node_id}.Y[{i}]" in result:
-                    Y.append(result[f"{node_id}.Y[{i}]"])
-                    i += 1
-                if Y:
-                    # Convert mass fractions to mole fractions
-                    from combaero import mass_to_mole
-
-                    default_X = mass_to_mole(np.array(Y))
+            # Prefer pre-computed X if available
+            if f"{node_id}.X[0]" in result:
+                X_list = []
+                idx = 0
+                while f"{node_id}.X[{idx}]" in result:
+                    X_list.append(result[f"{node_id}.X[{idx}]"])
+                    idx += 1
+                if X_list:
+                    default_X = np.array(X_list)
+                    break
+            elif f"{node_id}.Y[0]" in result:
+                Y_list = []
+                idx = 0
+                while f"{node_id}.Y[{idx}]" in result:
+                    Y_list.append(result[f"{node_id}.Y[{idx}]"])
+                    idx += 1
+                if Y_list:
+                    default_X = mass_to_mole(np.array(Y_list))
                     break
 
-        # Fallback to air if no composition found
         if default_X is None:
-            default_X = cb.humid_air_composition(300.0, 101325.0, 0.0)  # Dry air at STP
+            default_X = cb.humid_air_composition(350.0, 101325.0, 0.0)
 
-        # Extract CompleteState for each node
         for node_id in self.network.nodes:
             try:
-                # Get temperature and pressure from result
-                T = result.get(f"{node_id}.T", float("nan"))
-                P = result.get(f"{node_id}.P", float("nan"))
+                T = result.get(f"{node_id}.T", result.get(f"{node_id}.T_total", 300.0))
+                P = result.get(f"{node_id}.P", result.get(f"{node_id}.P_total", 101325.0))
 
-                # Get composition for this node (fallback to default)
-                X = default_X.copy()
-                if f"{node_id}.Y[0]" in result:
-                    Y = []
-                    i = 0
-                    while f"{node_id}.Y[{i}]" in result:
-                        Y.append(result[f"{node_id}.Y[{i}]"])
-                        i += 1
-                    if Y:
-                        X = mass_to_mole(np.array(Y))
+                # Use pre-computed X if available, otherwise fallback to Y-parsing
+                X = None
+                if f"{node_id}.X[0]" in result:
+                    X_list = []
+                    idx = 0
+                    while f"{node_id}.X[{idx}]" in result:
+                        X_list.append(result[f"{node_id}.X[{idx}]"])
+                        idx += 1
+                    if X_list:
+                        X = np.array(X_list)
 
-                # Create CompleteState if we have valid T and P
+                if X is None and f"{node_id}.Y[0]" in result:
+                    Y_list = []
+                    idx = 0
+                    while f"{node_id}.Y[{idx}]" in result:
+                        Y_list.append(result[f"{node_id}.Y[{idx}]"])
+                        idx += 1
+                    if Y_list:
+                        X = mass_to_mole(np.array(Y_list))
+
+                X = X if X is not None else default_X
+
                 if not (math.isnan(T) or math.isnan(P)):
-                    complete_state_obj = cb.complete_state(T, P, X)
-                    complete_states[node_id] = complete_state_obj
+                    complete_states[node_id] = cb.complete_state(T, P, X)
                 else:
-                    # Create a placeholder with nan values
                     complete_states[node_id] = None
-
             except Exception:
-                # Store None for nodes that fail state calculation
                 complete_states[node_id] = None
-                # Could add logging here for debugging
 
         return complete_states
 

@@ -1,0 +1,154 @@
+@import "tailwindcss";
+
+:root {
+	font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+	line-height: 1.5;
+	font-weight: 400;
+
+	color-scheme: light dark;
+	color: rgba(255, 255, 255, 0.87);
+	background-color: #242424;
+
+	font-synthesis: none;
+	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+body {
+	margin: 0;
+	display: flex;
+	place-items: center;
+	min-width: 320px;
+	min-height: 100vh;
+}
+
+/* React Flow overrides for Tailwind compatibility */
+.react-flow__node {
+	border-radius: 0;
+	border: none;
+	background: none;
+}
+
+/* --- Handle styling (inlet/outlet indicators) --- */
+
+/* Flow-target handles: blue triangle pointing INTO the node via ::after */
+.react-flow__handle[data-handleid="flow-target"],
+.react-flow__handle[data-handleid="flow-left"],
+.react-flow__handle[data-handleid="flow-top"] {
+	width: 12px !important;
+	height: 12px !important;
+	min-width: 12px !important;
+	min-height: 12px !important;
+	background: transparent !important;
+	border: none !important;
+	border-radius: 0 !important;
+}
+.react-flow__handle-left[data-handleid="flow-target"]::after,
+.react-flow__handle-left[data-handleid="flow-left"]::after {
+	content: "";
+	position: absolute;
+	top: 50%;
+	left: 0;
+	transform: translateY(-50%);
+	border-top: 5px solid transparent;
+	border-bottom: 5px solid transparent;
+	border-left: 7px solid #3b82f6;
+}
+.react-flow__handle-right[data-handleid="flow-target"]::after {
+	content: "";
+	position: absolute;
+	top: 50%;
+	right: 0;
+	transform: translateY(-50%);
+	border-top: 5px solid transparent;
+	border-bottom: 5px solid transparent;
+	border-right: 7px solid #3b82f6;
+}
+.react-flow__handle-top[data-handleid="flow-target"]::after,
+.react-flow__handle-top[data-handleid="flow-top"]::after {
+	content: "";
+	position: absolute;
+	left: 50%;
+	top: 0;
+	transform: translateX(-50%);
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;
+	border-top: 7px solid #3b82f6;
+}
+.react-flow__handle-bottom[data-handleid="flow-target"]::after {
+	content: "";
+	position: absolute;
+	left: 50%;
+	bottom: 0;
+	transform: translateX(-50%);
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;
+	border-bottom: 7px solid #3b82f6;
+}
+
+/* Flow-source handles: green triangle pointing AWAY from the node via ::after */
+.react-flow__handle[data-handleid="flow-source"],
+.react-flow__handle[data-handleid="flow-right"],
+.react-flow__handle[data-handleid="flow-bottom"] {
+	width: 12px !important;
+	height: 12px !important;
+	min-width: 12px !important;
+	min-height: 12px !important;
+	background: transparent !important;
+	border: none !important;
+	border-radius: 0 !important;
+}
+.react-flow__handle-left[data-handleid="flow-source"]::after {
+	content: "";
+	position: absolute;
+	top: 50%;
+	left: 0;
+	transform: translateY(-50%);
+	border-top: 5px solid transparent;
+	border-bottom: 5px solid transparent;
+	border-right: 7px solid #22c55e;
+}
+.react-flow__handle-right[data-handleid="flow-source"]::after,
+.react-flow__handle-right[data-handleid="flow-right"]::after {
+	content: "";
+	position: absolute;
+	top: 50%;
+	right: 0;
+	transform: translateY(-50%);
+	border-top: 5px solid transparent;
+	border-bottom: 5px solid transparent;
+	border-left: 7px solid #22c55e;
+}
+.react-flow__handle-top[data-handleid="flow-source"]::after {
+	content: "";
+	position: absolute;
+	left: 50%;
+	top: 0;
+	transform: translateX(-50%);
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;
+	border-bottom: 7px solid #22c55e;
+}
+.react-flow__handle-bottom[data-handleid="flow-source"]::after,
+.react-flow__handle-bottom[data-handleid="flow-bottom"]::after {
+	content: "";
+	position: absolute;
+	left: 50%;
+	bottom: 0;
+	transform: translateX(-50%);
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;
+	border-top: 7px solid #22c55e;
+}
+
+/* Thermal handles: small orange dots */
+.react-flow__handle[data-handleid^="thermal-"] {
+	width: 6px !important;
+	height: 6px !important;
+	min-width: 6px !important;
+	min-height: 6px !important;
+	background: #ff9800 !important;
+	border: none !important;
+	border-radius: 50% !important;
+}

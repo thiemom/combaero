@@ -5,11 +5,11 @@ import numpy as np
 import combaero as cb
 from combaero.heat_transfer import ConvectiveSurface, SmoothModel
 from combaero.network import (
+    ChannelElement,
     FlowNetwork,
     MassFlowBoundary,
     NetworkSolver,
     OrificeElement,
-    PipeElement,
     PlenumNode,
     PressureBoundary,
     WallConnection,
@@ -29,7 +29,13 @@ def test_compressible_orifice_network():
 
     # Compressible orifice
     orifice = OrificeElement(
-        "orifice", "inlet", "outlet", Cd=0.65, area=1e-4, regime="compressible"
+        "orifice",
+        "inlet",
+        "outlet",
+        Cd=0.65,
+        diameter=0.011284,
+        regime="compressible",
+        correlation="fixed",
     )
     net.add_element(orifice)
 
@@ -53,8 +59,8 @@ def test_compressible_orifice_network():
     assert abs(sol["orifice.m_dot"] - mdot_direct) / mdot_direct < 0.01
 
 
-def test_compressible_pipe_network():
-    """Test network with compressible Fanno pipe element."""
+def test_compressible_channel_network():
+    """Test network with compressible Fanno channel element."""
     net = FlowNetwork()
 
     inlet = PressureBoundary("inlet", P_total=200000.0, T_total=400.0)
@@ -63,9 +69,9 @@ def test_compressible_pipe_network():
     net.add_node(inlet)
     net.add_node(outlet)
 
-    # Simple compressible Fanno pipe directly between boundaries
-    pipe = PipeElement(
-        "pipe",
+    # Simple compressible Fanno channel directly between boundaries
+    channel = ChannelElement(
+        "channel",
         "inlet",
         "outlet",
         length=1.0,
@@ -75,17 +81,17 @@ def test_compressible_pipe_network():
         friction_model="haaland",
     )
 
-    net.add_element(pipe)
+    net.add_element(channel)
 
     solver = NetworkSolver(net)
     sol = solver.solve(method="lm")
 
     # Verify solution
-    assert sol["pipe.m_dot"] > 0, "Pipe mass flow should be positive"
+    assert sol["channel.m_dot"] > 0, "Channel mass flow should be positive"
 
     # Verify pressure drop is reasonable
     dP = inlet.P_total - outlet.P_total
-    assert dP > 0, "Pressure should drop across pipe"
+    assert dP > 0, "Pressure should drop across channel"
 
 
 def test_mixed_compressible_incompressible_network():
@@ -102,9 +108,9 @@ def test_mixed_compressible_incompressible_network():
     net.add_node(junction1)
     net.add_node(junction2)
 
-    # Incompressible pipe first
-    pipe1 = PipeElement(
-        "pipe1",
+    # Incompressible channel first
+    channel1 = ChannelElement(
+        "channel1",
         "inlet",
         "j1",
         length=1.0,
@@ -114,11 +120,19 @@ def test_mixed_compressible_incompressible_network():
     )
 
     # Compressible orifice in middle (high pressure drop)
-    orifice = OrificeElement("orifice", "j1", "j2", Cd=0.65, area=1e-4, regime="compressible")
+    orifice = OrificeElement(
+        "orifice",
+        "j1",
+        "j2",
+        Cd=0.65,
+        diameter=0.011284,
+        regime="compressible",
+        correlation="fixed",
+    )
 
-    # Incompressible pipe at end
-    pipe2 = PipeElement(
-        "pipe2",
+    # Incompressible channel at end
+    channel2 = ChannelElement(
+        "channel2",
         "j2",
         "outlet",
         length=0.5,
@@ -127,21 +141,21 @@ def test_mixed_compressible_incompressible_network():
         regime="incompressible",
     )
 
-    net.add_element(pipe1)
+    net.add_element(channel1)
     net.add_element(orifice)
-    net.add_element(pipe2)
+    net.add_element(channel2)
 
     solver = NetworkSolver(net)
     sol = solver.solve(method="lm")
 
     # Verify solution
-    assert sol["pipe1.m_dot"] > 0
+    assert sol["channel1.m_dot"] > 0
     assert sol["orifice.m_dot"] > 0
-    assert sol["pipe2.m_dot"] > 0
+    assert sol["channel2.m_dot"] > 0
 
     # Mass conservation
-    assert abs(sol["pipe1.m_dot"] - sol["orifice.m_dot"]) < 1e-6
-    assert abs(sol["orifice.m_dot"] - sol["pipe2.m_dot"]) < 1e-6
+    assert abs(sol["channel1.m_dot"] - sol["orifice.m_dot"]) < 1e-6
+    assert abs(sol["orifice.m_dot"] - sol["channel2.m_dot"]) < 1e-6
 
     # Pressure should decrease monotonically
     assert inlet.P_total > sol["j1.P"] > sol["j2.P"] > outlet.P_total
@@ -158,7 +172,15 @@ def test_compressible_vs_incompressible_comparison():
         net.add_node(inlet)
         net.add_node(outlet)
 
-        orifice = OrificeElement("orifice", "inlet", "outlet", Cd=0.65, area=2e-4, regime=regime)
+        orifice = OrificeElement(
+            "orifice",
+            "inlet",
+            "outlet",
+            Cd=0.65,
+            diameter=0.015958,
+            regime=regime,
+            correlation="fixed",
+        )
         net.add_element(orifice)
         return net
 
@@ -193,7 +215,13 @@ def test_compressible_choked_orifice():
     net.add_node(outlet)
 
     orifice = OrificeElement(
-        "orifice", "inlet", "outlet", Cd=0.65, area=5e-5, regime="compressible"
+        "orifice",
+        "inlet",
+        "outlet",
+        Cd=0.65,
+        diameter=0.007979,
+        regime="compressible",
+        correlation="fixed",
     )
     net.add_element(orifice)
 
@@ -211,8 +239,8 @@ def test_compressible_choked_orifice():
     assert sol["orifice.m_dot"] > 0, "Mass flow should be positive even when choked"
 
 
-def test_compressible_pipe_high_mach():
-    """Test compressible pipe at higher Mach number."""
+def test_compressible_channel_high_mach():
+    """Test compressible channel at higher Mach number."""
     net = FlowNetwork()
 
     inlet = PressureBoundary("inlet", P_total=300000.0, T_total=400.0)
@@ -221,9 +249,9 @@ def test_compressible_pipe_high_mach():
     net.add_node(inlet)
     net.add_node(outlet)
 
-    # Long pipe with small diameter to get higher velocity
-    pipe = PipeElement(
-        "pipe",
+    # Long channel with small diameter to get higher velocity
+    channel = ChannelElement(
+        "channel",
         "inlet",
         "outlet",
         length=5.0,
@@ -231,18 +259,18 @@ def test_compressible_pipe_high_mach():
         roughness=1e-4,
         regime="compressible",
     )
-    net.add_element(pipe)
+    net.add_element(channel)
 
     solver = NetworkSolver(net)
     sol = solver.solve(method="lm")
 
-    assert sol["pipe.m_dot"] > 0, "Mass flow should be positive"
+    assert sol["channel.m_dot"] > 0, "Mass flow should be positive"
 
     # Verify Mach number is significant
     X = cb.species.dry_air()
     rho = cb.density(inlet.T_total, inlet.P_total, X)
     area = 3.14159 * (0.03 / 2) ** 2
-    u = sol["pipe.m_dot"] / (rho * area)
+    u = sol["channel.m_dot"] / (rho * area)
     a = cb.speed_of_sound(inlet.T_total, X)
     M = u / a
 
@@ -280,7 +308,7 @@ def _build_fully_coupled_network(regime: str, mach_target: float) -> FlowNetwork
     mdot_hot = _mdot_for_mach(mach_target, t_hot, p_out_hot, x_air, _area(d_hot))
     mdot_cold = 0.65 * _mdot_for_mach(mach_target, t_cold, p_out_cold, x_air, _area(d_cold))
 
-    pipe_regime = "compressible" if regime == "compressible" else "incompressible"
+    channel_regime = "compressible" if regime == "compressible" else "incompressible"
     orifice_regime = "compressible" if regime == "compressible" else "incompressible"
 
     net = FlowNetwork()
@@ -296,14 +324,14 @@ def _build_fully_coupled_network(regime: str, mach_target: float) -> FlowNetwork
     cold_surface = ConvectiveSurface(area=np.pi * d_cold * length, model=SmoothModel())
 
     net.add_element(
-        PipeElement(
-            id="hot_pipe",
+        ChannelElement(
+            id="hot_channel",
             from_node="hot_inlet",
             to_node="hot_plenum",
             length=length,
             diameter=d_hot,
             roughness=5.0e-5,
-            regime=pipe_regime,
+            regime=channel_regime,
             surface=hot_surface,
         )
     )
@@ -313,20 +341,21 @@ def _build_fully_coupled_network(regime: str, mach_target: float) -> FlowNetwork
             from_node="hot_plenum",
             to_node="hot_outlet",
             Cd=0.72,
-            area=_area(0.030),
+            diameter=0.030,
             regime=orifice_regime,
+            correlation="fixed",
         )
     )
 
     net.add_element(
-        PipeElement(
-            id="cold_pipe",
+        ChannelElement(
+            id="cold_channel",
             from_node="cold_inlet",
             to_node="cold_plenum",
             length=length,
             diameter=d_cold,
             roughness=5.0e-5,
-            regime=pipe_regime,
+            regime=channel_regime,
             surface=cold_surface,
         )
     )
@@ -336,16 +365,17 @@ def _build_fully_coupled_network(regime: str, mach_target: float) -> FlowNetwork
             from_node="cold_plenum",
             to_node="cold_outlet",
             Cd=0.72,
-            area=_area(0.025),
+            diameter=0.025,
             regime=orifice_regime,
+            correlation="fixed",
         )
     )
 
     net.add_wall(
         WallConnection(
             id="coupling_wall",
-            element_a="hot_pipe",
-            element_b="cold_pipe",
+            element_a="hot_channel",
+            element_b="cold_channel",
             wall_thickness=0.002,
             wall_conductivity=20.0,
         )
@@ -419,9 +449,9 @@ def test_homotopy_initialization_strategy():
     net.add_node(inlet)
     net.add_node(outlet)
 
-    # Long narrow pipe to create high pressure drop and high velocity
-    pipe = PipeElement(
-        "pipe",
+    # Long narrow channel to create high pressure drop and high velocity
+    channel = ChannelElement(
+        "channel",
         "inlet",
         "outlet",
         length=5.0,
@@ -429,7 +459,7 @@ def test_homotopy_initialization_strategy():
         roughness=1e-4,
         regime="compressible",
     )
-    net.add_element(pipe)
+    net.add_element(channel)
 
     solver = NetworkSolver(net)
 
@@ -438,4 +468,4 @@ def test_homotopy_initialization_strategy():
     print("solver solution:")
     print(sol)
     assert sol["__success__"], "Homotopy solve failed"
-    assert sol["pipe.m_dot"] > 0, "Mass flow should be positive"
+    assert sol["channel.m_dot"] > 0, "Mass flow should be positive"

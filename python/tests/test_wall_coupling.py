@@ -5,7 +5,7 @@ import pytest
 import combaero as cb
 
 
-def test_wall_coupling_basic():
+def test_hot_coupling_basic():
     """Test basic wall coupling calculation."""
     # Hot side: h=500 W/(m^2*K), T_aw=1000 K
     # Cold side: h=2000 W/(m^2*K), T_aw=400 K
@@ -27,10 +27,10 @@ def test_wall_coupling_basic():
 
     assert abs(result.Q - Q_expected) < 1e-6
     assert result.Q > 0.0  # Heat flows from hot to cold
-    assert result.T_wall > T_aw_b and result.T_wall < T_aw_a
+    assert result.T_hot > T_aw_b and result.T_hot < T_aw_a
 
 
-def test_wall_coupling_jacobians():
+def test_hot_coupling_jacobians():
     """Test wall coupling Jacobians with finite differences."""
     h_a = 500.0
     T_aw_a = 1000.0
@@ -69,7 +69,7 @@ def test_wall_coupling_jacobians():
     assert abs(result.dQ_dT_aw_b - dQ_dT_aw_b_fd) / abs(dQ_dT_aw_b_fd) < 1e-5
 
 
-def test_wall_coupling_zero_temperature_difference():
+def test_hot_coupling_zero_temperature_difference():
     """Test wall coupling with zero temperature difference."""
     h_a = 500.0
     T_aw_a = 700.0
@@ -81,10 +81,10 @@ def test_wall_coupling_zero_temperature_difference():
     result = cb.wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b, t_over_k, A)
 
     assert abs(result.Q) < 1e-10  # No heat transfer
-    assert abs(result.T_wall - T_aw_a) < 1e-10  # Wall at same temperature
+    assert abs(result.T_hot - T_aw_a) < 1e-10  # Wall at same temperature
 
 
-def test_wall_coupling_high_resistance():
+def test_hot_coupling_high_resistance():
     """Test wall coupling with high wall resistance."""
     h_a = 500.0
     T_aw_a = 1000.0
@@ -101,7 +101,7 @@ def test_wall_coupling_high_resistance():
     assert result.Q > 0.0
 
 
-def test_wall_coupling_asymmetric_htcs():
+def test_hot_coupling_asymmetric_htcs():
     """Test wall coupling with very different HTCs on each side."""
     h_a = 50.0  # Low HTC (gas side)
     T_aw_a = 1200.0
@@ -116,14 +116,13 @@ def test_wall_coupling_asymmetric_htcs():
     U_expected = 1.0 / (1.0 / h_a + t_over_k + 1.0 / h_b)
     assert U_expected < h_a * 1.1  # U should be close to h_a
 
-    # Wall temperature is weighted average: T_wall = (h_a*T_a + h_b*T_b)/(h_a + h_b)
-    # With h_b >> h_a, T_wall should be much closer to cold side
-    T_wall_expected = (h_a * T_aw_a + h_b * T_aw_b) / (h_a + h_b)
-    assert abs(result.T_wall - T_wall_expected) < 1.0
-    assert result.T_wall < 400.0  # Much closer to cold side due to high h_b
+    # T_hot is the hot-side surface temperature: T_aw_a - Q / (h_a * A)
+    T_hot_expected = T_aw_a - result.Q / (h_a * A)
+    assert abs(result.T_hot - T_hot_expected) < 1e-6
+    assert result.T_hot < T_aw_a  # Below the hot-side adiabatic wall temperature
 
 
-def test_wall_coupling_repr():
+def test_hot_coupling_repr():
     """Test WallCouplingResult string representation."""
     h_a = 500.0
     T_aw_a = 1000.0
@@ -137,7 +136,7 @@ def test_wall_coupling_repr():
     repr_str = repr(result)
     assert "WallCouplingResult" in repr_str
     assert "Q=" in repr_str
-    assert "T_wall=" in repr_str
+    assert "T_hot=" in repr_str
 
 
 if __name__ == "__main__":

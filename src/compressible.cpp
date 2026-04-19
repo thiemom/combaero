@@ -126,15 +126,9 @@ CompressibleFlowSolution nozzle_flow(
     const std::vector<double>& X,
     double tol, std::size_t max_iter) {
 
-    if (T0 <= 0.0) {
-        throw std::invalid_argument("nozzle_flow: T0 must be positive");
-    }
-    if (P0 <= 0.0) {
-        throw std::invalid_argument("nozzle_flow: P0 must be positive");
-    }
-    if (P_back <= 0.0) {
-        throw std::invalid_argument("nozzle_flow: P_back must be positive");
-    }
+    T0 = std::max(T0, 10.0);
+    P0 = std::max(P0, 1.0);
+    P_back = std::max(P_back, 1.0);
     if (A_eff <= 0.0) {
         throw std::invalid_argument("nozzle_flow: A_eff must be positive");
     }
@@ -195,9 +189,9 @@ double solve_A_eff_from_mdot(
     const std::vector<double>& X,
     double tol, std::size_t max_iter) {
 
-    if (mdot_target <= 0.0) {
-        throw std::invalid_argument("solve_A_eff_from_mdot: mdot_target must be positive");
-    }
+    T0 = std::max(T0, 10.0);
+    P0 = std::max(P0, 1.0);
+    P_back = std::max(P_back, 1.0);
 
     // Compute mass flux at operating conditions
     State stag;
@@ -226,6 +220,8 @@ double solve_P_back_from_mdot(
     const std::vector<double>& X,
     double tol, std::size_t max_iter) {
 
+    T0 = std::max(T0, 10.0);
+    P0 = std::max(P0, 1.0);
     if (mdot_target <= 0.0) {
         throw std::invalid_argument("solve_P_back_from_mdot: mdot_target must be positive");
     }
@@ -287,14 +283,10 @@ double solve_P0_from_mdot(
     const std::vector<double>& X,
     double tol, std::size_t max_iter) {
 
+    T0 = std::max(T0, 10.0);
+    P_back = std::max(P_back, 1.0);
     if (mdot_target <= 0.0) {
         throw std::invalid_argument("solve_P0_from_mdot: mdot_target must be positive");
-    }
-    if (A_eff <= 0.0) {
-        throw std::invalid_argument("solve_P0_from_mdot: A_eff must be positive");
-    }
-    if (P_back <= 0.0) {
-        throw std::invalid_argument("solve_P0_from_mdot: P_back must be positive");
     }
 
     // Bisection search for P0
@@ -415,7 +407,7 @@ double solve_T_from_energy(
 
     for (std::size_t iter = 0; iter < max_iter; ++iter) {
         // Density from ideal gas: rho = P * mw / (R * T), mw in kg/mol
-        double rho = P * mw_kg / (R_GAS * T);
+        double rho = std::max(P, 1.0) * mw_kg / (R_GAS * T);
 
         // Velocity from mass conservation: u = mdot / (rho * A)
         double u = mdot / (rho * A);
@@ -457,7 +449,7 @@ double solve_T_from_energy(
     }
 
     // Final values
-    rho_out = P * mw_kg / (R_GAS * T);
+    rho_out = std::max(P, 1.0) * mw_kg / (R_GAS * T);
     u_out = mdot / (rho_out * A);
 
     return T;
@@ -470,7 +462,7 @@ double dpdx_fanno(double rho, double u, double f, double D) {
 
 }  // namespace
 
-FannoSolution fanno_pipe(
+FannoSolution fanno_channel(
     double T_in, double P_in, double u_in,
     double L, double D, double f,
     const std::vector<double>& X,
@@ -478,23 +470,21 @@ FannoSolution fanno_pipe(
     bool store_profile)
 {
     // Validate inputs
-    if (T_in <= 0.0) {
-        throw std::invalid_argument("fanno_pipe: T_in must be positive");
-    }
-    if (P_in <= 0.0) {
-        throw std::invalid_argument("fanno_pipe: P_in must be positive");
-    }
+    // Robustness clamping
+    T_in = std::max(T_in, 10.0);
+    P_in = std::max(P_in, 1.0);
+
     if (L <= 0.0) {
-        throw std::invalid_argument("fanno_pipe: L must be positive");
+        throw std::invalid_argument("fanno_channel: L must be positive");
     }
     if (D <= 0.0) {
-        throw std::invalid_argument("fanno_pipe: D must be positive");
+        throw std::invalid_argument("fanno_channel: D must be positive");
     }
     if (f < 0.0) {
-        throw std::invalid_argument("fanno_pipe: f must be non-negative");
+        throw std::invalid_argument("fanno_channel: f must be non-negative");
     }
     if (n_steps == 0) {
-        throw std::invalid_argument("fanno_pipe: n_steps must be positive");
+        throw std::invalid_argument("fanno_channel: n_steps must be positive");
     }
 
     FannoSolution sol;
@@ -527,7 +517,7 @@ FannoSolution fanno_pipe(
     double a_in = sol.inlet.a();
     double M_in = u_in / a_in;
     if (M_in >= 1.0) {
-        throw std::invalid_argument("fanno_pipe: inlet flow is supersonic (M >= 1), not supported");
+        throw std::invalid_argument("fanno_channel: inlet flow is supersonic (M >= 1), not supported");
     }
 
     // Store inlet profile point
@@ -633,52 +623,55 @@ FannoSolution fanno_pipe(
     return sol;
 }
 
-FannoSolution fanno_pipe(
+FannoSolution fanno_channel(
     const State& inlet, double u_in,
     double L, double D, double f,
     std::size_t n_steps,
     bool store_profile)
 {
-    return fanno_pipe(inlet.T, inlet.P, u_in, L, D, f, inlet.X, n_steps, store_profile);
+    return fanno_channel(inlet.T, inlet.P, u_in, L, D, f, inlet.X, n_steps, store_profile);
 }
 
 // Helper: compute local friction factor from local state
 static double local_friction(double T, double P, double u, double D,
                              double roughness, const std::vector<double>& X,
-                             const std::string& correlation)
+                             const std::string& correlation, double f_multiplier)
 {
     State s;
     s.T = T; s.P = P; s.X = X;
     const double Re_local = s.rho() * u * D / s.mu();
     const double e_D = (D > 0.0) ? roughness / D : 0.0;
-    if (correlation == "haaland")   return friction_haaland(Re_local, e_D);
-    if (correlation == "serghides") return friction_serghides(Re_local, e_D);
-    if (correlation == "colebrook") return friction_colebrook(Re_local, e_D);
-    throw std::invalid_argument(
-        "fanno_pipe_rough: unknown correlation '" + correlation + "'. "
+    double f = 0.0;
+    if (correlation == "haaland")   f = friction_haaland(Re_local, e_D);
+    else if (correlation == "serghides") f = friction_serghides(Re_local, e_D);
+    else if (correlation == "colebrook") f = friction_colebrook(Re_local, e_D);
+    else throw std::invalid_argument(
+        "fanno_channel_rough: unknown correlation '" + correlation + "'. "
         "Valid options: 'haaland', 'serghides', 'colebrook'");
+    return f * f_multiplier;
 }
 
-FannoSolution fanno_pipe_rough(
+FannoSolution fanno_channel_rough(
     double T_in, double P_in, double u_in,
     double L, double D, double roughness,
     const std::vector<double>& X,
     const std::string& correlation,
+    double f_multiplier,
     std::size_t n_steps,
     bool store_profile)
 {
-    if (T_in <= 0.0)
-        throw std::invalid_argument("fanno_pipe_rough: T_in must be positive");
-    if (P_in <= 0.0)
-        throw std::invalid_argument("fanno_pipe_rough: P_in must be positive");
+    // Robustness clamping
+    T_in = std::max(T_in, 10.0);
+    P_in = std::max(P_in, 1.0);
+
     if (L <= 0.0)
-        throw std::invalid_argument("fanno_pipe_rough: L must be positive");
+        throw std::invalid_argument("fanno_channel_rough: L must be positive");
     if (D <= 0.0)
-        throw std::invalid_argument("fanno_pipe_rough: D must be positive");
+        throw std::invalid_argument("fanno_channel_rough: D must be positive");
     if (roughness < 0.0)
-        throw std::invalid_argument("fanno_pipe_rough: roughness must be non-negative");
+        throw std::invalid_argument("fanno_channel_rough: roughness must be non-negative");
     if (n_steps == 0)
-        throw std::invalid_argument("fanno_pipe_rough: n_steps must be positive");
+        throw std::invalid_argument("fanno_channel_rough: n_steps must be positive");
 
     FannoSolution sol;
     sol.L = L;
@@ -702,13 +695,20 @@ FannoSolution fanno_pipe_rough(
 
     const double a_in = sol.inlet.a();
     const double M_in = u_in / a_in;
-    if (M_in >= 1.0)
-        throw std::invalid_argument("fanno_pipe_rough: inlet flow is supersonic (M >= 1)");
+
+    if (M_in >= 1.0) {
+        // Relaxing this to allow solver recovery during iteration.
+        // Return a choked result starting from nearly sonic conditions.
+        sol.choked = true;
+        sol.outlet = sol.inlet;
+        sol.outlet.set_TP(sol.inlet.T, sol.inlet.P); // effectively stalled
+        return sol;
+    }
 
     sol.Re_in = reynolds(T_in, P_in, X, u_in, D);
 
     // Compute inlet friction factor
-    const double f_in = local_friction(T_in, P_in, u_in, D, roughness, X, correlation);
+    const double f_in = local_friction(T_in, P_in, u_in, D, roughness, X, correlation, f_multiplier);
 
     if (store_profile) {
         FannoStation st;
@@ -735,7 +735,7 @@ FannoSolution fanno_pipe_rough(
 
     for (std::size_t step = 0; step < n_steps; ++step) {
         // k1: local f at current state
-        const double f1 = local_friction(T, P, u, D, roughness, X, correlation);
+        const double f1 = local_friction(T, P, u, D, roughness, X, correlation, f_multiplier);
         const double k1 = dpdx_fanno(rho, u, f1, D);
 
         // k2
@@ -743,7 +743,7 @@ FannoSolution fanno_pipe_rough(
         if (P2 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
         double T2, u2, rho2;
         T2 = solve_T_from_energy(P2, sol.h0, sol.mdot, A, X, mw_kg, T, u2, rho2);
-        const double f2 = local_friction(T2, P2, u2, D, roughness, X, correlation);
+        const double f2 = local_friction(T2, P2, u2, D, roughness, X, correlation, f_multiplier);
         const double k2 = dpdx_fanno(rho2, u2, f2, D);
 
         // k3
@@ -751,7 +751,7 @@ FannoSolution fanno_pipe_rough(
         if (P3 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
         double T3, u3, rho3;
         T3 = solve_T_from_energy(P3, sol.h0, sol.mdot, A, X, mw_kg, T, u3, rho3);
-        const double f3 = local_friction(T3, P3, u3, D, roughness, X, correlation);
+        const double f3 = local_friction(T3, P3, u3, D, roughness, X, correlation, f_multiplier);
         const double k3 = dpdx_fanno(rho3, u3, f3, D);
 
         // k4
@@ -759,7 +759,7 @@ FannoSolution fanno_pipe_rough(
         if (P4 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
         double T4, u4, rho4;
         T4 = solve_T_from_energy(P4, sol.h0, sol.mdot, A, X, mw_kg, T, u4, rho4);
-        const double f4 = local_friction(T4, P4, u4, D, roughness, X, correlation);
+        const double f4 = local_friction(T4, P4, u4, D, roughness, X, correlation, f_multiplier);
         const double k4 = dpdx_fanno(rho4, u4, f4, D);
 
         const double P_new = P + dx * (k1 + 2.0*k2 + 2.0*k3 + k4) / 6.0;
@@ -790,7 +790,7 @@ FannoSolution fanno_pipe_rough(
             st.M   = M;
             st.h   = h(T, X) / mw_g * 1000.0;
             st.s   = current.s();
-            st.f   = local_friction(T, P, u, D, roughness, X, correlation);
+            st.f   = local_friction(T, P, u, D, roughness, X, correlation, f_multiplier);
             st.Re  = rho * u * D / current.mu();
             sol.profile.push_back(st);
         }
@@ -806,15 +806,16 @@ FannoSolution fanno_pipe_rough(
     return sol;
 }
 
-FannoSolution fanno_pipe_rough(
+FannoSolution fanno_channel_rough(
     const State& inlet, double u_in,
     double L, double D, double roughness,
     const std::string& correlation,
+    double f_multiplier,
     std::size_t n_steps,
     bool store_profile)
 {
-    return fanno_pipe_rough(inlet.T, inlet.P, u_in, L, D, roughness,
-                            inlet.X, correlation, n_steps, store_profile);
+    return fanno_channel_rough(inlet.T, inlet.P, u_in, L, D, roughness,
+                               inlet.X, correlation, f_multiplier, n_steps, store_profile);
 }
 
 double fanno_max_length(
@@ -853,7 +854,7 @@ double fanno_max_length(
         double L_mid = 0.5 * (L_low + L_high);
 
         try {
-            auto sol = fanno_pipe(T_in, P_in, u_in, L_mid, D, f, X, 200, false);
+            auto sol = fanno_channel(T_in, P_in, u_in, L_mid, D, f, X, 200, false);
 
             if (sol.choked) {
                 L_high = L_mid;
@@ -906,7 +907,7 @@ namespace {
 
     for (std::size_t iter = 0; iter < max_iter; ++iter) {
         // Density from ideal gas: rho = P * mw_kg / (R * T)
-        double rho = P * mw_kg / (R_GAS * T);
+        double rho = std::max(P, 1.0) * mw_kg / (R_GAS * T);
 
         // Velocity from mass conservation: u = mdot / (rho * A)
         double u = mdot / (rho * A);
@@ -942,7 +943,7 @@ namespace {
 
         if (std::abs(dT) < tol * T) {
             T_out = T;
-            rho_out = P * mw_kg / (R_GAS * T);
+            rho_out = std::max(P, 1.0) * mw_kg / (R_GAS * T);
             u_out = mdot / (rho_out * A);
             return true;
         }
@@ -950,7 +951,7 @@ namespace {
 
     // Return best estimate even if not fully converged
     T_out = T;
-    rho_out = P * mw_kg / (R_GAS * T);
+    rho_out = std::max(P, 1.0) * mw_kg / (R_GAS * T);
     u_out = mdot / (rho_out * A);
     return false;
 }
@@ -1250,7 +1251,7 @@ NozzleSolution nozzle_quasi1d(
         double gamma_local = cp_mol / cv_mol;
         double a = std::sqrt(gamma_local * R_GAS * T / mw_kg);
         double u = M_guess * a;
-        double rho = P * mw_kg / (R_GAS * T);
+        double rho = std::max(P, 1.0) * mw_kg / (R_GAS * T);
 
         // Store state and compute final Mach
         State st;

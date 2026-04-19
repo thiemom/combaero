@@ -7,18 +7,18 @@ Swapping the import is sufficient to switch flow regimes::
 
     # incompressible
     from combaero import incompressible as flow
-    sol = flow.pipe_flow(T, P, X, u=10.0, L=1.0, D=0.05)
+    sol = flow.channel_flow(T, P, X, u=10.0, L=1.0, D=0.05)
 
     # compressible (same call signature)
     from combaero import compressible as flow
-    sol = flow.pipe_flow(T, P, X, u=10.0, L=1.0, D=0.05)
+    sol = flow.channel_flow(T, P, X, u=10.0, L=1.0, D=0.05)
 
 Functions
 ---------
-pipe_flow
-    Darcy-Weisbach pipe flow with a user-supplied friction factor.
-pipe_flow_rough
-    Darcy-Weisbach pipe flow with friction factor from roughness + Re.
+channel_flow
+    Darcy-Weisbach channel flow with a user-supplied friction factor.
+channel_flow_rough
+    Darcy-Weisbach channel flow with friction factor from roughness + Re.
 orifice_flow
     Incompressible orifice flow (Bernoulli + Cd).
 """
@@ -33,10 +33,10 @@ from ._core import (
     orifice_flow_thermo,
 )
 from ._core import (
-    pipe_flow as _pipe_flow,
+    channel_flow as _channel_flow,
 )
 from ._core import (
-    pipe_flow_rough as _pipe_flow_rough,
+    channel_flow_rough as _channel_flow_rough,
 )
 from ._flow_solution import FlowSolution
 
@@ -55,7 +55,7 @@ def _to_flow_solution(sol: IncompressibleFlowSolution, Cd: float = math.nan) -> 
     )
 
 
-def pipe_flow(
+def channel_flow(
     T: float,
     P: float,
     X: Sequence[float],
@@ -65,7 +65,7 @@ def pipe_flow(
     D: float,
     f: float,
 ) -> FlowSolution:
-    """Incompressible pipe flow with a constant Darcy friction factor.
+    """Incompressible channel flow with a constant Darcy friction factor.
 
     Evaluates density from ``(T, P, X)`` internally and applies the
     Darcy-Weisbach equation.
@@ -81,9 +81,9 @@ def pipe_flow(
     u:
         Bulk flow velocity [m/s].
     L:
-        Pipe length [m].
+        Channel length [m].
     D:
-        Pipe inner diameter [m].
+        Channel inner diameter [m].
     f:
         Darcy friction factor [-].
 
@@ -94,11 +94,11 @@ def pipe_flow(
         ``choked``, ``L_choke``, and ``Cd`` are not applicable and carry
         ``nan`` / ``False``.
     """
-    sol = _pipe_flow(T, P, list(X), u=u, L=L, D=D, f=f)
+    sol = _channel_flow(T, P, list(X), u=u, L=L, D=D, f=f)
     return _to_flow_solution(sol)
 
 
-def pipe_flow_rough(
+def channel_flow_rough(
     T: float,
     P: float,
     X: Sequence[float],
@@ -109,7 +109,7 @@ def pipe_flow_rough(
     roughness: float = 0.0,
     correlation: str = "haaland",
 ) -> FlowSolution:
-    """Incompressible pipe flow with roughness-based friction factor.
+    """Incompressible channel flow with roughness-based friction factor.
 
     Evaluates density and dynamic viscosity from ``(T, P, X)`` internally,
     computes the Reynolds number, derives the Darcy friction factor from the
@@ -126,11 +126,11 @@ def pipe_flow_rough(
     u:
         Bulk flow velocity [m/s].
     L:
-        Pipe length [m].
+        Channel length [m].
     D:
-        Pipe inner diameter [m].
+        Channel inner diameter [m].
     roughness:
-        Absolute wall roughness [m].  ``0.0`` for a hydraulically smooth pipe.
+        Absolute wall roughness [m].  ``0.0`` for a hydraulically smooth channel.
     correlation:
         Friction factor correlation.  One of ``"haaland"`` (default),
         ``"serghides"``, ``"colebrook"``, ``"petukhov"``.
@@ -140,7 +140,7 @@ def pipe_flow_rough(
     FlowSolution
         ``regime="incompressible"``.
     """
-    sol = _pipe_flow_rough(
+    sol = _channel_flow_rough(
         T, P, list(X), u=u, L=L, D=D, roughness=roughness, correlation=correlation
     )
     return _to_flow_solution(sol)

@@ -8,17 +8,20 @@ from .components import (
     MixtureState,
     MomentumChamberNode,
     OrificeElement,
-    PipeElement,
+    ChannelElement,
     PlenumNode,
+    PressureLossElement,
     NetworkNode,
     NetworkElement,
-    AreaDischargeCoefficientConnectionElement,
+    DiameterDischargeCoefficientConnectionElement,
     ConvectiveSurface,
     SmoothModel,
     RibbedModel,
     DimpledModel,
     PinFinModel,
     ImpingementModel,
+    WallLayer,
+    ThermalWall,
     WallConnection,
 )
 from .combustion import (
@@ -29,7 +32,16 @@ from .combustion import (
     mix_streams,
 )
 from .graph import FlowNetwork
+from .pressure_loss import (
+    ConstantFractionLoss,
+    ConstantHeadLoss,
+    ConstantLoss,
+    LinearThetaFractionLoss,
+    LinearThetaHeadLoss,
+    LinearThetaLoss,
+)
 from .solver import NetworkSolver
+from .utils import results_to_dataframe
 
 __all__: list[str] = [
     "PlenumNode",
@@ -37,11 +49,12 @@ __all__: list[str] = [
     "PressureBoundary",
     "MassFlowBoundary",
     "CombustorNode",
-    "PipeElement",
+    "ChannelElement",
     "OrificeElement",
     "EffectiveAreaConnectionElement",
     "LosslessConnectionElement",
-    "AreaDischargeCoefficientConnectionElement",
+    "DiameterDischargeCoefficientConnectionElement",
+    "PressureLossElement",
     "EnergyBoundary",
     "MixtureState",
     "CombustionResult",
@@ -53,11 +66,20 @@ __all__: list[str] = [
     "NetworkSolver",
     "NetworkNode",
     "NetworkElement",
+    "results_to_dataframe",
     "ConvectiveSurface",
     "SmoothModel",
     "RibbedModel",
     "DimpledModel",
     "PinFinModel",
     "ImpingementModel",
+    "WallLayer",
+    "ThermalWall",
     "WallConnection",
+    "ConstantLoss",
+    "ConstantFractionLoss",
+    "ConstantHeadLoss",
+    "LinearThetaLoss",
+    "LinearThetaFractionLoss",
+    "LinearThetaHeadLoss",
 ]

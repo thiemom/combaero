@@ -10,7 +10,7 @@ def test_solver_no_timeout():
     graph = FlowNetwork()
     inlet = PressureBoundary("inlet", P_total=200000, T_total=300)
     outlet = PressureBoundary("outlet", P_total=100000, T_total=300)
-    orf = OrificeElement("orf", "inlet", "outlet", Cd=0.6, area=0.001)
+    orf = OrificeElement("orf", "inlet", "outlet", Cd=0.6, diameter=0.035682, correlation="fixed")
 
     graph.add_node(inlet)
     graph.add_node(outlet)
@@ -28,7 +28,7 @@ def test_solver_timeout_trigger():
     graph = FlowNetwork()
     inlet = PressureBoundary("inlet", P_total=200000, T_total=300)
     outlet = PressureBoundary("outlet", P_total=100000, T_total=300)
-    orf = OrificeElement("orf", "inlet", "outlet", Cd=0.6, area=0.001)
+    orf = OrificeElement("orf", "inlet", "outlet", Cd=0.6, diameter=0.035682, correlation="fixed")
 
     graph.add_node(inlet)
     graph.add_node(outlet)
@@ -39,9 +39,9 @@ def test_solver_timeout_trigger():
     # Inject an artificial delay in _residuals_and_jacobian to force a timeout
     original_raj = solver._residuals_and_jacobian
 
-    def slow_raj(x):
+    def slow_raj(x, **kwargs):
         time.sleep(0.2)
-        return original_raj(x)
+        return original_raj(x, **kwargs)
 
     solver._residuals_and_jacobian = slow_raj
 
@@ -58,7 +58,7 @@ def test_solver_maxfev_limit():
     graph = FlowNetwork()
     inlet = PressureBoundary("inlet", P_total=500000, T_total=300)
     outlet = PressureBoundary("outlet", P_total=100000, T_total=300)
-    orf = OrificeElement("orf", "inlet", "outlet", Cd=0.6, area=0.01)
+    orf = OrificeElement("orf", "inlet", "outlet", Cd=0.6, diameter=0.112838, correlation="fixed")
 
     graph.add_node(inlet)
     graph.add_node(outlet)
@@ -78,7 +78,7 @@ def test_solver_unexpected_error_graceful_exit():
     graph = FlowNetwork()
     inlet = PressureBoundary("inlet", P_total=200000, T_total=300)
     outlet = PressureBoundary("outlet", P_total=100000, T_total=300)
-    orf = OrificeElement("orf", "inlet", "outlet", Cd=0.6, area=0.001)
+    orf = OrificeElement("orf", "inlet", "outlet", Cd=0.6, diameter=0.035682, correlation="fixed")
 
     graph.add_node(inlet)
     graph.add_node(outlet)
@@ -88,12 +88,12 @@ def test_solver_unexpected_error_graceful_exit():
     call_count = 0
     original_raj = solver._residuals_and_jacobian
 
-    def failing_raj(x):
+    def failing_raj(x, **kwargs):
         nonlocal call_count
         call_count += 1
         if call_count > 1:
             raise RuntimeError("Unexpected failure")
-        return original_raj(x)
+        return original_raj(x, **kwargs)
 
     solver._residuals_and_jacobian = failing_raj
 

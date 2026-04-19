@@ -159,7 +159,7 @@ All functions use consistent units to avoid conversion errors.
 
 | Function           | Input Units                                                | Output Unit   |
 |--------------------|------------------------------------------------------------|---------------|
-| `fanno_pipe`       | T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, f: -, X: mol/mol | FannoSolution |
+| `fanno_channel`    | T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, f: -, X: mol/mol | FannoSolution |
 | `fanno_max_length` | T_in: K, P_in: Pa, u_in: m/s, D: m, f: -, X: mol/mol       | m             |
 
 #### Thrust
@@ -176,7 +176,7 @@ All functions use consistent units to avoid conversion errors.
 
 | Function              | Input Units                                        | Output Unit                |
 |-----------------------|----------------------------------------------------|----------------------------|
-| `pipe_flow`           | T: K, P: Pa, X: mol/mol, u: m/s, L: m, D: m, f: -  | IncompressibleFlowSolution |
+| `channel_flow`        | T: K, P: Pa, X: mol/mol, u: m/s, L: m, D: m, f: -  | IncompressibleFlowSolution |
 | `orifice_flow_thermo` | T: K, P: Pa, X: mol/mol, P_back: Pa, A: m^2, Cd: - | IncompressibleFlowSolution |
 
 #### Bernoulli & Orifice
@@ -391,24 +391,26 @@ All functions use consistent units to avoid conversion errors.
 
 ### composition.h - Composition Utilities
 
-| Function                   | Input Units | Output Unit |
-|----------------------------|-------------|-------------|
-| `mwmix`                    | X: mol/mol  | g/mol       |
-| `mole_to_mass`             | X: mol/mol  | kg/kg       |
-| `mass_to_mole`             | Y: kg/kg    | mol/mol     |
-| `normalize_fractions`      | X: mol/mol  | mol/mol     |
-| `convert_to_dry_fractions` | X: mol/mol  | mol/mol     |
+| Function                   | Input Units             | Output Unit |
+|----------------------------|-------------------------|-------------|
+| `mwmix`                    | X: mol/mol              | g/mol       |
+| `mole_to_mass`             | X: mol/mol              | kg/kg       |
+| `mass_to_mole`             | Y: kg/kg                | mol/mol     |
+| `normalize_fractions`      | X: mol/mol              | mol/mol     |
+| `convert_to_dry_fractions` | X: mol/mol              | mol/mol     |
+| `equivalence_ratio`        | mole_fractions: mol/mol | [-]         |
 
 ### materials.h - Material Thermal Conductivity
 
-| Function                | Input Units                                                | Output Unit |
-|-------------------------|------------------------------------------------------------|-------------|
-| `k_inconel718`          | T: K                                                       | W/(m*K)     |
-| `k_haynes230`           | T: K                                                       | W/(m*K)     |
-| `k_stainless_steel_316` | T: K                                                       | W/(m*K)     |
-| `k_aluminum_6061`       | T: K                                                       | W/(m*K)     |
-| `k_tbc_ysz`             | T: K, hours: h (default 0), is_ebpvd: bool (default False) | W/(m*K)     |
-| `list_materials`        | -                                                          | list[str]   |
+| Function                    | Input Units                                                | Output Unit |
+|-----------------------------|------------------------------------------------------------|-------------|
+| `k_inconel718`              | T: K                                                       | W/(m*K)     |
+| `k_haynes230`               | T: K                                                       | W/(m*K)     |
+| `k_stainless_steel_316`     | T: K                                                       | W/(m*K)     |
+| `k_aluminum_6061`           | T: K                                                       | W/(m*K)     |
+| `k_tbc_ysz`                 | T: K, hours: h (default 0), is_ebpvd: bool (default False) | W/(m*K)     |
+| `list_materials`            | -                                                          | list[str]   |
+| `get_material_conductivity` | name: str, T: K                                            | W/(m*K)     |
 
 ### cooling_correlations.h - Advanced Cooling Correlations
 
@@ -458,11 +460,11 @@ All functions use consistent units to avoid conversion errors.
 
 | Function                     | Input Units            | Output Unit  |
 |------------------------------|------------------------|--------------|
-| `pipe_area`                  | D: m                   | m^2          |
+| `circular_area`              | D: m                   | m^2          |
 | `annular_area`               | D_outer: m, D_inner: m | m^2          |
-| `pipe_volume`                | D: m, L: m             | m^3          |
-| `pipe_roughness`             | material: str          | m            |
-| `standard_pipe_roughness`    | -                      | dict[str, m] |
+| `cylinder_volume`            | D: m, L: m             | m^3          |
+| `channel_roughness`          | material: str          | m            |
+| `standard_channel_roughness` | -                      | dict[str, m] |
 | `hydraulic_diameter`         | A: m^2, P_wetted: m    | m            |
 | `hydraulic_diameter_rect`    | a: m, b: m             | m            |
 | `hydraulic_diameter_annulus` | D_outer: m, D_inner: m | m            |
@@ -476,14 +478,14 @@ All functions use consistent units to avoid conversion errors.
 | `nusselt_sieder_tate`          | Re: -, Pr: -, mu_ratio: -                                        | - (Nu)                    |
 | `nusselt_petukhov`             | Re: -, Pr: -, f: - (optional)                                    | - (Nu)                    |
 | `htc_from_nusselt`             | Nu: -, k: W/(m*K), L: m                                          | W/(m^2*K)                 |
-| `nusselt_pipe`                 | State, V: m/s, D: m                                              | - (Nu)                    |
-| `htc_pipe`                     | State, V: m/s, D: m                                              | W/(m^2*K)                 |
+| `nusselt_circular_channel`     | State, V: m/s, D: m                                              | - (Nu)                    |
+| `htc_circular_channel`         | State, V: m/s, D: m                                              | W/(m^2*K)                 |
 | `lmtd`                         | dT1: K, dT2: K                                                   | K                         |
 | `lmtd_counterflow`             | T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K           | K                         |
 | `lmtd_parallelflow`            | T_hot_in: K, T_hot_out: K, T_cold_in: K, T_cold_out: K           | K                         |
 | `overall_htc`                  | h_values: W/(m^2*K), t_over_k: m^2*K/W                           | W/(m^2*K)                 |
 | `overall_htc_wall`             | h_inner, h_outer: W/(m^2*K), t_over_k_layers: m^2*K/W            | W/(m^2*K)                 |
-| `overall_htc_tube`             | h_inner, h_outer: W/(m^2*K), t_wall: m, k_wall: W/(m*K)          | W/(m^2*K)                 |
+| `overall_htc_wall`             | h_inner, h_outer: W/(m^2*K), t_wall: m, k_wall: W/(m*K)          | W/(m^2*K)                 |
 | `thermal_resistance`           | h: W/(m^2*K), A: m^2                                             | K/W                       |
 | `thermal_resistance_wall`      | t: m, k: W/(m*K), A: m^2                                         | K/W                       |
 | `heat_rate`                    | U: W/(m^2*K), A: m^2, dT: K                                      | W                         |
@@ -575,17 +577,26 @@ All functions use consistent units to avoid conversion errors.
 
 ### heat_transfer.h - ChannelResult fields
 
-| Function              | Input Units | Output Unit             |
-|-----------------------|-------------|-------------------------|
-| `ChannelResult::h`    | -           | W/(m^2*K)               |
-| `ChannelResult::Nu`   | -           | - (Nu)                  |
-| `ChannelResult::Re`   | -           | - (Re)                  |
-| `ChannelResult::Pr`   | -           | - (Pr)                  |
-| `ChannelResult::f`    | -           | - (friction/loss coeff) |
-| `ChannelResult::dP`   | -           | Pa                      |
-| `ChannelResult::M`    | -           | - (M)                   |
-| `ChannelResult::T_aw` | -           | K                       |
-| `ChannelResult::q`    | -           | W/m^2                   |
+| Function                     | Input Units | Output Unit             |
+|------------------------------|-------------|-------------------------|
+| `ChannelResult::h`           | -           | W/(m^2*K)               |
+| `ChannelResult::Nu`          | -           | - (Nu)                  |
+| `ChannelResult::Re`          | -           | - (Re)                  |
+| `ChannelResult::Pr`          | -           | - (Pr)                  |
+| `ChannelResult::f`           | -           | - (friction/loss coeff) |
+| `ChannelResult::dP`          | -           | Pa                      |
+| `ChannelResult::M`           | -           | - (M)                   |
+| `ChannelResult::T_aw`        | -           | K                       |
+| `ChannelResult::q`           | -           | W/m^2                   |
+| `ChannelResult::dh_dmdot`    | -           | W/(m^2*K*kg/s)          |
+| `ChannelResult::dh_dT`       | -           | W/(m^2*K^2)             |
+| `ChannelResult::ddP_dmdot`   | -           | Pa*s/kg                 |
+| `ChannelResult::ddP_dT`      | -           | Pa/K                    |
+| `ChannelResult::dT_aw_dmdot` | -           | K*s/kg                  |
+| `ChannelResult::dT_aw_dT`    | -           | - (dimensionless)       |
+| `ChannelResult::dq_dmdot`    | -           | W*s/(m^2*kg)            |
+| `ChannelResult::dq_dT`       | -           | W/(m^2*K)               |
+| `ChannelResult::dq_dT_hot`   | -           | W/(m^2*K)               |
 
 ### cooling_correlations.h - Pin fin friction (new scalar)
 
@@ -602,7 +613,7 @@ All functions use consistent units to avoid conversion errors.
 | `normalize_fractions`                          | -                        | -                          |
 | `convert_to_dry_fractions`                     | -                        | -                          |
 | `solve_orifice_mdot`                           | -                        | Pa                         |
-| `standard_dry_air_composition`                 | -                        | float                      |
+| `dry_air`                                      | -                        | X: mol/mol                 |
 | `humid_air_enthalpy_nasa9`                     | -                        | J/kg dry air               |
 | `complete_combustion_to_CO2_H2O_with_fraction` | -                        | -                          |
 | `HumidAir::rh`                                 | -                        | 0-1                        |
@@ -799,10 +810,16 @@ All functions use consistent units to avoid conversion errors.
 | `AcousticProperties::particle_velocity`        | -                        | m/s                        |
 | `AcousticProperties::spl`                      | -                        | dB                         |
 | `AcousticProperties::wavelength`               | -                        | m                          |
-| `pipe_dP`                                      | -                        | m/s                        |
-| `pipe_dP_mdot`                                 | -                        | Pa                         |
-| `pipe_velocity`                                | -                        | m/s                        |
-| `pipe_mdot`                                    | -                        | m/s                        |
+| `channel_dP`                                   | -                        | Pa                         |
+| `channel_dP_mdot`                              | -                        | Pa                         |
+| `channel_velocity`                             | -                        | m/s                        |
+| `channel_mdot`                                 | -                        | kg/s                       |
+| `channel_area`                                 | -                        | m²                         |
+| `channel_volume`                               | -                        | m³                         |
+| `channel_roughness`                            | -                        | m                          |
+| `pressure_drop_channel`                        | -                        | Pa                         |
+| `nusselt_channel`                              | -                        | -                          |
+| `htc_channel`                                  | -                        | W/(m²·K)                   |
 | `dynamic_pressure`                             | -                        | Pa                         |
 | `velocity_from_q`                              | -                        | m/s                        |
 | `OrificeGeometry::D`                           | -                        | m                          |

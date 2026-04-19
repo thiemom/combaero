@@ -15,7 +15,7 @@
 //   h = Nu * k / L   [W/(m²·K)]
 // where k is thermal conductivity [W/(m·K)] and L is characteristic length [m].
 //
-// For pipe flow: L = D (diameter)
+// For channel flow: L = D (diameter)
 // For flat plate: L = x (distance from leading edge) or plate length
 //
 // References:
@@ -25,7 +25,7 @@
 // - Petukhov (1970): Advances in Heat Transfer, 6, 503
 
 // -------------------------------------------------------------
-// Internal Flow (Pipe/Duct)
+// Internal Flow (Channel/Duct)
 // -------------------------------------------------------------
 
 // Dittus-Boelter correlation (1930)
@@ -137,7 +137,7 @@ double nusselt_petukhov(double Re, double Pr,
 // Laminar Flow (for completeness)
 // -------------------------------------------------------------
 
-// Fully developed laminar flow in circular pipe
+// Fully developed laminar flow in circular channel
 // Nu = 3.66 (constant wall temperature)
 // Nu = 4.36 (constant heat flux)
 constexpr double NU_LAMINAR_CONST_T = 3.66;
@@ -153,7 +153,7 @@ constexpr double NU_LAMINAR_CONST_Q = 4.36;
 // Parameters:
 //   Nu : Nusselt number [-]
 //   k  : thermal conductivity [W/(m·K)]
-//   L  : characteristic length [m] (diameter for pipe flow)
+//   L  : characteristic length [m] (diameter for channel flow)
 double htc_from_nusselt(double Nu, double k, double L);
 
 // -------------------------------------------------------------
@@ -176,12 +176,12 @@ double overall_htc(const std::vector<double> &h_values,
 // Convenience: overall HTC for wall with inner/outer convection and single
 // layer 1/U = 1/h_inner + t_wall/k_wall + 1/h_outer
 double overall_htc_wall(double h_inner, double h_outer, double t_wall,
-                        double k_wall);
+                        double k_wall, double R_fouling = 0.0);
 
 // Multi-layer wall: h_in, [t1/k1, t2/k2, ...], h_out
 // 1/U = 1/h_inner + Σ(t_i/k_i) + 1/h_outer
 //
-// Example: insulated pipe with steel + insulation
+// Example: insulated channel with steel + insulation
 //   overall_htc_wall(500, 10, {0.003/50, 0.05/0.04})
 //   = h_in=500, h_out=10, steel 3mm @ k=50, insulation 50mm @ k=0.04
 double overall_htc_wall(double h_inner, double h_outer,
@@ -193,16 +193,6 @@ double overall_htc_wall(double h_inner, double h_outer,
                         double R_fouling);
 
 // Legacy alias for single-layer wall
-inline double overall_htc_tube(double h_inner, double h_outer, double t_wall,
-                               double k_wall) {
-  return overall_htc_wall(h_inner, h_outer, t_wall, k_wall);
-}
-
-inline double overall_htc_tube(double h_inner, double h_outer, double t_wall,
-                               double k_wall, double R_fouling) {
-  std::vector<double> layers = {t_wall / k_wall};
-  return overall_htc_wall(h_inner, h_outer, layers, R_fouling);
-}
 
 // Thermal resistance from HTC and area
 // R = 1 / (h * A)  [K/W]
@@ -301,21 +291,22 @@ inline double heat_transfer_dT(double Q, double U, double A) {
 std::vector<double>
 wall_temperature_profile(double T_hot, double T_cold, double h_hot,
                          double h_cold, const std::vector<double> &t_over_k,
-                         double &q);
+                         double R_fouling, double &q);
 
-// Simplified version without heat flux output
 std::vector<double>
 wall_temperature_profile(double T_hot, double T_cold, double h_hot,
-                         double h_cold, const std::vector<double> &t_over_k);
+                         double h_cold, const std::vector<double> &t_over_k,
+                         double R_fouling = 0.0);
 
 // Single-layer wall convenience function
 // Returns: {T_hot_surface, T_cold_surface}
 inline std::vector<double> wall_temperature_profile(double T_hot, double T_cold,
                                                     double h_hot, double h_cold,
                                                     double t_wall,
-                                                    double k_wall) {
+                                                    double k_wall,
+                                                    double R_fouling = 0.0) {
   return wall_temperature_profile(T_hot, T_cold, h_hot, h_cold,
-                                  std::vector<double>{t_wall / k_wall});
+                                  std::vector<double>{t_wall / k_wall}, R_fouling);
 }
 
 // -------------------------------------------------------------
@@ -469,14 +460,16 @@ inline double heat_rate_from_effectiveness(double epsilon, double C_min,
 
 struct State; // Forward declaration
 
-// Nusselt number for pipe flow using State
+// Nusselt number for circular channel flow using State
 // Automatically computes Re, Pr from state and velocity/diameter
-double nusselt_pipe(const State &s, double velocity, double diameter,
-                    bool heating = true, double roughness = 0.0);
+double nusselt_circular_channel(const State &s, double velocity, double diameter,
+                                bool heating = true, double roughness = 0.0);
 
-// Heat transfer coefficient for pipe flow [W/(m²·K)]
-double htc_pipe(const State &s, double velocity, double diameter,
-                bool heating = true, double roughness = 0.0);
+
+// Heat transfer coefficient for circular channel flow [W/(m²·K)]
+double htc_circular_channel(const State &s, double velocity, double diameter,
+                            bool heating = true, double roughness = 0.0);
+
 
 // Composite function: compute HTC, Nu, and Re from thermodynamic state
 // Returns: tuple (h [W/(m²·K)], Nu [-], Re [-])
@@ -493,19 +486,23 @@ double htc_pipe(const State &s, double velocity, double diameter,
 //   P           : pressure [Pa]
 //   X           : mole fractions [mol/mol]
 //   velocity    : flow velocity [m/s]
-//   diameter    : pipe diameter [m]
+//   diameter    : channel diameter [m]
 //   correlation : "gnielinski" (default), "dittus_boelter", "sieder_tate",
 //   "petukhov" heating     : true for heating, false for cooling (affects
 //   Dittus-Boelter) mu_ratio    : μ_bulk / μ_wall for Sieder-Tate viscosity
 //   correction (default: 1.0) roughness   : absolute roughness [m] (default:
-//   0.0 = smooth pipe)
+//   0.0 = smooth channel)
 //
 // Automatically computes: ρ, μ, k, Pr, Re from (T, P, X)
 // Selects appropriate correlation and handles laminar flow (Re < 2300)
+// Selects appropriate correlation and handles laminar flow (Re < 2300)
 std::tuple<double, double, double>
-htc_pipe(double T, double P, const std::vector<double> &X, double velocity,
-         double diameter, const std::string &correlation = "gnielinski",
-         bool heating = true, double mu_ratio = 1.0, double roughness = 0.0);
+htc_circular_channel(double T, double P, const std::vector<double> &X,
+                     double velocity, double diameter,
+                     const std::string &correlation = "gnielinski",
+                     bool heating = true, double mu_ratio = 1.0,
+                     double roughness = 0.0);
+
 
 // -------------------------------------------------------------
 // Combined convective heat transfer + pressure loss result
@@ -550,7 +547,7 @@ struct ChannelResult {
   double dT_aw_dT = 0.0;     // ∂T_aw/∂T [-] (≈1 at low Mach)
   double dq_dmdot = 0.0;     // ∂q/∂ṁ  [W·s/(m²·kg)]
   double dq_dT = 0.0;        // ∂q/∂T  [W/(m²·K)]
-  double dq_dT_wall = 0.0;   // ∂q/∂T_wall [W/(m²·K)]  (= -h when T_wall finite)
+  double dq_dT_hot = 0.0;   // ∂q/∂T_hot [W/(m²·K)]  (= -h when T_hot finite)
 };
 
 // -------------------------------------------------------------
@@ -559,7 +556,7 @@ struct ChannelResult {
 
 struct WallCouplingResult {
   double Q = 0.0;            // heat transfer rate [W] (positive A→B)
-  double T_wall = 0.0;       // wall temperature [K] (hot-side surface)
+  double T_hot = 0.0;       // wall temperature [K] (hot-side surface)
   double dQ_dh_a = 0.0;      // ∂Q/∂h_a [W·m²·K/W]
   double dQ_dh_b = 0.0;      // ∂Q/∂h_b [W·m²·K/W]
   double dQ_dT_aw_a = 0.0;   // ∂Q/∂T_aw_a [W/K]
@@ -584,6 +581,17 @@ WallCouplingResult wall_coupling_and_jacobian(
     double h_b, double T_aw_b,
     double t_over_k,
     double A);
+
+// Multi-layer wall coupling
+// Parameters:
+//   t_over_k_layers : thicknesses / conductivities for each layer [m²·K/W]
+//   R_fouling : additional fouling resistance [m²·K/W]
+WallCouplingResult wall_coupling_and_jacobian(
+    double h_a, double T_aw_a,
+    double h_b, double T_aw_b,
+    const std::vector<double> &t_over_k_layers,
+    double A,
+    double R_fouling = 0.0);
 
 // -------------------------------------------------------------
 // High-level channel functions — each returns a ChannelResult
@@ -615,7 +623,7 @@ WallCouplingResult wall_coupling_and_jacobian(
 ChannelResult
 channel_smooth(double T, double P, const std::vector<double> &X,
                double velocity, double diameter, double length,
-               double T_wall = std::numeric_limits<double>::quiet_NaN(),
+               double T_hot = std::numeric_limits<double>::quiet_NaN(),
                const std::string &correlation = "gnielinski",
                bool heating = true, double mu_ratio = 1.0,
                double roughness = 0.0,
@@ -636,7 +644,7 @@ ChannelResult
 channel_ribbed(double T, double P, const std::vector<double> &X,
                double velocity, double diameter, double length, double e_D,
                double pitch_to_height, double alpha_deg,
-               double T_wall = std::numeric_limits<double>::quiet_NaN(),
+               double T_hot = std::numeric_limits<double>::quiet_NaN(),
                bool heating = true,
                double Nu_multiplier = 1.0, double f_multiplier = 1.0);
 
@@ -655,7 +663,7 @@ ChannelResult
 channel_dimpled(double T, double P, const std::vector<double> &X,
                 double velocity, double diameter, double length, double d_Dh,
                 double h_d, double S_d,
-                double T_wall = std::numeric_limits<double>::quiet_NaN(),
+                double T_hot = std::numeric_limits<double>::quiet_NaN(),
                 bool heating = true,
                 double Nu_multiplier = 1.0, double f_multiplier = 1.0);
 
@@ -681,7 +689,7 @@ ChannelResult
 channel_pin_fin(double T, double P, const std::vector<double> &X,
                 double velocity, double channel_height, double pin_diameter,
                 double S_D, double X_D, int N_rows,
-                double T_wall = std::numeric_limits<double>::quiet_NaN(),
+                double T_hot = std::numeric_limits<double>::quiet_NaN(),
                 bool is_staggered = true,
                 double Nu_multiplier = 1.0, double f_multiplier = 1.0);
 
@@ -707,7 +715,7 @@ ChannelResult
 channel_impingement(double T, double P, const std::vector<double> &X,
                     double mdot_jet, double d_jet, double z_D, double x_D,
                     double y_D, double A_target,
-                    double T_wall = std::numeric_limits<double>::quiet_NaN(),
+                    double T_hot = std::numeric_limits<double>::quiet_NaN(),
                     double Cd_jet = 0.65,
                     double Nu_multiplier = 1.0, double f_multiplier = 1.0);
 

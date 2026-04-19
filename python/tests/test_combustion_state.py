@@ -484,22 +484,22 @@ class TestIncompressibleHooks:
 
         assert sol_fn.mdot > sol_const.mdot
 
-    def test_pipe_k_loss_zero_matches_base(self):
-        """K=0 callable must give same dP as base pipe_flow_rough."""
+    def test_channel_k_loss_zero_matches_base(self):
+        """K=0 callable must give same dP as base channel_flow_rough."""
         X = self._air()
         T, P, u, L, D = 400.0, 300_000.0, 20.0, 2.0, 0.05
 
-        sol_base = cb.pipe_flow_rough(T, P, X, u, L, D)
-        sol_zero = cb.pipe_flow_rough(T, P, X, u, L, D, k_loss_fn=lambda T_, P_, X_, Re: 0.0)
+        sol_base = cb.channel_flow_rough(T, P, X, u, L, D)
+        sol_zero = cb.channel_flow_rough(T, P, X, u, L, D, k_loss_fn=lambda T_, P_, X_, Re: 0.0)
 
         assert sol_zero.dP == pytest.approx(sol_base.dP, rel=1e-9)
 
-    def test_pipe_k_loss_nonzero_increases_dp(self):
+    def test_channel_k_loss_nonzero_increases_dp(self):
         """Positive K must increase dP above base friction."""
         X = self._air()
         T, P, u, L, D = 400.0, 300_000.0, 20.0, 2.0, 0.05
 
-        sol_base = cb.pipe_flow_rough(T, P, X, u, L, D)
-        sol_k = cb.pipe_flow_rough(T, P, X, u, L, D, k_loss_fn=lambda T_, P_, X_, Re: 1.5)
+        sol_base = cb.channel_flow_rough(T, P, X, u, L, D)
+        sol_k = cb.channel_flow_rough(T, P, X, u, L, D, k_loss_fn=lambda T_, P_, X_, Re: 1.5)
 
         assert sol_k.dP > sol_base.dP

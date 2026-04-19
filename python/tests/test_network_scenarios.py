@@ -1,11 +1,11 @@
 import pytest
 
 from combaero.network import (
+    ChannelElement,
     FlowNetwork,
     MomentumChamberNode,
     NetworkSolver,
     OrificeElement,
-    PipeElement,
     PlenumNode,
     PressureBoundary,
 )
@@ -27,13 +27,13 @@ def build_pressure_bounds():
 
 
 def test_step_1_simple_series():
-    """Test: PB -> Pipe -> Plenum -> Pipe -> PB"""
+    """Test: PB -> Channel -> Plenum -> Channel -> PB"""
     graph = FlowNetwork()
     inlet, outlet = build_pressure_bounds()
 
     n1 = PlenumNode("n1")
-    p1 = PipeElement("p1", "inlet", "n1", length=2.0, diameter=0.1, roughness=1e-4)
-    p2 = PipeElement("p2", "n1", "outlet", length=2.0, diameter=0.1, roughness=1e-4)
+    p1 = ChannelElement("p1", "inlet", "n1", length=2.0, diameter=0.1, roughness=1e-4)
+    p2 = ChannelElement("p2", "n1", "outlet", length=2.0, diameter=0.1, roughness=1e-4)
 
     for n in [inlet, outlet, n1]:
         graph.add_node(n)
@@ -51,16 +51,16 @@ def test_step_1_simple_series():
 
 
 def test_step_2_add_orifices():
-    """Test: PB -> Pipe -> n1 -> Orifice -> mc1 -> Pipe -> PB"""
+    """Test: PB -> Channel -> n1 -> Orifice -> mc1 -> Channel -> PB"""
     graph = FlowNetwork()
     inlet, outlet = build_pressure_bounds()
 
     n1 = PlenumNode("n1")
     mc1 = MomentumChamberNode("mc1")
 
-    p1 = PipeElement("p1", "inlet", "n1", length=2.0, diameter=0.1, roughness=1e-4)
-    o1 = OrificeElement("o1", "n1", "mc1", Cd=0.6, area=0.005)
-    p2 = PipeElement("p2", "mc1", "outlet", length=2.0, diameter=0.1, roughness=1e-4)
+    p1 = ChannelElement("p1", "inlet", "n1", length=2.0, diameter=0.1, roughness=1e-4)
+    o1 = OrificeElement("o1", "n1", "mc1", Cd=0.6, diameter=0.079788, correlation="fixed")
+    p2 = ChannelElement("p2", "mc1", "outlet", length=2.0, diameter=0.1, roughness=1e-4)
 
     for n in [inlet, outlet, n1, mc1]:
         graph.add_node(n)
@@ -87,12 +87,12 @@ def test_step_3_full_series_no_bypass():
     plen = PlenumNode("plenum")
     mc2 = MomentumChamberNode("mc2")
 
-    p1 = PipeElement("p1", "inlet", "n1", length=2.0, diameter=0.1, roughness=1e-4)
-    o1 = OrificeElement("o1", "n1", "mc1", Cd=0.6, area=0.008)
-    p2 = PipeElement("p2", "mc1", "n2", length=2.0, diameter=0.1, roughness=1e-4)
-    o2 = OrificeElement("o2", "n2", "plenum", Cd=0.6, area=0.008)
-    p3 = PipeElement("p3", "plenum", "mc2", length=2.0, diameter=0.1, roughness=1e-4)
-    p4 = PipeElement("p4", "mc2", "outlet", length=2.0, diameter=0.1, roughness=1e-4)
+    p1 = ChannelElement("p1", "inlet", "n1", length=2.0, diameter=0.1, roughness=1e-4)
+    o1 = OrificeElement("o1", "n1", "mc1", Cd=0.6, diameter=0.100925, correlation="fixed")
+    p2 = ChannelElement("p2", "mc1", "n2", length=2.0, diameter=0.1, roughness=1e-4)
+    o2 = OrificeElement("o2", "n2", "plenum", Cd=0.6, diameter=0.100925, correlation="fixed")
+    p3 = ChannelElement("p3", "plenum", "mc2", length=2.0, diameter=0.1, roughness=1e-4)
+    p4 = ChannelElement("p4", "mc2", "outlet", length=2.0, diameter=0.1, roughness=1e-4)
 
     for n in [inlet, outlet, n1, mc1, n2, plen, mc2]:
         graph.add_node(n)
@@ -131,12 +131,12 @@ def test_step_4_adding_bypass():
     mc2 = MomentumChamberNode("mc2")
 
     # Main series elements
-    p1 = PipeElement("p1", "inlet", "n1", length=2.0, diameter=0.1, roughness=1e-4)
-    o1 = OrificeElement("o1", "n1", "mc1", Cd=0.6, area=0.008)
-    p2 = PipeElement("p2", "mc1", "n2", length=2.0, diameter=0.1, roughness=1e-4)
-    o2 = OrificeElement("o2", "n2", "plenum", Cd=0.6, area=0.008)
-    p3 = PipeElement("p3", "plenum", "mc2", length=2.0, diameter=0.1, roughness=1e-4)
-    p4 = PipeElement("p4", "mc2", "outlet", length=2.0, diameter=0.1, roughness=1e-4)
+    p1 = ChannelElement("p1", "inlet", "n1", length=2.0, diameter=0.1, roughness=1e-4)
+    o1 = OrificeElement("o1", "n1", "mc1", Cd=0.6, diameter=0.100925, correlation="fixed")
+    p2 = ChannelElement("p2", "mc1", "n2", length=2.0, diameter=0.1, roughness=1e-4)
+    o2 = OrificeElement("o2", "n2", "plenum", Cd=0.6, diameter=0.100925, correlation="fixed")
+    p3 = ChannelElement("p3", "plenum", "mc2", length=2.0, diameter=0.1, roughness=1e-4)
+    p4 = ChannelElement("p4", "mc2", "outlet", length=2.0, diameter=0.1, roughness=1e-4)
 
     # Bypass branch
     # Size the bypass orifice to be clearly more restrictive than the main
@@ -148,8 +148,12 @@ def test_step_4_adding_bypass():
     #   A_bypass * Cd ~ 0.5 * 0.0048 = 0.0024
     # so with Cd = 0.6, use A_bypass ~ 0.004 m2.
     n_bypass = PlenumNode("n_bypass")
-    p_bypass = PipeElement("p_bypass", "mc1", "n_bypass", length=5.0, diameter=0.08, roughness=1e-4)
-    o_bypass = OrificeElement("o_bypass", "n_bypass", "mc2", Cd=0.6, area=0.004)
+    p_bypass = ChannelElement(
+        "p_bypass", "mc1", "n_bypass", length=5.0, diameter=0.08, roughness=1e-4
+    )
+    o_bypass = OrificeElement(
+        "o_bypass", "n_bypass", "mc2", Cd=0.6, diameter=0.071365, correlation="fixed"
+    )
 
     # Add all nodes and elements
     for n in [inlet, outlet, n1, mc1, n2, plen, mc2, n_bypass]:
@@ -195,7 +199,11 @@ def test_network_validation_edge_cases():
 
     # Should raise ValueError for self-loop
     with pytest.raises(ValueError, match="Self-loops are not permitted"):
-        graph.add_element(OrificeElement("self_loop", "inlet", "inlet", Cd=0.6, area=0.005))
+        graph.add_element(
+            OrificeElement(
+                "self_loop", "inlet", "inlet", Cd=0.6, diameter=0.079788, correlation="fixed"
+            )
+        )
 
     # Test isolated node detection
     graph2 = FlowNetwork()
@@ -206,7 +214,9 @@ def test_network_validation_edge_cases():
     graph2.add_node(inlet2)
     graph2.add_node(outlet2)
     graph2.add_node(isolated)
-    graph2.add_element(OrificeElement("conn", "inlet2", "outlet2", Cd=0.6, area=0.005))
+    graph2.add_element(
+        OrificeElement("conn", "inlet2", "outlet2", Cd=0.6, diameter=0.079788, correlation="fixed")
+    )
 
     # Should raise ValueError for isolated node
     with pytest.raises(ValueError, match="isolated node"):
@@ -223,8 +233,12 @@ def test_parallel_elements():
     graph.add_node(outlet)
 
     # Two parallel orifices with different areas
-    orf1 = OrificeElement("orf_1", "inlet", "outlet", Cd=0.6, area=0.005)
-    orf2 = OrificeElement("orf_2", "inlet", "outlet", Cd=0.6, area=0.002)
+    orf1 = OrificeElement(
+        "orf_1", "inlet", "outlet", Cd=0.6, diameter=0.079788, correlation="fixed"
+    )
+    orf2 = OrificeElement(
+        "orf_2", "inlet", "outlet", Cd=0.6, diameter=0.050463, correlation="fixed"
+    )
 
     graph.add_element(orf1)
     graph.add_element(orf2)

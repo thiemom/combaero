@@ -115,7 +115,7 @@ CombAero provides symmetric submodules for incompressible and compressible flow.
 ```python
 from combaero import incompressible as flow   # OR: from combaero import compressible as flow
 
-sol = flow.pipe_flow(T=400, P=2e5, X=air, u=10.0, L=2.0, D=0.05, f=0.02)
+sol = flow.channel_flow(T=400, P=2e5, X=air, u=10.0, L=2.0, D=0.05, f=0.02)
 print(f"Pressure drop: {sol.dP} Pa")
 print(f"Outlet Mach: {sol.M}") # nan for incompressible
 ```
@@ -244,7 +244,7 @@ Defines convective heat transfer properties on network elements. Supports differ
 ```python
 from combaero.heat_transfer import ConvectiveSurface, SmoothModel, RibbedModel, DimpledModel, PinFinModel, ImpingementModel
 
-# Smooth pipe with Gnielinski correlation (default)
+# Smooth channel with Gnielinski correlation (default)
 surface = ConvectiveSurface(
     area=np.pi * 0.04 * 1.0,  # Surface area [m²]
     model=SmoothModel(correlation="gnielinski")
@@ -280,11 +280,11 @@ Thermal coupling between two network elements through a shared wall.
 ```python
 from combaero.heat_transfer import WallConnection
 
-# Couple hot and cold pipes through a wall
+# Couple hot and cold channels through a wall
 wall = WallConnection(
     id="coupling_wall",
-    element_a="hot_pipe",      # First element ID
-    element_b="cold_pipe",     # Second element ID
+    element_a="hot_channel",      # First element ID
+    element_b="cold_channel",     # Second element ID
     wall_thickness=0.002,      # Wall thickness [m]
     wall_conductivity=25.0,    # Wall thermal conductivity [W/(m·K)]
     contact_area=None          # Optional: override surface area
@@ -298,11 +298,11 @@ network.add_wall(wall)
 Elements with convective surfaces support heat transfer calculations.
 
 ```python
-from combaero.network import PipeElement
+from combaero.network import ChannelElement
 
-# Pipe with convective heat transfer
-pipe = PipeElement(
-    id="heated_pipe",
+# Channel with convective heat transfer
+channel = ChannelElement(
+    id="heated_channel",
     from_node="inlet",
     to_node="outlet",
     diameter=0.04,
@@ -312,7 +312,7 @@ pipe = PipeElement(
 )
 
 # Get heat transfer coefficient and temperature
-h, T = pipe.htc_and_T(state)  # Returns (htc [W/(m²·K)], T [K])
+h, T = channel.htc_and_T(state)  # Returns (htc [W/(m²·K)], T [K])
 ```
 
 #### Thermal Coupling Toggle
@@ -350,7 +350,7 @@ modes = cb.tube_axial_modes(tube, c=340, bc1=cb.BoundaryCondition.Closed, bc2=cb
 from combaero.network import FlowNetwork, NetworkSolver, OrificeElement
 
 graph = FlowNetwork()
-graph.add_element(OrificeElement("ori1", "nodeA", "nodeB", Cd=0.6, area=1e-4))
+graph.add_element(OrificeElement("ori1", "nodeA", "nodeB", Cd=0.6, diameter=0.011284))
 
 solver = NetworkSolver(graph)
 # init_strategy options: "default", "incompressible_warmstart", "homotopy"
@@ -380,18 +380,18 @@ energy = EnergyBoundary("energy", Q=50000)  # Heat addition [W]
 ### Network Elements
 ```python
 from combaero.network import (
-    OrificeElement, PipeElement, EffectiveAreaConnectionElement,
-    LosslessConnectionElement, AreaDischargeCoefficientConnectionElement
+    OrificeElement, ChannelElement, EffectiveAreaConnectionElement,
+    LosslessConnectionElement, DiameterDischargeCoefficientConnectionElement
 )
 
 # Flow elements
-orifice = OrificeElement("orifice", "node1", "node2", Cd=0.65, area=1e-4, regime="compressible")
-pipe = PipeElement("pipe", "node2", "node3", length=2.0, diameter=0.05, roughness=1e-4, regime="compressible_fanno")
+orifice = OrificeElement("orifice", "node1", "node2", Cd=0.65, diameter=0.011284, regime="compressible")
+channel = ChannelElement("channel", "node2", "node3", length=2.0, diameter=0.05, roughness=1e-4, regime="compressible")
 
 # Connection elements
-effective_area = EffectiveAreaConnectionElement("ea", "node3", "node4", area=2e-4)
+effective_area = EffectiveAreaConnectionElement("ea", "node3", "node4", diameter=0.015958)
 lossless = LosslessConnectionElement("lossless", "node4", "node5")
-area_cd = AreaDischargeCoefficientConnectionElement("area_cd", "node5", "node6", area=1e-4, Cd=0.7)
+area_cd = DiameterDischargeCoefficientConnectionElement("area_cd", "node5", "node6", diameter=0.011284, Cd=0.7)
 ```
 
 ### Combustion Integration
@@ -430,6 +430,7 @@ High-accuracy analytical Jacobians are available for performance-critical solver
 ```python
 # Exact residuals and derivatives wrt (P_tot, P_static, T, Y)
 res_ori = cb.orifice_residuals_and_jacobian(m_dot, P_tot, P_stat, T, Y, P_down, Cd, area)
+res_chan = cb.channel_residuals_and_jacobian(m_dot, P_tot, P_stat, T, Y, P_down, L, D, roughness, correlation)
 res_comb = cb.combustor_residuals_and_jacobians(m_dot, P_tot, P_stat, T, Y, Q_comb, method, smooth, pressure_loss_func)
 res_plen = cb.plenum_residuals_and_jacobian(m_dot_vec, P_target, T_target, Y_target)
 ```

@@ -24,8 +24,12 @@ def test_momentum_chamber_dynamic_pressure():
     )  # 0.02 m^2, larger area for easier convergence
     outlet = PressureBoundary("outlet", P_total=101325.0)
 
-    orf1 = OrificeElement("orf1", "inlet", "chamber", Cd=0.6, area=0.001)
-    orf2 = OrificeElement("orf2", "chamber", "outlet", Cd=0.6, area=0.001)
+    orf1 = OrificeElement(
+        "orf1", "inlet", "chamber", Cd=0.6, diameter=0.035682, correlation="fixed"
+    )
+    orf2 = OrificeElement(
+        "orf2", "chamber", "outlet", Cd=0.6, diameter=0.035682, correlation="fixed"
+    )
 
     graph.add_node(inlet)
     graph.add_node(chamber)
@@ -80,8 +84,12 @@ def test_momentum_chamber_vs_plenum():
     graph_mom.add_node(inlet_mom)
     graph_mom.add_node(chamber_mom)
     graph_mom.add_node(outlet_mom)
-    graph_mom.add_element(OrificeElement("orf1", "inlet", "chamber", Cd=0.6, area=0.001))
-    graph_mom.add_element(OrificeElement("orf2", "chamber", "outlet", Cd=0.6, area=0.001))
+    graph_mom.add_element(
+        OrificeElement("orf1", "inlet", "chamber", Cd=0.6, diameter=0.035682, correlation="fixed")
+    )
+    graph_mom.add_element(
+        OrificeElement("orf2", "chamber", "outlet", Cd=0.6, diameter=0.035682, correlation="fixed")
+    )
 
     solver_mom = NetworkSolver(graph_mom)
     sol_mom = solver_mom.solve()
@@ -95,8 +103,12 @@ def test_momentum_chamber_vs_plenum():
     graph_ple.add_node(inlet_ple)
     graph_ple.add_node(chamber_ple)
     graph_ple.add_node(outlet_ple)
-    graph_ple.add_element(OrificeElement("orf1", "inlet", "chamber", Cd=0.6, area=0.001))
-    graph_ple.add_element(OrificeElement("orf2", "chamber", "outlet", Cd=0.6, area=0.001))
+    graph_ple.add_element(
+        OrificeElement("orf1", "inlet", "chamber", Cd=0.6, diameter=0.035682, correlation="fixed")
+    )
+    graph_ple.add_element(
+        OrificeElement("orf2", "chamber", "outlet", Cd=0.6, diameter=0.035682, correlation="fixed")
+    )
 
     solver_ple = NetworkSolver(graph_ple)
     sol_ple = solver_ple.solve()
@@ -142,8 +154,12 @@ def test_momentum_chamber_with_heat_exchange():
     # Add heat exchange to chamber
     chamber.add_energy_boundary(EnergyBoundary("heater", Q=5000.0))
 
-    orf1 = OrificeElement("orf1", "inlet", "chamber", Cd=0.6, area=0.001)
-    orf2 = OrificeElement("orf2", "chamber", "outlet", Cd=0.6, area=0.001)
+    orf1 = OrificeElement(
+        "orf1", "inlet", "chamber", Cd=0.6, diameter=0.035682, correlation="fixed"
+    )
+    orf2 = OrificeElement(
+        "orf2", "chamber", "outlet", Cd=0.6, diameter=0.035682, correlation="fixed"
+    )
 
     graph.add_node(inlet)
     graph.add_node(chamber)

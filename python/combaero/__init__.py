@@ -72,7 +72,8 @@ try:
         OrificeGeometry,
         OrificeState,
         OrificeResult,
-        PipeResult,
+        ChannelSolverResult,
+        MixtureState,
         MomentumChamberResult,
         State,
         Stream,
@@ -107,7 +108,15 @@ try:
         bulk_T_from_edge_T_and_q,
         calc_T_from_cp,
         calc_T_from_h,
+        calc_T_from_h_mass,
         calc_T_from_s,
+        calc_T_from_s_mass,
+        calc_T_from_u_mass,
+        calc_T_from_sv_mass,
+        calc_T_from_sh_mass,
+        dh_dT,
+        ds_dT,
+        dcp_dT,
         can_annular_eigenmodes,
         capacity_ratio,
         channel_dimpled,
@@ -118,6 +127,7 @@ try:
         ChannelResult,
         WallCouplingResult,
         wall_coupling_and_jacobian,
+        wall_coupling_and_jacobian_multilayer,
         closest_mode,
         combustion_equilibrium,
         combustion_state,
@@ -136,6 +146,10 @@ try:
         cv,
         cv_mass,
         damping_ratio,
+        channel_flow,
+        channel_flow_rough,
+        fanno_channel,
+        fanno_channel_rough,
         density,
         dewpoint,
         dry_air,
@@ -151,13 +165,13 @@ try:
         effectiveness_parallelflow,
         effusion_discharge_coefficient,
         effusion_effectiveness,
+        equivalence_ratio,
         equivalence_ratio_from_bilger_Z_mass,
         equivalence_ratio_mass,
         equivalence_ratio_mole,
         expansibility_factor,
         fanno_max_length,
-        fanno_pipe,
-        fanno_pipe_rough,
+        # Nozzle flow is already channel-like
         film_cooling_effectiveness,
         film_cooling_effectiveness_avg,
         film_cooling_multirow_sellers,
@@ -186,7 +200,6 @@ try:
         helmholtz_frequency,
         helmholtz_Q,
         htc_from_nusselt,
-        htc_pipe,
         humid_air_composition,
         humid_air_density,
         humid_air_enthalpy,
@@ -213,6 +226,7 @@ try:
         liner_sdof_impedance_norm,
         list_functions_with_units,
         list_materials,
+        get_material_conductivity,
         lmtd,
         lmtd_counterflow,
         lmtd_parallelflow,
@@ -276,17 +290,7 @@ try:
         peclet,
         pin_fin_friction,
         pin_fin_nusselt,
-        pipe_area,
-        pipe_dP,
-        pipe_dP_mdot,
-        pipe_flow,
-        pipe_flow_rough,
-        pipe_mdot,
-        pipe_roughness,
-        pipe_velocity,
-        pipe_volume,
         prandtl,
-        pressure_drop_pipe,
         pressure_loss,
         quarter_wave_frequency,
         quarter_wave_resonator_tmm,
@@ -336,7 +340,6 @@ try:
         specific_gas_constant,
         speed_of_sound,
         standard_dry_air_composition,  # deprecated: use species.dry_air
-        standard_pipe_roughness,
         stokes_layer,
         strouhal,
         sweep_liner_2dof_serial_absorption,
@@ -400,19 +403,33 @@ try:
         enthalpy_and_jacobian,
         viscosity_and_jacobians,
         orifice_residuals_and_jacobian,
-        pipe_residuals_and_jacobian,
+        channel_residuals_and_jacobian,
         momentum_chamber_residual_and_jacobian,
         mixer_from_streams_and_jacobians,
         adiabatic_T_complete_and_jacobian_T_from_streams,
         adiabatic_T_equilibrium_and_jacobians_from_streams,
         combustor_residuals_and_jacobians,
+        # Channel/circular functions
+        htc_circular_channel,
+        nusselt_circular_channel,
+        channel_dP,
+        channel_dP_mdot,
+        channel_velocity,
+        channel_mdot,
+        channel_pressure_drop,
+        pressure_drop_channel,
+        circular_area,
+        cylinder_volume,
+        channel_roughness,
+        standard_channel_roughness,
     )
 
     molar_mass = mwmix
     Tube = geometry.Tube
     Annulus = geometry.Annulus
     CanAnnularFlowGeometry = geometry.CanAnnularFlowGeometry
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError) as e:
+    print(f"DEBUG: Import failed with {type(e).__name__}: {e}")
     # Fallback: attempt to import from an installed combaero package that
     # already has _core available, then re-export the symbols.
     _core = import_module("combaero._core")
@@ -444,7 +461,8 @@ except ModuleNotFoundError:
     normalize_fractions = _core.normalize_fractions
     convert_to_dry_fractions = _core.convert_to_dry_fractions
     equivalence_ratio_mole = _core.equivalence_ratio_mole
-    set_equivalence_ratio_mole = _core.set_equivalence_ratio_mole
+    equivalence_ratio = _core.equivalence_ratio
+    equivalence_ratio_mole = _core.equivalence_ratio_mole
     equivalence_ratio_mass = _core.equivalence_ratio_mass
     set_equivalence_ratio_mass = _core.set_equivalence_ratio_mass
     bilger_stoich_mixture_fraction_mass = _core.bilger_stoich_mixture_fraction_mass
@@ -470,8 +488,15 @@ except ModuleNotFoundError:
     common_name = _core.common_name
     formula = _core.formula
     calc_T_from_h = _core.calc_T_from_h
+    calc_T_from_h_mass = _core.calc_T_from_h_mass
     calc_T_from_s = _core.calc_T_from_s
-    calc_T_from_cp = _core.calc_T_from_cp
+    calc_T_from_s_mass = _core.calc_T_from_s_mass
+    calc_T_from_u_mass = _core.calc_T_from_u_mass
+    calc_T_from_sv_mass = _core.calc_T_from_sv_mass
+    calc_T_from_sh_mass = _core.calc_T_from_sh_mass
+    dh_dT = _core.dh_dT
+    ds_dT = _core.ds_dT
+    dcp_dT = _core.dcp_dT
     num_species = _core.num_species
     species_name = _core.species_name
     species_index_from_name = _core.species_index_from_name
@@ -488,6 +513,7 @@ except ModuleNotFoundError:
         _core.complete_combustion_to_CO2_H2O_with_fraction
     )
     # State-based API
+    MixtureState = _core.MixtureState
     State = _core.State
     Stream = _core.Stream
     Registry = _core.Registry
@@ -532,8 +558,6 @@ except ModuleNotFoundError:
     mach_number = _core.mach_number
     mass_flux_isentropic = _core.mass_flux_isentropic
     nozzle_cd = _core.nozzle_cd
-    fanno_pipe = _core.fanno_pipe
-    fanno_pipe_rough = _core.fanno_pipe_rough
     fanno_max_length = _core.fanno_max_length
     # Thrust
     ThrustResult = _core.ThrustResult
@@ -562,6 +586,8 @@ except ModuleNotFoundError:
     heat_flux = _core.heat_flux
     heat_transfer_area = _core.heat_transfer_area
     heat_transfer_dT = _core.heat_transfer_dT
+    wall_coupling_and_jacobian = _core.wall_coupling_and_jacobian
+    wall_coupling_and_jacobian_multilayer = _core.wall_coupling_and_jacobian_multilayer
     wall_temperature_profile = _core.wall_temperature_profile
     ntu = _core.ntu
     capacity_ratio = _core.capacity_ratio
@@ -634,21 +660,22 @@ except ModuleNotFoundError:
     orifice_velocity = _core.orifice_velocity
     orifice_area = _core.orifice_area
     orifice_dP = _core.orifice_dP
-    pipe_dP = _core.pipe_dP
-    pipe_dP_mdot = _core.pipe_dP_mdot
-    pipe_velocity = _core.pipe_velocity
-    pipe_mdot = _core.pipe_mdot
-    pressure_drop_pipe = _core.pressure_drop_pipe
+    channel_dP = _core.channel_dP
+    channel_dP_mdot = _core.channel_dP_mdot
+    channel_velocity = _core.channel_velocity
+    channel_mdot = _core.channel_mdot
+    channel_pressure_drop = _core.channel_pressure_drop
+    pressure_drop_channel = _core.channel_pressure_drop
     dynamic_pressure = _core.dynamic_pressure
     velocity_from_q = _core.velocity_from_q
     hydraulic_diameter = _core.hydraulic_diameter
     hydraulic_diameter_rect = _core.hydraulic_diameter_rect
     hydraulic_diameter_annulus = _core.hydraulic_diameter_annulus
-    pipe_area = _core.pipe_area
+    channel_area = _core.circular_area
+    channel_volume = _core.cylinder_volume
+    channel_roughness = _core.channel_roughness
+    standard_channel_roughness = _core.standard_channel_roughness
     annular_area = _core.annular_area
-    pipe_volume = _core.pipe_volume
-    pipe_roughness = _core.pipe_roughness
-    standard_pipe_roughness = _core.standard_pipe_roughness
     # Orifice Cd correlations
     OrificeGeometry = _core.OrificeGeometry
     OrificeState = _core.OrificeState
@@ -720,8 +747,20 @@ except ModuleNotFoundError:
     enthalpy_and_jacobian = _core.enthalpy_and_jacobian
     viscosity_and_jacobians = _core.viscosity_and_jacobians
     orifice_residuals_and_jacobian = _core.orifice_residuals_and_jacobian
-    pipe_residuals_and_jacobian = _core.pipe_residuals_and_jacobian
+    channel_residuals_and_jacobian = _core.channel_residuals_and_jacobian
+    htc_circular_channel = _core.htc_circular_channel
+    nusselt_circular_channel = _core.nusselt_circular_channel
 
+# Terminology aliases - always available
+try:
+    htc_channel = htc_circular_channel
+    nusselt_channel = nusselt_circular_channel
+    pressure_drop_channel = channel_pressure_drop
+    channel_area = circular_area
+    channel_volume = cylinder_volume
+except NameError:
+    # Fallback for complex loading scenarios or missing core extension
+    pass
 
 # Submodule imports - always available regardless of _core load path.
 from . import compressible, heat_transfer, incompressible, network, species
@@ -797,7 +836,8 @@ __all__ = [
     "normalize_fractions",
     "convert_to_dry_fractions",
     "equivalence_ratio_mole",
-    "set_equivalence_ratio_mole",
+    "equivalence_ratio",
+    "equivalence_ratio_mole",
     "equivalence_ratio_mass",
     "set_equivalence_ratio_mass",
     "equivalence_ratio_from_bilger_Z_mass",
@@ -834,6 +874,7 @@ __all__ = [
     "complete_combustion_to_CO2_H2O_with_fraction",
     # State-based API
     "State",
+    "MixtureState",
     "Stream",
     "HumidAir",
     "AirProperties",
@@ -931,7 +972,6 @@ __all__ = [
     "mach_from_pressure_ratio",
     "mass_flux_isentropic",
     "nozzle_cd",
-    "fanno_pipe",
     "fanno_max_length",
     # Thrust
     "ThrustResult",
@@ -953,8 +993,11 @@ __all__ = [
     "nusselt_gnielinski",
     "nusselt_sieder_tate",
     "nusselt_petukhov",
+    "nusselt_circular_channel",
+    "nusselt_channel",
     "htc_from_nusselt",
-    "htc_pipe",
+    "htc_circular_channel",
+    "htc_channel",
     "orifice_impedance_with_flow",
     "quarter_wave_resonator_tmm",
     "TransferMatrix",
@@ -1060,21 +1103,19 @@ __all__ = [
     "orifice_velocity",
     "orifice_area",
     "orifice_dP",
-    "pipe_dP",
-    "pipe_dP_mdot",
-    "pipe_velocity",
-    "pipe_mdot",
-    "pressure_drop_pipe",
+    "channel_dP",
+    "channel_dP_mdot",
+    "channel_velocity",
+    "channel_mdot",
+    "channel_pressure_drop",
+    "pressure_drop_channel",
+    "channel_area",
+    "channel_volume",
+    "channel_roughness",
+    "standard_channel_roughness",
+    "circular_area",
+    "cylinder_volume",
     "dynamic_pressure",
-    "velocity_from_q",
-    "hydraulic_diameter",
-    "hydraulic_diameter_rect",
-    "hydraulic_diameter_annulus",
-    "pipe_area",
-    "annular_area",
-    "pipe_volume",
-    "pipe_roughness",
-    "standard_pipe_roughness",
     # Orifice Cd correlations
     "OrificeGeometry",
     "OrificeState",

@@ -2627,18 +2627,12 @@ TEST_F(ThermoTransportTest, CompressibleInvalidInputs) {
     X_air[species_index_from_name("O2")] = 0.21;
     X_air[species_index_from_name("N2")] = 0.79;
 
-    // Invalid T0
-    EXPECT_THROW(nozzle_flow(0.0, 200000.0, 100000.0, 0.001, X_air), std::invalid_argument);
-    EXPECT_THROW(nozzle_flow(-100.0, 200000.0, 100000.0, 0.001, X_air), std::invalid_argument);
+    // Pressures and temperatures <= 0 are now clamped for solver robustness
+    EXPECT_NO_THROW(nozzle_flow(0.0, 200000.0, 100000.0, 0.001, X_air));
+    EXPECT_NO_THROW(nozzle_flow(500.0, 0.0, 100000.0, 0.001, X_air));
+    EXPECT_NO_THROW(nozzle_flow(500.0, 200000.0, 0.0, 0.001, X_air));
 
-    // Invalid P0
-    EXPECT_THROW(nozzle_flow(500.0, 0.0, 100000.0, 0.001, X_air), std::invalid_argument);
-    EXPECT_THROW(nozzle_flow(500.0, -100000.0, 100000.0, 0.001, X_air), std::invalid_argument);
-
-    // Invalid P_back
-    EXPECT_THROW(nozzle_flow(500.0, 200000.0, 0.0, 0.001, X_air), std::invalid_argument);
-
-    // Invalid A_eff
+    // Invalid A_eff (geometry) should still throw
     EXPECT_THROW(nozzle_flow(500.0, 200000.0, 100000.0, 0.0, X_air), std::invalid_argument);
     EXPECT_THROW(nozzle_flow(500.0, 200000.0, 100000.0, -0.001, X_air), std::invalid_argument);
 }
@@ -2756,7 +2750,7 @@ TEST_F(ThermoTransportTest, FannoFlowBasic) {
     double D = 0.05;          // m (5 cm pipe)
     double f = 0.02;          // Darcy friction factor
 
-    auto sol = fanno_pipe(T_in, P_in, u_in, L, D, f, X_air);
+    auto sol = fanno_channel(T_in, P_in, u_in, L, D, f, X_air);
 
     // Pressure should drop due to friction
     EXPECT_LT(sol.outlet.P, P_in);
@@ -2792,7 +2786,7 @@ TEST_F(ThermoTransportTest, FannoFlowEnergyConservation) {
     double D = 0.1;
     double f = 0.015;
 
-    auto sol = fanno_pipe(T_in, P_in, u_in, L, D, f, X_air, 200, true);
+    auto sol = fanno_channel(T_in, P_in, u_in, L, D, f, X_air, 200, true);
 
     // Stagnation enthalpy should be conserved
     // Note: State.h() returns J/kg (mass-specific), not J/mol
@@ -2824,7 +2818,7 @@ TEST_F(ThermoTransportTest, FannoFlowEnergyConvergence) {
     double f = 0.015;
 
     // Test with 200 steps (coarse)
-    auto sol_200 = fanno_pipe(T_in, P_in, u_in, L, D, f, X_air, 200, false);
+    auto sol_200 = fanno_channel(T_in, P_in, u_in, L, D, f, X_air, 200, false);
     double h_in = sol_200.inlet.h();  // J/kg
     double h0_in = h_in + 0.5 * u_in * u_in;
     double A = M_PI * D * D / 4.0;
@@ -2834,7 +2828,7 @@ TEST_F(ThermoTransportTest, FannoFlowEnergyConvergence) {
     double error_200 = std::abs(h0_out_200 - h0_in) / h0_in;
 
     // Test with 2000 steps (fine)
-    auto sol_2000 = fanno_pipe(T_in, P_in, u_in, L, D, f, X_air, 2000, false);
+    auto sol_2000 = fanno_channel(T_in, P_in, u_in, L, D, f, X_air, 2000, false);
     double u_out_2000 = sol_2000.mdot / (sol_2000.outlet.rho() * A);
     double h_out_2000 = sol_2000.outlet.h();  // J/kg
     double h0_out_2000 = h_out_2000 + 0.5 * u_out_2000 * u_out_2000;
@@ -2870,7 +2864,7 @@ TEST_F(ThermoTransportTest, FannoFlowProfile) {
     double D = 0.05;
     double f = 0.02;
 
-    auto sol = fanno_pipe(T_in, P_in, u_in, L, D, f, X_air, 50, true);
+    auto sol = fanno_channel(T_in, P_in, u_in, L, D, f, X_air, 50, true);
 
     // Profile should have entries
     EXPECT_GT(sol.profile.size(), 0u);
@@ -2898,20 +2892,18 @@ TEST_F(ThermoTransportTest, FannoFlowInvalidInputs) {
     X_air[species_index_from_name("O2")] = 0.21;
     X_air[species_index_from_name("N2")] = 0.79;
 
-    // Invalid T_in
-    EXPECT_THROW(fanno_pipe(0.0, 200000.0, 50.0, 10.0, 0.05, 0.02, X_air), std::invalid_argument);
-
-    // Invalid P_in
-    EXPECT_THROW(fanno_pipe(400.0, 0.0, 50.0, 10.0, 0.05, 0.02, X_air), std::invalid_argument);
+    // T_in <= 0 and P_in <= 0 are now clamped for solver robustness rather than throwing
+    EXPECT_NO_THROW(fanno_channel(0.0, 200000.0, 50.0, 10.0, 0.05, 0.02, X_air));
+    EXPECT_NO_THROW(fanno_channel(400.0, 0.0, 50.0, 10.0, 0.05, 0.02, X_air));
 
     // Invalid L
-    EXPECT_THROW(fanno_pipe(400.0, 200000.0, 50.0, 0.0, 0.05, 0.02, X_air), std::invalid_argument);
+    EXPECT_THROW(fanno_channel(400.0, 200000.0, 50.0, 0.0, 0.05, 0.02, X_air), std::invalid_argument);
 
     // Invalid D
-    EXPECT_THROW(fanno_pipe(400.0, 200000.0, 50.0, 10.0, 0.0, 0.02, X_air), std::invalid_argument);
+    EXPECT_THROW(fanno_channel(400.0, 200000.0, 50.0, 10.0, 0.0, 0.02, X_air), std::invalid_argument);
 
     // Invalid f (negative)
-    EXPECT_THROW(fanno_pipe(400.0, 200000.0, 50.0, 10.0, 0.05, -0.02, X_air), std::invalid_argument);
+    EXPECT_THROW(fanno_channel(400.0, 200000.0, 50.0, 10.0, 0.05, -0.02, X_air), std::invalid_argument);
 }
 
 // =============================================================================
@@ -3322,8 +3314,8 @@ TEST(HeatTransferTest, StateBased) {
     double velocity = 10.0;  // m/s
     double diameter = 0.05;  // m
 
-    double Nu = nusselt_pipe(s, velocity, diameter);
-    double h = htc_pipe(s, velocity, diameter);
+    double Nu = nusselt_circular_channel(s, velocity, diameter);
+    double h = htc_circular_channel(s, velocity, diameter);
 
     // Check reasonable values
     EXPECT_GT(Nu, 10);
@@ -3405,7 +3397,7 @@ TEST(HeatTransferTest, OverallHtcWithWall) {
     double t_wall = 0.003;    // 3 mm
     double k_wall = 50.0;     // W/(m·K), steel
 
-    double U = overall_htc_tube(h_inner, h_outer, t_wall, k_wall);
+    double U = overall_htc_wall(h_inner, h_outer, t_wall, k_wall);
 
     // 1/U = 1/500 + 0.003/50 + 1/50 = 0.002 + 0.00006 + 0.02 = 0.02206
     // U ≈ 45.3 W/(m²·K)
@@ -3419,8 +3411,8 @@ TEST(HeatTransferTest, OverallHtcWithFouling) {
     double k_wall = 50.0;
     double R_fouling = 0.0002;  // m²·K/W, typical fouling
 
-    double U_clean = overall_htc_tube(h_inner, h_outer, t_wall, k_wall);
-    double U_fouled = overall_htc_tube(h_inner, h_outer, t_wall, k_wall, R_fouling);
+    double U_clean = overall_htc_wall(h_inner, h_outer, t_wall, k_wall);
+    double U_fouled = overall_htc_wall(h_inner, h_outer, t_wall, k_wall, R_fouling);
 
     // Fouling should reduce U
     EXPECT_LT(U_fouled, U_clean);
@@ -3524,9 +3516,9 @@ TEST(HeatTransferTest, WallTemperatureProfileSingleLayer) {
     double t_wall = 0.01;   // m
     double k_wall = 50.0;   // W/(m·K)
 
-    double q;
+    double q = 0.0;
     std::vector<double> layers = {t_wall / k_wall};
-    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, layers, q);
+    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, layers, 0.0, q);
 
     // Total R = 1/500 + 0.01/50 + 1/100 = 0.002 + 0.0002 + 0.01 = 0.0122 m²·K/W
     // q = 100 / 0.0122 ≈ 8197 W/m²
@@ -3557,9 +3549,9 @@ TEST(HeatTransferTest, WallTemperatureProfileMultiLayer) {
     double t_insul = 0.05;    // m
     double k_insul = 0.04;    // W/(m·K)
 
-    double q;
+    double q = 0.0;
     auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold,
-                                          {t_steel / k_steel, t_insul / k_insul}, q);
+                                          {t_steel / k_steel, t_insul / k_insul}, 0.0, q);
 
     // Should have 3 interface temperatures
     ASSERT_EQ(temps.size(), 3u);
@@ -3659,8 +3651,8 @@ TEST(HeatTransferTest, HeatFluxFromTAtEdge) {
     std::vector<double> t_over_k = {0.01 / 50.0};  // 10mm steel
 
     // First, compute the actual temperature profile
-    double q_expected;
-    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_expected);
+    double q_expected = 0.0;
+    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, 0.0, q_expected);
 
     // Now verify we can recover q from each edge temperature
     double q0 = heat_flux_from_T_at_edge(temps[0], 0, T_hot, T_cold, h_hot, h_cold, t_over_k);
@@ -3679,8 +3671,8 @@ TEST(HeatTransferTest, HeatFluxFromTAtEdgeMultiLayer) {
     // Steel + insulation
     std::vector<double> t_over_k = {0.005 / 50.0, 0.05 / 0.04};
 
-    double q_expected;
-    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_expected);
+    double q_expected = 0.0;
+    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, 0.0, q_expected);
 
     // Verify all edges
     for (std::size_t i = 0; i < temps.size(); ++i) {
@@ -3699,8 +3691,8 @@ TEST(HeatTransferTest, HeatFluxFromTAtDepth) {
     std::vector<double> conductivities = {50.0};  // steel
     std::vector<double> t_over_k = {0.01 / 50.0};
 
-    double q_expected;
-    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_expected);
+    double q_expected = 0.0;
+    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, 0.0, q_expected);
 
     // At depth 0 (hot surface)
     double q0 = heat_flux_from_T_at_depth(temps[0], 0.0, T_hot, T_cold, h_hot, h_cold,
@@ -3727,8 +3719,8 @@ TEST(HeatTransferTest, BulkTFromEdgeTAndQ) {
     double h_cold = 100.0;
     std::vector<double> t_over_k = {0.01 / 50.0};
 
-    double q;
-    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q);
+    double q = 0.0;
+    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, 0.0, q);
 
     // From hot surface temperature, recover T_hot
     double T_hot_calc = bulk_T_from_edge_T_and_q(temps[0], 0, q, h_hot, h_cold, t_over_k, "hot");
@@ -3763,8 +3755,8 @@ TEST(HeatTransferTest, HeatFluxRoundTrip) {
     double q_original = heat_flux(U, dT);
 
     // Step 2: Get temperature profile
-    double q_profile;
-    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_profile);
+    double q_profile = 0.0;
+    auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, 0.0, q_profile);
 
     // Verify heat flux from profile matches
     EXPECT_NEAR(q_profile, q_original, 0.01);
@@ -3790,8 +3782,8 @@ TEST(HeatTransferTest, HeatFluxFromDepthRoundTrip) {
     std::vector<double> t_over_k = {0.010/50.0, 0.050/0.04};
 
     // Get reference heat flux
-    double q_ref;
-    wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q_ref);
+    double q_ref = 0.0;
+    wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, 0.0, q_ref);
 
     // Test at various depths (simulating embedded thermocouples)
     std::vector<double> test_depths = {0.0, 0.005, 0.010, 0.025, 0.060};
@@ -3877,13 +3869,13 @@ TEST(HeatTransferTest, TemperatureSensitivityVerifyWithFiniteDiff) {
         auto [dT_dT_hot_anal, dT_dT_cold_anal] = dT_edge_dT_bulk(edge, h_hot, h_cold, t_over_k);
 
         // Finite difference for T_hot
-        double q1, q2;
-        auto temps1 = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, q1);
-        auto temps2 = wall_temperature_profile(T_hot + dT, T_cold, h_hot, h_cold, t_over_k, q2);
+        double q1 = 0.0, q2 = 0.0;
+        auto temps1 = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, 0.0, q1);
+        auto temps2 = wall_temperature_profile(T_hot + dT, T_cold, h_hot, h_cold, t_over_k, 0.0, q2);
         double dT_dT_hot_fd = (temps2[edge] - temps1[edge]) / dT;
 
         // Finite difference for T_cold
-        auto temps3 = wall_temperature_profile(T_hot, T_cold + dT, h_hot, h_cold, t_over_k, q1);
+        auto temps3 = wall_temperature_profile(T_hot, T_cold + dT, h_hot, h_cold, t_over_k, 0.0, q1);
         double dT_dT_cold_fd = (temps3[edge] - temps1[edge]) / dT;
 
         EXPECT_NEAR(dT_dT_hot_anal, dT_dT_hot_fd, 1e-6) << "Edge " << edge;

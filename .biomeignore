@@ -1,0 +1,16 @@
+.venv/**
+build/**
+dist/**
+python/**
+src/**
+include/**
+scripts/**
+tests/**
+thermo_data_generator/**
+benchmarks/**
+cantera_validation_tests/**
+node_modules/**
+**/__pycache__/**
+**/CMakeFiles/**
+**/cmake_install.cmake
+**/CMakeCache.txt

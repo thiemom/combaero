@@ -10,12 +10,17 @@
 namespace combaero {
 
 std::vector<double> normalize_fractions(const std::vector<double>& fractions) {
-    double sum = std::accumulate(fractions.begin(), fractions.end(), 0.0);
-    std::vector<double> normalized = fractions;
+    std::vector<double> clamped = fractions;
+    for (double& value : clamped) {
+        if (value < 1.0e-15) value = 1.0e-15;
+    }
+
+    double sum = std::accumulate(clamped.begin(), clamped.end(), 0.0);
+    std::vector<double> normalized = clamped;
 
     if (std::abs(sum) < 1.0e-10) {
         std::cerr << "Warning: normalize_fractions received all zeros. Returning all zeros." << std::endl;
-        return normalized;
+        return fractions;
     }
 
     for (double& value : normalized) {

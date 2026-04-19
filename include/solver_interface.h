@@ -14,6 +14,8 @@
 // -----------------------------------------------------------------------------
 // Functions in this module execute highly optimized `(f, J)` combined
 // evaluations required by the global Python `scipy.optimize.root` solver.
+// Note: Concepts currently named "Pipe" are scheduled for renaming to "Channel"
+// to account for advanced non-circular geometries and aerospace cooling applications.
 //
 // Every function returns a `std::tuple<double, double>`, corresponding to:
 //    (Value, Exact Analytical Jacobian / Derivative)
@@ -81,13 +83,15 @@ struct OrificeResult {
   std::vector<double> d_mdot_dY_up;
 };
 
-struct PipeResult {
+struct ChannelResult {
   double dP_calc;
   double d_dP_d_mdot;
   double d_dP_dP_static_up;
   double d_dP_dT_up;
   std::vector<double> d_dP_dY_up;
 };
+
+using PipeResult = ChannelResult;
 
 // -----------------------------------------------------------------------------
 // 1. Incompressible Flow Components
@@ -132,13 +136,15 @@ OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
 std::tuple<double, double> pressure_loss_and_jacobian(double v, double rho,
                                                        double K);
 
-// Full pipe evaluation with all derivatives.
-PipeResult pipe_residuals_and_jacobian(double m_dot, double P_total_up,
-                                       double P_static_up, double T_up,
-                                       const std::vector<double> &Y_up,
-                                       double P_static_down, double L, double D,
-                                       double roughness,
-                                       const std::string &friction_model);
+// Full channel evaluation with all derivatives.
+ChannelResult channel_residuals_and_jacobian(double m_dot, double P_total_up,
+                                             double P_static_up, double T_up,
+                                             const std::vector<double> &Y_up,
+                                             double P_static_down, double L,
+                                             double D, double roughness,
+                                             const std::string &friction_model,
+                                             double f_multiplier = 1.0);
+
 
 
 // Calculate Lossless Connection Ideal Pressure and Jacobian
@@ -189,9 +195,9 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
     const std::vector<double>& Y_up,
     double P_static_down, double Cd, double area, double beta);
 
-// Compressible pipe flow using Fanno model with variable friction.
+// Compressible channel flow using Fanno model with variable friction.
 //
-// Method: Finite Difference Jacobians (fanno_pipe_rough is iterative)
+// Method: Finite Difference Jacobians (fanno_channel_rough is iterative)
 // Inputs:
 //   T_in   : Inlet static temperature [K]
 //   P_in   : Inlet static pressure [Pa]
@@ -208,18 +214,22 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
 //   d_dP_dP_in : Jacobian w.r.t. inlet pressure [Pa/Pa] = [-]
 //   d_dP_dT_in : Jacobian w.r.t. inlet temperature [Pa/K]
 //   d_dP_du_in : Jacobian w.r.t. inlet velocity [Pa/(m/s)]
-std::tuple<double, double, double, double> pipe_compressible_mdot_and_jacobian(
+std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobian(
     double T_in, double P_in, double u_in,
     const std::vector<double>& X,
     double L, double D, double roughness,
-    const std::string& friction_model);
+    const std::string& friction_model,
+    double f_multiplier = 1.0);
 
-// Full compressible pipe evaluation with all derivatives for network solver.
-PipeResult pipe_compressible_residuals_and_jacobian(
+
+// Full compressible channel evaluation with all derivatives for network solver.
+ChannelResult channel_compressible_residuals_and_jacobian(
     double m_dot, double P_total_up, double T_up,
     const std::vector<double>& Y_up,
     double P_static_down, double L, double D, double roughness,
-    const std::string& friction_model);
+    const std::string& friction_model,
+    double f_multiplier = 1.0);
+
 
 // -----------------------------------------------------------------------------
 // 2. Heat Transfer Components

@@ -23,6 +23,7 @@ inline constexpr Entry function_units[] = {
     {"mass_to_mole", "Y: kg/kg", "mol/mol"},
     {"normalize_fractions", "X: mol/mol", "mol/mol"},
     {"convert_to_dry_fractions", "X: mol/mol", "mol/mol"},
+    {"equivalence_ratio", "mole_fractions: mol/mol", "[-]"},
 
     // -------------------------------------------------------------------------
     // thermo.h - Species Data
@@ -99,6 +100,7 @@ inline constexpr Entry function_units[] = {
     {"k_tbc_ysz", "T: K, hours: h (default 0), is_ebpvd: bool (default False)",
      "W/(m*K)"},
     {"list_materials", "-", "list[str]"},
+    {"get_material_conductivity", "name: str, T: K", "W/(m*K)"},
 
     // -------------------------------------------------------------------------
     // cooling_correlations.h - Advanced Cooling Correlations
@@ -188,11 +190,11 @@ inline constexpr Entry function_units[] = {
     // -------------------------------------------------------------------------
     // compressible.h - Fanno Flow
     // -------------------------------------------------------------------------
-    {"fanno_pipe", "T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, f: -, X: mol/mol",
+    {"fanno_channel", "T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, f: -, X: mol/mol",
      "FannoSolution"},
-    {"fanno_pipe_rough",
+    {"fanno_channel_rough",
      "T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, roughness: m, X: mol/mol, "
-     "correlation: str",
+     "correlation: str, f_multiplier: - (default 1.0)",
      "FannoSolution"},
     {"fanno_max_length", "T_in: K, P_in: Pa, u_in: m/s, D: m, f: -, X: mol/mol",
      "m"},
@@ -219,16 +221,16 @@ inline constexpr Entry function_units[] = {
     // -------------------------------------------------------------------------
     // incompressible.h - Thermo-Aware High-Level Functions
     // -------------------------------------------------------------------------
-    {"pipe_flow", "T: K, P: Pa, X: mol/mol, u: m/s, L: m, D: m, f: -",
+    {"channel_flow", "T: K, P: Pa, X: mol/mol, u: m/s, L: m, D: m, f: -",
      "IncompressibleFlowSolution"},
-    {"pipe_flow_rough",
+    {"channel_flow_rough",
      "T: K, P: Pa, X: mol/mol, u: m/s, L: m, D: m, roughness: m, correlation: "
      "str",
      "IncompressibleFlowSolution"},
     {"orifice_flow_thermo",
      "T: K, P: Pa, X: mol/mol, P_back: Pa, A: m^2, Cd: -",
      "IncompressibleFlowSolution"},
-    {"pressure_drop_pipe",
+    {"channel_pressure_drop",
      "T: K, P: Pa, X: mol/mol, v: m/s, D: m, L: m, roughness: m, correlation: "
      "str",
      "tuple(Pa, -, -)"},
@@ -243,23 +245,23 @@ inline constexpr Entry function_units[] = {
      "m_dot: kg/s, P_total_up: Pa, T_up: K, Y_up: kg/kg, P_static_down: Pa, "
      "Cd: -, area: m^2, beta: -",
      "OrificeResult"},
-    {"pipe_compressible_mdot_and_jacobian",
+    {"channel_compressible_mdot_and_jacobian",
      "T_in: K, P_in: Pa, u_in: m/s, X: mol/mol, L: m, D: m, roughness: m, "
-     "friction_model: str",
+     "friction_model: str, f_multiplier: - (default 1.0)",
      "tuple(Pa, -, Pa/K, Pa/(m/s))"},
-    {"pipe_compressible_residuals_and_jacobian",
+    {"channel_compressible_residuals_and_jacobian",
      "m_dot: kg/s, P_total_up: Pa, T_up: K, Y_up: kg/kg, P_static_down: Pa, "
-     "L: m, D: m, roughness: m, friction_model: str",
-     "PipeResult"},
+     "L: m, D: m, roughness: m, friction_model: str, f_multiplier: - (default 1.0)",
+     "ChannelResult"},
 
     // -------------------------------------------------------------------------
     // geometry.h - Geometric Utilities
     // -------------------------------------------------------------------------
-    {"pipe_area", "D: m", "m^2"},
+    {"circular_area", "D: m", "m^2"},
     {"annular_area", "D_outer: m, D_inner: m", "m^2"},
-    {"pipe_volume", "D: m, L: m", "m^3"},
-    {"pipe_roughness", "material: str", "m"},
-    {"standard_pipe_roughness", "-", "dict[str, m]"},
+    {"cylinder_volume", "D: m, L: m", "m^3"},
+    {"channel_roughness", "material: str", "m"},
+    {"standard_channel_roughness", "-", "dict[str, m]"},
     {"hydraulic_diameter", "A: m^2, P_wetted: m", "m"},
     {"hydraulic_diameter_rect", "a: m, b: m", "m"},
     {"hydraulic_diameter_annulus", "D_outer: m, D_inner: m", "m"},
@@ -280,9 +282,9 @@ inline constexpr Entry function_units[] = {
     {"nusselt_sieder_tate", "Re: -, Pr: -, mu_ratio: -", "- (Nu)"},
     {"nusselt_petukhov", "Re: -, Pr: -, f: - (optional)", "- (Nu)"},
     {"htc_from_nusselt", "Nu: -, k: W/(m*K), L: m", "W/(m^2*K)"},
-    {"nusselt_pipe", "State, V: m/s, D: m", "- (Nu)"},
-    {"htc_pipe", "State, V: m/s, D: m", "W/(m^2*K)"},
-    {"htc_pipe",
+    {"nusselt_circular_channel", "State, V: m/s, D: m", "- (Nu)"},
+    {"htc_circular_channel", "State, V: m/s, D: m", "W/(m^2*K)"},
+    {"htc_circular_channel",
      "T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, correlation: str, "
      "heating: bool, mu_ratio: -, roughness: m",
      "tuple(W/(m^2*K), -, -)"},
@@ -294,7 +296,7 @@ inline constexpr Entry function_units[] = {
     {"overall_htc", "h_values: W/(m^2*K), t_over_k: m^2*K/W", "W/(m^2*K)"},
     {"overall_htc_wall",
      "h_inner, h_outer: W/(m^2*K), t_over_k_layers: m^2*K/W", "W/(m^2*K)"},
-    {"overall_htc_tube",
+    {"overall_htc_wall",
      "h_inner, h_outer: W/(m^2*K), t_wall: m, k_wall: W/(m*K)", "W/(m^2*K)"},
     {"thermal_resistance", "h: W/(m^2*K), A: m^2", "K/W"},
     {"thermal_resistance_wall", "t: m, k: W/(m*K), A: m^2", "K/W"},
@@ -631,7 +633,7 @@ inline constexpr Entry function_units[] = {
     {"ChannelResult::dT_aw_dT", "-", "- (dimensionless)"},
     {"ChannelResult::dq_dmdot", "-", "W*s/(m^2*kg)"},
     {"ChannelResult::dq_dT", "-", "W/(m^2*K)"},
-    {"ChannelResult::dq_dT_wall", "-", "W/(m^2*K)"},
+    {"ChannelResult::dq_dT_hot", "-", "W/(m^2*K)"},
 
     // -------------------------------------------------------------------------
     // heat_transfer.h - Channel flow functions (HTC + pressure drop)
@@ -642,19 +644,19 @@ inline constexpr Entry function_units[] = {
      "ChannelResult"},
     {"channel_ribbed",
      "T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, e_D: -, "
-     "pitch_to_height: -, alpha_deg: deg, T_wall: K",
+     "pitch_to_height: -, alpha_deg: deg, T_hot: K",
      "ChannelResult"},
     {"channel_dimpled",
      "T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, d_Dh: -, "
-     "h_d: -, S_d: -, T_wall: K",
+     "h_d: -, S_d: -, T_hot: K",
      "ChannelResult"},
     {"channel_pin_fin",
      "T: K, P: Pa, X: mol/mol, velocity: m/s, channel_height: m, pin_diameter: "
-     "m, S_D: -, X_D: -, N_rows: -, T_wall: K",
+     "m, S_D: -, X_D: -, N_rows: -, T_hot: K",
      "ChannelResult"},
     {"channel_impingement",
      "T: K, P: Pa, X: mol/mol, mdot_jet: kg/s, d_jet: m, z_D: -, x_D: -, y_D: "
-     "-, A_target: m^2, T_wall: K",
+     "-, A_target: m^2, T_hot: K",
      "ChannelResult"},
 
     // -------------------------------------------------------------------------
@@ -868,10 +870,16 @@ inline constexpr Entry function_units[] = {
     {"AcousticProperties::particle_velocity", "-", "m/s"},
     {"AcousticProperties::spl", "-", "dB"},
     {"AcousticProperties::wavelength", "-", "m"},
-    {"pipe_dP", "-", "m/s"},
-    {"pipe_dP_mdot", "-", "Pa"},
-    {"pipe_velocity", "-", "m/s"},
-    {"pipe_mdot", "-", "m/s"},
+    {"channel_dP", "-", "Pa"},
+    {"channel_dP_mdot", "-", "Pa"},
+    {"channel_velocity", "-", "m/s"},
+    {"channel_mdot", "-", "kg/s"},
+    {"channel_area", "-", "m²"},
+    {"channel_volume", "-", "m³"},
+    {"channel_roughness", "-", "m"},
+    {"pressure_drop_channel", "-", "Pa"},
+    {"nusselt_channel", "-", "-"},
+    {"htc_channel", "-", "W/(m²·K)"},
     {"dynamic_pressure", "-", "Pa"},
     {"velocity_from_q", "-", "m/s"},
     {"OrificeGeometry::D", "-", "m"},

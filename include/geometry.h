@@ -26,7 +26,7 @@ double hydraulic_diameter(double A, double P_wetted);
 // Returns: hydraulic diameter [m]
 double hydraulic_diameter_rect(double a, double b);
 
-// Hydraulic diameter for annulus (concentric pipes)
+// Hydraulic diameter for annulus (concentric channels)
 // Dh = D_outer - D_inner
 //
 // Parameters:
@@ -38,15 +38,16 @@ double hydraulic_diameter_annulus(double D_outer, double D_inner);
 // -------------------------------------------------------------
 // Simple Geometry Helpers
 // -------------------------------------------------------------
-// Common geometric calculations for pipe flow
+// Common geometric calculations for channel flow
 
-// Circular pipe cross-sectional area
+// Circular channel cross-sectional area
 // A = π * (D/2)²
 //
 // Parameters:
 //   D : diameter [m]
 // Returns: area [m²]
-double pipe_area(double D);
+double circular_area(double D);
+
 
 // Annular cross-sectional area
 // A = π * ((D_outer/2)² - (D_inner/2)²)
@@ -57,14 +58,15 @@ double pipe_area(double D);
 // Returns: area [m²]
 double annular_area(double D_outer, double D_inner);
 
-// Cylindrical pipe volume
+// Cylindrical channel volume
 // V = π * (D/2)² * L
 //
 // Parameters:
 //   D : diameter [m]
 //   L : length [m]
 // Returns: volume [m³]
-double pipe_volume(double D, double L);
+double cylinder_volume(double D, double L);
+
 
 // -------------------------------------------------------------
 // Acoustic Geometry Primitives
@@ -72,7 +74,7 @@ double pipe_volume(double D, double L);
 // Standard shapes for acoustic mode calculations.
 // All dimensions in SI units (meters).
 
-// Cylindrical tube (pipe, duct, combustor liner)
+// Cylindrical tube (channel, duct, combustor liner)
 struct Tube {
     double L;   // Length [m]
     double D;   // Diameter [m]

@@ -2,10 +2,10 @@ import numpy as np
 from scipy.optimize._numdiff import approx_derivative
 
 from combaero.network import (
+    ChannelElement,
     FlowNetwork,
     NetworkSolver,
     OrificeElement,
-    PipeElement,
     PlenumNode,
     PressureBoundary,
 )
@@ -48,20 +48,22 @@ def test_jacobian_accuracy():
     net.add_node(n_out)
 
     # Elements
-    orf = OrificeElement("orf", from_node="in", to_node="n1", Cd=0.6, area=0.01)
-    pipe = PipeElement(
-        "pipe", from_node="n1", to_node="out", length=1.0, diameter=0.1, roughness=1e-5
+    orf = OrificeElement(
+        "orf", from_node="in", to_node="n1", Cd=0.6, diameter=0.112838, correlation="fixed"
+    )
+    channel = ChannelElement(
+        "channel", from_node="n1", to_node="out", length=1.0, diameter=0.1, roughness=1e-5
     )
 
     net.add_element(orf)
-    net.add_element(pipe)
+    net.add_element(channel)
 
     solver = NetworkSolver(net)
     _assert_jacobian_matches_fd(solver, max_rel_tol=0.01)
 
 
 def test_jacobian_accuracy_compressible_network() -> None:
-    """Global Jacobian FD check for a compressible pipe-orifice network."""
+    """Global Jacobian FD check for a compressible channel-orifice network."""
     net = FlowNetwork()
 
     n_in = PressureBoundary("in", P_total=4.8e5, T_total=540.0)
@@ -73,8 +75,8 @@ def test_jacobian_accuracy_compressible_network() -> None:
     net.add_node(n_out)
 
     net.add_element(
-        PipeElement(
-            "pipe",
+        ChannelElement(
+            "channel",
             from_node="in",
             to_node="mid",
             length=3.2,
@@ -90,8 +92,9 @@ def test_jacobian_accuracy_compressible_network() -> None:
             from_node="mid",
             to_node="out",
             Cd=0.69,
-            area=1.2e-4,
+            diameter=0.012361,
             regime="compressible",
+            correlation="fixed",
         )
     )
 

@@ -104,3 +104,9 @@ diagnostic_reports/
 
 TODO.md
 .aider*
+
+# Benchmark run outputs (auto-generated, not for tracking)
+benchmarks/runs/
+benchmarks/network_solver_benchmark_latest.json
+gui/nw_*.json
+gui/tmp/

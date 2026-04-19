@@ -6,6 +6,7 @@ and the initial-guess propagation becomes critical.
 """
 
 import numpy as np
+
 import combaero as cb
 from combaero.heat_transfer import ConvectiveSurface, SmoothModel
 from combaero.network import (
@@ -19,17 +20,21 @@ from combaero.network import (
     WallConnection,
 )
 
+
 def _area(diameter: float) -> float:
     return float(np.pi * (diameter / 2.0) ** 2)
+
 
 def _mdot_for_mach(mach: float, T: float, P_ref: float, X: list[float], area: float) -> float:
     rho = cb.density(T, P_ref, X)
     a = cb.speed_of_sound(T, X)
     return float(mach * rho * a * area)
 
+
 _T_HOT = 740.0
 _T_COLD = 320.0
 _P_OUT = 2.0e5
+
 
 def _build_fully_coupled_network(mach_target: float) -> FlowNetwork:
     x_air = cb.species.dry_air()
@@ -58,14 +63,63 @@ def _build_fully_coupled_network(mach_target: float) -> FlowNetwork:
     hot_surface = ConvectiveSurface(area=np.pi * d_hot * length, model=SmoothModel())
     cold_surface = ConvectiveSurface(area=np.pi * d_cold * length, model=SmoothModel())
 
-    net.add_element(PipeElement(id="hot_pipe", from_node="hot_inlet", to_node="hot_plenum", length=length, diameter=d_hot, roughness=5.0e-5, regime="compressible", surface=hot_surface))
-    net.add_element(OrificeElement(id="hot_orifice", from_node="hot_plenum", to_node="hot_outlet", Cd=0.72, area=_area(0.030), regime="compressible"))
-    net.add_element(PipeElement(id="cold_pipe", from_node="cold_inlet", to_node="cold_plenum", length=length, diameter=d_cold, roughness=5.0e-5, regime="compressible", surface=cold_surface))
-    net.add_element(OrificeElement(id="cold_orifice", from_node="cold_plenum", to_node="cold_outlet", Cd=0.72, area=_area(0.025), regime="compressible"))
+    net.add_element(
+        PipeElement(
+            id="hot_pipe",
+            from_node="hot_inlet",
+            to_node="hot_plenum",
+            length=length,
+            diameter=d_hot,
+            roughness=5.0e-5,
+            regime="compressible",
+            surface=hot_surface,
+        )
+    )
+    net.add_element(
+        OrificeElement(
+            id="hot_orifice",
+            from_node="hot_plenum",
+            to_node="hot_outlet",
+            Cd=0.72,
+            area=_area(0.030),
+            regime="compressible",
+        )
+    )
+    net.add_element(
+        PipeElement(
+            id="cold_pipe",
+            from_node="cold_inlet",
+            to_node="cold_plenum",
+            length=length,
+            diameter=d_cold,
+            roughness=5.0e-5,
+            regime="compressible",
+            surface=cold_surface,
+        )
+    )
+    net.add_element(
+        OrificeElement(
+            id="cold_orifice",
+            from_node="cold_plenum",
+            to_node="cold_outlet",
+            Cd=0.72,
+            area=_area(0.025),
+            regime="compressible",
+        )
+    )
 
-    net.add_wall(WallConnection(id="coupling_wall", element_a="hot_pipe", element_b="cold_pipe", wall_thickness=0.002, wall_conductivity=20.0))
+    net.add_wall(
+        WallConnection(
+            id="coupling_wall",
+            element_a="hot_pipe",
+            element_b="cold_pipe",
+            wall_thickness=0.002,
+            wall_conductivity=20.0,
+        )
+    )
     net.thermal_coupling_enabled = True
     return net
+
 
 if __name__ == "__main__":
     mach_values = np.linspace(0.20, 1.50, 14)

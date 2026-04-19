@@ -14,12 +14,14 @@ Usage:
 """
 
 import argparse
-import pandas as pd
-import sys
+import datetime
 import os
 import subprocess
-import datetime
+import sys
 from pathlib import Path
+
+import pandas as pd
+
 
 def load_csv(filepath):
     """Load CSV file with error handling."""
@@ -33,40 +35,42 @@ def load_csv(filepath):
         print(f"Error loading {filepath}: {e}")
         return None
 
+
 def compare_differences(baseline_df, current_df):
     """Compare Jacobian differences between baseline and current results."""
     # Merge on test_name and derivative
-    merged = pd.merge(baseline_df, current_df,
-                     on=['test_name', 'derivative'],
-                     suffixes=('_baseline', '_current'))
+    merged = pd.merge(
+        baseline_df, current_df, on=["test_name", "derivative"], suffixes=("_baseline", "_current")
+    )
 
     if len(merged) == 0:
         print("No matching derivatives found between baseline and current")
         return None
 
     # Calculate changes
-    merged['abs_diff_change'] = merged['abs_diff_current'] - merged['abs_diff_baseline']
-    merged['rel_diff_change'] = merged['rel_diff_current'] - merged['rel_diff_baseline']
+    merged["abs_diff_change"] = merged["abs_diff_current"] - merged["abs_diff_baseline"]
+    merged["rel_diff_change"] = merged["rel_diff_current"] - merged["rel_diff_baseline"]
 
     # Find regressions (increased differences)
-    regressions = merged[merged['abs_diff_change'] > 1e-10].copy()
-    improvements = merged[merged['abs_diff_change'] < -1e-10].copy()
+    regressions = merged[merged["abs_diff_change"] > 1e-10].copy()
+    improvements = merged[merged["abs_diff_change"] < -1e-10].copy()
 
     return {
-        'merged': merged,
-        'regressions': regressions,
-        'improvements': improvements,
-        'total_compared': len(merged)
+        "merged": merged,
+        "regressions": regressions,
+        "improvements": improvements,
+        "total_compared": len(merged),
     }
+
 
 def print_summary(results):
     """Print comparison summary."""
     if not results:
         return
 
-    merged = results['merged']
-    regressions = results['regressions']
-    improvements = results['improvements']
+    merged = results["merged"]
+    regressions = results["regressions"]
+    improvements = results["improvements"]
 
     print("\n=== JACOBIAN BASELINE COMPARISON ===")
     print(f"Total derivatives compared: {results['total_compared']}")
@@ -75,46 +79,66 @@ def print_summary(results):
     print(f"Unchanged: {results['total_compared'] - len(regressions) - len(improvements)}")
 
     # Statistics
-    max_abs_change = merged['abs_diff_change'].abs().max()
-    max_rel_change = merged['rel_diff_change'].abs().max()
+    max_abs_change = merged["abs_diff_change"].abs().max()
+    max_rel_change = merged["rel_diff_change"].abs().max()
 
     print(f"\nMaximum absolute difference change: {max_abs_change:.2e}")
     print(f"Maximum relative difference change: {max_rel_change:.2e}")
 
     # Show top regressions
     if len(regressions) > 0:
-        print(f"\n=== TOP 5 REGRESSIONS ===")
-        worst_regressions = regressions.nlargest(5, 'abs_diff_change')
+        print("\n=== TOP 5 REGRESSIONS ===")
+        worst_regressions = regressions.nlargest(5, "abs_diff_change")
         for _, row in worst_regressions.iterrows():
-            print(f"{row['test_name']}.{row['derivative']}: "
-                  f"{row['abs_diff_baseline']:.2e} → {row['abs_diff_current']:.2e} "
-                  f"(+{row['abs_diff_change']:.2e})")
+            print(
+                f"{row['test_name']}.{row['derivative']}: "
+                f"{row['abs_diff_baseline']:.2e} → {row['abs_diff_current']:.2e} "
+                f"(+{row['abs_diff_change']:.2e})"
+            )
 
     # Show top improvements
     if len(improvements) > 0:
-        print(f"\n=== TOP 5 IMPROVEMENTS ===")
-        best_improvements = improvements.nsmallest(5, 'abs_diff_change')
+        print("\n=== TOP 5 IMPROVEMENTS ===")
+        best_improvements = improvements.nsmallest(5, "abs_diff_change")
         for _, row in best_improvements.iterrows():
-            print(f"{row['test_name']}.{row['derivative']}: "
-                  f"{row['abs_diff_baseline']:.2e} → {row['abs_diff_current']:.2e} "
-                  f"({row['abs_diff_change']:.2e})")
+            print(
+                f"{row['test_name']}.{row['derivative']}: "
+                f"{row['abs_diff_baseline']:.2e} → {row['abs_diff_current']:.2e} "
+                f"({row['abs_diff_change']:.2e})"
+            )
+
 
 def main():
-    parser = argparse.ArgumentParser(description='Compare Jacobian test results against baseline')
+    parser = argparse.ArgumentParser(description="Compare Jacobian test results against baseline")
     root_dir = Path(__file__).resolve().parent.parent
     benchmarks_dir = root_dir / "benchmarks"
     runs_dir = benchmarks_dir / "runs"
 
-    parser.add_argument('--baseline', default=str(benchmarks_dir / 'jacobian_baseline_current.csv'),
-                       help='Baseline CSV file')
-    parser.add_argument('--current',
-                       help='Current results CSV file (if not provided, will run tests)')
-    parser.add_argument('--threshold', type=float, default=1e-10,
-                       help='Minimum change to consider as regression (default: 1e-10)')
-    parser.add_argument('--verbose', '-v', action='store_true',
-                       help='Enable detailed difference reporting (PRINT_JACOBIAN_DIFFERENCES=1)')
-    parser.add_argument('--save', action='store_true',
-                       help='Save current results to benchmarks/runs/ instead of a temporary file')
+    parser.add_argument(
+        "--baseline",
+        default=str(benchmarks_dir / "jacobian_baseline_current.csv"),
+        help="Baseline CSV file",
+    )
+    parser.add_argument(
+        "--current", help="Current results CSV file (if not provided, will run tests)"
+    )
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=1e-10,
+        help="Minimum change to consider as regression (default: 1e-10)",
+    )
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Enable detailed difference reporting (PRINT_JACOBIAN_DIFFERENCES=1)",
+    )
+    parser.add_argument(
+        "--save",
+        action="store_true",
+        help="Save current results to benchmarks/runs/ instead of a temporary file",
+    )
 
     args = parser.parse_args()
 
@@ -138,7 +162,7 @@ def main():
     else:
         print("Running current tests...")
 
-        timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%SZ")
+        timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%SZ")
         if args.save:
             runs_dir.mkdir(parents=True, exist_ok=True)
             output_file_name = f"jacobian_test_{timestamp}.csv"
@@ -161,10 +185,13 @@ def main():
                 print(f"Error: Executable not found at {exe_path}")
                 return 1
 
-            result = subprocess.run([
-                str(exe_path),
-                '--gtest_print_time=0'
-            ], env=env, capture_output=not args.verbose, text=True, cwd=str(build_dir))
+            result = subprocess.run(
+                [str(exe_path), "--gtest_print_time=0"],
+                env=env,
+                capture_output=not args.verbose,
+                text=True,
+                cwd=str(build_dir),
+            )
 
             if result.returncode != 0 and not args.verbose:
                 print(f"Error running tests: {result.stderr}")
@@ -211,12 +238,13 @@ def main():
     print_summary(results)
 
     # Return error code if there are regressions
-    if len(results['regressions']) > 0:
+    if len(results["regressions"]) > 0:
         print(f"⚠️  DETECTED {len(results['regressions'])} REGRESSIONS")
         return 1
     else:
-        print(f"\n✅ NO REGRESSIONS DETECTED")
+        print("\n✅ NO REGRESSIONS DETECTED")
         return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

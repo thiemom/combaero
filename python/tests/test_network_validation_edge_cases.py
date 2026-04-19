@@ -35,11 +35,19 @@ def test_validation_disjoint_boundaries():
     graph.add_node(outlet_2)
     graph.add_node(plenum_2)
 
-    graph.add_element(OrificeElement("orf_1", "inlet_1", "plenum_1", 0.6, 0.05))
-    graph.add_element(OrificeElement("orf_2", "plenum_1", "outlet_1", 0.6, 0.05))
+    graph.add_element(
+        OrificeElement("orf_1", "inlet_1", "plenum_1", 0.6, 0.05, correlation="fixed")
+    )
+    graph.add_element(
+        OrificeElement("orf_2", "plenum_1", "outlet_1", 0.6, 0.05, correlation="fixed")
+    )
 
-    graph.add_element(OrificeElement("orf_3", "inlet_2", "plenum_2", 0.6, 0.05))
-    graph.add_element(OrificeElement("orf_4", "plenum_2", "outlet_2", 0.6, 0.05))
+    graph.add_element(
+        OrificeElement("orf_3", "inlet_2", "plenum_2", 0.6, 0.05, correlation="fixed")
+    )
+    graph.add_element(
+        OrificeElement("orf_4", "plenum_2", "outlet_2", 0.6, 0.05, correlation="fixed")
+    )
 
     # We expect this to either be deemed valid (two separate systems) or invalid (not fully connected).
     # The current requirement says "No isolated subgraphs", but our implementation only checks
@@ -49,7 +57,7 @@ def test_validation_disjoint_boundaries():
 
 def test_validation_multiple_edges_between_same_nodes():
     # Adding two elements between the exact same nodes.
-    # E.g. parallel pipes without intermediate plenums.
+    # E.g. parallel channels without intermediate plenums.
     graph = FlowNetwork()
     inlet = PressureBoundary("inlet")
     outlet = PressureBoundary("outlet")
@@ -58,9 +66,9 @@ def test_validation_multiple_edges_between_same_nodes():
     graph.add_node(outlet)
 
     # Element 1
-    graph.add_element(OrificeElement("orf_1", "inlet", "outlet", 0.6, 0.05))
+    graph.add_element(OrificeElement("orf_1", "inlet", "outlet", 0.6, 0.05, correlation="fixed"))
     # Element 2
-    graph.add_element(OrificeElement("orf_2", "inlet", "outlet", 0.6, 0.02))
+    graph.add_element(OrificeElement("orf_2", "inlet", "outlet", 0.6, 0.02, correlation="fixed"))
 
     # This should be structurally valid, but let's make sure it doesn't crash
     # the solver or validation.
@@ -85,8 +93,8 @@ def test_validation_mass_flow_mismatch():
     graph.add_node(in2)
     graph.add_node(plenum)
 
-    graph.add_element(OrificeElement("o1", "in1", "p1", 0.6, 0.05))
-    graph.add_element(OrificeElement("o2", "in2", "p1", 0.6, 0.05))
+    graph.add_element(OrificeElement("o1", "in1", "p1", 0.6, 0.05, correlation="fixed"))
+    graph.add_element(OrificeElement("o2", "in2", "p1", 0.6, 0.05, correlation="fixed"))
 
     # Wait, our existing validator requires at least 1 pressure boundary, so this will fail early.
     with pytest.raises(ValueError, match="at least one PressureBoundary"):
@@ -107,9 +115,9 @@ def test_validation_mismatching_mass_flow_with_pressure_node():
     graph.add_node(plenum)
     graph.add_node(out)
 
-    graph.add_element(OrificeElement("o1", "in1", "p1", 0.6, 0.05))
-    graph.add_element(OrificeElement("o2", "in2", "p1", 0.6, 0.05))
-    graph.add_element(OrificeElement("o3", "p1", "out", 0.6, 0.05))
+    graph.add_element(OrificeElement("o1", "in1", "p1", 0.6, 0.05, correlation="fixed"))
+    graph.add_element(OrificeElement("o2", "in2", "p1", 0.6, 0.05, correlation="fixed"))
+    graph.add_element(OrificeElement("o3", "p1", "out", 0.6, 0.05, correlation="fixed"))
 
     graph.validate()
 
@@ -128,10 +136,12 @@ def test_validation_closed_loop():
     graph.add_node(p2)
     graph.add_node(p3)
 
-    graph.add_element(OrificeElement("o_ref", "ref", "p1", 0.6, 0.05))
-    graph.add_element(OrificeElement("o_1", "p1", "p2", 0.6, 0.05))
-    graph.add_element(OrificeElement("o_2", "p2", "p3", 0.6, 0.05))
-    graph.add_element(OrificeElement("o_3", "p3", "p1", 0.6, 0.05))  # closed loop
+    graph.add_element(OrificeElement("o_ref", "ref", "p1", 0.6, 0.05, correlation="fixed"))
+    graph.add_element(OrificeElement("o_1", "p1", "p2", 0.6, 0.05, correlation="fixed"))
+    graph.add_element(OrificeElement("o_2", "p2", "p3", 0.6, 0.05, correlation="fixed"))
+    graph.add_element(
+        OrificeElement("o_3", "p3", "p1", 0.6, 0.05, correlation="fixed")
+    )  # closed loop
 
     graph.validate()
 
@@ -153,7 +163,7 @@ def test_validation_elements_between_boundaries():
 
     graph.add_node(inlet)
     graph.add_node(outlet)
-    graph.add_element(OrificeElement("orf_1", "inlet", "outlet", 0.6, 0.05))
+    graph.add_element(OrificeElement("orf_1", "inlet", "outlet", 0.6, 0.05, correlation="fixed"))
 
     graph.validate()  # Should pass
 

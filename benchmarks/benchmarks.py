@@ -15,7 +15,7 @@ import math
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, TimeoutError
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from statistics import mean, median
 from time import perf_counter
@@ -85,7 +85,11 @@ def _build_fully_coupled_grid(
     pipe_regime = "compressible" if use_compressible else "incompressible"
     ori_regime = "compressible" if use_compressible else "incompressible"
 
-    net.add_element(OrificeElement("ori_air_in", "inlet_air", "distributor", Cd=0.8, area=total_area, regime=ori_regime))
+    net.add_element(
+        OrificeElement(
+            "ori_air_in", "inlet_air", "distributor", Cd=0.8, area=total_area, regime=ori_regime
+        )
+    )
 
     A_branch = total_area / n_parallel
     D_branch = math.sqrt(4 * A_branch / math.pi)
@@ -95,7 +99,16 @@ def _build_fully_coupled_grid(
 
     distributor_fuel = PlenumNode("distributor_fuel")
     net.add_node(distributor_fuel)
-    net.add_element(OrificeElement("ori_fuel_in", "inlet_fuel", "distributor_fuel", Cd=0.6, area=A_branch * 0.1 * n_parallel, regime=ori_regime))
+    net.add_element(
+        OrificeElement(
+            "ori_fuel_in",
+            "inlet_fuel",
+            "distributor_fuel",
+            Cd=0.6,
+            area=A_branch * 0.1 * n_parallel,
+            regime=ori_regime,
+        )
+    )
 
     for p in range(n_parallel):
         mixing = PlenumNode(f"mixing_plenum_{p}")
@@ -103,45 +116,123 @@ def _build_fully_coupled_grid(
         net.add_node(mixing)
         net.add_node(combustor)
 
-        net.add_element(OrificeElement(f"ori_fuel_{p}", "distributor_fuel", f"mixing_plenum_{p}", Cd=0.6, area=A_branch * 0.1, regime=ori_regime))
+        net.add_element(
+            OrificeElement(
+                f"ori_fuel_{p}",
+                "distributor_fuel",
+                f"mixing_plenum_{p}",
+                Cd=0.6,
+                area=A_branch * 0.1,
+                regime=ori_regime,
+            )
+        )
 
         for i in range(n_serial + 1):
             net.add_node(MomentumChamberNode(f"cold_chamber_{p}_{i}", area=A_branch))
             net.add_node(MomentumChamberNode(f"hot_chamber_{p}_{i}", area=A_branch))
 
-        net.add_element(OrificeElement(f"ori_cold_in_{p}", "distributor", f"cold_chamber_{p}_0", Cd=0.8, area=A_branch, regime=ori_regime))
+        net.add_element(
+            OrificeElement(
+                f"ori_cold_in_{p}",
+                "distributor",
+                f"cold_chamber_{p}_0",
+                Cd=0.8,
+                area=A_branch,
+                regime=ori_regime,
+            )
+        )
         for i in range(n_serial):
-            net.add_element(PipeElement(
-                f"cold_pipe_{p}_{i}", f"cold_chamber_{p}_{i}", f"cold_chamber_{p}_{i+1}",
-                length=L_pipe, diameter=D_branch, roughness=2e-5, regime=pipe_regime,
-                surface=ConvectiveSurface(area=A_ht_pipe, model=SmoothModel()) if A_ht_pipe > 0 else None
-            ))
+            net.add_element(
+                PipeElement(
+                    f"cold_pipe_{p}_{i}",
+                    f"cold_chamber_{p}_{i}",
+                    f"cold_chamber_{p}_{i + 1}",
+                    length=L_pipe,
+                    diameter=D_branch,
+                    roughness=2e-5,
+                    regime=pipe_regime,
+                    surface=ConvectiveSurface(area=A_ht_pipe, model=SmoothModel())
+                    if A_ht_pipe > 0
+                    else None,
+                )
+            )
 
-        net.add_element(OrificeElement(f"ori_comb_in_{p}", f"cold_chamber_{p}_{n_serial}", f"mixing_plenum_{p}", Cd=0.8, area=A_branch, regime=ori_regime))
-        net.add_element(OrificeElement(f"ori_mix_to_comb_{p}", f"mixing_plenum_{p}", f"combustor_{p}", Cd=0.8, area=A_branch, regime=ori_regime))
-        net.add_element(OrificeElement(f"ori_comb_out_{p}", f"combustor_{p}", f"hot_chamber_{p}_0", Cd=0.8, area=A_branch, regime=ori_regime))
+        net.add_element(
+            OrificeElement(
+                f"ori_comb_in_{p}",
+                f"cold_chamber_{p}_{n_serial}",
+                f"mixing_plenum_{p}",
+                Cd=0.8,
+                area=A_branch,
+                regime=ori_regime,
+            )
+        )
+        net.add_element(
+            OrificeElement(
+                f"ori_mix_to_comb_{p}",
+                f"mixing_plenum_{p}",
+                f"combustor_{p}",
+                Cd=0.8,
+                area=A_branch,
+                regime=ori_regime,
+            )
+        )
+        net.add_element(
+            OrificeElement(
+                f"ori_comb_out_{p}",
+                f"combustor_{p}",
+                f"hot_chamber_{p}_0",
+                Cd=0.8,
+                area=A_branch,
+                regime=ori_regime,
+            )
+        )
 
         for i in range(n_serial):
-            net.add_element(PipeElement(
-                f"hot_pipe_{p}_{i}", f"hot_chamber_{p}_{i}", f"hot_chamber_{p}_{i+1}",
-                length=L_pipe, diameter=D_branch, roughness=2e-5, regime=pipe_regime,
-                surface=ConvectiveSurface(area=A_ht_pipe, model=SmoothModel()) if A_ht_pipe > 0 else None
-            ))
+            net.add_element(
+                PipeElement(
+                    f"hot_pipe_{p}_{i}",
+                    f"hot_chamber_{p}_{i}",
+                    f"hot_chamber_{p}_{i + 1}",
+                    length=L_pipe,
+                    diameter=D_branch,
+                    roughness=2e-5,
+                    regime=pipe_regime,
+                    surface=ConvectiveSurface(area=A_ht_pipe, model=SmoothModel())
+                    if A_ht_pipe > 0
+                    else None,
+                )
+            )
 
             if A_ht_pipe > 0:
                 wall_cold_pipe_idx = n_serial - 1 - i
-                net.add_wall(WallConnection(
-                    id=f"wall_{p}_{i}",
-                    element_a=f"hot_pipe_{p}_{i}",
-                    element_b=f"cold_pipe_{p}_{wall_cold_pipe_idx}",
-                    wall_thickness=0.005,
-                    wall_conductivity=20.0,
-                    contact_area=A_ht_pipe
-                ))
+                net.add_wall(
+                    WallConnection(
+                        id=f"wall_{p}_{i}",
+                        element_a=f"hot_pipe_{p}_{i}",
+                        element_b=f"cold_pipe_{p}_{wall_cold_pipe_idx}",
+                        wall_thickness=0.005,
+                        wall_conductivity=20.0,
+                        contact_area=A_ht_pipe,
+                    )
+                )
 
-        net.add_element(OrificeElement(f"ori_hot_out_{p}", f"hot_chamber_{p}_{n_serial}", "collector", Cd=0.8, area=A_branch, regime=ori_regime))
+        net.add_element(
+            OrificeElement(
+                f"ori_hot_out_{p}",
+                f"hot_chamber_{p}_{n_serial}",
+                "collector",
+                Cd=0.8,
+                area=A_branch,
+                regime=ori_regime,
+            )
+        )
 
-    net.add_element(OrificeElement("ori_exhaust", "collector", "outlet", Cd=0.8, area=total_area, regime=ori_regime))
+    net.add_element(
+        OrificeElement(
+            "ori_exhaust", "collector", "outlet", Cd=0.8, area=total_area, regime=ori_regime
+        )
+    )
 
     net.thermal_coupling_enabled = True
     return net
@@ -184,7 +275,7 @@ def _run_network_case(case: BenchmarkCase, solver_timeout_s: float) -> dict[str,
         method="lm",
         timeout=solver_timeout_s,
         options=solver_options,
-        init_strategy="incompressible_warmstart"
+        init_strategy="incompressible_warmstart",
     )
     elapsed = perf_counter() - t0
 
@@ -204,33 +295,30 @@ def _run_case_once(case: BenchmarkCase, solver_timeout_s: float) -> dict[str, An
 
 
 def run_benchmarks(repeats: int, case_timeout_s: float, solver_timeout_s: float) -> dict[str, Any]:
-    total_area = 0.25 * math.pi * (0.8)**2
+    total_area = 0.25 * math.pi * (0.8) ** 2
 
-    grids = [
-        (1, 1),
-        (2, 2),
-        (5, 5),
-        (10, 10)
-    ]
+    grids = [(1, 1), (2, 2), (5, 5), (10, 10)]
 
     cases = []
     for s, p in grids:
         ht_area = max(50.0, float(s * p * 2.0))
         for comp in [False, True]:
             reg_str = "comp" if comp else "incomp"
-            cases.append(BenchmarkCase(
-                name=f"grid_{s}x{p}_{reg_str}",
-                timeout_s=case_timeout_s,
-                m_dot_air=10.0,
-                T_ad=1700.0,
-                n_serial=s,
-                n_parallel=p,
-                total_area=total_area,
-                total_ht_area=ht_area,
-                use_compressible=comp
-            ))
+            cases.append(
+                BenchmarkCase(
+                    name=f"grid_{s}x{p}_{reg_str}",
+                    timeout_s=case_timeout_s,
+                    m_dot_air=10.0,
+                    T_ad=1700.0,
+                    n_serial=s,
+                    n_parallel=p,
+                    total_area=total_area,
+                    total_ht_area=ht_area,
+                    use_compressible=comp,
+                )
+            )
 
-    run_stamp = datetime.now(timezone.utc).isoformat()
+    run_stamp = datetime.now(UTC).isoformat()
     results: dict[str, Any] = {
         "run_utc": run_stamp,
         "repeats": repeats,
@@ -315,14 +403,17 @@ def format_markdown(results: dict[str, Any]) -> str:
         max_s = stats.get("max_s", float("nan"))
         median_norm = stats.get("median_final_norm", float("nan"))
         lines.append(
-            "| "
-            f"`{case_name}` | {success_txt} | {median_s:.4f} | {max_s:.4f} | {median_norm:.3e} |"
+            f"| `{case_name}` | {success_txt} | {median_s:.4f} | {max_s:.4f} | {median_norm:.3e} |"
         )
 
     lines.append("")
     lines.append("## Notes")
-    lines.append("- Tested heavily non-linear parameterized combustor grid arrays (from 1x1 up to 10x10).")
-    lines.append("- \"comp\" forces strict Fanno/Orifice compressibility, which frequently crashes generic non-damped Newton solvers.")
+    lines.append(
+        "- Tested heavily non-linear parameterized combustor grid arrays (from 1x1 up to 10x10)."
+    )
+    lines.append(
+        '- "comp" forces strict Fanno/Orifice compressibility, which frequently crashes generic non-damped Newton solvers.'
+    )
     lines.append("- Timeouts are used to prevent hangs in difficult nonlinear regimes.")
     return "\n".join(lines)
 
@@ -390,7 +481,9 @@ def main() -> None:
     parser.add_argument(
         "--json-out",
         type=Path,
-        default=Path(__file__).parent.parent / "benchmarks" / "network_solver_benchmark_latest.json",
+        default=Path(__file__).parent.parent
+        / "benchmarks"
+        / "network_solver_benchmark_latest.json",
         help="Path for latest benchmark JSON output.",
     )
     parser.add_argument(

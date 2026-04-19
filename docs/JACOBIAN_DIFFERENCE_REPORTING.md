@@ -56,7 +56,7 @@ OrificeDerivatives,d_mdot_dP_static_down,-0.000004745402,-0.000004745461,0.00000
                      Test          Derivative       Abs Diff       Rel Diff
 ---------------------------------------------------------------------
 OrificeDerivatives  d_mdot_dT_up          0.000          0.000
-PipeDerivatives     d_dP_dT_up            0.001          0.000
+ChannelDerivatives     d_dP_dT_up            0.001          0.000
 ...
 ---------------------------------------------------------------------
 Maximum absolute difference: 1.234e-10
@@ -126,9 +126,9 @@ Use the actual differences to set appropriate test tolerances:
 
 ### Tests Needing Updates
 The following tests need `report_jacobian_difference()` calls added:
-- `PipeDerivatives` - 4 derivatives
+- `ChannelDerivatives` - 4 derivatives
 - `OrificeCompressibleDerivatives` - 3 derivatives
-- `PipeCompressibleMdotDerivatives` - 3 derivatives
+- `ChannelCompressibleMdotDerivatives` - 3 derivatives
 - `MomentumChamberDerivatives` - 2 derivatives
 - `AdiabaticTCompleteDerivatives` - 1 derivative
 - `AdiabaticTEquilibriumDerivatives` - 2 derivatives
@@ -186,7 +186,7 @@ PRINT_JACOBIAN_DIFFERENCES=1 ./test_solver_jacobians 2>&1 | \
 6. **Persistent Records**: CSV files create historical data for long-term analysis
 7. **Time Series Analysis**: Track accuracy changes over git history and code modifications
 8. **Statistical Analysis**: Export to pandas/Excel/R for deeper statistical analysis
-9. **Automated Reporting**: Integrate with CI/CD pipelines for automated accuracy tracking
+9. **Automated Reporting**: Integrate with CI/CD channellines for automated accuracy tracking
 
 ## Future Enhancements
 

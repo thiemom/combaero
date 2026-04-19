@@ -12,10 +12,10 @@ import combaero as cb
 class TestFrictionFactors:
     """Test friction factor correlation bindings."""
 
-    def test_friction_haaland_smooth_pipe(self):
-        """Test Haaland correlation for smooth pipe (e_D = 0)."""
+    def test_friction_haaland_smooth_channel(self):
+        """Test Haaland correlation for smooth channel (e_D = 0)."""
         Re = 1e5  # Reynolds number [-]
-        e_D = 0.0  # Smooth pipe (relative roughness) [-]
+        e_D = 0.0  # Smooth channel (relative roughness) [-]
 
         f = cb.friction_haaland(Re, e_D)
 
@@ -23,35 +23,35 @@ class TestFrictionFactors:
         assert f > 0
         assert isinstance(f, float)
 
-        # For smooth pipe at Re=1e5, f should be around 0.018
+        # For smooth channel at Re=1e5, f should be around 0.018
         # (from Moody diagram)
         assert 0.015 < f < 0.025
 
-    def test_friction_haaland_rough_pipe(self):
-        """Test Haaland correlation for rough pipe."""
+    def test_friction_haaland_rough_channel(self):
+        """Test Haaland correlation for rough channel."""
         Re = 1e5  # Reynolds number [-]
         e_D = 0.001  # Relative roughness [-]
 
         f = cb.friction_haaland(Re, e_D)
 
-        # Rough pipe should have higher friction than smooth
+        # Rough channel should have higher friction than smooth
         f_smooth = cb.friction_haaland(Re, 0.0)
         assert f > f_smooth
 
         # Reasonable range for this roughness
         assert 0.020 < f < 0.030
 
-    def test_friction_serghides_smooth_pipe(self):
-        """Test Serghides correlation for smooth pipe."""
+    def test_friction_serghides_smooth_channel(self):
+        """Test Serghides correlation for smooth channel."""
         Re = 1e5  # Reynolds number [-]
-        e_D = 0.0  # Smooth pipe [-]
+        e_D = 0.0  # Smooth channel [-]
 
         f = cb.friction_serghides(Re, e_D)
 
         assert f > 0
         assert isinstance(f, float)
 
-        # Should be very close to Haaland for smooth pipe
+        # Should be very close to Haaland for smooth channel
         f_haaland = cb.friction_haaland(Re, e_D)
         assert abs(f - f_haaland) / f_haaland < 0.05  # Within 5%
 
@@ -72,10 +72,10 @@ class TestFrictionFactors:
         # They should be close but not identical
         assert abs(f_serghides - f_haaland) / f_haaland < 0.03
 
-    def test_friction_colebrook_smooth_pipe(self):
-        """Test Colebrook-White for smooth pipe."""
+    def test_friction_colebrook_smooth_channel(self):
+        """Test Colebrook-White for smooth channel."""
         Re = 1e5  # Reynolds number [-]
-        e_D = 0.0  # Smooth pipe [-]
+        e_D = 0.0  # Smooth channel [-]
 
         f = cb.friction_colebrook(Re, e_D)
 
@@ -98,8 +98,8 @@ class TestFrictionFactors:
         # Both should converge to similar values
         assert abs(f_tight - f_loose) / f_tight < 1e-5
 
-    def test_friction_petukhov_smooth_pipe(self):
-        """Test Petukhov correlation for smooth pipe."""
+    def test_friction_petukhov_smooth_channel(self):
+        """Test Petukhov correlation for smooth channel."""
         Re = 1e5  # Reynolds number [-]
 
         f = cb.friction_petukhov(Re)
@@ -107,7 +107,7 @@ class TestFrictionFactors:
         assert f > 0
         assert isinstance(f, float)
 
-        # Should match smooth pipe Colebrook
+        # Should match smooth channel Colebrook
         f_colebrook = cb.friction_colebrook(Re, 0.0)
         assert abs(f - f_colebrook) / f_colebrook < 0.01  # Within 1%
 
@@ -128,18 +128,18 @@ class TestFrictionFactors:
         """Test friction factor increases with roughness."""
         Re = 1e5  # Fixed Reynolds number [-]
 
-        e_D_smooth = 0.0  # Smooth pipe [-]
-        e_D_rough = 0.01  # Rough pipe [-]
+        e_D_smooth = 0.0  # Smooth channel [-]
+        e_D_rough = 0.01  # Rough channel [-]
 
         f_smooth = cb.friction_haaland(Re, e_D_smooth)
         f_rough = cb.friction_haaland(Re, e_D_rough)
 
-        # Rougher pipe should have higher friction
+        # Rougher channel should have higher friction
         assert f_rough > f_smooth
 
     def test_friction_valid_range(self):
         """Test friction correlations work across valid Reynolds number range."""
-        e_D = 0.0  # Smooth pipe [-]
+        e_D = 0.0  # Smooth channel [-]
 
         # Test at transition region (Re ~ 3000)
         Re_transition = 3000

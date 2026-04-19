@@ -587,50 +587,62 @@ T_adiabatic_wall_and_jacobian_v(double T_static, double v, double T, double P,
 std::tuple<double, double>
 T0_from_static_and_jacobian_M(double T, double M,
                                const std::vector<double> &X) {
-  // Smooth floor for M to handle near-zero and reverse flow cases
-  // M can be negative for reverse flow, so use abs(M) for epsilon scaling
-  const double eps = std::max(1e-6, std::abs(M) * 1e-6);
+  // Enforce non-negative M (T0_from_static requires M >= 0).
+  // Use a smooth floor so the derivative remains informative near M = 0.
+  // For solver purposes the useful range is M >= 0; negative values are
+  // mapped to zero with a leaky 0.01 gradient.
+  double M_eff = (M >= 0.0) ? M : 0.01 * M;
+  double dMeff_dM = (M >= 0.0) ? 1.0 : 0.01;
 
-  // Smooth floor to avoid negative M issues (M_limit = 0.0)
-  constexpr double M_limit = 0.0;
-  constexpr double delta_M = 1e-6;
-  double M_target_minus = M - eps;
-  double diff_M = M_target_minus - M_limit;
-  double sq_dist_M = std::sqrt(diff_M * diff_M + delta_M);
-  double M_minus = 0.5 * (M_target_minus + M_limit + sq_dist_M);
-  double M_plus = M + eps;
-  double actual_dM = M_plus - M_minus;
+  double T0 = T0_from_static(T, M_eff, X);
 
-  double T0_plus = T0_from_static(T, M_plus, X);
-  double T0_minus = T0_from_static(T, M_minus, X);
-  double dT0_dM = (T0_plus - T0_minus) / actual_dM;
+  // Analytical derivative via the definition h(T0, X) = h(T, X) + 0.5 * v^2
+  // where v = M_eff * a(T, X).  Differentiating w.r.t. M_eff:
+  //   cp_mass(T0) * dT0/dM_eff = M_eff * a(T)^2
+  // => dT0/dM_eff = M_eff * a^2 / cp_mass(T0)
+  double a = combaero::speed_of_sound(T, X);
+  double cp_T0 = combaero::cp_mass(T0, X);
+  double dT0_dMeff = (cp_T0 > 1.0) ? (M_eff * a * a / cp_T0) : 0.0;
 
-  double T0 = T0_from_static(T, M, X);
+  double dT0_dM = dT0_dMeff * dMeff_dM;
+
   return {T0, dT0_dM};
 }
 
 std::tuple<double, double>
 P0_from_static_and_jacobian_M(double P, double T, double M,
                                const std::vector<double> &X) {
-  // Smooth floor for M to handle near-zero and reverse flow cases
-  // M can be negative for reverse flow, so use abs(M) for epsilon scaling
-  const double eps = std::max(1e-6, std::abs(M) * 1e-6);
+  // Enforce non-negative M with a leaky floor for differentiability.
+  double M_eff = (M >= 0.0) ? M : 0.01 * M;
+  double dMeff_dM = (M >= 0.0) ? 1.0 : 0.01;
 
-  // Smooth floor to avoid negative M issues (M_limit = 0.0)
-  constexpr double M_limit = 0.0;
-  constexpr double delta_M = 1e-6;
-  double M_target_minus = M - eps;
-  double diff_M = M_target_minus - M_limit;
-  double sq_dist_M = std::sqrt(diff_M * diff_M + delta_M);
-  double M_minus = 0.5 * (M_target_minus + M_limit + sq_dist_M);
-  double M_plus = M + eps;
-  double actual_dM = M_plus - M_minus;
+  double P0 = P0_from_static(P, T, M_eff, X);
 
-  double P0_plus = P0_from_static(P, T, M_plus, X);
-  double P0_minus = P0_from_static(P, T, M_minus, X);
-  double dP0_dM = (P0_plus - P0_minus) / actual_dM;
+  // Chain rule: P0 = P * exp((s(T0) - s(T,P)) / R_specific)
+  // where s(T0) = s(T0, X, P_REF) and T0 = T0_from_static(T, M_eff, X).
+  //
+  // dP0/dM_eff = P0 * d/dM_eff [ln(P0 / P)]
+  //            = P0 * d/dT0 [(s(T0) - const) / R_specific] * dT0/dM_eff
+  //            = P0 * [cp_mass(T0) / T0 / R_specific] * (dT0/dM_eff)
+  //
+  // The positive sign comes from: s increases with T (at const P_ref) for ideal
+  // gas, so raising T0 increases the entropy difference, increasing P0/P.
+  //
+  // dT0/dM_eff (analytical, from T0 definition): M_eff * a(T)^2 / cp_mass(T0)
+  double a = combaero::speed_of_sound(T, X);
+  double T0_val = T0_from_static(T, M_eff, X);
+  double cp_T0 = combaero::cp_mass(T0_val, X);
+  double R_spec = combaero::specific_gas_constant(X); // J/(kg*K)
 
-  double P0 = P0_from_static(P, T, M, X);
+  double dT0_dMeff = (cp_T0 > 1.0) ? (M_eff * a * a / cp_T0) : 0.0;
+
+  // dP0/dT0 = P0 * (+cp_mass(T0) / T0) / R_specific
+  double dP0_dT0 = (T0_val > 1.0 && R_spec > 1.0)
+                       ? P0 * (cp_T0 / T0_val) / R_spec
+                       : 0.0;
+
+  double dP0_dM = dP0_dT0 * dT0_dMeff * dMeff_dM;
+
   return {P0, dP0_dM};
 }
 
@@ -1251,6 +1263,10 @@ MixerResult combustor_residuals_and_jacobians(
   // Compute X_products from Y_products for the context
   std::vector<double> X_products = mass_to_mole(res.Y_mix);
 
+  double mdot_total = 0.0;
+  for (const auto &s : streams)
+    mdot_total += s.m_dot;
+
   PressureLossContext ctx{
       reactant_state,
       0.0, // phi
@@ -1258,7 +1274,8 @@ MixerResult combustor_residuals_and_jacobians(
       X_products,
       res.Y_mix, // Y_products
       theta,
-      0.0, 0.0 // mdot fuel/air
+      0.0, 0.0, // mdot fuel/air
+      mdot_total,
   };
 
   auto loss_res = pressure_loss(ctx);
@@ -1348,12 +1365,13 @@ OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
   return res;
 }
 
-PipeResult pipe_residuals_and_jacobian(double m_dot, double P_total_up,
+ChannelResult channel_residuals_and_jacobian(double m_dot, double P_total_up,
                                        double P_static_up, double T_up,
                                        const std::vector<double> &Y_up,
                                        double P_static_down, double L, double D,
                                        double roughness,
-                                       const std::string &friction_model) {
+                                       const std::string &friction_model,
+                                       double f_multiplier) {
   (void)P_total_up;
   (void)P_static_down;
   const std::vector<double> X_up = combaero::mass_to_mole(combaero::normalize_fractions(Y_up));
@@ -1366,10 +1384,12 @@ PipeResult pipe_residuals_and_jacobian(double m_dot, double P_total_up,
   double Re = rho * abs_v * D / mu;
 
   auto [f, df_dRe] = friction_and_jacobian(friction_model, Re, roughness / D).result;
+  f *= f_multiplier;
+  df_dRe *= f_multiplier;
 
   double dP_calc = f * (L / D) * (0.5 * rho * v * abs_v);
 
-  PipeResult res;
+  ChannelResult res;
   res.dP_calc = dP_calc;
 
   double dRe_dmdot = D / (mu * area);
@@ -1386,6 +1406,8 @@ PipeResult pipe_residuals_and_jacobian(double m_dot, double P_total_up,
   double Re_m = rho_m * std::abs(v_m) * D / mu_m;
   auto [f_p, df_dRe_p] = friction_and_jacobian(friction_model, Re_p, roughness / D).result;
   auto [f_m, df_dRe_m] = friction_and_jacobian(friction_model, Re_m, roughness / D).result;
+  f_p *= f_multiplier;
+  f_m *= f_multiplier;
   double dP_p = f_p * (L / D) * (0.5 * rho_p * v_p * std::abs(v_p));
   double dP_m = f_m * (L / D) * (0.5 * rho_m * v_m * std::abs(v_m));
   res.d_dP_dP_static_up = (dP_p - dP_m) / (2.0 * eps_P);
@@ -1401,6 +1423,8 @@ PipeResult pipe_residuals_and_jacobian(double m_dot, double P_total_up,
   double Re_T_m = rho_T_m * std::abs(v_T_m) * D / mu_T_m;
   auto [f_T_p, df_dRe_T_p] = friction_and_jacobian(friction_model, Re_T_p, roughness / D).result;
   auto [f_T_m, df_dRe_T_m] = friction_and_jacobian(friction_model, Re_T_m, roughness / D).result;
+  f_T_p *= f_multiplier;
+  f_T_m *= f_multiplier;
   double dP_T_p = f_T_p * (L / D) * (0.5 * rho_T_p * v_T_p * std::abs(v_T_p));
   double dP_T_m = f_T_m * (L / D) * (0.5 * rho_T_m * v_T_m * std::abs(v_T_m));
   res.d_dP_dT_up = (dP_T_p - dP_T_m) / (2.0 * eps_T);
@@ -1416,6 +1440,7 @@ PipeResult pipe_residuals_and_jacobian(double m_dot, double P_total_up,
     double v_plus = m_dot / (rho_plus * area);
     double Re_plus = rho_plus * std::abs(v_plus) * D / mu_plus;
     auto [f_plus, dummy] = friction_and_jacobian(friction_model, Re_plus, roughness / D).result;
+    f_plus *= f_multiplier;
     double dP_plus = f_plus * (L / D) * (0.5 * rho_plus * v_plus * std::abs(v_plus));
     res.d_dP_dY_up[i] = (dP_plus - dP_calc) / eps_Y;
   }
@@ -1507,68 +1532,68 @@ std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobia
   auto sol = combaero::nozzle_flow(T0_fwd, P0_fwd, P_back_fwd, A_eff, X);
   double mdot = reverse_flow ? -sol.mdot : sol.mdot;
 
-  // Compute Jacobians via finite differences with smooth perturbations
-  const double eps_P0 = std::max(1e-6, std::abs(P0) * 1e-6);
-  const double eps_Pb = std::max(1e-6, std::abs(P_back) * 1e-6);
-  const double eps_T0 = std::max(1e-6, std::abs(T0) * 1e-6);
+  // Compute Jacobians analytically using isentropic relations
+  // G = rho * v = (P/RT) * sqrt(2*(h0 - h))
+  // For isentropic flow: dT/dP = 1/(rho*cp), d_rho/dP = 1/a^2
+  // dG/dP = 1/v * (M^2 - 1)
 
-  // Jacobian w.r.t. P0
-  double P0_plus = reverse_flow ? P_back : (P0 + eps_P0);
-  double P_back_plus_P0 = reverse_flow ? (P0 + eps_P0) : P_back;
-  double P0_minus = reverse_flow ? P_back : (P0 - eps_P0);
-  double P_back_minus_P0 = reverse_flow ? (P0 - eps_P0) : P_back;
-  auto sol_P0_plus = combaero::nozzle_flow(T0_fwd, P0_plus, P_back_plus_P0, A_eff, X);
-  auto sol_P0_minus = combaero::nozzle_flow(T0_fwd, P0_minus, P_back_minus_P0, A_eff, X);
-  double mdot_P0_plus = reverse_flow ? -sol_P0_plus.mdot : sol_P0_plus.mdot;
-  double mdot_P0_minus = reverse_flow ? -sol_P0_minus.mdot : sol_P0_minus.mdot;
-  double d_mdot_dP0 = (mdot_P0_plus - mdot_P0_minus) / (2.0 * eps_P0);
+  double T_outlet = sol.outlet.T;
+  double v_outlet = sol.v;
+  double rho_outlet = sol.outlet.rho();
+  double M_outlet = sol.M;
+  double cp_outlet = combaero::cp_mass(T_outlet, X);
+  double cp0 = combaero::cp_mass(T0, X);
 
-  // Jacobian w.r.t. P_back with smooth choked flow transition
-  // Compute critical pressure ratio for smooth transition
-  double PR = P_back_fwd / P0_fwd;
-  double PR_crit = combaero::critical_pressure_ratio(T0_fwd, P0_fwd, X);
-
-  // Smooth step function for choked flow transition
-  const double delta_PR = 0.01;  // Transition width (1% of pressure ratio)
-  double t = (PR - PR_crit) / delta_PR;
-  double choke_factor = 1.0;
-  if (t >= 1.0) {
-    choke_factor = 1.0;  // Well unchoked
-  } else if (t <= -1.0) {
-    choke_factor = 0.0;  // Well choked
-  } else {
-    // Cubic Hermite interpolation for smooth C1 transition
-    choke_factor = 0.5 * (1.0 + t * (3.0 - t * t));
+  // Unchoked derivatives (subsonic branch)
+  double dmdot_dP_back_sub = 0.0;
+  if (v_outlet > 1e-6) {
+    dmdot_dP_back_sub = A_eff * (1.0 / v_outlet) * (M_outlet * M_outlet - 1.0);
   }
 
-  // Compute raw Jacobian via central difference
-  double P_back_minus = reverse_flow ? (P0 - eps_Pb) : (P_back - eps_Pb);
-  double P0_minus_Pb = reverse_flow ? P_back : P0;
-  double P_back_plus = reverse_flow ? (P0 + eps_Pb) : (P_back + eps_Pb);
-  double P0_plus_Pb = reverse_flow ? P_back : P0;
+  // Choked derivatives (constant mass flow)
+  // mdot_choked = A_eff * G_crit
+  // G_crit ~ P0 / sqrt(T0)
+  double dmdot_dP_back_choked = 0.0;
 
-  auto sol_Pb_minus = combaero::nozzle_flow(T0_fwd, P0_minus_Pb, P_back_minus, A_eff, X);
-  auto sol_Pb_plus = combaero::nozzle_flow(T0_fwd, P0_plus_Pb, P_back_plus, A_eff, X);
-  double mdot_Pb_minus = reverse_flow ? -sol_Pb_minus.mdot : sol_Pb_minus.mdot;
-  double mdot_Pb_plus = reverse_flow ? -sol_Pb_plus.mdot : sol_Pb_plus.mdot;
+  // Apply smooth transition (C1 continuous)
+  double PR = P_back_fwd / P0_fwd;
+  double PR_crit = combaero::critical_pressure_ratio(T0_fwd, P0_fwd, X);
+  const double delta_PR = 0.01;
+  double t = (PR - PR_crit) / delta_PR;
+  double choke_factor = 1.0;
+  if (t >= 1.0) choke_factor = 1.0;
+  else if (t <= -1.0) choke_factor = 0.0;
+  else choke_factor = 0.5 * (1.0 + t * (3.0 - t * t));
 
-  double d_mdot_dP_back_raw = (mdot_Pb_plus - mdot_Pb_minus) / (2.0 * eps_Pb);
+  double d_mdot_dP_back_fwd = dmdot_dP_back_sub * choke_factor + dmdot_dP_back_choked * (1.0 - choke_factor);
 
-  // Apply smooth transition factor
-  double d_mdot_dP_back = d_mdot_dP_back_raw * choke_factor;
+  // Upstream pressure derivative: P0 only affects PR and scales G linearly if choked
+  // dmdot/dP0 = mdot/P0 - (Pb/P0) * dmdot/dPb
+  double d_mdot_dP0_fwd = (P0_fwd > 1e-6) ? (sol.mdot / P0_fwd - PR * d_mdot_dP_back_fwd) : 0.0;
 
-  // Jacobian w.r.t. T0
-  auto sol_T0_plus = combaero::nozzle_flow(T0_fwd + eps_T0, P0_fwd, P_back_fwd, A_eff, X);
-  auto sol_T0_minus = combaero::nozzle_flow(T0_fwd - eps_T0, P0_fwd, P_back_fwd, A_eff, X);
-  double mdot_T0_plus = reverse_flow ? -sol_T0_plus.mdot : sol_T0_plus.mdot;
-  double mdot_T0_minus = reverse_flow ? -sol_T0_minus.mdot : sol_T0_minus.mdot;
-  double d_mdot_dT0 = (mdot_T0_plus - mdot_T0_minus) / (2.0 * eps_T0);
+  // Upstream temperature derivative: mdot ~ 1/sqrt(T0) roughly
+  // More precisely: dG/dT0 = rho * cp0 / v * [(1 - T/T0) - v^2/(cp*T0)]
+  double d_mdot_dT0_fwd = 0.0;
+  if (v_outlet > 1e-6 && T0 > 1e-6) {
+    d_mdot_dT0_fwd = A_eff * rho_outlet * cp0 / v_outlet * ((1.0 - T_outlet / T0) - v_outlet * v_outlet / (cp_outlet * T0));
+  } else if (T0 > 1e-6) {
+    // Choked limit: dG/dT0 = -G / (2*T0)
+    d_mdot_dT0_fwd = -sol.mdot / (2.0 * T0);
+  }
 
-  // For reverse flow, swap Jacobian signs appropriately
+  // Assign results
+  double d_mdot_dP0 = d_mdot_dP0_fwd;
+  double d_mdot_dP_back = d_mdot_dP_back_fwd;
+  double d_mdot_dT0 = d_mdot_dT0_fwd;
+
+  // For reverse flow, swap Jacobian signs appropriately.
+  // mdot = -mdot_fwd(P_back, P0), so all three derivatives are negated,
+  // and P0/P_back roles are swapped.
   if (reverse_flow) {
     std::swap(d_mdot_dP0, d_mdot_dP_back);
     d_mdot_dP0 = -d_mdot_dP0;
     d_mdot_dP_back = -d_mdot_dP_back;
+    d_mdot_dT0 = -d_mdot_dT0;
   }
 
   return {mdot, d_mdot_dP0, d_mdot_dP_back, d_mdot_dT0};
@@ -1608,18 +1633,19 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
   return res;
 }
 
-std::tuple<double, double, double, double> pipe_compressible_mdot_and_jacobian(
+std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobian(
     double T_in, double P_in, double u_in,
     const std::vector<double>& X,
     double L, double D, double roughness,
-    const std::string& friction_model) {
+    const std::string& friction_model,
+    double f_multiplier) {
 
   // Handle reverse flow by swapping direction
   bool reverse_flow = (u_in < 0.0);
   double u_fwd = std::abs(u_in);
 
-  // Call fanno_pipe_rough for forward direction
-  auto sol = combaero::fanno_pipe_rough(T_in, P_in, u_fwd, L, D, roughness, X, friction_model);
+  // Call fanno_channel_rough for forward direction
+  auto sol = combaero::fanno_channel_rough(T_in, P_in, u_fwd, L, D, roughness, X, friction_model, f_multiplier);
   double dP = P_in - sol.outlet.P;
 
   // For reverse flow, negate dP to maintain sign convention
@@ -1633,8 +1659,8 @@ std::tuple<double, double, double, double> pipe_compressible_mdot_and_jacobian(
   const double eps_u = std::max(1e-6, std::abs(u_in) * 1e-6);
 
   // Jacobian w.r.t. P_in
-  auto sol_P_plus = combaero::fanno_pipe_rough(T_in, P_in + eps_P, u_fwd, L, D, roughness, X, friction_model);
-  auto sol_P_minus = combaero::fanno_pipe_rough(T_in, P_in - eps_P, u_fwd, L, D, roughness, X, friction_model);
+  auto sol_P_plus = combaero::fanno_channel_rough(T_in, P_in + eps_P, u_fwd, L, D, roughness, X, friction_model, f_multiplier);
+  auto sol_P_minus = combaero::fanno_channel_rough(T_in, P_in - eps_P, u_fwd, L, D, roughness, X, friction_model, f_multiplier);
   double dP_P_plus = (P_in + eps_P) - sol_P_plus.outlet.P;
   double dP_P_minus = (P_in - eps_P) - sol_P_minus.outlet.P;
   if (reverse_flow) dP_P_plus = -dP_P_plus;
@@ -1642,8 +1668,8 @@ std::tuple<double, double, double, double> pipe_compressible_mdot_and_jacobian(
   double d_dP_dP_in = (dP_P_plus - dP_P_minus) / (2.0 * eps_P);
 
   // Jacobian w.r.t. T_in
-  auto sol_T_plus = combaero::fanno_pipe_rough(T_in + eps_T, P_in, u_fwd, L, D, roughness, X, friction_model);
-  auto sol_T_minus = combaero::fanno_pipe_rough(T_in - eps_T, P_in, u_fwd, L, D, roughness, X, friction_model);
+  auto sol_T_plus = combaero::fanno_channel_rough(T_in + eps_T, P_in, u_fwd, L, D, roughness, X, friction_model, f_multiplier);
+  auto sol_T_minus = combaero::fanno_channel_rough(T_in - eps_T, P_in, u_fwd, L, D, roughness, X, friction_model, f_multiplier);
   double dP_T_plus = P_in - sol_T_plus.outlet.P;
   double dP_T_minus = P_in - sol_T_minus.outlet.P;
   if (reverse_flow) dP_T_plus = -dP_T_plus;
@@ -1651,8 +1677,8 @@ std::tuple<double, double, double, double> pipe_compressible_mdot_and_jacobian(
   double d_dP_dT_in = (dP_T_plus - dP_T_minus) / (2.0 * eps_T);
 
   // Jacobian w.r.t. u_in (note: u_in is signed, but we use u_fwd for Fanno)
-  auto sol_u_plus = combaero::fanno_pipe_rough(T_in, P_in, u_fwd + eps_u, L, D, roughness, X, friction_model);
-  auto sol_u_minus = combaero::fanno_pipe_rough(T_in, P_in, std::max(1e-9, u_fwd - eps_u), L, D, roughness, X, friction_model);
+  auto sol_u_plus = combaero::fanno_channel_rough(T_in, P_in, u_fwd + eps_u, L, D, roughness, X, friction_model, f_multiplier);
+  auto sol_u_minus = combaero::fanno_channel_rough(T_in, P_in, std::max(1e-9, u_fwd - eps_u), L, D, roughness, X, friction_model, f_multiplier);
   double dP_u_plus = P_in - sol_u_plus.outlet.P;
   double dP_u_minus = P_in - sol_u_minus.outlet.P;
   if (reverse_flow) dP_u_plus = -dP_u_plus;
@@ -1669,11 +1695,12 @@ std::tuple<double, double, double, double> pipe_compressible_mdot_and_jacobian(
   return {dP, d_dP_dP_in, d_dP_dT_in, d_dP_du_in};
 }
 
-PipeResult pipe_compressible_residuals_and_jacobian(
+ChannelResult channel_compressible_residuals_and_jacobian(
     double m_dot, double P_total_up, double T_up,
     const std::vector<double>& Y_up,
     double P_static_down, double L, double D, double roughness,
-    const std::string& friction_model) {
+    const std::string& friction_model,
+    double f_multiplier) {
 
   (void)P_static_down;  // Computed from Fanno flow, not an input
 
@@ -1689,9 +1716,9 @@ PipeResult pipe_compressible_residuals_and_jacobian(
 
   // Get pressure drop and partial Jacobians w.r.t. (P_in, T_in, u_in)
   auto [dP_calc, d_dP_dP_in, d_dP_dT_in, d_dP_du_in] =
-      pipe_compressible_mdot_and_jacobian(T_up, P_total_up, u_in, X_up, L, D, roughness, friction_model);
+      channel_compressible_mdot_and_jacobian(T_up, P_total_up, u_in, X_up, L, D, roughness, friction_model, f_multiplier);
 
-  PipeResult res;
+  ChannelResult res;
   res.dP_calc = dP_calc;
 
   // --- Full chain rule through u = m_dot / (rho(T,P) * area) ---
@@ -1721,7 +1748,7 @@ PipeResult pipe_compressible_residuals_and_jacobian(
     auto [rho_plus, dummy1, dummy2] = density_and_jacobians(T_up, P_total_up, X_plus);
     double u_plus = m_dot / (rho_plus * area);
     auto [dP_plus, dummy3, dummy4, dummy5] =
-        pipe_compressible_mdot_and_jacobian(T_up, P_total_up, u_plus, X_plus, L, D, roughness, friction_model);
+        channel_compressible_mdot_and_jacobian(T_up, P_total_up, u_plus, X_plus, L, D, roughness, friction_model, f_multiplier);
     res.d_dP_dY_up[i] = (dP_plus - dP_calc) / eps_Y;
   }
 

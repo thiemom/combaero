@@ -61,7 +61,7 @@ int main()
     const double D_pipe = 0.025;  // m
     const double f_pipe = 0.02;   // Darcy friction factor
 
-    const double dP_pipe = pipe_dP(v_pipe, L_pipe, D_pipe, f_pipe, rho);
+    const double dP_pipe = channel_dP(v_pipe, L_pipe, D_pipe, f_pipe, rho);
     std::cout << "Pipe Darcy-Weisbach (v=" << v_pipe << " m/s, L=" << L_pipe
               << " m, D=" << D_pipe * 1e3 << " mm, f=" << f_pipe << "):\n";
     std::cout << "  dP = " << dP_pipe << " Pa\n\n";
@@ -151,7 +151,7 @@ int main()
     const double u_flow  = 15.0;     // m/s
     const double L_seg   = 3.0;      // m
     const double D_seg   = 0.03;     // m
-    const double rough   = pipe_roughness("commercial_steel");
+    const double rough   = channel_roughness("commercial_steel");
 
     std::cout << "Pipe roughness (commercial steel): " << rough * 1e6 << " μm\n\n";
 

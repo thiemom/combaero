@@ -49,7 +49,7 @@ class TestNusseltCorrelations:
         """Test Gnielinski correlation with explicit friction factor."""
         Re = 1e5  # Reynolds number [-]
         Pr = 0.7  # Prandtl number [-]
-        f = cb.friction_colebrook(Re, 0.0)  # Smooth pipe friction [-]
+        f = cb.friction_colebrook(Re, 0.0)  # Smooth channel friction [-]
 
         Nu = cb.nusselt_gnielinski(Re, Pr, f)
 
@@ -67,8 +67,8 @@ class TestNusseltCorrelations:
 
         Nu_auto = cb.nusselt_gnielinski(Re, Pr)
 
-        # Should match manual friction for smooth pipe
-        f = cb.friction_petukhov(Re)  # Smooth pipe friction [-]
+        # Should match manual friction for smooth channel
+        f = cb.friction_petukhov(Re)  # Smooth channel friction [-]
         Nu_manual = cb.nusselt_gnielinski(Re, Pr, f)
 
         # Should be very close
@@ -142,7 +142,7 @@ class TestHeatTransferCoefficient:
         """Test HTC calculation from Nusselt number."""
         Nu = 100.0  # Nusselt number [-]
         k = 0.025  # Thermal conductivity (air) [W/(m*K)]
-        L = 0.05  # Characteristic length (pipe diameter) [m]
+        L = 0.05  # Characteristic length (channel diameter) [m]
 
         h = cb.htc_from_nusselt(Nu, k, L)
 
@@ -258,13 +258,13 @@ class TestLMTD:
 class TestIntegration:
     """Integration tests combining multiple functions."""
 
-    def test_pipe_flow_heat_transfer(self):
-        """Test complete pipe flow heat transfer calculation."""
-        # Air flow in a pipe
+    def test_channel_flow_heat_transfer(self):
+        """Test complete channel flow heat transfer calculation."""
+        # Air flow in a channel
         Re = 5e4  # Reynolds number [-]
         Pr = 0.7  # Prandtl number (air) [-]
         k = 0.026  # Thermal conductivity (air at 300K) [W/(m*K)]
-        D = 0.05  # Pipe diameter [m]
+        D = 0.05  # Channel diameter [m]
 
         # Calculate Nusselt number
         Nu = cb.nusselt_dittus_boelter(Re, Pr)

@@ -1,6 +1,6 @@
 from combaero.network.components import (
+    ChannelElement,
     LosslessConnectionElement,
-    PipeElement,
     PlenumNode,
     PressureBoundary,
 )
@@ -22,8 +22,8 @@ def test_flownetwork_serialization():
 
     # Elements
     e1 = LosslessConnectionElement(" inlet_conn ", " inlet ", " plenum1")
-    e2 = PipeElement(
-        " pipe1",
+    e2 = ChannelElement(
+        " channel1",
         " plenum1",
         " outlet ",
         length=2.5,
@@ -43,12 +43,12 @@ def test_flownetwork_serialization():
     assert "nodes" in data
     assert "elements" in data
     assert " inlet " in data["nodes"]
-    assert " pipe1" in data["elements"]
+    assert " channel1" in data["elements"]
 
     # Verify registry_id is captured
-    pipe_kwargs = data["elements"][" pipe1"]["kwargs"]
-    assert pipe_kwargs["friction_model"] == "haaland"
-    assert pipe_kwargs["length"] == 2.5
+    channel_kwargs = data["elements"][" channel1"]["kwargs"]
+    assert channel_kwargs["friction_model"] == "haaland"
+    assert channel_kwargs["length"] == 2.5
 
     # Deserialize
     network2 = FlowNetwork.from_dict(data)
@@ -57,7 +57,7 @@ def test_flownetwork_serialization():
     assert len(network2.nodes) == 3
     assert len(network2.elements) == 2
 
-    pipe_reconstructed = network2.elements[" pipe1"]
-    assert isinstance(pipe_reconstructed, PipeElement)
-    assert pipe_reconstructed.friction_model == "haaland"
-    assert pipe_reconstructed.length == 2.5
+    channel_reconstructed = network2.elements[" channel1"]
+    assert isinstance(channel_reconstructed, ChannelElement)
+    assert channel_reconstructed.friction_model == "haaland"
+    assert channel_reconstructed.length == 2.5

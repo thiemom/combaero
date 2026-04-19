@@ -18,18 +18,18 @@ This document summarizes the implementation of compressible flow elements for ne
   - Bidirectional flow support (handles P_back > P0)
   - Exact mdot matching with `nozzle_flow`
 
-#### 2. `pipe_compressible_mdot_and_jacobian`
-- **Purpose**: Compressible pipe flow using Fanno model
-- **Physics**: Uses `fanno_pipe_rough` with variable friction
+#### 2. `channel_compressible_mdot_and_jacobian`
+- **Purpose**: Compressible channel flow using Fanno model
+- **Physics**: Uses `fanno_channel_rough` with variable friction
 - **Returns**: `(dP, d_dP_dP_in, d_dP_dT_in, d_dP_du_in)`
 - **Key Features**:
   - Handles reverse flow (negative velocity)
-  - Exact dP matching with `fanno_pipe_rough`
+  - Exact dP matching with `fanno_channel_rough`
   - Jacobians computed via finite differences
 
 #### 3. Network Solver Integration Functions
 - `orifice_compressible_residuals_and_jacobian`: Full derivatives for network solver
-- `pipe_compressible_residuals_and_jacobian`: Full derivatives for network solver
+- `channel_compressible_residuals_and_jacobian`: Full derivatives for network solver
 
 ### Python Bindings (`python/combaero/_core.cpp`)
 
@@ -38,7 +38,7 @@ All 4 functions exposed to Python with proper documentation:
 mdot, d_P0, d_Pb, d_T0 = cb._core.orifice_compressible_mdot_and_jacobian(
     T0, P0, P_back, X, Cd, area, beta)
 
-dP, d_Pin, d_Tin, d_u = cb._core.pipe_compressible_mdot_and_jacobian(
+dP, d_Pin, d_Tin, d_u = cb._core.channel_compressible_mdot_and_jacobian(
     T_in, P_in, u_in, X, L, D, roughness, friction_model)
 ```
 
@@ -55,12 +55,12 @@ dP, d_Pin, d_Tin, d_u = cb._core.pipe_compressible_mdot_and_jacobian(
    - `test_orifice_compressible_matches_nozzle_flow` - Exact matching
    - `test_orifice_compressible_smoothing_accuracy_far` - Error bounds
 
-2. **Pipe Tests (6)**:
-   - `test_pipe_compressible_low_mach` - Low Mach number flow
-   - `test_pipe_compressible_high_mach` - High Mach number flow
-   - `test_pipe_compressible_matches_fanno` - Exact matching
-   - `test_pipe_compressible_jacobian_accuracy` - Numerical validation
-   - `test_pipe_compressible_reverse_flow` - Bidirectional flow
+2. **Channel Tests (6)**:
+   - `test_channel_compressible_low_mach` - Low Mach number flow
+   - `test_channel_compressible_high_mach` - High Mach number flow
+   - `test_channel_compressible_matches_fanno` - Exact matching
+   - `test_channel_compressible_jacobian_accuracy` - Numerical validation
+   - `test_channel_compressible_reverse_flow` - Bidirectional flow
 
 **All 12 tests passing** ✓
 
@@ -77,7 +77,7 @@ dP, d_Pin, d_Tin, d_u = cb._core.pipe_compressible_mdot_and_jacobian(
 - Shows smooth transition behavior
 
 #### Comparison Example (`python/examples/compressible_vs_incompressible_network.py`)
-- Compares compressible vs incompressible models in pipe-orifice network
+- Compares compressible vs incompressible models in channel-orifice network
 - Shows when compressibility effects become important
 - Generates comparison plots
 - **Key Finding**: Use compressible models when PR < 0.8 or ΔP/P > 0.2
@@ -117,12 +117,12 @@ d_mdot_dP_back = d_mdot_dP_back_raw * choke_factor;
 Both elements support reverse flow:
 
 **Orifice**: When P_back > P0, swap pressures and negate mdot
-**Pipe**: When u_in < 0, use abs(u_in) for Fanno and negate dP
+**Channel**: When u_in < 0, use abs(u_in) for Fanno and negate dP
 
 ## Performance Characteristics
 
 - **Computational Cost**: ~10x slower than incompressible (due to iterative solvers)
-- **Accuracy**: Exact matching with `nozzle_flow` and `fanno_pipe_rough`
+- **Accuracy**: Exact matching with `nozzle_flow` and `fanno_channel_rough`
 - **Robustness**: Handles all flow regimes (subsonic, choked, reverse)
 
 ## Usage Recommendations
@@ -147,7 +147,7 @@ Use incompressible models when:
 
 Potential enhancements:
 1. Network solver integration (automatic compressible/incompressible switching)
-2. Thermal choking in pipes (heat addition)
+2. Thermal choking in channels (heat addition)
 3. Real gas effects (non-ideal EOS)
 4. Adjoint sensitivities for optimization
 

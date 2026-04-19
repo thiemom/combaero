@@ -626,13 +626,39 @@ def test_orifice_compressible_reverse_flow():
     # Mass flow should be negative for reverse flow
     assert mdot < 0, "Mass flow should be negative for reverse flow"
 
-    # In reverse flow, the roles are swapped but signs depend on implementation
-    # The key is that increasing P0 should reduce reverse flow (make it less negative)
-    # and increasing P_back should increase reverse flow (make it more negative)
-    # After the swap in the implementation, we get:
-    assert d_P0 < 0, "d_mdot_dP0 should be negative in reverse flow"
-    # d_Pb stays negative because the smoothing is applied after the swap
-    assert d_Pb < 0, "d_mdot_dP_back should be negative (smoothed)"
+    # Increasing P0 reduces the pressure difference -> less reverse flow (less negative)
+    assert d_P0 > 0, "d_mdot_dP0 should be positive in reverse flow"
+    # Increasing P_back increases the pressure difference -> more reverse flow (more negative)
+    assert d_Pb < 0, "d_mdot_dP_back should be negative in reverse flow"
+    # Increasing T0 reduces density -> less reverse flow (less negative)
+    assert d_T0 > 0, "d_mdot_dT0 should be positive in reverse flow"
+
+    # Validate all three Jacobians against central FD
+    eps_P = 1.0
+    mp, _, _, _ = cb._core.orifice_compressible_mdot_and_jacobian(
+        T0, P0 + eps_P, P_back, X, Cd, area, beta
+    )
+    mm, _, _, _ = cb._core.orifice_compressible_mdot_and_jacobian(
+        T0, P0 - eps_P, P_back, X, Cd, area, beta
+    )
+    np.testing.assert_allclose(d_P0, (mp - mm) / (2 * eps_P), rtol=1e-4)
+
+    mp2, _, _, _ = cb._core.orifice_compressible_mdot_and_jacobian(
+        T0, P0, P_back + eps_P, X, Cd, area, beta
+    )
+    mm2, _, _, _ = cb._core.orifice_compressible_mdot_and_jacobian(
+        T0, P0, P_back - eps_P, X, Cd, area, beta
+    )
+    np.testing.assert_allclose(d_Pb, (mp2 - mm2) / (2 * eps_P), rtol=1e-4)
+
+    eps_T = 1e-3
+    mp3, _, _, _ = cb._core.orifice_compressible_mdot_and_jacobian(
+        T0 + eps_T, P0, P_back, X, Cd, area, beta
+    )
+    mm3, _, _, _ = cb._core.orifice_compressible_mdot_and_jacobian(
+        T0 - eps_T, P0, P_back, X, Cd, area, beta
+    )
+    np.testing.assert_allclose(d_T0, (mp3 - mm3) / (2 * eps_T), rtol=1e-4)
 
 
 def test_orifice_compressible_jacobian_accuracy():
@@ -727,13 +753,13 @@ def test_orifice_compressible_smoothing_accuracy_far():
                 )
 
 
-def test_pipe_compressible_low_mach():
-    """Test compressible pipe at low Mach number."""
+def test_channel_compressible_low_mach():
+    """Test compressible channel at low Mach number."""
     T_in, P_in, u_in = 400.0, 200000.0, 10.0  # Low velocity
     X = cb.species.dry_air()
     L, D, roughness = 2.0, 0.05, 1e-4
 
-    dP, d_Pin, d_Tin, d_u = cb._core.pipe_compressible_mdot_and_jacobian(
+    dP, d_Pin, d_Tin, d_u = cb._core.channel_compressible_mdot_and_jacobian(
         T_in, P_in, u_in, X, L, D, roughness, "haaland"
     )
 
@@ -746,13 +772,13 @@ def test_pipe_compressible_low_mach():
     assert d_u > 0, "d_dP_du_in should be positive (higher velocity → more friction)"
 
 
-def test_pipe_compressible_high_mach():
-    """Test compressible pipe at higher Mach number."""
+def test_channel_compressible_high_mach():
+    """Test compressible channel at higher Mach number."""
     T_in, P_in, u_in = 400.0, 200000.0, 150.0  # Higher velocity
     X = cb.species.dry_air()
     L, D, roughness = 2.0, 0.05, 1e-4
 
-    dP, d_Pin, d_Tin, d_u = cb._core.pipe_compressible_mdot_and_jacobian(
+    dP, d_Pin, d_Tin, d_u = cb._core.channel_compressible_mdot_and_jacobian(
         T_in, P_in, u_in, X, L, D, roughness, "haaland"
     )
 
@@ -761,37 +787,37 @@ def test_pipe_compressible_high_mach():
     assert np.isfinite(dP), "Pressure drop should be finite"
 
 
-def test_pipe_compressible_matches_fanno():
-    """Verify compressible pipe matches fanno_pipe_rough exactly."""
+def test_channel_compressible_matches_fanno():
+    """Verify compressible channel matches fanno_channel_rough exactly."""
     T_in, P_in, u_in = 400.0, 200000.0, 50.0
     X = cb.species.dry_air()
     L, D, roughness = 2.0, 0.05, 1e-4
 
-    dP, _, _, _ = cb._core.pipe_compressible_mdot_and_jacobian(
+    dP, _, _, _ = cb._core.channel_compressible_mdot_and_jacobian(
         T_in, P_in, u_in, X, L, D, roughness, "haaland"
     )
 
-    # Direct fanno_pipe_rough call
-    sol = cb.fanno_pipe_rough(T_in, P_in, u_in, L, D, roughness, X, "haaland")
+    # Direct fanno_channel_rough call
+    sol = cb.fanno_channel_rough(T_in, P_in, u_in, L, D, roughness, X, "haaland")
     dP_direct = P_in - sol.outlet.P
 
     # Should match exactly
     np.testing.assert_allclose(dP, dP_direct, rtol=1e-10)
 
 
-def test_pipe_compressible_jacobian_accuracy():
-    """Verify pipe Jacobian accuracy via numerical differentiation."""
+def test_channel_compressible_jacobian_accuracy():
+    """Verify channel Jacobian accuracy via numerical differentiation."""
     T_in, P_in, u_in = 400.0, 200000.0, 50.0
     X = cb.species.dry_air()
     L, D, roughness = 2.0, 0.05, 1e-4
 
-    dP, d_Pin, d_Tin, d_u = cb._core.pipe_compressible_mdot_and_jacobian(
+    dP, d_Pin, d_Tin, d_u = cb._core.channel_compressible_mdot_and_jacobian(
         T_in, P_in, u_in, X, L, D, roughness, "haaland"
     )
 
     # Numerical Jacobian w.r.t. P_in
     eps_P = max(1e-6, P_in * 1e-6)
-    dP_plus, _, _, _ = cb._core.pipe_compressible_mdot_and_jacobian(
+    dP_plus, _, _, _ = cb._core.channel_compressible_mdot_and_jacobian(
         T_in, P_in + eps_P, u_in, X, L, D, roughness, "haaland"
     )
     d_Pin_num = (dP_plus - dP) / eps_P
@@ -799,20 +825,20 @@ def test_pipe_compressible_jacobian_accuracy():
 
     # Numerical Jacobian w.r.t. u_in
     eps_u = max(1e-6, u_in * 1e-6)
-    dP_plus, _, _, _ = cb._core.pipe_compressible_mdot_and_jacobian(
+    dP_plus, _, _, _ = cb._core.channel_compressible_mdot_and_jacobian(
         T_in, P_in, u_in + eps_u, X, L, D, roughness, "haaland"
     )
     d_u_num = (dP_plus - dP) / eps_u
     np.testing.assert_allclose(d_u, d_u_num, rtol=1e-5)
 
 
-def test_pipe_compressible_reverse_flow():
-    """Test compressible pipe with reverse flow (negative velocity)."""
+def test_channel_compressible_reverse_flow():
+    """Test compressible channel with reverse flow (negative velocity)."""
     T_in, P_in, u_in = 400.0, 200000.0, -50.0  # Negative velocity
     X = cb.species.dry_air()
     L, D, roughness = 2.0, 0.05, 1e-4
 
-    dP, d_Pin, d_Tin, d_u = cb._core.pipe_compressible_mdot_and_jacobian(
+    dP, d_Pin, d_Tin, d_u = cb._core.channel_compressible_mdot_and_jacobian(
         T_in, P_in, u_in, X, L, D, roughness, "haaland"
     )
 
@@ -827,7 +853,7 @@ def test_pipe_compressible_reverse_flow():
 def test_compressible_network_scenario():
     """Test compressible elements in a realistic network scenario.
 
-    Network: High Pressure -> Pipe -> Junction -> Orifice -> Low Pressure
+    Network: High Pressure -> Channel -> Junction -> Orifice -> Low Pressure
     This mimics the pattern from test_network_scenarios.py but uses compressible models.
     """
     # Use standard air composition (not hardcoded)
@@ -840,32 +866,32 @@ def test_compressible_network_scenario():
     P_low = 101325.0  # 1 atm
 
     # Geometry
-    L_pipe = 2.0  # m
-    D_pipe = 0.05  # m
+    L_channel = 2.0  # m
+    D_channel = 0.05  # m
     roughness = 1e-4  # m
     A_orifice = 1e-4  # m²
     Cd = 0.65
     beta = 0.5
 
-    # Test pipe element
+    # Test channel element
     rho = cb.density(T, P_high, X)
-    area_pipe = 0.25 * np.pi * D_pipe**2
-    u_pipe = 50.0  # m/s estimate
+    area_channel = 0.25 * np.pi * D_channel**2
+    u_channel = 50.0  # m/s estimate
 
-    dP_pipe, d_dP_dP, d_dP_dT, d_dP_du = cb._core.pipe_compressible_mdot_and_jacobian(
-        T, P_high, u_pipe, X, L_pipe, D_pipe, roughness, "haaland"
+    dP_channel, d_dP_dP, d_dP_dT, d_dP_du = cb._core.channel_compressible_mdot_and_jacobian(
+        T, P_high, u_channel, X, L_channel, D_channel, roughness, "haaland"
     )
 
-    # Verify pipe results
-    assert dP_pipe > 0, "Pipe pressure drop should be positive"
+    # Verify channel results
+    assert dP_channel > 0, "Channel pressure drop should be positive"
     assert d_dP_dP > 0, "d_dP/dP_in should be positive"
     assert d_dP_du > 0, "d_dP/du should be positive (more velocity = more friction)"
 
-    # Compute mass flow through pipe
-    mdot_pipe = rho * area_pipe * u_pipe
+    # Compute mass flow through channel
+    mdot_channel = rho * area_channel * u_channel
 
     # Test orifice element at junction
-    P_junction = P_high - dP_pipe
+    P_junction = P_high - dP_channel
 
     mdot_orifice, d_mdot_dP0, d_mdot_dPb, d_mdot_dT0 = (
         cb._core.orifice_compressible_mdot_and_jacobian(
@@ -892,9 +918,9 @@ def test_compressible_network_scenario():
         # Unchoked flow - Jacobian should be negative
         assert d_mdot_dPb < 0, "d_mdot/dP_back should be negative when unchoked"
 
-    # Verify mass flow consistency (pipe and orifice should be similar order of magnitude)
+    # Verify mass flow consistency (channel and orifice should be similar order of magnitude)
     # They won't match exactly since we're not solving the full network, but should be close
-    flow_ratio = mdot_orifice / mdot_pipe
+    flow_ratio = mdot_orifice / mdot_channel
     assert 0.1 < flow_ratio < 10.0, (
         f"Flow rates should be similar order of magnitude (ratio={flow_ratio:.2f})"
     )
@@ -914,12 +940,12 @@ def test_compressible_network_scenario():
         err_msg="Residuals should match direct call",
     )
 
-    # Test pipe residuals function
-    res_pipe = cb._core.pipe_compressible_residuals_and_jacobian(
-        mdot_pipe, P_high, T, Y, P_low, L_pipe, D_pipe, roughness, "haaland"
+    # Test channel residuals function
+    res_channel = cb._core.channel_compressible_residuals_and_jacobian(
+        mdot_channel, P_high, T, Y, P_low, L_channel, D_channel, roughness, "haaland"
     )
 
-    # Verify pipe residuals structure
-    assert hasattr(res_pipe, "dP_calc"), "Should have dP_calc attribute"
-    assert hasattr(res_pipe, "d_dP_d_mdot"), "Should have Jacobian attributes"
-    assert res_pipe.dP_calc > 0, "Pipe pressure drop should be positive"
+    # Verify channel residuals structure
+    assert hasattr(res_channel, "dP_calc"), "Should have dP_calc attribute"
+    assert hasattr(res_channel, "d_dP_d_mdot"), "Should have Jacobian attributes"
+    assert res_channel.dP_calc > 0, "Channel pressure drop should be positive"

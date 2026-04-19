@@ -8,7 +8,7 @@ This package provides Python bindings for the core CombAero C++ library:
 - Humid air properties and standard dry-air composition
 - Species common-name mapping
 - Compressible flow (isentropic nozzle, quasi-1D, Fanno flow)
-- Incompressible flow (Bernoulli, orifice, pipe pressure drop)
+- Incompressible flow (Bernoulli, orifice, channel pressure drop)
 - Friction factor correlations (Colebrook, Haaland, Serghides)
 - Heat transfer correlations (Dittus-Boelter, Gnielinski, Sieder-Tate)
 - Integrated channel-flow solvers (`channel_smooth`, `channel_ribbed`, `channel_dimpled`, `channel_pin_fin`, `channel_impingement`)
@@ -218,9 +218,9 @@ print(f"Mass flow: {sol_cd.mdot:.4f} kg/s")
 for st in sol_cd.profile[::10]:  # Every 10th station
     print(f"x={st.x:.3f} m, M={st.M:.3f}, T={st.T:.1f} K")
 
-# Fanno flow (adiabatic pipe with friction)
+# Fanno flow (adiabatic channel with friction)
 f = cb.friction_colebrook(Re=100000, e_D=0.0001)
-sol_fanno = cb.fanno_pipe(T_in=400.0, P_in=5e5, u_in=100.0,
+sol_fanno = cb.fanno_channel(T_in=400.0, P_in=5e5, u_in=100.0,
                           L=5.0, D=0.05, f=f, X=X)
 print(f"Outlet P: {sol_fanno.outlet.P/1000:.1f} kPa")
 ```
@@ -280,9 +280,9 @@ v2 = cb.bernoulli_v2(P1=200000, P2=150000, v1=2.0, rho=rho)
 mdot = cb.orifice_mdot(P1=200000, P2=100000, A=0.001, Cd=0.62, rho=rho)
 A = cb.orifice_area(mdot=5.0, P1=200000, P2=100000, Cd=0.62, rho=rho)
 
-# Pipe pressure drop (Darcy-Weisbach)
+# Channel pressure drop (Darcy-Weisbach)
 f = cb.friction_colebrook(Re=100000, e_D=0.0001)
-dP = cb.pipe_dP(v=2.0, L=10.0, D=0.05, f=f, rho=rho)
+dP = cb.channel_dP(v=2.0, L=10.0, D=0.05, f=f, rho=rho)
 
 # Hydraulic diameter
 Dh = cb.hydraulic_diameter_rect(a=0.1, b=0.05)  # Rectangular duct
@@ -299,7 +299,7 @@ X = cb.species.dry_air()
 T, P, u = 600.0, 20e5, 30.0  # K, Pa, m/s
 D, L = 0.008, 0.35           # m
 
-# Smooth pipe (Gnielinski baseline)
+# Smooth channel (Gnielinski baseline)
 sol = cb.channel_smooth(T, P, X, u, D, L)
 print(f"h = {sol.h:.0f} W/(m2*K), Nu = {sol.Nu:.1f}, dP = {sol.dP:.0f} Pa")
 
@@ -317,7 +317,7 @@ sol_pin = cb.channel_pin_fin(T, P, X, u,
                               S_D=2.5, X_D=2.5, N_rows=4)
 
 # With wall temperature (enables q calculation)
-sol_q = cb.channel_smooth(T, P, X, u, D, L, T_wall=800.0)
+sol_q = cb.channel_smooth(T, P, X, u, D, L, T_hot=800.0)
 print(f"q = {sol_q.q/1000:.1f} kW/m2")
 ```
 
