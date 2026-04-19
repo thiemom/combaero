@@ -90,12 +90,11 @@ jobs:
       - name: Set up uv (Build dependencies)
         uses: astral-sh/setup-uv@v7
         with:
-          enable-cache: false
+          enable-cache: true
           python-version: '3.12'
 
-      - name: Install Ninja (Windows)
-        if: runner.os == 'Windows'
-        run: uv pip install ninja
+      - name: Install build dependencies
+        run: uv sync --all-extras --all-groups
 
       - name: Set up CMake
         uses: jwlawson/actions-setup-cmake@v2
