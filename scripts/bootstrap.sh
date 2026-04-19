@@ -2,22 +2,26 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VENV_DIR="${ROOT_DIR}/.venv"
-PYTHON_BIN="${VENV_DIR}/bin/python"
 
 cd "${ROOT_DIR}"
 
-if [[ ! -x "${PYTHON_BIN}" ]]; then
-    echo "Creating local virtual environment at ${VENV_DIR}"
-    python3 -m venv "${VENV_DIR}"
+# Check for uv
+if ! command -v uv &> /dev/null; then
+    # If not in path, check if it was installed by astral.sh in the default location
+    if [[ -x "$HOME/.local/bin/uv" ]]; then
+        export PATH="$HOME/.local/bin:$PATH"
+    else
+        echo "uv not found. Installing uv..."
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        export PATH="$HOME/.local/bin:$PATH"
+    fi
 fi
 
-echo "Using interpreter: ${PYTHON_BIN}"
-"${PYTHON_BIN}" -m pip install --upgrade pip
-"${PYTHON_BIN}" -m pip install -e .[dev,examples] --no-build-isolation
-"${PYTHON_BIN}" -m pip install ruff black isort flake8 mypy pre-commit build
+echo "Initializing environment with uv..."
+uv sync --all-extras --all-groups
 
 echo "Installing pre-commit hooks"
-"${PYTHON_BIN}" -m pre_commit install
+uv run pre-commit install
 
-echo "Bootstrap complete. Activate with: source .venv/bin/activate"
+echo "Bootstrap complete. The environment is managed by uv at .venv"
+echo "To activate: source .venv/bin/activate"
