@@ -53,7 +53,7 @@ if [ "$FAILED_CHECKS" != "0" ]; then
     # Check for style/lint issues
     if echo "$FAILED_CHECK_NAMES" | grep -q -E "Lint|Style|format"; then
         echo "📝 Attempting style fixes..."
-        pre-commit run --all-files || true
+        uv run pre-commit run --all-files || true
         REPAIR_ATTEMPTED=true
     fi
 
@@ -70,16 +70,14 @@ if [ "$FAILED_CHECKS" != "0" ]; then
     # Check for Python import issues (might need reinstall)
     if echo "$FAILED_CHECK_NAMES" | grep -q -E "Python|Import"; then
         echo "🐍 Attempting Python package reinstall..."
-        pip install -e . --no-build-isolation || true
+        uv pip install -e . || true
         REPAIR_ATTEMPTED=true
     fi
 
     # Check for dependency issues
     if echo "$FAILED_CHECK_NAMES" | grep -q -E "dependency|Dependency"; then
         echo "📦 Attempting dependency refresh..."
-        if [ -f "requirements.txt" ]; then
-            pip install -r requirements.txt || true
-        fi
+        uv sync || true
         REPAIR_ATTEMPTED=true
     fi
 

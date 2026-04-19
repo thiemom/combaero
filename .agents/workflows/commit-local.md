@@ -15,8 +15,8 @@ Note: If a `COMMIT_MSG.md` exists, review it and delete if stale, or keep to reu
 
 ### 2. Run Python formatting and linting
 ```bash
-.venv/bin/ruff format python/
-.venv/bin/ruff check --fix python/
+uv run ruff format python/
+uv run ruff check --fix python/
 ```
 
 ### 3. Run Frontend formatting and linting (Biome)
@@ -26,7 +26,7 @@ cd gui/frontend && npm run format && cd ../..
 
 ### 4. Check for units synchronization (Mandatory)
 ```bash
-.venv/bin/python -m pytest python/tests/test_units_sync.py
+uv run pytest python/tests/test_units_sync.py
 ```
 
 ### 5. Check for non-ASCII characters in C++ source
@@ -37,7 +37,7 @@ cd gui/frontend && npm run format && cd ../..
 ### 6. Stage and run pre-commit hooks
 ```bash
 git add -A
-pre-commit run --all-files
+uv run pre-commit run --all-files
 git add -A
 ```
 

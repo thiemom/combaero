@@ -11,19 +11,19 @@ This workflow automatically fixes linting issues in all modified Python files us
 // turbo
 1. Run ruff check with --fix on all changed Python files
 ```bash
-git status --porcelain | grep '^[AMR].*\.py$' | cut -c4- | xargs -r ruff check --fix
+git status --porcelain | grep '^[AMR].*\.py$' | cut -c4- | xargs -r uv run ruff check --fix
 ```
 
 // turbo
 2. Run ruff format on all changed Python files
 ```bash
-git status --porcelain | grep '^[AMR].*\.py$' | cut -c4- | xargs -r ruff format
+git status --porcelain | grep '^[AMR].*\.py$' | cut -c4- | xargs -r uv run ruff format
 ```
 
 // turbo
 3. Verify all issues are fixed
 ```bash
-git status --porcelain | grep '^[AMR].*\.py$' | cut -c4- | xargs -r ruff check
+git status --porcelain | grep '^[AMR].*\.py$' | cut -c4- | xargs -r uv run ruff check
 ```
 
 ## Usage

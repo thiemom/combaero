@@ -54,7 +54,7 @@ Check Python code style and quality (PEP 8 compliance).
 
 **Dependencies:** `ruff` (included in `.venv` via `bootstrap.sh`)
 
-See [INSTALL.md](INSTALL.md) for detailed installation options (Poetry, uv, pre-commit).
+See [INSTALL.md](INSTALL.md) for detailed installation options (uv, pre-commit).
 
 ### run-clang-tidy.sh
 

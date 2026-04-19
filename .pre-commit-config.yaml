@@ -20,7 +20,7 @@ repos:
 
       - id: cantera-validation-tests
         name: Cantera Validation Tests
-        entry: bash -c 'CANTERA_DATA="$PWD/cantera_validation_tests" ./.venv/bin/python -m pytest cantera_validation_tests -v --tb=short'
+        entry: bash -c 'CANTERA_DATA="$PWD/cantera_validation_tests" uv run --project cantera_validation_tests pytest -v --tb=short'
         language: system
         pass_filenames: false
         always_run: false
@@ -29,7 +29,7 @@ repos:
 
       - id: python-unit-tests
         name: Python Unit Tests
-        entry: bash -c './.venv/bin/python -m pytest python/tests/ -v'
+        entry: bash -c 'uv run pytest python/tests/ -v'
         language: system
         pass_filenames: false
         always_run: false

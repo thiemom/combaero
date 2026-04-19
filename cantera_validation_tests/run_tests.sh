@@ -1,14 +1,10 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-cd "$(dirname "$0")"
+# Helper to run validation tests in an isolated environment.
+# This uses the root-managed 'uv' workspace environment.
 
-echo "=== Installing dependencies with Poetry ==="
-poetry install --quiet
-
-echo ""
-echo "=== Running Cantera Validation Tests ==="
-poetry run pytest -v --tb=short
-
-echo ""
-echo "=== All tests passed! ==="
+echo "=== Running Validation Tests (via uv) ==="
+# Use -n auto for parallel execution
+# We use --project to ensure we're targeting the workspace member specifically
+uv run --project cantera_validation_tests pytest -v --tb=short

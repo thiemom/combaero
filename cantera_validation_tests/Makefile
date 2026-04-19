@@ -1,52 +1,42 @@
-.PHONY: install test test-verbose test-parallel test-combustion test-equilibrium test-transport test-mixing clean help
+.PHONY: help sync test test-verbose test-parallel combustion-test equilibrium-test transport-test mixing-test
+
+# Use uv run with --project . to ensure we target this workspace member
+UV := uv run --project .
 
 help:
-	@echo "Cantera Validation Tests - Make targets:"
+	@echo "CombAero Cantera Validation Tests"
+	@echo "Usage:"
+	@echo "  make sync              - Synchronize dependencies with uv (run from root ideally)"
+	@echo "  make test              - Run all validation tests"
+	@echo "  make test-verbose      - Run all tests with verbose output"
+	@echo "  make test-parallel     - Run tests in parallel (using pytest-xdist)"
 	@echo ""
-	@echo "Setup:"
-	@echo "  make install           - Install dependencies with Poetry"
-	@echo ""
-	@echo "Run tests:"
-	@echo "  make test              - Run all tests"
-	@echo "  make test-verbose      - Run tests with verbose output"
-	@echo "  make test-parallel     - Run tests in parallel"
-	@echo "  make test-combustion   - Run combustion tests only"
-	@echo "  make test-equilibrium  - Run equilibrium tests only"
-	@echo "  make test-transport    - Run transport tests only"
-	@echo "  make test-mixing       - Run mixing tests only"
-	@echo ""
-	@echo "Maintenance:"
-	@echo "  make clean             - Clean cache and temporary files"
+	@echo "Specific Validation Areas:"
+	@echo "  make combustion-test   - Validate Tad and Complete Combustion"
+	@echo "  make equilibrium-test  - Validate WGS and Reforming Equilibrium"
+	@echo "  make transport-test    - Validate viscosity, conductivity, and Prandtl"
+	@echo "  make mixing-test       - Validate stream enthalpy/mass balancing"
 
-install:
-	poetry install
+sync:
+	uv sync
 
 test:
-	poetry run pytest
+	$(UV) pytest
 
 test-verbose:
-	poetry run pytest -v -s
+	$(UV) pytest -v -s
 
 test-parallel:
-	poetry run pytest -n auto
+	$(UV) pytest -n auto
 
-test-combustion:
-	@echo "Running combustion validation tests..."
-	poetry run pytest test_combustion_validation.py -v
+combustion-test:
+	$(UV) pytest test_combustion_validation.py -v
 
-test-equilibrium:
-	@echo "Running equilibrium validation tests..."
-	poetry run pytest test_equilibrium_validation.py -v
+equilibrium-test:
+	$(UV) pytest test_equilibrium_validation.py -v
 
-test-transport:
-	@echo "Running transport validation tests..."
-	poetry run pytest test_transport_validation.py -v
+transport-test:
+	$(UV) pytest test_transport_validation.py -v
 
-test-mixing:
-	@echo "Running mixing validation tests..."
-	poetry run pytest test_mixing_validation.py -v
-
-clean:
-	rm -rf .pytest_cache __pycache__
-	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name "*.pyc" -delete
+mixing-test:
+	$(UV) pytest test_mixing_validation.py -v

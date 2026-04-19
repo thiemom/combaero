@@ -20,7 +20,7 @@ dev = [
 ]
 examples = ["matplotlib>=3.8"]
 generator = ["pandas>=2.2.3", "pyyaml>=6.0.2"]
-gui = ["fastapi", "uvicorn", "pydantic", "pandas"]
+gui = ["combaero-gui"]
 
 [tool.scikit-build]
 # Python package lives under python/combaero
@@ -36,4 +36,7 @@ package = true
 dev-dependencies = ["pytest-cov"]
 
 [tool.uv.workspace]
-members = ["cantera_validation_tests"]
+members = ["cantera_validation_tests", "thermo_data_generator", "gui"]
+
+[tool.uv.sources]
+combaero-gui = { workspace = true }

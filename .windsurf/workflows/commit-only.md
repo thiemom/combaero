@@ -39,7 +39,7 @@ git add -A
 // turbo
 ### 6. Run pre-commit hooks (should be fast now, most issues already fixed)
 ```bash
-pre-commit run --all-files
+uv run pre-commit run --all-files
 ```
 
 // turbo
@@ -56,7 +56,7 @@ If pre-commit reported errors that couldn't be auto-fixed, review the output and
 
 Once fixed, re-run pre-commit and stage:
 ```bash
-pre-commit run --all-files
+uv run pre-commit run --all-files
 git add -A
 ```
 
