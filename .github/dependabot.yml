@@ -5,16 +5,18 @@ updates:
     schedule:
       interval: "weekly"
     groups:
-      python-dependencies:
+      python-safe-updates:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: "npm"
     directory: "/gui/frontend"
     schedule:
       interval: "weekly"
     groups:
-      frontend-dependencies:
+      frontend-safe-updates:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
