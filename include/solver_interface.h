@@ -219,7 +219,8 @@ std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobia
     const std::vector<double>& X,
     double L, double D, double roughness,
     const std::string& friction_model,
-    double f_multiplier = 1.0);
+    double f_multiplier = 1.0,
+    bool compute_jacobians = true);
 
 
 // Full compressible channel evaluation with all derivatives for network solver.

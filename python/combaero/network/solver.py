@@ -4,6 +4,7 @@ import warnings
 from typing import Any, Literal
 
 import numpy as np
+import scipy.sparse as sp
 from scipy.optimize import root
 
 import combaero as cb
@@ -141,6 +142,7 @@ class NetworkSolver:
         self._name_to_index: dict[str, int] = {}
         # Canonical default composition (Mass Fractions)
         self._default_Y: list[float] = list(cb.species.dry_air_mass())
+        self._n_species: int = len(self._default_Y)
         self._topological_order: list[str] = []
         self._derived_states: dict[str, tuple[float, list[float], Any]] = {}
 
@@ -593,7 +595,7 @@ class NetworkSolver:
                     name = unknown_names[global_idx]
                     if name.endswith(".P_total"):
                         relay[nid].setdefault(
-                            global_idx, {"T": 0.0, "Y": np.zeros(cb.num_species()), "P_total": 0.0}
+                            global_idx, {"T": 0.0, "Y": np.zeros(self._n_species), "P_total": 0.0}
                         )["P_total"] = 1.0
                 continue
 
@@ -649,7 +651,7 @@ class NetworkSolver:
 
             # Sensitivity Relay (Chain-Rule)
             if mix_res:
-                n_species = cb.num_species()
+                n_species = self._n_species
                 for i, elem in enumerate(up_elems):
                     from_nid = elem.from_node
                     t_jac = mix_res.dT_mix_d_stream[i]
@@ -799,7 +801,7 @@ class NetworkSolver:
                 unk_name = self.unknown_names[unk_idx]
                 if unk_name.endswith(".P_total"):
                     node_relay = relay[nid].setdefault(
-                        unk_idx, {"T": 0.0, "Y": np.zeros(cb.num_species()), "P_total": 0.0}
+                        unk_idx, {"T": 0.0, "Y": np.zeros(self._n_species), "P_total": 0.0}
                     )
                     node_relay["P_total"] = 1.0
 
@@ -848,7 +850,14 @@ class NetworkSolver:
             if var_name in state_dict:
                 state_dict[var_name] = x[i]
 
-        return MixtureState(**state_dict)
+        return MixtureState(
+            float(state_dict["P"]),
+            float(state_dict["P_total"]),
+            float(state_dict["T"]),
+            float(state_dict["T_total"]),
+            float(state_dict["m_dot"]),
+            state_dict["Y"],
+        )
 
     def _get_node_state(self, node: NetworkNode, x: np.ndarray) -> MixtureState:
         """Constructs a MixtureState for a given node based on the current solver vector x."""
@@ -864,7 +873,7 @@ class NetworkSolver:
             Y = getattr(node, "Y", None)
             if Y is None:
                 Y = default_Y
-            return MixtureState(P=P_stat, P_total=P_tot, T=T_stat, T_total=T_tot, m_dot=0.0, Y=Y)
+            return MixtureState(float(P_stat), float(P_tot), float(T_stat), float(T_tot), 0.0, Y)
 
         if isinstance(node, MassFlowBoundary):
             guess = getattr(node, "initial_guess", {})
@@ -893,7 +902,9 @@ class NetworkSolver:
                 elif unk.endswith(".P_total"):
                     ptot_val = x[i]
 
-            return MixtureState(P=p_val, P_total=ptot_val, T=T_stat, T_total=T_tot, m_dot=m, Y=Y)
+            return MixtureState(
+                float(p_val), float(ptot_val), float(T_stat), float(T_tot), float(m), Y
+            )
 
         # For interior nodes, unpack from x
         indices = self._unknown_indices.get(node.id, [])
@@ -934,9 +945,15 @@ class NetworkSolver:
         y_sum = sum(Y_safe)
         if y_sum > 0:
             Y_safe = [yi / y_sum for yi in Y_safe]
-        state_dict["Y"] = Y_safe
 
-        return MixtureState(**state_dict)
+        return MixtureState(
+            float(state_dict["P"]),
+            float(state_dict["P_total"]),
+            float(state_dict["T"]),
+            float(state_dict["T_total"]),
+            float(state_dict["m_dot"]),
+            Y_safe,
+        )
 
     def _residuals_and_jacobian(
         self, x: np.ndarray, *, compute_jacobian: bool = True
@@ -1091,8 +1108,6 @@ class NetworkSolver:
 
         jac_sparse = None
         if compute_jacobian:
-            import scipy.sparse as sp
-
             jac_sparse = sp.coo_matrix((data, (rows, cols)), shape=(len(res), len(x))).tocsr()
 
         return np.array(res, dtype=float), jac_sparse
@@ -1172,6 +1187,15 @@ class NetworkSolver:
         # Ensure topology is resolved before solving
         self.network.resolve_all_topology()
         self.network.validate()
+
+        # Build initial guess to populate unknown_names early
+        x0_auto = self._build_x0()
+        if not self.unknown_names:
+            return {
+                "__success__": True,
+                "__message__": "Network is empty or fully constrained (no unknowns).",
+                "__iterations__": 0,
+            }
 
         warmstart_x0: np.ndarray | None = None
         if x0 is None and init_strategy == "incompressible_warmstart":
@@ -1278,7 +1302,6 @@ class NetworkSolver:
                 warmstart_x0 = current_x0
 
         # --- Initial guess: user-supplied (warm-start) or auto-built ----
-        x0_auto = self._build_x0()
         if x0 is not None:
             if len(x0) != len(x0_auto):
                 raise ValueError(

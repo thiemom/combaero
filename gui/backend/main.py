@@ -73,7 +73,10 @@ def _solve_sync(schema: NetworkGraphSchema):
     """
     net = build_network_from_schema(schema)
     solver = NetworkSolver(net)
-    result = solver.solve(init_strategy=schema.solver_settings.init_strategy)
+    result = solver.solve(
+        init_strategy=schema.solver_settings.init_strategy,
+        timeout=schema.solver_settings.timeout,
+    )
     success = bool(result.get("__success__", False))
 
     node_results = {}
@@ -159,7 +162,9 @@ async def solve(schema: NetworkGraphSchema):
 async def export_results(schema: NetworkGraphSchema):
     try:
         # Solve quickly to get states
-        _, node_results, element_results, edge_results, _ = await asyncio.to_thread(_solve_sync, schema)
+        _, node_results, element_results, edge_results, _ = await asyncio.to_thread(
+            _solve_sync, schema
+        )
 
         # Convert to DataFrame
         import pandas as pd
