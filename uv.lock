@@ -106,7 +106,7 @@ dependencies = [
     { name = "pytest-xdist" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
     { name = "pytest-cov" },
 ]
@@ -116,9 +116,11 @@ requires-dist = [
     { name = "cantera", specifier = ">=3.0.0" },
     { name = "numpy", specifier = ">=1.26.0" },
     { name = "pytest", specifier = ">=8.0.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
     { name = "pytest-xdist", specifier = ">=3.5.0" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest-cov", specifier = ">=4.1.0" }]
 
 [[package]]
 name = "cfgv"
@@ -160,13 +162,6 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-dev = [
-    { name = "build" },
-    { name = "mypy" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "ruff" },
-]
 examples = [
     { name = "matplotlib" },
 ]
@@ -180,26 +175,33 @@ gui = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "build" },
+    { name = "mypy" },
+    { name = "pre-commit" },
+    { name = "pytest" },
     { name = "pytest-cov" },
+    { name = "ruff" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "build", marker = "extra == 'dev'", specifier = ">=1.2.0" },
     { name = "combaero-gui", marker = "extra == 'gui'", editable = "gui" },
     { name = "matplotlib", marker = "extra == 'examples'", specifier = ">=3.8" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.12.0" },
     { name = "numpy", specifier = ">=1.24" },
     { name = "pandas", marker = "extra == 'generator'", specifier = ">=2.2.3" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pyyaml", marker = "extra == 'generator'", specifier = ">=6.0.2" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
     { name = "scipy", specifier = ">=1.10" },
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest-cov" }]
+dev = [
+    { name = "build", specifier = ">=1.2.0" },
+    { name = "mypy", specifier = ">=1.12.0" },
+    { name = "pre-commit", specifier = ">=4.0.0" },
+    { name = "pytest", specifier = ">=8.0.0" },
+    { name = "pytest-cov" },
+    { name = "ruff", specifier = ">=0.8.0" },
+]
 
 [[package]]
 name = "combaero-gui"
@@ -1489,7 +1491,7 @@ dependencies = [
     { name = "pyyaml" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
     { name = "pytest" },
 ]
@@ -1497,9 +1499,11 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "pandas", specifier = ">=2.2.3" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pyyaml", specifier = ">=6.0.2" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "tomli"

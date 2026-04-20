@@ -33,7 +33,8 @@ echo "Starting CombAero GUI..."
 # 1. Start FastAPI Backend in background
 echo "Starting Backend (FastAPI)..."
 export PYTHONPATH="$PYTHONPATH:$PROJECT_ROOT"
-$VENV_PYTHON -m uvicorn gui.backend.main:app --host 127.0.0.1 --port 8000 --reload &
+# Using uv run ensures we use the modernized synchronized environment
+uv run uvicorn gui.backend.main:app --host 127.0.0.1 --port 8000 --reload &
 BACKEND_PID=$!
 
 # Wait a moment for backend to initialize
@@ -41,6 +42,7 @@ sleep 2
 
 # 2. Start Vite Frontend
 echo "Starting Frontend (Vite)..."
+echo "NOTE: If this fails, ensure you ran 'npm install' in gui/frontend following the React 19 upgrade."
 cd gui/frontend
 npm run dev -- --port 5173 --host
 

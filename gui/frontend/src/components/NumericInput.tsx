@@ -16,6 +16,7 @@ interface NumericInputProps {
 	placeholder?: string;
 	step?: string;
 	min?: number;
+	disabled?: boolean;
 }
 
 const NumericInput: React.FC<NumericInputProps> = ({
@@ -26,6 +27,7 @@ const NumericInput: React.FC<NumericInputProps> = ({
 	className,
 	placeholder,
 	min,
+	disabled,
 }) => {
 	const [localValue, setLocalValue] = useState(
 		value !== undefined && value !== null ? value.toString() : "",
@@ -97,6 +99,7 @@ const NumericInput: React.FC<NumericInputProps> = ({
 			onBlur={handleBlur}
 			className={className}
 			placeholder={placeholder}
+			disabled={disabled}
 		/>
 	);
 };
