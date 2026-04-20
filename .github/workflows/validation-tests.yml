@@ -36,6 +36,7 @@ jobs:
               - 'tests/**'
               - 'cantera_validation_tests/**'
               - 'scripts/**'
+              - 'gui/**'
               - 'examples/**'
               - '.github/workflows/**'
               - 'CMakeLists.txt'
@@ -140,11 +141,39 @@ jobs:
         run: |
           uv run pytest -v --tb=short
 
+  frontend-validation:
+    name: Frontend Validation (Node 24 LTS)
+    needs: changes
+    if: needs.changes.outputs.source == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+          cache-dependency-path: 'gui/frontend/pnpm-lock.yaml'
+      - name: Install dependencies
+        run: pnpm install
+        working-directory: gui/frontend
+      - name: Run validation
+        run: |
+          pnpm run lint
+          pnpm run test
+          pnpm run build
+        working-directory: gui/frontend
+
   status-check:
     # IMPORTANT: Keep this literal name in sync with Iron ruleset required context:
     # "Validation Tests / status-check". Ruleset matching is strict and relies on exact string equality.
     name: Validation Tests / status-check
-    needs: [changes, cantera-validation, python-unit-tests]
+    needs: [changes, cantera-validation, python-unit-tests, frontend-validation]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -154,18 +183,25 @@ jobs:
           source_changed="${{ needs.changes.outputs.source }}"
           cantera_result="${{ needs.cantera-validation.result }}"
           py_unit_result="${{ needs.python-unit-tests.result }}"
+          frontend_result="${{ needs.frontend-validation.result }}"
 
           echo "source_changed=${source_changed}"
           echo "cantera_result=${cantera_result}"
           echo "py_unit_result=${py_unit_result}"
+          echo "frontend_result=${frontend_result}"
 
           if [[ "${source_changed}" != "true" ]]; then
             echo "Documentation-only (or non-source) change detected. Passing status-check."
             exit 0
           fi
 
-          if [[ "${cantera_result}" == "success" && "${py_unit_result}" == "success" ]]; then
-            echo "All validation jobs succeeded."
+          # Allow success OR skipped if no relevant changes triggered it
+          is_success() {
+            [[ "$1" == "success" || "$1" == "skipped" ]]
+          }
+
+          if is_success "${cantera_result}" && is_success "${py_unit_result}" && is_success "${frontend_result}"; then
+            echo "All validation jobs succeeded or were correctly skipped."
             exit 0
           fi
 

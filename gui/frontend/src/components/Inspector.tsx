@@ -1431,54 +1431,58 @@ const Inspector = () => {
 		);
 	}
 
-	return (
-		<aside className="w-80 border-l bg-white p-4 flex flex-col gap-4 overflow-y-auto">
-			<h2 className="text-lg font-bold border-b pb-2 uppercase text-slate-600">
-				Connection
-			</h2>
+	if (selectedEdge) {
+		return (
+			<aside className="w-80 border-l bg-white p-4 flex flex-col gap-4 overflow-y-auto">
+				<h2 className="text-lg font-bold border-b pb-2 uppercase text-slate-600">
+					Connection
+				</h2>
 
-			{/* Custom label */}
-			<div className="flex flex-col gap-1">
-				<label className="text-xs font-bold text-gray-500 uppercase">
-					Custom Label (optional)
+				{/* Custom label */}
+				<div className="flex flex-col gap-1">
+					<label className="text-xs font-bold text-gray-500 uppercase">
+						Custom Label (optional)
+					</label>
+					<input
+						type="text"
+						value={selectedEdge.data?.label ?? ""}
+						onChange={(e) =>
+							updateEdgeData(selectedEdge.id, {
+								label: e.target.value || undefined,
+							})
+						}
+						placeholder="e.g. Main Feed"
+						className="p-1.5 border rounded text-xs w-full focus:ring-1 focus:ring-slate-400 outline-none"
+					/>
+				</div>
+
+				{/* Show label on graph */}
+				<label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
+					<input
+						type="checkbox"
+						checked={!!selectedEdge.data?.show_label}
+						onChange={(e) =>
+							updateEdgeData(selectedEdge.id, { show_label: e.target.checked })
+						}
+						className="rounded"
+					/>
+					Show label in graph
 				</label>
-				<input
-					type="text"
-					value={selectedEdge.data?.label ?? ""}
-					onChange={(e) =>
-						updateEdgeData(selectedEdge.id, {
-							label: e.target.value || undefined,
-						})
-					}
-					placeholder="e.g. Main Feed"
-					className="p-1.5 border rounded text-xs w-full focus:ring-1 focus:ring-slate-400 outline-none"
-				/>
-			</div>
 
-			{/* Show label on graph */}
-			<label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
-				<input
-					type="checkbox"
-					checked={!!selectedEdge.data?.show_label}
-					onChange={(e) =>
-						updateEdgeData(selectedEdge.id, { show_label: e.target.checked })
-					}
-					className="rounded"
-				/>
-				Show label in graph
-			</label>
+				{/* Auto ID for reference */}
+				<div className="flex flex-col gap-1 mt-2 border-t pt-3">
+					<span className="text-[10px] font-bold text-stone-400 uppercase">
+						Internal ID
+					</span>
+					<span className="font-mono text-[10px] text-stone-400 break-all">
+						{selectedEdge.id}
+					</span>
+				</div>
+			</aside>
+		);
+	}
 
-			{/* Auto ID for reference */}
-			<div className="flex flex-col gap-1 mt-2 border-t pt-3">
-				<span className="text-[10px] font-bold text-stone-400 uppercase">
-					Internal ID
-				</span>
-				<span className="font-mono text-[10px] text-stone-400 break-all">
-					{selectedEdge.id}
-				</span>
-			</div>
-		</aside>
-	);
+	return null;
 };
 
 const InitialGuessEditor = ({ node }: { node: any }) => {

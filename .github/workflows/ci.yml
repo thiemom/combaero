@@ -36,6 +36,7 @@ jobs:
               - 'tests/**'
               - 'scripts/**'
               - 'examples/**'
+              - 'gui/**'
               - '.github/workflows/**'
               - 'CMakeLists.txt'
               - 'pyproject.toml'
