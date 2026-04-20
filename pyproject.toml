@@ -11,16 +11,19 @@ requires-python = ">=3.9"
 dependencies = ["numpy>=1.24", "scipy>=1.10"]
 
 [project.optional-dependencies]
+examples = ["matplotlib>=3.8"]
+generator = ["pandas>=2.2.3", "pyyaml>=6.0.2"]
+gui = ["combaero-gui"]
+
+[dependency-groups]
 dev = [
     "pytest>=8.0.0",
     "ruff>=0.8.0",
     "mypy>=1.12.0",
     "pre-commit>=4.0.0",
     "build>=1.2.0",
+    "pytest-cov",
 ]
-examples = ["matplotlib>=3.8"]
-generator = ["pandas>=2.2.3", "pyyaml>=6.0.2"]
-gui = ["combaero-gui"]
 
 [tool.scikit-build]
 # Python package lives under python/combaero
@@ -33,7 +36,6 @@ args = ["-DCOMBAERO_ENABLE_TESTS=OFF", "-DCOMBAERO_BUILD_PYTHON=ON"]
 [tool.uv]
 managed = true
 package = true
-dev-dependencies = ["pytest-cov"]
 
 [tool.uv.workspace]
 members = ["cantera_validation_tests", "thermo_data_generator", "gui"]

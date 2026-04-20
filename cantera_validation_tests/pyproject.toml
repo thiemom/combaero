@@ -11,7 +11,7 @@ dependencies = [
     "pytest-xdist>=3.5.0",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest-cov>=4.1.0",
 ]
