@@ -1,4 +1,6 @@
+import contextlib
 import math
+import sys
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable
@@ -162,9 +164,6 @@ class ConvectiveSurface:
             Full ChannelResult with h, T_aw, and Jacobians (dh_dmdot, dh_dT, etc.),
             or None if area=0. Access convective area via ``self.area``.
         """
-        import math
-
-        import combaero as cb
 
         if self.area == 0.0 or abs(velocity) < 1e-12:
             return None
@@ -304,12 +303,9 @@ class WallLayer:
 
     def update_conductivity(self, T: float) -> None:
         """Update conductivity based on temperature if a database material is selected."""
-        import combaero as cb
 
         # 'generic' is legacy, 'custom' is new name for manual input
         if self.material.lower() not in ("generic", "custom"):
-            import contextlib
-
             with contextlib.suppress(RuntimeError, ValueError):
                 # The C++ binding handles T-clamping and k-clamping internally
                 self.conductivity = cb.get_material_conductivity(self.material, T)
@@ -547,8 +543,6 @@ class NetworkNode(ABC):
         By default, it just takes the first upstream state (pass-through).
         """
         if not upstream_states:
-            import combaero as cb
-
             return 300.0, list(cb.mole_to_mass(cb.species.dry_air())), None
 
         up = upstream_states[0]
@@ -565,7 +559,6 @@ class NetworkNode(ABC):
 
     def diagnostics(self, state: MixtureState) -> dict[str, float]:
         """Compute generalized node-level diagnostics (e.g., thermo properties)."""
-        import combaero as cb
 
         # Robustness check: state must be physically valid (P > 0)
         if state.P <= 0:
@@ -674,7 +667,6 @@ class PlenumNode(NetworkNode):
         self, upstream_states: list[MixtureState]
     ) -> tuple[float, list[float], Any]:
         """Derived T and Y for a plenum (simple mixing + energy boundaries)."""
-        import combaero as cb
 
         if not upstream_states:
             return 300.0, list(cb.mole_to_mass(cb.species.dry_air())), None
@@ -694,7 +686,6 @@ class PlenumNode(NetworkNode):
         return res, jac
 
     def diagnostics(self, state: MixtureState) -> dict[str, float]:
-        import combaero as cb
 
         # Plenums don't have transport properties (per user request / stationary reservoir model)
         ts = cb.thermo_state(state.T, state.P, state.X)
@@ -767,7 +758,6 @@ class MomentumChamberNode(NetworkNode):
         self, upstream_states: list[MixtureState]
     ) -> tuple[float, list[float], Any]:
         """Derived T and Y for a momentum chamber (simple mixing + energy boundaries)."""
-        import combaero as cb
 
         # Store total mass flow for use in residuals
         self._total_m_dot = sum(s.m_dot for s in upstream_states) if upstream_states else 1.0
@@ -794,8 +784,6 @@ class MomentumChamberNode(NetworkNode):
         if self.surface.area == 0.0:
             return None
 
-        import math
-
         T_hot = self.t_hot if self.t_hot is not None else math.nan
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
         rho, _ = _safe_rho(state.density())
@@ -815,7 +803,6 @@ class MomentumChamberNode(NetworkNode):
         )
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
-        import combaero as cb
 
         # Momentum chamber: P_total = P_static + 0.5 * rho * v^2
         # Use total mass flow computed during compute_derived_state
@@ -843,7 +830,6 @@ class MomentumChamberNode(NetworkNode):
 
     def mach(self, state: MixtureState) -> float:
         """Computes Mach number using internal total mass flow and area."""
-        import combaero as cb
 
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
         if self.area <= 0 or m_dot_total <= 1e-12:
@@ -854,9 +840,6 @@ class MomentumChamberNode(NetworkNode):
         return float(cb.mach_number(velocity, state.T, state.X))
 
     def diagnostics(self, state: MixtureState) -> dict[str, float]:
-        import math
-
-        import combaero as cb
 
         # Momentum chambers use rich CompleteState
         cs = cb.complete_state(state.T, state.P, state.X)
@@ -935,7 +918,6 @@ class PressureBoundary(NetworkNode):
         self, upstream_states: list[MixtureState]
     ) -> tuple[float, list[float], Any]:
         # Boundary nodes define their own state
-        import combaero as cb
 
         Y = self.Y if self.Y is not None else list(cb.mole_to_mass(cb.species.dry_air()))
         return self.T_total, Y, None
@@ -980,7 +962,6 @@ class MassFlowBoundary(NetworkNode):
         - If upstream_states exists, it acts as a SINK (Outlet): inherits state via mixing.
         - If upstream_states is empty, it acts as a SOURCE (Inlet): uses user settings.
         """
-        import combaero as cb
 
         if upstream_states:
             # SINK behavior: Automatically mix upstream streams using C++ core logic
@@ -1060,7 +1041,6 @@ class CombustorNode(NetworkNode):
         self, upstream_states: list[MixtureState]
     ) -> tuple[float, list[float], Any]:
         """Derived T and Y for a combustor (Reaction + Mixing + energy boundaries)."""
-        import combaero as cb
 
         # Store total mass flow and unburned temperature for use in diagnostics
         self._total_m_dot = sum(s.m_dot for s in upstream_states) if upstream_states else 1.0
@@ -1112,9 +1092,6 @@ class CombustorNode(NetworkNode):
         return res, jac
 
     def diagnostics(self, state: MixtureState) -> dict[str, float]:
-        import math
-
-        import combaero as cb
 
         # Combustors use rich CompleteState
         cs = cb.complete_state(state.T, state.P, state.X)
@@ -1168,7 +1145,6 @@ class CombustorNode(NetworkNode):
             diag["phi"] = phi
         except Exception as e:
             # Reveal the root cause of the diagnostic failure
-            import sys
 
             print(f"DEBUG: CombustorNode.diagnostics phi calculation failed: {e}", file=sys.stderr)
             diag["phi"] = 0.0
@@ -1186,8 +1162,6 @@ class CombustorNode(NetworkNode):
         """Compute heat transfer coefficient for the combustor wall."""
         if self.surface.area == 0.0:
             return None
-
-        import math
 
         T_hot = self.t_hot if self.t_hot is not None else math.nan
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
@@ -1242,7 +1216,6 @@ class OrificeElement(NetworkElement):
         area: float | None = None,
     ):
         super().__init__(id, from_node, to_node)
-        import math
 
         if diameter is None and area is None:
             raise ValueError("OrificeElement requires either 'diameter' or 'area'.")
@@ -1285,8 +1258,6 @@ class OrificeElement(NetworkElement):
             self.downstream_diameter = downstream_channels[0].diameter
 
         # Pre-compute beta for velocity-of-approach factor
-        import math
-        import warnings
 
         d_bore = math.sqrt(4.0 * self.area / math.pi)
         self.beta = 0.0
@@ -1305,8 +1276,6 @@ class OrificeElement(NetworkElement):
                 )
 
         if self.use_correlation:
-            import combaero as cb
-
             # Build geometry descriptor for Cd correlation.
             # D=0 when no upstream channel known (plenum connection) -> beta=0 -> RHG extrapolates to ~0.597.
             D_up = (
@@ -1331,8 +1300,6 @@ class OrificeElement(NetworkElement):
         if not self.use_correlation or self._orifice_geom is None:
             # Clamp manual Cd strictly <= 1.0 to strictly preserve vena contracta physics (A_eff <= A_geom)
             return max(1e-4, min(self.Cd, 1.0))
-
-        import combaero as cb
 
         # Estimate Re_D from current m_dot and upstream viscosity.
         D_up = self._orifice_geom.D
@@ -1390,7 +1357,6 @@ class OrificeElement(NetworkElement):
     def residuals(
         self, state_in: "MixtureState", state_out: "MixtureState"
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
-        import combaero as cb
 
         m_dot = state_in.m_dot
         effective_cd = self._effective_Cd(state_in, state_out)
@@ -1442,8 +1408,6 @@ class OrificeElement(NetworkElement):
         return 1
 
     def diagnostics(self, state_in: MixtureState, state_out: MixtureState) -> dict[str, float]:
-
-        import combaero as cb
 
         # Full thermo + transport bundle at inlet static conditions (mole fractions X)
         cs = cb.complete_state(state_in.T, state_in.P, state_in.X)
@@ -1556,7 +1520,6 @@ class EffectiveAreaConnectionElement(OrificeElement):
             have a sharp-edged orifice with geometric area 0.0125 m^2 and Cd=0.8, you would
             specify effective_area=0.01 m^2 (0.8 * 0.0125).
         """
-        import math
 
         diameter = math.sqrt(4.0 * effective_area / math.pi)
         super().__init__(id, from_node, to_node, Cd=1.0, diameter=diameter, correlation="fixed")
@@ -1708,13 +1671,12 @@ class LosslessConnectionElement(NetworkElement):
         This provides structural symmetry with realistic pipes (e.g. Fanno/Rough)
         for GUI plotters.
         """
-        import combaero as cba
 
         # Simplified placeholder for test completion validation
         # Normally would utilize the true state nodes
         profile = []
         for _ in range(n_steps):
-            st = cba.IncompressibleStation()
+            st = cb.IncompressibleStation()
             st.x = 0.0
             st.P = 100000.0
             st.T = 300.0
@@ -1827,7 +1789,6 @@ class PressureLossElement(NetworkElement):
         where ``Dh = sqrt(4*A/pi)`` is derived from the flow area. Returns
         ``None`` if either the convective surface or the flow area is missing.
         """
-        import math
 
         if self.surface.area == 0.0 or not self.area or self.area <= 0.0:
             return None
@@ -1997,9 +1958,6 @@ class PressureLossElement(NetworkElement):
         return res, jac
 
     def diagnostics(self, state_in: MixtureState, state_out: MixtureState) -> dict[str, float]:
-        import math
-
-        import combaero as cb
 
         graph = getattr(self, "_graph_ref", None)
         ctx = self._build_ctx(state_in, state_out, graph)
@@ -2119,9 +2077,6 @@ class ChannelElement(NetworkElement):
         return [f"{self.id}.m_dot"]
 
     def residuals(self, state_in: MixtureState, state_out: MixtureState) -> list[float]:
-        import math
-
-        import combaero as cb
 
         m_dot = state_in.m_dot
 
@@ -2220,7 +2175,6 @@ class ChannelElement(NetworkElement):
 
     def diagnostics(self, state_in: MixtureState, state_out: MixtureState) -> dict[str, float]:
         """Compute inlet/outlet Mach numbers and pressure ratio."""
-        import combaero as cb
 
         # Inlet Mach
         rho_in = state_in.density()
@@ -2270,8 +2224,6 @@ class ChannelElement(NetworkElement):
             res_dict["htc"] = 0.0
             res_dict["T_aw"] = state_in.T
 
-            import math
-
             e_D = self.roughness / self.diameter if self.diameter > 0 else 0.0
             if re_in < 2300:
                 res_dict["f"] = 64.0 / re_in if re_in > 0 else 0.0
@@ -2310,13 +2262,12 @@ class ChannelElement(NetworkElement):
         Compute and return the spatial flow profile array along the channel length.
         Requires the solved inlet MixtureState.
         """
-        import combaero as cba
 
-        rho = cba.density(state_in.T, state_in.P, state_in.X)
-        u = cba.channel_velocity(state_in.m_dot, self.diameter, rho)
+        rho = cb.density(state_in.T, state_in.P, state_in.X)
+        u = cb.channel_velocity(state_in.m_dot, self.diameter, rho)
 
         if self.regime == "incompressible":
-            res = cba.channel_flow_rough(
+            res = cb.channel_flow_rough(
                 state_in.T,
                 state_in.P,
                 state_in.X,
@@ -2331,10 +2282,10 @@ class ChannelElement(NetworkElement):
             return res.profile
 
         elif self.regime == "compressible":
-            res = cba.fanno_channel(
+            res = cb.fanno_channel(
                 state_in.T,
                 state_in.P,
-                cba.mass_to_mole(
+                cb.mass_to_mole(
                     state_in.Y
                 ),  # C++ expects mole fractions for Fanno solver currently
                 state_in.m_dot,

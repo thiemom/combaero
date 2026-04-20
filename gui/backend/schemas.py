@@ -243,6 +243,7 @@ class SolverSettings(BaseModel):
     model_config = ConfigDict(extra="ignore")
     global_regime: Literal["incompressible", "compressible"] = "incompressible"
     init_strategy: Literal["default", "incompressible_warmstart", "homotopy"] = "default"
+    timeout: float | None = 180.0
 
 
 # --- React Flow Wrapper Schemas ---
