@@ -15,6 +15,7 @@ import {
 import type React from "react";
 import { useRef, useState } from "react";
 import useStore from "../store/useStore";
+import NumericInput from "./NumericInput";
 
 const Sidebar = () => {
 	const fileInputRef = useRef<HTMLInputElement>(null);
@@ -271,6 +272,19 @@ const Sidebar = () => {
 						<option value="incompressible_warmstart">Incomp. Warmstart</option>
 						<option value="homotopy">Load-Stepping (Homotopy)</option>
 					</select>
+				</div>
+				<div className="flex flex-col gap-1">
+					<label className="text-[10px] font-bold text-gray-400 uppercase">
+						Max Solver Time (s)
+					</label>
+					<NumericInput
+						className="p-1 border rounded text-xs bg-white h-7 outline-none focus:ring-1 focus:ring-stone-200"
+						value={solverSettings.timeout}
+						onChange={(val) => updateSolverSettings({ timeout: val })}
+						onClear={() => updateSolverSettings({ timeout: null })}
+						min={0}
+						placeholder="None"
+					/>
 				</div>
 
 				<div className="border-t border-stone-200 pt-2">
