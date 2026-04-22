@@ -396,3 +396,42 @@ def test_area_change_exports() -> None:
     # Check they match the core versions
     assert cb.sharp_area_change == cb._core.sharp_area_change
     assert cb.AreaChangeResult == cb._core.AreaChangeResult
+
+
+# ---------------------------------------------------------------------------
+# Test 10: Edge Cases - Zero Area and D_h fallback
+# ---------------------------------------------------------------------------
+def test_zero_area_safety() -> None:
+    """Verify that F=0 doesn't crash and returns zero/bounded results."""
+    # F0=0 leads to zero velocity fallback in diagnostics, but core handles it with eps
+    res = cb.sharp_area_change(m_dot=0.1, rho=1.2, mu=1.8e-5, F0=0.0, F1=0.04)
+    assert np.isfinite(res.dP)
+    assert res.dP > 0  # Should be very high loss but finite
+
+
+def test_dh_fallback() -> None:
+    """Verify that D_h=0 falls back to circular formula."""
+    F0, F1 = 0.01, 0.01
+    # Circular D = sqrt(4*0.01/pi) approx 0.1128
+    res_auto = cb.sharp_area_change(m_dot=0.1, rho=1.2, mu=1.8e-5, F0=F0, F1=F1, D_h=0.0)
+
+    D_manual = np.sqrt(4.0 * 0.01 / np.pi)
+    res_manual = cb.sharp_area_change(m_dot=0.1, rho=1.2, mu=1.8e-5, F0=F0, F1=F1, D_h=D_manual)
+
+    np.testing.assert_allclose(res_auto.dP, res_manual.dP, rtol=1e-10)
+
+
+def test_area_change_validation() -> None:
+    """Verify that AreaChangeElement.validate() catches bad geometry."""
+    # Good geometry
+    cb.network.AreaChangeElement("ac1", "n1", "n2", F0=0.01, F1=0.02).validate()
+
+    # Bad F0
+    ac_bad = cb.network.AreaChangeElement("ac1", "n1", "n2", F0=0.0, F1=0.02)
+    with pytest.raises(ValueError, match="invalid Upstream Area"):
+        ac_bad.validate()
+
+    # Bad Dh
+    ac_bad_dh = cb.network.AreaChangeElement("ac1", "n1", "n2", F0=0.01, F1=0.02, D_h=-1.0)
+    with pytest.raises(ValueError, match="invalid Hydraulic Diameter"):
+        ac_bad_dh.validate()

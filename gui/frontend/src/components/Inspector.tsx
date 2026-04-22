@@ -583,6 +583,25 @@ const Inspector = () => {
 							</select>
 						</div>
 
+						{(selectedNode.data.F0 <= 0 ||
+							selectedNode.data.F1 <= 0 ||
+							(selectedNode.data.D_h !== undefined &&
+								selectedNode.data.D_h !== null &&
+								selectedNode.data.D_h < 0)) && (
+							<div className="bg-amber-50 border border-amber-200 p-2 rounded text-[10px] text-amber-800 flex items-center gap-2 mb-2">
+								<Activity size={14} className="shrink-0" />
+								<div>
+									<p className="font-bold uppercase leading-none mb-1">
+										Invalid Geometry
+									</p>
+									<p>
+										Area (F) must be &gt; 0 and Hydraulic Diameter (D_h) must be
+										&ge; 0. Solve will fail.
+									</p>
+								</div>
+							</div>
+						)}
+
 						<AreaInput
 							id={`F0_${selectedNode.id}`}
 							label="Upstream Area (F0)"
@@ -616,7 +635,10 @@ const Inspector = () => {
 									value={selectedNode.data.D_h}
 									placeholder="Circular (Auto)"
 									onChange={(val) =>
-										updateNodeData(selectedNode.id, { D_h: val || 0.0 })
+										updateNodeData(selectedNode.id, { D_h: val })
+									}
+									onClear={() =>
+										updateNodeData(selectedNode.id, { D_h: undefined })
 									}
 								/>
 								<p className="text-[9px] text-gray-400 italic">

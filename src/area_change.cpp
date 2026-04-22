@@ -67,7 +67,7 @@ AreaChangeResult sharp_area_change(double m_dot, double rho, double mu,
 
     // Hydraulic diameter of the smaller section (reference for Re).
     // D_h > 0 overrides the circular assumption for non-circular ducts.
-    double D_small = (D_h > 0.0) ? D_h : std::sqrt(4.0 * F_small / M_PI);
+    double D_small = (D_h > 0.0) ? D_h : std::sqrt(std::max(4.0 * F_small / M_PI, 0.0));
 
     // --- Reynolds number based on F_small (higher-velocity side) ---
     double m_abs = smooth_abs(m_dot);
@@ -169,8 +169,8 @@ AreaChangeResult conical_area_change(double m_dot, double rho, double mu,
     double F_large = std::max(F0, F1);
     double ar = F_small / std::max(F_large, eps);  // area ratio in (0, 1]
 
-    double r_small = std::sqrt(F_small / M_PI);
-    double r_large = std::sqrt(F_large / M_PI);
+    double r_small = std::sqrt(std::max(F_small / M_PI, 0.0));
+    double r_large = std::sqrt(std::max(F_large / M_PI, 0.0));
     // Half-angle: atan2 keeps theta in [0, pi/2] for any positive length.
     double theta = std::atan2(r_large - r_small, std::max(length, eps));
 

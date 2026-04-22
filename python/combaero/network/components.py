@@ -634,6 +634,12 @@ class NetworkElement(ABC):
         """Called automatically by FlowNetwork to resolve neighbors."""
         pass
 
+    def validate(self) -> None:
+        """Perform element-specific validation checks.
+        Should raise ValueError with a clear message if validation fails.
+        """
+        return None
+
     def htc_and_T(self, state: MixtureState):
         """Compute heat transfer coefficient and adiabatic wall temperature."""
         return None
@@ -2356,7 +2362,7 @@ class AreaChangeElement(NetworkElement):
         F1: float,
         model_type: Literal["sharp", "conical"] = "sharp",
         length: float | None = None,
-        D_h: float = 0.0,
+        D_h: float | None = 0.0,
     ):
         super().__init__(id, from_node, to_node)
         self.F0 = F0
@@ -2374,6 +2380,20 @@ class AreaChangeElement(NetworkElement):
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         pass
 
+    def validate(self) -> None:
+        if self.F0 <= 0:
+            raise ValueError(
+                f"AreaChangeElement '{self.id}' has invalid Upstream Area F0={self.F0}. Must be > 0."
+            )
+        if self.F1 <= 0:
+            raise ValueError(
+                f"AreaChangeElement '{self.id}' has invalid Downstream Area F1={self.F1}. Must be > 0."
+            )
+        if self.D_h is not None and self.D_h < 0:
+            raise ValueError(
+                f"AreaChangeElement '{self.id}' has invalid Hydraulic Diameter D_h={self.D_h}. Must be >= 0."
+            )
+
     def residuals(
         self, state_in: MixtureState, state_out: MixtureState
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
@@ -2390,7 +2410,7 @@ class AreaChangeElement(NetworkElement):
                 F0=self.F0,
                 F1=self.F1,
                 m_scale=1e-4,
-                D_h=self.D_h,
+                D_h=self.D_h or 0.0,
             )
         else:
             res_cpp = cb._core.conical_area_change_residuals_and_jacobian(
@@ -2467,11 +2487,11 @@ class AreaChangeElement(NetworkElement):
 
         # 5. Physics result for exact dP
         if self.model_type == "sharp":
-            res = cb.sharp_area_change(m_dot, rho_in, mu_in, f0, f1, Mach=mach_small, D_h=self.D_h)
-        else:
-            res = cb.conical_area_change(
-                m_dot, rho_in, mu_in, f0, f1, self.length, Mach=mach_small, D_h=self.D_h
+            res = cb.sharp_area_change(
+                m_dot, rho_in, mu_in, f0, f1, Mach=mach_small, D_h=self.D_h or 0.0
             )
+        else:
+            res = cb.conical_area_change(m_dot, rho_in, mu_in, f0, f1, self.length, Mach=mach_small)
 
         dP_abs = abs(res.dP)
         q_small = 0.5 * rho_in * v_small**2

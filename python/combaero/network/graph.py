@@ -157,6 +157,10 @@ class FlowNetwork:
                 "There must be at least one pressure drop element to solve flow."
             )
 
+        # Per-element specific validation
+        for _, elem in self.elements.items():
+            elem.validate()
+
         # PressureLossElement ambiguity: both endpoints have has_theta=True and no
         # explicit theta_source override.  Requires user disambiguation.
         for eid, elem in self.elements.items():
