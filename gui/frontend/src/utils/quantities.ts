@@ -10,10 +10,13 @@ export const QUANTITY_CATALOGUE: Record<
 	mach: { label: "Ma", unit: "—", format: (v) => v.toFixed(4) },
 	mach_in: { label: "Ma in", unit: "—", format: (v) => v.toFixed(4) },
 	mach_out: { label: "Ma out", unit: "—", format: (v) => v.toFixed(4) },
+	mach_small: { label: "Ma small", unit: "—", format: (v) => v.toFixed(4) },
+	zeta: { label: "ζ", unit: "—", format: (v) => v.toFixed(4) },
 	phi: { label: "Phi", unit: "—", format: (v) => v.toFixed(3) },
 	theta: { label: "Theta", unit: "—", format: (v) => v.toFixed(3) },
 	p_ratio_total: { label: "P ratio", unit: "—", format: (v) => v.toFixed(4) },
 	p_ratio: { label: "P ratio", unit: "—", format: (v) => v.toFixed(4) },
+	ratio: { label: "AR", unit: "—", format: (v) => v.toFixed(3) },
 	Re: {
 		label: "Re",
 		unit: "—",
@@ -72,6 +75,11 @@ export const BASIC_STATE_KEYS = [
 	"Pt_out",
 	"Tt_in",
 	"Tt_out",
+	"zeta",
+	"mach_in",
+	"mach_out",
+	"mach_small",
+	"ratio",
 ];
 export const TRANSPORT_KEYS = [
 	"mu",

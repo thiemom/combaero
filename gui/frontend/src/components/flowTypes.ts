@@ -1,4 +1,5 @@
 import FlowEdge from "./FlowEdge";
+import AreaChangeNode from "./nodes/AreaChangeNode";
 import ChannelNode from "./nodes/ChannelNode";
 import CombustorNode from "./nodes/CombustorNode.tsx";
 import DiscreteLossNode from "./nodes/DiscreteLossNode";
@@ -22,6 +23,7 @@ export const nodeTypes = {
 	discrete_loss: DiscreteLossNode,
 	lossless_connection: LosslessNode,
 	probe: ProbeNode,
+	area_change: AreaChangeNode,
 };
 
 export const edgeTypes = {

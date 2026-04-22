@@ -267,6 +267,20 @@ inline constexpr Entry function_units[] = {
     {"hydraulic_diameter_annulus", "D_outer: m, D_inner: m", "m"},
 
     // -------------------------------------------------------------------------
+    // area_change.h - Area Change Elements
+    // -------------------------------------------------------------------------
+    {"sharp_area_change",
+     "m_dot: kg/s, rho: kg/m^3, mu: Pa*s, F0: m^2, F1: m^2, Mach: -, "
+     "m_scale: kg/s, D_h: m",
+     "AreaChangeResult (dP: Pa, dS_dm: Pa*s/kg, dS_drho: Pa*m^3/kg, "
+     "dS_dmu: -, mach_clamped: bool)"},
+    {"conical_area_change",
+     "m_dot: kg/s, rho: kg/m^3, mu: Pa*s, F0: m^2, F1: m^2, length: m, "
+     "Mach: -, m_scale: kg/s",
+     "AreaChangeResult (dP: Pa, dS_dm: Pa*s/kg, dS_drho: Pa*m^3/kg, "
+     "dS_dmu: -, mach_clamped: bool)"},
+
+    // -------------------------------------------------------------------------
     // friction.h - Friction Factor Correlations
     // -------------------------------------------------------------------------
     {"friction_haaland", "Re: -, e_D: -", "- (f)"},

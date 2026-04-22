@@ -539,6 +539,51 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
     double P, double P_total, double m_dot, double T,
     const std::vector<double> &Y, double area);
 
+// -----------------------------------------------------------------------------
+// 4. Area Change Elements
+// -----------------------------------------------------------------------------
+
+// Result for area change elements in the network solver.
+// All derivatives are w.r.t. the solver state variables (m_dot, P, T, Y).
+struct AreaChangeElementResult {
+  double dP_calc;            // Total pressure drop [Pa], signed
+  double d_dP_d_mdot;        // d(dP)/d(m_dot)       [Pa*s/kg]
+  double d_dP_dP_static_up;  // d(dP)/d(P_static_up) [Pa/Pa]
+  double d_dP_dT_up;         // d(dP)/d(T_up)        [Pa/K]
+  std::vector<double> d_dP_dY_up;  // d(dP)/d(Y[i])  [Pa]
+  bool   mach_clamped{false};      // true if |Mach| was reduced to MACH_CLAMP
+};
+
+// Network-level wrapper for sharp-edge area change.
+// Evaluates density and viscosity from (T_up, P_static_up, Y_up) internally.
+//
+// Inputs:
+//   m_dot          : mass flow rate [kg/s], signed (positive = F0 -> F1)
+//   P_total_up     : upstream total pressure [Pa] (unused, for API consistency)
+//   P_static_up    : upstream static pressure [Pa] (used for rho, mu)
+//   T_up           : upstream temperature [K]
+//   Y_up           : upstream mass fractions [-]
+//   P_static_down  : downstream static pressure [Pa] (unused)
+//   F0             : area at node-0 side [m^2]
+//   F1             : area at node-1 side [m^2]
+//   m_scale        : sigmoid transition width [kg/s]
+//   D_h            : hydraulic diameter [m] (default 0 = circular)
+AreaChangeElementResult area_change_residuals_and_jacobian(
+    double m_dot, double P_total_up, double P_static_up, double T_up,
+    const std::vector<double>& Y_up, double P_static_down,
+    double F0, double F1, double m_scale = 1e-4, double D_h = 0.0);
+
+// Network-level wrapper for conical (gradual) area change.
+// Same interface as area_change_residuals_and_jacobian with additional length.
+//
+// Inputs:
+//   length         : axial length of conical section [m]
+//   (all others identical to area_change_residuals_and_jacobian)
+AreaChangeElementResult conical_area_change_residuals_and_jacobian(
+    double m_dot, double P_total_up, double P_static_up, double T_up,
+    const std::vector<double>& Y_up, double P_static_down,
+    double F0, double F1, double length, double m_scale = 1e-4);
+
 } // namespace solver
 } // namespace combaero
 

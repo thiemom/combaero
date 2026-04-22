@@ -77,6 +77,20 @@ export function validateNetwork(nodes: Node[]): string[] {
 				errors.push(`${node.id}: Discrete loss zeta must be > 0`);
 			}
 		}
+		if (node.type === "area_change") {
+			if ((node.data.F0 ?? 0.01) <= 0)
+				errors.push(`${node.id}: AreaChange Upstream Area (F0) must be > 0`);
+			if ((node.data.F1 ?? 0.01) <= 0)
+				errors.push(`${node.id}: AreaChange Downstream Area (F1) must be > 0`);
+			if (
+				node.data.D_h !== undefined &&
+				node.data.D_h !== null &&
+				node.data.D_h < 0
+			)
+				errors.push(
+					`${node.id}: AreaChange Dh must be >= 0 (or left blank for auto)`,
+				);
+		}
 	}
 
 	return errors;

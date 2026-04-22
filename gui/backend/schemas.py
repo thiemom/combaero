@@ -185,6 +185,17 @@ class OrificeData(BaseModel):
         return data
 
 
+class AreaChangeData(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    model_type: Literal["sharp", "conical"] = "sharp"
+    F0: float = 0.01
+    F1: float = 0.02
+    length: float | None = None
+    D_h: float = 0.0
+    initial_guess: dict[str, float] = Field(default_factory=dict)
+    label: str | None = None
+
+
 class LosslessConnectionData(BaseModel):
     pass
 
