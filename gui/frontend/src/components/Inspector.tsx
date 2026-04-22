@@ -642,8 +642,18 @@ const Inspector = () => {
 									}
 								/>
 								<p className="text-[9px] text-gray-400 italic">
-									Set explicitly for non-circular ducts to compute correct
-									Reynolds number.
+									Defaults to circular diameter:{" "}
+									{(
+										Math.sqrt(
+											(4 *
+												Math.min(
+													selectedNode.data.F0 ?? 0,
+													selectedNode.data.F1 ?? 0,
+												)) /
+												Math.PI,
+										) * (unitPreferences.length === "mm" ? 1000 : 1)
+									).toFixed(2)}{" "}
+									{unitPreferences.length}
 								</p>
 							</div>
 						)}
@@ -1000,19 +1010,26 @@ const Inspector = () => {
 									id={`Dh_comb_${selectedNode.id}`}
 									label="Dh"
 									value={selectedNode.data.Dh}
-									placeholder={Math.sqrt(
-										(4 * (selectedNode.data.area ?? 0.1)) / Math.PI,
-									)}
 									onChange={(val) =>
 										updateNodeData(selectedNode.id, {
-											Dh: val || undefined,
+											Dh: val,
+										})
+									}
+									onClear={() =>
+										updateNodeData(selectedNode.id, {
+											Dh: undefined,
 										})
 									}
 								/>
 							</div>
 						</div>
 						<p className="text-[9px] text-gray-400 italic -mt-2 mb-2">
-							Dh defaults to sqrt(4*Area/π) if omitted.
+							Defaults to circular diameter:{" "}
+							{(
+								Math.sqrt((4 * (selectedNode.data.area ?? 0.1)) / Math.PI) *
+								(unitPreferences.length === "mm" ? 1000 : 1)
+							).toFixed(2)}{" "}
+							{unitPreferences.length}
 						</p>
 						<div className="flex flex-col gap-2">
 							<label className="text-xs font-bold text-gray-500 uppercase">
@@ -1058,19 +1075,26 @@ const Inspector = () => {
 									id={`Dh_mom_${selectedNode.id}`}
 									label="Dh"
 									value={selectedNode.data.Dh}
-									placeholder={Math.sqrt(
-										(4 * (selectedNode.data.area ?? 0.1)) / Math.PI,
-									)}
 									onChange={(val) =>
 										updateNodeData(selectedNode.id, {
-											Dh: val || undefined,
+											Dh: val,
+										})
+									}
+									onClear={() =>
+										updateNodeData(selectedNode.id, {
+											Dh: undefined,
 										})
 									}
 								/>
 							</div>
 						</div>
 						<p className="text-[9px] text-gray-400 italic -mt-2 mb-2">
-							Dh defaults to sqrt(4*Area/π) if omitted.
+							Defaults to circular diameter:{" "}
+							{(
+								Math.sqrt((4 * (selectedNode.data.area ?? 0.1)) / Math.PI) *
+								(unitPreferences.length === "mm" ? 1000 : 1)
+							).toFixed(2)}{" "}
+							{unitPreferences.length}
 						</p>
 						<div className="flex flex-col gap-2">
 							<label className="text-xs font-bold text-gray-500 uppercase">
