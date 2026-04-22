@@ -1666,6 +1666,7 @@ const InitialGuessEditor = ({ node }: { node: any }) => {
 		channel: [{ key: "m_dot", unit: "kg/s" }],
 		orifice: [{ key: "m_dot", unit: "kg/s" }],
 		discrete_loss: [{ key: "m_dot", unit: "kg/s" }],
+		area_change: [{ key: "m_dot", unit: "kg/s" }],
 	};
 	const guessFields = FIELDS_BY_TYPE[node.type as string] ?? [];
 	if (guessFields.length === 0) {
