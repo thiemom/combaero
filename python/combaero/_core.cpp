@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "acoustics.h"
+#include "area_change.h"
 #include "can_annular_solvers.h"
 #include "combustion.h"
 #include "common_names.h"
@@ -290,6 +291,60 @@ PYBIND11_MODULE(_core, m) {
         py::arg("P_total"), py::arg("m_dot"), py::arg("T"), py::arg("Y"),
         py::arg("area"),
         "Momentum chamber residual: P_total = P + 0.5*rho*v^2");
+
+  // Area change elements
+  py::class_<combaero::AreaChangeResult>(
+      m, "AreaChangeResult",
+      "Result of sharp_area_change: dP and Jacobian partials")
+      .def_readonly("dP", &combaero::AreaChangeResult::dP)
+      .def_readonly("dS_dm", &combaero::AreaChangeResult::dS_dm)
+      .def_readonly("dS_drho", &combaero::AreaChangeResult::dS_drho)
+      .def_readonly("dS_dmu", &combaero::AreaChangeResult::dS_dmu)
+      .def_readonly("mach_clamped", &combaero::AreaChangeResult::mach_clamped);
+
+  m.def("sharp_area_change", &combaero::sharp_area_change,
+        py::arg("m_dot"), py::arg("rho"), py::arg("mu"),
+        py::arg("F0"), py::arg("F1"),
+        py::arg("Mach") = 0.0, py::arg("m_scale") = 1e-4,
+        py::arg("D_h") = 0.0,
+        "Sharp-edge area change: pressure drop and Jacobian partials.\n\n"
+        "D_h overrides the circular hydraulic diameter when > 0.\n"
+        "Returns AreaChangeResult with dP, dS_dm, dS_drho, dS_dmu.");
+
+  m.def("conical_area_change", &combaero::conical_area_change,
+        py::arg("m_dot"), py::arg("rho"), py::arg("mu"),
+        py::arg("F0"), py::arg("F1"), py::arg("length"),
+        py::arg("Mach") = 0.0, py::arg("m_scale") = 1e-4,
+        "Conical (gradual) area change: pressure drop and Jacobian partials.\n\n"
+        "Returns AreaChangeResult with dP, dS_dm, dS_drho, dS_dmu.");
+
+  py::class_<solver::AreaChangeElementResult>(
+      m, "AreaChangeElementResult",
+      "Result of area_change_residuals_and_jacobian for network solver")
+      .def(py::init<>())
+      .def_readonly("dP_calc", &solver::AreaChangeElementResult::dP_calc)
+      .def_readonly("d_dP_d_mdot", &solver::AreaChangeElementResult::d_dP_d_mdot)
+      .def_readonly("d_dP_dP_static_up",
+                    &solver::AreaChangeElementResult::d_dP_dP_static_up)
+      .def_readonly("d_dP_dT_up", &solver::AreaChangeElementResult::d_dP_dT_up)
+      .def_readonly("d_dP_dY_up", &solver::AreaChangeElementResult::d_dP_dY_up)
+      .def_readonly("mach_clamped", &solver::AreaChangeElementResult::mach_clamped);
+
+  m.def("area_change_residuals_and_jacobian",
+        &solver::area_change_residuals_and_jacobian,
+        py::arg("m_dot"), py::arg("P_total_up"), py::arg("P_static_up"),
+        py::arg("T_up"), py::arg("Y_up"), py::arg("P_static_down"),
+        py::arg("F0"), py::arg("F1"), py::arg("m_scale") = 1e-4,
+        py::arg("D_h") = 0.0,
+        "Network-level sharp-edge area change with all derivatives.");
+
+  m.def("conical_area_change_residuals_and_jacobian",
+        &solver::conical_area_change_residuals_and_jacobian,
+        py::arg("m_dot"), py::arg("P_total_up"), py::arg("P_static_up"),
+        py::arg("T_up"), py::arg("Y_up"), py::arg("P_static_down"),
+        py::arg("F0"), py::arg("F1"), py::arg("length"),
+        py::arg("m_scale") = 1e-4,
+        "Network-level conical area change with all derivatives.");
 
   // Species metadata helpers
   m.def("num_species", &num_species,
