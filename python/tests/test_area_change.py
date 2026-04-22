@@ -376,3 +376,23 @@ def test_conical_network_wrapper() -> None:
     )
     fd_dm = (res_p.dP_calc - res.dP_calc) / eps
     np.testing.assert_allclose(res.d_dP_d_mdot, fd_dm, rtol=1e-3)
+
+
+# ---------------------------------------------------------------------------
+# Test 9: Public API Export Check
+# ---------------------------------------------------------------------------
+def test_area_change_exports() -> None:
+    """Verify all area change functions and results are exported in the main package."""
+    # Functions
+    assert hasattr(cb, "sharp_area_change")
+    assert hasattr(cb, "conical_area_change")
+    assert hasattr(cb, "area_change_residuals_and_jacobian")
+    assert hasattr(cb, "conical_area_change_residuals_and_jacobian")
+
+    # Result Structs
+    assert hasattr(cb, "AreaChangeResult")
+    assert hasattr(cb, "AreaChangeElementResult")
+
+    # Check they match the core versions
+    assert cb.sharp_area_change == cb._core.sharp_area_change
+    assert cb.AreaChangeResult == cb._core.AreaChangeResult

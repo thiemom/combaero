@@ -8,6 +8,7 @@ import {
 	Link,
 	LogIn,
 	LogOut,
+	Maximize2,
 	Save,
 	Upload,
 	Wind,
@@ -202,6 +203,16 @@ const Sidebar = () => {
 			>
 				<ChevronRight size={18} className="text-orange-400" />
 				<span>Orifice</span>
+			</button>
+
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "area_change")}
+				draggable
+			>
+				<Maximize2 size={18} className="text-blue-500" />
+				<span>Area Change</span>
 			</button>
 
 			<button

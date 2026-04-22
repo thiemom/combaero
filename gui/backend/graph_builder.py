@@ -21,6 +21,7 @@ from combaero.network import (
     SmoothModel,
     ThermalWall,
     WallLayer,
+    AreaChangeElement,
 )
 
 from .schemas import (
@@ -44,6 +45,7 @@ from .schemas import (
     RibbedModelData,
     SmoothModelData,
     ThermalWallData,
+    AreaChangeData,
 )
 
 
@@ -342,6 +344,20 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 data.regime if data.regime != "default" else schema.solver_settings.global_regime
             )
             elem.regime = regime
+            elem.initial_guess = _expand_initial_guess(data.initial_guess, elem_id)
+            net.add_element(elem)
+        elif elem_type == "area_change":
+            data = AreaChangeData(**elem_data)
+            elem = AreaChangeElement(
+                id=elem_id,
+                from_node=source_id,
+                to_node=target_id,
+                F0=data.F0,
+                F1=data.F1,
+                model_type=data.model_type,
+                length=data.length,
+                D_h=data.D_h,
+            )
             elem.initial_guess = _expand_initial_guess(data.initial_guess, elem_id)
             net.add_element(elem)
         elif elem_type == "lossless_connection":

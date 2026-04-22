@@ -75,6 +75,8 @@ try:
         ChannelSolverResult,
         MixtureState,
         MomentumChamberResult,
+        AreaChangeResult,
+        AreaChangeElementResult,
         State,
         Stream,
         Registry,
@@ -409,6 +411,10 @@ try:
         adiabatic_T_complete_and_jacobian_T_from_streams,
         adiabatic_T_equilibrium_and_jacobians_from_streams,
         combustor_residuals_and_jacobians,
+        sharp_area_change,
+        conical_area_change,
+        area_change_residuals_and_jacobian,
+        conical_area_change_residuals_and_jacobian,
         # Channel/circular functions
         htc_circular_channel,
         nusselt_circular_channel,
@@ -542,6 +548,12 @@ except (ModuleNotFoundError, ImportError) as e:
     reforming_equilibrium_adiabatic = _core.reforming_equilibrium_adiabatic
     combustion_equilibrium = _core.combustion_equilibrium
     combustor_residuals_and_jacobians = _core.combustor_residuals_and_jacobians
+    sharp_area_change = _core.sharp_area_change
+    conical_area_change = _core.conical_area_change
+    area_change_residuals_and_jacobian = _core.area_change_residuals_and_jacobian
+    conical_area_change_residuals_and_jacobian = _core.conical_area_change_residuals_and_jacobian
+    AreaChangeResult = _core.AreaChangeResult
+    AreaChangeElementResult = _core.AreaChangeElementResult
     # Compressible flow
     CompressibleFlowSolution = _core.CompressibleFlowSolution
     NozzleStation = _core.NozzleStation
@@ -750,6 +762,12 @@ except (ModuleNotFoundError, ImportError) as e:
     channel_residuals_and_jacobian = _core.channel_residuals_and_jacobian
     htc_circular_channel = _core.htc_circular_channel
     nusselt_circular_channel = _core.nusselt_circular_channel
+    sharp_area_change = _core.sharp_area_change
+    conical_area_change = _core.conical_area_change
+    area_change_residuals_and_jacobian = _core.area_change_residuals_and_jacobian
+    conical_area_change_residuals_and_jacobian = _core.conical_area_change_residuals_and_jacobian
+    AreaChangeResult = _core.AreaChangeResult
+    AreaChangeElementResult = _core.AreaChangeElementResult
 
 # Terminology aliases - always available
 try:
@@ -1148,5 +1166,11 @@ __all__ = [
     "has_units",
     "list_functions_with_units",
     "all_units",
+    "sharp_area_change",
+    "conical_area_change",
+    "area_change_residuals_and_jacobian",
+    "conical_area_change_residuals_and_jacobian",
+    "AreaChangeResult",
+    "AreaChangeElementResult",
     "__version__",
 ]

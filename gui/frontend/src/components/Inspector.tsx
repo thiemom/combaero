@@ -49,20 +49,49 @@ const Inspector = () => {
 			edges.find((e) => e.id === probeData.target_id);
 		const result = targetElement?.data?.result;
 
-		// Build available quantity list from target's result keys
-		const availableKeys: string[] = [];
+		// Build available quantity list
+		const availableKeys: { key: string; label: string }[] = [];
+		const seenKeys = new Set<string>();
+
+		const addKey = (k: string, isState = false) => {
+			const fullKey = isState ? `state.${k}` : k;
+			if (seenKeys.has(fullKey)) return;
+			seenKeys.add(fullKey);
+
+			const meta = QUANTITY_CATALOGUE[k];
+			availableKeys.push({
+				key: fullKey,
+				label: meta ? `${meta.label} (${k})` : k,
+			});
+		};
+
 		if (result) {
+			// Populate from actual results
 			if (result.state) {
 				for (const k of Object.keys(result.state)) {
-					if (typeof result.state[k] === "number")
-						availableKeys.push(`state.${k}`);
+					if (typeof result.state[k] === "number") addKey(k, true);
 				}
 			}
 			for (const k of Object.keys(result)) {
-				if (k !== "state" && typeof result[k] === "number")
-					availableKeys.push(k);
+				if (k !== "state" && typeof result[k] === "number") addKey(k);
+			}
+		} else {
+			// Fallback: show common state and transport quantities if no result yet
+			for (const k of [...BASIC_STATE_KEYS, ...TRANSPORT_KEYS]) {
+				addKey(k);
+			}
+			// Specifically add area change ones if target is area change
+			if (targetElement?.type === "area_change") {
+				addKey("zeta");
+				addKey("mach_small");
+				addKey("mach_in");
+				addKey("mach_out");
+				addKey("ratio");
 			}
 		}
+
+		// Sort by label
+		availableKeys.sort((a, b) => a.label.localeCompare(b.label));
 
 		const slotSelect = (
 			slot: "slot1_key" | "slot2_key",
@@ -79,9 +108,9 @@ const Inspector = () => {
 				}
 			>
 				<option value="">— select quantity —</option>
-				{availableKeys.map((k) => (
-					<option key={k} value={k}>
-						{k}
+				{availableKeys.map((item) => (
+					<option key={item.key} value={item.key}>
+						{item.label}
 					</option>
 				))}
 			</select>
@@ -530,6 +559,73 @@ const Inspector = () => {
 								<option value="compressible">Forced Compressible</option>
 							</select>
 						</div>
+						<InitialGuessEditor node={selectedNode} />
+					</>
+				)}
+
+				{selectedNode.type === "area_change" && (
+					<>
+						<div className="flex flex-col gap-2">
+							<label className="text-xs font-bold text-gray-500 uppercase">
+								Model Type
+							</label>
+							<select
+								className="p-2 border rounded bg-white text-xs border-stone-200"
+								value={selectedNode.data.model_type || "sharp"}
+								onChange={(e) =>
+									updateNodeData(selectedNode.id, {
+										model_type: e.target.value,
+									})
+								}
+							>
+								<option value="sharp">Sharp-Edged (Sudden)</option>
+								<option value="conical">Conical (Gradual)</option>
+							</select>
+						</div>
+
+						<AreaInput
+							id={`F0_${selectedNode.id}`}
+							label="Upstream Area (F0)"
+							value={selectedNode.data.F0 ?? 0.01}
+							onChange={(val) => updateNodeData(selectedNode.id, { F0: val })}
+						/>
+
+						<AreaInput
+							id={`F1_${selectedNode.id}`}
+							label="Downstream Area (F1)"
+							value={selectedNode.data.F1 ?? 0.02}
+							onChange={(val) => updateNodeData(selectedNode.id, { F1: val })}
+						/>
+
+						{selectedNode.data.model_type === "conical" && (
+							<LengthInput
+								id={`length_${selectedNode.id}`}
+								label="Axial Length"
+								value={selectedNode.data.length ?? 0.1}
+								onChange={(val) =>
+									updateNodeData(selectedNode.id, { length: val })
+								}
+							/>
+						)}
+
+						{selectedNode.data.model_type !== "conical" && (
+							<div className="flex flex-col gap-1 mt-1">
+								<LengthInput
+									id={`D_h_${selectedNode.id}`}
+									label="Hydraulic Diameter (D_h)"
+									value={selectedNode.data.D_h}
+									placeholder="Circular (Auto)"
+									onChange={(val) =>
+										updateNodeData(selectedNode.id, { D_h: val || 0.0 })
+									}
+								/>
+								<p className="text-[9px] text-gray-400 italic">
+									Set explicitly for non-circular ducts to compute correct
+									Reynolds number.
+								</p>
+							</div>
+						)}
+
 						<InitialGuessEditor node={selectedNode} />
 					</>
 				)}

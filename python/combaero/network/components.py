@@ -2340,3 +2340,165 @@ class ChannelElement(NetworkElement):
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         pass
+
+
+class AreaChangeElement(NetworkElement):
+    """
+    Area change element applying pressure drop for sharp or conical area changes.
+    """
+
+    def __init__(
+        self,
+        id: str,
+        from_node: str,
+        to_node: str,
+        F0: float,
+        F1: float,
+        model_type: Literal["sharp", "conical"] = "sharp",
+        length: float | None = None,
+        D_h: float = 0.0,
+    ):
+        super().__init__(id, from_node, to_node)
+        self.F0 = F0
+        self.F1 = F1
+        self.model_type = model_type
+        self.length = length if length is not None else 0.0
+        self.D_h = D_h
+
+    def unknowns(self) -> list[str]:
+        return [f"{self.id}.m_dot"]
+
+    def n_equations(self) -> int:
+        return 1
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        pass
+
+    def residuals(
+        self, state_in: MixtureState, state_out: MixtureState
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        m_dot = state_in.m_dot
+
+        if self.model_type == "sharp":
+            res_cpp = cb._core.area_change_residuals_and_jacobian(
+                m_dot=m_dot,
+                P_total_up=state_in.P_total,
+                P_static_up=state_in.P,
+                T_up=state_in.T,
+                Y_up=state_in.Y,
+                P_static_down=state_out.P,
+                F0=self.F0,
+                F1=self.F1,
+                m_scale=1e-4,
+                D_h=self.D_h,
+            )
+        else:
+            res_cpp = cb._core.conical_area_change_residuals_and_jacobian(
+                m_dot=m_dot,
+                P_total_up=state_in.P_total,
+                P_static_up=state_in.P,
+                T_up=state_in.T,
+                Y_up=state_in.Y,
+                P_static_down=state_out.P,
+                F0=self.F0,
+                F1=self.F1,
+                length=self.length,
+                m_scale=1e-4,
+            )
+
+        res = [state_in.P_total - state_out.P - res_cpp.dP_calc]
+
+        upstream_id = self.from_node
+        downstream_id = self.to_node
+
+        jac = {
+            0: {
+                f"{self.id}.m_dot": -res_cpp.d_dP_d_mdot,
+                f"{upstream_id}.P_total": 1.0,
+                f"{upstream_id}.P": -res_cpp.d_dP_dP_static_up,
+                f"{upstream_id}.T": -res_cpp.d_dP_dT_up,
+                f"{downstream_id}.P": -1.0,
+            }
+        }
+        for i, val in enumerate(res_cpp.d_dP_dY_up):
+            jac[0][f"{upstream_id}.Y[{i}]"] = -val
+
+        return res, jac
+
+    def diagnostics(self, state_in: MixtureState, state_out: MixtureState) -> dict[str, float]:
+        """Compute Mach numbers, effective loss coefficient, and thermo-transport state."""
+        # 1. Properties at inlet
+        try:
+            cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
+        except Exception:
+            # Fallback for numerical edge cases during iteration/failed solves
+            return {"dP": 0.0, "ratio": self.F1 / self.F0 if self.F0 > 0 else 0.0}
+
+        rho_in = cs_in.thermo.rho
+        mu_in = cs_in.transport.mu
+        a_in = cs_in.thermo.a
+
+        # 2. Geometry
+        f0 = self.F0
+        f1 = self.F1
+        f_small = min(f0, f1)
+        ratio = f1 / f0 if f0 > 0 else 0.0
+
+        m_dot = state_in.m_dot
+        m_dot_abs = abs(m_dot)
+
+        # 3. Velocities and Mach
+        v0 = m_dot_abs / (rho_in * f0) if f0 > 0 and rho_in > 0 else 0.0
+        mach_in = v0 / a_in if a_in > 0 else 0.0
+
+        v_small = m_dot_abs / (rho_in * f_small) if f_small > 0 and rho_in > 0 else 0.0
+        mach_small = v_small / a_in if a_in > 0 else 0.0
+
+        # 4. Outlet Mach approx (using cs_out for accuracy)
+        try:
+            cs_out = cb.complete_state(state_out.T, state_out.P, state_out.X)
+            mach_out = (
+                (m_dot_abs / (cs_out.thermo.rho * f1)) / cs_out.thermo.a
+                if f1 > 0 and cs_out.thermo.rho > 0 and cs_out.thermo.a > 0
+                else 0.0
+            )
+        except Exception:
+            mach_out = 0.0
+
+        # 5. Physics result for exact dP
+        if self.model_type == "sharp":
+            res = cb.sharp_area_change(m_dot, rho_in, mu_in, f0, f1, Mach=mach_small, D_h=self.D_h)
+        else:
+            res = cb.conical_area_change(
+                m_dot, rho_in, mu_in, f0, f1, self.length, Mach=mach_small, D_h=self.D_h
+            )
+
+        dP_abs = abs(res.dP)
+        q_small = 0.5 * rho_in * v_small**2
+        zeta_eff = dP_abs / q_small if q_small > 1e-6 else 0.0
+
+        return {
+            "dP": float(dP_abs),
+            "ratio": float(ratio),
+            "zeta": float(zeta_eff),
+            "mach_small": float(mach_small),
+            "mach_in": float(mach_in),
+            "mach_out": float(mach_out),
+            "P_in": state_in.P,
+            "P_out": state_out.P,
+            "T_in": state_in.T,
+            "T_out": state_out.T,
+            "Pt_in": state_in.P_total,
+            "Pt_out": state_out.P_total,
+            "Tt_in": state_in.T_total,
+            "Tt_out": state_out.T_total,
+            "rho": float(rho_in),
+            "mu": float(mu_in),
+            "k": float(cs_in.transport.k),
+            "cp": float(cs_in.thermo.cp),
+            "cv": float(cs_in.thermo.cv),
+            "gamma": float(cs_in.thermo.gamma),
+            "mw": float(cs_in.thermo.mw),
+            "Pr": float(cs_in.transport.Pr),
+            "nu": float(cs_in.transport.nu),
+        }
