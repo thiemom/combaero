@@ -21,10 +21,16 @@
 - Type annotations on all signatures; `-> None` for void functions; `|` union syntax (Python 3.12).
 - No non-ASCII characters, including docstrings and comments.
 
+## Frontend Style (gui/frontend)
+- Package manager: `pnpm`. Use `pnpm install`, `pnpm run dev`, etc.
+- Linting and formatting: `biome`. Run `./scripts/check-gui-style.sh` before committing.
+- Biome config: `biome.json` at repo root.
+
 ## Key Scripts
 ```bash
 ./scripts/check-source-style.sh             # C++ style
 ./scripts/check-python-style.sh --fix       # Python lint + format
+./scripts/check-gui-style.sh                # Frontend lint + format (biome)
 uv pip install -e .                         # rebuild C++ extension
 uv run pytest python/tests/                 # Python tests
 cd build && ctest                           # C++ tests
@@ -40,3 +46,6 @@ uv run scripts/generate_units_md.py         # regenerate docs/UNITS.md
 ## Version Sync Checklist
 When changing Python version or tool versions, keep in sync:
 `.python-version` · `ruff.toml` · `ci.yml` · `validation-tests.yml` · `.pre-commit-config.yaml` · `Makefile`
+
+When changing frontend tool versions, keep in sync:
+`gui/frontend/package.json` · `biome.json` (`$schema` version) · `.pre-commit-config.yaml` (biome rev + `@biomejs/biome` pin)

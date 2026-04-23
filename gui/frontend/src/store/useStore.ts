@@ -201,7 +201,7 @@ const useStore = create<RFState>((set, get) => ({
 	solverSettings: {
 		global_regime: "compressible",
 		init_strategy: "default",
-		timeout: 180,
+		timeout: 30,
 	},
 	updateSolverSettings: (settings: Partial<RFState["solverSettings"]>) => {
 		set({
