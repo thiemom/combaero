@@ -5272,6 +5272,30 @@ PYBIND11_MODULE(_core, m) {
       "Computes v = M * a(T, X) internally, then applies recovery factor "
       "correction.");
 
+  m.def(
+      "stagnation_from_static",
+      [](double T, double P, double v,
+         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+         double tol, std::size_t max_iter) {
+        return stagnation_from_static(T, P, v, to_vec(X_arr), tol, max_iter);
+      },
+      py::arg("T"), py::arg("P"), py::arg("v"), py::arg("X"),
+      py::arg("tol") = 1e-8, py::arg("max_iter") = 50,
+      "Combined stagnation state (Tt, Pt) from static (T, P) and velocity v.\n"
+      "Returns tuple (Tt [K], Pt [Pa]).\n"
+      "Preferred over calling T0_from_static_v + P0_from_static separately\n"
+      "as it uses a single Newton loop and avoids redundant physics calls.");
+
+  m.def("bulk_velocity", &bulk_velocity, py::arg("m_dot"), py::arg("rho"),
+        py::arg("area"),
+        "Bulk velocity v = m_dot / (rho * area)  [m/s].");
+
+  m.def("reynolds_from_state", &reynolds_from_state, py::arg("rho"),
+        py::arg("v"), py::arg("L"), py::arg("mu"),
+        "Reynolds number Re = rho * v * L / mu  [-].\n"
+        "Use when rho and mu are already available from CompleteState or\n"
+        "TransportState to avoid recomputing mixture properties.");
+
   // -----------------------------------------------------------------
   // ChannelResult struct
   // -----------------------------------------------------------------

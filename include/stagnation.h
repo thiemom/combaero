@@ -34,11 +34,17 @@ namespace combaero {
 //   Incropera et al. (2007) Fundamentals of Heat and Mass Transfer, 6th ed.
 
 // -------------------------------------------------------------
-// Kinetic energy
+// Kinetic energy and bulk velocity
 // -------------------------------------------------------------
 
 // Specific kinetic energy: v^2/2  [J/kg]
 inline double kinetic_energy(double v) { return 0.5 * v * v; }
+
+// Bulk velocity from mass flow, density, and cross-sectional area.
+// v = m_dot / (rho * area)  [m/s]
+inline double bulk_velocity(double m_dot, double rho, double area) {
+    return m_dot / (rho * area);
+}
 
 // -------------------------------------------------------------
 // Stagnation enthalpy (exact, no iteration)
@@ -139,6 +145,15 @@ double P_from_stagnation(double P0, double T0, double M,
 double T_adiabatic_wall(double T_static, double v,
                         double T, double P, const std::vector<double>& X,
                         bool turbulent = true);
+
+// Combined stagnation state from static conditions and velocity.
+// Returns (Tt, Pt) = (T0, P0) in a single call.
+// Equivalent to calling T0_from_static_v then P0_from_static, but avoids
+// recomputing Mach number internally.
+std::tuple<double, double> stagnation_from_static(
+    double T, double P, double v,
+    const std::vector<double>& X,
+    double tol = 1e-8, std::size_t max_iter = 50);
 
 // Convenience: T_aw from static temperature and Mach number.
 // Computes v = M * a(T, X) internally.

@@ -172,6 +172,7 @@ inline constexpr Entry function_units[] = {
     {"kinematic_viscosity", "T: K, P: Pa, X: mol/mol", "m^2/s"},
     {"thermal_diffusivity", "T: K, P: Pa, X: mol/mol", "m^2/s"},
     {"reynolds", "T: K, P: Pa, X: mol/mol, V: m/s, L: m", "- (Re)"},
+    {"reynolds_from_state", "rho: kg/m^3, v: m/s, L: m, mu: Pa*s", "- (Re)"},
     {"peclet", "T: K, P: Pa, X: mol/mol, V: m/s, L: m", "- (Pe)"},
 
     // -------------------------------------------------------------------------
@@ -614,6 +615,7 @@ inline constexpr Entry function_units[] = {
     // stagnation.h - Stagnation/Static Conversions
     // -------------------------------------------------------------------------
     {"kinetic_energy", "v: m/s", "J/kg"},
+    {"bulk_velocity", "m_dot: kg/s, rho: kg/m^3, area: m^2", "m/s"},
     {"h0_from_static", "h_static: J/kg, v: m/s", "J/kg"},
     {"v_from_h0", "h0: J/kg, h_static: J/kg", "m/s"},
     {"mach_number", "v: m/s, T: K, X: mol/mol", "- (M)"},
@@ -626,6 +628,7 @@ inline constexpr Entry function_units[] = {
     {"T_adiabatic_wall", "T_static: K, v: m/s, T: K, P: Pa, X: mol/mol", "K"},
     {"T_adiabatic_wall_mach", "T_static: K, M: -, T: K, P: Pa, X: mol/mol",
      "K"},
+    {"stagnation_from_static", "T: K, P: Pa, v: m/s, X: mol/mol", "tuple(K, Pa)"},
 
     // -------------------------------------------------------------------------
     // heat_transfer.h - ChannelResult fields

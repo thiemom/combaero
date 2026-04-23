@@ -522,10 +522,18 @@ T_from_u = cb.calc_T_from_u(u_target=2.2e5, X=air)
 
 ### Flow Analysis
 ```python
+# Bulk velocity and kinetic energy
+v = cb.bulk_velocity(m_dot=0.5, rho=1.2, area=1e-3)   # m/s
+KE = cb.kinetic_energy(v=v)                             # J/kg
+
 # Dimensionless numbers
-Re = cb.reynolds(rho=1.2, v=10, D=0.05, mu=1.8e-5)
-Pe = cb.peclet(rho=1.2, v=10, D=0.05, cp=1000, k=0.026)
-KE = cb.kinetic_energy(rho=1.2, v=10)
+# From full mixture state (recomputes rho, mu internally):
+Re = cb.reynolds(T=300, P=101325, X=air, V=v, L=0.05)
+# From pre-computed state properties (use when CompleteState is available):
+Re = cb.reynolds_from_state(rho=1.2, v=v, L=0.05, mu=1.8e-5)
+
+# Stagnation conditions from static state and velocity
+Tt, Pt = cb.stagnation_from_static(T=300, P=101325, v=v, X=air)  # (K, Pa)
 ```
 
 ---
