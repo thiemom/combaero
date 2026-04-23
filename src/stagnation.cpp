@@ -238,4 +238,33 @@ double T_adiabatic_wall_mach(double T_static, double M,
     return T_adiabatic_wall(T_static, v, T, P, X, turbulent);
 }
 
+std::tuple<double, double> stagnation_from_static(
+    double T, double P, double v,
+    const std::vector<double>& X,
+    double tol, std::size_t max_iter)
+{
+    if (T <= 0.0)
+        throw std::invalid_argument("stagnation_from_static: T must be positive");
+    if (P <= 0.0)
+        throw std::invalid_argument("stagnation_from_static: P must be positive");
+    if (v < 0.0)
+        throw std::invalid_argument("stagnation_from_static: v must be non-negative");
+    if (v == 0.0) return {T, P};
+
+    // One Newton loop for Tt.
+    double Tt = T0_from_static_v(T, v, X, tol, max_iter);
+
+    // Pt from isentropic entropy conservation: s(T, P) = s(Tt, Pt).
+    // Bypasses P0_from_static to avoid its internal T0_from_static call,
+    // which would repeat the Newton loop and re-evaluate speed_of_sound(T, X).
+    constexpr double P_REF = 101325.0;
+    const double mw_kg  = mwmix(X) / 1000.0;
+    const double R_spec = specific_gas_constant(X);
+    const double s_static = s(T,  X, P,     P_REF) / mw_kg;
+    const double s_stag   = s(Tt, X, P_REF, P_REF) / mw_kg;
+    double Pt = P_REF * std::exp((s_stag - s_static) / R_spec);
+
+    return {Tt, Pt};
+}
+
 } // namespace combaero

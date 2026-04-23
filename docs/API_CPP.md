@@ -122,6 +122,7 @@ double thermal_conductivity(double T, double P, const std::vector<double>& X);
 double prandtl(double T, double P, const std::vector<double>& X);
 double kinematic_viscosity(double T, double P, const std::vector<double>& X);
 double thermal_diffusivity(double T, double P, const std::vector<double>& X);
+double reynolds_from_state(double rho, double v, double L, double mu);
 ```
 
 ---
@@ -191,6 +192,14 @@ double P_from_stagnation(double P0, double T0, double M, const std::vector<doubl
 double T_adiabatic_wall(double T_static, double v, double T, double P,
                         const std::vector<double>& X, bool turbulent = true);
 double recovery_factor(double Pr, bool turbulent = true);
+
+double bulk_velocity(double m_dot, double rho, double area);
+double kinetic_energy(double v);
+
+std::tuple<double, double> stagnation_from_static(
+    double T, double P, double v,
+    const std::vector<double>& X,
+    double tol = 1e-8, std::size_t max_iter = 50);
 ```
 
 ---
