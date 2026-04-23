@@ -11,6 +11,11 @@ import type { Node } from "reactflow";
 export function validateNetwork(nodes: Node[]): string[] {
 	const errors: string[] = [];
 
+	if (nodes.length === 0) {
+		errors.push("Network is empty. Add nodes and elements before solving.");
+		return errors;
+	}
+
 	for (const node of nodes) {
 		if (node.type === "pressure_boundary" || node.type === "mass_boundary") {
 			if ((node.data.P_total || 0) <= 0 && node.type === "pressure_boundary") {

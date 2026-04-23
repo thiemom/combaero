@@ -138,10 +138,16 @@ def _solve_sync(schema: NetworkGraphSchema):
 
 @app.post("/solve", response_model=SolveResponse)
 async def solve(schema: NetworkGraphSchema):
+    # Hard async-level deadline: even if a single C++ Fanno/RK4 step blocks,
+    # the event loop stays alive for health checks and subsequent requests.
+    # Add a 10 s buffer on top of the solver's own soft timeout.
+    soft_timeout = schema.solver_settings.timeout or 180.0
+    hard_timeout = soft_timeout + 10.0
     try:
         # Offload CPU-bound C++ solver to a worker thread
-        result, node_results, element_results, edge_results, _ = await asyncio.to_thread(
-            _solve_sync, schema
+        result, node_results, element_results, edge_results, _ = await asyncio.wait_for(
+            asyncio.to_thread(_solve_sync, schema),
+            timeout=hard_timeout,
         )
 
         return SolveResponse(
@@ -152,6 +158,12 @@ async def solve(schema: NetworkGraphSchema):
             element_results=element_results,
             edge_results=edge_results,
         )
+    except TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail=f"Solver exceeded the hard timeout of {hard_timeout:.0f}s. "
+            "Try a shorter timeout, a simpler network, or the homotopy init strategy.",
+        ) from None
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
@@ -160,10 +172,13 @@ async def solve(schema: NetworkGraphSchema):
 
 @app.post("/export")
 async def export_results(schema: NetworkGraphSchema):
+    soft_timeout = schema.solver_settings.timeout or 180.0
+    hard_timeout = soft_timeout + 10.0
     try:
         # Solve quickly to get states
-        _, node_results, element_results, edge_results, _ = await asyncio.to_thread(
-            _solve_sync, schema
+        _, node_results, element_results, edge_results, _ = await asyncio.wait_for(
+            asyncio.to_thread(_solve_sync, schema),
+            timeout=hard_timeout,
         )
 
         # Convert to DataFrame
@@ -280,6 +295,11 @@ async def export_results(schema: NetworkGraphSchema):
             media_type="text/csv",
             headers={"Content-Disposition": "attachment; filename=combaero_results.csv"},
         )
+    except TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail=f"Export solve exceeded the hard timeout of {hard_timeout:.0f}s.",
+        ) from None
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:

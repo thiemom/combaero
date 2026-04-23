@@ -1,4 +1,5 @@
 from combaero.network import (
+    AreaChangeElement,
     ChannelElement,
     CombustorNode,
     ConstantFractionLoss,
@@ -21,10 +22,10 @@ from combaero.network import (
     SmoothModel,
     ThermalWall,
     WallLayer,
-    AreaChangeElement,
 )
 
 from .schemas import (
+    AreaChangeData,
     ChannelData,
     CombustorData,
     CompositionData,
@@ -45,7 +46,6 @@ from .schemas import (
     RibbedModelData,
     SmoothModelData,
     ThermalWallData,
-    AreaChangeData,
 )
 
 

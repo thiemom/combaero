@@ -72,7 +72,7 @@ const App = () => {
 					<button
 						type="button"
 						onClick={exportNetworkResults}
-						disabled={isExporting}
+						disabled={isExporting || nodes.length === 0}
 						className="flex items-center gap-2 px-4 py-1.5 border rounded-md hover:bg-slate-50 transition-colors text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed min-w-[124px] justify-center"
 					>
 						{isExporting ? (
@@ -103,7 +103,7 @@ const App = () => {
 					<button
 						type="button"
 						onClick={handleSolve}
-						disabled={isSolving}
+						disabled={isSolving || nodes.length === 0}
 						className="flex items-center gap-2 px-6 py-1.5 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors shadow-sm text-sm font-bold disabled:opacity-60 disabled:cursor-not-allowed"
 					>
 						{isSolving ? (
