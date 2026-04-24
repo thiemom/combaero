@@ -298,9 +298,9 @@ for u_in in velocities:
 
         # --- Network solver ---
         net = FlowNetwork()
-        net.add_node(MassFlowBoundary("inlet", m_dot=mdot, T_total=T, Y=Y))
+        net.add_node(MassFlowBoundary("inlet", m_dot=mdot, Tt=T, Y=Y))
         net.add_node(PlenumNode("junction"))
-        net.add_node(PressureBoundary("outlet", P_total=P_low, T_total=T, Y=Y))
+        net.add_node(PressureBoundary("outlet", Pt=P_low, Tt=T, Y=Y))
         net.add_element(
             ChannelElement(
                 id="channel",
@@ -325,7 +325,7 @@ for u_in in velocities:
         solver = NetworkSolver(net)
         sol_net = solver.solve()
         ok = sol_net["__success__"]
-        Pin_net = float(sol_net["inlet.P_total"]) if ok else float("nan")
+        Pin_net = float(sol_net["inlet.Pt"]) if ok else float("nan")
 
         err = abs(Pin_net - Pin_direct) / Pin_direct * 100 if ok else float("nan")
         tag = "" if ok else "  [FAILED]"

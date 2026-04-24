@@ -74,9 +74,9 @@ class TestPlenumEnergyBoundary:
 
         up = MixtureState(
             P=101325.0,
-            P_total=101325.0,
+            Pt=101325.0,
             T=300.0,
-            T_total=300.0,
+            Tt=300.0,
             m_dot=1.0,
             Y=_air_Y(),
         )
@@ -93,9 +93,9 @@ class TestPlenumEnergyBoundary:
 
         up = MixtureState(
             P=101325.0,
-            P_total=101325.0,
+            Pt=101325.0,
             T=300.0,
-            T_total=300.0,
+            Tt=300.0,
             m_dot=1.0,
             Y=_air_Y(),
         )
@@ -119,9 +119,9 @@ class TestPlenumEnergyBoundary:
 
         up = MixtureState(
             P=101325.0,
-            P_total=101325.0,
+            Pt=101325.0,
             T=600.0,
-            T_total=600.0,
+            Tt=600.0,
             m_dot=1.0,
             Y=_air_Y(),
         )
@@ -142,9 +142,9 @@ class TestPlenumEnergyBoundary:
 
         up = MixtureState(
             P=101325.0,
-            P_total=101325.0,
+            Pt=101325.0,
             T=300.0,
-            T_total=300.0,
+            Tt=300.0,
             m_dot=1.0,
             Y=_air_Y(),
         )
@@ -169,9 +169,9 @@ class TestPlenumEnergyBoundary:
 
         up = MixtureState(
             P=101325.0,
-            P_total=101325.0,
+            Pt=101325.0,
             T=400.0,
-            T_total=400.0,
+            Tt=400.0,
             m_dot=mdot,
             Y=_air_Y(),
         )
@@ -180,7 +180,7 @@ class TestPlenumEnergyBoundary:
         X_out = cb.mass_to_mole(cb.normalize_fractions(Y_out))
         X_in = cb.mass_to_mole(cb.normalize_fractions(up.Y))
 
-        h_in = cb.h_mass(up.T_total, X_in)
+        h_in = cb.h_mass(up.Tt, X_in)
         h_out = cb.h_mass(T_out, X_out)
         delta_h = Q / mdot
 
@@ -195,9 +195,9 @@ class TestPlenumEnergyBoundary:
 
         up = MixtureState(
             P=101325.0,
-            P_total=101325.0,
+            Pt=101325.0,
             T=500.0,
-            T_total=500.0,
+            Tt=500.0,
             m_dot=1.0,
             Y=_air_Y(),
         )
@@ -221,17 +221,17 @@ class TestCombustorEnergyBoundary:
 
         fuel = MixtureState(
             P=101325.0,
-            P_total=101325.0,
+            Pt=101325.0,
             T=300.0,
-            T_total=300.0,
+            Tt=300.0,
             m_dot=0.05,
             Y=_ch4_Y(),
         )
         air = MixtureState(
             P=101325.0,
-            P_total=101325.0,
+            Pt=101325.0,
             T=600.0,
-            T_total=600.0,
+            Tt=600.0,
             m_dot=1.0,
             Y=_air_Y(),
         )
@@ -288,9 +288,9 @@ class TestMomentumChamberEnergyBoundary:
 
         up = MixtureState(
             P=200000.0,
-            P_total=200000.0,
+            Pt=200000.0,
             T=400.0,
-            T_total=400.0,
+            Tt=400.0,
             m_dot=2.0,
             Y=_air_Y(),
         )
@@ -316,9 +316,9 @@ class TestSignConvention:
 
         up = MixtureState(
             P=101325.0,
-            P_total=101325.0,
+            Pt=101325.0,
             T=300.0,
-            T_total=300.0,
+            Tt=300.0,
             m_dot=1.0,
             Y=_air_Y(),
         )
@@ -338,9 +338,9 @@ class TestSignConvention:
 
         up = MixtureState(
             P=101325.0,
-            P_total=101325.0,
+            Pt=101325.0,
             T=800.0,
-            T_total=800.0,
+            Tt=800.0,
             m_dot=1.0,
             Y=_air_Y(),
         )
@@ -360,9 +360,9 @@ class TestSignConvention:
 
         up = MixtureState(
             P=101325.0,
-            P_total=101325.0,
+            Pt=101325.0,
             T=500.0,
-            T_total=500.0,
+            Tt=500.0,
             m_dot=1.0,
             Y=_air_Y(),
         )
@@ -389,8 +389,8 @@ class TestNetworkWithEnergyBoundary:
         The heated plenum should have a higher temperature than without heating."""
         graph = FlowNetwork()
 
-        inlet = PressureBoundary("inlet", P_total=200000.0, T_total=300.0, Y=_air_Y())
-        outlet = PressureBoundary("outlet", P_total=101325.0, T_total=300.0, Y=_air_Y())
+        inlet = PressureBoundary("inlet", Pt=200000.0, Tt=300.0, Y=_air_Y())
+        outlet = PressureBoundary("outlet", Pt=101325.0, Tt=300.0, Y=_air_Y())
 
         plenum = PlenumNode("plenum")
         plenum.add_energy_boundary(EnergyBoundary("heater", Q=50000.0))
@@ -431,8 +431,8 @@ class TestNetworkWithEnergyBoundary:
         """Network with a cooled plenum: temperature should drop."""
         graph = FlowNetwork()
 
-        inlet = PressureBoundary("inlet", P_total=300000.0, T_total=800.0, Y=_air_Y())
-        outlet = PressureBoundary("outlet", P_total=101325.0, T_total=300.0, Y=_air_Y())
+        inlet = PressureBoundary("inlet", Pt=300000.0, Tt=800.0, Y=_air_Y())
+        outlet = PressureBoundary("outlet", Pt=101325.0, Tt=300.0, Y=_air_Y())
 
         plenum = PlenumNode("plenum")
         # Use moderate Q relative to expected mdot (~10 kg/s with large orifice)
@@ -473,9 +473,9 @@ def test_heat_exchange_node():
 
     # Simple network: MassFlowBoundary → Plenum(Q=1000W) → PressureBoundary
     Y_air = _air_Y()
-    inlet = MassFlowBoundary("inlet", m_dot=0.1, T_total=600.0, Y=Y_air)
+    inlet = MassFlowBoundary("inlet", m_dot=0.1, Tt=600.0, Y=Y_air)
     plenum = PlenumNode("plenum")
-    outlet = PressureBoundary("outlet", P_total=101325.0)
+    outlet = PressureBoundary("outlet", Pt=101325.0)
 
     # Add heat exchange: 1000W heating
     heater = EnergyBoundary("heater", Q=1000.0)
@@ -534,9 +534,9 @@ def test_heat_exchange_node():
     # Test that Q parameter affects the solution by comparing with Q=0
     # Create reference network with no heat exchange
     ref_graph = FlowNetwork()
-    ref_inlet = MassFlowBoundary("inlet", m_dot=0.1, T_total=600.0, Y=Y_air)
+    ref_inlet = MassFlowBoundary("inlet", m_dot=0.1, Tt=600.0, Y=Y_air)
     ref_plenum = PlenumNode("plenum")
-    ref_outlet = PressureBoundary("outlet", P_total=101325.0)
+    ref_outlet = PressureBoundary("outlet", Pt=101325.0)
 
     ref_orf1 = OrificeElement(
         "orf1", "inlet", "plenum", Cd=0.6, diameter=0.035682, correlation="fixed"

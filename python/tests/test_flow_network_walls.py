@@ -25,7 +25,7 @@ def test_add_wall_success():
     network = FlowNetwork()
 
     # Add nodes and elements
-    pb = PressureBoundary("pb", P_total=101325, T_total=300)
+    pb = PressureBoundary("pb", Pt=101325, Tt=300)
     plenum = PlenumNode("plenum")
     channel1 = ChannelElement("channel1", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
     channel2 = ChannelElement("channel2", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
@@ -55,7 +55,7 @@ def test_add_wall_duplicate_id():
     network = FlowNetwork()
 
     # Add nodes and elements
-    pb = PressureBoundary("pb", P_total=101325, T_total=300)
+    pb = PressureBoundary("pb", Pt=101325, Tt=300)
     plenum = PlenumNode("plenum")
     channel1 = ChannelElement("channel1", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
 
@@ -78,7 +78,7 @@ def test_add_wall_unknown_element_a():
     network = FlowNetwork()
 
     # Add nodes and elements
-    pb = PressureBoundary("pb", P_total=101325, T_total=300)
+    pb = PressureBoundary("pb", Pt=101325, Tt=300)
     plenum = PlenumNode("plenum")
     channel1 = ChannelElement("channel1", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
 
@@ -99,7 +99,7 @@ def test_add_wall_unknown_element_b():
     network = FlowNetwork()
 
     # Add nodes and elements
-    pb = PressureBoundary("pb", P_total=101325, T_total=300)
+    pb = PressureBoundary("pb", Pt=101325, Tt=300)
     plenum = PlenumNode("plenum")
     channel1 = ChannelElement("channel1", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
 
@@ -136,7 +136,7 @@ def test_to_dict_with_walls():
     network = FlowNetwork()
 
     # Add nodes and elements
-    pb = PressureBoundary("pb", P_total=101325, T_total=300)
+    pb = PressureBoundary("pb", Pt=101325, Tt=300)
     plenum = PlenumNode("plenum")
     channel1 = ChannelElement("channel1", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
     channel2 = ChannelElement("channel2", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
@@ -186,7 +186,7 @@ def test_from_dict_with_walls():
     network1 = FlowNetwork()
 
     # Add nodes and elements
-    pb = PressureBoundary("pb", P_total=101325, T_total=300)
+    pb = PressureBoundary("pb", Pt=101325, Tt=300)
     plenum = PlenumNode("plenum")
     channel1 = ChannelElement("channel1", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)
     channel2 = ChannelElement("channel2", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5)

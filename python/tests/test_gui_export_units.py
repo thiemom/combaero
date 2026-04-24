@@ -7,8 +7,8 @@ from gui.backend.units import UNIT_MAP, label_with_unit
 
 def test_label_with_unit_known_scalar_pressure():
     assert label_with_unit("P") == "P [Pa]"
-    assert label_with_unit("P_total") == "P_total [Pa]"
-    assert label_with_unit("dP_total") == "dP_total [Pa]"
+    assert label_with_unit("Pt") == "Pt [Pa]"
+    assert label_with_unit("dPt") == "dPt [Pa]"
 
 
 def test_label_with_unit_known_scalar_temperature_and_flow():
@@ -62,7 +62,7 @@ def test_unit_map_core_coverage():
     core = {
         "T",
         "P",
-        "P_total",
+        "Pt",
         "m_dot",
         "rho",
         "mach",
@@ -71,7 +71,23 @@ def test_unit_map_core_coverage():
         "htc",
         "Q",
         "xi",
-        "p_ratio",
+        "pr_total",
     }
     missing = core - UNIT_MAP.keys()
     assert not missing, f"Missing expected unit-map entries: {sorted(missing)}"
+
+
+def test_unit_map_covers_all_schema_fields():
+    """Every field declared in schema.py must have a unit in UNIT_MAP.
+
+    This test catches UNIT_MAP drift whenever schema.py gains new fields.
+    Composition keys (Y[...], X[...]) are handled by the regex branch in
+    label_with_unit and are intentionally excluded from UNIT_MAP.
+    """
+    from combaero.network.schema import ALL_KNOWN_FIELDS
+
+    missing = ALL_KNOWN_FIELDS - UNIT_MAP.keys()
+    assert not missing, (
+        f"Schema fields not covered by UNIT_MAP: {sorted(missing)}\n"
+        "Add them to gui/backend/units.py."
+    )

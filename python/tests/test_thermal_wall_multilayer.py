@@ -57,8 +57,8 @@ def test_solver_interface_temperature():
     net = FlowNetwork()
 
     # Path A: Hot (1000K -> 950K)
-    in_a = PressureBoundary("in_a", P_total=200000, T_total=1000)
-    out_a = PressureBoundary("out_a", P_total=150000, T_total=1000)
+    in_a = PressureBoundary("in_a", Pt=200000, Tt=1000)
+    out_a = PressureBoundary("out_a", Pt=150000, Tt=1000)
     net.add_node(in_a)
     net.add_node(out_a)
     p_hot = ChannelElement(
@@ -68,8 +68,8 @@ def test_solver_interface_temperature():
     net.add_element(p_hot)
 
     # Path B: Cold (300K -> 350K)
-    in_b = PressureBoundary("in_b", P_total=200000, T_total=300)
-    out_b = PressureBoundary("out_b", P_total=150000, T_total=300)
+    in_b = PressureBoundary("in_b", Pt=200000, Tt=300)
+    out_b = PressureBoundary("out_b", Pt=150000, Tt=300)
     net.add_node(in_b)
     net.add_node(out_b)
     p_cold = ChannelElement(

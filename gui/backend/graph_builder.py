@@ -135,7 +135,7 @@ def _expand_initial_guess(short_guess: dict, prefix: str) -> dict:
     entries that do not correspond to an actual unknown.
     Any key already containing a ``.`` is passed through unchanged so that
     hand-authored qualified guesses still work. Explicit short keys
-    (e.g. ``P_total``) take precedence over broadcast values from ``P``/``T``.
+    (e.g. ``Pt``) take precedence over broadcast values from ``P``/``T``.
     """
     if not short_guess:
         return {}
@@ -146,11 +146,11 @@ def _expand_initial_guess(short_guess: dict, prefix: str) -> dict:
             continue
         if key == "P":
             result[f"{prefix}.P"] = val
-            result[f"{prefix}.P_total"] = val
+            result[f"{prefix}.Pt"] = val
         elif key == "T":
             result[f"{prefix}.T"] = val
-            result[f"{prefix}.T_total"] = val
-    # Pass 2 — explicit short keys (P_total, T_total, m_dot, X[i], etc.)
+            result[f"{prefix}.Tt"] = val
+    # Pass 2 — explicit short keys (Pt, Tt, m_dot, X[i], etc.)
     # are applied after the broadcast so they win on conflict.
     for key, val in short_guess.items():
         if "." in key:
@@ -204,15 +204,15 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             plenum_node_ids.add(node_id)
         elif node_type == "mass_boundary":
             data = MassBoundaryData(**node_data)
-            Y = resolve_composition(data.composition, data.T_total, 101325.0)
-            node = MassFlowBoundary(node_id, m_dot=data.m_dot, T_total=data.T_total, Y=Y)
+            Y = resolve_composition(data.composition, data.Tt, 101325.0)
+            node = MassFlowBoundary(node_id, m_dot=data.m_dot, Tt=data.Tt, Y=Y)
             node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
             net.add_node(node)
             nodes_map[node_id] = node
         elif node_type == "pressure_boundary":
             data = PressureBoundaryData(**node_data)
-            Y = resolve_composition(data.composition, data.T_total, data.P_total)
-            node = PressureBoundary(node_id, P_total=data.P_total, T_total=data.T_total, Y=Y)
+            Y = resolve_composition(data.composition, data.Tt, data.Pt)
+            node = PressureBoundary(node_id, Pt=data.Pt, Tt=data.Tt, Y=Y)
             node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
             net.add_node(node)
             nodes_map[node_id] = node

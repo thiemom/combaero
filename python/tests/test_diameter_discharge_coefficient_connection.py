@@ -192,12 +192,12 @@ class TestDiameterDischargeCoefficientConnectionElement:
         # Network 1: Using DiameterDischargeCoefficientConnectionElement
         graph1 = FlowNetwork()
         inlet1 = PressureBoundary("inlet")
-        inlet1.P_total = 150000.0
-        inlet1.T_total = 300.0
+        inlet1.Pt = 150000.0
+        inlet1.Tt = 300.0
         inlet1.Y = cb.species.dry_air_mass()
         outlet1 = PressureBoundary("outlet")
-        outlet1.P_total = 100000.0
-        outlet1.T_total = 300.0
+        outlet1.Pt = 100000.0
+        outlet1.Tt = 300.0
         outlet1.Y = cb.species.dry_air_mass()
         conn1 = DiameterDischargeCoefficientConnectionElement(
             "conn", "inlet", "outlet", diameter, Cd=Cd
@@ -213,12 +213,12 @@ class TestDiameterDischargeCoefficientConnectionElement:
         # Network 2: Using OrificeElement with same Cd and physical area
         graph2 = FlowNetwork()
         inlet2 = PressureBoundary("inlet")
-        inlet2.P_total = 150000.0
-        inlet2.T_total = 300.0
+        inlet2.Pt = 150000.0
+        inlet2.Tt = 300.0
         inlet2.Y = cb.species.dry_air_mass()
         outlet2 = PressureBoundary("outlet")
-        outlet2.P_total = 100000.0
-        outlet2.T_total = 300.0
+        outlet2.Pt = 100000.0
+        outlet2.Tt = 300.0
         outlet2.Y = cb.species.dry_air_mass()
         orf2 = OrificeElement(
             "orf", "inlet", "outlet", Cd=Cd, diameter=diameter, correlation="fixed"
@@ -242,12 +242,12 @@ class TestDiameterDischargeCoefficientConnectionElement:
         # Network with DiameterDischargeCoefficientConnectionElement
         graph = FlowNetwork()
         inlet = PressureBoundary("inlet")
-        inlet.P_total = 150000.0
-        inlet.T_total = 300.0
+        inlet.Pt = 150000.0
+        inlet.Tt = 300.0
         inlet.Y = cb.species.dry_air_mass()
         outlet = PressureBoundary("outlet")
-        outlet.P_total = 100000.0
-        outlet.T_total = 300.0
+        outlet.Pt = 100000.0
+        outlet.Tt = 300.0
         outlet.Y = cb.species.dry_air_mass()
         conn = DiameterDischargeCoefficientConnectionElement(
             "conn", "inlet", "outlet", diameter, Cd=Cd
@@ -264,7 +264,7 @@ class TestDiameterDischargeCoefficientConnectionElement:
         assert sol["conn.m_dot"] > 0
 
         # Verify pressure drop exists
-        assert inlet.P_total > outlet.P_total
+        assert inlet.Pt > outlet.Pt
 
     def test_different_cd_produce_different_flows(self):
         """Verify that different discharge coefficients produce different flow rates."""
@@ -275,12 +275,12 @@ class TestDiameterDischargeCoefficientConnectionElement:
         for Cd in Cds:
             graph = FlowNetwork()
             inlet = PressureBoundary("inlet")
-            inlet.P_total = 150000.0
-            inlet.T_total = 300.0
+            inlet.Pt = 150000.0
+            inlet.Tt = 300.0
             inlet.Y = cb.species.dry_air_mass()
             outlet = PressureBoundary("outlet")
-            outlet.P_total = 100000.0
-            outlet.T_total = 300.0
+            outlet.Pt = 100000.0
+            outlet.Tt = 300.0
             outlet.Y = cb.species.dry_air_mass()
             conn = DiameterDischargeCoefficientConnectionElement(
                 "conn", "inlet", "outlet", diameter, Cd=Cd
@@ -306,12 +306,12 @@ class TestDiameterDischargeCoefficientConnectionElement:
         for zeta in zetas:
             graph = FlowNetwork()
             inlet = PressureBoundary("inlet")
-            inlet.P_total = 150000.0
-            inlet.T_total = 300.0
+            inlet.Pt = 150000.0
+            inlet.Tt = 300.0
             inlet.Y = cb.species.dry_air_mass()
             outlet = PressureBoundary("outlet")
-            outlet.P_total = 100000.0
-            outlet.T_total = 300.0
+            outlet.Pt = 100000.0
+            outlet.Tt = 300.0
             outlet.Y = cb.species.dry_air_mass()
             conn = DiameterDischargeCoefficientConnectionElement(
                 "conn", "inlet", "outlet", diameter, zeta=zeta
@@ -387,12 +387,12 @@ class TestDiameterDischargeCoefficientConnectionElement:
         # High pressure drop case (more compressibility effects)
         graph1 = FlowNetwork()
         inlet1 = PressureBoundary("inlet")
-        inlet1.P_total = 200000.0
-        inlet1.T_total = 300.0
+        inlet1.Pt = 200000.0
+        inlet1.Tt = 300.0
         inlet1.Y = cb.species.dry_air_mass()
         outlet1 = PressureBoundary("outlet")
-        outlet1.P_total = 50000.0
-        outlet1.T_total = 300.0
+        outlet1.Pt = 50000.0
+        outlet1.Tt = 300.0
         outlet1.Y = cb.species.dry_air_mass()
         conn1 = DiameterDischargeCoefficientConnectionElement(
             "conn", "inlet", "outlet", diameter, Cd=Cd
@@ -409,12 +409,12 @@ class TestDiameterDischargeCoefficientConnectionElement:
         # Low pressure drop case (less compressibility effects)
         graph2 = FlowNetwork()
         inlet2 = PressureBoundary("inlet")
-        inlet2.P_total = 110000.0
-        inlet2.T_total = 300.0
+        inlet2.Pt = 110000.0
+        inlet2.Tt = 300.0
         inlet2.Y = cb.species.dry_air()
         outlet2 = PressureBoundary("outlet")
-        outlet2.P_total = 100000.0
-        outlet2.T_total = 300.0
+        outlet2.Pt = 100000.0
+        outlet2.Tt = 300.0
         outlet2.Y = cb.species.dry_air()
         conn2 = DiameterDischargeCoefficientConnectionElement(
             "conn", "inlet", "outlet", diameter, Cd=Cd

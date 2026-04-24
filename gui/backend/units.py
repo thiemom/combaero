@@ -32,8 +32,10 @@ UNIT_MAP: dict[str, str] = {
     "P_out": "Pa",
     "Pt_in": "Pa",
     "Pt_out": "Pa",
-    "dP_total": "Pa",
     "dP": "Pa",
+    "dPt": "Pa",
+    "pr_total": "-",
+    "pr_static": "-",
     # --- Flow ---
     "m_dot": "kg/s",
     "velocity": "m/s",
@@ -43,13 +45,18 @@ UNIT_MAP: dict[str, str] = {
     "mach_in": "-",
     "mach_out": "-",
     "mach_throat": "-",
+    "mach_loss_ref": "-",
+    # --- Node stagnation ---
+    "Tt": "K",
+    "Pt": "Pa",
     # --- Transport ---
     "mu": "Pa·s",
     "k": "W/m/K",
     "nu": "m²/s",
     "Pr": "-",
     "Re": "-",
-    # --- Thermo per-mass ---
+    "Dh": "m",
+    # --- Thermo per-mass (node/element state) ---
     "rho": "kg/m³",
     "h": "J/kg",
     "s": "J/kg/K",
@@ -58,6 +65,20 @@ UNIT_MAP: dict[str, str] = {
     "cv": "J/kg/K",
     "gamma": "-",
     "mw": "kg/mol",
+    # --- Thermo reference-state block (Phase 2, element inlet state) ---
+    "rho_ref": "kg/m³",
+    "h_ref": "J/kg",
+    "s_ref": "J/kg/K",
+    "u_ref": "J/kg",
+    "cp_ref": "J/kg/K",
+    "cv_ref": "J/kg/K",
+    "gamma_ref": "-",
+    "a_ref": "m/s",
+    "mw_ref": "kg/mol",
+    "mu_ref": "Pa·s",
+    "k_ref": "W/m/K",
+    "nu_ref": "m²/s",
+    "Pr_ref": "-",
     # --- Heat transfer ---
     "Nu": "-",
     "htc": "W/m²/K",
@@ -67,8 +88,10 @@ UNIT_MAP: dict[str, str] = {
     # --- Element diagnostics ---
     "xi": "-",
     "theta": "-",
-    "p_ratio": "-",
-    "p_ratio_total": "-",
+    "zeta": "-",
+    "ratio": "-",            # AreaChangeElement (renamed to area_ratio in Phase 2)
+    "area_ratio": "-",       # Phase 2 name
+    "is_correlation": "-",
     "f": "-",
     "Cd": "-",
     "phi": "-",
@@ -109,5 +132,6 @@ _META_COLUMNS: frozenset[str] = frozenset(
         "success",
         "is_boundary",
         "combustion_method",
+        "ref_location",
     }
 )

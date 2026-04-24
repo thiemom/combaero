@@ -51,7 +51,7 @@ const MomentumChamberNode = ({ id, data, selected }: NodeProps) => {
 							{data.result.state.T.toFixed(0)} K
 						</div>
 						<div className="text-[9px] text-gray-400 font-mono whitespace-nowrap opacity-75">
-							Pt {(data.result.state.P_total / 1e5).toFixed(2)} bar
+							Pt {(data.result.state.Pt / 1e5).toFixed(2)} bar
 						</div>
 						<div className="text-[9px] text-stone-600 font-mono font-bold whitespace-nowrap">
 							P&nbsp;&nbsp;{(data.result.state.P / 1e5).toFixed(2)} bar

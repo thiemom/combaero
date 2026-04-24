@@ -108,11 +108,11 @@ class TestLinearThetaFractionLoss:
 class TestPressureLossElementResidual:
     """Unit-level checks on ``PressureLossElement.residuals`` for each correlation.
 
-    Verifies the element residual ``P_total_out - P_total_in * (1 - xi) = 0``
+    Verifies the element residual ``Pt_out - Pt_in * (1 - xi) = 0``
     vanishes at the physically correct P ratio, for every supported correlation.
     """
 
-    def _make_air_state(self, P_total: float = 150000.0, T: float = 700.0, m_dot: float = 1.0):
+    def _make_air_state(self, Pt: float = 150000.0, T: float = 700.0, m_dot: float = 1.0):
         """Helper: build an air-composition MixtureState."""
         import combaero as cb
         from combaero.network import MixtureState
@@ -125,16 +125,16 @@ class TestPressureLossElementResidual:
                 Y[k] = 0.767
             elif name == "O2":
                 Y[k] = 0.233
-        return MixtureState(P=P_total, P_total=P_total, T=T, T_total=T, m_dot=m_dot, Y=Y)
+        return MixtureState(P=Pt, Pt=Pt, T=T, Tt=T, m_dot=m_dot, Y=Y)
 
     def test_constant_fraction_residual_zero_at_exact_ratio(self) -> None:
-        """res == 0 iff P_total_out / P_total_in == (1 - xi)."""
+        """res == 0 iff Pt_out / Pt_in == (1 - xi)."""
         from combaero.network import PressureLossElement
 
         xi = 0.05
         P_in = 150000.0
-        state_in = self._make_air_state(P_total=P_in)
-        state_out = self._make_air_state(P_total=P_in * (1.0 - xi))
+        state_in = self._make_air_state(Pt=P_in)
+        state_out = self._make_air_state(Pt=P_in * (1.0 - xi))
 
         elem = PressureLossElement("loss", "a", "b", correlation=ConstantFractionLoss(xi=xi))
         res, _ = elem.residuals(state_in, state_out)
@@ -145,8 +145,8 @@ class TestPressureLossElementResidual:
 
         xi = 0.05
         P_in = 150000.0
-        state_in = self._make_air_state(P_total=P_in)
-        state_out = self._make_air_state(P_total=P_in)  # no drop
+        state_in = self._make_air_state(Pt=P_in)
+        state_out = self._make_air_state(Pt=P_in)  # no drop
 
         elem = PressureLossElement("loss", "a", "b", correlation=ConstantFractionLoss(xi=xi))
         res, _ = elem.residuals(state_in, state_out)
@@ -160,8 +160,8 @@ class TestPressureLossElementResidual:
 
         k, xi0 = 0.5, 0.02
         P_in = 150000.0
-        state_in = self._make_air_state(P_total=P_in)
-        state_out = self._make_air_state(P_total=P_in * (1.0 - xi0))
+        state_in = self._make_air_state(Pt=P_in)
+        state_out = self._make_air_state(Pt=P_in * (1.0 - xi0))
 
         elem = PressureLossElement(
             "loss", "a", "b", correlation=LinearThetaFractionLoss(k=k, xi0=xi0)
@@ -181,7 +181,7 @@ class TestPressureLossElementResidual:
         area = 0.1
         P_in = 150000.0
         mdot = 1.0
-        state_in = self._make_air_state(P_total=P_in, m_dot=mdot)
+        state_in = self._make_air_state(Pt=P_in, m_dot=mdot)
 
         corr = ConstantHeadLoss(zeta=zeta, area=area)
         elem = PressureLossElement("loss", "a", "b", correlation=corr)
@@ -190,7 +190,7 @@ class TestPressureLossElementResidual:
         xi, _ = corr(ctx)
         assert 0.0 < xi < 1.0
 
-        state_out = self._make_air_state(P_total=P_in * (1.0 - xi), m_dot=mdot)
+        state_out = self._make_air_state(Pt=P_in * (1.0 - xi), m_dot=mdot)
         res, _ = elem.residuals(state_in, state_out)
         assert res[0] == pytest.approx(0.0, abs=1e-6)
 
@@ -213,7 +213,7 @@ def _air_mixture_state(P: float = 150000.0, T: float = 700.0, m_dot: float = 1.0
             Y[k] = 0.767
         elif name == "O2":
             Y[k] = 0.233
-    return MixtureState(P=P, P_total=P, T=T, T_total=T, m_dot=m_dot, Y=Y)
+    return MixtureState(P=P, Pt=P, T=T, Tt=T, m_dot=m_dot, Y=Y)
 
 
 class TestPressureLossElementConvectiveSurface:
@@ -304,7 +304,8 @@ class TestPressureLossElementDiagnostics:
             # Loss / pressure
             "xi",
             "theta",
-            "dP_total",
+            "dPt",
+            "dP",
             "P_in",
             "P_out",
             "T_in",
@@ -315,23 +316,25 @@ class TestPressureLossElementDiagnostics:
             "Tt_out",
             "mach_in",
             "mach_out",
-            "p_ratio_total",
-            "p_ratio",
+            "pr_total",
+            "pr_static",
             "Re",
-            "rho",
+            "velocity",
+            "ref_location",
             # Thermo + transport at inlet
-            "h",
-            "s",
-            "u",
-            "gamma",
-            "a",
-            "cp",
-            "cv",
-            "mw",
-            "mu",
-            "k",
-            "Pr",
-            "nu",
+            "rho_ref",
+            "h_ref",
+            "s_ref",
+            "u_ref",
+            "gamma_ref",
+            "a_ref",
+            "cp_ref",
+            "cv_ref",
+            "mw_ref",
+            "mu_ref",
+            "k_ref",
+            "Pr_ref",
+            "nu_ref",
         }
 
     def test_constant_fraction_exposes_all_common_keys(self) -> None:
@@ -349,9 +352,12 @@ class TestPressureLossElementDiagnostics:
         diag = elem.diagnostics(state_in, state_out)
         missing = self._expected_common_keys() - diag.keys()
         assert not missing, f"Missing diagnostic keys: {sorted(missing)}"
-        # All values finite floats
+        # All values finite floats (except ref_location)
         for k, v in diag.items():
-            assert isinstance(v, float), f"{k} is not float: {v!r}"
+            if k == "ref_location":
+                assert isinstance(v, str)
+            else:
+                assert isinstance(v, float), f"{k} is not float: {v!r}"
 
     def test_head_loss_exposes_common_keys_including_htc(self) -> None:
         """With a convective surface, diagnostics must also include Nu/htc/T_aw/f."""
@@ -424,13 +430,13 @@ class TestPressureLossElementWallCoupling:
         Y_air = cb.species.dry_air_mass()
 
         # Hot side: inlet -> loss -> outlet
-        hot_in = MassFlowBoundary("hot_in", m_dot=0.1, T_total=800.0, Y=Y_air)
-        hot_out = PressureBoundary("hot_out", P_total=2e5, T_total=800.0, Y=Y_air)
+        hot_in = MassFlowBoundary("hot_in", m_dot=0.1, Tt=800.0, Y=Y_air)
+        hot_out = PressureBoundary("hot_out", Pt=2e5, Tt=800.0, Y=Y_air)
         # Cold side: inlet -> loss -> outlet
-        cold_in = MassFlowBoundary("cold_in", m_dot=0.05, T_total=400.0, Y=Y_air)
-        cold_out = PressureBoundary("cold_out", P_total=2e5, T_total=400.0, Y=Y_air)
+        cold_in = MassFlowBoundary("cold_in", m_dot=0.05, Tt=400.0, Y=Y_air)
+        cold_out = PressureBoundary("cold_out", Pt=2e5, Tt=400.0, Y=Y_air)
 
-        # Intermediate plenums allow the solver to settle P_total freely.
+        # Intermediate plenums allow the solver to settle Pt freely.
         hot_mid = PlenumNode("hot_mid")
         cold_mid = PlenumNode("cold_mid")
 

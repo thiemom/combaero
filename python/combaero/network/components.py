@@ -459,9 +459,9 @@ class EnergyBoundary:
 @dataclass
 class MixtureState:
     P: float
-    P_total: float
+    Pt: float
     T: float
-    T_total: float
+    Tt: float
     m_dot: float
     Y: list[float]
 
@@ -490,7 +490,7 @@ class MixtureState:
 
     def total_enthalpy(self) -> float:
         """Total (stagnation) specific enthalpy [J/kg]."""
-        return cb.h_mass(self.T_total, self.X)
+        return cb.h_mass(self.Tt, self.X)
 
     def cp(self) -> float:
         """Specific heat capacity at constant pressure [J/(kg*K)]."""
@@ -538,15 +538,15 @@ class NetworkNode(ABC):
         self, upstream_states: list[MixtureState]
     ) -> tuple[float, list[float], Any]:
         """
-        Computes (T_total, Y, Jac) for nodes based on upstream conditions.
-        Jac contains derivatives d(T_total)/d(stream_i) and d(Y)/d(stream_i).
+        Computes (Tt, Y, Jac) for nodes based on upstream conditions.
+        Jac contains derivatives d(Tt)/d(stream_i) and d(Y)/d(stream_i).
         By default, it just takes the first upstream state (pass-through).
         """
         if not upstream_states:
             return 300.0, list(cb.mole_to_mass(cb.species.dry_air())), None
 
         up = upstream_states[0]
-        return up.T_total, up.Y, None
+        return up.Tt, up.Y, None
 
     @abstractmethod
     def resolve_topology(self, graph: "FlowNetwork") -> None:
@@ -559,15 +559,14 @@ class NetworkNode(ABC):
 
     def diagnostics(self, state: MixtureState) -> dict[str, float]:
         """Compute generalized node-level diagnostics (e.g., thermo properties)."""
-
-        # Robustness check: state must be physically valid (P > 0)
         if state.P <= 0:
             return {}
 
-        # Robust fallback using CompleteState
         try:
             cs = cb.complete_state(state.T, state.P, state.X)
             return {
+                "Tt": float(state.Tt),
+                "Pt": float(state.Pt),
                 "h": cs.thermo.h,
                 "s": cs.thermo.s,
                 "u": cs.thermo.u,
@@ -583,9 +582,10 @@ class NetworkNode(ABC):
                 "nu": cs.transport.nu,
             }
         except Exception:
-            # Fallback to pure thermo if transport fails or is unsupported
             ts = cb.thermo_state(state.T, state.P, state.X)
             return {
+                "Tt": float(state.Tt),
+                "Pt": float(state.Pt),
                 "h": ts.h,
                 "s": ts.s,
                 "u": ts.u,
@@ -596,6 +596,76 @@ class NetworkNode(ABC):
                 "cv": ts.cv,
                 "mw": ts.mw,
             }
+
+
+# ---------------------------------------------------------------------------
+# Shared diagnostic helpers
+# ---------------------------------------------------------------------------
+
+
+def _element_pressure_block(
+    state_in: "MixtureState",
+    state_out: "MixtureState",
+    mach_in: float,
+    mach_out: float,
+) -> dict[str, float]:
+    """Return the universal 14-field pressure/Mach block for any element."""
+    p_ratio_total = state_out.Pt / state_in.Pt if state_in.Pt > 0 else 0.0
+    p_ratio_static = state_out.P / state_in.P if state_in.P > 0 else 0.0
+    return {
+        "P_in": float(state_in.P),
+        "P_out": float(state_out.P),
+        "T_in": float(state_in.T),
+        "T_out": float(state_out.T),
+        "Pt_in": float(state_in.Pt),
+        "Pt_out": float(state_out.Pt),
+        "Tt_in": float(state_in.Tt),
+        "Tt_out": float(state_out.Tt),
+        "mach_in": float(mach_in),
+        "mach_out": float(mach_out),
+        "dPt": float(state_in.Pt - state_out.Pt),
+        "dP": float(state_in.P - state_out.P),
+        "pr_total": float(p_ratio_total),
+        "pr_static": float(p_ratio_static),
+    }
+
+
+def _element_reference_block(
+    cs: Any,
+    *,
+    m_dot: float,
+    area: float,
+    Dh: float | None = None,
+    location: str = "inlet",
+) -> dict[str, float | str]:
+    """Return the thermo/transport reference-state block evaluated at the inlet.
+
+    All keys use the ``_ref`` suffix so it is unambiguous which state they
+    refer to.  ``velocity`` and ``Re`` are always included; Re is 0 when
+    geometry is insufficient to compute it.
+    """
+    rho = cs.thermo.rho
+    v = (abs(m_dot)) / ((rho) * (area)) if area > 0 and rho > 0 else 0.0
+    mu = cs.transport.mu
+    re = (v) * (Dh) / (mu) if (Dh and Dh > 0 and v > 0 and mu > 0) else 0.0
+    return {
+        "ref_location": location,
+        "velocity": v,
+        "Re": re,
+        "rho_ref": float(rho),
+        "h_ref": float(cs.thermo.h),
+        "s_ref": float(cs.thermo.s),
+        "u_ref": float(cs.thermo.u),
+        "cp_ref": float(cs.thermo.cp),
+        "cv_ref": float(cs.thermo.cv),
+        "gamma_ref": float(cs.thermo.gamma),
+        "a_ref": float(cs.thermo.a),
+        "mw_ref": float(cs.thermo.mw),
+        "mu_ref": float(mu),
+        "k_ref": float(cs.transport.k),
+        "nu_ref": float(cs.transport.nu),
+        "Pr_ref": float(cs.transport.Pr),
+    }
 
 
 class NetworkElement(ABC):
@@ -651,7 +721,7 @@ class NetworkElement(ABC):
 
 class PlenumNode(NetworkNode):
     """
-    A stagnation volume where v ~ 0, so P_total = P_static.
+    A stagnation volume where v ~ 0, so Pt = P_static.
     For Phase 1: pressure-only node.
     For Phase 2+: automatically handles mixing when multiple upstream connections exist.
     """
@@ -667,7 +737,7 @@ class PlenumNode(NetworkNode):
 
     def unknowns(self) -> list[str]:
         # Pure Pressure-Flow: Temperature and Composition are derived forward, not unknowns.
-        return [f"{self.id}.P", f"{self.id}.P_total"]
+        return [f"{self.id}.P", f"{self.id}.Pt"]
 
     def compute_derived_state(
         self, upstream_states: list[MixtureState]
@@ -677,7 +747,7 @@ class PlenumNode(NetworkNode):
         if not upstream_states:
             return 300.0, list(cb.mole_to_mass(cb.species.dry_air())), None
 
-        streams = [cb.MassStream(s.m_dot, s.T_total, s.P_total, s.Y) for s in upstream_states]
+        streams = [cb.MassStream(s.m_dot, s.Tt, s.Pt, s.Y) for s in upstream_states]
         Q_total = sum(eb.Q for eb in self.energy_boundaries)
         fraction_total = sum(eb.fraction for eb in self.energy_boundaries)
 
@@ -686,16 +756,17 @@ class PlenumNode(NetworkNode):
         return mix_res.T_mix, mix_res.Y_mix, mix_res
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
-        # Base residual: P_total = P for plenum
-        res = [state.P_total - state.P]
-        jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.P_total": 1.0}}
+        # Base residual: Pt = P for plenum
+        res = [state.Pt - state.P]
+        jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.Pt": 1.0}}
         return res, jac
 
     def diagnostics(self, state: MixtureState) -> dict[str, float]:
-
-        # Plenums don't have transport properties (per user request / stationary reservoir model)
+        # Plenums: v ~ 0, so stagnation = static
         ts = cb.thermo_state(state.T, state.P, state.X)
         return {
+            "Tt": float(state.T),
+            "Pt": float(state.P),
             "h": ts.h,
             "s": ts.s,
             "u": ts.u,
@@ -715,7 +786,7 @@ class PlenumNode(NetworkNode):
 class MomentumChamberNode(NetworkNode):
     """
     Similar to a plenum, but preserves dynamic pressure.
-    Enforces P_total = P_static + 0.5 * rho * v^2 instead of P_total = P_static.
+    Enforces Pt = P_static + 0.5 * rho * v^2 instead of Pt = P_static.
     Supports directional flow vectors (port angles) for momentum conservation.
     Automatically handles mixing when multiple upstream connections exist.
     """
@@ -758,7 +829,7 @@ class MomentumChamberNode(NetworkNode):
 
     def unknowns(self) -> list[str]:
         # Pure Pressure-Flow: Temperature and Composition are derived forward, not unknowns.
-        return [f"{self.id}.P", f"{self.id}.P_total"]
+        return [f"{self.id}.P", f"{self.id}.Pt"]
 
     def compute_derived_state(
         self, upstream_states: list[MixtureState]
@@ -777,7 +848,7 @@ class MomentumChamberNode(NetworkNode):
         if not upstream_states:
             return 300.0, list(cb.mole_to_mass(cb.species.dry_air())), None
 
-        streams = [cb.MassStream(s.m_dot, s.T_total, s.P_total, s.Y) for s in upstream_states]
+        streams = [cb.MassStream(s.m_dot, s.Tt, s.Pt, s.Y) for s in upstream_states]
         Q_total = sum(eb.Q for eb in self.energy_boundaries)
         fraction_total = sum(eb.fraction for eb in self.energy_boundaries)
 
@@ -810,20 +881,20 @@ class MomentumChamberNode(NetworkNode):
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
 
-        # Momentum chamber: P_total = P_static + 0.5 * rho * v^2
+        # Momentum chamber: Pt = P_static + 0.5 * rho * v^2
         # Use total mass flow computed during compute_derived_state
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
 
         # Use C++ function for residual and analytical Jacobian
         result = cb.momentum_chamber_residual_and_jacobian(
-            state.P, state.P_total, m_dot_total, state.T, state.Y, self.area
+            state.P, state.Pt, m_dot_total, state.T, state.Y, self.area
         )
 
         res = [result.residual]
         jac = {
             0: {
                 f"{self.id}.P": result.d_res_dP,
-                f"{self.id}.P_total": result.d_res_dP_total,
+                f"{self.id}.Pt": result.d_res_dP_total,
             }
         }
 
@@ -846,21 +917,19 @@ class MomentumChamberNode(NetworkNode):
         return float(cb.mach_number(velocity, state.T, state.X))
 
     def diagnostics(self, state: MixtureState) -> dict[str, float]:
-
-        # Momentum chambers use rich CompleteState
         cs = cb.complete_state(state.T, state.P, state.X)
 
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
         rho = cs.thermo.rho
-        u = m_dot_total / (rho * self.area) if rho > 0 and self.area > 0 else 1.0
+        u = (abs(m_dot_total)) / ((rho) * (self.area)) if rho > 0 and self.area > 0 else 0.0
         diameter = self.Dh if self.Dh is not None else math.sqrt(4.0 * self.area / math.pi)
+        re = (u) * (diameter) / (cs.transport.mu) if u > 0 and cs.transport.mu > 0 else 0.0
+        mach = u / cs.thermo.a if cs.thermo.a > 0 else 0.0
+        Tt, Pt = (state.Tt, state.Pt)
 
-        re = (rho * u * diameter / cs.transport.mu) if cs.transport.mu > 0 else 1.0
-
-        # Detailed heat transfer diagnostics if surface is active
         nu_val = 0.0
         htc_val = 0.0
-        t_aw_val = cs.thermo.T
+        t_aw_val = float(state.T)
         if self.has_convective_surface:
             h_res = self.htc_and_T(state)
             if h_res is not None:
@@ -869,6 +938,8 @@ class MomentumChamberNode(NetworkNode):
                 t_aw_val = h_res.T_aw
 
         return {
+            "Tt": float(Tt),
+            "Pt": float(Pt),
             "h": cs.thermo.h,
             "s": cs.thermo.s,
             "u": cs.thermo.u,
@@ -885,7 +956,7 @@ class MomentumChamberNode(NetworkNode):
             "Re": re,
             "Dh": diameter,
             "velocity": u,
-            "mach": (u / cs.thermo.a) if cs.thermo.a > 0 else 1.0,
+            "mach": mach,
             "Nu": nu_val,
             "htc": htc_val,
             "T_aw": t_aw_val,
@@ -905,13 +976,13 @@ class PressureBoundary(NetworkNode):
     def __init__(
         self,
         id: str,
-        P_total: float = 101325.0,
-        T_total: float = 300.0,
+        Pt: float = 101325.0,
+        Tt: float = 300.0,
         Y: list[float] | None = None,
     ) -> None:
         super().__init__(id)
-        self.P_total = P_total
-        self.T_total = T_total
+        self.Pt = Pt
+        self.Tt = Tt
         self.Y = Y
 
     def unknowns(self) -> list[str]:
@@ -926,7 +997,7 @@ class PressureBoundary(NetworkNode):
         # Boundary nodes define their own state
 
         Y = self.Y if self.Y is not None else list(cb.mole_to_mass(cb.species.dry_air()))
-        return self.T_total, Y, None
+        return self.Tt, Y, None
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         pass
@@ -942,29 +1013,29 @@ class MassFlowBoundary(NetworkNode):
         self,
         id: str,
         m_dot: float = 0.1,
-        T_total: float = 300.0,
+        Tt: float = 300.0,
         Y: list[float] | None = None,
     ) -> None:
         super().__init__(id)
         self.m_dot = m_dot
-        self.T_total = T_total
+        self.Tt = Tt
         self.Y = Y
 
     def unknowns(self) -> list[str]:
         # Pressure floats to whatever is required to push the defined mass flow
-        return [f"{self.id}.P", f"{self.id}.P_total"]
+        return [f"{self.id}.P", f"{self.id}.Pt"]
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
-        # Stagnation assumptions: P_total = P_static
-        res = [state.P_total - state.P]
-        jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.P_total": 1.0}}
+        # Stagnation assumptions: Pt = P_static
+        res = [state.Pt - state.P]
+        jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.Pt": 1.0}}
         return res, jac
 
     def compute_derived_state(
         self, upstream_states: list[MixtureState]
     ) -> tuple[float, list[float], Any]:
         """
-        Computes (T_total, Y, Jac) for a MassFlowBoundary.
+        Computes (Tt, Y, Jac) for a MassFlowBoundary.
         - If upstream_states exists, it acts as a SINK (Outlet): inherits state via mixing.
         - If upstream_states is empty, it acts as a SOURCE (Inlet): uses user settings.
         """
@@ -972,13 +1043,13 @@ class MassFlowBoundary(NetworkNode):
         if upstream_states:
             # SINK behavior: Automatically mix upstream streams using C++ core logic
             # This ensures energy conservation and correct species transport at outlets.
-            streams = [cb.MassStream(s.m_dot, s.T_total, s.P_total, s.Y) for s in upstream_states]
+            streams = [cb.MassStream(s.m_dot, s.Tt, s.Pt, s.Y) for s in upstream_states]
             mix_res = cb.mixer_from_streams_and_jacobians(streams)
             return mix_res.T_mix, mix_res.Y_mix, mix_res
 
         # SOURCE behavior: Use developer/user-defined boundary constants
         Y = self.Y if self.Y is not None else list(cb.mole_to_mass(cb.species.dry_air()))
-        return self.T_total, Y, None
+        return self.Tt, Y, None
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         pass
@@ -1041,7 +1112,7 @@ class CombustorNode(NetworkNode):
 
     def unknowns(self) -> list[str]:
         # Pure Pressure-Flow: Temperature and Composition are derived forward, not unknowns.
-        return [f"{self.id}.P", f"{self.id}.P_total"]
+        return [f"{self.id}.P", f"{self.id}.Pt"]
 
     def compute_derived_state(
         self, upstream_states: list[MixtureState]
@@ -1051,7 +1122,7 @@ class CombustorNode(NetworkNode):
         # Store total mass flow and unburned temperature for use in diagnostics
         self._total_m_dot = sum(s.m_dot for s in upstream_states) if upstream_states else 1.0
         self._T_unburned = (
-            sum(s.m_dot * s.T_total for s in upstream_states) / self._total_m_dot
+            sum(s.m_dot * s.Tt for s in upstream_states) / self._total_m_dot
             if self._total_m_dot > 0
             else 300.0
         )
@@ -1065,11 +1136,11 @@ class CombustorNode(NetworkNode):
             # Default fallback
             return 300.0, list(cb.mole_to_mass(cb.species.dry_air())), None
 
-        streams = [cb.MassStream(s.m_dot, s.T_total, s.P_total, s.Y) for s in upstream_states]
+        streams = [cb.MassStream(s.m_dot, s.Tt, s.Pt, s.Y) for s in upstream_states]
         if self._total_m_dot > 0.0:
-            P_ref = sum(s.m_dot * s.P_total for s in upstream_states) / self._total_m_dot
+            P_ref = sum(s.m_dot * s.Pt for s in upstream_states) / self._total_m_dot
         else:
-            P_ref = upstream_states[0].P_total
+            P_ref = upstream_states[0].Pt
 
         Q_total = sum(eb.Q for eb in self.energy_boundaries)
         fraction_total = sum(eb.fraction for eb in self.energy_boundaries)
@@ -1089,27 +1160,49 @@ class CombustorNode(NetworkNode):
         return mix_res.T_mix, mix_res.Y_mix, mix_res
 
     def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
-        # Stagnation constraint: P_total = P (combustor is a large-area, low-velocity volume).
+        # Stagnation constraint: Pt = P (combustor is a large-area, low-velocity volume).
         # The dynamic pressure 0.5*rho*v^2 is negligible compared to P at combustor scales,
-        # so P ~= P_total is an excellent approximation (same as PlenumNode).
+        # so P ~= Pt is an excellent approximation (same as PlenumNode).
         # Pressure loss is applied by an adjacent PressureLossElement, not here.
-        res = [state.P_total - state.P]
-        jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.P_total": 1.0}}
+        res = [state.Pt - state.P]
+        jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.Pt": 1.0}}
         return res, jac
 
     def diagnostics(self, state: MixtureState) -> dict[str, float]:
-
-        # Combustors use rich CompleteState
+        if state.P <= 0 or state.T <= 0:
+            return {}
         cs = cb.complete_state(state.T, state.P, state.X)
 
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
         rho = cs.thermo.rho
-        u = m_dot_total / (rho * self.area) if rho > 0 and self.area > 0 else 1.0
+        u = (abs(m_dot_total)) / ((rho) * (self.area)) if rho > 0 and self.area > 0 else 0.0
         diameter = self.Dh if self.Dh is not None else math.sqrt(4.0 * self.area / math.pi)
+        re = (u) * (diameter) / (cs.transport.mu) if u > 0 and cs.transport.mu > 0 else 0.0
+        mach = u / cs.thermo.a if cs.thermo.a > 0 else 0.0
+        Tt, Pt = (state.Tt, state.Pt)
 
-        re = (rho * u * diameter / cs.transport.mu) if cs.transport.mu > 0 else 1.0
+        nu_val = 0.0
+        htc_val = 0.0
+        t_aw_val = float(state.T)
+        if self.has_convective_surface:
+            h_res = self.htc_and_T(state)
+            if h_res is not None:
+                nu_val = h_res.Nu
+                htc_val = h_res.h
+                t_aw_val = h_res.T_aw
 
-        diag = {
+        try:
+            phi = float(cb.equivalence_ratio(state.X))
+        except Exception as e:
+            print(f"DEBUG: CombustorNode.diagnostics phi calculation failed: {e}", file=sys.stderr)
+            phi = 0.0
+
+        T_u = getattr(self, "_T_unburned", state.Tt)
+        theta = (state.Tt / T_u) - 1.0 if T_u > 0 else 0.0
+
+        return {
+            "Tt": float(Tt),
+            "Pt": float(Pt),
             "m_dot": m_dot_total,
             "h": cs.thermo.h,
             "s": cs.thermo.s,
@@ -1127,42 +1220,13 @@ class CombustorNode(NetworkNode):
             "Re": re,
             "Dh": diameter,
             "velocity": u,
-            "mach": u / cs.thermo.a if cs.thermo.a > 0 else 1.0,
+            "mach": mach,
+            "Nu": nu_val,
+            "htc": htc_val,
+            "T_aw": t_aw_val,
+            "phi": phi,
+            "theta": theta,
         }
-
-        # --- Heat Transfer Diagnostics ---
-        nu_val = 0.0
-        htc_val = 0.0
-        t_aw_val = cs.thermo.T
-        if self.has_convective_surface:
-            h_res = self.htc_and_T(state)
-            if h_res is not None:
-                nu_val = h_res.Nu
-                htc_val = h_res.h
-                t_aw_val = h_res.T_aw
-        diag["Nu"] = nu_val
-        diag["htc"] = htc_val
-        diag["T_aw"] = t_aw_val
-
-        # --- Combustion Diagnostics ---
-        # 1. Equivalence Ratio (phi) via elemental analysis in C++
-        try:
-            phi = cb.equivalence_ratio(state.X)
-            diag["phi"] = phi
-        except Exception as e:
-            # Reveal the root cause of the diagnostic failure
-
-            print(f"DEBUG: CombustorNode.diagnostics phi calculation failed: {e}", file=sys.stderr)
-            diag["phi"] = 0.0
-
-        # 2. Temperature Rise Ratio (theta) = (T_burned / T_unburned) - 1
-        T_u = getattr(self, "_T_unburned", state.T_total)
-        if T_u > 0:
-            diag["theta"] = (state.T_total / T_u) - 1.0
-        else:
-            diag["theta"] = 0.0
-
-        return diag
 
     def htc_and_T(self, state: MixtureState):
         """Compute heat transfer coefficient for the combustor wall."""
@@ -1319,7 +1383,7 @@ class OrificeElement(NetworkElement):
 
         flow_state = cb.OrificeState()
         flow_state.Re_D = Re_D
-        flow_state.dP = max(state_in.P_total - state_out.P, 1.0)
+        flow_state.dP = max(state_in.Pt - state_out.P, 1.0)
         flow_state.rho = cb.density(state_in.T, state_in.P, state_in.X)
         flow_state.mu = cb.transport_state(state_in.T, state_in.P, state_in.X).mu
 
@@ -1370,8 +1434,8 @@ class OrificeElement(NetworkElement):
         if self.regime == "compressible":
             res_cpp = cb._core.orifice_compressible_residuals_and_jacobian(
                 m_dot,
-                state_in.P_total,
-                state_in.T_total,
+                state_in.Pt,
+                state_in.Tt,
                 state_in.Y,
                 state_out.P,
                 effective_cd,
@@ -1382,7 +1446,7 @@ class OrificeElement(NetworkElement):
             # Use incompressible Bernoulli formulation
             res_cpp = cb.orifice_residuals_and_jacobian(
                 m_dot,
-                state_in.P_total,
+                state_in.Pt,
                 state_in.P,
                 state_in.T,
                 state_in.Y,
@@ -1398,7 +1462,7 @@ class OrificeElement(NetworkElement):
         jac = {
             0: {
                 f"{self.id}.m_dot": 1.0,
-                f"{self.from_node}.P_total": -res_cpp.d_mdot_dP_total_up,
+                f"{self.from_node}.Pt": -res_cpp.d_mdot_dP_total_up,
                 f"{self.from_node}.P": -res_cpp.d_mdot_dP_static_up,
                 f"{self.from_node}.T": -res_cpp.d_mdot_dT_up,
                 f"{self.to_node}.P": -res_cpp.d_mdot_dP_static_down,
@@ -1414,65 +1478,49 @@ class OrificeElement(NetworkElement):
         return 1
 
     def diagnostics(self, state_in: MixtureState, state_out: MixtureState) -> dict[str, float]:
-
-        # Full thermo + transport bundle at inlet static conditions (mole fractions X)
+        if state_in.P <= 0 or state_in.T <= 0:
+            return {}
         cs = cb.complete_state(state_in.T, state_in.P, state_in.X)
 
-        p_ratio = state_out.P / state_in.P_total if state_in.P_total > 0 else 1.0
-
-        # Estimate throat Mach number
+        # Throat Mach: use isentropic pressure ratio from total inlet to static outlet
         gamma = cs.thermo.gamma
-        # Critical pressure ratio for choking
         pr_crit = (2.0 / (gamma + 1.0)) ** (gamma / (gamma - 1.0))
-
-        if p_ratio <= pr_crit:
-            mach_throat = 1.0
-        else:
-            mach_throat = float(
-                cb.mach_from_pressure_ratio(
-                    state_in.T_total, state_in.P_total, state_out.P, state_in.X
-                )
+        p_ratio_throat = state_out.P / state_in.Pt if state_in.Pt > 0 else 1.0
+        mach_throat = (
+            1.0
+            if p_ratio_throat <= pr_crit
+            else float(
+                cb.mach_from_pressure_ratio(state_in.Tt, state_in.Pt, state_out.P, state_in.X)
             )
-
-        # Effective Cd actually used in this solve
-        effective_cd = self._effective_Cd(state_in, state_out)
-
-        # Calculate macro physical velocity strictly based on the geometric area
-        # This prevents physical velocity and Mach from artificially zeroing out when tuning Cd ~ infinity
-        v_physical = (
-            abs(state_in.m_dot) / (cs.thermo.rho * self.area)
-            if self.area > 0 and cs.thermo.rho > 0
-            else 0.0
         )
-        mach_physical = v_physical / cs.thermo.a if cs.thermo.a > 0 else 0.0
+
+        # Physical velocity / Mach at the geometric bore (not Cd-adjusted)
+        Dh = math.sqrt(4.0 * self.area / math.pi) if self.area > 0 else 0.0
+        ref = _element_reference_block(
+            cs, m_dot=state_in.m_dot, area=self.area, Dh=Dh, location="inlet"
+        )
+        v_in = ref["velocity"]
+        mach_in = v_in / cs.thermo.a if cs.thermo.a > 0 else 0.0
+
+        # Outlet Mach (use outlet state for accuracy)
+        try:
+            cs_out = cb.complete_state(state_out.T, state_out.P, state_out.X)
+            v_out = (
+                (abs(state_in.m_dot)) / ((cs_out.thermo.rho) * (self.area))
+                if self.area > 0 and cs_out.thermo.rho > 0
+                else 0.0
+            )
+            mach_out = v_out / cs_out.thermo.a if cs_out.thermo.a > 0 else 0.0
+        except Exception:
+            mach_out = 0.0
 
         return {
-            "v": v_physical,
-            "mach": mach_physical,
-            "mach_throat": mach_throat,
-            "p_ratio": p_ratio,
-            "P_in": state_in.P,
-            "P_out": state_out.P,
-            "T_in": state_in.T,
-            "T_out": state_out.T,
-            "Pt_in": state_in.P_total,
-            "Pt_out": state_out.P_total,
-            "Tt_in": state_in.T_total,
-            "Tt_out": state_out.T_total,
-            "Cd": effective_cd,
+            "m_dot": float(state_in.m_dot),
+            **_element_pressure_block(state_in, state_out, mach_in=mach_in, mach_out=mach_out),
+            **ref,
+            "mach_throat": float(mach_throat),
+            "Cd": float(self._effective_Cd(state_in, state_out)),
             "is_correlation": float(self.use_correlation),
-            # Thermo
-            "h": cs.thermo.h,
-            "s": cs.thermo.s,
-            "u": cs.thermo.u,
-            "rho": cs.thermo.rho,
-            "gamma": cs.thermo.gamma,
-            "a": cs.thermo.a,
-            # Transport
-            "mu": cs.transport.mu,
-            "k": cs.transport.k,
-            "Pr": cs.transport.Pr,
-            "nu": cs.transport.nu,
         }
 
 
@@ -1648,7 +1696,7 @@ class DiameterDischargeCoefficientConnectionElement(OrificeElement):
 class LosslessConnectionElement(NetworkElement):
     """
     An ideal connection with no friction or momentum loss.
-    Inherently preserves total pressure: P_total_in = P_total_out.
+    Inherently preserves total pressure: Pt_in = Pt_out.
     Does not require geometric parameters.
     """
 
@@ -1666,9 +1714,9 @@ class LosslessConnectionElement(NetworkElement):
     def residuals(
         self, state_in: MixtureState, state_out: MixtureState
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
-        # Residual: P_total_in - P_total_out = 0
-        res = [state_in.P_total - state_out.P_total]
-        jac = {0: {f"{self.from_node}.P_total": 1.0, f"{self.to_node}.P_total": -1.0}}
+        # Residual: Pt_in - Pt_out = 0
+        res = [state_in.Pt - state_out.Pt]
+        jac = {0: {f"{self.from_node}.Pt": 1.0, f"{self.to_node}.Pt": -1.0}}
         return res, jac
 
     def get_spatial_profile(self, n_steps: int = 100):
@@ -1692,6 +1740,25 @@ class LosslessConnectionElement(NetworkElement):
             st.h = 300000.0
             profile.append(st)
         return profile
+
+    def diagnostics(
+        self, state_in: MixtureState, state_out: MixtureState
+    ) -> dict[str, float | str]:
+        if state_in.P <= 0 or state_in.T <= 0:
+            return {}
+
+        cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
+        ref = _element_reference_block(
+            cs_in, m_dot=state_in.m_dot, area=self.area or 0.0, Dh=self.diameter, location="inlet"
+        )
+        v_in = ref["velocity"]
+        mach_in = v_in / cs_in.thermo.a if cs_in.thermo.a > 0 and v_in > 0 else 0.0
+
+        return {
+            "m_dot": float(state_in.m_dot),
+            **_element_pressure_block(state_in, state_out, mach_in=mach_in, mach_out=mach_in),
+            **ref,
+        }
 
     def n_equations(self) -> int:
         return 1
@@ -1740,7 +1807,7 @@ def _correlation_is_linear_theta(correlation: Callable) -> bool:
 
 class PressureLossElement(NetworkElement):
     """
-    Discrete pressure-loss edge.  Enforces ``P_total_out = P_total_in * (1 - xi)``
+    Discrete pressure-loss edge.  Enforces ``Pt_out = Pt_in * (1 - xi)``
     where ``xi`` is supplied by a user correlation callable.
 
     Four standard correlations are provided in :mod:`combaero.network.pressure_loss`:
@@ -1913,20 +1980,20 @@ class PressureLossElement(NetworkElement):
                 f"PressureLossElement '{self.id}' correlation raised: {exc}"
             ) from exc
 
-        # Residual: P_total_out - P_total_in * (1 - xi) = 0.
-        res = [state_out.P_total - state_in.P_total * (1.0 - xi)]
+        # Residual: Pt_out - Pt_in * (1 - xi) = 0.
+        res = [state_out.Pt - state_in.Pt * (1.0 - xi)]
 
         jac: dict[int, dict[str, float]] = {
             0: {
-                f"{self.from_node}.P_total": -(1.0 - xi),
-                f"{self.to_node}.P_total": 1.0,
+                f"{self.from_node}.Pt": -(1.0 - xi),
+                f"{self.to_node}.Pt": 1.0,
             }
         }
 
         # ----- Analytical theta Jacobian (linear-theta correlations) -----
-        # d_res/d_T_burned = -P_total_in * dxi_dtheta / T_in.
+        # d_res/d_T_burned = -Pt_in * dxi_dtheta / T_in.
         if self._theta_source_resolved is not None and dxi_dtheta != 0.0 and ctx.T_in > 0:
-            jac[0][f"{self._theta_source_resolved}.T"] = state_in.P_total * dxi_dtheta / ctx.T_in
+            jac[0][f"{self._theta_source_resolved}.T"] = state_in.Pt * dxi_dtheta / ctx.T_in
 
         # ----- FD-based Jacobian for correlation dependencies not captured
         # analytically (e.g. zeta-based xi depends on mdot, P_in, T_in via rho).
@@ -1947,23 +2014,25 @@ class PressureLossElement(NetworkElement):
         # (skip for constant fraction to avoid unneeded correlation calls).
         dxi_dmdot = _dxi_dvar("mdot_total", ctx.mdot_total, 1e-6)
         if dxi_dmdot != 0.0:
-            jac[0][f"{self.id}.m_dot"] = state_in.P_total * dxi_dmdot
+            jac[0][f"{self.id}.m_dot"] = state_in.Pt * dxi_dmdot
 
         dxi_dP_in = _dxi_dvar("P_in", ctx.P_in, 1.0)
         if dxi_dP_in != 0.0:
             # P_in = state_in.P.  Static P is driven by the node's P unknown.
-            jac[0][f"{self.from_node}.P"] = state_in.P_total * dxi_dP_in
+            jac[0][f"{self.from_node}.P"] = state_in.Pt * dxi_dP_in
 
         if self._theta_source_resolved is None:
             # When no theta source, ctx.T_in = state_in.T (a derived state).
             # Emit a relay-routable T Jacobian on the upstream node.
             dxi_dT_in = _dxi_dvar("T_in", ctx.T_in, 0.01)
             if dxi_dT_in != 0.0:
-                jac[0][f"{self.from_node}.T"] = state_in.P_total * dxi_dT_in
+                jac[0][f"{self.from_node}.T"] = state_in.Pt * dxi_dT_in
 
         return res, jac
 
     def diagnostics(self, state_in: MixtureState, state_out: MixtureState) -> dict[str, float]:
+        if state_in.P <= 0 or state_in.T <= 0 or state_out.P <= 0 or state_out.T <= 0:
+            return {}
 
         graph = getattr(self, "_graph_ref", None)
         ctx = self._build_ctx(state_in, state_out, graph)
@@ -1972,67 +2041,33 @@ class PressureLossElement(NetworkElement):
         except Exception:
             xi = 0.0
 
-        # Prefer area attached to the element (e.g. by GUI / graph builder);
-        # fall back to head-loss correlation area; else None.
         area = getattr(self, "area", None) or getattr(self.correlation, "area", None)
+        Dh = math.sqrt(4.0 * area / math.pi) if area and area > 0 else None
 
         cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
-        rho_in = cs_in.thermo.rho
-        mu_in = cs_in.transport.mu
-
-        # Velocity / Mach only meaningful when area is known.
-        v_in = abs(state_in.m_dot) / (rho_in * area) if area and area > 0 and rho_in > 0 else 0.0
-        mach_in = float(cb.mach_number(v_in, state_in.T, state_in.X)) if v_in > 0 else 0.0
-
-        rho_out = cb.density(state_out.T, state_out.P, state_out.X)
-        v_out = (
-            abs(state_out.m_dot) / (rho_out * area) if area and area > 0 and rho_out > 0 else 0.0
+        ref = _element_reference_block(
+            cs_in, m_dot=state_in.m_dot, area=area or 0.0, Dh=Dh, location="inlet"
         )
-        mach_out = float(cb.mach_number(v_out, state_out.T, state_out.X)) if v_out > 0 else 0.0
+        v_in = ref["velocity"]
+        mach_in = v_in / cs_in.thermo.a if cs_in.thermo.a > 0 and v_in > 0 else 0.0
 
-        # Reynolds at inlet using Dh = sqrt(4*A/pi)
-        if area and area > 0 and mu_in > 0 and v_in > 0:
-            Dh = math.sqrt(4.0 * area / math.pi)
-            re_in = rho_in * v_in * Dh / mu_in
-        else:
-            re_in = 0.0
-
-        p_ratio_total = state_out.P_total / state_in.P_total if state_in.P_total > 0 else 0.0
+        cs_out = cb.complete_state(state_out.T, state_out.P, state_out.X)
+        rho_out = cs_out.thermo.rho
+        v_out = (
+            (abs(state_out.m_dot)) / ((rho_out) * (area))
+            if area and area > 0 and rho_out > 0
+            else 0.0
+        )
+        mach_out = v_out / cs_out.thermo.a if cs_out.thermo.a > 0 and v_out > 0 else 0.0
 
         diag: dict[str, float] = {
+            "m_dot": float(state_in.m_dot),
+            **_element_pressure_block(state_in, state_out, mach_in=mach_in, mach_out=mach_out),
+            **ref,
             "xi": float(xi),
             "theta": float(ctx.theta),
-            "dP_total": float(state_in.P_total - state_out.P_total),
-            "P_in": float(state_in.P),
-            "P_out": float(state_out.P),
-            "T_in": float(state_in.T),
-            "T_out": float(state_out.T),
-            "Pt_in": float(state_in.P_total),
-            "Pt_out": float(state_out.P_total),
-            "Tt_in": float(state_in.T_total),
-            "Tt_out": float(state_out.T_total),
-            "mach_in": mach_in,
-            "mach_out": mach_out,
-            "p_ratio_total": float(p_ratio_total),
-            "p_ratio": float(p_ratio_total),
-            "Re": float(re_in),
-            "rho": float(rho_in),
-            # Thermo + transport at inlet static conditions
-            "h": float(cs_in.thermo.h),
-            "s": float(cs_in.thermo.s),
-            "u": float(cs_in.thermo.u),
-            "gamma": float(cs_in.thermo.gamma),
-            "a": float(cs_in.thermo.a),
-            "cp": float(cs_in.thermo.cp),
-            "cv": float(cs_in.thermo.cv),
-            "mw": float(cs_in.thermo.mw),
-            "mu": float(cs_in.transport.mu),
-            "k": float(cs_in.transport.k),
-            "Pr": float(cs_in.transport.Pr),
-            "nu": float(cs_in.transport.nu),
         }
 
-        # Heat transfer diagnostics (only when a convective surface is attached)
         if self.has_convective_surface:
             h_res = self.htc_and_T(state_in)
             if h_res is not None:
@@ -2089,7 +2124,7 @@ class ChannelElement(NetworkElement):
         f_mult = self.surface.f_multiplier if self.surface else 1.0
 
         if self.surface and not isinstance(self.surface.model, SmoothModel):
-            cs = cb.complete_state(state_in.T, state_in.P_total, state_in.X)
+            cs = cb.complete_state(state_in.T, state_in.Pt, state_in.X)
             rho = state_in.density() if state_in.density() > 0 else 1.2
             mu = cs.transport.mu if cs.transport.mu > 0 else 1.8e-5
             v = abs(m_dot) / (rho * self.area) if self.area > 0.0 else 0.0
@@ -2128,8 +2163,8 @@ class ChannelElement(NetworkElement):
             # Use compressible Fanno flow with friction
             res_cpp = cb._core.channel_compressible_residuals_and_jacobian(
                 m_dot,
-                state_in.P_total,
-                state_in.T_total,
+                state_in.Pt,
+                state_in.Tt,
                 state_in.Y,
                 state_out.P,
                 self.length,
@@ -2142,7 +2177,7 @@ class ChannelElement(NetworkElement):
             # Use incompressible Darcy-Weisbach formulation
             res_cpp = cb.channel_residuals_and_jacobian(
                 m_dot,
-                state_in.P_total,
+                state_in.Pt,
                 state_in.P,
                 state_in.T,
                 state_in.Y,
@@ -2156,11 +2191,11 @@ class ChannelElement(NetworkElement):
 
         # Residual of P-node unknowns matching channel drop
         # C++ returns dP_calc = friction_loss
-        # In a stable network: P_total_up - P_static_down = dP_friction (for exit into plenum)
-        # Or more generally: P_total_up - P_total_down = dP_friction
+        # In a stable network: Pt_up - P_static_down = dP_friction (for exit into plenum)
+        # Or more generally: Pt_up - Pt_down = dP_friction
 
-        # Test suite currently expects P_total_up - P_static_down = dP_calc
-        res = [state_in.P_total - state_out.P - res_cpp.dP_calc]
+        # Test suite currently expects Pt_up - P_static_down = dP_calc
+        res = [state_in.Pt - state_out.P - res_cpp.dP_calc]
 
         upstream_id = self.from_node
         downstream_id = self.to_node
@@ -2168,7 +2203,7 @@ class ChannelElement(NetworkElement):
         jac = {
             0: {
                 f"{self.id}.m_dot": -res_cpp.d_dP_d_mdot,
-                f"{upstream_id}.P_total": 1.0,
+                f"{upstream_id}.Pt": 1.0,
                 f"{upstream_id}.P": -res_cpp.d_dP_dP_static_up,
                 f"{upstream_id}.T": -res_cpp.d_dP_dT_up,
                 f"{downstream_id}.P": -1.0,
@@ -2179,85 +2214,49 @@ class ChannelElement(NetworkElement):
 
         return res, jac
 
-    def diagnostics(self, state_in: MixtureState, state_out: MixtureState) -> dict[str, float]:
-        """Compute inlet/outlet Mach numbers and pressure ratio."""
-
-        # Inlet Mach
-        rho_in = state_in.density()
-        v_in = abs(state_in.m_dot) / (rho_in * self.area) if self.area > 0 and rho_in > 0 else 1.0
-        mach_in = float(cb.mach_number(v_in, state_in.T, state_in.X))
-
-        # Outlet Mach (at static pressure P_out)
-        rho_out = cb.density(state_out.T, state_out.P, state_out.X)
-        v_out = (
-            abs(state_out.m_dot) / (rho_out * self.area) if self.area > 0 and rho_out > 0 else 1.0
+    def diagnostics(
+        self, state_in: MixtureState, state_out: MixtureState
+    ) -> dict[str, float | str]:
+        cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
+        ref = _element_reference_block(
+            cs_in, m_dot=state_in.m_dot, area=self.area, Dh=self.diameter, location="inlet"
         )
-        mach_out = float(cb.mach_number(v_out, state_out.T, state_out.X))
+        v_in = ref["velocity"]
+        re_in = ref["Re"]
+        mach_in = v_in / cs_in.thermo.a if cs_in.thermo.a > 0 and v_in > 0 else 0.0
 
-        p_ratio_total = state_out.P_total / state_in.P_total if state_in.P_total > 0 else 1.0
+        cs_out = cb.complete_state(state_out.T, state_out.P, state_out.X)
+        rho_out = cs_out.thermo.rho
+        v_out = (
+            (abs(state_out.m_dot)) / ((rho_out) * (self.area))
+            if self.area > 0 and rho_out > 0
+            else 0.0
+        )
+        mach_out = v_out / cs_out.thermo.a if cs_out.thermo.a > 0 and v_out > 0 else 0.0
 
-        # Full thermo + transport bundle at inlet static conditions (mole fractions X)
-        cs = cb.complete_state(state_in.T, state_in.P, state_in.X)
-
-        # Reynolds number at inlet: Re = rho * v * D / mu
-        re_in = (rho_in * v_in * self.diameter / cs.transport.mu) if cs.transport.mu > 0 else 1.0
-
-        res_dict = {
-            "mach_in": mach_in,
-            "mach_out": mach_out,
-            "p_ratio_total": p_ratio_total,
-            "Re": re_in,
-            "dP": max(0.0, state_in.P_total - state_out.P_total),
-            "P_in": state_in.P,
-            "P_out": state_out.P,
-            "T_in": state_in.T,
-            "T_out": state_out.T,
-            "Pt_in": state_in.P_total,
-            "Pt_out": state_out.P_total,
-            "Tt_in": state_in.T_total,
-            "Tt_out": state_out.T_total,
-        }
-
-        # Heat Transfer diagnostics
         h_res = self.htc_and_T(state_in)
         if h_res is not None:
-            res_dict["Nu"] = h_res.Nu
-            res_dict["htc"] = h_res.h
-            res_dict["T_aw"] = h_res.T_aw
-            res_dict["f"] = h_res.f
+            Nu, htc, T_aw, f = h_res.Nu, h_res.h, h_res.T_aw, h_res.f
         else:
-            res_dict["Nu"] = 0.0
-            res_dict["htc"] = 0.0
-            res_dict["T_aw"] = state_in.T
-
+            Nu, htc, T_aw = 0.0, 0.0, state_in.T
             e_D = self.roughness / self.diameter if self.diameter > 0 else 0.0
             if re_in < 2300:
-                res_dict["f"] = 64.0 / re_in if re_in > 0 else 0.0
+                f = 64.0 / re_in if re_in > 0 else 0.0
+            elif e_D > 1e-8:
+                f = (1.0 / (-1.8 * math.log10((e_D / 3.7) ** 1.11 + 6.9 / re_in))) ** 2
             else:
-                if e_D > 1e-8:
-                    res_dict["f"] = (
-                        1.0 / (-1.8 * math.log10((e_D / 3.7) ** 1.11 + 6.9 / re_in)) ** 2
-                    )
-                else:
-                    res_dict["f"] = (0.79 * math.log(re_in) - 1.64) ** -2
+                f = (0.79 * math.log(re_in) - 1.64) ** -2
 
-        # Thermo
-        res_dict.update(
-            {
-                "h": cs.thermo.h,
-                "s": cs.thermo.s,
-                "u": cs.thermo.u,
-                "rho": cs.thermo.rho,
-                "gamma": cs.thermo.gamma,
-                "a": cs.thermo.a,
-                # Transport
-                "mu": cs.transport.mu,
-                "k": cs.transport.k,
-                "Pr": cs.transport.Pr,
-                "nu": cs.transport.nu,
-            }
-        )
-        return res_dict
+        return {
+            "m_dot": float(state_in.m_dot),
+            **_element_pressure_block(state_in, state_out, mach_in=mach_in, mach_out=mach_out),
+            **ref,
+            "Dh": float(self.diameter),
+            "Nu": float(Nu),
+            "htc": float(htc),
+            "T_aw": float(T_aw),
+            "f": float(f),
+        }
 
     def get_spatial_profile(
         self,
@@ -2402,7 +2401,7 @@ class AreaChangeElement(NetworkElement):
         if self.model_type == "sharp":
             res_cpp = cb._core.area_change_residuals_and_jacobian(
                 m_dot=m_dot,
-                P_total_up=state_in.P_total,
+                P_total_up=state_in.Pt,
                 P_static_up=state_in.P,
                 T_up=state_in.T,
                 Y_up=state_in.Y,
@@ -2415,7 +2414,7 @@ class AreaChangeElement(NetworkElement):
         else:
             res_cpp = cb._core.conical_area_change_residuals_and_jacobian(
                 m_dot=m_dot,
-                P_total_up=state_in.P_total,
+                P_total_up=state_in.Pt,
                 P_static_up=state_in.P,
                 T_up=state_in.T,
                 Y_up=state_in.Y,
@@ -2426,7 +2425,7 @@ class AreaChangeElement(NetworkElement):
                 m_scale=1e-4,
             )
 
-        res = [state_in.P_total - state_out.P - res_cpp.dP_calc]
+        res = [state_in.Pt - state_out.P - res_cpp.dP_calc]
 
         upstream_id = self.from_node
         downstream_id = self.to_node
@@ -2434,7 +2433,7 @@ class AreaChangeElement(NetworkElement):
         jac = {
             0: {
                 f"{self.id}.m_dot": -res_cpp.d_dP_d_mdot,
-                f"{upstream_id}.P_total": 1.0,
+                f"{upstream_id}.Pt": 1.0,
                 f"{upstream_id}.P": -res_cpp.d_dP_dP_static_up,
                 f"{upstream_id}.T": -res_cpp.d_dP_dT_up,
                 f"{downstream_id}.P": -1.0,
@@ -2446,79 +2445,69 @@ class AreaChangeElement(NetworkElement):
         return res, jac
 
     def diagnostics(self, state_in: MixtureState, state_out: MixtureState) -> dict[str, float]:
-        """Compute Mach numbers, effective loss coefficient, and thermo-transport state."""
-        # 1. Properties at inlet
         try:
             cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
         except Exception:
-            # Fallback for numerical edge cases during iteration/failed solves
-            return {"dP": 0.0, "ratio": self.F1 / self.F0 if self.F0 > 0 else 0.0}
+            return {
+                "dP_static": 0.0,
+                "area_ratio": self.F1 / self.F0 if self.F0 > 0 else 0.0,
+            }
 
-        rho_in = cs_in.thermo.rho
-        mu_in = cs_in.transport.mu
-        a_in = cs_in.thermo.a
-
-        # 2. Geometry
         f0 = self.F0
         f1 = self.F1
         f_small = min(f0, f1)
-        ratio = f1 / f0 if f0 > 0 else 0.0
-
+        area_ratio = f1 / f0 if f0 > 0 else 0.0
         m_dot = state_in.m_dot
         m_dot_abs = abs(m_dot)
 
-        # 3. Velocities and Mach
-        v0 = m_dot_abs / (rho_in * f0) if f0 > 0 and rho_in > 0 else 0.0
-        mach_in = v0 / a_in if a_in > 0 else 0.0
+        rho_in = cs_in.thermo.rho
+        a_in = cs_in.thermo.a
 
-        v_small = m_dot_abs / (rho_in * f_small) if f_small > 0 and rho_in > 0 else 0.0
-        mach_small = v_small / a_in if a_in > 0 else 0.0
+        # Inlet velocity / Mach (at larger section F0)
+        v_in = (m_dot_abs) / ((rho_in) * (f0)) if f0 > 0 and rho_in > 0 else 0.0
+        mach_in = v_in / a_in if a_in > 0 else 0.0
 
-        # 4. Outlet Mach approx (using cs_out for accuracy)
+        # Mach at the smaller section - used for loss coefficient lookup
+        v_loss_ref = (m_dot_abs) / ((rho_in) * (f_small)) if f_small > 0 and rho_in > 0 else 0.0
+        mach_loss_ref = v_loss_ref / a_in if a_in > 0 else 0.0
+
+        # Outlet Mach (use outlet state for accuracy)
         try:
             cs_out = cb.complete_state(state_out.T, state_out.P, state_out.X)
-            mach_out = (
-                (m_dot_abs / (cs_out.thermo.rho * f1)) / cs_out.thermo.a
-                if f1 > 0 and cs_out.thermo.rho > 0 and cs_out.thermo.a > 0
+            v_out = (
+                (m_dot_abs) / ((cs_out.thermo.rho) * (f1))
+                if f1 > 0 and cs_out.thermo.rho > 0
                 else 0.0
             )
+            mach_out = v_out / cs_out.thermo.a if cs_out.thermo.a > 0 else 0.0
         except Exception:
             mach_out = 0.0
 
-        # 5. Physics result for exact dP
+        # Physics result for dP_static
         if self.model_type == "sharp":
             res = cb.sharp_area_change(
-                m_dot, rho_in, mu_in, f0, f1, Mach=mach_small, D_h=self.D_h or 0.0
+                m_dot, rho_in, cs_in.transport.mu, f0, f1, Mach=mach_loss_ref, D_h=self.D_h or 0.0
             )
         else:
-            res = cb.conical_area_change(m_dot, rho_in, mu_in, f0, f1, self.length, Mach=mach_small)
+            res = cb.conical_area_change(
+                m_dot, rho_in, cs_in.transport.mu, f0, f1, self.length, Mach=mach_loss_ref
+            )
 
-        dP_abs = abs(res.dP)
-        q_small = 0.5 * rho_in * v_small**2
-        zeta_eff = dP_abs / q_small if q_small > 1e-6 else 0.0
+        dP_static = abs(res.dP)
+        q_small = 0.5 * rho_in * v_loss_ref**2
+        zeta = dP_static / q_small if q_small > 1e-6 else 0.0
+
+        Dh_in = self.D_h or math.sqrt(4.0 * f0 / math.pi)
+        ref = _element_reference_block(
+            cs_in, m_dot=m_dot, area=f0, Dh=Dh_in, location="small_section"
+        )
 
         return {
-            "dP": float(dP_abs),
-            "ratio": float(ratio),
-            "zeta": float(zeta_eff),
-            "mach_small": float(mach_small),
-            "mach_in": float(mach_in),
-            "mach_out": float(mach_out),
-            "P_in": state_in.P,
-            "P_out": state_out.P,
-            "T_in": state_in.T,
-            "T_out": state_out.T,
-            "Pt_in": state_in.P_total,
-            "Pt_out": state_out.P_total,
-            "Tt_in": state_in.T_total,
-            "Tt_out": state_out.T_total,
-            "rho": float(rho_in),
-            "mu": float(mu_in),
-            "k": float(cs_in.transport.k),
-            "cp": float(cs_in.thermo.cp),
-            "cv": float(cs_in.thermo.cv),
-            "gamma": float(cs_in.thermo.gamma),
-            "mw": float(cs_in.thermo.mw),
-            "Pr": float(cs_in.transport.Pr),
-            "nu": float(cs_in.transport.nu),
+            "m_dot": float(m_dot),
+            **_element_pressure_block(state_in, state_out, mach_in=mach_in, mach_out=mach_out),
+            **ref,
+            "dP_static": float(dP_static),
+            "area_ratio": float(area_ratio),
+            "zeta": float(zeta),
+            "mach_loss_ref": float(mach_loss_ref),
         }

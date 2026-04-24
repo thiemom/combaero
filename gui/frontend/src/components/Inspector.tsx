@@ -83,10 +83,10 @@ const Inspector = () => {
 			// Specifically add area change ones if target is area change
 			if (targetElement?.type === "area_change") {
 				addKey("zeta");
-				addKey("mach_small");
+				addKey("mach_loss_ref");
 				addKey("mach_in");
 				addKey("mach_out");
-				addKey("ratio");
+				addKey("area_ratio");
 			}
 		}
 
@@ -314,17 +314,17 @@ const Inspector = () => {
 						</div>
 						<div className="flex flex-col gap-2">
 							<label
-								htmlFor={`T_total_mb_${selectedNode.id}`}
+								htmlFor={`Tt_mb_${selectedNode.id}`}
 								className="text-xs font-bold text-gray-500 uppercase"
 							>
-								T_total (K)
+								Tt (K)
 							</label>
 							<NumericInput
-								id={`T_total_mb_${selectedNode.id}`}
-								value={selectedNode.data.T_total ?? 300}
+								id={`Tt_mb_${selectedNode.id}`}
+								value={selectedNode.data.Tt ?? 300}
 								onChange={(val) =>
 									updateNodeData(selectedNode.id, {
-										T_total: val,
+										Tt: val,
 									})
 								}
 								className="p-2 border rounded"
@@ -342,25 +342,23 @@ const Inspector = () => {
 				{selectedNode.type === "pressure_boundary" && (
 					<>
 						<UnitInput
-							label="P_total"
-							value={selectedNode.data.P_total ?? 101325}
-							onChange={(val) =>
-								updateNodeData(selectedNode.id, { P_total: val })
-							}
+							label="Pt"
+							value={selectedNode.data.Pt ?? 101325}
+							onChange={(val) => updateNodeData(selectedNode.id, { Pt: val })}
 						/>
 						<div className="flex flex-col gap-2">
 							<label
-								htmlFor={`T_total_pb_${selectedNode.id}`}
+								htmlFor={`Tt_pb_${selectedNode.id}`}
 								className="text-xs font-bold text-gray-500 uppercase"
 							>
-								T_total (K)
+								Tt (K)
 							</label>
 							<NumericInput
-								id={`T_total_pb_${selectedNode.id}`}
-								value={selectedNode.data.T_total ?? 300}
+								id={`Tt_pb_${selectedNode.id}`}
+								value={selectedNode.data.Tt ?? 300}
 								onChange={(val) =>
 									updateNodeData(selectedNode.id, {
-										T_total: val,
+										Tt: val,
 									})
 								}
 								className="p-2 border rounded"
@@ -1639,7 +1637,7 @@ const InitialGuessEditor = ({ node }: { node: any }) => {
 			{ key: "P", unit: "Pa" },
 			{ key: "T", unit: "K" },
 		],
-		// Boundaries: P_total is solved (mass-flow inlet) or fixed (pressure
+		// Boundaries: Pt is solved (mass-flow inlet) or fixed (pressure
 		// inlet). Short key "P" is broadcast to both by the backend; we show
 		// it only where at least one of the two is actually an unknown.
 		mass_boundary: [{ key: "P", unit: "Pa" }],

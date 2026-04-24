@@ -31,7 +31,7 @@ class NetworkSolver:
     """
     Orchestrates the numerical solution of a fluid flow network using scipy.optimize.root.
     Translates the graph topology into a flat array of unknowns and residuals.
-    Nodes define their Pressure (P) and Total Pressure (P_total) as unknowns,
+    Nodes define their Pressure (P) and Total Pressure (Pt) as unknowns,
     while Temperature (T) and Composition (Y) are forward-propagated using
     topological ordering and automatic differentiation (chain-rule relay).
     """
@@ -51,7 +51,7 @@ class NetworkSolver:
 
     @staticmethod
     def _is_pressure_unknown(name: str) -> bool:
-        return name.endswith(".P") or name.endswith(".P_total")
+        return name.endswith(".P") or name.endswith(".Pt")
 
     @staticmethod
     def _is_mdot_unknown(name: str) -> bool:
@@ -168,8 +168,8 @@ class NetworkSolver:
 
         for node in self.network.nodes.values():
             if isinstance(node, PressureBoundary):
-                pressures.append(getattr(node, "P_total", 101325.0))
-                T = getattr(node, "T_total", None)
+                pressures.append(getattr(node, "Pt", 101325.0))
+                T = getattr(node, "Tt", None)
                 if T is not None:
                     temperatures.append(T)
                 Y = getattr(node, "Y", None)
@@ -177,7 +177,7 @@ class NetworkSolver:
                     compositions.append(list(Y))
 
             elif isinstance(node, MassFlowBoundary):
-                T = getattr(node, "T_total", None)
+                T = getattr(node, "Tt", None)
                 if T is not None:
                     temperatures.append(T)
                 Y = getattr(node, "Y", None)
@@ -214,7 +214,7 @@ class NetworkSolver:
         # discover them by propagating upstream from known outlets.
         for nid, node in self.network.nodes.items():
             if isinstance(node, PressureBoundary):
-                p_guess[nid] = getattr(node, "P_total", ref["P"])
+                p_guess[nid] = getattr(node, "Pt", ref["P"])
 
         # Estimated per-element dP: spread across elements, or 0.1 % of ref_P
         seed_pressures = list(p_guess.values())
@@ -344,9 +344,9 @@ class NetworkSolver:
                         guess_dict = getattr(node, "initial_guess", {})
                         if unk in guess_dict:
                             x0_list.append(guess_dict[unk])
-                        elif unk.endswith(".P") or unk.endswith(".P_total"):
+                        elif unk.endswith(".P") or unk.endswith(".Pt"):
                             x0_list.append(p_guess.get(node_id, ref["P"]))
-                        elif unk.endswith(".T") or unk.endswith(".T_total"):
+                        elif unk.endswith(".T") or unk.endswith(".Tt"):
                             x0_list.append(ref["T"])
                         elif ".Y[" in unk:
                             idx = int(unk.split(".Y[")[1].replace("]", ""))
@@ -574,7 +574,7 @@ class NetworkSolver:
         # Preserve previous iteration's derived states for back-edge wall coupling
         self._prev_derived_states = getattr(self, "_derived_states", {})
         self._derived_states = {}
-        # relay[node_id][global_unknown_index] = {'T': dT/dx, 'Y': [dY/dx], 'P_total_mix': dP_total_mix/dx}
+        # relay[node_id][global_unknown_index] = {'T': dT/dx, 'Y': [dY/dx], 'Pt_mix': dP_total_mix/dx}
         relay = {nid: {} for nid in self.network.nodes}
 
         has_walls = self.network.thermal_coupling_enabled and bool(self.network.walls)
@@ -593,10 +593,10 @@ class NetworkSolver:
                 unknown_names = self.unknown_names
                 for global_idx in node_indices:
                     name = unknown_names[global_idx]
-                    if name.endswith(".P_total"):
+                    if name.endswith(".Pt"):
                         relay[nid].setdefault(
-                            global_idx, {"T": 0.0, "Y": np.zeros(self._n_species), "P_total": 0.0}
-                        )["P_total"] = 1.0
+                            global_idx, {"T": 0.0, "Y": np.zeros(self._n_species), "Pt": 0.0}
+                        )["Pt"] = 1.0
                 continue
 
             up_states = []
@@ -664,10 +664,10 @@ class NetworkSolver:
                     if m_indices:
                         idx = m_indices[0]
                         node_relay = relay[nid].setdefault(
-                            idx, {"T": 0.0, "Y": np.zeros(n_species), "P_total_mix": 0.0}
+                            idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt_mix": 0.0}
                         )
                         node_relay["T"] += t_jac.d_mdot
-                        node_relay["P_total_mix"] += pt_jac.d_mdot
+                        node_relay["Pt_mix"] += pt_jac.d_mdot
                         for k in range(n_species):
                             node_relay["Y"][k] += y_jacs[k].d_mdot
 
@@ -675,27 +675,23 @@ class NetworkSolver:
                     if from_nid in relay:
                         for idx, sens_up in relay[from_nid].items():
                             node_relay = relay[nid].setdefault(
-                                idx, {"T": 0.0, "Y": np.zeros(n_species), "P_total_mix": 0.0}
+                                idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt_mix": 0.0}
                             )
                             # dT/dx = sum_i( dT/dT_in_i * dT_in_i/dx + dT/dP_in_i * dP_in_i/dx + dT/dY_in_i * dY_in_i/dx )
                             node_relay["T"] += t_jac.d_T * sens_up["T"]
-                            # Note: stagnation P_total doesn't usually have T/Y dependency, but we relay it if present
-                            node_relay["T"] += t_jac.d_P_total * sens_up.get("P_total", 0.0)
+                            # Note: stagnation Pt doesn't usually have T/Y dependency, but we relay it if present
+                            node_relay["T"] += t_jac.d_P_total * sens_up.get("Pt", 0.0)
                             node_relay["T"] += np.dot(t_jac.d_Y, sens_up["Y"])
 
                             # dP_total_mix/dx
-                            node_relay["P_total_mix"] += pt_jac.d_T * sens_up["T"]
-                            node_relay["P_total_mix"] += pt_jac.d_P_total * sens_up.get(
-                                "P_total", 0.0
-                            )
-                            node_relay["P_total_mix"] += np.dot(pt_jac.d_Y, sens_up["Y"])
+                            node_relay["Pt_mix"] += pt_jac.d_T * sens_up["T"]
+                            node_relay["Pt_mix"] += pt_jac.d_P_total * sens_up.get("Pt", 0.0)
+                            node_relay["Pt_mix"] += np.dot(pt_jac.d_Y, sens_up["Y"])
 
                             # dY_k/dx
                             for k in range(n_species):
                                 node_relay["Y"][k] += y_jacs[k].d_T * sens_up["T"]
-                                node_relay["Y"][k] += y_jacs[k].d_P_total * sens_up.get(
-                                    "P_total", 0.0
-                                )
+                                node_relay["Y"][k] += y_jacs[k].d_P_total * sens_up.get("Pt", 0.0)
                                 node_relay["Y"][k] += np.dot(y_jacs[k].d_Y, sens_up["Y"])
 
                 # Wall coupling relay extension: dT_node/dx += dT_mix/dQ * dQ/dx
@@ -737,7 +733,7 @@ class NetworkSolver:
                             )
                             for idx, sens_up in relay[from_a].items():
                                 nr = relay[nid].setdefault(
-                                    idx, {"T": 0.0, "Y": np.zeros(n_species), "P_total": 0.0}
+                                    idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
                                 )
                                 nr["T"] += factor_T_a * sens_up["T"]
 
@@ -754,7 +750,7 @@ class NetworkSolver:
                                 )
                             )
                             nr = relay[nid].setdefault(
-                                idx_mdot_a, {"T": 0.0, "Y": np.zeros(n_species), "P_total": 0.0}
+                                idx_mdot_a, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
                             )
                             nr["T"] += factor_mdot_a
 
@@ -775,7 +771,7 @@ class NetworkSolver:
                             )
                             for idx, sens_up in relay[from_b].items():
                                 nr = relay[nid].setdefault(
-                                    idx, {"T": 0.0, "Y": np.zeros(n_species), "P_total": 0.0}
+                                    idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
                                 )
                                 nr["T"] += factor_T_b * sens_up["T"]
 
@@ -791,19 +787,19 @@ class NetworkSolver:
                                 )
                             )
                             nr = relay[nid].setdefault(
-                                idx_mdot_b, {"T": 0.0, "Y": np.zeros(n_species), "P_total": 0.0}
+                                idx_mdot_b, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
                             )
                             nr["T"] += factor_mdot_b
 
-            # 3. Add own unknowns (P_total) to the relay
+            # 3. Add own unknowns (Pt) to the relay
             node_unks = self._unknown_indices.get(nid, [])
             for unk_idx in node_unks:
                 unk_name = self.unknown_names[unk_idx]
-                if unk_name.endswith(".P_total"):
+                if unk_name.endswith(".Pt"):
                     node_relay = relay[nid].setdefault(
-                        unk_idx, {"T": 0.0, "Y": np.zeros(self._n_species), "P_total": 0.0}
+                        unk_idx, {"T": 0.0, "Y": np.zeros(self._n_species), "Pt": 0.0}
                     )
-                    node_relay["P_total"] = 1.0
+                    node_relay["Pt"] = 1.0
 
         return relay
 
@@ -838,9 +834,9 @@ class NetworkSolver:
 
         state_dict = {
             "P": 101325.0,
-            "P_total": 101325.0,
+            "Pt": 101325.0,
             "T": T_prev,
-            "T_total": T_prev,
+            "Tt": T_prev,
             "m_dot": 0.0,
             "Y": Y_prev,
         }
@@ -852,9 +848,9 @@ class NetworkSolver:
 
         return MixtureState(
             float(state_dict["P"]),
-            float(state_dict["P_total"]),
+            float(state_dict["Pt"]),
             float(state_dict["T"]),
-            float(state_dict["T_total"]),
+            float(state_dict["Tt"]),
             float(state_dict["m_dot"]),
             state_dict["Y"],
         )
@@ -866,9 +862,9 @@ class NetworkSolver:
         # Determine boundaries
         if isinstance(node, PressureBoundary):
             guess = getattr(node, "initial_guess", {})
-            P_tot = guess.get(f"{node.id}.P_total", getattr(node, "P_total", 101325.0))
+            P_tot = guess.get(f"{node.id}.Pt", getattr(node, "Pt", 101325.0))
             P_stat = guess.get(f"{node.id}.P", P_tot)
-            T_tot = guess.get(f"{node.id}.T_total", getattr(node, "T_total", 300.0))
+            T_tot = guess.get(f"{node.id}.Tt", getattr(node, "Tt", 300.0))
             T_stat = guess.get(f"{node.id}.T", T_tot)
             Y = getattr(node, "Y", None)
             if Y is None:
@@ -878,7 +874,7 @@ class NetworkSolver:
         if isinstance(node, MassFlowBoundary):
             guess = getattr(node, "initial_guess", {})
             m = getattr(node, "m_dot", 0.0)
-            T_tot = guess.get(f"{node.id}.T_total", getattr(node, "T_total", 300.0))
+            T_tot = guess.get(f"{node.id}.Tt", getattr(node, "Tt", 300.0))
             Y = getattr(node, "Y", None)
 
             # If this boundary has upstream connections (sink), use derived mixed state
@@ -892,14 +888,14 @@ class NetworkSolver:
 
             T_stat = guess.get(f"{node.id}.T", T_tot)
             p_val = guess.get(f"{node.id}.P", 101325.0)
-            ptot_val = guess.get(f"{node.id}.P_total", 101325.0)
+            ptot_val = guess.get(f"{node.id}.Pt", 101325.0)
 
             indices = self._unknown_indices.get(node.id, [])
             unknowns = node.unknowns()
             for i, unk in zip(indices, unknowns, strict=False):
                 if unk.endswith(".P"):
                     p_val = x[i]
-                elif unk.endswith(".P_total"):
+                elif unk.endswith(".Pt"):
                     ptot_val = x[i]
 
             return MixtureState(
@@ -913,9 +909,9 @@ class NetworkSolver:
         # Default state
         state_dict = {
             "P": 101325.0,
-            "P_total": 101325.0,
+            "Pt": 101325.0,
             "T": 300.0,
-            "T_total": 300.0,
+            "Tt": 300.0,
             "m_dot": 0.0,
             "Y": default_Y,
         }
@@ -924,7 +920,7 @@ class NetworkSolver:
         if node.id in self._derived_states:
             T, Y, _ = self._derived_states[node.id]
             state_dict["T"] = T
-            state_dict["T_total"] = T
+            state_dict["Tt"] = T
             state_dict["Y"] = Y
 
         for i, unk in zip(indices, unknowns, strict=False):
@@ -948,9 +944,9 @@ class NetworkSolver:
 
         return MixtureState(
             float(state_dict["P"]),
-            float(state_dict["P_total"]),
+            float(state_dict["Pt"]),
             float(state_dict["T"]),
-            float(state_dict["T_total"]),
+            float(state_dict["Tt"]),
             float(state_dict["m_dot"]),
             Y_safe,
         )
@@ -1007,10 +1003,10 @@ class NetworkSolver:
                                             rows.append(row)
                                             cols.append(unk_idx)
                                             data.append(deriv * sens_pkg["Y"][s_idx])
-                                    elif prop == "P_total_mix" and "P_total_mix" in sens_pkg:
+                                    elif prop == "Pt_mix" and "Pt_mix" in sens_pkg:
                                         rows.append(row)
                                         cols.append(unk_idx)
-                                        data.append(deriv * sens_pkg["P_total_mix"])
+                                        data.append(deriv * sens_pkg["Pt_mix"])
 
             # Mass Conservation: Sum(m_dot_in) - Sum(m_dot_out) = 0
             mass_res_idx = len(res)
@@ -1097,14 +1093,14 @@ class NetworkSolver:
                                             rows.append(row)
                                             cols.append(unk_idx)
                                             data.append(deriv * sens_pkg["Y"][s_idx])
-                                    elif prop == "P_total_mix" and "P_total_mix" in sens_pkg:
+                                    elif prop == "Pt_mix" and "Pt_mix" in sens_pkg:
                                         rows.append(row)
                                         cols.append(unk_idx)
-                                        data.append(deriv * sens_pkg["P_total_mix"])
-                                    elif prop == "P_total" and "P_total" in sens_pkg:
+                                        data.append(deriv * sens_pkg["Pt_mix"])
+                                    elif prop == "Pt" and "Pt" in sens_pkg:
                                         rows.append(row)
                                         cols.append(unk_idx)
-                                        data.append(deriv * sens_pkg["P_total"])
+                                        data.append(deriv * sens_pkg["Pt"])
 
         jac_sparse = None
         if compute_jacobian:
@@ -1477,7 +1473,6 @@ class NetworkSolver:
 
         for nid, (T, Y, _) in self._derived_states.items():
             sol_dict[f"{nid}.T"] = T
-            sol_dict[f"{nid}.T_total"] = T  # Canonical total T
             for i, yi in enumerate(Y):
                 sol_dict[f"{nid}.Y[{i}]"] = float(yi)
 
@@ -1612,7 +1607,7 @@ class NetworkSolver:
             for nid, (T, Y, _) in self._derived_states.items():
                 # For P, we rely on node.P or total P if defined in the network
                 node = self.network.nodes[nid]
-                P = getattr(node, "P", getattr(node, "P_total", 101325.0))
+                P = getattr(node, "P", getattr(node, "Pt", 101325.0))
                 X = mass_to_mole(np.array(Y))
                 complete_states[nid] = cb.complete_state(T, P, X)
             return complete_states
@@ -1646,8 +1641,8 @@ class NetworkSolver:
 
         for node_id in self.network.nodes:
             try:
-                T = result.get(f"{node_id}.T", result.get(f"{node_id}.T_total", 300.0))
-                P = result.get(f"{node_id}.P", result.get(f"{node_id}.P_total", 101325.0))
+                T = result.get(f"{node_id}.T", result.get(f"{node_id}.Tt", 300.0))
+                P = result.get(f"{node_id}.P", result.get(f"{node_id}.Pt", 101325.0))
 
                 # Use pre-computed X if available, otherwise fallback to Y-parsing
                 X = None

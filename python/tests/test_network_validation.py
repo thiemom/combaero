@@ -15,8 +15,8 @@ def test_validation_empty_network():
         graph.validate()
 
     inlet = PressureBoundary("inlet")
-    inlet.P_total = 100000.0
-    inlet.T_total = 300.0
+    inlet.Pt = 100000.0
+    inlet.Tt = 300.0
     graph.add_node(inlet)
 
     with pytest.raises(ValueError, match="contains no elements"):

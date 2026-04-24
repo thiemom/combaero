@@ -18,10 +18,10 @@ export function validateNetwork(nodes: Node[]): string[] {
 
 	for (const node of nodes) {
 		if (node.type === "pressure_boundary" || node.type === "mass_boundary") {
-			if ((node.data.P_total || 0) <= 0 && node.type === "pressure_boundary") {
+			if ((node.data.Pt || 0) <= 0 && node.type === "pressure_boundary") {
 				errors.push(`${node.id}: Total Pressure must be > 0`);
 			}
-			if ((node.data.T_total || 0) <= 0) {
+			if ((node.data.Tt || 0) <= 0) {
 				errors.push(`${node.id}: Temperature must be > 0`);
 			}
 			if (node.data.composition?.source === "custom") {

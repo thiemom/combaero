@@ -99,7 +99,8 @@ def _solve_sync(schema: NetworkGraphSchema):
         state_res = StateResult(
             T=float(node_vals.pop("T", 300.0)),
             P=float(node_vals.pop("P", 101325.0)),
-            P_total=node_vals.pop("P_total", None),
+            Pt=node_vals.pop("Pt", None),
+            Tt=node_vals.pop("Tt", None),
             Y=y_vals,
             X=x_vals or None,
             **node_vals,  # All remaining diagnostics (rho, mach, mu, k, etc.)
@@ -111,7 +112,8 @@ def _solve_sync(schema: NetworkGraphSchema):
     for elem_id in net.elements:
         m_dot = float(result.get(f"{elem_id}.m_dot", 0.0))
         # Pull element diagnostics from the structured dict aggregated by solve()
-        diag = elem_diags.get(elem_id, {})
+        diag = elem_diags.get(elem_id, {}).copy()
+        diag.pop("m_dot", None)
         element_results[elem_id] = ElementResult(m_dot=m_dot, success=success, **diag)
 
     edge_results = {}

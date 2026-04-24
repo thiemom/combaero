@@ -116,12 +116,12 @@ class TestEffectiveAreaConnectionElement:
         # Network 1: Using EffectiveAreaConnectionElement
         graph1 = FlowNetwork()
         inlet1 = PressureBoundary("inlet")
-        inlet1.P_total = 150000.0
-        inlet1.T_total = 300.0
+        inlet1.Pt = 150000.0
+        inlet1.Tt = 300.0
         inlet1.Y = cb.species.dry_air_mass()
         outlet1 = PressureBoundary("outlet")
-        outlet1.P_total = 100000.0
-        outlet1.T_total = 300.0
+        outlet1.Pt = 100000.0
+        outlet1.Tt = 300.0
         outlet1.Y = cb.species.dry_air_mass()
         conn1 = EffectiveAreaConnectionElement("conn", "inlet", "outlet", effective_area)
 
@@ -135,12 +135,12 @@ class TestEffectiveAreaConnectionElement:
         # Network 2: Using OrificeElement with Cd=1.0
         graph2 = FlowNetwork()
         inlet2 = PressureBoundary("inlet")
-        inlet2.P_total = 150000.0
-        inlet2.T_total = 300.0
+        inlet2.Pt = 150000.0
+        inlet2.Tt = 300.0
         inlet2.Y = cb.species.dry_air_mass()
         outlet2 = PressureBoundary("outlet")
-        outlet2.P_total = 100000.0
-        outlet2.T_total = 300.0
+        outlet2.Pt = 100000.0
+        outlet2.Tt = 300.0
         outlet2.Y = cb.species.dry_air_mass()
         orf2 = OrificeElement(
             "orf",
@@ -166,12 +166,12 @@ class TestEffectiveAreaConnectionElement:
         # Network with EffectiveAreaConnectionElement
         graph = FlowNetwork()
         inlet = PressureBoundary("inlet")
-        inlet.P_total = 150000.0
-        inlet.T_total = 300.0
+        inlet.Pt = 150000.0
+        inlet.Tt = 300.0
         inlet.Y = cb.species.dry_air_mass()
         outlet = PressureBoundary("outlet")
-        outlet.P_total = 100000.0
-        outlet.T_total = 300.0
+        outlet.Pt = 100000.0
+        outlet.Tt = 300.0
         outlet.Y = cb.species.dry_air_mass()
         conn = EffectiveAreaConnectionElement("conn", "inlet", "outlet", 0.01)
 
@@ -186,7 +186,7 @@ class TestEffectiveAreaConnectionElement:
         assert sol["conn.m_dot"] > 0
 
         # Verify pressure drop exists
-        assert inlet.P_total > outlet.P_total
+        assert inlet.Pt > outlet.Pt
 
     def test_different_areas_produce_different_flows(self):
         """Verify that different effective areas produce different flow rates."""
@@ -196,12 +196,12 @@ class TestEffectiveAreaConnectionElement:
         for area in areas:
             graph = FlowNetwork()
             inlet = PressureBoundary("inlet")
-            inlet.P_total = 150000.0
-            inlet.T_total = 300.0
+            inlet.Pt = 150000.0
+            inlet.Tt = 300.0
             inlet.Y = cb.species.dry_air_mass()
             outlet = PressureBoundary("outlet")
-            outlet.P_total = 100000.0
-            outlet.T_total = 300.0
+            outlet.Pt = 100000.0
+            outlet.Tt = 300.0
             outlet.Y = cb.species.dry_air_mass()
             conn = EffectiveAreaConnectionElement("conn", "inlet", "outlet", area)
 
@@ -255,12 +255,12 @@ class TestEffectiveAreaConnectionElement:
         # High pressure drop case (more compressibility effects)
         graph1 = FlowNetwork()
         inlet1 = PressureBoundary("inlet")
-        inlet1.P_total = 200000.0
-        inlet1.T_total = 300.0
+        inlet1.Pt = 200000.0
+        inlet1.Tt = 300.0
         inlet1.Y = cb.species.dry_air_mass()
         outlet1 = PressureBoundary("outlet")
-        outlet1.P_total = 50000.0
-        outlet1.T_total = 300.0
+        outlet1.Pt = 50000.0
+        outlet1.Tt = 300.0
         outlet1.Y = cb.species.dry_air_mass()
         conn1 = EffectiveAreaConnectionElement("conn", "inlet", "outlet", effective_area)
 
@@ -275,12 +275,12 @@ class TestEffectiveAreaConnectionElement:
         # Low pressure drop case (less compressibility effects)
         graph2 = FlowNetwork()
         inlet2 = PressureBoundary("inlet")
-        inlet2.P_total = 110000.0
-        inlet2.T_total = 300.0
+        inlet2.Pt = 110000.0
+        inlet2.Tt = 300.0
         inlet2.Y = cb.species.dry_air_mass()
         outlet2 = PressureBoundary("outlet")
-        outlet2.P_total = 100000.0
-        outlet2.T_total = 300.0
+        outlet2.Pt = 100000.0
+        outlet2.Tt = 300.0
         outlet2.Y = cb.species.dry_air_mass()
         conn2 = EffectiveAreaConnectionElement("conn", "inlet", "outlet", effective_area)
 

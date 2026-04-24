@@ -5,7 +5,7 @@ import combaero as cb
 
 def test_orifice_jacobian_accuracy():
     m_dot = 0.5
-    P_total_up = 2e5
+    Pt_up = 2e5
     P_static_up = 1.9e5
     T_up = 300.0
     Y_up = [1.0]  # Pure species or whatever num_species is
@@ -21,7 +21,7 @@ def test_orifice_jacobian_accuracy():
 
     # C++ Calculation
     res_obj = cb.orifice_residuals_and_jacobian(
-        m_dot, P_total_up, P_static_up, T_up, Y_up, P_static_down, Cd, area
+        m_dot, Pt_up, P_static_up, T_up, Y_up, P_static_down, Cd, area
     )
 
     # Numerical derivatives (Central Finite Difference)
@@ -33,26 +33,26 @@ def test_orifice_jacobian_accuracy():
 
     # d_mdot/dP_total_up
     d_tot_num = (
-        get_mdot(P_total_up + eps, P_static_up, T_up, Y_up, P_static_down)
-        - get_mdot(P_total_up - eps, P_static_up, T_up, Y_up, P_static_down)
+        get_mdot(Pt_up + eps, P_static_up, T_up, Y_up, P_static_down)
+        - get_mdot(Pt_up - eps, P_static_up, T_up, Y_up, P_static_down)
     ) / (2 * eps)
 
     # d_mdot/dP_static_up
     d_stat_num = (
-        get_mdot(P_total_up, P_static_up + eps, T_up, Y_up, P_static_down)
-        - get_mdot(P_total_up, P_static_up - eps, T_up, Y_up, P_static_down)
+        get_mdot(Pt_up, P_static_up + eps, T_up, Y_up, P_static_down)
+        - get_mdot(Pt_up, P_static_up - eps, T_up, Y_up, P_static_down)
     ) / (2 * eps)
 
     # d_mdot/dT_up
     d_temp_num = (
-        get_mdot(P_total_up, P_static_up, T_up + eps, Y_up, P_static_down)
-        - get_mdot(P_total_up, P_static_up, T_up - eps, Y_up, P_static_down)
+        get_mdot(Pt_up, P_static_up, T_up + eps, Y_up, P_static_down)
+        - get_mdot(Pt_up, P_static_up, T_up - eps, Y_up, P_static_down)
     ) / (2 * eps)
 
     # d_mdot/dP_static_down
     d_down_num = (
-        get_mdot(P_total_up, P_static_up, T_up, Y_up, P_static_down + eps)
-        - get_mdot(P_total_up, P_static_up, T_up, Y_up, P_static_down - eps)
+        get_mdot(Pt_up, P_static_up, T_up, Y_up, P_static_down + eps)
+        - get_mdot(Pt_up, P_static_up, T_up, Y_up, P_static_down - eps)
     ) / (2 * eps)
 
     print("\nOrifice Comparison:")
@@ -71,7 +71,7 @@ def test_orifice_jacobian_accuracy():
 
 def test_channel_jacobian_accuracy():
     m_dot = 0.5
-    P_total_up = 2e5
+    Pt_up = 2e5
     P_static_up = 1.9e5
     T_up = 300.0
     n_sp = cb.species.num_species
@@ -85,7 +85,7 @@ def test_channel_jacobian_accuracy():
 
     # C++ Calculation
     res_obj = cb.channel_residuals_and_jacobian(
-        m_dot, P_total_up, P_static_up, T_up, Y_up, P_static_down, L, D, roughness, friction_model
+        m_dot, Pt_up, P_static_up, T_up, Y_up, P_static_down, L, D, roughness, friction_model
     )
 
     eps = 1e-6
@@ -100,20 +100,20 @@ def test_channel_jacobian_accuracy():
 
     # d_dP/d_mdot
     d_mdot_num = (
-        get_dp(m_dot + eps, P_total_up, P_static_up, T_up, Y_up, P_static_down)
-        - get_dp(m_dot - eps, P_total_up, P_static_up, T_up, Y_up, P_static_down)
+        get_dp(m_dot + eps, Pt_up, P_static_up, T_up, Y_up, P_static_down)
+        - get_dp(m_dot - eps, Pt_up, P_static_up, T_up, Y_up, P_static_down)
     ) / (2 * eps)
 
     # d_dP/dP_static_up
     d_stat_num = (
-        get_dp(m_dot, P_total_up, P_static_up + eps, T_up, Y_up, P_static_down)
-        - get_dp(m_dot, P_total_up, P_static_up - eps, T_up, Y_up, P_static_down)
+        get_dp(m_dot, Pt_up, P_static_up + eps, T_up, Y_up, P_static_down)
+        - get_dp(m_dot, Pt_up, P_static_up - eps, T_up, Y_up, P_static_down)
     ) / (2 * eps)
 
     # d_dP/dT_up
     d_temp_num = (
-        get_dp(m_dot, P_total_up, P_static_up, T_up + eps, Y_up, P_static_down)
-        - get_dp(m_dot, P_total_up, P_static_up, T_up - eps, Y_up, P_static_down)
+        get_dp(m_dot, Pt_up, P_static_up, T_up + eps, Y_up, P_static_down)
+        - get_dp(m_dot, Pt_up, P_static_up, T_up - eps, Y_up, P_static_down)
     ) / (2 * eps)
 
     print("\nChannel Comparison:")

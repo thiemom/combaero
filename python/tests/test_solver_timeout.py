@@ -8,8 +8,8 @@ from combaero.network import FlowNetwork, NetworkSolver, OrificeElement, Pressur
 def test_solver_no_timeout():
     """Verify solver still works normally when no timeout is hit."""
     graph = FlowNetwork()
-    inlet = PressureBoundary("inlet", P_total=200000, T_total=300)
-    outlet = PressureBoundary("outlet", P_total=100000, T_total=300)
+    inlet = PressureBoundary("inlet", Pt=200000, Tt=300)
+    outlet = PressureBoundary("outlet", Pt=100000, Tt=300)
     orf = OrificeElement("orf", "inlet", "outlet", Cd=0.6, diameter=0.035682, correlation="fixed")
 
     graph.add_node(inlet)
@@ -26,8 +26,8 @@ def test_solver_no_timeout():
 def test_solver_timeout_trigger():
     """Verify solver triggers a timeout and returns the best iterate."""
     graph = FlowNetwork()
-    inlet = PressureBoundary("inlet", P_total=200000, T_total=300)
-    outlet = PressureBoundary("outlet", P_total=100000, T_total=300)
+    inlet = PressureBoundary("inlet", Pt=200000, Tt=300)
+    outlet = PressureBoundary("outlet", Pt=100000, Tt=300)
     orf = OrificeElement("orf", "inlet", "outlet", Cd=0.6, diameter=0.035682, correlation="fixed")
 
     graph.add_node(inlet)
@@ -56,8 +56,8 @@ def test_solver_timeout_trigger():
 def test_solver_maxfev_limit():
     """Verify solver respects maxfev for hybr method."""
     graph = FlowNetwork()
-    inlet = PressureBoundary("inlet", P_total=500000, T_total=300)
-    outlet = PressureBoundary("outlet", P_total=100000, T_total=300)
+    inlet = PressureBoundary("inlet", Pt=500000, Tt=300)
+    outlet = PressureBoundary("outlet", Pt=100000, Tt=300)
     orf = OrificeElement("orf", "inlet", "outlet", Cd=0.6, diameter=0.112838, correlation="fixed")
 
     graph.add_node(inlet)
@@ -76,8 +76,8 @@ def test_solver_maxfev_limit():
 def test_solver_unexpected_error_graceful_exit():
     """Verify solver returns best iterate on unexpected residuals error."""
     graph = FlowNetwork()
-    inlet = PressureBoundary("inlet", P_total=200000, T_total=300)
-    outlet = PressureBoundary("outlet", P_total=100000, T_total=300)
+    inlet = PressureBoundary("inlet", Pt=200000, Tt=300)
+    outlet = PressureBoundary("outlet", Pt=100000, Tt=300)
     orf = OrificeElement("orf", "inlet", "outlet", Cd=0.6, diameter=0.035682, correlation="fixed")
 
     graph.add_node(inlet)

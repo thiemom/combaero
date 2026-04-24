@@ -40,9 +40,9 @@ def build_and_solve_network(
 
     net = FlowNetwork()
 
-    inlet_air = MassFlowBoundary("inlet_air", m_dot=m_dot_air, T_total=T_air, Y=Y_air)
-    inlet_fuel = MassFlowBoundary("inlet_fuel", m_dot=m_dot_fuel, T_total=300.0, Y=Y_fuel)
-    outlet = PressureBoundary("outlet", P_total=101325.0, T_total=300.0, Y=Y_air)
+    inlet_air = MassFlowBoundary("inlet_air", m_dot=m_dot_air, Tt=T_air, Y=Y_air)
+    inlet_fuel = MassFlowBoundary("inlet_fuel", m_dot=m_dot_fuel, Tt=300.0, Y=Y_fuel)
+    outlet = PressureBoundary("outlet", Pt=101325.0, Tt=300.0, Y=Y_air)
 
     net.add_node(inlet_air)
     net.add_node(inlet_fuel)
@@ -236,9 +236,9 @@ def build_and_solve_network(
         "time": wall_time,
         "n_nodes": len(net.nodes),
         "n_elems": len(net.elements),
-        "P_inlet_air": result.get("inlet_air.P_total", float("nan")) / 1e5,
-        "T_comb": result.get("combustor_0.T_total", float("nan")),
-        "T_hot_out": result.get("collector.T_total", float("nan")),
+        "P_inlet_air": result.get("inlet_air.Pt", float("nan")) / 1e5,
+        "T_comb": result.get("combustor_0.Tt", float("nan")),
+        "T_hot_out": result.get("collector.Tt", float("nan")),
         "max_hot_mach": max_hot_mach,
         "residual": result.get("__f_norm__", float("nan")),
     }

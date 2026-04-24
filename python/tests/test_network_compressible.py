@@ -21,8 +21,8 @@ def test_compressible_orifice_network():
     net = FlowNetwork()
 
     # High pressure ratio to ensure compressible effects
-    inlet = PressureBoundary("inlet", P_total=300000.0, T_total=300.0)
-    outlet = PressureBoundary("outlet", P_total=101325.0, T_total=300.0)
+    inlet = PressureBoundary("inlet", Pt=300000.0, Tt=300.0)
+    outlet = PressureBoundary("outlet", Pt=101325.0, Tt=300.0)
 
     net.add_node(inlet)
     net.add_node(outlet)
@@ -46,13 +46,13 @@ def test_compressible_orifice_network():
     assert sol["orifice.m_dot"] > 0, "Mass flow should be positive"
 
     # Check pressure ratio to confirm compressible regime
-    PR = outlet.P_total / inlet.P_total
+    PR = outlet.Pt / inlet.Pt
     assert PR < 0.8, f"Should be in compressible regime (PR={PR:.3f})"
 
     # Verify against direct compressible calculation
     X = cb.species.dry_air()
     mdot_direct, _, _, _ = cb._core.orifice_compressible_mdot_and_jacobian(
-        inlet.T_total, inlet.P_total, outlet.P_total, X, 0.65, 1e-4, 0.0
+        inlet.Tt, inlet.Pt, outlet.Pt, X, 0.65, 1e-4, 0.0
     )
 
     # Should match within solver tolerance
@@ -63,8 +63,8 @@ def test_compressible_channel_network():
     """Test network with compressible Fanno channel element."""
     net = FlowNetwork()
 
-    inlet = PressureBoundary("inlet", P_total=200000.0, T_total=400.0)
-    outlet = PressureBoundary("outlet", P_total=150000.0, T_total=400.0)
+    inlet = PressureBoundary("inlet", Pt=200000.0, Tt=400.0)
+    outlet = PressureBoundary("outlet", Pt=150000.0, Tt=400.0)
 
     net.add_node(inlet)
     net.add_node(outlet)
@@ -90,7 +90,7 @@ def test_compressible_channel_network():
     assert sol["channel.m_dot"] > 0, "Channel mass flow should be positive"
 
     # Verify pressure drop is reasonable
-    dP = inlet.P_total - outlet.P_total
+    dP = inlet.Pt - outlet.Pt
     assert dP > 0, "Pressure should drop across channel"
 
 
@@ -98,8 +98,8 @@ def test_mixed_compressible_incompressible_network():
     """Test network mixing compressible and incompressible elements."""
     net = FlowNetwork()
 
-    inlet = PressureBoundary("inlet", P_total=250000.0, T_total=350.0)
-    outlet = PressureBoundary("outlet", P_total=101325.0, T_total=350.0)
+    inlet = PressureBoundary("inlet", Pt=250000.0, Tt=350.0)
+    outlet = PressureBoundary("outlet", Pt=101325.0, Tt=350.0)
     junction1 = PlenumNode("j1")
     junction2 = PlenumNode("j2")
 
@@ -158,7 +158,7 @@ def test_mixed_compressible_incompressible_network():
     assert abs(sol["orifice.m_dot"] - sol["channel2.m_dot"]) < 1e-6
 
     # Pressure should decrease monotonically
-    assert inlet.P_total > sol["j1.P"] > sol["j2.P"] > outlet.P_total
+    assert inlet.Pt > sol["j1.P"] > sol["j2.P"] > outlet.Pt
 
 
 def test_compressible_vs_incompressible_comparison():
@@ -167,8 +167,8 @@ def test_compressible_vs_incompressible_comparison():
     # Setup identical networks with different regimes
     def create_network(regime):
         net = FlowNetwork()
-        inlet = PressureBoundary("inlet", P_total=200000.0, T_total=300.0)
-        outlet = PressureBoundary("outlet", P_total=150000.0, T_total=300.0)
+        inlet = PressureBoundary("inlet", Pt=200000.0, Tt=300.0)
+        outlet = PressureBoundary("outlet", Pt=150000.0, Tt=300.0)
         net.add_node(inlet)
         net.add_node(outlet)
 
@@ -208,8 +208,8 @@ def test_compressible_choked_orifice():
     net = FlowNetwork()
 
     # Very high pressure ratio to ensure choking
-    inlet = PressureBoundary("inlet", P_total=500000.0, T_total=300.0)
-    outlet = PressureBoundary("outlet", P_total=101325.0, T_total=300.0)
+    inlet = PressureBoundary("inlet", Pt=500000.0, Tt=300.0)
+    outlet = PressureBoundary("outlet", Pt=101325.0, Tt=300.0)
 
     net.add_node(inlet)
     net.add_node(outlet)
@@ -230,8 +230,8 @@ def test_compressible_choked_orifice():
 
     # Verify choked flow
     X = cb.species.dry_air()
-    PR_crit = cb.critical_pressure_ratio(inlet.T_total, inlet.P_total, X)
-    PR_actual = outlet.P_total / inlet.P_total
+    PR_crit = cb.critical_pressure_ratio(inlet.Tt, inlet.Pt, X)
+    PR_actual = outlet.Pt / inlet.Pt
 
     assert PR_actual < PR_crit, (
         f"Flow should be choked (PR={PR_actual:.3f} < PR_crit={PR_crit:.3f})"
@@ -243,8 +243,8 @@ def test_compressible_channel_high_mach():
     """Test compressible channel at higher Mach number."""
     net = FlowNetwork()
 
-    inlet = PressureBoundary("inlet", P_total=300000.0, T_total=400.0)
-    outlet = PressureBoundary("outlet", P_total=200000.0, T_total=400.0)
+    inlet = PressureBoundary("inlet", Pt=300000.0, Tt=400.0)
+    outlet = PressureBoundary("outlet", Pt=200000.0, Tt=400.0)
 
     net.add_node(inlet)
     net.add_node(outlet)
@@ -268,10 +268,10 @@ def test_compressible_channel_high_mach():
 
     # Verify Mach number is significant
     X = cb.species.dry_air()
-    rho = cb.density(inlet.T_total, inlet.P_total, X)
+    rho = cb.density(inlet.Tt, inlet.Pt, X)
     area = 3.14159 * (0.03 / 2) ** 2
     u = sol["channel.m_dot"] / (rho * area)
-    a = cb.speed_of_sound(inlet.T_total, X)
+    a = cb.speed_of_sound(inlet.Tt, X)
     M = u / a
 
     assert M > 0.1, f"Mach number should be significant (M={M:.3f})"
@@ -312,13 +312,13 @@ def _build_fully_coupled_network(regime: str, mach_target: float) -> FlowNetwork
     orifice_regime = "compressible" if regime == "compressible" else "incompressible"
 
     net = FlowNetwork()
-    net.add_node(MassFlowBoundary("hot_inlet", m_dot=mdot_hot, T_total=t_hot, Y=y_air))
+    net.add_node(MassFlowBoundary("hot_inlet", m_dot=mdot_hot, Tt=t_hot, Y=y_air))
     net.add_node(PlenumNode("hot_plenum"))
-    net.add_node(PressureBoundary("hot_outlet", P_total=p_out_hot, T_total=t_hot, Y=y_air))
+    net.add_node(PressureBoundary("hot_outlet", Pt=p_out_hot, Tt=t_hot, Y=y_air))
 
-    net.add_node(MassFlowBoundary("cold_inlet", m_dot=mdot_cold, T_total=t_cold, Y=y_air))
+    net.add_node(MassFlowBoundary("cold_inlet", m_dot=mdot_cold, Tt=t_cold, Y=y_air))
     net.add_node(PlenumNode("cold_plenum"))
-    net.add_node(PressureBoundary("cold_outlet", P_total=p_out_cold, T_total=t_cold, Y=y_air))
+    net.add_node(PressureBoundary("cold_outlet", Pt=p_out_cold, Tt=t_cold, Y=y_air))
 
     hot_surface = ConvectiveSurface(area=np.pi * d_hot * length, model=SmoothModel())
     cold_surface = ConvectiveSurface(area=np.pi * d_cold * length, model=SmoothModel())
@@ -406,8 +406,8 @@ def test_fully_coupled_compressible_vs_incompressible_mach_sweep():
         assert sol_comp["__success__"], f"compressible solve failed at M={mach_target:.3f}"
         assert sol_incomp["__success__"], f"incompressible solve failed at M={mach_target:.3f}"
 
-        pr_comp.append(_P_OUT / float(sol_comp["hot_inlet.P_total"]))
-        pr_incomp.append(_P_OUT / float(sol_incomp["hot_inlet.P_total"]))
+        pr_comp.append(_P_OUT / float(sol_comp["hot_inlet.Pt"]))
+        pr_incomp.append(_P_OUT / float(sol_incomp["hot_inlet.Pt"]))
 
         t_hot_out = float(solver_comp._derived_states["hot_plenum"][0])
         t_cold_out = float(solver_comp._derived_states["cold_plenum"][0])
@@ -443,8 +443,8 @@ def test_homotopy_initialization_strategy():
     print("running: test_homotopy_initialization_strategy")
     # Define a high-flow scenario that might struggle with cold start
     # but should be easy for homotopy
-    inlet = MassFlowBoundary("inlet", m_dot=2.0, T_total=500.0)
-    outlet = PressureBoundary("outlet", P_total=101325.0, T_total=300.0)
+    inlet = MassFlowBoundary("inlet", m_dot=2.0, Tt=500.0)
+    outlet = PressureBoundary("outlet", Pt=101325.0, Tt=300.0)
 
     net.add_node(inlet)
     net.add_node(outlet)

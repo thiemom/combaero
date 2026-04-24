@@ -39,9 +39,9 @@ def test_jacobian_accuracy():
     net = FlowNetwork()
 
     # Nodes
-    n_in = PressureBoundary("in", P_total=200000.0, T_total=300.0)
+    n_in = PressureBoundary("in", Pt=200000.0, Tt=300.0)
     n1 = PlenumNode("n1")
-    n_out = PressureBoundary("out", P_total=101325.0, T_total=300.0)
+    n_out = PressureBoundary("out", Pt=101325.0, Tt=300.0)
 
     net.add_node(n_in)
     net.add_node(n1)
@@ -66,9 +66,9 @@ def test_jacobian_accuracy_compressible_network() -> None:
     """Global Jacobian FD check for a compressible channel-orifice network."""
     net = FlowNetwork()
 
-    n_in = PressureBoundary("in", P_total=4.8e5, T_total=540.0)
+    n_in = PressureBoundary("in", Pt=4.8e5, Tt=540.0)
     n_mid = PlenumNode("mid")
-    n_out = PressureBoundary("out", P_total=1.9e5, T_total=520.0)
+    n_out = PressureBoundary("out", Pt=1.9e5, Tt=520.0)
 
     net.add_node(n_in)
     net.add_node(n_mid)

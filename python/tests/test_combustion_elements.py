@@ -45,9 +45,9 @@ def test_mix_streams_basic():
     # Create two simple states with same pressure
     state1 = MixtureState(
         P=101325.0,
-        P_total=101325.0,
+        Pt=101325.0,
         T=300.0,
-        T_total=300.0,
+        Tt=300.0,
         m_dot=0.05,
         Y=cb.species.empty(),  # Pure species 0
     )
@@ -55,9 +55,9 @@ def test_mix_streams_basic():
 
     state2 = MixtureState(
         P=101325.0,
-        P_total=101325.0,
+        Pt=101325.0,
         T=400.0,
-        T_total=400.0,
+        Tt=400.0,
         m_dot=0.05,
         Y=cb.species.empty(),  # Pure species 1
     )
@@ -81,18 +81,18 @@ def test_mix_streams_energy_conservation():
     """Test that mixing conserves energy."""
     state1 = MixtureState(
         P=101325.0,
-        P_total=101325.0,
+        Pt=101325.0,
         T=300.0,
-        T_total=300.0,
+        Tt=300.0,
         m_dot=0.05,
         Y=cb.species.dry_air_mass(),
     )
 
     state2 = MixtureState(
         P=101325.0,
-        P_total=101325.0,
+        Pt=101325.0,
         T=300.0,
-        T_total=300.0,
+        Tt=300.0,
         m_dot=0.05,
         Y=cb.species.dry_air_mass(),
     )
@@ -141,9 +141,9 @@ def test_combustion_from_phi_basic():
     # Create air state
     air_state = MixtureState(
         P=500000.0,  # 5 bar
-        P_total=500000.0,
+        Pt=500000.0,
         T=700.0,  # 700K
-        T_total=700.0,
+        Tt=700.0,
         m_dot=0.1,  # 0.1 kg/s air
         Y=cb.species.dry_air_mass(),
     )
@@ -168,9 +168,9 @@ def test_combustion_from_phi_lean_vs_rich():
     """Test lean vs rich combustion."""
     air_state = MixtureState(
         P=500000.0,
-        P_total=500000.0,
+        Pt=500000.0,
         T=700.0,
-        T_total=700.0,
+        Tt=700.0,
         m_dot=0.1,
         Y=cb.species.dry_air_mass(),
     )
@@ -194,9 +194,9 @@ def test_combustion_efficiency():
     """Test combustion efficiency parameter."""
     air_state = MixtureState(
         P=500000.0,
-        P_total=500000.0,
+        Pt=500000.0,
         T=700.0,
-        T_total=700.0,
+        Tt=700.0,
         m_dot=0.1,
         Y=cb.species.dry_air_mass(),
     )
@@ -219,9 +219,9 @@ def test_pressure_drop():
     """Test pressure drop parameter."""
     air_state = MixtureState(
         P=500000.0,
-        P_total=500000.0,
+        Pt=500000.0,
         T=700.0,
-        T_total=700.0,
+        Tt=700.0,
         m_dot=0.1,
         Y=cb.species.dry_air_mass(),
     )

@@ -17,12 +17,12 @@ def test_combustor_pressure_loss():
 
     # Inlet Air: 10 kg/s, 700 K, 5 bar
     Y_air = cb.species.dry_air_mass()
-    inlet = MassFlowBoundary("Inlet", m_dot=10.0, T_total=700.0, Y=list(Y_air))
+    inlet = MassFlowBoundary("Inlet", m_dot=10.0, Tt=700.0, Y=list(Y_air))
     net.add_node(inlet)
 
     # Fuel Inlet: CH4 at 300K
     Y_fuel = cb.species.pure_species("CH4")
-    fuel_inlet = MassFlowBoundary("Fuel", m_dot=0.5, T_total=300.0, Y=list(Y_fuel))
+    fuel_inlet = MassFlowBoundary("Fuel", m_dot=0.5, Tt=300.0, Y=list(Y_fuel))
     net.add_node(fuel_inlet)
 
     # Combustor: zeta = 0.03 + 0.005 * theta
@@ -38,7 +38,7 @@ def test_combustor_pressure_loss():
     net.add_node(pre_outlet)
 
     # Outlet: 4.5 bar
-    outlet = PressureBoundary("Outlet", P_total=450000.0)
+    outlet = PressureBoundary("Outlet", Pt=450000.0)
     net.add_node(outlet)
 
     # Connections
