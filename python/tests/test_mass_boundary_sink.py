@@ -17,11 +17,11 @@ def test_mass_boundary_sink_convergence() -> None:
     net = FlowNetwork()
 
     # Node 1: Inlet Pressure (1.5 bar)
-    n1 = PressureBoundary("inlet", P_total=1.5e5, T_total=300.0)
+    n1 = PressureBoundary("inlet", Pt=1.5e5, Tt=300.0)
     net.add_node(n1)
 
     # Node 2: Outlet Mass Flow (Sink, 0.5 kg/s)
-    n2 = MassFlowBoundary("outlet", m_dot=0.5, T_total=300.0)
+    n2 = MassFlowBoundary("outlet", m_dot=0.5, Tt=300.0)
     net.add_node(n2)
 
     # Element: Channel
@@ -61,13 +61,13 @@ def test_mass_boundary_injection_node() -> None:
     net = FlowNetwork()
 
     # Inlet: 2.0 bar
-    net.add_node(PressureBoundary("inlet", P_total=2.0e5))
+    net.add_node(PressureBoundary("inlet", Pt=2.0e5))
 
     # Injection: Adds 0.1 kg/s
     net.add_node(MassFlowBoundary("injection", m_dot=0.1))
 
     # Outlet: 1.0 bar
-    net.add_node(PressureBoundary("outlet", P_total=1.0e5))
+    net.add_node(PressureBoundary("outlet", Pt=1.0e5))
 
     # Elements
     net.add_element(

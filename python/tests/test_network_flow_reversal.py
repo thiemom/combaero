@@ -15,17 +15,17 @@ def test_flow_reversal_simple_orifice():
     p1 = PressureBoundary("p1")
     p1.initial_guess = {
         "p1.P": 100000.0,
-        "p1.P_total": 100000.0,
+        "p1.Pt": 100000.0,
         "p1.T": 300.0,
-        "p1.T_total": 300.0,
+        "p1.Tt": 300.0,
     }
 
     p2 = PressureBoundary("p2")
     p2.initial_guess = {
         "p2.P": 200000.0,
-        "p2.P_total": 200000.0,
+        "p2.Pt": 200000.0,
         "p2.T": 300.0,
-        "p2.T_total": 300.0,
+        "p2.Tt": 300.0,
     }
 
     graph.add_node(p1)
@@ -45,34 +45,34 @@ def test_flow_reversal_simple_orifice():
 
 
 def test_flow_reversal_momentum_chamber():
-    # MomentumChamber: P_total > P_static
+    # MomentumChamber: Pt > P_static
     # Let's test two cases:
     # 1. Flow entering chamber (should use static pressure of chamber to draw flow, then stagnate it)
     # 2. Flow leaving chamber (should use total pressure of chamber to drive flow)
 
-    # For a momentum chamber where P_total > P_static:
-    # Let's set P_total = 200kPa, P_static = 180kPa
+    # For a momentum chamber where Pt > P_static:
+    # Let's set Pt = 200kPa, P_static = 180kPa
 
     # CASE A: Flow leaving chamber to a boundary of 150kPa
     # Flow direction is chamber -> out
     graph_a = FlowNetwork()
     chamber_a = MomentumChamberNode("chamber")
-    chamber_a.initial_guess = {"chamber.P": 180000.0, "chamber.P_total": 200000.0}  # solver guess
+    chamber_a.initial_guess = {"chamber.P": 180000.0, "chamber.Pt": 200000.0}  # solver guess
     # Flown is out of chamber
     inlet_a = PressureBoundary("inlet_a")
     inlet_a.initial_guess = {
         "inlet_a.P": 250000.0,
-        "inlet_a.P_total": 250000.0,
+        "inlet_a.Pt": 250000.0,
         "inlet_a.T": 300.0,
-        "inlet_a.T_total": 300.0,
+        "inlet_a.Tt": 300.0,
     }
 
     outlet_a = PressureBoundary("outlet_a")
     outlet_a.initial_guess = {
         "outlet_a.P": 150000.0,
-        "outlet_a.P_total": 150000.0,
+        "outlet_a.Pt": 150000.0,
         "outlet_a.T": 300.0,
-        "outlet_a.T_total": 300.0,
+        "outlet_a.Tt": 300.0,
     }
 
     graph_a.add_node(inlet_a)
@@ -101,17 +101,17 @@ def test_flow_reversal_momentum_chamber():
     inlet_b = PressureBoundary("inlet_b")
     inlet_b.initial_guess = {
         "inlet_b.P": 150000.0,
-        "inlet_b.P_total": 150000.0,
+        "inlet_b.Pt": 150000.0,
         "inlet_b.T": 300.0,
-        "inlet_b.T_total": 300.0,
+        "inlet_b.Tt": 300.0,
     }
 
     outlet_b = PressureBoundary("outlet_b")
     outlet_b.initial_guess = {
         "outlet_b.P": 250000.0,
-        "outlet_b.P_total": 250000.0,
+        "outlet_b.Pt": 250000.0,
         "outlet_b.T": 300.0,
-        "outlet_b.T_total": 300.0,
+        "outlet_b.Tt": 300.0,
     }
 
     graph_b.add_node(inlet_b)

@@ -33,14 +33,14 @@ def test_two_channel_wall_coupling_convergence():
     Y_air = cb.species.from_mapping({"N2": 0.767, "O2": 0.233})
 
     # Hot side: Inlet -> Channel -> Plenum -> Outlet
-    hot_inlet = MassFlowBoundary("hot_inlet", m_dot=0.1, T_total=800.0, Y=Y_air)
+    hot_inlet = MassFlowBoundary("hot_inlet", m_dot=0.1, Tt=800.0, Y=Y_air)
     hot_plenum = PlenumNode("hot_plenum")
-    hot_outlet = PressureBoundary("hot_outlet", P_total=2e5)
+    hot_outlet = PressureBoundary("hot_outlet", Pt=2e5)
 
     # Cold side: Inlet -> Channel -> Plenum -> Outlet
-    cold_inlet = MassFlowBoundary("cold_inlet", m_dot=0.05, T_total=400.0, Y=Y_air)
+    cold_inlet = MassFlowBoundary("cold_inlet", m_dot=0.05, Tt=400.0, Y=Y_air)
     cold_plenum = PlenumNode("cold_plenum")
-    cold_outlet = PressureBoundary("cold_outlet", P_total=2e5)
+    cold_outlet = PressureBoundary("cold_outlet", Pt=2e5)
 
     net.add_node(hot_inlet)
     net.add_node(hot_plenum)
@@ -138,14 +138,14 @@ def test_thermal_coupling_disabled_matches_no_wall():
         net = FlowNetwork()
 
         # Hot side
-        hot_inlet = MassFlowBoundary("hot_inlet", m_dot=0.1, T_total=800.0, Y=Y_air)
+        hot_inlet = MassFlowBoundary("hot_inlet", m_dot=0.1, Tt=800.0, Y=Y_air)
         hot_plenum = PlenumNode("hot_plenum")
-        hot_outlet = PressureBoundary("hot_outlet", P_total=2e5)
+        hot_outlet = PressureBoundary("hot_outlet", Pt=2e5)
 
         # Cold side
-        cold_inlet = MassFlowBoundary("cold_inlet", m_dot=0.05, T_total=400.0, Y=Y_air)
+        cold_inlet = MassFlowBoundary("cold_inlet", m_dot=0.05, Tt=400.0, Y=Y_air)
         cold_plenum = PlenumNode("cold_plenum")
-        cold_outlet = PressureBoundary("cold_outlet", P_total=2e5)
+        cold_outlet = PressureBoundary("cold_outlet", Pt=2e5)
 
         net.add_node(hot_inlet)
         net.add_node(hot_plenum)
@@ -253,13 +253,13 @@ def test_hot_coupling_jacobian_validation():
     net = FlowNetwork()
 
     # Nodes
-    hot_inlet = MassFlowBoundary("hot_inlet", m_dot=0.1, T_total=800.0, Y=Y_air)
+    hot_inlet = MassFlowBoundary("hot_inlet", m_dot=0.1, Tt=800.0, Y=Y_air)
     hot_plenum = PlenumNode("hot_plenum")
-    hot_outlet = PressureBoundary("hot_outlet", P_total=2e5)
+    hot_outlet = PressureBoundary("hot_outlet", Pt=2e5)
 
-    cold_inlet = MassFlowBoundary("cold_inlet", m_dot=0.05, T_total=400.0, Y=Y_air)
+    cold_inlet = MassFlowBoundary("cold_inlet", m_dot=0.05, Tt=400.0, Y=Y_air)
     cold_plenum = PlenumNode("cold_plenum")
-    cold_outlet = PressureBoundary("cold_outlet", P_total=2e5)
+    cold_outlet = PressureBoundary("cold_outlet", Pt=2e5)
 
     net.add_node(hot_inlet)
     net.add_node(hot_plenum)

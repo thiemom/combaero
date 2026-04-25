@@ -101,10 +101,10 @@ def create_cooling_network(
 
     # Nodes
     net.add_node(
-        MassFlowBoundary("cool_inlet", m_dot=mdot_channel, T_total=T2, Y=cb.mole_to_mass(X_cool))
+        MassFlowBoundary("cool_inlet", m_dot=mdot_channel, Tt=T2, Y=cb.mole_to_mass(X_cool))
     )
     net.add_node(PlenumNode("cool_exit"))
-    net.add_node(PressureBoundary("cool_outlet", P_total=P2))
+    net.add_node(PressureBoundary("cool_outlet", Pt=P2))
 
     # Cooling channel element with convective surface
     cool_channel = ChannelElement(
@@ -163,11 +163,9 @@ def create_coupled_wall_network(
     mdot_hot = rho_hot * u_hot_ann * A_ann
 
     hot_surface = ConvectiveSurface(area=A_liner, model=SmoothModel())
-    net.add_node(
-        MassFlowBoundary("hot_inlet", m_dot=mdot_hot, T_total=T_hot, Y=cb.mole_to_mass(X_hot))
-    )
+    net.add_node(MassFlowBoundary("hot_inlet", m_dot=mdot_hot, Tt=T_hot, Y=cb.mole_to_mass(X_hot)))
     net.add_node(PlenumNode("hot_exit"))
-    net.add_node(PressureBoundary("hot_outlet", P_total=P_hot))
+    net.add_node(PressureBoundary("hot_outlet", Pt=P_hot))
 
     hot_channel = ChannelElement(
         id="hot_channel",
@@ -259,9 +257,9 @@ def solve_operating_point_network(
         cool_elem = net.elements["cool_channel"]
         cool_state_in = MixtureState(
             T=T2,
-            T_total=T2,
+            Tt=T2,
             P=P2,
-            P_total=P2,
+            Pt=P2,
             Y=cb.mole_to_mass(X_cool),
             m_dot=mdot_cool / N_ch,
         )
@@ -308,9 +306,9 @@ def solve_operating_point_network(
     solver_smooth.solve()
     cool_state_smooth = MixtureState(
         T=T2,
-        T_total=T2,
+        Tt=T2,
         P=P2,
-        P_total=P2,
+        Pt=P2,
         Y=cb.mole_to_mass(X_cool),
         m_dot=mdot_cool / N_ch,
     )
@@ -402,7 +400,7 @@ def solve_operating_point_network_coupled(
         # Update hot-side inlet to current combustor estimate.
         A_ann = np.pi * (D_ann / 2.0) ** 2
         rho_hot = cb.density(T_hot_est, P_hot, X_air)
-        net.nodes["hot_inlet"].T_total = T_hot_est
+        net.nodes["hot_inlet"].Tt = T_hot_est
         net.nodes["hot_inlet"].m_dot = rho_hot * u_hot_ann * A_ann
 
         result = solver.solve()
@@ -430,18 +428,18 @@ def solve_operating_point_network_coupled(
     hot_elem = net.elements["hot_channel"]
     cool_state_in = MixtureState(
         T=result["cool_inlet.T"],
-        T_total=result["cool_inlet.T"],
+        Tt=result["cool_inlet.T"],
         P=result["cool_inlet.P"],
-        P_total=result["cool_inlet.P"],
+        Pt=result["cool_inlet.P"],
         Y=cb.mole_to_mass(X_cool),
         m_dot=mdot_cool / N_ch,
     )
     A_ann = np.pi * (D_ann / 2.0) ** 2
     hot_state_in = MixtureState(
         T=result["hot_inlet.T"],
-        T_total=result["hot_inlet.T"],
+        Tt=result["hot_inlet.T"],
         P=result["hot_inlet.P"],
-        P_total=result["hot_inlet.P"],
+        Pt=result["hot_inlet.P"],
         Y=cb.mole_to_mass(X_air),
         m_dot=cb.density(T_hot_est, P_hot, X_air) * u_hot_ann * A_ann,
     )
@@ -463,9 +461,9 @@ def solve_operating_point_network_coupled(
     NetworkSolver(net_smooth).solve()
     cool_state_smooth = MixtureState(
         T=T2,
-        T_total=T2,
+        Tt=T2,
         P=P2,
-        P_total=P2,
+        Pt=P2,
         Y=cb.mole_to_mass(X_cool),
         m_dot=mdot_cool / N_ch,
     )

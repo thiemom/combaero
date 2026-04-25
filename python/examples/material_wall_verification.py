@@ -17,13 +17,13 @@ def verify_material_scaling() -> None:
         net = FlowNetwork()
 
         # Nodes
-        net.add_node(PressureBoundary("hot_in", P_total=2e6, T_total=T_hot))
+        net.add_node(PressureBoundary("hot_in", Pt=2e6, Tt=T_hot))
         net.add_node(PlenumNode("hot_p"))
-        net.add_node(PressureBoundary("hot_out", P_total=1e6, T_total=T_hot))
+        net.add_node(PressureBoundary("hot_out", Pt=1e6, Tt=T_hot))
 
-        net.add_node(PressureBoundary("cold_in", P_total=2e6, T_total=300.0))
+        net.add_node(PressureBoundary("cold_in", Pt=2e6, Tt=300.0))
         net.add_node(PlenumNode("cold_p"))
-        net.add_node(PressureBoundary("cold_out", P_total=1e6, T_total=300.0))
+        net.add_node(PressureBoundary("cold_out", Pt=1e6, Tt=300.0))
 
         # Elements (Channels with convective surfaces)
         # We use large area to ensure coupling is sensitive

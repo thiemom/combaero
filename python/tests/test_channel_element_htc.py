@@ -45,8 +45,8 @@ def test_channel_element_default_surface():
     state = MixtureState(
         T=300.0,
         P=101325.0,
-        P_total=101325.0,
-        T_total=300.0,
+        Pt=101325.0,
+        Tt=300.0,
         m_dot=0.1,
         Y=cb.mole_to_mass(cb.species.dry_air()),
     )
@@ -81,8 +81,8 @@ def test_channel_element_with_surface():
     state = MixtureState(
         T=300.0,
         P=101325.0,
-        P_total=101325.0,
-        T_total=300.0,
+        Pt=101325.0,
+        Tt=300.0,
         m_dot=0.1,
         Y=cb.mole_to_mass(cb.species.dry_air()),
     )
@@ -104,8 +104,8 @@ def _make_state(m_dot: float = 0.5) -> MixtureState:
     return MixtureState(
         T=600.0,
         P=200000.0,
-        P_total=210000.0,
-        T_total=610.0,
+        Pt=210000.0,
+        Tt=610.0,
         m_dot=m_dot,
         Y=cb.mole_to_mass(cb.species.dry_air()),
     )
@@ -210,8 +210,8 @@ def test_channel_element_with_t_hot():
     state = MixtureState(
         T=300.0,
         P=101325.0,
-        P_total=101325.0,
-        T_total=300.0,
+        Pt=101325.0,
+        Tt=300.0,
         m_dot=0.1,
         Y=cb.mole_to_mass(cb.species.dry_air()),
     )
@@ -248,8 +248,8 @@ def test_network_element_default():
     state = MixtureState(
         T=300.0,
         P=101325.0,
-        P_total=101325.0,
-        T_total=300.0,
+        Pt=101325.0,
+        Tt=300.0,
         m_dot=0.1,
         Y=cb.mole_to_mass(cb.species.dry_air()),
     )

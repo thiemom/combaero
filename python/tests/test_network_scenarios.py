@@ -21,8 +21,8 @@ def _get_air_Y():
 
 def build_pressure_bounds():
     """Create standard pressure boundaries."""
-    inlet = PressureBoundary("inlet", P_total=150000.0, T_total=300.0, Y=_get_air_Y())
-    outlet = PressureBoundary("outlet", P_total=100000.0, T_total=300.0, Y=_get_air_Y())
+    inlet = PressureBoundary("inlet", Pt=150000.0, Tt=300.0, Y=_get_air_Y())
+    outlet = PressureBoundary("outlet", Pt=100000.0, Tt=300.0, Y=_get_air_Y())
     return inlet, outlet
 
 
@@ -100,11 +100,11 @@ def test_step_3_full_series_no_bypass():
         graph.add_element(e)
 
     # Set initial guesses for better convergence
-    n1.initial_guess = {"n1.P": 140000.0, "n1.P_total": 140000.0}
-    mc1.initial_guess = {"mc1.P": 135000.0, "mc1.P_total": 135000.0}
-    n2.initial_guess = {"n2.P": 130000.0, "n2.P_total": 130000.0}
-    plen.initial_guess = {"plenum.P": 120000.0, "plenum.P_total": 120000.0}
-    mc2.initial_guess = {"mc2.P": 110000.0, "mc2.P_total": 110000.0}
+    n1.initial_guess = {"n1.P": 140000.0, "n1.Pt": 140000.0}
+    mc1.initial_guess = {"mc1.P": 135000.0, "mc1.Pt": 135000.0}
+    n2.initial_guess = {"n2.P": 130000.0, "n2.Pt": 130000.0}
+    plen.initial_guess = {"plenum.P": 120000.0, "plenum.Pt": 120000.0}
+    mc2.initial_guess = {"mc2.P": 110000.0, "mc2.Pt": 110000.0}
 
     solver = NetworkSolver(graph)
     sol = solver.solve(method="lm")
@@ -162,12 +162,12 @@ def test_step_4_adding_bypass():
         graph.add_element(e)
 
     # Set initial guesses
-    n1.initial_guess = {"n1.P": 145000.0, "n1.P_total": 145000.0}
-    mc1.initial_guess = {"mc1.P": 140000.0, "mc1.P_total": 140000.0}
-    n_bypass.initial_guess = {"n_bypass.P": 130000.0, "n_bypass.P_total": 130000.0}
-    n2.initial_guess = {"n2.P": 135000.0, "n2.P_total": 135000.0}
-    plen.initial_guess = {"plenum.P": 125000.0, "plenum.P_total": 125000.0}
-    mc2.initial_guess = {"mc2.P": 115000.0, "mc2.P_total": 115000.0}
+    n1.initial_guess = {"n1.P": 145000.0, "n1.Pt": 145000.0}
+    mc1.initial_guess = {"mc1.P": 140000.0, "mc1.Pt": 140000.0}
+    n_bypass.initial_guess = {"n_bypass.P": 130000.0, "n_bypass.Pt": 130000.0}
+    n2.initial_guess = {"n2.P": 135000.0, "n2.Pt": 135000.0}
+    plen.initial_guess = {"plenum.P": 125000.0, "plenum.Pt": 125000.0}
+    mc2.initial_guess = {"mc2.P": 115000.0, "mc2.Pt": 115000.0}
 
     solver = NetworkSolver(graph)
     sol = solver.solve(method="lm")
@@ -191,8 +191,8 @@ def test_network_validation_edge_cases():
 
     # Test self-loop rejection
     graph = FlowNetwork()
-    inlet = PressureBoundary("inlet", P_total=150000.0, T_total=300.0, Y=_get_air_Y())
-    outlet = PressureBoundary("outlet", P_total=100000.0, T_total=300.0, Y=_get_air_Y())
+    inlet = PressureBoundary("inlet", Pt=150000.0, Tt=300.0, Y=_get_air_Y())
+    outlet = PressureBoundary("outlet", Pt=100000.0, Tt=300.0, Y=_get_air_Y())
 
     graph.add_node(inlet)
     graph.add_node(outlet)
@@ -207,8 +207,8 @@ def test_network_validation_edge_cases():
 
     # Test isolated node detection
     graph2 = FlowNetwork()
-    inlet2 = PressureBoundary("inlet2", P_total=150000.0, T_total=300.0, Y=_get_air_Y())
-    outlet2 = PressureBoundary("outlet2", P_total=100000.0, T_total=300.0, Y=_get_air_Y())
+    inlet2 = PressureBoundary("inlet2", Pt=150000.0, Tt=300.0, Y=_get_air_Y())
+    outlet2 = PressureBoundary("outlet2", Pt=100000.0, Tt=300.0, Y=_get_air_Y())
     isolated = PlenumNode("isolated")
 
     graph2.add_node(inlet2)
@@ -226,8 +226,8 @@ def test_network_validation_edge_cases():
 def test_parallel_elements():
     """Test parallel elements between same nodes"""
     graph = FlowNetwork()
-    inlet = PressureBoundary("inlet", P_total=150000.0, T_total=300.0, Y=_get_air_Y())
-    outlet = PressureBoundary("outlet", P_total=100000.0, T_total=300.0, Y=_get_air_Y())
+    inlet = PressureBoundary("inlet", Pt=150000.0, Tt=300.0, Y=_get_air_Y())
+    outlet = PressureBoundary("outlet", Pt=100000.0, Tt=300.0, Y=_get_air_Y())
 
     graph.add_node(inlet)
     graph.add_node(outlet)

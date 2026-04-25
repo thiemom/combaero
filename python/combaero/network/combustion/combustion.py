@@ -282,9 +282,9 @@ def combustion_from_phi(
     # to avoid circular import
     fuel_state_dict = {
         "P": state_air.P,
-        "P_total": state_air.P_total,
+        "Pt": state_air.Pt,
         "T": state_air.T,
-        "T_total": state_air.T_total,
+        "Tt": state_air.Tt,
         "m_dot": fuel_stream_phi.mdot,
         "Y": cb.mole_to_mass(X_fuel),
     }

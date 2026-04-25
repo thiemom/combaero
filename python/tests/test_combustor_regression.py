@@ -5,7 +5,7 @@ These tests guard against:
    inlets via LosslessConnectionElement (the original symptom was comb.P being
    unconstrained, leading to divergence and a ~2% mass imbalance).
 2. Pressure loss being silently ignored when using LosslessConnectionElement
-   inlets (marked xfail until the structural fix for the P / P_total decoupling
+   inlets (marked xfail until the structural fix for the P / Pt decoupling
    is implemented).
 """
 
@@ -45,17 +45,17 @@ def _make_lossless_inlet_network(xi=None):
     Y_ch4 = cb.species.pure_species("CH4")
 
     net = FlowNetwork()
-    air = MassFlowBoundary("air", m_dot=1.0, T_total=600.0, Y=Y_air)
-    air.initial_guess = {"air.P_total": 160000.0, "air.P": 160000.0}
-    fuel = MassFlowBoundary("fuel", m_dot=0.03, T_total=300.0, Y=Y_ch4)
-    fuel.initial_guess = {"fuel.P_total": 160000.0, "fuel.P": 160000.0}
+    air = MassFlowBoundary("air", m_dot=1.0, Tt=600.0, Y=Y_air)
+    air.initial_guess = {"air.Pt": 160000.0, "air.P": 160000.0}
+    fuel = MassFlowBoundary("fuel", m_dot=0.03, Tt=300.0, Y=Y_ch4)
+    fuel.initial_guess = {"fuel.Pt": 160000.0, "fuel.P": 160000.0}
 
     comb = CombustorNode("comb", method="complete")
-    comb.initial_guess = {"comb.P_total": 150000.0, "comb.P": 150000.0}
+    comb.initial_guess = {"comb.Pt": 150000.0, "comb.P": 150000.0}
     post = PlenumNode("post")
-    post.initial_guess = {"post.P_total": 140000.0, "post.P": 140000.0}
+    post.initial_guess = {"post.Pt": 140000.0, "post.P": 140000.0}
 
-    out = PressureBoundary("out", P_total=101325.0, T_total=300.0)
+    out = PressureBoundary("out", Pt=101325.0, Tt=300.0)
 
     for n in (air, fuel, comb, post, out):
         net.add_node(n)
@@ -86,8 +86,8 @@ def test_combustor_lossless_inlets_mass_balance():
     """Regression: CombustorNode fed by MassFlowBoundary via LosslessConnectionElement.
 
     Previously the comb.P unknown was unconstrained when the node residual was
-    P_total - P_total_mix = 0, causing solver divergence and a ~2% mass imbalance.
-    The fix (P_total - P = 0) ties both pressure unknowns together.
+    Pt - Pt_mix = 0, causing solver divergence and a ~2% mass imbalance.
+    The fix (Pt - P = 0) ties both pressure unknowns together.
     """
     net, _comb = _make_lossless_inlet_network(xi=None)
     sol = NetworkSolver(net).solve(method="hybr", use_jac=True)
@@ -102,8 +102,8 @@ def test_combustor_lossless_inlets_mass_balance():
     assert abs(m_out - 1.03) < 1e-6, f"Outlet mass wrong: {m_out:.6f} != 1.03"
     assert abs(m_in - m_out) < 1e-8, f"Mass imbalance: {m_in - m_out:.2e}"
 
-    # P and P_total must be consistent (combustor is low-velocity volume).
-    assert abs(sol["comb.P"] - sol["comb.P_total"]) < 1.0
+    # P and Pt must be consistent (combustor is low-velocity volume).
+    assert abs(sol["comb.P"] - sol["comb.Pt"]) < 1.0
 
 
 def _make_effective_area_inlet_network(loss_correlation=None):
@@ -118,15 +118,15 @@ def _make_effective_area_inlet_network(loss_correlation=None):
     Y_ch4 = cb.species.pure_species("CH4")
 
     net = FlowNetwork()
-    air = MassFlowBoundary("air", m_dot=1.0, T_total=600.0, Y=Y_air)
-    air.initial_guess = {"air.P_total": 160000.0, "air.P": 160000.0}
-    fuel = MassFlowBoundary("fuel", m_dot=0.03, T_total=300.0, Y=Y_ch4)
-    fuel.initial_guess = {"fuel.P_total": 160000.0, "fuel.P": 160000.0}
+    air = MassFlowBoundary("air", m_dot=1.0, Tt=600.0, Y=Y_air)
+    air.initial_guess = {"air.Pt": 160000.0, "air.P": 160000.0}
+    fuel = MassFlowBoundary("fuel", m_dot=0.03, Tt=300.0, Y=Y_ch4)
+    fuel.initial_guess = {"fuel.Pt": 160000.0, "fuel.P": 160000.0}
     comb = CombustorNode("comb", method="complete")
-    comb.initial_guess = {"comb.P_total": 150000.0, "comb.P": 140000.0}
+    comb.initial_guess = {"comb.Pt": 150000.0, "comb.P": 140000.0}
     post = PlenumNode("post")
-    post.initial_guess = {"post.P_total": 135000.0, "post.P": 135000.0}
-    out = PressureBoundary("out", P_total=101325.0, T_total=300.0)
+    post.initial_guess = {"post.Pt": 135000.0, "post.P": 135000.0}
+    out = PressureBoundary("out", Pt=101325.0, Tt=300.0)
     for n in (air, fuel, comb, post, out):
         net.add_node(n)
 
@@ -158,7 +158,7 @@ def test_combustor_pressure_loss_applied_at_post_plenum():
     net, _ = _make_effective_area_inlet_network(loss_correlation=ConstantFractionLoss(xi=xi))
     sol = NetworkSolver(net).solve(method="hybr", use_jac=True, options={"xtol": 1e-12})
     assert sol["__success__"]
-    ratio = sol["post.P_total"] / sol["comb.P_total"]
+    ratio = sol["post.Pt"] / sol["comb.Pt"]
     assert ratio == pytest.approx(1.0 - xi, rel=1e-4)
 
 
@@ -186,8 +186,8 @@ LOSS_MODELS = [
 def test_combustor_pressure_loss_affects_solution(loss_model, label):
     """The solution with loss MUST differ from the lossless baseline.
 
-    Physically: with fixed outlet P_total and fixed inlet mass flows, introducing
-    a combustor pressure loss must raise the upstream MassFlowBoundary P_total so
+    Physically: with fixed outlet Pt and fixed inlet mass flows, introducing
+    a combustor pressure loss must raise the upstream MassFlowBoundary Pt so
     the nozzle still passes the required flow against the same back pressure.
     """
     # Lossless baseline
@@ -201,10 +201,10 @@ def test_combustor_pressure_loss_affects_solution(loss_model, label):
     assert sol["__success__"], f"{label} solver failed: |F|={sol['__final_norm__']:.2e}"
 
     # Upstream pressure MUST rise to overcome the loss. Require at least 0.1% difference.
-    rel_diff = abs(sol["air.P_total"] - sol0["air.P_total"]) / sol0["air.P_total"]
+    rel_diff = abs(sol["air.Pt"] - sol0["air.Pt"]) / sol0["air.Pt"]
     assert rel_diff > 1e-3, (
-        f"{label}: loss not enforced - air.P_total={sol['air.P_total']:.2f} vs "
-        f"lossless={sol0['air.P_total']:.2f} (rel diff {rel_diff:.2e})"
+        f"{label}: loss not enforced - air.Pt={sol['air.Pt']:.2f} vs "
+        f"lossless={sol0['air.Pt']:.2f} (rel diff {rel_diff:.2e})"
     )
 
 
@@ -216,9 +216,9 @@ def test_combustor_pressure_loss_affects_solution(loss_model, label):
 
 
 def test_combustor_constant_fraction_loss_exact_pressure_rise():
-    """ConstantFractionLoss(xi=0.05): upstream P_total must rise by 1/(1-xi) - 1 = 5.263%.
+    """ConstantFractionLoss(xi=0.05): upstream Pt must rise by 1/(1-xi) - 1 = 5.263%.
 
-    With fixed outlet P_total and fixed inlet m_dot, the nozzle (orifice) dictates
+    With fixed outlet Pt and fixed inlet m_dot, the nozzle (orifice) dictates
     a required upstream-of-orifice stagnation pressure. Introducing a 5% combustor
     total-pressure loss forces the MassFlowBoundary pressures up by exactly the
     inverse factor 1/(1-xi) to deliver the same flow against the same back pressure.
@@ -239,16 +239,16 @@ def test_combustor_constant_fraction_loss_exact_pressure_rise():
     # The exact factor depends on the pressure-flow law of the upstream element;
     # allow a ~1% tolerance on the rise magnitude.
     expected_rise = 1.0 / (1.0 - xi) - 1.0
-    actual_rise = (sol["air.P_total"] - sol0["air.P_total"]) / sol0["air.P_total"]
+    actual_rise = (sol["air.Pt"] - sol0["air.Pt"]) / sol0["air.Pt"]
     assert actual_rise == pytest.approx(expected_rise, rel=1e-2), (
-        f"Upstream P_total rise {actual_rise * 100:.4f}% != "
+        f"Upstream Pt rise {actual_rise * 100:.4f}% != "
         f"expected {expected_rise * 100:.4f}% (1/(1-xi)-1)"
     )
 
-    # Post-loss plenum P_total must be (1-xi) * combustor P_total exactly.
-    ratio = sol["post.P_total"] / sol["comb.P_total"]
+    # Post-loss plenum Pt must be (1-xi) * combustor Pt exactly.
+    ratio = sol["post.Pt"] / sol["comb.Pt"]
     assert ratio == pytest.approx(1.0 - xi, rel=1e-4), (
-        f"post.P_total / comb.P_total = {ratio:.5f} != {1.0 - xi:.5f}"
+        f"post.Pt / comb.Pt = {ratio:.5f} != {1.0 - xi:.5f}"
     )
 
 
@@ -256,7 +256,7 @@ def test_combustor_constant_head_loss_exact_pressure_rise():
     """ConstantHeadLoss(zeta): the loss fraction xi = zeta * 0.5*rho*v^2 / P_in.
 
     For the same network with fixed inlet m_dot and outlet P, the solver must
-    satisfy post.P_total = (1 - xi_converged) * comb.P_total where
+    satisfy post.Pt = (1 - xi_converged) * comb.Pt where
     xi_converged is the dynamic-head fraction at the converged flow state.
     """
     zeta = 5.0
@@ -270,17 +270,17 @@ def test_combustor_constant_head_loss_exact_pressure_rise():
     assert sol["__success__"], f"|F|={sol['__final_norm__']:.2e}"
 
     # xi at converged state = 1 - post/comb (total-pressure ratio)
-    xi_eff = 1.0 - sol["post.P_total"] / sol["comb.P_total"]
+    xi_eff = 1.0 - sol["post.Pt"] / sol["comb.Pt"]
     assert xi_eff > 0.001, f"Converged xi too small: {xi_eff:.2e}"
 
-    # Upstream P_total rise relative to lossless baseline matches 1/(1-xi_eff) - 1
+    # Upstream Pt rise relative to lossless baseline matches 1/(1-xi_eff) - 1
     net0, _ = _make_effective_area_inlet_network(loss_correlation=None)
     sol0 = NetworkSolver(net0).solve(method="hybr", use_jac=True, options={"xtol": 1e-12})
     assert sol0["__success__"]
     expected_rise = 1.0 / (1.0 - xi_eff) - 1.0
-    actual_rise = (sol["air.P_total"] - sol0["air.P_total"]) / sol0["air.P_total"]
+    actual_rise = (sol["air.Pt"] - sol0["air.Pt"]) / sol0["air.Pt"]
     assert actual_rise == pytest.approx(expected_rise, rel=5e-3), (
-        f"Zeta loss: upstream P_total rise {actual_rise * 100:.4f}% != "
+        f"Zeta loss: upstream Pt rise {actual_rise * 100:.4f}% != "
         f"expected {expected_rise * 100:.4f}% (based on converged xi={xi_eff:.5f})"
     )
 
@@ -297,7 +297,7 @@ def test_combustor_lossless_inlets_pressure_loss_enforced():
     sol = NetworkSolver(net).solve(method="hybr", use_jac=True, options={"xtol": 1e-12})
     assert sol["__success__"]
 
-    ratio = sol["post.P_total"] / sol["comb.P_total"]
+    ratio = sol["post.Pt"] / sol["comb.Pt"]
     assert ratio == pytest.approx(1.0 - xi, rel=1e-4), (
         f"Loss not enforced: post/comb = {ratio:.5f}, expected {1.0 - xi:.5f}"
     )
@@ -315,10 +315,10 @@ def test_pressure_loss_cold_flow_warning_without_theta_source():
 
     net = FlowNetwork()
     # Two generic plenums, no combustor anywhere.
-    p_in = PressureBoundary("p_in", P_total=200000.0, T_total=500.0)
-    p_out = PressureBoundary("p_out", P_total=101325.0, T_total=500.0)
+    p_in = PressureBoundary("p_in", Pt=200000.0, Tt=500.0)
+    p_out = PressureBoundary("p_out", Pt=101325.0, Tt=500.0)
     p_mid = PlenumNode("mid")
-    p_mid.initial_guess = {"mid.P_total": 150000.0, "mid.P": 150000.0}
+    p_mid.initial_guess = {"mid.Pt": 150000.0, "mid.P": 150000.0}
     for n in (p_in, p_mid, p_out):
         net.add_node(n)
 
@@ -344,21 +344,21 @@ def test_pressure_loss_cold_flow_warning_without_theta_source():
         f"Expected cold-flow warning; got: {msgs!r}"
     )
     assert sol["__success__"]
-    # Cold-flow: theta = 0 -> xi = xi0. Ratio = P_out_boundary / mid.P_total.
+    # Cold-flow: theta = 0 -> xi = xi0. Ratio = P_out_boundary / mid.Pt.
     P_out_fixed = 101325.0
-    ratio = P_out_fixed / sol["mid.P_total"]
+    ratio = P_out_fixed / sol["mid.Pt"]
     assert ratio == pytest.approx(1.0 - xi0, rel=1e-4)
 
 
 def test_pressure_loss_ambiguous_both_endpoints_theta_raises():
     """PressureLossElement between two has_theta=True nodes raises at validate."""
     net = FlowNetwork()
-    p_in = PressureBoundary("p_in", P_total=200000.0, T_total=500.0)
-    p_out = PressureBoundary("p_out", P_total=101325.0, T_total=500.0)
+    p_in = PressureBoundary("p_in", Pt=200000.0, Tt=500.0)
+    p_out = PressureBoundary("p_out", Pt=101325.0, Tt=500.0)
     c1 = CombustorNode("c1", method="complete")
-    c1.initial_guess = {"c1.P_total": 180000.0, "c1.P": 180000.0}
+    c1.initial_guess = {"c1.Pt": 180000.0, "c1.P": 180000.0}
     c2 = CombustorNode("c2", method="complete")
-    c2.initial_guess = {"c2.P_total": 160000.0, "c2.P": 160000.0}
+    c2.initial_guess = {"c2.Pt": 160000.0, "c2.P": 160000.0}
     for n in (p_in, c1, c2, p_out):
         net.add_node(n)
 
@@ -375,12 +375,12 @@ def test_pressure_loss_ambiguous_both_endpoints_theta_raises():
 def test_pressure_loss_explicit_theta_source_override():
     """theta_source='<id>' disambiguates when both endpoints are combustors."""
     net = FlowNetwork()
-    p_in = PressureBoundary("p_in", P_total=400000.0, T_total=500.0)
-    p_out = PressureBoundary("p_out", P_total=101325.0, T_total=500.0)
+    p_in = PressureBoundary("p_in", Pt=400000.0, Tt=500.0)
+    p_out = PressureBoundary("p_out", Pt=101325.0, Tt=500.0)
     c1 = CombustorNode("c1", method="complete")
-    c1.initial_guess = {"c1.P_total": 380000.0, "c1.P": 380000.0}
+    c1.initial_guess = {"c1.Pt": 380000.0, "c1.P": 380000.0}
     c2 = CombustorNode("c2", method="complete")
-    c2.initial_guess = {"c2.P_total": 340000.0, "c2.P": 340000.0}
+    c2.initial_guess = {"c2.Pt": 340000.0, "c2.P": 340000.0}
     for n in (p_in, c1, c2, p_out):
         net.add_node(n)
 
@@ -401,15 +401,15 @@ def test_pressure_loss_explicit_theta_source_override():
     sol = NetworkSolver(net).solve(method="hybr", use_jac=True, options={"xtol": 1e-12})
     assert sol["__success__"]
     # Loss must still be applied exactly.
-    ratio = sol["c2.P_total"] / sol["c1.P_total"]
+    ratio = sol["c2.Pt"] / sol["c1.Pt"]
     assert ratio == pytest.approx(0.95, rel=1e-4)
 
 
 def test_pressure_loss_invalid_theta_source_raises():
     """theta_source pointing to a has_theta=False node raises at resolve."""
     net = FlowNetwork()
-    p_in = PressureBoundary("p_in", P_total=200000.0, T_total=500.0)
-    p_out = PressureBoundary("p_out", P_total=101325.0, T_total=500.0)
+    p_in = PressureBoundary("p_in", Pt=200000.0, Tt=500.0)
+    p_out = PressureBoundary("p_out", Pt=101325.0, Tt=500.0)
     mid = PlenumNode("mid")
     for n in (p_in, mid, p_out):
         net.add_node(n)
@@ -437,13 +437,13 @@ def test_combustor_channel_outlet_network_converges():
     Y_ch4 = cb.species.pure_species("CH4")
 
     net = FlowNetwork()
-    air = MassFlowBoundary("air", m_dot=1.0, T_total=600.0, Y=Y_air)
-    air.initial_guess = {"air.P_total": 160000.0, "air.P": 160000.0}
-    fuel = MassFlowBoundary("fuel", m_dot=0.03, T_total=300.0, Y=Y_ch4)
-    fuel.initial_guess = {"fuel.P_total": 160000.0, "fuel.P": 160000.0}
+    air = MassFlowBoundary("air", m_dot=1.0, Tt=600.0, Y=Y_air)
+    air.initial_guess = {"air.Pt": 160000.0, "air.P": 160000.0}
+    fuel = MassFlowBoundary("fuel", m_dot=0.03, Tt=300.0, Y=Y_ch4)
+    fuel.initial_guess = {"fuel.Pt": 160000.0, "fuel.P": 160000.0}
     comb = CombustorNode("comb", method="complete")
-    comb.initial_guess = {"comb.P_total": 150000.0, "comb.P": 150000.0}
-    out = PressureBoundary("out", P_total=101325.0, T_total=300.0)
+    comb.initial_guess = {"comb.Pt": 150000.0, "comb.P": 150000.0}
+    out = PressureBoundary("out", Pt=101325.0, Tt=300.0)
     for n in (air, fuel, comb, out):
         net.add_node(n)
 

@@ -32,21 +32,21 @@ def test_combustor_network_conservation():
     m_dot_fuel1 = 0.02
     m_dot_fuel2 = 0.04
 
-    air_in = MassFlowBoundary("air", m_dot=m_dot_air, T_total=600.0, Y=Y_air)
-    air_in.initial_guess = {"air.P_total": 160000.0, "air.P": 160000.0}
-    fuel1 = MassFlowBoundary("f1", m_dot=m_dot_fuel1, T_total=300.0, Y=Y_ch4)
-    fuel1.initial_guess = {"f1.P_total": 160000.0, "f1.P": 160000.0}
-    fuel2 = MassFlowBoundary("f2", m_dot=m_dot_fuel2, T_total=300.0, Y=Y_ch4)
-    fuel2.initial_guess = {"f2.P_total": 160000.0, "f2.P": 160000.0}
+    air_in = MassFlowBoundary("air", m_dot=m_dot_air, Tt=600.0, Y=Y_air)
+    air_in.initial_guess = {"air.Pt": 160000.0, "air.P": 160000.0}
+    fuel1 = MassFlowBoundary("f1", m_dot=m_dot_fuel1, Tt=300.0, Y=Y_ch4)
+    fuel1.initial_guess = {"f1.Pt": 160000.0, "f1.P": 160000.0}
+    fuel2 = MassFlowBoundary("f2", m_dot=m_dot_fuel2, Tt=300.0, Y=Y_ch4)
+    fuel2.initial_guess = {"f2.Pt": 160000.0, "f2.P": 160000.0}
 
-    p_out = PressureBoundary("out", P_total=101325.0, T_total=300.0)
+    p_out = PressureBoundary("out", Pt=101325.0, Tt=300.0)
 
     # complete combustion
     combustor = CombustorNode("combustor", method="complete")
 
     # Provide an initial guess to avoid dP=0 singularity across the nozzle at x0
     combustor.initial_guess = {
-        "combustor.P_total": 150000.0,
+        "combustor.Pt": 150000.0,
         "combustor.P": 140000.0,
         "combustor.T": 1500.0,
     }
@@ -123,16 +123,16 @@ def _make_simple_combustor_net(xi: float | None):
     Y_air = cb.species.dry_air_mass()
     Y_ch4 = cb.species.pure_species("CH4")
 
-    air_in = MassFlowBoundary("air", m_dot=1.0, T_total=600.0, Y=Y_air)
-    air_in.initial_guess = {"air.P_total": 160000.0, "air.P": 160000.0}
-    fuel_in = MassFlowBoundary("fuel", m_dot=0.03, T_total=300.0, Y=Y_ch4)
-    fuel_in.initial_guess = {"fuel.P_total": 160000.0, "fuel.P": 160000.0}
-    p_out = PressureBoundary("out", P_total=101325.0, T_total=300.0)
+    air_in = MassFlowBoundary("air", m_dot=1.0, Tt=600.0, Y=Y_air)
+    air_in.initial_guess = {"air.Pt": 160000.0, "air.P": 160000.0}
+    fuel_in = MassFlowBoundary("fuel", m_dot=0.03, Tt=300.0, Y=Y_ch4)
+    fuel_in.initial_guess = {"fuel.Pt": 160000.0, "fuel.P": 160000.0}
+    p_out = PressureBoundary("out", Pt=101325.0, Tt=300.0)
 
     combustor = CombustorNode("comb", method="complete")
-    combustor.initial_guess = {"comb.P_total": 150000.0, "comb.P": 140000.0}
+    combustor.initial_guess = {"comb.Pt": 150000.0, "comb.P": 140000.0}
     post = PlenumNode("post")
-    post.initial_guess = {"post.P_total": 140000.0, "post.P": 140000.0}
+    post.initial_guess = {"post.Pt": 140000.0, "post.P": 140000.0}
 
     net.add_node(air_in)
     net.add_node(fuel_in)
@@ -168,16 +168,16 @@ def test_pressure_loss_applied_in_network():
 
     With the new API, the loss is a ``PressureLossElement`` between the
     combustor and a downstream plenum. The invariant
-    ``post.P_total / comb.P_total == 1 - xi`` must hold exactly.
+    ``post.Pt / comb.Pt == 1 - xi`` must hold exactly.
     """
     xi = 0.05
     net_loss, _ = _make_simple_combustor_net(xi=xi)
     sol = NetworkSolver(net_loss).solve(method="hybr", use_jac=True)
 
-    P_comb = sol["comb.P_total"]
-    P_post = sol["post.P_total"]
+    P_comb = sol["comb.Pt"]
+    P_post = sol["post.Pt"]
     ratio = P_post / P_comb
     assert ratio == pytest.approx(1 - xi, rel=1e-4), (
         f"Loss ratio wrong: post/comb={ratio:.6f}, expected {1 - xi:.6f}"
     )
-    assert P_post < P_comb, "P_total must drop across the loss element"
+    assert P_post < P_comb, "Pt must drop across the loss element"

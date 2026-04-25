@@ -20,10 +20,10 @@ def test_all_nodes_only_P_Ptotal_unknowns():
     net = FlowNetwork()
 
     # Boundary nodes (no unknowns)
-    net.add_node(PressureBoundary("B1", P_total=101325.0, T_total=300.0))
-    net.add_node(PressureBoundary("B2", P_total=100000.0, T_total=300.0))
+    net.add_node(PressureBoundary("B1", Pt=101325.0, Tt=300.0))
+    net.add_node(PressureBoundary("B2", Pt=100000.0, Tt=300.0))
 
-    # Interior nodes (2 unknowns each: P, P_total)
+    # Interior nodes (2 unknowns each: P, Pt)
     net.add_node(PlenumNode("N1"))
     net.add_node(PlenumNode("N2"))
 
@@ -48,7 +48,7 @@ def test_all_nodes_only_P_Ptotal_unknowns():
 
     # Check naming pattern
     assert "N1.P" in solver.unknown_names
-    assert "N1.P_total" in solver.unknown_names
+    assert "N1.Pt" in solver.unknown_names
     assert "E1.m_dot" in solver.unknown_names
     # T and Y should NOT be in unknown_names
     for name in solver.unknown_names:
@@ -69,9 +69,9 @@ def test_single_stream_passthrough():
     X_in[1] = 0.3  # O2
     Y_in = list(cb.mole_to_mass(X_in))
 
-    net.add_node(PressureBoundary("IN", P_total=200000.0, T_total=500.0, Y=Y_in))
+    net.add_node(PressureBoundary("IN", Pt=200000.0, Tt=500.0, Y=Y_in))
     net.add_node(PlenumNode("MID"))
-    net.add_node(PressureBoundary("OUT", P_total=100000.0, T_total=300.0))
+    net.add_node(PressureBoundary("OUT", Pt=100000.0, Tt=300.0))
 
     net.add_element(
         OrificeElement("E1", "IN", "MID", Cd=0.6, diameter=0.112838, correlation="fixed")
@@ -99,12 +99,12 @@ def test_plenum_temperature_passthrough():
     net = FlowNetwork()
 
     # Stream 1: 1 kg/s at 300K
-    net.add_node(MassFlowBoundary("MF1", m_dot=1.0, T_total=300.0))
+    net.add_node(MassFlowBoundary("MF1", m_dot=1.0, Tt=300.0))
     # Stream 2: 1 kg/s at 500K
-    net.add_node(MassFlowBoundary("MF2", m_dot=1.0, T_total=500.0))
+    net.add_node(MassFlowBoundary("MF2", m_dot=1.0, Tt=500.0))
 
     net.add_node(PlenumNode("MIX"))
-    net.add_node(PressureBoundary("OUT", P_total=100000.0, T_total=400.0))
+    net.add_node(PressureBoundary("OUT", Pt=100000.0, Tt=400.0))
 
     # Connect both to MIX
     net.add_element(

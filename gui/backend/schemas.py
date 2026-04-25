@@ -73,7 +73,7 @@ class CompositionData(BaseModel):
 class MassBoundaryData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     m_dot: float = 1.0
-    T_total: float = 300.0
+    Tt: float = 300.0
     composition: CompositionData = Field(default_factory=CompositionData)
     initial_guess: dict[str, float] = Field(default_factory=dict)
     label: str | None = None
@@ -81,8 +81,8 @@ class MassBoundaryData(BaseModel):
 
 class PressureBoundaryData(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    P_total: float = 101325.0
-    T_total: float = 300.0
+    Pt: float = 101325.0
+    Tt: float = 300.0
     composition: CompositionData = Field(default_factory=CompositionData)
     initial_guess: dict[str, float] = Field(default_factory=dict)
     label: str | None = None
@@ -294,7 +294,8 @@ class StateResult(BaseModel):
     model_config = ConfigDict(extra="allow")
     T: float
     P: float
-    P_total: float | None = None
+    Pt: float | None = None
+    Tt: float | None = None
     rho: float | None = None
     h: float | None = None
     s: float | None = None

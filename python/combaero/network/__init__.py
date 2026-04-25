@@ -41,8 +41,8 @@ from .pressure_loss import (
     LinearThetaHeadLoss,
     LinearThetaLoss,
 )
+from .schema import DiagnosticSpec, spec_for, validate_diagnostics, ALL_KNOWN_FIELDS
 from .solver import NetworkSolver
-from .utils import results_to_dataframe
 
 __all__: list[str] = [
     "PlenumNode",
@@ -68,7 +68,10 @@ __all__: list[str] = [
     "NetworkSolver",
     "NetworkNode",
     "NetworkElement",
-    "results_to_dataframe",
+    "DiagnosticSpec",
+    "spec_for",
+    "validate_diagnostics",
+    "ALL_KNOWN_FIELDS",
     "ConvectiveSurface",
     "SmoothModel",
     "RibbedModel",

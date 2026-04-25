@@ -62,15 +62,15 @@ def main():
     Y_air = air.state.Y
     Y_fuel = fuel.state.Y
 
-    air_pilot_in = MassFlowBoundary("air_pilot_in", m_dot=m_dot_air_pilot, T_total=700.0, Y=Y_air)
-    air_main_in = MassFlowBoundary("air_main_in", m_dot=m_dot_air_main, T_total=700.0, Y=Y_air)
+    air_pilot_in = MassFlowBoundary("air_pilot_in", m_dot=m_dot_air_pilot, Tt=700.0, Y=Y_air)
+    air_main_in = MassFlowBoundary("air_main_in", m_dot=m_dot_air_main, Tt=700.0, Y=Y_air)
 
-    f_pilot_in = MassFlowBoundary("f_pilot_in", m_dot=m_dot_pilot, T_total=300.0, Y=Y_fuel)
-    f_main_in = MassFlowBoundary("f_main_in", m_dot=m_dot_main, T_total=300.0, Y=Y_fuel)
-    f_axial_in = MassFlowBoundary("f_axial_in", m_dot=m_dot_axial, T_total=300.0, Y=Y_fuel)
+    f_pilot_in = MassFlowBoundary("f_pilot_in", m_dot=m_dot_pilot, Tt=300.0, Y=Y_fuel)
+    f_main_in = MassFlowBoundary("f_main_in", m_dot=m_dot_main, Tt=300.0, Y=Y_fuel)
+    f_axial_in = MassFlowBoundary("f_axial_in", m_dot=m_dot_axial, Tt=300.0, Y=Y_fuel)
 
     turbine_back_pressure = PressureBoundary(
-        "turbine_bc", P_total=P_turbine_inlet, T_total=T_combustor_target, Y=Y_air
+        "turbine_bc", Pt=P_turbine_inlet, Tt=T_combustor_target, Y=Y_air
     )
 
     # Internal Mixing/Combustion Nodes
@@ -146,7 +146,7 @@ def main():
     print("-" * 50)
     for node_id in ["pilot_zone", "main_zone", "intermediate_exit", "axial_zone"]:
         T = sol[f"{node_id}.T"]
-        P = sol[f"{node_id}.P_total"] / 1e3
+        P = sol[f"{node_id}.Pt"] / 1e3
         print(f"{node_id:<25} {T:10.2f} {P:12.2f}")
 
     print("\n--- Mass Balance ---")

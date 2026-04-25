@@ -43,7 +43,7 @@ const NetworkCanvas = () => {
 				data = {
 					...data,
 					m_dot: 1.0,
-					T_total: 300,
+					Tt: 300,
 					composition: {
 						source: "dry_air",
 						mode: "mole",
@@ -53,8 +53,8 @@ const NetworkCanvas = () => {
 			} else if (type === "pressure_boundary") {
 				data = {
 					...data,
-					P_total: 101325,
-					T_total: 300,
+					Pt: 101325,
+					Tt: 300,
 					composition: {
 						source: "dry_air",
 						mode: "mole",

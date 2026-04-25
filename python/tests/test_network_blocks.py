@@ -64,13 +64,9 @@ def test_atomic_network_components():
     Y_air[11] = 0.79  # N2
     Y_air[12] = 0.21  # O2
 
-    state_in = MixtureState(
-        P=500000.0, P_total=500000.0, T=300.0, T_total=300.0, m_dot=0.1, Y=Y_air
-    )
+    state_in = MixtureState(P=500000.0, Pt=500000.0, T=300.0, Tt=300.0, m_dot=0.1, Y=Y_air)
 
-    _state_out = MixtureState(
-        P=101325.0, P_total=101325.0, T=300.0, T_total=300.0, m_dot=0.1, Y=Y_air
-    )
+    _state_out = MixtureState(P=101325.0, Pt=101325.0, T=300.0, Tt=300.0, m_dot=0.1, Y=Y_air)
 
     # 2. Instantiate nodes (Boundary, intermediate Plenum, Sink)
     inlet = PressureBoundary("inlet")
@@ -101,7 +97,7 @@ def test_atomic_network_components():
     assert orifice_1.n_equations() == 1
     assert channel_1.n_equations() == 1
     assert len(inlet.unknowns()) == 0
-    assert len(node_1.unknowns()) >= 2  # P, P_total, and possibly T or X
+    assert len(node_1.unknowns()) >= 2  # P, Pt, and possibly T or X
 
     # 5. Verify mixture state wrappers
     rho = state_in.density()
@@ -119,7 +115,7 @@ def test_momentum_chamber_network():
     unknowns = node_mc.unknowns()
     assert len(unknowns) >= 2
     assert "chamber_1.P" in unknowns
-    assert "chamber_1.P_total" in unknowns
+    assert "chamber_1.Pt" in unknowns
 
     # 1b. Verify directional flow vectors (angles)
     assert node_mc.get_port_angle("channel_in") == 0.0  # default

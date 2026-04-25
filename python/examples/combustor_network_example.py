@@ -22,7 +22,7 @@ def main():
     X_air = cb.species.dry_air()
     Y_air = cb.mole_to_mass(X_air)
     m_dot_air = 2.0
-    air_in = MassFlowBoundary("air_in", m_dot=m_dot_air, T_total=600.0, Y=Y_air)
+    air_in = MassFlowBoundary("air_in", m_dot=m_dot_air, Tt=600.0, Y=Y_air)
 
     # Fuel/air ratio
     FAR = 0.03
@@ -35,21 +35,21 @@ def main():
     X_ch4[cb.species_index_from_name("CH4")] = 1.0
     Y_ch4 = cb.mole_to_mass(X_ch4)
     m_dot_pilot = PFF * m_dot_air * FAR
-    fuel_pilot = MassFlowBoundary("fuel_pilot", m_dot=m_dot_pilot, T_total=300.0, Y=Y_ch4)
+    fuel_pilot = MassFlowBoundary("fuel_pilot", m_dot=m_dot_pilot, Tt=300.0, Y=Y_ch4)
 
     # Fuel stream 2 (Main, pure CH4)
     m_dot_main = (1 - PFF) * m_dot_air * FAR
-    fuel_main = MassFlowBoundary("fuel_main", m_dot=m_dot_main, T_total=300.0, Y=Y_ch4)
+    fuel_main = MassFlowBoundary("fuel_main", m_dot=m_dot_main, Tt=300.0, Y=Y_ch4)
 
     # Back pressure (discharge atmosphere)
-    p_out = PressureBoundary("exhaust", P_total=101325.0, T_total=300.0, Y=Y_air)
+    p_out = PressureBoundary("exhaust", Pt=101325.0, Tt=300.0, Y=Y_air)
 
     # --- Inner Nodes ---
     combustor = CombustorNode("combustor", method="complete")
 
     # Provide an initial guess to avoid dP=0 singularity across the nozzle at x0
     combustor.initial_guess = {
-        "combustor.P_total": 150000.0,
+        "combustor.Pt": 150000.0,
         "combustor.P": 140000.0,
         "combustor.T": 1500.0,
     }
@@ -87,7 +87,7 @@ def main():
 
     # Print results
     print("\n--- Combustor Results ---")
-    print(f"P_total: {sol['combustor.P_total'] / 1000.0:.1f} kPa")
+    print(f"Pt: {sol['combustor.Pt'] / 1000.0:.1f} kPa")
     print(f"T_out:   {sol['combustor.T']:.2f} K")
 
     print("\n--- Network Mass Balance ---")

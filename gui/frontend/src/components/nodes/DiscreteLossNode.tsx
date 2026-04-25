@@ -14,8 +14,8 @@ const DiscreteLossNode = ({ id, data, selected }: NodeProps) => {
 	const textRotation = rotation === 90 || rotation === 180 ? 180 : 0;
 
 	const dPBar =
-		data.result?.dP_total != null
-			? `ΔP ${(data.result.dP_total / 1e5).toFixed(4)} bar`
+		data.result?.dPt != null
+			? `ΔP ${(data.result.dPt / 1e5).toFixed(4)} bar`
 			: null;
 
 	const formulaByType: Record<string, string> = {

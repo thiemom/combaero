@@ -121,12 +121,12 @@ def test_expand_initial_guess_empty_returns_empty():
 
 def test_expand_initial_guess_P_broadcasts_to_static_and_total():
     out = _expand_initial_guess({"P": 150000.0}, "plenum1")
-    assert out == {"plenum1.P": 150000.0, "plenum1.P_total": 150000.0}
+    assert out == {"plenum1.P": 150000.0, "plenum1.Pt": 150000.0}
 
 
 def test_expand_initial_guess_T_broadcasts_to_static_and_total():
     out = _expand_initial_guess({"T": 600.0}, "comb")
-    assert out == {"comb.T": 600.0, "comb.T_total": 600.0}
+    assert out == {"comb.T": 600.0, "comb.Tt": 600.0}
 
 
 def test_expand_initial_guess_m_dot_maps_without_broadcast():
@@ -141,23 +141,23 @@ def test_expand_initial_guess_qualified_key_passthrough():
 
 
 def test_expand_initial_guess_explicit_Ptotal_wins_over_P_broadcast():
-    """Regression: ensure explicit `P_total` overrides the `P -> P_total`
+    """Regression: ensure explicit `Pt` overrides the `P -> Pt`
     broadcast regardless of dict iteration order."""
     # P first in dict
-    out1 = _expand_initial_guess({"P": 100000.0, "P_total": 101325.0}, "n")
+    out1 = _expand_initial_guess({"P": 100000.0, "Pt": 101325.0}, "n")
     assert out1["n.P"] == 100000.0
-    assert out1["n.P_total"] == 101325.0
+    assert out1["n.Pt"] == 101325.0
 
-    # P_total first in dict
-    out2 = _expand_initial_guess({"P_total": 101325.0, "P": 100000.0}, "n")
+    # Pt first in dict
+    out2 = _expand_initial_guess({"Pt": 101325.0, "P": 100000.0}, "n")
     assert out2["n.P"] == 100000.0
-    assert out2["n.P_total"] == 101325.0
+    assert out2["n.Pt"] == 101325.0
 
 
 def test_expand_initial_guess_explicit_Ttotal_wins_over_T_broadcast():
-    out = _expand_initial_guess({"T": 500.0, "T_total": 520.0}, "n")
+    out = _expand_initial_guess({"T": 500.0, "Tt": 520.0}, "n")
     assert out["n.T"] == 500.0
-    assert out["n.T_total"] == 520.0
+    assert out["n.Tt"] == 520.0
 
 
 def test_expand_initial_guess_mixed_short_and_qualified():
@@ -167,7 +167,7 @@ def test_expand_initial_guess_mixed_short_and_qualified():
     )
     assert out == {
         "comb.P": 150000.0,
-        "comb.P_total": 150000.0,
+        "comb.Pt": 150000.0,
         "comb.m_dot": 1.2,
         "other.X[0]": 0.767,
     }

@@ -41,7 +41,7 @@ const PressureBoundaryNode = ({ id, data, selected }: NodeProps) => {
 					</span>
 				)}
 				<div className="text-[10px] text-gray-500 font-mono whitespace-nowrap">
-					{(data.P_total / 1e5).toFixed(2)} bar
+					{(data.Pt / 1e5).toFixed(2)} bar
 				</div>
 			</div>
 
