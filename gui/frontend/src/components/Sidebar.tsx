@@ -14,7 +14,8 @@ import {
 	Wind,
 } from "lucide-react";
 import type React from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { checkContinuationAvailable } from "../api";
 import useStore from "../store/useStore";
 import NumericInput from "./NumericInput";
 
@@ -29,7 +30,25 @@ const Sidebar = () => {
 		updateSolverSettings,
 		nodes,
 		setNodes,
+		solveResults,
 	} = useStore();
+
+	const [isContinuationAvailable, setIsContinuationAvailable] = useState(false);
+
+	useEffect(() => {
+		// Use dependencies to satisfy linter while ensuring re-check on change
+		const _trigger = [solverSettings, solveResults];
+		void _trigger;
+		const check = async () => {
+			try {
+				const available = await checkContinuationAvailable();
+				setIsContinuationAvailable(available);
+			} catch (err) {
+				console.error("Failed to check continuation availability:", err);
+			}
+		};
+		check();
+	}, [solverSettings, solveResults]);
 
 	const resetAllInitialGuesses = () => {
 		let touched = 0;
@@ -282,6 +301,17 @@ const Sidebar = () => {
 						<option value="default">Default Cold Start</option>
 						<option value="incompressible_warmstart">Incomp. Warmstart</option>
 						<option value="homotopy">Load-Stepping (Homotopy)</option>
+						<option
+							value="continuation"
+							disabled={!isContinuationAvailable}
+							title={
+								!isContinuationAvailable
+									? "Run a standard solve first to enable continuation"
+									: ""
+							}
+						>
+							Continuation {!isContinuationAvailable ? "(Locked)" : ""}
+						</option>
 					</select>
 				</div>
 				<div className="flex flex-col gap-1">
@@ -319,7 +349,7 @@ const Sidebar = () => {
 					/>
 				</div>
 
-				<div className="border-t border-stone-200 pt-2">
+				<div className="border-t border-stone-200 pt-2 flex flex-col gap-2">
 					<button
 						type="button"
 						onClick={resetAllInitialGuesses}
@@ -328,6 +358,16 @@ const Sidebar = () => {
 					>
 						Reset All Initial Guesses
 					</button>
+
+					{solveResults && (solveResults as any).isTopologyMismatch && (
+						<button
+							type="button"
+							onClick={() => updateSolverSettings({ init_strategy: "default" })}
+							className="w-full text-[10px] font-bold uppercase tracking-wider bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded px-2 py-1.5 transition-colors"
+						>
+							Reset Solver (Cold Start)
+						</button>
+					)}
 				</div>
 			</div>
 		</aside>

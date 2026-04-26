@@ -39,3 +39,10 @@ export const fetchMaterials = async (): Promise<string[]> => {
 	const response = await axios.get(`${API_BASE_URL}/metadata/materials`);
 	return response.data.names || [];
 };
+
+export const checkContinuationAvailable = async (): Promise<boolean> => {
+	const response = await axios.get(
+		`${API_BASE_URL}/solver/continuation_available`,
+	);
+	return response.data.available;
+};
