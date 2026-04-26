@@ -286,6 +286,27 @@ const Sidebar = () => {
 				</div>
 				<div className="flex flex-col gap-1">
 					<label className="text-[10px] font-bold text-gray-400 uppercase">
+						Solver Method
+					</label>
+					<select
+						className="p-1 border rounded text-xs bg-white"
+						value={solverSettings.method}
+						onChange={(e) => updateSolverSettings({ method: e.target.value })}
+					>
+						<option value="hybr">hybr (Powell)</option>
+						<option value="lm">lm (Levenberg-M.)</option>
+						<option value="krylov">krylov (Iterative)</option>
+						<option value="broyden1">broyden1 (Quasi-N.)</option>
+						<option value="broyden2">broyden2 (Quasi-N.)</option>
+						<option value="anderson">anderson</option>
+						<option value="linearmixing">linearmixing</option>
+						<option value="diagbroyden">diagbroyden</option>
+						<option value="excitingmixing">excitingmixing</option>
+						<option value="df-sane">df-sane</option>
+					</select>
+				</div>
+				<div className="flex flex-col gap-1">
+					<label className="text-[10px] font-bold text-gray-400 uppercase">
 						Max Solver Time (s)
 					</label>
 					<NumericInput
