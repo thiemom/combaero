@@ -31,6 +31,7 @@ export interface RFState {
 	solverSettings: {
 		global_regime: "incompressible" | "compressible";
 		init_strategy: "default" | "incompressible_warmstart" | "homotopy";
+		method: string;
 		timeout: number | null;
 	};
 	updateSolverSettings: (settings: Partial<RFState["solverSettings"]>) => void;
@@ -201,6 +202,7 @@ const useStore = create<RFState>((set, get) => ({
 	solverSettings: {
 		global_regime: "compressible",
 		init_strategy: "default",
+		method: "hybr",
 		timeout: 30,
 	},
 	updateSolverSettings: (settings: Partial<RFState["solverSettings"]>) => {

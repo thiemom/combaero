@@ -74,6 +74,7 @@ def _solve_sync(schema: NetworkGraphSchema):
     net = build_network_from_schema(schema)
     solver = NetworkSolver(net)
     result = solver.solve(
+        method=schema.solver_settings.method,
         init_strategy=schema.solver_settings.init_strategy,
         timeout=schema.solver_settings.timeout,
     )

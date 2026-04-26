@@ -254,6 +254,18 @@ class SolverSettings(BaseModel):
     model_config = ConfigDict(extra="ignore")
     global_regime: Literal["incompressible", "compressible"] = "incompressible"
     init_strategy: Literal["default", "incompressible_warmstart", "homotopy"] = "default"
+    method: Literal[
+        "hybr",
+        "lm",
+        "broyden1",
+        "broyden2",
+        "anderson",
+        "linearmixing",
+        "diagbroyden",
+        "excitingmixing",
+        "krylov",
+        "df-sane",
+    ] = "hybr"
     timeout: float | None = 180.0
 
 
