@@ -38,6 +38,7 @@ const Sidebar = () => {
 	useEffect(() => {
 		// Use dependencies to satisfy linter while ensuring re-check on change
 		const _trigger = [solverSettings, solveResults];
+		void _trigger;
 		const check = async () => {
 			try {
 				const available = await checkContinuationAvailable();

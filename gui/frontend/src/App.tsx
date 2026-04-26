@@ -1,6 +1,6 @@
 import axios from "axios";
 import { Download, Play, Zap } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ReactFlowProvider } from "reactflow";
 import { solveNetwork } from "./api";
 import Inspector from "./components/Inspector";
