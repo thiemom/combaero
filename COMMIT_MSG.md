@@ -1,7 +1,8 @@
-feat: expose solver method selection in the GUI sidebar
+feat: implement continuation solver and solver method selection
 
-Exposed the `method` parameter of `NetworkSolver.solve()` (e.g., `hybr`, `lm`, `krylov`) to the user via the "Solver Configuration" sidebar.
-- Added `method` to `SolverSettings` Pydantic model with Literal validation.
-- Updated FastAPI solve handler to pass the selected method to the solver.
-- Integrated `method` into the frontend Zustand store.
-- Added a dropdown menu in the Sidebar component for algorithm selection.
+- Exposed solver method options (lm, krylov, etc.) in backend and GUI.
+- Implemented 'continuation' initialization strategy to reuse converged solutions.
+- Added module-level persistence in FastAPI backend for solver warm-starts.
+- Implemented safety resets for topology mismatches and initial guess changes.
+- Added automated tests for continuation logic and fingerprinting.
+- Updated Sidebar with dynamic continuation availability and reset recovery.

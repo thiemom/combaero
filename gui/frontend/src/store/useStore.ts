@@ -30,7 +30,11 @@ export interface RFState {
 	setDisplaySettings: (settings: string[]) => void;
 	solverSettings: {
 		global_regime: "incompressible" | "compressible";
-		init_strategy: "default" | "incompressible_warmstart" | "homotopy";
+		init_strategy:
+			| "default"
+			| "incompressible_warmstart"
+			| "homotopy"
+			| "continuation";
 		method: string;
 		timeout: number | null;
 	};

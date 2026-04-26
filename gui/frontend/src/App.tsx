@@ -1,6 +1,6 @@
 import axios from "axios";
 import { Download, Play, Zap } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "reactflow";
 import { solveNetwork } from "./api";
 import Inspector from "./components/Inspector";
@@ -43,14 +43,24 @@ const App = () => {
 			console.error("Solve failed:", err);
 			if (axios.isAxiosError(err)) {
 				const detail = err.response?.data?.detail;
-				alert(
-					detail
-						? `Solve failed: ${detail}`
-						: "Solve failed. Check console for details.",
-				);
+				const message = detail
+					? `Solve failed: ${detail}`
+					: "Solve failed. Check console for details.";
+
+				setSolveResults({
+					success: false,
+					message: message,
+					isTopologyMismatch:
+						detail?.includes("Topology mismatch") ||
+						detail?.includes("Initial guess mismatch") ||
+						detail?.includes("x0 length does not match"),
+				});
 				return;
 			}
-			alert("Solve failed. Check console for details.");
+			setSolveResults({
+				success: false,
+				message: "Solve failed. Check console for details.",
+			});
 		} finally {
 			setIsSolving(false);
 		}

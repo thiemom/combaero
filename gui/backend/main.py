@@ -65,20 +65,54 @@ async def get_materials():
         "names": cb.list_materials(),
     }
 
+# Module-level persistence for warm-starting the solver across requests.
+_continuation_state: dict | None = None
 
 def _solve_sync(schema: NetworkGraphSchema):
     """
     Synchronous helper to build and solve the network.
     Runs in a separate thread to avoid blocking the FastAPI event loop.
     """
+    global _continuation_state
     net = build_network_from_schema(schema)
     solver = NetworkSolver(net)
+    x0 = None
+    if schema.solver_settings.init_strategy == "continuation":
+        if _continuation_state:
+            # Check topology fingerprint
+            solver._build_x0()
+            if _continuation_state["unknown_names"] != list(solver.unknown_names):
+                raise ValueError(
+                    "Topology mismatch: the current network unknowns do not match "
+                    "the saved continuation state. Please run a 'Default' solve first."
+                )
+
+            # Safety Reset: Check if initial guesses have changed
+            current_guesses = {
+                n.id: n.data.get("initial_guess", {}) for n in schema.nodes
+            }
+            if _continuation_state.get("initial_guesses") != current_guesses:
+                raise ValueError(
+                    "Initial guess mismatch: user overrides have changed since the last solve. "
+                    "Please run a 'Default' solve to incorporate these changes."
+                )
+
+            x0 = _continuation_state["x"]
+
     result = solver.solve(
         method=schema.solver_settings.method,
         init_strategy=schema.solver_settings.init_strategy,
         timeout=schema.solver_settings.timeout,
+        x0=x0,
     )
     success = bool(result.get("__success__", False))
+
+    if success:
+        _continuation_state = {
+            "x": result["__x_solution__"],
+            "unknown_names": result["__unknown_names__"],
+            "initial_guesses": {n.id: n.data.get("initial_guess", {}) for n in schema.nodes},
+        }
 
     node_results = {}
     for node_id in net.nodes:
@@ -307,6 +341,12 @@ async def export_results(schema: NetworkGraphSchema):
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/solver/continuation_available")
+async def get_continuation_available():
+    """Returns whether a converged state exists for continuation."""
+    return {"available": _continuation_state is not None}
 
 
 @app.get("/health")

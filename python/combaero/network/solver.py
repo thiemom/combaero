@@ -1158,9 +1158,9 @@ class NetworkSolver:
                 f"Method '{method}' is not supported. Supported methods are: {', '.join(self.SUPPORTED_METHODS)}"
             )
 
-        if init_strategy not in ("default", "incompressible_warmstart", "homotopy"):
+        if init_strategy not in ("default", "incompressible_warmstart", "homotopy", "continuation"):
             raise ValueError(
-                "init_strategy must be one of: 'default', 'incompressible_warmstart', 'homotopy'."
+                "init_strategy must be one of: 'default', 'incompressible_warmstart', 'homotopy', 'continuation'."
             )
         if warmstart_maxfev <= 0:
             raise ValueError("warmstart_maxfev must be > 0.")
@@ -1296,6 +1296,11 @@ class NetworkSolver:
                 # If it failed at lam=1.0 but current_x0 is much better than cold start,
                 # we will naturally use it as warmstart_x0 below.
                 warmstart_x0 = current_x0
+        elif x0 is None and init_strategy == "continuation":
+            raise ValueError(
+                "continuation init: no prior converged solution provided via 'x0'. "
+                "The caller is responsible for persisting and passing the previous 'x' vector."
+            )
 
         # --- Initial guess: user-supplied (warm-start) or auto-built ----
         if x0 is not None:
@@ -1576,6 +1581,8 @@ class NetworkSolver:
         sol_dict["__success__"] = success
         sol_dict["__message__"] = message
         sol_dict["__final_norm__"] = final_norm
+        sol_dict["__unknown_names__"] = list(self.unknown_names)
+        sol_dict["__x_solution__"] = list(final_x)
         return sol_dict
 
     def extract_complete_states(self, result: dict[str, float] | None = None) -> dict[str, Any]:
