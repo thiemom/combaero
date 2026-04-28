@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Literal
 
 import combaero as cb
+from combaero import _solver_tools
 
 # Physics configuration types for network introspectability
 CompressibilityLiteral = Literal["incompressible", "compressible"]
@@ -388,7 +389,7 @@ class ThermalWall:
         t_over_k_layers = [L.r_val for L in self.layers]
 
         # 4. Call C++ solver function
-        res = cb.wall_coupling_and_jacobian_multilayer(
+        res = _solver_tools.wall_coupling_and_jacobian_multilayer(
             h_a, T_aw_a, h_b, T_aw_b, t_over_k_layers, A_eff, self.R_fouling
         )
 
@@ -400,39 +401,6 @@ class ThermalWall:
         self._last_profile = [float(tp) for tp in profile]
 
         return res
-
-
-# Backward Compatibility Alias (Deprecated: use ThermalWall instead)
-class WallConnection(ThermalWall):
-    """Legacy alias for ThermalWall to support older network definitions.
-
-    Translates scalar thickness/conductivity into a single-layer ThermalWall.
-    """
-
-    def __init__(
-        self,
-        id: str,
-        element_a: str,
-        element_b: str,
-        wall_thickness: float,
-        wall_conductivity: float,
-        contact_area: float | None = None,
-    ):
-        super().__init__(
-            id=id,
-            element_a=element_a,
-            element_b=element_b,
-            layers=[WallLayer(thickness=wall_thickness, conductivity=wall_conductivity)],
-            contact_area=contact_area,
-        )
-
-    @property
-    def wall_thickness(self) -> float:
-        return self.layers[0].thickness if self.layers else 1.0
-
-    @property
-    def wall_conductivity(self) -> float:
-        return self.layers[0].conductivity if self.layers else 1.0
 
 
 class EnergyBoundary:
@@ -457,7 +425,7 @@ class EnergyBoundary:
 
 
 @dataclass
-class MixtureState:
+class NetworkMixtureState:
     P: float
     Pt: float
     T: float
@@ -530,12 +498,14 @@ class NetworkNode(ABC):
         pass
 
     @abstractmethod
-    def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
+    def residuals(
+        self, state: NetworkMixtureState
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
         """Returns (residuals, local_jacobian)."""
         pass
 
     def compute_derived_state(
-        self, upstream_states: list[MixtureState]
+        self, upstream_states: list[NetworkMixtureState]
     ) -> tuple[float, list[float], Any]:
         """
         Computes (Tt, Y, Jac) for nodes based on upstream conditions.
@@ -553,11 +523,11 @@ class NetworkNode(ABC):
         """Called automatically by FlowNetwork to resolve neighbors."""
         pass
 
-    def mach(self, state: MixtureState) -> float:
+    def mach(self, state: NetworkMixtureState) -> float:
         """Returns the local Mach number at this node. Default 0.0 (stagnation)."""
         return 0.0
 
-    def diagnostics(self, state: MixtureState) -> dict[str, float]:
+    def diagnostics(self, state: NetworkMixtureState) -> dict[str, float]:
         """Compute generalized node-level diagnostics (e.g., thermo properties)."""
         if state.P <= 0:
             return {}
@@ -604,8 +574,8 @@ class NetworkNode(ABC):
 
 
 def _element_pressure_block(
-    state_in: "MixtureState",
-    state_out: "MixtureState",
+    state_in: "NetworkMixtureState",
+    state_out: "NetworkMixtureState",
     mach_in: float,
     mach_out: float,
 ) -> dict[str, float]:
@@ -686,7 +656,7 @@ class NetworkElement(ABC):
 
     @abstractmethod
     def residuals(
-        self, state_in: MixtureState, state_out: MixtureState
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
         """
         Returns (residuals, local_jacobian).
@@ -710,11 +680,13 @@ class NetworkElement(ABC):
         """
         return None
 
-    def htc_and_T(self, state: MixtureState):
+    def htc_and_T(self, state: NetworkMixtureState):
         """Compute heat transfer coefficient and adiabatic wall temperature."""
         return None
 
-    def diagnostics(self, state_in: MixtureState, state_out: MixtureState) -> dict[str, float]:
+    def diagnostics(
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+    ) -> dict[str, float]:
         """Compute diagnostic properties for this element (e.g. Mach, P_ratio)."""
         return {}
 
@@ -740,7 +712,7 @@ class PlenumNode(NetworkNode):
         return [f"{self.id}.P", f"{self.id}.Pt"]
 
     def compute_derived_state(
-        self, upstream_states: list[MixtureState]
+        self, upstream_states: list[NetworkMixtureState]
     ) -> tuple[float, list[float], Any]:
         """Derived T and Y for a plenum (simple mixing + energy boundaries)."""
 
@@ -751,17 +723,21 @@ class PlenumNode(NetworkNode):
         Q_total = sum(eb.Q for eb in self.energy_boundaries)
         fraction_total = sum(eb.fraction for eb in self.energy_boundaries)
 
-        mix_res = cb.mixer_from_streams_and_jacobians(streams, Q=Q_total, fraction=fraction_total)
+        mix_res = _solver_tools.mixer_from_streams_and_jacobians(
+            streams, Q=Q_total, fraction=fraction_total
+        )
 
         return mix_res.T_mix, mix_res.Y_mix, mix_res
 
-    def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
+    def residuals(
+        self, state: NetworkMixtureState
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
         # Base residual: Pt = P for plenum
         res = [state.Pt - state.P]
         jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.Pt": 1.0}}
         return res, jac
 
-    def diagnostics(self, state: MixtureState) -> dict[str, float]:
+    def diagnostics(self, state: NetworkMixtureState) -> dict[str, float]:
         # Plenums: v ~ 0, so stagnation = static
         ts = cb.thermo_state(state.T, state.P, state.X)
         return {
@@ -832,7 +808,7 @@ class MomentumChamberNode(NetworkNode):
         return [f"{self.id}.P", f"{self.id}.Pt"]
 
     def compute_derived_state(
-        self, upstream_states: list[MixtureState]
+        self, upstream_states: list[NetworkMixtureState]
     ) -> tuple[float, list[float], Any]:
         """Derived T and Y for a momentum chamber (simple mixing + energy boundaries)."""
 
@@ -852,11 +828,13 @@ class MomentumChamberNode(NetworkNode):
         Q_total = sum(eb.Q for eb in self.energy_boundaries)
         fraction_total = sum(eb.fraction for eb in self.energy_boundaries)
 
-        mix_res = cb.mixer_from_streams_and_jacobians(streams, Q=Q_total, fraction=fraction_total)
+        mix_res = _solver_tools.mixer_from_streams_and_jacobians(
+            streams, Q=Q_total, fraction=fraction_total
+        )
 
         return mix_res.T_mix, mix_res.Y_mix, mix_res
 
-    def htc_and_T(self, state: MixtureState):
+    def htc_and_T(self, state: NetworkMixtureState):
         """Compute heat transfer coefficient for the momentum chamber."""
         if self.surface.area == 0.0:
             return None
@@ -879,14 +857,16 @@ class MomentumChamberNode(NetworkNode):
             T_hot=T_hot,
         )
 
-    def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
+    def residuals(
+        self, state: NetworkMixtureState
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
 
         # Momentum chamber: Pt = P_static + 0.5 * rho * v^2
         # Use total mass flow computed during compute_derived_state
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
 
         # Use C++ function for residual and analytical Jacobian
-        result = cb.momentum_chamber_residual_and_jacobian(
+        result = _solver_tools.momentum_chamber_residual_and_jacobian(
             state.P, state.Pt, m_dot_total, state.T, state.Y, self.area
         )
 
@@ -905,7 +885,7 @@ class MomentumChamberNode(NetworkNode):
 
         return res, jac
 
-    def mach(self, state: MixtureState) -> float:
+    def mach(self, state: NetworkMixtureState) -> float:
         """Computes Mach number using internal total mass flow and area."""
 
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
@@ -916,7 +896,7 @@ class MomentumChamberNode(NetworkNode):
         velocity = m_dot_total / (rho * self.area)
         return float(cb.mach_number(velocity, state.T, state.X))
 
-    def diagnostics(self, state: MixtureState) -> dict[str, float]:
+    def diagnostics(self, state: NetworkMixtureState) -> dict[str, float]:
         cs = cb.complete_state(state.T, state.P, state.X)
 
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
@@ -988,11 +968,13 @@ class PressureBoundary(NetworkNode):
     def unknowns(self) -> list[str]:
         return []
 
-    def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
+    def residuals(
+        self, state: NetworkMixtureState
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
         return [], {}
 
     def compute_derived_state(
-        self, upstream_states: list[MixtureState]
+        self, upstream_states: list[NetworkMixtureState]
     ) -> tuple[float, list[float], Any]:
         # Boundary nodes define their own state
 
@@ -1025,14 +1007,16 @@ class MassFlowBoundary(NetworkNode):
         # Pressure floats to whatever is required to push the defined mass flow
         return [f"{self.id}.P", f"{self.id}.Pt"]
 
-    def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
+    def residuals(
+        self, state: NetworkMixtureState
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
         # Stagnation assumptions: Pt = P_static
         res = [state.Pt - state.P]
         jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.Pt": 1.0}}
         return res, jac
 
     def compute_derived_state(
-        self, upstream_states: list[MixtureState]
+        self, upstream_states: list[NetworkMixtureState]
     ) -> tuple[float, list[float], Any]:
         """
         Computes (Tt, Y, Jac) for a MassFlowBoundary.
@@ -1044,7 +1028,7 @@ class MassFlowBoundary(NetworkNode):
             # SINK behavior: Automatically mix upstream streams using C++ core logic
             # This ensures energy conservation and correct species transport at outlets.
             streams = [cb.MassStream(s.m_dot, s.Tt, s.Pt, s.Y) for s in upstream_states]
-            mix_res = cb.mixer_from_streams_and_jacobians(streams)
+            mix_res = _solver_tools.mixer_from_streams_and_jacobians(streams)
             return mix_res.T_mix, mix_res.Y_mix, mix_res
 
         # SOURCE behavior: Use developer/user-defined boundary constants
@@ -1115,7 +1099,7 @@ class CombustorNode(NetworkNode):
         return [f"{self.id}.P", f"{self.id}.Pt"]
 
     def compute_derived_state(
-        self, upstream_states: list[MixtureState]
+        self, upstream_states: list[NetworkMixtureState]
     ) -> tuple[float, list[float], Any]:
         """Derived T and Y for a combustor (Reaction + Mixing + energy boundaries)."""
 
@@ -1146,7 +1130,7 @@ class CombustorNode(NetworkNode):
         fraction_total = sum(eb.fraction for eb in self.energy_boundaries)
 
         # Combustor only: mixing + combustion, NO pressure loss (that's on the edge).
-        mix_res = cb.combustor_residuals_and_jacobians(
+        mix_res = _solver_tools.combustor_residuals_and_jacobians(
             streams,
             P_ref,
             Q=Q_total,
@@ -1159,7 +1143,9 @@ class CombustorNode(NetworkNode):
         self._T_burned = float(mix_res.T_mix)
         return mix_res.T_mix, mix_res.Y_mix, mix_res
 
-    def residuals(self, state: MixtureState) -> tuple[list[float], dict[int, dict[str, float]]]:
+    def residuals(
+        self, state: NetworkMixtureState
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
         # Stagnation constraint: Pt = P (combustor is a large-area, low-velocity volume).
         # The dynamic pressure 0.5*rho*v^2 is negligible compared to P at combustor scales,
         # so P ~= Pt is an excellent approximation (same as PlenumNode).
@@ -1168,7 +1154,7 @@ class CombustorNode(NetworkNode):
         jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.Pt": 1.0}}
         return res, jac
 
-    def diagnostics(self, state: MixtureState) -> dict[str, float]:
+    def diagnostics(self, state: NetworkMixtureState) -> dict[str, float]:
         if state.P <= 0 or state.T <= 0:
             return {}
         cs = cb.complete_state(state.T, state.P, state.X)
@@ -1228,7 +1214,7 @@ class CombustorNode(NetworkNode):
             "theta": theta,
         }
 
-    def htc_and_T(self, state: MixtureState):
+    def htc_and_T(self, state: NetworkMixtureState):
         """Compute heat transfer coefficient for the combustor wall."""
         if self.surface.area == 0.0:
             return None
@@ -1365,7 +1351,9 @@ class OrificeElement(NetworkElement):
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
 
-    def _effective_Cd(self, state_in: "MixtureState", state_out: "MixtureState") -> float:
+    def _effective_Cd(
+        self, state_in: "NetworkMixtureState", state_out: "NetworkMixtureState"
+    ) -> float:
         """Return effective Cd: from correlation or user-supplied fixed value."""
         if not self.use_correlation or self._orifice_geom is None:
             # Clamp manual Cd strictly <= 1.0 to strictly preserve vena contracta physics (A_eff <= A_geom)
@@ -1425,14 +1413,14 @@ class OrificeElement(NetworkElement):
             return float(cb.Cd_orifice(self._orifice_geom, flow_state))
 
     def residuals(
-        self, state_in: "MixtureState", state_out: "MixtureState"
+        self, state_in: "NetworkMixtureState", state_out: "NetworkMixtureState"
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
 
         m_dot = state_in.m_dot
         effective_cd = self._effective_Cd(state_in, state_out)
 
         if self.regime == "compressible":
-            res_cpp = cb._core.orifice_compressible_residuals_and_jacobian(
+            res_cpp = _solver_tools.orifice_compressible_residuals_and_jacobian(
                 m_dot,
                 state_in.Pt,
                 state_in.Tt,
@@ -1444,7 +1432,7 @@ class OrificeElement(NetworkElement):
             )
         else:
             # Use incompressible Bernoulli formulation
-            res_cpp = cb.orifice_residuals_and_jacobian(
+            res_cpp = _solver_tools.orifice_residuals_and_jacobian(
                 m_dot,
                 state_in.Pt,
                 state_in.P,
@@ -1477,7 +1465,9 @@ class OrificeElement(NetworkElement):
     def n_equations(self) -> int:
         return 1
 
-    def diagnostics(self, state_in: MixtureState, state_out: MixtureState) -> dict[str, float]:
+    def diagnostics(
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+    ) -> dict[str, float]:
         if state_in.P <= 0 or state_in.T <= 0:
             return {}
         cs = cb.complete_state(state_in.T, state_in.P, state_in.X)
@@ -1712,7 +1702,7 @@ class LosslessConnectionElement(NetworkElement):
         return [f"{self.id}.m_dot"]
 
     def residuals(
-        self, state_in: MixtureState, state_out: MixtureState
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
         # Residual: Pt_in - Pt_out = 0
         res = [state_in.Pt - state_out.Pt]
@@ -1742,7 +1732,7 @@ class LosslessConnectionElement(NetworkElement):
         return profile
 
     def diagnostics(
-        self, state_in: MixtureState, state_out: MixtureState
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> dict[str, float | str]:
         if state_in.P <= 0 or state_in.T <= 0:
             return {}
@@ -1855,7 +1845,7 @@ class PressureLossElement(NetworkElement):
     def has_convective_surface(self) -> bool:
         return self.surface.area > 0.0
 
-    def htc_and_T(self, state: MixtureState):
+    def htc_and_T(self, state: NetworkMixtureState):
         """Convective HTC on the discrete loss element.
 
         Treats the element as a short duct of length ``L = Dh`` (L/D = 1),
@@ -1936,7 +1926,10 @@ class PressureLossElement(NetworkElement):
             )
 
     def _build_ctx(
-        self, state_in: MixtureState, state_out: MixtureState, graph: "FlowNetwork | None"
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        graph: "FlowNetwork | None",
     ) -> SimpleNamespace:
         """Build a duck-typed PressureLossContext from the current states."""
         # Theta sourcing: read the reference node's burned/unburned temperatures.
@@ -1967,7 +1960,7 @@ class PressureLossElement(NetworkElement):
         )
 
     def residuals(
-        self, state_in: MixtureState, state_out: MixtureState
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
         # Graph reference is stashed on the element by the solver pre-pass;
         # fall back to ctx without theta sourcing if unavailable.
@@ -2030,7 +2023,9 @@ class PressureLossElement(NetworkElement):
 
         return res, jac
 
-    def diagnostics(self, state_in: MixtureState, state_out: MixtureState) -> dict[str, float]:
+    def diagnostics(
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+    ) -> dict[str, float]:
         if state_in.P <= 0 or state_in.T <= 0 or state_out.P <= 0 or state_out.T <= 0:
             return {}
 
@@ -2117,7 +2112,9 @@ class ChannelElement(NetworkElement):
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
 
-    def residuals(self, state_in: MixtureState, state_out: MixtureState) -> list[float]:
+    def residuals(
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+    ) -> list[float]:
 
         m_dot = state_in.m_dot
 
@@ -2161,7 +2158,7 @@ class ChannelElement(NetworkElement):
 
         if self.regime == "compressible":
             # Use compressible Fanno flow with friction
-            res_cpp = cb._core.channel_compressible_residuals_and_jacobian(
+            res_cpp = _solver_tools.channel_compressible_residuals_and_jacobian(
                 m_dot,
                 state_in.Pt,
                 state_in.Tt,
@@ -2175,7 +2172,7 @@ class ChannelElement(NetworkElement):
             )
         else:
             # Use incompressible Darcy-Weisbach formulation
-            res_cpp = cb.channel_residuals_and_jacobian(
+            res_cpp = _solver_tools.channel_residuals_and_jacobian(
                 m_dot,
                 state_in.Pt,
                 state_in.P,
@@ -2215,7 +2212,7 @@ class ChannelElement(NetworkElement):
         return res, jac
 
     def diagnostics(
-        self, state_in: MixtureState, state_out: MixtureState
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> dict[str, float | str]:
         cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
         ref = _element_reference_block(
@@ -2260,12 +2257,12 @@ class ChannelElement(NetworkElement):
 
     def get_spatial_profile(
         self,
-        state_in: MixtureState,
+        state_in: NetworkMixtureState,
         n_steps: int = 100,
     ) -> list:
         """
         Compute and return the spatial flow profile array along the channel length.
-        Requires the solved inlet MixtureState.
+        Requires the solved inlet NetworkMixtureState.
         """
 
         rho = cb.density(state_in.T, state_in.P, state_in.X)
@@ -2305,14 +2302,14 @@ class ChannelElement(NetworkElement):
 
         return []
 
-    def htc_and_T(self, state: MixtureState):
+    def htc_and_T(self, state: NetworkMixtureState):
         """Compute heat transfer coefficient and adiabatic wall temperature.
 
         Uses the element's ConvectiveSurface to compute HTC and adiabatic wall temperature.
 
         Parameters
         ----------
-        state : MixtureState
+        state : NetworkMixtureState
             Flow state at the element inlet.
 
         Returns
@@ -2394,12 +2391,12 @@ class AreaChangeElement(NetworkElement):
             )
 
     def residuals(
-        self, state_in: MixtureState, state_out: MixtureState
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
         m_dot = state_in.m_dot
 
         if self.model_type == "sharp":
-            res_cpp = cb._core.area_change_residuals_and_jacobian(
+            res_cpp = _solver_tools.area_change_residuals_and_jacobian(
                 m_dot=m_dot,
                 P_total_up=state_in.Pt,
                 P_static_up=state_in.P,
@@ -2412,7 +2409,7 @@ class AreaChangeElement(NetworkElement):
                 D_h=self.D_h or 0.0,
             )
         else:
-            res_cpp = cb._core.conical_area_change_residuals_and_jacobian(
+            res_cpp = _solver_tools.conical_area_change_residuals_and_jacobian(
                 m_dot=m_dot,
                 P_total_up=state_in.Pt,
                 P_static_up=state_in.P,
@@ -2444,7 +2441,9 @@ class AreaChangeElement(NetworkElement):
 
         return res, jac
 
-    def diagnostics(self, state_in: MixtureState, state_out: MixtureState) -> dict[str, float]:
+    def diagnostics(
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+    ) -> dict[str, float]:
         try:
             cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
         except Exception:

@@ -128,8 +128,6 @@ try:
         channel_smooth,
         ChannelResult,
         WallCouplingResult,
-        wall_coupling_and_jacobian,
-        wall_coupling_and_jacobian_multilayer,
         closest_mode,
         combustion_equilibrium,
         combustion_state,
@@ -377,44 +375,8 @@ try:
         geometry,
         h0_from_static,
         v_from_h0,
-        orifice_mdot_and_jacobian,
-        pressure_loss_and_jacobian,
-        lossless_pressure_and_jacobian,
-        nusselt_and_jacobian_dittus_boelter,
-        nusselt_and_jacobian_gnielinski,
-        nusselt_and_jacobian_sieder_tate,
-        nusselt_and_jacobian_petukhov,
-        pin_fin_nusselt_and_jacobian,
-        pin_fin_friction_and_jacobian,
-        dimple_nusselt_enhancement_and_jacobian,
-        dimple_friction_multiplier_and_jacobian,
-        rib_enhancement_factor_high_re_and_jacobian,
-        impingement_nusselt_and_jacobian,
-        film_cooling_effectiveness_and_jacobian,
-        effusion_effectiveness_and_jacobian,
-        mach_number_and_jacobian_v,
-        T_adiabatic_wall_and_jacobian_v,
-        T0_from_static_and_jacobian_M,
-        P0_from_static_and_jacobian_M,
-        friction_and_jacobian_haaland,
-        friction_and_jacobian_serghides,
-        friction_and_jacobian_colebrook,
-        friction_and_jacobian_petukhov,
-        friction_and_jacobian,
-        density_and_jacobians,
-        enthalpy_and_jacobian,
-        viscosity_and_jacobians,
-        orifice_residuals_and_jacobian,
-        channel_residuals_and_jacobian,
-        momentum_chamber_residual_and_jacobian,
-        mixer_from_streams_and_jacobians,
-        adiabatic_T_complete_and_jacobian_T_from_streams,
-        adiabatic_T_equilibrium_and_jacobians_from_streams,
-        combustor_residuals_and_jacobians,
         sharp_area_change,
         conical_area_change,
-        area_change_residuals_and_jacobian,
-        conical_area_change_residuals_and_jacobian,
         # Channel/circular functions
         htc_circular_channel,
         nusselt_circular_channel,
@@ -547,12 +509,10 @@ except (ModuleNotFoundError, ImportError) as e:
     reforming_equilibrium = _core.reforming_equilibrium
     reforming_equilibrium_adiabatic = _core.reforming_equilibrium_adiabatic
     combustion_equilibrium = _core.combustion_equilibrium
-    combustor_residuals_and_jacobians = _core.combustor_residuals_and_jacobians
     sharp_area_change = _core.sharp_area_change
     conical_area_change = _core.conical_area_change
-    area_change_residuals_and_jacobian = _core.area_change_residuals_and_jacobian
-    conical_area_change_residuals_and_jacobian = _core.conical_area_change_residuals_and_jacobian
     AreaChangeResult = _core.AreaChangeResult
+
     AreaChangeElementResult = _core.AreaChangeElementResult
     # Compressible flow
     CompressibleFlowSolution = _core.CompressibleFlowSolution
@@ -598,9 +558,8 @@ except (ModuleNotFoundError, ImportError) as e:
     heat_flux = _core.heat_flux
     heat_transfer_area = _core.heat_transfer_area
     heat_transfer_dT = _core.heat_transfer_dT
-    wall_coupling_and_jacobian = _core.wall_coupling_and_jacobian
-    wall_coupling_and_jacobian_multilayer = _core.wall_coupling_and_jacobian_multilayer
     wall_temperature_profile = _core.wall_temperature_profile
+
     ntu = _core.ntu
     capacity_ratio = _core.capacity_ratio
     effectiveness_counterflow = _core.effectiveness_counterflow
@@ -730,43 +689,12 @@ except (ModuleNotFoundError, ImportError) as e:
     pin_fin_friction = _core.pin_fin_friction
     geometry = _core.geometry
 
-    # Internal Solver Tools (f, J) exact Jacobians
-    orifice_mdot_and_jacobian = _core.orifice_mdot_and_jacobian
-    pressure_loss_and_jacobian = _core.pressure_loss_and_jacobian
-    lossless_pressure_and_jacobian = _core.lossless_pressure_and_jacobian
-    nusselt_and_jacobian_dittus_boelter = _core.nusselt_and_jacobian_dittus_boelter
-    nusselt_and_jacobian_gnielinski = _core.nusselt_and_jacobian_gnielinski
-    nusselt_and_jacobian_sieder_tate = _core.nusselt_and_jacobian_sieder_tate
-    nusselt_and_jacobian_petukhov = _core.nusselt_and_jacobian_petukhov
-    pin_fin_nusselt_and_jacobian = _core.pin_fin_nusselt_and_jacobian
-    pin_fin_friction_and_jacobian = _core.pin_fin_friction_and_jacobian
-    dimple_nusselt_enhancement_and_jacobian = _core.dimple_nusselt_enhancement_and_jacobian
-    dimple_friction_multiplier_and_jacobian = _core.dimple_friction_multiplier_and_jacobian
-    rib_enhancement_factor_high_re_and_jacobian = _core.rib_enhancement_factor_high_re_and_jacobian
-    impingement_nusselt_and_jacobian = _core.impingement_nusselt_and_jacobian
-    film_cooling_effectiveness_and_jacobian = _core.film_cooling_effectiveness_and_jacobian
-    effusion_effectiveness_and_jacobian = _core.effusion_effectiveness_and_jacobian
-    mach_number_and_jacobian_v = _core.mach_number_and_jacobian_v
-    T_adiabatic_wall_and_jacobian_v = _core.T_adiabatic_wall_and_jacobian_v
-    T0_from_static_and_jacobian_M = _core.T0_from_static_and_jacobian_M
-    P0_from_static_and_jacobian_M = _core.P0_from_static_and_jacobian_M
-    friction_and_jacobian_haaland = _core.friction_and_jacobian_haaland
-    friction_and_jacobian_serghides = _core.friction_and_jacobian_serghides
-    friction_and_jacobian_colebrook = _core.friction_and_jacobian_colebrook
-    friction_and_jacobian_petukhov = _core.friction_and_jacobian_petukhov
-    friction_and_jacobian = _core.friction_and_jacobian
-    density_and_jacobians = _core.density_and_jacobians
-    enthalpy_and_jacobian = _core.enthalpy_and_jacobian
-    viscosity_and_jacobians = _core.viscosity_and_jacobians
-    orifice_residuals_and_jacobian = _core.orifice_residuals_and_jacobian
-    channel_residuals_and_jacobian = _core.channel_residuals_and_jacobian
     htc_circular_channel = _core.htc_circular_channel
     nusselt_circular_channel = _core.nusselt_circular_channel
     sharp_area_change = _core.sharp_area_change
     conical_area_change = _core.conical_area_change
-    area_change_residuals_and_jacobian = _core.area_change_residuals_and_jacobian
-    conical_area_change_residuals_and_jacobian = _core.conical_area_change_residuals_and_jacobian
     AreaChangeResult = _core.AreaChangeResult
+
     AreaChangeElementResult = _core.AreaChangeElementResult
 
 # Terminology aliases - always available
@@ -781,8 +709,9 @@ except NameError:
     pass
 
 # Submodule imports - always available regardless of _core load path.
-from . import compressible, heat_transfer, incompressible, network, species
+from . import compressible, heat_transfer, incompressible, network, species, _solver_tools
 from ._flow_solution import FlowSolution
+
 
 # ---------------------------------------------------------------------------
 # suppress_warnings context manager
@@ -825,6 +754,7 @@ __all__ = [
     "incompressible",
     "network",
     "species",
+    "_solver_tools",
     # Core Constants
     "cp",
     "cp_mass",
@@ -949,20 +879,6 @@ __all__ = [
     "set_fuel_stream_for_O2_dry",
     "set_fuel_stream_for_CO2",
     "set_fuel_stream_for_CO2_dry",
-    # Internal Solver Tools (f, J) exact Jacobians
-    "orifice_mdot_and_jacobian",
-    "pressure_loss_and_jacobian",
-    "lossless_pressure_and_jacobian",
-    "nusselt_and_jacobian_dittus_boelter",
-    "friction_and_jacobian_haaland",
-    "friction_and_jacobian_serghides",
-    "friction_and_jacobian_colebrook",
-    "friction_and_jacobian_petukhov",
-    "friction_and_jacobian",
-    "density_and_jacobians",
-    "enthalpy_and_jacobian",
-    "viscosity_and_jacobians",
-    "combustor_residuals_and_jacobians",
     # Inverse solvers - find oxidizer stream
     "set_oxidizer_stream_for_Tad",
     "set_oxidizer_stream_for_O2",
@@ -1168,8 +1084,6 @@ __all__ = [
     "all_units",
     "sharp_area_change",
     "conical_area_change",
-    "area_change_residuals_and_jacobian",
-    "conical_area_change_residuals_and_jacobian",
     "AreaChangeResult",
     "AreaChangeElementResult",
     "__version__",

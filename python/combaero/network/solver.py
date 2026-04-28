@@ -14,7 +14,7 @@ from .components import (
     EnergyBoundary,
     LosslessConnectionElement,
     MassFlowBoundary,
-    MixtureState,
+    NetworkMixtureState,
     NetworkNode,
     PressureBoundary,
 )
@@ -803,9 +803,9 @@ class NetworkSolver:
 
         return relay
 
-    def _get_node_state_with_prev(self, node: NetworkNode, x: np.ndarray) -> MixtureState:
+    def _get_node_state_with_prev(self, node: NetworkNode, x: np.ndarray) -> NetworkMixtureState:
         """
-        Constructs a MixtureState for a node, using previous iteration's derived state
+        Constructs a NetworkMixtureState for a node, using previous iteration's derived state
         for back-edges (nodes not yet visited in current topological pass).
         This ensures wall coupling uses lagged values for cross-stream coupling.
         """
@@ -846,7 +846,7 @@ class NetworkSolver:
             if var_name in state_dict:
                 state_dict[var_name] = x[i]
 
-        return MixtureState(
+        return NetworkMixtureState(
             float(state_dict["P"]),
             float(state_dict["Pt"]),
             float(state_dict["T"]),
@@ -855,8 +855,8 @@ class NetworkSolver:
             state_dict["Y"],
         )
 
-    def _get_node_state(self, node: NetworkNode, x: np.ndarray) -> MixtureState:
-        """Constructs a MixtureState for a given node based on the current solver vector x."""
+    def _get_node_state(self, node: NetworkNode, x: np.ndarray) -> NetworkMixtureState:
+        """Constructs a NetworkMixtureState for a given node based on the current solver vector x."""
         default_Y = self._default_Y
 
         # Determine boundaries
@@ -869,7 +869,9 @@ class NetworkSolver:
             Y = getattr(node, "Y", None)
             if Y is None:
                 Y = default_Y
-            return MixtureState(float(P_stat), float(P_tot), float(T_stat), float(T_tot), 0.0, Y)
+            return NetworkMixtureState(
+                float(P_stat), float(P_tot), float(T_stat), float(T_tot), 0.0, Y
+            )
 
         if isinstance(node, MassFlowBoundary):
             guess = getattr(node, "initial_guess", {})
@@ -898,7 +900,7 @@ class NetworkSolver:
                 elif unk.endswith(".Pt"):
                     ptot_val = x[i]
 
-            return MixtureState(
+            return NetworkMixtureState(
                 float(p_val), float(ptot_val), float(T_stat), float(T_tot), float(m), Y
             )
 
@@ -942,7 +944,7 @@ class NetworkSolver:
         if y_sum > 0:
             Y_safe = [yi / y_sum for yi in Y_safe]
 
-        return MixtureState(
+        return NetworkMixtureState(
             float(state_dict["P"]),
             float(state_dict["Pt"]),
             float(state_dict["T"]),

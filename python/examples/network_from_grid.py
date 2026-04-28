@@ -13,7 +13,8 @@ from combaero.network.components import (
     PlenumNode,
     PressureBoundary,
     SmoothModel,
-    WallConnection,
+    ThermalWall,
+    WallLayer,
 )
 
 
@@ -175,12 +176,11 @@ def build_and_solve_network(
             if A_ht_channel > 0:
                 wall_cold_channel_idx = n_serial - 1 - i
                 net.add_wall(
-                    WallConnection(
+                    ThermalWall(
                         id=f"wall_{p}_{i}",
                         element_a=f"hot_channel_{p}_{i}",
                         element_b=f"cold_channel_{p}_{wall_cold_channel_idx}",
-                        wall_thickness=0.005,
-                        wall_conductivity=20.0,
+                        layers=[WallLayer(thickness=0.005, conductivity=20.0)],
                         contact_area=A_ht_channel,
                     )
                 )

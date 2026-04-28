@@ -5,7 +5,8 @@ This is a post-processing example showing how to use ConvectiveSurface and WallC
 """
 
 import combaero as cb
-from combaero.heat_transfer import ConvectiveSurface, RibbedModel, SmoothModel, WallConnection
+from combaero.heat_transfer import ConvectiveSurface, RibbedModel, SmoothModel
+from combaero.network import ThermalWall, WallLayer
 
 # ============================================================================
 # Flow conditions
@@ -90,15 +91,15 @@ print()
 # Wall coupling
 # ============================================================================
 
-wall = WallConnection(
+wall = ThermalWall(
     id="liner_wall",
     element_a="hot_pipe",
     element_b="cold_pipe",
-    wall_thickness=t_wall,
-    wall_conductivity=k_wall,
+    layers=[WallLayer(thickness=t_wall, conductivity=k_wall)],
 )
 
-Q, T_wall = wall.compute_coupling(h_hot, T_aw_hot, A_hot, h_cold, T_aw_cold, A_cold)
+res = wall.compute_coupling(h_hot, T_aw_hot, A_hot, h_cold, T_aw_cold, A_cold)
+Q, T_wall = res.Q, res.T_hot
 
 print("Wall Coupling:")
 print(f"  Wall thickness = {t_wall * 1000:.1f} mm")

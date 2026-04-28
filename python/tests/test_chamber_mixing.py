@@ -6,8 +6,8 @@ import combaero as cb
 from combaero.network.components import (
     CombustorNode,
     MassFlowBoundary,
-    MixtureState,
     MomentumChamberNode,
+    NetworkMixtureState,
     PlenumNode,
     PressureBoundary,
 )
@@ -118,7 +118,7 @@ def test_chamber_pressure_relationship():
     """Test that chamber nodes enforce proper pressure relationships."""
     # Test PlenumNode: Pt = P_static (Legacy path)
     plenum = PlenumNode("plenum")
-    state = MixtureState(
+    state = NetworkMixtureState(
         P=100000.0,
         Pt=100000.0,
         T=300.0,
@@ -134,7 +134,7 @@ def test_chamber_pressure_relationship():
     assert residuals[0] == 0.0  # Pt - P = 100000 - 100000 = 0
 
     # Test with mismatch (Legacy path)
-    state_mismatch = MixtureState(
+    state_mismatch = NetworkMixtureState(
         P=100000.0,
         Pt=101000.0,
         T=300.0,

@@ -16,12 +16,12 @@ from .combustion_result import CombustionResult
 from .stoichiometry import stoichiometric_products
 
 if TYPE_CHECKING:
-    from combaero.network.components import MixtureState
+    from combaero.network.components import NetworkMixtureState
 
 
 def mix_streams(
-    state_1: "MixtureState",
-    state_2: "MixtureState",
+    state_1: "NetworkMixtureState",
+    state_2: "NetworkMixtureState",
 ) -> CombustionResult:
     """
     Mix two streams conserving mass, species, and enthalpy.
@@ -32,9 +32,9 @@ def mix_streams(
 
     Parameters
     ----------
-    state_1 : MixtureState
+    state_1 : NetworkMixtureState
         First stream (P, T, m_dot, X).
-    state_2 : MixtureState
+    state_2 : NetworkMixtureState
         Second stream (P, T, m_dot, X).
         Pressure must be compatible with state_1 (solver enforces this).
 
@@ -107,8 +107,8 @@ def mix_streams(
 
 
 def combustion_from_streams(
-    state_air: "MixtureState | dict",
-    state_fuel: "MixtureState | dict",
+    state_air: "NetworkMixtureState | dict",
+    state_fuel: "NetworkMixtureState | dict",
     method: str = "complete",
     eta: float = 1.0,
     delta_P_frac: float = 0.04,
@@ -126,9 +126,9 @@ def combustion_from_streams(
 
     Parameters
     ----------
-    state_air : MixtureState or dict
+    state_air : NetworkMixtureState or dict
         Oxidiser stream (P, T, m_dot, Y).
-    state_fuel : MixtureState or dict
+    state_fuel : NetworkMixtureState or dict
         Fuel stream (P, T, m_dot, Y). m_dot is the fuel mass flow rate.
     method : str
         Combustion method: 'complete' or 'equilibrium'. Default 'complete'.
@@ -144,17 +144,17 @@ def combustion_from_streams(
     """
     import combaero as cb
 
-    # Convert dictionaries to MixtureState objects if needed
+    # Convert dictionaries to NetworkMixtureState objects if needed
     if isinstance(state_air, dict):
         # Import here to avoid circular import
-        from combaero.network.components import MixtureState as LocalMixtureState
+        from combaero.network.components import NetworkMixtureState as LocalNetworkMixtureState
 
-        state_air = LocalMixtureState(**state_air)
+        state_air = LocalNetworkMixtureState(**state_air)
     if isinstance(state_fuel, dict):
         # Import here to avoid circular import
-        from combaero.network.components import MixtureState as LocalMixtureState
+        from combaero.network.components import NetworkMixtureState as LocalNetworkMixtureState
 
-        state_fuel = LocalMixtureState(**state_fuel)
+        state_fuel = LocalNetworkMixtureState(**state_fuel)
 
     # Validate inputs
     if state_air.P != state_fuel.P:
@@ -228,7 +228,7 @@ def combustion_from_streams(
 
 
 def combustion_from_phi(
-    state_air: "MixtureState",
+    state_air: "NetworkMixtureState",
     X_fuel: list[float],
     phi: float,
     method: str = "complete",
@@ -243,7 +243,7 @@ def combustion_from_phi(
 
     Parameters
     ----------
-    state_air : MixtureState
+    state_air : NetworkMixtureState
         Oxidiser stream.
     X_fuel : list[float]
         Fuel composition (mole fractions).
@@ -290,7 +290,7 @@ def combustion_from_phi(
     }
 
     # Delegate to combustion_from_streams using the state dictionary
-    # We'll create proper MixtureState objects inside combustion_from_streams
+    # We'll create proper NetworkMixtureState objects inside combustion_from_streams
     return combustion_from_streams(
         state_air,
         fuel_state_dict,

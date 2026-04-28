@@ -7,7 +7,8 @@ from combaero.network import (
     FlowNetwork,
     PlenumNode,
     PressureBoundary,
-    WallConnection,
+    ThermalWall,
+    WallLayer,
 )
 
 
@@ -36,12 +37,11 @@ def test_add_wall_success():
     network.add_element(channel2)
 
     # Add wall
-    wall = WallConnection(
+    wall = ThermalWall(
         id="wall1",
         element_a="channel1",
         element_b="channel2",
-        wall_thickness=0.002,
-        wall_conductivity=25.0,
+        layers=[WallLayer(thickness=0.002, conductivity=25.0)],
     )
     network.add_wall(wall)
 
@@ -64,11 +64,15 @@ def test_add_wall_duplicate_id():
     network.add_element(channel1)
 
     # Add first wall
-    wall1 = WallConnection("wall1", "channel1", "channel1", 0.002, 25.0)
+    wall1 = ThermalWall(
+        "wall1", "channel1", "channel1", [WallLayer(thickness=0.002, conductivity=25.0)]
+    )
     network.add_wall(wall1)
 
     # Try to add duplicate
-    wall1_dup = WallConnection("wall1", "channel1", "channel1", 0.002, 25.0)
+    wall1_dup = ThermalWall(
+        "wall1", "channel1", "channel1", [WallLayer(thickness=0.002, conductivity=25.0)]
+    )
     with pytest.raises(ValueError, match="Wall 'wall1' already exists in network"):
         network.add_wall(wall1_dup)
 
@@ -87,7 +91,9 @@ def test_add_wall_unknown_element_a():
     network.add_element(channel1)
 
     # Try to add wall with unknown element_a
-    wall = WallConnection("wall2", "unknown_channel", "channel1", 0.002, 25.0)
+    wall = ThermalWall(
+        "wall2", "unknown_channel", "channel1", [WallLayer(thickness=0.002, conductivity=25.0)]
+    )
     with pytest.raises(
         ValueError, match="Unknown element_a/node_a 'unknown_channel' for wall 'wall2'"
     ):
@@ -108,7 +114,9 @@ def test_add_wall_unknown_element_b():
     network.add_element(channel1)
 
     # Try to add wall with unknown element_b
-    wall = WallConnection("wall3", "channel1", "unknown_channel", 0.002, 25.0)
+    wall = ThermalWall(
+        "wall3", "channel1", "unknown_channel", [WallLayer(thickness=0.002, conductivity=25.0)]
+    )
     with pytest.raises(
         ValueError, match="Unknown element_b/node_b 'unknown_channel' for wall 'wall3'"
     ):
@@ -147,12 +155,11 @@ def test_to_dict_with_walls():
     network.add_element(channel2)
 
     # Add wall
-    wall = WallConnection(
+    wall = ThermalWall(
         id="wall1",
         element_a="channel1",
         element_b="channel2",
-        wall_thickness=0.002,
-        wall_conductivity=25.0,
+        layers=[WallLayer(thickness=0.002, conductivity=25.0)],
         contact_area=0.05,
     )
     network.add_wall(wall)
@@ -172,11 +179,12 @@ def test_to_dict_with_walls():
 
     # Check wall data
     wall_data = data["walls"]["wall1"]
-    assert wall_data["type"] == "WallConnection"
+    assert wall_data["type"] == "ThermalWall"
     assert wall_data["kwargs"]["element_a"] == "channel1"
     assert wall_data["kwargs"]["element_b"] == "channel2"
-    assert wall_data["kwargs"]["wall_thickness"] == 0.002
-    assert wall_data["kwargs"]["wall_conductivity"] == 25.0
+    assert len(wall_data["kwargs"]["layers"]) == 1
+    assert wall_data["kwargs"]["layers"][0].thickness == 0.002
+    assert wall_data["kwargs"]["layers"][0].conductivity == 25.0
     assert wall_data["kwargs"]["contact_area"] == 0.05
 
 
@@ -197,12 +205,11 @@ def test_from_dict_with_walls():
     network1.add_element(channel2)
 
     # Add wall
-    wall = WallConnection(
+    wall = ThermalWall(
         id="wall1",
         element_a="channel1",
         element_b="channel2",
-        wall_thickness=0.002,
-        wall_conductivity=25.0,
+        layers=[WallLayer(thickness=0.002, conductivity=25.0)],
     )
     network1.add_wall(wall)
 
@@ -221,8 +228,8 @@ def test_from_dict_with_walls():
     restored_wall = network2.walls["wall1"]
     assert restored_wall.element_a == "channel1"
     assert restored_wall.element_b == "channel2"
-    assert restored_wall.wall_thickness == 0.002
-    assert restored_wall.wall_conductivity == 25.0
+    assert restored_wall.layers[0].thickness == 0.002
+    assert restored_wall.layers[0].conductivity == 25.0
 
 
 def test_from_dict_default_thermal_coupling():

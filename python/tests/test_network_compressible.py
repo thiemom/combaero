@@ -12,7 +12,8 @@ from combaero.network import (
     OrificeElement,
     PlenumNode,
     PressureBoundary,
-    WallConnection,
+    ThermalWall,
+    WallLayer,
 )
 
 
@@ -372,12 +373,11 @@ def _build_fully_coupled_network(regime: str, mach_target: float) -> FlowNetwork
     )
 
     net.add_wall(
-        WallConnection(
+        ThermalWall(
             id="coupling_wall",
             element_a="hot_channel",
             element_b="cold_channel",
-            wall_thickness=0.002,
-            wall_conductivity=20.0,
+            layers=[WallLayer(thickness=0.002, conductivity=20.0)],
         )
     )
     net.thermal_coupling_enabled = True

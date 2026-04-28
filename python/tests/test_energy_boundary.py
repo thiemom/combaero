@@ -70,9 +70,9 @@ class TestPlenumEnergyBoundary:
     def test_plenum_no_energy_boundary_unchanged(self) -> None:
         """PlenumNode with no energy boundaries behaves as before."""
         node = PlenumNode("p1")
-        from combaero.network import MixtureState
+        from combaero.network import NetworkMixtureState
 
-        up = MixtureState(
+        up = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
             T=300.0,
@@ -89,9 +89,9 @@ class TestPlenumEnergyBoundary:
         eb = EnergyBoundary("heater", Q=50000.0)  # 50 kW
         node.add_energy_boundary(eb)
 
-        from combaero.network import MixtureState
+        from combaero.network import NetworkMixtureState
 
-        up = MixtureState(
+        up = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
             T=300.0,
@@ -115,9 +115,9 @@ class TestPlenumEnergyBoundary:
         eb = EnergyBoundary("cooler", Q=-80000.0)  # -80 kW
         node.add_energy_boundary(eb)
 
-        from combaero.network import MixtureState
+        from combaero.network import NetworkMixtureState
 
-        up = MixtureState(
+        up = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
             T=600.0,
@@ -138,9 +138,9 @@ class TestPlenumEnergyBoundary:
         node.add_energy_boundary(EnergyBoundary("h1", Q=30000.0))
         node.add_energy_boundary(EnergyBoundary("h2", Q=20000.0))
 
-        from combaero.network import MixtureState
+        from combaero.network import NetworkMixtureState
 
-        up = MixtureState(
+        up = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
             T=300.0,
@@ -165,9 +165,9 @@ class TestPlenumEnergyBoundary:
         node = PlenumNode("p1")
         node.add_energy_boundary(EnergyBoundary("eb", Q=Q))
 
-        from combaero.network import MixtureState
+        from combaero.network import NetworkMixtureState
 
-        up = MixtureState(
+        up = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
             T=400.0,
@@ -191,9 +191,9 @@ class TestPlenumEnergyBoundary:
         node = PlenumNode("p1")
         node.add_energy_boundary(EnergyBoundary("eb", Q=0.0))
 
-        from combaero.network import MixtureState
+        from combaero.network import NetworkMixtureState
 
-        up = MixtureState(
+        up = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
             T=500.0,
@@ -216,10 +216,10 @@ class TestPlenumEnergyBoundary:
 
 class TestCombustorEnergyBoundary:
     def _make_combustor_upstream(self):
-        """Returns (fuel_state, air_state) as MixtureState objects."""
-        from combaero.network import MixtureState
+        """Returns (fuel_state, air_state) as NetworkMixtureState objects."""
+        from combaero.network import NetworkMixtureState
 
-        fuel = MixtureState(
+        fuel = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
             T=300.0,
@@ -227,7 +227,7 @@ class TestCombustorEnergyBoundary:
             m_dot=0.05,
             Y=_ch4_Y(),
         )
-        air = MixtureState(
+        air = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
             T=600.0,
@@ -284,9 +284,9 @@ class TestMomentumChamberEnergyBoundary:
         node = MomentumChamberNode("mc1")
         node.add_energy_boundary(EnergyBoundary("heater", Q=60000.0))
 
-        from combaero.network import MixtureState
+        from combaero.network import NetworkMixtureState
 
-        up = MixtureState(
+        up = NetworkMixtureState(
             P=200000.0,
             Pt=200000.0,
             T=400.0,
@@ -312,9 +312,9 @@ class TestMomentumChamberEnergyBoundary:
 class TestSignConvention:
     def test_positive_Q_heats(self) -> None:
         """Positive Q always increases temperature."""
-        from combaero.network import MixtureState
+        from combaero.network import NetworkMixtureState
 
-        up = MixtureState(
+        up = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
             T=300.0,
@@ -334,9 +334,9 @@ class TestSignConvention:
 
     def test_negative_Q_cools(self) -> None:
         """Negative Q always decreases temperature."""
-        from combaero.network import MixtureState
+        from combaero.network import NetworkMixtureState
 
-        up = MixtureState(
+        up = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
             T=800.0,
@@ -356,9 +356,9 @@ class TestSignConvention:
 
     def test_opposite_Q_cancel(self) -> None:
         """Equal and opposite Q boundaries cancel out."""
-        from combaero.network import MixtureState
+        from combaero.network import NetworkMixtureState
 
-        up = MixtureState(
+        up = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
             T=500.0,

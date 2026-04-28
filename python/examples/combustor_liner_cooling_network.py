@@ -52,12 +52,13 @@ from combaero.network import (
     ChannelElement,
     FlowNetwork,
     MassFlowBoundary,
-    MixtureState,
+    NetworkMixtureState,
     NetworkSolver,
     OrificeElement,
     PlenumNode,
     PressureBoundary,
-    WallConnection,
+    ThermalWall,
+    WallLayer,
 )
 
 
@@ -190,16 +191,14 @@ def create_coupled_wall_network(
         )
     )
 
-    # Equivalent single-layer wall from multilayer t/k sum
-    t_wall_total = sum(t for t, _ in wall_layers)
-    k_wall_eff = t_wall_total / sum(t / k for t, k in wall_layers)
+    # Use full multi-layer wall directly
+    layers = [WallLayer(thickness=t, conductivity=k) for t, k in wall_layers]
     net.add_wall(
-        WallConnection(
+        ThermalWall(
             id="liner_wall",
             element_a="hot_channel",
             element_b="cool_channel",
-            wall_thickness=t_wall_total,
-            wall_conductivity=k_wall_eff,
+            layers=layers,
             contact_area=A_liner,
         )
     )
@@ -255,7 +254,7 @@ def solve_operating_point_network(
 
         # Get HTC and heat flux from cooling side
         cool_elem = net.elements["cool_channel"]
-        cool_state_in = MixtureState(
+        cool_state_in = NetworkMixtureState(
             T=T2,
             Tt=T2,
             P=P2,
@@ -304,7 +303,7 @@ def solve_operating_point_network(
     net_smooth.elements["cool_channel"].t_wall = T_hot_est
     solver_smooth = NetworkSolver(net_smooth)
     solver_smooth.solve()
-    cool_state_smooth = MixtureState(
+    cool_state_smooth = NetworkMixtureState(
         T=T2,
         Tt=T2,
         P=P2,
@@ -426,7 +425,7 @@ def solve_operating_point_network_coupled(
     # Post-process consistent with existing return schema
     cool_elem = net.elements["cool_channel"]
     hot_elem = net.elements["hot_channel"]
-    cool_state_in = MixtureState(
+    cool_state_in = NetworkMixtureState(
         T=result["cool_inlet.T"],
         Tt=result["cool_inlet.T"],
         P=result["cool_inlet.P"],
@@ -435,7 +434,7 @@ def solve_operating_point_network_coupled(
         m_dot=mdot_cool / N_ch,
     )
     A_ann = np.pi * (D_ann / 2.0) ** 2
-    hot_state_in = MixtureState(
+    hot_state_in = NetworkMixtureState(
         T=result["hot_inlet.T"],
         Tt=result["hot_inlet.T"],
         P=result["hot_inlet.P"],
@@ -459,7 +458,7 @@ def solve_operating_point_network_coupled(
     )
     net_smooth.elements["cool_channel"].t_wall = T_hot_est
     NetworkSolver(net_smooth).solve()
-    cool_state_smooth = MixtureState(
+    cool_state_smooth = NetworkMixtureState(
         T=T2,
         Tt=T2,
         P=P2,

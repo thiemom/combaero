@@ -386,8 +386,8 @@ def test_area_change_exports() -> None:
     # Functions
     assert hasattr(cb, "sharp_area_change")
     assert hasattr(cb, "conical_area_change")
-    assert hasattr(cb, "area_change_residuals_and_jacobian")
-    assert hasattr(cb, "conical_area_change_residuals_and_jacobian")
+    assert hasattr(cb._solver_tools, "area_change_residuals_and_jacobian")
+    assert hasattr(cb._solver_tools, "conical_area_change_residuals_and_jacobian")
 
     # Result Structs
     assert hasattr(cb, "AreaChangeResult")
