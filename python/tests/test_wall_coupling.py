@@ -19,7 +19,7 @@ def test_hot_coupling_basic():
     t_over_k = 0.002 / 25.0  # 8e-5
     A = 0.1
 
-    result = cb.wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b, t_over_k, A)
+    result = cb._solver_tools.wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b, t_over_k, A)
 
     # Overall HTC: U = 1 / (1/500 + 8e-5 + 1/2000) = 1 / 0.00258 = 387.6 W/(m^2*K)
     U_expected = 1.0 / (1.0 / h_a + t_over_k + 1.0 / h_b)
@@ -39,32 +39,48 @@ def test_hot_coupling_jacobians():
     t_over_k = 8e-5
     A = 0.1
 
-    result = cb.wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b, t_over_k, A)
+    result = cb._solver_tools.wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b, t_over_k, A)
 
     # Finite difference validation
     eps = 1e-6
 
     # dQ/dh_a
-    result_plus = cb.wall_coupling_and_jacobian(h_a + eps, T_aw_a, h_b, T_aw_b, t_over_k, A)
-    result_minus = cb.wall_coupling_and_jacobian(h_a - eps, T_aw_a, h_b, T_aw_b, t_over_k, A)
+    result_plus = cb._solver_tools.wall_coupling_and_jacobian(
+        h_a + eps, T_aw_a, h_b, T_aw_b, t_over_k, A
+    )
+    result_minus = cb._solver_tools.wall_coupling_and_jacobian(
+        h_a - eps, T_aw_a, h_b, T_aw_b, t_over_k, A
+    )
     dQ_dh_a_fd = (result_plus.Q - result_minus.Q) / (2 * eps)
     assert abs(result.dQ_dh_a - dQ_dh_a_fd) / abs(dQ_dh_a_fd) < 1e-5
 
     # dQ/dh_b
-    result_plus = cb.wall_coupling_and_jacobian(h_a, T_aw_a, h_b + eps, T_aw_b, t_over_k, A)
-    result_minus = cb.wall_coupling_and_jacobian(h_a, T_aw_a, h_b - eps, T_aw_b, t_over_k, A)
+    result_plus = cb._solver_tools.wall_coupling_and_jacobian(
+        h_a, T_aw_a, h_b + eps, T_aw_b, t_over_k, A
+    )
+    result_minus = cb._solver_tools.wall_coupling_and_jacobian(
+        h_a, T_aw_a, h_b - eps, T_aw_b, t_over_k, A
+    )
     dQ_dh_b_fd = (result_plus.Q - result_minus.Q) / (2 * eps)
     assert abs(result.dQ_dh_b - dQ_dh_b_fd) / abs(dQ_dh_b_fd) < 1e-5
 
     # dQ/dT_aw_a
-    result_plus = cb.wall_coupling_and_jacobian(h_a, T_aw_a + eps, h_b, T_aw_b, t_over_k, A)
-    result_minus = cb.wall_coupling_and_jacobian(h_a, T_aw_a - eps, h_b, T_aw_b, t_over_k, A)
+    result_plus = cb._solver_tools.wall_coupling_and_jacobian(
+        h_a, T_aw_a + eps, h_b, T_aw_b, t_over_k, A
+    )
+    result_minus = cb._solver_tools.wall_coupling_and_jacobian(
+        h_a, T_aw_a - eps, h_b, T_aw_b, t_over_k, A
+    )
     dQ_dT_aw_a_fd = (result_plus.Q - result_minus.Q) / (2 * eps)
     assert abs(result.dQ_dT_aw_a - dQ_dT_aw_a_fd) / abs(dQ_dT_aw_a_fd) < 1e-5
 
     # dQ/dT_aw_b
-    result_plus = cb.wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b + eps, t_over_k, A)
-    result_minus = cb.wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b - eps, t_over_k, A)
+    result_plus = cb._solver_tools.wall_coupling_and_jacobian(
+        h_a, T_aw_a, h_b, T_aw_b + eps, t_over_k, A
+    )
+    result_minus = cb._solver_tools.wall_coupling_and_jacobian(
+        h_a, T_aw_a, h_b, T_aw_b - eps, t_over_k, A
+    )
     dQ_dT_aw_b_fd = (result_plus.Q - result_minus.Q) / (2 * eps)
     assert abs(result.dQ_dT_aw_b - dQ_dT_aw_b_fd) / abs(dQ_dT_aw_b_fd) < 1e-5
 
@@ -78,7 +94,7 @@ def test_hot_coupling_zero_temperature_difference():
     t_over_k = 8e-5
     A = 0.1
 
-    result = cb.wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b, t_over_k, A)
+    result = cb._solver_tools.wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b, t_over_k, A)
 
     assert abs(result.Q) < 1e-10  # No heat transfer
     assert abs(result.T_hot - T_aw_a) < 1e-10  # Wall at same temperature
@@ -93,7 +109,7 @@ def test_hot_coupling_high_resistance():
     t_over_k = 0.01  # High resistance wall
     A = 0.1
 
-    result = cb.wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b, t_over_k, A)
+    result = cb._solver_tools.wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b, t_over_k, A)
 
     # With high wall resistance, U should be dominated by wall resistance
     U_expected = 1.0 / (1.0 / h_a + t_over_k + 1.0 / h_b)
@@ -110,7 +126,7 @@ def test_hot_coupling_asymmetric_htcs():
     t_over_k = 1e-4
     A = 0.05
 
-    result = cb.wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b, t_over_k, A)
+    result = cb._solver_tools.wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b, t_over_k, A)
 
     # Overall HTC should be dominated by the lower HTC (gas side)
     U_expected = 1.0 / (1.0 / h_a + t_over_k + 1.0 / h_b)
@@ -131,7 +147,7 @@ def test_hot_coupling_repr():
     t_over_k = 8e-5
     A = 0.1
 
-    result = cb.wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b, t_over_k, A)
+    result = cb._solver_tools.wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b, t_over_k, A)
 
     repr_str = repr(result)
     assert "WallCouplingResult" in repr_str

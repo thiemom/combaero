@@ -20,7 +20,7 @@ def test_orifice_jacobian_accuracy():
     area = 0.01
 
     # C++ Calculation
-    res_obj = cb.orifice_residuals_and_jacobian(
+    res_obj = cb._solver_tools.orifice_residuals_and_jacobian(
         m_dot, Pt_up, P_static_up, T_up, Y_up, P_static_down, Cd, area
     )
 
@@ -28,7 +28,9 @@ def test_orifice_jacobian_accuracy():
     eps = 1e-6
 
     def get_mdot(p_tot, p_stat, t, y, p_down):
-        r = cb.orifice_residuals_and_jacobian(m_dot, p_tot, p_stat, t, y, p_down, Cd, area)
+        r = cb._solver_tools.orifice_residuals_and_jacobian(
+            m_dot, p_tot, p_stat, t, y, p_down, Cd, area
+        )
         return r.m_dot_calc
 
     # d_mdot/dP_total_up
@@ -84,7 +86,7 @@ def test_channel_jacobian_accuracy():
     friction_model = "haaland"
 
     # C++ Calculation
-    res_obj = cb.channel_residuals_and_jacobian(
+    res_obj = cb._solver_tools.channel_residuals_and_jacobian(
         m_dot, Pt_up, P_static_up, T_up, Y_up, P_static_down, L, D, roughness, friction_model
     )
 
@@ -93,7 +95,7 @@ def test_channel_jacobian_accuracy():
         eps = 1e-7  # Better precision near zero
 
     def get_dp(m, p_tot, p_stat, t, y, p_down):
-        r = cb.channel_residuals_and_jacobian(
+        r = cb._solver_tools.channel_residuals_and_jacobian(
             m, p_tot, p_stat, t, y, p_down, L, D, roughness, friction_model
         )
         return r.dP_calc

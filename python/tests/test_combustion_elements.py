@@ -11,7 +11,7 @@ from combaero.network import (
     mix_streams,
     stoichiometric_products,
 )
-from combaero.network.components import MixtureState
+from combaero.network.components import NetworkMixtureState
 
 
 def test_combustion_result_dataclass():
@@ -43,7 +43,7 @@ def test_combustion_result_dataclass():
 def test_mix_streams_basic():
     """Test basic stream mixing functionality."""
     # Create two simple states with same pressure
-    state1 = MixtureState(
+    state1 = NetworkMixtureState(
         P=101325.0,
         Pt=101325.0,
         T=300.0,
@@ -53,7 +53,7 @@ def test_mix_streams_basic():
     )
     state1.Y[0] = 1.0
 
-    state2 = MixtureState(
+    state2 = NetworkMixtureState(
         P=101325.0,
         Pt=101325.0,
         T=400.0,
@@ -79,7 +79,7 @@ def test_mix_streams_basic():
 
 def test_mix_streams_energy_conservation():
     """Test that mixing conserves energy."""
-    state1 = MixtureState(
+    state1 = NetworkMixtureState(
         P=101325.0,
         Pt=101325.0,
         T=300.0,
@@ -88,7 +88,7 @@ def test_mix_streams_energy_conservation():
         Y=cb.species.dry_air_mass(),
     )
 
-    state2 = MixtureState(
+    state2 = NetworkMixtureState(
         P=101325.0,
         Pt=101325.0,
         T=300.0,
@@ -139,7 +139,7 @@ def test_stoichiometric_products_validation():
 def test_combustion_from_phi_basic():
     """Test combustion_from_phi with basic parameters."""
     # Create air state
-    air_state = MixtureState(
+    air_state = NetworkMixtureState(
         P=500000.0,  # 5 bar
         Pt=500000.0,
         T=700.0,  # 700K
@@ -166,7 +166,7 @@ def test_combustion_from_phi_basic():
 
 def test_combustion_from_phi_lean_vs_rich():
     """Test lean vs rich combustion."""
-    air_state = MixtureState(
+    air_state = NetworkMixtureState(
         P=500000.0,
         Pt=500000.0,
         T=700.0,
@@ -192,7 +192,7 @@ def test_combustion_from_phi_lean_vs_rich():
 
 def test_combustion_efficiency():
     """Test combustion efficiency parameter."""
-    air_state = MixtureState(
+    air_state = NetworkMixtureState(
         P=500000.0,
         Pt=500000.0,
         T=700.0,
@@ -217,7 +217,7 @@ def test_combustion_efficiency():
 
 def test_pressure_drop():
     """Test pressure drop parameter."""
-    air_state = MixtureState(
+    air_state = NetworkMixtureState(
         P=500000.0,
         Pt=500000.0,
         T=700.0,

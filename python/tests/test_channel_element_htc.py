@@ -9,7 +9,7 @@ from combaero.network import (
     ChannelElement,
     ConvectiveSurface,
     DimpledModel,
-    MixtureState,
+    NetworkMixtureState,
     RibbedModel,
     SmoothModel,
 )
@@ -42,7 +42,7 @@ def test_channel_element_default_surface():
     assert channel.surface.area == 0.0
 
     # Create test state
-    state = MixtureState(
+    state = NetworkMixtureState(
         T=300.0,
         P=101325.0,
         Pt=101325.0,
@@ -78,7 +78,7 @@ def test_channel_element_with_surface():
     assert channel.surface.model.correlation == "gnielinski"
 
     # Create test state
-    state = MixtureState(
+    state = NetworkMixtureState(
         T=300.0,
         P=101325.0,
         Pt=101325.0,
@@ -99,9 +99,9 @@ def test_channel_element_with_surface():
     assert abs(result.T_aw - state.T) < 10.0
 
 
-def _make_state(m_dot: float = 0.5) -> MixtureState:
+def _make_state(m_dot: float = 0.5) -> NetworkMixtureState:
     """Helper: representative flowing state with non-trivial Re."""
-    return MixtureState(
+    return NetworkMixtureState(
         T=600.0,
         P=200000.0,
         Pt=210000.0,
@@ -207,7 +207,7 @@ def test_channel_element_with_t_hot():
     )
 
     # Create test state
-    state = MixtureState(
+    state = NetworkMixtureState(
         T=300.0,
         P=101325.0,
         Pt=101325.0,
@@ -245,7 +245,7 @@ def test_network_element_default():
     element = TestElement("test", "node1", "node2")
 
     # Create test state
-    state = MixtureState(
+    state = NetworkMixtureState(
         T=300.0,
         P=101325.0,
         Pt=101325.0,

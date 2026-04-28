@@ -9,7 +9,7 @@ Tests verify:
 import numpy as np
 
 import combaero as cb
-from combaero.heat_transfer import ConvectiveSurface, SmoothModel, WallConnection
+from combaero.heat_transfer import ConvectiveSurface, SmoothModel
 from combaero.network import (
     FlowNetwork,
     MassFlowBoundary,
@@ -17,6 +17,8 @@ from combaero.network import (
     OrificeElement,
     PlenumNode,
     PressureBoundary,
+    ThermalWall,
+    WallLayer,
 )
 
 
@@ -90,12 +92,11 @@ def test_two_channel_wall_coupling_convergence():
     net.add_element(cold_orifice)
 
     # Wall connection
-    wall = WallConnection(
+    wall = ThermalWall(
         id="coupling_wall",
         element_a="hot_channel",
         element_b="cold_channel",
-        wall_thickness=0.002,
-        wall_conductivity=25.0,
+        layers=[WallLayer(thickness=0.002, conductivity=25.0)],
     )
     net.add_wall(wall)
 
@@ -205,12 +206,11 @@ def test_thermal_coupling_disabled_matches_no_wall():
 
         # Optionally add wall
         if add_wall:
-            wall = WallConnection(
+            wall = ThermalWall(
                 id="coupling_wall",
                 element_a="hot_channel",
                 element_b="cold_channel",
-                wall_thickness=0.002,
-                wall_conductivity=25.0,
+                layers=[WallLayer(thickness=0.002, conductivity=25.0)],
             )
             net.add_wall(wall)
 
@@ -308,12 +308,11 @@ def test_hot_coupling_jacobian_validation():
     net.add_element(cold_orifice)
 
     # Wall connection
-    wall = WallConnection(
+    wall = ThermalWall(
         id="coupling_wall",
         element_a="hot_channel",
         element_b="cold_channel",
-        wall_thickness=0.002,
-        wall_conductivity=25.0,
+        layers=[WallLayer(thickness=0.002, conductivity=25.0)],
     )
     net.add_wall(wall)
 

@@ -5,7 +5,7 @@ from .components import (
     EffectiveAreaConnectionElement,
     EnergyBoundary,
     LosslessConnectionElement,
-    MixtureState,
+    NetworkMixtureState,
     MomentumChamberNode,
     OrificeElement,
     ChannelElement,
@@ -22,7 +22,6 @@ from .components import (
     ImpingementModel,
     WallLayer,
     ThermalWall,
-    WallConnection,
     AreaChangeElement,
 )
 from .combustion import (
@@ -58,7 +57,7 @@ __all__: list[str] = [
     "PressureLossElement",
     "AreaChangeElement",
     "EnergyBoundary",
-    "MixtureState",
+    "NetworkMixtureState",
     "CombustionResult",
     "stoichiometric_products",
     "combustion_from_streams",
@@ -80,7 +79,6 @@ __all__: list[str] = [
     "ImpingementModel",
     "WallLayer",
     "ThermalWall",
-    "WallConnection",
     "ConstantLoss",
     "ConstantFractionLoss",
     "ConstantHeadLoss",

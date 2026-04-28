@@ -113,9 +113,9 @@ class TestPressureLossElementResidual:
     """
 
     def _make_air_state(self, Pt: float = 150000.0, T: float = 700.0, m_dot: float = 1.0):
-        """Helper: build an air-composition MixtureState."""
+        """Helper: build an air-composition NetworkMixtureState."""
         import combaero as cb
-        from combaero.network import MixtureState
+        from combaero.network import NetworkMixtureState
 
         ns = cb.species.num_species
         Y = [0.0] * ns
@@ -125,7 +125,7 @@ class TestPressureLossElementResidual:
                 Y[k] = 0.767
             elif name == "O2":
                 Y[k] = 0.233
-        return MixtureState(P=Pt, Pt=Pt, T=T, Tt=T, m_dot=m_dot, Y=Y)
+        return NetworkMixtureState(P=Pt, Pt=Pt, T=T, Tt=T, m_dot=m_dot, Y=Y)
 
     def test_constant_fraction_residual_zero_at_exact_ratio(self) -> None:
         """res == 0 iff Pt_out / Pt_in == (1 - xi)."""
@@ -201,9 +201,9 @@ class TestPressureLossElementResidual:
 
 
 def _air_mixture_state(P: float = 150000.0, T: float = 700.0, m_dot: float = 1.0):
-    """Helper: 76.7/23.3 N2/O2 air MixtureState at requested conditions."""
+    """Helper: 76.7/23.3 N2/O2 air NetworkMixtureState at requested conditions."""
     import combaero as cb
-    from combaero.network import MixtureState
+    from combaero.network import NetworkMixtureState
 
     ns = cb.species.num_species
     Y = [0.0] * ns
@@ -213,7 +213,7 @@ def _air_mixture_state(P: float = 150000.0, T: float = 700.0, m_dot: float = 1.0
             Y[k] = 0.767
         elif name == "O2":
             Y[k] = 0.233
-    return MixtureState(P=P, Pt=P, T=T, Tt=T, m_dot=m_dot, Y=Y)
+    return NetworkMixtureState(P=P, Pt=P, T=T, Tt=T, m_dot=m_dot, Y=Y)
 
 
 class TestPressureLossElementConvectiveSurface:
@@ -416,7 +416,7 @@ class TestPressureLossElementWallCoupling:
         import numpy as np
 
         import combaero as cb
-        from combaero.heat_transfer import ConvectiveSurface, SmoothModel, WallConnection
+        from combaero.heat_transfer import ConvectiveSurface, SmoothModel
         from combaero.network import (
             ConstantFractionLoss,
             FlowNetwork,
@@ -425,6 +425,8 @@ class TestPressureLossElementWallCoupling:
             PlenumNode,
             PressureBoundary,
             PressureLossElement,
+            ThermalWall,
+            WallLayer,
         )
 
         Y_air = cb.species.dry_air_mass()
@@ -472,12 +474,11 @@ class TestPressureLossElementWallCoupling:
         for e in (hot_loss, cold_loss, hot_exit, cold_exit):
             net.add_element(e)
 
-        wall = WallConnection(
+        wall = ThermalWall(
             id="coupling_wall",
             element_a="hot_loss",
             element_b="cold_loss",
-            wall_thickness=0.002,
-            wall_conductivity=25.0,
+            layers=[WallLayer(thickness=0.002, conductivity=25.0)],
         )
         net.add_wall(wall)
 

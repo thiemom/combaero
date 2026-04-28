@@ -381,7 +381,6 @@ from combaero.network.components import (
     PinFinModel,
     RibbedModel,
     SmoothModel,
-    WallConnection,
 )
 
 # Mark as re-exported to prevent ruff F401 errors
@@ -393,5 +392,4 @@ __all__ = [
     "PinFinModel",
     "RibbedModel",
     "SmoothModel",
-    "WallConnection",
 ]
