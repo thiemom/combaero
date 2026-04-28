@@ -73,6 +73,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
+        env:
+          SETUPTOOLS_SCM_PRETEND_VERSION: "0.0.0.dev0"
         run: uv sync --all-extras --all-groups
 
       - name: Run combustion validation tests
@@ -132,6 +134,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
+        env:
+          SETUPTOOLS_SCM_PRETEND_VERSION: "0.0.0.dev0"
         run: uv sync --all-extras --all-groups
 
       - name: Run Python unit tests
