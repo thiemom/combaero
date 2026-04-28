@@ -56,6 +56,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Check C++ source code style
         run: ./scripts/check-source-style.sh --verbose
@@ -67,7 +69,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: uv sync --all-extras --all-groups
+        run: uv sync --no-install-workspace --all-extras --all-groups
 
       - name: Check Python code style
         run: uv run ./scripts/check-python-style.sh --verbose
@@ -87,6 +89,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Set up uv (Build dependencies)
         uses: astral-sh/setup-uv@v7
