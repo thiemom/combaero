@@ -17,6 +17,7 @@ import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { checkContinuationAvailable } from "../api";
 import useStore from "../store/useStore";
+import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import NumericInput from "./NumericInput";
 
 const Sidebar = () => {
@@ -267,6 +268,11 @@ const Sidebar = () => {
 				<Crosshair size={18} className="text-blue-400" />
 				<span>Probe</span>
 			</button>
+
+			{/* Display field picker */}
+			<div className="border-t border-stone-100 pt-3 mt-1">
+				<DiagnosticsPanel />
+			</div>
 
 			<div className="mt-6 text-sm font-bold text-gray-500 uppercase tracking-wider">
 				Solver Configuration

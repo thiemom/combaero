@@ -6,6 +6,7 @@ import {
 	Position,
 	useUpdateNodeInternals,
 } from "reactflow";
+import { NodeDiagRows } from "../NodeDiagRows";
 
 const MomentumChamberNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
@@ -45,19 +46,7 @@ const MomentumChamberNode = ({ id, data, selected }: NodeProps) => {
 				<div className="text-xs font-bold whitespace-nowrap">
 					{data.label ? data.label : "Mom. Chamber"}
 				</div>
-				{isSolved && data.result.state && (
-					<div className="flex flex-col items-center">
-						<div className="text-[9px] text-gray-500 font-mono whitespace-nowrap">
-							{data.result.state.T.toFixed(0)} K
-						</div>
-						<div className="text-[9px] text-gray-400 font-mono whitespace-nowrap opacity-75">
-							Pt {(data.result.state.Pt / 1e5).toFixed(2)} bar
-						</div>
-						<div className="text-[9px] text-stone-600 font-mono font-bold whitespace-nowrap">
-							P&nbsp;&nbsp;{(data.result.state.P / 1e5).toFixed(2)} bar
-						</div>
-					</div>
-				)}
+				{isSolved && <NodeDiagRows result={data.result} />}
 			</div>
 
 			{/* Flow handles */}

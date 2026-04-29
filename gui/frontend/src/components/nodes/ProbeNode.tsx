@@ -28,20 +28,25 @@ function ProbeSlot({
 		);
 	}
 
-	const meta = QUANTITY_CATALOGUE[quantityKey];
+	const rawKey = quantityKey.startsWith("state.")
+		? quantityKey.slice(6)
+		: quantityKey;
+	const meta = QUANTITY_CATALOGUE[rawKey];
 	const value = resolveQuantity(result, quantityKey);
 
 	return (
 		<div className="flex justify-between items-baseline gap-2 text-[11px] font-mono">
 			<span className="text-stone-500 min-w-[24px]">
-				{meta?.label ?? quantityKey}
+				{meta?.label ?? rawKey}
 			</span>
 			<span className="font-bold text-right">
 				{value !== undefined && value !== null
 					? (meta?.format(value) ?? String(value))
 					: "—"}
 			</span>
-			<span className="text-stone-400 text-[9px]">{meta?.unit ?? ""}</span>
+			<span className="text-stone-400 text-[9px] font-light">
+				{meta?.unit ?? ""}
+			</span>
 		</div>
 	);
 }

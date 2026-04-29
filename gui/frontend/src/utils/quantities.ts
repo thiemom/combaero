@@ -26,8 +26,16 @@ export const QUANTITY_CATALOGUE: Record<
 		format: (v) => v.toFixed(4),
 	},
 	area_ratio: { label: "Area ratio", unit: "—", format: (v) => v.toFixed(3) },
-	dPt: { label: "dP (total)", unit: "Pa", format: (v) => v.toFixed(0) },
-	dP: { label: "dP (static)", unit: "Pa", format: (v) => v.toFixed(0) },
+	dPt: {
+		label: "dP (total)",
+		unit: "bar",
+		format: (v) => (v / 1e5).toFixed(4),
+	},
+	dP: {
+		label: "dP (static)",
+		unit: "bar",
+		format: (v) => (v / 1e5).toFixed(4),
+	},
 	Re: {
 		label: "Re",
 		unit: "—",
@@ -39,8 +47,8 @@ export const QUANTITY_CATALOGUE: Record<
 	Q: { label: "Q", unit: "W", format: (v) => v.toFixed(0) },
 	ref_location: { label: "Ref Loc", unit: "—", format: (v) => String(v) },
 	// State results (accessed via result.state.*)
-	P: { label: "P", unit: "Pa", format: (v) => v.toFixed(0) },
-	Pt: { label: "Pt", unit: "Pa", format: (v) => v.toFixed(0) },
+	P: { label: "P", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
+	Pt: { label: "Pt", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
 	T: { label: "T", unit: "K", format: (v) => v.toFixed(2) },
 	Tt: { label: "Tt", unit: "K", format: (v) => v.toFixed(2) },
 	rho: { label: "rho", unit: "kg/m³", format: (v) => v.toFixed(4) },
@@ -58,13 +66,13 @@ export const QUANTITY_CATALOGUE: Record<
 	nu: { label: "nu", unit: "m²/s", format: (v) => v.toExponential(2) },
 	u: { label: "u", unit: "J/kg", format: (v) => v.toFixed(0) },
 	// Element-specific diagnostics (Static)
-	P_in: { label: "Pi", unit: "Pa", format: (v) => v.toFixed(0) },
-	P_out: { label: "Po", unit: "Pa", format: (v) => v.toFixed(0) },
+	P_in: { label: "Pi", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
+	P_out: { label: "Po", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
 	T_in: { label: "Ti", unit: "K", format: (v) => v.toFixed(2) },
 	T_out: { label: "To", unit: "K", format: (v) => v.toFixed(2) },
 	// Element-specific diagnostics (Total)
-	Pt_in: { label: "Pti", unit: "Pa", format: (v) => v.toFixed(0) },
-	Pt_out: { label: "Pto", unit: "Pa", format: (v) => v.toFixed(0) },
+	Pt_in: { label: "Pti", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
+	Pt_out: { label: "Pto", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
 	Tt_in: { label: "Tti", unit: "K", format: (v) => v.toFixed(2) },
 	Tt_out: { label: "Tto", unit: "K", format: (v) => v.toFixed(2) },
 	// Thermal diagnostics

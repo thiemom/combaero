@@ -6,6 +6,7 @@ import {
 	Position,
 	useUpdateNodeInternals,
 } from "reactflow";
+import { NodeDiagRows } from "../NodeDiagRows";
 
 const AreaChangeNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
@@ -58,6 +59,7 @@ const AreaChangeNode = ({ id, data, selected }: NodeProps) => {
 				<div className="flex flex-row gap-1 text-[9px] font-mono text-gray-500 whitespace-nowrap">
 					<div>F₁/F₀: {(data.result?.ratio ?? f1 / f0).toFixed(2)}</div>
 				</div>
+				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}
 			</div>
 
 			<Handle type="target" position={Position.Left} id="flow-target" />

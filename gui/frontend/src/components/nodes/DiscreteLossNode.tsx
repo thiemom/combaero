@@ -6,17 +6,13 @@ import {
 	Position,
 	useUpdateNodeInternals,
 } from "reactflow";
+import { NodeDiagRows } from "../NodeDiagRows";
 
 const DiscreteLossNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
 	const isSolved = !!data.result;
 	const updateNodeInternals = useUpdateNodeInternals();
 	const textRotation = rotation === 90 || rotation === 180 ? 180 : 0;
-
-	const dPBar =
-		data.result?.dPt != null
-			? `ΔP ${(data.result.dPt / 1e5).toFixed(4)} bar`
-			: null;
 
 	const formulaByType: Record<string, string> = {
 		constant_fraction: "ΔP = ξ·P",
@@ -62,9 +58,13 @@ const DiscreteLossNode = ({ id, data, selected }: NodeProps) => {
 				<div className="text-[10px] font-bold uppercase leading-none whitespace-nowrap">
 					{data.label ? data.label : "Discrete Loss"}
 				</div>
-				<div className="text-[9px] font-mono text-gray-500 whitespace-nowrap">
-					{dPBar ?? formula}
-				</div>
+				{isSolved ? (
+					<NodeDiagRows result={data.result} maxRows={1} />
+				) : (
+					<div className="text-[9px] font-mono text-gray-500 whitespace-nowrap">
+						{formula}
+					</div>
+				)}
 			</div>
 
 			<Handle type="target" position={Position.Left} id="flow-target" />

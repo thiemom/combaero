@@ -1,6 +1,7 @@
 import { Activity, Crosshair, RotateCw } from "lucide-react";
 import React from "react";
 import useStore from "../store/useStore";
+import { resolveField } from "../utils/diagnostics";
 import {
 	BASIC_STATE_KEYS,
 	QUANTITY_CATALOGUE,
@@ -25,6 +26,7 @@ const Inspector = () => {
 		unitPreferences,
 		isExporting,
 		exportNetworkResults,
+		displaySettings,
 	} = useStore();
 
 	const validationErrors = validateNetwork(nodes);
@@ -57,23 +59,25 @@ const Inspector = () => {
 			const fullKey = isState ? `state.${k}` : k;
 			if (seenKeys.has(fullKey)) return;
 			seenKeys.add(fullKey);
-
-			const meta = QUANTITY_CATALOGUE[k];
+			const unit = QUANTITY_CATALOGUE[k]?.unit;
 			availableKeys.push({
 				key: fullKey,
-				label: meta ? `${meta.label} (${k})` : k,
+				label: unit ? `${k} [${unit}]` : k,
 			});
 		};
 
 		if (result) {
-			// Populate from actual results
+			// Only offer keys whose value is actually a finite number in this
+			// target's result — mirrors discoverFields to avoid NaN / Infinity slots.
+			const isFiniteNum = (v: unknown): v is number =>
+				typeof v === "number" && Number.isFinite(v);
 			if (result.state) {
 				for (const k of Object.keys(result.state)) {
-					if (typeof result.state[k] === "number") addKey(k, true);
+					if (isFiniteNum(result.state[k])) addKey(k, true);
 				}
 			}
 			for (const k of Object.keys(result)) {
-				if (k !== "state" && typeof result[k] === "number") addKey(k);
+				if (k !== "state" && isFiniteNum(result[k])) addKey(k);
 			}
 		} else {
 			// Fallback: show common state and transport quantities if no result yet
@@ -93,6 +97,11 @@ const Inspector = () => {
 		// Sort by label
 		availableKeys.sort((a, b) => a.label.localeCompare(b.label));
 
+		// availableKeys is already filtered to finite values for this target
+		// (via isFiniteNum when building the list). No further displaySettings
+		// filtering here — that would hide fields like phi/theta that exist on
+		// the target but aren't in the current displaySettings selection.
+
 		const slotSelect = (
 			slot: "slot1_key" | "slot2_key",
 			current: string | undefined,
@@ -102,9 +111,11 @@ const Inspector = () => {
 				value={current ?? ""}
 				onChange={(e) =>
 					selectedNode &&
-					updateNodeData(selectedNode.id, {
-						[slot]: e.target.value || undefined,
-					})
+					updateNodeData(
+						selectedNode.id,
+						{ [slot]: e.target.value || undefined },
+						true,
+					)
 				}
 			>
 				<option value="">— select quantity —</option>
@@ -132,7 +143,7 @@ const Inspector = () => {
 						type="text"
 						value={probeData.label ?? "Probe"}
 						onChange={(e) =>
-							updateNodeData(selectedNode.id, { label: e.target.value })
+							updateNodeData(selectedNode.id, { label: e.target.value }, true)
 						}
 						className="p-1.5 border rounded text-xs w-full focus:ring-1 focus:ring-blue-500 outline-none"
 					/>
@@ -231,9 +242,11 @@ const Inspector = () => {
 							type="button"
 							onClick={() => {
 								const currentRotation = selectedNode.data.rotation || 0;
-								updateNodeData(selectedNode.id, {
-									rotation: (currentRotation + 90) % 360,
-								});
+								updateNodeData(
+									selectedNode.id,
+									{ rotation: (currentRotation + 90) % 360 },
+									true,
+								);
 							}}
 							className="flex items-center gap-1 text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-600 px-2 py-1 rounded border border-blue-200 transition-colors uppercase font-bold"
 							title="Rotate node 90° clockwise"
@@ -264,9 +277,7 @@ const Inspector = () => {
 						type="text"
 						value={selectedNode.data.label || ""}
 						onChange={(e) =>
-							updateNodeData(selectedNode.id, {
-								label: e.target.value,
-							})
+							updateNodeData(selectedNode.id, { label: e.target.value }, true)
 						}
 						placeholder="e.g. Custom Label"
 						className="p-2 border rounded border-stone-200 outline-none focus:ring-2 focus:ring-blue-100"
@@ -1110,23 +1121,27 @@ const Inspector = () => {
 							</h3>
 						</div>
 
-						{selectedNode.data.result.state ? (
+						{displaySettings.length === 0 ? (
+							<p className="text-[10px] text-stone-400 italic text-center py-2">
+								Select fields in the Display Fields panel to show diagnostics
+								here.
+							</p>
+						) : (
 							<div className="flex flex-col gap-3">
-								{/* 1. Basic State Section (Always visible) */}
 								<div className="grid grid-cols-2 gap-x-2 gap-y-3">
-									{BASIC_STATE_KEYS.map((key) => {
-										const val = selectedNode.data.result.state[key];
-										if (val === undefined || val === null) return null;
+									{displaySettings.map((key) => {
+										const val = resolveField(selectedNode.data.result, key);
+										if (val === undefined) return null;
 										const meta = QUANTITY_CATALOGUE[key];
 										return (
 											<div key={key} className="flex flex-col">
 												<span className="text-stone-400 text-[9px] font-bold">
-													{meta?.label || key}
+													{meta?.label ?? key}
 												</span>
 												<span className="font-mono text-xs font-bold whitespace-nowrap">
-													{meta?.format(val) || val.toFixed(4)}{" "}
+													{meta ? meta.format(val) : val.toFixed(4)}{" "}
 													<span className="text-[9px] font-normal text-stone-400 ml-0.5">
-														{meta?.unit}
+														{meta?.unit ?? ""}
 													</span>
 												</span>
 											</div>
@@ -1134,39 +1149,8 @@ const Inspector = () => {
 									})}
 								</div>
 
-								{/* 2. Advanced/Transport Section (Conditional) */}
-								{TRANSPORT_KEYS.some(
-									(k) => selectedNode.data.result.state[k] !== undefined,
-								) && (
-									<div className="border-t border-stone-100 pt-3">
-										<div className="text-[10px] font-bold text-stone-400 uppercase mb-2">
-											Advanced Properties
-										</div>
-										<div className="grid grid-cols-2 gap-x-2 gap-y-2">
-											{TRANSPORT_KEYS.map((key) => {
-												const val = selectedNode.data.result.state[key];
-												if (val === undefined || val === null) return null;
-												const meta = QUANTITY_CATALOGUE[key];
-												return (
-													<div
-														key={key}
-														className="flex justify-between items-baseline border-b border-dotted border-stone-100 pb-1"
-													>
-														<span className="text-stone-500 text-[10px]">
-															{meta?.label || key}
-														</span>
-														<span className="font-mono text-[10px] font-bold">
-															{meta?.format(val) || val.toFixed(4)}
-														</span>
-													</div>
-												);
-											})}
-										</div>
-									</div>
-								)}
-
-								{/* 3. Composition Section */}
-								{selectedNode.data.result.state.X && (
+								{/* Composition — not a scalar field, always shown when present */}
+								{selectedNode.data.result.state?.X && (
 									<div className="border-t border-stone-100 pt-3">
 										<div className="text-[10px] font-bold text-stone-400 uppercase mb-2">
 											Composition (Mole %)
@@ -1195,55 +1179,6 @@ const Inspector = () => {
 										</div>
 									</div>
 								)}
-							</div>
-						) : (
-							<div className="flex flex-col gap-3">
-								<div className="text-[10px] font-bold text-stone-400 uppercase mb-1">
-									Element Diagnostics
-								</div>
-								<div className="grid grid-cols-2 gap-x-2 gap-y-3">
-									{Object.keys(QUANTITY_CATALOGUE)
-										.filter((k) => !k.startsWith("state."))
-										.map((key) => {
-											const val = selectedNode.data.result[key];
-											if (val === undefined || val === null) return null;
-											const meta = QUANTITY_CATALOGUE[key];
-
-											// Special styling for primary metrics like m_dot
-											if (key === "m_dot") {
-												return (
-													<div
-														key={key}
-														className="col-span-2 flex flex-col mb-1 border-b border-stone-100 pb-2"
-													>
-														<span className="text-stone-400 text-[10px] uppercase font-bold">
-															{meta.label}
-														</span>
-														<span className="font-mono text-lg font-bold text-orange-600">
-															{meta.format(val)}{" "}
-															<span className="text-xs font-normal text-stone-400">
-																{meta.unit}
-															</span>
-														</span>
-													</div>
-												);
-											}
-
-											return (
-												<div key={key} className="flex flex-col">
-													<span className="text-stone-400 text-[9px] font-bold">
-														{meta?.label || key}
-													</span>
-													<span className="font-mono text-xs font-bold whitespace-nowrap">
-														{meta?.format(val) || val.toFixed(4)}{" "}
-														<span className="text-[9px] font-normal text-stone-400 ml-0.5">
-															{meta?.unit}
-														</span>
-													</span>
-												</div>
-											);
-										})}
-								</div>
 							</div>
 						)}
 					</div>
@@ -1356,7 +1291,7 @@ const Inspector = () => {
 						type="text"
 						value={selectedEdge.data.label ?? ""}
 						onChange={(e) =>
-							updateEdgeData(selectedEdge.id, { label: e.target.value })
+							updateEdgeData(selectedEdge.id, { label: e.target.value }, true)
 						}
 						placeholder="e.g. Custom Wall"
 						className="p-1.5 border rounded text-xs w-full focus:ring-1 focus:ring-orange-500 outline-none"
@@ -1369,7 +1304,11 @@ const Inspector = () => {
 						type="checkbox"
 						checked={!!selectedEdge.data?.show_label}
 						onChange={(e) =>
-							updateEdgeData(selectedEdge.id, { show_label: e.target.checked })
+							updateEdgeData(
+								selectedEdge.id,
+								{ show_label: e.target.checked },
+								true,
+							)
 						}
 						className="rounded"
 					/>
@@ -1426,13 +1365,21 @@ const Inspector = () => {
 							onChange={(e) => {
 								const val = e.target.value;
 								if (val === "custom") {
-									updateEdgeData(selectedEdge.id, { probe_mode: "custom" });
+									updateEdgeData(
+										selectedEdge.id,
+										{ probe_mode: "custom" },
+										true,
+									);
 								} else {
 									const [_, type, idx] = val.split(":");
-									updateEdgeData(selectedEdge.id, {
-										probe_mode: "preset",
-										probe_preset: { type, index: Number.parseInt(idx, 10) },
-									});
+									updateEdgeData(
+										selectedEdge.id,
+										{
+											probe_mode: "preset",
+											probe_preset: { type, index: Number.parseInt(idx, 10) },
+										},
+										true,
+									);
 								}
 							}}
 						>
@@ -1469,7 +1416,7 @@ const Inspector = () => {
 										0,
 									) || 0.003;
 								const clamped = Math.min(Math.max(0, val), totalThickness);
-								updateEdgeData(selectedEdge.id, { probe_depth: clamped });
+								updateEdgeData(selectedEdge.id, { probe_depth: clamped }, true);
 							}}
 							placeholder="0.00"
 						/>
@@ -1568,9 +1515,11 @@ const Inspector = () => {
 						type="text"
 						value={selectedEdge.data?.label ?? ""}
 						onChange={(e) =>
-							updateEdgeData(selectedEdge.id, {
-								label: e.target.value || undefined,
-							})
+							updateEdgeData(
+								selectedEdge.id,
+								{ label: e.target.value || undefined },
+								true,
+							)
 						}
 						placeholder="e.g. Main Feed"
 						className="p-1.5 border rounded text-xs w-full focus:ring-1 focus:ring-slate-400 outline-none"
@@ -1583,7 +1532,11 @@ const Inspector = () => {
 						type="checkbox"
 						checked={!!selectedEdge.data?.show_label}
 						onChange={(e) =>
-							updateEdgeData(selectedEdge.id, { show_label: e.target.checked })
+							updateEdgeData(
+								selectedEdge.id,
+								{ show_label: e.target.checked },
+								true,
+							)
 						}
 						className="rounded"
 					/>

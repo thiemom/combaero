@@ -6,6 +6,7 @@ import {
 	Position,
 	useUpdateNodeInternals,
 } from "reactflow";
+import { NodeDiagRows } from "../NodeDiagRows";
 
 const ChannelNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
@@ -48,6 +49,7 @@ const ChannelNode = ({ id, data, selected }: NodeProps) => {
 				<span className="text-[9px] font-mono text-gray-500 whitespace-nowrap">
 					L:{data.L} D:{data.D}
 				</span>
+				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}
 			</div>
 
 			<Handle type="target" position={Position.Left} id="flow-target" />

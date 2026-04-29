@@ -6,6 +6,7 @@ import {
 	Position,
 	useUpdateNodeInternals,
 } from "reactflow";
+import { NodeDiagRows } from "../NodeDiagRows";
 
 const OrificeNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
@@ -48,6 +49,7 @@ const OrificeNode = ({ id, data, selected }: NodeProps) => {
 				<div className="text-[9px] font-mono text-gray-500 whitespace-nowrap">
 					Cd: {(data.result?.Cd ?? data.Cd ?? 0.6).toFixed(3)}
 				</div>
+				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}
 			</div>
 
 			<Handle type="target" position={Position.Left} id="flow-target" />

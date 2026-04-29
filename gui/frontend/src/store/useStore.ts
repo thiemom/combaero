@@ -11,6 +11,7 @@ import {
 } from "reactflow";
 import { create } from "zustand";
 import { exportResults } from "../api";
+import { discoverFields } from "../utils/diagnostics";
 
 export interface RFState {
 	nodes: Node[];
@@ -21,8 +22,16 @@ export interface RFState {
 	onConnect: (connection: Connection) => void;
 	setNodes: (nodes: Node[]) => void;
 	setEdges: (edges: Edge[]) => void;
-	updateNodeData: (nodeId: string, data: any) => void;
-	updateEdgeData: (edgeId: string, data: any) => void;
+	updateNodeData: (
+		nodeId: string,
+		data: any,
+		preserveResults?: boolean,
+	) => void;
+	updateEdgeData: (
+		edgeId: string,
+		data: any,
+		preserveResults?: boolean,
+	) => void;
 	setSolveResults: (results: any) => void;
 	speciesMetadata: { names: string[]; molar_masses: number[] } | null;
 	fetchSpeciesMetadata: () => Promise<void>;
@@ -118,42 +127,79 @@ const useStore = create<RFState>((set, get) => ({
 		set({ edges });
 	},
 
-	updateNodeData: (nodeId: string, data: any) => {
-		set({
-			nodes: get().nodes.map((node) => {
-				// Clear stale result on every node when any edit invalidates the solve
-				const { result: _r, ...rest } = node.data ?? {};
-				if (node.id === nodeId) {
-					return { ...node, data: { ...rest, ...data } };
-				}
-				return { ...node, data: rest };
-			}),
-			edges: get().edges.map((edge) => {
-				const { result: _r, ...rest } = edge.data ?? {};
-				return { ...edge, data: rest };
-			}),
-			solveResults: null,
-		});
+	updateNodeData: (nodeId: string, data: any, preserveResults = false) => {
+		if (preserveResults) {
+			set({
+				nodes: get().nodes.map((node) => {
+					if (node.id === nodeId) {
+						return { ...node, data: { ...node.data, ...data } };
+					}
+					return node;
+				}),
+			});
+		} else {
+			set({
+				nodes: get().nodes.map((node) => {
+					// Clear stale result on every node when any edit invalidates the solve
+					const { result: _r, ...rest } = node.data ?? {};
+					if (node.id === nodeId) {
+						return { ...node, data: { ...rest, ...data } };
+					}
+					return { ...node, data: rest };
+				}),
+				edges: get().edges.map((edge) => {
+					const { result: _r, ...rest } = edge.data ?? {};
+					return { ...edge, data: rest };
+				}),
+				solveResults: null,
+			});
+		}
 	},
-	updateEdgeData: (edgeId: string, data: any) => {
-		set({
-			nodes: get().nodes.map((node) => {
-				const { result: _r, ...rest } = node.data ?? {};
-				return { ...node, data: rest };
-			}),
-			edges: get().edges.map((edge) => {
-				const { result: _r, ...rest } = edge.data ?? {};
-				if (edge.id === edgeId) {
-					return { ...edge, data: { ...rest, ...data } };
-				}
-				return { ...edge, data: rest };
-			}),
-			solveResults: null,
-		});
+	updateEdgeData: (edgeId: string, data: any, preserveResults = false) => {
+		if (preserveResults) {
+			set({
+				edges: get().edges.map((edge) => {
+					if (edge.id === edgeId) {
+						return { ...edge, data: { ...edge.data, ...data } };
+					}
+					return edge;
+				}),
+			});
+		} else {
+			set({
+				nodes: get().nodes.map((node) => {
+					const { result: _r, ...rest } = node.data ?? {};
+					return { ...node, data: rest };
+				}),
+				edges: get().edges.map((edge) => {
+					const { result: _r, ...rest } = edge.data ?? {};
+					if (edge.id === edgeId) {
+						return { ...edge, data: { ...rest, ...data } };
+					}
+					return { ...edge, data: rest };
+				}),
+				solveResults: null,
+			});
+		}
 	},
 
 	setSolveResults: (results: any) => {
 		set({ solveResults: results });
+
+		// Auto-promote every newly discovered scalar field into displaySettings so
+		// the Inspector and node cards show it without manual opt-in.  Users can
+		// uncheck individual fields afterwards to shorten the display.
+		if (results) {
+			const discovered = discoverFields(results);
+			const current = get().displaySettings;
+			const existing = new Set(current);
+			const toAdd = discovered
+				.filter((f) => !existing.has(f.key))
+				.map((f) => f.key);
+			if (toAdd.length > 0) {
+				set({ displaySettings: [...current, ...toAdd] });
+			}
+		}
 
 		// Also inject results into node data for reactive UI
 		if (results) {
