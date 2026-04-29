@@ -19,24 +19,6 @@ L5 (legacy combustion guards), F.3 (non-smooth channel models in GUI).
 
 ---
 
-## Architectural Note: Ideal Post-Solve Flow
-
-After all fixes, the post-solve data flow should be:
-
-```
-solve()
-  -> root() converges -> final_x
-  -> _propagate_states(final_x)          # once, populates _derived_states
-  -> for each node:
-       cb.complete_state(T, P, X)        # once per node, returns CompleteState
-  -> for each element:
-       cb.complete_state(T_in, P_in, X)  # once per element
-  -> sol_dict contains all unknowns + derived T/Y + CompleteState fields
-  -> GUI reads sol_dict directly — zero re-computation
-```
-
----
-
 ## Part D — PyPI Publishing Readiness
 
 Current state assessed against [PyPA packaging guide](https://packaging.python.org/)
@@ -143,30 +125,6 @@ scientific library with a pybind11 C++ extension, this means:
   `pybind11-stubgen combaero._core -o python/combaero/`
 - Include the `.pyi` files in the wheel via `scikit-build` config
 
-### D.4 — Version management (MEDIUM)
-
-Version is hardcoded in `pyproject.toml` (`version = "0.2.0"`). For PyPI releases,
-**every upload must have a unique version**. Options:
-
-- **Manual**: bump in `pyproject.toml` before each release (current approach — fragile)
-- **`setuptools-scm`** or **`scikit-build-core`'s built-in git versioning**:
-  derive version from git tags automatically
-
-Recommended: use `scikit-build-core`'s `[tool.scikit-build.metadata.version]` with
-git tags:
-
-```toml
-[project]
-dynamic = ["version"]
-
-[tool.scikit-build.metadata]
-version.provider = "scikit_build_core.metadata.setuptools_scm"
-
-[tool.setuptools_scm]
-```
-
-Or simpler: keep manual but add a CI check that the tag matches `pyproject.toml`.
-
 ### D.5 — CHANGELOG.md (MEDIUM)
 
 No changelog exists. PyPI best practice is a `CHANGELOG.md` tracking releases.
@@ -188,18 +146,6 @@ sdist.include = ["src/**", "include/**", "python/**", "CMakeLists.txt",
 sdist.exclude = ["build", ".venv", "gui", "diagnostic_*", "benchmarks",
                  "cantera_validation_tests", "thermo_data_generator", "dist"]
 ```
-
-### D.7 — `__all__` cleanup in `__init__.py` (LOW)
-
-The `__init__.py` exports **~300 symbols** in `__all__`. This is fine but:
-- Two different `MixtureState` classes exist: `combaero.MixtureState` (C++ pybind11)
-  and `combaero.network.MixtureState` (Python dataclass). This will confuse users.
-- Many internal solver helpers are exported (`orifice_mdot_and_jacobian`,
-  `density_and_jacobians`, etc.) — consider whether these belong in the public API
-  or under a `combaero._solver_tools` namespace.
-
-**Recommendation**: Audit `__all__` and split into public API vs internal helpers.
-Resolve the `MixtureState` name collision.
 
 ### D.8 — Network/GUI should not be in the PyPI package (LOW)
 
@@ -246,10 +192,8 @@ license-files = ["LICENSE"]
 | D.1 | pyproject.toml metadata | High | Small | Missing authors, classifiers, urls |
 | D.2 | cibuildwheel CI for multi-platform wheels | High | Medium | No wheel CI exists |
 | D.3 | Type stubs + py.typed | Medium | Small | No stubs, no marker |
-| D.4 | Version management (git tags) | Medium | Small | Hardcoded version |
 | D.5 | CHANGELOG.md | Medium | Small | Does not exist |
 | D.6 | sdist include/exclude | Low | Small | May ship build artifacts |
-| D.7 | `__all__` audit + MixtureState collision | Low | Medium | 300+ exports, name clash |
 | D.8 | network/gui packaging scope | Low | Decision | Keep bundled vs split |
 | D.9 | Python version floor | Low | Trivial | 3.9 is EOL |
 | D.10 | License in wheel metadata | Trivial | Trivial | Missing `license-files` |
