@@ -27,8 +27,8 @@ dev = [
 ]
 
 [tool.scikit-build]
-# Python package lives under python/combaero
 wheel.packages = ["python/combaero"]
+sdist.exclude = ["gui/*", "gui/**/*"]
 build.verbose = true
 
 [tool.scikit-build.metadata.version]

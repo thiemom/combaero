@@ -19,6 +19,9 @@ requires-python = ">=3.9"
 package-dir = {gui = "."}
 packages = ["gui", "gui.backend"]
 
+[project.scripts]
+combaero-gui = "gui.backend.main:run_server"
+
 [tool.uv]
 managed = true
 package = true
