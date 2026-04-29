@@ -1,212 +1,125 @@
 """Combustion functions for network solver.
 
-UPDATED: Now uses proper C++ Jacobian functions via pybind11:
-- adiabatic_T_complete_and_jacobian_T()
-- adiabatic_T_equilibrium_and_jacobians()
-
-These functions return (T_ad, dT_ad_dT_in, X_products) with analytical Jacobians,
-complying with SOLVER.md Section 4 design rules.
+All thermodynamic calculations delegate to C++ via pybind11:
+- mixer_from_streams_and_jacobians()  -- adiabatic stream mixing
+- adiabatic_T_complete_and_jacobian_T_from_streams()  -- complete combustion
+- adiabatic_T_equilibrium_and_jacobians_from_streams() -- equilibrium combustion
 """
+
+from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
 import combaero._core as core
 
 from .combustion_result import CombustionResult
-from .stoichiometry import stoichiometric_products
 
 if TYPE_CHECKING:
     from combaero.network.components import NetworkMixtureState
 
 
 def mix_streams(
-    state_1: "NetworkMixtureState",
-    state_2: "NetworkMixtureState",
+    state_1: NetworkMixtureState,
+    state_2: NetworkMixtureState,
 ) -> CombustionResult:
-    """
-    Mix two streams conserving mass, species, and enthalpy.
+    """Mix two streams conserving mass, species, and enthalpy.
 
-    The mixed temperature is found by solving:
-        h_mix = (m1*h1 + m2*h2) / (m1 + m2)
-    using combaero.calc_T_from_h().
-
-    Parameters
-    ----------
-    state_1 : NetworkMixtureState
-        First stream (P, T, m_dot, X).
-    state_2 : NetworkMixtureState
-        Second stream (P, T, m_dot, X).
-        Pressure must be compatible with state_1 (solver enforces this).
-
-    Returns
-    -------
-    CombustionResult
-        Mixed stream state. phi=0, eta=1, Q_released=0.
+    Delegates to mixer_from_streams_and_jacobians (C++ via pybind11).
     """
     import combaero as cb
 
-    # Validate inputs
-    if state_1.P != state_2.P:
-        raise ValueError("Streams must have compatible pressures for mixing")
+    streams = [
+        core.MassStream(state_1.m_dot, state_1.Tt, state_1.Pt, list(state_1.Y)),
+        core.MassStream(state_2.m_dot, state_2.Tt, state_2.Pt, list(state_2.Y)),
+    ]
+    mix = core.mixer_from_streams_and_jacobians(streams)
 
-    m1, m2 = state_1.m_dot, state_2.m_dot
-    m_total = m1 + m2
-
-    if m_total <= 0:
-        raise ValueError("Total mass flow must be positive")
-
-    # Mass-flow weighted composition
-    Y_mix = [(m1 * y1 + m2 * y2) / m_total for y1, y2 in zip(state_1.Y, state_2.Y, strict=False)]
-
-    # Mass-weighted enthalpy
-    h1 = state_1.enthalpy()
-    h2 = state_2.enthalpy()
-    h_mix = (m1 * h1 + m2 * h2) / m_total
-
-    # Find temperature that gives this enthalpy
-    # Convert mass enthalpy [J/kg] to molar enthalpy [J/mol] because cb.calc_T_from_h expects molar enthalpy
-    X_mix = cb.mass_to_mole(Y_mix)
-    mw = cb.mwmix(X_mix)
-    h_mix_molar = h_mix * mw / 1000.0
-
-    try:
-        T_mix = cb.calc_T_from_h(h_mix_molar, X_mix)
-    except Exception as e:
-        # Fallback to mass-weighted average if enthalpy inversion fails
-        # This should be removed once the enthalpy inversion is working properly
-        m1, m2 = state_1.m_dot, state_2.m_dot
-        m_total = m1 + m2
-        T_mix = (m1 * state_1.T + m2 * state_2.T) / m_total
-        # Log warning for debugging
-        print(f"Warning: calc_T_from_h failed, using fallback: {e}")
-
-    # Compute derived properties
-    mw = cb.mwmix(X_mix)
-    rho = cb.density(T_mix, state_1.P, X_mix)
-    cp = cb.cp(T_mix, X_mix)
-    gamma = cb.isentropic_expansion_coefficient(T_mix, X_mix)
-    a = cb.speed_of_sound(T_mix, X_mix)
+    T = mix.T_mix
+    P = mix.P_total_mix
+    Y = list(mix.Y_mix)
+    X = list(cb.mass_to_mole(Y))
+    mw = cb.mwmix(X)
 
     return CombustionResult(
-        X=X_mix,
-        Y=Y_mix,
+        X=X,
+        Y=Y,
         mw=mw,
-        T=T_mix,
-        P=state_1.P,
-        m_dot=m_total,
-        h=h_mix,
-        cp=cp,
-        rho=rho,
-        gamma=gamma,
-        a=a,
-        phi=0.0,  # No combustion
-        T_adiabatic=T_mix,  # No temperature rise from combustion
-        eta=1.0,  # Perfect mixing efficiency
-        Q_released=0.0,  # No heat release
+        T=T,
+        P=P,
+        m_dot=state_1.m_dot + state_2.m_dot,
+        h=cb.h_mass(T, X),
+        cp=cb.cp(T, X),
+        rho=cb.density(T, P, X),
+        gamma=cb.isentropic_expansion_coefficient(T, X),
+        a=cb.speed_of_sound(T, X),
+        phi=0.0,
+        T_adiabatic=T,
+        eta=1.0,
+        Q_released=0.0,
     )
 
 
 def combustion_from_streams(
-    state_air: "NetworkMixtureState | dict",
-    state_fuel: "NetworkMixtureState | dict",
+    state_air: NetworkMixtureState,
+    state_fuel: NetworkMixtureState,
     method: str = "complete",
     eta: float = 1.0,
     delta_P_frac: float = 0.04,
 ) -> CombustionResult:
-    """
-    Compute burned gas state from separate air and fuel streams.
+    """Compute burned gas state from separate air and fuel streams.
 
     Steps:
-      1. Mix air + fuel streams (mass flow weighted)
-      2. Compute equivalence ratio phi from atom balance
-      3. Compute burned composition via stoichiometric_products()
-      4. Compute adiabatic flame temperature via calc_T_from_h()
-      5. Apply combustion efficiency: T_out = T_in + eta*(T_adiabatic - T_in)
-      6. Apply pressure drop: P_out = P_in * (1 - delta_P_frac)
+      1. Mix streams in C++ to get inlet state (T_in, Y_mix)
+      2. Compute adiabatic flame temperature and product composition in C++
+      3. Apply combustion efficiency: T_out = T_in + eta*(T_ad - T_in)
+      4. Apply pressure drop: P_out = P_in * (1 - delta_P_frac)
 
     Parameters
     ----------
-    state_air : NetworkMixtureState or dict
-        Oxidiser stream (P, T, m_dot, Y).
-    state_fuel : NetworkMixtureState or dict
-        Fuel stream (P, T, m_dot, Y). m_dot is the fuel mass flow rate.
+    state_air : NetworkMixtureState
+        Oxidiser stream (Pt, Tt, m_dot, Y).
+    state_fuel : NetworkMixtureState
+        Fuel stream (Pt, Tt, m_dot, Y).
     method : str
-        Combustion method: 'complete' or 'equilibrium'. Default 'complete'.
+        'complete' or 'equilibrium'. Default 'complete'.
     eta : float
-        Combustion efficiency [0, 1]. Default 1.0 (complete combustion).
+        Combustion efficiency [0, 1]. Default 1.0.
     delta_P_frac : float
-        Fractional total pressure drop across burner. Default 0.04 (4%).
-
-    Returns
-    -------
-    CombustionResult
-        Complete burned gas state including diagnostics.
+        Fractional total pressure drop. Default 0.04.
     """
     import combaero as cb
 
-    # Convert dictionaries to NetworkMixtureState objects if needed
-    if isinstance(state_air, dict):
-        # Import here to avoid circular import
-        from combaero.network.components import NetworkMixtureState as LocalNetworkMixtureState
+    streams = [
+        core.MassStream(state_air.m_dot, state_air.Tt, state_air.Pt, list(state_air.Y)),
+        core.MassStream(state_fuel.m_dot, state_fuel.Tt, state_fuel.Pt, list(state_fuel.Y)),
+    ]
+    P = state_air.P
 
-        state_air = LocalNetworkMixtureState(**state_air)
-    if isinstance(state_fuel, dict):
-        # Import here to avoid circular import
-        from combaero.network.components import NetworkMixtureState as LocalNetworkMixtureState
+    mix_in = core.mixer_from_streams_and_jacobians(streams)
+    T_in = mix_in.T_mix
+    X_mix_in = list(cb.mass_to_mole(list(mix_in.Y_mix)))
 
-        state_fuel = LocalNetworkMixtureState(**state_fuel)
+    if method == "complete":
+        res = core.adiabatic_T_complete_and_jacobian_T_from_streams(streams, P)
+    else:
+        res = core.adiabatic_T_equilibrium_and_jacobians_from_streams(streams, P)
 
-    # Validate inputs
-    if state_air.P != state_fuel.P:
-        raise ValueError("Air and fuel streams must have the same pressure")
+    T_ad = res.T_mix
+    Y_products = list(res.Y_mix)
+    X_products = list(cb.mass_to_mole(Y_products))
 
-    # Step 1: Mix air + fuel streams
-    mixed = mix_streams(state_air, state_fuel)
-
-    # Step 2: Compute equivalence ratio (using mole fractions for the API)
     phi = cb.equivalence_ratio_mole(
-        cb.mass_to_mole(mixed.Y), cb.mass_to_mole(state_fuel.Y), cb.mass_to_mole(state_air.Y)
+        X_mix_in,
+        list(cb.mass_to_mole(list(state_fuel.Y))),
+        list(cb.mass_to_mole(list(state_air.Y))),
     )
 
-    # Step 3: Compute burned composition
-    X_products = stoichiometric_products(
-        cb.mass_to_mole(state_fuel.Y), cb.mass_to_mole(state_air.Y), phi
-    )
-
-    # Step 4: Compute adiabatic flame temperature using proper Jacobian function
-    # Use the new C++ function that returns (T_ad, dT_ad_dT_in, X_products)
-    # Note: We need to pass the method parameter explicitly since mixed is a CombustionResult
-    combustion_method = method  # Use the method parameter passed to this function
-
-    if combustion_method == "complete":
-        T_adiabatic, dT_ad_dT_in, X_products = core.adiabatic_T_complete_and_jacobian_T(
-            mixed.T, mixed.P, mixed.X
-        )
-    else:  # equilibrium
-        T_adiabatic, dT_ad_dT_in, X_products = core.adiabatic_T_equilibrium_and_jacobians(
-            mixed.T, mixed.P, mixed.X
-        )
-
-    # Store the analytical Jacobian for potential use in residuals
-    # TODO: Pass this to the network element for proper Jacobian assembly
-
-    # Step 5: Apply combustion efficiency
-    T_out = mixed.T + eta * (T_adiabatic - mixed.T)
-
-    # Step 6: Apply pressure drop
-    P_out = mixed.P * (1 - delta_P_frac)
-
-    # Compute derived properties at output conditions
-    rho = cb.density(T_out, P_out, X_products)
-    h = cb.h_mass(T_out, X_products)
-    cp = cb.cp(T_out, X_products)
-    gamma = cb.isentropic_expansion_coefficient(T_out, X_products)
-    a = cb.speed_of_sound(T_out, X_products)
+    T_out = T_in + eta * (T_ad - T_in)
+    P_out = P * (1.0 - delta_P_frac)
+    m_dot = state_air.m_dot + state_fuel.m_dot
     mw = cb.mwmix(X_products)
-    Y_products = cb.mole_to_mass(X_products)
 
-    # Compute heat released: enthalpy difference at same T_in between reactants and products
-    Q_released = mixed.m_dot * (mixed.h - cb.h_mass(mixed.T, X_products))
+    Q_released = m_dot * (cb.h_mass(T_in, X_mix_in) - cb.h_mass(T_in, X_products))
 
     return CombustionResult(
         X=X_products,
@@ -214,29 +127,28 @@ def combustion_from_streams(
         mw=mw,
         T=T_out,
         P=P_out,
-        m_dot=mixed.m_dot,
-        h=h,
-        cp=cp,
-        rho=rho,
-        gamma=gamma,
-        a=a,
+        m_dot=m_dot,
+        h=cb.h_mass(T_out, X_products),
+        cp=cb.cp(T_out, X_products),
+        rho=cb.density(T_out, P_out, X_products),
+        gamma=cb.isentropic_expansion_coefficient(T_out, X_products),
+        a=cb.speed_of_sound(T_out, X_products),
         phi=phi,
-        T_adiabatic=T_adiabatic,
+        T_adiabatic=T_ad,
         eta=eta,
         Q_released=Q_released,
     )
 
 
 def combustion_from_phi(
-    state_air: "NetworkMixtureState",
+    state_air: NetworkMixtureState,
     X_fuel: list[float],
     phi: float,
     method: str = "complete",
     eta: float = 1.0,
     delta_P_frac: float = 0.04,
 ) -> CombustionResult:
-    """
-    Compute burned gas state from equivalence ratio.
+    """Compute burned gas state from equivalence ratio.
 
     Derives fuel mass flow from phi and FAR_stoich, then delegates
     to combustion_from_streams().
@@ -246,55 +158,41 @@ def combustion_from_phi(
     state_air : NetworkMixtureState
         Oxidiser stream.
     X_fuel : list[float]
-        Fuel composition (mole fractions).
+        Fuel mole fractions.
     phi : float
         Equivalence ratio. phi=1: stoichiometric.
     method : str
-        Combustion method: 'complete' or 'equilibrium'. Default 'complete'.
+        'complete' or 'equilibrium'. Default 'complete'.
     eta : float
         Combustion efficiency.
     delta_P_frac : float
         Fractional pressure drop.
-
-    Returns
-    -------
-    CombustionResult
-        Complete burned gas state.
     """
     import combaero as cb
+    from combaero.network.components import NetworkMixtureState
 
-    # Create fuel stream with appropriate mass flow for target phi
-    # Use CombAero to set the fuel mass flow
+    air_cb = cb.Stream()
+    air_cb.set_T(state_air.T).set_P(state_air.Pt).set_X(
+        list(cb.mass_to_mole(list(state_air.Y)))
+    ).set_mdot(state_air.m_dot)
 
-    # Create streams for CombAero's set_fuel_stream_for_phi function
-    fuel_stream = cb.Stream()
-    fuel_stream.set_T(state_air.T).set_X(X_fuel)
+    fuel_cb = cb.Stream()
+    fuel_cb.set_T(state_air.T).set_X(list(X_fuel))
+    fuel_cb = cb.set_fuel_stream_for_phi(phi, fuel_cb, air_cb)
 
-    air_stream = cb.Stream()
-    air_stream.set_T(state_air.T).set_P(state_air.P).set_X(cb.mass_to_mole(state_air.Y)).set_mdot(
-        state_air.m_dot
+    state_fuel = NetworkMixtureState(
+        P=state_air.P,
+        Pt=state_air.Pt,
+        T=state_air.T,
+        Tt=state_air.Tt,
+        m_dot=fuel_cb.mdot,
+        Y=list(cb.mole_to_mass(list(X_fuel))),
     )
 
-    # Set fuel stream mass flow to achieve target phi
-    fuel_stream_phi = cb.set_fuel_stream_for_phi(phi, fuel_stream, air_stream)
-
-    # Create a simple state dictionary for fuel instead of using cb.MixtureState
-    # to avoid circular import
-    fuel_state_dict = {
-        "P": state_air.P,
-        "Pt": state_air.Pt,
-        "T": state_air.T,
-        "Tt": state_air.Tt,
-        "m_dot": fuel_stream_phi.mdot,
-        "Y": cb.mole_to_mass(X_fuel),
-    }
-
-    # Delegate to combustion_from_streams using the state dictionary
-    # We'll create proper NetworkMixtureState objects inside combustion_from_streams
     return combustion_from_streams(
         state_air,
-        fuel_state_dict,
-        method=state_air.method if hasattr(state_air, "method") else "complete",
+        state_fuel,
+        method=method,
         eta=eta,
         delta_P_frac=delta_P_frac,
     )
