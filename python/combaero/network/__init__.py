@@ -26,7 +26,6 @@ from .components import (
 )
 from .combustion import (
     CombustionResult,
-    stoichiometric_products,
     combustion_from_streams,
     combustion_from_phi,
     mix_streams,
@@ -59,7 +58,6 @@ __all__: list[str] = [
     "EnergyBoundary",
     "NetworkMixtureState",
     "CombustionResult",
-    "stoichiometric_products",
     "combustion_from_streams",
     "combustion_from_phi",
     "mix_streams",
