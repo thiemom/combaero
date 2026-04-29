@@ -89,8 +89,8 @@ UNIT_MAP: dict[str, str] = {
     "xi": "-",
     "theta": "-",
     "zeta": "-",
-    "ratio": "-",            # AreaChangeElement (renamed to area_ratio in Phase 2)
-    "area_ratio": "-",       # Phase 2 name
+    "ratio": "-",  # AreaChangeElement (renamed to area_ratio in Phase 2)
+    "area_ratio": "-",  # Phase 2 name
     "is_correlation": "-",
     "f": "-",
     "Cd": "-",

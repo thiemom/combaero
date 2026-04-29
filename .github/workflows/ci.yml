@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       source: ${{ steps.filter.outputs.source }}
+      gui: ${{ steps.filter.outputs.gui }}
       documentation: ${{ steps.filter.outputs.documentation }}
     steps:
       - name: Checkout
@@ -36,13 +37,14 @@ jobs:
               - 'tests/**'
               - 'scripts/**'
               - 'examples/**'
-              - 'gui/**'
               - '.github/workflows/**'
               - 'CMakeLists.txt'
               - 'pyproject.toml'
               - '.pre-commit-config.yaml'
               - 'ruff.toml'
               - 'Makefile'
+            gui:
+              - 'gui/**'
             documentation:
               - 'docs/**'
               - 'README.md'
@@ -73,6 +75,35 @@ jobs:
 
       - name: Check Python code style
         run: uv run ./scripts/check-python-style.sh --verbose
+
+  lint-gui:
+    name: Lint & Style Checks (GUI)
+    needs: changes
+    if: needs.changes.outputs.gui == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: uv sync --no-install-workspace --all-extras --all-groups
+
+      - name: Check Python style (GUI backend)
+        run: uv run ruff check gui/ && uv run ruff format --check gui/
+
+      - name: Set up Biome
+        uses: biomejs/setup-biome@v2
+        with:
+          version: 2.4.9
+
+      - name: Check frontend style (Biome)
+        run: biome check gui/frontend/src
 
   build-and-test:
     name: Build & Test C++ (${{ matrix.os }}, ${{ matrix.build_type }})
@@ -165,7 +196,7 @@ jobs:
     # IMPORTANT: Keep this literal name in sync with Iron ruleset required context:
     # "CI / status-check". Ruleset matching is strict and relies on exact string equality.
     name: CI / status-check
-    needs: [changes, lint, build-and-test, build-mingw]
+    needs: [changes, lint, lint-gui, build-and-test, build-mingw]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -173,24 +204,32 @@ jobs:
         shell: bash
         run: |
           source_changed="${{ needs.changes.outputs.source }}"
+          gui_changed="${{ needs.changes.outputs.gui }}"
           lint_result="${{ needs.lint.result }}"
+          lint_gui_result="${{ needs.lint-gui.result }}"
           build_result="${{ needs.build-and-test.result }}"
           mingw_result="${{ needs.build-mingw.result }}"
 
           echo "source_changed=${source_changed}"
+          echo "gui_changed=${gui_changed}"
           echo "lint_result=${lint_result}"
+          echo "lint_gui_result=${lint_gui_result}"
           echo "build_result=${build_result}"
           echo "mingw_result=${mingw_result}"
 
-          if [[ "${source_changed}" != "true" ]]; then
-            echo "Documentation-only (or non-source) change detected. Passing status-check."
-            exit 0
+          if [[ "${source_changed}" == "true" ]]; then
+            if [[ "${lint_result}" != "success" || "${build_result}" != "success" || "${mingw_result}" != "success" ]]; then
+              echo "One or more source-related jobs failed or were cancelled."
+              exit 1
+            fi
           fi
 
-          if [[ "${lint_result}" == "success" && "${build_result}" == "success" && "${mingw_result}" == "success" ]]; then
-            echo "All source-related jobs succeeded."
-            exit 0
+          if [[ "${gui_changed}" == "true" ]]; then
+            if [[ "${lint_gui_result}" != "success" ]]; then
+              echo "GUI lint job failed or was cancelled."
+              exit 1
+            fi
           fi
 
-          echo "One or more source-related jobs failed or were cancelled."
-          exit 1
+          echo "All required checks passed."
+          exit 0

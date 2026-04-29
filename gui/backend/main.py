@@ -65,8 +65,10 @@ async def get_materials():
         "names": cb.list_materials(),
     }
 
+
 # Module-level persistence for warm-starting the solver across requests.
 _continuation_state: dict | None = None
+
 
 def _solve_sync(schema: NetworkGraphSchema):
     """
@@ -77,27 +79,24 @@ def _solve_sync(schema: NetworkGraphSchema):
     net = build_network_from_schema(schema)
     solver = NetworkSolver(net)
     x0 = None
-    if schema.solver_settings.init_strategy == "continuation":
-        if _continuation_state:
-            # Check topology fingerprint
-            solver._build_x0()
-            if _continuation_state["unknown_names"] != list(solver.unknown_names):
-                raise ValueError(
-                    "Topology mismatch: the current network unknowns do not match "
-                    "the saved continuation state. Please run a 'Default' solve first."
-                )
+    if schema.solver_settings.init_strategy == "continuation" and _continuation_state:
+        # Check topology fingerprint
+        solver._build_x0()
+        if _continuation_state["unknown_names"] != list(solver.unknown_names):
+            raise ValueError(
+                "Topology mismatch: the current network unknowns do not match "
+                "the saved continuation state. Please run a 'Default' solve first."
+            )
 
-            # Safety Reset: Check if initial guesses have changed
-            current_guesses = {
-                n.id: n.data.get("initial_guess", {}) for n in schema.nodes
-            }
-            if _continuation_state.get("initial_guesses") != current_guesses:
-                raise ValueError(
-                    "Initial guess mismatch: user overrides have changed since the last solve. "
-                    "Please run a 'Default' solve to incorporate these changes."
-                )
+        # Safety Reset: Check if initial guesses have changed
+        current_guesses = {n.id: n.data.get("initial_guess", {}) for n in schema.nodes}
+        if _continuation_state.get("initial_guesses") != current_guesses:
+            raise ValueError(
+                "Initial guess mismatch: user overrides have changed since the last solve. "
+                "Please run a 'Default' solve to incorporate these changes."
+            )
 
-            x0 = _continuation_state["x"]
+        x0 = _continuation_state["x"]
 
     result = solver.solve(
         method=schema.solver_settings.method,
@@ -352,3 +351,9 @@ async def get_continuation_available():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+def run_server(host: str = "127.0.0.1", port: int = 8000) -> None:
+    import uvicorn
+
+    uvicorn.run(app, host=host, port=port)
