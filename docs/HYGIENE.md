@@ -48,13 +48,9 @@ These documents describe the implementation of specific features. While valuable
 
 Based on the audit, the following technical tasks are documented but not yet fully implemented:
 
-1. **Jacobian Coverage**: Add `report_jacobian_difference()` to existing tests in `tests/test_solver_jacobians.cpp`:
-   - `OrificeCompressibleMdotDerivatives`
-   - `PipeCompressibleMdotDerivatives`
-   - `MachNumberDerivatives`
-   - `SharpAreaChangeExpansionDerivatives`
-2. **Inverse Solvers**: Bind `calc_T_from_s_mass`, `calc_T_from_u_mass`, and flash-calculation functions in PyBind11 (unblocks Turbomachinery elements).
-3. **Packaging**: Populate missing metadata in `pyproject.toml` (authors, keywords, classifiers, URLs) for PyPI parity.
+1. **Jacobian Coverage**: [DONE] Integrated `report_jacobian_difference()` into compressible flow tests in `tests/test_solver_jacobians.cpp`.
+2. **Inverse Solvers**: [DONE] Bound `calc_T_from_s_mass`, `calc_T_from_u_mass`, and flash functions in PyBind11 (merged in #108).
+3. **Packaging**: [DONE] Populated missing metadata in `pyproject.toml` (authors, keywords, classifiers, URLs).
 4. **GUI Refinement**:
    - `Combustor`: Add `f_multiplier` to both backend schema and `Inspector.tsx`.
    - `Momentum Chamber`: Expose existing `f_multiplier` in `Inspector.tsx`.

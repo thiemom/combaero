@@ -8,7 +8,25 @@ dynamic = ["version"]
 description = "Combustion and aerothermal tools (C++ core with Python bindings)"
 readme = "README.md"
 requires-python = ">=3.9"
+authors = [
+    { name = "thiemom", email = "2641939+thiemom@users.noreply.github.com" }
+]
+keywords = ["aerodynamics", "combustion", "aerothermal", "propulsion", "solver"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Programming Language :: C++",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+]
 dependencies = ["numpy>=1.24", "scipy>=1.10"]
+
+[project.urls]
+Homepage = "https://github.com/thiemom/combaero"
+Repository = "https://github.com/thiemom/combaero"
+"Bug Tracker" = "https://github.com/thiemom/combaero/issues"
 
 [project.optional-dependencies]
 examples = ["matplotlib>=3.8"]
