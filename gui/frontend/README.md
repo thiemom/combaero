@@ -1,73 +1,38 @@
-# React + TypeScript + Vite
+# CombAero GUI Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This directory contains the React + TypeScript + Vite frontend for the CombAero network designer.
 
-Currently, two official plugins are available:
+## Tech Stack
+- **Framework**: React 18+
+- **Build Tool**: Vite
+- **Language**: TypeScript
+- **State Management**: React Context / Hooks
+- **Styling**: CSS Modules (Vanilla CSS)
+- **Linting/Formatting**: Biome
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Getting Started
 
-## React Compiler
+1. **Install Dependencies**:
+   ```bash
+   pnpm install
+   ```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+2. **Run Development Server**:
+   ```bash
+   pnpm run dev
+   ```
 
-## Expanding the ESLint configuration
+3. **Build for Production**:
+   ```bash
+   pnpm run build
+   ```
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Development Rules
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- **Biome**: We use Biome for linting and formatting. Run `./scripts/check-gui-style.sh` from the repo root before committing.
+- **Components**: Keep components functional and focused. Use CSS modules for scoped styling.
+- **API**: The frontend communicates with the FastAPI backend (located in `gui/backend/`). Ensure schemas match `gui/backend/schemas.py`.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Agent Guidance
+- If adding a new network element, you must update the node palette in `src/components/Palette.tsx` and the inspector logic in `src/components/Inspector.tsx`.
+- Refer to [docs/GUI_TECHNICAL.md](../../docs/GUI_TECHNICAL.md) for the JSON schemas expected by the backend.

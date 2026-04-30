@@ -36,20 +36,20 @@ import numpy as np
 import combaero as ca
 
 # Get species index for N2 and O2
-i_N2 = cb.species_index_from_name("N2")
-i_O2 = cb.species_index_from_name("O2")
+i_N2 = ca.species_index_from_name("N2")
+i_O2 = ca.species_index_from_name("O2")
 
 # Create air composition (79% N2, 21% O2)
-X = np.zeros(cb.species.num_species, dtype=float)
+X = np.zeros(ca.species.num_species, dtype=float)
 X[i_N2] = 0.79
 X[i_O2] = 0.21
 
 T = 300.0   # K
 P = 101325.0  # Pa
 
-print(f"cp = {cb.cp(T, X):.2f} J/(mol·K)")
-print(f"density = {cb.density(T, P, X):.4f} kg/m³")
-print(f"viscosity = {cb.viscosity(T, P, X):.2e} Pa·s")
+print(f"cp = {ca.cp(T, X):.2f} J/(mol·K)")
+print(f"density = {ca.density(T, P, X):.4f} kg/m³")
+print(f"viscosity = {ca.viscosity(T, P, X):.2e} Pa·s")
 ```
 
 ### State-based API
@@ -61,13 +61,13 @@ import numpy as np
 import combaero as ca
 
 # Create a State - direct property assignment
-s = cb.State()
+s = ca.State()
 s.T = 300.0
 s.P = 101325.0
 s.X = X_air
 
 # Or use fluent setters for chaining
-s = cb.State()
+s = ca.State()
 s.set_T(300.0).set_P(101325.0).set_X(X_air)
 
 # Access thermodynamic properties (all are properties, not methods)

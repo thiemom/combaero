@@ -4,7 +4,8 @@
 - **Virtual environment only:** use `uv run` and `uv pip`. Never install into system Python or use global `pip`.
 - **Never bypass pre-commit hooks** or CI checks. All code must pass cleanly before pushing.
 - **No manual edits to auto-generated files** (`docs/UNITS.md`, `include/thermo_transport_data.h`). Use the scripts below.
-- **API sync is mandatory:** adding/removing/changing any function or property requires updating `include/units_data.h` and `docs/API_REFERENCE.md` in the same commit.
+- **API sync is mandatory:** adding/removing/changing any function or property requires updating `include/units_data.h` and the relevant API reference ([docs/API_CPP.md](docs/API_CPP.md) or [docs/API_PYTHON.md](docs/API_PYTHON.md)) in the same commit.
+- **Documentation Hygiene:** Follow [docs/HYGIENE.md](docs/HYGIENE.md) classification. Archive feature reports to `docs/archive/`.
 - **Unit sync test:** every exported Python symbol needs a `units_data.h` entry, or an `IGNORE_LIST` entry in `python/tests/test_units_sync.py`.
 - **Solver (f, J) rule:** solver-facing calculations must expose a C++ PyBind11 API returning `std::tuple<double, double>` (value, derivative). Analytical derivatives via chain rule; no finite differences exposed to Python.
 - **Define Once:** physics constants go as `constexpr` in the relevant public header namespace — never as magic numbers in `.cpp` files.
