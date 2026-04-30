@@ -113,6 +113,7 @@ try:
         calc_T_from_h_mass,
         calc_T_from_s,
         calc_T_from_s_mass,
+        calc_T_from_u,
         calc_T_from_u_mass,
         calc_T_from_sv_mass,
         calc_T_from_sh_mass,
@@ -459,6 +460,8 @@ except (ModuleNotFoundError, ImportError) as e:
     calc_T_from_h_mass = _core.calc_T_from_h_mass
     calc_T_from_s = _core.calc_T_from_s
     calc_T_from_s_mass = _core.calc_T_from_s_mass
+    calc_T_from_cp = _core.calc_T_from_cp
+    calc_T_from_u = _core.calc_T_from_u
     calc_T_from_u_mass = _core.calc_T_from_u_mass
     calc_T_from_sv_mass = _core.calc_T_from_sv_mass
     calc_T_from_sh_mass = _core.calc_T_from_sh_mass
@@ -810,8 +813,14 @@ __all__ = [
     "common_name",
     "formula",
     "calc_T_from_h",
+    "calc_T_from_h_mass",
     "calc_T_from_s",
+    "calc_T_from_s_mass",
     "calc_T_from_cp",
+    "calc_T_from_u",
+    "calc_T_from_u_mass",
+    "calc_T_from_sv_mass",
+    "calc_T_from_sh_mass",
     "oxygen_required_per_mol_fuel",
     "oxygen_required_per_kg_fuel",
     "oxygen_required_per_mol_mixture",

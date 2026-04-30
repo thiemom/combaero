@@ -162,6 +162,12 @@ inline constexpr Entry function_units[] = {
     {"calc_T_from_h", "h_target: J/mol, X: mol/mol", "K"},
     {"calc_T_from_s", "s_target: J/(mol*K), P: Pa, X: mol/mol", "K"},
     {"calc_T_from_cp", "cp_target: J/(mol*K), X: mol/mol", "K"},
+    {"calc_T_from_u", "u_target: J/mol, X: mol/mol", "K"},
+    {"calc_T_from_h_mass", "h_mass_target: J/kg, X: mol/mol", "K"},
+    {"calc_T_from_s_mass", "s_mass_target: J/(kg*K), P: Pa, X: mol/mol", "K"},
+    {"calc_T_from_u_mass", "u_mass_target: J/kg, X: mol/mol", "K"},
+    {"calc_T_from_sv_mass", "s_mass_target: J/(kg*K), v_mass_target: m^3/kg, X: mol/mol", "K"},
+    {"calc_T_from_sh_mass", "s_mass_target: J/(kg*K), h_mass_target: J/kg, X: mol/mol", "K"},
 
     // -------------------------------------------------------------------------
     // transport.h - Transport Properties

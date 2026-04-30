@@ -548,11 +548,20 @@ dg_dT = cb.dg_over_RT_dT(T=300, X=air)
 
 ### Advanced Inverse Solvers
 ```python
-# Temperature from various properties
-T_from_h = cb.calc_T_from_h(h_target=3e5, X=air)
-T_from_s = cb.calc_T_from_s(s_target=7000, P=101325, X=air)
-T_from_cp = cb.calc_T_from_cp(cp_target=1000, X=air)
-T_from_u = cb.calc_T_from_u(u_target=2.2e5, X=air)
+# Molar-basis inverses (targets in J/mol or J/(mol*K))
+T_from_h   = cb.calc_T_from_h(h_target=3e5, X=air)            # J/mol -> K
+T_from_s   = cb.calc_T_from_s(s_target=7000, P=101325, X=air) # J/(mol*K), Pa -> K
+T_from_cp  = cb.calc_T_from_cp(cp_target=29, X=air)           # J/(mol*K) -> K
+T_from_u   = cb.calc_T_from_u(u_target=2.2e5, X=air)          # J/mol -> K
+
+# Mass-specific inverses (targets in J/kg or J/(kg*K))
+T_from_h_m = cb.calc_T_from_h_mass(h_mass_target=3e5, X=air)
+T_from_s_m = cb.calc_T_from_s_mass(s_mass_target=7000, P=101325, X=air)
+T_from_u_m = cb.calc_T_from_u_mass(u_mass_target=2.2e5, X=air)
+
+# Flash calculations — solve T from two independent properties
+T_from_sv  = cb.calc_T_from_sv_mass(s_mass_target=7000, v_mass_target=0.8, X=air)
+T_from_sh  = cb.calc_T_from_sh_mass(s_mass_target=7000, h_mass_target=3e5, X=air)
 ```
 
 ### Flow Analysis

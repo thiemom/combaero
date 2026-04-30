@@ -1127,6 +1127,19 @@ PYBIND11_MODULE(_core, m) {
       "Solve for temperature T given target Cp cp_target and composition X.");
 
   m.def(
+      "calc_T_from_u",
+      [](double u_target,
+         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+         double T_guess, double tol, std::size_t max_iter) {
+        auto X = to_vec(X_arr);
+        return calc_T_from_u(u_target, X, T_guess, tol, max_iter);
+      },
+      py::arg("u_target"), py::arg("X"), py::arg("T_guess") = 300.0,
+      py::arg("tol") = 1.0e-6, py::arg("max_iter") = 50,
+      "Solve for temperature T given target molar internal energy u_target [J/mol] "
+      "and composition X.");
+
+  m.def(
       "calc_T_from_s_mass",
       [](double s_mass_target, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
@@ -1211,6 +1224,17 @@ PYBIND11_MODULE(_core, m) {
       },
       py::arg("T"), py::arg("X"),
       "Mass specific heat derivative dcp/dT [J/(kg*K^2)] at temperature T and composition X.");
+
+  m.def(
+      "dg_over_RT_dT",
+      [](double T,
+         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+        auto X = to_vec(X_arr);
+        return dg_over_RT_dT(T, X);
+      },
+      py::arg("T"), py::arg("X"),
+      "Derivative of dimensionless Gibbs energy g/RT with respect to T [1/K] "
+      "at temperature T and composition X.");
 
   // Oxygen requirement helpers (scalar fuel index and mixtures)
   m.def("oxygen_required_per_mol_fuel", &oxygen_required_per_mol_fuel,
