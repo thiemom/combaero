@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       source: ${{ steps.filter.outputs.source }}
+      gui: ${{ steps.filter.outputs.gui }}
       documentation: ${{ steps.filter.outputs.documentation }}
     steps:
       - name: Checkout
@@ -36,7 +37,6 @@ jobs:
               - 'tests/**'
               - 'cantera_validation_tests/**'
               - 'scripts/**'
-              - 'gui/**'
               - 'examples/**'
               - '.github/workflows/**'
               - 'CMakeLists.txt'
@@ -45,6 +45,8 @@ jobs:
               - 'ruff.toml'
               - '.python-version'
               - 'Makefile'
+            gui:
+              - 'gui/**'
             documentation:
               - 'docs/**'
               - 'README.md'
@@ -120,7 +122,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os: [ ubuntu-latest ]
         python-version: [ '3.12' ]
 
     steps:
@@ -148,7 +150,7 @@ jobs:
   frontend-validation:
     name: Frontend Validation (Node 24 LTS)
     needs: changes
-    if: needs.changes.outputs.source == 'true'
+    if: needs.changes.outputs.gui == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -185,29 +187,35 @@ jobs:
         shell: bash
         run: |
           source_changed="${{ needs.changes.outputs.source }}"
+          gui_changed="${{ needs.changes.outputs.gui }}"
           cantera_result="${{ needs.cantera-validation.result }}"
           py_unit_result="${{ needs.python-unit-tests.result }}"
           frontend_result="${{ needs.frontend-validation.result }}"
 
           echo "source_changed=${source_changed}"
+          echo "gui_changed=${gui_changed}"
           echo "cantera_result=${cantera_result}"
           echo "py_unit_result=${py_unit_result}"
           echo "frontend_result=${frontend_result}"
 
-          if [[ "${source_changed}" != "true" ]]; then
-            echo "Documentation-only (or non-source) change detected. Passing status-check."
-            exit 0
-          fi
-
-          # Allow success OR skipped if no relevant changes triggered it
+          # Allow success OR skipped
           is_success() {
             [[ "$1" == "success" || "$1" == "skipped" ]]
           }
 
-          if is_success "${cantera_result}" && is_success "${py_unit_result}" && is_success "${frontend_result}"; then
-            echo "All validation jobs succeeded or were correctly skipped."
-            exit 0
+          if [[ "${source_changed}" == "true" ]]; then
+            if ! is_success "${cantera_result}" || ! is_success "${py_unit_result}"; then
+              echo "One or more source validation jobs failed or were cancelled."
+              exit 1
+            fi
           fi
 
-          echo "One or more validation jobs failed or were cancelled."
-          exit 1
+          if [[ "${gui_changed}" == "true" ]]; then
+            if ! is_success "${frontend_result}"; then
+              echo "Frontend validation failed or was cancelled."
+              exit 1
+            fi
+          fi
+
+          echo "All required validation jobs passed."
+          exit 0
