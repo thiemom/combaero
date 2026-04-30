@@ -1,40 +1,36 @@
-# CombAero Packaging & GUI Separation Strategy
+# CombAero Architecture: Package Separation Strategy
 
-This document details the rationale and implementation plan for separating the core `combaero` physics/solver library from the `combaero-gui` application.
+This document details the architecture and rationale for the separation between the core `combaero` physics/solver library and the `combaero-gui` application.
 
 ## 1. Rationale for Separation
 
-Currently, the core C++ engine, Python bindings (`combaero`), the network solver (`combaero.network`), and the frontend GUI (`gui/`) live together and are conceptually packaged as a single unit. As the project matures toward PyPI publishing and end-user distribution, they must be decoupled.
+The core C++ engine, Python bindings (`combaero`), the network solver (`combaero.network`), and the frontend GUI (`gui/`) are decoupled to ensure optimal performance, maintenance, and user experience.
 
 ### 1.1 User Perspective
-- **The API User (Data Scientist / Engineer)**: Wants to run `pip install combaero`. They use the library in Jupyter notebooks, optimization loops, or larger simulation frameworks. They want a lightweight, fast installation. They **do not** want Node.js assets, FastAPI servers, React bundles, or heavy web dependencies cluttering their environment.
-- **The GUI User (Analyst / Designer)**: Wants a standalone application (e.g., double-clicking a `.exe` or `.dmg`). They might not know or care about Python environments, virtual environments, or `pip`. They just want the visual network builder.
+- **The API User (Data Scientist / Engineer)**: Can run `pip install combaero` for a lightweight, fast installation without web dependencies or Node.js assets.
+- **The GUI User (Analyst / Designer)**: Receives a standalone application (e.g., `.exe` or `.dmg`) focused on the visual network builder experience.
 
 ### 1.2 Maintenance & CI/CD
-- **Build Times**: The core package involves compiling C++ across multiple platforms (macOS, Windows, Linux) which is inherently slow. The GUI builds React/TypeScript via Node.js. Decoupling means changing a UI button styling doesn't trigger the heavy C++ CI pipeline.
-- **Release Cadence**: The GUI will likely iterate rapidly (UX improvements, new visualizations). The core solver will iterate slower, requiring strict semantic versioning to protect mathematical correctness and API contracts. Tying them together forces unnecessary version bumps for the core library just to release a UI fix.
-- **Issue Tracking**: Separation of concerns allows developers to isolate UI/state bugs from core thermodynamic/solver bugs more easily.
+- **Build Times**: Decoupling prevents UI changes from triggering heavy C++ cross-platform compilation.
+- **Release Cadence**: The GUI can iterate rapidly on UX without forcing version bumps on the core mathematical library.
+- **Issue Tracking**: Separation of concerns isolates UI state bugs from thermodynamic solver logic.
 
 ### 1.3 Coding & Architecture
-- **Strict API Boundaries**: Physical separation forces a strict boundary (API contract) between the backend (FastAPI) and the frontend. It prevents "leakage" where the GUI relies on internal, undocumented Python states instead of formal, stable endpoints.
-- **Ecosystem Clash**: Python packaging (wheels, PyPI) and JavaScript packaging (npm, Electron/Tauri) use vastly different tools. Mixing them in a single `pyproject.toml` build backend (like `scikit-build-core`) becomes a fragile, highly complex setup.
+- **Strict API Boundaries**: Forces a formal, stable contract between the backend (FastAPI) and the frontend.
+- **Ecosystem Integrity**: Avoids fragile tool clashing between Python (`pyproject.toml`) and JavaScript (`npm`) build systems.
 
 ---
 
-## 2. Recommended Architecture
+## 2. Monorepo Architecture
 
-**Recommendation: The Monorepo Approach with Split Packaging**
+The project utilizes a monorepo approach (`thiemom/combaero`) to ease cross-cutting feature development while maintaining distinct distribution packages.
 
-We should keep both components in the same `thiemom/combaero` Git repository (a monorepo) to ease cross-cutting feature development (e.g., adding a new component requires both C++ solver logic and a GUI node). However, we must **package and distribute** them entirely separately.
-
-- **`combaero` (Core)**: Contains C++ `src/`, `include/`, and `python/combaero` (excluding GUI/server code). Published to PyPI as wheels.
-- **`combaero-gui` (App)**: Contains `gui/` (React frontend) and the FastAPI wrapper backend. Distributed primarily as a standalone bundled desktop app via GitHub Releases, and optionally as a separate PyPI package (`pip install combaero-gui`).
+- **`combaero` (Core)**: C++ `src/`, `include/`, and `python/combaero`. Published as PyPI wheels.
+- **`combaero-gui` (App)**: `gui/` (React frontend) and FastAPI wrapper. Distributed as a standalone desktop app and optional PyPI package.
 
 ---
 
-## 3. Implementation Plan
-
-# Plan: CombAero Package Separation
+## 3. Implementation Details
 
 ## Current State
 

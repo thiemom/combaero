@@ -1,5 +1,7 @@
 # Network Solver Benchmark History
 
+> [!NOTE]
+> This document is a historical log of solver performance benchmarks. It tracks convergence times and success rates across various network configurations to detect long-term performance regressions.
 
 ## 2026-03-20T10:21:12.309858+00:00
 

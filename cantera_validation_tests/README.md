@@ -102,7 +102,8 @@ Based on measured deviations (NASA-7 vs NASA-9 polynomials):
 - **Equilibrium temperature**: ±1 K (measured max: 0.0 K)
 - **Equilibrium constant (Kp)**: ±0.2% relative (measured max: 0.12%)
 
-See `FINAL_TEST_REPORT.md` and `EQUILIBRIUM_TEST_RESULTS.md` for detailed validation results.
+> [!NOTE]
+> Detailed test reports and CSV results are generated locally in this directory when running the full suite with coverage enabled.
 
 ## Pre-commit Integration
 

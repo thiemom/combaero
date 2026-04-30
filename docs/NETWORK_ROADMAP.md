@@ -366,7 +366,7 @@ class NetworkElement(ABC):
 - **No GUI** — JSON in, JSON out
 - Validation: Flow reversals bounded strictly positive against C++ limits, orifices intelligently extracting asymmetric topology diameters.
 
-### Phase 2 — Combustion and Composition
+### Phase 2 — Combustion and Composition (Completed ✅)
 
 **Goal:** track mixture composition and temperature; add combustion element.
 
@@ -374,29 +374,26 @@ class NetworkElement(ABC):
 - Nodes: `MomentumChamberNode` with total/static distinction
 - Elements: `CombustionElement`, `MixingElement`, `RegressionElement`
 - Segregated solve: flow first, then energy/composition propagation
-- See `COMBUSTION_ELEMENTS.md` for combustion function design
 - Validation: adiabatic flame temperature against Cantera
 
-### Phase 3 — Heat Exchange
+### Phase 3 — Heat Exchange (Completed ✅)
 
 **Goal:** conjugate heat transfer between streams through walls.
 
 - `HeatExchangerElement` with `T_wall` as additional unknown per segment
-- Nusselt correlations via `cooling_correlations` (already in CombAero)
-- Upgrade solver to CasADi for exact sparse Jacobians
+- Nusselt correlations via `cooling_correlations`
 - Fully coupled Newton solve over [P, ṁ, T, T_wall, X]
 - BC types: fixed T_wall, fixed Q, adiabatic, convective both sides
 
-### Phase 4 — GUI
+### Phase 4 — GUI (Completed ✅)
 
-**Goal:** visual network editor. Can develop in parallel with Phase 2–3.
+**Goal:** visual network editor.
 
 - React + React Flow node-graph editor
 - Nodes and edges map 1:1 to Python element classes
 - FastAPI backend: `POST /solve` accepts network JSON, returns solution JSON
 - Results overlay: colour-coded P, T, ṁ per element
 - Export: network JSON, CSV results
-
 ### Phase 5 — Acoustics
 
 **Goal:** linearise mean flow solution → acoustic transfer matrix propagation.

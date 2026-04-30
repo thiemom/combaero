@@ -22,7 +22,7 @@ This document provides the high-level reference for the `combaero` Python packag
 ## Core Thermodynamics
 
 ### State Object
-The `State` object is the central data structure, managing T, P, and composition.
+The `State` object is the central data structure, managing T [K], P [Pa], and composition.
 
 ```python
 import combaero as cb
@@ -42,6 +42,7 @@ print(f"Viscosity: {state.mu} Pa·s")
 
 ### MixtureState (Network Data)
 The `MixtureState` struct is used for network node properties and carries both static and stagnation conditions.
+**Units**: P [Pa], T [K], m_dot [kg/s].
 
 ```python
 # Constructor: MixtureState(P, P_total, T, T_total, m_dot, Y)
@@ -340,6 +341,40 @@ f_helm = cb.helmholtz_frequency(V=0.001, A_neck=1e-4, L_neck=0.01, c=340)
 tube = cb.Tube(L=1.0, D=0.1)
 modes = cb.tube_axial_modes(tube, c=340, bc1=cb.BoundaryCondition.Closed, bc2=cb.BoundaryCondition.Open)
 ```
+
+---
+
+## Programmatic Network Design
+
+For automated design and agents, `combaero.network` provides a pure-Python interface to build and solve networks without the GUI.
+
+```python
+from combaero.network import FlowNetwork, NetworkSolver, OrificeElement, PressureBoundary, PlenumNode
+import combaero.species as species
+
+# 1. Initialize Network
+net = FlowNetwork()
+
+# 2. Define Boundaries & Nodes
+net.add_node(PressureBoundary("inlet", P_total=5e5, T_total=400, Y=species.dry_air_mass()))
+net.add_node(PlenumNode("plenum", P=4e5, T=400))
+net.add_node(PressureBoundary("outlet", P_total=1e5, T_total=300))
+
+# 3. Add Elements
+net.add_element(OrificeElement("feed", "inlet", "plenum", diameter=0.01, Cd=0.65))
+net.add_element(OrificeElement("exhaust", "plenum", "outlet", diameter=0.015, Cd=0.62))
+
+# 4. Solve
+solver = NetworkSolver(net)
+results = solver.solve(method="hybr")
+
+# 5. Access Results
+print(f"Plenum Pressure: {results.nodes['plenum'].P} Pa")
+print(f"System Mass Flow: {results.elements['feed'].m_dot} kg/s")
+```
+
+> [!TIP]
+> **Agent Hint**: Use `net.to_dict()` to get a JSON-serializable representation of the network, which can be saved or sent to the GUI.
 
 ---
 

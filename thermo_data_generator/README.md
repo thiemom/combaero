@@ -183,6 +183,25 @@ The header uses format-specific structs with a common alias:
 pytest
 ```
 
+## Agent Guidance: Adding New Species
+
+If you are an AI agent asked to add a new species to CombAero, follow these exact steps:
+
+1. **Locate Source Data**: Look for a Cantera YAML mechanism (`.yaml`) or NASA CEA output (`.txt`) in the workspace or provided as context.
+2. **Extract JSON**: Run `extract_species_data.py` to create or update a `species.json` file.
+   ```bash
+   python extract_species_data.py --yaml path/to/mechanism.yaml -s "CO2,O2,YOUR_NEW_SPECIES" -o species.json
+   ```
+3. **Map Common Name**: Open `include/common_names.h` and add the mapping for your new species in both `formula_to_name` and `name_to_formula` maps.
+4. **Regenerate Header**: Run `generate_thermo_data.py` to update the C++ source.
+   ```bash
+   python generate_thermo_data.py --json species.json --species "..." --check-names --output ../include/thermo_transport_data.h
+   ```
+5. **Verify**: Run the C++ and Python tests to ensure the new species is accessible and the properties are correct.
+
+> [!IMPORTANT]
+> Never manually edit `include/thermo_transport_data.h`. Always use the generator scripts to maintain consistency.
+
 ## Licensing Note
 
 **Source data files (YAML mechanisms, CEA output) are not included** in this

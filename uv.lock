@@ -154,7 +154,7 @@ wheels = [
 
 [[package]]
 name = "combaero"
-version = "0.2.1.dev4+gd86586aa1.d20260429"
+version = "0.2.1.dev5+ga41da42c2.d20260430"
 source = { editable = "." }
 dependencies = [
     { name = "numpy" },

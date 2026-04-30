@@ -27,6 +27,10 @@ This document provides the technical reference for the CombAero C++ library. For
 
 ## Thermodynamics (thermo.h)
 
+> [!NOTE]
+> **Base Units**: Temperature [K], Pressure [Pa], Mass [kg], Energy [J], Power [W].
+> Compositions are `std::vector<double>` of mole fractions (sum to 1.0) unless explicitly marked as `_mass` (mass fractions).
+
 ### Composition Utilities (composition.h)
 ```cpp
 // Mass/Mole fraction conversions
@@ -116,6 +120,10 @@ double speed_of_sound(const State& s);
 
 ## Transport Properties (transport.h)
 
+> [!NOTE]
+> All transport properties are evaluated at the local (T, P) state.
+> **Units**: Viscosity [Pa·s], Conductivity [W/(m·K)], Diffusivity [m²/s].
+
 ```cpp
 double viscosity(double T, double P, const std::vector<double>& X);
 double thermal_conductivity(double T, double P, const std::vector<double>& X);
@@ -128,6 +136,10 @@ double reynolds_from_state(double rho, double v, double L, double mu);
 ---
 
 ## Combustion (combustion.h)
+
+> [!NOTE]
+> Combustion functions assume complete combustion to CO₂ and H₂O unless equilibrium is invoked.
+> `smooth=True` enables a sigmoid-based transition at Phi=0 for better Jacobian stability.
 
 ### Stoichiometry & Equivalence Ratio
 ```cpp
@@ -205,6 +217,10 @@ std::tuple<double, double> stagnation_from_static(
 ---
 
 ## Compressible Flow (compressible.h)
+
+> [!IMPORTANT]
+> All compressible solvers assume **ideal-gas** behavior with variable properties (gamma and Cp are recalculated at each state).
+> **Choking**: Functions return a `choked` flag. If true, the mass flow is limited by the sonic condition at the throat.
 
 ### Results Structs
 ```cpp
@@ -354,6 +370,10 @@ double friction_petukhov(double Re);
 ---
 
 ## Heat Transfer Correlations (heat_transfer.h)
+
+> [!NOTE]
+> **Units**: HTC [W/(m²·K)], q [W/m²].
+> **Jacobians**: High-performance solver components return `dh/dmdot` and other derivatives essential for coupled fluid-thermal networks.
 
 ### Nusselt Numbers
 ```cpp
