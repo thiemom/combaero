@@ -647,6 +647,8 @@ TEST(SolverJacobianTest, OrificeCompressibleMdotDerivatives) {
       orifice_compressible_mdot_and_jacobian(T0 - eps_T, P0, P_back, X, Cd,
                                              area, beta);
   double fd_dT0 = (mdot_T_plus - mdot_T_minus) / (2.0 * eps_T);
+  report_jacobian_difference("OrificeCompressibleMdotDerivatives", "dmdot_dT0",
+                             dmdot_dT0, fd_dT0);
   EXPECT_NEAR(dmdot_dT0, fd_dT0, std::abs(fd_dT0) * 1e-6 + 1e-12);
 
   // Central FD for dmdot/dP0
@@ -658,6 +660,8 @@ TEST(SolverJacobianTest, OrificeCompressibleMdotDerivatives) {
       orifice_compressible_mdot_and_jacobian(T0, P0 - eps_P, P_back, X, Cd,
                                              area, beta);
   double fd_dP0 = (mdot_P_plus - mdot_P_minus) / (2.0 * eps_P);
+  report_jacobian_difference("OrificeCompressibleMdotDerivatives", "dmdot_dP0",
+                             dmdot_dP0, fd_dP0);
   EXPECT_NEAR(dmdot_dP0, fd_dP0, std::abs(fd_dP0) * 1e-6 + 1e-12);
 
   // Central FD for dmdot/dP_back
@@ -668,6 +672,8 @@ TEST(SolverJacobianTest, OrificeCompressibleMdotDerivatives) {
       orifice_compressible_mdot_and_jacobian(T0, P0, P_back - eps_P, X, Cd,
                                              area, beta);
   double fd_dP_back = (mdot_Pb_plus - mdot_Pb_minus) / (2.0 * eps_P);
+  report_jacobian_difference("OrificeCompressibleMdotDerivatives",
+                             "dmdot_dP_back", dmdot_dP_back, fd_dP_back);
   EXPECT_NEAR(dmdot_dP_back, fd_dP_back, std::abs(fd_dP_back) * 1e-6 + 1e-12);
 }
 
@@ -702,6 +708,8 @@ TEST(SolverJacobianTest, PipeCompressibleMdotDerivatives) {
       channel_compressible_mdot_and_jacobian(T_in - eps_T, P_in, u_in, X, L, D,
                                              roughness, model);
   double fd_dT_in = (dP_T_plus - dP_T_minus) / (2.0 * eps_T);
+  report_jacobian_difference("PipeCompressibleMdotDerivatives", "ddP_dT_in",
+                             ddP_dT_in, fd_dT_in);
   EXPECT_NEAR(ddP_dT_in, fd_dT_in, std::abs(fd_dT_in) * 1e-6 + 1e-8);
 
   // Central FD for ddP/dP_in
@@ -713,6 +721,8 @@ TEST(SolverJacobianTest, PipeCompressibleMdotDerivatives) {
       channel_compressible_mdot_and_jacobian(T_in, P_in - eps_P, u_in, X, L, D,
                                              roughness, model);
   double fd_dP_in = (dP_P_plus - dP_P_minus) / (2.0 * eps_P);
+  report_jacobian_difference("PipeCompressibleMdotDerivatives", "ddP_dP_in",
+                             ddP_dP_in, fd_dP_in);
   EXPECT_NEAR(ddP_dP_in, fd_dP_in, std::abs(fd_dP_in) * 1e-6 + 1e-10);
 
   // Central FD for ddP/du_in
@@ -724,6 +734,8 @@ TEST(SolverJacobianTest, PipeCompressibleMdotDerivatives) {
       channel_compressible_mdot_and_jacobian(T_in, P_in, u_in - eps_u, X, L, D,
                                              roughness, model);
   double fd_du_in = (dP_u_plus - dP_u_minus) / (2.0 * eps_u);
+  report_jacobian_difference("PipeCompressibleMdotDerivatives", "ddP_du_in",
+                             ddP_du_in, fd_du_in);
   EXPECT_NEAR(ddP_du_in, fd_du_in, std::abs(fd_du_in) * 1e-6 + 1e-7);
 }
 
@@ -747,6 +759,7 @@ TEST(SolverJacobianTest, MachNumberDerivatives) {
   auto [M_plus, dummy1] = mach_number_and_jacobian_v(v + eps_v, T, X);
   auto [M_minus, dummy2] = mach_number_and_jacobian_v(v - eps_v, T, X);
   double fd_dM_dv = (M_plus - M_minus) / (2.0 * eps_v);
+  report_jacobian_difference("MachNumberDerivatives", "dM_dv", dM_dv, fd_dM_dv);
   EXPECT_NEAR(dM_dv, fd_dM_dv, std::abs(fd_dM_dv) * 1e-6 + 1e-14);
 }
 
