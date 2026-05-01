@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Optimization and warning flags
 if(MSVC)
     add_compile_options(/W4 /WX /permissive- /utf-8)
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()

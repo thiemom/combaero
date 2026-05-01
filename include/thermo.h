@@ -26,12 +26,12 @@ namespace combaero {
 double J_per_mol_to_J_per_kg(double value, double molar_mass);
 
 // Species metadata and lookup functions
-std::string species_name(std::size_t species_index);
+std::string species_name(std::size_t idx);
 std::size_t species_index_from_name(const std::string& name);
 std::size_t num_species();
 
 // Molar mass of a species [g/mol]
-double species_molar_mass(std::size_t species_index);
+double species_molar_mass(std::size_t idx);
 double species_molar_mass_from_name(const std::string& name);
 
 // NASA polynomial evaluations (dimensionless)

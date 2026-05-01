@@ -1268,7 +1268,6 @@ ChannelResult channel_pin_fin(double T, double P, const std::vector<double> &X,
     double rho_minus = density(T - eps_T_aw, P, X);
     double v_plus = mdot / (rho_plus * A_cross);
     double v_minus = mdot / (rho_minus * A_cross);
-    const bool turbulent_flow = true;
     double T_aw_plus = T_adiabatic_wall(T + eps_T_aw, v_plus, T + eps_T_aw, P, X, turbulent_flow);
     double T_aw_minus = T_adiabatic_wall(T - eps_T_aw, v_minus, T - eps_T_aw, P, X, turbulent_flow);
     result.dT_aw_dT = (T_aw_plus - T_aw_minus) / (2.0 * eps_T_aw);
@@ -1382,7 +1381,6 @@ ChannelResult channel_impingement(double T, double P,
     double rho_minus = density(T - eps_T_aw, P, X);
     double v_plus = mdot_jet / (rho_plus * A_jet);
     double v_minus = mdot_jet / (rho_minus * A_jet);
-    const bool turbulent_flow = true;
     double T_aw_plus = T_adiabatic_wall(T + eps_T_aw, v_plus, T + eps_T_aw, P, X, turbulent_flow);
     double T_aw_minus = T_adiabatic_wall(T - eps_T_aw, v_minus, T - eps_T_aw, P, X, turbulent_flow);
     result.dT_aw_dT = (T_aw_plus - T_aw_minus) / (2.0 * eps_T_aw);

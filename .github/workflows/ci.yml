@@ -190,11 +190,29 @@ jobs:
       - name: Build Windows binaries
         run: cmake --build build-mingw --config Release
 
+  build-python-windows:
+    name: Build Python Extension (Windows/MSVC)
+    needs: [changes, lint]
+    if: needs.changes.outputs.source == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          python-version: '3.12'
+
+      - name: Build Python extension (MSVC)
+        run: uv pip install --system --no-deps -e .
+
   status-check:
     # IMPORTANT: Keep this literal name in sync with Iron ruleset required context:
     # "CI / status-check". Ruleset matching is strict and relies on exact string equality.
     name: CI / status-check
-    needs: [changes, lint, lint-gui, build-and-test, build-mingw]
+    needs: [changes, lint, lint-gui, build-and-test, build-mingw, build-python-windows]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -207,6 +225,7 @@ jobs:
           lint_gui_result="${{ needs.lint-gui.result }}"
           build_result="${{ needs.build-and-test.result }}"
           mingw_result="${{ needs.build-mingw.result }}"
+          build_python_windows_result="${{ needs.build-python-windows.result }}"
 
           echo "source_changed=${source_changed}"
           echo "gui_changed=${gui_changed}"
@@ -214,9 +233,10 @@ jobs:
           echo "lint_gui_result=${lint_gui_result}"
           echo "build_result=${build_result}"
           echo "mingw_result=${mingw_result}"
+          echo "build_python_windows_result=${build_python_windows_result}"
 
           if [[ "${source_changed}" == "true" ]]; then
-            if [[ "${lint_result}" != "success" || "${build_result}" != "success" || "${mingw_result}" != "success" ]]; then
+            if [[ "${lint_result}" != "success" || "${build_result}" != "success" || "${mingw_result}" != "success" || "${build_python_windows_result}" != "success" ]]; then
               echo "One or more source-related jobs failed or were cancelled."
               exit 1
             fi

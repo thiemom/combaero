@@ -18,11 +18,11 @@ double J_per_mol_to_J_per_kg(double value, double molar_mass) {
 // Species metadata and lookup functions
 // -------------------------------------------------------------
 
-std::string species_name(std::size_t species_index) {
-    if (species_index >= species_names.size()) {
+std::string species_name(std::size_t idx) {
+    if (idx >= species_names.size()) {
         throw std::out_of_range("species_name: index out of bounds");
     }
-    return species_names[species_index];
+    return species_names[idx];
 }
 
 std::size_t species_index_from_name(const std::string& name) {
@@ -37,11 +37,11 @@ std::size_t num_species() {
     return species_names.size();
 }
 
-double species_molar_mass(std::size_t species_index) {
-    if (species_index >= molar_masses.size()) {
+double species_molar_mass(std::size_t idx) {
+    if (idx >= molar_masses.size()) {
         throw std::out_of_range("species_molar_mass: index out of bounds");
     }
-    return molar_masses[species_index];
+    return molar_masses[idx];
 }
 
 double species_molar_mass_from_name(const std::string& name) {

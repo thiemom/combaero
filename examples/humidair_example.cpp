@@ -85,7 +85,7 @@ int main() {
         try {
           double dp = air.dewpoint() - 273.15; // Convert to °C
           std::cout << std::setw(13) << dp << " | ";
-        } catch (const std::exception &e) {
+        } catch (const std::exception &) {
           std::cout << std::setw(13) << "N/A" << " | ";
         }
       } else {
