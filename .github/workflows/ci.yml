@@ -206,7 +206,7 @@ jobs:
           python-version: '3.12'
 
       - name: Build Python extension (MSVC)
-        run: uv pip install --system -e .
+        run: uv pip install --system --no-deps -e .
 
   status-check:
     # IMPORTANT: Keep this literal name in sync with Iron ruleset required context:
