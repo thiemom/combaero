@@ -104,10 +104,50 @@ def test_momentum_chamber_thermal_wall_is_built_and_multipliers_forwarded():
     channel = net.elements["channel_1"]
 
     assert mom.surface.Nu_multiplier == 1.3
-    # Momentum chamber is lossless by design; friction multiplier is fixed.
-    assert mom.surface.f_multiplier == 1.0
+    # Momentum chamber is no longer hardcoded to 1.0; it should forward the UI value.
+    assert mom.surface.f_multiplier == 0.8
     assert channel.surface.Nu_multiplier == 1.2
     assert channel.surface.f_multiplier == 0.9
+
+
+def test_combustor_multipliers_forwarded():
+    schema = NetworkGraphSchema(
+        nodes=[
+            {
+                "id": "plenum_in",
+                "type": "plenum",
+                "position": {"x": 0.0, "y": 0.0},
+                "data": {},
+            },
+            {
+                "id": "comb_1",
+                "type": "combustor",
+                "position": {"x": 200.0, "y": 0.0},
+                "data": {
+                    "method": "complete",
+                    "area": 0.1,
+                    "Nu_multiplier": 1.4,
+                    "f_multiplier": 0.7,
+                },
+            },
+            {
+                "id": "plenum_out",
+                "type": "plenum",
+                "position": {"x": 400.0, "y": 0.0},
+                "data": {},
+            },
+        ],
+        edges=[
+            {"id": "e1", "source": "plenum_in", "target": "comb_1", "data": {}},
+            {"id": "e2", "source": "comb_1", "target": "plenum_out", "data": {}},
+        ],
+    )
+
+    net = build_network_from_schema(schema)
+    comb = net.nodes["comb_1"]
+
+    assert comb.surface.Nu_multiplier == 1.4
+    assert comb.surface.f_multiplier == 0.7
 
 
 # ---------------------------------------------------------------------------

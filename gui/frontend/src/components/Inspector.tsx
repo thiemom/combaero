@@ -946,6 +946,37 @@ const Inspector = () => {
 									)}
 								</div>
 
+								<div className="grid grid-cols-2 gap-3 border-t pt-3">
+									<div className="flex flex-col gap-2">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Nu Multiplier
+										</label>
+										<NumericInput
+											value={selectedNode.data.Nu_multiplier ?? 1.0}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, {
+													Nu_multiplier: val,
+												})
+											}
+											className="p-2 border rounded"
+										/>
+									</div>
+									<div className="flex flex-col gap-2">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											F Multiplier
+										</label>
+										<NumericInput
+											value={selectedNode.data.f_multiplier ?? 1.0}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, {
+													f_multiplier: val,
+												})
+											}
+											className="p-2 border rounded"
+										/>
+									</div>
+								</div>
+
 								<div className="border-t pt-3">
 									<SurfaceEnhancementInspector
 										surface={selectedNode.data.surface || { type: "smooth" }}
@@ -1021,20 +1052,37 @@ const Inspector = () => {
 							).toFixed(2)}{" "}
 							{unitPreferences.length}
 						</p>
-						<div className="flex flex-col gap-2">
-							<label className="text-xs font-bold text-gray-500 uppercase">
-								Nu Multiplier
-							</label>
-							<NumericInput
-								id={`Nu_multiplier_comb_${selectedNode.id}`}
-								value={selectedNode.data.Nu_multiplier ?? 1.0}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, {
-										Nu_multiplier: val,
-									})
-								}
-								className="p-2 border rounded"
-							/>
+						<div className="grid grid-cols-2 gap-3">
+							<div className="flex flex-col gap-2">
+								<label className="text-xs font-bold text-gray-500 uppercase">
+									Nu Multiplier
+								</label>
+								<NumericInput
+									id={`Nu_multiplier_comb_${selectedNode.id}`}
+									value={selectedNode.data.Nu_multiplier ?? 1.0}
+									onChange={(val) =>
+										updateNodeData(selectedNode.id, {
+											Nu_multiplier: val,
+										})
+									}
+									className="p-2 border rounded"
+								/>
+							</div>
+							<div className="flex flex-col gap-2">
+								<label className="text-xs font-bold text-gray-500 uppercase">
+									F Multiplier
+								</label>
+								<NumericInput
+									id={`f_multiplier_comb_${selectedNode.id}`}
+									value={selectedNode.data.f_multiplier ?? 1.0}
+									onChange={(val) =>
+										updateNodeData(selectedNode.id, {
+											f_multiplier: val,
+										})
+									}
+									className="p-2 border rounded"
+								/>
+							</div>
 						</div>
 						<SurfaceEnhancementInspector
 							surface={selectedNode.data.surface || { type: "smooth" }}
@@ -1086,20 +1134,37 @@ const Inspector = () => {
 							).toFixed(2)}{" "}
 							{unitPreferences.length}
 						</p>
-						<div className="flex flex-col gap-2">
-							<label className="text-xs font-bold text-gray-500 uppercase">
-								Nu Multiplier
-							</label>
-							<NumericInput
-								id={`Nu_multiplier_mom_${selectedNode.id}`}
-								value={selectedNode.data.Nu_multiplier ?? 1.0}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, {
-										Nu_multiplier: val,
-									})
-								}
-								className="p-2 border rounded"
-							/>
+						<div className="grid grid-cols-2 gap-3">
+							<div className="flex flex-col gap-2">
+								<label className="text-xs font-bold text-gray-500 uppercase">
+									Nu Multiplier
+								</label>
+								<NumericInput
+									id={`Nu_multiplier_mom_${selectedNode.id}`}
+									value={selectedNode.data.Nu_multiplier ?? 1.0}
+									onChange={(val) =>
+										updateNodeData(selectedNode.id, {
+											Nu_multiplier: val,
+										})
+									}
+									className="p-2 border rounded"
+								/>
+							</div>
+							<div className="flex flex-col gap-2">
+								<label className="text-xs font-bold text-gray-500 uppercase">
+									F Multiplier
+								</label>
+								<NumericInput
+									id={`f_multiplier_mom_${selectedNode.id}`}
+									value={selectedNode.data.f_multiplier ?? 1.0}
+									onChange={(val) =>
+										updateNodeData(selectedNode.id, {
+											f_multiplier: val,
+										})
+									}
+									className="p-2 border rounded"
+								/>
+							</div>
 						</div>
 						<SurfaceEnhancementInspector
 							surface={selectedNode.data.surface || { type: "smooth" }}
