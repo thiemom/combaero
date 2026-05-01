@@ -36,7 +36,7 @@ static std::vector<double>
 to_vec(py::array_t<double, py::array::c_style | py::array::forcecast> arr) {
   auto buf = arr.unchecked<1>();
   std::vector<double> v(buf.shape(0));
-  for (ssize_t i = 0; i < buf.shape(0); ++i)
+  for (py::ssize_t i = 0; i < buf.shape(0); ++i)
     v[static_cast<std::size_t>(i)] = buf(i);
   return v;
 }
