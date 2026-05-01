@@ -79,6 +79,7 @@ archs = ["x86_64", "arm64"]
 archs = ["AMD64"]
 
 [tool.uv]
+required-version = ">=0.5.9"
 managed = true
 package = true
 
