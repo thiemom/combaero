@@ -129,6 +129,7 @@ class CombustorData(BaseModel):
     Dh: float | None = None
     surface: SurfaceModelData = Field(default_factory=SmoothModelData)
     Nu_multiplier: float = 1.0
+    f_multiplier: float = 1.0
     initial_guess: dict[str, float] = Field(default_factory=dict)
     label: str | None = None
 

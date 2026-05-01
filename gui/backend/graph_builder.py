@@ -227,7 +227,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                     area=data.area,
                     model=map_surface_model(data.surface),
                     Nu_multiplier=data.Nu_multiplier,
-                    f_multiplier=1.0,
+                    f_multiplier=data.f_multiplier,
                 ),
             )
             node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
@@ -242,9 +242,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                     area=data.area,
                     model=map_surface_model(data.surface),
                     Nu_multiplier=data.Nu_multiplier,
-                    # MomentumChamberNode is modeled as lossless for pressure-flow,
-                    # so friction multiplier is fixed to 1.0 by design.
-                    f_multiplier=1.0,
+                    f_multiplier=data.f_multiplier,
                 ),
             )
             node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
