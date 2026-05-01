@@ -8,8 +8,6 @@ This example demonstrates:
 - Equivalence ratio sweep from lean to rich
 """
 
-from __future__ import annotations
-
 import combaero as cb
 
 

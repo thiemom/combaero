@@ -4,8 +4,6 @@
 Runs both implementations with identical inputs and verifies results match.
 """
 
-from __future__ import annotations
-
 import sys
 from pathlib import Path
 

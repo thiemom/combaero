@@ -1,7 +1,5 @@
 """Tests for combustion Jacobian functions."""
 
-from __future__ import annotations
-
 import combaero as cb
 
 

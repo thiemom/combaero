@@ -13,8 +13,6 @@ Field naming conventions
 - Area ratio of an area change: area_ratio.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 
 # ---------------------------------------------------------------------------

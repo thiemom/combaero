@@ -1,7 +1,5 @@
 """Tests for reforming equilibrium functions."""
 
-from __future__ import annotations
-
 import pytest
 
 import combaero as ca

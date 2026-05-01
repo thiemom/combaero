@@ -20,8 +20,6 @@ The derivative enables exact analytical Jacobians through
 Theta = T_ad / T_in - 1  (dimensionless temperature-rise ratio).
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 

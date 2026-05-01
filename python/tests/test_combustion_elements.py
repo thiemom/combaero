@@ -1,7 +1,5 @@
 """Tests for combustion elements and functions."""
 
-from __future__ import annotations
-
 import pytest
 
 import combaero as cb

@@ -29,8 +29,6 @@ Design notes
 - ``q = h * (T_aw - T_hot)`` when ``T_hot`` is supplied, else ``nan``.
 """
 
-from __future__ import annotations
-
 import math
 from collections.abc import Sequence
 from typing import TYPE_CHECKING

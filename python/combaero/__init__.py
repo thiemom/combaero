@@ -5,8 +5,6 @@ It is written to work both when running from the source tree and when
 combaero is installed as a wheel.
 """
 
-from __future__ import annotations
-
 from importlib import import_module
 
 try:  # Python 3.8+

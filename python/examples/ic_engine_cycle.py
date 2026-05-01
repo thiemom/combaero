@@ -17,8 +17,6 @@ Key combaero tools used:
   - isentropic_expansion_coefficient  (local gamma along path)
 """
 
-from __future__ import annotations
-
 import matplotlib.pyplot as plt
 import numpy as np
 from plot_utils import show_or_save

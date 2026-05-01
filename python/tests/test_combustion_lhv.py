@@ -1,7 +1,5 @@
 """Tests for fuel lower heating value (LHV) helpers."""
 
-from __future__ import annotations
-
 import pytest
 
 import combaero as cb

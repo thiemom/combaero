@@ -6,8 +6,6 @@ front plate and burner jets using coupled combustion, transport, and cooling
 correlations.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 import combaero as cb

@@ -1,7 +1,5 @@
 """Tests for chamber mixing functionality in network solver."""
 
-from __future__ import annotations
-
 import combaero as cb
 from combaero.network.components import (
     CombustorNode,

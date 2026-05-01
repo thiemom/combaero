@@ -19,8 +19,6 @@ Compressible nozzle
     regime="compressible", dP=nan, Re=nan, rho=nan, f=nan, Cd=nan, L_choke=nan
 """
 
-from __future__ import annotations
-
 import math
 from dataclasses import dataclass, field
 

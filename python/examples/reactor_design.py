@@ -9,8 +9,6 @@ This example demonstrates:
 - Combustor design applications
 """
 
-from __future__ import annotations
-
 import numpy as np
 
 import combaero as cb

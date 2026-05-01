@@ -37,8 +37,6 @@ Wall configurations compared:
   - Inconel 718 + YSZ EB-PVD TBC
 """
 
-from __future__ import annotations
-
 import numpy as np
 
 import combaero as cb
