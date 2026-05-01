@@ -114,7 +114,7 @@ PYBIND11_MODULE(_core, m) {
                  s.X.assign(Y.size(), 0.0);
                }
              } else {
-               int n = num_species();
+               std::size_t n = num_species();
                s.X.assign(n, 0.0);
                s.Y.assign(n, 0.0);
                if (n > 0) {
