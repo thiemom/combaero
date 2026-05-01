@@ -23,8 +23,6 @@ Energy balance (per kg air):
   w_t   = w_net + w_c              [turbine, by difference]
 """
 
-from __future__ import annotations
-
 import matplotlib.pyplot as plt
 import numpy as np
 from plot_utils import show_or_save

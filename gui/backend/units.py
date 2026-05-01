@@ -7,8 +7,6 @@ Keep this module dependency-free; it is imported by ``main.py`` during the
 CSV-streaming response.
 """
 
-from __future__ import annotations
-
 import re
 
 # ---------------------------------------------------------------------------

@@ -4,8 +4,6 @@ These are exact Jacobian helpers and internal residual calculators used by the n
 They are not part of the public API and may change without notice.
 """
 
-from __future__ import annotations
-
 from . import _core
 
 # Re-export all internal solver tools from _core

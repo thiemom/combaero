@@ -1,7 +1,5 @@
 """Unit tests for :mod:`gui.backend.units` used by the CSV export pipeline."""
 
-from __future__ import annotations
-
 from gui.backend.units import UNIT_MAP, label_with_unit
 
 

@@ -11,8 +11,6 @@ change the flow regime.  These tests verify:
 5. The symmetric call pattern works (same kwargs, different module).
 """
 
-from __future__ import annotations
-
 import math
 
 import numpy as np

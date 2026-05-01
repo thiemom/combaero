@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core>=0.12.2", "pybind11>=3.0.4", "setuptools-scm>=8"]
+requires = ["scikit-build-core>=0.12.2", "pybind11>=3.0.4", "setuptools-scm>=8", "cmake>=3.21", "ninja"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -7,10 +7,11 @@ name = "combaero"
 dynamic = ["version"]
 description = "Combustion and aerothermal tools (C++ core with Python bindings)"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 authors = [
     { name = "thiemom", email = "2641939+thiemom@users.noreply.github.com" }
 ]
+license-files = ["LICENSE"]
 keywords = ["aerodynamics", "combustion", "aerothermal", "propulsion", "solver"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -27,6 +28,7 @@ dependencies = ["numpy>=1.24", "scipy>=1.10"]
 Homepage = "https://github.com/thiemom/combaero"
 Repository = "https://github.com/thiemom/combaero"
 "Bug Tracker" = "https://github.com/thiemom/combaero/issues"
+Changelog = "https://github.com/thiemom/combaero/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 examples = ["matplotlib>=3.8"]
@@ -46,7 +48,12 @@ dev = [
 
 [tool.scikit-build]
 wheel.packages = ["python/combaero"]
-sdist.exclude = ["gui/*", "gui/**/*"]
+sdist.exclude = [
+    "gui/*", "gui/**/*",
+    "cantera_validation_tests/*", "cantera_validation_tests/**/*",
+    "thermo_data_generator/*", "thermo_data_generator/**/*",
+    ".github/*", ".github/**/*",
+]
 build.verbose = true
 
 [tool.scikit-build.metadata.version]
@@ -57,7 +64,22 @@ args = ["-DCOMBAERO_ENABLE_TESTS=OFF", "-DCOMBAERO_BUILD_PYTHON=ON"]
 
 [tool.setuptools_scm]
 
+[tool.cibuildwheel]
+build = "cp312-*"
+test-command = "python -c \"import combaero; import combaero.network\""
+
+[tool.cibuildwheel.linux]
+archs = ["x86_64"]
+manylinux-x86_64-image = "manylinux_2_28"
+
+[tool.cibuildwheel.macos]
+archs = ["x86_64", "arm64"]
+
+[tool.cibuildwheel.windows]
+archs = ["AMD64"]
+
 [tool.uv]
+required-version = ">=0.5.9"
 managed = true
 package = true
 

@@ -47,8 +47,6 @@ Key combaero tools used:
   - nusselt_dittus_boelter / htc_from_nusselt  (hot-side HTC)
 """
 
-from __future__ import annotations
-
 import matplotlib.pyplot as plt
 import numpy as np
 from plot_utils import show_or_save

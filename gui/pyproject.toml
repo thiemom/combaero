@@ -4,23 +4,46 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "combaero-gui"
-version = "0.2.0"
-description = "CombAero Network GUI Backend"
+dynamic = ["version"]
+description = "CombAero Network GUI — React/FastAPI desktop application"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+    { name = "thiemom", email = "2641939+thiemom@users.noreply.github.com" }
+]
+keywords = ["aerodynamics", "combustion", "aerothermal", "propulsion", "gui", "network"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+]
 dependencies = [
     "fastapi",
     "uvicorn",
     "pydantic",
     "pandas",
-    "combaero",
+    "combaero~=0.2",
 ]
-requires-python = ">=3.9"
+
+[project.urls]
+Homepage = "https://github.com/thiemom/combaero"
+Repository = "https://github.com/thiemom/combaero"
+"Bug Tracker" = "https://github.com/thiemom/combaero/issues"
+Changelog = "https://github.com/thiemom/combaero/blob/main/CHANGELOG.md"
+
+[project.scripts]
+combaero-gui = "gui.backend.main:run_server"
 
 [tool.setuptools]
 package-dir = {gui = "."}
 packages = ["gui", "gui.backend"]
 
-[project.scripts]
-combaero-gui = "gui.backend.main:run_server"
+[tool.setuptools_scm]
+root = ".."
 
 [tool.uv]
 managed = true

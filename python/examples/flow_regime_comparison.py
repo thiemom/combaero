@@ -13,8 +13,6 @@ Topics covered:
 - Validity range: when do the two regimes agree / diverge?
 """
 
-from __future__ import annotations
-
 import math
 
 import matplotlib.pyplot as plt

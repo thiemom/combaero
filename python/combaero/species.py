@@ -1,7 +1,6 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Self
 
 import numpy as np
 
@@ -22,7 +21,7 @@ class SpeciesLocator:
     molar_masses: np.ndarray
 
     @classmethod
-    def from_core(cls) -> SpeciesLocator:
+    def from_core(cls) -> Self:
         """Build a layout from the compiled core metadata."""
 
         n = _core.num_species()

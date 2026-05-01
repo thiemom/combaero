@@ -23,8 +23,6 @@ orifice_flow
     Incompressible orifice flow (Bernoulli + Cd).
 """
 
-from __future__ import annotations
-
 import math
 from collections.abc import Sequence
 

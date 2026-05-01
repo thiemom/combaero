@@ -1,7 +1,5 @@
 """Tests for combustor pressure-loss correlation classes."""
 
-from __future__ import annotations
-
 import pytest
 
 from combaero.network import (

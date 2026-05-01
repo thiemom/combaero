@@ -10,8 +10,6 @@ Demonstrates:
 - Unit introspection: query expected API units
 """
 
-from __future__ import annotations
-
 import combaero as cb
 
 
