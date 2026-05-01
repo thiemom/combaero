@@ -148,7 +148,7 @@ std::unordered_map<std::string, double> standard_channel_roughness() {
 
 double channel_roughness(const std::string &material) {
   std::string key = material;
-  std::transform(key.begin(), key.end(), key.begin(), ::tolower);
+  std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c) { return static_cast<char>(::tolower(c)); });
   auto it = ROUGHNESS_DATA.find(key);
   if (it != ROUGHNESS_DATA.end()) {
     return it->second;
