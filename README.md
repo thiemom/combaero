@@ -2,7 +2,7 @@
 
 **High-performance C++17 engine for aerospace thermodynamics, combustion, and fluid network simulation.**
 
-![CombAero Banner](.github/assets/combaero_banner.png)
+![CombAero Banner](https://raw.githubusercontent.com/thiemom/combaero/main/.github/assets/combaero_banner.png)
 
 CombAero provides aerospace engineers and researchers with a fast, accurate, and extensible toolset for modeling complex gas mixtures, chemical equilibrium, and integrated cooling systems.
 
@@ -22,19 +22,19 @@ Install the pre-built wheel:
 ```bash
 pip install combaero
 ```
-Calculate adiabatic flame temperature in 3 lines:
+Calculate adiabatic flame temperature:
 ```python
 import combaero as cb
 state = cb.State().set_TPX(300, 101325, "CH4:1, O2:2, N2:7.52")
-burned = cb.complete_combustion(state)
+burned = cb.complete_combustion(state.T, state.X)
 print(f"Adiabatic Flame Temperature: {burned.T:.2f} K")
 ```
 
 ### C++
-Include the headers in your project:
+Include the headers in your project (add `include/` to your include path):
 ```cpp
-#include <combaero/combustion.h>
-#include <combaero/state.h>
+#include <combustion.h>
+#include <state.h>
 
 combaero::State in;
 in.set_T(300.0).set_P(101325.0).set_X(X_mixture);
@@ -43,16 +43,19 @@ auto burned = combaero::complete_combustion(in);
 
 ## Documentation
 
-- **[API Reference (C++)](docs/API_CPP.md)**: Technical reference for C++ developers and agents.
-- **[API Reference (Python)](docs/API_PYTHON.md)**: High-level Python usage and examples.
-- **[Units Guide](docs/UNITS.md)**: SI unit system and physical constants.
-- **[CombAero GUI](gui/README.md)**: Interactive desktop application for network design.
+- **[API Reference (C++)](https://github.com/thiemom/combaero/blob/main/docs/API_CPP.md)**: Technical reference for C++ developers and agents.
+- **[API Reference (Python)](https://github.com/thiemom/combaero/blob/main/docs/API_PYTHON.md)**: High-level Python usage and examples.
+- **[Units Guide](https://github.com/thiemom/combaero/blob/main/docs/UNITS.md)**: SI unit system and physical constants.
 
 ## Technical Details
 
-- **[Building CombAero](docs/BUILDING.md)**: Prerequisites and build instructions.
-- **[Development Workflow](docs/DEVELOPMENT.md)**: Testing, styling, and contribution guide.
-- **[Packaging Strategy](docs/PACKAGING.md)**: How we decouple core physics from the GUI.
+- **[Building CombAero](https://github.com/thiemom/combaero/blob/main/docs/BUILDING.md)**: Prerequisites and build instructions.
+- **[Development Workflow](https://github.com/thiemom/combaero/blob/main/docs/DEVELOPMENT.md)**: Testing, styling, and contribution guide.
+- **[Packaging Strategy](https://github.com/thiemom/combaero/blob/main/docs/PACKAGING.md)**: How we decouple core physics from the GUI.
+
+## GUI
+
+For an interactive drag-and-drop network designer built on this library, see **[combaero-gui](https://pypi.org/project/combaero-gui/)**.
 
 ## License
 [MIT License](LICENSE)

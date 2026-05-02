@@ -237,7 +237,7 @@ const useStore = create<RFState>((set, get) => ({
 	speciesMetadata: null,
 	fetchSpeciesMetadata: async () => {
 		try {
-			const res = await fetch("http://localhost:8000/metadata/species");
+			const res = await fetch("/metadata/species");
 			const data = await res.json();
 			set({ speciesMetadata: data });
 		} catch (error) {

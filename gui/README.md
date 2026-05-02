@@ -8,9 +8,9 @@ The CombAero GUI allows for rapid construction of complex aerospace networks usi
 
 ### 1. Install
 
+Create a virtual environment (Python 3.12+; we recommend [uv](https://docs.astral.sh/uv/)) and install:
+
 ```bash
-uv venv --python 3.12
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
 uv pip install combaero-gui
 ```
 
@@ -47,5 +47,9 @@ For agents with screen control (multimodal LLMs), the following selectors and ID
 > [!TIP]
 > **Automation Hint**: To add a node via script, use the `gui.backend` API or generate a network JSON and load it via `File -> Import`.
 
-## Technical Reference
-For internal data structures and JSON schemas, see [docs/GUI_TECHNICAL.md](../docs/GUI_TECHNICAL.md).
+---
+
+## Related
+
+- **[combaero](https://pypi.org/project/combaero/)** — the C++ physics core and Python API powering this GUI.
+- **[Source & docs](https://github.com/thiemom/combaero)** — monorepo with full API reference and technical documentation.

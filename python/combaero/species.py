@@ -146,6 +146,22 @@ def humid_air(T: float, P: float, RH: float) -> np.ndarray:
     return _default_locator.humid_air(T, P, RH)
 
 
+def _parse_comp_str(s: str) -> np.ndarray:
+    """Parse a Cantera-style composition string into a mole-fraction array.
+
+    Accepts 'CH4:1, O2:2, N2:7.52'. Values need not sum to 1; from_mapping
+    stores them unnormalized as the C++ side expects raw mole fractions.
+    """
+    mapping: dict[str, float] = {}
+    for part in s.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        name, _, val = part.partition(":")
+        mapping[name.strip()] = float(val.strip())
+    return from_mapping(mapping)
+
+
 def humid_air_mass(T: float, P: float, RH: float) -> np.ndarray:
     """Return the humid air composition (mass fractions)."""
     return _default_locator.humid_air_mass(T, P, RH)
