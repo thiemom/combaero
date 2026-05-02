@@ -369,15 +369,17 @@ async def health():
     return {"status": "ok"}
 
 
+
+
+if (_FRONTEND_DIST / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIST / "assets")), name="assets")
+
+
 @app.get("/{path:path}")
 async def serve_spa_route(path: str):
     if _FRONTEND_DIST.is_dir():
         return FileResponse(_FRONTEND_DIST / "index.html")
     raise HTTPException(status_code=404, detail=f"/{path} not found")
-
-
-if (_FRONTEND_DIST / "assets").is_dir():
-    app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIST / "assets")), name="assets")
 
 
 def run_server(host: str = "127.0.0.1", port: int = 8000) -> None:
