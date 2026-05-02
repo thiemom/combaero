@@ -369,8 +369,6 @@ async def health():
     return {"status": "ok"}
 
 
-
-
 if (_FRONTEND_DIST / "assets").is_dir():
     app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIST / "assets")), name="assets")
 
