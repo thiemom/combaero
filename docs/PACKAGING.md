@@ -34,16 +34,12 @@ The project utilizes a monorepo approach (`thiemom/combaero`) to ease cross-cutt
 
 ## Current State
 
-### Already done
 - Core `pyproject.toml` dependencies: only `numpy>=1.24`, `scipy>=1.10` — no GUI deps
 - `gui/pyproject.toml` exists as a separate workspace package (`combaero-gui`) with fastapi/uvicorn/pydantic/pandas isolated there
-- `wheel.packages = ["python/combaero"]` — core wheel already excludes `gui/`
-- Backend code lives in `gui/backend/` (clean separation of files)
-
-### Gaps to fix
-1. **sdist includes `gui/`** — scikit-build-core bundles all git-tracked files into the source distribution by default; `gui/` is tracked but not excluded
-2. **No `combaero-gui` CLI entry point** — no `[project.scripts]` in `gui/pyproject.toml`, no launcher function in the backend
-3. **CI: GUI changes trigger C++ builds** — `gui/**` is in the `source` path filter in `ci.yml`, causing expensive 3-platform C++ matrix builds on every UI change
+- `wheel.packages = ["python/combaero"]` — core wheel excludes `gui/`
+- `sdist.exclude` covers `gui/`, `cantera_validation_tests/`, `thermo_data_generator/`, `.github/`
+- `[project.scripts]` in `gui/pyproject.toml` provides `combaero-gui` CLI entry point
+- CI splits `gui/**` into a separate `lint-gui` job; C++ matrix builds only on `source` changes
 
 ---
 

@@ -38,24 +38,15 @@ The Python package `combaero` uses `scikit-build-core` to compile the C++ extens
 
 ### Environment Setup
 
-We recommend using the repository-local virtual environment:
-
 ```bash
-# Create/update .venv and install dev tooling
-./scripts/bootstrap.sh
-
-# Activate shell
-source .venv/bin/activate
+uv venv --python 3.12
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 ```
 
 ### Building the Wheel
 
 ```bash
-# Build the wheel using build
-python -m build --wheel
-
-# Install the wheel locally
-python -m pip install dist/combaero-*.whl
+uv pip install -e .
 ```
 
 ## Troubleshooting

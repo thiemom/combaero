@@ -45,6 +45,9 @@ combaero-gui = "gui.backend.main:run_server"
 package-dir = {gui = "."}
 packages = ["gui", "gui.backend"]
 
+[tool.setuptools.package-data]
+gui = ["frontend/dist/**/*", "frontend/dist/*"]
+
 [tool.setuptools_scm]
 root = ".."
 
