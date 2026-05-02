@@ -2,7 +2,7 @@
 
 **High-performance C++17 engine for aerospace thermodynamics, combustion, and fluid network simulation.**
 
-![CombAero Banner](.github/assets/combaero_banner.png)
+![CombAero Banner](https://raw.githubusercontent.com/thiemom/combaero/main/.github/assets/combaero_banner.png)
 
 CombAero provides aerospace engineers and researchers with a fast, accurate, and extensible toolset for modeling complex gas mixtures, chemical equilibrium, and integrated cooling systems.
 
