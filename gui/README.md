@@ -6,18 +6,21 @@ The CombAero GUI allows for rapid construction of complex aerospace networks usi
 
 ## Quick Start
 
-### 1. Environment Setup
-Ensure the GUI components are installed:
+### 1. Install
+
 ```bash
-uv pip install -e ".[gui]"
+uv venv --python 3.12
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+uv pip install combaero-gui
 ```
 
 ### 2. Launch
-The GUI can be launched with a single command:
+
 ```bash
 combaero-gui
 ```
-This starts both the FastAPI backend and the Vite-based frontend.
+
+Open http://127.0.0.1:8000 in your browser.
 
 ## Key Workflows
 

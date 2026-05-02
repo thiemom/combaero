@@ -18,13 +18,16 @@ This package provides Python bindings for the core CombAero C++ library:
 
 The bindings are implemented with [pybind11](https://pybind11.readthedocs.io/) and built via [scikit-build-core](https://scikit-build-core.readthedocs.io/).
 
-## Installation (from source)
-
-The recommended workflow is from the repository root; see the top-level README for details. In short:
+## Installation
 
 ```bash
-python -m build --wheel
-python -m pip install dist/combaero-0.1.0-*.whl
+pip install combaero
+```
+
+For development (editable install from repo root):
+
+```bash
+uv pip install -e .
 ```
 
 ## Usage
@@ -33,11 +36,11 @@ Example using NumPy arrays and the high-level `combaero` package:
 
 ```python
 import numpy as np
-import combaero as ca
+import combaero as cb
 
 # Get species index for N2 and O2
-i_N2 = ca.species_index_from_name("N2")
-i_O2 = ca.species_index_from_name("O2")
+i_N2 = cb.species_index_from_name("N2")
+i_O2 = cb.species_index_from_name("O2")
 
 # Create air composition (79% N2, 21% O2)
 X = np.zeros(ca.species.num_species, dtype=float)
@@ -58,16 +61,16 @@ The `State` class uses Pythonic properties for all attribute access:
 
 ```python
 import numpy as np
-import combaero as ca
+import combaero as cb
 
 # Create a State - direct property assignment
-s = ca.State()
+s = cb.State()
 s.T = 300.0
 s.P = 101325.0
 s.X = X_air
 
 # Or use fluent setters for chaining
-s = ca.State()
+s = cb.State()
 s.set_T(300.0).set_P(101325.0).set_X(X_air)
 
 # Access thermodynamic properties (all are properties, not methods)
@@ -87,7 +90,7 @@ print(f"Prandtl = {s.Pr:.3f}")
 
 ```python
 import numpy as np
-import combaero as ca
+import combaero as cb
 
 # Create a CH4 + air mixture
 X = np.zeros(cb.species.num_species, dtype=float)
@@ -112,7 +115,7 @@ to compute the steam reforming + water-gas shift equilibrium:
 
 ```python
 import numpy as np
-import combaero as ca
+import combaero as cb
 
 # Rich combustion products (with unburned CH4, C2H6, etc.)
 X = np.zeros(cb.species.num_species, dtype=float)
@@ -162,7 +165,7 @@ Mix multiple streams with mass and enthalpy balance:
 
 ```python
 import numpy as np
-import combaero as ca
+import combaero as cb
 
 # Create streams - use property assignment (Pythonic)
 air = cb.Stream()
@@ -192,7 +195,7 @@ mixed2 = cb.mix([air, fuel], P_out=150000.0)
 ### Compressible Flow
 
 ```python
-import combaero as ca
+import combaero as cb
 
 X = cb.species.dry_air()
 
@@ -228,7 +231,7 @@ print(f"Outlet P: {sol_fanno.outlet.P/1000:.1f} kPa")
 ### Transport Properties
 
 ```python
-import combaero as ca
+import combaero as cb
 
 X = cb.species.dry_air()
 T, P = 300.0, 101325.0
@@ -248,7 +251,7 @@ print(f"Reynolds: {Re:.0f}, Peclet: {Pe:.0f}")
 ### Species Common Names
 
 ```python
-import combaero as ca
+import combaero as cb
 
 # Formula to common name
 print(cb.common_name("CH4"))  # "Methane"
@@ -268,7 +271,7 @@ name_map = cb.name_to_formula()     # dict: name -> formula
 For liquids and low-speed gas flows (Ma < 0.3):
 
 ```python
-import combaero as ca
+import combaero as cb
 
 rho = 998.0  # Water density [kg/m3]
 
@@ -293,7 +296,7 @@ Dh = cb.hydraulic_diameter_rect(a=0.1, b=0.05)  # Rectangular duct
 Integrated solvers that return `ChannelResult` with h, Nu, Re, Pr, f, dP, Mach, T_aw, and q in one call:
 
 ```python
-import combaero as ca
+import combaero as cb
 
 X = cb.species.dry_air()
 T, P, u = 600.0, 20e5, 30.0  # K, Pa, m/s
@@ -326,7 +329,7 @@ print(f"q = {sol_q.q/1000:.1f} kW/m2")
 ### Advanced Cooling Correlations
 
 ```python
-import combaero as ca
+import combaero as cb
 
 # Rib enhancement factor - geometry-only (Han et al. 1988, used by channel_ribbed)
 enh = cb.rib_enhancement_factor(e_D=0.05, pitch_to_height=10.0, alpha_deg=60.0)
@@ -359,7 +362,7 @@ eta_eff = cb.effusion_effectiveness(x_D=5.0, M=0.5, DR=1.5,
 ### Materials Database
 
 ```python
-import combaero as ca
+import combaero as cb
 
 # Superalloys
 k = cb.k_inconel718(T=900)      # W/(m*K), valid 300-1200 K

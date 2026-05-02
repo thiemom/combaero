@@ -1,9 +1,11 @@
 import asyncio
 import io
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 import combaero as cb
 from combaero.network import NetworkSolver
@@ -17,6 +19,8 @@ from .schemas import (
     StateResult,
 )
 
+_FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
+
 app = FastAPI(title="CombAero Network GUI API")
 
 # Configure CORS for local development (Vite typically runs on 5173)
@@ -29,8 +33,20 @@ app.add_middleware(
 )
 
 
+@app.get("/favicon.svg")
+async def favicon_svg():
+    return FileResponse(_FRONTEND_DIST / "favicon.svg")
+
+
+@app.get("/icons.svg")
+async def icons_svg():
+    return FileResponse(_FRONTEND_DIST / "icons.svg")
+
+
 @app.get("/")
 async def root():
+    if _FRONTEND_DIST.is_dir():
+        return FileResponse(_FRONTEND_DIST / "index.html")
     return {
         "message": "CombAero Network GUI API is running",
         "docs": "/docs",
@@ -351,6 +367,10 @@ async def get_continuation_available():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+if (_FRONTEND_DIST / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIST / "assets")), name="assets")
 
 
 def run_server(host: str = "127.0.0.1", port: int = 8000) -> None:
