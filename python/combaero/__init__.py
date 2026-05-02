@@ -715,6 +715,70 @@ from ._flow_solution import FlowSolution
 
 
 # ---------------------------------------------------------------------------
+# State: wrap _core.State to accept Cantera-style composition strings
+# e.g. set_TPX(300, 101325, "CH4:1, O2:2, N2:7.52")
+# ---------------------------------------------------------------------------
+import numpy as _np
+
+
+def _coerce_comp(comp: "_np.ndarray | str") -> "_np.ndarray":
+    if isinstance(comp, str):
+        return species._parse_comp_str(comp)
+    return comp
+
+
+_StateBase = State
+
+
+class State(_StateBase):
+    def set_X(self, X: "_np.ndarray | str") -> "State":
+        return super().set_X(_coerce_comp(X))
+
+    def set_Y(self, Y: "_np.ndarray | str") -> "State":
+        return super().set_Y(_coerce_comp(Y))
+
+    def set_TPX(self, T: float, P: float, X: "_np.ndarray | str") -> "State":
+        return super().set_TPX(T, P, _coerce_comp(X))
+
+    def set_TPY(self, T: float, P: float, Y: "_np.ndarray | str") -> "State":
+        return super().set_TPY(T, P, _coerce_comp(Y))
+
+    @property
+    def X(self) -> "_np.ndarray":
+        return super().X
+
+    @X.setter
+    def X(self, value: "_np.ndarray | str") -> None:
+        super().set_X(_coerce_comp(value))
+
+    @property
+    def Y(self) -> "_np.ndarray":
+        return super().Y
+
+    @Y.setter
+    def Y(self, value: "_np.ndarray | str") -> None:
+        super().set_Y(_coerce_comp(value))
+
+    @property
+    def TPX(self) -> tuple:
+        return super().TPX
+
+    @TPX.setter
+    def TPX(self, value: tuple) -> None:
+        T, P, X = value
+        super().set_TPX(T, P, _coerce_comp(X))
+
+    @property
+    def TPY(self) -> tuple:
+        return super().TPY
+
+    @TPY.setter
+    def TPY(self, value: tuple) -> None:
+        T, P, Y = value
+        super().set_TPY(T, P, _coerce_comp(Y))
+
+
+# ---------------------------------------------------------------------------
 # suppress_warnings context manager
 # ---------------------------------------------------------------------------
 from collections.abc import Generator

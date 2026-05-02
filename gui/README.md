@@ -8,9 +8,9 @@ The CombAero GUI allows for rapid construction of complex aerospace networks usi
 
 ### 1. Install
 
+Create a virtual environment (Python 3.12+; we recommend [uv](https://docs.astral.sh/uv/)) and install:
+
 ```bash
-uv venv --python 3.12
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
 uv pip install combaero-gui
 ```
 

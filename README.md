@@ -22,11 +22,11 @@ Install the pre-built wheel:
 ```bash
 pip install combaero
 ```
-Calculate adiabatic flame temperature in 3 lines:
+Calculate adiabatic flame temperature:
 ```python
 import combaero as cb
 state = cb.State().set_TPX(300, 101325, "CH4:1, O2:2, N2:7.52")
-burned = cb.complete_combustion(state)
+burned = cb.complete_combustion(state.T, state.X)
 print(f"Adiabatic Flame Temperature: {burned.T:.2f} K")
 ```
 

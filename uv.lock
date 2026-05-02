@@ -198,7 +198,7 @@ dev = [
 
 [[package]]
 name = "combaero-gui"
-version = "0.2.2.dev0+g378037340.d20260502"
+version = "0.2.3.dev0+gbc492dec3.d20260502"
 source = { editable = "gui" }
 dependencies = [
     { name = "combaero" },
