@@ -46,13 +46,16 @@ auto burned = combaero::complete_combustion(in);
 - **[API Reference (C++)](https://github.com/thiemom/combaero/blob/main/docs/API_CPP.md)**: Technical reference for C++ developers and agents.
 - **[API Reference (Python)](https://github.com/thiemom/combaero/blob/main/docs/API_PYTHON.md)**: High-level Python usage and examples.
 - **[Units Guide](https://github.com/thiemom/combaero/blob/main/docs/UNITS.md)**: SI unit system and physical constants.
-- **[CombAero GUI](https://pypi.org/project/combaero-gui/)**: Interactive desktop application for network design.
 
 ## Technical Details
 
 - **[Building CombAero](https://github.com/thiemom/combaero/blob/main/docs/BUILDING.md)**: Prerequisites and build instructions.
 - **[Development Workflow](https://github.com/thiemom/combaero/blob/main/docs/DEVELOPMENT.md)**: Testing, styling, and contribution guide.
 - **[Packaging Strategy](https://github.com/thiemom/combaero/blob/main/docs/PACKAGING.md)**: How we decouple core physics from the GUI.
+
+## GUI
+
+For an interactive drag-and-drop network designer built on this library, see **[combaero-gui](https://pypi.org/project/combaero-gui/)**.
 
 ## License
 [MIT License](LICENSE)
