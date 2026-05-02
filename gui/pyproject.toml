@@ -29,6 +29,9 @@ dependencies = [
     "combaero~=0.2",
 ]
 
+[project.optional-dependencies]
+gui = []
+
 [project.urls]
 Homepage = "https://github.com/thiemom/combaero"
 Repository = "https://github.com/thiemom/combaero"
