@@ -54,6 +54,7 @@ gui = [
 
 [tool.setuptools_scm]
 root = ".."
+local_scheme = "no-local-version"
 
 [tool.uv]
 managed = true
