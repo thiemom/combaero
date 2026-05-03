@@ -5,6 +5,7 @@
 - **Never bypass pre-commit hooks** or CI checks. All code must pass cleanly before pushing.
 - **No manual edits to auto-generated files** (`docs/UNITS.md`, `include/thermo_transport_data.h`). Use the scripts below.
 - **API sync is mandatory:** adding/removing/changing any function or property requires updating `include/units_data.h` and the relevant API reference ([docs/API_CPP.md](docs/API_CPP.md) or [docs/API_PYTHON.md](docs/API_PYTHON.md)) in the same commit.
+- **CHANGELOG is mandatory:** every user-visible change must have an entry added under `[Unreleased]` in `CHANGELOG.md` in the same commit. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) (Added / Changed / Fixed / Removed). At release time the `[Unreleased]` block becomes `[x.y.z] - YYYY-MM-DD`.
 - **Documentation Hygiene:** Follow [docs/HYGIENE.md](docs/HYGIENE.md) classification. Archive feature reports to `docs/archive/`.
 - **Unit sync test:** every exported Python symbol needs a `units_data.h` entry, or an `IGNORE_LIST` entry in `python/tests/test_units_sync.py`.
 - **Solver (f, J) rule:** solver-facing calculations must expose a C++ PyBind11 API returning `std::tuple<double, double>` (value, derivative). Analytical derivatives via chain rule; no finite differences exposed to Python.
@@ -36,6 +37,7 @@ uv pip install -e .                         # rebuild C++ extension
 uv run pytest python/tests/                 # Python tests
 cd build && ctest                           # C++ tests
 uv run scripts/generate_units_md.py         # regenerate docs/UNITS.md
+./scripts/test-pypi-wheel.sh                # verify combaero-gui wheel before PyPI publish
 ```
 
 ## Auto-Generated Files
