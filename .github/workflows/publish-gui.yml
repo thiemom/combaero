@@ -54,9 +54,74 @@ jobs:
           name: dist-gui
           path: dist/combaero_gui-*
 
+  verify:
+    name: Verify wheel (smoke test)
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-gui
+          path: dist/
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.12'
+
+      - name: Check wheel contains JS assets
+        run: |
+          python - <<'EOF'
+          import zipfile, sys, glob
+          wheels = glob.glob("dist/combaero_gui-*.whl")
+          if not wheels:
+              print("ERROR: no wheel found in dist/")
+              sys.exit(1)
+          with zipfile.ZipFile(wheels[0]) as z:
+              names = z.namelist()
+          js = [n for n in names if n.endswith(".js") and "/assets/" in n]
+          css = [n for n in names if n.endswith(".css") and "/assets/" in n]
+          html = [n for n in names if n.endswith("index.html")]
+          print(f"index.html entries : {html}")
+          print(f"JS files in assets : {js}")
+          print(f"CSS files in assets: {css}")
+          if not js:
+              print("FAIL: no JS files found in wheel — frontend/dist/assets/ was not bundled!")
+              sys.exit(1)
+          if not html:
+              print("FAIL: index.html missing from wheel!")
+              sys.exit(1)
+          print("OK: wheel contents look good")
+          EOF
+
+      - name: Install wheel and smoke-test server
+        run: |
+          uv venv .test-venv
+          # install wheel (combaero is a dependency, pulled from PyPI)
+          uv pip install --python .test-venv dist/combaero_gui-*.whl
+          .test-venv/bin/combaero-gui &
+          SERVER_PID=$!
+          sleep 4
+          # health endpoint must respond 200
+          curl -fsS http://localhost:8000/health
+          # root must serve HTML (index.html), not JSON
+          # Use GET — modern Starlette does not auto-generate HEAD for @app.get() routes.
+          ROOT_BODY=$(curl -s http://localhost:8000/)
+          echo "$ROOT_BODY" | grep -qi "<!doctype html>" || { echo "FAIL: / did not return HTML"; kill $SERVER_PID; exit 1; }
+          # a JS asset must NOT return text/html
+          JS_PATH=$(echo "$ROOT_BODY" | grep -o 'src="[^"]*\.js"' | head -1 | sed 's/src="//;s/"//')
+          echo "Detected JS path: $JS_PATH"
+          if [ -n "$JS_PATH" ]; then
+            JS_CT=$(curl -s -o /dev/null -w '%{content_type}' "http://localhost:8000${JS_PATH}")
+            echo "JS content-type: $JS_CT"
+            echo "$JS_CT" | grep -qi "text/html" && { echo "FAIL: JS asset served as HTML — MIME bug present!"; kill $SERVER_PID; exit 1; }
+          fi
+          kill $SERVER_PID
+          echo "All smoke tests passed"
+
   publish:
     name: Publish
-    needs: build
+    needs: verify
     runs-on: ubuntu-latest
     environment: release
     permissions:
