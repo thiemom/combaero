@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `combaero-gui` white page on fresh PyPI install: `frontend/dist/assets/` was not bundled in
+  the wheel because the `**` glob in `package-data` is unreliable below setuptools 69; added an
+  explicit `assets/*` pattern and a `MANIFEST.in` as belt-and-suspenders.
+
+### Added
+- `scripts/test-pypi-wheel.sh`: local pre-publish wheel verification — builds both wheels,
+  inspects the GUI wheel for bundled assets, installs in an isolated venv, and smoke-tests that
+  the server starts and serves JS with the correct MIME type.
+- CI `verify` job in `publish-gui.yml` gates the PyPI publish step on the same wheel checks.
+
 ### Changed
 - Narrowed `requires-python` to `>=3.12`; dropped `from __future__ import annotations` throughout
 - Self-referential `classmethod` return types migrated to `typing.Self`

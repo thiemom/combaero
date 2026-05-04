@@ -46,10 +46,15 @@ package-dir = {gui = "."}
 packages = ["gui", "gui.backend"]
 
 [tool.setuptools.package-data]
-gui = ["frontend/dist/**/*", "frontend/dist/*"]
+gui = [
+    "frontend/dist/*",
+    "frontend/dist/assets/*",
+    "frontend/dist/**/*",
+]
 
 [tool.setuptools_scm]
 root = ".."
+local_scheme = "no-local-version"
 
 [tool.uv]
 managed = true
