@@ -3,127 +3,197 @@
 Tools to extract thermodynamic and transport data from external databases and
 generate `thermo_transport_data.h` for the C++ library.
 
-## Quick Start
+## Adding a Species
 
-### Step 1: Obtain Source Data (not included)
+This is the primary use case. The complete workflow for adding one or more species:
 
-Source data files are **not included** in this repository to avoid licensing issues.
-You must obtain them yourself:
+### Step 1 — Obtain source data
 
-**Cantera YAML mechanisms** (NASA-7 + transport):
+Source files are **not included** in this repository (licensing). You need at
+least one Cantera YAML mechanism covering the new species. If the species
+appears in multiple mechanisms (common for transport data), you can supply all
+of them and the extractor will merge them.
+
+**Cantera YAML** (NASA-7 thermo + Lennard-Jones transport):
 - Download from [Cantera](https://cantera.org/examples/input-files.html)
-- Or convert from Chemkin format using `ck2yaml`
+- Or convert Chemkin-format files with `ck2yaml`:
 
-**NASA CEA data** (NASA-9, high temperature):
+```bash
+# Example: convert NUIGMech1.1 Chemkin files to Cantera YAML
+ck2yaml \
+    --thermo NUIGMech1.1.THERM \
+    --transport NUIGMech1.1.TRAN \
+    --output NUIGMech1.1.yaml \
+    --permissive
+```
+
+**NASA CEA** (NASA-9 thermo, up to 20 000 K — no transport):
 - Use the [NASA CEA web interface](https://cearun.grc.nasa.gov/)
-- Select species, generate output, save as text file
+- Select species, run, save the text output
 
-### Step 2: Extract Species Data
+### Step 2 — Extract species data
 
 ```bash
-# Extract from YAML only (NASA-7 + transport)
-python extract_species_data.py --yaml mechanism.yaml -o species.json
+cd thermo_data_generator
 
-# Extract from CEA only (NASA-9, up to 20000 K)
-python extract_species_data.py --cea cea_output.txt -o species.json
+# Single YAML source
+uv run extract_species_data.py \
+    --yaml JetSurf2.yaml \
+    -s N2 O2 AR CO2 H2O CH4 C2H6 C3H8 IC4H10 NC5H12 NC6H14 NC7H16 CO H2 \
+    -o merged_species.json
 
-# Merge both sources (recommended: NASA-9 thermo + YAML transport)
-python extract_species_data.py \
-    --yaml mechanism.yaml \
+# Multiple YAML sources — transport data split across mechanisms
+# First file wins on conflict; add fallback files after the primary source.
+# Example: adding NH3, whose transport data lives in a combustion mechanism
+# but not in JetSurf2.
+uv run extract_species_data.py \
+    --yaml JetSurf2.yaml NUIGMech1.1.yaml \
+    -s N2 O2 AR CO2 H2O CH4 C2H6 C3H8 IC4H10 NC5H12 NC6H14 NC7H16 CO H2 NH3 \
+    -o merged_species.json
+
+# Full pipeline: multiple YAMLs for transport + CEA for NASA-9 thermo
+uv run extract_species_data.py \
+    --yaml JetSurf2.yaml NUIGMech1.1.yaml \
     --cea cea_output.txt \
-    -s O2 N2 AR H2O CO2 CH4 H2 CO \
-    -o species.json
+    -s N2 O2 NH3 \
+    -o merged_species.json
 ```
 
-### Step 3: Generate C++ Header
+The output `merged_species.json` is gitignored (large derived file, regenerated
+on demand).
 
-```bash
-# From YAML mechanism (NASA-7)
-python generate_thermo_data.py \
-    --mechanism mechanism.yaml \
-    --species "N2,O2,AR,CO2,H2O,CH4,C2H6,C3H8,H2,CO" \
-    --output ../include/thermo_transport_data.h
+### Step 3 — Add the common name (manual)
 
-# From merged JSON (NASA-9 preferred)
-python generate_thermo_data.py \
-    --json species.json \
-    --species "N2,O2,AR,CO2,H2O,CH4,C2H6,C3H8,H2,CO" \
-    --output ../include/thermo_transport_data.h
+`include/common_names.h` maps formula → human-readable name (e.g. `NH3` →
+`"Ammonia"`). This is the **only manual step** in the workflow — common names
+are editorial choices that cannot be derived automatically.
+
+Edit **both** maps:
+
+```cpp
+// formula_to_name
+{"NH3", "Ammonia"},
+
+// name_to_formula
+{"Ammonia", "NH3"},
 ```
 
-### Step 4: Check common-name completeness (optional)
+Both maps must stay in sync. The pre-commit hook `check-common-names.sh` will
+catch any missing entries.
 
-`include/common_names.h` maps formula → human-readable name (e.g. `CH4` → `"Methane"`).
-It is **maintained by hand** because common names are editorial choices (history, culture,
-trade names) that cannot be derived from formulas or thermo data.
-
-When adding new species, verify they have an entry in `common_names.h`:
+### Step 4 — Regenerate the C++ header
 
 ```bash
-python generate_thermo_data.py \
-    --json species.json \
-    --species "N2,O2,C2H4" \
+uv run generate_thermo_data.py \
+    --json merged_species.json \
+    --species "N2,O2,AR,CO2,H2O,CH4,C2H6,C3H8,IC4H10,NC5H12,NC6H14,NC7H16,CO,H2,NH3" \
+    --prefer-nasa9 \
     --check-names \
     --output ../include/thermo_transport_data.h
 ```
 
-Use `--strict` to make missing entries a hard error (useful in CI):
+`--check-names` verifies every species in the list has an entry in
+`common_names.h`. Use `--strict` to make this a hard error.
+
+### Step 5 — Rebuild the C++ extension
 
 ```bash
-python generate_thermo_data.py --json species.json --species "..." \
-    --check-names --strict --output ../include/thermo_transport_data.h
+cd ..
+uv pip install -e .
 ```
 
-**Convention for adding a new species:**
-1. Add thermo/transport data to `merged_species.json` (via `extract_species_data.py`)
-2. Add the formula → name mapping to `include/common_names.h` (both `formula_to_name` and `name_to_formula`)
-3. Regenerate `include/thermo_transport_data.h` with `--check-names`
+### Step 6 — Verify
 
-`include/common_names.h` is the **single source of truth** for common names.
-`merged_species.json` is gitignored (large derived file) and carries no name data.
+```bash
+# Smoke-test Python bindings
+uv run python -c "import combaero as cb; print(cb.species.names)"
+
+# Full test suite
+uv run pytest python/tests/ -v
+```
+
+The test suite and GUI adapt automatically — there are no hardcoded species
+counts anywhere in tests, Python bindings, or the GUI. Adding a species only
+requires the steps above.
+
+### What adapts automatically
+
+| Layer | How it adapts |
+|-------|--------------|
+| C++ library | Loops use `species_names.size()` — no hardcoded counts |
+| Python API (`cb.species`) | Reads count from C++ core at import time |
+| Python tests | All use `cb.species.num_species` dynamically |
+| GUI backend (`/metadata/species`) | Returns `cb.species.names` from C++ |
+| GUI frontend | Fetches species list from API at startup |
+
+### What requires a manual edit
+
+| File | What to add | Why manual |
+|------|-------------|-----------|
+| `include/common_names.h` | Entry in both `formula_to_name` and `name_to_formula` | Common names are editorial — cannot be derived from formulas |
+
+---
 
 ## Scripts
 
 | Script | Purpose |
 |--------|---------|
-| `extract_species_data.py` | **Unified extractor** - extracts from YAML and/or CEA to JSON |
-| `generate_thermo_data.py` | **Header generator** - creates C++ header from YAML or JSON |
+| `extract_species_data.py` | Extracts thermo + transport from YAML and/or CEA, merges multiple sources |
+| `generate_thermo_data.py` | Generates `thermo_transport_data.h` from merged JSON |
 
-### Legacy Scripts (deprecated)
+### Legacy (deprecated)
 
 | Script | Purpose |
 |--------|---------|
-| `create_cpp_header.py` | CSV to header converter |
+| `create_cpp_header.py` | Old CSV-to-header converter; superseded by `generate_thermo_data.py` |
+
+---
 
 ## Data Sources
 
 ### Cantera YAML Mechanisms
 
-Combined thermo + transport data in Cantera's YAML format:
-- NASA-7 polynomial coefficients (typically 200-3500 K)
-- Lennard-Jones transport parameters
+Provide NASA-7 polynomial thermo and Lennard-Jones transport parameters.
+Recommended sources (covering different species families):
 
-Recommended sources:
-- **GRI-Mech 3.0** - natural gas combustion
-- **JetSurF 2.0** - jet fuel surrogate
-- **San Diego mechanism** - hydrocarbon combustion
+| Mechanism | Coverage |
+|-----------|---------|
+| GRI-Mech 3.0 | Natural gas, C1–C2 hydrocarbons |
+| JetSurF 2.0 | Jet fuel surrogates, C1–C16 |
+| San Diego mechanism | Hydrocarbon combustion |
+| NUIGMech 1.1 | Comprehensive: C0–C7 + nitrogen chemistry (NH3, NOx) |
 
-**Note: YAML 1.1 Boolean Parsing**
+When a species' transport data appears in a secondary mechanism but not your
+primary one, pass both to `extract_species_data.py --yaml primary.yaml secondary.yaml`.
+The first file takes priority on conflicts; later files fill gaps.
 
-PyYAML parses certain species names as booleans (`NO` → `False`).
-The generator handles this automatically.
+**Note — PyYAML boolean parsing**: species names like `NO` parse as `False`
+in YAML 1.1. The extractor handles this automatically.
 
 ### NASA CEA Database
 
-NASA-9 polynomials with extended temperature range (200-20000 K):
-- Higher accuracy at extreme temperatures
-- No transport data (must be obtained separately)
+Provides NASA-9 polynomials with an extended temperature range (200–20 000 K).
+No transport data — transport must come from a YAML mechanism.
+
+Use the [NASA CEA web interface](https://cearun.grc.nasa.gov/), select species,
+run, and save the text output. Pass it via `--cea` to overlay NASA-9 thermo on
+top of the YAML-sourced transport data.
+
+### Chemkin-format files
+
+Convert to Cantera YAML first with `ck2yaml` (installed with Cantera):
+
+```bash
+ck2yaml --thermo file.THERM --transport file.TRAN --output out.yaml --permissive
+```
+
+---
 
 ## NASA Polynomial Formats
 
 ### NASA-7 (from YAML)
 
-7 coefficients per temperature range (typically 2 ranges):
+Two temperature ranges, 7 coefficients each:
 
 ```
 Cp/R = a1 + a2*T + a3*T² + a4*T³ + a5*T⁴
@@ -133,78 +203,60 @@ S/R  = a1*ln(T) + a2*T + a3*T²/2 + a4*T³/3 + a5*T⁴/4 + a7
 
 ### NASA-9 (from CEA)
 
-10 coefficients per interval (typically 2-3 intervals):
+Up to three temperature intervals, 10 coefficients each (wider T range):
 
 ```
 Cp/R = a1/T² + a2/T + a3 + a4*T + a5*T² + a6*T³ + a7*T⁴
 ```
 
-Coefficients a8, a9 are integration constants for H and S.
+`generate_thermo_data.py --prefer-nasa9` (default) uses NASA-9 where available
+and falls back to NASA-7 otherwise.
 
-## Output Formats
+---
 
-### JSON (from extract_species_data.py)
+## Output
+
+### JSON (`merged_species.json`)
 
 ```json
 {
-  "sources": ["mechanism.yaml", "cea_output.txt"],
+  "sources": ["JetSurf2.yaml", "NUIGMech1.1.yaml"],
   "species": [
     {
-      "name": "N2",
-      "name_normalized": "N2",
-      "molar_mass": 28.014,
-      "thermo_nasa7": {"...": "..."},
-      "thermo_nasa9": {"intervals": ["..."]},
-      "transport": {"geometry": "linear"}
+      "name": "NH3",
+      "name_normalized": "NH3",
+      "molar_mass": 17.031,
+      "thermo_nasa7": { "T_min": 200, "T_mid": 1000, "T_max": 6000, "..." },
+      "transport": { "geometry": "nonlinear", "well_depth": 481.0, "..." }
     }
   ]
 }
 ```
 
-The `common_name` field shown above is illustrative; `merged_species.json` is gitignored
-and not the authoritative source. The canonical mapping lives in `include/common_names.h`.
+### C++ Header (`include/thermo_transport_data.h`)
 
-### C++ Header (from generate_thermo_data.py)
+Auto-generated. Do not edit manually. Contains:
 
-- `species_names` - vector of species name strings
-- `molar_masses` - vector of molar masses [g/mol]
-- `nasa_coeffs` - vector of NASA polynomial coefficients
-- `transport_props` - vector of Lennard-Jones parameters
+- `species_names` — `std::vector<std::string>`
+- `species_index` — `std::unordered_map<std::string, int>` for O(1) lookup
+- `molar_masses` — `std::vector<double>` [g/mol]
+- `nasa_coeffs` — NASA-7 or NASA-9 structs depending on `--prefer-nasa9`
+- `transport_props` — Lennard-Jones parameters
+- `molecular_structures` — atomic composition (C, H, O, N counts)
 
-The header uses format-specific structs with a common alias:
-
-**NASA-7**: `NASA7_Coeffs` with fixed low/high temperature ranges (2 intervals)
-
-**NASA-9**: `NASA9_Coeffs` with variable `intervals` vector (1-3 intervals per species)
+---
 
 ## Testing
 
 ```bash
-pytest
+uv run pytest
 ```
 
-## Agent Guidance: Adding New Species
-
-If you are an AI agent asked to add a new species to CombAero, follow these exact steps:
-
-1. **Locate Source Data**: Look for a Cantera YAML mechanism (`.yaml`) or NASA CEA output (`.txt`) in the workspace or provided as context.
-2. **Extract JSON**: Run `extract_species_data.py` to create or update a `species.json` file.
-   ```bash
-   python extract_species_data.py --yaml path/to/mechanism.yaml -s "CO2,O2,YOUR_NEW_SPECIES" -o species.json
-   ```
-3. **Map Common Name**: Open `include/common_names.h` and add the mapping for your new species in both `formula_to_name` and `name_to_formula` maps.
-4. **Regenerate Header**: Run `generate_thermo_data.py` to update the C++ source.
-   ```bash
-   python generate_thermo_data.py --json species.json --species "..." --check-names --output ../include/thermo_transport_data.h
-   ```
-5. **Verify**: Run the C++ and Python tests to ensure the new species is accessible and the properties are correct.
-
-> [!IMPORTANT]
-> Never manually edit `include/thermo_transport_data.h`. Always use the generator scripts to maintain consistency.
+---
 
 ## Licensing Note
 
-**Source data files (YAML mechanisms, CEA output) are not included** in this
+Source data files (YAML mechanisms, CEA output) are not included in this
 repository. Many thermodynamic databases have specific licensing terms:
 
 - Some mechanisms incorporate Burcat's database (restricted use)

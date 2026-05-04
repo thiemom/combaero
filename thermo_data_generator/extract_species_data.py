@@ -314,6 +314,22 @@ def extract_from_cea(
 # =============================================================================
 
 
+def merge_yaml_sources(
+    sources: list[tuple[Path, dict[str, dict[str, Any]]]],
+) -> dict[str, dict[str, Any]]:
+    """Merge species data from multiple YAML sources.
+
+    Strategy: first source wins for conflicts — put the most authoritative
+    source first and let the rest fill gaps.
+    """
+    merged: dict[str, dict[str, Any]] = {}
+    for _path, data in sources:
+        for name_norm, entry in data.items():
+            if name_norm not in merged:
+                merged[name_norm] = entry
+    return merged
+
+
 def merge_species_data(
     yaml_data: dict[str, dict[str, Any]],
     cea_data: dict[str, dict[str, Any]],
@@ -326,17 +342,13 @@ def merge_species_data(
     """
     merged: dict[str, dict[str, Any]] = {}
 
-    # Start with YAML data
     for name_norm, entry in yaml_data.items():
         merged[name_norm] = entry.copy()
 
-    # Add/merge CEA data
     for name_norm, cea_entry in cea_data.items():
         if name_norm in merged:
-            # Add NASA-9 to existing entry
             merged[name_norm]["thermo_nasa9"] = cea_entry["thermo_nasa9"]
         else:
-            # New species from CEA only
             merged[name_norm] = cea_entry
 
     return merged
@@ -353,14 +365,17 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Extract from YAML only
+  # Extract from a single YAML
   %(prog)s --yaml mechanism.yaml -o species.json
 
-  # Extract from CEA only
+  # Merge transport data from multiple YAMLs (first file wins on conflict)
+  %(prog)s --yaml primary.yaml secondary.yaml fallback.yaml -o species.json
+
+  # Extract from CEA only (NASA-9)
   %(prog)s --cea cea_output.txt -o species.json
 
-  # Merge both sources (NASA-9 thermo + YAML transport)
-  %(prog)s --yaml mechanism.yaml --cea cea_output.txt -o species.json
+  # Full merge: multiple YAMLs + CEA (NASA-9 thermo + YAML transport)
+  %(prog)s --yaml primary.yaml secondary.yaml --cea cea_output.txt -o species.json
 
   # Extract specific species
   %(prog)s --yaml mechanism.yaml -s O2 N2 H2O CO2 -o species.json
@@ -369,7 +384,9 @@ Examples:
     parser.add_argument(
         "--yaml",
         type=Path,
-        help="Cantera YAML mechanism file (NASA-7 + transport)",
+        nargs="+",
+        metavar="FILE",
+        help="Cantera YAML mechanism file(s) (NASA-7 + transport); first file wins on conflict",
     )
     parser.add_argument(
         "--cea",
@@ -401,15 +418,16 @@ Examples:
         parser.error("At least one of --yaml or --cea is required")
 
     all_warnings: list[str] = []
-    yaml_data: dict[str, dict[str, Any]] = {}
+    yaml_sources: list[tuple[Path, dict[str, dict[str, Any]]]] = []
     cea_data: dict[str, dict[str, Any]] = {}
 
-    # Extract from YAML
-    if args.yaml:
-        if not args.yaml.exists():
-            print(f"ERROR: File not found: {args.yaml}", file=sys.stderr)
+    # Extract from YAML file(s)
+    for yaml_path in args.yaml or []:
+        if not yaml_path.exists():
+            print(f"ERROR: File not found: {yaml_path}", file=sys.stderr)
             sys.exit(1)
-        yaml_data, warnings = extract_from_yaml(args.yaml, args.species)
+        data, warnings = extract_from_yaml(yaml_path, args.species)
+        yaml_sources.append((yaml_path, data))
         all_warnings.extend(warnings)
 
     # Extract from CEA
@@ -423,10 +441,10 @@ Examples:
     # List mode
     if args.list:
         print("Available species:")
-        if yaml_data:
-            print(f"\n  YAML ({len(yaml_data)}):")
-            for name in sorted(yaml_data.keys()):
-                print(f"    {yaml_data[name]['name']}")
+        for yaml_path, data in yaml_sources:
+            print(f"\n  YAML {yaml_path} ({len(data)}):")
+            for name in sorted(data.keys()):
+                print(f"    {data[name]['name']}")
         if cea_data:
             print(f"\n  CEA ({len(cea_data)}):")
             for name in sorted(cea_data.keys()):
@@ -434,12 +452,15 @@ Examples:
         return
 
     # Merge data
+    yaml_data = merge_yaml_sources(yaml_sources)
+    source_paths: list[str] = [str(p) for p, _ in yaml_sources]
+
     if yaml_data and cea_data:
         merged = merge_species_data(yaml_data, cea_data)
-        sources = [str(args.yaml), str(args.cea)]
+        sources = source_paths + [str(args.cea)]
     elif yaml_data:
         merged = yaml_data
-        sources = [str(args.yaml)]
+        sources = source_paths
     else:
         merged = cea_data
         sources = [str(args.cea)]
