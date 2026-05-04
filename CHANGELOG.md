@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   inspects the GUI wheel for bundled assets, installs in an isolated venv, and smoke-tests that
   the server starts and serves JS with the correct MIME type.
 - CI `verify` job in `publish-gui.yml` gates the PyPI publish step on the same wheel checks.
+- `test_gui_export_dataframe.py`: unit tests for the CSV export pipeline's DataFrame
+  construction, column-rename, and `to_csv` logic; covers pandas 3.0 compatibility.
 
 ### Changed
 - Narrowed `requires-python` to `>=3.12`; dropped `from __future__ import annotations` throughout
