@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   explicit `assets/*` pattern and a `MANIFEST.in` as belt-and-suspenders.
 
 ### Added
+- Ammonia (NH3) species to the thermodynamic and transport database.
+- Dynamic species count support in C++ and Python test suites to prevent regressions when modifying the database.
 - `scripts/test-pypi-wheel.sh`: local pre-publish wheel verification — builds both wheels,
   inspects the GUI wheel for bundled assets, installs in an isolated venv, and smoke-tests that
   the server starts and serves JS with the correct MIME type.
