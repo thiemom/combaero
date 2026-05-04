@@ -151,7 +151,8 @@ class TestVariousCompositions:
 
     def test_pure_nitrogen(self):
         """Test with pure nitrogen."""
-        X = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        X = [0.0] * cb.num_species()
+        X[cb.species_index_from_name("N2")] = 1.0
         T = 300
         P = 101325
         state = cb.complete_state(T=T, P=P, X=X)
@@ -165,7 +166,8 @@ class TestVariousCompositions:
 
     def test_pure_methane(self):
         """Test with pure methane."""
-        X = [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        X = [0.0] * cb.num_species()
+        X[cb.species_index_from_name("CH4")] = 1.0
         T = 300
         P = 101325
         state = cb.complete_state(T=T, P=P, X=X)

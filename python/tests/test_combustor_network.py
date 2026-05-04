@@ -96,7 +96,7 @@ def test_combustor_network_conservation():
     H_in = m_dot_air * h_air + (m_dot_fuel1 + m_dot_fuel2) * h_ch4
 
     T_out = sol["combustor.T"]
-    X_out = [sol[f"combustor.Y[{i}]"] for i in range(14)]
+    X_out = [sol[f"combustor.Y[{i}]"] for i in range(cb.num_species())]
 
     h_out, _ = cb._core.enthalpy_and_jacobian(T_out, cb.mass_to_mole(X_out))
     H_out = m_dot_out * h_out

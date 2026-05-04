@@ -16,9 +16,9 @@ from combaero.network import (
 
 
 def _get_air_Y():
-    Y = [0.0] * 14
-    Y[0] = 0.79
-    Y[1] = 0.21
+    Y = [0.0] * cb.num_species()
+    Y[cb.species_index_from_name("N2")] = 0.79
+    Y[cb.species_index_from_name("O2")] = 0.21
     return Y
 
 

@@ -2913,7 +2913,7 @@ TEST_F(ThermoTransportTest, FannoFlowInvalidInputs) {
 TEST(Quasi1DNozzle, SubsonicConvergingDiverging) {
     // Subsonic flow through C-D nozzle (high back pressure)
     // Species: N2, O2, AR, CO2, H2O, CH4, C2H6, C3H8, IC4H10, NC5H12, NC6H14, NC7H16, CO, H2
-    std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
     double T0 = 500.0;  // K
     double P0 = 500000.0;  // Pa
@@ -2950,7 +2950,7 @@ TEST(Quasi1DNozzle, SubsonicConvergingDiverging) {
 
 TEST(Quasi1DNozzle, ChokedConvergingDiverging) {
     // Choked flow through C-D nozzle (low back pressure)
-    std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
     double T0 = 500.0;  // K
     double P0 = 500000.0;  // Pa
@@ -2983,7 +2983,7 @@ TEST(Quasi1DNozzle, ChokedConvergingDiverging) {
 
 TEST(Quasi1DNozzle, MassConservation) {
     // Verify mass conservation along nozzle
-    std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
     double T0 = 600.0;
     double P0 = 300000.0;
@@ -3020,7 +3020,7 @@ TEST(Quasi1DNozzle, MassConservation) {
 
 TEST(Quasi1DNozzle, AreaFunctionInterface) {
     // Test with custom area function
-    std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
     double T0 = 500.0;
     double P0 = 400000.0;
@@ -3042,7 +3042,7 @@ TEST(Quasi1DNozzle, AreaFunctionInterface) {
 
 TEST(Quasi1DNozzle, AreaProfileInterface) {
     // Test with (x, A) pairs
-    std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
     double T0 = 500.0;
     double P0 = 400000.0;
@@ -3068,7 +3068,7 @@ TEST(Quasi1DNozzle, AreaProfileInterface) {
 TEST(Quasi1DNozzle, PolynomialArea) {
     // Test with polynomial area: A(x) = 0.01 - 0.1*x + 0.5*x²
     // This gives a minimum at x = 0.1
-    std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
     double T0 = 500.0;
     double P0 = 400000.0;
@@ -3086,7 +3086,7 @@ TEST(Quasi1DNozzle, PolynomialArea) {
 }
 
 TEST(Quasi1DNozzle, InvalidInputs) {
-    std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
     auto area_func = [](double x) { return 0.01 - 0.05 * x; };
 
@@ -3306,7 +3306,7 @@ TEST(HeatTransferTest, CorrelationsConsistent) {
 
 TEST(HeatTransferTest, StateBased) {
     // Test state-based convenience functions
-    std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
     State s;
     s.set_T(400.0).set_P(101325.0).set_X(X_air);

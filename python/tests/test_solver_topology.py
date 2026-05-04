@@ -64,9 +64,9 @@ def test_single_stream_passthrough():
     net = FlowNetwork()
     # Inflow at 500K with specific composition
     # Using mole fractions: 70% N2, 30% O2
-    X_in = np.zeros(14)
-    X_in[0] = 0.7  # N2
-    X_in[1] = 0.3  # O2
+    X_in = np.zeros(cb.num_species())
+    X_in[cb.species_index_from_name("N2")] = 0.7
+    X_in[cb.species_index_from_name("O2")] = 0.3
     Y_in = list(cb.mole_to_mass(X_in))
 
     net.add_node(PressureBoundary("IN", Pt=200000.0, Tt=500.0, Y=Y_in))

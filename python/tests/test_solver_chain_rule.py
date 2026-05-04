@@ -41,8 +41,10 @@ def test_chain_rule_orifice_through_combustor():
     net.add_node(MassFlowBoundary("AIR_IN", m_dot=10.0, Tt=300.0))
     # Fuel stream (CH4)
     # Using mole fractions: 100% CH4
-    X_fuel = np.zeros(14)
-    X_fuel[5] = 1.0  # CH4 (NASA order might differ, but mixer uses Y)
+    X_fuel = np.zeros(cb.num_species())
+    X_fuel[cb.species_index_from_name("CH4")] = (
+        1.0  # CH4 (NASA order might differ, but mixer uses Y)
+    )
     Y_fuel = list(cb.mole_to_mass(X_fuel))
     net.add_node(MassFlowBoundary("FUEL_IN", m_dot=0.5, Tt=300.0, Y=Y_fuel))
 

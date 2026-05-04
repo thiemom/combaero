@@ -21,6 +21,7 @@ CB_SPECIES = [
     "NC7H16",
     "CO",
     "H2",
+    "NH3",
 ]
 
 

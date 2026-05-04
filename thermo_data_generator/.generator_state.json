@@ -13,7 +13,8 @@
     "NC6H14",
     "NC7H16",
     "CO",
-    "H2"
+    "H2",
+    "NH3"
   ],
   "json_source": "thermo_data_generator/merged_species.json",
   "nasa_format": "NASA9"

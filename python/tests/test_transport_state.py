@@ -141,7 +141,8 @@ class TestVariousCompositions:
 
     def test_pure_nitrogen(self):
         """Test with pure nitrogen."""
-        X = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        X = [0.0] * cb.num_species()
+        X[cb.species_index_from_name("N2")] = 1.0
         T = 300
         P = 101325
         state = cb.transport_state(T=T, P=P, X=X)
@@ -153,7 +154,8 @@ class TestVariousCompositions:
 
     def test_pure_methane(self):
         """Test with pure methane."""
-        X = [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        X = [0.0] * cb.num_species()
+        X[cb.species_index_from_name("CH4")] = 1.0
         T = 300
         P = 101325
         state = cb.transport_state(T=T, P=P, X=X)
@@ -165,7 +167,11 @@ class TestVariousCompositions:
 
     def test_combustion_products(self):
         """Test with typical combustion products."""
-        X = [0.72, 0.03, 0.0, 0.10, 0.15, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        X = [0.0] * cb.num_species()
+        X[cb.species_index_from_name("N2")] = 0.72
+        X[cb.species_index_from_name("O2")] = 0.03
+        X[cb.species_index_from_name("CO2")] = 0.10
+        X[cb.species_index_from_name("H2O")] = 0.15
         T = 1500
         P = 101325
         state = cb.transport_state(T=T, P=P, X=X)

@@ -14,8 +14,8 @@ from combaero.network.components import NetworkMixtureState
 def test_combustion_result_dataclass():
     """Test CombustionResult dataclass creation."""
     result = CombustionResult(
-        X=[0.1] * 14,
-        Y=[0.1] * 14,
+        X=[0.1] * cb.num_species(),
+        Y=[0.1] * cb.num_species(),
         mw=29.0,
         T=1000.0,
         P=101325.0,

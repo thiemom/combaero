@@ -39,6 +39,7 @@ class TestWgsEquilibrium:
                 "NC7H16",
                 "CO",
                 "H2",
+                "NH3",
             ]
         ):
             if cb_X[i] > 1e-10:
@@ -338,6 +339,7 @@ class TestReformingEquilibrium:
         "NC7H16",
         "CO",
         "H2",
+        "NH3",
     ]
 
     @pytest.fixture
