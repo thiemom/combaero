@@ -279,9 +279,9 @@ def test_friction_dispatcher_matches_direct_models():
 
 def test_density_jacobians():
     P = 101325.0
-    X = [0.0] * 14
-    X[11] = 0.79  # N2
-    X[12] = 0.21  # O2
+    X = [0.0] * cb.num_species()
+    X[cb.species_index_from_name("N2")] = 0.79
+    X[cb.species_index_from_name("O2")] = 0.21
 
     def rho_T_func(T):
         return cb._core.density_and_jacobians(T, P, X)[0]
@@ -303,9 +303,9 @@ def test_density_jacobians():
 
 
 def test_enthalpy_jacobian():
-    X = [0.0] * 14
-    X[11] = 0.79  # N2
-    X[12] = 0.21  # O2
+    X = [0.0] * cb.num_species()
+    X[cb.species_index_from_name("N2")] = 0.79
+    X[cb.species_index_from_name("O2")] = 0.21
 
     def h_func(T):
         return cb._core.enthalpy_and_jacobian(T, X)[0]
@@ -318,9 +318,9 @@ def test_enthalpy_jacobian():
 
 def test_viscosity_jacobians():
     P = 101325.0
-    X = [0.0] * 14
-    X[11] = 0.79  # N2
-    X[12] = 0.21  # O2
+    X = [0.0] * cb.num_species()
+    X[cb.species_index_from_name("N2")] = 0.79
+    X[cb.species_index_from_name("O2")] = 0.21
 
     def mu_T_func(T):
         return cb._core.viscosity_and_jacobians(T, P, X)[0]

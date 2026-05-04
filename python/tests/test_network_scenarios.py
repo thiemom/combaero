@@ -1,5 +1,6 @@
 import pytest
 
+import combaero as cb
 from combaero.network import (
     ChannelElement,
     FlowNetwork,
@@ -13,9 +14,9 @@ from combaero.network import (
 
 def _get_air_Y():
     """Helper to create standard air composition."""
-    Y = [0.0] * 14
-    Y[0] = 0.79  # N2
-    Y[1] = 0.21  # O2
+    Y = [0.0] * cb.num_species()
+    Y[cb.species_index_from_name("N2")] = 0.79
+    Y[cb.species_index_from_name("O2")] = 0.21
     return Y
 
 

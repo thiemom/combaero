@@ -1,3 +1,4 @@
+import combaero as cb
 from combaero.network.components import (
     ChannelElement,
     LosslessConnectionElement,
@@ -12,7 +13,7 @@ def test_flownetwork_serialization():
     network1 = FlowNetwork()
 
     # Nodes
-    n1 = PressureBoundary(" inlet ", Pt=150000.0, Tt=300.0, Y=[0.0] * 14)
+    n1 = PressureBoundary(" inlet ", Pt=150000.0, Tt=300.0, Y=[0.0] * cb.num_species())
     n2 = PlenumNode(" plenum1")
     n3 = PressureBoundary(" outlet ", Pt=100000.0, Tt=300.0)
 

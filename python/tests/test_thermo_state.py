@@ -203,7 +203,8 @@ class TestVariousCompositions:
     def test_pure_nitrogen(self):
         """Test with pure nitrogen."""
         # Create pure N2 composition (14 species, N2 is index 0)
-        X = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        X = [0.0] * cb.num_species()
+        X[cb.species_index_from_name("N2")] = 1.0
         T = 300
         P = 101325
         state = cb.thermo_state(T=T, P=P, X=X)
@@ -215,7 +216,8 @@ class TestVariousCompositions:
     def test_pure_methane(self):
         """Test with pure methane."""
         # Create pure CH4 composition (14 species, CH4 is index 5)
-        X = [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        X = [0.0] * cb.num_species()
+        X[cb.species_index_from_name("CH4")] = 1.0
         T = 300
         P = 101325
         state = cb.thermo_state(T=T, P=P, X=X)
@@ -227,7 +229,11 @@ class TestVariousCompositions:
         """Test with typical combustion products."""
         # Approximate post-combustion mixture
         # Species order: N2, O2, AR, CO2, H2O, CH4, C2H6, C3H8, IC4H10, NC5H12, NC6H14, NC7H16, CO, H2
-        X = [0.72, 0.03, 0.0, 0.10, 0.15, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        X = [0.0] * cb.num_species()
+        X[cb.species_index_from_name("N2")] = 0.72
+        X[cb.species_index_from_name("O2")] = 0.03
+        X[cb.species_index_from_name("CO2")] = 0.10
+        X[cb.species_index_from_name("H2O")] = 0.15
         T = 1500
         P = 101325
         state = cb.thermo_state(T=T, P=P, X=X)

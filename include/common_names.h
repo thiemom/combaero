@@ -26,6 +26,7 @@ inline const std::unordered_map<std::string, std::string> formula_to_name{
     {"NC7H16", "n-Heptane"},
     {"CO",     "Carbon monoxide"},
     {"H2",     "Hydrogen"},
+    {"NH3",    "Ammonia"},
 };
 
 // Inverse mapping: common name -> formula
@@ -44,6 +45,7 @@ inline const std::unordered_map<std::string, std::string> name_to_formula{
     {"n-Heptane",       "NC7H16"},
     {"Carbon monoxide", "CO"},
     {"Hydrogen",        "H2"},
+    {"Ammonia",         "NH3"},
 };
 
 // Lookup functions with error handling

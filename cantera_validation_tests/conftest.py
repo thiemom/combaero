@@ -41,6 +41,7 @@ def species_mapping():
         "NC7H16": "NC7H16",
         "CO": "CO",
         "H2": "H2",
+        "NH3": "NH3",
     }
 
 

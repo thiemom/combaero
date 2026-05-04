@@ -56,14 +56,20 @@ def get_atomic_mass(element: str) -> float:
 # =============================================================================
 
 
-def normalize_species_name(name: str) -> str:
+def normalize_species_name(name: Any) -> str:
     """Normalize species name for matching.
 
     Converts to uppercase and normalizes common naming conventions:
     - C4H10,n-butane -> NC4H10
     - C5H12,i-pentane -> IC5H12
     """
-    upper = name.upper()
+    # Handle PyYAML boolean parsing (e.g., 'NO' -> False)
+    if name is False:
+        name = "NO"
+    elif name is True:
+        name = "YES"
+
+    upper = str(name).upper()
 
     # Handle CEA-style names like "C4H10,n-butane" -> "NC4H10"
     if "," in upper:

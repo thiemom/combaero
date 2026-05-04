@@ -60,9 +60,9 @@ def test_atomic_network_components():
     Currently only validates instantiation and topological property storage.
     """
     # 1. Initialize states
-    Y_air = [0.0] * 14
-    Y_air[11] = 0.79  # N2
-    Y_air[12] = 0.21  # O2
+    Y_air = [0.0] * cb.num_species()
+    Y_air[cb.species_index_from_name("N2")] = 0.79
+    Y_air[cb.species_index_from_name("O2")] = 0.21
 
     state_in = NetworkMixtureState(P=500000.0, Pt=500000.0, T=300.0, Tt=300.0, m_dot=0.1, Y=Y_air)
 
@@ -123,7 +123,7 @@ def test_momentum_chamber_network():
     assert node_mc.get_port_angle("channel_in") == 45.0
 
     # Placeholder residuals ensure conservation equations can later be injected
-    state = cb.network.NetworkMixtureState(1e5, 1.1e5, 300.0, 300.0, 1.0, [0.0] * 14)
+    state = cb.network.NetworkMixtureState(1e5, 1.1e5, 300.0, 300.0, 1.0, [0.0] * cb.num_species())
     residuals, _ = node_mc.residuals(state)
     assert len(residuals) == 1
     assert residuals[0] == 1.1e5 - 1e5

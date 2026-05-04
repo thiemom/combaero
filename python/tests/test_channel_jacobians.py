@@ -183,7 +183,7 @@ def test_channel_ribbed_jacobians():
     # Verify Jacobian fields are populated
     assert result.dh_dmdot != 0.0
     assert result.ddP_dmdot != 0.0
-    assert result.dq_dT_hot == -result.h
+    assert abs(result.dq_dT_hot + result.h) < 1e-9, "dq/dT_hot should equal -h"
 
     # Verify multipliers work
     Nu_mult = 1.1
@@ -223,7 +223,7 @@ def test_channel_pin_fin_jacobians():
     # Verify Jacobian fields are populated
     assert result.dh_dmdot != 0.0
     assert result.ddP_dmdot != 0.0
-    assert result.dq_dT_hot == -result.h
+    assert abs(result.dq_dT_hot + result.h) < 1e-9, "dq/dT_hot should equal -h"
 
 
 if __name__ == "__main__":

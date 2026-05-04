@@ -13,7 +13,7 @@ TEST(StateTest, SettersperfectlyRecoverConditions) {
   State s;
   std::vector<double> X_air = {0.78084, 0.209476, 0.009365, 0.000319, 0.0,
                                0.0,     0.0,      0.0,      0.0,      0.0,
-                               0.0,     0.0,      0.0,      0.0};
+                               0.0,     0.0,      0.0,      0.0,      0.0};
 
   double T_target = 800.0;
   double P_target = 2000000.0; // 2 MPa
