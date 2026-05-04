@@ -24,6 +24,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Narrowed `requires-python` to `>=3.12`; dropped `from __future__ import annotations` throughout
 - Self-referential `classmethod` return types migrated to `typing.Self`
 
+## [0.2.6] - 2026-05-03
+
+### Fixed
+- `combaero-gui` wheel did not bundle `frontend/dist/assets/`; the `**` glob in
+  `package-data` is unreliable below setuptools 69 — added explicit `assets/*`
+  pattern and `MANIFEST.in` as belt-and-suspenders (#124).
+- `setuptools_scm` appended a local version identifier (`+g…`) to the GUI wheel
+  version, causing PyPI to reject uploads; suppressed with
+  `local_scheme = "no-local-version"` (#125).
+- Tracked `gui/frontend/dist/` in git caused dirty working tree during CI builds,
+  making the version suffix appear; removed from index (#125).
+- `publish-gui.yml` skipped after re-pushing a tag because the `workflow_run`
+  trigger resolved to `failure`; replaced with a direct `push: tags: v*` trigger
+  (#126).
+
+### Added
+- `scripts/test-pypi-wheel.sh`: local pre-publish wheel verification — builds both
+  wheels, inspects bundled assets, installs in an isolated venv, and smoke-tests
+  MIME types (#124).
+- CI `verify` job in `publish-gui.yml` gates the PyPI publish step on the same
+  checks (#124).
+
+## [0.2.4] - 2026-05-02
+
+### Fixed
+- GUI bundle not rebuilt before release; SPA catch-all route incorrectly served
+  JSON for unmatched paths; development banner visible in production build (#118).
+
+## [0.2.3] - 2026-05-02
+
+### Fixed
+- Relative API URLs broke on non-root deployments (#117).
+- SPA catch-all route returning JSON instead of HTML for deep-linked paths (#117).
+- PyPI documentation links pointed to wrong locations (#117).
+
+## [0.2.2] - 2026-05-02
+
+### Fixed
+- `combaero-gui` frontend assets not served when installed from PyPI; broken
+  documentation code examples (#116).
+
+## [0.2.1] - 2026-05-02
+
+### Fixed
+- `gui` extra missing from `combaero-gui` package metadata (#115).
+- `gui/frontend/dist/` artefacts incorrectly tracked in git (#115).
+
 ## [0.2.0] - 2026-04-26
 
 ### Added
@@ -47,5 +94,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - State property units mismatch in example runner
 - Solver stability under degenerate initial conditions
 
-[Unreleased]: https://github.com/thiemom/combaero/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/thiemom/combaero/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/thiemom/combaero/compare/v0.2.4...v0.2.6
+[0.2.4]: https://github.com/thiemom/combaero/compare/v0.2.3...v0.2.4
+[0.2.3]: https://github.com/thiemom/combaero/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/thiemom/combaero/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/thiemom/combaero/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/thiemom/combaero/releases/tag/v0.2.0

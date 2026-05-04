@@ -9,108 +9,64 @@ Utility scripts for code quality, documentation generation, and testing.
 Check C++ source code style and quality.
 
 ```bash
-# Basic check
 ./scripts/check-source-style.sh
-
-# Verbose output
 ./scripts/check-source-style.sh --verbose
-
-# Strict mode (fail on warnings)
 ./scripts/check-source-style.sh --strict
 ```
 
-**Checks:**
-- Non-ASCII characters outside comments and strings
-- Block comments (only line comments allowed)
-- M_PI usage without math_constants.h
-
+**Checks:** Non-ASCII characters, block comments, M_PI without `math_constants.h`.
 **Scans:** `src/`, `include/`, `examples/`, `tests/`
 
 ### check-python-style.sh
 
-Check Python code style and quality (PEP 8 compliance).
+Check Python code style and quality.
 
 ```bash
-# Basic check
-./scripts/check-python-style.sh
-
-# Auto-fix formatting issues
-./scripts/check-python-style.sh --fix
-
-# Verbose output
-./scripts/check-python-style.sh --verbose
-
-# Strict mode (fail on type hints)
-./scripts/check-python-style.sh --strict
+./scripts/check-python-style.sh        # Check
+./scripts/check-python-style.sh --fix  # Auto-fix formatting
 ```
 
-**Checks:**
-1. Non-ASCII characters outside comments and strings
-2. Code quality (ruff check)
-3. Code formatting (ruff format)
-4. Type hints (mypy, optional)
-
+**Checks:** Non-ASCII characters, ruff lint, ruff format, optional mypy.
 **Scans:** `python/`, `cantera_validation_tests/`, `thermo_data_generator/`
 
-**Dependencies:** `ruff` (included in `.venv` via `bootstrap.sh`)
+### check-gui-style.sh
 
-See [BUILDING.md](../docs/BUILDING.md) and [DEVELOPMENT.md](../docs/DEVELOPMENT.md) for detailed installation options.
+Check frontend code style (Biome).
+
+```bash
+./scripts/check-gui-style.sh
+```
 
 ### run-clang-tidy.sh
 
-Run clang-tidy static analysis on C++ code.
+Run clang-tidy static analysis (requires a CMake build with `compile_commands.json`).
 
 ```bash
-# Requires existing CMake build with compile_commands.json
 ./scripts/run-clang-tidy.sh
 ```
-
-**Scans:** `src/`, `include/` (skips tests and Python bindings)
 
 ## Documentation Scripts
 
 ### generate_units_md.py
 
-Generate `docs/UNITS.md` from `include/units_data.h`.
+Regenerate `docs/UNITS.md` from `include/units_data.h`.
 
 ```bash
-python scripts/generate_units_md.py
+uv run scripts/generate_units_md.py
 ```
 
-Parses unit annotations and creates formatted documentation organized by module.
+## Testing Scripts
 
-## Usage in CI/CD
+### test-pypi-wheel.sh
 
-### Pre-commit Hooks
+Build and verify the `combaero-gui` wheel end-to-end before a PyPI release. Builds
+the frontend and both wheels, inspects wheel contents, installs in an isolated venv,
+and smoke-tests that the server starts and serves JS assets with the correct MIME type.
 
-Add to `.pre-commit-config.yaml`:
-
-```yaml
-- repo: local
-  hooks:
-    - id: check-cpp-style
-      name: Check C++ Style
-      entry: ./scripts/check-source-style.sh
-      language: system
-      types: [c++]
-      pass_filenames: false
-
-    - id: check-python-style
-      name: Check Python Style
-      entry: ./scripts/check-python-style.sh
-      language: system
-      types: [python]
-      pass_filenames: false
-```
-
-### GitHub Actions
-
-```yaml
-- name: Check C++ Style
-  run: ./scripts/check-source-style.sh
-
-- name: Check Python Style
-  run: ./scripts/check-python-style.sh
+```bash
+./scripts/test-pypi-wheel.sh                        # Full run
+./scripts/test-pypi-wheel.sh --skip-frontend        # Reuse existing gui/frontend/dist/
+./scripts/test-pypi-wheel.sh --skip-combaero-build  # Use existing dist/combaero-*.whl
 ```
 
 ## Quick Reference
@@ -120,13 +76,9 @@ Add to `.pre-commit-config.yaml`:
 | Check C++ style | `./scripts/check-source-style.sh` |
 | Check Python style | `./scripts/check-python-style.sh` |
 | Auto-fix Python formatting | `./scripts/check-python-style.sh --fix` |
+| Check GUI style | `./scripts/check-gui-style.sh` |
 | Run static analysis | `./scripts/run-clang-tidy.sh` |
-| Generate units docs | `python scripts/generate_units_md.py` |
+| Regenerate units docs | `uv run scripts/generate_units_md.py` |
+| Verify GUI wheel before publish | `./scripts/test-pypi-wheel.sh` |
 
-## Exit Codes
-
-All scripts return:
-- `0` - All checks passed
-- `1` - Violations found
-
-This allows easy integration into CI/CD pipelines.
+All scripts return `0` on success and `1` on failure.
