@@ -36,16 +36,13 @@ ctest --output-on-failure
 
 The Python package `combaero` uses `scikit-build-core` to compile the C++ extensions.
 
-### Environment Setup
+### Environment Setup and Build
 
 ```bash
-uv venv --python 3.12
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-```
+# Bootstrap the environment (creates .venv and installs all deps)
+./scripts/bootstrap.sh
 
-### Building the Wheel
-
-```bash
+# Or build the wheel directly — uv creates the venv automatically
 uv pip install -e .
 ```
 

@@ -8,8 +8,9 @@ Thank you for your interest in contributing to CombAero! This project welcomes c
 2. **Line Comments**: Use `//` line comments for C++.
 3. **Type Safety**: Mandatory type hints for Python.
 4. **Jacobian Mandate**: Physics correlations must expose `(f, J)` analytical derivatives where applicable.
+5. **CHANGELOG**: Every user-visible change (feature, bug fix, breaking change) must have an entry under `[Unreleased]` in `CHANGELOG.md` in the same commit.
 
-For detailed coding styles and hard rules, see [GEMINI.md](GEMINI.md).
+For detailed coding styles and hard rules, see [CLAUDE.md](CLAUDE.md) / [AGENTS.md](AGENTS.md) / [GEMINI.md](GEMINI.md).
 
 ## Development Workflow
 
@@ -21,8 +22,9 @@ We use a standard fork-and-pull-request workflow. For detailed instructions on e
 ## Pull Request Process
 
 1. **Update Documentation**: If your change modifies a public API or a physical correlation, update the relevant markdown file in `docs/`.
-2. **Automated Checks**: Ensure your code passes all CI checks (style, units sync, and unit tests).
-3. **Review**: All PRs require review from at least one maintainer.
+2. **Update CHANGELOG**: Add an entry under `[Unreleased]` in `CHANGELOG.md`.
+3. **Automated Checks**: Ensure your code passes all CI checks (style, units sync, and unit tests).
+4. **Review**: All PRs require review from at least one maintainer.
 
 ## Reporting Issues
 

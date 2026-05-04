@@ -16,10 +16,16 @@ CombAero provides aerospace engineers and researchers with a fast, accurate, and
 ## Quick Start
 
 ### Python (Recommended)
-Install the pre-built wheel:
+Install the pre-built wheel (Python 3.12+; we recommend [uv](https://docs.astral.sh/uv/)):
 ```bash
-pip install combaero
+uv pip install combaero
 ```
+
+For the interactive visual network designer, install the GUI package instead:
+```bash
+uv pip install combaero-gui  # then run: combaero-gui
+```
+
 Calculate adiabatic flame temperature:
 ```python
 import combaero as cb
