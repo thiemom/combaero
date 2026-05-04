@@ -104,6 +104,7 @@ diagnostic_reports/
 
 TODO.md
 .aider*
+.claude
 
 # Benchmark run outputs (auto-generated, not for tracking)
 benchmarks/runs/
