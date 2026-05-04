@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from combaero._core import num_species, species_index_from_name
+from combaero._core import num_species, species_index_from_name, species_name
 
 
 class TestWgsEquilibrium:
@@ -23,26 +23,9 @@ class TestWgsEquilibrium:
     def set_cantera_composition(self, gas, cb_X, species_mapping):
         """Set Cantera composition from CombAero mole fractions."""
         ct_species = {}
-        for i, name in enumerate(
-            [
-                "N2",
-                "O2",
-                "AR",
-                "CO2",
-                "H2O",
-                "CH4",
-                "C2H6",
-                "C3H8",
-                "IC4H10",
-                "NC5H12",
-                "NC6H14",
-                "NC7H16",
-                "CO",
-                "H2",
-                "NH3",
-            ]
-        ):
+        for i in range(num_species()):
             if cb_X[i] > 1e-10:
+                name = species_name(i)
                 ct_name = species_mapping.get(name, name)
                 if ct_name in gas.species_names:
                     ct_species[ct_name] = cb_X[i]
@@ -324,24 +307,6 @@ class TestReformingEquilibrium:
     Cantera uses restricted species to match the same partial equilibrium model.
     """
 
-    SPECIES_ORDER = [
-        "N2",
-        "O2",
-        "AR",
-        "CO2",
-        "H2O",
-        "CH4",
-        "C2H6",
-        "C3H8",
-        "IC4H10",
-        "NC5H12",
-        "NC6H14",
-        "NC7H16",
-        "CO",
-        "H2",
-        "NH3",
-    ]
-
     @pytest.fixture
     def reforming_gas(self, cantera):
         """Cantera gas restricted to reforming + WGS species."""
@@ -358,8 +323,9 @@ class TestReformingEquilibrium:
 
     def set_cantera_composition(self, gas, cb_X, species_mapping):
         ct_species = {}
-        for i, name in enumerate(self.SPECIES_ORDER):
+        for i in range(num_species()):
             if cb_X[i] > 1e-10:
+                name = species_name(i)
                 ct_name = species_mapping.get(name, name)
                 if ct_name in gas.species_names:
                     ct_species[ct_name] = cb_X[i]
@@ -511,31 +477,15 @@ class TestReformingEquilibrium:
 class TestCombustionEquilibrium:
     """Validate combustion_equilibrium against Cantera full equilibrium."""
 
-    SPECIES_ORDER = [
-        "N2",
-        "O2",
-        "AR",
-        "CO2",
-        "H2O",
-        "CH4",
-        "C2H6",
-        "C3H8",
-        "IC4H10",
-        "NC5H12",
-        "NC6H14",
-        "NC7H16",
-        "CO",
-        "H2",
-    ]
-
     @pytest.fixture
     def gri30_gas(self, cantera):
         return cantera.Solution("gri30.yaml")
 
     def set_cantera_composition(self, gas, cb_X, species_mapping):
         ct_species = {}
-        for i, name in enumerate(self.SPECIES_ORDER):
+        for i in range(num_species()):
             if cb_X[i] > 1e-10:
+                name = species_name(i)
                 ct_name = species_mapping.get(name, name)
                 if ct_name in gas.species_names:
                     ct_species[ct_name] = cb_X[i]

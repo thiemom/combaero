@@ -6,23 +6,7 @@ import pytest
 
 import combaero as cb
 
-CB_SPECIES = [
-    "N2",
-    "O2",
-    "AR",
-    "CO2",
-    "H2O",
-    "CH4",
-    "C2H6",
-    "C3H8",
-    "IC4H10",
-    "NC5H12",
-    "NC6H14",
-    "NC7H16",
-    "CO",
-    "H2",
-    "NH3",
-]
+CB_SPECIES = list(cb.species.names)
 
 
 @pytest.fixture(scope="module")

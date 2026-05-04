@@ -202,7 +202,7 @@ class TestVariousCompositions:
 
     def test_pure_nitrogen(self):
         """Test with pure nitrogen."""
-        # Create pure N2 composition (14 species, N2 is index 0)
+        # Create pure N2 composition (N2 is index 0)
         X = [0.0] * cb.num_species()
         X[cb.species_index_from_name("N2")] = 1.0
         T = 300
@@ -215,7 +215,7 @@ class TestVariousCompositions:
 
     def test_pure_methane(self):
         """Test with pure methane."""
-        # Create pure CH4 composition (14 species, CH4 is index 5)
+        # Create pure CH4 composition (CH4 is index 5)
         X = [0.0] * cb.num_species()
         X[cb.species_index_from_name("CH4")] = 1.0
         T = 300
@@ -228,7 +228,7 @@ class TestVariousCompositions:
     def test_combustion_products(self):
         """Test with typical combustion products."""
         # Approximate post-combustion mixture
-        # Species order: N2, O2, AR, CO2, H2O, CH4, C2H6, C3H8, IC4H10, NC5H12, NC6H14, NC7H16, CO, H2
+        # Approximate post-combustion mixture using dynamic species indexing
         X = [0.0] * cb.num_species()
         X[cb.species_index_from_name("N2")] = 0.72
         X[cb.species_index_from_name("O2")] = 0.03

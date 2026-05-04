@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from combaero._core import num_species, species_index_from_name
+from combaero._core import num_species, species_index_from_name, species_name
 
 
 class TestStreamMixing:
@@ -15,26 +15,9 @@ class TestStreamMixing:
     def set_cantera_composition(self, gas, cb_X, species_mapping):
         """Set Cantera composition from CombAero mole fractions."""
         ct_species = {}
-        for i, name in enumerate(
-            [
-                "N2",
-                "O2",
-                "AR",
-                "CO2",
-                "H2O",
-                "CH4",
-                "C2H6",
-                "C3H8",
-                "IC4H10",
-                "NC5H12",
-                "NC6H14",
-                "NC7H16",
-                "CO",
-                "H2",
-                "NH3",
-            ]
-        ):
+        for i in range(num_species()):
             if cb_X[i] > 1e-10:
+                name = species_name(i)
                 ct_name = species_mapping.get(name, name)
                 ct_species[ct_name] = cb_X[i]
         gas.X = ct_species
@@ -272,26 +255,9 @@ class TestDensityCalculation:
     def set_cantera_composition(self, gas, cb_X, species_mapping):
         """Set Cantera composition from CombAero mole fractions."""
         ct_species = {}
-        for i, name in enumerate(
-            [
-                "N2",
-                "O2",
-                "AR",
-                "CO2",
-                "H2O",
-                "CH4",
-                "C2H6",
-                "C3H8",
-                "IC4H10",
-                "NC5H12",
-                "NC6H14",
-                "NC7H16",
-                "CO",
-                "H2",
-                "NH3",
-            ]
-        ):
+        for i in range(num_species()):
             if cb_X[i] > 1e-10:
+                name = species_name(i)
                 ct_name = species_mapping.get(name, name)
                 ct_species[ct_name] = cb_X[i]
         gas.X = ct_species
