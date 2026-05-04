@@ -1,10 +1,8 @@
 name: Publish combaero-gui to PyPI
 
 on:
-  workflow_run:
-    workflows: ["Publish to PyPI"]
-    types: [completed]
-    branches:
+  push:
+    tags:
       - 'v*'
   workflow_dispatch:
 
@@ -15,14 +13,10 @@ jobs:
   build:
     name: Build combaero-gui
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
 
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
 
       - uses: astral-sh/setup-uv@v7
