@@ -51,12 +51,13 @@ class NASACoeffs:
 
 @dataclass
 class TransportProps:
-    """Lennard-Jones transport properties."""
+    """Lennard-Jones / Stockmayer transport properties."""
 
     geometry: Geometry
     well_depth: float  # K
     diameter: float  # Angstrom
-    polarizability: float = 0.0  # Angstrom^3
+    polarizability: float = 0.0  # Angstrom^3; 0.0 is valid for non-polar species
+    dipole_moment: float = 0.0  # Debye; 0.0 for non-polar species
     rotational_relaxation: float = 0.0
 
 
@@ -197,6 +198,7 @@ def load_cantera_yaml(
                 well_depth=transport_data.get("well-depth", 0.0),
                 diameter=transport_data.get("diameter", 0.0),
                 polarizability=transport_data.get("polarizability", 0.0),
+                dipole_moment=transport_data.get("dipole", 0.0),
                 rotational_relaxation=transport_data.get("rotational-relaxation", 0.0),
             )
 
@@ -325,6 +327,7 @@ def load_merged_json(
                 well_depth=tr.get("well_depth", 0.0) or 0.0,
                 diameter=tr.get("diameter", 0.0) or 0.0,
                 polarizability=tr.get("polarizability", 0.0) or 0.0,
+                dipole_moment=tr.get("dipole", 0.0) or tr.get("dipole_moment", 0.0) or 0.0,
                 rotational_relaxation=tr.get("rotational_relaxation", 0.0) or 0.0,
             )
 
@@ -514,9 +517,11 @@ using NASA_Coeffs = NASA9_Coeffs;
 
 struct Transport_Props {
     MolecularGeometry geometry;
-    double well_depth;
-    double diameter;
-    double polarizability;
+    double well_depth;      // epsilon/k_B [K]
+    double diameter;        // sigma [Ang]
+    double polarizability;  // alpha [Ang^3]; 0.0 for non-polar
+    double dipole_moment;   // mu [Debye]; 0.0 for non-polar
+    double z_rot;           // rotational relaxation collision number [-]
 };
 
 struct Molecular_Structure {
@@ -575,19 +580,22 @@ using G = MolecularGeometry;
     # Transport properties
     output.write("const std::vector<Transport_Props> transport_props = {\n")
     transport_entries = []
+    geom_map = {
+        Geometry.ATOM: "G::Atom",
+        Geometry.LINEAR: "G::Linear",
+        Geometry.NONLINEAR: "G::Nonlinear",
+    }
     for sp in species:
         if sp.transport:
             t = sp.transport
             pol_str = format_double(t.polarizability)
-            geom_map = {
-                Geometry.ATOM: "G::Atom",
-                Geometry.LINEAR: "G::Linear",
-                Geometry.NONLINEAR: "G::Nonlinear",
-            }
+            dip_str = format_double(t.dipole_moment)
             geom_cpp = geom_map.get(t.geometry, "G::Nonlinear")
-            transport_entries.append(f"{{{geom_cpp}, {t.well_depth}, {t.diameter}, {pol_str}}}")
+            transport_entries.append(
+                f"{{{geom_cpp}, {t.well_depth}, {t.diameter}, {pol_str}, {dip_str}, {t.rotational_relaxation}}}"
+            )
         else:
-            transport_entries.append("{G::Nonlinear, 0.0, 0.0, 0.0}")
+            transport_entries.append("{G::Nonlinear, 0.0, 0.0, 0.0, 0.0, 0.0}")
 
     output.write(",\n".join(transport_entries))
     output.write("\n};\n\n")

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Polar molecule transport model (Monchick-Mason Omega*(2,2) table, 37 T* x 8 delta* points):
+  - `Transport_Props` struct gains `dipole_moment` [Debye] and `z_rot` fields.
+  - `omega22()` refactored to accept `(T_star, delta_star)` and bilinearly interpolate
+    the full Monchick-Mason table (same table as Cantera's `MMCollisionInt`).
+  - `compute_delta_star()` helper computes reduced dipole moment in SI.
+  - Thermal conductivity upgraded from simple Eucken to Mason-Monchick modified Eucken
+    with Parker Z_rot temperature correction (matches Cantera's `fitProperties` formula).
+  - All 15 species entries updated with `dipole_moment` and `z_rot` (GRI-Mech 3.0 values).
+  - H2O dipole was previously missing; now correctly set to 1.844 D.
+  - NH3 polarizability corrected from 0.0 to 2.100 A^3.
+  - `generate_thermo_data.py` updated to emit both new fields; `TransportProps` dataclass
+    extended with `dipole_moment` field.
+- Polar species Cantera validation tests (`TestPolarSpeciesTransport`): pure NH3 and H2O
+  viscosity/conductivity vs GRI-Mech at 300/1000/2000 K; NH3/air and H2O/N2 mixtures.
+
 ### Fixed
 - `combaero-gui` white page on fresh PyPI install: `frontend/dist/assets/` was not bundled in
   the wheel because the `**` glob in `package-data` is unreliable below setuptools 69; added an

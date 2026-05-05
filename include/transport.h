@@ -8,7 +8,7 @@ namespace combaero {
 
 // Collision integral functions
 double linear_interp(double x, const std::vector<double>& x_values, const std::vector<double>& y_values);
-double omega22(double T, double well_depth);
+double omega22(double T_star, double delta_star);
 
 // Transport properties
 double viscosity(double T, double P, const std::vector<double>& X);
