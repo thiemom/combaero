@@ -2,6 +2,9 @@ import type { EdgeProps } from "reactflow";
 import { EdgeLabelRenderer, getBezierPath } from "reactflow";
 import useStore from "../store/useStore";
 
+const ARROW_COLOR = "#ff9800";
+const MARKER_SIZE = 6;
+
 export default function ThermalEdge({
 	id,
 	sourceX,
@@ -11,7 +14,6 @@ export default function ThermalEdge({
 	sourcePosition,
 	targetPosition,
 	style = {},
-	markerEnd,
 	data,
 }: EdgeProps) {
 	const { unitPreferences } = useStore();
@@ -27,10 +29,15 @@ export default function ThermalEdge({
 		targetPosition,
 	});
 
+	const Q: number | undefined = data?.result?.Q;
+	const flowsForward = Q === undefined || Q >= 0;
+
+	const markerId = `thermal-arrow-${id}`;
+	const markerIdReverse = `thermal-arrow-reverse-${id}`;
+
 	let labelText = "Thermal";
 	let probeText = "";
-	if (data?.result?.Q !== undefined) {
-		const Q = data.result.Q;
+	if (Q !== undefined) {
 		const absQ = Math.abs(Q);
 		const formattedValue =
 			absQ >= 1000 ? `${(Q / 1000).toFixed(1)} kW` : `${Q.toFixed(1)} W`;
@@ -45,13 +52,11 @@ export default function ThermalEdge({
 			},
 		];
 
-		let targetX = data.probe_depth ?? 0;
-		let displayLabel = `d=${(targetX * scale).toFixed(unit === "mm" ? 1 : 3)}${unit}`;
+		let probeDepth = data.probe_depth ?? 0;
+		let displayLabel = `d=${(probeDepth * scale).toFixed(unit === "mm" ? 1 : 3)}${unit}`;
 
-		// 1. Resolve Preset to Depth and Label
 		if (data.probe_mode === "preset" && data.probe_preset) {
 			const { type, index } = data.probe_preset;
-			// Ensure index is valid for current layers
 			const safeIndex = Math.min(index, layers.length - 1);
 			const layer = layers[safeIndex];
 
@@ -62,25 +67,22 @@ export default function ThermalEdge({
 
 			const L = layer?.thickness || 0;
 			if (type === "hot") {
-				targetX = runningX;
-				displayLabel = `L${safeIndex + 1} hot`;
+				probeDepth = runningX;
+				displayLabel = `L${safeIndex + 1} ${flowsForward ? "hot" : "cold"}`;
 			} else if (type === "avg") {
-				targetX = runningX + L / 2;
+				probeDepth = runningX + L / 2;
 				displayLabel = `L${safeIndex + 1} avg`;
 			} else {
-				targetX = runningX + L;
-				displayLabel = `L${safeIndex + 1} cold`;
+				probeDepth = runningX + L;
+				displayLabel = `L${safeIndex + 1} ${flowsForward ? "cold" : "hot"}`;
 			}
 		}
 
-		// 2. DIMENSION SAFETY GUARD
-		// For N layers, we expect N+1 interface temperatures.
-		// If structure changed but solve hasn't run, temps array will be the wrong size.
 		if (temps.length !== layers.length + 1) {
 			probeText = `${displayLabel}: (solve needed)`;
 		} else {
 			let probeTemp: number | null = null;
-			if (targetX <= 0) {
+			if (probeDepth <= 0) {
 				probeTemp = temps[0];
 			} else {
 				let found = false;
@@ -88,9 +90,8 @@ export default function ThermalEdge({
 				for (let i = 0; i < layers.length; i++) {
 					const t = layers[i].thickness;
 					const nextX = iterX + t;
-					if (targetX <= nextX + 1e-9) {
-						// Add small epsilon to handle precision issues at interfaces
-						const frac = t > 0 ? (targetX - iterX) / t : 0;
+					if (probeDepth <= nextX + 1e-9) {
+						const frac = t > 0 ? (probeDepth - iterX) / t : 0;
 						probeTemp = temps[i] + frac * (temps[i + 1] - temps[i]);
 						found = true;
 						break;
@@ -108,31 +109,55 @@ export default function ThermalEdge({
 
 	return (
 		<>
-			{/* Transparent path to carry the solid marker without inheriting the dash array */}
+			<defs>
+				<marker
+					id={markerId}
+					markerWidth={MARKER_SIZE}
+					markerHeight={MARKER_SIZE}
+					refX={MARKER_SIZE}
+					refY={MARKER_SIZE / 2}
+					orient="auto"
+				>
+					<path
+						d={`M 0 0 L ${MARKER_SIZE} ${MARKER_SIZE / 2} L 0 ${MARKER_SIZE} z`}
+						fill={ARROW_COLOR}
+					/>
+				</marker>
+				<marker
+					id={markerIdReverse}
+					markerWidth={MARKER_SIZE}
+					markerHeight={MARKER_SIZE}
+					refX={0}
+					refY={MARKER_SIZE / 2}
+					orient="auto-start-reverse"
+				>
+					<path
+						d={`M 0 0 L ${MARKER_SIZE} ${MARKER_SIZE / 2} L 0 ${MARKER_SIZE} z`}
+						fill={ARROW_COLOR}
+					/>
+				</marker>
+			</defs>
+			{/* Transparent wider path for hit-testing */}
 			<path
-				style={{
-					stroke: "transparent",
-					strokeWidth: 3,
-					fill: "none",
-					pointerEvents: "none",
-				}}
+				style={{ stroke: "transparent", strokeWidth: 10, fill: "none" }}
 				className="react-flow__edge-path"
 				d={edgePath}
-				markerEnd={markerEnd}
 			/>
-			{/* Visible dashed path for the connection line */}
+			{/* Visible dashed path with data-driven arrowhead */}
 			<path
 				id={id}
 				style={{
 					...style,
 					strokeWidth: 3,
-					stroke: "#ff9800",
+					stroke: ARROW_COLOR,
 					strokeDasharray: "5,5",
 					opacity: 0.8,
 					fill: "none",
 				}}
 				className="react-flow__edge-path"
 				d={edgePath}
+				markerEnd={flowsForward ? `url(#${markerId})` : undefined}
+				markerStart={!flowsForward ? `url(#${markerIdReverse})` : undefined}
 			/>
 			<EdgeLabelRenderer>
 				<div
@@ -143,8 +168,8 @@ export default function ThermalEdge({
 						padding: "2px 6px",
 						borderRadius: "4px",
 						fontSize: "12px",
-						color: "#ff9800",
-						border: "2px solid #ff9800",
+						color: ARROW_COLOR,
+						border: `2px solid ${ARROW_COLOR}`,
 						pointerEvents: "all",
 					}}
 					className="nodrag nopan flex flex-col items-center shadow-sm"
@@ -155,7 +180,6 @@ export default function ThermalEdge({
 						</span>
 					)}
 					<span style={{ fontWeight: 700 }}>{labelText}</span>
-
 					{probeText && (
 						<span
 							style={{ fontWeight: 400 }}
