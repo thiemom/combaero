@@ -238,7 +238,9 @@ Auto-generated. Do not edit manually. Contains:
 - `species_index` — `std::unordered_map<std::string, int>` for O(1) lookup
 - `molar_masses` — `std::vector<double>` [g/mol]
 - `nasa_coeffs` — NASA-7 or NASA-9 structs depending on `--prefer-nasa9`
-- `transport_props` — Lennard-Jones parameters
+- `transport_props` — Lennard-Jones / Stockmayer transport parameters per species:
+  geometry, well_depth [K], diameter [Ang], polarizability [Ang³],
+  dipole_moment [Debye] (0.0 for non-polar), z_rot [-]
 - `molecular_structures` — atomic composition (C, H, O, N counts)
 
 ---

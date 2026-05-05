@@ -39,9 +39,11 @@ enum class MolecularGeometry : std::uint8_t { Atom, Linear, Nonlinear };
 
 struct Transport_Props {
     MolecularGeometry geometry;
-    double well_depth;
-    double diameter;
-    double polarizability;
+    double well_depth;      // epsilon/k_B [K]
+    double diameter;        // sigma [Ang]
+    double polarizability;  // alpha [Ang^3]; 0.0 for non-polar
+    double dipole_moment;   // mu [Debye]; 0.0 for non-polar
+    double z_rot;           // rotational relaxation collision number [-]
 };
 
 struct Molecular_Structure {
@@ -94,21 +96,21 @@ const std::vector<NASA_Coeffs> nasa_coeffs = {
 };
 
 const std::vector<Transport_Props> transport_props = {
-{G::Linear, 97.839, 3.61, 1.756},
-{G::Linear, 676.424, 3.069, 1.487},
-{G::Atom, 127.697, 3.462, 1.609},
-{G::Linear, 244.0, 3.763, 2.65},
-{G::Nonlinear, 637.056, 2.943, 1.407},
-{G::Nonlinear, 141.4, 3.746, 2.6},
-{G::Nonlinear, 247.5, 4.35, 0.0},
-{G::Nonlinear, 303.4, 4.81, 0.0},
-{G::Nonlinear, 335.7, 5.208, 0.0},
-{G::Nonlinear, 391.7, 5.591, 0.0},
-{G::Nonlinear, 427.4, 5.946, 0.0},
-{G::Nonlinear, 459.6, 6.253, 0.0},
-{G::Linear, 98.1, 3.65, 1.95},
-{G::Linear, 304.69, 2.19, 0.775},
-{G::Nonlinear, 481.0, 2.92, 0.0}
+{G::Linear, 97.839, 3.61, 1.756, 0.0, 4.0},
+{G::Linear, 676.424, 3.069, 1.487, 0.0, 3.8},
+{G::Atom, 127.697, 3.462, 1.609, 0.0, 0.0},
+{G::Linear, 244.0, 3.763, 2.65, 0.0, 2.1},
+{G::Nonlinear, 637.056, 2.943, 1.407, 1.844, 4.0},
+{G::Nonlinear, 141.4, 3.746, 2.6, 0.0, 13.0},
+{G::Nonlinear, 247.5, 4.35, 0.0, 0.0, 1.5},
+{G::Nonlinear, 303.4, 4.81, 0.0, 0.0, 1.0},
+{G::Nonlinear, 335.7, 5.208, 0.0, 0.0, 1.0},
+{G::Nonlinear, 391.7, 5.591, 0.0, 0.0, 1.0},
+{G::Nonlinear, 427.4, 5.946, 0.0, 0.0, 1.0},
+{G::Nonlinear, 459.6, 6.253, 0.0, 0.0, 1.0},
+{G::Linear, 98.1, 3.65, 1.95, 0.112, 1.8},
+{G::Linear, 304.69, 2.19, 0.775, 0.0, 280.0},
+{G::Nonlinear, 481.0, 2.92, 2.1, 1.4718, 10.0}
 };
 
 const std::vector<Molecular_Structure> molecular_structures = {
