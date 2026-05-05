@@ -19,7 +19,6 @@ of them and the extractor will merge them.
 - Or convert Chemkin-format files with `ck2yaml`:
 
 ```bash
-# Example: convert NUIGMech1.1 Chemkin files to Cantera YAML
 ck2yaml \
     --thermo NUIGMech1.1.THERM \
     --transport NUIGMech1.1.TRAN \
@@ -33,29 +32,31 @@ ck2yaml \
 
 ### Step 2 — Extract species data
 
+The current species list is recorded in `.generator_state.json`. Read it to
+build the `-s` argument: take all existing species and append the new one(s).
+
 ```bash
 cd thermo_data_generator
 
-# Single YAML source
+# Single YAML source (transport data for all species in one mechanism)
 uv run extract_species_data.py \
     --yaml JetSurf2.yaml \
-    -s N2 O2 AR CO2 H2O CH4 C2H6 C3H8 IC4H10 NC5H12 NC6H14 NC7H16 CO H2 \
+    -s N2 O2 AR CO2 H2O CH4 C2H6 C3H8 IC4H10 NC5H12 NC6H14 NC7H16 CO H2 NEW_SPECIES \
     -o merged_species.json
 
-# Multiple YAML sources — transport data split across mechanisms
-# First file wins on conflict; add fallback files after the primary source.
-# Example: adding NH3, whose transport data lives in a combustion mechanism
-# but not in JetSurf2.
+# Multiple YAML sources — when transport data is split across mechanisms.
+# First file wins on conflict; later files fill gaps.
 uv run extract_species_data.py \
-    --yaml JetSurf2.yaml NUIGMech1.1.yaml \
-    -s N2 O2 AR CO2 H2O CH4 C2H6 C3H8 IC4H10 NC5H12 NC6H14 NC7H16 CO H2 NH3 \
+    --yaml JetSurf2.yaml secondary.yaml \
+    -s N2 O2 AR CO2 H2O CH4 C2H6 C3H8 IC4H10 NC5H12 NC6H14 NC7H16 CO H2 NEW_SPECIES \
     -o merged_species.json
 
-# Full pipeline: multiple YAMLs for transport + CEA for NASA-9 thermo
+# Add NASA-9 thermo via CEA (higher accuracy, wider T range).
+# YAML still supplies transport; CEA overlays thermo.
 uv run extract_species_data.py \
-    --yaml JetSurf2.yaml NUIGMech1.1.yaml \
+    --yaml JetSurf2.yaml secondary.yaml \
     --cea cea_output.txt \
-    -s N2 O2 NH3 \
+    -s N2 O2 AR CO2 H2O CH4 C2H6 C3H8 IC4H10 NC5H12 NC6H14 NC7H16 CO H2 NEW_SPECIES \
     -o merged_species.json
 ```
 
@@ -64,18 +65,18 @@ on demand).
 
 ### Step 3 — Add the common name (manual)
 
-`include/common_names.h` maps formula → human-readable name (e.g. `NH3` →
-`"Ammonia"`). This is the **only manual step** in the workflow — common names
-are editorial choices that cannot be derived automatically.
+`include/common_names.h` maps formula → human-readable name. This is the
+**only manual step** — common names are editorial choices that cannot be
+derived automatically.
 
 Edit **both** maps:
 
 ```cpp
 // formula_to_name
-{"NH3", "Ammonia"},
+{"NEW_SPECIES", "Human Readable Name"},
 
 // name_to_formula
-{"Ammonia", "NH3"},
+{"Human Readable Name", "NEW_SPECIES"},
 ```
 
 Both maps must stay in sync. The pre-commit hook `check-common-names.sh` will
@@ -83,17 +84,19 @@ catch any missing entries.
 
 ### Step 4 — Regenerate the C++ header
 
+Use the species list from `.generator_state.json` plus your new species:
+
 ```bash
 uv run generate_thermo_data.py \
     --json merged_species.json \
-    --species "N2,O2,AR,CO2,H2O,CH4,C2H6,C3H8,IC4H10,NC5H12,NC6H14,NC7H16,CO,H2,NH3" \
+    --species "N2,O2,AR,CO2,H2O,CH4,C2H6,C3H8,IC4H10,NC5H12,NC6H14,NC7H16,CO,H2,NEW_SPECIES" \
     --prefer-nasa9 \
-    --check-names \
+    --check-names --strict \
     --output ../include/thermo_transport_data.h
 ```
 
-`--check-names` verifies every species in the list has an entry in
-`common_names.h`. Use `--strict` to make this a hard error.
+`--check-names --strict` exits non-zero if any species is missing a common name
+entry in `common_names.h` — catches Step 3 omissions before the build.
 
 ### Step 5 — Rebuild the C++ extension
 
@@ -113,8 +116,7 @@ uv run pytest python/tests/ -v
 ```
 
 The test suite and GUI adapt automatically — there are no hardcoded species
-counts anywhere in tests, Python bindings, or the GUI. Adding a species only
-requires the steps above.
+counts or lists in tests, Python bindings, or the GUI.
 
 ### What adapts automatically
 
@@ -122,7 +124,8 @@ requires the steps above.
 |-------|--------------|
 | C++ library | Loops use `species_names.size()` — no hardcoded counts |
 | Python API (`cb.species`) | Reads count from C++ core at import time |
-| Python tests | All use `cb.species.num_species` dynamically |
+| Python unit tests | All use `cb.species.num_species` / `cb.num_species()` dynamically |
+| Cantera validation tests | All use `num_species()` + `species_name(i)` from `_core` |
 | GUI backend (`/metadata/species`) | Returns `cb.species.names` from C++ |
 | GUI frontend | Fetches species list from API at startup |
 
@@ -218,20 +221,14 @@ and falls back to NASA-7 otherwise.
 
 ### JSON (`merged_species.json`)
 
-```json
-{
-  "sources": ["JetSurf2.yaml", "NUIGMech1.1.yaml"],
-  "species": [
-    {
-      "name": "NH3",
-      "name_normalized": "NH3",
-      "molar_mass": 17.031,
-      "thermo_nasa7": { "T_min": 200, "T_mid": 1000, "T_max": 6000, "..." },
-      "transport": { "geometry": "nonlinear", "well_depth": 481.0, "..." }
-    }
-  ]
-}
-```
+Intermediate file, gitignored. Contains merged thermo and transport data from
+all sources. Passed to `generate_thermo_data.py`.
+
+### Generator state (`.generator_state.json`)
+
+Tracked in git. Records the species list, JSON source path, and NASA format
+used in the last successful generation — the canonical reference for what is
+currently in `thermo_transport_data.h`.
 
 ### C++ Header (`include/thermo_transport_data.h`)
 
