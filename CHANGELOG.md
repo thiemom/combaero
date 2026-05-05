@@ -11,10 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `combaero-gui` white page on fresh PyPI install: `frontend/dist/assets/` was not bundled in
   the wheel because the `**` glob in `package-data` is unreliable below setuptools 69; added an
   explicit `assets/*` pattern and a `MANIFEST.in` as belt-and-suspenders.
+- Silent NH3 composition drop in `TestTransportProperties` and `TestCombustionEquilibrium`
+  Cantera validation tests: hardcoded 14-item species lists were missing NH3 (index 14), so
+  any NH3 mole fraction was silently discarded when building the Cantera composition dict.
+- Floating-point precision failure in `test_channel_ribbed_jacobians` on Linux: the
+  `dq/dT_hot == -h` identity is exact analytically but accumulated ~4 × 10⁻¹⁴ rounding
+  error after NH3 extended `dry_air()` from 14 to 15 elements; replaced exact equality with
+  `abs(...) < 1e-9` (matching the pattern used elsewhere in the same file).
 
 ### Added
 - Ammonia (NH3) species to the thermodynamic and transport database.
 - Dynamic species count support in C++ and Python test suites to prevent regressions when modifying the database.
+- Cantera validation tests fully migrated to dynamic species API (`num_species()` /
+  `species_name(i)` from `combaero._core`); hardcoded species lists removed from all
+  `set_cantera_composition` helpers and `SPECIES_ORDER` / `CB_SPECIES` constants.
 - `scripts/test-pypi-wheel.sh`: local pre-publish wheel verification — builds both wheels,
   inspects the GUI wheel for bundled assets, installs in an isolated venv, and smoke-tests that
   the server starts and serves JS with the correct MIME type.
