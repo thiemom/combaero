@@ -22,7 +22,7 @@ fi
 SPECIES=$(.venv/bin/python3 -c "import json; d=json.load(open('$SIDECAR')); print(','.join(d['species']))")
 JSON_SOURCE=$(.venv/bin/python3 -c "import json; d=json.load(open('$SIDECAR')); print(d['json_source'])")
 
-TMPFILE=$(mktemp /tmp/thermo_transport_data_XXXXXX.h)
+TMPFILE=$(mktemp "${TMPDIR:-/tmp}/thermo_transport_data_XXXXXX.h")
 trap 'rm -f "$TMPFILE"' EXIT
 
 .venv/bin/python thermo_data_generator/generate_thermo_data.py \

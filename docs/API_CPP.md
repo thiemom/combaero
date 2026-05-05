@@ -133,6 +133,29 @@ double thermal_diffusivity(double T, double P, const std::vector<double>& X);
 double reynolds_from_state(double rho, double v, double L, double mu);
 ```
 
+### Transport Model
+
+Viscosity uses Chapman-Enskog kinetic theory with the Monchick-Mason
+Omega*(2,2) collision integral (37 x 8 bilinear table in T* and delta*).
+Polar species (H2O, NH3, CO) use the full 2D table; non-polar species use the
+delta*=0 column. Mixture viscosity uses the Wilke mixing rule.
+
+Thermal conductivity uses the Mason-Monchick modified Eucken formula with
+Parker Z_rot temperature correction, matching the Cantera GasTransport model.
+
+Species transport parameters are stored in `transport_props` (thermo_transport_data.h):
+
+```cpp
+struct Transport_Props {
+    MolecularGeometry geometry;  // Atom, Linear, or Nonlinear
+    double well_depth;           // epsilon/k_B [K]
+    double diameter;             // sigma [Ang]
+    double polarizability;       // alpha [Ang^3]; 0.0 for non-polar
+    double dipole_moment;        // mu [Debye]; 0.0 for non-polar
+    double z_rot;                // rotational relaxation collision number [-]
+};
+```
+
 ---
 
 ## Combustion (combustion.h)
