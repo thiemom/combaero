@@ -1272,6 +1272,7 @@ const Inspector = () => {
 			];
 
 			let targetX = targetX_manual;
+			let hotSideShortcut = false;
 			if (
 				selectedEdge.data.probe_mode === "preset" &&
 				selectedEdge.data.probe_preset
@@ -1288,22 +1289,27 @@ const Inspector = () => {
 
 				const L = layer?.thickness || 0;
 				if (type === "hot") {
-					targetX = runningX;
+					targetX = flowsForward ? runningX : runningX + L;
 					probeLabel = `L${safeIndex + 1} ${flowsForward ? "Hot" : "Cold"} Side`;
 				} else if (type === "avg") {
 					targetX = runningX + L / 2;
 					probeLabel = `L${safeIndex + 1} Average`;
 				} else {
-					targetX = runningX + L;
+					targetX = flowsForward ? runningX + L : runningX;
 					probeLabel = `L${safeIndex + 1} ${flowsForward ? "Cold" : "Hot"} Side`;
 				}
+			} else if (!selectedEdge.data.probe_mode) {
+				hotSideShortcut = true;
+				probeLabel = "Hot Side";
 			} else {
 				const scale = unitPreferences.length === "mm" ? 1000 : 1;
 				probeLabel = `Custom Depth d=${(targetX * scale).toFixed(unitPreferences.length === "mm" ? 1 : 3)}${unitPreferences.length}`;
 			}
 
 			if (tInt.length === layers.length + 1) {
-				if (targetX <= 0) {
+				if (hotSideShortcut) {
+					probeTemp = flowsForward ? tInt[0] : tInt[tInt.length - 1];
+				} else if (targetX <= 0) {
 					probeTemp = tInt[0];
 				} else {
 					let found = false;
@@ -1319,7 +1325,7 @@ const Inspector = () => {
 						}
 						iterX = nextX;
 					}
-					if (!found) probeTemp = tInt[tInt.length - 1]; // Beyond cold side
+					if (!found) probeTemp = tInt[tInt.length - 1];
 				}
 			} else {
 				probeLabel = "(solve needed)";
@@ -1493,9 +1499,6 @@ const Inspector = () => {
 							placeholder="0.00"
 						/>
 					)}
-					<span className="text-[9px] text-gray-400 font-normal italic text-right -mt-1">
-						{flowsForward ? "0 = Hot, L = Cold" : "0 = Cold, L = Hot"}
-					</span>
 				</div>
 
 				{selectedEdge.data.result && (

@@ -5,6 +5,15 @@ import useStore from "../store/useStore";
 const ARROW_COLOR = "#ff9800";
 const MARKER_SIZE = 6;
 
+// Hot end: existing orange. Cool end: sky blue.
+// t=0 → hot, t=1 → cold.
+function thermalColor(t: number): string {
+	const r = Math.round(255 + (41 - 255) * t);
+	const g = Math.round(152 + (182 - 152) * t);
+	const b = Math.round(0 + (246 - 0) * t);
+	return `rgb(${r},${g},${b})`;
+}
+
 export default function ThermalEdge({
 	id,
 	sourceX,
@@ -32,6 +41,13 @@ export default function ThermalEdge({
 	const Q: number | undefined = data?.result?.Q;
 	const flowsForward = Q === undefined || Q >= 0;
 
+	const topoLayers: Array<{ thickness?: number }> = data?.layers || [
+		{ thickness: data?.thickness || 0.003 },
+	];
+	const nLayers = topoLayers.length;
+	const totalT =
+		topoLayers.reduce((s, l) => s + (l.thickness || 0.003), 0) || 0.003;
+
 	const markerId = `thermal-arrow-${id}`;
 	const markerIdReverse = `thermal-arrow-reverse-${id}`;
 
@@ -54,6 +70,7 @@ export default function ThermalEdge({
 
 		let probeDepth = data.probe_depth ?? 0;
 		let displayLabel = `d=${(probeDepth * scale).toFixed(unit === "mm" ? 1 : 3)}${unit}`;
+		let hotSideShortcut = false;
 
 		if (data.probe_mode === "preset" && data.probe_preset) {
 			const { type, index } = data.probe_preset;
@@ -67,22 +84,27 @@ export default function ThermalEdge({
 
 			const L = layer?.thickness || 0;
 			if (type === "hot") {
-				probeDepth = runningX;
+				probeDepth = flowsForward ? runningX : runningX + L;
 				displayLabel = `L${safeIndex + 1} ${flowsForward ? "hot" : "cold"}`;
 			} else if (type === "avg") {
 				probeDepth = runningX + L / 2;
 				displayLabel = `L${safeIndex + 1} avg`;
 			} else {
-				probeDepth = runningX + L;
+				probeDepth = flowsForward ? runningX + L : runningX;
 				displayLabel = `L${safeIndex + 1} ${flowsForward ? "cold" : "hot"}`;
 			}
+		} else if (!data.probe_mode) {
+			hotSideShortcut = true;
+			displayLabel = "hot side";
 		}
 
 		if (temps.length !== layers.length + 1) {
 			probeText = `${displayLabel}: (solve needed)`;
 		} else {
 			let probeTemp: number | null = null;
-			if (probeDepth <= 0) {
+			if (hotSideShortcut) {
+				probeTemp = flowsForward ? temps[0] : temps[temps.length - 1];
+			} else if (probeDepth <= 0) {
 				probeTemp = temps[0];
 			} else {
 				let found = false;
@@ -180,6 +202,64 @@ export default function ThermalEdge({
 						</span>
 					)}
 					<span style={{ fontWeight: 700 }}>{labelText}</span>
+					<div
+						style={{
+							display: "flex",
+							alignItems: "center",
+							gap: 3,
+							marginTop: 2,
+							width: "100%",
+						}}
+					>
+						<span
+							style={{
+								fontSize: 8,
+								fontWeight: 700,
+								color: ARROW_COLOR,
+								lineHeight: 1,
+								flexShrink: 0,
+							}}
+						>
+							L1
+						</span>
+						<div
+							style={{
+								display: "flex",
+								gap: 1,
+								height: 6,
+								flex: 1,
+								minWidth: 32,
+								borderRadius: 2,
+								overflow: "hidden",
+							}}
+						>
+							{topoLayers.map((layer, i) => {
+								const topo = nLayers <= 1 ? 0 : i / (nLayers - 1);
+								const t = flowsForward ? topo : 1 - topo;
+								return (
+									<div
+										key={i}
+										style={{
+											flex: (layer.thickness || 0.003) / totalT,
+											minWidth: 3,
+											background: thermalColor(t),
+										}}
+									/>
+								);
+							})}
+						</div>
+						<span
+							style={{
+								fontSize: 8,
+								fontWeight: 700,
+								color: ARROW_COLOR,
+								lineHeight: 1,
+								flexShrink: 0,
+							}}
+						>
+							L{nLayers}
+						</span>
+					</div>
 					{probeText && (
 						<span
 							style={{ fontWeight: 400 }}
