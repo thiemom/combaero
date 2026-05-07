@@ -1254,6 +1254,9 @@ const Inspector = () => {
 
 	// Edge Inspector
 	if (selectedEdge && selectedEdge.data?.type === "thermal") {
+		const edgeQ: number | undefined = selectedEdge.data.result?.Q;
+		const flowsForward = edgeQ === undefined || edgeQ >= 0;
+
 		let probeTemp: number | null = null;
 		let probeLabel = "Probe Temp";
 		if (selectedEdge.data.result?.T_interface) {
@@ -1269,6 +1272,7 @@ const Inspector = () => {
 			];
 
 			let targetX = targetX_manual;
+			let hotSideShortcut = false;
 			if (
 				selectedEdge.data.probe_mode === "preset" &&
 				selectedEdge.data.probe_preset
@@ -1285,22 +1289,27 @@ const Inspector = () => {
 
 				const L = layer?.thickness || 0;
 				if (type === "hot") {
-					targetX = runningX;
-					probeLabel = `L${safeIndex + 1} Hot Side`;
+					targetX = flowsForward ? runningX : runningX + L;
+					probeLabel = `L${safeIndex + 1} ${flowsForward ? "Hot" : "Cold"} Side`;
 				} else if (type === "avg") {
 					targetX = runningX + L / 2;
 					probeLabel = `L${safeIndex + 1} Average`;
 				} else {
-					targetX = runningX + L;
-					probeLabel = `L${safeIndex + 1} Cold Side`;
+					targetX = flowsForward ? runningX + L : runningX;
+					probeLabel = `L${safeIndex + 1} ${flowsForward ? "Cold" : "Hot"} Side`;
 				}
+			} else if (!selectedEdge.data.probe_mode) {
+				hotSideShortcut = true;
+				probeLabel = "Hot Side";
 			} else {
 				const scale = unitPreferences.length === "mm" ? 1000 : 1;
 				probeLabel = `Custom Depth d=${(targetX * scale).toFixed(unitPreferences.length === "mm" ? 1 : 3)}${unitPreferences.length}`;
 			}
 
 			if (tInt.length === layers.length + 1) {
-				if (targetX <= 0) {
+				if (hotSideShortcut) {
+					probeTemp = flowsForward ? tInt[0] : tInt[tInt.length - 1];
+				} else if (targetX <= 0) {
 					probeTemp = tInt[0];
 				} else {
 					let found = false;
@@ -1316,7 +1325,7 @@ const Inspector = () => {
 						}
 						iterX = nextX;
 					}
-					if (!found) probeTemp = tInt[tInt.length - 1]; // Beyond cold side
+					if (!found) probeTemp = tInt[tInt.length - 1];
 				}
 			} else {
 				probeLabel = "(solve needed)";
@@ -1450,9 +1459,13 @@ const Inspector = () => {
 						>
 							<option value="custom">Custom Position (d=x)</option>
 							{/* Predefined locations for Layer 1 */}
-							<option value="preset:hot:0">L1 Hot Side</option>
+							<option value="preset:hot:0">
+								L1 {flowsForward ? "Hot" : "Cold"} Side
+							</option>
 							<option value="preset:avg:0">L1 Average</option>
-							<option value="preset:cold:0">L1 Cold Side</option>
+							<option value="preset:cold:0">
+								L1 {flowsForward ? "Cold" : "Hot"} Side
+							</option>
 							{/* Dynamic locations for additional layers */}
 							{(selectedEdge.data.layers || [])
 								.slice(1)
@@ -1462,7 +1475,7 @@ const Inspector = () => {
 											L{i + 2} Average
 										</option>
 										<option value={`preset:cold:${i + 1}`}>
-											L{i + 2} Cold Side
+											L{i + 2} {flowsForward ? "Cold" : "Hot"} Side
 										</option>
 									</React.Fragment>
 								))}
@@ -1486,9 +1499,6 @@ const Inspector = () => {
 							placeholder="0.00"
 						/>
 					)}
-					<span className="text-[9px] text-gray-400 font-normal italic text-right -mt-1">
-						0 = Hot, L = Cold
-					</span>
 				</div>
 
 				{selectedEdge.data.result && (
@@ -1510,7 +1520,17 @@ const Inspector = () => {
 									Hot Side Wall Temp
 								</span>
 								<span className="font-mono text-xs font-black">
-									{selectedEdge.data.result.T_hot?.toFixed(1)} K
+									{(() => {
+										const tInt = selectedEdge.data.result.T_interface as
+											| number[]
+											| undefined;
+										if (tInt && tInt.length >= 2) {
+											return flowsForward
+												? tInt[0].toFixed(1)
+												: tInt[tInt.length - 1].toFixed(1);
+										}
+										return selectedEdge.data.result.T_hot?.toFixed(1);
+									})()} K
 								</span>
 							</div>
 							<div className="grid grid-cols-4 gap-1 pt-2 border-t border-stone-100">

@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Thermal wall GUI: arrow direction, probe hot/cold labels, dropdown options, depth hint
+  ("0 = Hot, L = Cold"), and "Hot Side Wall Temp" now all reflect the actual heat flow
+  direction from the solver (Q sign) rather than the topology of the drawn edge. Wiring a
+  thermal wall in either direction gives correct visual feedback without manual adjustment.
 - Polar molecule transport model (Monchick-Mason Omega*(2,2) table, 37 T* x 8 delta* points):
   - `Transport_Props` struct gains `dipole_moment` [Debye] and `z_rot` fields.
   - `omega22()` refactored to accept `(T_star, delta_star)` and bilinearly interpolate
