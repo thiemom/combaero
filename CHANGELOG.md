@@ -56,6 +56,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Narrowed `requires-python` to `>=3.12`; dropped `from __future__ import annotations` throughout
 - Self-referential `classmethod` return types migrated to `typing.Self`
 
+### Added
+- Tee junction pressure-loss model (Bassett 2001) in `include/tee_junction.h`:
+  - Pure K-coefficient functions K5, K6, K11, K12 with analytical dK/dq derivatives.
+  - `merging_tee_K_straight/branch` and `branching_tee_K_straight/branch`: blended,
+    smooth K functions valid for any real inputs (soft-lower protection, tanh blend for
+    topology reversal, no NaN or throws outside the validated range).
+  - `tee_check_inputs(q, psi, theta)` returns `TeeInputStatus` with per-parameter
+    validity flags and an overall `CorrelationStatus` (Valid / Extrapolated).
+  - `soft_lower(x, lo)`: smooth max(x, lo) using sqrt regularisation.
+- `TeeJunctionResult` struct and `merging_tee_residuals_and_jacobian` /
+  `branching_tee_residuals_and_jacobian` in `solver_interface.h/.cpp`: full Jacobians
+  w.r.t. mass-flow rates; FD Jacobians w.r.t. P, T, and species mass fractions.
+- Python bindings in `_core.cpp` exposing `TeeJunctionResult`, both residual functions,
+  and utility functions (`tee_K5`, `tee_K6`, `tee_K11`, `tee_K12`, `tee_blend_weight`,
+  `tee_check_inputs`, `merging/branching_tee_K_straight/branch`).
+- GTest suite `tests/test_tee_junction.cpp` (13 tests) and Python test suite
+  `python/tests/test_tee_junction.py` (19 tests) covering reference values, derivative
+  accuracy, zero-flow regularisation, robustness outside the validated range, and
+  Jacobian finite-difference verification.
+
 ## [0.2.6] - 2026-05-03
 
 ### Fixed

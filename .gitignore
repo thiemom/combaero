@@ -6,6 +6,7 @@ cmake-build-*/
 humidair_examples/
 cantera_examples/
 temp/
+docs/bassett
 
 # IDE files
 .idea/
@@ -116,3 +117,6 @@ gui/tmp/
 .package_tests/
 test_venv_env/
 test_uv_env/
+
+# Local validation data and reference papers
+docs/bassett/
