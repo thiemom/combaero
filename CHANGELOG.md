@@ -89,6 +89,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Network-level tee tests in `python/tests/test_tee_network.py` (15 tests): graph
   connectivity, solver convergence and mass conservation for both merging and
   branching configurations, Jacobian FD verification, and `validate()` error paths.
+- `TeeJunctionElement.diagnostics()` extended to expose C++-computed `K_straight`,
+  `K_branch`, and `correlation_extrapolated` (1.0 when Bassett inputs are outside the
+  validated range) alongside the existing `m_dot_com/straight/branch` and `q` fields.
 
 ## [0.2.6] - 2026-05-03
 

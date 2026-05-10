@@ -2706,10 +2706,41 @@ class TeeJunctionElement(NetworkElement):
     ) -> dict[str, float]:
         m_com = state_com.m_dot
         m_branch = state_branch.m_dot
-        q = m_branch / m_com if abs(m_com) > 1e-12 else 0.0
+        if self.tee_type == "merging":
+            res = cb._core.merging_tee_residuals_and_jacobian(
+                m_dot_com=m_com,
+                m_dot_branch=m_branch,
+                dP0_straight=state_straight.Pt - state_com.P,
+                dP0_branch=state_branch.Pt - state_com.P,
+                P_static_com=state_com.P,
+                T_com=state_com.T,
+                Y_com=state_com.Y,
+                theta=self.theta,
+                psi=self.psi,
+                F_C=self.F_C,
+                blend_k=self.blend_k,
+            )
+        else:
+            res = cb._core.branching_tee_residuals_and_jacobian(
+                m_dot_com=m_com,
+                m_dot_branch=m_branch,
+                dP0_straight=state_com.Pt - state_straight.P,
+                dP0_branch=state_com.Pt - state_branch.P,
+                P_static_com=state_com.P,
+                T_com=state_com.T,
+                Y_com=state_com.Y,
+                theta=self.theta,
+                psi=self.psi,
+                F_C=self.F_C,
+                blend_k=self.blend_k,
+            )
+        is_extrapolated = res.status != cb._core.CorrelationValidity.VALID
         return {
             "m_dot_com": float(m_com),
             "m_dot_straight": float(m_com - m_branch),
             "m_dot_branch": float(m_branch),
-            "q": float(q),
+            "q": float(res.q),
+            "K_straight": float(res.K_straight),
+            "K_branch": float(res.K_branch),
+            "correlation_extrapolated": 1.0 if is_extrapolated else 0.0,
         }
