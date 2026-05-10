@@ -75,6 +75,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `python/tests/test_tee_junction.py` (19 tests) covering reference values, derivative
   accuracy, zero-flow regularisation, robustness outside the validated range, and
   Jacobian finite-difference verification.
+- `TeeJunctionElement` network component: three-port flow element using Bassett 2001
+  coefficients, solvable via `NetworkSolver`.  Supports both merging and branching
+  tee configurations.  Unknowns are `{id}.m_dot_com` (total common-arm flow) and
+  `{id}.m_dot_branch`; straight flow is implicit.  Analytical Jacobian provided for
+  all unknowns including pressures, temperature, and species.
+- Multi-port element protocol on `NetworkElement`: `all_source_nodes()`,
+  `all_sink_nodes()`, `flow_at_node()`, `flow_jac_at_node()` extension points allow
+  N-port elements to integrate with the existing solver and graph topology without
+  breaking 2-port elements.
+- `NetworkSolver` Bernoulli-based initial guess for `TeeJunctionElement` mass flows
+  (A * sqrt(2*rho*dP)) to ensure Newton converges from a physically reasonable start.
+- Network-level tee tests in `python/tests/test_tee_network.py` (15 tests): graph
+  connectivity, solver convergence and mass conservation for both merging and
+  branching configurations, Jacobian FD verification, and `validate()` error paths.
 
 ## [0.2.6] - 2026-05-03
 

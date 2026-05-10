@@ -45,7 +45,7 @@ def test_validation_self_loop():
     graph.add_node(inlet)
 
     elem = LosslessConnectionElement("conn", "inlet", "inlet")
-    with pytest.raises(ValueError, match="Self-loops are not permitted"):
+    with pytest.raises(ValueError, match="duplicate"):
         graph.add_element(elem)
 
 

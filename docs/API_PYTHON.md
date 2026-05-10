@@ -416,7 +416,8 @@ energy = EnergyBoundary("energy", Q=50000)  # Heat addition [W]
 ```python
 from combaero.network import (
     OrificeElement, ChannelElement, EffectiveAreaConnectionElement,
-    LosslessConnectionElement, DiameterDischargeCoefficientConnectionElement
+    LosslessConnectionElement, DiameterDischargeCoefficientConnectionElement,
+    TeeJunctionElement,
 )
 
 # Flow elements
@@ -427,6 +428,21 @@ channel = ChannelElement("channel", "node2", "node3", length=2.0, diameter=0.05,
 effective_area = EffectiveAreaConnectionElement("ea", "node3", "node4", diameter=0.015958)
 lossless = LosslessConnectionElement("lossless", "node4", "node5")
 area_cd = DiameterDischargeCoefficientConnectionElement("area_cd", "node5", "node6", diameter=0.011284, Cd=0.7)
+
+# Three-port tee junction (Bassett 2001 pressure-loss model)
+import math
+# Merging tee: two inlets (straight_node, branch_node) -> one outlet (common_node)
+tee_merge = TeeJunctionElement(
+    "tee", common_node="outlet", straight_node="inlet_s", branch_node="inlet_b",
+    theta=math.pi / 2.0, F_C=0.01, psi=1.0, tee_type="merging",
+)
+# Branching tee: one inlet (common_node) -> two outlets (straight_node, branch_node)
+tee_branch = TeeJunctionElement(
+    "tee", common_node="inlet", straight_node="outlet_s", branch_node="outlet_b",
+    theta=math.pi / 2.0, F_C=0.01, psi=1.0, tee_type="branching",
+)
+# Solved unknowns: tee.m_dot_com (total), tee.m_dot_branch (branch arm)
+# Straight flow is implicit: m_dot_straight = m_dot_com - m_dot_branch
 ```
 
 ### Combustion Integration

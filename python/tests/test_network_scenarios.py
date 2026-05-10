@@ -199,7 +199,7 @@ def test_network_validation_edge_cases():
     graph.add_node(outlet)
 
     # Should raise ValueError for self-loop
-    with pytest.raises(ValueError, match="Self-loops are not permitted"):
+    with pytest.raises(ValueError, match="duplicate"):
         graph.add_element(
             OrificeElement(
                 "self_loop", "inlet", "inlet", Cd=0.6, diameter=0.079788, correlation="fixed"

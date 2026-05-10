@@ -55,7 +55,9 @@ class NetworkSolver:
 
     @staticmethod
     def _is_mdot_unknown(name: str) -> bool:
-        return name.endswith(".m_dot")
+        return (
+            name.endswith(".m_dot") or name.endswith(".m_dot_com") or name.endswith(".m_dot_branch")
+        )
 
     @staticmethod
     def _to_incompressible_regime(regime: str) -> str | None:
@@ -333,6 +335,34 @@ class NetworkSolver:
         p_guess = self._propagate_pressure_guess(ref)
         mdot_guess = self._propagate_mdot_guess(ref)
 
+        # Bernoulli-based initial guess for TeeJunctionElement unknowns.
+        # The generic mdot_guess propagator seeds from ref["m_dot"]=0.1 (arbitrary
+        # when no MassFlowBoundary exists), but tee flows scale as A*sqrt(2*rho*dP)
+        # which can be O(1) kg/s for typical pressure differences.  A factor-of-10
+        # error in the starting mass flow prevents Newton from converging.
+        from .components import TeeJunctionElement as _TeeJE
+
+        _ref_X_tee = list(cb.mass_to_mole(ref["Y"]))
+        _rho_tee = float(cb.density(ref["T"], ref["P"], _ref_X_tee))
+        _tee_branch_guess: dict[str, float] = {}
+        for _eid, _elem in self.network.elements.items():
+            if not isinstance(_elem, _TeeJE):
+                continue
+            _src = _elem.all_source_nodes()
+            _snk = _elem.all_sink_nodes()
+            _pt_src = max(float(getattr(self.network.nodes[n], "Pt", ref["P"])) for n in _src)
+            _pt_snk = min(float(getattr(self.network.nodes[n], "Pt", ref["P"])) for n in _snk)
+            _dP_total = max(_pt_src - _pt_snk, 1.0)
+            mdot_guess[_eid] = _elem.F_C * math.sqrt(2.0 * _rho_tee * _dP_total)
+            # Branch guess: Bernoulli estimate for the branch arm pressure drop.
+            if _elem.tee_type == "merging":
+                _pt_br = float(getattr(self.network.nodes[_elem.branch_node], "Pt", ref["P"]))
+                _dP_br = max(_pt_br - _pt_snk, 1.0)
+            else:
+                _pt_br = float(getattr(self.network.nodes[_elem.branch_node], "Pt", ref["P"]))
+                _dP_br = max(_pt_src - _pt_br, 1.0)
+            _tee_branch_guess[_eid] = _elem.F_C * math.sqrt(2.0 * _rho_tee * _dP_br)
+
         # Iterate through interior nodes and gather unknowns
         for node_id, node in self.network.nodes.items():
             if not isinstance(node, PressureBoundary):
@@ -365,8 +395,14 @@ class NetworkSolver:
                     guess_dict = getattr(element, "initial_guess", {})
                     if unk in guess_dict:
                         x0_list.append(guess_dict[unk])
-                    elif unk.endswith(".m_dot"):
+                    elif unk.endswith(".m_dot") or unk.endswith(".m_dot_com"):
                         x0_list.append(mdot_guess.get(elem_id, ref["m_dot"]))
+                    elif unk.endswith(".m_dot_branch"):
+                        x0_list.append(
+                            _tee_branch_guess.get(
+                                elem_id, mdot_guess.get(elem_id, ref["m_dot"]) * 0.5
+                            )
+                        )
                     else:
                         x0_list.append(1.0)
                 self._unknown_indices[elem_id] = list(range(start_idx, len(x0_list)))
@@ -399,13 +435,13 @@ class NetworkSolver:
             nid = queue.pop(0)
             order.append(nid)
             for elem in self.network.get_downstream_elements(nid):
-                to_id = elem.to_node
-                if to_id not in visited:
-                    up_elems = self.network.get_upstream_elements(to_id)
-                    # A node is ready if all its upstream 'from' nodes are visited
-                    if all(e.from_node in visited for e in up_elems):
-                        visited.add(to_id)
-                        queue.append(to_id)
+                for to_id in elem.all_sink_nodes():
+                    if to_id not in visited:
+                        up_elems = self.network.get_upstream_elements(to_id)
+                        # Ready when all source nodes of all upstream elements are visited
+                        if all(src in visited for e in up_elems for src in e.all_source_nodes()):
+                            visited.add(to_id)
+                            queue.append(to_id)
 
         # Cleanup: append any unvisited (cycles or islands)
         for nid in self.network.nodes:
@@ -599,15 +635,18 @@ class NetworkSolver:
                         )["Pt"] = 1.0
                 continue
 
-            up_states = []
+            # stream_info: (state, elem, src_nid) - one entry per upstream stream.
+            # Multi-port elements (e.g. TeeJunctionElement) contribute multiple entries.
+            stream_info: list[tuple] = []
             for elem in up_elems:
-                state_up = self._get_node_state(self.network.nodes[elem.from_node], x)
                 indices = self._unknown_indices.get(elem.id, [])
-                if indices:
-                    state_up.m_dot = x[indices[0]]
-                    # Tag state with element ID for momentum chamber Jacobian
-                    state_up._element_id = elem.id
-                up_states.append(state_up)
+                for src_nid in elem.all_source_nodes():
+                    state_up = self._get_node_state(self.network.nodes[src_nid], x)
+                    if indices:
+                        state_up.m_dot = elem.flow_at_node(src_nid, x, indices)
+                        state_up._element_id = elem.id
+                    stream_info.append((state_up, elem, src_nid))
+            up_states = [s for s, _, _ in stream_info]
 
             # Wall Coupling: evaluate walls BEFORE compute_derived_state
             # so that Q flows through the EnergyBoundary abstraction.
@@ -652,8 +691,9 @@ class NetworkSolver:
             # Sensitivity Relay (Chain-Rule)
             if mix_res:
                 n_species = self._n_species
-                for i, elem in enumerate(up_elems):
-                    from_nid = elem.from_node
+                # Iterate over stream_info (one entry per upstream stream, including
+                # multiple entries for multi-port elements like TeeJunctionElement).
+                for i, (_, elem, src_nid) in enumerate(stream_info):
                     t_jac = mix_res.dT_mix_d_stream[i]
                     pt_jac = mix_res.dP_total_mix_d_stream[i]
                     # dY_mix_d_stream is indexed by [species][stream]
@@ -662,18 +702,21 @@ class NetworkSolver:
                     # 1. Direct dependency on upstream mass flow (if it's a solver unknown)
                     m_indices = self._unknown_indices.get(elem.id)
                     if m_indices:
-                        idx = m_indices[0]
-                        node_relay = relay[nid].setdefault(
-                            idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt_mix": 0.0}
-                        )
-                        node_relay["T"] += t_jac.d_mdot
-                        node_relay["Pt_mix"] += pt_jac.d_mdot
-                        for k in range(n_species):
-                            node_relay["Y"][k] += y_jacs[k].d_mdot
+                        # flow_jac_at_node maps each unknown index to its coefficient
+                        # in d(stream_i.m_dot)/d(x). For 2-port: {idx: 1.0}. For tee:
+                        # may involve 2 unknowns (m_dot_com and m_dot_branch).
+                        for idx, coeff in elem.flow_jac_at_node(src_nid, m_indices).items():
+                            node_relay = relay[nid].setdefault(
+                                idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt_mix": 0.0}
+                            )
+                            node_relay["T"] += t_jac.d_mdot * coeff
+                            node_relay["Pt_mix"] += pt_jac.d_mdot * coeff
+                            for k in range(n_species):
+                                node_relay["Y"][k] += y_jacs[k].d_mdot * coeff
 
-                    # 2. Recursive dependency on upstream P/T/Y via from_node relay
-                    if from_nid in relay:
-                        for idx, sens_up in relay[from_nid].items():
+                    # 2. Recursive dependency on upstream P/T/Y via src_nid relay
+                    if src_nid in relay:
+                        for idx, sens_up in relay[src_nid].items():
                             node_relay = relay[nid].setdefault(
                                 idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt_mix": 0.0}
                             )
@@ -1029,11 +1072,12 @@ class NetworkSolver:
             for elem in upstream_elems:
                 indices = self._unknown_indices.get(elem.id)
                 if indices:
-                    m_dot_in += x[indices[0]]
+                    m_dot_in += elem.flow_at_node(node_id, x, indices)
                     if compute_jacobian:
-                        rows.append(mass_res_idx)
-                        cols.append(indices[0])
-                        data.append(1.0)
+                        for col, coeff in elem.flow_jac_at_node(node_id, indices).items():
+                            rows.append(mass_res_idx)
+                            cols.append(col)
+                            data.append(coeff)
                 else:
                     from_node = self.network.nodes[elem.from_node]
                     m_dot_in += getattr(from_node, "m_dot", 0.0)
@@ -1041,11 +1085,12 @@ class NetworkSolver:
             for elem in downstream_elems:
                 indices = self._unknown_indices.get(elem.id)
                 if indices:
-                    m_dot_out += x[indices[0]]
+                    m_dot_out += elem.flow_at_node(node_id, x, indices)
                     if compute_jacobian:
-                        rows.append(mass_res_idx)
-                        cols.append(indices[0])
-                        data.append(-1.0)
+                        for col, coeff in elem.flow_jac_at_node(node_id, indices).items():
+                            rows.append(mass_res_idx)
+                            cols.append(col)
+                            data.append(-coeff)
                 else:
                     to_node = self.network.nodes[elem.to_node]
                     m_dot_out += getattr(to_node, "m_dot", 0.0)
@@ -1053,22 +1098,36 @@ class NetworkSolver:
             res.append(m_dot_in - m_dot_out)
 
         # 2. Element Residuals
+        from .components import TeeJunctionElement
+
         for elem_id, element in self.network.elements.items():
             start_res_idx = len(res)
 
-            node_in = self.network.nodes[element.from_node]
-            node_out = self.network.nodes[element.to_node]
-
-            state_in = self._get_node_state(node_in, x)
-            state_out = self._get_node_state(node_out, x)
-
-            # Unpack element-specific unknowns (like m_dot) into the state
             m_indices = self._unknown_indices.get(elem_id)
-            if m_indices:
-                state_in.m_dot = x[m_indices[0]]
-                state_out.m_dot = x[m_indices[0]]
 
-            elem_res, elem_jac = element.residuals(state_in, state_out)
+            if isinstance(element, TeeJunctionElement):
+                nodes = self.network.nodes
+                state_com = self._get_node_state(nodes[element.common_node], x)
+                state_straight = self._get_node_state(nodes[element.straight_node], x)
+                state_branch = self._get_node_state(nodes[element.branch_node], x)
+                if m_indices:
+                    state_com.m_dot = float(x[m_indices[0]])
+                    state_branch.m_dot = float(x[m_indices[1]])
+                    state_straight.m_dot = float(x[m_indices[0]]) - float(x[m_indices[1]])
+                elem_res, elem_jac = element.residuals(state_com, state_straight, state_branch)
+            else:
+                node_in = self.network.nodes[element.from_node]
+                node_out = self.network.nodes[element.to_node]
+
+                state_in = self._get_node_state(node_in, x)
+                state_out = self._get_node_state(node_out, x)
+
+                # Unpack element-specific unknowns (like m_dot) into the state
+                if m_indices:
+                    state_in.m_dot = x[m_indices[0]]
+                    state_out.m_dot = x[m_indices[0]]
+
+                elem_res, elem_jac = element.residuals(state_in, state_out)
             res.extend(elem_res)
 
             if compute_jacobian:
@@ -1498,17 +1557,32 @@ class NetworkSolver:
                     sol_dict[f"{nid}.{key}"] = val
 
         # Element-specific diagnostics (e.g. throat Mach, P-ratio)
+        from .components import TeeJunctionElement as _TeeJunctionElement
+
         sol_dict["__element_diag__"] = {}
         for eid, element in self.network.elements.items():
-            state_in = self._get_node_state(self.network.nodes[element.from_node], final_x)
-            state_out = self._get_node_state(self.network.nodes[element.to_node], final_x)
-            # Inject solved m_dot so velocity-dependent diagnostics (e.g. Mach) are correct
             m_indices = self._unknown_indices.get(eid, [])
-            if m_indices:
-                m_solved = float(final_x[m_indices[0]])
-                state_in.m_dot = m_solved
-                state_out.m_dot = m_solved
-            diag = element.diagnostics(state_in, state_out)
+            if isinstance(element, _TeeJunctionElement):
+                nodes = self.network.nodes
+                state_com = self._get_node_state(nodes[element.common_node], final_x)
+                state_straight = self._get_node_state(nodes[element.straight_node], final_x)
+                state_branch = self._get_node_state(nodes[element.branch_node], final_x)
+                if m_indices:
+                    state_com.m_dot = float(final_x[m_indices[0]])
+                    state_branch.m_dot = float(final_x[m_indices[1]])
+                    state_straight.m_dot = float(final_x[m_indices[0]]) - float(
+                        final_x[m_indices[1]]
+                    )
+                diag = element.diagnostics(state_com, state_straight, state_branch)
+            else:
+                state_in = self._get_node_state(self.network.nodes[element.from_node], final_x)
+                state_out = self._get_node_state(self.network.nodes[element.to_node], final_x)
+                # Inject solved m_dot so velocity-dependent diagnostics (e.g. Mach) are correct
+                if m_indices:
+                    m_solved = float(final_x[m_indices[0]])
+                    state_in.m_dot = m_solved
+                    state_out.m_dot = m_solved
+                diag = element.diagnostics(state_in, state_out)
             sol_dict["__element_diag__"][eid] = diag
             for key, val in diag.items():
                 sol_dict[f"{eid}.{key}"] = val

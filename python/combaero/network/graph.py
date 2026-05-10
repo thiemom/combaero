@@ -35,31 +35,29 @@ class FlowNetwork:
 
     def add_element(self, element: NetworkElement) -> None:
         """
-        Register a new flow element. Connects the element to its from_node and
-        to_node, ensuring they exist in the network.
+        Register a new flow element. Connects the element to its source and sink
+        nodes, ensuring they exist in the network.
         """
         if element.id in self.elements:
             raise ValueError(f"Element '{element.id}' already exists in topology.")
 
-        if element.from_node not in self.nodes:
-            raise ValueError(f"Unknown from_node '{element.from_node}' for element {element.id}.")
+        all_nodes = element.all_source_nodes() + element.all_sink_nodes()
+        for nid in all_nodes:
+            if nid not in self.nodes:
+                raise ValueError(f"Unknown node '{nid}' for element '{element.id}'.")
 
-        if element.to_node not in self.nodes:
-            raise ValueError(f"Unknown to_node '{element.to_node}' for element {element.id}.")
-
-        if element.from_node == element.to_node:
+        if len(all_nodes) != len(set(all_nodes)):
             raise ValueError(
-                f"Element '{element.id}' has from_node == to_node ('{element.from_node}'). "
-                "Self-loops are not permitted."
+                f"Element '{element.id}' has duplicate nodes among its source/sink nodes."
             )
 
         self.elements[element.id] = element
 
-        # Element 'from_node' -> implies element is downstream of the from_node
-        self._downstream_of_node[element.from_node].append(element.id)
+        for src in element.all_source_nodes():
+            self._downstream_of_node[src].append(element.id)
 
-        # Element 'to_node' -> implies element is upstream of the to_node
-        self._upstream_of_node[element.to_node].append(element.id)
+        for snk in element.all_sink_nodes():
+            self._upstream_of_node[snk].append(element.id)
 
     def add_wall(self, wall: ThermalWall) -> None:
         """Register a thermal coupling wall between two elements.
@@ -119,9 +117,13 @@ class FlowNetwork:
             visited.add(nid)
             for eid in self._upstream_of_node[nid] + self._downstream_of_node[nid]:
                 elem = self.elements[eid]
-                neighbour = elem.from_node if elem.to_node == nid else elem.to_node
-                if neighbour not in visited:
-                    queue.append(neighbour)
+                if nid in elem.all_sink_nodes():
+                    neighbours = elem.all_source_nodes()
+                else:
+                    neighbours = elem.all_sink_nodes()
+                for nb in neighbours:
+                    if nb not in visited:
+                        queue.append(nb)
         return visited
 
     def validate(self) -> None:
