@@ -1,3 +1,5 @@
+import math as _math
+
 from combaero.network import (
     AreaChangeElement,
     ChannelElement,
@@ -20,6 +22,7 @@ from combaero.network import (
     PressureLossElement,
     RibbedModel,
     SmoothModel,
+    TeeJunctionElement,
     ThermalWall,
     WallLayer,
 )
@@ -45,6 +48,7 @@ from .schemas import (
     PressureBoundaryData,
     RibbedModelData,
     SmoothModelData,
+    TeeJunctionData,
     ThermalWallData,
 )
 
@@ -183,6 +187,37 @@ def _build_discrete_loss_correlation(
     return ConstantFractionLoss(xi=xi)
 
 
+def _find_tee_port(edges: list, tee_id: str, port: str, nodes_map: dict) -> str:
+    """Return the physical-node ID connected to a named tee port.
+
+    Checks both edge directions: tee as source (sourceHandle == port-X-source)
+    and tee as target (targetHandle == port-X-target).
+    Raises ValueError if the port is unconnected or connects to a non-physical node.
+    """
+    src_handle = f"port-{port}-source"
+    tgt_handle = f"port-{port}-target"
+    for edge in edges:
+        if edge.data and edge.data.get("type") == "thermal":
+            continue
+        if edge.source == tee_id and edge.sourceHandle == src_handle:
+            nid = edge.target
+        elif edge.target == tee_id and edge.targetHandle == tgt_handle:
+            nid = edge.source
+        else:
+            continue
+        if nid not in nodes_map:
+            raise ValueError(
+                f"Tee '{tee_id}' port '{port}' connects to '{nid}', which is not a "
+                "physical node (plenum or boundary). All tee ports must connect directly "
+                "to plena or boundaries."
+            )
+        return nid
+    raise ValueError(
+        f"Tee '{tee_id}' port '{port}' is not connected. "
+        "All three tee ports (common, straight, branch) must be wired to a node."
+    )
+
+
 def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
     net = FlowNetwork()
     nodes_map = {}  # ID -> Physical Node
@@ -255,13 +290,20 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             element_nodes.append(node_schema)
 
     element_ids = {node.id for node in element_nodes}
+    tee_ids = {node.id for node in element_nodes if node.type == "tee_junction"}
 
     # 1b. Create implicit junction nodes for element -> element visual links.
+    # Tee junction ports connect directly to physical nodes -- never auto-junction them.
     edge_junction_map: dict[tuple[str, str], str] = {}
     for edge in schema.edges:
         if edge.data and edge.data.get("type") == "thermal":
             continue
-        if edge.source in element_ids and edge.target in element_ids:
+        if (
+            edge.source in element_ids
+            and edge.target in element_ids
+            and edge.source not in tee_ids
+            and edge.target not in tee_ids
+        ):
             junction_id = f"__junction__{edge.source}__{edge.target}"
             if junction_id not in nodes_map:
                 junction_node = MomentumChamberNode(junction_id)
@@ -273,6 +315,24 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
     for elem_node_schema in element_nodes:
         elem_id = elem_node_schema.id
         elem_data = elem_node_schema.data
+        elem_type = elem_node_schema.type
+
+        # 3-port element: bypass the 2-port source/target logic entirely.
+        if elem_type == "tee_junction":
+            _d = TeeJunctionData(**elem_data)
+            net.add_element(
+                TeeJunctionElement(
+                    id=elem_id,
+                    common_node=_find_tee_port(schema.edges, elem_id, "common", nodes_map),
+                    straight_node=_find_tee_port(schema.edges, elem_id, "straight", nodes_map),
+                    branch_node=_find_tee_port(schema.edges, elem_id, "branch", nodes_map),
+                    theta=_math.radians(_d.theta_deg),
+                    F_C=_d.F_C,
+                    psi=_d.psi,
+                    tee_type=_d.tee_type,
+                )
+            )
+            continue
 
         source_id = None
         target_id = None
@@ -302,7 +362,6 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         if not source_id or not target_id:
             raise ValueError(f"Element '{elem_id}' is not fully connected.")
 
-        elem_type = elem_node_schema.type
         if elem_type == "channel":
             data = ChannelData(**elem_data)
             conv_area = 3.1415926535 * data.D * data.L

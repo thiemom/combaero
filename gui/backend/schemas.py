@@ -201,6 +201,15 @@ class LosslessConnectionData(BaseModel):
     pass
 
 
+class TeeJunctionData(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    label: str | None = None
+    tee_type: str = "merging"  # "merging" | "branching"
+    theta_deg: float = 90.0  # branch angle [deg], converted to radians in graph_builder
+    F_C: float = 0.01  # common-arm area [m^2]
+    psi: float = 1.0  # F_C / F_S area ratio
+
+
 class DiscreteLossData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     correlation_type: Literal[
@@ -292,6 +301,8 @@ class ReactFlowEdge(BaseModel):
     id: str
     source: str
     target: str
+    sourceHandle: str | None = None
+    targetHandle: str | None = None
     type: str | None = None
     data: dict | None = None
 
@@ -327,7 +338,7 @@ class NodeResult(BaseModel):
 
 class ElementResult(BaseModel):
     model_config = ConfigDict(extra="allow")
-    m_dot: float
+    m_dot: float = 0.0
     success: bool = True
 
 

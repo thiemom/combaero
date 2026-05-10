@@ -160,9 +160,9 @@ def _solve_sync(schema: NetworkGraphSchema):
     element_results = {}
     elem_diags = result.get("__element_diag__", {})
     for elem_id in net.elements:
-        m_dot = float(result.get(f"{elem_id}.m_dot", 0.0))
-        # Pull element diagnostics from the structured dict aggregated by solve()
         diag = elem_diags.get(elem_id, {}).copy()
+        # Tee junctions expose m_dot_com instead of m_dot; use it as primary metric.
+        m_dot = float(result.get(f"{elem_id}.m_dot", diag.get("m_dot_com", 0.0)))
         diag.pop("m_dot", None)
         element_results[elem_id] = ElementResult(m_dot=m_dot, success=success, **diag)
 

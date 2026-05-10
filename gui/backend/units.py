@@ -83,6 +83,13 @@ UNIT_MAP: dict[str, str] = {
     "h_a": "W/m²/K",
     "h_b": "W/m²/K",
     "Q": "W",
+    # --- Tee junction ---
+    "m_dot_com": "kg/s",
+    "m_dot_straight": "kg/s",
+    "m_dot_branch": "kg/s",
+    "q": "-",
+    "K_straight": "-",
+    "K_branch": "-",
     # --- Element diagnostics ---
     "xi": "-",
     "theta": "-",

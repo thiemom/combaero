@@ -652,6 +652,133 @@ const Inspector = () => {
 					</>
 				)}
 
+				{selectedNode.type === "tee_junction" && (
+					<div className="flex flex-col gap-4">
+						{/* Tee type */}
+						<div className="flex flex-col gap-2">
+							<label className="text-xs font-bold text-gray-500 uppercase">
+								Tee Type
+							</label>
+							<select
+								className="p-2 border rounded bg-white text-xs border-stone-200"
+								value={selectedNode.data.tee_type ?? "merging"}
+								onChange={(e) =>
+									updateNodeData(selectedNode.id, { tee_type: e.target.value })
+								}
+							>
+								<option value="merging">Merging (2 inlets, 1 outlet)</option>
+								<option value="branching">
+									Branching (1 inlet, 2 outlets)
+								</option>
+							</select>
+							<p className="text-[9px] text-gray-400 italic">
+								Declares intended flow direction; the Bassett model blends
+								smoothly if flow reverses.
+							</p>
+						</div>
+
+						{/* Branch angle */}
+						<div className="flex flex-col gap-2">
+							<label className="text-xs font-bold text-gray-500 uppercase">
+								Branch Angle (deg)
+							</label>
+							<NumericInput
+								value={selectedNode.data.theta_deg ?? 90}
+								onChange={(val) =>
+									updateNodeData(selectedNode.id, { theta_deg: val })
+								}
+								className="p-2 border rounded"
+								placeholder="90"
+							/>
+							<p className="text-[9px] text-gray-400 italic">
+								Angle between branch and common arm. Bassett (2001) valid range:
+								30–90 deg.
+							</p>
+						</div>
+
+						{/* Common arm area */}
+						<AreaInput
+							id={`F_C_${selectedNode.id}`}
+							label="Common Arm Area (F_C)"
+							value={selectedNode.data.F_C ?? 0.01}
+							onChange={(val) => updateNodeData(selectedNode.id, { F_C: val })}
+						/>
+
+						{/* Area ratio */}
+						<div className="flex flex-col gap-2">
+							<label className="text-xs font-bold text-gray-500 uppercase">
+								Area Ratio psi = F_C / F_S
+							</label>
+							<NumericInput
+								value={selectedNode.data.psi ?? 1.0}
+								onChange={(val) =>
+									updateNodeData(selectedNode.id, { psi: val })
+								}
+								className="p-2 border rounded"
+								placeholder="1.0"
+							/>
+							<p className="text-[9px] text-gray-400 italic">
+								Ratio of common-arm to straight-arm area. 1.0 = equal areas.
+							</p>
+						</div>
+
+						{/* Post-solve diagnostics */}
+						{selectedNode.data.result && (
+							<div className="border-t pt-3 flex flex-col gap-2">
+								<div className="text-[10px] font-bold text-stone-400 uppercase">
+									Flow Distribution
+								</div>
+								{selectedNode.data.result.correlation_extrapolated > 0 && (
+									<div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+										Inputs outside Bassett (2001) validated range -- results are
+										extrapolated.
+									</div>
+								)}
+								<div className="grid grid-cols-2 gap-x-2 gap-y-1 font-mono text-xs">
+									<span className="text-stone-400 text-[9px] font-bold uppercase">
+										ṁ common
+									</span>
+									<span className="font-bold">
+										{(selectedNode.data.result.m_dot_com ?? 0).toFixed(4)} kg/s
+									</span>
+									<span className="text-stone-400 text-[9px] font-bold uppercase">
+										ṁ straight
+									</span>
+									<span className="font-bold">
+										{(selectedNode.data.result.m_dot_straight ?? 0).toFixed(4)}{" "}
+										kg/s
+									</span>
+									<span className="text-stone-400 text-[9px] font-bold uppercase">
+										ṁ branch
+									</span>
+									<span className="font-bold">
+										{(selectedNode.data.result.m_dot_branch ?? 0).toFixed(4)}{" "}
+										kg/s
+									</span>
+									<span className="text-stone-400 text-[9px] font-bold uppercase">
+										q (branch ratio)
+									</span>
+									<span className="font-bold">
+										{(selectedNode.data.result.q ?? 0).toFixed(3)}
+									</span>
+									<span className="text-stone-400 text-[9px] font-bold uppercase">
+										K straight
+									</span>
+									<span className="font-bold">
+										{(selectedNode.data.result.K_straight ?? 0).toFixed(3)}
+									</span>
+									<span className="text-stone-400 text-[9px] font-bold uppercase">
+										K branch
+									</span>
+									<span className="font-bold">
+										{(selectedNode.data.result.K_branch ?? 0).toFixed(3)}
+									</span>
+								</div>
+							</div>
+						)}
+					</div>
+				)}
+
 				{selectedNode.type === "discrete_loss" &&
 					(() => {
 						// Compute default area from upstream node
