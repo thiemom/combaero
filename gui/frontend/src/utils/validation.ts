@@ -82,6 +82,18 @@ export function validateNetwork(nodes: Node[]): string[] {
 				errors.push(`${node.id}: Discrete loss zeta must be > 0`);
 			}
 		}
+		if (node.type === "tee_junction") {
+			const thetaDeg = node.data.theta_deg ?? 90;
+			if (Math.abs(thetaDeg) > 90) {
+				errors.push(
+					`${node.id}: Tee branch angle |theta| must be <= 90 deg, got ${thetaDeg} deg`,
+				);
+			}
+			if ((node.data.F_C ?? 0) <= 0)
+				errors.push(`${node.id}: Tee common arm area F_C must be > 0`);
+			if ((node.data.psi ?? 1) <= 0)
+				errors.push(`${node.id}: Tee area ratio psi must be > 0`);
+		}
 		if (node.type === "area_change") {
 			if ((node.data.F0 ?? 0.01) <= 0)
 				errors.push(`${node.id}: AreaChange Upstream Area (F0) must be > 0`);
