@@ -10,6 +10,7 @@ import OrificeNode from "./nodes/OrificeNode";
 import PlenumNode from "./nodes/PlenumNode";
 import PressureBoundaryNode from "./nodes/PressureBoundaryNode";
 import ProbeNode from "./nodes/ProbeNode";
+import TeeJunctionNode from "./nodes/TeeJunctionNode";
 import ThermalEdge from "./ThermalEdge";
 
 export const nodeTypes = {
@@ -24,6 +25,7 @@ export const nodeTypes = {
 	lossless_connection: LosslessNode,
 	probe: ProbeNode,
 	area_change: AreaChangeNode,
+	tee_junction: TeeJunctionNode,
 };
 
 export const edgeTypes = {

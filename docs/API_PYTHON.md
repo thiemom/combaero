@@ -416,7 +416,8 @@ energy = EnergyBoundary("energy", Q=50000)  # Heat addition [W]
 ```python
 from combaero.network import (
     OrificeElement, ChannelElement, EffectiveAreaConnectionElement,
-    LosslessConnectionElement, DiameterDischargeCoefficientConnectionElement
+    LosslessConnectionElement, DiameterDischargeCoefficientConnectionElement,
+    TeeJunctionElement,
 )
 
 # Flow elements
@@ -427,6 +428,21 @@ channel = ChannelElement("channel", "node2", "node3", length=2.0, diameter=0.05,
 effective_area = EffectiveAreaConnectionElement("ea", "node3", "node4", diameter=0.015958)
 lossless = LosslessConnectionElement("lossless", "node4", "node5")
 area_cd = DiameterDischargeCoefficientConnectionElement("area_cd", "node5", "node6", diameter=0.011284, Cd=0.7)
+
+# Three-port tee junction (Bassett 2001 pressure-loss model)
+import math
+# Merging tee: two inlets (straight_node, branch_node) -> one outlet (common_node)
+tee_merge = TeeJunctionElement(
+    "tee", common_node="outlet", straight_node="inlet_s", branch_node="inlet_b",
+    theta=math.pi / 2.0, F_C=0.01, psi=1.0, tee_type="merging",
+)
+# Branching tee: one inlet (common_node) -> two outlets (straight_node, branch_node)
+tee_branch = TeeJunctionElement(
+    "tee", common_node="inlet", straight_node="outlet_s", branch_node="outlet_b",
+    theta=math.pi / 2.0, F_C=0.01, psi=1.0, tee_type="branching",
+)
+# Solved unknowns: tee.m_dot_com (total), tee.m_dot_branch (branch arm)
+# Straight flow is implicit: m_dot_straight = m_dot_com - m_dot_branch
 ```
 
 ### Combustion Integration
@@ -471,6 +487,55 @@ res_plen = cb.plenum_residuals_and_jacobian(m_dot_vec, P_target, T_target, Y_tar
 ```
 
 Combustor results return mapping specific to `(m_dot, P_total, T, Y)` state vectors.
+
+### Tee Junction Interface
+Bassett 2001 tee junction K-factor model with full Jacobians for the network solver.
+
+Port convention: MAIN_INLET (A), BRANCH (B), MAIN_OUTLET (C).
+`m_dot_com` = common-port mass flow [kg/s], `m_dot_branch` = branch mass flow [kg/s],
+`F_C` = common-port cross-sectional area [m^2], `psi` = A_branch/A_com, `theta` = branch angle [rad].
+
+```python
+import combaero._core as _core
+import math
+
+Y = [0.0] * 15
+Y[0] = 0.767  # N2
+Y[1] = 0.233  # O2
+
+# Check input validity (non-throwing)
+status = _core.tee_check_inputs(q=0.5, psi=1.0, theta=math.pi/2)
+# status.valid, status.q_in_range, status.psi_valid, status.theta_valid
+
+# Raw K-coefficient functions (Bassett 2001)
+k5  = _core.tee_K5(q)               # straight arm, separating tee
+k6  = _core.tee_K6(q, psi, theta)   # branch arm, separating tee
+k11 = _core.tee_K11(q, psi, theta)  # straight arm, joining tee
+k12 = _core.tee_K12(q, psi, theta)  # branch arm, joining tee
+
+# Blended K functions (always finite, smooth at q=0 and across topology reversal)
+ks = _core.merging_tee_K_straight(q, psi, theta)
+kb = _core.merging_tee_K_branch(q, psi, theta)
+
+# Solver residuals and full Jacobians
+res = _core.merging_tee_residuals_and_jacobian(
+    m_dot_com=0.5, m_dot_branch=0.2,
+    dP0_straight=150.0, dP0_branch=200.0,
+    P_static_com=2e5, T_com=600.0, Y_com=Y,
+    theta=math.pi/2, psi=1.0, F_C=0.01,
+)
+# res.R_straight, res.R_branch
+# res.dR_straight_d_mdot_com, res.dR_straight_d_mdot_branch
+# res.dR_straight_dP_static_com, res.dR_straight_dT_com
+# res.topology_valid, res.status  (CorrelationValidity.VALID or EXTRAPOLATED)
+
+res = _core.branching_tee_residuals_and_jacobian(
+    m_dot_com=0.5, m_dot_branch=0.15,
+    dP0_straight=100.0, dP0_branch=180.0,
+    P_static_com=1.5e5, T_com=500.0, Y_com=Y,
+    theta=math.pi/3, psi=1.2, F_C=0.008,
+)
+```
 
 ---
 

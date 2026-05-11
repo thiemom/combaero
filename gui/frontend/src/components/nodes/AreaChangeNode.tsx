@@ -26,7 +26,7 @@ const AreaChangeNode = ({ id, data, selected }: NodeProps) => {
 
 	return (
 		<div
-			className={`shadow-sm rounded bg-stone-50 border-2 flex items-center gap-2 px-3 py-1 overflow-hidden ${
+			className={`shadow-sm rounded bg-stone-50 border-2 flex items-center gap-2 px-3 py-1 ${
 				selected
 					? "border-blue-500 shadow-blue-100"
 					: isSolved
@@ -60,6 +60,31 @@ const AreaChangeNode = ({ id, data, selected }: NodeProps) => {
 					<div>F₁/F₀: {(data.result?.ratio ?? f1 / f0).toFixed(2)}</div>
 				</div>
 				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}
+			</div>
+
+			<div
+				className="absolute -left-3 top-1/2 -translate-y-1/2 text-[7px] font-extrabold leading-none select-none pointer-events-none bg-white/70 rounded-sm px-0.5 text-blue-500"
+				style={{ transform: `rotate(${-rotation}deg)` }}
+			>
+				i
+			</div>
+			<div
+				className="absolute -right-3 top-1/2 -translate-y-1/2 text-[7px] font-extrabold leading-none select-none pointer-events-none bg-white/70 rounded-sm px-0.5 text-green-500"
+				style={{ transform: `rotate(${-rotation}deg)` }}
+			>
+				o
+			</div>
+			<div
+				className="absolute -top-3 left-1/2 -translate-x-1/2 text-[7px] font-extrabold leading-none select-none pointer-events-none bg-white/70 rounded-sm px-0.5 text-orange-400"
+				style={{ transform: `rotate(${-rotation}deg)` }}
+			>
+				q
+			</div>
+			<div
+				className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-[7px] font-extrabold leading-none select-none pointer-events-none bg-white/70 rounded-sm px-0.5 text-orange-400"
+				style={{ transform: `rotate(${-rotation}deg)` }}
+			>
+				q
 			</div>
 
 			<Handle type="target" position={Position.Left} id="flow-target" />
