@@ -87,7 +87,7 @@ UNIT_MAP: dict[str, str] = {
     "m_dot_com": "kg/s",
     "m_dot_straight": "kg/s",
     "m_dot_branch": "kg/s",
-    "q": "-",
+    "mass_flow_ratio": "kg/kg",
     "K_straight": "-",
     "K_branch": "-",
     # --- Element diagnostics ---

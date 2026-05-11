@@ -187,12 +187,32 @@ def _build_discrete_loss_correlation(
     return ConstantFractionLoss(xi=xi)
 
 
-def _find_tee_port(edges: list, tee_id: str, port: str, nodes_map: dict) -> str:
+def _port_from_handle(handle: str | None) -> str | None:
+    """Extract port name from a tee handle string.
+
+    'port-common-source' -> 'common', 'port-branch-target' -> 'branch', etc.
+    Returns None for non-tee handles.
+    """
+    if handle and handle.startswith("port-") and (
+        handle.endswith("-source") or handle.endswith("-target")
+    ):
+        return handle.split("-")[1]
+    return None
+
+
+def _find_tee_port(
+    edges: list,
+    tee_id: str,
+    port: str,
+    nodes_map: dict,
+    tee_port_node_map: dict | None = None,
+) -> str:
     """Return the physical-node ID connected to a named tee port.
 
     Checks both edge directions: tee as source (sourceHandle == port-X-source)
     and tee as target (targetHandle == port-X-target).
-    Raises ValueError if the port is unconnected or connects to a non-physical node.
+    Falls back to *tee_port_node_map* for auto-created junction nodes when an
+    element is connected directly to a tee port without an explicit plenum.
     """
     src_handle = f"port-{port}-source"
     tgt_handle = f"port-{port}-target"
@@ -205,13 +225,15 @@ def _find_tee_port(edges: list, tee_id: str, port: str, nodes_map: dict) -> str:
             nid = edge.source
         else:
             continue
-        if nid not in nodes_map:
-            raise ValueError(
-                f"Tee '{tee_id}' port '{port}' connects to '{nid}', which is not a "
-                "physical node (plenum or boundary). All tee ports must connect directly "
-                "to plena or boundaries."
-            )
-        return nid
+        if nid in nodes_map:
+            return nid
+        if tee_port_node_map and (tee_id, port) in tee_port_node_map:
+            return tee_port_node_map[(tee_id, port)]
+        raise ValueError(
+            f"Tee '{tee_id}' port '{port}' connects to '{nid}', which is not a "
+            "physical node (plenum or boundary). All tee ports must connect directly "
+            "to plena or boundaries."
+        )
     raise ValueError(
         f"Tee '{tee_id}' port '{port}' is not connected. "
         "All three tee ports (common, straight, branch) must be wired to a node."
@@ -293,23 +315,51 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
     tee_ids = {node.id for node in element_nodes if node.type == "tee_junction"}
 
     # 1b. Create implicit junction nodes for element -> element visual links.
-    # Tee junction ports connect directly to physical nodes -- never auto-junction them.
+    # For direct element<->element connections we auto-insert a MomentumChamberNode.
+    # For direct element<->tee-port connections we auto-insert a PlenumNode so that
+    # users don't need to manually place a plenum on every tee arm.
     edge_junction_map: dict[tuple[str, str], str] = {}
+    tee_port_node_map: dict[tuple[str, str], str] = {}  # (tee_id, port) -> node_id
     for edge in schema.edges:
         if edge.data and edge.data.get("type") == "thermal":
             continue
-        if (
-            edge.source in element_ids
-            and edge.target in element_ids
-            and edge.source not in tee_ids
-            and edge.target not in tee_ids
-        ):
+        src_elem = edge.source in element_ids
+        tgt_elem = edge.target in element_ids
+        src_tee = edge.source in tee_ids
+        tgt_tee = edge.target in tee_ids
+
+        if src_elem and tgt_elem and not src_tee and not tgt_tee:
+            # Standard element-to-element: auto-insert MomentumChamberNode
             junction_id = f"__junction__{edge.source}__{edge.target}"
             if junction_id not in nodes_map:
                 junction_node = MomentumChamberNode(junction_id)
                 net.add_node(junction_node)
                 nodes_map[junction_id] = junction_node
             edge_junction_map[(edge.source, edge.target)] = junction_id
+
+        elif src_tee and tgt_elem:
+            # Tee port → element (e.g. tee.common-source → channel): auto-insert PlenumNode
+            port = _port_from_handle(edge.sourceHandle)
+            if port and (edge.source, port) not in tee_port_node_map:
+                jid = f"__tee_jct__{edge.source}_{port}"
+                if jid not in nodes_map:
+                    jn = PlenumNode(jid)
+                    net.add_node(jn)
+                    nodes_map[jid] = jn
+                tee_port_node_map[(edge.source, port)] = jid
+                edge_junction_map[(edge.source, edge.target)] = jid
+
+        elif src_elem and tgt_tee:
+            # Element → tee port (e.g. channel → tee.straight-target): auto-insert PlenumNode
+            port = _port_from_handle(edge.targetHandle)
+            if port and (edge.target, port) not in tee_port_node_map:
+                jid = f"__tee_jct__{edge.target}_{port}"
+                if jid not in nodes_map:
+                    jn = PlenumNode(jid)
+                    net.add_node(jn)
+                    nodes_map[jid] = jn
+                tee_port_node_map[(edge.target, port)] = jid
+                edge_junction_map[(edge.source, edge.target)] = jid
 
     # 2. Second Pass: Create Elements
     for elem_node_schema in element_nodes:
@@ -320,18 +370,24 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         # 3-port element: bypass the 2-port source/target logic entirely.
         if elem_type == "tee_junction":
             _d = TeeJunctionData(**elem_data)
-            net.add_element(
-                TeeJunctionElement(
-                    id=elem_id,
-                    common_node=_find_tee_port(schema.edges, elem_id, "common", nodes_map),
-                    straight_node=_find_tee_port(schema.edges, elem_id, "straight", nodes_map),
-                    branch_node=_find_tee_port(schema.edges, elem_id, "branch", nodes_map),
-                    theta=_math.radians(_d.theta_deg),
-                    F_C=_d.F_C,
-                    psi=_d.psi,
-                    tee_type=_d.tee_type,
-                )
+            _tee = TeeJunctionElement(
+                id=elem_id,
+                common_node=_find_tee_port(
+                    schema.edges, elem_id, "common", nodes_map, tee_port_node_map
+                ),
+                straight_node=_find_tee_port(
+                    schema.edges, elem_id, "straight", nodes_map, tee_port_node_map
+                ),
+                branch_node=_find_tee_port(
+                    schema.edges, elem_id, "branch", nodes_map, tee_port_node_map
+                ),
+                theta=_math.radians(_d.theta_deg),
+                F_C=_d.F_C,
+                psi=_d.psi,
+                tee_type=_d.tee_type,
             )
+            _tee.initial_guess = _expand_initial_guess(_d.initial_guess, elem_id)
+            net.add_element(_tee)
             continue
 
         source_id = None

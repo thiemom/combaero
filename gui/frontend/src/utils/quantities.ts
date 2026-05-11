@@ -69,7 +69,11 @@ export const QUANTITY_CATALOGUE: Record<
 	m_dot_com: { label: "ṁ com", unit: "kg/s", format: (v) => v.toFixed(4) },
 	m_dot_straight: { label: "ṁ str", unit: "kg/s", format: (v) => v.toFixed(4) },
 	m_dot_branch: { label: "ṁ br", unit: "kg/s", format: (v) => v.toFixed(4) },
-	q: { label: "q", unit: "—", format: (v) => v.toFixed(3) },
+	mass_flow_ratio: {
+		label: "ṁ str/ṁ com",
+		unit: "kg/kg",
+		format: (v) => v.toFixed(3),
+	},
 	K_straight: { label: "K str", unit: "—", format: (v) => v.toFixed(3) },
 	K_branch: { label: "K br", unit: "—", format: (v) => v.toFixed(3) },
 	// Element-specific diagnostics (Static)

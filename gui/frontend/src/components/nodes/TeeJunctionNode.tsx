@@ -1,3 +1,4 @@
+import { Split } from "lucide-react";
 import { useEffect } from "react";
 import {
 	Handle,
@@ -7,23 +8,8 @@ import {
 } from "reactflow";
 import { NodeDiagRows } from "../NodeDiagRows";
 
-const TeeIcon = () => (
-	<svg
-		width="20"
-		height="20"
-		viewBox="0 0 20 20"
-		fill="none"
-		stroke="currentColor"
-		strokeWidth="2"
-		strokeLinecap="round"
-		aria-hidden="true"
-	>
-		<title>Tee junction</title>
-		<line x1="1" y1="8" x2="19" y2="8" />
-		<line x1="10" y1="8" x2="10" y2="19" />
-		<circle cx="10" cy="8" r="1.5" fill="currentColor" stroke="none" />
-	</svg>
-);
+// Port colours: blue = input arm, green = output arm (matches handle triangle colours).
+const portColor = (isInput: boolean) => (isInput ? "#3b82f6" : "#22c55e");
 
 const TeeJunctionNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
@@ -34,14 +20,20 @@ const TeeJunctionNode = ({ id, data, selected }: NodeProps) => {
 	const isExtrapolated =
 		isSolved && (data.result?.correlation_extrapolated ?? 0) > 0;
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: rotation triggers handle re-measurement
+	// Merging:  S(left, in) + B(bottom, in)  → C(right, out)
+	// Branching: C(left, in) → S(right, out) + B(bottom, out)
+	// Swap the left/right positions of S and C when the type changes.
+	const straightPos = isMerging ? Position.Left : Position.Right;
+	const commonPos = isMerging ? Position.Right : Position.Left;
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: rotation and tee_type both trigger handle re-measurement
 	useEffect(() => {
 		updateNodeInternals(id);
-	}, [id, rotation, updateNodeInternals]);
+	}, [id, rotation, data.tee_type, updateNodeInternals]);
 
 	return (
 		<div
-			className={`shadow-sm rounded bg-stone-50 border-2 flex items-center gap-2 px-3 py-1 overflow-hidden ${
+			className={`shadow-sm rounded bg-stone-50 border-2 flex items-center gap-2 px-3 py-1 ${
 				selected
 					? "border-blue-500 shadow-blue-100"
 					: isExtrapolated
@@ -51,7 +43,7 @@ const TeeJunctionNode = ({ id, data, selected }: NodeProps) => {
 							: "border-stone-300"
 			}`}
 			style={{
-				width: 128,
+				width: 140,
 				height: 56,
 				transform: `rotate(${rotation}deg)`,
 				transformOrigin: "center center",
@@ -64,7 +56,7 @@ const TeeJunctionNode = ({ id, data, selected }: NodeProps) => {
 						: "bg-orange-50 border-orange-200 text-orange-500"
 				}`}
 			>
-				<TeeIcon />
+				<Split size={16} />
 			</div>
 
 			<div
@@ -72,38 +64,61 @@ const TeeJunctionNode = ({ id, data, selected }: NodeProps) => {
 				style={{ transform: `rotate(${textRotation}deg)` }}
 			>
 				<div className="text-[10px] font-bold uppercase leading-none whitespace-nowrap">
-					{data.label ? data.label : "Tee Junction"}
+					{data.label ? data.label : "Tee"}
 				</div>
 				<div
 					className={`text-[9px] font-mono whitespace-nowrap ${isMerging ? "text-blue-500" : "text-orange-500"}`}
 				>
-					{isMerging ? "merging" : "branching"}
+					{isMerging ? "merging" : "branching"}{" "}
+					{Math.round(Math.abs(data.theta_deg ?? 90))}&deg;
 				</div>
 				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}
 				{isExtrapolated && (
-					<div className="text-[8px] font-bold text-amber-600 uppercase leading-none mt-0.5">
-						EXT
+					<div className="text-[8px] font-bold text-amber-600 uppercase leading-none mt-0.5 whitespace-nowrap">
+						extrapolated
 					</div>
 				)}
 			</div>
 
-			{/* Straight arm -- left */}
-			<Handle
-				type="target"
-				position={Position.Left}
-				id="port-straight-target"
-			/>
-			<Handle
-				type="source"
-				position={Position.Left}
-				id="port-straight-source"
-			/>
+			{/* Port labels sit just outside the visual bounding box.
+			    S and C swap left/right when tee_type changes; B stays at bottom. */}
+			<div
+				className={`absolute ${isMerging ? "-left-3" : "-right-3"} top-1/2 -translate-y-1/2 text-[7px] font-extrabold leading-none select-none pointer-events-none bg-white/70 rounded-sm px-0.5`}
+				style={{
+					color: portColor(isMerging),
+					transform: `rotate(${-rotation}deg)`,
+				}}
+			>
+				S
+			</div>
+			<div
+				className={`absolute ${isMerging ? "-right-3" : "-left-3"} top-1/2 -translate-y-1/2 text-[7px] font-extrabold leading-none select-none pointer-events-none bg-white/70 rounded-sm px-0.5`}
+				style={{
+					color: portColor(!isMerging),
+					transform: `rotate(${-rotation}deg)`,
+				}}
+			>
+				C
+			</div>
+			<div
+				className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-[7px] font-extrabold leading-none select-none pointer-events-none bg-white/70 rounded-sm px-0.5"
+				style={{
+					color: portColor(isMerging),
+					transform: `rotate(${-rotation}deg)`,
+				}}
+			>
+				B
+			</div>
 
-			{/* Common arm -- right */}
-			<Handle type="target" position={Position.Right} id="port-common-target" />
-			<Handle type="source" position={Position.Right} id="port-common-source" />
+			{/* Straight arm — left for merging, right for branching */}
+			<Handle type="target" position={straightPos} id="port-straight-target" />
+			<Handle type="source" position={straightPos} id="port-straight-source" />
 
-			{/* Branch arm -- bottom */}
+			{/* Common arm — right for merging, left for branching */}
+			<Handle type="target" position={commonPos} id="port-common-target" />
+			<Handle type="source" position={commonPos} id="port-common-source" />
+
+			{/* Branch arm — always bottom */}
 			<Handle
 				type="target"
 				position={Position.Bottom}

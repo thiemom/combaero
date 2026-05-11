@@ -92,6 +92,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TeeJunctionElement.diagnostics()` extended to expose C++-computed `K_straight`,
   `K_branch`, and `correlation_extrapolated` (1.0 when Bassett inputs are outside the
   validated range) alongside the existing `m_dot_com/straight/branch` and `q` fields.
+- `test_tee_network.py`: conservation tests for mixed-composition merging streams
+  (`test_merging_tee_node_mass_conservation`, `test_merging_tee_species_conservation`,
+  `test_merging_tee_enthalpy_conservation`) and full central-difference Jacobian coverage
+  for both merging and branching tees including mixed-composition sensitivities.
+- GUI tee junction inspector, palette item, and React Flow node visual.
+- GUI solver status panel now shows full error messages in a scrollable area (previously
+  truncated to a single line).
+- Tee junction node now shows port labels S / C / B (straight / common / branch) in
+  blue (input) or amber (output) based on the current tee type, so wiring direction
+  is unambiguous at a glance.
+- Inspector shows a port guide card that updates with the selected tee type and
+  describes which arms are inlets vs. outlets.
+- `graph_builder` auto-inserts a `PlenumNode` junction when an element is connected
+  directly to a tee port, removing the requirement to manually place a plenum on every
+  tee arm.
+
+### Changed
+- `TeeJunctionElement.diagnostics()` key `q` renamed to `mass_flow_ratio`
+  (unit kg/kg) for clarity; updated in Python, GUI inspector, CSV export, and
+  `quantities.ts` catalogue.
+- `TeeJunctionElement.validate()` now accepts negative branch angles: `|theta|`
+  must be in `(0, pi/2]` and `abs(theta)` is passed to the C++ correlation,
+  since the model uses `cos(0.75*theta)` which is symmetric. The inspector hint
+  text and frontend validation both reflect the `(-90, 0) U (0, 90]` deg domain.
+- GUI FLOW DISTRIBUTION section in the tee inspector now matches the LIVE
+  TELEMETRY visual style (card background, `text-xs` heading, stacked label+value
+  cells with `gap-y-3`).
+- `TeeJunctionData` schema gains `initial_guess: dict[str, float]` field;
+  `graph_builder` wires it through `_expand_initial_guess`, and the inspector
+  shows an `InitialGuessEditor` for `m_dot_com` and `m_dot_branch`.
+- Frontend validation (`validation.ts`) covers tee junction `theta`, `F_C`, and
+  `psi` with the same yellow warning-box UX as other elements.
+- CSV export mole fractions X for tee junction common-arm state (consistent with
+  other element types).
+
+### Fixed
+- `NetworkSolver` Bernoulli initial guess for `TeeJunctionElement` now uses the
+  propagated `p_guess` dict for non-`PressureBoundary` nodes (plenums, mass-flow
+  boundaries, momentum chambers).  Previously `getattr(node, "Pt", ref["P"])` fell back
+  to the reference pressure for interior nodes whose `Pt` is a solver unknown, giving
+  `dP_total = 0` and a degenerate `m_dot` starting point.
+- CSV export for tee junction rows now includes the common-arm thermodynamic state
+  (T, P, Pt, Tt, rho, and full species composition Y[N2] ... Y[NH3]) so that the
+  canonical mixed state is accessible without joining to node rows.
+- `_propagate_mdot_guess` overwrote rather than accumulated flow for multi-source elements
+  (merging tee): the branch-arm visit (0.1 kg/s) silently clobbered the straight-arm visit
+  (1.0 kg/s), leaving the tee initial-guess at 0.1 instead of 1.1 kg/s.  The resulting 7x
+  underestimate prevented Newton from converging for small `F_C` (e.g. 0.01) where the
+  quadratic pressure-drop scaling amplifies initial-guess errors.
 
 ## [0.2.6] - 2026-05-03
 

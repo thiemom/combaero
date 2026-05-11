@@ -2606,9 +2606,9 @@ class TeeJunctionElement(NetworkElement):
             raise ValueError(
                 f"TeeJunctionElement '{self.id}': tee_type must be 'merging' or 'branching'."
             )
-        if not (0.0 < self.theta <= math.pi / 2.0):
+        if not (abs(self.theta) <= math.pi / 2.0):
             raise ValueError(
-                f"TeeJunctionElement '{self.id}': theta must be in (0, pi/2], got {self.theta}."
+                f"TeeJunctionElement '{self.id}': |theta| must be <= pi/2, got {self.theta}."
             )
         if self.F_C <= 0.0:
             raise ValueError(f"TeeJunctionElement '{self.id}': F_C must be > 0, got {self.F_C}.")
@@ -2635,7 +2635,7 @@ class TeeJunctionElement(NetworkElement):
                 P_static_com=state_com.P,
                 T_com=state_com.T,
                 Y_com=state_com.Y,
-                theta=self.theta,
+                theta=abs(self.theta),
                 psi=self.psi,
                 F_C=self.F_C,
                 blend_k=self.blend_k,
@@ -2667,7 +2667,7 @@ class TeeJunctionElement(NetworkElement):
                 P_static_com=state_com.P,
                 T_com=state_com.T,
                 Y_com=state_com.Y,
-                theta=self.theta,
+                theta=abs(self.theta),
                 psi=self.psi,
                 F_C=self.F_C,
                 blend_k=self.blend_k,
@@ -2715,7 +2715,7 @@ class TeeJunctionElement(NetworkElement):
                 P_static_com=state_com.P,
                 T_com=state_com.T,
                 Y_com=state_com.Y,
-                theta=self.theta,
+                theta=abs(self.theta),
                 psi=self.psi,
                 F_C=self.F_C,
                 blend_k=self.blend_k,
@@ -2729,7 +2729,7 @@ class TeeJunctionElement(NetworkElement):
                 P_static_com=state_com.P,
                 T_com=state_com.T,
                 Y_com=state_com.Y,
-                theta=self.theta,
+                theta=abs(self.theta),
                 psi=self.psi,
                 F_C=self.F_C,
                 blend_k=self.blend_k,
@@ -2739,7 +2739,7 @@ class TeeJunctionElement(NetworkElement):
             "m_dot_com": float(m_com),
             "m_dot_straight": float(m_com - m_branch),
             "m_dot_branch": float(m_branch),
-            "q": float(res.q),
+            "mass_flow_ratio": float(res.q),
             "K_straight": float(res.K_straight),
             "K_branch": float(res.K_branch),
             "correlation_extrapolated": 1.0 if is_extrapolated else 0.0,

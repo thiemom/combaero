@@ -191,7 +191,9 @@ class FlowNetwork:
         # Every interior node must have at least 2 connected elements to satisfy continuity (in and out)
         # Boundary nodes only need at least 1.
         for node_id, node in self.nodes.items():
-            connected = self._upstream_of_node[node_id] + self._downstream_of_node[node_id]
+            upstream = self._upstream_of_node[node_id]
+            downstream = self._downstream_of_node[node_id]
+            connected = upstream + downstream
             is_boundary = type(node).__name__ in ("PressureBoundary", "MassFlowBoundary")
 
             if not connected:
@@ -204,6 +206,17 @@ class FlowNetwork:
                     f"FlowNetwork validation failed: interior node '{node_id}' has only {len(connected)} "
                     "connected element(s). Interior nodes must have at least 2 connections to satisfy "
                     "mass conservation."
+                )
+
+            # Every interior node needs at least one element delivering flow in and one taking
+            # flow out. All-upstream or all-downstream means mass cannot be conserved --
+            # the most common cause is a tee junction wired with the wrong port as inlet.
+            if not is_boundary and (not upstream or not downstream):
+                direction = "upstream" if not upstream else "downstream"
+                raise ValueError(
+                    f"FlowNetwork validation failed: interior node '{node_id}' has no {direction} "
+                    "connections -- flow has nowhere to go. This often means a tee junction port "
+                    "is wired backwards (e.g. C on a branching tee should be the inlet)."
                 )
 
     def to_dict(self) -> dict:

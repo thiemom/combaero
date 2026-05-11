@@ -4,20 +4,26 @@ Network-level solver tests for TeeJunctionElement.
 Covers:
 - Merging tee: two pressure-boundary inlets, one outlet
 - Branching tee: one inlet, two pressure-boundary outlets
-- Mass conservation at each node
-- Jacobian accuracy (FD vs analytical)
+- Mass conservation at each node (including mixed-composition streams)
+- Species conservation across the mixing junction
+- Enthalpy conservation across the mixing junction
+- Jacobian accuracy (FD vs analytical) for both tee types
 - No-flow edge cases
 - TeeJunctionElement.validate() error paths
 """
 
 import math
 
+import numpy as np
 import pytest
 
 import combaero as cb
 from combaero.network import (
     FlowNetwork,
+    LosslessConnectionElement,
+    MassFlowBoundary,
     NetworkSolver,
+    PlenumNode,
     PressureBoundary,
     TeeJunctionElement,
 )
@@ -167,7 +173,7 @@ def test_merging_tee_diagnostics():
     net = _merging_net()
     solver = NetworkSolver(net)
     sol = solver.solve()
-    assert math.isfinite(sol["tee.q"])
+    assert math.isfinite(sol["tee.mass_flow_ratio"])
     assert math.isfinite(sol["tee.m_dot_com"])
     assert math.isfinite(sol["tee.m_dot_branch"])
 
@@ -210,15 +216,126 @@ def test_branching_tee_residuals_near_zero():
 
 
 # ---------------------------------------------------------------------------
+# Conservation laws: mixed-composition streams
+# ---------------------------------------------------------------------------
+
+
+# Two-stream fixture: 1 kg/s pure N2 at 300 K merges with 0.1 kg/s dry air at 400 K.
+# Common arm is a PlenumNode so its T and Y are solver unknowns, giving independent
+# verification that the C++ mixer satisfies conservation.
+def _make_Y_n2() -> list[float]:
+    Y = [0.0] * cb.num_species()
+    names = [cb.species_name(i) for i in range(cb.num_species())]
+    if "N2" in names:
+        Y[names.index("N2")] = 1.0
+    return Y
+
+
+def _merging_net_two_compositions() -> FlowNetwork:
+    """Merging tee: straight=pure N2 @ 300 K, branch=dry air @ 400 K."""
+    Y_n2 = _make_Y_n2()
+    Y_air = _DRY_AIR_Y
+
+    net = FlowNetwork()
+    net.add_node(MassFlowBoundary("mb_str", m_dot=1.0, Tt=300.0, Y=Y_n2))
+    net.add_node(MassFlowBoundary("mb_br", m_dot=0.1, Tt=400.0, Y=Y_air))
+    net.add_node(PressureBoundary("pb", Pt=101325.0, Tt=300.0, Y=Y_air))
+    net.add_node(PlenumNode("pl_str"))
+    net.add_node(PlenumNode("pl_br"))
+    net.add_node(PlenumNode("pl_com"))
+    net.add_element(
+        TeeJunctionElement(
+            "tee",
+            common_node="pl_com",
+            straight_node="pl_str",
+            branch_node="pl_br",
+            F_C=0.02,
+            psi=1.0,
+            theta=_THETA_90,
+            tee_type="merging",
+        )
+    )
+    net.add_element(LosslessConnectionElement("lc_str", "mb_str", "pl_str"))
+    net.add_element(LosslessConnectionElement("lc_br", "mb_br", "pl_br"))
+    net.add_element(LosslessConnectionElement("lc_com", "pl_com", "pb"))
+    return net
+
+
+def test_merging_tee_node_mass_conservation():
+    """lc_str + lc_br == lc_com: independent solver unknowns satisfy global continuity."""
+    net = _merging_net_two_compositions()
+    sol = NetworkSolver(net).solve()
+    m_str = sol["lc_str.m_dot"]
+    m_br = sol["lc_br.m_dot"]
+    m_com = sol["lc_com.m_dot"]
+    assert abs(m_com - m_str - m_br) < 1e-9, (
+        f"Mass not conserved: {m_com:.6f} != {m_str:.6f} + {m_br:.6f}"
+    )
+
+
+def test_merging_tee_species_conservation():
+    """Species conservation: m_com*Y_com[i] == m_str*Y_str[i] + m_br*Y_br[i]."""
+    Y_n2 = _make_Y_n2()
+    Y_air = _DRY_AIR_Y
+    net = _merging_net_two_compositions()
+    sol = NetworkSolver(net).solve()
+
+    m_str = sol["lc_str.m_dot"]
+    m_br = sol["lc_br.m_dot"]
+    m_com = sol["lc_com.m_dot"]
+
+    n_spec = cb.num_species()
+    for i in range(n_spec):
+        y_com = sol.get(f"pl_com.Y[{i}]", 0.0)
+        expected = (m_str * Y_n2[i] + m_br * Y_air[i]) / m_com
+        err = abs(y_com - expected)
+        assert err < 1e-8, (
+            f"Species {cb.species_name(i)}: Y_com={y_com:.8f}, expected={expected:.8f}, err={err:.2e}"
+        )
+
+
+def test_merging_tee_enthalpy_conservation():
+    """Adiabatic mixing: m_com*h(T_com,Y_com) == m_str*h(T_str,Y_str) + m_br*h(T_br,Y_br)."""
+    Y_n2 = _make_Y_n2()
+    Y_air = _DRY_AIR_Y
+    net = _merging_net_two_compositions()
+    sol = NetworkSolver(net).solve()
+
+    m_str = sol["lc_str.m_dot"]
+    m_br = sol["lc_br.m_dot"]
+    m_com = sol["lc_com.m_dot"]
+
+    T_str = sol.get("pl_str.T", 300.0)
+    T_br = sol.get("pl_br.T", 400.0)
+    T_com = sol.get("pl_com.T")
+    assert T_com is not None
+
+    n_spec = cb.num_species()
+    Y_com = [sol.get(f"pl_com.Y[{i}]", 0.0) for i in range(n_spec)]
+
+    X_n2 = list(cb.mass_to_mole(Y_n2))
+    X_air = list(cb.mass_to_mole(Y_air))
+    X_com = list(cb.mass_to_mole(Y_com))
+
+    h_str = float(cb._core.enthalpy_and_jacobian(T_str, X_n2)[0])
+    h_br = float(cb._core.enthalpy_and_jacobian(T_br, X_air)[0])
+    h_com = float(cb._core.enthalpy_and_jacobian(T_com, X_com)[0])
+
+    h_expected = (m_str * h_str + m_br * h_br) / m_com
+    # Allow 1 J/kg absolute tolerance (rounding in iterative T solve)
+    err = abs(h_com - h_expected)
+    assert err < 1.0, (
+        f"Enthalpy not conserved: h_com={h_com:.2f}, expected={h_expected:.2f}, err={err:.3f} J/kg"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Jacobian accuracy (FD check)
 # ---------------------------------------------------------------------------
 
 
-def test_merging_tee_jacobian_vs_fd():
-    """Analytical Jacobian matches central-difference FD to within 1e-4."""
-    import numpy as np
-
-    net = _merging_net()
+def _check_jacobian_vs_fd(net: FlowNetwork, tol: float = 5e-3) -> None:
+    """Central-difference Jacobian check against analytical for the full solver system."""
     solver = NetworkSolver(net)
     sol = solver.solve()
     x0 = np.array([sol.get(n, 0.0) for n in solver.unknown_names])
@@ -236,11 +353,33 @@ def test_merging_tee_jacobian_vs_fd():
         xm[j] -= eps
         jac_fd[:, j] = (solver._residuals(xp) - solver._residuals(xm)) / (2 * eps)
 
-    # Only compare non-zero FD columns to avoid noise in near-zero entries
-    mask = np.abs(jac_fd).max(axis=0) > 1e-8
-    if mask.any():
-        diff = np.abs(jac_dense[:, mask] - jac_fd[:, mask])
-        assert diff.max() < 5e-3, f"Jacobian FD mismatch: max={diff.max():.3e}"
+    # Check all columns with a combined absolute+relative criterion so that
+    # near-zero analytical entries (that FD correctly resolves as near-zero) are
+    # still covered without false failures from floating-point noise.
+    scale = np.maximum(np.abs(jac_fd), np.abs(jac_dense)) + 1.0
+    rel_err = np.abs(jac_dense - jac_fd) / scale
+    max_err = rel_err.max()
+    worst_idx = np.unravel_index(rel_err.argmax(), rel_err.shape)
+    assert max_err < tol, (
+        f"Jacobian FD mismatch: max relative err={max_err:.3e} "
+        f"at row={worst_idx[0]} (res '{solver.unknown_names[worst_idx[0]] if worst_idx[0] < len(solver.unknown_names) else worst_idx[0]}'), "
+        f"col={worst_idx[1]} (unk '{solver.unknown_names[worst_idx[1]]}')"
+    )
+
+
+def test_merging_tee_jacobian_vs_fd():
+    """Merging-tee analytical Jacobian matches central-difference FD (all entries)."""
+    _check_jacobian_vs_fd(_merging_net())
+
+
+def test_branching_tee_jacobian_vs_fd():
+    """Branching-tee analytical Jacobian matches central-difference FD (all entries)."""
+    _check_jacobian_vs_fd(_branching_net())
+
+
+def test_merging_tee_mixed_composition_jacobian_vs_fd():
+    """Jacobian accuracy with two different inlet compositions (mixed-species sensitivity)."""
+    _check_jacobian_vs_fd(_merging_net_two_compositions())
 
 
 # ---------------------------------------------------------------------------
@@ -249,12 +388,14 @@ def test_merging_tee_jacobian_vs_fd():
 
 
 def test_validate_bad_theta():
+    # theta=0 is now accepted (limit is continuous, flagged as extrapolated by C++ correlation)
+    # Only values with |theta| > pi/2 should raise.
     with pytest.raises(ValueError, match="theta"):
         net = FlowNetwork()
         Y = _DRY_AIR_Y
         for nid in ("a", "b", "c"):
             net.add_node(PressureBoundary(nid, Pt=2e5, Tt=400.0, Y=Y))
-        net.add_element(TeeJunctionElement("tee", "a", "b", "c", theta=0.0, F_C=0.01))
+        net.add_element(TeeJunctionElement("tee", "a", "b", "c", theta=2.0, F_C=0.01))
         net.validate()
 
 

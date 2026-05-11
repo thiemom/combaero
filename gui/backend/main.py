@@ -228,7 +228,7 @@ async def export_results(schema: NetworkGraphSchema):
     hard_timeout = soft_timeout + 10.0
     try:
         # Solve quickly to get states
-        _, node_results, element_results, edge_results, _ = await asyncio.wait_for(
+        _, node_results, element_results, edge_results, net = await asyncio.wait_for(
             asyncio.to_thread(_solve_sync, schema),
             timeout=hard_timeout,
         )
@@ -299,9 +299,32 @@ async def export_results(schema: NetworkGraphSchema):
             data.append(base_data)
 
         # 2. Process Flow Elements
+        from combaero.network.components import TeeJunctionElement as _TeeJE
+
         for elem_id, res in element_results.items():
             # Include all analytic/diagnostic fields (Re, Nu, h, q_dot, f, etc.)
             elem_data = res.model_dump()
+
+            # Tee junctions: add the common-arm node state (T, P, Pt, Tt, rho,
+            # and full composition) so downstream analysis has one canonical
+            # thermodynamic state per tee row without having to join to node rows.
+            elem_obj = net.elements.get(elem_id)
+            if isinstance(elem_obj, _TeeJE):
+                common_res = node_results.get(elem_obj.common_node)
+                if common_res:
+                    common_state = common_res.state.model_dump()
+                    Y = common_state.pop("Y", [])
+                    X = common_state.pop("X", None) or []
+                    for k, v in common_state.items():
+                        if v is not None:
+                            elem_data[k] = v
+                    for i, y_val in enumerate(Y):
+                        name = species_labels[i] if i < len(species_labels) else str(i)
+                        elem_data[f"Y[{name}]"] = y_val
+                    for i, x_val in enumerate(X):
+                        name = species_labels[i] if i < len(species_labels) else str(i)
+                        elem_data[f"X[{name}]"] = x_val
+
             data.append(
                 {
                     "type": "element",

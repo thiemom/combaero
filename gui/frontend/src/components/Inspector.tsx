@@ -654,6 +654,63 @@ const Inspector = () => {
 
 				{selectedNode.type === "tee_junction" && (
 					<div className="flex flex-col gap-4">
+						{/* Port legend */}
+						{(() => {
+							const tm =
+								(selectedNode.data.tee_type ?? "merging") === "merging";
+							return (
+								<div className="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-[9px] leading-snug text-stone-600">
+									<div className="font-bold uppercase text-stone-400 mb-1">
+										Port Guide
+									</div>
+									<div className="grid grid-cols-3 gap-1 text-center font-mono mb-1.5">
+										<div>
+											<span
+												className="font-extrabold"
+												style={{ color: tm ? "#3b82f6" : "#f59e0b" }}
+											>
+												S
+											</span>{" "}
+											straight
+										</div>
+										<div>
+											<span
+												className="font-extrabold"
+												style={{ color: tm ? "#f59e0b" : "#3b82f6" }}
+											>
+												C
+											</span>{" "}
+											common
+										</div>
+										<div>
+											<span
+												className="font-extrabold"
+												style={{ color: tm ? "#3b82f6" : "#f59e0b" }}
+											>
+												B
+											</span>{" "}
+											branch
+										</div>
+									</div>
+									<div className="text-stone-500">
+										{tm ? (
+											<>
+												<span style={{ color: "#3b82f6" }}>S, B</span> →{" "}
+												<span style={{ color: "#f59e0b" }}>C</span>
+												{"  "}(two inlets, one outlet at C)
+											</>
+										) : (
+											<>
+												<span style={{ color: "#3b82f6" }}>C</span> →{" "}
+												<span style={{ color: "#f59e0b" }}>S, B</span>
+												{"  "}(one inlet at C, two outlets)
+											</>
+										)}
+									</div>
+								</div>
+							);
+						})()}
+
 						{/* Tee type */}
 						<div className="flex flex-col gap-2">
 							<label className="text-xs font-bold text-gray-500 uppercase">
@@ -691,8 +748,9 @@ const Inspector = () => {
 								placeholder="90"
 							/>
 							<p className="text-[9px] text-gray-400 italic">
-								Angle between branch and common arm. Bassett (2001) valid range:
-								30–90 deg.
+								Angle between branch and common arm. Sign is ignored
+								(symmetric). Bassett (2001) validated range: 30–90 deg. 0° is
+								accepted but flagged as extrapolated.
 							</p>
 						</div>
 
@@ -722,57 +780,85 @@ const Inspector = () => {
 							</p>
 						</div>
 
+						<InitialGuessEditor node={selectedNode} />
+
 						{/* Post-solve diagnostics */}
 						{selectedNode.data.result && (
-							<div className="border-t pt-3 flex flex-col gap-2">
-								<div className="text-[10px] font-bold text-stone-400 uppercase">
+							<div className="mt-4 p-3 bg-stone-50 border border-stone-200 rounded">
+								<h3 className="text-xs font-bold text-stone-500 uppercase mb-3">
 									Flow Distribution
-								</div>
+								</h3>
 								{selectedNode.data.result.correlation_extrapolated > 0 && (
-									<div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+									<div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-3">
 										Inputs outside Bassett (2001) validated range -- results are
 										extrapolated.
 									</div>
 								)}
-								<div className="grid grid-cols-2 gap-x-2 gap-y-1 font-mono text-xs">
-									<span className="text-stone-400 text-[9px] font-bold uppercase">
-										ṁ common
-									</span>
-									<span className="font-bold">
-										{(selectedNode.data.result.m_dot_com ?? 0).toFixed(4)} kg/s
-									</span>
-									<span className="text-stone-400 text-[9px] font-bold uppercase">
-										ṁ straight
-									</span>
-									<span className="font-bold">
-										{(selectedNode.data.result.m_dot_straight ?? 0).toFixed(4)}{" "}
-										kg/s
-									</span>
-									<span className="text-stone-400 text-[9px] font-bold uppercase">
-										ṁ branch
-									</span>
-									<span className="font-bold">
-										{(selectedNode.data.result.m_dot_branch ?? 0).toFixed(4)}{" "}
-										kg/s
-									</span>
-									<span className="text-stone-400 text-[9px] font-bold uppercase">
-										q (branch ratio)
-									</span>
-									<span className="font-bold">
-										{(selectedNode.data.result.q ?? 0).toFixed(3)}
-									</span>
-									<span className="text-stone-400 text-[9px] font-bold uppercase">
-										K straight
-									</span>
-									<span className="font-bold">
-										{(selectedNode.data.result.K_straight ?? 0).toFixed(3)}
-									</span>
-									<span className="text-stone-400 text-[9px] font-bold uppercase">
-										K branch
-									</span>
-									<span className="font-bold">
-										{(selectedNode.data.result.K_branch ?? 0).toFixed(3)}
-									</span>
+								<div className="grid grid-cols-2 gap-x-2 gap-y-3">
+									<div className="flex flex-col">
+										<span className="text-stone-400 text-[9px] font-bold uppercase">
+											ṁ common
+										</span>
+										<span className="font-mono text-xs font-bold">
+											{(selectedNode.data.result.m_dot_com ?? 0).toFixed(4)}{" "}
+											<span className="text-[9px] font-normal text-stone-400">
+												kg/s
+											</span>
+										</span>
+									</div>
+									<div className="flex flex-col">
+										<span className="text-stone-400 text-[9px] font-bold uppercase">
+											ṁ straight
+										</span>
+										<span className="font-mono text-xs font-bold">
+											{(selectedNode.data.result.m_dot_straight ?? 0).toFixed(
+												4,
+											)}{" "}
+											<span className="text-[9px] font-normal text-stone-400">
+												kg/s
+											</span>
+										</span>
+									</div>
+									<div className="flex flex-col">
+										<span className="text-stone-400 text-[9px] font-bold uppercase">
+											ṁ branch
+										</span>
+										<span className="font-mono text-xs font-bold">
+											{(selectedNode.data.result.m_dot_branch ?? 0).toFixed(4)}{" "}
+											<span className="text-[9px] font-normal text-stone-400">
+												kg/s
+											</span>
+										</span>
+									</div>
+									<div className="flex flex-col">
+										<span className="text-stone-400 text-[9px] font-bold uppercase">
+											ṁ straight / ṁ common
+										</span>
+										<span className="font-mono text-xs font-bold">
+											{(selectedNode.data.result.mass_flow_ratio ?? 0).toFixed(
+												3,
+											)}{" "}
+											<span className="text-[9px] font-normal text-stone-400">
+												kg/kg
+											</span>
+										</span>
+									</div>
+									<div className="flex flex-col">
+										<span className="text-stone-400 text-[9px] font-bold uppercase">
+											K straight
+										</span>
+										<span className="font-mono text-xs font-bold">
+											{(selectedNode.data.result.K_straight ?? 0).toFixed(3)}
+										</span>
+									</div>
+									<div className="flex flex-col">
+										<span className="text-stone-400 text-[9px] font-bold uppercase">
+											K branch
+										</span>
+										<span className="font-mono text-xs font-bold">
+											{(selectedNode.data.result.K_branch ?? 0).toFixed(3)}
+										</span>
+									</div>
 								</div>
 							</div>
 						)}
@@ -1811,6 +1897,11 @@ const InitialGuessEditor = ({ node }: { node: any }) => {
 		orifice: [{ key: "m_dot", unit: "kg/s" }],
 		discrete_loss: [{ key: "m_dot", unit: "kg/s" }],
 		area_change: [{ key: "m_dot", unit: "kg/s" }],
+		// Tee junction: two independent mass-flow unknowns.
+		tee_junction: [
+			{ key: "m_dot_com", unit: "kg/s" },
+			{ key: "m_dot_branch", unit: "kg/s" },
+		],
 	};
 	const guessFields = FIELDS_BY_TYPE[node.type as string] ?? [];
 	if (guessFields.length === 0) {

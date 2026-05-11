@@ -208,6 +208,7 @@ class TeeJunctionData(BaseModel):
     theta_deg: float = 90.0  # branch angle [deg], converted to radians in graph_builder
     F_C: float = 0.01  # common-arm area [m^2]
     psi: float = 1.0  # F_C / F_S area ratio
+    initial_guess: dict[str, float] = Field(default_factory=dict)
 
 
 class DiscreteLossData(BaseModel):

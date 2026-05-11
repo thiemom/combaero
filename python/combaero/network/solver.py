@@ -309,7 +309,10 @@ class NetworkSolver:
                         if share < 0:
                             elem_share = -elem_share
 
-                mdot_guess[elem.id] = elem_share
+                # Accumulate rather than overwrite: multi-source elements (e.g.
+                # merging tee) are visited once per source node and each visit
+                # contributes its share, so the total equals the sum of all inflows.
+                mdot_guess[elem.id] = mdot_guess.get(elem.id, 0.0) + elem_share
                 node_flow[elem.to_node] = node_flow.get(elem.to_node, 0.0) + elem_share
 
         return mdot_guess
@@ -344,24 +347,37 @@ class NetworkSolver:
 
         _ref_X_tee = list(cb.mass_to_mole(ref["Y"]))
         _rho_tee = float(cb.density(ref["T"], ref["P"], _ref_X_tee))
+
+        def _node_pt(n: str) -> float:
+            node = self.network.nodes[n]
+            if isinstance(node, PressureBoundary):
+                return float(node.Pt)
+            return p_guess.get(n, ref["P"])
+
         _tee_branch_guess: dict[str, float] = {}
         for _eid, _elem in self.network.elements.items():
             if not isinstance(_elem, _TeeJE):
                 continue
             _src = _elem.all_source_nodes()
             _snk = _elem.all_sink_nodes()
-            _pt_src = max(float(getattr(self.network.nodes[n], "Pt", ref["P"])) for n in _src)
-            _pt_snk = min(float(getattr(self.network.nodes[n], "Pt", ref["P"])) for n in _snk)
+            _pt_src = max(_node_pt(n) for n in _src)
+            _pt_snk = min(_node_pt(n) for n in _snk)
             _dP_total = max(_pt_src - _pt_snk, 1.0)
-            mdot_guess[_eid] = _elem.F_C * math.sqrt(2.0 * _rho_tee * _dP_total)
+            _bernoulli_com = _elem.F_C * math.sqrt(2.0 * _rho_tee * _dP_total)
+            # Prefer a propagated mdot (e.g. from MassFlowBoundary) over the
+            # Bernoulli estimate when the former is larger -- the propagated value
+            # is exact when a mass-flow BC seeds the network, while the Bernoulli
+            # estimate can be a factor of ~6 too small when only one pressure
+            # boundary exists (dP from p_guess is only 0.1% of ref_P).
+            mdot_guess[_eid] = max(_bernoulli_com, mdot_guess.get(_eid, 0.0))
             # Branch guess: Bernoulli estimate for the branch arm pressure drop.
+            _pt_br = _node_pt(_elem.branch_node)
             if _elem.tee_type == "merging":
-                _pt_br = float(getattr(self.network.nodes[_elem.branch_node], "Pt", ref["P"]))
                 _dP_br = max(_pt_br - _pt_snk, 1.0)
             else:
-                _pt_br = float(getattr(self.network.nodes[_elem.branch_node], "Pt", ref["P"]))
                 _dP_br = max(_pt_src - _pt_br, 1.0)
-            _tee_branch_guess[_eid] = _elem.F_C * math.sqrt(2.0 * _rho_tee * _dP_br)
+            _bernoulli_br = _elem.F_C * math.sqrt(2.0 * _rho_tee * _dP_br)
+            _tee_branch_guess[_eid] = max(_bernoulli_br, mdot_guess[_eid] * 0.25)
 
         # Iterate through interior nodes and gather unknowns
         for node_id, node in self.network.nodes.items():
