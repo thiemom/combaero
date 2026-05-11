@@ -193,8 +193,10 @@ def _port_from_handle(handle: str | None) -> str | None:
     'port-common-source' -> 'common', 'port-branch-target' -> 'branch', etc.
     Returns None for non-tee handles.
     """
-    if handle and handle.startswith("port-") and (
-        handle.endswith("-source") or handle.endswith("-target")
+    if (
+        handle
+        and handle.startswith("port-")
+        and (handle.endswith("-source") or handle.endswith("-target"))
     ):
         return handle.split("-")[1]
     return None
