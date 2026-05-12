@@ -1,5 +1,23 @@
 import type { EdgeProps } from "reactflow";
-import { BaseEdge, EdgeLabelRenderer, getBezierPath } from "reactflow";
+import {
+	BaseEdge,
+	EdgeLabelRenderer,
+	getBezierPath,
+	Position,
+} from "reactflow";
+
+function coordPosition(
+	fromX: number,
+	fromY: number,
+	toX: number,
+	toY: number,
+): Position {
+	const dx = toX - fromX;
+	const dy = toY - fromY;
+	if (Math.abs(dx) >= Math.abs(dy))
+		return dx >= 0 ? Position.Right : Position.Left;
+	return dy >= 0 ? Position.Bottom : Position.Top;
+}
 
 export default function FlowEdge({
 	id,
@@ -7,12 +25,12 @@ export default function FlowEdge({
 	sourceY,
 	targetX,
 	targetY,
-	sourcePosition,
-	targetPosition,
 	style = {},
 	markerEnd,
 	data,
 }: EdgeProps) {
+	const sourcePosition = coordPosition(sourceX, sourceY, targetX, targetY);
+	const targetPosition = coordPosition(targetX, targetY, sourceX, sourceY);
 	const [edgePath, labelX, labelY] = getBezierPath({
 		sourceX,
 		sourceY,

@@ -28,6 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   viscosity/conductivity vs GRI-Mech at 300/1000/2000 K; NH3/air and H2O/N2 mixtures.
 
 ### Fixed
+- Compressible solver convergence with mass-flow boundary inlets: `_propagate_mdot_guess`
+  was applying a Mach-0.3 cap even to elements directly seeded by a `MassFlowBoundary`,
+  causing the initial guess to underestimate the known mass flow and leading hybr to
+  converge to a spurious local minimum. The cap is now skipped for elements whose
+  immediate upstream node is a `MassFlowBoundary`.
+- Edge connection paths for rotated nodes: `FlowEdge` and `ThermalEdge` now compute
+  bezier `sourcePosition`/`targetPosition` from the actual handle coordinates rather
+  than from the static `position` prop (which does not update when a node is CSS-rotated).
+  Connection lines no longer route behind element bounding boxes after rotation.
 - `combaero-gui` white page on fresh PyPI install: `frontend/dist/assets/` was not bundled in
   the wheel because the `**` glob in `package-data` is unreliable below setuptools 69; added an
   explicit `assets/*` pattern and a `MANIFEST.in` as belt-and-suspenders.

@@ -298,10 +298,16 @@ class NetworkSolver:
             if abs(share) < 1e-12 and not isinstance(node, MassFlowBoundary):
                 share = ref["m_dot"]
 
+            from_mass_boundary = isinstance(node, MassFlowBoundary)
             for elem in down_elems:
                 elem_share = share
                 regime = getattr(elem, "regime", None)
-                if regime == "compressible":
+                # Only apply the Mach cap when the flow is estimated (pressure-
+                # boundary seeded).  When a MassFlowBoundary seeds the element
+                # directly, the mass flow is a known constraint and capping it
+                # produces an initial guess that is too far from the solution,
+                # causing hybr to converge to a spurious local minimum.
+                if regime == "compressible" and not from_mass_boundary:
                     area = getattr(elem, "area", None)
                     if area is not None and area > 0.0:
                         mdot_cap = rho_ref * a_ref * area * mdot_ratio

@@ -1,5 +1,19 @@
 import type { EdgeProps } from "reactflow";
-import { EdgeLabelRenderer, getBezierPath } from "reactflow";
+import { EdgeLabelRenderer, getBezierPath, Position } from "reactflow";
+
+function coordPosition(
+	fromX: number,
+	fromY: number,
+	toX: number,
+	toY: number,
+): Position {
+	const dx = toX - fromX;
+	const dy = toY - fromY;
+	if (Math.abs(dx) >= Math.abs(dy))
+		return dx >= 0 ? Position.Right : Position.Left;
+	return dy >= 0 ? Position.Bottom : Position.Top;
+}
+
 import useStore from "../store/useStore";
 
 const ARROW_COLOR = "#ff9800";
@@ -20,8 +34,6 @@ export default function ThermalEdge({
 	sourceY,
 	targetX,
 	targetY,
-	sourcePosition,
-	targetPosition,
 	style = {},
 	data,
 }: EdgeProps) {
@@ -29,6 +41,8 @@ export default function ThermalEdge({
 	const unit = unitPreferences.length;
 	const scale = unit === "mm" ? 1000 : 1;
 
+	const sourcePosition = coordPosition(sourceX, sourceY, targetX, targetY);
+	const targetPosition = coordPosition(targetX, targetY, sourceX, sourceY);
 	const [edgePath, labelX, labelY] = getBezierPath({
 		sourceX,
 		sourceY,
