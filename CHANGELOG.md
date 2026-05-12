@@ -33,10 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   causing the initial guess to underestimate the known mass flow and leading hybr to
   converge to a spurious local minimum. The cap is now skipped for elements whose
   immediate upstream node is a `MassFlowBoundary`.
-- Edge connection paths for rotated nodes: `FlowEdge` and `ThermalEdge` now compute
-  bezier `sourcePosition`/`targetPosition` from the actual handle coordinates rather
-  than from the static `position` prop (which does not update when a node is CSS-rotated).
-  Connection lines no longer route behind element bounding boxes after rotation.
+- Edge connection paths for rotated nodes: `FlowEdge` and `ThermalEdge` now apply a
+  `rotatePosition` helper that maps each handle's static `position` prop (e.g.
+  `Position.Left`) through the connected node's CSS rotation in 90° steps. This gives
+  `getBezierPath` the correct perpendicular exit/entry direction after rotation — for
+  example, a 180°-rotated node's `flow-target` (logically Left) is correctly treated as
+  Right, producing a smooth C-curve instead of an initial vertical leg routing behind the
+  element bounding box.
 - `combaero-gui` white page on fresh PyPI install: `frontend/dist/assets/` was not bundled in
   the wheel because the `**` glob in `package-data` is unreliable below setuptools 69; added an
   explicit `assets/*` pattern and a `MANIFEST.in` as belt-and-suspenders.

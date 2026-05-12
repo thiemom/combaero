@@ -4,40 +4,51 @@ import {
 	EdgeLabelRenderer,
 	getBezierPath,
 	Position,
+	useNodes,
 } from "reactflow";
 
-function coordPosition(
-	fromX: number,
-	fromY: number,
-	toX: number,
-	toY: number,
-): Position {
-	const dx = toX - fromX;
-	const dy = toY - fromY;
-	if (Math.abs(dx) >= Math.abs(dy))
-		return dx >= 0 ? Position.Right : Position.Left;
-	return dy >= 0 ? Position.Bottom : Position.Top;
+function rotatePosition(pos: Position, degrees: number): Position {
+	const cycle: Position[] = [
+		Position.Right,
+		Position.Bottom,
+		Position.Left,
+		Position.Top,
+	];
+	const steps = Math.round((((degrees % 360) + 360) % 360) / 90) % 4;
+	const idx = cycle.indexOf(pos);
+	return idx === -1 ? pos : cycle[(idx + steps) % 4];
 }
 
 export default function FlowEdge({
 	id,
+	source,
+	target,
 	sourceX,
 	sourceY,
 	targetX,
 	targetY,
+	sourcePosition,
+	targetPosition,
 	style = {},
 	markerEnd,
 	data,
 }: EdgeProps) {
-	const sourcePosition = coordPosition(sourceX, sourceY, targetX, targetY);
-	const targetPosition = coordPosition(targetX, targetY, sourceX, sourceY);
+	const nodes = useNodes();
+	const sourceRotation =
+		nodes.find((n) => n.id === source)?.data?.rotation ?? 0;
+	const targetRotation =
+		nodes.find((n) => n.id === target)?.data?.rotation ?? 0;
+
+	const adjSourcePos = rotatePosition(sourcePosition, sourceRotation);
+	const adjTargetPos = rotatePosition(targetPosition, targetRotation);
+
 	const [edgePath, labelX, labelY] = getBezierPath({
 		sourceX,
 		sourceY,
-		sourcePosition,
+		sourcePosition: adjSourcePos,
 		targetX,
 		targetY,
-		targetPosition,
+		targetPosition: adjTargetPos,
 	});
 
 	const showLabel = data?.show_label && data?.label;
