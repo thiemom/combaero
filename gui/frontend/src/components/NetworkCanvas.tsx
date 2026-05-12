@@ -98,6 +98,14 @@ const NetworkCanvas = () => {
 					Nu_multiplier: 1.0,
 					f_multiplier: 1.0,
 				} as any;
+			} else if (type === "tee_junction") {
+				data = {
+					...data,
+					tee_type: "merging",
+					theta_deg: 90,
+					F_C: 0.01,
+					psi: 1.0,
+				} as any;
 			}
 
 			const newNode = {

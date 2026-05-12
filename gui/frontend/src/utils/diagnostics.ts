@@ -52,7 +52,13 @@ export function discoverFields(solveResults: unknown): DiscoveredField[] {
 	const elemKeys = new Set<string>();
 	const edgeKeys = new Set<string>();
 
-	const SKIP = new Set(["Y", "X", "success", "is_correlation"]);
+	const SKIP = new Set([
+		"Y",
+		"X",
+		"success",
+		"is_correlation",
+		"correlation_extrapolated",
+	]);
 
 	for (const nr of Object.values(
 		(r.node_results as Record<string, unknown>) ?? {},

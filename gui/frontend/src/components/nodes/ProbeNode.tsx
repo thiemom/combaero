@@ -64,9 +64,10 @@ function ProbeNode({ data, selected }: { data: any; selected?: boolean }) {
 	const result = targetElement?.data?.result;
 	const label = data.label || "Probe";
 	const targetLabel =
-		targetElement?.data?.label || (targetElement as any)?.type === "thermal"
-			? "Thermal Wall"
-			: targetElement?.type?.replace(/_/g, " ") ||
+		(targetElement as any)?.type === "thermal"
+			? (targetElement?.data?.label ?? "Thermal Wall")
+			: targetElement?.data?.label ||
+				targetElement?.type?.replace(/_/g, " ") ||
 				(data.target_id ? "Unknown target" : "No target");
 	const hasTarget = !!data.target_id;
 

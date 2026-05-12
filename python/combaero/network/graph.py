@@ -35,31 +35,29 @@ class FlowNetwork:
 
     def add_element(self, element: NetworkElement) -> None:
         """
-        Register a new flow element. Connects the element to its from_node and
-        to_node, ensuring they exist in the network.
+        Register a new flow element. Connects the element to its source and sink
+        nodes, ensuring they exist in the network.
         """
         if element.id in self.elements:
             raise ValueError(f"Element '{element.id}' already exists in topology.")
 
-        if element.from_node not in self.nodes:
-            raise ValueError(f"Unknown from_node '{element.from_node}' for element {element.id}.")
+        all_nodes = element.all_source_nodes() + element.all_sink_nodes()
+        for nid in all_nodes:
+            if nid not in self.nodes:
+                raise ValueError(f"Unknown node '{nid}' for element '{element.id}'.")
 
-        if element.to_node not in self.nodes:
-            raise ValueError(f"Unknown to_node '{element.to_node}' for element {element.id}.")
-
-        if element.from_node == element.to_node:
+        if len(all_nodes) != len(set(all_nodes)):
             raise ValueError(
-                f"Element '{element.id}' has from_node == to_node ('{element.from_node}'). "
-                "Self-loops are not permitted."
+                f"Element '{element.id}' has duplicate nodes among its source/sink nodes."
             )
 
         self.elements[element.id] = element
 
-        # Element 'from_node' -> implies element is downstream of the from_node
-        self._downstream_of_node[element.from_node].append(element.id)
+        for src in element.all_source_nodes():
+            self._downstream_of_node[src].append(element.id)
 
-        # Element 'to_node' -> implies element is upstream of the to_node
-        self._upstream_of_node[element.to_node].append(element.id)
+        for snk in element.all_sink_nodes():
+            self._upstream_of_node[snk].append(element.id)
 
     def add_wall(self, wall: ThermalWall) -> None:
         """Register a thermal coupling wall between two elements.
@@ -119,9 +117,13 @@ class FlowNetwork:
             visited.add(nid)
             for eid in self._upstream_of_node[nid] + self._downstream_of_node[nid]:
                 elem = self.elements[eid]
-                neighbour = elem.from_node if elem.to_node == nid else elem.to_node
-                if neighbour not in visited:
-                    queue.append(neighbour)
+                if nid in elem.all_sink_nodes():
+                    neighbours = elem.all_source_nodes()
+                else:
+                    neighbours = elem.all_sink_nodes()
+                for nb in neighbours:
+                    if nb not in visited:
+                        queue.append(nb)
         return visited
 
     def validate(self) -> None:
@@ -189,7 +191,9 @@ class FlowNetwork:
         # Every interior node must have at least 2 connected elements to satisfy continuity (in and out)
         # Boundary nodes only need at least 1.
         for node_id, node in self.nodes.items():
-            connected = self._upstream_of_node[node_id] + self._downstream_of_node[node_id]
+            upstream = self._upstream_of_node[node_id]
+            downstream = self._downstream_of_node[node_id]
+            connected = upstream + downstream
             is_boundary = type(node).__name__ in ("PressureBoundary", "MassFlowBoundary")
 
             if not connected:
@@ -202,6 +206,17 @@ class FlowNetwork:
                     f"FlowNetwork validation failed: interior node '{node_id}' has only {len(connected)} "
                     "connected element(s). Interior nodes must have at least 2 connections to satisfy "
                     "mass conservation."
+                )
+
+            # Every interior node needs at least one element delivering flow in and one taking
+            # flow out. All-upstream or all-downstream means mass cannot be conserved --
+            # the most common cause is a tee junction wired with the wrong port as inlet.
+            if not is_boundary and (not upstream or not downstream):
+                direction = "upstream" if not upstream else "downstream"
+                raise ValueError(
+                    f"FlowNetwork validation failed: interior node '{node_id}' has no {direction} "
+                    "connections -- flow has nowhere to go. This often means a tee junction port "
+                    "is wired backwards (e.g. C on a branching tee should be the inlet)."
                 )
 
     def to_dict(self) -> dict:

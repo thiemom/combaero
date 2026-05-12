@@ -9,12 +9,6 @@ const LosslessNode = ({ data }: { data: any }) => {
 			className={`px-3 py-1 shadow-sm rounded bg-stone-50 border-2 flex items-center gap-2 ${isSolved ? "border-green-400" : "border-stone-300"}`}
 			style={{ minWidth: "120px" }}
 		>
-			<Handle
-				type="target"
-				position={Position.Left}
-				className="w-2 h-2 !bg-stone-400"
-			/>
-
 			<div className="flex flex-col items-center justify-center p-1 bg-white rounded border border-stone-200">
 				<Link size={14} className="text-slate-500" />
 			</div>
@@ -28,6 +22,18 @@ const LosslessNode = ({ data }: { data: any }) => {
 				</div>
 			</div>
 
+			<div className="absolute -left-3 top-1/2 -translate-y-1/2 text-[7px] font-extrabold leading-none select-none pointer-events-none bg-white/70 rounded-sm px-0.5 text-blue-500">
+				in
+			</div>
+			<div className="absolute -right-3 top-1/2 -translate-y-1/2 text-[7px] font-extrabold leading-none select-none pointer-events-none bg-white/70 rounded-sm px-0.5 text-amber-500">
+				out
+			</div>
+
+			<Handle
+				type="target"
+				position={Position.Left}
+				className="w-2 h-2 !bg-stone-400"
+			/>
 			<Handle
 				type="source"
 				position={Position.Right}

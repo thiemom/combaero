@@ -288,6 +288,24 @@ inline constexpr Entry function_units[] = {
      "dS_dmu: -, mach_clamped: bool)"},
 
     // -------------------------------------------------------------------------
+    // tee_junction.h + solver_interface.h - Tee Junction Elements
+    // -------------------------------------------------------------------------
+    {"merging_tee_residuals_and_jacobian",
+     "m_dot_com: kg/s, m_dot_branch: kg/s, dP0_straight: Pa, dP0_branch: Pa, "
+     "P_static_com: Pa, T_com: K, Y_com: kg/kg, theta: rad, psi: -, F_C: m^2, "
+     "blend_k: - (default 30.0)",
+     "TeeJunctionResult (R_straight: Pa, R_branch: Pa, dR/dm_dot: Pa*s/kg, "
+     "dR/dP: -, dR/dT: Pa/K, dR/dY: Pa, K_straight: -, K_branch: -, "
+     "q: -, blend_w: -, topology_valid: bool, status: CorrelationValidity)"},
+    {"branching_tee_residuals_and_jacobian",
+     "m_dot_com: kg/s, m_dot_branch: kg/s, dP0_straight: Pa, dP0_branch: Pa, "
+     "P_static_com: Pa, T_com: K, Y_com: kg/kg, theta: rad, psi: -, F_C: m^2, "
+     "blend_k: - (default 30.0)",
+     "TeeJunctionResult (R_straight: Pa, R_branch: Pa, dR/dm_dot: Pa*s/kg, "
+     "dR/dP: -, dR/dT: Pa/K, dR/dY: Pa, K_straight: -, K_branch: -, "
+     "q: -, blend_w: -, topology_valid: bool, status: CorrelationValidity)"},
+
+    // -------------------------------------------------------------------------
     // friction.h - Friction Factor Correlations
     // -------------------------------------------------------------------------
     {"friction_haaland", "Re: -, e_D: -", "- (f)"},

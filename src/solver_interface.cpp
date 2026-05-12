@@ -1,5 +1,6 @@
 #include "../include/solver_interface.h"
 #include "../include/area_change.h"
+#include "../include/tee_junction.h"
 #include "../include/composition.h"
 #include "../include/transport.h"
 #include "../include/combustion.h"
@@ -1861,6 +1862,244 @@ AreaChangeElementResult conical_area_change_residuals_and_jacobian(
   }
 
   return res;
+}
+
+// -----------------------------------------------------------------------------
+// 5. Tee Junction Elements (Bassett 2001)
+// -----------------------------------------------------------------------------
+
+namespace {
+// Shared core computation for merging/branching tee wrappers.
+// Returns residuals + analytical m_dot Jacobians given pre-computed K values.
+struct TeeCore {
+    double R_straight;
+    double R_branch;
+    double dRs_d_mcom;
+    double dRs_d_mbranch;
+    double dRb_d_mcom;
+    double dRb_d_mbranch;
+    double q_dyn;
+    double q;
+};
+
+TeeCore tee_core(double m_dot_com, double m_dot_branch,
+                 double dP0_straight, double dP0_branch,
+                 double rho, double F_C,
+                 double Ks, double dKs_dq,
+                 double Kb, double dKb_dq) {
+    // Regularised flow ratio: q = m_dot_branch/m_dot_com, safe at m_dot_com=0.
+    // Uses q = m_b * m_c / (m_c^2 + eps^2) which gives 0 at m_c=0 and
+    // correct sign for both positive and negative m_dot_com.
+    constexpr double eps_m = 1e-10; // kg/s
+    const double m_com_sq = m_dot_com * m_dot_com;
+    const double m_com_sq_safe = m_com_sq + eps_m * eps_m;
+    const double q = m_dot_branch * m_dot_com / m_com_sq_safe;
+
+    // Regularised u_com^2 so residual is finite even at zero flow.
+    constexpr double eps_v_sq = 1e-12; // (m/s)^2
+    const double u_com_sq_safe =
+        m_com_sq / (rho * rho * F_C * F_C) + eps_v_sq;
+    const double q_dyn = 0.5 * rho * u_com_sq_safe;
+
+    // Residuals
+    const double R_straight = dP0_straight - Ks * q_dyn;
+    const double R_branch = dP0_branch - Kb * q_dyn;
+
+    // Analytical Jacobians for m_dot (psi/theta fixed; only q varies with flow)
+    // dq/dm_dot_com = m_dot_branch * (eps^2 - m_com_sq) / m_com_sq_safe^2
+    // dq/dm_dot_branch = m_dot_com / m_com_sq_safe
+    const double dq_dmcom =
+        m_dot_branch * (eps_m * eps_m - m_com_sq) / (m_com_sq_safe * m_com_sq_safe);
+    const double dq_dmbranch = m_dot_com / m_com_sq_safe;
+
+    // dq_dyn/dm_dot_com = m_dot_com / (rho * F_C^2)
+    const double dqdyn_dmcom = m_dot_com / (rho * F_C * F_C);
+
+    const double dRs_dmcom =
+        -dKs_dq * dq_dmcom * q_dyn - Ks * dqdyn_dmcom;
+    const double dRs_dmbranch = -dKs_dq * dq_dmbranch * q_dyn;
+    const double dRb_dmcom =
+        -dKb_dq * dq_dmcom * q_dyn - Kb * dqdyn_dmcom;
+    const double dRb_dmbranch = -dKb_dq * dq_dmbranch * q_dyn;
+
+    return {R_straight, R_branch, dRs_dmcom, dRs_dmbranch,
+            dRb_dmcom, dRb_dmbranch, q_dyn, q};
+}
+
+// Finite-difference Jacobians for density-dependent variables (T, P_static, Y).
+// Evaluates func(rho_perturbed) to get the FD derivative.
+void tee_fd_density_jacobians(
+    double m_dot_com, double m_dot_branch,
+    double dP0_straight, double dP0_branch,
+    double P_static, double T,
+    const std::vector<double>& X,
+    double theta, double psi, double F_C, double blend_k,
+    bool is_merging,
+    double& dRs_dP, double& dRb_dP,
+    double& dRs_dT, double& dRb_dT,
+    std::vector<double>& dRs_dY, std::vector<double>& dRb_dY,
+    const std::vector<double>& Y) {
+
+    // K depends only on q/psi/theta -- compute once, reuse across all rho evals.
+    constexpr double eps_m = 1e-10;
+    const double q = m_dot_branch * m_dot_com
+                     / (m_dot_com * m_dot_com + eps_m * eps_m);
+    double Ks, dKs, Kb, dKb;
+    if (is_merging) {
+        Ks  = merging_tee_K_straight(q, psi, theta, blend_k);
+        dKs = merging_tee_dK_straight_dq(q, psi, theta, blend_k);
+        Kb  = merging_tee_K_branch(q, psi, theta, blend_k);
+        dKb = merging_tee_dK_branch_dq(q, psi, theta, blend_k);
+    } else {
+        Ks  = branching_tee_K_straight(q, psi, theta, blend_k);
+        dKs = branching_tee_dK_straight_dq(q, psi, theta, blend_k);
+        Kb  = branching_tee_K_branch(q, psi, theta, blend_k);
+        dKb = branching_tee_dK_branch_dq(q, psi, theta, blend_k);
+    }
+
+    auto eval = [&](double rho) {
+        auto c = tee_core(m_dot_com, m_dot_branch, dP0_straight, dP0_branch,
+                          rho, F_C, Ks, dKs, Kb, dKb);
+        return std::make_pair(c.R_straight, c.R_branch);
+    };
+
+    // Central FD w.r.t. P_static
+    const double eps_P = 1.0;
+    auto [Rs_pp, Rb_pp] = eval(std::get<0>(density_and_jacobians(T, P_static + eps_P, X)));
+    auto [Rs_pm, Rb_pm] = eval(std::get<0>(density_and_jacobians(T, P_static - eps_P, X)));
+    dRs_dP = (Rs_pp - Rs_pm) / (2.0 * eps_P);
+    dRb_dP = (Rb_pp - Rb_pm) / (2.0 * eps_P);
+
+    // Central FD w.r.t. T
+    const double eps_T = 1e-3;
+    auto [Rs_tp, Rb_tp] = eval(std::get<0>(density_and_jacobians(T + eps_T, P_static, X)));
+    auto [Rs_tm, Rb_tm] = eval(std::get<0>(density_and_jacobians(T - eps_T, P_static, X)));
+    dRs_dT = (Rs_tp - Rs_tm) / (2.0 * eps_T);
+    dRb_dT = (Rb_tp - Rb_tm) / (2.0 * eps_T);
+
+    // Central FD w.r.t. Y[i] (composition)
+    const double eps_Y = 1e-6;
+    dRs_dY.assign(Y.size(), 0.0);
+    dRb_dY.assign(Y.size(), 0.0);
+    for (std::size_t i = 0; i < Y.size(); ++i) {
+        std::vector<double> Y_p = Y, Y_m = Y;
+        Y_p[i] += eps_Y;
+        Y_m[i] -= eps_Y;
+        auto X_p = combaero::mass_to_mole(combaero::normalize_fractions(Y_p));
+        auto X_m = combaero::mass_to_mole(combaero::normalize_fractions(Y_m));
+        auto [Rs_yp, Rb_yp] = eval(std::get<0>(density_and_jacobians(T, P_static, X_p)));
+        auto [Rs_ym, Rb_ym] = eval(std::get<0>(density_and_jacobians(T, P_static, X_m)));
+        dRs_dY[i] = (Rs_yp - Rs_ym) / (2.0 * eps_Y);
+        dRb_dY[i] = (Rb_yp - Rb_ym) / (2.0 * eps_Y);
+    }
+}
+} // anonymous namespace
+
+TeeJunctionResult merging_tee_residuals_and_jacobian(
+    double m_dot_com, double m_dot_branch,
+    double dP0_straight, double dP0_branch,
+    double P_static_com, double T_com,
+    const std::vector<double>& Y_com,
+    double theta, double psi, double F_C,
+    double blend_k) {
+
+    const auto X_com = combaero::mass_to_mole(
+        combaero::normalize_fractions(Y_com));
+    const auto [rho, drho_dT, drho_dP] =
+        density_and_jacobians(T_com, P_static_com, X_com);
+
+    // Flow ratio (regularised) and blended K values
+    constexpr double eps_m = 1e-10;
+    const double m_com_sq_safe =
+        m_dot_com * m_dot_com + eps_m * eps_m;
+    const double q = m_dot_branch * m_dot_com / m_com_sq_safe;
+
+    const double Ks = merging_tee_K_straight(q, psi, theta, blend_k);
+    const double dKs = merging_tee_dK_straight_dq(q, psi, theta, blend_k);
+    const double Kb = merging_tee_K_branch(q, psi, theta, blend_k);
+    const double dKb = merging_tee_dK_branch_dq(q, psi, theta, blend_k);
+
+    auto core = tee_core(m_dot_com, m_dot_branch, dP0_straight, dP0_branch,
+                         rho, F_C, Ks, dKs, Kb, dKb);
+
+    TeeJunctionResult res;
+    res.R_straight = core.R_straight;
+    res.R_branch = core.R_branch;
+    res.dR_straight_d_mdot_com = core.dRs_d_mcom;
+    res.dR_straight_d_mdot_branch = core.dRs_d_mbranch;
+    res.dR_branch_d_mdot_com = core.dRb_d_mcom;
+    res.dR_branch_d_mdot_branch = core.dRb_d_mbranch;
+
+    tee_fd_density_jacobians(
+        m_dot_com, m_dot_branch, dP0_straight, dP0_branch,
+        P_static_com, T_com, X_com, theta, psi, F_C, blend_k, true,
+        res.dR_straight_dP_static_com, res.dR_branch_dP_static_com,
+        res.dR_straight_dT_com, res.dR_branch_dT_com,
+        res.dR_straight_dY_com, res.dR_branch_dY_com, Y_com);
+
+    res.K_straight = Ks;
+    res.K_branch = Kb;
+    res.q = q;
+    res.blend_w = blend_weight(q, blend_k);
+    res.topology_valid = tee_topology_valid(q);
+    auto inp = tee_check_inputs(q, psi, theta);
+    res.status = inp.valid() ? CorrelationValidity::VALID
+                             : CorrelationValidity::EXTRAPOLATED;
+
+    return res;
+}
+
+TeeJunctionResult branching_tee_residuals_and_jacobian(
+    double m_dot_com, double m_dot_branch,
+    double dP0_straight, double dP0_branch,
+    double P_static_com, double T_com,
+    const std::vector<double>& Y_com,
+    double theta, double psi, double F_C,
+    double blend_k) {
+
+    const auto X_com = combaero::mass_to_mole(
+        combaero::normalize_fractions(Y_com));
+    const auto [rho, drho_dT, drho_dP] =
+        density_and_jacobians(T_com, P_static_com, X_com);
+
+    constexpr double eps_m = 1e-10;
+    const double m_com_sq_safe =
+        m_dot_com * m_dot_com + eps_m * eps_m;
+    const double q = m_dot_branch * m_dot_com / m_com_sq_safe;
+
+    const double Ks = branching_tee_K_straight(q, psi, theta, blend_k);
+    const double dKs = branching_tee_dK_straight_dq(q, psi, theta, blend_k);
+    const double Kb = branching_tee_K_branch(q, psi, theta, blend_k);
+    const double dKb = branching_tee_dK_branch_dq(q, psi, theta, blend_k);
+
+    auto core = tee_core(m_dot_com, m_dot_branch, dP0_straight, dP0_branch,
+                         rho, F_C, Ks, dKs, Kb, dKb);
+
+    TeeJunctionResult res;
+    res.R_straight = core.R_straight;
+    res.R_branch = core.R_branch;
+    res.dR_straight_d_mdot_com = core.dRs_d_mcom;
+    res.dR_straight_d_mdot_branch = core.dRs_d_mbranch;
+    res.dR_branch_d_mdot_com = core.dRb_d_mcom;
+    res.dR_branch_d_mdot_branch = core.dRb_d_mbranch;
+
+    tee_fd_density_jacobians(
+        m_dot_com, m_dot_branch, dP0_straight, dP0_branch,
+        P_static_com, T_com, X_com, theta, psi, F_C, blend_k, false,
+        res.dR_straight_dP_static_com, res.dR_branch_dP_static_com,
+        res.dR_straight_dT_com, res.dR_branch_dT_com,
+        res.dR_straight_dY_com, res.dR_branch_dY_com, Y_com);
+
+    res.K_straight = Ks;
+    res.K_branch = Kb;
+    res.q = q;
+    res.blend_w = blend_weight(q, blend_k);
+    res.topology_valid = tee_topology_valid(q);
+    auto inp = tee_check_inputs(q, psi, theta);
+    res.status = inp.valid() ? CorrelationValidity::VALID
+                             : CorrelationValidity::EXTRAPOLATED;
+
+    return res;
 }
 
 } // namespace solver

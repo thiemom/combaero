@@ -674,6 +674,22 @@ class NetworkElement(ABC):
         """Called automatically by FlowNetwork to resolve neighbors."""
         pass
 
+    def all_source_nodes(self) -> list[str]:
+        """All node IDs this element draws flow FROM."""
+        return [self.from_node]
+
+    def all_sink_nodes(self) -> list[str]:
+        """All node IDs this element delivers flow TO."""
+        return [self.to_node]
+
+    def flow_at_node(self, node_id: str, x: Any, indices: list[int]) -> float:
+        """Mass flow this element contributes at the given connected node."""
+        return float(x[indices[0]])
+
+    def flow_jac_at_node(self, node_id: str, indices: list[int]) -> dict[int, float]:
+        """d(mass_flow_at_node)/d(solver_unknown): {global_index: coefficient}."""
+        return {indices[0]: 1.0}
+
     def validate(self) -> None:
         """Perform element-specific validation checks.
         Should raise ValueError with a clear message if validation fails.
@@ -2509,4 +2525,222 @@ class AreaChangeElement(NetworkElement):
             "area_ratio": float(area_ratio),
             "zeta": float(zeta),
             "mach_loss_ref": float(mach_loss_ref),
+        }
+
+
+class TeeJunctionElement(NetworkElement):
+    """
+    Three-port tee junction element using Bassett 2001 pressure-loss coefficients.
+
+    Merging (tee_type="merging"): straight_node and branch_node are inlets;
+    common_node is the outlet.
+
+    Branching (tee_type="branching"): common_node is the inlet; straight_node
+    and branch_node are outlets.
+
+    Unknowns: m_dot_com (total common flow) and m_dot_branch (branch flow).
+    Straight flow is implicit: m_dot_straight = m_dot_com - m_dot_branch.
+    """
+
+    def __init__(
+        self,
+        id: str,
+        common_node: str,
+        straight_node: str,
+        branch_node: str,
+        theta: float,
+        F_C: float,
+        psi: float = 1.0,
+        tee_type: Literal["merging", "branching"] = "merging",
+        blend_k: float = 30.0,
+    ):
+        from_node = straight_node if tee_type == "merging" else common_node
+        to_node = common_node if tee_type == "merging" else straight_node
+        super().__init__(id, from_node, to_node)
+        self.common_node = common_node
+        self.straight_node = straight_node
+        self.branch_node = branch_node
+        self.theta = theta
+        self.F_C = F_C
+        self.psi = psi
+        self.tee_type = tee_type
+        self.blend_k = blend_k
+
+    def all_source_nodes(self) -> list[str]:
+        if self.tee_type == "merging":
+            return [self.straight_node, self.branch_node]
+        return [self.common_node]
+
+    def all_sink_nodes(self) -> list[str]:
+        if self.tee_type == "merging":
+            return [self.common_node]
+        return [self.straight_node, self.branch_node]
+
+    def flow_at_node(self, node_id: str, x: Any, indices: list[int]) -> float:
+        m_com = float(x[indices[0]])
+        m_branch = float(x[indices[1]])
+        if node_id == self.common_node:
+            return m_com
+        if node_id == self.branch_node:
+            return m_branch
+        return m_com - m_branch  # straight_node
+
+    def flow_jac_at_node(self, node_id: str, indices: list[int]) -> dict[int, float]:
+        if node_id == self.common_node:
+            return {indices[0]: 1.0}
+        if node_id == self.branch_node:
+            return {indices[1]: 1.0}
+        return {indices[0]: 1.0, indices[1]: -1.0}  # straight_node
+
+    def unknowns(self) -> list[str]:
+        return [f"{self.id}.m_dot_com", f"{self.id}.m_dot_branch"]
+
+    def n_equations(self) -> int:
+        return 2
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        pass
+
+    def validate(self) -> None:
+        if self.tee_type not in ("merging", "branching"):
+            raise ValueError(
+                f"TeeJunctionElement '{self.id}': tee_type must be 'merging' or 'branching'."
+            )
+        if not (abs(self.theta) <= math.pi / 2.0):
+            raise ValueError(
+                f"TeeJunctionElement '{self.id}': |theta| must be <= pi/2, got {self.theta}."
+            )
+        if self.F_C <= 0.0:
+            raise ValueError(f"TeeJunctionElement '{self.id}': F_C must be > 0, got {self.F_C}.")
+        if self.psi <= 0.0:
+            raise ValueError(f"TeeJunctionElement '{self.id}': psi must be > 0, got {self.psi}.")
+
+    def residuals(
+        self,
+        state_com: NetworkMixtureState,
+        state_straight: NetworkMixtureState,
+        state_branch: NetworkMixtureState,
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        m_com = state_com.m_dot
+        m_branch = state_branch.m_dot
+
+        if self.tee_type == "merging":
+            dP0_straight = state_straight.Pt - state_com.P
+            dP0_branch = state_branch.Pt - state_com.P
+            res = cb._core.merging_tee_residuals_and_jacobian(
+                m_dot_com=m_com,
+                m_dot_branch=m_branch,
+                dP0_straight=dP0_straight,
+                dP0_branch=dP0_branch,
+                P_static_com=state_com.P,
+                T_com=state_com.T,
+                Y_com=state_com.Y,
+                theta=abs(self.theta),
+                psi=self.psi,
+                F_C=self.F_C,
+                blend_k=self.blend_k,
+            )
+            jac: dict[int, dict[str, float]] = {
+                0: {
+                    f"{self.id}.m_dot_com": res.dR_straight_d_mdot_com,
+                    f"{self.id}.m_dot_branch": res.dR_straight_d_mdot_branch,
+                    f"{self.straight_node}.Pt": 1.0,
+                    f"{self.common_node}.P": -1.0 + res.dR_straight_dP_static_com,
+                    f"{self.common_node}.T": res.dR_straight_dT_com,
+                },
+                1: {
+                    f"{self.id}.m_dot_com": res.dR_branch_d_mdot_com,
+                    f"{self.id}.m_dot_branch": res.dR_branch_d_mdot_branch,
+                    f"{self.branch_node}.Pt": 1.0,
+                    f"{self.common_node}.P": -1.0 + res.dR_branch_dP_static_com,
+                    f"{self.common_node}.T": res.dR_branch_dT_com,
+                },
+            }
+        else:
+            dP0_straight = state_com.Pt - state_straight.P
+            dP0_branch = state_com.Pt - state_branch.P
+            res = cb._core.branching_tee_residuals_and_jacobian(
+                m_dot_com=m_com,
+                m_dot_branch=m_branch,
+                dP0_straight=dP0_straight,
+                dP0_branch=dP0_branch,
+                P_static_com=state_com.P,
+                T_com=state_com.T,
+                Y_com=state_com.Y,
+                theta=abs(self.theta),
+                psi=self.psi,
+                F_C=self.F_C,
+                blend_k=self.blend_k,
+            )
+            jac = {
+                0: {
+                    f"{self.id}.m_dot_com": res.dR_straight_d_mdot_com,
+                    f"{self.id}.m_dot_branch": res.dR_straight_d_mdot_branch,
+                    f"{self.common_node}.Pt": 1.0,
+                    f"{self.straight_node}.P": -1.0,
+                    f"{self.common_node}.P": res.dR_straight_dP_static_com,
+                    f"{self.common_node}.T": res.dR_straight_dT_com,
+                },
+                1: {
+                    f"{self.id}.m_dot_com": res.dR_branch_d_mdot_com,
+                    f"{self.id}.m_dot_branch": res.dR_branch_d_mdot_branch,
+                    f"{self.common_node}.Pt": 1.0,
+                    f"{self.branch_node}.P": -1.0,
+                    f"{self.common_node}.P": res.dR_branch_dP_static_com,
+                    f"{self.common_node}.T": res.dR_branch_dT_com,
+                },
+            }
+
+        for i, v in enumerate(res.dR_straight_dY_com):
+            jac[0][f"{self.common_node}.Y[{i}]"] = v
+        for i, v in enumerate(res.dR_branch_dY_com):
+            jac[1][f"{self.common_node}.Y[{i}]"] = v
+
+        return [res.R_straight, res.R_branch], jac
+
+    def diagnostics(
+        self,
+        state_com: NetworkMixtureState,
+        state_straight: NetworkMixtureState,
+        state_branch: NetworkMixtureState,
+    ) -> dict[str, float]:
+        m_com = state_com.m_dot
+        m_branch = state_branch.m_dot
+        if self.tee_type == "merging":
+            res = cb._core.merging_tee_residuals_and_jacobian(
+                m_dot_com=m_com,
+                m_dot_branch=m_branch,
+                dP0_straight=state_straight.Pt - state_com.P,
+                dP0_branch=state_branch.Pt - state_com.P,
+                P_static_com=state_com.P,
+                T_com=state_com.T,
+                Y_com=state_com.Y,
+                theta=abs(self.theta),
+                psi=self.psi,
+                F_C=self.F_C,
+                blend_k=self.blend_k,
+            )
+        else:
+            res = cb._core.branching_tee_residuals_and_jacobian(
+                m_dot_com=m_com,
+                m_dot_branch=m_branch,
+                dP0_straight=state_com.Pt - state_straight.P,
+                dP0_branch=state_com.Pt - state_branch.P,
+                P_static_com=state_com.P,
+                T_com=state_com.T,
+                Y_com=state_com.Y,
+                theta=abs(self.theta),
+                psi=self.psi,
+                F_C=self.F_C,
+                blend_k=self.blend_k,
+            )
+        is_extrapolated = res.status != cb._core.CorrelationValidity.VALID
+        return {
+            "m_dot_com": float(m_com),
+            "m_dot_straight": float(m_com - m_branch),
+            "m_dot_branch": float(m_branch),
+            "mass_flow_ratio": float(res.q),
+            "K_straight": float(res.K_straight),
+            "K_branch": float(res.K_branch),
+            "correlation_extrapolated": 1.0 if is_extrapolated else 0.0,
         }
