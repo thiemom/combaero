@@ -35,9 +35,11 @@ export default function FlowEdge({
 }: EdgeProps) {
 	const nodes = useNodes();
 	const sourceRotation =
-		nodes.find((n) => n.id === source)?.data?.rotation ?? 0;
+		(nodes.find((n) => n.id === source)?.data as { rotation?: number })
+			?.rotation ?? 0;
 	const targetRotation =
-		nodes.find((n) => n.id === target)?.data?.rotation ?? 0;
+		(nodes.find((n) => n.id === target)?.data as { rotation?: number })
+			?.rotation ?? 0;
 
 	const adjSourcePos = rotatePosition(sourcePosition, sourceRotation);
 	const adjTargetPos = rotatePosition(targetPosition, targetRotation);
