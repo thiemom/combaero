@@ -65,6 +65,17 @@ export const QUANTITY_CATALOGUE: Record<
 	mw: { label: "mw", unit: "g/mol", format: (v) => v.toFixed(2) },
 	nu: { label: "nu", unit: "m²/s", format: (v) => v.toExponential(2) },
 	u: { label: "u", unit: "J/kg", format: (v) => v.toFixed(0) },
+	// Tee junction diagnostics
+	m_dot_com: { label: "ṁ com", unit: "kg/s", format: (v) => v.toFixed(4) },
+	m_dot_straight: { label: "ṁ str", unit: "kg/s", format: (v) => v.toFixed(4) },
+	m_dot_branch: { label: "ṁ br", unit: "kg/s", format: (v) => v.toFixed(4) },
+	mass_flow_ratio: {
+		label: "ṁ str/ṁ com",
+		unit: "kg/kg",
+		format: (v) => v.toFixed(3),
+	},
+	K_straight: { label: "K str", unit: "—", format: (v) => v.toFixed(3) },
+	K_branch: { label: "K br", unit: "—", format: (v) => v.toFixed(3) },
 	// Element-specific diagnostics (Static)
 	P_in: { label: "Pi", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
 	P_out: { label: "Po", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },

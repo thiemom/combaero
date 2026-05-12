@@ -22,6 +22,7 @@
 #include "orifice.h"
 #include "registry.h"
 #include "solver_interface.h"
+#include "tee_junction.h"
 #include "stagnation.h"
 #include "state.h"
 #include "thermo.h"
@@ -345,6 +346,120 @@ PYBIND11_MODULE(_core, m) {
         py::arg("F0"), py::arg("F1"), py::arg("length"),
         py::arg("m_scale") = 1e-4,
         "Network-level conical area change with all derivatives.");
+
+  // Tee junction (Bassett 2001)
+  py::class_<solver::TeeJunctionResult>(
+      m, "TeeJunctionResult",
+      "Result of merging/branching_tee_residuals_and_jacobian for network solver")
+      .def(py::init<>())
+      .def_readonly("R_straight", &solver::TeeJunctionResult::R_straight)
+      .def_readonly("R_branch", &solver::TeeJunctionResult::R_branch)
+      .def_readonly("dR_straight_d_mdot_com",
+                    &solver::TeeJunctionResult::dR_straight_d_mdot_com)
+      .def_readonly("dR_straight_d_mdot_branch",
+                    &solver::TeeJunctionResult::dR_straight_d_mdot_branch)
+      .def_readonly("dR_straight_dP_static_com",
+                    &solver::TeeJunctionResult::dR_straight_dP_static_com)
+      .def_readonly("dR_straight_dT_com",
+                    &solver::TeeJunctionResult::dR_straight_dT_com)
+      .def_readonly("dR_straight_dY_com",
+                    &solver::TeeJunctionResult::dR_straight_dY_com)
+      .def_readonly("dR_branch_d_mdot_com",
+                    &solver::TeeJunctionResult::dR_branch_d_mdot_com)
+      .def_readonly("dR_branch_d_mdot_branch",
+                    &solver::TeeJunctionResult::dR_branch_d_mdot_branch)
+      .def_readonly("dR_branch_dP_static_com",
+                    &solver::TeeJunctionResult::dR_branch_dP_static_com)
+      .def_readonly("dR_branch_dT_com",
+                    &solver::TeeJunctionResult::dR_branch_dT_com)
+      .def_readonly("dR_branch_dY_com",
+                    &solver::TeeJunctionResult::dR_branch_dY_com)
+      .def_readonly("K_straight", &solver::TeeJunctionResult::K_straight)
+      .def_readonly("K_branch", &solver::TeeJunctionResult::K_branch)
+      .def_readonly("q", &solver::TeeJunctionResult::q)
+      .def_readonly("blend_w", &solver::TeeJunctionResult::blend_w)
+      .def_readonly("topology_valid", &solver::TeeJunctionResult::topology_valid)
+      .def_readonly("status", &solver::TeeJunctionResult::status);
+
+  m.def("merging_tee_residuals_and_jacobian",
+        &solver::merging_tee_residuals_and_jacobian,
+        py::arg("m_dot_com"), py::arg("m_dot_branch"),
+        py::arg("dP0_straight"), py::arg("dP0_branch"),
+        py::arg("P_static_com"), py::arg("T_com"), py::arg("Y_com"),
+        py::arg("theta"), py::arg("psi"), py::arg("F_C"),
+        py::arg("blend_k") = 30.0,
+        "MergingTee (joining flow, Bassett 2001 type 6) residuals and Jacobians.\n\n"
+        "Parameters:\n"
+        "  m_dot_com    : total outlet flow C [kg/s]\n"
+        "  m_dot_branch : branch inlet flow B [kg/s]\n"
+        "  dP0_straight : p0_A - p0_C [Pa]\n"
+        "  dP0_branch   : p0_B - p0_C [Pa]\n"
+        "  P_static_com : static pressure at port C [Pa] (for density)\n"
+        "  T_com        : temperature at port C [K]\n"
+        "  Y_com        : mass fractions at port C [-]\n"
+        "  theta        : branch angle [rad] (valid: (0, pi/2])\n"
+        "  psi          : area ratio F_C/F_B [-] (valid: >= 0.05)\n"
+        "  F_C          : main duct area [m^2]\n"
+        "  blend_k      : tanh blend sharpness (default 30.0)\n\n"
+        "Returns: TeeJunctionResult");
+
+  m.def("branching_tee_residuals_and_jacobian",
+        &solver::branching_tee_residuals_and_jacobian,
+        py::arg("m_dot_com"), py::arg("m_dot_branch"),
+        py::arg("dP0_straight"), py::arg("dP0_branch"),
+        py::arg("P_static_com"), py::arg("T_com"), py::arg("Y_com"),
+        py::arg("theta"), py::arg("psi"), py::arg("F_C"),
+        py::arg("blend_k") = 30.0,
+        "BranchingTee (separating flow, Bassett 2001 type 3) residuals and Jacobians.\n\n"
+        "Parameters:\n"
+        "  m_dot_com    : total inlet flow C [kg/s]\n"
+        "  m_dot_branch : branch outlet flow B [kg/s]\n"
+        "  dP0_straight : p0_C - p0_A [Pa]\n"
+        "  dP0_branch   : p0_C - p0_B [Pa]\n"
+        "  P_static_com : static pressure at port C [Pa] (for density)\n"
+        "  T_com        : temperature at port C [K]\n"
+        "  Y_com        : mass fractions at port C [-]\n"
+        "  theta        : branch angle [rad] (valid: (0, pi/2])\n"
+        "  psi          : area ratio F_C/F_B [-] (valid: >= 0.05)\n"
+        "  F_C          : main duct area [m^2]\n"
+        "  blend_k      : tanh blend sharpness (default 30.0)\n\n"
+        "Returns: TeeJunctionResult");
+
+  // Tee junction pure K functions and helpers (for testing and diagnostics)
+  m.def("tee_K5", &combaero::K5, py::arg("q"),
+        "Bassett K5: straight-through loss, separating flow. K5(q) = q^2-1.5q+0.5");
+  m.def("tee_K6", &combaero::K6, py::arg("q"), py::arg("psi"), py::arg("theta"),
+        "Bassett K6: branch loss, separating flow type 3.");
+  m.def("tee_K11", &combaero::K11, py::arg("q"), py::arg("psi"), py::arg("theta"),
+        "Bassett K11: straight-to-outlet, joining flow type 6.");
+  m.def("tee_K12", &combaero::K12, py::arg("q"), py::arg("psi"), py::arg("theta"),
+        "Bassett K12: branch-to-outlet, joining flow type 6.");
+  m.def("tee_blend_weight", &combaero::blend_weight,
+        py::arg("r"), py::arg("k") = 30.0,
+        "Smooth topology blend weight: 0.5*(1+tanh(k*r)).");
+  m.def("tee_check_inputs",
+        [](double q, double psi, double theta) {
+            auto s = combaero::tee_check_inputs(q, psi, theta);
+            return py::dict(py::arg("q_in_range") = s.q_in_range,
+                            py::arg("psi_valid") = s.psi_valid,
+                            py::arg("theta_valid") = s.theta_valid,
+                            py::arg("valid") = s.valid());
+        },
+        py::arg("q"), py::arg("psi"), py::arg("theta"),
+        "Check if tee junction inputs are in the Bassett 2001 validated range.\n"
+        "Returns dict with q_in_range, psi_valid, theta_valid, valid keys.");
+  m.def("merging_tee_K_straight", &combaero::merging_tee_K_straight,
+        py::arg("q"), py::arg("psi"), py::arg("theta"), py::arg("blend_k") = 30.0,
+        "MergingTee effective straight-path K (blended, with soft bounds).");
+  m.def("merging_tee_K_branch", &combaero::merging_tee_K_branch,
+        py::arg("q"), py::arg("psi"), py::arg("theta"), py::arg("blend_k") = 30.0,
+        "MergingTee effective branch-path K (blended, with soft bounds).");
+  m.def("branching_tee_K_straight", &combaero::branching_tee_K_straight,
+        py::arg("q"), py::arg("psi"), py::arg("theta"), py::arg("blend_k") = 30.0,
+        "BranchingTee effective straight-path K (blended, with soft bounds).");
+  m.def("branching_tee_K_branch", &combaero::branching_tee_K_branch,
+        py::arg("q"), py::arg("psi"), py::arg("theta"), py::arg("blend_k") = 30.0,
+        "BranchingTee effective branch-path K (blended, with soft bounds).");
 
   // Species metadata helpers
   m.def("num_species", &num_species,

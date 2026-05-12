@@ -584,6 +584,73 @@ AreaChangeElementResult conical_area_change_residuals_and_jacobian(
     const std::vector<double>& Y_up, double P_static_down,
     double F0, double F1, double length, double m_scale = 1e-4);
 
+// -----------------------------------------------------------------------------
+// 5. Tee Junction Elements (Bassett 2001)
+// -----------------------------------------------------------------------------
+// Three-port pressure-loss elements: MergingTee and BranchingTee.
+// Both residuals are normalised by 0.5*rho*u_com^2.
+//
+// Port convention:
+//   MergingTee:   MAIN_INLET=A, BRANCH=B (inflow),  MAIN_OUTLET=C (common)
+//   BranchingTee: MAIN_OUTLET=A, BRANCH=B (outflow), MAIN_INLET=C (common)
+//
+// Inputs common to both wrappers:
+//   m_dot_com    : total flow at common port C [kg/s] (positive = design direction)
+//   m_dot_branch : branch flow at port B [kg/s] (positive = design direction)
+//   dP0_straight : p0_upstream - p0_downstream for the straight path [Pa]
+//   dP0_branch   : p0_upstream - p0_downstream for the branch path [Pa]
+//   P_static_com : static pressure at common port [Pa] (used for density)
+//   T_com        : temperature at common port [K]
+//   Y_com        : mass fractions at common port [-]
+//   theta        : branch angle [rad] (validated range: (0, pi/2])
+//   psi          : area ratio F_C/F_B [-] (validated range: >= 0.05)
+//   F_C          : main duct cross-section area [m^2]
+//   blend_k      : tanh blend sharpness (default 30.0)
+
+struct TeeJunctionResult {
+    // Straight path residual and m_dot Jacobians (analytical)
+    double R_straight;
+    double dR_straight_d_mdot_com;
+    double dR_straight_d_mdot_branch;
+    // Straight path: density-dependent Jacobians (finite difference)
+    double dR_straight_dP_static_com;
+    double dR_straight_dT_com;
+    std::vector<double> dR_straight_dY_com;
+
+    // Branch path residual and m_dot Jacobians (analytical)
+    double R_branch;
+    double dR_branch_d_mdot_com;
+    double dR_branch_d_mdot_branch;
+    // Branch path: density-dependent Jacobians (finite difference)
+    double dR_branch_dP_static_com;
+    double dR_branch_dT_com;
+    std::vector<double> dR_branch_dY_com;
+
+    // Diagnostics
+    double K_straight;      // effective straight-path loss coefficient
+    double K_branch;        // effective branch-path loss coefficient
+    double q;               // flow ratio m_dot_branch / m_dot_com
+    double blend_w;         // tanh blend weight (1 = primary topology)
+    bool topology_valid;    // true if q in design direction (within 5% margin)
+    CorrelationValidity status; // VALID if inputs in validated Bassett range
+};
+
+TeeJunctionResult merging_tee_residuals_and_jacobian(
+    double m_dot_com, double m_dot_branch,
+    double dP0_straight, double dP0_branch,
+    double P_static_com, double T_com,
+    const std::vector<double>& Y_com,
+    double theta, double psi, double F_C,
+    double blend_k = 30.0);
+
+TeeJunctionResult branching_tee_residuals_and_jacobian(
+    double m_dot_com, double m_dot_branch,
+    double dP0_straight, double dP0_branch,
+    double P_static_com, double T_com,
+    const std::vector<double>& Y_com,
+    double theta, double psi, double F_C,
+    double blend_k = 30.0);
+
 } // namespace solver
 } // namespace combaero
 

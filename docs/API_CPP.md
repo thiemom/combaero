@@ -22,6 +22,7 @@ This document provides the technical reference for the CombAero C++ library. For
 - [Acoustics (acoustics.h)](#acoustics-acousticsh)
 - [Humid Air (humidair.h)](#humid-air-humidairh)
 - [Network Solver Interface (solver_interface.h)](#network-solver-interface-solver_interfaceh)
+  - [Tee Junction Components](#tee-junction-components-tee_junctionh--solver_interfaceh)
 
 ---
 
@@ -695,6 +696,84 @@ ChannelResult channel_compressible_residuals_and_jacobian(
     double P_static_down, double L, double D, double roughness,
     const std::string& friction_model);
 ```
+
+### Tee Junction Components (tee_junction.h + solver_interface.h)
+```cpp
+// Constants
+constexpr double TEE_Q_LO     = 0.0;        // lower bound of validated flow ratio
+constexpr double TEE_Q_HI     = 1.0;        // upper bound of validated flow ratio
+constexpr double TEE_PSI_MIN  = 0.05;       // minimum area ratio psi = A_branch / A_com
+constexpr double TEE_THETA_MAX = M_PI / 2;  // maximum branch angle
+
+// Validity check (non-throwing)
+struct TeeInputStatus {
+    bool q_in_range;
+    bool psi_valid;
+    bool theta_valid;
+    bool valid() const;
+    CorrelationStatus status() const;
+};
+TeeInputStatus tee_check_inputs(double q, double psi, double theta);
+
+// Raw K-coefficient functions (Bassett 2001, Table 2) -- pure, no guards
+double K5(double q);                                   // straight arm, separating
+double K6(double q, double psi, double theta);         // branch arm, separating
+double K11(double q, double psi, double theta);        // straight arm, joining
+double K12(double q, double psi, double theta);        // branch arm, joining
+double dK5_dq(double q);
+double dK6_dq(double q, double psi, double theta);
+double dK11_dq(double q, double psi, double theta);
+double dK12_dq(double q, double psi, double theta);
+
+// Smooth blend helpers
+double soft_lower(double x, double lo);              // smooth max(x, lo)
+double blend_weight(double r, double k = 30.0);      // 0.5*(1+tanh(k*r))
+double blend_weight_deriv(double r, double k = 30.0); // d(blend_weight)/dr
+
+// Blended K functions (safe for any real inputs, never NaN)
+double merging_tee_K_straight(double q, double psi, double theta, double blend_k = 30.0);
+double merging_tee_K_branch(double q, double psi, double theta, double blend_k = 30.0);
+double branching_tee_K_straight(double q, double psi, double theta, double blend_k = 30.0);
+double branching_tee_K_branch(double q, double psi, double theta, double blend_k = 30.0);
+
+// Helper utilities
+double tee_flow_ratio(double m_dot_branch, double m_dot_com);
+bool   tee_topology_valid(double q, double epsilon = 0.05);
+
+// Solver result struct (declared in solver_interface.h)
+struct TeeJunctionResult {
+    double R_straight, R_branch;
+    double dR_straight_d_mdot_com, dR_straight_d_mdot_branch;
+    double dR_straight_dP_static_com, dR_straight_dT_com;
+    std::vector<double> dR_straight_dY_com;
+    double dR_branch_d_mdot_com, dR_branch_d_mdot_branch;
+    double dR_branch_dP_static_com, dR_branch_dT_com;
+    std::vector<double> dR_branch_dY_com;
+    double K_straight, K_branch, q, blend_w;
+    bool topology_valid;
+    CorrelationValidity status;
+};
+
+// Solver interface
+TeeJunctionResult merging_tee_residuals_and_jacobian(
+    double m_dot_com, double m_dot_branch,
+    double dP0_straight, double dP0_branch,
+    double P_static_com, double T_com, const std::vector<double>& Y_com,
+    double theta, double psi, double F_C, double blend_k = 30.0);
+
+TeeJunctionResult branching_tee_residuals_and_jacobian(
+    double m_dot_com, double m_dot_branch,
+    double dP0_straight, double dP0_branch,
+    double P_static_com, double T_com, const std::vector<double>& Y_com,
+    double theta, double psi, double F_C, double blend_k = 30.0);
+```
+
+Port convention: MAIN_INLET=A, BRANCH=B, MAIN_OUTLET=C; `m_dot_com` = common-port
+mass flow, `m_dot_branch` = branch mass flow, `F_C` = cross-sectional area [m^2] at
+the common port, `psi` = A_branch / A_com, `theta` = branch angle [rad].
+
+Residual sign convention: `R_straight = dP0_straight + K_straight * q_dyn`,
+`R_branch = dP0_branch + K_branch * q_dyn`.
 
 ### Mixing and Combustion Components
 ```cpp

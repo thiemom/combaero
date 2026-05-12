@@ -10,6 +10,7 @@ import {
 	LogOut,
 	Maximize2,
 	Save,
+	Split,
 	Upload,
 	Wind,
 } from "lucide-react";
@@ -204,6 +205,17 @@ const Sidebar = () => {
 			<div className="mt-4 text-sm font-bold text-gray-500 uppercase tracking-wider">
 				Elements
 			</div>
+			<div className="text-[9px] text-stone-400 flex gap-2">
+				<span>
+					<span className="font-bold text-blue-500">i</span> flow in
+				</span>
+				<span>
+					<span className="font-bold text-green-500">o</span> flow out
+				</span>
+				<span>
+					<span className="font-bold text-orange-400">q</span> thermal
+				</span>
+			</div>
 
 			<button
 				type="button"
@@ -253,6 +265,16 @@ const Sidebar = () => {
 			>
 				<Link size={18} className="text-slate-400" />
 				<span>Lossless Connection</span>
+			</button>
+
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "tee_junction")}
+				draggable
+			>
+				<Split size={18} className="text-teal-500" />
+				<span>Tee Junction</span>
 			</button>
 
 			{/* Diagnostics divider */}
