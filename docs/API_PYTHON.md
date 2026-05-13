@@ -13,6 +13,7 @@ This document provides the high-level reference for the `combaero` Python packag
   - [Network Heat Transfer](#network-heat-transfer)
 - [Acoustics](#acoustics)
 - [Network Solver](#network-solver)
+- [NetworkRunner (GUI-JSON Programmatic Driver)](#networkrunner-gui-json-programmatic-driver)
 - [Geometry & Materials](#geometry--materials)
 - [Advanced Thermodynamics](#advanced-thermodynamics)
 - [Psychrometrics (Humid Air)](#psychrometrics-humid-air)
@@ -536,6 +537,109 @@ res = _core.branching_tee_residuals_and_jacobian(
     theta=math.pi/3, psi=1.2, F_C=0.008,
 )
 ```
+
+---
+
+## NetworkRunner (GUI-JSON Programmatic Driver)
+
+`NetworkRunner` loads a network saved from the GUI and runs it from Python
+scripts or Jupyter notebooks — no web server required.
+
+### Loading a network
+
+```python
+from gui.backend.runner import NetworkRunner
+
+# From a file downloaded from the GUI
+runner = NetworkRunner.from_file("my_network.json")
+
+# From an already-loaded dict (normalises GUI camelCase keys automatically)
+import json
+with open("my_network.json") as f:
+    runner = NetworkRunner.from_dict(json.load(f))
+```
+
+Node labels are read from the GUI's label field.  If a node has no label the
+node ID is used as the fallback key for overrides and result lookup.
+
+### Single solve with boundary-condition overrides
+
+```python
+# Override format: "<label>.<attribute>": value
+result = runner.solve({
+    "air_inlet.m_dot": 1.2,   # kg/s
+    "air_inlet.Tt": 650.0,    # K
+    "outlet.Pt": 200_000.0,   # Pa
+})
+
+print(result.success, result.final_norm)
+
+# Scalar result by label.quantity (resolves label → node ID automatically)
+T_combustor = result.get("combustor.T")         # K
+phi          = result.get("combustor.phi")
+m_dot_out    = result.get("hot_channel.m_dot")  # kg/s
+
+# Full thermodynamic state dict for a node
+state = result.node_state("combustor")
+# {"T": 1738.0, "P": 195000.0, "Pt": 200000.0, "Tt": 1760.0, ...}
+
+# Full-detail DataFrame (matches GUI CSV export, unit-annotated columns)
+df = result.to_dataframe()
+```
+
+### Parametric sweep
+
+```python
+import pandas as pd
+
+params = pd.DataFrame({
+    "fuel_inlet.m_dot": [0.020, 0.025, 0.030, 0.035],
+})
+
+# Compact: one row per solve, only requested metrics
+sweep_df = runner.sweep(params, metrics=["combustor.T", "combustor.phi"])
+# columns: fuel_inlet.m_dot | combustor.T | combustor.phi | success | final_norm
+
+# Full detail: complete to_dataframe() output for each solve, stacked
+full_df = runner.sweep(params)
+# columns: _sweep_index | fuel_inlet.m_dot | <all entity columns> | success | final_norm
+```
+
+### Injecting labels for unlabelled networks
+
+GUI exports may omit node labels.  Inject them before constructing the runner:
+
+```python
+import json
+
+with open("network.json") as f:
+    schema = json.load(f)
+
+label_map = {
+    "node_1778698958490": "air_inlet",
+    "node_1778698961265": "fuel_inlet",
+    "node_1778699014636": "combustor",
+}
+for node in schema["nodes"]:
+    if node["id"] in label_map:
+        node["data"]["label"] = label_map[node["id"]]
+
+runner = NetworkRunner.from_dict(schema)
+```
+
+### NetworkResult attributes
+
+| Attribute | Type | Description |
+|---|---|---|
+| `success` | `bool` | True when solver converged |
+| `message` | `str` | Human-readable solver status |
+| `final_norm` | `float \| None` | Residual norm at convergence |
+
+| Method | Returns | Description |
+|---|---|---|
+| `get(key)` | `float` | Scalar by `<id>.<qty>` or `<label>.<qty>` |
+| `node_state(label)` | `dict` | Full state dict for a node |
+| `to_dataframe()` | `DataFrame` | Unit-annotated full-detail export |
 
 ---
 
