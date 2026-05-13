@@ -20,7 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     DataFrame of BC overrides; returns a compact result DataFrame (one row per
     solve) when ``metrics`` is given, or the full per-entity detail export
     stacked with a ``_sweep_index`` column when omitted.
-  - `NetworkResult.get(key)`: scalar result by raw solver key.
+  - `NetworkResult.get(key)`: scalar result by raw solver key **or by
+    ``<label>.<quantity>`` format** (e.g. ``result.get("combustor.T")``),
+    resolving GUI node labels to internal IDs automatically.
   - `NetworkResult.node_state(label)`: full solved thermodynamic state dict for
     a node by GUI label.
   - `NetworkResult.to_dataframe()`: full-detail DataFrame identical to the GUI
@@ -28,12 +30,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `_schema_maps` and `_build_result_objects` helpers extracted from the HTTP
   solve/export handlers into `runner.py`; shared by `NetworkRunner` and
   `main.py` to eliminate duplication.
+- `python/examples/network_runner_combustion_sweep.py`: end-to-end example
+  loading a GUI-saved compressible CH4/air combustor network, injecting node
+  labels, and sweeping equivalence ratio 0.3–0.9 via `NetworkRunner.sweep()`.
+- `scripts/check-python-style.sh` now scans `gui/backend/` alongside the core
+  Python source directories so backend style is checked locally, not only in CI.
+- `scripts/check-gui-style.sh` now supports a `--fix` flag; default (no flag)
+  is read-only, matching the CI `lint-gui` job.
+
+### Fixed
+- `NetworkGraphSchema` now normalises the camelCase ``solverSettings`` key
+  (written by the GUI's JSON export) to ``solver_settings`` via a Pydantic
+  ``model_validator``, preventing solver regime, method, and timeout settings
+  from being silently dropped when loading a GUI-saved file.
 
 ### Changed
 - `gui/backend/main.py`: result-building and DataFrame construction replaced
   with calls to the shared helpers in `runner.py` (~135 lines removed).
 
-### Added
 - Thermal wall GUI: arrow direction, probe hot/cold labels, dropdown options, depth hint
   ("0 = Hot, L = Cold"), and "Hot Side Wall Temp" now all reflect the actual heat flow
   direction from the solver (Q sign) rather than the topology of the drawn edge. Wiring a
