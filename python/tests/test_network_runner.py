@@ -59,6 +59,46 @@ _SIMPLE: dict = {
 }
 
 
+# Fixture with two pressure boundaries so one can be swapped to mass without
+# leaving the network without a pressure reference (which the solver requires).
+_DUAL_PRESSURE: dict = {
+    "nodes": [
+        {
+            "id": "p_inlet",
+            "type": "pressure_boundary",
+            "position": {"x": 0, "y": 0},
+            "data": {
+                "label": "p_inlet",
+                "Pt": 200_000.0,
+                "Tt": 300.0,
+                "composition": {"source": "dry_air"},
+            },
+        },
+        {
+            "id": "chan",
+            "type": "channel",
+            "position": {"x": 200, "y": 0},
+            "data": {"label": "chan", "L": 1.0, "D": 0.1, "roughness": 1e-5},
+        },
+        {
+            "id": "p_outlet",
+            "type": "pressure_boundary",
+            "position": {"x": 400, "y": 0},
+            "data": {
+                "label": "p_outlet",
+                "Pt": 101_325.0,
+                "Tt": 300.0,
+                "composition": {"source": "dry_air"},
+            },
+        },
+    ],
+    "edges": [
+        {"id": "e1", "source": "p_inlet", "target": "chan"},
+        {"id": "e2", "source": "chan", "target": "p_outlet"},
+    ],
+}
+
+
 # Fixture with UUID-style IDs and separate labels (tests label-based resolution)
 _UUID_LABELED: dict = {
     "nodes": [
@@ -340,6 +380,94 @@ def test_sweep_empty_params():
     df = runner.sweep(params, metrics=["chan.m_dot"])
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 0
+
+
+# ---------------------------------------------------------------------------
+# swap_boundary
+# ---------------------------------------------------------------------------
+
+
+def test_swap_mass_to_pressure_returns_runner():
+    runner = NetworkRunner.from_dict(_SIMPLE)
+    result = runner.solve()
+    p_runner = result.swap_boundary("inlet", "pressure_boundary")
+    assert isinstance(p_runner, NetworkRunner)
+
+
+def test_swap_mass_to_pressure_pt_in_schema():
+    runner = NetworkRunner.from_dict(_SIMPLE)
+    result = runner.solve()
+    solved_Pt = result.node_state("inlet")["Pt"]
+    p_runner = result.swap_boundary("inlet", "pressure_boundary")
+    inlet_node = next(n for n in p_runner._schema.nodes if n.id == "inlet")
+    assert math.isclose(inlet_node.data["Pt"], solved_Pt, rel_tol=1e-6)
+
+
+def test_swap_mass_to_pressure_resolves_same():
+    runner = NetworkRunner.from_dict(_SIMPLE)
+    result = runner.solve()
+    p_runner = result.swap_boundary("inlet", "pressure_boundary")
+    result2 = p_runner.solve()
+    assert math.isclose(result.get("chan.m_dot"), result2.get("chan.m_dot"), rel_tol=1e-3)
+    assert math.isclose(
+        result.node_state("outlet")["T"], result2.node_state("outlet")["T"], rel_tol=1e-3
+    )
+
+
+def test_swap_pressure_to_mass_returns_runner():
+    # _DUAL_PRESSURE has two pressure BCs; swapping the inlet keeps a pressure reference.
+    runner = NetworkRunner.from_dict(_DUAL_PRESSURE)
+    result = runner.solve()
+    m_runner = result.swap_boundary("p_inlet", "mass_boundary")
+    assert isinstance(m_runner, NetworkRunner)
+
+
+def test_swap_pressure_to_mass_mdot_in_schema():
+    runner = NetworkRunner.from_dict(_DUAL_PRESSURE)
+    result = runner.solve()
+    solved_m_dot = result.get("chan.m_dot")
+    m_runner = result.swap_boundary("p_inlet", "mass_boundary")
+    inlet_node = next(n for n in m_runner._schema.nodes if n.id == "p_inlet")
+    assert math.isclose(inlet_node.data["m_dot"], solved_m_dot, rel_tol=1e-3)
+
+
+def test_swap_pressure_to_mass_resolves_same():
+    runner = NetworkRunner.from_dict(_DUAL_PRESSURE)
+    result = runner.solve()
+    m_runner = result.swap_boundary("p_inlet", "mass_boundary")
+    result2 = m_runner.solve()
+    assert math.isclose(result.get("chan.m_dot"), result2.get("chan.m_dot"), rel_tol=1e-3)
+    assert math.isclose(
+        result.node_state("p_outlet")["T"], result2.node_state("p_outlet")["T"], rel_tol=1e-3
+    )
+
+
+def test_swap_same_type_raises():
+    runner = NetworkRunner.from_dict(_SIMPLE)
+    result = runner.solve()
+    with pytest.raises(ValueError, match="already"):
+        result.swap_boundary("inlet", "mass_boundary")
+
+
+def test_swap_unsupported_new_type_raises():
+    runner = NetworkRunner.from_dict(_SIMPLE)
+    result = runner.solve()
+    with pytest.raises(ValueError):
+        result.swap_boundary("inlet", "plenum")
+
+
+def test_swap_unsupported_old_type_raises():
+    runner = NetworkRunner.from_dict(_SIMPLE)
+    result = runner.solve()
+    with pytest.raises(ValueError, match="cannot be swapped"):
+        result.swap_boundary("chan", "pressure_boundary")
+
+
+def test_swap_missing_label_raises():
+    runner = NetworkRunner.from_dict(_SIMPLE)
+    result = runner.solve()
+    with pytest.raises(KeyError):
+        result.swap_boundary("no_such_node", "pressure_boundary")
 
 
 # ---------------------------------------------------------------------------

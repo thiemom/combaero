@@ -640,6 +640,27 @@ runner = NetworkRunner.from_dict(schema)
 | `get(key)` | `float` | Scalar by `<id>.<qty>` or `<label>.<qty>` |
 | `node_state(label)` | `dict` | Full state dict for a node |
 | `to_dataframe()` | `DataFrame` | Unit-annotated full-detail export |
+| `swap_boundary(label, new_type)` | `NetworkRunner` | Retype a boundary node (mass ↔ pressure) and return a new runner pre-seeded with the full solved state |
+
+### Boundary condition swap
+
+```python
+result = runner.solve({"air_inlet.m_dot": 1.0})
+
+# Re-run the same point with a pressure BC (Pt auto-populated from solved state)
+p_runner = result.swap_boundary("air_inlet", "pressure_boundary")
+result2 = p_runner.solve()  # starts from solved state, converges immediately
+
+# Sweep inlet pressure around the design point
+import pandas as pd, numpy as np
+design_Pt = result.node_state("air_inlet")["Pt"]
+params = pd.DataFrame({"air_inlet.Pt": design_Pt * np.linspace(0.90, 1.10, 11)})
+sweep_df = p_runner.sweep(params, metrics=["combustor.T"])
+```
+
+Only `mass_boundary` ↔ `pressure_boundary` swaps are supported.  The returned
+runner carries the full solved state (pressures, flows, junction states) as a
+warm start so `solve()` requires no additional `init_strategy`.
 
 ---
 
