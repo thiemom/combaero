@@ -28,8 +28,8 @@ from pathlib import Path
 from typing import Any
 
 import combaero as cb
-import pandas as pd
 from combaero.network import NetworkSolver
+import pandas as pd
 
 from .graph_builder import build_network_from_schema
 from .schemas import ElementResult, NetworkGraphSchema, NodeResult, StateResult
