@@ -11,12 +11,10 @@ import combaero as cb
 from combaero.network import NetworkSolver
 
 from .graph_builder import build_network_from_schema
+from .runner import NetworkResult, _build_result_objects, _schema_maps
 from .schemas import (
-    ElementResult,
     NetworkGraphSchema,
-    NodeResult,
     SolveResponse,
-    StateResult,
 )
 
 _FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
@@ -129,62 +127,7 @@ def _solve_sync(schema: NetworkGraphSchema):
             "initial_guesses": {n.id: n.data.get("initial_guess", {}) for n in schema.nodes},
         }
 
-    node_results = {}
-    for node_id in net.nodes:
-        # Pull all node diagnostics and state variables directly from sol_dict
-        # flat keys are like node_id.T, node_id.P, node_id.mach, node_id.rho, etc.
-        prefix = f"{node_id}."
-        node_vals = {k[len(prefix) :]: v for k, v in result.items() if k.startswith(prefix)}
-
-        # Handle composition lists (Y and X)
-        y_vals = []
-        x_vals = []
-        i = 0
-        while f"Y[{i}]" in node_vals:
-            y_vals.append(float(node_vals.pop(f"Y[{i}]")))
-            if f"X[{i}]" in node_vals:
-                x_vals.append(float(node_vals.pop(f"X[{i}]")))
-            i += 1
-
-        state_res = StateResult(
-            T=float(node_vals.pop("T", 300.0)),
-            P=float(node_vals.pop("P", 101325.0)),
-            Pt=node_vals.pop("Pt", None),
-            Tt=node_vals.pop("Tt", None),
-            Y=y_vals,
-            X=x_vals or None,
-            **node_vals,  # All remaining diagnostics (rho, mach, mu, k, etc.)
-        )
-        node_results[node_id] = NodeResult(state=state_res, success=success)
-
-    element_results = {}
-    elem_diags = result.get("__element_diag__", {})
-    for elem_id in net.elements:
-        diag = elem_diags.get(elem_id, {}).copy()
-        # Tee junctions expose m_dot_com instead of m_dot; use it as primary metric.
-        m_dot = float(result.get(f"{elem_id}.m_dot", diag.get("m_dot_com", 0.0)))
-        diag.pop("m_dot", None)
-        element_results[elem_id] = ElementResult(m_dot=m_dot, success=success, **diag)
-
-    edge_results = {}
-
-    def _safe_float(v):
-        try:
-            if isinstance(v, (list, tuple, dict)):
-                return v
-            return float(v)
-        except (TypeError, ValueError):
-            return v
-
-    for edge_id in net.walls:
-        edge_keys = {
-            k.split(".", 1)[1]: _safe_float(v)
-            for k, v in result.items()
-            if k.startswith(f"{edge_id}.")
-        }
-        if edge_keys:
-            edge_results[edge_id] = edge_keys
-
+    node_results, element_results, edge_results = _build_result_objects(result, net)
     return result, node_results, element_results, edge_results, net
 
 
@@ -228,138 +171,24 @@ async def export_results(schema: NetworkGraphSchema):
     hard_timeout = soft_timeout + 10.0
     try:
         # Solve quickly to get states
-        _, node_results, element_results, edge_results, net = await asyncio.wait_for(
+        raw, node_results, element_results, edge_results, net = await asyncio.wait_for(
             asyncio.to_thread(_solve_sync, schema),
             timeout=hard_timeout,
         )
 
-        # Convert to DataFrame
-        import pandas as pd
-
-        # Build unified id_to_label map from nodes, edges, and auto-links
-        id_to_label = {}
-        # Map each schema node/edge id to its declared ``type`` so the CSV can
-        # preserve specific-kind information (plenum vs combustor vs
-        # discrete_loss, …) needed for later round-trips or sweep workflows.
-        id_to_kind: dict[str, str] = {}
-        for n in schema.nodes:
-            id_to_label[n.id] = n.data.get("label") or ""
-            id_to_kind[n.id] = n.type
-        for e in schema.edges:
-            lbl = (e.data or {}).get("label") or ""
-            id_to_label[e.id] = lbl
-            id_to_kind[e.id] = (e.data or {}).get("type") or "flow"
-            # Also map solver auto-link IDs
-            auto_id = f"__auto_link__{e.source}__{e.target}"
-            id_to_label[auto_id] = lbl
-            id_to_kind[auto_id] = "lossless_connection"
-
-        _BOUNDARY_KINDS = {"mass_boundary", "pressure_boundary"}
-
-        # Per-node combustion method (empty string for non-combustor rows).
-        id_to_method: dict[str, str] = {}
-        for n in schema.nodes:
-            if n.type == "combustor":
-                id_to_method[n.id] = n.data.get("method", "complete")
-
-        # Species labels for composition column headers (``Y[N2]`` not ``Y[0]``).
-        import combaero as cb
-
-        species_labels: list[str] = list(cb.species.names)
-
-        data = []
-
-        # 1. Process Nodes
-        for node_id, res in node_results.items():
-            # Include all fields from StateResult (rho, mach, k, etc.)
-            state_data = res.state.model_dump()
-            # Handle Y/X list expansion
-            Y = state_data.pop("Y", [])
-            X = state_data.pop("X", None)
-
-            kind = id_to_kind.get(node_id, "")
-            base_data = {
-                "type": "node",
-                "kind": kind,
-                "is_boundary": kind in _BOUNDARY_KINDS,
-                "combustion_method": id_to_method.get(node_id, ""),
-                "id": node_id,
-                "label": id_to_label.get(node_id, ""),
-                **state_data,
-            }
-            # Flatten species fractions with species-name indexing.
-            for i, y_val in enumerate(Y):
-                name = species_labels[i] if i < len(species_labels) else str(i)
-                base_data[f"Y[{name}]"] = y_val
-            if X:
-                for i, x_val in enumerate(X):
-                    name = species_labels[i] if i < len(species_labels) else str(i)
-                    base_data[f"X[{name}]"] = x_val
-
-            data.append(base_data)
-
-        # 2. Process Flow Elements
-        from combaero.network.components import TeeJunctionElement as _TeeJE
-
-        for elem_id, res in element_results.items():
-            # Include all analytic/diagnostic fields (Re, Nu, h, q_dot, f, etc.)
-            elem_data = res.model_dump()
-
-            # Tee junctions: add the common-arm node state (T, P, Pt, Tt, rho,
-            # and full composition) so downstream analysis has one canonical
-            # thermodynamic state per tee row without having to join to node rows.
-            elem_obj = net.elements.get(elem_id)
-            if isinstance(elem_obj, _TeeJE):
-                common_res = node_results.get(elem_obj.common_node)
-                if common_res:
-                    common_state = common_res.state.model_dump()
-                    Y = common_state.pop("Y", [])
-                    X = common_state.pop("X", None) or []
-                    for k, v in common_state.items():
-                        if v is not None:
-                            elem_data[k] = v
-                    for i, y_val in enumerate(Y):
-                        name = species_labels[i] if i < len(species_labels) else str(i)
-                        elem_data[f"Y[{name}]"] = y_val
-                    for i, x_val in enumerate(X):
-                        name = species_labels[i] if i < len(species_labels) else str(i)
-                        elem_data[f"X[{name}]"] = x_val
-
-            data.append(
-                {
-                    "type": "element",
-                    "kind": id_to_kind.get(elem_id, ""),
-                    "is_boundary": False,
-                    "combustion_method": "",
-                    "id": elem_id,
-                    "label": id_to_label.get(elem_id, ""),
-                    **elem_data,
-                }
-            )
-
-        # 3. Process Thermal Walls (edge_results)
-        for wall_id, res in edge_results.items():
-            # thermal wall results are already a dict from _solve_sync
-            data.append(
-                {
-                    "type": "thermal_wall",
-                    "kind": "thermal_wall",
-                    "is_boundary": False,
-                    "combustion_method": "",
-                    "id": wall_id,
-                    "label": id_to_label.get(wall_id, ""),
-                    **res,
-                }
-            )
-
-        df = pd.DataFrame(data)
-
-        # Rename columns with unit annotations (e.g. ``P`` -> ``P [Pa]``).
-        # Meta columns (``id``, ``type``, ``kind``, ``is_boundary``, ...) are
-        # passed through unchanged; unknown columns also remain untouched.
-        from gui.backend.units import label_with_unit
-
-        df = df.rename(columns={col: label_with_unit(col) for col in df.columns})
+        id_to_label, id_to_kind, id_to_method = _schema_maps(schema)
+        result_obj = NetworkResult(
+            raw=raw,
+            node_results=node_results,
+            element_results=element_results,
+            edge_results=edge_results,
+            net=net,
+            schema=schema,
+            id_to_label=id_to_label,
+            id_to_kind=id_to_kind,
+            id_to_method=id_to_method,
+        )
+        df = result_obj.to_dataframe()
 
         # Stream as CSV
         stream = io.StringIO()
