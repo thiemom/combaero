@@ -313,6 +313,14 @@ class NetworkGraphSchema(BaseModel):
     edges: list[ReactFlowEdge]
     solver_settings: SolverSettings = Field(default_factory=SolverSettings)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _normalise_solver_settings_key(cls, data: object) -> object:
+        if isinstance(data, dict) and "solverSettings" in data and "solver_settings" not in data:
+            data = dict(data)
+            data["solver_settings"] = data.pop("solverSettings")
+        return data
+
 
 # --- Results Schemas ---
 

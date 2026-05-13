@@ -176,15 +176,27 @@ class NetworkResult:
         self._id_to_method = id_to_method
 
     def get(self, key: str) -> float:
-        """Get a scalar result by raw solver key (e.g. ``'combustor.T'``).
+        """Get a scalar result by solver key or ``'<label>.<quantity>'``.
 
-        Keys follow the pattern ``'<element_or_node_id>.<quantity>'``.
+        Tries the key directly first (raw ``'<id>.<quantity>'`` form), then
+        resolves the left-hand part as a node/element label so callers can
+        write ``result.get("combustor.T")`` instead of a UUID key.
         """
-        if key not in self._raw:
-            raise KeyError(
-                f"Result key '{key}' not found. Keys follow the format '<id>.<quantity>'."
-            )
-        return float(self._raw[key])
+        if key in self._raw:
+            return float(self._raw[key])
+        if "." in key:
+            label, quantity = key.split(".", 1)
+            try:
+                node_id = self._resolve_label(label)
+                raw_key = f"{node_id}.{quantity}"
+                if raw_key in self._raw:
+                    return float(self._raw[raw_key])
+            except KeyError:
+                pass
+        raise KeyError(
+            f"Result key '{key}' not found. "
+            "Keys follow the format '<id>.<quantity>' or '<label>.<quantity>'."
+        )
 
     def node_state(self, label: str) -> dict:
         """Return the full solved thermodynamic state for a node by label or id.

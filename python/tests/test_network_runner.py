@@ -59,6 +59,45 @@ _SIMPLE: dict = {
 }
 
 
+# Fixture with UUID-style IDs and separate labels (tests label-based resolution)
+_UUID_LABELED: dict = {
+    "nodes": [
+        {
+            "id": "node_abc123",
+            "type": "mass_boundary",
+            "position": {"x": 0, "y": 0},
+            "data": {
+                "label": "air_inlet",
+                "m_dot": 1.0,
+                "Tt": 300.0,
+                "composition": {"source": "dry_air"},
+            },
+        },
+        {
+            "id": "node_def456",
+            "type": "channel",
+            "position": {"x": 200, "y": 0},
+            "data": {"label": "hot_channel", "L": 1.0, "D": 0.1, "roughness": 1e-5},
+        },
+        {
+            "id": "node_ghi789",
+            "type": "pressure_boundary",
+            "position": {"x": 400, "y": 0},
+            "data": {
+                "label": "exhaust",
+                "Pt": 101325.0,
+                "Tt": 300.0,
+                "composition": {"source": "dry_air"},
+            },
+        },
+    ],
+    "edges": [
+        {"id": "e1", "source": "node_abc123", "target": "node_def456"},
+        {"id": "e2", "source": "node_def456", "target": "node_ghi789"},
+    ],
+}
+
+
 # ---------------------------------------------------------------------------
 # Construction tests
 # ---------------------------------------------------------------------------
@@ -76,6 +115,27 @@ def test_from_file(tmp_path):
     p.write_text(json.dumps(_SIMPLE))
     runner = NetworkRunner.from_file(p)
     assert isinstance(runner, NetworkRunner)
+
+
+def test_from_dict_normalises_solver_settings_camelcase():
+    """GUI exports use camelCase 'solverSettings'; from_dict must translate it."""
+    import copy
+
+    d = copy.deepcopy(_SIMPLE)
+    d["solverSettings"] = {"global_regime": "compressible", "method": "hybr"}
+    runner = NetworkRunner.from_dict(d)
+    assert runner._schema.solver_settings.global_regime == "compressible"
+
+
+def test_from_dict_snake_case_solver_settings_unchanged():
+    """If snake_case solver_settings is already present it takes precedence."""
+    import copy
+
+    d = copy.deepcopy(_SIMPLE)
+    d["solver_settings"] = {"global_regime": "incompressible"}
+    d["solverSettings"] = {"global_regime": "compressible"}
+    runner = NetworkRunner.from_dict(d)
+    assert runner._schema.solver_settings.global_regime == "incompressible"
 
 
 # ---------------------------------------------------------------------------
@@ -170,6 +230,25 @@ def test_result_get_missing_key_raises():
     result = runner.solve()
     with pytest.raises(KeyError):
         result.get("nonexistent.key")
+
+
+def test_result_get_by_label_when_id_differs():
+    """get() must resolve '<label>.<quantity>' when label != node id."""
+    runner = NetworkRunner.from_dict(_UUID_LABELED)
+    result = runner.solve()
+    # 'hot_channel' is the label for node id 'node_def456'
+    v = result.get("hot_channel.m_dot")
+    assert isinstance(v, float)
+    assert math.isclose(v, 1.0, rel_tol=1e-3)
+
+
+def test_result_get_label_fallback_does_not_shadow_raw_key():
+    """A key present verbatim in raw must be returned without label resolution."""
+    runner = NetworkRunner.from_dict(_SIMPLE)
+    result = runner.solve()
+    v_direct = result.get("chan.m_dot")
+    v_label = result.get("chan.m_dot")
+    assert v_direct == v_label
 
 
 def test_node_state_by_label():
