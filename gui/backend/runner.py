@@ -27,14 +27,14 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
 import combaero as cb
 from combaero.network import NetworkSolver
-import pandas as pd
 
 from .graph_builder import build_network_from_schema
 from .schemas import ElementResult, NetworkGraphSchema, NodeResult, StateResult
 from .units import label_with_unit
-
 
 # ---------------------------------------------------------------------------
 # Shared result-building helper (used by both the HTTP API and NetworkRunner)
@@ -82,7 +82,7 @@ def _build_result_objects(
     node_results: dict[str, NodeResult] = {}
     for node_id in net.nodes:
         prefix = f"{node_id}."
-        node_vals = {k[len(prefix):]: v for k, v in result.items() if k.startswith(prefix)}
+        node_vals = {k[len(prefix) :]: v for k, v in result.items() if k.startswith(prefix)}
 
         y_vals: list[float] = []
         x_vals: list[float] = []
@@ -182,8 +182,7 @@ class NetworkResult:
         """
         if key not in self._raw:
             raise KeyError(
-                f"Result key '{key}' not found. "
-                "Keys follow the format '<id>.<quantity>'."
+                f"Result key '{key}' not found. Keys follow the format '<id>.<quantity>'."
             )
         return float(self._raw[key])
 
@@ -478,8 +477,7 @@ class NetworkRunner:
         for key, value in overrides.items():
             if "." not in key:
                 raise ValueError(
-                    f"Override key '{key}' must be '<label>.<attribute>' "
-                    "(e.g. 'air_inlet.m_dot')."
+                    f"Override key '{key}' must be '<label>.<attribute>' (e.g. 'air_inlet.m_dot')."
                 )
             label, attr = key.split(".", 1)
             node_id = self._label_to_node_id.get(label)
@@ -487,9 +485,7 @@ class NetworkRunner:
                 if any(n.id == label for n in schema.nodes):
                     node_id = label
                 else:
-                    raise KeyError(
-                        f"No node with label or id '{label}' found in this network."
-                    )
+                    raise KeyError(f"No node with label or id '{label}' found in this network.")
             for node in schema.nodes:
                 if node.id == node_id:
                     node.data[attr] = value
