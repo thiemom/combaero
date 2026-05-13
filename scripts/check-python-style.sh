@@ -22,7 +22,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PYTHON="${ROOT_DIR}/.venv/bin/python"
 
 # Directories to scan
-SCAN_DIRS=("python" "cantera_validation_tests" "thermo_data_generator")
+SCAN_DIRS=("python" "cantera_validation_tests" "thermo_data_generator" "gui/backend")
 
 # Directories to check for non-ASCII (subset of SCAN_DIRS)
 # Tests and examples can use Unicode for readability (Greek letters, arrows, etc.)
