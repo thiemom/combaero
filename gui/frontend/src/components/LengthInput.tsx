@@ -9,6 +9,7 @@ interface LengthInputProps {
 	id?: string;
 	placeholder?: string | number;
 	onClear?: () => void;
+	disabled?: boolean;
 }
 
 const LengthInput: React.FC<LengthInputProps> = ({
@@ -18,6 +19,7 @@ const LengthInput: React.FC<LengthInputProps> = ({
 	id,
 	onClear,
 	placeholder = "0.00",
+	disabled,
 }) => {
 	const { unitPreferences, setLengthUnit } = useStore();
 	const unit = unitPreferences.length;
@@ -34,7 +36,9 @@ const LengthInput: React.FC<LengthInputProps> = ({
 			: placeholder;
 
 	return (
-		<div className="flex flex-col gap-1">
+		<div
+			className={`flex flex-col gap-1${disabled ? " opacity-40 pointer-events-none" : ""}`}
+		>
 			<label htmlFor={id} className="text-xs font-medium text-stone-500">
 				{label}
 			</label>
@@ -46,11 +50,13 @@ const LengthInput: React.FC<LengthInputProps> = ({
 					onClear={onClear}
 					className="min-w-0 w-full p-1.5 border rounded text-xs bg-stone-50 focus:bg-white focus:ring-1 focus:ring-orange-500 outline-none"
 					placeholder={scaledPlaceholder.toString()}
+					disabled={disabled}
 				/>
 				<select
 					value={unit}
 					onChange={(e) => setLengthUnit(e.target.value as "m" | "mm")}
 					className="w-14 h-[30px] border rounded text-[9px] bg-white outline-none shrink-0"
+					disabled={disabled}
 				>
 					<option value="m">m</option>
 					<option value="mm">mm</option>

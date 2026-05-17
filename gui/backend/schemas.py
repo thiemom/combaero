@@ -153,6 +153,7 @@ class ChannelData(BaseModel):
     L: float = 1.0
     D: float = 0.1
     roughness: float = 1e-5
+    friction_model: Literal["haaland", "serghides", "colebrook", "petukhov"] = "haaland"
     surface: SurfaceModelData = Field(default_factory=SmoothModelData)
     Nu_multiplier: float = 1.0
     f_multiplier: float = 1.0
