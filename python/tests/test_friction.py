@@ -111,6 +111,12 @@ class TestFrictionFactors:
         f_colebrook = cb.friction_colebrook(Re, 0.0)
         assert abs(f - f_colebrook) / f_colebrook < 0.01  # Within 1%
 
+    def test_friction_petukhov_extrapolates_below_3000(self):
+        """Petukhov formula is continuous; values below Re=3000 are extrapolated."""
+        f_low = cb.friction_petukhov(500.0)
+        assert f_low > 0
+        assert isinstance(f_low, float)
+
     def test_friction_reynolds_number_effect(self):
         """Test friction factor decreases with Reynolds number."""
         e_D = 0.001  # Fixed roughness [-]

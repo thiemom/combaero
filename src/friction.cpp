@@ -161,11 +161,8 @@ double channel_roughness(const std::string &material) {
 
 // Petukhov correlation (1970) - smooth pipes only
 // f = (0.790 * ln(Re) - 1.64)^(-2)
-// Valid for 3000 < Re < 5x10^6
+// Valid for 3000 < Re < 5x10^6; extrapolated outside that range.
 double friction_petukhov(double Re) {
-  if (Re < 3000) {
-    throw std::invalid_argument("friction_petukhov: Re must be > 3000");
-  }
   double x = petukhov::coeff_a * std::log(Re) - petukhov::coeff_b;
   return 1.0 / (x * x);
 }

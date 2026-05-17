@@ -352,12 +352,6 @@ friction_and_jacobian_colebrook(double Re, double e_D) {
 
 CorrelationResult<std::tuple<double, double>>
 friction_and_jacobian_petukhov(double Re) {
-  if (Re < 3000.0) {
-    return {{0.0, 0.0},
-            CorrelationValidity::EXTRAPOLATED,
-            "solver_interface::friction_petukhov requires Re >= 3000"};
-  }
-
   // f = (coeff_a * ln(Re) - coeff_b)^(-2)
   double x = petukhov::coeff_a * std::log(Re) - petukhov::coeff_b;
   double f = 1.0 / (x * x);
@@ -367,7 +361,9 @@ friction_and_jacobian_petukhov(double Re) {
   double dx_dRe = petukhov::coeff_a / Re;
   double jacobian = (-2.0 / (x * x * x)) * dx_dRe;
 
-  return {{f, jacobian}, CorrelationValidity::VALID, ""};
+  CorrelationValidity validity =
+      (Re >= 3000.0) ? CorrelationValidity::VALID : CorrelationValidity::EXTRAPOLATED;
+  return {{f, jacobian}, validity, ""};
 }
 
 CorrelationResult<std::tuple<double, double>>

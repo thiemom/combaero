@@ -51,6 +51,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is read-only, matching the CI `lint-gui` job.
 
 ### Fixed
+- `friction_petukhov()` and `friction_and_jacobian_petukhov()` no longer throw
+  for Re < 3000; the Petukhov formula is mathematically continuous so values below
+  the validated range are returned as extrapolated rather than raising an error.
+  `CorrelationValidity::EXTRAPOLATED` is set when Re < 3000; `VALID` otherwise.
 - `NetworkGraphSchema` now normalises the camelCase ``solverSettings`` key
   (written by the GUI's JSON export) to ``solver_settings`` via a Pydantic
   ``model_validator``, preventing solver regime, method, and timeout settings

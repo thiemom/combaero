@@ -256,6 +256,13 @@ def test_friction_petukhov_jacobian():
     boundary = cb._core.friction_and_jacobian_petukhov(3000.0)
     assert boundary.status.name == "VALID"
 
+    # Below 3000: extrapolated, but still returns a finite nonzero value
+    low_re = cb._core.friction_and_jacobian_petukhov(500.0)
+    assert low_re.status.name == "EXTRAPOLATED"
+    f_low, jac_low = low_re.result
+    assert f_low > 0.0
+    assert jac_low < 0.0
+
 
 def test_friction_dispatcher_matches_direct_models():
     Re = 50000.0
