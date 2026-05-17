@@ -165,6 +165,10 @@ class NetworkResult:
         self.success: bool = bool(raw.get("__success__", False))
         self.message: str = str(raw.get("__message__", ""))
         self.final_norm: float | None = raw.get("__final_norm__")
+        self._x_solution: Any = raw.get("__x_solution__")
+        unk_names: list[str] = raw.get("__unknown_names__", [])
+        x_sol: list[float] = raw.get("__x_solution__") or []
+        self._solved_state: dict[str, float] = dict(zip(unk_names, x_sol, strict=False))
         self._raw = raw
         self._node_results = node_results
         self._element_results = element_results
@@ -301,6 +305,110 @@ class NetworkResult:
         df = pd.DataFrame(data)
         return df.rename(columns={col: label_with_unit(col) for col in df.columns})
 
+    def swap_boundary(self, label: str, new_type: str) -> "NetworkRunner":
+        """Return a new NetworkRunner with one boundary node retyped.
+
+        The required field for ``new_type`` is auto-populated from this solved
+        state so that the first re-solve reproduces the same physical operating
+        point:
+
+        * ``mass_boundary`` → ``pressure_boundary``: copies solved ``Pt``.
+        * ``pressure_boundary`` → ``mass_boundary``: sums ``m_dot`` of all
+          adjacent elements.
+
+        ``Tt``, ``composition``, ``label``, and ``initial_guess`` are
+        preserved unchanged.
+
+        Args:
+            label: Node label or raw node id.
+            new_type: ``"mass_boundary"`` or ``"pressure_boundary"``.
+
+        Returns:
+            A new :class:`NetworkRunner` ready for ``.solve()`` or ``.sweep()``.
+
+        Raises:
+            ValueError: If ``new_type`` is not supported, the node is already
+                that type, or the existing type cannot be swapped.
+            KeyError: If ``label`` does not resolve to a node.
+        """
+        _SUPPORTED = {"mass_boundary", "pressure_boundary"}
+        if new_type not in _SUPPORTED:
+            raise ValueError(f"swap_boundary only supports {_SUPPORTED!r}, got '{new_type}'.")
+        node_id = self._resolve_label(label)
+        schema = self._schema.model_copy(deep=True)
+        node = next((n for n in schema.nodes if n.id == node_id), None)
+        if node is None:
+            raise KeyError(f"Node '{label}' not found in schema.")
+        old_type = node.type
+        if old_type == new_type:
+            raise ValueError(f"Node '{label}' is already '{new_type}'.")
+        if old_type not in _SUPPORTED:
+            raise ValueError(
+                f"Node '{label}' has type '{old_type}', which cannot be swapped. "
+                f"Only {_SUPPORTED!r} are supported."
+            )
+        state = self._node_results[node_id].state
+        if new_type == "pressure_boundary":
+            if state.Pt is None:
+                raise ValueError(
+                    f"Solved state for '{label}' has no Pt — cannot swap to pressure_boundary."
+                )
+            node.data.pop("m_dot", None)
+            node.data["Pt"] = float(state.Pt)
+        else:
+            node.data.pop("Pt", None)
+            node.data["m_dot"] = self._adjacent_m_dot(node_id)
+        node.type = new_type
+
+        # Seed initial_guess on internal (non-pressure-boundary) nodes so that
+        # the first solve after the swap starts from a physically valid point.
+        # PressureBoundary nodes must NOT have P/Pt/T/Tt in initial_guess —
+        # _get_node_state() prefers initial_guess over node.Pt/Tt, so seeding
+        # them would prevent BC overrides (e.g. pressure sweeps) from taking effect.
+        for n in schema.nodes:
+            if n.type == "pressure_boundary":
+                continue
+            res = self._node_results.get(n.id)
+            if res is None:
+                continue
+            s = res.state
+            guess: dict[str, float] = {}
+            if s.T is not None:
+                guess["T"] = float(s.T)
+            if s.P is not None:
+                guess["P"] = float(s.P)
+            if s.Pt is not None:
+                guess["Pt"] = float(s.Pt)
+            if s.Tt is not None:
+                guess["Tt"] = float(s.Tt)
+            if guess:
+                n.data["initial_guess"] = guess
+
+        for e in schema.edges:
+            eres = self._element_results.get(e.id)
+            if eres is None:
+                continue
+            if e.data is None:
+                e.data = {}
+            e.data["initial_guess"] = {"m_dot": float(eres.m_dot)}
+
+        return NetworkRunner(schema, _warm_state=self._solved_state)
+
+    def _adjacent_m_dot(self, node_id: str) -> float:
+        """Sum m_dot of all elements directly connected to a boundary node."""
+        downstream = self._net.get_downstream_elements(node_id)
+        upstream = self._net.get_upstream_elements(node_id)
+        connected = downstream or upstream
+        if not connected:
+            raise ValueError(
+                f"Node '{node_id}' has no connected elements — cannot determine m_dot."
+            )
+        return sum(
+            float(self._element_results[e.id].m_dot)
+            for e in connected
+            if e.id in self._element_results
+        )
+
 
 # ---------------------------------------------------------------------------
 # NetworkRunner
@@ -336,12 +444,17 @@ class NetworkRunner:
         sweep_df = runner.sweep(params, metrics=["combustor.T", "hot_channel.m_dot"])
     """
 
-    def __init__(self, schema: NetworkGraphSchema) -> None:
+    def __init__(
+        self,
+        schema: NetworkGraphSchema,
+        _warm_state: dict[str, float] | None = None,
+    ) -> None:
         self._schema = schema
         self._id_to_label, self._id_to_kind, self._id_to_method = _schema_maps(schema)
         self._label_to_node_id: dict[str, str] = {
             lbl: nid for nid, lbl in self._id_to_label.items() if lbl
         }
+        self._warm_state = _warm_state or {}
 
     @classmethod
     def from_file(cls, path: str | Path) -> "NetworkRunner":
@@ -364,6 +477,7 @@ class NetworkRunner:
         method: str = "hybr",
         init_strategy: str = "default",
         timeout: float | None = 180.0,
+        _x0: Any = None,
     ) -> NetworkResult:
         """Solve the network, optionally patching boundary conditions.
 
@@ -380,17 +494,33 @@ class NetworkRunner:
                 (``"default"``, ``"incompressible_warmstart"``,
                 ``"homotopy"``).
             timeout: Per-solve soft timeout in seconds.
+            _x0: Internal — solver solution vector from a prior solve used
+                as the initial guess (passed by ``sweep`` for continuation).
 
         Returns:
             NetworkResult with solved state and DataFrame export.
         """
+        import numpy as np
+
         schema = self._schema.model_copy(deep=True)
         if overrides:
             self._apply_overrides(schema, overrides)
 
         net = build_network_from_schema(schema)
         solver = NetworkSolver(net)
-        raw = solver.solve(method=method, init_strategy=init_strategy, timeout=timeout)
+        x0_array: np.ndarray | None = None
+        if _x0 is not None:
+            x0_array = np.asarray(_x0)
+        elif self._warm_state:
+            default_x0 = solver._build_x0()
+            x0_array = np.array(
+                [
+                    self._warm_state.get(name, default_x0[i])
+                    for i, name in enumerate(solver.unknown_names)
+                ],
+                dtype=float,
+            )
+        raw = solver.solve(method=method, init_strategy=init_strategy, timeout=timeout, x0=x0_array)
         node_results, element_results, edge_results = _build_result_objects(raw, net)
 
         return NetworkResult(
@@ -443,14 +573,34 @@ class NetworkRunner:
             DataFrame with one or more rows per parameter combination.
         """
         rows: list[Any] = []
+        _prev_x: Any = None
         for idx, param_row in params.iterrows():
             overrides = {col: param_row[col] for col in params.columns}
-            result = self.solve(
-                overrides=overrides,
-                method=method,
-                init_strategy=init_strategy,
-                timeout=timeout,
-            )
+            try:
+                result = self.solve(
+                    overrides=overrides,
+                    method=method,
+                    init_strategy=init_strategy,
+                    timeout=timeout,
+                    _x0=_prev_x,
+                )
+                if result.success:
+                    _prev_x = result._x_solution
+            except Exception as exc:
+                import warnings
+
+                warnings.warn(
+                    f"NetworkRunner.sweep: solve raised an exception at index {idx}: {exc}",
+                    stacklevel=2,
+                )
+                if metrics is not None:
+                    row: dict[str, Any] = dict(param_row)
+                    row["success"] = False
+                    row["final_norm"] = None
+                    for m in metrics:
+                        row[m] = None
+                    rows.append(row)
+                continue
             if metrics is not None:
                 row: dict[str, Any] = dict(param_row)
                 row["success"] = result.success

@@ -27,6 +27,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     a node by GUI label.
   - `NetworkResult.to_dataframe()`: full-detail DataFrame identical to the GUI
     CSV export, with unit-annotated column names.
+  - `NetworkResult.swap_boundary(label, new_type)`: retype a boundary node
+    (mass ↔ pressure) and auto-populate its required field from the solved
+    state (``Pt`` when going mass→pressure; ``m_dot`` when going
+    pressure→mass).  Returns a new ``NetworkRunner`` pre-seeded with the full
+    solved state — including junction-node pressures and element flows — so the
+    first re-solve starts from the exact operating point and converges without
+    requiring a warm-start strategy.  Enables off-design pressure sensitivity
+    studies and matched boundary-condition workflows.
+- `python/examples/network_runner_bc_swap.py`: example loading the compressible
+  CH4/air combustor, solving the design point at fixed air mass flow, swapping
+  the air inlet to a pressure boundary, and sweeping inlet total pressure
+  ±10 % around the design point (11/11 points converge).
 - `_schema_maps` and `_build_result_objects` helpers extracted from the HTTP
   solve/export handlers into `runner.py`; shared by `NetworkRunner` and
   `main.py` to eliminate duplication.
