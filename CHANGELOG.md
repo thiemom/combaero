@@ -55,6 +55,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is read-only, matching the CI `lint-gui` job.
 
 ### Fixed
+- Network solver no longer crashes on combustor networks where Newton steps temporarily
+  produce non-physical states (T ≤ 0 or P ≤ 0). `adiabatic_T_complete_and_jacobian_T()`
+  and `adiabatic_T_equilibrium_and_jacobians()` now clamp T and P to safe floors instead of
+  throwing; `_propagate_states` and `_get_node_state` in the Python solver clamp T ≥ 50 K
+  so that reverse-flow mixing artefacts (negative T_mix from negative m_dot streams) never
+  propagate into physics calls.
 - `friction_petukhov()` and `friction_and_jacobian_petukhov()` no longer throw
   for Re < 3000; the Petukhov formula is mathematically continuous so values below
   the validated range are returned as extrapolated rather than raising an error.
