@@ -398,6 +398,31 @@ const Inspector = () => {
 							value={selectedNode.data.D ?? 0.1}
 							onChange={(val) => updateNodeData(selectedNode.id, { D: val })}
 						/>
+						<div className="flex flex-col gap-2">
+							<label className="text-xs font-bold text-gray-500 uppercase">
+								Friction Model
+							</label>
+							<select
+								className="p-2 border rounded bg-white text-xs"
+								value={selectedNode.data.friction_model || "haaland"}
+								onChange={(e) =>
+									updateNodeData(selectedNode.id, {
+										friction_model: e.target.value,
+									})
+								}
+							>
+								<option value="haaland">
+									Haaland (default, ~2–3% vs Colebrook)
+								</option>
+								<option value="serghides">
+									Serghides (&lt;0.3% vs Colebrook)
+								</option>
+								<option value="colebrook">Colebrook-White (reference)</option>
+								<option value="petukhov">
+									Petukhov (smooth pipe, pairs with Petukhov Nu)
+								</option>
+							</select>
+						</div>
 						<LengthInput
 							id={`roughness_${selectedNode.id}`}
 							label="Surface Roughness"
@@ -405,6 +430,7 @@ const Inspector = () => {
 							onChange={(val) =>
 								updateNodeData(selectedNode.id, { roughness: val })
 							}
+							disabled={selectedNode.data.friction_model === "petukhov"}
 						/>
 						<div className="grid grid-cols-2 gap-3">
 							<div className="flex flex-col gap-2">

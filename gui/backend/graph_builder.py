@@ -430,6 +430,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 length=data.L,
                 diameter=data.D,
                 roughness=data.roughness,
+                friction_model=data.friction_model,
                 surface=ConvectiveSurface(
                     area=conv_area,
                     model=map_surface_model(data.surface),

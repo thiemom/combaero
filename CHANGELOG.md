@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Channel element friction model selector in the GUI Inspector: Haaland (default),
+  Serghides, Colebrook-White, or Petukhov. The Roughness field is greyed out when
+  Petukhov is selected (smooth-pipe model, ignores roughness). Petukhov is the natural
+  pairing for channels that already use the Petukhov/Gnielinski heat transfer correlation.
 - `NetworkRunner` and `NetworkResult` in `gui/backend/runner.py`: programmatic
   network driver for use in Python scripts and Jupyter notebooks without
   starting the web server.
