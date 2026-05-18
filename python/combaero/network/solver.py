@@ -677,6 +677,7 @@ class NetworkSolver:
                 wall_contributions = self._evaluate_walls_for_node(nid, up_elems, x)
 
             T, Y, mix_res = node.compute_derived_state(up_states)
+            T = max(float(T), 50.0)
             self._derived_states[nid] = (T, Y, mix_res)
 
             # Store wall coupling debug info on the node
@@ -1012,8 +1013,8 @@ class NetworkSolver:
         return NetworkMixtureState(
             float(state_dict["P"]),
             float(state_dict["Pt"]),
-            float(state_dict["T"]),
-            float(state_dict["Tt"]),
+            max(float(state_dict["T"]), 50.0),
+            max(float(state_dict["Tt"]), 50.0),
             float(state_dict["m_dot"]),
             Y_safe,
         )

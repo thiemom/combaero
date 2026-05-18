@@ -651,10 +651,12 @@ P0_from_static_and_jacobian_M(double P, double T, double M,
 std::tuple<double, double, std::vector<double>>
 adiabatic_T_complete_and_jacobian_T(double T_in, double P,
                                      const std::vector<double> &X_in) {
-  if (T_in <= 0.0 || P <= 0.0) {
-    throw std::invalid_argument(
-        "solver_interface::adiabatic_T_complete requires T_in > 0 and P > 0");
-  }
+  // Clamp to safe physical floor instead of throwing: the solver may
+  // probe unphysical (T<=0, P<=0) intermediates during Newton steps.
+  // Clamping keeps residuals finite with correct gradient direction so
+  // the trust-region can step back toward physical territory.
+  T_in = std::max(T_in, T_SMOOTH_FLOOR_LIMIT);
+  P = std::max(P, 100.0);
 
   State in_state;
   in_state.set_TPX(T_in, P, X_in);
@@ -690,10 +692,8 @@ adiabatic_T_complete_and_jacobian_T(double T_in, double P,
 std::tuple<double, double, double, std::vector<double>>
 adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
                                        const std::vector<double> &X_in) {
-  if (T_in <= 0.0 || P <= 0.0) {
-    throw std::invalid_argument("solver_interface::adiabatic_T_equilibrium "
-                                "requires T_in > 0 and P > 0");
-  }
+  T_in = std::max(T_in, T_SMOOTH_FLOOR_LIMIT);
+  P = std::max(P, 100.0);
 
   State in_state;
   in_state.set_TPX(T_in, P, X_in);
