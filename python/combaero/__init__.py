@@ -389,6 +389,17 @@ try:
         cylinder_volume,
         channel_roughness,
         standard_channel_roughness,
+        # Vatistas n-vortex model
+        vatistas_v0_bar,
+        vatistas_dv0_bar_drbar,
+        vatistas_vr_bar,
+        vatistas_dvr_bar_drbar,
+        vatistas_pressure_integral,
+        vatistas_d_pressure_integral_drbar,
+        vatistas_v_theta,
+        vatistas_v_theta_and_jacobians,
+        vatistas_delta_p,
+        vatistas_delta_p_and_jacobians,
     )
 
     molar_mass = mwmix
@@ -541,6 +552,17 @@ except (ModuleNotFoundError, ImportError) as e:
     friction_serghides = _core.friction_serghides
     friction_colebrook = _core.friction_colebrook
     friction_petukhov = _core.friction_petukhov
+    # Vatistas n-vortex model
+    vatistas_v0_bar = _core.vatistas_v0_bar
+    vatistas_dv0_bar_drbar = _core.vatistas_dv0_bar_drbar
+    vatistas_vr_bar = _core.vatistas_vr_bar
+    vatistas_dvr_bar_drbar = _core.vatistas_dvr_bar_drbar
+    vatistas_pressure_integral = _core.vatistas_pressure_integral
+    vatistas_d_pressure_integral_drbar = _core.vatistas_d_pressure_integral_drbar
+    vatistas_v_theta = _core.vatistas_v_theta
+    vatistas_v_theta_and_jacobians = _core.vatistas_v_theta_and_jacobians
+    vatistas_delta_p = _core.vatistas_delta_p
+    vatistas_delta_p_and_jacobians = _core.vatistas_delta_p_and_jacobians
     # Heat transfer
     nusselt_dittus_boelter = _core.nusselt_dittus_boelter
     nusselt_gnielinski = _core.nusselt_gnielinski
@@ -712,6 +734,7 @@ except NameError:
 # Submodule imports - always available regardless of _core load path.
 from . import compressible, heat_transfer, incompressible, network, species, _solver_tools
 from ._flow_solution import FlowSolution
+from .vortex import VatistasVortex
 
 
 # ---------------------------------------------------------------------------
@@ -1157,5 +1180,17 @@ __all__ = [
     "conical_area_change",
     "AreaChangeResult",
     "AreaChangeElementResult",
+    # Vatistas n-vortex model
+    "vatistas_v0_bar",
+    "vatistas_dv0_bar_drbar",
+    "vatistas_vr_bar",
+    "vatistas_dvr_bar_drbar",
+    "vatistas_pressure_integral",
+    "vatistas_d_pressure_integral_drbar",
+    "vatistas_v_theta",
+    "vatistas_v_theta_and_jacobians",
+    "vatistas_delta_p",
+    "vatistas_delta_p_and_jacobians",
+    "VatistasVortex",
     "__version__",
 ]

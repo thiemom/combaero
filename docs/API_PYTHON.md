@@ -540,6 +540,56 @@ res = _core.branching_tee_residuals_and_jacobian(
 
 ---
 
+## Vatistas n-Vortex Model
+
+Reference: Vatistas, Kozel, Mih (1991), *Exp. Fluids* 11, 73–76.
+
+Shape parameter `n >= 1` (default 2.0). `n=2` gives the best fit to most
+experimental swirl data.  Closed-form antiderivatives for the pressure integral
+are used for `n=1` and `n=2`; composite Simpson quadrature for general `n`.
+All Jacobians are analytical.
+
+### Free functions
+
+```python
+import combaero as cb
+
+# Normalised shape functions (no units, r_bar = r / r_c)
+v0   = cb.vatistas_v0_bar(r_bar, n)           # tangential velocity shape
+dv0  = cb.vatistas_dv0_bar_drbar(r_bar, n)    # d(V0_bar)/d(r_bar)
+vr   = cb.vatistas_vr_bar(r_bar, n)           # radial velocity shape (< 0)
+dvr  = cb.vatistas_dvr_bar_drbar(r_bar, n)    # d(Vr_bar)/d(r_bar)
+I    = cb.vatistas_pressure_integral(r_bar, n) # integral_0^r V0^2/r' dr'
+dI   = cb.vatistas_d_pressure_integral_drbar(r_bar, n)  # V0_bar^2/r_bar (FTC)
+
+# Dimensional functions (Gamma [m^2/s], r_c [m], rho [kg/m^3])
+Vt   = cb.vatistas_v_theta(r, Gamma, r_c, n)  # [m/s]
+Vt, dVt_dr, dVt_dG, dVt_drc = cb.vatistas_v_theta_and_jacobians(r, Gamma, r_c, n)
+
+dP   = cb.vatistas_delta_p(r, rho, Gamma, r_c, n)  # P(r)-P(0) [Pa]
+dP, ddP_dr, ddP_dG, ddP_drc = cb.vatistas_delta_p_and_jacobians(r, rho, Gamma, r_c, n)
+```
+
+### `VatistasVortex` class
+
+```python
+import numpy as np
+import combaero as cb
+
+vortex = cb.VatistasVortex(Gamma=0.5, r_c=0.05, n=2.0)
+
+r = np.linspace(0, 0.2, 200)
+V  = vortex.V_theta(r)          # [m/s], vectorised
+dV = vortex.dV_theta_dr(r)      # [1/s], vectorised
+
+Vmax = vortex.V_theta_max()     # peak tangential velocity at r = r_c
+
+dP   = vortex.delta_P(r=0.1, rho=1.2)    # [Pa], scalar
+dPbar = vortex.delta_P_bar(r=0.1)        # normalised [0, 1)
+```
+
+---
+
 ## NetworkRunner (GUI-JSON Programmatic Driver)
 
 `NetworkRunner` loads a network saved from the GUI and runs it from Python

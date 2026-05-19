@@ -23,6 +23,7 @@
 #include "registry.h"
 #include "solver_interface.h"
 #include "tee_junction.h"
+#include "vatistas.h"
 #include "stagnation.h"
 #include "state.h"
 #include "thermo.h"
@@ -2252,6 +2253,124 @@ PYBIND11_MODULE(_core, m) {
         "Returns: Darcy friction factor f [-] (dimensionless)\n\n"
         "Valid for: 3000 < Re < 5x10^6\n"
         "Often used with Gnielinski/Petukhov heat transfer correlations.");
+
+  // -------------------------------------------------------------
+  // Vatistas n-vortex model
+  // Reference: Vatistas, Kozel, Mih (1991), Exp. Fluids 11, 73-76.
+  // -------------------------------------------------------------
+
+  m.def("vatistas_v0_bar", &solver::vatistas_v0_bar, py::arg("r_bar"),
+        py::arg("n") = vatistas::n_default,
+        "Normalised tangential velocity profile V0_bar(r_bar; n).\n\n"
+        "V0_bar = r_bar / (1 + r_bar^{2n})^{1/n}  [Eq. 2]\n\n"
+        "Peak at r_bar = 1 with value 2^{-1/n} for all n >= 1.\n\n"
+        "Parameters:\n"
+        "  r_bar : normalised radius r/r_c [-]\n"
+        "  n     : shape parameter [-] (must be >= 1, default 2)\n\n"
+        "Returns: V0_bar [-] (dimensionless)");
+
+  m.def("vatistas_dv0_bar_drbar", &solver::vatistas_dv0_bar_drbar,
+        py::arg("r_bar"), py::arg("n") = vatistas::n_default,
+        "Analytical d(V0_bar)/d(r_bar).\n\n"
+        "= (1 - r_bar^{2n}) / (1 + r_bar^{2n})^{1 + 1/n}\n\n"
+        "Positive for r_bar < 1, zero at r_bar = 1, negative for r_bar > 1.\n\n"
+        "Parameters:\n"
+        "  r_bar : normalised radius r/r_c [-]\n"
+        "  n     : shape parameter [-] (default 2)\n\n"
+        "Returns: d(V0_bar)/d(r_bar) [-]");
+
+  m.def("vatistas_vr_bar", &solver::vatistas_vr_bar, py::arg("r_bar"),
+        py::arg("n") = vatistas::n_default,
+        "Normalised radial velocity Vr_bar = V_r * r_c / nu  [Eq. 3].\n\n"
+        "= -2*(1+n)*r_bar^{2n-1} / (1 + r_bar^{2n})\n\n"
+        "Negative by definition (inward flow toward vortex axis).\n\n"
+        "Parameters:\n"
+        "  r_bar : normalised radius r/r_c [-]\n"
+        "  n     : shape parameter [-] (default 2)\n\n"
+        "Returns: Vr_bar [-] (dimensionless, negative)");
+
+  m.def("vatistas_dvr_bar_drbar", &solver::vatistas_dvr_bar_drbar,
+        py::arg("r_bar"), py::arg("n") = vatistas::n_default,
+        "Analytical d(Vr_bar)/d(r_bar).\n\n"
+        "Parameters:\n"
+        "  r_bar : normalised radius r/r_c [-]\n"
+        "  n     : shape parameter [-] (default 2)\n\n"
+        "Returns: d(Vr_bar)/d(r_bar) [-]");
+
+  m.def("vatistas_pressure_integral", &solver::vatistas_pressure_integral,
+        py::arg("r_bar"), py::arg("n") = vatistas::n_default,
+        "Raw pressure integral I(r_bar; n) = integral_0^{r_bar} V0_bar^2/r' dr'.\n\n"
+        "Closed form for n=1 and n=2; composite Simpson quadrature otherwise.\n"
+        "  n = 1: r_bar^2 / (2*(1 + r_bar^2))\n"
+        "  n = 2: arctan(r_bar^2) / 2\n\n"
+        "Dimensional delta_P = (Gamma/(2*pi*r_c))^2 * rho * I(r/r_c; n)\n\n"
+        "For the normalised form (0 to 1 as r_bar -> inf):\n"
+        "  n=2: delta_P_bar = I / (pi/4)  =  (2/pi)*arctan(r_bar^2)  [Eq. 11]\n\n"
+        "Parameters:\n"
+        "  r_bar : normalised radius r/r_c [-]\n"
+        "  n     : shape parameter [-] (default 2)\n\n"
+        "Returns: I(r_bar; n) [-]");
+
+  m.def("vatistas_d_pressure_integral_drbar",
+        &solver::vatistas_d_pressure_integral_drbar, py::arg("r_bar"),
+        py::arg("n") = vatistas::n_default,
+        "Analytical d(I)/d(r_bar) = V0_bar(r_bar)^2 / r_bar  [FTC, all n].\n\n"
+        "Parameters:\n"
+        "  r_bar : normalised radius r/r_c [-]\n"
+        "  n     : shape parameter [-] (default 2)\n\n"
+        "Returns: d(I)/d(r_bar) [-]");
+
+  m.def("vatistas_v_theta",
+        py::overload_cast<double, double, double, double>(
+            &solver::vatistas_v_theta),
+        py::arg("r"), py::arg("Gamma"), py::arg("r_c"),
+        py::arg("n") = vatistas::n_default,
+        "Tangential velocity V_theta(r; Gamma, r_c, n) [m/s].\n\n"
+        "V_theta = [Gamma/(2*pi*r_c)] * V0_bar(r/r_c; n)\n\n"
+        "Parameters:\n"
+        "  r     : radius [m] (>= 0)\n"
+        "  Gamma : vortex circulation [m^2/s] (must be > 0)\n"
+        "  r_c   : core radius [m] (must be > 0)\n"
+        "  n     : shape parameter [-] (must be >= 1, default 2)\n\n"
+        "Returns: V_theta [m/s]");
+
+  m.def("vatistas_v_theta_and_jacobians",
+        py::overload_cast<double, double, double, double>(
+            &solver::vatistas_v_theta_and_jacobians),
+        py::arg("r"), py::arg("Gamma"), py::arg("r_c"),
+        py::arg("n") = vatistas::n_default,
+        "V_theta and its partial derivatives (all analytical).\n\n"
+        "Parameters:\n"
+        "  r, Gamma, r_c, n : same as vatistas_v_theta\n\n"
+        "Returns: tuple (V_theta [m/s], dV/dr [1/s],\n"
+        "                dV/dGamma [(m/s)/(m^2/s)], dV/dr_c [(m/s)/m])");
+
+  m.def("vatistas_delta_p",
+        py::overload_cast<double, double, double, double, double>(
+            &solver::vatistas_delta_p),
+        py::arg("r"), py::arg("rho"), py::arg("Gamma"), py::arg("r_c"),
+        py::arg("n") = vatistas::n_default,
+        "Static pressure rise P(r) - P(0) [Pa].\n\n"
+        "delta_P = (Gamma/(2*pi*r_c))^2 * rho * I(r/r_c; n)\n\n"
+        "Parameters:\n"
+        "  r     : radius [m]\n"
+        "  rho   : fluid density [kg/m^3]\n"
+        "  Gamma : vortex circulation [m^2/s] (must be > 0)\n"
+        "  r_c   : core radius [m] (must be > 0)\n"
+        "  n     : shape parameter [-] (must be >= 1, default 2)\n\n"
+        "Returns: delta_P [Pa]");
+
+  m.def("vatistas_delta_p_and_jacobians",
+        py::overload_cast<double, double, double, double, double>(
+            &solver::vatistas_delta_p_and_jacobians),
+        py::arg("r"), py::arg("rho"), py::arg("Gamma"), py::arg("r_c"),
+        py::arg("n") = vatistas::n_default,
+        "delta_P and its partial derivatives (all analytical).\n\n"
+        "Parameters:\n"
+        "  r, rho, Gamma, r_c, n : same as vatistas_delta_p\n\n"
+        "Returns: tuple (delta_P [Pa], d_delta_P/dr [Pa/m],\n"
+        "                d_delta_P/dGamma [Pa/(m^2/s)],\n"
+        "                d_delta_P/dr_c [Pa/m])");
 
   // -------------------------------------------------------------
   // Heat transfer correlations
