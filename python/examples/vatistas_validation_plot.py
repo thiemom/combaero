@@ -1,27 +1,21 @@
-"""
-Vatistas n-vortex model -- validation plots against digitised paper data.
+"""Vatistas n-vortex model -- validation plots against digitised paper data.
 
 Recreates Figs 1b, 2a, 2b from:
   Vatistas, Kozel, Mih (1991), Exp. Fluids 11, 73-76.
   DOI: 10.1007/BF00198434
-
-Usage::
-
-    uv run examples/vatistas_validation_plot.py
-    uv run examples/vatistas_validation_plot.py --save vatistas_validation.png
 """
 
-import argparse
 import math
 import pathlib
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from plot_utils import show_or_save
 
 import combaero as cb
 
-DATA_DIR = pathlib.Path(__file__).parent.parent / "python" / "tests" / "data" / "vatistas"
+DATA_DIR = pathlib.Path(__file__).parent.parent / "tests" / "data" / "vatistas"
 
 
 def load(filename: str) -> tuple[np.ndarray, np.ndarray]:
@@ -29,7 +23,7 @@ def load(filename: str) -> tuple[np.ndarray, np.ndarray]:
     return df["x"].to_numpy(), df[" y"].to_numpy()
 
 
-def main(save: str | None = None) -> None:
+def main() -> None:
     r_dense = np.linspace(0.0, 4.0, 400)
 
     fig, axes = plt.subplots(1, 3, figsize=(14, 4.5))
@@ -60,7 +54,6 @@ def main(save: str | None = None) -> None:
     ax = axes[1]
     r_exp, dp_exp = load("fig2b_exp_data.csv")
     ax.scatter(r_exp, dp_exp, s=14, color="tomato", zorder=3, label="Exp. data (Fig 2b)")
-    # Eq. 11: delta_P_bar = (2/pi) * arctan(r_bar^2)  for n=2
     dp_model = np.array([(2.0 / math.pi) * math.atan(r**2) for r in r_dense])
     ax.plot(r_dense, dp_model, "k-", lw=1.5, label="Model n=2")
     ax.set_xlabel(r"$\bar{r} = r / r_c$")
@@ -76,14 +69,18 @@ def main(save: str | None = None) -> None:
     ax = axes[2]
     configs = [
         ("fig_1b_n=1.csv", 1.0, "o", "steelblue"),
-        ("fig1b_n=2.csv",  2.0, "s", "tomato"),
-        ("fig1b_n=3.csv",  3.0, "^", "seagreen"),
+        ("fig1b_n=2.csv", 2.0, "s", "tomato"),
+        ("fig1b_n=3.csv", 3.0, "^", "seagreen"),
     ]
     for filename, n, marker, color in configs:
         r_exp, vr_exp = load(filename)
         ax.scatter(
-            r_exp, vr_exp,
-            s=14, marker=marker, color=color, zorder=3,
+            r_exp,
+            vr_exp,
+            s=14,
+            marker=marker,
+            color=color,
+            zorder=3,
             label=f"Exp. data n={int(n)}",
         )
         vr_model = np.array([abs(cb.vatistas_vr_bar(r, n)) for r in r_dense])
@@ -97,16 +94,8 @@ def main(save: str | None = None) -> None:
     ax.set_ylim(0, None)
 
     plt.tight_layout()
-
-    if save:
-        fig.savefig(save, dpi=150)
-        print(f"Saved to {save}")
-    else:
-        plt.show()
+    show_or_save(fig, "vatistas_validation_plot.png")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Vatistas validation plots")
-    parser.add_argument("--save", metavar="FILE", help="Save figure instead of displaying")
-    args = parser.parse_args()
-    main(save=args.save)
+    main()
