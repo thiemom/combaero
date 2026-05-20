@@ -143,9 +143,7 @@ const CompositionEditor: React.FC<CompositionEditorProps> = ({
 								className="p-1 text-sm border rounded bg-white"
 							/>
 							<span className="text-[9px] text-stone-400">
-								{solverSettings.ambient_T != null
-									? `global: ${solverSettings.ambient_T} K`
-									: "global: not set"}
+								{`global: ${solverSettings.ambient_T ?? 288.15} K`}
 							</span>
 						</div>
 						<div className="flex flex-col gap-1">
@@ -160,9 +158,7 @@ const CompositionEditor: React.FC<CompositionEditorProps> = ({
 								className="p-1 text-sm border rounded bg-white"
 							/>
 							<span className="text-[9px] text-stone-400">
-								{solverSettings.ambient_RH != null
-									? `global: ${solverSettings.ambient_RH}`
-									: "global: not set"}
+								{`global: ${solverSettings.ambient_RH ?? 0.6}`}
 							</span>
 						</div>
 					</div>
@@ -173,9 +169,7 @@ const CompositionEditor: React.FC<CompositionEditorProps> = ({
 						onClear={() => updateComp({ ambient_P: null })}
 					/>
 					<span className="text-[9px] text-stone-400 -mt-1">
-						{solverSettings.ambient_P != null
-							? `global: ${solverSettings.ambient_P} Pa`
-							: "global: not set"}
+						{`global: ${solverSettings.ambient_P ?? 101325} Pa`}
 					</span>
 				</div>
 			)}
