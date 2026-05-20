@@ -446,6 +446,11 @@ const Inspector = () => {
 									}
 									className="p-2 border rounded"
 								/>
+								<span className="text-[9px] text-stone-400">
+									{solverSettings.Nu_multiplier != null
+										? `global: ×${solverSettings.Nu_multiplier}`
+										: "global: —"}
+								</span>
 							</div>
 							<div className="flex flex-col gap-2">
 								<label className="text-xs font-bold text-gray-500 uppercase">
@@ -458,6 +463,11 @@ const Inspector = () => {
 									}
 									className="p-2 border rounded"
 								/>
+								<span className="text-[9px] text-stone-400">
+									{solverSettings.f_multiplier != null
+										? `global: ×${solverSettings.f_multiplier}`
+										: "global: —"}
+								</span>
 							</div>
 						</div>
 						<div className="flex flex-col gap-2">
@@ -1306,6 +1316,11 @@ const Inspector = () => {
 											}
 											className="p-2 border rounded"
 										/>
+										<span className="text-[9px] text-stone-400">
+											{solverSettings.Nu_multiplier != null
+												? `global: ×${solverSettings.Nu_multiplier}`
+												: "global: —"}
+										</span>
 									</div>
 									<div className="flex flex-col gap-2">
 										<label className="text-xs font-bold text-gray-500 uppercase">
@@ -1320,6 +1335,11 @@ const Inspector = () => {
 											}
 											className="p-2 border rounded"
 										/>
+										<span className="text-[9px] text-stone-400">
+											{solverSettings.f_multiplier != null
+												? `global: ×${solverSettings.f_multiplier}`
+												: "global: —"}
+										</span>
 									</div>
 								</div>
 
@@ -1413,6 +1433,11 @@ const Inspector = () => {
 									}
 									className="p-2 border rounded"
 								/>
+								<span className="text-[9px] text-stone-400">
+									{solverSettings.Nu_multiplier != null
+										? `global: ×${solverSettings.Nu_multiplier}`
+										: "global: —"}
+								</span>
 							</div>
 							<div className="flex flex-col gap-2">
 								<label className="text-xs font-bold text-gray-500 uppercase">
@@ -1428,6 +1453,11 @@ const Inspector = () => {
 									}
 									className="p-2 border rounded"
 								/>
+								<span className="text-[9px] text-stone-400">
+									{solverSettings.f_multiplier != null
+										? `global: ×${solverSettings.f_multiplier}`
+										: "global: —"}
+								</span>
 							</div>
 						</div>
 						<SurfaceEnhancementInspector
@@ -1495,6 +1525,11 @@ const Inspector = () => {
 									}
 									className="p-2 border rounded"
 								/>
+								<span className="text-[9px] text-stone-400">
+									{solverSettings.Nu_multiplier != null
+										? `global: ×${solverSettings.Nu_multiplier}`
+										: "global: —"}
+								</span>
 							</div>
 							<div className="flex flex-col gap-2">
 								<label className="text-xs font-bold text-gray-500 uppercase">
@@ -1510,6 +1545,11 @@ const Inspector = () => {
 									}
 									className="p-2 border rounded"
 								/>
+								<span className="text-[9px] text-stone-400">
+									{solverSettings.f_multiplier != null
+										? `global: ×${solverSettings.f_multiplier}`
+										: "global: —"}
+								</span>
 							</div>
 						</div>
 						<SurfaceEnhancementInspector
