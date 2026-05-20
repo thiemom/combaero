@@ -287,8 +287,9 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 surface=ConvectiveSurface(
                     area=data.area,
                     model=map_surface_model(data.surface),
-                    Nu_multiplier=data.Nu_multiplier,
-                    f_multiplier=data.f_multiplier,
+                    Nu_multiplier=data.Nu_multiplier
+                    * (schema.solver_settings.Nu_multiplier or 1.0),
+                    f_multiplier=data.f_multiplier * (schema.solver_settings.f_multiplier or 1.0),
                 ),
             )
             node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
@@ -302,8 +303,9 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 surface=ConvectiveSurface(
                     area=data.area,
                     model=map_surface_model(data.surface),
-                    Nu_multiplier=data.Nu_multiplier,
-                    f_multiplier=data.f_multiplier,
+                    Nu_multiplier=data.Nu_multiplier
+                    * (schema.solver_settings.Nu_multiplier or 1.0),
+                    f_multiplier=data.f_multiplier * (schema.solver_settings.f_multiplier or 1.0),
                 ),
             )
             node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
@@ -436,8 +438,9 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 surface=ConvectiveSurface(
                     area=conv_area,
                     model=map_surface_model(data.surface),
-                    Nu_multiplier=data.Nu_multiplier,
-                    f_multiplier=data.f_multiplier,
+                    Nu_multiplier=data.Nu_multiplier
+                    * (schema.solver_settings.Nu_multiplier or 1.0),
+                    f_multiplier=data.f_multiplier * (schema.solver_settings.f_multiplier or 1.0),
                 ),
             )
             regime = (

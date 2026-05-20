@@ -293,6 +293,12 @@ class SolverSettings(BaseModel):
     ] = "hybr"
     timeout: float | None = 180.0
     omega_rpm: float | None = None  # global shaft speed [rpm]; None = disabled
+    Nu_multiplier: float | None = (
+        None  # global heat-transfer scale; stacks multiplicatively with per-element
+    )
+    f_multiplier: float | None = (
+        None  # global friction scale; stacks multiplicatively with per-element
+    )
 
 
 # --- React Flow Wrapper Schemas ---

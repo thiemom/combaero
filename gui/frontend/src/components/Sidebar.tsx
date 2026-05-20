@@ -448,6 +448,38 @@ const Sidebar = () => {
 						</select>
 					</div>
 				</div>
+				<div className="flex flex-col gap-1">
+					<label className="text-[10px] font-bold text-gray-400 uppercase">
+						Nu Multiplier
+					</label>
+					<NumericInput
+						className="p-1 border rounded text-xs bg-white h-7 outline-none focus:ring-1 focus:ring-stone-200"
+						value={solverSettings.Nu_multiplier ?? null}
+						onChange={(val) => updateSolverSettings({ Nu_multiplier: val })}
+						onClear={() => updateSolverSettings({ Nu_multiplier: null })}
+						min={0}
+						placeholder="1.0"
+					/>
+					<span className="text-[9px] text-stone-400">
+						Scales heat transfer on all elements multiplicatively
+					</span>
+				</div>
+				<div className="flex flex-col gap-1">
+					<label className="text-[10px] font-bold text-gray-400 uppercase">
+						f Multiplier
+					</label>
+					<NumericInput
+						className="p-1 border rounded text-xs bg-white h-7 outline-none focus:ring-1 focus:ring-stone-200"
+						value={solverSettings.f_multiplier ?? null}
+						onChange={(val) => updateSolverSettings({ f_multiplier: val })}
+						onClear={() => updateSolverSettings({ f_multiplier: null })}
+						min={0}
+						placeholder="1.0"
+					/>
+					<span className="text-[9px] text-stone-400">
+						Scales friction factor on all elements multiplicatively
+					</span>
+				</div>
 			</div>
 		</aside>
 	);
