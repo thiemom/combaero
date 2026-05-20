@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Global Nu/f multipliers in the sidebar "Global Settings" panel. Setting either
+  scales all channel, combustor, momentum-chamber, and discrete-loss elements
+  multiplicatively on top of their per-element values — useful for network-wide
+  sensitivity studies without touching individual elements.
 - `VortexElement` network element: models centrifugal pressure rise in rotating cavities
   (disc pumps, pre-swirl chambers, inter-stage labyrinth spaces) using the Vatistas n-vortex
   model. Parameters: `r_c` (core radius), `r_out`, `r_in` (evaluation radii), `omega_rpm`
