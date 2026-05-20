@@ -31,6 +31,13 @@ const VortexNode = ({ data, selected }: NodeProps) => {
 				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}
 			</div>
 
+			<div className="absolute -left-3 top-1/2 -translate-y-1/2 text-[7px] font-extrabold leading-none select-none pointer-events-none bg-white/70 rounded-sm px-0.5 text-blue-500">
+				i
+			</div>
+			<div className="absolute -right-3 top-1/2 -translate-y-1/2 text-[7px] font-extrabold leading-none select-none pointer-events-none bg-white/70 rounded-sm px-0.5 text-green-500">
+				o
+			</div>
+
 			<Handle type="target" position={Position.Left} id="flow-target" />
 			<Handle type="source" position={Position.Right} id="flow-source" />
 		</div>
