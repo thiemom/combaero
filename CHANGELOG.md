@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Vatistas (1991) n-vortex model: `vatistas_v0_bar`, `vatistas_vr_bar`,
+  `vatistas_pressure_integral` and their analytical derivatives, plus dimensional
+  `vatistas_v_theta` / `vatistas_delta_p` with full analytical Jacobians w.r.t.
+  r, Γ and r_c. Closed-form antiderivatives for n=1 and n=2; composite Simpson
+  quadrature for general n. Python class `VatistasVortex` wraps the free functions
+  with vectorised `V_theta`, `dV_theta_dr`, `delta_P`, and `delta_P_bar` methods.
+  Validated against digitised experimental data from the original paper
+  (Vatistas, Kozel, Mih, *Exp. Fluids* 11, 73–76, 1991).
 - Channel element friction model selector in the GUI Inspector: Haaland (default),
   Serghides, Colebrook-White, or Petukhov. The Roughness field is greyed out when
   Petukhov is selected (smooth-pipe model, ignores roughness). Petukhov is the natural
