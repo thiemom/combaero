@@ -390,9 +390,35 @@ const Sidebar = () => {
 					/>
 				</div>
 
+				<div className="border-t border-stone-200 pt-2 flex flex-col gap-2">
+					<button
+						type="button"
+						onClick={resetAllInitialGuesses}
+						className="w-full text-[10px] font-bold uppercase tracking-wider bg-white hover:bg-amber-50 text-amber-700 border border-amber-200 rounded px-2 py-1.5 transition-colors"
+						title="Clear initial-guess overrides on every node and element; solver reverts to auto-seeding"
+					>
+						Reset All Initial Guesses
+					</button>
+
+					{solveResults && (solveResults as any).isTopologyMismatch && (
+						<button
+							type="button"
+							onClick={() => updateSolverSettings({ init_strategy: "default" })}
+							className="w-full text-[10px] font-bold uppercase tracking-wider bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded px-2 py-1.5 transition-colors"
+						>
+							Reset Solver (Cold Start)
+						</button>
+					)}
+				</div>
+			</div>
+
+			<div className="mt-6 text-sm font-bold text-gray-500 uppercase tracking-wider">
+				Shaft Speed
+			</div>
+			<div className="flex flex-col gap-4 mt-2 p-3 bg-stone-50 rounded border border-stone-200">
 				<div className="flex flex-col gap-1">
 					<label className="text-[10px] font-bold text-gray-400 uppercase">
-						Shaft Speed (Global)
+						Global
 					</label>
 					<div className="flex items-center gap-1 w-full">
 						<NumericInput
@@ -421,27 +447,6 @@ const Sidebar = () => {
 							<option value="Hz">Hz</option>
 						</select>
 					</div>
-				</div>
-
-				<div className="border-t border-stone-200 pt-2 flex flex-col gap-2">
-					<button
-						type="button"
-						onClick={resetAllInitialGuesses}
-						className="w-full text-[10px] font-bold uppercase tracking-wider bg-white hover:bg-amber-50 text-amber-700 border border-amber-200 rounded px-2 py-1.5 transition-colors"
-						title="Clear initial-guess overrides on every node and element; solver reverts to auto-seeding"
-					>
-						Reset All Initial Guesses
-					</button>
-
-					{solveResults && (solveResults as any).isTopologyMismatch && (
-						<button
-							type="button"
-							onClick={() => updateSolverSettings({ init_strategy: "default" })}
-							className="w-full text-[10px] font-bold uppercase tracking-wider bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded px-2 py-1.5 transition-colors"
-						>
-							Reset Solver (Cold Start)
-						</button>
-					)}
 				</div>
 			</div>
 		</aside>
