@@ -65,9 +65,9 @@ class CompositionData(BaseModel):
     mode: Literal["mole", "mass"] = "mole"
     source: Literal["dry_air", "humid_air", "fuel", "custom"] = "humid_air"
     custom_fractions: dict[str, float] | None = None
-    relative_humidity: float = 0.6  # [0-1] for humid_air
-    ambient_T: float = 288.15
-    ambient_P: float = 101325.0
+    relative_humidity: float | None = None  # None = use global or 0.6
+    ambient_T: float | None = None  # None = use global or 288.15
+    ambient_P: float | None = None  # None = use global or 101325.0
 
 
 class MassBoundaryData(BaseModel):

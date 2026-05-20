@@ -493,7 +493,9 @@ const Sidebar = () => {
 							onClear={() => updateSolverSettings({ ambient_T: null })}
 							placeholder="288.15"
 						/>
-						<span className="text-[10px] text-stone-400 shrink-0">K</span>
+						<span className="text-[10px] text-stone-400 w-10 text-right shrink-0">
+							K
+						</span>
 					</div>
 				</div>
 				<div className="flex flex-col gap-1">
@@ -533,7 +535,7 @@ const Sidebar = () => {
 										: "101325"
 							}
 						/>
-						<span className="text-[10px] text-stone-400 shrink-0">
+						<span className="text-[10px] text-stone-400 w-10 text-right shrink-0">
 							{unitPreferences.pressure}
 						</span>
 					</div>
@@ -552,7 +554,9 @@ const Sidebar = () => {
 							max={1}
 							placeholder="0.6"
 						/>
-						<span className="text-[10px] text-stone-400 shrink-0">0–1</span>
+						<span className="text-[10px] text-stone-400 w-10 text-right shrink-0">
+							0–1
+						</span>
 					</div>
 				</div>
 			</div>

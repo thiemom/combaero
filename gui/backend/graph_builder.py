@@ -121,10 +121,20 @@ def resolve_composition(
         Y = cb.species.dry_air_mass()
     elif comp.source == "humid_air":
         s = solver_settings
-        ambient_T = s.ambient_T if (s is not None and s.ambient_T is not None) else comp.ambient_T
-        ambient_P = s.ambient_P if (s is not None and s.ambient_P is not None) else comp.ambient_P
+        ambient_T = (
+            comp.ambient_T
+            if comp.ambient_T is not None
+            else (s.ambient_T if s is not None and s.ambient_T is not None else 288.15)
+        )
+        ambient_P = (
+            comp.ambient_P
+            if comp.ambient_P is not None
+            else (s.ambient_P if s is not None and s.ambient_P is not None else 101325.0)
+        )
         ambient_RH = (
-            s.ambient_RH if (s is not None and s.ambient_RH is not None) else comp.relative_humidity
+            comp.relative_humidity
+            if comp.relative_humidity is not None
+            else (s.ambient_RH if s is not None and s.ambient_RH is not None else 0.6)
         )
         Y = cb.species.humid_air_mass(ambient_T, ambient_P, ambient_RH)
     elif comp.source == "fuel":

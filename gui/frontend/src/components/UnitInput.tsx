@@ -4,8 +4,9 @@ import NumericInput from "./NumericInput";
 
 interface UnitInputProps {
 	label: string;
-	value: number;
+	value: number | null;
 	onChange: (val: number) => void;
+	onClear?: () => void;
 	id?: string;
 }
 
@@ -13,6 +14,7 @@ const UnitInput: React.FC<UnitInputProps> = ({
 	label,
 	value,
 	onChange,
+	onClear,
 	id,
 }) => {
 	const { unitPreferences, setPressureUnit } = useStore();
@@ -29,8 +31,9 @@ const UnitInput: React.FC<UnitInputProps> = ({
 			<div className="flex gap-1">
 				<NumericInput
 					id={id}
-					value={value / scale}
+					value={value !== null ? value / scale : null}
 					onChange={(v) => onChange(v * scale)}
+					onClear={onClear}
 					className="flex-grow p-1.5 border rounded text-sm bg-stone-50 focus:bg-white focus:ring-1 focus:ring-orange-500 outline-none"
 					placeholder="0.00"
 				/>
