@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Global ambient conditions (T, P, RH) in the sidebar "Global Settings" panel, defaulting
+  to ISO 2314 gas-turbine reference conditions (288.15 K, 101325 Pa, RH 0.6). When set,
+  these override the per-node `ambient_T`, `ambient_P`, and `relative_humidity` fields on
+  all boundary nodes that use the `humid_air` composition source. The CompositionEditor
+  shows a live `global: —` / `global: value` hint below each affected field.
+- All new boundary nodes now default to `humid_air` composition (was `dry_air`). Existing
+  saved networks with explicit `source: "dry_air"` are unaffected.
+- `test_humid_air_rh0_equals_dry_air`: verifies `species.humid_air_mass(T, P, RH=0)` is
+  identical to `species.dry_air_mass()` within floating-point tolerance.
 - Global Nu/f multipliers in the sidebar "Global Settings" panel. Setting either
   scales all channel, combustor, momentum-chamber, and discrete-loss elements
   multiplicatively on top of their per-element values — useful for network-wide

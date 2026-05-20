@@ -108,7 +108,9 @@ def map_surface_model(data):
     return SmoothModel()
 
 
-def resolve_composition(comp: CompositionData, T: float, P: float) -> list[float]:
+def resolve_composition(
+    comp: CompositionData, T: float, P: float, solver_settings=None
+) -> list[float]:
     """
     Converts UI CompositionData into a mass fraction list (Y)
     using combaero.species utilities.
@@ -118,8 +120,13 @@ def resolve_composition(comp: CompositionData, T: float, P: float) -> list[float
     if comp.source == "dry_air":
         Y = cb.species.dry_air_mass()
     elif comp.source == "humid_air":
-        # humid_air_mass takes ambient T, P, RH
-        Y = cb.species.humid_air_mass(comp.ambient_T, comp.ambient_P, comp.relative_humidity)
+        s = solver_settings
+        ambient_T = s.ambient_T if (s is not None and s.ambient_T is not None) else comp.ambient_T
+        ambient_P = s.ambient_P if (s is not None and s.ambient_P is not None) else comp.ambient_P
+        ambient_RH = (
+            s.ambient_RH if (s is not None and s.ambient_RH is not None) else comp.relative_humidity
+        )
+        Y = cb.species.humid_air_mass(ambient_T, ambient_P, ambient_RH)
     elif comp.source == "fuel":
         # Default fuel to CH4 for now, or use a specific fuel if provided
         Y = cb.species.pure_species("CH4")
@@ -265,14 +272,14 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             plenum_node_ids.add(node_id)
         elif node_type == "mass_boundary":
             data = MassBoundaryData(**node_data)
-            Y = resolve_composition(data.composition, data.Tt, 101325.0)
+            Y = resolve_composition(data.composition, data.Tt, 101325.0, schema.solver_settings)
             node = MassFlowBoundary(node_id, m_dot=data.m_dot, Tt=data.Tt, Y=Y)
             node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
             net.add_node(node)
             nodes_map[node_id] = node
         elif node_type == "pressure_boundary":
             data = PressureBoundaryData(**node_data)
-            Y = resolve_composition(data.composition, data.Tt, data.Pt)
+            Y = resolve_composition(data.composition, data.Tt, data.Pt, schema.solver_settings)
             node = PressureBoundary(node_id, Pt=data.Pt, Tt=data.Tt, Y=Y)
             node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
             net.add_node(node)

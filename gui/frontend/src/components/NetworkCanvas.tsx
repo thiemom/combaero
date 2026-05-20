@@ -45,9 +45,11 @@ const NetworkCanvas = () => {
 					m_dot: 1.0,
 					Tt: 300,
 					composition: {
-						source: "dry_air",
+						source: "humid_air",
 						mode: "mole",
-						relative_humidity: 0.0,
+						relative_humidity: 0.6,
+						ambient_T: 288.15,
+						ambient_P: 101325.0,
 					},
 				} as any;
 			} else if (type === "pressure_boundary") {
@@ -56,9 +58,11 @@ const NetworkCanvas = () => {
 					Pt: 101325,
 					Tt: 300,
 					composition: {
-						source: "dry_air",
+						source: "humid_air",
 						mode: "mole",
-						relative_humidity: 0.0,
+						relative_humidity: 0.6,
+						ambient_T: 288.15,
+						ambient_P: 101325.0,
 					},
 				} as any;
 			} else if (type === "channel") {

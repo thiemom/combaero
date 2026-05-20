@@ -9,7 +9,7 @@ interface CompositionEditorProps {
 }
 
 const DEFAULT_COMPOSITION = {
-	source: "dry_air",
+	source: "humid_air",
 	mode: "mole",
 	custom_fractions: {},
 	relative_humidity: 0.6,
@@ -21,7 +21,12 @@ const CompositionEditor: React.FC<CompositionEditorProps> = ({
 	nodeId,
 	data,
 }) => {
-	const { speciesMetadata, fetchSpeciesMetadata, updateNodeData } = useStore();
+	const {
+		speciesMetadata,
+		fetchSpeciesMetadata,
+		updateNodeData,
+		solverSettings,
+	} = useStore();
 	const [localComp, setLocalComp] = useState(() => ({
 		...DEFAULT_COMPOSITION,
 		...(data.composition || {}),
@@ -131,6 +136,11 @@ const CompositionEditor: React.FC<CompositionEditorProps> = ({
 								onChange={(val) => updateComp({ ambient_T: val })}
 								className="p-1 text-sm border rounded bg-white"
 							/>
+							<span className="text-[9px] text-stone-400">
+								{solverSettings.ambient_T != null
+									? `global: ${solverSettings.ambient_T} K`
+									: "global: —"}
+							</span>
 						</div>
 						<div className="flex flex-col gap-1">
 							<label className="text-[10px] text-stone-400 uppercase font-bold">
@@ -141,6 +151,11 @@ const CompositionEditor: React.FC<CompositionEditorProps> = ({
 								onChange={(val) => updateComp({ relative_humidity: val })}
 								className="p-1 text-sm border rounded bg-white"
 							/>
+							<span className="text-[9px] text-stone-400">
+								{solverSettings.ambient_RH != null
+									? `global: ${solverSettings.ambient_RH}`
+									: "global: —"}
+							</span>
 						</div>
 					</div>
 					<UnitInput
@@ -148,6 +163,11 @@ const CompositionEditor: React.FC<CompositionEditorProps> = ({
 						value={localComp.ambient_P}
 						onChange={(val) => updateComp({ ambient_P: val })}
 					/>
+					<span className="text-[9px] text-stone-400 -mt-1">
+						{solverSettings.ambient_P != null
+							? `global: ${solverSettings.ambient_P} Pa`
+							: "global: —"}
+					</span>
 				</div>
 			)}
 
