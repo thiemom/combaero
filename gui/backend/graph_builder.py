@@ -185,6 +185,35 @@ def _expand_initial_guess(short_guess: dict, prefix: str) -> dict:
     return result
 
 
+def _guess_from_prior_result(node_data: dict, prefix: str) -> dict:
+    """Build an initial-guess dict from a prior solve result stored in node_data.
+
+    The GUI frontend writes the last solve result into node_data["result"].
+    When data.initial_guess is empty (no explicit user override), this
+    provides a warm-start from the previously found state so that repeated
+    solves on a difficult network benefit from accumulated Newton progress.
+    Works for both pressure-node results (state.P/T/Pt/Tt) and element
+    results (m_dot stored at the top level).
+    """
+    prior = node_data.get("result")
+    if not prior:
+        return {}
+    short: dict[str, float] = {}
+    state = prior.get("state")
+    if state:
+        if (p := state.get("P")) is not None:
+            short["P"] = float(p)
+        if (t := state.get("T")) is not None:
+            short["T"] = float(t)
+        if (pt := state.get("Pt")) is not None:
+            short["Pt"] = float(pt)
+        if (tt := state.get("Tt")) is not None:
+            short["Tt"] = float(tt)
+    if (m_dot := prior.get("m_dot")) is not None:
+        short["m_dot"] = float(m_dot)
+    return _expand_initial_guess(short, prefix)
+
+
 def _build_discrete_loss_correlation(
     corr_type: str,
     xi: float,
@@ -277,6 +306,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             data = PlenumData(**node_data)
             node = PlenumNode(node_id)
             node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
+            if not node.initial_guess:
+                node.initial_guess = _guess_from_prior_result(node_data, node_id)
             net.add_node(node)
             nodes_map[node_id] = node
             plenum_node_ids.add(node_id)
@@ -285,6 +316,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             Y = resolve_composition(data.composition, data.Tt, 101325.0, schema.solver_settings)
             node = MassFlowBoundary(node_id, m_dot=data.m_dot, Tt=data.Tt, Y=Y)
             node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
+            if not node.initial_guess:
+                node.initial_guess = _guess_from_prior_result(node_data, node_id)
             net.add_node(node)
             nodes_map[node_id] = node
         elif node_type == "pressure_boundary":
@@ -310,6 +343,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 ),
             )
             node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
+            if not node.initial_guess:
+                node.initial_guess = _guess_from_prior_result(node_data, node_id)
             net.add_node(node)
             nodes_map[node_id] = node
         elif node_type == "momentum_chamber":
@@ -326,6 +361,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 ),
             )
             node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
+            if not node.initial_guess:
+                node.initial_guess = _guess_from_prior_result(node_data, node_id)
             net.add_node(node)
             nodes_map[node_id] = node
         elif node_type == "probe":
@@ -410,6 +447,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 tee_type=_d.tee_type,
             )
             _tee.initial_guess = _expand_initial_guess(_d.initial_guess, elem_id)
+            if not _tee.initial_guess:
+                _tee.initial_guess = _guess_from_prior_result(elem_data, elem_id)
             net.add_element(_tee)
             continue
 
@@ -465,6 +504,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             )
             elem.regime = regime
             elem.initial_guess = _expand_initial_guess(data.initial_guess, elem_id)
+            if not elem.initial_guess:
+                elem.initial_guess = _guess_from_prior_result(elem_data, elem_id)
             net.add_element(elem)
         elif elem_type == "orifice":
             data = OrificeData(**elem_data)
@@ -483,6 +524,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             )
             elem.regime = regime
             elem.initial_guess = _expand_initial_guess(data.initial_guess, elem_id)
+            if not elem.initial_guess:
+                elem.initial_guess = _guess_from_prior_result(elem_data, elem_id)
             net.add_element(elem)
         elif elem_type == "area_change":
             data = AreaChangeData(**elem_data)
@@ -497,6 +540,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 D_h=data.D_h,
             )
             elem.initial_guess = _expand_initial_guess(data.initial_guess, elem_id)
+            if not elem.initial_guess:
+                elem.initial_guess = _guess_from_prior_result(elem_data, elem_id)
             net.add_element(elem)
         elif elem_type == "lossless_connection":
             elem = LosslessConnectionElement(elem_id, from_node=source_id, to_node=target_id)
@@ -528,6 +573,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 surface=surface,
             )
             elem.initial_guess = _expand_initial_guess(data.initial_guess, elem_id)
+            if not elem.initial_guess:
+                elem.initial_guess = _guess_from_prior_result(elem_data, elem_id)
             net.add_element(elem)
         elif elem_type == "vortex":
             data = VortexData(**elem_data)
@@ -547,6 +594,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 n=data.n,
             )
             elem.initial_guess = _expand_initial_guess(data.initial_guess, elem_id)
+            if not elem.initial_guess:
+                elem.initial_guess = _guess_from_prior_result(elem_data, elem_id)
             net.add_element(elem)
 
     # 3. Third Pass: Auto-connections

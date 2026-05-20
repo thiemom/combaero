@@ -677,7 +677,7 @@ class NetworkSolver:
                 wall_contributions = self._evaluate_walls_for_node(nid, up_elems, x)
 
             T, Y, mix_res = node.compute_derived_state(up_states)
-            T = max(float(T), 50.0)
+            T = min(max(float(T), 200.0), 5000.0)
             self._derived_states[nid] = (T, Y, mix_res)
 
             # Store wall coupling debug info on the node
@@ -1010,11 +1010,14 @@ class NetworkSolver:
         if y_sum > 0:
             Y_safe = [yi / y_sum for yi in Y_safe]
 
+        # P5: Floor on static pressure to prevent NaN in thermo calls at near-zero P.
+        P_safe = max(float(state_dict["P"]), 1000.0)
+
         return NetworkMixtureState(
-            float(state_dict["P"]),
+            P_safe,
             float(state_dict["Pt"]),
-            max(float(state_dict["T"]), 50.0),
-            max(float(state_dict["Tt"]), 50.0),
+            min(max(float(state_dict["T"]), 200.0), 5000.0),
+            min(max(float(state_dict["Tt"]), 200.0), 5000.0),
             float(state_dict["m_dot"]),
             Y_safe,
         )
@@ -1473,7 +1476,12 @@ class NetworkSolver:
                         stacklevel=2,
                     )
                     self._penalty_warning_issued = True
-                penalty = np.full(len(x_scaled), 10.0, dtype=float)
+                # Penalty that pulls Newton back toward the best physical point
+                # seen so far.  F = x_scaled - x_best means Newton step = x_best
+                # exactly (J=I), so hybr retreats to a known-safe iterate rather
+                # than stepping deeper into unphysical territory.
+                x_best_scaled = best_x * inv_D_x
+                penalty = x_scaled - x_best_scaled
                 if use_jac and method in ("hybr", "lm"):
                     return penalty, np.eye(len(x_scaled))
                 return penalty
