@@ -1146,14 +1146,22 @@ class CombustorNode(NetworkNode):
         fraction_total = sum(eb.fraction for eb in self.energy_boundaries)
 
         # Combustor only: mixing + combustion, NO pressure loss (that's on the edge).
-        mix_res = _solver_tools.combustor_residuals_and_jacobians(
-            streams,
-            P_ref,
-            Q=Q_total,
-            fraction=fraction_total,
-            pressure_loss=_zero_loss,
-            use_equilibrium=(self.method == "equilibrium"),
-        )
+        try:
+            mix_res = _solver_tools.combustor_residuals_and_jacobians(
+                streams,
+                P_ref,
+                Q=Q_total,
+                fraction=fraction_total,
+                pressure_loss=_zero_loss,
+                use_equilibrium=(self.method == "equilibrium"),
+            )
+        except Exception as exc:
+            # Unphysical intermediate state during Newton iteration (e.g. extreme phi).
+            # Re-raise so the solver penalty path can guide the step back to physics.
+            raise RuntimeError(
+                f"CombustorNode '{self.id}': combustion call failed "
+                f"(T_unburned={self._T_unburned:.1f} K)"
+            ) from exc
         self._last_mix_res = mix_res
         # Expose burned temperature for adjacent PressureLossElement (theta source).
         self._T_burned = float(mix_res.T_mix)

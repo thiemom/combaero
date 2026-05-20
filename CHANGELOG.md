@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Solver hardening** against unphysical intermediate states during Newton iteration:
+  - Temperature floor raised from 50 K to 200 K (both in `_propagate_states` and
+    `_get_node_state`); ceiling of 5000 K added to bound combustion runaway.
+  - Static pressure floor of 1000 Pa added in `_get_node_state` to prevent NaN
+    propagation in thermo calls when P drifts near zero.
+  - Penalty residual (triggered on unphysical state exceptions) now encodes
+    `F = x_scaled − x_best_scaled` with `J = I`, so the Newton step jumps back
+    exactly to the best physical iterate seen so far — previously the constant
+    penalty `[10,…,10]` could drive iterates further into unphysical territory.
+  - `CombustorNode.compute_derived_state` now wraps the C++ combustion call in a
+    try/except and re-raises with a diagnostic message; the solver penalty path
+    already handled C++ exceptions, but the new wrapper provides traceability.
+  - `graph_builder` now seeds `initial_guess` from the previous solve result
+    (`data.result` in node/element data) when no explicit user override exists,
+    giving repeated solves a warm start without requiring the `continuation`
+    strategy.
+
 ### Added
 - Global ambient conditions (T, P, RH) in the sidebar "Global Settings" panel, defaulting
   to ISO 2314 gas-turbine reference conditions (288.15 K, 101325 Pa, RH 0.6). When set,
