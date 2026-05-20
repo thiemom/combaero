@@ -394,9 +394,9 @@ const Sidebar = () => {
 					<label className="text-[10px] font-bold text-gray-400 uppercase">
 						Shaft Speed (Global)
 					</label>
-					<div className="flex items-center gap-1">
+					<div className="flex items-center gap-1 w-full">
 						<NumericInput
-							className="p-1 border rounded text-xs bg-white h-7 outline-none focus:ring-1 focus:ring-stone-200 flex-1"
+							className="p-1 border rounded text-xs bg-white h-7 outline-none focus:ring-1 focus:ring-stone-200 flex-1 min-w-0"
 							value={
 								solverSettings.omega_rpm != null
 									? solverSettings.omega_rpm *
