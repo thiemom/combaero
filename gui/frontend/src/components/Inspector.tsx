@@ -449,7 +449,7 @@ const Inspector = () => {
 								<span className="text-[9px] text-stone-400">
 									{solverSettings.Nu_multiplier != null
 										? `global: ×${solverSettings.Nu_multiplier}`
-										: "global: —"}
+										: "global: not set"}
 								</span>
 							</div>
 							<div className="flex flex-col gap-2">
@@ -466,7 +466,7 @@ const Inspector = () => {
 								<span className="text-[9px] text-stone-400">
 									{solverSettings.f_multiplier != null
 										? `global: ×${solverSettings.f_multiplier}`
-										: "global: —"}
+										: "global: not set"}
 								</span>
 							</div>
 						</div>
@@ -1319,7 +1319,7 @@ const Inspector = () => {
 										<span className="text-[9px] text-stone-400">
 											{solverSettings.Nu_multiplier != null
 												? `global: ×${solverSettings.Nu_multiplier}`
-												: "global: —"}
+												: "global: not set"}
 										</span>
 									</div>
 									<div className="flex flex-col gap-2">
@@ -1338,7 +1338,7 @@ const Inspector = () => {
 										<span className="text-[9px] text-stone-400">
 											{solverSettings.f_multiplier != null
 												? `global: ×${solverSettings.f_multiplier}`
-												: "global: —"}
+												: "global: not set"}
 										</span>
 									</div>
 								</div>
@@ -1436,7 +1436,7 @@ const Inspector = () => {
 								<span className="text-[9px] text-stone-400">
 									{solverSettings.Nu_multiplier != null
 										? `global: ×${solverSettings.Nu_multiplier}`
-										: "global: —"}
+										: "global: not set"}
 								</span>
 							</div>
 							<div className="flex flex-col gap-2">
@@ -1456,7 +1456,7 @@ const Inspector = () => {
 								<span className="text-[9px] text-stone-400">
 									{solverSettings.f_multiplier != null
 										? `global: ×${solverSettings.f_multiplier}`
-										: "global: —"}
+										: "global: not set"}
 								</span>
 							</div>
 						</div>
@@ -1528,7 +1528,7 @@ const Inspector = () => {
 								<span className="text-[9px] text-stone-400">
 									{solverSettings.Nu_multiplier != null
 										? `global: ×${solverSettings.Nu_multiplier}`
-										: "global: —"}
+										: "global: not set"}
 								</span>
 							</div>
 							<div className="flex flex-col gap-2">
@@ -1548,7 +1548,7 @@ const Inspector = () => {
 								<span className="text-[9px] text-stone-400">
 									{solverSettings.f_multiplier != null
 										? `global: ×${solverSettings.f_multiplier}`
-										: "global: —"}
+										: "global: not set"}
 								</span>
 							</div>
 						</div>

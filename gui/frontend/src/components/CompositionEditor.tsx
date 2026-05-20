@@ -145,7 +145,7 @@ const CompositionEditor: React.FC<CompositionEditorProps> = ({
 							<span className="text-[9px] text-stone-400">
 								{solverSettings.ambient_T != null
 									? `global: ${solverSettings.ambient_T} K`
-									: "global: —"}
+									: "global: not set"}
 							</span>
 						</div>
 						<div className="flex flex-col gap-1">
@@ -162,7 +162,7 @@ const CompositionEditor: React.FC<CompositionEditorProps> = ({
 							<span className="text-[9px] text-stone-400">
 								{solverSettings.ambient_RH != null
 									? `global: ${solverSettings.ambient_RH}`
-									: "global: —"}
+									: "global: not set"}
 							</span>
 						</div>
 					</div>
@@ -175,7 +175,7 @@ const CompositionEditor: React.FC<CompositionEditorProps> = ({
 					<span className="text-[9px] text-stone-400 -mt-1">
 						{solverSettings.ambient_P != null
 							? `global: ${solverSettings.ambient_P} Pa`
-							: "global: —"}
+							: "global: not set"}
 					</span>
 				</div>
 			)}
