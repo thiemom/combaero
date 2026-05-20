@@ -24,6 +24,7 @@ const Inspector = () => {
 		updateEdgeData,
 		speciesMetadata,
 		unitPreferences,
+		setRotSpeedUnit,
 		isExporting,
 		exportNetworkResults,
 		displaySettings,
@@ -902,9 +903,17 @@ const Inspector = () => {
 								<NumericInput
 									id={`omega_rpm_${selectedNode.id}`}
 									className="p-1 border rounded text-xs bg-white h-7 outline-none focus:ring-1 focus:ring-stone-200 flex-1"
-									value={selectedNode.data.omega_rpm ?? null}
+									value={
+										selectedNode.data.omega_rpm != null
+											? selectedNode.data.omega_rpm *
+												(unitPreferences.rotSpeed === "Hz" ? 1 / 60 : 1)
+											: null
+									}
 									onChange={(val) =>
-										updateNodeData(selectedNode.id, { omega_rpm: val })
+										updateNodeData(selectedNode.id, {
+											omega_rpm:
+												val * (unitPreferences.rotSpeed === "Hz" ? 60 : 1),
+										})
 									}
 									onClear={() =>
 										updateNodeData(selectedNode.id, { omega_rpm: null })
@@ -912,11 +921,20 @@ const Inspector = () => {
 									min={0}
 									placeholder={
 										solverSettings.omega_rpm != null
-											? `global: ${solverSettings.omega_rpm}`
+											? `global: ${(solverSettings.omega_rpm * (unitPreferences.rotSpeed === "Hz" ? 1 / 60 : 1)).toFixed(unitPreferences.rotSpeed === "Hz" ? 3 : 0)}`
 											: "global (not set)"
 									}
 								/>
-								<span className="text-xs text-stone-400 shrink-0">rpm</span>
+								<select
+									value={unitPreferences.rotSpeed}
+									onChange={(e) =>
+										setRotSpeedUnit(e.target.value as "rpm" | "Hz")
+									}
+									className="w-14 h-[30px] border rounded text-[9px] bg-white outline-none shrink-0"
+								>
+									<option value="rpm">rpm</option>
+									<option value="Hz">Hz</option>
+								</select>
 							</div>
 						</div>
 						<LengthInput

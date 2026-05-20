@@ -31,6 +31,8 @@ const Sidebar = () => {
 		loadNetwork,
 		solverSettings,
 		updateSolverSettings,
+		unitPreferences,
+		setRotSpeedUnit,
 		nodes,
 		setNodes,
 		solveResults,
@@ -395,13 +397,29 @@ const Sidebar = () => {
 					<div className="flex items-center gap-1">
 						<NumericInput
 							className="p-1 border rounded text-xs bg-white h-7 outline-none focus:ring-1 focus:ring-stone-200 flex-1"
-							value={solverSettings.omega_rpm ?? null}
-							onChange={(val) => updateSolverSettings({ omega_rpm: val })}
+							value={
+								solverSettings.omega_rpm != null
+									? solverSettings.omega_rpm *
+										(unitPreferences.rotSpeed === "Hz" ? 1 / 60 : 1)
+									: null
+							}
+							onChange={(val) =>
+								updateSolverSettings({
+									omega_rpm: val * (unitPreferences.rotSpeed === "Hz" ? 60 : 1),
+								})
+							}
 							onClear={() => updateSolverSettings({ omega_rpm: null })}
 							min={0}
 							placeholder="None"
 						/>
-						<span className="text-[10px] text-stone-400 shrink-0">rpm</span>
+						<select
+							value={unitPreferences.rotSpeed}
+							onChange={(e) => setRotSpeedUnit(e.target.value as "rpm" | "Hz")}
+							className="w-12 h-7 border rounded text-[9px] bg-white outline-none shrink-0"
+						>
+							<option value="rpm">rpm</option>
+							<option value="Hz">Hz</option>
+						</select>
 					</div>
 				</div>
 

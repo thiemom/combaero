@@ -53,10 +53,12 @@ export interface RFState {
 		pressure: "Pa" | "kPa" | "MPa";
 		length: "m" | "mm";
 		area: "m²" | "mm²";
+		rotSpeed: "rpm" | "Hz";
 	};
 	setPressureUnit: (unit: "Pa" | "kPa" | "MPa") => void;
 	setLengthUnit: (unit: "m" | "mm") => void;
 	setAreaUnit: (unit: "m²" | "mm²") => void;
+	setRotSpeedUnit: (unit: "rpm" | "Hz") => void;
 	saveNetwork: (filename?: string) => void | Promise<void>;
 	loadNetwork: (data: any) => void;
 	dismissSolveStatus: () => void;
@@ -263,7 +265,12 @@ const useStore = create<RFState>((set, get) => ({
 		});
 	},
 
-	unitPreferences: { pressure: "kPa", length: "m", area: "m²" },
+	unitPreferences: {
+		pressure: "kPa",
+		length: "m",
+		area: "m²",
+		rotSpeed: "rpm",
+	},
 	setPressureUnit: (unit: "Pa" | "kPa" | "MPa") => {
 		set((state) => ({
 			unitPreferences: { ...state.unitPreferences, pressure: unit },
@@ -277,6 +284,11 @@ const useStore = create<RFState>((set, get) => ({
 	setAreaUnit: (unit: "m²" | "mm²") => {
 		set((state) => ({
 			unitPreferences: { ...state.unitPreferences, area: unit },
+		}));
+	},
+	setRotSpeedUnit: (unit: "rpm" | "Hz") => {
+		set((state) => ({
+			unitPreferences: { ...state.unitPreferences, rotSpeed: unit },
 		}));
 	},
 
