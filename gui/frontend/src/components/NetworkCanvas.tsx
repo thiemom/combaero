@@ -106,6 +106,15 @@ const NetworkCanvas = () => {
 					F_C: 0.01,
 					psi: 1.0,
 				} as any;
+			} else if (type === "vortex") {
+				data = {
+					...data,
+					r_c: 0.02,
+					r_out: 0.1,
+					r_in: 0.0,
+					omega_rpm: null,
+					n: 2.0,
+				} as any;
 			}
 
 			const newNode = {

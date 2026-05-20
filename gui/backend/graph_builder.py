@@ -24,6 +24,7 @@ from combaero.network import (
     SmoothModel,
     TeeJunctionElement,
     ThermalWall,
+    VortexElement,
     WallLayer,
 )
 
@@ -50,6 +51,7 @@ from .schemas import (
     SmoothModelData,
     TeeJunctionData,
     ThermalWallData,
+    VortexData,
 )
 
 
@@ -504,6 +506,25 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 theta_source=theta_source,
                 area=area,
                 surface=surface,
+            )
+            elem.initial_guess = _expand_initial_guess(data.initial_guess, elem_id)
+            net.add_element(elem)
+        elif elem_type == "vortex":
+            data = VortexData(**elem_data)
+            omega = (
+                data.omega_rpm
+                if data.omega_rpm is not None
+                else (schema.solver_settings.omega_rpm or 0.0)
+            )
+            elem = VortexElement(
+                elem_id,
+                from_node=source_id,
+                to_node=target_id,
+                r_c=data.r_c,
+                r_out=data.r_out,
+                r_in=data.r_in,
+                omega_rpm=float(omega),
+                n=data.n,
             )
             elem.initial_guess = _expand_initial_guess(data.initial_guess, elem_id)
             net.add_element(elem)

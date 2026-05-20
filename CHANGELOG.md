@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `VortexElement` network element: models centrifugal pressure rise in rotating cavities
+  (disc pumps, pre-swirl chambers, inter-stage labyrinth spaces) using the Vatistas n-vortex
+  model. Parameters: `r_c` (core radius), `r_out`, `r_in` (evaluation radii), `omega_rpm`
+  (shaft speed; `None` = inherit global setting), `n` (Vatistas shape parameter, default 2).
+  Residual `Pt_out - Pt_in - dP_vortex = 0` with analytical Jacobians w.r.t. Pt and inlet
+  density. GUI: Tornado icon (violet), inspectable from the sidebar with a global shaft-speed
+  field and per-element override.
 - Vatistas (1991) n-vortex model: `vatistas_v0_bar`, `vatistas_vr_bar`,
   `vatistas_pressure_integral` and their analytical derivatives, plus dimensional
   `vatistas_v_theta` / `vatistas_delta_p` with full analytical Jacobians w.r.t.

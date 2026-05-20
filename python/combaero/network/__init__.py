@@ -24,6 +24,7 @@ from .components import (
     ThermalWall,
     AreaChangeElement,
     TeeJunctionElement,
+    VortexElement,
 )
 from .combustion import (
     CombustionResult,
@@ -57,6 +58,7 @@ __all__: list[str] = [
     "PressureLossElement",
     "AreaChangeElement",
     "TeeJunctionElement",
+    "VortexElement",
     "EnergyBoundary",
     "NetworkMixtureState",
     "CombustionResult",

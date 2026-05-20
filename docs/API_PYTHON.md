@@ -418,7 +418,7 @@ energy = EnergyBoundary("energy", Q=50000)  # Heat addition [W]
 from combaero.network import (
     OrificeElement, ChannelElement, EffectiveAreaConnectionElement,
     LosslessConnectionElement, DiameterDischargeCoefficientConnectionElement,
-    TeeJunctionElement,
+    TeeJunctionElement, VortexElement,
 )
 
 # Flow elements
@@ -444,6 +444,21 @@ tee_branch = TeeJunctionElement(
 )
 # Solved unknowns: tee.m_dot_com (total), tee.m_dot_branch (branch arm)
 # Straight flow is implicit: m_dot_straight = m_dot_com - m_dot_branch
+
+# Rotating cavity / disc-pump pressure rise (Vatistas n-vortex model)
+vortex = VortexElement(
+    "vortex", "node_in", "node_out",
+    r_c=0.02,       # vortex core radius [m]
+    r_out=0.10,     # outer evaluation radius [m]
+    r_in=0.0,       # inner evaluation radius [m] (0 = on-axis)
+    omega_rpm=3000, # shaft speed [rpm]
+    n=2.0,          # Vatistas shape parameter (>= 1, default n=2)
+)
+# Residual: Pt_out - Pt_in - dP_vortex = 0
+# dP_vortex = vatistas_delta_p(r_out, ...) - vatistas_delta_p(r_in, ...)
+# Gamma is derived from omega so that V_theta(r_c) = omega * r_c exactly (solid-body core).
+# Diagnostics include: m_dot, omega_rpm, dP_vortex [Pa], Pt_in, Pt_out.
+# If omega_rpm=0 the element is lossless (transparent); r_in=0 omits the on-axis term.
 ```
 
 ### Combustion Integration

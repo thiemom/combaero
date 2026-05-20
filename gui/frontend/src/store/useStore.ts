@@ -46,6 +46,7 @@ export interface RFState {
 			| "continuation";
 		method: string;
 		timeout: number | null;
+		omega_rpm: number | null;
 	};
 	updateSolverSettings: (settings: Partial<RFState["solverSettings"]>) => void;
 	unitPreferences: {
@@ -254,6 +255,7 @@ const useStore = create<RFState>((set, get) => ({
 		init_strategy: "default",
 		method: "hybr",
 		timeout: 30,
+		omega_rpm: null,
 	},
 	updateSolverSettings: (settings: Partial<RFState["solverSettings"]>) => {
 		set({

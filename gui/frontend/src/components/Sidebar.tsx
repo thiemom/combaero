@@ -11,6 +11,7 @@ import {
 	Maximize2,
 	Save,
 	Split,
+	Tornado,
 	Upload,
 	Wind,
 } from "lucide-react";
@@ -277,6 +278,16 @@ const Sidebar = () => {
 				<span>Tee Junction</span>
 			</button>
 
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "vortex")}
+				draggable
+			>
+				<Tornado size={18} className="text-violet-500" />
+				<span>Vortex</span>
+			</button>
+
 			{/* Diagnostics divider */}
 			<div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mt-2 mb-0.5">
 				Diagnostics
@@ -375,6 +386,23 @@ const Sidebar = () => {
 						min={0}
 						placeholder="None"
 					/>
+				</div>
+
+				<div className="flex flex-col gap-1">
+					<label className="text-[10px] font-bold text-gray-400 uppercase">
+						Shaft Speed (Global)
+					</label>
+					<div className="flex items-center gap-1">
+						<NumericInput
+							className="p-1 border rounded text-xs bg-white h-7 outline-none focus:ring-1 focus:ring-stone-200 flex-1"
+							value={solverSettings.omega_rpm ?? null}
+							onChange={(val) => updateSolverSettings({ omega_rpm: val })}
+							onClear={() => updateSolverSettings({ omega_rpm: null })}
+							min={0}
+							placeholder="None"
+						/>
+						<span className="text-[10px] text-stone-400 shrink-0">rpm</span>
+					</div>
 				</div>
 
 				<div className="border-t border-stone-200 pt-2 flex flex-col gap-2">
