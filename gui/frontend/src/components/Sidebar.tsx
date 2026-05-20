@@ -413,12 +413,12 @@ const Sidebar = () => {
 			</div>
 
 			<div className="mt-6 text-sm font-bold text-gray-500 uppercase tracking-wider">
-				Shaft Speed
+				Global Settings
 			</div>
 			<div className="flex flex-col gap-4 mt-2 p-3 bg-stone-50 rounded border border-stone-200">
 				<div className="flex flex-col gap-1">
 					<label className="text-[10px] font-bold text-gray-400 uppercase">
-						Global
+						Shaft Speed
 					</label>
 					<div className="flex items-center gap-1 w-full">
 						<NumericInput
