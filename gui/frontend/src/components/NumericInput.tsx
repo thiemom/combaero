@@ -16,6 +16,7 @@ interface NumericInputProps {
 	placeholder?: string;
 	step?: string;
 	min?: number;
+	max?: number;
 	disabled?: boolean;
 }
 
@@ -27,6 +28,7 @@ const NumericInput: React.FC<NumericInputProps> = ({
 	className,
 	placeholder,
 	min,
+	max,
 	disabled,
 }) => {
 	const [localValue, setLocalValue] = useState(
@@ -83,7 +85,12 @@ const NumericInput: React.FC<NumericInputProps> = ({
 		if (Number.isNaN(parsed)) {
 			setLocalValue(value != null ? value.toString() : "");
 		} else {
-			const clamped = min !== undefined && parsed < min ? min : parsed;
+			const clamped =
+				min !== undefined && parsed < min
+					? min
+					: max !== undefined && parsed > max
+						? max
+						: parsed;
 			onChange(clamped);
 			setLocalValue(clamped.toString());
 		}
