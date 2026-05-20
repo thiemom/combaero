@@ -1,5 +1,7 @@
+import numpy as np
 import pytest
 
+import combaero as cb
 from combaero import HumidAir, dewpoint, humidity_ratio, wet_bulb_temperature
 
 
@@ -63,3 +65,12 @@ def test_humidair_rh_bounds():
 
     with pytest.raises(ValueError):
         air.set_TP_RH(300.0, 101325.0, -0.5)  # RH < 0.0
+
+
+def test_humid_air_rh0_equals_dry_air():
+    T, P = 288.15, 101325.0
+    humid_rh0 = cb.species.humid_air_mass(T, P, 0.0)
+    dry = cb.species.dry_air_mass()
+    assert np.allclose(humid_rh0, dry, atol=1e-10), (
+        f"humid_air_mass(RH=0) differs from dry_air_mass: max delta = {np.max(np.abs(humid_rh0 - dry))}"
+    )

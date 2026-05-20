@@ -49,6 +49,9 @@ export interface RFState {
 		omega_rpm: number | null;
 		Nu_multiplier: number | null;
 		f_multiplier: number | null;
+		ambient_T: number | null;
+		ambient_P: number | null;
+		ambient_RH: number | null;
 	};
 	updateSolverSettings: (settings: Partial<RFState["solverSettings"]>) => void;
 	unitPreferences: {
@@ -262,6 +265,9 @@ const useStore = create<RFState>((set, get) => ({
 		omega_rpm: null,
 		Nu_multiplier: null,
 		f_multiplier: null,
+		ambient_T: null,
+		ambient_P: null,
+		ambient_RH: null,
 	},
 	updateSolverSettings: (settings: Partial<RFState["solverSettings"]>) => {
 		set({

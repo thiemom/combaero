@@ -480,6 +480,85 @@ const Sidebar = () => {
 						Scales friction factor on all elements multiplicatively
 					</span>
 				</div>
+				<div className="border-t border-stone-200 my-1" />
+				<div className="flex flex-col gap-1">
+					<label className="text-[10px] font-bold text-gray-400 uppercase">
+						Ambient Temperature
+					</label>
+					<div className="flex items-center gap-1 w-full">
+						<NumericInput
+							className="p-1 border rounded text-xs bg-white h-7 outline-none focus:ring-1 focus:ring-stone-200 flex-1 min-w-0"
+							value={solverSettings.ambient_T ?? null}
+							onChange={(val) => updateSolverSettings({ ambient_T: val })}
+							onClear={() => updateSolverSettings({ ambient_T: null })}
+							placeholder="288.15"
+						/>
+						<span className="text-[10px] text-stone-400 w-10 text-right shrink-0">
+							K
+						</span>
+					</div>
+				</div>
+				<div className="flex flex-col gap-1">
+					<label className="text-[10px] font-bold text-gray-400 uppercase">
+						Ambient Pressure
+					</label>
+					<div className="flex items-center gap-1 w-full">
+						<NumericInput
+							className="p-1 border rounded text-xs bg-white h-7 outline-none focus:ring-1 focus:ring-stone-200 flex-1 min-w-0"
+							value={
+								solverSettings.ambient_P != null
+									? solverSettings.ambient_P *
+										(unitPreferences.pressure === "kPa"
+											? 1 / 1000
+											: unitPreferences.pressure === "MPa"
+												? 1 / 1e6
+												: 1)
+									: null
+							}
+							onChange={(val) =>
+								updateSolverSettings({
+									ambient_P:
+										val *
+										(unitPreferences.pressure === "kPa"
+											? 1000
+											: unitPreferences.pressure === "MPa"
+												? 1e6
+												: 1),
+								})
+							}
+							onClear={() => updateSolverSettings({ ambient_P: null })}
+							placeholder={
+								unitPreferences.pressure === "kPa"
+									? "101.325"
+									: unitPreferences.pressure === "MPa"
+										? "0.101325"
+										: "101325"
+							}
+						/>
+						<span className="text-[10px] text-stone-400 w-10 text-right shrink-0">
+							{unitPreferences.pressure}
+						</span>
+					</div>
+				</div>
+				<div className="flex flex-col gap-1">
+					<label className="text-[10px] font-bold text-gray-400 uppercase">
+						Ambient Rel. Humidity
+					</label>
+					<div className="flex items-center gap-1 w-full">
+						<NumericInput
+							className="p-1 border rounded text-xs bg-white h-7 outline-none focus:ring-1 focus:ring-stone-200 flex-1 min-w-0"
+							value={solverSettings.ambient_RH ?? null}
+							onChange={(val) => updateSolverSettings({ ambient_RH: val })}
+							onClear={() => updateSolverSettings({ ambient_RH: null })}
+							min={0}
+							max={1}
+							placeholder="0.6"
+						/>
+						<span className="text-[10px] text-stone-400 w-10 text-right shrink-0">
+							0–1
+						</span>
+					</div>
+				</div>
 			</div>
 		</aside>
 	);

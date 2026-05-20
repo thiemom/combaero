@@ -447,9 +447,7 @@ const Inspector = () => {
 									className="p-2 border rounded"
 								/>
 								<span className="text-[9px] text-stone-400">
-									{solverSettings.Nu_multiplier != null
-										? `global: ×${solverSettings.Nu_multiplier}`
-										: "global: —"}
+									{`global: ×${solverSettings.Nu_multiplier ?? 1}`}
 								</span>
 							</div>
 							<div className="flex flex-col gap-2">
@@ -464,9 +462,7 @@ const Inspector = () => {
 									className="p-2 border rounded"
 								/>
 								<span className="text-[9px] text-stone-400">
-									{solverSettings.f_multiplier != null
-										? `global: ×${solverSettings.f_multiplier}`
-										: "global: —"}
+									{`global: ×${solverSettings.f_multiplier ?? 1}`}
 								</span>
 							</div>
 						</div>
@@ -929,11 +925,10 @@ const Inspector = () => {
 										updateNodeData(selectedNode.id, { omega_rpm: null })
 									}
 									min={0}
-									placeholder={
-										solverSettings.omega_rpm != null
-											? `global: ${(solverSettings.omega_rpm * (unitPreferences.rotSpeed === "Hz" ? 1 / 60 : 1)).toFixed(unitPreferences.rotSpeed === "Hz" ? 3 : 0)}`
-											: "global (not set)"
-									}
+									placeholder={`global: ${(
+										(solverSettings.omega_rpm ?? 0) *
+											(unitPreferences.rotSpeed === "Hz" ? 1 / 60 : 1)
+									).toFixed(unitPreferences.rotSpeed === "Hz" ? 3 : 0)}`}
 								/>
 								<select
 									value={unitPreferences.rotSpeed}
@@ -1317,9 +1312,7 @@ const Inspector = () => {
 											className="p-2 border rounded"
 										/>
 										<span className="text-[9px] text-stone-400">
-											{solverSettings.Nu_multiplier != null
-												? `global: ×${solverSettings.Nu_multiplier}`
-												: "global: —"}
+											{`global: ×${solverSettings.Nu_multiplier ?? 1}`}
 										</span>
 									</div>
 									<div className="flex flex-col gap-2">
@@ -1336,9 +1329,7 @@ const Inspector = () => {
 											className="p-2 border rounded"
 										/>
 										<span className="text-[9px] text-stone-400">
-											{solverSettings.f_multiplier != null
-												? `global: ×${solverSettings.f_multiplier}`
-												: "global: —"}
+											{`global: ×${solverSettings.f_multiplier ?? 1}`}
 										</span>
 									</div>
 								</div>
@@ -1434,9 +1425,7 @@ const Inspector = () => {
 									className="p-2 border rounded"
 								/>
 								<span className="text-[9px] text-stone-400">
-									{solverSettings.Nu_multiplier != null
-										? `global: ×${solverSettings.Nu_multiplier}`
-										: "global: —"}
+									{`global: ×${solverSettings.Nu_multiplier ?? 1}`}
 								</span>
 							</div>
 							<div className="flex flex-col gap-2">
@@ -1454,9 +1443,7 @@ const Inspector = () => {
 									className="p-2 border rounded"
 								/>
 								<span className="text-[9px] text-stone-400">
-									{solverSettings.f_multiplier != null
-										? `global: ×${solverSettings.f_multiplier}`
-										: "global: —"}
+									{`global: ×${solverSettings.f_multiplier ?? 1}`}
 								</span>
 							</div>
 						</div>
@@ -1526,9 +1513,7 @@ const Inspector = () => {
 									className="p-2 border rounded"
 								/>
 								<span className="text-[9px] text-stone-400">
-									{solverSettings.Nu_multiplier != null
-										? `global: ×${solverSettings.Nu_multiplier}`
-										: "global: —"}
+									{`global: ×${solverSettings.Nu_multiplier ?? 1}`}
 								</span>
 							</div>
 							<div className="flex flex-col gap-2">
@@ -1546,9 +1531,7 @@ const Inspector = () => {
 									className="p-2 border rounded"
 								/>
 								<span className="text-[9px] text-stone-400">
-									{solverSettings.f_multiplier != null
-										? `global: ×${solverSettings.f_multiplier}`
-										: "global: —"}
+									{`global: ×${solverSettings.f_multiplier ?? 1}`}
 								</span>
 							</div>
 						</div>

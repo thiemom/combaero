@@ -44,22 +44,14 @@ const NetworkCanvas = () => {
 					...data,
 					m_dot: 1.0,
 					Tt: 300,
-					composition: {
-						source: "dry_air",
-						mode: "mole",
-						relative_humidity: 0.0,
-					},
+					composition: { source: "humid_air", mode: "mole" },
 				} as any;
 			} else if (type === "pressure_boundary") {
 				data = {
 					...data,
 					Pt: 101325,
 					Tt: 300,
-					composition: {
-						source: "dry_air",
-						mode: "mole",
-						relative_humidity: 0.0,
-					},
+					composition: { source: "humid_air", mode: "mole" },
 				} as any;
 			} else if (type === "channel") {
 				data = {

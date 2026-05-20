@@ -9,19 +9,24 @@ interface CompositionEditorProps {
 }
 
 const DEFAULT_COMPOSITION = {
-	source: "dry_air",
+	source: "humid_air",
 	mode: "mole",
 	custom_fractions: {},
-	relative_humidity: 0.6,
-	ambient_T: 288.15,
-	ambient_P: 101325.0,
+	relative_humidity: null,
+	ambient_T: null,
+	ambient_P: null,
 };
 
 const CompositionEditor: React.FC<CompositionEditorProps> = ({
 	nodeId,
 	data,
 }) => {
-	const { speciesMetadata, fetchSpeciesMetadata, updateNodeData } = useStore();
+	const {
+		speciesMetadata,
+		fetchSpeciesMetadata,
+		updateNodeData,
+		solverSettings,
+	} = useStore();
 	const [localComp, setLocalComp] = useState(() => ({
 		...DEFAULT_COMPOSITION,
 		...(data.composition || {}),
@@ -43,6 +48,10 @@ const CompositionEditor: React.FC<CompositionEditorProps> = ({
 		const custom_fractions = { ...localComp.custom_fractions, [species]: val };
 		updateComp({ custom_fractions });
 	};
+
+	// Effective ambient values: local override → global setting → ISO default
+	const effT = localComp.ambient_T ?? solverSettings.ambient_T ?? 288.15;
+	const effRH = localComp.relative_humidity ?? solverSettings.ambient_RH ?? 0.6;
 
 	return (
 		<div className="flex flex-col gap-3 p-3 bg-stone-50 rounded-lg border border-stone-200">
@@ -128,9 +137,14 @@ const CompositionEditor: React.FC<CompositionEditorProps> = ({
 							</label>
 							<NumericInput
 								value={localComp.ambient_T}
+								placeholder={`${effT}`}
 								onChange={(val) => updateComp({ ambient_T: val })}
+								onClear={() => updateComp({ ambient_T: null })}
 								className="p-1 text-sm border rounded bg-white"
 							/>
+							<span className="text-[9px] text-stone-400">
+								{`global: ${solverSettings.ambient_T ?? 288.15} K`}
+							</span>
 						</div>
 						<div className="flex flex-col gap-1">
 							<label className="text-[10px] text-stone-400 uppercase font-bold">
@@ -138,16 +152,25 @@ const CompositionEditor: React.FC<CompositionEditorProps> = ({
 							</label>
 							<NumericInput
 								value={localComp.relative_humidity}
+								placeholder={`${effRH}`}
 								onChange={(val) => updateComp({ relative_humidity: val })}
+								onClear={() => updateComp({ relative_humidity: null })}
 								className="p-1 text-sm border rounded bg-white"
 							/>
+							<span className="text-[9px] text-stone-400">
+								{`global: ${solverSettings.ambient_RH ?? 0.6}`}
+							</span>
 						</div>
 					</div>
 					<UnitInput
 						label="Ambient Pressure"
 						value={localComp.ambient_P}
 						onChange={(val) => updateComp({ ambient_P: val })}
+						onClear={() => updateComp({ ambient_P: null })}
 					/>
+					<span className="text-[9px] text-stone-400 -mt-1">
+						{`global: ${solverSettings.ambient_P ?? 101325} Pa`}
+					</span>
 				</div>
 			)}
 
