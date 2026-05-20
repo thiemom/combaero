@@ -11,6 +11,7 @@ import {
 	Maximize2,
 	Save,
 	Split,
+	Tornado,
 	Upload,
 	Wind,
 } from "lucide-react";
@@ -30,6 +31,8 @@ const Sidebar = () => {
 		loadNetwork,
 		solverSettings,
 		updateSolverSettings,
+		unitPreferences,
+		setRotSpeedUnit,
 		nodes,
 		setNodes,
 		solveResults,
@@ -277,6 +280,16 @@ const Sidebar = () => {
 				<span>Tee Junction</span>
 			</button>
 
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "vortex")}
+				draggable
+			>
+				<Tornado size={18} className="text-violet-500" />
+				<span>Vortex</span>
+			</button>
+
 			{/* Diagnostics divider */}
 			<div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mt-2 mb-0.5">
 				Diagnostics
@@ -396,6 +409,44 @@ const Sidebar = () => {
 							Reset Solver (Cold Start)
 						</button>
 					)}
+				</div>
+			</div>
+
+			<div className="mt-6 text-sm font-bold text-gray-500 uppercase tracking-wider">
+				Global Settings
+			</div>
+			<div className="flex flex-col gap-4 mt-2 p-3 bg-stone-50 rounded border border-stone-200">
+				<div className="flex flex-col gap-1">
+					<label className="text-[10px] font-bold text-gray-400 uppercase">
+						Shaft Speed
+					</label>
+					<div className="flex items-center gap-1 w-full">
+						<NumericInput
+							className="p-1 border rounded text-xs bg-white h-7 outline-none focus:ring-1 focus:ring-stone-200 flex-1 min-w-0"
+							value={
+								solverSettings.omega_rpm != null
+									? solverSettings.omega_rpm *
+										(unitPreferences.rotSpeed === "Hz" ? 1 / 60 : 1)
+									: null
+							}
+							onChange={(val) =>
+								updateSolverSettings({
+									omega_rpm: val * (unitPreferences.rotSpeed === "Hz" ? 60 : 1),
+								})
+							}
+							onClear={() => updateSolverSettings({ omega_rpm: null })}
+							min={0}
+							placeholder="None"
+						/>
+						<select
+							value={unitPreferences.rotSpeed}
+							onChange={(e) => setRotSpeedUnit(e.target.value as "rpm" | "Hz")}
+							className="w-12 h-7 border rounded text-[9px] bg-white outline-none shrink-0"
+						>
+							<option value="rpm">rpm</option>
+							<option value="Hz">Hz</option>
+						</select>
+					</div>
 				</div>
 			</div>
 		</aside>

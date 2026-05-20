@@ -2744,3 +2744,115 @@ class TeeJunctionElement(NetworkElement):
             "K_branch": float(res.K_branch),
             "correlation_extrapolated": 1.0 if is_extrapolated else 0.0,
         }
+
+
+# ---------------------------------------------------------------------------
+# Vortex element: rotating-cavity centrifugal pressure rise (Vatistas 1991)
+# ---------------------------------------------------------------------------
+
+
+class VortexElement(NetworkElement):
+    """
+    Models the centrifugal pressure rise of a rotating cavity or disc
+    using the Vatistas (1991) n-vortex model.
+
+    The shaft angular velocity omega drives a vortex whose circulation is
+    Gamma = 2*pi * r_c^2 * omega * 2^(1/n), i.e. the core rotates as solid
+    body at omega.  The pressure rise from r_in to r_out follows from
+    integrating the centripetal acceleration:
+        dP_rise = vatistas_delta_p(r_out, rho, Gamma, r_c, n)
+                - vatistas_delta_p(r_in,  rho, Gamma, r_c, n)
+    where rho is taken from the upstream node state.
+    """
+
+    def __init__(
+        self,
+        id: str,
+        from_node: str,
+        to_node: str,
+        r_c: float = 0.02,
+        r_out: float = 0.10,
+        r_in: float = 0.0,
+        omega_rpm: float = 0.0,
+        n: float = 2.0,
+    ):
+        super().__init__(id, from_node, to_node)
+        if n < 1.0:
+            raise ValueError(f"Vatistas shape parameter n must be >= 1; got {n}")
+        if r_c <= 0.0:
+            raise ValueError(f"Core radius r_c must be > 0; got {r_c}")
+        if r_out <= 0.0:
+            raise ValueError(f"Outer radius r_out must be > 0; got {r_out}")
+        if r_in < 0.0:
+            raise ValueError(f"Inner radius r_in must be >= 0; got {r_in}")
+        self.r_c = float(r_c)
+        self.r_out = float(r_out)
+        self.r_in = float(r_in)
+        self.omega_rpm = float(omega_rpm)
+        self.n = float(n)
+
+    def _gamma(self) -> float:
+        """Circulation [m^2/s] from shaft speed assuming solid-body vortex core."""
+        omega = self.omega_rpm * 2.0 * math.pi / 60.0
+        return 2.0 * math.pi * self.r_c**2 * omega * 2.0 ** (1.0 / self.n)
+
+    def _dp_rise(self, rho: float) -> float:
+        """Total pressure rise [Pa] at inlet density rho."""
+        gamma = self._gamma()
+        if gamma == 0.0:
+            return 0.0
+        dp_out = cb.vatistas_delta_p(self.r_out, rho, gamma, self.r_c, self.n)
+        dp_in = (
+            cb.vatistas_delta_p(self.r_in, rho, gamma, self.r_c, self.n) if self.r_in > 0.0 else 0.0
+        )
+        return dp_out - dp_in
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        pass
+
+    def unknowns(self) -> list[str]:
+        return [f"{self.id}.m_dot"]
+
+    def n_equations(self) -> int:
+        return 1
+
+    def residuals(
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        rho_raw = state_in.density()
+        rho, d_rho_safe = _safe_rho(rho_raw)
+        dp_rise = self._dp_rise(rho)
+
+        res = [state_out.Pt - state_in.Pt - dp_rise]
+
+        # d(dp_rise)/d(rho) = dp_rise / rho  (dP scales linearly with rho)
+        # d(rho)/d(P)  ~  rho / P  for ideal gas
+        # d(rho)/d(T)  ~ -rho / T  for ideal gas
+        dp_drho = (dp_rise / rho) * d_rho_safe if rho > 0 else 0.0
+        drho_dP = rho / state_in.P if state_in.P > 0 else 0.0
+        drho_dT = -rho / state_in.T if state_in.T > 0 else 0.0
+
+        jac: dict[int, dict[str, float]] = {
+            0: {
+                f"{self.to_node}.Pt": 1.0,
+                f"{self.from_node}.Pt": -1.0,
+                f"{self.from_node}.P": -dp_drho * drho_dP,
+                f"{self.from_node}.T": -dp_drho * drho_dT,
+            }
+        }
+        return res, jac
+
+    def diagnostics(
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+    ) -> dict[str, float]:
+        if state_in.P <= 0 or state_in.T <= 0:
+            return {}
+        cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
+        rho = cs_in.thermo.rho
+        dp_rise = self._dp_rise(rho)
+        return {
+            "m_dot": float(state_in.m_dot),
+            "omega_rpm": float(self.omega_rpm),
+            "dP_vortex": float(dp_rise),
+            **_element_pressure_block(state_in, state_out, mach_in=0.0, mach_out=0.0),
+        }

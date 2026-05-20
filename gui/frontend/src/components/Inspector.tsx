@@ -24,9 +24,11 @@ const Inspector = () => {
 		updateEdgeData,
 		speciesMetadata,
 		unitPreferences,
+		setRotSpeedUnit,
 		isExporting,
 		exportNetworkResults,
 		displaySettings,
+		solverSettings,
 	} = useStore();
 
 	const validationErrors = validateNetwork(nodes);
@@ -885,6 +887,111 @@ const Inspector = () => {
 											{(selectedNode.data.result.K_branch ?? 0).toFixed(3)}
 										</span>
 									</div>
+								</div>
+							</div>
+						)}
+					</div>
+				)}
+
+				{selectedNode.type === "vortex" && (
+					<div className="flex flex-col gap-4">
+						<div className="flex flex-col gap-1">
+							<label className="text-xs font-bold text-gray-500 uppercase">
+								Rotational Speed
+							</label>
+							<div className="flex items-center gap-1">
+								<NumericInput
+									id={`omega_rpm_${selectedNode.id}`}
+									className="p-1 border rounded text-xs bg-white h-7 outline-none focus:ring-1 focus:ring-stone-200 flex-1"
+									value={
+										selectedNode.data.omega_rpm != null
+											? selectedNode.data.omega_rpm *
+												(unitPreferences.rotSpeed === "Hz" ? 1 / 60 : 1)
+											: null
+									}
+									onChange={(val) =>
+										updateNodeData(selectedNode.id, {
+											omega_rpm:
+												val * (unitPreferences.rotSpeed === "Hz" ? 60 : 1),
+										})
+									}
+									onClear={() =>
+										updateNodeData(selectedNode.id, { omega_rpm: null })
+									}
+									min={0}
+									placeholder={
+										solverSettings.omega_rpm != null
+											? `global: ${(solverSettings.omega_rpm * (unitPreferences.rotSpeed === "Hz" ? 1 / 60 : 1)).toFixed(unitPreferences.rotSpeed === "Hz" ? 3 : 0)}`
+											: "global (not set)"
+									}
+								/>
+								<select
+									value={unitPreferences.rotSpeed}
+									onChange={(e) =>
+										setRotSpeedUnit(e.target.value as "rpm" | "Hz")
+									}
+									className="w-14 h-[30px] border rounded text-[9px] bg-white outline-none shrink-0"
+								>
+									<option value="rpm">rpm</option>
+									<option value="Hz">Hz</option>
+								</select>
+							</div>
+						</div>
+						<LengthInput
+							id={`r_c_${selectedNode.id}`}
+							label="Core Radius r_c"
+							value={selectedNode.data.r_c ?? 0.02}
+							onChange={(val) => updateNodeData(selectedNode.id, { r_c: val })}
+						/>
+						<LengthInput
+							id={`r_out_${selectedNode.id}`}
+							label="Outer Radius r_out"
+							value={selectedNode.data.r_out ?? 0.1}
+							onChange={(val) =>
+								updateNodeData(selectedNode.id, { r_out: val })
+							}
+						/>
+						<LengthInput
+							id={`r_in_${selectedNode.id}`}
+							label="Inner Radius r_in"
+							value={selectedNode.data.r_in ?? 0.0}
+							onChange={(val) => updateNodeData(selectedNode.id, { r_in: val })}
+						/>
+						<div className="flex flex-col gap-1">
+							<label className="text-xs font-bold text-gray-500 uppercase">
+								Shape Parameter n
+							</label>
+							<NumericInput
+								id={`n_${selectedNode.id}`}
+								className="p-1 border rounded text-xs bg-white h-7 outline-none focus:ring-1 focus:ring-stone-200"
+								value={selectedNode.data.n ?? 2.0}
+								onChange={(val) => updateNodeData(selectedNode.id, { n: val })}
+								min={1}
+								placeholder="2.0"
+							/>
+							<span className="text-[9px] text-stone-400">
+								Vatistas n ≥ 1, default n=2
+							</span>
+						</div>
+						{selectedNode.data.result && (
+							<div className="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-xs">
+								<div className="font-bold uppercase text-stone-400 mb-1 text-[9px]">
+									Result
+								</div>
+								<div className="flex justify-between">
+									<span className="text-stone-500">ΔP vortex</span>
+									<span className="font-mono font-bold">
+										{((selectedNode.data.result.dP_vortex ?? 0) / 1000).toFixed(
+											2,
+										)}{" "}
+										kPa
+									</span>
+								</div>
+								<div className="flex justify-between">
+									<span className="text-stone-500">ṁ</span>
+									<span className="font-mono font-bold">
+										{(selectedNode.data.result.m_dot ?? 0).toFixed(4)} kg/s
+									</span>
 								</div>
 							</div>
 						)}
@@ -1928,6 +2035,7 @@ const InitialGuessEditor = ({ node }: { node: any }) => {
 			{ key: "m_dot_com", unit: "kg/s" },
 			{ key: "m_dot_branch", unit: "kg/s" },
 		],
+		vortex: [{ key: "m_dot", unit: "kg/s" }],
 	};
 	const guessFields = FIELDS_BY_TYPE[node.type as string] ?? [];
 	if (guessFields.length === 0) {
