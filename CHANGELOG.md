@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-05-21
+
+### Fixed
+- `combaero-gui` dependency pin updated from `~=0.2` to `~=0.3`; the old pin
+  resolved to `combaero 0.2.6` on PyPI which predates `TeeJunctionElement` and
+  `VortexElement`, causing an `ImportError` at startup (#156).
+- `publish-gui.yml` CI workflow upgraded from Node 20 to Node 22; `pnpm latest`
+  (v11) requires Node ≥22 and crashed with `ERR_UNKNOWN_BUILTIN_MODULE: node:sqlite`
+  on Node 20 (#157).
+
 ## [0.3.0] - 2026-05-20
 
 ### Changed
