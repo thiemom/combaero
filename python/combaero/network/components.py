@@ -1055,6 +1055,31 @@ class MassFlowBoundary(NetworkNode):
         pass
 
 
+class WallNode(NetworkNode):
+    """Closed-end boundary that imposes zero mass flow.
+
+    The Pt = P residual enforces zero velocity at the dead end.
+    The solver's automatic mass-balance equation (applied to every non-PressureBoundary
+    node) forces m_dot = 0 on all connected elements without any additional logic here.
+    """
+
+    def __init__(self, id: str) -> None:
+        super().__init__(id)
+
+    def unknowns(self) -> list[str]:
+        return [f"{self.id}.P", f"{self.id}.Pt"]
+
+    def residuals(
+        self, state: NetworkMixtureState
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        res = [state.Pt - state.P]
+        jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.Pt": 1.0}}
+        return res, jac
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        pass
+
+
 def _zero_loss(ctx: object) -> tuple[float, float]:
     return 0.0, 0.0
 

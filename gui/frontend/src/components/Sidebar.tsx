@@ -11,6 +11,7 @@ import {
 	Maximize2,
 	Save,
 	Split,
+	Square,
 	Tornado,
 	Upload,
 	Wind,
@@ -183,6 +184,16 @@ const Sidebar = () => {
 			>
 				<LogOut size={18} className="text-blue-500" />
 				<span>Pressure Boundary</span>
+			</button>
+
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "wall")}
+				draggable
+			>
+				<Square size={18} className="text-stone-600 fill-stone-600" />
+				<span>Wall</span>
 			</button>
 
 			<button

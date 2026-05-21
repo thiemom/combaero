@@ -194,7 +194,11 @@ class FlowNetwork:
             upstream = self._upstream_of_node[node_id]
             downstream = self._downstream_of_node[node_id]
             connected = upstream + downstream
-            is_boundary = type(node).__name__ in ("PressureBoundary", "MassFlowBoundary")
+            is_boundary = type(node).__name__ in (
+                "PressureBoundary",
+                "MassFlowBoundary",
+                "WallNode",
+            )
 
             if not connected:
                 raise ValueError(
@@ -206,6 +210,14 @@ class FlowNetwork:
                     f"FlowNetwork validation failed: interior node '{node_id}' has only {len(connected)} "
                     "connected element(s). Interior nodes must have at least 2 connections to satisfy "
                     "mass conservation."
+                )
+
+            # WallNode is a dead end - no flow may exit it.
+            if type(node).__name__ == "WallNode" and downstream:
+                raise ValueError(
+                    f"FlowNetwork validation failed: WallNode '{node_id}' has downstream "
+                    "connections. A wall is a closed end - connect only one element leading "
+                    "into the wall, not out of it."
                 )
 
             # Every interior node needs at least one element delivering flow in and one taking

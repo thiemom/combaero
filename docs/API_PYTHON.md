@@ -396,7 +396,7 @@ results = solver.solve(method="hybr", init_strategy="homotopy")
 ### Network Nodes
 ```python
 from combaero.network import (
-    PressureBoundary, MassFlowBoundary, PlenumNode,
+    PressureBoundary, MassFlowBoundary, WallNode, PlenumNode,
     CombustorNode, MomentumChamberNode, MomentumBoundary, EnergyBoundary
 )
 
@@ -405,6 +405,10 @@ inlet = PressureBoundary("inlet", P_total=2e5, T_total=300)
 outlet = PressureBoundary("outlet", P_total=1e5, T_total=300)
 mass_in = MassFlowBoundary("mass_in", m_dot=0.1, T_total=400, Y=air)
 mom_in = MomentumBoundary("mom_in", P_total=2e5, T_total=300, area=1e-4)
+
+# Closed-end boundary (zero mass flow)
+# Typical use: symmetry plane of a ring manifold, or any dead-end branch.
+wall = WallNode("wall")
 
 # Internal nodes
 junction = PlenumNode("junction", P=1.5e5, T=350, Y=air)

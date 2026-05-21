@@ -88,6 +88,12 @@ class PressureBoundaryData(BaseModel):
     label: str | None = None
 
 
+class WallData(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    label: str | None = None
+    initial_guess: dict[str, float] = Field(default_factory=dict)
+
+
 class ConstantFractionLossData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     type: Literal["constant_fraction"] = "constant_fraction"
