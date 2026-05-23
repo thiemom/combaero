@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `WallNode`: closed-end (zero mass-flow) boundary node for modelling dead-end
+  branches and symmetry planes of ring manifolds. Drag from the GUI palette or
+  instantiate directly via `combaero.network.WallNode("id")`.
+
 ## [0.3.1] - 2026-05-21
 
 ### Fixed

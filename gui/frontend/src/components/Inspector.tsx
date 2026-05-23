@@ -386,6 +386,12 @@ const Inspector = () => {
 					</>
 				)}
 
+				{selectedNode.type === "wall" && (
+					<div className="text-xs text-stone-400 italic px-1">
+						Closed end — zero mass flow. No configurable parameters.
+					</div>
+				)}
+
 				{selectedNode.type === "channel" && (
 					<>
 						<LengthInput

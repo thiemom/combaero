@@ -12,6 +12,7 @@ import PressureBoundaryNode from "./nodes/PressureBoundaryNode";
 import ProbeNode from "./nodes/ProbeNode";
 import TeeJunctionNode from "./nodes/TeeJunctionNode";
 import VortexNode from "./nodes/VortexNode";
+import WallNode from "./nodes/WallNode";
 import ThermalEdge from "./ThermalEdge";
 
 export const nodeTypes = {
@@ -28,6 +29,7 @@ export const nodeTypes = {
 	area_change: AreaChangeNode,
 	tee_junction: TeeJunctionNode,
 	vortex: VortexNode,
+	wall: WallNode,
 };
 
 export const edgeTypes = {

@@ -26,6 +26,7 @@ from combaero.network import (
     ThermalWall,
     VortexElement,
     WallLayer,
+    WallNode,
 )
 
 from .schemas import (
@@ -52,6 +53,7 @@ from .schemas import (
     TeeJunctionData,
     ThermalWallData,
     VortexData,
+    WallData,
 )
 
 
@@ -256,6 +258,7 @@ def _find_tee_port(
     port: str,
     nodes_map: dict,
     tee_port_node_map: dict | None = None,
+    wall_edge_remap: dict | None = None,
 ) -> str:
     """Return the physical-node ID connected to a named tee port.
 
@@ -276,6 +279,8 @@ def _find_tee_port(
         else:
             continue
         if nid in nodes_map:
+            if wall_edge_remap and edge.id in wall_edge_remap:
+                return wall_edge_remap[edge.id]
             return nid
         if tee_port_node_map and (tee_id, port) in tee_port_node_map:
             return tee_port_node_map[(tee_id, port)]
@@ -367,6 +372,12 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             nodes_map[node_id] = node
         elif node_type == "probe":
             pass  # Display-only diagnostic nodes -- not part of the solver graph
+        elif node_type == "wall":
+            data = WallData(**node_data)
+            node = WallNode(node_id)
+            node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
+            net.add_node(node)
+            nodes_map[node_id] = node
         else:
             # This is an element node (Channel, Orifice, etc.)
             element_nodes.append(node_schema)
@@ -421,6 +432,26 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 tee_port_node_map[(edge.target, port)] = jid
                 edge_junction_map[(edge.source, edge.target)] = jid
 
+    # Pre-scan: for each edge whose target is a WallNode, the 2nd+ connection
+    # gets its own clone so the solver enforces m_dot=0 per branch individually
+    # (not just sum(m_dot)=0, which allows non-zero flows to cancel).
+    # This covers both regular elements and tee junction port connections.
+    _wall_edge_remap: dict[str, str] = {}  # edge_id -> effective target node_id
+    _wall_target_count: dict[str, int] = {}
+    for _edge in schema.edges:
+        if _edge.data and _edge.data.get("type") == "thermal":
+            continue
+        _tgt = _edge.target
+        if isinstance(nodes_map.get(_tgt), WallNode):
+            _wall_target_count[_tgt] = _wall_target_count.get(_tgt, 0) + 1
+            if _wall_target_count[_tgt] > 1:
+                _n = _wall_target_count[_tgt]
+                _clone_id = f"{_tgt}_w{_n}"
+                _clone = WallNode(_clone_id)
+                net.add_node(_clone)
+                nodes_map[_clone_id] = _clone
+                _wall_edge_remap[_edge.id] = _clone_id
+
     # 2. Second Pass: Create Elements
     for elem_node_schema in element_nodes:
         elem_id = elem_node_schema.id
@@ -433,13 +464,18 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             _tee = TeeJunctionElement(
                 id=elem_id,
                 common_node=_find_tee_port(
-                    schema.edges, elem_id, "common", nodes_map, tee_port_node_map
+                    schema.edges, elem_id, "common", nodes_map, tee_port_node_map, _wall_edge_remap
                 ),
                 straight_node=_find_tee_port(
-                    schema.edges, elem_id, "straight", nodes_map, tee_port_node_map
+                    schema.edges,
+                    elem_id,
+                    "straight",
+                    nodes_map,
+                    tee_port_node_map,
+                    _wall_edge_remap,
                 ),
                 branch_node=_find_tee_port(
-                    schema.edges, elem_id, "branch", nodes_map, tee_port_node_map
+                    schema.edges, elem_id, "branch", nodes_map, tee_port_node_map, _wall_edge_remap
                 ),
                 theta=_math.radians(_d.theta_deg),
                 F_C=_d.F_C,
@@ -473,7 +509,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 if outgoing_count > 1:
                     raise ValueError(f"Element '{elem_id}' has multiple downstream links.")
                 if edge.target in nodes_map:
-                    target_id = edge.target
+                    target_id = _wall_edge_remap.get(edge.id, edge.target)
                 elif edge.target in element_ids:
                     target_id = edge_junction_map.get((elem_id, edge.target))
 
