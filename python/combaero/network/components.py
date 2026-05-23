@@ -2573,6 +2573,10 @@ class TeeJunctionElement(NetworkElement):
 
     Unknowns: m_dot_com (total common flow) and m_dot_branch (branch flow).
     Straight flow is implicit: m_dot_straight = m_dot_com - m_dot_branch.
+
+    psi = F_C / F_branch (common-arm area / lateral-branch area, default 1.0).
+    Bassett 2001 derives K5/K11 (straight-arm coefficients) under the assumption
+    F_straight = F_C; the straight-arm area is therefore not a free parameter.
     """
 
     def __init__(
@@ -2583,7 +2587,7 @@ class TeeJunctionElement(NetworkElement):
         branch_node: str,
         theta: float,
         F_C: float,
-        psi: float = 1.0,
+        psi: float = 1.0,  # F_C / F_branch: common / lateral-branch area ratio
         tee_type: Literal["merging", "branching"] = "merging",
         blend_k: float = 30.0,
     ):
