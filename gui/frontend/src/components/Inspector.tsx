@@ -805,7 +805,7 @@ const Inspector = () => {
 						{/* Area ratio */}
 						<div className="flex flex-col gap-2">
 							<label className="text-xs font-bold text-gray-500 uppercase">
-								Area Ratio psi = F_C / F_S
+								Area Ratio psi = F_C / F_branch
 							</label>
 							<NumericInput
 								value={selectedNode.data.psi ?? 1.0}
@@ -816,7 +816,9 @@ const Inspector = () => {
 								placeholder="1.0"
 							/>
 							<p className="text-[9px] text-gray-400 italic">
-								Ratio of common-arm to straight-arm area. 1.0 = equal areas.
+								Ratio of common-arm to lateral-branch area. 1.0 = equal areas.
+								Straight arm is assumed equal to the common arm (Bassett
+								constraint).
 							</p>
 						</div>
 

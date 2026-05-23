@@ -513,7 +513,8 @@ Bassett 2001 tee junction K-factor model with full Jacobians for the network sol
 
 Port convention: MAIN_INLET (A), BRANCH (B), MAIN_OUTLET (C).
 `m_dot_com` = common-port mass flow [kg/s], `m_dot_branch` = branch mass flow [kg/s],
-`F_C` = common-port cross-sectional area [m^2], `psi` = A_branch/A_com, `theta` = branch angle [rad].
+`F_C` = common-port cross-sectional area [m^2],
+`psi` = F_C/F_branch (common-port area / lateral-branch area), `theta` = branch angle [rad].
 
 ```python
 import combaero._core as _core
