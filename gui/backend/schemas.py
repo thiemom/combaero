@@ -143,7 +143,7 @@ class CombustorData(BaseModel):
 class MomentumChamberData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     area: float = 0.1
-    Dh: float = 0.1
+    Dh: float | None = None  # None = inherit from upstream channel (Dh = D)
     surface: SurfaceModelData = Field(default_factory=SmoothModelData)
     Nu_multiplier: float = 1.0
     f_multiplier: float = 1.0

@@ -357,6 +357,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             node = MomentumChamberNode(
                 node_id,
                 area=data.area,
+                Dh=data.Dh,
                 surface=ConvectiveSurface(
                     area=data.area,
                     model=map_surface_model(data.surface),

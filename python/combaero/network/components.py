@@ -959,8 +959,13 @@ class MomentumChamberNode(NetworkNode):
         }
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
-        # Store upstream elements for mixing calculations
         self.upstream_elements = graph.get_upstream_elements(self.id)
+        # Inherit hydraulic diameter from upstream channel when not user-specified
+        if self.Dh is None:
+            for elem in self.upstream_elements:
+                if isinstance(elem, ChannelElement) and elem.diameter is not None:
+                    self.Dh = elem.diameter
+                    break
 
 
 class PressureBoundary(NetworkNode):
