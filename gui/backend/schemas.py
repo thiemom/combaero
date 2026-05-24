@@ -170,7 +170,7 @@ class ChannelData(BaseModel):
 
 class OrificeData(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    diameter: float = 0.08
+    diameter: float | None = None  # None = inherit from upstream channel
     Cd: float = 0.6
     correlation: Literal[
         "ReaderHarrisGallagher", "Stolz", "Miller", "ThickPlate", "RoundedEntry", "fixed"

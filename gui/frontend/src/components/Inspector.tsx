@@ -498,119 +498,186 @@ const Inspector = () => {
 					</>
 				)}
 
-				{selectedNode.type === "orifice" && (
-					<>
-						<LengthInput
-							id={`diameter_${selectedNode.id}`}
-							label="Bore Diameter"
-							value={selectedNode.data.diameter ?? 0.08}
-							onChange={(val) =>
-								updateNodeData(selectedNode.id, { diameter: val })
-							}
-						/>
-
-						<div className="flex flex-col gap-2">
-							<label className="text-xs font-bold text-gray-500 uppercase">
-								Discharge Model (Cd)
-							</label>
-							<select
-								className="p-2 border rounded bg-white text-xs border-stone-200"
-								value={selectedNode.data.correlation || "ReaderHarrisGallagher"}
-								onChange={(e) =>
-									updateNodeData(selectedNode.id, {
-										correlation: e.target.value,
-									})
-								}
-							>
-								<option value="ReaderHarrisGallagher">
-									Reader-Harris/Gallagher (Sharp)
-								</option>
-								<option value="Stolz">Stolz (Corner Taps)</option>
-								<option value="Miller">Miller (Simplified)</option>
-								<option value="ThickPlate">Thick Plate (Sharp Edge)</option>
-								<option value="RoundedEntry">Rounded Entry</option>
-								<option value="fixed">Manual / Fixed Value</option>
-							</select>
-						</div>
-
-						{/* Conditional Inputs based on correlation */}
-						{selectedNode.data.correlation === "ThickPlate" && (
-							<LengthInput
-								id={`plate_thickness_${selectedNode.id}`}
-								label="Plate Thickness (t)"
-								value={selectedNode.data.plate_thickness ?? 0.0}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, { plate_thickness: val })
-								}
-							/>
-						)}
-
-						{selectedNode.data.correlation === "RoundedEntry" && (
-							<LengthInput
-								id={`edge_radius_${selectedNode.id}`}
-								label="Inlet Edge Radius (r)"
-								value={selectedNode.data.edge_radius ?? 0.0}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, { edge_radius: val })
-								}
-							/>
-						)}
-
-						{/* Calculated Result (for correlation models) */}
-						{selectedNode.data.correlation !== "fixed" && (
-							<div className="flex flex-col gap-1 mb-2 bg-blue-50/50 p-2 rounded border border-blue-100/50">
-								<label className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">
-									Calculated Cd
-								</label>
-								<div className="text-sm font-mono font-bold text-blue-700">
-									{selectedNode.data.result?.Cd?.toFixed(4) ||
-										"— (Pending Solve)"}
+				{selectedNode.type === "orifice" &&
+					(() => {
+						const upstreamEdge = edges.find(
+							(e) => e.target === selectedNode.id && !e.data?.type,
+						);
+						const upstreamNode = upstreamEdge
+							? nodes.find((n) => n.id === upstreamEdge.source)
+							: undefined;
+						const inheritedDiameter: number | undefined =
+							upstreamNode?.type === "channel"
+								? upstreamNode.data.D
+								: (upstreamNode?.data?.Dh ??
+									(upstreamNode?.data?.area != null
+										? Math.sqrt((4 * upstreamNode.data.area) / Math.PI)
+										: undefined));
+						const userSetDiameter =
+							selectedNode.data.diameter !== null &&
+							selectedNode.data.diameter !== undefined;
+						return (
+							<>
+								<div className="flex flex-col gap-2">
+									<div className="flex items-center justify-between">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Bore Diameter
+										</label>
+										{userSetDiameter && (
+											<button
+												type="button"
+												className="text-[9px] text-blue-500 hover:underline"
+												onClick={() =>
+													updateNodeData(selectedNode.id, {
+														diameter: null,
+													})
+												}
+											>
+												Reset to inherited
+											</button>
+										)}
+									</div>
+									<LengthInput
+										id={`diameter_${selectedNode.id}`}
+										label=""
+										value={
+											userSetDiameter
+												? selectedNode.data.diameter
+												: (inheritedDiameter ?? 0.08)
+										}
+										placeholder={inheritedDiameter ?? 0.08}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { diameter: val })
+										}
+										onClear={() =>
+											updateNodeData(selectedNode.id, { diameter: null })
+										}
+										className={
+											userSetDiameter ? "font-semibold" : "text-gray-400"
+										}
+									/>
+									{!userSetDiameter && inheritedDiameter != null && (
+										<p className="text-[9px] text-gray-400 italic -mt-1">
+											Inherited from upstream ({upstreamNode?.id}). Edit to
+											override.
+										</p>
+									)}
+									{!userSetDiameter && inheritedDiameter == null && (
+										<p className="text-[9px] text-gray-400 italic -mt-1">
+											Connect an upstream element to auto-inherit bore.
+										</p>
+									)}
 								</div>
-							</div>
-						)}
 
-						{/* Manual Entry (only for Fixed model) */}
-						{selectedNode.data.correlation === "fixed" && (
-							<div className="flex flex-col gap-1 mt-1">
-								<label
-									htmlFor={`Cd_${selectedNode.id}`}
-									className="text-xs font-bold text-gray-500 uppercase"
-								>
-									Fixed Cd Value
-								</label>
-								<NumericInput
-									id={`Cd_${selectedNode.id}`}
-									value={selectedNode.data.Cd ?? 0.6}
-									onChange={(val) =>
-										updateNodeData(selectedNode.id, {
-											Cd: val,
-										})
-									}
-									className="p-1.5 h-8 text-sm border rounded bg-white"
-									placeholder="0.6"
-								/>
-							</div>
-						)}
+								<div className="flex flex-col gap-2">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Discharge Model (Cd)
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={
+											selectedNode.data.correlation || "ReaderHarrisGallagher"
+										}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												correlation: e.target.value,
+											})
+										}
+									>
+										<option value="ReaderHarrisGallagher">
+											Reader-Harris/Gallagher (Sharp)
+										</option>
+										<option value="Stolz">Stolz (Corner Taps)</option>
+										<option value="Miller">Miller (Simplified)</option>
+										<option value="ThickPlate">Thick Plate (Sharp Edge)</option>
+										<option value="RoundedEntry">Rounded Entry</option>
+										<option value="fixed">Manual / Fixed Value</option>
+									</select>
+								</div>
 
-						<div className="flex flex-col gap-2 mt-2">
-							<label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
-								Flow Regime
-							</label>
-							<select
-								className="p-2 border rounded bg-white text-xs border-stone-200"
-								value={selectedNode.data.regime || "default"}
-								onChange={(e) =>
-									updateNodeData(selectedNode.id, { regime: e.target.value })
-								}
-							>
-								<option value="default">Default (Global)</option>
-								<option value="incompressible">Forced Incompressible</option>
-								<option value="compressible">Forced Compressible</option>
-							</select>
-						</div>
-						<InitialGuessEditor node={selectedNode} />
-					</>
-				)}
+								{/* Conditional Inputs based on correlation */}
+								{selectedNode.data.correlation === "ThickPlate" && (
+									<LengthInput
+										id={`plate_thickness_${selectedNode.id}`}
+										label="Plate Thickness (t)"
+										value={selectedNode.data.plate_thickness ?? 0.0}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { plate_thickness: val })
+										}
+									/>
+								)}
+
+								{selectedNode.data.correlation === "RoundedEntry" && (
+									<LengthInput
+										id={`edge_radius_${selectedNode.id}`}
+										label="Inlet Edge Radius (r)"
+										value={selectedNode.data.edge_radius ?? 0.0}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { edge_radius: val })
+										}
+									/>
+								)}
+
+								{/* Calculated Result (for correlation models) */}
+								{selectedNode.data.correlation !== "fixed" && (
+									<div className="flex flex-col gap-1 mb-2 bg-blue-50/50 p-2 rounded border border-blue-100/50">
+										<label className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">
+											Calculated Cd
+										</label>
+										<div className="text-sm font-mono font-bold text-blue-700">
+											{selectedNode.data.result?.Cd?.toFixed(4) ||
+												"— (Pending Solve)"}
+										</div>
+									</div>
+								)}
+
+								{/* Manual Entry (only for Fixed model) */}
+								{selectedNode.data.correlation === "fixed" && (
+									<div className="flex flex-col gap-1 mt-1">
+										<label
+											htmlFor={`Cd_${selectedNode.id}`}
+											className="text-xs font-bold text-gray-500 uppercase"
+										>
+											Fixed Cd Value
+										</label>
+										<NumericInput
+											id={`Cd_${selectedNode.id}`}
+											value={selectedNode.data.Cd ?? 0.6}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, {
+													Cd: val,
+												})
+											}
+											className="p-1.5 h-8 text-sm border rounded bg-white"
+											placeholder="0.6"
+										/>
+									</div>
+								)}
+
+								<div className="flex flex-col gap-2 mt-2">
+									<label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+										Flow Regime
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={selectedNode.data.regime || "default"}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												regime: e.target.value,
+											})
+										}
+									>
+										<option value="default">Default (Global)</option>
+										<option value="incompressible">
+											Forced Incompressible
+										</option>
+										<option value="compressible">Forced Compressible</option>
+									</select>
+								</div>
+								<InitialGuessEditor node={selectedNode} />
+							</>
+						);
+					})()}
 
 				{selectedNode.type === "area_change" && (
 					<>

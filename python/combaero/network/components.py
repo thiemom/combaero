@@ -1322,15 +1322,16 @@ class OrificeElement(NetworkElement):
     ):
         super().__init__(id, from_node, to_node)
 
-        if diameter is None and area is None:
-            raise ValueError("OrificeElement requires either 'diameter' or 'area'.")
-
         if diameter is not None:
-            self.diameter = diameter
-            self.area = math.pi * (diameter / 2.0) ** 2
-        else:
+            self.diameter: float | None = diameter
+            self.area: float | None = math.pi * (diameter / 2.0) ** 2
+        elif area is not None:
             self.area = area
             self.diameter = math.sqrt(4.0 * area / math.pi)
+        else:
+            # Both None: inherit from upstream channel in resolve_topology
+            self.diameter = None
+            self.area = None
 
         self.Cd = Cd
         self.regime = regime
@@ -1361,6 +1362,16 @@ class OrificeElement(NetworkElement):
 
         if len(downstream_channels) == 1:
             self.downstream_diameter = downstream_channels[0].diameter
+
+        # Inherit bore from upstream channel when user left diameter unspecified
+        if self.diameter is None:
+            if self.upstream_diameter is not None:
+                self.diameter = self.upstream_diameter
+            elif self.downstream_diameter is not None:
+                self.diameter = self.downstream_diameter
+            else:
+                self.diameter = 0.08  # fallback default
+            self.area = math.pi * (self.diameter / 2.0) ** 2
 
         # Pre-compute beta for velocity-of-approach factor
 
