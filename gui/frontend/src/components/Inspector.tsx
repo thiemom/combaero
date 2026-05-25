@@ -429,6 +429,12 @@ const Inspector = () => {
 									: undefined;
 						const userSetD =
 							selectedNode.data.D !== null && selectedNode.data.D !== undefined;
+						const userSetDh =
+							selectedNode.data.Dh !== null &&
+							selectedNode.data.Dh !== undefined;
+						const effectiveD = userSetD
+							? selectedNode.data.D
+							: (inheritedD ?? 0.1);
 						return (
 							<>
 								<LengthInput
@@ -470,6 +476,42 @@ const Inspector = () => {
 									{!userSetD && inheritedD != null && (
 										<p className="text-[9px] text-gray-400 italic -mt-1">
 											Inherited from {inheritSource?.id}. Edit to override.
+										</p>
+									)}
+								</div>
+								<div className="flex flex-col gap-2">
+									<div className="flex items-center justify-between">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Hydraulic Diameter Dh
+										</label>
+										{userSetDh && (
+											<button
+												type="button"
+												className="text-[9px] text-blue-500 hover:underline"
+												onClick={() =>
+													updateNodeData(selectedNode.id, { Dh: null })
+												}
+											>
+												Reset to circular
+											</button>
+										)}
+									</div>
+									<LengthInput
+										id={`Dh_${selectedNode.id}`}
+										label=""
+										value={userSetDh ? selectedNode.data.Dh : effectiveD}
+										placeholder={effectiveD}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { Dh: val })
+										}
+										onClear={() =>
+											updateNodeData(selectedNode.id, { Dh: null })
+										}
+										className={userSetDh ? "font-semibold" : "text-gray-400"}
+									/>
+									{!userSetDh && (
+										<p className="text-[9px] text-gray-400 italic -mt-1">
+											Dh = D (circular). Override for non-circular ducts.
 										</p>
 									)}
 								</div>

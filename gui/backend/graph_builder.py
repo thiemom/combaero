@@ -527,6 +527,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 to_node=target_id,
                 length=data.L,
                 diameter=data.D,
+                Dh=data.Dh,
                 roughness=data.roughness,
                 friction_model=data.friction_model,
                 surface=ConvectiveSurface(

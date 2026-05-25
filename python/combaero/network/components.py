@@ -2156,6 +2156,7 @@ class ChannelElement(NetworkElement):
         to_node: str,
         length: float,
         diameter: float | None = None,
+        Dh: float | None = None,
         roughness: float = 1e-5,
         regime: CompressibilityLiteral = "incompressible",
         friction_model: FrictionModelLiteral = "haaland",
@@ -2166,6 +2167,9 @@ class ChannelElement(NetworkElement):
         super().__init__(id, from_node, to_node)
         self.length = length
         self.diameter: float | None = diameter
+        # Dh: user-specified hydraulic diameter (for non-circular ducts).
+        # None until resolved: defaults to diameter (circular assumption).
+        self.Dh: float | None = Dh if Dh is not None else diameter
         self.roughness = roughness
         self.area: float | None = math.pi * (diameter / 2) ** 2 if diameter is not None else None
 
@@ -2195,13 +2199,14 @@ class ChannelElement(NetworkElement):
             rho = state_in.density() if state_in.density() > 0 else 1.2
             mu = cs.transport.mu if cs.transport.mu > 0 else 1.8e-5
             v = abs(m_dot) / (rho * self.area) if self.area > 0.0 else 0.0
-            Re = rho * v * self.diameter / mu if mu > 0 else 1.0
+            dh = self.Dh or self.diameter or 1.0
+            Re = rho * v * dh / mu if mu > 0 else 1.0
 
             # Base pure pipe friction calculation
             if Re < 2300:
                 f_base = 64.0 / Re if Re > 0 else 0.0
             else:
-                e_D = self.roughness / self.diameter if self.diameter > 0 else 0.0
+                e_D = self.roughness / dh if dh > 0 else 0.0
                 if e_D > 1e-8:
                     f_base = 1.0 / (-1.8 * math.log10((e_D / 3.7) ** 1.11 + 6.9 / Re)) ** 2
                 else:
@@ -2223,7 +2228,7 @@ class ChannelElement(NetworkElement):
                         dP_target = h_res.dP
                         dynamic_head = 0.5 * rho * v**2
                         if dynamic_head > 0:
-                            f_total = dP_target / ((self.length / self.diameter) * dynamic_head)
+                            f_total = dP_target / ((self.length / dh) * dynamic_head)
                             f_mult *= f_total / f_base
 
         if self.regime == "compressible":
@@ -2286,7 +2291,11 @@ class ChannelElement(NetworkElement):
     ) -> dict[str, float | str]:
         cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
         ref = _element_reference_block(
-            cs_in, m_dot=state_in.m_dot, area=self.area, Dh=self.diameter, location="inlet"
+            cs_in,
+            m_dot=state_in.m_dot,
+            area=self.area,
+            Dh=self.Dh or self.diameter,
+            location="inlet",
         )
         v_in = ref["velocity"]
         re_in = ref["Re"]
@@ -2306,7 +2315,8 @@ class ChannelElement(NetworkElement):
             Nu, htc, T_aw, f = h_res.Nu, h_res.h, h_res.T_aw, h_res.f
         else:
             Nu, htc, T_aw = 0.0, 0.0, state_in.T
-            e_D = self.roughness / self.diameter if self.diameter > 0 else 0.0
+            dh_diag = self.Dh or self.diameter or 1.0
+            e_D = self.roughness / dh_diag if dh_diag > 0 else 0.0
             if re_in < 2300:
                 f = 64.0 / re_in if re_in > 0 else 0.0
             elif e_D > 1e-8:
@@ -2318,7 +2328,7 @@ class ChannelElement(NetworkElement):
             "m_dot": float(state_in.m_dot),
             **_element_pressure_block(state_in, state_out, mach_in=mach_in, mach_out=mach_out),
             **ref,
-            "Dh": float(self.diameter),
+            "Dh": float(self.Dh or self.diameter or 0.0),
             "Nu": float(Nu),
             "htc": float(htc),
             "T_aw": float(T_aw),
@@ -2402,7 +2412,7 @@ class ChannelElement(NetworkElement):
             P=state.P,
             X=state.X,
             velocity=u,
-            diameter=self.diameter,
+            diameter=self.Dh or self.diameter,
             length=self.length,
             T_hot=T_hot,
         )
@@ -2430,6 +2440,8 @@ class ChannelElement(NetworkElement):
         if self.diameter is None:
             self.diameter = 0.1  # fallback default
         self.area = math.pi * (self.diameter / 2) ** 2
+        if self.Dh is None:
+            self.Dh = self.diameter
         # Update convective surface area (was 0 if diameter was deferred)
         if self.surface and self.surface.area == 0.0:
             self.surface.area = math.pi * self.diameter * self.length
