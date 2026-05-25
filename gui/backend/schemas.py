@@ -213,7 +213,7 @@ class TeeJunctionData(BaseModel):
     label: str | None = None
     tee_type: str = "merging"  # "merging" | "branching"
     theta_deg: float = 90.0  # branch angle [deg], converted to radians in graph_builder
-    F_C: float = 0.01  # common-arm area [m^2]
+    F_C: float | None = None  # None = inherit from common-arm channel (A = pi/4*D^2)
     psi: float = 1.0  # F_C / F_branch (common / lateral-branch area ratio)
     initial_guess: dict[str, float] = Field(default_factory=dict)
 

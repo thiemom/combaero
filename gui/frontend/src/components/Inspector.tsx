@@ -856,220 +856,301 @@ const Inspector = () => {
 						);
 					})()}
 
-				{selectedNode.type === "tee_junction" && (
-					<div className="flex flex-col gap-4">
-						{/* Port legend */}
-						{(() => {
-							const tm =
-								(selectedNode.data.tee_type ?? "merging") === "merging";
-							return (
-								<div className="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-[9px] leading-snug text-stone-600">
-									<div className="font-bold uppercase text-stone-400 mb-1">
-										Port Guide
-									</div>
-									<div className="grid grid-cols-3 gap-1 text-center font-mono mb-1.5">
-										<div>
-											<span
-												className="font-extrabold"
-												style={{ color: tm ? "#3b82f6" : "#f59e0b" }}
-											>
-												S
-											</span>{" "}
-											straight
+				{selectedNode.type === "tee_junction" &&
+					(() => {
+						const teeType = selectedNode.data.tee_type ?? "merging";
+						// Find the common-arm neighbour (the element/node on the C port)
+						const commonEdge =
+							teeType === "merging"
+								? edges.find(
+										(e) =>
+											e.source === selectedNode.id &&
+											e.sourceHandle === "common" &&
+											!e.data?.type,
+									)
+								: edges.find(
+										(e) =>
+											e.target === selectedNode.id &&
+											e.targetHandle === "common" &&
+											!e.data?.type,
+									);
+						const commonNeighbour = commonEdge
+							? nodes.find(
+									(n) =>
+										n.id ===
+										(teeType === "merging"
+											? commonEdge.target
+											: commonEdge.source),
+								)
+							: undefined;
+						const inheritedFC: number | undefined =
+							commonNeighbour?.type === "channel"
+								? (Math.PI / 4) *
+									(commonNeighbour.data.D ?? 0) *
+									(commonNeighbour.data.D ?? 0)
+								: commonNeighbour?.data?.area;
+						const userSetFC =
+							selectedNode.data.F_C !== null &&
+							selectedNode.data.F_C !== undefined;
+						const effectiveFC = userSetFC
+							? selectedNode.data.F_C
+							: (inheritedFC ?? 0.01);
+						return (
+							<div className="flex flex-col gap-4">
+								{/* Port legend */}
+								{(() => {
+									const tm =
+										(selectedNode.data.tee_type ?? "merging") === "merging";
+									return (
+										<div className="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-[9px] leading-snug text-stone-600">
+											<div className="font-bold uppercase text-stone-400 mb-1">
+												Port Guide
+											</div>
+											<div className="grid grid-cols-3 gap-1 text-center font-mono mb-1.5">
+												<div>
+													<span
+														className="font-extrabold"
+														style={{ color: tm ? "#3b82f6" : "#f59e0b" }}
+													>
+														S
+													</span>{" "}
+													straight
+												</div>
+												<div>
+													<span
+														className="font-extrabold"
+														style={{ color: tm ? "#f59e0b" : "#3b82f6" }}
+													>
+														C
+													</span>{" "}
+													common
+												</div>
+												<div>
+													<span
+														className="font-extrabold"
+														style={{ color: tm ? "#3b82f6" : "#f59e0b" }}
+													>
+														B
+													</span>{" "}
+													branch
+												</div>
+											</div>
+											<div className="text-stone-500">
+												{tm ? (
+													<>
+														<span style={{ color: "#3b82f6" }}>S, B</span> →{" "}
+														<span style={{ color: "#f59e0b" }}>C</span>
+														{"  "}(two inlets, one outlet at C)
+													</>
+												) : (
+													<>
+														<span style={{ color: "#3b82f6" }}>C</span> →{" "}
+														<span style={{ color: "#f59e0b" }}>S, B</span>
+														{"  "}(one inlet at C, two outlets)
+													</>
+												)}
+											</div>
 										</div>
-										<div>
-											<span
-												className="font-extrabold"
-												style={{ color: tm ? "#f59e0b" : "#3b82f6" }}
+									);
+								})()}
+
+								{/* Tee type */}
+								<div className="flex flex-col gap-2">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Tee Type
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={selectedNode.data.tee_type ?? "merging"}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												tee_type: e.target.value,
+											})
+										}
+									>
+										<option value="merging">
+											Merging (2 inlets, 1 outlet)
+										</option>
+										<option value="branching">
+											Branching (1 inlet, 2 outlets)
+										</option>
+									</select>
+									<p className="text-[9px] text-gray-400 italic">
+										Declares intended flow direction; the Bassett model blends
+										smoothly if flow reverses.
+									</p>
+								</div>
+
+								{/* Branch angle */}
+								<div className="flex flex-col gap-2">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Branch Angle (deg)
+									</label>
+									<NumericInput
+										value={selectedNode.data.theta_deg ?? 90}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { theta_deg: val })
+										}
+										className="p-2 border rounded"
+										placeholder="90"
+									/>
+									<p className="text-[9px] text-gray-400 italic">
+										Angle between branch and common arm. Sign is ignored
+										(symmetric). Bassett (2001) validated range: 30–90 deg. 0°
+										is accepted but flagged as extrapolated.
+									</p>
+								</div>
+
+								{/* Common arm area */}
+								<div className="flex flex-col gap-2">
+									<div className="flex items-center justify-between">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Common Arm Area (F_C)
+										</label>
+										{userSetFC && (
+											<button
+												type="button"
+												className="text-[9px] text-blue-500 hover:underline"
+												onClick={() =>
+													updateNodeData(selectedNode.id, { F_C: null })
+												}
 											>
-												C
-											</span>{" "}
-											common
-										</div>
-										<div>
-											<span
-												className="font-extrabold"
-												style={{ color: tm ? "#3b82f6" : "#f59e0b" }}
-											>
-												B
-											</span>{" "}
-											branch
-										</div>
-									</div>
-									<div className="text-stone-500">
-										{tm ? (
-											<>
-												<span style={{ color: "#3b82f6" }}>S, B</span> →{" "}
-												<span style={{ color: "#f59e0b" }}>C</span>
-												{"  "}(two inlets, one outlet at C)
-											</>
-										) : (
-											<>
-												<span style={{ color: "#3b82f6" }}>C</span> →{" "}
-												<span style={{ color: "#f59e0b" }}>S, B</span>
-												{"  "}(one inlet at C, two outlets)
-											</>
+												Reset to inherited
+											</button>
 										)}
 									</div>
+									<AreaInput
+										id={`F_C_${selectedNode.id}`}
+										label=""
+										value={effectiveFC}
+										placeholder={
+											inheritedFC != null ? inheritedFC.toFixed(5) : "0.01"
+										}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { F_C: val })
+										}
+										onClear={() =>
+											updateNodeData(selectedNode.id, { F_C: null })
+										}
+										className={userSetFC ? "font-semibold" : "text-gray-400"}
+									/>
+									{!userSetFC && inheritedFC != null && (
+										<p className="text-[9px] text-gray-400 italic -mt-1">
+											Inherited from common-arm ({commonNeighbour?.id}). Edit to
+											override.
+										</p>
+									)}
 								</div>
-							);
-						})()}
 
-						{/* Tee type */}
-						<div className="flex flex-col gap-2">
-							<label className="text-xs font-bold text-gray-500 uppercase">
-								Tee Type
-							</label>
-							<select
-								className="p-2 border rounded bg-white text-xs border-stone-200"
-								value={selectedNode.data.tee_type ?? "merging"}
-								onChange={(e) =>
-									updateNodeData(selectedNode.id, { tee_type: e.target.value })
-								}
-							>
-								<option value="merging">Merging (2 inlets, 1 outlet)</option>
-								<option value="branching">
-									Branching (1 inlet, 2 outlets)
-								</option>
-							</select>
-							<p className="text-[9px] text-gray-400 italic">
-								Declares intended flow direction; the Bassett model blends
-								smoothly if flow reverses.
-							</p>
-						</div>
+								{/* Area ratio */}
+								<div className="flex flex-col gap-2">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Area Ratio psi = F_C / F_branch
+									</label>
+									<NumericInput
+										value={selectedNode.data.psi ?? 1.0}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { psi: val })
+										}
+										className="p-2 border rounded"
+										placeholder="1.0"
+									/>
+									<p className="text-[9px] text-gray-400 italic">
+										Ratio of common-arm to lateral-branch area. 1.0 = equal
+										areas. Straight arm is assumed equal to the common arm
+										(Bassett constraint).
+									</p>
+								</div>
 
-						{/* Branch angle */}
-						<div className="flex flex-col gap-2">
-							<label className="text-xs font-bold text-gray-500 uppercase">
-								Branch Angle (deg)
-							</label>
-							<NumericInput
-								value={selectedNode.data.theta_deg ?? 90}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, { theta_deg: val })
-								}
-								className="p-2 border rounded"
-								placeholder="90"
-							/>
-							<p className="text-[9px] text-gray-400 italic">
-								Angle between branch and common arm. Sign is ignored
-								(symmetric). Bassett (2001) validated range: 30–90 deg. 0° is
-								accepted but flagged as extrapolated.
-							</p>
-						</div>
+								<InitialGuessEditor node={selectedNode} />
 
-						{/* Common arm area */}
-						<AreaInput
-							id={`F_C_${selectedNode.id}`}
-							label="Common Arm Area (F_C)"
-							value={selectedNode.data.F_C ?? 0.01}
-							onChange={(val) => updateNodeData(selectedNode.id, { F_C: val })}
-						/>
-
-						{/* Area ratio */}
-						<div className="flex flex-col gap-2">
-							<label className="text-xs font-bold text-gray-500 uppercase">
-								Area Ratio psi = F_C / F_branch
-							</label>
-							<NumericInput
-								value={selectedNode.data.psi ?? 1.0}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, { psi: val })
-								}
-								className="p-2 border rounded"
-								placeholder="1.0"
-							/>
-							<p className="text-[9px] text-gray-400 italic">
-								Ratio of common-arm to lateral-branch area. 1.0 = equal areas.
-								Straight arm is assumed equal to the common arm (Bassett
-								constraint).
-							</p>
-						</div>
-
-						<InitialGuessEditor node={selectedNode} />
-
-						{/* Post-solve diagnostics */}
-						{selectedNode.data.result && (
-							<div className="mt-4 p-3 bg-stone-50 border border-stone-200 rounded">
-								<h3 className="text-xs font-bold text-stone-500 uppercase mb-3">
-									Flow Distribution
-								</h3>
-								{selectedNode.data.result.correlation_extrapolated > 0 && (
-									<div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-3">
-										Inputs outside Bassett (2001) validated range -- results are
-										extrapolated.
+								{/* Post-solve diagnostics */}
+								{selectedNode.data.result && (
+									<div className="mt-4 p-3 bg-stone-50 border border-stone-200 rounded">
+										<h3 className="text-xs font-bold text-stone-500 uppercase mb-3">
+											Flow Distribution
+										</h3>
+										{selectedNode.data.result.correlation_extrapolated > 0 && (
+											<div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-3">
+												Inputs outside Bassett (2001) validated range -- results
+												are extrapolated.
+											</div>
+										)}
+										<div className="grid grid-cols-2 gap-x-2 gap-y-3">
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[9px] font-bold uppercase">
+													ṁ common
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{(selectedNode.data.result.m_dot_com ?? 0).toFixed(4)}{" "}
+													<span className="text-[9px] font-normal text-stone-400">
+														kg/s
+													</span>
+												</span>
+											</div>
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[9px] font-bold uppercase">
+													ṁ straight
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{(
+														selectedNode.data.result.m_dot_straight ?? 0
+													).toFixed(4)}{" "}
+													<span className="text-[9px] font-normal text-stone-400">
+														kg/s
+													</span>
+												</span>
+											</div>
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[9px] font-bold uppercase">
+													ṁ branch
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{(selectedNode.data.result.m_dot_branch ?? 0).toFixed(
+														4,
+													)}{" "}
+													<span className="text-[9px] font-normal text-stone-400">
+														kg/s
+													</span>
+												</span>
+											</div>
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[9px] font-bold uppercase">
+													ṁ straight / ṁ common
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{(
+														selectedNode.data.result.mass_flow_ratio ?? 0
+													).toFixed(3)}{" "}
+													<span className="text-[9px] font-normal text-stone-400">
+														kg/kg
+													</span>
+												</span>
+											</div>
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[9px] font-bold uppercase">
+													K straight
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{(selectedNode.data.result.K_straight ?? 0).toFixed(
+														3,
+													)}
+												</span>
+											</div>
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[9px] font-bold uppercase">
+													K branch
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{(selectedNode.data.result.K_branch ?? 0).toFixed(3)}
+												</span>
+											</div>
+										</div>
 									</div>
 								)}
-								<div className="grid grid-cols-2 gap-x-2 gap-y-3">
-									<div className="flex flex-col">
-										<span className="text-stone-400 text-[9px] font-bold uppercase">
-											ṁ common
-										</span>
-										<span className="font-mono text-xs font-bold">
-											{(selectedNode.data.result.m_dot_com ?? 0).toFixed(4)}{" "}
-											<span className="text-[9px] font-normal text-stone-400">
-												kg/s
-											</span>
-										</span>
-									</div>
-									<div className="flex flex-col">
-										<span className="text-stone-400 text-[9px] font-bold uppercase">
-											ṁ straight
-										</span>
-										<span className="font-mono text-xs font-bold">
-											{(selectedNode.data.result.m_dot_straight ?? 0).toFixed(
-												4,
-											)}{" "}
-											<span className="text-[9px] font-normal text-stone-400">
-												kg/s
-											</span>
-										</span>
-									</div>
-									<div className="flex flex-col">
-										<span className="text-stone-400 text-[9px] font-bold uppercase">
-											ṁ branch
-										</span>
-										<span className="font-mono text-xs font-bold">
-											{(selectedNode.data.result.m_dot_branch ?? 0).toFixed(4)}{" "}
-											<span className="text-[9px] font-normal text-stone-400">
-												kg/s
-											</span>
-										</span>
-									</div>
-									<div className="flex flex-col">
-										<span className="text-stone-400 text-[9px] font-bold uppercase">
-											ṁ straight / ṁ common
-										</span>
-										<span className="font-mono text-xs font-bold">
-											{(selectedNode.data.result.mass_flow_ratio ?? 0).toFixed(
-												3,
-											)}{" "}
-											<span className="text-[9px] font-normal text-stone-400">
-												kg/kg
-											</span>
-										</span>
-									</div>
-									<div className="flex flex-col">
-										<span className="text-stone-400 text-[9px] font-bold uppercase">
-											K straight
-										</span>
-										<span className="font-mono text-xs font-bold">
-											{(selectedNode.data.result.K_straight ?? 0).toFixed(3)}
-										</span>
-									</div>
-									<div className="flex flex-col">
-										<span className="text-stone-400 text-[9px] font-bold uppercase">
-											K branch
-										</span>
-										<span className="font-mono text-xs font-bold">
-											{(selectedNode.data.result.K_branch ?? 0).toFixed(3)}
-										</span>
-									</div>
-								</div>
 							</div>
-						)}
-					</div>
-				)}
+						);
+					})()}
 
 				{selectedNode.type === "vortex" && (
 					<div className="flex flex-col gap-4">

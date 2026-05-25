@@ -2620,7 +2620,7 @@ class TeeJunctionElement(NetworkElement):
         straight_node: str,
         branch_node: str,
         theta: float,
-        F_C: float,
+        F_C: float | None = None,
         psi: float = 1.0,  # F_C / F_branch: common / lateral-branch area ratio
         tee_type: Literal["merging", "branching"] = "merging",
         blend_k: float = 30.0,
@@ -2632,7 +2632,7 @@ class TeeJunctionElement(NetworkElement):
         self.straight_node = straight_node
         self.branch_node = branch_node
         self.theta = theta
-        self.F_C = F_C
+        self.F_C: float | None = F_C
         self.psi = psi
         self.tee_type = tee_type
         self.blend_k = blend_k
@@ -2670,7 +2670,19 @@ class TeeJunctionElement(NetworkElement):
         return 2
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
-        pass
+        if self.F_C is None:
+            # Scan common-arm connections (both directions) for a channel to inherit area from
+            candidates = [
+                e
+                for e in graph.get_upstream_elements(self.common_node)
+                + graph.get_downstream_elements(self.common_node)
+                if isinstance(e, ChannelElement) and e.diameter is not None
+            ]
+            if candidates:
+                d = candidates[0].diameter
+                self.F_C = math.pi * (d / 2.0) ** 2
+            else:
+                self.F_C = 0.01
 
     def validate(self) -> None:
         if self.tee_type not in ("merging", "branching"):
@@ -2681,7 +2693,7 @@ class TeeJunctionElement(NetworkElement):
             raise ValueError(
                 f"TeeJunctionElement '{self.id}': |theta| must be <= pi/2, got {self.theta}."
             )
-        if self.F_C <= 0.0:
+        if (self.F_C or 0.0) <= 0.0:
             raise ValueError(f"TeeJunctionElement '{self.id}': F_C must be > 0, got {self.F_C}.")
         if self.psi <= 0.0:
             raise ValueError(f"TeeJunctionElement '{self.id}': psi must be > 0, got {self.psi}.")
