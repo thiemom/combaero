@@ -906,6 +906,60 @@ const Inspector = () => {
 									)}
 								</div>
 
+								{(() => {
+									const ratio =
+										effectiveF0 > 0 ? effectiveF1 / effectiveF0 : null;
+									const d0 = Math.sqrt((4 * effectiveF0) / Math.PI);
+									const d1 = Math.sqrt((4 * effectiveF1) / Math.PI);
+									const label =
+										ratio == null
+											? null
+											: ratio > 1.005
+												? "expansion"
+												: ratio < 0.995
+													? "contraction"
+													: "straight";
+									return ratio != null ? (
+										<div className="rounded bg-stone-50 border border-stone-200 px-3 py-2 text-[10px] text-stone-600 flex flex-col gap-0.5">
+											<div className="flex justify-between">
+												<span className="font-medium text-stone-500 uppercase tracking-wide text-[8px]">
+													Area ratio
+												</span>
+												<span
+													className={
+														label === "expansion"
+															? "text-blue-600 font-semibold"
+															: label === "contraction"
+																? "text-amber-600 font-semibold"
+																: "text-stone-500"
+													}
+												>
+													{label}
+												</span>
+											</div>
+											<div className="flex justify-between mt-0.5">
+												<span className="text-stone-400">F₁/F₀</span>
+												<span className="font-mono font-semibold">
+													{ratio.toFixed(4)}
+												</span>
+											</div>
+											<div className="flex justify-between">
+												<span className="text-stone-400">D₀ → D₁</span>
+												<span className="font-mono">
+													{(
+														d0 * (unitPreferences.length === "mm" ? 1000 : 1)
+													).toFixed(1)}{" "}
+													→{" "}
+													{(
+														d1 * (unitPreferences.length === "mm" ? 1000 : 1)
+													).toFixed(1)}{" "}
+													{unitPreferences.length}
+												</span>
+											</div>
+										</div>
+									) : null;
+								})()}
+
 								{selectedNode.data.model_type === "conical" && (
 									<LengthInput
 										id={`length_${selectedNode.id}`}
