@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Upstream geometry inheritance**: geometry fields on elements and nodes can now
+  be left blank (schema value `null`); the GUI Inspector shows an inherited value
+  as a greyed placeholder with a "Reset to inherited" / "Reset to circular" button.
+  Affected fields:
+  - `OrificeElement.diameter` — inherits from adjacent `ChannelElement`
+  - `MomentumChamberNode.Dh` — inherits from upstream `ChannelElement.D`
+  - `CombustorNode.Dh` — inherits from upstream `ChannelElement.D`
+  - `AreaChangeElement.F0` / `F1` — inherit from upstream/downstream `ChannelElement`
+  - `TeeJunctionElement.F_C` — inherits from common-arm `ChannelElement`
+  - `ChannelElement.D` — inherits from upstream `AreaChangeElement.F1`,
+    `ChannelElement`, or `TeeJunctionElement.F_C` (circular-equivalent conversion)
+  - `ChannelElement.Dh` — new optional field; defaults to `D` (circular assumption);
+    override for non-circular ducts to use correct hydraulic diameter in friction/Nu
 - `WallNode`: closed-end (zero mass-flow) boundary node for modelling dead-end
   branches and symmetry planes of ring manifolds. Drag from the GUI palette or
   instantiate directly via `combaero.network.WallNode("id")`.
