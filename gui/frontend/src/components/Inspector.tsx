@@ -406,17 +406,20 @@ const Inspector = () => {
 						const downstreamNode = downstreamEdge
 							? nodes.find((n) => n.id === downstreamEdge.target)
 							: undefined;
-						const dFromNeighbour = (
+						// Returns {d, dh} to propagate both circular-equivalent diameter
+						// and hydraulic diameter through chains. channel: dh = Dh ?? D.
+						// area_change: dh = D_h (if set) ?? sqrt(4F/pi). Tees: dh = d.
+						const walkGeometry = (
 							n: typeof upstreamNode,
 							edge: typeof upstreamEdge,
 							side: "upstream" | "downstream",
 							depth = 0,
-						): number | undefined => {
+						): { d: number; dh: number } | undefined => {
 							if (!n || depth > 20) return undefined;
 							if (n.type === "channel") {
 								const d = n.data.D as number | null | undefined;
-								if (d != null) return d;
-								// D is also inherited — walk one more hop in the same direction
+								const dh = n.data.Dh as number | null | undefined;
+								if (d != null) return { d, dh: dh ?? d };
 								const hopEdge =
 									side === "upstream"
 										? edges.find((e) => e.target === n.id && !e.data?.type)
@@ -428,15 +431,19 @@ const Inspector = () => {
 												(side === "upstream" ? hopEdge.source : hopEdge.target),
 										)
 									: undefined;
-								return dFromNeighbour(hopNode, hopEdge, side, depth + 1);
+								return walkGeometry(hopNode, hopEdge, side, depth + 1);
 							}
 							if (n.type === "area_change") {
-								// from upstream neighbour inherit its exit (F1); from downstream its entry (F0)
+								const dhAc = n.data.D_h as number | null | undefined;
 								const f =
 									side === "upstream"
 										? (n.data.F1 as number | null | undefined)
 										: (n.data.F0 as number | null | undefined);
-								return f != null ? Math.sqrt((4 * f) / Math.PI) : undefined;
+								if (f != null) {
+									const d = Math.sqrt((4 * f) / Math.PI);
+									return { d, dh: dhAc != null && dhAc > 0 ? dhAc : d };
+								}
+								return undefined;
 							}
 							if (n.type === "tee_junction") {
 								const handle =
@@ -445,36 +452,41 @@ const Inspector = () => {
 									side === "upstream"
 										? handle === "port-branch-source"
 										: handle === "port-branch-target";
+								let d: number | undefined;
 								if (isBranch) {
 									const fb = n.data.F_branch as number | null | undefined;
 									const fc = n.data.F_C as number | null | undefined;
 									const psi = (n.data.psi as number | undefined) ?? 1.0;
 									const fBranch =
 										fb != null ? fb : fc != null ? fc / psi : undefined;
-									return fBranch != null
-										? Math.sqrt((4 * fBranch) / Math.PI)
-										: undefined;
+									d =
+										fBranch != null
+											? Math.sqrt((4 * fBranch) / Math.PI)
+											: undefined;
+								} else {
+									const fc = n.data.F_C as number | null | undefined;
+									d = fc != null ? Math.sqrt((4 * fc) / Math.PI) : undefined;
 								}
-								const fc = n.data.F_C as number | null | undefined;
-								return fc != null ? Math.sqrt((4 * fc) / Math.PI) : undefined;
+								return d != null ? { d, dh: d } : undefined;
 							}
 							return undefined;
 						};
-						const inheritedDUp = dFromNeighbour(
+						const inheritedGeomUp = walkGeometry(
 							upstreamNode,
 							upstreamEdge,
 							"upstream",
 						);
-						const inheritedDDown = dFromNeighbour(
+						const inheritedGeomDown = walkGeometry(
 							downstreamNode,
 							downstreamEdge,
 							"downstream",
 						);
-						const inheritedD = inheritedDUp ?? inheritedDDown;
+						const inheritedD = inheritedGeomUp?.d ?? inheritedGeomDown?.d;
+						const inheritedDh = inheritedGeomUp?.dh ?? inheritedGeomDown?.dh;
 						const inheritSide =
-							inheritedDUp != null
+							inheritedGeomUp != null
 								? "upstream"
-								: inheritedDDown != null
+								: inheritedGeomDown != null
 									? "downstream"
 									: undefined;
 						const inheritSourceId =
@@ -489,6 +501,11 @@ const Inspector = () => {
 						const effectiveD = userSetD
 							? selectedNode.data.D
 							: (inheritedD ?? 0.1);
+						// True when the upstream source provides a non-circular Dh
+						const dhIsNonCircular =
+							inheritedDh != null &&
+							(inheritedD == null ||
+								Math.abs(inheritedDh - inheritedD) > 1e-10);
 						return (
 							<>
 								<LengthInput
@@ -546,15 +563,21 @@ const Inspector = () => {
 													updateNodeData(selectedNode.id, { Dh: null })
 												}
 											>
-												Reset to circular
+												{dhIsNonCircular
+													? "Reset to inherited"
+													: "Reset to circular"}
 											</button>
 										)}
 									</div>
 									<LengthInput
 										id={`Dh_${selectedNode.id}`}
 										label=""
-										value={userSetDh ? selectedNode.data.Dh : effectiveD}
-										placeholder={effectiveD}
+										value={
+											userSetDh
+												? selectedNode.data.Dh
+												: (inheritedDh ?? effectiveD)
+										}
+										placeholder={inheritedDh ?? effectiveD}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, { Dh: val })
 										}
@@ -563,7 +586,13 @@ const Inspector = () => {
 										}
 										className={userSetDh ? "font-semibold" : "text-gray-400"}
 									/>
-									{!userSetDh && (
+									{!userSetDh && dhIsNonCircular && (
+										<p className="text-[9px] text-gray-400 italic -mt-1">
+											Inherited non-circular Dh from {inheritSide}. Edit to
+											override.
+										</p>
+									)}
+									{!userSetDh && !dhIsNonCircular && (
 										<p className="text-[9px] text-gray-400 italic -mt-1">
 											Dh = D (circular). Override for non-circular ducts.
 										</p>
@@ -2099,10 +2128,13 @@ const Inspector = () => {
 							if (!n) return undefined;
 							if (n.type === "channel") {
 								const d = n.data.D as number | null | undefined;
-								if (d != null) return d;
+								const dh = n.data.Dh as number | null | undefined;
+								if (d != null) return dh ?? d;
 								return walkChannelD(n.id, depth + 1);
 							}
 							if (n.type === "area_change") {
+								const dhAc = n.data.D_h as number | null | undefined;
+								if (dhAc != null && dhAc > 0) return dhAc;
 								const f = n.data.F1 as number | null | undefined;
 								if (f != null && f > 0) return Math.sqrt((4 * f) / Math.PI);
 								return walkChannelD(n.id, depth + 1);
@@ -2291,10 +2323,13 @@ const Inspector = () => {
 							if (!n) return undefined;
 							if (n.type === "channel") {
 								const d = n.data.D as number | null | undefined;
-								if (d != null) return d;
+								const dh = n.data.Dh as number | null | undefined;
+								if (d != null) return dh ?? d;
 								return walkChannelD(n.id, depth + 1);
 							}
 							if (n.type === "area_change") {
+								const dhAc = n.data.D_h as number | null | undefined;
+								if (dhAc != null && dhAc > 0) return dhAc;
 								const f = n.data.F1 as number | null | undefined;
 								if (f != null && f > 0) return Math.sqrt((4 * f) / Math.PI);
 								return walkChannelD(n.id, depth + 1);
