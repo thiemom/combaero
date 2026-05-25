@@ -786,7 +786,7 @@ class MomentumChamberNode(NetworkNode):
     def __init__(
         self,
         id: str,
-        area: float = 0.1,
+        area: float | None = None,
         port_angles_deg: dict[str, float] | None = None,
         length: float | None = None,
         surface: ConvectiveSurface | None = None,
@@ -794,7 +794,8 @@ class MomentumChamberNode(NetworkNode):
         Dh: float | None = None,
     ):
         super().__init__(id)
-        self.area = area  # Cross-sectional area for momentum calculations
+        self._auto_area = area is None
+        self.area = area if area is not None else 0.0
         self.port_angles_deg: dict[str, float] = port_angles_deg or {}
         self.length = length
         self.Dh = Dh
@@ -966,6 +967,12 @@ class MomentumChamberNode(NetworkNode):
                 if isinstance(elem, ChannelElement) and elem.diameter is not None:
                     self.Dh = elem.diameter
                     break
+        # Derive cross-section area from Dh when area was not user-specified
+        if self._auto_area and self.Dh is not None:
+            self.area = math.pi * (self.Dh / 2.0) ** 2
+            self.surface.area = self.area
+        elif self._auto_area:
+            self.area = 0.1  # fallback (same as original default)
 
 
 class PressureBoundary(NetworkNode):
@@ -1110,14 +1117,15 @@ class CombustorNode(NetworkNode):
         self,
         id: str,
         method: CombustionMethodLiteral = "complete",
-        area: float = 0.1,
+        area: float | None = None,
         Dh: float | None = None,
         surface: ConvectiveSurface | None = None,
         t_hot: float | None = None,
     ):
         super().__init__(id)
         self.method = method
-        self.area = area
+        self._auto_area = area is None
+        self.area = area if area is not None else 0.0
         self.Dh = Dh
         self.surface = surface or ConvectiveSurface()
         self.t_hot = t_hot
@@ -1299,6 +1307,12 @@ class CombustorNode(NetworkNode):
                 if isinstance(elem, ChannelElement) and elem.diameter is not None:
                     self.Dh = elem.diameter
                     break
+        # Derive cross-section area from Dh when area was not user-specified
+        if self._auto_area and self.Dh is not None:
+            self.area = math.pi * (self.Dh / 2.0) ** 2
+            self.surface.area = self.area
+        elif self._auto_area:
+            self.area = 0.1  # fallback (same as original default)
 
 
 class OrificeElement(NetworkElement):
@@ -1373,14 +1387,10 @@ class OrificeElement(NetworkElement):
         if len(downstream_channels) == 1:
             self.downstream_diameter = downstream_channels[0].diameter
 
-        # Inherit bore from upstream channel when user left diameter unspecified
+        # Bore must be explicitly set by the user; fall back to 0.08 when unspecified.
+        # (upstream_diameter is kept only for the velocity-of-approach Beta correction.)
         if self.diameter is None:
-            if self.upstream_diameter is not None:
-                self.diameter = self.upstream_diameter
-            elif self.downstream_diameter is not None:
-                self.diameter = self.downstream_diameter
-            else:
-                self.diameter = 0.08  # fallback default
+            self.diameter = 0.08
             self.area = math.pi * (self.diameter / 2.0) ** 2
 
         # Pre-compute beta for velocity-of-approach factor
@@ -2703,19 +2713,24 @@ class TeeJunctionElement(NetworkElement):
         return 2
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
-        if self.F_C is None:
-            # Scan common-arm connections (both directions) for a channel to inherit area from
-            candidates = [
-                e
-                for e in graph.get_upstream_elements(self.common_node)
-                + graph.get_downstream_elements(self.common_node)
-                if isinstance(e, ChannelElement) and e.diameter is not None
-            ]
-            if candidates:
-                d = candidates[0].diameter
-                self.F_C = math.pi * (d / 2.0) ** 2
-            else:
-                self.F_C = 0.01
+        if self.F_C is not None:
+            return
+        # Scan common-arm connections (both directions) for a channel to inherit area from
+        candidates = [
+            e
+            for e in graph.get_upstream_elements(self.common_node)
+            + graph.get_downstream_elements(self.common_node)
+            if isinstance(e, ChannelElement) and e.diameter is not None
+        ]
+        if candidates:
+            d = candidates[0].diameter
+            self.F_C = math.pi * (d / 2.0) ** 2
+        elif getattr(self, "_topo_pass", 0) >= 1:
+            # Second pass and still no resolved channel - use fallback
+            self.F_C = 0.01
+        else:
+            # First pass with no candidates: defer to second pass (channel D may resolve later)
+            self._topo_pass = 1
 
     def validate(self) -> None:
         if self.tee_type not in ("merging", "branching"):

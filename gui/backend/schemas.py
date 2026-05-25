@@ -131,7 +131,7 @@ PressureLossData = (
 class CombustorData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     method: Literal["complete", "equilibrium"] = "complete"
-    area: float = 0.1
+    area: float | None = None  # None = derive from Dh (pi/4 * Dh^2)
     Dh: float | None = None
     surface: SurfaceModelData = Field(default_factory=SmoothModelData)
     Nu_multiplier: float = 1.0
@@ -142,7 +142,7 @@ class CombustorData(BaseModel):
 
 class MomentumChamberData(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    area: float = 0.1
+    area: float | None = None  # None = derive from Dh (pi/4 * Dh^2)
     Dh: float | None = None  # None = inherit from upstream channel (Dh = D)
     surface: SurfaceModelData = Field(default_factory=SmoothModelData)
     Nu_multiplier: float = 1.0

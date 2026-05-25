@@ -340,7 +340,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 area=data.area,
                 Dh=data.Dh,
                 surface=ConvectiveSurface(
-                    area=data.area,
+                    area=data.area or 0.0,
                     model=map_surface_model(data.surface),
                     Nu_multiplier=data.Nu_multiplier
                     * (schema.solver_settings.Nu_multiplier or 1.0),
@@ -359,7 +359,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 area=data.area,
                 Dh=data.Dh,
                 surface=ConvectiveSurface(
-                    area=data.area,
+                    area=data.area or 0.0,
                     model=map_surface_model(data.surface),
                     Nu_multiplier=data.Nu_multiplier
                     * (schema.solver_settings.Nu_multiplier or 1.0),

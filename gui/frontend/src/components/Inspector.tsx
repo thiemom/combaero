@@ -622,67 +622,43 @@ const Inspector = () => {
 						const upstreamNode = upstreamEdge
 							? nodes.find((n) => n.id === upstreamEdge.source)
 							: undefined;
-						const inheritedDiameter: number | undefined =
+						const upstreamChannelD: number | null | undefined =
 							upstreamNode?.type === "channel"
-								? upstreamNode.data.D
-								: (upstreamNode?.data?.Dh ??
-									(upstreamNode?.data?.area != null
-										? Math.sqrt((4 * upstreamNode.data.area) / Math.PI)
-										: undefined));
-						const userSetDiameter =
-							selectedNode.data.diameter !== null &&
-							selectedNode.data.diameter !== undefined;
+								? (upstreamNode.data.D as number | null | undefined)
+								: undefined;
+						const boreDiameter: number = selectedNode.data.diameter ?? 0.08;
+						const boreArea = (Math.PI / 4) * boreDiameter * boreDiameter;
 						return (
 							<>
 								<div className="flex flex-col gap-2">
-									<div className="flex items-center justify-between">
-										<label className="text-xs font-bold text-gray-500 uppercase">
-											Bore Diameter
-										</label>
-										{userSetDiameter && (
-											<button
-												type="button"
-												className="text-[9px] text-blue-500 hover:underline"
-												onClick={() =>
-													updateNodeData(selectedNode.id, {
-														diameter: null,
-													})
-												}
-											>
-												Reset to inherited
-											</button>
-										)}
-									</div>
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Bore Diameter
+									</label>
 									<LengthInput
 										id={`diameter_${selectedNode.id}`}
 										label=""
-										value={
-											userSetDiameter
-												? selectedNode.data.diameter
-												: (inheritedDiameter ?? 0.08)
-										}
-										placeholder={inheritedDiameter ?? 0.08}
+										value={boreDiameter}
+										placeholder={0.08}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, { diameter: val })
 										}
 										onClear={() =>
 											updateNodeData(selectedNode.id, { diameter: null })
 										}
-										className={
-											userSetDiameter ? "font-semibold" : "text-gray-400"
-										}
 									/>
-									{!userSetDiameter && inheritedDiameter != null && (
-										<p className="text-[9px] text-gray-400 italic -mt-1">
-											Inherited from upstream ({upstreamNode?.id}). Edit to
-											override.
-										</p>
-									)}
-									{!userSetDiameter && inheritedDiameter == null && (
-										<p className="text-[9px] text-gray-400 italic -mt-1">
-											Connect an upstream element to auto-inherit bore.
-										</p>
-									)}
+									<div className="flex items-center justify-between text-[9px] text-gray-400 -mt-1">
+										<span>
+											Bore area:{" "}
+											<span className="font-mono">
+												{boreArea.toExponential(3)} m²
+											</span>
+										</span>
+										{upstreamChannelD != null && (
+											<span>
+												Pipe D: {upstreamChannelD.toFixed(4)} m (β correction)
+											</span>
+										)}
+									</div>
 								</div>
 
 								<div className="flex flex-col gap-2">
@@ -975,19 +951,19 @@ const Inspector = () => {
 				{selectedNode.type === "tee_junction" &&
 					(() => {
 						const teeType = selectedNode.data.tee_type ?? "merging";
-						// Find the common-arm neighbour (the element/node on the C port)
+						// Find the common-arm neighbour via the correct handle IDs
 						const commonEdge =
 							teeType === "merging"
 								? edges.find(
 										(e) =>
 											e.source === selectedNode.id &&
-											e.sourceHandle === "common" &&
+											e.sourceHandle === "port-common-source" &&
 											!e.data?.type,
 									)
 								: edges.find(
 										(e) =>
 											e.target === selectedNode.id &&
-											e.targetHandle === "common" &&
+											e.targetHandle === "port-common-target" &&
 											!e.data?.type,
 									);
 						const commonNeighbour = commonEdge
@@ -999,12 +975,38 @@ const Inspector = () => {
 											: commonEdge.source),
 								)
 							: undefined;
-						const inheritedFC: number | undefined =
+						const commonArmChannel =
 							commonNeighbour?.type === "channel"
-								? (Math.PI / 4) *
-									(commonNeighbour.data.D ?? 0) *
-									(commonNeighbour.data.D ?? 0)
-								: commonNeighbour?.data?.area;
+								? commonNeighbour
+								: teeType === "merging"
+									? nodes.find(
+											(n) =>
+												n.type === "channel" &&
+												edges.some(
+													(e) =>
+														e.source === commonNeighbour?.id &&
+														e.target === n.id &&
+														!e.data?.type,
+												),
+										)
+									: nodes.find(
+											(n) =>
+												n.type === "channel" &&
+												edges.some(
+													(e) =>
+														e.target === commonNeighbour?.id &&
+														e.source === n.id &&
+														!e.data?.type,
+												),
+										);
+						const channelD = commonArmChannel?.data?.D as
+							| number
+							| null
+							| undefined;
+						const inheritedFC: number | undefined =
+							channelD != null
+								? (Math.PI / 4) * channelD * channelD
+								: undefined;
 						const userSetFC =
 							selectedNode.data.F_C !== null &&
 							selectedNode.data.F_C !== undefined;
@@ -1152,10 +1154,17 @@ const Inspector = () => {
 									/>
 									{!userSetFC && inheritedFC != null && (
 										<p className="text-[9px] text-gray-400 italic -mt-1">
-											Inherited from common-arm ({commonNeighbour?.id}). Edit to
-											override.
+											Inherited from {commonArmChannel?.id} (D=
+											{channelD?.toFixed(4)} m). Edit to override.
 										</p>
 									)}
+									{!userSetFC &&
+										inheritedFC == null &&
+										commonNeighbour != null && (
+											<p className="text-[9px] text-gray-400 italic -mt-1">
+												Connect a channel to the C port to auto-inherit area.
+											</p>
+										)}
 								</div>
 
 								{/* Area ratio */}
