@@ -16,11 +16,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `MomentumChamberNode.Dh` — inherits from upstream `ChannelElement.D`
   - `CombustorNode.Dh` — inherits from upstream `ChannelElement.D`
   - `AreaChangeElement.F0` / `F1` — inherit from upstream/downstream `ChannelElement`
-  - `TeeJunctionElement.F_C` — inherits from common-arm `ChannelElement`
+  - `TeeJunctionElement.F_C` — inherits from common- or straight-arm `ChannelElement`
+  - `TeeJunctionElement.F_branch` — new field; inherits from branch-arm `ChannelElement`;
+    `psi = F_C / F_branch` is now computed automatically from the two areas, replacing
+    the manual psi input
   - `ChannelElement.D` — inherits from upstream `AreaChangeElement.F1`,
-    `ChannelElement`, or `TeeJunctionElement.F_C` (circular-equivalent conversion)
+    `ChannelElement`, or `TeeJunctionElement` (correct arm area used for branch vs. straight)
   - `ChannelElement.Dh` — new optional field; defaults to `D` (circular assumption);
     override for non-circular ducts to use correct hydraulic diameter in friction/Nu
+- **TeeJunction Inspector overhaul**: three-arm area layout (C, S read-only, B) with
+  per-arm inheritance and a derived ratio card showing `psi`, `D_C → D_B`, and an
+  expansion/contraction label — mirrors the `AreaChange` inspector style. The `F_straight
+  = F_C` Bassett (2001) model constraint is now clearly annotated.
+- **AreaChange Inspector**: non-editable area ratio summary card showing `F₁/F₀`,
+  expansion/contraction/straight label, and equivalent circular diameters `D₀ → D₁`.
+- **Topology resolution robustness**: two-pass topology resolution now handles
+  mutual dependencies (e.g. channel and tee both with null geometry) without
+  ghost fallback values; deferred fallbacks applied only after second pass.
 - `WallNode`: closed-end (zero mass-flow) boundary node for modelling dead-end
   branches and symmetry planes of ring manifolds. Drag from the GUI palette or
   instantiate directly via `combaero.network.WallNode("id")`.
