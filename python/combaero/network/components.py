@@ -2451,7 +2451,12 @@ class ChannelElement(NetworkElement):
                 self.diameter = math.sqrt(4.0 * area / math.pi)
                 break
         if self.diameter is None:
-            self.diameter = 0.1  # fallback default
+            if getattr(self, "_topo_pass", 0) >= 1:
+                self.diameter = 0.1  # fallback only after second pass
+            else:
+                # Defer: upstream tee may not have resolved F_C yet in this pass
+                self._topo_pass = 1
+                return
         self.area = math.pi * (self.diameter / 2) ** 2
         if self.Dh is None:
             self.Dh = self.diameter
@@ -2718,17 +2723,23 @@ class TeeJunctionElement(NetworkElement):
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         if self.F_C is not None:
             return
-        # Scan common-arm connections (both directions) for a channel to inherit area from
-        candidates = [
-            e
-            for e in graph.get_upstream_elements(self.common_node)
-            + graph.get_downstream_elements(self.common_node)
-            if isinstance(e, ChannelElement) and e.diameter is not None
-        ]
-        if candidates:
-            d = candidates[0].diameter
-            self.F_C = math.pi * (d / 2.0) ** 2
-        elif getattr(self, "_topo_pass", 0) >= 1:
+        # Search all three arms in priority order: common/straight give F_C directly;
+        # branch arm gives F_branch so we back-calculate F_C = F_branch * psi.
+        for node_id, is_branch_arm in (
+            (self.common_node, False),
+            (self.straight_node, False),
+            (self.branch_node, True),
+        ):
+            for e in graph.get_upstream_elements(node_id) + graph.get_downstream_elements(node_id):
+                if e is self:
+                    continue
+                if isinstance(e, ChannelElement) and e.diameter is not None:
+                    if is_branch_arm:
+                        self.F_C = math.pi * (e.diameter / 2.0) ** 2 * self.psi
+                    else:
+                        self.F_C = math.pi * (e.diameter / 2.0) ** 2
+                    return
+        if getattr(self, "_topo_pass", 0) >= 1:
             # Second pass and still no resolved channel - use fallback
             self.F_C = 0.01
         else:
