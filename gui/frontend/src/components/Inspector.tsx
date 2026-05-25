@@ -584,7 +584,9 @@ const Inspector = () => {
 										onClear={() =>
 											updateNodeData(selectedNode.id, { Dh: null })
 										}
-										className={userSetDh ? "font-semibold" : "text-gray-400"}
+										inputClassName={
+											userSetDh ? "font-semibold" : "text-gray-400"
+										}
 									/>
 									{!userSetDh && dhIsNonCircular && (
 										<p className="text-[9px] text-gray-400 italic -mt-1">
@@ -1018,7 +1020,9 @@ const Inspector = () => {
 										onClear={() =>
 											updateNodeData(selectedNode.id, { F0: null })
 										}
-										className={userSetF0 ? "font-semibold" : "text-gray-400"}
+										inputClassName={
+											userSetF0 ? "font-semibold" : "text-gray-400"
+										}
 									/>
 									{!userSetF0 && inheritedF0 != null && (
 										<p className="text-[9px] text-gray-400 italic -mt-1">
@@ -1058,7 +1062,9 @@ const Inspector = () => {
 										onClear={() =>
 											updateNodeData(selectedNode.id, { F1: null })
 										}
-										className={userSetF1 ? "font-semibold" : "text-gray-400"}
+										inputClassName={
+											userSetF1 ? "font-semibold" : "text-gray-400"
+										}
 									/>
 									{!userSetF1 && inheritedF1 != null && (
 										<p className="text-[9px] text-gray-400 italic -mt-1">
@@ -1429,7 +1435,9 @@ const Inspector = () => {
 										onClear={() =>
 											updateNodeData(selectedNode.id, { F_C: null })
 										}
-										className={userSetFC ? "font-semibold" : "text-gray-400"}
+										inputClassName={
+											userSetFC ? "font-semibold" : "text-gray-400"
+										}
 									/>
 									{!userSetFC && inheritedFC != null && (
 										<p className="text-[9px] text-gray-400 italic -mt-1">
@@ -1498,7 +1506,7 @@ const Inspector = () => {
 										onClear={() =>
 											updateNodeData(selectedNode.id, { F_branch: null })
 										}
-										className={
+										inputClassName={
 											userSetFBranch ? "font-semibold" : "text-gray-400"
 										}
 									/>
@@ -2232,7 +2240,7 @@ const Inspector = () => {
 													Dh: null,
 												})
 											}
-											className={
+											inputClassName={
 												userSetDhComb ? "font-semibold" : "text-gray-400"
 											}
 										/>
@@ -2405,7 +2413,7 @@ const Inspector = () => {
 													Dh: null,
 												})
 											}
-											className={
+											inputClassName={
 												userSetDhMom ? "font-semibold" : "text-gray-400"
 											}
 										/>
