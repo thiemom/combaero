@@ -1962,6 +1962,22 @@ class PressureLossElement(NetworkElement):
         # source node's burned/unburned temperatures without a re-pass.
         self._graph_ref = graph
 
+        # 0. Area inheritance: when no user-specified area, inherit from the
+        #    nearest upstream ChannelElement diameter.  This makes discrete loss
+        #    work after any element, not just combustor/plenum nodes.
+        if self.area is None:
+            for elem in graph.get_upstream_elements(self.from_node):
+                if isinstance(elem, ChannelElement) and elem.diameter is not None:
+                    self.area = math.pi / 4.0 * elem.diameter**2
+                    break
+            if self.area is None:
+                self.area = 0.1
+            # Propagate updated area into head-loss correlations and convective surface.
+            if hasattr(self.correlation, "area"):
+                self.correlation.area = self.area
+            if self.surface.area == 0.0:
+                self.surface.area = self.area
+
         # 1. Explicit override wins.
         if self.theta_source is not None:
             src = graph.nodes.get(self.theta_source)

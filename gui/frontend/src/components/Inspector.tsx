@@ -406,27 +406,81 @@ const Inspector = () => {
 						const downstreamNode = downstreamEdge
 							? nodes.find((n) => n.id === downstreamEdge.target)
 							: undefined;
-						const dFromNode = (n: typeof upstreamNode) => {
-							if (!n) return undefined;
-							if (n.type === "channel") return n.data.D as number | undefined;
+						const dFromNeighbour = (
+							n: typeof upstreamNode,
+							edge: typeof upstreamEdge,
+							side: "upstream" | "downstream",
+							depth = 0,
+						): number | undefined => {
+							if (!n || depth > 20) return undefined;
+							if (n.type === "channel") {
+								const d = n.data.D as number | null | undefined;
+								if (d != null) return d;
+								// D is also inherited — walk one more hop in the same direction
+								const hopEdge =
+									side === "upstream"
+										? edges.find((e) => e.target === n.id && !e.data?.type)
+										: edges.find((e) => e.source === n.id && !e.data?.type);
+								const hopNode = hopEdge
+									? nodes.find(
+											(nn) =>
+												nn.id ===
+												(side === "upstream" ? hopEdge.source : hopEdge.target),
+										)
+									: undefined;
+								return dFromNeighbour(hopNode, hopEdge, side, depth + 1);
+							}
 							if (n.type === "area_change") {
-								const f1 = n.data.F1 as number | null | undefined;
-								return f1 != null ? Math.sqrt((4 * f1) / Math.PI) : undefined;
+								// from upstream neighbour inherit its exit (F1); from downstream its entry (F0)
+								const f =
+									side === "upstream"
+										? (n.data.F1 as number | null | undefined)
+										: (n.data.F0 as number | null | undefined);
+								return f != null ? Math.sqrt((4 * f) / Math.PI) : undefined;
 							}
 							if (n.type === "tee_junction") {
+								const handle =
+									side === "upstream" ? edge?.sourceHandle : edge?.targetHandle;
+								const isBranch =
+									side === "upstream"
+										? handle === "port-branch-source"
+										: handle === "port-branch-target";
+								if (isBranch) {
+									const fb = n.data.F_branch as number | null | undefined;
+									const fc = n.data.F_C as number | null | undefined;
+									const psi = (n.data.psi as number | undefined) ?? 1.0;
+									const fBranch =
+										fb != null ? fb : fc != null ? fc / psi : undefined;
+									return fBranch != null
+										? Math.sqrt((4 * fBranch) / Math.PI)
+										: undefined;
+								}
 								const fc = n.data.F_C as number | null | undefined;
 								return fc != null ? Math.sqrt((4 * fc) / Math.PI) : undefined;
 							}
 							return undefined;
 						};
-						const inheritedD =
-							dFromNode(upstreamNode) ?? dFromNode(downstreamNode);
-						const inheritSource =
-							dFromNode(upstreamNode) != null
-								? upstreamNode
-								: dFromNode(downstreamNode) != null
-									? downstreamNode
+						const inheritedDUp = dFromNeighbour(
+							upstreamNode,
+							upstreamEdge,
+							"upstream",
+						);
+						const inheritedDDown = dFromNeighbour(
+							downstreamNode,
+							downstreamEdge,
+							"downstream",
+						);
+						const inheritedD = inheritedDUp ?? inheritedDDown;
+						const inheritSide =
+							inheritedDUp != null
+								? "upstream"
+								: inheritedDDown != null
+									? "downstream"
 									: undefined;
+						const inheritSourceId =
+							inheritSide === "upstream"
+								? upstreamNode?.id
+								: downstreamNode?.id;
 						const userSetD =
 							selectedNode.data.D !== null && selectedNode.data.D !== undefined;
 						const userSetDh =
@@ -471,11 +525,11 @@ const Inspector = () => {
 											updateNodeData(selectedNode.id, { D: val })
 										}
 										onClear={() => updateNodeData(selectedNode.id, { D: null })}
-										className={userSetD ? "font-semibold" : "text-gray-400"}
 									/>
 									{!userSetD && inheritedD != null && (
 										<p className="text-[9px] text-gray-400 italic -mt-1">
-											Inherited from {inheritSource?.id}. Edit to override.
+											Inherited from {inheritSide} ({inheritSourceId}). Edit to
+											override.
 										</p>
 									)}
 								</div>
@@ -646,19 +700,58 @@ const Inspector = () => {
 											updateNodeData(selectedNode.id, { diameter: null })
 										}
 									/>
-									<div className="flex items-center justify-between text-[9px] text-gray-400 -mt-1">
-										<span>
-											Bore area:{" "}
-											<span className="font-mono">
-												{boreArea.toExponential(3)} m²
-											</span>
-										</span>
-										{upstreamChannelD != null && (
-											<span>
-												Pipe D: {upstreamChannelD.toFixed(4)} m (β correction)
-											</span>
-										)}
-									</div>
+									{(() => {
+										const pipeD =
+											upstreamChannelD != null && upstreamChannelD > 0
+												? upstreamChannelD
+												: null;
+										const beta =
+											pipeD != null && boreDiameter < pipeD
+												? boreDiameter / pipeD
+												: null;
+										const beta2 = beta != null ? beta ** 2 : null;
+										const E =
+											beta != null ? 1.0 / Math.sqrt(1 - beta ** 4) : null;
+										return (
+											<div className="text-[9px] text-gray-400 -mt-1 flex flex-col gap-0.5">
+												<span>
+													Bore area:{" "}
+													<span className="font-mono">
+														{boreArea.toExponential(3)} m²
+													</span>
+													{beta2 != null && (
+														<>
+															{" · "}Area ratio β²:{" "}
+															<span className="font-mono">
+																{beta2.toFixed(4)}
+															</span>
+														</>
+													)}
+												</span>
+												{pipeD != null && (
+													<span>
+														Pipe D:{" "}
+														<span className="font-mono">
+															{pipeD.toFixed(4)} m
+														</span>
+														{beta != null && E != null ? (
+															<>
+																{" · "}β = {beta.toFixed(4)} → E ={" "}
+																<span className="font-mono">
+																	{E.toFixed(4)}
+																</span>{" "}
+																(velocity-of-approach)
+															</>
+														) : (
+															<span className="text-amber-500">
+																{" · "}β ≥ 1 — correction skipped
+															</span>
+														)}
+													</span>
+												)}
+											</div>
+										);
+									})()}
 								</div>
 
 								<div className="flex flex-col gap-2">
@@ -785,15 +878,55 @@ const Inspector = () => {
 						const downstreamNode = downstreamEdge
 							? nodes.find((n) => n.id === downstreamEdge.target)
 							: undefined;
-						const areaFromD = (d: number) => (Math.PI / 4) * d * d;
-						const inheritedF0: number | undefined =
-							upstreamNode?.type === "channel"
-								? areaFromD(upstreamNode.data.D)
-								: upstreamNode?.data?.area;
-						const inheritedF1: number | undefined =
-							downstreamNode?.type === "channel"
-								? areaFromD(downstreamNode.data.D)
-								: downstreamNode?.data?.area;
+						const areaFromD = (d: number | null | undefined) =>
+							d != null ? (Math.PI / 4) * d * d : undefined;
+						const walkArea = (
+							nodeId: string,
+							dir: "upstream" | "downstream",
+							depth = 0,
+						): number | undefined => {
+							if (depth > 20) return undefined;
+							const e =
+								dir === "upstream"
+									? edges.find((ee) => ee.target === nodeId && !ee.data?.type)
+									: edges.find((ee) => ee.source === nodeId && !ee.data?.type);
+							const n = e
+								? nodes.find(
+										(nn) =>
+											nn.id === (dir === "upstream" ? e.source : e.target),
+									)
+								: undefined;
+							if (!n) return undefined;
+							if (n.type === "channel") {
+								const d = n.data.D as number | null | undefined;
+								if (d != null) return areaFromD(d);
+								return walkArea(n.id, dir, depth + 1);
+							}
+							// For area_change: walking upstream reads its exit face (F1);
+							// walking downstream reads its entry face (F0).
+							if (n.type === "area_change") {
+								const f = (dir === "upstream" ? n.data.F1 : n.data.F0) as
+									| number
+									| null
+									| undefined;
+								if (f != null && f > 0) return f;
+								return walkArea(n.id, dir, depth + 1);
+							}
+							if (n.type === "tee_junction") {
+								const fc = n.data.F_C as number | null | undefined;
+								if (fc != null && fc > 0) return fc;
+							}
+							const a = n.data?.area as number | null | undefined;
+							return a != null && a > 0 ? a : undefined;
+						};
+						const inheritedF0: number | undefined = walkArea(
+							selectedNode.id,
+							"upstream",
+						);
+						const inheritedF1: number | undefined = walkArea(
+							selectedNode.id,
+							"downstream",
+						);
 						const userSetF0 =
 							selectedNode.data.F0 !== null &&
 							selectedNode.data.F0 !== undefined;
@@ -1061,6 +1194,47 @@ const Inspector = () => {
 							);
 						};
 
+						// Walk through null-D channels (and through tee/area-change nodes)
+						// to find the first explicit D in the chain.
+						const walkChD = (
+							ch: (typeof nodes)[0] | undefined,
+							isOutgoing: boolean,
+							depth = 0,
+						): number | undefined => {
+							if (!ch || depth > 20) return undefined;
+							const d = ch.data.D as number | null | undefined;
+							if (d != null) return d;
+							const e = isOutgoing
+								? edges.find((ee) => ee.source === ch.id && !ee.data?.type)
+								: edges.find((ee) => ee.target === ch.id && !ee.data?.type);
+							if (!e) return undefined;
+							const next = nodes.find(
+								(n) => n.id === (isOutgoing ? e.target : e.source),
+							);
+							if (!next) return undefined;
+							if (next.type === "channel")
+								return walkChD(next, isOutgoing, depth + 1);
+							// Non-channel: extract area-equivalent D from tee/area-change
+							if (next.type === "tee_junction") {
+								const fc = next.data.F_C as number | null | undefined;
+								if (fc != null && fc > 0) return Math.sqrt((4 * fc) / Math.PI);
+							}
+							if (next.type === "area_change") {
+								const f = isOutgoing
+									? (next.data.F0 as number | null | undefined)
+									: (next.data.F1 as number | null | undefined);
+								if (f != null && f > 0) return Math.sqrt((4 * f) / Math.PI);
+							}
+							return undefined;
+						};
+
+						const portD = (portName: string) => {
+							const isOutgoing =
+								(teeType === "merging" && portName === "common") ||
+								(teeType === "branching" && portName !== "common");
+							return walkChD(findPortChannel(portName), isOutgoing);
+						};
+
 						const commonCh = findPortChannel("common");
 						const straightCh = findPortChannel("straight");
 						const branchCh = findPortChannel("branch");
@@ -1070,10 +1244,9 @@ const Inspector = () => {
 
 						// F_C: common arm (= straight arm per Bassett); prefer common over straight channel
 						const inheritedFC: number | undefined =
-							areaFromD(commonCh?.data?.D as number | null | undefined) ??
-							areaFromD(straightCh?.data?.D as number | null | undefined);
+							areaFromD(portD("common")) ?? areaFromD(portD("straight"));
 						const inheritedFBranch: number | undefined = areaFromD(
-							branchCh?.data?.D as number | null | undefined,
+							portD("branch"),
 						);
 
 						const userSetFC = selectedNode.data.F_C != null;
@@ -1542,14 +1715,34 @@ const Inspector = () => {
 
 				{selectedNode.type === "discrete_loss" &&
 					(() => {
-						// Compute default area from upstream node
+						// Compute default area from upstream node or channel element
 						const upstreamEdge = edges.find(
 							(e) => e.target === selectedNode.id && !e.data?.type,
 						);
 						const upstreamNode = upstreamEdge
 							? nodes.find((n) => n.id === upstreamEdge.source)
 							: undefined;
-						const inheritedArea: number | undefined = upstreamNode?.data?.area;
+						// Walk one more hop upstream to reach a channel when there is an
+						// auto-inserted junction node between the channel and this element.
+						const upstreamChannelNode =
+							upstreamNode?.type === "channel"
+								? upstreamNode
+								: (() => {
+										if (!upstreamNode) return undefined;
+										const hopEdge = edges.find(
+											(e) => e.target === upstreamNode.id && !e.data?.type,
+										);
+										const hopNode = hopEdge
+											? nodes.find((n) => n.id === hopEdge.source)
+											: undefined;
+										return hopNode?.type === "channel" ? hopNode : undefined;
+									})();
+						const inheritedArea: number | undefined =
+							upstreamNode?.data?.area && upstreamNode.data.area > 0
+								? upstreamNode.data.area
+								: upstreamChannelNode?.data?.D != null
+									? (Math.PI / 4) * upstreamChannelNode.data.D ** 2
+									: undefined;
 
 						const userSetArea =
 							selectedNode.data.area !== null &&
@@ -1691,13 +1884,14 @@ const Inspector = () => {
 									/>
 									{!userSetArea && inheritedArea != null && (
 										<p className="text-[9px] text-gray-400 italic -mt-1">
-											Inherited from upstream ({upstreamNode?.id}). Edit to
+											Inherited from upstream (
+											{upstreamChannelNode?.id ?? upstreamNode?.id}). Edit to
 											override.
 										</p>
 									)}
 									{!userSetArea && inheritedArea == null && (
 										<p className="text-[9px] text-gray-400 italic -mt-1">
-											Connect an upstream node to auto-discover area.
+											Connect an upstream channel or node to auto-discover area.
 										</p>
 									)}
 									{areaWarning && (
@@ -1893,13 +2087,40 @@ const Inspector = () => {
 						const upstreamNode = upstreamEdge
 							? nodes.find((n) => n.id === upstreamEdge.source)
 							: undefined;
-						const inheritedDhComb: number | undefined =
-							upstreamNode?.type === "channel"
-								? upstreamNode.data.D
-								: (upstreamNode?.data?.Dh ??
-									(upstreamNode?.data?.area != null
-										? Math.sqrt((4 * upstreamNode.data.area) / Math.PI)
-										: undefined));
+						const walkChannelD = (
+							nodeId: string,
+							depth = 0,
+						): number | undefined => {
+							if (depth > 20) return undefined;
+							const e = edges.find(
+								(ee) => ee.target === nodeId && !ee.data?.type,
+							);
+							const n = e ? nodes.find((nn) => nn.id === e.source) : undefined;
+							if (!n) return undefined;
+							if (n.type === "channel") {
+								const d = n.data.D as number | null | undefined;
+								if (d != null) return d;
+								return walkChannelD(n.id, depth + 1);
+							}
+							if (n.type === "area_change") {
+								const f = n.data.F1 as number | null | undefined;
+								if (f != null && f > 0) return Math.sqrt((4 * f) / Math.PI);
+								return walkChannelD(n.id, depth + 1);
+							}
+							if (n.type === "tee_junction") {
+								const fc = n.data.F_C as number | null | undefined;
+								if (fc != null && fc > 0) return Math.sqrt((4 * fc) / Math.PI);
+							}
+							return (
+								(n.data?.Dh as number | undefined) ??
+								(n.data?.area != null
+									? Math.sqrt((4 * n.data.area) / Math.PI)
+									: undefined)
+							);
+						};
+						const inheritedDhComb: number | undefined = walkChannelD(
+							selectedNode.id,
+						);
 						const userSetDhComb =
 							selectedNode.data.Dh !== null &&
 							selectedNode.data.Dh !== undefined;
@@ -2058,13 +2279,40 @@ const Inspector = () => {
 						const upstreamNode = upstreamEdge
 							? nodes.find((n) => n.id === upstreamEdge.source)
 							: undefined;
-						const inheritedDhMom: number | undefined =
-							upstreamNode?.type === "channel"
-								? upstreamNode.data.D
-								: (upstreamNode?.data?.Dh ??
-									(upstreamNode?.data?.area != null
-										? Math.sqrt((4 * upstreamNode.data.area) / Math.PI)
-										: undefined));
+						const walkChannelD = (
+							nodeId: string,
+							depth = 0,
+						): number | undefined => {
+							if (depth > 20) return undefined;
+							const e = edges.find(
+								(ee) => ee.target === nodeId && !ee.data?.type,
+							);
+							const n = e ? nodes.find((nn) => nn.id === e.source) : undefined;
+							if (!n) return undefined;
+							if (n.type === "channel") {
+								const d = n.data.D as number | null | undefined;
+								if (d != null) return d;
+								return walkChannelD(n.id, depth + 1);
+							}
+							if (n.type === "area_change") {
+								const f = n.data.F1 as number | null | undefined;
+								if (f != null && f > 0) return Math.sqrt((4 * f) / Math.PI);
+								return walkChannelD(n.id, depth + 1);
+							}
+							if (n.type === "tee_junction") {
+								const fc = n.data.F_C as number | null | undefined;
+								if (fc != null && fc > 0) return Math.sqrt((4 * fc) / Math.PI);
+							}
+							return (
+								(n.data?.Dh as number | undefined) ??
+								(n.data?.area != null
+									? Math.sqrt((4 * n.data.area) / Math.PI)
+									: undefined)
+							);
+						};
+						const inheritedDhMom: number | undefined = walkChannelD(
+							selectedNode.id,
+						);
 						const userSetDhMom =
 							selectedNode.data.Dh !== null &&
 							selectedNode.data.Dh !== undefined;

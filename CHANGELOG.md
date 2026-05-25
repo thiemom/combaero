@@ -30,6 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   = F_C` Bassett (2001) model constraint is now clearly annotated.
 - **AreaChange Inspector**: non-editable area ratio summary card showing `F₁/F₀`,
   expansion/contraction/straight label, and equivalent circular diameters `D₀ → D₁`.
+- **Discrete loss area inheritance**: `PressureLossElement` now inherits flow
+  area from an adjacent `ChannelElement` when none is explicitly set, so discrete
+  losses can be placed after any element (not only combustors / momentum chambers).
+  The Inspector placeholder and hint text update automatically when a channel is
+  connected upstream.
 - **Topology resolution robustness**: two-pass topology resolution now handles
   mutual dependencies (e.g. channel and tee both with null geometry) without
   ghost fallback values; deferred fallbacks applied only after second pass.

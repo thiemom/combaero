@@ -592,17 +592,26 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             net.add_element(elem)
         elif elem_type == "discrete_loss":
             data = DiscreteLossData(**elem_data)
-            # Infer area from upstream node if not explicitly set
-            area = data.area
+            # area=None signals "inherit from upstream element in resolve_topology".
+            # Use a quick node-area lookup only when data.area is explicitly set or
+            # the upstream node exposes a non-zero area (combustor / momentum chamber).
+            area: float | None = data.area
             if area is None and source_id in nodes_map:
-                area = getattr(nodes_map[source_id], "area", 0.1)
-            area = area if area and area > 0 else 0.1
+                node_area = getattr(nodes_map[source_id], "area", None)
+                if node_area and node_area > 0:
+                    area = node_area
             correlation = _build_discrete_loss_correlation(
-                data.correlation_type, data.xi, data.k, data.xi0, data.zeta, data.zeta0, area
+                data.correlation_type,
+                data.xi,
+                data.k,
+                data.xi0,
+                data.zeta,
+                data.zeta0,
+                area if area and area > 0 else 0.1,
             )
             theta_source = data.theta_source if data.theta_source not in (None, "none") else None
             surface = ConvectiveSurface(
-                area=area,
+                area=area if area and area > 0 else 0.0,
                 model=map_surface_model(data.surface),
                 Nu_multiplier=data.Nu_multiplier,
                 f_multiplier=data.f_multiplier,
