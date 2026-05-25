@@ -2672,7 +2672,8 @@ class TeeJunctionElement(NetworkElement):
         branch_node: str,
         theta: float,
         F_C: float | None = None,
-        psi: float = 1.0,  # F_C / F_branch: common / lateral-branch area ratio
+        F_branch: float | None = None,
+        psi: float = 1.0,  # fallback ratio when F_branch is None and not inherited
         tee_type: Literal["merging", "branching"] = "merging",
         blend_k: float = 30.0,
     ):
@@ -2684,6 +2685,9 @@ class TeeJunctionElement(NetworkElement):
         self.branch_node = branch_node
         self.theta = theta
         self.F_C: float | None = F_C
+        self._F_branch: float | None = (
+            F_branch  # resolved branch area; psi derived from F_C/_F_branch
+        )
         self.psi = psi
         self.tee_type = tee_type
         self.blend_k = blend_k
@@ -2721,30 +2725,56 @@ class TeeJunctionElement(NetworkElement):
         return 2
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
-        if self.F_C is not None:
-            return
-        # Search all three arms in priority order: common/straight give F_C directly;
-        # branch arm gives F_branch so we back-calculate F_C = F_branch * psi.
-        for node_id, is_branch_arm in (
-            (self.common_node, False),
-            (self.straight_node, False),
-            (self.branch_node, True),
-        ):
-            for e in graph.get_upstream_elements(node_id) + graph.get_downstream_elements(node_id):
+        # Step 1: resolve F_C from common or straight arm channels.
+        # Branch arm is only used as last resort (back-calculate F_C = F_branch * psi).
+        if self.F_C is None:
+            found_fc = False
+            for node_id in (self.common_node, self.straight_node):
+                for e in graph.get_upstream_elements(node_id) + graph.get_downstream_elements(
+                    node_id
+                ):
+                    if e is self:
+                        continue
+                    if isinstance(e, ChannelElement) and e.diameter is not None:
+                        self.F_C = math.pi * (e.diameter / 2.0) ** 2
+                        found_fc = True
+                        break
+                if found_fc:
+                    break
+            if not found_fc:
+                # Last resort: use branch arm channel to back-calculate F_C = F_branch * psi
+                for e in graph.get_upstream_elements(
+                    self.branch_node
+                ) + graph.get_downstream_elements(self.branch_node):
+                    if e is self:
+                        continue
+                    if isinstance(e, ChannelElement) and e.diameter is not None:
+                        f_b = math.pi * (e.diameter / 2.0) ** 2
+                        if self._F_branch is None:
+                            self._F_branch = f_b
+                        self.F_C = f_b * self.psi
+                        found_fc = True
+                        break
+            if not found_fc:
+                if getattr(self, "_topo_pass", 0) >= 1:
+                    self.F_C = 0.01
+                else:
+                    self._topo_pass = 1
+
+        # Step 2: resolve F_branch independently from the branch arm channel.
+        if self._F_branch is None:
+            for e in graph.get_upstream_elements(self.branch_node) + graph.get_downstream_elements(
+                self.branch_node
+            ):
                 if e is self:
                     continue
                 if isinstance(e, ChannelElement) and e.diameter is not None:
-                    if is_branch_arm:
-                        self.F_C = math.pi * (e.diameter / 2.0) ** 2 * self.psi
-                    else:
-                        self.F_C = math.pi * (e.diameter / 2.0) ** 2
-                    return
-        if getattr(self, "_topo_pass", 0) >= 1:
-            # Second pass and still no resolved channel - use fallback
-            self.F_C = 0.01
-        else:
-            # First pass with no candidates: defer to second pass (channel D may resolve later)
-            self._topo_pass = 1
+                    self._F_branch = math.pi * (e.diameter / 2.0) ** 2
+                    break
+
+        # Step 3: recompute psi from resolved areas.
+        if self.F_C is not None and self._F_branch is not None and self._F_branch > 0:
+            self.psi = self.F_C / self._F_branch
 
     def validate(self) -> None:
         if self.tee_type not in ("merging", "branching"):

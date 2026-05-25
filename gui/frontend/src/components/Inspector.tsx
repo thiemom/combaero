@@ -1005,74 +1005,96 @@ const Inspector = () => {
 				{selectedNode.type === "tee_junction" &&
 					(() => {
 						const teeType = selectedNode.data.tee_type ?? "merging";
-						// Find the common-arm neighbour via the correct handle IDs
-						const commonEdge =
-							teeType === "merging"
-								? edges.find(
-										(e) =>
-											e.source === selectedNode.id &&
-											e.sourceHandle === "port-common-source" &&
-											!e.data?.type,
-									)
-								: edges.find(
-										(e) =>
-											e.target === selectedNode.id &&
-											e.targetHandle === "port-common-target" &&
-											!e.data?.type,
-									);
-						const commonNeighbour = commonEdge
-							? nodes.find(
+
+						// Helper: find the channel node connected to a named tee port.
+						// For merging: common port is outgoing, straight/branch are incoming.
+						// For branching: common port is incoming, straight/branch are outgoing.
+						const findPortChannel = (portName: string) => {
+							const isOutgoing =
+								(teeType === "merging" && portName === "common") ||
+								(teeType === "branching" && portName !== "common");
+							let neighbour: (typeof nodes)[0] | undefined;
+							if (isOutgoing) {
+								const edge = edges.find(
+									(e) =>
+										e.source === selectedNode.id &&
+										e.sourceHandle === `port-${portName}-source` &&
+										!e.data?.type,
+								);
+								neighbour = edge
+									? nodes.find((n) => n.id === edge.target)
+									: undefined;
+							} else {
+								const edge = edges.find(
+									(e) =>
+										e.target === selectedNode.id &&
+										e.targetHandle === `port-${portName}-target` &&
+										!e.data?.type,
+								);
+								neighbour = edge
+									? nodes.find((n) => n.id === edge.source)
+									: undefined;
+							}
+							if (neighbour?.type === "channel") return neighbour;
+							// Neighbour is a plenum/boundary; look one hop further
+							if (isOutgoing) {
+								return nodes.find(
 									(n) =>
-										n.id ===
-										(teeType === "merging"
-											? commonEdge.target
-											: commonEdge.source),
-								)
-							: undefined;
-						const commonArmChannel =
-							commonNeighbour?.type === "channel"
-								? commonNeighbour
-								: teeType === "merging"
-									? nodes.find(
-											(n) =>
-												n.type === "channel" &&
-												edges.some(
-													(e) =>
-														e.source === commonNeighbour?.id &&
-														e.target === n.id &&
-														!e.data?.type,
-												),
-										)
-									: nodes.find(
-											(n) =>
-												n.type === "channel" &&
-												edges.some(
-													(e) =>
-														e.target === commonNeighbour?.id &&
-														e.source === n.id &&
-														!e.data?.type,
-												),
-										);
-						const channelD = commonArmChannel?.data?.D as
-							| number
-							| null
-							| undefined;
+										n.type === "channel" &&
+										edges.some(
+											(e) =>
+												e.source === neighbour?.id &&
+												e.target === n.id &&
+												!e.data?.type,
+										),
+								);
+							}
+							return nodes.find(
+								(n) =>
+									n.type === "channel" &&
+									edges.some(
+										(e) =>
+											e.target === neighbour?.id &&
+											e.source === n.id &&
+											!e.data?.type,
+									),
+							);
+						};
+
+						const commonCh = findPortChannel("common");
+						const straightCh = findPortChannel("straight");
+						const branchCh = findPortChannel("branch");
+
+						const areaFromD = (d: number | null | undefined) =>
+							d != null ? (Math.PI / 4) * d * d : undefined;
+
+						// F_C: common arm (= straight arm per Bassett); prefer common over straight channel
 						const inheritedFC: number | undefined =
-							channelD != null
-								? (Math.PI / 4) * channelD * channelD
-								: undefined;
-						const userSetFC =
-							selectedNode.data.F_C !== null &&
-							selectedNode.data.F_C !== undefined;
-						const effectiveFC = userSetFC
-							? selectedNode.data.F_C
+							areaFromD(commonCh?.data?.D as number | null | undefined) ??
+							areaFromD(straightCh?.data?.D as number | null | undefined);
+						const inheritedFBranch: number | undefined = areaFromD(
+							branchCh?.data?.D as number | null | undefined,
+						);
+
+						const userSetFC = selectedNode.data.F_C != null;
+						const userSetFBranch = selectedNode.data.F_branch != null;
+
+						const effectiveFC: number = userSetFC
+							? (selectedNode.data.F_C as number)
 							: (inheritedFC ?? 0.01);
+						const effectiveFBranch: number = userSetFBranch
+							? (selectedNode.data.F_branch as number)
+							: (inheritedFBranch ?? effectiveFC);
+						const psi =
+							effectiveFBranch > 0 ? effectiveFC / effectiveFBranch : null;
+						const dFromF = (f: number) => Math.sqrt((4 * f) / Math.PI);
+						const lu = unitPreferences.length === "mm" ? 1000 : 1;
+						const lu_label = unitPreferences.length;
 						return (
 							<div className="flex flex-col gap-4">
 								{/* Port legend */}
 								{(() => {
-									const tm =
-										(selectedNode.data.tee_type ?? "merging") === "merging";
+									const tm = teeType === "merging";
 									return (
 										<div className="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-[9px] leading-snug text-stone-600">
 											<div className="font-bold uppercase text-stone-400 mb-1">
@@ -1168,12 +1190,13 @@ const Inspector = () => {
 									/>
 									<p className="text-[9px] text-gray-400 italic">
 										Angle between branch and common arm. Sign is ignored
-										(symmetric). Bassett (2001) validated range: 30–90 deg. 0°
-										is accepted but flagged as extrapolated.
+										(symmetric). Bassett (2001) validated range: 30–90 deg.
 									</p>
 								</div>
 
-								{/* Common arm area */}
+								{/* ── Arm areas (3-arm, mirrors AreaChange) ── */}
+
+								{/* Common arm (F_C) */}
 								<div className="flex flex-col gap-2">
 									<div className="flex items-center justify-between">
 										<label className="text-xs font-bold text-gray-500 uppercase">
@@ -1208,38 +1231,120 @@ const Inspector = () => {
 									/>
 									{!userSetFC && inheritedFC != null && (
 										<p className="text-[9px] text-gray-400 italic -mt-1">
-											Inherited from {commonArmChannel?.id} (D=
-											{channelD?.toFixed(4)} m). Edit to override.
+											Inherited from{" "}
+											{commonCh?.id ?? straightCh?.id ?? "connected channel"}.
+											Edit to override.
 										</p>
 									)}
-									{!userSetFC &&
-										inheritedFC == null &&
-										commonNeighbour != null && (
-											<p className="text-[9px] text-gray-400 italic -mt-1">
-												Connect a channel to the C port to auto-inherit area.
-											</p>
-										)}
 								</div>
 
-								{/* Area ratio */}
-								<div className="flex flex-col gap-2">
+								{/* Straight arm (read-only = F_C per Bassett) */}
+								<div className="flex flex-col gap-1">
 									<label className="text-xs font-bold text-gray-500 uppercase">
-										Area Ratio psi = F_C / F_branch
+										Straight Arm Area (F_S)
 									</label>
-									<NumericInput
-										value={selectedNode.data.psi ?? 1.0}
-										onChange={(val) =>
-											updateNodeData(selectedNode.id, { psi: val })
-										}
-										className="p-2 border rounded"
-										placeholder="1.0"
-									/>
-									<p className="text-[9px] text-gray-400 italic">
-										Ratio of common-arm to lateral-branch area. 1.0 = equal
-										areas. Straight arm is assumed equal to the common arm
-										(Bassett constraint).
+									<div className="rounded bg-stone-50 border border-stone-200 px-3 py-2 text-[10px] text-stone-500 flex justify-between items-center">
+										<span className="font-mono">
+											{effectiveFC.toExponential(3)} m²
+											{"  "}(D = {(dFromF(effectiveFC) * lu).toFixed(2)}{" "}
+											{lu_label})
+										</span>
+										<span className="italic text-[9px] text-stone-400">
+											= F_C (Bassett)
+										</span>
+									</div>
+									<p className="text-[9px] text-stone-400 italic">
+										The Bassett (2001) model assumes F_S = F_C. If the physical
+										straight arm differs, add an AreaChange element.
 									</p>
 								</div>
+
+								{/* Branch arm (F_branch) */}
+								<div className="flex flex-col gap-2">
+									<div className="flex items-center justify-between">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Branch Arm Area (F_B)
+										</label>
+										{userSetFBranch && (
+											<button
+												type="button"
+												className="text-[9px] text-blue-500 hover:underline"
+												onClick={() =>
+													updateNodeData(selectedNode.id, {
+														F_branch: null,
+													})
+												}
+											>
+												Reset to inherited
+											</button>
+										)}
+									</div>
+									<AreaInput
+										id={`F_branch_${selectedNode.id}`}
+										label=""
+										value={effectiveFBranch}
+										placeholder={
+											inheritedFBranch != null
+												? inheritedFBranch.toFixed(5)
+												: inheritedFC != null
+													? inheritedFC.toFixed(5)
+													: "0.01"
+										}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { F_branch: val })
+										}
+										onClear={() =>
+											updateNodeData(selectedNode.id, { F_branch: null })
+										}
+										className={
+											userSetFBranch ? "font-semibold" : "text-gray-400"
+										}
+									/>
+									{!userSetFBranch && inheritedFBranch != null && (
+										<p className="text-[9px] text-gray-400 italic -mt-1">
+											Inherited from {branchCh?.id}. Edit to override.
+										</p>
+									)}
+								</div>
+
+								{/* Derived ratio summary card */}
+								{psi != null && (
+									<div className="rounded bg-stone-50 border border-stone-200 px-3 py-2 text-[10px] text-stone-600 flex flex-col gap-0.5">
+										<div className="flex justify-between">
+											<span className="font-medium text-stone-500 uppercase tracking-wide text-[8px]">
+												Area ratio
+											</span>
+											<span
+												className={
+													psi > 1.005
+														? "text-amber-600 font-semibold"
+														: psi < 0.995
+															? "text-blue-600 font-semibold"
+															: "text-stone-500"
+												}
+											>
+												{psi > 1.005
+													? "C larger than B"
+													: psi < 0.995
+														? "B larger than C"
+														: "equal areas"}
+											</span>
+										</div>
+										<div className="flex justify-between mt-0.5">
+											<span className="text-stone-400">psi = F_C / F_B</span>
+											<span className="font-mono font-semibold">
+												{psi.toFixed(4)}
+											</span>
+										</div>
+										<div className="flex justify-between">
+											<span className="text-stone-400">D_C → D_B</span>
+											<span className="font-mono">
+												{(dFromF(effectiveFC) * lu).toFixed(1)} →{" "}
+												{(dFromF(effectiveFBranch) * lu).toFixed(1)} {lu_label}
+											</span>
+										</div>
+									</div>
+								)}
 
 								<InitialGuessEditor node={selectedNode} />
 

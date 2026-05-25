@@ -462,6 +462,10 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         # 3-port element: bypass the 2-port source/target logic entirely.
         if elem_type == "tee_junction":
             _d = TeeJunctionData(**elem_data)
+            # psi is computed from explicit areas when both are set; otherwise use stored psi
+            _psi = _d.psi
+            if _d.F_C is not None and _d.F_branch is not None and _d.F_branch > 0:
+                _psi = _d.F_C / _d.F_branch
             _tee = TeeJunctionElement(
                 id=elem_id,
                 common_node=_find_tee_port(
@@ -480,7 +484,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 ),
                 theta=_math.radians(_d.theta_deg),
                 F_C=_d.F_C,
-                psi=_d.psi,
+                F_branch=_d.F_branch,
+                psi=_psi,
                 tee_type=_d.tee_type,
             )
             _tee.initial_guess = _expand_initial_guess(_d.initial_guess, elem_id)
