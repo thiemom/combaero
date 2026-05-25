@@ -1423,115 +1423,170 @@ const Inspector = () => {
 						);
 					})()}
 
-				{selectedNode.type === "combustor" && (
-					<div className="flex flex-col gap-4">
-						<div className="flex flex-col gap-2">
-							<label
-								htmlFor={`method_${selectedNode.id}`}
-								className="text-xs font-bold text-gray-500 uppercase"
-							>
-								Combustion Method
-							</label>
-							<select
-								id={`method_${selectedNode.id}`}
-								className="p-2 border rounded bg-white text-sm"
-								value={selectedNode.data.method || "complete"}
-								onChange={(e) =>
-									updateNodeData(selectedNode.id, {
-										method: e.target.value,
-									})
-								}
-							>
-								<option value="complete">Complete (Fast)</option>
-								<option value="equilibrium">Chemical Equilibrium</option>
-							</select>
-						</div>
+				{selectedNode.type === "combustor" &&
+					(() => {
+						const upstreamEdge = edges.find(
+							(e) => e.target === selectedNode.id && !e.data?.type,
+						);
+						const upstreamNode = upstreamEdge
+							? nodes.find((n) => n.id === upstreamEdge.source)
+							: undefined;
+						const inheritedDhComb: number | undefined =
+							upstreamNode?.type === "channel"
+								? upstreamNode.data.D
+								: (upstreamNode?.data?.Dh ??
+									(upstreamNode?.data?.area != null
+										? Math.sqrt((4 * upstreamNode.data.area) / Math.PI)
+										: undefined));
+						const userSetDhComb =
+							selectedNode.data.Dh !== null &&
+							selectedNode.data.Dh !== undefined;
+						const circularDhComb = Math.sqrt(
+							(4 * (selectedNode.data.area ?? 0.1)) / Math.PI,
+						);
+						return (
+							<div className="flex flex-col gap-4">
+								<div className="flex flex-col gap-2">
+									<label
+										htmlFor={`method_${selectedNode.id}`}
+										className="text-xs font-bold text-gray-500 uppercase"
+									>
+										Combustion Method
+									</label>
+									<select
+										id={`method_${selectedNode.id}`}
+										className="p-2 border rounded bg-white text-sm"
+										value={selectedNode.data.method || "complete"}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												method: e.target.value,
+											})
+										}
+									>
+										<option value="complete">Complete (Fast)</option>
+										<option value="equilibrium">Chemical Equilibrium</option>
+									</select>
+								</div>
 
-						<div className="grid grid-cols-2 gap-2 pb-2">
-							<AreaInput
-								id={`area_comb_${selectedNode.id}`}
-								label="Area"
-								value={selectedNode.data.area ?? 0.1}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, {
-										area: val,
-									})
-								}
-							/>
-							<div className="flex flex-col gap-1">
-								<LengthInput
-									id={`Dh_comb_${selectedNode.id}`}
-									label="Dh"
-									value={selectedNode.data.Dh}
-									onChange={(val) =>
-										updateNodeData(selectedNode.id, {
-											Dh: val,
-										})
-									}
-									onClear={() =>
-										updateNodeData(selectedNode.id, {
-											Dh: undefined,
-										})
+								<div className="grid grid-cols-2 gap-2 pb-2">
+									<AreaInput
+										id={`area_comb_${selectedNode.id}`}
+										label="Area"
+										value={selectedNode.data.area ?? 0.1}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, {
+												area: val,
+											})
+										}
+									/>
+									<div className="flex flex-col gap-1">
+										<div className="flex items-center justify-between">
+											<label className="text-xs font-bold text-gray-500 uppercase">
+												Dh
+											</label>
+											{userSetDhComb && (
+												<button
+													type="button"
+													className="text-[9px] text-blue-500 hover:underline"
+													onClick={() =>
+														updateNodeData(selectedNode.id, {
+															Dh: null,
+														})
+													}
+												>
+													Reset to inherited
+												</button>
+											)}
+										</div>
+										<LengthInput
+											id={`Dh_comb_${selectedNode.id}`}
+											label=""
+											value={
+												userSetDhComb
+													? selectedNode.data.Dh
+													: (inheritedDhComb ?? circularDhComb)
+											}
+											placeholder={inheritedDhComb ?? circularDhComb}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, {
+													Dh: val,
+												})
+											}
+											onClear={() =>
+												updateNodeData(selectedNode.id, {
+													Dh: null,
+												})
+											}
+											className={
+												userSetDhComb ? "font-semibold" : "text-gray-400"
+											}
+										/>
+										{!userSetDhComb && inheritedDhComb != null && (
+											<p className="text-[9px] text-gray-400 italic -mt-1">
+												Inherited from upstream ({upstreamNode?.id}).
+											</p>
+										)}
+										{!userSetDhComb && inheritedDhComb == null && (
+											<p className="text-[9px] text-gray-400 italic -mt-1">
+												Circular from area (D ={" "}
+												{(
+													circularDhComb *
+													(unitPreferences.length === "mm" ? 1000 : 1)
+												).toFixed(2)}{" "}
+												{unitPreferences.length}).
+											</p>
+										)}
+									</div>
+								</div>
+								<div className="grid grid-cols-2 gap-3">
+									<div className="flex flex-col gap-2">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Nu Multiplier
+										</label>
+										<NumericInput
+											id={`Nu_multiplier_comb_${selectedNode.id}`}
+											value={selectedNode.data.Nu_multiplier ?? 1.0}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, {
+													Nu_multiplier: val,
+												})
+											}
+											className="p-2 border rounded"
+										/>
+										<span className="text-[9px] text-stone-400">
+											{`global: ×${solverSettings.Nu_multiplier ?? 1}`}
+										</span>
+									</div>
+									<div className="flex flex-col gap-2">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											F Multiplier
+										</label>
+										<NumericInput
+											id={`f_multiplier_comb_${selectedNode.id}`}
+											value={selectedNode.data.f_multiplier ?? 1.0}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, {
+													f_multiplier: val,
+												})
+											}
+											className="p-2 border rounded"
+										/>
+										<span className="text-[9px] text-stone-400">
+											{`global: ×${solverSettings.f_multiplier ?? 1}`}
+										</span>
+									</div>
+								</div>
+								<SurfaceEnhancementInspector
+									surface={selectedNode.data.surface || { type: "smooth" }}
+									onChange={(surface) =>
+										updateNodeData(selectedNode.id, { surface })
 									}
 								/>
-							</div>
-						</div>
-						<p className="text-[9px] text-gray-400 italic -mt-2 mb-2">
-							Defaults to circular diameter:{" "}
-							{(
-								Math.sqrt((4 * (selectedNode.data.area ?? 0.1)) / Math.PI) *
-								(unitPreferences.length === "mm" ? 1000 : 1)
-							).toFixed(2)}{" "}
-							{unitPreferences.length}
-						</p>
-						<div className="grid grid-cols-2 gap-3">
-							<div className="flex flex-col gap-2">
-								<label className="text-xs font-bold text-gray-500 uppercase">
-									Nu Multiplier
-								</label>
-								<NumericInput
-									id={`Nu_multiplier_comb_${selectedNode.id}`}
-									value={selectedNode.data.Nu_multiplier ?? 1.0}
-									onChange={(val) =>
-										updateNodeData(selectedNode.id, {
-											Nu_multiplier: val,
-										})
-									}
-									className="p-2 border rounded"
-								/>
-								<span className="text-[9px] text-stone-400">
-									{`global: ×${solverSettings.Nu_multiplier ?? 1}`}
-								</span>
-							</div>
-							<div className="flex flex-col gap-2">
-								<label className="text-xs font-bold text-gray-500 uppercase">
-									F Multiplier
-								</label>
-								<NumericInput
-									id={`f_multiplier_comb_${selectedNode.id}`}
-									value={selectedNode.data.f_multiplier ?? 1.0}
-									onChange={(val) =>
-										updateNodeData(selectedNode.id, {
-											f_multiplier: val,
-										})
-									}
-									className="p-2 border rounded"
-								/>
-								<span className="text-[9px] text-stone-400">
-									{`global: ×${solverSettings.f_multiplier ?? 1}`}
-								</span>
-							</div>
-						</div>
-						<SurfaceEnhancementInspector
-							surface={selectedNode.data.surface || { type: "smooth" }}
-							onChange={(surface) =>
-								updateNodeData(selectedNode.id, { surface })
-							}
-						/>
 
-						<InitialGuessEditor node={selectedNode} />
-					</div>
-				)}
+								<InitialGuessEditor node={selectedNode} />
+							</div>
+						);
+					})()}
 
 				{selectedNode.type === "momentum_chamber" &&
 					(() => {
