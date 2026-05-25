@@ -519,7 +519,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
 
         if elem_type == "channel":
             data = ChannelData(**elem_data)
-            conv_area = 3.1415926535 * data.D * data.L
+            # conv_area is deferred to 0 when D=None; resolve_topology updates it
+            conv_area = (3.1415926535 * data.D * data.L) if data.D is not None else 0.0
             elem = ChannelElement(
                 elem_id,
                 from_node=source_id,

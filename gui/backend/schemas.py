@@ -157,7 +157,7 @@ class MomentumChamberData(BaseModel):
 class ChannelData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     L: float = 1.0
-    D: float = 0.1
+    D: float | None = None  # None = inherit from upstream element geometry
     roughness: float = 1e-5
     friction_model: Literal["haaland", "serghides", "colebrook", "petukhov"] = "haaland"
     surface: SurfaceModelData = Field(default_factory=SmoothModelData)

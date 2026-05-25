@@ -392,111 +392,185 @@ const Inspector = () => {
 					</div>
 				)}
 
-				{selectedNode.type === "channel" && (
-					<>
-						<LengthInput
-							id={`L_${selectedNode.id}`}
-							label="Length Flow Path"
-							value={selectedNode.data.L ?? 1.0}
-							onChange={(val) => updateNodeData(selectedNode.id, { L: val })}
-						/>
-						<LengthInput
-							id={`D_${selectedNode.id}`}
-							label="Channel Inner Diameter"
-							value={selectedNode.data.D ?? 0.1}
-							onChange={(val) => updateNodeData(selectedNode.id, { D: val })}
-						/>
-						<div className="flex flex-col gap-2">
-							<label className="text-xs font-bold text-gray-500 uppercase">
-								Friction Model
-							</label>
-							<select
-								className="p-2 border rounded bg-white text-xs"
-								value={selectedNode.data.friction_model || "haaland"}
-								onChange={(e) =>
-									updateNodeData(selectedNode.id, {
-										friction_model: e.target.value,
-									})
-								}
-							>
-								<option value="haaland">
-									Haaland (default, ~2–3% vs Colebrook)
-								</option>
-								<option value="serghides">
-									Serghides (&lt;0.3% vs Colebrook)
-								</option>
-								<option value="colebrook">Colebrook-White (reference)</option>
-								<option value="petukhov">
-									Petukhov (smooth pipe, pairs with Petukhov Nu)
-								</option>
-							</select>
-						</div>
-						<LengthInput
-							id={`roughness_${selectedNode.id}`}
-							label="Surface Roughness"
-							value={selectedNode.data.roughness ?? 1e-5}
-							onChange={(val) =>
-								updateNodeData(selectedNode.id, { roughness: val })
+				{selectedNode.type === "channel" &&
+					(() => {
+						const upstreamEdge = edges.find(
+							(e) => e.target === selectedNode.id && !e.data?.type,
+						);
+						const downstreamEdge = edges.find(
+							(e) => e.source === selectedNode.id && !e.data?.type,
+						);
+						const upstreamNode = upstreamEdge
+							? nodes.find((n) => n.id === upstreamEdge.source)
+							: undefined;
+						const downstreamNode = downstreamEdge
+							? nodes.find((n) => n.id === downstreamEdge.target)
+							: undefined;
+						const dFromNode = (n: typeof upstreamNode) => {
+							if (!n) return undefined;
+							if (n.type === "channel") return n.data.D as number | undefined;
+							if (n.type === "area_change") {
+								const f1 = n.data.F1 as number | null | undefined;
+								return f1 != null ? Math.sqrt((4 * f1) / Math.PI) : undefined;
 							}
-							disabled={selectedNode.data.friction_model === "petukhov"}
-						/>
-						<div className="grid grid-cols-2 gap-3">
-							<div className="flex flex-col gap-2">
-								<label className="text-xs font-bold text-gray-500 uppercase">
-									Nu Multiplier
-								</label>
-								<NumericInput
-									value={selectedNode.data.Nu_multiplier ?? 1.0}
-									onChange={(val) =>
-										updateNodeData(selectedNode.id, { Nu_multiplier: val })
-									}
-									className="p-2 border rounded"
-								/>
-								<span className="text-[9px] text-stone-400">
-									{`global: ×${solverSettings.Nu_multiplier ?? 1}`}
-								</span>
-							</div>
-							<div className="flex flex-col gap-2">
-								<label className="text-xs font-bold text-gray-500 uppercase">
-									F Multiplier
-								</label>
-								<NumericInput
-									value={selectedNode.data.f_multiplier ?? 1.0}
-									onChange={(val) =>
-										updateNodeData(selectedNode.id, { f_multiplier: val })
-									}
-									className="p-2 border rounded"
-								/>
-								<span className="text-[9px] text-stone-400">
-									{`global: ×${solverSettings.f_multiplier ?? 1}`}
-								</span>
-							</div>
-						</div>
-						<div className="flex flex-col gap-2">
-							<label className="text-xs font-bold text-gray-500 uppercase">
-								Regime
-							</label>
-							<select
-								className="p-2 border rounded bg-white text-xs"
-								value={selectedNode.data.regime || "default"}
-								onChange={(e) =>
-									updateNodeData(selectedNode.id, { regime: e.target.value })
-								}
-							>
-								<option value="default">Default (Global)</option>
-								<option value="incompressible">Forced Incompressible</option>
-								<option value="compressible">Forced Compressible</option>
-							</select>
-						</div>
-						<SurfaceEnhancementInspector
-							surface={selectedNode.data.surface || { type: "smooth" }}
-							onChange={(surface) =>
-								updateNodeData(selectedNode.id, { surface })
+							if (n.type === "tee_junction") {
+								const fc = n.data.F_C as number | null | undefined;
+								return fc != null ? Math.sqrt((4 * fc) / Math.PI) : undefined;
 							}
-						/>
-						<InitialGuessEditor node={selectedNode} />
-					</>
-				)}
+							return undefined;
+						};
+						const inheritedD =
+							dFromNode(upstreamNode) ?? dFromNode(downstreamNode);
+						const inheritSource =
+							dFromNode(upstreamNode) != null
+								? upstreamNode
+								: dFromNode(downstreamNode) != null
+									? downstreamNode
+									: undefined;
+						const userSetD =
+							selectedNode.data.D !== null && selectedNode.data.D !== undefined;
+						return (
+							<>
+								<LengthInput
+									id={`L_${selectedNode.id}`}
+									label="Length Flow Path"
+									value={selectedNode.data.L ?? 1.0}
+									onChange={(val) =>
+										updateNodeData(selectedNode.id, { L: val })
+									}
+								/>
+								<div className="flex flex-col gap-2">
+									<div className="flex items-center justify-between">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Channel Inner Diameter
+										</label>
+										{userSetD && (
+											<button
+												type="button"
+												className="text-[9px] text-blue-500 hover:underline"
+												onClick={() =>
+													updateNodeData(selectedNode.id, { D: null })
+												}
+											>
+												Reset to inherited
+											</button>
+										)}
+									</div>
+									<LengthInput
+										id={`D_${selectedNode.id}`}
+										label=""
+										value={userSetD ? selectedNode.data.D : (inheritedD ?? 0.1)}
+										placeholder={inheritedD ?? 0.1}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { D: val })
+										}
+										onClear={() => updateNodeData(selectedNode.id, { D: null })}
+										className={userSetD ? "font-semibold" : "text-gray-400"}
+									/>
+									{!userSetD && inheritedD != null && (
+										<p className="text-[9px] text-gray-400 italic -mt-1">
+											Inherited from {inheritSource?.id}. Edit to override.
+										</p>
+									)}
+								</div>
+								<div className="flex flex-col gap-2">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Friction Model
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs"
+										value={selectedNode.data.friction_model || "haaland"}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												friction_model: e.target.value,
+											})
+										}
+									>
+										<option value="haaland">
+											Haaland (default, ~2–3% vs Colebrook)
+										</option>
+										<option value="serghides">
+											Serghides (&lt;0.3% vs Colebrook)
+										</option>
+										<option value="colebrook">
+											Colebrook-White (reference)
+										</option>
+										<option value="petukhov">
+											Petukhov (smooth pipe, pairs with Petukhov Nu)
+										</option>
+									</select>
+								</div>
+								<LengthInput
+									id={`roughness_${selectedNode.id}`}
+									label="Surface Roughness"
+									value={selectedNode.data.roughness ?? 1e-5}
+									onChange={(val) =>
+										updateNodeData(selectedNode.id, { roughness: val })
+									}
+									disabled={selectedNode.data.friction_model === "petukhov"}
+								/>
+								<div className="grid grid-cols-2 gap-3">
+									<div className="flex flex-col gap-2">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Nu Multiplier
+										</label>
+										<NumericInput
+											value={selectedNode.data.Nu_multiplier ?? 1.0}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, { Nu_multiplier: val })
+											}
+											className="p-2 border rounded"
+										/>
+										<span className="text-[9px] text-stone-400">
+											{`global: ×${solverSettings.Nu_multiplier ?? 1}`}
+										</span>
+									</div>
+									<div className="flex flex-col gap-2">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											F Multiplier
+										</label>
+										<NumericInput
+											value={selectedNode.data.f_multiplier ?? 1.0}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, { f_multiplier: val })
+											}
+											className="p-2 border rounded"
+										/>
+										<span className="text-[9px] text-stone-400">
+											{`global: ×${solverSettings.f_multiplier ?? 1}`}
+										</span>
+									</div>
+								</div>
+								<div className="flex flex-col gap-2">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Regime
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs"
+										value={selectedNode.data.regime || "default"}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												regime: e.target.value,
+											})
+										}
+									>
+										<option value="default">Default (Global)</option>
+										<option value="incompressible">
+											Forced Incompressible
+										</option>
+										<option value="compressible">Forced Compressible</option>
+									</select>
+								</div>
+								<SurfaceEnhancementInspector
+									surface={selectedNode.data.surface || { type: "smooth" }}
+									onChange={(surface) =>
+										updateNodeData(selectedNode.id, { surface })
+									}
+								/>
+								<InitialGuessEditor node={selectedNode} />
+							</>
+						);
+					})()}
 
 				{selectedNode.type === "orifice" &&
 					(() => {

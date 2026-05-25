@@ -2155,8 +2155,8 @@ class ChannelElement(NetworkElement):
         from_node: str,
         to_node: str,
         length: float,
-        diameter: float,
-        roughness: float,
+        diameter: float | None = None,
+        roughness: float = 1e-5,
         regime: CompressibilityLiteral = "incompressible",
         friction_model: FrictionModelLiteral = "haaland",
         htc_model: HeatTransferModelLiteral = "none",
@@ -2165,9 +2165,9 @@ class ChannelElement(NetworkElement):
     ):
         super().__init__(id, from_node, to_node)
         self.length = length
-        self.diameter = diameter
+        self.diameter: float | None = diameter
         self.roughness = roughness
-        self.area = math.pi * (diameter / 2) ** 2
+        self.area: float | None = math.pi * (diameter / 2) ** 2 if diameter is not None else None
 
         self.regime = regime
         self.friction_model = friction_model
@@ -2411,7 +2411,28 @@ class ChannelElement(NetworkElement):
         return 1
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
-        pass
+        if self.diameter is not None:
+            return
+        # Inherit diameter from the nearest upstream geometry source
+        sources = graph.get_upstream_elements(self.from_node) + graph.get_downstream_elements(
+            self.to_node
+        )
+        for elem in sources:
+            if isinstance(elem, ChannelElement) and elem.diameter is not None:
+                self.diameter = elem.diameter
+                break
+            if isinstance(elem, AreaChangeElement) and elem.F1 is not None:
+                self.diameter = math.sqrt(4.0 * elem.F1 / math.pi)
+                break
+            if isinstance(elem, TeeJunctionElement) and elem.F_C is not None:
+                self.diameter = math.sqrt(4.0 * elem.F_C / math.pi)
+                break
+        if self.diameter is None:
+            self.diameter = 0.1  # fallback default
+        self.area = math.pi * (self.diameter / 2) ** 2
+        # Update convective surface area (was 0 if diameter was deferred)
+        if self.surface and self.surface.area == 0.0:
+            self.surface.area = math.pi * self.diameter * self.length
 
 
 class AreaChangeElement(NetworkElement):
