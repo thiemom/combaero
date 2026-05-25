@@ -2445,7 +2445,10 @@ class ChannelElement(NetworkElement):
                 self.diameter = math.sqrt(4.0 * elem.F1 / math.pi)
                 break
             if isinstance(elem, TeeJunctionElement) and elem.F_C is not None:
-                self.diameter = math.sqrt(4.0 * elem.F_C / math.pi)
+                # Branch arm carries F_C/psi; straight/common arm carries F_C
+                is_branch = self.from_node == elem.branch_node or self.to_node == elem.branch_node
+                area = elem.F_C / elem.psi if is_branch else elem.F_C
+                self.diameter = math.sqrt(4.0 * area / math.pi)
                 break
         if self.diameter is None:
             self.diameter = 0.1  # fallback default
