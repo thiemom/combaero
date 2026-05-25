@@ -2424,15 +2424,15 @@ class AreaChangeElement(NetworkElement):
         id: str,
         from_node: str,
         to_node: str,
-        F0: float,
-        F1: float,
+        F0: float | None = None,
+        F1: float | None = None,
         model_type: Literal["sharp", "conical"] = "sharp",
         length: float | None = None,
         D_h: float | None = 0.0,
     ):
         super().__init__(id, from_node, to_node)
-        self.F0 = F0
-        self.F1 = F1
+        self.F0: float | None = F0
+        self.F1: float | None = F1
         self.model_type = model_type
         self.length = length if length is not None else 0.0
         self.D_h = D_h
@@ -2444,14 +2444,27 @@ class AreaChangeElement(NetworkElement):
         return 1
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
-        pass
+        if self.F0 is None:
+            for elem in graph.get_upstream_elements(self.from_node):
+                if isinstance(elem, ChannelElement) and elem.diameter is not None:
+                    self.F0 = math.pi * (elem.diameter / 2.0) ** 2
+                    break
+            if self.F0 is None:
+                self.F0 = 0.01
+        if self.F1 is None:
+            for elem in graph.get_downstream_elements(self.to_node):
+                if isinstance(elem, ChannelElement) and elem.diameter is not None:
+                    self.F1 = math.pi * (elem.diameter / 2.0) ** 2
+                    break
+            if self.F1 is None:
+                self.F1 = 0.02
 
     def validate(self) -> None:
-        if self.F0 <= 0:
+        if (self.F0 or 0.0) <= 0:
             raise ValueError(
                 f"AreaChangeElement '{self.id}' has invalid Upstream Area F0={self.F0}. Must be > 0."
             )
-        if self.F1 <= 0:
+        if (self.F1 or 0.0) <= 0:
             raise ValueError(
                 f"AreaChangeElement '{self.id}' has invalid Downstream Area F1={self.F1}. Must be > 0."
             )

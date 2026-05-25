@@ -679,85 +679,182 @@ const Inspector = () => {
 						);
 					})()}
 
-				{selectedNode.type === "area_change" && (
-					<>
-						<div className="flex flex-col gap-2">
-							<label className="text-xs font-bold text-gray-500 uppercase">
-								Model Type
-							</label>
-							<select
-								className="p-2 border rounded bg-white text-xs border-stone-200"
-								value={selectedNode.data.model_type || "sharp"}
-								onChange={(e) =>
-									updateNodeData(selectedNode.id, {
-										model_type: e.target.value,
-									})
-								}
-							>
-								<option value="sharp">Sharp-Edged (Sudden)</option>
-								<option value="conical">Conical (Gradual)</option>
-							</select>
-						</div>
+				{selectedNode.type === "area_change" &&
+					(() => {
+						const upstreamEdge = edges.find(
+							(e) => e.target === selectedNode.id && !e.data?.type,
+						);
+						const downstreamEdge = edges.find(
+							(e) => e.source === selectedNode.id && !e.data?.type,
+						);
+						const upstreamNode = upstreamEdge
+							? nodes.find((n) => n.id === upstreamEdge.source)
+							: undefined;
+						const downstreamNode = downstreamEdge
+							? nodes.find((n) => n.id === downstreamEdge.target)
+							: undefined;
+						const areaFromD = (d: number) => (Math.PI / 4) * d * d;
+						const inheritedF0: number | undefined =
+							upstreamNode?.type === "channel"
+								? areaFromD(upstreamNode.data.D)
+								: upstreamNode?.data?.area;
+						const inheritedF1: number | undefined =
+							downstreamNode?.type === "channel"
+								? areaFromD(downstreamNode.data.D)
+								: downstreamNode?.data?.area;
+						const userSetF0 =
+							selectedNode.data.F0 !== null &&
+							selectedNode.data.F0 !== undefined;
+						const userSetF1 =
+							selectedNode.data.F1 !== null &&
+							selectedNode.data.F1 !== undefined;
+						const effectiveF0 = userSetF0
+							? selectedNode.data.F0
+							: (inheritedF0 ?? 0.01);
+						const effectiveF1 = userSetF1
+							? selectedNode.data.F1
+							: (inheritedF1 ?? 0.02);
+						return (
+							<>
+								<div className="flex flex-col gap-2">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Model Type
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={selectedNode.data.model_type || "sharp"}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												model_type: e.target.value,
+											})
+										}
+									>
+										<option value="sharp">Sharp-Edged (Sudden)</option>
+										<option value="conical">Conical (Gradual)</option>
+									</select>
+								</div>
 
-						<AreaInput
-							id={`F0_${selectedNode.id}`}
-							label="Upstream Area (F0)"
-							value={selectedNode.data.F0 ?? 0.01}
-							onChange={(val) => updateNodeData(selectedNode.id, { F0: val })}
-						/>
+								<div className="flex flex-col gap-2">
+									<div className="flex items-center justify-between">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Upstream Area (F0)
+										</label>
+										{userSetF0 && (
+											<button
+												type="button"
+												className="text-[9px] text-blue-500 hover:underline"
+												onClick={() =>
+													updateNodeData(selectedNode.id, { F0: null })
+												}
+											>
+												Reset to inherited
+											</button>
+										)}
+									</div>
+									<AreaInput
+										id={`F0_${selectedNode.id}`}
+										label=""
+										value={effectiveF0}
+										placeholder={
+											inheritedF0 != null ? inheritedF0.toFixed(5) : "0.01"
+										}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { F0: val })
+										}
+										onClear={() =>
+											updateNodeData(selectedNode.id, { F0: null })
+										}
+										className={userSetF0 ? "font-semibold" : "text-gray-400"}
+									/>
+									{!userSetF0 && inheritedF0 != null && (
+										<p className="text-[9px] text-gray-400 italic -mt-1">
+											Inherited from upstream ({upstreamNode?.id}). Edit to
+											override.
+										</p>
+									)}
+								</div>
 
-						<AreaInput
-							id={`F1_${selectedNode.id}`}
-							label="Downstream Area (F1)"
-							value={selectedNode.data.F1 ?? 0.02}
-							onChange={(val) => updateNodeData(selectedNode.id, { F1: val })}
-						/>
+								<div className="flex flex-col gap-2">
+									<div className="flex items-center justify-between">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Downstream Area (F1)
+										</label>
+										{userSetF1 && (
+											<button
+												type="button"
+												className="text-[9px] text-blue-500 hover:underline"
+												onClick={() =>
+													updateNodeData(selectedNode.id, { F1: null })
+												}
+											>
+												Reset to inherited
+											</button>
+										)}
+									</div>
+									<AreaInput
+										id={`F1_${selectedNode.id}`}
+										label=""
+										value={effectiveF1}
+										placeholder={
+											inheritedF1 != null ? inheritedF1.toFixed(5) : "0.02"
+										}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { F1: val })
+										}
+										onClear={() =>
+											updateNodeData(selectedNode.id, { F1: null })
+										}
+										className={userSetF1 ? "font-semibold" : "text-gray-400"}
+									/>
+									{!userSetF1 && inheritedF1 != null && (
+										<p className="text-[9px] text-gray-400 italic -mt-1">
+											Inherited from downstream ({downstreamNode?.id}). Edit to
+											override.
+										</p>
+									)}
+								</div>
 
-						{selectedNode.data.model_type === "conical" && (
-							<LengthInput
-								id={`length_${selectedNode.id}`}
-								label="Axial Length"
-								value={selectedNode.data.length ?? 0.1}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, { length: val })
-								}
-							/>
-						)}
+								{selectedNode.data.model_type === "conical" && (
+									<LengthInput
+										id={`length_${selectedNode.id}`}
+										label="Axial Length"
+										value={selectedNode.data.length ?? 0.1}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { length: val })
+										}
+									/>
+								)}
 
-						{selectedNode.data.model_type !== "conical" && (
-							<div className="flex flex-col gap-1 mt-1">
-								<LengthInput
-									id={`D_h_${selectedNode.id}`}
-									label="Hydraulic Diameter (D_h)"
-									value={selectedNode.data.D_h}
-									placeholder="Circular (Auto)"
-									onChange={(val) =>
-										updateNodeData(selectedNode.id, { D_h: val })
-									}
-									onClear={() =>
-										updateNodeData(selectedNode.id, { D_h: undefined })
-									}
-								/>
-								<p className="text-[9px] text-gray-400 italic">
-									Defaults to circular diameter:{" "}
-									{(
-										Math.sqrt(
-											(4 *
-												Math.min(
-													selectedNode.data.F0 ?? 0,
-													selectedNode.data.F1 ?? 0,
-												)) /
-												Math.PI,
-										) * (unitPreferences.length === "mm" ? 1000 : 1)
-									).toFixed(2)}{" "}
-									{unitPreferences.length}
-								</p>
-							</div>
-						)}
+								{selectedNode.data.model_type !== "conical" && (
+									<div className="flex flex-col gap-1 mt-1">
+										<LengthInput
+											id={`D_h_${selectedNode.id}`}
+											label="Hydraulic Diameter (D_h)"
+											value={selectedNode.data.D_h}
+											placeholder="Circular (Auto)"
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, { D_h: val })
+											}
+											onClear={() =>
+												updateNodeData(selectedNode.id, { D_h: undefined })
+											}
+										/>
+										<p className="text-[9px] text-gray-400 italic">
+											Defaults to circular diameter:{" "}
+											{(
+												Math.sqrt(
+													(4 * Math.min(effectiveF0, effectiveF1)) / Math.PI,
+												) * (unitPreferences.length === "mm" ? 1000 : 1)
+											).toFixed(2)}{" "}
+											{unitPreferences.length}
+										</p>
+									</div>
+								)}
 
-						<InitialGuessEditor node={selectedNode} />
-					</>
-				)}
+								<InitialGuessEditor node={selectedNode} />
+							</>
+						);
+					})()}
 
 				{selectedNode.type === "tee_junction" && (
 					<div className="flex flex-col gap-4">
