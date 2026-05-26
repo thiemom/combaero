@@ -6,7 +6,7 @@ import {
 	Position,
 	useUpdateNodeInternals,
 } from "reactflow";
-import { rotPos } from "../../utils/nodeUtils";
+import { HANDLE_CSS, rotPos } from "../../utils/nodeUtils";
 
 const PressureBoundaryNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
@@ -49,11 +49,13 @@ const PressureBoundaryNode = ({ id, data, selected }: NodeProps) => {
 			<Handle
 				type="source"
 				position={rotPos(Position.Right, rotation)}
+				style={HANDLE_CSS[Position.Right]}
 				id="flow-source"
 			/>
 			<Handle
 				type="target"
 				position={rotPos(Position.Left, rotation)}
+				style={HANDLE_CSS[Position.Left]}
 				id="flow-target"
 			/>
 		</div>

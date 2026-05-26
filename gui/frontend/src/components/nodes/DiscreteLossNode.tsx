@@ -6,7 +6,7 @@ import {
 	Position,
 	useUpdateNodeInternals,
 } from "reactflow";
-import { rotPos } from "../../utils/nodeUtils";
+import { HANDLE_CSS, rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
 
 const DiscreteLossNode = ({ id, data, selected }: NodeProps) => {
@@ -96,21 +96,25 @@ const DiscreteLossNode = ({ id, data, selected }: NodeProps) => {
 			<Handle
 				type="target"
 				position={rotPos(Position.Left, rotation)}
+				style={HANDLE_CSS[Position.Left]}
 				id="flow-target"
 			/>
 			<Handle
 				type="source"
 				position={rotPos(Position.Right, rotation)}
+				style={HANDLE_CSS[Position.Right]}
 				id="flow-source"
 			/>
 			<Handle
 				type="target"
 				position={rotPos(Position.Top, rotation)}
+				style={HANDLE_CSS[Position.Top]}
 				id="thermal-target"
 			/>
 			<Handle
 				type="source"
 				position={rotPos(Position.Bottom, rotation)}
+				style={HANDLE_CSS[Position.Bottom]}
 				id="thermal-source"
 			/>
 		</div>
