@@ -6,6 +6,7 @@ import {
 	Position,
 	useUpdateNodeInternals,
 } from "reactflow";
+import { rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
 
 const MomentumChamberNode = ({ id, data, selected }: NodeProps) => {
@@ -75,10 +76,26 @@ const MomentumChamberNode = ({ id, data, selected }: NodeProps) => {
 			</div>
 
 			{/* Flow handles */}
-			<Handle type="target" position={Position.Left} id="flow-target" />
-			<Handle type="source" position={Position.Right} id="flow-source" />
-			<Handle type="target" position={Position.Top} id="thermal-target" />
-			<Handle type="source" position={Position.Bottom} id="thermal-source" />
+			<Handle
+				type="target"
+				position={rotPos(Position.Left, rotation)}
+				id="flow-target"
+			/>
+			<Handle
+				type="source"
+				position={rotPos(Position.Right, rotation)}
+				id="flow-source"
+			/>
+			<Handle
+				type="target"
+				position={rotPos(Position.Top, rotation)}
+				id="thermal-target"
+			/>
+			<Handle
+				type="source"
+				position={rotPos(Position.Bottom, rotation)}
+				id="thermal-source"
+			/>
 		</div>
 	);
 };

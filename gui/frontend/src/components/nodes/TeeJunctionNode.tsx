@@ -6,6 +6,7 @@ import {
 	Position,
 	useUpdateNodeInternals,
 } from "reactflow";
+import { rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
 
 // Port colours: blue = input arm, green = output arm (matches handle triangle colours).
@@ -23,8 +24,15 @@ const TeeJunctionNode = ({ id, data, selected }: NodeProps) => {
 	// Merging:  S(left, in) + B(bottom, in)  → C(right, out)
 	// Branching: C(left, in) → S(right, out) + B(bottom, out)
 	// Swap the left/right positions of S and C when the type changes.
-	const straightPos = isMerging ? Position.Left : Position.Right;
-	const commonPos = isMerging ? Position.Right : Position.Left;
+	const straightPos = rotPos(
+		isMerging ? Position.Left : Position.Right,
+		rotation,
+	);
+	const commonPos = rotPos(
+		isMerging ? Position.Right : Position.Left,
+		rotation,
+	);
+	const branchPos = rotPos(Position.Bottom, rotation);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: rotation and tee_type both trigger handle re-measurement
 	useEffect(() => {
@@ -118,17 +126,9 @@ const TeeJunctionNode = ({ id, data, selected }: NodeProps) => {
 			<Handle type="target" position={commonPos} id="port-common-target" />
 			<Handle type="source" position={commonPos} id="port-common-source" />
 
-			{/* Branch arm — always bottom */}
-			<Handle
-				type="target"
-				position={Position.Bottom}
-				id="port-branch-target"
-			/>
-			<Handle
-				type="source"
-				position={Position.Bottom}
-				id="port-branch-source"
-			/>
+			{/* Branch arm — bottom at 0°, rotates with node */}
+			<Handle type="target" position={branchPos} id="port-branch-target" />
+			<Handle type="source" position={branchPos} id="port-branch-source" />
 		</div>
 	);
 };

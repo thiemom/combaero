@@ -6,6 +6,7 @@ import {
 	Position,
 	useUpdateNodeInternals,
 } from "reactflow";
+import { rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
 
 const PlenumNode = ({ id, data, selected }: NodeProps) => {
@@ -76,10 +77,26 @@ const PlenumNode = ({ id, data, selected }: NodeProps) => {
 			</div>
 
 			{/* Flow Handles: L/T = target (inlet), R/B = source (outlet) */}
-			<Handle type="target" position={Position.Left} id="flow-left" />
-			<Handle type="source" position={Position.Right} id="flow-right" />
-			<Handle type="target" position={Position.Top} id="flow-top" />
-			<Handle type="source" position={Position.Bottom} id="flow-bottom" />
+			<Handle
+				type="target"
+				position={rotPos(Position.Left, rotation)}
+				id="flow-left"
+			/>
+			<Handle
+				type="source"
+				position={rotPos(Position.Right, rotation)}
+				id="flow-right"
+			/>
+			<Handle
+				type="target"
+				position={rotPos(Position.Top, rotation)}
+				id="flow-top"
+			/>
+			<Handle
+				type="source"
+				position={rotPos(Position.Bottom, rotation)}
+				id="flow-bottom"
+			/>
 		</div>
 	);
 };
