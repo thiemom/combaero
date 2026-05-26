@@ -6,6 +6,7 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { useCallback } from "react";
+import { useCopyPaste } from "../hooks/useCopyPaste";
 import useStore from "../store/useStore";
 import { edgeTypes, nodeTypes } from "./flowTypes";
 import SolverStatusBadge from "./SolverStatusBadge";
@@ -13,6 +14,7 @@ import SolverStatusBadge from "./SolverStatusBadge";
 const NetworkCanvas = () => {
 	const { nodes, edges, setNodes, onNodesChange, onEdgesChange, onConnect } =
 		useStore();
+	useCopyPaste();
 	const { screenToFlowPosition } = useReactFlow();
 
 	const onDragOver = useCallback((event: React.DragEvent) => {

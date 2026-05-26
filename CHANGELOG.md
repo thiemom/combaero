@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Copy-paste nodes** (Ctrl/Cmd+C / Ctrl/Cmd+V): selected nodes can be duplicated
+  on the canvas. Physics and configuration data (including orientation) are copied;
+  custom labels and stale solver results are not. Connections are not duplicated —
+  the pasted nodes start unconnected. Pasted nodes land 50 px offset from the
+  originals and are immediately selected so they can be repositioned.
 - **Upstream geometry inheritance**: geometry fields on elements and nodes can now
   be left blank (schema value `null`); the GUI Inspector shows an inherited value
   as a greyed placeholder with a "Reset to inherited" / "Reset to circular" button.
