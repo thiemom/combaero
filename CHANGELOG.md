@@ -204,6 +204,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   example, a 180°-rotated node's `flow-target` (logically Left) is correctly treated as
   Right, producing a smooth C-curve instead of an initial vertical leg routing behind the
   element bounding box.
+- Rotated-node handle placement and connector triangle orientation: each `Handle` now
+  receives an inline style from `handleStyle(basePos, rotation)` in `nodeUtils.ts`.
+  This overrides ReactFlow's position CSS classes (which apply in the rotated coordinate
+  system and would land a handle on the wrong visual edge) and counter-rotates the handle
+  by `−rotation` so the `::after` CSS triangle defined in `index.css` always points
+  perpendicular to the edge it sits on.  The centering uses `calc(50% − 6px)` rather than
+  `transform:translate`, so `getBoundingClientRect()` returns the correct screen centre
+  regardless of node rotation — keeping edge spline endpoints accurate.
 - `combaero-gui` white page on fresh PyPI install: `frontend/dist/assets/` was not bundled in
   the wheel because the `**` glob in `package-data` is unreliable below setuptools 69; added an
   explicit `assets/*` pattern and a `MANIFEST.in` as belt-and-suspenders.
