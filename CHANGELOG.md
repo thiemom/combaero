@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Solver convergence hardening** for networks with dead-end branches (Wall nodes) and
+  inherited-geometry TeeJunctions (`F_C: null`):
+  - `_build_x0` now guards the TeeJunction Bernoulli estimate against `F_C=None`,
+    eliminating the `TypeError: NoneType * float` crash when using *Continuation* init
+    on a network whose tee junctions inherit area from adjacent channels.
+  - Initial guess for dead-end channels (connected to a `WallNode`) is now seeded at
+    `m_dot=0` instead of the full upstream flow, so Newton starts from the physically
+    correct state.
+  - `WallNode` initial pressure is now set equal to the upstream node pressure (no
+    friction drop at zero flow) instead of the BFS-propagated underestimate.
+  - Default `maxfev`/`maxiter` limit is now `max(500, 200*(n+1))` (matching scipy's
+    hybr internal default) computed from the actual problem size, replacing the
+    hard-coded 500 that caused convergence failures on larger networks or near-choking
+    operating points.
+  - `ChannelElement.diagnostics` applies the same Re floor (`sqrt(Re²+64²)`) used by
+    the C++ friction correlations, preventing `f` from reporting astronomically large
+    values (e.g. 5.7 × 10¹⁶) for dead-end channels with near-zero mass flow.
+
 ### Added
 - **Copy-paste nodes** (Ctrl/Cmd+C / Ctrl/Cmd+V): selected nodes can be duplicated
   on the canvas. Physics and configuration data (including orientation) are copied;

@@ -17,6 +17,7 @@ from .components import (
     NetworkMixtureState,
     NetworkNode,
     PressureBoundary,
+    WallNode,
 )
 from .graph import FlowNetwork
 
@@ -245,6 +246,14 @@ class NetworkSolver:
                     visited.add(from_id)
                     queue.append(from_id)
 
+        # WallNode dead-ends carry no flow, so the correct pressure equals the
+        # upstream node pressure (no friction drop).  Override the BFS estimate.
+        for nid, node in self.network.nodes.items():
+            if isinstance(node, WallNode):
+                for elem in self.network.get_upstream_elements(nid):
+                    p_guess[nid] = p_guess.get(elem.from_node, p_guess.get(nid, ref["P"]))
+                    break
+
         return p_guess
 
     def _propagate_mdot_guess(self, ref: dict[str, Any]) -> dict[str, float]:
@@ -302,12 +311,19 @@ class NetworkSolver:
             for elem in down_elems:
                 elem_share = share
                 regime = getattr(elem, "regime", None)
+
+                # Dead-end channels (to_node is a WallNode) carry zero flow.
+                # Start Newton at m_dot=0 so the mass-balance constraint is
+                # trivially satisfied from the first iteration.
+                if isinstance(self.network.nodes.get(elem.to_node), WallNode):
+                    elem_share = 0.0
+
                 # Only apply the Mach cap when the flow is estimated (pressure-
                 # boundary seeded).  When a MassFlowBoundary seeds the element
                 # directly, the mass flow is a known constraint and capping it
                 # produces an initial guess that is too far from the solution,
                 # causing hybr to converge to a spurious local minimum.
-                if regime == "compressible" and not from_mass_boundary:
+                elif regime == "compressible" and not from_mass_boundary:
                     area = getattr(elem, "area", None)
                     if area is not None and area > 0.0:
                         mdot_cap = rho_ref * a_ref * area * mdot_ratio
@@ -369,6 +385,11 @@ class NetworkSolver:
             _pt_src = max(_node_pt(n) for n in _src)
             _pt_snk = min(_node_pt(n) for n in _snk)
             _dP_total = max(_pt_src - _pt_snk, 1.0)
+            # F_C may be None before topology is resolved (e.g. when _build_x0
+            # is called directly before NetworkSolver.solve resolves topology).
+            # Skip the Bernoulli estimate and fall back to the propagated guess.
+            if not _elem.F_C:
+                continue
             _bernoulli_com = _elem.F_C * math.sqrt(2.0 * _rho_tee * _dP_total)
             # Prefer a propagated mdot (e.g. from MassFlowBoundary) over the
             # Bernoulli estimate when the former is larger -- the propagated value
@@ -1262,11 +1283,6 @@ class NetworkSolver:
         if method != "hybr" and "maxfev" in options:
             options.setdefault("maxiter", options.pop("maxfev"))
 
-        if method == "hybr":
-            options.setdefault("maxfev", 500)
-        else:
-            options.setdefault("maxiter", 500)
-
         # Ensure topology is resolved before solving
         self.network.resolve_all_topology()
         self.network.validate()
@@ -1279,6 +1295,16 @@ class NetworkSolver:
                 "__message__": "Network is empty or fully constrained (no unknowns).",
                 "__iterations__": 0,
             }
+
+        # Set default iteration limit based on problem size (matches hybr's own default
+        # of 200*(n+1)) now that we know n.  Applied after the early-return check so
+        # the network can't be empty when we read len(unknown_names).
+        _n_unk = len(self.unknown_names)
+        _default_iters = max(500, 200 * (_n_unk + 1))
+        if method == "hybr":
+            options.setdefault("maxfev", _default_iters)
+        else:
+            options.setdefault("maxiter", _default_iters)
 
         warmstart_x0: np.ndarray | None = None
         if x0 is None and init_strategy == "incompressible_warmstart":
@@ -1348,10 +1374,9 @@ class NetworkSolver:
                     # Limit maxfev/maxiter for intermediate steps to stay fast.
                     # This is decremental to convergence: trade speed versus robustness near choking.
                     step_options = dict(options)
-                    if method == "hybr":
-                        step_options["maxfev"] = step_options.get("maxfev", 500)
-                    else:
-                        step_options["maxiter"] = step_options.get("maxiter", 500)
+                    # options already has maxfev/_default_iters set above; honour
+                    # it.  The setdefault here is only reached if the caller
+                    # explicitly zeroed out maxfev/maxiter, which should not happen.
 
                     last_sol = self.solve(
                         method=method,
