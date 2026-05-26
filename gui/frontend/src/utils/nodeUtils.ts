@@ -20,60 +20,58 @@ export const rotPos = (pos: Position, rotation: number): Position => {
 	return CYCLE[(idx + steps + 4) % 4];
 };
 
-// Base positioning for each handle edge. Used by handleStyle below.
-// The left/top/right/bottom values pin the handle to the correct physical
-// edge within the node div's local (pre-rotation) coordinate system.
+// Half the flow-handle size (12 px) so we can center without translate.
+// Using calc() in top/left instead of transform:translate avoids the
+// "translate in rotated axes" pitfall: if the transform only contains
+// rotate(), rotating around 50%/50% is a pure in-place spin and
+// getBoundingClientRect() returns the correct screen center both before
+// and after rotation.
+const H = "6px";
+
 const HANDLE_BASE: Record<Position, React.CSSProperties> = {
 	[Position.Left]: {
 		left: "-4px",
 		right: "auto",
-		top: "50%",
+		top: `calc(50% - ${H})`,
 		bottom: "auto",
 	},
 	[Position.Right]: {
 		left: "auto",
 		right: "-4px",
-		top: "50%",
+		top: `calc(50% - ${H})`,
 		bottom: "auto",
 	},
 	[Position.Top]: {
-		left: "50%",
+		left: `calc(50% - ${H})`,
 		right: "auto",
 		top: "-4px",
 		bottom: "auto",
 	},
 	[Position.Bottom]: {
-		left: "50%",
+		left: `calc(50% - ${H})`,
 		right: "auto",
 		top: "auto",
 		bottom: "-4px",
 	},
 };
 
-// Centering offset for left/right vs top/bottom handles.
-const HANDLE_CENTER: Record<Position, string> = {
-	[Position.Left]: "translate(0, -50%)",
-	[Position.Right]: "translate(0, -50%)",
-	[Position.Top]: "translate(-50%, 0)",
-	[Position.Bottom]: "translate(-50%, 0)",
-};
-
 /**
- * Returns the inline style for a Handle based on its pre-rotation base
- * position and the node's current rotation.
+ * Inline style for a Handle.
  *
- * Two effects:
- *  1. Overrides ReactFlow's position CSS classes (which would otherwise
- *     place the handle in the rotated coordinate system, landing it on the
- *     wrong visual edge).
- *  2. Counter-rotates the handle div by −rotation so that the ::after
- *     triangle drawn by index.css stays perpendicular to the edge it sits on,
- *     rather than inheriting the node's CSS rotation.
+ * 1. Pins it to the correct physical edge (overriding ReactFlow's position
+ *    CSS classes, which apply in the rotated coordinate system and would
+ *    land the handle on the wrong visual edge).
+ * 2. Counter-rotates the handle div by −rotation.  Because the node div has
+ *    transform:rotate(+rotation), the net rotation of the handle and its
+ *    ::after triangle is 0° relative to the screen — keeping the triangle
+ *    perpendicular to the edge it sits on.
+ *    The rotation is a pure spin (no translate), so getBoundingClientRect()
+ *    returns the correct screen center at every rotation step.
  */
 export const handleStyle = (
 	basePos: Position,
 	rotation: number,
 ): React.CSSProperties => ({
 	...HANDLE_BASE[basePos],
-	transform: `${HANDLE_CENTER[basePos]} rotate(${-rotation}deg)`,
+	transform: `rotate(${-rotation}deg)`,
 });
