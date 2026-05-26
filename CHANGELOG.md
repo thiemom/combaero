@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Levenberg-Marquardt fallback for hybr oscillation** on compressible networks: when
+  `hybr` (Powell's method) fails to converge on a compressible network — typically because
+  the Jacobian is ill-conditioned near a choked operating point and Newton steps bounce
+  without making progress — the solver now automatically retries from the best iterate
+  using Levenberg-Marquardt.  LM's `(J^TJ + lI)` regularisation limits the step even
+  when J is nearly singular, providing monotone reduction in `||F||`.  The timeout budget
+  is split 65/35 between hybr and the LM fallback so both methods have working time.
+  The initial hybr trust-region is also reduced (`factor=10`, down from the scipy default
+  of 100) to dampen oscillating overshoots from the start.
 - **Solver convergence hardening** for networks with dead-end branches (Wall nodes) and
   inherited-geometry TeeJunctions (`F_C: null`):
   - `_build_x0` now guards the TeeJunction Bernoulli estimate against `F_C=None`,

@@ -1303,6 +1303,10 @@ class NetworkSolver:
         _default_iters = max(500, 200 * (_n_unk + 1))
         if method == "hybr":
             options.setdefault("maxfev", _default_iters)
+            # Reduce initial trust-region step bound (hybr default is 100).
+            # Smaller steps prevent large oscillating Newton steps near
+            # ill-conditioned Jacobians (e.g., compressible flow near choking).
+            options.setdefault("factor", 10)
         else:
             options.setdefault("maxiter", _default_iters)
 
@@ -1449,6 +1453,16 @@ class NetworkSolver:
 
         x0_scaled = x0_use * inv_D_x  # should be ~1.0
 
+        # For compressible networks hybr can oscillate near choking.  Reserve
+        # 35% of the wall-clock budget for an LM fallback that has better
+        # global convergence via (J^TJ + lI) regularisation.
+        # Incompressible inner solves (regime overrides applied) have no
+        # compressible elements and keep the full budget.
+        _has_compressible = method == "hybr" and bool(self._compressible_element_overrides())
+        _hybr_budget = timeout * 0.65 if (_has_compressible and timeout is not None) else timeout
+        # Mutable so the LM fallback block can extend the effective limit.
+        _timeout_eff: list[float | None] = [_hybr_budget]
+
         # State for timeout and best iterate tracking (in real space)
         start_time = time.perf_counter()
         best_x = x0_use.copy()
@@ -1459,8 +1473,8 @@ class NetworkSolver:
             nonlocal best_x, best_res_norm, last_exception
 
             # Check timeout
-            if timeout is not None and (time.perf_counter() - start_time) > timeout:
-                raise SolverTimeoutError(f"Solver timed out after {timeout} seconds.")
+            if _timeout_eff[0] is not None and (time.perf_counter() - start_time) > _timeout_eff[0]:
+                raise SolverTimeoutError(f"Solver timed out after {_timeout_eff[0]:.1f} seconds.")
 
             # Un-scale to real space
             x_real = x_scaled * D_x
@@ -1560,6 +1574,39 @@ class NetworkSolver:
                     final_norm = fallback_norm
             except Exception:
                 pass  # keep original failure
+
+        # LM fallback for hybr oscillation on compressible networks.
+        # Levenberg-Marquardt's (J^TJ + lI) regularisation prevents the
+        # ill-conditioned Newton step that causes hybr to bounce near a
+        # choked solution without making progress.  Start from the best
+        # iterate hybr found; restore the full timeout so LM gets the
+        # remaining 35% of the budget.
+        if not success and _has_compressible:
+            _elapsed = time.perf_counter() - start_time
+            _remaining = (timeout - _elapsed) if timeout is not None else None
+            if _remaining is None or _remaining > 2.0:
+                _timeout_eff[0] = timeout
+                try:
+                    root(
+                        residuals_wrapper,
+                        best_x * inv_D_x,
+                        method="lm",
+                        jac=use_jac,
+                        options={"maxiter": _default_iters},
+                    )
+                    _lm_norm = float(best_res_norm)
+                    if _lm_norm < _RESIDUAL_TOL:
+                        final_x = best_x
+                        success = True
+                        message = (
+                            f"Converged with LM fallback "
+                            f"(hybr |F|={final_norm:.3e}, LM |F|={_lm_norm:.3e})."
+                        )
+                        final_norm = _lm_norm
+                except SolverTimeoutError:
+                    pass
+                except Exception:
+                    pass
 
         if not success:
             warnings.warn(
