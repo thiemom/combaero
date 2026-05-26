@@ -91,7 +91,12 @@ const NumericInput: React.FC<NumericInputProps> = ({
 					: max !== undefined && parsed > max
 						? max
 						: parsed;
-			onChange(clamped);
+			// Only propagate if the value actually changed; clicking into a field
+			// that shows an inherited/default value and clicking away without typing
+			// should not mark it as user-set.
+			if (value == null || Math.abs(clamped - value) > 1e-10) {
+				onChange(clamped);
+			}
 			setLocalValue(clamped.toString());
 		}
 	};

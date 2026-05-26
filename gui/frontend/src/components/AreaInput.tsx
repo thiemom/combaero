@@ -9,6 +9,7 @@ interface AreaInputProps {
 	id?: string;
 	placeholder?: string;
 	onClear?: () => void;
+	inputClassName?: string;
 }
 
 const AreaInput: React.FC<AreaInputProps> = ({
@@ -18,6 +19,7 @@ const AreaInput: React.FC<AreaInputProps> = ({
 	id,
 	onClear,
 	placeholder = "0.00",
+	inputClassName,
 }) => {
 	const { unitPreferences, setAreaUnit } = useStore();
 	const unit = unitPreferences.area;
@@ -37,7 +39,7 @@ const AreaInput: React.FC<AreaInputProps> = ({
 					value={value * displayScale}
 					onChange={(v) => onChange(v / displayScale)}
 					onClear={onClear}
-					className="min-w-0 w-full p-1.5 border rounded text-xs bg-stone-50 focus:bg-white focus:ring-1 focus:ring-orange-500 outline-none"
+					className={`min-w-0 w-full p-1.5 border rounded text-xs bg-stone-50 focus:bg-white focus:ring-1 focus:ring-orange-500 outline-none${inputClassName ? ` ${inputClassName}` : ""}`}
 					placeholder={placeholder}
 				/>
 				<select

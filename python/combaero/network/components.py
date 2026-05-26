@@ -786,7 +786,7 @@ class MomentumChamberNode(NetworkNode):
     def __init__(
         self,
         id: str,
-        area: float = 0.1,
+        area: float | None = None,
         port_angles_deg: dict[str, float] | None = None,
         length: float | None = None,
         surface: ConvectiveSurface | None = None,
@@ -794,7 +794,8 @@ class MomentumChamberNode(NetworkNode):
         Dh: float | None = None,
     ):
         super().__init__(id)
-        self.area = area  # Cross-sectional area for momentum calculations
+        self._auto_area = area is None
+        self.area = area if area is not None else 0.0
         self.port_angles_deg: dict[str, float] = port_angles_deg or {}
         self.length = length
         self.Dh = Dh
@@ -959,8 +960,19 @@ class MomentumChamberNode(NetworkNode):
         }
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
-        # Store upstream elements for mixing calculations
         self.upstream_elements = graph.get_upstream_elements(self.id)
+        # Inherit hydraulic diameter from upstream channel when not user-specified
+        if self.Dh is None:
+            for elem in self.upstream_elements:
+                if isinstance(elem, ChannelElement) and elem.diameter is not None:
+                    self.Dh = elem.diameter
+                    break
+        # Derive cross-section area from Dh when area was not user-specified
+        if self._auto_area and self.Dh is not None:
+            self.area = math.pi * (self.Dh / 2.0) ** 2
+            self.surface.area = self.area
+        elif self._auto_area:
+            self.area = 0.1  # fallback (same as original default)
 
 
 class PressureBoundary(NetworkNode):
@@ -1105,14 +1117,15 @@ class CombustorNode(NetworkNode):
         self,
         id: str,
         method: CombustionMethodLiteral = "complete",
-        area: float = 0.1,
+        area: float | None = None,
         Dh: float | None = None,
         surface: ConvectiveSurface | None = None,
         t_hot: float | None = None,
     ):
         super().__init__(id)
         self.method = method
-        self.area = area
+        self._auto_area = area is None
+        self.area = area if area is not None else 0.0
         self.Dh = Dh
         self.surface = surface or ConvectiveSurface()
         self.t_hot = t_hot
@@ -1287,8 +1300,19 @@ class CombustorNode(NetworkNode):
         )
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
-        # Store upstream elements for mixing calculations
         self.upstream_elements = graph.get_upstream_elements(self.id)
+        # Inherit hydraulic diameter from upstream channel when not user-specified
+        if self.Dh is None:
+            for elem in self.upstream_elements:
+                if isinstance(elem, ChannelElement) and elem.diameter is not None:
+                    self.Dh = elem.diameter
+                    break
+        # Derive cross-section area from Dh when area was not user-specified
+        if self._auto_area and self.Dh is not None:
+            self.area = math.pi * (self.Dh / 2.0) ** 2
+            self.surface.area = self.area
+        elif self._auto_area:
+            self.area = 0.1  # fallback (same as original default)
 
 
 class OrificeElement(NetworkElement):
@@ -1322,15 +1346,16 @@ class OrificeElement(NetworkElement):
     ):
         super().__init__(id, from_node, to_node)
 
-        if diameter is None and area is None:
-            raise ValueError("OrificeElement requires either 'diameter' or 'area'.")
-
         if diameter is not None:
-            self.diameter = diameter
-            self.area = math.pi * (diameter / 2.0) ** 2
-        else:
+            self.diameter: float | None = diameter
+            self.area: float | None = math.pi * (diameter / 2.0) ** 2
+        elif area is not None:
             self.area = area
             self.diameter = math.sqrt(4.0 * area / math.pi)
+        else:
+            # Both None: inherit from upstream channel in resolve_topology
+            self.diameter = None
+            self.area = None
 
         self.Cd = Cd
         self.regime = regime
@@ -1361,6 +1386,12 @@ class OrificeElement(NetworkElement):
 
         if len(downstream_channels) == 1:
             self.downstream_diameter = downstream_channels[0].diameter
+
+        # Bore must be explicitly set by the user; fall back to 0.08 when unspecified.
+        # (upstream_diameter is kept only for the velocity-of-approach Beta correction.)
+        if self.diameter is None:
+            self.diameter = 0.08
+            self.area = math.pi * (self.diameter / 2.0) ** 2
 
         # Pre-compute beta for velocity-of-approach factor
 
@@ -1931,6 +1962,22 @@ class PressureLossElement(NetworkElement):
         # source node's burned/unburned temperatures without a re-pass.
         self._graph_ref = graph
 
+        # 0. Area inheritance: when no user-specified area, inherit from the
+        #    nearest upstream ChannelElement diameter.  This makes discrete loss
+        #    work after any element, not just combustor/plenum nodes.
+        if self.area is None:
+            for elem in graph.get_upstream_elements(self.from_node):
+                if isinstance(elem, ChannelElement) and elem.diameter is not None:
+                    self.area = math.pi / 4.0 * elem.diameter**2
+                    break
+            if self.area is None:
+                self.area = 0.1
+            # Propagate updated area into head-loss correlations and convective surface.
+            if hasattr(self.correlation, "area"):
+                self.correlation.area = self.area
+            if self.surface.area == 0.0:
+                self.surface.area = self.area
+
         # 1. Explicit override wins.
         if self.theta_source is not None:
             src = graph.nodes.get(self.theta_source)
@@ -2134,8 +2181,9 @@ class ChannelElement(NetworkElement):
         from_node: str,
         to_node: str,
         length: float,
-        diameter: float,
-        roughness: float,
+        diameter: float | None = None,
+        Dh: float | None = None,
+        roughness: float = 1e-5,
         regime: CompressibilityLiteral = "incompressible",
         friction_model: FrictionModelLiteral = "haaland",
         htc_model: HeatTransferModelLiteral = "none",
@@ -2144,9 +2192,12 @@ class ChannelElement(NetworkElement):
     ):
         super().__init__(id, from_node, to_node)
         self.length = length
-        self.diameter = diameter
+        self.diameter: float | None = diameter
+        # Dh: user-specified hydraulic diameter (for non-circular ducts).
+        # None until resolved: defaults to diameter (circular assumption).
+        self.Dh: float | None = Dh if Dh is not None else diameter
         self.roughness = roughness
-        self.area = math.pi * (diameter / 2) ** 2
+        self.area: float | None = math.pi * (diameter / 2) ** 2 if diameter is not None else None
 
         self.regime = regime
         self.friction_model = friction_model
@@ -2174,13 +2225,14 @@ class ChannelElement(NetworkElement):
             rho = state_in.density() if state_in.density() > 0 else 1.2
             mu = cs.transport.mu if cs.transport.mu > 0 else 1.8e-5
             v = abs(m_dot) / (rho * self.area) if self.area > 0.0 else 0.0
-            Re = rho * v * self.diameter / mu if mu > 0 else 1.0
+            dh = self.Dh or self.diameter or 1.0
+            Re = rho * v * dh / mu if mu > 0 else 1.0
 
             # Base pure pipe friction calculation
             if Re < 2300:
                 f_base = 64.0 / Re if Re > 0 else 0.0
             else:
-                e_D = self.roughness / self.diameter if self.diameter > 0 else 0.0
+                e_D = self.roughness / dh if dh > 0 else 0.0
                 if e_D > 1e-8:
                     f_base = 1.0 / (-1.8 * math.log10((e_D / 3.7) ** 1.11 + 6.9 / Re)) ** 2
                 else:
@@ -2202,7 +2254,7 @@ class ChannelElement(NetworkElement):
                         dP_target = h_res.dP
                         dynamic_head = 0.5 * rho * v**2
                         if dynamic_head > 0:
-                            f_total = dP_target / ((self.length / self.diameter) * dynamic_head)
+                            f_total = dP_target / ((self.length / dh) * dynamic_head)
                             f_mult *= f_total / f_base
 
         if self.regime == "compressible":
@@ -2265,7 +2317,11 @@ class ChannelElement(NetworkElement):
     ) -> dict[str, float | str]:
         cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
         ref = _element_reference_block(
-            cs_in, m_dot=state_in.m_dot, area=self.area, Dh=self.diameter, location="inlet"
+            cs_in,
+            m_dot=state_in.m_dot,
+            area=self.area,
+            Dh=self.Dh or self.diameter,
+            location="inlet",
         )
         v_in = ref["velocity"]
         re_in = ref["Re"]
@@ -2285,7 +2341,8 @@ class ChannelElement(NetworkElement):
             Nu, htc, T_aw, f = h_res.Nu, h_res.h, h_res.T_aw, h_res.f
         else:
             Nu, htc, T_aw = 0.0, 0.0, state_in.T
-            e_D = self.roughness / self.diameter if self.diameter > 0 else 0.0
+            dh_diag = self.Dh or self.diameter or 1.0
+            e_D = self.roughness / dh_diag if dh_diag > 0 else 0.0
             if re_in < 2300:
                 f = 64.0 / re_in if re_in > 0 else 0.0
             elif e_D > 1e-8:
@@ -2297,7 +2354,7 @@ class ChannelElement(NetworkElement):
             "m_dot": float(state_in.m_dot),
             **_element_pressure_block(state_in, state_out, mach_in=mach_in, mach_out=mach_out),
             **ref,
-            "Dh": float(self.diameter),
+            "Dh": float(self.Dh or self.diameter or 0.0),
             "Nu": float(Nu),
             "htc": float(htc),
             "T_aw": float(T_aw),
@@ -2381,7 +2438,7 @@ class ChannelElement(NetworkElement):
             P=state.P,
             X=state.X,
             velocity=u,
-            diameter=self.diameter,
+            diameter=self.Dh or self.diameter,
             length=self.length,
             T_hot=T_hot,
         )
@@ -2390,7 +2447,38 @@ class ChannelElement(NetworkElement):
         return 1
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
-        pass
+        if self.diameter is not None:
+            return
+        # Inherit diameter from the nearest upstream geometry source
+        sources = graph.get_upstream_elements(self.from_node) + graph.get_downstream_elements(
+            self.to_node
+        )
+        for elem in sources:
+            if isinstance(elem, ChannelElement) and elem.diameter is not None:
+                self.diameter = elem.diameter
+                break
+            if isinstance(elem, AreaChangeElement) and elem.F1 is not None:
+                self.diameter = math.sqrt(4.0 * elem.F1 / math.pi)
+                break
+            if isinstance(elem, TeeJunctionElement) and elem.F_C is not None:
+                # Branch arm carries F_C/psi; straight/common arm carries F_C
+                is_branch = self.from_node == elem.branch_node or self.to_node == elem.branch_node
+                area = elem.F_C / elem.psi if is_branch else elem.F_C
+                self.diameter = math.sqrt(4.0 * area / math.pi)
+                break
+        if self.diameter is None:
+            if getattr(self, "_topo_pass", 0) >= 1:
+                self.diameter = 0.1  # fallback only after second pass
+            else:
+                # Defer: upstream tee may not have resolved F_C yet in this pass
+                self._topo_pass = 1
+                return
+        self.area = math.pi * (self.diameter / 2) ** 2
+        if self.Dh is None:
+            self.Dh = self.diameter
+        # Update convective surface area (was 0 if diameter was deferred)
+        if self.surface and self.surface.area == 0.0:
+            self.surface.area = math.pi * self.diameter * self.length
 
 
 class AreaChangeElement(NetworkElement):
@@ -2403,15 +2491,15 @@ class AreaChangeElement(NetworkElement):
         id: str,
         from_node: str,
         to_node: str,
-        F0: float,
-        F1: float,
+        F0: float | None = None,
+        F1: float | None = None,
         model_type: Literal["sharp", "conical"] = "sharp",
         length: float | None = None,
         D_h: float | None = 0.0,
     ):
         super().__init__(id, from_node, to_node)
-        self.F0 = F0
-        self.F1 = F1
+        self.F0: float | None = F0
+        self.F1: float | None = F1
         self.model_type = model_type
         self.length = length if length is not None else 0.0
         self.D_h = D_h
@@ -2423,14 +2511,27 @@ class AreaChangeElement(NetworkElement):
         return 1
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
-        pass
+        if self.F0 is None:
+            for elem in graph.get_upstream_elements(self.from_node):
+                if isinstance(elem, ChannelElement) and elem.diameter is not None:
+                    self.F0 = math.pi * (elem.diameter / 2.0) ** 2
+                    break
+            if self.F0 is None:
+                self.F0 = 0.01
+        if self.F1 is None:
+            for elem in graph.get_downstream_elements(self.to_node):
+                if isinstance(elem, ChannelElement) and elem.diameter is not None:
+                    self.F1 = math.pi * (elem.diameter / 2.0) ** 2
+                    break
+            if self.F1 is None:
+                self.F1 = 0.02
 
     def validate(self) -> None:
-        if self.F0 <= 0:
+        if (self.F0 or 0.0) <= 0:
             raise ValueError(
                 f"AreaChangeElement '{self.id}' has invalid Upstream Area F0={self.F0}. Must be > 0."
             )
-        if self.F1 <= 0:
+        if (self.F1 or 0.0) <= 0:
             raise ValueError(
                 f"AreaChangeElement '{self.id}' has invalid Downstream Area F1={self.F1}. Must be > 0."
             )
@@ -2586,8 +2687,9 @@ class TeeJunctionElement(NetworkElement):
         straight_node: str,
         branch_node: str,
         theta: float,
-        F_C: float,
-        psi: float = 1.0,  # F_C / F_branch: common / lateral-branch area ratio
+        F_C: float | None = None,
+        F_branch: float | None = None,
+        psi: float = 1.0,  # fallback ratio when F_branch is None and not inherited
         tee_type: Literal["merging", "branching"] = "merging",
         blend_k: float = 30.0,
     ):
@@ -2598,7 +2700,10 @@ class TeeJunctionElement(NetworkElement):
         self.straight_node = straight_node
         self.branch_node = branch_node
         self.theta = theta
-        self.F_C = F_C
+        self.F_C: float | None = F_C
+        self._F_branch: float | None = (
+            F_branch  # resolved branch area; psi derived from F_C/_F_branch
+        )
         self.psi = psi
         self.tee_type = tee_type
         self.blend_k = blend_k
@@ -2636,7 +2741,56 @@ class TeeJunctionElement(NetworkElement):
         return 2
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
-        pass
+        # Step 1: resolve F_C from common or straight arm channels.
+        # Branch arm is only used as last resort (back-calculate F_C = F_branch * psi).
+        if self.F_C is None:
+            found_fc = False
+            for node_id in (self.common_node, self.straight_node):
+                for e in graph.get_upstream_elements(node_id) + graph.get_downstream_elements(
+                    node_id
+                ):
+                    if e is self:
+                        continue
+                    if isinstance(e, ChannelElement) and e.diameter is not None:
+                        self.F_C = math.pi * (e.diameter / 2.0) ** 2
+                        found_fc = True
+                        break
+                if found_fc:
+                    break
+            if not found_fc:
+                # Last resort: use branch arm channel to back-calculate F_C = F_branch * psi
+                for e in graph.get_upstream_elements(
+                    self.branch_node
+                ) + graph.get_downstream_elements(self.branch_node):
+                    if e is self:
+                        continue
+                    if isinstance(e, ChannelElement) and e.diameter is not None:
+                        f_b = math.pi * (e.diameter / 2.0) ** 2
+                        if self._F_branch is None:
+                            self._F_branch = f_b
+                        self.F_C = f_b * self.psi
+                        found_fc = True
+                        break
+            if not found_fc:
+                if getattr(self, "_topo_pass", 0) >= 1:
+                    self.F_C = 0.01
+                else:
+                    self._topo_pass = 1
+
+        # Step 2: resolve F_branch independently from the branch arm channel.
+        if self._F_branch is None:
+            for e in graph.get_upstream_elements(self.branch_node) + graph.get_downstream_elements(
+                self.branch_node
+            ):
+                if e is self:
+                    continue
+                if isinstance(e, ChannelElement) and e.diameter is not None:
+                    self._F_branch = math.pi * (e.diameter / 2.0) ** 2
+                    break
+
+        # Step 3: recompute psi from resolved areas.
+        if self.F_C is not None and self._F_branch is not None and self._F_branch > 0:
+            self.psi = self.F_C / self._F_branch
 
     def validate(self) -> None:
         if self.tee_type not in ("merging", "branching"):
@@ -2647,7 +2801,7 @@ class TeeJunctionElement(NetworkElement):
             raise ValueError(
                 f"TeeJunctionElement '{self.id}': |theta| must be <= pi/2, got {self.theta}."
             )
-        if self.F_C <= 0.0:
+        if (self.F_C or 0.0) <= 0.0:
             raise ValueError(f"TeeJunctionElement '{self.id}': F_C must be > 0, got {self.F_C}.")
         if self.psi <= 0.0:
             raise ValueError(f"TeeJunctionElement '{self.id}': psi must be > 0, got {self.psi}.")

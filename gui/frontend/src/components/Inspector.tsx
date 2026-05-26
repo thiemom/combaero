@@ -392,520 +392,1259 @@ const Inspector = () => {
 					</div>
 				)}
 
-				{selectedNode.type === "channel" && (
-					<>
-						<LengthInput
-							id={`L_${selectedNode.id}`}
-							label="Length Flow Path"
-							value={selectedNode.data.L ?? 1.0}
-							onChange={(val) => updateNodeData(selectedNode.id, { L: val })}
-						/>
-						<LengthInput
-							id={`D_${selectedNode.id}`}
-							label="Channel Inner Diameter"
-							value={selectedNode.data.D ?? 0.1}
-							onChange={(val) => updateNodeData(selectedNode.id, { D: val })}
-						/>
-						<div className="flex flex-col gap-2">
-							<label className="text-xs font-bold text-gray-500 uppercase">
-								Friction Model
-							</label>
-							<select
-								className="p-2 border rounded bg-white text-xs"
-								value={selectedNode.data.friction_model || "haaland"}
-								onChange={(e) =>
-									updateNodeData(selectedNode.id, {
-										friction_model: e.target.value,
-									})
-								}
-							>
-								<option value="haaland">
-									Haaland (default, ~2–3% vs Colebrook)
-								</option>
-								<option value="serghides">
-									Serghides (&lt;0.3% vs Colebrook)
-								</option>
-								<option value="colebrook">Colebrook-White (reference)</option>
-								<option value="petukhov">
-									Petukhov (smooth pipe, pairs with Petukhov Nu)
-								</option>
-							</select>
-						</div>
-						<LengthInput
-							id={`roughness_${selectedNode.id}`}
-							label="Surface Roughness"
-							value={selectedNode.data.roughness ?? 1e-5}
-							onChange={(val) =>
-								updateNodeData(selectedNode.id, { roughness: val })
+				{selectedNode.type === "channel" &&
+					(() => {
+						const upstreamEdge = edges.find(
+							(e) => e.target === selectedNode.id && !e.data?.type,
+						);
+						const downstreamEdge = edges.find(
+							(e) => e.source === selectedNode.id && !e.data?.type,
+						);
+						const upstreamNode = upstreamEdge
+							? nodes.find((n) => n.id === upstreamEdge.source)
+							: undefined;
+						const downstreamNode = downstreamEdge
+							? nodes.find((n) => n.id === downstreamEdge.target)
+							: undefined;
+						// Returns {d, dh} to propagate both circular-equivalent diameter
+						// and hydraulic diameter through chains. channel: dh = Dh ?? D.
+						// area_change: dh = D_h (if set) ?? sqrt(4F/pi). Tees: dh = d.
+						const walkGeometry = (
+							n: typeof upstreamNode,
+							edge: typeof upstreamEdge,
+							side: "upstream" | "downstream",
+							depth = 0,
+						): { d: number; dh: number } | undefined => {
+							if (!n || depth > 20) return undefined;
+							if (n.type === "channel") {
+								const d = n.data.D as number | null | undefined;
+								const dh = n.data.Dh as number | null | undefined;
+								if (d != null) return { d, dh: dh ?? d };
+								const hopEdge =
+									side === "upstream"
+										? edges.find((e) => e.target === n.id && !e.data?.type)
+										: edges.find((e) => e.source === n.id && !e.data?.type);
+								const hopNode = hopEdge
+									? nodes.find(
+											(nn) =>
+												nn.id ===
+												(side === "upstream" ? hopEdge.source : hopEdge.target),
+										)
+									: undefined;
+								return walkGeometry(hopNode, hopEdge, side, depth + 1);
 							}
-							disabled={selectedNode.data.friction_model === "petukhov"}
-						/>
-						<div className="grid grid-cols-2 gap-3">
-							<div className="flex flex-col gap-2">
-								<label className="text-xs font-bold text-gray-500 uppercase">
-									Nu Multiplier
-								</label>
-								<NumericInput
-									value={selectedNode.data.Nu_multiplier ?? 1.0}
-									onChange={(val) =>
-										updateNodeData(selectedNode.id, { Nu_multiplier: val })
-									}
-									className="p-2 border rounded"
-								/>
-								<span className="text-[9px] text-stone-400">
-									{`global: ×${solverSettings.Nu_multiplier ?? 1}`}
-								</span>
-							</div>
-							<div className="flex flex-col gap-2">
-								<label className="text-xs font-bold text-gray-500 uppercase">
-									F Multiplier
-								</label>
-								<NumericInput
-									value={selectedNode.data.f_multiplier ?? 1.0}
-									onChange={(val) =>
-										updateNodeData(selectedNode.id, { f_multiplier: val })
-									}
-									className="p-2 border rounded"
-								/>
-								<span className="text-[9px] text-stone-400">
-									{`global: ×${solverSettings.f_multiplier ?? 1}`}
-								</span>
-							</div>
-						</div>
-						<div className="flex flex-col gap-2">
-							<label className="text-xs font-bold text-gray-500 uppercase">
-								Regime
-							</label>
-							<select
-								className="p-2 border rounded bg-white text-xs"
-								value={selectedNode.data.regime || "default"}
-								onChange={(e) =>
-									updateNodeData(selectedNode.id, { regime: e.target.value })
+							if (n.type === "area_change") {
+								const dhAc = n.data.D_h as number | null | undefined;
+								const f =
+									side === "upstream"
+										? (n.data.F1 as number | null | undefined)
+										: (n.data.F0 as number | null | undefined);
+								if (f != null) {
+									const d = Math.sqrt((4 * f) / Math.PI);
+									return { d, dh: dhAc != null && dhAc > 0 ? dhAc : d };
 								}
-							>
-								<option value="default">Default (Global)</option>
-								<option value="incompressible">Forced Incompressible</option>
-								<option value="compressible">Forced Compressible</option>
-							</select>
-						</div>
-						<SurfaceEnhancementInspector
-							surface={selectedNode.data.surface || { type: "smooth" }}
-							onChange={(surface) =>
-								updateNodeData(selectedNode.id, { surface })
+								return undefined;
 							}
-						/>
-						<InitialGuessEditor node={selectedNode} />
-					</>
-				)}
-
-				{selectedNode.type === "orifice" && (
-					<>
-						<LengthInput
-							id={`diameter_${selectedNode.id}`}
-							label="Bore Diameter"
-							value={selectedNode.data.diameter ?? 0.08}
-							onChange={(val) =>
-								updateNodeData(selectedNode.id, { diameter: val })
+							if (n.type === "tee_junction") {
+								const handle =
+									side === "upstream" ? edge?.sourceHandle : edge?.targetHandle;
+								const isBranch =
+									side === "upstream"
+										? handle === "port-branch-source"
+										: handle === "port-branch-target";
+								let d: number | undefined;
+								if (isBranch) {
+									const fb = n.data.F_branch as number | null | undefined;
+									const fc = n.data.F_C as number | null | undefined;
+									const psi = (n.data.psi as number | undefined) ?? 1.0;
+									const fBranch =
+										fb != null ? fb : fc != null ? fc / psi : undefined;
+									d =
+										fBranch != null
+											? Math.sqrt((4 * fBranch) / Math.PI)
+											: undefined;
+								} else {
+									const fc = n.data.F_C as number | null | undefined;
+									d = fc != null ? Math.sqrt((4 * fc) / Math.PI) : undefined;
+								}
+								return d != null ? { d, dh: d } : undefined;
 							}
-						/>
-
-						<div className="flex flex-col gap-2">
-							<label className="text-xs font-bold text-gray-500 uppercase">
-								Discharge Model (Cd)
-							</label>
-							<select
-								className="p-2 border rounded bg-white text-xs border-stone-200"
-								value={selectedNode.data.correlation || "ReaderHarrisGallagher"}
-								onChange={(e) =>
-									updateNodeData(selectedNode.id, {
-										correlation: e.target.value,
-									})
-								}
-							>
-								<option value="ReaderHarrisGallagher">
-									Reader-Harris/Gallagher (Sharp)
-								</option>
-								<option value="Stolz">Stolz (Corner Taps)</option>
-								<option value="Miller">Miller (Simplified)</option>
-								<option value="ThickPlate">Thick Plate (Sharp Edge)</option>
-								<option value="RoundedEntry">Rounded Entry</option>
-								<option value="fixed">Manual / Fixed Value</option>
-							</select>
-						</div>
-
-						{/* Conditional Inputs based on correlation */}
-						{selectedNode.data.correlation === "ThickPlate" && (
-							<LengthInput
-								id={`plate_thickness_${selectedNode.id}`}
-								label="Plate Thickness (t)"
-								value={selectedNode.data.plate_thickness ?? 0.0}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, { plate_thickness: val })
-								}
-							/>
-						)}
-
-						{selectedNode.data.correlation === "RoundedEntry" && (
-							<LengthInput
-								id={`edge_radius_${selectedNode.id}`}
-								label="Inlet Edge Radius (r)"
-								value={selectedNode.data.edge_radius ?? 0.0}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, { edge_radius: val })
-								}
-							/>
-						)}
-
-						{/* Calculated Result (for correlation models) */}
-						{selectedNode.data.correlation !== "fixed" && (
-							<div className="flex flex-col gap-1 mb-2 bg-blue-50/50 p-2 rounded border border-blue-100/50">
-								<label className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">
-									Calculated Cd
-								</label>
-								<div className="text-sm font-mono font-bold text-blue-700">
-									{selectedNode.data.result?.Cd?.toFixed(4) ||
-										"— (Pending Solve)"}
-								</div>
-							</div>
-						)}
-
-						{/* Manual Entry (only for Fixed model) */}
-						{selectedNode.data.correlation === "fixed" && (
-							<div className="flex flex-col gap-1 mt-1">
-								<label
-									htmlFor={`Cd_${selectedNode.id}`}
-									className="text-xs font-bold text-gray-500 uppercase"
-								>
-									Fixed Cd Value
-								</label>
-								<NumericInput
-									id={`Cd_${selectedNode.id}`}
-									value={selectedNode.data.Cd ?? 0.6}
-									onChange={(val) =>
-										updateNodeData(selectedNode.id, {
-											Cd: val,
-										})
-									}
-									className="p-1.5 h-8 text-sm border rounded bg-white"
-									placeholder="0.6"
-								/>
-							</div>
-						)}
-
-						<div className="flex flex-col gap-2 mt-2">
-							<label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
-								Flow Regime
-							</label>
-							<select
-								className="p-2 border rounded bg-white text-xs border-stone-200"
-								value={selectedNode.data.regime || "default"}
-								onChange={(e) =>
-									updateNodeData(selectedNode.id, { regime: e.target.value })
-								}
-							>
-								<option value="default">Default (Global)</option>
-								<option value="incompressible">Forced Incompressible</option>
-								<option value="compressible">Forced Compressible</option>
-							</select>
-						</div>
-						<InitialGuessEditor node={selectedNode} />
-					</>
-				)}
-
-				{selectedNode.type === "area_change" && (
-					<>
-						<div className="flex flex-col gap-2">
-							<label className="text-xs font-bold text-gray-500 uppercase">
-								Model Type
-							</label>
-							<select
-								className="p-2 border rounded bg-white text-xs border-stone-200"
-								value={selectedNode.data.model_type || "sharp"}
-								onChange={(e) =>
-									updateNodeData(selectedNode.id, {
-										model_type: e.target.value,
-									})
-								}
-							>
-								<option value="sharp">Sharp-Edged (Sudden)</option>
-								<option value="conical">Conical (Gradual)</option>
-							</select>
-						</div>
-
-						<AreaInput
-							id={`F0_${selectedNode.id}`}
-							label="Upstream Area (F0)"
-							value={selectedNode.data.F0 ?? 0.01}
-							onChange={(val) => updateNodeData(selectedNode.id, { F0: val })}
-						/>
-
-						<AreaInput
-							id={`F1_${selectedNode.id}`}
-							label="Downstream Area (F1)"
-							value={selectedNode.data.F1 ?? 0.02}
-							onChange={(val) => updateNodeData(selectedNode.id, { F1: val })}
-						/>
-
-						{selectedNode.data.model_type === "conical" && (
-							<LengthInput
-								id={`length_${selectedNode.id}`}
-								label="Axial Length"
-								value={selectedNode.data.length ?? 0.1}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, { length: val })
-								}
-							/>
-						)}
-
-						{selectedNode.data.model_type !== "conical" && (
-							<div className="flex flex-col gap-1 mt-1">
+							return undefined;
+						};
+						const inheritedGeomUp = walkGeometry(
+							upstreamNode,
+							upstreamEdge,
+							"upstream",
+						);
+						const inheritedGeomDown = walkGeometry(
+							downstreamNode,
+							downstreamEdge,
+							"downstream",
+						);
+						const inheritedD = inheritedGeomUp?.d ?? inheritedGeomDown?.d;
+						const inheritedDh = inheritedGeomUp?.dh ?? inheritedGeomDown?.dh;
+						const inheritSide =
+							inheritedGeomUp != null
+								? "upstream"
+								: inheritedGeomDown != null
+									? "downstream"
+									: undefined;
+						const inheritSourceId =
+							inheritSide === "upstream"
+								? upstreamNode?.id
+								: downstreamNode?.id;
+						const userSetD =
+							selectedNode.data.D !== null && selectedNode.data.D !== undefined;
+						const userSetDh =
+							selectedNode.data.Dh !== null &&
+							selectedNode.data.Dh !== undefined;
+						const effectiveD = userSetD
+							? selectedNode.data.D
+							: (inheritedD ?? 0.1);
+						// True when the upstream source provides a non-circular Dh
+						const dhIsNonCircular =
+							inheritedDh != null &&
+							(inheritedD == null ||
+								Math.abs(inheritedDh - inheritedD) > 1e-10);
+						return (
+							<>
 								<LengthInput
-									id={`D_h_${selectedNode.id}`}
-									label="Hydraulic Diameter (D_h)"
-									value={selectedNode.data.D_h}
-									placeholder="Circular (Auto)"
+									id={`L_${selectedNode.id}`}
+									label="Length Flow Path"
+									value={selectedNode.data.L ?? 1.0}
 									onChange={(val) =>
-										updateNodeData(selectedNode.id, { D_h: val })
-									}
-									onClear={() =>
-										updateNodeData(selectedNode.id, { D_h: undefined })
+										updateNodeData(selectedNode.id, { L: val })
 									}
 								/>
-								<p className="text-[9px] text-gray-400 italic">
-									Defaults to circular diameter:{" "}
-									{(
-										Math.sqrt(
-											(4 *
-												Math.min(
-													selectedNode.data.F0 ?? 0,
-													selectedNode.data.F1 ?? 0,
-												)) /
-												Math.PI,
-										) * (unitPreferences.length === "mm" ? 1000 : 1)
-									).toFixed(2)}{" "}
-									{unitPreferences.length}
-								</p>
-							</div>
-						)}
-
-						<InitialGuessEditor node={selectedNode} />
-					</>
-				)}
-
-				{selectedNode.type === "tee_junction" && (
-					<div className="flex flex-col gap-4">
-						{/* Port legend */}
-						{(() => {
-							const tm =
-								(selectedNode.data.tee_type ?? "merging") === "merging";
-							return (
-								<div className="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-[9px] leading-snug text-stone-600">
-									<div className="font-bold uppercase text-stone-400 mb-1">
-										Port Guide
-									</div>
-									<div className="grid grid-cols-3 gap-1 text-center font-mono mb-1.5">
-										<div>
-											<span
-												className="font-extrabold"
-												style={{ color: tm ? "#3b82f6" : "#f59e0b" }}
+								<div className="flex flex-col gap-2">
+									<div className="flex items-center justify-between">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Channel Inner Diameter
+										</label>
+										{userSetD && (
+											<button
+												type="button"
+												className="text-[9px] text-blue-500 hover:underline"
+												onClick={() =>
+													updateNodeData(selectedNode.id, { D: null })
+												}
 											>
-												S
-											</span>{" "}
-											straight
-										</div>
-										<div>
-											<span
-												className="font-extrabold"
-												style={{ color: tm ? "#f59e0b" : "#3b82f6" }}
-											>
-												C
-											</span>{" "}
-											common
-										</div>
-										<div>
-											<span
-												className="font-extrabold"
-												style={{ color: tm ? "#3b82f6" : "#f59e0b" }}
-											>
-												B
-											</span>{" "}
-											branch
-										</div>
-									</div>
-									<div className="text-stone-500">
-										{tm ? (
-											<>
-												<span style={{ color: "#3b82f6" }}>S, B</span> →{" "}
-												<span style={{ color: "#f59e0b" }}>C</span>
-												{"  "}(two inlets, one outlet at C)
-											</>
-										) : (
-											<>
-												<span style={{ color: "#3b82f6" }}>C</span> →{" "}
-												<span style={{ color: "#f59e0b" }}>S, B</span>
-												{"  "}(one inlet at C, two outlets)
-											</>
+												Reset to inherited
+											</button>
 										)}
 									</div>
+									<LengthInput
+										id={`D_${selectedNode.id}`}
+										label=""
+										value={userSetD ? selectedNode.data.D : (inheritedD ?? 0.1)}
+										placeholder={inheritedD ?? 0.1}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { D: val })
+										}
+										onClear={() => updateNodeData(selectedNode.id, { D: null })}
+									/>
+									{!userSetD && inheritedD != null && (
+										<p className="text-[9px] text-gray-400 italic -mt-1">
+											Inherited from {inheritSide} ({inheritSourceId}). Edit to
+											override.
+										</p>
+									)}
 								</div>
-							);
-						})()}
+								<div className="flex flex-col gap-2">
+									<div className="flex items-center justify-between">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Hydraulic Diameter Dh
+										</label>
+										{userSetDh && (
+											<button
+												type="button"
+												className="text-[9px] text-blue-500 hover:underline"
+												onClick={() =>
+													updateNodeData(selectedNode.id, { Dh: null })
+												}
+											>
+												{dhIsNonCircular
+													? "Reset to inherited"
+													: "Reset to circular"}
+											</button>
+										)}
+									</div>
+									<LengthInput
+										id={`Dh_${selectedNode.id}`}
+										label=""
+										value={
+											userSetDh
+												? selectedNode.data.Dh
+												: (inheritedDh ?? effectiveD)
+										}
+										placeholder={inheritedDh ?? effectiveD}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { Dh: val })
+										}
+										onClear={() =>
+											updateNodeData(selectedNode.id, { Dh: null })
+										}
+										inputClassName={
+											userSetDh ? "font-semibold" : "text-gray-400"
+										}
+									/>
+									{!userSetDh && dhIsNonCircular && (
+										<p className="text-[9px] text-gray-400 italic -mt-1">
+											Inherited non-circular Dh from {inheritSide}. Edit to
+											override.
+										</p>
+									)}
+									{!userSetDh && !dhIsNonCircular && (
+										<p className="text-[9px] text-gray-400 italic -mt-1">
+											Dh = D (circular). Override for non-circular ducts.
+										</p>
+									)}
+								</div>
+								<div className="flex flex-col gap-2">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Friction Model
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs"
+										value={selectedNode.data.friction_model || "haaland"}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												friction_model: e.target.value,
+											})
+										}
+									>
+										<option value="haaland">
+											Haaland (default, ~2–3% vs Colebrook)
+										</option>
+										<option value="serghides">
+											Serghides (&lt;0.3% vs Colebrook)
+										</option>
+										<option value="colebrook">
+											Colebrook-White (reference)
+										</option>
+										<option value="petukhov">
+											Petukhov (smooth pipe, pairs with Petukhov Nu)
+										</option>
+									</select>
+								</div>
+								<LengthInput
+									id={`roughness_${selectedNode.id}`}
+									label="Surface Roughness"
+									value={selectedNode.data.roughness ?? 1e-5}
+									onChange={(val) =>
+										updateNodeData(selectedNode.id, { roughness: val })
+									}
+									disabled={selectedNode.data.friction_model === "petukhov"}
+								/>
+								<div className="grid grid-cols-2 gap-3">
+									<div className="flex flex-col gap-2">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Nu Multiplier
+										</label>
+										<NumericInput
+											value={selectedNode.data.Nu_multiplier ?? 1.0}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, { Nu_multiplier: val })
+											}
+											className="p-2 border rounded"
+										/>
+										<span className="text-[9px] text-stone-400">
+											{`global: ×${solverSettings.Nu_multiplier ?? 1}`}
+										</span>
+									</div>
+									<div className="flex flex-col gap-2">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											F Multiplier
+										</label>
+										<NumericInput
+											value={selectedNode.data.f_multiplier ?? 1.0}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, { f_multiplier: val })
+											}
+											className="p-2 border rounded"
+										/>
+										<span className="text-[9px] text-stone-400">
+											{`global: ×${solverSettings.f_multiplier ?? 1}`}
+										</span>
+									</div>
+								</div>
+								<div className="flex flex-col gap-2">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Regime
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs"
+										value={selectedNode.data.regime || "default"}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												regime: e.target.value,
+											})
+										}
+									>
+										<option value="default">Default (Global)</option>
+										<option value="incompressible">
+											Forced Incompressible
+										</option>
+										<option value="compressible">Forced Compressible</option>
+									</select>
+								</div>
+								<SurfaceEnhancementInspector
+									surface={selectedNode.data.surface || { type: "smooth" }}
+									onChange={(surface) =>
+										updateNodeData(selectedNode.id, { surface })
+									}
+								/>
+								<InitialGuessEditor node={selectedNode} />
+							</>
+						);
+					})()}
 
-						{/* Tee type */}
-						<div className="flex flex-col gap-2">
-							<label className="text-xs font-bold text-gray-500 uppercase">
-								Tee Type
-							</label>
-							<select
-								className="p-2 border rounded bg-white text-xs border-stone-200"
-								value={selectedNode.data.tee_type ?? "merging"}
-								onChange={(e) =>
-									updateNodeData(selectedNode.id, { tee_type: e.target.value })
-								}
-							>
-								<option value="merging">Merging (2 inlets, 1 outlet)</option>
-								<option value="branching">
-									Branching (1 inlet, 2 outlets)
-								</option>
-							</select>
-							<p className="text-[9px] text-gray-400 italic">
-								Declares intended flow direction; the Bassett model blends
-								smoothly if flow reverses.
-							</p>
-						</div>
+				{selectedNode.type === "orifice" &&
+					(() => {
+						const upstreamEdge = edges.find(
+							(e) => e.target === selectedNode.id && !e.data?.type,
+						);
+						const upstreamNode = upstreamEdge
+							? nodes.find((n) => n.id === upstreamEdge.source)
+							: undefined;
+						const upstreamChannelD: number | null | undefined =
+							upstreamNode?.type === "channel"
+								? (upstreamNode.data.D as number | null | undefined)
+								: undefined;
+						const boreDiameter: number = selectedNode.data.diameter ?? 0.08;
+						const boreArea = (Math.PI / 4) * boreDiameter * boreDiameter;
+						return (
+							<>
+								<div className="flex flex-col gap-2">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Bore Diameter
+									</label>
+									<LengthInput
+										id={`diameter_${selectedNode.id}`}
+										label=""
+										value={boreDiameter}
+										placeholder={0.08}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { diameter: val })
+										}
+										onClear={() =>
+											updateNodeData(selectedNode.id, { diameter: null })
+										}
+									/>
+									{(() => {
+										const pipeD =
+											upstreamChannelD != null && upstreamChannelD > 0
+												? upstreamChannelD
+												: null;
+										const beta =
+											pipeD != null && boreDiameter < pipeD
+												? boreDiameter / pipeD
+												: null;
+										const beta2 = beta != null ? beta ** 2 : null;
+										const E =
+											beta != null ? 1.0 / Math.sqrt(1 - beta ** 4) : null;
+										return (
+											<div className="text-[9px] text-gray-400 -mt-1 flex flex-col gap-0.5">
+												<span>
+													Bore area:{" "}
+													<span className="font-mono">
+														{boreArea.toExponential(3)} m²
+													</span>
+													{beta2 != null && (
+														<>
+															{" · "}Area ratio β²:{" "}
+															<span className="font-mono">
+																{beta2.toFixed(4)}
+															</span>
+														</>
+													)}
+												</span>
+												{pipeD != null && (
+													<span>
+														Pipe D:{" "}
+														<span className="font-mono">
+															{pipeD.toFixed(4)} m
+														</span>
+														{beta != null && E != null ? (
+															<>
+																{" · "}β = {beta.toFixed(4)} → E ={" "}
+																<span className="font-mono">
+																	{E.toFixed(4)}
+																</span>{" "}
+																(velocity-of-approach)
+															</>
+														) : (
+															<span className="text-amber-500">
+																{" · "}β ≥ 1 — correction skipped
+															</span>
+														)}
+													</span>
+												)}
+											</div>
+										);
+									})()}
+								</div>
 
-						{/* Branch angle */}
-						<div className="flex flex-col gap-2">
-							<label className="text-xs font-bold text-gray-500 uppercase">
-								Branch Angle (deg)
-							</label>
-							<NumericInput
-								value={selectedNode.data.theta_deg ?? 90}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, { theta_deg: val })
-								}
-								className="p-2 border rounded"
-								placeholder="90"
-							/>
-							<p className="text-[9px] text-gray-400 italic">
-								Angle between branch and common arm. Sign is ignored
-								(symmetric). Bassett (2001) validated range: 30–90 deg. 0° is
-								accepted but flagged as extrapolated.
-							</p>
-						</div>
+								<div className="flex flex-col gap-2">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Discharge Model (Cd)
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={
+											selectedNode.data.correlation || "ReaderHarrisGallagher"
+										}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												correlation: e.target.value,
+											})
+										}
+									>
+										<option value="ReaderHarrisGallagher">
+											Reader-Harris/Gallagher (Sharp)
+										</option>
+										<option value="Stolz">Stolz (Corner Taps)</option>
+										<option value="Miller">Miller (Simplified)</option>
+										<option value="ThickPlate">Thick Plate (Sharp Edge)</option>
+										<option value="RoundedEntry">Rounded Entry</option>
+										<option value="fixed">Manual / Fixed Value</option>
+									</select>
+								</div>
 
-						{/* Common arm area */}
-						<AreaInput
-							id={`F_C_${selectedNode.id}`}
-							label="Common Arm Area (F_C)"
-							value={selectedNode.data.F_C ?? 0.01}
-							onChange={(val) => updateNodeData(selectedNode.id, { F_C: val })}
-						/>
+								{/* Conditional Inputs based on correlation */}
+								{selectedNode.data.correlation === "ThickPlate" && (
+									<LengthInput
+										id={`plate_thickness_${selectedNode.id}`}
+										label="Plate Thickness (t)"
+										value={selectedNode.data.plate_thickness ?? 0.0}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { plate_thickness: val })
+										}
+									/>
+								)}
 
-						{/* Area ratio */}
-						<div className="flex flex-col gap-2">
-							<label className="text-xs font-bold text-gray-500 uppercase">
-								Area Ratio psi = F_C / F_branch
-							</label>
-							<NumericInput
-								value={selectedNode.data.psi ?? 1.0}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, { psi: val })
-								}
-								className="p-2 border rounded"
-								placeholder="1.0"
-							/>
-							<p className="text-[9px] text-gray-400 italic">
-								Ratio of common-arm to lateral-branch area. 1.0 = equal areas.
-								Straight arm is assumed equal to the common arm (Bassett
-								constraint).
-							</p>
-						</div>
+								{selectedNode.data.correlation === "RoundedEntry" && (
+									<LengthInput
+										id={`edge_radius_${selectedNode.id}`}
+										label="Inlet Edge Radius (r)"
+										value={selectedNode.data.edge_radius ?? 0.0}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { edge_radius: val })
+										}
+									/>
+								)}
 
-						<InitialGuessEditor node={selectedNode} />
-
-						{/* Post-solve diagnostics */}
-						{selectedNode.data.result && (
-							<div className="mt-4 p-3 bg-stone-50 border border-stone-200 rounded">
-								<h3 className="text-xs font-bold text-stone-500 uppercase mb-3">
-									Flow Distribution
-								</h3>
-								{selectedNode.data.result.correlation_extrapolated > 0 && (
-									<div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-3">
-										Inputs outside Bassett (2001) validated range -- results are
-										extrapolated.
+								{/* Calculated Result (for correlation models) */}
+								{selectedNode.data.correlation !== "fixed" && (
+									<div className="flex flex-col gap-1 mb-2 bg-blue-50/50 p-2 rounded border border-blue-100/50">
+										<label className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">
+											Calculated Cd
+										</label>
+										<div className="text-sm font-mono font-bold text-blue-700">
+											{selectedNode.data.result?.Cd?.toFixed(4) ||
+												"— (Pending Solve)"}
+										</div>
 									</div>
 								)}
-								<div className="grid grid-cols-2 gap-x-2 gap-y-3">
-									<div className="flex flex-col">
-										<span className="text-stone-400 text-[9px] font-bold uppercase">
-											ṁ common
-										</span>
-										<span className="font-mono text-xs font-bold">
-											{(selectedNode.data.result.m_dot_com ?? 0).toFixed(4)}{" "}
-											<span className="text-[9px] font-normal text-stone-400">
-												kg/s
-											</span>
-										</span>
+
+								{/* Manual Entry (only for Fixed model) */}
+								{selectedNode.data.correlation === "fixed" && (
+									<div className="flex flex-col gap-1 mt-1">
+										<label
+											htmlFor={`Cd_${selectedNode.id}`}
+											className="text-xs font-bold text-gray-500 uppercase"
+										>
+											Fixed Cd Value
+										</label>
+										<NumericInput
+											id={`Cd_${selectedNode.id}`}
+											value={selectedNode.data.Cd ?? 0.6}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, {
+													Cd: val,
+												})
+											}
+											className="p-1.5 h-8 text-sm border rounded bg-white"
+											placeholder="0.6"
+										/>
 									</div>
-									<div className="flex flex-col">
-										<span className="text-stone-400 text-[9px] font-bold uppercase">
-											ṁ straight
-										</span>
-										<span className="font-mono text-xs font-bold">
-											{(selectedNode.data.result.m_dot_straight ?? 0).toFixed(
-												4,
-											)}{" "}
-											<span className="text-[9px] font-normal text-stone-400">
-												kg/s
-											</span>
-										</span>
-									</div>
-									<div className="flex flex-col">
-										<span className="text-stone-400 text-[9px] font-bold uppercase">
-											ṁ branch
-										</span>
-										<span className="font-mono text-xs font-bold">
-											{(selectedNode.data.result.m_dot_branch ?? 0).toFixed(4)}{" "}
-											<span className="text-[9px] font-normal text-stone-400">
-												kg/s
-											</span>
-										</span>
-									</div>
-									<div className="flex flex-col">
-										<span className="text-stone-400 text-[9px] font-bold uppercase">
-											ṁ straight / ṁ common
-										</span>
-										<span className="font-mono text-xs font-bold">
-											{(selectedNode.data.result.mass_flow_ratio ?? 0).toFixed(
-												3,
-											)}{" "}
-											<span className="text-[9px] font-normal text-stone-400">
-												kg/kg
-											</span>
-										</span>
-									</div>
-									<div className="flex flex-col">
-										<span className="text-stone-400 text-[9px] font-bold uppercase">
-											K straight
-										</span>
-										<span className="font-mono text-xs font-bold">
-											{(selectedNode.data.result.K_straight ?? 0).toFixed(3)}
-										</span>
-									</div>
-									<div className="flex flex-col">
-										<span className="text-stone-400 text-[9px] font-bold uppercase">
-											K branch
-										</span>
-										<span className="font-mono text-xs font-bold">
-											{(selectedNode.data.result.K_branch ?? 0).toFixed(3)}
-										</span>
-									</div>
+								)}
+
+								<div className="flex flex-col gap-2 mt-2">
+									<label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+										Flow Regime
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={selectedNode.data.regime || "default"}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												regime: e.target.value,
+											})
+										}
+									>
+										<option value="default">Default (Global)</option>
+										<option value="incompressible">
+											Forced Incompressible
+										</option>
+										<option value="compressible">Forced Compressible</option>
+									</select>
 								</div>
+								<InitialGuessEditor node={selectedNode} />
+							</>
+						);
+					})()}
+
+				{selectedNode.type === "area_change" &&
+					(() => {
+						const upstreamEdge = edges.find(
+							(e) => e.target === selectedNode.id && !e.data?.type,
+						);
+						const downstreamEdge = edges.find(
+							(e) => e.source === selectedNode.id && !e.data?.type,
+						);
+						const upstreamNode = upstreamEdge
+							? nodes.find((n) => n.id === upstreamEdge.source)
+							: undefined;
+						const downstreamNode = downstreamEdge
+							? nodes.find((n) => n.id === downstreamEdge.target)
+							: undefined;
+						const areaFromD = (d: number | null | undefined) =>
+							d != null ? (Math.PI / 4) * d * d : undefined;
+						const walkArea = (
+							nodeId: string,
+							dir: "upstream" | "downstream",
+							depth = 0,
+						): number | undefined => {
+							if (depth > 20) return undefined;
+							const e =
+								dir === "upstream"
+									? edges.find((ee) => ee.target === nodeId && !ee.data?.type)
+									: edges.find((ee) => ee.source === nodeId && !ee.data?.type);
+							const n = e
+								? nodes.find(
+										(nn) =>
+											nn.id === (dir === "upstream" ? e.source : e.target),
+									)
+								: undefined;
+							if (!n) return undefined;
+							if (n.type === "channel") {
+								const d = n.data.D as number | null | undefined;
+								if (d != null) return areaFromD(d);
+								return walkArea(n.id, dir, depth + 1);
+							}
+							// For area_change: walking upstream reads its exit face (F1);
+							// walking downstream reads its entry face (F0).
+							if (n.type === "area_change") {
+								const f = (dir === "upstream" ? n.data.F1 : n.data.F0) as
+									| number
+									| null
+									| undefined;
+								if (f != null && f > 0) return f;
+								return walkArea(n.id, dir, depth + 1);
+							}
+							if (n.type === "tee_junction") {
+								const fc = n.data.F_C as number | null | undefined;
+								if (fc != null && fc > 0) return fc;
+							}
+							const a = n.data?.area as number | null | undefined;
+							return a != null && a > 0 ? a : undefined;
+						};
+						const inheritedF0: number | undefined = walkArea(
+							selectedNode.id,
+							"upstream",
+						);
+						const inheritedF1: number | undefined = walkArea(
+							selectedNode.id,
+							"downstream",
+						);
+						const userSetF0 =
+							selectedNode.data.F0 !== null &&
+							selectedNode.data.F0 !== undefined;
+						const userSetF1 =
+							selectedNode.data.F1 !== null &&
+							selectedNode.data.F1 !== undefined;
+						const effectiveF0 = userSetF0
+							? selectedNode.data.F0
+							: (inheritedF0 ?? 0.01);
+						const effectiveF1 = userSetF1
+							? selectedNode.data.F1
+							: (inheritedF1 ?? 0.02);
+						return (
+							<>
+								<div className="flex flex-col gap-2">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Model Type
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={selectedNode.data.model_type || "sharp"}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												model_type: e.target.value,
+											})
+										}
+									>
+										<option value="sharp">Sharp-Edged (Sudden)</option>
+										<option value="conical">Conical (Gradual)</option>
+									</select>
+								</div>
+
+								<div className="flex flex-col gap-2">
+									<div className="flex items-center justify-between">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Upstream Area (F0)
+										</label>
+										{userSetF0 && (
+											<button
+												type="button"
+												className="text-[9px] text-blue-500 hover:underline"
+												onClick={() =>
+													updateNodeData(selectedNode.id, { F0: null })
+												}
+											>
+												Reset to inherited
+											</button>
+										)}
+									</div>
+									<AreaInput
+										id={`F0_${selectedNode.id}`}
+										label=""
+										value={effectiveF0}
+										placeholder={
+											inheritedF0 != null ? inheritedF0.toFixed(5) : "0.01"
+										}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { F0: val })
+										}
+										onClear={() =>
+											updateNodeData(selectedNode.id, { F0: null })
+										}
+										inputClassName={
+											userSetF0 ? "font-semibold" : "text-gray-400"
+										}
+									/>
+									{!userSetF0 && inheritedF0 != null && (
+										<p className="text-[9px] text-gray-400 italic -mt-1">
+											Inherited from upstream ({upstreamNode?.id}). Edit to
+											override.
+										</p>
+									)}
+								</div>
+
+								<div className="flex flex-col gap-2">
+									<div className="flex items-center justify-between">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Downstream Area (F1)
+										</label>
+										{userSetF1 && (
+											<button
+												type="button"
+												className="text-[9px] text-blue-500 hover:underline"
+												onClick={() =>
+													updateNodeData(selectedNode.id, { F1: null })
+												}
+											>
+												Reset to inherited
+											</button>
+										)}
+									</div>
+									<AreaInput
+										id={`F1_${selectedNode.id}`}
+										label=""
+										value={effectiveF1}
+										placeholder={
+											inheritedF1 != null ? inheritedF1.toFixed(5) : "0.02"
+										}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { F1: val })
+										}
+										onClear={() =>
+											updateNodeData(selectedNode.id, { F1: null })
+										}
+										inputClassName={
+											userSetF1 ? "font-semibold" : "text-gray-400"
+										}
+									/>
+									{!userSetF1 && inheritedF1 != null && (
+										<p className="text-[9px] text-gray-400 italic -mt-1">
+											Inherited from downstream ({downstreamNode?.id}). Edit to
+											override.
+										</p>
+									)}
+								</div>
+
+								{(() => {
+									const ratio =
+										effectiveF0 > 0 ? effectiveF1 / effectiveF0 : null;
+									const d0 = Math.sqrt((4 * effectiveF0) / Math.PI);
+									const d1 = Math.sqrt((4 * effectiveF1) / Math.PI);
+									const label =
+										ratio == null
+											? null
+											: ratio > 1.005
+												? "expansion"
+												: ratio < 0.995
+													? "contraction"
+													: "straight";
+									return ratio != null ? (
+										<div className="rounded bg-stone-50 border border-stone-200 px-3 py-2 text-[10px] text-stone-600 flex flex-col gap-0.5">
+											<div className="flex justify-between">
+												<span className="font-medium text-stone-500 uppercase tracking-wide text-[8px]">
+													Area ratio
+												</span>
+												<span
+													className={
+														label === "expansion"
+															? "text-blue-600 font-semibold"
+															: label === "contraction"
+																? "text-amber-600 font-semibold"
+																: "text-stone-500"
+													}
+												>
+													{label}
+												</span>
+											</div>
+											<div className="flex justify-between mt-0.5">
+												<span className="text-stone-400">F₁/F₀</span>
+												<span className="font-mono font-semibold">
+													{ratio.toFixed(4)}
+												</span>
+											</div>
+											<div className="flex justify-between">
+												<span className="text-stone-400">D₀ → D₁</span>
+												<span className="font-mono">
+													{(
+														d0 * (unitPreferences.length === "mm" ? 1000 : 1)
+													).toFixed(1)}{" "}
+													→{" "}
+													{(
+														d1 * (unitPreferences.length === "mm" ? 1000 : 1)
+													).toFixed(1)}{" "}
+													{unitPreferences.length}
+												</span>
+											</div>
+										</div>
+									) : null;
+								})()}
+
+								{selectedNode.data.model_type === "conical" && (
+									<LengthInput
+										id={`length_${selectedNode.id}`}
+										label="Axial Length"
+										value={selectedNode.data.length ?? 0.1}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { length: val })
+										}
+									/>
+								)}
+
+								{selectedNode.data.model_type !== "conical" && (
+									<div className="flex flex-col gap-1 mt-1">
+										<LengthInput
+											id={`D_h_${selectedNode.id}`}
+											label="Hydraulic Diameter (D_h)"
+											value={selectedNode.data.D_h}
+											placeholder="Circular (Auto)"
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, { D_h: val })
+											}
+											onClear={() =>
+												updateNodeData(selectedNode.id, { D_h: undefined })
+											}
+										/>
+										<p className="text-[9px] text-gray-400 italic">
+											Defaults to circular diameter:{" "}
+											{(
+												Math.sqrt(
+													(4 * Math.min(effectiveF0, effectiveF1)) / Math.PI,
+												) * (unitPreferences.length === "mm" ? 1000 : 1)
+											).toFixed(2)}{" "}
+											{unitPreferences.length}
+										</p>
+									</div>
+								)}
+
+								<InitialGuessEditor node={selectedNode} />
+							</>
+						);
+					})()}
+
+				{selectedNode.type === "tee_junction" &&
+					(() => {
+						const teeType = selectedNode.data.tee_type ?? "merging";
+
+						// Helper: find the channel node connected to a named tee port.
+						// For merging: common port is outgoing, straight/branch are incoming.
+						// For branching: common port is incoming, straight/branch are outgoing.
+						const findPortChannel = (portName: string) => {
+							const isOutgoing =
+								(teeType === "merging" && portName === "common") ||
+								(teeType === "branching" && portName !== "common");
+							let neighbour: (typeof nodes)[0] | undefined;
+							if (isOutgoing) {
+								const edge = edges.find(
+									(e) =>
+										e.source === selectedNode.id &&
+										e.sourceHandle === `port-${portName}-source` &&
+										!e.data?.type,
+								);
+								neighbour = edge
+									? nodes.find((n) => n.id === edge.target)
+									: undefined;
+							} else {
+								const edge = edges.find(
+									(e) =>
+										e.target === selectedNode.id &&
+										e.targetHandle === `port-${portName}-target` &&
+										!e.data?.type,
+								);
+								neighbour = edge
+									? nodes.find((n) => n.id === edge.source)
+									: undefined;
+							}
+							if (neighbour?.type === "channel") return neighbour;
+							// Neighbour is a plenum/boundary; look one hop further
+							if (isOutgoing) {
+								return nodes.find(
+									(n) =>
+										n.type === "channel" &&
+										edges.some(
+											(e) =>
+												e.source === neighbour?.id &&
+												e.target === n.id &&
+												!e.data?.type,
+										),
+								);
+							}
+							return nodes.find(
+								(n) =>
+									n.type === "channel" &&
+									edges.some(
+										(e) =>
+											e.target === neighbour?.id &&
+											e.source === n.id &&
+											!e.data?.type,
+									),
+							);
+						};
+
+						// Walk through null-D channels (and through tee/area-change nodes)
+						// to find the first explicit D in the chain.
+						const walkChD = (
+							ch: (typeof nodes)[0] | undefined,
+							isOutgoing: boolean,
+							depth = 0,
+						): number | undefined => {
+							if (!ch || depth > 20) return undefined;
+							const d = ch.data.D as number | null | undefined;
+							if (d != null) return d;
+							const e = isOutgoing
+								? edges.find((ee) => ee.source === ch.id && !ee.data?.type)
+								: edges.find((ee) => ee.target === ch.id && !ee.data?.type);
+							if (!e) return undefined;
+							const next = nodes.find(
+								(n) => n.id === (isOutgoing ? e.target : e.source),
+							);
+							if (!next) return undefined;
+							if (next.type === "channel")
+								return walkChD(next, isOutgoing, depth + 1);
+							// Non-channel: extract area-equivalent D from tee/area-change
+							if (next.type === "tee_junction") {
+								const fc = next.data.F_C as number | null | undefined;
+								if (fc != null && fc > 0) return Math.sqrt((4 * fc) / Math.PI);
+							}
+							if (next.type === "area_change") {
+								const f = isOutgoing
+									? (next.data.F0 as number | null | undefined)
+									: (next.data.F1 as number | null | undefined);
+								if (f != null && f > 0) return Math.sqrt((4 * f) / Math.PI);
+							}
+							return undefined;
+						};
+
+						const portD = (portName: string) => {
+							const isOutgoing =
+								(teeType === "merging" && portName === "common") ||
+								(teeType === "branching" && portName !== "common");
+							return walkChD(findPortChannel(portName), isOutgoing);
+						};
+
+						const commonCh = findPortChannel("common");
+						const straightCh = findPortChannel("straight");
+						const branchCh = findPortChannel("branch");
+
+						const areaFromD = (d: number | null | undefined) =>
+							d != null ? (Math.PI / 4) * d * d : undefined;
+
+						// F_C: common arm (= straight arm per Bassett); prefer common over straight channel
+						const inheritedFC: number | undefined =
+							areaFromD(portD("common")) ?? areaFromD(portD("straight"));
+						const inheritedFBranch: number | undefined = areaFromD(
+							portD("branch"),
+						);
+
+						const userSetFC = selectedNode.data.F_C != null;
+						const userSetFBranch = selectedNode.data.F_branch != null;
+
+						const effectiveFC: number = userSetFC
+							? (selectedNode.data.F_C as number)
+							: (inheritedFC ?? 0.01);
+						const effectiveFBranch: number = userSetFBranch
+							? (selectedNode.data.F_branch as number)
+							: (inheritedFBranch ?? effectiveFC);
+						const psi =
+							effectiveFBranch > 0 ? effectiveFC / effectiveFBranch : null;
+						const dFromF = (f: number) => Math.sqrt((4 * f) / Math.PI);
+						const lu = unitPreferences.length === "mm" ? 1000 : 1;
+						const lu_label = unitPreferences.length;
+						return (
+							<div className="flex flex-col gap-4">
+								{/* Port legend */}
+								{(() => {
+									const tm = teeType === "merging";
+									return (
+										<div className="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-[9px] leading-snug text-stone-600">
+											<div className="font-bold uppercase text-stone-400 mb-1">
+												Port Guide
+											</div>
+											<div className="grid grid-cols-3 gap-1 text-center font-mono mb-1.5">
+												<div>
+													<span
+														className="font-extrabold"
+														style={{ color: tm ? "#3b82f6" : "#f59e0b" }}
+													>
+														S
+													</span>{" "}
+													straight
+												</div>
+												<div>
+													<span
+														className="font-extrabold"
+														style={{ color: tm ? "#f59e0b" : "#3b82f6" }}
+													>
+														C
+													</span>{" "}
+													common
+												</div>
+												<div>
+													<span
+														className="font-extrabold"
+														style={{ color: tm ? "#3b82f6" : "#f59e0b" }}
+													>
+														B
+													</span>{" "}
+													branch
+												</div>
+											</div>
+											<div className="text-stone-500">
+												{tm ? (
+													<>
+														<span style={{ color: "#3b82f6" }}>S, B</span> →{" "}
+														<span style={{ color: "#f59e0b" }}>C</span>
+														{"  "}(two inlets, one outlet at C)
+													</>
+												) : (
+													<>
+														<span style={{ color: "#3b82f6" }}>C</span> →{" "}
+														<span style={{ color: "#f59e0b" }}>S, B</span>
+														{"  "}(one inlet at C, two outlets)
+													</>
+												)}
+											</div>
+										</div>
+									);
+								})()}
+
+								{/* Tee type */}
+								<div className="flex flex-col gap-2">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Tee Type
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={selectedNode.data.tee_type ?? "merging"}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												tee_type: e.target.value,
+											})
+										}
+									>
+										<option value="merging">
+											Merging (2 inlets, 1 outlet)
+										</option>
+										<option value="branching">
+											Branching (1 inlet, 2 outlets)
+										</option>
+									</select>
+									<p className="text-[9px] text-gray-400 italic">
+										Declares intended flow direction; the Bassett model blends
+										smoothly if flow reverses.
+									</p>
+								</div>
+
+								{/* Branch angle */}
+								<div className="flex flex-col gap-2">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Branch Angle (deg)
+									</label>
+									<NumericInput
+										value={selectedNode.data.theta_deg ?? 90}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { theta_deg: val })
+										}
+										className="p-2 border rounded"
+										placeholder="90"
+									/>
+									<p className="text-[9px] text-gray-400 italic">
+										Angle between branch and common arm. Sign is ignored
+										(symmetric). Bassett (2001) validated range: 30–90 deg.
+									</p>
+								</div>
+
+								{/* ── Arm areas (3-arm, mirrors AreaChange) ── */}
+
+								{/* Common arm (F_C) */}
+								<div className="flex flex-col gap-2">
+									<div className="flex items-center justify-between">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Common Arm Area (F_C)
+										</label>
+										{userSetFC && (
+											<button
+												type="button"
+												className="text-[9px] text-blue-500 hover:underline"
+												onClick={() =>
+													updateNodeData(selectedNode.id, { F_C: null })
+												}
+											>
+												Reset to inherited
+											</button>
+										)}
+									</div>
+									<AreaInput
+										id={`F_C_${selectedNode.id}`}
+										label=""
+										value={effectiveFC}
+										placeholder={
+											inheritedFC != null ? inheritedFC.toFixed(5) : "0.01"
+										}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { F_C: val })
+										}
+										onClear={() =>
+											updateNodeData(selectedNode.id, { F_C: null })
+										}
+										inputClassName={
+											userSetFC ? "font-semibold" : "text-gray-400"
+										}
+									/>
+									{!userSetFC && inheritedFC != null && (
+										<p className="text-[9px] text-gray-400 italic -mt-1">
+											Inherited from{" "}
+											{commonCh?.id ?? straightCh?.id ?? "connected channel"}.
+											Edit to override.
+										</p>
+									)}
+								</div>
+
+								{/* Straight arm (read-only = F_C per Bassett) */}
+								<div className="flex flex-col gap-1">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Straight Arm Area (F_S)
+									</label>
+									<div className="rounded bg-stone-50 border border-stone-200 px-3 py-2 text-[10px] text-stone-500 flex justify-between items-center">
+										<span className="font-mono">
+											{effectiveFC.toExponential(3)} m²
+											{"  "}(D = {(dFromF(effectiveFC) * lu).toFixed(2)}{" "}
+											{lu_label})
+										</span>
+										<span className="italic text-[9px] text-stone-400">
+											= F_C (Bassett)
+										</span>
+									</div>
+									<p className="text-[9px] text-stone-400 italic">
+										The Bassett (2001) model assumes F_S = F_C. If the physical
+										straight arm differs, add an AreaChange element.
+									</p>
+								</div>
+
+								{/* Branch arm (F_branch) */}
+								<div className="flex flex-col gap-2">
+									<div className="flex items-center justify-between">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Branch Arm Area (F_B)
+										</label>
+										{userSetFBranch && (
+											<button
+												type="button"
+												className="text-[9px] text-blue-500 hover:underline"
+												onClick={() =>
+													updateNodeData(selectedNode.id, {
+														F_branch: null,
+													})
+												}
+											>
+												Reset to inherited
+											</button>
+										)}
+									</div>
+									<AreaInput
+										id={`F_branch_${selectedNode.id}`}
+										label=""
+										value={effectiveFBranch}
+										placeholder={
+											inheritedFBranch != null
+												? inheritedFBranch.toFixed(5)
+												: inheritedFC != null
+													? inheritedFC.toFixed(5)
+													: "0.01"
+										}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { F_branch: val })
+										}
+										onClear={() =>
+											updateNodeData(selectedNode.id, { F_branch: null })
+										}
+										inputClassName={
+											userSetFBranch ? "font-semibold" : "text-gray-400"
+										}
+									/>
+									{!userSetFBranch && inheritedFBranch != null && (
+										<p className="text-[9px] text-gray-400 italic -mt-1">
+											Inherited from {branchCh?.id}. Edit to override.
+										</p>
+									)}
+								</div>
+
+								{/* Derived ratio summary card */}
+								{psi != null && (
+									<div className="rounded bg-stone-50 border border-stone-200 px-3 py-2 text-[10px] text-stone-600 flex flex-col gap-0.5">
+										<div className="flex justify-between">
+											<span className="font-medium text-stone-500 uppercase tracking-wide text-[8px]">
+												Area ratio
+											</span>
+											<span
+												className={
+													psi > 1.005
+														? "text-amber-600 font-semibold"
+														: psi < 0.995
+															? "text-blue-600 font-semibold"
+															: "text-stone-500"
+												}
+											>
+												{psi > 1.005
+													? "C larger than B"
+													: psi < 0.995
+														? "B larger than C"
+														: "equal areas"}
+											</span>
+										</div>
+										<div className="flex justify-between mt-0.5">
+											<span className="text-stone-400">psi = F_C / F_B</span>
+											<span className="font-mono font-semibold">
+												{psi.toFixed(4)}
+											</span>
+										</div>
+										<div className="flex justify-between">
+											<span className="text-stone-400">D_C → D_B</span>
+											<span className="font-mono">
+												{(dFromF(effectiveFC) * lu).toFixed(1)} →{" "}
+												{(dFromF(effectiveFBranch) * lu).toFixed(1)} {lu_label}
+											</span>
+										</div>
+									</div>
+								)}
+
+								<InitialGuessEditor node={selectedNode} />
+
+								{/* Post-solve diagnostics */}
+								{selectedNode.data.result && (
+									<div className="mt-4 p-3 bg-stone-50 border border-stone-200 rounded">
+										<h3 className="text-xs font-bold text-stone-500 uppercase mb-3">
+											Flow Distribution
+										</h3>
+										{selectedNode.data.result.correlation_extrapolated > 0 && (
+											<div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-3">
+												Inputs outside Bassett (2001) validated range -- results
+												are extrapolated.
+											</div>
+										)}
+										<div className="grid grid-cols-2 gap-x-2 gap-y-3">
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[9px] font-bold uppercase">
+													ṁ common
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{(selectedNode.data.result.m_dot_com ?? 0).toFixed(4)}{" "}
+													<span className="text-[9px] font-normal text-stone-400">
+														kg/s
+													</span>
+												</span>
+											</div>
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[9px] font-bold uppercase">
+													ṁ straight
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{(
+														selectedNode.data.result.m_dot_straight ?? 0
+													).toFixed(4)}{" "}
+													<span className="text-[9px] font-normal text-stone-400">
+														kg/s
+													</span>
+												</span>
+											</div>
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[9px] font-bold uppercase">
+													ṁ branch
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{(selectedNode.data.result.m_dot_branch ?? 0).toFixed(
+														4,
+													)}{" "}
+													<span className="text-[9px] font-normal text-stone-400">
+														kg/s
+													</span>
+												</span>
+											</div>
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[9px] font-bold uppercase">
+													ṁ straight / ṁ common
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{(
+														selectedNode.data.result.mass_flow_ratio ?? 0
+													).toFixed(3)}{" "}
+													<span className="text-[9px] font-normal text-stone-400">
+														kg/kg
+													</span>
+												</span>
+											</div>
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[9px] font-bold uppercase">
+													K straight
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{(selectedNode.data.result.K_straight ?? 0).toFixed(
+														3,
+													)}
+												</span>
+											</div>
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[9px] font-bold uppercase">
+													K branch
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{(selectedNode.data.result.K_branch ?? 0).toFixed(3)}
+												</span>
+											</div>
+										</div>
+									</div>
+								)}
 							</div>
-						)}
-					</div>
-				)}
+						);
+					})()}
 
 				{selectedNode.type === "vortex" && (
 					<div className="flex flex-col gap-4">
@@ -1013,14 +1752,34 @@ const Inspector = () => {
 
 				{selectedNode.type === "discrete_loss" &&
 					(() => {
-						// Compute default area from upstream node
+						// Compute default area from upstream node or channel element
 						const upstreamEdge = edges.find(
 							(e) => e.target === selectedNode.id && !e.data?.type,
 						);
 						const upstreamNode = upstreamEdge
 							? nodes.find((n) => n.id === upstreamEdge.source)
 							: undefined;
-						const inheritedArea: number | undefined = upstreamNode?.data?.area;
+						// Walk one more hop upstream to reach a channel when there is an
+						// auto-inserted junction node between the channel and this element.
+						const upstreamChannelNode =
+							upstreamNode?.type === "channel"
+								? upstreamNode
+								: (() => {
+										if (!upstreamNode) return undefined;
+										const hopEdge = edges.find(
+											(e) => e.target === upstreamNode.id && !e.data?.type,
+										);
+										const hopNode = hopEdge
+											? nodes.find((n) => n.id === hopEdge.source)
+											: undefined;
+										return hopNode?.type === "channel" ? hopNode : undefined;
+									})();
+						const inheritedArea: number | undefined =
+							upstreamNode?.data?.area && upstreamNode.data.area > 0
+								? upstreamNode.data.area
+								: upstreamChannelNode?.data?.D != null
+									? (Math.PI / 4) * upstreamChannelNode.data.D ** 2
+									: undefined;
 
 						const userSetArea =
 							selectedNode.data.area !== null &&
@@ -1162,13 +1921,14 @@ const Inspector = () => {
 									/>
 									{!userSetArea && inheritedArea != null && (
 										<p className="text-[9px] text-gray-400 italic -mt-1">
-											Inherited from upstream ({upstreamNode?.id}). Edit to
+											Inherited from upstream (
+											{upstreamChannelNode?.id ?? upstreamNode?.id}). Edit to
 											override.
 										</p>
 									)}
 									{!userSetArea && inheritedArea == null && (
 										<p className="text-[9px] text-gray-400 italic -mt-1">
-											Connect an upstream node to auto-discover area.
+											Connect an upstream channel or node to auto-discover area.
 										</p>
 									)}
 									{areaWarning && (
@@ -1356,203 +2116,373 @@ const Inspector = () => {
 						);
 					})()}
 
-				{selectedNode.type === "combustor" && (
-					<div className="flex flex-col gap-4">
-						<div className="flex flex-col gap-2">
-							<label
-								htmlFor={`method_${selectedNode.id}`}
-								className="text-xs font-bold text-gray-500 uppercase"
-							>
-								Combustion Method
-							</label>
-							<select
-								id={`method_${selectedNode.id}`}
-								className="p-2 border rounded bg-white text-sm"
-								value={selectedNode.data.method || "complete"}
-								onChange={(e) =>
-									updateNodeData(selectedNode.id, {
-										method: e.target.value,
-									})
-								}
-							>
-								<option value="complete">Complete (Fast)</option>
-								<option value="equilibrium">Chemical Equilibrium</option>
-							</select>
-						</div>
-
-						<div className="grid grid-cols-2 gap-2 pb-2">
-							<AreaInput
-								id={`area_comb_${selectedNode.id}`}
-								label="Area"
-								value={selectedNode.data.area ?? 0.1}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, {
-										area: val,
-									})
-								}
-							/>
-							<div className="flex flex-col gap-1">
-								<LengthInput
-									id={`Dh_comb_${selectedNode.id}`}
-									label="Dh"
-									value={selectedNode.data.Dh}
-									onChange={(val) =>
-										updateNodeData(selectedNode.id, {
-											Dh: val,
-										})
-									}
-									onClear={() =>
-										updateNodeData(selectedNode.id, {
-											Dh: undefined,
-										})
-									}
-								/>
-							</div>
-						</div>
-						<p className="text-[9px] text-gray-400 italic -mt-2 mb-2">
-							Defaults to circular diameter:{" "}
-							{(
-								Math.sqrt((4 * (selectedNode.data.area ?? 0.1)) / Math.PI) *
-								(unitPreferences.length === "mm" ? 1000 : 1)
-							).toFixed(2)}{" "}
-							{unitPreferences.length}
-						</p>
-						<div className="grid grid-cols-2 gap-3">
-							<div className="flex flex-col gap-2">
-								<label className="text-xs font-bold text-gray-500 uppercase">
-									Nu Multiplier
-								</label>
-								<NumericInput
-									id={`Nu_multiplier_comb_${selectedNode.id}`}
-									value={selectedNode.data.Nu_multiplier ?? 1.0}
-									onChange={(val) =>
-										updateNodeData(selectedNode.id, {
-											Nu_multiplier: val,
-										})
-									}
-									className="p-2 border rounded"
-								/>
-								<span className="text-[9px] text-stone-400">
-									{`global: ×${solverSettings.Nu_multiplier ?? 1}`}
-								</span>
-							</div>
-							<div className="flex flex-col gap-2">
-								<label className="text-xs font-bold text-gray-500 uppercase">
-									F Multiplier
-								</label>
-								<NumericInput
-									id={`f_multiplier_comb_${selectedNode.id}`}
-									value={selectedNode.data.f_multiplier ?? 1.0}
-									onChange={(val) =>
-										updateNodeData(selectedNode.id, {
-											f_multiplier: val,
-										})
-									}
-									className="p-2 border rounded"
-								/>
-								<span className="text-[9px] text-stone-400">
-									{`global: ×${solverSettings.f_multiplier ?? 1}`}
-								</span>
-							</div>
-						</div>
-						<SurfaceEnhancementInspector
-							surface={selectedNode.data.surface || { type: "smooth" }}
-							onChange={(surface) =>
-								updateNodeData(selectedNode.id, { surface })
+				{selectedNode.type === "combustor" &&
+					(() => {
+						const upstreamEdge = edges.find(
+							(e) => e.target === selectedNode.id && !e.data?.type,
+						);
+						const upstreamNode = upstreamEdge
+							? nodes.find((n) => n.id === upstreamEdge.source)
+							: undefined;
+						const walkChannelD = (
+							nodeId: string,
+							depth = 0,
+						): number | undefined => {
+							if (depth > 20) return undefined;
+							const e = edges.find(
+								(ee) => ee.target === nodeId && !ee.data?.type,
+							);
+							const n = e ? nodes.find((nn) => nn.id === e.source) : undefined;
+							if (!n) return undefined;
+							if (n.type === "channel") {
+								const d = n.data.D as number | null | undefined;
+								const dh = n.data.Dh as number | null | undefined;
+								if (d != null) return dh ?? d;
+								return walkChannelD(n.id, depth + 1);
 							}
-						/>
-
-						<InitialGuessEditor node={selectedNode} />
-					</div>
-				)}
-
-				{selectedNode.type === "momentum_chamber" && (
-					<div className="flex flex-col gap-4">
-						<div className="grid grid-cols-2 gap-2 pb-2">
-							<AreaInput
-								id={`area_mom_${selectedNode.id}`}
-								label="Area"
-								value={selectedNode.data.area ?? 0.1}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, {
-										area: val,
-									})
-								}
-							/>
-							<div className="flex flex-col gap-1">
-								<LengthInput
-									id={`Dh_mom_${selectedNode.id}`}
-									label="Dh"
-									value={selectedNode.data.Dh}
-									onChange={(val) =>
-										updateNodeData(selectedNode.id, {
-											Dh: val,
-										})
-									}
-									onClear={() =>
-										updateNodeData(selectedNode.id, {
-											Dh: undefined,
-										})
-									}
-								/>
-							</div>
-						</div>
-						<p className="text-[9px] text-gray-400 italic -mt-2 mb-2">
-							Defaults to circular diameter:{" "}
-							{(
-								Math.sqrt((4 * (selectedNode.data.area ?? 0.1)) / Math.PI) *
-								(unitPreferences.length === "mm" ? 1000 : 1)
-							).toFixed(2)}{" "}
-							{unitPreferences.length}
-						</p>
-						<div className="grid grid-cols-2 gap-3">
-							<div className="flex flex-col gap-2">
-								<label className="text-xs font-bold text-gray-500 uppercase">
-									Nu Multiplier
-								</label>
-								<NumericInput
-									id={`Nu_multiplier_mom_${selectedNode.id}`}
-									value={selectedNode.data.Nu_multiplier ?? 1.0}
-									onChange={(val) =>
-										updateNodeData(selectedNode.id, {
-											Nu_multiplier: val,
-										})
-									}
-									className="p-2 border rounded"
-								/>
-								<span className="text-[9px] text-stone-400">
-									{`global: ×${solverSettings.Nu_multiplier ?? 1}`}
-								</span>
-							</div>
-							<div className="flex flex-col gap-2">
-								<label className="text-xs font-bold text-gray-500 uppercase">
-									F Multiplier
-								</label>
-								<NumericInput
-									id={`f_multiplier_mom_${selectedNode.id}`}
-									value={selectedNode.data.f_multiplier ?? 1.0}
-									onChange={(val) =>
-										updateNodeData(selectedNode.id, {
-											f_multiplier: val,
-										})
-									}
-									className="p-2 border rounded"
-								/>
-								<span className="text-[9px] text-stone-400">
-									{`global: ×${solverSettings.f_multiplier ?? 1}`}
-								</span>
-							</div>
-						</div>
-						<SurfaceEnhancementInspector
-							surface={selectedNode.data.surface || { type: "smooth" }}
-							onChange={(surface) =>
-								updateNodeData(selectedNode.id, { surface })
+							if (n.type === "area_change") {
+								const dhAc = n.data.D_h as number | null | undefined;
+								if (dhAc != null && dhAc > 0) return dhAc;
+								const f = n.data.F1 as number | null | undefined;
+								if (f != null && f > 0) return Math.sqrt((4 * f) / Math.PI);
+								return walkChannelD(n.id, depth + 1);
 							}
-						/>
+							if (n.type === "tee_junction") {
+								const fc = n.data.F_C as number | null | undefined;
+								if (fc != null && fc > 0) return Math.sqrt((4 * fc) / Math.PI);
+							}
+							return (
+								(n.data?.Dh as number | undefined) ??
+								(n.data?.area != null
+									? Math.sqrt((4 * n.data.area) / Math.PI)
+									: undefined)
+							);
+						};
+						const inheritedDhComb: number | undefined = walkChannelD(
+							selectedNode.id,
+						);
+						const userSetDhComb =
+							selectedNode.data.Dh !== null &&
+							selectedNode.data.Dh !== undefined;
+						const circularDhComb = Math.sqrt(
+							(4 * (selectedNode.data.area ?? 0.1)) / Math.PI,
+						);
+						return (
+							<div className="flex flex-col gap-4">
+								<div className="flex flex-col gap-2">
+									<label
+										htmlFor={`method_${selectedNode.id}`}
+										className="text-xs font-bold text-gray-500 uppercase"
+									>
+										Combustion Method
+									</label>
+									<select
+										id={`method_${selectedNode.id}`}
+										className="p-2 border rounded bg-white text-sm"
+										value={selectedNode.data.method || "complete"}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												method: e.target.value,
+											})
+										}
+									>
+										<option value="complete">Complete (Fast)</option>
+										<option value="equilibrium">Chemical Equilibrium</option>
+									</select>
+								</div>
 
-						<InitialGuessEditor node={selectedNode} />
-					</div>
-				)}
+								<div className="grid grid-cols-2 gap-2 pb-2">
+									<AreaInput
+										id={`area_comb_${selectedNode.id}`}
+										label="Area"
+										value={selectedNode.data.area ?? 0.1}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, {
+												area: val,
+											})
+										}
+									/>
+									<div className="flex flex-col gap-1">
+										<div className="flex items-center justify-between">
+											<label className="text-xs font-bold text-gray-500 uppercase">
+												Dh
+											</label>
+											{userSetDhComb && (
+												<button
+													type="button"
+													className="text-[9px] text-blue-500 hover:underline"
+													onClick={() =>
+														updateNodeData(selectedNode.id, {
+															Dh: null,
+														})
+													}
+												>
+													Reset to inherited
+												</button>
+											)}
+										</div>
+										<LengthInput
+											id={`Dh_comb_${selectedNode.id}`}
+											label=""
+											value={
+												userSetDhComb
+													? selectedNode.data.Dh
+													: (inheritedDhComb ?? circularDhComb)
+											}
+											placeholder={inheritedDhComb ?? circularDhComb}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, {
+													Dh: val,
+												})
+											}
+											onClear={() =>
+												updateNodeData(selectedNode.id, {
+													Dh: null,
+												})
+											}
+											inputClassName={
+												userSetDhComb ? "font-semibold" : "text-gray-400"
+											}
+										/>
+										{!userSetDhComb && inheritedDhComb != null && (
+											<p className="text-[9px] text-gray-400 italic -mt-1">
+												Inherited from upstream ({upstreamNode?.id}).
+											</p>
+										)}
+										{!userSetDhComb && inheritedDhComb == null && (
+											<p className="text-[9px] text-gray-400 italic -mt-1">
+												Circular from area (D ={" "}
+												{(
+													circularDhComb *
+													(unitPreferences.length === "mm" ? 1000 : 1)
+												).toFixed(2)}{" "}
+												{unitPreferences.length}).
+											</p>
+										)}
+									</div>
+								</div>
+								<div className="grid grid-cols-2 gap-3">
+									<div className="flex flex-col gap-2">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Nu Multiplier
+										</label>
+										<NumericInput
+											id={`Nu_multiplier_comb_${selectedNode.id}`}
+											value={selectedNode.data.Nu_multiplier ?? 1.0}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, {
+													Nu_multiplier: val,
+												})
+											}
+											className="p-2 border rounded"
+										/>
+										<span className="text-[9px] text-stone-400">
+											{`global: ×${solverSettings.Nu_multiplier ?? 1}`}
+										</span>
+									</div>
+									<div className="flex flex-col gap-2">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											F Multiplier
+										</label>
+										<NumericInput
+											id={`f_multiplier_comb_${selectedNode.id}`}
+											value={selectedNode.data.f_multiplier ?? 1.0}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, {
+													f_multiplier: val,
+												})
+											}
+											className="p-2 border rounded"
+										/>
+										<span className="text-[9px] text-stone-400">
+											{`global: ×${solverSettings.f_multiplier ?? 1}`}
+										</span>
+									</div>
+								</div>
+								<SurfaceEnhancementInspector
+									surface={selectedNode.data.surface || { type: "smooth" }}
+									onChange={(surface) =>
+										updateNodeData(selectedNode.id, { surface })
+									}
+								/>
+
+								<InitialGuessEditor node={selectedNode} />
+							</div>
+						);
+					})()}
+
+				{selectedNode.type === "momentum_chamber" &&
+					(() => {
+						const upstreamEdge = edges.find(
+							(e) => e.target === selectedNode.id && !e.data?.type,
+						);
+						const upstreamNode = upstreamEdge
+							? nodes.find((n) => n.id === upstreamEdge.source)
+							: undefined;
+						const walkChannelD = (
+							nodeId: string,
+							depth = 0,
+						): number | undefined => {
+							if (depth > 20) return undefined;
+							const e = edges.find(
+								(ee) => ee.target === nodeId && !ee.data?.type,
+							);
+							const n = e ? nodes.find((nn) => nn.id === e.source) : undefined;
+							if (!n) return undefined;
+							if (n.type === "channel") {
+								const d = n.data.D as number | null | undefined;
+								const dh = n.data.Dh as number | null | undefined;
+								if (d != null) return dh ?? d;
+								return walkChannelD(n.id, depth + 1);
+							}
+							if (n.type === "area_change") {
+								const dhAc = n.data.D_h as number | null | undefined;
+								if (dhAc != null && dhAc > 0) return dhAc;
+								const f = n.data.F1 as number | null | undefined;
+								if (f != null && f > 0) return Math.sqrt((4 * f) / Math.PI);
+								return walkChannelD(n.id, depth + 1);
+							}
+							if (n.type === "tee_junction") {
+								const fc = n.data.F_C as number | null | undefined;
+								if (fc != null && fc > 0) return Math.sqrt((4 * fc) / Math.PI);
+							}
+							return (
+								(n.data?.Dh as number | undefined) ??
+								(n.data?.area != null
+									? Math.sqrt((4 * n.data.area) / Math.PI)
+									: undefined)
+							);
+						};
+						const inheritedDhMom: number | undefined = walkChannelD(
+							selectedNode.id,
+						);
+						const userSetDhMom =
+							selectedNode.data.Dh !== null &&
+							selectedNode.data.Dh !== undefined;
+						const circularDh = Math.sqrt(
+							(4 * (selectedNode.data.area ?? 0.1)) / Math.PI,
+						);
+						return (
+							<div className="flex flex-col gap-4">
+								<div className="grid grid-cols-2 gap-2 pb-2">
+									<AreaInput
+										id={`area_mom_${selectedNode.id}`}
+										label="Area"
+										value={selectedNode.data.area ?? 0.1}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, {
+												area: val,
+											})
+										}
+									/>
+									<div className="flex flex-col gap-1">
+										<div className="flex items-center justify-between">
+											<label className="text-xs font-bold text-gray-500 uppercase">
+												Dh
+											</label>
+											{userSetDhMom && (
+												<button
+													type="button"
+													className="text-[9px] text-blue-500 hover:underline"
+													onClick={() =>
+														updateNodeData(selectedNode.id, {
+															Dh: null,
+														})
+													}
+												>
+													Reset to inherited
+												</button>
+											)}
+										</div>
+										<LengthInput
+											id={`Dh_mom_${selectedNode.id}`}
+											label=""
+											value={
+												userSetDhMom
+													? selectedNode.data.Dh
+													: (inheritedDhMom ?? circularDh)
+											}
+											placeholder={inheritedDhMom ?? circularDh}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, {
+													Dh: val,
+												})
+											}
+											onClear={() =>
+												updateNodeData(selectedNode.id, {
+													Dh: null,
+												})
+											}
+											inputClassName={
+												userSetDhMom ? "font-semibold" : "text-gray-400"
+											}
+										/>
+										{!userSetDhMom && inheritedDhMom != null && (
+											<p className="text-[9px] text-gray-400 italic -mt-1">
+												Inherited from upstream ({upstreamNode?.id}).
+											</p>
+										)}
+										{!userSetDhMom && inheritedDhMom == null && (
+											<p className="text-[9px] text-gray-400 italic -mt-1">
+												Circular from area (D ={" "}
+												{(
+													circularDh *
+													(unitPreferences.length === "mm" ? 1000 : 1)
+												).toFixed(2)}{" "}
+												{unitPreferences.length}).
+											</p>
+										)}
+									</div>
+								</div>
+								<div className="grid grid-cols-2 gap-3">
+									<div className="flex flex-col gap-2">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Nu Multiplier
+										</label>
+										<NumericInput
+											id={`Nu_multiplier_mom_${selectedNode.id}`}
+											value={selectedNode.data.Nu_multiplier ?? 1.0}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, {
+													Nu_multiplier: val,
+												})
+											}
+											className="p-2 border rounded"
+										/>
+										<span className="text-[9px] text-stone-400">
+											{`global: ×${solverSettings.Nu_multiplier ?? 1}`}
+										</span>
+									</div>
+									<div className="flex flex-col gap-2">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											F Multiplier
+										</label>
+										<NumericInput
+											id={`f_multiplier_mom_${selectedNode.id}`}
+											value={selectedNode.data.f_multiplier ?? 1.0}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, {
+													f_multiplier: val,
+												})
+											}
+											className="p-2 border rounded"
+										/>
+										<span className="text-[9px] text-stone-400">
+											{`global: ×${solverSettings.f_multiplier ?? 1}`}
+										</span>
+									</div>
+								</div>
+								<SurfaceEnhancementInspector
+									surface={selectedNode.data.surface || { type: "smooth" }}
+									onChange={(surface) =>
+										updateNodeData(selectedNode.id, { surface })
+									}
+								/>
+
+								<InitialGuessEditor node={selectedNode} />
+							</div>
+						);
+					})()}
 
 				{selectedNode.data.result && (
 					<div className="mt-4 p-3 bg-stone-50 border border-stone-200 rounded">

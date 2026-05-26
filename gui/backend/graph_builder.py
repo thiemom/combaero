@@ -340,7 +340,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 area=data.area,
                 Dh=data.Dh,
                 surface=ConvectiveSurface(
-                    area=data.area,
+                    area=data.area or 0.0,
                     model=map_surface_model(data.surface),
                     Nu_multiplier=data.Nu_multiplier
                     * (schema.solver_settings.Nu_multiplier or 1.0),
@@ -357,8 +357,9 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             node = MomentumChamberNode(
                 node_id,
                 area=data.area,
+                Dh=data.Dh,
                 surface=ConvectiveSurface(
-                    area=data.area,
+                    area=data.area or 0.0,
                     model=map_surface_model(data.surface),
                     Nu_multiplier=data.Nu_multiplier
                     * (schema.solver_settings.Nu_multiplier or 1.0),
@@ -461,6 +462,10 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         # 3-port element: bypass the 2-port source/target logic entirely.
         if elem_type == "tee_junction":
             _d = TeeJunctionData(**elem_data)
+            # psi is computed from explicit areas when both are set; otherwise use stored psi
+            _psi = _d.psi
+            if _d.F_C is not None and _d.F_branch is not None and _d.F_branch > 0:
+                _psi = _d.F_C / _d.F_branch
             _tee = TeeJunctionElement(
                 id=elem_id,
                 common_node=_find_tee_port(
@@ -479,7 +484,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 ),
                 theta=_math.radians(_d.theta_deg),
                 F_C=_d.F_C,
-                psi=_d.psi,
+                F_branch=_d.F_branch,
+                psi=_psi,
                 tee_type=_d.tee_type,
             )
             _tee.initial_guess = _expand_initial_guess(_d.initial_guess, elem_id)
@@ -518,13 +524,15 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
 
         if elem_type == "channel":
             data = ChannelData(**elem_data)
-            conv_area = 3.1415926535 * data.D * data.L
+            # conv_area is deferred to 0 when D=None; resolve_topology updates it
+            conv_area = (3.1415926535 * data.D * data.L) if data.D is not None else 0.0
             elem = ChannelElement(
                 elem_id,
                 from_node=source_id,
                 to_node=target_id,
                 length=data.L,
                 diameter=data.D,
+                Dh=data.Dh,
                 roughness=data.roughness,
                 friction_model=data.friction_model,
                 surface=ConvectiveSurface(
@@ -584,17 +592,26 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             net.add_element(elem)
         elif elem_type == "discrete_loss":
             data = DiscreteLossData(**elem_data)
-            # Infer area from upstream node if not explicitly set
-            area = data.area
+            # area=None signals "inherit from upstream element in resolve_topology".
+            # Use a quick node-area lookup only when data.area is explicitly set or
+            # the upstream node exposes a non-zero area (combustor / momentum chamber).
+            area: float | None = data.area
             if area is None and source_id in nodes_map:
-                area = getattr(nodes_map[source_id], "area", 0.1)
-            area = area if area and area > 0 else 0.1
+                node_area = getattr(nodes_map[source_id], "area", None)
+                if node_area and node_area > 0:
+                    area = node_area
             correlation = _build_discrete_loss_correlation(
-                data.correlation_type, data.xi, data.k, data.xi0, data.zeta, data.zeta0, area
+                data.correlation_type,
+                data.xi,
+                data.k,
+                data.xi0,
+                data.zeta,
+                data.zeta0,
+                area if area and area > 0 else 0.1,
             )
             theta_source = data.theta_source if data.theta_source not in (None, "none") else None
             surface = ConvectiveSurface(
-                area=area,
+                area=area if area and area > 0 else 0.0,
                 model=map_surface_model(data.surface),
                 Nu_multiplier=data.Nu_multiplier,
                 f_multiplier=data.f_multiplier,

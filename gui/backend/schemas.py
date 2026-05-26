@@ -131,7 +131,7 @@ PressureLossData = (
 class CombustorData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     method: Literal["complete", "equilibrium"] = "complete"
-    area: float = 0.1
+    area: float | None = None  # None = derive from Dh (pi/4 * Dh^2)
     Dh: float | None = None
     surface: SurfaceModelData = Field(default_factory=SmoothModelData)
     Nu_multiplier: float = 1.0
@@ -142,8 +142,8 @@ class CombustorData(BaseModel):
 
 class MomentumChamberData(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    area: float = 0.1
-    Dh: float = 0.1
+    area: float | None = None  # None = derive from Dh (pi/4 * Dh^2)
+    Dh: float | None = None  # None = inherit from upstream channel (Dh = D)
     surface: SurfaceModelData = Field(default_factory=SmoothModelData)
     Nu_multiplier: float = 1.0
     f_multiplier: float = 1.0
@@ -157,7 +157,8 @@ class MomentumChamberData(BaseModel):
 class ChannelData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     L: float = 1.0
-    D: float = 0.1
+    D: float | None = None  # None = inherit from upstream element geometry
+    Dh: float | None = None  # None = circular (Dh = D); override for non-circular ducts
     roughness: float = 1e-5
     friction_model: Literal["haaland", "serghides", "colebrook", "petukhov"] = "haaland"
     surface: SurfaceModelData = Field(default_factory=SmoothModelData)
@@ -170,7 +171,7 @@ class ChannelData(BaseModel):
 
 class OrificeData(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    diameter: float = 0.08
+    diameter: float | None = None  # None = inherit from upstream channel
     Cd: float = 0.6
     correlation: Literal[
         "ReaderHarrisGallagher", "Stolz", "Miller", "ThickPlate", "RoundedEntry", "fixed"
@@ -196,8 +197,8 @@ class OrificeData(BaseModel):
 class AreaChangeData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     model_type: Literal["sharp", "conical"] = "sharp"
-    F0: float = 0.01
-    F1: float = 0.02
+    F0: float | None = None  # None = inherit from upstream channel (A = pi/4*D^2)
+    F1: float | None = None  # None = inherit from downstream channel
     length: float | None = None
     D_h: float = 0.0
     initial_guess: dict[str, float] = Field(default_factory=dict)
@@ -213,8 +214,11 @@ class TeeJunctionData(BaseModel):
     label: str | None = None
     tee_type: str = "merging"  # "merging" | "branching"
     theta_deg: float = 90.0  # branch angle [deg], converted to radians in graph_builder
-    F_C: float = 0.01  # common-arm area [m^2]
-    psi: float = 1.0  # F_C / F_branch (common / lateral-branch area ratio)
+    F_C: float | None = None  # None = inherit from common/straight-arm channel (A = pi/4*D^2)
+    F_branch: float | None = (
+        None  # None = inherit from branch-arm channel; psi is computed from F_C/F_branch
+    )
+    psi: float = 1.0  # fallback ratio used only when F_branch is None and not inherited
     initial_guess: dict[str, float] = Field(default_factory=dict)
 
 

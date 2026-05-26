@@ -37,28 +37,34 @@ export function validateNetwork(nodes: Node[]): string[] {
 			}
 		}
 		if (node.type === "channel") {
-			if ((node.data.D || 0) <= 0)
+			// null/undefined D means "inherit from graph" — only flag explicit non-positive values
+			if (node.data.D != null && node.data.D <= 0)
 				errors.push(`${node.id}: Channel diameter must be > 0`);
 			if ((node.data.L || 0) <= 0)
 				errors.push(`${node.id}: Channel length must be > 0`);
 		}
 		if (node.type === "orifice") {
-			if ((node.data.area || 0) <= 0 && (node.data.diameter || 0) <= 0)
-				errors.push(`${node.id}: Orifice area or diameter must be > 0`);
+			// null diameter means "use default 0.08 m" — only flag explicit non-positive values
+			if (node.data.diameter != null && node.data.diameter <= 0)
+				errors.push(`${node.id}: Orifice diameter must be > 0`);
 		}
 		if (node.type === "momentum_chamber") {
-			if ((node.data.area ?? 0) <= 0)
+			// null area means "derive from Dh" — only flag explicit non-positive values
+			if (node.data.area != null && node.data.area <= 0)
 				errors.push(`${node.id}: Momentum Chamber area must be > 0`);
-			if (node.data.Dh !== undefined && node.data.Dh < 0)
+			if (node.data.Dh != null && node.data.Dh <= 0)
 				errors.push(
-					`${node.id}: Momentum Chamber Dh must be > 0 (or 0 for auto)`,
+					`${node.id}: Momentum Chamber Dh must be > 0 (or left blank to inherit)`,
 				);
 		}
 		if (node.type === "combustor") {
-			if ((node.data.area ?? 0.1) <= 0)
+			// null area means "derive from Dh" — only flag explicit non-positive values
+			if (node.data.area != null && node.data.area <= 0)
 				errors.push(`${node.id}: Combustor area must be > 0`);
-			if (node.data.Dh !== undefined && node.data.Dh < 0)
-				errors.push(`${node.id}: Combustor Dh must be > 0 (or 0 for auto)`);
+			if (node.data.Dh != null && node.data.Dh <= 0)
+				errors.push(
+					`${node.id}: Combustor Dh must be > 0 (or left blank to inherit)`,
+				);
 		}
 		if (node.type === "discrete_loss") {
 			// `area` is optional: when undefined/null it is inferred from the
@@ -89,15 +95,17 @@ export function validateNetwork(nodes: Node[]): string[] {
 					`${node.id}: Tee branch angle |theta| must be <= 90 deg, got ${thetaDeg} deg`,
 				);
 			}
-			if ((node.data.F_C ?? 0) <= 0)
+			// null F_C means "inherit from connected channels" — only flag explicit non-positive values
+			if (node.data.F_C != null && node.data.F_C <= 0)
 				errors.push(`${node.id}: Tee common arm area F_C must be > 0`);
 			if ((node.data.psi ?? 1) <= 0)
 				errors.push(`${node.id}: Tee area ratio psi must be > 0`);
 		}
 		if (node.type === "area_change") {
-			if ((node.data.F0 ?? 0.01) <= 0)
+			// null F0/F1 means "inherit from connected channels" — only flag explicit non-positive values
+			if (node.data.F0 != null && node.data.F0 <= 0)
 				errors.push(`${node.id}: AreaChange Upstream Area (F0) must be > 0`);
-			if ((node.data.F1 ?? 0.01) <= 0)
+			if (node.data.F1 != null && node.data.F1 <= 0)
 				errors.push(`${node.id}: AreaChange Downstream Area (F1) must be > 0`);
 			if (
 				node.data.D_h !== undefined &&

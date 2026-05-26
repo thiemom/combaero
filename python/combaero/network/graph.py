@@ -105,6 +105,11 @@ class FlowNetwork:
             node.resolve_topology(self)
         for element in self.elements.values():
             element.resolve_topology(self)
+        # Second pass: elements that inherit from other elements (e.g. TeeJunction.F_C from a
+        # channel whose D was itself inherited) get a second chance after the first pass resolved
+        # all direct values.
+        for element in self.elements.values():
+            element.resolve_topology(self)
 
     def _reachable_from(self, start_id: str) -> set[str]:
         """BFS over undirected adjacency to find all node IDs reachable from start_id."""

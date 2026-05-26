@@ -247,7 +247,7 @@ def test_system_size_reduction_assertion():
 
 
 @pytest.mark.xfail(
-    reason="Known convergence issue with mixing plenum configuration - unrelated to current changes",
+    reason="Mixing plenum convergence is non-deterministic when run in suite (passes in isolation)",
     strict=False,
 )
 def test_mixing_plenum_convergence():
