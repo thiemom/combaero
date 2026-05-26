@@ -6,7 +6,7 @@ import {
 	Position,
 	useUpdateNodeInternals,
 } from "reactflow";
-import { HANDLE_CSS, rotPos } from "../../utils/nodeUtils";
+import { handleStyle, rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
 
 const OrificeNode = ({ id, data, selected }: NodeProps) => {
@@ -81,25 +81,25 @@ const OrificeNode = ({ id, data, selected }: NodeProps) => {
 			<Handle
 				type="target"
 				position={rotPos(Position.Left, rotation)}
-				style={HANDLE_CSS[Position.Left]}
+				style={handleStyle(Position.Left, rotation)}
 				id="flow-target"
 			/>
 			<Handle
 				type="source"
 				position={rotPos(Position.Right, rotation)}
-				style={HANDLE_CSS[Position.Right]}
+				style={handleStyle(Position.Right, rotation)}
 				id="flow-source"
 			/>
 			<Handle
 				type="target"
 				position={rotPos(Position.Top, rotation)}
-				style={HANDLE_CSS[Position.Top]}
+				style={handleStyle(Position.Top, rotation)}
 				id="thermal-target"
 			/>
 			<Handle
 				type="source"
 				position={rotPos(Position.Bottom, rotation)}
-				style={HANDLE_CSS[Position.Bottom]}
+				style={handleStyle(Position.Bottom, rotation)}
 				id="thermal-source"
 			/>
 		</div>

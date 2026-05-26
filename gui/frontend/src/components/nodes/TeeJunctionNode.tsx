@@ -6,7 +6,7 @@ import {
 	Position,
 	useUpdateNodeInternals,
 } from "reactflow";
-import { HANDLE_CSS, rotPos } from "../../utils/nodeUtils";
+import { handleStyle, rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
 
 // Port colours: blue = input arm, green = output arm (matches handle triangle colours).
@@ -119,13 +119,13 @@ const TeeJunctionNode = ({ id, data, selected }: NodeProps) => {
 			<Handle
 				type="target"
 				position={straightPos}
-				style={HANDLE_CSS[straightBase]}
+				style={handleStyle(straightBase, rotation)}
 				id="port-straight-target"
 			/>
 			<Handle
 				type="source"
 				position={straightPos}
-				style={HANDLE_CSS[straightBase]}
+				style={handleStyle(straightBase, rotation)}
 				id="port-straight-source"
 			/>
 
@@ -133,13 +133,13 @@ const TeeJunctionNode = ({ id, data, selected }: NodeProps) => {
 			<Handle
 				type="target"
 				position={commonPos}
-				style={HANDLE_CSS[commonBase]}
+				style={handleStyle(commonBase, rotation)}
 				id="port-common-target"
 			/>
 			<Handle
 				type="source"
 				position={commonPos}
-				style={HANDLE_CSS[commonBase]}
+				style={handleStyle(commonBase, rotation)}
 				id="port-common-source"
 			/>
 
@@ -147,13 +147,13 @@ const TeeJunctionNode = ({ id, data, selected }: NodeProps) => {
 			<Handle
 				type="target"
 				position={branchPos}
-				style={HANDLE_CSS[branchBase]}
+				style={handleStyle(branchBase, rotation)}
 				id="port-branch-target"
 			/>
 			<Handle
 				type="source"
 				position={branchPos}
-				style={HANDLE_CSS[branchBase]}
+				style={handleStyle(branchBase, rotation)}
 				id="port-branch-source"
 			/>
 		</div>

@@ -20,39 +20,60 @@ export const rotPos = (pos: Position, rotation: number): Position => {
 	return CYCLE[(idx + steps + 4) % 4];
 };
 
-// Inline styles that pin each Handle to its correct physical edge within the
-// rotated node div. ReactFlow positions handles via CSS classes
-// (.react-flow__handle-left etc.) but since the node div has a CSS transform
-// those classes apply in the rotated coordinate system — causing the handle
-// to appear on the wrong visual edge. Inline styles (higher specificity) keep
-// the handle at the intended pre-rotation location regardless of rotation.
-export const HANDLE_CSS: Record<Position, React.CSSProperties> = {
+// Base positioning for each handle edge. Used by handleStyle below.
+// The left/top/right/bottom values pin the handle to the correct physical
+// edge within the node div's local (pre-rotation) coordinate system.
+const HANDLE_BASE: Record<Position, React.CSSProperties> = {
 	[Position.Left]: {
 		left: "-4px",
 		right: "auto",
 		top: "50%",
 		bottom: "auto",
-		transform: "translate(0, -50%)",
 	},
 	[Position.Right]: {
 		left: "auto",
 		right: "-4px",
 		top: "50%",
 		bottom: "auto",
-		transform: "translate(0, -50%)",
 	},
 	[Position.Top]: {
 		left: "50%",
 		right: "auto",
 		top: "-4px",
 		bottom: "auto",
-		transform: "translate(-50%, 0)",
 	},
 	[Position.Bottom]: {
 		left: "50%",
 		right: "auto",
 		top: "auto",
 		bottom: "-4px",
-		transform: "translate(-50%, 0)",
 	},
 };
+
+// Centering offset for left/right vs top/bottom handles.
+const HANDLE_CENTER: Record<Position, string> = {
+	[Position.Left]: "translate(0, -50%)",
+	[Position.Right]: "translate(0, -50%)",
+	[Position.Top]: "translate(-50%, 0)",
+	[Position.Bottom]: "translate(-50%, 0)",
+};
+
+/**
+ * Returns the inline style for a Handle based on its pre-rotation base
+ * position and the node's current rotation.
+ *
+ * Two effects:
+ *  1. Overrides ReactFlow's position CSS classes (which would otherwise
+ *     place the handle in the rotated coordinate system, landing it on the
+ *     wrong visual edge).
+ *  2. Counter-rotates the handle div by −rotation so that the ::after
+ *     triangle drawn by index.css stays perpendicular to the edge it sits on,
+ *     rather than inheriting the node's CSS rotation.
+ */
+export const handleStyle = (
+	basePos: Position,
+	rotation: number,
+): React.CSSProperties => ({
+	...HANDLE_BASE[basePos],
+	transform: `${HANDLE_CENTER[basePos]} rotate(${-rotation}deg)`,
+});
