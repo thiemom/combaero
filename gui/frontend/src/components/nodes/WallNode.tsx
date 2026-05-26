@@ -6,6 +6,7 @@ import {
 	Position,
 	useUpdateNodeInternals,
 } from "reactflow";
+import { handleStyle, rotPos } from "../../utils/nodeUtils";
 
 const WallNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
@@ -45,7 +46,12 @@ const WallNode = ({ id, data, selected }: NodeProps) => {
 				</div>
 			</div>
 
-			<Handle type="target" position={Position.Left} id="flow-target" />
+			<Handle
+				type="target"
+				position={rotPos(Position.Left, rotation)}
+				style={handleStyle(Position.Left, rotation)}
+				id="flow-target"
+			/>
 		</div>
 	);
 };

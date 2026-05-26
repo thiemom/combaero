@@ -6,6 +6,7 @@ import {
 	Position,
 	useUpdateNodeInternals,
 } from "reactflow";
+import { handleStyle, rotPos } from "../../utils/nodeUtils";
 
 const MassBoundaryNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
@@ -43,8 +44,18 @@ const MassBoundaryNode = ({ id, data, selected }: NodeProps) => {
 				</div>
 			</div>
 
-			<Handle type="source" position={Position.Right} id="flow-source" />
-			<Handle type="target" position={Position.Left} id="flow-target" />
+			<Handle
+				type="source"
+				position={rotPos(Position.Right, rotation)}
+				style={handleStyle(Position.Right, rotation)}
+				id="flow-source"
+			/>
+			<Handle
+				type="target"
+				position={rotPos(Position.Left, rotation)}
+				style={handleStyle(Position.Left, rotation)}
+				id="flow-target"
+			/>
 		</div>
 	);
 };

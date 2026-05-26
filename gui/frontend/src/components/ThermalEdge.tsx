@@ -1,23 +1,6 @@
 import type { EdgeProps } from "reactflow";
-import {
-	EdgeLabelRenderer,
-	getBezierPath,
-	Position,
-	useNodes,
-} from "reactflow";
+import { EdgeLabelRenderer, getBezierPath } from "reactflow";
 import useStore from "../store/useStore";
-
-function rotatePosition(pos: Position, degrees: number): Position {
-	const cycle: Position[] = [
-		Position.Right,
-		Position.Bottom,
-		Position.Left,
-		Position.Top,
-	];
-	const steps = Math.round((((degrees % 360) + 360) % 360) / 90) % 4;
-	const idx = cycle.indexOf(pos);
-	return idx === -1 ? pos : cycle[(idx + steps) % 4];
-}
 
 const ARROW_COLOR = "#ff9800";
 const MARKER_SIZE = 6;
@@ -33,8 +16,6 @@ function thermalColor(t: number): string {
 
 export default function ThermalEdge({
 	id,
-	source,
-	target,
 	sourceX,
 	sourceY,
 	targetX,
@@ -48,24 +29,13 @@ export default function ThermalEdge({
 	const unit = unitPreferences.length;
 	const scale = unit === "mm" ? 1000 : 1;
 
-	const nodes = useNodes();
-	const sourceRotation =
-		(nodes.find((n) => n.id === source)?.data as { rotation?: number })
-			?.rotation ?? 0;
-	const targetRotation =
-		(nodes.find((n) => n.id === target)?.data as { rotation?: number })
-			?.rotation ?? 0;
-
-	const adjSourcePos = rotatePosition(sourcePosition, sourceRotation);
-	const adjTargetPos = rotatePosition(targetPosition, targetRotation);
-
 	const [edgePath, labelX, labelY] = getBezierPath({
 		sourceX,
 		sourceY,
-		sourcePosition: adjSourcePos,
+		sourcePosition,
 		targetX,
 		targetY,
-		targetPosition: adjTargetPos,
+		targetPosition,
 	});
 
 	const Q: number | undefined = data?.result?.Q;

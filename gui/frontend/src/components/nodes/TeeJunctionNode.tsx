@@ -6,6 +6,7 @@ import {
 	Position,
 	useUpdateNodeInternals,
 } from "reactflow";
+import { handleStyle, rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
 
 // Port colours: blue = input arm, green = output arm (matches handle triangle colours).
@@ -23,8 +24,12 @@ const TeeJunctionNode = ({ id, data, selected }: NodeProps) => {
 	// Merging:  S(left, in) + B(bottom, in)  → C(right, out)
 	// Branching: C(left, in) → S(right, out) + B(bottom, out)
 	// Swap the left/right positions of S and C when the type changes.
-	const straightPos = isMerging ? Position.Left : Position.Right;
-	const commonPos = isMerging ? Position.Right : Position.Left;
+	const straightBase = isMerging ? Position.Left : Position.Right;
+	const commonBase = isMerging ? Position.Right : Position.Left;
+	const branchBase = Position.Bottom;
+	const straightPos = rotPos(straightBase, rotation);
+	const commonPos = rotPos(commonBase, rotation);
+	const branchPos = rotPos(branchBase, rotation);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: rotation and tee_type both trigger handle re-measurement
 	useEffect(() => {
@@ -111,22 +116,44 @@ const TeeJunctionNode = ({ id, data, selected }: NodeProps) => {
 			</div>
 
 			{/* Straight arm — left for merging, right for branching */}
-			<Handle type="target" position={straightPos} id="port-straight-target" />
-			<Handle type="source" position={straightPos} id="port-straight-source" />
-
-			{/* Common arm — right for merging, left for branching */}
-			<Handle type="target" position={commonPos} id="port-common-target" />
-			<Handle type="source" position={commonPos} id="port-common-source" />
-
-			{/* Branch arm — always bottom */}
 			<Handle
 				type="target"
-				position={Position.Bottom}
+				position={straightPos}
+				style={handleStyle(straightBase, rotation)}
+				id="port-straight-target"
+			/>
+			<Handle
+				type="source"
+				position={straightPos}
+				style={handleStyle(straightBase, rotation)}
+				id="port-straight-source"
+			/>
+
+			{/* Common arm — right for merging, left for branching */}
+			<Handle
+				type="target"
+				position={commonPos}
+				style={handleStyle(commonBase, rotation)}
+				id="port-common-target"
+			/>
+			<Handle
+				type="source"
+				position={commonPos}
+				style={handleStyle(commonBase, rotation)}
+				id="port-common-source"
+			/>
+
+			{/* Branch arm — bottom at 0°, rotates with node */}
+			<Handle
+				type="target"
+				position={branchPos}
+				style={handleStyle(branchBase, rotation)}
 				id="port-branch-target"
 			/>
 			<Handle
 				type="source"
-				position={Position.Bottom}
+				position={branchPos}
+				style={handleStyle(branchBase, rotation)}
 				id="port-branch-source"
 			/>
 		</div>
