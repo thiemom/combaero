@@ -49,6 +49,7 @@ uv run scripts/generate_units_md.py         # regenerate docs/UNITS.md
 ## Git Workflow
 - **Branch protection on `main`:** never push directly to `main`. Always work on a feature/fix branch and open a PR (`feature-branch → main`).
 - **Opening PRs:** `gh pr create` requires `dangerouslyDisableSandbox: true` — the sandbox intercepts TLS and `gh` cannot reach the GitHub API without it.
+- **CI is required to merge:** GitHub Actions checks must pass before a PR can be merged. If main was updated after the PR was opened, re-run checks against the updated base before merging.
 
 ## Version Sync Checklist
 When changing Python version or tool versions, keep in sync:
