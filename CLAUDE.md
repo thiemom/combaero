@@ -46,6 +46,10 @@ uv run scripts/generate_units_md.py         # regenerate docs/UNITS.md
 | `docs/UNITS.md` | `include/units_data.h` | `uv run scripts/generate_units_md.py` |
 | `include/thermo_transport_data.h` | `thermo_data_generator/` | see `thermo_data_generator/README.md` |
 
+## Git Workflow
+- **Branch protection on `main`:** never push directly to `main`. Always work on a feature/fix branch and open a PR (`feature-branch → main`).
+- **Opening PRs:** `gh pr create` requires `dangerouslyDisableSandbox: true` — the sandbox intercepts TLS and `gh` cannot reach the GitHub API without it.
+
 ## Version Sync Checklist
 When changing Python version or tool versions, keep in sync:
 `.python-version` · `ruff.toml` · `ci.yml` · `validation-tests.yml` · `.pre-commit-config.yaml` · `Makefile`
