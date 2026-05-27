@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   context.
 
 ### Fixed
+- **Tee FD Jacobian eps_P scaling**: the finite-difference pressure step in
+  `tee_fd_density_jacobians` is now `max(1.0, |P| × 10⁻⁴)` Pa instead of a fixed 1 Pa,
+  preventing a numerically negligible step at high absolute pressures (e.g. 300 kPa inlet).
 - **Levenberg-Marquardt fallback for hybr oscillation** on compressible networks: when
   `hybr` (Powell's method) fails to converge on a compressible network — typically because
   the Jacobian is ill-conditioned near a choked operating point and Newton steps bounce
