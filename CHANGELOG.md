@@ -22,21 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   context.
 
 ### Fixed
-- **Physics-informed pressure init guess**: initial node pressures are now computed
-  using Darcy-Weisbach (`f=0.02`, velocity capped at 0.9×a) from the mass-flow estimates
-  rather than a uniform 0.1%-of-Pref heuristic.  At high mass flows (e.g. m=0.19 kg/s
-  through the compressible manifold) the inlet pressure guess now scales correctly with
-  flow, placing Newton in the correct basin from iteration 0.
 - **Tee FD Jacobian eps_P scaling**: the finite-difference pressure step in
   `tee_fd_density_jacobians` is now `max(1.0, |P| × 10⁻⁴)` Pa instead of a fixed 1 Pa,
   preventing a numerically negligible step at high absolute pressures (e.g. 300 kPa inlet).
-- **Prandtl-Glauert compressibility correction to tee K coefficients**: Bassett (2001)
-  loss coefficients are calibrated for incompressible flow. At Ma > 0.2 the uncorrected
-  K values overpredict friction loss by up to 40% at Ma=0.8, creating a physically
-  inconsistent system that the solver cannot converge. The correction
-  `K_eff = K / sqrt(max(1 − Ma², 0.01))` is now applied in both merging and branching
-  tee residuals, with full analytical Jacobians (including the `d(1/β)/dm̊_com` term)
-  and a consistent FD lambda that recomputes β for each rho perturbation.
 - **Levenberg-Marquardt fallback for hybr oscillation** on compressible networks: when
   `hybr` (Powell's method) fails to converge on a compressible network — typically because
   the Jacobian is ill-conditioned near a choked operating point and Newton steps bounce

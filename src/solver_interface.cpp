@@ -1953,18 +1953,9 @@ void tee_fd_density_jacobians(
         dKb = branching_tee_dK_branch_dq(q, psi, theta, blend_k);
     }
 
-    // Prandtl-Glauert correction: beta = sqrt(1 - Ma^2) evaluated per rho so
-    // the FD captures d(beta)/d(rho) through the pressure/temperature perturbations.
-    const double a_fd = combaero::speed_of_sound(T, X);
-
-    auto eval = [&](double rho_per) {
-        const double Ma_sq_per =
-            m_dot_com * m_dot_com / (rho_per * rho_per * F_C * F_C * a_fd * a_fd);
-        const double beta_per = std::sqrt(std::max(1.0 - Ma_sq_per, 0.01));
+    auto eval = [&](double rho) {
         auto c = tee_core(m_dot_com, m_dot_branch, dP0_straight, dP0_branch,
-                          rho_per, F_C,
-                          Ks / beta_per, dKs / beta_per,
-                          Kb / beta_per, dKb / beta_per);
+                          rho, F_C, Ks, dKs, Kb, dKb);
         return std::make_pair(c.R_straight, c.R_branch);
     };
 
@@ -2025,28 +2016,15 @@ TeeJunctionResult merging_tee_residuals_and_jacobian(
     const double Kb = merging_tee_K_branch(q, psi, theta, blend_k);
     const double dKb = merging_tee_dK_branch_dq(q, psi, theta, blend_k);
 
-    // Prandtl-Glauert compressibility correction to Bassett K coefficients.
-    const double a_com = combaero::speed_of_sound(T_com, X_com);
-    const double Ma_com_sq =
-        m_dot_com * m_dot_com / (rho * rho * F_C * F_C * a_com * a_com);
-    const double beta = std::sqrt(std::max(1.0 - Ma_com_sq, 0.01));
-
     auto core = tee_core(m_dot_com, m_dot_branch, dP0_straight, dP0_branch,
-                         rho, F_C, Ks / beta, dKs / beta, Kb / beta, dKb / beta);
-
-    // Analytical correction for d(Ks/beta)/dm_dot_com: tee_core treats beta as
-    // constant, so we add the missing -K * q_dyn * d(1/beta)/dm_dot_com term.
-    // d(1/beta)/dm_dot_com = Ma_com / (beta^3 * rho * F_C * a_com)
-    const double Ma_com = std::sqrt(Ma_com_sq);
-    const double pg_corr =
-        -core.q_dyn * Ma_com / (beta * beta * beta * rho * F_C * a_com);
+                         rho, F_C, Ks, dKs, Kb, dKb);
 
     TeeJunctionResult res;
     res.R_straight = core.R_straight;
     res.R_branch = core.R_branch;
-    res.dR_straight_d_mdot_com = core.dRs_d_mcom + Ks * pg_corr;
+    res.dR_straight_d_mdot_com = core.dRs_d_mcom;
     res.dR_straight_d_mdot_branch = core.dRs_d_mbranch;
-    res.dR_branch_d_mdot_com = core.dRb_d_mcom + Kb * pg_corr;
+    res.dR_branch_d_mdot_com = core.dRb_d_mcom;
     res.dR_branch_d_mdot_branch = core.dRb_d_mbranch;
 
     tee_fd_density_jacobians(
@@ -2091,25 +2069,15 @@ TeeJunctionResult branching_tee_residuals_and_jacobian(
     const double Kb = branching_tee_K_branch(q, psi, theta, blend_k);
     const double dKb = branching_tee_dK_branch_dq(q, psi, theta, blend_k);
 
-    // Prandtl-Glauert compressibility correction to Bassett K coefficients.
-    const double a_com = combaero::speed_of_sound(T_com, X_com);
-    const double Ma_com_sq =
-        m_dot_com * m_dot_com / (rho * rho * F_C * F_C * a_com * a_com);
-    const double beta = std::sqrt(std::max(1.0 - Ma_com_sq, 0.01));
-
     auto core = tee_core(m_dot_com, m_dot_branch, dP0_straight, dP0_branch,
-                         rho, F_C, Ks / beta, dKs / beta, Kb / beta, dKb / beta);
-
-    const double Ma_com = std::sqrt(Ma_com_sq);
-    const double pg_corr =
-        -core.q_dyn * Ma_com / (beta * beta * beta * rho * F_C * a_com);
+                         rho, F_C, Ks, dKs, Kb, dKb);
 
     TeeJunctionResult res;
     res.R_straight = core.R_straight;
     res.R_branch = core.R_branch;
-    res.dR_straight_d_mdot_com = core.dRs_d_mcom + Ks * pg_corr;
+    res.dR_straight_d_mdot_com = core.dRs_d_mcom;
     res.dR_straight_d_mdot_branch = core.dRs_d_mbranch;
-    res.dR_branch_d_mdot_com = core.dRb_d_mcom + Kb * pg_corr;
+    res.dR_branch_d_mdot_com = core.dRb_d_mcom;
     res.dR_branch_d_mdot_branch = core.dRb_d_mbranch;
 
     tee_fd_density_jacobians(

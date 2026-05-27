@@ -165,7 +165,7 @@ def test_merging_tee_residuals_near_zero():
 
     x = np.array([sol.get(n, 0.0) for n in solver.unknown_names])
     res, _ = solver._residuals_and_jacobian(x, compute_jacobian=False)
-    assert all(abs(r) < 1e-4 for r in res), f"Non-zero residuals: {res}"
+    assert all(abs(r) < 1e-6 for r in res), f"Non-zero residuals: {res}"
 
 
 def test_merging_tee_diagnostics():
@@ -212,7 +212,7 @@ def test_branching_tee_residuals_near_zero():
 
     x = np.array([sol.get(n, 0.0) for n in solver.unknown_names])
     res, _ = solver._residuals_and_jacobian(x, compute_jacobian=False)
-    assert all(abs(r) < 1e-4 for r in res), f"Non-zero residuals: {res}"
+    assert all(abs(r) < 1e-6 for r in res), f"Non-zero residuals: {res}"
 
 
 # ---------------------------------------------------------------------------
