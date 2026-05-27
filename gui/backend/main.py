@@ -128,7 +128,8 @@ def _solve_sync(schema: NetworkGraphSchema):
         }
 
     node_results, element_results, edge_results = _build_result_objects(result, net)
-    return result, node_results, element_results, edge_results, net
+    diag = getattr(solver, "_diagnostic_data", {})
+    return result, node_results, element_results, edge_results, net, diag
 
 
 @app.post("/solve", response_model=SolveResponse)
@@ -140,7 +141,7 @@ async def solve(schema: NetworkGraphSchema):
     hard_timeout = soft_timeout + 10.0
     try:
         # Offload CPU-bound C++ solver to a worker thread
-        result, node_results, element_results, edge_results, _ = await asyncio.wait_for(
+        result, node_results, element_results, edge_results, _, diag = await asyncio.wait_for(
             asyncio.to_thread(_solve_sync, schema),
             timeout=hard_timeout,
         )
@@ -152,6 +153,10 @@ async def solve(schema: NetworkGraphSchema):
             node_results=node_results,
             element_results=element_results,
             edge_results=edge_results,
+            convergence_history=diag.get("convergence_history", []),
+            worst_residuals=diag.get("worst_residuals", []),
+            solver_settings_used=diag.get("solver_settings_used", {}),
+            lm_started_at_eval=diag.get("lm_started_at_eval"),
         )
     except TimeoutError:
         raise HTTPException(
