@@ -385,6 +385,17 @@ class ElementResult(BaseModel):
     success: bool = True
 
 
+class ConvergencePoint(BaseModel):
+    eval: int
+    t: float
+    norm: float
+
+
+class WorstResidual(BaseModel):
+    name: str
+    residual: float
+
+
 class SolveResponse(BaseModel):
     success: bool
     message: str = ""
@@ -392,3 +403,7 @@ class SolveResponse(BaseModel):
     node_results: dict[str, NodeResult] = {}
     element_results: dict[str, ElementResult] = {}
     edge_results: dict[str, dict] = {}
+    convergence_history: list[ConvergencePoint] = []
+    worst_residuals: list[WorstResidual] = []
+    solver_settings_used: dict = {}
+    lm_started_at_eval: int | None = None

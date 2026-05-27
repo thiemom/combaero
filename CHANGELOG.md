@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Solver convergence chart**: after every solve a "View convergence" link appears in
+  the solver status badge (both success and failure). Clicking opens a modal with a
+  log-scale `||F||` vs. time chart (no new dependency — pure SVG). The hybr phase is
+  shown in orange; the LM fallback phase (if triggered) in blue with a dashed boundary
+  line. A "Worst residuals" table below the chart shows the top-5 unknowns by absolute
+  residual value, helping identify which node or element is hardest to converge.
+- **Convergence history in API response**: `SolveResponse` now includes
+  `convergence_history` (list of `{eval, t, norm}` sampled at every `||F||` improvement
+  and at most every 0.1 s, capped at 1 000 points), `worst_residuals` (top 10 per-unknown
+  residuals at the final iterate), `solver_settings_used`, and `lm_started_at_eval`.
+  Useful for LLM-assisted diagnostics: the response is self-contained with full solver
+  context.
+
 ### Fixed
 - **Levenberg-Marquardt fallback for hybr oscillation** on compressible networks: when
   `hybr` (Powell's method) fails to converge on a compressible network — typically because
