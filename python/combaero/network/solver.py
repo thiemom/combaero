@@ -17,6 +17,7 @@ from .components import (
     NetworkMixtureState,
     NetworkNode,
     PressureBoundary,
+    WallNode,
 )
 from .graph import FlowNetwork
 
@@ -245,6 +246,14 @@ class NetworkSolver:
                     visited.add(from_id)
                     queue.append(from_id)
 
+        # WallNode dead-ends carry no flow, so the correct pressure equals the
+        # upstream node pressure (no friction drop).  Override the BFS estimate.
+        for nid, node in self.network.nodes.items():
+            if isinstance(node, WallNode):
+                for elem in self.network.get_upstream_elements(nid):
+                    p_guess[nid] = p_guess.get(elem.from_node, p_guess.get(nid, ref["P"]))
+                    break
+
         return p_guess
 
     def _propagate_mdot_guess(self, ref: dict[str, Any]) -> dict[str, float]:
@@ -302,12 +311,19 @@ class NetworkSolver:
             for elem in down_elems:
                 elem_share = share
                 regime = getattr(elem, "regime", None)
+
+                # Dead-end channels (to_node is a WallNode) carry zero flow.
+                # Start Newton at m_dot=0 so the mass-balance constraint is
+                # trivially satisfied from the first iteration.
+                if isinstance(self.network.nodes.get(elem.to_node), WallNode):
+                    elem_share = 0.0
+
                 # Only apply the Mach cap when the flow is estimated (pressure-
                 # boundary seeded).  When a MassFlowBoundary seeds the element
                 # directly, the mass flow is a known constraint and capping it
                 # produces an initial guess that is too far from the solution,
                 # causing hybr to converge to a spurious local minimum.
-                if regime == "compressible" and not from_mass_boundary:
+                elif regime == "compressible" and not from_mass_boundary:
                     area = getattr(elem, "area", None)
                     if area is not None and area > 0.0:
                         mdot_cap = rho_ref * a_ref * area * mdot_ratio
@@ -369,6 +385,11 @@ class NetworkSolver:
             _pt_src = max(_node_pt(n) for n in _src)
             _pt_snk = min(_node_pt(n) for n in _snk)
             _dP_total = max(_pt_src - _pt_snk, 1.0)
+            # F_C may be None before topology is resolved (e.g. when _build_x0
+            # is called directly before NetworkSolver.solve resolves topology).
+            # Skip the Bernoulli estimate and fall back to the propagated guess.
+            if not _elem.F_C:
+                continue
             _bernoulli_com = _elem.F_C * math.sqrt(2.0 * _rho_tee * _dP_total)
             # Prefer a propagated mdot (e.g. from MassFlowBoundary) over the
             # Bernoulli estimate when the former is larger -- the propagated value
@@ -1262,11 +1283,6 @@ class NetworkSolver:
         if method != "hybr" and "maxfev" in options:
             options.setdefault("maxiter", options.pop("maxfev"))
 
-        if method == "hybr":
-            options.setdefault("maxfev", 500)
-        else:
-            options.setdefault("maxiter", 500)
-
         # Ensure topology is resolved before solving
         self.network.resolve_all_topology()
         self.network.validate()
@@ -1279,6 +1295,20 @@ class NetworkSolver:
                 "__message__": "Network is empty or fully constrained (no unknowns).",
                 "__iterations__": 0,
             }
+
+        # Set default iteration limit based on problem size (matches hybr's own default
+        # of 200*(n+1)) now that we know n.  Applied after the early-return check so
+        # the network can't be empty when we read len(unknown_names).
+        _n_unk = len(self.unknown_names)
+        _default_iters = max(500, 200 * (_n_unk + 1))
+        if method == "hybr":
+            options.setdefault("maxfev", _default_iters)
+            # Reduce initial trust-region step bound (hybr default is 100).
+            # Smaller steps prevent large oscillating Newton steps near
+            # ill-conditioned Jacobians (e.g., compressible flow near choking).
+            options.setdefault("factor", 10)
+        else:
+            options.setdefault("maxiter", _default_iters)
 
         warmstart_x0: np.ndarray | None = None
         if x0 is None and init_strategy == "incompressible_warmstart":
@@ -1348,10 +1378,9 @@ class NetworkSolver:
                     # Limit maxfev/maxiter for intermediate steps to stay fast.
                     # This is decremental to convergence: trade speed versus robustness near choking.
                     step_options = dict(options)
-                    if method == "hybr":
-                        step_options["maxfev"] = step_options.get("maxfev", 500)
-                    else:
-                        step_options["maxiter"] = step_options.get("maxiter", 500)
+                    # options already has maxfev/_default_iters set above; honour
+                    # it.  The setdefault here is only reached if the caller
+                    # explicitly zeroed out maxfev/maxiter, which should not happen.
 
                     last_sol = self.solve(
                         method=method,
@@ -1424,6 +1453,16 @@ class NetworkSolver:
 
         x0_scaled = x0_use * inv_D_x  # should be ~1.0
 
+        # For compressible networks hybr can oscillate near choking.  Reserve
+        # 35% of the wall-clock budget for an LM fallback that has better
+        # global convergence via (J^TJ + lI) regularisation.
+        # Incompressible inner solves (regime overrides applied) have no
+        # compressible elements and keep the full budget.
+        _has_compressible = method == "hybr" and bool(self._compressible_element_overrides())
+        _hybr_budget = timeout * 0.65 if (_has_compressible and timeout is not None) else timeout
+        # Mutable so the LM fallback block can extend the effective limit.
+        _timeout_eff: list[float | None] = [_hybr_budget]
+
         # State for timeout and best iterate tracking (in real space)
         start_time = time.perf_counter()
         best_x = x0_use.copy()
@@ -1434,8 +1473,8 @@ class NetworkSolver:
             nonlocal best_x, best_res_norm, last_exception
 
             # Check timeout
-            if timeout is not None and (time.perf_counter() - start_time) > timeout:
-                raise SolverTimeoutError(f"Solver timed out after {timeout} seconds.")
+            if _timeout_eff[0] is not None and (time.perf_counter() - start_time) > _timeout_eff[0]:
+                raise SolverTimeoutError(f"Solver timed out after {_timeout_eff[0]:.1f} seconds.")
 
             # Un-scale to real space
             x_real = x_scaled * D_x
@@ -1535,6 +1574,39 @@ class NetworkSolver:
                     final_norm = fallback_norm
             except Exception:
                 pass  # keep original failure
+
+        # LM fallback for hybr oscillation on compressible networks.
+        # Levenberg-Marquardt's (J^TJ + lI) regularisation prevents the
+        # ill-conditioned Newton step that causes hybr to bounce near a
+        # choked solution without making progress.  Start from the best
+        # iterate hybr found; restore the full timeout so LM gets the
+        # remaining 35% of the budget.
+        if not success and _has_compressible:
+            _elapsed = time.perf_counter() - start_time
+            _remaining = (timeout - _elapsed) if timeout is not None else None
+            if _remaining is None or _remaining > 2.0:
+                _timeout_eff[0] = timeout
+                try:
+                    root(
+                        residuals_wrapper,
+                        best_x * inv_D_x,
+                        method="lm",
+                        jac=use_jac,
+                        options={"maxiter": _default_iters},
+                    )
+                    _lm_norm = float(best_res_norm)
+                    if _lm_norm < _RESIDUAL_TOL:
+                        final_x = best_x
+                        success = True
+                        message = (
+                            f"Converged with LM fallback "
+                            f"(hybr |F|={final_norm:.3e}, LM |F|={_lm_norm:.3e})."
+                        )
+                        final_norm = _lm_norm
+                except SolverTimeoutError:
+                    pass
+                except Exception:
+                    pass
 
         if not success:
             warnings.warn(

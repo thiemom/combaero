@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Levenberg-Marquardt fallback for hybr oscillation** on compressible networks: when
+  `hybr` (Powell's method) fails to converge on a compressible network — typically because
+  the Jacobian is ill-conditioned near a choked operating point and Newton steps bounce
+  without making progress — the solver now automatically retries from the best iterate
+  using Levenberg-Marquardt.  LM's `(J^TJ + lI)` regularisation limits the step even
+  when J is nearly singular, providing monotone reduction in `||F||`.  The timeout budget
+  is split 65/35 between hybr and the LM fallback so both methods have working time.
+  The initial hybr trust-region is also reduced (`factor=10`, down from the scipy default
+  of 100) to dampen oscillating overshoots from the start.
+- **Solver convergence hardening** for networks with dead-end branches (Wall nodes) and
+  inherited-geometry TeeJunctions (`F_C: null`):
+  - `_build_x0` now guards the TeeJunction Bernoulli estimate against `F_C=None`,
+    eliminating the `TypeError: NoneType * float` crash when using *Continuation* init
+    on a network whose tee junctions inherit area from adjacent channels.
+  - Initial guess for dead-end channels (connected to a `WallNode`) is now seeded at
+    `m_dot=0` instead of the full upstream flow, so Newton starts from the physically
+    correct state.
+  - `WallNode` initial pressure is now set equal to the upstream node pressure (no
+    friction drop at zero flow) instead of the BFS-propagated underestimate.
+  - Default `maxfev`/`maxiter` limit is now `max(500, 200*(n+1))` (matching scipy's
+    hybr internal default) computed from the actual problem size, replacing the
+    hard-coded 500 that caused convergence failures on larger networks or near-choking
+    operating points.
+  - `ChannelElement.diagnostics` applies the same Re floor (`sqrt(Re²+64²)`) used by
+    the C++ friction correlations, preventing `f` from reporting astronomically large
+    values (e.g. 5.7 × 10¹⁶) for dead-end channels with near-zero mass flow.
+
 ### Added
 - **Copy-paste nodes** (Ctrl/Cmd+C / Ctrl/Cmd+V): selected nodes can be duplicated
   on the canvas. Physics and configuration data (including orientation) are copied;

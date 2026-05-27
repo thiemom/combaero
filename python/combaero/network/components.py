@@ -2343,12 +2343,15 @@ class ChannelElement(NetworkElement):
             Nu, htc, T_aw = 0.0, 0.0, state_in.T
             dh_diag = self.Dh or self.diameter or 1.0
             e_D = self.roughness / dh_diag if dh_diag > 0 else 0.0
-            if re_in < 2300:
-                f = 64.0 / re_in if re_in > 0 else 0.0
+            # Apply the same Re floor used by the C++ friction correlations
+            # (Re_eff = sqrt(Re^2 + 64^2)) so f stays finite at near-zero flow.
+            re_eff = math.sqrt(re_in * re_in + 64.0 * 64.0)
+            if re_eff < 2300:
+                f = 64.0 / re_eff
             elif e_D > 1e-8:
-                f = (1.0 / (-1.8 * math.log10((e_D / 3.7) ** 1.11 + 6.9 / re_in))) ** 2
+                f = (1.0 / (-1.8 * math.log10((e_D / 3.7) ** 1.11 + 6.9 / re_eff))) ** 2
             else:
-                f = (0.79 * math.log(re_in) - 1.64) ** -2
+                f = (0.79 * math.log(re_eff) - 1.64) ** -2
 
         return {
             "m_dot": float(state_in.m_dot),
