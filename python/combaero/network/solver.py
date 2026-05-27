@@ -1463,6 +1463,15 @@ class NetworkSolver:
         # Mutable so the LM fallback block can extend the effective limit.
         _timeout_eff: list[float | None] = [_hybr_budget]
 
+        # Convergence history: record on every ||F|| improvement and at most
+        # once per 0.1 s to show oscillation without excessive overhead.
+        # Cap at 1 000 entries (~50 KB JSON) regardless of problem size.
+        _history: list[dict] = []
+        _last_record_t: list[float] = [0.0]
+        _RECORD_INTERVAL = 0.1
+        _eval_count: list[int] = [0]
+        _lm_started_at_eval: list[int | None] = [None]
+
         # State for timeout and best iterate tracking (in real space)
         start_time = time.perf_counter()
         best_x = x0_use.copy()
@@ -1485,9 +1494,19 @@ class NetworkSolver:
 
                 # Track best iterate (in real space, unscaled residual)
                 res_norm = np.linalg.norm(res)
-                if res_norm < best_res_norm:
+                _improved = res_norm < best_res_norm
+                if _improved:
                     best_res_norm = res_norm
                     best_x = x_real.copy()
+
+                # Record convergence history point
+                _t = time.perf_counter() - start_time
+                if (_improved or _t - _last_record_t[0] >= _RECORD_INTERVAL) and len(
+                    _history
+                ) < 1000:
+                    _history.append({"eval": _eval_count[0], "t": round(_t, 3), "norm": res_norm})
+                    _last_record_t[0] = _t
+                _eval_count[0] += 1
 
                 # Scale residuals
                 res_scaled = res * inv_D_f
@@ -1585,6 +1604,7 @@ class NetworkSolver:
             _elapsed = time.perf_counter() - start_time
             _remaining = (timeout - _elapsed) if timeout is not None else None
             if _remaining is None or _remaining > 2.0:
+                _lm_started_at_eval[0] = _eval_count[0]
                 _timeout_eff[0] = timeout
                 try:
                     root(
@@ -1619,6 +1639,20 @@ class NetworkSolver:
         # Store solution for warm-start reuse
         self._last_x = final_x.copy()
 
+        # Decompose final residual vector into per-unknown contributions.
+        # One extra _residuals() call; same cost as a single Newton step.
+        # Guard with try-except: mocked or patched _residuals_and_jacobian in
+        # tests may raise, and diagnostic collection must never break the caller.
+        try:
+            _res_final = self._residuals(final_x)
+            _breakdown = {
+                name: float(abs(r)) for name, r in zip(self.unknown_names, _res_final, strict=False)
+            }
+            _worst = sorted(_breakdown.items(), key=lambda kv: kv[1], reverse=True)[:10]
+        except Exception:
+            _breakdown = {}
+            _worst = []
+
         # Store diagnostic data
         self._diagnostic_data = {
             "x0": x0_use.copy(),
@@ -1630,6 +1664,16 @@ class NetworkSolver:
             "solver_method": method,
             "solver_options": options.copy() if options else {},
             "wall_time": getattr(self, "_wall_time", None),
+            "convergence_history": _history,
+            "residual_breakdown": _breakdown,
+            "worst_residuals": [{"name": n, "residual": v} for n, v in _worst],
+            "lm_started_at_eval": _lm_started_at_eval[0],
+            "solver_settings_used": {
+                "method": method,
+                "init_strategy": init_strategy,
+                "timeout": timeout,
+                **options,
+            },
         }
 
         sol_dict = dict(zip(self.unknown_names, final_x, strict=False))
