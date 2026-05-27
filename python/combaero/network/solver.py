@@ -200,7 +200,11 @@ class NetworkSolver:
 
         return {"P": ref_P, "T": ref_T, "Y": ref_Y, "m_dot": ref_mdot}
 
-    def _propagate_pressure_guess(self, ref: dict[str, Any]) -> dict[str, float]:
+    def _propagate_pressure_guess(
+        self,
+        ref: dict[str, Any],
+        mdot_guess: dict[str, float] | None = None,
+    ) -> dict[str, float]:
         """Estimate per-node pressures by walking the graph from boundaries.
 
         Starting from every ``PressureBoundary``, pressures are propagated
@@ -209,6 +213,11 @@ class NetworkSolver:
         their pressure is discovered by reverse propagation from known
         outlets, ensuring the pressure gradient points in the correct
         flow direction.
+
+        When ``mdot_guess`` is provided, per-element dP for
+        ``ChannelElement``s is computed via Darcy-Weisbach using the
+        estimated mass flow, giving a physics-informed starting pressure
+        that scales correctly with mass flow rate.
         """
         p_guess: dict[str, float] = {}
 
@@ -228,6 +237,33 @@ class NetworkSolver:
         else:
             dp_est = ref["P"] * 0.001
 
+        # Reference density and speed of sound for Darcy-Weisbach dP.
+        ref_X = list(cb.mass_to_mole(ref["Y"]))
+        rho_ref = float(cb.density(ref["T"], ref["P"], ref_X))
+        a_ref = float(cb.speed_of_sound(ref["T"], ref_X))
+
+        def _channel_dp(elem: Any) -> float:
+            """Physics-based dP for ChannelElements; falls back to dp_est."""
+            if mdot_guess is None or not isinstance(elem, ChannelElement):
+                return dp_est
+            m_est = mdot_guess.get(elem.id, 0.0)
+            area = getattr(elem, "area", None)
+            dh = getattr(elem, "Dh", None) or getattr(elem, "diameter", None)
+            length = getattr(elem, "length", None)
+            if (
+                area is None
+                or area <= 0.0
+                or dh is None
+                or dh <= 0.0
+                or length is None
+                or length <= 0.0
+            ):
+                return dp_est
+            v = abs(m_est) / (rho_ref * area)
+            v = min(v, 0.9 * a_ref)
+            f = 0.02
+            return max(f * (length / dh) * 0.5 * rho_ref * v**2, dp_est)
+
         # BFS propagation from known nodes
         visited = set(p_guess.keys())
         queue = list(visited)
@@ -236,13 +272,13 @@ class NetworkSolver:
             for elem in self.network.get_downstream_elements(nid):
                 to_id = elem.to_node
                 if to_id not in visited:
-                    p_guess[to_id] = p_guess[nid] - dp_est
+                    p_guess[to_id] = p_guess[nid] - _channel_dp(elem)
                     visited.add(to_id)
                     queue.append(to_id)
             for elem in self.network.get_upstream_elements(nid):
                 from_id = elem.from_node
                 if from_id not in visited:
-                    p_guess[from_id] = p_guess[nid] + dp_est
+                    p_guess[from_id] = p_guess[nid] + _channel_dp(elem)
                     visited.add(from_id)
                     queue.append(from_id)
 
@@ -357,8 +393,8 @@ class NetworkSolver:
 
         # --- Infer sensible defaults from boundary nodes ----------------
         ref = self._infer_reference_state()
-        p_guess = self._propagate_pressure_guess(ref)
         mdot_guess = self._propagate_mdot_guess(ref)
+        p_guess = self._propagate_pressure_guess(ref, mdot_guess)
 
         # Bernoulli-based initial guess for TeeJunctionElement unknowns.
         # The generic mdot_guess propagator seeds from ref["m_dot"]=0.1 (arbitrary
