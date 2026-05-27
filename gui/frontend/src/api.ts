@@ -15,10 +15,27 @@ export interface NodeResult {
 	success: boolean;
 }
 
+export interface ConvergencePoint {
+	eval: number;
+	t: number;
+	norm: number;
+}
+
+export interface WorstResidual {
+	name: string;
+	residual: number;
+}
+
 export interface SolveResponse {
 	success: boolean;
 	message: string;
+	final_norm?: number;
 	node_results: Record<string, NodeResult>;
+	element_results?: Record<string, any>;
+	convergence_history?: ConvergencePoint[];
+	worst_residuals?: WorstResidual[];
+	solver_settings_used?: Record<string, unknown>;
+	lm_started_at_eval?: number | null;
 }
 
 export const solveNetwork = async (
