@@ -2,6 +2,7 @@
 #include "math_constants.h"
 #include "correlation_status.h"
 #include <cmath>
+#include <complex>
 
 // Tee junction loss coefficients (Bassett 2001, Proc. IMechE Part C 215(8):861-881).
 //
@@ -352,6 +353,71 @@ inline bool tee_topology_valid(double q, double epsilon = 0.05) {
 inline double tee_flow_ratio(double m_dot_branch, double m_dot_com) {
     constexpr double eps_m = 1e-10; // kg/s, matches solver regularisation
     return m_dot_branch * m_dot_com / (m_dot_com * m_dot_com + eps_m * eps_m);
+}
+
+// =============================================================================
+// Unified0D compressible junction model
+// Mynard & Valen-Sendstad 2015, extended to O(M^2) (see docs/junction/).
+// =============================================================================
+
+// Per-branch face state, templated on scalar T (double or complex<double>).
+// mdot sign: >0 = supplier (inflow to junction), <0 = collector (outflow).
+// gamma_eff and R_gas_eff are effective perfect-gas constants for this branch.
+template <typename T>
+struct BranchState {
+    T p;              // static pressure [Pa]
+    T Tk;             // static temperature [K]
+    T mdot;           // signed mass flow [kg/s]
+    double A;         // cross-section area [m^2]
+    double theta;     // centreline angle [rad] (measured from reference direction)
+    double gamma_eff; // ratio of specific heats [-]
+    double R_gas_eff; // specific gas constant [J/(kg*K)]
+
+    T rho()  const { return p / (R_gas_eff * Tk); }
+    T u()    const { return mdot * R_gas_eff * Tk / (p * A); }
+    T M2()   const { auto v = u(); return v * v / (gamma_eff * R_gas_eff * Tk); }
+    T Phi()  const { return T{1.0} + T{0.5 * (gamma_eff - 1.0)} * M2(); }
+    T h0()   const {
+        const double cp_eff = gamma_eff * R_gas_eff / (gamma_eff - 1.0);
+        auto v = u();
+        return T{cp_eff} * Tk + T{0.5} * v * v;
+    }
+    T p0() const {
+        return p * std::pow(Phi(), T{gamma_eff / (gamma_eff - 1.0)});
+    }
+};
+
+// Closed-form K_dat,j to O(M^2) using frozen-xi assumption (Section 5 of
+// docs/junction/junction_model.tex). Templated to allow complex-step use.
+//   x_j   = lambda_j * psi_j  (flow-area ratio product, >= 0)
+//   phi_j  = effective inflow angle [rad]  (Hager 3/4 factor already applied)
+//   M_dat2 = M_dat^2 of the pseudodatum
+template <typename T>
+T K_dat_j_closed(T x_j, T phi_j, T M_dat2) {
+    const T cosphi = std::cos(phi_j);
+    const T K_inc  = T{1.0} + x_j * x_j - T{2.0} * x_j * cosphi;
+    const T sqrtK  = std::sqrt(K_inc);
+    const T kappa  = T{0.5} * ((x_j + sqrtK) * (x_j + sqrtK) - T{1.0});
+    return K_inc * (T{1.0} + kappa * M_dat2);
+}
+
+// Machine-precision derivative of K_dat_j_closed (or any compatible kernel)
+// w.r.t. one of its three arguments, evaluated at a real point.
+//   which: 0 = d/dx, 1 = d/dphi, 2 = d/dM2
+//   h:     complex-step size (default 1e-30 gives machine-precision results)
+template <typename Fn>
+double cstep_deriv(Fn f, int which, double x, double phi, double M2,
+                   double h = 1e-30)
+{
+    using C = std::complex<double>;
+    C xC{x}, pC{phi}, M2C{M2};
+    switch (which) {
+        case 0: xC  = C(x,   h); break;
+        case 1: pC  = C(phi, h); break;
+        case 2: M2C = C(M2,  h); break;
+        default: break;
+    }
+    return std::imag(f(xC, pC, M2C)) / h;
 }
 
 } // namespace combaero

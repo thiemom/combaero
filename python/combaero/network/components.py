@@ -2809,6 +2809,24 @@ class TeeJunctionElement(NetworkElement):
         if self.psi <= 0.0:
             raise ValueError(f"TeeJunctionElement '{self.id}': psi must be > 0, got {self.psi}.")
 
+    def _make_branch_input(
+        self,
+        state: NetworkMixtureState,
+        m_dot: float,
+        A: float,
+        theta: float,
+    ) -> "cb._core.BranchInput":
+        bi = cb._core.BranchInput()
+        bi.P_static = state.P
+        bi.Pt = state.Pt
+        bi.T = state.T
+        bi.m_dot = m_dot
+        bi.A = A
+        bi.theta = theta
+        bi.gamma_eff = state.gamma()
+        bi.R_gas = float(cb.specific_gas_constant(state.X))
+        return bi
+
     def residuals(
         self,
         state_com: NetworkMixtureState,
@@ -2817,80 +2835,65 @@ class TeeJunctionElement(NetworkElement):
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
         m_com = state_com.m_dot
         m_branch = state_branch.m_dot
+        m_straight = m_com - m_branch
+        A_branch = self._F_branch if self._F_branch is not None else self.F_C / max(self.psi, 1e-6)
 
         if self.tee_type == "merging":
-            dP0_straight = state_straight.Pt - state_com.P
-            dP0_branch = state_branch.Pt - state_com.P
-            res = cb._core.merging_tee_residuals_and_jacobian(
-                m_dot_com=m_com,
-                m_dot_branch=m_branch,
-                dP0_straight=dP0_straight,
-                dP0_branch=dP0_branch,
-                P_static_com=state_com.P,
-                T_com=state_com.T,
-                Y_com=state_com.Y,
-                theta=abs(self.theta),
-                psi=self.psi,
-                F_C=self.F_C,
-                blend_k=self.blend_k,
-            )
+            # Suppliers: straight (m_straight > 0) and branch (m_branch > 0)
+            # Collector: common (m_com > 0 is the outlet)
+            # BranchInput sign: >0 = supplier. Straight and branch supply; common collects.
+            bra_com = self._make_branch_input(state_com, -m_com, self.F_C, 0.0)
+            bra_str = self._make_branch_input(state_straight, m_straight, self.F_C, 0.0)
+            bra_bra = self._make_branch_input(state_branch, m_branch, A_branch, abs(self.theta))
+            res = cb._core.compressible_merging_tee_rj(bra_com, bra_str, bra_bra)
             jac: dict[int, dict[str, float]] = {
                 0: {
-                    f"{self.id}.m_dot_com": res.dR_straight_d_mdot_com,
-                    f"{self.id}.m_dot_branch": res.dR_straight_d_mdot_branch,
-                    f"{self.straight_node}.Pt": 1.0,
-                    f"{self.common_node}.P": -1.0 + res.dR_straight_dP_static_com,
-                    f"{self.common_node}.T": res.dR_straight_dT_com,
+                    f"{self.straight_node}.Pt": res.dR0_dPt_str,
+                    f"{self.common_node}.Pt": res.dR0_dPt_com,
+                    f"{self.straight_node}.P": res.dR0_dP_str,
+                    f"{self.straight_node}.T": res.dR0_dT_str,
+                    f"{self.branch_node}.P": res.dR0_dP_bra,
+                    f"{self.branch_node}.T": res.dR0_dT_bra,
+                    f"{self.id}.m_dot_com": res.dR0_dmdot_com,
+                    f"{self.id}.m_dot_branch": res.dR0_dmdot_branch,
                 },
                 1: {
-                    f"{self.id}.m_dot_com": res.dR_branch_d_mdot_com,
-                    f"{self.id}.m_dot_branch": res.dR_branch_d_mdot_branch,
-                    f"{self.branch_node}.Pt": 1.0,
-                    f"{self.common_node}.P": -1.0 + res.dR_branch_dP_static_com,
-                    f"{self.common_node}.T": res.dR_branch_dT_com,
+                    f"{self.branch_node}.Pt": res.dR1_dPt_bra,
+                    f"{self.common_node}.Pt": res.dR1_dPt_com,
+                    f"{self.straight_node}.P": res.dR1_dP_str,
+                    f"{self.straight_node}.T": res.dR1_dT_str,
+                    f"{self.branch_node}.P": res.dR1_dP_bra,
+                    f"{self.branch_node}.T": res.dR1_dT_bra,
+                    f"{self.id}.m_dot_com": res.dR1_dmdot_com,
+                    f"{self.id}.m_dot_branch": res.dR1_dmdot_branch,
                 },
             }
         else:
-            dP0_straight = state_com.Pt - state_straight.P
-            dP0_branch = state_com.Pt - state_branch.P
-            res = cb._core.branching_tee_residuals_and_jacobian(
-                m_dot_com=m_com,
-                m_dot_branch=m_branch,
-                dP0_straight=dP0_straight,
-                dP0_branch=dP0_branch,
-                P_static_com=state_com.P,
-                T_com=state_com.T,
-                Y_com=state_com.Y,
-                theta=abs(self.theta),
-                psi=self.psi,
-                F_C=self.F_C,
-                blend_k=self.blend_k,
-            )
+            # Supplier: common. Collectors: straight and branch.
+            bra_com = self._make_branch_input(state_com, m_com, self.F_C, 0.0)
+            bra_str = self._make_branch_input(state_straight, m_straight, self.F_C, 0.0)
+            bra_bra = self._make_branch_input(state_branch, m_branch, A_branch, abs(self.theta))
+            res = cb._core.compressible_branching_tee_rj(bra_com, bra_str, bra_bra)
             jac = {
                 0: {
-                    f"{self.id}.m_dot_com": res.dR_straight_d_mdot_com,
-                    f"{self.id}.m_dot_branch": res.dR_straight_d_mdot_branch,
-                    f"{self.common_node}.Pt": 1.0,
-                    f"{self.straight_node}.P": -1.0,
-                    f"{self.common_node}.P": res.dR_straight_dP_static_com,
-                    f"{self.common_node}.T": res.dR_straight_dT_com,
+                    f"{self.id}.m_dot_com": res.dR0_dmdot_com,
+                    f"{self.id}.m_dot_branch": res.dR0_dmdot_branch,
+                    f"{self.common_node}.Pt": res.dR0_dPt_com,
+                    f"{self.common_node}.P": res.dR0_dP_com,
+                    f"{self.common_node}.T": res.dR0_dT_com,
+                    f"{self.straight_node}.Pt": res.dR0_dPt_str,
                 },
                 1: {
-                    f"{self.id}.m_dot_com": res.dR_branch_d_mdot_com,
-                    f"{self.id}.m_dot_branch": res.dR_branch_d_mdot_branch,
-                    f"{self.common_node}.Pt": 1.0,
-                    f"{self.branch_node}.P": -1.0,
-                    f"{self.common_node}.P": res.dR_branch_dP_static_com,
-                    f"{self.common_node}.T": res.dR_branch_dT_com,
+                    f"{self.id}.m_dot_com": res.dR1_dmdot_com,
+                    f"{self.id}.m_dot_branch": res.dR1_dmdot_branch,
+                    f"{self.common_node}.Pt": res.dR1_dPt_com,
+                    f"{self.common_node}.P": res.dR1_dP_com,
+                    f"{self.common_node}.T": res.dR1_dT_com,
+                    f"{self.branch_node}.Pt": res.dR1_dPt_bra,
                 },
             }
 
-        for i, v in enumerate(res.dR_straight_dY_com):
-            jac[0][f"{self.common_node}.Y[{i}]"] = v
-        for i, v in enumerate(res.dR_branch_dY_com):
-            jac[1][f"{self.common_node}.Y[{i}]"] = v
-
-        return [res.R_straight, res.R_branch], jac
+        return [res.R_0, res.R_1], jac
 
     def diagnostics(
         self,

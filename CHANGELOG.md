@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Useful for LLM-assisted diagnostics: the response is self-contained with full solver
   context.
 
+### Changed
+- **`TeeJunctionElement`**: replaced Bassett 2001 empirical K tables with the
+  Unified0D compressible model (Mynard & Valen-Sendstad 2015, extended to O(M²)
+  by closed-form Borda-Carnot correction). Residuals now use stagnation pressure
+  (p₀) and mass-flow continuity, consistent with compressible duct elements. Both
+  branching and merging tees use two K-equation residuals symmetric in structure,
+  derived from a mass-weighted pseudodatum for the supplier branches.
+
 ### Fixed
 - **Tee FD Jacobian eps_P scaling**: the finite-difference pressure step in
   `tee_fd_density_jacobians` is now `max(1.0, |P| × 10⁻⁴)` Pa instead of a fixed 1 Pa,
