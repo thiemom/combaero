@@ -65,8 +65,8 @@ def _merging_net(
 
 def _branching_net(
     Pt_common: float = 2.1e5,
-    Pt_straight: float = 2.0e5,
-    Pt_branch: float = 2.02e5,
+    Pt_straight: float = 2.06e5,
+    Pt_branch: float = 2.0e5,
     theta: float = _THETA_90,
     psi: float = 1.0,
 ) -> FlowNetwork:

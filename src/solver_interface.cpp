@@ -2133,9 +2133,12 @@ CompressibleTeeResult compressible_branching_tee_rj(
     const double x_str = m_str * m_com / m_com_sq_safe * (Ac / str.A);
     const double x_bra = m_bra * m_com / m_com_sq_safe * (Ac / bra.A);
 
-    // Effective inflow angles: phi_j = 0.75*(pi - (theta_dat - theta_j))
-    const double phi_str = 0.75 * (M_PI - (com.theta - str.theta));
-    const double phi_bra = 0.75 * (M_PI - (com.theta - bra.theta));
+    // Effective inflow angles: phi_j = 0.75 * |theta_j - theta_dat|.
+    // (The LaTeX formula 0.75*(pi-(theta_dat-theta_j)) applies the convention that
+    // theta_dat is measured as the branch's outward direction; Python passes the
+    // "same-axis = 0" convention so the equivalent form is the absolute difference.)
+    const double phi_str = 0.75 * std::abs(str.theta - com.theta);
+    const double phi_bra = 0.75 * std::abs(bra.theta - com.theta);
 
     const double K_str = K_dat_j_closed(x_str, phi_str, M2_dat);
     const double K_bra = K_dat_j_closed(x_bra, phi_bra, M2_dat);
@@ -2253,8 +2256,11 @@ CompressibleTeeResult compressible_merging_tee_rj(
     // Loss coefficients for each supplier branch (flow into collector)
     const double x_str_v = m_str * A_dat / (m_dat_safe * As);
     const double x_bra_v = m_bra * A_dat / (m_dat_safe * Ab);
-    const double phi_str_v = 0.75 * (M_PI - (theta_dat - str.theta));
-    const double phi_bra_v = 0.75 * (M_PI - (theta_dat - bra.theta));
+    const double phi_str_v = 0.75 * std::abs(str.theta - theta_dat);
+    const double phi_bra_v = 0.75 * std::abs(bra.theta - theta_dat);
+    // dphi/d(theta_dat): +0.75 for str (phi increases with theta_dat), -0.75 for bra (phi decreases)
+    const double dphi_str_dtheta = (str.theta < theta_dat) ? 0.75 : -0.75;
+    const double dphi_bra_dtheta = (bra.theta > theta_dat) ? -0.75 : 0.75;
     const double K_str_v = K_dat_j_closed(x_str_v, phi_str_v, M2_dat);
     const double K_bra_v = K_dat_j_closed(x_bra_v, phi_bra_v, M2_dat);
 
@@ -2281,7 +2287,7 @@ CompressibleTeeResult compressible_merging_tee_rj(
                         double m_j, double A_j,
                         double du_d, double dh0_d,
                         double dm_d, double dp_d, double dtheta_d,
-                        double dm_j_dv) -> double
+                        double dm_j_dv, double dphi_theta_fac) -> double
     {
         const double dT_d = (dh0_d - u_dat * du_d) / cp_dat;
         const double drho_d = rho_dat * (dp_d / p_dat - dT_d / T_dat);
@@ -2294,7 +2300,7 @@ CompressibleTeeResult compressible_merging_tee_rj(
         // x_j = m_j * A_dat / (m_dat * A_j)
         const double dx_j = (dm_j_dv * A_dat + m_j * dA_d
                              - m_j * A_dat * dm_d / m_dat_safe) / (m_dat_safe * A_j);
-        const double dphi_j = -0.75 * dtheta_d;
+        const double dphi_j = dphi_theta_fac * dtheta_d;
         const double dK_j = dKj_dx * dx_j + dKj_dphi * dphi_j + dKj_dM2 * dM2_d;
         return -(dK_j * q_ref + K_j * dq_d);
     };
@@ -2321,9 +2327,9 @@ CompressibleTeeResult compressible_merging_tee_rj(
         const double du_d = m_str / m_dat_safe * du_s;
         const double dh0_d = m_str / m_dat_safe * dh0_s;
         res.dR0_dP_str = dNeg_Kq(K_str_v, dKs_dx, dKs_dphi, dKs_dM2, m_str, As,
-                                  du_d, dh0_d, 0.0, 1.0, 0.0, 0.0);
+                                  du_d, dh0_d, 0.0, 1.0, 0.0, 0.0, 0.0);
         res.dR1_dP_str = dNeg_Kq(K_bra_v, dKb_dx, dKb_dphi, dKb_dM2, m_bra, Ab,
-                                  du_d, dh0_d, 0.0, 1.0, 0.0, 0.0);
+                                  du_d, dh0_d, 0.0, 1.0, 0.0, 0.0, 0.0);
     }
 
     // dR/dT_str: u_str = m_str*Rs*Ts/(Ps*As) -> du_str/dTs = u_str/Ts
@@ -2333,9 +2339,9 @@ CompressibleTeeResult compressible_merging_tee_rj(
         const double du_d = m_str / m_dat_safe * du_s;
         const double dh0_d = m_str / m_dat_safe * dh0_s;
         res.dR0_dT_str = dNeg_Kq(K_str_v, dKs_dx, dKs_dphi, dKs_dM2, m_str, As,
-                                  du_d, dh0_d, 0.0, 0.0, 0.0, 0.0);
+                                  du_d, dh0_d, 0.0, 0.0, 0.0, 0.0, 0.0);
         res.dR1_dT_str = dNeg_Kq(K_bra_v, dKb_dx, dKb_dphi, dKb_dM2, m_bra, Ab,
-                                  du_d, dh0_d, 0.0, 0.0, 0.0, 0.0);
+                                  du_d, dh0_d, 0.0, 0.0, 0.0, 0.0, 0.0);
     }
 
     // dR/dP_static_bra: p_dat = Ps, so dp_d = 0 for bra (ref is str, not bra)
@@ -2345,9 +2351,9 @@ CompressibleTeeResult compressible_merging_tee_rj(
         const double du_d = m_bra / m_dat_safe * du_b;
         const double dh0_d = m_bra / m_dat_safe * dh0_b;
         res.dR0_dP_bra = dNeg_Kq(K_str_v, dKs_dx, dKs_dphi, dKs_dM2, m_str, As,
-                                  du_d, dh0_d, 0.0, 0.0, 0.0, 0.0);
+                                  du_d, dh0_d, 0.0, 0.0, 0.0, 0.0, 0.0);
         res.dR1_dP_bra = dNeg_Kq(K_bra_v, dKb_dx, dKb_dphi, dKb_dM2, m_bra, Ab,
-                                  du_d, dh0_d, 0.0, 0.0, 0.0, 0.0);
+                                  du_d, dh0_d, 0.0, 0.0, 0.0, 0.0, 0.0);
     }
 
     // dR/dT_bra
@@ -2357,9 +2363,9 @@ CompressibleTeeResult compressible_merging_tee_rj(
         const double du_d = m_bra / m_dat_safe * du_b;
         const double dh0_d = m_bra / m_dat_safe * dh0_b;
         res.dR0_dT_bra = dNeg_Kq(K_str_v, dKs_dx, dKs_dphi, dKs_dM2, m_str, As,
-                                  du_d, dh0_d, 0.0, 0.0, 0.0, 0.0);
+                                  du_d, dh0_d, 0.0, 0.0, 0.0, 0.0, 0.0);
         res.dR1_dT_bra = dNeg_Kq(K_bra_v, dKb_dx, dKb_dphi, dKb_dM2, m_bra, Ab,
-                                  du_d, dh0_d, 0.0, 0.0, 0.0, 0.0);
+                                  du_d, dh0_d, 0.0, 0.0, 0.0, 0.0, 0.0);
     }
 
     // dR/dm_dot_com: m_str = m_com - m_branch, dm_str/dm_com = 1, dm_bra/dm_com = 0, dm_dat/dm_com = 1
@@ -2369,9 +2375,9 @@ CompressibleTeeResult compressible_merging_tee_rj(
         const double dtheta_d = (SC_sq > 1e-30)
             ? (C_S * std::sin(str.theta) - S_S * std::cos(str.theta)) / SC_sq : 0.0;
         res.dR0_dmdot_com = dNeg_Kq(K_str_v, dKs_dx, dKs_dphi, dKs_dM2, m_str, As,
-                                     du_d, dh0_d, 1.0, 0.0, dtheta_d, 1.0);
+                                     du_d, dh0_d, 1.0, 0.0, dtheta_d, 1.0, dphi_str_dtheta);
         res.dR1_dmdot_com = dNeg_Kq(K_bra_v, dKb_dx, dKb_dphi, dKb_dM2, m_bra, Ab,
-                                     du_d, dh0_d, 1.0, 0.0, dtheta_d, 0.0);
+                                     du_d, dh0_d, 1.0, 0.0, dtheta_d, 0.0, dphi_bra_dtheta);
     }
 
     // dR/dm_dot_branch: dm_str/dm_branch = -1, dm_bra/dm_branch = +1, dm_dat = 0
@@ -2384,9 +2390,9 @@ CompressibleTeeResult compressible_merging_tee_rj(
             ? (C_S * std::sin(bra.theta) - S_S * std::cos(bra.theta)) / SC_sq : 0.0;
         const double dtheta_d = -dt_s + dt_b;
         res.dR0_dmdot_branch = dNeg_Kq(K_str_v, dKs_dx, dKs_dphi, dKs_dM2, m_str, As,
-                                        du_d, dh0_d, 0.0, 0.0, dtheta_d, -1.0);
+                                        du_d, dh0_d, 0.0, 0.0, dtheta_d, -1.0, dphi_str_dtheta);
         res.dR1_dmdot_branch = dNeg_Kq(K_bra_v, dKb_dx, dKb_dphi, dKb_dM2, m_bra, Ab,
-                                        du_d, dh0_d, 0.0, 0.0, dtheta_d, 1.0);
+                                        du_d, dh0_d, 0.0, 0.0, dtheta_d, 1.0, dphi_bra_dtheta);
     }
 
     return res;

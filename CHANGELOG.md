@@ -30,6 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   derived from a mass-weighted pseudodatum for the supplier branches.
 
 ### Fixed
+- **Tee phi angle convention**: the branching and merging tee models now use
+  `phi_j = 0.75 * |theta_j - theta_dat|` (absolute-difference form) instead of
+  the LaTeX formula `0.75*(pi - (theta_dat - theta_j))` which assumed the
+  "outward-pointing" angle convention. Python passes `theta_com = theta_str = 0`
+  (axis-aligned), so the old formula produced phi_str = 135° instead of 0° and
+  phi_bra ≈ 168° instead of 67.5° for a 90° branch, making K values 4–8× too
+  large and preventing manifold convergence. The Jacobian `dphi/d(theta_dat)` sign
+  is also corrected per branch in the merging model.
 - **Tee FD Jacobian eps_P scaling**: the finite-difference pressure step in
   `tee_fd_density_jacobians` is now `max(1.0, |P| × 10⁻⁴)` Pa instead of a fixed 1 Pa,
   preventing a numerically negligible step at high absolute pressures (e.g. 300 kPa inlet).
