@@ -683,11 +683,21 @@ class NetworkSolver:
             stream_info: list[tuple] = []
             for elem in up_elems:
                 indices = self._unknown_indices.get(elem.id, [])
+                # Compute named m_dot Jacobian for this element once (flow into nid).
+                # Stored on each upstream state so MomentumChamberNode can build the
+                # correct d_res/dm_dot Jacobian even when the element has named unknowns
+                # like tee.m_dot_com / tee.m_dot_branch instead of a plain elem.m_dot.
+                elem_jac_names: dict[str, float] = {}
+                if indices:
+                    for col, coeff in elem.flow_jac_at_node(nid, indices).items():
+                        if col < len(self.unknown_names):
+                            elem_jac_names[self.unknown_names[col]] = coeff
                 for src_nid in elem.all_source_nodes():
                     state_up = self._get_node_state(self.network.nodes[src_nid], x)
                     if indices:
                         state_up.m_dot = elem.flow_at_node(src_nid, x, indices)
                         state_up._element_id = elem.id
+                        state_up._m_dot_jac_names = elem_jac_names
                     stream_info.append((state_up, elem, src_nid))
             up_states = [s for s, _, _ in stream_info]
 

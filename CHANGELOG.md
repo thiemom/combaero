@@ -25,9 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`TeeJunctionElement`**: replaced Bassett 2001 empirical K tables with the
   Unified0D compressible model (Mynard & Valen-Sendstad 2015, extended to O(M²)
   by closed-form Borda-Carnot correction). Residuals now use stagnation pressure
-  (p₀) and mass-flow continuity, consistent with compressible duct elements. Both
-  branching and merging tees use two K-equation residuals symmetric in structure,
-  derived from a mass-weighted pseudodatum for the supplier branches.
+  (p₀) and mass-flow continuity, consistent with compressible duct elements.
+  Branching tees use two K-equation residuals (loss from supplier to each collector).
+  Merging tees use R_sp (equal static pressure between suppliers) + R_K,com (loss
+  from mass-weighted pseudodatum to the collector), matching the LaTeX derivation
+  in `docs/junction/junction_model.tex` exactly. Tee port nodes in the GUI backend
+  are now `MomentumChamberNode` so static pressure P can differ from Pt at junction
+  ports, allowing R_sp to be satisfied at non-zero velocity.
 
 ### Fixed
 - **Tee phi angle convention**: the branching and merging tee models now use
@@ -41,6 +45,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tee FD Jacobian eps_P scaling**: the finite-difference pressure step in
   `tee_fd_density_jacobians` is now `max(1.0, |P| × 10⁻⁴)` Pa instead of a fixed 1 Pa,
   preventing a numerically negligible step at high absolute pressures (e.g. 300 kPa inlet).
+- **MomentumChamberNode Jacobian coupling for tee junctions**: `MomentumChamberNode`
+  was silently dropping the `d(residual)/d(m_dot)` coupling when the upstream element
+  was a `TeeJunctionElement`, because the old code emitted `{"tee.m_dot": coeff}` — a
+  non-existent variable name. The solver now calls `flow_jac_at_node(nid, indices)` once
+  per element in `_propagate_states()` to obtain the correct variable names
+  (`tee.m_dot_com`, `tee.m_dot_branch`, or `lc.m_dot`) and propagates them via the new
+  `_m_dot_jac_names` attribute on each upstream state. `MomentumChamberNode` accumulates
+  these into `_upstream_m_dot_jac` and uses them in `residuals()`. This fixes a Newton
+  plateau (solver stall at non-zero residual) that occurred in both incompressible and
+  compressible mode whenever a `MomentumChamberNode` was connected to a tee junction.
 - **Levenberg-Marquardt fallback for hybr oscillation** on compressible networks: when
   `hybr` (Powell's method) fails to converge on a compressible network — typically because
   the Jacobian is ill-conditioned near a choked operating point and Newton steps bounce

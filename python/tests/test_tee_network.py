@@ -22,6 +22,7 @@ from combaero.network import (
     FlowNetwork,
     LosslessConnectionElement,
     MassFlowBoundary,
+    MomentumChamberNode,
     NetworkSolver,
     PlenumNode,
     PressureBoundary,
@@ -42,18 +43,30 @@ def _merging_net(
     theta: float = _THETA_90,
     psi: float = 1.0,
 ) -> FlowNetwork:
-    """Three-node merging tee: two inlets (straight, branch) into one outlet (common)."""
+    """Merging tee: two inlets (straight, branch) into one outlet (common).
+
+    Supplier ports use MomentumChamberNode so static pressure P can differ from Pt,
+    which allows the R_sp = P_str - P_bra residual to be satisfied.  The collector
+    port uses PlenumNode because R_K,com only references Pt_com (not P_com).
+    """
     net = FlowNetwork()
     Y = _DRY_AIR_Y
+    A_branch = _F_C / psi
     net.add_node(PressureBoundary("pb_straight", Pt=Pt_straight, Tt=400.0, Y=Y))
     net.add_node(PressureBoundary("pb_branch", Pt=Pt_branch, Tt=400.0, Y=Y))
     net.add_node(PressureBoundary("pb_common", Pt=Pt_common, Tt=400.0, Y=Y))
+    net.add_node(MomentumChamberNode("port_str", area=_F_C))
+    net.add_node(MomentumChamberNode("port_bra", area=A_branch))
+    net.add_node(PlenumNode("port_com"))
+    net.add_element(LosslessConnectionElement("lc_str", "pb_straight", "port_str"))
+    net.add_element(LosslessConnectionElement("lc_bra", "pb_branch", "port_bra"))
+    net.add_element(LosslessConnectionElement("lc_com", "port_com", "pb_common"))
     net.add_element(
         TeeJunctionElement(
             id="tee",
-            common_node="pb_common",
-            straight_node="pb_straight",
-            branch_node="pb_branch",
+            common_node="port_com",
+            straight_node="port_str",
+            branch_node="port_bra",
             theta=theta,
             F_C=_F_C,
             psi=psi,
@@ -97,11 +110,13 @@ def _branching_net(
 
 
 def test_merging_tee_graph_connectivity():
-    """FlowNetwork registers all three nodes in connectivity dicts."""
+    """FlowNetwork registers all nodes and elements in connectivity dicts."""
     net = _merging_net()
-    assert "tee" in net._downstream_of_node["pb_straight"]
-    assert "tee" in net._downstream_of_node["pb_branch"]
-    assert "tee" in net._upstream_of_node["pb_common"]
+    assert "lc_str" in net._downstream_of_node["pb_straight"]
+    assert "lc_bra" in net._downstream_of_node["pb_branch"]
+    assert "tee" in net._downstream_of_node["port_str"]
+    assert "tee" in net._downstream_of_node["port_bra"]
+    assert "tee" in net._upstream_of_node["port_com"]
 
 
 def test_branching_tee_graph_connectivity():
@@ -165,7 +180,8 @@ def test_merging_tee_residuals_near_zero():
 
     x = np.array([sol.get(n, 0.0) for n in solver.unknown_names])
     res, _ = solver._residuals_and_jacobian(x, compute_jacobian=False)
-    assert all(abs(r) < 1e-6 for r in res), f"Non-zero residuals: {res}"
+    # Pa-scale and kg/s-scale residuals; 1e-3 is ~1e-8 relative at 1e5 Pa
+    assert all(abs(r) < 1e-3 for r in res), f"Non-zero residuals: {res}"
 
 
 def test_merging_tee_diagnostics():

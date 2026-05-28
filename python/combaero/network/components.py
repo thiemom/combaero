@@ -832,11 +832,23 @@ class MomentumChamberNode(NetworkNode):
         # Store total mass flow for use in residuals
         self._total_m_dot = sum(s.m_dot for s in upstream_states) if upstream_states else 1.0
 
-        # Store upstream element IDs for Jacobian
+        # Build named m_dot Jacobian: {var_name: d(m_total)/d(var)}.
+        # flow_jac_at_node(nid) from the solver already gives d(flow_into_nid)/d(each unknown),
+        # stored on each upstream state as _m_dot_jac_names. Accumulate across elements,
+        # deduplicating by element_id so multi-source elements (tee) are not double-counted.
         self._upstream_element_ids = []
+        self._upstream_m_dot_jac: dict[str, float] = {}
+        _seen_elem_ids: set[str] = set()
         for s in upstream_states:
             if hasattr(s, "_element_id"):
                 self._upstream_element_ids.append(s._element_id)
+                eid = s._element_id
+                if eid not in _seen_elem_ids and hasattr(s, "_m_dot_jac_names"):
+                    _seen_elem_ids.add(eid)
+                    for var, coeff in s._m_dot_jac_names.items():
+                        self._upstream_m_dot_jac[var] = (
+                            self._upstream_m_dot_jac.get(var, 0.0) + coeff
+                        )
 
         if not upstream_states:
             return 300.0, list(cb.mole_to_mass(cb.species.dry_air())), None
@@ -888,17 +900,21 @@ class MomentumChamberNode(NetworkNode):
         )
 
         res = [result.residual]
-        jac = {
+        jac: dict[int, dict[str, float]] = {
             0: {
                 f"{self.id}.P": result.d_res_dP,
                 f"{self.id}.Pt": result.d_res_dP_total,
             }
         }
 
-        # Add Jacobian entries for upstream element mass flows
-        upstream_elem_ids = getattr(self, "_upstream_element_ids", [])
-        for elem_id in upstream_elem_ids:
-            jac[0][f"{elem_id}.m_dot"] = result.d_res_dmdot
+        # Add Jacobian entries for upstream element mass flows using the
+        # named Jacobian built in compute_derived_state. This correctly handles
+        # multi-unknown elements (e.g. TeeJunctionElement with m_dot_com /
+        # m_dot_branch) by mapping d(residual)/d(m_total) through the chain
+        # d(m_total)/d(each_unknown) provided by flow_jac_at_node.
+        for var_name, coeff in getattr(self, "_upstream_m_dot_jac", {}).items():
+            if coeff != 0.0:
+                jac[0][var_name] = jac[0].get(var_name, 0.0) + result.d_res_dmdot * coeff
 
         return res, jac
 
@@ -2846,19 +2862,14 @@ class TeeJunctionElement(NetworkElement):
             bra_str = self._make_branch_input(state_straight, m_straight, self.F_C, 0.0)
             bra_bra = self._make_branch_input(state_branch, m_branch, A_branch, abs(self.theta))
             res = cb._core.compressible_merging_tee_rj(bra_com, bra_str, bra_bra)
+            # R_0 = P_str - P_bra  (R_sp: equal static pressure at merge point)
+            # R_1 = p0_dat - Pt_com - K_com * q_ref  (R_K,com: loss to collector)
             jac: dict[int, dict[str, float]] = {
                 0: {
-                    f"{self.straight_node}.Pt": res.dR0_dPt_str,
-                    f"{self.common_node}.Pt": res.dR0_dPt_com,
                     f"{self.straight_node}.P": res.dR0_dP_str,
-                    f"{self.straight_node}.T": res.dR0_dT_str,
                     f"{self.branch_node}.P": res.dR0_dP_bra,
-                    f"{self.branch_node}.T": res.dR0_dT_bra,
-                    f"{self.id}.m_dot_com": res.dR0_dmdot_com,
-                    f"{self.id}.m_dot_branch": res.dR0_dmdot_branch,
                 },
                 1: {
-                    f"{self.branch_node}.Pt": res.dR1_dPt_bra,
                     f"{self.common_node}.Pt": res.dR1_dPt_com,
                     f"{self.straight_node}.P": res.dR1_dP_str,
                     f"{self.straight_node}.T": res.dR1_dT_str,

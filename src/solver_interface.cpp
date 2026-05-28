@@ -2253,41 +2253,35 @@ CompressibleTeeResult compressible_merging_tee_rj(
     const double SC_sq = S_S * S_S + C_S * C_S;
     const double theta_dat = std::atan2(S_S, C_S);
 
-    // Loss coefficients for each supplier branch (flow into collector)
-    const double x_str_v = m_str * A_dat / (m_dat_safe * As);
-    const double x_bra_v = m_bra * A_dat / (m_dat_safe * Ab);
-    const double phi_str_v = 0.75 * std::abs(str.theta - theta_dat);
-    const double phi_bra_v = 0.75 * std::abs(bra.theta - theta_dat);
-    // dphi/d(theta_dat): +0.75 for str (phi increases with theta_dat), -0.75 for bra (phi decreases)
-    const double dphi_str_dtheta = (str.theta < theta_dat) ? 0.75 : -0.75;
-    const double dphi_bra_dtheta = (bra.theta > theta_dat) ? -0.75 : 0.75;
-    const double K_str_v = K_dat_j_closed(x_str_v, phi_str_v, M2_dat);
-    const double K_bra_v = K_dat_j_closed(x_bra_v, phi_bra_v, M2_dat);
+    // K_com: loss coefficient from pseudodatum to collector (common) branch.
+    // x_com = A_dat / A_com  (m_com = m_dat so flow ratio = 1, area ratio gives x).
+    const double x_com_v   = (u_dat > eps_m) ? A_dat / com.A : 0.0;
+    const double phi_com_v = 0.75 * std::abs(com.theta - theta_dat);
+    // dphi_com / d(theta_dat): sign depends on relative direction
+    const double dphi_com_dtheta = (com.theta >= theta_dat) ? -0.75 : 0.75;
+    const double K_com_v   = K_dat_j_closed(x_com_v, phi_com_v, M2_dat);
 
-    // Residuals: each supplier loses p0 to collector
-    const double R_0 = str.Pt - com.Pt - K_str_v * q_ref;
-    const double R_1 = bra.Pt - com.Pt - K_bra_v * q_ref;
+    // Stagnation pressure of pseudodatum: p0_dat = p_dat * Phi_dat^(gamma/(gamma-1))
+    const double Phi_dat    = 1.0 + 0.5 * (g_dat - 1.0) * M2_dat;
+    const double p0_dat_val = (u_dat > eps_m)
+        ? p_dat * std::pow(Phi_dat, g_dat / (g_dat - 1.0)) : p_dat;
 
-    // Complex-step K derivatives for str and bra
+    // Residuals (LaTeX Sec 6, merging 2-supplier / 1-collector):
+    //   R_sp      = p_str - p_bra              (equal static pressure at merge point)
+    //   R_K,com   = p0_dat - p0_com - K * q    (stagnation loss from dat to collector)
+    const double R_0 = Ps - Pb;
+    const double R_1 = p0_dat_val - com.Pt - K_com_v * q_ref;
+
+    // Complex-step K derivatives for K_com
     auto K_fn = [](auto x, auto phi, auto M2) { return K_dat_j_closed(x, phi, M2); };
-    const double dKs_dx   = cstep_deriv(K_fn, 0, x_str_v, phi_str_v, M2_dat);
-    const double dKs_dphi = cstep_deriv(K_fn, 1, x_str_v, phi_str_v, M2_dat);
-    const double dKs_dM2  = cstep_deriv(K_fn, 2, x_str_v, phi_str_v, M2_dat);
-    const double dKb_dx   = cstep_deriv(K_fn, 0, x_bra_v, phi_bra_v, M2_dat);
-    const double dKb_dphi = cstep_deriv(K_fn, 1, x_bra_v, phi_bra_v, M2_dat);
-    const double dKb_dM2  = cstep_deriv(K_fn, 2, x_bra_v, phi_bra_v, M2_dat);
+    const double dKc_dx   = cstep_deriv(K_fn, 0, x_com_v, phi_com_v, M2_dat);
+    const double dKc_dphi = cstep_deriv(K_fn, 1, x_com_v, phi_com_v, M2_dat);
+    const double dKc_dM2  = cstep_deriv(K_fn, 2, x_com_v, phi_com_v, M2_dat);
 
-    // Helper: compute d(-K_j * q_ref)/dv from pseudodatum chain and branch-j chain.
-    // K_j: K value; dKj_{dx,dphi,dM2}: K derivatives via complex-step.
-    // m_j, A_j: branch mass flow and area.
-    // du_d, dh0_d, dm_d, dp_d, dtheta_d: pseudodatum quantity derivatives w.r.t. v.
-    // dm_j_dv: dm_j/dv (the branch-j mass flow derivative).
-    auto dNeg_Kq = [&](double K_j,
-                        double dKj_dx, double dKj_dphi, double dKj_dM2,
-                        double m_j, double A_j,
-                        double du_d, double dh0_d,
-                        double dm_d, double dp_d, double dtheta_d,
-                        double dm_j_dv, double dphi_theta_fac) -> double
+    // Helper: compute d(-K_com * q_ref)/dv from pseudodatum chain.
+    // m_j = m_dat, A_j = com.A, dm_j_dv = dm_d (since m_j = m_dat).
+    auto dNeg_Kq = [&](double du_d, double dh0_d,
+                        double dm_d, double dp_d, double dtheta_d) -> double
     {
         const double dT_d = (dh0_d - u_dat * du_d) / cp_dat;
         const double drho_d = rho_dat * (dp_d / p_dat - dT_d / T_dat);
@@ -2297,90 +2291,84 @@ CompressibleTeeResult compressible_merging_tee_rj(
             ? q_ref * (drho_d / rho_dat + 2.0 * du_d / u_dat) : 0.0;
         const double dA_d = (u_dat > eps_m)
             ? A_dat * (dm_d / m_dat_safe - drho_d / rho_dat - du_d / u_dat) : 0.0;
-        // x_j = m_j * A_dat / (m_dat * A_j)
-        const double dx_j = (dm_j_dv * A_dat + m_j * dA_d
-                             - m_j * A_dat * dm_d / m_dat_safe) / (m_dat_safe * A_j);
-        const double dphi_j = dphi_theta_fac * dtheta_d;
-        const double dK_j = dKj_dx * dx_j + dKj_dphi * dphi_j + dKj_dM2 * dM2_d;
-        return -(dK_j * q_ref + K_j * dq_d);
+        // x_com = A_dat / A_com, so dx_com = dA_d / A_com
+        const double dx_j  = dA_d / com.A;
+        const double dphi_j = dphi_com_dtheta * dtheta_d;
+        const double dK_j  = dKc_dx * dx_j + dKc_dphi * dphi_j + dKc_dM2 * dM2_d;
+        return -(dK_j * q_ref + K_com_v * dq_d);
+    };
+
+    // Helper: d(p0_dat)/dv via pseudodatum chain.
+    auto dp0dat_dv = [&](double du_d, double dh0_d, double dp_d) -> double {
+        if (u_dat < eps_m) return dp_d;
+        const double dT_d  = (dh0_d - u_dat * du_d) / cp_dat;
+        const double dM2_d = M2_dat * (2.0 * du_d / u_dat - dT_d / T_dat);
+        return (p0_dat_val / p_dat) * dp_d
+             + p0_dat_val * g_dat / 2.0 / Phi_dat * dM2_d;
     };
 
     CompressibleTeeResult res{};
     res.R_0 = R_0;
     res.R_1 = R_1;
 
-    // Direct Pt terms
-    res.dR0_dPt_str = 1.0;
-    res.dR0_dPt_com = -1.0;
-    res.dR0_dPt_bra = 0.0;
-    res.dR1_dPt_bra = 1.0;
-    res.dR1_dPt_com = -1.0;
-    res.dR1_dPt_str = 0.0;
-    // P_com, T_com do not appear in pseudodatum (ref = str)
-    res.dR0_dP_com = 0.0; res.dR0_dT_com = 0.0;
-    res.dR1_dP_com = 0.0; res.dR1_dT_com = 0.0;
+    // R_0 = Ps - Pb: trivial Jacobian (only static pressures of suppliers)
+    res.dR0_dPt_str = 0.0; res.dR0_dPt_com = 0.0; res.dR0_dPt_bra = 0.0;
+    res.dR0_dP_str  = 1.0; res.dR0_dP_com  = 0.0; res.dR0_dP_bra  = -1.0;
+    res.dR0_dT_str  = 0.0; res.dR0_dT_com  = 0.0; res.dR0_dT_bra  = 0.0;
+    res.dR0_dmdot_com = 0.0; res.dR0_dmdot_branch = 0.0;
 
-    // dR/dP_static_str: u_str depends on Ps, and p_dat = Ps
+    // R_1 = p0_dat - Pt_com - K_com*q_ref
+    // Direct term: dR1/dPt_com = -1
+    res.dR1_dPt_com = -1.0;
+    res.dR1_dPt_str = 0.0; res.dR1_dPt_bra = 0.0;
+    res.dR1_dP_com  = 0.0; res.dR1_dT_com  = 0.0;
+
+    // dR1/dP_str: u_str depends on Ps; p_dat = Ps so dp_d = 1
     {
         const double du_s = -u_str / Ps;
         const double dh0_s = u_str * du_s;
         const double du_d = m_str / m_dat_safe * du_s;
         const double dh0_d = m_str / m_dat_safe * dh0_s;
-        res.dR0_dP_str = dNeg_Kq(K_str_v, dKs_dx, dKs_dphi, dKs_dM2, m_str, As,
-                                  du_d, dh0_d, 0.0, 1.0, 0.0, 0.0, 0.0);
-        res.dR1_dP_str = dNeg_Kq(K_bra_v, dKb_dx, dKb_dphi, dKb_dM2, m_bra, Ab,
-                                  du_d, dh0_d, 0.0, 1.0, 0.0, 0.0, 0.0);
+        res.dR1_dP_str = dp0dat_dv(du_d, dh0_d, 1.0)
+                       + dNeg_Kq(du_d, dh0_d, 0.0, 1.0, 0.0);
     }
-
-    // dR/dT_str: u_str = m_str*Rs*Ts/(Ps*As) -> du_str/dTs = u_str/Ts
+    // dR1/dT_str
     {
         const double du_s = u_str / Ts;
         const double dh0_s = cp_s + u_str * u_str / Ts;
         const double du_d = m_str / m_dat_safe * du_s;
         const double dh0_d = m_str / m_dat_safe * dh0_s;
-        res.dR0_dT_str = dNeg_Kq(K_str_v, dKs_dx, dKs_dphi, dKs_dM2, m_str, As,
-                                  du_d, dh0_d, 0.0, 0.0, 0.0, 0.0, 0.0);
-        res.dR1_dT_str = dNeg_Kq(K_bra_v, dKb_dx, dKb_dphi, dKb_dM2, m_bra, Ab,
-                                  du_d, dh0_d, 0.0, 0.0, 0.0, 0.0, 0.0);
+        res.dR1_dT_str = dp0dat_dv(du_d, dh0_d, 0.0)
+                       + dNeg_Kq(du_d, dh0_d, 0.0, 0.0, 0.0);
     }
-
-    // dR/dP_static_bra: p_dat = Ps, so dp_d = 0 for bra (ref is str, not bra)
+    // dR1/dP_bra: p_dat = Ps so dp_d = 0 for bra
     {
         const double du_b = -u_bra / Pb;
         const double dh0_b = u_bra * du_b;
         const double du_d = m_bra / m_dat_safe * du_b;
         const double dh0_d = m_bra / m_dat_safe * dh0_b;
-        res.dR0_dP_bra = dNeg_Kq(K_str_v, dKs_dx, dKs_dphi, dKs_dM2, m_str, As,
-                                  du_d, dh0_d, 0.0, 0.0, 0.0, 0.0, 0.0);
-        res.dR1_dP_bra = dNeg_Kq(K_bra_v, dKb_dx, dKb_dphi, dKb_dM2, m_bra, Ab,
-                                  du_d, dh0_d, 0.0, 0.0, 0.0, 0.0, 0.0);
+        res.dR1_dP_bra = dp0dat_dv(du_d, dh0_d, 0.0)
+                       + dNeg_Kq(du_d, dh0_d, 0.0, 0.0, 0.0);
     }
-
-    // dR/dT_bra
+    // dR1/dT_bra
     {
         const double du_b = u_bra / Tb;
         const double dh0_b = cp_b + u_bra * u_bra / Tb;
         const double du_d = m_bra / m_dat_safe * du_b;
         const double dh0_d = m_bra / m_dat_safe * dh0_b;
-        res.dR0_dT_bra = dNeg_Kq(K_str_v, dKs_dx, dKs_dphi, dKs_dM2, m_str, As,
-                                  du_d, dh0_d, 0.0, 0.0, 0.0, 0.0, 0.0);
-        res.dR1_dT_bra = dNeg_Kq(K_bra_v, dKb_dx, dKb_dphi, dKb_dM2, m_bra, Ab,
-                                  du_d, dh0_d, 0.0, 0.0, 0.0, 0.0, 0.0);
+        res.dR1_dT_bra = dp0dat_dv(du_d, dh0_d, 0.0)
+                       + dNeg_Kq(du_d, dh0_d, 0.0, 0.0, 0.0);
     }
-
-    // dR/dm_dot_com: m_str = m_com - m_branch, dm_str/dm_com = 1, dm_bra/dm_com = 0, dm_dat/dm_com = 1
+    // dR1/dm_dot_com: m_str = m_com - m_bra, dm_str/dm_com = 1, dm_dat/dm_com = 1
     {
         const double du_d = (2.0 * u_str - u_dat) / m_dat_safe;
         const double dh0_d = (u_str * u_str + h0_str - h0_dat) / m_dat_safe;
         const double dtheta_d = (SC_sq > 1e-30)
             ? (C_S * std::sin(str.theta) - S_S * std::cos(str.theta)) / SC_sq : 0.0;
-        res.dR0_dmdot_com = dNeg_Kq(K_str_v, dKs_dx, dKs_dphi, dKs_dM2, m_str, As,
-                                     du_d, dh0_d, 1.0, 0.0, dtheta_d, 1.0, dphi_str_dtheta);
-        res.dR1_dmdot_com = dNeg_Kq(K_bra_v, dKb_dx, dKb_dphi, dKb_dM2, m_bra, Ab,
-                                     du_d, dh0_d, 1.0, 0.0, dtheta_d, 0.0, dphi_bra_dtheta);
+        res.dR1_dmdot_com = dp0dat_dv(du_d, dh0_d, 0.0)
+                          + dNeg_Kq(du_d, dh0_d, 1.0, 0.0, dtheta_d);
     }
-
-    // dR/dm_dot_branch: dm_str/dm_branch = -1, dm_bra/dm_branch = +1, dm_dat = 0
+    // dR1/dm_dot_branch: dm_str/dm_branch = -1, dm_bra/dm_branch = +1, dm_dat = 0
     {
         const double du_d = (-2.0 * u_str + 2.0 * u_bra) / m_dat_safe;
         const double dh0_d = (-h0_str - u_str*u_str + h0_bra + u_bra*u_bra) / m_dat_safe;
@@ -2389,10 +2377,8 @@ CompressibleTeeResult compressible_merging_tee_rj(
         const double dt_b = (SC_sq > 1e-30)
             ? (C_S * std::sin(bra.theta) - S_S * std::cos(bra.theta)) / SC_sq : 0.0;
         const double dtheta_d = -dt_s + dt_b;
-        res.dR0_dmdot_branch = dNeg_Kq(K_str_v, dKs_dx, dKs_dphi, dKs_dM2, m_str, As,
-                                        du_d, dh0_d, 0.0, 0.0, dtheta_d, -1.0, dphi_str_dtheta);
-        res.dR1_dmdot_branch = dNeg_Kq(K_bra_v, dKb_dx, dKb_dphi, dKb_dM2, m_bra, Ab,
-                                        du_d, dh0_d, 0.0, 0.0, dtheta_d, 1.0, dphi_bra_dtheta);
+        res.dR1_dmdot_branch = dp0dat_dv(du_d, dh0_d, 0.0)
+                             + dNeg_Kq(du_d, dh0_d, 0.0, 0.0, dtheta_d);
     }
 
     return res;
