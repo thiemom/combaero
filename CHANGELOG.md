@@ -34,6 +34,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ports, allowing R_sp to be satisfied at non-zero velocity.
 
 ### Fixed
+- **Tee residual scaling**: `_build_residual_scales` classified `TeeJunctionElement`
+  rows with the mass-flow scale (`ref_mdot`, ~0.1 kg/s) although they are stagnation-
+  pressure residuals (~10^5 Pa). The ~10^6 mismatch inflated the tee Jacobian rows and
+  pushed the scaled condition number to ~5e8, stalling Newton. Tee rows now use the
+  pressure scale (`ref_p`), dropping the scaled condition number to ~7e2.
+- **Tee compressibility-correction sign**: the O(M^2) correction kappa in
+  `K_dat_j_closed` (`include/tee_junction.h`) was missing the bracket factor, giving the
+  wrong sign so that compressibility *raised* K. The corrected closed form
+  `kappa = (s/2)[-1 - 2x/sqrt(K_inc) + s/(2 K_inc)]` is <= 0 over the physical domain
+  (compressibility lowers K), matching `docs/junction/junction_model_v2.tex`.
+- **LM fallback for tee networks**: the Levenberg-Marquardt fallback now also fires for
+  any network containing a `TeeJunctionElement` (previously only elements flagged as
+  compressible). The two supplier stagnation pressures of a tee share a near-singular
+  common mode that defeats hybr; LM's regularised step resolves it, so merging tees now
+  converge by default.
+- **Branching-tee port areas**: a branching `TeeJunctionElement` now propagates its duct
+  geometry (`F_C`, `F_branch`) to auto-area `MomentumChamberNode` ports, which cannot see
+  an upstream channel during their own topology resolution and otherwise fall back to a
+  sentinel area.
 - **Tee phi angle convention**: the branching and merging tee models now use
   `phi_j = 0.75 * |theta_j - theta_dat|` (absolute-difference form) instead of
   the LaTeX formula `0.75*(pi - (theta_dat - theta_j))` which assumed the

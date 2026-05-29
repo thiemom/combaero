@@ -2811,6 +2811,31 @@ class TeeJunctionElement(NetworkElement):
         if self.F_C is not None and self._F_branch is not None and self._F_branch > 0:
             self.psi = self.F_C / self._F_branch
 
+        # Step 4: propagate duct area to auto-area MCN nodes at each arm.
+        # MCN nodes at straight/branch ports cannot see an upstream channel in
+        # their own resolve_topology (the upstream is this tee element), so they
+        # fall back to the 0.1 m^2 sentinel.  The tee already knows F_C and
+        # F_branch, so we inject the correct geometry here.
+        if self.F_C is not None and self.F_C > 0:
+            D_main = math.sqrt(4.0 * self.F_C / math.pi)
+            for nid in (self.common_node, self.straight_node):
+                _node = graph.nodes.get(nid)
+                if isinstance(_node, MomentumChamberNode) and _node._auto_area and _node.Dh is None:
+                    _node.Dh = D_main
+                    _node.area = self.F_C
+                    _node.surface.area = _node.area
+        if self._F_branch is not None and self._F_branch > 0:
+            D_branch = math.sqrt(4.0 * self._F_branch / math.pi)
+            _bra_node = graph.nodes.get(self.branch_node)
+            if (
+                isinstance(_bra_node, MomentumChamberNode)
+                and _bra_node._auto_area
+                and _bra_node.Dh is None
+            ):
+                _bra_node.Dh = D_branch
+                _bra_node.area = self._F_branch
+                _bra_node.surface.area = _bra_node.area
+
     def validate(self) -> None:
         if self.tee_type not in ("merging", "branching"):
             raise ValueError(

@@ -387,17 +387,26 @@ struct BranchState {
     }
 };
 
-// Closed-form K_dat,j to O(M^2) using frozen-xi assumption (Section 5 of
-// docs/junction/junction_model.tex). Templated to allow complex-step use.
+// Closed-form K_dat,j to O(M^2), Variant-2 (momentum-consistent) expansion;
+// see Section 5 (eq. Kclosed) of docs/junction/junction_model_v2.tex.
 //   x_j   = lambda_j * psi_j  (flow-area ratio product, >= 0)
 //   phi_j  = effective inflow angle [rad]  (Hager 3/4 factor already applied)
 //   M_dat2 = M_dat^2 of the pseudodatum
+//
+// kappa = (s/2) * [-1 - 2*x/sqrt(K_inc) + s/(2*K_inc)] with s = mu0^2 - 1 and
+// mu0 = x + sqrt(K_inc). The bracket is <= 0 on the entire physical domain, so
+// kappa <= 0: compressibility lowers K at fixed (lambda, psi, phi). The earlier
+// frozen-xi form kappa = s/2 dropped the bracket and had the wrong sign, which
+// drove the Newton residual against its Jacobian (v1 convergence failures).
 template <typename T>
 T K_dat_j_closed(T x_j, T phi_j, T M_dat2) {
-    const T cosphi = std::cos(phi_j);
-    const T K_inc  = T{1.0} + x_j * x_j - T{2.0} * x_j * cosphi;
-    const T sqrtK  = std::sqrt(K_inc);
-    const T kappa  = T{0.5} * ((x_j + sqrtK) * (x_j + sqrtK) - T{1.0});
+    const T cosphi  = std::cos(phi_j);
+    const T K_inc   = T{1.0} + x_j * x_j - T{2.0} * x_j * cosphi;
+    const T sqrtK   = std::sqrt(K_inc);
+    const T mu0     = x_j + sqrtK;
+    const T s       = mu0 * mu0 - T{1.0};
+    const T bracket = T{-1.0} - T{2.0} * x_j / sqrtK + s / (T{2.0} * K_inc);
+    const T kappa   = T{0.5} * s * bracket;
     return K_inc * (T{1.0} + kappa * M_dat2);
 }
 
