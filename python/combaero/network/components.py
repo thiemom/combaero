@@ -2303,13 +2303,18 @@ class ChannelElement(NetworkElement):
                 f_mult,
             )
 
-        # Residual of P-node unknowns matching channel drop
-        # C++ returns dP_calc = friction_loss
-        # In a stable network: Pt_up - P_static_down = dP_friction (for exit into plenum)
-        # Or more generally: Pt_up - Pt_down = dP_friction
-
-        # Test suite currently expects Pt_up - P_static_down = dP_calc
-        res = [state_in.Pt - state_out.P - res_cpp.dP_calc]
+        # Residual of P-node unknowns matching channel drop.
+        # C++ returns dP_calc = friction stagnation-pressure loss only (the
+        # downstream static pressure is not an input). A channel therefore
+        # connects stagnation pressures: Pt_up - Pt_down = dP_friction. The
+        # static-vs-stagnation distinction lives entirely in the node
+        # constitutive relation (PlenumNode: Pt = P; MomentumChamberNode:
+        # Pt = P + 0.5*rho*v^2). Referencing the downstream node's static P
+        # instead would let an inline MomentumChamberNode leak its dynamic head
+        # q_N = Pt - P as a free pressure gain across the junction. For every
+        # plenum- or boundary-terminated channel Pt == P, so this is identical
+        # to the previous static-face coupling.
+        res = [state_in.Pt - state_out.Pt - res_cpp.dP_calc]
 
         upstream_id = self.from_node
         downstream_id = self.to_node
@@ -2320,7 +2325,7 @@ class ChannelElement(NetworkElement):
                 f"{upstream_id}.Pt": 1.0,
                 f"{upstream_id}.P": -res_cpp.d_dP_dP_static_up,
                 f"{upstream_id}.T": -res_cpp.d_dP_dT_up,
-                f"{downstream_id}.P": -1.0,
+                f"{downstream_id}.Pt": -1.0,
             }
         }
         for i, val in enumerate(res_cpp.d_dP_dY_up):

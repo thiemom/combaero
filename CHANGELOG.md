@@ -42,6 +42,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   follow-up work. The merging tee is unaffected.
 
 ### Fixed
+- **Channel-to-MomentumChamberNode face convention**: `ChannelElement.residuals` coupled
+  the upstream node's stagnation pressure to the downstream node's *static* pressure
+  (`Pt_up - P_down - dP_friction = 0`). Across an inline `MomentumChamberNode` (where
+  `Pt = P + q`) this leaked the node dynamic head `q_N` as a free pressure gain - negligible
+  at low Mach, fatal near choke. Since the C++ `dP_calc` is a friction-only stagnation-loss
+  (the downstream static pressure is not an input), a channel now couples stagnation to
+  stagnation (`Pt_up - Pt_down - dP_friction = 0`). For `PlenumNode`/boundary terminations
+  (`Pt = P`) this is identical to the previous form, so only inline-MCN networks change.
+  This does not address high-dynamic-head *merging* chambers, which need an axial momentum
+  balance over the chamber (angle-dependent transverse loss); that closure is tracked in
+  #174 and `test_step_4_adding_bypass` is `xfail` until it lands.
 - **Tee residual scaling**: `_build_residual_scales` classified `TeeJunctionElement`
   rows with the mass-flow scale (`ref_mdot`, ~0.1 kg/s) although they are stagnation-
   pressure residuals (~10^5 Pa). The ~10^6 mismatch inflated the tee Jacobian rows and
