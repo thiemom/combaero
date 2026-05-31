@@ -21,10 +21,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Useful for LLM-assisted diagnostics: the response is self-contained with full solver
   context.
 
+### Changed
+- **`TeeJunctionElement`**: replaced Bassett 2001 empirical K tables with the
+  Unified0D compressible model (Mynard & Valen-Sendstad 2015, extended to O(M²)
+  by closed-form Borda-Carnot correction). Residuals now use stagnation pressure
+  (p₀) and mass-flow continuity, consistent with compressible duct elements.
+  Branching tees use two K-equation residuals (loss from supplier to each collector).
+  Merging tees use R_sp (equal static pressure between suppliers) + R_K,com (loss
+  from mass-weighted pseudodatum to the collector), matching the LaTeX derivation
+  in `docs/junction/junction_model.tex` exactly. Tee port nodes in the GUI backend
+  are now `MomentumChamberNode` so static pressure P can differ from Pt at junction
+  ports, allowing R_sp to be satisfied at non-zero velocity.
+  Known limitation: the dividing (branching) tee reaches a physical all-forward root
+  only when the branch outlet is pulled below the straight outlet; at equal or
+  straight-adverse splits the current parallel closure has no forward root, and a
+  `MomentumChamberNode`-bounded cascade additionally leaks the node dynamic head
+  through the channel coupling. Both defects, and a validated blended turning-loss
+  closure that fixes the split direction, are documented in
+  `docs/junction/junction_model_v3_addendum.md` (Findings 4-5) and tracked as
+  follow-up work. The merging tee is unaffected.
+
 ### Fixed
+- **Tee residual scaling**: `_build_residual_scales` classified `TeeJunctionElement`
+  rows with the mass-flow scale (`ref_mdot`, ~0.1 kg/s) although they are stagnation-
+  pressure residuals (~10^5 Pa). The ~10^6 mismatch inflated the tee Jacobian rows and
+  pushed the scaled condition number to ~5e8, stalling Newton. Tee rows now use the
+  pressure scale (`ref_p`), dropping the scaled condition number to ~7e2.
+- **Tee compressibility-correction sign**: the O(M^2) correction kappa in
+  `K_dat_j_closed` (`include/tee_junction.h`) was missing the bracket factor, giving the
+  wrong sign so that compressibility *raised* K. The corrected closed form
+  `kappa = (s/2)[-1 - 2x/sqrt(K_inc) + s/(2 K_inc)]` is <= 0 over the physical domain
+  (compressibility lowers K), matching `docs/junction/junction_model_v2.tex`.
+- **LM fallback for tee networks**: the Levenberg-Marquardt fallback now also fires for
+  any network containing a `TeeJunctionElement` (previously only elements flagged as
+  compressible). The two supplier stagnation pressures of a tee share a near-singular
+  common mode that defeats hybr; LM's regularised step resolves it, so merging tees now
+  converge by default.
+- **Branching-tee port areas**: a branching `TeeJunctionElement` now propagates its duct
+  geometry (`F_C`, `F_branch`) to auto-area `MomentumChamberNode` ports, which cannot see
+  an upstream channel during their own topology resolution and otherwise fall back to a
+  sentinel area.
+- **Tee phi angle convention**: the branching and merging tee models now use
+  `phi_j = 0.75 * |theta_j - theta_dat|` (absolute-difference form) instead of
+  the LaTeX formula `0.75*(pi - (theta_dat - theta_j))` which assumed the
+  "outward-pointing" angle convention. Python passes `theta_com = theta_str = 0`
+  (axis-aligned), so the old formula produced phi_str = 135° instead of 0° and
+  phi_bra ≈ 168° instead of 67.5° for a 90° branch, making K values 4–8× too
+  large and preventing manifold convergence. The Jacobian `dphi/d(theta_dat)` sign
+  is also corrected per branch in the merging model.
 - **Tee FD Jacobian eps_P scaling**: the finite-difference pressure step in
   `tee_fd_density_jacobians` is now `max(1.0, |P| × 10⁻⁴)` Pa instead of a fixed 1 Pa,
   preventing a numerically negligible step at high absolute pressures (e.g. 300 kPa inlet).
+- **MomentumChamberNode Jacobian coupling for tee junctions**: `MomentumChamberNode`
+  was silently dropping the `d(residual)/d(m_dot)` coupling when the upstream element
+  was a `TeeJunctionElement`, because the old code emitted `{"tee.m_dot": coeff}` — a
+  non-existent variable name. The solver now calls `flow_jac_at_node(nid, indices)` once
+  per element in `_propagate_states()` to obtain the correct variable names
+  (`tee.m_dot_com`, `tee.m_dot_branch`, or `lc.m_dot`) and propagates them via the new
+  `_m_dot_jac_names` attribute on each upstream state. `MomentumChamberNode` accumulates
+  these into `_upstream_m_dot_jac` and uses them in `residuals()`. This fixes a Newton
+  plateau (solver stall at non-zero residual) that occurred in both incompressible and
+  compressible mode whenever a `MomentumChamberNode` was connected to a tee junction.
 - **Levenberg-Marquardt fallback for hybr oscillation** on compressible networks: when
   `hybr` (Powell's method) fails to converge on a compressible network — typically because
   the Jacobian is ill-conditioned near a choked operating point and Newton steps bounce

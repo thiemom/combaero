@@ -1,5 +1,6 @@
 # Build directories
 build/
+build_tmp/
 cmake-build-*/
 
 # Excluded folders
@@ -8,6 +9,7 @@ cantera_examples/
 temp/
 docs/bassett
 docs/vatistas
+docs/junction
 
 # IDE files
 .idea/

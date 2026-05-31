@@ -595,6 +595,205 @@ TEST(TeeJunctionKCoefficients, Figure10cK12ExperimentalScatter) {
             << "psi=4 exp q=" << p.q;
 }
 
+// -----------------------------------------------------------------------------
+// Unified0D compressible tee: Jacobian verification via central FD
+// Convention matches Python caller: m_str = m_com - m_branch.
+// Perturbing m_dot_com also adjusts str.m_dot by the same delta.
+// Perturbing m_dot_branch also adjusts str.m_dot by -delta.
+// All other Jacobian entries perturb only their own BranchInput field.
+// -----------------------------------------------------------------------------
+namespace {
+BranchInput make_bi(double P_s, double Pt, double T, double m_dot,
+                     double A, double theta, double gamma = 1.4,
+                     double R_gas = 287.05) {
+    BranchInput b{};
+    b.P_static = P_s; b.Pt = Pt; b.T = T; b.m_dot = m_dot;
+    b.A = A; b.theta = theta; b.gamma_eff = gamma; b.R_gas = R_gas;
+    return b;
+}
+} // namespace
+
+TEST(CompressibleTeeJacobian, BranchingFDAllFields) {
+    const double eps = 1e-5;
+    const double tol_rel = 2e-4;  // central FD tolerance
+    const double tol_abs = 1.0;   // Pa absolute floor
+
+    // Typical branching state (M_dat ~ 0.25 in common duct)
+    BranchInput com = make_bi(1.95e5, 2.0e5, 400.0,  0.50, 0.01, 0.0);
+    BranchInput str = make_bi(1.88e5, 1.93e5, 402.0, 0.30, 0.01, 0.0);
+    BranchInput bra = make_bi(1.82e5, 1.90e5, 398.0, 0.20, 0.01, M_PI / 2.0);
+
+    CompressibleTeeResult res0 = compressible_branching_tee_rj(com, str, bra);
+
+    auto check = [&](double anal, double fd_val, const char* name) {
+        double scale = std::max(std::abs(fd_val), std::abs(anal)) + tol_abs;
+        EXPECT_NEAR(anal, fd_val, scale * tol_rel) << name;
+    };
+
+    // dR/dPt_com
+    { auto cp = com; cp.Pt += eps; auto cm = com; cm.Pt -= eps;
+      check(res0.dR0_dPt_com,
+            (compressible_branching_tee_rj(cp,str,bra).R_0 - compressible_branching_tee_rj(cm,str,bra).R_0)/(2*eps),
+            "dR0_dPt_com");
+      check(res0.dR1_dPt_com,
+            (compressible_branching_tee_rj(cp,str,bra).R_1 - compressible_branching_tee_rj(cm,str,bra).R_1)/(2*eps),
+            "dR1_dPt_com"); }
+
+    // dR/dP_static_com
+    { auto cp = com; cp.P_static += eps; auto cm = com; cm.P_static -= eps;
+      check(res0.dR0_dP_com,
+            (compressible_branching_tee_rj(cp,str,bra).R_0 - compressible_branching_tee_rj(cm,str,bra).R_0)/(2*eps),
+            "dR0_dP_com");
+      check(res0.dR1_dP_com,
+            (compressible_branching_tee_rj(cp,str,bra).R_1 - compressible_branching_tee_rj(cm,str,bra).R_1)/(2*eps),
+            "dR1_dP_com"); }
+
+    // dR/dT_com
+    { auto cp = com; cp.T += eps; auto cm = com; cm.T -= eps;
+      check(res0.dR0_dT_com,
+            (compressible_branching_tee_rj(cp,str,bra).R_0 - compressible_branching_tee_rj(cm,str,bra).R_0)/(2*eps),
+            "dR0_dT_com");
+      check(res0.dR1_dT_com,
+            (compressible_branching_tee_rj(cp,str,bra).R_1 - compressible_branching_tee_rj(cm,str,bra).R_1)/(2*eps),
+            "dR1_dT_com"); }
+
+    // dR/dPt_str
+    { auto sp = str; sp.Pt += eps; auto sm = str; sm.Pt -= eps;
+      check(res0.dR0_dPt_str,
+            (compressible_branching_tee_rj(com,sp,bra).R_0 - compressible_branching_tee_rj(com,sm,bra).R_0)/(2*eps),
+            "dR0_dPt_str"); }
+
+    // dR/dPt_bra
+    { auto bp = bra; bp.Pt += eps; auto bm = bra; bm.Pt -= eps;
+      check(res0.dR1_dPt_bra,
+            (compressible_branching_tee_rj(com,str,bp).R_1 - compressible_branching_tee_rj(com,str,bm).R_1)/(2*eps),
+            "dR1_dPt_bra"); }
+
+    // dR/dm_dot_com: caller convention m_str = m_com - m_branch, so str.m_dot changes too
+    { auto cp = com; cp.m_dot += eps; auto sp = str; sp.m_dot += eps;
+      auto cm = com; cm.m_dot -= eps; auto sm = str; sm.m_dot -= eps;
+      check(res0.dR0_dmdot_com,
+            (compressible_branching_tee_rj(cp,sp,bra).R_0 - compressible_branching_tee_rj(cm,sm,bra).R_0)/(2*eps),
+            "dR0_dmdot_com");
+      check(res0.dR1_dmdot_com,
+            (compressible_branching_tee_rj(cp,sp,bra).R_1 - compressible_branching_tee_rj(cm,sm,bra).R_1)/(2*eps),
+            "dR1_dmdot_com"); }
+
+    // dR/dm_dot_branch: bra.m_dot up, str.m_dot down (dm_str/dm_branch = -1)
+    { auto bp = bra; bp.m_dot += eps; auto sp = str; sp.m_dot -= eps;
+      auto bm = bra; bm.m_dot -= eps; auto sm = str; sm.m_dot += eps;
+      check(res0.dR0_dmdot_branch,
+            (compressible_branching_tee_rj(com,sp,bp).R_0 - compressible_branching_tee_rj(com,sm,bm).R_0)/(2*eps),
+            "dR0_dmdot_branch");
+      check(res0.dR1_dmdot_branch,
+            (compressible_branching_tee_rj(com,sp,bp).R_1 - compressible_branching_tee_rj(com,sm,bm).R_1)/(2*eps),
+            "dR1_dmdot_branch"); }
+}
+
+TEST(CompressibleTeeJacobian, MergingFDAllFields) {
+    const double eps = 1e-5;
+    const double tol_rel = 2e-4;
+    const double tol_abs = 1.0;
+
+    // Typical merging state (M_dat ~ 0.25 in combined supplier stream)
+    BranchInput com = make_bi(1.88e5, 1.95e5, 401.0, -0.50, 0.01, 0.0);
+    BranchInput str = make_bi(1.95e5, 2.0e5,  400.0,  0.30, 0.01, 0.0);
+    BranchInput bra = make_bi(1.93e5, 1.98e5, 402.0,  0.20, 0.01, M_PI / 2.0);
+
+    CompressibleTeeResult res0 = compressible_merging_tee_rj(com, str, bra);
+
+    auto check = [&](double anal, double fd_val, const char* name) {
+        double scale = std::max(std::abs(fd_val), std::abs(anal)) + tol_abs;
+        EXPECT_NEAR(anal, fd_val, scale * tol_rel) << name;
+    };
+
+    // dR/dPt_com
+    { auto cp = com; cp.Pt += eps; auto cm = com; cm.Pt -= eps;
+      check(res0.dR0_dPt_com,
+            (compressible_merging_tee_rj(cp,str,bra).R_0 - compressible_merging_tee_rj(cm,str,bra).R_0)/(2*eps),
+            "dR0_dPt_com");
+      check(res0.dR1_dPt_com,
+            (compressible_merging_tee_rj(cp,str,bra).R_1 - compressible_merging_tee_rj(cm,str,bra).R_1)/(2*eps),
+            "dR1_dPt_com"); }
+
+    // dR/dPt_str
+    { auto sp = str; sp.Pt += eps; auto sm = str; sm.Pt -= eps;
+      check(res0.dR0_dPt_str,
+            (compressible_merging_tee_rj(com,sp,bra).R_0 - compressible_merging_tee_rj(com,sm,bra).R_0)/(2*eps),
+            "dR0_dPt_str"); }
+
+    // dR/dPt_bra
+    { auto bp = bra; bp.Pt += eps; auto bm = bra; bm.Pt -= eps;
+      check(res0.dR1_dPt_bra,
+            (compressible_merging_tee_rj(com,str,bp).R_1 - compressible_merging_tee_rj(com,str,bm).R_1)/(2*eps),
+            "dR1_dPt_bra"); }
+
+    // dR/dP_static_str
+    { auto sp = str; sp.P_static += eps; auto sm = str; sm.P_static -= eps;
+      check(res0.dR0_dP_str,
+            (compressible_merging_tee_rj(com,sp,bra).R_0 - compressible_merging_tee_rj(com,sm,bra).R_0)/(2*eps),
+            "dR0_dP_str");
+      check(res0.dR1_dP_str,
+            (compressible_merging_tee_rj(com,sp,bra).R_1 - compressible_merging_tee_rj(com,sm,bra).R_1)/(2*eps),
+            "dR1_dP_str"); }
+
+    // dR/dT_str
+    { auto sp = str; sp.T += eps; auto sm = str; sm.T -= eps;
+      check(res0.dR0_dT_str,
+            (compressible_merging_tee_rj(com,sp,bra).R_0 - compressible_merging_tee_rj(com,sm,bra).R_0)/(2*eps),
+            "dR0_dT_str");
+      check(res0.dR1_dT_str,
+            (compressible_merging_tee_rj(com,sp,bra).R_1 - compressible_merging_tee_rj(com,sm,bra).R_1)/(2*eps),
+            "dR1_dT_str"); }
+
+    // dR/dP_static_bra
+    { auto bp = bra; bp.P_static += eps; auto bm = bra; bm.P_static -= eps;
+      check(res0.dR0_dP_bra,
+            (compressible_merging_tee_rj(com,str,bp).R_0 - compressible_merging_tee_rj(com,str,bm).R_0)/(2*eps),
+            "dR0_dP_bra");
+      check(res0.dR1_dP_bra,
+            (compressible_merging_tee_rj(com,str,bp).R_1 - compressible_merging_tee_rj(com,str,bm).R_1)/(2*eps),
+            "dR1_dP_bra"); }
+
+    // dR/dT_bra
+    { auto bp = bra; bp.T += eps; auto bm = bra; bm.T -= eps;
+      check(res0.dR0_dT_bra,
+            (compressible_merging_tee_rj(com,str,bp).R_0 - compressible_merging_tee_rj(com,str,bm).R_0)/(2*eps),
+            "dR0_dT_bra");
+      check(res0.dR1_dT_bra,
+            (compressible_merging_tee_rj(com,str,bp).R_1 - compressible_merging_tee_rj(com,str,bm).R_1)/(2*eps),
+            "dR1_dT_bra"); }
+
+    // dR/dm_dot_com: m_str = m_com - m_branch, dm_str/dm_com = 1
+    { auto cp = com; cp.m_dot += eps; auto sp = str; sp.m_dot += eps;
+      auto cm = com; cm.m_dot -= eps; auto sm = str; sm.m_dot -= eps;
+      check(res0.dR0_dmdot_com,
+            (compressible_merging_tee_rj(cp,sp,bra).R_0 - compressible_merging_tee_rj(cm,sm,bra).R_0)/(2*eps),
+            "dR0_dmdot_com");
+      check(res0.dR1_dmdot_com,
+            (compressible_merging_tee_rj(cp,sp,bra).R_1 - compressible_merging_tee_rj(cm,sm,bra).R_1)/(2*eps),
+            "dR1_dmdot_com"); }
+
+    // dR/dm_dot_branch: bra.m_dot up, str.m_dot down (dm_str/dm_branch = -1)
+    { auto bp = bra; bp.m_dot += eps; auto sp = str; sp.m_dot -= eps;
+      auto bm = bra; bm.m_dot -= eps; auto sm = str; sm.m_dot += eps;
+      check(res0.dR0_dmdot_branch,
+            (compressible_merging_tee_rj(com,sp,bp).R_0 - compressible_merging_tee_rj(com,sm,bm).R_0)/(2*eps),
+            "dR0_dmdot_branch");
+      check(res0.dR1_dmdot_branch,
+            (compressible_merging_tee_rj(com,sp,bp).R_1 - compressible_merging_tee_rj(com,sm,bm).R_1)/(2*eps),
+            "dR1_dmdot_branch"); }
+}
+
+TEST(CompressibleTeeJacobian, ZeroFlowIsRegularised) {
+    BranchInput zero = make_bi(1e5, 1e5, 400.0, 1e-15, 0.01, 0.0);
+    auto res_b = compressible_branching_tee_rj(zero, zero, zero);
+    auto res_m = compressible_merging_tee_rj(zero, zero, zero);
+    for (double v : {res_b.R_0, res_b.R_1, res_b.dR0_dmdot_com, res_b.dR1_dmdot_com,
+                     res_m.R_0, res_m.R_1, res_m.dR0_dmdot_com, res_m.dR1_dmdot_com})
+        EXPECT_FALSE(std::isnan(v)) << "NaN in zero-flow result";
+}
+
 // Zero flow: regularisation must prevent NaN in all outputs
 TEST(TeeJunctionSolverInterface, ZeroFlowIsRegularised) {
     auto Y = dry_air_Y();

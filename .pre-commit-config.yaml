@@ -20,7 +20,7 @@ repos:
 
       - id: cantera-validation-tests
         name: Cantera Validation Tests
-        entry: bash -c 'CANTERA_DATA="$PWD/cantera_validation_tests" uv run --project cantera_validation_tests pytest -v --tb=short'
+        entry: bash -c 'CANTERA_DATA="$PWD/cantera_validation_tests" uv run --project cantera_validation_tests pytest cantera_validation_tests -v --tb=short'
         language: system
         pass_filenames: false
         always_run: false
