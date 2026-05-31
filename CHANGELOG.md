@@ -32,6 +32,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in `docs/junction/junction_model.tex` exactly. Tee port nodes in the GUI backend
   are now `MomentumChamberNode` so static pressure P can differ from Pt at junction
   ports, allowing R_sp to be satisfied at non-zero velocity.
+  Known limitation: the dividing (branching) tee reaches a physical all-forward root
+  only when the branch outlet is pulled below the straight outlet; at equal or
+  straight-adverse splits the current parallel closure has no forward root, and a
+  `MomentumChamberNode`-bounded cascade additionally leaks the node dynamic head
+  through the channel coupling. Both defects, and a validated blended turning-loss
+  closure that fixes the split direction, are documented in
+  `docs/junction/junction_model_v3_addendum.md` (Findings 4-5) and tracked as
+  follow-up work. The merging tee is unaffected.
 
 ### Fixed
 - **Tee residual scaling**: `_build_residual_scales` classified `TeeJunctionElement`

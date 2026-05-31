@@ -232,6 +232,29 @@ def test_branching_tee_residuals_near_zero():
     assert all(abs(r) < 1e-6 for r in res), f"Non-zero residuals: {res}"
 
 
+def test_branching_tee_forward_flow_root():
+    """Single dividing tee on direct pressure boundaries converges to a PHYSICAL
+    (all-forward) split when the branch outlet is pulled below the straight outlet.
+
+    This is the honest positive baseline: a clean fixture (no MomentumChamberNode
+    coupling, see addendum Finding 4) where the committed parallel closure does reach
+    a forward exact zero (|F| ~ 5e-11).  At equal or straight-adverse outlet pressures
+    the same closure has no forward root (addendum Finding 5, task #9), so this test
+    deliberately uses the branch-low default of _branching_net (str 2.06, bra 2.0 bar)
+    rather than asserting direction for the symmetric case.
+    """
+    net = _branching_net()
+    solver = NetworkSolver(net)
+    sol = solver.solve()
+    assert sol["__success__"], f"did not converge: {sol.get('__message__')}"
+    m_com = sol["tee.m_dot_com"]
+    m_branch = sol["tee.m_dot_branch"]
+    m_straight = m_com - m_branch
+    assert m_com > 0.0, f"common reversed: {m_com}"
+    assert m_branch > 0.0, f"branch reversed: {m_branch}"
+    assert m_straight > 0.0, f"straight reversed: {m_straight}"
+
+
 # ---------------------------------------------------------------------------
 # Conservation laws: mixed-composition streams
 # ---------------------------------------------------------------------------
@@ -615,8 +638,23 @@ def _gentle_branching_cascade() -> FlowNetwork:
     return net
 
 
-def test_gentle_branching_cascade_converges():
-    """Two-tee MCN-bounded manifold converges to a mass-conserving root at low Mach."""
+# Two known defects keep the MCN-bounded branching cascade from reaching a
+# physical (all-forward) root; both are documented in
+# docs/junction/junction_model_v3_addendum.md (Findings 4 and 5):
+#   * Defect 1 (task #7): ChannelElement couples upstream Pt to downstream P, which
+#     leaks an inline MomentumChamberNode's dynamic head as a free pressure gain.
+#   * Defect 2 (task #9): the parallel branch closure has no forward root at equal
+#     or straight-adverse outlets; the validated blended turning-loss closure is not
+#     yet ported to C++.
+# The cascade does reach a mass-conserving "__success__" root, but it is REVERSED
+# (tee straight arms run backward), so these tests assert flow DIRECTION and are
+# xfailed - we do not let a green test stand on an unphysical root.
+@pytest.mark.xfail(
+    reason="branching cascade converges only to a reversed split (addendum Findings 4-5; tasks #7, #9)",
+    strict=False,
+)
+def test_gentle_branching_cascade_forward_root():
+    """Two-tee MCN-bounded manifold should reach an all-forward, mass-conserving root."""
     net = _gentle_branching_cascade()
     solver = NetworkSolver(net)
     sol = solver.solve()
@@ -626,16 +664,18 @@ def test_gentle_branching_cascade_converges():
     assert abs(m_in - m_out) < 1e-6 * max(abs(m_in), 1e-6), (
         f"Mass not conserved: {m_in:.6f} vs {m_out:.6f}"
     )
+    for tee in ("tee1", "tee2"):
+        m_com = sol[f"{tee}.m_dot_com"]
+        m_branch = sol[f"{tee}.m_dot_branch"]
+        m_straight = m_com - m_branch
+        assert m_com > 0.0, f"{tee} common reversed: {m_com}"
+        assert m_branch > 0.0, f"{tee} branch reversed: {m_branch}"
+        assert m_straight > 0.0, f"{tee} straight reversed: {m_straight}"
 
 
-# The full near-choke manifold (2:1 pressure ratio) is not yet solvable: the
-# branching tee + MomentumChamberNode collector coupling admits only reversed,
-# unphysical splits (the branch over-draws the common supply), and at this
-# pressure ratio no root is reachable at all.  This is a pre-existing limitation
-# shared by the baseline tee model on main, not a regression of the compressible
-# model.  Tracked for a future split-direction fix.
 @pytest.mark.xfail(
-    reason="branching tee + MCN collectors at near-choke ratio is not yet solvable", strict=False
+    reason="branching cascade reversed/unsolvable at near-choke ratio (addendum Findings 4-5; tasks #7, #9)",
+    strict=False,
 )
 def test_cascaded_branching_manifold_converges():
     """3-tee branching manifold with channels: solver must converge."""
@@ -647,7 +687,8 @@ def test_cascaded_branching_manifold_converges():
 
 
 @pytest.mark.xfail(
-    reason="branching tee + MCN collectors at near-choke ratio is not yet solvable", strict=False
+    reason="branching cascade reversed/unsolvable at near-choke ratio (addendum Findings 4-5; tasks #7, #9)",
+    strict=False,
 )
 def test_cascaded_branching_manifold_mass_conservation():
     """Total inlet flow equals sum of 4 outlet flows."""
