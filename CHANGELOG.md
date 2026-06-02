@@ -32,14 +32,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in `docs/junction/junction_model.tex` exactly. Tee port nodes in the GUI backend
   are now `MomentumChamberNode` so static pressure P can differ from Pt at junction
   ports, allowing R_sp to be satisfied at non-zero velocity.
-  Known limitation: the dividing (branching) tee reaches a physical all-forward root
-  only when the branch outlet is pulled below the straight outlet; at equal or
-  straight-adverse splits the current parallel closure has no forward root, and a
-  `MomentumChamberNode`-bounded cascade additionally leaks the node dynamic head
-  through the channel coupling. Both defects, and a validated blended turning-loss
-  closure that fixes the split direction, are documented in
-  `docs/junction/junction_model_v3_addendum.md` (Findings 4-5) and tracked as
-  follow-up work. The merging tee is unaffected.
+  Branching split closure: both collector legs now use one consistent blended
+  turning-loss closure `Pt_com - Pt_leg - K_turn(theta)*q_leg - beta*x_leg*K_bc*q_ref`
+  (straight leg: `theta = 0` so the turning term vanishes, leaving the Borda-Carnot
+  extraction term). This removes the prior over-charge of a near-closed branch
+  (`K -> 1`) and lets a low-Mach `MomentumChamberNode`-bounded branching cascade reach
+  a physical all-forward, mass-conserving root. Known envelope limit: the straight run
+  is a low-loss through-leg whose effective loss coefficient is capped near
+  `beta*4/27 ~ 0.30` of the common dynamic head, so a large imposed straight-run
+  stagnation drop (and ejector/reverse behaviour generally) is outside this closure -
+  a momentum-CV junction is the sanctioned successor (see
+  `docs/junction/junction_model_v3_addendum.md` Finding 6 and
+  `docs/junction/momentum cv implementation guide.pdf`). The merging tee is unaffected.
 
 ### Fixed
 - **Channel-to-MomentumChamberNode face convention**: `ChannelElement.residuals` coupled

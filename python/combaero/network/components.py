@@ -2931,6 +2931,8 @@ class TeeJunctionElement(NetworkElement):
                     f"{self.common_node}.P": res.dR1_dP_com,
                     f"{self.common_node}.T": res.dR1_dT_com,
                     f"{self.branch_node}.Pt": res.dR1_dPt_bra,
+                    f"{self.branch_node}.P": res.dR1_dP_bra,
+                    f"{self.branch_node}.T": res.dR1_dT_bra,
                 },
             }
 
