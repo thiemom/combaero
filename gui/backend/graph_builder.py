@@ -410,24 +410,25 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             edge_junction_map[(edge.source, edge.target)] = junction_id
 
         elif src_tee and tgt_elem:
-            # Tee port → element (e.g. tee.common-source → channel): auto-insert PlenumNode
+            # Tee port → element (e.g. tee.common-source → channel): auto-insert MomentumChamberNode
+            # so that Pt != P_static and velocity is correctly accounted for.
             port = _port_from_handle(edge.sourceHandle)
             if port and (edge.source, port) not in tee_port_node_map:
                 jid = f"__tee_jct__{edge.source}_{port}"
                 if jid not in nodes_map:
-                    jn = PlenumNode(jid)
+                    jn = MomentumChamberNode(jid)
                     net.add_node(jn)
                     nodes_map[jid] = jn
                 tee_port_node_map[(edge.source, port)] = jid
                 edge_junction_map[(edge.source, edge.target)] = jid
 
         elif src_elem and tgt_tee:
-            # Element → tee port (e.g. channel → tee.straight-target): auto-insert PlenumNode
+            # Element → tee port (e.g. channel → tee.straight-target): auto-insert MomentumChamberNode
             port = _port_from_handle(edge.targetHandle)
             if port and (edge.target, port) not in tee_port_node_map:
                 jid = f"__tee_jct__{edge.target}_{port}"
                 if jid not in nodes_map:
-                    jn = PlenumNode(jid)
+                    jn = MomentumChamberNode(jid)
                     net.add_node(jn)
                     nodes_map[jid] = jn
                 tee_port_node_map[(edge.target, port)] = jid

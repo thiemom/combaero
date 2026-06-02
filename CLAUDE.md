@@ -1,5 +1,9 @@
 # CombAero — Claude Code Instructions
 
+## Practical Tips
+- Avoid shell variable expansions and use literal paths or printenv/env instead. Run shell expansions once per session and use the abs path after. Shell variable expansions require user approval per open bugs (#29616, #18160). Allow list workarounds are not always reliable.
+- There are allow rules for sandboxed commands such as uv run, that are best executed in sandbox mode. Disabling sandbox requires user approval and should only be used when absolutely required.
+
 ## Hard Rules
 - **Virtual environment only:** use `uv run` and `uv pip`. Never install into system Python or use global `pip`.
 - **Never bypass pre-commit hooks** or CI checks. All code must pass cleanly before pushing.

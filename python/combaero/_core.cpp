@@ -462,6 +462,65 @@ PYBIND11_MODULE(_core, m) {
         py::arg("q"), py::arg("psi"), py::arg("theta"), py::arg("blend_k") = 30.0,
         "BranchingTee effective branch-path K (blended, with soft bounds).");
 
+  // Compressible Unified0D tee junction (Mynard & Valen-Sendstad 2015, O(M^2) extension)
+  py::class_<solver::BranchInput>(m, "BranchInput",
+      "Per-branch face state for compressible_branching/merging_tee_rj.")
+      .def(py::init<>())
+      .def_readwrite("P_static",  &solver::BranchInput::P_static)
+      .def_readwrite("Pt",        &solver::BranchInput::Pt)
+      .def_readwrite("T",         &solver::BranchInput::T)
+      .def_readwrite("m_dot",     &solver::BranchInput::m_dot)
+      .def_readwrite("A",         &solver::BranchInput::A)
+      .def_readwrite("theta",     &solver::BranchInput::theta)
+      .def_readwrite("gamma_eff", &solver::BranchInput::gamma_eff)
+      .def_readwrite("R_gas",     &solver::BranchInput::R_gas);
+
+  py::class_<solver::CompressibleTeeResult>(m, "CompressibleTeeResult",
+      "Result of compressible_branching/merging_tee_rj.")
+      .def(py::init<>())
+      .def_readonly("R_0",              &solver::CompressibleTeeResult::R_0)
+      .def_readonly("R_1",              &solver::CompressibleTeeResult::R_1)
+      .def_readonly("dR0_dPt_com",      &solver::CompressibleTeeResult::dR0_dPt_com)
+      .def_readonly("dR0_dP_com",       &solver::CompressibleTeeResult::dR0_dP_com)
+      .def_readonly("dR0_dT_com",       &solver::CompressibleTeeResult::dR0_dT_com)
+      .def_readonly("dR0_dmdot_com",    &solver::CompressibleTeeResult::dR0_dmdot_com)
+      .def_readonly("dR0_dPt_str",      &solver::CompressibleTeeResult::dR0_dPt_str)
+      .def_readonly("dR0_dP_str",       &solver::CompressibleTeeResult::dR0_dP_str)
+      .def_readonly("dR0_dT_str",       &solver::CompressibleTeeResult::dR0_dT_str)
+      .def_readonly("dR0_dPt_bra",      &solver::CompressibleTeeResult::dR0_dPt_bra)
+      .def_readonly("dR0_dP_bra",       &solver::CompressibleTeeResult::dR0_dP_bra)
+      .def_readonly("dR0_dT_bra",       &solver::CompressibleTeeResult::dR0_dT_bra)
+      .def_readonly("dR0_dmdot_branch", &solver::CompressibleTeeResult::dR0_dmdot_branch)
+      .def_readonly("dR1_dPt_com",      &solver::CompressibleTeeResult::dR1_dPt_com)
+      .def_readonly("dR1_dP_com",       &solver::CompressibleTeeResult::dR1_dP_com)
+      .def_readonly("dR1_dT_com",       &solver::CompressibleTeeResult::dR1_dT_com)
+      .def_readonly("dR1_dmdot_com",    &solver::CompressibleTeeResult::dR1_dmdot_com)
+      .def_readonly("dR1_dPt_str",      &solver::CompressibleTeeResult::dR1_dPt_str)
+      .def_readonly("dR1_dP_str",       &solver::CompressibleTeeResult::dR1_dP_str)
+      .def_readonly("dR1_dT_str",       &solver::CompressibleTeeResult::dR1_dT_str)
+      .def_readonly("dR1_dPt_bra",      &solver::CompressibleTeeResult::dR1_dPt_bra)
+      .def_readonly("dR1_dP_bra",       &solver::CompressibleTeeResult::dR1_dP_bra)
+      .def_readonly("dR1_dT_bra",       &solver::CompressibleTeeResult::dR1_dT_bra)
+      .def_readonly("dR1_dmdot_branch", &solver::CompressibleTeeResult::dR1_dmdot_branch);
+
+  m.def("compressible_branching_tee_rj",
+        &solver::compressible_branching_tee_rj,
+        py::arg("com"), py::arg("str"), py::arg("bra"),
+        "Compressible branching tee (Unified0D, O(M^2)).\n"
+        "common=supplier, straight+branch=collectors.\n"
+        "  R_0 = Pt_com - Pt_str - K_str * q_ref\n"
+        "  R_1 = Pt_com - Pt_bra - K_bra * q_ref\n"
+        "Returns: CompressibleTeeResult");
+
+  m.def("compressible_merging_tee_rj",
+        &solver::compressible_merging_tee_rj,
+        py::arg("com"), py::arg("str"), py::arg("bra"),
+        "Compressible merging tee (Unified0D, O(M^2)).\n"
+        "straight+branch=suppliers, common=collector.\n"
+        "  R_0 = P_static_str - P_static_bra  (supplier pressure equality)\n"
+        "  R_1 = p0_dat - Pt_com - K_com * q_ref\n"
+        "Returns: CompressibleTeeResult");
+
   // Species metadata helpers
   m.def("num_species", &num_species,
         "Number of thermo species in the internal tables.");

@@ -434,7 +434,7 @@ effective_area = EffectiveAreaConnectionElement("ea", "node3", "node4", diameter
 lossless = LosslessConnectionElement("lossless", "node4", "node5")
 area_cd = DiameterDischargeCoefficientConnectionElement("area_cd", "node5", "node6", diameter=0.011284, Cd=0.7)
 
-# Three-port tee junction (Bassett 2001 pressure-loss model)
+# Three-port tee junction (Unified0D compressible model, Mynard & Valen-Sendstad 2015)
 import math
 # Merging tee: two inlets (straight_node, branch_node) -> one outlet (common_node)
 tee_merge = TeeJunctionElement(
@@ -509,12 +509,44 @@ res_plen = cb.plenum_residuals_and_jacobian(m_dot_vec, P_target, T_target, Y_tar
 Combustor results return mapping specific to `(m_dot, P_total, T, Y)` state vectors.
 
 ### Tee Junction Interface
-Bassett 2001 tee junction K-factor model with full Jacobians for the network solver.
 
-Port convention: MAIN_INLET (A), BRANCH (B), MAIN_OUTLET (C).
-`m_dot_com` = common-port mass flow [kg/s], `m_dot_branch` = branch mass flow [kg/s],
-`F_C` = common-port cross-sectional area [m^2],
-`psi` = F_C/F_branch (common-port area / lateral-branch area), `theta` = branch angle [rad].
+Two solver-facing APIs are available:
+
+**Unified0D compressible model** (current, used by `TeeJunctionElement`): stagnation-pressure
+residuals with mass-flow continuity, consistent with compressible duct elements. Supports
+arbitrary per-branch gamma and R_gas.
+
+**Legacy Bassett 2001 model**: empirical incompressible K tables retained for direct
+low-level access; not used by the network solver.
+
+#### Unified0D compressible interface
+
+`BranchInput` holds per-branch thermodynamic state. `CompressibleTeeResult` holds the
+two residuals and the full Jacobian.
+
+```python
+import combaero._core as _core
+import math
+
+# Build per-branch state (P_static [Pa], Pt [Pa], T [K], m_dot [kg/s],
+#                         A [m^2], theta [rad], gamma_eff [-], R_gas [J/kg/K])
+com = _core.BranchInput(P_static=1.95e5, Pt=2.0e5, T=400.0, m_dot=0.5,
+                         A=0.01, theta=0.0, gamma_eff=1.4, R_gas=287.0)
+str_b = _core.BranchInput(P_static=1.88e5, Pt=1.95e5, T=400.0, m_dot=0.3,
+                           A=0.01, theta=0.0, gamma_eff=1.4, R_gas=287.0)
+bra = _core.BranchInput(P_static=1.82e5, Pt=1.90e5, T=400.0, m_dot=0.2,
+                         A=0.01, theta=math.pi/2, gamma_eff=1.4, R_gas=287.0)
+
+# Branching: common=supplier, straight+branch=collectors
+res = _core.compressible_branching_tee_rj(com=com, str=str_b, bra=bra)
+# res.R_0, res.R_1           -- residuals [Pa]
+# res.dR0_dPt_com, res.dR0_dPt_str, ...  -- full Jacobian fields
+
+# Merging: straight+branch=suppliers, common=collector
+res = _core.compressible_merging_tee_rj(com=com, str=str_b, bra=bra)
+```
+
+#### Legacy Bassett 2001 interface
 
 ```python
 import combaero._core as _core
@@ -538,7 +570,7 @@ k12 = _core.tee_K12(q, psi, theta)  # branch arm, joining tee
 ks = _core.merging_tee_K_straight(q, psi, theta)
 kb = _core.merging_tee_K_branch(q, psi, theta)
 
-# Solver residuals and full Jacobians
+# Legacy solver residuals and full Jacobians
 res = _core.merging_tee_residuals_and_jacobian(
     m_dot_com=0.5, m_dot_branch=0.2,
     dP0_straight=150.0, dP0_branch=200.0,
