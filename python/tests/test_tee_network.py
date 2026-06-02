@@ -79,12 +79,25 @@ def _merging_net(
 
 def _branching_net(
     Pt_common: float = 2.1e5,
-    Pt_straight: float = 2.06e5,
-    Pt_branch: float = 2.0e5,
+    Pt_straight: float = 2.098e5,
+    Pt_branch: float = 2.06e5,
     theta: float = _THETA_90,
     psi: float = 1.0,
 ) -> FlowNetwork:
-    """Three-node branching tee: one inlet (common) into two outlets (straight, branch)."""
+    """Three-node branching tee: one inlet (common) into two outlets (straight, branch).
+
+    Default boundary pressures sit inside the unified0D closure's physical envelope.
+    The straight run is a low-loss through-leg: its blended extraction term tops out at
+    an effective loss coefficient of beta*4/27 ~ 0.30 of the common dynamic head (the
+    Borda-Carnot diversion maximum). A large imposed straight-run stagnation drop is
+    therefore unreachable - the earlier 4.0e3 Pa straight drop (str 2.06 bar) only ever
+    "solved" because the pre-#9 closure over-charged the run with a full Borda-Carnot
+    K ~ 1, the bug Finding 5 removes. With a small straight drop the solver reaches a
+    clean all-forward exact root; the split is branch-dominated because the low-loss run
+    cannot carry much flow without downstream loading (see addendum Finding 6). See
+    docs/junction/'momentum cv implementation guide.pdf' for the momentum-CV successor
+    that removes this envelope limit entirely.
+    """
     net = FlowNetwork()
     Y = _DRY_AIR_Y
     net.add_node(PressureBoundary("pb_common", Pt=Pt_common, Tt=400.0, Y=Y))
@@ -234,14 +247,17 @@ def test_branching_tee_residuals_near_zero():
 
 def test_branching_tee_forward_flow_root():
     """Single dividing tee on direct pressure boundaries converges to a PHYSICAL
-    (all-forward) split when the branch outlet is pulled below the straight outlet.
+    (all-forward) exact root.
 
-    This is the honest positive baseline: a clean fixture (no MomentumChamberNode
-    coupling, see addendum Finding 4) where the committed parallel closure does reach
-    a forward exact zero (|F| ~ 5e-11).  At equal or straight-adverse outlet pressures
-    the same closure has no forward root (addendum Finding 5, task #9), so this test
-    deliberately uses the branch-low default of _branching_net (str 2.06, bra 2.0 bar)
-    rather than asserting direction for the symmetric case.
+    Honest positive baseline for the unified0D blended closure (task #9, addendum
+    Finding 6): a clean fixture (no MomentumChamberNode coupling, see Finding 4) with a
+    single source (common) and two sinks (straight, branch), so the BCs unambiguously
+    force all-outward flow - which the solver must then reproduce. The split is
+    branch-dominated because the straight run is a low-loss through-leg (its loss
+    coefficient is capped near 0.30 of the common dynamic head); a large straight drop
+    is outside the closure envelope. Direction here is a consequence of the BCs, not an
+    intrinsic property: with a single source and two sinks the physical answer is
+    all-forward, and that is what we assert.
     """
     net = _branching_net()
     solver = NetworkSolver(net)
@@ -638,23 +654,19 @@ def _gentle_branching_cascade() -> FlowNetwork:
     return net
 
 
-# Two known defects keep the MCN-bounded branching cascade from reaching a
-# physical (all-forward) root; both are documented in
-# docs/junction/junction_model_v3_addendum.md (Findings 4 and 5):
-#   * Defect 1 (task #7): ChannelElement couples upstream Pt to downstream P, which
-#     leaks an inline MomentumChamberNode's dynamic head as a free pressure gain.
-#   * Defect 2 (task #9): the parallel branch closure has no forward root at equal
-#     or straight-adverse outlets; the validated blended turning-loss closure is not
-#     yet ported to C++.
-# The cascade does reach a mass-conserving "__success__" root, but it is REVERSED
-# (tee straight arms run backward), so these tests assert flow DIRECTION and are
-# xfailed - we do not let a green test stand on an unphysical root.
-@pytest.mark.xfail(
-    reason="branching cascade converges only to a reversed split (addendum Findings 4-5; tasks #7, #9)",
-    strict=False,
-)
+# The gentle (low-Mach) MCN-bounded branching cascade now reaches a physical
+# (all-forward) mass-conserving root. Two defects previously blocked it, both fixed:
+#   * Defect 1 (task #7): ChannelElement coupled upstream Pt to downstream P, leaking an
+#     inline MomentumChamberNode's dynamic head as a free pressure gain. Landed.
+#   * Defect 2 (task #9): the parallel branch closure over-charged a near-closed branch
+#     (Borda-Carnot K -> 1) and forced K_str = K_bra at equal outlets. The unified0D
+#     blended turning-loss closure (both legs: extraction + branch turning loss) removes
+#     this. Landed in compressible_branching_tee_rj.
+# With both fixed, the gentle cascade is a single source feeding sinks, so the physical
+# answer is all-outward; the solver reproduces it (addendum Finding 6). The full
+# near-choke manifold below stays xfail - it is outside the closure envelope.
 def test_gentle_branching_cascade_forward_root():
-    """Two-tee MCN-bounded manifold should reach an all-forward, mass-conserving root."""
+    """Two-tee MCN-bounded manifold reaches an all-forward, mass-conserving root."""
     net = _gentle_branching_cascade()
     solver = NetworkSolver(net)
     sol = solver.solve()

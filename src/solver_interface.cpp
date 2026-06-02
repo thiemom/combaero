@@ -2108,9 +2108,6 @@ CompressibleTeeResult compressible_branching_tee_rj(
     const BranchInput& str,
     const BranchInput& bra)
 {
-    using combaero::K_dat_j_closed;
-    using combaero::cstep_deriv;
-
     constexpr double eps_m = 1e-10;
 
     // Pseudodatum = common branch (single supplier for branching)
@@ -2120,12 +2117,10 @@ CompressibleTeeResult compressible_branching_tee_rj(
     const double Pc    = com.P_static;
     const double Tc    = com.T;
     const double Rc    = com.R_gas;
-    const double gc    = com.gamma_eff;
     const double Ac    = com.A;
 
     const double m_com_sq_safe = m_com * m_com + eps_m * eps_m;
     const double u_dat  = m_com * Rc * Tc / (Pc * Ac);
-    const double M2_dat = u_dat * u_dat / (gc * Rc * Tc);
     const double q_ref  = 0.5 * (Pc / (Rc * Tc)) * u_dat * u_dat;
     // A_dat = Ac (derived: m_com / (rho_dat * u_dat) = m_com * Rc * Tc / (Pc * u_dat) = Ac)
 
@@ -2140,28 +2135,37 @@ CompressibleTeeResult compressible_branching_tee_rj(
     const double phi_str = 0.75 * std::abs(str.theta - com.theta);
     const double phi_bra = 0.75 * std::abs(bra.theta - com.theta);
 
-    const double K_str = K_dat_j_closed(x_str, phi_str, M2_dat);
-    const double K_bra = K_dat_j_closed(x_bra, phi_bra, M2_dat);
+    // Both collector legs use one consistent blended turning-loss closure (Finding 5):
+    //   R = Pt_com - Pt_leg - K_turn(theta)*q_leg - BETA_EXTRACT*x_leg*K_bc_leg*q_ref
+    // where q_leg is the leg-local dynamic head (turning loss, vanishes at theta=0) and
+    // K_bc_leg = 1 + x^2 - 2*x*cos(phi) is the incompressible Borda-Carnot kernel
+    // (faithful to the FD prototype; phi is constant w.r.t. the unknowns, so its
+    // x-derivative is the trivial 2x - 2cos(phi)). The straight leg has theta_str = 0,
+    // so K_turn(0) = 0 and its closure collapses to the pure extraction term.
+    const double BE = combaero::BETA_EXTRACT;
 
-    // Residuals: R = Pt_dat - Pt_j - K_j * q_ref  (p0_dat = Pt_com)
-    const double R_0 = com.Pt - str.Pt - K_str * q_ref;
-    const double R_1 = com.Pt - bra.Pt - K_bra * q_ref;
+    // Straight collector (theta_str = 0 -> no turning loss).
+    const double cos_phi_str = std::cos(phi_str);
+    const double K_bc_str    = 1.0 + x_str * x_str - 2.0 * x_str * cos_phi_str;
+    const double dKbc_str_dx = 2.0 * x_str - 2.0 * cos_phi_str;
 
-    // K kernel derivatives via complex-step
-    auto K_fn = [](auto x, auto phi, auto M2) {
-        return K_dat_j_closed(x, phi, M2);
-    };
-    const double dKs_dx  = cstep_deriv(K_fn, 0, x_str, phi_str, M2_dat);
-    const double dKs_dM2 = cstep_deriv(K_fn, 2, x_str, phi_str, M2_dat);
-    const double dKb_dx  = cstep_deriv(K_fn, 0, x_bra, phi_bra, M2_dat);
-    const double dKb_dM2 = cstep_deriv(K_fn, 2, x_bra, phi_bra, M2_dat);
+    const double R_0 = com.Pt - str.Pt - BE * x_str * K_bc_str * q_ref;
 
-    // Pseudodatum derivatives (M2_dat = m_com^2 * Rc * Tc / (gc * Pc^2 * Ac^2),
-    //                          q_ref  = 0.5 * m_com^2 * Rc * Tc / (Pc * Ac^2))
-    const double dM2_dPc    = -2.0 * M2_dat / Pc;
-    const double dM2_dTc    = M2_dat / Tc;
-    const double dM2_dm_com = 2.0 * m_com * Rc * Tc / (gc * Pc * Pc * Ac * Ac);
+    // Branch collector (theta_bra != 0 -> turning loss present).
+    const double cos_phi_bra = std::cos(phi_bra);
+    const double K_bc        = 1.0 + x_bra * x_bra - 2.0 * x_bra * cos_phi_bra;
+    const double dKbc_dx     = 2.0 * x_bra - 2.0 * cos_phi_bra;
+    const double K_turn      = combaero::K_turn_div(bra.theta);
 
+    const double Pb    = bra.P_static;
+    const double Tb    = bra.T;
+    const double Rb    = bra.R_gas;
+    const double Ab    = bra.A;
+    const double q_bra = 0.5 * Rb * Tb * m_bra * m_bra / (Pb * Ab * Ab);
+
+    const double R_1 = com.Pt - bra.Pt - K_turn * q_bra - BE * x_bra * K_bc * q_ref;
+
+    // Pseudodatum derivatives (q_ref = 0.5 * m_com^2 * Rc * Tc / (Pc * Ac^2)).
     const double dq_dPc    = -q_ref / Pc;
     const double dq_dTc    = q_ref / Tc;
     const double dq_dm_com = m_com * Rc * Tc / (Pc * Ac * Ac);
@@ -2181,25 +2185,40 @@ CompressibleTeeResult compressible_branching_tee_rj(
     res.R_0 = R_0;
     res.R_1 = R_1;
 
-    // R_0 Jacobians (dR0 = d(Pt_com - Pt_str - K_str * q_ref))
+    // R_0 Jacobians: R_0 = Pt_com - Pt_str - BETA_EXTRACT*x_str*K_bc_str*q_ref.
+    // Pure extraction term (straight leg, no turning loss); phi_str is constant w.r.t.
+    // the unknowns. d(x_str*K_bc_str)/dx_str = K_bc_str + x_str*dKbc_str_dx.
+    const double d_xKbc_str_dx = K_bc_str + x_str * dKbc_str_dx;
     res.dR0_dPt_com    = 1.0;
     res.dR0_dPt_str    = -1.0;
-    res.dR0_dP_com     = -(dKs_dM2 * dM2_dPc    * q_ref + K_str * dq_dPc);
-    res.dR0_dT_com     = -(dKs_dM2 * dM2_dTc    * q_ref + K_str * dq_dTc);
-    res.dR0_dmdot_com  = -(dKs_dx  * dx_str_dm_com * q_ref + dKs_dM2 * dM2_dm_com * q_ref + K_str * dq_dm_com);
-    res.dR0_dmdot_branch = -(dKs_dx * dx_str_dm_branch * q_ref);
-    // R_0 has no bra node dependence for branching
+    res.dR0_dP_com     = -BE * x_str * K_bc_str * dq_dPc;
+    res.dR0_dT_com     = -BE * x_str * K_bc_str * dq_dTc;
+    res.dR0_dmdot_com  = -BE * (q_ref * d_xKbc_str_dx * dx_str_dm_com + x_str * K_bc_str * dq_dm_com);
+    res.dR0_dmdot_branch = -BE * q_ref * d_xKbc_str_dx * dx_str_dm_branch;
+    // R_0 has no bra node dependence for branching.
     res.dR0_dP_str = 0.0;
+    res.dR0_dT_str = 0.0;
     res.dR0_dP_bra = 0.0;
 
-    // R_1 Jacobians (dR1 = d(Pt_com - Pt_bra - K_bra * q_ref))
+    // R_1 Jacobians: R_1 = Pt_com - Pt_bra - K_turn*q_bra - BETA_EXTRACT*x_bra*K_bc*q_ref.
+    // K_turn and phi_bra (hence K_bc's cos term) are constant w.r.t. the unknowns.
+    // Extraction term E = BETA_EXTRACT*x_bra*K_bc*q_ref; d(x_bra*K_bc)/dx_bra = K_bc + x_bra*dKbc_dx.
+    const double d_xKbc_dx      = K_bc + x_bra * dKbc_dx;
+    const double dq_bra_dm_bra  = Rb * Tb * m_bra / (Pb * Ab * Ab);  // d(q_bra)/d(m_branch)
+
     res.dR1_dPt_com    = 1.0;
     res.dR1_dPt_bra    = -1.0;
-    res.dR1_dP_com     = -(dKb_dM2 * dM2_dPc    * q_ref + K_bra * dq_dPc);
-    res.dR1_dT_com     = -(dKb_dM2 * dM2_dTc    * q_ref + K_bra * dq_dTc);
-    res.dR1_dmdot_com  = -(dKb_dx  * dx_bra_dm_com * q_ref + dKb_dM2 * dM2_dm_com * q_ref + K_bra * dq_dm_com);
-    res.dR1_dmdot_branch = -(dKb_dx * dx_bra_dm_branch * q_ref);
-    // R_1 has no str node dependence for branching
+    // Branch-local q_bra (q_bra ~ 1/P_bra, ~ T_bra); turning-loss term only.
+    res.dR1_dP_bra     = K_turn * q_bra / Pb;
+    res.dR1_dT_bra     = -K_turn * q_bra / Tb;
+    // Common datum enters only through q_ref in the extraction term (K_bc is incompressible).
+    res.dR1_dP_com     = -BE * x_bra * K_bc * dq_dPc;
+    res.dR1_dT_com     = -BE * x_bra * K_bc * dq_dTc;
+    // Flows: q_bra depends on m_branch only; x_bra and q_ref depend on m_com; x_bra on m_branch.
+    res.dR1_dmdot_com  = -BE * (q_ref * d_xKbc_dx * dx_bra_dm_com + x_bra * K_bc * dq_dm_com);
+    res.dR1_dmdot_branch = -K_turn * dq_bra_dm_bra
+                           - BE * q_ref * d_xKbc_dx * dx_bra_dm_branch;
+    // R_1 has no straight-node dependence for branching.
     res.dR1_dP_str = 0.0;
     res.dR1_dT_str = 0.0;
     res.dR1_dPt_str = 0.0;

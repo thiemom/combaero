@@ -410,6 +410,28 @@ T K_dat_j_closed(T x_j, T phi_j, T M_dat2) {
     return K_inc * (T{1.0} + kappa * M_dat2);
 }
 
+// Dividing-tee branch turning-loss model (blended closure; see Finding 5 of
+// docs/junction/junction_model_v3_addendum.md). The committed parallel closure
+//   R_branch = Pt_com - Pt_bra - K_bc * q_ref
+// charges both collector legs the common dynamic head q_ref, forcing K_str = K_bra
+// at equal outlets, which has no forward-octant root for an angled branch. The
+// blended closure replaces the branch leg with
+//   R_branch = Pt_com - Pt_bra - K_turn(theta) * q_bra - BETA_EXTRACT * x_bra * K_bc * q_ref
+// where q_bra is the branch-local dynamic head (the genuine turning loss) and the
+// x_bra prefactor makes the Borda-Carnot extraction term vanish as the branch
+// closes. K_turn(theta) follows the perpendicular-momentum-loss principle: the
+// incoming axial stream's component normal to the branch axis (u*sin(theta)) is
+// destroyed, so the lost stagnation head scales as sin^2(theta). K_TURN_90 (the
+// 90-deg value) and BETA_EXTRACT were FD-validated on the plenum cascade across
+// equal, branch-low, and straight-low regimes.
+inline constexpr double K_TURN_90    = 1.3;
+inline constexpr double BETA_EXTRACT = 2.0;
+
+inline double K_turn_div(double theta) {
+    const double s = std::sin(theta);
+    return K_TURN_90 * s * s;
+}
+
 // Machine-precision derivative of K_dat_j_closed (or any compatible kernel)
 // w.r.t. one of its three arguments, evaluated at a real point.
 //   which: 0 = d/dx, 1 = d/dphi, 2 = d/dM2
