@@ -126,10 +126,15 @@ class NetworkSolver:
             # Node mass conservation equation appended in _residuals_and_jacobian
             scales.append(ref_mdot)
 
+        from .components import TeeJunctionElement
+
         for element in self.network.elements.values():
             elem_scale = (
                 ref_p
-                if isinstance(element, (ChannelElement, LosslessConnectionElement))
+                if isinstance(
+                    element,
+                    (ChannelElement, LosslessConnectionElement, TeeJunctionElement),
+                )
                 else ref_mdot
             )
             scales.extend([elem_scale] * element.n_equations())
@@ -369,6 +374,12 @@ class NetworkSolver:
 
         _ref_X_tee = list(cb.mass_to_mole(ref["Y"]))
         _rho_tee = float(cb.density(ref["T"], ref["P"], _ref_X_tee))
+        _a_tee = float(cb.speed_of_sound(ref["T"], _ref_X_tee))
+        _gamma_tee = float(cb.isentropic_expansion_coefficient(ref["T"], _ref_X_tee))
+        _mach_cap_target = 0.3
+        _term_tee = 1.0 + 0.5 * (_gamma_tee - 1.0) * _mach_cap_target**2
+        _exp_tee = -(_gamma_tee + 1.0) / (2.0 * (_gamma_tee - 1.0))
+        _mdot_ratio_tee = _mach_cap_target * _term_tee**_exp_tee
 
         def _node_pt(n: str) -> float:
             node = self.network.nodes[n]
@@ -390,7 +401,16 @@ class NetworkSolver:
             # Skip the Bernoulli estimate and fall back to the propagated guess.
             if not _elem.F_C:
                 continue
-            _bernoulli_com = _elem.F_C * math.sqrt(2.0 * _rho_tee * _dP_total)
+            # Mach cap: the tee duct cannot carry more than M=0.3 at reference
+            # conditions.  Without this cap the Bernoulli estimate can overestimate
+            # the tee flow by 3x when downstream channel losses are included in the
+            # boundary-to-boundary dP, causing Newton to start at a wildly
+            # inconsistent mass balance.
+            _mdot_cap_tee = _rho_tee * _a_tee * _elem.F_C * _mdot_ratio_tee
+            _bernoulli_com = min(
+                _elem.F_C * math.sqrt(2.0 * _rho_tee * _dP_total),
+                _mdot_cap_tee,
+            )
             # Prefer a propagated mdot (e.g. from MassFlowBoundary) over the
             # Bernoulli estimate when the former is larger -- the propagated value
             # is exact when a mass-flow BC seeds the network, while the Bernoulli
@@ -403,7 +423,10 @@ class NetworkSolver:
                 _dP_br = max(_pt_br - _pt_snk, 1.0)
             else:
                 _dP_br = max(_pt_src - _pt_br, 1.0)
-            _bernoulli_br = _elem.F_C * math.sqrt(2.0 * _rho_tee * _dP_br)
+            _bernoulli_br = min(
+                _elem.F_C * math.sqrt(2.0 * _rho_tee * _dP_br),
+                mdot_guess[_eid] * 0.75,
+            )
             _tee_branch_guess[_eid] = max(_bernoulli_br, mdot_guess[_eid] * 0.25)
 
         # Iterate through interior nodes and gather unknowns
@@ -683,11 +706,31 @@ class NetworkSolver:
             stream_info: list[tuple] = []
             for elem in up_elems:
                 indices = self._unknown_indices.get(elem.id, [])
+                # Compute named m_dot Jacobian for this element once (flow into nid).
+                # Stored on each upstream state so MomentumChamberNode can build the
+                # correct d_res/dm_dot Jacobian even when the element has named unknowns
+                # like tee.m_dot_com / tee.m_dot_branch instead of a plain elem.m_dot.
+                elem_jac_names: dict[str, float] = {}
+                if indices:
+                    for col, coeff in elem.flow_jac_at_node(nid, indices).items():
+                        if col < len(self.unknown_names):
+                            elem_jac_names[self.unknown_names[col]] = coeff
+                _single_source = len(elem.all_source_nodes()) == 1
                 for src_nid in elem.all_source_nodes():
                     state_up = self._get_node_state(self.network.nodes[src_nid], x)
                     if indices:
-                        state_up.m_dot = elem.flow_at_node(src_nid, x, indices)
+                        # For single-source elements (channels, branching tees) use the
+                        # flow INTO the current sink node (nid) so that each sink's
+                        # _total_m_dot reflects its actual partial flow, not the
+                        # supplier's total.  For multi-source elements (merging tees) each
+                        # source contributes its own partial flow, so keep flow_at_node
+                        # called with src_nid.
+                        if _single_source:
+                            state_up.m_dot = elem.flow_at_node(nid, x, indices)
+                        else:
+                            state_up.m_dot = elem.flow_at_node(src_nid, x, indices)
                         state_up._element_id = elem.id
+                        state_up._m_dot_jac_names = elem_jac_names
                     stream_info.append((state_up, elem, src_nid))
             up_states = [s for s, _, _ in stream_info]
 
@@ -1458,7 +1501,15 @@ class NetworkSolver:
         # global convergence via (J^TJ + lI) regularisation.
         # Incompressible inner solves (regime overrides applied) have no
         # compressible elements and keep the full budget.
-        _has_compressible = method == "hybr" and bool(self._compressible_element_overrides())
+        # Tee junctions couple two supplier stagnation pressures whose
+        # common mode leaves hybr's Jacobian near-singular; LM's regularised
+        # step resolves it, so route tee networks through the same fallback.
+        from .components import TeeJunctionElement as _TeeJE
+
+        _has_tee = any(isinstance(e, _TeeJE) for e in self.network.elements.values())
+        _has_compressible = method == "hybr" and (
+            bool(self._compressible_element_overrides()) or _has_tee
+        )
         _hybr_budget = timeout * 0.65 if (_has_compressible and timeout is not None) else timeout
         # Mutable so the LM fallback block can extend the effective limit.
         _timeout_eff: list[float | None] = [_hybr_budget]

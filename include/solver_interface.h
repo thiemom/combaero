@@ -651,6 +651,79 @@ TeeJunctionResult branching_tee_residuals_and_jacobian(
     double theta, double psi, double F_C,
     double blend_k = 30.0);
 
+// -----------------------------------------------------------------------------
+// 6. Compressible Unified0D Tee Junction (Mynard & Valen-Sendstad 2015)
+// -----------------------------------------------------------------------------
+// Replaces the Bassett incompressible K tables with a geometry-derived K to
+// O(M^2) that is consistent with mass-flow continuity and stagnation pressure.
+// See docs/junction/junction_model.tex for derivation.
+//
+// Per-branch input struct.  mdot sign: >0 = supplier (inflow to junction).
+// P_static and Pt are both passed explicitly (available as state_X.P / Pt in
+// the Python solver; C++ does not need to invert the stagnation relation).
+struct BranchInput {
+    double P_static; // static pressure [Pa]
+    double Pt;       // stagnation pressure [Pa]
+    double T;        // static temperature [K]
+    double m_dot;    // signed mass flow [kg/s]  (>0 = supplier)
+    double A;        // cross-section area [m^2]
+    double theta;    // centreline angle [rad]
+    double gamma_eff;
+    double R_gas;    // specific gas constant [J/(kg*K)]
+};
+
+// Result: two residuals [Pa] and their Jacobians w.r.t. all coupled unknowns.
+// Naming: dR{0|1}_d{Pt|P|T|mdot}_{com|str|bra}
+// Pt = stagnation pressure, P = static pressure, T = static temperature.
+// Not all fields are nonzero for both tee types -- zero fields are explicitly set.
+struct CompressibleTeeResult {
+    double R_0;              // first residual [Pa]
+    double R_1;              // second residual [Pa]
+    // R_0 Jacobians
+    double dR0_dPt_com;      // d(R_0)/d(Pt_com)
+    double dR0_dP_com;       // d(R_0)/d(P_static_com)
+    double dR0_dT_com;       // d(R_0)/d(T_com)
+    double dR0_dmdot_com;    // d(R_0)/d(m_dot_com)
+    double dR0_dPt_str;      // d(R_0)/d(Pt_str)
+    double dR0_dP_str;       // d(R_0)/d(P_static_str)
+    double dR0_dT_str;
+    double dR0_dPt_bra;
+    double dR0_dP_bra;       // d(R_0)/d(P_static_bra)
+    double dR0_dT_bra;
+    double dR0_dmdot_branch; // d(R_0)/d(m_dot_branch element unknown)
+    // R_1 Jacobians
+    double dR1_dPt_com;
+    double dR1_dP_com;
+    double dR1_dT_com;
+    double dR1_dmdot_com;
+    double dR1_dPt_str;
+    double dR1_dP_str;
+    double dR1_dT_str;
+    double dR1_dPt_bra;
+    double dR1_dP_bra;
+    double dR1_dT_bra;
+    double dR1_dmdot_branch;
+};
+
+// Branching tee: common is the single supplier; straight and branch are collectors.
+//   R_0 = p0_dat - p0_straight - K_straight * q_ref
+//   R_1 = p0_dat - p0_branch   - K_branch   * q_ref
+// com.m_dot and bra.m_dot carry the element unknowns m_dot_com, m_dot_branch.
+// str.m_dot = com.m_dot - bra.m_dot (derived; pass the current iterate value).
+CompressibleTeeResult compressible_branching_tee_rj(
+    const BranchInput& com,
+    const BranchInput& str,
+    const BranchInput& bra);
+
+// Merging tee: straight and branch are suppliers; common is the collector.
+//   R_0 = P_static_straight - P_static_branch   (supplier static-pressure equality)
+//   R_1 = p0_dat - p0_com - K_com * q_ref
+// All three m_dot values are passed (str.m_dot + bra.m_dot == com.m_dot by mass balance).
+CompressibleTeeResult compressible_merging_tee_rj(
+    const BranchInput& com,
+    const BranchInput& str,
+    const BranchInput& bra);
+
 } // namespace solver
 } // namespace combaero
 

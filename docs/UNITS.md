@@ -478,6 +478,26 @@ All functions use consistent units to avoid conversion errors.
 | `hydraulic_diameter_rect`    | a: m, b: m             | m            |
 | `hydraulic_diameter_annulus` | D_outer: m, D_inner: m | m            |
 
+### vatistas.h - Vatistas n-Vortex Model
+
+| Function                             | Input Units                                   | Output Unit                             |
+|--------------------------------------|-----------------------------------------------|-----------------------------------------|
+| `vatistas_v0_bar`                    | r_bar: -, n: -                                | - (V0_bar)                              |
+| `vatistas_dv0_bar_drbar`             | r_bar: -, n: -                                | -                                       |
+| `vatistas_vr_bar`                    | r_bar: -, n: -                                | - (Vr_bar)                              |
+| `vatistas_dvr_bar_drbar`             | r_bar: -, n: -                                | -                                       |
+| `vatistas_pressure_integral`         | r_bar: -, n: -                                | - (integral)                            |
+| `vatistas_d_pressure_integral_drbar` | r_bar: -, n: -                                | -                                       |
+| `vatistas_v_theta`                   | r: m, Gamma: m^2/s, r_c: m, n: -              | m/s                                     |
+| `vatistas_v_theta_and_jacobians`     | r: m, Gamma: m^2/s, r_c: m, n: -              | tuple(m/s, 1/s, (m/s)/(m^2/s), (m/s)/m) |
+| `vatistas_delta_p`                   | r: m, rho: kg/m^3, Gamma: m^2/s, r_c: m, n: - | Pa                                      |
+| `vatistas_delta_p_and_jacobians`     | r: m, rho: kg/m^3, Gamma: m^2/s, r_c: m, n: - | tuple(Pa, Pa/m, Pa/(m^2/s), Pa/m)       |
+| `VatistasVortex::V_theta`            | r: m                                          | m/s                                     |
+| `VatistasVortex::V_theta_max`        | -                                             | m/s                                     |
+| `VatistasVortex::dV_theta_dr`        | r: m                                          | 1/s                                     |
+| `VatistasVortex::delta_P`            | r: m, rho: kg/m^3                             | Pa                                      |
+| `VatistasVortex::delta_P_bar`        | r: m                                          | -                                       |
+
 ### heat_transfer.h - Heat Transfer Correlations
 
 | Function                       | Input Units                                                      | Output Unit               |
