@@ -306,6 +306,23 @@ inline constexpr Entry function_units[] = {
      "q: -, blend_w: -, topology_valid: bool, status: CorrelationValidity)"},
 
     // -------------------------------------------------------------------------
+    // multi_port_chamber.h + solver_interface.h - Momentum-CV junction
+    // -------------------------------------------------------------------------
+    {"multi_port_chamber_residuals_and_jacobian",
+     "P_jct: Pa, P: list[Pa], mdot: list[kg/s] (positive = out of junction), "
+     "T: list[K], Y: list[list[kg/kg]], A: list[m^2]",
+     "MultiPortChamberResult (impulse_residuals: list[Pa], "
+     "port_jac: list[PortImpulseJacobian (dR_dP: -, dR_dmdot: Pa*s/kg, "
+     "dR_dT: Pa/K)], mass_residual: kg/s)"},
+    {"border_carnot_loss_residual_and_jacobian",
+     "mdot: kg/s, Pt_in: Pa, Pt_out: Pa, P_in: Pa, T_in: K, Y_in: kg/kg, "
+     "area: m^2, delta_geom: rad",
+     "BorderCarnotLossResult (residual: Pa, d_res_dPt_in: -, "
+     "d_res_dPt_out: -, d_res_dP_in: -, d_res_dT_in: Pa/K, "
+     "d_res_dmdot: Pa*s/kg)"},
+    {"border_carnot_L", "delta_geom: rad", "- (L = 4*(1-cos((3/4)*delta))^2)"},
+
+    // -------------------------------------------------------------------------
     // friction.h - Friction Factor Correlations
     // -------------------------------------------------------------------------
     {"friction_haaland", "Re: -, e_D: -", "- (f)"},

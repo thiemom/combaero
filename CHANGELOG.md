@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`MultiPortChamberElement` + `BorderCarnotLossElement`** (Phase 1 of the
+  momentum-CV junction). Sanctioned successor to `TeeJunctionElement` for
+  n-port manifolds, ejector / merge-split-reverse regimes, and high-Mach
+  operation outside the K-closure's structural `K_run ~ 0.30` ceiling
+  (see `docs/junction/junction_model_v3_addendum.md` Finding 6 and the
+  implementation guide `docs/junction/momentum cv implementation guide.pdf`).
+  The junction owns one scalar `P_jct` and emits `N` per-port impulse-function
+  residuals plus a global sum-mass residual; loss content moves to companion
+  per-port `BorderCarnotLossElement` instances applying the Hager (3/4)
+  effective-angle correction (reproduces Hager `xi_l` / Bassett `K_inc`
+  exactly at M -> 0 on a sharp-edged lateral). Both elements coexist with
+  `TeeJunctionElement` as first-class options; the user selects per junction.
+  Solver change: at each port-MCN the mass-conservation row is skipped (the
+  junction's sum-mass residual covers conservation; otherwise the channel and
+  junction declare equal-and-opposite flows at the port, producing a zero
+  row). Tier-4 cross-check against the K-closure and GUI selection dropdown
+  follow in subsequent commits.
 - **Solver convergence chart**: after every solve a "View convergence" link appears in
   the solver status badge (both success and failure). Clicking opens a modal with a
   log-scale `||F||` vs. time chart (no new dependency — pure SVG). The hybr phase is
