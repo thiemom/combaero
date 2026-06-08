@@ -458,9 +458,12 @@ mc_str = MomentumChamberNode("mc_str", area=0.01)
 mc_bra = MomentumChamberNode("mc_bra", area=0.008)
 
 jct = MultiPortChamberElement(
-    "jct", port_nodes=["mc_com", "mc_str", "mc_bra"],
-    port_angles_deg=[0.0, 0.0, 90.0],  # geometric branch angles per port
-    # port_areas inherited from connecting channels if not given
+    "jct",
+    inlet_nodes=["mc_com"],
+    outlet_nodes=["mc_str", "mc_bra"],
+    inlet_angles_deg=[0.0],
+    outlet_angles_deg=[0.0, 90.0],   # geometric branch angles per outlet port
+    # port_areas (length = N_in + N_out) inherited from connecting channels if not given
 )
 # Lateral port turning loss (sharp-edged 90 deg branch). Straight ports
 # (delta_geom = 0) do not need a loss element.

@@ -3020,10 +3020,13 @@ class MultiPortChamberElement(NetworkElement):
     - Exactly one element (channel, loss element, etc.) must connect to each
       port-MCN on the outside. Its m_dot is the port's mass-flow source; the
       junction reads it via the graph at residual-eval time.
-    - Sign convention per port is resolved automatically from element topology:
-      if the connecting element's ``to_node`` is the port-MCN, flow goes INTO
-      the MCN (and thus INTO the junction), so the junction's outflow at that
-      port is ``-element.m_dot``. If ``from_node`` matches, sign is ``+1``.
+    - Sign convention per port is fixed by the inlet/outlet declaration in
+      the constructor. ``inlet_nodes`` carry sign ``-1`` (canonical flow INTO
+      junction); ``outlet_nodes`` carry sign ``+1`` (canonical flow OUT). The
+      connecting outer element's ``from_node``/``to_node`` is then checked
+      against the declared direction at :meth:`resolve_topology` and a clear
+      error is raised on mismatch. Runtime flow may still reverse (mdot < 0
+      at any port); only the canonical direction is fixed for graph topology.
 
     Port areas are inherited from the connecting :class:`ChannelElement`'s
     diameter unless explicitly given.
@@ -3037,27 +3040,65 @@ class MultiPortChamberElement(NetworkElement):
     def __init__(
         self,
         id: str,
-        port_nodes: list[str],
-        port_angles_deg: list[float] | None = None,
+        inlet_nodes: list[str],
+        outlet_nodes: list[str],
+        inlet_angles_deg: list[float] | None = None,
+        outlet_angles_deg: list[float] | None = None,
         port_areas: list[float] | None = None,
     ):
-        if len(port_nodes) < 2:
-            raise ValueError(
-                f"MultiPortChamberElement '{id}': need at least 2 ports, got {len(port_nodes)}."
-            )
+        """Build a momentum-CV junction.
+
+        Args:
+            id: Element id.
+            inlet_nodes: Port-MCN ids where flow CANONICALLY enters the
+                junction (junction is graph-downstream of each). Flow can
+                reverse at runtime; this just sets the canonical topology
+                direction for the graph validator.
+            outlet_nodes: Port-MCN ids where flow CANONICALLY leaves the
+                junction.
+            inlet_angles_deg: Geometric branch angles for the inlet ports
+                (length must match inlet_nodes). Default 0 each.
+            outlet_angles_deg: Same, for outlet ports. Default 0 each.
+            port_areas: Per-port cross-section areas [m^2], ordered as
+                ``inlet_nodes + outlet_nodes``. If None, inherited from
+                connecting channels at resolve time.
+        """
+        if not inlet_nodes:
+            raise ValueError(f"MultiPortChamberElement '{id}': need >= 1 inlet port.")
+        if not outlet_nodes:
+            raise ValueError(f"MultiPortChamberElement '{id}': need >= 1 outlet port.")
+        n_in = len(inlet_nodes)
+        n_out = len(outlet_nodes)
+
         # NetworkElement base class requires from_node/to_node; use the first
-        # two ports as placeholders. Source/sink topology is overridden below.
-        super().__init__(id, port_nodes[0], port_nodes[-1])
-        self.port_nodes = list(port_nodes)
+        # inlet and the first outlet as placeholders. The all_source_nodes /
+        # all_sink_nodes overrides below carry the real topology.
+        super().__init__(id, inlet_nodes[0], outlet_nodes[0])
+
+        self.inlet_nodes = list(inlet_nodes)
+        self.outlet_nodes = list(outlet_nodes)
+        self.port_nodes = self.inlet_nodes + self.outlet_nodes  # ordered: inlets first
         self.N = len(self.port_nodes)
-        self.port_angles_deg = (
-            list(port_angles_deg) if port_angles_deg is not None else [0.0] * self.N
-        )
-        if len(self.port_angles_deg) != self.N:
+
+        # Canonical sign convention (PDF Section 2.2: positive = out of junction):
+        #   inlet ports: flow into junction at canonical orientation -> -1
+        #   outlet ports: flow out of junction at canonical orientation -> +1
+        self._port_signs: list[float] = [-1.0] * n_in + [+1.0] * n_out
+
+        inlet_angles = list(inlet_angles_deg) if inlet_angles_deg is not None else [0.0] * n_in
+        outlet_angles = list(outlet_angles_deg) if outlet_angles_deg is not None else [0.0] * n_out
+        if len(inlet_angles) != n_in:
             raise ValueError(
-                f"MultiPortChamberElement '{id}': port_angles_deg has "
-                f"{len(self.port_angles_deg)} entries, need {self.N}."
+                f"MultiPortChamberElement '{id}': inlet_angles_deg has "
+                f"{len(inlet_angles)} entries, need {n_in}."
             )
+        if len(outlet_angles) != n_out:
+            raise ValueError(
+                f"MultiPortChamberElement '{id}': outlet_angles_deg has "
+                f"{len(outlet_angles)} entries, need {n_out}."
+            )
+        self.port_angles_deg = inlet_angles + outlet_angles
+
         self.port_areas: list[float | None] = (
             list(port_areas) if port_areas is not None else [None] * self.N
         )
@@ -3068,10 +3109,8 @@ class MultiPortChamberElement(NetworkElement):
             )
 
         # Resolved during resolve_topology:
-        #   self._port_element_ids[i]  = id of the element connected at port i
-        #   self._port_signs[i]        = +1 or -1, junction outflow / element.m_dot
+        #   self._port_element_ids[i] = id of the element connected at port i
         self._port_element_ids: list[str] = [""] * self.N
-        self._port_signs: list[float] = [1.0] * self.N
 
     def unknowns(self) -> list[str]:
         return [f"{self.id}.P_jct"]
@@ -3080,14 +3119,12 @@ class MultiPortChamberElement(NetworkElement):
         return self.N + 1  # N impulse + 1 sum-mass
 
     def all_source_nodes(self) -> list[str]:
-        # Declare junction as downstream of every port (port-MCN is the source).
-        # Direction is data-dependent in reality; this satisfies the topology
-        # validator (every interior node needs at least one upstream and one
-        # downstream element). The actual signs are tracked in self._port_signs.
-        return list(self.port_nodes)
+        # Inlet ports = nodes the junction draws flow FROM (canonical orientation).
+        return list(self.inlet_nodes)
 
     def all_sink_nodes(self) -> list[str]:
-        return []
+        # Outlet ports = nodes the junction delivers flow TO.
+        return list(self.outlet_nodes)
 
     def flow_at_node(self, node_id: str, x: Any, indices: list[int]) -> float:
         # We never actually contribute to a port-MCN's mass row (solver skips
@@ -3132,20 +3169,36 @@ class MultiPortChamberElement(NetworkElement):
                 )
             outer = outside_elems[0]
             self._port_element_ids[i] = outer.id
-            # Sign convention (PDF Section 2.2: positive = out of junction):
-            #   outer.from_node == port_MCN -> outer takes flow OUT of port (+1)
-            #   outer.to_node   == port_MCN -> outer feeds flow INTO port  (-1)
+
+            # Validate the outer element's orientation matches the declared
+            # inlet/outlet for this port. The sign convention was fixed at
+            # __init__ from the inlet/outlet split:
+            #   inlet port (sign = -1):  outer.to_node should be the port-MCN
+            #     (outer feeds flow INTO the port, junction takes it from there).
+            #   outlet port (sign = +1): outer.from_node should be the port-MCN
+            #     (outer takes flow OUT of port, junction sends flow to there).
+            expected_sign = self._port_signs[i]
             if outer.from_node == port_id:
-                self._port_signs[i] = +1.0
+                topo_sign = +1.0  # outer takes flow OUT of port = +1 outflow
             elif outer.to_node == port_id:
-                self._port_signs[i] = -1.0
+                topo_sign = -1.0  # outer feeds flow INTO port = -1 outflow
             else:
-                # Multi-port outer elements aren't supported as port connectors.
                 raise ValueError(
                     f"MultiPortChamberElement '{self.id}': connecting element "
                     f"'{outer.id}' at port '{port_id}' has no direct from/to "
                     f"link to that port (multi-port outer elements are not "
                     f"supported)."
+                )
+            if topo_sign != expected_sign:
+                role = "inlet" if expected_sign < 0 else "outlet"
+                raise ValueError(
+                    f"MultiPortChamberElement '{self.id}': port '{port_id}' is "
+                    f"declared as an {role} (sign={expected_sign:+.0f}) but the "
+                    f"connecting element '{outer.id}' is wired in the opposite "
+                    f"direction (sign={topo_sign:+.0f}). For an inlet port, the "
+                    f"outer element should feed INTO the port-MCN (outer.to_node "
+                    f"== port). For an outlet port, the outer element should take "
+                    f"flow OUT of the port-MCN (outer.from_node == port)."
                 )
 
             # 2. Inherit port area from connecting channel if not set.

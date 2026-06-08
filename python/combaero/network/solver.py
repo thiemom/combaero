@@ -123,8 +123,11 @@ class NetworkSolver:
             node_res, _ = node.residuals(state)
             scales.extend([ref_p] * len(node_res))
 
-            # Node mass conservation equation appended in _residuals_and_jacobian
-            scales.append(ref_mdot)
+            # Node mass conservation equation appended in _residuals_and_jacobian,
+            # unless the node is a junction port (then the MultiPortChamberElement's
+            # sum-mass residual covers conservation; mass row is skipped).
+            if not getattr(node, "_is_junction_port", False):
+                scales.append(ref_mdot)
 
         from .components import TeeJunctionElement
 
@@ -469,6 +472,12 @@ class NetworkSolver:
                                 elem_id, mdot_guess.get(elem_id, ref["m_dot"]) * 0.5
                             )
                         )
+                    elif unk.endswith(".P_jct"):
+                        # MultiPortChamberElement: P_jct should be close to the
+                        # ambient port static pressure. Use the max boundary Pt
+                        # as a stand-in (P_jct >= Pt at every port since the
+                        # impulse equation gives P_jct = Pt + q with q >= 0).
+                        x0_list.append(ref["P"])
                     else:
                         x0_list.append(1.0)
                 self._unknown_indices[elem_id] = list(range(start_idx, len(x0_list)))
@@ -1525,11 +1534,16 @@ class NetworkSolver:
         # Tee junctions couple two supplier stagnation pressures whose
         # common mode leaves hybr's Jacobian near-singular; LM's regularised
         # step resolves it, so route tee networks through the same fallback.
+        # Same near-singularity affects MultiPortChamberElement networks (the
+        # P_jct unknown couples N port-pressure rows that share a common-mode
+        # direction at low-Mach).
+        from .components import MultiPortChamberElement as _MPCElem
         from .components import TeeJunctionElement as _TeeJE
 
         _has_tee = any(isinstance(e, _TeeJE) for e in self.network.elements.values())
+        _has_mpce = any(isinstance(e, _MPCElem) for e in self.network.elements.values())
         _has_compressible = method == "hybr" and (
-            bool(self._compressible_element_overrides()) or _has_tee
+            bool(self._compressible_element_overrides()) or _has_tee or _has_mpce
         )
         _hybr_budget = timeout * 0.65 if (_has_compressible and timeout is not None) else timeout
         # Mutable so the LM fallback block can extend the effective limit.
@@ -1678,10 +1692,17 @@ class NetworkSolver:
             if _remaining is None or _remaining > 2.0:
                 _lm_started_at_eval[0] = _eval_count[0]
                 _timeout_eff[0] = timeout
+                # For MPCE networks the impulse + sum-mass residual structure
+                # leaves hybr near-singular at low Mach; its "best iterate" is
+                # often a worse LM starting point than the original x0. Restart
+                # LM from x0 in that case to avoid getting trapped in hybr's
+                # poor basin. For tee / compressible networks the existing
+                # warm-start-from-hybr path is fine.
+                _lm_x0_scaled = x0_scaled if _has_mpce else best_x * inv_D_x
                 try:
                     root(
                         residuals_wrapper,
-                        best_x * inv_D_x,
+                        _lm_x0_scaled,
                         method="lm",
                         jac=use_jac,
                         options={"maxiter": _default_iters},
@@ -1776,7 +1797,12 @@ class NetworkSolver:
                     sol_dict[f"{nid}.{key}"] = val
 
         # Element-specific diagnostics (e.g. throat Mach, P-ratio)
-        from .components import TeeJunctionElement as _TeeJunctionElement
+        from .components import (
+            MultiPortChamberElement as _MultiPortChamberElement,
+        )
+        from .components import (
+            TeeJunctionElement as _TeeJunctionElement,
+        )
 
         sol_dict["__element_diag__"] = {}
         for eid, element in self.network.elements.items():
@@ -1793,6 +1819,13 @@ class NetworkSolver:
                         final_x[m_indices[1]]
                     )
                 diag = element.diagnostics(state_com, state_straight, state_branch)
+            elif isinstance(element, _MultiPortChamberElement):
+                nodes = self.network.nodes
+                port_states = [
+                    self._get_node_state(nodes[pid], final_x) for pid in element.port_nodes
+                ]
+                P_jct_val = float(final_x[m_indices[0]]) if m_indices else 0.0
+                diag = element.diagnostics(port_states, P_jct_val)
             else:
                 state_in = self._get_node_state(self.network.nodes[element.from_node], final_x)
                 state_out = self._get_node_state(self.network.nodes[element.to_node], final_x)
