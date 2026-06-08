@@ -1144,6 +1144,14 @@ class NetworkSolver:
                                         data.append(deriv * sens_pkg["Pt_mix"])
 
             # Mass Conservation: Sum(m_dot_in) - Sum(m_dot_out) = 0
+            #
+            # Skip for port-MCNs of a MultiPortChamberElement: the junction's
+            # sum-mdot residual replaces the per-port mass row. Without this
+            # skip the row degenerates to 0=0 (both the channel and the junction
+            # report the same flow at the node with opposite signs, producing a
+            # zero row in the Jacobian).
+            if getattr(node, "_is_junction_port", False):
+                continue
             mass_res_idx = len(res)
             upstream_elems = self.network.get_upstream_elements(node_id)
             downstream_elems = self.network.get_downstream_elements(node_id)
@@ -1188,7 +1196,7 @@ class NetworkSolver:
             res.append(m_dot_in - m_dot_out)
 
         # 2. Element Residuals
-        from .components import TeeJunctionElement
+        from .components import MultiPortChamberElement, TeeJunctionElement
 
         for elem_id, element in self.network.elements.items():
             start_res_idx = len(res)
@@ -1205,6 +1213,19 @@ class NetworkSolver:
                     state_branch.m_dot = float(x[m_indices[1]])
                     state_straight.m_dot = float(x[m_indices[0]]) - float(x[m_indices[1]])
                 elem_res, elem_jac = element.residuals(state_com, state_straight, state_branch)
+            elif isinstance(element, MultiPortChamberElement):
+                # N-port momentum-CV junction: one P_jct unknown plus N+1 residuals.
+                # Port mdots are sourced from each connecting element's m_dot
+                # unknown, sign-mapped to junction convention (positive = out).
+                nodes = self.network.nodes
+                port_states = [self._get_node_state(nodes[pid], x) for pid in element.port_nodes]
+                P_jct_val = float(x[m_indices[0]]) if m_indices else 0.0
+                port_mdots: list[float] = []
+                for i, outer_id in enumerate(element._port_element_ids):
+                    outer_indices = self._unknown_indices.get(outer_id, [])
+                    outer_mdot = float(x[outer_indices[0]]) if outer_indices else 0.0
+                    port_mdots.append(element._port_signs[i] * outer_mdot)
+                elem_res, elem_jac = element.residuals(port_states, P_jct_val, port_mdots)
             else:
                 node_in = self.network.nodes[element.from_node]
                 node_out = self.network.nodes[element.to_node]

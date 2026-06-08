@@ -1,5 +1,6 @@
 #include "../include/solver_interface.h"
 #include "../include/area_change.h"
+#include "../include/multi_port_chamber.h"
 #include "../include/tee_junction.h"
 #include "../include/composition.h"
 #include "../include/transport.h"
@@ -1499,6 +1500,122 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
   // d(q_dynamic)/d(m_dot) = m_dot / (rho * A^2)
   double dq_dmdot = m_dot / (rho * area * area);
   res.d_res_dmdot = -dq_dmdot;
+
+  return res;
+}
+
+// -----------------------------------------------------------------------------
+// Multi-port chamber (momentum-CV junction)
+// -----------------------------------------------------------------------------
+
+namespace {
+// Normalise a per-port Y vector to a safe X vector for density evaluation.
+// Mirrors the all-zero fallback used in momentum_chamber_residual_and_jacobian
+// (treats degenerate Y as dry air) so multi-port behaves identically at edges.
+std::vector<double> y_to_safe_x(const std::vector<double> &Y) {
+  double sum_Y = 0.0;
+  for (double y : Y) {
+    sum_Y += y;
+  }
+  const double eps = 1e-10;
+  if (sum_Y < eps) {
+    std::vector<double> Y_safe(Y.size(), 0.0);
+    std::size_t n2_idx = combaero::species_index_from_name("N2");
+    std::size_t o2_idx = combaero::species_index_from_name("O2");
+    Y_safe[n2_idx] = 0.767;
+    Y_safe[o2_idx] = 0.233;
+    return combaero::mass_to_mole(combaero::normalize_fractions(Y_safe));
+  }
+  return combaero::mass_to_mole(combaero::normalize_fractions(Y));
+}
+}  // namespace
+
+MultiPortChamberResult multi_port_chamber_residuals_and_jacobian(
+    double P_jct,
+    const std::vector<double> &P,
+    const std::vector<double> &mdot,
+    const std::vector<double> &T,
+    const std::vector<std::vector<double>> &Y,
+    const std::vector<double> &A) {
+  const std::size_t N = P.size();
+  if (mdot.size() != N || T.size() != N || Y.size() != N || A.size() != N) {
+    throw std::invalid_argument(
+        "multi_port_chamber_residuals_and_jacobian: per-port vector sizes "
+        "must all equal P.size()");
+  }
+  if (N < 2) {
+    throw std::invalid_argument(
+        "multi_port_chamber_residuals_and_jacobian: need at least 2 ports");
+  }
+
+  MultiPortChamberResult res;
+  res.impulse_residuals.resize(N);
+  res.port_jac.resize(N);
+  res.mass_residual = 0.0;
+
+  for (std::size_t i = 0; i < N; ++i) {
+    const std::vector<double> X = y_to_safe_x(Y[i]);
+    auto [rho_i, drho_dT, drho_dP] = density_and_jacobians(T[i], P[i], X);
+
+    // q_dyn = 0.5 * rho * u^2 written in mdot-form (sign-free): mdot^2 / (rho * A^2)
+    // NOTE: the impulse form uses rho * u^2 = mdot^2 / (rho * A^2)  (no 0.5).
+    const double rho_A2 = rho_i * A[i] * A[i];
+    const double rho_u2 = mdot[i] * mdot[i] / rho_A2;
+
+    res.impulse_residuals[i] = P[i] + rho_u2 - P_jct;
+
+    // d(rho_u2)/d(P) = -mdot^2/(rho^2 * A^2) * drho_dP
+    const double drhou2_dP = -mdot[i] * mdot[i] / (rho_i * rho_i * A[i] * A[i]) * drho_dP;
+    res.port_jac[i].dR_dP = 1.0 + drhou2_dP;
+
+    // d(rho_u2)/d(T) = -mdot^2/(rho^2 * A^2) * drho_dT
+    res.port_jac[i].dR_dT = -mdot[i] * mdot[i] / (rho_i * rho_i * A[i] * A[i]) * drho_dT;
+
+    // d(rho_u2)/d(mdot) = 2 * mdot / (rho * A^2)
+    res.port_jac[i].dR_dmdot = 2.0 * mdot[i] / rho_A2;
+
+    res.mass_residual += mdot[i];
+  }
+
+  return res;
+}
+
+// -----------------------------------------------------------------------------
+// Border-Carnot loss element (companion to multi-port chamber)
+// -----------------------------------------------------------------------------
+
+BorderCarnotLossResult border_carnot_loss_residual_and_jacobian(
+    double mdot,
+    double Pt_in, double Pt_out,
+    double P_in, double T_in,
+    const std::vector<double> &Y_in,
+    double area, double delta_geom) {
+  const std::vector<double> X = y_to_safe_x(Y_in);
+  auto [rho, drho_dT, drho_dP] = density_and_jacobians(T_in, P_in, X);
+
+  const double L = combaero::border_carnot_L(delta_geom);
+
+  // dP_loss = L * 0.5 * rho * u^2 = L * 0.5 * mdot^2 / (rho * A^2)
+  // R = Pt_in - Pt_out - dP_loss
+  const double half_mdot2_over_rho_A2 =
+      0.5 * mdot * mdot / (rho * area * area);
+  const double dP_loss = L * half_mdot2_over_rho_A2;
+
+  BorderCarnotLossResult res;
+  res.residual = Pt_in - Pt_out - dP_loss;
+
+  res.d_res_dPt_in = 1.0;
+  res.d_res_dPt_out = -1.0;
+
+  // d(dP_loss)/d(mdot) = L * mdot / (rho * A^2)
+  res.d_res_dmdot = -L * mdot / (rho * area * area);
+
+  // d(dP_loss)/d(P_in) through rho:
+  //   d/dP_in [L * 0.5 * mdot^2 / (rho * A^2)]
+  //     = -L * 0.5 * mdot^2 / (rho^2 * A^2) * drho_dP
+  // R = ... - dP_loss, so d_res_dP_in = +L * 0.5 * mdot^2 / (rho^2 * A^2) * drho_dP
+  res.d_res_dP_in = L * 0.5 * mdot * mdot / (rho * rho * area * area) * drho_dP;
+  res.d_res_dT_in = L * 0.5 * mdot * mdot / (rho * rho * area * area) * drho_dT;
 
   return res;
 }
