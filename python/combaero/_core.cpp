@@ -308,6 +308,12 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("impulse_residuals",
                     &solver::MultiPortChamberResult::impulse_residuals)
       .def_readonly("port_jac", &solver::MultiPortChamberResult::port_jac)
+      .def_readonly("cross_dR_dP_axial",
+                    &solver::MultiPortChamberResult::cross_dR_dP_axial)
+      .def_readonly("cross_dR_dT_axial",
+                    &solver::MultiPortChamberResult::cross_dR_dT_axial)
+      .def_readonly("cross_dR_dmdot_axial",
+                    &solver::MultiPortChamberResult::cross_dR_dmdot_axial)
       .def_readonly("mass_residual",
                     &solver::MultiPortChamberResult::mass_residual);
 

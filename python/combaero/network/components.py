@@ -3245,7 +3245,13 @@ class MultiPortChamberElement(NetworkElement):
         residuals = list(cpp.impulse_residuals) + [cpp.mass_residual]
         jac: dict[int, dict[str, float]] = {}
 
-        # Impulse rows: each depends on (P_jct, port P, port mdot, port T).
+        # Axial reference (port 0): cross-coupling Jacobian goes here.
+        axial_port_node = self.port_nodes[0]
+        axial_outer_id = self._port_element_ids[0]
+        axial_sign = self._port_signs[0]
+
+        # Impulse rows: each depends on (P_jct, port P, port mdot, port T) and
+        # on the axial reference port 0's state via the cross-coupling.
         for i in range(self.N):
             row = {
                 f"{self.id}.P_jct": -1.0,
@@ -3256,6 +3262,22 @@ class MultiPortChamberElement(NetworkElement):
             # d(R_mom_i)/d(outer.m_dot) = dR/dmdot_port * sign_i
             mdot_var = f"{self._port_element_ids[i]}.m_dot"
             row[mdot_var] = cpp.port_jac[i].dR_dmdot * self._port_signs[i]
+
+            # Cross-coupling: non-axial ports also depend on port 0's state.
+            # Add to existing entries if same unknown (e.g. axial port mdot)
+            # to avoid clobbering.
+            cross_P = cpp.cross_dR_dP_axial[i]
+            cross_T = cpp.cross_dR_dT_axial[i]
+            cross_mdot = cpp.cross_dR_dmdot_axial[i] * axial_sign
+            if cross_P != 0.0:
+                key = f"{axial_port_node}.P"
+                row[key] = row.get(key, 0.0) + cross_P
+            if cross_T != 0.0:
+                key = f"{axial_port_node}.T"
+                row[key] = row.get(key, 0.0) + cross_T
+            if cross_mdot != 0.0:
+                key = f"{axial_outer_id}.m_dot"
+                row[key] = row.get(key, 0.0) + cross_mdot
             jac[i] = row
 
         # Mass row: d(sum mdot_port)/d(outer_i.m_dot) = sign_i.

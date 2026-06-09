@@ -556,14 +556,23 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
 // dR_mom_i/dP_jct = -1 (constant, omitted from struct; caller adds).
 // Mass-row Jacobian dR_mass/dmdot_i = +1 (constant, omitted).
 struct PortImpulseJacobian {
-  double dR_dP;     // d(R_mom_i)/d(P_i): 1 - mdot^2/(rho^2*A^2) * drho_dP
-  double dR_dmdot;  // d(R_mom_i)/d(mdot_i): 2 * mdot / (rho * A^2)
-  double dR_dT;     // d(R_mom_i)/d(T_i): -mdot^2/(rho^2*A^2) * drho_dT
+  double dR_dP;     // d(R_mom_i)/d(P_i)
+  double dR_dmdot;  // d(R_mom_i)/d(mdot_i)
+  double dR_dT;     // d(R_mom_i)/d(T_i)
 };
 
 struct MultiPortChamberResult {
   std::vector<double> impulse_residuals;     // size N
   std::vector<PortImpulseJacobian> port_jac; // size N
+
+  // Cross-coupling Jacobian: each non-axial port's impulse residual depends
+  // on the AXIAL REFERENCE port (port 0) state through rho_0 and u_0 in the
+  // -2*sin(theta_i)*cos((3/4)*theta_i)*rho_0*u_0*u_i term. Zero at axial
+  // ports (sin(theta_i)=0) and at port 0 itself.
+  std::vector<double> cross_dR_dP_axial;     // size N: d(R_mom_i)/d(P_0)
+  std::vector<double> cross_dR_dT_axial;     // size N: d(R_mom_i)/d(T_0)
+  std::vector<double> cross_dR_dmdot_axial;  // size N: d(R_mom_i)/d(mdot_0)
+
   double mass_residual;                      // sum_i mdot_i
 };
 
