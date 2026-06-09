@@ -72,6 +72,8 @@ TEST(BorderCarnotKernel, AnalyticDerivativeMatchesFD) {
 
 TEST(MultiPortChamber, MassResidualEqualsSignedSum) {
   // 3 ports, mass-balanced: +0.1 in, two symmetric outflows of -0.05 each.
+  // Use a lateral port (theta != 0) so the impulse term is non-trivial under
+  // the sin^2(theta) projection.
   const auto Y = dry_air_Y();
   const std::vector<double> P{1.0e5, 1.0e5, 1.0e5};
   const std::vector<double> mdot{+0.1, -0.05, -0.05};
@@ -79,8 +81,10 @@ TEST(MultiPortChamber, MassResidualEqualsSignedSum) {
   const std::vector<std::vector<double>> Yall{Y, Y, Y};
   const std::vector<double> A{1e-3, 1e-3, 1e-3};
 
+  // All lateral (theta=pi/2 -> sin^2=1) for this test of the impulse scaling.
+  const std::vector<double> theta(3, M_PI / 2.0);
   auto res = multi_port_chamber_residuals_and_jacobian(
-      1.0e5, P, mdot, T, Yall, A);
+      1.0e5, P, mdot, T, Yall, A, theta);
   EXPECT_NEAR(res.mass_residual, 0.0, 1e-14);
 
   // Symmetric outflow ports (same |mdot|, T, P, A) -> identical impulse residuals.
@@ -95,10 +99,11 @@ TEST(MultiPortChamber, MassResidualEqualsSignedSum) {
 TEST(MultiPortChamber, SignFreeInMdot) {
   // Same |mdot|, opposite sign at otherwise-identical ports gives same impulse residual.
   const auto Y = dry_air_Y();
+  const std::vector<double> theta(2, 0.0);
   auto r_plus = multi_port_chamber_residuals_and_jacobian(
-      1.0e5, {1.0e5, 1.0e5}, {+0.1, -0.1}, {300.0, 300.0}, {Y, Y}, {1e-3, 1e-3});
+      1.0e5, {1.0e5, 1.0e5}, {+0.1, -0.1}, {300.0, 300.0}, {Y, Y}, {1e-3, 1e-3}, theta);
   auto r_minus = multi_port_chamber_residuals_and_jacobian(
-      1.0e5, {1.0e5, 1.0e5}, {-0.1, +0.1}, {300.0, 300.0}, {Y, Y}, {1e-3, 1e-3});
+      1.0e5, {1.0e5, 1.0e5}, {-0.1, +0.1}, {300.0, 300.0}, {Y, Y}, {1e-3, 1e-3}, theta);
   EXPECT_NEAR(r_plus.impulse_residuals[0], r_minus.impulse_residuals[0], 1e-12);
   EXPECT_NEAR(r_plus.impulse_residuals[1], r_minus.impulse_residuals[1], 1e-12);
   // Mass residual flips sign with the flow reversal.
@@ -109,14 +114,14 @@ TEST(MultiPortChamber, RejectsSizeMismatch) {
   const auto Y = dry_air_Y();
   EXPECT_THROW(multi_port_chamber_residuals_and_jacobian(
                    1.0e5, {1.0e5, 1.0e5}, {0.1, -0.05, -0.05},
-                   {300.0, 300.0}, {Y, Y}, {1e-3, 1e-3}),
+                   {300.0, 300.0}, {Y, Y}, {1e-3, 1e-3}, {0.0, 0.0}),
                std::invalid_argument);
 }
 
 TEST(MultiPortChamber, RejectsTooFewPorts) {
   const auto Y = dry_air_Y();
   EXPECT_THROW(multi_port_chamber_residuals_and_jacobian(
-                   1.0e5, {1.0e5}, {0.0}, {300.0}, {Y}, {1e-3}),
+                   1.0e5, {1.0e5}, {0.0}, {300.0}, {Y}, {1e-3}, {0.0}),
                std::invalid_argument);
 }
 
@@ -129,8 +134,9 @@ TEST(MultiPortChamber, FourPortManifoldScalesWithN) {
   const std::vector<std::vector<double>> Yall(4, Y);
   const std::vector<double> A(4, 1e-3);
 
+  const std::vector<double> theta(4, 0.0);
   auto res = multi_port_chamber_residuals_and_jacobian(
-      1.0e5, P, mdot, T, Yall, A);
+      1.0e5, P, mdot, T, Yall, A, theta);
   EXPECT_EQ(res.impulse_residuals.size(), 4u);
   EXPECT_EQ(res.port_jac.size(), 4u);
   EXPECT_NEAR(res.mass_residual, 0.0, 1e-14);
@@ -153,8 +159,9 @@ TEST(MultiPortChamber, AnalyticJacobianMatchesFD) {
   const std::vector<double> A{1e-3, 1.2e-3, 0.8e-3};
   const double P_jct = 1.0e5;
 
+  const std::vector<double> theta(3, 0.0);
   auto base = multi_port_chamber_residuals_and_jacobian(
-      P_jct, P, mdot, T, Yall, A);
+      P_jct, P, mdot, T, Yall, A, theta);
 
   for (std::size_t k = 0; k < 3; ++k) {
     // dR_k/dP_k
@@ -163,8 +170,8 @@ TEST(MultiPortChamber, AnalyticJacobianMatchesFD) {
       P_p[k] += 1.0;
       auto P_m = P;
       P_m[k] -= 1.0;
-      auto rp = multi_port_chamber_residuals_and_jacobian(P_jct, P_p, mdot, T, Yall, A);
-      auto rm = multi_port_chamber_residuals_and_jacobian(P_jct, P_m, mdot, T, Yall, A);
+      auto rp = multi_port_chamber_residuals_and_jacobian(P_jct, P_p, mdot, T, Yall, A, theta);
+      auto rm = multi_port_chamber_residuals_and_jacobian(P_jct, P_m, mdot, T, Yall, A, theta);
       const double fd = (rp.impulse_residuals[k] - rm.impulse_residuals[k]) / 2.0;
       EXPECT_NEAR(fd, base.port_jac[k].dR_dP, 1e-6)
           << "port " << k << " dR/dP";
@@ -175,8 +182,8 @@ TEST(MultiPortChamber, AnalyticJacobianMatchesFD) {
       md_p[k] += 1e-5;
       auto md_m = mdot;
       md_m[k] -= 1e-5;
-      auto rp = multi_port_chamber_residuals_and_jacobian(P_jct, P, md_p, T, Yall, A);
-      auto rm = multi_port_chamber_residuals_and_jacobian(P_jct, P, md_m, T, Yall, A);
+      auto rp = multi_port_chamber_residuals_and_jacobian(P_jct, P, md_p, T, Yall, A, theta);
+      auto rm = multi_port_chamber_residuals_and_jacobian(P_jct, P, md_m, T, Yall, A, theta);
       const double fd = (rp.impulse_residuals[k] - rm.impulse_residuals[k]) / 2e-5;
       const double rel = std::abs(fd - base.port_jac[k].dR_dmdot)
                          / std::max(std::abs(base.port_jac[k].dR_dmdot), 1e-12);
@@ -188,8 +195,8 @@ TEST(MultiPortChamber, AnalyticJacobianMatchesFD) {
       T_p[k] += 0.01;
       auto T_m = T;
       T_m[k] -= 0.01;
-      auto rp = multi_port_chamber_residuals_and_jacobian(P_jct, P, mdot, T_p, Yall, A);
-      auto rm = multi_port_chamber_residuals_and_jacobian(P_jct, P, mdot, T_m, Yall, A);
+      auto rp = multi_port_chamber_residuals_and_jacobian(P_jct, P, mdot, T_p, Yall, A, theta);
+      auto rm = multi_port_chamber_residuals_and_jacobian(P_jct, P, mdot, T_m, Yall, A, theta);
       const double fd = (rp.impulse_residuals[k] - rm.impulse_residuals[k]) / 0.02;
       const double rel = std::abs(fd - base.port_jac[k].dR_dT)
                          / std::max(std::abs(base.port_jac[k].dR_dT), 1e-12);

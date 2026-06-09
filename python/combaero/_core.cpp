@@ -313,11 +313,13 @@ PYBIND11_MODULE(_core, m) {
 
   m.def("multi_port_chamber_residuals_and_jacobian",
         &solver::multi_port_chamber_residuals_and_jacobian, py::arg("P_jct"),
-        py::arg("P"), py::arg("mdot"), py::arg("T"), py::arg("Y"),
-        py::arg("A"),
-        "Momentum-CV junction: N impulse residuals R_mom_i = "
-        "(P_i + rho_i*u_i^2) - P_jct plus mass residual sum_i mdot_i. "
-        "mdot_i > 0 = flow out of junction.");
+        py::arg("P"), py::arg("mdot"), py::arg("T"), py::arg("Y"), py::arg("A"),
+        py::arg("theta_rad"),
+        "Momentum-CV junction: N impulse residuals "
+        "R_mom_i = (P_i + cos^2(theta_i)*rho_i*u_i^2) - P_jct plus mass "
+        "residual sum_i mdot_i. mdot_i > 0 = flow out of junction. The "
+        "cos^2(theta) projection recovers 1D-duct impulse at theta=0 and "
+        "static equality at theta=pi/2.");
 
   // Border-Carnot loss element
   py::class_<solver::BorderCarnotLossResult>(

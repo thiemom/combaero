@@ -1536,9 +1536,11 @@ MultiPortChamberResult multi_port_chamber_residuals_and_jacobian(
     const std::vector<double> &mdot,
     const std::vector<double> &T,
     const std::vector<std::vector<double>> &Y,
-    const std::vector<double> &A) {
+    const std::vector<double> &A,
+    const std::vector<double> &theta_rad) {
   const std::size_t N = P.size();
-  if (mdot.size() != N || T.size() != N || Y.size() != N || A.size() != N) {
+  if (mdot.size() != N || T.size() != N || Y.size() != N || A.size() != N ||
+      theta_rad.size() != N) {
     throw std::invalid_argument(
         "multi_port_chamber_residuals_and_jacobian: per-port vector sizes "
         "must all equal P.size()");
@@ -1557,22 +1559,40 @@ MultiPortChamberResult multi_port_chamber_residuals_and_jacobian(
     const std::vector<double> X = y_to_safe_x(Y[i]);
     auto [rho_i, drho_dT, drho_dP] = density_and_jacobians(T[i], P[i], X);
 
+    // Per-port angle projection: theta=0 (straight) gives sin^2=0 ->
+    // static-only equality R_mom_i = P_i - P_jct (no impulse term, since the
+    // straight port's momentum goes into the COMMON-STRAIGHT axial balance,
+    // not the chamber side-wall balance). theta=pi/2 (lateral perpendicular)
+    // gives sin^2=1 -> FULL impulse R_mom_i = P_i + rho*u^2 - P_jct (the
+    // lateral's momentum goes fully into the chamber side-wall balance).
+    //
+    // This recovers Bassett K6 = 1 + q^2 at q=0 (positive offset, matching
+    // measurement) instead of the original K = q^2 - 1 (negative offset,
+    // unphysical). The remaining linear term -2*q*cos((3/4)*theta) in
+    // Bassett K6 is supplied by the BorderCarnotLoss element. See Tier 1
+    // experiment notes.
+    const double sin_theta = std::sin(theta_rad[i]);
+    const double sin2_theta = sin_theta * sin_theta;
+
     // q_dyn = 0.5 * rho * u^2 written in mdot-form (sign-free): mdot^2 / (rho * A^2)
     // NOTE: the impulse form uses rho * u^2 = mdot^2 / (rho * A^2)  (no 0.5).
     const double rho_A2 = rho_i * A[i] * A[i];
     const double rho_u2 = mdot[i] * mdot[i] / rho_A2;
 
-    res.impulse_residuals[i] = P[i] + rho_u2 - P_jct;
+    res.impulse_residuals[i] = P[i] + sin2_theta * rho_u2 - P_jct;
 
-    // d(rho_u2)/d(P) = -mdot^2/(rho^2 * A^2) * drho_dP
-    const double drhou2_dP = -mdot[i] * mdot[i] / (rho_i * rho_i * A[i] * A[i]) * drho_dP;
-    res.port_jac[i].dR_dP = 1.0 + drhou2_dP;
+    // d(cos2*rho_u2)/d(P) = cos2 * -mdot^2/(rho^2 * A^2) * drho_dP
+    const double drhou2_dP =
+        -mdot[i] * mdot[i] / (rho_i * rho_i * A[i] * A[i]) * drho_dP;
+    res.port_jac[i].dR_dP = 1.0 + sin2_theta * drhou2_dP;
 
-    // d(rho_u2)/d(T) = -mdot^2/(rho^2 * A^2) * drho_dT
-    res.port_jac[i].dR_dT = -mdot[i] * mdot[i] / (rho_i * rho_i * A[i] * A[i]) * drho_dT;
+    // d(cos2*rho_u2)/d(T) = cos2 * -mdot^2/(rho^2 * A^2) * drho_dT
+    res.port_jac[i].dR_dT =
+        sin2_theta *
+        (-mdot[i] * mdot[i] / (rho_i * rho_i * A[i] * A[i]) * drho_dT);
 
-    // d(rho_u2)/d(mdot) = 2 * mdot / (rho * A^2)
-    res.port_jac[i].dR_dmdot = 2.0 * mdot[i] / rho_A2;
+    // d(cos2*rho_u2)/d(mdot) = cos2 * 2 * mdot / (rho * A^2)
+    res.port_jac[i].dR_dmdot = sin2_theta * 2.0 * mdot[i] / rho_A2;
 
     res.mass_residual += mdot[i];
   }

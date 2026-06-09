@@ -574,13 +574,21 @@ struct MultiPortChamberResult {
 //   T           : port temperatures [K]
 //   Y           : per-port mass-fraction vectors (each length n_species)
 //   A           : port cross-section areas [m^2]
+//   theta_rad   : per-port geometric branch angles [rad]; the impulse term
+//                 picks up a cos^2(theta) projection so the residual recovers
+//                 1D-duct momentum at theta=0 (straight) and decouples
+//                 entirely at theta=pi/2 (perpendicular branch). This is the
+//                 angle-aware extension of the PDF Section 2.2 spec; at
+//                 theta=0 for every port it reduces to the original
+//                 P + rho*u^2 form.
 MultiPortChamberResult multi_port_chamber_residuals_and_jacobian(
     double P_jct,
     const std::vector<double> &P,
     const std::vector<double> &mdot,
     const std::vector<double> &T,
     const std::vector<std::vector<double>> &Y,
-    const std::vector<double> &A);
+    const std::vector<double> &A,
+    const std::vector<double> &theta_rad);
 
 // -----------------------------------------------------------------------------
 // Border-Carnot loss element (companion to multi-port chamber).

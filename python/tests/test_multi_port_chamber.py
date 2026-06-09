@@ -120,15 +120,18 @@ def test_three_port_mass_conservation():
     )
 
 
-def test_three_port_bidirectional_split():
-    """Asymmetric collector BCs produce bidirectional flow.
+def test_three_port_all_forward_under_pressure_drive():
+    """With a single source (highest Pt) feeding two sinks (lower Pt), flow is
+    forward through every port.
 
-    With pb_in at 2.1e5, pb_str at 2.05e5 and pb_bra at 2.0e5, the momentum-CV
-    junction acts as a bidirectional manifold: it draws from pb_str (the
-    intermediate-Pt collector) and discharges to pb_bra (the lowest-Pt
-    collector) in addition to passing the inlet flow. This is the
-    physically-correct behaviour the K-closure tee CANNOT represent (see
-    addendum Finding 6). We assert directions consistent with this picture.
+    Note: an earlier version of this test asserted BIDIRECTIONAL flow as a
+    "feature" of the PDF Section 2.2 angle-blind impulse-equality ansatz
+    (R = P + rho*u^2 - P_jct = 0). That bidirectional behaviour was an
+    artifact of the formulation, not real physics -- Bassett 2001 Fig 7a
+    shows real branching-tee K6 is purely positive and forward-driven under
+    these BCs. The sin^2(theta) projection in the impulse residual recovers
+    the physical all-forward solution. See feat(junction) sin^2 milestone
+    commit for derivation.
     """
     net = _three_port_net()
     solver = NetworkSolver(net)
@@ -139,15 +142,8 @@ def test_three_port_bidirectional_split():
     m_str = sol["ch_str.m_dot"]
     m_bra = sol["ch_bra.m_dot"]
     assert m_in > 0.0, f"inlet reversed: m_in={m_in}"
-    # Branch collector (lowest Pt) is a true outflow.
+    assert m_str > 0.0, f"straight reversed: m_str={m_str}"
     assert m_bra > 0.0, f"branch reversed: m_bra={m_bra}"
-    # Straight collector (intermediate Pt) is pulled INTO the junction by the
-    # branch's stronger demand -- reversed at the canonical orientation.
-    assert m_str < 0.0, (
-        f"straight expected to source into junction (sign-free residual + "
-        f"asymmetric outlet Pt should pull from the higher-Pt collector), "
-        f"got m_str={m_str}"
-    )
 
 
 def test_three_port_p_jct_in_physical_range():

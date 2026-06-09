@@ -3236,9 +3236,10 @@ class MultiPortChamberElement(NetworkElement):
         T = [s.T for s in states]
         Y = [list(s.Y) for s in states]
         A = [float(a) for a in self.port_areas]
+        theta_rad = [math.radians(float(t)) for t in self.port_angles_deg]
 
         cpp = _solver_tools.multi_port_chamber_residuals_and_jacobian(
-            P_jct=P_jct, P=P, mdot=port_mdots, T=T, Y=Y, A=A
+            P_jct=P_jct, P=P, mdot=port_mdots, T=T, Y=Y, A=A, theta_rad=theta_rad
         )
 
         residuals = list(cpp.impulse_residuals) + [cpp.mass_residual]
