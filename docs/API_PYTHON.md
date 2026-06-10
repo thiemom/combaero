@@ -588,9 +588,19 @@ Y[1] = 0.233  # O2
 status = _core.tee_check_inputs(q=0.5, psi=1.0, theta=math.pi/2)
 # status.valid, status.q_in_range, status.psi_valid, status.theta_valid
 
-# Raw K-coefficient functions (Bassett 2001)
+# Raw K-coefficient functions (Bassett 2001 Table 2 + Eq 33/34 angle corrections).
+# K2 and K5 take only q (psi/theta-independent per Eq 15); the rest take (q, psi, theta).
+# Provided for diagnostics and validation against measured data.
+k1  = _core.tee_K1(q, psi, theta)
+k2  = _core.tee_K2(q)
+k3  = _core.tee_K3(q, psi, theta)
+k4  = _core.tee_K4(q, psi, theta)
 k5  = _core.tee_K5(q)               # straight arm, separating tee
 k6  = _core.tee_K6(q, psi, theta)   # branch arm, separating tee
+k7  = _core.tee_K7(q, psi, theta)
+k8  = _core.tee_K8(q, psi, theta)
+k9  = _core.tee_K9(q, psi, theta)
+k10 = _core.tee_K10(q, psi, theta)
 k11 = _core.tee_K11(q, psi, theta)  # straight arm, joining tee
 k12 = _core.tee_K12(q, psi, theta)  # branch arm, joining tee
 

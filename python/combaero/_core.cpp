@@ -483,10 +483,26 @@ PYBIND11_MODULE(_core, m) {
         "Returns: TeeJunctionResult");
 
   // Tee junction pure K functions and helpers (for testing and diagnostics)
+  m.def("tee_K1", &combaero::K1, py::arg("q"), py::arg("psi"), py::arg("theta"),
+        "Bassett K1: branch loss, separating flow type 1 (reverse of K6).");
+  m.def("tee_K2", &combaero::K5, py::arg("q"),
+        "Bassett K2: straight-through loss, separating flow types 1/2. Same expression as K5.");
+  m.def("tee_K3", &combaero::K3, py::arg("q"), py::arg("psi"), py::arg("theta"),
+        "Bassett K3: branch-to-downstream, separating flow type 2 (reverse of K4).");
+  m.def("tee_K4", &combaero::K4, py::arg("q"), py::arg("psi"), py::arg("theta"),
+        "Bassett K4: branch-to-downstream, separating flow type 2.");
   m.def("tee_K5", &combaero::K5, py::arg("q"),
         "Bassett K5: straight-through loss, separating flow. K5(q) = q^2-1.5q+0.5");
   m.def("tee_K6", &combaero::K6, py::arg("q"), py::arg("psi"), py::arg("theta"),
         "Bassett K6: branch loss, separating flow type 3.");
+  m.def("tee_K7", &combaero::K7, py::arg("q"), py::arg("psi"), py::arg("theta"),
+        "Bassett K7: straight path, joining flow type 4.");
+  m.def("tee_K8", &combaero::K8, py::arg("q"), py::arg("psi"), py::arg("theta"),
+        "Bassett K8: branch path, joining flow type 4.");
+  m.def("tee_K9", &combaero::K9, py::arg("q"), py::arg("psi"), py::arg("theta"),
+        "Bassett K9: branch A path, joining flow type 5.");
+  m.def("tee_K10", &combaero::K10, py::arg("q"), py::arg("psi"), py::arg("theta"),
+        "Bassett K10: branch C path, joining flow type 5.");
   m.def("tee_K11", &combaero::K11, py::arg("q"), py::arg("psi"), py::arg("theta"),
         "Bassett K11: straight-to-outlet, joining flow type 6.");
   m.def("tee_K12", &combaero::K12, py::arg("q"), py::arg("psi"), py::arg("theta"),

@@ -29,7 +29,13 @@ CORE_K_IDS = {"K_straight_sep", "K_lateral_sep", "K_lateral_join", "K_straight_j
 
 @dataclass
 class Cell:
-    """One row of the scorecard."""
+    """One row of the scorecard.
+
+    A cell is "fully unsupported" when every record had K_model is None
+    (e.g. the model has no binding for that K). The metric fields are NaN
+    in that case; the renderer shows '-' rather than 0 to avoid the
+    misleading negative D_ceil it produced before.
+    """
 
     canonical_K: str
     psi_bin: str  # "1.0" or "all" if mixed
@@ -43,6 +49,11 @@ class Cell:
     delta_vs_ceiling: float = 0.0
     median_wall_time_s: float = 0.0
     n_unsupported: int = 0  # model returned None
+
+    @property
+    def fully_unsupported(self) -> bool:
+        """True if the model had no evaluable records in this cell."""
+        return self.N > 0 and self.n_unsupported >= self.N
 
 
 def _rmse(errs: list[float]) -> float:
@@ -82,19 +93,41 @@ def build_cells(records: list[Record], *, uncertainty_K: float = 0.05) -> list[C
         return (cK, psi if psi is not None else -1.0, theta if theta is not None else -1.0)
 
     cells: list[Cell] = []
+    nan = float("nan")
     for (cK, psi, theta), recs in sorted(groups.items(), key=_sort_key):
         N = len(recs)
         model_errs = [r.K_model - r.K_measured for r in recs if r.K_model is not None]
         ceil_errs = [r.K_ceiling - r.K_measured for r in recs if r.K_ceiling is not None]
         unsupported = sum(1 for r in recs if r.K_model is None)
-        rmse_m = _rmse(model_errs)
-        rmse_c = _rmse(ceil_errs)
-        mae = sum(abs(e) for e in model_errs) / len(model_errs) if model_errs else 0.0
-        bias = sum(model_errs) / len(model_errs) if model_errs else 0.0
-        max_err = max((abs(e) for e in model_errs), default=0.0)
-        within = sum(1 for e in model_errs if abs(e) <= uncertainty_K)
-        pct = within / len(model_errs) if model_errs else 0.0
         wt = _median([r.wall_time_s for r in recs])
+        if not model_errs:
+            # Model couldn't evaluate any record in this cell. Don't fabricate
+            # a 0 RMSE / negative D_ceil; mark metrics NaN so the renderer can
+            # show them as '-' and the headline can exclude them.
+            cells.append(
+                Cell(
+                    canonical_K=cK,
+                    psi_bin=f"{psi:g}" if psi is not None else "n/a",
+                    theta_bin=f"{theta:g}" if theta is not None else "n/a",
+                    N=N,
+                    rmse_meas=nan,
+                    mae_meas=nan,
+                    bias_meas=nan,
+                    max_err_meas=nan,
+                    pct_within_uncertainty=nan,
+                    delta_vs_ceiling=nan,
+                    median_wall_time_s=wt,
+                    n_unsupported=unsupported,
+                )
+            )
+            continue
+        rmse_m = _rmse(model_errs)
+        rmse_c = _rmse(ceil_errs) if ceil_errs else nan
+        mae = sum(abs(e) for e in model_errs) / len(model_errs)
+        bias = sum(model_errs) / len(model_errs)
+        max_err = max(abs(e) for e in model_errs)
+        within = sum(1 for e in model_errs if abs(e) <= uncertainty_K)
+        pct = within / len(model_errs)
         cells.append(
             Cell(
                 canonical_K=cK,
@@ -106,7 +139,7 @@ def build_cells(records: list[Record], *, uncertainty_K: float = 0.05) -> list[C
                 bias_meas=bias,
                 max_err_meas=max_err,
                 pct_within_uncertainty=pct,
-                delta_vs_ceiling=rmse_m - rmse_c,
+                delta_vs_ceiling=rmse_m - rmse_c if not math.isnan(rmse_c) else nan,
                 median_wall_time_s=wt,
                 n_unsupported=unsupported,
             )
@@ -125,9 +158,17 @@ class Headline:
 
 
 def headline(model_name: str, cells: list[Cell]) -> Headline:
-    core = [c.rmse_meas for c in cells if c.canonical_K in CORE_K_IDS and c.N > 0]
-    extended = [c.rmse_meas for c in cells if c.N > 0]
-    deltas = [c.delta_vs_ceiling for c in cells if c.N > 0]
+    """Aggregate cells into one-line headline. Fully-unsupported cells are
+    excluded; otherwise NaN cells (rare: model evaluated some records but
+    no ceiling) are also excluded for sanity."""
+
+    def _ok(c: Cell, attr: str) -> bool:
+        v = getattr(c, attr)
+        return c.N > 0 and not c.fully_unsupported and not math.isnan(v)
+
+    core = [c.rmse_meas for c in cells if _ok(c, "rmse_meas") and c.canonical_K in CORE_K_IDS]
+    extended = [c.rmse_meas for c in cells if _ok(c, "rmse_meas")]
+    deltas = [c.delta_vs_ceiling for c in cells if _ok(c, "delta_vs_ceiling")]
     n_sup = sum(c.N - c.n_unsupported for c in cells)
     n_unsup = sum(c.n_unsupported for c in cells)
     return Headline(
@@ -140,8 +181,17 @@ def headline(model_name: str, cells: list[Cell]) -> Headline:
     )
 
 
+def _fmt(v: float, spec: str, na: str = "-") -> str:
+    """Format a float, rendering NaN as `na` right-aligned to spec's width."""
+    if math.isnan(v):
+        # spec like '>7.3f' -> width is the number before the dot
+        width = int(spec.lstrip("+").lstrip(">").split(".")[0]) if "." in spec else 6
+        return f"{na:>{width}}"
+    return format(v, spec)
+
+
 def format_scorecard(model_name: str, cells: list[Cell], h: Headline) -> str:
-    """Render a human-readable scorecard."""
+    """Render a human-readable scorecard. NaN metrics render as '-'."""
     lines = []
     lines.append(f"=== Scorecard: {model_name} ===")
     lines.append(
@@ -151,11 +201,12 @@ def format_scorecard(model_name: str, cells: list[Cell], h: Headline) -> str:
     )
     lines.append("-" * 110)
     for c in sorted(cells, key=lambda c: (c.canonical_K, c.psi_bin, c.theta_bin)):
+        pct_str = "-" if math.isnan(c.pct_within_uncertainty) else f"{c.pct_within_uncertainty * 100:.0f}%"
         lines.append(
             f"{c.canonical_K:<20} {c.psi_bin:>6} {c.theta_bin:>6} {c.N:>4} "
-            f"{c.rmse_meas:>7.3f} {c.mae_meas:>7.3f} {c.bias_meas:>+8.3f} "
-            f"{c.max_err_meas:>7.3f} {c.pct_within_uncertainty * 100:>7.0f}% "
-            f"{c.delta_vs_ceiling:>+8.3f} {c.n_unsupported:>6}"
+            f"{_fmt(c.rmse_meas, '>7.3f')} {_fmt(c.mae_meas, '>7.3f')} "
+            f"{_fmt(c.bias_meas, '>+8.3f')} {_fmt(c.max_err_meas, '>7.3f')} "
+            f"{pct_str:>8} {_fmt(c.delta_vs_ceiling, '>+8.3f')} {c.n_unsupported:>6}"
         )
     lines.append("-" * 110)
     lines.append(

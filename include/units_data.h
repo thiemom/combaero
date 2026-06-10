@@ -304,6 +304,19 @@ inline constexpr Entry function_units[] = {
      "TeeJunctionResult (R_straight: Pa, R_branch: Pa, dR/dm_dot: Pa*s/kg, "
      "dR/dP: -, dR/dT: Pa/K, dR/dY: Pa, K_straight: -, K_branch: -, "
      "q: -, blend_w: -, topology_valid: bool, status: CorrelationValidity)"},
+    // Raw Bassett K coefficients (validation/diagnostic; no clamping).
+    {"tee_K1", "q: -, psi: -, theta: rad", "- (K)"},
+    {"tee_K2", "q: -", "- (K)"},
+    {"tee_K3", "q: -, psi: -, theta: rad", "- (K)"},
+    {"tee_K4", "q: -, psi: -, theta: rad", "- (K)"},
+    {"tee_K5", "q: -", "- (K)"},
+    {"tee_K6", "q: -, psi: -, theta: rad", "- (K)"},
+    {"tee_K7", "q: -, psi: -, theta: rad", "- (K)"},
+    {"tee_K8", "q: -, psi: -, theta: rad", "- (K)"},
+    {"tee_K9", "q: -, psi: -, theta: rad", "- (K)"},
+    {"tee_K10", "q: -, psi: -, theta: rad", "- (K)"},
+    {"tee_K11", "q: -, psi: -, theta: rad", "- (K)"},
+    {"tee_K12", "q: -, psi: -, theta: rad", "- (K)"},
 
     // -------------------------------------------------------------------------
     // multi_port_chamber.h + solver_interface.h - Momentum-CV junction

@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Python bindings for all 12 Bassett K coefficients**: `cb._core.tee_K1`
+  through `tee_K12`. Previously only K5, K6, K11, K12 were exposed; the
+  rest required separate C++ tests. The new bindings let the
+  `validation/junction` scorecard evaluate all 12 K against measured
+  data in one pass (K1, K3, K4, K7, K8, K9, K10 now contribute real
+  numbers instead of being silently unsupported). `units_data.h` and
+  `docs/API_CPP.md` / `docs/API_PYTHON.md` updated to match.
 - **`MultiPortChamberElement` + `BorderCarnotLossElement`** (Phase 1 of the
   momentum-CV junction). Sanctioned successor to `TeeJunctionElement` for
   n-port manifolds, ejector / merge-split-reverse regimes, and high-Mach
@@ -63,6 +70,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docs/junction/momentum cv implementation guide.pdf`). The merging tee is unaffected.
 
 ### Fixed
+- **Junction validation scorecard**: cells where the candidate model could
+  not evaluate any record (e.g. K not yet bound, paper not supported) now
+  display `-` instead of `0.000` and a misleading negative `Delta_vs_ceiling`.
+  Fully-unsupported cells are also excluded from the headline aggregates.
 - **`tee_junction.h` K8 transcription**: K8 (joining type 4, lateral path) had
   `c / psi` where Bassett Table 2 + Eq 34 angle correction call for `psi * c`.
   Invisible at `psi = 1` (the only point covered by the existing
