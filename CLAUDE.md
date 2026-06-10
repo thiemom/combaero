@@ -52,7 +52,7 @@ uv run scripts/generate_units_md.py         # regenerate docs/UNITS.md
 
 ## Git Workflow
 - **Branch protection on `main`:** never push directly to `main`. Always work on a feature/fix branch and open a PR (`feature-branch → main`).
-- **Opening PRs:** `gh pr create` requires `dangerouslyDisableSandbox: true` — the sandbox intercepts TLS and `gh` cannot reach the GitHub API without it.
+- **Opening PRs:** `git` and `gh` are allowlisted in `.claude/settings.local.json` and run inside the sandbox without approval — including `git push`, `gh pr view/checks/merge`, and (verified) most network operations to `github.com`. `dangerouslyDisableSandbox: true` is only needed when a command writes to a denied path (e.g., `git rebase` that touches `uv.lock`).
 - **CI is required to merge:** GitHub Actions checks must pass before a PR can be merged. If main was updated after the PR was opened, re-run checks against the updated base before merging.
 
 ## Version Sync Checklist
