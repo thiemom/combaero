@@ -50,10 +50,12 @@ _CEILING = PaperCeiling()
 def _measured_files_with_analytical() -> list[FileMetadata]:
     """Files we can sweep: measured kind, K_id present, paper-ceiling evaluable.
 
-    Excludes Hager xi_l (xi_t is included but tested only via Bassett K5
-    cross-paper via the runner's canonical_K dispatch). We don't yet have
-    paper_ceiling support for Hager evaluation cleanly; deferred to a
-    follow-up.
+    Bassett: all measured Ks (K1..K12 with angle-corrected forms).
+    Wang: a=1, q=0.5 (Table 1) and a=1, M_3=0.5 (Table 2) only -- other
+      slices have no analytical reference in the paper; PaperCeiling
+      returns None and the test skips.
+    Hager: xi_t via Eq 8 (q = lateral/total convention).
+    Perez-Garcia: analytical-only paper, no measured CSVs.
     """
     ds = load_dataset()
     out: list[FileMetadata] = []
@@ -62,11 +64,11 @@ def _measured_files_with_analytical() -> list[FileMetadata]:
             continue
         if f.K_id is None and (f.coefficient is None or f.coefficient == "xi"):
             continue
-        # Skip Hager and Perez-Garcia for now -- the analytical correlation
-        # paths in PaperCeiling need a bit more wiring for non-Bassett papers.
-        # The runner has the dispatch but the quality test wants exact-axis
-        # comparison which is more fragile across papers.
-        if f.path.parent.name not in {"bassett2001", "wang2014"}:
+        # Perez-Garcia is analytical-only (no measured CSVs). Wang is wired
+        # in via Tables 1/2 interpolation at a=1; other area ratios are
+        # returned as None and the test correctly skips them. Hager xi_t
+        # is wired via Eq 8.
+        if f.path.parent.name not in {"bassett2001", "wang2014", "hager1984"}:
             continue
         out.append(f)
     return out
@@ -75,7 +77,7 @@ def _measured_files_with_analytical() -> list[FileMetadata]:
 def _evaluate_ceiling(file: FileMetadata, x: float) -> float | None:
     """Evaluate the paper's analytical correlation at this point."""
     paper_slug = file.path.parent.name
-    K_id = file.K_id or ""
+    K_id = file.K_id or (file.coefficient or "")
     theta_rad = math.radians(file.theta_deg) if file.theta_deg is not None else None
     if file.x_axis == "q":
         q_val = x
@@ -83,7 +85,7 @@ def _evaluate_ceiling(file: FileMetadata, x: float) -> float | None:
     else:
         q_val = file.q if file.q is not None else 0.5
         M_val = x
-    return _CEILING.evaluate(paper_slug, K_id, q_val, file.psi, theta_rad, M_3=M_val)
+    return _CEILING.evaluate(paper_slug, K_id, q_val, file.psi, theta_rad, M_3=M_val, a=file.a)
 
 
 def _tolerance_for(file: FileMetadata) -> float:

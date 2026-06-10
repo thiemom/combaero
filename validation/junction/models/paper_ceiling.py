@@ -36,6 +36,7 @@ class PaperCeiling:
         psi: float | None,
         theta_rad: float | None,
         M_3: float | None = None,
+        a: float | None = None,
         **kwargs: float,
     ) -> float | None:
         if paper == "bassett2001":
@@ -43,7 +44,7 @@ class PaperCeiling:
         if paper == "hager1984":
             return self._hager(K_id, q, theta_rad)
         if paper == "wang2014":
-            return self._wang(K_id, q, M_3)
+            return self._wang(K_id, q, M_3, a)
         if paper == "perez_garcia2010":
             return self._perez_garcia(K_id, q, M_3)
         return None
@@ -72,18 +73,28 @@ class PaperCeiling:
             return hager1984.xi_l(q, theta_rad)
         return None
 
-    def _wang(self, K_id: str, q: float, M_3: float | None) -> float | None:
-        if M_3 is None:
+    def _wang(
+        self, K_id: str, q: float, M_3: float | None, a: float | None
+    ) -> float | None:
+        """Wang ceiling via Tables 1 and 2 interpolation.
+
+        Wang only tabulates at a=1; other area ratios have no analytical
+        reference and are returned as None (the quality-check test will
+        skip those files cleanly).
+
+        Two paths:
+        - q close to 0.5 (Table 1's slice): interpolate K vs M_3 in [0.1, 0.6]
+        - M_3 close to 0.5 (Table 2's slice): interpolate K vs q in [0, 1]
+        - Both: prefer Table 1 (M_3 sweep is the primary axis in the figures)
+        """
+        if K_id not in {"K_13", "K_23"} or a is None or abs(a - 1.0) > 1e-3:
             return None
-        try:
-            if K_id == "K_13":
-                return (
-                    wang2014.lookup_table1(round(M_3, 6), "K_13") if abs(M_3 - 0.5) > 0.5 else None
-                )
-            if K_id == "K_23":
-                return None  # Wang's tables are at fixed q=0.5 or fixed M=0.5 only
-        except ValueError:
-            return None
+        # Table 1 path: a=1, q=0.5, M_3 varying
+        if abs(q - 0.5) < 1e-3 and M_3 is not None:
+            return wang2014.interp_table1(M_3, K_id)
+        # Table 2 path: a=1, M_3=0.5, q varying
+        if M_3 is not None and abs(M_3 - 0.5) < 1e-3:
+            return wang2014.interp_table2(q, K_id)
         return None
 
     def _perez_garcia(self, K_id: str, q: float, M_3: float | None) -> float | None:

@@ -100,9 +100,13 @@ def iter_records(
                 q_val = file.q if file.q is not None else 0.5
                 M_val = x
             t0 = time.perf_counter()
-            K_model = model.evaluate(paper_slug, K_id, q_val, file.psi, theta_rad, M_3=M_val)
+            K_model = model.evaluate(
+                paper_slug, K_id, q_val, file.psi, theta_rad, M_3=M_val, a=file.a
+            )
             wall_time = time.perf_counter() - t0
-            K_ceil = ceiling.evaluate(paper_slug, K_id, q_val, file.psi, theta_rad, M_3=M_val)
+            K_ceil = ceiling.evaluate(
+                paper_slug, K_id, q_val, file.psi, theta_rad, M_3=M_val, a=file.a
+            )
             yield Record(
                 paper=paper_slug,
                 file=file.path.name,
