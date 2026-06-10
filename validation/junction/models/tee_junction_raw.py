@@ -22,15 +22,20 @@ class TeeJunctionRaw:
 
     name = "tee_junction_raw_cpp"
 
-    # Only 4 of 12 Bassett K's are currently bound to Python via cb._core:
-    #     tee_K5, tee_K6, tee_K11, tee_K12.
-    # K1, K3, K4, K7, K8, K9, K10 are inline-only in include/tee_junction.h
-    # and not exposed via pybind11. Adding those bindings is a separate
-    # follow-up; the bound 4 cover the K12 ψ² bug verdict (the headline
-    # case) so we proceed.
+    # All 12 Bassett K's are exposed via cb._core as tee_K1..tee_K12.
+    # K2 and K5 take only q (the formula is psi/theta-independent per Eq 15);
+    # the others take (q, psi, theta).
     _CORE_K_FNS = {
+        "K1": "tee_K1",
+        "K2": "tee_K2",
+        "K3": "tee_K3",
+        "K4": "tee_K4",
         "K5": "tee_K5",
         "K6": "tee_K6",
+        "K7": "tee_K7",
+        "K8": "tee_K8",
+        "K9": "tee_K9",
+        "K10": "tee_K10",
         "K11": "tee_K11",
         "K12": "tee_K12",
     }
@@ -57,7 +62,7 @@ class TeeJunctionRaw:
         fn = getattr(cb._core, self._CORE_K_FNS[K_id], None)
         if fn is None:
             return None
-        # K2/K5 take only q in the C++ API.
+        # K2 and K5 take only q in the C++ API (theta- and psi-independent).
         if K_id in {"K2", "K5"}:
             return float(fn(q))
         return float(fn(q, psi, theta_rad))

@@ -715,13 +715,30 @@ struct TeeInputStatus {
 };
 TeeInputStatus tee_check_inputs(double q, double psi, double theta);
 
-// Raw K-coefficient functions (Bassett 2001, Table 2) -- pure, no guards
-double K5(double q);                                   // straight arm, separating
-double K6(double q, double psi, double theta);         // branch arm, separating
-double K11(double q, double psi, double theta);        // straight arm, joining
-double K12(double q, double psi, double theta);        // branch arm, joining
+// Raw K-coefficient functions (Bassett 2001, Table 2 + Eq 33/34 angle corrections).
+// Pure math, no input guards. K2 and K5 are psi/theta-independent per Eq 15.
+double K1(double q, double psi, double theta);
+double K2(double q);                                   // = q^2 - 1.5*q + 0.5
+double K3(double q, double psi, double theta);
+double K4(double q, double psi, double theta);
+double K5(double q);                                   // same as K2; separating type 3
+double K6(double q, double psi, double theta);
+double K7(double q, double psi, double theta);
+double K8(double q, double psi, double theta);
+double K9(double q, double psi, double theta);
+double K10(double q, double psi, double theta);
+double K11(double q, double psi, double theta);
+double K12(double q, double psi, double theta);
+// Analytic q-derivatives for each.
+double dK1_dq(double q, double psi, double theta);
+double dK3_dq(double q, double psi, double theta);
+double dK4_dq(double q, double psi, double theta);
 double dK5_dq(double q);
 double dK6_dq(double q, double psi, double theta);
+double dK7_dq(double q, double psi, double theta);
+double dK8_dq(double q, double psi, double theta);
+double dK9_dq(double q, double psi, double theta);
+double dK10_dq(double q, double psi, double theta);
 double dK11_dq(double q, double psi, double theta);
 double dK12_dq(double q, double psi, double theta);
 
