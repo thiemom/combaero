@@ -1,0 +1,44 @@
+# Hager 1984 dataset metadata.
+
+paper:
+  name: Hager 1984
+  citation: "W H Hager. An approximate treatment of flow in branches and bends. Proc IMechE Part C 198C(4):63-69, 1984."
+  doi: "10.1243/PIME_PROC_1984_198_088_02"
+  q_convention: hager   # q = lateral / total -- OPPOSITE of Bassett K5; runner flips for cross-paper comparison
+  default_uncertainty_K: 0.05   # envelope (4b) gives explicit bounds for half the data
+
+fit_tiers:
+  xi_t: good     # paper text claims good agreement with Eq 8
+  xi_l: good     # paper text: similar quality for Eq 19
+
+files:
+  # ----- Fig 4a: xi_t measured at delta=90 deg, two source datasets -----
+  hager_fig04a_xi_t_delta=90_single_measured.csv:
+    coefficient: xi_t
+    delta_deg: 90
+    x_axis: q
+    kind: measured
+    dataset: single_laterals
+  hager_fig04a_xi_t_delta=90_manifold_measured.csv:
+    coefficient: xi_t
+    delta_deg: 90
+    x_axis: q
+    kind: measured
+    dataset: manifold_laterals
+
+  # ----- Fig 4b: xi_t envelope for arbitrary branch geometry (Hager's range plot) -----
+  hager_fig04b_xi_t_envelope=mean.csv:
+    coefficient: xi_t
+    x_axis: q
+    kind: envelope
+    envelope_role: mean
+  hager_fig04b_xi_t_envelope=upper.csv:
+    coefficient: xi_t
+    x_axis: q
+    kind: envelope
+    envelope_role: upper
+  hager_fig04b_xi_t_envelope=lower.csv:
+    coefficient: xi_t
+    x_axis: q
+    kind: envelope
+    envelope_role: lower
