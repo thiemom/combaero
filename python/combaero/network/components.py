@@ -2987,6 +2987,416 @@ class TeeJunctionElement(NetworkElement):
 
 
 # ---------------------------------------------------------------------------
+# Momentum-CV junction (momentum cv implementation guide.pdf).
+# Sanctioned successor to TeeJunctionElement: junction = pure conservation,
+# loss = separate per-port elements (BorderCarnotLossElement below).
+# ---------------------------------------------------------------------------
+
+
+class MultiPortChamberElement(NetworkElement):
+    """
+    Momentum-CV junction element (N >= 2 ports).
+
+    Owns one scalar unknown ``{id}.P_jct`` (junction internal static pressure).
+    Emits N per-port impulse-function residuals plus a global mass residual:
+
+        R_mom_i = (P_i + rho_i * u_i^2) - P_jct = 0     (per port)
+        R_mass  = sum_i mdot_port_i = 0                 (global)
+
+    The impulse residual is sign-free (u_i^2 is direction-invariant); the
+    sum-mass residual uses a per-port orientation derived from the topology
+    (positive = flow out of junction). All empirical loss content lives in
+    companion :class:`BorderCarnotLossElement` instances bolted onto specific
+    ports; this element itself is purely conservation.
+
+    Topology contract (see PDF Section 2 + addendum task #10):
+
+    - Each port must be a :class:`MomentumChamberNode` (carries P, Pt at the
+      port face). The MCN is marked ``_is_junction_port = True`` during
+      :meth:`resolve_topology` so the solver skips its mass-balance row -- the
+      junction's R_mass takes over conservation at the port (otherwise the
+      MCN's mass row degenerates to 0 = 0 once the junction declares the
+      same flow with opposite sign).
+    - Exactly one element (channel, loss element, etc.) must connect to each
+      port-MCN on the outside. Its m_dot is the port's mass-flow source; the
+      junction reads it via the graph at residual-eval time.
+    - Sign convention per port is fixed by the inlet/outlet declaration in
+      the constructor. ``inlet_nodes`` carry sign ``-1`` (canonical flow INTO
+      junction); ``outlet_nodes`` carry sign ``+1`` (canonical flow OUT). The
+      connecting outer element's ``from_node``/``to_node`` is then checked
+      against the declared direction at :meth:`resolve_topology` and a clear
+      error is raised on mismatch. Runtime flow may still reverse (mdot < 0
+      at any port); only the canonical direction is fixed for graph topology.
+
+    Port areas are inherited from the connecting :class:`ChannelElement`'s
+    diameter unless explicitly given.
+
+    See ``docs/junction/momentum cv implementation guide.pdf`` Sections 2-3
+    and ``docs/junction/junction_model_v3_addendum.md`` Finding 6 for the
+    motivation (the K-closure's structural K_run ~ 0.30 ceiling and its
+    inability to represent ejector / merge-split direction natively).
+    """
+
+    def __init__(
+        self,
+        id: str,
+        inlet_nodes: list[str],
+        outlet_nodes: list[str],
+        inlet_angles_deg: list[float] | None = None,
+        outlet_angles_deg: list[float] | None = None,
+        port_areas: list[float] | None = None,
+    ):
+        """Build a momentum-CV junction.
+
+        Args:
+            id: Element id.
+            inlet_nodes: Port-MCN ids where flow CANONICALLY enters the
+                junction (junction is graph-downstream of each). Flow can
+                reverse at runtime; this just sets the canonical topology
+                direction for the graph validator.
+            outlet_nodes: Port-MCN ids where flow CANONICALLY leaves the
+                junction.
+            inlet_angles_deg: Geometric branch angles for the inlet ports
+                (length must match inlet_nodes). Default 0 each.
+            outlet_angles_deg: Same, for outlet ports. Default 0 each.
+            port_areas: Per-port cross-section areas [m^2], ordered as
+                ``inlet_nodes + outlet_nodes``. If None, inherited from
+                connecting channels at resolve time.
+        """
+        if not inlet_nodes:
+            raise ValueError(f"MultiPortChamberElement '{id}': need >= 1 inlet port.")
+        if not outlet_nodes:
+            raise ValueError(f"MultiPortChamberElement '{id}': need >= 1 outlet port.")
+        n_in = len(inlet_nodes)
+        n_out = len(outlet_nodes)
+
+        # NetworkElement base class requires from_node/to_node; use the first
+        # inlet and the first outlet as placeholders. The all_source_nodes /
+        # all_sink_nodes overrides below carry the real topology.
+        super().__init__(id, inlet_nodes[0], outlet_nodes[0])
+
+        self.inlet_nodes = list(inlet_nodes)
+        self.outlet_nodes = list(outlet_nodes)
+        self.port_nodes = self.inlet_nodes + self.outlet_nodes  # ordered: inlets first
+        self.N = len(self.port_nodes)
+
+        # Canonical sign convention (PDF Section 2.2: positive = out of junction):
+        #   inlet ports: flow into junction at canonical orientation -> -1
+        #   outlet ports: flow out of junction at canonical orientation -> +1
+        self._port_signs: list[float] = [-1.0] * n_in + [+1.0] * n_out
+
+        inlet_angles = list(inlet_angles_deg) if inlet_angles_deg is not None else [0.0] * n_in
+        outlet_angles = list(outlet_angles_deg) if outlet_angles_deg is not None else [0.0] * n_out
+        if len(inlet_angles) != n_in:
+            raise ValueError(
+                f"MultiPortChamberElement '{id}': inlet_angles_deg has "
+                f"{len(inlet_angles)} entries, need {n_in}."
+            )
+        if len(outlet_angles) != n_out:
+            raise ValueError(
+                f"MultiPortChamberElement '{id}': outlet_angles_deg has "
+                f"{len(outlet_angles)} entries, need {n_out}."
+            )
+        self.port_angles_deg = inlet_angles + outlet_angles
+
+        self.port_areas: list[float | None] = (
+            list(port_areas) if port_areas is not None else [None] * self.N
+        )
+        if len(self.port_areas) != self.N:
+            raise ValueError(
+                f"MultiPortChamberElement '{id}': port_areas has "
+                f"{len(self.port_areas)} entries, need {self.N}."
+            )
+
+        # Resolved during resolve_topology:
+        #   self._port_element_ids[i] = id of the element connected at port i
+        self._port_element_ids: list[str] = [""] * self.N
+
+    def unknowns(self) -> list[str]:
+        return [f"{self.id}.P_jct"]
+
+    def n_equations(self) -> int:
+        return self.N + 1  # N impulse + 1 sum-mass
+
+    def all_source_nodes(self) -> list[str]:
+        # Inlet ports = nodes the junction draws flow FROM (canonical orientation).
+        return list(self.inlet_nodes)
+
+    def all_sink_nodes(self) -> list[str]:
+        # Outlet ports = nodes the junction delivers flow TO.
+        return list(self.outlet_nodes)
+
+    def flow_at_node(self, node_id: str, x: Any, indices: list[int]) -> float:
+        # We never actually contribute to a port-MCN's mass row (solver skips
+        # it via _is_junction_port). Return 0 for safety if asked.
+        return 0.0
+
+    def flow_jac_at_node(self, node_id: str, indices: list[int]) -> dict[int, float]:
+        return {}
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        # 1. For each port: locate the (unique) connecting element on the
+        #    OUTSIDE of the port-MCN and determine the orientation sign.
+        for i, port_id in enumerate(self.port_nodes):
+            port_node = graph.nodes.get(port_id)
+            if port_node is None:
+                raise ValueError(
+                    f"MultiPortChamberElement '{self.id}': port node "
+                    f"'{port_id}' is not in the network."
+                )
+            if not isinstance(port_node, MomentumChamberNode):
+                raise ValueError(
+                    f"MultiPortChamberElement '{self.id}': port '{port_id}' "
+                    f"must be a MomentumChamberNode, got "
+                    f"'{type(port_node).__name__}'."
+                )
+            # Mark the port-MCN so the solver skips its mass row.
+            port_node._is_junction_port = True
+            port_node._junction_id = self.id
+
+            outside_elems = [
+                e
+                for e in (
+                    graph.get_upstream_elements(port_id) + graph.get_downstream_elements(port_id)
+                )
+                if e is not self
+            ]
+            if len(outside_elems) != 1:
+                raise ValueError(
+                    f"MultiPortChamberElement '{self.id}': port '{port_id}' "
+                    f"must have exactly one outside element (channel, loss "
+                    f"element, etc.), found {len(outside_elems)}."
+                )
+            outer = outside_elems[0]
+            self._port_element_ids[i] = outer.id
+
+            # Validate the outer element's orientation matches the declared
+            # inlet/outlet for this port. The sign convention was fixed at
+            # __init__ from the inlet/outlet split:
+            #   inlet port (sign = -1):  outer.to_node should be the port-MCN
+            #     (outer feeds flow INTO the port, junction takes it from there).
+            #   outlet port (sign = +1): outer.from_node should be the port-MCN
+            #     (outer takes flow OUT of port, junction sends flow to there).
+            expected_sign = self._port_signs[i]
+            if outer.from_node == port_id:
+                topo_sign = +1.0  # outer takes flow OUT of port = +1 outflow
+            elif outer.to_node == port_id:
+                topo_sign = -1.0  # outer feeds flow INTO port = -1 outflow
+            else:
+                raise ValueError(
+                    f"MultiPortChamberElement '{self.id}': connecting element "
+                    f"'{outer.id}' at port '{port_id}' has no direct from/to "
+                    f"link to that port (multi-port outer elements are not "
+                    f"supported)."
+                )
+            if topo_sign != expected_sign:
+                role = "inlet" if expected_sign < 0 else "outlet"
+                raise ValueError(
+                    f"MultiPortChamberElement '{self.id}': port '{port_id}' is "
+                    f"declared as an {role} (sign={expected_sign:+.0f}) but the "
+                    f"connecting element '{outer.id}' is wired in the opposite "
+                    f"direction (sign={topo_sign:+.0f}). For an inlet port, the "
+                    f"outer element should feed INTO the port-MCN (outer.to_node "
+                    f"== port). For an outlet port, the outer element should take "
+                    f"flow OUT of the port-MCN (outer.from_node == port)."
+                )
+
+            # 2. Inherit port area from connecting channel if not set.
+            if self.port_areas[i] is None:
+                if isinstance(outer, ChannelElement) and outer.diameter is not None:
+                    self.port_areas[i] = math.pi * (outer.diameter / 2.0) ** 2
+                elif isinstance(outer, BorderCarnotLossElement) and outer.area is not None:
+                    self.port_areas[i] = outer.area
+            if self.port_areas[i] is None:
+                raise ValueError(
+                    f"MultiPortChamberElement '{self.id}': could not infer "
+                    f"area at port '{port_id}'. Provide port_areas explicitly "
+                    f"or attach a ChannelElement with diameter set."
+                )
+
+    def residuals(
+        self, states: list[NetworkMixtureState], P_jct: float, port_mdots: list[float]
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        """Evaluate residuals + Jacobian. Called from the solver special-case.
+
+        Args:
+            states: per-port NetworkMixtureState (carries P, T, Y at each port).
+            P_jct: junction's internal static pressure unknown value.
+            port_mdots: per-port mass flow IN JUNCTION CONVENTION (positive = out
+                of junction). Already sign-mapped by the solver via
+                self._port_signs.
+
+        Returns:
+            (residuals, jac) where residuals = [R_mom_0, ..., R_mom_{N-1}, R_mass]
+            and jac maps row index -> {unknown_name: derivative}. The mass-row
+            Jacobian uses the connecting elements' m_dot unknown names with the
+            port-orientation sign baked in.
+        """
+        P = [s.P for s in states]
+        T = [s.T for s in states]
+        Y = [list(s.Y) for s in states]
+        A = [float(a) for a in self.port_areas]
+        theta_rad = [math.radians(float(t)) for t in self.port_angles_deg]
+
+        cpp = _solver_tools.multi_port_chamber_residuals_and_jacobian(
+            P_jct=P_jct, P=P, mdot=port_mdots, T=T, Y=Y, A=A, theta_rad=theta_rad
+        )
+
+        residuals = list(cpp.impulse_residuals) + [cpp.mass_residual]
+        jac: dict[int, dict[str, float]] = {}
+
+        # Axial reference (port 0): cross-coupling Jacobian goes here.
+        axial_port_node = self.port_nodes[0]
+        axial_outer_id = self._port_element_ids[0]
+        axial_sign = self._port_signs[0]
+
+        # Impulse rows: each depends on (P_jct, port P, port mdot, port T) and
+        # on the axial reference port 0's state via the cross-coupling.
+        for i in range(self.N):
+            row = {
+                f"{self.id}.P_jct": -1.0,
+                f"{self.port_nodes[i]}.P": cpp.port_jac[i].dR_dP,
+                f"{self.port_nodes[i]}.T": cpp.port_jac[i].dR_dT,
+            }
+            # mdot Jacobian: chain rule through port sign.
+            # d(R_mom_i)/d(outer.m_dot) = dR/dmdot_port * sign_i
+            mdot_var = f"{self._port_element_ids[i]}.m_dot"
+            row[mdot_var] = cpp.port_jac[i].dR_dmdot * self._port_signs[i]
+
+            # Cross-coupling: non-axial ports also depend on port 0's state.
+            # Add to existing entries if same unknown (e.g. axial port mdot)
+            # to avoid clobbering.
+            cross_P = cpp.cross_dR_dP_axial[i]
+            cross_T = cpp.cross_dR_dT_axial[i]
+            cross_mdot = cpp.cross_dR_dmdot_axial[i] * axial_sign
+            if cross_P != 0.0:
+                key = f"{axial_port_node}.P"
+                row[key] = row.get(key, 0.0) + cross_P
+            if cross_T != 0.0:
+                key = f"{axial_port_node}.T"
+                row[key] = row.get(key, 0.0) + cross_T
+            if cross_mdot != 0.0:
+                key = f"{axial_outer_id}.m_dot"
+                row[key] = row.get(key, 0.0) + cross_mdot
+            jac[i] = row
+
+        # Mass row: d(sum mdot_port)/d(outer_i.m_dot) = sign_i.
+        mass_row = {}
+        for i in range(self.N):
+            mass_var = f"{self._port_element_ids[i]}.m_dot"
+            mass_row[mass_var] = mass_row.get(mass_var, 0.0) + self._port_signs[i]
+        jac[self.N] = mass_row
+
+        return residuals, jac
+
+    def diagnostics(self, states: list[NetworkMixtureState], P_jct: float) -> dict[str, float]:
+        diag: dict[str, float] = {"P_jct": float(P_jct), "n_ports": float(self.N)}
+        for i in range(self.N):
+            diag[f"port_{i}_P"] = float(states[i].P)
+            diag[f"port_{i}_T"] = float(states[i].T)
+            diag[f"port_{i}_area"] = float(self.port_areas[i] or 0.0)
+            diag[f"port_{i}_sign"] = float(self._port_signs[i])
+        return diag
+
+
+class BorderCarnotLossElement(NetworkElement):
+    """
+    Per-port Border-Carnot turning-loss element. Companion to
+    :class:`MultiPortChamberElement`; bolted onto lateral ports of the junction.
+
+    Residual (PDF Section 3.1):
+
+        Pt_in - Pt_out - L(delta_geom) * 0.5 * rho_in * u_in^2 = 0
+        L = 4 * (1 - cos((3/4) * delta_geom))^2
+
+    The (3/4) factor is Hager's effective-angle correction for sharp-edged
+    lateral branches. The form reproduces Hager xi_l and Bassett K_inc exactly
+    at M -> 0 on a sharp-edged 90-deg lateral. Straight-through ports
+    (delta_geom = 0) get L = 0 and need no loss element at all.
+
+    The element is sign-free in m_dot (mdot^2 in the dynamic head). The
+    initial form has no direction asymmetry parameter; an
+    ``alpha_contract`` calibration multiplier can be added later if validation
+    data forces it (PDF Section 3.3, deferred).
+    """
+
+    def __init__(
+        self,
+        id: str,
+        from_node: str,
+        to_node: str,
+        delta_geom_deg: float,
+        area: float | None = None,
+    ):
+        super().__init__(id, from_node, to_node)
+        self.delta_geom_deg = float(delta_geom_deg)
+        self.area = area
+
+    def unknowns(self) -> list[str]:
+        return [f"{self.id}.m_dot"]
+
+    def n_equations(self) -> int:
+        return 1
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        if self.area is None:
+            for elem in (
+                graph.get_upstream_elements(self.from_node)
+                + graph.get_downstream_elements(self.from_node)
+                + graph.get_upstream_elements(self.to_node)
+                + graph.get_downstream_elements(self.to_node)
+            ):
+                if elem is self:
+                    continue
+                if isinstance(elem, ChannelElement) and elem.diameter is not None:
+                    self.area = math.pi * (elem.diameter / 2.0) ** 2
+                    break
+            if self.area is None:
+                raise ValueError(
+                    f"BorderCarnotLossElement '{self.id}': could not infer "
+                    f"area from a neighboring channel. Provide area explicitly."
+                )
+
+    def residuals(
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        delta_rad = math.radians(self.delta_geom_deg)
+        cpp = _solver_tools.border_carnot_loss_residual_and_jacobian(
+            mdot=state_in.m_dot,
+            Pt_in=state_in.Pt,
+            Pt_out=state_out.Pt,
+            P_in=state_in.P,
+            T_in=state_in.T,
+            Y_in=list(state_in.Y),
+            area=float(self.area),
+            delta_geom=delta_rad,
+        )
+        res = [cpp.residual]
+        jac: dict[int, dict[str, float]] = {
+            0: {
+                f"{self.from_node}.Pt": cpp.d_res_dPt_in,
+                f"{self.to_node}.Pt": cpp.d_res_dPt_out,
+                f"{self.from_node}.P": cpp.d_res_dP_in,
+                f"{self.from_node}.T": cpp.d_res_dT_in,
+                f"{self.id}.m_dot": cpp.d_res_dmdot,
+            }
+        }
+        return res, jac
+
+    def diagnostics(
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+    ) -> dict[str, float]:
+        return {
+            "m_dot": float(state_in.m_dot),
+            "Pt_in": float(state_in.Pt),
+            "Pt_out": float(state_out.Pt),
+            "dPt": float(state_in.Pt - state_out.Pt),
+            "delta_geom_deg": float(self.delta_geom_deg),
+            "area": float(self.area or 0.0),
+        }
+
+
+# ---------------------------------------------------------------------------
 # Vortex element: rotating-cavity centrifugal pressure rise (Vatistas 1991)
 # ---------------------------------------------------------------------------
 

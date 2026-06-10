@@ -423,6 +423,7 @@ from combaero.network import (
     OrificeElement, ChannelElement, EffectiveAreaConnectionElement,
     LosslessConnectionElement, DiameterDischargeCoefficientConnectionElement,
     TeeJunctionElement, VortexElement,
+    MultiPortChamberElement, BorderCarnotLossElement,
 )
 
 # Flow elements
@@ -448,6 +449,33 @@ tee_branch = TeeJunctionElement(
 )
 # Solved unknowns: tee.m_dot_com (total), tee.m_dot_branch (branch arm)
 # Straight flow is implicit: m_dot_straight = m_dot_com - m_dot_branch
+
+# Momentum-CV junction (PDF spec, supersedes K-closure for n>3 manifolds and
+# high-Mach / ejector behaviour; see docs/junction/momentum cv implementation guide.pdf).
+# N port-MCNs feed a single junction; each lateral port carries a turning loss.
+mc_com = MomentumChamberNode("mc_com", area=0.01)
+mc_str = MomentumChamberNode("mc_str", area=0.01)
+mc_bra = MomentumChamberNode("mc_bra", area=0.008)
+
+jct = MultiPortChamberElement(
+    "jct",
+    inlet_nodes=["mc_com"],
+    outlet_nodes=["mc_str", "mc_bra"],
+    inlet_angles_deg=[0.0],
+    outlet_angles_deg=[0.0, 90.0],   # geometric branch angles per outlet port
+    # port_areas (length = N_in + N_out) inherited from connecting channels if not given
+)
+# Lateral port turning loss (sharp-edged 90 deg branch). Straight ports
+# (delta_geom = 0) do not need a loss element.
+loss_bra = BorderCarnotLossElement(
+    "loss_bra", from_node="mc_bra", to_node="ch_bra_in",
+    delta_geom_deg=90.0,
+    # area inherited from neighbouring channel if not given
+)
+# Solved unknowns: jct.P_jct (junction static pressure). Per-port mass flows
+# live on the connecting channels / loss elements; the junction reads them via
+# the graph. The N+1 residuals = N impulse-function residuals (one per port,
+# sign-free in m_dot) + global sum-of-port-mdots = 0.
 
 # Rotating cavity / disc-pump pressure rise (Vatistas n-vortex model)
 vortex = VortexElement(

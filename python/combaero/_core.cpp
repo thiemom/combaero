@@ -294,6 +294,62 @@ PYBIND11_MODULE(_core, m) {
         py::arg("area"),
         "Momentum chamber residual: P_total = P + 0.5*rho*v^2");
 
+  // Multi-port chamber (momentum-CV junction)
+  py::class_<solver::PortImpulseJacobian>(
+      m, "PortImpulseJacobian",
+      "Per-port impulse-residual Jacobian for MultiPortChamberResult")
+      .def_readonly("dR_dP", &solver::PortImpulseJacobian::dR_dP)
+      .def_readonly("dR_dmdot", &solver::PortImpulseJacobian::dR_dmdot)
+      .def_readonly("dR_dT", &solver::PortImpulseJacobian::dR_dT);
+
+  py::class_<solver::MultiPortChamberResult>(
+      m, "MultiPortChamberResult",
+      "Result of multi-port chamber (momentum-CV junction) residuals")
+      .def_readonly("impulse_residuals",
+                    &solver::MultiPortChamberResult::impulse_residuals)
+      .def_readonly("port_jac", &solver::MultiPortChamberResult::port_jac)
+      .def_readonly("cross_dR_dP_axial",
+                    &solver::MultiPortChamberResult::cross_dR_dP_axial)
+      .def_readonly("cross_dR_dT_axial",
+                    &solver::MultiPortChamberResult::cross_dR_dT_axial)
+      .def_readonly("cross_dR_dmdot_axial",
+                    &solver::MultiPortChamberResult::cross_dR_dmdot_axial)
+      .def_readonly("mass_residual",
+                    &solver::MultiPortChamberResult::mass_residual);
+
+  m.def("multi_port_chamber_residuals_and_jacobian",
+        &solver::multi_port_chamber_residuals_and_jacobian, py::arg("P_jct"),
+        py::arg("P"), py::arg("mdot"), py::arg("T"), py::arg("Y"), py::arg("A"),
+        py::arg("theta_rad"),
+        "Momentum-CV junction: N impulse residuals "
+        "R_mom_i = (P_i + cos^2(theta_i)*rho_i*u_i^2) - P_jct plus mass "
+        "residual sum_i mdot_i. mdot_i > 0 = flow out of junction. The "
+        "cos^2(theta) projection recovers 1D-duct impulse at theta=0 and "
+        "static equality at theta=pi/2.");
+
+  // Border-Carnot loss element
+  py::class_<solver::BorderCarnotLossResult>(
+      m, "BorderCarnotLossResult",
+      "Result of Border-Carnot loss residual and Jacobian evaluation")
+      .def_readonly("residual", &solver::BorderCarnotLossResult::residual)
+      .def_readonly("d_res_dPt_in",
+                    &solver::BorderCarnotLossResult::d_res_dPt_in)
+      .def_readonly("d_res_dPt_out",
+                    &solver::BorderCarnotLossResult::d_res_dPt_out)
+      .def_readonly("d_res_dP_in",
+                    &solver::BorderCarnotLossResult::d_res_dP_in)
+      .def_readonly("d_res_dT_in",
+                    &solver::BorderCarnotLossResult::d_res_dT_in)
+      .def_readonly("d_res_dmdot",
+                    &solver::BorderCarnotLossResult::d_res_dmdot);
+
+  m.def("border_carnot_loss_residual_and_jacobian",
+        &solver::border_carnot_loss_residual_and_jacobian, py::arg("mdot"),
+        py::arg("Pt_in"), py::arg("Pt_out"), py::arg("P_in"), py::arg("T_in"),
+        py::arg("Y_in"), py::arg("area"), py::arg("delta_geom"),
+        "Border-Carnot turning loss: Pt_in - Pt_out - L*0.5*rho*u^2 = 0 with "
+        "L = 4*(1 - cos((3/4)*delta_geom))^2 (Hager sharp-edge correction).");
+
   // Area change elements
   py::class_<combaero::AreaChangeResult>(
       m, "AreaChangeResult",

@@ -25,6 +25,8 @@ from .components import (
     AreaChangeElement,
     TeeJunctionElement,
     VortexElement,
+    MultiPortChamberElement,
+    BorderCarnotLossElement,
     WallNode,
 )
 from .combustion import (
@@ -61,6 +63,8 @@ __all__: list[str] = [
     "AreaChangeElement",
     "TeeJunctionElement",
     "VortexElement",
+    "MultiPortChamberElement",
+    "BorderCarnotLossElement",
     "EnergyBoundary",
     "NetworkMixtureState",
     "CombustionResult",

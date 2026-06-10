@@ -1,5 +1,6 @@
 #include "../include/solver_interface.h"
 #include "../include/area_change.h"
+#include "../include/multi_port_chamber.h"
 #include "../include/tee_junction.h"
 #include "../include/composition.h"
 #include "../include/transport.h"
@@ -1499,6 +1500,184 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
   // d(q_dynamic)/d(m_dot) = m_dot / (rho * A^2)
   double dq_dmdot = m_dot / (rho * area * area);
   res.d_res_dmdot = -dq_dmdot;
+
+  return res;
+}
+
+// -----------------------------------------------------------------------------
+// Multi-port chamber (momentum-CV junction)
+// -----------------------------------------------------------------------------
+
+namespace {
+// Normalise a per-port Y vector to a safe X vector for density evaluation.
+// Mirrors the all-zero fallback used in momentum_chamber_residual_and_jacobian
+// (treats degenerate Y as dry air) so multi-port behaves identically at edges.
+std::vector<double> y_to_safe_x(const std::vector<double> &Y) {
+  double sum_Y = 0.0;
+  for (double y : Y) {
+    sum_Y += y;
+  }
+  const double eps = 1e-10;
+  if (sum_Y < eps) {
+    std::vector<double> Y_safe(Y.size(), 0.0);
+    std::size_t n2_idx = combaero::species_index_from_name("N2");
+    std::size_t o2_idx = combaero::species_index_from_name("O2");
+    Y_safe[n2_idx] = 0.767;
+    Y_safe[o2_idx] = 0.233;
+    return combaero::mass_to_mole(combaero::normalize_fractions(Y_safe));
+  }
+  return combaero::mass_to_mole(combaero::normalize_fractions(Y));
+}
+}  // namespace
+
+MultiPortChamberResult multi_port_chamber_residuals_and_jacobian(
+    double P_jct,
+    const std::vector<double> &P,
+    const std::vector<double> &mdot,
+    const std::vector<double> &T,
+    const std::vector<std::vector<double>> &Y,
+    const std::vector<double> &A,
+    const std::vector<double> &theta_rad) {
+  const std::size_t N = P.size();
+  if (mdot.size() != N || T.size() != N || Y.size() != N || A.size() != N ||
+      theta_rad.size() != N) {
+    throw std::invalid_argument(
+        "multi_port_chamber_residuals_and_jacobian: per-port vector sizes "
+        "must all equal P.size()");
+  }
+  if (N < 2) {
+    throw std::invalid_argument(
+        "multi_port_chamber_residuals_and_jacobian: need at least 2 ports");
+  }
+
+  MultiPortChamberResult res;
+  res.impulse_residuals.resize(N);
+  res.port_jac.resize(N);
+  res.mass_residual = 0.0;
+
+  // Axial reference: port 0 (by convention the common / primary axial
+  // inlet). The cross-coupling term gives Bassett's -2*q*cos((3/4)*theta)
+  // contribution to K6 (Eq 27), arising from his axial momentum balance
+  // (Eq 3-4) wall reaction R_w projected through cos(theta).
+  const std::vector<double> X0 = y_to_safe_x(Y[0]);
+  auto [rho_axial, drho_axial_dT, drho_axial_dP] =
+      density_and_jacobians(T[0], P[0], X0);
+  const double A0 = A[0];
+  const double u_axial = mdot[0] / (rho_axial * A0);
+  const double du_axial_dmdot0 = 1.0 / (rho_axial * A0);
+  const double du_axial_dP0 =
+      -mdot[0] / (rho_axial * rho_axial * A0) * drho_axial_dP;
+  const double du_axial_dT0 =
+      -mdot[0] / (rho_axial * rho_axial * A0) * drho_axial_dT;
+
+  res.cross_dR_dP_axial.assign(N, 0.0);
+  res.cross_dR_dT_axial.assign(N, 0.0);
+  res.cross_dR_dmdot_axial.assign(N, 0.0);
+
+  for (std::size_t i = 0; i < N; ++i) {
+    const std::vector<double> X = y_to_safe_x(Y[i]);
+    auto [rho_i, drho_dT, drho_dP] = density_and_jacobians(T[i], P[i], X);
+
+    // Per-port angle projection: theta=0 (axial port) gives sin^2=0 ->
+    // static equality R_mom_i = P_i - P_jct. theta=pi/2 (lateral perpendi-
+    // cular) gives sin^2=1 -> full impulse + cross-coupling.
+    // The cross-coupling 2*sin(theta_i)*cos((3/4)*theta_i)*rho_0*u_0*u_i
+    // vanishes at theta_i = 0 and produces the -2*q*cos((3/4)*theta)
+    // contribution to K6 at lateral ports. Together with sin^2(theta_i)*
+    // rho_i*u_i^2 this reproduces Bassett K6 = 1 + q^2 - 2q*cos((3/4)*theta)
+    // at theta=pi/2, psi=1, M=0.
+    const double sin_theta = std::sin(theta_rad[i]);
+    const double cos_theta_eff = std::cos(0.75 * theta_rad[i]);
+    const double sin2_theta = sin_theta * sin_theta;
+    const double cross_coeff = 2.0 * sin_theta * cos_theta_eff;  // 0 at theta=0
+
+    const double rho_A2 = rho_i * A[i] * A[i];
+    const double u_i = mdot[i] / (rho_i * A[i]);
+    const double rho_u2 = mdot[i] * mdot[i] / rho_A2;
+
+    // Cross-coupling pressure contribution: 2*sin*cos*rho_axial*u_axial*u_i.
+    const double cross = cross_coeff * rho_axial * u_axial * u_i;
+
+    res.impulse_residuals[i] = P[i] + sin2_theta * rho_u2 + cross - P_jct;
+
+    // Local-port partials:
+    //   dR/dP_i: 1 + sin2 * d(rho*u^2)/dP_i + cross_coeff * rho_axial * u_axial * du_i/dP_i
+    const double drhou2_dP =
+        -mdot[i] * mdot[i] / (rho_i * rho_i * A[i] * A[i]) * drho_dP;
+    const double du_i_dP = -mdot[i] / (rho_i * rho_i * A[i]) * drho_dP;
+    res.port_jac[i].dR_dP =
+        1.0 + sin2_theta * drhou2_dP +
+        cross_coeff * rho_axial * u_axial * du_i_dP;
+
+    //   dR/dT_i
+    const double du_i_dT = -mdot[i] / (rho_i * rho_i * A[i]) * drho_dT;
+    res.port_jac[i].dR_dT =
+        sin2_theta *
+            (-mdot[i] * mdot[i] / (rho_i * rho_i * A[i] * A[i]) * drho_dT) +
+        cross_coeff * rho_axial * u_axial * du_i_dT;
+
+    //   dR/dmdot_i: sin2 * 2 * mdot/(rho*A^2) + cross_coeff * rho_axial * u_axial * du_i/dmdot_i
+    const double du_i_dmdot = 1.0 / (rho_i * A[i]);
+    res.port_jac[i].dR_dmdot =
+        sin2_theta * 2.0 * mdot[i] / rho_A2 +
+        cross_coeff * rho_axial * u_axial * du_i_dmdot;
+
+    // Cross-coupling partials wrt axial reference (port 0).
+    // Zero for the axial port itself (cross_coeff = 0). For i=0 the cross
+    // term and these partials are 0 anyway.
+    if (cross_coeff != 0.0) {
+      res.cross_dR_dP_axial[i] =
+          cross_coeff * u_i *
+          (drho_axial_dP * u_axial + rho_axial * du_axial_dP0);
+      res.cross_dR_dT_axial[i] =
+          cross_coeff * u_i *
+          (drho_axial_dT * u_axial + rho_axial * du_axial_dT0);
+      res.cross_dR_dmdot_axial[i] =
+          cross_coeff * u_i * rho_axial * du_axial_dmdot0;
+    }
+
+    res.mass_residual += mdot[i];
+  }
+
+  return res;
+}
+
+// -----------------------------------------------------------------------------
+// Border-Carnot loss element (companion to multi-port chamber)
+// -----------------------------------------------------------------------------
+
+BorderCarnotLossResult border_carnot_loss_residual_and_jacobian(
+    double mdot,
+    double Pt_in, double Pt_out,
+    double P_in, double T_in,
+    const std::vector<double> &Y_in,
+    double area, double delta_geom) {
+  const std::vector<double> X = y_to_safe_x(Y_in);
+  auto [rho, drho_dT, drho_dP] = density_and_jacobians(T_in, P_in, X);
+
+  const double L = combaero::border_carnot_L(delta_geom);
+
+  // dP_loss = L * 0.5 * rho * u^2 = L * 0.5 * mdot^2 / (rho * A^2)
+  // R = Pt_in - Pt_out - dP_loss
+  const double half_mdot2_over_rho_A2 =
+      0.5 * mdot * mdot / (rho * area * area);
+  const double dP_loss = L * half_mdot2_over_rho_A2;
+
+  BorderCarnotLossResult res;
+  res.residual = Pt_in - Pt_out - dP_loss;
+
+  res.d_res_dPt_in = 1.0;
+  res.d_res_dPt_out = -1.0;
+
+  // d(dP_loss)/d(mdot) = L * mdot / (rho * A^2)
+  res.d_res_dmdot = -L * mdot / (rho * area * area);
+
+  // d(dP_loss)/d(P_in) through rho:
+  //   d/dP_in [L * 0.5 * mdot^2 / (rho * A^2)]
+  //     = -L * 0.5 * mdot^2 / (rho^2 * A^2) * drho_dP
+  // R = ... - dP_loss, so d_res_dP_in = +L * 0.5 * mdot^2 / (rho^2 * A^2) * drho_dP
+  res.d_res_dP_in = L * 0.5 * mdot * mdot / (rho * rho * area * area) * drho_dP;
+  res.d_res_dT_in = L * 0.5 * mdot * mdot / (rho * rho * area * area) * drho_dT;
 
   return res;
 }
