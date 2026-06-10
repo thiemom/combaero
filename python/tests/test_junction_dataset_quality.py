@@ -94,16 +94,7 @@ def _tolerance_for(file: FileMetadata) -> float:
 # Known digitization issues to xfail rather than block. Each entry should
 # have a one-line reason; the test will fail loudly if a known-issue file
 # starts passing so the entry can be removed.
-_KNOWN_ISSUES: dict[str, str] = {
-    # Fig 10a captures multiple theta curves on one plot; the original
-    # digitization picked up data from q in [0, 2] across multiple symbols.
-    # The valid-range filter cuts most of it but the residual scatter is
-    # still too high for the "good" tier.
-    "bassett_fig10a_K12_theta=30_psi=1_measured.csv": "fig 10a digitization picked up extra theta curves; q-range filter helps but residual scatter remains",
-    "bassett_fig10a_K12_theta=45_psi=1_measured.csv": "fig 10a digitization picked up extra theta curves",
-    "bassett_fig10a_K12_theta=60_psi=1_measured.csv": "fig 10a digitization picked up extra theta curves",
-    "bassett_fig10a_K12_theta=90_psi=1_measured.csv": "fig 10a digitization picked up extra theta curves",
-}
+_KNOWN_ISSUES: dict[str, str] = {}
 
 
 @pytest.mark.parametrize(
