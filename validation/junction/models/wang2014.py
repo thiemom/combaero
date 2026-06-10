@@ -67,3 +67,39 @@ def lookup_table2(q: float, K_id: str) -> float:
         if abs(row["q"] - q) < 1e-6:
             return row[K_id]
     raise ValueError(f"q={q} not in Wang Table 2 (tabulated: {[r['q'] for r in TABLE_2]})")
+
+
+def _interp(value: float, points: list[tuple[float, float]]) -> float | None:
+    """Linear interpolation between sorted (x, y) points; None if out of range."""
+    pts = sorted(points)
+    if value < pts[0][0] - 1e-9 or value > pts[-1][0] + 1e-9:
+        return None
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+        if x0 <= value <= x1:
+            if x1 == x0:
+                return y0
+            t = (value - x0) / (x1 - x0)
+            return y0 + t * (y1 - y0)
+    return None
+
+
+def interp_table1(M_3: float, K_id: str) -> float | None:
+    """Linear interpolation in Table 1 (a=1, q=0.5) on M_3.
+
+    Returns None when M_3 is outside the tabulated range [0.1, 0.6] or
+    K_id is unsupported."""
+    if K_id not in {"K_13", "K_23"}:
+        return None
+    pts = [(row["M_3"], row[K_id]) for row in TABLE_1]
+    return _interp(M_3, pts)
+
+
+def interp_table2(q: float, K_id: str) -> float | None:
+    """Linear interpolation in Table 2 (a=1, M_3=0.5) on q.
+
+    Returns None when q is outside the tabulated range [0, 1] or
+    K_id is unsupported."""
+    if K_id not in {"K_13", "K_23"}:
+        return None
+    pts = [(row["q"], row[K_id]) for row in TABLE_2]
+    return _interp(q, pts)
