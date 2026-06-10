@@ -97,14 +97,14 @@ def K7_corr(q: float, psi: float, theta: float) -> float:
 
 def K8_raw(q: float, psi: float, theta: float) -> float:
     """Joining type 4, lateral path (Table 2, no angle correction).
-    K8 = 1 - q^2 + 2*(1-q)*psi*cos(theta)."""
-    return 1.0 - q * q + 2.0 * (1.0 - q) * psi * math.cos(theta)
+    K8 = 1 - q^2 + 2 * (1-q)^2 * psi * cos(theta)."""
+    return 1.0 - q * q + 2.0 * (1.0 - q) * (1.0 - q) * psi * math.cos(theta)
 
 
 def K8_corr(q: float, psi: float, theta: float) -> float:
     """Joining type 4, lateral path with Eq 34 correction."""
     tc = math.pi - 0.75 * (math.pi - theta)
-    return 1.0 - q * q + 2.0 * (1.0 - q) * psi * math.cos(tc)
+    return 1.0 - q * q + 2.0 * (1.0 - q) * (1.0 - q) * psi * math.cos(tc)
 
 
 def K9_raw(q: float, psi: float, theta: float) -> float:

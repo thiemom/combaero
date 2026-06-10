@@ -63,6 +63,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docs/junction/momentum cv implementation guide.pdf`). The merging tee is unaffected.
 
 ### Fixed
+- **`tee_junction.h` K8 transcription**: K8 (joining type 4, lateral path) had
+  `c / psi` where Bassett Table 2 + Eq 34 angle correction call for `psi * c`.
+  Invisible at `psi = 1` (the only point covered by the existing
+  `K7-K8` complementary-identity test, since both forms reduce to the same
+  expression there); diverges at `psi != 1`. Verdict surfaced by the new
+  junction-validation runner (`#183`) on Bassett Fig 12b digitized data
+  (`psi in {1, 2, 4}` at theta=45 deg). Corrected K8 matches Bassett's own
+  published calc line in Fig 12b; the residual gap vs measured (~0.6 at
+  psi=4, q=0.5) is the paper's own acknowledged moderate fit, not a code
+  defect. Same fix applied to `dK8_dq`. K7-K8 identity test still passes
+  unchanged. New regression test pins K8 across psi=1, 2, 4 at theta=45
+  deg.
 - **Channel-to-MomentumChamberNode face convention**: `ChannelElement.residuals` coupled
   the upstream node's stagnation pressure to the downstream node's *static* pressure
   (`Pt_up - P_down - dP_friction = 0`). Across an inline `MomentumChamberNode` (where
