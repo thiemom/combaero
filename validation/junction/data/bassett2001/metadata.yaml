@@ -56,10 +56,15 @@ files:
   bassett_fig08_K4_theta=135_psi=1_measured.csv: {K_id: K4, psi: 1.0, theta_deg: 135, x_axis: q, flow_regime: separating, kind: measured}
 
   # ----- Fig 10a: K12 (no angle correction in calc), equal-area, theta sweep -----
+  # Re-digitized cleanly with all 4 theta calc lines (the original had only
+  # theta=90 calc and a broken q-axis range up to 2.0).
   bassett_fig10a_K12_theta=30_psi=1_measured.csv: {K_id: K12, psi: 1.0, theta_deg: 30, x_axis: q, flow_regime: joining, kind: measured}
   bassett_fig10a_K12_theta=45_psi=1_measured.csv: {K_id: K12, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
   bassett_fig10a_K12_theta=60_psi=1_measured.csv: {K_id: K12, psi: 1.0, theta_deg: 60, x_axis: q, flow_regime: joining, kind: measured}
   bassett_fig10a_K12_theta=90_psi=1_measured.csv: {K_id: K12, psi: 1.0, theta_deg: 90, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig10a_K12_theta=30_psi=1_calc.csv:     {K_id: K12, psi: 1.0, theta_deg: 30, x_axis: q, flow_regime: joining, kind: calc, calc_variant: raw}
+  bassett_fig10a_K12_theta=45_psi=1_calc.csv:     {K_id: K12, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: calc, calc_variant: raw}
+  bassett_fig10a_K12_theta=60_psi=1_calc.csv:     {K_id: K12, psi: 1.0, theta_deg: 60, x_axis: q, flow_regime: joining, kind: calc, calc_variant: raw}
   bassett_fig10a_K12_theta=90_psi=1_calc.csv:     {K_id: K12, psi: 1.0, theta_deg: 90, x_axis: q, flow_regime: joining, kind: calc, calc_variant: raw}
 
   # ----- Fig 10b: K12 WITH angle correction (Eq 33), equal-area, theta sweep -----
