@@ -14,7 +14,7 @@ fit_tiers:
   K1: very_good
   K2: excellent
   K3: very_good
-  K4: very_good
+  K4: good      # Fig 8 measured shows ~0.3-0.4 endpoint spread vs calc despite Bassett's "agree well" text
   K5: excellent
   K6: very_good
   K7: moderate
