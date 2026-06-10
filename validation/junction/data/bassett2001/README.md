@@ -45,11 +45,15 @@ A candidate junction model that fails to match measured K9 is NOT necessarily
 broken — it's failing where 1D physics itself fails. The scorecard's
 `Delta_vs_ceiling` metric encodes this.
 
-## Known issues caught here
+## Verdicts from the runner (vs Fig 10c, Fig 12b measured)
 
-- `include/tee_junction.h` K12 in main has a transcription bug: the bracket
-  uses `q^2 * psi * cos(theta)` instead of the correct `q^2 * psi^2 * cos(theta)`
-  per Bassett Table 2. Invisible at psi=1 (ψ = ψ²) — Fig 10c psi=3 measurements
-  resolve it.
-- K8 in tee_junction.h uses `(1-q)^2 / psi` where Table 2 has `(1-q) * psi`.
-  Fig 12a equal-area measurements resolve it.
+- **K12 in `include/tee_junction.h` is CORRECT.** An earlier suspicion of a
+  ψ²-vs-ψ transcription bug was wrong — the correct Bassett formula has
+  ψ (not ψ²) inside the bracket. Verified at psi=3, q=0.5: C++ K12 gives
+  1.47, measured K12 from Fig 10c gives 1.46.
+- **K8 in `include/tee_junction.h` has a real transcription error.** Code
+  uses `2*(1-q)^2 * cos(theta')/psi` where Bassett Table 2 has
+  `2*(1-q) * psi * cos(theta')`. At psi=4, q=0.5: code gives 0.77, the
+  correct formula gives 1.53, Fig 12b measured gives 1.73. Code is off
+  by ~1.0; correct formula is within Bassett's ~12% typical fit. Fix
+  belongs in a separate `fix(junction):` PR.

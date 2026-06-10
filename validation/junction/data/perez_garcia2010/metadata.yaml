@@ -1,0 +1,17 @@
+# Perez-Garcia 2010 dataset metadata.
+# Analytical-only: no measured CSVs. The K-hat regression correlations live
+# in validation/junction/models/perez_garcia2010.py (Table 1 transcription).
+# This file exists for paper-level metadata and consistency with the schema.
+
+paper:
+  name: Perez-Garcia 2010
+  citation: "J Perez-Garcia, E Sanmiguel-Rojas, A Viedma. New Coefficient to Characterize Energy Losses in Compressible Flow at T-Junctions. Appl Math Modelling 34:4289-4305, 2010."
+  doi: "10.1016/j.apm.2010.04.022"
+  q_convention: perez_garcia   # q = G_1 / G_3 = inlet (or outlet) 1 / common
+  default_uncertainty_K: null   # not applicable -- analytical correlation only
+
+fit_tiers:
+  K_hat_1: very_good   # paper R^2 >= 0.9997 across C1/D1 fits
+  K_hat_2: very_good   # paper R^2 >= 0.9996 across all flow types
+
+files: {}   # analytical-only; no measured data files

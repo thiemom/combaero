@@ -1,0 +1,52 @@
+# Wang 2014/2015 dataset metadata.
+
+paper:
+  name: Wang 2014
+  citation: "Wenhui Wang, Zhenhua Lu, Kangyao Deng, Shuan Qu. An experimental study of compressible combining flow at 45 degree T-junctions. Proc IMechE Part C 229(9):1600-1610, 2015."
+  doi: "10.1177/0954406214546678"
+  q_convention: wang   # q = m_1 / m_3 = lateral / common
+  default_uncertainty_K: 0.04   # ~1% measurement repeatability per paper; conservative 4% absolute K
+
+# Wang's K_13 / K_23 are compressible-flow joining loss coefficients. They
+# correspond physically to Bassett's K12 / K11 in the M->0 limit but include
+# Mach-dependent corrections; only the M_3 -> 0 slice is directly comparable.
+fit_tiers:
+  K_13: excellent   # paper reports measurement repeatability ~1%
+  K_23: excellent
+
+files:
+  # ----- Fig 10: a = 1, K13 / K23 vs M_3 at q sweep -----
+  wang_fig10_K13_a=1_q=0_measured.csv:   {K_id: K_13, a: 1.0, theta_deg: 45, q: 0,   x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig10_K13_a=1_q=0.2_measured.csv: {K_id: K_13, a: 1.0, theta_deg: 45, q: 0.2, x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig10_K13_a=1_q=0.5_measured.csv: {K_id: K_13, a: 1.0, theta_deg: 45, q: 0.5, x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig10_K13_a=1_q=0.8_measured.csv: {K_id: K_13, a: 1.0, theta_deg: 45, q: 0.8, x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig10_K13_a=1_q=1_measured.csv:   {K_id: K_13, a: 1.0, theta_deg: 45, q: 1,   x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig10_K23_a=1_q=0_measured.csv:   {K_id: K_23, a: 1.0, theta_deg: 45, q: 0,   x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig10_K23_a=1_q=0.2_measured.csv: {K_id: K_23, a: 1.0, theta_deg: 45, q: 0.2, x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig10_K23_a=1_q=0.5_measured.csv: {K_id: K_23, a: 1.0, theta_deg: 45, q: 0.5, x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig10_K23_a=1_q=0.8_measured.csv: {K_id: K_23, a: 1.0, theta_deg: 45, q: 0.8, x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig10_K23_a=1_q=1_measured.csv:   {K_id: K_23, a: 1.0, theta_deg: 45, q: 1,   x_axis: M_3, flow_regime: combining, kind: measured}
+
+  # ----- Fig 11: a = 1.56 -----
+  wang_fig11_K13_a=1.56_q=0_measured.csv:   {K_id: K_13, a: 1.56, theta_deg: 45, q: 0,   x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig11_K13_a=1.56_q=0.2_measured.csv: {K_id: K_13, a: 1.56, theta_deg: 45, q: 0.2, x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig11_K13_a=1.56_q=0.5_measured.csv: {K_id: K_13, a: 1.56, theta_deg: 45, q: 0.5, x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig11_K13_a=1.56_q=0.8_measured.csv: {K_id: K_13, a: 1.56, theta_deg: 45, q: 0.8, x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig11_K13_a=1.56_q=1_measured.csv:   {K_id: K_13, a: 1.56, theta_deg: 45, q: 1,   x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig11_K23_a=1.56_q=0_measured.csv:   {K_id: K_23, a: 1.56, theta_deg: 45, q: 0,   x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig11_K23_a=1.56_q=0.2_measured.csv: {K_id: K_23, a: 1.56, theta_deg: 45, q: 0.2, x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig11_K23_a=1.56_q=0.5_measured.csv: {K_id: K_23, a: 1.56, theta_deg: 45, q: 0.5, x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig11_K23_a=1.56_q=0.8_measured.csv: {K_id: K_23, a: 1.56, theta_deg: 45, q: 0.8, x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig11_K23_a=1.56_q=1_measured.csv:   {K_id: K_23, a: 1.56, theta_deg: 45, q: 1,   x_axis: M_3, flow_regime: combining, kind: measured}
+
+  # ----- Fig 12: a = 2.44 -----
+  wang_fig12_K13_a=2.44_q=0_measured.csv:   {K_id: K_13, a: 2.44, theta_deg: 45, q: 0,   x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig12_K13_a=2.44_q=0.2_measured.csv: {K_id: K_13, a: 2.44, theta_deg: 45, q: 0.2, x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig12_K13_a=2.44_q=0.5_measured.csv: {K_id: K_13, a: 2.44, theta_deg: 45, q: 0.5, x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig12_K13_a=2.44_q=0.8_measured.csv: {K_id: K_13, a: 2.44, theta_deg: 45, q: 0.8, x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig12_K13_a=2.44_q=1_measured.csv:   {K_id: K_13, a: 2.44, theta_deg: 45, q: 1,   x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig12_K23_a=2.44_q=0_measured.csv:   {K_id: K_23, a: 2.44, theta_deg: 45, q: 0,   x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig12_K23_a=2.44_q=0.2_measured.csv: {K_id: K_23, a: 2.44, theta_deg: 45, q: 0.2, x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig12_K23_a=2.44_q=0.5_measured.csv: {K_id: K_23, a: 2.44, theta_deg: 45, q: 0.5, x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig12_K23_a=2.44_q=0.8_measured.csv: {K_id: K_23, a: 2.44, theta_deg: 45, q: 0.8, x_axis: M_3, flow_regime: combining, kind: measured}
+  wang_fig12_K23_a=2.44_q=1_measured.csv:   {K_id: K_23, a: 2.44, theta_deg: 45, q: 1,   x_axis: M_3, flow_regime: combining, kind: measured}

@@ -1,0 +1,107 @@
+# Bassett 2001 dataset metadata.
+# Schema: see validation/junction/schema.py.
+# Filenames already encode K_id, psi, theta -- per-file fields are redundant
+# but serve as sanity-check assertions for the runner.
+
+paper:
+  name: Bassett 2001
+  citation: "M D Bassett, D E Winterbone, R J Pearson. Calculation of steady flow pressure loss coefficients for pipe junctions. Proc IMechE Part C 215(8):861-881, 2001."
+  doi: "10.1177/095440620121500801"
+  q_convention: bassett   # q = m_other / m_com per Table 1
+  default_uncertainty_K: 0.05
+
+fit_tiers:
+  K1: very_good
+  K2: excellent
+  K3: very_good
+  K4: very_good
+  K5: excellent
+  K6: very_good
+  K7: moderate
+  K8: moderate
+  K9: poor
+  K10: poor
+  K11: moderate
+  K12: good
+
+files:
+  # ----- Fig 5: contraction coefficient xi vs q, theta sweep (Eq 22 analytical) -----
+  bassett_fig05_xi_theta=0_calc.csv:   {coefficient: xi, theta_deg: 0,   x_axis: q, kind: calc}
+  bassett_fig05_xi_theta=30_calc.csv:  {coefficient: xi, theta_deg: 30,  x_axis: q, kind: calc}
+  bassett_fig05_xi_theta=45_calc.csv:  {coefficient: xi, theta_deg: 45,  x_axis: q, kind: calc}
+  bassett_fig05_xi_theta=60_calc.csv:  {coefficient: xi, theta_deg: 60,  x_axis: q, kind: calc}
+  bassett_fig05_xi_theta=90_calc.csv:  {coefficient: xi, theta_deg: 90,  x_axis: q, kind: calc}
+  bassett_fig05_xi_theta=120_calc.csv: {coefficient: xi, theta_deg: 120, x_axis: q, kind: calc}
+  bassett_fig05_xi_theta=180_calc.csv: {coefficient: xi, theta_deg: 180, x_axis: q, kind: calc}
+
+  # ----- Fig 7a: K6 measured, equal-area, theta sweep -----
+  bassett_fig07a_K6_theta=45_psi=1_measured.csv:  {K_id: K6, psi: 1.0, theta_deg: 45,  x_axis: q, flow_regime: separating, kind: measured}
+  bassett_fig07a_K6_theta=60_psi=1_measured.csv:  {K_id: K6, psi: 1.0, theta_deg: 60,  x_axis: q, flow_regime: separating, kind: measured}
+  bassett_fig07a_K6_theta=90_psi=1_measured.csv:  {K_id: K6, psi: 1.0, theta_deg: 90,  x_axis: q, flow_regime: separating, kind: measured}
+  bassett_fig07a_K6_theta=120_psi=1_measured.csv: {K_id: K6, psi: 1.0, theta_deg: 120, x_axis: q, flow_regime: separating, kind: measured}
+
+  # ----- Fig 7b: K6 measured at theta=45, psi sweep -----
+  bassett_fig07b_K6_theta=45_psi=1_measured.csv: {K_id: K6, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: separating, kind: measured}
+  bassett_fig07b_K6_theta=45_psi=3_measured.csv: {K_id: K6, psi: 3.0, theta_deg: 45, x_axis: q, flow_regime: separating, kind: measured}
+
+  # ----- Fig 7c: K5 measured (theta- and psi-independent by Eq 15; multiple slices) -----
+  bassett_fig07c_K5_theta=45_psi=1_measured.csv: {K_id: K5, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: separating, kind: measured}
+  bassett_fig07c_K5_theta=45_psi=3_measured.csv: {K_id: K5, psi: 3.0, theta_deg: 45, x_axis: q, flow_regime: separating, kind: measured}
+  bassett_fig07c_K5_theta=60_psi=1_measured.csv: {K_id: K5, psi: 1.0, theta_deg: 60, x_axis: q, flow_regime: separating, kind: measured}
+  bassett_fig07c_K5_theta=90_psi=1_measured.csv: {K_id: K5, psi: 1.0, theta_deg: 90, x_axis: q, flow_regime: separating, kind: measured}
+
+  # ----- Fig 8: K4 measured, equal-area, theta sweep -----
+  bassett_fig08_K4_theta=45_psi=1_measured.csv:  {K_id: K4, psi: 1.0, theta_deg: 45,  x_axis: q, flow_regime: separating, kind: measured}
+  bassett_fig08_K4_theta=90_psi=1_measured.csv:  {K_id: K4, psi: 1.0, theta_deg: 90,  x_axis: q, flow_regime: separating, kind: measured}
+  bassett_fig08_K4_theta=135_psi=1_measured.csv: {K_id: K4, psi: 1.0, theta_deg: 135, x_axis: q, flow_regime: separating, kind: measured}
+
+  # ----- Fig 10a: K12 (no angle correction in calc), equal-area, theta sweep -----
+  bassett_fig10a_K12_theta=30_psi=1_measured.csv: {K_id: K12, psi: 1.0, theta_deg: 30, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig10a_K12_theta=45_psi=1_measured.csv: {K_id: K12, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig10a_K12_theta=60_psi=1_measured.csv: {K_id: K12, psi: 1.0, theta_deg: 60, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig10a_K12_theta=90_psi=1_measured.csv: {K_id: K12, psi: 1.0, theta_deg: 90, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig10a_K12_theta=90_psi=1_calc.csv:     {K_id: K12, psi: 1.0, theta_deg: 90, x_axis: q, flow_regime: joining, kind: calc, calc_variant: raw}
+
+  # ----- Fig 10b: K12 WITH angle correction (Eq 33), equal-area, theta sweep -----
+  bassett_fig10b_K12_theta=30_psi=1_measured.csv: {K_id: K12, psi: 1.0, theta_deg: 30, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig10b_K12_theta=45_psi=1_measured.csv: {K_id: K12, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig10b_K12_theta=60_psi=1_measured.csv: {K_id: K12, psi: 1.0, theta_deg: 60, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig10b_K12_theta=90_psi=1_measured.csv: {K_id: K12, psi: 1.0, theta_deg: 90, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig10b_K12_theta=90_psi=1_calc.csv:     {K_id: K12, psi: 1.0, theta_deg: 90, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+
+  # ----- Fig 10c: K12 at theta=45, psi sweep (with angle correction in calc lines) -----
+  bassett_fig10c_K12_theta=45_psi=1_measured.csv: {K_id: K12, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig10c_K12_theta=45_psi=2_measured.csv: {K_id: K12, psi: 2.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig10c_K12_theta=45_psi=3_measured.csv: {K_id: K12, psi: 3.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig10c_K12_theta=45_psi=4_measured.csv: {K_id: K12, psi: 4.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig10c_K12_theta=45_psi=1_calc.csv: {K_id: K12, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig10c_K12_theta=45_psi=3_calc.csv: {K_id: K12, psi: 3.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig10c_K12_theta=45_psi=4_calc.csv: {K_id: K12, psi: 4.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+
+  # ----- Fig 11b: K11 at theta=45, psi sweep (measured only) -----
+  bassett_fig11b_K11_theta=45_psi=1_measured.csv: {K_id: K11, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig11b_K11_theta=45_psi=2_measured.csv: {K_id: K11, psi: 2.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig11b_K11_theta=45_psi=3_measured.csv: {K_id: K11, psi: 3.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig11b_K11_theta=45_psi=4_measured.csv: {K_id: K11, psi: 4.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
+
+  # ----- Fig 12a: K8 measured, equal-area, theta sweep -----
+  bassett_fig12a_K8_theta=30_psi=1_measured.csv: {K_id: K8, psi: 1.0, theta_deg: 30, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig12a_K8_theta=45_psi=1_measured.csv: {K_id: K8, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig12a_K8_theta=60_psi=1_measured.csv: {K_id: K8, psi: 1.0, theta_deg: 60, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig12a_K8_theta=90_psi=1_measured.csv: {K_id: K8, psi: 1.0, theta_deg: 90, x_axis: q, flow_regime: joining, kind: measured}
+
+  # ----- Fig 12b: K8 at theta=45 (assumed -- paper subfig b convention), psi sweep -----
+  # NOTE: paper does NOT report psi=3 for this subfigure; user digitized {1, 2, 4}.
+  bassett_fig12b_K8_psi=1_measured.csv: {K_id: K8, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig12b_K8_psi=2_measured.csv: {K_id: K8, psi: 2.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig12b_K8_psi=4_measured.csv: {K_id: K8, psi: 4.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
+
+  # ----- Fig 13b: K7 at theta=45, psi sweep (same theta convention as 12b) -----
+  bassett_fig13b_K7_psi=1_measured.csv: {K_id: K7, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig13b_K7_psi=2_measured.csv: {K_id: K7, psi: 2.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
+  bassett_fig13b_K7_psi=4_measured.csv: {K_id: K7, psi: 4.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
+
+  # ----- Fig 14: K9 at theta=90, psi=1 (Ito-Imai measured + 2 model lines) -----
+  bassett_fig14_K9_theta=90_psi=1_measured_ito_imai.csv: {K_id: K9, psi: 1.0, theta_deg: 90, x_axis: q, flow_regime: joining, kind: measured, source: "Ito and Imai 1973"}
+  bassett_fig14_K9_theta=90_psi=1_calc_raw.csv:          {K_id: K9, psi: 1.0, theta_deg: 90, x_axis: q, flow_regime: joining, kind: calc, calc_variant: raw}
+  bassett_fig14_K9_theta=90_psi=1_calc_corr.csv:         {K_id: K9, psi: 1.0, theta_deg: 90, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}

@@ -121,10 +121,7 @@ def K9_corr(q: float, psi: float, theta: float) -> float:
     ca = math.cos(theta + alpha)
     cb = math.cos(theta - beta)
     return (
-        2.0 * q * q * ca / psi
-        - 2.0 * (1.0 - q) * (1.0 - q) * cb / psi
-        + q * q / (psi * psi)
-        + 1.0
+        2.0 * q * q * ca / psi - 2.0 * (1.0 - q) * (1.0 - q) * cb / psi + q * q / (psi * psi) + 1.0
     )
 
 
@@ -141,10 +138,7 @@ def K10_corr(q: float, psi: float, theta: float) -> float:
     ca = math.cos(theta + alpha)
     cb = math.cos(theta - beta)
     return (
-        2.0 * (1.0 - q) * (1.0 - q) * ca / psi
-        - 2.0 * q * q * cb / psi
-        + q * q / (psi * psi)
-        + 1.0
+        2.0 * (1.0 - q) * (1.0 - q) * ca / psi - 2.0 * q * q * cb / psi + q * q / (psi * psi) + 1.0
     )
 
 
@@ -166,13 +160,13 @@ def K11_corr(q: float, psi: float, theta: float) -> float:
 
 def K12_raw(q: float, psi: float, theta: float) -> float:
     """Joining type 6, branch-to-outlet (Table 2, no angle correction).
-    K12 = 2*psi/(psi + 0.5*cos(theta)) * [1 - (1-q)^2 - q^2 * psi^2 * cos(theta)]
+    K12 = 2*psi/(psi + 0.5*cos(theta)) * [1 - (1-q)^2 - q^2 * psi * cos(theta)]
           + q^2 * psi^2 - 1.
-    Note the psi^2 inside the bracket; this is the term where tee_junction.h
-    has a transcription bug (uses psi instead of psi^2)."""
+    Note: psi inside the bracket (not psi^2). The Fig 10c psi=3 measured
+    data (K12=1.46 at q=0.5) confirms this; a psi^2 form gives -0.72."""
     c = math.cos(theta)
     D = psi + 0.5 * c
-    N = 1.0 - (1.0 - q) * (1.0 - q) - q * q * psi * psi * c
+    N = 1.0 - (1.0 - q) * (1.0 - q) - q * q * psi * c
     return (2.0 * psi / D) * N + q * q * psi * psi - 1.0
 
 
@@ -180,7 +174,7 @@ def K12_corr(q: float, psi: float, theta: float) -> float:
     """Joining type 6, branch-to-outlet with Eq 33 correction."""
     c = math.cos(0.75 * theta)
     D = psi + 0.5 * c
-    N = 1.0 - (1.0 - q) * (1.0 - q) - q * q * psi * psi * c
+    N = 1.0 - (1.0 - q) * (1.0 - q) - q * q * psi * c
     return (2.0 * psi / D) * N + q * q * psi * psi - 1.0
 
 
@@ -216,7 +210,9 @@ K_JOINING_CORR: dict[str, callable] = {
 }
 
 
-def evaluate(K_id: str, q: float, psi: float, theta: float, *, angle_corrected: bool = True) -> float:
+def evaluate(
+    K_id: str, q: float, psi: float, theta: float, *, angle_corrected: bool = True
+) -> float:
     """Evaluate any Bassett K by id.
 
     K_id in {K1..K12}. For separating coefficients (K1..K6) the angle_corrected
