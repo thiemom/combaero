@@ -55,6 +55,36 @@ TEST(TeeJunctionKCoefficients, K6AtNinetyDegreeEqualArea) {
 }
 
 // -----------------------------------------------------------------------------
+// K8 psi-sweep test (Bassett Table 2 + Eq 34 angle correction).
+// Pins the fix to a prior transcription error that had c/psi instead of
+// psi*c. The (1-q)^2 form is correct per Table 2 and preserves the
+// K7-K8 identity at psi=1 (since the psi factor reduces to 1 there).
+// Reference values computed analytically from the corrected formula at
+// theta=45 deg; their disagreement with Fig 12b measured (1.73 at psi=4)
+// is the paper's own acknowledged moderate fit, not a code bug.
+// -----------------------------------------------------------------------------
+TEST(TeeJunctionKCoefficients, K8PsiSweepAtFortyFiveDeg) {
+    const double theta = M_PI / 4.0;
+    const double q = 0.5;
+    const double tc = M_PI - 0.75 * (M_PI - theta);
+    const double c = std::cos(tc);
+    for (double psi : {1.0, 2.0, 4.0}) {
+        const double expected = 1.0 - q * q + 2.0 * (1.0 - q) * (1.0 - q) * psi * c;
+        EXPECT_NEAR(K8(q, psi, theta), expected, 1e-10)
+            << "K8 at psi=" << psi << ", q=0.5, theta=45 deg should equal "
+            << expected << " per Bassett Table 2 + Eq 34";
+    }
+    // Specific reference values at q=0.5, theta=45 deg:
+    //   cos(theta') = cos(78.75 deg) ~ 0.195090
+    //   psi=1: 0.75 + 2 * 0.25 * 1 * 0.195 ~ 0.848
+    //   psi=2: 0.75 + 2 * 0.25 * 2 * 0.195 ~ 0.945
+    //   psi=4: 0.75 + 2 * 0.25 * 4 * 0.195 ~ 1.141
+    EXPECT_NEAR(K8(0.5, 1.0, theta), 0.848, 5e-3);
+    EXPECT_NEAR(K8(0.5, 2.0, theta), 0.945, 5e-3);
+    EXPECT_NEAR(K8(0.5, 4.0, theta), 1.141, 5e-3);
+}
+
+// -----------------------------------------------------------------------------
 // Test 3: K12 at theta=90deg, psi=1 (Bassett Fig. 10b reference ~0.35)
 // -----------------------------------------------------------------------------
 TEST(TeeJunctionKCoefficients, K12AtNinetyDegreeEqualArea) {

@@ -151,17 +151,18 @@ inline double dK11_dq(double q, double psi, double theta) {
     return (2.0 * psi / D) * dN + 2.0 * q;
 }
 
-// K8: branch path, type 4. Has 1/psi: protect psi before calling.
-// theta_corr = pi - (3/4)*(pi - theta).
+// K8: branch path, type 4 (Bassett Table 2 + Eq 34 angle correction).
+// theta_corr = pi - (3/4)*(pi - theta). Multiplied by psi (not 1/psi);
+// no protection needed.
 inline double K8(double q, double psi, double theta) {
     const double tc = M_PI - 0.75 * (M_PI - theta);
     const double c = std::cos(tc);
-    return 1.0 - q * q + 2.0 * (1.0 - q) * (1.0 - q) * c / psi;
+    return 1.0 - q * q + 2.0 * (1.0 - q) * (1.0 - q) * psi * c;
 }
 inline double dK8_dq(double q, double psi, double theta) {
     const double tc = M_PI - 0.75 * (M_PI - theta);
     const double c = std::cos(tc);
-    return -2.0 * q - 4.0 * (1.0 - q) * c / psi;
+    return -2.0 * q - 4.0 * (1.0 - q) * psi * c;
 }
 
 // K7: straight path, type 4. theta_corr = pi - (3/4)*(pi - theta).
