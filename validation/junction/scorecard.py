@@ -201,7 +201,11 @@ def format_scorecard(model_name: str, cells: list[Cell], h: Headline) -> str:
     )
     lines.append("-" * 110)
     for c in sorted(cells, key=lambda c: (c.canonical_K, c.psi_bin, c.theta_bin)):
-        pct_str = "-" if math.isnan(c.pct_within_uncertainty) else f"{c.pct_within_uncertainty * 100:.0f}%"
+        pct_str = (
+            "-"
+            if math.isnan(c.pct_within_uncertainty)
+            else f"{c.pct_within_uncertainty * 100:.0f}%"
+        )
         lines.append(
             f"{c.canonical_K:<20} {c.psi_bin:>6} {c.theta_bin:>6} {c.N:>4} "
             f"{_fmt(c.rmse_meas, '>7.3f')} {_fmt(c.mae_meas, '>7.3f')} "

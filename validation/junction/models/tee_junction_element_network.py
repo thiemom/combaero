@@ -28,14 +28,19 @@ from combaero.network import (
     TeeJunctionElement,
 )
 
+from validation.junction.models import bassett2001
 from validation.junction.models._network_builder import (
     _F_C,
     _M_DOT_REF,
     _PT_REF,
     _TT_REF,
     _DRY_AIR_Y,
+    ALL_TOPOLOGIES,
     NetworkResult,
+    Topology,
+    build_separating_mfb_two_pb_skeleton,
     build_separating_network_skeleton,
+    build_separating_three_pb_skeleton,
     solve_and_extract,
 )
 
@@ -45,6 +50,10 @@ class TeeJunctionElementNetwork:
 
     name = "tee_junction_element_network"
 
+    # Topologies the adapter has wiring for. Add more here as joining-flow
+    # topologies are implemented.
+    SUPPORTED_TOPOLOGIES: tuple[Topology, ...] = ALL_TOPOLOGIES
+
     def evaluate_network(
         self,
         paper: str,
@@ -52,30 +61,66 @@ class TeeJunctionElementNetwork:
         q: float,
         psi: float | None,
         theta_rad: float | None,
+        topology: Topology = "imposed_q",
         **kwargs: float,
     ) -> NetworkResult:
-        """Solve the imposed-q network and return convergence + extracted K."""
         if paper != "bassett2001":
             return NetworkResult(converged=False, message="non-Bassett papers unsupported")
-        # Map K_id to network regime + which extracted K to report.
-        # K6 (separating lateral): report K_lateral
-        # K5/K2 (separating straight): report K_straight
-        # K12 / K11 / K7 / K8: would need joining flow topology
-        if K_id in {"K6", "K5", "K2"}:
-            return self._separating(q, psi or 1.0, theta_rad or math.pi / 2.0)
-        return NetworkResult(
-            converged=False,
-            message=f"K_id {K_id} requires non-separating topology, not yet wired",
+        if topology not in self.SUPPORTED_TOPOLOGIES:
+            return NetworkResult(
+                converged=False, message=f"topology {topology!r} not wired for this adapter"
+            )
+        if K_id not in {"K6", "K5", "K2"}:
+            return NetworkResult(
+                converged=False,
+                message=f"K_id {K_id} requires non-separating topology, not yet wired",
+            )
+        return self._separating(q, psi or 1.0, theta_rad or math.pi / 2.0, topology)
+
+    def _separating(
+        self, q: float, psi: float, theta_rad: float, topology: Topology
+    ) -> NetworkResult:
+        if topology == "imposed_q":
+            return self._separating_imposed_q(q, psi, theta_rad)
+        # For PB-based topologies, use Bassett analytical K to set up BCs.
+        K_lat = bassett2001.K6(q, psi, theta_rad)
+        K_str = bassett2001.K5(q)
+        if topology == "three_pb":
+            net = build_separating_three_pb_skeleton(
+                K_lateral_target=K_lat, K_straight_target=K_str
+            )
+            common_in = ("pb_com", "port_com", "lc_com")
+        else:  # mfb_two_pb
+            net = build_separating_mfb_two_pb_skeleton(
+                K_lateral_target=K_lat, K_straight_target=K_str
+            )
+            common_in = None  # no extra wiring; mb_in already connected by skeleton
+        net.add_element(LosslessConnectionElement("lc_bra", "port_bra", "pb_bra"))
+        net.add_element(
+            TeeJunctionElement(
+                id="tee",
+                common_node="port_com",
+                straight_node="port_str",
+                branch_node="port_bra",
+                theta=theta_rad,
+                F_C=_F_C,
+                psi=psi,
+                tee_type="branching",
+            )
+        )
+        return solve_and_extract(
+            net,
+            common_node="port_com",
+            straight_node="port_str",
+            lateral_node="port_bra",
+            m_dot_ref=_M_DOT_REF,
+            area=_F_C,
         )
 
-    def _separating(self, q: float, psi: float, theta_rad: float) -> NetworkResult:
-        """Build separating-flow network with TeeJunctionElement, solve, extract K."""
+    def _separating_imposed_q(self, q: float, psi: float, theta_rad: float) -> NetworkResult:
         m_in = _M_DOT_REF
         m_lat = q * m_in
         net = build_separating_network_skeleton(m_in=m_in, m_lateral=m_lat)
-        # TeeJunctionElement: branching tee with common as inlet, straight + branch as outlets.
-        # Need an extra MFB on the branch outlet to enforce m_lat split (the skeleton already
-        # has mb_lat as a MassFlowBoundary). Connect port_bra -> mb_lat.
         net.add_element(LosslessConnectionElement("lc_bra", "port_bra", "mb_lat"))
         net.add_element(
             TeeJunctionElement(
