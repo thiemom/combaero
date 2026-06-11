@@ -33,11 +33,16 @@ from combaero.network import (
     MultiPortChamberElement,
 )
 
+from validation.junction.models import bassett2001
 from validation.junction.models._network_builder import (
     _F_C,
     _M_DOT_REF,
+    ALL_TOPOLOGIES,
     NetworkResult,
+    Topology,
+    build_separating_mfb_two_pb_skeleton,
     build_separating_network_skeleton,
+    build_separating_three_pb_skeleton,
     solve_and_extract,
 )
 
@@ -47,6 +52,8 @@ class MPCEv1Network:
 
     name = "mpce_v1_network"
 
+    SUPPORTED_TOPOLOGIES: tuple[Topology, ...] = ALL_TOPOLOGIES
+
     def evaluate_network(
         self,
         paper: str,
@@ -54,12 +61,17 @@ class MPCEv1Network:
         q: float,
         psi: float | None,
         theta_rad: float | None,
+        topology: Topology = "imposed_q",
         **kwargs: float,
     ) -> NetworkResult:
         if paper != "bassett2001":
             return NetworkResult(converged=False, message="non-Bassett papers unsupported")
+        if topology not in self.SUPPORTED_TOPOLOGIES:
+            return NetworkResult(
+                converged=False, message=f"topology {topology!r} not wired for this adapter"
+            )
         if K_id == "K6":
-            return self._separating_lateral(q, psi or 1.0, theta_rad or math.pi / 2.0)
+            return self._separating_lateral(q, psi or 1.0, theta_rad or math.pi / 2.0, topology)
         if K_id in {"K5", "K2"}:
             return NetworkResult(
                 converged=False,
@@ -72,17 +84,27 @@ class MPCEv1Network:
             )
         return NetworkResult(converged=False, message=f"K_id {K_id} not in MPCE-v1 scope")
 
-    def _separating_lateral(self, q: float, psi: float, theta_rad: float) -> NetworkResult:
-        """Imposed-q separating network with MPCE + per-port BorderCarnotLoss.
-
-        Mirrors test_momentum_cv_tier1_bassett._build_imposed_q_network: MPCE
-        as the junction, BorderCarnotLossElement on the lateral branch with
-        the geometric angle, lossless straight branch.
-        """
-        m_in = _M_DOT_REF
-        m_lat = q * m_in
-        net = build_separating_network_skeleton(m_in=m_in, m_lateral=m_lat)
-        # Add a post-loss MCN on the lateral branch (MPCE pattern).
+    def _separating_lateral(
+        self, q: float, psi: float, theta_rad: float, topology: Topology
+    ) -> NetworkResult:
+        """MPCE + per-port BorderCarnotLoss in any of the 3 separating topologies."""
+        if topology == "imposed_q":
+            m_in = _M_DOT_REF
+            net = build_separating_network_skeleton(m_in=m_in, m_lateral=q * m_in)
+            lateral_terminal = "mb_lat"
+        else:
+            K_lat = bassett2001.K6(q, psi, theta_rad)
+            K_str = bassett2001.K5(q)
+            if topology == "three_pb":
+                net = build_separating_three_pb_skeleton(
+                    K_lateral_target=K_lat, K_straight_target=K_str
+                )
+            else:  # mfb_two_pb
+                net = build_separating_mfb_two_pb_skeleton(
+                    K_lateral_target=K_lat, K_straight_target=K_str
+                )
+            lateral_terminal = "pb_bra"
+        # Add post-loss MCN on the lateral branch (MPCE pattern).
         net.add_node(MomentumChamberNode("port_bra_post", area=_F_C))
         net.add_element(
             BorderCarnotLossElement(
@@ -93,7 +115,7 @@ class MPCEv1Network:
                 area=_F_C,
             )
         )
-        net.add_element(LosslessConnectionElement("lc_bra", "port_bra_post", "mb_lat"))
+        net.add_element(LosslessConnectionElement("lc_bra", "port_bra_post", lateral_terminal))
         net.add_element(
             MultiPortChamberElement(
                 id="jct",
@@ -104,12 +126,11 @@ class MPCEv1Network:
                 port_areas=[_F_C, _F_C, _F_C],
             )
         )
-        # Extract K against the POST-LOSS node so the loss element is captured.
         return solve_and_extract(
             net,
             common_node="port_com",
             straight_node="port_str",
             lateral_node="port_bra_post",
-            m_dot_ref=m_in,
+            m_dot_ref=_M_DOT_REF,
             area=_F_C,
         )
