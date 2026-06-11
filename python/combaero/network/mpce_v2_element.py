@@ -95,40 +95,54 @@ class MPCEv2Element(MultiPortChamberElement):
             residuals.append(sum(port_mdots))
             return residuals, {}
 
-        # ITERATION-1 PROTOTYPE: use Mynard's C per branch with the global
-        # supplier-side q_dyn. This converges across the slices MPCE-v1
-        # converges at (and at theta=120 where v1 fails to converge), but
-        # the extracted K is biased because C and q_dyn here are
-        # mismatched in normalization (C is collector-relative, q_dyn is
-        # supplier-relative). Iteration-2 will either:
-        #   - switch to mynard.K with common-side q_dyn (correct
-        #     normalization but currently fails convergence -- needs
-        #     residual scaling or analytical Jacobian),
-        #   - or keep C and switch to per-port collector-side q_dyn (also
-        #     currently fails convergence -- to be investigated).
-        # The runner scorecard quantifies the bias so we can iterate
-        # against measured data.
-        C_per_port = mynard.C.copy()
+        # ITERATION-2: use mynard.K (Matlab line 73) with common-side q_dyn.
+        # This is the physically correct normalization: K is defined such
+        # that Pt_common - Pt_other = K * 0.5 * rho_com * u_com^2.
+        # The common branch is the single supplier (diverging) or single
+        # collector (converging); mynard.K is per non-common port.
+        if int(np.sum(sup_mask)) == 1:
+            common_mask = sup_mask
+            non_common_idxs = np.where(col_mask)[0]
+        else:
+            common_mask = col_mask
+            non_common_idxs = np.where(sup_mask)[0]
 
-        # Supplier-side dynamic head (mass-flow-weighted; equals u_sup^2
-        # for the single-supplier case).
-        sup_idxs = np.where(sup_mask)[0]
-        u_sup_sq_avg = float(
-            np.sum(U_mynard[sup_idxs] ** 2 * rho_port[sup_idxs] * A[sup_idxs])
-            / np.sum(rho_port[sup_idxs] * A[sup_idxs])
-        )
-        rho_sup_avg = float(
-            np.sum(rho_port[sup_idxs] * A[sup_idxs] * U_mynard[sup_idxs])
-            / np.sum(A[sup_idxs] * U_mynard[sup_idxs])
-        )
-        q_dyn_ref = 0.5 * rho_sup_avg * u_sup_sq_avg
+        K_per_port = np.zeros(N)
+        if mynard.K is not None and len(mynard.K) == len(non_common_idxs):
+            for j, port_idx in enumerate(non_common_idxs):
+                K_per_port[port_idx] = float(mynard.K[j])
 
+        # Common-side dynamic head: q_dyn at the single common port.
+        common_idx = int(np.where(common_mask)[0][0])
+        u_com = abs(float(U_mynard[common_idx]))
+        rho_com = float(rho_port[common_idx])
+        q_dyn_com = 0.5 * rho_com * u_com * u_com
+
+        # Residual: Pt_i - Pt_jct + K_i * q_dyn_com = 0
+        # Common port: K_i = 0, so Pt_common = Pt_jct (continuity).
+        # Other ports: K * q_dyn_com is the loss term per Mynard's
+        # stagnation-pressure relation (Eq 15).
         residuals: list[float] = []
         for i in range(N):
             Pt_i = float(states[i].Pt)
-            R_i = Pt_i - Pt_jct + C_per_port[i] * q_dyn_ref
+            R_i = Pt_i - Pt_jct + K_per_port[i] * q_dyn_com
             residuals.append(R_i)
         residuals.append(sum(port_mdots))
 
-        # Stub Jacobian -- solver falls back to numerical differencing.
-        return residuals, {}
+        # Partial Jacobian: explicit for the linear pieces (dPt_i, dPt_jct
+        # and the mass-row mdot's), zero for the nonlinear K*q_dyn term
+        # which is held frozen at this iteration. Iteration-3 will derive
+        # the full Jacobian symbolically via sympy.
+        jac: dict[int, dict[str, float]] = {}
+        for i in range(N):
+            jac[i] = {
+                f"{self.port_nodes[i]}.Pt": 1.0,
+                f"{self.id}.P_jct": -1.0,
+            }
+        mass_row: dict[str, float] = {}
+        for i in range(N):
+            mass_var = f"{self._port_element_ids[i]}.m_dot"
+            mass_row[mass_var] = mass_row.get(mass_var, 0.0) + self._port_signs[i]
+        jac[N] = mass_row
+
+        return residuals, jac
