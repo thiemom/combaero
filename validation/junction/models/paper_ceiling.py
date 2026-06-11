@@ -73,9 +73,7 @@ class PaperCeiling:
             return hager1984.xi_l(q, theta_rad)
         return None
 
-    def _wang(
-        self, K_id: str, q: float, M_3: float | None, a: float | None
-    ) -> float | None:
+    def _wang(self, K_id: str, q: float, M_3: float | None, a: float | None) -> float | None:
         """Wang ceiling via Tables 1 and 2 interpolation.
 
         Wang only tabulates at a=1; other area ratios have no analytical
