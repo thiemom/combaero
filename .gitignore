@@ -3,6 +3,9 @@ build/
 build_tmp/
 cmake-build-*/
 
+# Scratch / one-off diagnostics (project-relative scratch dir)
+/tmp/
+
 # Excluded folders
 humidair_examples/
 cantera_examples/

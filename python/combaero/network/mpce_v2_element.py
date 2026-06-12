@@ -73,22 +73,29 @@ class MPCEv2Element(MultiPortChamberElement):
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
         N = self.N
         A = np.array([float(a) for a in self.port_areas])
-        # Convert MPCE-v1 branch angles (angle from main axis) to Mynard
-        # convention (vessel direction). Inlet ports have +pi added because
-        # they point away from the junction in the opposite direction from
-        # the canonical inlet flow.
-        theta_rad = np.array(
-            [
-                math.radians(float(t)) + (math.pi if self._port_signs[i] < 0 else 0.0)
-                for i, t in enumerate(self.port_angles_deg)
-            ]
-        )
 
         # Convert: port_mdots are in junction convention (positive = out of
         # junction). For Mynard: positive U = supplier (into junction).
         # So Mynard's U = -port_mdots / (rho * A).
         rho_port = np.array([float(s.density()) for s in states])
         U_mynard = -np.array(port_mdots) / (rho_port * A)
+
+        # Convert MPCE-v1 branch angles (angle from main axis) to Mynard
+        # vessel-direction convention. The "axial back" port -- the single
+        # port whose flow direction opposes the other N-1 ports (the lone
+        # supplier in separating flow, or lone collector in joining flow) --
+        # gets angle pi (pointing back along the main duct axis). All other
+        # ports keep their MPCE-v1 angles. This is flow-direction-aware so
+        # the same element handles separating and joining cleanly.
+        theta_rad = np.array([math.radians(float(t)) for t in self.port_angles_deg])
+        sup_count = int(np.sum(U_mynard > 1e-9))
+        col_count = int(np.sum(U_mynard < -1e-9))
+        if sup_count == 1 and col_count == N - 1:
+            axial_idx = int(np.argmax(U_mynard))
+            theta_rad[axial_idx] = math.pi
+        elif col_count == 1 and sup_count == N - 1:
+            axial_idx = int(np.argmin(U_mynard))
+            theta_rad[axial_idx] = math.pi
 
         # Mynard requires at least one supplier (U > 0) AND at least one
         # collector (U < 0). When the imposed BCs imply a degenerate state
@@ -115,12 +122,20 @@ class MPCEv2Element(MultiPortChamberElement):
         # that Pt_common - Pt_other = K * 0.5 * rho_com * u_com^2.
         # The common branch is the single supplier (diverging) or single
         # collector (converging); mynard.K is per non-common port.
+        #
+        # Sign of the K*q_dyn term in the residual:
+        #   Separating: common is supplier (higher Pt), collectors have
+        #               LOWER Pt -> Pt_col = Pt_jct - K*q_dyn -> +1 in residual
+        #   Joining:    common is collector (lower Pt), suppliers have
+        #               HIGHER Pt -> Pt_sup = Pt_jct + K*q_dyn -> -1 in residual
         if int(np.sum(sup_mask)) == 1:
             common_mask = sup_mask
             non_common_idxs = np.where(col_mask)[0]
+            K_term_sign = +1.0
         else:
             common_mask = col_mask
             non_common_idxs = np.where(sup_mask)[0]
+            K_term_sign = -1.0
 
         K_per_port = np.zeros(N)
         if mynard.K is not None and len(mynard.K) == len(non_common_idxs):
@@ -140,7 +155,7 @@ class MPCEv2Element(MultiPortChamberElement):
         residuals: list[float] = []
         for i in range(N):
             Pt_i = float(states[i].Pt)
-            R_i = Pt_i - Pt_jct + K_per_port[i] * q_dyn_com
+            R_i = Pt_i - Pt_jct + K_term_sign * K_per_port[i] * q_dyn_com
             residuals.append(R_i)
         residuals.append(sum(port_mdots))
 
@@ -198,7 +213,10 @@ class MPCEv2Element(MultiPortChamberElement):
                     mdot_var = f"{self._port_element_ids[j]}.m_dot"
                     # Outer mdot has been sign-mapped: port_mdots[j] = sign_j * outer.
                     # Chain rule: d(KQ_i)/d(outer_j) = dKQ_dmdot[i,j] * sign_j.
-                    row[mdot_var] = row.get(mdot_var, 0.0) + (dKQ_dmdot[i, j] * self._port_signs[j])
+                    # K_term_sign carries the joining/separating residual flip.
+                    row[mdot_var] = row.get(mdot_var, 0.0) + (
+                        K_term_sign * dKQ_dmdot[i, j] * self._port_signs[j]
+                    )
             jac[i] = row
 
         mass_row: dict[str, float] = {}

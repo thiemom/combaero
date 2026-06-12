@@ -21,6 +21,9 @@ from validation.junction.models._network_builder import (
     ALL_TOPOLOGIES,
     NetworkResult,
     Topology,
+    build_joining_imposed_q_skeleton,
+    build_joining_mfb_two_pb_skeleton,
+    build_joining_three_pb_skeleton,
     build_separating_mfb_two_pb_skeleton,
     build_separating_network_skeleton,
     build_separating_three_pb_skeleton,
@@ -49,12 +52,14 @@ class MPCEv2Network:
             return NetworkResult(converged=False, message="non-Bassett papers unsupported")
         if topology not in self.SUPPORTED_TOPOLOGIES:
             return NetworkResult(converged=False, message=f"topology {topology!r} not wired")
-        if K_id not in {"K6", "K5", "K2"}:
-            return NetworkResult(
-                converged=False,
-                message=f"K_id {K_id} requires non-separating topology (TBD)",
-            )
-        return self._separating(q, psi or 1.0, theta_rad or math.pi / 2.0, topology)
+        if K_id in {"K6", "K5", "K2"}:
+            return self._separating(q, psi or 1.0, theta_rad or math.pi / 2.0, topology)
+        if K_id in {"K11", "K12"}:
+            return self._joining(q, psi or 1.0, theta_rad or math.pi / 2.0, topology)
+        return NetworkResult(
+            converged=False,
+            message=f"K_id {K_id} not yet wired for MPCE-v2",
+        )
 
     def _separating(
         self, q: float, psi: float, theta_rad: float, topology: Topology
@@ -99,4 +104,57 @@ class MPCEv2Network:
             lateral_node="port_bra",
             m_dot_ref=m_in,
             area=_F_C,
+        )
+
+    def _joining(
+        self, q: float, psi: float, theta_rad: float, topology: Topology
+    ) -> NetworkResult:
+        """Build a joining-flow MPCE-v2 network.
+
+        Geometry mirrors the separating case (str at 0deg, bra at theta) but
+        flow reverses: str and bra are inlets, com is the outlet. The
+        ``MPCEv2Element`` residual reads the flow direction from the
+        signed mass flows at runtime, so the same element handles both.
+        """
+        m_in = _M_DOT_REF
+        A_bra = _F_C / psi
+        if topology == "imposed_q":
+            net = build_joining_imposed_q_skeleton(m_in=m_in, m_lateral=q * m_in)
+        else:
+            K11 = bassett2001.K11_corr(q, psi, theta_rad)
+            K12 = bassett2001.K12_corr(q, psi, theta_rad)
+            if topology == "three_pb":
+                net = build_joining_three_pb_skeleton(K11_target=K11, K12_target=K12)
+            else:
+                net = build_joining_mfb_two_pb_skeleton(
+                    m_in=m_in, K11_target=K11, K12_target=K12
+                )
+
+        net.nodes["port_bra"].area = A_bra
+        # Branch supplier connects to its MFB/PB terminal.
+        if topology == "imposed_q":
+            net.add_element(LosslessConnectionElement("lc_bra", "mb_bra", "port_bra"))
+        else:
+            net.add_element(LosslessConnectionElement("lc_bra", "pb_bra", "port_bra"))
+
+        # MPCE-v1 inlet/outlet declaration: for joining, str and bra are
+        # inlets (flow into junction from supply), com is the outlet.
+        net.add_element(
+            MPCEv2Element(
+                id="jct",
+                inlet_nodes=["port_str", "port_bra"],
+                outlet_nodes=["port_com"],
+                inlet_angles_deg=[0.0, math.degrees(theta_rad)],
+                outlet_angles_deg=[0.0],
+                port_areas=[_F_C, A_bra, _F_C],
+            )
+        )
+        return solve_and_extract(
+            net,
+            common_node="port_com",
+            straight_node="port_str",
+            lateral_node="port_bra",
+            m_dot_ref=m_in,
+            area=_F_C,
+            flow_direction="joining",
         )
