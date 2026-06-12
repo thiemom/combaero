@@ -37,6 +37,7 @@ longer fail?), we move to either analytical Jacobian or a C++ port.
 from __future__ import annotations
 
 import math
+from typing import Literal
 
 import numpy as np
 
@@ -46,6 +47,8 @@ from combaero.network.components import (
     NetworkMixtureState,
 )
 from validation.junction.models.mynard2010 import junction_loss_coefficient
+
+FlowDirection = Literal["merge", "branch"]
 
 
 class MPCEv2Element(MultiPortChamberElement):
@@ -61,9 +64,42 @@ class MPCEv2Element(MultiPortChamberElement):
         3-port separating T. Faster (no Mynard perturbations) but the
         exact derivative leads to more aggressive Newton steps that can
         overshoot in some low-q mfb_two_pb cases.
+
+    ``flow_direction`` constrains which physical flow regime this element
+    represents:
+      - ``"merge"``: 2 suppliers + 1 collector (joining flow). The
+        residual asserts at solve time and raises if the observed mdot
+        signs imply separating flow instead.
+      - ``"branch"``: 1 supplier + 2 collectors (separating flow). Errors
+        on observed joining flow.
     """
 
     jacobian_method: str = "fd"
+
+    def __init__(
+        self,
+        id: str,
+        inlet_nodes: list[str],
+        outlet_nodes: list[str],
+        inlet_angles_deg: list[float] | None = None,
+        outlet_angles_deg: list[float] | None = None,
+        port_areas: list[float] | None = None,
+        flow_direction: FlowDirection = "branch",
+    ):
+        super().__init__(
+            id=id,
+            inlet_nodes=inlet_nodes,
+            outlet_nodes=outlet_nodes,
+            inlet_angles_deg=inlet_angles_deg,
+            outlet_angles_deg=outlet_angles_deg,
+            port_areas=port_areas,
+        )
+        if flow_direction not in ("merge", "branch"):
+            raise ValueError(
+                f"MPCEv2Element '{id}': flow_direction must be 'merge' or "
+                f"'branch', got {flow_direction!r}."
+            )
+        self.flow_direction: FlowDirection = flow_direction
 
     def residuals(  # type: ignore[override]
         self,
@@ -108,6 +144,21 @@ class MPCEv2Element(MultiPortChamberElement):
             residuals.append(sum(port_mdots))
             jac: dict[int, dict[str, float]] = {}
             return residuals, jac
+
+        # Constrained topology: refuse if observed flow direction does not
+        # match the declared one. "branch" expects 1 supplier + N-1 collectors
+        # (separating); "merge" expects N-1 suppliers + 1 collector (joining).
+        observed_sup = int(sup_count)
+        if self.flow_direction == "branch" and observed_sup != 1:
+            raise ValueError(
+                f"MPCEv2Element '{self.id}': declared flow_direction='branch' "
+                f"(separating) but observed {observed_sup} suppliers, expected 1."
+            )
+        if self.flow_direction == "merge" and observed_sup != N - 1:
+            raise ValueError(
+                f"MPCEv2Element '{self.id}': declared flow_direction='merge' "
+                f"(joining) but observed {observed_sup} suppliers, expected {N - 1}."
+            )
 
         try:
             mynard = junction_loss_coefficient(U_mynard, A, theta_rad)

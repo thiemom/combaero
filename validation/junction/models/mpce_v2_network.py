@@ -13,7 +13,6 @@ import math
 
 from combaero.network import LosslessConnectionElement
 from combaero.network.mpce_v2_element import MPCEv2Element
-
 from validation.junction.models import bassett2001
 from validation.junction.models._network_builder import (
     _F_C,
@@ -95,6 +94,7 @@ class MPCEv2Network:
                 inlet_angles_deg=[0.0],
                 outlet_angles_deg=[0.0, math.degrees(theta_rad)],
                 port_areas=[_F_C, _F_C, A_bra],
+                flow_direction="branch",
             )
         )
         return solve_and_extract(
@@ -147,6 +147,7 @@ class MPCEv2Network:
                 inlet_angles_deg=[0.0, math.degrees(theta_rad)],
                 outlet_angles_deg=[0.0],
                 port_areas=[_F_C, A_bra, _F_C],
+                flow_direction="merge",
             )
         )
         return solve_and_extract(

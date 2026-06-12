@@ -294,6 +294,16 @@ const Sidebar = () => {
 			<button
 				type="button"
 				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "mpce_tee")}
+				draggable
+			>
+				<Split size={18} className="text-indigo-500" />
+				<span>MPCE Tee</span>
+			</button>
+
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
 				onDragStart={(event) => onDragStart(event, "vortex")}
 				draggable
 			>
