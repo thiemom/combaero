@@ -40,6 +40,7 @@ import math
 
 import numpy as np
 
+from combaero.network._mpce_v2_jacobian import dKQ_dmdot_separating_T
 from combaero.network.components import (
     MultiPortChamberElement,
     NetworkMixtureState,
@@ -129,40 +130,48 @@ class MPCEv2Element(MultiPortChamberElement):
             residuals.append(R_i)
         residuals.append(sum(port_mdots))
 
-        # Jacobian: linear pieces explicit + numerical FD for the K*q_dyn
-        # term's dependence on port mdots. The FD perturbs each port's mdot
-        # in turn and re-evaluates Mynard, costing N+1 Mynard calls per
-        # residual eval. Sympy-generated analytical Jacobian is the next
-        # iteration but the FD here is sufficient to test whether the full
-        # Jacobian solves the PB-topology convergence regression.
-        KQ_base = K_per_port * q_dyn_com  # per-port loss term (only collectors nonzero)
-
-        # Compute dKQ/d(port_mdot_j) via FD. Hold sup/col classification fixed
-        # at the current state -- the perturbation is small enough not to
-        # cross a sign boundary in normal operation.
-        eps_scale = 1e-4
+        # Jacobian: linear pieces explicit + analytical (sympy-derived) for
+        # the K*q_dyn term in the canonical 3-port separating case; FD
+        # fallback for everything else.
+        KQ_base = K_per_port * q_dyn_com  # per-port loss term (collectors nonzero)
         dKQ_dmdot = np.zeros((N, N))
-        for j in range(N):
-            mdot_eps = max(abs(port_mdots[j]) * eps_scale, 1e-7)
-            mdot_pert = list(port_mdots)
-            mdot_pert[j] = port_mdots[j] + mdot_eps
-            U_pert = -np.array(mdot_pert) / (rho_port * A)
-            # Skip if perturbation flipped a sign (rare; fallback dKQ row = 0).
-            if (np.sign(U_pert) != np.sign(U_mynard)).any():
-                continue
-            try:
-                m_pert = junction_loss_coefficient(U_pert, A, theta_rad)
-            except Exception:
-                continue
-            if m_pert.K is None or len(m_pert.K) != len(non_common_idxs):
-                continue
-            K_pert = np.zeros(N)
-            for k, port_idx in enumerate(non_common_idxs):
-                K_pert[port_idx] = float(m_pert.K[k])
-            u_com_pert = abs(float(U_pert[common_idx]))
-            q_dyn_pert = 0.5 * rho_com * u_com_pert * u_com_pert
-            KQ_pert = K_pert * q_dyn_pert
-            dKQ_dmdot[:, j] = (KQ_pert - KQ_base) / mdot_eps
+
+        is_canonical_separating_T = (
+            N == 3
+            and int(np.sum(sup_mask)) == 1
+            and bool(sup_mask[0])  # port 0 is the supplier
+            and abs(self.port_angles_deg[1]) < 1e-9  # straight at 0
+        )
+        if is_canonical_separating_T:
+            dKQ_dmdot = dKQ_dmdot_separating_T(
+                np.asarray(port_mdots, dtype=float),
+                rho_port,
+                A,
+                math.radians(float(self.port_angles_deg[2])),
+            )
+        else:
+            # FD fallback: N+1 Mynard calls.
+            eps_scale = 1e-4
+            for j in range(N):
+                mdot_eps = max(abs(port_mdots[j]) * eps_scale, 1e-7)
+                mdot_pert = list(port_mdots)
+                mdot_pert[j] = port_mdots[j] + mdot_eps
+                U_pert = -np.array(mdot_pert) / (rho_port * A)
+                if (np.sign(U_pert) != np.sign(U_mynard)).any():
+                    continue
+                try:
+                    m_pert = junction_loss_coefficient(U_pert, A, theta_rad)
+                except Exception:
+                    continue
+                if m_pert.K is None or len(m_pert.K) != len(non_common_idxs):
+                    continue
+                K_pert = np.zeros(N)
+                for k, port_idx in enumerate(non_common_idxs):
+                    K_pert[port_idx] = float(m_pert.K[k])
+                u_com_pert = abs(float(U_pert[common_idx]))
+                q_dyn_pert = 0.5 * rho_com * u_com_pert * u_com_pert
+                KQ_pert = K_pert * q_dyn_pert
+                dKQ_dmdot[:, j] = (KQ_pert - KQ_base) / mdot_eps
 
         jac: dict[int, dict[str, float]] = {}
         for i in range(N):
