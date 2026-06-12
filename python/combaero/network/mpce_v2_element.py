@@ -129,16 +129,55 @@ class MPCEv2Element(MultiPortChamberElement):
             residuals.append(R_i)
         residuals.append(sum(port_mdots))
 
-        # Partial Jacobian: explicit for the linear pieces (dPt_i, dPt_jct
-        # and the mass-row mdot's), zero for the nonlinear K*q_dyn term
-        # which is held frozen at this iteration. Iteration-3 will derive
-        # the full Jacobian symbolically via sympy.
+        # Jacobian: linear pieces explicit + numerical FD for the K*q_dyn
+        # term's dependence on port mdots. The FD perturbs each port's mdot
+        # in turn and re-evaluates Mynard, costing N+1 Mynard calls per
+        # residual eval. Sympy-generated analytical Jacobian is the next
+        # iteration but the FD here is sufficient to test whether the full
+        # Jacobian solves the PB-topology convergence regression.
+        KQ_base = K_per_port * q_dyn_com  # per-port loss term (only collectors nonzero)
+
+        # Compute dKQ/d(port_mdot_j) via FD. Hold sup/col classification fixed
+        # at the current state -- the perturbation is small enough not to
+        # cross a sign boundary in normal operation.
+        eps_scale = 1e-4
+        dKQ_dmdot = np.zeros((N, N))
+        for j in range(N):
+            mdot_eps = max(abs(port_mdots[j]) * eps_scale, 1e-7)
+            mdot_pert = list(port_mdots)
+            mdot_pert[j] = port_mdots[j] + mdot_eps
+            U_pert = -np.array(mdot_pert) / (rho_port * A)
+            # Skip if perturbation flipped a sign (rare; fallback dKQ row = 0).
+            if (np.sign(U_pert) != np.sign(U_mynard)).any():
+                continue
+            try:
+                m_pert = junction_loss_coefficient(U_pert, A, theta_rad)
+            except Exception:
+                continue
+            if m_pert.K is None or len(m_pert.K) != len(non_common_idxs):
+                continue
+            K_pert = np.zeros(N)
+            for k, port_idx in enumerate(non_common_idxs):
+                K_pert[port_idx] = float(m_pert.K[k])
+            u_com_pert = abs(float(U_pert[common_idx]))
+            q_dyn_pert = 0.5 * rho_com * u_com_pert * u_com_pert
+            KQ_pert = K_pert * q_dyn_pert
+            dKQ_dmdot[:, j] = (KQ_pert - KQ_base) / mdot_eps
+
         jac: dict[int, dict[str, float]] = {}
         for i in range(N):
-            jac[i] = {
+            row: dict[str, float] = {
                 f"{self.port_nodes[i]}.Pt": 1.0,
                 f"{self.id}.P_jct": -1.0,
             }
+            for j in range(N):
+                if abs(dKQ_dmdot[i, j]) > 0.0:
+                    mdot_var = f"{self._port_element_ids[j]}.m_dot"
+                    # Outer mdot has been sign-mapped: port_mdots[j] = sign_j * outer.
+                    # Chain rule: d(KQ_i)/d(outer_j) = dKQ_dmdot[i,j] * sign_j.
+                    row[mdot_var] = row.get(mdot_var, 0.0) + (dKQ_dmdot[i, j] * self._port_signs[j])
+            jac[i] = row
+
         mass_row: dict[str, float] = {}
         for i in range(N):
             mass_var = f"{self._port_element_ids[i]}.m_dot"
