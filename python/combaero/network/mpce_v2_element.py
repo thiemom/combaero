@@ -49,7 +49,21 @@ from validation.junction.models.mynard2010 import junction_loss_coefficient
 
 
 class MPCEv2Element(MultiPortChamberElement):
-    """Mynard Unified0D residual on MPCE-v1's topology framework."""
+    """Mynard Unified0D residual on MPCE-v1's topology framework.
+
+    The ``jacobian_method`` attribute controls how the K*q_dyn term's
+    Jacobian is computed:
+      - ``"fd"`` (default): numerical finite-difference on Mynard. Costs N+1
+        Mynard evaluations per residual call. Empirically slightly more
+        robust on mfb_two_pb due to FD's tiny truncation acting as
+        regularization for Newton's step.
+      - ``"sympy"``: analytical sympy-derived Jacobian for the canonical
+        3-port separating T. Faster (no Mynard perturbations) but the
+        exact derivative leads to more aggressive Newton steps that can
+        overshoot in some low-q mfb_two_pb cases.
+    """
+
+    jacobian_method: str = "fd"
 
     def residuals(  # type: ignore[override]
         self,
@@ -142,7 +156,7 @@ class MPCEv2Element(MultiPortChamberElement):
             and bool(sup_mask[0])  # port 0 is the supplier
             and abs(self.port_angles_deg[1]) < 1e-9  # straight at 0
         )
-        if is_canonical_separating_T:
+        if is_canonical_separating_T and self.jacobian_method == "sympy":
             dKQ_dmdot = dKQ_dmdot_separating_T(
                 np.asarray(port_mdots, dtype=float),
                 rho_port,
