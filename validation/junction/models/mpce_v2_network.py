@@ -37,6 +37,12 @@ class MPCEv2Network:
 
     SUPPORTED_TOPOLOGIES: tuple[Topology, ...] = ALL_TOPOLOGIES
 
+    def __init__(self, strict: bool = True) -> None:
+        """``strict=False`` enables the soft-barrier fallback on the underlying
+        MPCEv2Element so the solver gets a quadratic pull-back when it
+        starts in the wrong basin instead of an immediate raise."""
+        self.strict = strict
+
     def evaluate_network(
         self,
         paper: str,
@@ -86,17 +92,17 @@ class MPCEv2Network:
         net.nodes["port_bra"].area = A_bra
 
         net.add_element(LosslessConnectionElement("lc_bra", "port_bra", lateral_terminal))
-        net.add_element(
-            MPCEv2Element(
-                id="jct",
-                inlet_nodes=["port_com"],
-                outlet_nodes=["port_str", "port_bra"],
-                inlet_angles_deg=[0.0],
-                outlet_angles_deg=[0.0, math.degrees(theta_rad)],
-                port_areas=[_F_C, _F_C, A_bra],
-                flow_direction="branch",
-            )
+        jct = MPCEv2Element(
+            id="jct",
+            inlet_nodes=["port_com"],
+            outlet_nodes=["port_str", "port_bra"],
+            inlet_angles_deg=[0.0],
+            outlet_angles_deg=[0.0, math.degrees(theta_rad)],
+            port_areas=[_F_C, _F_C, A_bra],
+            flow_direction="branch",
+            strict=self.strict,
         )
+        net.add_element(jct)
         return solve_and_extract(
             net,
             common_node="port_com",
@@ -104,6 +110,7 @@ class MPCEv2Network:
             lateral_node="port_bra",
             m_dot_ref=m_in,
             area=_F_C,
+            verifier=jct.verify_solution_consistent if not self.strict else None,
         )
 
     def _joining(
@@ -139,17 +146,17 @@ class MPCEv2Network:
 
         # MPCE-v1 inlet/outlet declaration: for joining, str and bra are
         # inlets (flow into junction from supply), com is the outlet.
-        net.add_element(
-            MPCEv2Element(
-                id="jct",
-                inlet_nodes=["port_str", "port_bra"],
-                outlet_nodes=["port_com"],
-                inlet_angles_deg=[0.0, math.degrees(theta_rad)],
-                outlet_angles_deg=[0.0],
-                port_areas=[_F_C, A_bra, _F_C],
-                flow_direction="merge",
-            )
+        jct = MPCEv2Element(
+            id="jct",
+            inlet_nodes=["port_str", "port_bra"],
+            outlet_nodes=["port_com"],
+            inlet_angles_deg=[0.0, math.degrees(theta_rad)],
+            outlet_angles_deg=[0.0],
+            port_areas=[_F_C, A_bra, _F_C],
+            flow_direction="merge",
+            strict=self.strict,
         )
+        net.add_element(jct)
         return solve_and_extract(
             net,
             common_node="port_com",
@@ -158,4 +165,5 @@ class MPCEv2Network:
             m_dot_ref=m_in,
             area=_F_C,
             flow_direction="joining",
+            verifier=jct.verify_solution_consistent if not self.strict else None,
         )

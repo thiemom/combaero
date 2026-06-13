@@ -33,6 +33,7 @@ import math
 import time
 import warnings
 from dataclasses import dataclass
+from collections.abc import Callable
 from typing import Literal
 
 import combaero as cb
@@ -328,6 +329,7 @@ def solve_and_extract(
     m_dot_ref: float,
     area: float = _F_C,
     flow_direction: Literal["separating", "joining"] = "separating",
+    verifier: Callable[[dict[str, float]], bool] | None = None,
 ) -> NetworkResult:
     """Run NetworkSolver, return convergence + K diagnostics."""
     solver = NetworkSolver(net)
@@ -351,6 +353,13 @@ def solve_and_extract(
             residual_norm=res_norm,
             wall_time_s=wall_time,
             message=sol.get("__message__", "")[:120],
+        )
+    if verifier is not None and not verifier(sol):
+        return NetworkResult(
+            converged=False,
+            residual_norm=res_norm,
+            wall_time_s=wall_time,
+            message="post-solve verification failed (soft barrier landed off-physical)",
         )
     try:
         extractor = _extract_K_joining if flow_direction == "joining" else _extract_K

@@ -76,6 +76,13 @@ class MPCEv2Element(MultiPortChamberElement):
 
     jacobian_method: str = "fd"
 
+    # Soft-barrier penalty scale used when ``strict=False`` and the observed
+    # flow direction disagrees with the declared one. Wraps the
+    # one-sided quadratic ``alpha * max(0, -expected_sign * mdot)^2``.
+    # Calibrated so that a wrong-sign mdot of 0.1 kg/s contributes roughly
+    # 1e5 Pa to the residual -- the natural Pt scale. Tunable via attribute.
+    soft_penalty_alpha: float = 1.0e7
+
     def __init__(
         self,
         id: str,
@@ -85,6 +92,7 @@ class MPCEv2Element(MultiPortChamberElement):
         outlet_angles_deg: list[float] | None = None,
         port_areas: list[float] | None = None,
         flow_direction: FlowDirection = "branch",
+        strict: bool = True,
     ):
         super().__init__(
             id=id,
@@ -100,6 +108,84 @@ class MPCEv2Element(MultiPortChamberElement):
                 f"'branch', got {flow_direction!r}."
             )
         self.flow_direction: FlowDirection = flow_direction
+        # strict=True: raise on direction mismatch (default, safe).
+        # strict=False: return a soft-barrier residual that pulls Newton
+        # back toward the correct sign. Use for hard cases where the
+        # solver starts in the wrong basin but a physical root exists.
+        self.strict: bool = strict
+
+    def verify_solution_consistent(
+        self,
+        sol: dict[str, float],
+        eps: float = 1e-6,
+    ) -> bool:
+        """Post-solve check that converged mdots match the declared direction.
+
+        For each port-connecting element, the canonical-direction unknown
+        ``{elem_id}.m_dot`` should be > 0 at convergence (the sign mapping
+        ``port_mdots[i] = port_signs[i] * outer_mdot[i]`` guarantees that
+        outer_mdot > 0 implies the correct in/out direction at the port).
+        Returns False when soft mode landed at a wrong-basin fixed point
+        with at least one outer mdot at or below ``eps``.
+        """
+        for elem_id in self._port_element_ids:
+            if not elem_id:
+                continue
+            key = f"{elem_id}.m_dot"
+            if key not in sol:
+                continue  # connecting element has no m_dot unknown
+            if sol[key] < eps:
+                return False
+        return True
+
+    def _soft_barrier_residual(
+        self,
+        states: list[NetworkMixtureState],
+        Pt_jct: float,
+        port_mdots: list[float],
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        """Continuity + sign-coercing penalty when in the wrong basin.
+
+        Returns ``R_i = (Pt_i - Pt_jct) + alpha * max(0, -e_i * mdot_i)^2``
+        where ``e_i = self._port_signs[i]`` is the canonical sign for that
+        port given the declared ``flow_direction``. The penalty is C^1
+        smooth, zero in the correct-direction half-space, and has gradient
+        ``2 * alpha * (-e_i) * max(0, -e_i * mdot_i)`` in the wrong half.
+        Newton's step on this residual is pulled toward ``mdot_i = 0``,
+        from which a sign flip restores the strict-physics residual on the
+        next iteration.
+        """
+        N = self.N
+        alpha = float(self.soft_penalty_alpha)
+        residuals: list[float] = []
+        jac: dict[int, dict[str, float]] = {}
+        for i in range(N):
+            e_i = float(self._port_signs[i])
+            mdot_i = float(port_mdots[i])
+            slack = max(0.0, -e_i * mdot_i)  # positive when wrong-direction
+            pen = alpha * slack * slack
+            Pt_i = float(states[i].Pt)
+            residuals.append(Pt_i - Pt_jct + pen)
+
+            row: dict[str, float] = {
+                f"{self.port_nodes[i]}.Pt": 1.0,
+                f"{self.id}.P_jct": -1.0,
+            }
+            if slack > 0.0:
+                # d(pen)/d(mdot_i) = 2 * alpha * slack * (-e_i)
+                # Chain through outer-mdot sign: d(mdot_i)/d(outer_i) = sign_i = e_i.
+                # So d(pen)/d(outer_i) = 2 * alpha * slack * (-e_i) * e_i = -2*alpha*slack.
+                mdot_var = f"{self._port_element_ids[i]}.m_dot"
+                row[mdot_var] = row.get(mdot_var, 0.0) - 2.0 * alpha * slack
+            jac[i] = row
+
+        residuals.append(sum(port_mdots))
+        mass_row: dict[str, float] = {}
+        for i in range(N):
+            mass_var = f"{self._port_element_ids[i]}.m_dot"
+            mass_row[mass_var] = mass_row.get(mass_var, 0.0) + self._port_signs[i]
+        jac[N] = mass_row
+        return residuals, jac
 
     def residuals(  # type: ignore[override]
         self,
@@ -145,20 +231,36 @@ class MPCEv2Element(MultiPortChamberElement):
             jac: dict[int, dict[str, float]] = {}
             return residuals, jac
 
-        # Constrained topology: refuse if observed flow direction does not
-        # match the declared one. "branch" expects 1 supplier + N-1 collectors
-        # (separating); "merge" expects N-1 suppliers + 1 collector (joining).
-        observed_sup = int(sup_count)
-        if self.flow_direction == "branch" and observed_sup != 1:
-            raise ValueError(
-                f"MPCEv2Element '{self.id}': declared flow_direction='branch' "
-                f"(separating) but observed {observed_sup} suppliers, expected 1."
-            )
-        if self.flow_direction == "merge" and observed_sup != N - 1:
-            raise ValueError(
-                f"MPCEv2Element '{self.id}': declared flow_direction='merge' "
-                f"(joining) but observed {observed_sup} suppliers, expected {N - 1}."
-            )
+        # Constrained topology: refuse if observed direction does not match
+        # the declared one. Per-port check: port_mdots[i] should have the
+        # canonical sign self._port_signs[i] (e.g., port_signs[i]=-1 for an
+        # inlet -> port_mdots[i] < 0). The earlier count-based check
+        # (1 supplier vs N-1) was insufficient because it accepted
+        # configurations with the right count but wrong port distribution
+        # (e.g., for "merge" port_mdots=[-, +, -] has 2 suppliers but at
+        # the wrong ports). Per-port catches this exactly.
+        # Correct direction at port i: sign(port_mdots[i]) == sign(port_signs[i]),
+        # i.e., port_signs[i] * port_mdots[i] > 0. Wrong when the product is
+        # strictly negative (a tolerance keeps the boundary mdot=0 quiet).
+        wrong_ports = [i for i in range(N) if self._port_signs[i] * port_mdots[i] < -1e-9]
+        if wrong_ports:
+            if self.strict:
+                expected = [
+                    "into junction" if self._port_signs[i] < 0 else "out of junction"
+                    for i in wrong_ports
+                ]
+                raise ValueError(
+                    f"MPCEv2Element '{self.id}': declared "
+                    f"flow_direction={self.flow_direction!r} but observed "
+                    f"wrong flow direction at port(s) {wrong_ports} "
+                    f"(expected {expected})."
+                )
+            # Soft-barrier fallback. Replace the physics residual with
+            # continuity (Pt_i = Pt_jct) plus a one-sided quadratic penalty
+            # on each port mdot whose sign is wrong, scaled by
+            # ``soft_penalty_alpha``. Pulls Newton back toward the boundary
+            # mdot=0 from which a sign flip can restore the declared regime.
+            return self._soft_barrier_residual(states, Pt_jct, port_mdots)
 
         try:
             mynard = junction_loss_coefficient(U_mynard, A, theta_rad)
