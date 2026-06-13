@@ -28,6 +28,7 @@ from combaero.network import (
     WallLayer,
     WallNode,
 )
+from combaero.network.mpce_v2_element import MPCEv2Element
 
 from .schemas import (
     AreaChangeData,
@@ -43,6 +44,7 @@ from .schemas import (
     LinearThetaHeadLossData,
     MassBoundaryData,
     MomentumChamberData,
+    MPCETeeData,
     NetworkGraphSchema,
     OrificeData,
     PinFinModelData,
@@ -384,7 +386,9 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             element_nodes.append(node_schema)
 
     element_ids = {node.id for node in element_nodes}
-    tee_ids = {node.id for node in element_nodes if node.type == "tee_junction"}
+    # Both tee_junction (Bassett K-based) and mpce_tee (Mynard-based) share the
+    # same 3-port handle layout and reuse the port-MCN auto-insert machinery.
+    tee_ids = {node.id for node in element_nodes if node.type in ("tee_junction", "mpce_tee")}
 
     # 1b. Create implicit junction nodes for element -> element visual links.
     # For direct element<->element connections we auto-insert a MomentumChamberNode.
@@ -493,6 +497,56 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             if not _tee.initial_guess:
                 _tee.initial_guess = _guess_from_prior_result(elem_data, elem_id)
             net.add_element(_tee)
+            continue
+
+        # 3-port Mynard-based variant. Same port layout as tee_junction; the
+        # flow_direction field constrains which side is upstream.
+        if elem_type == "mpce_tee":
+            _md = MPCETeeData(**elem_data)
+            _psi = _md.psi
+            if _md.F_C is not None and _md.F_branch is not None and _md.F_branch > 0:
+                _psi = _md.F_C / _md.F_branch
+            _F_C = _md.F_C if _md.F_C is not None else 0.01
+            _A_branch = _F_C / _psi if _md.F_branch is None else _md.F_branch
+
+            _common = _find_tee_port(
+                schema.edges, elem_id, "common", nodes_map, tee_port_node_map, _wall_edge_remap
+            )
+            _straight = _find_tee_port(
+                schema.edges, elem_id, "straight", nodes_map, tee_port_node_map, _wall_edge_remap
+            )
+            _branch = _find_tee_port(
+                schema.edges, elem_id, "branch", nodes_map, tee_port_node_map, _wall_edge_remap
+            )
+
+            # Branch (separating): single inlet at common, two outlets.
+            # Merge (joining): two inlets at straight+branch, single outlet at common.
+            if _md.flow_direction == "branch":
+                _inlets = [_common]
+                _outlets = [_straight, _branch]
+                _inlet_angles = [0.0]
+                _outlet_angles = [0.0, _md.theta_deg]
+                _port_areas = [_F_C, _F_C, _A_branch]
+            else:  # "merge"
+                _inlets = [_straight, _branch]
+                _outlets = [_common]
+                _inlet_angles = [0.0, _md.theta_deg]
+                _outlet_angles = [0.0]
+                _port_areas = [_F_C, _A_branch, _F_C]
+
+            _mpce = MPCEv2Element(
+                id=elem_id,
+                inlet_nodes=_inlets,
+                outlet_nodes=_outlets,
+                inlet_angles_deg=_inlet_angles,
+                outlet_angles_deg=_outlet_angles,
+                port_areas=_port_areas,
+                flow_direction=_md.flow_direction,
+            )
+            _mpce.initial_guess = _expand_initial_guess(_md.initial_guess, elem_id)
+            if not _mpce.initial_guess:
+                _mpce.initial_guess = _guess_from_prior_result(elem_data, elem_id)
+            net.add_element(_mpce)
             continue
 
         source_id = None

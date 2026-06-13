@@ -100,6 +100,14 @@ const NetworkCanvas = () => {
 					F_C: 0.01,
 					psi: 1.0,
 				} as any;
+			} else if (type === "mpce_tee") {
+				data = {
+					...data,
+					flow_direction: "branch",
+					theta_deg: 90,
+					F_C: 0.01,
+					psi: 1.0,
+				} as any;
 			} else if (type === "vortex") {
 				data = {
 					...data,

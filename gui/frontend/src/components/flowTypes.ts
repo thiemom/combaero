@@ -6,6 +6,7 @@ import DiscreteLossNode from "./nodes/DiscreteLossNode";
 import LosslessNode from "./nodes/LosslessNode";
 import MassBoundaryNode from "./nodes/MassBoundaryNode";
 import MomentumChamberNode from "./nodes/MomentumChamberNode.tsx";
+import MPCETeeNode from "./nodes/MPCETeeNode";
 import OrificeNode from "./nodes/OrificeNode";
 import PlenumNode from "./nodes/PlenumNode";
 import PressureBoundaryNode from "./nodes/PressureBoundaryNode";
@@ -28,6 +29,7 @@ export const nodeTypes = {
 	probe: ProbeNode,
 	area_change: AreaChangeNode,
 	tee_junction: TeeJunctionNode,
+	mpce_tee: MPCETeeNode,
 	vortex: VortexNode,
 	wall: WallNode,
 };
