@@ -33,6 +33,7 @@ import math
 import time
 import warnings
 from dataclasses import dataclass
+from collections.abc import Callable
 from typing import Literal
 
 import combaero as cb
@@ -203,6 +204,122 @@ def build_separating_mfb_two_pb_skeleton(
     return net
 
 
+def build_joining_imposed_q_skeleton(
+    *,
+    m_in: float = _M_DOT_REF,
+    m_lateral: float | None = None,
+    Pt_ref: float = _PT_REF,
+) -> FlowNetwork:
+    """IMPOSED_Q joining skeleton: MFB on each inlet + PB on common outlet.
+
+    m_in is the combined outflow at the common; m_lateral is the branch inlet
+    mass flow; the straight inlet flow is m_in - m_lateral. PB at the common
+    outlet sets the pressure datum.
+    """
+    if m_lateral is None:
+        m_lateral = 0.5 * m_in
+    m_straight = m_in - m_lateral
+    net = FlowNetwork()
+    Y = _DRY_AIR_Y
+    net.add_node(MassFlowBoundary("mb_str", m_dot=m_straight, Tt=_TT_REF, Y=Y))
+    net.add_node(MassFlowBoundary("mb_bra", m_dot=m_lateral, Tt=_TT_REF, Y=Y))
+    net.add_node(PressureBoundary("pb_com", Pt=Pt_ref, Tt=_TT_REF, Y=Y))
+    net.add_node(MomentumChamberNode("port_com", area=_F_C))
+    net.add_node(MomentumChamberNode("port_str", area=_F_C))
+    net.add_node(MomentumChamberNode("port_bra", area=_F_C))
+    net.add_element(LosslessConnectionElement("lc_str", "mb_str", "port_str"))
+    net.add_element(LosslessConnectionElement("lc_com", "port_com", "pb_com"))
+    return net
+
+
+def build_joining_three_pb_skeleton(
+    *,
+    K11_target: float,
+    K12_target: float,
+    Pt_com: float = _PT_REF,
+) -> FlowNetwork:
+    """THREE_PB joining skeleton: PB on every branch.
+
+    BC pressures derived from analytical K11/K12 so the target q is a
+    converged root. Suppliers (str, bra) sit at HIGHER Pt than the common
+    collector since K11, K12 > 0 means pressure drops INTO the junction.
+    """
+    q_dyn = _q_dyn_ref(Pt=Pt_com)
+    Pt_str = Pt_com + K11_target * q_dyn
+    Pt_bra = Pt_com + K12_target * q_dyn
+    net = FlowNetwork()
+    Y = _DRY_AIR_Y
+    net.add_node(PressureBoundary("pb_com", Pt=Pt_com, Tt=_TT_REF, Y=Y))
+    net.add_node(PressureBoundary("pb_str", Pt=Pt_str, Tt=_TT_REF, Y=Y))
+    net.add_node(PressureBoundary("pb_bra", Pt=Pt_bra, Tt=_TT_REF, Y=Y))
+    net.add_node(MomentumChamberNode("port_com", area=_F_C))
+    net.add_node(MomentumChamberNode("port_str", area=_F_C))
+    net.add_node(MomentumChamberNode("port_bra", area=_F_C))
+    net.add_element(LosslessConnectionElement("lc_str", "pb_str", "port_str"))
+    net.add_element(LosslessConnectionElement("lc_com", "port_com", "pb_com"))
+    return net
+
+
+def build_joining_mfb_two_pb_skeleton(
+    *,
+    m_in: float = _M_DOT_REF,
+    K11_target: float,
+    K12_target: float,
+    Pt_com: float = _PT_REF,
+) -> FlowNetwork:
+    """MFB_TWO_PB joining skeleton: PB on each inlet + MFB on common outlet.
+
+    Common-outlet flow imposed at m_in; supplier pressures sized from
+    analytical K11/K12 so target q is a converged root. The joining analog
+    of the production-realistic separating mfb_two_pb.
+    """
+    q_dyn = _q_dyn_ref(m_dot=m_in, Pt=Pt_com)
+    Pt_str = Pt_com + K11_target * q_dyn
+    Pt_bra = Pt_com + K12_target * q_dyn
+    net = FlowNetwork()
+    Y = _DRY_AIR_Y
+    net.add_node(MassFlowBoundary("mb_com", m_dot=m_in, Tt=_TT_REF, Y=Y))
+    net.add_node(PressureBoundary("pb_str", Pt=Pt_str, Tt=_TT_REF, Y=Y))
+    net.add_node(PressureBoundary("pb_bra", Pt=Pt_bra, Tt=_TT_REF, Y=Y))
+    net.add_node(MomentumChamberNode("port_com", area=_F_C))
+    net.add_node(MomentumChamberNode("port_str", area=_F_C))
+    net.add_node(MomentumChamberNode("port_bra", area=_F_C))
+    net.add_element(LosslessConnectionElement("lc_str", "pb_str", "port_str"))
+    net.add_element(LosslessConnectionElement("lc_com", "port_com", "mb_com"))
+    return net
+
+
+def _extract_K_joining(
+    sol: dict[str, float],
+    *,
+    common_node: str,
+    straight_node: str,
+    lateral_node: str,
+    m_dot_ref: float,
+    area: float,
+) -> tuple[float, float]:
+    """Extract joining flow K coefficients.
+
+    Returns ``(K_lateral, K_straight)`` to match the separating
+    ``_extract_K`` return order so callers unpack the same way:
+      K_lateral = K12 = (Pt_branch   - Pt_common) / q_dyn_common
+      K_straight = K11 = (Pt_straight - Pt_common) / q_dyn_common
+    Both > 0 in normal joining flow (suppliers above the chamber Pt).
+    """
+    P_com = sol[f"{common_node}.P"]
+    Pt_com = sol[f"{common_node}.Pt"]
+    Pt_str = sol[f"{straight_node}.Pt"]
+    Pt_lat = sol[f"{lateral_node}.Pt"]
+    X = _x_air()
+    rho_com = float(cb.density(_TT_REF, P_com, X))
+    u_com = m_dot_ref / (rho_com * area)
+    q_dyn_com = 0.5 * rho_com * u_com * u_com
+    return (
+        (Pt_lat - Pt_com) / q_dyn_com,  # K12
+        (Pt_str - Pt_com) / q_dyn_com,  # K11
+    )
+
+
 def solve_and_extract(
     net: FlowNetwork,
     *,
@@ -211,6 +328,8 @@ def solve_and_extract(
     lateral_node: str,
     m_dot_ref: float,
     area: float = _F_C,
+    flow_direction: Literal["separating", "joining"] = "separating",
+    verifier: Callable[[dict[str, float]], bool] | None = None,
 ) -> NetworkResult:
     """Run NetworkSolver, return convergence + K diagnostics."""
     solver = NetworkSolver(net)
@@ -235,8 +354,16 @@ def solve_and_extract(
             wall_time_s=wall_time,
             message=sol.get("__message__", "")[:120],
         )
+    if verifier is not None and not verifier(sol):
+        return NetworkResult(
+            converged=False,
+            residual_norm=res_norm,
+            wall_time_s=wall_time,
+            message="post-solve verification failed (soft barrier landed off-physical)",
+        )
     try:
-        K_lat, K_str = _extract_K(
+        extractor = _extract_K_joining if flow_direction == "joining" else _extract_K
+        K_lat, K_str = extractor(
             sol,
             common_node=common_node,
             straight_node=straight_node,

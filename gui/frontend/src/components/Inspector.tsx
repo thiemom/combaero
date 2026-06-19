@@ -1646,6 +1646,53 @@ const Inspector = () => {
 						);
 					})()}
 
+				{selectedNode.type === "mpce_tee" && (
+					<div className="flex flex-col gap-4">
+						{/* Flow direction */}
+						<div className="flex flex-col gap-2">
+							<label className="text-xs font-bold text-gray-500 uppercase">
+								Flow Direction
+							</label>
+							<select
+								className="p-2 border rounded bg-white text-xs border-stone-200"
+								value={selectedNode.data.flow_direction ?? "branch"}
+								onChange={(e) =>
+									updateNodeData(selectedNode.id, {
+										flow_direction: e.target.value,
+									})
+								}
+							>
+								<option value="branch">Branch (1 inlet, 2 outlets)</option>
+								<option value="merge">Merge (2 inlets, 1 outlet)</option>
+							</select>
+							<p className="text-[9px] text-gray-400 italic">
+								Constrained: the Mynard residual asserts at solve time and
+								errors if the observed flow direction disagrees with this
+								declaration.
+							</p>
+						</div>
+
+						{/* Branch angle */}
+						<div className="flex flex-col gap-2">
+							<label className="text-xs font-bold text-gray-500 uppercase">
+								Branch Angle (deg)
+							</label>
+							<NumericInput
+								value={selectedNode.data.theta_deg ?? 90}
+								onChange={(val) =>
+									updateNodeData(selectedNode.id, { theta_deg: val })
+								}
+								className="p-2 border rounded"
+								placeholder="90"
+							/>
+							<p className="text-[9px] text-gray-400 italic">
+								Branch arm angle measured from the main axis. Mynard's smooth K
+								relation is valid across the full 0-180 deg range.
+							</p>
+						</div>
+					</div>
+				)}
+
 				{selectedNode.type === "vortex" && (
 					<div className="flex flex-col gap-4">
 						<div className="flex flex-col gap-1">

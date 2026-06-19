@@ -205,6 +205,101 @@ TEST(MultiPortChamber, AnalyticJacobianMatchesFD) {
   }
 }
 
+// -----------------------------------------------------------------------------
+// MPCE Jacobian: cross-port terms (axial-reference cross-coupling) + dR/dP_jct
+// + mass row. theta != 0 so the cross-coupling formula is actually exercised.
+// Tight tolerance (1e-6) so any future MPCE-v1 regression trips immediately.
+// -----------------------------------------------------------------------------
+TEST(MultiPortChamber, JacobianFullCoverageAtNonzeroTheta) {
+  const auto Y = dry_air_Y();
+  const std::vector<double> P{1.0e5, 1.0050e5, 0.9950e5};
+  const std::vector<double> mdot{+0.10, -0.06, -0.04};
+  const std::vector<double> T{300.0, 308.0, 305.0};
+  const std::vector<std::vector<double>> Yall{Y, Y, Y};
+  const std::vector<double> A{1.0e-3, 1.2e-3, 0.8e-3};
+  const double P_jct = 1.0e5;
+  // theta_0 is the axial reference (always 0); lateral port 2 at 45 deg
+  // exercises the cross-coupling terms that the diagonal-only test misses.
+  const std::vector<double> theta{0.0, 0.0, M_PI / 4.0};
+
+  auto base = multi_port_chamber_residuals_and_jacobian(
+      P_jct, P, mdot, T, Yall, A, theta);
+
+  // dR_k/dP_jct: should be -1 by construction.
+  for (std::size_t k = 0; k < 3; ++k) {
+    auto Pj_p = multi_port_chamber_residuals_and_jacobian(
+        P_jct + 1.0, P, mdot, T, Yall, A, theta);
+    auto Pj_m = multi_port_chamber_residuals_and_jacobian(
+        P_jct - 1.0, P, mdot, T, Yall, A, theta);
+    const double fd =
+        (Pj_p.impulse_residuals[k] - Pj_m.impulse_residuals[k]) / 2.0;
+    EXPECT_NEAR(fd, -1.0, 1e-9) << "port " << k << " dR/dP_jct";
+  }
+
+  // Cross-port dR_k/dP_axial (where axial = port 0). For port 0 itself this
+  // collapses to the diagonal; for ports 1, 2 it exercises the cross-coupling
+  // contribution via cross_dR_dP_axial[k].
+  for (std::size_t k = 1; k < 3; ++k) {
+    auto P_p = P;
+    P_p[0] += 1.0;
+    auto P_m = P;
+    P_m[0] -= 1.0;
+    auto rp = multi_port_chamber_residuals_and_jacobian(P_jct, P_p, mdot, T, Yall, A, theta);
+    auto rm = multi_port_chamber_residuals_and_jacobian(P_jct, P_m, mdot, T, Yall, A, theta);
+    const double fd = (rp.impulse_residuals[k] - rm.impulse_residuals[k]) / 2.0;
+    const double expected = base.cross_dR_dP_axial[k];
+    EXPECT_NEAR(fd, expected, 1e-6)
+        << "cross dR_" << k << "/dP_0 disagrees with FD";
+  }
+
+  // Cross-port dR_k/dmdot_0.
+  for (std::size_t k = 1; k < 3; ++k) {
+    auto md_p = mdot;
+    md_p[0] += 1e-5;
+    auto md_m = mdot;
+    md_m[0] -= 1e-5;
+    auto rp = multi_port_chamber_residuals_and_jacobian(P_jct, P, md_p, T, Yall, A, theta);
+    auto rm = multi_port_chamber_residuals_and_jacobian(P_jct, P, md_m, T, Yall, A, theta);
+    const double fd = (rp.impulse_residuals[k] - rm.impulse_residuals[k]) / 2e-5;
+    const double expected = base.cross_dR_dmdot_axial[k];
+    const double rel =
+        std::abs(fd - expected) / std::max(std::abs(expected), 1e-12);
+    EXPECT_LT(rel, 1e-5)
+        << "cross dR_" << k << "/dmdot_0 disagrees with FD (rel=" << rel
+        << ", fd=" << fd << ", analytic=" << expected << ")";
+  }
+
+  // Cross-port dR_k/dT_0.
+  for (std::size_t k = 1; k < 3; ++k) {
+    auto T_p = T;
+    T_p[0] += 0.01;
+    auto T_m = T;
+    T_m[0] -= 0.01;
+    auto rp = multi_port_chamber_residuals_and_jacobian(P_jct, P, mdot, T_p, Yall, A, theta);
+    auto rm = multi_port_chamber_residuals_and_jacobian(P_jct, P, mdot, T_m, Yall, A, theta);
+    const double fd = (rp.impulse_residuals[k] - rm.impulse_residuals[k]) / 0.02;
+    const double expected = base.cross_dR_dT_axial[k];
+    if (std::abs(expected) < 1e-12 && std::abs(fd) < 1e-6) continue;
+    const double rel =
+        std::abs(fd - expected) / std::max(std::abs(expected), 1e-12);
+    EXPECT_LT(rel, 1e-5)
+        << "cross dR_" << k << "/dT_0 disagrees with FD (rel=" << rel
+        << ", fd=" << fd << ", analytic=" << expected << ")";
+  }
+
+  // Mass row: R_mass = sum_i mdot_i, so dR_mass/dmdot_k = 1 exactly.
+  for (std::size_t k = 0; k < 3; ++k) {
+    auto md_p = mdot;
+    md_p[k] += 1e-5;
+    auto md_m = mdot;
+    md_m[k] -= 1e-5;
+    auto rp = multi_port_chamber_residuals_and_jacobian(P_jct, P, md_p, T, Yall, A, theta);
+    auto rm = multi_port_chamber_residuals_and_jacobian(P_jct, P, md_m, T, Yall, A, theta);
+    const double fd = (rp.mass_residual - rm.mass_residual) / 2e-5;
+    EXPECT_NEAR(fd, 1.0, 1e-9) << "dR_mass/dmdot_" << k;
+  }
+}
+
 // =============================================================================
 // border_carnot_loss_residual_and_jacobian: analytic vs FD
 // =============================================================================
