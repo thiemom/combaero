@@ -542,6 +542,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 outlet_angles_deg=_outlet_angles,
                 port_areas=_port_areas,
                 flow_direction=_md.flow_direction,
+                joining_etransfer_alpha=_md.joining_etransfer_alpha,
             )
             _mpce.initial_guess = _expand_initial_guess(_md.initial_guess, elem_id)
             if not _mpce.initial_guess:
