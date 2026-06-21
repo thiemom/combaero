@@ -240,6 +240,11 @@ class MPCETeeData(BaseModel):
     F_C: float | None = None  # None = inherit from common/straight-arm channel
     F_branch: float | None = None  # None = inherit from branch-arm channel
     psi: float = 1.0  # fallback ratio used only when F_branch is None and not inherited
+    # Joining-side etransfer correction scale (combaero extension to faithful
+    # Mynard). Default 0.2 calibrated against Bassett K11/K12 analytical +
+    # Idelchik 1966 tabulated values. Set to 0.0 to disable the correction
+    # (faithful Mynard); set to a custom value for re-calibrated workflows.
+    joining_etransfer_alpha: float | None = None
     initial_guess: dict[str, float] = Field(default_factory=dict)
 
 

@@ -63,6 +63,7 @@ def junction_loss_coefficient(
     U: np.ndarray,
     A: np.ndarray,
     theta: np.ndarray,
+    joining_etransfer_alpha: float = 0.0,
 ) -> MynardResult:
     """Compute Mynard Unified0D loss coefficients for a junction.
 
@@ -71,6 +72,22 @@ def junction_loss_coefficient(
            negative = collector (flow OUT of junction).
         A: per-branch cross-sectional areas (same length as U).
         theta: per-branch angles relative to an arbitrary reference (radians).
+        joining_etransfer_alpha: extension to Mynard for joining (converging)
+            flow with asymmetric supplier areas. Mynard's original etransfer
+            collapses to zero for joining (the (1 - flow_ratio) factor) since
+            the single collector takes 100% of Qtot. When the supplier areas
+            are asymmetric (psi != 1), the audit shows Mynard underpredicts
+            K_avg vs both Bassett analytical and Idelchik tabulated; this
+            term adds a joining-side correction:
+
+                etransfer_join = alpha * (A_max - A_min) / (A_max + A_min)
+
+            where the area asymmetry is taken over supplier ports, vanishes
+            at psi=1 (equal areas), and grows monotonically toward 1 at
+            extreme asymmetry. Default 0.0 preserves the faithful-port
+            Mynard behavior. The single calibrated alpha is fit against
+            Bassett K11_corr/K12_corr + Idelchik tables (analytical anchors)
+            and validated against the held-out measured points.
 
     Returns:
         MynardResult with per-branch C and per-collector K (only for n<=3).
@@ -107,6 +124,19 @@ def junction_loss_coefficient(
 
     # ---- Effective pseudosupplier area (Mynard's empirical energy transfer) ----
     etransfer = (0.8 * (math.pi - pseudo_sup_angle) * np.sign(theta[Ci]) - 0.2) * (1.0 - flow_ratio)
+
+    # ---- Joining-side asymmetry correction (combaero extension to Mynard) ----
+    # Active only when joining_etransfer_alpha != 0 AND we have multiple
+    # suppliers with different areas. Vanishes at A_max==A_min (psi=1) so
+    # the original Mynard behavior is preserved in the equal-area baseline.
+    if joining_etransfer_alpha != 0.0 and int(np.sum(Si)) >= 2:
+        A_sup = A[Si]
+        A_max = float(np.max(A_sup))
+        A_min = float(np.min(A_sup))
+        if A_max + A_min > 0.0:
+            area_asym = (A_max - A_min) / (A_max + A_min)
+            etransfer = etransfer + joining_etransfer_alpha * area_asym
+
     pseudo_velocity_avg = float(np.sum(U[Si] * Q[Si]) / Qtot)
     tot_pseudo_area = Qtot / ((1.0 - etransfer) * pseudo_velocity_avg)
 
@@ -122,10 +152,7 @@ def junction_loss_coefficient(
     # ---- K coefficients (3-branch only per the original) ----
     K = None
     if len(U) <= 3:
-        if int(np.sum(Ci)) == 1:
-            Ucom = float(U[Ci][0])
-        else:
-            Ucom = float(U[Si][0])
+        Ucom = float(U[Ci][0]) if int(np.sum(Ci)) == 1 else float(U[Si][0])
         K = (U[Ci] ** 2 / Ucom**2) * (2.0 * C_all[Ci] + U[Si] ** 2 / U[Ci] ** 2 - 1.0)
 
     return MynardResult(

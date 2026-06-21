@@ -37,11 +37,22 @@ class MPCEv2Network:
 
     SUPPORTED_TOPOLOGIES: tuple[Topology, ...] = ALL_TOPOLOGIES
 
-    def __init__(self, strict: bool = True) -> None:
+    def __init__(
+        self,
+        strict: bool = True,
+        joining_etransfer_alpha: float | None = None,
+    ) -> None:
         """``strict=False`` enables the soft-barrier fallback on the underlying
         MPCEv2Element so the solver gets a quadratic pull-back when it
-        starts in the wrong basin instead of an immediate raise."""
+        starts in the wrong basin instead of an immediate raise.
+
+        ``joining_etransfer_alpha=None`` uses the calibrated default on
+        ``MPCEv2Element`` (currently 0.2). Pass ``0.0`` to disable the
+        joining-side correction entirely (faithful Mynard), or a custom
+        float to override.
+        """
         self.strict = strict
+        self.joining_etransfer_alpha = joining_etransfer_alpha
 
     def evaluate_network(
         self,
@@ -101,6 +112,7 @@ class MPCEv2Network:
             port_areas=[_F_C, _F_C, A_bra],
             flow_direction="branch",
             strict=self.strict,
+            joining_etransfer_alpha=self.joining_etransfer_alpha,
         )
         net.add_element(jct)
         return solve_and_extract(
@@ -113,9 +125,7 @@ class MPCEv2Network:
             verifier=jct.verify_solution_consistent if not self.strict else None,
         )
 
-    def _joining(
-        self, q: float, psi: float, theta_rad: float, topology: Topology
-    ) -> NetworkResult:
+    def _joining(self, q: float, psi: float, theta_rad: float, topology: Topology) -> NetworkResult:
         """Build a joining-flow MPCE-v2 network.
 
         Geometry mirrors the separating case (str at 0deg, bra at theta) but
@@ -133,9 +143,7 @@ class MPCEv2Network:
             if topology == "three_pb":
                 net = build_joining_three_pb_skeleton(K11_target=K11, K12_target=K12)
             else:
-                net = build_joining_mfb_two_pb_skeleton(
-                    m_in=m_in, K11_target=K11, K12_target=K12
-                )
+                net = build_joining_mfb_two_pb_skeleton(m_in=m_in, K11_target=K11, K12_target=K12)
 
         net.nodes["port_bra"].area = A_bra
         # Branch supplier connects to its MFB/PB terminal.
@@ -155,6 +163,7 @@ class MPCEv2Network:
             port_areas=[_F_C, A_bra, _F_C],
             flow_direction="merge",
             strict=self.strict,
+            joining_etransfer_alpha=self.joining_etransfer_alpha,
         )
         net.add_element(jct)
         return solve_and_extract(

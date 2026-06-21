@@ -8,6 +8,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Idelchik 1966 joining-T dataset** (`validation/junction/data/idelchik1966/`):
+  396 raw tabulated K-coefficient cells from Section VII diagrams 7-1 through
+  7-7 (converging wye with `Fs+Fb > Fc, Fs = Fc`, theta=30/45/90 deg, F_b/F_c
+  in {0.1..1.0}, q in {0..1}). Two-pass independent transcription with
+  formula cross-check; two confirmed Idelchik typos tagged in metadata.yaml.
+  Mapping: Idelchik zeta_c.b -> K12, zeta_c.s -> K11; psi = 1/(F_b/F_c)
+  matches Bassett convention. Reformatted into 36 per-(psi, theta) CSVs
+  under the standard dataset naming. Used as second analytical cross-anchor
+  for the MPCE-v2 joining-side calibration.
+- **MPCE-v2 joining-side etransfer correction** (combaero extension to
+  faithful Mynard 2010): `joining_etransfer_alpha: float = 0.2` on
+  `MPCEv2Element`. Mynard's original etransfer collapses to zero for
+  converging flow (the `(1 - flow_ratio)` factor); the asymmetric supplier
+  areas in joining-T networks then leave Mynard underpredicting K_avg at
+  psi > 1. The correction adds `alpha * (A_max - A_min) / (A_max + A_min)`
+  to etransfer, vanishing at psi=1 (preserves the equal-area baseline) and
+  growing with area asymmetry. Single parameter, calibrated against Bassett
+  K11/K12 analytical + Idelchik 1966 tabulated values at psi in [1.25,
+  3.33] and theta in {30, 45, 90} (analytical-only anchors, measured points
+  held out as independent validation). Independent validation: imposed_q
+  joining-flow audit gives mean error -10%, max error -14% vs faithful
+  Mynard; three_pb and mfb_two_pb topologies essentially tied. Pass
+  `joining_etransfer_alpha=0.0` for faithful Mynard, or a custom float for
+  re-calibrated workflows. The default value is locked by a regression
+  test (`test_mpce_v2_joining_etransfer.py`).
+- **Calibration script** `scripts/calibrate_mpce_v2_etransfer.py`:
+  reproduces the alpha=0.2 fit and reports stratified residuals by
+  (theta, psi) for any future re-calibration.
+
+### Changed
+- `validation/junction/schema.py`: extended `Kind` Literal with
+  `"tabulated"` (handbook semi-empirical values, distinct from `"calc"`
+  analytical formulas and `"measured"` experimental points). Extended
+  `QConvention` Literal with `"idelchik"` (equivalent to `"bassett"` for
+  joining type-6).
+- `validation/junction/models/mynard2010.py`: `junction_loss_coefficient`
+  gains optional `joining_etransfer_alpha: float = 0.0` parameter. Default
+  preserves faithful-port Mynard behavior; non-zero values enable the
+  combaero joining-side correction described above.
 - **Python bindings for all 12 Bassett K coefficients**: `cb._core.tee_K1`
   through `tee_K12`. Previously only K5, K6, K11, K12 were exposed; the
   rest required separate C++ tests. The new bindings let the

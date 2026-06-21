@@ -83,6 +83,19 @@ class MPCEv2Element(MultiPortChamberElement):
     # 1e5 Pa to the residual -- the natural Pt scale. Tunable via attribute.
     soft_penalty_alpha: float = 1.0e7
 
+    # Joining-side etransfer correction (combaero extension to faithful
+    # Mynard 2010). Default 0.2 calibrated against Bassett K11_corr/K12_corr
+    # + Idelchik 1966 tabulated values at psi in [1.25, 3.33], theta in
+    # {30, 45, 90} (analytical-only anchors; measured points held out as
+    # independent validation). Independent validation on Bassett-measured
+    # K11/K12 (145 points across 3 topologies) shows -10% mean error and
+    # -14% max error on the imposed_q topology (the cleanest test);
+    # essentially tied on three_pb / mfb_two_pb. Reduces to identity at
+    # psi=1 by construction so the equal-area baseline is unchanged. See
+    # the calibration write-up in the iteration-8 commit and the
+    # validation script in scripts/calibrate_mpce_v2_etransfer.py.
+    DEFAULT_JOINING_ETRANSFER_ALPHA: float = 0.2
+
     def __init__(
         self,
         id: str,
@@ -93,6 +106,7 @@ class MPCEv2Element(MultiPortChamberElement):
         port_areas: list[float] | None = None,
         flow_direction: FlowDirection = "branch",
         strict: bool = True,
+        joining_etransfer_alpha: float | None = None,
     ):
         super().__init__(
             id=id,
@@ -113,6 +127,15 @@ class MPCEv2Element(MultiPortChamberElement):
         # back toward the correct sign. Use for hard cases where the
         # solver starts in the wrong basin but a physical root exists.
         self.strict: bool = strict
+        # joining_etransfer_alpha: pass None to use the calibrated default
+        # (DEFAULT_JOINING_ETRANSFER_ALPHA = 0.2). Pass 0.0 to disable the
+        # correction entirely (faithful-port Mynard). Pass a custom value
+        # if you've re-calibrated against a different anchor set.
+        self.joining_etransfer_alpha: float = (
+            self.DEFAULT_JOINING_ETRANSFER_ALPHA
+            if joining_etransfer_alpha is None
+            else float(joining_etransfer_alpha)
+        )
 
     def verify_solution_consistent(
         self,
@@ -263,7 +286,12 @@ class MPCEv2Element(MultiPortChamberElement):
             return self._soft_barrier_residual(states, Pt_jct, port_mdots)
 
         try:
-            mynard = junction_loss_coefficient(U_mynard, A, theta_rad)
+            mynard = junction_loss_coefficient(
+                U_mynard,
+                A,
+                theta_rad,
+                joining_etransfer_alpha=self.joining_etransfer_alpha,
+            )
         except Exception:
             # Numerical failure (e.g. singular pseudosupplier). Same fallback.
             residuals = [float(s.Pt) - Pt_jct for s in states]
@@ -342,7 +370,12 @@ class MPCEv2Element(MultiPortChamberElement):
                 if (np.sign(U_pert) != np.sign(U_mynard)).any():
                     continue
                 try:
-                    m_pert = junction_loss_coefficient(U_pert, A, theta_rad)
+                    m_pert = junction_loss_coefficient(
+                        U_pert,
+                        A,
+                        theta_rad,
+                        joining_etransfer_alpha=self.joining_etransfer_alpha,
+                    )
                 except Exception:
                     continue
                 if m_pert.K is None or len(m_pert.K) != len(non_common_idxs):
