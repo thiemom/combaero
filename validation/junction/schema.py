@@ -16,10 +16,10 @@ import yaml
 
 DATA_ROOT = Path(__file__).parent / "data"
 
-Kind = Literal["measured", "calc", "envelope"]
+Kind = Literal["measured", "calc", "envelope", "tabulated"]
 FlowRegime = Literal["separating", "joining", "combining"]
 FitTier = Literal["excellent", "very_good", "good", "moderate", "poor"]
-QConvention = Literal["bassett", "hager", "wang", "perez_garcia"]
+QConvention = Literal["bassett", "hager", "wang", "perez_garcia", "idelchik"]
 
 
 @dataclass(frozen=True)

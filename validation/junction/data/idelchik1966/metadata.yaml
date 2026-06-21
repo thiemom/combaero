@@ -1,0 +1,126 @@
+# Idelchik 1966 dataset metadata.
+#
+# Source: I. E. Idel'chik, "Handbook of Hydraulic Resistance" -- English
+# translation IPST 1966 (AEC-tr-6630) of the 1960 Russian edition.
+#
+# All values are TABULATED handbook coefficients (semi-empirical) from
+# Section VII Diagrams 7-1 through 7-7, for the converging wye/tee geometry
+# `Fs + Fb > Fc, Fs = Fc`. The same Bassett-comparable joining-T geometry
+# (straight area equals common area; only branch area varies).
+#
+# Mapping to our K_id notation:
+#   ζ_c.b (branch -> common outlet) -> K12   [matches Bassett K12 normalisation]
+#   ζ_c.s (straight -> common outlet) -> K11 [matches Bassett K11 normalisation]
+#
+# psi convention: psi = F_c / F_b (matches Bassett).
+#   F_b/F_c=0.1 -> psi=10.0
+#   F_b/F_c=0.2 -> psi=5.0
+#   F_b/F_c=0.3 -> psi=3.333
+#   F_b/F_c=0.4 -> psi=2.5
+#   F_b/F_c=0.6 -> psi=1.667
+#   F_b/F_c=0.8 -> psi=1.25
+#   F_b/F_c=1.0 -> psi=1.0
+#
+# q convention: q = Q_b/Q_c (branch flow over common flow). Same as Bassett's
+# joining-type-6 q definition (m_lat / m_com), so all bassett2001 K11/K12
+# comparisons apply directly without unit-conversion.
+#
+# theta coverage: 30, 45, 90 deg. We deliberately skipped theta=60 deg
+# (diagrams 7-5, 7-6) because the calibration target was a smooth angle
+# correction in the unified Mynard etransfer formulation -- three angles
+# spanning the full range bracket that fit cleanly. If calibration error
+# patterns later suggest the etransfer-vs-angle curve has structure between
+# 45 and 90 deg, transcribe 7-5 (K12 alpha=60) and 7-6 (K11 alpha=60)
+# following the same cross-check methodology and re-run the calibration.
+#
+# Diagram 7-7 (alpha=90) is structurally different from the others: it bundles
+# the K12 11x7 branch table AND a 1x11 psi-independent K11 table on the same
+# page. The K11 file is suffixed _psi-independent_ to flag that. Per the
+# printed text, ζ_c.s at alpha=90 is "practically true for all values of
+# F_b/F_c", so a single curve covers all area ratios.
+#
+# Known Idelchik typos (printed-vs-formula deviations confirmed by two
+# independent readings of the source page; kept as-printed because handbook
+# is canonical, but flagged so downstream calibration code can weight down
+# or skip):
+#   - 7-1, theta=30, K12: cell (q=0.9, F_b/F_c=0.1) i.e. psi=10
+#     printed = 58.0; formula = 67.9. Almost certainly a single-digit
+#     typesetting error (5 set instead of 6).
+#   - 7-7, theta=90, K12: cell (q=0.7, F_b/F_c=0.1) i.e. psi=10
+#     printed = 42.9; formula = 49.8. Same pattern (4 set instead of 4).
+
+paper:
+  name: Idelchik 1966
+  citation: "I. E. Idel'chik, Handbook of Hydraulic Resistance: Coefficients of Local Resistance and of Friction. Translated from Russian, Israel Program for Scientific Translations, Jerusalem 1966 (AEC-tr-6630). Originally Gosenergoizdat, Moskva-Leningrad, 1960."
+  doi: null
+  q_convention: idelchik   # equivalent to bassett for joining-type-6
+  default_uncertainty_K: 0.10   # tabulated handbook values; broader band than Bassett's 0.05
+
+fit_tiers:
+  # Idelchik's own assessment is implicit in the source attribution: Levin/Taliev
+  # formulas refined by Kinne/Petermann/Vogel experiments. Treat as 'good'.
+  K11: good
+  K12: good
+
+known_typos:
+  - file: idelchik_diag7-1_K12_theta=30_psi=10_tabulated.csv
+    q: 0.9
+    printed_value: 58.0
+    expected_value: 67.9
+    note: "Likely single-digit typesetting error in Idelchik (5 vs 6 confusion)."
+  - file: idelchik_diag7-7_K12_theta=90_psi=10_tabulated.csv
+    q: 0.7
+    printed_value: 42.9
+    expected_value: 49.8
+    note: "Same pattern as 7-1 typo; F_b/F_c=0.1 column mid-q cell sits ~7-10 units below formula."
+
+files:
+  # ----- 7-1: K12, alpha=30 (branch loss, joining wye) -----
+  idelchik_diag7-1_K12_theta=30_psi=1_tabulated.csv:     {K_id: K12, psi: 1.0,   theta_deg: 30, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-1_K12_theta=30_psi=1.25_tabulated.csv:  {K_id: K12, psi: 1.25,  theta_deg: 30, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-1_K12_theta=30_psi=1.667_tabulated.csv: {K_id: K12, psi: 1.667, theta_deg: 30, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-1_K12_theta=30_psi=2.5_tabulated.csv:   {K_id: K12, psi: 2.5,   theta_deg: 30, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-1_K12_theta=30_psi=3.333_tabulated.csv: {K_id: K12, psi: 3.333, theta_deg: 30, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-1_K12_theta=30_psi=5_tabulated.csv:     {K_id: K12, psi: 5.0,   theta_deg: 30, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-1_K12_theta=30_psi=10_tabulated.csv:    {K_id: K12, psi: 10.0,  theta_deg: 30, x_axis: q, flow_regime: joining, kind: tabulated}
+
+  # ----- 7-2: K11, alpha=30 (main passage loss, joining wye) -----
+  idelchik_diag7-2_K11_theta=30_psi=1_tabulated.csv:     {K_id: K11, psi: 1.0,   theta_deg: 30, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-2_K11_theta=30_psi=1.25_tabulated.csv:  {K_id: K11, psi: 1.25,  theta_deg: 30, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-2_K11_theta=30_psi=1.667_tabulated.csv: {K_id: K11, psi: 1.667, theta_deg: 30, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-2_K11_theta=30_psi=2.5_tabulated.csv:   {K_id: K11, psi: 2.5,   theta_deg: 30, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-2_K11_theta=30_psi=3.333_tabulated.csv: {K_id: K11, psi: 3.333, theta_deg: 30, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-2_K11_theta=30_psi=5_tabulated.csv:     {K_id: K11, psi: 5.0,   theta_deg: 30, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-2_K11_theta=30_psi=10_tabulated.csv:    {K_id: K11, psi: 10.0,  theta_deg: 30, x_axis: q, flow_regime: joining, kind: tabulated}
+
+  # ----- 7-3: K12, alpha=45 (branch loss, joining wye) -----
+  idelchik_diag7-3_K12_theta=45_psi=1_tabulated.csv:     {K_id: K12, psi: 1.0,   theta_deg: 45, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-3_K12_theta=45_psi=1.25_tabulated.csv:  {K_id: K12, psi: 1.25,  theta_deg: 45, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-3_K12_theta=45_psi=1.667_tabulated.csv: {K_id: K12, psi: 1.667, theta_deg: 45, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-3_K12_theta=45_psi=2.5_tabulated.csv:   {K_id: K12, psi: 2.5,   theta_deg: 45, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-3_K12_theta=45_psi=3.333_tabulated.csv: {K_id: K12, psi: 3.333, theta_deg: 45, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-3_K12_theta=45_psi=5_tabulated.csv:     {K_id: K12, psi: 5.0,   theta_deg: 45, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-3_K12_theta=45_psi=10_tabulated.csv:    {K_id: K12, psi: 10.0,  theta_deg: 45, x_axis: q, flow_regime: joining, kind: tabulated}
+
+  # ----- 7-4: K11, alpha=45 (main passage loss, joining wye) -----
+  idelchik_diag7-4_K11_theta=45_psi=1_tabulated.csv:     {K_id: K11, psi: 1.0,   theta_deg: 45, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-4_K11_theta=45_psi=1.25_tabulated.csv:  {K_id: K11, psi: 1.25,  theta_deg: 45, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-4_K11_theta=45_psi=1.667_tabulated.csv: {K_id: K11, psi: 1.667, theta_deg: 45, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-4_K11_theta=45_psi=2.5_tabulated.csv:   {K_id: K11, psi: 2.5,   theta_deg: 45, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-4_K11_theta=45_psi=3.333_tabulated.csv: {K_id: K11, psi: 3.333, theta_deg: 45, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-4_K11_theta=45_psi=5_tabulated.csv:     {K_id: K11, psi: 5.0,   theta_deg: 45, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-4_K11_theta=45_psi=10_tabulated.csv:    {K_id: K11, psi: 10.0,  theta_deg: 45, x_axis: q, flow_regime: joining, kind: tabulated}
+
+  # ----- 7-7: K12, alpha=90 (branch loss, converging tee) -----
+  idelchik_diag7-7_K12_theta=90_psi=1_tabulated.csv:     {K_id: K12, psi: 1.0,   theta_deg: 90, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-7_K12_theta=90_psi=1.25_tabulated.csv:  {K_id: K12, psi: 1.25,  theta_deg: 90, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-7_K12_theta=90_psi=1.667_tabulated.csv: {K_id: K12, psi: 1.667, theta_deg: 90, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-7_K12_theta=90_psi=2.5_tabulated.csv:   {K_id: K12, psi: 2.5,   theta_deg: 90, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-7_K12_theta=90_psi=3.333_tabulated.csv: {K_id: K12, psi: 3.333, theta_deg: 90, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-7_K12_theta=90_psi=5_tabulated.csv:     {K_id: K12, psi: 5.0,   theta_deg: 90, x_axis: q, flow_regime: joining, kind: tabulated}
+  idelchik_diag7-7_K12_theta=90_psi=10_tabulated.csv:    {K_id: K12, psi: 10.0,  theta_deg: 90, x_axis: q, flow_regime: joining, kind: tabulated}
+
+  # ----- 7-7b: K11, alpha=90 (main passage, psi-independent per source note) -----
+  # No psi value: source explicitly states "practically true for all values
+  # of F_b/F_c". Loader can broadcast across psi for matching.
+  idelchik_diag7-7b_K11_theta=90_psi-independent_tabulated.csv: {K_id: K11, psi: null, theta_deg: 90, x_axis: q, flow_regime: joining, kind: tabulated}
