@@ -76,6 +76,12 @@ export const QUANTITY_CATALOGUE: Record<
 	},
 	K_straight: { label: "K str", unit: "—", format: (v) => v.toFixed(3) },
 	K_branch: { label: "K br", unit: "—", format: (v) => v.toFixed(3) },
+	// MPCE-v2 joining-flow K aliases (Bassett K11/K12 convention)
+	K11: { label: "K11", unit: "—", format: (v) => v.toFixed(3) },
+	K12: { label: "K12", unit: "—", format: (v) => v.toFixed(3) },
+	// Chamber stagnation pressure (MPCE-v2 emits Pt_jct; legacy P_jct stored too)
+	Pt_jct: { label: "Pt jct", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
+	P_jct: { label: "P jct", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
 	// Element-specific diagnostics (Static)
 	P_in: { label: "Pi", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
 	P_out: { label: "Po", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },

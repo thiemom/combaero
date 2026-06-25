@@ -1646,52 +1646,497 @@ const Inspector = () => {
 						);
 					})()}
 
-				{selectedNode.type === "mpce_tee" && (
-					<div className="flex flex-col gap-4">
-						{/* Flow direction */}
-						<div className="flex flex-col gap-2">
-							<label className="text-xs font-bold text-gray-500 uppercase">
-								Flow Direction
-							</label>
-							<select
-								className="p-2 border rounded bg-white text-xs border-stone-200"
-								value={selectedNode.data.flow_direction ?? "branch"}
-								onChange={(e) =>
-									updateNodeData(selectedNode.id, {
-										flow_direction: e.target.value,
-									})
-								}
-							>
-								<option value="branch">Branch (1 inlet, 2 outlets)</option>
-								<option value="merge">Merge (2 inlets, 1 outlet)</option>
-							</select>
-							<p className="text-[9px] text-gray-400 italic">
-								Constrained: the Mynard residual asserts at solve time and
-								errors if the observed flow direction disagrees with this
-								declaration.
-							</p>
-						</div>
+				{selectedNode.type === "mpce_tee" &&
+					(() => {
+						const flowDirection = selectedNode.data.flow_direction ?? "branch";
+						const isMerge = flowDirection === "merge";
 
-						{/* Branch angle */}
-						<div className="flex flex-col gap-2">
-							<label className="text-xs font-bold text-gray-500 uppercase">
-								Branch Angle (deg)
-							</label>
-							<NumericInput
-								value={selectedNode.data.theta_deg ?? 90}
-								onChange={(val) =>
-									updateNodeData(selectedNode.id, { theta_deg: val })
-								}
-								className="p-2 border rounded"
-								placeholder="90"
-							/>
-							<p className="text-[9px] text-gray-400 italic">
-								Branch arm angle measured from the main axis. Mynard's smooth K
-								relation is valid across the full 0-180 deg range.
-							</p>
-						</div>
-					</div>
-				)}
+						// Port-channel detection: same logic as TeeJunction. For "branch"
+						// (separating): common is incoming, straight+branch are outgoing.
+						// For "merge" (joining): common is outgoing, straight+branch are
+						// incoming.
+						const findPortChannel = (portName: string) => {
+							const isOutgoing =
+								(isMerge && portName === "common") ||
+								(!isMerge && portName !== "common");
+							let neighbour: (typeof nodes)[0] | undefined;
+							if (isOutgoing) {
+								const edge = edges.find(
+									(e) =>
+										e.source === selectedNode.id &&
+										e.sourceHandle === `port-${portName}-source` &&
+										!e.data?.type,
+								);
+								neighbour = edge
+									? nodes.find((n) => n.id === edge.target)
+									: undefined;
+							} else {
+								const edge = edges.find(
+									(e) =>
+										e.target === selectedNode.id &&
+										e.targetHandle === `port-${portName}-target` &&
+										!e.data?.type,
+								);
+								neighbour = edge
+									? nodes.find((n) => n.id === edge.source)
+									: undefined;
+							}
+							if (neighbour?.type === "channel") return neighbour;
+							// Neighbour is a plenum/boundary; look one hop further
+							if (isOutgoing) {
+								return nodes.find(
+									(n) =>
+										n.type === "channel" &&
+										edges.some(
+											(e) =>
+												e.source === neighbour?.id &&
+												e.target === n.id &&
+												!e.data?.type,
+										),
+								);
+							}
+							return nodes.find(
+								(n) =>
+									n.type === "channel" &&
+									edges.some(
+										(e) =>
+											e.target === neighbour?.id &&
+											e.source === n.id &&
+											!e.data?.type,
+									),
+							);
+						};
+
+						const walkChD = (
+							ch: (typeof nodes)[0] | undefined,
+							isOutgoing: boolean,
+							depth = 0,
+						): number | undefined => {
+							if (!ch || depth > 20) return undefined;
+							const d = ch.data.D as number | null | undefined;
+							if (d != null) return d;
+							const e = isOutgoing
+								? edges.find((ee) => ee.source === ch.id && !ee.data?.type)
+								: edges.find((ee) => ee.target === ch.id && !ee.data?.type);
+							if (!e) return undefined;
+							const next = nodes.find(
+								(n) => n.id === (isOutgoing ? e.target : e.source),
+							);
+							if (!next) return undefined;
+							if (next.type === "channel")
+								return walkChD(next, isOutgoing, depth + 1);
+							return undefined;
+						};
+
+						const portD = (portName: string) => {
+							const isOutgoing =
+								(isMerge && portName === "common") ||
+								(!isMerge && portName !== "common");
+							return walkChD(findPortChannel(portName), isOutgoing);
+						};
+
+						const commonCh = findPortChannel("common");
+						const straightCh = findPortChannel("straight");
+
+						const areaFromD = (d: number | null | undefined) =>
+							d != null ? (Math.PI / 4) * d * d : undefined;
+
+						const inheritedFC: number | undefined =
+							areaFromD(portD("common")) ?? areaFromD(portD("straight"));
+						const inheritedFBranch: number | undefined = areaFromD(
+							portD("branch"),
+						);
+
+						const userSetFC = selectedNode.data.F_C != null;
+						const userSetFBranch = selectedNode.data.F_branch != null;
+
+						const effectiveFC: number = userSetFC
+							? (selectedNode.data.F_C as number)
+							: (inheritedFC ?? 0.01);
+						const effectiveFBranch: number = userSetFBranch
+							? (selectedNode.data.F_branch as number)
+							: (inheritedFBranch ?? effectiveFC);
+						const psi =
+							effectiveFBranch > 0 ? effectiveFC / effectiveFBranch : null;
+						const dFromF = (f: number) => Math.sqrt((4 * f) / Math.PI);
+						const lu = unitPreferences.length === "mm" ? 1000 : 1;
+						const lu_label = unitPreferences.length;
+
+						const result = selectedNode.data.result;
+
+						return (
+							<div className="flex flex-col gap-4">
+								{/* Port legend (MPCE indigo / rose theme) */}
+								<div className="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-[9px] leading-snug text-stone-600">
+									<div className="font-bold uppercase text-stone-400 mb-1">
+										Port Guide
+									</div>
+									<div className="grid grid-cols-3 gap-1 text-center font-mono mb-1.5">
+										<div>
+											<span
+												className="font-extrabold"
+												style={{ color: isMerge ? "#3b82f6" : "#f43f5e" }}
+											>
+												S
+											</span>{" "}
+											straight
+										</div>
+										<div>
+											<span
+												className="font-extrabold"
+												style={{ color: isMerge ? "#f43f5e" : "#3b82f6" }}
+											>
+												C
+											</span>{" "}
+											common
+										</div>
+										<div>
+											<span
+												className="font-extrabold"
+												style={{ color: isMerge ? "#3b82f6" : "#f43f5e" }}
+											>
+												B
+											</span>{" "}
+											branch
+										</div>
+									</div>
+									<div className="text-stone-500">
+										{isMerge ? (
+											<>
+												<span style={{ color: "#3b82f6" }}>S, B</span> →{" "}
+												<span style={{ color: "#f43f5e" }}>C</span>
+												{"  "}(two inlets, one outlet at C)
+											</>
+										) : (
+											<>
+												<span style={{ color: "#3b82f6" }}>C</span> →{" "}
+												<span style={{ color: "#f43f5e" }}>S, B</span>
+												{"  "}(one inlet at C, two outlets)
+											</>
+										)}
+									</div>
+								</div>
+
+								{/* Flow direction (constrained — the Mynard residual asserts) */}
+								<div className="flex flex-col gap-2">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Flow Direction
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={flowDirection}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												flow_direction: e.target.value,
+											})
+										}
+									>
+										<option value="branch">Branch (1 inlet, 2 outlets)</option>
+										<option value="merge">Merge (2 inlets, 1 outlet)</option>
+									</select>
+									<p className="text-[9px] text-gray-400 italic">
+										Constrained: the Mynard residual asserts at solve time and
+										errors if the observed flow direction disagrees with this
+										declaration.
+									</p>
+								</div>
+
+								{/* Branch angle */}
+								<div className="flex flex-col gap-2">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Branch Angle (deg)
+									</label>
+									<NumericInput
+										value={selectedNode.data.theta_deg ?? 90}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { theta_deg: val })
+										}
+										className="p-2 border rounded"
+										placeholder="90"
+									/>
+									<p className="text-[9px] text-gray-400 italic">
+										Branch arm angle measured from the main axis. Mynard's
+										smooth K relation is valid across the full 0-180 deg range.
+									</p>
+								</div>
+
+								{/* ── Arm areas (3-arm, mirrors TeeJunction with Mynard labels) ── */}
+
+								{/* Common arm (F_C) */}
+								<div className="flex flex-col gap-2">
+									<div className="flex items-center justify-between">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Common Arm Area (F_C)
+										</label>
+										{userSetFC && (
+											<button
+												type="button"
+												className="text-[9px] text-blue-500 hover:underline"
+												onClick={() =>
+													updateNodeData(selectedNode.id, { F_C: null })
+												}
+											>
+												Reset to inherited
+											</button>
+										)}
+									</div>
+									<AreaInput
+										id={`F_C_mpce_${selectedNode.id}`}
+										label=""
+										value={effectiveFC}
+										placeholder={
+											inheritedFC != null ? inheritedFC.toFixed(5) : "0.01"
+										}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { F_C: val })
+										}
+										onClear={() =>
+											updateNodeData(selectedNode.id, { F_C: null })
+										}
+										inputClassName={
+											userSetFC ? "font-semibold" : "text-gray-400"
+										}
+									/>
+									{!userSetFC && inheritedFC != null && (
+										<p className="text-[9px] text-gray-400 italic -mt-1">
+											Inherited from{" "}
+											{commonCh?.id ?? straightCh?.id ?? "connected channel"}.
+											Edit to override.
+										</p>
+									)}
+								</div>
+
+								{/* Straight arm (read-only = F_C — Mynard joining type-6 sets F_S = F_C) */}
+								<div className="flex flex-col gap-1">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Straight Arm Area (F_S)
+									</label>
+									<div className="rounded bg-stone-50 border border-stone-200 px-3 py-2 text-[10px] text-stone-500 flex justify-between items-center">
+										<span className="font-mono">
+											{effectiveFC.toExponential(3)} m²{"  "}(D ={" "}
+											{(dFromF(effectiveFC) * lu).toFixed(2)} {lu_label})
+										</span>
+										<span className="italic text-[9px] text-stone-400">
+											= F_C (Mynard)
+										</span>
+									</div>
+									<p className="text-[9px] text-stone-400 italic">
+										Mynard's pseudosupplier geometry assumes F_S = F_C. For a
+										physically different straight arm, add an AreaChange
+										element.
+									</p>
+								</div>
+
+								{/* Branch arm (F_branch) */}
+								<div className="flex flex-col gap-2">
+									<div className="flex items-center justify-between">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Branch Arm Area (F_B)
+										</label>
+										{userSetFBranch && (
+											<button
+												type="button"
+												className="text-[9px] text-blue-500 hover:underline"
+												onClick={() =>
+													updateNodeData(selectedNode.id, { F_branch: null })
+												}
+											>
+												Reset to inherited
+											</button>
+										)}
+									</div>
+									<AreaInput
+										id={`F_branch_mpce_${selectedNode.id}`}
+										label=""
+										value={effectiveFBranch}
+										placeholder={
+											inheritedFBranch != null
+												? inheritedFBranch.toFixed(5)
+												: inheritedFC != null
+													? inheritedFC.toFixed(5)
+													: "0.01"
+										}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { F_branch: val })
+										}
+										onClear={() =>
+											updateNodeData(selectedNode.id, { F_branch: null })
+										}
+										inputClassName={
+											userSetFBranch ? "font-semibold" : "text-gray-400"
+										}
+									/>
+								</div>
+
+								{/* Derived ratio summary */}
+								{psi != null && (
+									<div className="rounded bg-stone-50 border border-stone-200 px-3 py-2 text-[10px] text-stone-600 flex flex-col gap-0.5">
+										<div className="flex justify-between">
+											<span className="font-medium text-stone-500 uppercase tracking-wide text-[8px]">
+												Area ratio
+											</span>
+											<span
+												className={
+													psi > 1.005
+														? "text-amber-600 font-semibold"
+														: psi < 0.995
+															? "text-blue-600 font-semibold"
+															: "text-stone-500"
+												}
+											>
+												{psi > 1.005
+													? "C larger than B"
+													: psi < 0.995
+														? "B larger than C"
+														: "equal areas"}
+											</span>
+										</div>
+										<div className="flex justify-between mt-0.5">
+											<span className="text-stone-400">psi = F_C / F_B</span>
+											<span className="font-mono font-semibold">
+												{psi.toFixed(4)}
+											</span>
+										</div>
+										<div className="flex justify-between">
+											<span className="text-stone-400">D_C → D_B</span>
+											<span className="font-mono">
+												{(dFromF(effectiveFC) * lu).toFixed(1)} →{" "}
+												{(dFromF(effectiveFBranch) * lu).toFixed(1)} {lu_label}
+											</span>
+										</div>
+									</div>
+								)}
+
+								{/* Initial guess panel */}
+								<InitialGuessEditor node={selectedNode} />
+
+								{/* Post-solve diagnostics — emitted by MPCEv2Element.diagnostics */}
+								{result && (
+									<div className="mt-4 p-3 bg-stone-50 border border-stone-200 rounded">
+										<h3 className="text-xs font-bold text-stone-500 uppercase mb-3">
+											{isMerge ? "Joining" : "Separating"} Flow Diagnostics
+										</h3>
+										<div className="grid grid-cols-2 gap-x-2 gap-y-3">
+											{/* Chamber stagnation pressure */}
+											{result.Pt_jct != null && (
+												<div className="flex flex-col col-span-2">
+													<span className="text-stone-400 text-[9px] font-bold uppercase">
+														Pt junction
+													</span>
+													<span className="font-mono text-xs font-bold">
+														{(result.Pt_jct ?? result.P_jct ?? 0).toFixed(1)}{" "}
+														<span className="text-[9px] font-normal text-stone-400">
+															Pa
+														</span>
+													</span>
+												</div>
+											)}
+											{/* Per-port mdots (port_0_m_dot, etc.). Indices depend on
+											    flow direction:
+											      branch: 0=com, 1=straight, 2=branch
+											      merge:  0=straight, 1=branch, 2=com */}
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[9px] font-bold uppercase">
+													ṁ common
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{Math.abs(
+														(isMerge
+															? result.port_2_m_dot
+															: result.port_0_m_dot) ?? 0,
+													).toFixed(4)}{" "}
+													<span className="text-[9px] font-normal text-stone-400">
+														kg/s
+													</span>
+												</span>
+											</div>
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[9px] font-bold uppercase">
+													ṁ straight
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{Math.abs(
+														(isMerge
+															? result.port_0_m_dot
+															: result.port_1_m_dot) ?? 0,
+													).toFixed(4)}{" "}
+													<span className="text-[9px] font-normal text-stone-400">
+														kg/s
+													</span>
+												</span>
+											</div>
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[9px] font-bold uppercase">
+													ṁ branch
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{Math.abs(
+														(isMerge
+															? result.port_1_m_dot
+															: result.port_2_m_dot) ?? 0,
+													).toFixed(4)}{" "}
+													<span className="text-[9px] font-normal text-stone-400">
+														kg/s
+													</span>
+												</span>
+											</div>
+											<div className="flex flex-col">
+												<span className="text-stone-400 text-[9px] font-bold uppercase">
+													ṁ branch / ṁ common
+												</span>
+												<span className="font-mono text-xs font-bold">
+													{(result.mass_flow_ratio ?? 0).toFixed(3)}{" "}
+													<span className="text-[9px] font-normal text-stone-400">
+														kg/kg
+													</span>
+												</span>
+											</div>
+											{/* K coefficients — names differ by direction */}
+											{isMerge ? (
+												<>
+													<div className="flex flex-col">
+														<span className="text-stone-400 text-[9px] font-bold uppercase">
+															K11 (str → com)
+														</span>
+														<span className="font-mono text-xs font-bold">
+															{(result.K11 ?? 0).toFixed(3)}
+														</span>
+													</div>
+													<div className="flex flex-col">
+														<span className="text-stone-400 text-[9px] font-bold uppercase">
+															K12 (bra → com)
+														</span>
+														<span className="font-mono text-xs font-bold">
+															{(result.K12 ?? 0).toFixed(3)}
+														</span>
+													</div>
+												</>
+											) : (
+												<>
+													<div className="flex flex-col">
+														<span className="text-stone-400 text-[9px] font-bold uppercase">
+															K straight
+														</span>
+														<span className="font-mono text-xs font-bold">
+															{(result.K_straight ?? 0).toFixed(3)}
+														</span>
+													</div>
+													<div className="flex flex-col">
+														<span className="text-stone-400 text-[9px] font-bold uppercase">
+															K branch
+														</span>
+														<span className="font-mono text-xs font-bold">
+															{(result.K_branch ?? 0).toFixed(3)}
+														</span>
+													</div>
+												</>
+											)}
+										</div>
+									</div>
+								)}
+							</div>
+						);
+					})()}
 
 				{selectedNode.type === "vortex" && (
 					<div className="flex flex-col gap-4">
@@ -3043,6 +3488,10 @@ const InitialGuessEditor = ({ node }: { node: any }) => {
 			{ key: "m_dot_com", unit: "kg/s" },
 			{ key: "m_dot_branch", unit: "kg/s" },
 		],
+		// MPCE tee: the only element-owned unknown is the chamber stagnation
+		// pressure (legacy slot named P_jct; MPCE-v2 stores Pt there). Warm-
+		// starting Pt_jct is the most useful nudge for the slower MPCE solve.
+		mpce_tee: [{ key: "P_jct", unit: "Pa" }],
 		vortex: [{ key: "m_dot", unit: "kg/s" }],
 	};
 	const guessFields = FIELDS_BY_TYPE[node.type as string] ?? [];
