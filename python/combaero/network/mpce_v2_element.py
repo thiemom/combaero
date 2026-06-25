@@ -161,6 +161,104 @@ class MPCEv2Element(MultiPortChamberElement):
                 return False
         return True
 
+    def diagnostics(  # type: ignore[override]
+        self,
+        states: list[NetworkMixtureState],
+        Pt_jct: float,
+        port_mdots: list[float] | None = None,
+    ) -> dict[str, float]:
+        """Emit MPCE-v2 diagnostics: parent fields + Mynard K + named aliases.
+
+        Beyond the parent class output (``P_jct``, ``n_ports``, per-port
+        ``P/T/area/sign``), this re-evaluates Mynard at the converged
+        operating point to expose the K coefficient used in the residual,
+        plus the topology-aware aliases that the GUI displays:
+
+          - separating (flow_direction='branch'): ``K_straight``,
+            ``K_branch``, ``mass_flow_ratio = m_dot_branch / m_dot_com``
+          - joining (flow_direction='merge'): ``K11``, ``K12``,
+            ``mass_flow_ratio = m_dot_branch / m_dot_com`` (same convention
+            as Bassett's joining-T q)
+
+        Re-evaluation rather than caching keeps diagnostics consistent with
+        a converged state and avoids the residual call having to stash
+        per-element state.
+        """
+        diag = super().diagnostics(states, Pt_jct, port_mdots)
+        if port_mdots is None or len(port_mdots) != self.N:
+            return diag
+
+        # Per-port mdot in junction convention is already in `port_mdots`.
+        # Convert to Mynard's U (positive = supplier into junction).
+        rho_port = np.array([float(s.density()) for s in states])
+        A = np.array([float(a or 0.0) for a in self.port_areas])
+        if (A <= 0.0).any():
+            return diag  # underspecified geometry; skip K emission
+        U_mynard = -np.array(port_mdots) / (rho_port * A)
+
+        # Reproduce the residual's angle-handling: axial-back at pi for the
+        # lone opposite-sign port.
+        theta_rad = np.array([math.radians(float(t)) for t in self.port_angles_deg])
+        sup_count = int(np.sum(U_mynard > 1e-9))
+        col_count = int(np.sum(U_mynard < -1e-9))
+        if sup_count == 1 and col_count == self.N - 1:
+            theta_rad[int(np.argmax(U_mynard))] = math.pi
+        elif col_count == 1 and sup_count == self.N - 1:
+            theta_rad[int(np.argmin(U_mynard))] = math.pi
+        else:
+            return diag  # degenerate / multi-supplier-multi-collector
+
+        try:
+            mynard = junction_loss_coefficient(
+                U_mynard,
+                A,
+                theta_rad,
+                joining_etransfer_alpha=self.joining_etransfer_alpha,
+            )
+        except Exception:
+            return diag
+
+        if mynard.K is None:
+            return diag
+
+        # Mynard K is per non-common port (collectors for separating, suppliers
+        # for joining). non_common_idxs preserves Si/Ci order, which for the
+        # 3-port canonical setup matches (straight, branch) for separating and
+        # (straight, branch) for joining (the lone-opposite port is common).
+        sup_mask = U_mynard > 1e-9
+        col_mask = U_mynard < -1e-9
+        non_common_idxs = np.where(col_mask)[0] if sup_count == 1 else np.where(sup_mask)[0]
+        if len(non_common_idxs) != len(mynard.K):
+            return diag
+
+        K_per_port = np.zeros(self.N)
+        for j, port_idx in enumerate(non_common_idxs):
+            K_per_port[port_idx] = float(mynard.K[j])
+            diag[f"port_{port_idx}_K"] = float(mynard.K[j])
+
+        # Topology-aware aliases. port ordering:
+        #   "branch" (separating): port 0 = com (inlet), 1 = straight, 2 = branch
+        #   "merge"  (joining):    port 0 = straight, 1 = branch, 2 = com (outlet)
+        if self.N == 3:
+            if self.flow_direction == "branch":
+                diag["K_straight"] = float(K_per_port[1])
+                diag["K_branch"] = float(K_per_port[2])
+                m_com = abs(float(port_mdots[0]))
+                m_branch = abs(float(port_mdots[2]))
+            else:  # "merge"
+                # K11 (straight->common), K12 (branch->common)
+                diag["K11"] = float(K_per_port[0])
+                diag["K12"] = float(K_per_port[1])
+                m_com = abs(float(port_mdots[2]))
+                m_branch = abs(float(port_mdots[1]))
+            if m_com > 1e-12:
+                diag["mass_flow_ratio"] = m_branch / m_com
+
+        # Convenience: Pt at the chamber (equals P_jct in MPCE-v2 naming, since
+        # `P_jct` re-purposes the MPCE-v1 static slot for Pt).
+        diag["Pt_jct"] = float(Pt_jct)
+        return diag
+
     def _soft_barrier_residual(
         self,
         states: list[NetworkMixtureState],

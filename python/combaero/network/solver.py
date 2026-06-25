@@ -1825,7 +1825,14 @@ class NetworkSolver:
                     self._get_node_state(nodes[pid], final_x) for pid in element.port_nodes
                 ]
                 P_jct_val = float(final_x[m_indices[0]]) if m_indices else 0.0
-                diag = element.diagnostics(port_states, P_jct_val)
+                # Per-port mdots in junction convention (positive = out of
+                # junction), same sign-mapping the residual call uses.
+                port_mdots: list[float] = []
+                for i, outer_id in enumerate(element._port_element_ids):
+                    outer_indices = self._unknown_indices.get(outer_id, [])
+                    outer_mdot = float(final_x[outer_indices[0]]) if outer_indices else 0.0
+                    port_mdots.append(element._port_signs[i] * outer_mdot)
+                diag = element.diagnostics(port_states, P_jct_val, port_mdots)
             else:
                 state_in = self._get_node_state(self.network.nodes[element.from_node], final_x)
                 state_out = self._get_node_state(self.network.nodes[element.to_node], final_x)
