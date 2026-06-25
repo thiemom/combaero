@@ -93,20 +93,22 @@ const NetworkCanvas = () => {
 					f_multiplier: 1.0,
 				} as any;
 			} else if (type === "tee_junction") {
+				// F_C / F_branch / psi intentionally omitted so the backend
+				// inherits geometry from connected channels (per schema default
+				// `None = inherit`). User can explicitly set values via the
+				// Inspector to override.
 				data = {
 					...data,
 					tee_type: "merging",
 					theta_deg: 90,
-					F_C: 0.01,
-					psi: 1.0,
 				} as any;
 			} else if (type === "mpce_tee") {
+				// Same inheritance pattern as tee_junction; defaults left null
+				// so the backend resolves areas from connected channel D.
 				data = {
 					...data,
 					flow_direction: "branch",
 					theta_deg: 90,
-					F_C: 0.01,
-					psi: 1.0,
 				} as any;
 			} else if (type === "vortex") {
 				data = {
