@@ -3289,13 +3289,20 @@ class MultiPortChamberElement(NetworkElement):
 
         return residuals, jac
 
-    def diagnostics(self, states: list[NetworkMixtureState], P_jct: float) -> dict[str, float]:
+    def diagnostics(
+        self,
+        states: list[NetworkMixtureState],
+        P_jct: float,
+        port_mdots: list[float] | None = None,
+    ) -> dict[str, float]:
         diag: dict[str, float] = {"P_jct": float(P_jct), "n_ports": float(self.N)}
         for i in range(self.N):
             diag[f"port_{i}_P"] = float(states[i].P)
             diag[f"port_{i}_T"] = float(states[i].T)
             diag[f"port_{i}_area"] = float(self.port_areas[i] or 0.0)
             diag[f"port_{i}_sign"] = float(self._port_signs[i])
+            if port_mdots is not None and i < len(port_mdots):
+                diag[f"port_{i}_m_dot"] = float(port_mdots[i])
         return diag
 
 

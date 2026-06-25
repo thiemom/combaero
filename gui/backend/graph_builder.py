@@ -239,6 +239,93 @@ def _build_discrete_loss_correlation(
     return ConstantFractionLoss(xi=xi)
 
 
+def _channel_D_at_tee_port(
+    schema_edges,
+    schema_nodes,
+    tee_id: str,
+    port: str,
+) -> float | None:
+    """Return the inner diameter [m] of a channel directly connected to a tee port.
+
+    The user-facing schema connects channels straight to tee handles (the
+    port-MCN is auto-inserted at network-build time, not at schema level).
+    Used by both ``tee_junction`` and ``mpce_tee`` dispatch to inherit
+    ``F_C`` / ``F_branch`` from the connected channel geometry when the
+    user has not explicitly set them. Returns None when no channel is
+    directly connected (e.g., plenum, boundary, multi-hop).
+    """
+    src_handle = f"port-{port}-source"
+    tgt_handle = f"port-{port}-target"
+    for edge in schema_edges:
+        if edge.data and edge.data.get("type") == "thermal":
+            continue
+        neighbour_id: str | None = None
+        if edge.source == tee_id and edge.sourceHandle == src_handle:
+            neighbour_id = edge.target
+        elif edge.target == tee_id and edge.targetHandle == tgt_handle:
+            neighbour_id = edge.source
+        if neighbour_id is None:
+            continue
+        neighbour = next((n for n in schema_nodes if n.id == neighbour_id), None)
+        if neighbour is None or neighbour.type != "channel":
+            continue
+        d = neighbour.data.get("D") if isinstance(neighbour.data, dict) else None
+        if d is None:
+            continue
+        try:
+            d_val = float(d)
+        except (TypeError, ValueError):
+            continue
+        if d_val > 0.0:
+            return d_val
+    return None
+
+
+def _resolve_tee_areas(
+    schema_edges,
+    schema_nodes,
+    tee_id: str,
+    F_C_explicit: float | None,
+    F_branch_explicit: float | None,
+    psi_fallback: float,
+) -> tuple[float, float, float]:
+    """Resolve (F_C, F_branch, psi) for a 3-port tee, applying inheritance.
+
+    Precedence:
+      1. Explicit user-set value (non-null) wins.
+      2. Channel D at the connected port (auto-inherited).
+      3. Fallback: F_C=0.01 m^2, F_branch derived from psi_fallback.
+
+    Returns (F_C, F_branch, psi) all resolved to concrete floats.
+    """
+    F_C = F_C_explicit
+    if F_C is None:
+        # Try common port first, then straight (both are F_C in Bassett/Idelchik
+        # geometry where F_s = F_c by definition).
+        for port in ("common", "straight"):
+            d = _channel_D_at_tee_port(schema_edges, schema_nodes, tee_id, port)
+            if d is not None:
+                F_C = _math.pi / 4.0 * d * d
+                break
+    if F_C is None:
+        F_C = 0.01  # ultimate default for a fully disconnected tee
+
+    F_branch = F_branch_explicit
+    if F_branch is None:
+        d = _channel_D_at_tee_port(schema_edges, schema_nodes, tee_id, "branch")
+        if d is not None:
+            F_branch = _math.pi / 4.0 * d * d
+
+    if F_branch is not None and F_branch > 0.0:
+        psi = F_C / F_branch
+    else:
+        # No branch channel; use stored psi to derive F_branch
+        psi = max(float(psi_fallback), 1e-12)
+        F_branch = F_C / psi
+
+    return F_C, F_branch, psi
+
+
 def _port_from_handle(handle: str | None) -> str | None:
     """Extract port name from a tee handle string.
 
@@ -467,10 +554,18 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         # 3-port element: bypass the 2-port source/target logic entirely.
         if elem_type == "tee_junction":
             _d = TeeJunctionData(**elem_data)
-            # psi is computed from explicit areas when both are set; otherwise use stored psi
-            _psi = _d.psi
-            if _d.F_C is not None and _d.F_branch is not None and _d.F_branch > 0:
-                _psi = _d.F_C / _d.F_branch
+            # Resolve areas with inheritance precedence:
+            #   1. Explicit user F_C / F_branch wins.
+            #   2. Channel D at the connected port (auto-inherited).
+            #   3. Fallback to defaults / stored psi.
+            _F_C, _F_branch, _psi = _resolve_tee_areas(
+                schema.edges,
+                schema.nodes,
+                elem_id,
+                F_C_explicit=_d.F_C,
+                F_branch_explicit=_d.F_branch,
+                psi_fallback=_d.psi,
+            )
             _tee = TeeJunctionElement(
                 id=elem_id,
                 common_node=_find_tee_port(
@@ -488,8 +583,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                     schema.edges, elem_id, "branch", nodes_map, tee_port_node_map, _wall_edge_remap
                 ),
                 theta=_math.radians(_d.theta_deg),
-                F_C=_d.F_C,
-                F_branch=_d.F_branch,
+                F_C=_F_C,
+                F_branch=_F_branch,
                 psi=_psi,
                 tee_type=_d.tee_type,
             )
@@ -503,11 +598,15 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         # flow_direction field constrains which side is upstream.
         if elem_type == "mpce_tee":
             _md = MPCETeeData(**elem_data)
-            _psi = _md.psi
-            if _md.F_C is not None and _md.F_branch is not None and _md.F_branch > 0:
-                _psi = _md.F_C / _md.F_branch
-            _F_C = _md.F_C if _md.F_C is not None else 0.01
-            _A_branch = _F_C / _psi if _md.F_branch is None else _md.F_branch
+            # Resolve areas with inheritance precedence (see _resolve_tee_areas).
+            _F_C, _A_branch, _psi = _resolve_tee_areas(
+                schema.edges,
+                schema.nodes,
+                elem_id,
+                F_C_explicit=_md.F_C,
+                F_branch_explicit=_md.F_branch,
+                psi_fallback=_md.psi,
+            )
 
             _common = _find_tee_port(
                 schema.edges, elem_id, "common", nodes_map, tee_port_node_map, _wall_edge_remap

@@ -8,6 +8,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **K diagnostics for MPCE-v2 tee element**. ``MPCEv2Element.diagnostics``
+  re-evaluates Mynard at the converged state and emits per-port K values
+  plus topology-aware named aliases:
+    - separating (``flow_direction='branch'``): ``K_straight``, ``K_branch``,
+      ``mass_flow_ratio = m_dot_branch / m_dot_com``
+    - joining (``flow_direction='merge'``): ``K11``, ``K12``,
+      ``mass_flow_ratio`` (same convention as Bassett joining-T q)
+  Plus convenience ``Pt_jct`` field (renames the legacy ``P_jct`` slot
+  which already stores Pt in MPCE-v2). GUI Inspector / save files can now
+  show K coefficients in the same shape that ``TeeJunctionElement``
+  emits, enabling side-by-side comparison and validation against Bassett
+  / Hager / Idelchik reference data without back-calculating from port
+  pressures. Falls back to the parent fields only when ``port_mdots`` is
+  not provided (legacy callers).
+- Per-port ``port_{i}_m_dot`` field on ``MultiPortChamberElement.diagnostics``
+  when the solver supplies ``port_mdots``.
+
+### Fixed
+- **Tee area inheritance** (both ``tee_junction`` and ``mpce_tee``): the
+  schema docstring promised ``F_C / F_branch = None`` means "inherit from
+  connected channel", but the graph_builder dispatch never implemented the
+  walk. New ``_resolve_tee_areas`` helper inherits ``F_C`` from the
+  common-arm channel and ``F_branch`` from the branch-arm channel,
+  computes ``psi = F_C / F_branch``. Explicit user values still win;
+  fallback to ``F_C = 0.01`` and stored ``psi`` when no channels are
+  connected. Frontend ``NetworkCanvas`` drag-create defaults no longer
+  bake in ``F_C=0.01`` / ``psi=1.0`` so the schema-level ``None`` default
+  propagates and inheritance kicks in for new tees. Backwards-compatible:
+  existing saved networks with explicit ``F_C: 0.01`` retain that value;
+  users can clear the Inspector field to opt into inheritance.
+
+### Added
 - **Idelchik 1966 joining-T dataset** (`validation/junction/data/idelchik1966/`):
   396 raw tabulated K-coefficient cells from Section VII diagrams 7-1 through
   7-7 (converging wye with `Fs+Fb > Fc, Fs = Fc`, theta=30/45/90 deg, F_b/F_c
