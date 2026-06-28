@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **``__convergence_history__`` field on NetworkSolver solution dict**.
+  Previously the per-iteration residual-norm trace lived only on
+  ``solver._diagnostic_data`` (consumed by the GUI API path) and was
+  invisible to plain ``solver.solve()`` callers. Now also emitted as
+  ``sol["__convergence_history__"]`` so validation scripts / Python
+  notebooks can plot the |F| vs iteration curve without reaching into
+  solver internals. Format: list of ``{eval, t, norm}`` dicts, throttled
+  at 0.1s intervals (or whenever the iterate improves), capped at 1000
+  points. Both sources read from the same ``_history`` accumulator;
+  this just exposes it via the public sol dict too.
+- **CSV download button on ``ConvergenceChart`` GUI modal**. The chart
+  already showed live the residual-norm trace + worst-residuals table
+  after each solve; users can now click a download icon to save the
+  raw trace as ``convergence-{timestamp}.csv`` (columns ``eval,t_s,norm``,
+  plus the worst-residuals list as a comment block at the end). Lets
+  you grab a slow-convergence trace, close the modal, and analyse
+  later without re-solving.
+
 ### Changed
 - **MPCE-v2 default Jacobian method flipped from ``"fd"`` to ``"sympy"``**
   (``MPCEv2Element.jacobian_method``). The sympy analytical Jacobian for
