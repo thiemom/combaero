@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { Download, X } from "lucide-react";
 import type React from "react";
 
 export interface ConvergencePoint {
@@ -79,14 +79,56 @@ const ConvergenceChart: React.FC<Props> = ({
 					<span className="font-semibold text-sm text-gray-700">
 						Convergence history
 					</span>
-					<button
-						type="button"
-						onClick={onClose}
-						className="hover:bg-gray-100 p-1 rounded-full transition-colors"
-						aria-label="Close"
-					>
-						<X size={15} />
-					</button>
+					<div className="flex items-center gap-1">
+						<button
+							type="button"
+							onClick={() => {
+								// CSV with the same columns the backend emits.
+								// Worst residuals (if any) appended as a comment block
+								// at the end so the file remains a valid single-table CSV.
+								const lines: string[] = ["eval,t_s,norm"];
+								for (const p of history) {
+									lines.push(`${p.eval},${p.t},${p.norm}`);
+								}
+								if ((worstResiduals?.length ?? 0) > 0) {
+									lines.push("");
+									lines.push("# worst_residuals at final iterate:");
+									lines.push("# name,residual");
+									for (const r of worstResiduals ?? []) {
+										lines.push(`# ${r.name},${r.residual}`);
+									}
+								}
+								const blob = new Blob([lines.join("\n")], {
+									type: "text/csv",
+								});
+								const url = URL.createObjectURL(blob);
+								const ts = new Date()
+									.toISOString()
+									.replace(/[:.]/g, "-")
+									.slice(0, 19);
+								const a = document.createElement("a");
+								a.href = url;
+								a.download = `convergence-${ts}.csv`;
+								document.body.appendChild(a);
+								a.click();
+								document.body.removeChild(a);
+								URL.revokeObjectURL(url);
+							}}
+							className="hover:bg-gray-100 p-1 rounded-full transition-colors"
+							aria-label="Download convergence history as CSV"
+							title="Download CSV"
+						>
+							<Download size={14} />
+						</button>
+						<button
+							type="button"
+							onClick={onClose}
+							className="hover:bg-gray-100 p-1 rounded-full transition-colors"
+							aria-label="Close"
+						>
+							<X size={15} />
+						</button>
+					</div>
 				</div>
 
 				<svg
