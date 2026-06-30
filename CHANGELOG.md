@@ -64,6 +64,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when the solver supplies ``port_mdots``.
 
 ### Fixed
+- **MPCE Tee GUI shows ``m: 0.000 kg/s`` on the node card and in Live
+  Telemetry** even when the junction is actually flowing. Root cause:
+  ``MPCEv2Element.diagnostics`` only emitted per-port ``port_i_m_dot``
+  values, so ``runner._build_result_objects`` (which derives
+  ``ElementResult.m_dot`` from ``diag["m_dot_com"]``) fell through to
+  ``0.0``. Now emits the topology-aware aliases ``m_dot_com``,
+  ``m_dot_branch``, ``m_dot_straight`` (matching ``TeeJunctionElement``'s
+  convention) for the canonical 3-port case. The Live Telemetry panel
+  also annotates ``port_X_*`` keys with the arm letter (C/S/B) so the
+  port index displayed matches the C/S/B labels on the node card.
 - **Tee area inheritance** (both ``tee_junction`` and ``mpce_tee``): the
   schema docstring promised ``F_C / F_branch = None`` means "inherit from
   connected channel", but the graph_builder dispatch never implemented the

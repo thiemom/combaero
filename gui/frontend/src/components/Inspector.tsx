@@ -2997,10 +2997,27 @@ const Inspector = () => {
 										const val = resolveField(selectedNode.data.result, key);
 										if (val === undefined) return null;
 										const meta = QUANTITY_CATALOGUE[key];
+										// For mpce_tee, annotate port_X_* keys with the arm
+										// letter so the label matches the node card.
+										//   branch: 0=C, 1=S, 2=B
+										//   merge:  0=S, 1=B, 2=C
+										let label = meta?.label ?? key;
+										if (selectedNode.type === "mpce_tee") {
+											const m = /^port_([012])_/.exec(key);
+											if (m) {
+												const isMergeDir =
+													(selectedNode.data.flow_direction ?? "branch") ===
+													"merge";
+												const arms = isMergeDir
+													? ["S", "B", "C"]
+													: ["C", "S", "B"];
+												label = `${label} (${arms[Number(m[1])]})`;
+											}
+										}
 										return (
 											<div key={key} className="flex flex-col">
 												<span className="text-stone-400 text-[9px] font-bold">
-													{meta?.label ?? key}
+													{label}
 												</span>
 												<span className="font-mono text-xs font-bold whitespace-nowrap">
 													{meta ? meta.format(val) : val.toFixed(4)}{" "}
