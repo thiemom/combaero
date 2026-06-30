@@ -116,6 +116,11 @@ def test_diagnostics_element_level_separating_emits_K_named_aliases():
     assert diag["K_straight"] == pytest.approx(K_str_ref, abs=1e-6)
     assert diag["K_branch"] == pytest.approx(K_bra_ref, abs=1e-6)
     assert diag["mass_flow_ratio"] == pytest.approx(q, abs=1e-9)
+    # Topology-aware mdot aliases let runner.py expose ElementResult.m_dot
+    # as the junction throughput instead of the meaningless 0.0 fallback.
+    assert diag["m_dot_com"] == pytest.approx(m_com, abs=1e-12)
+    assert diag["m_dot_branch"] == pytest.approx(q * m_com, abs=1e-12)
+    assert diag["m_dot_straight"] == pytest.approx((1.0 - q) * m_com, abs=1e-12)
 
 
 def test_diagnostics_element_level_joining_emits_K11_K12():
@@ -148,6 +153,9 @@ def test_diagnostics_element_level_joining_emits_K11_K12():
     assert diag["K11"] == pytest.approx(K11_ref, abs=1e-6)
     assert diag["K12"] == pytest.approx(K12_ref, abs=1e-6)
     assert diag["mass_flow_ratio"] == pytest.approx(q, abs=1e-9)
+    assert diag["m_dot_com"] == pytest.approx(m_com, abs=1e-12)
+    assert diag["m_dot_branch"] == pytest.approx(q * m_com, abs=1e-12)
+    assert diag["m_dot_straight"] == pytest.approx((1.0 - q) * m_com, abs=1e-12)
 
 
 def test_diagnostics_without_port_mdots_returns_parent_fields_only():

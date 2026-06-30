@@ -259,6 +259,9 @@ class MPCEv2Element(MultiPortChamberElement):
                 m_branch = abs(float(port_mdots[1]))
             if m_com > 1e-12:
                 diag["mass_flow_ratio"] = m_branch / m_com
+            diag["m_dot_com"] = m_com
+            diag["m_dot_branch"] = m_branch
+            diag["m_dot_straight"] = max(m_com - m_branch, 0.0)
 
         # Convenience: Pt at the chamber (equals P_jct in MPCE-v2 naming, since
         # `P_jct` re-purposes the MPCE-v1 static slot for Pt).
