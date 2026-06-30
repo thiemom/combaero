@@ -1918,6 +1918,13 @@ class NetworkSolver:
         sol_dict["__final_norm__"] = final_norm
         sol_dict["__unknown_names__"] = list(self.unknown_names)
         sol_dict["__x_solution__"] = list(final_x)
+        # Convergence history: per-eval (eval_idx, t_elapsed_s, residual_norm)
+        # triples accumulated by the residuals wrapper. Throttled at 0.1s
+        # intervals (or whenever the iterate improves), capped at 1000 points.
+        # Used by GUI diagnostics to plot the |F| vs iteration trace -- helps
+        # diagnose slow-converging networks ("Newton overshoots 5 steps then
+        # damps" vs "monotone but many iterations" tell different stories).
+        sol_dict["__convergence_history__"] = list(_history)
         return sol_dict
 
     def extract_complete_states(self, result: dict[str, float] | None = None) -> dict[str, Any]:

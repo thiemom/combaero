@@ -56,14 +56,20 @@ class MPCEv2Element(MultiPortChamberElement):
 
     The ``jacobian_method`` attribute controls how the K*q_dyn term's
     Jacobian is computed:
-      - ``"fd"`` (default): numerical finite-difference on Mynard. Costs N+1
-        Mynard evaluations per residual call. Empirically slightly more
-        robust on mfb_two_pb due to FD's tiny truncation acting as
-        regularization for Newton's step.
-      - ``"sympy"``: analytical sympy-derived Jacobian for the canonical
-        3-port separating T. Faster (no Mynard perturbations) but the
-        exact derivative leads to more aggressive Newton steps that can
-        overshoot in some low-q mfb_two_pb cases.
+      - ``"sympy"`` (default): analytical sympy-derived Jacobian for the
+        canonical 3-port separating T (1 supplier on port 0, straight at
+        0 deg, branch at theta_branch). Uses 1 Mynard evaluation per
+        residual call. Non-canonical topologies (joining, theta != 0 on
+        the straight arm, N != 3) auto-fall-back to FD because the
+        sympy derivation is specific to the canonical case. Validated on
+        the separating K6 / K5 audit: identical convergence + accuracy
+        vs FD with ~1.14x wall-time speedup.
+      - ``"fd"``: numerical finite-difference on Mynard. Costs N+1
+        Mynard evaluations per residual call. Always available across
+        all topologies. The previous default; flipped to sympy in PR
+        adding GUI solver tweaks once the empirical "fd is more robust
+        on mfb_two_pb low-q" concern was found to no longer apply at
+        the post-soft-barrier audit point.
 
     ``flow_direction`` constrains which physical flow regime this element
     represents:
@@ -74,7 +80,7 @@ class MPCEv2Element(MultiPortChamberElement):
         on observed joining flow.
     """
 
-    jacobian_method: str = "fd"
+    jacobian_method: str = "sympy"
 
     # Soft-barrier penalty scale used when ``strict=False`` and the observed
     # flow direction disagrees with the declared one. Wraps the
