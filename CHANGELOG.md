@@ -8,6 +8,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **``__convergence_history__`` field on NetworkSolver solution dict**.
+  Previously the per-iteration residual-norm trace lived only on
+  ``solver._diagnostic_data`` (consumed by the GUI API path) and was
+  invisible to plain ``solver.solve()`` callers. Now also emitted as
+  ``sol["__convergence_history__"]`` so validation scripts / Python
+  notebooks can plot the |F| vs iteration curve without reaching into
+  solver internals. Format: list of ``{eval, t, norm}`` dicts, throttled
+  at 0.1s intervals (or whenever the iterate improves), capped at 1000
+  points. Both sources read from the same ``_history`` accumulator;
+  this just exposes it via the public sol dict too.
+- **CSV download button on ``ConvergenceChart`` GUI modal**. The chart
+  already showed live the residual-norm trace + worst-residuals table
+  after each solve; users can now click a download icon to save the
+  raw trace as ``convergence-{timestamp}.csv`` (columns ``eval,t_s,norm``,
+  plus the worst-residuals list as a comment block at the end). Lets
+  you grab a slow-convergence trace, close the modal, and analyse
+  later without re-solving.
+
+### Changed
+- **MPCE-v2 default Jacobian method flipped from ``"fd"`` to ``"sympy"``**
+  (``MPCEv2Element.jacobian_method``). The sympy analytical Jacobian for
+  the canonical 3-port separating T has been wired since the prototype
+  PR but was kept disabled because the iteration-4 commit message
+  noted FD's tiny truncation acting as regularization on some hard
+  low-q mfb_two_pb cases. After the soft-barrier iteration and PR #197
+  joining-side calibration shipped, that empirical concern no longer
+  shows up: a focused audit comparing both methods across the full
+  separating measured grid (Bassett K6 + K5, 105 points x 3 topologies)
+  shows IDENTICAL convergence counts (94/32/11 of 105 across imposed_q
+  / three_pb / mfb_two_pb) and IDENTICAL mean/max K errors, with
+  ~1.14x wall-time speedup from cutting 4 Mynard evaluations to 1 per
+  Newton step on the canonical case. Joining flow and non-canonical
+  geometries (theta != 0 on straight, N != 3, port 0 not supplier)
+  auto-fall-back to FD via the existing canonical-check, so the flip
+  only affects separating canonical cases. Set ``MPCEv2Element.jacobian_method = "fd"``
+  on a per-instance basis to revert.
+
+### Added
 - **K diagnostics for MPCE-v2 tee element**. ``MPCEv2Element.diagnostics``
   re-evaluates Mynard at the converged state and emits per-port K values
   plus topology-aware named aliases:
