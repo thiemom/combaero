@@ -230,8 +230,6 @@ class NetworkResult:
         with all available diagnostic quantities.  Column names carry unit
         annotations matching the GUI export (e.g. ``'P [Pa]'``, ``'T [K]'``).
         """
-        from combaero.network.components import TeeJunctionElement as _TeeJE
-
         _BOUNDARY_KINDS = {"mass_boundary", "pressure_boundary"}
         species_labels: list[str] = list(cb.species.names)
         data: list[dict] = []
@@ -261,22 +259,6 @@ class NetworkResult:
 
         for elem_id, res in self._element_results.items():
             elem_data = res.model_dump()
-            elem_obj = self._net.elements.get(elem_id)
-            if isinstance(elem_obj, _TeeJE):
-                common_res = self._node_results.get(elem_obj.common_node)
-                if common_res:
-                    common_state = common_res.state.model_dump()
-                    Y = common_state.pop("Y", [])
-                    X = common_state.pop("X", None) or []
-                    for k, v in common_state.items():
-                        if v is not None:
-                            elem_data[k] = v
-                    for i, y_val in enumerate(Y):
-                        name = species_labels[i] if i < len(species_labels) else str(i)
-                        elem_data[f"Y[{name}]"] = y_val
-                    for i, x_val in enumerate(X):
-                        name = species_labels[i] if i < len(species_labels) else str(i)
-                        elem_data[f"X[{name}]"] = x_val
             data.append(
                 {
                     "type": "element",

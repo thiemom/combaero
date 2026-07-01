@@ -88,7 +88,7 @@ export function validateNetwork(nodes: Node[]): string[] {
 				errors.push(`${node.id}: Discrete loss zeta must be > 0`);
 			}
 		}
-		if (node.type === "tee_junction") {
+		if (node.type === "mpce_tee") {
 			const thetaDeg = node.data.theta_deg ?? 90;
 			if (Math.abs(thetaDeg) > 90) {
 				errors.push(

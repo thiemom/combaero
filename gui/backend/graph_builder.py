@@ -22,7 +22,6 @@ from combaero.network import (
     PressureLossElement,
     RibbedModel,
     SmoothModel,
-    TeeJunctionElement,
     ThermalWall,
     VortexElement,
     WallLayer,
@@ -52,7 +51,6 @@ from .schemas import (
     PressureBoundaryData,
     RibbedModelData,
     SmoothModelData,
-    TeeJunctionData,
     ThermalWallData,
     VortexData,
     WallData,
@@ -249,8 +247,8 @@ def _channel_D_at_tee_port(
 
     The user-facing schema connects channels straight to tee handles (the
     port-MCN is auto-inserted at network-build time, not at schema level).
-    Used by both ``tee_junction`` and ``mpce_tee`` dispatch to inherit
-    ``F_C`` / ``F_branch`` from the connected channel geometry when the
+    Used by ``mpce_tee`` dispatch to inherit ``F_C`` / ``F_branch``
+    from the connected channel geometry when the
     user has not explicitly set them. Returns None when no channel is
     directly connected (e.g., plenum, boundary, multi-hop).
     """
@@ -473,9 +471,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             element_nodes.append(node_schema)
 
     element_ids = {node.id for node in element_nodes}
-    # Both tee_junction (Bassett K-based) and mpce_tee (Mynard-based) share the
-    # same 3-port handle layout and reuse the port-MCN auto-insert machinery.
-    tee_ids = {node.id for node in element_nodes if node.type in ("tee_junction", "mpce_tee")}
+    tee_ids = {node.id for node in element_nodes if node.type == "mpce_tee"}
 
     # 1b. Create implicit junction nodes for element -> element visual links.
     # For direct element<->element connections we auto-insert a MomentumChamberNode.
@@ -551,51 +547,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         elem_data = elem_node_schema.data
         elem_type = elem_node_schema.type
 
-        # 3-port element: bypass the 2-port source/target logic entirely.
-        if elem_type == "tee_junction":
-            _d = TeeJunctionData(**elem_data)
-            # Resolve areas with inheritance precedence:
-            #   1. Explicit user F_C / F_branch wins.
-            #   2. Channel D at the connected port (auto-inherited).
-            #   3. Fallback to defaults / stored psi.
-            _F_C, _F_branch, _psi = _resolve_tee_areas(
-                schema.edges,
-                schema.nodes,
-                elem_id,
-                F_C_explicit=_d.F_C,
-                F_branch_explicit=_d.F_branch,
-                psi_fallback=_d.psi,
-            )
-            _tee = TeeJunctionElement(
-                id=elem_id,
-                common_node=_find_tee_port(
-                    schema.edges, elem_id, "common", nodes_map, tee_port_node_map, _wall_edge_remap
-                ),
-                straight_node=_find_tee_port(
-                    schema.edges,
-                    elem_id,
-                    "straight",
-                    nodes_map,
-                    tee_port_node_map,
-                    _wall_edge_remap,
-                ),
-                branch_node=_find_tee_port(
-                    schema.edges, elem_id, "branch", nodes_map, tee_port_node_map, _wall_edge_remap
-                ),
-                theta=_math.radians(_d.theta_deg),
-                F_C=_F_C,
-                F_branch=_F_branch,
-                psi=_psi,
-                tee_type=_d.tee_type,
-            )
-            _tee.initial_guess = _expand_initial_guess(_d.initial_guess, elem_id)
-            if not _tee.initial_guess:
-                _tee.initial_guess = _guess_from_prior_result(elem_data, elem_id)
-            net.add_element(_tee)
-            continue
-
-        # 3-port Mynard-based variant. Same port layout as tee_junction; the
-        # flow_direction field constrains which side is upstream.
+        # 3-port element (Mynard-based). The flow_direction field constrains
+        # which side is upstream.
         if elem_type == "mpce_tee":
             _md = MPCETeeData(**elem_data)
             # Resolve areas with inheritance precedence (see _resolve_tee_areas).
