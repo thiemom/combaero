@@ -3,6 +3,7 @@ import pytest
 from combaero.network import (
     FlowNetwork,
     MassFlowBoundary,
+    MomentumChamberNode,
     NetworkSolver,
     OrificeElement,
     PlenumNode,
@@ -170,3 +171,53 @@ def test_validation_elements_between_boundaries():
     solver = NetworkSolver(graph)
     sol = solver.solve()
     assert "orf_1.m_dot" in sol
+
+
+def test_validation_mcn_multiple_incoming_edges_rejected():
+    """MCN with >1 incoming edges (merging chamber) is rejected at build time.
+
+    MCN's scalar Pt = P + 0.5 rho v^2 cannot represent merging streams (#174);
+    the topology guard should fire before solve.
+    """
+    graph = FlowNetwork()
+    graph.add_node(PressureBoundary("pb_a", Pt=200000.0))
+    graph.add_node(PressureBoundary("pb_b", Pt=200000.0))
+    graph.add_node(PressureBoundary("outlet", Pt=100000.0))
+    graph.add_node(MomentumChamberNode("mc_merge", area=0.01))
+    graph.add_element(OrificeElement("orf_a", "pb_a", "mc_merge", 0.6, 0.05, correlation="fixed"))
+    graph.add_element(OrificeElement("orf_b", "pb_b", "mc_merge", 0.6, 0.05, correlation="fixed"))
+    graph.add_element(
+        OrificeElement("orf_out", "mc_merge", "outlet", 0.6, 0.05, correlation="fixed")
+    )
+
+    with pytest.raises(ValueError, match="multiple incoming edges"):
+        graph.validate()
+
+
+def test_validation_mcn_multiple_outgoing_edges_rejected():
+    """MCN with >1 outgoing edges (splitting chamber) is rejected at build time."""
+    graph = FlowNetwork()
+    graph.add_node(PressureBoundary("inlet", Pt=200000.0))
+    graph.add_node(PressureBoundary("pb_a", Pt=100000.0))
+    graph.add_node(PressureBoundary("pb_b", Pt=100000.0))
+    graph.add_node(MomentumChamberNode("mc_split", area=0.01))
+    graph.add_element(OrificeElement("orf_in", "inlet", "mc_split", 0.6, 0.05, correlation="fixed"))
+    graph.add_element(OrificeElement("orf_a", "mc_split", "pb_a", 0.6, 0.05, correlation="fixed"))
+    graph.add_element(OrificeElement("orf_b", "mc_split", "pb_b", 0.6, 0.05, correlation="fixed"))
+
+    with pytest.raises(ValueError, match="multiple outgoing edges"):
+        graph.validate()
+
+
+def test_validation_mcn_pass_through_accepted():
+    """MCN with exactly 1 in + 1 out (pass-through) is the valid envelope."""
+    graph = FlowNetwork()
+    graph.add_node(PressureBoundary("inlet", Pt=200000.0))
+    graph.add_node(PressureBoundary("outlet", Pt=100000.0))
+    graph.add_node(MomentumChamberNode("mc_pass", area=0.01))
+    graph.add_element(OrificeElement("orf_in", "inlet", "mc_pass", 0.6, 0.05, correlation="fixed"))
+    graph.add_element(
+        OrificeElement("orf_out", "mc_pass", "outlet", 0.6, 0.05, correlation="fixed")
+    )
+
+    graph.validate()  # no raise

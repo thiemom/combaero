@@ -64,6 +64,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when the solver supplies ``port_mdots``.
 
 ### Fixed
+- **Merging/splitting MomentumChamberNode now refused at build time** (#174).
+  MCN's scalar ``Pt = P + 0.5 rho v^2`` closure models a single bulk
+  velocity and cannot represent merging or splitting streams within the
+  chamber itself; the silent-corruption case at the time of #174 was
+  ``test_step_4_adding_bypass``, where the face-convention proxy
+  (channel -> Pt, orifice -> static) produced a non-physical 17 kPa
+  asymmetry at a high-q merging MCN. ``FlowNetwork.validate`` now raises
+  ``ValueError`` for any MCN with > 1 incoming or > 1 outgoing edges,
+  pointing the user at ``MultiPortChamberElement`` (momentum-CV junction
+  with one MCN per port) as the correct migration target. The
+  formerly-xfailed ``test_step_4_adding_bypass`` is restored as a
+  passing test on the MPCE topology and now exhibits the expected
+  diameter-driven split (smaller-bore bypass < main branch). Pass-through
+  MCNs (1-in / 1-out, including the GUI auto-insert pattern and MPCE
+  port faces) remain valid.
 - **MPCE Tee GUI shows ``m: 0.000 kg/s`` on the node card and in Live
   Telemetry** even when the junction is actually flowing. Root cause:
   ``MPCEv2Element.diagnostics`` only emitted per-port ``port_i_m_dot``
