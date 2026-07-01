@@ -209,24 +209,10 @@ class LosslessConnectionData(BaseModel):
     pass
 
 
-class TeeJunctionData(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    label: str | None = None
-    tee_type: str = "merging"  # "merging" | "branching"
-    theta_deg: float = 90.0  # branch angle [deg], converted to radians in graph_builder
-    F_C: float | None = None  # None = inherit from common/straight-arm channel (A = pi/4*D^2)
-    F_branch: float | None = (
-        None  # None = inherit from branch-arm channel; psi is computed from F_C/F_branch
-    )
-    psi: float = 1.0  # fallback ratio used only when F_branch is None and not inherited
-    initial_guess: dict[str, float] = Field(default_factory=dict)
-
-
 class MPCETeeData(BaseModel):
     """Mynard-based multi-port chamber tee element with constrained topology.
 
-    Same 3-port geometry as TeeJunction but uses Mynard's Unified0D
-    pseudosupplier residual instead of Bassett's K formulas. The
+    3-port junction using Mynard's Unified0D pseudosupplier residual. The
     ``flow_direction`` field declares whether this junction is a merge
     (joining flow, 2 inlets + 1 outlet) or a branch (separating flow,
     1 inlet + 2 outlets); the runtime element raises if the observed

@@ -2690,6 +2690,13 @@ class TeeJunctionElement(NetworkElement):
     """
     Three-port tee junction element using Bassett 2001 pressure-loss coefficients.
 
+    Superseded by ``MultiPortChamberElement`` / ``MPCEv2Element`` (momentum-CV
+    junction, #177). Retained as the M -> 0 regression baseline for the
+    junction validation suite (see ``validation/junction/models/
+    tee_junction_element_network.py``) and for the existing Python tests
+    under ``python/tests/test_tee_network.py``. Not exposed through the GUI:
+    new user-drawn junctions use ``mpce_tee`` instead.
+
     Merging (tee_type="merging"): straight_node and branch_node are inlets;
     common_node is the outlet.
 

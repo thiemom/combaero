@@ -445,7 +445,7 @@ const Inspector = () => {
 								}
 								return undefined;
 							}
-							if (n.type === "tee_junction") {
+							if (n.type === "mpce_tee") {
 								const handle =
 									side === "upstream" ? edge?.sourceHandle : edge?.targetHandle;
 								const isBranch =
@@ -943,7 +943,7 @@ const Inspector = () => {
 								if (f != null && f > 0) return f;
 								return walkArea(n.id, dir, depth + 1);
 							}
-							if (n.type === "tee_junction") {
+							if (n.type === "mpce_tee") {
 								const fc = n.data.F_C as number | null | undefined;
 								if (fc != null && fc > 0) return fc;
 							}
@@ -1170,491 +1170,14 @@ const Inspector = () => {
 						);
 					})()}
 
-				{selectedNode.type === "tee_junction" &&
-					(() => {
-						const teeType = selectedNode.data.tee_type ?? "merging";
-
-						// Helper: find the channel node connected to a named tee port.
-						// For merging: common port is outgoing, straight/branch are incoming.
-						// For branching: common port is incoming, straight/branch are outgoing.
-						const findPortChannel = (portName: string) => {
-							const isOutgoing =
-								(teeType === "merging" && portName === "common") ||
-								(teeType === "branching" && portName !== "common");
-							let neighbour: (typeof nodes)[0] | undefined;
-							if (isOutgoing) {
-								const edge = edges.find(
-									(e) =>
-										e.source === selectedNode.id &&
-										e.sourceHandle === `port-${portName}-source` &&
-										!e.data?.type,
-								);
-								neighbour = edge
-									? nodes.find((n) => n.id === edge.target)
-									: undefined;
-							} else {
-								const edge = edges.find(
-									(e) =>
-										e.target === selectedNode.id &&
-										e.targetHandle === `port-${portName}-target` &&
-										!e.data?.type,
-								);
-								neighbour = edge
-									? nodes.find((n) => n.id === edge.source)
-									: undefined;
-							}
-							if (neighbour?.type === "channel") return neighbour;
-							// Neighbour is a plenum/boundary; look one hop further
-							if (isOutgoing) {
-								return nodes.find(
-									(n) =>
-										n.type === "channel" &&
-										edges.some(
-											(e) =>
-												e.source === neighbour?.id &&
-												e.target === n.id &&
-												!e.data?.type,
-										),
-								);
-							}
-							return nodes.find(
-								(n) =>
-									n.type === "channel" &&
-									edges.some(
-										(e) =>
-											e.target === neighbour?.id &&
-											e.source === n.id &&
-											!e.data?.type,
-									),
-							);
-						};
-
-						// Walk through null-D channels (and through tee/area-change nodes)
-						// to find the first explicit D in the chain.
-						const walkChD = (
-							ch: (typeof nodes)[0] | undefined,
-							isOutgoing: boolean,
-							depth = 0,
-						): number | undefined => {
-							if (!ch || depth > 20) return undefined;
-							const d = ch.data.D as number | null | undefined;
-							if (d != null) return d;
-							const e = isOutgoing
-								? edges.find((ee) => ee.source === ch.id && !ee.data?.type)
-								: edges.find((ee) => ee.target === ch.id && !ee.data?.type);
-							if (!e) return undefined;
-							const next = nodes.find(
-								(n) => n.id === (isOutgoing ? e.target : e.source),
-							);
-							if (!next) return undefined;
-							if (next.type === "channel")
-								return walkChD(next, isOutgoing, depth + 1);
-							// Non-channel: extract area-equivalent D from tee/area-change
-							if (next.type === "tee_junction") {
-								const fc = next.data.F_C as number | null | undefined;
-								if (fc != null && fc > 0) return Math.sqrt((4 * fc) / Math.PI);
-							}
-							if (next.type === "area_change") {
-								const f = isOutgoing
-									? (next.data.F0 as number | null | undefined)
-									: (next.data.F1 as number | null | undefined);
-								if (f != null && f > 0) return Math.sqrt((4 * f) / Math.PI);
-							}
-							return undefined;
-						};
-
-						const portD = (portName: string) => {
-							const isOutgoing =
-								(teeType === "merging" && portName === "common") ||
-								(teeType === "branching" && portName !== "common");
-							return walkChD(findPortChannel(portName), isOutgoing);
-						};
-
-						const commonCh = findPortChannel("common");
-						const straightCh = findPortChannel("straight");
-						const branchCh = findPortChannel("branch");
-
-						const areaFromD = (d: number | null | undefined) =>
-							d != null ? (Math.PI / 4) * d * d : undefined;
-
-						// F_C: common arm (= straight arm per Bassett); prefer common over straight channel
-						const inheritedFC: number | undefined =
-							areaFromD(portD("common")) ?? areaFromD(portD("straight"));
-						const inheritedFBranch: number | undefined = areaFromD(
-							portD("branch"),
-						);
-
-						const userSetFC = selectedNode.data.F_C != null;
-						const userSetFBranch = selectedNode.data.F_branch != null;
-
-						const effectiveFC: number = userSetFC
-							? (selectedNode.data.F_C as number)
-							: (inheritedFC ?? 0.01);
-						const effectiveFBranch: number = userSetFBranch
-							? (selectedNode.data.F_branch as number)
-							: (inheritedFBranch ?? effectiveFC);
-						const psi =
-							effectiveFBranch > 0 ? effectiveFC / effectiveFBranch : null;
-						const dFromF = (f: number) => Math.sqrt((4 * f) / Math.PI);
-						const lu = unitPreferences.length === "mm" ? 1000 : 1;
-						const lu_label = unitPreferences.length;
-						return (
-							<div className="flex flex-col gap-4">
-								{/* Port legend */}
-								{(() => {
-									const tm = teeType === "merging";
-									return (
-										<div className="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-[9px] leading-snug text-stone-600">
-											<div className="font-bold uppercase text-stone-400 mb-1">
-												Port Guide
-											</div>
-											<div className="grid grid-cols-3 gap-1 text-center font-mono mb-1.5">
-												<div>
-													<span
-														className="font-extrabold"
-														style={{ color: tm ? "#3b82f6" : "#f59e0b" }}
-													>
-														S
-													</span>{" "}
-													straight
-												</div>
-												<div>
-													<span
-														className="font-extrabold"
-														style={{ color: tm ? "#f59e0b" : "#3b82f6" }}
-													>
-														C
-													</span>{" "}
-													common
-												</div>
-												<div>
-													<span
-														className="font-extrabold"
-														style={{ color: tm ? "#3b82f6" : "#f59e0b" }}
-													>
-														B
-													</span>{" "}
-													branch
-												</div>
-											</div>
-											<div className="text-stone-500">
-												{tm ? (
-													<>
-														<span style={{ color: "#3b82f6" }}>S, B</span> →{" "}
-														<span style={{ color: "#f59e0b" }}>C</span>
-														{"  "}(two inlets, one outlet at C)
-													</>
-												) : (
-													<>
-														<span style={{ color: "#3b82f6" }}>C</span> →{" "}
-														<span style={{ color: "#f59e0b" }}>S, B</span>
-														{"  "}(one inlet at C, two outlets)
-													</>
-												)}
-											</div>
-										</div>
-									);
-								})()}
-
-								{/* Tee type */}
-								<div className="flex flex-col gap-2">
-									<label className="text-xs font-bold text-gray-500 uppercase">
-										Tee Type
-									</label>
-									<select
-										className="p-2 border rounded bg-white text-xs border-stone-200"
-										value={selectedNode.data.tee_type ?? "merging"}
-										onChange={(e) =>
-											updateNodeData(selectedNode.id, {
-												tee_type: e.target.value,
-											})
-										}
-									>
-										<option value="merging">
-											Merging (2 inlets, 1 outlet)
-										</option>
-										<option value="branching">
-											Branching (1 inlet, 2 outlets)
-										</option>
-									</select>
-									<p className="text-[9px] text-gray-400 italic">
-										Declares intended flow direction; the Bassett model blends
-										smoothly if flow reverses.
-									</p>
-								</div>
-
-								{/* Branch angle */}
-								<div className="flex flex-col gap-2">
-									<label className="text-xs font-bold text-gray-500 uppercase">
-										Branch Angle (deg)
-									</label>
-									<NumericInput
-										value={selectedNode.data.theta_deg ?? 90}
-										onChange={(val) =>
-											updateNodeData(selectedNode.id, { theta_deg: val })
-										}
-										className="p-2 border rounded"
-										placeholder="90"
-									/>
-									<p className="text-[9px] text-gray-400 italic">
-										Angle between branch and common arm. Sign is ignored
-										(symmetric). Bassett (2001) validated range: 30–90 deg.
-									</p>
-								</div>
-
-								{/* ── Arm areas (3-arm, mirrors AreaChange) ── */}
-
-								{/* Common arm (F_C) */}
-								<div className="flex flex-col gap-2">
-									<div className="flex items-center justify-between">
-										<label className="text-xs font-bold text-gray-500 uppercase">
-											Common Arm Area (F_C)
-										</label>
-										{userSetFC && (
-											<button
-												type="button"
-												className="text-[9px] text-blue-500 hover:underline"
-												onClick={() =>
-													updateNodeData(selectedNode.id, { F_C: null })
-												}
-											>
-												Reset to inherited
-											</button>
-										)}
-									</div>
-									<AreaInput
-										id={`F_C_${selectedNode.id}`}
-										label=""
-										value={effectiveFC}
-										placeholder={
-											inheritedFC != null ? inheritedFC.toFixed(5) : "0.01"
-										}
-										onChange={(val) =>
-											updateNodeData(selectedNode.id, { F_C: val })
-										}
-										onClear={() =>
-											updateNodeData(selectedNode.id, { F_C: null })
-										}
-										inputClassName={
-											userSetFC ? "font-semibold" : "text-gray-400"
-										}
-									/>
-									{!userSetFC && inheritedFC != null && (
-										<p className="text-[9px] text-gray-400 italic -mt-1">
-											Inherited from{" "}
-											{commonCh?.id ?? straightCh?.id ?? "connected channel"}.
-											Edit to override.
-										</p>
-									)}
-								</div>
-
-								{/* Straight arm (read-only = F_C per Bassett) */}
-								<div className="flex flex-col gap-1">
-									<label className="text-xs font-bold text-gray-500 uppercase">
-										Straight Arm Area (F_S)
-									</label>
-									<div className="rounded bg-stone-50 border border-stone-200 px-3 py-2 text-[10px] text-stone-500 flex justify-between items-center">
-										<span className="font-mono">
-											{effectiveFC.toExponential(3)} m²
-											{"  "}(D = {(dFromF(effectiveFC) * lu).toFixed(2)}{" "}
-											{lu_label})
-										</span>
-										<span className="italic text-[9px] text-stone-400">
-											= F_C (Bassett)
-										</span>
-									</div>
-									<p className="text-[9px] text-stone-400 italic">
-										The Bassett (2001) model assumes F_S = F_C. If the physical
-										straight arm differs, add an AreaChange element.
-									</p>
-								</div>
-
-								{/* Branch arm (F_branch) */}
-								<div className="flex flex-col gap-2">
-									<div className="flex items-center justify-between">
-										<label className="text-xs font-bold text-gray-500 uppercase">
-											Branch Arm Area (F_B)
-										</label>
-										{userSetFBranch && (
-											<button
-												type="button"
-												className="text-[9px] text-blue-500 hover:underline"
-												onClick={() =>
-													updateNodeData(selectedNode.id, {
-														F_branch: null,
-													})
-												}
-											>
-												Reset to inherited
-											</button>
-										)}
-									</div>
-									<AreaInput
-										id={`F_branch_${selectedNode.id}`}
-										label=""
-										value={effectiveFBranch}
-										placeholder={
-											inheritedFBranch != null
-												? inheritedFBranch.toFixed(5)
-												: inheritedFC != null
-													? inheritedFC.toFixed(5)
-													: "0.01"
-										}
-										onChange={(val) =>
-											updateNodeData(selectedNode.id, { F_branch: val })
-										}
-										onClear={() =>
-											updateNodeData(selectedNode.id, { F_branch: null })
-										}
-										inputClassName={
-											userSetFBranch ? "font-semibold" : "text-gray-400"
-										}
-									/>
-									{!userSetFBranch && inheritedFBranch != null && (
-										<p className="text-[9px] text-gray-400 italic -mt-1">
-											Inherited from {branchCh?.id}. Edit to override.
-										</p>
-									)}
-								</div>
-
-								{/* Derived ratio summary card */}
-								{psi != null && (
-									<div className="rounded bg-stone-50 border border-stone-200 px-3 py-2 text-[10px] text-stone-600 flex flex-col gap-0.5">
-										<div className="flex justify-between">
-											<span className="font-medium text-stone-500 uppercase tracking-wide text-[8px]">
-												Area ratio
-											</span>
-											<span
-												className={
-													psi > 1.005
-														? "text-amber-600 font-semibold"
-														: psi < 0.995
-															? "text-blue-600 font-semibold"
-															: "text-stone-500"
-												}
-											>
-												{psi > 1.005
-													? "C larger than B"
-													: psi < 0.995
-														? "B larger than C"
-														: "equal areas"}
-											</span>
-										</div>
-										<div className="flex justify-between mt-0.5">
-											<span className="text-stone-400">psi = F_C / F_B</span>
-											<span className="font-mono font-semibold">
-												{psi.toFixed(4)}
-											</span>
-										</div>
-										<div className="flex justify-between">
-											<span className="text-stone-400">D_C → D_B</span>
-											<span className="font-mono">
-												{(dFromF(effectiveFC) * lu).toFixed(1)} →{" "}
-												{(dFromF(effectiveFBranch) * lu).toFixed(1)} {lu_label}
-											</span>
-										</div>
-									</div>
-								)}
-
-								<InitialGuessEditor node={selectedNode} />
-
-								{/* Post-solve diagnostics */}
-								{selectedNode.data.result && (
-									<div className="mt-4 p-3 bg-stone-50 border border-stone-200 rounded">
-										<h3 className="text-xs font-bold text-stone-500 uppercase mb-3">
-											Flow Distribution
-										</h3>
-										{selectedNode.data.result.correlation_extrapolated > 0 && (
-											<div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-3">
-												Inputs outside Bassett (2001) validated range -- results
-												are extrapolated.
-											</div>
-										)}
-										<div className="grid grid-cols-2 gap-x-2 gap-y-3">
-											<div className="flex flex-col">
-												<span className="text-stone-400 text-[9px] font-bold uppercase">
-													ṁ common
-												</span>
-												<span className="font-mono text-xs font-bold">
-													{(selectedNode.data.result.m_dot_com ?? 0).toFixed(4)}{" "}
-													<span className="text-[9px] font-normal text-stone-400">
-														kg/s
-													</span>
-												</span>
-											</div>
-											<div className="flex flex-col">
-												<span className="text-stone-400 text-[9px] font-bold uppercase">
-													ṁ straight
-												</span>
-												<span className="font-mono text-xs font-bold">
-													{(
-														selectedNode.data.result.m_dot_straight ?? 0
-													).toFixed(4)}{" "}
-													<span className="text-[9px] font-normal text-stone-400">
-														kg/s
-													</span>
-												</span>
-											</div>
-											<div className="flex flex-col">
-												<span className="text-stone-400 text-[9px] font-bold uppercase">
-													ṁ branch
-												</span>
-												<span className="font-mono text-xs font-bold">
-													{(selectedNode.data.result.m_dot_branch ?? 0).toFixed(
-														4,
-													)}{" "}
-													<span className="text-[9px] font-normal text-stone-400">
-														kg/s
-													</span>
-												</span>
-											</div>
-											<div className="flex flex-col">
-												<span className="text-stone-400 text-[9px] font-bold uppercase">
-													ṁ straight / ṁ common
-												</span>
-												<span className="font-mono text-xs font-bold">
-													{(
-														selectedNode.data.result.mass_flow_ratio ?? 0
-													).toFixed(3)}{" "}
-													<span className="text-[9px] font-normal text-stone-400">
-														kg/kg
-													</span>
-												</span>
-											</div>
-											<div className="flex flex-col">
-												<span className="text-stone-400 text-[9px] font-bold uppercase">
-													K straight
-												</span>
-												<span className="font-mono text-xs font-bold">
-													{(selectedNode.data.result.K_straight ?? 0).toFixed(
-														3,
-													)}
-												</span>
-											</div>
-											<div className="flex flex-col">
-												<span className="text-stone-400 text-[9px] font-bold uppercase">
-													K branch
-												</span>
-												<span className="font-mono text-xs font-bold">
-													{(selectedNode.data.result.K_branch ?? 0).toFixed(3)}
-												</span>
-											</div>
-										</div>
-									</div>
-								)}
-							</div>
-						);
-					})()}
-
 				{selectedNode.type === "mpce_tee" &&
 					(() => {
 						const flowDirection = selectedNode.data.flow_direction ?? "branch";
 						const isMerge = flowDirection === "merge";
 
-						// Port-channel detection: same logic as TeeJunction. For "branch"
-						// (separating): common is incoming, straight+branch are outgoing.
-						// For "merge" (joining): common is outgoing, straight+branch are
-						// incoming.
+						// Port-channel detection. For "branch" (separating): common is
+						// incoming, straight+branch are outgoing. For "merge" (joining):
+						// common is outgoing, straight+branch are incoming.
 						const findPortChannel = (portName: string) => {
 							const isOutgoing =
 								(isMerge && portName === "common") ||
@@ -1860,7 +1383,7 @@ const Inspector = () => {
 									</p>
 								</div>
 
-								{/* ── Arm areas (3-arm, mirrors TeeJunction with Mynard labels) ── */}
+								{/* ── Arm areas (3-arm with Mynard labels) ── */}
 
 								{/* Common arm (F_C) */}
 								<div className="flex flex-col gap-2">
@@ -2639,7 +2162,7 @@ const Inspector = () => {
 								if (f != null && f > 0) return Math.sqrt((4 * f) / Math.PI);
 								return walkChannelD(n.id, depth + 1);
 							}
-							if (n.type === "tee_junction") {
+							if (n.type === "mpce_tee") {
 								const fc = n.data.F_C as number | null | undefined;
 								if (fc != null && fc > 0) return Math.sqrt((4 * fc) / Math.PI);
 							}
@@ -2834,7 +2357,7 @@ const Inspector = () => {
 								if (f != null && f > 0) return Math.sqrt((4 * f) / Math.PI);
 								return walkChannelD(n.id, depth + 1);
 							}
-							if (n.type === "tee_junction") {
+							if (n.type === "mpce_tee") {
 								const fc = n.data.F_C as number | null | undefined;
 								if (fc != null && fc > 0) return Math.sqrt((4 * fc) / Math.PI);
 							}
@@ -3500,11 +3023,6 @@ const InitialGuessEditor = ({ node }: { node: any }) => {
 		orifice: [{ key: "m_dot", unit: "kg/s" }],
 		discrete_loss: [{ key: "m_dot", unit: "kg/s" }],
 		area_change: [{ key: "m_dot", unit: "kg/s" }],
-		// Tee junction: two independent mass-flow unknowns.
-		tee_junction: [
-			{ key: "m_dot_com", unit: "kg/s" },
-			{ key: "m_dot_branch", unit: "kg/s" },
-		],
 		// MPCE tee: the only element-owned unknown is the chamber stagnation
 		// pressure (legacy slot named P_jct; MPCE-v2 stores Pt there). Warm-
 		// starting Pt_jct is the most useful nudge for the slower MPCE solve.

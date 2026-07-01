@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **``tee_junction`` (Bassett K-closure) retired from the GUI** (#177).
+  ``MPCE Tee`` (``mpce_tee``, momentum-CV closure) is now the sole
+  user-drawable tee type. Removed the Sidebar drag-create entry,
+  ``TeeJunctionNode.tsx`` node card, ``TeeJunctionData`` schema,
+  ``graph_builder`` dispatch, ``runner`` state projection, and all
+  Inspector conditionals + display fields. The ``TeeJunctionElement``
+  Python class + Python tests + validation adapters
+  (``validation/junction/models/tee_junction_element_network.py``,
+  ``tee_junction_raw.py``) are retained as the M -> 0 regression
+  baseline for the junction validation suite -- the K-closure is no
+  longer a competing user-facing model but remains authoritative for
+  regression against Bassett 2001. GUI networks saved with a
+  ``tee_junction`` node no longer load; they need to be recreated with
+  ``mpce_tee``.
+
 ### Added
 - **``__convergence_history__`` field on NetworkSolver solution dict**.
   Previously the per-iteration residual-norm trace lived only on
