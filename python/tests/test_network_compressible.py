@@ -602,10 +602,14 @@ def test_analytical_pt_prop_rescues_cold_stuck_case():
         flow_direction="merge",
     )
     solver = NetworkSolver(net)
+    # Local timing: converges in ~18s / 113 evals on macOS. CI Linux runners
+    # are ~2x slower; 180s ceiling keeps the regression guard meaningful
+    # (strategy that no longer converges will still trip fast) while
+    # tolerating the platform gap.
     sol = solver.solve(
         method="hybr",
         init_strategy="analytical_pt_prop",
-        timeout=60.0,
+        timeout=180.0,
         options={"maxfev": 400},
     )
     assert sol["__success__"], f"analytical_pt_prop failed: {sol.get('__message__')}"
