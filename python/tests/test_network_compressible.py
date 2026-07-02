@@ -624,6 +624,149 @@ def test_analytical_pt_prop_rescues_cold_stuck_case():
     )
 
 
+def _mpce_mfb_merge_network(theta_deg: float = 45.0) -> FlowNetwork:
+    """MFB-driven 3-port merge tee with unequal supply temperatures.
+
+    Mass-flow boundaries impose the flow direction, so the solve lands the
+    physical basin deterministically -- suitable for closure/mixing
+    regression tests independent of basin selection.
+    """
+    diameter = 0.05
+    A = math.pi * (diameter / 2.0) ** 2
+    net = FlowNetwork()
+    net.add_node(MassFlowBoundary("mfb_hot", m_dot=0.3, Tt=400.0))
+    net.add_node(MassFlowBoundary("mfb_cold", m_dot=0.1, Tt=300.0))
+    net.add_node(PressureBoundary("pb_out", Pt=100000.0, Tt=300.0))
+    net.add_node(MomentumChamberNode("mc_str", area=A))
+    net.add_node(MomentumChamberNode("mc_bra", area=A))
+    net.add_node(MomentumChamberNode("mc_com", area=A))
+    net.add_element(
+        ChannelElement(
+            "ch_hot", "mfb_hot", "mc_str", length=1.0, diameter=diameter, regime="compressible"
+        )
+    )
+    net.add_element(
+        ChannelElement(
+            "ch_cold", "mfb_cold", "mc_bra", length=1.0, diameter=diameter, regime="compressible"
+        )
+    )
+    net.add_element(
+        ChannelElement(
+            "ch_out", "mc_com", "pb_out", length=1.0, diameter=diameter, regime="compressible"
+        )
+    )
+    net.add_element(
+        MultiPortChamberElement(
+            id="jct",
+            inlet_nodes=["mc_str", "mc_bra"],
+            outlet_nodes=["mc_com"],
+            inlet_angles_deg=[0.0, theta_deg],
+            outlet_angles_deg=[0.0],
+            port_areas=[A, A, A],
+        )
+    )
+    return net
+
+
+def test_mpce_collector_port_carries_dynamic_head():
+    """Collector-port MCNs must see their real face flow in the
+    Pt = P + 0.5*rho*v^2 closure.
+
+    Before the throughflow fix, MultiPortChamberElement.flow_at_node
+    returned 0, so any port fed by the junction had _total_m_dot = 0 and
+    its closure silently degenerated to Pt = P -- the outflow dynamic head
+    (tens of kPa at these conditions) vanished from the bookkeeping.
+    """
+    net = _mpce_mfb_merge_network()
+    solver = NetworkSolver(net)
+    sol = solver.solve(timeout=120.0)
+    assert sol["__final_norm__"] < 1e-3
+
+    node = net.nodes["mc_com"]
+    m_out = sol["ch_out.m_dot"]
+    assert m_out == pytest.approx(0.4, abs=1e-4)
+    assert node._total_m_dot == pytest.approx(m_out, rel=1e-6)
+
+    T_com, _, _ = solver._derived_states["mc_com"]
+    rho = cb.density(T_com, sol["mc_com.P"], cb.species.dry_air())
+    A = node.area
+    q_expected = 0.5 * rho * (m_out / (rho * A)) ** 2
+    q_solved = sol["mc_com.Pt"] - sol["mc_com.P"]
+    assert q_solved > 1e3, "collector dynamic head must not degenerate to zero"
+    assert q_solved == pytest.approx(q_expected, rel=1e-4)
+
+
+def test_mpce_merge_outlet_temperature_mass_weighted():
+    """Merging streams with unequal temperatures must mix mass-weighted.
+
+    Before the throughflow fix, all streams through the junction carried
+    m_dot = 0, so the mixer fell back to the FIRST stream's temperature:
+    the outlet of a 0.3 kg/s @ 400 K + 0.1 kg/s @ 300 K merge reported
+    400 K instead of the enthalpy-weighted ~375 K.
+    """
+    net = _mpce_mfb_merge_network()
+    solver = NetworkSolver(net)
+    sol = solver.solve(timeout=120.0)
+    assert sol["__final_norm__"] < 1e-3
+
+    T_com, _, _ = solver._derived_states["mc_com"]
+    assert T_com == pytest.approx(375.1, abs=2.0)
+    assert abs(T_com - 400.0) > 20.0, "outlet T stuck at first-stream value"
+
+
+def test_mpce_collector_port_mcn_inherits_area():
+    """Auto-sized collector-port MCNs inherit the junction port area.
+
+    Nodes resolve before elements, and a collector port has no upstream
+    channel to inherit Dh from, so MomentumChamberNode.resolve_topology
+    leaves it at the 0.1 m^2 fallback; MultiPortChamberElement.resolve_
+    topology must then push the inferred port area onto it, otherwise the
+    Pt closure sees a near-zero face velocity.
+    """
+    D_main, D_bra = 0.05, 0.04
+    net = FlowNetwork()
+    net.add_node(PressureBoundary("pb_hi", Pt=150000.0, Tt=300.0))
+    net.add_node(PressureBoundary("pb_lo_str", Pt=100000.0, Tt=300.0))
+    net.add_node(PressureBoundary("pb_lo_bra", Pt=100000.0, Tt=300.0))
+    net.add_node(MomentumChamberNode("mc_com"))
+    net.add_node(MomentumChamberNode("mc_str"))
+    net.add_node(MomentumChamberNode("mc_bra"))
+    net.add_element(
+        ChannelElement(
+            "ch_in", "pb_hi", "mc_com", length=1.0, diameter=D_main, regime="compressible"
+        )
+    )
+    net.add_element(
+        ChannelElement(
+            "ch_str", "mc_str", "pb_lo_str", length=1.0, diameter=D_main, regime="compressible"
+        )
+    )
+    net.add_element(
+        ChannelElement(
+            "ch_bra", "mc_bra", "pb_lo_bra", length=1.0, diameter=D_bra, regime="compressible"
+        )
+    )
+    net.add_element(
+        MultiPortChamberElement(
+            id="jct",
+            inlet_nodes=["mc_com"],
+            outlet_nodes=["mc_str", "mc_bra"],
+            inlet_angles_deg=[0.0],
+            outlet_angles_deg=[0.0, 45.0],
+        )
+    )
+    net.resolve_all_topology()
+
+    A_main = math.pi * (D_main / 2.0) ** 2
+    A_bra = math.pi * (D_bra / 2.0) ** 2
+    # Inlet port: pre-existing inheritance via upstream channel Dh.
+    assert net.nodes["mc_com"].area == pytest.approx(A_main, rel=1e-12)
+    # Collector ports: inherited through the junction's port areas.
+    assert net.nodes["mc_str"].area == pytest.approx(A_main, rel=1e-12)
+    assert net.nodes["mc_bra"].area == pytest.approx(A_bra, rel=1e-12)
+    assert net.nodes["mc_bra"].Dh == pytest.approx(D_bra, rel=1e-12)
+
+
 def test_analytical_pt_prop_rejects_unknown_strategy_name():
     net = FlowNetwork()
     net.add_node(PressureBoundary("in", Pt=200000.0, Tt=300.0))

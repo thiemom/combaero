@@ -558,6 +558,22 @@ class NetworkSolver:
         # Build name to index mapping
         self._name_to_index = {name: i for i, name in enumerate(self.unknown_names)}
 
+        # MultiPortChamberElement ports carry their throughflow on the outer
+        # connecting elements' m_dot unknowns. Stash the resolved global
+        # indices on each junction so flow_at_node / flow_jac_at_node can
+        # report real port flows during state propagation: collector-port
+        # MCNs need them for the Pt = P + 0.5*rho*v^2 closure and for
+        # mass-weighted mixing of merging streams.
+        from .components import MultiPortChamberElement as _MPCElem
+
+        for element in self.network.elements.values():
+            if isinstance(element, _MPCElem):
+                element._port_outer_mdot_idx = {
+                    outer_id: self._name_to_index[f"{outer_id}.m_dot"]
+                    for outer_id in element._port_element_ids
+                    if f"{outer_id}.m_dot" in self._name_to_index
+                }
+
         # Pre-compute topological order for forward state propagation
         self._topological_order = self._compute_topological_order()
 
