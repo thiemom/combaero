@@ -1822,9 +1822,30 @@ std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobia
   bool reverse_flow = (u_in < 0.0);
   double u_fwd = std::abs(u_in);
 
-  // Call fanno_channel_rough for forward direction
-  auto sol = combaero::fanno_channel_rough(T_in, P_in, u_fwd, L, D, roughness, X, friction_model, f_multiplier);
-  double dP = P_in - sol.outlet.P;
+  // Forward-direction friction drop with an infeasibility barrier on top of
+  // the truncated Fanno march (see kChannelChokeBarrierKappa in the header
+  // for the rationale and the barrier shape).
+  auto dp_forward = [&](double T, double P, double u_abs) -> double {
+    auto sol = combaero::fanno_channel_rough(T, P, u_abs, L, D, roughness, X,
+                                             friction_model, f_multiplier);
+    double dP = P - sol.outlet.P;
+    if (!sol.choked) {
+      return dP;
+    }
+    const double a = combaero::speed_of_sound(T, X);
+    if (u_abs >= a) {
+      // Supersonic inlet: the march never started (outlet == inlet).
+      const double rho = combaero::density(T, P, X);
+      return kChannelChokeBarrierKappa * P +
+             0.5 * kChannelChokeBarrierBeta * rho * (u_abs * u_abs - a * a);
+    }
+    // Subsonic inlet choked at L_choke < L: this m_dot cannot traverse the
+    // full channel. The penalty grows as choking moves toward the inlet and
+    // meets the supersonic branch (kappa * P) at L_choke -> 0.
+    return dP + kChannelChokeBarrierKappa * P * (1.0 - sol.L_choke / L);
+  };
+
+  double dP = dp_forward(T_in, P_in, u_fwd);
 
   // For reverse flow, negate dP to maintain sign convention
   if (reverse_flow) {
@@ -1836,44 +1857,33 @@ std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobia
   double d_dP_du_in = 0.0;
 
   if (compute_jacobians) {
-    // Compute Jacobians via finite differences
+    // Compute Jacobians via finite differences on the composite (Fanno +
+    // barrier) drop so Newton sees a consistent gradient in both regions.
     const double eps_P = std::max(1e-6, std::abs(P_in) * 1e-6);
     const double eps_T = std::max(1e-6, std::abs(T_in) * 1e-6);
     const double eps_u = std::max(1e-6, std::abs(u_in) * 1e-6);
 
     // Jacobian w.r.t. P_in
-    auto sol_P_plus = combaero::fanno_channel_rough(T_in, P_in + eps_P, u_fwd, L, D, roughness, X, friction_model, f_multiplier);
-    auto sol_P_minus = combaero::fanno_channel_rough(T_in, P_in - eps_P, u_fwd, L, D, roughness, X, friction_model, f_multiplier);
-    double dP_P_plus = (P_in + eps_P) - sol_P_plus.outlet.P;
-    double dP_P_minus = (P_in - eps_P) - sol_P_minus.outlet.P;
-    if (reverse_flow) dP_P_plus = -dP_P_plus;
-    if (reverse_flow) dP_P_minus = -dP_P_minus;
-    d_dP_dP_in = (dP_P_plus - dP_P_minus) / (2.0 * eps_P);
+    d_dP_dP_in = (dp_forward(T_in, P_in + eps_P, u_fwd) -
+                  dp_forward(T_in, P_in - eps_P, u_fwd)) /
+                 (2.0 * eps_P);
 
     // Jacobian w.r.t. T_in
-    auto sol_T_plus = combaero::fanno_channel_rough(T_in + eps_T, P_in, u_fwd, L, D, roughness, X, friction_model, f_multiplier);
-    auto sol_T_minus = combaero::fanno_channel_rough(T_in - eps_T, P_in, u_fwd, L, D, roughness, X, friction_model, f_multiplier);
-    double dP_T_plus = P_in - sol_T_plus.outlet.P;
-    double dP_T_minus = P_in - sol_T_minus.outlet.P;
-    if (reverse_flow) dP_T_plus = -dP_T_plus;
-    if (reverse_flow) dP_T_minus = -dP_T_minus;
-    d_dP_dT_in = (dP_T_plus - dP_T_minus) / (2.0 * eps_T);
+    d_dP_dT_in = (dp_forward(T_in + eps_T, P_in, u_fwd) -
+                  dp_forward(T_in - eps_T, P_in, u_fwd)) /
+                 (2.0 * eps_T);
 
-    // Jacobian w.r.t. u_in (note: u_in is signed, but we use u_fwd for Fanno)
-    auto sol_u_plus = combaero::fanno_channel_rough(T_in, P_in, u_fwd + eps_u, L, D, roughness, X, friction_model, f_multiplier);
-    auto sol_u_minus = combaero::fanno_channel_rough(T_in, P_in, std::max(1e-9, u_fwd - eps_u), L, D, roughness, X, friction_model, f_multiplier);
-    double dP_u_plus = P_in - sol_u_plus.outlet.P;
-    double dP_u_minus = P_in - sol_u_minus.outlet.P;
-    if (reverse_flow) dP_u_plus = -dP_u_plus;
-    if (reverse_flow) dP_u_minus = -dP_u_minus;
-    double d_dP_du_fwd = (dP_u_plus - dP_u_minus) / (2.0 * eps_u);
-    d_dP_du_in = reverse_flow ? -d_dP_du_fwd : d_dP_du_fwd;
-
-    // Apply smooth transition near choked conditions
-    if (sol.choked || sol.L_choke < L * 1.2) {
-      // Near choking - Jacobians may need smoothing
-      // For now, keep as-is since Fanno solver handles this internally
+    if (reverse_flow) {
+      d_dP_dP_in = -d_dP_dP_in;
+      d_dP_dT_in = -d_dP_dT_in;
     }
+
+    // Jacobian w.r.t. u_in. u_in is signed while the march uses u_fwd; the
+    // reverse-flow negations of sample and direction cancel, so the forward
+    // difference quotient is already d(dP)/d(u_in).
+    d_dP_du_in = (dp_forward(T_in, P_in, u_fwd + eps_u) -
+                  dp_forward(T_in, P_in, std::max(1e-9, u_fwd - eps_u))) /
+                 (2.0 * eps_u);
   }
 
   return {dP, d_dP_dP_in, d_dP_dT_in, d_dP_du_in};

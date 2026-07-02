@@ -136,6 +136,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the v1 vs K-closure comparison test now seeds the forward basin
   explicitly since v1's sign-symmetric residuals admit the mirrored
   all-reverse root from a cold start.
+- **Choked compressible channels no longer report zero resistance to the
+  network solver.** ``channel_compressible_mdot_and_jacobian`` passed
+  through ``fanno_channel_rough``'s truncated march: a supersonic inlet
+  (M >= 1) returned ``dP = 0`` with zero ``m_dot`` sensitivity, and
+  in-channel choking (``L_choke < L``) collapsed the reported drop toward
+  zero as the requested velocity approached sonic. The infeasible region
+  therefore looked frictionless to Newton and acted as a flat attractor
+  with exact spurious network roots -- e.g. the canonical 3-port MPCE
+  branch tee (pt_ratio 2.0, theta 45 deg, psi 1.0) "converged" at
+  |F| ~ 3e-7 to a dead branch arm with the straight arm at M ~ 1.1 and
+  zero total-pressure drop. The kernel now applies a monotone
+  infeasibility barrier (``kChannelChokeBarrierKappa``,
+  ``kChannelChokeBarrierBeta`` in ``solver_interface.h``): in-channel
+  choking adds ``kappa * P_in * (1 - L_choke/L)`` on top of the truncated
+  drop, a supersonic inlet returns ``kappa * P_in`` plus quadratic growth
+  in velocity, keeping ``dP(u)`` strictly increasing across feasible,
+  choked, and supersonic regions so Newton is always pushed back toward
+  the feasible branch. Feasible (un-choked) results are bit-identical to
+  before. The previously-spurious dead-branch state now evaluates at
+  |F| > 1e4 (regression-tested); such cases honestly report
+  non-convergence instead of silently returning a wrong flow split.
 - **Merging/splitting MomentumChamberNode now refused at build time** (#174).
   MCN's scalar ``Pt = P + 0.5 rho v^2`` closure models a single bulk
   velocity and cannot represent merging or splitting streams within the

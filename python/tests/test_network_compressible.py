@@ -767,6 +767,44 @@ def test_mpce_collector_port_mcn_inherits_area():
     assert net.nodes["mc_bra"].Dh == pytest.approx(D_bra, rel=1e-12)
 
 
+def test_choke_barrier_rejects_dead_branch_spurious_root():
+    """Regression for the choked-channel flat region (solver review, 2026-07).
+
+    Before the choke barrier in channel_compressible_mdot_and_jacobian, the
+    state below was an EXACT root (|F| ~ 3e-7) of the branch tee: the branch
+    arm dead (m_dot = 0) and the straight arm carrying the full 0.883 kg/s at
+    M ~ 1.1 with zero total-pressure drop, because choked channels reported
+    dP = 0 with zero m_dot sensitivity. With the barrier, the straight
+    channel's row must now show a large residual at this state.
+    """
+    net = _mpce_tee_network(
+        pt_ratio=2.0,
+        theta_deg=45.0,
+        psi=1.0,
+        flow_direction="branch",
+    )
+    solver = NetworkSolver(net)
+    x = solver._build_x0()
+    spurious = {
+        "mc_com.P": 100000.0,
+        "mc_com.Pt": 187100.39,
+        "mc_str.P": 100000.0,
+        "mc_str.Pt": 100000.0,
+        "mc_bra.P": 100000.0,
+        "mc_bra.Pt": 100000.0,
+        "jct.P_jct": 100000.0,
+        "ch_in.m_dot": 0.8831240560197469,
+        "ch_str.m_dot": 0.8831240560197469,
+        "ch_bra.m_dot": 0.0,
+    }
+    for name, val in spurious.items():
+        x[solver._name_to_index[name]] = val
+    res = solver._residuals(x)
+    assert float(np.linalg.norm(res)) > 1e4, (
+        "choked dead-branch state must no longer be a root of the network"
+    )
+
+
 def test_analytical_pt_prop_rejects_unknown_strategy_name():
     net = FlowNetwork()
     net.add_node(PressureBoundary("in", Pt=200000.0, Tt=300.0))
