@@ -24,6 +24,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ``mpce_tee``.
 
 ### Added
+- **``init_strategy="analytical_pt_prop"`` on ``NetworkSolver.solve``**.
+  Opt-in initialization strategy targeting MPCE compressible cold-start
+  cases where the solver's default per-element uniform-dP propagation
+  lands Newton in the wrong basin. Seeds two element unknowns the
+  default path leaves at arbitrary constants:
+  ``ChannelElement.m_dot`` from a Bernoulli estimate on the propagated
+  Pt drop (default fallback is ``ref["m_dot"] = 0.1``), and
+  ``MultiPortChamberElement.P_jct`` from the propagated Pt at the
+  junction's "common" port (default fallback is ``min(boundary Pt)``,
+  almost never near the true junction static). User-provided
+  ``initial_guess`` entries take precedence; single-shot semantics
+  (overrides cleared after ``_build_x0``). LHS-32 audit
+  (``tmp/mpce_cold_start_audit.py``) partitions cases where the new
+  strategy is complementary to ``default``: high-theta (> 50 deg)
+  topologies favour analytical, low-theta favour default. Combined
+  success rate 21/32 = 66% vs 14/32 = 44% for either alone; ship as an
+  alternative attractor, not a default replacement. Follow-up work:
+  fallback/auto strategy that tries multiple starts.
 - **``__convergence_history__`` field on NetworkSolver solution dict**.
   Previously the per-iteration residual-norm trace lived only on
   ``solver._diagnostic_data`` (consumed by the GUI API path) and was

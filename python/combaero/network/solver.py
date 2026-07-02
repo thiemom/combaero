@@ -156,6 +156,12 @@ class NetworkSolver:
         self._n_species: int = len(self._default_Y)
         self._topological_order: list[str] = []
         self._derived_states: dict[str, tuple[float, list[float], Any]] = {}
+        # Optional initial-guess overrides keyed by unknown name; consulted
+        # by _build_x0 after user-provided initial_guess dicts and before
+        # the topological p_guess / mdot_guess propagators. Populated by
+        # init_strategy branches (e.g. analytical_pt_prop) and cleared
+        # once the solve returns.
+        self._init_overrides: dict[str, float] = {}
 
     def _infer_reference_state(self) -> dict[str, Any]:
         """Derive sensible default values for unknowns from boundary nodes.
@@ -347,6 +353,69 @@ class NetworkSolver:
 
         return mdot_guess
 
+    def _propagate_analytical_pt_prop(self, ref: dict[str, Any]) -> dict[str, float]:
+        """Compute topology-aware initial guesses for MPCE compressible cold-start.
+
+        For each ``ChannelElement`` with a signed pressure gradient across
+        it, seed the m_dot unknown via a Bernoulli estimate
+        ``m_dot = sign(dP) * A * sqrt(2 * rho_ref * |dP|)``.
+
+        For each ``MultiPortChamberElement`` (and subclasses), seed the
+        ``P_jct`` unknown from the propagated Pt at the junction's
+        "common" port (the arm on the single-inlet side for a branch or
+        the single-outlet side for a merge). The default
+        ``ref["P"] = min(boundary Pt)`` is almost never near the true
+        junction static, which is what motivated this strategy (see
+        LHS-32 audit, ``tmp/mpce_cold_start_audit.py``).
+
+        Returns a dict mapping unknown name to seed value. Consumed by
+        ``_build_x0`` via ``self._init_overrides``.
+        """
+        from .components import MultiPortChamberElement
+
+        p_guess = self._propagate_pressure_guess(ref)
+        if not p_guess:
+            return {}
+        # Reference density from Pt/RT at the propagated mean pressure and
+        # ambient reference temperature. R_air is a stand-in for the local
+        # gas; MPCE audit shows this level of approximation is enough to
+        # get Newton into the correct basin.
+        R_air = 287.0
+        Tt = float(ref.get("T", 300.0))
+        Pt_ref = float(np.mean(list(p_guess.values())))
+        rho_ref = max(Pt_ref / (R_air * Tt), 1e-3)
+
+        overrides: dict[str, float] = {}
+        for elem_id, elem in self.network.elements.items():
+            if isinstance(elem, ChannelElement):
+                pt_from = p_guess.get(elem.from_node)
+                pt_to = p_guess.get(elem.to_node)
+                if pt_from is None or pt_to is None:
+                    continue
+                dp = pt_from - pt_to
+                if dp == 0.0:
+                    continue
+                diameter = getattr(elem, "diameter", None)
+                if diameter is None or diameter <= 0.0:
+                    continue
+                area = math.pi * (float(diameter) / 2.0) ** 2
+                mdot_mag = area * math.sqrt(2.0 * rho_ref * abs(dp))
+                overrides[f"{elem_id}.m_dot"] = math.copysign(mdot_mag, dp)
+            elif isinstance(elem, MultiPortChamberElement):
+                inlets = list(getattr(elem, "inlet_nodes", []))
+                outlets = list(getattr(elem, "outlet_nodes", []))
+                if len(inlets) == 1:
+                    common = inlets[0]
+                elif len(outlets) == 1:
+                    common = outlets[0]
+                else:
+                    continue
+                pt = p_guess.get(common)
+                if pt is None:
+                    continue
+                overrides[f"{elem_id}.P_jct"] = pt
+        return overrides
+
     def _build_x0(self) -> np.ndarray:
         """
         Constructs the initial guess vector by gathering all unknowns.
@@ -443,6 +512,8 @@ class NetworkSolver:
                         guess_dict = getattr(node, "initial_guess", {})
                         if unk in guess_dict:
                             x0_list.append(guess_dict[unk])
+                        elif unk in self._init_overrides:
+                            x0_list.append(self._init_overrides[unk])
                         elif unk.endswith(".P") or unk.endswith(".Pt"):
                             x0_list.append(p_guess.get(node_id, ref["P"]))
                         elif unk.endswith(".T") or unk.endswith(".Tt"):
@@ -464,6 +535,8 @@ class NetworkSolver:
                     guess_dict = getattr(element, "initial_guess", {})
                     if unk in guess_dict:
                         x0_list.append(guess_dict[unk])
+                    elif unk in self._init_overrides:
+                        x0_list.append(self._init_overrides[unk])
                     elif unk.endswith(".m_dot") or unk.endswith(".m_dot_com"):
                         x0_list.append(mdot_guess.get(elem_id, ref["m_dot"]))
                     elif unk.endswith(".m_dot_branch"):
@@ -1303,7 +1376,9 @@ class NetworkSolver:
         options: dict[str, Any] | None = None,
         use_jac: bool = True,
         x0: np.ndarray | None = None,
-        init_strategy: Literal["default", "incompressible_warmstart", "homotopy"] = "default",
+        init_strategy: Literal[
+            "default", "incompressible_warmstart", "homotopy", "analytical_pt_prop"
+        ] = "default",
         warmstart_maxfev: int = 150,
         lambda_steps: list[float] | None = None,
     ) -> dict[str, float]:
@@ -1326,7 +1401,13 @@ class NetworkSolver:
             init_strategy: Initialization strategy. ``default`` uses
                 direct x0 construction; ``incompressible_warmstart``
                 first solves an incompressible-regime proxy network and
-                uses that solution as x0.
+                uses that solution as x0; ``analytical_pt_prop`` seeds
+                topology-aware initial guesses (channel Bernoulli m_dot
+                + MPCE junction P_jct at the common port), targeting
+                MPCE compressible cold-start cases where the solver's
+                default per-element uniform dP fallback lands Newton in
+                a wrong basin (see LHS-32 audit
+                ``tmp/mpce_cold_start_audit.py``).
             warmstart_maxfev: Maximum function evaluations for the
                 incompressible proxy solve when
                 ``init_strategy='incompressible_warmstart'``.
@@ -1339,9 +1420,16 @@ class NetworkSolver:
                 f"Method '{method}' is not supported. Supported methods are: {', '.join(self.SUPPORTED_METHODS)}"
             )
 
-        if init_strategy not in ("default", "incompressible_warmstart", "homotopy", "continuation"):
+        if init_strategy not in (
+            "default",
+            "incompressible_warmstart",
+            "homotopy",
+            "continuation",
+            "analytical_pt_prop",
+        ):
             raise ValueError(
-                "init_strategy must be one of: 'default', 'incompressible_warmstart', 'homotopy', 'continuation'."
+                "init_strategy must be one of: 'default', 'incompressible_warmstart', "
+                "'homotopy', 'continuation', 'analytical_pt_prop'."
             )
         if warmstart_maxfev <= 0:
             raise ValueError("warmstart_maxfev must be > 0.")
@@ -1360,8 +1448,18 @@ class NetworkSolver:
         self.network.resolve_all_topology()
         self.network.validate()
 
+        # analytical_pt_prop seeds channel m_dot + MPCE P_jct through the
+        # regular _build_x0 path via self._init_overrides. _build_x0 reads
+        # the dict once and clears it, so no cross-solve leakage.
+        if x0 is None and init_strategy == "analytical_pt_prop":
+            _ref = self._infer_reference_state()
+            self._init_overrides = self._propagate_analytical_pt_prop(_ref)
+        else:
+            self._init_overrides = {}
+
         # Build initial guess to populate unknown_names early
         x0_auto = self._build_x0()
+        self._init_overrides = {}
         if not self.unknown_names:
             return {
                 "__success__": True,
