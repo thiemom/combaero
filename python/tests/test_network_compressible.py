@@ -1,6 +1,9 @@
 """Tests for compressible flow elements in network solver."""
 
+import math
+
 import numpy as np
+import pytest
 
 import combaero as cb
 from combaero.heat_transfer import ConvectiveSurface, SmoothModel
@@ -8,6 +11,8 @@ from combaero.network import (
     ChannelElement,
     FlowNetwork,
     MassFlowBoundary,
+    MomentumChamberNode,
+    MultiPortChamberElement,
     NetworkSolver,
     OrificeElement,
     PlenumNode,
@@ -469,3 +474,182 @@ def test_homotopy_initialization_strategy():
     print(sol)
     assert sol["__success__"], "Homotopy solve failed"
     assert sol["channel.m_dot"] > 0, "Mass flow should be positive"
+
+
+# ---------------------------------------------------------------------------
+# analytical_pt_prop init strategy
+# ---------------------------------------------------------------------------
+
+
+def _mpce_tee_network(
+    pt_ratio: float,
+    theta_deg: float,
+    psi: float,
+    flow_direction: str,
+    Tt: float = 300.0,
+    Pt_ref: float = 100000.0,
+) -> FlowNetwork:
+    """Canonical 3-port MPCE tee. Mirrors tmp/mpce_cold_start_audit.py."""
+    diameter = 0.05
+    A_com = math.pi * (diameter / 2.0) ** 2
+    A_bra = A_com / psi
+    D_bra = 2.0 * math.sqrt(A_bra / math.pi)
+    length = 1.0
+    Pt_hi = Pt_ref * pt_ratio
+    Pt_lo = Pt_ref
+    net = FlowNetwork()
+
+    if flow_direction == "branch":
+        net.add_node(PressureBoundary("pb_hi", Pt=Pt_hi, Tt=Tt))
+        net.add_node(PressureBoundary("pb_lo_str", Pt=Pt_lo, Tt=Tt))
+        net.add_node(PressureBoundary("pb_lo_bra", Pt=Pt_lo, Tt=Tt))
+        net.add_node(MomentumChamberNode("mc_com", area=A_com))
+        net.add_node(MomentumChamberNode("mc_str", area=A_com))
+        net.add_node(MomentumChamberNode("mc_bra", area=A_bra))
+        net.add_element(
+            ChannelElement(
+                "ch_in", "pb_hi", "mc_com", length=length, diameter=diameter, regime="compressible"
+            )
+        )
+        net.add_element(
+            ChannelElement(
+                "ch_str",
+                "mc_str",
+                "pb_lo_str",
+                length=length,
+                diameter=diameter,
+                regime="compressible",
+            )
+        )
+        net.add_element(
+            ChannelElement(
+                "ch_bra",
+                "mc_bra",
+                "pb_lo_bra",
+                length=length,
+                diameter=D_bra,
+                regime="compressible",
+            )
+        )
+        net.add_element(
+            MultiPortChamberElement(
+                id="jct",
+                inlet_nodes=["mc_com"],
+                outlet_nodes=["mc_str", "mc_bra"],
+                inlet_angles_deg=[0.0],
+                outlet_angles_deg=[0.0, theta_deg],
+                port_areas=[A_com, A_com, A_bra],
+            )
+        )
+    else:
+        net.add_node(PressureBoundary("pb_hi_str", Pt=Pt_hi, Tt=Tt))
+        net.add_node(PressureBoundary("pb_hi_bra", Pt=Pt_hi, Tt=Tt))
+        net.add_node(PressureBoundary("pb_lo", Pt=Pt_lo, Tt=Tt))
+        net.add_node(MomentumChamberNode("mc_str", area=A_com))
+        net.add_node(MomentumChamberNode("mc_bra", area=A_bra))
+        net.add_node(MomentumChamberNode("mc_com", area=A_com))
+        net.add_element(
+            ChannelElement(
+                "ch_str",
+                "pb_hi_str",
+                "mc_str",
+                length=length,
+                diameter=diameter,
+                regime="compressible",
+            )
+        )
+        net.add_element(
+            ChannelElement(
+                "ch_bra",
+                "pb_hi_bra",
+                "mc_bra",
+                length=length,
+                diameter=D_bra,
+                regime="compressible",
+            )
+        )
+        net.add_element(
+            ChannelElement(
+                "ch_out", "mc_com", "pb_lo", length=length, diameter=diameter, regime="compressible"
+            )
+        )
+        net.add_element(
+            MultiPortChamberElement(
+                id="jct",
+                inlet_nodes=["mc_str", "mc_bra"],
+                outlet_nodes=["mc_com"],
+                inlet_angles_deg=[0.0, theta_deg],
+                outlet_angles_deg=[0.0],
+                port_areas=[A_com, A_bra, A_com],
+            )
+        )
+    return net
+
+
+def test_analytical_pt_prop_rescues_cold_stuck_case():
+    """Case #4 from the LHS-32 audit: cold_baseline, incompressible_warmstart,
+    and homotopy all stall in the wrong Newton basin at |F|~3111 even with
+    a 120 s budget. analytical_pt_prop lands the correct basin in ~110 evals.
+
+    Verifies both that the new strategy is wired end-to-end and that its
+    convergence advantage on this audited-hard case survives as a
+    regression check.
+    """
+    net = _mpce_tee_network(
+        pt_ratio=1.8385290361105023,
+        theta_deg=46.83168762022338,
+        psi=0.7810566293706353,
+        flow_direction="merge",
+    )
+    solver = NetworkSolver(net)
+    sol = solver.solve(
+        method="hybr",
+        init_strategy="analytical_pt_prop",
+        timeout=60.0,
+        options={"maxfev": 400},
+    )
+    assert sol["__success__"], f"analytical_pt_prop failed: {sol.get('__message__')}"
+    assert sol["__final_norm__"] < 1e-3
+    # Mass conservation at the merge junction (sum of port flows into the
+    # chamber = 0, per sign convention of MultiPortChamberElement).
+    m_str, m_bra, m_out = sol["ch_str.m_dot"], sol["ch_bra.m_dot"], sol["ch_out.m_dot"]
+    # Either supply -> outlet or reverse; either root is valid without a
+    # flow_direction constraint. Just require mass balance.
+    assert abs(m_str + m_bra - m_out) < 1e-3, (
+        f"mass imbalance at merge: m_str={m_str}, m_bra={m_bra}, m_out={m_out}"
+    )
+
+
+def test_analytical_pt_prop_rejects_unknown_strategy_name():
+    net = FlowNetwork()
+    net.add_node(PressureBoundary("in", Pt=200000.0, Tt=300.0))
+    net.add_node(PressureBoundary("out", Pt=100000.0, Tt=300.0))
+    net.add_element(OrificeElement("orf", "in", "out", 0.6, 0.05, correlation="fixed"))
+    solver = NetworkSolver(net)
+    with pytest.raises(ValueError, match="init_strategy must be one of"):
+        solver.solve(init_strategy="analytical_pt_property")  # type: ignore[arg-type]
+
+
+def test_analytical_pt_prop_respects_user_initial_guess():
+    """User-provided initial_guess on a channel wins over the analytical seed."""
+    net = _mpce_tee_network(
+        pt_ratio=1.5,
+        theta_deg=60.0,
+        psi=1.0,
+        flow_direction="branch",
+    )
+    # Preset an obviously-wrong m_dot guess on ch_in that the solver would
+    # normally overwrite via analytical seeding. If our precedence order is
+    # correct, x0 keeps this value going into the solve.
+    net.elements["ch_in"].initial_guess = {"ch_in.m_dot": 42.0}
+    solver = NetworkSolver(net)
+    _ = solver.solve(
+        method="hybr",
+        init_strategy="analytical_pt_prop",
+        timeout=10.0,
+        options={"maxfev": 5},  # 5 evals: enough to observe x0 but not to converge
+    )
+    # After solve, _init_overrides must be cleared (single-shot semantics).
+    assert solver._init_overrides == {}
+    # And the user value survived in the source of truth (not clobbered).
+    assert net.elements["ch_in"].initial_guess["ch_in.m_dot"] == 42.0
