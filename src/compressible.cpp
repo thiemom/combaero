@@ -543,7 +543,12 @@ FannoSolution fanno_channel(
     double T = T_in;
     double rho = rho_in;
     double u = u_in;
+    double M_prev = M_in;
 
+    // L_choke is interpolated within the breaking step below. Snapping it
+    // to the march grid makes any closure built on it (e.g. the network
+    // choke barrier) a staircase in m_dot whose jumps can leave residuals
+    // rootless near choke onset.
     for (std::size_t step = 0; step < n_steps; ++step) {
         // RK4 integration of dp/dx
         // k1
@@ -551,21 +556,21 @@ FannoSolution fanno_channel(
 
         // k2: evaluate at x + dx/2, P + k1*dx/2
         double P2 = P + 0.5 * k1 * dx;
-        if (P2 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
+        if (P2 <= 0.0) { sol.choked = true; sol.L_choke = x + 0.5 * dx * P / (P - P2); break; }
         [[maybe_unused]] double T2, u2, rho2;
         T2 = solve_T_from_energy(P2, sol.h0, sol.mdot, A, X, mw_kg, T, u2, rho2);
         double k2 = dpdx_fanno(rho2, u2, f, D);
 
         // k3: evaluate at x + dx/2, P + k2*dx/2
         double P3 = P + 0.5 * k2 * dx;
-        if (P3 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
+        if (P3 <= 0.0) { sol.choked = true; sol.L_choke = x + 0.5 * dx * P / (P - P3); break; }
         [[maybe_unused]] double T3, u3, rho3;
         T3 = solve_T_from_energy(P3, sol.h0, sol.mdot, A, X, mw_kg, T, u3, rho3);
         double k3 = dpdx_fanno(rho3, u3, f, D);
 
         // k4: evaluate at x + dx, P + k3*dx
         double P4 = P + k3 * dx;
-        if (P4 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
+        if (P4 <= 0.0) { sol.choked = true; sol.L_choke = x + dx * P / (P - P4); break; }
         [[maybe_unused]] double T4, u4, rho4;
         T4 = solve_T_from_energy(P4, sol.h0, sol.mdot, A, X, mw_kg, T, u4, rho4);
         double k4 = dpdx_fanno(rho4, u4, f, D);
@@ -575,7 +580,7 @@ FannoSolution fanno_channel(
 
         if (P_new <= 0.0) {
             sol.choked = true;
-            sol.L_choke = x;
+            sol.L_choke = x + dx * P / (P - P_new);
             break;
         }
 
@@ -592,11 +597,16 @@ FannoSolution fanno_channel(
         double a = current.a();
         double M = u / a;
 
-        if (M >= 0.999) {
+        if (M >= kFannoChokeMach) {
             sol.choked = true;
-            sol.L_choke = x;
+            double frac = 1.0;
+            if (M - M_prev > 1e-12) {
+                frac = (kFannoChokeMach - M_prev) / (M - M_prev);
+            }
+            sol.L_choke = x - dx * (1.0 - std::clamp(frac, 0.0, 1.0));
             break;
         }
+        M_prev = M;
 
         // Store profile point
         if (store_profile) {
@@ -732,7 +742,10 @@ FannoSolution fanno_channel_rough(
     double rho = rho_in;
     double u   = u_in;
     double f_sum = f_in;  // accumulate for f_avg
+    double M_prev = M_in;
 
+    // L_choke is interpolated within the breaking step below (see the
+    // constant-f overload for why grid-snapped L_choke is harmful).
     for (std::size_t step = 0; step < n_steps; ++step) {
         // k1: local f at current state
         const double f1 = local_friction(T, P, u, D, roughness, X, correlation, f_multiplier);
@@ -740,7 +753,7 @@ FannoSolution fanno_channel_rough(
 
         // k2
         const double P2 = P + 0.5 * k1 * dx;
-        if (P2 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
+        if (P2 <= 0.0) { sol.choked = true; sol.L_choke = x + 0.5 * dx * P / (P - P2); break; }
         double T2, u2, rho2;
         T2 = solve_T_from_energy(P2, sol.h0, sol.mdot, A, X, mw_kg, T, u2, rho2);
         const double f2 = local_friction(T2, P2, u2, D, roughness, X, correlation, f_multiplier);
@@ -748,7 +761,7 @@ FannoSolution fanno_channel_rough(
 
         // k3
         const double P3 = P + 0.5 * k2 * dx;
-        if (P3 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
+        if (P3 <= 0.0) { sol.choked = true; sol.L_choke = x + 0.5 * dx * P / (P - P3); break; }
         double T3, u3, rho3;
         T3 = solve_T_from_energy(P3, sol.h0, sol.mdot, A, X, mw_kg, T, u3, rho3);
         const double f3 = local_friction(T3, P3, u3, D, roughness, X, correlation, f_multiplier);
@@ -756,14 +769,14 @@ FannoSolution fanno_channel_rough(
 
         // k4
         const double P4 = P + k3 * dx;
-        if (P4 <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
+        if (P4 <= 0.0) { sol.choked = true; sol.L_choke = x + dx * P / (P - P4); break; }
         double T4, u4, rho4;
         T4 = solve_T_from_energy(P4, sol.h0, sol.mdot, A, X, mw_kg, T, u4, rho4);
         const double f4 = local_friction(T4, P4, u4, D, roughness, X, correlation, f_multiplier);
         const double k4 = dpdx_fanno(rho4, u4, f4, D);
 
         const double P_new = P + dx * (k1 + 2.0*k2 + 2.0*k3 + k4) / 6.0;
-        if (P_new <= 0.0) { sol.choked = true; sol.L_choke = x; break; }
+        if (P_new <= 0.0) { sol.choked = true; sol.L_choke = x + dx * P / (P - P_new); break; }
 
         x += dx;
         P = P_new;
@@ -778,7 +791,16 @@ FannoSolution fanno_channel_rough(
         const double a = current.a();
         const double M = u / a;
 
-        if (M >= 0.999) { sol.choked = true; sol.L_choke = x; break; }
+        if (M >= kFannoChokeMach) {
+            sol.choked = true;
+            double frac = 1.0;
+            if (M - M_prev > 1e-12) {
+                frac = (kFannoChokeMach - M_prev) / (M - M_prev);
+            }
+            sol.L_choke = x - dx * (1.0 - std::clamp(frac, 0.0, 1.0));
+            break;
+        }
+        M_prev = M;
 
         if (store_profile) {
             FannoStation st;

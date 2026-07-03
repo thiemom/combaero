@@ -98,6 +98,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when the solver supplies ``port_mdots``.
 
 ### Fixed
+- **``L_choke`` is interpolated within the breaking march step instead of
+  snapping to the RK4 grid.** ``fanno_channel`` / ``fanno_channel_rough``
+  reported the length-to-choking quantized to ``L / n_steps`` (the
+  position of the last completed step). The in-channel choke barrier
+  (see the barrier entry below) builds its ramp on ``L_choke``, so the
+  channel's dP(m_dot) closure was a staircase near choke onset: jumps of
+  ``kappa * P_in / n_steps`` (~1 kPa at 1 bar with the default 100-step
+  march) every ~0.008 kg/s. Any pressure-driven network whose residual
+  zero fell inside a staircase jump had NO root -- a single air channel
+  (L=1 m, D=0.05 m) between two pressure boundaries failed to converge
+  at EVERY Pt ratio from 1.2 to 10 under every method/init combination,
+  stalling at a tread edge (best |F| ~ 90 at ratio 1.2). The sonic
+  station is now interpolated: linearly in Mach between the last two
+  steps for the ``M >= kFannoChokeMach`` exit, and linearly in the
+  pressure probe for the ``P <= 0`` RK4-stage exits. The same
+  single-channel sweep now converges at all 13 sampled ratios (1.2-10),
+  landing on the monotone barrier ramp at the choke boundary as the
+  barrier design intended. The choke threshold Mach (0.999) is hoisted
+  to ``constexpr kFannoChokeMach`` in ``compressible.h``. NOTE: for BCs
+  beyond the subsonic envelope the converged ``m_dot`` sits on the
+  barrier ramp slightly above the physical choked flow -- check the
+  channel's ``choked`` flag when interpreting such solutions. This also
+  invalidates (again) the pre-fix LHS-32 audit numbers: the 2026-07-03
+  re-run showed 25/32 all-strategy failures, most of which trace to this
+  staircase because the audit's channel geometry leaves the subsonic
+  envelope at Pt ratio ~1.19.
 - **MultiPortChamberElement ports now report their real throughflow to the
   solver's state propagation.** ``flow_at_node`` returned 0 "for safety",
   so every port-MCN fed by the junction (all collector/outflow ports)

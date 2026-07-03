@@ -230,6 +230,37 @@ def test_fanno_channel_rough_choked() -> None:
     assert sol.L_choke < 1000.0  # choking happened before the end
 
 
+def test_fanno_channel_rough_lchoke_interpolated() -> None:
+    """L_choke must vary continuously with inlet velocity, not snap to the
+    march grid.
+
+    L_choke used to be quantized to L / n_steps (the RK4 march step). Any
+    closure built on it -- e.g. the network choke barrier, which adds
+    kappa * P_in * (1 - L_choke / L) -- became a staircase in m_dot with
+    jumps of kappa * P_in / n_steps (~1 kPa at 1 bar). A pressure-driven
+    channel whose residual zero fell inside a jump had no root at all: a
+    single channel between two pressure boundaries at Pt ratio 1.2
+    stalled at |F| ~ 90 under every solver configuration. The sonic
+    station is now interpolated within the breaking march step.
+    """
+    X = cb.species.dry_air()
+    T_in, P_in = 300.0, 100000.0
+    L, D, roughness = 1.0, 0.05, 1e-5
+    grid_dx = L / 100.0  # default n_steps = 100
+
+    l_chokes = []
+    for u in np.arange(298.5, 320.0, 0.1):
+        sol = cb.fanno_channel_rough(T_in, P_in, float(u), L, D, roughness, X)
+        assert sol.choked
+        l_chokes.append(sol.L_choke)
+    diffs = np.abs(np.diff(l_chokes))
+    # Grid-snapped L_choke moves in whole-step jumps (grid_dx) separated
+    # by flat stretches; interpolated L_choke tracks the ~0.002 m per
+    # sample physical trend everywhere.
+    assert float(np.max(diffs)) < 0.5 * grid_dx
+    assert float(np.median(diffs)) > 1e-3
+
+
 def test_fanno_channel_rough_invalid_correlation() -> None:
     """Unknown correlation should raise ValueError."""
     import pytest
