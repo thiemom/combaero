@@ -3026,7 +3026,10 @@ class MultiPortChamberElement(NetworkElement):
       same flow with opposite sign).
     - Exactly one element (channel, loss element, etc.) must connect to each
       port-MCN on the outside. Its m_dot is the port's mass-flow source; the
-      junction reads it via the graph at residual-eval time.
+      junction reads it via the graph at residual-eval time, and reports it
+      back through ``flow_at_node`` so the state propagation gives every
+      port-MCN its real face flow (collector ports would otherwise see zero
+      and their Pt = P + 0.5*rho*v^2 closure would degenerate to Pt = P).
     - Sign convention per port is fixed by the inlet/outlet declaration in
       the constructor. ``inlet_nodes`` carry sign ``-1`` (canonical flow INTO
       junction); ``outlet_nodes`` carry sign ``+1`` (canonical flow OUT). The
@@ -3133,13 +3136,52 @@ class MultiPortChamberElement(NetworkElement):
         # Outlet ports = nodes the junction delivers flow TO.
         return list(self.outlet_nodes)
 
+    def _port_throughflow_terms(self, node_id: str) -> list[tuple[str, float]]:
+        """Outer-element terms whose weighted sum is the junction throughflow
+        at ``node_id`` (positive = canonical direction through the port).
+
+        Supplier (inlet) ports and collector ports of a single-supplier
+        junction carry exactly their own outer element's flow. A collector
+        of a multi-supplier junction (e.g. merge tee outlet) receives the
+        sum of the supplier feeds -- consistent with how the solver's state
+        propagation composes the collector's total flow from one stream per
+        supplier port.
+        """
+        if node_id not in self.port_nodes:
+            return []
+        i = self.port_nodes.index(node_id)
+        if self._port_signs[i] < 0 or len(self.inlet_nodes) == 1:
+            return [(self._port_element_ids[i], 1.0)]
+        return [(self._port_element_ids[j], 1.0) for j in range(self.N) if self._port_signs[j] < 0]
+
     def flow_at_node(self, node_id: str, x: Any, indices: list[int]) -> float:
-        # We never actually contribute to a port-MCN's mass row (solver skips
-        # it via _is_junction_port). Return 0 for safety if asked.
-        return 0.0
+        # Port-MCN mass rows are skipped by the solver (_is_junction_port);
+        # this is consumed by the state propagation instead, so collector-port
+        # MCNs see their real face flow in the Pt = P + 0.5*rho*v^2 closure
+        # and mix upstream streams with true mass weights. `indices` are this
+        # element's own unknowns (P_jct); the port flows live on the outer
+        # elements, resolved via the _port_outer_mdot_idx map the solver
+        # stashes when it builds the unknown vector.
+        idx_map = getattr(self, "_port_outer_mdot_idx", None)
+        if not idx_map:
+            return 0.0
+        total = 0.0
+        for outer_id, coeff in self._port_throughflow_terms(node_id):
+            global_idx = idx_map.get(outer_id)
+            if global_idx is not None:
+                total += coeff * float(x[global_idx])
+        return total
 
     def flow_jac_at_node(self, node_id: str, indices: list[int]) -> dict[int, float]:
-        return {}
+        idx_map = getattr(self, "_port_outer_mdot_idx", None)
+        if not idx_map:
+            return {}
+        jac: dict[int, float] = {}
+        for outer_id, coeff in self._port_throughflow_terms(node_id):
+            global_idx = idx_map.get(outer_id)
+            if global_idx is not None:
+                jac[global_idx] = jac.get(global_idx, 0.0) + coeff
+        return jac
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         # 1. For each port: locate the (unique) connecting element on the
@@ -3220,6 +3262,21 @@ class MultiPortChamberElement(NetworkElement):
                     f"area at port '{port_id}'. Provide port_areas explicitly "
                     f"or attach a ChannelElement with diameter set."
                 )
+
+            # 3. Give auto-sized port-MCNs a real flow area. Nodes resolve
+            #    before elements (FlowNetwork.resolve_all_topology), and a
+            #    collector port has no upstream channel to inherit Dh from,
+            #    so it would otherwise keep MomentumChamberNode's 0.1 m^2
+            #    fallback and its Pt = P + 0.5*rho*v^2 closure would see a
+            #    near-zero face velocity. Mirrors the MCN auto path (Dh ->
+            #    area, surface.area) exactly so a later node-resolve pass is
+            #    idempotent and collector ports match what inlet ports
+            #    already get from upstream-channel Dh inheritance.
+            if port_node._auto_area and port_node.Dh is None:
+                area_i = float(self.port_areas[i])
+                port_node.Dh = 2.0 * math.sqrt(area_i / math.pi)
+                port_node.area = area_i
+                port_node.surface.area = area_i
 
     def residuals(
         self, states: list[NetworkMixtureState], P_jct: float, port_mdots: list[float]

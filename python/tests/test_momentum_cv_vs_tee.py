@@ -154,7 +154,18 @@ def test_both_models_give_forward_dominant_inlet_flow():
     physically valid).
     """
     v3_sol = NetworkSolver(_v3_branching_net_direct()).solve()
-    mp_sol = NetworkSolver(_mpce_branching_net()).solve()
+
+    # MPCE's residual set is even in the mass flows apart from the linear
+    # mass row, so the network is symmetric under a global sign flip: the
+    # all-forward root and its mirrored all-reverse image are equally exact,
+    # and the default cold start may land either. Seed the forward basin
+    # explicitly -- this test compares the models' forward solutions, it
+    # does not test cold-start basin selection.
+    mp_net = _mpce_branching_net()
+    mp_net.elements["lc_com"].initial_guess = {"lc_com.m_dot": 0.4}
+    mp_net.elements["lc_str"].initial_guess = {"lc_str.m_dot": 0.25}
+    mp_net.elements["lc_bra"].initial_guess = {"lc_bra.m_dot": 0.15}
+    mp_sol = NetworkSolver(mp_net).solve()
 
     assert v3_sol["__success__"], f"v3 did not converge: {v3_sol.get('__message__')}"
     assert mp_sol["__success__"], f"MPCE did not converge: {mp_sol.get('__message__')}"

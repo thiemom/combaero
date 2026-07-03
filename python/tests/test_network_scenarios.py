@@ -6,7 +6,6 @@ from combaero.network import (
     ChannelElement,
     FlowNetwork,
     MomentumChamberNode,
-    MultiPortChamberElement,
     NetworkSolver,
     OrificeElement,
     PlenumNode,
@@ -126,14 +125,25 @@ def test_step_4_adding_bypass():
     """Bypass branch: splits at mc1, rejoins at mc2.
 
     mc1 (splitting) and mc2 (merging) are momentum-CV junctions built from
-    MultiPortChamberElement + MomentumChamberNode port faces. The earlier
-    incarnation of this test used bare MomentumChamberNode at both splits
-    and was xfailed against #174 because MCN's scalar Pt = P + 0.5 rho v^2
-    cannot represent merging or splitting streams in the chamber itself.
-    Migration onto the momentum-CV junction (closes #174) restores the
-    expected diameter-driven split: smaller-bore bypass < main branch.
+    MPCEv2Element + MomentumChamberNode port faces. The earlier incarnation
+    of this test used bare MomentumChamberNode at both splits and was
+    xfailed against #174 because MCN's scalar Pt = P + 0.5 rho v^2 cannot
+    represent merging or splitting streams in the chamber itself. Migration
+    onto the momentum-CV junction (closes #174) restores the expected
+    diameter-driven split: smaller-bore bypass < main branch.
+
+    The junctions are the Mynard-based MPCEv2Element rather than the v1
+    impulse MultiPortChamberElement: once collector ports carry their real
+    face flow (honest Pt = P + 0.5 rho v^2 closure), v1's per-port
+    sin^2(theta) impulse rows -- whose Bassett correspondence is derived
+    for separating flow -- create flow work out of nothing at a joining
+    junction, and the rejoin at mc2 has no energetically consistent
+    all-forward root. MPCEv2's stagnation-pressure residual handles
+    joining natively and converges from the default cold start.
     """
     import math
+
+    from combaero.network.mpce_v2_element import MPCEv2Element
 
     D_main = 0.1
     D_bypass = 0.08
@@ -162,13 +172,15 @@ def test_step_4_adding_bypass():
         delta_geom_deg=90.0,
         area=A_bypass,
     )
-    mpce_mc1 = MultiPortChamberElement(
+    mpce_mc1 = MPCEv2Element(
         id="mpce_mc1",
         inlet_nodes=["mc1_com"],
         outlet_nodes=["mc1_str", "mc1_bra"],
         inlet_angles_deg=[0.0],
         outlet_angles_deg=[0.0, 90.0],
         port_areas=[A_main, A_main, A_bypass],
+        flow_direction="branch",
+        strict=False,
     )
 
     # mc2: merging junction (2 inflows from p3 and o_bypass, 1 outflow to p4).
@@ -184,13 +196,15 @@ def test_step_4_adding_bypass():
         delta_geom_deg=90.0,
         area=A_bypass,
     )
-    mpce_mc2 = MultiPortChamberElement(
+    mpce_mc2 = MPCEv2Element(
         id="mpce_mc2",
         inlet_nodes=["mc2_str", "mc2_bra"],
         outlet_nodes=["mc2_com"],
         inlet_angles_deg=[0.0, 90.0],
         outlet_angles_deg=[0.0],
         port_areas=[A_main, A_bypass, A_main],
+        flow_direction="merge",
+        strict=False,
     )
 
     # Main series elements (now attach to port-face MCNs at mc1, mc2).
@@ -256,6 +270,10 @@ def test_step_4_adding_bypass():
     # Mass conservation: split at mc1, rejoin at mc2.
     assert abs(sol["p1.m_dot"] - (sol["p2.m_dot"] + sol["p_bypass.m_dot"])) < 1e-6
     assert abs((sol["p3.m_dot"] + sol["p_bypass.m_dot"]) - sol["p4.m_dot"]) < 1e-6
+
+    # Diameter-driven split: forward bypass flow, smaller than the main branch.
+    assert sol["p_bypass.m_dot"] > 0.0
+    assert sol["p2.m_dot"] > sol["p_bypass.m_dot"]
 
     assert all(sol[f"{e}.m_dot"] > 0 for e in ["p1", "p2", "p3", "p4", "p_bypass"])
 

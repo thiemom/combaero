@@ -98,6 +98,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when the solver supplies ``port_mdots``.
 
 ### Fixed
+- **MultiPortChamberElement ports now report their real throughflow to the
+  solver's state propagation.** ``flow_at_node`` returned 0 "for safety",
+  so every port-MCN fed by the junction (all collector/outflow ports)
+  received zero-mass upstream streams. Three consequences, all fixed:
+  (1) the collector-port MCN closure ``Pt = P + 0.5 rho v^2`` silently
+  degenerated to ``Pt = P`` -- the outflow dynamic head (~29 kPa for
+  0.4 kg/s through a 5 cm port at 1 bar) vanished from the bookkeeping,
+  and MPCE-v2's Mynard residual received a static pressure where its
+  design expects the port stagnation pressure; (2) merging streams with
+  unequal temperatures mixed with all-zero weights, so the outlet
+  temperature snapped to the FIRST inlet stream's value (a 0.3 kg/s @
+  400 K + 0.1 kg/s @ 300 K merge reported 400 K instead of the
+  enthalpy-weighted ~375 K) -- previously masked because all junction
+  tests are isothermal; (3) the degenerate closure made non-physical
+  network states exactly satisfiable (dead-branch / reversed-supply roots
+  at |F| ~ 1e-7). Ports now resolve their outer connecting elements'
+  ``m_dot`` unknowns via an index map stashed by ``NetworkSolver`` at
+  unknown-vector build time; supplier ports and single-supplier
+  collectors carry their own outer flow, multi-supplier collectors the
+  sum of the supplier feeds, with matching ``flow_jac_at_node`` entries
+  so the closure Jacobian stays consistent. Additionally,
+  ``MultiPortChamberElement.resolve_topology`` pushes inferred port areas
+  onto auto-sized port-MCNs (collector ports have no upstream channel to
+  inherit ``Dh`` from and previously kept the 0.1 m^2 fallback, hiding
+  the face velocity even when flows were known). Converged results for
+  MPCE networks shift by the collector dynamic head; junction loss
+  calibrations (e.g. MPCE-v2 ``joining_etransfer_alpha``) were fitted on
+  the degenerate plumbing and should be revisited against the validation
+  suite. Known consequence: with honest collector stagnation pressures,
+  the v1 impulse rows (``sin^2(theta)`` per-port form, Bassett
+  correspondence derived for separating flow) are energetically
+  inconsistent for JOINING flow -- a v1 merge junction can manufacture
+  flow work and may lose its all-forward root entirely.
+  ``test_step_4_adding_bypass`` migrated its junctions to
+  ``MPCEv2Element`` (the production model, joining-capable by design);
+  the v1 vs K-closure comparison test now seeds the forward basin
+  explicitly since v1's sign-symmetric residuals admit the mirrored
+  all-reverse root from a cold start.
 - **Merging/splitting MomentumChamberNode now refused at build time** (#174).
   MCN's scalar ``Pt = P + 0.5 rho v^2`` closure models a single bulk
   velocity and cannot represent merging or splitting streams within the
