@@ -100,6 +100,44 @@ def test_compressible_channel_network():
     assert dP > 0, "Pressure should drop across channel"
 
 
+def test_compressible_channel_beyond_subsonic_envelope_converges():
+    """A pressure-driven channel demanding more than the subsonic Fanno
+    envelope must converge onto the choke-barrier boundary state.
+
+    The L=1 m, D=0.05 m air channel leaves the subsonic envelope at a Pt
+    ratio of about 1.19. Before L_choke was interpolated within the march
+    step (it snapped to L/n_steps), the choke-barrier ramp was a
+    staircase in m_dot: when the residual zero fell inside a staircase
+    jump this network had no root, and every method/init combination
+    stalled at a tread edge (best |F| ~ 90 at Pt ratio 1.2).
+    """
+    mdots = []
+    for pr in (1.2, 3.0):
+        net = FlowNetwork()
+        net.add_node(PressureBoundary("inlet", Pt=100000.0 * pr, Tt=300.0))
+        net.add_node(PressureBoundary("outlet", Pt=100000.0, Tt=300.0))
+        net.add_element(
+            ChannelElement(
+                "channel",
+                "inlet",
+                "outlet",
+                length=1.0,
+                diameter=0.05,
+                regime="compressible",
+            )
+        )
+        solver = NetworkSolver(net)
+        sol = solver.solve(timeout=30.0)
+        assert sol["__success__"], (
+            f"pr={pr}: {sol.get('__message__')} (|F|={sol.get('__final_norm__')})"
+        )
+        assert sol["channel.m_dot"] > 0
+        mdots.append(sol["channel.m_dot"])
+    # Choked mass flow scales with inlet pressure: the barrier root must
+    # track the envelope boundary, not park at an arbitrary tread.
+    assert mdots[1] > 2.0 * mdots[0]
+
+
 def test_mixed_compressible_incompressible_network():
     """Test network mixing compressible and incompressible elements."""
     net = FlowNetwork()

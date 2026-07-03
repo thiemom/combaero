@@ -215,6 +215,11 @@ NozzleSolution nozzle_cd(
 //
 // Integration via RK4 on p(x), solving for T from energy at each step.
 
+// Mach number at which the Fanno march declares in-channel choking.
+// Slightly below 1 so the RK4 step stays finite near the sonic
+// singularity (dP/dx -> -inf as M -> 1).
+constexpr double kFannoChokeMach = 0.999;
+
 // Result of Fanno flow calculation at a single station
 struct FannoStation {
     double x   = 0.0;    // Position along channel [m]
