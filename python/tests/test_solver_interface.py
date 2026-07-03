@@ -855,6 +855,64 @@ def test_channel_compressible_reverse_flow():
     assert np.isfinite(d_u), "d_dP_du_in should be finite"
 
 
+def test_channel_compressible_supersonic_barrier():
+    """Supersonic inlet must see a steep resistance, not dP = 0.
+
+    fanno_channel_rough stalls at M_in >= 1 (returns outlet == inlet). The
+    solver-facing kernel used to pass that through as dP = 0 with zero m_dot
+    sensitivity, which made the infeasible region a flat Newton attractor
+    with exact spurious network roots (dead branch arms at M ~ 1.1). The
+    barrier replaces it with kappa * P_in plus quadratic growth in u.
+    """
+    T_in, P_in = 300.0, 100000.0
+    X = cb.species.dry_air()
+    L, D, roughness = 1.0, 0.05, 1e-5
+
+    # u = 388 m/s is M ~ 1.12 at 300 K: the previously flat point.
+    dP, _, _, d_u = cb._core.channel_compressible_mdot_and_jacobian(
+        T_in, P_in, 388.0, X, L, D, roughness, "haaland"
+    )
+    assert dP > P_in, "supersonic request must be at least the kappa * P_in barrier"
+    assert d_u > 0, "barrier must keep pushing u back toward the feasible branch"
+
+
+def test_channel_compressible_dp_monotone_through_choke():
+    """dP(u) must increase monotonically across feasible, in-channel-choked,
+    and supersonic-inlet regions -- no flat or folded stretch anywhere, so
+    the channel row never stops constraining its m_dot unknown."""
+    T_in, P_in = 300.0, 100000.0
+    X = cb.species.dry_air()
+    L, D, roughness = 1.0, 0.05, 1e-5
+
+    prev = None
+    for u in np.arange(20.0, 500.0, 10.0):
+        dP, _, _, d_u = cb._core.channel_compressible_mdot_and_jacobian(
+            T_in, P_in, float(u), X, L, D, roughness, "haaland"
+        )
+        assert np.isfinite(dP)
+        assert d_u > 0, f"zero/negative m_dot sensitivity at u={u}"
+        if prev is not None:
+            assert dP > prev, f"dP(u) not monotone at u={u}"
+        prev = dP
+
+
+def test_channel_compressible_supersonic_reverse_antisymmetric():
+    """The barrier must preserve the reverse-flow sign convention."""
+    T_in, P_in = 300.0, 100000.0
+    X = cb.species.dry_air()
+    L, D, roughness = 1.0, 0.05, 1e-5
+
+    dP_fwd, _, _, d_u_fwd = cb._core.channel_compressible_mdot_and_jacobian(
+        T_in, P_in, 400.0, X, L, D, roughness, "haaland"
+    )
+    dP_rev, _, _, d_u_rev = cb._core.channel_compressible_mdot_and_jacobian(
+        T_in, P_in, -400.0, X, L, D, roughness, "haaland"
+    )
+    np.testing.assert_allclose(dP_rev, -dP_fwd, rtol=1e-12)
+    assert d_u_fwd > 0
+    assert d_u_rev > 0, "slope of an odd increasing dP(u) is positive on both sides"
+
+
 def test_compressible_network_scenario():
     """Test compressible elements in a realistic network scenario.
 

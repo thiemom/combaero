@@ -587,13 +587,21 @@ def _mpce_tee_network(
 
 
 def test_analytical_pt_prop_rescues_cold_stuck_case():
-    """Case #4 from the LHS-32 audit: cold_baseline, incompressible_warmstart,
-    and homotopy all stall in the wrong Newton basin at |F|~3111 even with
-    a 120 s budget. analytical_pt_prop lands the correct basin in ~110 evals.
+    """Case #4 from the LHS-32 audit, with both solver-review fixes in:
+    the choke barrier (this PR) and the honest collector-port closure
+    (#212). Their interplay flipped this test twice:
 
-    Verifies both that the new strategy is wired end-to-end and that its
-    convergence advantage on this audited-hard case survives as a
-    regression check.
+    - pre-barrier, pre-#212: cold start stalled at |F|~3111 in the choked
+      flat region; analytical_pt_prop escaped in ~110 evals (the original
+      #210 rescue claim, but its long hybr trajectory through the barrier
+      region proved platform-sensitive on CI).
+    - barrier alone: the flat attractor was the whole story -- the default
+      cold start converged in seconds and analytical was no faster.
+    - barrier + honest closure (this, final state): the v1 impulse merge's
+      root structure changed; the default cold start stalls at |F|~1e5
+      again, while analytical_pt_prop converges DIRECTLY in ~1-2 s (no
+      LM-fallback marathon). The rescue semantics are restored with
+      comfortable margin.
     """
     net = _mpce_tee_network(
         pt_ratio=1.8385290361105023,
@@ -602,16 +610,9 @@ def test_analytical_pt_prop_rescues_cold_stuck_case():
         flow_direction="merge",
     )
     solver = NetworkSolver(net)
-    # Local timing: converges in ~18s / 113 evals on macOS. CI Linux runners
-    # are ~2x slower; 180s ceiling keeps the regression guard meaningful
-    # (strategy that no longer converges will still trip fast) while
-    # tolerating the platform gap.
-    sol = solver.solve(
-        method="hybr",
-        init_strategy="analytical_pt_prop",
-        timeout=180.0,
-        options={"maxfev": 400},
-    )
+    # Local timing: ~1s with lm from the analytical seed; 180s ceiling
+    # tolerates slower CI runners.
+    sol = solver.solve(method="lm", init_strategy="analytical_pt_prop", timeout=180.0)
     assert sol["__success__"], f"analytical_pt_prop failed: {sol.get('__message__')}"
     assert sol["__final_norm__"] < 1e-3
     # Mass conservation at the merge junction (sum of port flows into the
@@ -765,6 +766,44 @@ def test_mpce_collector_port_mcn_inherits_area():
     assert net.nodes["mc_str"].area == pytest.approx(A_main, rel=1e-12)
     assert net.nodes["mc_bra"].area == pytest.approx(A_bra, rel=1e-12)
     assert net.nodes["mc_bra"].Dh == pytest.approx(D_bra, rel=1e-12)
+
+
+def test_choke_barrier_rejects_dead_branch_spurious_root():
+    """Regression for the choked-channel flat region (solver review, 2026-07).
+
+    Before the choke barrier in channel_compressible_mdot_and_jacobian, the
+    state below was an EXACT root (|F| ~ 3e-7) of the branch tee: the branch
+    arm dead (m_dot = 0) and the straight arm carrying the full 0.883 kg/s at
+    M ~ 1.1 with zero total-pressure drop, because choked channels reported
+    dP = 0 with zero m_dot sensitivity. With the barrier, the straight
+    channel's row must now show a large residual at this state.
+    """
+    net = _mpce_tee_network(
+        pt_ratio=2.0,
+        theta_deg=45.0,
+        psi=1.0,
+        flow_direction="branch",
+    )
+    solver = NetworkSolver(net)
+    x = solver._build_x0()
+    spurious = {
+        "mc_com.P": 100000.0,
+        "mc_com.Pt": 187100.39,
+        "mc_str.P": 100000.0,
+        "mc_str.Pt": 100000.0,
+        "mc_bra.P": 100000.0,
+        "mc_bra.Pt": 100000.0,
+        "jct.P_jct": 100000.0,
+        "ch_in.m_dot": 0.8831240560197469,
+        "ch_str.m_dot": 0.8831240560197469,
+        "ch_bra.m_dot": 0.0,
+    }
+    for name, val in spurious.items():
+        x[solver._name_to_index[name]] = val
+    res = solver._residuals(x)
+    assert float(np.linalg.norm(res)) > 1e4, (
+        "choked dead-branch state must no longer be a root of the network"
+    )
 
 
 def test_analytical_pt_prop_rejects_unknown_strategy_name():

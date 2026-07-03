@@ -195,6 +195,25 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
     const std::vector<double>& Y_up,
     double P_static_down, double Cd, double area, double beta);
 
+// Infeasible-flow barrier constants for the solver-facing compressible
+// channel residual.
+//
+// fanno_channel_rough reports choked flow by truncating the march: at
+// M_in >= 1 it returns outlet == inlet (dP = 0, zero slope), and for
+// in-channel choking (L_choke < L) the reported friction drop collapses
+// toward zero as the requested velocity approaches sonic. A Newton solver
+// reads that as "no resistance", which turns the infeasible region into a
+// flat attractor with exact spurious network roots (dead branch arms,
+// reversed supplies). channel_compressible_mdot_and_jacobian therefore
+// replaces the truncated result with a monotone barrier:
+//   in-channel choking: dP = dP_truncated + kappa * P_in * (1 - L_choke/L)
+//   supersonic inlet:   dP = kappa * P_in + (beta/2) * rho_in * (u^2 - a^2)
+// Both branches are continuous at their region boundaries and increase with
+// the depth of infeasibility, so the residual always pushes m_dot back
+// toward the feasible branch.
+constexpr double kChannelChokeBarrierKappa = 1.0;
+constexpr double kChannelChokeBarrierBeta = 2.0;
+
 // Compressible channel flow using Fanno model with variable friction.
 //
 // Method: Finite Difference Jacobians (fanno_channel_rough is iterative)
