@@ -157,6 +157,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   before. The previously-spurious dead-branch state now evaluates at
   |F| > 1e4 (regression-tested); such cases honestly report
   non-convergence instead of silently returning a wrong flow split.
+  Notable interplay with the port-throughflow fix (#212): the |F|~3111
+  cold-start stall on audit case #4 was the flat region itself (with the
+  barrier alone the default cold start converges the case in seconds),
+  but the honest collector closure changes the v1 impulse merge's root
+  structure so the default cold start stalls again -- while
+  ``analytical_pt_prop`` now converges the case directly in ~1-2 s
+  instead of the earlier ~110-eval marathon. The #210 regression test
+  keeps its rescue semantics with the updated timings. The LHS-32
+  audit's strategy comparison predates both fixes and should be re-run
+  before designing the auto/fallback init strategy.
 - **Merging/splitting MomentumChamberNode now refused at build time** (#174).
   MCN's scalar ``Pt = P + 0.5 rho v^2`` closure models a single bulk
   velocity and cannot represent merging or splitting streams within the
