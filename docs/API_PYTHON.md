@@ -389,7 +389,11 @@ graph = FlowNetwork()
 graph.add_element(OrificeElement("ori1", "nodeA", "nodeB", Cd=0.6, diameter=0.011284))
 
 solver = NetworkSolver(graph)
-# init_strategy options: "default", "incompressible_warmstart", "homotopy"
+# init_strategy options: "default", "analytical_pt_prop", "homotopy",
+# "continuation", "incompressible_warmstart" (deprecated).
+# "default" auto-upgrades to "analytical_pt_prop" for networks that
+# contain a MultiPortChamberElement; pass another strategy or an
+# explicit x0 to opt out.
 results = solver.solve(method="hybr", init_strategy="homotopy")
 ```
 

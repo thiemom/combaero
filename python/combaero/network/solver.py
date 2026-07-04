@@ -1415,15 +1415,18 @@ class NetworkSolver:
                 previous solution's ``_last_x`` for warm-starting
                 parameter sweeps.
             init_strategy: Initialization strategy. ``default`` uses
-                direct x0 construction; ``incompressible_warmstart``
-                first solves an incompressible-regime proxy network and
-                uses that solution as x0; ``analytical_pt_prop`` seeds
-                topology-aware initial guesses (channel Bernoulli m_dot
-                + MPCE junction P_jct at the common port), targeting
-                MPCE compressible cold-start cases where the solver's
-                default per-element uniform dP fallback lands Newton in
-                a wrong basin (see LHS-32 audit
-                ``tmp/mpce_cold_start_audit.py``).
+                direct x0 construction; for networks containing a
+                ``MultiPortChamberElement`` it auto-upgrades to
+                ``analytical_pt_prop`` (32/32 vs 28/32 certified-root
+                convergence on the 2026-07 inverse-design audit,
+                ``tmp/mpce_audit_v2_runner.py``) -- pass another
+                strategy or an explicit ``x0`` to opt out.
+                ``analytical_pt_prop`` seeds topology-aware initial
+                guesses (channel Bernoulli m_dot + MPCE junction P_jct
+                at the common port). ``incompressible_warmstart``
+                (DEPRECATED: 10/32 on the same audit at ~10x the wall
+                time) first solves an incompressible-regime proxy
+                network and uses that solution as x0.
             warmstart_maxfev: Maximum function evaluations for the
                 incompressible proxy solve when
                 ``init_strategy='incompressible_warmstart'``.
@@ -1460,9 +1463,39 @@ class NetworkSolver:
         if method != "hybr" and "maxfev" in options:
             options.setdefault("maxiter", options.pop("maxfev"))
 
+        if init_strategy == "incompressible_warmstart":
+            warnings.warn(
+                "init_strategy='incompressible_warmstart' is deprecated. "
+                "On the certified MPCE cold-start audit (2026-07) it "
+                "converged 10/32 cases at ~10x the wall time of "
+                "'analytical_pt_prop' (32/32). Use 'analytical_pt_prop' "
+                "or leave init_strategy='default'.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         # Ensure topology is resolved before solving
         self.network.resolve_all_topology()
         self.network.validate()
+
+        # MPCE networks auto-upgrade the default initialization to the
+        # analytical Pt-propagation seeds: on the certified inverse-design
+        # audit (tmp/mpce_audit_v2_*, 2026-07-04) analytical_pt_prop
+        # converged 32/32 to the certified root vs 28/32 for the plain
+        # cold start, and was the fastest strategy overall. Explicitly
+        # passing any other init_strategy (or an x0) opts out.
+        # The incompressible_warmstart proxy solve passes "default" and
+        # must keep the legacy plain cold start (flag below), otherwise
+        # the deprecated strategy's behavior silently changes.
+        if (
+            x0 is None
+            and init_strategy == "default"
+            and not getattr(self, "_in_warmstart_proxy", False)
+        ):
+            from .components import MultiPortChamberElement as _MPCElem
+
+            if any(isinstance(e, _MPCElem) for e in self.network.elements.values()):
+                init_strategy = "analytical_pt_prop"
 
         # analytical_pt_prop seeds channel m_dot + MPCE P_jct through the
         # regular _build_x0 path via self._init_overrides. _build_x0 reads
@@ -1512,14 +1545,17 @@ class NetworkSolver:
                     self.network.resolve_all_topology()
 
                     warm_options = {"maxfev": int(warmstart_maxfev)}
-                    warm_sol = self.solve(
-                        method="hybr",
-                        timeout=timeout,
-                        options=warm_options,
-                        use_jac=use_jac,
-                        x0=None,
-                        init_strategy="default",
-                    )
+                    self._in_warmstart_proxy = True
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore", DeprecationWarning)
+                        warm_sol = self.solve(
+                            method="hybr",
+                            timeout=timeout,
+                            options=warm_options,
+                            use_jac=use_jac,
+                            x0=None,
+                            init_strategy="default",
+                        )
 
                     if bool(warm_sol.get("__success__", False)):
                         candidate = getattr(self, "_last_x", None)
@@ -1533,6 +1569,7 @@ class NetworkSolver:
                         stacklevel=2,
                     )
                 finally:
+                    self._in_warmstart_proxy = False
                     for elem_id, regime in original_regimes.items():
                         self.network.elements[elem_id].regime = regime
                     self.network.resolve_all_topology()
