@@ -298,9 +298,13 @@ class ThermalWallData(BaseModel):
 class SolverSettings(BaseModel):
     model_config = ConfigDict(extra="ignore")
     global_regime: Literal["incompressible", "compressible"] = "incompressible"
-    init_strategy: Literal["default", "incompressible_warmstart", "homotopy", "continuation"] = (
-        "default"
-    )
+    init_strategy: Literal[
+        "default",
+        "analytical_pt_prop",
+        "incompressible_warmstart",
+        "homotopy",
+        "continuation",
+    ] = "default"
     method: Literal[
         "hybr",
         "lm",

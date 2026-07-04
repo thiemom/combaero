@@ -854,6 +854,58 @@ def test_analytical_pt_prop_rejects_unknown_strategy_name():
         solver.solve(init_strategy="analytical_pt_property")  # type: ignore[arg-type]
 
 
+def test_mpce_network_default_init_auto_upgrades():
+    """MPCE networks silently upgrade init_strategy='default' to
+    'analytical_pt_prop' (32/32 vs 28/32 certified-root convergence on
+    the 2026-07 inverse-design audit)."""
+    net = _mpce_tee_network(
+        pt_ratio=1.5,
+        theta_deg=60.0,
+        psi=1.0,
+        flow_direction="branch",
+    )
+    solver = NetworkSolver(net)
+    _ = solver.solve(timeout=10.0, options={"maxfev": 5})
+    used = solver._diagnostic_data["solver_settings_used"]["init_strategy"]
+    assert used == "analytical_pt_prop"
+
+
+def test_non_mpce_network_default_init_unchanged():
+    """Networks without an MPCE keep the plain default initialization."""
+    net = FlowNetwork()
+    net.add_node(PressureBoundary("in", Pt=200000.0, Tt=300.0))
+    net.add_node(PressureBoundary("out", Pt=100000.0, Tt=300.0))
+    net.add_element(OrificeElement("orf", "in", "out", 0.6, 0.05, correlation="fixed"))
+    solver = NetworkSolver(net)
+    _ = solver.solve(timeout=10.0)
+    used = solver._diagnostic_data["solver_settings_used"]["init_strategy"]
+    assert used == "default"
+
+
+def test_mpce_explicit_strategy_opts_out_of_auto_upgrade():
+    """Passing a non-default init_strategy suppresses the MPCE upgrade."""
+    net = _mpce_tee_network(
+        pt_ratio=1.5,
+        theta_deg=60.0,
+        psi=1.0,
+        flow_direction="branch",
+    )
+    solver = NetworkSolver(net)
+    _ = solver.solve(init_strategy="homotopy", timeout=10.0, options={"maxfev": 5})
+    used = solver._diagnostic_data["solver_settings_used"]["init_strategy"]
+    assert used == "homotopy"
+
+
+def test_incompressible_warmstart_deprecated():
+    net = FlowNetwork()
+    net.add_node(PressureBoundary("in", Pt=200000.0, Tt=300.0))
+    net.add_node(PressureBoundary("out", Pt=100000.0, Tt=300.0))
+    net.add_element(OrificeElement("orf", "in", "out", 0.6, 0.05, correlation="fixed"))
+    solver = NetworkSolver(net)
+    with pytest.warns(DeprecationWarning, match="incompressible_warmstart"):
+        _ = solver.solve(init_strategy="incompressible_warmstart", timeout=10.0)
+
+
 def test_analytical_pt_prop_respects_user_initial_guess():
     """User-provided initial_guess on a channel wins over the analytical seed."""
     net = _mpce_tee_network(

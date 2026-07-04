@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **MPCE networks now default to ``analytical_pt_prop`` initialization.**
+  ``NetworkSolver.solve(init_strategy="default")`` auto-upgrades to
+  ``analytical_pt_prop`` when the network contains a
+  ``MultiPortChamberElement``; passing any other strategy or an
+  explicit ``x0`` opts out, and the strategy actually used is recorded
+  in ``solver_settings_used``. Evidence: on the certified inverse-design
+  audit (``tmp/mpce_audit_v2_generator.py`` + ``_runner.py``, 32
+  feasible fixtures with stored ground-truth roots), analytical
+  converged 32/32 to the certified root and was the fastest strategy
+  overall (41 s total), vs 28/32 for the plain cold start and
+  homotopy. The GUI ``SolverSettings`` schema now accepts
+  ``analytical_pt_prop`` explicitly. NOTE: the earlier LHS-32 audit
+  numbers (complementary default/analytical partition) are void -- that
+  fixture family was later shown to be infeasible for any physical tee
+  closure (equal-Pt sinks + constant-area legs demand static recovery
+  the model set cannot represent).
+
+### Deprecated
+- **``init_strategy="incompressible_warmstart"``** now emits a
+  ``DeprecationWarning``. On the certified audit it converged 10/32 at
+  roughly 10x the wall time of ``analytical_pt_prop`` (409 s vs 41 s
+  total); on a real GUI tee network it needed 445 evaluations vs 31
+  for the cold start. The incompressible proxy seeds a low-residual but
+  poorly conditioned region for the compressible restart. Will be
+  removed once the GUI drops the option.
+
 ### Removed
 - **``tee_junction`` (Bassett K-closure) retired from the GUI** (#177).
   ``MPCE Tee`` (``mpce_tee``, momentum-CV closure) is now the sole
