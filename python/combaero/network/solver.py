@@ -1416,11 +1416,16 @@ class NetworkSolver:
                 parameter sweeps.
             init_strategy: Initialization strategy. ``default`` uses
                 direct x0 construction; for networks containing a
-                ``MultiPortChamberElement`` it auto-upgrades to
+                ``MultiPortChamberElement`` AND at least two
+                ``PressureBoundary`` nodes it auto-upgrades to
                 ``analytical_pt_prop`` (32/32 vs 28/32 certified-root
                 convergence on the 2026-07 inverse-design audit,
                 ``tmp/mpce_audit_v2_runner.py``) -- pass another
-                strategy or an explicit ``x0`` to opt out.
+                strategy or an explicit ``x0`` to opt out. The >= 2 PB
+                requirement exists because the strategy's Pt
+                propagation needs a boundary pressure gradient: on
+                MFB-driven networks it seeds reversed channel m_dots
+                from path-length artifacts.
                 ``analytical_pt_prop`` seeds topology-aware initial
                 guesses (channel Bernoulli m_dot + MPCE junction P_jct
                 at the common port). ``incompressible_warmstart``
@@ -1487,6 +1492,15 @@ class NetworkSolver:
         # The incompressible_warmstart proxy solve passes "default" and
         # must keep the legacy plain cold start (flag below), otherwise
         # the deprecated strategy's behavior silently changes.
+        # The upgrade additionally requires >= 2 PressureBoundary nodes:
+        # the strategy's Pt propagation needs a boundary pressure
+        # gradient to be meaningful. On MFB-driven networks with a
+        # single PB, propagated per-node Pt differences are path-length
+        # artifacts and the Bernoulli sign logic seeds REVERSED channel
+        # m_dots, parking the first iterate inside the junctions'
+        # soft-barrier region (observed on a real 5-tee GUI network:
+        # |F(x0)| = 1.15e6 of pure penalty, hybr immediately stuck,
+        # while the plain cold start converges in 16 evals).
         if (
             x0 is None
             and init_strategy == "default"
@@ -1494,7 +1508,8 @@ class NetworkSolver:
         ):
             from .components import MultiPortChamberElement as _MPCElem
 
-            if any(isinstance(e, _MPCElem) for e in self.network.elements.values()):
+            _n_pb = sum(isinstance(n, PressureBoundary) for n in self.network.nodes.values())
+            if _n_pb >= 2 and any(isinstance(e, _MPCElem) for e in self.network.elements.values()):
                 init_strategy = "analytical_pt_prop"
 
         # analytical_pt_prop seeds channel m_dot + MPCE P_jct through the
