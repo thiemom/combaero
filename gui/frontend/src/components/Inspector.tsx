@@ -238,7 +238,12 @@ const Inspector = () => {
 					</div>
 				)}
 				<h2 className="text-lg font-bold border-b pb-2 capitalize flex justify-between items-center">
-					<span>{(selectedNode.type || "unknown").replace("_", " ")} Node</span>
+					<span>
+						{selectedNode.type === "mpce_tee"
+							? "Tee"
+							: (selectedNode.type || "unknown").replace("_", " ")}{" "}
+						Node
+					</span>
 					<div className="flex gap-2">
 						<button
 							type="button"
@@ -1289,6 +1294,13 @@ const Inspector = () => {
 
 						return (
 							<div className="flex flex-col gap-4">
+								{/* Model explainer: the canvas calls this element just
+								    "Tee"; the underlying model name lives here. */}
+								<div className="text-[9px] leading-snug text-stone-500 italic">
+									Momentum-based multi-port chamber junction (MPCE): a
+									momentum-control-volume tee model (Mynard closure) for
+									splitting ("branch") and joining ("merge") flow.
+								</div>
 								{/* Port legend (MPCE indigo / rose theme) */}
 								<div className="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-[9px] leading-snug text-stone-600">
 									<div className="font-bold uppercase text-stone-400 mb-1">

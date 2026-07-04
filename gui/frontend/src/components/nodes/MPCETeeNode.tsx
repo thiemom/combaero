@@ -64,7 +64,7 @@ const MPCETeeNode = ({ id, data, selected }: NodeProps) => {
 				style={{ transform: `rotate(${textRotation}deg)` }}
 			>
 				<div className="text-[10px] font-bold uppercase leading-none whitespace-nowrap">
-					{data.label ? data.label : "MPCE Tee"}
+					{data.label ? data.label : "Tee"}
 				</div>
 				<div
 					className={`text-[9px] font-mono whitespace-nowrap ${isMerge ? "text-indigo-500" : "text-rose-500"}`}

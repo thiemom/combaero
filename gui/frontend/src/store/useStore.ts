@@ -41,6 +41,7 @@ export interface RFState {
 		global_regime: "incompressible" | "compressible";
 		init_strategy:
 			| "default"
+			| "analytical_pt_prop"
 			| "incompressible_warmstart"
 			| "homotopy"
 			| "continuation";

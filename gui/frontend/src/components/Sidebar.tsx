@@ -56,15 +56,20 @@ const Sidebar = () => {
 		check();
 	}, [solverSettings, solveResults]);
 
-	const resetAllInitialGuesses = () => {
+	// True reset: clears explicit initial-guess overrides AND stored solve
+	// results. The graph builder warm-starts from node.data.result whenever
+	// initial_guess is empty, so clearing guesses alone would silently
+	// RE-ENABLE result-based seeding instead of giving a cold start. After
+	// this, the next solve behaves like a freshly built network.
+	const resetGuessesAndResults = () => {
 		let touched = 0;
 		const next = nodes.map((n) => {
-			if (
-				n.data?.initial_guess &&
-				Object.keys(n.data.initial_guess).length > 0
-			) {
+			const hasGuess =
+				n.data?.initial_guess && Object.keys(n.data.initial_guess).length > 0;
+			const hasResult = n.data?.result != null;
+			if (hasGuess || hasResult) {
 				touched += 1;
-				const { initial_guess: _ig, ...rest } = n.data;
+				const { initial_guess: _ig, result: _res, ...rest } = n.data;
 				return { ...n, data: { ...rest, initial_guess: {} } };
 			}
 			return n;
@@ -288,7 +293,7 @@ const Sidebar = () => {
 				draggable
 			>
 				<Split size={18} className="text-indigo-500" />
-				<span>MPCE Tee</span>
+				<span>Tee</span>
 			</button>
 
 			<button
@@ -351,7 +356,10 @@ const Sidebar = () => {
 						}
 					>
 						<option value="default">Default Cold Start</option>
-						<option value="incompressible_warmstart">Incomp. Warmstart</option>
+						<option value="analytical_pt_prop">Analytical (Pt Prop.)</option>
+						<option value="incompressible_warmstart">
+							Incomp. Warmstart (deprecated)
+						</option>
 						<option value="homotopy">Load-Stepping (Homotopy)</option>
 						<option
 							value="continuation"
@@ -404,11 +412,11 @@ const Sidebar = () => {
 				<div className="border-t border-stone-200 pt-2 flex flex-col gap-2">
 					<button
 						type="button"
-						onClick={resetAllInitialGuesses}
+						onClick={resetGuessesAndResults}
 						className="w-full text-[10px] font-bold uppercase tracking-wider bg-white hover:bg-amber-50 text-amber-700 border border-amber-200 rounded px-2 py-1.5 transition-colors"
-						title="Clear initial-guess overrides on every node and element; solver reverts to auto-seeding"
+						title="Clear initial-guess overrides AND stored solve results on every node; the next solve starts cold, like a freshly built network"
 					>
-						Reset All Initial Guesses
+						Reset Guesses & Results
 					</button>
 
 					{solveResults && (solveResults as any).isTopologyMismatch && (
