@@ -35,6 +35,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   removed once the GUI drops the option.
 
 ### Fixed
+- **The MPCE ``analytical_pt_prop`` auto-upgrade now requires >= 2
+  ``PressureBoundary`` nodes.** The strategy's Pt propagation needs a
+  boundary pressure gradient to be meaningful. On MFB-driven networks
+  with a single PB (the common GUI pattern: mass inlet -> tee tree ->
+  one pressure sink), propagated per-node Pt differences are
+  path-length artifacts and the Bernoulli sign logic seeded REVERSED
+  channel m_dots -- parking the first iterate inside the junctions'
+  soft-barrier penalty region (|F(x0)| ~ 1.15e6 of pure penalty on a
+  real 5-tee GUI network, hybr immediately "not making good progress")
+  while the plain cold start converges in 16 evaluations. Such
+  networks now keep the plain default initialization. The certified
+  audit result behind the auto-upgrade is unaffected (all 32 fixtures
+  are PB-driven).
 - **GUI ``mpce_tee`` junctions are now built with ``strict=False``.**
   Strict mode raises whenever a Newton ITERATE (not the converged
   answer) explores a wrong-sign port m_dot, killing GUI solves that

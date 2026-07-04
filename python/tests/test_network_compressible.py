@@ -896,6 +896,25 @@ def test_mpce_explicit_strategy_opts_out_of_auto_upgrade():
     assert used == "homotopy"
 
 
+def test_mfb_driven_mpce_network_keeps_plain_default_init():
+    """MFB-driven MPCE networks (< 2 PressureBoundaries) must NOT
+    auto-upgrade to analytical_pt_prop.
+
+    The strategy's Pt propagation needs a boundary pressure gradient.
+    With a single PB the propagated per-node Pt differences are
+    path-length artifacts and the Bernoulli sign logic seeds REVERSED
+    channel m_dots, parking the first iterate inside the junctions'
+    soft-barrier penalty region (|F(x0)| ~ 1e6 observed on a real
+    5-tee GUI network) while the plain cold start converges.
+    """
+    net = _mpce_mfb_merge_network()
+    solver = NetworkSolver(net)
+    sol = solver.solve(timeout=30.0)
+    used = solver._diagnostic_data["solver_settings_used"]["init_strategy"]
+    assert used == "default"
+    assert sol["__success__"], sol.get("__message__")
+
+
 def test_incompressible_warmstart_deprecated():
     net = FlowNetwork()
     net.add_node(PressureBoundary("in", Pt=200000.0, Tt=300.0))
