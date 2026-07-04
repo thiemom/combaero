@@ -35,6 +35,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   removed once the GUI drops the option.
 
 ### Fixed
+- **GUI ``mpce_tee`` junctions are now built with ``strict=False``.**
+  Strict mode raises whenever a Newton ITERATE (not the converged
+  answer) explores a wrong-sign port m_dot, killing GUI solves that
+  would otherwise converge with "Unexpected error during residual
+  evaluation: MPCEv2Element ... declared flow_direction=... but
+  observed wrong flow direction". Soft mode lets the solver explore
+  wrong-direction states transiently; the post-solve
+  ``verify_solution_consistent`` guard (see entry below) rejects any
+  wrong-direction artifact root at convergence, so this switch does
+  not admit silently wrong answers.
 - **Soft-barrier artifact roots are demoted to honest failures.**
   ``MPCEv2Element`` with ``strict=False`` replaces a wrong-direction
   port's physics row with Pt continuity plus a one-sided penalty
