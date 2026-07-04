@@ -100,6 +100,11 @@ def test_mpce_tee_branch_builds_separating_element():
     e = _get_element(net, "mpce")
     assert isinstance(e, MPCEv2Element)
     assert e.flow_direction == "branch"
+    assert e.strict is False, (
+        "GUI junctions must use soft mode: strict raises on transient "
+        "wrong-sign Newton iterates and kills solves that would converge; "
+        "the post-solve direction guard rejects artifact roots instead"
+    )
     assert len(e.inlet_nodes) == 1
     assert len(e.outlet_nodes) == 2
     assert e.port_angles_deg == [0.0, 0.0, 45.0]
@@ -111,6 +116,7 @@ def test_mpce_tee_merge_builds_joining_element():
     e = _get_element(net, "mpce")
     assert isinstance(e, MPCEv2Element)
     assert e.flow_direction == "merge"
+    assert e.strict is False
     assert len(e.inlet_nodes) == 2
     assert len(e.outlet_nodes) == 1
     assert e.port_angles_deg == [0.0, 45.0, 0.0]

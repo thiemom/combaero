@@ -586,6 +586,13 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 _outlet_angles = [0.0]
                 _port_areas = [_F_C, _A_branch, _F_C]
 
+            # strict=False: strict mode raises whenever a Newton ITERATE
+            # (not the converged answer) explores a wrong-sign port
+            # m_dot, killing GUI solves that would otherwise converge
+            # ("Unexpected error during residual evaluation"). Soft mode
+            # lets the solver explore; the post-solve
+            # verify_solution_consistent guard in NetworkSolver rejects
+            # any wrong-direction artifact root at convergence.
             _mpce = MPCEv2Element(
                 id=elem_id,
                 inlet_nodes=_inlets,
@@ -594,6 +601,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 outlet_angles_deg=_outlet_angles,
                 port_areas=_port_areas,
                 flow_direction=_md.flow_direction,
+                strict=False,
                 joining_etransfer_alpha=_md.joining_etransfer_alpha,
             )
             _mpce.initial_guess = _expand_initial_guess(_md.initial_guess, elem_id)
