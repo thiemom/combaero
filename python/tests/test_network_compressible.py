@@ -929,3 +929,134 @@ def test_analytical_pt_prop_respects_user_initial_guess():
     assert solver._init_overrides == {}
     # And the user value survived in the source of truth (not clobbered).
     assert net.elements["ch_in"].initial_guess["ch_in.m_dot"] == 42.0
+
+
+def _certified_merge_case1_network() -> FlowNetwork:
+    """Certified audit case 1 (merge, exact-root fixture, 2026-07-04).
+
+    Constants from tmp/mpce_audit_v2_cases.jsonl: an inverse-designed
+    merge tee whose certified root has both feeds flowing forward
+    (m_str=0.2576, m_bra=0.2129). The strict=False soft-barrier system
+    additionally admits an EXACT artifact root with the branch feed
+    slightly reversed (-0.0035 kg/s), where the one-sided penalty
+    cancels the Pt-continuity mismatch.
+    """
+    from combaero.network.mpce_v2_element import MPCEv2Element
+
+    D_com = 0.08
+    A_com = math.pi * (D_com / 2.0) ** 2
+    psi = 0.6823922768792331
+    A_bra = A_com / psi
+    D_bra = 2.0 * math.sqrt(A_bra / math.pi)
+    theta = 59.990127553939544
+    net = FlowNetwork()
+    net.add_node(PressureBoundary("pb_hi_str", Pt=114712.54467660612, Tt=300.0))
+    net.add_node(PressureBoundary("pb_hi_bra", Pt=113912.05698248411, Tt=300.0))
+    net.add_node(PressureBoundary("pb_lo", Pt=1.0e5, Tt=300.0))
+    net.add_node(MomentumChamberNode("mc_str", area=A_com))
+    net.add_node(MomentumChamberNode("mc_bra", area=A_bra))
+    net.add_node(MomentumChamberNode("mc_com", area=A_com))
+    net.add_node(MomentumChamberNode("n2_com", area=A_com))
+    net.add_element(
+        ChannelElement(
+            "ch_str",
+            "pb_hi_str",
+            "mc_str",
+            length=1.0,
+            diameter=D_com,
+            regime="compressible",
+        )
+    )
+    net.add_element(
+        ChannelElement(
+            "ch_bra",
+            "pb_hi_bra",
+            "mc_bra",
+            length=1.0,
+            diameter=D_bra,
+            regime="compressible",
+        )
+    )
+    net.add_element(
+        ChannelElement(
+            "ch_out",
+            "mc_com",
+            "n2_com",
+            length=1.0,
+            diameter=D_com,
+            regime="compressible",
+        )
+    )
+    net.add_element(
+        OrificeElement(
+            "orf_out",
+            "n2_com",
+            "pb_lo",
+            Cd=0.62,
+            diameter=0.06559708398216724,
+            regime="compressible",
+            correlation="fixed",
+        )
+    )
+    net.add_element(
+        MPCEv2Element(
+            id="jct",
+            inlet_nodes=["mc_str", "mc_bra"],
+            outlet_nodes=["mc_com"],
+            inlet_angles_deg=[0.0, theta],
+            outlet_angles_deg=[0.0],
+            port_areas=[A_com, A_bra, A_com],
+            flow_direction="merge",
+            strict=False,
+        )
+    )
+    return net
+
+
+def test_soft_barrier_artifact_root_demoted_to_failure():
+    """A converged wrong-direction soft-barrier root must NOT be
+    reported as success.
+
+    The one-sided penalty alpha * mdot^2 on a slightly reversed port can
+    exactly cancel that row's Pt-continuity mismatch, giving |F| ~ 1e-10
+    at a state the strict residual rejects (raises). Seeding the solve
+    AT that artifact root makes the demotion deterministic: the solver
+    "converges" immediately, then the post-solve direction verification
+    must fail it.
+    """
+    artifact_root = {
+        "mc_str.P": 110171.3996,
+        "mc_str.Pt": 114033.6720,
+        "mc_bra.P": 113912.0118,
+        "mc_bra.Pt": 113912.0971,
+        "mc_com.P": 110227.2258,
+        "mc_com.Pt": 114033.6720,
+        "n2_com.P": 109529.0722,
+        "n2_com.Pt": 113359.7813,
+        "ch_str.m_dot": 0.49797,
+        "ch_bra.m_dot": -0.00349,
+        "ch_out.m_dot": 0.49448,
+        "orf_out.m_dot": 0.49448,
+        "jct.P_jct": 114033.6720,
+    }
+    net = _certified_merge_case1_network()
+    solver = NetworkSolver(net)
+    net.resolve_all_topology()
+    x0 = solver._build_x0()
+    for name, val in artifact_root.items():
+        x0[solver._name_to_index[name]] = val
+    with pytest.warns(UserWarning, match="artifact root"):
+        sol = solver.solve(x0=x0, timeout=30.0)
+    assert not sol["__success__"]
+    assert "artifact root" in sol["__message__"]
+
+
+def test_certified_merge_root_passes_direction_verification():
+    """The genuine all-forward root of the same fixture stays a success."""
+    net = _certified_merge_case1_network()
+    solver = NetworkSolver(net)
+    sol = solver.solve(timeout=30.0)
+    assert sol["__success__"], sol.get("__message__")
+    # Certified ground truth from the inverse-design generator.
+    assert abs(sol["ch_str.m_dot"] - 0.25761378909667976) < 5e-3
+    assert abs(sol["ch_bra.m_dot"] - 0.21294516374058128) < 5e-3
