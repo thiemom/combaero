@@ -1872,6 +1872,34 @@ class NetworkSolver:
                 except Exception:
                     pass
 
+        # Post-solve direction verification for constrained junctions.
+        # strict=False soft-barrier mode can manufacture EXACT artifact
+        # roots: the one-sided penalty alpha * mdot^2 on a slightly
+        # reversed port can cancel that row's Pt-continuity mismatch, so
+        # the solver converges (|F| ~ 1e-10) to a wrong-direction state
+        # (exposed by constant-K warm starts on the certified audit,
+        # 2026-07-04: a merge feed reversed to -0.0035 kg/s while the
+        # strict residual raises at the same state). Demote such
+        # solutions to honest failures instead of reporting them.
+        if success:
+            _sol_names = dict(zip(self.unknown_names, final_x, strict=False))
+            _bad_junctions = [
+                eid
+                for eid, element in self.network.elements.items()
+                if hasattr(element, "verify_solution_consistent")
+                and not element.verify_solution_consistent(_sol_names)
+            ]
+            if _bad_junctions:
+                success = False
+                message = (
+                    "Converged to a wrong-direction artifact root at "
+                    f"junction(s) {_bad_junctions}: the soft-barrier "
+                    "penalty balanced the residual with reversed or zero "
+                    "port flow. Treating as non-converged; try "
+                    "init_strategy='analytical_pt_prop' or a different "
+                    "initial guess."
+                )
+
         if not success:
             warnings.warn(
                 f"NetworkSolver did not converge: {message} "

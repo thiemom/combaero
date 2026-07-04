@@ -34,6 +34,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   poorly conditioned region for the compressible restart. Will be
   removed once the GUI drops the option.
 
+### Fixed
+- **Soft-barrier artifact roots are demoted to honest failures.**
+  ``MPCEv2Element`` with ``strict=False`` replaces a wrong-direction
+  port's physics row with Pt continuity plus a one-sided penalty
+  ``alpha * mdot^2`` -- and that penalty can exactly cancel the
+  continuity mismatch, so the solver converges (|F| ~ 1e-10) to a state
+  with a slightly reversed feed that the strict residual rejects
+  (found via constant-K warm starts on the certified audit: a merge
+  feed reversed to -0.0035 kg/s while the certified all-forward root
+  has it at +0.213). ``NetworkSolver.solve`` now runs the element's
+  ``verify_solution_consistent`` post-solve and reports such solutions
+  as non-converged with an explanatory message, instead of returning a
+  silently wrong flow split. This is the prerequisite for building GUI
+  junctions with ``strict=False`` (Newton may explore wrong-direction
+  states transiently without dying, and artifact roots can no longer
+  masquerade as answers).
+
 ### Removed
 - **``tee_junction`` (Bassett K-closure) retired from the GUI** (#177).
   ``MPCE Tee`` (``mpce_tee``, momentum-CV closure) is now the sole
