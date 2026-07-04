@@ -5,7 +5,7 @@ import useStore from "../store/useStore";
 import ConvergenceChart from "./ConvergenceChart";
 
 const SolverStatusBadge: React.FC = () => {
-	const { solveResults, dismissSolveStatus } = useStore();
+	const { solveResults, dismissSolveStatus, solverSettings } = useStore();
 	const [showChart, setShowChart] = useState(false);
 
 	if (!solveResults) return null;
@@ -16,6 +16,15 @@ const SolverStatusBadge: React.FC = () => {
 		(isSuccess ? "Solve completed" : "Failed to converge");
 	const finalNorm = solveResults.final_norm;
 	const hasHistory = (solveResults.convergence_history?.length ?? 0) > 0;
+	// The solver may auto-upgrade "default" (e.g. to analytical_pt_prop on
+	// MPCE networks); show what actually ran, flagged when it differs from
+	// the requested strategy.
+	const usedInit = solveResults.solver_settings_used?.init_strategy as
+		| string
+		| undefined;
+	const initLabel =
+		usedInit &&
+		`init: ${usedInit}${usedInit !== solverSettings.init_strategy ? " (auto)" : ""}`;
 
 	if (isSuccess) {
 		return (
@@ -29,6 +38,11 @@ const SolverStatusBadge: React.FC = () => {
 						{finalNorm !== undefined && finalNorm !== null && (
 							<span className="text-xs font-mono">
 								||F|| = {finalNorm.toExponential(3)}
+							</span>
+						)}
+						{initLabel && (
+							<span className="text-[10px] font-mono opacity-70">
+								{initLabel}
 							</span>
 						)}
 						<span className="text-xs opacity-80">{message}</span>
@@ -84,6 +98,11 @@ const SolverStatusBadge: React.FC = () => {
 					</button>
 				</div>
 				<div className="px-4 py-2 max-h-40 overflow-y-auto">
+					{initLabel && (
+						<div className="text-[10px] font-mono opacity-70 pb-1">
+							{initLabel}
+						</div>
+					)}
 					<pre className="text-xs font-mono whitespace-pre-wrap break-words">
 						{message}
 					</pre>

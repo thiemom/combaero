@@ -34,6 +34,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   poorly conditioned region for the compressible restart. Will be
   removed once the GUI drops the option.
 
+### Added
+- **GUI: all supported init strategies selectable in the sidebar.**
+  ``analytical_pt_prop`` added to the strategy dropdown (the backend
+  accepted it since the auto-upgrade PR but the frontend never offered
+  it); ``incompressible_warmstart`` is labelled "(deprecated)".
+- **GUI: the solver status badge shows the init strategy that actually
+  ran** (from ``solver_settings_used``), flagged "(auto)" when the
+  solver upgraded the requested "default" -- previously the MPCE
+  auto-upgrade was invisible from the GUI.
+
+### Changed
+- **GUI: "Reset All Initial Guesses" is now "Reset Guesses & Results"
+  and truly resets.** It previously cleared only
+  ``node.data.initial_guess`` -- but the graph builder warm-starts from
+  ``node.data.result`` whenever ``initial_guess`` is empty, so the old
+  button silently RE-ENABLED result-based seeding instead of giving a
+  cold start. It now clears stored solve results as well; the next
+  solve behaves like a freshly built network.
+- **GUI: ``mpce_tee`` is displayed as "Tee".** Sidebar drag entry, node
+  card default label, and Inspector header now say "Tee"; the Inspector
+  section carries a short explainer naming the underlying model
+  (momentum-based multi-port chamber junction, MPCE / Mynard closure).
+  The internal node type and save-file format are unchanged.
+
 ### Fixed
 - **The MPCE ``analytical_pt_prop`` auto-upgrade now requires >= 2
   ``PressureBoundary`` nodes.** The strategy's Pt propagation needs a
