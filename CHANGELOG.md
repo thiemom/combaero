@@ -59,6 +59,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The internal node type and save-file format are unchanged.
 
 ### Fixed
+- **GUI: failed solve results no longer poison subsequent solves.**
+  The graph builder warm-started every solve from the previous result
+  stored on each node -- including the best iterate of a FAILED solve
+  (e.g. a timeout). Seeding from a stall point parks Newton exactly
+  where the last attempt died, so one failure made a network
+  "practically unsolvable" even when it converges fine from cold
+  (observed on a single-tee mdot-to-pressure network: cold start 173
+  evaluations, warm-from-failed stalls at |F| ~ 1.5e2 with the same
+  residual signature on every retry). ``_guess_from_prior_result`` now
+  ignores results with ``success != True``. Added a practical
+  ``flow -> tee -> orifices -> pressure`` cold-start regression fixture
+  (GUI-parity geometry) in both regimes.
+- **GUI: the hard-timeout error message no longer recommends the
+  homotopy init strategy** (it could appear while already running
+  homotopy, and suggested a "shorter timeout" where a longer one is
+  what helps).
 - **GUI: inherited ambient pressure placeholder showed ``0.00``.** For
   humid-air compositions inheriting ambient conditions from the global
   solver settings, the Inspector's Ambient Pressure field displayed a

@@ -1079,3 +1079,99 @@ def test_certified_merge_root_passes_direction_verification():
     # Certified ground truth from the inverse-design generator.
     assert abs(sol["ch_str.m_dot"] - 0.25761378909667976) < 5e-3
     assert abs(sol["ch_bra.m_dot"] - 0.21294516374058128) < 5e-3
+
+
+def _mfb_branch_tee_orifice_network(m_dot: float, regime: str) -> FlowNetwork:
+    """Practical flow -> tee -> pressure topology (GUI parity fixture).
+
+    Mirrors gui/tmp/one_mpce_tee_mdot_to_p.json: a mass-flow inlet feeds a
+    separating MPCEv2 tee whose two legs each end in an orifice discharging
+    to a single ambient PressureBoundary. The orifices provide the leg
+    resistance that makes the fixture family feasible (bare equal-Pt sinks
+    with resistance-free constant-area legs have no root for any physical
+    tee closure -- see the 2026-07-04 case-31 analysis).
+    """
+    from combaero.network.mpce_v2_element import MPCEv2Element
+
+    D_main, D_leg = 0.1, 0.06
+    A_main = math.pi * (D_main / 2.0) ** 2
+    A_leg = math.pi * (D_leg / 2.0) ** 2
+    net = FlowNetwork()
+    net.add_node(MassFlowBoundary("mfb_in", m_dot=m_dot, Tt=300.0))
+    net.add_node(PressureBoundary("pb_amb", Pt=101325.0, Tt=300.0))
+    net.add_node(MomentumChamberNode("mc_com", area=A_main))
+    net.add_node(MomentumChamberNode("mc_str", area=A_main))
+    net.add_node(MomentumChamberNode("mc_bra", area=A_leg))
+    net.add_node(PlenumNode("pl_str"))
+    net.add_node(PlenumNode("pl_bra"))
+    net.add_element(
+        ChannelElement("ch_in", "mfb_in", "mc_com", length=1.0, diameter=D_main, regime=regime)
+    )
+    net.add_element(
+        ChannelElement("ch_str", "mc_str", "pl_str", length=1.0, diameter=D_main, regime=regime)
+    )
+    net.add_element(
+        ChannelElement("ch_bra", "mc_bra", "pl_bra", length=1.0, diameter=D_leg, regime=regime)
+    )
+    net.add_element(
+        OrificeElement(
+            "orf_str",
+            "pl_str",
+            "pb_amb",
+            Cd=0.6,
+            diameter=0.032,
+            regime=regime,
+            correlation="fixed",
+        )
+    )
+    net.add_element(
+        OrificeElement(
+            "orf_bra",
+            "pl_bra",
+            "pb_amb",
+            Cd=0.6,
+            diameter=0.03,
+            regime=regime,
+            correlation="fixed",
+        )
+    )
+    net.add_element(
+        MPCEv2Element(
+            id="tee",
+            inlet_nodes=["mc_com"],
+            outlet_nodes=["mc_str", "mc_bra"],
+            inlet_angles_deg=[0.0],
+            outlet_angles_deg=[0.0, 90.0],
+            port_areas=[A_main, A_main, A_leg],
+            flow_direction="branch",
+            strict=False,
+        )
+    )
+    return net
+
+
+@pytest.mark.parametrize("regime", ["incompressible", "compressible"])
+def test_flow_tee_pressure_cold_start_converges(regime: str):
+    """Regression: the practical MFB -> tee -> orifices -> PB topology must
+    converge from a plain cold start.
+
+    The GUI network this mirrors was reported 'practically unsolvable' at
+    m_dot=0.4 compressible; headless diagnosis (2026-07-05) showed the
+    root exists at every m_dot and the GUI failures came from warm-starting
+    off a stored FAILED result. This pins the cold-start behavior so a
+    genuine solver regression cannot hide behind that GUI artifact again.
+    m_dot=0.2 keeps the compressible solve fast (~50 evals); higher m_dot
+    approaches the orifice choke edge and only costs iterations, not the
+    root.
+    """
+    net = _mfb_branch_tee_orifice_network(0.2, regime)
+    solver = NetworkSolver(net)
+    sol = solver.solve(timeout=60.0)
+    assert sol["__success__"], sol.get("__message__")
+    assert sol["__final_norm__"] < 1e-3
+    m_str = sol["ch_str.m_dot"]
+    m_bra = sol["ch_bra.m_dot"]
+    assert m_str > 0.0 and m_bra > 0.0
+    assert m_str + m_bra == pytest.approx(0.2, abs=1e-4)
+    # The larger straight orifice (0.032 vs 0.03 bore) must carry more flow.
+    assert m_str > m_bra

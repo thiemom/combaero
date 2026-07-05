@@ -477,10 +477,15 @@ def test_swap_missing_label_raises():
 
 @pytest.mark.skipif(not _MULTI_WALL_TEE.exists(), reason="fixture not present")
 def test_multi_wall_tee_solve():
+    # init_strategy="default": the fixture's stored results are from a
+    # FAILED solve, so since the warm-start success gate they no longer
+    # seed the solver -- and the deprecated incompressible_warmstart this
+    # test used to pin only converged FROM that poisoned seed. The plain
+    # default converges cold.
     runner = NetworkRunner.from_file(_MULTI_WALL_TEE)
     result = runner.solve(
         method="hybr",
-        init_strategy="incompressible_warmstart",
+        init_strategy="default",
         timeout=60.0,
     )
     assert result.success, f"Solver failed: {result.message}"
@@ -492,7 +497,7 @@ def test_multi_wall_tee_to_dataframe():
     runner = NetworkRunner.from_file(_MULTI_WALL_TEE)
     result = runner.solve(
         method="hybr",
-        init_strategy="incompressible_warmstart",
+        init_strategy="default",
         timeout=60.0,
     )
     df = result.to_dataframe()

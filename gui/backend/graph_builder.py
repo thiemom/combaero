@@ -196,9 +196,14 @@ def _guess_from_prior_result(node_data: dict, prefix: str) -> dict:
     solves on a difficult network benefit from accumulated Newton progress.
     Works for both pressure-node results (state.P/T/Pt/Tt) and element
     results (m_dot stored at the top level).
+
+    Only CONVERGED prior results are used: the best iterate of a failed
+    solve is stored too, and seeding from it parks Newton at the stall
+    point -- one failed solve (e.g. a timeout) would otherwise poison
+    every subsequent run of a network that converges fine from cold.
     """
     prior = node_data.get("result")
-    if not prior:
+    if not prior or not prior.get("success"):
         return {}
     short: dict[str, float] = {}
     state = prior.get("state")
