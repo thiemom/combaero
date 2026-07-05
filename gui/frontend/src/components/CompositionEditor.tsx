@@ -52,6 +52,7 @@ const CompositionEditor: React.FC<CompositionEditorProps> = ({
 	// Effective ambient values: local override → global setting → ISO default
 	const effT = localComp.ambient_T ?? solverSettings.ambient_T ?? 288.15;
 	const effRH = localComp.relative_humidity ?? solverSettings.ambient_RH ?? 0.6;
+	const effP = localComp.ambient_P ?? solverSettings.ambient_P ?? 101325;
 
 	return (
 		<div className="flex flex-col gap-3 p-3 bg-stone-50 rounded-lg border border-stone-200">
@@ -165,6 +166,7 @@ const CompositionEditor: React.FC<CompositionEditorProps> = ({
 					<UnitInput
 						label="Ambient Pressure"
 						value={localComp.ambient_P}
+						placeholder={effP}
 						onChange={(val) => updateComp({ ambient_P: val })}
 						onClear={() => updateComp({ ambient_P: null })}
 					/>
