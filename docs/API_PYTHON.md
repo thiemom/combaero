@@ -394,6 +394,10 @@ solver = NetworkSolver(graph)
 # "default" auto-upgrades to "analytical_pt_prop" for networks that
 # contain a MultiPortChamberElement; pass another strategy or an
 # explicit x0 to opt out.
+# auto_retry (default True): failed cold solves on compressible
+# MPCE networks are retried once from an outlet-referenced
+# incompressible warm start (densities at the downstream static).
+# The primary attempt gets 40% of `timeout`, the retry the rest.
 results = solver.solve(method="hybr", init_strategy="homotopy")
 ```
 

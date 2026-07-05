@@ -865,7 +865,10 @@ def test_mpce_network_default_init_auto_upgrades():
         flow_direction="branch",
     )
     solver = NetworkSolver(net)
-    _ = solver.solve(timeout=10.0, options={"maxfev": 5})
+    # auto_retry=False: this test forces a failure (maxfev=5) to inspect
+    # the recorded strategy; with the retry enabled the diagnostics would
+    # reflect the outlet-ref warm-start retry instead of the upgrade.
+    _ = solver.solve(timeout=10.0, options={"maxfev": 5}, auto_retry=False)
     used = solver._diagnostic_data["solver_settings_used"]["init_strategy"]
     assert used == "analytical_pt_prop"
 
@@ -943,6 +946,7 @@ def test_analytical_pt_prop_respects_user_initial_guess():
         init_strategy="analytical_pt_prop",
         timeout=10.0,
         options={"maxfev": 5},  # 5 evals: enough to observe x0 but not to converge
+        auto_retry=False,
     )
     # After solve, _init_overrides must be cleared (single-shot semantics).
     assert solver._init_overrides == {}
@@ -1175,3 +1179,112 @@ def test_flow_tee_pressure_cold_start_converges(regime: str):
     assert m_str + m_bra == pytest.approx(0.2, abs=1e-4)
     # The larger straight orifice (0.032 vs 0.03 bore) must carry more flow.
     assert m_str > m_bra
+
+
+def _mk_state(P: float, Pt: float, m_dot: float = 0.1) -> "object":
+    from combaero.network.components import NetworkMixtureState
+
+    y_air = list(cb.mole_to_mass(cb.species.dry_air()))
+    return NetworkMixtureState(P=P, Pt=Pt, T=300.0, Tt=300.0, m_dot=m_dot, Y=y_air)
+
+
+def test_outlet_ref_channel_moves_density_sensitivity_downstream():
+    """With _incompressible_p_ref='outlet' the incompressible channel
+    evaluates density at the downstream static, so the friction-loss
+    pressure sensitivity must land on the downstream node's P (and the
+    default inlet reference must be unchanged)."""
+    ch = ChannelElement("ch", "up", "dn", length=1.0, diameter=0.05, regime="incompressible")
+    s_in = _mk_state(P=1.5e5, Pt=1.51e5)
+    s_out = _mk_state(P=1.2e5, Pt=1.21e5)
+
+    _, jac_default = ch.residuals(s_in, s_out)
+    assert "up.P" in jac_default[0]
+    assert "dn.P" not in jac_default[0]
+
+    ch._incompressible_p_ref = "outlet"
+    res_out, jac_outlet = ch.residuals(s_in, s_out)
+    assert "dn.P" in jac_outlet[0]
+    assert "up.P" not in jac_outlet[0]
+
+    # Lower reference pressure -> lower density -> higher velocity ->
+    # larger friction loss -> smaller residual (res = Pt_in - Pt_out - dP).
+    ch._incompressible_p_ref = "inlet"
+    res_inlet, _ = ch.residuals(s_in, s_out)
+    assert res_out[0] < res_inlet[0]
+
+
+def test_outlet_ref_orifice_moves_density_sensitivity_downstream():
+    orf = OrificeElement(
+        "orf", "up", "dn", Cd=0.6, diameter=0.03, regime="incompressible", correlation="fixed"
+    )
+    s_in = _mk_state(P=1.5e5, Pt=1.51e5)
+    s_out = _mk_state(P=1.2e5, Pt=1.2e5)
+
+    _, jac_default = orf.residuals(s_in, s_out)
+    assert "up.P" in jac_default[0]
+
+    orf._incompressible_p_ref = "outlet"
+    _, jac_outlet = orf.residuals(s_in, s_out)
+    assert "up.P" not in jac_outlet[0]
+    assert "dn.P" in jac_outlet[0]
+
+
+def test_auto_retry_outletref_rescues_failed_cold_solve():
+    """When the cold compressible solve fails, solve() must retry from
+    the outlet-referenced incompressible warm start and succeed. The
+    primary failure is forced so the test is deterministic and fast."""
+    net = _mfb_branch_tee_orifice_network(0.2, "compressible")
+    solver = NetworkSolver(net)
+    real_impl = solver._solve_impl
+    calls: list[dict] = []
+
+    def fake_impl(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            return {"__success__": False, "__message__": "forced failure", "__final_norm__": 1e3}
+        return real_impl(**kwargs)
+
+    solver._solve_impl = fake_impl
+    with pytest.warns(RuntimeWarning, match="auto-retrying"):
+        sol = solver.solve(timeout=120.0)
+    assert sol["__success__"], sol.get("__message__")
+    # primary (forced fail) + incompressible proxy + seeded retry
+    assert len(calls) == 3
+    assert calls[1].get("x0") is None  # proxy solves cold
+    assert calls[2].get("x0") is not None  # retry is seeded
+    ssu = solver._diagnostic_data["solver_settings_used"]
+    assert ssu["init_strategy"] == "outletref_warmstart"
+    assert ssu["auto_retry"] is True
+    assert "auto-retry" in sol["__message__"]
+
+
+def test_auto_retry_optout_returns_primary_failure():
+    net = _mfb_branch_tee_orifice_network(0.2, "compressible")
+    solver = NetworkSolver(net)
+    calls: list[dict] = []
+
+    def fake_impl(**kwargs):
+        calls.append(kwargs)
+        return {"__success__": False, "__message__": "forced failure", "__final_norm__": 1e3}
+
+    solver._solve_impl = fake_impl
+    sol = solver.solve(timeout=30.0, auto_retry=False)
+    assert not sol["__success__"]
+    assert len(calls) == 1
+
+
+def test_auto_retry_skipped_on_incompressible_networks():
+    """The retry proxy re-solves in the incompressible regime, which is a
+    no-op for already-incompressible networks -- no retry there."""
+    net = _mfb_branch_tee_orifice_network(0.2, "incompressible")
+    solver = NetworkSolver(net)
+    calls: list[dict] = []
+
+    def fake_impl(**kwargs):
+        calls.append(kwargs)
+        return {"__success__": False, "__message__": "forced failure", "__final_norm__": 1e3}
+
+    solver._solve_impl = fake_impl
+    sol = solver.solve(timeout=30.0)
+    assert not sol["__success__"]
+    assert len(calls) == 1

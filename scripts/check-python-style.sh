@@ -225,7 +225,10 @@ if "${PYTHON}" -m mypy --version > /dev/null 2>&1; then
         if [ "$VERBOSE" = true ]; then
             echo "$MYPY_OUTPUT"
         else
-            echo "$MYPY_OUTPUT" | grep "error:" | head -10
+            # sed consumes all input (unlike head, which closes the pipe
+            # early and can kill grep with SIGPIPE -> exit 141 under
+            # `set -o pipefail`, flakily failing the pre-commit hook).
+            echo "$MYPY_OUTPUT" | grep "error:" | sed -n '1,10p'
         fi
         if [ "$STRICT" = true ]; then
             ((VIOLATIONS++))

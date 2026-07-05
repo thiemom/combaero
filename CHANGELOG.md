@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Solver: automatic outlet-referenced incompressible warm-start retry
+  for failed cold solves on compressible MPCE networks.** Cold hybr on
+  compressible tee networks shows non-monotone "slow pockets" (5-tee
+  GUI network: 0.32 kg/s needs 510 evals/161 s while 0.4 kg/s needs
+  276/88 s), which look like hard failures at GUI timeouts. When a cold
+  ``default``/``analytical_pt_prop`` solve fails, ``NetworkSolver.solve``
+  now re-solves the network once in the incompressible regime with
+  element densities evaluated at the DOWNSTREAM static pressure and
+  warm-starts the compressible retry from that proxy solution. The
+  outlet-referenced proxy tracks the compressible solution 6-7x closer
+  than the classic inlet-referenced incompressible solve (RMS junction
+  pressures 5-30 kPa vs 32-211 kPa across 3 diagnosed networks) and its
+  seed converges cases where the inlet-referenced seed fails outright.
+  The worst slow-pocket case now converges in 86 s total (vs 161 s+
+  cold). Budget split: primary 40%, proxy <= 25%, seeded retry the
+  rest; the effective strategy is recorded as
+  ``solver_settings_used.init_strategy = "outletref_warmstart"`` with
+  ``auto_retry: true``. Opt out with ``solve(auto_retry=False)``.
+  Evidence: ``tmp/outlet_ref_seed_experiment.py`` (2026-07-05). NOTE:
+  the homotopy ladder was also evaluated as the retry strategy and
+  rejected -- its true wall cost is 64-200 s on the 5-tee network (each
+  rung is a full solve; earlier per-rung timings undercounted it).
+
+### Fixed
+- **Homotopy init: the rung ladder now shares the caller's ``timeout``
+  as a total deadline.** Previously every rung received the full budget,
+  so an ``init_strategy="homotopy"`` solve could run to ~6x the
+  requested timeout -- blowing through the GUI's hard (soft + 10 s)
+  request timeout and returning a 504 instead of a diagnosable result.
+
 ### Changed
 - **MPCE networks now default to ``analytical_pt_prop`` initialization.**
   ``NetworkSolver.solve(init_strategy="default")`` auto-upgrades to
