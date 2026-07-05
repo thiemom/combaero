@@ -30,6 +30,65 @@ class SolverTimeoutError(Exception):
     pass
 
 
+class SolverStallError(SolverTimeoutError):
+    """Raised when hybr's best residual plateaus and an LM fallback exists.
+
+    Subclasses SolverTimeoutError so every existing handler treats it as
+    "this phase is over, keep the best iterate" -- the LM fallback then
+    runs with all the remaining budget instead of waiting for hybr to
+    burn its fixed share.
+    """
+
+    pass
+
+
+# Stall-handover tuning. Validated offline against recorded convergence
+# histories (tmp/stall_detector_sim.py) and live (tmp/stall_handover_
+# verify.py, 2026-07-05): with a 5 s window and a 10% relative-improvement
+# floor the detector fired at 15.5 s on a 16 kg/s 20 bar 5-tee network
+# where hybr plateaus at |F| ~ 1e4 and LM-from-cold converges in ~6 s
+# (103.5 s -> 23.0 s total), and never fired on networks where hybr
+# converges steadily (one-tee 0.4, 5-tee 0.18). The far-from-tolerance
+# gate (100x tol) exists because slow-but-steady grinding NEAR the root
+# is not a stall: the outlet-ref seeded retry on the 5-tee at 0.18 kg/s
+# crawls at |F| ~ 1e-2 for a while and then converges -- cutting it over
+# to LM (which cannot finish that network) turned a success into a
+# failure during live verification.
+_STALL_WINDOW_S = 5.0
+_STALL_MIN_REL_IMPROVEMENT = 0.10
+_STALL_FAR_FACTOR = 100.0
+
+
+def _hybr_stall_detected(
+    samples: list[tuple[float, float]],
+    window: float = _STALL_WINDOW_S,
+    min_rel: float = _STALL_MIN_REL_IMPROVEMENT,
+    tol: float = 1e-3,
+    far_factor: float = _STALL_FAR_FACTOR,
+) -> bool:
+    """Return True when the best-|F| trace has plateaued far from the root.
+
+    ``samples`` is the per-eval history of ``(t_elapsed_s, best_norm)``
+    with best_norm non-increasing. Stall = the newest best norm is still
+    far above tolerance (``> far_factor * tol``) and improved by less
+    than ``min_rel`` relative to the best norm from ``window`` seconds
+    ago. Histories shorter than the window never stall (grace period).
+    """
+    if not samples:
+        return False
+    t_now, best_now = samples[-1]
+    if best_now <= far_factor * tol or t_now < window:
+        return False
+    best_then = None
+    for tv, bv in reversed(samples):
+        if tv <= t_now - window:
+            best_then = bv
+            break
+    if best_then is None or best_then <= 0.0:
+        return False
+    return (best_then - best_now) / best_then < min_rel
+
+
 class NetworkSolver:
     """
     Orchestrates the numerical solution of a fluid flow network using scipy.optimize.root.
@@ -1951,6 +2010,11 @@ class NetworkSolver:
         _RECORD_INTERVAL = 0.1
         _eval_count: list[int] = [0]
         _lm_started_at_eval: list[int | None] = [None]
+        # Per-eval (t, best|F|) trace for the stall detector; checked every
+        # _STALL_CHECK_EVERY evals during the hybr phase only.
+        _stall_samples: list[tuple[float, float]] = []
+        _STALL_CHECK_EVERY = 10
+        _stall_fired: list[bool] = [False]
 
         # State for timeout and best iterate tracking (in real space)
         start_time = time.perf_counter()
@@ -1987,6 +2051,26 @@ class NetworkSolver:
                     _history.append({"eval": _eval_count[0], "t": round(_t, 3), "norm": res_norm})
                     _last_record_t[0] = _t
                 _eval_count[0] += 1
+
+                # Stall-triggered handover to the LM fallback: when hybr's
+                # best |F| plateaus there is no point burning the rest of
+                # its budget share -- LM (which is what actually cracks
+                # these networks) should get the time instead. Active only
+                # while a compressible/tee LM fallback exists and has not
+                # started yet.
+                if method == "hybr" and _has_compressible and _lm_started_at_eval[0] is None:
+                    _stall_samples.append((_t, float(best_res_norm)))
+                    if _eval_count[0] % _STALL_CHECK_EVERY == 0 and _hybr_stall_detected(
+                        _stall_samples, tol=_RESIDUAL_TOL
+                    ):
+                        _stall_fired[0] = True
+                        raise SolverStallError(
+                            f"hybr stalled: best |F|={best_res_norm:.3e} "
+                            f"improved less than "
+                            f"{_STALL_MIN_REL_IMPROVEMENT:.0%} over the last "
+                            f"{_STALL_WINDOW_S:.0f} s; handing over to the "
+                            "LM fallback."
+                        )
 
                 # Scale residuals
                 res_scaled = res * inv_D_f
@@ -2105,9 +2189,11 @@ class NetworkSolver:
                     if _lm_norm < _RESIDUAL_TOL:
                         final_x = best_x
                         success = True
+                        _hybr_end = "stalled at" if _stall_fired[0] else "|F|="
                         message = (
                             f"Converged with LM fallback "
-                            f"(hybr |F|={final_norm:.3e}, LM |F|={_lm_norm:.3e})."
+                            f"(hybr {_hybr_end} {final_norm:.3e}, "
+                            f"LM |F|={_lm_norm:.3e})."
                         )
                         final_norm = _lm_norm
                 except SolverTimeoutError:
@@ -2183,6 +2269,7 @@ class NetworkSolver:
             "residual_breakdown": _breakdown,
             "worst_residuals": [{"name": n, "residual": v} for n, v in _worst],
             "lm_started_at_eval": _lm_started_at_eval[0],
+            "stall_handover": _stall_fired[0],
             "solver_settings_used": {
                 "method": method,
                 "init_strategy": init_strategy,
