@@ -14,8 +14,10 @@ from .components import (
     EnergyBoundary,
     LosslessConnectionElement,
     MassFlowBoundary,
+    MultiPortChamberElement,
     NetworkMixtureState,
     NetworkNode,
+    OrificeElement,
     PressureBoundary,
     WallNode,
 )
@@ -1397,10 +1399,227 @@ class NetworkSolver:
         ] = "default",
         warmstart_maxfev: int = 150,
         lambda_steps: list[float] | None = None,
+        auto_retry: bool = True,
     ) -> dict[str, float]:
         """
         Executes the root finding algorithm to solve the network.
         Returns a dictionary mapping unknown names to their solved values.
+
+        For cold solves (``x0=None``, ``init_strategy`` 'default' or
+        'analytical_pt_prop') on COMPRESSIBLE networks containing a
+        ``MultiPortChamberElement``, a failed solve is automatically
+        retried once from an outlet-referenced incompressible warm
+        start (disable via ``auto_retry=False``): the network is
+        re-solved in the incompressible regime with element densities
+        evaluated at the DOWNSTREAM static pressure, and that solution
+        seeds the compressible retry. On blow-down networks this proxy
+        tracks the compressible solution 6-7x closer than the classic
+        inlet-referenced incompressible solve and rescues the cold
+        path's non-monotone 'slow pockets' (5-tee GUI network at
+        0.32 kg/s: cold needs 510 evals/161 s, the seeded retry 96
+        evals/30 s; the seed even converges cases where the
+        inlet-referenced seed fails -- 2026-07-05 outlet-ref seed
+        experiment, tmp/outlet_ref_seed_experiment.py). When a
+        ``timeout`` is given and the retry is applicable, the primary
+        attempt gets 40% of the budget, the proxy at most 25%, and the
+        seeded retry the remainder (at least 30%). Compressible tee
+        networks are best given 90-120 s total.
+        """
+        retry_applicable = (
+            auto_retry
+            and x0 is None
+            and init_strategy in ("default", "analytical_pt_prop")
+            and any(isinstance(e, MultiPortChamberElement) for e in self.network.elements.values())
+            and bool(self._compressible_element_overrides())
+        )
+        if not retry_applicable:
+            return self._solve_impl(
+                method=method,
+                timeout=timeout,
+                options=options,
+                use_jac=use_jac,
+                x0=x0,
+                init_strategy=init_strategy,
+                warmstart_maxfev=warmstart_maxfev,
+                lambda_steps=lambda_steps,
+            )
+
+        _t0 = time.time()
+        primary_timeout = 0.4 * timeout if timeout is not None else None
+        sol = self._solve_impl(
+            method=method,
+            timeout=primary_timeout,
+            options=options,
+            use_jac=use_jac,
+            x0=None,
+            init_strategy=init_strategy,
+            warmstart_maxfev=warmstart_maxfev,
+            lambda_steps=lambda_steps,
+        )
+        if sol.get("__success__", False):
+            return sol
+
+        primary_norm = sol.get("__final_norm__")
+        primary_msg = str(sol.get("__message__", "")).strip()
+        warnings.warn(
+            f"Cold '{init_strategy}' solve failed (|F|={primary_norm:.3e}); "
+            "auto-retrying from an outlet-referenced incompressible warm "
+            "start. Pass auto_retry=False to disable.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        # Heavy networks (high Re, thermal surfaces) can need tens of
+        # seconds even for the incompressible proxy (observed 35 s on a
+        # 16 kg/s 20 bar 5-tee net), so give it up to 60 s / 30% of budget.
+        proxy_timeout = 60.0 if timeout is None else max(min(0.3 * timeout, 60.0), 10.0)
+        _primary_diag = getattr(self, "_diagnostic_data", None)
+        seed_x0 = self._outlet_ref_incompressible_seed(use_jac=use_jac, timeout=proxy_timeout)
+        _seed_kind = "outlet-referenced"
+        if seed_x0 is None:
+            # The outlet-referenced system is stiffer and can time out where
+            # the classic inlet-referenced proxy solves in a handful of
+            # evaluations; its (coarser) seed still rescues heavy MFB-driven
+            # networks, so fall back to it before giving up.
+            seed_x0 = self._outlet_ref_incompressible_seed(
+                use_jac=use_jac, timeout=proxy_timeout, p_ref="inlet"
+            )
+            _seed_kind = "inlet-referenced (outlet-ref proxy did not converge)"
+        if seed_x0 is None:
+            # Restore the primary attempt's diagnostics -- the failed proxy
+            # solves overwrote them, and we are returning the primary result.
+            if _primary_diag is not None:
+                self._diagnostic_data = _primary_diag
+            sol["__message__"] = (
+                f"{primary_msg} [incompressible warm-start auto-retry "
+                "skipped: neither the outlet- nor the inlet-referenced "
+                "proxy solve converged]"
+            )
+            return sol
+
+        remaining = None
+        if timeout is not None:
+            remaining = max(timeout - (time.time() - _t0), 0.3 * timeout)
+        retry_sol = self._solve_impl(
+            method=method,
+            timeout=remaining,
+            options=options,
+            use_jac=use_jac,
+            x0=seed_x0,
+            init_strategy="default",
+        )
+        # Stamp what actually ran so the GUI badge and headless tooling
+        # report the effective strategy.
+        _diag = getattr(self, "_diagnostic_data", None)
+        if isinstance(_diag, dict):
+            _ssu = _diag.get("solver_settings_used")
+            if isinstance(_ssu, dict):
+                _ssu["init_strategy"] = (
+                    "outletref_warmstart"
+                    if _seed_kind.startswith("outlet")
+                    else "inletref_warmstart"
+                )
+                _ssu["auto_retry"] = True
+        if retry_sol.get("__success__", False):
+            retry_sol["__message__"] = (
+                f"Converged via {_seed_kind} incompressible warm-start "
+                f"auto-retry after the '{init_strategy}' attempt failed "
+                f"({primary_msg[:120]})."
+            )
+            return retry_sol
+        retry_sol["__message__"] = (
+            f"{str(retry_sol.get('__message__', '')).strip()} "
+            f"[{_seed_kind} warm-start auto-retry; the primary "
+            f"'{init_strategy}' attempt failed at |F|={primary_norm:.3e} "
+            f"with: {primary_msg[:120]}]"
+        )
+        return retry_sol
+
+    def _outlet_ref_incompressible_seed(
+        self,
+        use_jac: bool = True,
+        timeout: float = 30.0,
+        p_ref: str = "outlet",
+    ) -> np.ndarray | None:
+        """Solve the incompressible proxy; return its solution vector.
+
+        Temporarily flips every compressible element to its incompressible
+        fallback regime and sets ``_incompressible_p_ref = p_ref`` on all
+        channel/orifice elements. ``p_ref='outlet'`` (default) evaluates
+        densities at the downstream static -- the seed that tracks the
+        compressible solution best; ``p_ref='inlet'`` is the classic,
+        easier-to-solve proxy used as a fallback. Returns the proxy
+        solution vector for use as a compressible warm start, or ``None``
+        when the proxy fails.
+        """
+        overrides = self._compressible_element_overrides()
+        if not overrides:
+            return None
+        original_regimes = {
+            elem_id: getattr(self.network.elements[elem_id], "regime", None)
+            for elem_id in overrides
+        }
+        ref_elems = [
+            e
+            for e in self.network.elements.values()
+            if isinstance(e, (ChannelElement, OrificeElement))
+        ]
+        seed: np.ndarray | None = None
+        try:
+            for elem_id, fallback_regime in overrides.items():
+                self.network.elements[elem_id].regime = fallback_regime
+            for e in ref_elems:
+                e._incompressible_p_ref = p_ref
+            self.network.resolve_all_topology()
+            self._in_warmstart_proxy = True
+            # No maxfev cap: the outlet-referenced system is stiffer than
+            # the classic inlet-referenced one (couples pressures through
+            # the downstream density) and can need a few hundred cheap
+            # incompressible evaluations. A tight timeout would push the
+            # solve into the slower LM fallback phase and starve it.
+            proxy_sol = self._solve_impl(
+                method="hybr",
+                timeout=timeout,
+                use_jac=use_jac,
+                x0=None,
+                init_strategy="default",
+            )
+            if bool(proxy_sol.get("__success__", False)):
+                candidate = getattr(self, "_last_x", None)
+                if candidate is not None:
+                    seed = np.asarray(candidate, dtype=float)
+        except Exception as e:
+            warnings.warn(
+                "Outlet-referenced incompressible proxy solve raised; "
+                f"skipping warm-start auto-retry: {e}",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            seed = None
+        finally:
+            self._in_warmstart_proxy = False
+            for elem_id, regime in original_regimes.items():
+                self.network.elements[elem_id].regime = regime
+            for e in ref_elems:
+                e._incompressible_p_ref = "inlet"
+            self.network.resolve_all_topology()
+        return seed
+
+    def _solve_impl(
+        self,
+        method: str = "hybr",
+        timeout: float | None = None,
+        options: dict[str, Any] | None = None,
+        use_jac: bool = True,
+        x0: np.ndarray | None = None,
+        init_strategy: Literal[
+            "default", "incompressible_warmstart", "homotopy", "analytical_pt_prop"
+        ] = "default",
+        warmstart_maxfev: int = 150,
+        lambda_steps: list[float] | None = None,
+    ) -> dict[str, float]:
+        """
+        Single solve attempt (no auto-retry). See ``solve`` for the
+        public entry point and argument semantics.
 
         Args:
             method: The scipy.optimize.root method to use.
@@ -1563,7 +1782,7 @@ class NetworkSolver:
                     self._in_warmstart_proxy = True
                     with warnings.catch_warnings():
                         warnings.simplefilter("ignore", DeprecationWarning)
-                        warm_sol = self.solve(
+                        warm_sol = self._solve_impl(
                             method="hybr",
                             timeout=timeout,
                             options=warm_options,
@@ -1607,6 +1826,12 @@ class NetworkSolver:
 
                 current_x0 = None
                 last_sol = {"__success__": False}
+                # The whole ladder shares the caller's timeout as a
+                # deadline. Previously each rung got the full budget, so
+                # a slow ladder could run to ~6x the requested timeout --
+                # blowing straight through the GUI's hard (soft + 10 s)
+                # request timeout.
+                _ladder_t0 = time.time()
 
                 for lam in lambda_steps:
                     # Update boundaries
@@ -1621,9 +1846,12 @@ class NetworkSolver:
                     # it.  The setdefault here is only reached if the caller
                     # explicitly zeroed out maxfev/maxiter, which should not happen.
 
-                    last_sol = self.solve(
+                    rung_timeout = (
+                        None if timeout is None else max(timeout - (time.time() - _ladder_t0), 1.0)
+                    )
+                    last_sol = self._solve_impl(
                         method=method,
-                        timeout=timeout,
+                        timeout=rung_timeout,
                         options=step_options,
                         use_jac=use_jac,
                         x0=current_x0,

@@ -1527,11 +1527,18 @@ class OrificeElement(NetworkElement):
                 getattr(self, "beta", 0.0),
             )
         else:
-            # Use incompressible Bernoulli formulation
+            # Use incompressible Bernoulli formulation. The density
+            # reference is the upstream static by default; the solver's
+            # compressible-seed proxy switches it to the downstream static
+            # (_incompressible_p_ref = "outlet"), which tracks the
+            # compressible solution far better on blow-down networks
+            # (6-7x closer junction pressures on the 2026-07-05 outlet-ref
+            # seed experiment, tmp/outlet_ref_seed_experiment.py).
+            _p_ref_outlet = getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
             res_cpp = _solver_tools.orifice_residuals_and_jacobian(
                 m_dot,
                 state_in.Pt,
-                state_in.P,
+                state_out.P if _p_ref_outlet else state_in.P,
                 state_in.T,
                 state_in.Y,
                 state_out.P,
@@ -1547,11 +1554,20 @@ class OrificeElement(NetworkElement):
             0: {
                 f"{self.id}.m_dot": 1.0,
                 f"{self.from_node}.Pt": -res_cpp.d_mdot_dP_total_up,
-                f"{self.from_node}.P": -res_cpp.d_mdot_dP_static_up,
                 f"{self.from_node}.T": -res_cpp.d_mdot_dT_up,
-                f"{self.to_node}.P": -res_cpp.d_mdot_dP_static_down,
             }
         }
+        if self.regime != "compressible" and (
+            getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
+        ):
+            # Density evaluated at the downstream static: its sensitivity
+            # moves onto the downstream node's P.
+            jac[0][f"{self.to_node}.P"] = -(
+                res_cpp.d_mdot_dP_static_down + res_cpp.d_mdot_dP_static_up
+            )
+        else:
+            jac[0][f"{self.from_node}.P"] = -res_cpp.d_mdot_dP_static_up
+            jac[0][f"{self.to_node}.P"] = -res_cpp.d_mdot_dP_static_down
         # Add species sensitivities
         for i, val in enumerate(res_cpp.d_mdot_dY_up):
             jac[0][f"{self.from_node}.Y[{i}]"] = -val
@@ -2288,11 +2304,15 @@ class ChannelElement(NetworkElement):
                 f_mult,
             )
         else:
-            # Use incompressible Darcy-Weisbach formulation
+            # Use incompressible Darcy-Weisbach formulation. Density
+            # reference: upstream static by default, downstream static when
+            # the solver's compressible-seed proxy sets
+            # _incompressible_p_ref = "outlet" (see OrificeElement).
+            _p_ref_outlet = getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
             res_cpp = _solver_tools.channel_residuals_and_jacobian(
                 m_dot,
                 state_in.Pt,
-                state_in.P,
+                state_out.P if _p_ref_outlet else state_in.P,
                 state_in.T,
                 state_in.Y,
                 state_out.P,
@@ -2323,11 +2343,18 @@ class ChannelElement(NetworkElement):
             0: {
                 f"{self.id}.m_dot": -res_cpp.d_dP_d_mdot,
                 f"{upstream_id}.Pt": 1.0,
-                f"{upstream_id}.P": -res_cpp.d_dP_dP_static_up,
                 f"{upstream_id}.T": -res_cpp.d_dP_dT_up,
                 f"{downstream_id}.Pt": -1.0,
             }
         }
+        if self.regime != "compressible" and (
+            getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
+        ):
+            # Density evaluated at the downstream static: the friction-loss
+            # pressure sensitivity moves onto the downstream node's P.
+            jac[0][f"{downstream_id}.P"] = -res_cpp.d_dP_dP_static_up
+        else:
+            jac[0][f"{upstream_id}.P"] = -res_cpp.d_dP_dP_static_up
         for i, val in enumerate(res_cpp.d_dP_dY_up):
             jac[0][f"{upstream_id}.Y[{i}]"] = -val
 
