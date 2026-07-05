@@ -7,7 +7,7 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { useCallback } from "react";
 import { useCopyPaste } from "../hooks/useCopyPaste";
-import useStore from "../store/useStore";
+import useStore, { stripResults } from "../store/useStore";
 import { edgeTypes, nodeTypes } from "./flowTypes";
 import SolverStatusBadge from "./SolverStatusBadge";
 
@@ -119,7 +119,9 @@ const NetworkCanvas = () => {
 				data,
 			};
 
-			setNodes(nodes.concat(newNode));
+			// Adding a node is a structural edit: stored results solved a
+			// different network and must not warm-start the next solve.
+			setNodes(stripResults(nodes).concat(newNode));
 		},
 		[nodes, setNodes, screenToFlowPosition],
 	);

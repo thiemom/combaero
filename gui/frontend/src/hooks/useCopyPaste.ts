@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { Node } from "reactflow";
-import useStore from "../store/useStore";
+import useStore, { stripResults } from "../store/useStore";
 
 const PASTE_OFFSET = 50;
 
@@ -32,20 +32,25 @@ export const useCopyPaste = () => {
 			if (e.key === "c") {
 				const selected = nodesRef.current.filter((n) => n.selected);
 				if (!selected.length) return;
-				clipboard.current = selected;
+				// Deep-clone: the clipboard must be a snapshot, and pasted
+				// nodes must never share nested data objects (composition,
+				// initial_guess, wall layers, ...) with the originals.
+				clipboard.current = structuredClone(selected);
 			}
 
 			if (e.key === "v" && clipboard.current?.length) {
 				e.preventDefault();
 				const stamp = Date.now().toString(36);
 				const newNodes: Node[] = clipboard.current.map((n, i) => {
-					// Copy physics/config data; strip identity fields and stale results
+					// Copy physics/config data; strip identity fields and stale results.
+					// structuredClone again: repeated pastes from the same clipboard
+					// must not share nested data objects with each other either.
 					const {
 						id: _id,
 						label: _label,
 						result: _result,
 						...physicsData
-					} = n.data as Record<string, unknown>;
+					} = structuredClone(n.data) as Record<string, unknown>;
 					const newId = `node_${stamp}_${i}`;
 					return {
 						...n,
@@ -62,7 +67,9 @@ export const useCopyPaste = () => {
 					};
 				});
 
-				const current = nodesRef.current;
+				// Structural edit: stored results solved a different network,
+				// so drop them from the existing nodes too.
+				const current = stripResults(nodesRef.current);
 				setNodes([
 					...current.map((n) => ({ ...n, selected: false })),
 					...newNodes,

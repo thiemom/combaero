@@ -130,7 +130,10 @@ const Inspector = () => {
 		);
 
 		return (
-			<aside className="w-80 border-l bg-white p-4 flex flex-col gap-4 overflow-y-auto">
+			<aside
+				key={selectedNode.id}
+				className="w-80 border-l bg-white p-4 flex flex-col gap-4 overflow-y-auto"
+			>
 				<h2 className="text-lg font-bold border-b pb-2 flex items-center gap-2 text-blue-600">
 					<Crosshair size={18} />
 					<span>Probe</span>
@@ -226,7 +229,17 @@ const Inspector = () => {
 
 	if (selectedNode) {
 		return (
-			<aside className="w-80 border-l bg-white p-4 flex flex-col gap-4 overflow-y-auto">
+			// key: remount the whole subtree when the selection changes.
+			// React Flow prevents default on node mousedown, so a focused
+			// input never blurs when the user clicks another node; without
+			// the remount React rewires the still-focused input (holding the
+			// typed value) to the NEW node, and the eventual blur commits the
+			// old node's edit onto it (observed as "diameter edit applied to
+			// 2 nodes").
+			<aside
+				key={selectedNode.id}
+				className="w-80 border-l bg-white p-4 flex flex-col gap-4 overflow-y-auto"
+			>
 				{validationErrors.length > 0 && (
 					<div className="bg-amber-50 border border-amber-200 p-2 rounded text-[10px] text-amber-800 flex flex-col gap-1">
 						<div className="font-bold uppercase">Network Warnings</div>
@@ -2702,7 +2715,10 @@ const Inspector = () => {
 		const h_total = h_total_inv > 0 ? 1 / h_total_inv : 0;
 
 		return (
-			<aside className="w-80 border-l bg-white p-4 flex flex-col gap-4 overflow-y-auto">
+			<aside
+				key={selectedEdge.id}
+				className="w-80 border-l bg-white p-4 flex flex-col gap-4 overflow-y-auto"
+			>
 				<h2 className="text-lg font-bold border-b pb-2 uppercase text-orange-600">
 					Thermal Wall
 				</h2>
@@ -2937,7 +2953,10 @@ const Inspector = () => {
 
 	if (selectedEdge) {
 		return (
-			<aside className="w-80 border-l bg-white p-4 flex flex-col gap-4 overflow-y-auto">
+			<aside
+				key={selectedEdge.id}
+				className="w-80 border-l bg-white p-4 flex flex-col gap-4 overflow-y-auto"
+			>
 				<h2 className="text-lg font-bold border-b pb-2 uppercase text-slate-600">
 					Connection
 				</h2>
