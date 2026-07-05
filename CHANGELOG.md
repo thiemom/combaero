@@ -8,6 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Solver: stall-triggered handover from hybr to the LM fallback.**
+  On compressible/tee networks hybr previously kept 65% of the
+  wall-clock budget even when its best residual had flatlined; the LM
+  fallback (which is what actually cracks these networks) only started
+  afterwards. A plateau detector now ends the hybr phase early: if the
+  best |F| improves by less than 10% over a trailing 5 s window while
+  still far from tolerance (> 100x), a ``SolverStallError`` (a
+  ``SolverTimeoutError`` subclass, so every existing handler applies)
+  hands the remaining budget to the LM fallback. Verified live: a
+  16 kg/s 20 bar 5-tee network drops from 103.5 s to 23.0 s
+  ("hybr stalled at 1.2e4, LM |F|=1.7e-4"), while steadily-converging
+  networks are untouched (the detector never fires on them). The
+  far-from-tolerance gate exists because slow-but-steady grinding near
+  the root is not a stall: the outlet-ref seeded retry on a 5-tee at
+  0.18 kg/s crawls at |F| ~ 1e-2 before converging, and cutting it
+  over to LM turned that success into a failure during live
+  verification. Diagnostics record ``stall_handover: true``.
+  Alternating hybr/LM was evaluated first and rejected: chaining the
+  best iterate between methods poisons LM with hybr's plateau basin
+  and failed on all four benchmark cases (``tmp/alternating_probe.py``,
+  ``tmp/stall_detector_sim.py``, ``tmp/stall_handover_verify.py``).
 - **Solver: automatic outlet-referenced incompressible warm-start retry
   for failed cold solves on compressible MPCE networks.** Cold hybr on
   compressible tee networks shows non-monotone "slow pockets" (5-tee
