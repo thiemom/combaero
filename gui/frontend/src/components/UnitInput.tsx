@@ -8,6 +8,8 @@ interface UnitInputProps {
 	onChange: (val: number) => void;
 	onClear?: () => void;
 	id?: string;
+	/** Placeholder shown when value is null, in Pa; scaled to the display unit. */
+	placeholder?: number;
 }
 
 const UnitInput: React.FC<UnitInputProps> = ({
@@ -16,6 +18,7 @@ const UnitInput: React.FC<UnitInputProps> = ({
 	onChange,
 	onClear,
 	id,
+	placeholder,
 }) => {
 	const { unitPreferences, setPressureUnit } = useStore();
 	const unit = unitPreferences.pressure;
@@ -35,7 +38,7 @@ const UnitInput: React.FC<UnitInputProps> = ({
 					onChange={(v) => onChange(v * scale)}
 					onClear={onClear}
 					className="flex-grow p-1.5 border rounded text-sm bg-stone-50 focus:bg-white focus:ring-1 focus:ring-orange-500 outline-none"
-					placeholder="0.00"
+					placeholder={placeholder != null ? `${placeholder / scale}` : "0.00"}
 				/>
 				<select
 					value={unit}

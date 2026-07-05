@@ -59,6 +59,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The internal node type and save-file format are unchanged.
 
 ### Fixed
+- **GUI: inherited ambient pressure placeholder showed ``0.00``.** For
+  humid-air compositions inheriting ambient conditions from the global
+  solver settings, the Inspector's Ambient Pressure field displayed a
+  hardcoded ``0.00`` grey placeholder while Temperature and Relative
+  Humidity correctly showed the effective inherited values.
+  ``UnitInput`` now accepts an effective-value placeholder (in Pa,
+  scaled to the selected display unit).
 - **The MPCE ``analytical_pt_prop`` auto-upgrade now requires >= 2
   ``PressureBoundary`` nodes.** The strategy's Pt propagation needs a
   boundary pressure gradient to be meaningful. On MFB-driven networks
