@@ -22,14 +22,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pressures 5-30 kPa vs 32-211 kPa across 3 diagnosed networks) and its
   seed converges cases where the inlet-referenced seed fails outright.
   The worst slow-pocket case now converges in 86 s total (vs 161 s+
-  cold). Budget split: primary 40%, proxy <= 25%, seeded retry the
-  rest; the effective strategy is recorded as
-  ``solver_settings_used.init_strategy = "outletref_warmstart"`` with
-  ``auto_retry: true``. Opt out with ``solve(auto_retry=False)``.
-  Evidence: ``tmp/outlet_ref_seed_experiment.py`` (2026-07-05). NOTE:
-  the homotopy ladder was also evaluated as the retry strategy and
-  rejected -- its true wall cost is 64-200 s on the 5-tee network (each
-  rung is a full solve; earlier per-rung timings undercounted it).
+  cold). Budget split: primary 40%, proxy <= 30% (up to 60 s -- heavy
+  high-Re networks need ~35 s even incompressible), seeded retry the
+  rest; when the stiffer outlet-referenced proxy does not converge the
+  retry falls back to the classic inlet-referenced proxy seed (which
+  rescued a 16 kg/s 20 bar 5-tee network where outlet-ref starved).
+  The effective strategy is recorded as
+  ``solver_settings_used.init_strategy = "outletref_warmstart"`` (or
+  ``"inletref_warmstart"`` for the fallback) with ``auto_retry: true``.
+  Opt out with ``solve(auto_retry=False)``. Evidence:
+  ``tmp/outlet_ref_seed_experiment.py`` (2026-07-05) and the certified
+  inverse-design audit: seeded outlet-ref scores 27/32 same-root on
+  PB-driven fixtures (weak on merge topologies) vs 32/32 for the
+  analytical default -- hence retry, not primary. NOTE: the homotopy
+  ladder was also evaluated as the retry strategy and rejected -- its
+  true wall cost is 64-200 s on the 5-tee network (each rung is a full
+  solve; earlier per-rung timings undercounted it). A useful side
+  effect of the 40% primary budget: hybr hands over to the
+  LM fallback earlier, which alone cut the 16 kg/s network from 104 s
+  to 29 s at timeout=90.
 
 ### Fixed
 - **Homotopy init: the rung ladder now shares the caller's ``timeout``

@@ -1468,17 +1468,31 @@ class NetworkSolver:
             RuntimeWarning,
             stacklevel=2,
         )
-        proxy_timeout = 30.0 if timeout is None else max(min(0.25 * timeout, 30.0), 10.0)
+        # Heavy networks (high Re, thermal surfaces) can need tens of
+        # seconds even for the incompressible proxy (observed 35 s on a
+        # 16 kg/s 20 bar 5-tee net), so give it up to 60 s / 30% of budget.
+        proxy_timeout = 60.0 if timeout is None else max(min(0.3 * timeout, 60.0), 10.0)
         _primary_diag = getattr(self, "_diagnostic_data", None)
         seed_x0 = self._outlet_ref_incompressible_seed(use_jac=use_jac, timeout=proxy_timeout)
+        _seed_kind = "outlet-referenced"
+        if seed_x0 is None:
+            # The outlet-referenced system is stiffer and can time out where
+            # the classic inlet-referenced proxy solves in a handful of
+            # evaluations; its (coarser) seed still rescues heavy MFB-driven
+            # networks, so fall back to it before giving up.
+            seed_x0 = self._outlet_ref_incompressible_seed(
+                use_jac=use_jac, timeout=proxy_timeout, p_ref="inlet"
+            )
+            _seed_kind = "inlet-referenced (outlet-ref proxy did not converge)"
         if seed_x0 is None:
             # Restore the primary attempt's diagnostics -- the failed proxy
-            # solve overwrote them, and we are returning the primary result.
+            # solves overwrote them, and we are returning the primary result.
             if _primary_diag is not None:
                 self._diagnostic_data = _primary_diag
             sol["__message__"] = (
-                f"{primary_msg} [outlet-referenced incompressible warm-start "
-                "auto-retry skipped: the proxy solve did not converge]"
+                f"{primary_msg} [incompressible warm-start auto-retry "
+                "skipped: neither the outlet- nor the inlet-referenced "
+                "proxy solve converged]"
             )
             return sol
 
@@ -1499,33 +1513,43 @@ class NetworkSolver:
         if isinstance(_diag, dict):
             _ssu = _diag.get("solver_settings_used")
             if isinstance(_ssu, dict):
-                _ssu["init_strategy"] = "outletref_warmstart"
+                _ssu["init_strategy"] = (
+                    "outletref_warmstart"
+                    if _seed_kind.startswith("outlet")
+                    else "inletref_warmstart"
+                )
                 _ssu["auto_retry"] = True
         if retry_sol.get("__success__", False):
             retry_sol["__message__"] = (
-                "Converged via outlet-referenced incompressible warm-start "
+                f"Converged via {_seed_kind} incompressible warm-start "
                 f"auto-retry after the '{init_strategy}' attempt failed "
                 f"({primary_msg[:120]})."
             )
             return retry_sol
         retry_sol["__message__"] = (
             f"{str(retry_sol.get('__message__', '')).strip()} "
-            "[outlet-referenced warm-start auto-retry; the primary "
+            f"[{_seed_kind} warm-start auto-retry; the primary "
             f"'{init_strategy}' attempt failed at |F|={primary_norm:.3e} "
             f"with: {primary_msg[:120]}]"
         )
         return retry_sol
 
     def _outlet_ref_incompressible_seed(
-        self, use_jac: bool = True, timeout: float = 30.0
+        self,
+        use_jac: bool = True,
+        timeout: float = 30.0,
+        p_ref: str = "outlet",
     ) -> np.ndarray | None:
-        """Solve the incompressible outlet-referenced proxy; return its x.
+        """Solve the incompressible proxy; return its solution vector.
 
         Temporarily flips every compressible element to its incompressible
-        fallback regime and sets ``_incompressible_p_ref = 'outlet'`` on all
-        channel/orifice elements so densities are evaluated at the
-        downstream static. Returns the proxy solution vector for use as a
-        compressible warm start, or ``None`` when the proxy fails.
+        fallback regime and sets ``_incompressible_p_ref = p_ref`` on all
+        channel/orifice elements. ``p_ref='outlet'`` (default) evaluates
+        densities at the downstream static -- the seed that tracks the
+        compressible solution best; ``p_ref='inlet'`` is the classic,
+        easier-to-solve proxy used as a fallback. Returns the proxy
+        solution vector for use as a compressible warm start, or ``None``
+        when the proxy fails.
         """
         overrides = self._compressible_element_overrides()
         if not overrides:
@@ -1544,7 +1568,7 @@ class NetworkSolver:
             for elem_id, fallback_regime in overrides.items():
                 self.network.elements[elem_id].regime = fallback_regime
             for e in ref_elems:
-                e._incompressible_p_ref = "outlet"
+                e._incompressible_p_ref = p_ref
             self.network.resolve_all_topology()
             self._in_warmstart_proxy = True
             # No maxfev cap: the outlet-referenced system is stiffer than

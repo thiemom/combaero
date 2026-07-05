@@ -1288,3 +1288,51 @@ def test_auto_retry_skipped_on_incompressible_networks():
     sol = solver.solve(timeout=30.0)
     assert not sol["__success__"]
     assert len(calls) == 1
+
+
+def test_outlet_ref_proxy_seed_tracks_compressible_root_better_than_inlet():
+    """Core hypothesis pin (2026-07-05 outlet-ref seed experiment): the
+    incompressible proxy with densities at the DOWNSTREAM static lands
+    closer to the compressible solution than the classic inlet-referenced
+    proxy -- measured as RMS over pressure unknowns. If a model change
+    breaks this ordering, the auto-retry seed quality regresses silently."""
+    net = _mfb_branch_tee_orifice_network(0.2, "compressible")
+    solver = NetworkSolver(net)
+    sol = solver.solve(timeout=60.0, auto_retry=False)
+    assert sol["__success__"], sol.get("__message__")
+    names = solver.unknown_names
+    x_comp = {n: sol[n] for n in names}
+
+    seed_out = solver._outlet_ref_incompressible_seed(p_ref="outlet", timeout=30.0)
+    seed_in = solver._outlet_ref_incompressible_seed(p_ref="inlet", timeout=30.0)
+    assert seed_out is not None, "outlet-ref proxy must converge on this fixture"
+    assert seed_in is not None, "inlet-ref proxy must converge on this fixture"
+
+    def rms_p(seed) -> float:
+        sq = [
+            (v - x_comp[n]) ** 2
+            for n, v in zip(names, seed, strict=False)
+            if ".P" in n or ".Pt" in n
+        ]
+        return math.sqrt(sum(sq) / len(sq))
+
+    assert rms_p(seed_out) < rms_p(seed_in)
+
+
+def test_outlet_ref_seeded_solve_reaches_same_root_as_cold():
+    """The outlet-ref seed must not steer the compressible solve to a
+    different root than the cold start finds."""
+    net = _mfb_branch_tee_orifice_network(0.2, "compressible")
+    solver = NetworkSolver(net)
+    sol_cold = solver.solve(timeout=60.0, auto_retry=False)
+    assert sol_cold["__success__"], sol_cold.get("__message__")
+
+    net2 = _mfb_branch_tee_orifice_network(0.2, "compressible")
+    solver2 = NetworkSolver(net2)
+    net2.resolve_all_topology()
+    seed = solver2._outlet_ref_incompressible_seed(p_ref="outlet", timeout=30.0)
+    assert seed is not None
+    sol_seeded = solver2.solve(timeout=60.0, x0=seed)
+    assert sol_seeded["__success__"], sol_seeded.get("__message__")
+    assert sol_seeded["ch_str.m_dot"] == pytest.approx(sol_cold["ch_str.m_dot"], rel=1e-3)
+    assert sol_seeded["ch_bra.m_dot"] == pytest.approx(sol_cold["ch_bra.m_dot"], rel=1e-3)
