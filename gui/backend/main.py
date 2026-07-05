@@ -162,7 +162,8 @@ async def solve(schema: NetworkGraphSchema):
         raise HTTPException(
             status_code=504,
             detail=f"Solver exceeded the hard timeout of {hard_timeout:.0f}s. "
-            "Try a shorter timeout, a simpler network, or the homotopy init strategy.",
+            "Try raising the solver timeout, simplifying the network, or a "
+            "different init strategy.",
         ) from None
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

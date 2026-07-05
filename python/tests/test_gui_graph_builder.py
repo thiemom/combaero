@@ -211,3 +211,43 @@ def test_expand_initial_guess_mixed_short_and_qualified():
         "comb.m_dot": 1.2,
         "other.X[0]": 0.767,
     }
+
+
+# ---------------------------------------------------------------------------
+# _guess_from_prior_result: warm start only from CONVERGED prior results
+# ---------------------------------------------------------------------------
+
+
+def test_prior_result_warm_start_requires_success():
+    """Regression: the best iterate of a FAILED solve is stored in
+    node_data["result"] too; seeding from it parks Newton at the stall
+    point, so one timed-out solve poisoned every subsequent run of a
+    network that converges fine from cold (observed on
+    one_mpce_tee_mdot_to_p.json: cold 173 evals OK, warm-from-failed
+    stalls at |F|~1.5e2)."""
+    from gui.backend.graph_builder import _guess_from_prior_result
+
+    failed = {"result": {"success": False, "state": {"P": 1.0e5, "T": 300.0}}}
+    assert _guess_from_prior_result(failed, "n") == {}
+
+    legacy_no_flag = {"result": {"state": {"P": 1.0e5, "T": 300.0}}}
+    assert _guess_from_prior_result(legacy_no_flag, "n") == {}
+
+
+def test_prior_result_warm_start_used_when_converged():
+    from gui.backend.graph_builder import _guess_from_prior_result
+
+    ok = {
+        "result": {
+            "success": True,
+            "state": {"P": 1.5e5, "T": 320.0, "Pt": 1.51e5, "Tt": 321.0},
+        }
+    }
+    out = _guess_from_prior_result(ok, "n")
+    assert out["n.P"] == 1.5e5
+    assert out["n.Pt"] == 1.51e5
+    assert out["n.T"] == 320.0
+    assert out["n.Tt"] == 321.0
+
+    ok_elem = {"result": {"success": True, "m_dot": 0.4}}
+    assert _guess_from_prior_result(ok_elem, "ch")["ch.m_dot"] == 0.4
