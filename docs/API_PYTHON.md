@@ -390,14 +390,25 @@ graph.add_element(OrificeElement("ori1", "nodeA", "nodeB", Cd=0.6, diameter=0.01
 
 solver = NetworkSolver(graph)
 # init_strategy options: "default", "analytical_pt_prop", "homotopy",
-# "continuation", "incompressible_warmstart" (deprecated).
+# "continuation", "outletref_warmstart", "incompressible_warmstart"
+# (deprecated).
 # "default" auto-upgrades to "analytical_pt_prop" for networks that
 # contain a MultiPortChamberElement; pass another strategy or an
 # explicit x0 to opt out.
+# "outletref_warmstart" solves the outlet-referenced incompressible
+# proxy (densities at the downstream static) and warm-starts the
+# compressible solve from it directly -- the auto-retry's seed as a
+# primary strategy, for networks known to stall the cold path.
 # auto_retry (default True): failed cold solves on compressible
 # MPCE networks are retried once from an outlet-referenced
 # incompressible warm start (densities at the downstream static).
 # The primary attempt gets 40% of `timeout`, the retry the rest.
+# Stall detection ends doomed phases early: when hybr's best |F|
+# plateaus far from tolerance it hands over to the LM fallback, and
+# when the LM fallback plateaus too the attempt fails fast so the
+# auto-retry gets the budget. Cold attempts only -- seeded solves
+# (explicit x0 or a warm-start seed) are the last rung and keep
+# their full budget.
 results = solver.solve(method="hybr", init_strategy="homotopy")
 ```
 

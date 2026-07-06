@@ -4,6 +4,7 @@ from gui.backend.schemas import (
     DiscreteLossData,
     MomentumChamberData,
     PlenumData,
+    SolverSettings,
 )
 
 
@@ -75,6 +76,11 @@ def test_discrete_loss_data_multipliers():
     d2 = DiscreteLossData(Nu_multiplier=1.2, f_multiplier=1.1)
     assert d2.Nu_multiplier == 1.2
     assert d2.f_multiplier == 1.1
+
+
+def test_solver_settings_accepts_outletref_warmstart():
+    s = SolverSettings(init_strategy="outletref_warmstart")
+    assert s.init_strategy == "outletref_warmstart"
 
 
 if __name__ == "__main__":

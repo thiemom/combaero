@@ -31,12 +31,14 @@ class SolverTimeoutError(Exception):
 
 
 class SolverStallError(SolverTimeoutError):
-    """Raised when hybr's best residual plateaus and an LM fallback exists.
+    """Raised when a solve phase's best residual plateaus far from the root.
 
     Subclasses SolverTimeoutError so every existing handler treats it as
-    "this phase is over, keep the best iterate" -- the LM fallback then
-    runs with all the remaining budget instead of waiting for hybr to
-    burn its fixed share.
+    "this phase is over, keep the best iterate". In the hybr phase the
+    LM fallback then runs with all the remaining budget instead of
+    waiting for hybr to burn its fixed share; in the LM fallback phase
+    the primary attempt fails fast so the outlet-referenced warm-start
+    auto-retry gets the budget instead of a doomed LM grind.
     """
 
     pass
@@ -59,7 +61,7 @@ _STALL_MIN_REL_IMPROVEMENT = 0.10
 _STALL_FAR_FACTOR = 100.0
 
 
-def _hybr_stall_detected(
+def _stall_detected(
     samples: list[tuple[float, float]],
     window: float = _STALL_WINDOW_S,
     min_rel: float = _STALL_MIN_REL_IMPROVEMENT,
@@ -67,6 +69,10 @@ def _hybr_stall_detected(
     far_factor: float = _STALL_FAR_FACTOR,
 ) -> bool:
     """Return True when the best-|F| trace has plateaued far from the root.
+
+    Phase-agnostic: used for both the hybr phase and the LM fallback
+    phase (the LM phase feeds phase-relative times so the grace period
+    applies from the start of the phase, not the solve).
 
     ``samples`` is the per-eval history of ``(t_elapsed_s, best_norm)``
     with best_norm non-increasing. Stall = the newest best norm is still
@@ -1454,7 +1460,11 @@ class NetworkSolver:
         use_jac: bool = True,
         x0: np.ndarray | None = None,
         init_strategy: Literal[
-            "default", "incompressible_warmstart", "homotopy", "analytical_pt_prop"
+            "default",
+            "incompressible_warmstart",
+            "outletref_warmstart",
+            "homotopy",
+            "analytical_pt_prop",
         ] = "default",
         warmstart_maxfev: int = 150,
         lambda_steps: list[float] | None = None,
@@ -1483,6 +1493,13 @@ class NetworkSolver:
         attempt gets 40% of the budget, the proxy at most 25%, and the
         seeded retry the remainder (at least 30%). Compressible tee
         networks are best given 90-120 s total.
+
+        Pass ``init_strategy='outletref_warmstart'`` to run the proxy
+        seed directly as the primary initialization (no cold attempt
+        first) -- useful on networks known to stall the cold path.
+        Certified audit (2026-07): 16/16 same-root on branch
+        topologies, 11/16 on merge -- prefer 'default' /
+        'analytical_pt_prop' for merge networks.
         """
         retry_applicable = (
             auto_retry
@@ -1671,7 +1688,11 @@ class NetworkSolver:
         use_jac: bool = True,
         x0: np.ndarray | None = None,
         init_strategy: Literal[
-            "default", "incompressible_warmstart", "homotopy", "analytical_pt_prop"
+            "default",
+            "incompressible_warmstart",
+            "outletref_warmstart",
+            "homotopy",
+            "analytical_pt_prop",
         ] = "default",
         warmstart_maxfev: int = 150,
         lambda_steps: list[float] | None = None,
@@ -1710,6 +1731,11 @@ class NetworkSolver:
                 (DEPRECATED: 10/32 on the same audit at ~10x the wall
                 time) first solves an incompressible-regime proxy
                 network and uses that solution as x0.
+                ``outletref_warmstart`` solves the outlet-referenced
+                incompressible proxy (densities at the DOWNSTREAM
+                static; the auto-retry's seed) and warm-starts from it
+                directly -- 16/16 same-root on branch topologies,
+                11/16 on merge in the certified audit.
             warmstart_maxfev: Maximum function evaluations for the
                 incompressible proxy solve when
                 ``init_strategy='incompressible_warmstart'``.
@@ -1725,13 +1751,14 @@ class NetworkSolver:
         if init_strategy not in (
             "default",
             "incompressible_warmstart",
+            "outletref_warmstart",
             "homotopy",
             "continuation",
             "analytical_pt_prop",
         ):
             raise ValueError(
                 "init_strategy must be one of: 'default', 'incompressible_warmstart', "
-                "'homotopy', 'continuation', 'analytical_pt_prop'."
+                "'outletref_warmstart', 'homotopy', 'continuation', 'analytical_pt_prop'."
             )
         if warmstart_maxfev <= 0:
             raise ValueError("warmstart_maxfev must be > 0.")
@@ -1824,6 +1851,24 @@ class NetworkSolver:
             options.setdefault("maxiter", _default_iters)
 
         warmstart_x0: np.ndarray | None = None
+        if x0 is None and init_strategy == "outletref_warmstart":
+            # Explicit selection of the auto-retry's seed: solve the
+            # outlet-referenced incompressible proxy and warm-start the
+            # compressible solve from it. Same budget formula as the
+            # retry path. When the proxy fails, warn and proceed cold --
+            # mirroring incompressible_warmstart's failure behavior.
+            _proxy_timeout = 60.0 if timeout is None else max(min(0.3 * timeout, 60.0), 10.0)
+            warmstart_x0 = self._outlet_ref_incompressible_seed(
+                use_jac=use_jac, timeout=_proxy_timeout
+            )
+            if warmstart_x0 is None:
+                warnings.warn(
+                    "Outlet-referenced incompressible proxy did not converge. "
+                    "Proceeding with default initialization.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+
         if x0 is None and init_strategy == "incompressible_warmstart":
             overrides = self._compressible_element_overrides()
             if overrides:
@@ -2010,11 +2055,27 @@ class NetworkSolver:
         _RECORD_INTERVAL = 0.1
         _eval_count: list[int] = [0]
         _lm_started_at_eval: list[int | None] = [None]
-        # Per-eval (t, best|F|) trace for the stall detector; checked every
-        # _STALL_CHECK_EVERY evals during the hybr phase only.
+        # Per-eval (t, best|F|) traces for the stall detector; checked every
+        # _STALL_CHECK_EVERY evals. The hybr trace uses solve-relative
+        # times; the LM-fallback trace uses phase-relative times so the
+        # detector's grace period applies from the start of the LM phase.
         _stall_samples: list[tuple[float, float]] = []
+        _lm_stall_samples: list[tuple[float, float]] = []
         _STALL_CHECK_EVERY = 10
         _stall_fired: list[bool] = [False]
+        _lm_stall_fired: list[bool] = [False]
+        _lm_start_t: list[float] = [0.0]
+        # Stall detection (both phases) only makes sense for COLD
+        # attempts, where a later rung (LM fallback / warm-start retry)
+        # exists to receive the freed budget. Seeded solves (explicit
+        # x0 or a warmstart proxy seed) are the LAST rung and must keep
+        # their full grind: on the certified audit the seeded LM phase
+        # can plateau far from tolerance for > 5 s and still dig out to
+        # the root (4/32 outletref cases), and the hybr handover firing
+        # mid-seeded-solve turned two 20 s successes into failures
+        # (audit cases 13/19) because LM cannot always finish from the
+        # same seed.
+        _cold_attempt = x0 is None and warmstart_x0 is None
 
         # State for timeout and best iterate tracking (in real space)
         start_time = time.perf_counter()
@@ -2057,10 +2118,16 @@ class NetworkSolver:
                 # its budget share -- LM (which is what actually cracks
                 # these networks) should get the time instead. Active only
                 # while a compressible/tee LM fallback exists and has not
-                # started yet.
-                if method == "hybr" and _has_compressible and _lm_started_at_eval[0] is None:
+                # started yet, and only on cold attempts -- see
+                # _cold_attempt above.
+                if (
+                    method == "hybr"
+                    and _has_compressible
+                    and _cold_attempt
+                    and _lm_started_at_eval[0] is None
+                ):
                     _stall_samples.append((_t, float(best_res_norm)))
-                    if _eval_count[0] % _STALL_CHECK_EVERY == 0 and _hybr_stall_detected(
+                    if _eval_count[0] % _STALL_CHECK_EVERY == 0 and _stall_detected(
                         _stall_samples, tol=_RESIDUAL_TOL
                     ):
                         _stall_fired[0] = True
@@ -2070,6 +2137,26 @@ class NetworkSolver:
                             f"{_STALL_MIN_REL_IMPROVEMENT:.0%} over the last "
                             f"{_STALL_WINDOW_S:.0f} s; handing over to the "
                             "LM fallback."
+                        )
+
+                # Same detector for the LM fallback phase (phase-relative
+                # times): when LM also plateaus far from tolerance the
+                # primary attempt is doomed -- fail fast so the caller's
+                # outlet-referenced warm-start auto-retry gets the budget
+                # instead of an unbounded LM grind (observed 180 s flat at
+                # |F| ~ 4e3 on nets the retry then solves in seconds).
+                # Cold attempts only -- see _cold_attempt above.
+                elif _has_compressible and _cold_attempt and _lm_started_at_eval[0] is not None:
+                    _lm_stall_samples.append((_t - _lm_start_t[0], float(best_res_norm)))
+                    if _eval_count[0] % _STALL_CHECK_EVERY == 0 and _stall_detected(
+                        _lm_stall_samples, tol=_RESIDUAL_TOL
+                    ):
+                        _lm_stall_fired[0] = True
+                        raise SolverStallError(
+                            f"LM fallback stalled: best |F|={best_res_norm:.3e} "
+                            f"improved less than "
+                            f"{_STALL_MIN_REL_IMPROVEMENT:.0%} over the last "
+                            f"{_STALL_WINDOW_S:.0f} s; abandoning this attempt."
                         )
 
                 # Scale residuals
@@ -2169,6 +2256,7 @@ class NetworkSolver:
             _remaining = (timeout - _elapsed) if timeout is not None else None
             if _remaining is None or _remaining > 2.0:
                 _lm_started_at_eval[0] = _eval_count[0]
+                _lm_start_t[0] = time.perf_counter() - start_time
                 _timeout_eff[0] = timeout
                 # For MPCE networks the impulse + sum-mass residual structure
                 # leaves hybr near-singular at low Mach; its "best iterate" is
@@ -2200,6 +2288,10 @@ class NetworkSolver:
                     pass
                 except Exception:
                     pass
+                if not success and _lm_stall_fired[0]:
+                    message = (
+                        f"{message} LM fallback also stalled at |F|={float(best_res_norm):.3e}."
+                    )
 
         # Post-solve direction verification for constrained junctions.
         # strict=False soft-barrier mode can manufacture EXACT artifact
@@ -2270,6 +2362,7 @@ class NetworkSolver:
             "worst_residuals": [{"name": n, "residual": v} for n, v in _worst],
             "lm_started_at_eval": _lm_started_at_eval[0],
             "stall_handover": _stall_fired[0],
+            "lm_stall": _lm_stall_fired[0],
             "solver_settings_used": {
                 "method": method,
                 "init_strategy": init_strategy,

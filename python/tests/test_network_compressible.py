@@ -1343,3 +1343,24 @@ def test_outlet_ref_seeded_solve_reaches_same_root_as_cold():
     assert sol_seeded["__success__"], sol_seeded.get("__message__")
     assert sol_seeded["ch_str.m_dot"] == pytest.approx(sol_cold["ch_str.m_dot"], rel=1e-3)
     assert sol_seeded["ch_bra.m_dot"] == pytest.approx(sol_cold["ch_bra.m_dot"], rel=1e-3)
+
+
+def test_outletref_warmstart_explicit_strategy_converges():
+    """init_strategy='outletref_warmstart' runs the proxy seed directly
+    as the primary initialization (no cold attempt first) and reaches
+    the same root as the cold start."""
+    net = _mfb_branch_tee_orifice_network(0.2, "compressible")
+    solver = NetworkSolver(net)
+    sol_cold = solver.solve(timeout=60.0, auto_retry=False)
+    assert sol_cold["__success__"], sol_cold.get("__message__")
+
+    net2 = _mfb_branch_tee_orifice_network(0.2, "compressible")
+    solver2 = NetworkSolver(net2)
+    sol = solver2.solve(timeout=60.0, init_strategy="outletref_warmstart")
+    assert sol["__success__"], sol.get("__message__")
+    ssu = solver2._diagnostic_data["solver_settings_used"]
+    assert ssu["init_strategy"] == "outletref_warmstart"
+    # Explicit strategy selection opts out of the auto-retry chain.
+    assert "auto_retry" not in ssu
+    assert sol["ch_str.m_dot"] == pytest.approx(sol_cold["ch_str.m_dot"], rel=1e-3)
+    assert sol["ch_bra.m_dot"] == pytest.approx(sol_cold["ch_bra.m_dot"], rel=1e-3)

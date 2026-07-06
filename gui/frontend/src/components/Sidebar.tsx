@@ -360,6 +360,9 @@ const Sidebar = () => {
 						<option value="incompressible_warmstart">
 							Incomp. Warmstart (deprecated)
 						</option>
+						<option value="outletref_warmstart">
+							Incomp. Warmstart (Outlet-ref)
+						</option>
 						<option value="homotopy">Load-Stepping (Homotopy)</option>
 						<option
 							value="continuation"

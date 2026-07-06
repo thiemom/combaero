@@ -302,6 +302,7 @@ class SolverSettings(BaseModel):
         "default",
         "analytical_pt_prop",
         "incompressible_warmstart",
+        "outletref_warmstart",
         "homotopy",
         "continuation",
     ] = "default"

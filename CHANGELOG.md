@@ -8,6 +8,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Solver: LM-phase stall detection -- doomed primaries fail fast so
+  the outlet-ref auto-retry gets the budget.** The stall detector
+  (previously hybr-phase only) now also watches the LM fallback: when
+  LM's best |F| plateaus (< 10% improvement over 5 s) while still far
+  from tolerance (> 100x), the attempt is abandoned via
+  ``SolverStallError`` instead of grinding unbounded. On the doomed
+  three-port junction net the primary previously burned ~187 s flat at
+  |F| ~ 4e3 before the outlet-referenced warm-start retry rescued it in
+  3 s; it now fails ~10 s after LM flatlines and the full solve drops
+  to ~25 s. Discrimination verified on recorded traces: fires at 5.5 s
+  and 8.2 s into the two doomed LM phases, never on the 16 kg/s net
+  whose LM fallback is the rescue (converges in 4.8 s). Also fixes a
+  #224 side effect: the 5-tee net at 0.32 kg/s converged cold pre-#224
+  (161 s of hybr grinding) but the handover sent it to an LM that
+  plateaus -- it burned the full 180 s timeout and survived only via
+  the auto-retry; the doomed burn now ends in seconds. Diagnostics
+  record ``lm_stall: true``. Stall detection (BOTH phases, including
+  the earlier hybr handover) now applies to cold attempts only: seeded
+  solves (explicit x0 or a warm-start proxy seed) are the last retry
+  rung and keep their full grind. Certified-audit evidence: 4/32
+  outlet-ref seeded cases plateau far from tolerance for > 5 s and
+  still dig out to the root (the LM-phase abort turned those slow
+  successes into fast failures), and the hybr handover firing
+  mid-seeded-solve turned two 20 s successes into failures (cases
+  13/19) because LM cannot always finish from the same seed.
+- **Solver/GUI: ``init_strategy="outletref_warmstart"`` is selectable.**
+  The outlet-referenced incompressible proxy (the auto-retry's seed)
+  can now be chosen directly as the primary initialization -- no cold
+  attempt first -- for networks known to stall the cold path. Certified
+  audit: 16/16 same-root on branch topologies, 11/16 on merge (prefer
+  ``default``/``analytical_pt_prop`` for merge networks; on healthy
+  branch nets the cold start remains ~4x faster, which is why this is
+  not the default). Exposed in the GUI init-strategy dropdown.
 - **CI: Windows extension import smoke test.** The MSVC Python extension
   build job now imports ``combaero`` and ``combaero._core`` via
   ``pytest python/tests/test_import.py``; previously the extension was
