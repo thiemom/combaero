@@ -64,6 +64,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to 29 s at timeout=90.
 
 ### Fixed
+- **GUI: editing a value could apply it to two nodes.** React Flow
+  prevents default on node mousedown, so a focused Inspector input never
+  blurred when clicking another node; React then reused the same input
+  component (still holding the typed value) rewired to the newly
+  selected node, and the eventual blur committed the old node's edit
+  onto it. The Inspector's node/edge subtrees are now keyed by the
+  selected entity's id, forcing a remount (fresh input state) on every
+  selection change.
+- **GUI: topology edits now invalidate stored results.** Adding or
+  removing nodes/edges (including drag-drop creation, new connections,
+  and paste) previously kept every node's ``result`` from the last
+  solve, and the backend warm-starts from those -- so after adding a
+  tee to a converged network the first solve was seeded with the old
+  topology's solution and stalled ("poisoned by 5-tee data" on a 6-tee
+  network). Structural changes now strip all stored node/edge results;
+  position/selection changes keep them.
+- **GUI: copy/paste no longer shares nested data between nodes.** The
+  clipboard stored live node references and paste spread ``data``
+  shallowly, so nested objects (composition, initial guesses, wall
+  layers) stayed shared between the original and the pasted node;
+  both are now deep-cloned.
 - **Homotopy init: the rung ladder now shares the caller's ``timeout``
   as a total deadline.** Previously every rung received the full budget,
   so an ``init_strategy="homotopy"`` solve could run to ~6x the

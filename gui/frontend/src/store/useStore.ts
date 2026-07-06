@@ -13,6 +13,22 @@ import { create } from "zustand";
 import { exportResults } from "../api";
 import { discoverFields } from "../utils/diagnostics";
 
+// Stored per-node/edge results warm-start the next solve (backend
+// graph_builder). A structural edit (add/remove node or edge, new
+// connection) changes the system those results solved, so they must be
+// dropped: a converged 5-tee solution seeding a 6-tee network poisons
+// the first solve after the topology edit. Position/selection changes
+// keep results.
+export const stripResults = <T extends Node | Edge>(items: T[]): T[] =>
+	items.map((item) => {
+		if (!item.data?.result) return item;
+		const { result: _result, ...rest } = item.data;
+		return { ...item, data: rest };
+	});
+
+const isStructural = (changes: (NodeChange | EdgeChange)[]): boolean =>
+	changes.some((c) => c.type === "add" || c.type === "remove");
+
 export interface RFState {
 	nodes: Node[];
 	edges: Edge[];
@@ -79,17 +95,29 @@ const useStore = create<RFState>((set, get) => ({
 	isExporting: false,
 
 	onNodesChange: (changes: NodeChange[]) => {
-		set({
-			nodes: applyNodeChanges(changes, get().nodes),
-			solveResults: null,
-		});
+		const nodes = applyNodeChanges(changes, get().nodes);
+		if (isStructural(changes)) {
+			set({
+				nodes: stripResults(nodes),
+				edges: stripResults(get().edges),
+				solveResults: null,
+			});
+		} else {
+			set({ nodes, solveResults: null });
+		}
 	},
 
 	onEdgesChange: (changes: EdgeChange[]) => {
-		set({
-			edges: applyEdgeChanges(changes, get().edges),
-			solveResults: null,
-		});
+		const edges = applyEdgeChanges(changes, get().edges);
+		if (isStructural(changes)) {
+			set({
+				edges: stripResults(edges),
+				nodes: stripResults(get().nodes),
+				solveResults: null,
+			});
+		} else {
+			set({ edges, solveResults: null });
+		}
 	},
 
 	onConnect: (connection: Connection) => {
@@ -123,7 +151,8 @@ const useStore = create<RFState>((set, get) => ({
 		} as Edge;
 
 		set({
-			edges: addEdge(edge, get().edges),
+			edges: stripResults(addEdge(edge, get().edges)),
+			nodes: stripResults(get().nodes),
 			solveResults: null,
 		});
 	},
