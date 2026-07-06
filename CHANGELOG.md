@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **CI: Windows extension import smoke test.** The MSVC Python extension
+  build job now imports ``combaero`` and ``combaero._core`` via
+  ``pytest python/tests/test_import.py``; previously the extension was
+  built on Windows but never loaded, so DLL/ABI load failures could
+  merge undetected.
+- **GUI: frontend unit tests for topology result invalidation.**
+  ``useStore.test.ts`` locks in the result-stripping semantics shipped
+  with the GUI integrity fixes: structural edits (add/remove node or
+  edge, new connection) drop all stored node/edge results while
+  position/selection changes keep them.
 - **Solver: stall-triggered handover from hybr to the LM fallback.**
   On compressible/tee networks hybr previously kept 65% of the
   wall-clock budget even when its best residual had flatlined; the LM
@@ -92,6 +102,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   request timeout and returning a 504 instead of a diagnosable result.
 
 ### Changed
+- **Test suite and CI: 3-4x faster merge gate at unchanged coverage.**
+  The four ``test_three_port_*`` network tests now share one
+  module-scoped solve instead of re-running the identical ~3 min solve
+  each (that single network is a known doomed-primary case: hybr
+  stalls, the LM fallback grinds, and the outlet-referenced warm-start
+  retry rescues it in seconds -- the shared solve pins that
+  rescue-within-budget behavior with ``timeout=120``); pytest runs in
+  parallel (``pytest-xdist``, ``-n auto --dist loadscope``) in CI and
+  in the pre-commit hook; CI logs report ``--durations=25`` to keep
+  slow-test creep visible. Python unit test job: ~29 min to a few
+  minutes; local pre-commit test hook similarly.
+- **CI: dependency lockfile changes now trigger the test suite.**
+  ``uv.lock`` was missing from the change filters in both workflows,
+  so dependency bumps (e.g. scipy/numpy) could merge without running
+  a single Python test.
 - **MPCE networks now default to ``analytical_pt_prop`` initialization.**
   ``NetworkSolver.solve(init_strategy="default")`` auto-upgrades to
   ``analytical_pt_prop`` when the network contains a

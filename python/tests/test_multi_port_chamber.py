@@ -15,6 +15,7 @@ Hager / Bassett / Perez-Garcia / Wang reference data live in separate files.
 import math
 
 import numpy as np
+import pytest
 
 import combaero as cb
 from combaero.network import (
@@ -85,11 +86,25 @@ def _three_port_net(
     return net
 
 
-def test_three_port_network_converges():
-    """Solver assembles and converges on the basic 3-port momentum-CV network."""
+@pytest.fixture(scope="module")
+def three_port_solution() -> tuple[NetworkSolver, dict]:
+    """One shared solve of the default 3-port net for the test_three_port_*
+    assertions below (each previously re-ran the identical ~3 min solve).
+
+    The primary attempt on this net is known-doomed (hybr stalls, the LM
+    fallback grinds without converging) and the outlet-referenced warm-start
+    auto-retry rescues it in seconds; the finite timeout bounds the doomed
+    phase and pins that rescue-within-budget behavior.
+    """
     net = _three_port_net()
     solver = NetworkSolver(net)
-    sol = solver.solve()
+    sol = solver.solve(timeout=120.0)
+    return solver, sol
+
+
+def test_three_port_network_converges(three_port_solution):
+    """Solver assembles and converges on the basic 3-port momentum-CV network."""
+    solver, sol = three_port_solution
     assert sol["__success__"], f"did not converge: {sol.get('__message__')}"
 
     # Residual norm at the converged state is small.
@@ -98,7 +113,7 @@ def test_three_port_network_converges():
     assert max(abs(r) for r in res) < 1e-3, f"residuals not small: {res}"
 
 
-def test_three_port_mass_conservation():
+def test_three_port_mass_conservation(three_port_solution):
     """All three port flows balance at the junction (sum-mass residual = 0).
 
     Junction convention: ch_in is the declared inlet (sign -1: +ch_in is flow
@@ -106,9 +121,7 @@ def test_three_port_mass_conservation():
     are flow OUT of junction). Conservation:
         -ch_in.m_dot + ch_str.m_dot + ch_bra.m_dot = 0
     """
-    net = _three_port_net()
-    solver = NetworkSolver(net)
-    sol = solver.solve()
+    _, sol = three_port_solution
     assert sol["__success__"], f"did not converge: {sol.get('__message__')}"
 
     m_in = sol["ch_in.m_dot"]
@@ -120,7 +133,7 @@ def test_three_port_mass_conservation():
     )
 
 
-def test_three_port_converges_with_conservation():
+def test_three_port_converges_with_conservation(three_port_solution):
     """Network converges and conserves mass.
 
     Directional behaviour at asymmetric pressure BCs depends on the cross-
@@ -130,9 +143,7 @@ def test_three_port_converges_with_conservation():
     Section 3 (and the basis of the K6 < 0 region at low q). We assert
     convergence + mass conservation only; direction is BC-dependent.
     """
-    net = _three_port_net()
-    solver = NetworkSolver(net)
-    sol = solver.solve()
+    _, sol = three_port_solution
     assert sol["__success__"], f"did not converge: {sol.get('__message__')}"
 
     m_in = sol["ch_in.m_dot"]
@@ -147,14 +158,13 @@ def test_three_port_converges_with_conservation():
     )
 
 
-def test_three_port_p_jct_in_physical_range():
+def test_three_port_p_jct_in_physical_range(three_port_solution):
     """P_jct should lie between the lowest collector Pt and the source Pt."""
+    # Fixture defaults (see _three_port_net signature).
     Pt_in = 2.1e5
     Pt_str = 2.05e5
     Pt_bra = 2.00e5
-    net = _three_port_net(Pt_in=Pt_in, Pt_str=Pt_str, Pt_bra=Pt_bra)
-    solver = NetworkSolver(net)
-    sol = solver.solve()
+    _, sol = three_port_solution
     assert sol["__success__"]
 
     P_jct = sol["jct.P_jct"]

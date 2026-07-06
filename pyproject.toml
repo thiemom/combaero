@@ -48,6 +48,7 @@ dev = [
     "build>=1.2.0",
     "pytest-cov",
     "setuptools-scm>=10.0.5",
+    "pytest-xdist>=3.6",
 ]
 
 [tool.scikit-build]
