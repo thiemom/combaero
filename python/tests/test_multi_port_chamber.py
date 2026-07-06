@@ -92,9 +92,9 @@ def three_port_solution() -> tuple[NetworkSolver, dict]:
     assertions below (each previously re-ran the identical ~3 min solve).
 
     The primary attempt on this net is known-doomed (hybr stalls, the LM
-    fallback grinds without converging) and the outlet-referenced warm-start
-    auto-retry rescues it in seconds; the finite timeout bounds the doomed
-    phase and pins that rescue-within-budget behavior.
+    fallback stalls too) and the outlet-referenced warm-start auto-retry
+    rescues it in seconds; the finite timeout bounds the doomed phase and
+    pins that rescue-within-budget behavior.
     """
     net = _three_port_net()
     solver = NetworkSolver(net)
@@ -111,6 +111,35 @@ def test_three_port_network_converges(three_port_solution):
     x = np.array([sol.get(n, 0.0) for n in solver.unknown_names])
     res, _ = solver._residuals_and_jacobian(x, compute_jacobian=False)
     assert max(abs(r) for r in res) < 1e-3, f"residuals not small: {res}"
+
+    # Document the rescue path: this net converges via the outlet-ref
+    # warm-start auto-retry after the doomed primary fails fast.
+    ssu = solver._diagnostic_data["solver_settings_used"]
+    assert ssu["init_strategy"] == "outletref_warmstart"
+    assert ssu.get("auto_retry") is True
+
+
+def test_three_port_doomed_primary_fails_fast_via_lm_stall():
+    """Without the auto-retry, the doomed primary must fail FAST: hybr
+    stalls (handover), the LM fallback then plateaus far from tolerance
+    and the LM-phase stall detector aborts it. Pre-detector this burned
+    ~187 s flat at |F| ~ 4e3 (timeout=None leaves LM unbounded); with it
+    the attempt ends ~10 s after LM flatlines.
+    """
+    import time
+
+    net = _three_port_net()
+    solver = NetworkSolver(net)
+    t0 = time.perf_counter()
+    with pytest.warns(UserWarning, match="did not converge"):
+        sol = solver.solve(timeout=None, auto_retry=False)
+    wall = time.perf_counter() - t0
+    assert not sol["__success__"]
+    diag = solver._diagnostic_data
+    assert diag["stall_handover"] is True
+    assert diag["lm_stall"] is True
+    assert "LM fallback also stalled" in str(sol.get("__message__"))
+    assert wall < 60.0, f"doomed primary took {wall:.1f} s; LM-stall abort broken"
 
 
 def test_three_port_mass_conservation(three_port_solution):
