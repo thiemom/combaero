@@ -45,6 +45,7 @@ jobs:
               - 'ruff.toml'
               - '.python-version'
               - 'Makefile'
+              - 'uv.lock'
             gui:
               - 'gui/**'
             documentation:
@@ -145,7 +146,7 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          uv run pytest -v --tb=short
+          uv run pytest -n auto --dist loadscope -q --tb=short --durations=25
 
   frontend-validation:
     name: Frontend Validation (Node 24 LTS)

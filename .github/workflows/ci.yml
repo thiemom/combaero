@@ -43,6 +43,7 @@ jobs:
               - '.pre-commit-config.yaml'
               - 'ruff.toml'
               - 'Makefile'
+              - 'uv.lock'
             gui:
               - 'gui/**'
             documentation:
@@ -207,6 +208,11 @@ jobs:
 
       - name: Build Python extension (MSVC)
         run: uv pip install --system --no-deps -e .
+
+      - name: Import smoke test (MSVC extension)
+        run: |
+          uv pip install --system pytest numpy scipy
+          python -m pytest python/tests/test_import.py -q
 
   status-check:
     # IMPORTANT: Keep this literal name in sync with Iron ruleset required context:

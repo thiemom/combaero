@@ -822,6 +822,10 @@ def test_choke_barrier_rejects_dead_branch_spurious_root():
         psi=1.0,
         flow_direction="branch",
     )
+    # Residual probes outside solve() require resolved topology: without it
+    # the port MCNs are not marked as junction ports and _residuals is a
+    # different function than the one the solver sees.
+    net.resolve_all_topology()
     solver = NetworkSolver(net)
     x = solver._build_x0()
     spurious = {
@@ -868,7 +872,9 @@ def test_mpce_network_default_init_auto_upgrades():
     # auto_retry=False: this test forces a failure (maxfev=5) to inspect
     # the recorded strategy; with the retry enabled the diagnostics would
     # reflect the outlet-ref warm-start retry instead of the upgrade.
-    _ = solver.solve(timeout=10.0, options={"maxfev": 5}, auto_retry=False)
+    # Short timeout: only the recorded strategy stamp matters here; the LM
+    # fallback would otherwise idle away the rest of the budget.
+    _ = solver.solve(timeout=2.0, options={"maxfev": 5}, auto_retry=False)
     used = solver._diagnostic_data["solver_settings_used"]["init_strategy"]
     assert used == "analytical_pt_prop"
 
@@ -894,7 +900,8 @@ def test_mpce_explicit_strategy_opts_out_of_auto_upgrade():
         flow_direction="branch",
     )
     solver = NetworkSolver(net)
-    _ = solver.solve(init_strategy="homotopy", timeout=10.0, options={"maxfev": 5})
+    # Short timeout: only the recorded strategy stamp matters here.
+    _ = solver.solve(init_strategy="homotopy", timeout=2.0, options={"maxfev": 5})
     used = solver._diagnostic_data["solver_settings_used"]["init_strategy"]
     assert used == "homotopy"
 
