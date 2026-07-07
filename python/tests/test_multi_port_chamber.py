@@ -99,10 +99,13 @@ def three_port_solution() -> tuple[NetworkSolver, dict]:
     (flow entering from the LOWEST-Pt sink and exiting to the highest --
     energetically impossible for a passive junction; the known v1
     joining-flow inconsistency). The plain cold start converges onto
-    that mirror root, and v1 has no direction/energy verification hook
-    to demote it (MPCEv2 does; GUI networks are v2). Since the
-    2026-07-07 residual-scale fix all init paths converge in seconds
-    (this net was previously the ~187 s "doomed primary" exemplar).
+    that mirror root; the v1 energy-consistency hook now demotes it and
+    the auto-retry self-heals onto the physical root (see
+    test_three_port_default_path_self_heals_from_mirror_root), but the
+    explicit seed keeps this shared fixture on the fast direct path.
+    Since the 2026-07-07 residual-scale fix all init paths converge in
+    seconds (this net was previously the ~187 s "doomed primary"
+    exemplar).
     """
     net = _three_port_net()
     solver = NetworkSolver(net)
@@ -142,6 +145,94 @@ def test_residual_scales_classify_mpce_impulse_rows_as_pressure():
     n_p_rows = int(np.sum(scales == ref_p))
     assert n_mdot_rows == 1, f"expected 1 ref_mdot row (junction sum-mass), got {n_mdot_rows}"
     assert n_p_rows == len(scales) - 1
+
+
+def _resolved_junction():
+    net = _three_port_net()
+    net.resolve_all_topology()
+    return net.elements["jct"]
+
+
+def _sol_dict(m_in: float, m_str: float, m_bra: float, pt_com: float, pt_str: float, pt_bra: float):
+    return {
+        "ch_in.m_dot": m_in,
+        "ch_str.m_dot": m_str,
+        "ch_bra.m_dot": m_bra,
+        "mc_com.Pt": pt_com,
+        "mc_str.Pt": pt_str,
+        "mc_bra.Pt": pt_bra,
+    }
+
+
+def test_v1_energy_check_rejects_mirror_root():
+    """Suppliers at ~2.0 bar feeding a ~2.11 bar collector: the exact
+    sign-flipped image of the physical root, energetically impossible
+    for a passive junction."""
+    jct = _resolved_junction()
+    mirror = _sol_dict(-0.43, 0.29, -0.72, 2.11e5, 2.05e5, 1.99e5)
+    assert jct.verify_solution_consistent(mirror) is False
+
+
+def test_v1_energy_check_accepts_physical_ejector_root():
+    """The 2.1 bar primary entrains the 2.05 bar straight arm and all
+    flow exits at the 2.0 bar branch: reversal at a port is physical
+    (Bassett 2001 Section 3). Two suppliers => joining mode => the
+    check is out of scope (and the state is energetically fine anyway)."""
+    jct = _resolved_junction()
+    ejector = _sol_dict(0.36, -0.21, 0.57, 2.09e5, 2.04e5, 2.02e5)
+    assert jct.verify_solution_consistent(ejector) is True
+
+
+def test_v1_energy_check_skips_joining_mode():
+    """>= 2 suppliers (joining) is out of scope even when a collector
+    exceeds every supplier Pt: the v1 impulse rows themselves can
+    manufacture flow work for joining flow (the documented deficiency
+    that motivated MPCEv2), so policing energy here would reject the
+    v1 merge model's own legitimate solutions."""
+    jct = _resolved_junction()
+    # Suppliers: the common port (element-frame +0.4, junction-convention
+    # -0.4) and the reversed straight arm (-0.25); collector: the branch
+    # at 2.2e5 Pa, above both supplier Pts (2.05e5 / 2.0e5).
+    joining = _sol_dict(0.4, -0.25, 0.65, 2.05e5, 2.0e5, 2.2e5)
+    assert jct.verify_solution_consistent(joining) is True
+
+
+def test_v1_energy_check_zero_flow_is_vacuous():
+    jct = _resolved_junction()
+    idle = _sol_dict(1e-12, -1e-12, 1e-12, 1.5e5, 1.5e5, 1.5e5)
+    assert jct.verify_solution_consistent(idle) is True
+
+
+def test_v1_energy_check_missing_keys_pass():
+    jct = _resolved_junction()
+    partial = {"ch_in.m_dot": -0.43, "mc_com.Pt": 2.11e5}
+    assert jct.verify_solution_consistent(partial) is True
+
+
+def test_v1_energy_check_tolerates_near_equal_pt():
+    """A collector within rel_tol of the max supplier Pt is numerical
+    noise, not manufactured work."""
+    jct = _resolved_junction()
+    near = _sol_dict(0.4, 0.2, 0.2, 2.0e5, 2.0e5 * (1.0 + 0.5e-4), 1.9e5)
+    assert jct.verify_solution_consistent(near) is True
+
+
+def test_three_port_default_path_self_heals_from_mirror_root():
+    """End-to-end payoff of the v1 energy hook: the plain cold solve on
+    this net converges onto the mirror root, the post-solve verification
+    demotes it, and the outlet-ref auto-retry then reaches the physical
+    ejector root -- success with forward common inflow, no manual
+    strategy selection needed.
+    """
+    net = _three_port_net()
+    solver = NetworkSolver(net)
+    with pytest.warns(UserWarning):
+        sol = solver.solve(timeout=120.0)
+    assert sol["__success__"], sol.get("__message__")
+    assert sol["ch_in.m_dot"] > 0.0, f"inlet reversed: {sol['ch_in.m_dot']}"
+    ssu = solver._diagnostic_data["solver_settings_used"]
+    assert ssu["init_strategy"] == "outletref_warmstart"
+    assert ssu.get("auto_retry") is True
 
 
 def test_stall_wiring_forced_detector(monkeypatch):
