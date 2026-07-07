@@ -2307,15 +2307,20 @@ class NetworkSolver:
                         f"{message} LM fallback also stalled at |F|={float(best_res_norm):.3e}."
                     )
 
-        # Post-solve direction verification for constrained junctions.
-        # strict=False soft-barrier mode can manufacture EXACT artifact
-        # roots: the one-sided penalty alpha * mdot^2 on a slightly
-        # reversed port can cancel that row's Pt-continuity mismatch, so
-        # the solver converges (|F| ~ 1e-10) to a wrong-direction state
+        # Post-solve physical-consistency verification for junctions.
+        # Two known ways a junction net converges (|F| ~ 1e-10) onto an
+        # unphysical exact root: (a) MPCEv2 strict=False soft-barrier
+        # mode, where the one-sided penalty alpha * mdot^2 on a slightly
+        # reversed port cancels that row's Pt-continuity mismatch
         # (exposed by constant-K warm starts on the certified audit,
         # 2026-07-04: a merge feed reversed to -0.0035 kg/s while the
-        # strict residual raises at the same state). Demote such
-        # solutions to honest failures instead of reporting them.
+        # strict residual raises at the same state); (b) v1 MPCE mirror
+        # roots -- the impulse rows are even in the flows, so the
+        # sign-flipped image of any root is also exact, and the image of
+        # a physical root collects flow from low-Pt ports into a
+        # higher-Pt port (a passive junction manufacturing flow work).
+        # Each element's verify_solution_consistent encodes its own
+        # criterion; demote failures to honest non-convergence.
         if success:
             _sol_names = dict(zip(self.unknown_names, final_x, strict=False))
             _bad_junctions = [
@@ -2327,10 +2332,12 @@ class NetworkSolver:
             if _bad_junctions:
                 success = False
                 message = (
-                    "Converged to a wrong-direction artifact root at "
-                    f"junction(s) {_bad_junctions}: the soft-barrier "
-                    "penalty balanced the residual with reversed or zero "
-                    "port flow. Treating as non-converged; try "
+                    "Converged to an unphysical artifact root at "
+                    f"junction(s) {_bad_junctions}: the solution failed "
+                    "the junction's physical-consistency verification "
+                    "(wrong-direction port flow under a soft barrier, or "
+                    "an energy-inconsistent mirror root). Treating as "
+                    "non-converged; try "
                     "init_strategy='analytical_pt_prop' or a different "
                     "initial guess."
                 )

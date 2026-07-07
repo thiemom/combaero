@@ -8,6 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Solver: energy-consistency verification for v1
+  ``MultiPortChamberElement`` -- mirror roots are demoted like
+  MPCEv2's wrong-direction roots.** The v1 impulse rows are even in
+  the port flows, so the sign-flipped image of any root is also an
+  exact root, and the image of a physical root is energetically
+  impossible (a passive junction collecting flow from low-Pt ports
+  into a higher-Pt port). Post-#228 the fast cold path converges onto
+  such mirror roots and reported success (three-port net: the 2.0 bar
+  branch "pumping" into the 2.1 bar reservoir). The new
+  ``verify_solution_consistent`` demotes them via the existing
+  post-solve gate: no collector port's total pressure may exceed the
+  single supplier's (1e-4 relative tolerance). Scope: separating mode
+  only (exactly one supplier at the converged state) -- in joining
+  mode the v1 impulse rows themselves can manufacture flow work (the
+  documented deficiency that motivated MPCEv2, which merge networks
+  must use), so policing energy there would reject the v1 merge
+  model's own legitimate solutions. Direction cannot be checked
+  instead: v1 legitimately supports runtime reversal (ejector
+  regimes). End-to-end effect: the plain cold solve on ambiguous v1
+  nets now self-heals -- the mirror root is demoted and the
+  outlet-ref auto-retry reaches the physical root. The post-solve
+  demotion message is generalized to cover both verification kinds.
 - **Solver: LM-phase stall detection -- doomed primaries fail fast so
   the outlet-ref auto-retry gets the budget.** The stall detector
   (previously hybr-phase only) now also watches the LM fallback: when

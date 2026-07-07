@@ -3155,6 +3155,54 @@ class MultiPortChamberElement(NetworkElement):
     def n_equations(self) -> int:
         return self.N + 1  # N impulse + 1 sum-mass
 
+    def verify_solution_consistent(
+        self,
+        sol: dict[str, float],
+        rel_tol: float = 1e-4,
+    ) -> bool:
+        """Post-solve energy-consistency check: no collector port may end
+        up with a higher total pressure than the best supplier port.
+
+        The v1 impulse rows are even in the port flows (u_i^2), so the
+        sign-flipped image of any root is also an exact root -- and the
+        image of a physical root is energetically impossible (flow
+        collected from low-Pt ports and delivered to a higher-Pt port,
+        i.e. a passive junction manufacturing flow work). Canonical
+        direction CANNOT be checked instead: v1 legitimately supports
+        runtime reversal (ejector regimes, Bassett 2001 Section 3), where
+        a below-supply-Pt port feeds the junction. The max-Pt bound is
+        deliberately weak -- Pt and m_dot are the only quantities in the
+        solution dict, and the goal is demoting mirror images, not fine
+        energy accounting. Missing keys => True (do not police
+        incomplete dicts; same convention as MPCEv2's direction check).
+
+        SCOPE: the check applies only when the converged state has
+        exactly ONE supplier port (separating mode). In joining mode
+        (>= 2 suppliers) the v1 impulse rows themselves can manufacture
+        flow work -- the documented deficiency that motivated MPCEv2,
+        which merge networks must use -- so policing energy there would
+        reject the v1 model's own legitimate solutions (observed on the
+        certified-audit merge fixtures).
+        """
+        flows: list[float] = []
+        pts: list[float] = []
+        for i in range(self.N):
+            eid = self._port_element_ids[i]
+            m_key = f"{eid}.m_dot"
+            pt_key = f"{self.port_nodes[i]}.Pt"
+            if not eid or m_key not in sol or pt_key not in sol:
+                return True
+            # Junction convention: positive = flow OUT of the junction.
+            flows.append(float(self._port_signs[i]) * float(sol[m_key]))
+            pts.append(float(sol[pt_key]))
+        m_ref = max(abs(f) for f in flows)
+        thr = max(1e-9, 1e-6 * m_ref)
+        suppliers = [pt for f, pt in zip(flows, pts, strict=True) if f < -thr]
+        collectors = [pt for f, pt in zip(flows, pts, strict=True) if f > thr]
+        if len(suppliers) != 1 or not collectors:
+            return True
+        return max(collectors) <= suppliers[0] * (1.0 + rel_tol)
+
     def all_source_nodes(self) -> list[str]:
         # Inlet ports = nodes the junction draws flow FROM (canonical orientation).
         return list(self.inlet_nodes)
