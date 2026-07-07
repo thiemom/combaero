@@ -89,16 +89,24 @@ def _three_port_net(
 @pytest.fixture(scope="module")
 def three_port_solution() -> tuple[NetworkSolver, dict]:
     """One shared solve of the default 3-port net for the test_three_port_*
-    assertions below (each previously re-ran the identical ~3 min solve).
+    assertions below.
 
-    The primary attempt on this net is known-doomed (hybr stalls, the LM
-    fallback stalls too) and the outlet-referenced warm-start auto-retry
-    rescues it in seconds; the finite timeout bounds the doomed phase and
-    pins that rescue-within-budget behavior.
+    The solve is seeded via init_strategy='outletref_warmstart' to pin
+    the PHYSICAL root: this net sits in the ejector regime (the 2.05 bar
+    straight sink is entrained by the 2.1 bar feed and everything exits
+    through the 2.0 bar branch -- Bassett 2001 Section 3), and the
+    sign-symmetric v1 impulse rows admit an exact MIRROR root as well
+    (flow entering from the LOWEST-Pt sink and exiting to the highest --
+    energetically impossible for a passive junction; the known v1
+    joining-flow inconsistency). The plain cold start converges onto
+    that mirror root, and v1 has no direction/energy verification hook
+    to demote it (MPCEv2 does; GUI networks are v2). Since the
+    2026-07-07 residual-scale fix all init paths converge in seconds
+    (this net was previously the ~187 s "doomed primary" exemplar).
     """
     net = _three_port_net()
     solver = NetworkSolver(net)
-    sol = solver.solve(timeout=120.0)
+    sol = solver.solve(timeout=120.0, init_strategy="outletref_warmstart")
     return solver, sol
 
 
@@ -112,34 +120,48 @@ def test_three_port_network_converges(three_port_solution):
     res, _ = solver._residuals_and_jacobian(x, compute_jacobian=False)
     assert max(abs(r) for r in res) < 1e-3, f"residuals not small: {res}"
 
-    # Document the rescue path: this net converges via the outlet-ref
-    # warm-start auto-retry after the doomed primary fails fast.
-    ssu = solver._diagnostic_data["solver_settings_used"]
-    assert ssu["init_strategy"] == "outletref_warmstart"
-    assert ssu.get("auto_retry") is True
 
-
-def test_three_port_doomed_primary_fails_fast_via_lm_stall():
-    """Without the auto-retry, the doomed primary must fail FAST: hybr
-    stalls (handover), the LM fallback then plateaus far from tolerance
-    and the LM-phase stall detector aborts it. Pre-detector this burned
-    ~187 s flat at |F| ~ 4e3 (timeout=None leaves LM unbounded); with it
-    the attempt ends ~10 s after LM flatlines.
+def test_residual_scales_classify_mpce_impulse_rows_as_pressure():
+    """Regression for the 2026-07-07 scaling fix: on the 3-port net the
+    ONLY ref_mdot-scaled row is the junction sum-mass row (port-MCN mass
+    rows are skipped; MCN closures, channel rows, and the N impulse rows
+    are all pressure-magnitude). Before the fix all N+1 MPCE rows were
+    ref_mdot, over-weighting the impulse rows by ref_p/ref_mdot (~1e5)
+    in the scaled system -- the root cause of the doomed-primary stall
+    class on MPCE networks.
     """
-    import time
-
     net = _three_port_net()
     solver = NetworkSolver(net)
-    t0 = time.perf_counter()
+    net.resolve_all_topology()
+    net.validate()
+    x0 = solver._build_x0()
+    ref_p, ref_mdot = solver._reference_scales(x0)
+    scales = solver._build_residual_scales(x0)
+    assert len(scales) == len(x0)
+    n_mdot_rows = int(np.sum(scales == ref_mdot))
+    n_p_rows = int(np.sum(scales == ref_p))
+    assert n_mdot_rows == 1, f"expected 1 ref_mdot row (junction sum-mass), got {n_mdot_rows}"
+    assert n_p_rows == len(scales) - 1
+
+
+def test_stall_wiring_forced_detector(monkeypatch):
+    """Deterministic wiring test for the stall machinery (its natural
+    fixture, this net's doomed primary, was cured by the residual-scale
+    fix): force the detector to fire in both phases and assert the
+    hybr handover and the LM-phase abort route correctly.
+    """
+    from combaero.network import solver as solver_module
+
+    monkeypatch.setattr(solver_module, "_stall_detected", lambda *a, **k: True)
+    net = _three_port_net()
+    solver = NetworkSolver(net)
     with pytest.warns(UserWarning, match="did not converge"):
-        sol = solver.solve(timeout=None, auto_retry=False)
-    wall = time.perf_counter() - t0
+        sol = solver.solve(timeout=30.0, auto_retry=False)
     assert not sol["__success__"]
     diag = solver._diagnostic_data
     assert diag["stall_handover"] is True
     assert diag["lm_stall"] is True
     assert "LM fallback also stalled" in str(sol.get("__message__"))
-    assert wall < 60.0, f"doomed primary took {wall:.1f} s; LM-stall abort broken"
 
 
 def test_three_port_mass_conservation(three_port_solution):

@@ -196,9 +196,23 @@ class NetworkSolver:
             if not getattr(node, "_is_junction_port", False):
                 scales.append(ref_mdot)
 
-        from .components import TeeJunctionElement
+        from .components import MultiPortChamberElement, TeeJunctionElement
 
         for element in self.network.elements.values():
+            # MultiPortChamberElement emits N impulse rows,
+            # (P_i + rho_i u_i^2) - P_jct, which are PRESSURE-magnitude,
+            # followed by one sum-mass row. Classifying all N+1 rows as
+            # ref_mdot (the pre-2026-07-07 behavior) over-weighted the
+            # impulse rows by ref_p/ref_mdot (~1e5) in the scaled system
+            # hybr/LM optimize -- the root cause of the "doomed primary"
+            # stall class on MPCE networks (three-port fixture: cold hybr
+            # 187 s stall -> 2.6 s clean convergence with correct scales;
+            # 5-tee slow pockets and the 16 kg/s net likewise solve cold
+            # with no stall handover).
+            if isinstance(element, MultiPortChamberElement):
+                scales.extend([ref_p] * element.N)
+                scales.append(ref_mdot)
+                continue
             elem_scale = (
                 ref_p
                 if isinstance(
