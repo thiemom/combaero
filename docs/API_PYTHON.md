@@ -496,6 +496,22 @@ loss_bra = BorderCarnotLossElement(
 # the graph. The N+1 residuals = N impulse-function residuals (one per port,
 # sign-free in m_dot) + global sum-of-port-mdots = 0.
 
+# Constant-K junction (the "simplest model" tier): fixed handbook loss
+# coefficients instead of the Mynard closure. K is referenced to the
+# common-leg dynamic head (Idelchik convention) and does not vary with the
+# flow split. K_ports keys are port indices (inlets first, then outlets);
+# the common port (single inlet for 'branch', single outlet for 'merge')
+# is ignored. Exposed in the GUI as the tee's "Constant K (handbook)"
+# junction model.
+from combaero.network.mpce_v2_element import ConstantKTeeElement
+jct_k = ConstantKTeeElement(
+    "jct",
+    inlet_nodes=["mc_com"],
+    outlet_nodes=["mc_str", "mc_bra"],
+    flow_direction="branch",
+    K_ports={1: 0.4, 2: 1.0},   # K_straight, K_branch
+)
+
 # Rotating cavity / disc-pump pressure rise (Vatistas n-vortex model)
 vortex = VortexElement(
     "vortex", "node_in", "node_out",

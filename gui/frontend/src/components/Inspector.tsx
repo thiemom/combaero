@@ -1389,6 +1389,66 @@ const Inspector = () => {
 									</p>
 								</div>
 
+								{/* Junction closure model */}
+								<div className="flex flex-col gap-2">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Junction Model
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={selectedNode.data.junction_model ?? "mynard"}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												junction_model: e.target.value,
+											})
+										}
+									>
+										<option value="mynard">Momentum CV (Mynard)</option>
+										<option value="constant_k">Constant K (handbook)</option>
+									</select>
+									<p className="text-[9px] text-gray-400 italic">
+										Constant K: fixed loss coefficients referenced to the
+										common-leg dynamic head (Idelchik convention); the Mynard
+										closure is disabled and K does not vary with the flow split.
+									</p>
+								</div>
+
+								{(selectedNode.data.junction_model ?? "mynard") ===
+									"constant_k" && (
+									<>
+										<div className="flex flex-col gap-2">
+											<label className="text-xs font-bold text-gray-500 uppercase">
+												K Straight [-]
+											</label>
+											<NumericInput
+												value={selectedNode.data.K_straight ?? 0.4}
+												onChange={(val) =>
+													updateNodeData(selectedNode.id, { K_straight: val })
+												}
+												className="p-2 border rounded"
+												placeholder="0.4"
+											/>
+										</div>
+										<div className="flex flex-col gap-2">
+											<label className="text-xs font-bold text-gray-500 uppercase">
+												K Branch [-]
+											</label>
+											<NumericInput
+												value={selectedNode.data.K_branch ?? 1.0}
+												onChange={(val) =>
+													updateNodeData(selectedNode.id, { K_branch: val })
+												}
+												className="p-2 border rounded"
+												placeholder="1.0"
+											/>
+											<p className="text-[9px] text-gray-400 italic">
+												Pt_arm = Pt_jct -/+ K * q_common (separating/joining).
+												Defaults are representative for a sharp 90-deg tee.
+											</p>
+										</div>
+									</>
+								)}
+
 								{/* Branch angle */}
 								<div className="flex flex-col gap-2">
 									<label className="text-xs font-bold text-gray-500 uppercase">

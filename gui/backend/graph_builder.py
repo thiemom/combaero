@@ -27,7 +27,7 @@ from combaero.network import (
     WallLayer,
     WallNode,
 )
-from combaero.network.mpce_v2_element import MPCEv2Element
+from combaero.network.mpce_v2_element import ConstantKTeeElement, MPCEv2Element
 
 from .schemas import (
     AreaChangeData,
@@ -598,17 +598,38 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             # lets the solver explore; the post-solve
             # verify_solution_consistent guard in NetworkSolver rejects
             # any wrong-direction artifact root at convergence.
-            _mpce = MPCEv2Element(
-                id=elem_id,
-                inlet_nodes=_inlets,
-                outlet_nodes=_outlets,
-                inlet_angles_deg=_inlet_angles,
-                outlet_angles_deg=_outlet_angles,
-                port_areas=_port_areas,
-                flow_direction=_md.flow_direction,
-                strict=False,
-                joining_etransfer_alpha=_md.joining_etransfer_alpha,
-            )
+            if _md.junction_model == "constant_k":
+                # Simplest-model tier: fixed handbook K per non-common
+                # port, referenced to the common-leg dynamic head. Port
+                # order is inlets first: branch = [common, straight,
+                # branch]; merge = [straight, branch, common].
+                if _md.flow_direction == "branch":
+                    _k_ports = {1: _md.K_straight, 2: _md.K_branch}
+                else:
+                    _k_ports = {0: _md.K_straight, 1: _md.K_branch}
+                _mpce = ConstantKTeeElement(
+                    id=elem_id,
+                    inlet_nodes=_inlets,
+                    outlet_nodes=_outlets,
+                    inlet_angles_deg=_inlet_angles,
+                    outlet_angles_deg=_outlet_angles,
+                    port_areas=_port_areas,
+                    flow_direction=_md.flow_direction,
+                    strict=False,
+                    K_ports=_k_ports,
+                )
+            else:
+                _mpce = MPCEv2Element(
+                    id=elem_id,
+                    inlet_nodes=_inlets,
+                    outlet_nodes=_outlets,
+                    inlet_angles_deg=_inlet_angles,
+                    outlet_angles_deg=_outlet_angles,
+                    port_areas=_port_areas,
+                    flow_direction=_md.flow_direction,
+                    strict=False,
+                    joining_etransfer_alpha=_md.joining_etransfer_alpha,
+                )
             _mpce.initial_guess = _expand_initial_guess(_md.initial_guess, elem_id)
             if not _mpce.initial_guess:
                 _mpce.initial_guess = _guess_from_prior_result(elem_data, elem_id)

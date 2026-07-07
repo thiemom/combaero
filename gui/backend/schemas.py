@@ -222,6 +222,13 @@ class MPCETeeData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     label: str | None = None
     flow_direction: Literal["merge", "branch"] = "branch"
+    # Junction closure model. "mynard" (default) is the full Unified0D
+    # pseudosupplier physics; "constant_k" is the simplest-model tier:
+    # fixed handbook loss coefficients referenced to the common-leg
+    # dynamic head (Idelchik convention), K independent of the split.
+    junction_model: Literal["mynard", "constant_k"] = "mynard"
+    K_straight: float = 0.4  # constant_k only: straight-arm loss coeff [-]
+    K_branch: float = 1.0  # constant_k only: branch-arm loss coeff [-]
     theta_deg: float = 90.0  # branch angle [deg], converted to radians in graph_builder
     F_C: float | None = None  # None = inherit from common/straight-arm channel
     F_branch: float | None = None  # None = inherit from branch-arm channel
