@@ -160,11 +160,14 @@ def test_both_models_give_forward_dominant_inlet_flow():
     # all-forward root and its mirrored all-reverse image are equally exact,
     # and the default cold start may land either. Seed the forward basin
     # explicitly -- this test compares the models' forward solutions, it
-    # does not test cold-start basin selection.
+    # does not test cold-start basin selection. Seeds are anchored near
+    # the all-forward root (m_com ~ +1.41); after the 2026-07-07
+    # residual-scale fix the basin geometry changed and the previous
+    # 0.4/0.25/0.15 seeds flowed to the mirror image.
     mp_net = _mpce_branching_net()
-    mp_net.elements["lc_com"].initial_guess = {"lc_com.m_dot": 0.4}
-    mp_net.elements["lc_str"].initial_guess = {"lc_str.m_dot": 0.25}
-    mp_net.elements["lc_bra"].initial_guess = {"lc_bra.m_dot": 0.15}
+    mp_net.elements["lc_com"].initial_guess = {"lc_com.m_dot": 1.0}
+    mp_net.elements["lc_str"].initial_guess = {"lc_str.m_dot": 0.8}
+    mp_net.elements["lc_bra"].initial_guess = {"lc_bra.m_dot": 0.2}
     mp_sol = NetworkSolver(mp_net).solve()
 
     assert v3_sol["__success__"], f"v3 did not converge: {v3_sol.get('__message__')}"

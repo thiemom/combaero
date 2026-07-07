@@ -107,6 +107,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to 29 s at timeout=90.
 
 ### Fixed
+- **Solver: MPCE impulse rows were residual-scaled as mass flows --
+  the root cause of the "doomed primary" stall class on junction
+  networks.** ``_build_residual_scales`` classified all N+1
+  ``MultiPortChamberElement`` rows as ``ref_mdot``, but the N impulse
+  rows ``(P_i + rho_i u_i^2) - P_jct`` are PRESSURE-magnitude: in the
+  scaled system hybr/LM actually optimize they were over-weighted by
+  ``ref_p/ref_mdot`` (~1e5; measured 7.5e4 vs O(0.1) for correctly
+  classified rows on the three-port fixture at x0). With the corrected
+  classification (``[ref_p] * N + [ref_mdot]``) every known
+  doomed-primary network converges COLD with no stall handover, no LM
+  fallback, and no warm-start retry: three-port fixture 187 s doomed
+  grind -> 2.6 s, 5-tee slow pockets at 0.26/0.32/0.40 kg/s (all
+  previously failing cold) -> 5-7 s, 16 kg/s 20 bar net 23 s
+  (stall+LM rescue) -> 12 s direct, one-tee choke net 25 s -> 2.3 s.
+  Certified audit unchanged at 32/32 (39 s). The stall-handover and
+  outlet-ref auto-retry machinery remains as a safety net but no
+  longer fires on these networks. Found while investigating why the
+  phi-closure prototype's trf solver crawled: least-squares objectives
+  are brutally sensitive to row weights where root-finders merely
+  degrade. NOTE: the faster cold path exposes that the sign-symmetric
+  v1 MPCE (no ``flow_direction`` constraint, no direction verification
+  hook) can converge onto exact mirror/reversed roots on
+  pressure-driven nets with ambiguous direction -- a pre-existing
+  model property; affected tests now pin the physical basin
+  explicitly, and GUI networks are unaffected (MPCEv2 with direction
+  verification).
 - **GUI: editing a value could apply it to two nodes.** React Flow
   prevents default on node mousedown, so a focused Inspector input never
   blurred when clicking another node; React then reused the same input
