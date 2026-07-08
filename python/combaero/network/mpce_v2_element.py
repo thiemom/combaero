@@ -519,3 +519,152 @@ class MPCEv2Element(MultiPortChamberElement):
         jac[N] = mass_row
 
         return residuals, jac
+
+
+class ConstantKTeeElement(MPCEv2Element):
+    """Junction with FIXED per-port loss coefficients (the "simplest
+    model" tier): handbook/datasheet K values instead of the Mynard
+    closure.
+
+    Residual on each non-common port i:
+
+        Pt_i - Pt_jct + sign * K_i * q_dyn_com = 0
+
+    with ``sign = +1`` separating (flow_direction='branch') and ``-1``
+    joining ('merge'); Pt continuity (K = 0) on the common port; the
+    usual junction sum-mass row. ``q_dyn_com`` is the common port's own
+    dynamic head, so K follows the Idelchik convention (coefficients
+    referenced to the combined-leg velocity head). K does NOT depend on
+    the flow split: the junction rows depend on m_com only and the
+    network nearly decouples.
+
+    The rows are smooth and even in m_com (no strict/soft barrier
+    machinery; the ``strict`` flag is ignored). Like every even-form
+    junction, the sign-flipped image of a root is also a root; the
+    inherited MPCEv2 ``verify_solution_consistent`` direction guard
+    demotes wrong-direction results post-solve.
+
+    Promoted from the certified-audit prototype
+    (tmp/mpce_audit_v2_runner.py ConstantKTee, 2026-07-04: 28/32
+    converged in 4-14 evaluations).
+    """
+
+    def __init__(
+        self,
+        id: str,
+        inlet_nodes: list[str],
+        outlet_nodes: list[str],
+        inlet_angles_deg: list[float] | None = None,
+        outlet_angles_deg: list[float] | None = None,
+        port_areas: list[float] | None = None,
+        flow_direction: FlowDirection = "branch",
+        strict: bool = False,
+        K_ports: dict[int, float] | None = None,
+    ):
+        super().__init__(
+            id=id,
+            inlet_nodes=inlet_nodes,
+            outlet_nodes=outlet_nodes,
+            inlet_angles_deg=inlet_angles_deg,
+            outlet_angles_deg=outlet_angles_deg,
+            port_areas=port_areas,
+            flow_direction=flow_direction,
+            strict=strict,
+        )
+        if flow_direction == "branch" and len(inlet_nodes) != 1:
+            raise ValueError(
+                f"ConstantKTeeElement '{id}': flow_direction='branch' "
+                f"requires exactly 1 inlet port, got {len(inlet_nodes)}."
+            )
+        if flow_direction == "merge" and len(outlet_nodes) != 1:
+            raise ValueError(
+                f"ConstantKTeeElement '{id}': flow_direction='merge' "
+                f"requires exactly 1 outlet port, got {len(outlet_nodes)}."
+            )
+        # Per-port loss coefficient, keyed by port index (inlets first,
+        # then outlets); the common port's entry is ignored (K = 0).
+        self.K_ports: dict[int, float] = dict(K_ports) if K_ports else {}
+
+    def _common_port_index(self) -> int:
+        # Port order is inlet_nodes + outlet_nodes: the single inlet of a
+        # branch tee is port 0; the single outlet of a merge tee is the
+        # last port.
+        return 0 if self.flow_direction == "branch" else self.N - 1
+
+    def residuals(  # type: ignore[override]
+        self,
+        states: list[NetworkMixtureState],
+        Pt_jct: float,
+        port_mdots: list[float],
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        N = self.N
+        common = self._common_port_index()
+        sign = +1.0 if self.flow_direction == "branch" else -1.0
+        A_c = float(self.port_areas[common])
+        rho_c = float(states[common].density())
+        P_c = float(states[common].P)
+        T_c = float(states[common].T)
+        m_c = float(port_mdots[common])
+        q_dyn = m_c * m_c / (2.0 * rho_c * A_c * A_c)
+        dq_dm = m_c / (rho_c * A_c * A_c)
+        # q ~ 1/rho with rho ~ P/T (near-ideal gas): d q/dP = -q/P and
+        # d q/dT = +q/T at the common port's static state.
+        dq_dP = -q_dyn / P_c if P_c > 0.0 else 0.0
+        dq_dT = q_dyn / T_c if T_c > 0.0 else 0.0
+
+        residuals: list[float] = []
+        jac: dict[int, dict[str, float]] = {}
+        m_var_c = f"{self._port_element_ids[common]}.m_dot"
+        p_var_c = f"{self.port_nodes[common]}.P"
+        t_var_c = f"{self.port_nodes[common]}.T"
+        for i in range(N):
+            K_i = 0.0 if i == common else float(self.K_ports.get(i, 0.0))
+            residuals.append(float(states[i].Pt) - Pt_jct + sign * K_i * q_dyn)
+            row: dict[str, float] = {
+                f"{self.port_nodes[i]}.Pt": 1.0,
+                f"{self.id}.P_jct": -1.0,
+            }
+            if K_i != 0.0:
+                # port_mdots[common] = sign_c * outer_c; q is quadratic in
+                # m_c, so chain d q / d outer_c through the port sign.
+                row[m_var_c] = row.get(m_var_c, 0.0) + (
+                    sign * K_i * dq_dm * self._port_signs[common]
+                )
+                row[p_var_c] = row.get(p_var_c, 0.0) + sign * K_i * dq_dP
+                row[t_var_c] = row.get(t_var_c, 0.0) + sign * K_i * dq_dT
+            jac[i] = row
+
+        residuals.append(sum(port_mdots))
+        mass_row: dict[str, float] = {}
+        for i in range(N):
+            mv = f"{self._port_element_ids[i]}.m_dot"
+            mass_row[mv] = mass_row.get(mv, 0.0) + self._port_signs[i]
+        jac[N] = mass_row
+        return residuals, jac
+
+    def diagnostics(  # type: ignore[override]
+        self,
+        states: list[NetworkMixtureState],
+        Pt_jct: float,
+        port_mdots: list[float] | None = None,
+    ) -> dict[str, float]:
+        """Parent per-port fields plus the FIXED K values actually used.
+
+        Deliberately skips MPCEv2's diagnostics (which re-evaluate the
+        Mynard closure -- not the model in use here). For the 3-port tee
+        the two non-common ports are aliased ``K_straight`` / ``K_branch``
+        in port order, matching the GUI wiring.
+        """
+        diag = MultiPortChamberElement.diagnostics(self, states, Pt_jct, port_mdots)
+        common = self._common_port_index()
+        noncommon = [i for i in range(self.N) if i != common]
+        for i in noncommon:
+            diag[f"port_{i}_K"] = float(self.K_ports.get(i, 0.0))
+        if self.N == 3:
+            diag["K_straight"] = float(self.K_ports.get(noncommon[0], 0.0))
+            diag["K_branch"] = float(self.K_ports.get(noncommon[1], 0.0))
+        if port_mdots is not None and len(port_mdots) == self.N:
+            m_c = float(port_mdots[common])
+            if abs(m_c) > 1e-12 and self.N == 3:
+                diag["mass_flow_ratio"] = abs(float(port_mdots[noncommon[1]])) / abs(m_c)
+        return diag

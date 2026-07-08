@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **GUI/Network: constant-K junction model tier for the tee.** The
+  tee Inspector gains a "Junction Model" selector: the default
+  "Momentum CV (Mynard)" full closure, or "Constant K (handbook)" --
+  fixed loss coefficients ``K_straight`` / ``K_branch`` (defaults
+  0.4 / 1.0, representative for a sharp 90-deg tee) referenced to the
+  common-leg dynamic head (Idelchik convention), independent of the
+  flow split. Backed by the new ``ConstantKTeeElement`` (promoted from
+  the certified-audit prototype), supporting both branch and merge
+  topologies, with analytical Jacobian rows (including the dynamic
+  head's density sensitivity to the common port's P and T) and the
+  inherited MPCEv2 direction guard. Diagnostics report the fixed K
+  values and the mass-flow ratio. At convergence the port total
+  pressure drops reproduce ``K * q_common`` exactly (anchored in
+  tests).
 - **Solver: energy-consistency verification for v1
   ``MultiPortChamberElement`` -- mirror roots are demoted like
   MPCEv2's wrong-direction roots.** The v1 impulse rows are even in

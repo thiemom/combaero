@@ -329,3 +329,64 @@ def test_inheritance_falls_back_to_default_when_no_channels():
     # No channels to inherit from; defaults apply
     assert e.port_areas[0] == 0.01
     assert e.port_areas[2] == 0.01  # F_branch derives from F_C/psi=1
+
+
+def test_constant_k_model_builds_constant_k_element_branch():
+    """junction_model='constant_k' dispatches to ConstantKTeeElement with
+    K_ports mapped by port order (branch: [common, straight, branch])."""
+    from combaero.network.mpce_v2_element import ConstantKTeeElement
+
+    schema = _three_plenum_mpce_schema("branch")
+    mpce_node = next(n for n in schema.nodes if n.id == "mpce")
+    mpce_node.data["junction_model"] = "constant_k"
+    mpce_node.data["K_straight"] = 0.3
+    mpce_node.data["K_branch"] = 1.2
+    net = build_network_from_schema(schema)
+    e = _get_element(net, "mpce")
+    assert isinstance(e, ConstantKTeeElement)
+    assert e.flow_direction == "branch"
+    assert e.K_ports == {1: 0.3, 2: 1.2}
+
+
+def test_constant_k_model_builds_constant_k_element_merge():
+    """Merge port order is [straight, branch, common]."""
+    from combaero.network.mpce_v2_element import ConstantKTeeElement
+
+    schema = _three_plenum_mpce_schema("merge")
+    mpce_node = next(n for n in schema.nodes if n.id == "mpce")
+    mpce_node.data["junction_model"] = "constant_k"
+    net = build_network_from_schema(schema)
+    e = _get_element(net, "mpce")
+    assert isinstance(e, ConstantKTeeElement)
+    assert e.flow_direction == "merge"
+    # Schema defaults: K_straight=0.4, K_branch=1.0.
+    assert e.K_ports == {0: 0.4, 1: 1.0}
+
+
+def test_default_and_legacy_schemas_build_mynard_element():
+    """junction_model absent (legacy save files) or 'mynard' keeps the
+    full MPCEv2 element -- and NOT the ConstantKTeeElement subclass."""
+    from combaero.network.mpce_v2_element import ConstantKTeeElement
+
+    legacy = _three_plenum_mpce_schema("branch")
+    net = build_network_from_schema(legacy)
+    e = _get_element(net, "mpce")
+    assert type(e) is MPCEv2Element
+    assert not isinstance(e, ConstantKTeeElement)
+
+    explicit = _three_plenum_mpce_schema("branch")
+    node = next(n for n in explicit.nodes if n.id == "mpce")
+    node.data["junction_model"] = "mynard"
+    e2 = _get_element(build_network_from_schema(explicit), "mpce")
+    assert type(e2) is MPCEv2Element
+
+
+def test_mpce_tee_data_constant_k_defaults():
+    d = MPCETeeData()
+    assert d.junction_model == "mynard"
+    assert d.K_straight == 0.4
+    assert d.K_branch == 1.0
+    d2 = MPCETeeData(junction_model="constant_k", K_straight=0.25, K_branch=2.0)
+    assert d2.junction_model == "constant_k"
+    assert d2.K_straight == 0.25
+    assert d2.K_branch == 2.0
