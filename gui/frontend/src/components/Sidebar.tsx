@@ -357,9 +357,6 @@ const Sidebar = () => {
 					>
 						<option value="default">Default Cold Start</option>
 						<option value="analytical_pt_prop">Analytical (Pt Prop.)</option>
-						<option value="incompressible_warmstart">
-							Incomp. Warmstart (deprecated)
-						</option>
 						<option value="outletref_warmstart">
 							Incomp. Warmstart (Outlet-ref)
 						</option>

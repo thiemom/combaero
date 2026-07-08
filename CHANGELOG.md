@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **GUI: the deprecated "Incomp. Warmstart" init strategy is no longer
+  offered in the dropdown.** The inlet-referenced incompressible warm
+  start occasionally works (heavy MFB-driven nets), but its successor
+  -- the outlet-referenced variant, which tracks the compressible root
+  6-7x closer and remains selectable -- covers that niche, and the
+  auto-retry ladder still falls back to the inlet-referenced proxy
+  internally when the outlet-referenced one starves. Legacy save
+  files that stored the old strategy are migrated to
+  ``outletref_warmstart`` on load. The Python API still accepts
+  ``init_strategy="incompressible_warmstart"`` (with its
+  DeprecationWarning) for headless workflows.
+
 ### Added
 - **GUI/Network: constant-K junction model tier for the tee.** The
   tee Inspector gains a "Junction Model" selector: the default

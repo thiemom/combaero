@@ -126,3 +126,33 @@ describe("useStore topology result invalidation", () => {
 		expect(solveResults).toBeNull();
 	});
 });
+
+describe("loadNetwork legacy migration", () => {
+	it("maps the retired incompressible_warmstart strategy to outletref_warmstart", () => {
+		useStore.getState().loadNetwork({
+			nodes: [nodeWithResult("n1")],
+			edges: [],
+			solverSettings: {
+				...useStore.getState().solverSettings,
+				init_strategy: "incompressible_warmstart",
+			},
+		});
+		expect(useStore.getState().solverSettings.init_strategy).toBe(
+			"outletref_warmstart",
+		);
+	});
+
+	it("leaves current strategies untouched", () => {
+		useStore.getState().loadNetwork({
+			nodes: [nodeWithResult("n1")],
+			edges: [],
+			solverSettings: {
+				...useStore.getState().solverSettings,
+				init_strategy: "analytical_pt_prop",
+			},
+		});
+		expect(useStore.getState().solverSettings.init_strategy).toBe(
+			"analytical_pt_prop",
+		);
+	});
+});
