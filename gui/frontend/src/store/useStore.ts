@@ -58,7 +58,6 @@ export interface RFState {
 		init_strategy:
 			| "default"
 			| "analytical_pt_prop"
-			| "incompressible_warmstart"
 			| "outletref_warmstart"
 			| "homotopy"
 			| "continuation";
@@ -398,6 +397,15 @@ const useStore = create<RFState>((set, get) => ({
 
 	loadNetwork: (data: any) => {
 		if (data.nodes && data.edges) {
+			const loadedSettings = data.solverSettings || get().solverSettings;
+			// Legacy migration: the deprecated inlet-referenced incompressible
+			// warm start is no longer offered in the UI; its successor is the
+			// outlet-referenced variant (tracks the compressible root 6-7x
+			// closer). The backend still accepts the old value for headless
+			// workflows.
+			if (loadedSettings.init_strategy === "incompressible_warmstart") {
+				loadedSettings.init_strategy = "outletref_warmstart";
+			}
 			set({
 				nodes: data.nodes.map((n: any) => ({
 					...n,
@@ -407,7 +415,7 @@ const useStore = create<RFState>((set, get) => ({
 					...e,
 					data: e.data ? { ...e.data, result: undefined } : e.data,
 				})),
-				solverSettings: data.solverSettings || get().solverSettings,
+				solverSettings: loadedSettings,
 				solveResults: null,
 			});
 		}
