@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **CI: `publish-gui.yml` no longer races `publish.yml` to PyPI.** Both
+  workflows trigger off the same `v*` tag, but the core `combaero` wheel
+  build (3 OSes via `cibuildwheel`) is slower than the GUI build; the
+  verify job's `uv pip install` could resolve before the matching
+  `combaero` version existed on the index ("No solution found" --
+  first hit on the v0.4.0 release). The verify job now polls PyPI for
+  the matching `combaero` version (up to 10 minutes) before installing.
+
 ## [0.4.0] - 2026-07-08
 
 ### Removed
