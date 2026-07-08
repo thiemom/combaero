@@ -88,6 +88,27 @@ jobs:
           print("OK: wheel contents look good")
           EOF
 
+      - name: Wait for matching combaero release on PyPI
+        run: |
+          # combaero-gui and combaero share a tag/version (both derived via
+          # setuptools_scm from the same `v*` tag), but publish.yml builds
+          # wheels for 3 OSes and is slower than this workflow -- poll until
+          # the matching combaero version actually lands on the index instead
+          # of racing it (see #232 follow-up: first v0.4.0 attempt failed
+          # because "No solution found" resolving combaero>=0.4 too early).
+          GUI_WHEEL=$(ls dist/combaero_gui-*.whl)
+          VERSION=$(basename "$GUI_WHEEL" | cut -d- -f2)
+          echo "Waiting for combaero==$VERSION on PyPI..."
+          for i in $(seq 1 40); do
+            if curl -fsS "https://pypi.org/pypi/combaero/$VERSION/json" > /dev/null 2>&1; then
+              echo "Found combaero==$VERSION on PyPI after $((i - 1)) retries."
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "FAIL: combaero==$VERSION did not appear on PyPI within 10 minutes"
+          exit 1
+
       - name: Install wheel and smoke-test server
         run: |
           uv venv .test-venv
