@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-08
+
 ### Removed
 - **GUI: the deprecated "Incomp. Warmstart" init strategy is no longer
   offered in the dropdown.** The inlet-referenced incompressible warm
@@ -1147,7 +1149,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - State property units mismatch in example runner
 - Solver stability under degenerate initial conditions
 
-[Unreleased]: https://github.com/thiemom/combaero/compare/v0.2.6...HEAD
+[Unreleased]: https://github.com/thiemom/combaero/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/thiemom/combaero/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/thiemom/combaero/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/thiemom/combaero/compare/v0.2.6...v0.3.0
 [0.2.6]: https://github.com/thiemom/combaero/compare/v0.2.4...v0.2.6
 [0.2.4]: https://github.com/thiemom/combaero/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/thiemom/combaero/compare/v0.2.2...v0.2.3
