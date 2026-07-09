@@ -96,11 +96,18 @@ jobs:
           # the matching combaero version actually lands on the index instead
           # of racing it (see #232 follow-up: first v0.4.0 attempt failed
           # because "No solution found" resolving combaero>=0.4 too early).
+          #
+          # Poll the Simple Repository index (the endpoint `uv pip install`
+          # actually resolves against), not the JSON API: on the v0.4.1
+          # release the JSON API reported the new version several minutes
+          # before it was visible via /simple/ (separate CDN cache), so the
+          # install step below silently resolved the prior (broken) version
+          # instead of failing.
           GUI_WHEEL=$(ls dist/combaero_gui-*.whl)
           VERSION=$(basename "$GUI_WHEEL" | cut -d- -f2)
-          echo "Waiting for combaero==$VERSION on PyPI..."
+          echo "Waiting for combaero==$VERSION on the PyPI simple index..."
           for i in $(seq 1 40); do
-            if curl -fsS "https://pypi.org/pypi/combaero/$VERSION/json" > /dev/null 2>&1; then
+            if curl -fsS "https://pypi.org/simple/combaero/" 2>/dev/null | grep -q "combaero-$VERSION"; then
               echo "Found combaero==$VERSION on PyPI after $((i - 1)) retries."
               exit 0
             fi
@@ -116,7 +123,18 @@ jobs:
           uv pip install --python .test-venv dist/combaero_gui-*.whl
           .test-venv/bin/combaero-gui &
           SERVER_PID=$!
-          sleep 4
+          # poll instead of a fixed sleep -- a fixed 4s sleep flaked on the
+          # v0.4.1 release when server startup (heavier now with the MPCE
+          # junction models) took slightly longer than that.
+          for i in $(seq 1 20); do
+            curl -fsS http://localhost:8000/health > /dev/null 2>&1 && break
+            if [ "$i" -eq 20 ]; then
+              echo "FAIL: server did not respond on :8000/health within 10s"
+              kill $SERVER_PID
+              exit 1
+            fi
+            sleep 0.5
+          done
           # health endpoint must respond 200
           curl -fsS http://localhost:8000/health
           # root must serve HTML (index.html), not JSON

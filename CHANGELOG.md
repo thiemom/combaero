@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-07-09
+
+### Fixed
+- **CI: `publish-gui.yml` verify job had two more release-blocking races,
+  both hit on the v0.4.1 release attempt.** (1) The "wait for combaero"
+  step polled PyPI's JSON API, which updated several minutes before the
+  Simple Repository index that `uv pip install` actually resolves
+  against (separate CDN caches); the install step silently resolved the
+  prior, broken `combaero` version instead of failing outright. Now
+  polls `/simple/combaero/` directly. (2) The smoke test's fixed `sleep
+  4` before the health-check `curl` flaked repeatedly once server
+  startup (heavier now with the MPCE junction models) crept past 4s;
+  replaced with a poll loop (up to 10s).
+
 ## [0.4.1] - 2026-07-08
 
 ### Fixed
@@ -1173,7 +1187,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - State property units mismatch in example runner
 - Solver stability under degenerate initial conditions
 
-[Unreleased]: https://github.com/thiemom/combaero/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/thiemom/combaero/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/thiemom/combaero/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/thiemom/combaero/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/thiemom/combaero/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/thiemom/combaero/compare/v0.3.0...v0.3.1
