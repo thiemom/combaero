@@ -7,7 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-07-08
+
 ### Fixed
+- **`MPCEv2Element`/`ConstantKTeeElement` raised `ModuleNotFoundError: No
+  module named 'validation'` on a real PyPI install.** The Mynard
+  Unified0D loss-coefficient implementation lived in the dev-only
+  `validation/` tree (not shipped in the wheel) and was imported
+  directly by production code; a fresh `pip install combaero` (or
+  `combaero-gui`, which depends on it) hit the error the moment either
+  class was constructed. First surfaced by the v0.4.0 release's GUI
+  publish verify job, which installs the built wheel into a clean venv
+  rather than running from a repo checkout. The implementation now
+  lives in `combaero.network._mynard2010`; `validation/junction/models/
+  mynard2010.py` re-exports it so existing validation scripts/tests are
+  unaffected. Verified by installing a freshly built wheel into an
+  isolated venv outside the repo tree.
 - **CI: `publish-gui.yml` no longer races `publish.yml` to PyPI.** Both
   workflows trigger off the same `v*` tag, but the core `combaero` wheel
   build (3 OSes via `cibuildwheel`) is slower than the GUI build; the
@@ -1158,7 +1173,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - State property units mismatch in example runner
 - Solver stability under degenerate initial conditions
 
-[Unreleased]: https://github.com/thiemom/combaero/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/thiemom/combaero/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/thiemom/combaero/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/thiemom/combaero/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/thiemom/combaero/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/thiemom/combaero/compare/v0.2.6...v0.3.0

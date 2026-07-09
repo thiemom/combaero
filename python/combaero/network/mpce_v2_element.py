@@ -42,11 +42,11 @@ from typing import Literal
 import numpy as np
 
 from combaero.network._mpce_v2_jacobian import dKQ_dmdot_separating_T
+from combaero.network._mynard2010 import junction_loss_coefficient
 from combaero.network.components import (
     MultiPortChamberElement,
     NetworkMixtureState,
 )
-from validation.junction.models.mynard2010 import junction_loss_coefficient
 
 FlowDirection = Literal["merge", "branch"]
 
