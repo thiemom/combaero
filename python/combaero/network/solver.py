@@ -198,20 +198,27 @@ class NetworkSolver:
 
         from .components import MultiPortChamberElement, TeeJunctionElement
 
+        _row_scale_kind_map = {"p": ref_p, "mdot": ref_mdot}
         for element in self.network.elements.values():
-            # MultiPortChamberElement emits N impulse rows,
-            # (P_i + rho_i u_i^2) - P_jct, which are PRESSURE-magnitude,
-            # followed by one sum-mass row. Classifying all N+1 rows as
+            # MultiPortChamberElement's rows are a MIX of pressure- and
+            # mass-flow-magnitude residuals, and which row is which depends
+            # on the subclass's own physics (row_scale_kinds()). The base
+            # class's own impulse rows, (P_i + rho_i u_i^2) - P_jct, are all
+            # PRESSURE-magnitude, followed by one sum-mass row -- but a
+            # subclass with different residual physics (e.g. EjectorElement)
+            # can have the opposite pattern. Classifying all N+1 rows as
             # ref_mdot (the pre-2026-07-07 behavior) over-weighted the
             # impulse rows by ref_p/ref_mdot (~1e5) in the scaled system
             # hybr/LM optimize -- the root cause of the "doomed primary"
             # stall class on MPCE networks (three-port fixture: cold hybr
             # 187 s stall -> 2.6 s clean convergence with correct scales;
             # 5-tee slow pockets and the 16 kg/s net likewise solve cold
-            # with no stall handover).
+            # with no stall handover). Getting a subclass's row types wrong
+            # silently reintroduces the same class of stall, hence
+            # row_scale_kinds() being a real per-subclass override point
+            # rather than a hard-coded N-then-1 pattern.
             if isinstance(element, MultiPortChamberElement):
-                scales.extend([ref_p] * element.N)
-                scales.append(ref_mdot)
+                scales.extend(_row_scale_kind_map[k] for k in element.row_scale_kinds())
                 continue
             elem_scale = (
                 ref_p

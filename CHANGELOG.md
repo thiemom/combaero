@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`EjectorElement`: production supersonic-ejector network element**
+  (`combaero.network.ejector_element`), critical (double-choked) mode only.
+  Reuses Huang (1999)'s closed-form entrainment ratio (Eqs. 1-8) together
+  with Kracik & Dvorak (2016)'s lambda/q(lambda)/z(lambda) mixing closure
+  for the critical back pressure (their Eqs. 7-13), replacing Huang's own
+  original momentum+shock+diffuser P_c* chain (Eqs. 9-18) in the reference
+  model -- validated against Huang's 31-row R141b dataset (mean/max error
+  6.2%/13.2%, vs. 25%/35% for Huang's original chain and 9.0%/16.0% for a
+  Lienhard/McGovern zero-loss closure also evaluated; see
+  `validation/ejector/README.md` for the full comparison and paper
+  references). Sits on the `MultiPortChamberElement` 3-port junction
+  topology (primary/secondary inlets, one outlet); `P_jct` is repurposed
+  as a diagnostic critical back pressure P_c*, not the outlet's actual
+  pressure, since critical-mode entrainment ratio is independent of back
+  pressure by definition. gamma/R evaluated live from combaero's own
+  real-fluid EOS (combustion/air-relevant species only) at the
+  entrained-flow choking plane. `recovery_efficiency` (default 1.0, no
+  artificial loss) is intentionally not fitted to the validation dataset,
+  per this project's calibration policy of anchoring on analytical models.
+  Jacobian is FD fallback except for the linear mass-conservation row
+  (analytic Jacobians are planned for the C++ port). The underlying
+  closed-form physics (`entrainment_ratio`, `critical_back_pressure`,
+  `choked_mass_flow`, `EjectorGeometry`) now lives in
+  `combaero.network._ejector_huang1999`, following the same
+  production-tree placement already used for the Mynard tee-loss model,
+  since `python/combaero/` must never import from the dev-only
+  `validation/` tree; `validation/ejector/models/huang1999.py` re-exports
+  it unchanged for existing validation scripts.
+
+### Changed
+- **`MultiPortChamberElement` subclasses can now override
+  `row_scale_kinds()`** to declare their own per-row scale-kind pattern
+  ("p" or "mdot") for `solver.py`'s row-scaling vector, instead of the
+  solver unconditionally assuming every subclass shares the base class's
+  N-pressure-rows-then-one-mass-row pattern. Needed for `EjectorElement`,
+  whose four rows are the opposite pattern (three mass-flow rows, one
+  pressure row); the default matches prior hard-coded behaviour so
+  existing subclasses (`ConstantKTeeElement`, `MPCEv2Element`) are
+  unaffected.
+
 ## [0.4.2] - 2026-07-09
 
 ### Fixed

@@ -3155,6 +3155,22 @@ class MultiPortChamberElement(NetworkElement):
     def n_equations(self) -> int:
         return self.N + 1  # N impulse + 1 sum-mass
 
+    def row_scale_kinds(self) -> list[str]:
+        """Per-row scale kind ("p" or "mdot") for the solver's row-scaling
+        vector, in the same order as `residuals()`'s returned list.
+
+        Default matches this class's own impulse-CV rows: N pressure-
+        magnitude rows (P_i + rho_i u_i^2 - P_jct) followed by one mass-
+        magnitude row (sum of port mdots). Subclasses whose residual rows
+        have a DIFFERENT type pattern (e.g. a row expressed as a mass-flow
+        residual rather than a pressure residual) must override this --
+        the solver applies the wrong scale silently otherwise, which has
+        previously caused severe convergence stalls (see solver.py's
+        scaling block for the historical "doomed primary" stall class this
+        guards against).
+        """
+        return ["p"] * self.N + ["mdot"]
+
     def verify_solution_consistent(
         self,
         sol: dict[str, float],

@@ -526,6 +526,28 @@ vortex = VortexElement(
 # Gamma is derived from omega so that V_theta(r_c) = omega * r_c exactly (solid-body core).
 # Diagnostics include: m_dot, omega_rpm, dP_vortex [Pa], Pt_in, Pt_out.
 # If omega_rpm=0 the element is lossless (transparent); r_in=0 omits the on-axis term.
+
+# Supersonic ejector, critical (double-choked) mode only (Huang 1999 entrainment
+# ratio + Kracik & Dvorak 2016 mixing closure for the critical back pressure;
+# see validation/ejector/README.md for derivation, references, and accuracy).
+from combaero.network.ejector_element import EjectorElement
+ejector = EjectorElement(
+    "ej1", primary_node="mc_primary", secondary_node="mc_secondary", outlet_node="mc_outlet",
+    throat_area=3.14e-5,      # primary nozzle throat area A_t [m^2]
+    nozzle_exit_area=1.0e-4,  # primary nozzle exit area A_p1 [m^2], must exceed throat_area
+    mixing_area=8.0e-4,       # constant-area mixing section A_3 [m^2], must exceed nozzle_exit_area
+    recovery_efficiency=1.0,  # multiplies the lossless mixed stagnation pressure -> P_c*; not fitted to data
+)
+# Solved unknowns: ej1.P_jct, repurposed as the critical back pressure P_c* (a
+# diagnostic upper bound, NOT the outlet's actual pressure -- entrainment ratio
+# is by definition independent of back pressure in critical mode). Residuals:
+# choked primary mass flow, entrainment-ratio closure, mass conservation,
+# P_jct - P_c* = 0. Working fluid: combaero's real-fluid EOS (combustion/air
+# species only, no halocarbon refrigerants); gamma/R evaluated live at the
+# entrained-flow choking plane. Jacobian is FD fallback except for the linear
+# mass-conservation row (analytic Jacobians land in the planned C++ port).
+# Use ejector.verify_solution_consistent(sol) post-solve to confirm the
+# operating point is actually critical (outlet Pt <= P_c*).
 ```
 
 ### Combustion Integration
