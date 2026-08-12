@@ -47,6 +47,10 @@ foreach(test_source ${TEST_SOURCES})
     get_filename_component(test_name ${test_source} NAME_WE)
     add_executable(${test_name} ${test_source})
     target_link_libraries(${test_name} PRIVATE combaero_core GTest::gtest_main)
+    # Repo root on the include path so tests can pull in golden data headers
+    # that live outside include/ (e.g. validation/*/data/*.h) without
+    # duplicating reference numbers into the test file itself.
+    target_include_directories(${test_name} PRIVATE ${CMAKE_SOURCE_DIR})
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
 
