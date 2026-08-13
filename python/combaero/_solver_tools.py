@@ -28,6 +28,9 @@ density_and_jacobians = _core.density_and_jacobians
 dimple_friction_multiplier_and_jacobian = _core.dimple_friction_multiplier_and_jacobian
 dimple_nusselt_enhancement_and_jacobian = _core.dimple_nusselt_enhancement_and_jacobian
 effusion_effectiveness_and_jacobian = _core.effusion_effectiveness_and_jacobian
+ejector_choked_mass_flow_and_jacobian = _core.ejector_choked_mass_flow_and_jacobian
+ejector_critical_back_pressure_and_jacobian = _core.ejector_critical_back_pressure_and_jacobian
+ejector_entrainment_ratio_and_jacobian = _core.ejector_entrainment_ratio_and_jacobian
 enthalpy_and_jacobian = _core.enthalpy_and_jacobian
 film_cooling_effectiveness_and_jacobian = _core.film_cooling_effectiveness_and_jacobian
 friction_and_jacobian = _core.friction_and_jacobian
@@ -76,6 +79,9 @@ __all__ = [
     "dimple_friction_multiplier_and_jacobian",
     "dimple_nusselt_enhancement_and_jacobian",
     "effusion_effectiveness_and_jacobian",
+    "ejector_choked_mass_flow_and_jacobian",
+    "ejector_critical_back_pressure_and_jacobian",
+    "ejector_entrainment_ratio_and_jacobian",
     "enthalpy_and_jacobian",
     "film_cooling_effectiveness_and_jacobian",
     "friction_and_jacobian",

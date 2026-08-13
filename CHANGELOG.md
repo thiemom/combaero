@@ -27,8 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   entrained-flow choking plane. `recovery_efficiency` (default 1.0, no
   artificial loss) is intentionally not fitted to the validation dataset,
   per this project's calibration policy of anchoring on analytical models.
-  Jacobian is FD fallback except for the linear mass-conservation row
-  (analytic Jacobians are planned for the C++ port). The underlying
+  Residuals and their full analytic Jacobian are evaluated through a C++
+  `(f, J)` path (`include/ejector.h` / `src/ejector.cpp`, exposed via
+  pybind), per CLAUDE.md's Solver `(f, J)` rule. The underlying
   closed-form physics (`entrainment_ratio`, `critical_back_pressure`,
   `choked_mass_flow`, `EjectorGeometry`) now lives in
   `combaero.network._ejector_huang1999`, following the same
@@ -38,6 +39,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it unchanged for existing validation scripts.
 
 ### Changed
+- **`EjectorElement` now evaluates its residuals and a FULL analytic
+  Jacobian (all four rows) through the C++ `(f, J)` path** rather than the
+  pure-Python reference physics plus a finite-difference Jacobian fallback.
+  The ejector closed forms and their analytic derivatives (added to
+  `include/ejector.h` / `src/ejector.cpp`) are exposed via pybind
+  (`combaero._solver_tools.ejector_*_and_jacobian`). The element's Jacobian
+  is exact w.r.t. the four Newton-solved thermodynamic inputs (primary and
+  secondary stagnation pressure and temperature); `gamma` and `r_gas` are
+  frozen coefficients (recomputed each residual call, so the converged root
+  is exact -- only the weak implicit `d(gamma)/d(Tt)` term is dropped from
+  the step). `combaero.network._ejector_huang1999` is now the validation
+  reference only.
 - **`MultiPortChamberElement` subclasses can now override
   `row_scale_kinds()`** to declare their own per-row scale-kind pattern
   ("p" or "mdot") for `solver.py`'s row-scaling vector, instead of the

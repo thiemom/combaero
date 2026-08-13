@@ -135,7 +135,9 @@ def test_residuals_cross_check_against_reference_physics():
 
     res, jac = e.residuals([primary, secondary, outlet], P_jct_guess, port_mdots)
     assert len(res) == 4
-    assert set(jac.keys()) == {2}  # only the mass row is analytic
+    # All four rows are now analytic (full C++ (f,J) path); see
+    # test_residuals_jacobian_matches_finite_difference for the accuracy check.
+    assert set(jac.keys()) == {0, 1, 2, 3}
 
     gamma = choke_plane_gamma(secondary.Tt, secondary.X)
     r_gas = cb.specific_gas_constant(secondary.X)
@@ -183,6 +185,93 @@ def test_residuals_all_zero_at_the_converged_point():
     res, _jac = e.residuals([primary, secondary, outlet], pc, port_mdots)
     for r in res:
         assert r == pytest.approx(0.0, abs=1e-6)
+
+
+def test_residuals_jacobian_matches_finite_difference(monkeypatch):
+    """Central-difference-check every analytic jac-dict entry against
+    perturbed residuals() calls, at a non-converged operating point. This
+    directly proves the column-name / sign / relay mapping in residuals()
+    is correct (the error-prone part of the C++ (f,J) rewire).
+
+    gamma is monkeypatched to a constant so the FD holds it fixed, matching
+    the element's frozen-gamma Jacobian (see module docstring): only the
+    explicit (Pt, Tt) dependence is claimed analytic, and the dropped weak
+    d(gamma)/d(Tt) term would otherwise show up as spurious FD error on the
+    secondary-temperature column.
+    """
+    import dataclasses
+
+    import combaero.network.ejector_element as ejmod
+
+    e = _element()
+    e._port_element_ids = ["chan_p", "chan_s", "chan_o"]
+    primary, secondary, outlet = _states()
+
+    frozen_gamma = choke_plane_gamma(secondary.Tt, secondary.X)
+    monkeypatch.setattr(ejmod, "choke_plane_gamma", lambda t, x, **kw: frozen_gamma)
+
+    # A deliberately non-converged base point (residuals nonzero here, so the
+    # Jacobian is exercised away from R=0).
+    P_jct0 = 90000.0
+    port_mdots0 = [-0.070, -0.030, 0.100]
+    states0 = [primary, secondary, outlet]
+
+    _res0, jac = e.residuals(states0, P_jct0, port_mdots0)
+
+    def res_row(row_idx, *, P_jct=P_jct0, port_mdots=None, states=None):
+        pm = list(port_mdots0) if port_mdots is None else port_mdots
+        st = states0 if states is None else states
+        return e.residuals(st, P_jct, pm)[0][row_idx]
+
+    # Perturbation drivers keyed by jac column name. Each returns res_row as a
+    # function of the scalar unknown behind that column.
+    def perturb_mdot(port_i, sign):
+        # column "chan_x.m_dot" = raw unknown u; port_mdots[port_i] = sign*u.
+        def f(row_idx, u):
+            pm = list(port_mdots0)
+            pm[port_i] = sign * u
+            return res_row(row_idx, port_mdots=pm)
+
+        # base value of the raw unknown u = port_mdots[port_i]/sign
+        return f, port_mdots0[port_i] / sign
+
+    def perturb_state(idx, field):
+        def f(row_idx, v):
+            st = list(states0)
+            st[idx] = dataclasses.replace(states0[idx], **{field: v})
+            return res_row(row_idx, states=st)
+
+        return f, getattr(states0[idx], field)
+
+    def perturb_pjct(row_idx, v):
+        return res_row(row_idx, P_jct=v)
+
+    drivers = {
+        "chan_p.m_dot": perturb_mdot(0, e._port_signs[0]),
+        "chan_s.m_dot": perturb_mdot(1, e._port_signs[1]),
+        "chan_o.m_dot": perturb_mdot(2, e._port_signs[2]),
+        "p.Pt": perturb_state(0, "Pt"),
+        "p.T": perturb_state(0, "Tt"),
+        "s.Pt": perturb_state(1, "Pt"),
+        "s.T": perturb_state(1, "Tt"),
+        "ej1.P_jct": (perturb_pjct, P_jct0),
+    }
+
+    def central_diff(fn, row_idx, x0):
+        eps = 1e-6 * abs(x0) if x0 != 0.0 else 1e-6
+        return (fn(row_idx, x0 + eps) - fn(row_idx, x0 - eps)) / (2.0 * eps)
+
+    checked = 0
+    for row_idx, row in jac.items():
+        for col, analytic in row.items():
+            fn, x0 = drivers[col]
+            fd = central_diff(fn, row_idx, x0)
+            assert analytic == pytest.approx(fd, rel=1e-5, abs=1e-9), (
+                f"row {row_idx} col {col}: analytic {analytic} vs FD {fd}"
+            )
+            checked += 1
+    # Guard against a silently-empty jac dict masking a regression.
+    assert checked >= 12
 
 
 def test_diagnostics_reports_omega_and_critical_mode():
@@ -233,10 +322,10 @@ def test_choke_plane_gamma_matches_known_air_value():
 def _expected_operating_point() -> dict[str, float]:
     """mp / ms / mdot_out / P_c* for the network's boundary conditions, from
     the same reference physics the element itself uses -- a good Newton
-    starting point for a system with no analytic Jacobian yet (see the
-    FD-fallback note in ejector_element.py's module docstring). Port static
-    P/Pt are seeded at the boundary Pt (negligible drop expected over the
-    short, large-diameter test channels).
+    starting point (the element now has a full analytic Jacobian, but a
+    realistic seed still helps this stiff double-choked system converge fast).
+    Port static P/Pt are seeded at the boundary Pt (negligible drop expected
+    over the short, large-diameter test channels).
     """
     from combaero.network._ejector_huang1999 import (
         ETA_P,

@@ -40,11 +40,22 @@ post-solve by ``verify_solution_consistent`` (Pt_outlet must not exceed it --
 violation means the design point is subcritical, which this element does not
 model).
 
-Jacobian: FD fallback (``jac = {}`` for rows 0, 1, 3; row 2's mass
-conservation is linear so it gets an analytic entry). This mirrors
-``MPCEv2Element``'s own documented prototype pattern -- analytic
-(sympy-derived) Jacobians are planned for the C++ port, the next phase of
-this work, not this element.
+Jacobian: FULL analytic, all 4 rows, via the C++ (f, J) path
+(``combaero.network._ejector_huang1999`` is now only the validation
+reference; the hot path calls ``_solver_tools.ejector_*_and_jacobian``,
+i.e. ``include/ejector.h``/``src/ejector.cpp``). The C++ Jacobians are
+exact w.r.t. the four thermodynamic inputs (primary/secondary stagnation
+pressure and temperature) holding ``gamma`` and ``r_gas`` FROZEN. Here
+``gamma = choke_plane_gamma(secondary.Tt, ...)`` is a weak function of a
+Newton unknown and ``r_gas`` depends only on composition (not a solved
+unknown), so the element Jacobian is exact in the explicit (Pt, Tt)
+dependence and drops only the tiny implicit ``d gamma / d Tt`` term -- a
+standard frozen-property Jacobian. ``gamma`` is recomputed fresh every
+residual call, so the converged root is still exact; only the Newton step
+uses a slightly approximate slope. This matches the reference data's own
+convention (``generate_reference.py`` treats gamma as a separate Jacobian
+input, so its d/dt_e central-difference targets also hold gamma fixed).
+``choke_plane_gamma`` therefore stays in Python.
 """
 
 from __future__ import annotations
@@ -52,13 +63,8 @@ from __future__ import annotations
 from typing import Any
 
 import combaero as cb
-from combaero.network._ejector_huang1999 import (
-    ETA_P,
-    EjectorGeometry,
-    choked_mass_flow,
-    critical_back_pressure,
-    entrainment_ratio,
-)
+from combaero import _solver_tools
+from combaero.network._ejector_huang1999 import ETA_P, EjectorGeometry
 from combaero.network.components import MultiPortChamberElement, NetworkMixtureState
 
 
@@ -182,26 +188,37 @@ class EjectorElement(MultiPortChamberElement):
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
         primary, secondary, _outlet = states
 
+        # gamma/r_gas: frozen coefficients (see module docstring). gamma is a
+        # weak function of secondary.Tt via the Python fixed point; r_gas is a
+        # pure function of composition (not a Newton unknown). Recomputed each
+        # call, so the converged root is exact; the C++ Jacobians below hold
+        # both fixed, dropping only the tiny implicit d(gamma)/d(Tt) term.
         gamma = choke_plane_gamma(secondary.Tt, secondary.X)
         r_gas = float(cb.specific_gas_constant(secondary.X))
-        geom = self.geometry
+        arn = self.area_ratio_nozzle
+        arm = self.area_ratio_mix
 
-        mp_choked = choked_mass_flow(
-            primary.Pt, primary.Tt, self.throat_area, gamma, r_gas, eta=ETA_P
+        mp_choked, dmp_choked_dp_g, dmp_choked_dt_g = (
+            _solver_tools.ejector_choked_mass_flow_and_jacobian(
+                primary.Pt, primary.Tt, self.throat_area, gamma, r_gas, ETA_P
+            )
         )
-        omega = entrainment_ratio(
-            primary.Pt, primary.Tt, secondary.Pt, secondary.Tt, geom, gamma
-        ).omega
-        pc_star = critical_back_pressure(
+        entr = _solver_tools.ejector_entrainment_ratio_and_jacobian(
+            primary.Pt, primary.Tt, secondary.Pt, secondary.Tt, arn, arm, gamma
+        )
+        omega = entr.value.omega
+        pc = _solver_tools.ejector_critical_back_pressure_and_jacobian(
             primary.Pt,
             primary.Tt,
             secondary.Pt,
             secondary.Tt,
-            geom,
+            arn,
+            arm,
             gamma,
             r_gas,
             self.recovery_efficiency,
-        ).p_c_pa
+        )
+        pc_star = pc.value.p_c_pa
 
         # port_mdots are junction-sign convention (positive = out of
         # junction); primary/secondary are inlets (sign -1), so their
@@ -215,15 +232,51 @@ class EjectorElement(MultiPortChamberElement):
         r2 = mdot_out - mp - ms  # == sum(port_mdots); mass conservation
         r3 = P_jct - pc_star
 
-        # Analytic Jacobian only for the linear mass row; rows 0/1/3 are FD
-        # fallback -- documented prototype pattern (see module docstring),
-        # analytic Jacobians land in the C++ port.
+        # Full analytic Jacobian. Column-name conventions (see solver.py's
+        # element jac-relay loop): port mass flows are direct unknowns keyed
+        # "{outer_id}.m_dot"; a physical port flow d(mp) = -_port_signs[i]
+        # because port_mdots[i] = _port_signs[i] * (that unknown). Port
+        # stagnation pressures "{node}.Pt" are direct unknowns; port
+        # stagnation temperatures are emitted as "{node}.T" and chained
+        # through the solver's temperature relay (same convention the
+        # compressible orifice uses: pass Tt, key the column .T). "{id}.P_jct"
+        # is this element's own direct unknown.
+        m_p = f"{self._port_element_ids[0]}.m_dot"
+        m_s = f"{self._port_element_ids[1]}.m_dot"
+        pn_pt = f"{self.primary_node}.Pt"
+        pn_t = f"{self.primary_node}.T"
+        sn_pt = f"{self.secondary_node}.Pt"
+        sn_t = f"{self.secondary_node}.T"
+        # d(mp)/d(m_p unknown) and d(ms)/d(m_s unknown).
+        d_mp = -self._port_signs[0]
+        d_ms = -self._port_signs[1]
+
+        row0 = {
+            m_p: d_mp,
+            pn_pt: -dmp_choked_dp_g,
+            pn_t: -dmp_choked_dt_g,
+        }
+        row1 = {
+            m_s: d_ms,
+            m_p: -omega * d_mp,
+            pn_pt: -mp * entr.domega_dp_g,
+            pn_t: -mp * entr.domega_dt_g,
+            sn_pt: -mp * entr.domega_dp_e,
+            sn_t: -mp * entr.domega_dt_e,
+        }
         mass_row: dict[str, float] = {}
         for i in range(self.N):
             mdot_var = f"{self._port_element_ids[i]}.m_dot"
             mass_row[mdot_var] = mass_row.get(mdot_var, 0.0) + self._port_signs[i]
+        row3 = {
+            f"{self.id}.P_jct": 1.0,
+            pn_pt: -pc.dpc_dp_g,
+            pn_t: -pc.dpc_dt_g,
+            sn_pt: -pc.dpc_dp_e,
+            sn_t: -pc.dpc_dt_e,
+        }
 
-        return [r0, r1, r2, r3], {2: mass_row}
+        return [r0, r1, r2, r3], {0: row0, 1: row1, 2: mass_row, 3: row3}
 
     def verify_solution_consistent(
         self,
@@ -257,12 +310,19 @@ class EjectorElement(MultiPortChamberElement):
 
         gamma = choke_plane_gamma(secondary.Tt, secondary.X)
         r_gas = float(cb.specific_gas_constant(secondary.X))
-        geom = self.geometry
-        entr = entrainment_ratio(primary.Pt, primary.Tt, secondary.Pt, secondary.Tt, geom, gamma)
+        entr = _solver_tools.ejector_entrainment_ratio_and_jacobian(
+            primary.Pt,
+            primary.Tt,
+            secondary.Pt,
+            secondary.Tt,
+            self.area_ratio_nozzle,
+            self.area_ratio_mix,
+            gamma,
+        )
 
         diag["gamma"] = gamma
         diag["r_gas"] = r_gas
-        diag["omega"] = entr.omega
+        diag["omega"] = entr.value.omega
         diag["p_c_star_pa"] = float(P_jct)
         diag["outlet_pt_pa"] = float(outlet.Pt)
         diag["critical_mode"] = 1.0 if float(outlet.Pt) <= float(P_jct) else 0.0
