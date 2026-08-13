@@ -12,6 +12,7 @@
 #include "compressible.h"
 #include "cooling_correlations.h"
 #include "correlation_status.h"
+#include "ejector.h"
 #include "equilibrium.h"
 #include "friction.h"
 #include "geometry.h"
@@ -349,6 +350,106 @@ PYBIND11_MODULE(_core, m) {
         py::arg("Y_in"), py::arg("area"), py::arg("delta_geom"),
         "Border-Carnot turning loss: Pt_in - Pt_out - L*0.5*rho*u^2 = 0 with "
         "L = 4*(1 - cos((3/4)*delta_geom))^2 (Hager sharp-edge correction).");
+
+  // Ejector (critical-mode supersonic ejector on the MultiPortChamberElement
+  // topology). Physics + analytic Jacobians in include/ejector.h; Jacobians
+  // are w.r.t. the 4 thermodynamic inputs (p_g, t_g, p_e, t_e) only -- gamma,
+  // r_gas, geometry and recovery_efficiency are frozen coefficients here.
+  // Area ratios are passed as plain doubles (a lambda builds the internal
+  // EjectorGeometry), keeping the Python call flat like the other solver
+  // bindings.
+  py::class_<solver::EjectorEntrainmentResult>(
+      m, "EjectorEntrainmentResult",
+      "Value outputs of ejector_entrainment_ratio (Huang 1999 Eqs. 1-8)")
+      .def_readonly("omega", &solver::EjectorEntrainmentResult::omega)
+      .def_readonly("mach_nozzle_exit",
+                    &solver::EjectorEntrainmentResult::mach_nozzle_exit)
+      .def_readonly("mach_hypothetical_throat",
+                    &solver::EjectorEntrainmentResult::mach_hypothetical_throat)
+      .def_readonly("area_ratio_primary_core",
+                    &solver::EjectorEntrainmentResult::area_ratio_primary_core)
+      .def_readonly("area_ratio_entrained",
+                    &solver::EjectorEntrainmentResult::area_ratio_entrained)
+      .def_readonly("p_mixing_pa",
+                    &solver::EjectorEntrainmentResult::p_mixing_pa);
+
+  py::class_<solver::EjectorEntrainmentJacobian>(
+      m, "EjectorEntrainmentJacobian",
+      "Entrainment ratio value plus d(omega)/d(p_g, t_g, p_e, t_e)")
+      .def_readonly("value", &solver::EjectorEntrainmentJacobian::value)
+      .def_readonly("domega_dp_g",
+                    &solver::EjectorEntrainmentJacobian::domega_dp_g)
+      .def_readonly("domega_dt_g",
+                    &solver::EjectorEntrainmentJacobian::domega_dt_g)
+      .def_readonly("domega_dp_e",
+                    &solver::EjectorEntrainmentJacobian::domega_dp_e)
+      .def_readonly("domega_dt_e",
+                    &solver::EjectorEntrainmentJacobian::domega_dt_e);
+
+  py::class_<solver::EjectorCriticalPressureResult>(
+      m, "EjectorCriticalPressureResult",
+      "Value outputs of ejector_critical_back_pressure (Kracik & Dvorak "
+      "2016 Eqs. 7-13)")
+      .def_readonly("p_c_pa", &solver::EjectorCriticalPressureResult::p_c_pa)
+      .def_readonly(
+          "p_mixed_stagnation_pa",
+          &solver::EjectorCriticalPressureResult::p_mixed_stagnation_pa)
+      .def_readonly(
+          "temp_mixed_stagnation_k",
+          &solver::EjectorCriticalPressureResult::temp_mixed_stagnation_k)
+      .def_readonly("lambda_mixed",
+                    &solver::EjectorCriticalPressureResult::lambda_mixed)
+      .def_readonly("mach_mixed",
+                    &solver::EjectorCriticalPressureResult::mach_mixed);
+
+  py::class_<solver::EjectorCriticalPressureJacobian>(
+      m, "EjectorCriticalPressureJacobian",
+      "Critical back pressure value plus d(P_c*)/d(p_g, t_g, p_e, t_e)")
+      .def_readonly("value", &solver::EjectorCriticalPressureJacobian::value)
+      .def_readonly("dpc_dp_g",
+                    &solver::EjectorCriticalPressureJacobian::dpc_dp_g)
+      .def_readonly("dpc_dt_g",
+                    &solver::EjectorCriticalPressureJacobian::dpc_dt_g)
+      .def_readonly("dpc_dp_e",
+                    &solver::EjectorCriticalPressureJacobian::dpc_dp_e)
+      .def_readonly("dpc_dt_e",
+                    &solver::EjectorCriticalPressureJacobian::dpc_dt_e);
+
+  m.def("ejector_choked_mass_flow_and_jacobian",
+        &solver::ejector_choked_mass_flow_and_jacobian, py::arg("p0"),
+        py::arg("t0"), py::arg("area_throat"), py::arg("gamma"),
+        py::arg("r_gas"), py::arg("eta"),
+        "Choked (sonic-throat) mass flow (Huang 1999 Eqs. 1, 7).\n\n"
+        "Returns: (mdot, d_mdot_dp0, d_mdot_dt0)");
+
+  m.def(
+      "ejector_entrainment_ratio_and_jacobian",
+      [](double p_g, double t_g, double p_e, double t_e,
+         double area_ratio_nozzle, double area_ratio_mix, double gamma) {
+        return solver::ejector_entrainment_ratio_and_jacobian(
+            p_g, t_g, p_e, t_e,
+            solver::EjectorGeometry{area_ratio_nozzle, area_ratio_mix}, gamma);
+      },
+      py::arg("p_g"), py::arg("t_g"), py::arg("p_e"), py::arg("t_e"),
+      py::arg("area_ratio_nozzle"), py::arg("area_ratio_mix"), py::arg("gamma"),
+      "Critical-mode entrainment ratio omega with analytic Jacobian.\n\n"
+      "Returns: EjectorEntrainmentJacobian (value + domega_d{p_g,t_g,p_e,t_e})");
+
+  m.def(
+      "ejector_critical_back_pressure_and_jacobian",
+      [](double p_g, double t_g, double p_e, double t_e,
+         double area_ratio_nozzle, double area_ratio_mix, double gamma,
+         double r_gas, double recovery_efficiency) {
+        return solver::ejector_critical_back_pressure_and_jacobian(
+            p_g, t_g, p_e, t_e,
+            solver::EjectorGeometry{area_ratio_nozzle, area_ratio_mix}, gamma,
+            r_gas, recovery_efficiency);
+      },
+      py::arg("p_g"), py::arg("t_g"), py::arg("p_e"), py::arg("t_e"),
+      py::arg("area_ratio_nozzle"), py::arg("area_ratio_mix"), py::arg("gamma"),
+      py::arg("r_gas"), py::arg("recovery_efficiency"),
+      "Critical back pressure P_c* with analytic Jacobian.\n\n"
+      "Returns: EjectorCriticalPressureJacobian (value + dpc_d{p_g,t_g,p_e,t_e})");
 
   // Area change elements
   py::class_<combaero::AreaChangeResult>(
