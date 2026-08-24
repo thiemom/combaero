@@ -27,6 +27,7 @@ from combaero.network import (
     WallLayer,
     WallNode,
 )
+from combaero.network.ejector_element import EjectorElement
 from combaero.network.mpce_v2_element import ConstantKTeeElement, MPCEv2Element
 
 from .schemas import (
@@ -38,6 +39,7 @@ from .schemas import (
     ConstantHeadLossData,
     DimpledModelData,
     DiscreteLossData,
+    EjectorData,
     ImpingementModelData,
     LinearThetaFractionLossData,
     LinearThetaHeadLossData,
@@ -344,29 +346,32 @@ def _port_from_handle(handle: str | None) -> str | None:
     return None
 
 
-def _find_tee_port(
+def _find_junction_port(
     edges: list,
-    tee_id: str,
+    junction_id: str,
     port: str,
     nodes_map: dict,
     tee_port_node_map: dict | None = None,
     wall_edge_remap: dict | None = None,
+    all_ports: tuple[str, ...] = ("common", "straight", "branch"),
 ) -> str:
-    """Return the physical-node ID connected to a named tee port.
+    """Return the physical-node ID connected to a named junction port.
 
-    Checks both edge directions: tee as source (sourceHandle == port-X-source)
-    and tee as target (targetHandle == port-X-target).
+    Shared by the tee (ports common/straight/branch) and the ejector (ports
+    primary/secondary/outlet); ``all_ports`` only shapes the error message.
+    Checks both edge directions: junction as source (sourceHandle ==
+    port-X-source) and junction as target (targetHandle == port-X-target).
     Falls back to *tee_port_node_map* for auto-created junction nodes when an
-    element is connected directly to a tee port without an explicit plenum.
+    element is connected directly to a port without an explicit plenum.
     """
     src_handle = f"port-{port}-source"
     tgt_handle = f"port-{port}-target"
     for edge in edges:
         if edge.data and edge.data.get("type") == "thermal":
             continue
-        if edge.source == tee_id and edge.sourceHandle == src_handle:
+        if edge.source == junction_id and edge.sourceHandle == src_handle:
             nid = edge.target
-        elif edge.target == tee_id and edge.targetHandle == tgt_handle:
+        elif edge.target == junction_id and edge.targetHandle == tgt_handle:
             nid = edge.source
         else:
             continue
@@ -374,17 +379,135 @@ def _find_tee_port(
             if wall_edge_remap and edge.id in wall_edge_remap:
                 return wall_edge_remap[edge.id]
             return nid
-        if tee_port_node_map and (tee_id, port) in tee_port_node_map:
-            return tee_port_node_map[(tee_id, port)]
+        if tee_port_node_map and (junction_id, port) in tee_port_node_map:
+            return tee_port_node_map[(junction_id, port)]
         raise ValueError(
-            f"Tee '{tee_id}' port '{port}' connects to '{nid}', which is not a "
-            "physical node (plenum or boundary). All tee ports must connect directly "
-            "to plena or boundaries."
+            f"Junction '{junction_id}' port '{port}' connects to '{nid}', which is "
+            "not a physical node (plenum or boundary). All junction ports must "
+            "connect directly to plena or boundaries."
         )
     raise ValueError(
-        f"Tee '{tee_id}' port '{port}' is not connected. "
-        "All three tee ports (common, straight, branch) must be wired to a node."
+        f"Junction '{junction_id}' port '{port}' is not connected. All ports "
+        f"({', '.join(all_ports)}) must be wired to a node."
     )
+
+
+def _trace_boundary(
+    port_id: str, junction_id: str, edges: list, nodes_map: dict, max_hops: int = 8
+):
+    """BFS outward from a junction port (never through the junction itself) to
+    the first boundary node reached. Returns the boundary node object (a
+    PressureBoundary or MassFlowBoundary) or None. Used only to derive a
+    warm-start; a miss just means no seed for that port.
+    """
+    seen = {port_id}
+    frontier = [port_id]
+    for _ in range(max_hops):
+        nxt: list[str] = []
+        for nid in frontier:
+            for edge in edges:
+                if edge.data and edge.data.get("type") == "thermal":
+                    continue
+                if edge.source == nid and edge.target != junction_id:
+                    other = edge.target
+                elif edge.target == nid and edge.source != junction_id:
+                    other = edge.source
+                else:
+                    continue
+                if other in seen:
+                    continue
+                seen.add(other)
+                node = nodes_map.get(other)
+                if isinstance(node, (PressureBoundary, MassFlowBoundary)):
+                    return node
+                nxt.append(other)
+        frontier = nxt
+    return None
+
+
+def _seed_ejector_warmstart(
+    net: FlowNetwork,
+    ejector: EjectorElement,
+    port_ids: tuple[str, str, str],
+    edges: list,
+    nodes_map: dict,
+) -> None:
+    """Warm-start a GUI-built ejector so the (stiff, double-choked) solve
+    converges without the user hand-seeding interior nodes.
+
+    The port momentum-chambers' stagnation pressures start far from their
+    feeding-boundary values, which puts the cold Newton start outside the
+    ejector's narrow convergence basin (confirmed: no init_strategy cracks it
+    cold). Here we trace each port to its boundary, run the ejector's own
+    closed-form physics to get a consistent operating point, and seed the port
+    MCN P/Pt plus the element's P_jct (== P_c*). Only seeds values the user did
+    not already provide; best-effort (any failure leaves the seed unset).
+    """
+    import combaero as _cb
+    from combaero.network._ejector_huang1999 import (
+        ETA_P,
+        EjectorGeometry,
+        choked_mass_flow,
+        critical_back_pressure,
+    )
+    from combaero.network.ejector_element import choke_plane_gamma
+
+    primary_id, secondary_id, outlet_id = port_ids
+    pb = _trace_boundary(primary_id, ejector.id, edges, nodes_map)
+    sb = _trace_boundary(secondary_id, ejector.id, edges, nodes_map)
+    ob = _trace_boundary(outlet_id, ejector.id, edges, nodes_map)
+
+    # Nominal air properties for the SEED only (exact gamma/R not needed here).
+    X = _cb.species.dry_air()
+    t_g = float(getattr(pb, "Tt", 440.0))
+    t_e = float(getattr(sb, "Tt", 280.0))
+    try:
+        gamma = choke_plane_gamma(t_e, X)
+    except Exception:
+        gamma = 1.4
+    r_gas = float(_cb.specific_gas_constant(X))
+
+    # Primary stagnation: direct for a pressure boundary; inverse choked-flow
+    # for a mass boundary (mdot is linear in p0).
+    p_g = None
+    if isinstance(pb, PressureBoundary):
+        p_g = float(pb.Pt)
+    elif isinstance(pb, MassFlowBoundary):
+        unit = choked_mass_flow(1.0, t_g, ejector.throat_area, gamma, r_gas, eta=ETA_P)
+        if unit > 0.0:
+            p_g = float(pb.m_dot) / unit
+    p_e = float(sb.Pt) if isinstance(sb, PressureBoundary) else None
+    p_o = float(ob.Pt) if isinstance(ob, PressureBoundary) else None
+
+    def _seed_node(node_id: str, value: float | None) -> None:
+        if value is None or value <= 0.0:
+            return
+        node = net.nodes.get(node_id)
+        if node is None:
+            return
+        existing = dict(getattr(node, "initial_guess", {}) or {})
+        if any(k.endswith(".P") or k.endswith(".Pt") for k in existing):
+            return  # user already seeded this port
+        existing[f"{node_id}.P"] = float(value)
+        existing[f"{node_id}.Pt"] = float(value)
+        node.initial_guess = existing
+
+    _seed_node(primary_id, p_g)
+    _seed_node(secondary_id, p_e)
+    _seed_node(outlet_id, p_o)
+
+    if p_g and p_e:
+        try:
+            geom = EjectorGeometry(ejector.area_ratio_nozzle, ejector.area_ratio_mix)
+            pc = critical_back_pressure(
+                p_g, t_g, p_e, t_e, geom, gamma, r_gas, ejector.recovery_efficiency
+            ).p_c_pa
+            guess = dict(getattr(ejector, "initial_guess", {}) or {})
+            if not any(k.endswith(".P_jct") for k in guess):
+                guess[f"{ejector.id}.P_jct"] = float(pc)
+                ejector.initial_guess = guess
+        except Exception:
+            pass
 
 
 def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
@@ -476,21 +599,24 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             element_nodes.append(node_schema)
 
     element_ids = {node.id for node in element_nodes}
-    tee_ids = {node.id for node in element_nodes if node.type == "mpce_tee"}
+    # Junction elements with named handle ports (common/straight/branch for
+    # the tee; primary/secondary/outlet for the ejector). Both get the same
+    # per-port MomentumChamberNode auto-insertion below.
+    junction_ids = {node.id for node in element_nodes if node.type in ("mpce_tee", "ejector")}
 
     # 1b. Create implicit junction nodes for element -> element visual links.
     # For direct element<->element connections we auto-insert a MomentumChamberNode.
     # For direct element<->tee-port connections we auto-insert a PlenumNode so that
     # users don't need to manually place a plenum on every tee arm.
     edge_junction_map: dict[tuple[str, str], str] = {}
-    tee_port_node_map: dict[tuple[str, str], str] = {}  # (tee_id, port) -> node_id
+    tee_port_node_map: dict[tuple[str, str], str] = {}  # (junction_id, port) -> node_id
     for edge in schema.edges:
         if edge.data and edge.data.get("type") == "thermal":
             continue
         src_elem = edge.source in element_ids
         tgt_elem = edge.target in element_ids
-        src_tee = edge.source in tee_ids
-        tgt_tee = edge.target in tee_ids
+        src_tee = edge.source in junction_ids
+        tgt_tee = edge.target in junction_ids
 
         if src_elem and tgt_elem and not src_tee and not tgt_tee:
             # Standard element-to-element: auto-insert MomentumChamberNode
@@ -502,8 +628,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             edge_junction_map[(edge.source, edge.target)] = junction_id
 
         elif src_tee and tgt_elem:
-            # Tee port → element (e.g. tee.common-source → channel): auto-insert MomentumChamberNode
-            # so that Pt != P_static and velocity is correctly accounted for.
+            # Junction port → element (e.g. tee.common-source → channel): auto-insert
+            # MomentumChamberNode so that Pt != P_static and velocity is accounted for.
             port = _port_from_handle(edge.sourceHandle)
             if port and (edge.source, port) not in tee_port_node_map:
                 jid = f"__tee_jct__{edge.source}_{port}"
@@ -515,7 +641,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 edge_junction_map[(edge.source, edge.target)] = jid
 
         elif src_elem and tgt_tee:
-            # Element → tee port (e.g. channel → tee.straight-target): auto-insert MomentumChamberNode
+            # Element → junction port (e.g. channel → tee.straight-target): auto-insert MomentumChamberNode
             port = _port_from_handle(edge.targetHandle)
             if port and (edge.target, port) not in tee_port_node_map:
                 jid = f"__tee_jct__{edge.target}_{port}"
@@ -566,13 +692,13 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 psi_fallback=_md.psi,
             )
 
-            _common = _find_tee_port(
+            _common = _find_junction_port(
                 schema.edges, elem_id, "common", nodes_map, tee_port_node_map, _wall_edge_remap
             )
-            _straight = _find_tee_port(
+            _straight = _find_junction_port(
                 schema.edges, elem_id, "straight", nodes_map, tee_port_node_map, _wall_edge_remap
             )
-            _branch = _find_tee_port(
+            _branch = _find_junction_port(
                 schema.edges, elem_id, "branch", nodes_map, tee_port_node_map, _wall_edge_remap
             )
 
@@ -634,6 +760,61 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             if not _mpce.initial_guess:
                 _mpce.initial_guess = _guess_from_prior_result(elem_data, elem_id)
             net.add_element(_mpce)
+            continue
+
+        # Ejector: 3-port MultiPortChamberElement with fixed roles (primary +
+        # secondary inlets, one outlet). Reuses the same named-port resolution
+        # and per-port MomentumChamberNode auto-insertion as the tee.
+        if elem_type == "ejector":
+            _ed = EjectorData(**elem_data)
+            _ports = ("primary", "secondary", "outlet")
+            _primary = _find_junction_port(
+                schema.edges,
+                elem_id,
+                "primary",
+                nodes_map,
+                tee_port_node_map,
+                _wall_edge_remap,
+                all_ports=_ports,
+            )
+            _secondary = _find_junction_port(
+                schema.edges,
+                elem_id,
+                "secondary",
+                nodes_map,
+                tee_port_node_map,
+                _wall_edge_remap,
+                all_ports=_ports,
+            )
+            _outlet = _find_junction_port(
+                schema.edges,
+                elem_id,
+                "outlet",
+                nodes_map,
+                tee_port_node_map,
+                _wall_edge_remap,
+                all_ports=_ports,
+            )
+            _ejector = EjectorElement(
+                id=elem_id,
+                primary_node=_primary,
+                secondary_node=_secondary,
+                outlet_node=_outlet,
+                throat_area=_ed.throat_area,
+                nozzle_exit_area=_ed.nozzle_exit_area,
+                mixing_area=_ed.mixing_area,
+                recovery_efficiency=_ed.recovery_efficiency,
+            )
+            _ejector.initial_guess = _expand_initial_guess(_ed.initial_guess, elem_id)
+            if not _ejector.initial_guess:
+                _ejector.initial_guess = _guess_from_prior_result(elem_data, elem_id)
+            net.add_element(_ejector)
+            # Warm-start the port MCN pressures + P_jct from the feeding
+            # boundaries so this stiff double-choked element converges cold
+            # (only fills in guesses the user did not provide).
+            _seed_ejector_warmstart(
+                net, _ejector, (_primary, _secondary, _outlet), schema.edges, nodes_map
+            )
             continue
 
         source_id = None
