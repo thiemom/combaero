@@ -299,6 +299,16 @@ const Sidebar = () => {
 			<button
 				type="button"
 				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "ejector")}
+				draggable
+			>
+				<Wind size={18} className="text-sky-500" />
+				<span>Ejector</span>
+			</button>
+
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
 				onDragStart={(event) => onDragStart(event, "vortex")}
 				draggable
 			>

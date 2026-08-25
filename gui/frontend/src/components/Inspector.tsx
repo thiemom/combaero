@@ -1850,6 +1850,75 @@ const Inspector = () => {
 					</div>
 				)}
 
+				{selectedNode.type === "ejector" && (
+					<div className="flex flex-col gap-4">
+						<AreaInput
+							id={`throat_area_${selectedNode.id}`}
+							label="Throat Area A_t"
+							value={selectedNode.data.throat_area ?? 3.14e-5}
+							onChange={(val) =>
+								updateNodeData(selectedNode.id, { throat_area: val })
+							}
+						/>
+						<AreaInput
+							id={`nozzle_exit_area_${selectedNode.id}`}
+							label="Nozzle Exit Area A_p1"
+							value={selectedNode.data.nozzle_exit_area ?? 1.0e-4}
+							onChange={(val) =>
+								updateNodeData(selectedNode.id, { nozzle_exit_area: val })
+							}
+						/>
+						<AreaInput
+							id={`mixing_area_${selectedNode.id}`}
+							label="Mixing Area A_3"
+							value={selectedNode.data.mixing_area ?? 8.0e-4}
+							onChange={(val) =>
+								updateNodeData(selectedNode.id, { mixing_area: val })
+							}
+						/>
+						<div className="flex flex-col gap-1">
+							<label className="text-xs font-bold text-gray-500 uppercase">
+								Recovery Efficiency
+							</label>
+							<NumericInput
+								id={`recovery_efficiency_${selectedNode.id}`}
+								className="p-1 border rounded text-xs bg-white h-7 outline-none focus:ring-1 focus:ring-stone-200"
+								value={selectedNode.data.recovery_efficiency ?? 1.0}
+								onChange={(val) =>
+									updateNodeData(selectedNode.id, { recovery_efficiency: val })
+								}
+								min={0}
+								placeholder="1.0"
+							/>
+							<span className="text-[9px] text-stone-400">
+								Multiplies mixed stagnation P to give P_c*; 1.0 = no loss
+							</span>
+						</div>
+						{selectedNode.data.result && (
+							<div className="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-xs">
+								<div className="font-bold uppercase text-stone-400 mb-1 text-[9px]">
+									Result
+								</div>
+								<div className="flex justify-between">
+									<span className="text-stone-500">ω (entrainment)</span>
+									<span className="font-mono font-bold">
+										{(selectedNode.data.result.omega ?? 0).toFixed(4)}
+									</span>
+								</div>
+								<div className="flex justify-between">
+									<span className="text-stone-500">P_c*</span>
+									<span className="font-mono font-bold">
+										{(
+											(selectedNode.data.result.p_c_star_pa ?? 0) / 1000
+										).toFixed(2)}{" "}
+										kPa
+									</span>
+								</div>
+							</div>
+						)}
+					</div>
+				)}
+
 				{selectedNode.type === "discrete_loss" &&
 					(() => {
 						// Compute default area from upstream node or channel element
@@ -3118,6 +3187,9 @@ const InitialGuessEditor = ({ node }: { node: any }) => {
 		// pressure (legacy slot named P_jct; MPCE-v2 stores Pt there). Warm-
 		// starting Pt_jct is the most useful nudge for the slower MPCE solve.
 		mpce_tee: [{ key: "P_jct", unit: "Pa" }],
+		// Ejector: element-owned unknown is P_jct (repurposed as the critical
+		// back pressure P_c*); warm-starting it helps this stiff solve.
+		ejector: [{ key: "P_jct", unit: "Pa" }],
 		vortex: [{ key: "m_dot", unit: "kg/s" }],
 	};
 	const guessFields = FIELDS_BY_TYPE[node.type as string] ?? [];
