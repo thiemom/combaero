@@ -126,11 +126,8 @@ class EjectorElement(MultiPortChamberElement):
                 ``_ejector_huang1999``'s docstrings for why that default is
                 not fitted to any reference dataset.
         """
-        super().__init__(
-            id,
-            inlet_nodes=[primary_node, secondary_node],
-            outlet_nodes=[outlet_node],
-        )
+        # Validate geometry BEFORE super().__init__ so the port-face areas
+        # passed below are guaranteed positive.
         if throat_area <= 0.0:
             raise ValueError(f"EjectorElement '{id}': throat_area must be positive.")
         if nozzle_exit_area <= throat_area:
@@ -150,6 +147,28 @@ class EjectorElement(MultiPortChamberElement):
                 f"EjectorElement '{id}': recovery_efficiency must be positive, "
                 f"got {recovery_efficiency}."
             )
+        # Port-face areas from the ejector's OWN geometry (ordered
+        # inlet_nodes + outlet_nodes = [primary, secondary, outlet]). Unlike a
+        # generic tee, the ejector always knows these, so it supplies them
+        # rather than relying on the base class inferring them from a
+        # connecting ChannelElement -- an ejector can be fed by a bare
+        # boundary + connection with no channel/diameter to infer from.
+        # These set the port-MCN dynamic-head (Pt = P + 0.5*rho*v^2) only;
+        # the ejector's own residuals use throat/nozzle_exit/mixing directly.
+        #   primary  -> nozzle exit A_p1 (motive jet plane)
+        #   secondary-> annular suction A_3 - A_p1
+        #   outlet   -> mixing/diffuser duct A_3
+        port_areas = [
+            float(nozzle_exit_area),
+            float(mixing_area - nozzle_exit_area),
+            float(mixing_area),
+        ]
+        super().__init__(
+            id,
+            inlet_nodes=[primary_node, secondary_node],
+            outlet_nodes=[outlet_node],
+            port_areas=port_areas,
+        )
         self.primary_node = primary_node
         self.secondary_node = secondary_node
         self.outlet_node = outlet_node

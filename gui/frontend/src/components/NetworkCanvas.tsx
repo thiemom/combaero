@@ -101,6 +101,14 @@ const NetworkCanvas = () => {
 					flow_direction: "branch",
 					theta_deg: 90,
 				} as any;
+			} else if (type === "ejector") {
+				data = {
+					...data,
+					throat_area: 3.14e-5,
+					nozzle_exit_area: 1.0e-4,
+					mixing_area: 8.0e-4,
+					recovery_efficiency: 1.0,
+				} as any;
 			} else if (type === "vortex") {
 				data = {
 					...data,

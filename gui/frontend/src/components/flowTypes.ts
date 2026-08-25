@@ -3,6 +3,7 @@ import AreaChangeNode from "./nodes/AreaChangeNode";
 import ChannelNode from "./nodes/ChannelNode";
 import CombustorNode from "./nodes/CombustorNode.tsx";
 import DiscreteLossNode from "./nodes/DiscreteLossNode";
+import EjectorNode from "./nodes/EjectorNode";
 import LosslessNode from "./nodes/LosslessNode";
 import MassBoundaryNode from "./nodes/MassBoundaryNode";
 import MomentumChamberNode from "./nodes/MomentumChamberNode.tsx";
@@ -28,6 +29,7 @@ export const nodeTypes = {
 	probe: ProbeNode,
 	area_change: AreaChangeNode,
 	mpce_tee: MPCETeeNode,
+	ejector: EjectorNode,
 	vortex: VortexNode,
 	wall: WallNode,
 };
