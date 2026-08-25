@@ -56,6 +56,18 @@ Elements are defined by edges in the graph but carry their own physical paramete
 - `roughness`: Surface roughness [m]
 - `surface`: Surface model (smooth, ribbed, dimpled, pin_fin, impingement).
 
+#### Ejector Element (`ejector`)
+Critical-mode supersonic ejector (3 ports: `primary` + `secondary` inlets,
+one `outlet`; handle ids `port-{primary,secondary,outlet}-{target,source}`).
+- `throat_area`: Primary nozzle throat area A_t [m^2].
+- `nozzle_exit_area`: Primary nozzle exit area A_p1 [m^2] (must exceed throat).
+- `mixing_area`: Constant-area mixing-section area A_3 [m^2] (must exceed nozzle exit).
+- `recovery_efficiency`: Multiplies the lossless mixed stagnation pressure to
+  give the critical back pressure P_c* (default 1.0 = no artificial loss).
+
+Diagnostics returned on solve include `omega` (entrainment ratio),
+`p_c_star_pa` (critical back pressure), and `gamma`.
+
 ## Solver Settings
 ```json
 {

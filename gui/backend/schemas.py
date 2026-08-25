@@ -241,6 +241,27 @@ class MPCETeeData(BaseModel):
     initial_guess: dict[str, float] = Field(default_factory=dict)
 
 
+class EjectorData(BaseModel):
+    """Critical-mode supersonic ejector (3-port: primary + secondary inlets,
+    one outlet). Wraps ``combaero.network.ejector_element.EjectorElement``.
+
+    Geometry is three absolute areas (the ratios are computed by the
+    element). Validation (throat > 0, nozzle_exit > throat, mixing >
+    nozzle_exit, recovery_efficiency > 0) is enforced by the element
+    constructor at build time; the frontend mirrors it for early feedback.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+    label: str | None = None
+    throat_area: float = 3.14e-5  # primary nozzle throat area A_t [m^2]
+    nozzle_exit_area: float = 1.0e-4  # primary nozzle exit area A_p1 [m^2], > throat
+    mixing_area: float = 8.0e-4  # constant-area mixing section A_3 [m^2], > nozzle_exit
+    # Multiplies the lossless mixed stagnation pressure to give the critical
+    # back pressure P_c*. 1.0 = no artificial loss (not fitted to data).
+    recovery_efficiency: float = 1.0
+    initial_guess: dict[str, float] = Field(default_factory=dict)
+
+
 class VortexData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     label: str | None = None
