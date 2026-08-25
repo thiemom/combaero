@@ -108,7 +108,16 @@ def _build_result_objects(
     elem_diags = result.get("__element_diag__", {})
     for elem_id in net.elements:
         diag = elem_diags.get(elem_id, {}).copy()
-        m_dot = float(result.get(f"{elem_id}.m_dot", diag.get("m_dot_com", 0.0)))
+        # Junction elements have no own `.m_dot` unknown (flows live on the
+        # connecting elements). Report a representative through-flow from their
+        # diagnostics: the tee's common leg (`m_dot_com`), or the ejector's
+        # total outlet flow (`m_dot_outlet`).
+        m_dot = float(
+            result.get(
+                f"{elem_id}.m_dot",
+                diag.get("m_dot_com", diag.get("m_dot_outlet", 0.0)),
+            )
+        )
         diag.pop("m_dot", None)
         element_results[elem_id] = ElementResult(m_dot=m_dot, success=success, **diag)
 

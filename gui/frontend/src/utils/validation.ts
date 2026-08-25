@@ -101,6 +101,25 @@ export function validateNetwork(nodes: Node[]): string[] {
 			if ((node.data.psi ?? 1) <= 0)
 				errors.push(`${node.id}: Tee area ratio psi must be > 0`);
 		}
+		if (node.type === "ejector") {
+			// Mirrors EjectorElement.__init__ validation (see
+			// python/combaero/network/ejector_element.py).
+			const At = node.data.throat_area ?? 0;
+			const Ap1 = node.data.nozzle_exit_area ?? 0;
+			const A3 = node.data.mixing_area ?? 0;
+			const eta = node.data.recovery_efficiency ?? 1;
+			if (At <= 0) errors.push(`${node.id}: Ejector throat_area must be > 0`);
+			if (Ap1 <= At)
+				errors.push(
+					`${node.id}: Ejector nozzle_exit_area must exceed throat_area`,
+				);
+			if (A3 <= Ap1)
+				errors.push(
+					`${node.id}: Ejector mixing_area must exceed nozzle_exit_area`,
+				);
+			if (eta <= 0)
+				errors.push(`${node.id}: Ejector recovery_efficiency must be > 0`);
+		}
 		if (node.type === "area_change") {
 			// null F0/F1 means "inherit from connected channels" — only flag explicit non-positive values
 			if (node.data.F0 != null && node.data.F0 <= 0)

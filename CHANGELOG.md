@@ -22,7 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   topology (primary/secondary inlets, one outlet); `P_jct` is repurposed
   as a diagnostic critical back pressure P_c*, not the outlet's actual
   pressure, since critical-mode entrainment ratio is independent of back
-  pressure by definition. gamma/R evaluated live from combaero's own
+  pressure by definition. Supplies its own port-face areas from geometry
+  (primary = nozzle exit, secondary = mixing - nozzle exit, outlet =
+  mixing), so it resolves even when fed by a bare boundary/connection with
+  no channel to infer an area from (unlike a generic tee, which must infer
+  or be given `port_areas`). gamma/R evaluated live from combaero's own
   real-fluid EOS (combustion/air-relevant species only) at the
   entrained-flow choking plane. `recovery_efficiency` (default 1.0, no
   artificial loss) is intentionally not fitted to the validation dataset,
@@ -37,6 +41,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   since `python/combaero/` must never import from the dev-only
   `validation/` tree; `validation/ejector/models/huang1999.py` re-exports
   it unchanged for existing validation scripts.
+- **GUI: `EjectorElement` is wired end-to-end as a draggable "Ejector"
+  element** (Wind icon). Sidebar palette entry, a 3-port node card (primary
+  + secondary inlets, one outlet), an inspector form for the three areas
+  (throat / nozzle-exit / mixing) and `recovery_efficiency`, drop-time
+  defaults, and client-side geometry validation. The backend
+  `graph_builder` translates an `ejector` node into an `EjectorElement`,
+  reusing the tee's named-port resolution and per-port
+  `MomentumChamberNode` auto-insertion (generalized from `tee_ids` to a
+  shared `junction_ids`); solved diagnostics (entrainment ratio omega,
+  critical back pressure P_c*, gamma) surface through the generic
+  `ElementResult` path. `graph_builder` also warm-starts each ejector: it
+  traces each port to its feeding boundary, runs the ejector's own
+  closed-form physics for a consistent operating point, and seeds the port
+  MomentumChamberNode pressures and `P_jct` (only where the user provided
+  none) so the stiff double-choked solve converges from cold -- which it
+  does not otherwise (no solver init strategy cracks it without the seed).
 
 ### Changed
 - **`EjectorElement` now evaluates its residuals and a FULL analytic

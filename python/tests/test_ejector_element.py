@@ -101,6 +101,18 @@ def test_ports_are_primary_then_secondary_then_outlet():
     assert e._port_signs == [-1.0, -1.0, 1.0]
 
 
+def test_port_areas_derived_from_geometry():
+    # The ejector supplies its own port-face areas from geometry (ordered
+    # primary, secondary, outlet) so the base class never needs to infer them
+    # from a connecting channel -- an ejector can be fed by a bare boundary.
+    e = _element()
+    assert e.port_areas == [
+        _NOZZLE_EXIT_AREA,
+        _MIXING_AREA - _NOZZLE_EXIT_AREA,
+        _MIXING_AREA,
+    ]
+
+
 def test_row_scale_kinds_is_mdot_mdot_mdot_p():
     # Opposite of the base class's own N-pressure-rows + 1-mass-row pattern
     # -- see solver.py's scaling block and the module docstring.
