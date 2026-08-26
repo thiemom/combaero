@@ -61,7 +61,20 @@ invariant to count, while A_3/A_t shrinks as count grows, since the aggregate
 throat area scales with count but the shared mixing chamber does not.
 `count=1` reduces exactly to the direct constructor.
 
-Out of scope for now (roadmap): the subcritical / back-flow branches.
+Out of scope for the *current* model: the subcritical, unchoked-primary, and
+back-flow branches. These are designed in
+`OPERATING_REGIMES_DESIGN.md`, which diagnoses a real
+non-converging low-primary-flow case and proposes the extension. In brief, the
+device passes through these regimes as the forced primary flow rises: (1)
+`mp < mdot_choked(Pb)` -> primary **unchoked**, a subsonic jet pump (primary Pt
+floats just above the back pressure); (2) primary **choked** -> supersonic
+ejector, whose entrained flow is then **critical** (`Pb <= P_c*`, modeled here),
+**subcritical** (`P_c* < Pb < P_b0`, drooping omega), or **backflow**
+(`Pb >= P_b0`). A known limitation of the current critical-only model: a
+forced-primary flow below the choke threshold converges to a self-contradictory
+choked-branch root (primary Pt *below* the back pressure) and is demoted by
+`verify_solution_consistent` -- see the design doc for the fix (choked/unchoked
+R0 + subcritical R1 + jet-pump mode).
 
 ## gamma provenance (the only CoolProp step)
 
@@ -202,10 +215,16 @@ one dataset. `test_ejector_huang.py` checks P_c* by regression, by trend
 1. ~~Add the P_c* / critical-back-pressure chain to the reference model.~~
    Done -- see Accuracy above; uses Kracik & Dvorak's closure, not Huang's
    original Eqs. 9-18.
-2. Draft the production 3-port `EjectorElement` (primary-in, secondary-in,
-   outlet) in `python/combaero/network/`, real-fluid thermo, analytic `(f, J)`.
-3. Port to C++ with analytic Jacobians (derived symbolically with sympy where
+2. ~~Draft the production 3-port `EjectorElement` (primary-in, secondary-in,
+   outlet) in `python/combaero/network/`, real-fluid thermo, analytic `(f, J)`.~~
+   Done (PR #252).
+3. ~~Port to C++ with analytic Jacobians (derived symbolically with sympy where
    useful) and ctests consuming `huang1999_reference_data.h`'s central-
-   difference Jacobian columns to tight tolerance.
-4. pybind bindings, in a separate PR.
-5. GUI work and validation, last.
+   difference Jacobian columns to tight tolerance.~~ Done (PR #253).
+4. ~~pybind bindings, in a separate PR.~~ Done (PR #254).
+5. ~~GUI work and validation.~~ Done (PR #259).
+6. **Operating-regime extension (next):** choked/unchoked primary (R0),
+   subcritical entrainment droop (R1), and the unchoked subsonic jet-pump mode,
+   in one C1 residual system so critical <-> subcritical <-> jet-pump solve in a
+   single Newton pass. Full findings and design in
+   `OPERATING_REGIMES_DESIGN.md`.

@@ -86,6 +86,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the `.pre-commit-config.yaml` hook pin, per the frontend
   version-sync checklist.
 
+### Documentation
+- **Documented the ejector's operating-regime limitations and the planned
+  extension.** A new design note (`validation/ejector/OPERATING_REGIMES_DESIGN.md`)
+  diagnoses a real non-converging low-primary-flow case: the critical-only
+  `EjectorElement` hard-codes a choked primary in `R0` and converges to a
+  self-contradictory root (primary Pt *below* the back pressure) whenever the
+  forced primary flow is below the choke threshold, instead of the physical
+  unchoked/subsonic branch (primary Pt just *above* the back pressure,
+  `dp >= 0`). It proposes the fix -- a choked/unchoked `R0` reusing the
+  compressible-orifice nozzle `(f, J)`, a C1 smooth-min critical/subcritical
+  `R1` drooping omega between `P_c*` and the dead-head pressure `P_b0`, and a
+  subsonic jet-pump mode -- all in one Newton-solvable residual system. No
+  behaviour change; `ejector_element.py`, `_ejector_huang1999.py`,
+  `include/ejector.h`, and `validation/ejector/README.md` now cross-reference
+  the note and record the current limitation.
+
 ## [0.4.2] - 2026-07-09
 
 ### Fixed

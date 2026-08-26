@@ -27,7 +27,11 @@
 //     Source of the mixing closure ejector_critical_back_pressure
 //     implements (their Eqs. 7-13).
 //
-// Scope: critical (double-choked) operation only.
+// Scope: critical (double-choked) operation only. The subcritical,
+// unchoked-primary, and back-flow regimes are not modeled here; their design
+// (choked/unchoked primary R0, subcritical omega droop to the dead-head
+// pressure P_b0, and a subsonic jet-pump mode) lives in
+// validation/ejector/OPERATING_REGIMES_DESIGN.md.
 //
 // Jacobian scope (this header): analytic derivatives w.r.t. the 4
 // thermodynamic inputs (p_g, t_g, p_e, t_e) only -- these are the only

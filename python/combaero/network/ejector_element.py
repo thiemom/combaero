@@ -11,6 +11,23 @@ pressure, their Eqs. 7-13) -- see that module's docstring and
 and the accuracy comparison against three alternative closures that were
 also evaluated.
 
+Operating-regime scope and a known limitation. This element models the
+critical (double-choked) plateau ONLY: the primary is assumed choked and the
+entrained flow critical, so ``omega`` is back-pressure-independent. Two
+regimes are therefore NOT yet modeled -- (a) an UNCHOKED primary, which
+occurs when the forced primary mass flow is below the choke threshold
+``mdot_choked(P_back)``; the physical branch there floats the primary Pt to
+just ABOVE the back pressure (forward flow, ``dp >= 0``) and behaves as a
+subsonic jet pump, but ``R0 = mp - ejector_choked_mass_flow(...)`` hard-codes
+the choked branch and instead converges to a self-contradictory root with the
+primary Pt BELOW the back pressure (``verify_solution_consistent`` then demotes
+it) -- and (b) the SUBCRITICAL entrainment droop for ``P_c* < Pt_outlet <
+P_b0``. The full diagnosis (with the reported non-converging case) and the
+proposed extension -- a choked/unchoked ``R0`` reusing the compressible-orifice
+nozzle ``(f, J)``, a C1 smooth-min critical/subcritical ``R1``, and a subsonic
+jet-pump mode, all in one Newton-solvable residual system -- are in
+``validation/ejector/OPERATING_REGIMES_DESIGN.md``.
+
 Working fluid: combaero's real-fluid EOS covers combustion/air-relevant
 species only (N2, O2, Ar, CO2, H2O, light hydrocarbons, CO, H2, NH3) -- no
 halocarbon refrigerants. gamma and R are evaluated LIVE from that EOS at

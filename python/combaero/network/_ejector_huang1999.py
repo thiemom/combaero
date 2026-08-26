@@ -46,7 +46,13 @@ Scope
 Critical (double-choked) operation only: both the primary flow (choked at the
 nozzle throat) and the entrained flow (choked at the hypothetical throat y-y)
 are sonic, so the entrainment ratio omega is fixed and independent of back
-pressure. Subcritical / back-flow regimes are out of scope.
+pressure. Subcritical, unchoked-primary, and back-flow regimes are out of scope
+of THIS closed form; the extension that adds them (choked/unchoked primary,
+subcritical omega droop between P_c* and the dead-head pressure P_b0, and a
+subsonic jet-pump mode) is designed in
+``validation/ejector/OPERATING_REGIMES_DESIGN.md``. Note that ``critical_back_pressure``
+evaluated at omega = 0 already yields P_b0 (the zero-entrainment dead-head back
+pressure) with no new calibration constant -- an anchor that extension reuses.
 """
 
 from __future__ import annotations
