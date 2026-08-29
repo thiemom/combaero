@@ -101,6 +101,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   behaviour change; `ejector_element.py`, `_ejector_huang1999.py`,
   `include/ejector.h`, and `validation/ejector/README.md` now cross-reference
   the note and record the current limitation.
+- **Identified and committed the off-design validation sources for the ejector
+  regime extension.** The design note's validation strategy
+  (`OPERATING_REGIMES_DESIGN.md` sec 4) now records that the subcritical-droop
+  branch has air-fluid experiment + CFD data in repo (Henry et al. 2007,
+  HEFAT2007; Akbarnejad & Ziabasharhagh 2025 for numeric `P_c*`/`P_b0`
+  anchors), while the unchoked jet-pump branch has no dataset and is validated
+  analytically (isentropic-nozzle exactness + conservation/continuity). Henry
+  et al. Fig. 5 (measured air-ejector characteristic omega(Pb/P2) at 4/5/6 bar
+  primary) is digitized and committed as
+  `validation/ejector/data/henry2007_fig5.py`, cross-checked against the source
+  figure. Corrects the earlier "Bartosiewicz 2004" citation (the source PDF is
+  HEFAT2007). No behaviour change.
 
 ## [0.4.2] - 2026-07-09
 
