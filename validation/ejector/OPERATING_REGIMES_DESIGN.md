@@ -240,18 +240,73 @@ residual.
 
 ## 4. Validation strategy
 
+Off-design validation data is **available in air for the subcritical branch**
+(regime 2's droop) and **absent for the unchoked jet-pump branch** (regime 1),
+which sets two different bars for the two branches.
+
+### 4.1 Subcritical droop -- validate against air experiment + CFD
+
+Two in-repo, air-fluid sources cover the plateau -> knee (`P_c*`) -> droop ->
+breakdown (`P_b0`) structure directly, so no refrigerant EOS / CoolProp is
+needed (unlike the R141b critical fixture):
+
+- **Henry et al. (2007), HEFAT2007** (`../../docs/ejector/Bartosiewicz_ejector_2004.pdf`;
+  filename predates the confirmed citation). Fig. 5 is the measured air-ejector
+  characteristic `omega(Pb/P2^0)` at three primary pressures (4/5/6 bar), each
+  showing the full plateau -> droop -> near-breakdown shape, with a reported
+  CFD-vs-experiment deviation < 10%. **Digitized and committed** as
+  `validation/ejector/data/henry2007_fig5.py` (cross-checked against the source
+  figure; see that module's docstring for the provenance + cross-check verdict).
+  This is the primary droop-*shape* target.
+- **Akbarnejad & Ziabasharhagh (2025)**, *Theoretical Model for Predicting
+  Performance of a Gas Ejector*, Thermal Engineering 72(1). Air runs (case E2;
+  E1 temperature sweep) with numeric **tables of both critical and breakdown
+  back pressures** across ~7 primary/secondary combinations -- directly
+  digitizable anchor values for `P_c*` and `P_b0` without curve tracing. The
+  anchor-pressure cross-check. *(Not yet digitized -- add when Phase 1 lands.)*
+
+Use these as **validation, not calibration**: check the model's droop shape and
+`P_c*`/`P_b0` anchors against them (trend + loose relative tolerance, in the
+spirit of the existing critical-mode `pc_rel_tol`); do not fit
+`recovery_efficiency` or any droop parameter to them. If the Tier-1 linear chord
+deviates materially from the Henry Fig. 5 droop, that deviation is the concrete
+trigger to implement Tier-2 (mixing-curve inversion), per sec 3.2.
+
+*(Galindo et al. (2020) has the richest fitted subcritical + breakdown surface
+but uses R1234yf -- outside combaero's air/combustion EOS, so it is a
+methodology reference only, not a usable fixture.)*
+
+### 4.2 Unchoked jet-pump branch -- validate analytically, no dataset needed
+
+None of the in-repo ejector references (nor the surveyed literature) report a
+measured `omega` characteristic for the unchoked-primary / subsonic jet-pump
+regime; only Lienhard/McGovern even name it, qualitatively. This branch does
+**not** require a bespoke dataset, because it rests on exact analytic relations
+rather than an empirical droop:
+
+- R0 is isentropic compressible-nozzle flow (choked/unchoked), already validated
+  in the suite via the compressible `OrificeElement` path R0 reuses (sec 3.1) --
+  the jet-pump branch **inherits** that validation.
+- The entrainment is fixed by mass/momentum/energy conservation across the
+  subsonic mixing section (sec 3.3), checkable by conservation + consistency
+  assertions rather than a fitted curve.
+
+So validate regime 1 by **analytical exactness + consistency checks**:
+`dp >= 0` for forward flow, mass/energy balance, and C1 continuity of the
+`omega(mp)` / `omega(Pb)` surfaces with the ejector branch at the choke
+threshold. (An external eductor/jet-pump reference such as ESDU 86030 would be a
+nice-to-have independent number, but is not required for the branch to be
+validated.)
+
+### 4.3 Golden-fixture + regression mechanics
+
 - Extend the golden fixture (`validation/ejector/data/huang1999_reference.json`
   + generated `.h`) with **subcritical rows** (a `Pb`-sweep at fixed inlet
   conditions across `P_c* -> P_b0`) and **unchoked jet-pump rows**, each with
   central-difference Jacobian targets, so the C++ analytic `(f, J)` is checked
   the same way the critical rows are today.
-- Cross-check the subcritical droop shape and `P_b0` against the air-ejector
-  CFD + experiment in `../../docs/ejector/Bartosiewicz_ejector_2004.pdf` and the
-  characteristic curves in Huang (1999).
 - Regression + trend checks (monotonicity of `omega` in `Pb`; continuity at
   `P_c*` and at the choke threshold; `dp >= 0` for forward flow).
-- Keep the calibration policy: anchor closures on analytical/CFD references, do
-  not fit `recovery_efficiency` or any droop parameter to a measurement set.
 
 ## 5. Open decisions (flagged, not yet locked)
 
@@ -293,7 +348,16 @@ new exported symbols, and the doc-hygiene rules).
 - Kracik, Dvorak (2016), *Development of an Analytical Method for Predicting
   Flow in a Supersonic Air Ejector*, EPJ Web Conf. 114:02059.
   `../../docs/ejector/Development_of_an_Analytical_Method_for.pdf`.
-- Bartosiewicz et al. (2004), air-ejector CFD + experiment (validation
-  cross-check). `../../docs/ejector/Bartosiewicz_ejector_2004.pdf`.
+- Henry, Leclaire, Hemidi, Seynhaeve, Bartosiewicz (2007), *Analysis of
+  Supersonic Ejector Operation: Experimental Validation and Two-Phase Aspects*,
+  HEFAT2007, Sun City, paper HF1 -- air-ejector experiment + CFD; Fig. 5 is the
+  subcritical-droop validation target. `../../docs/ejector/Bartosiewicz_ejector_2004.pdf`
+  (filename predates the confirmed citation). Digitized:
+  `validation/ejector/data/henry2007_fig5.py`.
+- Akbarnejad, Ziabasharhagh (2025), *Theoretical Model for Predicting
+  Performance of a Gas Ejector*, Thermal Engineering 72(1) -- air runs with
+  numeric critical + breakdown back-pressure tables (`P_c*`/`P_b0` anchors).
+- Galindo et al. (2020), R1234yf ejector (fitted subcritical + breakdown
+  surface) -- methodology reference only; refrigerant fluid, not an air fixture.
 - ESDU 86030, *Ejectors and jet pumps* (subcritical/breakdown characteristic
-  shape reference).
+  shape reference; optional independent jet-pump cross-check).
