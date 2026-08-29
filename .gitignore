@@ -112,7 +112,11 @@ diagnostic_reports/
 
 TODO.md
 .aider*
-.claude
+# Ignore the local .claude tree, but track shared project skills.
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/model-provenance/
 
 # Benchmark run outputs (auto-generated, not for tracking)
 benchmarks/runs/
