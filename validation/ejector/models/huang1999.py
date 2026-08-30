@@ -88,11 +88,13 @@ from combaero.network._ejector_huang1999 import (
     DeadHeadResult,
     EjectorGeometry,
     EjectorResult,
+    JetPumpResult,
     blended_entrainment_ratio,
     choked_mass_flow,
     critical_back_pressure,
     dead_head_back_pressure,
     entrainment_ratio,
+    jet_pump_entrainment_ratio,
     subcritical_entrainment_ratio,
 )
 
@@ -104,10 +106,12 @@ __all__ = [
     "DeadHeadResult",
     "EjectorGeometry",
     "EjectorResult",
+    "JetPumpResult",
     "blended_entrainment_ratio",
     "choked_mass_flow",
     "critical_back_pressure",
     "dead_head_back_pressure",
     "entrainment_ratio",
+    "jet_pump_entrainment_ratio",
     "subcritical_entrainment_ratio",
 ]
