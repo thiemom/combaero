@@ -55,8 +55,15 @@ Kracik & Dvorak closure at omega = 0 -- no new constant), and
 `subcritical_entrainment_ratio` / `blended_entrainment_ratio` droop omega from
 omega_crit at P_c* to 0 at P_b0 with a C1 smooth-min through the critical point.
 
-Still out of scope of THIS closed form: the unchoked-primary subsonic jet-pump
-regime (Phase 1B) and back-flow (P_b > P_b0, omega < 0) -- see the design note.
+The unchoked-primary regime is modeled by `jet_pump_entrainment_ratio` (Phase
+1B): a Keenan constant-area mixing solve that reuses the SAME Kracik & Dvorak
+mixing closure with a subsonic (rather than supersonic) primary core, so the
+jet-pump and ejector branches meet continuously at the primary-choke threshold.
+Validated to reduce to the lossless incompressible jet-pump closed form (Sanger,
+NASA TN D-4445) as Mach -> 0.
+
+Still out of scope of THIS closed form: back-flow (P_b beyond the forward-flow
+window, omega < 0) -- see the design note.
 """
 
 from __future__ import annotations
@@ -164,6 +171,20 @@ class DeadHeadResult:
     p_b0_stagnation_pa: float  # p03 at omega = 0, before recovery_efficiency
     lambda_mixed: float  # lambda3 = subsonic conjugate of lambda1 (z3 = z1)
     mach_mixed: float  # M3, Mach number equivalent of lambda3
+    recovery_efficiency: float  # coefficient actually applied (echoed back)
+
+
+@dataclass(frozen=True)
+class JetPumpResult:
+    """Outputs of the unchoked-primary subsonic jet-pump evaluation."""
+
+    omega: float  # entrainment ratio ms/mp at the solved operating point
+    p_mix_pa: float  # solved common mixing-inlet static pressure p1
+    lambda_primary: float  # lambda1: primary core dimensionless velocity (< 1, subsonic)
+    lambda_secondary: float  # lambda2: entrained-stream dimensionless velocity
+    mach_mixed: float  # M3, Mach number of the mixed flow
+    boundary: str  # "" (interior root), "back_pressure" (P_b >= dead-head), or
+    #                "primary_choke" (P_b <= choke limit -> blends to the ejector)
     recovery_efficiency: float  # coefficient actually applied (echoed back)
 
 
@@ -592,3 +613,143 @@ def blended_entrainment_ratio(
     omega_sub = subcritical_entrainment_ratio(omega_crit, p_c_pa, p_b0_pa, p_b_pa)
     eps = eps_frac * omega_crit
     return 0.5 * (omega_crit + omega_sub - math.sqrt((omega_crit - omega_sub) ** 2 + eps * eps))
+
+
+def _lambda_from_expansion(p_stag: float, p_static: float, gamma: float) -> float:
+    """Dimensionless velocity lambda = V/c* for isentropic expansion of a
+    stream from stagnation `p_stag` to static `p_static`.
+
+    lambda^2 = ((g+1)/(g-1)) * (1 - (p_static/p_stag)^((g-1)/g)); r_gas- and
+    temperature-independent (it cancels between V and the critical velocity
+    c* = sqrt(2 g/(g+1) R T0)). lambda < 1 for a subsonic (unchoked) stream."""
+    gm1, gp1 = gamma - 1.0, gamma + 1.0
+    return math.sqrt(max((gp1 / gm1) * (1.0 - (p_static / p_stag) ** (gm1 / gamma)), 0.0))
+
+
+def jet_pump_entrainment_ratio(
+    p_g: float,
+    t_g: float,
+    p_e: float,
+    t_e: float,
+    geom: EjectorGeometry,
+    gamma: float,
+    p_b: float,
+    recovery_efficiency: float = 1.0,
+) -> JetPumpResult:
+    """Unchoked-primary subsonic jet-pump entrainment ratio omega.
+
+    When the primary is UNCHOKED (its supply pressure is too low to choke the
+    nozzle throat) there is no supersonic core and the device is a subsonic jet
+    pump, not an ejector. The double-choked construction (`entrainment_ratio`)
+    does not apply: its geometric area-filling gives an unbounded, unphysical
+    omega (the M_py < 1 degeneracy, see OPERATING_REGIMES_DESIGN.md sec 2.3).
+
+    This closure is the Keenan-Neumann-Lustwerk constant-area mixing solve:
+    both streams expand isentropically from their stagnation states to a common
+    mixing-inlet static pressure p1 (the primary through A_p1, the entrained
+    flow through A_3 - A_p1), so omega = ms/mp = f(p1); the mass+momentum+energy
+    mixing to the fully-mixed state is EXACTLY Kracik & Dvorak's closure
+    (`_mixed_flow_stagnation`, verified identical to a direct momentum balance),
+    reused here with a subsonic lambda1 instead of supersonic -- so the jet-pump
+    and ejector branches share one mixing model and meet continuously at the
+    primary-choke threshold. The physical p1 is the one whose mixed flow, after
+    diffuser recovery, discharges at the back pressure p_b:
+    recovery_efficiency * p03(p1) = p_b, solved for p1.
+
+    Parameters
+    ----------
+    p_g, t_g, p_e, t_e, geom, gamma : see `entrainment_ratio`.
+    p_b : float
+        Back (discharge) pressure [Pa] the mixed flow must recover to.
+    recovery_efficiency : float, default 1.0
+        Diffuser recovery multiplier on the mixed stagnation pressure, same
+        convention as `critical_back_pressure`. 1.0 = ideal (no fitted loss),
+        per the calibration policy. NOTE: audited against Sanger (NASA TN
+        D-4445) water-jet-pump data, the lossless form overpredicts the head
+        ratio by ~1.4x (a real jet pump delivers ~70% of ideal head), so
+        recovery_efficiency ~= 0.7 is the data-anchored value a caller would
+        set for quantitative accuracy -- left unfitted here (default 1.0).
+
+    Boundaries (set on `JetPumpResult.boundary`):
+      * "back_pressure": p_b is at or above the zero-entrainment discharge, so
+        no forward entrainment is possible (omega clamped to 0; backflow is out
+        of scope).
+      * "primary_choke": p_b is at or below the discharge at which the primary
+        chokes; the operating point has left the jet-pump regime for the
+        ejector regime, and omega is returned at that choke boundary (the value
+        the Phase 2 blend hands over to the critical/subcritical closure).
+    """
+    if not (p_g > 0.0 and p_e > 0.0 and t_g > 0.0 and t_e > 0.0 and p_b > 0.0):
+        raise ValueError(
+            f"jet_pump_entrainment_ratio: pressures and temperatures must be "
+            f"positive, got p_g={p_g}, t_g={t_g}, p_e={p_e}, t_e={t_e}, p_b={p_b}."
+        )
+    gm1, gp1 = gamma - 1.0, gamma + 1.0
+    k = gm1 / gamma
+    b = geom.area_ratio_nozzle / geom.area_ratio_mix  # A_p1 / A_3
+    if not (0.0 < b < 1.0):
+        raise ValueError(
+            f"jet_pump_entrainment_ratio: need 0 < A_p1/A_3 < 1, got {b} from "
+            f"area_ratio_nozzle={geom.area_ratio_nozzle}, "
+            f"area_ratio_mix={geom.area_ratio_mix}."
+        )
+    theta21 = t_e / t_g
+    area_ratio_ann = (1.0 - b) / b  # A_s / A_p1, A_s = A_3 - A_p1
+
+    def omega_of(p1: float) -> float:
+        # ms/mp: ratio of compressible mass fluxes (p1 and R_gas cancel) times
+        # the annulus/nozzle area ratio.
+        r_g = p1 / p_g
+        r_e = p1 / p_e
+        flux_p = r_g ** (-k) * math.sqrt(max(1.0 - r_g**k, 0.0)) / math.sqrt(t_g)
+        flux_s = r_e ** (-k) * math.sqrt(max(1.0 - r_e**k, 0.0)) / math.sqrt(t_e)
+        return (flux_s / flux_p) * area_ratio_ann if flux_p > 0.0 else 0.0
+
+    def evaluate(p1: float) -> tuple[float, float, float, float, float]:
+        lam1 = _lambda_from_expansion(p_g, p1, gamma)
+        lam2 = _lambda_from_expansion(p_e, p1, gamma)
+        omega = omega_of(p1)
+        state = _YYState(lambda1=lam1, lambda2=lam2, theta21=theta21, mach_py=0.0, omega=omega)
+        p03, _t03, _lam3, mach3 = _mixed_flow_stagnation(p_g, t_g, p_e, state, omega, gamma)
+        return omega, p03, lam1, lam2, mach3
+
+    # p1 window: below min(p_g, p_e) the entrained flow can flow forward; above
+    # p_g * (2/(g+1))^(g/(g-1)) the PRIMARY (higher stagnation) is unchoked.
+    r_crit = (2.0 / gp1) ** (gamma / gm1)
+    p_hi = p_e * (1.0 - 1e-9)  # secondary just able to move
+    p_floor = p_g * r_crit  # primary choke boundary
+    if p_floor >= p_hi:
+        raise ValueError(
+            "jet_pump_entrainment_ratio: no unchoked-primary window "
+            f"(primary chokes at {p_floor:.1f} Pa >= secondary inflow limit {p_hi:.1f} Pa); "
+            "the primary supply is strong enough that this is an ejector, not a jet pump."
+        )
+
+    def residual(p1: float) -> float:
+        return recovery_efficiency * evaluate(p1)[1] - p_b
+
+    # p03 (hence the residual) is monotone in p1, so the two ends bracket the
+    # feasible back-pressure range. Outside it, clamp to the named boundary.
+    res_hi = residual(p_hi)
+    res_lo = residual(p_floor)
+    if res_hi <= 0.0:  # p_b >= zero-entrainment discharge: no forward pumping
+        omega, _p03, lam1, lam2, mach3 = evaluate(p_hi)
+        return JetPumpResult(0.0, p_hi, lam1, lam2, mach3, "back_pressure", recovery_efficiency)
+    if res_lo >= 0.0:  # p_b <= choke-limit discharge: hand over to the ejector
+        omega, _p03, lam1, lam2, mach3 = evaluate(p_floor)
+        return JetPumpResult(
+            omega, p_floor, lam1, lam2, mach3, "primary_choke", recovery_efficiency
+        )
+
+    # residual increases with p1 (higher mixing pressure -> higher discharge),
+    # with residual(p_hi) > 0 > residual(p_floor); root where it crosses zero.
+    lo, hi = p_floor, p_hi
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        if residual(mid) > 0.0:
+            hi = mid  # root is at lower p1
+        else:
+            lo = mid  # root is at higher p1
+    p1 = 0.5 * (lo + hi)
+    omega, _p03, lam1, lam2, mach3 = evaluate(p1)
+    return JetPumpResult(omega, p1, lam1, lam2, mach3, "", recovery_efficiency)

@@ -47,6 +47,7 @@ from validation.ejector.models.huang1999 import (  # noqa: E402
     critical_back_pressure,
     dead_head_back_pressure,
     entrainment_ratio,
+    jet_pump_entrainment_ratio,
     subcritical_entrainment_ratio,
 )
 
@@ -267,6 +268,77 @@ def _subcritical_sweep(row: HuangRow) -> dict:
     }
 
 
+# Air jet-pump reference case (the reported degenerate network, sec 2.4).
+# gamma is a fixed ideal-gas air value here (the unchoked regime is air, not
+# R141b); the closure's omega is r_gas-independent.
+_JETPUMP_AIR = {
+    "p_g_pa": 102435.0,
+    "t_g_k": 300.0,
+    "p_e_pa": 101325.0,
+    "t_e_k": 288.15,
+    "area_ratio_nozzle": 1.0e-4 / 3.14e-5,
+    "area_ratio_mix": 8.0e-4 / 3.14e-5,
+    "gamma": 1.40,
+    "recovery_efficiency": 1.0,
+}
+
+
+def _jetpump_feasible_window(inp: dict) -> tuple[float, float]:
+    """[lower, upper] back-pressure window of interior jet-pump solutions,
+    located via the closure's own boundary flags."""
+    geom = EjectorGeometry(inp["area_ratio_nozzle"], inp["area_ratio_mix"])
+
+    def boundary(p_b: float) -> str:
+        return jet_pump_entrainment_ratio(
+            inp["p_g_pa"], inp["t_g_k"], inp["p_e_pa"], inp["t_e_k"],
+            geom, inp["gamma"], p_b, inp["recovery_efficiency"],
+        ).boundary
+
+    lo, hi = inp["p_e_pa"], inp["p_g_pa"]
+    for _ in range(100):
+        mid = 0.5 * (lo + hi)
+        if boundary(mid) == "back_pressure":
+            hi = mid
+        else:
+            lo = mid
+    upper = 0.5 * (lo + hi)
+    lo, hi = inp["p_e_pa"], inp["p_g_pa"]
+    for _ in range(100):
+        mid = 0.5 * (lo + hi)
+        if boundary(mid) == "primary_choke":
+            lo = mid
+        else:
+            hi = mid
+    return 0.5 * (lo + hi), upper
+
+
+def _jetpump_case() -> dict:
+    """Air jet-pump back-pressure sweep: omega and d(omega)/d(P_b), the Phase
+    2/3 golden target for the unchoked-primary R1 branch."""
+    inp = _JETPUMP_AIR
+    geom = EjectorGeometry(inp["area_ratio_nozzle"], inp["area_ratio_mix"])
+    lower, upper = _jetpump_feasible_window(inp)
+
+    def omega_at(p_b: float) -> float:
+        return jet_pump_entrainment_ratio(
+            inp["p_g_pa"], inp["t_g_k"], inp["p_e_pa"], inp["t_e_k"],
+            geom, inp["gamma"], p_b, inp["recovery_efficiency"],
+        ).omega
+
+    sweep = []
+    for frac in (0.1, 0.25, 0.5, 0.75, 0.9):
+        p_b = lower + frac * (upper - lower)
+        h = 1.0e-4 * (upper - lower)
+        domega = (omega_at(p_b + h) - omega_at(p_b - h)) / (2.0 * h)
+        sweep.append({"frac": frac, "p_b_pa": p_b, "omega": omega_at(p_b), "domega_d_p_b": domega})
+    return {
+        "id": "air-reported-jetpump",
+        "inputs": inp,
+        "window": {"p_b_lower_pa": lower, "p_b_upper_pa": upper},
+        "sweep": sweep,
+    }
+
+
 def build_fixture() -> dict:
     return {
         "schema": "combaero.ejector.huang1999.v1",
@@ -326,8 +398,18 @@ def build_fixture() -> dict:
             "d(omega_eff)/d(P_b) coupling -- the Phase 2/3 R1 golden target. See "
             "validation/ejector/OPERATING_REGIMES_DESIGN.md sec 2.2, 3.2."
         ),
+        "jetpump_note": (
+            "Unchoked-primary jet-pump (Phase 1B): Keenan constant-area mixing "
+            "reusing the Kracik & Dvorak closure with a subsonic primary core. "
+            "omega is r_gas-independent; validated to reduce to the lossless "
+            "incompressible jet-pump relation (Sanger, NASA TN D-4445) as "
+            "Mach -> 0. recovery_efficiency=1.0 is unfitted but overpredicts "
+            "Sanger's measured head by ~1.4x (realistic ~0.7). See "
+            "OPERATING_REGIMES_DESIGN.md sec 3.3, 8.2."
+        ),
         "cases": [_case(r) for r in ALL_ROWS],
         "subcritical_cases": [_subcritical_sweep(ALL_ROWS[0])],
+        "jetpump_cases": [_jetpump_case()],
     }
 
 
@@ -447,6 +529,7 @@ def _emit_header(fixture: dict) -> str:
     lines.append("}};")
     lines.append("")
     lines.extend(_emit_subcritical(fixture))
+    lines.extend(_emit_jetpump(fixture))
     lines.append("}  // namespace combaero::validation::ejector")
     lines.append("")
     return "\n".join(lines)
@@ -491,6 +574,53 @@ def _emit_subcritical(fixture: dict) -> list[str]:
                 )
                 + "}"
             )
+        lines.append("    {" + ", ".join(head) + ", {{" + ", ".join(pts) + "}}},")
+    lines.append("}};")
+    lines.append("")
+    return lines
+
+
+def _emit_jetpump(fixture: dict) -> list[str]:
+    """Air jet-pump back-pressure sweep: omega(P_b) and d(omega)/d(P_b) -- the
+    Phase 2/3 golden target for the unchoked-primary R1 branch."""
+    jp = fixture["jetpump_cases"]
+    n_points = len(jp[0]["sweep"])
+    lines: list[str] = []
+    lines.append("// Unchoked-primary jet-pump (Phase 1B): Keenan constant-area mixing,")
+    lines.append("// reduces to the lossless incompressible relation (Sanger D-4445) at low M.")
+    lines.append("struct JetPumpPoint {")
+    lines.append("  double frac, p_b_pa, omega, domega_d_p_b;")
+    lines.append("};")
+    lines.append("struct JetPumpCase {")
+    lines.append("  const char *id;")
+    lines.append("  double p_g_pa, t_g_k, p_e_pa, t_e_k;")
+    lines.append("  double area_ratio_nozzle, area_ratio_mix, gamma, recovery_efficiency;")
+    lines.append("  double p_b_lower_pa, p_b_upper_pa;")
+    lines.append(f"  std::array<JetPumpPoint, {n_points}> sweep;")
+    lines.append("};")
+    lines.append("")
+    lines.append(
+        f"inline constexpr std::array<JetPumpCase, {len(jp)}> kJetPumpCases = {{{{"
+    )
+    for c in jp:
+        i = c["inputs"]
+        head = [
+            f'"{c["id"]}"',
+            _fmt(i["p_g_pa"]),
+            _fmt(i["t_g_k"]),
+            _fmt(i["p_e_pa"]),
+            _fmt(i["t_e_k"]),
+            _fmt(i["area_ratio_nozzle"]),
+            _fmt(i["area_ratio_mix"]),
+            _fmt(i["gamma"]),
+            _fmt(i["recovery_efficiency"]),
+            _fmt(c["window"]["p_b_lower_pa"]),
+            _fmt(c["window"]["p_b_upper_pa"]),
+        ]
+        pts = [
+            "{" + ", ".join(_fmt(p[k]) for k in ("frac", "p_b_pa", "omega", "domega_d_p_b")) + "}"
+            for p in c["sweep"]
+        ]
         lines.append("    {" + ", ".join(head) + ", {{" + ", ".join(pts) + "}}},")
     lines.append("}};")
     lines.append("")

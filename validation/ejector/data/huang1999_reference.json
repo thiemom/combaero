@@ -19,6 +19,7 @@
   "p_c_note": "P_c* (recovery_efficiency=1.0) uses Kracik & Dvorak (2016)'s mixing closure -- mass, momentum and energy solved together directly from the y-y state to the fully-mixed subsonic state, no phi_m loss coefficient and no separate shock -- in place of Huang's original Eqs. 9-18 (phi_m-weighted momentum + Rankine-Hugoniot shock + isentropic diffuser), which was systematically low (mean 25%, max 35%) against the T_c*-derived target across all 31 rows for reasons confirmed NOT to be gamma (monotonic in gamma over its whole valid range, gamma -> 1 limit still short) or an equation error (hand- verified; reproduces classical normal-shock tables exactly). The new closure cuts this to mean 6.2%, max 13.2% -- PC_REL_TOL=0.15 reflects that with margin. Independently, S. Akbarnejad and M. Ziabasharhagh's CFD (J. Braz. Soc. Mech. Sci. Eng. 47:253, 2025, DOI 10.1007/s40430-025-05536-7) measured a naive momentum-balance error of up to 30% at critical back pressure -- close to Huang's gap here -- but their own proposed fix (drop momentum, impose an exact-sonic condition) is a geometry-free DESIGN tool and does not transplant onto this given-geometry forward analysis (tested: mean 32-60% depending on the ambiguous mixing-pressure convention used, worse than Huang). recovery_efficiency defaults to 1.0 (no artificial loss) rather than a value fitted to this dataset -- see README.md's Accuracy section for the full comparison.",
   "jacobian_method": "central difference, h = 1e-6 * |x|",
   "p_b0_note": "P_b0 (dead-head back pressure) is the zero-entrainment upper anchor of the subcritical droop -- Kracik & Dvorak's SAME mixing closure at omega = 0 (gam = 0), no new constant. Present on every case; the subcritical_cases section sweeps the back pressure between P_c* and P_b0 and records the blended entrainment omega_eff plus its d(omega_eff)/d(P_b) coupling -- the Phase 2/3 R1 golden target. See validation/ejector/OPERATING_REGIMES_DESIGN.md sec 2.2, 3.2.",
+  "jetpump_note": "Unchoked-primary jet-pump (Phase 1B): Keenan constant-area mixing reusing the Kracik & Dvorak closure with a subsonic primary core. omega is r_gas-independent; validated to reduce to the lossless incompressible jet-pump relation (Sanger, NASA TN D-4445) as Mach -> 0. recovery_efficiency=1.0 is unfitted but overpredicts Sanger's measured head by ~1.4x (realistic ~0.7). See OPERATING_REGIMES_DESIGN.md sec 3.3, 8.2.",
   "cases": [
     {
       "id": "T3-EH-Pg0.604",
@@ -2112,6 +2113,57 @@
           "omega_eff": 0.02318141779002933,
           "omega_sub": 0.023181539798099705,
           "domega_eff_d_p_b": -5.81289186405554e-06
+        }
+      ]
+    }
+  ],
+  "jetpump_cases": [
+    {
+      "id": "air-reported-jetpump",
+      "inputs": {
+        "p_g_pa": 102435.0,
+        "t_g_k": 300.0,
+        "p_e_pa": 101325.0,
+        "t_e_k": 288.15,
+        "area_ratio_nozzle": 3.184713375796179,
+        "area_ratio_mix": 25.47770700636943,
+        "gamma": 1.4,
+        "recovery_efficiency": 1.0
+      },
+      "window": {
+        "p_b_lower_pa": 101460.61427810817,
+        "p_b_upper_pa": 101584.06086113025
+      },
+      "sweep": [
+        {
+          "frac": 0.1,
+          "p_b_pa": 101472.95893641037,
+          "omega": 6.050464854144917,
+          "domega_d_p_b": -0.09912026256674072
+        },
+        {
+          "frac": 0.25,
+          "p_b_pa": 101491.47592386369,
+          "omega": 4.4251046719207086,
+          "domega_d_p_b": -0.07723154384990459
+        },
+        {
+          "frac": 0.5,
+          "p_b_pa": 101522.33756961921,
+          "omega": 2.4472080363591826,
+          "domega_d_p_b": -0.05315626839275188
+        },
+        {
+          "frac": 0.75,
+          "p_b_pa": 101553.19921537473,
+          "omega": 1.0461655767491291,
+          "domega_d_p_b": -0.038769337867229296
+        },
+        {
+          "frac": 0.9,
+          "p_b_pa": 101571.71620282804,
+          "omega": 0.386113195326239,
+          "domega_d_p_b": -0.03277370062896739
         }
       ]
     }
