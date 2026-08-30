@@ -348,6 +348,61 @@ new exported symbols, and the doc-hygiene rules).
 5. **GUI**: surface the operating regime (critical / subcritical / jet-pump /
    backflow) as an ejector diagnostic; validate the reported network converges.
 
+## 6b. Phase 2 C++ port -- progress and the element-assembly blueprint
+
+Phases 2 (element) and 3 (C++ port) were merged into one combined effort: the
+element is C++-`(f, J)`-only, so a Python element path would be pure churn. Done
+and committed on `feat/ejector-phase2-element` (WIP, not yet a PR):
+
+- **Increment 1-2 -- C-D nozzle R0** (`ejector_cd_nozzle_mass_flow[_and_jacobian]`):
+  subsonic exit-`A_p1` flux smooth-min'd with the sonic-throat cap; value parity
+  vs the Python `cd_nozzle_mass_flow` (1e-9) and analytic `d/d(p0,t0,P_py)` vs
+  FD. Introduced a generic `DualN<N>` (the validated 4-seed `Dual4` untouched).
+- **Increment 3 -- jet-pump mixed discharge R3**
+  (`ejector_jetpump_discharge_and_jacobian`): `recovery * p03`, the Kracik &
+  Dvorak mixing reused at the subsonic-primary state, `DualN<6>` Jacobian
+  (seeds p_g,t_g,p_e,t_e,P_py,omega), value parity + FD-checked all six seeds.
+  The secondary entrained flux reuses `ejector_cd_nozzle_mass_flow`
+  (area_throat = area_exit = A_s), so no new closure.
+
+**Increment 4 -- the element assembly (next; the largest piece).** Five rows on
+the `MultiPortChamberElement` topology, with `P_py` (the common mixing static)
+exposed as a SECOND element-owned unknown alongside `P_jct`:
+
+    R0  = mp - cd_nozzle(p_g, t_g, P_py, A_t, A_p1)          primary C-D nozzle
+    R1  = ms - [s_choke*omega_crit*mp + (1 - s_choke)*ms_sec]  blended entrainment
+          ms_sec = cd_nozzle(p_e, t_e, P_py, A_s, A_s)         (secondary flux)
+    R2  = mdot_out - mp - ms                                  mass conservation
+    R3  = outlet.Pt - recovery*[s_choke*P_c* + (1 - s_choke)*p03_jetpump(P_py)]
+                                                              outlet-pin (A')
+    R_py = s_choke*(P_py - P_sy) + (1 - s_choke)*R0_like       P_py definition
+
+- `s_choke` is a smooth primary-choke indicator (C-D nozzle exit flux vs the
+  sonic cap); `omega_crit`/`P_c*` are the existing critical closures.
+- **Why R_py is mandatory (design finding):** in critical mode R0/R1/R3 are all
+  P_py-independent (choked primary; Huang omega and P_c*), so without R_py the
+  P_py Jacobian column is all-zeros and the Newton block is singular. R_py must
+  therefore be non-degenerate in BOTH regimes -- `s*(P_py - P_sy)` pins P_py in
+  critical, and the `(1-s)` branch must re-assert the primary relation (so the
+  row is not identically zero when unchoked); finalize its exact form so R_py's
+  row stays full-rank across the blend.
+- **Spurious-root exclusion = A' + B** (validated in the residual-structure
+  spike): R3 pins `outlet.Pt = recovery*p03`, so the choked artifact (discharge
+  ~= P_c* != outlet) is a non-root; B is the physical warm-start (Pt_primary >=
+  outlet, P_py just below it) that keeps Newton out of the sticky choked basin.
+- **Solver-integration change required:** the solver's MultiPortChamber dispatch
+  (`solver.py`, `P_jct_val = x[m_indices[0]]`) passes only the FIRST owned
+  unknown to `residuals()`. Extend it to pass the remaining owned unknowns
+  (backward-compatible: an optional map keyed by `element.unknowns()[1:]`), so
+  `EjectorElement` receives `P_py`. The Jacobian relay already handles named
+  unknown columns generically, so only the value-passing side changes.
+- Then: `verify_solution_consistent` accepts subcritical + jet-pump roots (drop
+  the `outlet <= P_c*` demotion); assemble the full analytic `(f, J)` in C++
+  (blend of the committed closures); rewrite the element unit tests for the new
+  structure; extend the golden fixture with coupled rows; and the end-to-end
+  regression: `gui/tmp/ejector_test_low_flow_not_converged.json` converges to
+  `Pt_primary ~= Pb`, `dp >= 0`, `omega ~= 7`.
+
 ## 7. References
 
 - Huang, Chang, Wang, Petrenko (1999), *A 1-D analysis of ejector performance*,
