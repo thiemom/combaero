@@ -87,6 +87,18 @@ double ejector_mach_from_area_ratio_supersonic(double area_ratio, double gamma);
 double ejector_choked_mass_flow(double p0, double t0, double area_throat,
                                 double gamma, double r_gas, double eta);
 
+// Converging-diverging nozzle mass flow spanning choked and unchoked, the R0
+// primary residual of the operating-regime extension (see
+// validation/ejector/OPERATING_REGIMES_DESIGN.md sec 3.1). Subsonic exit flux
+// (area_exit, exit static p_static_down) smooth-min'd with the sonic-throat cap
+// (area_throat); the two are equal at the choke threshold so the min is
+// continuous, and the C1 sqrt-smoothing (eps = eps_frac * cap) rounds the
+// corner. 1:1 with cd_nozzle_mass_flow in _ejector_huang1999.py.
+double ejector_cd_nozzle_mass_flow(double p0, double t0, double p_static_down,
+                                   double area_throat, double area_exit,
+                                   double gamma, double r_gas, double eta,
+                                   double eps_frac);
+
 struct EjectorEntrainmentResult {
   double omega;                     // entrainment ratio ms / mp
   double mach_nozzle_exit;          // M_p1
@@ -135,6 +147,20 @@ EjectorCriticalPressureResult ejector_critical_back_pressure(
 std::tuple<double, double, double>
 ejector_choked_mass_flow_and_jacobian(double p0, double t0, double area_throat,
                                       double gamma, double r_gas, double eta);
+
+struct EjectorCDNozzleJacobian {
+  double mdot;        // == ejector_cd_nozzle_mass_flow
+  double dmdot_dp0;   // d/d(primary stagnation pressure)
+  double dmdot_dt0;   // d/d(primary stagnation temperature)
+  double dmdot_dp_py; // d/d(exit/mixing static pressure P_py)
+};
+
+// C-D nozzle mass flow with its analytic Jacobian w.r.t. the three inputs that
+// are Newton-solved unknowns for EjectorElement (p0 = primary Pt, t0 = primary
+// Tt, p_static_down = P_py). gamma/r_gas/geometry/eta are frozen parameters.
+EjectorCDNozzleJacobian ejector_cd_nozzle_mass_flow_and_jacobian(
+    double p0, double t0, double p_static_down, double area_throat,
+    double area_exit, double gamma, double r_gas, double eta, double eps_frac);
 
 struct EjectorEntrainmentJacobian {
   EjectorEntrainmentResult value;

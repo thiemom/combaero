@@ -83,3 +83,24 @@ TEST(EjectorPhysics, MachFromAreaRatioSupersonicInvertsAreaOverAstar) {
     EXPECT_NEAR(ejector_area_over_astar(mach, gamma), area_ratio, 1e-8);
   }
 }
+
+TEST(EjectorPhysics, CDNozzleMassFlowMatchesPythonReference) {
+  // Value parity vs cd_nozzle_mass_flow in _ejector_huang1999.py (the R0
+  // primary residual). Cases: reported unchoked root, deeply choked, healthy
+  // motive (choked), and a near-threshold point.
+  struct Case {
+    double p0, t0, p_py, at, ae, gamma, r_gas, eta, eps, expected;
+  };
+  const Case cases[] = {
+      {101325.0, 300.0, 100207.0, 3.14e-05, 0.0001, 1.4, 287.0, 0.95, 0.001, 0.004970173368263851},
+      {101325.0, 300.0, 40000.0, 3.14e-05, 0.0001, 1.4, 287.0, 0.95, 0.001, 0.007236469139827049},
+      {604000.0, 368.0, 52828.0, 3.14e-05, 0.0001, 1.4, 287.0, 0.95, 0.001, 0.03894786052281535},
+      {101325.0, 300.0, 101000.0, 3.14e-05, 0.0001, 1.4, 287.0, 0.95, 0.001, 0.0026910837365242053},
+  };
+  for (const auto& c : cases) {
+    double mdot = ejector_cd_nozzle_mass_flow(c.p0, c.t0, c.p_py, c.at, c.ae, c.gamma,
+                                              c.r_gas, c.eta, c.eps);
+    EXPECT_NEAR(mdot, c.expected, 1e-9 * c.expected)
+        << "cd_nozzle mismatch at p_py=" << c.p_py;
+  }
+}

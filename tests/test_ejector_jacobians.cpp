@@ -85,3 +85,33 @@ TEST(EjectorJacobians, ChokedMassFlowMatchesCentralDifference) {
     EXPECT_GT(mdot, 0.0);
   }
 }
+
+TEST(EjectorJacobians, CDNozzleAnalyticMatchesCentralDifference) {
+  // C-D nozzle R0 residual: analytic (p0, t0, p_py) partials vs central
+  // difference of the value function. Covers unchoked, near-threshold, and
+  // choked (flat) points.
+  const double A_t = 3.14e-5, A_e = 1.0e-4, g = 1.40, R = 287.0, eta = 0.95, eps = 1e-3;
+  struct Pt {
+    double p0, t0, p_py;
+  };
+  const Pt pts[] = {
+      {101325.0, 300.0, 100207.0}, // unchoked (reported root)
+      {101325.0, 300.0, 98700.0},  // near the choke threshold
+      {101325.0, 300.0, 60000.0},  // choked (flat region)
+      {604000.0, 368.0, 300000.0}, // higher motive, unchoked
+  };
+  auto val = [&](double p0, double t0, double p_py) {
+    return ejector_cd_nozzle_mass_flow(p0, t0, p_py, A_t, A_e, g, R, eta, eps);
+  };
+  for (const auto& p : pts) {
+    EjectorCDNozzleJacobian j =
+        ejector_cd_nozzle_mass_flow_and_jacobian(p.p0, p.t0, p.p_py, A_t, A_e, g, R, eta, eps);
+    double hp0 = 1e-6 * p.p0, ht0 = 1e-6 * p.t0, hpy = 1e-6 * p.p_py;
+    double cd_p0 = (val(p.p0 + hp0, p.t0, p.p_py) - val(p.p0 - hp0, p.t0, p.p_py)) / (2 * hp0);
+    double cd_t0 = (val(p.p0, p.t0 + ht0, p.p_py) - val(p.p0, p.t0 - ht0, p.p_py)) / (2 * ht0);
+    double cd_py = (val(p.p0, p.t0, p.p_py + hpy) - val(p.p0, p.t0, p.p_py - hpy)) / (2 * hpy);
+    EXPECT_NEAR(j.dmdot_dp0, cd_p0, 1e-6 * std::abs(cd_p0) + 1e-12) << "dp0 at p_py=" << p.p_py;
+    EXPECT_NEAR(j.dmdot_dt0, cd_t0, 1e-6 * std::abs(cd_t0) + 1e-12) << "dt0 at p_py=" << p.p_py;
+    EXPECT_NEAR(j.dmdot_dp_py, cd_py, 1e-5 * std::abs(cd_py) + 1e-12) << "dp_py at p_py=" << p.p_py;
+  }
+}

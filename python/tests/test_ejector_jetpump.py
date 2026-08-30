@@ -30,6 +30,7 @@ from pathlib import Path
 import pytest
 
 import validation.ejector.data as _data_pkg
+from combaero.network._ejector_huang1999 import cd_nozzle_mass_flow, choked_mass_flow
 from validation.ejector.models.huang1999 import (
     EjectorGeometry,
     jet_pump_entrainment_ratio,
@@ -196,6 +197,46 @@ def test_fixture_jetpump_sweep_reproduces_model() -> None:
             i["recovery_efficiency"],
         ).omega
         assert live == pytest.approx(pt["omega"], rel=1e-9)
+
+
+def test_cd_nozzle_saturates_at_choked_cap() -> None:
+    """The C-D nozzle (R0 primary residual) saturates at the sonic-throat mass
+    flow once the exit pressure is low enough to choke -- deep expansion gives
+    the choked_mass_flow value (to within the smooth-min rounding)."""
+    A_t, A_e, g, R, Tt, p0 = 3.14e-5, 1.0e-4, 1.40, 287.0, 300.0, 101325.0
+    cap = choked_mass_flow(p0, Tt, A_t, g, R)
+    deep = cd_nozzle_mass_flow(p0, Tt, 0.3 * p0, A_t, A_e, g, R)
+    assert deep == pytest.approx(cap, rel=1e-3)  # within eps_frac rounding
+
+
+def test_cd_nozzle_monotone_rises_as_exit_pressure_falls() -> None:
+    """Unchoked: lower exit pressure -> more expansion -> more mass flow, up to
+    the choke cap. Strictly increasing as p_static_down falls, then flat."""
+    A_t, A_e, g, R, Tt, p0 = 3.14e-5, 1.0e-4, 1.40, 287.0, 300.0, 101325.0
+    ps = [p0 * f for f in (0.999, 0.99, 0.97, 0.95, 0.9)]
+    mdots = [cd_nozzle_mass_flow(p0, Tt, p, A_t, A_e, g, R) for p in ps]
+    assert all(mdots[i + 1] >= mdots[i] for i in range(len(mdots) - 1))
+    cap = choked_mass_flow(p0, Tt, A_t, g, R)
+    assert all(m <= cap * (1.0 + 1e-9) for m in mdots)  # never exceeds the cap
+
+
+def test_cd_nozzle_is_c1_across_the_choke_threshold() -> None:
+    """The smooth-min rounds the choke corner: the finite-difference slope is
+    continuous across the threshold (a bare min() would jump to zero)."""
+    A_t, A_e, g, R, Tt, p0 = 3.14e-5, 1.0e-4, 1.40, 287.0, 300.0, 101325.0
+
+    def slope(p):
+        h = 1.0
+        return (
+            cd_nozzle_mass_flow(p0, Tt, p + h, A_t, A_e, g, R)
+            - cd_nozzle_mass_flow(p0, Tt, p - h, A_t, A_e, g, R)
+        ) / (2.0 * h)
+
+    # scan the corner; consecutive slopes must not jump discontinuously
+    ps = [p0 * f for f in (0.975, 0.973, 0.971, 0.969, 0.967)]
+    slopes = [slope(p) for p in ps]
+    for i in range(len(slopes) - 1):
+        assert abs(slopes[i + 1] - slopes[i]) < 5.0e-7  # bounded curvature, no kink
 
 
 def test_raises_when_primary_cannot_be_unchoked() -> None:

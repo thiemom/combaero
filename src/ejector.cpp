@@ -2,6 +2,7 @@
 // paper references and the Jacobian-scope note.
 
 #include "ejector.h"
+#include <array>
 #include <cmath>
 
 namespace combaero::solver {
@@ -43,10 +44,146 @@ ejector_choked_mass_flow_and_jacobian(double p0, double t0, double area_throat,
   return {mdot, mdot / p0, -0.5 * mdot / t0};
 }
 
+double ejector_cd_nozzle_mass_flow(double p0, double t0, double p_static_down,
+                                   double area_throat, double area_exit,
+                                   double gamma, double r_gas, double eta,
+                                   double eps_frac) {
+  double cap = ejector_choked_mass_flow(p0, t0, area_throat, gamma, r_gas, eta);
+  double exit_flux = 0.0;
+  double r = p_static_down / p0;
+  if (r < 1.0) {
+    double gm1 = gamma - 1.0;
+    double gp1 = gamma + 1.0;
+    double mach = std::sqrt(2.0 / gm1 * (std::pow(r, -gm1 / gamma) - 1.0));
+    double flux = mach * std::pow(1.0 + 0.5 * gm1 * mach * mach, -gp1 / (2.0 * gm1));
+    exit_flux = area_exit * p0 / std::sqrt(t0) * std::sqrt(gamma / r_gas) * flux * std::sqrt(eta);
+  }
+  double eps = eps_frac * cap;
+  double diff = exit_flux - cap;
+  return 0.5 * (exit_flux + cap - std::sqrt(diff * diff + eps * eps));
+}
+
 double ejector_q_lambda(double lam, double gamma) {
   double gm1 = gamma - 1.0;
   double gp1 = gamma + 1.0;
   return std::pow(1.0 - (gm1 / gp1) * lam * lam, 1.0 / gm1) * std::pow(gp1 / 2.0, 1.0 / gm1) * lam;
+}
+
+// -----------------------------------------------------------------------------
+// Generic forward-mode dual (N seeds) for the operating-regime closures, whose
+// Newton unknowns include P_py and the outlet pressure in addition to the four
+// thermodynamic inputs -- so the fixed 4-seed Dual4 above (kept untouched for
+// the validated critical-mode path) does not fit. Same analytic chain-rule
+// bookkeeping; DualN<N>::seed(v, i) sets the i-th partial to 1.
+// -----------------------------------------------------------------------------
+namespace {
+
+template <int N> struct DualN {
+  double v = 0.0;
+  std::array<double, N> d{};
+  static DualN constant(double c) {
+    DualN r;
+    r.v = c;
+    return r;
+  }
+  static DualN seed(double c, int i) {
+    DualN r;
+    r.v = c;
+    r.d[i] = 1.0;
+    return r;
+  }
+};
+
+template <int N> DualN<N> operator+(const DualN<N>& a, const DualN<N>& b) {
+  DualN<N> r;
+  r.v = a.v + b.v;
+  for (int i = 0; i < N; ++i) r.d[i] = a.d[i] + b.d[i];
+  return r;
+}
+template <int N> DualN<N> operator+(const DualN<N>& a, double c) {
+  DualN<N> r = a;
+  r.v += c;
+  return r;
+}
+template <int N> DualN<N> operator+(double c, const DualN<N>& a) { return a + c; }
+template <int N> DualN<N> operator-(const DualN<N>& a, const DualN<N>& b) {
+  DualN<N> r;
+  r.v = a.v - b.v;
+  for (int i = 0; i < N; ++i) r.d[i] = a.d[i] - b.d[i];
+  return r;
+}
+template <int N> DualN<N> operator-(const DualN<N>& a, double c) {
+  DualN<N> r = a;
+  r.v -= c;
+  return r;
+}
+template <int N> DualN<N> operator*(const DualN<N>& a, const DualN<N>& b) {
+  DualN<N> r;
+  r.v = a.v * b.v;
+  for (int i = 0; i < N; ++i) r.d[i] = a.d[i] * b.v + a.v * b.d[i];
+  return r;
+}
+template <int N> DualN<N> operator*(const DualN<N>& a, double c) {
+  DualN<N> r;
+  r.v = a.v * c;
+  for (int i = 0; i < N; ++i) r.d[i] = a.d[i] * c;
+  return r;
+}
+template <int N> DualN<N> operator*(double c, const DualN<N>& a) { return a * c; }
+template <int N> DualN<N> operator/(const DualN<N>& a, const DualN<N>& b) {
+  DualN<N> r;
+  double inv = 1.0 / b.v;
+  double inv2 = inv * inv;
+  r.v = a.v * inv;
+  for (int i = 0; i < N; ++i) r.d[i] = (a.d[i] * b.v - a.v * b.d[i]) * inv2;
+  return r;
+}
+template <int N> DualN<N> dsqrt(const DualN<N>& a) {
+  DualN<N> r;
+  r.v = std::sqrt(a.v);
+  double coef = 0.5 / r.v;
+  for (int i = 0; i < N; ++i) r.d[i] = a.d[i] * coef;
+  return r;
+}
+template <int N> DualN<N> dpow(const DualN<N>& a, double c) {
+  DualN<N> r;
+  r.v = std::pow(a.v, c);
+  double coef = c * std::pow(a.v, c - 1.0);
+  for (int i = 0; i < N; ++i) r.d[i] = a.d[i] * coef;
+  return r;
+}
+
+} // namespace
+
+EjectorCDNozzleJacobian ejector_cd_nozzle_mass_flow_and_jacobian(
+    double p0_val, double t0_val, double p_py_val, double area_throat,
+    double area_exit, double gamma, double r_gas, double eta, double eps_frac) {
+  // Seeds: 0 = p0, 1 = t0, 2 = p_py.
+  using D = DualN<3>;
+  D p0 = D::seed(p0_val, 0);
+  D t0 = D::seed(t0_val, 1);
+  D p_py = D::seed(p_py_val, 2);
+
+  double gm1 = gamma - 1.0;
+  double gp1 = gamma + 1.0;
+  double choke_const = std::sqrt(gamma / r_gas * std::pow(2.0 / gp1, gp1 / gm1));
+  D cap = (choke_const * area_throat * std::sqrt(eta)) * p0 / dsqrt(t0);
+
+  D exit_flux = D::constant(0.0);
+  if (p_py_val < p0_val) {
+    D r = p_py / p0;
+    D mach_sq = (2.0 / gm1) * (dpow(r, -gm1 / gamma) - 1.0);
+    D mach = dsqrt(mach_sq);
+    D flux = mach * dpow(1.0 + 0.5 * gm1 * mach * mach, -gp1 / (2.0 * gm1));
+    exit_flux = (area_exit * std::sqrt(gamma / r_gas) * std::sqrt(eta)) * p0 / dsqrt(t0) * flux;
+  }
+
+  // eps = eps_frac * cap depends on (p0, t0); differentiate it too (FD of the
+  // Python value function does), else the Jacobian would be inconsistent.
+  D eps = eps_frac * cap;
+  D diff = exit_flux - cap;
+  D mdot = 0.5 * (exit_flux + cap - dsqrt(diff * diff + eps * eps));
+  return {mdot.v, mdot.d[0], mdot.d[1], mdot.d[2]};
 }
 
 // -----------------------------------------------------------------------------
