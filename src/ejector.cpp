@@ -117,6 +117,12 @@ template <int N> DualN<N> operator-(const DualN<N>& a, double c) {
   r.v -= c;
   return r;
 }
+template <int N> DualN<N> operator-(double c, const DualN<N>& a) {
+  DualN<N> r;
+  r.v = c - a.v;
+  for (int i = 0; i < N; ++i) r.d[i] = -a.d[i];
+  return r;
+}
 template <int N> DualN<N> operator*(const DualN<N>& a, const DualN<N>& b) {
   DualN<N> r;
   r.v = a.v * b.v;
@@ -136,6 +142,15 @@ template <int N> DualN<N> operator/(const DualN<N>& a, const DualN<N>& b) {
   double inv2 = inv * inv;
   r.v = a.v * inv;
   for (int i = 0; i < N; ++i) r.d[i] = (a.d[i] * b.v - a.v * b.d[i]) * inv2;
+  return r;
+}
+template <int N> DualN<N> operator/(const DualN<N>& a, double c) { return a * (1.0 / c); }
+template <int N> DualN<N> operator/(double c, const DualN<N>& a) {
+  DualN<N> r;
+  double inv = 1.0 / a.v;
+  r.v = c * inv;
+  double coef = -c * inv * inv;
+  for (int i = 0; i < N; ++i) r.d[i] = a.d[i] * coef;
   return r;
 }
 template <int N> DualN<N> dsqrt(const DualN<N>& a) {
@@ -184,6 +199,49 @@ EjectorCDNozzleJacobian ejector_cd_nozzle_mass_flow_and_jacobian(
   D diff = exit_flux - cap;
   D mdot = 0.5 * (exit_flux + cap - dsqrt(diff * diff + eps * eps));
   return {mdot.v, mdot.d[0], mdot.d[1], mdot.d[2]};
+}
+
+EjectorJetPumpDischargeJacobian ejector_jetpump_discharge_and_jacobian(
+    double p_g_val, double t_g_val, double p_e_val, double t_e_val,
+    double p_py_val, double omega_val, double gamma, double recovery_efficiency) {
+  // Seeds: 0=p_g, 1=t_g, 2=p_e, 3=t_e, 4=p_py, 5=omega.
+  using D = DualN<6>;
+  D p_g = D::seed(p_g_val, 0);
+  D t_g = D::seed(t_g_val, 1);
+  D p_e = D::seed(p_e_val, 2);
+  D t_e = D::seed(t_e_val, 3);
+  D p_py = D::seed(p_py_val, 4);
+  D gam = D::seed(omega_val, 5);
+
+  double gm1 = gamma - 1.0;
+  double gp1 = gamma + 1.0;
+  double k = gm1 / gamma;
+
+  // Both streams expand isentropically to the common mixing static P_py:
+  // lambda = sqrt((g+1)/(g-1) * (1 - (P_py/P0)^((g-1)/g))). Subsonic (< 1).
+  D lambda1 = dsqrt((gp1 / gm1) * (1.0 - dpow(p_py / p_g, k)));
+  D lambda2 = dsqrt((gp1 / gm1) * (1.0 - dpow(p_py / p_e, k)));
+  D theta21 = t_e / t_g;
+
+  // Kracik & Dvorak mixing (their Eqs. 7-13), identical to the critical path's
+  // chain -- only lambda1 is subsonic here instead of supersonic.
+  D z1 = lambda1 + 1.0 / lambda1;
+  D z2 = lambda2 + 1.0 / lambda2;
+  D z3 = (z1 + gam * dsqrt(theta21) * z2) / dsqrt((1.0 + gam) * (1.0 + gam * theta21));
+  D lambda3 = (z3 - dsqrt(z3 * z3 - 4.0)) * 0.5; // subsonic root (Eq. 12)
+
+  double k7 = std::pow(gp1 / 2.0, 1.0 / gm1);
+  auto q_of = [&](const D& lam) {
+    return dpow(1.0 - (gm1 / gp1) * lam * lam, 1.0 / gm1) * k7 * lam;
+  };
+  D q1 = q_of(lambda1);
+  D q2 = q_of(lambda2);
+  D q3 = q_of(lambda3);
+
+  D p03 = p_g * dsqrt((1.0 + gam) * (1.0 + gam * theta21)) /
+          (1.0 + (p_g / p_e) * gam * dsqrt(theta21) * q1 / q2) * q1 / q3;
+  D out = recovery_efficiency * p03;
+  return {out.v, out.d[0], out.d[1], out.d[2], out.d[3], out.d[4], out.d[5]};
 }
 
 // -----------------------------------------------------------------------------

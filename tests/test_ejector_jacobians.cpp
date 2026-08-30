@@ -115,3 +115,42 @@ TEST(EjectorJacobians, CDNozzleAnalyticMatchesCentralDifference) {
     EXPECT_NEAR(j.dmdot_dp_py, cd_py, 1e-5 * std::abs(cd_py) + 1e-12) << "dp_py at p_py=" << p.p_py;
   }
 }
+
+TEST(EjectorJacobians, JetPumpDischargeValueAndJacobian) {
+  // R3 building block: value parity vs the Python mixing closure, and analytic
+  // partials (p_g, t_g, p_e, t_e, p_py, omega) vs central difference.
+  struct Case {
+    double p_g, t_g, p_e, t_e, p_py, omega, gamma, rec, expected;
+  };
+  const Case cs[] = {
+      {101325.0, 300.0, 101325.0, 300.0, 100207.0, 7.0, 1.4, 1.0, 101325.00000000015},
+      {102435.0, 300.0, 101325.0, 288.15, 100000.0, 3.5, 1.4, 1.0, 101544.85636197214},
+      {110000.0, 320.0, 100000.0, 300.0, 95000.0, 1.5, 1.4, 0.9, 92957.65455779647},
+  };
+  auto val = [](double pg, double tg, double pe, double te, double ppy, double om, double gm,
+                double rec) {
+    return ejector_jetpump_discharge_and_jacobian(pg, tg, pe, te, ppy, om, gm, rec).p03;
+  };
+  for (const auto& c : cs) {
+    auto j = ejector_jetpump_discharge_and_jacobian(c.p_g, c.t_g, c.p_e, c.t_e, c.p_py, c.omega,
+                                                    c.gamma, c.rec);
+    EXPECT_NEAR(j.p03, c.expected, 1e-7 * c.expected) << "value at p_py=" << c.p_py;
+    double h[6] = {1e-6 * c.p_g, 1e-6 * c.t_g, 1e-6 * c.p_e,
+                   1e-6 * c.t_e, 1e-6 * c.p_py, 1e-6 * c.omega};
+    double an[6] = {j.dp03_dp_g, j.dp03_dt_g, j.dp03_dp_e, j.dp03_dt_e, j.dp03_dp_py, j.dp03_domega};
+    for (int k = 0; k < 6; ++k) {
+      double a[8] = {c.p_g, c.t_g, c.p_e, c.t_e, c.p_py, c.omega, c.gamma, c.rec};
+      double b[8];
+      for (int m = 0; m < 8; ++m) b[m] = a[m];
+      a[k] += h[k];
+      b[k] -= h[k];
+      double cd = (val(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]) -
+                   val(b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7])) /
+                  (2 * h[k]);
+      // Abs floor 1e-5 tolerates central-difference round-off on partials that
+      // are genuinely ~0 at the symmetric degenerate point (p_g=p_e, t_g=t_e);
+      // real partials here are O(0.01)-O(1000), caught by the relative term.
+      EXPECT_NEAR(an[k], cd, 1e-5 * std::abs(cd) + 1e-5) << "seed " << k << " at p_py=" << c.p_py;
+    }
+  }
+}

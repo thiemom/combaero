@@ -158,9 +158,31 @@ struct EjectorCDNozzleJacobian {
 // C-D nozzle mass flow with its analytic Jacobian w.r.t. the three inputs that
 // are Newton-solved unknowns for EjectorElement (p0 = primary Pt, t0 = primary
 // Tt, p_static_down = P_py). gamma/r_gas/geometry/eta are frozen parameters.
+// The secondary entrained flux reuses this with area_throat = area_exit = A_s.
 EjectorCDNozzleJacobian ejector_cd_nozzle_mass_flow_and_jacobian(
     double p0, double t0, double p_static_down, double area_throat,
     double area_exit, double gamma, double r_gas, double eta, double eps_frac);
+
+struct EjectorJetPumpDischargeJacobian {
+  double p03;      // recovery_efficiency * mixed stagnation pressure
+  double dp03_dp_g;
+  double dp03_dt_g;
+  double dp03_dp_e;
+  double dp03_dt_e;
+  double dp03_dp_py; // d/d(mixing static pressure P_py)
+  double dp03_domega; // d/d(entrainment ratio -- the R1 unknown feeding the mix)
+};
+
+// Jet-pump mixed-flow discharge stagnation: the Kracik & Dvorak mixing closure
+// (reused from the critical path, ejector_critical_back_pressure) evaluated at
+// the SUBSONIC-primary jet-pump state -- both streams expand to the common
+// mixing static P_py (lambda1/lambda2 from that expansion), mixed at ratio
+// omega. The R3 (outlet-pin) building block for the operating-regime element;
+// 1:1 with _mixed_flow_stagnation in _ejector_huang1999.py fed jet-pump
+// lambdas. r_gas cancels (lambda/q are dimensionless), so it is not an input.
+EjectorJetPumpDischargeJacobian ejector_jetpump_discharge_and_jacobian(
+    double p_g, double t_g, double p_e, double t_e, double p_py, double omega,
+    double gamma, double recovery_efficiency);
 
 struct EjectorEntrainmentJacobian {
   EjectorEntrainmentResult value;
