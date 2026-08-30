@@ -116,9 +116,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pressure row); the default matches prior hard-coded behaviour so
   existing subclasses (`ConstantKTeeElement`, `MPCEv2Element`) are
   unaffected.
-- **Dev tooling: Biome pinned to 2.5.9 across all three sources.** The
-  Dependabot frontend bump of `@biomejs/biome` (2.5.6 -> 2.5.9 in
-  `gui/frontend/package.json`) is now matched by the `biome.json` `$schema`
+- **Dev tooling: Biome pinned to 2.5.10 across all three sources.** The
+  Dependabot frontend bumps of `@biomejs/biome` (2.5.6 -> 2.5.9 -> 2.5.10 in
+  `gui/frontend/package.json`) are matched by the `biome.json` `$schema`
   and the `.pre-commit-config.yaml` hook pin, per the frontend
   version-sync checklist.
 
