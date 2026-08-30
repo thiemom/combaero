@@ -43,16 +43,20 @@ References
 
 Scope
 -----
-Critical (double-choked) operation only: both the primary flow (choked at the
-nozzle throat) and the entrained flow (choked at the hypothetical throat y-y)
-are sonic, so the entrainment ratio omega is fixed and independent of back
-pressure. Subcritical, unchoked-primary, and back-flow regimes are out of scope
-of THIS closed form; the extension that adds them (choked/unchoked primary,
-subcritical omega droop between P_c* and the dead-head pressure P_b0, and a
-subsonic jet-pump mode) is designed in
-``validation/ejector/OPERATING_REGIMES_DESIGN.md``. Note that ``critical_back_pressure``
-evaluated at omega = 0 already yields P_b0 (the zero-entrainment dead-head back
-pressure) with no new calibration constant -- an anchor that extension reuses.
+Critical (double-choked) operation is the core: both the primary flow (choked
+at the nozzle throat) and the entrained flow (choked at the hypothetical throat
+y-y) are sonic, so the critical entrainment ratio omega_crit is fixed and
+independent of back pressure (`entrainment_ratio`, `critical_back_pressure`).
+
+The subcritical droop is now also modeled as closed forms (Phase 1A of the
+operating-regime extension, ``validation/ejector/OPERATING_REGIMES_DESIGN.md``):
+`dead_head_back_pressure` is the zero-entrainment upper anchor P_b0 (the SAME
+Kracik & Dvorak closure at omega = 0 -- no new constant), and
+`subcritical_entrainment_ratio` / `blended_entrainment_ratio` droop omega from
+omega_crit at P_c* to 0 at P_b0 with a C1 smooth-min through the critical point.
+
+Still out of scope of THIS closed form: the unchoked-primary subsonic jet-pump
+regime (Phase 1B) and back-flow (P_b > P_b0, omega < 0) -- see the design note.
 """
 
 from __future__ import annotations
@@ -146,6 +150,19 @@ class CriticalPressureResult:
     )
     temp_mixed_stagnation_k: float  # T03, mixed-flow stagnation temperature
     lambda_mixed: float  # lambda3, dimensionless mixed-flow velocity (subsonic root)
+    mach_mixed: float  # M3, Mach number equivalent of lambda3
+    recovery_efficiency: float  # coefficient actually applied (echoed back)
+
+
+@dataclass(frozen=True)
+class DeadHeadResult:
+    """Outputs of the zero-entrainment (dead-head) back-pressure evaluation --
+    the same Kracik & Dvorak mixing closure as `CriticalPressureResult`, but
+    taken at omega = 0 (their gam = 0)."""
+
+    p_b0_pa: float  # dead-head back pressure P_b0 = recovery_efficiency * p03(omega=0)
+    p_b0_stagnation_pa: float  # p03 at omega = 0, before recovery_efficiency
+    lambda_mixed: float  # lambda3 = subsonic conjugate of lambda1 (z3 = z1)
     mach_mixed: float  # M3, Mach number equivalent of lambda3
     recovery_efficiency: float  # coefficient actually applied (echoed back)
 
@@ -305,6 +322,109 @@ def _q_lambda(lam: float, gamma: float) -> float:
     return (1.0 - (gm1 / gp1) * lam * lam) ** (1.0 / gm1) * (gp1 / 2.0) ** (1.0 / gm1) * lam
 
 
+@dataclass(frozen=True)
+class _YYState:
+    """The y-y mixing-plane state both back-pressure closures start from.
+
+    lambda1/lambda2 are the primary-core and entrained-stream dimensionless
+    velocities at y-y, each referenced to its own stream's critical velocity;
+    theta21 = T_e/T_g; omega is the critical-mode entrainment ratio. mach_py
+    (primary core Mach at y-y) is a geometry + pressure-matching quantity,
+    independent of the realized entrainment -- which is why the SAME state
+    serves both P_c* (mixing at gam = omega) and P_b0 (mixing at gam = 0)."""
+
+    lambda1: float
+    lambda2: float
+    theta21: float
+    mach_py: float
+    omega: float
+
+
+def _yy_lambda_state(
+    p_g: float,
+    t_g: float,
+    p_e: float,
+    t_e: float,
+    geom: EjectorGeometry,
+    gamma: float,
+    r_gas: float,
+) -> _YYState:
+    """Build the y-y dimensionless-velocity state (Huang Eqs. 9-10, 13-14).
+
+    Shared by `critical_back_pressure` and `dead_head_back_pressure` so the
+    y-y construction is single-sourced; the only thing the two differ in is
+    the mixing ratio gam handed to `_mixed_flow_stagnation`."""
+    gm1 = gamma - 1.0
+    gp1 = gamma + 1.0
+
+    entr = entrainment_ratio(p_g, t_g, p_e, t_e, geom, gamma)
+    mach_py = entr.mach_hypothetical_throat
+
+    # Static temperatures and velocities at y-y; entrained flow chokes there
+    # (M_sy = 1).
+    t_py = t_g / (1.0 + 0.5 * gm1 * mach_py * mach_py)
+    t_sy = t_e / (gp1 / 2.0)
+    v_py = mach_py * math.sqrt(gamma * r_gas * t_py)
+    v_sy = math.sqrt(gamma * r_gas * t_sy)  # M_sy = 1
+
+    # Dimensionless velocities, each referenced to its OWN stream's critical
+    # velocity anchored at its own (unchanged, isentropic) stagnation temp.
+    c1_star = math.sqrt(2.0 * gamma / gp1 * r_gas * t_g)
+    c2_star = math.sqrt(2.0 * gamma / gp1 * r_gas * t_e)
+    return _YYState(
+        lambda1=v_py / c1_star,
+        lambda2=v_sy / c2_star,
+        theta21=t_e / t_g,  # ratio of stagnation temperatures (Eq. 8)
+        mach_py=mach_py,
+        omega=entr.omega,
+    )
+
+
+def _mixed_flow_stagnation(
+    p_g: float,
+    t_g: float,
+    p_e: float,
+    state: _YYState,
+    gam: float,
+    gamma: float,
+) -> tuple[float, float, float, float]:
+    """Kracik & Dvorak mixed-flow stagnation state (their Eqs. 7-13).
+
+    Returns (p03, t03, lambda3, mach3). `gam` is the mixing ratio: at
+    gam = omega this is the critical-mode mix (P_c*); at gam = 0 the entrained
+    terms vanish, z3 -> z1, lambda3 -> the subsonic conjugate of lambda1, and
+    p03 -> p_g * q(lambda1)/q(lambda3) -- the dead-head pressure P_b0."""
+    gm1 = gamma - 1.0
+    gp1 = gamma + 1.0
+    lambda1 = state.lambda1
+    lambda2 = state.lambda2
+    theta21 = state.theta21
+
+    z1 = lambda1 + 1.0 / lambda1
+    z2 = lambda2 + 1.0 / lambda2
+    z3 = (z1 + gam * math.sqrt(theta21) * z2) / math.sqrt((1.0 + gam) * (1.0 + gam * theta21))
+    lambda3 = (z3 - math.sqrt(z3 * z3 - 4.0)) / 2.0  # subsonic root (Eq. 12)
+
+    q1 = _q_lambda(lambda1, gamma)
+    q2 = _q_lambda(lambda2, gamma)
+    q3 = _q_lambda(lambda3, gamma)
+
+    # Mixed flow's stagnation pressure and temperature after mixing (Eqs. 7, 11).
+    p03 = (
+        p_g
+        * math.sqrt((1.0 + gam) * (1.0 + gam * theta21))
+        / (1.0 + (p_g / p_e) * gam * math.sqrt(theta21) * q1 / q2)
+        * q1
+        / q3
+    )
+    t03 = t_g * (1.0 + gam * theta21) / (1.0 + gam)
+
+    # Mach number equivalent of lambda3 (standard lambda<->Mach conversion).
+    mach3_sq = 2.0 * lambda3 * lambda3 / (gp1 - gm1 * lambda3 * lambda3)
+    mach3 = math.sqrt(mach3_sq)
+    return p03, t03, lambda3, mach3
+
+
 def critical_back_pressure(
     p_g: float,
     t_g: float,
@@ -356,54 +476,10 @@ def critical_back_pressure(
         is by definition the pressure after isentropic recovery to zero
         velocity.
     """
-    gm1 = gamma - 1.0
-    gp1 = gamma + 1.0
-
-    entr = entrainment_ratio(p_g, t_g, p_e, t_e, geom, gamma)
-    omega = entr.omega
-    mach_py = entr.mach_hypothetical_throat
-
-    # Static temperatures and velocities at y-y (Huang Eqs. 9-10, 13-14);
-    # entrained flow chokes there (M_sy = 1).
-    t_py = t_g / (1.0 + 0.5 * gm1 * mach_py * mach_py)
-    t_sy = t_e / (gp1 / 2.0)
-    v_py = mach_py * math.sqrt(gamma * r_gas * t_py)
-    v_sy = math.sqrt(gamma * r_gas * t_sy)  # M_sy = 1
-
-    # Dimensionless velocities, each referenced to its OWN stream's critical
-    # velocity anchored at its own (unchanged, isentropic) stagnation temp.
-    c1_star = math.sqrt(2.0 * gamma / gp1 * r_gas * t_g)
-    c2_star = math.sqrt(2.0 * gamma / gp1 * r_gas * t_e)
-    lambda1 = v_py / c1_star
-    lambda2 = v_sy / c2_star
-
-    theta21 = t_e / t_g  # ratio of stagnation temperatures (Eq. 8)
-    gam = omega  # Kracik & Dvorak's Gamma = ms/mp, same definition as omega
-
-    z1 = lambda1 + 1.0 / lambda1
-    z2 = lambda2 + 1.0 / lambda2
-    z3 = (z1 + gam * math.sqrt(theta21) * z2) / math.sqrt((1.0 + gam) * (1.0 + gam * theta21))
-    lambda3 = (z3 - math.sqrt(z3 * z3 - 4.0)) / 2.0  # subsonic root (Eq. 12)
-
-    q1 = _q_lambda(lambda1, gamma)
-    q2 = _q_lambda(lambda2, gamma)
-    q3 = _q_lambda(lambda3, gamma)
-
-    # Mixed flow's stagnation pressure and temperature after mixing (Eqs. 7, 11).
-    p03 = (
-        p_g
-        * math.sqrt((1.0 + gam) * (1.0 + gam * theta21))
-        / (1.0 + (p_g / p_e) * gam * math.sqrt(theta21) * q1 / q2)
-        * q1
-        / q3
-    )
-    t03 = t_g * (1.0 + gam * theta21) / (1.0 + gam)
-
-    # Mach number equivalent of lambda3, for a diagnostic consistent with
-    # the rest of the API (standard lambda<->Mach conversion).
-    mach3_sq = 2.0 * lambda3 * lambda3 / (gp1 - gm1 * lambda3 * lambda3)
-    mach3 = math.sqrt(mach3_sq)
-
+    # Critical mode: the mixing ratio is the critical-mode entrainment ratio
+    # (Kracik & Dvorak's Gamma = ms/mp = omega).
+    state = _yy_lambda_state(p_g, t_g, p_e, t_e, geom, gamma, r_gas)
+    p03, t03, lambda3, mach3 = _mixed_flow_stagnation(p_g, t_g, p_e, state, state.omega, gamma)
     p_c = recovery_efficiency * p03
 
     return CriticalPressureResult(
@@ -414,3 +490,105 @@ def critical_back_pressure(
         mach_mixed=mach3,
         recovery_efficiency=recovery_efficiency,
     )
+
+
+def dead_head_back_pressure(
+    p_g: float,
+    t_g: float,
+    p_e: float,
+    t_e: float,
+    geom: EjectorGeometry,
+    gamma: float,
+    r_gas: float,
+    recovery_efficiency: float = 1.0,
+) -> DeadHeadResult:
+    """Zero-entrainment (dead-head) back pressure P_b0.
+
+    P_b0 is the highest back pressure the ejector can hold with NO secondary
+    flow -- the upper anchor of the subcritical droop (omega -> 0), the mirror
+    of `critical_back_pressure`'s lower anchor (omega = omega_crit). It is NOT
+    a new correlation or fitted constant: it is Kracik & Dvorak's SAME mixing
+    closure evaluated at omega = 0 (their gam = 0), reusing the identical y-y
+    state. At gam = 0 the entrained terms drop out, z3 collapses to z1, so
+    lambda3 is the subsonic conjugate of lambda1 and
+    ``p03 = p_g * q(lambda1)/q(lambda3)`` -- see OPERATING_REGIMES_DESIGN.md
+    sec 2.2. Parameters are exactly those of `critical_back_pressure`.
+
+    Valid (P_b0 > P_c*) only where the primary core is still supersonic at y-y
+    (M_py > 1, a healthy motive ejector); the degenerate M_py < 1 corner
+    coincides with an unchoked primary and is handled by the jet-pump regime,
+    not this closed form (OPERATING_REGIMES_DESIGN.md sec 2.3).
+    """
+    state = _yy_lambda_state(p_g, t_g, p_e, t_e, geom, gamma, r_gas)
+    p03, _t03, lambda3, mach3 = _mixed_flow_stagnation(p_g, t_g, p_e, state, 0.0, gamma)
+    p_b0 = recovery_efficiency * p03
+
+    return DeadHeadResult(
+        p_b0_pa=p_b0,
+        p_b0_stagnation_pa=p03,
+        lambda_mixed=lambda3,
+        mach_mixed=mach3,
+        recovery_efficiency=recovery_efficiency,
+    )
+
+
+def subcritical_entrainment_ratio(
+    omega_crit: float,
+    p_c_pa: float,
+    p_b0_pa: float,
+    p_b_pa: float,
+) -> float:
+    """Tier-1 (linear) subcritical entrainment droop omega_sub(P_b).
+
+    Between the two physical anchors the model already produces --
+    (P_c*, omega_crit) at the critical point and (P_b0, 0) at dead-head -- the
+    realized entrainment droops as the back pressure rises. Tier 1 is the
+    straight chord between them:
+
+        omega_sub(P_b) = omega_crit * (P_b0 - P_b) / (P_b0 - P_c*)
+
+    Exact at both anchors, monotone non-increasing in P_b, and introduces no
+    new constant. The near-linear subcritical droop is well documented
+    empirically (Henry et al. 2007 HEFAT2007 Fig. 5, air; ESDU 86030); a
+    Tier-2 mixing-curve inversion replaces this chord only if validation shows
+    it is too coarse (OPERATING_REGIMES_DESIGN.md sec 3.2).
+
+    Returns > omega_crit for P_b < P_c* (the plateau side -- the smooth-min in
+    `blended_entrainment_ratio` clips it back to omega_crit) and < 0 for
+    P_b > P_b0 (backflow, out of scope). Requires P_b0 > P_c*.
+    """
+    if p_b0_pa <= p_c_pa:
+        raise ValueError(
+            f"subcritical_entrainment_ratio: need P_b0 > P_c*, got "
+            f"P_b0={p_b0_pa}, P_c*={p_c_pa}. A collapsed droop window (P_b0 <= "
+            f"P_c*) is the degenerate M_py < 1 / unchoked-primary corner, which "
+            f"the jet-pump regime handles, not this closed form."
+        )
+    return omega_crit * (p_b0_pa - p_b_pa) / (p_b0_pa - p_c_pa)
+
+
+def blended_entrainment_ratio(
+    omega_crit: float,
+    p_c_pa: float,
+    p_b0_pa: float,
+    p_b_pa: float,
+    eps_frac: float = 1.0e-3,
+) -> float:
+    """Realized entrainment omega_eff across the critical/subcritical boundary.
+
+    The realized entrainment is the smaller of the choke-limited plateau value
+    omega_crit and the back-pressure-limited droop omega_sub(P_b), joined by a
+    C1 smooth-min so a Newton solver sees a continuous derivative through the
+    critical point P_c* (the same sqrt-smoothing idiom as MPCEv2Element's
+    soft barrier):
+
+        omega_eff = 0.5 * (a + b - sqrt((a - b)^2 + eps^2)),  a = omega_crit,
+                    b = omega_sub(P_b),  eps = eps_frac * omega_crit
+
+    Below P_c* (b > a) it returns omega_crit (flat plateau); above P_c* (b < a)
+    it returns omega_sub, drooping to 0 at P_b0. The rounding is bounded:
+    |omega_eff - min(a, b)| <= eps/2, worst exactly at the corner a = b.
+    """
+    omega_sub = subcritical_entrainment_ratio(omega_crit, p_c_pa, p_b0_pa, p_b_pa)
+    eps = eps_frac * omega_crit
+    return 0.5 * (omega_crit + omega_sub - math.sqrt((omega_crit - omega_sub) ** 2 + eps * eps))

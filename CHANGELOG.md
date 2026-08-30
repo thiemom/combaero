@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Ejector subcritical-droop reference closures (Phase 1A of the
+  operating-regime extension).** Three closed forms in
+  `combaero.network._ejector_huang1999` (re-exported from
+  `validation/ejector/models/huang1999.py`): `dead_head_back_pressure` (the
+  zero-entrainment upper anchor P_b0 -- Kracik & Dvorak's *existing* mixing
+  closure at omega = 0, no new calibration constant),
+  `subcritical_entrainment_ratio` (Tier-1 linear droop between P_c* and P_b0),
+  and `blended_entrainment_ratio` (C1 smooth-min joining the critical plateau
+  to the droop through P_c*). `critical_back_pressure` was refactored onto a
+  shared y-y-state + mixing helper so its 31 golden values regenerate
+  byte-identically. The Huang golden fixture now also carries per-case P_b0 and
+  a subcritical back-pressure sweep (omega_eff + d(omega_eff)/d(P_b)) as the
+  Phase 2/3 target. Reference-model only -- not yet wired into `EjectorElement`
+  (that is Phase 2). The near-linear droop is validated against measured air
+  data (Henry et al. 2007 HEFAT2007 Fig. 5, R^2 >= 0.94); see
+  `validation/ejector/OPERATING_REGIMES_DESIGN.md` sec 8.1 for the provenance
+  record.
 - **`EjectorElement`: production supersonic-ejector network element**
   (`combaero.network.ejector_element`), critical (double-choked) mode only.
   Reuses Huang (1999)'s closed-form entrainment ratio (Eqs. 1-8) together

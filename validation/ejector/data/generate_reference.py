@@ -43,8 +43,11 @@ from validation.ejector.models.huang1999 import (  # noqa: E402
     ETA_S,
     PHI_P,
     EjectorGeometry,
+    blended_entrainment_ratio,
     critical_back_pressure,
+    dead_head_back_pressure,
     entrainment_ratio,
+    subcritical_entrainment_ratio,
 )
 
 # R141b constants from the CoolProp EOS (baked so this generator needs no
@@ -104,6 +107,20 @@ def _pc_from_vector(v: dict[str, float]) -> float:
     ).p_c_pa
 
 
+def _pb0_from_vector(v: dict[str, float]) -> float:
+    geom = EjectorGeometry(v["area_ratio_nozzle"], v["area_ratio_mix"])
+    return dead_head_back_pressure(
+        v["p_g_pa"],
+        v["t_g_k"],
+        v["p_e_pa"],
+        v["t_e_k"],
+        geom,
+        v["gamma"],
+        v["r_gas"],
+        v["recovery_efficiency"],
+    ).p_b0_pa
+
+
 def _central_diff(f: Callable[[dict[str, float]], float], v: dict[str, float], key: str) -> float:
     x = v[key]
     h = 1.0e-6 * abs(x) if x != 0.0 else 1.0e-6
@@ -140,8 +157,19 @@ def _case(row: HuangRow) -> dict:
         inputs["r_gas"],
         inputs["recovery_efficiency"],
     )
+    dh_res = dead_head_back_pressure(
+        inputs["p_g_pa"],
+        inputs["t_g_k"],
+        inputs["p_e_pa"],
+        inputs["t_e_k"],
+        geom,
+        inputs["gamma"],
+        inputs["r_gas"],
+        inputs["recovery_efficiency"],
+    )
     omega_jac = {k: _central_diff(_omega_from_vector, inputs, k) for k in _JAC_INPUTS}
     pc_jac = {k: _central_diff(_pc_from_vector, inputs, k) for k in _JAC_INPUTS}
+    pb0_jac = {k: _central_diff(_pb0_from_vector, inputs, k) for k in _JAC_INPUTS}
     return {
         "id": f"{row.table}-{row.ejector}-Pg{row.p_g_mpa:g}",
         "table": row.table,
@@ -158,10 +186,13 @@ def _case(row: HuangRow) -> dict:
             "temp_mixed_stagnation_k": pc_res.temp_mixed_stagnation_k,
             "lambda_mixed": pc_res.lambda_mixed,
             "mach_mixed": pc_res.mach_mixed,
+            "p_b0_pa": dh_res.p_b0_pa,
+            "lambda_dead_head": dh_res.lambda_mixed,
         },
         "jacobian": {
             **{f"domega_d_{k}": omega_jac[k] for k in _JAC_INPUTS},
             **{f"dp_c_d_{k}": pc_jac[k] for k in _JAC_INPUTS},
+            **{f"dp_b0_d_{k}": pb0_jac[k] for k in _JAC_INPUTS},
         },
         "paper_theory": {
             "omega": row.omega_theory,
@@ -169,6 +200,70 @@ def _case(row: HuangRow) -> dict:
             "tc_star_c": row.tc_star_c,
             "p_c_pa": row.pc_star_theory_pa,
         },
+    }
+
+
+# Fractions of the [P_c*, P_b0] window swept for the subcritical droop case.
+# A plateau point (f < 0, clipped to omega_crit), the corner (f = 0 = P_c*),
+# and the droop toward dead-head (f -> 1). eps_frac is the smooth-min rounding.
+_SUBCRITICAL_FRACS = (-0.10, 0.0, 0.05, 0.20, 0.40, 0.60, 0.80, 0.95)
+_SUBCRITICAL_EPS_FRAC = 1.0e-3
+
+
+def _subcritical_sweep(row: HuangRow) -> dict:
+    """Back-pressure sweep of the blended entrainment omega_eff for one
+    geometry: the golden target for the Phase 2/3 R1 residual and its new
+    d(omega_eff)/d(P_b) coupling (OPERATING_REGIMES_DESIGN.md sec 3.2)."""
+    inputs = {
+        "p_g_pa": row.p_g_pa,
+        "t_g_k": row.t_g_k,
+        "p_e_pa": row.p_e_pa,
+        "t_e_k": row.t_e_k,
+        "area_ratio_nozzle": row.area_ratio_nozzle,
+        "area_ratio_mix": row.a3_at_theory,
+        "gamma": row.gamma,
+        "r_gas": R141B_R_SPECIFIC_J_PER_KGK,
+        "recovery_efficiency": 1.0,
+    }
+    geom = EjectorGeometry(inputs["area_ratio_nozzle"], inputs["area_ratio_mix"])
+    omega_crit = entrainment_ratio(
+        inputs["p_g_pa"], inputs["t_g_k"], inputs["p_e_pa"], inputs["t_e_k"], geom, inputs["gamma"]
+    ).omega
+    p_c = critical_back_pressure(
+        inputs["p_g_pa"], inputs["t_g_k"], inputs["p_e_pa"], inputs["t_e_k"],
+        geom, inputs["gamma"], inputs["r_gas"],
+    ).p_c_pa
+    p_b0 = dead_head_back_pressure(
+        inputs["p_g_pa"], inputs["t_g_k"], inputs["p_e_pa"], inputs["t_e_k"],
+        geom, inputs["gamma"], inputs["r_gas"],
+    ).p_b0_pa
+
+    sweep = []
+    for frac in _SUBCRITICAL_FRACS:
+        p_b = p_c + frac * (p_b0 - p_c)
+        omega_eff = blended_entrainment_ratio(omega_crit, p_c, p_b0, p_b, _SUBCRITICAL_EPS_FRAC)
+        h = 1.0e-6 * abs(p_b)
+        hi = blended_entrainment_ratio(omega_crit, p_c, p_b0, p_b + h, _SUBCRITICAL_EPS_FRAC)
+        lo = blended_entrainment_ratio(omega_crit, p_c, p_b0, p_b - h, _SUBCRITICAL_EPS_FRAC)
+        sweep.append(
+            {
+                "frac": frac,
+                "p_b_pa": p_b,
+                "omega_eff": omega_eff,
+                "omega_sub": subcritical_entrainment_ratio(omega_crit, p_c, p_b0, p_b),
+                "domega_eff_d_p_b": (hi - lo) / (2.0 * h),
+            }
+        )
+    return {
+        "id": f"{row.table}-{row.ejector}-Pg{row.p_g_mpa:g}-subcritical",
+        "inputs": inputs,
+        "anchors": {
+            "omega_crit": omega_crit,
+            "p_c_pa": p_c,
+            "p_b0_pa": p_b0,
+            "eps_frac": _SUBCRITICAL_EPS_FRAC,
+        },
+        "sweep": sweep,
     }
 
 
@@ -222,7 +317,17 @@ def build_fixture() -> dict:
             "README.md's Accuracy section for the full comparison."
         ),
         "jacobian_method": "central difference, h = 1e-6 * |x|",
+        "p_b0_note": (
+            "P_b0 (dead-head back pressure) is the zero-entrainment upper anchor "
+            "of the subcritical droop -- Kracik & Dvorak's SAME mixing closure at "
+            "omega = 0 (gam = 0), no new constant. Present on every case; the "
+            "subcritical_cases section sweeps the back pressure between P_c* and "
+            "P_b0 and records the blended entrainment omega_eff plus its "
+            "d(omega_eff)/d(P_b) coupling -- the Phase 2/3 R1 golden target. See "
+            "validation/ejector/OPERATING_REGIMES_DESIGN.md sec 2.2, 3.2."
+        ),
         "cases": [_case(r) for r in ALL_ROWS],
+        "subcritical_cases": [_subcritical_sweep(ALL_ROWS[0])],
     }
 
 
@@ -253,6 +358,8 @@ def _emit_header(fixture: dict) -> str:
     lines.append("  double area_ratio_primary_core, area_ratio_entrained;")
     lines.append("  double p_c_pa, p_mixed_stagnation_pa, temp_mixed_stagnation_k;")
     lines.append("  double lambda_mixed, mach_mixed;")
+    lines.append("  // Dead-head (omega -> 0) upper anchor P_b0 and its mixed lambda3.")
+    lines.append("  double p_b0_pa, lambda_dead_head;")
     lines.append("  // Central-difference d(omega)/d(input): analytic Jacobian target.")
     lines.append("  double domega_dp_g, domega_dt_g, domega_dp_e, domega_dt_e;")
     lines.append("  double domega_dar_nozzle, domega_dar_mix, domega_dgamma, domega_dr_gas;")
@@ -261,6 +368,10 @@ def _emit_header(fixture: dict) -> str:
     lines.append("  double dpc_dp_g, dpc_dt_g, dpc_dp_e, dpc_dt_e;")
     lines.append("  double dpc_dar_nozzle, dpc_dar_mix, dpc_dgamma, dpc_dr_gas;")
     lines.append("  double dpc_drecovery_eff;")
+    lines.append("  // Central-difference d(P_b0)/d(input): analytic Jacobian target.")
+    lines.append("  double dpb0_dp_g, dpb0_dt_g, dpb0_dp_e, dpb0_dt_e;")
+    lines.append("  double dpb0_dar_nozzle, dpb0_dar_mix, dpb0_dgamma, dpb0_dr_gas;")
+    lines.append("  double dpb0_drecovery_eff;")
     lines.append("  // Huang published theory column (physics check).")
     lines.append("  double omega_theory;")
     lines.append("  // P_c* target from T_c* (theory), via CoolProp saturation pressure.")
@@ -299,6 +410,8 @@ def _emit_header(fixture: dict) -> str:
             _fmt(r["temp_mixed_stagnation_k"]),
             _fmt(r["lambda_mixed"]),
             _fmt(r["mach_mixed"]),
+            _fmt(r["p_b0_pa"]),
+            _fmt(r["lambda_dead_head"]),
             _fmt(j["domega_d_p_g_pa"]),
             _fmt(j["domega_d_t_g_k"]),
             _fmt(j["domega_d_p_e_pa"]),
@@ -317,6 +430,15 @@ def _emit_header(fixture: dict) -> str:
             _fmt(j["dp_c_d_gamma"]),
             _fmt(j["dp_c_d_r_gas"]),
             _fmt(j["dp_c_d_recovery_efficiency"]),
+            _fmt(j["dp_b0_d_p_g_pa"]),
+            _fmt(j["dp_b0_d_t_g_k"]),
+            _fmt(j["dp_b0_d_p_e_pa"]),
+            _fmt(j["dp_b0_d_t_e_k"]),
+            _fmt(j["dp_b0_d_area_ratio_nozzle"]),
+            _fmt(j["dp_b0_d_area_ratio_mix"]),
+            _fmt(j["dp_b0_d_gamma"]),
+            _fmt(j["dp_b0_d_r_gas"]),
+            _fmt(j["dp_b0_d_recovery_efficiency"]),
             _fmt(c["paper_theory"]["omega"]),
             _fmt(c["paper_theory"]["tc_star_c"]),
             _fmt(c["paper_theory"]["p_c_pa"]),
@@ -324,9 +446,55 @@ def _emit_header(fixture: dict) -> str:
         lines.append("    {" + ", ".join(vals) + "},")
     lines.append("}};")
     lines.append("")
+    lines.extend(_emit_subcritical(fixture))
     lines.append("}  // namespace combaero::validation::ejector")
     lines.append("")
     return "\n".join(lines)
+
+
+def _emit_subcritical(fixture: dict) -> list[str]:
+    """Subcritical back-pressure sweep: blended entrainment omega_eff(P_b) and
+    its d(omega_eff)/d(P_b) coupling -- the Phase 2/3 R1 golden target."""
+    sub_cases = fixture["subcritical_cases"]
+    n_points = len(sub_cases[0]["sweep"])
+    lines: list[str] = []
+    lines.append("// Subcritical droop sweep (Phase 1A): omega_eff = smooth-min of the")
+    lines.append("// critical plateau and the Tier-1 linear droop between P_c* and P_b0.")
+    lines.append("struct SubcriticalPoint {")
+    lines.append("  double frac, p_b_pa, omega_eff, omega_sub, domega_eff_dp_b;")
+    lines.append("};")
+    lines.append("struct SubcriticalCase {")
+    lines.append("  const char *id;")
+    lines.append("  double omega_crit, p_c_pa, p_b0_pa, eps_frac;")
+    lines.append(f"  std::array<SubcriticalPoint, {n_points}> sweep;")
+    lines.append("};")
+    lines.append("")
+    lines.append(
+        f"inline constexpr std::array<SubcriticalCase, {len(sub_cases)}> "
+        "kSubcriticalCases = {{"
+    )
+    for c in sub_cases:
+        a = c["anchors"]
+        head = [
+            f'"{c["id"]}"',
+            _fmt(a["omega_crit"]),
+            _fmt(a["p_c_pa"]),
+            _fmt(a["p_b0_pa"]),
+            _fmt(a["eps_frac"]),
+        ]
+        pts = []
+        for p in c["sweep"]:
+            pts.append(
+                "{"
+                + ", ".join(
+                    _fmt(p[k]) for k in ("frac", "p_b_pa", "omega_eff", "omega_sub", "domega_eff_d_p_b")
+                )
+                + "}"
+            )
+        lines.append("    {" + ", ".join(head) + ", {{" + ", ".join(pts) + "}}},")
+    lines.append("}};")
+    lines.append("")
+    return lines
 
 
 def main() -> None:
