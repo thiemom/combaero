@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Ejector unchoked-primary jet-pump reference closure (Phase 1B of the
+  operating-regime extension).** `jet_pump_entrainment_ratio` in
+  `combaero.network._ejector_huang1999` (re-exported from
+  `validation/ejector/models/huang1999.py`) models the subsonic jet-pump regime
+  the double-choked construction cannot: a Keenan-Neumann-Lustwerk constant-area
+  mixing solve (both streams expand to a common mixing pressure; the physical
+  mixing pressure recovers to the back pressure). The mass+momentum+energy
+  mixing reuses the existing Kracik & Dvorak closure with a subsonic primary
+  core (verified bit-identical to a direct momentum balance), so the jet-pump
+  and ejector branches share one mixing model. Validated to reduce to the
+  lossless incompressible jet-pump relation N(M,R) (Sanger, NASA TN D-4445) as
+  Mach -> 0 (error -> 0.03%), and to give a bounded omega O(few) on the reported
+  degenerate network instead of the ~33 the choked construction returns.
+  `recovery_efficiency` stays 1.0 (unfitted) but is audited against Sanger's
+  measured data as a ~1.4x overprediction (realistic ~0.7). The golden fixture
+  gains an air jet-pump back-pressure sweep (omega + d(omega)/d(P_b)).
+  Reference-model only -- not yet wired into `EjectorElement` (Phase 2). See
+  `validation/ejector/OPERATING_REGIMES_DESIGN.md` sec 8.2 for the provenance
+  record.
 - **Ejector subcritical-droop reference closures (Phase 1A of the
   operating-regime extension).** Three closed forms in
   `combaero.network._ejector_huang1999` (re-exported from
