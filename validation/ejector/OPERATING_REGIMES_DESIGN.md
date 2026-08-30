@@ -332,8 +332,10 @@ new exported symbols, and the doc-hygiene rules).
      (Tier-1), `blended_entrainment_ratio` (smooth-min); golden fixture extended
      with per-case P_b0 + a subcritical `Pb`-sweep; see the provenance record in
      sec 8.1.
-   - **1B (pending):** the subsonic jet-pump entrainment closure (unchoked
-     primary), validated analytically (sec 4.2).
+   - **1B (DONE):** `jet_pump_entrainment_ratio` (unchoked primary), a Keenan
+     constant-area mixing solve reusing the Kracik & Dvorak closure with a
+     subsonic primary; golden fixture extended with an air jet-pump sweep; see
+     the provenance record in sec 8.2.
 2. **Production `EjectorElement`**: new R0 (compressible-nozzle, `P_py`
    downstream) and R1 (smooth-min); updated `verify_solution_consistent`;
    analytic `(f, J)` including the new `d R0/d P_py` and `d R1/d(outlet.Pt)`
@@ -365,6 +367,12 @@ new exported symbols, and the doc-hygiene rules).
   numeric critical + breakdown back-pressure tables (`P_c*`/`P_b0` anchors).
 - Galindo et al. (2020), R1234yf ejector (fitted subcritical + breakdown
   surface) -- methodology reference only; refrigerant fluid, not an air fixture.
+- Sanger, N.L. (1968), *Noncavitating Performance of Two Low-Area-Ratio Water
+  Jet Pumps Having Throat Lengths of 7.25 Diameters*, NASA TN D-4445 -- the
+  lossless incompressible jet-pump relation N(M,R) (Appendix B) that the Phase
+  1B compressible closure reduces to as Mach -> 0, and the measured water data
+  that anchors the ~1.4x lossless overprediction (recovery ~= 0.7).
+  `../../docs/ejector/19680008095.pdf`.
 - ESDU 86030, *Ejectors and jet pumps* (subcritical/breakdown characteristic
   shape reference; optional independent jet-pump cross-check).
 
@@ -412,3 +420,49 @@ it does show (6 bar, up to 8.5% of plateau) is the documented trigger for Tier 2
 **Pinned by.** `python/tests/test_ejector_subcritical.py` (anchors, omega -> 0
 continuity, smooth-min bound + C1, Henry linearity, fixture regression) and the
 extended `huang1999_reference.json` / `_data.h` golden data.
+
+### 8.2 Phase 1B -- unchoked-primary subsonic jet-pump
+
+**Formulation & alternatives.** `jet_pump_entrainment_ratio` is a Keenan-Neumann-
+Lustwerk constant-area mixing solve: both streams expand isentropically to a
+common mixing static pressure p1 (primary through A_p1, entrained through
+A_3 - A_p1) so omega = ms/mp = f(p1), and the physical p1 is the one whose mixed
+flow recovers to the back pressure (a 1-D root solve). Two grounded candidates
+were tried in the spike and REJECTED with numbers: (a) geometric area-filling
+(as in the choked closure) reproduces the omega ~ 33 degeneracy -- a weak primary
+cannot really entrain a whole annulus; (b) a momentum balance that leaves omega
+free is under-constrained. The mass+momentum+energy mixing is NOT a new closure:
+it was verified bit-identical to Kracik & Dvorak's `_mixed_flow_stagnation`
+(0.00 Pa difference), which is reused here with a subsonic lambda1 -- so the
+jet-pump and ejector branches share one mixing model and meet at the
+primary-choke threshold.
+
+**Literature basis.** Ground truth is the lossless incompressible jet-pump
+relation N(M, R) (Sanger, NASA TN D-4445, Appendix B), the same conservation
+laws in the constant-density limit. The compressible closure is verified to
+converge to it as Mach -> 0 (relative error 1.1% -> 0.034% as the driving
+pressure falls), the exact-limit signature.
+
+**Constant audit (recovery_efficiency).** Kept at 1.0, no fitted constant, per
+the calibration policy -- but AUDITED against data: the lossless form
+overpredicts Sanger's measured water-jet-pump head by ~1.4x (real pump ~= 70% of
+ideal head, consistent across his R = 0.066 and 0.197 pumps), so recovery ~= 0.7
+is the data-anchored value a caller would set. Documented, not baked in. (A
+first audit pass reported ~2x / recovery ~0.5; that came from a mis-transcribed
+Eq. 14 off the 1968 scan -- the Mach -> 0 reduction check caught the unphysical
+"N rising with M", and the equation was re-derived from first principles. The
+provenance discipline caught the error before it reached code or tests.)
+
+**Invariant preserved.** Bounded, forward omega O(few) on the reported case
+(NOT 33); omega monotone increasing as the back pressure falls; named boundary
+handoffs (`back_pressure` -> omega 0; `primary_choke` -> the ejector branch);
+refusal when the primary is too strong to be unchoked.
+
+**Dead ends.** Area-filling (omega ~ 33) and free-omega momentum balance (both
+above). Also an inverted interior-bisection direction, caught by the low-Mach
+reduction test landing 50% off before the fix.
+
+**Pinned by.** `python/tests/test_ejector_jetpump.py` (low-Mach reduction +
+monotone convergence, ~1.4x Sanger overprediction, bounded reported-case omega,
+monotonicity, boundary flags, fixture regression) and the `jetpump_cases`
+section of the golden fixture.
