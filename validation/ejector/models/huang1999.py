@@ -85,11 +85,15 @@ from combaero.network._ejector_huang1999 import (
     ETA_S,
     PHI_P,
     CriticalPressureResult,
+    DeadHeadResult,
     EjectorGeometry,
     EjectorResult,
+    blended_entrainment_ratio,
     choked_mass_flow,
     critical_back_pressure,
+    dead_head_back_pressure,
     entrainment_ratio,
+    subcritical_entrainment_ratio,
 )
 
 __all__ = [
@@ -97,9 +101,13 @@ __all__ = [
     "ETA_S",
     "PHI_P",
     "CriticalPressureResult",
+    "DeadHeadResult",
     "EjectorGeometry",
     "EjectorResult",
+    "blended_entrainment_ratio",
     "choked_mass_flow",
     "critical_back_pressure",
+    "dead_head_back_pressure",
     "entrainment_ratio",
+    "subcritical_entrainment_ratio",
 ]

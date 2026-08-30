@@ -328,6 +328,12 @@ new exported symbols, and the doc-hygiene rules).
 1. **Reference model** (`validation/ejector/` + `_ejector_huang1999.py`): add
    `P_b0` (dead-head), `omega_sub` (Tier 1), the subsonic jet-pump entrainment,
    and the smooth-min blend as pure closed forms. Extend the golden fixture.
+   - **1A (DONE):** `dead_head_back_pressure` (P_b0), `subcritical_entrainment_ratio`
+     (Tier-1), `blended_entrainment_ratio` (smooth-min); golden fixture extended
+     with per-case P_b0 + a subcritical `Pb`-sweep; see the provenance record in
+     sec 8.1.
+   - **1B (pending):** the subsonic jet-pump entrainment closure (unchoked
+     primary), validated analytically (sec 4.2).
 2. **Production `EjectorElement`**: new R0 (compressible-nozzle, `P_py`
    downstream) and R1 (smooth-min); updated `verify_solution_consistent`;
    analytic `(f, J)` including the new `d R0/d P_py` and `d R1/d(outlet.Pt)`
@@ -361,3 +367,48 @@ new exported symbols, and the doc-hygiene rules).
   surface) -- methodology reference only; refrigerant fluid, not an air fixture.
 - ESDU 86030, *Ejectors and jet pumps* (subcritical/breakdown characteristic
   shape reference; optional independent jet-pump cross-check).
+
+## 8. Implementation provenance records
+
+Short WHY-only records closing each implemented phase (per the
+`model-provenance` skill): formulation chosen + alternatives, literature basis,
+the invariant it must preserve, dead ends, and the test that pins it.
+
+### 8.1 Phase 1A -- subcritical droop (P_b0, Tier-1 omega_sub, smooth-min)
+
+**Formulation & alternatives.** P_b0 is Kracik & Dvorak's *existing* mixing
+closure evaluated at `omega = 0` (their `gam = 0`), not a new correlation -- so
+the subcritical window carries no new calibration constant, only the `omega`
+anchor the critical closure already produced. `critical_back_pressure` was
+refactored to share a single `_yy_lambda_state` + `_mixed_flow_stagnation`
+helper with `dead_head_back_pressure` so the two anchors cannot drift apart;
+the refactor is behaviour-preserving (the 31 golden values regenerate
+byte-identically). omega_sub is the Tier-1 linear chord between the two anchors;
+Tier-2 (mixing-curve inversion) was deliberately deferred, not implemented, per
+the "Tier 1 first" open decision (sec 5.2). The critical<->subcritical join is a
+C1 smooth-min (0.5*(a+b-sqrt((a-b)^2+eps^2))), the same sqrt-smoothing idiom as
+`MPCEv2Element`'s soft barrier; a bare `min()` was rejected because its
+derivative jump would break the single-Newton-solve requirement (sec 3.5).
+
+**Literature basis.** Mixing closure: Kracik & Dvorak 2016 (Eqs. 7-13). The
+near-linear-droop assumption is cross-checked against measured AIR data, Henry
+et al. 2007 HEFAT2007 Fig. 5 (`henry2007_fig5.py`): a least-squares line through
+each curve's droop fits with R^2 0.992 / 0.989 / 0.939 (4/5/6 bar). Absolute
+anchor placement (P_c*, P_b0) is NOT validated here -- that needs Akbarnejad &
+Ziabasharhagh 2025's numeric tables (not yet digitized); Henry validates the
+*shape* only.
+
+**Invariant preserved.** P_e < P_c* < P_b0 < P_g on all 31 rows; the omega -> 0
+limit is exact (at A_3/A_t = A_py/A_t, `critical_back_pressure` == P_b0); the
+smooth-min stays within eps/2 of `min` and is C1 through P_c*; the pre-existing
+critical golden fixture is unchanged.
+
+**Dead ends.** First measured linearity via deviation from a chord anchored at an
+*eyeballed* knee -- discarded: it conflated "is the droop linear" (yes, R^2 >=
+0.94) with "is my knee estimate right", and flagged a false 26% error on the 6
+bar curve. The least-squares metric isolates linearity. The residual concavity
+it does show (6 bar, up to 8.5% of plateau) is the documented trigger for Tier 2.
+
+**Pinned by.** `python/tests/test_ejector_subcritical.py` (anchors, omega -> 0
+continuity, smooth-min bound + C1, Henry linearity, fixture regression) and the
+extended `huang1999_reference.json` / `_data.h` golden data.
