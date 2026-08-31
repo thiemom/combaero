@@ -365,40 +365,54 @@ and committed on `feat/ejector-phase2-element` (WIP, not yet a PR):
   The secondary entrained flux reuses `ejector_cd_nozzle_mass_flow`
   (area_throat = area_exit = A_s), so no new closure.
 
-**Increment 4 -- the element assembly (next; the largest piece).** Five rows on
-the `MultiPortChamberElement` topology, with `P_py` (the common mixing static)
-exposed as a SECOND element-owned unknown alongside `P_jct`:
+**Increment 4a (DONE):** pybind for `ejector_cd_nozzle_mass_flow_and_jacobian`
+and `ejector_jetpump_discharge_and_jacobian` (Python values match the ctest to
+machine precision) so the element can call them.
 
-    R0  = mp - cd_nozzle(p_g, t_g, P_py, A_t, A_p1)          primary C-D nozzle
+**Increment 4b -- element structure settled by a Jacobian-rank spike.** The
+first blueprint (five rows, `P_py` exposed as a SECOND owned unknown with an
+`R_py` row) was RULED OUT: a throwaway Jacobian-rank spike showed the 5-row
+block is **rank-deficient in the jet-pump regime** (smallest singular value
+~1e-8), and this is structural, not tunable. Any `R_py` that pins `P_py` is, at
+the jet-pump solution, linearly parallel to an existing row -- pin via the
+nozzle and `grad(R_py) = c * grad(R0)`; pin via the discharge and it is parallel
+to `R3`; and at the jet-pump solution nothing zero-valued is independent of
+R0-R3. So **`P_py` cannot be a Newton unknown**. (The earlier "A' reduces to
+critical" claim was never validated -- that spike case was buggy.)
+
+Settled structure -- **four rows, `P_py` DERIVED** (not a solver unknown); the
+element keeps the base `MultiPortChamberElement` unknown/row count, so **no
+solver-dispatch change is needed**:
+
+    P_py = s_choke*P_sy + (1 - s_choke)*nozzle_inverse(mp, Pt_p)   derived
+    s_choke = smoothstep(mp / choked_mass_flow(Pt_p))    keyed on mp, NOT P_py
+    R0  = mp - cd_nozzle(Pt_p, Tt_p, P_py, A_t, A_p1)          primary C-D nozzle
     R1  = ms - [s_choke*omega_crit*mp + (1 - s_choke)*ms_sec]  blended entrainment
-          ms_sec = cd_nozzle(p_e, t_e, P_py, A_s, A_s)         (secondary flux)
-    R2  = mdot_out - mp - ms                                  mass conservation
-    R3  = outlet.Pt - recovery*[s_choke*P_c* + (1 - s_choke)*p03_jetpump(P_py)]
-                                                              outlet-pin (A')
-    R_py = s_choke*(P_py - P_sy) + (1 - s_choke)*R0_like       P_py definition
+          ms_sec = cd_nozzle(Pt_s, Tt_s, P_py, A_s, A_s)        (secondary flux)
+    R2  = mdot_out - mp - ms                                   mass conservation
+    R3  = outlet.Pt - recovery*[s_choke*p03_crit + (1 - s_choke)*p03_jetpump(P_py)]
 
-- `s_choke` is a smooth primary-choke indicator (C-D nozzle exit flux vs the
-  sonic cap); `omega_crit`/`P_c*` are the existing critical closures.
-- **Why R_py is mandatory (design finding):** in critical mode R0/R1/R3 are all
-  P_py-independent (choked primary; Huang omega and P_c*), so without R_py the
-  P_py Jacobian column is all-zeros and the Newton block is singular. R_py must
-  therefore be non-degenerate in BOTH regimes -- `s*(P_py - P_sy)` pins P_py in
-  critical, and the `(1-s)` branch must re-assert the primary relation (so the
-  row is not identically zero when unchoked); finalize its exact form so R_py's
-  row stays full-rank across the blend.
-- **Spurious-root exclusion = A' + B** (validated in the residual-structure
-  spike): R3 pins `outlet.Pt = recovery*p03`, so the choked artifact (discharge
-  ~= P_c* != outlet) is a non-root; B is the physical warm-start (Pt_primary >=
-  outlet, P_py just below it) that keeps Newton out of the sticky choked basin.
-- **Solver-integration change required:** the solver's MultiPortChamber dispatch
-  (`solver.py`, `P_jct_val = x[m_indices[0]]`) passes only the FIRST owned
-  unknown to `residuals()`. Extend it to pass the remaining owned unknowns
-  (backward-compatible: an optional map keyed by `element.unknowns()[1:]`), so
-  `EjectorElement` receives `P_py`. The Jacobian relay already handles named
-  unknown columns generically, so only the value-passing side changes.
-- Then: `verify_solution_consistent` accepts subcritical + jet-pump roots (drop
-  the `outlet <= P_c*` demotion); assemble the full analytic `(f, J)` in C++
-  (blend of the committed closures); rewrite the element unit tests for the new
+- **Full rank in both regimes** (spike-confirmed: 4/4 in jet-pump, 4/4 in
+  critical). `R0` transitions smoothly from a real constraint (`mp = choked` in
+  critical) to nearly-redundant-but-nonzero (jet-pump); the jet-pump block is
+  ill-conditioned in deep-unchoked (cond ~1e4) but well within the solver's LM
+  fallback.
+- **`s_choke` is keyed on `mp / choked_mass_flow(Pt_p)`, NOT on `P_py`** -- this
+  is essential: a `P_py`-based indicator is circular (`s` depends on `P_py`
+  depends on `s`) and mislabels the choked critical state. `s -> 1` as the
+  primary chokes (`mp -> choked`), `s -> 0` when `mp << choked`.
+- **`nozzle_inverse(mp, Pt_p)`** is the new closure needed: the unchoked C-D
+  nozzle exit static `P_py` such that `cd_nozzle(Pt_p, P_py) = mp` -- a 1-D
+  inversion with an implicit-function derivative (`dP_py/dmp`, `dP_py/dPt_p`).
+  Python reference -> C++ -> FD-checked, same recipe as the C-D nozzle.
+- **Spurious-root exclusion still A' + B:** R3 pins `outlet.Pt = recovery*p03`
+  (blended discharge), so the choked artifact (`discharge ~= P_c* != outlet`) is
+  a non-root; B is the physical warm-start (Pt_primary >= outlet) keeping Newton
+  out of the sticky choked basin.
+- Then: assemble the 4-row analytic `(f, J)` (blend of the committed closures +
+  the derived `P_py` chain, whose Jacobian folds in `dP_py` via the chain rule);
+  `verify_solution_consistent` accepts subcritical + jet-pump roots (drop the
+  `outlet <= P_c*` demotion); rewrite the element unit tests for the new
   structure; extend the golden fixture with coupled rows; and the end-to-end
   regression: `gui/tmp/ejector_test_low_flow_not_converged.json` converges to
   `Pt_primary ~= Pb`, `dp >= 0`, `omega ~= 7`.
