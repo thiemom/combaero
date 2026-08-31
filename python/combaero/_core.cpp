@@ -415,12 +415,46 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("dpc_dt_e",
                     &solver::EjectorCriticalPressureJacobian::dpc_dt_e);
 
+  py::class_<solver::EjectorCDNozzleJacobian>(
+      m, "EjectorCDNozzleJacobian",
+      "C-D nozzle mass flow plus d(mdot)/d(p0, t0, P_py)")
+      .def_readonly("mdot", &solver::EjectorCDNozzleJacobian::mdot)
+      .def_readonly("dmdot_dp0", &solver::EjectorCDNozzleJacobian::dmdot_dp0)
+      .def_readonly("dmdot_dt0", &solver::EjectorCDNozzleJacobian::dmdot_dt0)
+      .def_readonly("dmdot_dp_py", &solver::EjectorCDNozzleJacobian::dmdot_dp_py);
+
+  py::class_<solver::EjectorJetPumpDischargeJacobian>(
+      m, "EjectorJetPumpDischargeJacobian",
+      "Jet-pump discharge stagnation plus d(p03)/d(p_g, t_g, p_e, t_e, P_py, omega)")
+      .def_readonly("p03", &solver::EjectorJetPumpDischargeJacobian::p03)
+      .def_readonly("dp03_dp_g", &solver::EjectorJetPumpDischargeJacobian::dp03_dp_g)
+      .def_readonly("dp03_dt_g", &solver::EjectorJetPumpDischargeJacobian::dp03_dt_g)
+      .def_readonly("dp03_dp_e", &solver::EjectorJetPumpDischargeJacobian::dp03_dp_e)
+      .def_readonly("dp03_dt_e", &solver::EjectorJetPumpDischargeJacobian::dp03_dt_e)
+      .def_readonly("dp03_dp_py", &solver::EjectorJetPumpDischargeJacobian::dp03_dp_py)
+      .def_readonly("dp03_domega", &solver::EjectorJetPumpDischargeJacobian::dp03_domega);
+
   m.def("ejector_choked_mass_flow_and_jacobian",
         &solver::ejector_choked_mass_flow_and_jacobian, py::arg("p0"),
         py::arg("t0"), py::arg("area_throat"), py::arg("gamma"),
         py::arg("r_gas"), py::arg("eta"),
         "Choked (sonic-throat) mass flow (Huang 1999 Eqs. 1, 7).\n\n"
         "Returns: (mdot, d_mdot_dp0, d_mdot_dt0)");
+
+  m.def("ejector_cd_nozzle_mass_flow_and_jacobian",
+        &solver::ejector_cd_nozzle_mass_flow_and_jacobian, py::arg("p0"),
+        py::arg("t0"), py::arg("p_static_down"), py::arg("area_throat"),
+        py::arg("area_exit"), py::arg("gamma"), py::arg("r_gas"), py::arg("eta"),
+        py::arg("eps_frac"),
+        "C-D nozzle mass flow (choked/unchoked) with analytic Jacobian.\n\n"
+        "Returns: EjectorCDNozzleJacobian (mdot + dmdot_d{p0,t0,p_py})");
+
+  m.def("ejector_jetpump_discharge_and_jacobian",
+        &solver::ejector_jetpump_discharge_and_jacobian, py::arg("p_g"),
+        py::arg("t_g"), py::arg("p_e"), py::arg("t_e"), py::arg("p_py"),
+        py::arg("omega"), py::arg("gamma"), py::arg("recovery_efficiency"),
+        "Jet-pump mixed-flow discharge stagnation with analytic Jacobian.\n\n"
+        "Returns: EjectorJetPumpDischargeJacobian (p03 + dp03_d{p_g,t_g,p_e,t_e,p_py,omega})");
 
   m.def(
       "ejector_entrainment_ratio_and_jacobian",
