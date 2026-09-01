@@ -414,6 +414,21 @@ solver-dispatch change is needed**:
   (blended discharge), so the choked artifact (`discharge ~= P_c* != outlet`) is
   a non-root; B is the physical warm-start (Pt_primary >= outlet) keeping Newton
   out of the sticky choked basin.
+- **Jacobian VALIDATED** (prototype matches FD at non-degenerate points, both
+  regimes): assembled via a Python dual (value + grad-dict over the 8 primitives
+  mp, ms, mdot_out, p_g, t_g, p_e, t_e, p_out), chaining the committed closures'
+  partials -- `P_py` is injected as a dual carrying its implicit partials from
+  `cd_nozzle_exit_static` + `P_sy` + `s_choke`. Two physics details this pinned
+  down: the discharge mixing uses `omega_eff = ms / mp` (the ACTUAL ratio; R1
+  separately pins `ms = ms_model`), and the symmetric reported root has
+  genuinely ~0 R3/d(mp,ms) partials (FD is unreliable there -- validate the
+  Jacobian at asymmetric points).
+- **`P_jct` bookkeeping:** R3 must reference `outlet.Pt` (the A' pin), so it
+  cannot also define the base's `P_jct`. The ejector is not an impulse-CV
+  junction, so drop `P_jct` from `unknowns()` (the 4 rows R0-R3 constrain the 3
+  port pressures + mass flows directly; `flow_at_node` uses the port outer-mdot
+  indices, not `P_jct`, so it is unaffected) -- verify the DOF balances via the
+  end-to-end network solve.
 - Then: assemble the 4-row analytic `(f, J)` (blend of the committed closures +
   the derived `P_py` chain, whose Jacobian folds in `dP_py` via the chain rule);
   `verify_solution_consistent` accepts subcritical + jet-pump roots (drop the
