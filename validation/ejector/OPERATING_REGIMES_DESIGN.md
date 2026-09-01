@@ -399,8 +399,13 @@ solver-dispatch change is needed**:
   fallback.
 - **`s_choke` is keyed on `mp / choked_mass_flow(Pt_p)`, NOT on `P_py`** -- this
   is essential: a `P_py`-based indicator is circular (`s` depends on `P_py`
-  depends on `s`) and mislabels the choked critical state. `s -> 1` as the
-  primary chokes (`mp -> choked`), `s -> 0` when `mp << choked`.
+  depends on `s`) and mislabels the choked critical state. It must be a
+  SATURATING C1 form (clamped smootherstep on `mp/cap` with `lo~0.90`,
+  `hi~0.999`) so `s = 1` EXACTLY at the choke (`mp -> cap`) -- a `tanh` that
+  only asymptotes to 1 leaves an ~10 Pa R3 residual and a ~0.3% omega error in
+  critical mode. Verified: with the smootherstep, both physical roots evaluate
+  to all-four-residuals ~= 0 (jet-pump: R0=-6e-17, R3=1e-10, omega~6.6;
+  critical: s=1, P_py=P_sy, omega_eff=omega_crit, R3=0 all exact).
 - **`nozzle_inverse(mp, Pt_p)`** is the new closure needed: the unchoked C-D
   nozzle exit static `P_py` such that `cd_nozzle(Pt_p, P_py) = mp` -- a 1-D
   inversion with an implicit-function derivative (`dP_py/dmp`, `dP_py/dPt_p`).
