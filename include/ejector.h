@@ -163,6 +163,23 @@ EjectorCDNozzleJacobian ejector_cd_nozzle_mass_flow_and_jacobian(
     double p0, double t0, double p_static_down, double area_throat,
     double area_exit, double gamma, double r_gas, double eta, double eps_frac);
 
+struct EjectorCDExitStaticJacobian {
+  double p_py;         // exit static that passes m_dot (== cd_nozzle_exit_static)
+  double dp_py_dm_dot; // d/d(mass flow)
+  double dp_py_dp0;    // d/d(primary stagnation pressure)
+  double dp_py_dt0;    // d/d(primary stagnation temperature)
+};
+
+// Inverse of the C-D nozzle: the exit static P_py that passes m_dot, with its
+// implicit-function-theorem Jacobian. The derived mixing pressure of the
+// operating-regime element's unchoked branch (OPERATING_REGIMES_DESIGN.md sec
+// 6b); 1:1 with cd_nozzle_exit_static in _ejector_huang1999.py. The partials
+// are ratios of the C-D nozzle's own Jacobian at the solved P_py:
+//   dP_py/dm_dot = 1/(dmdot/dP_py),  dP_py/dp0 = -(dmdot/dp0)/(dmdot/dP_py), ...
+EjectorCDExitStaticJacobian ejector_cd_nozzle_exit_static_and_jacobian(
+    double m_dot, double p0, double t0, double area_throat, double area_exit,
+    double gamma, double r_gas, double eta, double eps_frac);
+
 struct EjectorJetPumpDischargeJacobian {
   double p03;      // recovery_efficiency * mixed stagnation pressure
   double dp03_dp_g;

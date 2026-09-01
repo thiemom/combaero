@@ -201,6 +201,34 @@ EjectorCDNozzleJacobian ejector_cd_nozzle_mass_flow_and_jacobian(
   return {mdot.v, mdot.d[0], mdot.d[1], mdot.d[2]};
 }
 
+EjectorCDExitStaticJacobian ejector_cd_nozzle_exit_static_and_jacobian(
+    double m_dot, double p0, double t0, double area_throat, double area_exit,
+    double gamma, double r_gas, double eta, double eps_frac) {
+  double gm1 = gamma - 1.0;
+  double gp1 = gamma + 1.0;
+  double r_crit = std::pow(2.0 / gp1, gamma / gm1);
+  // cd_nozzle_mass_flow is monotone decreasing in P_py: bisect for the root.
+  double lo = p0 * r_crit;
+  double hi = p0 * (1.0 - 1e-12);
+  for (int i = 0; i < 200; ++i) {
+    double mid = 0.5 * (lo + hi);
+    double f = ejector_cd_nozzle_mass_flow(p0, t0, mid, area_throat, area_exit, gamma, r_gas,
+                                           eta, eps_frac);
+    if (f > m_dot) {
+      lo = mid; // too much flow -> raise P_py
+    } else {
+      hi = mid;
+    }
+  }
+  double p_py = 0.5 * (lo + hi);
+  // Implicit function theorem: F(P_py) = cd_nozzle(P_py) - m_dot = 0, so
+  // dP_py/dx = -(dF/dx)/(dF/dP_py), using the C-D nozzle's own Jacobian.
+  EjectorCDNozzleJacobian j = ejector_cd_nozzle_mass_flow_and_jacobian(
+      p0, t0, p_py, area_throat, area_exit, gamma, r_gas, eta, eps_frac);
+  double inv = 1.0 / j.dmdot_dp_py;
+  return {p_py, inv, -j.dmdot_dp0 * inv, -j.dmdot_dt0 * inv};
+}
+
 EjectorJetPumpDischargeJacobian ejector_jetpump_discharge_and_jacobian(
     double p_g_val, double t_g_val, double p_e_val, double t_e_val,
     double p_py_val, double omega_val, double gamma, double recovery_efficiency) {

@@ -423,6 +423,14 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("dmdot_dt0", &solver::EjectorCDNozzleJacobian::dmdot_dt0)
       .def_readonly("dmdot_dp_py", &solver::EjectorCDNozzleJacobian::dmdot_dp_py);
 
+  py::class_<solver::EjectorCDExitStaticJacobian>(
+      m, "EjectorCDExitStaticJacobian",
+      "C-D nozzle exit static P_py plus d(P_py)/d(m_dot, p0, t0)")
+      .def_readonly("p_py", &solver::EjectorCDExitStaticJacobian::p_py)
+      .def_readonly("dp_py_dm_dot", &solver::EjectorCDExitStaticJacobian::dp_py_dm_dot)
+      .def_readonly("dp_py_dp0", &solver::EjectorCDExitStaticJacobian::dp_py_dp0)
+      .def_readonly("dp_py_dt0", &solver::EjectorCDExitStaticJacobian::dp_py_dt0);
+
   py::class_<solver::EjectorJetPumpDischargeJacobian>(
       m, "EjectorJetPumpDischargeJacobian",
       "Jet-pump discharge stagnation plus d(p03)/d(p_g, t_g, p_e, t_e, P_py, omega)")
@@ -448,6 +456,13 @@ PYBIND11_MODULE(_core, m) {
         py::arg("eps_frac"),
         "C-D nozzle mass flow (choked/unchoked) with analytic Jacobian.\n\n"
         "Returns: EjectorCDNozzleJacobian (mdot + dmdot_d{p0,t0,p_py})");
+
+  m.def("ejector_cd_nozzle_exit_static_and_jacobian",
+        &solver::ejector_cd_nozzle_exit_static_and_jacobian, py::arg("m_dot"),
+        py::arg("p0"), py::arg("t0"), py::arg("area_throat"), py::arg("area_exit"),
+        py::arg("gamma"), py::arg("r_gas"), py::arg("eta"), py::arg("eps_frac"),
+        "C-D nozzle exit static P_py that passes m_dot, with implicit Jacobian.\n\n"
+        "Returns: EjectorCDExitStaticJacobian (p_py + dp_py_d{m_dot,p0,t0})");
 
   m.def("ejector_jetpump_discharge_and_jacobian",
         &solver::ejector_jetpump_discharge_and_jacobian, py::arg("p_g"),

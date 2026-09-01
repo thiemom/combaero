@@ -154,3 +154,37 @@ TEST(EjectorJacobians, JetPumpDischargeValueAndJacobian) {
     }
   }
 }
+
+TEST(EjectorJacobians, CDNozzleExitStaticImplicitDerivatives) {
+  // Inverse of the C-D nozzle: analytic implicit-function partials
+  // (m_dot, p0, t0) vs central difference of the bisection value. Also checks
+  // the round-trip cd_nozzle(exit_static(m_dot)) == m_dot.
+  const double A_t = 3.14e-5, A_e = 1.0e-4, g = 1.40, R = 287.0, eta = 0.95, eps = 1e-3;
+  struct Pt {
+    double m_dot, p0, t0;
+  };
+  const Pt pts[] = {
+      {0.0051, 101325.0, 300.0}, // reported
+      {0.0030, 101325.0, 300.0}, // deeper unchoked
+      {0.0065, 101325.0, 300.0}, // near choke
+      {0.0300, 604000.0, 368.0}, // higher motive
+  };
+  auto val = [&](double md, double p0, double t0) {
+    return ejector_cd_nozzle_exit_static_and_jacobian(md, p0, t0, A_t, A_e, g, R, eta, eps).p_py;
+  };
+  for (const auto& p : pts) {
+    auto j = ejector_cd_nozzle_exit_static_and_jacobian(p.m_dot, p.p0, p.t0, A_t, A_e, g, R, eta,
+                                                        eps);
+    // round-trip
+    double back = ejector_cd_nozzle_mass_flow(p.p0, p.t0, j.p_py, A_t, A_e, g, R, eta, eps);
+    EXPECT_NEAR(back, p.m_dot, 1e-9 * p.m_dot) << "round-trip at m_dot=" << p.m_dot;
+    // implicit derivatives vs FD
+    double hm = 1e-7 * p.m_dot, hp = 1e-6 * p.p0, ht = 1e-6 * p.t0;
+    double cd_m = (val(p.m_dot + hm, p.p0, p.t0) - val(p.m_dot - hm, p.p0, p.t0)) / (2 * hm);
+    double cd_p = (val(p.m_dot, p.p0 + hp, p.t0) - val(p.m_dot, p.p0 - hp, p.t0)) / (2 * hp);
+    double cd_t = (val(p.m_dot, p.p0, p.t0 + ht) - val(p.m_dot, p.p0, p.t0 - ht)) / (2 * ht);
+    EXPECT_NEAR(j.dp_py_dm_dot, cd_m, 1e-4 * std::abs(cd_m) + 1e-6) << "dm at " << p.m_dot;
+    EXPECT_NEAR(j.dp_py_dp0, cd_p, 1e-4 * std::abs(cd_p) + 1e-9) << "dp0 at " << p.m_dot;
+    EXPECT_NEAR(j.dp_py_dt0, cd_t, 1e-4 * std::abs(cd_t) + 1e-9) << "dt0 at " << p.m_dot;
+  }
+}
