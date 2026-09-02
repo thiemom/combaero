@@ -8,13 +8,10 @@ resolves it. Nothing here is implemented yet -- this is the spec that the
 implementation PRs will follow.
 
 Companion docs:
-- `README.md` (this directory) -- current (critical-mode) model, accuracy
-  comparison, golden-fixture contract.
+- `README.md` (this directory) -- the reference model (critical plateau +
+  subcritical/jet-pump closures), accuracy comparison, golden-fixture contract.
 - `../../python/combaero/network/_ejector_huang1999.py` -- the closed-form
-  critical-mode physics (Huang 1999 + Kracik & Dvorak 2016).
-- `../../docs/ejector/handover.md` -- the original (2026-07-13) groundwork
-  handover (untracked, alongside the source PDFs; now largely superseded, kept
-  for history).
+  physics across regimes (Huang 1999 + Kracik & Dvorak 2016).
 
 ---
 
