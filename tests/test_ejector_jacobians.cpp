@@ -188,3 +188,65 @@ TEST(EjectorJacobians, CDNozzleExitStaticImplicitDerivatives) {
     EXPECT_NEAR(j.dp_py_dt0, cd_t, 1e-4 * std::abs(cd_t) + 1e-9) << "dt0 at " << p.m_dot;
   }
 }
+
+TEST(EjectorJacobians, ElementResidualsMatchCentralDifference) {
+  // Whole-element (f, J): every entry of the 4x9 analytic Jacobian vs a
+  // central difference of the residual value, at operating points inside each
+  // regime. This directly guards the DualN<9> assembly in
+  // ejector_element_residuals_and_jacobian (the C++ home of the element
+  // assembly; 1:1 with EjectorElement.residuals()). Points are chosen
+  // ASYMMETRIC (p_g != p_e or t_g != t_e) and away from the s_choke/s_sub
+  // seams so no partial is genuinely ~0 -- the same reason the Python FD test
+  // avoids the symmetric degenerate root.
+  const double A_t = 3.14e-5, A_e = 1.0e-4, A_mix = 8.0e-4, A_s = A_mix - A_e;
+  const EjectorGeometry geom{A_e / A_t, A_mix / A_t};
+  const double R = 287.0, ep = 0.95, es = 0.85, rec = 1.0, eps = 1e-3;
+  const double sc_lo = 0.90, sc_hi = 0.999, ss_lo = 0.98, ss_hi = 1.02;
+  // gamma is a frozen coefficient here (matches the element's frozen-property
+  // Jacobian); use a fixed representative air value so the FD holds it fixed.
+  const double g = 1.4;
+
+  struct Case {
+    const char* id;
+    double u[9]; // mp, ms, mdot_out, p_g, t_g, p_e, t_e, p_out, p_py
+  };
+  const Case cases[] = {
+      // Unchoked jet-pump regime (s_choke -> 0), asymmetric streams.
+      {"jetpump", {0.0051, 0.030, 0.0351, 105000.0, 305.0, 100000.0, 295.0, 100500.0, 99000.0}},
+      // Deeper unchoked, different values.
+      {"jetpump2", {0.0040, 0.022, 0.0260, 130000.0, 310.0, 101325.0, 292.0, 101000.0, 98500.0}},
+      // Double-choked critical regime (s_choke -> 1, outlet < P_c* -> s_sub 0).
+      {"critical", {0.44, 0.13, 0.57, 700000.0, 440.0, 22850.0, 280.0, 40000.0, 100000.0}},
+  };
+
+  auto resid = [&](const double u[9], int row) {
+    return ejector_element_residuals_and_jacobian(u[0], u[1], u[2], u[3], u[4], u[5], u[6], u[7],
+                                                  u[8], geom, A_t, A_e, A_s, g, R, ep, es, rec, eps,
+                                                  sc_lo, sc_hi, ss_lo, ss_hi)
+        .residuals[row];
+  };
+
+  for (const auto& c : cases) {
+    auto rj = ejector_element_residuals_and_jacobian(c.u[0], c.u[1], c.u[2], c.u[3], c.u[4], c.u[5],
+                                                     c.u[6], c.u[7], c.u[8], geom, A_t, A_e, A_s, g,
+                                                     R, ep, es, rec, eps, sc_lo, sc_hi, ss_lo, ss_hi);
+    for (int row = 0; row < 4; ++row) {
+      for (int k = 0; k < 9; ++k) {
+        double a[9], b[9];
+        for (int m = 0; m < 9; ++m) a[m] = b[m] = c.u[m];
+        double h = 1e-6 * std::abs(c.u[k]);
+        if (h == 0.0) h = 1e-6;
+        a[k] += h;
+        b[k] -= h;
+        double cd = (resid(a, row) - resid(b, row)) / (2 * h);
+        double an = rj.jacobian[row][k];
+        // Residuals span mass rows (O(0.01-1)) and pressure rows (O(1e4-1e5)),
+        // so the abs floor is scaled to the residual magnitude to tolerate CD
+        // round-off on the pressure rows without masking mass-row errors.
+        double floor = 1e-6 * std::abs(rj.residuals[row]) + 1e-7;
+        EXPECT_NEAR(an, cd, 1e-5 * std::abs(cd) + floor)
+            << "case " << c.id << " row " << row << " seed " << k;
+      }
+    }
+  }
+}

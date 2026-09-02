@@ -79,12 +79,17 @@ Jacobian -- safe because smootherstep is flat at ``s in {0, 1}``).
 ``verify_solution_consistent`` now returns True unconditionally: every regime
 is modeled, so there is no longer a subcritical design point to demote.
 
-Jacobian: FULL analytic, all 4 rows, via the C++ (f, J) path
-(``combaero.network._ejector_huang1999`` is now only the validation
-reference; the hot path calls ``_solver_tools.ejector_*_and_jacobian``,
-i.e. ``include/ejector.h``/``src/ejector.cpp``). The C++ Jacobians are
-exact w.r.t. the four thermodynamic inputs (primary/secondary stagnation
-pressure and temperature) holding ``gamma`` and ``r_gas`` FROZEN. Here
+Assembly: the whole 4-row residual system AND its 9-column analytic
+Jacobian are built in C++ -- a single ``_solver_tools.
+ejector_element_residuals_and_jacobian`` call (``include/ejector.h`` /
+``src/ejector.cpp``) that chains the scalar closures through a forward-mode
+``DualN<9>`` across the regime blend, matching the whole-element (f, J)
+practice of the base ``MultiPortChamberElement`` and ``TeeJunctionElement``.
+``residuals()`` here is only the relabeling shim: physical-flow signs and
+mapping the nine Jacobian seeds to solver column names.
+(``combaero.network._ejector_huang1999`` remains the Python validation
+reference the C++ is kept 1:1 with.) The C++ Jacobian is exact w.r.t. the
+nine Newton unknowns holding ``gamma`` and ``r_gas`` FROZEN. Here
 ``gamma = choke_plane_gamma(secondary.Tt, ...)`` is a weak function of a
 Newton unknown and ``r_gas`` depends only on composition (not a solved
 unknown), so the element Jacobian is exact in the explicit (Pt, Tt)
@@ -131,86 +136,6 @@ def choke_plane_gamma(t_e: float, x: Any, *, iterations: int = 12) -> float:
         t_sy = t_e / ((gamma + 1.0) / 2.0)
         gamma = _real_gamma(t_sy, x)
     return gamma
-
-
-class _D:
-    """Minimal forward-mode dual: a value plus a gradient dict over the element's
-    primitive unknowns (mp, ms, mdot_out, p_g, t_g, p_e, t_e, p_out). Lets the
-    operating-regime residuals be assembled by chaining the C++ closures' analytic
-    partials, exactly mirroring the FD-validated prototype (see
-    validation/ejector/OPERATING_REGIMES_DESIGN.md sec 6b). Only the operators
-    the assembly uses are defined."""
-
-    __slots__ = ("v", "d")
-
-    def __init__(self, v: float, d: dict[str, float] | None = None) -> None:
-        self.v = float(v)
-        self.d = dict(d) if d else {}
-
-    @staticmethod
-    def seed(v: float, name: str) -> _D:
-        return _D(v, {name: 1.0})
-
-    def __add__(self, b: _D | float) -> _D:
-        if isinstance(b, _D):
-            d = dict(self.d)
-            for k, x in b.d.items():
-                d[k] = d.get(k, 0.0) + x
-            return _D(self.v + b.v, d)
-        return _D(self.v + b, self.d)
-
-    __radd__ = __add__
-
-    def __neg__(self) -> _D:
-        return _D(-self.v, {k: -x for k, x in self.d.items()})
-
-    def __sub__(self, b: _D | float) -> _D:
-        return self + (-b if isinstance(b, _D) else -b)
-
-    def __rsub__(self, b: float) -> _D:
-        return (-self) + b
-
-    def __mul__(self, b: _D | float) -> _D:
-        if isinstance(b, _D):
-            d = {k: x * b.v for k, x in self.d.items()}
-            for k, x in b.d.items():
-                d[k] = d.get(k, 0.0) + self.v * x
-            return _D(self.v * b.v, d)
-        return _D(self.v * b, {k: x * b for k, x in self.d.items()})
-
-    __rmul__ = __mul__
-
-    def __truediv__(self, b: _D | float) -> _D:
-        if isinstance(b, _D):
-            inv = 1.0 / b.v
-            d = {k: x * inv for k, x in self.d.items()}
-            for k, x in b.d.items():
-                d[k] = d.get(k, 0.0) - self.v * x * inv * inv
-            return _D(self.v * inv, d)
-        return _D(self.v / b, {k: x / b for k, x in self.d.items()})
-
-
-def _chain(value: float, pairs: list[tuple[float, _D]]) -> _D:
-    """Wrap a C++ closure output: value + sum(partial * grad(input dual))."""
-    d: dict[str, float] = {}
-    for p, inp in pairs:
-        for k, x in inp.d.items():
-            d[k] = d.get(k, 0.0) + p * x
-    return _D(value, d)
-
-
-def _smootherstep(t: _D, lo: float, hi: float) -> _D:
-    """C1 clamped smootherstep on t, saturating to EXACTLY 0/1 outside [lo, hi]
-    (so s_choke = 1 exactly at the primary-choke threshold and critical mode
-    reduces exactly)."""
-    x = (t - lo) / (hi - lo)
-    if x.v <= 0.0:
-        return _D(0.0)
-    if x.v >= 1.0:
-        return _D(1.0)
-    val = x.v * x.v * x.v * (x.v * (x.v * 6.0 - 15.0) + 10.0)
-    dval = 30.0 * x.v * x.v * (x.v - 1.0) * (x.v - 1.0)
-    return _chain(val, [(dval, x)])
 
 
 class EjectorElement(MultiPortChamberElement):
@@ -352,175 +277,72 @@ class EjectorElement(MultiPortChamberElement):
         A_s = self.mixing_area - self.nozzle_exit_area
         rec = self.recovery_efficiency
 
-        # Primitive unknowns as duals. port_mdots are junction-sign convention
+        # Physical port flows. port_mdots are junction-sign convention
         # (positive = out); primary/secondary are inlets (sign -1), so their
-        # physical flow is the negation.
+        # physical flow is the negation. The owned unknown ``P_jct`` is
+        # repurposed as the mixing-plane static pressure P_py (see the module
+        # docstring's residual-design section).
         mp_v = -float(port_mdots[0])
         ms_v = -float(port_mdots[1])
         mo_v = float(port_mdots[2])
-        mp = _D.seed(mp_v, "mp")
-        ms = _D.seed(ms_v, "ms")
-        mdot_out = _D.seed(mo_v, "mdot_out")
-        p_g = _D.seed(primary.Pt, "p_g")
-        t_g = _D.seed(primary.Tt, "t_g")
-        p_e = _D.seed(secondary.Pt, "p_e")
-        t_e = _D.seed(secondary.Tt, "t_e")
-        p_out = _D.seed(outlet.Pt, "p_out")
 
-        # The owned unknown (base name "{id}.P_jct") is repurposed as the
-        # PHYSICAL mixing-plane static pressure P_py -- the pressure common to
-        # the primary jet and the entrained stream at the mixing-chamber
-        # entrance. This is the quantity the two nozzle relations R0/R1 share,
-        # so making it a genuine Newton unknown (instead of deriving it from
-        # the primary nozzle inverse, which makes R0 vacuous in the unchoked
-        # branch) keeps R0 AND R1 live and lets the downstream back pressure
-        # select the operating regime. See OPERATING_REGIMES_DESIGN.md sec 6c.
-        p_py = _D.seed(P_jct, "P_jct")
-
-        # s_choke = smootherstep(mp / cap), cap = choked_mass_flow(Pt_p): 0 when
-        # the primary is clearly unchoked (jet pump), 1 at the choke threshold.
-        cap_v, dcap_dp_g, dcap_dt_g = _solver_tools.ejector_choked_mass_flow_and_jacobian(
-            primary.Pt, primary.Tt, A_t, gamma, r_gas, ETA_P
+        # The 4-row residual system + its 9-column analytic Jacobian are
+        # assembled in C++ (whole-element (f, J), matching the base
+        # MultiPortChamberElement / TeeJunctionElement practice): the scalar
+        # closures are chained through a forward-mode DualN<9> across the
+        # regime blend. See src/ejector.cpp / OPERATING_REGIMES_DESIGN.md sec
+        # 6c. This Python is only the relabeling shim.
+        rj = _solver_tools.ejector_element_residuals_and_jacobian(
+            mp_v,
+            ms_v,
+            mo_v,
+            primary.Pt,
+            primary.Tt,
+            secondary.Pt,
+            secondary.Tt,
+            outlet.Pt,
+            P_jct,
+            arn,
+            arm,
+            A_t,
+            A_e,
+            A_s,
+            gamma,
+            r_gas,
+            ETA_P,
+            ETA_S,
+            rec,
+            self._EPS_FRAC,
+            self._S_CHOKE_LO,
+            self._S_CHOKE_HI,
+            self._S_SUB_LO,
+            self._S_SUB_HI,
         )
-        cap = _chain(cap_v, [(dcap_dp_g, p_g), (dcap_dt_g, t_g)])
-        s = _smootherstep(mp / cap, self._S_CHOKE_LO, self._S_CHOKE_HI)
 
-        # R0: primary C-D nozzle.
-        cd = _solver_tools.ejector_cd_nozzle_mass_flow_and_jacobian(
-            primary.Pt, primary.Tt, p_py.v, A_t, A_e, gamma, r_gas, ETA_P, self._EPS_FRAC
-        )
-        cd_d = _chain(cd.mdot, [(cd.dmdot_dp0, p_g), (cd.dmdot_dt0, t_g), (cd.dmdot_dp_py, p_py)])
-        r0 = mp - cd_d
-
-        # R1/R3 blend the critical (choked-primary) and jet-pump (unchoked)
-        # closures by s = s_choke. The critical closures
-        # (``ejector_entrainment_ratio``, ``ejector_critical_back_pressure``)
-        # assume a choked primary and return NaN once it is not (e.g. Pt_primary
-        # ~ back pressure in the jet-pump root); the jet-pump closure is
-        # symmetric at the choked end. Since smootherstep is FLAT at s in
-        # {0, 1} (both the blend weight AND its gradient vanish there), the
-        # inactive branch contributes exactly zero -- but ``0 * NaN = NaN``
-        # would still poison the value and Jacobian. So evaluate each branch
-        # ONLY where its weight is nonzero; the skipped branch is a hard zero
-        # dual, which is C1-consistent with the flat smootherstep endpoint.
-        omega_eff = ms / mp  # ACTUAL ratio for the discharge (R1 pins ms itself)
-        crit_active = s.v > 0.0
-        jet_active = s.v < 1.0
-
-        if crit_active:
-            entr = _solver_tools.ejector_entrainment_ratio_and_jacobian(
-                primary.Pt, primary.Tt, secondary.Pt, secondary.Tt, arn, arm, gamma
-            )
-            omega_crit = _chain(
-                entr.value.omega,
-                [
-                    (entr.domega_dp_g, p_g),
-                    (entr.domega_dt_g, t_g),
-                    (entr.domega_dp_e, p_e),
-                    (entr.domega_dt_e, t_e),
-                ],
-            )
-            pc = _solver_tools.ejector_critical_back_pressure_and_jacobian(
-                primary.Pt, primary.Tt, secondary.Pt, secondary.Tt, arn, arm, gamma, r_gas, 1.0
-            )
-            p03_crit = _chain(
-                pc.value.p_mixed_stagnation_pa,
-                [(pc.dpc_dp_g, p_g), (pc.dpc_dt_g, t_g), (pc.dpc_dp_e, p_e), (pc.dpc_dt_e, t_e)],
-            )
-            # s_sub: 0 while the outlet stays below the recovered critical back
-            # pressure (genuine critical mode -- outlet floats free), ramping to
-            # 1 as it rises above it (subcritical droop -- outlet pinned).
-            s_sub = _smootherstep(p_out / (rec * p03_crit), self._S_SUB_LO, self._S_SUB_HI)
-        else:
-            omega_crit = _D(0.0)
-            p03_crit = _D(0.0)
-            s_sub = _D(1.0)
-
-        if jet_active:
-            sec = _solver_tools.ejector_cd_nozzle_mass_flow_and_jacobian(
-                secondary.Pt, secondary.Tt, p_py.v, A_s, A_s, gamma, r_gas, ETA_S, self._EPS_FRAC
-            )
-            ms_sec = _chain(
-                sec.mdot, [(sec.dmdot_dp0, p_e), (sec.dmdot_dt0, t_e), (sec.dmdot_dp_py, p_py)]
-            )
-            jp = _solver_tools.ejector_jetpump_discharge_and_jacobian(
-                primary.Pt, primary.Tt, secondary.Pt, secondary.Tt, p_py.v, omega_eff.v, gamma, 1.0
-            )
-            p03_jet = _chain(
-                jp.p03,
-                [
-                    (jp.dp03_dp_g, p_g),
-                    (jp.dp03_dt_g, t_g),
-                    (jp.dp03_dp_e, p_e),
-                    (jp.dp03_dt_e, t_e),
-                    (jp.dp03_dp_py, p_py),
-                    (jp.dp03_domega, omega_eff),
-                ],
-            )
-        else:
-            ms_sec = _D(0.0)
-            p03_jet = _D(0.0)
-
-        # R1: blended entrainment  ms = s*omega_crit*mp + (1-s)*ms_sec.
-        ms_model = s * omega_crit * mp + (1.0 - s) * ms_sec
-        r1 = ms - ms_model
-
-        # R2: mass conservation.
-        r2 = mdot_out - mp - ms
-
-        # R3: regime-dependent closure of the owned unknown.
-        #   discharge = recovery * blend(P_c*, P03_jet) by s_choke.
-        #   w_pin = 1 - s*(1 - s_sub): the weight on the OUTLET-PIN form.
-        #     - jet-pump (s=0):            w_pin = 1  -> pin the outlet
-        #     - subcritical droop (s=1,    w_pin = 1  -> pin the outlet
-        #        outlet > P_c*, s_sub=1)
-        #     - critical (s=1, outlet <    w_pin = 0  -> P_jct diagnostic, outlet
-        #        P_c*, s_sub=0)                          free (set by the network)
-        # In the critical branch the outlet is legitimately below the ejector's
-        # critical back pressure, so pinning it would over-constrain the fixed
-        # downstream boundary; there the owned unknown is instead the diagnostic
-        # recovered stagnation. Everywhere the primary is unchoked, or choked
-        # but back-pressure-loaded above P_c*, the outlet IS what the ejector
-        # sets, so it is pinned and P_py floats to satisfy the two nozzles.
-        discharge = rec * (s * p03_crit + (1.0 - s) * p03_jet)
-        w_pin = 1.0 - s * (1.0 - s_sub)
-        lhs = w_pin * p_out + (1.0 - w_pin) * p_py
-        r3 = lhs - discharge
-
-        # Map each residual's gradient (over the primitives) to solver columns.
-        m_p = f"{self._port_element_ids[0]}.m_dot"
-        m_s = f"{self._port_element_ids[1]}.m_dot"
-        m_out = f"{self._port_element_ids[2]}.m_dot"
-        pn_pt, pn_t = f"{self.primary_node}.Pt", f"{self.primary_node}.T"
-        sn_pt, sn_t = f"{self.secondary_node}.Pt", f"{self.secondary_node}.T"
-        on_pt = f"{self.outlet_node}.Pt"
-        d_mp = -self._port_signs[0]  # d(mp_phys)/d(m_p unknown)
-        d_ms = -self._port_signs[1]
-        d_mo = self._port_signs[2]  # d(mdot_out_phys)/d(m_out unknown)
-        col_of = {
-            "mp": (m_p, d_mp),
-            "ms": (m_s, d_ms),
-            "mdot_out": (m_out, d_mo),
-            "p_g": (pn_pt, 1.0),
-            "t_g": (pn_t, 1.0),
-            "p_e": (sn_pt, 1.0),
-            "t_e": (sn_t, 1.0),
-            "p_out": (on_pt, 1.0),
-            "P_jct": (f"{self.id}.P_jct", 1.0),
-        }
-
-        def to_columns(res: _D) -> dict[str, float]:
+        # Map the 9 Jacobian seeds (in the C++ unknown order) to solver columns.
+        # Inlet flows: the physical flow is -(port unknown), so d(phys)/d(unknown)
+        # = -port_sign; the outlet unknown IS the physical flow (+port_sign).
+        seed_cols: list[tuple[str, float]] = [
+            (f"{self._port_element_ids[0]}.m_dot", -self._port_signs[0]),  # 0 mp
+            (f"{self._port_element_ids[1]}.m_dot", -self._port_signs[1]),  # 1 ms
+            (f"{self._port_element_ids[2]}.m_dot", self._port_signs[2]),  # 2 mdot_out
+            (f"{self.primary_node}.Pt", 1.0),  # 3 p_g
+            (f"{self.primary_node}.T", 1.0),  # 4 t_g
+            (f"{self.secondary_node}.Pt", 1.0),  # 5 p_e
+            (f"{self.secondary_node}.T", 1.0),  # 6 t_e
+            (f"{self.outlet_node}.Pt", 1.0),  # 7 p_out
+            (f"{self.id}.P_jct", 1.0),  # 8 P_py (owned)
+        ]
+        jac: dict[int, dict[str, float]] = {}
+        for row in range(4):
+            grad = rj.jacobian[row]
             cols: dict[str, float] = {}
-            for var, coeff in res.d.items():
-                name, chain = col_of[var]
-                if coeff != 0.0:
-                    cols[name] = cols.get(name, 0.0) + coeff * chain
-            return cols
-
-        return (
-            [r0.v, r1.v, r2.v, r3.v],
-            {0: to_columns(r0), 1: to_columns(r1), 2: to_columns(r2), 3: to_columns(r3)},
-        )
+            for seed, (name, coeff) in enumerate(seed_cols):
+                g = grad[seed]
+                if g != 0.0:
+                    cols[name] = cols.get(name, 0.0) + coeff * g
+            jac[row] = cols
+        return (list(rj.residuals), jac)
 
     def verify_solution_consistent(
         self,

@@ -27,24 +27,28 @@
 //     Source of the mixing closure ejector_critical_back_pressure
 //     implements (their Eqs. 7-13).
 //
-// Scope: critical (double-choked) operation only. The subcritical,
-// unchoked-primary, and back-flow regimes are not modeled here; their design
-// (choked/unchoked primary R0, subcritical omega droop to the dead-head
-// pressure P_b0, and a subsonic jet-pump mode) lives in
-// validation/ejector/OPERATING_REGIMES_DESIGN.md.
+// Scope. The critical-mode scalar closures (ejector_entrainment_ratio,
+// ejector_critical_back_pressure and their Jacobians) model double-choked
+// operation only; the additional operating-regime closures below
+// (ejector_cd_nozzle_mass_flow, ejector_jetpump_discharge, ...) extend to the
+// subcritical-droop and unchoked-primary jet-pump regimes, and
+// ejector_element_residuals_and_jacobian composes ALL of them into the
+// network element's full 4-row residual system spanning every regime. Design
+// + provenance: validation/ejector/OPERATING_REGIMES_DESIGN.md.
 //
-// Jacobian scope (this header): analytic derivatives w.r.t. the 4
-// thermodynamic inputs (p_g, t_g, p_e, t_e) only -- these are the only
-// inputs that are ever Newton-solved unknowns for the network element
-// consuming this module (EjectorElement). gamma, r_gas, geometry, and
-// recovery_efficiency are element parameters, not solved unknowns, so
-// their derivatives are intentionally not exposed here (deliberate scope
+// Jacobian scope. The critical-mode scalar closures expose derivatives w.r.t.
+// the 4 thermodynamic inputs (p_g, t_g, p_e, t_e) only -- the Newton-solved
+// unknowns for the choked-plateau path; gamma, r_gas, geometry, and
+// recovery_efficiency are frozen element parameters (deliberate scope
 // boundary, not an oversight -- validation/ejector/data/
 // huang1999_reference_data.h separately carries central-difference targets
-// for those too, for a possible future design-sensitivity extension).
+// for those too, for a possible future design-sensitivity extension). The
+// operating-regime closures additionally carry the P_py / omega / m_dot
+// partials the extended element needs, and the whole-element function returns
+// the full Jacobian w.r.t. all nine element unknowns.
 //
-// Key simplification that makes every derivative below exact analytic
-// chain rule (no implicit/root-finding differentiation needed anywhere):
+// Key simplification that makes every critical-mode derivative below exact
+// analytic chain rule (no implicit/root-finding differentiation needed there):
 // the one internal root-find (ejector_mach_from_area_ratio_supersonic, a
 // bisection for the primary nozzle-exit Mach number M_p1) depends ONLY on
 // area_ratio_nozzle and gamma -- neither a Newton-solved unknown here -- so
@@ -54,6 +58,7 @@
 // closed-form) chain.
 // -----------------------------------------------------------------------------
 
+#include <array>
 #include <tuple>
 
 namespace ejector {
@@ -225,5 +230,42 @@ EjectorCriticalPressureJacobian ejector_critical_back_pressure_and_jacobian(
     double p_g, double t_g, double p_e, double t_e,
     const EjectorGeometry& geom, double gamma, double r_gas,
     double recovery_efficiency);
+
+// -----------------------------------------------------------------------------
+// Whole-element (f, J): the 4-row operating-regime residual system.
+//
+// Composes the scalar closures above (choked/C-D nozzle mass flow, critical
+// entrainment + back pressure, jet-pump discharge) into the four coupled rows
+// the network EjectorElement solves, blending the critical/subcritical/unchoked
+// regimes by two smootherstep weights, and returns all four residuals with
+// their analytic Jacobian w.r.t. the nine Newton unknowns -- forward-mode dual
+// (DualN<9>) through the whole blend. This is the C++ home of the assembly
+// (matching the whole-element (f, J) practice of MultiPortChamberElement /
+// TeeJunctionElement); the Python EjectorElement is a thin relabeling shim.
+// 1:1 with EjectorElement.residuals() in ejector_element.py. Full derivation
+// and provenance: validation/ejector/OPERATING_REGIMES_DESIGN.md sec 6c/8.3.
+//
+// Unknown (seed) order -- both `jac` columns and the physical-flow convention:
+//   0 mp        primary mass flow (physical, = -port_mdot_primary)
+//   1 ms        secondary (entrained) mass flow (physical)
+//   2 mdot_out  outlet mass flow (physical)
+//   3 p_g       primary stagnation pressure   Pt_primary
+//   4 t_g       primary stagnation temperature Tt_primary
+//   5 p_e       secondary stagnation pressure  Pt_secondary
+//   6 t_e       secondary stagnation temperature Tt_secondary
+//   7 p_out     outlet-node stagnation pressure Pt_outlet
+//   8 p_py      the owned unknown, repurposed as the mixing-plane static P_py
+struct EjectorElementResidualJacobian {
+  std::array<double, 4> residuals;               // R0..R3
+  std::array<std::array<double, 9>, 4> jacobian; // jacobian[row][seed]
+};
+
+EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
+    double mp, double ms, double mdot_out, double p_g, double t_g, double p_e,
+    double t_e, double p_out, double p_py, const EjectorGeometry& geom,
+    double area_throat, double area_nozzle_exit, double area_secondary,
+    double gamma, double r_gas, double eta_primary, double eta_secondary,
+    double recovery_efficiency, double eps_frac, double s_choke_lo,
+    double s_choke_hi, double s_sub_lo, double s_sub_hi);
 
 } // namespace combaero::solver

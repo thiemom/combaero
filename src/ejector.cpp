@@ -1,9 +1,11 @@
-// 1-D critical-mode supersonic ejector model. See include/ejector.h for
-// paper references and the Jacobian-scope note.
+// 1-D supersonic ejector model (critical / subcritical / unchoked jet-pump
+// regimes). See include/ejector.h for paper references and the scope note.
 
 #include "ejector.h"
 #include <array>
 #include <cmath>
+#include <initializer_list>
+#include <utility>
 
 namespace combaero::solver {
 
@@ -468,6 +470,150 @@ EjectorCriticalPressureResult ejector_critical_back_pressure(
   return ejector_critical_back_pressure_and_jacobian(p_g, t_g, p_e, t_e, geom, gamma, r_gas,
                                                       recovery_efficiency)
       .value;
+}
+
+// -----------------------------------------------------------------------------
+// Whole-element (f, J): the 4-row operating-regime residual system.
+//
+// A transliteration of EjectorElement.residuals() (ejector_element.py): the
+// scalar closures above are chained into a forward-mode DualN<9> exactly as the
+// Python `_chain` wraps each closure's (value, partials), then blended by the
+// two smootherstep weights. Kept in 1:1 correspondence so the two can be
+// cross-validated (tests/test_ejector_jacobians.cpp FD-checks this directly).
+// -----------------------------------------------------------------------------
+namespace {
+
+// _chain: value + sum(partial * grad(input dual)) -- 1:1 with Python _chain.
+template <int N>
+DualN<N> ejector_chain(double value,
+                       std::initializer_list<std::pair<double, DualN<N>>> pairs) {
+  DualN<N> r = DualN<N>::constant(value);
+  for (const auto& pr : pairs) {
+    for (int i = 0; i < N; ++i) r.d[i] += pr.first * pr.second.d[i];
+  }
+  return r;
+}
+
+// C1 clamped smootherstep saturating to EXACTLY 0/1 outside [lo, hi] -- 1:1
+// with Python _smootherstep (so s_choke = 1 exactly at the choke threshold and
+// critical mode reduces exactly).
+template <int N>
+DualN<N> ejector_smootherstep(const DualN<N>& t, double lo, double hi) {
+  DualN<N> x = (t - lo) / (hi - lo);
+  if (x.v <= 0.0) return DualN<N>::constant(0.0);
+  if (x.v >= 1.0) return DualN<N>::constant(1.0);
+  double val = x.v * x.v * x.v * (x.v * (x.v * 6.0 - 15.0) + 10.0);
+  double dval = 30.0 * x.v * x.v * (x.v - 1.0) * (x.v - 1.0);
+  return ejector_chain<N>(val, {{dval, x}});
+}
+
+} // namespace
+
+EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
+    double mp_v, double ms_v, double mo_v, double p_g_v, double t_g_v,
+    double p_e_v, double t_e_v, double p_out_v, double p_py_v,
+    const EjectorGeometry& geom, double area_throat, double area_nozzle_exit,
+    double area_secondary, double gamma, double r_gas, double eta_primary,
+    double eta_secondary, double recovery_efficiency, double eps_frac,
+    double s_choke_lo, double s_choke_hi, double s_sub_lo, double s_sub_hi) {
+  using D = DualN<9>;
+
+  // Seed the nine Newton unknowns (see header for the index convention).
+  const D mp = D::seed(mp_v, 0);
+  const D ms = D::seed(ms_v, 1);
+  const D mdot_out = D::seed(mo_v, 2);
+  const D p_g = D::seed(p_g_v, 3);
+  const D t_g = D::seed(t_g_v, 4);
+  const D p_e = D::seed(p_e_v, 5);
+  const D t_e = D::seed(t_e_v, 6);
+  const D p_out = D::seed(p_out_v, 7);
+  const D p_py = D::seed(p_py_v, 8); // owned unknown == mixing-plane static
+
+  // s_choke = smootherstep(mp / cap), cap = choked_mass_flow(Pt_p).
+  auto [cap_v, dcap_dp0, dcap_dt0] =
+      ejector_choked_mass_flow_and_jacobian(p_g_v, t_g_v, area_throat, gamma, r_gas, eta_primary);
+  D cap = ejector_chain<9>(cap_v, {{dcap_dp0, p_g}, {dcap_dt0, t_g}});
+  D s = ejector_smootherstep<9>(mp / cap, s_choke_lo, s_choke_hi);
+
+  // R0: primary C-D nozzle (choked/unchoked via the closure's own smooth-min).
+  auto cd = ejector_cd_nozzle_mass_flow_and_jacobian(
+      p_g_v, t_g_v, p_py_v, area_throat, area_nozzle_exit, gamma, r_gas, eta_primary, eps_frac);
+  D cd_d = ejector_chain<9>(
+      cd.mdot, {{cd.dmdot_dp0, p_g}, {cd.dmdot_dt0, t_g}, {cd.dmdot_dp_py, p_py}});
+  D r0 = mp - cd_d;
+
+  // Blend the critical (choked-primary) and jet-pump (unchoked) closures by
+  // s = s_choke. The critical closures return NaN for an unchoked primary, and
+  // the jet-pump closure is symmetric at the choked end; smootherstep is flat
+  // at s in {0, 1} so the inactive branch contributes zero, but 0 * NaN = NaN
+  // would still poison the value/Jacobian -- so evaluate each branch ONLY where
+  // its weight is nonzero, leaving a hard-zero dual otherwise (C1-consistent
+  // with the flat endpoint).
+  D omega_eff = ms / mp; // ACTUAL ratio for the discharge (R1 pins ms itself)
+  const bool crit_active = s.v > 0.0;
+  const bool jet_active = s.v < 1.0;
+
+  D omega_crit = D::constant(0.0);
+  D p03_crit = D::constant(0.0);
+  D s_sub = D::constant(1.0);
+  if (crit_active) {
+    auto entr = ejector_entrainment_ratio_and_jacobian(p_g_v, t_g_v, p_e_v, t_e_v, geom, gamma);
+    omega_crit = ejector_chain<9>(entr.value.omega,
+                                  {{entr.domega_dp_g, p_g},
+                                   {entr.domega_dt_g, t_g},
+                                   {entr.domega_dp_e, p_e},
+                                   {entr.domega_dt_e, t_e}});
+    auto pc = ejector_critical_back_pressure_and_jacobian(
+        p_g_v, t_g_v, p_e_v, t_e_v, geom, gamma, r_gas, 1.0);
+    p03_crit = ejector_chain<9>(pc.value.p_mixed_stagnation_pa,
+                                {{pc.dpc_dp_g, p_g},
+                                 {pc.dpc_dt_g, t_g},
+                                 {pc.dpc_dp_e, p_e},
+                                 {pc.dpc_dt_e, t_e}});
+    s_sub = ejector_smootherstep<9>(p_out / (recovery_efficiency * p03_crit), s_sub_lo, s_sub_hi);
+  }
+
+  D ms_sec = D::constant(0.0);
+  D p03_jet = D::constant(0.0);
+  if (jet_active) {
+    auto sec = ejector_cd_nozzle_mass_flow_and_jacobian(
+        p_e_v, t_e_v, p_py_v, area_secondary, area_secondary, gamma, r_gas, eta_secondary,
+        eps_frac);
+    ms_sec = ejector_chain<9>(
+        sec.mdot, {{sec.dmdot_dp0, p_e}, {sec.dmdot_dt0, t_e}, {sec.dmdot_dp_py, p_py}});
+    auto jp = ejector_jetpump_discharge_and_jacobian(
+        p_g_v, t_g_v, p_e_v, t_e_v, p_py_v, omega_eff.v, gamma, 1.0);
+    p03_jet = ejector_chain<9>(jp.p03,
+                               {{jp.dp03_dp_g, p_g},
+                                {jp.dp03_dt_g, t_g},
+                                {jp.dp03_dp_e, p_e},
+                                {jp.dp03_dt_e, t_e},
+                                {jp.dp03_dp_py, p_py},
+                                {jp.dp03_domega, omega_eff}});
+  }
+
+  // R1: blended entrainment  ms = s*omega_crit*mp + (1-s)*ms_sec.
+  D ms_model = s * omega_crit * mp + (1.0 - s) * ms_sec;
+  D r1 = ms - ms_model;
+
+  // R2: mass conservation.
+  D r2 = mdot_out - mp - ms;
+
+  // R3: regime-dependent closure of the owned unknown (see ejector_element.py
+  // for the w_pin table). discharge = recovery * blend(P_c*, P03_jet) by
+  // s_choke; w_pin = 1 - s*(1 - s_sub) is the weight on the outlet-pin form.
+  D discharge = recovery_efficiency * (s * p03_crit + (1.0 - s) * p03_jet);
+  D w_pin = 1.0 - s * (1.0 - s_sub);
+  D lhs = w_pin * p_out + (1.0 - w_pin) * p_py;
+  D r3 = lhs - discharge;
+
+  EjectorElementResidualJacobian out;
+  const D rows[4] = {r0, r1, r2, r3};
+  for (int i = 0; i < 4; ++i) {
+    out.residuals[i] = rows[i].v;
+    for (int j = 0; j < 9; ++j) out.jacobian[i][j] = rows[i].d[j];
+  }
+  return out;
 }
 
 } // namespace combaero::solver

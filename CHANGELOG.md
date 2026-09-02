@@ -19,9 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   failing or landing on a spurious double-choked root with the primary pressure
   below the back pressure. The regime is selected smoothly by two smootherstep
   weights (`s_choke` on `mp / mdot_choked`, `s_sub` on `outlet.Pt / P_c*`) with
-  no branching discontinuity, all four residual rows keep a full analytic
-  Jacobian via the C++ `(f, J)` path, and the critical regime is exactly the
-  limit of the new blend so existing critical-mode behaviour is unchanged.
+  no branching discontinuity, and the whole 4-row residual system plus its
+  analytic Jacobian are assembled in C++ (a single
+  `ejector_element_residuals_and_jacobian` chaining the scalar closures through
+  a forward-mode `DualN<9>`), matching the whole-element `(f, J)` practice of
+  the base `MultiPortChamberElement`/`TeeJunctionElement`; the Python element is
+  a thin relabeling shim. The critical regime is exactly the limit of the new
+  blend so existing critical-mode behaviour is unchanged.
   `diagnostics()` now reports the ACTUAL entrainment ratio (`omega = ms/mp`,
   regime-independent), a `critical_mode` regime flag, the mixing-plane pressure
   `p_py_pa`, and suppresses the critical-only `p_c_star_pa`/`omega_critical`

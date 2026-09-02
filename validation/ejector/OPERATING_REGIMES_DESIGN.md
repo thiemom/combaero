@@ -508,6 +508,27 @@ critical mode (`critical_mode = 1`). Regression tests:
 `test_ejector_runner_solves_unchoked_jet_pump_regime` and the retained cold
 critical solve.
 
+**Assembly moved to C++ (whole-element (f, J)).** The 4-row blend was first
+assembled in Python via a forward-mode dual (`_D`) chaining the C++ scalar
+closures' partials -- correct and FD-validated, but a pattern used by no other
+element. A repo survey established that the house practice for a multi-row
+COUPLED junction is whole-element `(f, J)` in C++ (the base
+`MultiPortChamberElement` and `TeeJunctionElement` both do this; the ejector is
+a `MultiPortChamberElement` subclass), so the assembly was ported to a single
+C++ function `ejector_element_residuals_and_jacobian` (`src/ejector.cpp`) that
+seeds a `DualN<9>` over the nine unknowns and runs the identical smootherstep /
+branch-skip / `w_pin` blend, returning the 4 residuals + a 4x9 Jacobian. The
+Python `residuals()` is now a thin relabeling shim (physical-flow signs +
+seed->column names), mirroring the base class. The C++ output is **bit-identical**
+to the retired Python dual (residuals to 0.0, Jacobian to ~1e-11 round-off,
+across jet-pump / critical / non-converged points) since it is the same
+chain-rule over the same closures; and it is FD-checked directly in
+`tests/test_ejector_jacobians.cpp::ElementResidualsMatchCentralDifference`. The
+`_and_jacobian` scalar closures and this element function are solver-internal
+(`combaero._solver_tools`), a tier below the documented public API, so no
+`units_data.h` / `API_*.md` entry is required (consistent with the other
+ejector closures).
+
 ## 7. References
 
 - Huang, Chang, Wang, Petrenko (1999), *A 1-D analysis of ejector performance*,
@@ -680,4 +701,6 @@ seeding `Pt_p = outlet.Pt`.
 retained critical residual/Jacobian/network tests) and
 `python/tests/test_gui_ejector.py::test_ejector_runner_solves_unchoked_jet_pump_regime`
 (the reported low-flow case -> `omega ~ 6.6`, `s_choke = 0`, `dp >= 0`)
-alongside the retained cold critical solve.
+alongside the retained cold critical solve. The C++ whole-element assembly is
+FD-guarded by
+`tests/test_ejector_jacobians.cpp::ElementResidualsMatchCentralDifference`.

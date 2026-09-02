@@ -32,6 +32,7 @@ ejector_cd_nozzle_mass_flow_and_jacobian = _core.ejector_cd_nozzle_mass_flow_and
 ejector_cd_nozzle_exit_static_and_jacobian = _core.ejector_cd_nozzle_exit_static_and_jacobian
 ejector_choked_mass_flow_and_jacobian = _core.ejector_choked_mass_flow_and_jacobian
 ejector_critical_back_pressure_and_jacobian = _core.ejector_critical_back_pressure_and_jacobian
+ejector_element_residuals_and_jacobian = _core.ejector_element_residuals_and_jacobian
 ejector_entrainment_ratio_and_jacobian = _core.ejector_entrainment_ratio_and_jacobian
 ejector_jetpump_discharge_and_jacobian = _core.ejector_jetpump_discharge_and_jacobian
 enthalpy_and_jacobian = _core.enthalpy_and_jacobian
@@ -86,6 +87,7 @@ __all__ = [
     "ejector_cd_nozzle_exit_static_and_jacobian",
     "ejector_choked_mass_flow_and_jacobian",
     "ejector_critical_back_pressure_and_jacobian",
+    "ejector_element_residuals_and_jacobian",
     "ejector_entrainment_ratio_and_jacobian",
     "ejector_jetpump_discharge_and_jacobian",
     "enthalpy_and_jacobian",

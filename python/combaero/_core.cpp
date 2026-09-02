@@ -351,13 +351,16 @@ PYBIND11_MODULE(_core, m) {
         "Border-Carnot turning loss: Pt_in - Pt_out - L*0.5*rho*u^2 = 0 with "
         "L = 4*(1 - cos((3/4)*delta_geom))^2 (Hager sharp-edge correction).");
 
-  // Ejector (critical-mode supersonic ejector on the MultiPortChamberElement
-  // topology). Physics + analytic Jacobians in include/ejector.h; Jacobians
-  // are w.r.t. the 4 thermodynamic inputs (p_g, t_g, p_e, t_e) only -- gamma,
-  // r_gas, geometry and recovery_efficiency are frozen coefficients here.
-  // Area ratios are passed as plain doubles (a lambda builds the internal
-  // EjectorGeometry), keeping the Python call flat like the other solver
-  // bindings.
+  // Ejector (supersonic ejector on the MultiPortChamberElement topology,
+  // spanning the critical / subcritical / unchoked jet-pump regimes). Physics
+  // + analytic Jacobians in include/ejector.h. The critical-mode scalar
+  // closures expose Jacobians w.r.t. the 4 thermodynamic inputs (p_g, t_g,
+  // p_e, t_e); the operating-regime closures add the P_py / omega / m_dot
+  // partials, and ejector_element_residuals_and_jacobian returns the whole
+  // 4-row element system w.r.t. all nine unknowns. gamma, r_gas, geometry and
+  // recovery_efficiency are frozen coefficients here. Area ratios are passed
+  // as plain doubles (a lambda builds the internal EjectorGeometry), keeping
+  // the Python call flat like the other solver bindings.
   py::class_<solver::EjectorEntrainmentResult>(
       m, "EjectorEntrainmentResult",
       "Value outputs of ejector_entrainment_ratio (Huang 1999 Eqs. 1-8)")
@@ -499,6 +502,41 @@ PYBIND11_MODULE(_core, m) {
       py::arg("r_gas"), py::arg("recovery_efficiency"),
       "Critical back pressure P_c* with analytic Jacobian.\n\n"
       "Returns: EjectorCriticalPressureJacobian (value + dpc_d{p_g,t_g,p_e,t_e})");
+
+  py::class_<solver::EjectorElementResidualJacobian>(
+      m, "EjectorElementResidualJacobian",
+      "4-row ejector element residual system + Jacobian. `residuals` is [R0, "
+      "R1, R2, R3]; `jacobian` is jacobian[row][seed] over the 9 unknowns "
+      "(mp, ms, mdot_out, p_g, t_g, p_e, t_e, p_out, p_py).")
+      .def_readonly("residuals", &solver::EjectorElementResidualJacobian::residuals)
+      .def_readonly("jacobian", &solver::EjectorElementResidualJacobian::jacobian);
+
+  m.def(
+      "ejector_element_residuals_and_jacobian",
+      [](double mp, double ms, double mdot_out, double p_g, double t_g,
+         double p_e, double t_e, double p_out, double p_py,
+         double area_ratio_nozzle, double area_ratio_mix, double area_throat,
+         double area_nozzle_exit, double area_secondary, double gamma,
+         double r_gas, double eta_primary, double eta_secondary,
+         double recovery_efficiency, double eps_frac, double s_choke_lo,
+         double s_choke_hi, double s_sub_lo, double s_sub_hi) {
+        return solver::ejector_element_residuals_and_jacobian(
+            mp, ms, mdot_out, p_g, t_g, p_e, t_e, p_out, p_py,
+            solver::EjectorGeometry{area_ratio_nozzle, area_ratio_mix},
+            area_throat, area_nozzle_exit, area_secondary, gamma, r_gas,
+            eta_primary, eta_secondary, recovery_efficiency, eps_frac,
+            s_choke_lo, s_choke_hi, s_sub_lo, s_sub_hi);
+      },
+      py::arg("mp"), py::arg("ms"), py::arg("mdot_out"), py::arg("p_g"),
+      py::arg("t_g"), py::arg("p_e"), py::arg("t_e"), py::arg("p_out"),
+      py::arg("p_py"), py::arg("area_ratio_nozzle"), py::arg("area_ratio_mix"),
+      py::arg("area_throat"), py::arg("area_nozzle_exit"),
+      py::arg("area_secondary"), py::arg("gamma"), py::arg("r_gas"),
+      py::arg("eta_primary"), py::arg("eta_secondary"),
+      py::arg("recovery_efficiency"), py::arg("eps_frac"), py::arg("s_choke_lo"),
+      py::arg("s_choke_hi"), py::arg("s_sub_lo"), py::arg("s_sub_hi"),
+      "Whole-element 4-row ejector (f, J) across all three operating regimes.\n\n"
+      "Returns: EjectorElementResidualJacobian (residuals[4] + jacobian[4][9])");
 
   // Area change elements
   py::class_<combaero::AreaChangeResult>(
