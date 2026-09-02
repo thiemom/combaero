@@ -8,6 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Ejector operating-regime extension wired into `EjectorElement` (Phase 2).**
+  The network `EjectorElement` now resolves all three physical regimes in one
+  C1 Newton-solvable residual system instead of the critical (double-choked)
+  plateau only: critical, subcritical droop, and the unchoked-primary subsonic
+  jet pump. A previously non-converging network -- a low primary mass flow
+  (below the choke threshold at its back pressure) drawing suction against
+  atmospheric -- now converges to the physical jet-pump root (primary Pt floats
+  to ~the back pressure, `dp >= 0`, entrainment ratio `omega ~ 7`) instead of
+  failing or landing on a spurious double-choked root with the primary pressure
+  below the back pressure. The regime is selected smoothly by two smootherstep
+  weights (`s_choke` on `mp / mdot_choked`, `s_sub` on `outlet.Pt / P_c*`) with
+  no branching discontinuity, all four residual rows keep a full analytic
+  Jacobian via the C++ `(f, J)` path, and the critical regime is exactly the
+  limit of the new blend so existing critical-mode behaviour is unchanged.
+  `diagnostics()` now reports the ACTUAL entrainment ratio (`omega = ms/mp`,
+  regime-independent), a `critical_mode` regime flag, the mixing-plane pressure
+  `p_py_pa`, and suppresses the critical-only `p_c_star_pa`/`omega_critical`
+  when the primary is unchoked. `verify_solution_consistent` no longer demotes
+  subcritical/jet-pump solutions (all regimes are now modeled). The GUI ejector
+  warm-start seeds the jet-pump operating point when the primary cannot choke.
+  See `validation/ejector/OPERATING_REGIMES_DESIGN.md` sec 6c/8.3.
 - **Ejector unchoked-primary jet-pump reference closure (Phase 1B of the
   operating-regime extension).** `jet_pump_entrainment_ratio` in
   `combaero.network._ejector_huang1999` (re-exported from

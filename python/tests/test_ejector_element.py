@@ -286,32 +286,57 @@ def test_residuals_jacobian_matches_finite_difference(monkeypatch):
     assert checked >= 12
 
 
-def test_diagnostics_reports_omega_and_critical_mode():
+def test_diagnostics_reports_actual_omega_and_regime():
     e = _element()
     e._port_element_ids = ["chan_p", "chan_s", "chan_o"]
     primary, secondary, outlet = _states()
+    # Actual entrainment ratio is now reported directly from the port flows
+    # (regime-independent), NOT the choked-mode model value.
     port_mdots = [-0.5, -0.3, 0.8]
     diag = e.diagnostics([primary, secondary, outlet], 100000.0, port_mdots)
-    assert 0.0 < diag["omega"] < 5.0
+    assert diag["omega"] == pytest.approx(0.3 / 0.5)  # ms / mp
     assert diag["gamma"] == pytest.approx(1.4, abs=0.05)  # air
     assert diag["r_gas"] == pytest.approx(287.0, abs=1.0)  # air
     assert diag["m_dot_primary"] == pytest.approx(0.5)
     assert diag["m_dot_secondary"] == pytest.approx(0.3)
     assert diag["m_dot_outlet"] == pytest.approx(0.8)
-    # outlet Pt (40 kPa) vs P_jct guess (100 kPa): still "critical" by this metric.
+    # Primary at 700 kPa is choked (s_choke -> 1) and the outlet (40 kPa) is
+    # below the ejector's P_c*: the double-choked critical plateau.
+    assert diag["s_choke"] == pytest.approx(1.0)
     assert diag["critical_mode"] == 1.0
+    assert diag["p_c_star_pa"] > float(outlet.Pt)
 
 
-def test_verify_solution_consistent_flags_subcritical():
+def test_diagnostics_reports_jet_pump_regime():
+    # A near-atmospheric primary that cannot choke: the unchoked jet-pump
+    # regime. s_choke -> 0 and the critical-only fields are suppressed.
     e = _element()
-    sol_ok = {"ej1.P_jct": 100000.0, "o.Pt": 40000.0}
-    sol_bad = {"ej1.P_jct": 40000.0, "o.Pt": 100000.0}
-    assert e.verify_solution_consistent(sol_ok) is True
-    assert e.verify_solution_consistent(sol_bad) is False
+    e._port_element_ids = ["chan_p", "chan_s", "chan_o"]
+    primary = NetworkMixtureState(
+        P=101325.0, Pt=101325.0, T=300.0, Tt=300.0, m_dot=0.0, Y=_DRY_AIR_Y
+    )
+    secondary = NetworkMixtureState(
+        P=101325.0, Pt=101325.0, T=300.0, Tt=300.0, m_dot=0.0, Y=_DRY_AIR_Y
+    )
+    outlet = NetworkMixtureState(
+        P=101325.0, Pt=101325.0, T=300.0, Tt=300.0, m_dot=0.0, Y=_DRY_AIR_Y
+    )
+    port_mdots = [-0.0051, -0.0338, 0.0389]
+    diag = e.diagnostics([primary, secondary, outlet], 100142.0, port_mdots)
+    assert diag["s_choke"] == pytest.approx(0.0)
+    assert diag["critical_mode"] == 0.0
+    assert diag["omega"] == pytest.approx(0.0338 / 0.0051)
+    # Critical-only diagnostics are NaN here and are not reported.
+    assert "p_c_star_pa" not in diag
 
 
-def test_verify_solution_consistent_true_on_missing_keys():
+def test_verify_solution_consistent_always_true_all_regimes_modeled():
+    # The subcritical/jet-pump regimes are now MODELED (not demoted): the old
+    # "outlet exceeds P_c* -> inconsistent" check is gone, so verification is
+    # unconditionally satisfied once the residual system has converged.
     e = _element()
+    assert e.verify_solution_consistent({"ej1.P_jct": 100000.0, "o.Pt": 40000.0}) is True
+    assert e.verify_solution_consistent({"ej1.P_jct": 40000.0, "o.Pt": 100000.0}) is True
     assert e.verify_solution_consistent({}) is True
 
 

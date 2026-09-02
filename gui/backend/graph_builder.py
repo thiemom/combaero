@@ -479,6 +479,21 @@ def _seed_ejector_warmstart(
     p_e = float(sb.Pt) if isinstance(sb, PressureBoundary) else None
     p_o = float(ob.Pt) if isinstance(ob, PressureBoundary) else None
 
+    # Regime discriminator for the SEED. The choked-inverse p_g above is the
+    # primary stagnation the mass flow WOULD need to reach sonic at the throat.
+    # If that is below the outlet back pressure, the primary cannot choke (the
+    # forced mass flow is below choked_mass_flow(p_back)); the physical branch
+    # is the subsonic jet pump, where the primary Pt floats to ~the back
+    # pressure and the mixing pressure P_py sits just below it. Seeding the
+    # choked-inverse value there parks Newton in the (spurious) double-choked
+    # basin with Pt_primary < Pb, from which it stalls to nan. Detect that and
+    # seed the jet-pump operating point instead.
+    jetpump_seed = (
+        isinstance(pb, MassFlowBoundary) and p_g is not None and p_o is not None and p_g < p_o
+    )
+    if jetpump_seed:
+        p_g = p_o  # primary floats up to the back pressure (dp ~ 0)
+
     def _seed_node(node_id: str, value: float | None) -> None:
         if value is None or value <= 0.0:
             return
@@ -496,18 +511,28 @@ def _seed_ejector_warmstart(
     _seed_node(secondary_id, p_e)
     _seed_node(outlet_id, p_o)
 
-    if p_g and p_e:
+    # Seed the owned unknown P_jct (repurposed as the mixing-plane pressure
+    # P_py). In the jet-pump regime it sits just below the back pressure; in
+    # the critical regime the diagnostic critical back pressure P_c* is the
+    # right neighbourhood.
+    p_jct_seed: float | None = None
+    if jetpump_seed and p_o is not None:
+        p_jct_seed = 0.99 * p_o
+    elif p_g and p_e:
         try:
             geom = EjectorGeometry(ejector.area_ratio_nozzle, ejector.area_ratio_mix)
-            pc = critical_back_pressure(
-                p_g, t_g, p_e, t_e, geom, gamma, r_gas, ejector.recovery_efficiency
-            ).p_c_pa
-            guess = dict(getattr(ejector, "initial_guess", {}) or {})
-            if not any(k.endswith(".P_jct") for k in guess):
-                guess[f"{ejector.id}.P_jct"] = float(pc)
-                ejector.initial_guess = guess
+            p_jct_seed = float(
+                critical_back_pressure(
+                    p_g, t_g, p_e, t_e, geom, gamma, r_gas, ejector.recovery_efficiency
+                ).p_c_pa
+            )
         except Exception:
-            pass
+            p_jct_seed = None
+    if p_jct_seed is not None and p_jct_seed > 0.0:
+        guess = dict(getattr(ejector, "initial_guess", {}) or {})
+        if not any(k.endswith(".P_jct") for k in guess):
+            guess[f"{ejector.id}.P_jct"] = p_jct_seed
+            ejector.initial_guess = guess
 
 
 def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:

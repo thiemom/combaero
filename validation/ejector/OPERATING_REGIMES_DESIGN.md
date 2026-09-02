@@ -437,6 +437,77 @@ solver-dispatch change is needed**:
   regression: `gui/tmp/ejector_test_low_flow_not_converged.json` converges to
   `Pt_primary ~= Pb`, `dp >= 0`, `omega ~= 7`.
 
+## 6c. Phase 2 -- final implemented structure (supersedes 4b's "`P_py` DERIVED")
+
+**What actually shipped, and why 4b's derived-`P_py` plan was wrong.** During
+element assembly the 4b structure (`P_py` DERIVED from the primary nozzle
+inverse) converged but ALWAYS to the spurious double-choked artifact
+(`s_choke -> 1`, `omega ~ 33`), never the jet pump. Root cause: deriving
+`P_py = nozzle_inverse(mp, Pt_p)` makes `R0 = mp - cd_nozzle(Pt_p, P_py)`
+**VACUOUS in the unchoked branch** -- `P_py` is defined AS the exit static that
+makes the nozzle flow `mp`, so `R0 == 0` identically for any `Pt_p`. R0 then
+fails to pin `Pt_p`, and the solver slides to the choked basin. (Deriving `P_py`
+from the SECONDARY nozzle instead just moves the vacuity to R1.) The two nozzle
+relations genuinely share one `P_py`; it must be a free unknown for both to stay
+live.
+
+**Resolution -- `P_py` is the single owned unknown (NOT a second one).** The 4b
+rank spike ruled out `P_py` as a SECOND unknown carrying its own `R_py` row (that
+row is parallel to R0/R3 in the jet pump). But the base already owns exactly one
+scalar (`{id}.P_jct`) and emits N+1 = 4 rows -- the DOF the junction contract
+requires (4 rows - 3 skipped port-MCN mass rows - 1 owned = 0). So **repurpose
+that single owned unknown as `P_py`** (the mixing-plane static), add NO new row,
+and let R0/R1/R3 close it through the network coupling. Full rank, DOF-balanced,
+no solver-dispatch change. Shipped rows (`s = s_choke`):
+
+    R0 = mp - cd_nozzle(Pt_p, P_py, A_t, A_e)                  primary C-D nozzle
+    R1 = ms - [s*omega_crit*mp + (1 - s)*ms_sec(P_py)]         blended entrainment
+    R2 = mdot_out - mp - ms                                    mass conservation
+    R3 = [w_pin*outlet.Pt + (1 - w_pin)*P_py] - recovery*discharge
+         discharge = s*P_c* + (1 - s)*p03_jetpump(P_py, omega_eff = ms/mp)
+         w_pin     = 1 - s*(1 - s_sub)
+         s_sub     = smootherstep(outlet.Pt / (recovery*P_c*), 0.98, 1.02)
+
+**`R3` is regime-dependent by `w_pin`** -- this is the key correction over 4b's
+unconditional `outlet.Pt = recovery*discharge` pin, which BROKE critical mode
+(it over-constrains a genuine double-choked point whose outlet is legitimately
+below `P_c*`, forcing `outlet.Pt = recovery*P_c*` against the fixed downstream
+boundary -> `|F|` stall). The three regimes:
+
+  * jet pump (`s=0`) and subcritical droop (`s=1, outlet > P_c*, s_sub=1`):
+    `w_pin = 1` -> pin `outlet.Pt`. The pin is what excludes the artifact
+    (its recovered discharge cannot match the imposed back pressure), and the
+    downstream boundary forces `P_py` through the pin, which R0/R1 turn into
+    `Pt_p` and entrainment.
+  * critical (`s=1, outlet < P_c*, s_sub=0`): `w_pin = 0` -> `P_py = recovery*P_c*`
+    (diagnostic) and the outlet floats free. This is exactly 4b's diagnostic
+    form, recovered as the `w_pin -> 0` limit, so all the existing critical-mode
+    element tests pass unchanged.
+
+**`0 * NaN` guard.** The critical closures (`entrainment_ratio`,
+`critical_back_pressure`) return NaN for an unchoked primary; since smootherstep
+is flat at `s in {0, 1}` the inactive branch's weight AND gradient vanish, but
+`0 * NaN = NaN` would still poison the value/Jacobian. Each branch is therefore
+evaluated ONLY where its weight is nonzero (`crit_active = s.v > 0`,
+`jet_active = s.v < 1`); the skipped branch is a hard-zero dual, C1-consistent
+with the flat endpoint. This was the concrete source of the `|F| = nan` stall
+before the guard.
+
+**Warm-start (jet-pump regime).** The GUI ejector warm-start seeds a mass-flow
+primary at its choked-inverse Pt; when that is BELOW the outlet back pressure
+the primary cannot choke, so it now seeds `Pt_p = outlet.Pt` (jet-pump branch)
+and `P_jct = 0.99*outlet.Pt` instead of the choked-inverse / `P_c*` seed. Cold
+Newton lands in the jet-pump basin directly (`graph_builder._seed_ejector_warmstart`).
+
+**Verified:** element Jacobian matches FD at the jet-pump root (the earlier
+`d(R3)/d(mc_p.Pt) = NaN` gone; the lone residual `e4.m_dot R3` "mismatch" is FD
+round-off on a genuinely ~0 partial). End-to-end: the reported low-flow network
+converges to `omega = 6.62`, `s_choke = 0`, `P_py = 100.1 kPa`, `Pt_p = Pb`
+(`dp = 0`); the 700/22.85/40 kPa double-choked reference still converges in
+critical mode (`critical_mode = 1`). Regression tests:
+`test_ejector_runner_solves_unchoked_jet_pump_regime` and the retained cold
+critical solve.
+
 ## 7. References
 
 - Huang, Chang, Wang, Petrenko (1999), *A 1-D analysis of ejector performance*,
@@ -555,3 +626,58 @@ reduction test landing 50% off before the fix.
 monotone convergence, ~1.4x Sanger overprediction, bounded reported-case omega,
 monotonicity, boundary flags, fixture regression) and the `jetpump_cases`
 section of the golden fixture.
+
+### 8.3 Phase 2 -- element integration (all three regimes in one solve)
+
+**Formulation & the two rejected structures.** The `EjectorElement` residuals
+were rebuilt to resolve critical / subcritical-droop / unchoked-jet-pump in one
+C1 Newton system (full structure in sec 6c). Two grounded structures were built
+and REJECTED with evidence: (a) the 4b "`P_py` DERIVED from the primary nozzle
+inverse" plan converged but ALWAYS to the double-choked artifact (`omega ~ 33`),
+because deriving `P_py` makes `R0` algebraically vacuous in the unchoked branch,
+so it stops pinning `Pt_p`; (b) an unconditional outlet-pin `R3` (right for the
+jet pump) BROKE genuine critical mode -- it forces `outlet.Pt = recovery*P_c*`
+against a fixed downstream boundary whose outlet is legitimately below `P_c*`,
+stalling at `|F| ~ 1.8e4`. The shipped structure owns `P_py` as the SINGLE
+repurposed junction unknown (no new row, DOF unchanged) and makes `R3`
+regime-dependent via `w_pin = 1 - s_choke*(1 - s_sub)`, recovering 4b's
+diagnostic form as the `w_pin -> 0` (critical) limit.
+
+**Why the artifact is a genuine math root and how it is excluded.** With a
+back-pressure-independent closure the choked artifact (`Pt_p < Pb`, primary
+sonic, `omega ~ 33`) satisfies R0-R2 and is a real root; only the OUTLET PIN
+excludes it -- its recovered discharge cannot match the imposed back pressure,
+so it is a non-root of the FULL network. The pin is active exactly where it must
+be (jet pump + droop) and off where it must be (critical).
+
+**Constant audit.** No new fitted constants. The only new numeric knobs are
+smootherstep windows: `s_choke in [0.90, 0.999]` on `mp/cap` (must SATURATE to
+exactly 1 at choke -- a non-saturating form leaves a ~10 Pa R3 residual and
+~0.3% omega error in critical, per 4b), and `s_sub in [0.98, 1.02]` on
+`outlet.Pt/(recovery*P_c*)` (centred on the physical critical/subcritical
+boundary `outlet = P_c*`). `recovery_efficiency` stays 1.0 (audited in 8.2).
+
+**Invariant preserved.** The pre-existing critical-mode element tests
+(`residuals` cross-check vs the reference physics, all-residuals-zero at the
+choked root, analytic-Jacobian-vs-FD, full double-choked network) pass
+UNCHANGED -- the critical regime is the `s_choke=1, s_sub=0` limit of the new
+blend. Mass conservation (`R2`) and `omega = ms/mp` (actual, regime-independent)
+hold at every root.
+
+**Dead ends.** Derived-`P_py` (vacuous R0) and unconditional outlet-pin (breaks
+critical), both above. Also a `0 * NaN = NaN` Jacobian poison from eagerly
+evaluating the critical closures (which return NaN for an unchoked primary) even
+at `s_choke = 0` -- fixed by evaluating each branch only where its weight is
+nonzero, C1-safe because smootherstep is flat at the endpoints. Also a warm-start
+that seeded the primary at its choked-inverse Pt (the artifact basin) for a
+mass-flow primary below the choke threshold -- fixed by detecting that case and
+seeding `Pt_p = outlet.Pt`.
+
+**Pinned by.** `python/tests/test_ejector_element.py` (new
+`test_diagnostics_reports_actual_omega_and_regime`,
+`test_diagnostics_reports_jet_pump_regime`,
+`test_verify_solution_consistent_always_true_all_regimes_modeled`, plus the
+retained critical residual/Jacobian/network tests) and
+`python/tests/test_gui_ejector.py::test_ejector_runner_solves_unchoked_jet_pump_regime`
+(the reported low-flow case -> `omega ~ 6.6`, `s_choke = 0`, `dp >= 0`)
+alongside the retained cold critical solve.
