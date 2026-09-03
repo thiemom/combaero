@@ -42,8 +42,10 @@ inline constexpr double HAGER_FRACTION = 0.75;
 inline constexpr double MACH_CHOKE_THRESHOLD = 0.95;
 
 // Border-Carnot dynamic-head prefactor in L_i = 4 * (1 - cos(theta_eff))^2.
-// PDF Section 3.1: the squared form (vs the naive 2*(1-cos(theta)) linear
-// form) reproduces Hager xi_l and Bassett K_inc exactly at M -> 0.
+// PDF Section 3.1 claims the squared form (vs the naive 2*(1-cos(theta))
+// linear form) reproduces Hager xi_l and Bassett K_inc exactly at M -> 0.
+// That claim is UNVERIFIED in this repo: the Tier-1 tests are xfail at
+// 11-29% deviation on the lateral (see issue #272).
 inline constexpr double BC_LOSS_PREFACTOR = 4.0;
 
 // -----------------------------------------------------------------------------

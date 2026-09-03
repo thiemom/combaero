@@ -27,7 +27,10 @@ What's worth verifying here:
 
 Tier-1 (Hager / Bassett digitised CSVs under docs/bassett/) and Tier-2
 (Perez-Garcia / Wang compressible reference data under docs/junction/) are
-the strict numerical validations; they live in separate test files (TBD).
+the strict numerical validations. Tier-1 lives in
+test_momentum_cv_tier1_bassett.py and is currently xfail -- the momentum-CV
+match at M -> 0 that the PDF promises is NOT established (issue #272).
+Tier-2 has reference data but no tests yet.
 This file is the qualitative agreement check.
 """
 

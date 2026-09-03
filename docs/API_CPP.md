@@ -842,9 +842,10 @@ MultiPortChamberResult multi_port_chamber_residuals_and_jacobian(
     const std::vector<double>& A);
 
 // Two-port in-line loss element: Pt_in - Pt_out - L*0.5*rho*u_in^2 = 0.
-// L applies the Hager (3/4) effective-angle correction; reproduces Hager xi_l
-// and Bassett K_inc exactly at M -> 0 on a sharp-edged lateral. Sign-free in
-// mdot (mdot^2 in the dynamic head).
+// L applies the Hager (3/4) effective-angle correction, INTENDED to reproduce
+// Hager xi_l and Bassett K_inc at M -> 0 on a sharp-edged lateral -- unverified,
+// Tier-1 tests xfail at 11-29% deviation (issue #272). Sign-free in mdot
+// (mdot^2 in the dynamic head).
 BorderCarnotLossResult border_carnot_loss_residual_and_jacobian(
     double mdot,
     double Pt_in, double Pt_out,

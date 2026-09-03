@@ -1,36 +1,56 @@
 """
 Tier 1 validation: MPCE + BorderCarnotLoss vs Bassett 2001 / Hager 1984 at M -> 0.
 
-STATUS: tests are xfail. The PDF Section 3.4 claim "MPCE + loss element form 2
-reproduces Hager exactly at M -> 0" does NOT hold empirically as set up here.
+STATUS: both K tests are xfail. The PDF Section 3.4 claim "MPCE + loss element
+form 2 reproduces Hager exactly at M -> 0" does NOT hold. Tracked as issue #272.
 
-The disagreement could come from EITHER of two sources (or both); this file
-does not yet disentangle them:
+MEASURED (2026-09-03, sin^2(theta) impulse + cross-coupling in place, imposed-q
+network below, M_com = 0.025 throughout). K is defined here as
+(Pt_com - Pt_port) / q_dyn_com, so positive K = stagnation loss:
 
-1. PDF formula mismatch (algebra).
-   MPCE impulse + MCN KE coupling gives, at equal areas low Mach:
-     K_straight_MPCE = q^2 - 2*q          (not Hager xi_t = q^2 - 0.5*q)
-     K_lateral_MPCE  = q^2 - 1            (not Bassett K6 = q^2 + 1 - 0.7654*q)
-   Form-2 BorderCarnotLoss adds K_loss = L*q^2 with constant L for the
-   lateral; no constant L makes (1+L)*q^2 - 1 equal Bassett K6 across q.
+    q     K_str   Bassett K2    K_lat   Bassett K6   K_lat bounded-LM
+   0.25   0.4375     0.1875     0.7751     0.8712        0.6799
+   0.50   0.7500     0.0000     0.8657     0.8673        0.4847
+   0.75   0.9375    -0.0625     1.2719     0.9885        0.4145
 
-2. Solver finding a degenerate near-root.
-   The momentum-CV junction has multiple near-singular directions in its
-   Jacobian (sum-mass residual lives in a left-null direction of the
-   pressure block; impulse residuals are sign-free so flow direction can
-   flip). Newton lands on whichever locally-zero residual basin is
-   closest to the initial guess; that basin may not be the physically
-   correct root. We see this in the smoke tests too (test_three_port_*).
+Two SEPARATE problems, not one. Earlier revisions of this docstring framed it
+as a single undisentangled question and quoted formulas from a model version
+that predates the sin^2(theta) + cross-coupling integration; both are corrected
+here against the numbers above.
 
-Resolution requires both:
-- Verifying converged residual norm matches PDF expectations at the imposed q
-  (rules out solver degeneracy), AND
-- Either (a) revisiting the loss-element form (linear-in-q? referenced to
-  q_common not q_local?) or (b) accepting the PDF spec as approximate.
+1. K_straight: a MODEL gap, and the cleaner of the two.
+   The sin^2(theta) projection gives exactly K_str = 2*q - q^2 (reproduced to
+   4 decimals in the table, under BOTH the default and the bounded solver --
+   it is solver-independent), against Bassett K2 = q^2 - 1.5*q + 0.5. These
+   are different functions, not a tuning discrepancy: they cross zero in
+   different places and have opposite slope over Bassett's range. Either the
+   straight-port projection is wrong, or Bassett K2 is outside what the
+   impulse formulation can represent. That decision has not been made.
+   (Note the sign convention: 2*q - q^2, NOT the q^2 - 2*q quoted by older
+   comments -- the measured values are positive.)
 
-Tier 1 is foundational: until this is sorted, Tier 2 (Pérez-García / Wang
+2. K_lateral: closer, and NOT explained by solver basin choice.
+   The default solver agrees with Bassett K6 to 11.0% / 0.2% / 28.7% at
+   q = 0.25 / 0.5 / 0.75 -- it fails the 20%-or-0.15-absolute tolerance only
+   at q = 0.75. An earlier hypothesis held that bounds (enforcing physically
+   forward flow) would fix this; experimental_bounded_solver.py tests it and
+   the answer is NO -- bounded least_squares converges cleanly (|F| ~ 1e-11)
+   and lands FARTHER from K6 (22% / 44% / 58%), i.e. worse than the default
+   solver at every q. Degenerate-root selection is therefore ruled out as the
+   explanation, and the remaining candidates are the loss-element form or the
+   cross-coupling projection.
+
+Both xfails are strict=False, so they will not fail loudly if a change happens
+to fix them; re-check the table above after touching the junction closure.
+
+Tier 1 is foundational: until this is sorted, Tier 2 (Perez-Garcia / Wang
 compressible) rides on a low-Mach baseline that already disagrees with the
 canonical reference. See docs/junction/tier2_reference_data.md.
+
+Regenerate the table by calling _extract_K_at_imposed_q(q) below for the
+default-solver columns, and with
+  uv run pytest python/tests/experimental_bounded_solver.py -s
+for the bounded-LM column.
 """
 
 import math
@@ -153,12 +173,12 @@ def _extract_K_at_imposed_q(q: float) -> dict[str, float]:
 
 @pytest.mark.xfail(
     reason=(
-        "MPCE+cross-coupling reproduces Bassett K6 within ~15% under bounded "
-        "least_squares (see experimental_bounded_solver.py). The default "
-        "NetworkSolver (hybr -> LM) lands on a different basin for this "
-        "imposed-q setup -- the Newton problem is harder with cross-coupling "
-        "active. Switching the production solver to bounded LM for MPCE "
-        "networks is a separate work item."
+        "K_lateral agrees with Bassett K6 to 11.0% / 0.2% / 28.7% at "
+        "q = 0.25 / 0.5 / 0.75 -- only q=0.75 misses the tolerance. Bounds "
+        "do NOT explain the gap: experimental_bounded_solver.py converges to "
+        "|F| ~ 1e-11 and lands farther out (22% / 44% / 58%), so degenerate-"
+        "root selection is ruled out. Remaining candidates are the loss-"
+        "element form and the cross-coupling projection. Issue #272."
     ),
     strict=False,
 )
@@ -166,10 +186,9 @@ def test_low_mach_K_lateral_agrees_with_bassett_K6():
     """Sweep q over Bassett's range, compare K_lateral to K6.
 
     With sin^2(theta) impulse + cross-coupling (Bassett axial momentum +
-    wall reaction Eq 3-4) integrated into MPCE, K_lat matches Bassett
-    K6 = 1 + q^2 - 2*q*cos((3/4)*theta) within ~15% under the bounded LM
-    solver. With the default solver it lands on a different basin -- see
-    xfail reason.
+    wall reaction Eq 3-4) integrated into MPCE, K_lat tracks Bassett
+    K6 = 1 + q^2 - 2*q*cos((3/4)*theta) closely at low q and diverges as q
+    rises. See the module docstring for the measured table.
     """
     results = []
     for q in [0.25, 0.5, 0.75]:
@@ -198,9 +217,12 @@ def test_low_mach_K_lateral_agrees_with_bassett_K6():
 
 @pytest.mark.xfail(
     reason=(
-        "Empirically MPCE alone does not reproduce Hager xi_t / Bassett K2 "
-        "at M -> 0. Could be PDF formula mismatch or solver degeneracy. "
-        "See module docstring."
+        "MODEL gap, not solver degeneracy: the sin^2(theta) projection gives "
+        "exactly K_str = 2*q - q^2 under BOTH the default and the bounded "
+        "solver, against Bassett K2 = q^2 - 1.5*q + 0.5 -- different "
+        "functions, opposite slope over Bassett's range. Either the "
+        "straight-port projection is wrong or K2 is outside what the impulse "
+        "formulation can represent; undecided. Issue #272."
     ),
     strict=False,
 )
