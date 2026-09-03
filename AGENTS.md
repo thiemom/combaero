@@ -9,7 +9,7 @@ This file provides instructions for AI coding agents (OpenAI Codex, Cursor, etc.
 - **No manual edits to auto-generated files.** `docs/UNITS.md` and `include/thermo_transport_data.h` are generated — edit their sources and re-run the generator scripts.
 - **API sync is mandatory.** Adding, removing, or changing any function, property, or unit requires updating `include/units_data.h` and the relevant API reference (`docs/API_CPP.md` or `docs/API_PYTHON.md`) in the same commit.
 - **CHANGELOG is mandatory.** Every user-visible change (feature, bug fix, breaking change) must get an entry under `[Unreleased]` in `CHANGELOG.md` in the same commit. Use sub-headings Added / Changed / Fixed / Removed. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). At release time the maintainer promotes `[Unreleased]` to `[x.y.z] - YYYY-MM-DD`.
-- **Documentation hygiene.** Follow `docs/HYGIENE.md`. Archive feature reports to `docs/archive/`; keep core guides high-signal.
+- **Documentation hygiene.** Active references (API, build, workflow, schemas) live in `docs/`; archive feature reports and design records to `docs/archive/`. Keep core guides high-signal — a doc points at the file that owns a fact rather than transcribing it.
 - **Unit sync test.** Every exported Python symbol needs a `units_data.h` entry, or an explicit `IGNORE_LIST` entry in `python/tests/test_units_sync.py`.
 - **Solver (f, J) rule.** Solver-facing calculations must expose a C++ PyBind11 API returning `std::tuple<double, double>` (value, derivative). Use analytical chain-rule derivatives; no finite differences exposed to Python.
 - **Define Once.** Physics constants go as `constexpr` in the relevant public header namespace — never as magic numbers in `.cpp` files.
