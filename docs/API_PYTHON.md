@@ -555,6 +555,47 @@ ejector = EjectorElement(
 # regime is modeled.
 ```
 
+### Flow-Area Inference
+
+Components that need a reference flow area infer one from the topology when you
+do not supply it. Inference searches the neighbourhood of the attached nodes:
+channels first (so networks that resolved before resolve identically), then any
+other area-bearing element (`AreaChangeElement`, `TeeJunctionElement`,
+`BorderCarnotLossElement`, `PressureLossElement`), then adjacent nodes whose
+area you set explicitly (`MomentumChamberNode`, `CombustorNode`). An area that
+was itself auto-sized is never used as a source -- inheriting a placeholder
+would launder one guess into another.
+
+What happens when nothing can be inferred depends on what the area means:
+
+| Component | Parameter | Unresolvable |
+|---|---|---|
+| `AreaChangeElement` | `F0`, `F1` | **raises** |
+| `ChannelElement` | `diameter` | **raises** |
+| `TeeJunctionElement` | `F_C` | **raises** |
+| `BorderCarnotLossElement` | `area` | **raises** |
+| `MomentumChamberNode` | `area` | nominal default |
+| `CombustorNode` | `area` | nominal default |
+| `PressureLossElement` | `area` | nominal default, warns if a head-loss correlation reads it |
+
+The first group raises because the area *is* the geometry being modelled -- a
+default there invents a contraction or expansion the network does not contain,
+and the solver either stalls on it or converges to a confidently wrong answer.
+The second group defaults because the area is only a dynamic-head reference and
+a network can legitimately never read it.
+
+```python
+# Unresolvable -> a named error saying which parameter clears it
+AreaChangeElement("expansion", "plenum_a", "plenum_b")
+# ValueError: AreaChangeElement 'expansion': cannot determine upstream area F0
+# -- no neighbouring channel, area-bearing element or node with a known area
+# was found at 'plenum_a'. Set upstream area F0 explicitly ...
+
+# Either fix clears it: set the value, or give a neighbour a known area
+AreaChangeElement("expansion", "plenum_a", "plenum_b", F0=0.05, F1=0.08)
+MomentumChamberNode("chamber", area=0.15)  # neighbour the area change can read
+```
+
 ### Combustion Integration
 ```python
 from combaero.network.combustion import (

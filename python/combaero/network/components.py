@@ -475,6 +475,146 @@ class NetworkMixtureState:
         return cp / cv if cv > 0 else 1.4
 
 
+#: Nominal cross-section for a chamber-like node whose area could not be
+#: inferred and which nothing in the network measures against. It is a
+#: bookkeeping placeholder, not a geometry: components for which the area IS
+#: the physics (AreaChangeElement, ChannelElement, TeeJunctionElement) refuse
+#: to default and raise instead. Any consumer of a defaulted area reports
+#: ``area_source = "default"`` in its diagnostics (issue #262).
+DEFAULT_CHAMBER_AREA = 0.1
+
+
+# ---------------------------------------------------------------------------
+# Flow-area inference
+# ---------------------------------------------------------------------------
+# Elements and nodes that need a reference flow area infer one from the
+# topology when the user did not supply it.  Historically every such site
+# searched for a neighbouring ChannelElement only and, failing that, fell back
+# to a hard-coded constant (0.01 / 0.02 / 0.1 m^2).  Those constants trace to
+# "something had to be there", not to any geometry: with a non-channel
+# neighbour -- a momentum chamber, a combustor, an ejector outlet -- the
+# fallback fabricated an area change that never existed, and the resulting
+# residual is unsatisfiable at the real mass flow, so the solver stalls with a
+# message that blames the solver rather than the geometry (issue #262).
+#
+# _infer_flow_area consults every area-bearing neighbour instead.  Channels
+# keep the highest priority so that networks which resolved before resolve to
+# the same area now.
+
+
+def _known_node_area(node: "NetworkNode | None") -> float | None:
+    """Flow area of a node, but only when it is genuinely known.
+
+    A node whose area was auto-sized rather than user-supplied
+    (``_auto_area``) carries a placeholder, not a measurement; inferring from
+    it would launder one guess into another.
+    """
+    if node is None or getattr(node, "_auto_area", True):
+        return None
+    area = getattr(node, "area", None)
+    return float(area) if area is not None and area > 0.0 else None
+
+
+def _element_area_facing(elem: "NetworkElement", node_id: str) -> float | None:
+    """Flow area the element presents to ``node_id``, or None if it has none.
+
+    Orifices are deliberately excluded: a bore is a restriction, not the
+    channel area a neighbour should inherit.
+    """
+    if isinstance(elem, ChannelElement):
+        if elem.diameter is not None:
+            return math.pi * (elem.diameter / 2.0) ** 2
+        return None
+    if isinstance(elem, AreaChangeElement):
+        # The element changes area across itself, so the face matters.
+        if elem.to_node == node_id:
+            return float(elem.F1) if elem.F1 is not None else None
+        if elem.from_node == node_id:
+            return float(elem.F0) if elem.F0 is not None else None
+        return None
+    if isinstance(elem, TeeJunctionElement):
+        if elem.F_C is None:
+            return None
+        # Branch arm carries F_C/psi; straight and common arms carry F_C.
+        if node_id == elem.branch_node:
+            return float(elem.F_C) / elem.psi
+        return float(elem.F_C)
+    if isinstance(elem, (BorderCarnotLossElement, PressureLossElement)):
+        return float(elem.area) if elem.area is not None else None
+    return None
+
+
+def _infer_flow_area(
+    graph: "FlowNetwork",
+    node_ids: "list[str]",
+    exclude: "NetworkElement | None" = None,
+) -> "tuple[float | None, str]":
+    """Infer a flow area from the neighbourhood of ``node_ids``.
+
+    Returns ``(area, provenance)``; ``area`` is None when nothing in the
+    neighbourhood knows one, and ``provenance`` names the source so callers
+    can report where a resolved area came from.
+
+    Channels are searched first across all of ``node_ids`` so that a network
+    which previously resolved from a channel still resolves to that channel's
+    area regardless of what else is attached.
+    """
+    neighbours: list[tuple[str, NetworkElement]] = []
+    for node_id in node_ids:
+        for elem in graph.get_upstream_elements(node_id) + graph.get_downstream_elements(node_id):
+            if elem is exclude:
+                continue
+            neighbours.append((node_id, elem))
+
+    for node_id, elem in neighbours:
+        if isinstance(elem, ChannelElement):
+            area = _element_area_facing(elem, node_id)
+            if area is not None:
+                return area, f"channel '{elem.id}'"
+
+    for node_id, elem in neighbours:
+        area = _element_area_facing(elem, node_id)
+        if area is not None:
+            return area, f"{type(elem).__name__} '{elem.id}'"
+
+    for node_id in node_ids:
+        area = _known_node_area(graph.nodes.get(node_id))
+        if area is not None:
+            return area, f"node '{node_id}'"
+
+    for node_id, elem in neighbours:
+        for other in set(elem.all_source_nodes()) | set(elem.all_sink_nodes()):
+            if other == node_id:
+                continue
+            area = _known_node_area(graph.nodes.get(other))
+            if area is not None:
+                return area, f"node '{other}'"
+
+    return None, ""
+
+
+def _unresolved_area_error(
+    component: "NetworkNode | NetworkElement",
+    parameter: str,
+    node_ids: "list[str]",
+) -> ValueError:
+    """The error raised when a load-bearing flow area cannot be inferred.
+
+    Names the component, the parameter that clears the error, and where the
+    search looked -- a defaulted area here fabricates geometry, so failing
+    loudly is the only honest option (issue #262).
+    """
+    where = ", ".join(f"'{n}'" for n in node_ids)
+    return ValueError(
+        f"{type(component).__name__} '{component.id}': cannot determine "
+        f"{parameter} -- no neighbouring channel, area-bearing element or "
+        f"node with a known area was found at {where}. Set {parameter} "
+        f"explicitly on this component (or give a neighbour a known area). "
+        f"A default would fabricate a geometry that does not exist and the "
+        f"solver would stall on it."
+    )
+
+
 class NetworkNode(ABC):
     #: True when this node supplies a meaningful temperature-rise ratio theta
     #: (T_burned / T_unburned - 1).  Read by ``PressureLossElement`` with
@@ -796,6 +936,8 @@ class MomentumChamberNode(NetworkNode):
         super().__init__(id)
         self._auto_area = area is None
         self.area = area if area is not None else 0.0
+        #: Where self.area came from once resolved (issue #262).
+        self._area_source = "user" if area is not None else ""
         self.port_angles_deg: dict[str, float] = port_angles_deg or {}
         self.length = length
         self.Dh = Dh
@@ -988,7 +1130,23 @@ class MomentumChamberNode(NetworkNode):
             self.area = math.pi * (self.Dh / 2.0) ** 2
             self.surface.area = self.area
         elif self._auto_area:
-            self.area = 0.1  # fallback (same as original default)
+            # No channel to inherit from: widen the search to any area-bearing
+            # neighbour before falling back (issue #262).
+            area, source = _infer_flow_area(graph, [self.id])
+            if area is not None:
+                self.area = area
+                self.Dh = 2.0 * math.sqrt(area / math.pi)
+                self.surface.area = area
+                self._area_source = source
+            else:
+                # Unlike AreaChangeElement, this area is a dynamic-head
+                # reference rather than the geometry being modelled, and a
+                # network can legitimately never read it -- so a nominal
+                # default stands. It is recorded, not silent: anything that
+                # consumes it reports the provenance in diagnostics.
+                self.area = DEFAULT_CHAMBER_AREA
+                self.surface.area = self.area
+                self._area_source = "default"
 
 
 class PressureBoundary(NetworkNode):
@@ -1142,6 +1300,8 @@ class CombustorNode(NetworkNode):
         self.method = method
         self._auto_area = area is None
         self.area = area if area is not None else 0.0
+        #: Where self.area came from once resolved (issue #262).
+        self._area_source = "user" if area is not None else ""
         self.Dh = Dh
         self.surface = surface or ConvectiveSurface()
         self.t_hot = t_hot
@@ -1328,7 +1488,23 @@ class CombustorNode(NetworkNode):
             self.area = math.pi * (self.Dh / 2.0) ** 2
             self.surface.area = self.area
         elif self._auto_area:
-            self.area = 0.1  # fallback (same as original default)
+            # No channel to inherit from: widen the search to any area-bearing
+            # neighbour before falling back (issue #262).
+            area, source = _infer_flow_area(graph, [self.id])
+            if area is not None:
+                self.area = area
+                self.Dh = 2.0 * math.sqrt(area / math.pi)
+                self.surface.area = area
+                self._area_source = source
+            else:
+                # Unlike AreaChangeElement, this area is a dynamic-head
+                # reference rather than the geometry being modelled, and a
+                # network can legitimately never read it -- so a nominal
+                # default stands. It is recorded, not silent: anything that
+                # consumes it reports the provenance in diagnostics.
+                self.area = DEFAULT_CHAMBER_AREA
+                self.surface.area = self.area
+                self._area_source = "default"
 
 
 class OrificeElement(NetworkElement):
@@ -1947,6 +2123,8 @@ class PressureLossElement(NetworkElement):
         self.correlation = correlation
         self.theta_source = theta_source
         self.area = area
+        #: Where self.area came from once resolved (issue #262).
+        self._area_source = "user" if area is not None else ""
         self.surface = surface or ConvectiveSurface()
         # Resolved during resolve_topology.  Empty string sentinel disallowed
         # so callers can cleanly test ``if self._theta_source_resolved is not None``.
@@ -2003,7 +2181,32 @@ class PressureLossElement(NetworkElement):
                     self.area = math.pi / 4.0 * elem.diameter**2
                     break
             if self.area is None:
-                self.area = 0.1
+                # Widen to any area-bearing neighbour (a combustor or momentum
+                # chamber upstream is the common case) before defaulting.
+                area, source = _infer_flow_area(graph, [self.from_node, self.to_node], exclude=self)
+                if area is not None:
+                    self.area = area
+                    self._area_source = source
+            if self.area is None:
+                # A head-loss correlation reads this area as its velocity
+                # reference, so a wrong value rescales the loss rather than
+                # failing. Warn only when a correlation will actually consume
+                # it -- for a fraction-based correlation nothing reads it and
+                # a nominal value is harmless (issue #262).
+                self.area = DEFAULT_CHAMBER_AREA
+                self._area_source = "default"
+                if hasattr(self.correlation, "area"):
+                    warnings.warn(
+                        f"PressureLossElement '{self.id}': no flow area could be "
+                        f"inferred from the topology, so the nominal "
+                        f"{DEFAULT_CHAMBER_AREA} m^2 default is used as the "
+                        f"velocity reference for "
+                        f"{type(self.correlation).__name__}. The head loss scales "
+                        f"as 1/area^2 -- set 'area' explicitly to make it "
+                        f"meaningful.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
             # Propagate updated area into head-loss correlations and convective surface.
             if hasattr(self.correlation, "area"):
                 self.correlation.area = self.area
@@ -2500,30 +2703,18 @@ class ChannelElement(NetworkElement):
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         if self.diameter is not None:
             return
-        # Inherit diameter from the nearest upstream geometry source
-        sources = graph.get_upstream_elements(self.from_node) + graph.get_downstream_elements(
-            self.to_node
-        )
-        for elem in sources:
-            if isinstance(elem, ChannelElement) and elem.diameter is not None:
-                self.diameter = elem.diameter
-                break
-            if isinstance(elem, AreaChangeElement) and elem.F1 is not None:
-                self.diameter = math.sqrt(4.0 * elem.F1 / math.pi)
-                break
-            if isinstance(elem, TeeJunctionElement) and elem.F_C is not None:
-                # Branch arm carries F_C/psi; straight/common arm carries F_C
-                is_branch = self.from_node == elem.branch_node or self.to_node == elem.branch_node
-                area = elem.F_C / elem.psi if is_branch else elem.F_C
-                self.diameter = math.sqrt(4.0 * area / math.pi)
-                break
+        # Inherit diameter from the nearest geometry source. The channel's
+        # area sets its friction and Mach behaviour, so a defaulted diameter
+        # silently rewrites the flow; unresolvable is an error (issue #262).
+        area, _source = _infer_flow_area(graph, [self.from_node, self.to_node], exclude=self)
+        if area is not None:
+            self.diameter = math.sqrt(4.0 * area / math.pi)
         if self.diameter is None:
             if getattr(self, "_topo_pass", 0) >= 1:
-                self.diameter = 0.1  # fallback only after second pass
-            else:
-                # Defer: upstream tee may not have resolved F_C yet in this pass
-                self._topo_pass = 1
-                return
+                raise _unresolved_area_error(self, "diameter", [self.from_node, self.to_node])
+            # Defer: an upstream tee may not have resolved F_C yet this pass.
+            self._topo_pass = 1
+            return
         self.area = math.pi * (self.diameter / 2) ** 2
         if self.Dh is None:
             self.Dh = self.diameter
@@ -2554,6 +2745,9 @@ class AreaChangeElement(NetworkElement):
         self.model_type = model_type
         self.length = length if length is not None else 0.0
         self.D_h = D_h
+        # Where a resolved area came from, for diagnostics (issue #262).
+        self._F0_source = "user" if F0 is not None else ""
+        self._F1_source = "user" if F1 is not None else ""
 
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
@@ -2562,20 +2756,18 @@ class AreaChangeElement(NetworkElement):
         return 1
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
+        # F0/F1 ARE the physics here: their ratio is the area change the
+        # element exists to model. A defaulted value invents a contraction or
+        # expansion the network does not contain, so an unresolvable area is
+        # an error rather than a guess (issue #262).
         if self.F0 is None:
-            for elem in graph.get_upstream_elements(self.from_node):
-                if isinstance(elem, ChannelElement) and elem.diameter is not None:
-                    self.F0 = math.pi * (elem.diameter / 2.0) ** 2
-                    break
+            self.F0, self._F0_source = _infer_flow_area(graph, [self.from_node], exclude=self)
             if self.F0 is None:
-                self.F0 = 0.01
+                raise _unresolved_area_error(self, "upstream area F0", [self.from_node])
         if self.F1 is None:
-            for elem in graph.get_downstream_elements(self.to_node):
-                if isinstance(elem, ChannelElement) and elem.diameter is not None:
-                    self.F1 = math.pi * (elem.diameter / 2.0) ** 2
-                    break
+            self.F1, self._F1_source = _infer_flow_area(graph, [self.to_node], exclude=self)
             if self.F1 is None:
-                self.F1 = 0.02
+                raise _unresolved_area_error(self, "downstream area F1", [self.to_node])
 
     def validate(self) -> None:
         if (self.F0 or 0.0) <= 0:
@@ -2830,10 +3022,23 @@ class TeeJunctionElement(NetworkElement):
                         found_fc = True
                         break
             if not found_fc:
+                # Widen to any area-bearing neighbour before giving up: the
+                # common/straight arms may be fed by a chamber or an area
+                # change rather than a channel (issue #262).
+                area, _source = _infer_flow_area(
+                    graph, [self.common_node, self.straight_node], exclude=self
+                )
+                if area is not None:
+                    self.F_C = area
+                    found_fc = True
+            if not found_fc:
+                # F_C sets every loss reference in the junction closure, so a
+                # default would silently rescale all of them.
                 if getattr(self, "_topo_pass", 0) >= 1:
-                    self.F_C = 0.01
-                else:
-                    self._topo_pass = 1
+                    raise _unresolved_area_error(
+                        self, "common-arm area F_C", [self.common_node, self.straight_node]
+                    )
+                self._topo_pass = 1
 
         # Step 2: resolve F_branch independently from the branch arm channel.
         if self._F_branch is None:
@@ -3498,6 +3703,7 @@ class BorderCarnotLossElement(NetworkElement):
         super().__init__(id, from_node, to_node)
         self.delta_geom_deg = float(delta_geom_deg)
         self.area = area
+        self._area_source = "user" if area is not None else ""
 
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
@@ -3506,23 +3712,15 @@ class BorderCarnotLossElement(NetworkElement):
         return 1
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
+        # This element already refused to guess an area before #262; it now
+        # shares the widened inference path, so a chamber or area-change
+        # neighbour resolves it where only a channel used to.
         if self.area is None:
-            for elem in (
-                graph.get_upstream_elements(self.from_node)
-                + graph.get_downstream_elements(self.from_node)
-                + graph.get_upstream_elements(self.to_node)
-                + graph.get_downstream_elements(self.to_node)
-            ):
-                if elem is self:
-                    continue
-                if isinstance(elem, ChannelElement) and elem.diameter is not None:
-                    self.area = math.pi * (elem.diameter / 2.0) ** 2
-                    break
+            self.area, self._area_source = _infer_flow_area(
+                graph, [self.from_node, self.to_node], exclude=self
+            )
             if self.area is None:
-                raise ValueError(
-                    f"BorderCarnotLossElement '{self.id}': could not infer "
-                    f"area from a neighboring channel. Provide area explicitly."
-                )
+                raise _unresolved_area_error(self, "area", [self.from_node, self.to_node])
 
     def residuals(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState

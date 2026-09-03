@@ -940,14 +940,11 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             net.add_element(elem)
         elif elem_type == "discrete_loss":
             data = DiscreteLossData(**elem_data)
-            # area=None signals "inherit from upstream element in resolve_topology".
-            # Use a quick node-area lookup only when data.area is explicitly set or
-            # the upstream node exposes a non-zero area (combustor / momentum chamber).
+            # area=None signals "inherit from the topology in resolve_topology".
+            # The node-area lookup that used to live here is now part of the
+            # library's shared inference path, so GUI and headless networks
+            # resolve the same area (issue #262).
             area: float | None = data.area
-            if area is None and source_id in nodes_map:
-                node_area = getattr(nodes_map[source_id], "area", None)
-                if node_area and node_area > 0:
-                    area = node_area
             correlation = _build_discrete_loss_correlation(
                 data.correlation_type,
                 data.xi,
