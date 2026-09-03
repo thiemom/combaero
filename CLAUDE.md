@@ -12,7 +12,7 @@
 - **No manual edits to auto-generated files** (`docs/UNITS.md`, `include/thermo_transport_data.h`). Use the scripts below.
 - **API sync is mandatory:** adding/removing/changing any function or property requires updating `include/units_data.h` and the relevant API reference ([docs/API_CPP.md](docs/API_CPP.md) or [docs/API_PYTHON.md](docs/API_PYTHON.md)) in the same commit.
 - **CHANGELOG is mandatory:** every user-visible change must have an entry added under `[Unreleased]` in `CHANGELOG.md` in the same commit. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) (Added / Changed / Fixed / Removed). At release time the `[Unreleased]` block becomes `[x.y.z] - YYYY-MM-DD`.
-- **Documentation Hygiene:** Follow [docs/HYGIENE.md](docs/HYGIENE.md) classification. Archive feature reports to `docs/archive/`.
+- **Documentation Hygiene:** Active references (API, build, workflow, schemas) live in `docs/`; historical feature reports and design records go to `docs/archive/`. Keep core guides high-signal — a doc points at the file that owns a fact rather than transcribing it.
 - **Unit sync test:** every exported Python symbol needs a `units_data.h` entry, or an `IGNORE_LIST` entry in `python/tests/test_units_sync.py`.
 - **Solver (f, J) rule:** solver-facing calculations must expose a C++ PyBind11 API returning `std::tuple<double, double>` (value, derivative). Analytical derivatives via chain rule; no finite differences exposed to Python.
 - **Define Once:** physics constants go as `constexpr` in the relevant public header namespace — never as magic numbers in `.cpp` files.
