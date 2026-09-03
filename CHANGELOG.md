@@ -120,6 +120,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not otherwise (no solver init strategy cracks it without the seed).
 
 ### Changed
+- **Flow-area inference now consults every area-bearing neighbour, and refuses
+  to invent an area it cannot determine (issue #262).** Seven `resolve_topology`
+  sites searched only for a neighbouring `ChannelElement` and, failing that,
+  substituted a hard-coded constant (0.01 / 0.02 / 0.1 m^2). With a non-channel
+  neighbour -- a momentum chamber, a combustor, an ejector outlet -- that
+  fabricated a geometry the network does not contain: the reported case
+  (`momentum_chamber (0.15 m^2) -> area_change -> channel (0.636 m^2)`) resolved
+  `F0 = 0.01`, a 63.6x expansion out of nothing, and stalled the solver with a
+  message that blamed the solver rather than the geometry. In simpler chains it
+  is worse than a stall -- it converges, inflating the chamber stagnation
+  pressure by 4% at 1 kg/s, 64% at 5 kg/s and 342% at 20 kg/s.
+  All seven sites now share one inference path (channels first, so networks that
+  resolved before resolve identically; then other area-bearing elements; then
+  adjacent nodes whose area was set explicitly). An auto-sized area is never
+  used as a source.
+  **Breaking:** where the area *is* the geometry being modelled --
+  `AreaChangeElement` (`F0`/`F1`), `ChannelElement` (`diameter`),
+  `TeeJunctionElement` (`F_C`), `BorderCarnotLossElement` (`area`) -- an
+  unresolvable area now raises a `ValueError` naming the component, the
+  parameter that clears it, and where the search looked, instead of silently
+  defaulting. Networks that relied on those defaults must set the value
+  explicitly or give a neighbour a known area; both clear the error. Where the
+  area is only a dynamic-head reference (`MomentumChamberNode`,
+  `CombustorNode`, `PressureLossElement`) a nominal default still stands, since
+  a network can legitimately never read it -- `PressureLossElement` warns when a
+  head-loss correlation will actually consume the defaulted value, and stays
+  quiet for fraction-based correlations that never touch it.
 - **`EjectorElement` now evaluates its residuals and a FULL analytic
   Jacobian (all four rows) through the C++ `(f, J)` path** rather than the
   pure-Python reference physics plus a finite-difference Jacobian fallback.
