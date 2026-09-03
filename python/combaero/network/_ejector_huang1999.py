@@ -250,6 +250,93 @@ def choked_mass_flow(
     return (p0 * area_throat / math.sqrt(t0)) * choke_const * math.sqrt(eta)
 
 
+def cd_nozzle_mass_flow(
+    p0: float,
+    t0: float,
+    p_static_down: float,
+    area_throat: float,
+    area_exit: float,
+    gamma: float,
+    r_gas: float,
+    eta: float = ETA_P,
+    eps_frac: float = 1.0e-3,
+) -> float:
+    """Converging-diverging nozzle mass flow spanning choked and unchoked.
+
+    The R0 primary residual for the operating-regime extension needs one C1
+    relation for both a choked (supersonic) and an unchoked (subsonic venturi)
+    primary. When unchoked, the flow is subsonic throughout and the exit
+    (area_exit, static `p_static_down`) sets the mass flow; when the exit
+    pressure is low enough that the throat reaches sonic, the flow chokes and
+    the mass flow saturates at the sonic-throat value (`choked_mass_flow`,
+    area_throat). The two branches are equal at the choke threshold (the throat
+    passes the same mass either way), so their minimum is continuous; a C1
+    smooth-min (sqrt-rounded, the MPCEv2 idiom) rounds the corner for the
+    Newton Jacobian. See OPERATING_REGIMES_DESIGN.md sec 3.1.
+
+    Parameters mirror `choked_mass_flow` plus `p_static_down` (the exit/mixing
+    static pressure P_py) and `area_exit` (nozzle exit area A_p1).
+    """
+    cap = choked_mass_flow(p0, t0, area_throat, gamma, r_gas, eta)
+    r = p_static_down / p0
+    if r >= 1.0:
+        exit_flux = 0.0
+    else:
+        gm1 = gamma - 1.0
+        gp1 = gamma + 1.0
+        mach = math.sqrt(2.0 / gm1 * (r ** (-gm1 / gamma) - 1.0))
+        flux = mach * (1.0 + 0.5 * gm1 * mach * mach) ** (-gp1 / (2.0 * gm1))
+        exit_flux = (
+            area_exit * p0 / math.sqrt(t0) * math.sqrt(gamma / r_gas) * flux * math.sqrt(eta)
+        )
+    eps = eps_frac * cap
+    return 0.5 * (exit_flux + cap - math.sqrt((exit_flux - cap) ** 2 + eps * eps))
+
+
+def cd_nozzle_exit_static(
+    m_dot: float,
+    p0: float,
+    t0: float,
+    area_throat: float,
+    area_exit: float,
+    gamma: float,
+    r_gas: float,
+    eta: float = ETA_P,
+    eps_frac: float = 1.0e-3,
+    iterations: int = 200,
+) -> float:
+    """Invert `cd_nozzle_mass_flow` for the exit static pressure P_py that
+    passes `m_dot`.
+
+    The derived mixing pressure of the operating-regime element's unchoked
+    branch: given a forced primary flow and supply, the C-D nozzle's exit
+    static is the P_py the element mixes at (OPERATING_REGIMES_DESIGN.md sec
+    6b). `cd_nozzle_mass_flow` is monotone DECREASING in P_py (higher exit
+    pressure -> less expansion -> less flow: cap at P_py -> p0*r_crit, zero at
+    P_py -> p0), so bisection on ``cd_nozzle_mass_flow(P_py) - m_dot`` in
+    ``(p0*r_crit, p0)`` is unconditionally convergent for any 0 < m_dot < cap.
+
+    Value only (the analytic implicit-function derivatives live in the C++
+    ``ejector_cd_nozzle_exit_static_and_jacobian``, as ratios of the C-D
+    nozzle's own Jacobian: dP_py/dm_dot = 1/(dmdot/dP_py), etc.).
+    """
+    gm1 = gamma - 1.0
+    gp1 = gamma + 1.0
+    r_crit = (2.0 / gp1) ** (gamma / gm1)
+    lo = p0 * r_crit  # cd_nozzle == cap here (max flow)
+    hi = p0 * (1.0 - 1e-12)  # cd_nozzle -> 0 here (no flow)
+    for _ in range(iterations):
+        mid = 0.5 * (lo + hi)
+        if (
+            cd_nozzle_mass_flow(p0, t0, mid, area_throat, area_exit, gamma, r_gas, eta, eps_frac)
+            > m_dot
+        ):
+            lo = mid  # too much flow -> raise P_py
+        else:
+            hi = mid
+    return 0.5 * (lo + hi)
+
+
 def entrainment_ratio(
     p_g: float,
     t_g: float,

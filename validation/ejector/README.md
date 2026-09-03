@@ -38,6 +38,11 @@ model: primary flow choked at the nozzle throat, entrained flow choked at the
 hypothetical throat y-y, constant-pressure mixing (Huang's Eqs. 1-8,
 `entrainment_ratio`). In this regime the entrainment ratio omega is fixed and
 independent of back pressure -- the flat plateau of the ejector characteristic.
+It also carries the off-plateau operating-regime closures (see "Operating
+regimes" below): `cd_nozzle_mass_flow` / `cd_nozzle_exit_static` (choked or
+unchoked primary), `dead_head_back_pressure` + `subcritical_entrainment_ratio`
++ `blended_entrainment_ratio` (the subcritical droop), and
+`jet_pump_entrainment_ratio` (the unchoked subsonic jet pump).
 
 It also implements the critical back pressure P_c* (`critical_back_pressure`),
 using Kracik & Dvorak's mixing closure (their Eqs. 7-13) rather than Huang's
@@ -61,20 +66,22 @@ invariant to count, while A_3/A_t shrinks as count grows, since the aggregate
 throat area scales with count but the shared mixing chamber does not.
 `count=1` reduces exactly to the direct constructor.
 
-Out of scope for the *current* model: the subcritical, unchoked-primary, and
-back-flow branches. These are designed in
-`OPERATING_REGIMES_DESIGN.md`, which diagnoses a real
-non-converging low-primary-flow case and proposes the extension. In brief, the
-device passes through these regimes as the forced primary flow rises: (1)
+## Operating regimes
+
+The device passes through these regimes as the forced primary flow rises: (1)
 `mp < mdot_choked(Pb)` -> primary **unchoked**, a subsonic jet pump (primary Pt
 floats just above the back pressure); (2) primary **choked** -> supersonic
-ejector, whose entrained flow is then **critical** (`Pb <= P_c*`, modeled here),
-**subcritical** (`P_c* < Pb < P_b0`, drooping omega), or **backflow**
-(`Pb >= P_b0`). A known limitation of the current critical-only model: a
-forced-primary flow below the choke threshold converges to a self-contradictory
-choked-branch root (primary Pt *below* the back pressure) and is demoted by
-`verify_solution_consistent` -- see the design doc for the fix (choked/unchoked
-R0 + subcritical R1 + jet-pump mode).
+ejector, whose entrained flow is then **critical** (`Pb <= P_c*`, the flat
+plateau), **subcritical** (`P_c* < Pb < P_b0`, drooping omega), or **backflow**
+(`Pb >= P_b0`). The critical plateau was the original model; the subcritical
+droop and the unchoked jet pump are now implemented too (Phase 1A/1B reference
+closures listed under "Model scope"; the network `EjectorElement` composes all
+of them into one C1 residual system that resolves every regime in a single
+solve -- Phase 2). Full diagnosis (of the original non-converging
+low-primary-flow case, which used to converge to a self-contradictory
+choked-branch root with primary Pt *below* the back pressure) and the
+provenance of the fix are in `OPERATING_REGIMES_DESIGN.md`. Backflow
+(`Pb >= P_b0`) remains out of scope.
 
 ## gamma provenance (the only CoolProp step)
 
@@ -223,8 +230,9 @@ one dataset. `test_ejector_huang.py` checks P_c* by regression, by trend
    difference Jacobian columns to tight tolerance.~~ Done (PR #253).
 4. ~~pybind bindings, in a separate PR.~~ Done (PR #254).
 5. ~~GUI work and validation.~~ Done (PR #259).
-6. **Operating-regime extension (next):** choked/unchoked primary (R0),
-   subcritical entrainment droop (R1), and the unchoked subsonic jet-pump mode,
-   in one C1 residual system so critical <-> subcritical <-> jet-pump solve in a
-   single Newton pass. Full findings and design in
-   `OPERATING_REGIMES_DESIGN.md`.
+6. ~~**Operating-regime extension:** choked/unchoked primary (R0), subcritical
+   entrainment droop (R1), and the unchoked subsonic jet-pump mode, in one C1
+   residual system so critical <-> subcritical <-> jet-pump solve in a single
+   Newton pass.~~ Done: reference closures (Phase 1A/1B) and the whole-element
+   C++ `(f, J)` composed into `EjectorElement` (Phase 2). Full findings,
+   design, and provenance in `OPERATING_REGIMES_DESIGN.md`.

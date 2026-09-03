@@ -248,6 +248,70 @@ def test_ejector_runner_solve_converges_cold_and_exposes_diagnostics():
     assert p_c > 0.0
 
 
+def _jetpump_ejector_schema() -> dict:
+    """Low primary mass flow (0.0051 kg/s) into the same geometry against a
+    101.325 kPa suction/outlet. That mass flow is well below the primary's
+    choke threshold at this back pressure, so the physical operating point is
+    the UNCHOKED subsonic jet-pump regime (primary Pt floats to ~the back
+    pressure, dp >= 0, omega ~ 7) -- the reported case that previously failed
+    to converge (converged instead to a spurious double-choked root with
+    Pt_primary below the back pressure). See OPERATING_REGIMES_DESIGN.md."""
+    return {
+        "nodes": [
+            _node("mb_p", "mass_boundary", {"m_dot": 0.0051, "Tt": 300.0}),
+            _node("pb_s", "pressure_boundary", {"Pt": 101325.0, "Tt": 300.0}, y=200),
+            _node("pb_o", "pressure_boundary", {"Pt": 101325.0, "Tt": 300.0}, x=600),
+            _node("mc_p", "momentum_chamber", {"area": 0.1}, x=150),
+            _node("mc_s", "momentum_chamber", {"area": 0.1}, x=150, y=200),
+            _node("mc_o", "momentum_chamber", {"area": 0.15}, x=450),
+            _node(
+                "ej1",
+                "ejector",
+                {
+                    "throat_area": _THROAT,
+                    "nozzle_exit_area": _NOZZLE_EXIT,
+                    "mixing_area": _MIXING,
+                },
+                x=300,
+            ),
+        ],
+        "edges": [
+            _edge("e1", "mb_p", "mc_p"),
+            _edge("e2", "mc_p", "ej1", tgt_handle="port-primary-target"),
+            _edge("e3", "pb_s", "mc_s"),
+            _edge("e4", "mc_s", "ej1", tgt_handle="port-secondary-target"),
+            _edge("e5", "ej1", "mc_o", src_handle="port-outlet-source"),
+            _edge("e6", "mc_o", "pb_o"),
+        ],
+    }
+
+
+def test_ejector_runner_solves_unchoked_jet_pump_regime():
+    """The reported low-flow case must converge to the physical jet-pump root:
+    unchoked primary (s_choke -> 0), forward flow (dp >= 0), and a large
+    entrainment ratio -- NOT the spurious double-choked artifact."""
+    runner = NetworkRunner.from_dict(_jetpump_ejector_schema())
+    result = runner.solve(timeout=120.0)
+    df = result.to_dataframe()
+    row = df[df["id"] == "ej1"]
+    assert not row.empty, "ejector element row missing from results"
+    assert bool(row["success"].iloc[0]), "jet-pump ejector solve did not converge"
+
+    mp = float(row["m_dot_primary"].iloc[0])
+    ms = float(row["m_dot_secondary"].iloc[0])
+    assert mp == pytest.approx(0.0051, rel=1e-3)
+    assert ms > 0.0  # entrained flow is drawn in (positive suction)
+    omega = float(row["omega"].iloc[0])
+    assert 5.0 < omega < 9.0, f"expected jet-pump omega ~ 7, got {omega}"
+    # Unchoked regime, not the double-choked artifact.
+    assert float(row["s_choke"].iloc[0]) == pytest.approx(0.0, abs=1e-6)
+    assert float(row["critical_mode"].iloc[0]) == 0.0
+    # Primary floats up to ~the back pressure: forward flow, dp >= 0.
+    mc_p = df[df["id"] == "mc_p"]
+    if not mc_p.empty and "Pt" in df.columns:
+        assert float(mc_p["Pt"].iloc[0]) >= 101325.0 * 0.999
+
+
 def test_ejector_element_m_dot_reports_total_throughflow():
     """The ejector has no own `.m_dot` unknown (a junction). Its ElementResult
     m_dot -- shown on the node card and telemetry -- must report the total

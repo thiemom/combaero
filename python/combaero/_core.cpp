@@ -351,13 +351,16 @@ PYBIND11_MODULE(_core, m) {
         "Border-Carnot turning loss: Pt_in - Pt_out - L*0.5*rho*u^2 = 0 with "
         "L = 4*(1 - cos((3/4)*delta_geom))^2 (Hager sharp-edge correction).");
 
-  // Ejector (critical-mode supersonic ejector on the MultiPortChamberElement
-  // topology). Physics + analytic Jacobians in include/ejector.h; Jacobians
-  // are w.r.t. the 4 thermodynamic inputs (p_g, t_g, p_e, t_e) only -- gamma,
-  // r_gas, geometry and recovery_efficiency are frozen coefficients here.
-  // Area ratios are passed as plain doubles (a lambda builds the internal
-  // EjectorGeometry), keeping the Python call flat like the other solver
-  // bindings.
+  // Ejector (supersonic ejector on the MultiPortChamberElement topology,
+  // spanning the critical / subcritical / unchoked jet-pump regimes). Physics
+  // + analytic Jacobians in include/ejector.h. The critical-mode scalar
+  // closures expose Jacobians w.r.t. the 4 thermodynamic inputs (p_g, t_g,
+  // p_e, t_e); the operating-regime closures add the P_py / omega / m_dot
+  // partials, and ejector_element_residuals_and_jacobian returns the whole
+  // 4-row element system w.r.t. all nine unknowns. gamma, r_gas, geometry and
+  // recovery_efficiency are frozen coefficients here. Area ratios are passed
+  // as plain doubles (a lambda builds the internal EjectorGeometry), keeping
+  // the Python call flat like the other solver bindings.
   py::class_<solver::EjectorEntrainmentResult>(
       m, "EjectorEntrainmentResult",
       "Value outputs of ejector_entrainment_ratio (Huang 1999 Eqs. 1-8)")
@@ -415,12 +418,61 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("dpc_dt_e",
                     &solver::EjectorCriticalPressureJacobian::dpc_dt_e);
 
+  py::class_<solver::EjectorCDNozzleJacobian>(
+      m, "EjectorCDNozzleJacobian",
+      "C-D nozzle mass flow plus d(mdot)/d(p0, t0, P_py)")
+      .def_readonly("mdot", &solver::EjectorCDNozzleJacobian::mdot)
+      .def_readonly("dmdot_dp0", &solver::EjectorCDNozzleJacobian::dmdot_dp0)
+      .def_readonly("dmdot_dt0", &solver::EjectorCDNozzleJacobian::dmdot_dt0)
+      .def_readonly("dmdot_dp_py", &solver::EjectorCDNozzleJacobian::dmdot_dp_py);
+
+  py::class_<solver::EjectorCDExitStaticJacobian>(
+      m, "EjectorCDExitStaticJacobian",
+      "C-D nozzle exit static P_py plus d(P_py)/d(m_dot, p0, t0)")
+      .def_readonly("p_py", &solver::EjectorCDExitStaticJacobian::p_py)
+      .def_readonly("dp_py_dm_dot", &solver::EjectorCDExitStaticJacobian::dp_py_dm_dot)
+      .def_readonly("dp_py_dp0", &solver::EjectorCDExitStaticJacobian::dp_py_dp0)
+      .def_readonly("dp_py_dt0", &solver::EjectorCDExitStaticJacobian::dp_py_dt0);
+
+  py::class_<solver::EjectorJetPumpDischargeJacobian>(
+      m, "EjectorJetPumpDischargeJacobian",
+      "Jet-pump discharge stagnation plus d(p03)/d(p_g, t_g, p_e, t_e, P_py, omega)")
+      .def_readonly("p03", &solver::EjectorJetPumpDischargeJacobian::p03)
+      .def_readonly("dp03_dp_g", &solver::EjectorJetPumpDischargeJacobian::dp03_dp_g)
+      .def_readonly("dp03_dt_g", &solver::EjectorJetPumpDischargeJacobian::dp03_dt_g)
+      .def_readonly("dp03_dp_e", &solver::EjectorJetPumpDischargeJacobian::dp03_dp_e)
+      .def_readonly("dp03_dt_e", &solver::EjectorJetPumpDischargeJacobian::dp03_dt_e)
+      .def_readonly("dp03_dp_py", &solver::EjectorJetPumpDischargeJacobian::dp03_dp_py)
+      .def_readonly("dp03_domega", &solver::EjectorJetPumpDischargeJacobian::dp03_domega);
+
   m.def("ejector_choked_mass_flow_and_jacobian",
         &solver::ejector_choked_mass_flow_and_jacobian, py::arg("p0"),
         py::arg("t0"), py::arg("area_throat"), py::arg("gamma"),
         py::arg("r_gas"), py::arg("eta"),
         "Choked (sonic-throat) mass flow (Huang 1999 Eqs. 1, 7).\n\n"
         "Returns: (mdot, d_mdot_dp0, d_mdot_dt0)");
+
+  m.def("ejector_cd_nozzle_mass_flow_and_jacobian",
+        &solver::ejector_cd_nozzle_mass_flow_and_jacobian, py::arg("p0"),
+        py::arg("t0"), py::arg("p_static_down"), py::arg("area_throat"),
+        py::arg("area_exit"), py::arg("gamma"), py::arg("r_gas"), py::arg("eta"),
+        py::arg("eps_frac"),
+        "C-D nozzle mass flow (choked/unchoked) with analytic Jacobian.\n\n"
+        "Returns: EjectorCDNozzleJacobian (mdot + dmdot_d{p0,t0,p_py})");
+
+  m.def("ejector_cd_nozzle_exit_static_and_jacobian",
+        &solver::ejector_cd_nozzle_exit_static_and_jacobian, py::arg("m_dot"),
+        py::arg("p0"), py::arg("t0"), py::arg("area_throat"), py::arg("area_exit"),
+        py::arg("gamma"), py::arg("r_gas"), py::arg("eta"), py::arg("eps_frac"),
+        "C-D nozzle exit static P_py that passes m_dot, with implicit Jacobian.\n\n"
+        "Returns: EjectorCDExitStaticJacobian (p_py + dp_py_d{m_dot,p0,t0})");
+
+  m.def("ejector_jetpump_discharge_and_jacobian",
+        &solver::ejector_jetpump_discharge_and_jacobian, py::arg("p_g"),
+        py::arg("t_g"), py::arg("p_e"), py::arg("t_e"), py::arg("p_py"),
+        py::arg("omega"), py::arg("gamma"), py::arg("recovery_efficiency"),
+        "Jet-pump mixed-flow discharge stagnation with analytic Jacobian.\n\n"
+        "Returns: EjectorJetPumpDischargeJacobian (p03 + dp03_d{p_g,t_g,p_e,t_e,p_py,omega})");
 
   m.def(
       "ejector_entrainment_ratio_and_jacobian",
@@ -450,6 +502,41 @@ PYBIND11_MODULE(_core, m) {
       py::arg("r_gas"), py::arg("recovery_efficiency"),
       "Critical back pressure P_c* with analytic Jacobian.\n\n"
       "Returns: EjectorCriticalPressureJacobian (value + dpc_d{p_g,t_g,p_e,t_e})");
+
+  py::class_<solver::EjectorElementResidualJacobian>(
+      m, "EjectorElementResidualJacobian",
+      "4-row ejector element residual system + Jacobian. `residuals` is [R0, "
+      "R1, R2, R3]; `jacobian` is jacobian[row][seed] over the 9 unknowns "
+      "(mp, ms, mdot_out, p_g, t_g, p_e, t_e, p_out, p_py).")
+      .def_readonly("residuals", &solver::EjectorElementResidualJacobian::residuals)
+      .def_readonly("jacobian", &solver::EjectorElementResidualJacobian::jacobian);
+
+  m.def(
+      "ejector_element_residuals_and_jacobian",
+      [](double mp, double ms, double mdot_out, double p_g, double t_g,
+         double p_e, double t_e, double p_out, double p_py,
+         double area_ratio_nozzle, double area_ratio_mix, double area_throat,
+         double area_nozzle_exit, double area_secondary, double gamma,
+         double r_gas, double eta_primary, double eta_secondary,
+         double recovery_efficiency, double eps_frac, double s_choke_lo,
+         double s_choke_hi, double s_sub_lo, double s_sub_hi) {
+        return solver::ejector_element_residuals_and_jacobian(
+            mp, ms, mdot_out, p_g, t_g, p_e, t_e, p_out, p_py,
+            solver::EjectorGeometry{area_ratio_nozzle, area_ratio_mix},
+            area_throat, area_nozzle_exit, area_secondary, gamma, r_gas,
+            eta_primary, eta_secondary, recovery_efficiency, eps_frac,
+            s_choke_lo, s_choke_hi, s_sub_lo, s_sub_hi);
+      },
+      py::arg("mp"), py::arg("ms"), py::arg("mdot_out"), py::arg("p_g"),
+      py::arg("t_g"), py::arg("p_e"), py::arg("t_e"), py::arg("p_out"),
+      py::arg("p_py"), py::arg("area_ratio_nozzle"), py::arg("area_ratio_mix"),
+      py::arg("area_throat"), py::arg("area_nozzle_exit"),
+      py::arg("area_secondary"), py::arg("gamma"), py::arg("r_gas"),
+      py::arg("eta_primary"), py::arg("eta_secondary"),
+      py::arg("recovery_efficiency"), py::arg("eps_frac"), py::arg("s_choke_lo"),
+      py::arg("s_choke_hi"), py::arg("s_sub_lo"), py::arg("s_sub_hi"),
+      "Whole-element 4-row ejector (f, J) across all three operating regimes.\n\n"
+      "Returns: EjectorElementResidualJacobian (residuals[4] + jacobian[4][9])");
 
   // Area change elements
   py::class_<combaero::AreaChangeResult>(

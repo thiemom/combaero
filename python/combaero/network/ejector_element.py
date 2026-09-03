@@ -2,31 +2,33 @@
 topology (``MultiPortChamberElement``).
 
 Ports: ``primary_node`` (motive, high-pressure inlet), ``secondary_node``
-(suction/entrained inlet), ``outlet_node``. Critical (double-choked) mode
-only, reusing the validated closed-form physics in
-``combaero.network._ejector_huang1999`` (Huang 1999's entrainment ratio,
-Eqs. 1-8; Kracik & Dvorak 2016's mixing closure for the critical back
+(suction/entrained inlet), ``outlet_node``. Reuses the validated closed-form
+physics in ``combaero.network._ejector_huang1999`` (Huang 1999's entrainment
+ratio, Eqs. 1-8; Kracik & Dvorak 2016's mixing closure for the critical back
 pressure, their Eqs. 7-13) -- see that module's docstring and
 ``validation/ejector/README.md`` for the full derivation, paper references,
 and the accuracy comparison against three alternative closures that were
 also evaluated.
 
-Operating-regime scope and a known limitation. This element models the
-critical (double-choked) plateau ONLY: the primary is assumed choked and the
-entrained flow critical, so ``omega`` is back-pressure-independent. Two
-regimes are therefore NOT yet modeled -- (a) an UNCHOKED primary, which
-occurs when the forced primary mass flow is below the choke threshold
-``mdot_choked(P_back)``; the physical branch there floats the primary Pt to
-just ABOVE the back pressure (forward flow, ``dp >= 0``) and behaves as a
-subsonic jet pump, but ``R0 = mp - ejector_choked_mass_flow(...)`` hard-codes
-the choked branch and instead converges to a self-contradictory root with the
-primary Pt BELOW the back pressure (``verify_solution_consistent`` then demotes
-it) -- and (b) the SUBCRITICAL entrainment droop for ``P_c* < Pt_outlet <
-P_b0``. The full diagnosis (with the reported non-converging case) and the
-proposed extension -- a choked/unchoked ``R0`` reusing the compressible-orifice
-nozzle ``(f, J)``, a C1 smooth-min critical/subcritical ``R1``, and a subsonic
-jet-pump mode, all in one Newton-solvable residual system -- are in
-``validation/ejector/OPERATING_REGIMES_DESIGN.md``.
+Operating regimes. This element resolves all three physical regimes in one
+Newton-solvable residual system (design + provenance in
+``validation/ejector/OPERATING_REGIMES_DESIGN.md``):
+
+  * CRITICAL (double-choked): primary choked, entrained flow critical, so
+    ``omega`` is back-pressure-independent. The outlet floats freely below
+    the ejector's critical back pressure ``P_c*``.
+  * SUBCRITICAL droop: primary still choked but the outlet is pushed above
+    ``P_c*``; the outlet pressure sets the operating point.
+  * UNCHOKED jet pump: the forced primary mass flow is below the choke
+    threshold ``mdot_choked(P_back)``, so the primary Pt floats to just above
+    the back pressure (forward flow, ``dp >= 0``) and the device acts as a
+    subsonic constant-area jet pump (Keenan-Neumann-Lustwerk mixing via
+    ``ejector_jetpump_discharge``).
+
+The regime is selected smoothly (no branching discontinuity) by two
+smootherstep weights: ``s_choke = smootherstep(mp / mdot_choked(Pt_p))``
+(0 = unchoked jet pump, 1 = choked) and ``s_sub`` (0 = outlet below ``P_c*``,
+critical; 1 = outlet above it, subcritical). See the residual design below.
 
 Working fluid: combaero's real-fluid EOS covers combustion/air-relevant
 species only (N2, O2, Ar, CO2, H2O, light hydrocarbons, CO, H2, NH3) -- no
@@ -37,32 +39,57 @@ computed on the fly via ``cb.cp_mass``/``cb.cv_mass``), using the secondary
 stream's own composition -- Huang's model assumes a single working fluid, so
 this is the representative gamma/R for the whole closed form.
 
-Residual design (see the design discussion that produced this; not
-re-derived here). Ports are ``[primary, secondary, outlet]``, so
+Residual design. Ports are ``[primary, secondary, outlet]``, so
 ``_port_signs = [-1, -1, +1]`` and the base class's ``unknowns()``/
-``n_equations()`` (``{id}.P_jct``, N+1 = 4 rows) are inherited unchanged --
-only the row CONTENT is ejector physics instead of impulse-CV physics:
+``n_equations()`` (one owned unknown ``{id}.P_jct``, N+1 = 4 rows) are
+inherited unchanged -- but the owned unknown is REPURPOSED as the physical
+mixing-plane static pressure ``P_py`` (the pressure common to the primary jet
+and the entrained stream at the mixing-chamber entrance), and the row content
+is ejector physics instead of impulse-CV physics. With ``s = s_choke``:
 
-    R0 = mp - mdot_choked(Pt_primary, Tt_primary, throat_area, gamma, eta_p)
-    R1 = ms - omega(Pt_primary, Tt_primary, Pt_secondary, Tt_secondary) * mp
+    R0 = mp - cd_nozzle(Pt_p, P_py, A_t, A_e)      (primary C-D nozzle)
+    R1 = ms - [s*omega_crit*mp + (1-s)*ms_sec]     (blended entrainment)
     R2 = mdot_out - mp - ms                        (mass conservation)
-    R3 = P_jct - recovery_efficiency * P_c*(...)   (P_jct repurposed as P_c*)
+    R3 = [w_pin*Pt_outlet + (1-w_pin)*P_py] - recovery*discharge
 
-``P_jct`` is NOT tied to the outlet port's actual pressure: in critical mode
-the entrainment ratio is by definition independent of back pressure, so the
-outlet's actual Pt is legitimately external (set by the downstream network,
-same as any ordinary node) -- asserting ``Pt_outlet = P_c*`` would
-over-constrain it. ``P_jct`` is instead a diagnostic upper bound, checked
-post-solve by ``verify_solution_consistent`` (Pt_outlet must not exceed it --
-violation means the design point is subcritical, which this element does not
-model).
+``P_py`` is a genuine Newton unknown (not derived): it is the quantity the two
+nozzle relations R0/R1 share, so making it free keeps BOTH live and lets the
+downstream back pressure select the operating regime. ``R0``'s C-D nozzle
+smooth-mins the subsonic-flux and sonic-cap branches, so it is choked or
+unchoked automatically as ``P_py`` moves. ``discharge = recovery * (s*P_c* +
+(1-s)*P03_jetpump)`` blends the critical and jet-pump mixing closures; each is
+evaluated ONLY where its weight is nonzero (the critical closures return NaN
+for an unchoked primary, and ``0 * NaN = NaN`` would otherwise poison the
+Jacobian -- safe because smootherstep is flat at ``s in {0, 1}``).
 
-Jacobian: FULL analytic, all 4 rows, via the C++ (f, J) path
-(``combaero.network._ejector_huang1999`` is now only the validation
-reference; the hot path calls ``_solver_tools.ejector_*_and_jacobian``,
-i.e. ``include/ejector.h``/``src/ejector.cpp``). The C++ Jacobians are
-exact w.r.t. the four thermodynamic inputs (primary/secondary stagnation
-pressure and temperature) holding ``gamma`` and ``r_gas`` FROZEN. Here
+``R3`` closes the system differently per regime via
+``w_pin = 1 - s*(1 - s_sub)`` (the weight on the outlet-pin form):
+
+  * jet pump (s=0) and subcritical droop (s=1, s_sub=1): ``w_pin = 1`` ->
+    ``Pt_outlet = recovery*discharge``. The outlet is what the ejector sets;
+    the downstream boundary then forces ``P_py`` through this pin, and R0/R1
+    set the primary Pt and entrainment. This pin is what excludes the spurious
+    double-choked root (primary Pt below the back pressure) that a
+    back-pressure-independent closure would otherwise admit.
+  * critical (s=1, outlet below ``P_c*``, s_sub=0): ``w_pin = 0`` ->
+    ``P_py = recovery*P_c*`` (a diagnostic) and the outlet floats FREE, set by
+    the downstream network. Pinning it here would over-constrain the fixed
+    outlet boundary (``Pt_outlet < P_c*`` legitimately).
+
+``verify_solution_consistent`` now returns True unconditionally: every regime
+is modeled, so there is no longer a subcritical design point to demote.
+
+Assembly: the whole 4-row residual system AND its 9-column analytic
+Jacobian are built in C++ -- a single ``_solver_tools.
+ejector_element_residuals_and_jacobian`` call (``include/ejector.h`` /
+``src/ejector.cpp``) that chains the scalar closures through a forward-mode
+``DualN<9>`` across the regime blend, matching the whole-element (f, J)
+practice of the base ``MultiPortChamberElement`` and ``TeeJunctionElement``.
+``residuals()`` here is only the relabeling shim: physical-flow signs and
+mapping the nine Jacobian seeds to solver column names.
+(``combaero.network._ejector_huang1999`` remains the Python validation
+reference the C++ is kept 1:1 with.) The C++ Jacobian is exact w.r.t. the
+nine Newton unknowns holding ``gamma`` and ``r_gas`` FROZEN. Here
 ``gamma = choke_plane_gamma(secondary.Tt, ...)`` is a weak function of a
 Newton unknown and ``r_gas`` depends only on composition (not a solved
 unknown), so the element Jacobian is exact in the explicit (Pt, Tt)
@@ -77,11 +104,12 @@ input, so its d/dt_e central-difference targets also hold gamma fixed).
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import combaero as cb
 from combaero import _solver_tools
-from combaero.network._ejector_huang1999 import ETA_P, EjectorGeometry
+from combaero.network._ejector_huang1999 import ETA_P, ETA_S, EjectorGeometry
 from combaero.network.components import MultiPortChamberElement, NetworkMixtureState
 
 
@@ -111,7 +139,9 @@ def choke_plane_gamma(t_e: float, x: Any, *, iterations: int = 12) -> float:
 
 
 class EjectorElement(MultiPortChamberElement):
-    """Critical-mode supersonic ejector: 2 inlets (primary, secondary), 1 outlet."""
+    """Supersonic ejector across operating regimes: 2 inlets (primary, secondary),
+    1 outlet. Critical (double-choked), subcritical, and unchoked-primary
+    (subsonic jet-pump) in one C1 residual system."""
 
     def __init__(
         self,
@@ -216,121 +246,115 @@ class EjectorElement(MultiPortChamberElement):
         solver.py scaling block this overrides."""
         return ["mdot", "mdot", "mdot", "p"]
 
+    # smootherstep window for s_choke, on mp / choked_mass_flow(Pt_p): s = 0
+    # when clearly unchoked (jet pump), 1 exactly at the primary-choke threshold.
+    _S_CHOKE_LO = 0.90
+    _S_CHOKE_HI = 0.999
+    # s_sub window on outlet.Pt / (recovery * P_c*): 0 (critical, outlet free)
+    # below the recovered critical back pressure, 1 (subcritical, outlet pinned)
+    # above it. Centred on 1 with a narrow band for a sharp-but-smooth handover.
+    _S_SUB_LO = 0.98
+    _S_SUB_HI = 1.02
+    _EPS_FRAC = 1.0e-3  # C-D nozzle / secondary-flux smooth-min rounding
+
     def residuals(
         self,
         states: list[NetworkMixtureState],
         P_jct: float,
         port_mdots: list[float],
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
-        primary, secondary, _outlet = states
+        primary, secondary, outlet = states
 
-        # gamma/r_gas: frozen coefficients (see module docstring). gamma is a
-        # weak function of secondary.Tt via the Python fixed point; r_gas is a
-        # pure function of composition (not a Newton unknown). Recomputed each
-        # call, so the converged root is exact; the C++ Jacobians below hold
-        # both fixed, dropping only the tiny implicit d(gamma)/d(Tt) term.
+        # gamma/r_gas: frozen coefficients (see module docstring). Recomputed
+        # each call so the converged root is exact; the closure Jacobians hold
+        # both fixed (drops only the tiny implicit d(gamma)/d(Tt) term).
         gamma = choke_plane_gamma(secondary.Tt, secondary.X)
         r_gas = float(cb.specific_gas_constant(secondary.X))
         arn = self.area_ratio_nozzle
         arm = self.area_ratio_mix
+        A_t = self.throat_area
+        A_e = self.nozzle_exit_area
+        A_s = self.mixing_area - self.nozzle_exit_area
+        rec = self.recovery_efficiency
 
-        mp_choked, dmp_choked_dp_g, dmp_choked_dt_g = (
-            _solver_tools.ejector_choked_mass_flow_and_jacobian(
-                primary.Pt, primary.Tt, self.throat_area, gamma, r_gas, ETA_P
-            )
-        )
-        entr = _solver_tools.ejector_entrainment_ratio_and_jacobian(
-            primary.Pt, primary.Tt, secondary.Pt, secondary.Tt, arn, arm, gamma
-        )
-        omega = entr.value.omega
-        pc = _solver_tools.ejector_critical_back_pressure_and_jacobian(
+        # Physical port flows. port_mdots are junction-sign convention
+        # (positive = out); primary/secondary are inlets (sign -1), so their
+        # physical flow is the negation. The owned unknown ``P_jct`` is
+        # repurposed as the mixing-plane static pressure P_py (see the module
+        # docstring's residual-design section).
+        mp_v = -float(port_mdots[0])
+        ms_v = -float(port_mdots[1])
+        mo_v = float(port_mdots[2])
+
+        # The 4-row residual system + its 9-column analytic Jacobian are
+        # assembled in C++ (whole-element (f, J), matching the base
+        # MultiPortChamberElement / TeeJunctionElement practice): the scalar
+        # closures are chained through a forward-mode DualN<9> across the
+        # regime blend. See src/ejector.cpp / OPERATING_REGIMES_DESIGN.md sec
+        # 6c. This Python is only the relabeling shim.
+        rj = _solver_tools.ejector_element_residuals_and_jacobian(
+            mp_v,
+            ms_v,
+            mo_v,
             primary.Pt,
             primary.Tt,
             secondary.Pt,
             secondary.Tt,
+            outlet.Pt,
+            P_jct,
             arn,
             arm,
+            A_t,
+            A_e,
+            A_s,
             gamma,
             r_gas,
-            self.recovery_efficiency,
+            ETA_P,
+            ETA_S,
+            rec,
+            self._EPS_FRAC,
+            self._S_CHOKE_LO,
+            self._S_CHOKE_HI,
+            self._S_SUB_LO,
+            self._S_SUB_HI,
         )
-        pc_star = pc.value.p_c_pa
 
-        # port_mdots are junction-sign convention (positive = out of
-        # junction); primary/secondary are inlets (sign -1), so their
-        # physical mass flow is the negation.
-        mp = -float(port_mdots[0])
-        ms = -float(port_mdots[1])
-        mdot_out = float(port_mdots[2])
-
-        r0 = mp - mp_choked
-        r1 = ms - omega * mp
-        r2 = mdot_out - mp - ms  # == sum(port_mdots); mass conservation
-        r3 = P_jct - pc_star
-
-        # Full analytic Jacobian. Column-name conventions (see solver.py's
-        # element jac-relay loop): port mass flows are direct unknowns keyed
-        # "{outer_id}.m_dot"; a physical port flow d(mp) = -_port_signs[i]
-        # because port_mdots[i] = _port_signs[i] * (that unknown). Port
-        # stagnation pressures "{node}.Pt" are direct unknowns; port
-        # stagnation temperatures are emitted as "{node}.T" and chained
-        # through the solver's temperature relay (same convention the
-        # compressible orifice uses: pass Tt, key the column .T). "{id}.P_jct"
-        # is this element's own direct unknown.
-        m_p = f"{self._port_element_ids[0]}.m_dot"
-        m_s = f"{self._port_element_ids[1]}.m_dot"
-        pn_pt = f"{self.primary_node}.Pt"
-        pn_t = f"{self.primary_node}.T"
-        sn_pt = f"{self.secondary_node}.Pt"
-        sn_t = f"{self.secondary_node}.T"
-        # d(mp)/d(m_p unknown) and d(ms)/d(m_s unknown).
-        d_mp = -self._port_signs[0]
-        d_ms = -self._port_signs[1]
-
-        row0 = {
-            m_p: d_mp,
-            pn_pt: -dmp_choked_dp_g,
-            pn_t: -dmp_choked_dt_g,
-        }
-        row1 = {
-            m_s: d_ms,
-            m_p: -omega * d_mp,
-            pn_pt: -mp * entr.domega_dp_g,
-            pn_t: -mp * entr.domega_dt_g,
-            sn_pt: -mp * entr.domega_dp_e,
-            sn_t: -mp * entr.domega_dt_e,
-        }
-        mass_row: dict[str, float] = {}
-        for i in range(self.N):
-            mdot_var = f"{self._port_element_ids[i]}.m_dot"
-            mass_row[mdot_var] = mass_row.get(mdot_var, 0.0) + self._port_signs[i]
-        row3 = {
-            f"{self.id}.P_jct": 1.0,
-            pn_pt: -pc.dpc_dp_g,
-            pn_t: -pc.dpc_dt_g,
-            sn_pt: -pc.dpc_dp_e,
-            sn_t: -pc.dpc_dt_e,
-        }
-
-        return [r0, r1, r2, r3], {0: row0, 1: row1, 2: mass_row, 3: row3}
+        # Map the 9 Jacobian seeds (in the C++ unknown order) to solver columns.
+        # Inlet flows: the physical flow is -(port unknown), so d(phys)/d(unknown)
+        # = -port_sign; the outlet unknown IS the physical flow (+port_sign).
+        seed_cols: list[tuple[str, float]] = [
+            (f"{self._port_element_ids[0]}.m_dot", -self._port_signs[0]),  # 0 mp
+            (f"{self._port_element_ids[1]}.m_dot", -self._port_signs[1]),  # 1 ms
+            (f"{self._port_element_ids[2]}.m_dot", self._port_signs[2]),  # 2 mdot_out
+            (f"{self.primary_node}.Pt", 1.0),  # 3 p_g
+            (f"{self.primary_node}.T", 1.0),  # 4 t_g
+            (f"{self.secondary_node}.Pt", 1.0),  # 5 p_e
+            (f"{self.secondary_node}.T", 1.0),  # 6 t_e
+            (f"{self.outlet_node}.Pt", 1.0),  # 7 p_out
+            (f"{self.id}.P_jct", 1.0),  # 8 P_py (owned)
+        ]
+        jac: dict[int, dict[str, float]] = {}
+        for row in range(4):
+            grad = rj.jacobian[row]
+            cols: dict[str, float] = {}
+            for seed, (name, coeff) in enumerate(seed_cols):
+                g = grad[seed]
+                if g != 0.0:
+                    cols[name] = cols.get(name, 0.0) + coeff * g
+            jac[row] = cols
+        return (list(rj.residuals), jac)
 
     def verify_solution_consistent(
         self,
         sol: dict[str, float],
         rel_tol: float = 1e-3,
     ) -> bool:
-        """Post-solve check: the outlet's actual back pressure must not
-        exceed the computed critical back pressure P_c* (stored in
-        ``{id}.P_jct``). A violation means the converged operating point is
-        subcritical, which this element does not model (critical-mode
-        omega, used in the residuals, is only valid up to P_c*). Missing
-        keys => True (do not police incomplete dicts, matching the
-        convention used elsewhere in this module)."""
-        pc_key = f"{self.id}.P_jct"
-        pt_key = f"{self.outlet_node}.Pt"
-        if pc_key not in sol or pt_key not in sol:
-            return True
-        return float(sol[pt_key]) <= float(sol[pc_key]) * (1.0 + rel_tol)
+        """No post-solve demotion. The element now models the critical,
+        subcritical, and unchoked-primary (jet-pump) regimes in one C1 residual
+        system, so a converged root is physical by construction (the old
+        ``outlet.Pt <= P_c*`` check demoted valid subcritical/jet-pump points
+        and is dropped -- see OPERATING_REGIMES_DESIGN.md sec 6b)."""
+        return True
 
     def diagnostics(
         self,
@@ -346,24 +370,83 @@ class EjectorElement(MultiPortChamberElement):
 
         gamma = choke_plane_gamma(secondary.Tt, secondary.X)
         r_gas = float(cb.specific_gas_constant(secondary.X))
-        entr = _solver_tools.ejector_entrainment_ratio_and_jacobian(
-            primary.Pt,
-            primary.Tt,
-            secondary.Pt,
-            secondary.Tt,
-            self.area_ratio_nozzle,
-            self.area_ratio_mix,
-            gamma,
-        )
-
         diag["gamma"] = gamma
         diag["r_gas"] = r_gas
-        diag["omega"] = entr.value.omega
-        diag["p_c_star_pa"] = float(P_jct)
         diag["outlet_pt_pa"] = float(outlet.Pt)
-        diag["critical_mode"] = 1.0 if float(outlet.Pt) <= float(P_jct) else 0.0
+        diag["p_py_pa"] = float(P_jct)  # owned unknown = mixing-plane static
+
+        # Operating regime: s_choke = smootherstep(mp/cap), reported so the GUI
+        # can label critical (1) / jet-pump (0) / transition, plus the actual
+        # entrainment ratio and the choked-mode reference quantities. The
+        # critical closures (omega_critical, P_c*) assume a choked primary and
+        # return NaN in the jet-pump regime, so they are reported only when
+        # meaningful (s_choke > 0).
         if port_mdots is not None and len(port_mdots) == self.N:
-            diag["m_dot_primary"] = -float(port_mdots[0])
-            diag["m_dot_secondary"] = -float(port_mdots[1])
+            mp = -float(port_mdots[0])
+            ms = -float(port_mdots[1])
+            cap = _solver_tools.ejector_choked_mass_flow_and_jacobian(
+                primary.Pt, primary.Tt, self.throat_area, gamma, r_gas, ETA_P
+            )[0]
+            t = (mp / cap - self._S_CHOKE_LO) / (self._S_CHOKE_HI - self._S_CHOKE_LO)
+            t = min(max(t, 0.0), 1.0)
+            s_choke = t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
+            diag["s_choke"] = s_choke
+            diag["m_dot_primary"] = mp
+            diag["m_dot_secondary"] = ms
             diag["m_dot_outlet"] = float(port_mdots[2])
+            # ACTUAL entrainment ratio -- regime-independent, always valid.
+            diag["omega"] = ms / mp if mp != 0.0 else float("nan")
+            # Regime label. critical_mode = 1 only when the primary is choked
+            # AND the outlet sits below the ejector's critical back pressure
+            # (double-choked plateau); 0 in the subcritical-droop and unchoked
+            # jet-pump regimes, where the outlet pressure sets the operating
+            # point.
+            critical_mode = 0.0
+            if s_choke > 0.0:
+                omega_c = self._critical_omega(primary, secondary, gamma)
+                p_c_star = self._critical_back_pressure(primary, secondary, gamma, r_gas)
+                diag["omega_critical"] = omega_c
+                diag["p_c_star_pa"] = p_c_star
+                if s_choke >= 0.5 and math.isfinite(p_c_star) and float(outlet.Pt) <= p_c_star:
+                    critical_mode = 1.0
+            diag["critical_mode"] = critical_mode
+        else:
+            diag["omega"] = self._critical_omega(primary, secondary, gamma)
+            diag["p_c_star_pa"] = self._critical_back_pressure(primary, secondary, gamma, r_gas)
         return diag
+
+    def _critical_omega(
+        self, primary: NetworkMixtureState, secondary: NetworkMixtureState, gamma: float
+    ) -> float:
+        return float(
+            _solver_tools.ejector_entrainment_ratio_and_jacobian(
+                primary.Pt,
+                primary.Tt,
+                secondary.Pt,
+                secondary.Tt,
+                self.area_ratio_nozzle,
+                self.area_ratio_mix,
+                gamma,
+            ).value.omega
+        )
+
+    def _critical_back_pressure(
+        self,
+        primary: NetworkMixtureState,
+        secondary: NetworkMixtureState,
+        gamma: float,
+        r_gas: float,
+    ) -> float:
+        return float(
+            _solver_tools.ejector_critical_back_pressure_and_jacobian(
+                primary.Pt,
+                primary.Tt,
+                secondary.Pt,
+                secondary.Tt,
+                self.area_ratio_nozzle,
+                self.area_ratio_mix,
+                gamma,
+                r_gas,
+                self.recovery_efficiency,
+            ).value.p_c_pa
+        )
