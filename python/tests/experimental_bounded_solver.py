@@ -3,14 +3,24 @@ Bounds experiment: does enforcing physical positivity (m_dot >= 0 on
 canonically forward channels, all pressures >= 0) make MPCE Tier-1 match
 Bassett K2/K6 at M -> 0?
 
-If yes: Tier-1 disagreement is solver landing on degenerate roots
-(bidirectional-flow basins that are mathematically valid but physically
-forbidden by the boundary conditions). Fix is to expose bounded
-least_squares as a solver option for MPCE networks.
+ANSWER (measured 2026-09-03): NO, and emphatically so. The bounded solve
+converges cleanly (|F| ~ 1e-11) yet lands FARTHER from Bassett K6 than the
+default solver at every q:
 
-If no: the PDF Section 3.4 formula itself is the problem -- no constant L
-in form-2 BorderCarnotLoss can match Bassett K6 = q^2 + 1 - 0.7654*q.
-Fix is to revisit the loss-element form.
+    q      K_lat bounded   K_lat default   Bassett K6
+   0.25       0.6799          0.7751         0.8712      (22% vs 11%)
+   0.50       0.4847          0.8657         0.8673      (44% vs  0.2%)
+   0.75       0.4145          1.2719         0.9885      (58% vs 29%)
+
+So Tier-1 disagreement is NOT the solver landing on degenerate roots, and
+promoting bounded least_squares to a production solver path would not fix it
+(it would make the lateral worse). By this file's own decision rule the PDF
+Section 3.4 formula is the problem: the loss-element form / cross-coupling
+projection is what needs revisiting. Tracked as issue #272.
+
+Kept as the record of that experiment and as a bounded-solver harness; the
+K_lateral test below is left FAILING on purpose so the finding is not
+silently lost. Not collected by default (filename is not test_*.py).
 
 The experiment wraps scipy.optimize.least_squares(method='trf', bounds=...)
 around NetworkSolver's existing _residuals_and_jacobian() callable. The

@@ -3472,9 +3472,14 @@ class BorderCarnotLossElement(NetworkElement):
         L = 4 * (1 - cos((3/4) * delta_geom))^2
 
     The (3/4) factor is Hager's effective-angle correction for sharp-edged
-    lateral branches. The form reproduces Hager xi_l and Bassett K_inc exactly
-    at M -> 0 on a sharp-edged 90-deg lateral. Straight-through ports
-    (delta_geom = 0) get L = 0 and need no loss element at all.
+    lateral branches. The form is *intended* to reproduce Hager xi_l and
+    Bassett K_inc at M -> 0 on a sharp-edged 90-deg lateral, but this is NOT
+    yet demonstrated: the Tier-1 tests
+    (``python/tests/test_momentum_cv_tier1_bassett.py``) are xfail, measuring
+    11-29% deviation from Bassett K6 on the lateral. See issue #272 -- do not
+    rely on this element being quantitatively anchored to Hager/Bassett.
+    Straight-through ports (delta_geom = 0) get L = 0 and need no loss element
+    at all.
 
     The element is sign-free in m_dot (mdot^2 in the dynamic head). The
     initial form has no direction asymmetry parameter; an

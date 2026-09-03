@@ -623,8 +623,10 @@ MultiPortChamberResult multi_port_chamber_residuals_and_jacobian(
 // Two-port in-line element: stagnation drop across the port.
 //   R = Pt_in - Pt_out - L(delta_geom) * 0.5 * rho_in * u_in^2 = 0
 //   L = 4 * (1 - cos((3/4) * delta_geom))^2     (PDF Section 3.1)
-// Sign-free (mdot^2 in the dynamic head); matches Hager xi_l and Bassett K_inc
-// at M -> 0 on a sharp-edged lateral with the Hager (3/4) correction.
+// Sign-free (mdot^2 in the dynamic head). The (3/4) correction is INTENDED to
+// match Hager xi_l and Bassett K_inc at M -> 0 on a sharp-edged lateral; that
+// agreement is unverified (Tier-1 tests are xfail at 11-29% deviation, see
+// issue #272), so treat the anchoring as a design goal, not a property.
 struct BorderCarnotLossResult {
   double residual;
   double d_res_dPt_in;

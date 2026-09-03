@@ -148,6 +148,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   version-sync checklist.
 
 ### Documentation
+- **Corrected the `BorderCarnotLossElement` / momentum-CV accuracy claim, which
+  was stated as fact in five places but is not established.** The Python
+  docstring, `include/solver_interface.h`, `include/multi_port_chamber.h`,
+  `docs/API_CPP.md` and the v3 addendum all asserted that
+  `L = 4*(1 - cos((3/4)*delta))^2` "reproduces Hager `xi_l` and Bassett `K_inc`
+  exactly at M -> 0". The repo's own Tier-1 tests
+  (`python/tests/test_momentum_cv_tier1_bassett.py`) are `xfail` and contradict
+  it. All five now state the anchoring as design intent with the measured
+  deviation and a pointer to issue #272, so nobody takes the element as
+  quantitatively validated against Hager/Bassett. **No behaviour change** --
+  the physics and the coefficient are untouched; only the accuracy claim is
+  corrected. Also refreshed the Tier-1 module docstring, which described a
+  model version predating the sin^2(theta) + cross-coupling integration
+  (including a sign-flipped `K_str`) and framed the disagreement as one
+  undisentangled question; it now carries the measured K table and separates
+  the two independent problems, and `experimental_bounded_solver.py` records
+  that bounds do *not* explain the gap.
 - **Documented the ejector's operating-regime limitations and the planned
   extension.** A new design note (`validation/ejector/OPERATING_REGIMES_DESIGN.md`)
   diagnoses a real non-converging low-primary-flow case: the critical-only
