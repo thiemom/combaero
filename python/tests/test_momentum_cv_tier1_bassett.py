@@ -4,14 +4,21 @@ Tier 1 validation: MPCE + BorderCarnotLoss vs Bassett 2001 / Hager 1984 at M -> 
 STATUS: both K tests are xfail. The PDF Section 3.4 claim "MPCE + loss element
 form 2 reproduces Hager exactly at M -> 0" does NOT hold. Tracked as issue #272.
 
-MEASURED (2026-09-03, sin^2(theta) impulse + cross-coupling in place, imposed-q
-network below, M_com = 0.025 throughout). K is defined here as
-(Pt_com - Pt_port) / q_dyn_com, so positive K = stagnation loss:
+CONVENTION (fixed 2026-09-04, was the source of a bogus comparison). Each
+Bassett coefficient is a function of the mass-flow fraction in ITS OWN leg, so
+K6 takes the lateral fraction but K2/K5 take the STRAIGHT fraction. `q` in this
+module is the lateral fraction, so K2 is evaluated at 1-q via the transform
+equivalences.py already defines. Evaluating K2 at the lateral fraction -- which
+an earlier local copy of the formula did -- compares against a mirrored curve.
+The corrected K2 target is identically Hager xi_t = q^2 - 0.5*q.
+
+MEASURED (imposed-q network below, M_com = 0.025 throughout). K is defined here
+as (Pt_com - Pt_port) / q_dyn_com, so positive K = stagnation loss:
 
     q     K_str   Bassett K2    K_lat   Bassett K6   K_lat bounded-LM
-   0.25   0.4375     0.1875     0.7751     0.8712        0.6799
+   0.25   0.4375    -0.0625     0.7751     0.8712        0.6799
    0.50   0.7500     0.0000     0.8657     0.8673        0.4847
-   0.75   0.9375    -0.0625     1.2719     0.9885        0.4145
+   0.75   0.9375     0.1875     1.2719     0.9885        0.4145
 
 Two SEPARATE problems, not one. Earlier revisions of this docstring framed it
 as a single undisentangled question and quoted formulas from a model version
@@ -19,15 +26,57 @@ that predates the sin^2(theta) + cross-coupling integration; both are corrected
 here against the numbers above.
 
 1. K_straight: a MODEL gap, and the cleaner of the two.
-   The sin^2(theta) projection gives exactly K_str = 2*q - q^2 (reproduced to
-   4 decimals in the table, under BOTH the default and the bounded solver --
-   it is solver-independent), against Bassett K2 = q^2 - 1.5*q + 0.5. These
-   are different functions, not a tuning discrepancy: they cross zero in
-   different places and have opposite slope over Bassett's range. Either the
-   straight-port projection is wrong, or Bassett K2 is outside what the
-   impulse formulation can represent. That decision has not been made.
-   (Note the sign convention: 2*q - q^2, NOT the q^2 - 2*q quoted by older
-   comments -- the measured values are positive.)
+   The model gives exactly K_str = 2*q - q^2, solver-independently (identical
+   under the default and the bounded solver), against the corrected reference
+   q^2 - 0.5*q. The reference crosses zero at q=0.5 and stays small; the model
+   is positive across the whole range and roughly an order of magnitude larger.
+
+   ROOT CAUSE -- the sin^2(theta) gate on the port's OWN angle. The kernel
+   (src/solver_interface.cpp) evaluates
+
+       R_i = P_i + sin^2(theta_i) * rho_i*u_i^2 + cross_i - P_jct
+
+   so a collinear port (theta_i = 0) has its momentum flux gated OFF and
+   reduces to STATIC pressure equality P_i = P_jct -- not the impulse function
+   R_mom,i = (P_i + rho_i*u_i^2) - P_jct that the implementation guide states
+   for every port. That gate is the whole story:
+
+       static equality  (implemented) -> K_str = 2*q - q^2   (positive)
+       impulse function (spec)        -> K_str = q^2 - 2*q   (negative)
+
+   Note this is NOT settled by sweeping the LATERAL angle -- K_str is
+   bit-identical at 30/45/60/90/120 deg there, which is why an earlier revision
+   of this docstring wrongly concluded the projection was inert on this port.
+   Sweeping the STRAIGHT port's own angle moves it a long way: at q=0.5,
+   K_str = 0.7500 / 0.2759 / -0.0485 / -0.1754 at theta_straight =
+   0 / 15 / 30 / 45 deg.
+
+   WHY IT MATTERS -- the junction is loss-free BY DESIGN (empirical loss lives
+   in separate per-port elements), so the question is not whether the junction
+   alone reproduces a dissipative reference, but whether the loss a port
+   element would have to supply is physically realisable:
+
+       from the implemented static form : 2*q^2 - 2.5*q   NEGATIVE
+                                          (-0.75 at q=0.5: needs pressure
+                                          RECOVERY; no loss element can do it)
+       from the spec impulse form       : 1.5*q           NON-NEGATIVE
+                                          (0 at q=0, 1.5 at q=1: realisable)
+
+   So the spec residual leaves a deficit a loss element can close and the
+   implemented one does not. That points at the collinear-port gate as the
+   defect rather than at a capability limit of the closure.
+
+   Note also that the required 1.5*q is LINEAR in the split ratio, not
+   quadratic in a local velocity: a constant-coefficient element referenced to
+   the straight leg supplies L*(1-q)^2, referenced to the common leg L. Neither
+   is 1.5*q, so closing this needs a q-dependent (Mynard-style) coefficient --
+   i.e. a junction quantity, which is an argument for folding the straight-port
+   loss into the closure rather than a standalone element.
+
+   FIXTURE CAVEAT: this network attaches a BorderCarnotLossElement to the
+   lateral but a LosslessConnectionElement to the straight leg, then compares
+   K_straight against a dissipative reference. The comparison is only
+   meaningful once the straight port carries its loss too.
 
 2. K_lateral: closer, and NOT explained by solver basin choice.
    The default solver agrees with Bassett K6 to 11.0% / 0.2% / 28.7% at
@@ -68,21 +117,39 @@ from combaero.network import (
     NetworkSolver,
     PressureBoundary,
 )
+from validation.junction.equivalences import q_transform
+from validation.junction.models import bassett2001
 
 _DRY_AIR_Y = list(cb.mole_to_mass(cb.species.dry_air()))
 _F_C = 0.01  # 100 cm^2
 _M_DOT_IN = 0.1  # kg/s -- low-Mach inlet
 
 
+# Each Bassett coefficient is a function of the mass-flow fraction in ITS OWN
+# leg -- equivalences.py: "q = m_other / m_com, where m_other is the flow leg
+# defining the K". So K6 (lateral) takes the lateral fraction while K2/K5
+# (straight) take the STRAIGHT fraction. `q` throughout this module is the
+# lateral fraction (m_lateral / m_in), which is Hager's convention, so K2 needs
+# the 1-q transform that equivalences.py already defines for hager1984/xi_t.
+#
+# The canonical implementations are imported rather than re-typed: local copies
+# are how the transform got skipped in the first place, and K2 evaluated at the
+# lateral fraction is a mirrored curve, not Bassett's straight-loss coefficient.
+_Q_TO_K2 = q_transform("hager1984", "xi_t")
+
+
 def _K6_bassett(q: float, psi: float = 1.0, theta_rad: float = math.pi / 2.0) -> float:
-    """Bassett 2001 Eq. 27 (separating flow, lateral / main-to-branch loss).
-    Already includes Hager 3/4-correction."""
-    return q * q * psi * psi + 1.0 - 2.0 * q * psi * math.cos(0.75 * theta_rad)
+    """Bassett Eq. 27 (separating lateral loss) at the lateral fraction q."""
+    return bassett2001.K6(q, psi, theta_rad)
 
 
 def _K2_bassett(q: float) -> float:
-    """Bassett 2001 Eq. 15 (separating flow, straight loss). theta- and psi-independent."""
-    return q * q - 1.5 * q + 0.5
+    """Bassett Eq. 15 (separating straight loss) for a lateral fraction q.
+
+    Evaluates the canonical K2 at the straight fraction 1-q. The result is
+    identically Hager xi_t = q^2 - 0.5*q, as it must be.
+    """
+    return bassett2001.K2(_Q_TO_K2(q))
 
 
 def _build_imposed_q_network(m_in: float, m_lateral: float, Pt_ref: float = 1.0e5) -> FlowNetwork:
@@ -217,12 +284,13 @@ def test_low_mach_K_lateral_agrees_with_bassett_K6():
 
 @pytest.mark.xfail(
     reason=(
-        "MODEL gap, not solver degeneracy: the sin^2(theta) projection gives "
-        "exactly K_str = 2*q - q^2 under BOTH the default and the bounded "
-        "solver, against Bassett K2 = q^2 - 1.5*q + 0.5 -- different "
-        "functions, opposite slope over Bassett's range. Either the "
-        "straight-port projection is wrong or K2 is outside what the impulse "
-        "formulation can represent; undecided. Issue #272."
+        "The collinear straight port has its momentum flux gated off by "
+        "sin^2(theta_i)=0, so it uses static equality (K_str = 2*q - q^2) "
+        "rather than the impulse function the spec states (q^2 - 2*q), "
+        "against the corrected reference q^2 - 0.5*q. Under the spec form a "
+        "straight-port loss element would need 1.5*q (realisable); under the "
+        "implemented form 2*q^2 - 2.5*q (negative, unrealisable). Also, this "
+        "fixture leaves the straight leg lossless. Issue #272."
     ),
     strict=False,
 )

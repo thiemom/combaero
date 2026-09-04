@@ -59,7 +59,13 @@ def _K6_bassett(q, psi=1.0, theta_rad=math.pi / 2.0):
 
 
 def _K2_bassett(q):
-    return q * q - 1.5 * q + 0.5
+    """Bassett K2 for a LATERAL fraction q.
+
+    K2 is indexed on the straight leg, so it is evaluated at 1-q; the result is
+    identically Hager xi_t. Evaluating it at q compares against a mirrored
+    curve (issue #272).
+    """
+    return (1.0 - q) ** 2 - 1.5 * (1.0 - q) + 0.5
 
 
 def _build_imposed_q_network(m_in, m_lateral, Pt_ref=1.0e5):
@@ -215,10 +221,12 @@ def test_bounded_solver_K_lateral_vs_bassett_K6(q):
 
 @pytest.mark.xfail(
     reason=(
-        "MPCE sin^2(theta) + cross-coupling fixes K_lateral but not K_straight. "
-        "The sin^2(theta) projection gives K_str = 2q - q^2 (matches "
-        "empirically) but Bassett K2 = q^2 - 1.5q + 0.5. Separate model issue, "
-        "tracked separately."
+        "Bounds fix neither coefficient. The model gives K_str = 2q - q^2 "
+        "against the corrected reference q^2 - 0.5q (Bassett K2 at the "
+        "straight fraction). Not a projection error -- the straight port is "
+        "collinear, so K_str is angle-independent. A sign-free single-P_jct "
+        "CV can only yield Bernoulli recovery on a port with no loss element. "
+        "Tracked in issue #272."
     ),
     strict=False,
 )
