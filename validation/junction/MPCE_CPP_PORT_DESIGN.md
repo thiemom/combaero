@@ -106,16 +106,17 @@ coverage check:
 | constant | tuned over | in-network data covering that range | scored today | gap |
 |---|---|---|---|---|
 | `joining_etransfer_alpha = 0.2` | psi 1.25-3.33, theta {30, 45, 90}, joining type 6 (Bassett K11_corr/K12_corr + Idelchik anchors) | **Idelchik K11/K12: theta 30/45/90 x psi 1, 1.25, 1.67, 2.5, 3.33, 5, 10** (36 files) -- covers the range and beyond; Bassett Fig 10c/11b psi 1-4 at 45 deg | **no** | none in coverage; entirely in scoring. Proof = before/after table, alpha=0 vs 0.2, on Idelchik + Bassett psi sweeps |
-| Mynard `eta`: a0=0.8, a1=-0.2 | Mynard Fig 4 only: dividing Y-junction, 90 deg between collectors, orientation swept 0-90 deg, lambda=0.5, Re 1363-1817 | Bassett K5/K6 at theta=90, psi=1 is the **orientation = 0 endpoint** of that sweep (a T is a Y with one collector at 0); nothing covers orientations 15-75 deg or the symmetric Y | partially (that one endpoint) | **coverage gap**: the sweep `eta` was fitted to is not in the repo. Fig 4 is one clean 7-point curve -- digitise it |
+| Mynard `eta`: a0=0.8, a1=-0.2 | Mynard Fig 4: dividing Y-junction, Re 1363-1817 blood flow -- **a different scope**. A CFD-derived correction is a tuning, and its proof is not reproducing the CFD it came from but improving agreement on the data for **our** regime | Bassett K5/K6 (dividing, engine Re) and Hager xi_t | partially (Hager unscored) | none in coverage. Proof = before/after table, `eta` on vs off (a0=a1=0), on Bassett K5/K6 + Hager. If it does not improve the dividing cells it is a tuning that does not earn its place here |
 | Matlab damping `1 - exp(-FR/0.02)` | not tuned; a regulariser for FR -> 0 | Bassett curves reach q ~ 0 and q ~ 1, i.e. FR -> 0 on one collector | yes | none in coverage. Proof = sensitivity of the endpoint K to the 0.02 knob; document as regulariser, not physics |
 | Hager 3/4 deviation, Bassett CV, dividing-streamline `p*` | derived, not tuned (three independent papers) | Bassett K5/K6/K11/K12, Hager xi_t | partially (Hager unscored) | none once Hager is scored |
 | compressible `kappa M^2` (`K_dat_j_closed`, v3 spec sec 5) | derived analytically, **not yet proven against any data** | Wang 2014: joining, 45 deg, M 0.1-0.6, area ratio 1/1.56/2.44 (30 files); Perez-Garcia: 90 deg, C1/C2/D1/D2, M* 0.15-0.7 (**not digitised**) | **no** | **coverage gap**: no compressible dividing data at 45 deg, no compressible psi != 1 at 90 deg; Perez-Garcia must be digitised before dividing-flow compressibility can be claimed at all |
 
-Two of the five have a coverage gap that no amount of scoring closes:
-`eta`'s tuning sweep and the compressible dividing regime. Both are
-digitisation jobs on figures already on disk (Mynard Fig 4; Perez-Garcia
-tables in `tier2_reference_data.md`), and both should be done before the
-corresponding constant is written into C++.
+One of the five has a coverage gap that scoring alone cannot close: the
+compressible dividing regime, which needs Perez-Garcia digitised from the
+tables in `tier2_reference_data.md` before `kappa` can be claimed for
+dividing flow. **Mynard's CFD is deliberately not reproduced** -- his scope
+(blood flow, Re 350-2400) is not ours, and a CFD-fitted term is a tuning, so
+the bar it has to clear is our validation data, not his figures.
 
 **Labelling.** Each tuned constant carries, at its definition: the source
 figure/table it was fitted to, the range, the date, and the scorecard cell
@@ -171,7 +172,7 @@ This is the provenance step that decides whether a port is *verified* or just
 | Idelchik 1966 | 36 | K11, K12 tabulated at theta 30/45/90, psi 1..10 | joining, psi sweep | **no** -- used only by the alpha calibration script |
 | Wang 2014 | 30 | K_13, K_23 | joining, **compressible** M 0.1-0.6, 45 deg | **no** (Tier 2, no tests) |
 | Perez-Garcia 2010 | 0 csv | correlations in `tier2_reference_data.md` | **compressible** 90 deg, M* 0.15-0.7 | **no** -- not even digitised |
-| Mynard 2015 Figs 6-11 | 0 | CFD Ref3D, six flow types, Re 350-2400 | the regime `eta` was fitted in | **no** -- not digitised |
+| Mynard 2015 Figs 6-11 | 0 | CFD Ref3D, six flow types, Re 350-2400 | different scope; `eta` treated as a tuning | **by decision, not reproduced** |
 
 Consequences:
 
@@ -188,10 +189,9 @@ Consequences:
 - **Nothing compressible is scored**, and MPCEv2 has no compressibility to
   score. Wang is digitised; Perez-Garcia needs digitising from the tables in
   `tier2_reference_data.md`.
-- **Mynard's own CFD is not digitised**, so the two Mynard-fitted constants
-  (`eta` coefficients, and the implicit claim that the closure holds at the
-  Re it was built for) have no reference in the repo at all. Figs 6-9 (Types
-  1-3, dividing) and 9-11 (Types 4-6, converging) are the missing anchor.
+- **Mynard's own CFD is not digitised, and by decision will not be.** His
+  scope is blood flow at Re 350-2400; the `eta` term it produced is a tuning
+  whose bar is our engine-Re data, not a reproduction of his figures.
 
 ## 7. Bugs found, fixable now, independent of the port
 
@@ -281,9 +281,10 @@ Taken (user, 2026-09-04):
    first with an exact equivalence gate; move to Mynard-native `C_j` as a
    separate, later, data-gated change. Never both in one step.
 2. **Tuned corrections** (`alpha`, `eta`, damping, and any future one) prove
-   themselves against validation data covering their tuning range, and are
-   labelled as tuned. Sec 4a is the coverage check; its two gaps are
-   digitisation jobs that precede the corresponding C++.
+   themselves against validation data for our regime, and are labelled as
+   tuned. CFD-derived corrections count as tuning; the CFD they came from is
+   **not** reproduced. Sec 4a is the coverage check; its one remaining gap
+   (compressible dividing flow) is a digitisation job that precedes `kappa`.
 3. **Compressible corrections** are appealing and held to the same bar --
    Wang plus a digitised Perez-Garcia before `kappa` is claimed.
 
