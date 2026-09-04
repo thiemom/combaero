@@ -7,6 +7,38 @@ Mynard & Valen-Sendstad 2015), the internal compressible spec
 `MPCEv2Element` to C++, what has to be fixed before that is safe, and what the
 digitised data can and cannot prove.
 
+## 0. Policy checklist -- re-read before starting ANY step
+
+Context drift is the enemy over a long piece of work. Each step opens by
+re-reading this list and stating which items bind it. Items are the user's
+decisions (2026-09-04), not mine.
+
+1. **Ground truth is digitised measured data for our regime** (engine air,
+   high Re, compressible). Bassett, Hager, Idelchik, Wang, Perez-Garcia. Not
+   a paper's own CFD, not the current code's output, not a 3-point fixture.
+2. **Every tuned constant proves itself with an on/off (or old/new)
+   before-after table** on the scorecard cells covering its range, and is
+   labelled at its definition: source, fitted range, date, proving cell.
+   CFD-derived corrections are tunings; the source CFD is not reproduced.
+3. **Retune after every fix, physics or code.** A constant fitted with a bug
+   present may have absorbed it. The intermediate state (bug fixed, tuning
+   stale) can look worse -- that is incomplete follow-through, not a wrong
+   fix. Follow it through: fix, re-fit, measure.
+4. **Never falsify a change by removing one half of a matched pair.** If two
+   terms were designed together, test them together (#272 gate + cross term).
+5. **Residual-form change is stepwise and tested.** Faithful `Pt` form first
+   with an exact equivalence gate; Mynard-native `C_j` later, data-gated.
+   Never both in one PR.
+6. **Compressible corrections meet the same bar** as any other tuning.
+7. **Baseline before, score after, revert on a no.** Write the numbers down
+   either way. A negative result reported honestly is a good outcome.
+8. **A declared limitation is an unmeasured assumption until it has a
+   number.** ("K5 not reproduced", "dead code", "gate is load-bearing" --
+   all three were wrong this arc.)
+9. **Reachable-but-unexercised code gets a test on its precondition; a known
+   defect left unfixed is a `strict=True` xfail asserting the correct
+   behaviour**, never a green test on the wrong one.
+
 ## 1. Verdict in five lines
 
 1. **The port is an assembly job, not a rewrite.** A complete C++ Unified0D
