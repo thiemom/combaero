@@ -8,7 +8,7 @@ load_dataset() entrypoint.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
@@ -89,7 +89,8 @@ def _load_one_paper(paper_dir: Path) -> tuple[PaperMetadata, list[FileMetadata]]
                 K_id=e.get("K_id"),
                 coefficient=e.get("coefficient") or e.get("K_id"),
                 psi=e.get("psi"),
-                theta_deg=e.get("theta_deg"),
+                # Hager 1984 names the lateral angle delta; same quantity.
+                theta_deg=e.get("theta_deg", e.get("delta_deg")),
                 a=e.get("a"),
                 q=e.get("q"),
                 M_3=e.get("M_3"),

@@ -21,7 +21,10 @@
 #   F_b/F_c=0.8 -> psi=1.25
 #   F_b/F_c=1.0 -> psi=1.0
 #
-# q convention: q = Q_b/Q_c (branch flow over common flow). Same as Bassett's
+# q convention: q = Q_b/Q_c (branch flow over common flow) for EVERY diagram,
+# K11 included. This matches Bassett's K12 axis but NOT his K11 axis (Bassett
+# Table 1 indexes K11 on Q_s/Q_c, the straight leg). Adapters must not apply
+# Bassett's 1-q to Idelchik K11. Same as Bassett's
 # joining-type-6 q definition (m_lat / m_com), so all bassett2001 K11/K12
 # comparisons apply directly without unit-conversion.
 #

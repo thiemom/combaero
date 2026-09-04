@@ -85,6 +85,41 @@ def test_mpce_v2_joining_K11_uses_the_straight_inlet_fraction():
     assert straight.K_lateral == pytest.approx(lateral.K_lateral, rel=1e-9)
 
 
+def test_hager_xi_t_is_scored_on_the_lateral_fraction_directly():
+    """Hager's q = Delta_Q / Q is already the lateral fraction.
+
+    Unlike Bassett K5, it must NOT get the 1-q transform when building the
+    network: that transform maps Hager onto Bassett's straight-fraction axis
+    for cross-paper rollup, not onto the network. Pinned by symmetry against
+    the K6 path, which is indexed on the lateral leg too: xi_t at q and K6 at
+    the same q must build the same separating network.
+    """
+    model = MPCEv2Network()
+    hager = model.evaluate_network("hager1984", "xi_t", 0.3, 1.0, math.pi / 2.0)
+    bassett = model.evaluate_network("bassett2001", "K6", 0.3, 1.0, math.pi / 2.0)
+
+    assert hager.converged and bassett.converged
+    assert hager.K_straight == pytest.approx(bassett.K_straight, rel=1e-9)
+    assert hager.K_lateral == pytest.approx(bassett.K_lateral, rel=1e-9)
+
+
+def test_idelchik_K11_is_indexed_on_the_lateral_fraction_unlike_bassett():
+    """Idelchik tabulates EVERY diagram against Q_b/Q_c, K11 included.
+
+    Bassett re-indexes K11 on the straight leg; Idelchik does not. Applying
+    Bassett's 1-q to Idelchik K11 mirrors the curve. Pinned by symmetry:
+    Idelchik K11 and K12 at the SAME q must build the same joining network,
+    whereas Bassett K11 at q pairs with K12 at 1-q.
+    """
+    model = MPCEv2Network()
+    k11 = model.evaluate_network("idelchik1966", "K11", 0.3, 2.5, math.radians(45.0))
+    k12 = model.evaluate_network("idelchik1966", "K12", 0.3, 2.5, math.radians(45.0))
+
+    assert k11.converged and k12.converged
+    assert k11.K_straight == pytest.approx(k12.K_straight, rel=1e-9)
+    assert k11.K_lateral == pytest.approx(k12.K_lateral, rel=1e-9)
+
+
 def test_network_runner_produces_records_and_scorecard():
     """End-to-end: TeeJunctionElement run produces records across multiple
     topologies and the network-cell scorecard groups by them."""
