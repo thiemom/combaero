@@ -8,12 +8,11 @@ differs.
 
 Coverage limitations match the MPCE-v1 milestone scope (see
 `python/tests/test_momentum_cv_tier1_bassett.py`):
-  - K6 (separating lateral): MPCE+cross-coupling reproduces Bassett K6
-    within ~15% under bounded LM solver. Default NetworkSolver lands on
-    a different basin for imposed-q topology; expect non-convergence or
-    biased K extraction.
-  - K5 (separating straight): not reproduced -- sin^2(theta=0) loses
-    axial dynamic-head coupling.
+  - K5/K2 (separating straight) and K6 (separating lateral) are both
+    extracted from the same separating network and scored against the
+    Bassett measured curves. K_straight was previously declared
+    unsupported because the sin^2(theta_i) gate collapsed the collinear
+    port to static pressure equality; the gate was removed in issue #272.
   - K12 (joining): wrong cross-coupling sign for joining-flow direction
     convention. Tracked as MPCE-v2 follow-up.
 
@@ -70,12 +69,20 @@ class MPCEv1Network:
             return NetworkResult(
                 converged=False, message=f"topology {topology!r} not wired for this adapter"
             )
-        if K_id == "K6":
-            return self._separating_lateral(q, psi or 1.0, theta_rad or math.pi / 2.0, topology)
-        if K_id in {"K5", "K2"}:
-            return NetworkResult(
-                converged=False,
-                message="K_straight: MPCE-v1 known limitation (sin^2(0)=0 loses coupling)",
+        # K5/K2 (straight) and K6 (lateral) come from the same separating
+        # network; the runner selects which coefficient it reads. K_straight
+        # used to be declared unsupported because the sin^2(theta_i) gate
+        # collapsed the collinear port to static equality; with the gate
+        # removed (issue #272) it is a real prediction and is scored.
+        if K_id in {"K5", "K2", "K6"}:
+            # Bassett indexes each coefficient by the fraction in ITS OWN leg
+            # (equivalences.py), so a K5/K2 file's q is the STRAIGHT fraction
+            # while K6's is the lateral one. The network is built from the
+            # lateral fraction, so straight-leg coefficients need 1-q. Feeding
+            # the raw q builds a mirrored operating point (issue #272).
+            q_lateral = 1.0 - q if K_id in {"K5", "K2"} else q
+            return self._separating(
+                q_lateral, psi or 1.0, theta_rad or math.pi / 2.0, topology
             )
         if K_id in {"K11", "K12"}:
             return NetworkResult(
@@ -84,7 +91,7 @@ class MPCEv1Network:
             )
         return NetworkResult(converged=False, message=f"K_id {K_id} not in MPCE-v1 scope")
 
-    def _separating_lateral(
+    def _separating(
         self, q: float, psi: float, theta_rad: float, topology: Topology
     ) -> NetworkResult:
         """MPCE + per-port BorderCarnotLoss in any of the 3 separating topologies."""
