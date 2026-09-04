@@ -64,10 +64,32 @@ class MPCEv2Network:
         topology: Topology = "imposed_q",
         **kwargs: float,
     ) -> NetworkResult:
-        if paper != "bassett2001":
-            return NetworkResult(converged=False, message="non-Bassett papers unsupported")
         if topology not in self.SUPPORTED_TOPOLOGIES:
             return NetworkResult(converged=False, message=f"topology {topology!r} not wired")
+        if paper == "hager1984":
+            # Hager's q = Delta_Q / Q is the LATERAL fraction (hager1984.py
+            # notation block), which is what the network is built from, so it
+            # passes straight through -- the 1-q in equivalences.py maps Hager
+            # onto Bassett's straight-fraction axis for cross-paper rollup,
+            # not onto the network. xi_t and xi_l are extracted from the same
+            # separating network as K5/K6.
+            if K_id in {"xi_t", "xi_l"}:
+                return self._separating(q, psi or 1.0, theta_rad or math.pi / 2.0, topology)
+            return NetworkResult(converged=False, message=f"hager1984 coefficient {K_id} not wired")
+        if paper == "idelchik1966":
+            # Handbook joining tables in Bassett-comparable geometry, but with
+            # a SINGLE abscissa: every diagram is tabulated against
+            # Q_b/Q_c, the lateral fraction (metadata line 5). Unlike Bassett
+            # Table 1, K11 is NOT re-indexed on the straight leg, so both
+            # coefficients pass q through unchanged. Applying Bassett's 1-q
+            # here mirrors the K11 curve -- that was the first wiring attempt.
+            if K_id in {"K11", "K12"}:
+                return self._joining(q, psi or 1.0, theta_rad or math.pi / 2.0, topology)
+            return NetworkResult(
+                converged=False, message=f"idelchik1966 coefficient {K_id} not wired"
+            )
+        if paper != "bassett2001":
+            return NetworkResult(converged=False, message=f"paper {paper!r} not wired")
         if K_id in {"K6", "K5", "K2"}:
             return self._separating(q, psi or 1.0, theta_rad or math.pi / 2.0, topology)
         if K_id in {"K11", "K12"}:
