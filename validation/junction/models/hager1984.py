@@ -5,17 +5,28 @@ Reference: W H Hager, "An approximate treatment of flow in branches and bends",
 Proc IMechE Part C, 198C(4):63-69, 1984.
 
 Foundational paper introducing the (3/4)*delta angle correction adopted by
-Bassett. Considers equal-area T-junctions only (psi = 1 implicit). Both
-formulas reduce to special cases of Bassett's K2/K5 (straight) and K6 (lateral)
-at psi = 1.
+Bassett. Considers equal-area T-junctions only (psi = 1 implicit).
 
 Notation:
     q     = Delta_Q / Q  (mass flow ratio; lateral / total)
     delta = lateral branch angle [rad]
 
 Variables:
-    xi_t  = straight-through loss coefficient (= K5 / K2 of Bassett at psi=1)
-    xi_l  = lateral loss coefficient (= K6 of Bassett at psi=1)
+    xi_t  = straight-through loss coefficient
+    xi_l  = lateral loss coefficient (= K6 of Bassett at psi=1, same q)
+
+Relation to Bassett at psi = 1 -- MIND THE q CONVENTION. Bassett indexes each
+coefficient by the mass-flow fraction in ITS OWN leg, so his K2/K5 (straight)
+take the STRAIGHT fraction while Hager's q here is the lateral fraction:
+
+    xi_t(q) == K2(1 - q) == K5(1 - q)        NOT K2(q)
+    xi_l(q) == K6(q)                          (both indexed on the lateral leg)
+
+The transform is applied for you by equivalences.q_transform("hager1984",
+"xi_t"); do not compare xi_t against K2 evaluated at the same q, which is a
+mirrored curve. (An earlier version of this docstring claimed a direct
+equivalence and a local copy of K2 in the Tier-1 tests skipped the transform;
+see issue #272.)
 """
 
 from __future__ import annotations
