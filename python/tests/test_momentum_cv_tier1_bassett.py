@@ -31,25 +31,52 @@ here against the numbers above.
    q^2 - 0.5*q. The reference crosses zero at q=0.5 and stays small; the model
    is positive across the whole range and roughly an order of magnitude larger.
 
-   This is NOT an angle-projection error, and that is settled rather than
-   assumed: the straight and common ports are collinear, so any sin^2/cos^2
-   projection is inert there, and K_str is bit-identical (0.7500 at q=0.5) for
-   branch angles of 30, 45, 60, 90 and 120 degrees. A projection bug could only
-   show up on the lateral.
+   ROOT CAUSE -- the sin^2(theta) gate on the port's OWN angle. The kernel
+   (src/solver_interface.cpp) evaluates
 
-   A bare equal-area mass+momentum control volume with the sign-free single
-   P_jct residual gives K_str = (1-q)^2 - 1 = q^2 - 2*q: uniformly negative on
-   0<q<1, no zero-crossing, pure Bernoulli recovery. A conservation CV with no
-   dissipation term cannot produce genuine total-pressure loss on a port that
-   carries no loss element, which is what the reference demands at high q. So
-   the open question is a modelling-capability one -- add a dissipation term on
-   the straight port, or document that this closure cannot represent
-   K_straight > 0 and treat the reference as out of envelope.
+       R_i = P_i + sin^2(theta_i) * rho_i*u_i^2 + cross_i - P_jct
 
-   UNEXPLAINED: that derivation gives q^2 - 2*q, but the implementation
-   measures +(2*q - q^2) -- same magnitude, opposite sign. Whatever flips it
-   (cross-coupling, or a sign in the impulse assembly) is not accounted for and
-   should be identified before the closure is rebuilt.
+   so a collinear port (theta_i = 0) has its momentum flux gated OFF and
+   reduces to STATIC pressure equality P_i = P_jct -- not the impulse function
+   R_mom,i = (P_i + rho_i*u_i^2) - P_jct that the implementation guide states
+   for every port. That gate is the whole story:
+
+       static equality  (implemented) -> K_str = 2*q - q^2   (positive)
+       impulse function (spec)        -> K_str = q^2 - 2*q   (negative)
+
+   Note this is NOT settled by sweeping the LATERAL angle -- K_str is
+   bit-identical at 30/45/60/90/120 deg there, which is why an earlier revision
+   of this docstring wrongly concluded the projection was inert on this port.
+   Sweeping the STRAIGHT port's own angle moves it a long way: at q=0.5,
+   K_str = 0.7500 / 0.2759 / -0.0485 / -0.1754 at theta_straight =
+   0 / 15 / 30 / 45 deg.
+
+   WHY IT MATTERS -- the junction is loss-free BY DESIGN (empirical loss lives
+   in separate per-port elements), so the question is not whether the junction
+   alone reproduces a dissipative reference, but whether the loss a port
+   element would have to supply is physically realisable:
+
+       from the implemented static form : 2*q^2 - 2.5*q   NEGATIVE
+                                          (-0.75 at q=0.5: needs pressure
+                                          RECOVERY; no loss element can do it)
+       from the spec impulse form       : 1.5*q           NON-NEGATIVE
+                                          (0 at q=0, 1.5 at q=1: realisable)
+
+   So the spec residual leaves a deficit a loss element can close and the
+   implemented one does not. That points at the collinear-port gate as the
+   defect rather than at a capability limit of the closure.
+
+   Note also that the required 1.5*q is LINEAR in the split ratio, not
+   quadratic in a local velocity: a constant-coefficient element referenced to
+   the straight leg supplies L*(1-q)^2, referenced to the common leg L. Neither
+   is 1.5*q, so closing this needs a q-dependent (Mynard-style) coefficient --
+   i.e. a junction quantity, which is an argument for folding the straight-port
+   loss into the closure rather than a standalone element.
+
+   FIXTURE CAVEAT: this network attaches a BorderCarnotLossElement to the
+   lateral but a LosslessConnectionElement to the straight leg, then compares
+   K_straight against a dissipative reference. The comparison is only
+   meaningful once the straight port carries its loss too.
 
 2. K_lateral: closer, and NOT explained by solver basin choice.
    The default solver agrees with Bassett K6 to 11.0% / 0.2% / 28.7% at
@@ -257,14 +284,13 @@ def test_low_mach_K_lateral_agrees_with_bassett_K6():
 
 @pytest.mark.xfail(
     reason=(
-        "MODEL gap, not solver degeneracy and not a projection error: the "
-        "model gives K_str = 2*q - q^2 solver-independently, against the "
-        "corrected reference q^2 - 0.5*q (Bassett K2 at the straight "
-        "fraction). K_str is bit-identical across branch angles 30-120 deg, "
-        "so the collinear straight port cannot be affected by the sin^2 "
-        "projection. A sign-free single-P_jct CV yields only Bernoulli "
-        "recovery on a port with no loss element; representing K_straight > 0 "
-        "needs a dissipation term. Issue #272."
+        "The collinear straight port has its momentum flux gated off by "
+        "sin^2(theta_i)=0, so it uses static equality (K_str = 2*q - q^2) "
+        "rather than the impulse function the spec states (q^2 - 2*q), "
+        "against the corrected reference q^2 - 0.5*q. Under the spec form a "
+        "straight-port loss element would need 1.5*q (realisable); under the "
+        "implemented form 2*q^2 - 2.5*q (negative, unrealisable). Also, this "
+        "fixture leaves the straight leg lossless. Issue #272."
     ),
     strict=False,
 )
