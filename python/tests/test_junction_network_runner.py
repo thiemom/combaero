@@ -7,6 +7,7 @@ import math
 import pytest
 
 from validation.junction.models.mpce_v1_network import MPCEv1Network
+from validation.junction.models.mpce_v2_network import MPCEv2Network
 from validation.junction.models.tee_junction_element_network import (
     TeeJunctionElementNetwork,
 )
@@ -60,6 +61,24 @@ def test_mpce_straight_K_uses_the_straight_leg_fraction():
     model = MPCEv1Network()
     straight = model.evaluate_network("bassett2001", "K5", 0.3, 1.0, math.pi / 2.0)
     lateral = model.evaluate_network("bassett2001", "K6", 0.7, 1.0, math.pi / 2.0)
+
+    assert straight.converged and lateral.converged
+    assert straight.K_straight == pytest.approx(lateral.K_straight, rel=1e-9)
+    assert straight.K_lateral == pytest.approx(lateral.K_lateral, rel=1e-9)
+
+
+def test_mpce_v2_joining_K11_uses_the_straight_inlet_fraction():
+    """K11's q is the straight inlet fraction; K12's is the lateral one.
+
+    Bassett Table 1 indexes each joining coefficient by the fraction in its own
+    inlet leg -- K11 on mdot_A/mdot_C, K12 on mdot_B/mdot_C. Building the
+    network from a K11 file's q without the 1-q transform picks a mirrored
+    operating point, the same defect the separating side carried. Pinned by
+    symmetry: K11 at q and K12 at 1-q must be the SAME network.
+    """
+    model = MPCEv2Network()
+    straight = model.evaluate_network("bassett2001", "K11", 0.3, 1.0, math.pi / 2.0)
+    lateral = model.evaluate_network("bassett2001", "K12", 0.7, 1.0, math.pi / 2.0)
 
     assert straight.converged and lateral.converged
     assert straight.K_straight == pytest.approx(lateral.K_straight, rel=1e-9)
