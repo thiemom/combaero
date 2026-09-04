@@ -95,6 +95,33 @@ Three items are fudge-shaped in the sense the model-provenance discipline
 means: the damping knob, the alpha term, and -- less severely -- `eta`, which
 is real physics but fitted in a regime combaero does not operate in.
 
+## 4a. Policy for tuned corrections, and where the data does not reach
+
+Decision (user, 2026-09-04): **any empirical or CFD-derived correction must
+prove itself against validation data, be labelled and documented as tuned,
+and the validation data must cover the range it was tuned over.** Compressible
+corrections are held to the same bar. This turns sec 4's audit into a
+coverage check:
+
+| constant | tuned over | in-network data covering that range | scored today | gap |
+|---|---|---|---|---|
+| `joining_etransfer_alpha = 0.2` | psi 1.25-3.33, theta {30, 45, 90}, joining type 6 (Bassett K11_corr/K12_corr + Idelchik anchors) | **Idelchik K11/K12: theta 30/45/90 x psi 1, 1.25, 1.67, 2.5, 3.33, 5, 10** (36 files) -- covers the range and beyond; Bassett Fig 10c/11b psi 1-4 at 45 deg | **no** | none in coverage; entirely in scoring. Proof = before/after table, alpha=0 vs 0.2, on Idelchik + Bassett psi sweeps |
+| Mynard `eta`: a0=0.8, a1=-0.2 | Mynard Fig 4 only: dividing Y-junction, 90 deg between collectors, orientation swept 0-90 deg, lambda=0.5, Re 1363-1817 | Bassett K5/K6 at theta=90, psi=1 is the **orientation = 0 endpoint** of that sweep (a T is a Y with one collector at 0); nothing covers orientations 15-75 deg or the symmetric Y | partially (that one endpoint) | **coverage gap**: the sweep `eta` was fitted to is not in the repo. Fig 4 is one clean 7-point curve -- digitise it |
+| Matlab damping `1 - exp(-FR/0.02)` | not tuned; a regulariser for FR -> 0 | Bassett curves reach q ~ 0 and q ~ 1, i.e. FR -> 0 on one collector | yes | none in coverage. Proof = sensitivity of the endpoint K to the 0.02 knob; document as regulariser, not physics |
+| Hager 3/4 deviation, Bassett CV, dividing-streamline `p*` | derived, not tuned (three independent papers) | Bassett K5/K6/K11/K12, Hager xi_t | partially (Hager unscored) | none once Hager is scored |
+| compressible `kappa M^2` (`K_dat_j_closed`, v3 spec sec 5) | derived analytically, **not yet proven against any data** | Wang 2014: joining, 45 deg, M 0.1-0.6, area ratio 1/1.56/2.44 (30 files); Perez-Garcia: 90 deg, C1/C2/D1/D2, M* 0.15-0.7 (**not digitised**) | **no** | **coverage gap**: no compressible dividing data at 45 deg, no compressible psi != 1 at 90 deg; Perez-Garcia must be digitised before dividing-flow compressibility can be claimed at all |
+
+Two of the five have a coverage gap that no amount of scoring closes:
+`eta`'s tuning sweep and the compressible dividing regime. Both are
+digitisation jobs on figures already on disk (Mynard Fig 4; Perez-Garcia
+tables in `tier2_reference_data.md`), and both should be done before the
+corresponding constant is written into C++.
+
+**Labelling.** Each tuned constant carries, at its definition: the source
+figure/table it was fitted to, the range, the date, and the scorecard cell
+that proves it. `alpha` and `damping` currently carry none of this;
+`DEFAULT_JOINING_ETRANSFER_ALPHA` reads as a physics constant.
+
 ## 5. What the papers settle about the K_straight question (#272)
 
 Three independent sources say **negative `K_straight` in dividing flow is real
@@ -246,18 +273,25 @@ the v3 spec's derivation). Gate: Wang 2014 (digitised) and Perez-Garcia
 `MultiPortChamberElement` as the M -> 0 regression target; close the #272
 pressure-representation item as superseded.
 
-## 9. Decisions that are not mine
+## 9. Decisions
 
-1. **Residual form for the port** -- (a) faithful or (b) Mynard-native. Sec 8
-   step 3 recommends (a) then (b).
-2. **What to do with `alpha`** if the wider gate says it does not help: drop,
-   or re-fit. Dropping is the provenance-clean default.
-3. **Whether to digitise Mynard's CFD figures.** It is the only way to check
-   `eta` at the Re it was fitted for; without it the closure's empirical core
-   is taken on trust. The figures are clean line plots and would digitise well.
-4. **Whether to digitise Perez-Garcia** now (needed for step 5) or defer with
-   step 5.
-5. **Retiring v1** as a solver element.
+Taken (user, 2026-09-04):
+
+1. **Residual form: stepwise and tested.** Port the faithful `Pt`-based form
+   first with an exact equivalence gate; move to Mynard-native `C_j` as a
+   separate, later, data-gated change. Never both in one step.
+2. **Tuned corrections** (`alpha`, `eta`, damping, and any future one) prove
+   themselves against validation data covering their tuning range, and are
+   labelled as tuned. Sec 4a is the coverage check; its two gaps are
+   digitisation jobs that precede the corresponding C++.
+3. **Compressible corrections** are appealing and held to the same bar --
+   Wang plus a digitised Perez-Garcia before `kappa` is claimed.
+
+Still open:
+
+4. **What to do with `alpha`** if, once Idelchik is scored, it does not earn
+   its place: drop (provenance-clean default) or re-fit on current plumbing.
+5. **Retiring v1** as a solver element (sec 5).
 
 ## References on disk (`docs/junction/`, gitignored, present)
 
