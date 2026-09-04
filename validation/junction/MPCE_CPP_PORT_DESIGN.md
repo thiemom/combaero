@@ -118,6 +118,25 @@ dividing flow. **Mynard's CFD is deliberately not reproduced** -- his scope
 (blood flow, Re 350-2400) is not ours, and a CFD-fitted term is a tuning, so
 the bar it has to clear is our validation data, not his figures.
 
+**Retuning after a fix is expected, not optional.** A tuned constant was fitted
+*with* whatever bugs existed at the time, so it may have absorbed part of one.
+Fixing a bug -- physics or code -- therefore changes what the constant should
+be, and the fix is not finished until the constant is re-fit and the impact
+measured. Multiple bugs can cancel or dampen each other, which means the
+intermediate state (one bug fixed, compensating tuning still in place) can
+look *worse* than before. That is not evidence the fix was wrong; it is
+evidence the follow-through is incomplete. Two live instances:
+
+- `alpha = 0.2` was fitted on pre-#212 plumbing. Its retune on current
+  plumbing is the measurement of what #212 changed, and belongs to step 1.
+- The #272 gate removal was falsified by K6 collapsing -- but the kernel
+  comment states the `sin^2` gate and the cross-coupling term were designed
+  *as a pair* to hit Bassett K6 at 90 deg. Removing one half of a matched
+  pair and observing failure shows the two are **coupled**, not that the gate
+  is correct. The follow-through -- gate off *and* the cross term re-derived
+  from Bassett Eq 27 without the gate assumption -- was never run. #272's
+  "do not remove the gate" stands as "do not remove it *alone*".
+
 **Labelling.** Each tuned constant carries, at its definition: the source
 figure/table it was fitted to, the range, the date, and the scorecard cell
 that proves it. `alpha` and `damping` currently carry none of this;
