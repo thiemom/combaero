@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **The tuned constants in the MPCEv2 junction closure are now named,
+  labelled with their provenance, and switchable for measurement (issue
+  #271).** `combaero.network._mynard2010` gains `MYNARD_ETA_A0 = 0.8`,
+  `MYNARD_ETA_A1 = -0.2` (Mynard & Valen-Sendstad 2015 Eq 36, fitted to their
+  Fig 4 CFD at blood-flow Reynolds numbers) and `FLOW_RATIO_DAMPING = 0.02`
+  (a regulariser from the Matlab reference, not in the paper), each documented
+  at its definition. `MPCEv2Element` and `junction_loss_coefficient` accept a
+  new `eta_scale` keyword (default `1.0`, the faithful port; `0.0` switches
+  Mynard's energy-transfer term off) so the term can be scored on and off
+  against the digitised validation data alongside `joining_etransfer_alpha`.
+  **No behaviour change at the defaults** -- the closure is bit-identical.
+  The provenance label on `DEFAULT_JOINING_ETRANSFER_ALPHA` is rewritten: the
+  value was fitted with a mirrored Bassett K11 anchor (#283) and the
+  "145-point independent validation" it cited is not in the script that
+  produced it; `scripts/calibrate_mpce_v2_etransfer.py` (stale import path,
+  absolute data path, no validation code) is retired in favour of
+  `validation/junction/calibrate_etransfer.py`.
 - **Ejector operating-regime extension wired into `EjectorElement` (Phase 2).**
   The network `EjectorElement` now resolves all three physical regimes in one
   C1 Newton-solvable residual system instead of the critical (double-choked)

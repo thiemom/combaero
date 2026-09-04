@@ -59,11 +59,38 @@ class MynardResult:
     pseudo_area: np.ndarray  # per-collector effective pseudosupplier area
 
 
+# ---------------------------------------------------------------------------
+# Tuned constants. Each carries its provenance; each is a TUNING under this
+# repo's policy (a CFD-derived correction counts as tuning) and earns its place
+# only by improving agreement on the digitised data for our regime. The
+# on/off tables that prove or retire them live on issue #271 (step 1.3).
+# ---------------------------------------------------------------------------
+
+#: Mynard & Valen-Sendstad 2015 Eq 36 energy-transfer factor,
+#: eta_j = [a0 (pi - theta_dat) sign(theta_j) + a1] (1 - lambda_j).
+#: Source: fitted to the CFD of their Fig 4 only -- a dividing Y-junction with
+#: 90 deg between collectors, orientation swept 0-90 deg, lambda = 0.5,
+#: Re 1363-1817 (blood flow). That is not our regime, so the values are held
+#: to the Bassett K5/K6 + Hager xi_t dividing-flow cells, not to the CFD.
+#: Proving table: pending (#271 step 1.3). Switch: ``eta_scale``.
+MYNARD_ETA_A0: float = 0.8
+MYNARD_ETA_A1: float = -0.2
+
+#: Regulariser on the collector loss coefficient, (1 - exp(-FlowRatio/tau)).
+#: Source: the Matlab reference JunctionLossCoefficient.m lines 60-63, whose
+#: only justification is "avoids infinite C when FlowRatio approaches zero".
+#: NOT in the paper and NOT physics -- a numerical knob whose effect is
+#: confined to FlowRatio -> 0, i.e. the q -> 0 / q -> 1 endpoints of the
+#: Bassett curves. Proving table: pending (#271 step 1.3).
+FLOW_RATIO_DAMPING: float = 0.02
+
+
 def junction_loss_coefficient(
     U: np.ndarray,
     A: np.ndarray,
     theta: np.ndarray,
     joining_etransfer_alpha: float = 0.0,
+    eta_scale: float = 1.0,
 ) -> MynardResult:
     """Compute Mynard Unified0D loss coefficients for a junction.
 
@@ -85,9 +112,15 @@ def junction_loss_coefficient(
             where the area asymmetry is taken over supplier ports, vanishes
             at psi=1 (equal areas), and grows monotonically toward 1 at
             extreme asymmetry. Default 0.0 preserves the faithful-port
-            Mynard behavior. The single calibrated alpha is fit against
-            Bassett K11_corr/K12_corr + Idelchik tables (analytical anchors)
-            and validated against the held-out measured points.
+            Mynard behavior. The production default lives on
+            MPCEv2Element.DEFAULT_JOINING_ETRANSFER_ALPHA with its
+            provenance; the fit is validation/junction/calibrate_etransfer.py
+            and the validation is the in-network scorecard (issue #271).
+
+        eta_scale: multiplier on Mynard's energy-transfer factor eta_j
+            (MYNARD_ETA_A0 / MYNARD_ETA_A1). 1.0 is the faithful port; 0.0
+            switches the term off. Exists so the term can be measured on
+            and off against the validation data (issue #271).
 
     Returns:
         MynardResult with per-branch C and per-collector K (only for n<=3).
@@ -123,7 +156,11 @@ def junction_loss_coefficient(
     )
 
     # ---- Effective pseudosupplier area (Mynard's empirical energy transfer) ----
-    etransfer = (0.8 * (math.pi - pseudo_sup_angle) * np.sign(theta[Ci]) - 0.2) * (1.0 - flow_ratio)
+    etransfer = (
+        eta_scale
+        * (MYNARD_ETA_A0 * (math.pi - pseudo_sup_angle) * np.sign(theta[Ci]) + MYNARD_ETA_A1)
+        * (1.0 - flow_ratio)
+    )
 
     # ---- Joining-side asymmetry correction (combaero extension to Mynard) ----
     # Active only when joining_etransfer_alpha != 0 AND we have multiple
@@ -146,7 +183,7 @@ def junction_loss_coefficient(
 
     C_all = np.zeros_like(U)
     # The (1 - exp(-FlowRatio/0.02)) factor avoids infinite C as FlowRatio -> 0.
-    damping = 1.0 - np.exp(-flow_ratio / 0.02)
+    damping = 1.0 - np.exp(-flow_ratio / FLOW_RATIO_DAMPING)
     C_all[Ci] = damping * (1.0 - (1.0 / (area_ratio * flow_ratio)) * np.cos(0.75 * (math.pi - phi)))
 
     # ---- K coefficients (3-branch only per the original) ----

@@ -125,6 +125,7 @@ def _four_port_element() -> MPCEv2Element:
     element.joining_etransfer_alpha = 0.2
     element.jacobian_method = "sympy"
     element.penalty_alpha = 0.0
+    element.eta_scale = 1.0  # faithful-port default; see test_junction_tuned_constants
     return element
 
 
