@@ -222,6 +222,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.2] - 2026-07-09
 
 ### Fixed
+- **`MPCEv2Element`'s Jacobian was missing the common-port static-pressure
+  column (issue #271).** The Mynard loss term `K_i * q_dyn_com` depends on the
+  common port's density, and hence on its static pressure, through two paths:
+  `q_dyn_com ~ 1/rho`, and Mynard's `K` itself being a function of the port
+  velocities `U = -mdot/(rho*A)`. Neither was differentiated, so the row
+  carried a silently zero entry for a real solver unknown. This is the same
+  defect PR #230 fixed in `ConstantKTeeElement`; it survived here because
+  `test_mpce_v2_jacobian.py` FD-checks `dKQ_dmdot_separating_T` in isolation
+  and nothing pinned the assembled row against the residual it differentiates.
+  Taking only the first path is wrong by several per cent -- the second more
+  than cancels the naive `-K*q/P` -- so the analytic form is
+  `dR_i/dP_com = sign * [K_i*q_dyn/P - (mdot_com/P) * dKQ_i/dmdot_com]`, which
+  reuses the existing `dKQ/dmdot` column. **Converged roots are unchanged**
+  (a Jacobian correction moves the solver path, not the solution): scored
+  against the Bassett separating curves the K values are identical to 3
+  decimals. New whole-row FD guardrail in
+  `python/tests/test_mpce_v2_jacobian_rows.py` covers both `MPCEv2Element` and
+  `ConstantKTeeElement`.
 - **CI: `publish-gui.yml` verify job had two more release-blocking races,
   both hit on the v0.4.1 release attempt.** (1) The "wait for combaero"
   step polled PyPI's JSON API, which updated several minutes before the

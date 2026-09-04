@@ -42,10 +42,15 @@ def _merge_element() -> MPCEv2Element:
 
 
 class _State:
-    """Minimal stand-in for NetworkMixtureState (only Pt + density used)."""
+    """Minimal stand-in for NetworkMixtureState (Pt, static P and density).
 
-    def __init__(self, Pt: float, rho: float = 1.16) -> None:
+    The static pressure is required: the loss term's dependence on the common
+    port's density enters the Jacobian through it (issue #271).
+    """
+
+    def __init__(self, Pt: float, rho: float = 1.16, P: float | None = None) -> None:
         self.Pt = Pt
+        self.P = Pt if P is None else P
         self._rho = rho
 
     def density(self) -> float:

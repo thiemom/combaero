@@ -495,12 +495,42 @@ class MPCEv2Element(MultiPortChamberElement):
                 KQ_pert = K_pert * q_dyn_pert
                 dKQ_dmdot[:, j] = (KQ_pert - KQ_base) / mdot_eps
 
+        # Sensitivity of the loss term to the common port's STATIC pressure.
+        # This column was absent, leaving a silently zero Jacobian entry -- the
+        # same defect PR #230 fixed in ConstantKTeeElement (issue #271).
+        # Temperature is derived forward for a MomentumChamberNode rather than
+        # solved, so there is no .T unknown to differentiate against.
+        #
+        # Two paths carry the dependence, and taking only the first is wrong by
+        # a few per cent:
+        #   (a) q_dyn_com = mdot^2 / (2*rho*A^2) ~ 1/rho, and rho ~ P/T for a
+        #       near-ideal gas, so d(q_dyn)/dP = -q_dyn / P.
+        #   (b) Mynard's K is a function of the port velocities U = -mdot/(rho*A),
+        #       so it moves with rho too.
+        # For (b), U depends on P and on mdot through the same 1/rho factor:
+        #       dU/dP = -U/P     and     dU/dmdot = U/mdot
+        #   =>  dK/dP = -(mdot_com / P_com) * dK/dmdot_com,
+        # which lets the existing dKQ/dmdot column supply it. Substituting and
+        # using d(q_dyn)/dmdot_com = 2*q_dyn/mdot_com, the two paths combine to
+        #       dR_i/dP_com = sign * [ K_i*q_dyn/P - (mdot_com/P) * dKQ_i/dmdot_com ]
+        # Note the leading term ends up POSITIVE: path (b) more than cancels the
+        # naive -K*q/P. Pinned by test_mpce_v2_jacobian_rows.py.
+        P_com = float(states[common_idx].P)
+        m_com = float(port_mdots[common_idx])
+        p_var_com = f"{self.port_nodes[common_idx]}.P"
+
         jac: dict[int, dict[str, float]] = {}
         for i in range(N):
             row: dict[str, float] = {
                 f"{self.port_nodes[i]}.Pt": 1.0,
                 f"{self.id}.P_jct": -1.0,
             }
+            if P_com > 0.0:
+                dR_dP_com = float(K_per_port[i]) * q_dyn_com / P_com - (m_com / P_com) * float(
+                    dKQ_dmdot[i, common_idx]
+                )
+                if dR_dP_com != 0.0:
+                    row[p_var_com] = row.get(p_var_com, 0.0) + K_term_sign * dR_dP_com
             for j in range(N):
                 if abs(dKQ_dmdot[i, j]) > 0.0:
                     mdot_var = f"{self._port_element_ids[j]}.m_dot"
