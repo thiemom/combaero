@@ -71,7 +71,14 @@ class MPCEv2Network:
         if K_id in {"K6", "K5", "K2"}:
             return self._separating(q, psi or 1.0, theta_rad or math.pi / 2.0, topology)
         if K_id in {"K11", "K12"}:
-            return self._joining(q, psi or 1.0, theta_rad or math.pi / 2.0, topology)
+            # Bassett Table 1 indexes each joining coefficient by the fraction
+            # in ITS OWN inlet leg: K11's q is mdot_A/mdot_C (the STRAIGHT
+            # inlet), K12's is mdot_B/mdot_C (the lateral). The network is
+            # built from the lateral inlet fraction, so K11 files need 1-q.
+            # Feeding the raw q builds a mirrored operating point -- the same
+            # defect as the separating side (#276, #277).
+            q_lateral = 1.0 - q if K_id == "K11" else q
+            return self._joining(q_lateral, psi or 1.0, theta_rad or math.pi / 2.0, topology)
         return NetworkResult(
             converged=False,
             message=f"K_id {K_id} not yet wired for MPCE-v2",
@@ -126,7 +133,7 @@ class MPCEv2Network:
         )
 
     def _joining(self, q: float, psi: float, theta_rad: float, topology: Topology) -> NetworkResult:
-        """Build a joining-flow MPCE-v2 network.
+        """Build a joining-flow MPCE-v2 network. ``q`` is the LATERAL inlet fraction.
 
         Geometry mirrors the separating case (str at 0deg, bra at theta) but
         flow reverses: str and bra are inlets, com is the outlet. The
@@ -138,7 +145,9 @@ class MPCEv2Network:
         if topology == "imposed_q":
             net = build_joining_imposed_q_skeleton(m_in=m_in, m_lateral=q * m_in)
         else:
-            K11 = bassett2001.K11_corr(q, psi, theta_rad)
+            # Each target is evaluated on ITS OWN leg fraction: K11 on the
+            # straight inlet (1 - q_lateral), K12 on the lateral inlet.
+            K11 = bassett2001.K11_corr(1.0 - q, psi, theta_rad)
             K12 = bassett2001.K12_corr(q, psi, theta_rad)
             if topology == "three_pb":
                 net = build_joining_three_pb_skeleton(K11_target=K11, K12_target=K12)
