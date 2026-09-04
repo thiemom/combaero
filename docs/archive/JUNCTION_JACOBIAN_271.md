@@ -80,6 +80,16 @@ state into a plausible-looking zero. The right shapes are a one-sided
 difference across a sign flip, and a loud failure (or an analytic branch) where
 the closure genuinely has no value to give.
 
+Documenting that was not enough -- an untested reachable path is rediscovered,
+not remembered. `python/tests/test_mpce_v2_fd_fallback_guards.py` pins each
+guard's *precondition* against `_mynard2010`'s contract (K present at 3 ports,
+absent beyond; degenerate masks raise; the FD step crosses zero for a
+near-zero port), so a change to the closure surfaces there rather than
+silently changing which branch the Jacobian takes. The N > 3 consequence is
+pinned as a `strict=True` xfail asserting the CORRECT behaviour, so whichever
+fix lands forces the marker off rather than leaving a green test standing on a
+known-wrong result.
+
 ## The recurring bug this arc kept surfacing
 
 Bassett indexes each loss coefficient by the mass-flow fraction in **its own
@@ -127,6 +137,9 @@ better than implying a performance win that the numbers do not support.
 - Every analytic partial has an independent FD cross-check:
   `test_mpce_v2_jacobian_rows.py` (both v2 subclasses, 38 cases) and
   `test_multi_port_chamber_jacobian.py` (the v1 C++ base).
+- Every reachable-but-unexercised branch has a test on its precondition, and
+  every known defect left unfixed is a strict xfail asserting the correct
+  behaviour -- never a green test pinning the wrong one.
 - A coefficient is compared only against the leg its source indexes it on.
 - A change to a closure is scored against the digitised curves before it lands,
   and reverted with the numbers written down when the data says no.
