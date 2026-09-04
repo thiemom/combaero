@@ -14,8 +14,9 @@ production.
 from __future__ import annotations
 
 import math
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Iterator, Protocol
+from typing import Protocol
 
 from validation.junction.equivalences import canonical_K
 from validation.junction.models._network_builder import (
@@ -23,7 +24,7 @@ from validation.junction.models._network_builder import (
     NetworkResult,
     Topology,
 )
-from validation.junction.schema import Dataset, FileMetadata, load_dataset
+from validation.junction.schema import Dataset, load_dataset
 
 
 class NetworkModel(Protocol):
@@ -64,8 +65,16 @@ class NetworkRecord:
     message: str = ""
 
 
-_LATERAL_K_IDS = {"K1", "K6", "K12"}
-_STRAIGHT_K_IDS = {"K2", "K5", "K11"}
+# Hager 1984 names its coefficients xi_t (straight-through) and xi_l (lateral);
+# the schema stores them in `coefficient` with K_id=None, and _which_K is fed
+# `K_id or coefficient`, so both spellings must be here.
+_LATERAL_K_IDS = {"K1", "K6", "K12", "xi_l"}
+_STRAIGHT_K_IDS = {"K2", "K5", "K11", "xi_t"}
+
+# Ground truth for network scoring: digitised measurements, and handbook
+# tabulations (Idelchik) which are reference data in their own right. Not a
+# paper's own analytical curve ("calc") and not an envelope.
+_GROUND_TRUTH_KINDS = {"measured", "tabulated"}
 
 
 def _which_K(K_id: str) -> str | None:
@@ -90,7 +99,7 @@ def iter_network_records(
 
     supported = set(getattr(model, "SUPPORTED_TOPOLOGIES", ALL_TOPOLOGIES))
     for file in dataset.files:
-        if file.kind != "measured" or file.x_axis != "q":
+        if file.kind not in _GROUND_TRUTH_KINDS or file.x_axis != "q":
             continue
         K_id = file.K_id or file.coefficient or ""
         which = _which_K(K_id)
