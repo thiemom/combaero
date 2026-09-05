@@ -138,10 +138,31 @@ Falsified directly: a deliberately wrong model (`eta_scale=3.0`, whose
 | 0.6 | 1.6623 | 1.2464 | 1.2467 |
 | 0.8 | 3.0651 | 2.7677 | 2.7689 |
 
-`three_pb` measures convergence and nothing else. The residual 1e-3 differences
-are compressible/density corrections, not model content.
-`test_bassett_fig7b_case.py` asserted this tautology when it was merged in
-PR #288 and has been reduced to a convergence test.
+Once the achieved operating point is instrumented (below) the mechanism is
+visible in a single row. Bassett Fig 7b, target q=0.8, target K 2.7689:
+
+| model | topology | K reported | q the solve reached |
+|---|---|---|---|
+| honest | imposed_q | 2.8842 | 0.800 |
+| honest | three_pb | **2.7654** | **0.021** |
+| honest | mfb_two_pb | 3.4370 | 0.857 |
+| eta_scale=3 | imposed_q | 3.0651 | 0.800 |
+| eta_scale=3 | three_pb | **2.7677** | **0.737** |
+
+`three_pb` reports the target to three decimals from a junction passing 2% of
+its flow down the lateral leg, and reports it again from a model that is 6%
+different at a completely different operating point. It measures convergence
+and nothing else. The residual 1e-3 differences are compressible/density
+corrections, not model content.
+
+**Acted on:** `test_bassett_fig7b_case.py` asserted this tautology when it was
+merged in PR #288 and has been reduced to a convergence test.
+`network_runner._K_SCORING_TOPOLOGIES` now excludes `three_pb` from K scoring,
+and the scorecard prints `taut` in its RMSE and bias columns rather than a dash,
+so the exclusion cannot read as missing data. The perturbation above is pinned
+in `python/tests/test_junction_score_at_achieved_q.py` -- if `three_pb` ever
+becomes informative, that test fails and says to revisit the exclusion rather
+than delete it.
 
 ## Finding 3: the operating point drifts, and the score does not notice
 
@@ -154,11 +175,29 @@ pressure-driven record:
 | `mfb_two_pb` | 0.0001 | 0.3899 | 12.6% |
 
 `mfb_two_pb` mostly lands where intended, which is what makes the tail
-dangerous: the score compares K against the paper at the target q with no
+dangerous: the score compared K against the paper at the target q with no
 signal that 12.6% of the rows are at a different operating point altogether.
-**Scoring K at the achieved q is the detector this harness is missing**, and it
+**Reporting the achieved q is the detector this harness was missing**, and it
 subsumes the "wrong root" question: a root 0.4 away in q is a different
 operating point, not a failed validation of the intended one.
+
+**Acted on:** `NetworkResult.q_converged` (a field that existed and was never
+populated) is now filled by `solve_and_extract`, carried on `NetworkRecord`
+with a `q_drift` property, aggregated per cell as `median_q_drift`, and printed
+as a `dq` column. It reads back exactly the imposed value under `imposed_q`,
+which is the calibration of the instrument. Adapters that re-index a paper's q
+axis must invert the same transform on the way out -- Bassett K11 does, and a
+test pins it, because getting that wrong is the mirrored-axis defect class of
+#276/#277/#279/#283.
+
+The first thing it shows: on `K_lateral_sep` psi=1 theta=45, `three_pb`
+reported the *best* RMSE in the row (0.057, against `imposed_q`'s 0.061) while
+sitting a median of **0.476** away in q -- half the entire operating range.
+
+Still open (defect 9b): scoring K against the measured curve interpolated at
+the achieved q, so a drifted row is compared correctly instead of merely
+flagged. That needs a decision about extrapolation beyond each curve's
+digitised range.
 
 ## Finding 4: the seed defect is real, and worth about 70 solves
 

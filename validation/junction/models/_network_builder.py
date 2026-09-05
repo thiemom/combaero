@@ -75,6 +75,48 @@ def _x_air() -> list[float]:
     return list(cb.mass_to_mole(_DRY_AIR_Y))
 
 
+def _achieved_q(
+    net: FlowNetwork,
+    sol: dict[str, float],
+    *,
+    common_node: str,
+    lateral_node: str,
+    junction_id: str = "jct",
+) -> float | None:
+    """Lateral mass-flow fraction at the converged state, on the NETWORK axis.
+
+    In `imposed_q` the split is a boundary condition and this returns the
+    target. In the pressure-driven topologies it is an OUTCOME: the solve
+    settles wherever the model's coefficients reproduce the imposed pressure
+    differences, which is generally not the target q (issue #271,
+    docs/archive/JUNCTION_OPERATING_POINT_271.md). Comparing an extracted K
+    against the paper at the target q is then a comparison at the wrong
+    operating point, so every record carries the q it actually reached.
+
+    Callers that re-index q onto a paper's own axis must apply the same
+    transform to this value -- see `MPCEv2Network`.
+    """
+
+    def _mdot_at(node_id: str) -> float | None:
+        for elem in net.elements.values():
+            if elem.id == junction_id:
+                continue
+            frm = getattr(elem, "from_node", None)
+            to = getattr(elem, "to_node", None)
+            if node_id not in (frm, to):
+                continue
+            key = f"{elem.id}.m_dot"
+            if key in sol:
+                return abs(float(sol[key]))
+        return None
+
+    m_com = _mdot_at(common_node)
+    m_lat = _mdot_at(lateral_node)
+    if m_com is None or m_lat is None or m_com <= 0.0:
+        return None
+    return m_lat / m_com
+
+
 def _extract_K(
     sol: dict[str, float],
     *,
@@ -384,4 +426,7 @@ def solve_and_extract(
         K_straight=K_str,
         residual_norm=res_norm,
         wall_time_s=wall_time,
+        q_converged=_achieved_q(
+            net, sol, common_node=common_node, lateral_node=lateral_node
+        ),
     )

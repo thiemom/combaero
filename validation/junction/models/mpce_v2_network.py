@@ -10,6 +10,7 @@ lateral branch because Mynard's K already captures the full loss.
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 
 from combaero.network import LosslessConnectionElement
 from combaero.network.mpce_v2_element import MPCEv2Element
@@ -119,7 +120,15 @@ class MPCEv2Network:
             # Feeding the raw q builds a mirrored operating point -- the same
             # defect as the separating side (#276, #277).
             q_lateral = 1.0 - q if K_id == "K11" else q
-            return self._joining(q_lateral, psi or 1.0, theta_rad or math.pi / 2.0, topology)
+            result = self._joining(q_lateral, psi or 1.0, theta_rad or math.pi / 2.0, topology)
+            if K_id == "K11" and result.q_converged is not None:
+                # q_converged comes back on the NETWORK axis (lateral inlet
+                # fraction). K11's file axis is the straight inlet, so it takes
+                # the same 1 - q the target took on the way in. Forgetting this
+                # would put the drift on a mirrored axis -- the defect class of
+                # #276/#277/#279/#283.
+                result = replace(result, q_converged=1.0 - result.q_converged)
+            return result
         return NetworkResult(
             converged=False,
             message=f"K_id {K_id} not yet wired for MPCE-v2",
