@@ -25,8 +25,6 @@ import pytest
 
 import combaero as cb
 from combaero.network._mynard2010 import junction_loss_coefficient
-from combaero.network.components import NetworkMixtureState
-from combaero.network.mpce_v2_element import MPCEv2Element
 
 _Y = list(cb.mole_to_mass(cb.species.dry_air()))
 _A3 = np.array([0.01, 0.01, 0.01])
@@ -106,69 +104,8 @@ def test_perturbing_a_near_zero_port_flips_its_velocity_sign():
     )
 
 
-# ---------------------------------------------------------------------------
-# The consequence, pinned as a known defect so a fix surfaces
-# ---------------------------------------------------------------------------
-
-
-def _four_port_element() -> MPCEv2Element:
-    element = MPCEv2Element.__new__(MPCEv2Element)
-    element.id = "jct"
-    element.N = 4
-    element.port_nodes = [f"p{i}" for i in range(4)]
-    element.port_areas = [0.01] * 4
-    element.port_angles_deg = [180.0, 0.0, 90.0, 45.0]
-    element._port_signs = [-1.0, 1.0, 1.0, 1.0]
-    element._port_element_ids = [f"e{i}" for i in range(4)]
-    element.flow_direction = "branch"
-    element.strict = False
-    element.joining_etransfer_alpha = 0.2
-    element.jacobian_method = "sympy"
-    element.penalty_alpha = 0.0
-    element.eta_scale = 1.0  # faithful-port default; see test_junction_tuned_constants
-    return element
-
-
-def _four_port_states():
-    return [
-        NetworkMixtureState(P=1.0e5, Pt=100_300.0, T=300.0, Tt=300.5, m_dot=0.0, Y=_Y)
-        for _ in range(4)
-    ]
-
-
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Known defect (issue #271): MPCEv2Element does not restrict N, and "
-        "Mynard supplies no K beyond 3 ports, so every FD column is skipped "
-        "and the whole dKQ block is silently zero. Either the element must "
-        "reject N > 3 at construction -- honest, the closure is 3-branch by "
-        "derivation -- or the closure must be extended. Returning a zero "
-        "Jacobian with finite residuals is not a third option. Remove this "
-        "xfail with whichever fix lands."
-    ),
-)
-def test_four_port_junction_has_a_nonzero_loss_jacobian():
-    element = _four_port_element()
-
-    _, jac = element.residuals(_four_port_states(), 100_300.0, [-0.12, 0.05, 0.04, 0.03])
-
-    mdot_entries = sum(1 for row in range(4) for key in jac[row] if key.endswith(".m_dot"))
-    assert mdot_entries > 0, (
-        "the entire dKQ block is zero: every mass-flow derivative of the loss "
-        "term is missing, with no error and no warning"
-    )
-
-
-def test_four_port_junction_still_returns_finite_residuals():
-    """Why the defect above is silent rather than loud: nothing looks wrong.
-
-    The residuals are perfectly well-formed; only the Jacobian is empty, so a
-    solver has no signal that anything is amiss.
-    """
-    element = _four_port_element()
-
-    residuals, _ = element.residuals(_four_port_states(), 100_300.0, [-0.12, 0.05, 0.04, 0.03])
-
-    assert len(residuals) == 5  # 4 impulse rows + mass row
-    assert all(math.isfinite(r) for r in residuals)
+# The N > 3 consequence (a silently all-zero loss Jacobian) is no longer
+# reachable: MPCEv2Element refuses more than three ports at construction, and
+# that refusal is pinned in test_mpce_v2_degenerate_iterates.py. The closure-
+# level precondition above (K is None beyond three ports) is what makes the
+# refusal necessary and stays.

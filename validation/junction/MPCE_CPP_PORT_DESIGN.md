@@ -347,7 +347,7 @@ Consequences:
 
 | # | defect | evidence | fix | cost |
 |---|---|---|---|---|
-| 1 | `N > 3` returns finite residuals with an all-zero `dKQ` block | pinned by strict xfail in `test_mpce_v2_fd_fallback_guards.py` | reject `N > 3` at construction with a message naming the Mynard 3-branch K limit; the C-form is the eventual lift | 1 line + test |
+| 1 | ~~`N > 3` returns finite residuals with an all-zero `dKQ` block~~ | **fixed, step 2.** `MPCEv2Element.__init__` raises for N > 3 naming the Mynard 3-branch limit; ConstantKTee inherits it. The strict xfail is retired (the state is unconstructible); the closure-level precondition test stays | done |
 | 2 | ~~Residual-level silent physics switch: `mpce_v2_element.py` catches *any* exception from Mynard and returns a **lossless** continuity residual with an **empty** Jacobian `{}`~~ | **fixed, step 2.1.** Measured first: 0 hits across 2073 scorecard records + the full suite (the pre-check guard ahead of the call fired 145 times -- that is the legitimate degenerate path). All three wide `except`s (residual, FD loop, diagnostics) narrowed to `(IndexError, ValueError)`; residual and FD paths raise a named `RuntimeError` with the cause chained, diagnostics annotates `closure_error`. Falsified 8/9 against pre-fix; scorecard identical to the digit | done |
 | 3 | Hager and Idelchik unscored | sec 6 | extend `MPCEv2Network.evaluate_network` to `hager1984` (separating, `q -> 1 - q`) and `idelchik1966` (joining, `q` = Bassett's) | small; data + `q_transform` exist |
 | 4 | `alpha = 0.2` calibrated pre-#212 | memory + `tmp/calibrate_etransfer_join.py` | re-run the calibration on current plumbing **after** #3 lands, so its validation is in-network; if it no longer earns its place, set the default to 0 | script exists |
@@ -383,6 +383,50 @@ scorecard, on legitimate transient iterates. It works (the solves converge),
 but an empty Jacobian for a live element is the same shape of thing at a
 smaller scale, and it sits next to the `FlowRatio = 0 -> K = -1` edge from
 step 1.4 and the `N > 3` rejection. Those three are the remainder of step 2.
+
+## 7b. Step 2 result: the degenerate-iterate question (2026-09-05)
+
+Measured on the full scorecard (2073 solves) before changing anything.
+
+**(a) The pre-check fallback was where solves went to die.** Its 145 hits
+came from **26 solves, median 5 hits each, 0 of 26 converged**. It returned
+the continuity residual with `jac = {}` -- so even the trivial Jacobian it
+owns (+-1 on the `Pt` rows, the port signs on the mass row) was withheld,
+handing the solver N+1 zero rows. The iterates were all-same-sign with real
+magnitude (e.g. `[0.0021, 0.0011, 0.0048]`, every port flowing out), which
+violates mass conservation and is a wrong-direction state for at least one
+port -- exactly what the existing soft barrier handles, except the pre-check
+returned first. **Fix:** the all-ports-zero case (a cold start; never seen on
+the scorecard) returns the soft barrier at zero slack, which *is* the
+continuity residual with its Jacobian; the same-sign case now falls through
+to the wrong-direction check. No new code path.
+
+**(b) The mask mismatch was the more frequent silent lossless junction.**
+384 hits. Example `[-0.1, -0.0, 0.125]`: MPCEv2 excludes the `-0.0` port
+(`|U| <= 1e-9`), Mynard's `Q < 0` classifies it as a supplier, the two
+disagree, `K` comes back mis-shaped, the shape guard trips, and `K_per_port`
+stays all-zero. At what looks like initialization. **Fix:** an excluded port
+is snapped to a tiny flow in its *declared* direction and the masks are
+rebuilt from the snapped values, so the classifications agree by
+construction and the `FlowRatio -> 0` limit proven in step 1.4 applies
+(`K -> 1` for a dead outlet). After the fix the shape guard trips **0**
+times on the scorecard.
+
+**(c) N > 3** is refused at construction. Nothing outside the strict xfail
+ever constructed one.
+
+**Verified.** 9 of 10 new tests red against the pre-fix element (the 10th
+pins "three ports still accepted"); full suite green; the scorecard
+**identical to the digit** -- 1578/2073 converged, every imposed_q cell
+unchanged. That last number is the honest part: the 26 doomed solves are
+still doomed. The empty Jacobian was wrong, but it was not what killed them
+-- they are the true q-endpoint / artifact-root cases. What the fix buys is
+correctness of what the solver is handed on every iterate, which the port
+must preserve; it does not buy convergence here.
+
+**Dead end recorded:** re-instrumenting the element for the after-measurement
+and then reverting with `git checkout` reverted the fix as well. Commit
+first, then instrument.
 
 ## 8. The port, sequenced by provenance
 

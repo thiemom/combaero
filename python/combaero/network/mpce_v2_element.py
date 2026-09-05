@@ -172,6 +172,17 @@ class MPCEv2Element(MultiPortChamberElement):
         # Measurement switch on Mynard's eta (MYNARD_ETA_A0/A1); 1.0 = faithful
         # port. Exposed so the term can be scored on and off (#271 step 1.3).
         self.eta_scale: float = float(eta_scale)
+        # Mynard's K conversion (Eq 18) is defined for three branches only
+        # (the reference code computes K for n <= 3). A larger junction used
+        # to return finite residuals with an entirely zero loss-term Jacobian
+        # -- silently (issue #271). Refuse at construction; the native C-form
+        # residual is the route to N > 3 (design doc sec 8 step 3b).
+        if self.N > 3:
+            raise ValueError(
+                f"MPCEv2Element '{id}': {self.N} ports, but the Mynard K closure is "
+                f"defined for 3-branch junctions only. Split the junction, or use "
+                f"MultiPortChamberElement."
+            )
 
     def verify_solution_consistent(
         self,
@@ -390,11 +401,18 @@ class MPCEv2Element(MultiPortChamberElement):
         # residual: Pt_i = Pt_jct, mass conservation.
         sup_mask = U_mynard > 1e-9
         col_mask = U_mynard < -1e-9
-        if not sup_mask.any() or not col_mask.any():
-            residuals = [float(s.Pt) - Pt_jct for s in states]
-            residuals.append(sum(port_mdots))
-            jac: dict[int, dict[str, float]] = {}
-            return residuals, jac
+        if not sup_mask.any() and not col_mask.any():
+            # Every port ~zero: a cold-start iterate. The soft barrier at zero
+            # slack IS the continuity residual -- with its Jacobian. This used
+            # to return jac = {}: N+1 zero rows, and every solve that reached
+            # it stalled (26 of 26 on the scorecard, issue #271).
+            return self._soft_barrier_residual(states, Pt_jct, port_mdots)
+        # Every port flowing the same way is not handled here: it violates
+        # mass conservation and is a wrong-direction state for at least one
+        # port, which the check below routes to the strict raise or the soft
+        # barrier -- both of which carry a Jacobian that pulls the offending
+        # port back toward zero. Returning a lossless residual without one
+        # was where those solves went to die.
 
         # Constrained topology: refuse if observed direction does not match
         # the declared one. Per-port check: port_mdots[i] should have the
@@ -426,6 +444,24 @@ class MPCEv2Element(MultiPortChamberElement):
             # ``soft_penalty_alpha``. Pulls Newton back toward the boundary
             # mdot=0 from which a sign flip can restore the declared regime.
             return self._soft_barrier_residual(states, Pt_jct, port_mdots)
+
+        # A port excluded from both masks (|U| <= 1e-9, typically an exact
+        # zero in an initial guess) must not be left for the closure to
+        # classify on its own: Mynard puts Q = -0.0 with the suppliers, the two
+        # classifications disagree, K comes back mis-shaped and was silently
+        # zeroed -- a lossless junction 384 times per scorecard (issue #271).
+        # Snap it to a tiny flow in its DECLARED direction and rebuild the
+        # masks from the snapped values, so both sides agree by construction
+        # and the FlowRatio -> 0 limit (K -> 1 for a dead outlet, step 1.4)
+        # takes over.
+        excluded = ~(sup_mask | col_mask)
+        if excluded.any():
+            U_mynard = U_mynard.copy()
+            for i in np.where(excluded)[0]:
+                # _port_signs: -1 = inlet (Mynard supplier, U > 0), +1 = outlet.
+                U_mynard[i] = -float(self._port_signs[i]) * 1e-9
+            sup_mask = U_mynard > 0.0
+            col_mask = U_mynard < 0.0
 
         try:
             mynard = junction_loss_coefficient(

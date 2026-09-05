@@ -104,11 +104,14 @@ def test_damping_is_what_bounds_C_and_nothing_else(damping):
 
 
 def test_exact_zero_flow_edge_is_not_guarded_by_damping(damping):
-    """Documented edge: at FlowRatio exactly 0, K_lat = -1 either way.
+    """Documented edge of the RAW closure: at FlowRatio exactly 0, K_lat = -1.
 
-    A sign-flipped dead branch. Pinned so that whoever fixes it as part of
-    the degenerate-iterate work (#271 step 2) sees this test fail and removes
-    it rather than discovering the edge again.
+    Not a loss at all -- Mynard classifies Q = -0.0 as a supplier, the K
+    broadcast pairs the live collector with a zero-flow supplier, and the
+    spurious entry evaluates to -1. MPCEv2Element no longer lets an exact
+    zero reach the closure (it snaps an excluded port into its declared
+    direction, #271 step 2), so this is a property of the raw closure only.
+    Pinned so a future closure change that alters it is noticed.
     """
     with np.errstate(all="ignore"):
         damping(0.02)

@@ -239,6 +239,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.2] - 2026-07-09
 
 ### Fixed
+- **`MPCEv2Element` degenerate iterates now carry a Jacobian, dead ports are
+  classified consistently, and junctions with more than three ports are
+  refused (issue #271).** Measured on the scorecard before changing anything:
+  the pre-check fallback for an all-same-sign iterate returned a lossless
+  residual with an *empty* Jacobian on 145 iterates from 26 solves, and none
+  of those 26 converged; a port at exactly zero flow (typically an initial
+  guess) was excluded from the element's supplier/collector masks but
+  classified as a supplier by the Mynard closure, so its `K` came back
+  mis-shaped and was silently zeroed -- a lossless junction at initialization,
+  384 times per scorecard. Now: an all-ports-zero iterate returns the
+  continuity residual *with* its Jacobian; an all-same-sign iterate is
+  treated as the wrong-direction state it is and reaches the strict raise or
+  the soft barrier, both of which pull the offending port back with a real
+  derivative; an excluded port is snapped to a tiny flow in its declared
+  direction before the closure sees it, so both classifications agree by
+  construction and the dead-branch limit `K -> 1` applies. `MPCEv2Element`
+  (and `ConstantKTeeElement`) raise `ValueError` at construction for more than
+  three ports, since Mynard's `K` conversion is defined for three branches
+  only and a 4-port junction returned finite residuals with an all-zero loss
+  Jacobian. **Converged results are unchanged** -- the scorecard reproduces
+  the previous tables to the digit and the 26 doomed solves remain unconverged
+  (the empty Jacobian was wrong but was not what killed them).
 - **`MPCEv2Element` no longer turns an exception inside the Mynard closure
   into a silent lossless junction (issue #271).** Three call sites wrapped
   `junction_loss_coefficient` in `except Exception`; the residual site
