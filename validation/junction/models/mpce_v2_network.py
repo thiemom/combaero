@@ -31,6 +31,21 @@ from validation.junction.models._network_builder import (
 )
 
 
+
+def _to_file_axis(result: NetworkResult, *, flip: bool) -> NetworkResult:
+    """Put ``q_converged`` back on the axis the data file is indexed on.
+
+    ``solve_and_extract`` reports the achieved operating point as the network's
+    LATERAL fraction. A coefficient Bassett indexes on its own straight leg was
+    fed ``1 - q`` on the way in, so it takes the same transform coming out.
+    Skipping this measures the drift on a mirrored axis, which is the defect
+    class of #276/#277/#279/#283.
+    """
+    if not flip or result.q_converged is None:
+        return result
+    return replace(result, q_converged=1.0 - result.q_converged)
+
+
 class MPCEv2Network:
     """MPCE-v2 (Mynard residual) in the three separating topologies."""
 
@@ -111,7 +126,18 @@ class MPCEv2Network:
         if paper != "bassett2001":
             return NetworkResult(converged=False, message=f"paper {paper!r} not wired")
         if K_id in {"K6", "K5", "K2"}:
-            return self._separating(q, psi or 1.0, theta_rad or math.pi / 2.0, topology)
+            # Bassett indexes each coefficient by the fraction in ITS OWN leg
+            # (validation/junction/equivalences.py): a K5/K2 file's q is the
+            # STRAIGHT fraction, K6's is the lateral one. Every network here is
+            # built from the LATERAL fraction, so the straight-leg coefficients
+            # need 1 - q. Feeding the raw q builds a mirrored operating point --
+            # the defect class of #276/#277/#279/#283, still live on the
+            # separating side until now.
+            q_lateral = 1.0 - q if K_id in {"K5", "K2"} else q
+            result = self._separating(
+                q_lateral, psi or 1.0, theta_rad or math.pi / 2.0, topology
+            )
+            return _to_file_axis(result, flip=K_id in {"K5", "K2"})
         if K_id in {"K11", "K12"}:
             # Bassett Table 1 indexes each joining coefficient by the fraction
             # in ITS OWN inlet leg: K11's q is mdot_A/mdot_C (the STRAIGHT
@@ -121,14 +147,7 @@ class MPCEv2Network:
             # defect as the separating side (#276, #277).
             q_lateral = 1.0 - q if K_id == "K11" else q
             result = self._joining(q_lateral, psi or 1.0, theta_rad or math.pi / 2.0, topology)
-            if K_id == "K11" and result.q_converged is not None:
-                # q_converged comes back on the NETWORK axis (lateral inlet
-                # fraction). K11's file axis is the straight inlet, so it takes
-                # the same 1 - q the target took on the way in. Forgetting this
-                # would put the drift on a mirrored axis -- the defect class of
-                # #276/#277/#279/#283.
-                result = replace(result, q_converged=1.0 - result.q_converged)
-            return result
+            return _to_file_axis(result, flip=K_id == "K11")
         return NetworkResult(
             converged=False,
             message=f"K_id {K_id} not yet wired for MPCE-v2",

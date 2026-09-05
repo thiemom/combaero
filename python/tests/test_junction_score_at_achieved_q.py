@@ -271,3 +271,57 @@ def test_imposed_q_is_scored_against_the_measured_value_itself(model):
     assert all(r.K_measured_at_q_converged == r.K_measured for r in records)
     assert not any(r.off_curve for r in records)
     assert not any(r.off_point for r in records)
+
+
+# ---------------------------------------------------------------------------
+# The separating straight leg is indexed on its own leg too
+# ---------------------------------------------------------------------------
+
+
+def test_bassett_K5_is_evaluated_on_the_straight_fraction(model):
+    """K5's q is the STRAIGHT fraction, so a K5 record at q must produce the
+    same straight-leg K as a K6 record at 1 - q.
+
+    Four independent lines say so, and they are worth restating because this
+    was wrong in three adapters until #295:
+      * `validation/junction/equivalences.py` states the convention outright;
+      * the algebra: K5(q) = q^2 - 1.5q + 0.5 is Hager's xi_t evaluated at
+        1 - q, and Hager's argument is the lateral fraction;
+      * the digitised points fit Bassett's own K5 curve read directly (MAE
+        0.037) far better than mirrored (0.24);
+      * the physical limit: paired this way the flow-weighted mean K goes to
+        exactly zero as the lateral flow vanishes, which is what a junction
+        that diverts nothing must dissipate. Paired the other way it goes to
+        0.5, a loss with no flow diverted.
+    """
+    q = 0.3
+    as_k5 = model.evaluate_network("bassett2001", "K5", q, _PSI, _THETA)
+    as_k6 = model.evaluate_network("bassett2001", "K6", 1.0 - q, _PSI, _THETA)
+
+    assert as_k5.converged and as_k6.converged
+    assert as_k5.K_straight == pytest.approx(as_k6.K_straight, rel=1e-9)
+
+
+def test_bassett_K5_drift_is_reported_on_the_papers_own_axis(model):
+    """The achieved operating point takes the same transform as the target.
+
+    `imposed_q` pins the split, so on the file's axis the achieved q must come
+    back as the q that was asked for -- not its mirror image.
+    """
+    q = 0.3
+    r = model.evaluate_network("bassett2001", "K5", q, _PSI, _THETA)
+
+    assert r.converged, r.message
+    assert r.q_converged == pytest.approx(q, abs=1e-6)
+
+
+def test_hager_straight_coefficient_is_not_flipped(model):
+    """Hager indexes xi_t on the LATERAL fraction, so it passes through. The
+    1 - q in equivalences.py maps Hager onto Bassett's axis for the
+    cross-paper rollup, not onto the network."""
+    q = 0.3
+    as_hager = model.evaluate_network("hager1984", "xi_t", q, 1.0, _THETA)
+    as_k6 = model.evaluate_network("bassett2001", "K6", q, 1.0, _THETA)
+
+    assert as_hager.converged and as_k6.converged
+    assert as_hager.K_straight == pytest.approx(as_k6.K_straight, rel=1e-9)

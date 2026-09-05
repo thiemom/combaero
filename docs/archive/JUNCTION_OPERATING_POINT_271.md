@@ -482,9 +482,19 @@ and covers both flow directions.
 
 | source | worst mass-weighted mean K | violations |
 |---|---|---|
-| measured curves (paired K5/K6) | +0.21 | 0 |
-| Bassett analytical pair, swept | +0.19 | 0 |
+| Bassett analytical pair, correctly paired | **exactly 0** in the no-diversion limit | 0 |
 | **the model** | **-0.06** | violates for q below ~0.2 |
+
+**Corrected 2026-09-05.** The first version of this table read "measured curves
++0.21, Bassett analytical +0.19", computed by pairing K5 and K6 at the same q.
+That is the wrong pairing: Bassett indexes each coefficient on its own leg, so
+K5's argument is the STRAIGHT fraction (Finding 9). Paired correctly the
+quantity is `(1-q) K5(1-q) + q K6(q)`, which is positive throughout and tends
+to **exactly zero** as the lateral flow vanishes -- a junction that diverts
+nothing dissipates nothing, which is the sharper statement and a good check on
+the axis reading. The mirrored pairing gives 0.5 there, a loss with no flow
+diverted. The conclusion is unchanged and strengthened; the two margin figures
+were wrong.
 
 The data satisfies the condition with margin. The model does not: it is
 net-generating at low lateral fraction in four of five geometries checked
@@ -594,6 +604,65 @@ machinery tests that depended on the old path force it explicitly instead of
 being weakened.
 
 The change is deterministic: 1732 under hash seeds 0, 1 and 7.
+
+## Finding 9: the separating straight leg was scored on a mirrored axis
+
+Found while re-reading Mynard and Bassett to answer a question about whether a
+negative K implies an energy gain (it does not; see Finding 7's correction).
+
+Bassett indexes each coefficient on the fraction in **its own leg**. K6's
+argument is the lateral fraction; K5's and K2's is the **straight** fraction.
+Every network adapter builds its network from the lateral fraction, so a
+straight-leg record needs `1 - q` on the way in, and the achieved operating
+point needs the same transform coming back.
+
+Four independent lines settle the convention:
+
+1. `validation/junction/equivalences.py` states it outright: "Hager q is
+   lateral/total -> Bassett K5 q is straight/total = 1 - q_Hager".
+2. The algebra: `K5(q) = q^2 - 1.5q + 0.5` is exactly Hager's `xi_t` evaluated
+   at `1 - q`, and Hager's argument is the lateral fraction.
+3. The digitised points fit Bassett's own K5 curve read directly (mean error
+   0.037) far better than mirrored (0.240), across all four measured files.
+   Hager's `xi_t` files fit his own curve on the lateral axis (0.08 against
+   0.21), as documented.
+4. The physical limit. Paired correctly, the flow-weighted mean K tends to
+   **exactly zero** as the lateral flow vanishes: a junction that diverts
+   nothing dissipates nothing. Paired the other way it tends to 0.5, a loss
+   with no flow diverted.
+
+### Audited at every site
+
+| adapter | state |
+|---|---|
+| `mpce_v1_network` | input transform present (added with #277) |
+| `mpce_v2_network` | **mirrored** |
+| `tee_junction_element_network` | **mirrored** |
+| `mynard_analytical` | **mirrored** |
+| `tee_junction_raw` | correct: it calls Bassett's own formula on Bassett's own axis |
+
+**None of the four did the output half**, which only became reachable when
+`q_converged` was populated in #290 -- so the drift and the on-curve
+interpolation added for item 9b were being measured on a mirrored axis for
+every straight-leg record.
+
+### Effect, measured
+
+| topology | converged before | after | RMSE before | after |
+|---|---|---|---|---|
+| `imposed_q` | 77 | 79 | 0.3770 | **0.3178** |
+| `mfb_two_pb` | 70 | 70 | 0.1962 | **0.1399** |
+
+Every other canonical coefficient is bit-identical -- lateral separating,
+lateral joining and straight joining all unchanged -- which is the check that
+the fix is surgical. Overall convergence 1732 to 1734.
+
+**One honest caveat.** For MPCE-v1 the correct axis makes the straight-leg
+score *worse* (0.477 mirrored against 0.551 correct). That is not an argument
+against the fix: the axis is fixed by the paper's convention, not by which
+reading fits better. It is a statement about v1's straight-leg physics, which
+is separately known to be poor because its collinear ports are collapsed by
+the sin^2 gate.
 
 ## What this changes
 

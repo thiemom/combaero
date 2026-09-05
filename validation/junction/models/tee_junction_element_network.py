@@ -18,6 +18,7 @@ don't match the expected (paper, K_id).
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 
 from combaero.network import (
     BorderCarnotLossElement,
@@ -75,7 +76,13 @@ class TeeJunctionElementNetwork:
                 converged=False,
                 message=f"K_id {K_id} requires non-separating topology, not yet wired",
             )
-        return self._separating(q, psi or 1.0, theta_rad or math.pi / 2.0, topology)
+        # See mpce_v2_network: a K5/K2 file's q is the STRAIGHT fraction while
+        # this network is built from the lateral one.
+        q_lateral = 1.0 - q if K_id in {"K5", "K2"} else q
+        result = self._separating(q_lateral, psi or 1.0, theta_rad or math.pi / 2.0, topology)
+        if K_id in {"K5", "K2"} and result.q_converged is not None:
+            result = replace(result, q_converged=1.0 - result.q_converged)
+        return result
 
     def _separating(
         self, q: float, psi: float, theta_rad: float, topology: Topology
