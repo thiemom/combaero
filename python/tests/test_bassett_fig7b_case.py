@@ -70,7 +70,28 @@ def _run(model, topology: str, q: float):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("q", [0.2, 0.4, 0.6, 0.8])
+_INADMISSIBLE = (
+    "The model is not DISSIPATIVE at a low lateral fraction for this "
+    "geometry: its mass-weighted mean K goes negative below q ~ 0.22 "
+    "(psi=3, theta=45), so the junction would create flow work. The "
+    "post-solve energy check added for #271 defect 10 now refuses those "
+    "states, which is correct -- Bassett's own coefficients keep the "
+    "weighted mean at +0.19 or better everywhere. The three_pb cases fail "
+    "for the same reason at one remove: that topology wanders down to "
+    "q ~ 0.02, inside the inadmissible band. These come off when #272 "
+    "closes the K_straight gap."
+)
+
+
+@pytest.mark.parametrize(
+    "q",
+    [
+        pytest.param(0.2, marks=pytest.mark.xfail(strict=True, reason=_INADMISSIBLE)),
+        0.4,
+        0.6,
+        0.8,
+    ],
+)
 def test_imposed_q_converges_across_the_curve(model, q):
     r = _run(model, "imposed_q", q)
     assert r.converged, r.message
@@ -78,7 +99,12 @@ def test_imposed_q_converges_across_the_curve(model, q):
 
 @pytest.mark.parametrize(
     "q, expected",
-    [(0.2, 0.4534), (0.4, 0.5816), (0.6, 1.3888), (0.8, 2.8842)],
+    [
+        pytest.param(0.2, 0.4534, marks=pytest.mark.xfail(strict=True, reason=_INADMISSIBLE)),
+        (0.4, 0.5816),
+        (0.6, 1.3888),
+        (0.8, 2.8842),
+    ],
 )
 def test_imposed_q_reproduces_the_model_curve(model, q, expected):
     """Pins the model's own Fig 7b curve, so a physics change has to state
@@ -96,7 +122,14 @@ def test_imposed_q_reproduces_the_model_curve(model, q, expected):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("q", [0.4, 0.6, 0.8])
+@pytest.mark.parametrize(
+    "q",
+    [
+        0.4,
+        pytest.param(0.6, marks=pytest.mark.xfail(strict=True, reason=_INADMISSIBLE)),
+        pytest.param(0.8, marks=pytest.mark.xfail(strict=True, reason=_INADMISSIBLE)),
+    ],
+)
 def test_three_pb_converges(model, q):
     """The case that raised under strict=True. With the soft barrier steering
     the reversed first iterate back it converges. No K assertion: in this
