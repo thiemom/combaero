@@ -72,7 +72,14 @@ class MynardResult:
 #: 90 deg between collectors, orientation swept 0-90 deg, lambda = 0.5,
 #: Re 1363-1817 (blood flow). That is not our regime, so the values are held
 #: to the Bassett K5/K6 + Hager xi_t dividing-flow cells, not to the CFD.
-#: Proving table: pending (#271 step 1.3). Switch: ``eta_scale``.
+#: PROVEN 2026-09-05 (#271 step 1.3, imposed_q, on/off at fixed alpha):
+#:   Hager xi_t   MAE 0.3385 -> 0.2859, bias +0.338 -> +0.055
+#:   Bassett K5   MAE 0.3812 -> 0.3440, bias +0.235 -> +0.033
+#:   Bassett K6   MAE 0.0700 -> 0.0526, bias -0.047 -> -0.002
+#: Improves every dividing cell of both independent sources, chiefly by
+#: removing a large positive bias. No effect on any joining cell (its
+#: (1 - lambda) factor is zero there), verified to 4 decimals.
+#: Switch: ``eta_scale``.
 MYNARD_ETA_A0: float = 0.8
 MYNARD_ETA_A1: float = -0.2
 
@@ -81,7 +88,8 @@ MYNARD_ETA_A1: float = -0.2
 #: only justification is "avoids infinite C when FlowRatio approaches zero".
 #: NOT in the paper and NOT physics -- a numerical knob whose effect is
 #: confined to FlowRatio -> 0, i.e. the q -> 0 / q -> 1 endpoints of the
-#: Bassett curves. Proving table: pending (#271 step 1.3).
+#: Bassett curves. Proving table: pending (#271 step 1.4, endpoint
+#: sensitivity).
 FLOW_RATIO_DAMPING: float = 0.02
 
 

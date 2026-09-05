@@ -113,7 +113,19 @@ class MPCEv2Element(MultiPortChamberElement):
     #:   - It is measured together with Mynard's eta (both live in
     #:     ``etransfer``; see ``eta_scale``), never one half of the pair.
     #:
-    #: Proving table: pending (#271 step 1.3). Switch: pass 0.0.
+    #: PROVEN 2026-09-05 (#271 step 1.3, imposed_q, eta on, alpha swept):
+    #:   alpha        0.0     0.1     0.15    0.20    0.25    0.30
+    #:   Idelchik all 0.512   0.404   0.380   0.377   0.385   0.411   (MAE)
+    #:   Idelchik K11 bias    -0.309  ...    -0.025  +0.046  +0.116
+    #: In-network optimum is 0.2, shallow over [0.15, 0.25]; sources pull
+    #: slightly apart (Bassett K11 prefers ~0.25, Bassett K12 and Idelchik
+    #: K11 ~0.15). The corrected-axis ANCHOR refit (#283) said 0.28-0.31 and
+    #: is worse here (Idelchik +0.034): the anchors are Bassett's analytical
+    #: curves, this table is measured/tabulated data, and measured wins.
+    #: No alpha fixes Idelchik K12 (bias -0.27 at the MAE minimum) -- that
+    #: is the closure's K12@90 shape limit, not a tuning question.
+    #: No effect on any dividing cell or any psi = 1 cell, verified.
+    #: Switch: pass 0.0.
     DEFAULT_JOINING_ETRANSFER_ALPHA: float = 0.2
 
     def __init__(
