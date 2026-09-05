@@ -330,9 +330,18 @@ class NetworkSolver:
         else:
             dp_est = ref["P"] * 0.001
 
-        # BFS propagation from known nodes
+        # BFS propagation from known nodes.
+        # Seed the queue from the dict, NOT from `visited`: iterating a set of
+        # node-ID strings follows hash(str), which Python randomises per
+        # process, and every BFS hop applies dp_est -- so the propagated x0
+        # pressures, and with them the Newton basin, depended on
+        # PYTHONHASHSEED. Measured on the junction scorecard (issue #271):
+        # mfb_two_pb converged 618 or 629 of 691 depending on the seed, and
+        # Bassett's own Fig 7b case landed on a different root in 5 of 10
+        # identical processes. Dicts are insertion-ordered, so this is
+        # deterministic.
         visited = set(p_guess.keys())
-        queue = list(visited)
+        queue = list(p_guess.keys())
         while queue:
             nid = queue.pop(0)
             for elem in self.network.get_downstream_elements(nid):

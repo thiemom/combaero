@@ -51,10 +51,14 @@ class MPCEv2Network:
         reports artifact roots as converged. Measured on the full scorecard
         (issue #271): strict=True 1578/2073, strict=False 1711/2073, with
         imposed_q identical (602/691) and the difference entirely in the
-        pressure-driven topologies. Note the verifier is direction-only:
-        Bassett Fig 7b mfb_two_pb q=0.8 converges to a mirror root with the
-        right port signs (K_lat 3.44 vs 2.77) and is reported as a success
-        under either setting. Keep the adapter production-faithful.
+        pressure-driven topologies. Keep the adapter production-faithful.
+
+        The verifier is direction-only, and its threshold is `m_dot > 1e-6`,
+        so it also passes near-degenerate roots: a solve reporting a lateral
+        leg at 1% of the common flow is a success. That matters because the
+        pressure-driven topologies often have TWO roots, both exactly
+        reproducing the model, with the initial guess deciding which is
+        reported (docs/archive/JUNCTION_OPERATING_POINT_271.md).
 
         ``strict=False`` enables the soft-barrier fallback on the underlying
         MPCEv2Element so the solver gets a quadratic pull-back when it

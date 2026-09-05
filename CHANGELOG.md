@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`NetworkSolver` results no longer depend on `PYTHONHASHSEED`.**
+  `_propagate_pressure_guess` seeded its breadth-first pressure propagation
+  from `list(set(...))` over node-ID strings. Set iteration order for strings
+  follows `hash(str)`, which Python randomises per process, and every BFS hop
+  applies the same pressure decrement -- so the propagated initial guess, and
+  with it the Newton basin, changed from run to run on identical input. On
+  the junction validation scorecard (issue #271) the `mfb_two_pb` topology
+  converged 618 or 629 of 691 depending on the seed, and Bassett's own Fig 7b
+  case landed on a different root in 5 of 10 identical processes. The queue is
+  now seeded from the dict, which is insertion-ordered. Networks whose solve is
+  basin-sensitive may now select a different (deterministic) root than they
+  happened to select before; the junction scorecard is unchanged at 1700/2073
+  under every seed tested, against 1700 or 1711 before. The Python suite also
+  reported no intermittent `xpass` across three consecutive runs, where it
+  previously did.
+
 ### Added
 - **The tuned constants in the MPCEv2 junction closure are now named,
   labelled with their provenance, and switchable for measurement (issue
