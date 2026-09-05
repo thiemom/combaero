@@ -293,35 +293,68 @@ direction verifier. Measured on the full scorecard:
 - Every all-topology convergence comparison made earlier was a strict-mode
   artefact, including "v2 converges far less than v1" -- v1 has no strict
   raise. Withdrawn; the provenance record is corrected.
-- **Both modes report a false success** on Bassett Fig 7b `mfb_two_pb`
-  q=0.8: run cold it converges to K_lat 3.44 against 2.77 -- a mirror root
-  with the *correct port signs*, so the direction-only verifier cannot see
-  it. (An earlier run on a reused adapter instance happened to demote it;
-  measured cold, it is reported as converged every time.) A wrong root
-  reported as a success is the worst outcome the harness can produce. The v1
-  base has an energy-consistency check (#229); MPCEv2 has none. Pinned as a
-  strict xfail target.
-- **And it is not even deterministic.** The same `mfb_two_pb` q=0.8 case
-  converges to the mirror root in a cold single-process run and fails or is
-  demoted under the parallel test suite. A strict xfail on it flapped in CI.
-  It carries the junction tests' one deliberately non-strict xfail, with the
-  non-determinism stated as the reason; process-dependent outcomes in a
-  validation harness are a defect in their own right (step 3 must not
-  inherit them).
+- **The "mirror root" reading of Bassett Fig 7b `mfb_two_pb` q=0.8 is
+  withdrawn (2026-09-05, same day).** It converges to q=0.857, not 0.8, and
+  its extracted K of 3.4370 equals the model's own `imposed_q` K at q=0.857.
+  It is the model's correct root at a shifted operating point; the 24%
+  "error" was a comparison against Bassett at the target q. See
+  [JUNCTION_OPERATING_POINT_271.md] for the measurement and for what the
+  direction-only verifier does and does not need to catch.
+- **The run-to-run variation is real, and its cause is now known.** The same
+  case converges in 5 of 10 identical processes. It is `PYTHONHASHSEED`:
+  `_propagate_pressure_guess` seeds its BFS from `list(set(...))` over node-ID
+  strings, so the propagated x0 pressures depend on the process hash seed.
+  Fixed hash seed gives perfectly reproducible outcomes, and different seeds
+  give different roots. **Fixed** (defect 12 below): the scorecard is now
+  1700/2073 under every seed tested, against 1700 or 1711 before. Every
+  convergence count recorded in this document before 2026-09-05 carries that
+  uncertainty.
 - The adapter now defaults to `strict=False`. Never compare v1 and v2
   convergence without matching it.
 
 **Bassett's own Fig 7b case** (theta=45, psi=3, M ~ 0.03 -- inside his
-measured conditions) converges in `three_pb` at q=0.4/0.6/0.8 onto his curve
-(K_lat 0.444/1.246/2.765 vs 0.444/1.247/2.769) once the soft barrier is
-allowed to steer the reversed first iterate. The low-lateral-fraction points
-(q=0.2 `three_pb`; q=0.2/0.4 `mfb_two_pb`) still fail with "not making good
-progress" -- a solver-path failure inside documented conditions, which is
-the highest-priority kind. They are pinned as strict xfail **targets** in
-`python/tests/test_bassett_fig7b_case.py`, alongside the passing points, so
-the moment one starts passing it is noticed.
+measured conditions) converges in `three_pb` at q=0.4/0.6/0.8 and in
+`mfb_two_pb` at q=0.6/0.8. The low-lateral-fraction points (q=0.2/0.4) do
+not, and the follow-up investigation showed **why: those boundary-value
+problems have no solution.** The model's `K_lat - K_str` has a minimum of
+0.551 for this geometry and the targets sit at 0.122 and 0.385. No seed
+reaches a root that does not exist. They stay pinned as xfail targets in
+`python/tests/test_bassett_fig7b_case.py`, now labelled infeasible rather
+than solver-path failures, and they come off when #272 closes the
+`K_straight` gap. **The `three_pb` assertions in that test were tautological
+and have been removed** -- see the next section.
+
+## 4e. The pressure-driven topologies score less than they appear to (2026-09-05)
+
+Full record: [JUNCTION_OPERATING_POINT_271.md]. Three results that change what
+the port can be gated on:
+
+1. **`three_pb`'s K extraction is a tautology.** Every `Pt` is imposed by a
+   boundary through a lossless connection and `_extract_K` normalises by the
+   fixed `m_dot_ref`, so the extracted K is the target by construction. A
+   deliberately wrong model (`eta_scale=3.0`, `imposed_q` K 2.88 -> 3.07)
+   still reproduces the q=0.8 target to 0.05%. `three_pb` measures
+   convergence only.
+2. **The converged operating point drifts from the target q**, and the score
+   compares against the paper at the target anyway: `three_pb` median drift
+   0.134, `mfb_two_pb` 12.6% of converged rows more than 0.25 away. Scoring K
+   at the **achieved** q is the missing instrument.
+3. **Where the BC set is feasible it often has two roots**, both exactly
+   reproducing the model at their own q, with the initial guess deciding.
+   Uniqueness is a property of `K_lat - K_str` being monotonic, i.e. of
+   #272, not of the solver.
+
+Consequences for sec 8: the step-4 gate cannot include "reproduce the
+`three_pb` K table", and the `mfb_two_pb` table is only meaningful once K is
+scored at the achieved q.
 
 ## 5. What the papers settle about the K_straight question (#272)
+
+**Second motivation, added 2026-09-05:** `K_straight`'s size at low q also
+decides whether the pressure-driven problem has a unique solution. The
+model's `K_lat - K_str` is U-shaped, which makes low-q targets infeasible
+and mid-range targets doubly-rooted. A monotonic difference leaves one
+operating point. See [JUNCTION_OPERATING_POINT_271.md].
 
 Three independent sources say **negative `K_straight` in dividing flow is real
 physics**, not a solver artefact:
@@ -402,9 +435,17 @@ Consequences:
 | 5 | `damping` 0.02 undocumented as a regulariser | Matlab comment | name it (`FLOW_RATIO_DAMPING = 0.02`) with the Matlab citation and the sentence "numerical regulariser, not physics" | trivial |
 | 6 | No compressibility, no stated limit | sec 3 | short-term: document `Ma < 0.2` on the element as `tee_junction.h` does; long-term: sec 8 step 5 | trivial now |
 | 7 | Bassett K4/K7/K8/K9 unscored | sec 6 | add a type-4 joining builder and a K4 separating case to the adapter | medium |
+| 8 | `three_pb`'s K score is a tautology (sec 4e) | `eta_scale=3.0` still reproduces the q=0.8 target to 0.05% | score K at the achieved q, or demote `three_pb` to a convergence-only row in the scorecard | small |
+| 9 | K is scored at the TARGET q while the solve sits at the achieved q | drift: `three_pb` median 0.134; `mfb_two_pb` 12.6% of rows > 0.25 | return the converged q from `solve_and_extract` and score against the paper there | small |
+| 10 | `verify_solution_consistent` passes near-degenerate roots | a root at q=0.0102 (lateral leg at 1% of the flow) is reported as a success; its only criterion is `m_dot > 1e-6` | add a minimum-flow-fraction criterion | small |
+| 11 | `analytical_pt_prop` seeds no mass flow through `LosslessConnectionElement` | x0 violates continuity at every junction (0.1 in, 0.2 out); a junction-aware mass-conserving seed gains ~70 solves | extend the seed, but land it WITH item 9 -- it moves 22 already-converged roots between the two legitimate branches | medium |
+| 12 | ~~Solver results depend on `PYTHONHASHSEED`~~ **fixed** | `_propagate_pressure_guess` seeds its BFS from `list(set(p_guess.keys()))`; the same case converges in 5 of 10 identical processes, and is deterministic per fixed hash seed | **done.** `queue = list(p_guess.keys())`; scorecard identical (1700/2073) under seeds 0/1/7/13, against 1700 or 1711 before | done |
 
 Items 1, 2, 5, 6 are an afternoon. Item 3 is the one that changes what the
-port can be held to.
+port can be held to. Item 12 is done; it blocked reproducible measurement of everything else.
+Items 8-11 come from
+[JUNCTION_OPERATING_POINT_271.md] and change what the port can be *gated*
+on: 9 before 11, and 8 before either.
 
 ## 7a. Step 2.1 note: the wide-except audit (2026-09-05)
 
@@ -526,8 +567,12 @@ useless.
    stays as an offline cross-check of the canonical case (the ejector recipe),
    not as a runtime path.
 
-**Step 4 gate:** all Bassett, Hager and Idelchik tables reproduced to solver
-tolerance with no worse convergence; whole-row FD tests
+**Step 4 gate:** the `imposed_q` Bassett, Hager and Idelchik tables
+reproduced to solver tolerance with no worse convergence. **Not** the
+`three_pb` K table, which any model reproduces (sec 4e), and the
+`mfb_two_pb` table only once K is scored at the achieved q (item 9);
+until then `mfb_two_pb` contributes convergence counts, not accuracy.
+Plus whole-row FD tests
 (`test_mpce_v2_jacobian_rows.py`, extended to joining and to `N = 4` once
 item 1 is lifted) at `< 1e-6`; a ctest comparing the C++ kernel against golden
 Python values (the ejector recipe's `.h` golden-data pattern).
@@ -536,6 +581,12 @@ Python values (the ejector recipe's `.h` golden-data pattern).
 correction into the closure (it is already in `tee_junction.h`, templated, with
 the v3 spec's derivation). Gate: Wang 2014 (digitised) and Perez-Garcia
 (digitise first). This is the step that restores what the retired tee had.
+
+**Step 5a -- operating-point instrumentation (items 8-11).** Independent of
+the port and a prerequisite for gating it: return the converged q, score
+against the paper there, demote the `three_pb` K column, tighten the
+verifier, then land the junction-aware seed. Doing the seed first would
+silently move 22 roots with nothing able to tell which branch is wanted.
 
 **Step 6 -- retire v1 as a solver element** (sec 5). Keep
 `MultiPortChamberElement` as the M -> 0 regression target; close the #272
@@ -575,3 +626,5 @@ Still open:
 - `compressible_junction_model_v3.pdf` -- sec 5 (closed O(M^2) K), 8
   (residuals + Jacobian tables), 9 (C++ fragments), 11 (limitations).
 - `JunctionLossCoefficient.m` -- line 60-63 (damping), 65 (n <= 3 K).
+
+[JUNCTION_OPERATING_POINT_271.md]: ../../docs/archive/JUNCTION_OPERATING_POINT_271.md

@@ -127,11 +127,16 @@ post-solve direction verifier. Re-measured: all-topology 1578/2073 at
 (602/691) and the whole difference in the pressure-driven topologies. The
 MAE/bias rows stand (they are `imposed_q`); the convergence comparison
 between regimes, and the earlier "v2 converges far less than v1" reading,
-were strict-mode artefacts and are withdrawn. Separately, Bassett Fig 7b
-`mfb_two_pb` q=0.8 converges to a mirror root (K 3.44 vs 2.77) and is reported
-as a success under **both** settings: the port signs are correct, so the
-direction-only verifier cannot see it. The adapter now defaults to
-`strict=False`; the uncaught mirror root is a pinned target.
+were strict-mode artefacts and are withdrawn. The adapter now defaults to `strict=False`.
+
+**Second correction (same day): the "mirror root" recorded here is
+withdrawn.** Bassett Fig 7b `mfb_two_pb` q=0.8 was reported above as
+converging to a mirror root at K 3.44 against 2.77. It converges to q=0.857,
+not 0.8, and its extracted K of 3.4370 equals the model's own `imposed_q` K
+at q=0.857 -- the model's correct root at a shifted operating point. The
+error was comparing K against the paper at the target q while the solve sat
+elsewhere. Full measurement, and what the harness actually needs to detect,
+in [JUNCTION_OPERATING_POINT_271.md].
 
 **What survives:** the case for porting is architectural homogeneity and the
 CLAUDE.md `(f, J)` rule, not a convergence rescue. Joining runs its Jacobian
@@ -157,3 +162,5 @@ better than implying a performance win that the numbers do not support.
 - A coefficient is compared only against the leg its source indexes it on.
 - A change to a closure is scored against the digitised curves before it lands,
   and reverted with the numbers written down when the data says no.
+
+[JUNCTION_OPERATING_POINT_271.md]: JUNCTION_OPERATING_POINT_271.md
