@@ -228,6 +228,51 @@ disagreement), not something the joining correction can reach.
 Pinned executably by `python/tests/test_junction_tuned_constants_proof.py`:
 each term improves its own block by a margin and does not touch the other.
 
+## 4c. Step 1.4 result: the damping regulariser (2026-09-05)
+
+`damping = 1 - exp(-FlowRatio / tau)` on Mynard's collector `C`, from the
+Matlab reference only ("avoids infinite C when FlowRatio approaches zero").
+Swept tau over {off, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2} on all 150 dividing
+points (Bassett K5/K6, Hager xi_t) at the proven eta and alpha. A regulariser
+is not tuned to data; the task was to show it does not matter to it.
+
+| tau | interior MAE (101 pts) | endpoint MAE (49 pts) | endpoint converged |
+|---|---|---|---|
+| off | 0.1437 | **0.3809** | 38 / 49 |
+| 0.005 | 0.1437 | 0.3822 | 38 / 49 |
+| 0.01 | 0.1437 | 0.3837 | 38 / 49 |
+| **0.02** | 0.1437 | 0.3859 | 38 / 49 |
+| 0.05 | 0.1445 | 0.3986 | 38 / 49 |
+| 0.1 | 0.1491 | 0.4196 | 38 / 49 |
+| 0.2 | 0.1595 | 0.4425 | 38 / 49 |
+
+- **(a) inert in the interior** over (0, 0.02], to 4 decimals.
+- **(c) value-insensitive** over that band; degrades monotonically above it.
+- **(b) necessary for convergence -- no.** Convergence is identical with the
+  knob off at every endpoint (the same 11 Bassett failures at every tau,
+  which are the artifact-root guard at true q -> 0/1, not a C blow-up), and
+  the endpoint MAE is slightly *better* off. The "infinite C" case occurs
+  nowhere in the data.
+
+**Why it is cancelled.** Probing the FlowRatio -> 0 limit directly: `C`
+diverges as 1/FlowRatio without damping (-21 -> -2.2e5 from 1e-2 to 1e-6)
+and damping bounds it (~ -10.9). But MPCEv2 uses `K`, and Mynard Eq 18
+multiplies `C` by FlowRatio^2, so `K_lat -> 1` -- the correct dead-branch
+limit -- identically with or without the knob. The regulariser protects a
+quantity the production path never exposes. It *would* matter for Mynard's
+native `C_j` residual (sec 8 step 3b), which is the honest reason to keep it
+at the reference value rather than delete it.
+
+**Verdict:** band (0, 0.02], retained at 0.02 for fidelity to the reference
+and for the C-form option. Labelled as such; pinned by
+`python/tests/test_junction_damping_band.py` with exact tolerances (a limit,
+not a tuning).
+
+**Edge found on the way:** at FlowRatio exactly 0, `K_lat = -1` with or
+without damping -- a sign-flipped dead branch the knob never guarded. Pinned
+by test so the degenerate-iterate work (step 2) removes the test when it
+fixes the edge, rather than rediscovering it.
+
 ## 5. What the papers settle about the K_straight question (#272)
 
 Three independent sources say **negative `K_straight` in dividing flow is real

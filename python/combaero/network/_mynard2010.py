@@ -86,10 +86,23 @@ MYNARD_ETA_A1: float = -0.2
 #: Regulariser on the collector loss coefficient, (1 - exp(-FlowRatio/tau)).
 #: Source: the Matlab reference JunctionLossCoefficient.m lines 60-63, whose
 #: only justification is "avoids infinite C when FlowRatio approaches zero".
-#: NOT in the paper and NOT physics -- a numerical knob whose effect is
-#: confined to FlowRatio -> 0, i.e. the q -> 0 / q -> 1 endpoints of the
-#: Bassett curves. Proving table: pending (#271 step 1.4, endpoint
-#: sensitivity).
+#: NOT in the paper and NOT physics. Not tuned to data -- shown not to
+#: matter to it (#271 step 1.4, 2026-09-05, 150 dividing points, 3 sources):
+#:   tau in (0, 0.02]  identical to 4 decimals on every interior point and
+#:                     identical convergence at every endpoint, damping ON
+#:                     or OFF; the "infinite C" case occurs nowhere in the
+#:                     data.
+#:   tau >= 0.05       degrades monotonically (interior MAE +0.0007 at 0.05,
+#:                     +0.016 at 0.2).
+#: Why it is cancelled here: C ~ 1/FlowRatio without damping, but the K
+#: conversion (Mynard Eq 18, what MPCEv2 uses) multiplies by FlowRatio^2,
+#: so K -> 1 (the dead-branch limit) with or without it. The knob bounds a
+#: quantity the production path never exposes. It WOULD matter for
+#: Mynard's native C-form residual (p_i - p_j = C_j rho u_j^2), which is why
+#: it is kept at the reference value rather than removed. Band: (0, 0.02].
+#: Known edge: at FlowRatio exactly 0, K_lat = -1 with or without damping
+#: (a sign-flipped dead branch) -- a degenerate-iterate case for the
+#: solver-robustness work, not something this knob guards.
 FLOW_RATIO_DAMPING: float = 0.02
 
 
