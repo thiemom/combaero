@@ -50,12 +50,18 @@ def model():
 def test_three_pb_K_is_the_imposed_target_whatever_the_model_does():
     """A deliberately wrong model must still reproduce three_pb's target.
 
-    eta_scale=3.0 triples Mynard's energy-transfer factor. It moves the model's
-    own answer (imposed_q) by more than 6%. If three_pb's K moved with it, the
+    ``eta_scale=0.5`` halves Mynard's energy-transfer factor, moving the
+    model's own answer (imposed_q) by 0.045. If three_pb's K moved with it, the
     topology would be scoring the model and the exclusion below would be wrong.
+
+    The perturbation used to be ``eta_scale=3.0``, which moves the model four
+    times further. It no longer serves: since the energy check of defect 10,
+    the tripled model is inadmissible in three_pb at every q and is rejected
+    before a K can be extracted. A perturbation has to stay inside the physics
+    to demonstrate anything, which is why this one is milder.
     """
     honest = MPCEv2Network(strict=False)
-    wrong = MPCEv2Network(strict=False, eta_scale=3.0)
+    wrong = MPCEv2Network(strict=False, eta_scale=0.5)
     q = 0.8
     target = bassett2001.K6(q, _PSI, _THETA)
 
@@ -63,13 +69,13 @@ def test_three_pb_K_is_the_imposed_target_whatever_the_model_does():
     wrong_imposed = wrong.evaluate_network("bassett2001", "K6", q, _PSI, _THETA)
     assert honest_imposed.converged and wrong_imposed.converged
     moved = abs(wrong_imposed.K_lateral - honest_imposed.K_lateral)
-    assert moved > 0.15, f"the perturbation must actually change the model: moved only {moved:.4f}"
+    assert moved > 0.03, f"the perturbation must actually change the model: moved only {moved:.4f}"
 
     wrong_three_pb = wrong.evaluate_network(
         "bassett2001", "K6", q, _PSI, _THETA, topology="three_pb"
     )
-    assert wrong_three_pb.converged
-    assert wrong_three_pb.K_lateral == pytest.approx(target, abs=0.01), (
+    assert wrong_three_pb.converged, wrong_three_pb.message
+    assert abs(wrong_three_pb.K_lateral - target) < 0.25 * moved, (
         "three_pb no longer reproduces the target from a wrong model -- if this "
         "fails, the topology has become informative and the exclusion in "
         "_K_SCORING_TOPOLOGIES should be revisited, not deleted"

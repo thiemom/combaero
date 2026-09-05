@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **The initial guess at a junction now conserves mass and follows the
+  boundary pressures.** `NetworkSolver`'s `analytical_pt_prop` seeding applied
+  its Bernoulli mass-flow estimate only to `ChannelElement`, and junctions are
+  wired with `LosslessConnectionElement`, so every junction port fell back to
+  the flat reference flow: on a three-port junction that is 0.1 kg/s in against
+  0.2 kg/s out, with a 1:1 split whatever the boundary pressures say. The split
+  is now a Bernoulli share of the propagated port pressure differences,
+  rescaled so continuity holds exactly at the start with every port in its
+  declared direction. The total still comes from the existing topological
+  propagator, so an upstream `MassFlowBoundary` continues to set the level and
+  no new flow-scale heuristic is introduced. On the junction validation
+  scorecard, solves rejected as landing on a physically inadmissible or
+  artifact root fall from 227 to 163, and convergence rises from 1625 to 1732
+  of 2073, with accuracy unchanged on the records scored under both. The seed
+  is opt-in per element class through `seeds_ports_by_pressure_split`, which
+  `EjectorElement` sets to false: its port flows follow choking and entrainment
+  rather than a pressure split, and it carries its own warm start. Networks
+  with more than one admissible operating mode may now report a different one
+  than before; see `docs/archive/JUNCTION_OPERATING_POINT_271.md`.
+
 - **`MPCEv2Element` now rejects converged states in which the junction would
   create flow work.** Its post-solve `verify_solution_consistent` checked only
   that port flows kept their declared direction; `MultiPortChamberElement` (v1)

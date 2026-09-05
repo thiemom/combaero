@@ -274,12 +274,10 @@ at x0 with every port on its declared side.
 
 `imposed_q` is untouched, as expected: the flows are boundary conditions there.
 
-**It is not answer-neutral.** It moves 22 already-converged roots, because of
-Finding 1 -- both roots exist and the seed selects one. On psi=1, theta=90,
-q=0.701 that selection is an improvement (q=0.60 instead of a near-degenerate
-q=0.0102), but "improvement" is a judgement the harness cannot currently make,
-which is why the seed change must land **with** operating-point reporting, not
-before it.
+**It is not answer-neutral.** It moves already-converged roots, because of
+Finding 1 -- both roots exist and the seed selects one. That is why it landed
+last, after the operating-point reporting and the energy check were in place to
+judge the difference. The re-measurement with all of that present is Finding 8.
 
 The baseline also moved between runs (1700 and 1711 on identical inputs).
 That is Finding 5 below, not noise in the measurement of the seed: both seeds
@@ -527,6 +525,75 @@ positive mixing term that is not counted, so on a strongly non-isothermal
 junction the check is conservative in the wrong direction. The element is
 documented for low Mach and the fixtures are isothermal, so the case does not
 arise today; it is recorded at the method.
+
+## Finding 8: what the seed is actually worth, measured with the instruments in place
+
+Re-measured after items 8, 9 and 10 landed, which changed the baseline from
+1700 to 1625 and gave the harness three things the first prototype lacked: the
+achieved operating point, the off-point count, and the energy gate.
+
+| | seed off | seed on |
+|---|---|---|
+| converged | 1625 | **1732** |
+| rejected as inadmissible or artifact | 227 | **163** |
+| on-point evidence | 1243 | 1254 |
+| RMSE on the common subset, `imposed_q` | 0.7664 | 0.7664 |
+| RMSE on the common subset, `mfb_two_pb` | 0.7845 | 0.7844 |
+
+**Read the middle row first.** The seed's real effect is not "+107 rows": it is
+that 89 solves which previously landed on an inadmissible or artifact root now
+land on an admissible one, against 20 pushed the other way. That is the
+"steer away from non-physical branches" objective, and it is only visible
+because the energy check of item 10 exists to name those roots.
+
+**The convergence count on its own would have flattered it.** Of the 153 rows
+gained, 21 are on-point and 131 are not; 47 rows are lost, 11 of them on-point.
+Net evidence at the requested operating points is +11 on 2073 records. Anyone
+quoting the +107 as the benefit is quoting mostly off-point rows.
+
+**Accuracy is unchanged.** On the records scored under both seeds, RMSE and
+bias agree to four decimals. A first pass compared full populations and showed
+`mfb_two_pb` RMSE rising 0.7806 to 0.7884, which was a population effect from
+the 36 extra rows, not a degradation -- the common-subset comparison is the
+one that answers the question.
+
+**One earlier claim is withdrawn.** The prototype note said the seed "selects
+the intended operating point" on at least one case, generalising from six
+moved roots of which five landed nearer the target. Measured across every
+record converged under both seeds, it is a wash: `three_pb` median drift 0.0949
+to 0.0944 with 167 nearer and 195 further; `mfb_two_pb` 0.0001 to 0.0001 with
+231 nearer and 205 further. **The seed does not steer toward the requested q.**
+It steers toward admissible roots, which is a different and better thing.
+
+### Two things it broke, and what they turned out to mean
+
+**The ejector.** `EjectorElement` extends `MultiPortChamberElement`, so a
+blanket junction seed reached it and overwrote the physics-based warm start it
+carries for its own port pressures and `P_jct`. The cold reference network in
+`test_gui_ejector.py` stopped converging. The seed is now opt-in through a
+class attribute, `seeds_ports_by_pressure_split`, true on the chamber junction
+and false on the ejector, because an ejector's port flows follow choking and
+entrainment rather than a Bernoulli share of the imposed pressure difference.
+
+**A bistable production fixture.** `_three_port_net` in
+`test_multi_port_chamber.py` has three pressure boundaries at 2.10, 2.05 and
+2.00 bar with friction in every channel. Two flow arrangements satisfy it:
+
+| mode | common port | straight port | branch port |
+|---|---|---|---|
+| dividing (seed on) | in, 0.450 | **out**, 0.379 | out, 0.071 |
+| ejector (seed off) | in, 0.358 | **in**, 0.211 | out, 0.569 |
+
+Both conserve mass, both are net dissipative, both pass the v1 energy check,
+and both are consistent with the boundary pressures -- in the second the 2.05
+bar boundary also feeds the junction. The seed reaches the first directly; the
+plain cold start reaches the mirror root, is demoted, and the auto-retry
+reaches the second. **Nothing available says which is "the" answer**, so the
+bistability is now pinned as a test rather than resolved, and the two solver
+machinery tests that depended on the old path force it explicitly instead of
+being weakened.
+
+The change is deterministic: 1732 under hash seeds 0, 1 and 7.
 
 ## What this changes
 

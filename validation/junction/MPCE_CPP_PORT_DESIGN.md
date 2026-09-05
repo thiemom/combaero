@@ -446,7 +446,7 @@ Consequences:
 | 8 | ~~`three_pb`'s K score is a tautology (sec 4e)~~ **fixed** | `eta_scale=3.0` still reproduces the q=0.8 target to 0.05% | **done.** `_K_SCORING_TOPOLOGIES` excludes it; the scorecard prints `taut`, not a dash. The perturbation is pinned in `test_junction_score_at_achieved_q.py` | done |
 | 9 | ~~K is scored at the TARGET q while the solve sits at the achieved q~~ **fixed** | drift: `three_pb` median 0.134; `mfb_two_pb` 12.6% of rows > 0.25 | **done.** `q_converged` populated and printed as `dq`; K scored on the measured curve at the achieved q (interpolation error floor measured leave-one-out: median 0.030, p90 0.175); off-curve records excluded, off-point records counted separately so the coverage loss stays visible. `imposed_q` unchanged to the digit | done |
 | 10 | ~~`verify_solution_consistent` passes near-degenerate roots~~ **fixed, and the defect was miscast** | the real gap was that v1 has an energy check and v2 had none; a small flow is not unphysical, and landing at one is the coverage question item 9 already measures | **done.** Mass-weighted energy balance `sum_in |m| Pt >= sum_out |m| Pt`, which permits a branch to gain Pt (negative K is real) while forbidding a net gain, and covers joining, which v1's form skips. Audited first: the data satisfies it by +0.19 or better, the MODEL violates it below q ~ 0.2. Costs 75 of 1700 converged records, all of them physically impossible states previously reported as successes | done |
-| 11 | `analytical_pt_prop` seeds no mass flow through `LosslessConnectionElement` | x0 violates continuity at every junction (0.1 in, 0.2 out); a junction-aware mass-conserving seed gains ~70 solves | extend the seed, but land it WITH item 9 -- it moves 22 already-converged roots between the two legitimate branches | medium |
+| 11 | ~~`analytical_pt_prop` seeds no mass flow through `LosslessConnectionElement`~~ **fixed** | x0 violates continuity at every junction (0.1 in, 0.2 out); a junction-aware mass-conserving seed gains ~70 solves | **done.** Split and continuity fixed at x0 from the propagated pressures; the total still comes from the existing propagator, so no new flow-scale heuristic. Opt-in per class (`seeds_ports_by_pressure_split`) because it must not overwrite `EjectorElement`'s own warm start. Rejections as inadmissible/artifact 227 -> 163; converged 1625 -> 1732; accuracy unchanged on the common subset; it does NOT steer toward the requested q (that earlier claim withdrawn) | done |
 | 12 | ~~Solver results depend on `PYTHONHASHSEED`~~ **fixed** | `_propagate_pressure_guess` seeds its BFS from `list(set(p_guess.keys()))`; the same case converges in 5 of 10 identical processes, and is deterministic per fixed hash seed | **done.** `queue = list(p_guess.keys())`; scorecard identical (1700/2073) under seeds 0/1/7/13, against 1700 or 1711 before | done |
 
 Items 1, 2, 5, 6 are an afternoon. Item 3 is the one that changes what the
@@ -590,7 +590,7 @@ correction into the closure (it is already in `tee_junction.h`, templated, with
 the v3 spec's derivation). Gate: Wang 2014 (digitised) and Perez-Garcia
 (digitise first). This is the step that restores what the retired tee had.
 
-**Step 5a -- operating-point instrumentation (items 8-11).** Independent of
+**Step 5a -- operating-point instrumentation (items 8-11). COMPLETE.** Independent of
 the port and a prerequisite for gating it: return the converged q, score
 against the paper there, demote the `three_pb` K column, tighten the
 verifier, then land the junction-aware seed. Doing the seed first would

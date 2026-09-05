@@ -3279,6 +3279,13 @@ class MultiPortChamberElement(NetworkElement):
     inability to represent ejector / merge-split direction natively).
     """
 
+    # Opt-in for the solver's junction split seed (`_junction_split_guess`).
+    # True here because a chamber junction's port flows DO follow a Bernoulli
+    # share of the imposed port pressure differences, which is what that seed
+    # assumes. Subclasses whose port flows are set by their own internal
+    # physics must turn it off -- see `EjectorElement`.
+    seeds_ports_by_pressure_split: bool = True
+
     def __init__(
         self,
         id: str,

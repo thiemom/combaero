@@ -13,6 +13,7 @@ Hager / Bassett / Perez-Garcia / Wang reference data live in separate files.
 """
 
 import math
+import warnings
 
 import numpy as np
 import pytest
@@ -217,13 +218,23 @@ def test_v1_energy_check_tolerates_near_equal_pt():
     assert jct.verify_solution_consistent(near) is True
 
 
-def test_three_port_default_path_self_heals_from_mirror_root():
+def test_three_port_default_path_self_heals_from_mirror_root(monkeypatch):
     """End-to-end payoff of the v1 energy hook: the plain cold solve on
     this net converges onto the mirror root, the post-solve verification
     demotes it, and the outlet-ref auto-retry then reaches the physical
     ejector root -- success with forward common inflow, no manual
     strategy selection needed.
+
+    The junction split seed (#271 defect 11) is disabled here ON PURPOSE.
+    With it the cold solve no longer visits the mirror root at all: it
+    converges first time onto the OTHER admissible mode of this bistable net,
+    the plain dividing split (see
+    ``test_three_port_net_has_two_admissible_operating_modes``). That is a
+    better outcome, and it would leave the self-heal machinery -- which still
+    runs on other networks -- with no coverage. Forcing the precondition keeps
+    the machinery tested rather than quietly dropping the test.
     """
+    monkeypatch.setattr(NetworkSolver, "_junction_split_guess", lambda self, *a, **k: {})
     net = _three_port_net()
     solver = NetworkSolver(net)
     with pytest.warns(UserWarning):
@@ -244,6 +255,10 @@ def test_stall_wiring_forced_detector(monkeypatch):
     from combaero.network import solver as solver_module
 
     monkeypatch.setattr(solver_module, "_stall_detected", lambda *a, **k: True)
+    # Same reason as the test above: the junction split seed makes this net
+    # converge before the forced stall path decides anything, so the wiring
+    # under test would go unexercised. Disabled to hold the precondition.
+    monkeypatch.setattr(NetworkSolver, "_junction_split_guess", lambda self, *a, **k: {})
     net = _three_port_net()
     solver = NetworkSolver(net)
     with pytest.warns(UserWarning, match="did not converge"):
@@ -383,3 +398,44 @@ def test_border_carnot_loss_element_in_series_with_junction():
     assert abs(m_loss - m_ch_bra) < 1e-6, (
         f"loss/channel series mismatch: m_loss={m_loss}, m_ch_bra={m_ch_bra}"
     )
+
+
+def test_three_port_net_has_two_admissible_operating_modes(monkeypatch):
+    """The net of `_three_port_net` is bistable, and the initial guess picks.
+
+    Boundaries are 2.10 / 2.05 / 2.00 bar with friction in every channel and a
+    lossless junction, and two different flow arrangements satisfy that:
+
+      * the DIVIDING mode, where the 2.10 bar inlet feeds both outlets;
+      * the EJECTOR mode, where the straight boundary at 2.05 bar also feeds
+        the junction and both supply the 2.00 bar branch.
+
+    Both conserve mass, both are net dissipative, both pass the v1 energy
+    check. Found while landing the junction split seed (#271 defect 11), which
+    reaches the first while the plain cold start reaches the second. Neither is
+    an artifact, so nothing here asserts which one is "right" -- this pins that
+    the multiplicity is real, so a future change that collapses it is noticed.
+    """
+
+    def _solve(seeded: bool) -> dict:
+        if not seeded:
+            monkeypatch.setattr(NetworkSolver, "_junction_split_guess", lambda self, *a, **k: {})
+        net = _three_port_net()
+        solver = NetworkSolver(net)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            sol = solver.solve(timeout=120.0)
+        monkeypatch.undo()
+        return sol
+
+    dividing = _solve(seeded=True)
+    ejector = _solve(seeded=False)
+
+    for sol in (dividing, ejector):
+        assert sol["__success__"], sol.get("__message__")
+        assert sol["ch_in.m_dot"] > 0.0, "the common port must draw flow in"
+
+    # The straight port runs the other way between the two modes.
+    assert dividing["ch_str.m_dot"] > 0.0, "dividing mode: straight port is an outlet"
+    assert ejector["ch_str.m_dot"] < 0.0, "ejector mode: straight port feeds the junction"
+    assert dividing["ch_in.m_dot"] != pytest.approx(ejector["ch_in.m_dot"], rel=0.05)
