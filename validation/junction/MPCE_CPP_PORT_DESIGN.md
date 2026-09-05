@@ -174,6 +174,60 @@ figure/table it was fitted to, the range, the date, and the scorecard cell
 that proves it. `alpha` and `damping` currently carry none of this;
 `DEFAULT_JOINING_ETRANSFER_ALPHA` reads as a physics constant.
 
+## 4b. Step 1.3 result: the alpha x eta table (2026-09-05)
+
+Every (alpha, eta_scale) combination scored on every digitised cell, imposed_q
+topology, per source. Prediction written down first and confirmed: the two
+terms are structurally separable in this dataset -- `eta` moves only dividing
+cells (its `(1 - lambda)` factor is zero for a single collector), `alpha`
+moves only psi > 1 joining cells -- to 4 decimals. The baseline `(0.2, 1)`
+reproduces step 0 to the digit.
+
+**`eta` -- keep at (0.8, -0.2).** On/off at fixed alpha:
+
+| cell | eta off | eta on |
+|---|---|---|
+| Hager xi_t (45 pts) | MAE 0.3385, bias +0.338 | **0.2859, +0.055** |
+| Bassett K5 | 0.3812, +0.235 | **0.3440, +0.033** |
+| Bassett K6 | 0.0700, -0.047 | **0.0526, -0.002** |
+
+Improves every dividing cell of both independent sources, chiefly by
+removing a large positive bias -- without it the closure over-predicts
+straight-port loss by a third of a dynamic head. A CFD-fitted term from
+another regime that nonetheless earns its place on ours.
+
+**`alpha` -- keep at 0.2.** Swept at eta on, joining sources:
+
+| alpha | Bassett K11 | Bassett K12 | Idelchik K11 | Idelchik K12 | Idelchik all |
+|---|---|---|---|---|---|
+| 0.00 | 0.2268 (-0.159) | 0.1128 (+0.020) | 0.3095 (-0.309) | 0.6561 (-0.543) | 0.5116 |
+| 0.10 | 0.1980 | 0.1025 | 0.1851 | 0.5599 | 0.4037 |
+| 0.15 | 0.1887 | **0.1018** | **0.1611** | 0.5366 | 0.3801 |
+| **0.20** | 0.1803 (-0.027) | 0.1032 (+0.048) | 0.1646 (-0.025) | **0.5287** (-0.274) | **0.3770** |
+| 0.25 | 0.1738 | 0.1060 | 0.1744 | 0.5346 | 0.3845 |
+| 0.30 | **0.1708** (+0.039) | 0.1094 | 0.2107 (+0.116) | 0.5539 | 0.4109 |
+
+In-network optimum 0.2, shallow over [0.15, 0.25]; the sources pull slightly
+apart (Bassett K11 prefers ~0.25, Bassett K12 and Idelchik K11 ~0.15). A
+single scalar times area asymmetry cannot satisfy both angles at once --
+that is the form's limit, not a tuning question.
+
+**The anchor refit lost to the data.** #283's corrected-axis fit proposed
+0.28-0.31; in-network 0.3 is *worse* than 0.2 (Idelchik +0.034, and it
+over-corrects K11 at 30 deg badly). The anchors are Bassett's analytical
+curves -- including his own K11@90 anomaly (sec 5) -- while the table is
+measured and tabulated data. Checklist #1: the data decides. The calibration
+script remains the "anchor on analytical" half of the method; it does not
+set the value.
+
+**What no alpha fixes:** Idelchik K12 keeps a bias of -0.27 at the MAE
+minimum. That is the K12@90 under-prediction from step 0, growing with psi,
+and it is a closure-shape limit (and partly Idelchik-vs-Bassett source
+disagreement), not something the joining correction can reach.
+
+Pinned executably by `python/tests/test_junction_tuned_constants_proof.py`:
+each term improves its own block by a margin and does not touch the other.
+
 ## 5. What the papers settle about the K_straight question (#272)
 
 Three independent sources say **negative `K_straight` in dividing flow is real
