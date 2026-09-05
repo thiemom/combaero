@@ -50,18 +50,20 @@ def model():
 def test_three_pb_K_is_the_imposed_target_whatever_the_model_does():
     """A deliberately wrong model must still reproduce three_pb's target.
 
-    ``eta_scale=0.5`` halves Mynard's energy-transfer factor, moving the
-    model's own answer (imposed_q) by 0.045. If three_pb's K moved with it, the
-    topology would be scoring the model and the exclusion below would be wrong.
+    ``eta_scale=0.3`` turns Mynard's energy-transfer factor partly back on
+    (the production default is 0.0 since the dividing-streamline recovery
+    landed), moving the model's own answer by 0.027. If three_pb's K moved with
+    it, the topology would be scoring the model and the exclusion below would
+    be wrong.
 
-    The perturbation used to be ``eta_scale=3.0``, which moves the model four
-    times further. It no longer serves: since the energy check of defect 10,
-    the tripled model is inadmissible in three_pb at every q and is rejected
-    before a K can be extracted. A perturbation has to stay inside the physics
-    to demonstrate anything, which is why this one is milder.
+    The perturbation has shrunk twice, from 3.0 to 0.5 to 0.3, and for the same
+    reason each time: since the energy check of defect 10 a strongly perturbed
+    model is inadmissible in three_pb and is rejected before a K can be
+    extracted. A perturbation has to stay inside the physics to demonstrate
+    anything.
     """
     honest = MPCEv2Network(strict=False)
-    wrong = MPCEv2Network(strict=False, eta_scale=0.5)
+    wrong = MPCEv2Network(strict=False, eta_scale=0.3)
     q = 0.8
     target = bassett2001.K6(q, _PSI, _THETA)
 
@@ -69,7 +71,7 @@ def test_three_pb_K_is_the_imposed_target_whatever_the_model_does():
     wrong_imposed = wrong.evaluate_network("bassett2001", "K6", q, _PSI, _THETA)
     assert honest_imposed.converged and wrong_imposed.converged
     moved = abs(wrong_imposed.K_lateral - honest_imposed.K_lateral)
-    assert moved > 0.03, f"the perturbation must actually change the model: moved only {moved:.4f}"
+    assert moved > 0.02, f"the perturbation must actually change the model: moved only {moved:.4f}"
 
     wrong_three_pb = wrong.evaluate_network(
         "bassett2001", "K6", q, _PSI, _THETA, topology="three_pb"
@@ -166,7 +168,9 @@ def test_pressure_driven_solve_reports_where_it_actually_landed(model):
     r = model.evaluate_network("bassett2001", "K6", 0.8, _PSI, _THETA, topology="mfb_two_pb")
 
     assert r.converged, r.message
-    assert r.q_converged == pytest.approx(0.857, abs=0.005)
+    # 0.857 before the dividing-streamline recovery landed; the closure moved,
+    # so the operating point it settles at moved with it.
+    assert r.q_converged == pytest.approx(0.831, abs=0.005)
     assert r.q_converged != pytest.approx(0.8, abs=0.01)
 
 

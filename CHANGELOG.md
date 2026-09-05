@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The MPCE junction closure now carries the dividing-streamline pressure
+  recovery, and Mynard's fitted energy-transfer factor is off by default.**
+  With the transfer factor disabled, the closure's straight-leg coefficient was
+  exactly `q^2` -- the plain velocity-difference loss -- at every area ratio and
+  branch angle, while Bassett 2001 (K5) and Hager 1984 (xi_t) independently give
+  `q^2 - 0.5 q`. The missing `-0.5 q` is the dividing-streamline pressure
+  `p* = p + (1/4) rho u^2` acting over the diverted flow fraction; Mynard
+  carries the same term but only through the contraction analysis of a turning
+  collector, whose control volume degenerates for a collinear one.
+  `_mynard2010.DIVIDING_STREAMLINE_RECOVERY` restores it for the single-supplier
+  diverging case that both papers analysed.
+  Restoring it made Mynard's `eta` a duplicate of the same physics, so
+  `MPCEv2Element.DEFAULT_ETA_SCALE` is now `0.0`; `eta_scale=1.0` still
+  reproduces the faithful port. Measured at pinned operating points on the
+  digitised data, the straight-leg RMSE improves from 0.333 to 0.098 while the
+  lateral regresses from 0.079 to 0.097: the fitted factor was buying lateral
+  accuracy by making the junction a net source of flow work below a lateral
+  flow fraction of about 0.25. The closure is now dissipative everywhere and
+  reproduces the analytical identity `K_lateral - K_straight =
+  q (0.5 - 2 cos(0.75 theta)) + 1` at equal areas. The analytical Jacobian was
+  re-derived with the term and with `eta_scale` as a parameter rather than
+  baked in at 1. **Junction pressure drops will change**, most in dividing flow
+  at a small lateral fraction.
+
 ### Fixed
 - **The initial guess at a junction now conserves mass and follows the
   boundary pressures.** `NetworkSolver`'s `analytical_pt_prop` seeding applied

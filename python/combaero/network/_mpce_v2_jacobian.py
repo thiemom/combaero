@@ -31,12 +31,18 @@ import sympy as sp
 def _build_lambdified() -> dict[tuple[int, int], Callable]:
     """Return a dict mapping (port_i, port_j) -> dKQ_i/dm_j function.
 
-    The function signature is (m0, m1, m2, rho0, rho1, rho2, A0, A1, A2, th2).
+    The function signature is
+    (m0, m1, m2, rho0, rho1, rho2, A0, A1, A2, th2, eta).
+
+    `eta` is the energy-transfer scale. It used to be baked in at 1, which was
+    correct while that was the production default; it is a symbol now so the
+    derivative follows whatever the element is configured with.
     """
     m0, m1, m2 = sp.symbols("m0 m1 m2", real=True)
     rho0, rho1, rho2 = sp.symbols("rho0 rho1 rho2", positive=True)
     A0, A1, A2 = sp.symbols("A0 A1 A2", positive=True)
     th2 = sp.symbols("th2", positive=True)
+    eta = sp.symbols("eta", real=True)
 
     U0 = -m0 / (rho0 * A0)
     U1 = -m1 / (rho1 * A1)
@@ -54,8 +60,8 @@ def _build_lambdified() -> dict[tuple[int, int], Callable]:
     sign1 = -1
     sign2 = +1
 
-    etf1 = (sp.Rational(8, 10) * (sp.pi - psi_sup) * sign1 - sp.Rational(2, 10)) * (1 - FR1)
-    etf2 = (sp.Rational(8, 10) * (sp.pi - psi_sup) * sign2 - sp.Rational(2, 10)) * (1 - FR2)
+    etf1 = eta * (sp.Rational(8, 10) * (sp.pi - psi_sup) * sign1 - sp.Rational(2, 10)) * (1 - FR1)
+    etf2 = eta * (sp.Rational(8, 10) * (sp.pi - psi_sup) * sign2 - sp.Rational(2, 10)) * (1 - FR2)
 
     u_pseudo = U0
     tpa1 = Qtot / ((1 - etf1) * u_pseudo)
@@ -77,11 +83,17 @@ def _build_lambdified() -> dict[tuple[int, int], Callable]:
     K1 = (U1**2 / Ucom**2) * (2 * C1 + Ucom**2 / U1**2 - 1)
     K2 = (U2**2 / Ucom**2) * (2 * C2 + Ucom**2 / U2**2 - 1)
 
+    # Dividing-streamline recovery on the CONTINUING collector. In this
+    # canonical layout phi1 = psi_sup + th2/2 = pi exactly, so port 1 (the
+    # straight leg) is the continuing one and port 2 is not. Mirrors
+    # `_mynard2010.junction_loss_coefficient`, which applies the same term in K.
+    K1 = K1 - sp.Rational(1, 2) * (1 - FR1)
+
     q_dyn = sp.Rational(1, 2) * rho0 * Ucom**2
     KQ1 = K1 * q_dyn
     KQ2 = K2 * q_dyn
 
-    args = (m0, m1, m2, rho0, rho1, rho2, A0, A1, A2, th2)
+    args = (m0, m1, m2, rho0, rho1, rho2, A0, A1, A2, th2, eta)
     nontrivial = {
         (1, 0): sp.diff(KQ1, m0),
         (1, 1): sp.diff(KQ1, m1),
@@ -100,6 +112,7 @@ def dKQ_dmdot_separating_T(
     rho: np.ndarray,
     A: np.ndarray,
     theta_branch_rad: float,
+    eta_scale: float = 0.0,
 ) -> np.ndarray:
     """Return the 3x3 dKQ_i/dm_j Jacobian for the canonical 3-port separating T.
 
@@ -110,7 +123,7 @@ def dKQ_dmdot_separating_T(
     rho0, rho1, rho2 = float(rho[0]), float(rho[1]), float(rho[2])
     A0, A1, A2 = float(A[0]), float(A[1]), float(A[2])
     th2 = float(theta_branch_rad)
-    args = (m0, m1, m2, rho0, rho1, rho2, A0, A1, A2, th2)
+    args = (m0, m1, m2, rho0, rho1, rho2, A0, A1, A2, th2, float(eta_scale))
     J = np.zeros((3, 3))
     for (i, j), fn in _DKQ_FNS.items():
         try:

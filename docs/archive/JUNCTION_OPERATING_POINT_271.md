@@ -352,7 +352,7 @@ forms (Eq 15 and Eq 27), so their difference does too:
     K5(q)          = q^2 - 1.5 q + 0.5
     K6(q,psi,th)   = q^2 psi^2 + 1 - 2 q psi cos(0.75 th)
 
-    D(q) = K6 - K5 = q^2 (psi^2 - 1) + q (1.5 - 2 psi c) + 0.5,  c = cos(0.75 th)
+    D(q) = K6(q) - K5(1-q) = q^2 (psi^2 - 1) + q (0.5 - 2 psi c) + 1,  c = cos(0.75 th)
 
 A quadratic, verified against the functions to 1e-16 over the geometry grid.
 Three consequences follow directly from its coefficients.
@@ -367,11 +367,17 @@ Bassett's own coefficients are non-monotone there:
 | psi | theta | vertex q* | monotone on (0,1)? |
 |---|---|---|---|
 | 1 | any | linear | yes |
-| 2 | 45 | 0.304 | no |
-| 3 | 45 | 0.218 | no |
-| 4 | 45 | 0.172 | no |
-| 3.333 | 90 | 0.052 | no |
-| 10 | 90 | 0.031 | no |
+| 2 | 45 | 0.471 | no |
+| 3 | 45 | 0.281 | no |
+| 4 | 45 | 0.205 | no |
+| 3.333 | 90 | 0.101 | no |
+
+**Corrected 2026-09-05 (see Finding 9).** This section first paired K5 and K6
+at the same q, giving `... + q (1.5 - 2 psi c) + 0.5` and vertices 0.304 /
+0.218 / 0.172 / 0.052. Bassett indexes the straight coefficient on the
+straight fraction, so the difference is `K6(q) - K5(1-q)`. Every conclusion
+survives -- linear at equal areas, a cup with its vertex inside (0,1)
+otherwise -- and every number moved.
 
 Forcing monotonicity would contradict the source. It is not a defect to fix.
 
@@ -411,7 +417,7 @@ equal-area defect is structural, not a mis-tuned constant.
 Not "force monotonicity" but **"reproduce the analytical identity the source
 already gives you"**:
 
-    at psi = 1:   K_lateral(q) - K_straight(q) = q (1.5 - 2 cos(0.75 theta)) + 0.5
+    at psi = 1:   K_lateral(q) - K_straight(q) = q (0.5 - 2 cos(0.75 theta)) + 1
 
 Linear in q, with a slope and intercept fixed by geometry alone. That is a
 sharper acceptance criterion for #272 than any error metric: a structural
@@ -663,6 +669,98 @@ against the fix: the axis is fixed by the paper's convention, not by which
 reading fits better. It is a statement about v1's straight-leg physics, which
 is separately known to be poor because its collinear ports are collapsed by
 the sin^2 gate.
+
+## Finding 10: the closure was missing one derived term, and it was worth more than the fitted one
+
+Asked whether a negative K implies an energy gain. It does not, and chasing
+that question to its end produced the mechanism, then the fix.
+
+### The gap, measured exactly
+
+With Mynard's energy-transfer factor off, called directly on the closure:
+
+* the LATERAL coefficient reproduces Bassett K6 **exactly**, at every area
+  ratio and branch angle tested, away from the damping band;
+* the STRAIGHT coefficient is **exactly q^2**, the plain velocity-difference
+  (Borda-Carnot) loss.
+
+Both papers give the straight leg, on the lateral fraction, as
+
+    Bassett  K5(1-q) = (1-q)^2 - 1.5(1-q) + 0.5 = q^2 - 0.5 q
+    Hager    xi_t(q) = q (q - 1/2)              = q^2 - 0.5 q
+
+identical polynomials from independent derivations. The gap was exactly
+**-0.5 q**, at every geometry, with no fitting involved.
+
+### Where it comes from
+
+The dividing-streamline pressure. Hager and Bassett both take the pressure on
+the dividing streamline as `p* = p_com + (1/4) rho u_com^2`. Acting over the
+diverted flow fraction and normalised by the common dynamic head, that is
+`(1/4)/(1/2) = 0.5` per unit of diverted flow.
+
+Mynard carries the same `(1/4) rho u^2` (his Eq 26), but it enters through the
+contraction analysis of a **turning** collector (Eq 19-28), and that control
+volume degenerates when the collector is collinear with the supplier. So Eq 30
+reduces to Borda-Carnot exactly where Hager and Bassett keep the recovery.
+
+Implemented in K rather than in C: the same correction in C is
+`dK (u_com/u_j)^2 / 2`, which diverges as the collector's flow ratio goes to
+zero and would need damping -- an artifact of the variable, not the physics.
+Restricted to a single supplier, which is the case the two papers analysed and
+the only one the data constrains.
+
+### It made the fitted transfer redundant
+
+Mynard's eta was fitted to his Fig 4 CFD in a formulation that had lost this
+term, so the two are a matched pair and had to be tested as one (policy sec 0
+item 4). All four combinations, on the digitised dividing data:
+
+| configuration | Hager xi_t MAE | bias | Bassett K5+K6 MAE | bias |
+|---|---|---|---|---|
+| no term, eta=1 (was) | 0.2859 | +0.0546 | 0.1152 | +0.0366 |
+| term, eta=1 | 0.3007 | -0.2379 | 0.1205 | -0.0868 |
+| **term, eta=0 (now)** | **0.0859** | +0.0358 | **0.0564** | -0.0207 |
+| no term, eta=0 | 0.3385 | +0.3385 | 0.1569 | +0.0874 |
+
+Neither half alone is good, both together are worse than the derived term
+alone, and the term alone is 3.3x better than the shipped model on Hager and
+2.0x better on Bassett. That is what a matched pair looks like when one half
+was standing in for missing physics. **`eta_scale` now defaults to 0.0**, kept
+as a knob so `1.0` still reproduces the faithful port.
+
+### What it closed, and what it cost
+
+At pinned operating points, on records all four configurations resolve:
+
+| | K_straight_sep | K_lateral_sep | converged |
+|---|---|---|---|
+| before | 0.3333 | **0.0787** | 591 |
+| after | **0.0980** | 0.0972 | 601 |
+
+The straight leg, which was the defect, improves 3.4x. The lateral regresses
+23%, because the CFD-fitted transfer was genuinely buying accuracy there -- and
+paying for it by making the junction a net source of flow work below a lateral
+fraction of about 0.25. That trade is the whole point: an empirical correction
+that beats the paper's own correlation while violating the second law has not
+earned its place.
+
+Two structural conditions recorded earlier are now met:
+
+* **the equal-area identity** (Finding 6) holds to 0.02, where the model
+  previously put a hump and manufactured a second operating point in the 82%
+  of the separating dataset where the physics has exactly one;
+* **the flow-weighted mean K** is non-negative everywhere, so the junction
+  cannot create flow work.
+
+Whole-scorecard convergence goes 1734 to 1697: `imposed_q` gains 10, the
+pressure-driven topologies lose 47 between them as the closure moves where
+their roots are. Those are the topologies whose K is either not scored at all
+(`three_pb`) or off-point 13% of the time.
+
+The analytical Jacobian was re-derived with the term and with `eta_scale` as a
+symbol -- it had been baked in at 1, which was correct only while that was the
+default. Whole-row finite-difference tests pass.
 
 ## What this changes
 
