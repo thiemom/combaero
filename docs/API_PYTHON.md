@@ -596,6 +596,31 @@ AreaChangeElement("expansion", "plenum_a", "plenum_b", F0=0.05, F1=0.08)
 MomentumChamberNode("chamber", area=0.15)  # neighbour the area change can read
 ```
 
+### Tuned Constants in the Junction Closure
+
+`MPCEv2Element`'s Mynard closure carries three tuned constants, each named
+and documented at its definition in `combaero.network._mynard2010`:
+
+| constant | value | what it is | switch |
+|---|---|---|---|
+| `MYNARD_ETA_A0`, `MYNARD_ETA_A1` | 0.8, -0.2 | Mynard 2015 Eq 36 energy-transfer factor, CFD-fitted | `eta_scale` |
+| `FLOW_RATIO_DAMPING` | 0.02 | regulariser from the Matlab reference, not physics | -- |
+| `MPCEv2Element.DEFAULT_JOINING_ETRANSFER_ALPHA` | 0.2 | combaero's joining-side correction, fitted by `validation/junction/calibrate_etransfer.py` | pass `joining_etransfer_alpha=0.0` |
+
+Under this repo's policy a tuned constant earns its place only by improving
+agreement on the digitised validation data; the on/off tables live on issue
+#271. `eta_scale` exists for that measurement:
+
+```python
+MPCEv2Element(..., eta_scale=1.0)   # default: the faithful Mynard port
+MPCEv2Element(..., eta_scale=0.0)   # energy-transfer term off, for scoring
+junction_loss_coefficient(U, A, theta, eta_scale=0.0)
+```
+
+Changing any of these values is a retune and needs a before/after table
+before it lands, not a silent edit -- `python/tests/test_junction_tuned_constants.py`
+pins the documented values.
+
 ### Combustion Integration
 ```python
 from combaero.network.combustion import (

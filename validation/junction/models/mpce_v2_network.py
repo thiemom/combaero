@@ -41,6 +41,7 @@ class MPCEv2Network:
         self,
         strict: bool = True,
         joining_etransfer_alpha: float | None = None,
+        eta_scale: float = 1.0,
     ) -> None:
         """``strict=False`` enables the soft-barrier fallback on the underlying
         MPCEv2Element so the solver gets a quadratic pull-back when it
@@ -53,6 +54,7 @@ class MPCEv2Network:
         """
         self.strict = strict
         self.joining_etransfer_alpha = joining_etransfer_alpha
+        self.eta_scale = eta_scale
 
     def evaluate_network(
         self,
@@ -142,6 +144,7 @@ class MPCEv2Network:
             flow_direction="branch",
             strict=self.strict,
             joining_etransfer_alpha=self.joining_etransfer_alpha,
+            eta_scale=self.eta_scale,
         )
         net.add_element(jct)
         return solve_and_extract(
@@ -195,6 +198,7 @@ class MPCEv2Network:
             flow_direction="merge",
             strict=self.strict,
             joining_etransfer_alpha=self.joining_etransfer_alpha,
+            eta_scale=self.eta_scale,
         )
         net.add_element(jct)
         return solve_and_extract(

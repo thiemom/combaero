@@ -89,17 +89,31 @@ class MPCEv2Element(MultiPortChamberElement):
     # 1e5 Pa to the residual -- the natural Pt scale. Tunable via attribute.
     soft_penalty_alpha: float = 1.0e7
 
-    # Joining-side etransfer correction (combaero extension to faithful
-    # Mynard 2010). Default 0.2 calibrated against Bassett K11_corr/K12_corr
-    # + Idelchik 1966 tabulated values at psi in [1.25, 3.33], theta in
-    # {30, 45, 90} (analytical-only anchors; measured points held out as
-    # independent validation). Independent validation on Bassett-measured
-    # K11/K12 (145 points across 3 topologies) shows -10% mean error and
-    # -14% max error on the imposed_q topology (the cleanest test);
-    # essentially tied on three_pb / mfb_two_pb. Reduces to identity at
-    # psi=1 by construction so the equal-area baseline is unchanged. See
-    # the calibration write-up in the iteration-8 commit and the
-    # validation script in scripts/calibrate_mpce_v2_etransfer.py.
+    #: TUNED CONSTANT -- combaero's joining-side etransfer correction, an
+    #: extension to Mynard 2015 (not in the paper). Vanishes at psi = 1 by
+    #: construction.
+    #:
+    #: Source of the value: ``validation/junction/calibrate_etransfer.py``,
+    #: anchored on Bassett K11_corr/K12_corr + Idelchik tables over
+    #: psi in [1.25, 3.33], theta in {30, 45, 90}, q in [0.1, 0.9].
+    #:
+    #: Provenance caveats (issue #271):
+    #:   - 0.2 was fitted with the Bassett K11 anchor MIRRORED (lateral
+    #:     fraction passed where Table 1 wants the straight one) and on
+    #:     pre-#212 plumbing. The corrected-axis optimum is 0.28-0.31 and the
+    #:     fit is shallow (#283). The value here has NOT been moved yet.
+    #:   - The "145-point independent validation" once cited here is not in
+    #:     the script that produced the value (scripts/
+    #:     calibrate_mpce_v2_etransfer.py from #197: mirrored axis, no
+    #:     validation code, stale import path, absolute DATA_DIR -- retired
+    #:     and superseded by validation/junction/calibrate_etransfer.py). If
+    #:     it was measured, it was outside the script and is not
+    #:     reproducible; the in-network scorecard (#282) is the first
+    #:     validation this constant has had that can be re-run.
+    #:   - It is measured together with Mynard's eta (both live in
+    #:     ``etransfer``; see ``eta_scale``), never one half of the pair.
+    #:
+    #: Proving table: pending (#271 step 1.3). Switch: pass 0.0.
     DEFAULT_JOINING_ETRANSFER_ALPHA: float = 0.2
 
     def __init__(
@@ -113,6 +127,7 @@ class MPCEv2Element(MultiPortChamberElement):
         flow_direction: FlowDirection = "branch",
         strict: bool = True,
         joining_etransfer_alpha: float | None = None,
+        eta_scale: float = 1.0,
     ):
         super().__init__(
             id=id,
@@ -142,6 +157,9 @@ class MPCEv2Element(MultiPortChamberElement):
             if joining_etransfer_alpha is None
             else float(joining_etransfer_alpha)
         )
+        # Measurement switch on Mynard's eta (MYNARD_ETA_A0/A1); 1.0 = faithful
+        # port. Exposed so the term can be scored on and off (#271 step 1.3).
+        self.eta_scale: float = float(eta_scale)
 
     def verify_solution_consistent(
         self,
@@ -220,6 +238,7 @@ class MPCEv2Element(MultiPortChamberElement):
                 A,
                 theta_rad,
                 joining_etransfer_alpha=self.joining_etransfer_alpha,
+                eta_scale=self.eta_scale,
             )
         except Exception:
             return diag
@@ -398,6 +417,7 @@ class MPCEv2Element(MultiPortChamberElement):
                 A,
                 theta_rad,
                 joining_etransfer_alpha=self.joining_etransfer_alpha,
+                eta_scale=self.eta_scale,
             )
         except Exception:
             # Numerical failure (e.g. singular pseudosupplier). Same fallback.
@@ -482,6 +502,7 @@ class MPCEv2Element(MultiPortChamberElement):
                         A,
                         theta_rad,
                         joining_etransfer_alpha=self.joining_etransfer_alpha,
+                        eta_scale=self.eta_scale,
                     )
                 except Exception:
                     continue
