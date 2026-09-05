@@ -8,6 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **`MPCEv2Element` now rejects converged states in which the junction would
+  create flow work.** Its post-solve `verify_solution_consistent` checked only
+  that port flows kept their declared direction; `MultiPortChamberElement` (v1)
+  has had an energy check since #229, and v2 had none, so a solution where the
+  junction manufactured total pressure was reported as a success. The new
+  criterion is a mass-weighted energy balance,
+  `sum_in |m_i| Pt_i >= sum_out |m_i| Pt_i`, which is the element's own
+  dissipation identity. It deliberately **permits** one branch to gain total
+  pressure at another's expense -- that is measured physics in dividing flow,
+  and is why Bassett's K5 and Hager's xi_t go negative -- while forbidding a
+  net gain, and unlike v1's form it applies to joining flow too. Audited before
+  being imposed: the digitised measured curves and Bassett's analytical pair
+  satisfy it with margin, while the model violates it below a lateral fraction
+  of about 0.2, which is the known `K_straight` gap (#272) surfacing as a
+  physical violation. Networks solving a junction in that region will now
+  report non-convergence instead of an impossible answer; the solver's message
+  names a non-dissipative closure state as one of the causes.
+
 - **`NetworkSolver` results no longer depend on `PYTHONHASHSEED`.**
   `_propagate_pressure_guess` seeded its breadth-first pressure propagation
   from `list(set(...))` over node-ID strings. Set iteration order for strings

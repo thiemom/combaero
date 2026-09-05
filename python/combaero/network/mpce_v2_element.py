@@ -188,15 +188,59 @@ class MPCEv2Element(MultiPortChamberElement):
         self,
         sol: dict[str, float],
         eps: float = 1e-6,
+        energy_rel_tol: float = 1e-9,
     ) -> bool:
-        """Post-solve check that converged mdots match the declared direction.
+        """Post-solve check: declared flow directions, and an energy balance.
 
-        For each port-connecting element, the canonical-direction unknown
-        ``{elem_id}.m_dot`` should be > 0 at convergence (the sign mapping
-        ``port_mdots[i] = port_signs[i] * outer_mdot[i]`` guarantees that
-        outer_mdot > 0 implies the correct in/out direction at the port).
-        Returns False when soft mode landed at a wrong-basin fixed point
-        with at least one outer mdot at or below ``eps``.
+        **Direction.** For each port-connecting element, the canonical-direction
+        unknown ``{elem_id}.m_dot`` should be > 0 at convergence (the sign
+        mapping ``port_mdots[i] = port_signs[i] * outer_mdot[i]`` guarantees
+        that outer_mdot > 0 implies the correct in/out direction at the port).
+        Returns False when soft mode landed at a wrong-basin fixed point with
+        at least one outer mdot at or below ``eps``.
+
+        **Energy.** A passive junction cannot create flow work, so the
+        mass-weighted total pressure must not increase across it:
+
+            dissipation = sum_in |m_i| Pt_i - sum_out |m_i| Pt_i >= 0
+
+        v1 has an energy check (`MultiPortChamberElement`); v2 had none, which
+        is the gap this closes (issue #271, defect 10). The v1 form bounds each
+        collector's Pt by the single supplier's, which is deliberately weak and
+        single-supplier only. The mass-weighted balance is both stricter and
+        more permissive in the right places: it **allows** one branch to gain
+        total pressure at another's expense -- real physics, and the reason
+        Bassett's K5 and Hager's xi_t go negative in dividing flow -- while
+        forbidding a net gain, and it applies to joining flow too.
+
+        Equivalently, in coefficient terms the condition is that the
+        mass-weighted mean K is non-negative. Audited before being imposed: the
+        measured curves satisfy it with margin (weighted mean K at worst
+        +0.21), Bassett's analytical pair likewise (+0.19 at worst), and the
+        MODEL violates it at low lateral fraction (down to -0.06 near q = 0.1),
+        which is the K_straight defect of #272 showing up as a hard physical
+        violation rather than an accuracy gap.
+
+        ``energy_rel_tol`` is relative to ``sum |m_i| * max |Pt_i|``. A
+        converged solve leaves a residual of order 1e-10 Pa against dynamic
+        heads of order 10 Pa, so the numerical floor on this quantity is
+        ~1e-12 relative; 1e-9 sits three decades above it and still catches
+        every measured violation, the smallest of which is ~1e-3 in
+        weighted-mean-K units.
+
+        SCOPE. This is the model's own dissipation identity, not a general
+        entropy statement: it says the flow-weighted sum of the closure's loss
+        terms may not be net negative. Where the port total temperatures differ
+        the true entropy production also carries a mixing term, which is
+        positive and is not counted here -- so on a non-isothermal junction the
+        check is conservative in the wrong direction and could in principle
+        reject a solution whose full entropy budget is fine. The junction is
+        documented for low Mach and the validation fixtures are isothermal, so
+        that case does not arise today; revisit it if the element is ever used
+        across a large temperature difference.
+
+        Missing keys mean True: incomplete solution dicts are not policed, the
+        same convention v1 uses.
         """
         for elem_id in self._port_element_ids:
             if not elem_id:
@@ -206,7 +250,22 @@ class MPCEv2Element(MultiPortChamberElement):
                 continue  # connecting element has no m_dot unknown
             if sol[key] < eps:
                 return False
-        return True
+
+        flows: list[float] = []
+        pts: list[float] = []
+        for i in range(self.N):
+            elem_id = self._port_element_ids[i]
+            m_key = f"{elem_id}.m_dot"
+            pt_key = f"{self.port_nodes[i]}.Pt"
+            if not elem_id or m_key not in sol or pt_key not in sol:
+                return True
+            # Junction convention: positive = flow OUT of the junction.
+            flows.append(float(self._port_signs[i]) * float(sol[m_key]))
+            pts.append(float(sol[pt_key]))
+
+        net_outflow_of_energy = sum(f * pt for f, pt in zip(flows, pts, strict=True))
+        scale = sum(abs(f) for f in flows) * max(abs(pt) for pt in pts)
+        return net_outflow_of_energy <= energy_rel_tol * scale
 
     def diagnostics(  # type: ignore[override]
         self,

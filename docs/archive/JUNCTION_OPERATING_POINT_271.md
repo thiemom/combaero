@@ -453,6 +453,81 @@ where the split is imposed and stability does not select, so there is no
 conflict with the data. The criterion applies to pressure-driven networks, not
 to the validation of the coefficients themselves.
 
+## Finding 7: v2 had no energy check, and the model creates work at low q
+
+Defect 10 was recorded as "`verify_solution_consistent` passes near-degenerate
+roots (a lateral leg at 1% of the flow); its only criterion is
+`m_dot > 1e-6`". **That framing was wrong.** A tee CAN run at 1% lateral flow
+if the pressures say so; landing there when a different point was requested is
+a coverage question, and item 9 already measures it. Nothing about a small
+flow is unphysical.
+
+The real gap is that **v1 has an energy check and v2 had none**. With the
+element's own residual convention the dissipation across the junction is
+`q_dyn_com * sum_i |m_i| K_i`, so requiring a passive junction not to create
+flow work is
+
+    sum_in |m_i| Pt_i - sum_out |m_i| Pt_i >= 0
+
+computable from Pt and m_dot alone, with no closure re-evaluation.
+
+**Why not v1's form.** v1 bounds every collector's Pt by the single supplier's,
+which forbids *any* branch gaining total pressure. That is real physics in
+dividing flow -- Bassett's K5 and Hager's xi_t both go negative -- and v1 only
+escapes rejecting it because its relative tolerance (1e-4 of ~1e5 Pa, so ~10
+Pa) is wider than the effect at the validation dynamic head (~2.6 Pa). It is
+also single-supplier only, so it skips joining entirely. The mass-weighted
+balance permits one branch to gain at another's expense, forbids a net gain,
+and covers both flow directions.
+
+### Audited before being imposed
+
+| source | worst mass-weighted mean K | violations |
+|---|---|---|
+| measured curves (paired K5/K6) | +0.21 | 0 |
+| Bassett analytical pair, swept | +0.19 | 0 |
+| **the model** | **-0.06** | violates for q below ~0.2 |
+
+The data satisfies the condition with margin. The model does not: it is
+net-generating at low lateral fraction in four of five geometries checked
+(psi=1/th=90, psi=1/th=120, psi=3/th=45, psi=3.333/th=90), with the violating
+band running from q=0.02 to about q=0.22. That is the K_straight gap of #272
+appearing as a hard physical violation rather than an accuracy shortfall,
+independent of the equal-area identity in Finding 6.
+
+### Cost, measured
+
+| topology | converged before | after | demoted |
+|---|---|---|---|
+| `imposed_q` | 602 | 590 | 12 |
+| `three_pb` | 480 | 428 | 52 |
+| `mfb_two_pb` | 618 | 607 | 11 |
+| all | 1700 | 1625 | 75 |
+
+The audit predicted 74 from the converged states alone, so the outcome is the
+one that was measured in advance. Four previously-green assertions in
+`test_bassett_fig7b_case.py` now fail and have become strict xfail targets:
+the model cannot be evaluated at psi=3, theta=45, q=0.2 because it is
+inadmissible there, and `three_pb` at q=0.6 and 0.8 wanders down into the same
+band.
+
+**The honest reading of the cost.** These 75 were not solver failures being
+created; they were physically impossible answers being reported as successes.
+Losing them is the gate working. But it does mean the scorecard can no longer
+score the model in its inadmissible region, so the region is now visible as
+non-convergence rather than as a bad K -- and the solver's message was widened
+to say that a non-dissipative closure state is one of the causes, so it is not
+misread as a solver artifact.
+
+### A caveat that bounds the check
+
+This is the model's own dissipation identity, not a general entropy statement.
+Where port total temperatures differ, true entropy production also carries a
+positive mixing term that is not counted, so on a strongly non-isothermal
+junction the check is conservative in the wrong direction. The element is
+documented for low Mach and the fixtures are isothermal, so the case does not
+arise today; it is recorded at the method.
+
 ## What this changes
 
 - The 26 unrescued solves are no longer a mystery: most are infeasible, and
