@@ -273,6 +273,54 @@ without damping -- a sign-flipped dead branch the knob never guarded. Pinned
 by test so the degenerate-iterate work (step 2) removes the test when it
 fixes the edge, rather than rediscovering it.
 
+## 4d. The strict-mode artefact, and Bassett's own case (2026-09-05)
+
+Found while characterising one of the solves the step-2 fallback could not
+rescue. The validation adapter defaulted to `strict=True`; production
+(`gui/backend/graph_builder.py`) builds `MPCEv2Element` with `strict=False`.
+`strict=True` raises on any transient wrong-sign Newton iterate instead of
+steering it back through the soft barrier, **and** disables the post-solve
+direction verifier. Measured on the full scorecard:
+
+| topology | strict=True | strict=False |
+|---|---|---|
+| imposed_q | 602 / 691 | 602 / 691 |
+| mfb_two_pb | 587 | **629** |
+| three_pb | 389 | **480** |
+| all | 1578 | **1711** |
+
+- The `imposed_q` gate tables (sec 4b, 4c) are unaffected and stand.
+- Every all-topology convergence comparison made earlier was a strict-mode
+  artefact, including "v2 converges far less than v1" -- v1 has no strict
+  raise. Withdrawn; the provenance record is corrected.
+- **Both modes report a false success** on Bassett Fig 7b `mfb_two_pb`
+  q=0.8: run cold it converges to K_lat 3.44 against 2.77 -- a mirror root
+  with the *correct port signs*, so the direction-only verifier cannot see
+  it. (An earlier run on a reused adapter instance happened to demote it;
+  measured cold, it is reported as converged every time.) A wrong root
+  reported as a success is the worst outcome the harness can produce. The v1
+  base has an energy-consistency check (#229); MPCEv2 has none. Pinned as a
+  strict xfail target.
+- **And it is not even deterministic.** The same `mfb_two_pb` q=0.8 case
+  converges to the mirror root in a cold single-process run and fails or is
+  demoted under the parallel test suite. A strict xfail on it flapped in CI.
+  It carries the junction tests' one deliberately non-strict xfail, with the
+  non-determinism stated as the reason; process-dependent outcomes in a
+  validation harness are a defect in their own right (step 3 must not
+  inherit them).
+- The adapter now defaults to `strict=False`. Never compare v1 and v2
+  convergence without matching it.
+
+**Bassett's own Fig 7b case** (theta=45, psi=3, M ~ 0.03 -- inside his
+measured conditions) converges in `three_pb` at q=0.4/0.6/0.8 onto his curve
+(K_lat 0.444/1.246/2.765 vs 0.444/1.247/2.769) once the soft barrier is
+allowed to steer the reversed first iterate. The low-lateral-fraction points
+(q=0.2 `three_pb`; q=0.2/0.4 `mfb_two_pb`) still fail with "not making good
+progress" -- a solver-path failure inside documented conditions, which is
+the highest-priority kind. They are pinned as strict xfail **targets** in
+`python/tests/test_bassett_fig7b_case.py`, alongside the passing points, so
+the moment one starts passing it is noticed.
+
 ## 5. What the papers settle about the K_straight question (#272)
 
 Three independent sources say **negative `K_straight` in dividing flow is real
@@ -347,7 +395,7 @@ Consequences:
 
 | # | defect | evidence | fix | cost |
 |---|---|---|---|---|
-| 1 | `N > 3` returns finite residuals with an all-zero `dKQ` block | pinned by strict xfail in `test_mpce_v2_fd_fallback_guards.py` | reject `N > 3` at construction with a message naming the Mynard 3-branch K limit; the C-form is the eventual lift | 1 line + test |
+| 1 | ~~`N > 3` returns finite residuals with an all-zero `dKQ` block~~ | **fixed, step 2.** `MPCEv2Element.__init__` raises for N > 3 naming the Mynard 3-branch limit; ConstantKTee inherits it. The strict xfail is retired (the state is unconstructible); the closure-level precondition test stays | done |
 | 2 | ~~Residual-level silent physics switch: `mpce_v2_element.py` catches *any* exception from Mynard and returns a **lossless** continuity residual with an **empty** Jacobian `{}`~~ | **fixed, step 2.1.** Measured first: 0 hits across 2073 scorecard records + the full suite (the pre-check guard ahead of the call fired 145 times -- that is the legitimate degenerate path). All three wide `except`s (residual, FD loop, diagnostics) narrowed to `(IndexError, ValueError)`; residual and FD paths raise a named `RuntimeError` with the cause chained, diagnostics annotates `closure_error`. Falsified 8/9 against pre-fix; scorecard identical to the digit | done |
 | 3 | Hager and Idelchik unscored | sec 6 | extend `MPCEv2Network.evaluate_network` to `hager1984` (separating, `q -> 1 - q`) and `idelchik1966` (joining, `q` = Bassett's) | small; data + `q_transform` exist |
 | 4 | `alpha = 0.2` calibrated pre-#212 | memory + `tmp/calibrate_etransfer_join.py` | re-run the calibration on current plumbing **after** #3 lands, so its validation is in-network; if it no longer earns its place, set the default to 0 | script exists |
@@ -383,6 +431,50 @@ scorecard, on legitimate transient iterates. It works (the solves converge),
 but an empty Jacobian for a live element is the same shape of thing at a
 smaller scale, and it sits next to the `FlowRatio = 0 -> K = -1` edge from
 step 1.4 and the `N > 3` rejection. Those three are the remainder of step 2.
+
+## 7b. Step 2 result: the degenerate-iterate question (2026-09-05)
+
+Measured on the full scorecard (2073 solves) before changing anything.
+
+**(a) The pre-check fallback was where solves went to die.** Its 145 hits
+came from **26 solves, median 5 hits each, 0 of 26 converged**. It returned
+the continuity residual with `jac = {}` -- so even the trivial Jacobian it
+owns (+-1 on the `Pt` rows, the port signs on the mass row) was withheld,
+handing the solver N+1 zero rows. The iterates were all-same-sign with real
+magnitude (e.g. `[0.0021, 0.0011, 0.0048]`, every port flowing out), which
+violates mass conservation and is a wrong-direction state for at least one
+port -- exactly what the existing soft barrier handles, except the pre-check
+returned first. **Fix:** the all-ports-zero case (a cold start; never seen on
+the scorecard) returns the soft barrier at zero slack, which *is* the
+continuity residual with its Jacobian; the same-sign case now falls through
+to the wrong-direction check. No new code path.
+
+**(b) The mask mismatch was the more frequent silent lossless junction.**
+384 hits. Example `[-0.1, -0.0, 0.125]`: MPCEv2 excludes the `-0.0` port
+(`|U| <= 1e-9`), Mynard's `Q < 0` classifies it as a supplier, the two
+disagree, `K` comes back mis-shaped, the shape guard trips, and `K_per_port`
+stays all-zero. At what looks like initialization. **Fix:** an excluded port
+is snapped to a tiny flow in its *declared* direction and the masks are
+rebuilt from the snapped values, so the classifications agree by
+construction and the `FlowRatio -> 0` limit proven in step 1.4 applies
+(`K -> 1` for a dead outlet). After the fix the shape guard trips **0**
+times on the scorecard.
+
+**(c) N > 3** is refused at construction. Nothing outside the strict xfail
+ever constructed one.
+
+**Verified.** 9 of 10 new tests red against the pre-fix element (the 10th
+pins "three ports still accepted"); full suite green; the scorecard
+**identical to the digit** -- 1578/2073 converged, every imposed_q cell
+unchanged. That last number is the honest part: the 26 doomed solves are
+still doomed. The empty Jacobian was wrong, but it was not what killed them
+-- they are the true q-endpoint / artifact-root cases. What the fix buys is
+correctness of what the solver is handed on every iterate, which the port
+must preserve; it does not buy convergence here.
+
+**Dead end recorded:** re-instrumenting the element for the after-measurement
+and then reverting with `git checkout` reverted the fix as well. Commit
+first, then instrument.
 
 ## 8. The port, sequenced by provenance
 

@@ -163,10 +163,12 @@ def test_diagnostics_let_programming_errors_through(monkeypatch):
 
 
 def test_degenerate_split_is_handled_before_the_closure_is_called(monkeypatch):
-    """All ports flowing the same way is caught by the guard ahead of the try.
+    """All ports flowing the same way is caught ahead of the closure call.
 
-    It must reach the continuity fallback and never call the closure -- the
-    closure stand-in raising here would prove the guard was bypassed.
+    It is a wrong-direction state for at least one port, so it must reach the
+    soft barrier -- with a Jacobian (issue #271 step 2) -- and never call the
+    closure; the closure stand-in raising here would prove the guard was
+    bypassed. It once returned a lossless residual with jac = {}.
     """
     monkeypatch.setattr(
         v2, "junction_loss_coefficient", _raising(IndexError("should not be called"))
@@ -175,4 +177,4 @@ def test_degenerate_split_is_handled_before_the_closure_is_called(monkeypatch):
     residuals, jac = _element().residuals(_states(), 100_300.0, [-0.1, -0.05, -0.05])
 
     assert len(residuals) == 4
-    assert jac == {}
+    assert all(i in jac for i in range(4)), "the fallback must carry its Jacobian"

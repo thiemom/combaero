@@ -39,11 +39,24 @@ class MPCEv2Network:
 
     def __init__(
         self,
-        strict: bool = True,
+        strict: bool = False,
         joining_etransfer_alpha: float | None = None,
         eta_scale: float = 1.0,
     ) -> None:
-        """``strict=False`` enables the soft-barrier fallback on the underlying
+        """Defaults to ``strict=False``, which is how production builds the
+        element (``gui/backend/graph_builder.py``). ``strict=True`` raises on
+        any transient wrong-sign Newton iterate instead of steering it back
+        through the soft barrier, and it disables the post-solve direction
+        verifier -- so it both fails solves production would finish AND
+        reports artifact roots as converged. Measured on the full scorecard
+        (issue #271): strict=True 1578/2073, strict=False 1711/2073, with
+        imposed_q identical (602/691) and the difference entirely in the
+        pressure-driven topologies. Note the verifier is direction-only:
+        Bassett Fig 7b mfb_two_pb q=0.8 converges to a mirror root with the
+        right port signs (K_lat 3.44 vs 2.77) and is reported as a success
+        under either setting. Keep the adapter production-faithful.
+
+        ``strict=False`` enables the soft-barrier fallback on the underlying
         MPCEv2Element so the solver gets a quadratic pull-back when it
         starts in the wrong basin instead of an immediate raise.
 

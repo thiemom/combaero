@@ -118,17 +118,31 @@ formulation cannot rot the way a hard-coded expected value can.
 | converged | 184 / 315 | 368 / 435 |
 | median wall time | 5.2 ms | 7.8 ms |
 
-**The FD regime is the better-behaved one.** Joining is more accurate and
-converges more often than separating, and pays for it in wall time. The case
-for porting is architectural homogeneity and the CLAUDE.md `(f, J)` rule, not a
-convergence rescue -- anyone starting the port expecting robustness gains
-should recalibrate first.
+**Correction (2026-09-05): the convergence row above was measured with the
+validation adapter at `strict=True`, across all three topologies.** Production
+builds the element with `strict=False`, which steers transient wrong-sign
+iterates through the soft barrier instead of raising, and enables the
+post-solve direction verifier. Re-measured: all-topology 1578/2073 at
+`strict=True` vs 1711/2073 at `strict=False`, with `imposed_q` identical
+(602/691) and the whole difference in the pressure-driven topologies. The
+MAE/bias rows stand (they are `imposed_q`); the convergence comparison
+between regimes, and the earlier "v2 converges far less than v1" reading,
+were strict-mode artefacts and are withdrawn. Separately, Bassett Fig 7b
+`mfb_two_pb` q=0.8 converges to a mirror root (K 3.44 vs 2.77) and is reported
+as a success under **both** settings: the port signs are correct, so the
+direction-only verifier cannot see it. The adapter now defaults to
+`strict=False`; the uncaught mirror root is a pinned target.
+
+**What survives:** the case for porting is architectural homogeneity and the
+CLAUDE.md `(f, J)` rule, not a convergence rescue. Joining runs its Jacobian
+on finite differences and pays for it in wall time.
 
 ## Dead end
 
 The Jacobian fix was expected to improve convergence. It does not: roots are
-unchanged to three decimals and convergence moves 187 -> 184 of 315, which is
-noise on near-threshold cases. The missing entry is small next to the row
+unchanged to three decimals and convergence moves 187 -> 184 of 315 (all
+topologies, `strict=True` -- see the correction above), which is noise on
+near-threshold cases. The missing entry is small next to the row
 scale. Correctness before the port is the whole of the value, and saying so is
 better than implying a performance win that the numbers do not support.
 
