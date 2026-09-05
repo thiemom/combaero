@@ -341,8 +341,12 @@ the port can be gated on:
    at the **achieved** q is the missing instrument.
 3. **Where the BC set is feasible it often has two roots**, both exactly
    reproducing the model at their own q, with the initial guess deciding.
-   Uniqueness is a property of `K_lat - K_str` being monotonic, i.e. of
-   #272, not of the solver.
+   Uniqueness is NOT a matter of making `K_lat - K_str` monotonic: it is a
+   quadratic whose vertex lies inside (0,1) for every unequal-area geometry,
+   so Bassett's own is not monotone either. Where multiplicity is genuine the
+   selector is stability (`D' > 0`), and at equal areas -- 82% of the dataset
+   -- Bassett's `D` is exactly linear and the model's multiplicity is
+   spurious. Finding 6 of [JUNCTION_OPERATING_POINT_271.md].
 
 Consequences for sec 8: the step-4 gate cannot include "reproduce the
 `three_pb` K table", and the `mfb_two_pb` table is only meaningful once K is
@@ -353,8 +357,12 @@ scored at the achieved q.
 **Second motivation, added 2026-09-05:** `K_straight`'s size at low q also
 decides whether the pressure-driven problem has a unique solution. The
 model's `K_lat - K_str` is U-shaped, which makes low-q targets infeasible
-and mid-range targets doubly-rooted. A monotonic difference leaves one
-operating point. See [JUNCTION_OPERATING_POINT_271.md].
+and mid-range targets doubly-rooted. The acceptance criterion this yields is
+an exact identity, not an error metric: at `psi = 1` the source gives
+`K_lateral - K_straight = q (1.5 - 2 cos(0.75 theta)) + 0.5`, linear in q with
+slope and intercept fixed by geometry. The model violates it in both slope and
+shape, and satisfying it also removes the spurious multiplicity seen at equal
+areas. Finding 6 of [JUNCTION_OPERATING_POINT_271.md].
 
 Three independent sources say **negative `K_straight` in dividing flow is real
 physics**, not a solver artefact:
@@ -437,7 +445,7 @@ Consequences:
 | 7 | Bassett K4/K7/K8/K9 unscored | sec 6 | add a type-4 joining builder and a K4 separating case to the adapter | medium |
 | 8 | ~~`three_pb`'s K score is a tautology (sec 4e)~~ **fixed** | `eta_scale=3.0` still reproduces the q=0.8 target to 0.05% | **done.** `_K_SCORING_TOPOLOGIES` excludes it; the scorecard prints `taut`, not a dash. The perturbation is pinned in `test_junction_score_at_achieved_q.py` | done |
 | 9 | ~~K is scored at the TARGET q while the solve sits at the achieved q~~ **fixed** | drift: `three_pb` median 0.134; `mfb_two_pb` 12.6% of rows > 0.25 | **done.** `q_converged` populated and printed as `dq`; K scored on the measured curve at the achieved q (interpolation error floor measured leave-one-out: median 0.030, p90 0.175); off-curve records excluded, off-point records counted separately so the coverage loss stays visible. `imposed_q` unchanged to the digit | done |
-| 10 | `verify_solution_consistent` passes near-degenerate roots | a root at q=0.0102 (lateral leg at 1% of the flow) is reported as a success; its only criterion is `m_dot > 1e-6` | add a minimum-flow-fraction criterion | small |
+| 10 | `verify_solution_consistent` passes near-degenerate roots; the principled criterion is stability, `D' > 0` (Finding 6) | a root at q=0.0102 (lateral leg at 1% of the flow) is reported as a success; its only criterion is `m_dot > 1e-6` | add a minimum-flow-fraction criterion | small |
 | 11 | `analytical_pt_prop` seeds no mass flow through `LosslessConnectionElement` | x0 violates continuity at every junction (0.1 in, 0.2 out); a junction-aware mass-conserving seed gains ~70 solves | extend the seed, but land it WITH item 9 -- it moves 22 already-converged roots between the two legitimate branches | medium |
 | 12 | ~~Solver results depend on `PYTHONHASHSEED`~~ **fixed** | `_propagate_pressure_guess` seeds its BFS from `list(set(p_guess.keys()))`; the same case converges in 5 of 10 identical processes, and is deterministic per fixed hash seed | **done.** `queue = list(p_guess.keys())`; scorecard identical (1700/2073) under seeds 0/1/7/13, against 1700 or 1711 before | done |
 

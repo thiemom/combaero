@@ -75,9 +75,15 @@ model's `K_straight` spans -0.13 to +0.93 where Bassett's K5 spans -0.06 to
 +0.46: wrong sign and magnitude at low q, which lifts `D` above where the
 measured targets sit. Sec 5 of [MPCE_CPP_PORT_DESIGN.md] establishes that a
 negative `K_straight` in dividing flow is real physics; the defect is its
-size and where it crosses zero, not its existence. This gives #272 a second,
-independent motivation: **a monotonic `D` would leave one operating point.**
-Uniqueness here is a model property, not a solver property.
+size and where it crosses zero, not its existence.
+
+**Correction (2026-09-05, Finding 6).** This section first read "a monotonic
+`D` would leave one operating point", offering that to #272 as a second
+motivation. That is wrong: `D` is a quadratic whose vertex lies inside (0,1)
+for every unequal-area geometry in the dataset, so **Bassett's own `D` is not
+monotone either** and monotonicity is not available to aim at. What fixing the
+model does deliver is feasibility everywhere, and the removal of a *spurious*
+multiplicity at equal areas. See Finding 6.
 
 ## Finding 2: where there are two roots, both are physical
 
@@ -339,12 +345,121 @@ inherited it, and a validation harness that counts convergences inherited it
 twice. Landed with this record because the Fig 7b tests cannot be
 deterministic without it.
 
+## Finding 6: monotonicity is not the right target, and D is a quadratic
+
+Asked whether the coefficients could be reformulated to force monotonicity.
+They cannot, and they should not be. Bassett's separating pair has closed
+forms (Eq 15 and Eq 27), so their difference does too:
+
+    K5(q)          = q^2 - 1.5 q + 0.5
+    K6(q,psi,th)   = q^2 psi^2 + 1 - 2 q psi cos(0.75 th)
+
+    D(q) = K6 - K5 = q^2 (psi^2 - 1) + q (1.5 - 2 psi c) + 0.5,  c = cos(0.75 th)
+
+A quadratic, verified against the functions to 1e-16 over the geometry grid.
+Three consequences follow directly from its coefficients.
+
+**(a) At equal areas D is exactly LINEAR.** `psi = 1` kills the quadratic term:
+`D = q (1.5 - 2c) + 0.5`. So the operating point is unique for every
+equal-area geometry, at every q, with no appeal to numerics.
+
+**(b) At unequal areas D is a cup whose vertex sits inside the range**, so
+Bassett's own coefficients are non-monotone there:
+
+| psi | theta | vertex q* | monotone on (0,1)? |
+|---|---|---|---|
+| 1 | any | linear | yes |
+| 2 | 45 | 0.304 | no |
+| 3 | 45 | 0.218 | no |
+| 4 | 45 | 0.172 | no |
+| 3.333 | 90 | 0.052 | no |
+| 10 | 90 | 0.031 | no |
+
+Forcing monotonicity would contradict the source. It is not a defect to fix.
+
+**(c) Non-monotone does not mean two operating points.** For a target
+`D_t = D(q_t)` the second root is the mirror about the vertex,
+`q_2 = 2 q* - q_t`, which is physical only when `0 < 2 q* - q_t < 1`. Counted
+over every separating point in the dataset, with Bassett's own coefficients:
+
+| verdict | points | share |
+|---|---|---|
+| unique -- psi = 1, D linear | 86 | 81.9% |
+| unique -- mirror outside [0,1] | 9 | 8.6% |
+| genuinely two roots | 10 | 9.5% |
+
+**90.5% of the dataset has a unique physical operating point.** The 10 that do
+not are all psi=3, theta=45 at q_t < 0.436.
+
+### The model's multiplicity is in the wrong place
+
+Every two-root case measured in Finding 2 was at **psi = 1**, where the physics
+is provably unique. The model manufactures an extremum where Bassett has a
+straight line:
+
+| psi=1 | Bassett D | model D |
+|---|---|---|
+| theta=45 | linear, slope -0.163 | monotone, slope -0.7 to -2.9, goes negative |
+| theta=90 | linear, slope +0.735 | hump, turning at q=0.30 |
+| theta=120 | linear, slope +1.500 | hump, turning at q=0.50 |
+
+Mynard's energy-transfer factor is implicated but is not the whole story:
+`eta_scale=0` removes the hump at theta=90, and at theta=120 it leaves `D`
+essentially flat (1.000 to 0.994) where Bassett rises from 0.5 to 1.925. The
+equal-area defect is structural, not a mis-tuned constant.
+
+### The reformulation that IS available, and it is exact
+
+Not "force monotonicity" but **"reproduce the analytical identity the source
+already gives you"**:
+
+    at psi = 1:   K_lateral(q) - K_straight(q) = q (1.5 - 2 cos(0.75 theta)) + 0.5
+
+Linear in q, with a slope and intercept fixed by geometry alone. That is a
+sharper acceptance criterion for #272 than any error metric: a structural
+identity the model must satisfy exactly in the equal-area limit, currently
+violated in both slope and shape. It also disposes of the spurious multiplicity
+by construction, since a linear D cannot have two roots.
+
+### What selects the root where multiplicity is genuine
+
+Not monotonicity. Stability. Quasi-steady momentum on the two legs, with the
+split as the only freedom (m_com fixed, both outlet Pt fixed):
+
+    2 L d(m_lat)/dt = (Pt_str - Pt_bra) - D(q) Q
+
+Perturbing about a root gives `d(dq)/dt = -Q D'(q) dq / (2 L m_com)`, so
+
+    a root is dynamically stable iff D'(q) > 0.
+
+Checked on every two-root case measured: exactly one root has `D' > 0`.
+
+| psi | theta | q_t | roots | D' at each | stable |
+|---|---|---|---|---|---|
+| 1 | 120 | 0.406 | 0.055, 0.935 | +1.87, -2.08 | 0.055 |
+| 1 | 120 | 0.490 | 0.135, 0.865 | +1.54, -1.51 | 0.135 |
+| 1 | 120 | 0.637 | 0.325, 0.675 | +0.75, -0.70 | 0.325 |
+
+`D'` is already available analytically inside the element -- it is what the
+Jacobian carries -- so this costs nothing to evaluate. It is the principled
+form of defect 10's "reject roots that are not physical", and it is a stronger
+criterion than the present minimum-flow test because it rests on a stability
+argument rather than a threshold.
+
+**Caveat, stated because it bounds the claim.** The argument is quasi-steady
+and one-dimensional, and it says a pressure-driven tee cannot sit on the
+falling branch. Bassett measured those low-q points in a flow-controlled rig,
+where the split is imposed and stability does not select, so there is no
+conflict with the data. The criterion applies to pressure-driven networks, not
+to the validation of the coefficients themselves.
+
 ## What this changes
 
 - The 26 unrescued solves are no longer a mystery: most are infeasible, and
   the infeasibility measures the `K_straight` gap.
-- #272 gains a second motivation independent of accuracy: uniqueness of the
-  operating point.
+- #272 gains a sharper acceptance criterion than any error metric: the
+  equal-area identity in Finding 6, which the model currently violates in both
+  slope and shape.
 - The step-3 C++ port gate must not be "reproduce the `three_pb` K table" --
   that table is reproducible by any model at all.
 - `verify_solution_consistent` needs a minimum-flow criterion, not an
