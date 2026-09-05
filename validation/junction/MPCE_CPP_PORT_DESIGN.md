@@ -273,6 +273,54 @@ without damping -- a sign-flipped dead branch the knob never guarded. Pinned
 by test so the degenerate-iterate work (step 2) removes the test when it
 fixes the edge, rather than rediscovering it.
 
+## 4d. The strict-mode artefact, and Bassett's own case (2026-09-05)
+
+Found while characterising one of the solves the step-2 fallback could not
+rescue. The validation adapter defaulted to `strict=True`; production
+(`gui/backend/graph_builder.py`) builds `MPCEv2Element` with `strict=False`.
+`strict=True` raises on any transient wrong-sign Newton iterate instead of
+steering it back through the soft barrier, **and** disables the post-solve
+direction verifier. Measured on the full scorecard:
+
+| topology | strict=True | strict=False |
+|---|---|---|
+| imposed_q | 602 / 691 | 602 / 691 |
+| mfb_two_pb | 587 | **629** |
+| three_pb | 389 | **480** |
+| all | 1578 | **1711** |
+
+- The `imposed_q` gate tables (sec 4b, 4c) are unaffected and stand.
+- Every all-topology convergence comparison made earlier was a strict-mode
+  artefact, including "v2 converges far less than v1" -- v1 has no strict
+  raise. Withdrawn; the provenance record is corrected.
+- **Both modes report a false success** on Bassett Fig 7b `mfb_two_pb`
+  q=0.8: run cold it converges to K_lat 3.44 against 2.77 -- a mirror root
+  with the *correct port signs*, so the direction-only verifier cannot see
+  it. (An earlier run on a reused adapter instance happened to demote it;
+  measured cold, it is reported as converged every time.) A wrong root
+  reported as a success is the worst outcome the harness can produce. The v1
+  base has an energy-consistency check (#229); MPCEv2 has none. Pinned as a
+  strict xfail target.
+- **And it is not even deterministic.** The same `mfb_two_pb` q=0.8 case
+  converges to the mirror root in a cold single-process run and fails or is
+  demoted under the parallel test suite. A strict xfail on it flapped in CI.
+  It carries the junction tests' one deliberately non-strict xfail, with the
+  non-determinism stated as the reason; process-dependent outcomes in a
+  validation harness are a defect in their own right (step 3 must not
+  inherit them).
+- The adapter now defaults to `strict=False`. Never compare v1 and v2
+  convergence without matching it.
+
+**Bassett's own Fig 7b case** (theta=45, psi=3, M ~ 0.03 -- inside his
+measured conditions) converges in `three_pb` at q=0.4/0.6/0.8 onto his curve
+(K_lat 0.444/1.246/2.765 vs 0.444/1.247/2.769) once the soft barrier is
+allowed to steer the reversed first iterate. The low-lateral-fraction points
+(q=0.2 `three_pb`; q=0.2/0.4 `mfb_two_pb`) still fail with "not making good
+progress" -- a solver-path failure inside documented conditions, which is
+the highest-priority kind. They are pinned as strict xfail **targets** in
+`python/tests/test_bassett_fig7b_case.py`, alongside the passing points, so
+the moment one starts passing it is noticed.
+
 ## 5. What the papers settle about the K_straight question (#272)
 
 Three independent sources say **negative `K_straight` in dividing flow is real
