@@ -252,7 +252,11 @@ class MPCEv2Element(MultiPortChamberElement):
                 joining_etransfer_alpha=self.joining_etransfer_alpha,
                 eta_scale=self.eta_scale,
             )
-        except Exception:
+        except (IndexError, ValueError) as exc:
+            # The two exceptions the closure can raise on a degenerate flow
+            # split. Post-solve, so report rather than raise -- but never
+            # silently: an absent K field must be attributable.
+            diag["closure_error"] = type(exc).__name__
             return diag
 
         if mynard.K is None:
@@ -431,11 +435,22 @@ class MPCEv2Element(MultiPortChamberElement):
                 joining_etransfer_alpha=self.joining_etransfer_alpha,
                 eta_scale=self.eta_scale,
             )
-        except Exception:
-            # Numerical failure (e.g. singular pseudosupplier). Same fallback.
-            residuals = [float(s.Pt) - Pt_jct for s in states]
-            residuals.append(sum(port_mdots))
-            return residuals, {}
+        except (IndexError, ValueError) as exc:
+            # The closure can raise only on a degenerate flow split (empty
+            # supplier or collector mask), and the guard above already routes
+            # those to the continuity fallback before this call. Reaching
+            # here therefore means the two classifications disagree -- an
+            # anomaly worth seeing, not one to paper over. This used to
+            # return a lossless residual with an EMPTY Jacobian for *any*
+            # exception, which turned a plumbing error into a plausible-
+            # looking lossless junction mid-solve (issue #271). Programming
+            # errors now propagate untouched.
+            raise RuntimeError(
+                f"MPCEv2Element '{self.id}': Mynard closure failed on a "
+                f"non-degenerate state (port_mdots={list(port_mdots)}, "
+                f"suppliers={sup_mask.tolist()}, collectors={col_mask.tolist()}). "
+                f"The degenerate-split guard should have caught this first."
+            ) from exc
 
         # ITERATION-2: use mynard.K (Matlab line 73) with common-side q_dyn.
         # This is the physically correct normalization: K is defined such
@@ -516,8 +531,15 @@ class MPCEv2Element(MultiPortChamberElement):
                         joining_etransfer_alpha=self.joining_etransfer_alpha,
                         eta_scale=self.eta_scale,
                     )
-                except Exception:
-                    continue
+                except (IndexError, ValueError) as exc:
+                    # The sign-flip guard above already skips perturbations
+                    # that cross zero; a raise here is a state the closure
+                    # cannot classify at all. Leaving the column zero was a
+                    # silent wrong derivative (issue #271, #280).
+                    raise RuntimeError(
+                        f"MPCEv2Element '{self.id}': Mynard closure failed on the "
+                        f"FD perturbation of port {j} (perturbed mdots={mdot_pert})."
+                    ) from exc
                 if m_pert.K is None or len(m_pert.K) != len(non_common_idxs):
                     continue
                 K_pert = np.zeros(N)

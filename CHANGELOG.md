@@ -239,6 +239,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.2] - 2026-07-09
 
 ### Fixed
+- **`MPCEv2Element` no longer turns an exception inside the Mynard closure
+  into a silent lossless junction (issue #271).** Three call sites wrapped
+  `junction_loss_coefficient` in `except Exception`; the residual site
+  returned a lossless continuity residual with an *empty* Jacobian for any
+  error at all, and the FD-fallback site left a Jacobian column at zero.
+  Measured across 2073 scorecard records (three sources, three topologies)
+  and the full test suite, those handlers never caught a legitimate degenerate
+  flow split -- the guard ahead of the call already routes those to the
+  continuity fallback -- and the only thing they ever caught was a plumbing
+  error, which they disguised as a plausible-looking lossless junction
+  mid-solve. Now: the closure's two possible exceptions (`IndexError`,
+  `ValueError`) are re-raised as a `RuntimeError` naming the element, the
+  port mass flows and the supplier/collector masks, with the cause chained;
+  every other exception propagates untouched. `diagnostics()` narrows the
+  same way and, post-solve, reports a `closure_error` key instead of silently
+  omitting the `K` fields. **Converged results are unchanged** -- the
+  scorecard reproduces the previous tables to the digit -- because the
+  removed path was never taken on a legitimate state.
 - **`MPCEv2Element`'s Jacobian was missing the common-port static-pressure
   column (issue #271).** The Mynard loss term `K_i * q_dyn_com` depends on the
   common port's density, and hence on its static pressure, through two paths:
