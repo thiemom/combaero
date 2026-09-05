@@ -194,10 +194,55 @@ The first thing it shows: on `K_lateral_sep` psi=1 theta=45, `three_pb`
 reported the *best* RMSE in the row (0.057, against `imposed_q`'s 0.061) while
 sitting a median of **0.476** away in q -- half the entire operating range.
 
-Still open (defect 9b): scoring K against the measured curve interpolated at
-the achieved q, so a drifted row is compared correctly instead of merely
-flagged. That needs a decision about extrapolation beyond each curve's
-digitised range.
+**Also acted on (9b): K is now scored on the measured curve at the achieved q**,
+by linear interpolation between the curve's own digitised points. Three
+decisions, each with a number behind it:
+
+- **Interpolation is bounded, and the bound was measured.** Leave-one-out over
+  all 64 curves (drop an interior point, rebuild it from its neighbours):
+  median |error| 0.030, p90 0.175, worst 10.75 on a steep Idelchik K12 branch.
+  That spans two gaps and so overstates single-gap interpolation, but it is the
+  floor below which a rescored K resolves nothing. Against a model RMSE of 0.78
+  the median is about 4%, which is why the change is sound; the tail is why
+  extrapolation is refused rather than clamped.
+- **Outside a curve's digitised range there is no ground truth.** Those records
+  are reported as *off-curve* and excluded from RMSE, never extrapolated.
+- **Rescoring alone would hide a coverage loss.** A record aimed at q=0.2 that
+  lands at q=0.9 is a correct measurement of the model at 0.9 and no evidence
+  whatever about 0.2, and rescoring it makes the RMSE look better while the
+  requested point goes untested. So *off-point* is counted separately, at a
+  threshold of 0.05 -- half the median digitised spacing of the two dominant
+  sources (Bassett 0.0997, Idelchik 0.1000).
+
+Before and after, over the K-scoring topologies:
+
+| topology | converged | off-point | off-curve | RMSE at target | RMSE on the curve |
+|---|---|---|---|---|---|
+| `imposed_q` | 602 | 0 | 0 | 0.7595 | 0.7595 |
+| `mfb_two_pb` | 618 | 88 (14%) | 10 | 0.7894 | 0.7783 |
+
+`imposed_q` is untouched to the digit, which is the check that matters: the
+split is a boundary condition there, so nothing should move. (An earlier cut
+compared floats exactly, and float noise pushed 9 `imposed_q` records off the
+end of their own curves and out of the score. A snap at the instrument's
+calibration tolerance fixed it, and a test pins it.)
+
+On the 88 records the change actually touches, RMSE falls 0.2270 to 0.1724.
+The overall move is small because the median drift is 0.0001: `mfb_two_pb`
+usually lands where it was aimed, and it is the tail that was being scored
+wrongly.
+
+The coverage numbers are the more interesting output:
+
+| topology | converged | landed elsewhere |
+|---|---|---|
+| `imposed_q` | 602 | 0 |
+| `three_pb` | 480 | **349 (73%)** |
+| `mfb_two_pb` | 618 | 88 (14%) |
+
+`three_pb` does not merely report a tautological K. It probes an operating
+point other than the one asked for in nearly three quarters of its converged
+records.
 
 ## Finding 4: the seed defect is real, and worth about 70 solves
 

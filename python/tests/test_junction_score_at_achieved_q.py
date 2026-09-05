@@ -26,7 +26,9 @@ from validation.junction.models import bassett2001
 from validation.junction.models.mpce_v2_network import MPCEv2Network
 from validation.junction.network_runner import (
     _K_SCORING_TOPOLOGIES,
+    _Q_OFF_POINT,
     NetworkRecord,
+    _curve_value_at,
     build_network_cells,
     format_network_scorecard,
 )
@@ -79,7 +81,13 @@ def test_three_pb_is_excluded_from_K_scoring():
     assert {"imposed_q", "mfb_two_pb"} <= _K_SCORING_TOPOLOGIES
 
 
-def _record(topology: str, q: float, q_conv: float | None, K_ext: float) -> NetworkRecord:
+def _record(
+    topology: str,
+    q: float,
+    q_conv: float | None,
+    K_ext: float,
+    K_at_conv: float | None = 1.0,
+) -> NetworkRecord:
     return NetworkRecord(
         paper="bassett2001",
         K_id="K6",
@@ -95,6 +103,7 @@ def _record(topology: str, q: float, q_conv: float | None, K_ext: float) -> Netw
         which="lateral",
         topology=topology,
         q_converged=q_conv,
+        K_measured_at_q_converged=K_at_conv,
     )
 
 
@@ -176,3 +185,83 @@ def test_idelchik_K11_is_not_axis_flipped(model):
 
     assert r.converged, r.message
     assert r.q_converged == pytest.approx(q, abs=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# Item 9b: the comparison happens ON THE CURVE, where the solve landed
+# ---------------------------------------------------------------------------
+
+_CURVE = [(0.0, 0.0), (0.5, 1.0), (1.0, 3.0)]
+
+
+@pytest.mark.parametrize(
+    "q, expected",
+    [(0.0, 0.0), (0.25, 0.5), (0.5, 1.0), (0.75, 2.0), (1.0, 3.0)],
+)
+def test_curve_is_interpolated_between_its_digitised_points(q, expected):
+    assert _curve_value_at(_CURVE, q) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("q", [-0.01, 1.01, 5.0])
+def test_outside_the_digitised_range_there_is_no_ground_truth(q):
+    """Extrapolating a digitised curve is not measured data (policy sec 0
+    item 1). Such a record is reported as off-curve, never scored."""
+    assert _curve_value_at(_CURVE, q) is None
+
+
+def test_an_empty_curve_yields_nothing():
+    assert _curve_value_at([], 0.5) is None
+
+
+def test_error_is_measured_where_the_solve_landed_not_where_it_was_aimed():
+    r = _record("mfb_two_pb", q=0.2, q_conv=0.9, K_ext=3.0, K_at_conv=2.5)
+
+    assert r.error == pytest.approx(0.5)
+    assert r.K_measured == 1.0  # the value at the target q, deliberately unused
+
+
+def test_a_record_off_the_curve_is_not_scored():
+    r = _record("mfb_two_pb", q=0.2, q_conv=1.5, K_ext=3.0, K_at_conv=None)
+
+    assert r.off_curve
+    assert r.error is None
+    cells = build_network_cells([r])
+    assert cells[0].n_off_curve == 1
+    assert math.isnan(cells[0].rmse_meas), "an unscorable record must not enter RMSE"
+
+
+def test_a_record_that_landed_elsewhere_is_scored_but_counted_as_lost_coverage():
+    """It is a correct measurement of the model at 0.9, and no evidence at all
+    about 0.2. Both facts have to survive into the scorecard."""
+    r = _record("mfb_two_pb", q=0.2, q_conv=0.9, K_ext=3.0, K_at_conv=2.5)
+
+    assert r.off_point
+    cells = build_network_cells([r])
+    assert cells[0].n_off_point == 1
+    assert cells[0].rmse_meas == pytest.approx(0.5), "it must still be scored"
+    assert "off-point" in format_network_scorecard("m", cells)
+
+
+def test_a_record_within_the_off_point_threshold_keeps_its_coverage():
+    r = _record("mfb_two_pb", q=0.5, q_conv=0.5 + 0.5 * _Q_OFF_POINT, K_ext=1.0)
+    assert not r.off_point
+
+
+def test_imposed_q_is_scored_against_the_measured_value_itself(model):
+    """The split is imposed, so nothing drifted and no interpolation should
+    happen. An earlier cut compared floats exactly, and float noise pushed 9
+    imposed_q records off the end of their curves and out of the score.
+    """
+    from validation.junction.network_runner import iter_network_records
+    from validation.junction.schema import load_dataset
+
+    records = [
+        r
+        for r in iter_network_records(model, load_dataset(), topologies=("imposed_q",))
+        if r.converged and r.K_extracted is not None
+    ]
+
+    assert records, "no converged imposed_q records to check"
+    assert all(r.K_measured_at_q_converged == r.K_measured for r in records)
+    assert not any(r.off_curve for r in records)
+    assert not any(r.off_point for r in records)
