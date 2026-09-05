@@ -143,6 +143,13 @@ class EjectorElement(MultiPortChamberElement):
     1 outlet. Critical (double-choked), subcritical, and unchoked-primary
     (subsonic jet-pump) in one C1 residual system."""
 
+    # The ejector's port flows follow choking and entrainment, not a Bernoulli
+    # share of the imposed pressure differences, and it carries its own
+    # physics-based warm start for the port pressures and P_jct. The solver's
+    # junction split seed would overwrite that with a split the ejector does
+    # not obey, and the cold reference network then fails to converge.
+    seeds_ports_by_pressure_split: bool = False
+
     def __init__(
         self,
         id: str,

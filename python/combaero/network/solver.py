@@ -511,7 +511,77 @@ class NetworkSolver:
                 if pt is None:
                     continue
                 overrides[f"{elem_id}.P_jct"] = pt
+                if getattr(elem, "seeds_ports_by_pressure_split", False):
+                    overrides.update(
+                        self._junction_split_guess(elem, common, p_guess, rho_ref, ref)
+                    )
         return overrides
+
+    def _junction_split_guess(
+        self,
+        elem: Any,
+        common: str,
+        p_guess: dict[str, float],
+        rho_ref: float,
+        ref: dict[str, Any],
+    ) -> dict[str, float]:
+        """Seed a junction's port flows so x0 conserves mass and reflects the
+        imposed pressures.
+
+        The Bernoulli seed above only reaches `ChannelElement`. Junctions in
+        both the validation harness and `gui/backend/graph_builder.py` are
+        wired with `LosslessConnectionElement`, which got nothing, so every
+        port fell back to the flat reference flow: on a three-port junction
+        that is 0.1 kg/s in against 0.2 kg/s out, with a 1:1 split whatever the
+        boundary pressures say (issue #271, defect 11).
+
+        What this changes is only the SPLIT and the CONTINUITY. The total is
+        taken from whatever the topological propagator already put on the
+        common port's element, so no new flow-scale heuristic is introduced
+        and a MassFlowBoundary upstream still sets the level. The non-common
+        ports are then given a Bernoulli share of that total,
+        ``A_i * sqrt(2 rho dPt_i)``, normalised to sum to it -- and every port
+        is seeded in its own canonical direction, since the sign mapping
+        ``port_mdots[i] = port_signs[i] * outer_mdot[i]`` makes a positive
+        outer flow the correct direction at that port.
+
+        Ports whose imposed pressure difference is unknown or zero fall back
+        to an area-weighted share, which is the incompressible answer when
+        nothing distinguishes them.
+        """
+        port_nodes = list(getattr(elem, "port_nodes", []))
+        port_elems = list(getattr(elem, "_port_element_ids", []))
+        if len(port_nodes) != len(port_elems) or common not in port_nodes:
+            return {}
+        areas = list(getattr(elem, "port_areas", [])) or [1.0] * len(port_nodes)
+        if len(areas) != len(port_nodes):
+            return {}
+
+        common_i = port_nodes.index(common)
+        pt_com = p_guess[common]
+        mdot_guess = self._propagate_mdot_guess(ref)
+        total = abs(float(mdot_guess.get(port_elems[common_i], ref["m_dot"])))
+        if total <= 0.0:
+            return {}
+
+        others = [i for i in range(len(port_nodes)) if i != common_i]
+        shares = []
+        for i in others:
+            pt_i = p_guess.get(port_nodes[i])
+            dpt = 0.0 if pt_i is None else abs(pt_com - pt_i)
+            area = abs(float(areas[i])) or 1.0
+            shares.append(area * math.sqrt(2.0 * rho_ref * dpt) if dpt > 0.0 else 0.0)
+        if sum(shares) <= 0.0:
+            shares = [abs(float(areas[i])) or 1.0 for i in others]
+
+        scale = total / sum(shares)
+        out: dict[str, float] = {}
+        if port_elems[common_i]:
+            out[f"{port_elems[common_i]}.m_dot"] = total
+        for i, share in zip(others, shares, strict=True):
+            if port_elems[i]:
+                out[f"{port_elems[i]}.m_dot"] = share * scale
+        return out
 
     def _build_x0(self) -> np.ndarray:
         """
