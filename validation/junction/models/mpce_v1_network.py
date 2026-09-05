@@ -24,6 +24,7 @@ rather than fabricated bad K values.
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 
 from combaero.network import (
     BorderCarnotLossElement,
@@ -81,9 +82,16 @@ class MPCEv1Network:
             # lateral fraction, so straight-leg coefficients need 1-q. Feeding
             # the raw q builds a mirrored operating point (issue #272).
             q_lateral = 1.0 - q if K_id in {"K5", "K2"} else q
-            return self._separating(
+            result = self._separating(
                 q_lateral, psi or 1.0, theta_rad or math.pi / 2.0, topology
             )
+            if K_id in {"K5", "K2"} and result.q_converged is not None:
+                # The achieved operating point takes the same transform as the
+                # target did on the way in, or the drift is measured on a
+                # mirrored axis. Only reachable since q_converged was populated
+                # (#290), which is why the input half predates it.
+                result = replace(result, q_converged=1.0 - result.q_converged)
+            return result
         if K_id in {"K11", "K12"}:
             return NetworkResult(
                 converged=False,

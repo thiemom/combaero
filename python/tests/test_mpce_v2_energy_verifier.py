@@ -20,12 +20,25 @@ effect at the validation dynamic head. The mass-weighted balance permits one
 branch to gain at another's expense while forbidding a net gain, and it applies
 to joining flow, which v1's check explicitly skips.
 
-Audited before being imposed (tmp/audit_realizability.py):
+Audited before being imposed:
 
-    measured curves        worst mass-weighted mean K  +0.21   0 violations
-    Bassett analytical     worst                       +0.19   0 violations
-    the MODEL              worst                       -0.06   violates for
-                                                               q below ~0.2
+    Bassett analytical, correctly paired   -> exactly 0 in the no-diversion
+                                              limit, positive elsewhere
+    the MODEL                              -> -0.06, violating below q ~ 0.2
+
+The first audit paired K5 and K6 at the same q and reported margins of +0.19
+and +0.21. That pairing is wrong: Bassett indexes each coefficient on its own
+leg, so K5's argument is the straight fraction. Corrected, the analytical pair
+tends to exactly zero as the lateral flow vanishes -- a junction diverting
+nothing dissipates nothing -- which is both the sharper statement and a check
+on the axis reading.
+
+The model's violation comes from Mynard's energy-transfer factor (Eq 35-36).
+Measured on the closure directly, with it off the flow-weighted mean K is
+positive everywhere and K_straight is exactly q^2 (the velocity-difference
+loss); with it on the flow-weighted sum drops by up to 0.27 and goes negative
+below a lateral fraction of about 0.25. It is written as an exchange between
+collectors, but nothing in Eq 35-36 constrains the credit to equal the debit.
 """
 
 from __future__ import annotations

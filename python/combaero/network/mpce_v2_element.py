@@ -214,12 +214,16 @@ class MPCEv2Element(MultiPortChamberElement):
         forbidding a net gain, and it applies to joining flow too.
 
         Equivalently, in coefficient terms the condition is that the
-        mass-weighted mean K is non-negative. Audited before being imposed: the
-        measured curves satisfy it with margin (weighted mean K at worst
-        +0.21), Bassett's analytical pair likewise (+0.19 at worst), and the
-        MODEL violates it at low lateral fraction (down to -0.06 near q = 0.1),
-        which is the K_straight defect of #272 showing up as a hard physical
-        violation rather than an accuracy gap.
+        mass-weighted mean K is non-negative. Audited before being imposed:
+        Bassett's analytical pair satisfies it everywhere and tends to exactly
+        zero as the lateral flow vanishes, which is what a junction that
+        diverts nothing must dissipate. The MODEL violates it at low lateral
+        fraction (down to -0.06 near q = 0.1), which is the K_straight defect
+        of #272 showing up as a hard physical violation rather than an accuracy
+        gap. The mechanism is Mynard's energy-transfer factor (Eq 35-36): it is
+        written as an exchange between collectors, but nothing constrains the
+        credit to equal the debit, and measured on the closure it lowers the
+        flow-weighted sum by up to 0.27.
 
         ``energy_rel_tol`` is relative to ``sum |m_i| * max |Pt_i|``. A
         converged solve leaves a residual of order 1e-10 Pa against dynamic

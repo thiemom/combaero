@@ -61,6 +61,11 @@ class MynardAnalytical:
 
         if K_id in {"K5", "K2", "K6"}:
             # Separating: common supplier (U=+1), straight + branch collectors.
+            # The velocities below are built from the LATERAL fraction, and a
+            # K5/K2 file's q is the STRAIGHT fraction (equivalences.py), so it
+            # takes 1 - q first.
+            if K_id in {"K5", "K2"}:
+                q = 1.0 - q
             U_arr = np.array([1.0, -(1.0 - q), -q * psi])
             A_arr = np.array([A_com, A_str, A_bra])
             try:
