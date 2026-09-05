@@ -348,7 +348,7 @@ Consequences:
 | # | defect | evidence | fix | cost |
 |---|---|---|---|---|
 | 1 | `N > 3` returns finite residuals with an all-zero `dKQ` block | pinned by strict xfail in `test_mpce_v2_fd_fallback_guards.py` | reject `N > 3` at construction with a message naming the Mynard 3-branch K limit; the C-form is the eventual lift | 1 line + test |
-| 2 | Residual-level silent physics switch: `mpce_v2_element.py:402` catches *any* exception from Mynard and returns a **lossless** continuity residual with an **empty** Jacobian `{}` | same pattern as the FD guards, one level up: an unrepresentable state becomes a plausible-looking lossless junction mid-solve | narrow the `except` to the two exception types Mynard actually raises (`IndexError`, `ValueError` -- pinned in the guard tests), and either raise or return the soft-barrier residual, never `{}` | small |
+| 2 | ~~Residual-level silent physics switch: `mpce_v2_element.py` catches *any* exception from Mynard and returns a **lossless** continuity residual with an **empty** Jacobian `{}`~~ | **fixed, step 2.1.** Measured first: 0 hits across 2073 scorecard records + the full suite (the pre-check guard ahead of the call fired 145 times -- that is the legitimate degenerate path). All three wide `except`s (residual, FD loop, diagnostics) narrowed to `(IndexError, ValueError)`; residual and FD paths raise a named `RuntimeError` with the cause chained, diagnostics annotates `closure_error`. Falsified 8/9 against pre-fix; scorecard identical to the digit | done |
 | 3 | Hager and Idelchik unscored | sec 6 | extend `MPCEv2Network.evaluate_network` to `hager1984` (separating, `q -> 1 - q`) and `idelchik1966` (joining, `q` = Bassett's) | small; data + `q_transform` exist |
 | 4 | `alpha = 0.2` calibrated pre-#212 | memory + `tmp/calibrate_etransfer_join.py` | re-run the calibration on current plumbing **after** #3 lands, so its validation is in-network; if it no longer earns its place, set the default to 0 | script exists |
 | 5 | `damping` 0.02 undocumented as a regulariser | Matlab comment | name it (`FLOW_RATIO_DAMPING = 0.02`) with the Matlab citation and the sentence "numerical regulariser, not physics" | trivial |
@@ -357,6 +357,32 @@ Consequences:
 
 Items 1, 2, 5, 6 are an afternoon. Item 3 is the one that changes what the
 port can be held to.
+
+## 7a. Step 2.1 note: the wide-except audit (2026-09-05)
+
+Every `except` in the junction model, adapters and Jacobian helper was
+listed. Only three were wide, all in `mpce_v2_element.py`, all around
+`junction_loss_coefficient`. `_network_builder.py`'s `except Exception` is
+the correct pattern -- it reports `converged=False` *with the message*.
+`_mpce_v2_jacobian.py:118` is narrow in type (`ZeroDivisionError`,
+`FloatingPointError`) but wide in effect (a zero Jacobian entry); it belongs
+with the degenerate-iterate work below.
+
+**Measured, not assumed.** Instrumented all three and the pre-check guard,
+then ran the full scorecard (3 sources x 3 topologies, 2073 records) and the
+full suite: the three `except`s fired **0** times; the pre-check fallback
+fired 145 times on the scorecard and once in the suite. The structural
+argument -- the guard ahead of the call already routes every degenerate
+split to the continuity fallback, so the closure cannot raise its two known
+exceptions inside the `try` -- is confirmed. The handlers only ever caught
+programming errors, and disguised them.
+
+**What is now the open degenerate-iterate item.** The pre-check fallback
+itself returns the continuity residual with `jac = {}` -- 145 times per
+scorecard, on legitimate transient iterates. It works (the solves converge),
+but an empty Jacobian for a live element is the same shape of thing at a
+smaller scale, and it sits next to the `FlowRatio = 0 -> K = -1` edge from
+step 1.4 and the `N > 3` rejection. Those three are the remainder of step 2.
 
 ## 8. The port, sequenced by provenance
 
