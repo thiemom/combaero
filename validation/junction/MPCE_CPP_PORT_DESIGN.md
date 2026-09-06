@@ -354,6 +354,12 @@ scored at the achieved q.
 
 ## 5. What the papers settle about the K_straight question (#272)
 
+**RESOLVED 2026-09-05 (defect 14, Finding 10 of the operating-point
+record).** The model was missing the dividing-streamline recovery on the
+continuing collector: its K_straight was exactly `q^2` where Bassett and
+Hager both give `q^2 - 0.5q`. Restoring it made Mynard's CFD-fitted
+energy-transfer factor redundant, and the factor's default is now 0.
+
 **Second motivation, added 2026-09-05:** `K_straight`'s size at low q also
 decides whether the pressure-driven problem has a unique solution. The
 model's `K_lat - K_str` is U-shaped, which makes low-q targets infeasible
@@ -449,6 +455,7 @@ Consequences:
 | 11 | ~~`analytical_pt_prop` seeds no mass flow through `LosslessConnectionElement`~~ **fixed** | x0 violates continuity at every junction (0.1 in, 0.2 out); a junction-aware mass-conserving seed gains ~70 solves | **done.** Split and continuity fixed at x0 from the propagated pressures; the total still comes from the existing propagator, so no new flow-scale heuristic. Opt-in per class (`seeds_ports_by_pressure_split`) because it must not overwrite `EjectorElement`'s own warm start. Rejections as inadmissible/artifact 227 -> 163; converged 1625 -> 1732; accuracy unchanged on the common subset; it does NOT steer toward the requested q (that earlier claim withdrawn) | done |
 | 12 | ~~Solver results depend on `PYTHONHASHSEED`~~ **fixed** | `_propagate_pressure_guess` seeds its BFS from `list(set(p_guess.keys()))`; the same case converges in 5 of 10 identical processes, and is deterministic per fixed hash seed | **done.** `queue = list(p_guess.keys())`; scorecard identical (1700/2073) under seeds 0/1/7/13, against 1700 or 1711 before | done |
 | 13 | ~~Bassett K5/K2 scored on a mirrored axis in three of four network adapters~~ **fixed** | K5's q is the STRAIGHT fraction (equivalences.py, the algebra, the digitised fit, and the zero-dissipation limit all agree); every adapter builds from the lateral fraction | **done.** `1 - q` in and the inverse on `q_converged` out, at all sites. Straight-leg RMSE 0.377 -> 0.318 (imposed_q), 0.196 -> 0.140 (mfb_two_pb); every other coefficient bit-identical | done |
+| 14 | ~~The closure omits the dividing-streamline recovery on the continuing collector~~ **fixed** | K_straight came out as q^2 at every geometry; Bassett K5(1-q) and Hager xi_t(q) are both q^2 - 0.5q | **done.** `DIVIDING_STREAMLINE_RECOVERY = 0.5`, derived from p* = p + (1/4) rho u^2, applied in K for a single supplier. Made Mynard's fitted eta redundant: `DEFAULT_ETA_SCALE` is now 0.0. K_straight RMSE 0.333 -> 0.098; equal-area identity and energy admissibility both now hold | done |
 
 Items 1, 2, 5, 6 are an afternoon. Item 3 is the one that changes what the
 port can be held to. Item 12 is done; it blocked reproducible measurement of everything else.

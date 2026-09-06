@@ -50,26 +50,45 @@ def idelchik_by_alpha():
     return {a: _mae_bias(a, 1.0, "idelchik1966", {"K11", "K12"}) for a in (0.0, 0.2, 0.3)}
 
 
-def test_eta_improves_the_independent_straight_flow_data(hager):
+def test_eta_no_longer_earns_its_place_on_the_independent_straight_data(hager):
     """Hager xi_t is the one K_straight source that is not Bassett.
 
-    With eta off the closure over-predicts by a third of a dynamic head;
-    with it on the bias falls by ~0.28 and MAE by ~0.05.
+    THIS ASSERTION IS INVERTED FROM ITS ORIGINAL FORM, and the reason is the
+    matched pair. Mynard's eta was fitted to CFD in a formulation that had lost
+    the dividing-streamline recovery on the continuing collector. With that
+    recovery restored (`_mynard2010.DIVIDING_STREAMLINE_RECOVERY`) the two do
+    the same job and eta is now a duplicate. Measured on the digitised
+    dividing data, all four combinations:
+
+        configuration          Hager xi_t MAE    bias   Bassett K5+K6 MAE   bias
+        no term, eta=1 (was)          0.2859  +0.0546              0.1152 +0.0366
+        term,    eta=1                0.3007  -0.2379              0.1205 -0.0868
+        term,    eta=0 (now)          0.0859  +0.0358              0.0564 -0.0207
+        no term, eta=0                0.3385  +0.3385              0.1569 +0.0874
+
+    Neither half alone is good and both together are worse than the derived
+    term alone, which is what a matched pair looks like when one half is
+    standing in for missing physics.
     """
     mae_off, bias_off, n_off = hager[0.0]
-    mae_on, bias_on, n_on = hager[1.0]
+    mae_on, _bias_on, _n_on = hager[1.0]
 
-    assert n_on == n_off == 45
-    assert mae_on < mae_off - 0.03
-    assert abs(bias_on) < abs(bias_off) - 0.2
+    assert n_off == 45
+    assert mae_off < mae_on - 0.15, (
+        "eta is supposed to be the worse option now; if this fails the term "
+        "and the transfer are no longer duplicates and the default is worth "
+        "re-deciding, not silently flipping"
+    )
+    assert abs(bias_off) < 0.05
 
 
-def test_eta_improves_bassett_dividing_flow(bassett_dividing):
+def test_eta_no_longer_earns_its_place_on_bassett_dividing_flow(bassett_dividing):
+    """Same inversion, on Bassett's own dividing pair. See the table above."""
     mae_off, bias_off, _ = bassett_dividing[0.0]
-    mae_on, bias_on, _ = bassett_dividing[1.0]
+    mae_on, _bias_on, _ = bassett_dividing[1.0]
 
-    assert mae_on < mae_off - 0.01
-    assert abs(bias_on) < abs(bias_off)
+    assert mae_off < mae_on - 0.04
+    assert abs(bias_off) < 0.05
 
 
 def test_eta_does_not_touch_joining_cells():

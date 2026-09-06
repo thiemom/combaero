@@ -352,7 +352,7 @@ forms (Eq 15 and Eq 27), so their difference does too:
     K5(q)          = q^2 - 1.5 q + 0.5
     K6(q,psi,th)   = q^2 psi^2 + 1 - 2 q psi cos(0.75 th)
 
-    D(q) = K6 - K5 = q^2 (psi^2 - 1) + q (1.5 - 2 psi c) + 0.5,  c = cos(0.75 th)
+    D(q) = K6(q) - K5(1-q) = q^2 (psi^2 - 1) + q (0.5 - 2 psi c) + 1,  c = cos(0.75 th)
 
 A quadratic, verified against the functions to 1e-16 over the geometry grid.
 Three consequences follow directly from its coefficients.
@@ -367,11 +367,17 @@ Bassett's own coefficients are non-monotone there:
 | psi | theta | vertex q* | monotone on (0,1)? |
 |---|---|---|---|
 | 1 | any | linear | yes |
-| 2 | 45 | 0.304 | no |
-| 3 | 45 | 0.218 | no |
-| 4 | 45 | 0.172 | no |
-| 3.333 | 90 | 0.052 | no |
-| 10 | 90 | 0.031 | no |
+| 2 | 45 | 0.471 | no |
+| 3 | 45 | 0.281 | no |
+| 4 | 45 | 0.205 | no |
+| 3.333 | 90 | 0.101 | no |
+
+**Corrected 2026-09-05 (see Finding 9).** This section first paired K5 and K6
+at the same q, giving `... + q (1.5 - 2 psi c) + 0.5` and vertices 0.304 /
+0.218 / 0.172 / 0.052. Bassett indexes the straight coefficient on the
+straight fraction, so the difference is `K6(q) - K5(1-q)`. Every conclusion
+survives -- linear at equal areas, a cup with its vertex inside (0,1)
+otherwise -- and every number moved.
 
 Forcing monotonicity would contradict the source. It is not a defect to fix.
 
@@ -411,7 +417,7 @@ equal-area defect is structural, not a mis-tuned constant.
 Not "force monotonicity" but **"reproduce the analytical identity the source
 already gives you"**:
 
-    at psi = 1:   K_lateral(q) - K_straight(q) = q (1.5 - 2 cos(0.75 theta)) + 0.5
+    at psi = 1:   K_lateral(q) - K_straight(q) = q (0.5 - 2 cos(0.75 theta)) + 1
 
 Linear in q, with a slope and intercept fixed by geometry alone. That is a
 sharper acceptance criterion for #272 than any error metric: a structural
@@ -663,6 +669,298 @@ against the fix: the axis is fixed by the paper's convention, not by which
 reading fits better. It is a statement about v1's straight-leg physics, which
 is separately known to be poor because its collinear ports are collapsed by
 the sin^2 gate.
+
+## Finding 10: the closure was missing one derived term, and it was worth more than the fitted one
+
+Asked whether a negative K implies an energy gain. It does not, and chasing
+that question to its end produced the mechanism, then the fix.
+
+### The gap, measured exactly
+
+With Mynard's energy-transfer factor off, called directly on the closure:
+
+* the LATERAL coefficient reproduces Bassett K6 **exactly**, at every area
+  ratio and branch angle tested, away from the damping band;
+* the STRAIGHT coefficient is **exactly q^2**, the plain velocity-difference
+  (Borda-Carnot) loss.
+
+Both papers give the straight leg, on the lateral fraction, as
+
+    Bassett  K5(1-q) = (1-q)^2 - 1.5(1-q) + 0.5 = q^2 - 0.5 q
+    Hager    xi_t(q) = q (q - 1/2)              = q^2 - 0.5 q
+
+identical polynomials from independent derivations. The gap was exactly
+**-0.5 q**, at every geometry, with no fitting involved.
+
+### Where it comes from
+
+The dividing-streamline pressure. Hager and Bassett both take the pressure on
+the dividing streamline as `p* = p_com + (1/4) rho u_com^2`. Acting over the
+diverted flow fraction and normalised by the common dynamic head, that is
+`(1/4)/(1/2) = 0.5` per unit of diverted flow.
+
+Mynard carries the same `(1/4) rho u^2` (his Eq 26), but it enters through the
+contraction analysis of a **turning** collector (Eq 19-28), and that control
+volume degenerates when the collector is collinear with the supplier. So Eq 30
+reduces to Borda-Carnot exactly where Hager and Bassett keep the recovery.
+
+Implemented in K rather than in C: the same correction in C is
+`dK (u_com/u_j)^2 / 2`, which diverges as the collector's flow ratio goes to
+zero and would need damping -- an artifact of the variable, not the physics.
+Restricted to a single supplier, which is the case the two papers analysed and
+the only one the data constrains.
+
+### It made the fitted transfer redundant
+
+Mynard's eta was fitted to his Fig 4 CFD in a formulation that had lost this
+term, so the two are a matched pair and had to be tested as one (policy sec 0
+item 4). All four combinations, on the digitised dividing data:
+
+| configuration | Hager xi_t MAE | bias | Bassett K5+K6 MAE | bias |
+|---|---|---|---|---|
+| no term, eta=1 (was) | 0.2859 | +0.0546 | 0.1152 | +0.0366 |
+| term, eta=1 | 0.3007 | -0.2379 | 0.1205 | -0.0868 |
+| **term, eta=0 (now)** | **0.0859** | +0.0358 | **0.0564** | -0.0207 |
+| no term, eta=0 | 0.3385 | +0.3385 | 0.1569 | +0.0874 |
+
+Neither half alone is good, both together are worse than the derived term
+alone, and the term alone is 3.3x better than the shipped model on Hager and
+2.0x better on Bassett. That is what a matched pair looks like when one half
+was standing in for missing physics. **`eta_scale` now defaults to 0.0**, kept
+as a knob so `1.0` still reproduces the faithful port.
+
+### What it closed, and what it cost
+
+At pinned operating points, on records all four configurations resolve:
+
+| | K_straight_sep | K_lateral_sep | converged |
+|---|---|---|---|
+| before | 0.3333 | **0.0787** | 591 |
+| after | **0.0980** | 0.0972 | 601 |
+
+The straight leg, which was the defect, improves 3.4x. The lateral regresses
+23%, because the CFD-fitted transfer was genuinely buying accuracy there -- and
+paying for it by making the junction a net source of flow work below a lateral
+fraction of about 0.25. That trade is the whole point: an empirical correction
+that beats the paper's own correlation while violating the second law has not
+earned its place.
+
+Two structural conditions recorded earlier are now met:
+
+* **the equal-area identity** (Finding 6) holds to 0.02, where the model
+  previously put a hump and manufactured a second operating point in the 82%
+  of the separating dataset where the physics has exactly one;
+* **the flow-weighted mean K** is non-negative everywhere, so the junction
+  cannot create flow work.
+
+Whole-scorecard convergence goes 1734 to 1697: `imposed_q` gains 10, the
+pressure-driven topologies lose 47 between them as the closure moves where
+their roots are. Those are the topologies whose K is either not scored at all
+(`three_pb`) or off-point 13% of the time.
+
+The analytical Jacobian was re-derived with the term and with `eta_scale` as a
+symbol -- it had been baked in at 1, which was correct only while that was the
+default. Whole-row finite-difference tests pass.
+
+## Where the model stands (2026-09-06)
+
+Two measurements, deliberately taken with different instruments.
+
+### Accuracy, against the digitised data
+
+Scored on `imposed_q`, the one topology whose extracted K is a measurement of
+the model. The ceiling column is each paper's OWN analytical correlation scored
+against its OWN measured points -- the floor set by measurement and
+digitisation scatter, which no 1D closure of this kind can beat.
+
+| source | n | model MAE | paper's own MAE | ratio |
+|---|---|---|---|---|
+| Bassett | 233 | 0.0949 | 0.0968 | **0.98** |
+| Hager | 45 | 0.0859 | 0.0844 | **1.02** |
+| Idelchik | 324 | 0.3771 | (tabulated, no analytical form) | |
+
+**The model is at the paper ceiling on both sources that have one**, within
+2%, and per coefficient the ratios run 0.93 to 1.06. That is not the result of
+fitting: the closure now reproduces the papers' analytical forms from a derived
+term (Finding 10), which is why it lands on their curves rather than near them.
+
+Almost all remaining error is in one place, Idelchik's joining lateral
+coefficient at a 90 degree branch, degrading with area ratio and always
+under-predicting:
+
+| area ratio | 1 | 2.5 | 5 | 10 |
+|---|---|---|---|---|
+| MAE at 90 degrees | 0.34 | 0.85 | 1.61 | 2.80 |
+
+At 30 and 45 degrees the same coefficient is accurate until the most extreme
+area ratio. Sharp-angled merging into a much smaller branch is exactly the
+regime `joining_etransfer_alpha` was introduced for, and that constant was
+calibrated under the old closure with the mirrored axis in place. Re-running
+that calibration is the obvious next measurement.
+
+### Convergence, on boundary conditions nothing was tuned against
+
+`validation/junction/random_robustness.py`. 2000 draws, seeded, geometry and
+boundary conditions sampled uniformly inside physical ranges with no reference
+to any paper.
+
+| outcome | share |
+|---|---|
+| converged to an admissible root | 58.6% |
+| no root exists for those conditions | 23.9% |
+| converged then demoted by the physics checks | 7.9% |
+| no progress | 9.4% |
+| raised | 0 |
+
+**Of the 1368 draws that admit a root, 84.5% converge.** By how the junction is
+driven, feasible draws only:
+
+| driven by | first measured | after Finding 11 |
+|---|---|---|
+| both flows imposed | 91.8% | 91.8% |
+| inlet flow and outlet pressures | 97.0% | 97.4% |
+| all three pressures | **63.4%** | **90.4%** |
+
+The all-pressures case looked like a solver weakness and was not one. See
+Finding 11.
+
+**One caveat, since resolved in the other direction.** Of the draws with no
+root, some still report one, and conversely the feasibility test calls draws
+solvable that the compressible system cannot solve. Both are the same thing:
+the test is incompressible and the solver is not. Finding 12 measures how far
+that reaches and the sweep now reports the Mach class alongside the headline.
+
+## Finding 11: the free-level case was never a landscape problem
+
+Asked why the junction is so much harder to solve when the flow level and the
+split are both free. Three hypotheses, two of them mine and wrong.
+
+### Not the shape of the residual
+
+With three pressure boundaries every port total pressure is known, so the two
+loss equations decouple:
+
+    dP_str / dP_bra = K_str(q) / K_lat(q)      -- the split, alone
+    q_dyn           = dP_bra / K_lat(q)        -- the level follows
+
+The split is set by a RATIO where the other drive matches a DIFFERENCE, which
+looked like the answer: a ratio can have poles and a difference cannot.
+Measured, it does not. `K_lat` never crosses zero for any geometry sampled, so
+the ratio has no pole; it is gently sloped (median |dR/dq| about 0.5); and it
+admits multiple roots no more often than the difference does. **The structural
+explanation was wrong.**
+
+### Partly my own instrument
+
+`has_root` checked that the target ratio lies within the range of `K_str/K_lat`
+and stopped there. Matching the ratio is necessary but not sufficient: the
+level it implies is `dP_bra / K_lat(q)`, and a negative value has no real mass
+flow behind it. Eleven of sixty draws called solvable had no solution, and the
+solver was being blamed for failing on them. **That alone was 12 of the 34-point
+gap.**
+
+### The rest was one hard-coded constant
+
+`_infer_reference_state` ends with
+
+    ref_mdot = total_mdot / n_elems if total_mdot > 0 else 0.1
+
+With three pressure boundaries there is no `MassFlowBoundary` anywhere, so
+every such network starts from 0.1 kg/s whatever its size. Over the sweep the
+level the imposed pressures actually imply spans 2.4e-3 to 36 kg/s, and the
+fixed seed is off by more than a decade in 27 of 60 draws.
+
+Seeding the level the pressures imply, on solvable all-pressures draws:
+
+| seeded level | converged | no progress | rejected |
+|---|---|---|---|
+| as shipped, 0.1 kg/s | 80% | 18% | 2% |
+| 1e-3 | 65% | 15% | 20% |
+| 1e+0 | 85% | 12% | 2% |
+| **Bernoulli estimate** | **93%** | **3%** | **0%** |
+
+The estimate is `m = A sqrt(2 rho dP)`, which
+`_propagate_analytical_pt_prop` already computes for a `ChannelElement`. It was
+simply never computed for the reference level.
+
+### Landing it needed one correction
+
+Using the whole network's pressure spread broke a bypass scenario: in a chain
+the total drop is shared out, and charging all of it to one element
+overestimates the flow by roughly the square root of the chain length. The
+per-element step `_propagate_pressure_guess` already uses fixes that, at the
+cost of about three points on the junction sweep.
+
+| | before | after |
+|---|---|---|
+| all draws that admit a root | 88.9% | **92.0%** |
+| all three pressures | 75.7% | **90.4%** |
+| both flows imposed | 91.8% | 91.8% |
+| inlet flow and outlet pressures | 97.0% | 97.4% |
+| junction fixture scorecard | 1697 | 1708 |
+
+Two tests were relying on the poor seed to make a solve fail, one for the
+timeout path and one for the evaluation limit. Both now construct their own
+starting point instead, so the machinery stays covered.
+
+## Finding 12: the residual landscape is clean; the failures are outside the model
+
+One of the roughly 8% of solvable draws that still failed, taken apart. Three
+pressure boundaries, dividing, near-equal areas (ratio 1.15), a shallow 15
+degree branch, 1.8 bar and 375 K, imposed drops of 103 Pa on the straight leg
+and 12022 Pa on the branch against a reference dynamic head of 4059 Pa.
+
+### What the reduced system predicts
+
+The required coefficient ratio is `dP_str / dP_bra = 0.0086`, and the closure's
+own ratio spans -0.141 to 8.673 over the split, crossing the target once at
+q = 0.500. The level that crossing implies is 0.283 kg/s -- **a common-port
+Mach of 0.685**.
+
+### What the full system actually does
+
+Brute force over the (split, level) plane: a 41 by 41 grid, and at each of the
+1681 points the other seven unknowns minimised out with a least-squares solve,
+so nothing is assumed about the reduction.
+
+| | |
+|---|---|
+| residual range over the plane | 3.57e2 to 1.67e6 |
+| **global minimum** | **357, at split 0.382, level 0.186 kg/s** |
+| interior local minima | 3 |
+
+**The residual never reaches zero anywhere.** There is no root. The landscape
+itself is well behaved: a single broad valley in the split with a clear
+minimum, a level direction that is flat below 0.15 kg/s and climbs steeply
+above 0.37 as the branch chokes, three local minima with the global one an
+order of magnitude below the others. No pathology, no needle to thread. The
+solver stalls because there is nothing to find.
+
+The reduced test called it solvable because that test is INCOMPRESSIBLE. At
+the Mach 0.685 its own prediction requires, the compressible system it is
+standing in for is a different problem.
+
+### It generalises
+
+Maximum Mach over the three ports at the operating point, across all solvable
+draws:
+
+| | n | median | above 0.3 | above 0.5 | supersonic |
+|---|---|---|---|---|---|
+| converged | 711 | 0.172 | 23% | 8% | 2% |
+| failed | 57 | 0.562 | 84% | 54% | 16% |
+
+**Restricted to draws that stay inside the closure's documented low-Mach range,
+convergence is 98.4%.** At 0.5 it is 96.2%, at 0.8 it is 94.4%. Which port gets
+there first depends on the drive: with both flows imposed it is the branch,
+since `u_bra = q psi u_com` and the sweep draws area ratios to 10; with three
+pressures it can be the common port, since the level is then whatever the
+imposed drops demand.
+
+The sweep now reports that cut, so the headline is not read as a solver
+weakness when it is the model being used past where it is documented. The
+draws past the range are still swept and still reported -- they are simply
+reported as what they are.
 
 ## What this changes
 

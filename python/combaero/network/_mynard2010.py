@@ -80,6 +80,13 @@ class MynardResult:
 #: removing a large positive bias. No effect on any joining cell (its
 #: (1 - lambda) factor is zero there), verified to 4 decimals.
 #: Switch: ``eta_scale``.
+# Mynard Eq 36's fitted coefficients. Since 2026-09-05 the production default
+# switches this term OFF (`MPCEv2Element.DEFAULT_ETA_SCALE = 0.0`): with the
+# dividing-streamline recovery restored below, it duplicates that term on the
+# continuing collector, and it makes the junction a net source of flow work
+# below a lateral fraction of about 0.25. The table justifying the switch is on
+# `MPCEv2Element.DEFAULT_ETA_SCALE`. The coefficients stay because
+# `eta_scale=1.0` must keep reproducing the faithful port.
 MYNARD_ETA_A0: float = 0.8
 MYNARD_ETA_A1: float = -0.2
 
@@ -105,13 +112,37 @@ MYNARD_ETA_A1: float = -0.2
 #: solver-robustness work, not something this knob guards.
 FLOW_RATIO_DAMPING: float = 0.02
 
+# Dividing-streamline pressure recovery for a collector that CONTINUES straight
+# through the junction, in units of the common dynamic head.
+#
+# Hager 1984 and Bassett 2001 both take the pressure on the dividing streamline
+# as p* = p_com + (1/4) rho u_com^2. Acting over the diverted area fraction and
+# normalised by (1/2) rho u_com^2, that is (1/4)/(1/2) = 1/2 per unit of
+# diverted flow -- hence 0.5, a derived coefficient and not a fitted one.
+#
+# Mynard carries the same (1/4) rho u^2 (his Eq 26), but it enters through the
+# contraction analysis of a TURNING collector (Eq 19-28) and that control
+# volume degenerates when the collector is collinear with the supplier, so
+# Eq 30 reduces to the plain velocity-difference loss exactly where Hager and
+# Bassett keep the recovery. Measured on this closure before the term was
+# added: K_straight came out as q^2 at every area ratio and branch angle, while
+# both papers give q^2 - 0.5 q on the lateral fraction (Bassett K5(1-q) and
+# Hager xi_t(q) are the same polynomial). The gap was exactly 0.5 q.
+DIVIDING_STREAMLINE_RECOVERY = 0.5
+
+# A collector counts as "continuing" when its axis is collinear with the
+# pseudosupplier to within this angle. The test is on GEOMETRY, not on a solver
+# unknown, for the single-supplier case this term applies to, so a hard
+# threshold introduces no discontinuity in the residual.
+COLLINEAR_TOL_RAD = 1.0e-6
+
 
 def junction_loss_coefficient(
     U: np.ndarray,
     A: np.ndarray,
     theta: np.ndarray,
     joining_etransfer_alpha: float = 0.0,
-    eta_scale: float = 1.0,
+    eta_scale: float = 0.0,
 ) -> MynardResult:
     """Compute Mynard Unified0D loss coefficients for a junction.
 
@@ -212,6 +243,28 @@ def junction_loss_coefficient(
     if len(U) <= 3:
         Ucom = float(U[Ci][0]) if int(np.sum(Ci)) == 1 else float(U[Si][0])
         K = (U[Ci] ** 2 / Ucom**2) * (2.0 * C_all[Ci] + U[Si] ** 2 / U[Ci] ** 2 - 1.0)
+
+        # ---- Dividing-streamline recovery on the continuing collector -----
+        # dK_j = -0.5 (1 - lambda_j): the p* = p + (1/4) rho u^2 on the
+        # dividing streamline, acting over the diverted flow fraction and
+        # normalised by the common dynamic head.
+        #
+        # Applied in K rather than in C on purpose. The same correction in C is
+        # dK (u_com/u_j)^2 / 2, which diverges as the collector's flow ratio
+        # goes to zero and would have to be damped -- an artifact of the
+        # variable, not of the physics. In K it is bounded by 0.5 everywhere.
+        # The consequence is that C, which is the general-N quantity, does not
+        # carry the term; K is what the element's residual uses, and the
+        # correction is only defined for the single-supplier diverging case
+        # anyway.
+        #
+        # Restricted to ONE supplier: that is the case Hager and Bassett
+        # analysed and the only one the validation data constrains. With more
+        # than one supplier the pseudosupplier angle depends on the flow split,
+        # so "collinear" would stop being a statement about geometry.
+        if int(np.sum(Si)) == 1:
+            continuing = np.abs(np.abs(phi) - math.pi) < COLLINEAR_TOL_RAD
+            K = K - DIVIDING_STREAMLINE_RECOVERY * (1.0 - flow_ratio) * continuing
 
     return MynardResult(
         C=C_all,

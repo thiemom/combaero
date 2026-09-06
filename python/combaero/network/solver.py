@@ -298,9 +298,74 @@ class NetworkSolver:
             ref_Y = list(self._default_Y)
 
         n_elems = max(len(self.network.elements), 1)
-        ref_mdot = total_mdot / n_elems if total_mdot > 0 else 0.1
+        if total_mdot > 0:
+            ref_mdot = total_mdot / n_elems
+        else:
+            ref_mdot = self._bernoulli_reference_mdot(pressures, ref_P, ref_T, ref_Y)
 
         return {"P": ref_P, "T": ref_T, "Y": ref_Y, "m_dot": ref_mdot}
+
+    def _bernoulli_reference_mdot(
+        self,
+        pressures: list[float],
+        ref_P: float,
+        ref_T: float,
+        ref_Y: list[float],
+    ) -> float:
+        """Reference mass flow for a network driven only by pressures.
+
+        With no ``MassFlowBoundary`` anywhere, nothing tells the solver the
+        scale of the flow, and this used to return a hard 0.1 kg/s. The level
+        is then set entirely by the imposed pressure differences, which is
+        exactly what a Bernoulli estimate reads off:
+
+            m = A sqrt(2 rho dP)
+
+        the same estimate ``_propagate_analytical_pt_prop`` already makes for a
+        ``ChannelElement``; it was simply never made for the reference level.
+
+        Measured on the random-boundary-condition sweep
+        (``validation/junction/random_robustness.py``), over junctions driven
+        by three pressure boundaries: the implied level spans 2e-3 to 36 kg/s,
+        the fixed 0.1 was off by more than a decade in 27 of 60 draws, and
+        replacing it with this estimate takes convergence from 80% to 93% with
+        stalls falling from 18% to 3%.
+
+        Falls back to the old constant when the network offers no area or no
+        pressure spread to work from.
+        """
+        if len(pressures) < 2:
+            return 0.1
+        # Per ELEMENT, not the whole network's spread. The same step
+        # `_propagate_pressure_guess` uses for its BFS: in a chain the total
+        # drop is shared out, and charging all of it to one element
+        # overestimates the flow by roughly the square root of the chain
+        # length. Measured: the global spread broke a bypass scenario that
+        # converges either side of this change.
+        n_elems = max(len(self.network.elements), 1)
+        dp = float(max(pressures) - min(pressures)) / n_elems
+        if dp <= 0.0:
+            return 0.1
+        areas = [
+            float(a)
+            for a in (
+                getattr(obj, "area", None)
+                for obj in (*self.network.nodes.values(), *self.network.elements.values())
+            )
+            if a is not None and float(a) > 0.0
+        ]
+        if not areas:
+            return 0.1
+        try:
+            rho = float(cb.density(ref_T, ref_P, list(cb.mass_to_mole(ref_Y))))
+        except Exception:  # noqa: BLE001 -- a reference estimate must not raise
+            return 0.1
+        if rho <= 0.0:
+            return 0.1
+        # The median area, so one unusually small or large port does not set
+        # the scale for the whole network.
+        area = float(np.median(areas))
+        return max(area * math.sqrt(2.0 * rho * dp), 1e-9)
 
     def _propagate_pressure_guess(self, ref: dict[str, Any]) -> dict[str, float]:
         """Estimate per-node pressures by walking the graph from boundaries.

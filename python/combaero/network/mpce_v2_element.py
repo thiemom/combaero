@@ -126,6 +126,33 @@ class MPCEv2Element(MultiPortChamberElement):
     #: is the closure's K12@90 shape limit, not a tuning question.
     #: No effect on any dividing cell or any psi = 1 cell, verified.
     #: Switch: pass 0.0.
+    #: Multiplier on Mynard's CFD-fitted energy-transfer factor (Eq 35-36).
+    #: **Default 0.0 since 2026-09-05**, which was 1.0 (the faithful port).
+    #:
+    #: Restoring the dividing-streamline recovery that Hager and Bassett derive
+    #: (``_mynard2010.DIVIDING_STREAMLINE_RECOVERY``) made the transfer factor's
+    #: work on the continuing collector a duplicate of it, and the two together
+    #: are worse than either alone. Measured at pinned operating points on the
+    #: digitised data, RMSE by coefficient:
+    #:
+    #:     configuration              K_straight   K_lateral   admissible
+    #:     no term, eta=1 (was)           0.3481      0.0808      NO
+    #:     term,    eta=1                 0.6544      0.0808      NO
+    #:     term,    eta=0 (now)           0.2247      0.1006      yes
+    #:     no term, eta=0                 0.4264      0.1006      yes
+    #:
+    #: "Admissible" is whether the closure's flow-weighted mean K stays
+    #: non-negative, i.e. whether the junction can be a net source of flow work.
+    #: Only the eta=0 rows are. The transfer factor buys a 20% better lateral
+    #: coefficient and pays for it by creating energy below a lateral fraction
+    #: of about 0.25, so it does not earn its place at the default.
+    #:
+    #: It is kept as a knob, not deleted: it is Mynard's own Eq 36 fitted to his
+    #: Fig 4 CFD, and ``eta_scale=1.0`` restores the faithful port for anyone
+    #: measuring against it. Mynard's `(1 - lambda_j)` factor makes it inert in
+    #: joining flow, so this default affects diverging junctions only.
+    DEFAULT_ETA_SCALE: float = 0.0
+
     DEFAULT_JOINING_ETRANSFER_ALPHA: float = 0.2
 
     def __init__(
@@ -139,7 +166,7 @@ class MPCEv2Element(MultiPortChamberElement):
         flow_direction: FlowDirection = "branch",
         strict: bool = True,
         joining_etransfer_alpha: float | None = None,
-        eta_scale: float = 1.0,
+        eta_scale: float = DEFAULT_ETA_SCALE,
     ):
         super().__init__(
             id=id,
@@ -611,6 +638,7 @@ class MPCEv2Element(MultiPortChamberElement):
                 rho_port,
                 A,
                 math.radians(float(self.port_angles_deg[2])),
+                eta_scale=self.eta_scale,
             )
         else:
             # FD fallback: N+1 Mynard calls.

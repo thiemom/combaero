@@ -46,7 +46,12 @@ def test_band_is_inert_in_the_interior(damping, tau):
     K = mynard.junction_loss_coefficient(U, _A, _THETA).K
 
     assert reference is not None and K is not None
-    np.testing.assert_allclose(K, reference, rtol=1e-9)
+    # atol as well as rtol: with the dividing-streamline recovery in the
+    # closure the straight-leg K passes through exactly zero at a 50/50 split
+    # (Bassett K5(0.5) = 0), and a pure relative tolerance cannot compare
+    # against zero. The damping is still inert -- the residual difference here
+    # is ~7e-12 absolute.
+    np.testing.assert_allclose(K, reference, rtol=1e-9, atol=1e-9)
 
 
 def test_above_the_band_it_distorts(damping):

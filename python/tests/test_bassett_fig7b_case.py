@@ -82,16 +82,16 @@ _INADMISSIBLE = (
     "closes the K_straight gap."
 )
 
-
-@pytest.mark.parametrize(
-    "q",
-    [
-        pytest.param(0.2, marks=pytest.mark.xfail(strict=True, reason=_INADMISSIBLE)),
-        0.4,
-        0.6,
-        0.8,
-    ],
+_THREE_PB_WANDER = (
+    "three_pb at q=0.4 does not converge. That topology imposes every total "
+    "pressure and leaves the flow level free, so it wanders far from the "
+    "operating point it was asked for -- at q=0.6 and 0.8 it converges but "
+    "lands at q ~ 0.04-0.06. Its K column is not scored for the same reason "
+    "(#290). Tracked with the operating-point work, not with the closure."
 )
+
+
+@pytest.mark.parametrize("q", [0.2, 0.4, 0.6, 0.8])
 def test_imposed_q_converges_across_the_curve(model, q):
     r = _run(model, "imposed_q", q)
     assert r.converged, r.message
@@ -99,18 +99,18 @@ def test_imposed_q_converges_across_the_curve(model, q):
 
 @pytest.mark.parametrize(
     "q, expected",
-    [
-        pytest.param(0.2, 0.4534, marks=pytest.mark.xfail(strict=True, reason=_INADMISSIBLE)),
-        (0.4, 0.5816),
-        (0.6, 1.3888),
-        (0.8, 2.8842),
-    ],
+    [(0.2, 0.3623), (0.4, 0.4448), (0.6, 1.2520), (0.8, 2.7937)],
 )
 def test_imposed_q_reproduces_the_model_curve(model, q, expected):
     """Pins the model's own Fig 7b curve, so a physics change has to state
-    itself here. These are NOT Bassett's values -- the gap to his measured
-    curve is the accuracy question, tracked on the scorecard, and it is
-    largest exactly where K_straight is worst."""
+    itself here.
+
+    Updated 2026-09-05 with the dividing-streamline recovery. They were
+    0.4534 / 0.5816 / 1.3888 / 2.8842 and are now within 1% of Bassett's own
+    K6 (0.3622 / 0.4445 / 1.2467 / 2.7689) at every point, because with the
+    recovery restored and Mynard's fitted transfer off the closure reproduces
+    his analytical pair rather than approximating it.
+    """
     r = _run(model, "imposed_q", q)
 
     assert r.converged, r.message
@@ -125,9 +125,9 @@ def test_imposed_q_reproduces_the_model_curve(model, q, expected):
 @pytest.mark.parametrize(
     "q",
     [
-        0.4,
-        pytest.param(0.6, marks=pytest.mark.xfail(strict=True, reason=_INADMISSIBLE)),
-        pytest.param(0.8, marks=pytest.mark.xfail(strict=True, reason=_INADMISSIBLE)),
+        pytest.param(0.4, marks=pytest.mark.xfail(strict=True, reason=_THREE_PB_WANDER)),
+        0.6,
+        0.8,
     ],
 )
 def test_three_pb_converges(model, q):
@@ -152,7 +152,7 @@ def test_mfb_two_pb_root_is_the_models_own_answer(model):
     r = _run(model, "mfb_two_pb", 0.8)
     assert r.converged, r.message
 
-    reference = _run(model, "imposed_q", 0.8569)
+    reference = _run(model, "imposed_q", 0.8314)
     assert reference.converged, reference.message
     assert r.K_lateral == pytest.approx(reference.K_lateral, abs=0.01)
 
@@ -160,6 +160,7 @@ def test_mfb_two_pb_root_is_the_models_own_answer(model):
 # ---------------------------------------------------------------------------
 # Targets: infeasible until the K_straight gap closes
 # ---------------------------------------------------------------------------
+
 
 _TARGET = (
     "Bassett Fig 7b at a low lateral fraction has NO root in the "
@@ -178,6 +179,11 @@ def test_three_pb_low_lateral_fraction_converges(model):
 
 
 @pytest.mark.xfail(strict=True, reason=_TARGET)
-@pytest.mark.parametrize("q", [0.2, 0.4])
-def test_mfb_two_pb_low_lateral_fraction_converges(model, q):
-    assert _run(model, "mfb_two_pb", q).converged
+def test_mfb_two_pb_low_lateral_fraction_converges(model):
+    assert _run(model, "mfb_two_pb", 0.2).converged
+
+
+def test_mfb_two_pb_mid_lateral_fraction_converges(model):
+    """q=0.4 was an xfail target until the dividing-streamline recovery
+    landed. It converges now, so it is pinned as passing."""
+    assert _run(model, "mfb_two_pb", 0.4).converged

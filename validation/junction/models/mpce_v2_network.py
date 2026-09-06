@@ -57,7 +57,7 @@ class MPCEv2Network:
         self,
         strict: bool = False,
         joining_etransfer_alpha: float | None = None,
-        eta_scale: float = 1.0,
+        eta_scale: float | None = None,
     ) -> None:
         """Defaults to ``strict=False``, which is how production builds the
         element (``gui/backend/graph_builder.py``). ``strict=True`` raises on
@@ -87,7 +87,11 @@ class MPCEv2Network:
         """
         self.strict = strict
         self.joining_etransfer_alpha = joining_etransfer_alpha
-        self.eta_scale = eta_scale
+        # None means "whatever the element ships as its default", so the
+        # scorecard measures production rather than a value frozen here.
+        self.eta_scale = (
+            MPCEv2Element.DEFAULT_ETA_SCALE if eta_scale is None else float(eta_scale)
+        )
 
     def evaluate_network(
         self,
