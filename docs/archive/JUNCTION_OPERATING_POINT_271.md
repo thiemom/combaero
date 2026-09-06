@@ -762,6 +762,74 @@ The analytical Jacobian was re-derived with the term and with `eta_scale` as a
 symbol -- it had been baked in at 1, which was correct only while that was the
 default. Whole-row finite-difference tests pass.
 
+## Where the model stands (2026-09-06)
+
+Two measurements, deliberately taken with different instruments.
+
+### Accuracy, against the digitised data
+
+Scored on `imposed_q`, the one topology whose extracted K is a measurement of
+the model. The ceiling column is each paper's OWN analytical correlation scored
+against its OWN measured points -- the floor set by measurement and
+digitisation scatter, which no 1D closure of this kind can beat.
+
+| source | n | model MAE | paper's own MAE | ratio |
+|---|---|---|---|---|
+| Bassett | 233 | 0.0949 | 0.0968 | **0.98** |
+| Hager | 45 | 0.0859 | 0.0844 | **1.02** |
+| Idelchik | 324 | 0.3771 | (tabulated, no analytical form) | |
+
+**The model is at the paper ceiling on both sources that have one**, within
+2%, and per coefficient the ratios run 0.93 to 1.06. That is not the result of
+fitting: the closure now reproduces the papers' analytical forms from a derived
+term (Finding 10), which is why it lands on their curves rather than near them.
+
+Almost all remaining error is in one place, Idelchik's joining lateral
+coefficient at a 90 degree branch, degrading with area ratio and always
+under-predicting:
+
+| area ratio | 1 | 2.5 | 5 | 10 |
+|---|---|---|---|---|
+| MAE at 90 degrees | 0.34 | 0.85 | 1.61 | 2.80 |
+
+At 30 and 45 degrees the same coefficient is accurate until the most extreme
+area ratio. Sharp-angled merging into a much smaller branch is exactly the
+regime `joining_etransfer_alpha` was introduced for, and that constant was
+calibrated under the old closure with the mirrored axis in place. Re-running
+that calibration is the obvious next measurement.
+
+### Convergence, on boundary conditions nothing was tuned against
+
+`validation/junction/random_robustness.py`. 2000 draws, seeded, geometry and
+boundary conditions sampled uniformly inside physical ranges with no reference
+to any paper.
+
+| outcome | share |
+|---|---|
+| converged to an admissible root | 58.6% |
+| no root exists for those conditions | 23.9% |
+| converged then demoted by the physics checks | 7.9% |
+| no progress | 9.4% |
+| raised | 0 |
+
+**Of the 1368 draws that admit a root, 84.5% converge.** By how the junction is
+driven, feasible draws only:
+
+| driven by | converged | no progress |
+|---|---|---|
+| both flows imposed | 91.8% | 8.0% |
+| inlet flow and outlet pressures | 97.0% | 0.7% |
+| all three pressures | 63.4% | 32.7% |
+
+The weak case is the one where the flow level is free as well as the split,
+which matches the fixture scorecard where the same topology is worst.
+
+**One unresolved caveat.** Of the draws with no root, 21.8% are correctly
+demoted by the physics checks but 2.7% still report one. Either the feasibility
+grid misses a solution or the compressible solve reaches one the incompressible
+curve does not predict. The 84.5% should not be quoted tighter than a point or
+two until that is understood.
+
 ## What this changes
 
 - The 26 unrescued solves are no longer a mystery: most are infeasible, and

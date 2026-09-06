@@ -20,6 +20,7 @@ validation/junction/
     metadata.yaml              # K_id, theta, psi, q axis, uncertainty per file
   runner.py                    # iterate (model, dataset) -> records
   scorecard.py                 # records -> metrics + scorecards
+  random_robustness.py         # convergence on RANDOM physical BCs, no dataset
 ```
 
 ## Excluded sources
@@ -31,6 +32,30 @@ dataset:
 - **Torregrosa 2017**: unsteady wave propagation (transmission /
   reflection coefficients), not steady K. Could be a separate
   acoustic-tier dataset later if needed.
+
+## Convergence is measured somewhere else
+
+The scorecard's convergence column is measured on cases whose boundary
+conditions are built from Bassett's analytical K at a target split. That is
+right for accuracy and circular for robustness: it asks how often the solver
+reaches an operating point the paper's own correlation predicts, on the same
+points the closure has been measured against.
+
+`random_robustness.py` asks the production question instead. It draws geometry
+and boundary conditions uniformly inside physical ranges, with no reference to
+any paper, and reports whether the solver returns an admissible answer:
+
+    uv run python -m validation.junction.random_robustness 2000
+
+The width of the sample space is the point -- a narrow space could be
+flattered by tuning. `python/tests/test_junction_random_robustness.py` pins the
+ranges so narrowing them shows up in a diff, and keeps the convergence floor
+loose so it catches regressions rather than inviting anyone to optimise
+against it.
+
+It separates draws with **no root** from solver failures. A third of random
+draws constrain a function of the split to a value the closure cannot produce;
+counting those as failures is a category error.
 
 ## How candidate models are scored
 
