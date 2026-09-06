@@ -183,19 +183,28 @@ def test_the_report_names_every_outcome_it_counted(summary):
     assert "admit a root" in text
 
 
-def test_pressure_driven_cases_are_the_weak_ones(summary):
-    """Documented state, not a target: with all three pressures imposed the
-    flow level is free as well as the split, and that is where the solver
-    struggles. Recorded so an improvement is noticed as much as a regression.
+def test_no_drive_is_far_behind_the_others(summary):
+    """The all-pressures case used to be the clear weak spot, at 63.4%
+    against 91.8% and 97.0%.
+
+    That turned out to be two separate things, neither of them the shape of
+    the residual: a bug in this module's own feasibility test, which called
+    draws solvable that have no root, and a hard-coded 0.1 kg/s reference flow
+    used whenever a network has no MassFlowBoundary to set the scale. With the
+    level estimated from the imposed pressure difference instead, the three
+    drives are within a few points of each other. This asserts they stay that
+    way rather than pinning which one is worst.
     """
-    free_level = summary.by_cut[("solvable drive", "all_pressures")]
-    pinned = summary.by_cut[("solvable drive", "imposed_flows")]
-    if not sum(free_level.values()) or not sum(pinned.values()):
+    shares = []
+    for drive in rr.DRIVES:
+        counts = summary.by_cut[("solvable drive", drive)]
+        n = sum(counts.values())
+        if n:
+            shares.append(counts["converged"] / n)
+    if len(shares) < len(rr.DRIVES):
         pytest.skip("sweep too small to compare drives")
 
-    share_free = free_level["converged"] / sum(free_level.values())
-    share_pinned = pinned["converged"] / sum(pinned.values())
-    assert share_free < share_pinned
+    assert min(shares) > 0.70, f"one drive has fallen behind: {shares}"
 
 
 def test_the_closure_curve_covers_the_split_range():

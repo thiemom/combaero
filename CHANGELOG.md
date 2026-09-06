@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **A network driven only by pressures no longer starts from a hard-coded
+  0.1 kg/s.** `NetworkSolver._infer_reference_state` fell back to that constant
+  whenever no `MassFlowBoundary` set the scale, so the initial guess was
+  independent of the network's size and of the imposed pressure differences.
+  The reference flow is now a Bernoulli estimate, `m = A sqrt(2 rho dP)`, using
+  the median flow area and the per-element share of the boundary pressure
+  spread -- the same estimate `analytical_pt_prop` already made for channels,
+  and the same per-element pressure step the guess propagator already used. On
+  a sweep of junctions driven by three pressure boundaries, where the implied
+  level spans 2e-3 to 36 kg/s and the constant was off by more than a decade in
+  27 of 60 cases, convergence rises from 76% to 90%; the junction validation
+  scorecard rises from 1697 to 1708 of 2073. Networks that already carry a
+  mass-flow boundary are unaffected.
+
 ### Changed
 - **The MPCE junction closure now carries the dividing-streamline pressure
   recovery, and Mynard's fitted energy-transfer factor is off by default.**

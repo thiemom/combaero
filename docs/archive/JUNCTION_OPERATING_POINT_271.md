@@ -815,20 +815,93 @@ to any paper.
 **Of the 1368 draws that admit a root, 84.5% converge.** By how the junction is
 driven, feasible draws only:
 
-| driven by | converged | no progress |
+| driven by | first measured | after Finding 11 |
 |---|---|---|
-| both flows imposed | 91.8% | 8.0% |
-| inlet flow and outlet pressures | 97.0% | 0.7% |
-| all three pressures | 63.4% | 32.7% |
+| both flows imposed | 91.8% | 91.8% |
+| inlet flow and outlet pressures | 97.0% | 97.4% |
+| all three pressures | **63.4%** | **90.4%** |
 
-The weak case is the one where the flow level is free as well as the split,
-which matches the fixture scorecard where the same topology is worst.
+The all-pressures case looked like a solver weakness and was not one. See
+Finding 11.
 
 **One unresolved caveat.** Of the draws with no root, 21.8% are correctly
-demoted by the physics checks but 2.7% still report one. Either the feasibility
-grid misses a solution or the compressible solve reaches one the incompressible
-curve does not predict. The 84.5% should not be quoted tighter than a point or
-two until that is understood.
+demoted by the physics checks but a few still report one. Either the
+feasibility grid misses a solution or the compressible solve reaches one the
+incompressible curve does not predict. The headline should not be quoted
+tighter than a point or two until that is understood.
+
+## Finding 11: the free-level case was never a landscape problem
+
+Asked why the junction is so much harder to solve when the flow level and the
+split are both free. Three hypotheses, two of them mine and wrong.
+
+### Not the shape of the residual
+
+With three pressure boundaries every port total pressure is known, so the two
+loss equations decouple:
+
+    dP_str / dP_bra = K_str(q) / K_lat(q)      -- the split, alone
+    q_dyn           = dP_bra / K_lat(q)        -- the level follows
+
+The split is set by a RATIO where the other drive matches a DIFFERENCE, which
+looked like the answer: a ratio can have poles and a difference cannot.
+Measured, it does not. `K_lat` never crosses zero for any geometry sampled, so
+the ratio has no pole; it is gently sloped (median |dR/dq| about 0.5); and it
+admits multiple roots no more often than the difference does. **The structural
+explanation was wrong.**
+
+### Partly my own instrument
+
+`has_root` checked that the target ratio lies within the range of `K_str/K_lat`
+and stopped there. Matching the ratio is necessary but not sufficient: the
+level it implies is `dP_bra / K_lat(q)`, and a negative value has no real mass
+flow behind it. Eleven of sixty draws called solvable had no solution, and the
+solver was being blamed for failing on them. **That alone was 12 of the 34-point
+gap.**
+
+### The rest was one hard-coded constant
+
+`_infer_reference_state` ends with
+
+    ref_mdot = total_mdot / n_elems if total_mdot > 0 else 0.1
+
+With three pressure boundaries there is no `MassFlowBoundary` anywhere, so
+every such network starts from 0.1 kg/s whatever its size. Over the sweep the
+level the imposed pressures actually imply spans 2.4e-3 to 36 kg/s, and the
+fixed seed is off by more than a decade in 27 of 60 draws.
+
+Seeding the level the pressures imply, on solvable all-pressures draws:
+
+| seeded level | converged | no progress | rejected |
+|---|---|---|---|
+| as shipped, 0.1 kg/s | 80% | 18% | 2% |
+| 1e-3 | 65% | 15% | 20% |
+| 1e+0 | 85% | 12% | 2% |
+| **Bernoulli estimate** | **93%** | **3%** | **0%** |
+
+The estimate is `m = A sqrt(2 rho dP)`, which
+`_propagate_analytical_pt_prop` already computes for a `ChannelElement`. It was
+simply never computed for the reference level.
+
+### Landing it needed one correction
+
+Using the whole network's pressure spread broke a bypass scenario: in a chain
+the total drop is shared out, and charging all of it to one element
+overestimates the flow by roughly the square root of the chain length. The
+per-element step `_propagate_pressure_guess` already uses fixes that, at the
+cost of about three points on the junction sweep.
+
+| | before | after |
+|---|---|---|
+| all draws that admit a root | 88.9% | **92.0%** |
+| all three pressures | 75.7% | **90.4%** |
+| both flows imposed | 91.8% | 91.8% |
+| inlet flow and outlet pressures | 97.0% | 97.4% |
+| junction fixture scorecard | 1697 | 1708 |
+
+Two tests were relying on the poor seed to make a solve fail, one for the
+timeout path and one for the evaluation limit. Both now construct their own
+starting point instead, so the machinery stays covered.
 
 ## What this changes
 

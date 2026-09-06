@@ -268,10 +268,16 @@ def has_root(case: Case) -> bool | None:
     target = case.k_straight / case.k_branch
     with np.errstate(divide="ignore", invalid="ignore"):
         ratio = straight / branch
-    ratio = ratio[np.isfinite(ratio)]
-    if ratio.size == 0:
-        return None
-    return bool(ratio.min() <= target <= ratio.max())
+    crossings = np.where(np.diff(np.sign(ratio - target)) != 0)[0]
+    if crossings.size == 0:
+        return False
+    # Matching the ratio is necessary but NOT sufficient. The level that
+    # crossing implies is q_dyn = dP_branch / K_lat, and a negative q_dyn has
+    # no real mass flow behind it, so such a crossing is not a root. Leaving
+    # this out made the test optimistic: it called 11 of 60 draws solvable
+    # that have no solution, and the solver was then blamed for failing on
+    # them. The same condition is what `predicted_root` applies.
+    return bool(any(case.k_branch * branch[i] > 0.0 for i in crossings))
 
 
 def classify(net: FlowNetwork, timeout: float = 20.0) -> str:
