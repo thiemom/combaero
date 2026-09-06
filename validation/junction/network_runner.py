@@ -120,8 +120,11 @@ class NetworkRecord:
 # Wang 2014 names his joining pair K_13 (lateral inlet to common outlet) and
 # K_23 (straight inlet to common outlet), which are the lateral and straight
 # coefficients under different labels.
-_LATERAL_K_IDS = {"K1", "K6", "K12", "xi_l", "K_13"}
-_STRAIGHT_K_IDS = {"K2", "K5", "K11", "xi_t", "K_23"}
+# Bassett flow type 4 is joining with the common branch at A rather than C,
+# so K7 is the lateral-to-common coefficient and K8 the straight one -- the
+# reverse of what this module's docstrings claimed before 2026-09-06.
+_LATERAL_K_IDS = {"K1", "K6", "K12", "xi_l", "K_13", "K7"}
+_STRAIGHT_K_IDS = {"K2", "K5", "K11", "xi_t", "K_23", "K8"}
 
 # Ground truth for network scoring: digitised measurements, and handbook
 # tabulations (Idelchik) which are reference data in their own right. Not a

@@ -1093,6 +1093,76 @@ Still not digitised: Perez-Garcia 2010, 90 degree compressible tees, metadata
 and README only. Torregrosa 2017 and Stigler 2010 are on disk and referenced
 nowhere.
 
+## Finding 15: the crossover corroborated, and two labels found to be swapped
+
+The crossover in Finding 13 -- the pseudodatum form better below an area ratio
+of about 2.6, Bassett's two-supplier form better above -- rested almost entirely
+on Idelchik above the crossover. Before digitising anything new, the cheapest
+independent test was already on disk.
+
+**Bassett flow type 4**, joining, 75 measured points at area ratios 1, 2 and 4,
+unscored because K7 and K8 were never mapped to a leg. Wiring them needed two
+things settled from the paper rather than from our own docstrings.
+
+### The labels were the wrong way round
+
+Table 1, flow type 4:
+
+    K7 = [(p_B + rho u_B^2/2) - (p_A + rho u_A^2/2)] / (rho u_A^2/2),  q = m_B/m_A
+    K8 = [(p_C + rho u_C^2/2) - (p_A + rho u_A^2/2)] / (rho u_A^2/2),  q = m_C/m_A
+
+Every ratio and the denominator sit on A, so **A is the common branch**, B is
+the lateral and C the other straight leg. K7 is the LATERAL-to-common
+coefficient and K8 the STRAIGHT one. `bassett2001.py` said the opposite, and
+nothing caught it because neither coefficient was ever scored. Corrected, and
+the measurements confirm it: read as written the closure sits at 0.20 and 0.31,
+with the legs swapped it is 0.56 and 1.02.
+
+### It is the same network with the lateral mirrored
+
+Type 6 has the common at C, so in type 4 the lateral joins pointing the other
+way along the main duct. That is the same three-port network with the lateral
+at `pi - theta`, which the data confirms:
+
+| lateral angle | K7 error | K8 error |
+|---|---|---|
+| theta | 0.562 | 1.017 |
+| **pi - theta** | **0.201** | **0.313** |
+
+My first attempt at this was wrong, and instructively so: I predicted the
+mirror correctly but paired K7 with K11 and K8 with K12, because I trusted our
+docstrings over the paper's Table 1. Nothing fitted under any of the four
+mappings, which is what sent me back to the source.
+
+### The corroboration
+
+| area ratio | model | with the patch | Bassett's form |
+|---|---|---|---|
+| 1 | 0.153 | 0.153 | **0.081** |
+| 2 | 0.505 | 0.466 | **0.191** |
+| 4 | 0.700 | 0.549 | **0.267** |
+
+**The degradation with area ratio reproduces on an independent flow type**, and
+the tuned correction again helps without closing the gap. The trend is now
+carried by two distinct datasets rather than by Idelchik alone.
+
+The exact crossover location is *not* corroborated: on type 4 Bassett's form is
+ahead even at equal areas, where on type 6 the closure was clearly better. That
+comparison is his own analytical form against his own measurements, so some of
+the margin is circular. What survives independently is the shape of the
+degradation, not the point at which the two curves cross.
+
+Per-cell, once wired through the network:
+
+| coefficient | psi=1 | psi=2 | psi=4 |
+|---|---|---|---|
+| K7, lateral | 0.065 | 0.257 | 0.177 |
+| K8, straight | 0.159 | 0.551 | 0.766 |
+
+The bias is negative throughout at the larger area ratios, so the model
+under-predicts the joining loss into a small branch -- the same direction
+Idelchik and Wang both show.
+
 ## What this changes
 
 - The 26 unrescued solves are no longer a mystery: most are infeasible, and

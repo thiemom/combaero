@@ -33,6 +33,18 @@ dataset:
   reflection coefficients), not steady K. Could be a separate
   acoustic-tier dataset later if needed.
 
+## Joining flow types
+
+Bassett defines six flow types. Types 4 and 6 are both joining tees with one
+lateral inlet, one straight inlet and one straight outlet; they differ in WHICH
+straight leg is the outlet, so the lateral joins pointing the other way along
+the main duct. Type 4 is therefore scored on the same network with the lateral
+mirrored to `pi - theta`.
+
+Each coefficient is indexed on the fraction in its own leg, and which leg that
+is comes from Table 1, not from the coefficient's name: for type 4 the common
+branch is A, so K7 is the lateral coefficient and K8 the straight one.
+
 ## Mach-indexed sources
 
 Most files are a coefficient against the flow split. Wang 2014 is a Mach sweep
