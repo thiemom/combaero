@@ -8,6 +8,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **A failed solve now really does return its best iterate.**
+  `NetworkSolver.solve` warns "Returning best iterate" on non-convergence, but
+  the returned state and its residual norm were captured immediately after the
+  primary root-finding phase. Later phases -- above all the
+  Levenberg-Marquardt fallback -- keep evaluating through the same wrapper and
+  improve the tracked best, yet only re-pointed the returned state when they
+  reached the convergence tolerance, so an improvement that fell short was
+  discarded. Measured over 38 non-converged junction solves, 30 returned a
+  state worse than the best they had evaluated, by a median factor of 5.8 and
+  up to 2e5. The returned state is now re-pointed at the tracked best whenever
+  that is closer, before the junction consistency checks run, so those checks
+  judge the state actually handed back. **This does not change whether any
+  solve converges** -- the junction validation scorecard and the random
+  boundary-condition sweep are identical either side of the change.
+- **The automatic warm-start retry no longer replaces a closer result with a
+  worse one.** When both the primary attempt and the retry failed, the retry's
+  result was returned unconditionally. Whichever got closer is now returned,
+  with the other's residual norm quoted in the message.
+- **The junction validation harness records a real residual norm.** It read
+  `__residual_norm__`, a key `NetworkSolver` has never set, so every record's
+  residual norm was silently infinity; the solver's key is `__final_norm__`.
+
+
+### Fixed
 - **A network driven only by pressures no longer starts from a hard-coded
   0.1 kg/s.** `NetworkSolver._infer_reference_state` fell back to that constant
   whenever no `MassFlowBoundary` set the scale, so the initial guess was
