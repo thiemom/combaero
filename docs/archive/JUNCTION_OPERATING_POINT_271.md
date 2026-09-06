@@ -962,6 +962,50 @@ weakness when it is the model being used past where it is documented. The
 draws past the range are still swept and still reported -- they are simply
 reported as what they are.
 
+## Finding 13: the solver was not returning the iterate it promised
+
+Asked what a non-converged solve returns and whether the best iterate is kept.
+It is tracked, and it was usually not what came back.
+
+`solve` warns "Returning best iterate" and hands back a full solution
+dictionary: every unknown by name, derived node states, per-element
+diagnostics, and the bookkeeping keys `__success__`, `__message__`,
+`__final_norm__`, `__x_solution__`, `__unknown_names__` and
+`__convergence_history__`. The best point is tracked in real unscaled space,
+stored for warm-starting, and the derived states are re-propagated from it so
+they match rather than trailing the last trial point.
+
+But `final_x` and `final_norm` are captured immediately after the primary
+root() call, and every later phase -- the hybr fallback, and above all the LM
+fallback -- keeps evaluating through the same wrapper. Those phases improve the
+tracked best but only re-point the returned state when they REACH the
+convergence tolerance. An improvement that fell short was thrown away.
+
+| non-converged junction solves examined | 38 |
+|---|---|
+| returned a state worse than the best evaluated | **30** |
+| median ratio returned / best | 5.8x |
+| worst | 2.2e5x |
+
+In every case inspected the better point was found after the LM fallback
+started. Two smaller defects sat beside it: when the automatic retry also
+failed, its result was returned unconditionally even if the primary had got
+closer; and this harness read `__residual_norm__`, a key the solver has never
+set, so every record's residual norm had always been infinity.
+
+**None of the three changes whether a solve converges.** The scorecard stays at
+1708 of 2073 and the random sweep at 92.0% overall and 98.5% inside the
+documented Mach range, either side of the fix. That is the point: it corrects
+the answer that comes back, not the decision about success. Which also means
+the residual norms this harness has recorded until now carry no information,
+and any earlier reasoning that leaned on them should be re-checked -- nothing
+in this record does, because the norm was never used to decide anything.
+
+One behaviour left alone deliberately: a solution demoted by the junction
+consistency checks is still returned, with the success flag false. That is
+consistent with returning a best iterate, but a caller who ignores the flag
+receives a state the solver has just identified as physically inadmissible.
+
 ## What this changes
 
 - The 26 unrescued solves are no longer a mystery: most are infeasible, and

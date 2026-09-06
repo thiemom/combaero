@@ -388,7 +388,9 @@ def solve_and_extract(
         )
     wall_time = time.perf_counter() - t0
     converged = bool(sol.get("__success__", False))
-    res_norm = float(sol.get("__residual_norm__", math.inf))
+    # `__final_norm__` is the key the solver sets; `__residual_norm__` never
+    # existed, so every record's residual norm was silently infinity.
+    res_norm = float(sol.get("__final_norm__", math.inf))
     if not converged:
         return NetworkResult(
             converged=False,

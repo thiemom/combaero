@@ -1773,6 +1773,24 @@ class NetworkSolver:
             f"'{init_strategy}' attempt failed at |F|={primary_norm:.3e} "
             f"with: {primary_msg[:120]}]"
         )
+        # Neither attempt converged, so hand back whichever got closer. The
+        # retry used to be returned unconditionally, which could replace a
+        # near-miss with something far worse and still warn that the best
+        # iterate was being returned.
+        retry_norm = retry_sol.get("__final_norm__")
+        if (
+            primary_norm is not None
+            and retry_norm is not None
+            and float(retry_norm) > float(primary_norm)
+        ):
+            if _primary_diag is not None:
+                self._diagnostic_data = _primary_diag
+            sol["__message__"] = (
+                f"{primary_msg} [{_seed_kind} warm-start auto-retry also "
+                f"failed, at |F|={float(retry_norm):.3e}, so the closer "
+                f"primary result is returned]"
+            )
+            return sol
         return retry_sol
 
     def _outlet_ref_incompressible_seed(
@@ -2457,6 +2475,27 @@ class NetworkSolver:
                     message = (
                         f"{message} LM fallback also stalled at |F|={float(best_res_norm):.3e}."
                     )
+
+        # Honour the promise made in the non-convergence warning: return the
+        # BEST iterate, not the one that happened to be current when the
+        # primary phase ended.
+        #
+        # `final_x` and `final_norm` are captured immediately after the primary
+        # root() call. Every later phase -- the hybr fallback, and above all
+        # the LM fallback -- keeps evaluating through the same wrapper, so
+        # `best_x` and `best_res_norm` go on improving; but those phases only
+        # re-point `final_x` when they REACH the convergence tolerance. An
+        # improvement that falls short of it was being thrown away. Measured
+        # over 38 non-converged junction solves before this guard: 30 returned
+        # a state worse than the best they had evaluated, by a median of 5.8x
+        # and up to 2e5x, and in every case inspected the better point was
+        # found after the LM fallback started.
+        #
+        # Placed before the consistency verification below so the junction
+        # checks judge the state that is actually returned.
+        if float(best_res_norm) < final_norm:
+            final_x = best_x
+            final_norm = float(best_res_norm)
 
         # Post-solve physical-consistency verification for junctions.
         # Two known ways a junction net converges (|F| ~ 1e-10) onto an
