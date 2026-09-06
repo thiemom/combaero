@@ -824,11 +824,11 @@ driven, feasible draws only:
 The all-pressures case looked like a solver weakness and was not one. See
 Finding 11.
 
-**One unresolved caveat.** Of the draws with no root, 21.8% are correctly
-demoted by the physics checks but a few still report one. Either the
-feasibility grid misses a solution or the compressible solve reaches one the
-incompressible curve does not predict. The headline should not be quoted
-tighter than a point or two until that is understood.
+**One caveat, since resolved in the other direction.** Of the draws with no
+root, some still report one, and conversely the feasibility test calls draws
+solvable that the compressible system cannot solve. Both are the same thing:
+the test is incompressible and the solver is not. Finding 12 measures how far
+that reaches and the sweep now reports the Mach class alongside the headline.
 
 ## Finding 11: the free-level case was never a landscape problem
 
@@ -902,6 +902,65 @@ cost of about three points on the junction sweep.
 Two tests were relying on the poor seed to make a solve fail, one for the
 timeout path and one for the evaluation limit. Both now construct their own
 starting point instead, so the machinery stays covered.
+
+## Finding 12: the residual landscape is clean; the failures are outside the model
+
+One of the roughly 8% of solvable draws that still failed, taken apart. Three
+pressure boundaries, dividing, near-equal areas (ratio 1.15), a shallow 15
+degree branch, 1.8 bar and 375 K, imposed drops of 103 Pa on the straight leg
+and 12022 Pa on the branch against a reference dynamic head of 4059 Pa.
+
+### What the reduced system predicts
+
+The required coefficient ratio is `dP_str / dP_bra = 0.0086`, and the closure's
+own ratio spans -0.141 to 8.673 over the split, crossing the target once at
+q = 0.500. The level that crossing implies is 0.283 kg/s -- **a common-port
+Mach of 0.685**.
+
+### What the full system actually does
+
+Brute force over the (split, level) plane: a 41 by 41 grid, and at each of the
+1681 points the other seven unknowns minimised out with a least-squares solve,
+so nothing is assumed about the reduction.
+
+| | |
+|---|---|
+| residual range over the plane | 3.57e2 to 1.67e6 |
+| **global minimum** | **357, at split 0.382, level 0.186 kg/s** |
+| interior local minima | 3 |
+
+**The residual never reaches zero anywhere.** There is no root. The landscape
+itself is well behaved: a single broad valley in the split with a clear
+minimum, a level direction that is flat below 0.15 kg/s and climbs steeply
+above 0.37 as the branch chokes, three local minima with the global one an
+order of magnitude below the others. No pathology, no needle to thread. The
+solver stalls because there is nothing to find.
+
+The reduced test called it solvable because that test is INCOMPRESSIBLE. At
+the Mach 0.685 its own prediction requires, the compressible system it is
+standing in for is a different problem.
+
+### It generalises
+
+Maximum Mach over the three ports at the operating point, across all solvable
+draws:
+
+| | n | median | above 0.3 | above 0.5 | supersonic |
+|---|---|---|---|---|---|
+| converged | 711 | 0.172 | 23% | 8% | 2% |
+| failed | 57 | 0.562 | 84% | 54% | 16% |
+
+**Restricted to draws that stay inside the closure's documented low-Mach range,
+convergence is 98.4%.** At 0.5 it is 96.2%, at 0.8 it is 94.4%. Which port gets
+there first depends on the drive: with both flows imposed it is the branch,
+since `u_bra = q psi u_com` and the sweep draws area ratios to 10; with three
+pressures it can be the common port, since the level is then whatever the
+imposed drops demand.
+
+The sweep now reports that cut, so the headline is not read as a solver
+weakness when it is the model being used past where it is documented. The
+draws past the range are still swept and still reported -- they are simply
+reported as what they are.
 
 ## What this changes
 

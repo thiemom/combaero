@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import math
 import random
+from collections import Counter
 
 import pytest
 
@@ -212,3 +213,53 @@ def test_the_closure_curve_covers_the_split_range():
 
     assert straight.size == branch.size == rr._Q_GRID.size
     assert math.isfinite(float(straight[len(straight) // 2]))
+
+
+# ---------------------------------------------------------------------------
+# The Mach classification
+# ---------------------------------------------------------------------------
+
+
+def test_the_sweep_reaches_past_the_documented_range_and_says_so(summary):
+    """The sweep deliberately draws beyond low Mach, so it must report which
+    side of the line each draw fell on rather than averaging over both."""
+    labels = {b for (cut, b) in summary.by_cut if cut == "solvable port Mach"}
+
+    assert "within Mach 0.3" in labels
+    assert labels - {"within Mach 0.3"}, "the sweep is no longer reaching past the range"
+    assert "documented" in rr.format_summary(summary)
+
+
+def test_convergence_inside_the_documented_range_is_high(summary):
+    """The number that means something for production use. Measured at 98.4%
+    over 2000 draws; the floor is loose for the same reason as the one above.
+    """
+    assert summary.in_range[1] >= _N // 4, "too few in-range draws to conclude"
+    assert summary.in_range_converged_share > 0.90
+
+
+def test_failures_concentrate_outside_the_documented_range(summary):
+    """The finding this classification exists to record: within low Mach the
+    solver is reliable, and the residual landscape of a failure outside it has
+    no root at all rather than a hard-to-find one."""
+    inside = summary.by_cut[("solvable port Mach", "within Mach 0.3")]
+    outside = Counter()
+    for (cut, bucket), counts in summary.by_cut.items():
+        if cut == "solvable port Mach" and bucket != "within Mach 0.3":
+            outside.update(counts)
+    if not sum(outside.values()):
+        pytest.skip("sweep too small to compare")
+
+    share_in = inside["converged"] / sum(inside.values())
+    share_out = outside["converged"] / sum(outside.values())
+    assert share_in > share_out
+
+
+def test_the_operating_point_is_predicted_for_every_drive():
+    rng = random.Random(11)
+    seen = set()
+    for _ in range(200):
+        c = rr.sample(rng)
+        if rr.has_root(c) is True and rr.operating_point(c) is not None:
+            seen.add(c.drive)
+    assert seen == set(rr.DRIVES)
