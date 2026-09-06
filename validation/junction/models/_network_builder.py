@@ -362,6 +362,60 @@ def _extract_K_joining(
     )
 
 
+
+def mass_flow_for_mach(
+    mach: float,
+    area: float = _F_C,
+    Pt: float = _PT_REF,
+    Tt: float = _TT_REF,
+) -> float:
+    """Mass flow that puts a duct of ``area`` at ``mach``, isentropically.
+
+    Used to place a validation network at a source's own Mach number instead of
+    the fixture's fixed low-speed reference. Goes through the library's own
+    thermodynamics (`mass_flux_isentropic`) rather than a perfect-gas formula so
+    the property model is the one the solver will use.
+    """
+    X = _x_air()
+    gamma = float(cb.isentropic_expansion_coefficient(Tt, X))
+    ratio = (1.0 + 0.5 * (gamma - 1.0) * mach * mach) ** (gamma / (gamma - 1.0))
+    G = float(cb.mass_flux_isentropic(Tt, Pt, Pt / ratio, X))
+    return G * area
+
+
+def _extract_K_joining_dynamic_pressure(
+    sol: dict[str, float],
+    *,
+    common_node: str,
+    straight_node: str,
+    lateral_node: str,
+    m_dot_ref: float,
+    area: float,
+) -> tuple[float, float]:
+    """Joining K normalised on the common port's TOTAL MINUS STATIC pressure.
+
+    Wang 2014 defines K_13 = (p0_1 - p0_3) / (p0_3 - p_3) and K_23 likewise,
+    where 3 is the common branch. The usual `_extract_K_joining` divides by
+    1/2 rho u^2 evaluated at a fixed reference flow, which agrees with that only
+    in the incompressible limit and only when the flow is at the reference
+    level: p0 - p exceeds 1/2 rho u^2 by about M^2/4 in relative terms, so the
+    two definitions differ by roughly 0.2% at Mach 0.1 and 9% at Mach 0.6.
+
+    Extracting what the source actually measured keeps the comparison honest at
+    every Mach, rather than folding a definitional difference into what looks
+    like model error.
+    """
+    Pt_com = sol[f"{common_node}.Pt"]
+    P_com = sol[f"{common_node}.P"]
+    q_dyn = Pt_com - P_com
+    if q_dyn <= 0.0:
+        raise KeyError("common port has no dynamic pressure to normalise on")
+    return (
+        (sol[f"{lateral_node}.Pt"] - Pt_com) / q_dyn,
+        (sol[f"{straight_node}.Pt"] - Pt_com) / q_dyn,
+    )
+
+
 def solve_and_extract(
     net: FlowNetwork,
     *,
@@ -372,6 +426,7 @@ def solve_and_extract(
     area: float = _F_C,
     flow_direction: Literal["separating", "joining"] = "separating",
     verifier: Callable[[dict[str, float]], bool] | None = None,
+    extractor: Callable[..., tuple[float, float]] | None = None,
 ) -> NetworkResult:
     """Run NetworkSolver, return convergence + K diagnostics."""
     solver = NetworkSolver(net)
@@ -406,7 +461,8 @@ def solve_and_extract(
             message="post-solve verification failed (soft barrier landed off-physical)",
         )
     try:
-        extractor = _extract_K_joining if flow_direction == "joining" else _extract_K
+        if extractor is None:
+            extractor = _extract_K_joining if flow_direction == "joining" else _extract_K
         K_lat, K_str = extractor(
             sol,
             common_node=common_node,
