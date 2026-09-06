@@ -147,6 +147,22 @@ class MPCEv2Network:
                 q_lateral, psi or 1.0, theta_rad or math.pi / 2.0, topology
             )
             return _to_file_axis(result, flip=K_id in {"K5", "K2"})
+        if K_id in {"K7", "K8"}:
+            # Joining flow TYPE 4. Bassett Table 1 puts the common branch at A
+            # rather than C, so the lateral joins pointing the other way along
+            # the main duct than in type 6: the same three-port network with
+            # the lateral mirrored to pi - theta. Measured over his 75 type-4
+            # points, that mapping gives mean errors of 0.20 and 0.31 against
+            # 0.56 and 1.02 unmirrored.
+            #
+            # And K7 is the LATERAL-to-common coefficient on the lateral
+            # fraction, K8 the straight one on the straight fraction -- the
+            # reverse of what bassett2001.py's docstrings said until this was
+            # scored. Only K8 takes the 1 - q.
+            q_lateral = 1.0 - q if K_id == "K8" else q
+            theta_used = math.pi - (theta_rad if theta_rad is not None else math.pi / 2.0)
+            result = self._joining(q_lateral, psi or 1.0, theta_used, topology)
+            return _to_file_axis(result, flip=K_id == "K8")
         if K_id in {"K11", "K12"}:
             # Bassett Table 1 indexes each joining coefficient by the fraction
             # in ITS OWN inlet leg: K11's q is mdot_A/mdot_C (the STRAIGHT

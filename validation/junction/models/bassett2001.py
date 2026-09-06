@@ -82,13 +82,21 @@ def K6(q: float, psi: float, theta: float) -> float:
 
 
 def K7_raw(q: float, psi: float, theta: float) -> float:
-    """Joining type 4, straight path (Table 2, no angle correction)."""
+    """Joining type 4, LATERAL path (Table 2, no angle correction).
+
+    Table 1: K7 = [(p_B + rho u_B^2/2) - (p_A + rho u_A^2/2)] / (rho u_A^2/2)
+    with q = m_B/m_A. In flow type 4 the common branch is A, B is the lateral
+    and C the other straight leg, so this is the LATERAL-to-common coefficient
+    indexed on the lateral fraction -- K8 is the straight one. The docstrings
+    here said the opposite until 2026-09-06, and nothing caught it because
+    neither coefficient was scored.
+    """
     c = math.cos(theta)
     return 4.0 * q - 1.0 + q * q * (psi * psi - 2.0 + 2.0 * psi * c)
 
 
 def K7_corr(q: float, psi: float, theta: float) -> float:
-    """Joining type 4, straight path with Eq 34 correction:
+    """Joining type 4, LATERAL path with Eq 34 correction:
     theta' = pi - (3/4)*(pi - theta) substituted everywhere theta appears."""
     tc = math.pi - 0.75 * (math.pi - theta)
     c = math.cos(tc)
@@ -96,13 +104,19 @@ def K7_corr(q: float, psi: float, theta: float) -> float:
 
 
 def K8_raw(q: float, psi: float, theta: float) -> float:
-    """Joining type 4, lateral path (Table 2, no angle correction).
-    K8 = 1 - q^2 + 2 * (1-q)^2 * psi * cos(theta)."""
+    """Joining type 4, STRAIGHT path (Table 2, no angle correction).
+
+    Table 1: K8 = [(p_C + rho u_C^2/2) - (p_A + rho u_A^2/2)] / (rho u_A^2/2)
+    with q = m_C/m_A, so it is the straight-inlet coefficient on the straight
+    fraction. See K7 for the naming correction.
+
+    K8 = 1 - q^2 + 2 * (1-q)^2 * psi * cos(theta).
+    """
     return 1.0 - q * q + 2.0 * (1.0 - q) * (1.0 - q) * psi * math.cos(theta)
 
 
 def K8_corr(q: float, psi: float, theta: float) -> float:
-    """Joining type 4, lateral path with Eq 34 correction."""
+    """Joining type 4, STRAIGHT path with Eq 34 correction."""
     tc = math.pi - 0.75 * (math.pi - theta)
     return 1.0 - q * q + 2.0 * (1.0 - q) * (1.0 - q) * psi * math.cos(tc)
 
