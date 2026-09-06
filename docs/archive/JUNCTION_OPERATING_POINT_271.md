@@ -1163,6 +1163,30 @@ The bias is negative throughout at the larger area ratios, so the model
 under-predicts the joining loss into a small branch -- the same direction
 Idelchik and Wang both show.
 
+## Finding 16: a plateau above zero is a mode seam, not a blocked root
+
+Finding 12 concluded that the failures sit outside the model. That holds for
+the q-endpoint cases it examined, but it is not the whole picture: some
+non-converged solves have a smooth residual history that flattens onto a floor
+well above zero, and a minimum that is not a root means something is blocking
+the root.
+
+One such case was taken apart in full. Two candidate mechanisms were falsified
+by measurement -- the soft barrier (the floor does not scale with
+`soft_penalty_alpha`, and is *higher* with the barrier off) and choking (the
+branch runs at Mach 0.72 against a critical ratio of 1.892). The floor is
+carried by two equal and opposite rows, and equals the total-pressure jump a
+*lossless* connection cannot close. The Jacobian is rank 11 of 12 there, but
+none of the residual lies in the directions it cannot reach, so the root is
+reachable and Newton merely has no step.
+
+The mechanism is that the straight inlet has reversed: an element declared as
+a merge is physically dividing, the closure reads supplier and collector from
+the signed flows at runtime, and the residual formula changes across that
+reversal. The full numbers, the alpha sweep, the SVD and the sweep of the
+straight port's flow through zero are in [MPCE_CPP_PORT_DESIGN.md] section 7c,
+along with the limits of the evidence and what it means for the port.
+
 ## What this changes
 
 - The 26 unrescued solves are no longer a mystery: most are infeasible, and

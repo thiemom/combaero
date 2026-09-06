@@ -533,6 +533,77 @@ must preserve; it does not buy convergence here.
 and then reverting with `git checkout` reverted the fix as well. Commit
 first, then instrument.
 
+## 7c. Step 2 follow-up: the residual plateau is a mode seam (2026-09-07)
+
+Some non-converged solves have a well-behaved residual history that flattens
+onto a floor well above zero. A minimum that is not a root says an equation,
+a coefficient or a penalty is blocking the real root. One such case was taken
+apart to find which.
+
+**The case,** from the random-boundary sweep: joining flow, `flow_and_pressures`
+drive, branch at 156.3 deg (nearly head-on to the straight inlet), area ratio
+2.565, `k_straight` +0.710, `k_branch` +4.285. Floor `|F|` = 1.598e4 with the
+soft barrier on, 2.44e4 with it off.
+
+**The soft barrier is not the cause.** It was the first hypothesis and it is
+plausible from the magnitudes alone: `soft_penalty_alpha` is 1e7 and the
+reversed port sits at 0.04 kg/s, whose product is the right order. Falsified
+by sweeping alpha 1e7 -> 0: floors 1.598e4, 2.367e4, 2.435e4, 2.443e4,
+2.443e4, 2.443e4. The floor does not scale with alpha, and removing the
+barrier makes it **higher**.
+
+**Choking is not the cause.** With the barrier off the port Machs are 0.171,
+0.050 and 0.722 against a critical `Pt/P` of 1.892.
+
+**Two rows carry the floor, equal and opposite.** With the barrier off,
+`port_bra.Pt` at -1.2213e4 and `b_com.P` at +1.2213e4, 31.5% of `|F|` each.
+That 12213 Pa is exactly `b_bra.Pt - port_bra.Pt`: the total-pressure equality
+across a *lossless* connection cannot be closed.
+
+**The Jacobian is singular there, but that is not what blocks it.** SVD of the
+12x12 at the floor: rank 11, singular values 2.35e-1 down to 1.25e-7,
+condition 2.6e13. The null direction is almost purely `port_bra.P` (0.9987);
+the left null space pairs the `port_bra.P` and `jct.P_jct` rows at
+-0.707/+0.707, i.e. two rows have become linearly dependent. **But 0.0% of
+`|F|^2` lies in the unreachable directions.** So the residual is reducible in
+principle. Newton simply has no well-defined step.
+
+**The mechanism is a mode seam.** The element is declared `flow_direction="merge"`
+with the straight and branch ports as inlets. At the floor the straight port
+carries **-0.0268 kg/s**: physically the junction has become a *dividing* one.
+The closure reads supplier and collector from the signed flows at runtime, so
+it does switch. Sweeping the straight port's flow through zero with the other
+unknowns held at the floor:
+
+| `lc_str.m_dot` | `\|F\|` | sigma_min | cond | mode |
+|---|---|---|---|---|
+| -1e-4 | 2.596e4 | 1.251e-7 | 2.65e13 | dividing |
+| 0 | 1.840e5 | 3.06e-17 | 1.09e23 | on the seam |
+| +1e-4 | 3.278e5 | 6.585e-7 | 9.11e12 | merging |
+
+The residual jumps by an order of magnitude across a flow change of 2e-4 kg/s,
+and the system is near-singular on **both** sides, not only at the seam. At
+exactly zero the third behaviour is the step-2(b) fix: the excluded port is
+snapped to its *declared* direction, which is why `|F|` there sits near the
+merging value rather than between the two. The solve parks on this surface.
+
+**Limits of the evidence.** The sweep varies one unknown while holding the
+others at the dividing-side solution, so part of that jump is the far side
+being an inconsistent state rather than the residual being discontinuous in
+the full state. And the near-singularity is present on both sides, so the seam
+alone does not create it. What is established is that the plateau is neither a
+penalty artefact nor a blocked root, and that a port reversal changes which
+residual formula is evaluated.
+
+**What this means for the port.** The supplier/collector classification is a
+branch on a primal quantity that changes the residual formula, and the
+analytic Jacobian does not see it -- it differentiates whichever branch is
+active as though the classification were constant. Step 4's branch-on-primal
+note covers the pseudosupplier reorientation but not this one. A C++ port that
+transcribes the Python faithfully inherits the seam, so this is a defect to
+resolve before the port, not after. It is the one open item behind the
+"implementation correct first, then port" decision in section 9.
+
 ## 8. The port, sequenced by provenance
 
 Each step has a gate that is a table against digitised data, not a green suite.
