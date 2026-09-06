@@ -1006,6 +1006,93 @@ consistency checks is still returned, with the success flag false. That is
 consistent with returning a best iterate, but a caller who ignores the flag
 receives a state the solver has just identified as physically inadmissible.
 
+## Finding 14: the compressible data was there all along, and the model holds up in it
+
+Asked whether any compressible validation data exists. It does, it was fully
+digitised, and nothing scored a single point of it.
+
+**Wang 2014**, compressible combining flow at 45 degree tees: 30 curves, 200
+measured points, common-branch Mach from 0.091 to 0.595, area ratios 1, 1.56
+and 2.44, splits 0, 0.2, 0.5, 0.8 and 1. His K_13 and K_23 are the lateral and
+straight joining coefficients.
+
+Two independent reasons nothing used it, neither of them physics. The network
+runner dropped every file whose abscissa was not the split, which was all
+thirty. The raw correlation runner handles a Mach abscissa correctly but its
+model adapter returns nothing unless the source is Bassett. Even the
+paper-ceiling reference covered 16 of the 200.
+
+### What it took to wire
+
+Three things, and the axis one is where every previous mistake in this arc was
+made:
+
+- **Wang's q is the LATERAL inlet fraction and BOTH his coefficients are
+  indexed on it**, unlike Bassett, who re-indexes his straight-leg K11 on the
+  straight inlet. So neither takes a `1 - q` here. The `1 - q` that
+  `equivalences.py` carries for K_23 maps Wang onto Bassett's axis for the
+  cross-paper rollup, not onto the network.
+- **His `a = S_c / S_b` is common over lateral, which is exactly Bassett's
+  psi**, so it passes straight through.
+- **His K is normalised on the common port's total minus static**, not on
+  `1/2 rho u^2`. Those agree only in the incompressible limit: `p0 - p` exceeds
+  `1/2 rho u^2` by about `M^2/4` in relative terms, so 0.2% at Mach 0.1 and 9%
+  at Mach 0.6. Extracting what he actually measured keeps a definitional
+  difference out of what would otherwise look like model error.
+
+The network is placed at each point's own Mach through the library's isentropic
+mass-flux relation, rather than at the fixture's fixed low-speed reference.
+
+### The result
+
+| Mach band | n | MAE | bias |
+|---|---|---|---|
+| below 0.15 | 18 | **0.0967** | -0.037 |
+| 0.15 to 0.30 | 24 | 0.1187 | -0.069 |
+| 0.30 to 0.45 | 36 | 0.0938 | -0.005 |
+| above 0.45 | 42 | 0.1486 | -0.041 |
+
+For comparison, the same model scores 0.0949 against Bassett and 0.0859 against
+Hager. **At low Mach the closure agrees with Wang about as well as it agrees
+with the two sources it was built against**, on a source it had never been
+compared with. That is the first genuinely measured check of the joining side:
+Idelchik is a handbook tabulation and Bassett's joining coefficients are his own
+analytical forms.
+
+**And the degradation with Mach is mild.** Read with Wang's own definition, an
+incompressible closure holds to about 0.15 at Mach 0.6. That materially weakens
+the case for the `kappa M^2` correction in sec 8 step 5 of the design record --
+it should now have to prove it beats 0.15 before being added, rather than being
+assumed necessary.
+
+### Where it is weak, and the agreement is independent
+
+| split | area ratio 1 | 1.56 | 2.44 |
+|---|---|---|---|
+| 0.2 | 0.04 / 0.06 | 0.05 / 0.05 | 0.04 / 0.10 |
+| 0.5 | 0.14 / 0.12 | 0.04 / 0.08 | 0.19 / 0.06 |
+| 0.8 | 0.03 / 0.03 | 0.17 / 0.10 | **0.30 / 0.65** |
+
+(lateral / straight coefficient). The error grows with area ratio and with
+lateral fraction, worst at a small branch taking most of the flow. **That is
+exactly where Idelchik put the error too** -- two independent sources, one
+handbook and one experiment, agreeing on where the model is weak, which is a
+much stronger statement than either alone. It is also the regime
+`joining_etransfer_alpha` was introduced for.
+
+### What is not scored
+
+80 of the 200 points, all of them the `q = 0` and `q = 1` curves where one
+inlet carries no flow at all. 75 are refused by the direction check, which is
+it doing its job on a degenerate boundary case rather than a failure. The
+pressure-driven topologies are skipped for this source rather than failed: they
+size their boundary pressures from Bassett's analytical K, which has no meaning
+for another paper.
+
+Still not digitised: Perez-Garcia 2010, 90 degree compressible tees, metadata
+and README only. Torregrosa 2017 and Stigler 2010 are on disk and referenced
+nowhere.
+
 ## What this changes
 
 - The 26 unrescued solves are no longer a mystery: most are infeasible, and

@@ -593,6 +593,13 @@ Plus whole-row FD tests
 item 1 is lifted) at `< 1e-6`; a ctest comparing the C++ kernel against golden
 Python values (the ejector recipe's `.h` golden-data pattern).
 
+**Step 5 -- compressibility. THE PREMISE HAS WEAKENED (2026-09-06).** Wang's
+200 measured points are now scored in-network (Finding 14 of the
+operating-point record) and an incompressible closure, read with Wang's own K
+definition, holds to MAE 0.15 at Mach 0.6 and 0.097 below Mach 0.15 -- about
+what it manages against Bassett and Hager. A `kappa M^2` correction must now
+beat 0.15 to earn its place; it can no longer be assumed necessary.
+
 **Step 5 -- compressibility.** Port `K_dat_j_closed`'s `kappa M_dat^2`
 correction into the closure (it is already in `tee_junction.h`, templated, with
 the v3 spec's derivation). Gate: Wang 2014 (digitised) and Perez-Garcia

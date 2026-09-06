@@ -67,6 +67,9 @@ class NetworkRecord:
     # Only `imposed_q` imposes it; elsewhere it is an outcome and the record's
     # K was extracted there, not at `q` (issue #271).
     q_converged: float | None = None
+    #: Common-branch Mach the point was evaluated at. None for the
+    #: incompressible sources, which do not specify one.
+    mach: float | None = None
     # The measured curve's K at `q_converged`, which is the value `K_extracted`
     # must be compared against. None when the solve did not converge, or when
     # the operating point it reached lies outside the curve's digitised range.
@@ -114,8 +117,11 @@ class NetworkRecord:
 # Hager 1984 names its coefficients xi_t (straight-through) and xi_l (lateral);
 # the schema stores them in `coefficient` with K_id=None, and _which_K is fed
 # `K_id or coefficient`, so both spellings must be here.
-_LATERAL_K_IDS = {"K1", "K6", "K12", "xi_l"}
-_STRAIGHT_K_IDS = {"K2", "K5", "K11", "xi_t"}
+# Wang 2014 names his joining pair K_13 (lateral inlet to common outlet) and
+# K_23 (straight inlet to common outlet), which are the lateral and straight
+# coefficients under different labels.
+_LATERAL_K_IDS = {"K1", "K6", "K12", "xi_l", "K_13"}
+_STRAIGHT_K_IDS = {"K2", "K5", "K11", "xi_t", "K_23"}
 
 # Ground truth for network scoring: digitised measurements, and handbook
 # tabulations (Idelchik) which are reference data in their own right. Not a
@@ -202,7 +208,9 @@ def iter_network_records(
 
     supported = set(getattr(model, "SUPPORTED_TOPOLOGIES", ALL_TOPOLOGIES))
     for file in dataset.files:
-        if file.kind not in _GROUND_TRUTH_KINDS or file.x_axis != "q":
+        if file.kind not in _GROUND_TRUTH_KINDS:
+            continue
+        if file.x_axis not in ("q", "M_3"):
             continue
         K_id = file.K_id or file.coefficient or ""
         which = _which_K(K_id)
@@ -212,14 +220,30 @@ def iter_network_records(
         curve = sorted(rows)
         theta_rad = math.radians(file.theta_deg) if file.theta_deg is not None else None
         paper = file.path.parent.name
-        for q_val, K_m in rows:
+        # A Mach-indexed file sweeps M at a FIXED split, so the roles of the
+        # abscissa and the metadata swap. Wang 2014 is the only such source,
+        # and it is the only measured compressible data in the set.
+        mach_axis = file.x_axis == "M_3"
+        # Wang records the area ratio as `a` (common over lateral), which is
+        # the same quantity Bassett calls psi.
+        psi_val = file.psi if file.psi is not None else file.a
+        for x_val, K_m in rows:
+            q_val = (file.q if file.q is not None else 0.5) if mach_axis else x_val
+            mach_val = x_val if mach_axis else file.M_3
             if not (-0.05 <= q_val <= 1.05):
                 continue
             for topology in topologies:
                 if topology not in supported:
                     continue
+                # The pressure-driven skeletons size their boundary pressures
+                # from Bassett's analytical K, which has no meaning for another
+                # source. Skipping is not the same as failing, so a Mach-indexed
+                # source must not be charged for topologies it was never
+                # applicable to.
+                if mach_axis and topology != "imposed_q":
+                    continue
                 result = model.evaluate_network(
-                    paper, K_id, q_val, file.psi, theta_rad, topology=topology
+                    paper, K_id, q_val, psi_val, theta_rad, topology=topology, mach=mach_val
                 )
                 K_ext = (
                     (result.K_lateral if which == "lateral" else result.K_straight)
@@ -230,7 +254,7 @@ def iter_network_records(
                     paper=paper,
                     K_id=K_id,
                     canonical_K=canonical_K(paper, K_id),
-                    psi=file.psi,
+                    psi=psi_val,
                     theta_deg=file.theta_deg,
                     q=q_val,
                     K_measured=K_m,
@@ -242,14 +266,20 @@ def iter_network_records(
                     topology=topology,
                     message=result.message,
                     q_converged=result.q_converged if result.converged else None,
+                    # On a Mach-indexed curve the abscissa is not q, so the
+                    # achieved-q interpolation of item 9b does not apply: the
+                    # split is imposed and the measured value is the one at
+                    # this point.
                     K_measured_at_q_converged=(
                         K_m
-                        if result.q_converged is None
+                        if mach_axis
+                        or result.q_converged is None
                         or abs(result.q_converged - q_val) <= _Q_SNAP
                         else _curve_value_at(curve, result.q_converged)
                     )
                     if result.converged
                     else None,
+                    mach=mach_val,
                 )
 
 
@@ -270,6 +300,11 @@ class NetworkCell:
     canonical_K: str
     psi_bin: str
     theta_bin: str
+    #: Mach band for a compressible source, "n/a" for the incompressible ones.
+    #: Kept as its own axis so an incompressible closure is never averaged
+    #: across Mach: Wang 2014 sweeps 0.09 to 0.60, and the model is documented
+    #: only for the bottom of that.
+    mach_bin: str
     topology: Topology
     N: int = 0
     n_converged: int = 0
@@ -290,6 +325,26 @@ class NetworkCell:
     n_off_point: int = 0
 
 
+#: Mach bands for the compressible source. The first is where an
+#: incompressible closure is documented to apply; the rest are reported
+#: separately rather than averaged in.
+_MACH_BANDS: tuple[tuple[float, str], ...] = (
+    (0.15, "M<0.15"),
+    (0.30, "M.15-.3"),
+    (0.45, "M.3-.45"),
+    (10.0, "M>0.45"),
+)
+
+
+def _mach_bin(mach: float | None) -> str:
+    if mach is None:
+        return "n/a"
+    for upper, label in _MACH_BANDS:
+        if mach < upper:
+            return label
+    return _MACH_BANDS[-1][1]
+
+
 def _median(xs: list[float]) -> float:
     if not xs:
         return 0.0
@@ -302,25 +357,26 @@ def build_network_cells(records: list[NetworkRecord]) -> list[NetworkCell]:
     """Group by (canonical_K, psi, theta, topology) -> NetworkCell."""
     from collections import defaultdict
 
-    groups: dict[tuple[str, float | None, float | None, Topology], list[NetworkRecord]] = (
-        defaultdict(list)
-    )
+    groups: dict[
+        tuple[str, float | None, float | None, str, Topology], list[NetworkRecord]
+    ] = defaultdict(list)
     for r in records:
-        groups[(r.canonical_K, r.psi, r.theta_deg, r.topology)].append(r)
+        groups[(r.canonical_K, r.psi, r.theta_deg, _mach_bin(r.mach), r.topology)].append(r)
 
     topo_order = {t: i for i, t in enumerate(ALL_TOPOLOGIES)}
 
     def _sort_key(item):
-        (cK, psi, theta, topo), _ = item
+        (cK, psi, theta, mbin, topo), _ = item
         return (
             cK,
             psi if psi is not None else -1.0,
             theta if theta is not None else -1.0,
+            mbin,
             topo_order.get(topo, 99),
         )
 
     cells: list[NetworkCell] = []
-    for (cK, psi, theta, topo), recs in sorted(groups.items(), key=_sort_key):
+    for (cK, psi, theta, mbin, topo), recs in sorted(groups.items(), key=_sort_key):
         N = len(recs)
         conv = [r for r in recs if r.converged and r.K_extracted is not None]
         n_conv = len(conv)
@@ -340,6 +396,7 @@ def build_network_cells(records: list[NetworkRecord]) -> list[NetworkCell]:
                 canonical_K=cK,
                 psi_bin=f"{psi:g}" if psi is not None else "n/a",
                 theta_bin=f"{theta:g}" if theta is not None else "n/a",
+                mach_bin=mbin,
                 topology=topo,
                 N=N,
                 n_converged=n_conv,
@@ -360,7 +417,7 @@ def format_network_scorecard(model_name: str, cells: list[NetworkCell]) -> str:
     lines = []
     lines.append(f"=== Network scorecard: {model_name} ===")
     lines.append(
-        f"{'canonical_K':<18} {'psi':>5} {'theta':>5} {'topology':<12} "
+        f"{'canonical_K':<18} {'psi':>5} {'theta':>5} {'mach':>8} {'topology':<12} "
         f"{'N':>4} {'%conv':>6} {'RMSE':>8} {'bias':>8} {'dq':>6} {'off':>6} {'t_ms':>6}"
     )
     lines.append("-" * 95)
@@ -377,7 +434,8 @@ def format_network_scorecard(model_name: str, cells: list[NetworkCell]) -> str:
             "-" if not (c.n_off_point or c.n_off_curve) else f"{c.n_off_point}/{c.n_off_curve}"
         )
         lines.append(
-            f"{c.canonical_K:<18} {c.psi_bin:>5} {c.theta_bin:>5} {c.topology:<12} "
+            f"{c.canonical_K:<18} {c.psi_bin:>5} {c.theta_bin:>5} {c.mach_bin:>8} "
+            f"{c.topology:<12} "
             f"{c.N:>4} {c.pct_converged * 100:>5.0f}% {rmse_str:>8} {bias_str:>8} "
             f"{drift_str:>6} {off_str:>6} {c.median_wall_time_ms:>5.1f}"
         )

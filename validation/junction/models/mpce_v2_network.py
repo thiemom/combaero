@@ -10,6 +10,7 @@ lateral branch because Mynard's K already captures the full loss.
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import replace
 
 from combaero.network import LosslessConnectionElement
@@ -17,6 +18,7 @@ from combaero.network.mpce_v2_element import MPCEv2Element
 from validation.junction.models import bassett2001
 from validation.junction.models._network_builder import (
     _F_C,
+    _extract_K_joining_dynamic_pressure,
     _M_DOT_REF,
     ALL_TOPOLOGIES,
     NetworkResult,
@@ -27,6 +29,7 @@ from validation.junction.models._network_builder import (
     build_separating_mfb_two_pb_skeleton,
     build_separating_network_skeleton,
     build_separating_three_pb_skeleton,
+    mass_flow_for_mach,
     solve_and_extract,
 )
 
@@ -127,6 +130,8 @@ class MPCEv2Network:
             return NetworkResult(
                 converged=False, message=f"idelchik1966 coefficient {K_id} not wired"
             )
+        if paper == "wang2014":
+            return self._wang(K_id, q, psi, theta_rad, topology, kwargs.get("mach"))
         if paper != "bassett2001":
             return NetworkResult(converged=False, message=f"paper {paper!r} not wired")
         if K_id in {"K6", "K5", "K2"}:
@@ -155,6 +160,53 @@ class MPCEv2Network:
         return NetworkResult(
             converged=False,
             message=f"K_id {K_id} not yet wired for MPCE-v2",
+        )
+
+    def _wang(
+        self,
+        K_id: str,
+        q: float,
+        psi: float | None,
+        theta_rad: float | None,
+        topology: Topology,
+        mach: float | None,
+    ) -> NetworkResult:
+        """Wang 2014: compressible combining flow at 45 degrees.
+
+        AXES, because this is where every previous mistake was made. Wang's
+        `q = m_1 / m_3` is the LATERAL inlet fraction, and BOTH his
+        coefficients are indexed on it -- unlike Bassett, who re-indexes his
+        straight-leg K11 on the straight inlet. So neither K_13 nor K_23 takes
+        a 1 - q here, and neither needs one on the way out. The 1 - q that
+        `equivalences.py` carries for K_23 maps Wang onto Bassett's axis for
+        the cross-paper rollup, not onto this network.
+
+        `a = S_c / S_b` is common over lateral, which is exactly Bassett's psi,
+        so it passes straight through as the area ratio.
+
+        Only `imposed_q` is wired. The pressure-driven skeletons size their
+        boundary pressures from Bassett's analytical K, which has no meaning
+        for a different source, and `imposed_q` is in any case the only
+        topology whose extracted K measures the model (#290).
+        """
+        if K_id not in {"K_13", "K_23"}:
+            return NetworkResult(converged=False, message=f"wang2014 {K_id} not wired")
+        if topology != "imposed_q":
+            return NetworkResult(
+                converged=False,
+                message=(
+                    f"wang2014 is wired for imposed_q only; {topology!r} would size its "
+                    "boundary pressures from another paper's correlation"
+                ),
+            )
+        m_in = _M_DOT_REF if mach is None else mass_flow_for_mach(mach)
+        return self._joining(
+            q,
+            psi or 1.0,
+            theta_rad if theta_rad is not None else math.radians(45.0),
+            topology,
+            m_in=m_in,
+            extractor=_extract_K_joining_dynamic_pressure,
         )
 
     def _separating(
@@ -206,15 +258,27 @@ class MPCEv2Network:
             verifier=jct.verify_solution_consistent if not self.strict else None,
         )
 
-    def _joining(self, q: float, psi: float, theta_rad: float, topology: Topology) -> NetworkResult:
+    def _joining(
+        self,
+        q: float,
+        psi: float,
+        theta_rad: float,
+        topology: Topology,
+        m_in: float = _M_DOT_REF,
+        extractor: Callable[..., tuple[float, float]] | None = None,
+    ) -> NetworkResult:
         """Build a joining-flow MPCE-v2 network. ``q`` is the LATERAL inlet fraction.
 
         Geometry mirrors the separating case (str at 0deg, bra at theta) but
         flow reverses: str and bra are inlets, com is the outlet. The
         ``MPCEv2Element`` residual reads the flow direction from the
         signed mass flows at runtime, so the same element handles both.
+
+        ``m_in`` places the network at a chosen flow level, which is what lets
+        a Mach-indexed source be scored at its own operating point rather than
+        at the fixture's fixed low-speed reference. ``extractor`` lets a source
+        with its own K definition be read off the same solve.
         """
-        m_in = _M_DOT_REF
         A_bra = _F_C / psi
         if topology == "imposed_q":
             net = build_joining_imposed_q_skeleton(m_in=m_in, m_lateral=q * m_in)
@@ -259,4 +323,5 @@ class MPCEv2Network:
             area=_F_C,
             flow_direction="joining",
             verifier=jct.verify_solution_consistent if not self.strict else None,
+            extractor=extractor,
         )

@@ -33,6 +33,19 @@ dataset:
   reflection coefficients), not steady K. Could be a separate
   acoustic-tier dataset later if needed.
 
+## Mach-indexed sources
+
+Most files are a coefficient against the flow split. Wang 2014 is a Mach sweep
+at a FIXED split, and it is the only measured compressible data in the set: 200
+points from Mach 0.09 to 0.60. The network runner reads those files with the
+roles swapped -- abscissa is the Mach, split comes from the metadata -- places
+the network at that Mach, and extracts K with Wang's own normalisation
+(the common port's total minus static, not `1/2 rho u^2`, which differ by about
+9% at Mach 0.6).
+
+The scorecard keeps a Mach band as its own axis, so an incompressible closure
+is never averaged across one.
+
 ## Convergence is measured somewhere else
 
 The scorecard's convergence column is measured on cases whose boundary
