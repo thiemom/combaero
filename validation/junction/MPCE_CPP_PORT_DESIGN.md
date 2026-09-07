@@ -685,11 +685,12 @@ choice, because that is precisely the condition that places the fixed point at
 that mdot. The criterion is the fixed point's location, not the penalty's
 size.
 
-**Declared limitation.** `alpha` carries Pa/(kg/s)^2, so 1e11 is tied to the
-scales of the validation set (mdot ~ 1e-1 kg/s, Pt ~ 1e5-1e6 Pa). A network
-far outside them needs the same `slack*/mdot_ref` ratio, which means a
-scale-aware alpha built from the network's own pressure and mass scales. That
-is a residual-form change and is not made here.
+**Declared limitation -- since measured and removed, see section 7e.**
+`alpha` carries Pa/(kg/s)^2, so 1e11 is tied to the scales of the validation
+set. Measured on one junction scaled over five decades, the alpha needed
+follows 1/m_ref^2 exactly and 1e11 fails at a hundredth of the size. The
+weight is now derived from the network's own scales. Calling it a
+residual-form change was also wrong: frozen for the solve it is not one.
 
 **What this means for the port.** Less than section 7c claimed. There is no
 branch-on-primal defect in the closure to resolve first: the supplier and
@@ -698,6 +699,89 @@ construction, the common-port selection and the K sign were all measured
 identical on both sides of the traced seam. What the port must carry across is
 the barrier and its weight, since a C++ transcription with the old constant
 would reproduce the fixed point exactly.
+
+## 7e. The barrier weight has units, so it cannot be a constant (2026-09-07)
+
+Section 7d fixed the barrier's fixed point by raising `soft_penalty_alpha`
+from 1e7 to 1e11, and closed with the scale-dependence as a declared
+limitation. It was declared but not measured. Measuring it overturned the
+"1e11 is fine" reading.
+
+**The controlled experiment.** Take one junction and change only its SIZE.
+Scaling the port area at fixed pressure, Mach, angle, area ratio, split and
+loss coefficients leaves every dimensionless group untouched -- it is the same
+junction, bigger or smaller -- so anything that changes is a scale artefact.
+For each size, the smallest `alpha` (swept by decades) that converges:
+
+| size factor | m_ref (kg/s) | alpha needed | predicted `alpha_ref (m_ref/m)^2` |
+|---|---|---|---|
+| 1e-3 | 9.26e-5 | 1e14 | |
+| 1e-2 | 9.26e-4 | 1e12 | |
+| 1e-1 | 9.26e-3 | 1e10 | |
+| 1e0 | 9.26e-2 | 1e8 | 1e8 |
+| 1e1 | 9.26e-1 | 1e6 | 1e6 |
+| 1e2 | 9.26 | 1e4 | 1e4 |
+
+Two decades of `alpha` per decade of size, exactly, over five decades. The
+prediction column is not fitted -- it is `alpha_ref * (m_ref/m)^2` -- and it
+lands on the measured value every time. **The shipped 1e11 fails on the
+identical junction at a hundredth of its size** (measured: sizes 1e-2, 1e-3
+and 1e-4 do not converge with the hand-off disabled).
+
+**Why, dimensionally.** The row is a pressure balance in Pa, so `alpha`
+carries Pa/(kg/s)^2. It is not a tolerance or a dimensionless weight but a
+conversion factor between a mass-flow error and a pressure, meaningful only
+against a network's own scales. The governing group is
+
+    Pi = alpha m_ref^2 / dP        and        slack*/m_ref = 1 / sqrt(Pi)
+
+so a fixed `alpha` holds the fixed point at a sensible fraction of the flow
+for exactly one network size.
+
+**One correction to 7d.** It called this a residual-form change. It only is if
+`alpha` is recomputed from the state each iterate, because then it enters the
+Jacobian. **Frozen for the solve it is not a form change at all** -- the
+residual is character-for-character unchanged and only the constant is
+computed instead of declared. That is the version implemented.
+
+**What was built.** `NetworkSolver._apply_barrier_scale` derives
+
+    alpha = P_ref / (f m_ref)^2,   f = BARRIER_SLACK_FRACTION = 0.005
+
+from the reference state `_infer_reference_state` already computes for
+seeding, and hands it to each element that owns a barrier before the solve.
+The 0.5% is a margin, not a fit: solves stop parking in the barrier at roughly
+14% of the reference flow for the traced case (case-dependent), and the
+response saturates far below 0.5%. Taking `P_ref` as the pressure error the
+network can absorb overestimates it, which errs toward a larger `alpha` and a
+smaller fixed point -- the safe direction. A degenerate reference state falls
+back to the fixed default rather than producing a weaker barrier. An
+explicitly set `soft_penalty_alpha` always wins, so the tuning knob the
+earlier sweeps used still works.
+
+The hand-off is restricted to elements that actually own a barrier rather than
+to every `MultiPortChamberElement`: the chamber base is shared with
+`EjectorElement` and `ConstantKTeeElement`, and reaching for every subclass is
+how the junction seed broke the GUI ejector in step 5a.
+
+**Measured.**
+
+| | fixed 1e11 | scale-aware |
+|---|---|---|
+| scorecard converged | 2108 / 2546 | 2108 / 2546 |
+| scorecard scored | 2081 | 2081 |
+| Bassett / Hager / Idelchik / Wang mean err | 0.1538 / 0.0787 / 0.8880 / 0.1184 | identical |
+| random: within Mach 0.3 | 99.3% | 99.3% |
+| random: root exists | 92.9% | 92.7% |
+| same junction, sizes 1e-4 to 1e3 | 5 of 8 converge | **8 of 8** |
+
+The scorecard is identical to the digit, and that is the point: the validation
+set sits in the range where 1e11 was already on the saturation plateau, so the
+derived weight must reproduce it exactly. It is not a no-op -- across 982
+scorecard solves the barrier is evaluated 4809 times and the derived weight is
+used every one of them, spanning 1.8e10 to 6.4e12. The `root exists` cell
+moves by one draw of 395, which is noise. The gain is entirely in the size
+range the validation set does not cover.
 
 ## 8. The port, sequenced by provenance
 

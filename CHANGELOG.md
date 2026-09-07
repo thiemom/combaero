@@ -8,6 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **The junction soft-barrier weight is derived from the network's scales
+  instead of being a fixed constant.** `soft_penalty_alpha` multiplies a
+  squared mass flow to produce a pressure, so it carries `Pa/(kg/s)^2` and is
+  only meaningful against a particular network's scales; the barrier's fixed
+  point sits at `slack* = sqrt(dP/alpha)`, and what matters is that as a
+  fraction of the flow. Measured on one junction scaled over five decades with
+  every dimensionless group held fixed, the weight needed to converge follows
+  `1/m_ref^2` exactly -- two decades of weight per decade of size -- and the
+  previous fixed value failed on the same junction at a hundredth of its size.
+  `NetworkSolver` now derives `alpha = P_ref / (f*m_ref)^2` from the reference
+  state it already computes for seeding and hands it to each element that owns
+  a barrier, frozen for the solve so the residual and Jacobian are unchanged in
+  form. A degenerate reference state falls back to the fixed default rather
+  than producing a weaker barrier, and an explicitly set `soft_penalty_alpha`
+  always wins. Measured: the junction validation scorecard is identical to the
+  digit (2108 of 2546 converged, every source's mean error unchanged) because
+  that set already sat on the saturation plateau, while the same junction now
+  converges across seven decades of size instead of five.
 - **The junction soft barrier no longer has a fixed point that solves park
   in.** `MPCEv2Element` replaces the physics with a "soft barrier" when a port
   flows against its declared direction, meant to pull Newton back toward

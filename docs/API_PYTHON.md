@@ -621,6 +621,49 @@ Changing any of these values is a retune and needs a before/after table
 before it lands, not a silent edit -- `python/tests/test_junction_tuned_constants.py`
 pins the documented values.
 
+### The Junction Soft-Barrier Weight
+
+Distinct from the tuned constants above: this is a **numerical** parameter, not
+physics, and it is derived rather than declared.
+
+When `strict=False` and a port flows against its declared direction,
+`MPCEv2Element` replaces the physics with a continuity residual plus a
+one-sided quadratic penalty, `alpha * max(0, -e_i * mdot_i)^2`. The penalty
+shares its row with the continuity relation, so it balances against a pressure
+error rather than driving the offending flow to zero, and has a fixed point at
+`slack* = sqrt(dP / alpha)`. A solve that reaches it parks there.
+
+`alpha` therefore carries `Pa/(kg/s)^2` and cannot be a constant: the weight
+needed scales as `1/m_ref^2`, two decades per decade of network size.
+`NetworkSolver` derives it before each solve from the reference state it
+already computes for seeding:
+
+```python
+alpha = P_ref / (BARRIER_SLACK_FRACTION * m_ref) ** 2   # f = 0.005
+```
+
+placing the fixed point at 0.5% of the reference mass flow whatever the
+network's size. It is frozen for the solve, so the residual and Jacobian are
+unchanged in form.
+
+| name | where | meaning |
+|---|---|---|
+| `BARRIER_SLACK_FRACTION` | `combaero.network.mpce_v2_element` | where the fixed point is placed, as a fraction of `m_ref` |
+| `DEFAULT_SOFT_PENALTY_ALPHA` | same | fallback when no solver has supplied a weight, or the reference state is degenerate |
+| `scaled_penalty_alpha(P_ref, m_ref)` | same | the derivation, exposed for testing |
+| `MPCEv2Element.effective_penalty_alpha()` | element | the weight actually used, after precedence |
+
+Precedence: an explicitly set `soft_penalty_alpha` always wins, then the
+solver-supplied scale-aware weight, then the fallback. So the tuning knob keeps
+working:
+
+```python
+element.soft_penalty_alpha = 5.0e7   # explicit: overrides the derived weight
+```
+
+Raising `alpha` shrinks the fixed point and never destabilises the solve --
+the response is monotone and saturates -- so when in doubt, larger.
+
 ### Combustion Integration
 ```python
 from combaero.network.combustion import (
