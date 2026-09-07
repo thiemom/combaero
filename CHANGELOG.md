@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The momentum-CV junction's residual and Jacobian are now computed in C++.**
+  `MPCEv2Element` becomes a shim: it applies the guards -- the degenerate-state
+  fallbacks and the wrong-direction soft barrier, which are solver policy
+  rather than junction physics -- and then calls
+  `_core.mpce_v2_residuals_and_jacobian`, which seeds the whole element over
+  `(P_i, Pt_i, outer_mdot_i, Pt_jct)` and returns exact partials for every one.
+  This replaces a Python closure evaluation, a sympy-lambdified Jacobian block
+  for the canonical separating tee, an N+1-call finite-difference fallback for
+  every other topology, and a hand-derived `dR/dP` column.
+  **The Jacobian is now more complete, not merely faster.** The hand-derived
+  column covered the common port only, but `K` depends on every port's velocity
+  and every velocity on its own density; measured against central differences of
+  the assembled network Jacobian, the worst relative error falls from 4.4e-3 to
+  1.4e-6. Accuracy is unchanged to four decimals on every validation source
+  (Bassett 0.1538, Hager 0.0787, Idelchik 0.8880, Wang 0.1184) and convergence
+  is slightly better: the scorecard goes from 2108 to 2109 of 2546, and the
+  random boundary sweep from 92.9% to 93.7% of draws that admit a root.
+  `MPCEv2Element.jacobian_method` is retired and now selects nothing; it is kept
+  so existing callers do not break. The sympy derivation remains in
+  `_mpce_v2_jacobian.py` as an offline cross-check rather than a runtime path.
+
 ### Added
 - **`NetworkSolver.solve` now reports why a solve ended, separately from
   whether it succeeded.** Five new keys: `__converged__` (the root finder's own

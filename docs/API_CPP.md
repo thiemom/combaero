@@ -789,6 +789,57 @@ Port convention: MAIN_INLET=A, BRANCH=B, MAIN_OUTLET=C; `m_dot_com` = common-por
 mass flow, `m_dot_branch` = branch mass flow, `F_C` = cross-sectional area [m^2] at
 the common port, `psi` = A_branch / A_com, `theta` = branch angle [rad].
 
+### Momentum-CV Junction: whole-element (f, J)
+
+Backs `MPCEv2Element`. Unlike the tee functions above, this returns the whole
+element's residual vector and its full Jacobian from one seeded evaluation --
+forward-mode dual numbers over every unknown, so there is no separate
+derivation to keep in sync (`include/mpce_junction.h`).
+
+```cpp
+struct MpceGeometry {
+    std::array<double, 3> area, theta_rad, port_sign;
+    double joining_etransfer_alpha, eta_scale;
+};
+
+struct MpceResidualJacobian {
+    std::array<double, 4> residual;                    // 3 port rows + mass
+    std::array<std::array<double, 10>, 4> jacobian;    // [row][seed]
+    bool valid;                                        // false: not a junction
+    int common_port;
+    double k_term_sign;
+    std::array<double, 3> k_per_port;
+};
+
+MpceResidualJacobian mpce_v2_residuals_and_jacobian(
+    const std::array<double, 3>& p_static, const std::array<double, 3>& p_total,
+    const std::array<double, 3>& rho,      const std::array<double, 3>& drho_dp,
+    const std::array<double, 3>& outer_mdot, double pt_jct,
+    const MpceGeometry& geom);
+```
+
+Seed order, matching the Jacobian's columns:
+
+| columns | unknown |
+|---|---|
+| 0-2 | `p_static[i]` |
+| 3-5 | `p_total[i]` |
+| 6-8 | `outer_mdot[i]` |
+| 9 | `pt_jct` |
+
+`outer_mdot` is the CONNECTING element's mass flow, not the junction-convention
+one; `geom.port_sign` maps between them, so the Jacobian arrives already
+expressed in the solver's own unknowns.
+
+**Physics only.** The kernel does not own the degenerate-state guards or the
+wrong-direction soft barrier -- those are solver policy and live in
+`MPCEv2Element`. It reports `valid = false` for a flow pattern that is not a
+junction in any regime rather than guessing.
+
+**Thermodynamics stays at the call site**: pass `rho` and `drho/dP` per port.
+A Jacobian is first order, so seeding `rho + (drho/dP)(P - P_val)` is exact.
+For combaero's mixtures `drho/dP = rho/P` holds to 1e-11.
+
 Residual sign convention: `R_straight = dP0_straight + K_straight * q_dyn`,
 `R_branch = dP0_branch + K_branch * q_dyn`.
 
