@@ -41,7 +41,7 @@ from typing import Literal
 
 import numpy as np
 
-from combaero.network._mpce_v2_jacobian import dKQ_dmdot_separating_T
+from combaero import _core
 from combaero.network._mynard2010 import junction_loss_coefficient
 from combaero.network.components import (
     MultiPortChamberElement,
@@ -95,22 +95,21 @@ def scaled_penalty_alpha(ref_pressure: float, ref_mdot: float) -> float:
 class MPCEv2Element(MultiPortChamberElement):
     """Mynard Unified0D residual on MPCE-v1's topology framework.
 
-    The ``jacobian_method`` attribute controls how the K*q_dyn term's
-    Jacobian is computed:
-      - ``"sympy"`` (default): analytical sympy-derived Jacobian for the
-        canonical 3-port separating T (1 supplier on port 0, straight at
-        0 deg, branch at theta_branch). Uses 1 Mynard evaluation per
-        residual call. Non-canonical topologies (joining, theta != 0 on
-        the straight arm, N != 3) auto-fall-back to FD because the
-        sympy derivation is specific to the canonical case. Validated on
-        the separating K6 / K5 audit: identical convergence + accuracy
-        vs FD with ~1.14x wall-time speedup.
-      - ``"fd"``: numerical finite-difference on Mynard. Costs N+1
-        Mynard evaluations per residual call. Always available across
-        all topologies. The previous default; flipped to sympy in PR
-        adding GUI solver tweaks once the empirical "fd is more robust
-        on mfb_two_pb low-q" concern was found to no longer apply at
-        the post-soft-barrier audit point.
+    The residual and its Jacobian come from
+    ``_core.mpce_v2_residuals_and_jacobian``, which seeds the whole element
+    over ``(P_i, Pt_i, outer_mdot_i, Pt_jct)`` and returns exact partials for
+    every one. What stays here is the GUARDS -- the degenerate-state
+    fallbacks and the wrong-direction soft barrier -- which are solver policy
+    rather than junction physics (issue #271, step 4.4).
+
+    ``jacobian_method`` is RETIRED and selects nothing. It chose between a
+    sympy derivation for the canonical 3-port separating T and an N+1-call
+    finite-difference fallback for every other topology; both are gone. The
+    sympy derivation survives in ``_mpce_v2_jacobian.py`` as an offline
+    cross-check (``test_mpce_v2_jacobian.py``), not as a runtime path. The
+    attribute is kept so existing callers that set it do not break, and is
+    documented here rather than removed silently -- a knob that quietly does
+    nothing is worse than one that says so.
 
     ``flow_direction`` constrains which physical flow regime this element
     represents:
@@ -644,182 +643,89 @@ class MPCEv2Element(MultiPortChamberElement):
             sup_mask = U_mynard > 0.0
             col_mask = U_mynard < 0.0
 
-        try:
-            mynard = junction_loss_coefficient(
-                U_mynard,
-                A,
-                theta_rad,
-                joining_etransfer_alpha=self.joining_etransfer_alpha,
-                eta_scale=self.eta_scale,
-            )
-        except (IndexError, ValueError) as exc:
-            # The closure can raise only on a degenerate flow split (empty
-            # supplier or collector mask), and the guard above already routes
-            # those to the continuity fallback before this call. Reaching
-            # here therefore means the two classifications disagree -- an
-            # anomaly worth seeing, not one to paper over. This used to
-            # return a lossless residual with an EMPTY Jacobian for *any*
-            # exception, which turned a plumbing error into a plausible-
-            # looking lossless junction mid-solve (issue #271). Programming
-            # errors now propagate untouched.
-            raise RuntimeError(
-                f"MPCEv2Element '{self.id}': Mynard closure failed on a "
-                f"non-degenerate state (port_mdots={list(port_mdots)}, "
-                f"suppliers={sup_mask.tolist()}, collectors={col_mask.tolist()}). "
-                f"The degenerate-split guard should have caught this first."
-            ) from exc
-
-        # ITERATION-2: use mynard.K (Matlab line 73) with common-side q_dyn.
-        # This is the physically correct normalization: K is defined such
-        # that Pt_common - Pt_other = K * 0.5 * rho_com * u_com^2.
-        # The common branch is the single supplier (diverging) or single
-        # collector (converging); mynard.K is per non-common port.
+        # ---- Whole-element (f, J) from C++ ---------------------------------
         #
-        # Sign of the K*q_dyn term in the residual:
-        #   Separating: common is supplier (higher Pt), collectors have
-        #               LOWER Pt -> Pt_col = Pt_jct - K*q_dyn -> +1 in residual
-        #   Joining:    common is collector (lower Pt), suppliers have
-        #               HIGHER Pt -> Pt_sup = Pt_jct + K*q_dyn -> -1 in residual
-        if int(np.sum(sup_mask)) == 1:
-            common_mask = sup_mask
-            non_common_idxs = np.where(col_mask)[0]
-            K_term_sign = +1.0
-        else:
-            common_mask = col_mask
-            non_common_idxs = np.where(sup_mask)[0]
-            K_term_sign = -1.0
+        # Everything above is GUARD -- the degenerate-state fallbacks and the
+        # wrong-direction soft barrier, which are solver policy rather than
+        # junction physics and stay here where they are cheap to change
+        # (#302, #303). From this point the state is a junction, and the
+        # physics is one call.
+        #
+        # What this replaced: a Python closure evaluation, a sympy-lambdified
+        # dKQ/dmdot block for the canonical separating tee, an N+1-call finite
+        # -difference fallback for every other case, and a hand-derived dR/dP
+        # column. The kernel seeds the whole element over
+        # (P_i, Pt_i, outer_mdot_i, Pt_jct) and returns the Jacobian already
+        # expressed in those unknowns, so nothing is left to assemble here.
+        #
+        # It is also MORE complete. The hand-derived column covered the common
+        # port only, but K depends on every port's velocity and every velocity
+        # on its own density; measured against central differences, the two
+        # non-common dR/dP columns were absent and wrong by 4.4e-3 and 2.3e-3
+        # (issue #271).
+        #
+        # The snapped velocities are handed over as mass flows, since the
+        # kernel takes flows and derives its own U. d(rho)/dP is rho/P: the
+        # mixture density is ideal to 1e-11 over the validation range, so this
+        # is exact rather than an approximation.
+        outer_mdot = [
+            -float(U_mynard[i]) * float(rho_port[i]) * float(A[i]) * float(self._port_signs[i])
+            for i in range(N)
+        ]
+        p_static = [float(s.P) for s in states]
+        geom = _core.MpceGeometry()
+        geom.area = [float(a) for a in A]
+        # Declared angles: the kernel does the axial-back reassignment itself.
+        geom.theta_rad = [math.radians(float(t)) for t in self.port_angles_deg]
+        geom.port_sign = [float(s) for s in self._port_signs]
+        geom.joining_etransfer_alpha = float(self.joining_etransfer_alpha)
+        geom.eta_scale = float(self.eta_scale)
 
-        K_per_port = np.zeros(N)
-        if mynard.K is not None and len(mynard.K) == len(non_common_idxs):
-            for j, port_idx in enumerate(non_common_idxs):
-                K_per_port[port_idx] = float(mynard.K[j])
-
-        # Common-side dynamic head: q_dyn at the single common port.
-        common_idx = int(np.where(common_mask)[0][0])
-        u_com = abs(float(U_mynard[common_idx]))
-        rho_com = float(rho_port[common_idx])
-        q_dyn_com = 0.5 * rho_com * u_com * u_com
-
-        # Residual: Pt_i - Pt_jct + K_i * q_dyn_com = 0
-        # Common port: K_i = 0, so Pt_common = Pt_jct (continuity).
-        # Other ports: K * q_dyn_com is the loss term per Mynard's
-        # stagnation-pressure relation (Eq 15).
-        residuals: list[float] = []
-        for i in range(N):
-            Pt_i = float(states[i].Pt)
-            R_i = Pt_i - Pt_jct + K_term_sign * K_per_port[i] * q_dyn_com
-            residuals.append(R_i)
-        residuals.append(sum(port_mdots))
-
-        # Jacobian: linear pieces explicit + analytical (sympy-derived) for
-        # the K*q_dyn term in the canonical 3-port separating case; FD
-        # fallback for everything else.
-        KQ_base = K_per_port * q_dyn_com  # per-port loss term (collectors nonzero)
-        dKQ_dmdot = np.zeros((N, N))
-
-        is_canonical_separating_T = (
-            N == 3
-            and int(np.sum(sup_mask)) == 1
-            and bool(sup_mask[0])  # port 0 is the supplier
-            and abs(self.port_angles_deg[1]) < 1e-9  # straight at 0
+        kernel = _core.mpce_v2_residuals_and_jacobian(
+            p_static,
+            [float(s.Pt) for s in states],
+            [float(r) for r in rho_port],
+            [float(rho_port[i]) / p_static[i] if p_static[i] > 0.0 else 0.0 for i in range(N)],
+            outer_mdot,
+            float(Pt_jct),
+            geom,
         )
-        if is_canonical_separating_T and self.jacobian_method == "sympy":
-            dKQ_dmdot = dKQ_dmdot_separating_T(
-                np.asarray(port_mdots, dtype=float),
-                rho_port,
-                A,
-                math.radians(float(self.port_angles_deg[2])),
-                eta_scale=self.eta_scale,
+        if not kernel.valid:
+            # The guards above own every state the kernel refuses, so reaching
+            # here means the two disagree -- an anomaly worth seeing rather
+            # than one to paper over. This used to be an `except Exception`
+            # returning a lossless residual with an EMPTY Jacobian, which
+            # turned a plumbing error into a plausible-looking junction
+            # mid-solve (issue #271).
+            raise RuntimeError(
+                f"MPCEv2Element '{self.id}': the C++ kernel refused a state the "
+                f"guards accepted (port_mdots={list(port_mdots)}, "
+                f"suppliers={sup_mask.tolist()}, collectors={col_mask.tolist()})."
             )
-        else:
-            # FD fallback: N+1 Mynard calls.
-            eps_scale = 1e-4
-            for j in range(N):
-                mdot_eps = max(abs(port_mdots[j]) * eps_scale, 1e-7)
-                mdot_pert = list(port_mdots)
-                mdot_pert[j] = port_mdots[j] + mdot_eps
-                U_pert = -np.array(mdot_pert) / (rho_port * A)
-                if (np.sign(U_pert) != np.sign(U_mynard)).any():
-                    continue
-                try:
-                    m_pert = junction_loss_coefficient(
-                        U_pert,
-                        A,
-                        theta_rad,
-                        joining_etransfer_alpha=self.joining_etransfer_alpha,
-                        eta_scale=self.eta_scale,
-                    )
-                except (IndexError, ValueError) as exc:
-                    # The sign-flip guard above already skips perturbations
-                    # that cross zero; a raise here is a state the closure
-                    # cannot classify at all. Leaving the column zero was a
-                    # silent wrong derivative (issue #271, #280).
-                    raise RuntimeError(
-                        f"MPCEv2Element '{self.id}': Mynard closure failed on the "
-                        f"FD perturbation of port {j} (perturbed mdots={mdot_pert})."
-                    ) from exc
-                if m_pert.K is None or len(m_pert.K) != len(non_common_idxs):
-                    continue
-                K_pert = np.zeros(N)
-                for k, port_idx in enumerate(non_common_idxs):
-                    K_pert[port_idx] = float(m_pert.K[k])
-                u_com_pert = abs(float(U_pert[common_idx]))
-                q_dyn_pert = 0.5 * rho_com * u_com_pert * u_com_pert
-                KQ_pert = K_pert * q_dyn_pert
-                dKQ_dmdot[:, j] = (KQ_pert - KQ_base) / mdot_eps
 
-        # Sensitivity of the loss term to the common port's STATIC pressure.
-        # This column was absent, leaving a silently zero Jacobian entry -- the
-        # same defect PR #230 fixed in ConstantKTeeElement (issue #271).
-        # Temperature is derived forward for a MomentumChamberNode rather than
-        # solved, so there is no .T unknown to differentiate against.
-        #
-        # Two paths carry the dependence, and taking only the first is wrong by
-        # a few per cent:
-        #   (a) q_dyn_com = mdot^2 / (2*rho*A^2) ~ 1/rho, and rho ~ P/T for a
-        #       near-ideal gas, so d(q_dyn)/dP = -q_dyn / P.
-        #   (b) Mynard's K is a function of the port velocities U = -mdot/(rho*A),
-        #       so it moves with rho too.
-        # For (b), U depends on P and on mdot through the same 1/rho factor:
-        #       dU/dP = -U/P     and     dU/dmdot = U/mdot
-        #   =>  dK/dP = -(mdot_com / P_com) * dK/dmdot_com,
-        # which lets the existing dKQ/dmdot column supply it. Substituting and
-        # using d(q_dyn)/dmdot_com = 2*q_dyn/mdot_com, the two paths combine to
-        #       dR_i/dP_com = sign * [ K_i*q_dyn/P - (mdot_com/P) * dKQ_i/dmdot_com ]
-        # Note the leading term ends up POSITIVE: path (b) more than cancels the
-        # naive -K*q/P. Pinned by test_mpce_v2_jacobian_rows.py.
-        P_com = float(states[common_idx].P)
-        m_com = float(port_mdots[common_idx])
-        p_var_com = f"{self.port_nodes[common_idx]}.P"
+        residuals = [float(v) for v in kernel.residual]
+        # The mass row uses the ORIGINAL flows, not the snapped ones: snapping
+        # exists to let the closure classify a dead port, and must not add its
+        # 1e-9 to the conservation statement.
+        residuals[N] = float(sum(port_mdots))
 
+        # Relabel the seeds onto the solver's unknown names. The seed order is
+        # fixed by include/mpce_junction.h and pinned by
+        # test_mpce_shim_relabelling.py.
+        seed_names = (
+            [f"{self.port_nodes[i]}.P" for i in range(N)]
+            + [f"{self.port_nodes[i]}.Pt" for i in range(N)]
+            + [f"{self._port_element_ids[i]}.m_dot" for i in range(N)]
+            + [f"{self.id}.P_jct"]
+        )
         jac: dict[int, dict[str, float]] = {}
-        for i in range(N):
-            row: dict[str, float] = {
-                f"{self.port_nodes[i]}.Pt": 1.0,
-                f"{self.id}.P_jct": -1.0,
-            }
-            if P_com > 0.0:
-                dR_dP_com = float(K_per_port[i]) * q_dyn_com / P_com - (m_com / P_com) * float(
-                    dKQ_dmdot[i, common_idx]
-                )
-                if dR_dP_com != 0.0:
-                    row[p_var_com] = row.get(p_var_com, 0.0) + K_term_sign * dR_dP_com
-            for j in range(N):
-                if abs(dKQ_dmdot[i, j]) > 0.0:
-                    mdot_var = f"{self._port_element_ids[j]}.m_dot"
-                    # Outer mdot has been sign-mapped: port_mdots[j] = sign_j * outer.
-                    # Chain rule: d(KQ_i)/d(outer_j) = dKQ_dmdot[i,j] * sign_j.
-                    # K_term_sign carries the joining/separating residual flip.
-                    row[mdot_var] = row.get(mdot_var, 0.0) + (
-                        K_term_sign * dKQ_dmdot[i, j] * self._port_signs[j]
-                    )
-            jac[i] = row
-
-        mass_row: dict[str, float] = {}
-        for i in range(N):
-            mass_var = f"{self._port_element_ids[i]}.m_dot"
-            mass_row[mass_var] = mass_row.get(mass_var, 0.0) + self._port_signs[i]
-        jac[N] = mass_row
+        for row in range(N + 1):
+            entries: dict[str, float] = {}
+            for seed, name in enumerate(seed_names):
+                value = float(kernel.jacobian[row][seed])
+                if value != 0.0:
+                    entries[name] = entries.get(name, 0.0) + value
+            jac[row] = entries
 
         return residuals, jac
 

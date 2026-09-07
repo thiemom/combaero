@@ -101,6 +101,35 @@ def test_same_sign_iterate_raises_when_strict():
 # ---------------------------------------------------------------------------
 
 
+def _spy_outer_mdot(monkeypatch, element, states, pt_jct, mdots):
+    """The velocities the CLOSURE ends up seeing, observed at the kernel call.
+
+    The snapped state used to be checked by spying on the Python closure. Since
+    the whole-element (f, J) moved to C++ (#271 step 4.4) the residual path
+    hands the kernel mass flows and the kernel derives U itself, so the same
+    quantity is read back from the flows: U_i = -port_sign_i * outer_i /
+    (rho_i A_i), which is sign-equivalent to -port_sign_i * outer_i.
+    """
+    seen = {}
+    real = v2._core.mpce_v2_residuals_and_jacobian
+
+    def spy(p_static, p_total, rho, drho_dp, outer_mdot, pt, geom):
+        seen["U"] = np.array(
+            [
+                -float(geom.port_sign[i])
+                * float(outer_mdot[i])
+                / (float(rho[i]) * float(geom.area[i]))
+                for i in range(len(outer_mdot))
+            ]
+        )
+        return real(p_static, p_total, rho, drho_dp, outer_mdot, pt, geom)
+
+    monkeypatch.setattr(v2._core, "mpce_v2_residuals_and_jacobian", spy)
+    element.residuals(states, pt_jct, list(mdots))
+    assert "U" in seen, "the kernel was never reached"
+    return seen["U"]
+
+
 def test_exact_zero_outlet_is_classified_as_a_dead_collector(monkeypatch):
     """[-0.1, -0.0, 0.125]: the straight outlet at -0.0 (an initial guess).
 
@@ -108,17 +137,8 @@ def test_exact_zero_outlet_is_classified_as_a_dead_collector(monkeypatch):
     closure must now be handed a tiny flow in the port's DECLARED direction,
     so it sees one supplier and two collectors.
     """
-    seen = {}
-    real = v2.junction_loss_coefficient
+    U = _spy_outer_mdot(monkeypatch, _element(), _states(), 100_300.0, [-0.1, -0.0, 0.125])
 
-    def spy(U, *args, **kwargs):
-        seen["U"] = np.array(U, dtype=float)
-        return real(U, *args, **kwargs)
-
-    monkeypatch.setattr(v2, "junction_loss_coefficient", spy)
-    _element().residuals(_states(), 100_300.0, [-0.1, -0.0, 0.125])
-
-    U = seen["U"]
     assert U[1] < 0.0, "the dead outlet must reach the closure as a collector"
     assert (U > 0).sum() == 1 and (U < 0).sum() == 2
 
@@ -136,17 +156,9 @@ def test_exact_zero_outlet_carries_the_dead_branch_loss():
 
 
 def test_exact_zero_inlet_in_a_merge_is_a_dead_supplier(monkeypatch):
-    seen = {}
-    real = v2.junction_loss_coefficient
+    U = _spy_outer_mdot(monkeypatch, _element("merge"), _states(), 100_300.0, [-0.1, 0.0, 0.1])
 
-    def spy(U, *args, **kwargs):
-        seen["U"] = np.array(U, dtype=float)
-        return real(U, *args, **kwargs)
-
-    monkeypatch.setattr(v2, "junction_loss_coefficient", spy)
-    _element("merge").residuals(_states(), 100_300.0, [-0.1, 0.0, 0.1])
-
-    assert seen["U"][1] > 0.0, "a dead inlet must reach the closure as a supplier"
+    assert U[1] > 0.0, "a dead inlet must reach the closure as a supplier"
 
 
 # ---------------------------------------------------------------------------

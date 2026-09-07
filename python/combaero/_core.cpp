@@ -19,6 +19,7 @@
 #include "heat_transfer.h"
 #include "humidair.h"
 #include "incompressible.h"
+#include "mpce_junction.h"
 #include "materials.h"
 #include "orifice.h"
 #include "registry.h"
@@ -296,6 +297,44 @@ PYBIND11_MODULE(_core, m) {
         "Momentum chamber residual: P_total = P + 0.5*rho*v^2");
 
   // Multi-port chamber (momentum-CV junction)
+  // --- Momentum-CV junction: whole-element (f, J) -------------------------
+  py::class_<solver::MpceGeometry>(
+      m, "MpceGeometry",
+      "Fixed geometry and tuning for the momentum-CV junction kernel")
+      .def(py::init<>())
+      .def_readwrite("area", &solver::MpceGeometry::area)
+      .def_readwrite("theta_rad", &solver::MpceGeometry::theta_rad)
+      .def_readwrite("port_sign", &solver::MpceGeometry::port_sign)
+      .def_readwrite("joining_etransfer_alpha",
+                     &solver::MpceGeometry::joining_etransfer_alpha)
+      .def_readwrite("eta_scale", &solver::MpceGeometry::eta_scale);
+
+  py::class_<solver::MpceResidualJacobian>(
+      m, "MpceResidualJacobian",
+      "Whole-element residuals and Jacobian for the momentum-CV junction")
+      .def_readonly("residual", &solver::MpceResidualJacobian::residual)
+      .def_readonly("jacobian", &solver::MpceResidualJacobian::jacobian)
+      .def_readonly("valid", &solver::MpceResidualJacobian::valid)
+      .def_readonly("common_port", &solver::MpceResidualJacobian::common_port)
+      .def_readonly("k_term_sign", &solver::MpceResidualJacobian::k_term_sign)
+      .def_readonly("k_per_port", &solver::MpceResidualJacobian::k_per_port);
+
+  m.def("mpce_v2_residuals_and_jacobian",
+        &solver::mpce_v2_residuals_and_jacobian, py::arg("p_static"),
+        py::arg("p_total"), py::arg("rho"), py::arg("drho_dp"),
+        py::arg("outer_mdot"), py::arg("pt_jct"), py::arg("geom"),
+        "Momentum-CV junction whole-element (f, J), three ports.\n\n"
+        "Physics only: the caller owns the degenerate-state guards and the\n"
+        "wrong-direction soft barrier (see include/mpce_junction.h).\n\n"
+        "Jacobian seed order, matching the returned rows:\n"
+        "  0..2  p_static[i]     3..5  p_total[i]\n"
+        "  6..8  outer_mdot[i]   9     pt_jct\n\n"
+        "``outer_mdot`` is the CONNECTING element's mass flow, not the\n"
+        "junction-convention one; ``geom.port_sign`` maps between them, so\n"
+        "the Jacobian comes back already in the solver's own unknowns.\n\n"
+        "Returns: MpceResidualJacobian (valid=False when the flow pattern\n"
+        "is not a junction at all).");
+
   py::class_<solver::PortImpulseJacobian>(
       m, "PortImpulseJacobian",
       "Per-port impulse-residual Jacobian for MultiPortChamberResult")
