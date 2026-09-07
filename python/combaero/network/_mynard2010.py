@@ -33,7 +33,14 @@ import numpy as np
 
 
 def _wrap_to_pi(x: np.ndarray) -> np.ndarray:
-    """Matlab's `wrapToPi`: angle to (-pi, pi]."""
+    """Angle to [-pi, pi).
+
+    Named after Matlab's `wrapToPi`, but NOT identical to it at the boundary:
+    Matlab's range is (-pi, pi] and returns +pi for an input of exactly pi,
+    while this expression returns -pi. The difference is invisible for any
+    ordinary geometry and is preserved deliberately -- the C++ port matches
+    this implementation, not Matlab's documented range (issue #271).
+    """
     return (x + math.pi) % (2.0 * math.pi) - math.pi
 
 
