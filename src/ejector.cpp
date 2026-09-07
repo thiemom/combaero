@@ -2,6 +2,8 @@
 // regimes). See include/ejector.h for paper references and the scope note.
 
 #include "ejector.h"
+
+#include "dual_number.h"
 #include <array>
 #include <cmath>
 #include <initializer_list>
@@ -71,106 +73,10 @@ double ejector_q_lambda(double lam, double gamma) {
   return std::pow(1.0 - (gm1 / gp1) * lam * lam, 1.0 / gm1) * std::pow(gp1 / 2.0, 1.0 / gm1) * lam;
 }
 
-// -----------------------------------------------------------------------------
-// Generic forward-mode dual (N seeds) for the operating-regime closures, whose
-// Newton unknowns include P_py and the outlet pressure in addition to the four
-// thermodynamic inputs -- so the fixed 4-seed Dual4 above (kept untouched for
-// the validated critical-mode path) does not fit. Same analytic chain-rule
-// bookkeeping; DualN<N>::seed(v, i) sets the i-th partial to 1.
-// -----------------------------------------------------------------------------
-namespace {
-
-template <int N> struct DualN {
-  double v = 0.0;
-  std::array<double, N> d{};
-  static DualN constant(double c) {
-    DualN r;
-    r.v = c;
-    return r;
-  }
-  static DualN seed(double c, int i) {
-    DualN r;
-    r.v = c;
-    r.d[i] = 1.0;
-    return r;
-  }
-};
-
-template <int N> DualN<N> operator+(const DualN<N>& a, const DualN<N>& b) {
-  DualN<N> r;
-  r.v = a.v + b.v;
-  for (int i = 0; i < N; ++i) r.d[i] = a.d[i] + b.d[i];
-  return r;
-}
-template <int N> DualN<N> operator+(const DualN<N>& a, double c) {
-  DualN<N> r = a;
-  r.v += c;
-  return r;
-}
-template <int N> DualN<N> operator+(double c, const DualN<N>& a) { return a + c; }
-template <int N> DualN<N> operator-(const DualN<N>& a, const DualN<N>& b) {
-  DualN<N> r;
-  r.v = a.v - b.v;
-  for (int i = 0; i < N; ++i) r.d[i] = a.d[i] - b.d[i];
-  return r;
-}
-template <int N> DualN<N> operator-(const DualN<N>& a, double c) {
-  DualN<N> r = a;
-  r.v -= c;
-  return r;
-}
-template <int N> DualN<N> operator-(double c, const DualN<N>& a) {
-  DualN<N> r;
-  r.v = c - a.v;
-  for (int i = 0; i < N; ++i) r.d[i] = -a.d[i];
-  return r;
-}
-template <int N> DualN<N> operator*(const DualN<N>& a, const DualN<N>& b) {
-  DualN<N> r;
-  r.v = a.v * b.v;
-  for (int i = 0; i < N; ++i) r.d[i] = a.d[i] * b.v + a.v * b.d[i];
-  return r;
-}
-template <int N> DualN<N> operator*(const DualN<N>& a, double c) {
-  DualN<N> r;
-  r.v = a.v * c;
-  for (int i = 0; i < N; ++i) r.d[i] = a.d[i] * c;
-  return r;
-}
-template <int N> DualN<N> operator*(double c, const DualN<N>& a) { return a * c; }
-template <int N> DualN<N> operator/(const DualN<N>& a, const DualN<N>& b) {
-  DualN<N> r;
-  double inv = 1.0 / b.v;
-  double inv2 = inv * inv;
-  r.v = a.v * inv;
-  for (int i = 0; i < N; ++i) r.d[i] = (a.d[i] * b.v - a.v * b.d[i]) * inv2;
-  return r;
-}
-template <int N> DualN<N> operator/(const DualN<N>& a, double c) { return a * (1.0 / c); }
-template <int N> DualN<N> operator/(double c, const DualN<N>& a) {
-  DualN<N> r;
-  double inv = 1.0 / a.v;
-  r.v = c * inv;
-  double coef = -c * inv * inv;
-  for (int i = 0; i < N; ++i) r.d[i] = a.d[i] * coef;
-  return r;
-}
-template <int N> DualN<N> dsqrt(const DualN<N>& a) {
-  DualN<N> r;
-  r.v = std::sqrt(a.v);
-  double coef = 0.5 / r.v;
-  for (int i = 0; i < N; ++i) r.d[i] = a.d[i] * coef;
-  return r;
-}
-template <int N> DualN<N> dpow(const DualN<N>& a, double c) {
-  DualN<N> r;
-  r.v = std::pow(a.v, c);
-  double coef = c * std::pow(a.v, c - 1.0);
-  for (int i = 0; i < N; ++i) r.d[i] = a.d[i] * coef;
-  return r;
-}
-
-} // namespace
+// The generic forward-mode dual used below (DualN<N>) now lives in
+// include/dual_number.h, so the junction closure can share one implementation
+// rather than a second copy (issue #271). The fixed 4-seed Dual4 above is
+// deliberately left here: it backs the validated critical-mode path.
 
 EjectorCDNozzleJacobian ejector_cd_nozzle_mass_flow_and_jacobian(
     double p0_val, double t0_val, double p_py_val, double area_throat,
