@@ -1,6 +1,7 @@
 import math
 import time
 import warnings
+from enum import StrEnum
 from typing import Any, Literal
 
 import numpy as np
@@ -26,6 +27,47 @@ from .graph import FlowNetwork
 
 class SolverTimeoutError(Exception):
     """Raised when the solver exceeds the specified wall-clock timeout."""
+
+
+class SolveOutcome(StrEnum):
+    """Why a solve ended, in one machine-readable value.
+
+    A ``StrEnum``, so it compares and serialises as a plain string and an
+    existing ``== "converged"`` keeps working.
+
+    ``NetworkSolver`` used to report only ``__success__`` and a free-text
+    ``__message__``, so every consumer that needed to know WHY a solve failed
+    matched on substrings of that message -- and the messages come partly from
+    SciPy, which is free to reword them. This does that classification once, at
+    the point that knows the answer.
+    """
+
+    #: A root was found, and it passed every element's consistency check (or
+    #: no element had one).
+    CONVERGED = "converged"
+    #: A root was found and then rejected by an element's own physical
+    #: consistency check. ``__inconsistent_elements__`` names them.
+    INCONSISTENT = "inconsistent"
+    #: The minimiser stopped improving before reaching tolerance.
+    NO_PROGRESS = "no_progress"
+    #: The method reported success at a non-zero local minimum of ||F||.
+    RESIDUAL_TOO_LARGE = "residual_too_large"
+    #: The wall-clock budget ran out.
+    TIMEOUT = "timeout"
+    #: An exception was raised while evaluating residuals.
+    ERROR = "error"
+    #: Did not converge, with no more specific reason available.
+    NOT_CONVERGED = "not_converged"
+    #: Nothing to solve: the network is empty or fully constrained.
+    NO_UNKNOWNS = "no_unknowns"
+
+
+def _classify_solver_message(message: str) -> SolveOutcome:
+    """The one place SciPy's free-text failure message is interpreted."""
+    text = (message or "").lower()
+    if "not making good progress" in text:
+        return SolveOutcome.NO_PROGRESS
+    return SolveOutcome.NOT_CONVERGED
 
     pass
 
@@ -2058,6 +2100,11 @@ class NetworkSolver:
                 "__success__": True,
                 "__message__": "Network is empty or fully constrained (no unknowns).",
                 "__iterations__": 0,
+                "__converged__": True,
+                "__consistent__": None,
+                "__inconsistent_elements__": [],
+                "__outcome__": SolveOutcome.NO_UNKNOWNS,
+                "__worst_residuals__": [],
             }
 
         # Set default iteration limit based on problem size (matches hybr's own default
@@ -2422,6 +2469,7 @@ class NetworkSolver:
         # Solve with timing
         _RESIDUAL_TOL = 1e-3
         solve_start_time = time.time()
+        outcome: SolveOutcome = SolveOutcome.NOT_CONVERGED
         try:
             sol = root(residuals_wrapper, x0_scaled, method=method, options=options, jac=use_jac)
             solve_end_time = time.time()
@@ -2429,12 +2477,14 @@ class NetworkSolver:
             final_x = best_x
             success = sol.success
             message = sol.message
+            outcome = SolveOutcome.CONVERGED if success else _classify_solver_message(message)
             # Efficiently use tracked norm instead of re-evaluating
             final_norm = float(best_res_norm)
             # Guard against methods (e.g. lm) that report success at a
             # non-zero local minimum of ||F||^2.
             if success and final_norm > _RESIDUAL_TOL:
                 success = False
+                outcome = SolveOutcome.RESIDUAL_TOO_LARGE
                 message = (
                     f"Solver reported success but |F|={final_norm:.3e} "
                     f"exceeds residual tolerance ({_RESIDUAL_TOL})."
@@ -2444,12 +2494,14 @@ class NetworkSolver:
         except SolverTimeoutError as e:
             final_x = best_x
             success = False
+            outcome = SolveOutcome.TIMEOUT
             message = str(e)
             final_norm = float(best_res_norm)
         except Exception as e:
             # Fallback for unexpected errors during residuals evaluation
             final_x = best_x
             success = False
+            outcome = SolveOutcome.ERROR
             message = f"Unexpected error during residual evaluation: {e}"
             final_norm = float(best_res_norm)
 
@@ -2464,6 +2516,7 @@ class NetworkSolver:
                 if sol2.success and fallback_norm < _RESIDUAL_TOL:
                     final_x = fallback_x
                     success = True
+                    outcome = SolveOutcome.CONVERGED
                     message = f"Converged after fallback to hybr (original {method} failed)."
                     final_norm = fallback_norm
             except Exception:
@@ -2501,6 +2554,7 @@ class NetworkSolver:
                     if _lm_norm < _RESIDUAL_TOL:
                         final_x = best_x
                         success = True
+                        outcome = SolveOutcome.CONVERGED
                         _hybr_end = "stalled at" if _stall_fired[0] else "|F|="
                         message = (
                             f"Converged with LM fallback "
@@ -2552,6 +2606,22 @@ class NetworkSolver:
         # higher-Pt port (a passive junction manufacturing flow work).
         # Each element's verify_solution_consistent encodes its own
         # criterion; demote failures to honest non-convergence.
+        #
+        # The verdict is REPORTED as well as applied. "Not checked" is not the
+        # same as "fine": a network whose elements carry no verifier gets
+        # ``__consistent__ = None``, never True, so a caller cannot read a
+        # silent absence of checking as a clean bill of health.
+        # The root finder's own verdict, before the consistency check can
+        # demote it. ``__success__`` folds the two together and must keep
+        # doing so; this is the half that says whether Newton got there.
+        converged = bool(success)
+        _bad_junctions: list[str] = []
+        _checkable = [
+            element
+            for element in self.network.elements.values()
+            if hasattr(element, "verify_solution_consistent")
+        ]
+        consistent: bool | None = None
         if success:
             _sol_names = dict(zip(self.unknown_names, final_x, strict=False))
             _bad_junctions = [
@@ -2560,8 +2630,11 @@ class NetworkSolver:
                 if hasattr(element, "verify_solution_consistent")
                 and not element.verify_solution_consistent(_sol_names)
             ]
+            if _checkable:
+                consistent = not _bad_junctions
             if _bad_junctions:
                 success = False
+                outcome = SolveOutcome.INCONSISTENT
                 message = (
                     "Converged to an unphysical artifact root at "
                     f"junction(s) {_bad_junctions}: the solution failed "
@@ -2772,6 +2845,17 @@ class NetworkSolver:
         sol_dict["__success__"] = success
         sol_dict["__message__"] = message
         sol_dict["__final_norm__"] = final_norm
+        # Why the solve ended, split into the two questions ``__success__``
+        # conflates: did the root finder get there, and is what it found
+        # physically admissible. ``__success__`` keeps its meaning -- both.
+        sol_dict["__converged__"] = bool(converged)
+        sol_dict["__consistent__"] = consistent
+        sol_dict["__inconsistent_elements__"] = list(_bad_junctions)
+        sol_dict["__outcome__"] = outcome
+        # The rows carrying the residual, largest first. Already computed for
+        # the diagnostic payload; a failed solve is far easier to read with
+        # them than with a single norm.
+        sol_dict["__worst_residuals__"] = [{"name": n, "residual": v} for n, v in _worst]
         sol_dict["__unknown_names__"] = list(self.unknown_names)
         sol_dict["__x_solution__"] = list(final_x)
         # Convergence history: per-eval (eval_idx, t_elapsed_s, residual_norm)

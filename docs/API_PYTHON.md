@@ -381,6 +381,49 @@ print(f"System Mass Flow: {results.elements['feed'].m_dot} kg/s")
 
 ## Network Solver
 
+### What a solve reports
+
+`NetworkSolver.solve` returns the solved unknowns plus a set of `__dunder__`
+bookkeeping keys. Five of them say what happened:
+
+| key | type | meaning |
+|---|---|---|
+| `__success__` | `bool` | converged **and** consistent. Unchanged; keep using it for "can I trust this result". |
+| `__converged__` | `bool` | the root finder reached the residual tolerance, whatever the consistency checks then said |
+| `__consistent__` | `bool \| None` | the elements' own physical-consistency verdict. **`None` means not checked** -- either the solve never converged, or no element in this network has a verifier. It is not a pass. |
+| `__inconsistent_elements__` | `list[str]` | ids of the elements that rejected the solution |
+| `__outcome__` | `SolveOutcome` | why it ended, in one machine-readable value |
+| `__worst_residuals__` | `list[dict]` | the rows carrying the residual, largest first |
+
+`__success__` is False in two quite different situations, and reading it alone
+cannot tell them apart: Newton never got there, or Newton got there and a
+junction rejected the root as unphysical. The second reports a *small*
+`__final_norm__` next to `success=False`, which looks like a contradiction
+until `__converged__` and `__consistent__` are read separately.
+
+```python
+from combaero.network import SolveOutcome
+
+result = solver.solve()
+if result["__outcome__"] == SolveOutcome.INCONSISTENT:
+    print("converged, then rejected by", result["__inconsistent_elements__"])
+elif not result["__success__"]:
+    worst = result["__worst_residuals__"][0]
+    print(f"{result['__outcome__']}: {worst['name']} carries {worst['residual']:.3e}")
+```
+
+`SolveOutcome` is a `StrEnum`, so it compares and serialises as a plain
+string: `CONVERGED`, `INCONSISTENT`, `NO_PROGRESS`, `RESIDUAL_TOO_LARGE`,
+`TIMEOUT`, `ERROR`, `NOT_CONVERGED`, `NO_UNKNOWNS`.
+
+> [!TIP]
+> Prefer `__outcome__` over matching on `__message__`. Part of that text comes
+> from SciPy and can be reworded without notice; `__outcome__` is classified
+> once, by the code that knows the answer.
+
+Note there is no `__residual_norm__`; the norm is `__final_norm__`.
+
+
 ### Basic Usage
 ```python
 from combaero.network import FlowNetwork, NetworkSolver, OrificeElement

@@ -154,9 +154,25 @@ class NetworkResult:
     and use as a warm start for follow-on operations such as boundary swaps.
 
     Attributes:
-        success: True when the solver converged within the residual tolerance.
+        success: True when the solve both converged AND passed every element's
+            physical-consistency check. It is NOT "converged within the
+            residual tolerance" -- a root that a junction rejects as
+            unphysical reports ``success=False`` with a small ``final_norm``,
+            which read as a contradiction until ``converged`` and
+            ``consistent`` were reported separately.
+        converged: True when the root finder reached the residual tolerance,
+            regardless of what the consistency checks then said.
+        consistent: True/False from the elements' own physical-consistency
+            checks, or None when nothing checked -- either because the solve
+            never converged, or because no element in this network has a
+            verifier. None is NOT a pass.
+        inconsistent_elements: ids of the elements that rejected the solution.
+        outcome: machine-readable reason the solve ended
+            (``combaero.network.SolveOutcome``). Prefer this over matching on
+            ``message``, whose wording comes partly from SciPy.
         message: Human-readable solver status string.
         final_norm: Euclidean norm of the residual vector at convergence.
+        worst_residuals: the rows carrying the residual, largest first.
     """
 
     def __init__(
@@ -172,8 +188,13 @@ class NetworkResult:
         id_to_method: dict[str, str],
     ) -> None:
         self.success: bool = bool(raw.get("__success__", False))
+        self.converged: bool = bool(raw.get("__converged__", False))
+        self.consistent: bool | None = raw.get("__consistent__")
+        self.inconsistent_elements: list[str] = list(raw.get("__inconsistent_elements__") or [])
+        self.outcome: str = str(raw.get("__outcome__", "not_converged"))
         self.message: str = str(raw.get("__message__", ""))
         self.final_norm: float | None = raw.get("__final_norm__")
+        self.worst_residuals: list[dict] = list(raw.get("__worst_residuals__") or [])
         self._x_solution: Any = raw.get("__x_solution__")
         unk_names: list[str] = raw.get("__unknown_names__", [])
         x_sol: list[float] = raw.get("__x_solution__") or []
