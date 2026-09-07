@@ -51,6 +51,47 @@ from combaero.network.components import (
 FlowDirection = Literal["merge", "branch"]
 
 
+#: Fallback soft-barrier weight, in Pa/(kg/s)^2. Only used when the solver has
+#: not supplied a scale-aware value (see ``scaled_penalty_alpha``).
+DEFAULT_SOFT_PENALTY_ALPHA: float = 1.0e11
+
+#: Where the soft barrier's fixed point is placed, as a fraction of the
+#: network's reference mass flow.
+#:
+#: The barrier's penalty shares a residual row with the continuity relation, so
+#: it balances against a pressure error rather than driving the slack to zero,
+#: giving a fixed point at ``slack* = sqrt(dP / alpha)``. Solving that for alpha
+#: at ``slack* = f * m_ref`` and taking the reference pressure as the largest
+#: error the network could absorb gives
+#:
+#:     alpha = P_ref / (f * m_ref)^2
+#:
+#: which is dimensionally consistent and therefore size-independent, unlike a
+#: fixed alpha. 0.5% is not a fitted value: measured on the random boundary
+#: harness the response is monotone in alpha and flat well below this, so the
+#: choice is a margin above the point where solves stop parking in the barrier
+#: (measured at roughly 14% of the reference flow for the traced case, and
+#: case-dependent). Using ``P_ref`` in place of the pressure error the network
+#: can really absorb overestimates it, which errs toward a larger alpha and a
+#: smaller fixed point -- the safe direction (issue #272).
+BARRIER_SLACK_FRACTION: float = 0.005
+
+
+def scaled_penalty_alpha(ref_pressure: float, ref_mdot: float) -> float:
+    """Soft-barrier weight for a network of the given pressure and flow scale.
+
+    Returns ``DEFAULT_SOFT_PENALTY_ALPHA`` when either scale is unusable, so a
+    degenerate reference state can never produce a weaker barrier than the
+    fallback.
+    """
+    if not (math.isfinite(ref_pressure) and math.isfinite(ref_mdot)):
+        return DEFAULT_SOFT_PENALTY_ALPHA
+    if ref_pressure <= 0.0 or ref_mdot <= 0.0:
+        return DEFAULT_SOFT_PENALTY_ALPHA
+    slack = BARRIER_SLACK_FRACTION * ref_mdot
+    return float(ref_pressure / (slack * slack))
+
+
 class MPCEv2Element(MultiPortChamberElement):
     """Mynard Unified0D residual on MPCE-v1's topology framework.
 
@@ -107,14 +148,22 @@ class MPCEv2Element(MultiPortChamberElement):
     # mass flow. At 1e11 it is 0.45%, small enough that the sign flip that
     # restores the declared regime happens instead.
     #
-    # NOT dimensionless: alpha carries Pa/(kg/s)^2, so this value is tied to
-    # the scales of the validation set (mdot ~ 1e-1 kg/s, Pt ~ 1e5-1e6 Pa).
-    # A network far outside them wants the same slack*/mdot_ref ratio, i.e.
-    # a scale-aware alpha; that is a residual-form change and is not made
-    # here. Measured across the random boundary harness the response is
-    # monotone in alpha and flat from 1e9 up, so this is a saturation point
-    # rather than a tuned optimum (issue #272).
-    soft_penalty_alpha: float = 1.0e11
+    # NOT dimensionless: alpha carries Pa/(kg/s)^2, so a fixed value is tied
+    # to one network size. Measured on a single junction scaled over five
+    # decades with every dimensionless group held fixed, the alpha needed to
+    # converge follows 1/m_ref^2 exactly -- two decades of alpha per decade of
+    # size -- and this constant fails on the same junction at a hundredth of
+    # its size. It is therefore only the FALLBACK. ``NetworkSolver`` derives a
+    # scale-aware value from the network's own reference pressure and mass
+    # flow and hands it over (see ``BARRIER_SLACK_FRACTION`` and
+    # ``scaled_penalty_alpha``); this value is used when no solver has supplied
+    # one, or when a caller has set ``soft_penalty_alpha`` explicitly, which
+    # always wins.
+    soft_penalty_alpha: float = DEFAULT_SOFT_PENALTY_ALPHA
+
+    #: Scale-aware weight supplied by ``NetworkSolver`` before a solve. ``None``
+    #: when no solver has run, in which case ``soft_penalty_alpha`` is used.
+    _barrier_alpha_scaled: float | None = None
 
     #: TUNED CONSTANT -- combaero's joining-side etransfer correction, an
     #: extension to Mynard 2015 (not in the paper). Vanishes at psi = 1 by
@@ -431,6 +480,21 @@ class MPCEv2Element(MultiPortChamberElement):
         diag["Pt_jct"] = float(Pt_jct)
         return diag
 
+    def effective_penalty_alpha(self) -> float:
+        """The soft-barrier weight this element will actually use.
+
+        An explicitly set ``soft_penalty_alpha`` always wins -- that is the
+        tuning knob, and a caller who has reached for it means it. Otherwise
+        the scale-aware value the solver derived from the network's own
+        pressure and mass scales is used, falling back to the fixed default
+        when no solver has supplied one.
+        """
+        if self.soft_penalty_alpha != DEFAULT_SOFT_PENALTY_ALPHA:
+            return float(self.soft_penalty_alpha)
+        if self._barrier_alpha_scaled is None:
+            return float(self.soft_penalty_alpha)
+        return float(self._barrier_alpha_scaled)
+
     def _soft_barrier_residual(
         self,
         states: list[NetworkMixtureState],
@@ -449,7 +513,7 @@ class MPCEv2Element(MultiPortChamberElement):
         next iteration.
         """
         N = self.N
-        alpha = float(self.soft_penalty_alpha)
+        alpha = float(self.effective_penalty_alpha())
         residuals: list[float] = []
         jac: dict[int, dict[str, float]] = {}
         for i in range(N):

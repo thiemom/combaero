@@ -648,6 +648,46 @@ class NetworkSolver:
                 out[f"{port_elems[i]}.m_dot"] = share * scale
         return out
 
+    def _apply_barrier_scale(self) -> None:
+        """Give every chamber element a soft-barrier weight matched to this
+        network's scales.
+
+        The barrier's penalty shares a residual row with the continuity
+        relation, so it balances against a pressure error instead of driving
+        the offending mass flow to zero, and its fixed point sits at
+        ``slack* = sqrt(dP / alpha)``. ``alpha`` therefore carries
+        Pa/(kg/s)^2 and a fixed value only holds the fixed point at a sensible
+        fraction of the flow for ONE network size. Measured on a single
+        junction scaled over five decades with every dimensionless group held
+        fixed, the alpha needed to converge follows ``1/m_ref^2`` exactly, and
+        the shipped fallback fails on that junction at a hundredth of its size
+        (issue #272).
+
+        The weight is frozen for the solve rather than recomputed per
+        iterate, so it stays a constant in the residual and the Jacobian is
+        unchanged. A caller who sets ``soft_penalty_alpha`` explicitly keeps
+        it; see ``MPCEv2Element.effective_penalty_alpha``.
+        """
+        # Only elements that actually own a soft barrier. The chamber base is
+        # shared with EjectorElement and ConstantKTeeElement, and reaching for
+        # every subclass is how the junction seed broke the GUI ejector.
+        elements = [
+            e
+            for e in self.network.elements.values()
+            if isinstance(e, MultiPortChamberElement) and hasattr(e, "effective_penalty_alpha")
+        ]
+        if not elements:
+            return
+        # Imported here, not at module scope: mpce_v2_element pulls in the
+        # sympy-derived Jacobian, and sympy is not installed in the minimal
+        # build environments that only import combaero (Windows/MSVC CI).
+        from .mpce_v2_element import scaled_penalty_alpha
+
+        ref = self._infer_reference_state()
+        alpha = scaled_penalty_alpha(float(ref["P"]), float(ref["m_dot"]))
+        for element in elements:
+            element._barrier_alpha_scaled = alpha
+
     def _build_x0(self) -> np.ndarray:
         """
         Constructs the initial guess vector by gathering all unknowns.
@@ -1666,6 +1706,7 @@ class NetworkSolver:
         topologies, 11/16 on merge -- prefer 'default' /
         'analytical_pt_prop' for merge networks.
         """
+        self._apply_barrier_scale()
         retry_applicable = (
             auto_retry
             and x0 is None
