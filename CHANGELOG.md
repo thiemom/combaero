@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`NetworkSolver.solve` now reports why a solve ended, separately from
+  whether it succeeded.** Five new keys: `__converged__` (the root finder's own
+  verdict), `__consistent__` (the elements' physical-consistency verdict, with
+  **`None` meaning not checked** -- never `True`), `__inconsistent_elements__`,
+  `__outcome__` (a `SolveOutcome` `StrEnum`, always set) and
+  `__worst_residuals__` (the rows carrying the residual, largest first).
+  `__success__` keeps its exact meaning, converged **and** consistent, so
+  existing callers are unaffected. The motivation: `__success__` is False both
+  when Newton never got there and when it found a root a junction then rejected
+  as unphysical -- the latter reporting a tiny `__final_norm__` next to
+  `success=False` -- and everything else about the failure was only available
+  by matching substrings of `__message__`, part of which comes from SciPy.
+  `SolveOutcome` is exported from `combaero.network`. The GUI's `NetworkResult`
+  surfaces the same fields, and its docstring no longer describes `success` as
+  "converged within the residual tolerance", which it has not been since the
+  consistency checks landed.
+
 ### Fixed
 - **The junction soft-barrier weight is derived from the network's scales
   instead of being a fixed constant.** `soft_penalty_alpha` multiplies a

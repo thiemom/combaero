@@ -56,6 +56,7 @@ from combaero.network import (
     MassFlowBoundary,
     MomentumChamberNode,
     NetworkSolver,
+    SolveOutcome,
     PressureBoundary,
 )
 from combaero.network._mynard2010 import junction_loss_coefficient
@@ -345,6 +346,14 @@ def max_port_mach(case: Case) -> float | None:
     )
 
 
+_BUCKET_BY_OUTCOME = {
+    SolveOutcome.CONVERGED: "converged",
+    SolveOutcome.INCONSISTENT: "rejected",
+    SolveOutcome.NO_PROGRESS: "no progress",
+    SolveOutcome.RESIDUAL_TOO_LARGE: "residual too large",
+}
+
+
 def classify(net: FlowNetwork, timeout: float = 20.0) -> str:
     """Solve and bucket the outcome. Never raises."""
     solver = NetworkSolver(net)
@@ -354,16 +363,12 @@ def classify(net: FlowNetwork, timeout: float = 20.0) -> str:
             sol = solver.solve(timeout=timeout)
         except Exception:  # noqa: BLE001 -- the bucket IS the report
             return "raised"
-    if sol.get("__success__"):
-        return "converged"
-    message = (sol.get("__message__") or "").lower()
-    if "unphysical" in message or "dissipative" in message:
-        return "rejected"
-    if "not making good progress" in message:
-        return "no progress"
-    if "exceeds" in message:
-        return "residual too large"
-    return "other"
+    # Read the solver's own verdict. This used to match substrings of
+    # ``__message__`` -- including SciPy's wording, which SciPy is free to
+    # change -- so the buckets silently depended on prose. ``__outcome__``
+    # is the solver's single machine-readable answer; the bucket names are
+    # kept as they were so the summary tables stay comparable.
+    return _BUCKET_BY_OUTCOME.get(sol.get("__outcome__"), "other")
 
 
 @dataclass

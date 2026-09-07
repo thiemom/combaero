@@ -45,7 +45,7 @@ from .pressure_loss import (
     LinearThetaLoss,
 )
 from .schema import DiagnosticSpec, spec_for, validate_diagnostics, ALL_KNOWN_FIELDS
-from .solver import NetworkSolver
+from .solver import NetworkSolver, SolveOutcome
 
 __all__: list[str] = [
     "PlenumNode",
@@ -73,6 +73,7 @@ __all__: list[str] = [
     "mix_streams",
     "FlowNetwork",
     "NetworkSolver",
+    "SolveOutcome",
     "NetworkNode",
     "NetworkElement",
     "DiagnosticSpec",
