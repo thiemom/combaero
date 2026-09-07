@@ -94,6 +94,101 @@ TEST(DualNumber, ArithmeticMatchesFiniteDifference) {
   }
 }
 
+TEST(DualNumber, EveryOperatorOverloadIsExercised) {
+  // Coverage on a header of templates is a trap: an overload that is never
+  // CALLED is never instantiated, so it cannot be reported as missed and the
+  // file still reads 100%. Measured on the first version of this file, five
+  // overloads were invisible that way -- including dual+dual and dual-dual,
+  // the two a real closure leans on hardest. Each of the thirteen is named
+  // here explicitly, and each partial is checked, so the instantiation list
+  // is the coverage claim.
+  const double xv = 2.5;
+  const double yv = -1.25;
+  const double c = 3.0;
+  D2 x = D2::seed(xv, 0);
+  D2 y = D2::seed(yv, 1);
+
+  D2 sum_dd = x + y;                 // operator+(D, D)
+  EXPECT_DOUBLE_EQ(sum_dd.v, xv + yv);
+  EXPECT_DOUBLE_EQ(sum_dd.d[0], 1.0);
+  EXPECT_DOUBLE_EQ(sum_dd.d[1], 1.0);
+
+  D2 sum_dc = x + c;                 // operator+(D, double)
+  EXPECT_DOUBLE_EQ(sum_dc.v, xv + c);
+  EXPECT_DOUBLE_EQ(sum_dc.d[0], 1.0);
+  EXPECT_DOUBLE_EQ(sum_dc.d[1], 0.0);
+
+  D2 sum_cd = c + x;                 // operator+(double, D)
+  EXPECT_DOUBLE_EQ(sum_cd.v, c + xv);
+  EXPECT_DOUBLE_EQ(sum_cd.d[0], 1.0);
+
+  D2 dif_dd = x - y;                 // operator-(D, D)
+  EXPECT_DOUBLE_EQ(dif_dd.v, xv - yv);
+  EXPECT_DOUBLE_EQ(dif_dd.d[0], 1.0);
+  EXPECT_DOUBLE_EQ(dif_dd.d[1], -1.0);
+
+  D2 dif_dc = x - c;                 // operator-(D, double)
+  EXPECT_DOUBLE_EQ(dif_dc.v, xv - c);
+  EXPECT_DOUBLE_EQ(dif_dc.d[0], 1.0);
+
+  D2 dif_cd = c - x;                 // operator-(double, D)
+  EXPECT_DOUBLE_EQ(dif_cd.v, c - xv);
+  EXPECT_DOUBLE_EQ(dif_cd.d[0], -1.0);
+
+  D2 neg = -x;                       // operator-(D)
+  EXPECT_DOUBLE_EQ(neg.v, -xv);
+  EXPECT_DOUBLE_EQ(neg.d[0], -1.0);
+
+  D2 mul_dd = x * y;                 // operator*(D, D)
+  EXPECT_DOUBLE_EQ(mul_dd.v, xv * yv);
+  EXPECT_DOUBLE_EQ(mul_dd.d[0], yv);
+  EXPECT_DOUBLE_EQ(mul_dd.d[1], xv);
+
+  D2 mul_dc = x * c;                 // operator*(D, double)
+  EXPECT_DOUBLE_EQ(mul_dc.v, xv * c);
+  EXPECT_DOUBLE_EQ(mul_dc.d[0], c);
+
+  D2 mul_cd = c * x;                 // operator*(double, D)
+  EXPECT_DOUBLE_EQ(mul_cd.v, c * xv);
+  EXPECT_DOUBLE_EQ(mul_cd.d[0], c);
+
+  D2 div_dd = x / y;                 // operator/(D, D)
+  EXPECT_DOUBLE_EQ(div_dd.v, xv / yv);
+  EXPECT_NEAR(div_dd.d[0], 1.0 / yv, 1e-14);
+  EXPECT_NEAR(div_dd.d[1], -xv / (yv * yv), 1e-14);
+
+  D2 div_dc = x / c;                 // operator/(D, double)
+  EXPECT_DOUBLE_EQ(div_dc.v, xv / c);
+  EXPECT_NEAR(div_dc.d[0], 1.0 / c, 1e-14);
+
+  D2 div_cd = c / x;                 // operator/(double, D)
+  EXPECT_DOUBLE_EQ(div_cd.v, c / xv);
+  EXPECT_NEAR(div_cd.d[0], -c / (xv * xv), 1e-14);
+}
+
+TEST(DualNumber, MixedOverloadsAgreeWithTheirDualDualForm) {
+  // The scalar overloads are shortcuts, and a shortcut is where a chain rule
+  // gets dropped. Each must agree with the same expression written entirely
+  // in duals, where the constant carries zero partials.
+  D2 x = D2::seed(2.5, 0);
+  D2 y = D2::seed(-1.25, 1);
+  const double c = 3.0;
+  D2 k = D2::constant(c);
+
+  struct { D2 shortcut; D2 explicit_form; const char* what; } cases[] = {
+      {x + c, x + k, "+(D,double)"},   {c + x, k + x, "+(double,D)"},
+      {x - c, x - k, "-(D,double)"},   {c - x, k - x, "-(double,D)"},
+      {x * c, x * k, "*(D,double)"},   {c * x, k * x, "*(double,D)"},
+      {x / c, x / k, "/(D,double)"},   {c / x, k / x, "/(double,D)"},
+      {-x, 0.0 - x, "unary -"},        {x + y, y + x, "+ commutes"},
+  };
+  for (const auto& t : cases) {
+    EXPECT_NEAR(t.shortcut.v, t.explicit_form.v, 1e-14) << t.what;
+    EXPECT_NEAR(t.shortcut.d[0], t.explicit_form.d[0], 1e-14) << t.what;
+    EXPECT_NEAR(t.shortcut.d[1], t.explicit_form.d[1], 1e-14) << t.what;
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Elementary functions
 // -----------------------------------------------------------------------------
