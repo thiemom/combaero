@@ -8,6 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **The junction soft barrier no longer has a fixed point that solves park
+  in.** `MPCEv2Element` replaces the physics with a "soft barrier" when a port
+  flows against its declared direction, meant to pull Newton back toward
+  `mdot = 0` so a sign flip can restore the declared regime. It could not: the
+  penalty is added into the same residual row as the continuity relation,
+  `R_i = (Pt_i - Pt_jct) + alpha*max(0, -e_i*mdot_i)^2`, and the element has no
+  spare row to give it, so the solver could zero that row by carrying a
+  pressure error equal and opposite to the penalty instead of by driving the
+  slack to zero. The barrier therefore behaved as a fabricated pressure loss
+  with a fixed point at `slack* = sqrt(dP/alpha)`. At the previous
+  `soft_penalty_alpha` of 1e7 that put it at 45% of the common mass flow, and
+  affected solves plateaued on a residual floor with an ordinary in-regime root
+  available. `soft_penalty_alpha` is now 1e11, which moves the fixed point to
+  0.45%. Measured: the junction validation scorecard goes from 2080 to 2108
+  converged of 2546 with every source's mean error equal or better (Bassett
+  0.1548 -> 0.1538, Idelchik 0.8902 -> 0.8880, Hager and Wang unchanged), and
+  the random boundary-condition sweep from 98.3% to 99.3% inside the closure's
+  documented Mach range. The response is monotone in `alpha` and flat above
+  1e9, so this is a saturation point rather than a fitted value. Note that
+  `alpha` carries Pa/(kg/s)^2 and is therefore tied to the scales it was
+  measured on; a network far outside them wants a scale-aware weight.
 - **A failed solve now really does return its best iterate.**
   `NetworkSolver.solve` warns "Returning best iterate" on non-convergence, but
   the returned state and its residual norm were captured immediately after the
