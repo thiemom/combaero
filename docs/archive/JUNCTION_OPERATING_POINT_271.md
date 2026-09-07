@@ -1163,29 +1163,47 @@ The bias is negative throughout at the larger area ratios, so the model
 under-predicts the joining loss into a small branch -- the same direction
 Idelchik and Wang both show.
 
-## Finding 16: a plateau above zero is a mode seam, not a blocked root
+## Finding 16: a plateau above zero is the soft barrier's fixed point
 
 Finding 12 concluded that the failures sit outside the model. That holds for
-the q-endpoint cases it examined, but it is not the whole picture: some
+the q-endpoint cases it examined, but not for the whole set: some
 non-converged solves have a smooth residual history that flattens onto a floor
 well above zero, and a minimum that is not a root means something is blocking
 the root.
 
-One such case was taken apart in full. Two candidate mechanisms were falsified
-by measurement -- the soft barrier (the floor does not scale with
-`soft_penalty_alpha`, and is *higher* with the barrier off) and choking (the
-branch runs at Mach 0.72 against a critical ratio of 1.892). The floor is
-carried by two equal and opposite rows, and equals the total-pressure jump a
-*lossless* connection cannot close. The Jacobian is rank 11 of 12 there, but
-none of the residual lies in the directions it cannot reach, so the root is
-reachable and Newton merely has no step.
+One such case was taken apart in full. The blocker is the element's own
+soft barrier, and the two hypotheses that looked like better candidates were
+both wrong.
 
-The mechanism is that the straight inlet has reversed: an element declared as
-a merge is physically dividing, the closure reads supplier and collector from
-the signed flows at runtime, and the residual formula changes across that
-reversal. The full numbers, the alpha sweep, the SVD and the sweep of the
-straight port's flow through zero are in [MPCE_CPP_PORT_DESIGN.md] section 7c,
-along with the limits of the evidence and what it means for the port.
+**The barrier, not the physics.** At the floor, 95.7% of residual evaluations
+took the soft-barrier path rather than the Mynard closure: the straight port
+was flowing against its declared direction, and `MPCEv2Element.residuals`
+routes any such state to `_soft_barrier_residual`. Every anomaly first
+attributed to the junction model -- two equal and opposite rows, a rank-11
+Jacobian, a residual that jumps across the port's reversal -- belongs to the
+barrier.
+
+**Why it has a fixed point.** The penalty is added into the same residual row
+as the continuity relation, and the element has no spare row to give it. The
+solver can therefore zero that row by carrying a pressure error equal and
+opposite to the penalty rather than by driving the slack to zero, which puts a
+fixed point at `slack* = sqrt(dP / alpha)`. Confirmed to six digits: the case
+parked at 0.041338 kg/s carrying a fabricated 17088.3 Pa, against a predicted
+0.041338. At the old alpha of 1e7 that is 45% of the common mass flow.
+
+**Two wrong turns worth recording.** Sweeping alpha *downward* to zero made
+the floor higher, which read as a falsification of the penalty hypothesis. It
+is not: alpha = 0 does not remove the barrier, it turns the element into a
+lossless junction. And removing the barrier outright -- letting the closure
+solve whichever regime the flows present -- fixed the traced case but made
+both aggregates worse, and was reverted.
+
+**The fix is the weight**, 1e7 -> 1e11, which moves the fixed point to 0.45%
+of the common flow. Scorecard 2080 -> 2108 converged, random harness 98.3% ->
+99.3% in range, every source's mean error equal or better. The response is
+monotone in alpha and flat above 1e9, so this is a saturation point and not a
+tuned optimum. Full tables, the instrumented before/after and the declared
+scale-dependence are in [MPCE_CPP_PORT_DESIGN.md] sections 7c and 7d.
 
 ## What this changes
 

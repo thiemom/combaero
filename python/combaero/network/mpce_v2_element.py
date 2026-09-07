@@ -85,9 +85,36 @@ class MPCEv2Element(MultiPortChamberElement):
     # Soft-barrier penalty scale used when ``strict=False`` and the observed
     # flow direction disagrees with the declared one. Wraps the
     # one-sided quadratic ``alpha * max(0, -expected_sign * mdot)^2``.
-    # Calibrated so that a wrong-sign mdot of 0.1 kg/s contributes roughly
-    # 1e5 Pa to the residual -- the natural Pt scale. Tunable via attribute.
-    soft_penalty_alpha: float = 1.0e7
+    #
+    # Sized by where the barrier's FIXED POINT lands, not by the size of the
+    # penalty. The penalty is added into the same residual row as the
+    # continuity relation, ``R_i = (Pt_i - Pt_jct) + alpha*slack^2``, so the
+    # solver can zero that row by carrying a pressure error equal and
+    # opposite to the penalty rather than by driving the slack to zero. The
+    # barrier therefore has a fixed point at
+    #
+    #     slack* = sqrt(dP / alpha)
+    #
+    # where dP is the pressure error the surrounding network can absorb, and
+    # a solve that reaches it parks there instead of returning to the
+    # declared regime. Confirmed on a traced case to six digits: dP = 17088.3
+    # Pa gave slack* = 0.041338 kg/s against a measured 0.041338.
+    #
+    # The old value of 1e7 came from sizing the penalty to reach the Pt scale
+    # (1e5 Pa) at a representative wrong-sign mdot of 0.1 kg/s -- which is the
+    # worst possible choice, because it places the fixed point AT that
+    # representative mdot. On the traced case slack* was 45% of the common
+    # mass flow. At 1e11 it is 0.45%, small enough that the sign flip that
+    # restores the declared regime happens instead.
+    #
+    # NOT dimensionless: alpha carries Pa/(kg/s)^2, so this value is tied to
+    # the scales of the validation set (mdot ~ 1e-1 kg/s, Pt ~ 1e5-1e6 Pa).
+    # A network far outside them wants the same slack*/mdot_ref ratio, i.e.
+    # a scale-aware alpha; that is a residual-form change and is not made
+    # here. Measured across the random boundary harness the response is
+    # monotone in alpha and flat from 1e9 up, so this is a saturation point
+    # rather than a tuned optimum (issue #272).
+    soft_penalty_alpha: float = 1.0e11
 
     #: TUNED CONSTANT -- combaero's joining-side etransfer correction, an
     #: extension to Mynard 2015 (not in the paper). Vanishes at psi = 1 by

@@ -545,12 +545,17 @@ drive, branch at 156.3 deg (nearly head-on to the straight inlet), area ratio
 2.565, `k_straight` +0.710, `k_branch` +4.285. Floor `|F|` = 1.598e4 with the
 soft barrier on, 2.44e4 with it off.
 
-**The soft barrier is not the cause.** It was the first hypothesis and it is
-plausible from the magnitudes alone: `soft_penalty_alpha` is 1e7 and the
-reversed port sits at 0.04 kg/s, whose product is the right order. Falsified
-by sweeping alpha 1e7 -> 0: floors 1.598e4, 2.367e4, 2.435e4, 2.443e4,
-2.443e4, 2.443e4. The floor does not scale with alpha, and removing the
-barrier makes it **higher**.
+**The soft barrier IS the cause -- the first sweep tested the wrong thing.**
+The magnitudes make it the obvious suspect: `soft_penalty_alpha` is 1e7 and
+the reversed port sits at 0.04 kg/s, whose product is the right order.
+Sweeping alpha 1e7 -> 0 gave floors 1.598e4, 2.367e4, 2.435e4, 2.443e4,
+2.443e4, 2.443e4, which looked like a falsification: the floor does not scale
+with alpha and is *higher* with the barrier off. It is not. Setting alpha to
+zero does not remove the barrier, it turns the element into a **lossless
+junction** (`Pt_i = Pt_jct`), which is a different wrong model that happens to
+sit further from the boundary conditions. The sweep tested the penalty's
+WEIGHT while the barrier's PATH was what mattered, and only the downward
+direction was tried. See section 7d.
 
 **Choking is not the cause.** With the barrier off the port Machs are 0.171,
 0.050 and 0.722 against a critical `Pt/P` of 1.892.
@@ -568,8 +573,8 @@ the left null space pairs the `port_bra.P` and `jct.P_jct` rows at
 `|F|^2` lies in the unreachable directions.** So the residual is reducible in
 principle. Newton simply has no well-defined step.
 
-**The mechanism is a mode seam.** The element is declared `flow_direction="merge"`
-with the straight and branch ports as inlets. At the floor the straight port
+**It is not a mode seam either.** The element is declared
+`flow_direction="merge"` with the straight and branch ports as inlets. At the floor the straight port
 carries **-0.0268 kg/s**: physically the junction has become a *dividing* one.
 The closure reads supplier and collector from the signed flows at runtime, so
 it does switch. Sweeping the straight port's flow through zero with the other
@@ -603,6 +608,96 @@ note covers the pseudosupplier reorientation but not this one. A C++ port that
 transcribes the Python faithfully inherits the seam, so this is a defect to
 resolve before the port, not after. It is the one open item behind the
 "implementation correct first, then port" decision in section 9.
+
+## 7d. The plateau, fixed: the barrier's fixed point (2026-09-07)
+
+Section 7c identified the plateau's shape but named the wrong cause twice.
+Instrumenting the element settled it.
+
+**What the element was actually doing.** At the floor, 95.7% of residual
+evaluations took the **soft-barrier path**, not the closure. The straight
+port's declared direction is "in"; the iterate had it flowing out by 0.0413
+kg/s, and `residuals` routes any wrong-direction port to
+`_soft_barrier_residual`. Everything section 7c measured -- the two equal and
+opposite rows, the rank deficiency, the residual jump across the port's
+reversal -- was a property of the barrier, not of the junction physics. The
+"mode seam" was the boundary between the barrier path and the closure path.
+
+**Why the barrier had a fixed point.** Its docstring promises it "pulls Newton
+back toward mdot_i = 0, from which a sign flip restores the strict-physics
+residual on the next iteration". It cannot, because the penalty is added into
+the same residual row as the continuity relation:
+
+    R_i = (Pt_i - Pt_jct) + alpha * max(0, -e_i * mdot_i)^2
+
+The element has exactly N+1 rows for N+1 unknowns, so the penalty has no row
+of its own. The solver can therefore zero that row by carrying a pressure
+error equal and opposite to the penalty, instead of by driving the slack to
+zero. The penalty is not a barrier at all: it is a fabricated pressure loss
+the network accommodates, with a fixed point at
+
+    slack* = sqrt(dP / alpha)
+
+**Confirmed to six digits.** The traced case parked at slack = 0.041338 kg/s
+carrying a fabricated 17088.3 Pa, against a predicted
+`sqrt(17088.3 / 1e7)` = 0.041338. That is 45% of the common mass flow -- the
+sign flip the barrier exists to enable was never remotely close.
+
+**There was an in-regime root the whole time.** Seeded at the operating point
+the reduced incompressible system predicts, the same network converges to
+`|F|` = 1.0e-5 with every port in its declared direction. The floor was never
+the model running out of solutions.
+
+**The dead end: removing the barrier.** The first fix let the closure solve
+whatever regime the flows actually present, on the argument that a reversed
+port is a regime and not a wrong basin -- Mynard classifies from the signed
+flows at every call, and the element's own regime branches are already written
+from those masks rather than from the declaration. It fixed the traced case
+and made both aggregates **worse**: scorecard 2080 -> 1895 converged, random
+harness 98.3% -> 97.6% in range. Reverted. The barrier is doing real work
+pulling transient wrong-direction iterates back; the defect was where it
+parks, not that it exists.
+
+**The fix is the weight.** `soft_penalty_alpha` 1e7 -> 1e11 moves the fixed
+point from 45% of the common flow to 0.45%.
+
+| | alpha 1e7 | drop the barrier | alpha 1e9 | **alpha 1e11** |
+|---|---|---|---|---|
+| scorecard converged | 2080 / 2546 | 1895 | 2101 | **2108** |
+| scorecard scored | 2062 | 1873 | 2076 | **2081** |
+| Bassett mean err | 0.1548 | 0.1515 | 0.1541 | **0.1538** |
+| Idelchik mean err | 0.8902 | 0.9430 | 0.8898 | **0.8880** |
+| all sources mean err | 0.5017 | 0.4966 | 0.4995 | **0.4984** |
+| random: root exists | 91.4% | 90.4% | 92.9% | **92.9%** |
+| random: within Mach 0.3 | 98.3% | 97.6% | 99.3% | **99.3%** |
+
+Hager and Wang are unchanged to four decimals throughout.
+
+**Not a tuned optimum.** Swept across the whole random harness the response is
+monotone in alpha and flat from 1e9 upward, so 1e11 sits on a saturation
+plateau rather than at a peak. That is what makes it safe against fitting to
+the validation set: there is no peak to find.
+
+**Where the old value came from.** 1e7 was chosen so that a wrong-sign mdot of
+0.1 kg/s contributes about 1e5 Pa, "the natural Pt scale". Sizing a penalty to
+*equal* the pressure scale at a representative mdot is the worst available
+choice, because that is precisely the condition that places the fixed point at
+that mdot. The criterion is the fixed point's location, not the penalty's
+size.
+
+**Declared limitation.** `alpha` carries Pa/(kg/s)^2, so 1e11 is tied to the
+scales of the validation set (mdot ~ 1e-1 kg/s, Pt ~ 1e5-1e6 Pa). A network
+far outside them needs the same `slack*/mdot_ref` ratio, which means a
+scale-aware alpha built from the network's own pressure and mass scales. That
+is a residual-form change and is not made here.
+
+**What this means for the port.** Less than section 7c claimed. There is no
+branch-on-primal defect in the closure to resolve first: the supplier and
+collector classification is continuous through the crossing, and the angle
+construction, the common-port selection and the K sign were all measured
+identical on both sides of the traced seam. What the port must carry across is
+the barrier and its weight, since a C++ transcription with the old constant
+would reproduce the fixed point exactly.
 
 ## 8. The port, sequenced by provenance
 
