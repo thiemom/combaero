@@ -22,7 +22,6 @@ from .components import (
     WallNode,
 )
 from .graph import FlowNetwork
-from .mpce_v2_element import scaled_penalty_alpha
 
 
 class SolverTimeoutError(Exception):
@@ -679,6 +678,11 @@ class NetworkSolver:
         ]
         if not elements:
             return
+        # Imported here, not at module scope: mpce_v2_element pulls in the
+        # sympy-derived Jacobian, and sympy is not installed in the minimal
+        # build environments that only import combaero (Windows/MSVC CI).
+        from .mpce_v2_element import scaled_penalty_alpha
+
         ref = self._infer_reference_state()
         alpha = scaled_penalty_alpha(float(ref["P"]), float(ref["m_dot"]))
         for element in elements:
