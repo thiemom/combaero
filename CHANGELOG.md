@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Deprecated
+- **`MultiPortChamberElement`'s own junction model, for removal in 0.6.0.**
+  Its `residuals`, `diagnostics` and `verify_solution_consistent` now emit a
+  `DeprecationWarning` once per element. Use `MPCEv2Element`: on the same
+  Bassett separating cells it scores a mean absolute error of 0.0564 against
+  this model's 0.5260 and converges on 94 of 105 points against 77, and it
+  computes its residual and Jacobian in C++. This model is also energetically
+  inconsistent for joining flow and sign-symmetric, so it admits mirror roots.
+  Nothing in the package or the GUI instantiates it.
+
+  **Only the model is deprecated.** The class also owns the topology and port
+  machinery that `MPCEv2Element` and `ConstantKTeeElement` inherit unchanged --
+  13 of its 17 public members -- and that is staying. The warning is guarded on
+  the exact type rather than on `isinstance`, because
+  `MPCEv2Element.diagnostics` delegates here through `super()` and would
+  otherwise warn every user of the element that replaces this one.
+
+  0.5.0 is the last release carrying it, so a network built on it can be run by
+  pinning `combaero~=0.5`.
+
 ### Fixed
 - **The junction validation harness built its pressure-driven boundary targets
   from two different operating points.** Bassett Table 1 indexes each loss

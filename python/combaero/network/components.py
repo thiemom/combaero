@@ -3232,6 +3232,45 @@ class TeeJunctionElement(NetworkElement):
 # ---------------------------------------------------------------------------
 
 
+#: v0.5.0 is the last release carrying MultiPortChamberElement's own model.
+_V1_JUNCTION_REMOVAL = "0.6.0"
+
+
+def _warn_v1_junction_model(element: object, method: str) -> None:
+    """Warn once per element that this junction MODEL is going away.
+
+    Only the model is deprecated -- ``residuals``, ``diagnostics`` and
+    ``verify_solution_consistent`` on :class:`MultiPortChamberElement` itself.
+    The class also owns the topology and port machinery that
+    ``MPCEv2Element`` and ``ConstantKTeeElement`` inherit unchanged, 13 of its
+    17 public members, and none of that is going anywhere. So the check is
+    ``type(element) is MultiPortChamberElement`` and not ``isinstance``:
+    ``MPCEv2Element.diagnostics`` calls ``super().diagnostics()``, and warning
+    there would fire on every user of the element that REPLACES this one.
+
+    Why it is going: the model scores 0.5260 against Bassett's separating
+    curves where MPCEv2Element scores 0.0564 on the same cells, converges on
+    77 of 105 against 94, is energetically inconsistent for joining flow, and
+    is sign-symmetric so it admits mirror roots. Nothing in the package or the
+    GUI instantiates it. See issue #271.
+    """
+    if type(element) is not MultiPortChamberElement:
+        return
+    if getattr(element, "_v1_model_deprecation_warned", False):
+        return
+    element._v1_model_deprecation_warned = True  # type: ignore[attr-defined]
+    warnings.warn(
+        f"MultiPortChamberElement.{method} is deprecated and will be removed "
+        f"in combaero {_V1_JUNCTION_REMOVAL}. Use MPCEv2Element, which is "
+        f"roughly nine times more accurate on Bassett's separating curves, "
+        f"converges more often, and computes its residual and Jacobian in "
+        f"C++. The topology machinery this class also provides is NOT "
+        f"deprecated -- MPCEv2Element inherits it. See issue #271.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
+
 class MultiPortChamberElement(NetworkElement):
     """
     Momentum-CV junction element (N >= 2 ports).
@@ -3391,6 +3430,13 @@ class MultiPortChamberElement(NetworkElement):
         """Post-solve energy-consistency check: no collector port may end
         up with a higher total pressure than the best supplier port.
 
+        DEPRECATED, removal in 0.6.0. Note that this per-branch bound is the
+        form MPCEv2Element deliberately does NOT use: a passive junction may
+        raise one branch's total pressure at another's expense, which is real
+        physics and is why Bassett's K5 and Hager's xi_t go negative in
+        dividing flow. The replacement asserts the aggregate
+        ``sum_in |m| Pt >= sum_out |m| Pt`` instead.
+
         The v1 impulse rows are even in the port flows (u_i^2), so the
         sign-flipped image of any root is also an exact root -- and the
         image of a physical root is energetically impossible (flow
@@ -3412,6 +3458,7 @@ class MultiPortChamberElement(NetworkElement):
         reject the v1 model's own legitimate solutions (observed on the
         certified-audit merge fixtures).
         """
+        _warn_v1_junction_model(self, "verify_solution_consistent")
         flows: list[float] = []
         pts: list[float] = []
         for i in range(self.N):
@@ -3586,6 +3633,8 @@ class MultiPortChamberElement(NetworkElement):
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
         """Evaluate residuals + Jacobian. Called from the solver special-case.
 
+        DEPRECATED, removal in 0.6.0 -- see ``_warn_v1_junction_model``.
+
         Args:
             states: per-port NetworkMixtureState (carries P, T, Y at each port).
             P_jct: junction's internal static pressure unknown value.
@@ -3599,6 +3648,7 @@ class MultiPortChamberElement(NetworkElement):
             Jacobian uses the connecting elements' m_dot unknown names with the
             port-orientation sign baked in.
         """
+        _warn_v1_junction_model(self, "residuals")
         P = [s.P for s in states]
         T = [s.T for s in states]
         Y = [list(s.Y) for s in states]
@@ -3662,6 +3712,13 @@ class MultiPortChamberElement(NetworkElement):
         P_jct: float,
         port_mdots: list[float] | None = None,
     ) -> dict[str, float]:
+        """DEPRECATED, removal in 0.6.0 -- see ``_warn_v1_junction_model``.
+
+        Note that ``MPCEv2Element.diagnostics`` delegates here via ``super()``,
+        which is why the warning is guarded on the exact type rather than on
+        ``isinstance``.
+        """
+        _warn_v1_junction_model(self, "diagnostics")
         diag: dict[str, float] = {"P_jct": float(P_jct), "n_ports": float(self.N)}
         for i in range(self.N):
             diag[f"port_{i}_P"] = float(states[i].P)
