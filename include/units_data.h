@@ -336,6 +336,20 @@ inline constexpr Entry function_units[] = {
     {"border_carnot_L", "delta_geom: rad", "- (L = 4*(1-cos((3/4)*delta))^2)"},
 
     // -------------------------------------------------------------------------
+    // mpce_junction.h - Momentum-CV junction, whole-element (f, J)
+    // -------------------------------------------------------------------------
+    {"mpce_v2_residuals_and_jacobian",
+     "p_static: list[Pa], p_total: list[Pa], rho: list[kg/m^3], "
+     "drho_dp: list[kg/(m^3*Pa)], outer_mdot: list[kg/s] (the CONNECTING "
+     "element's flow; geom.port_sign maps it to junction convention), "
+     "pt_jct: Pa, geom: MpceGeometry (area: list[m^2], theta_rad: list[rad], "
+     "port_sign: list[-], joining_etransfer_alpha: -, eta_scale: -)",
+     "MpceResidualJacobian (residual: list[Pa] with a final kg/s mass row, "
+     "jacobian: list[list[d(row)/d(seed)]] over seeds "
+     "[p_static x3, p_total x3, outer_mdot x3, pt_jct], valid: bool, "
+     "common_port: -, k_term_sign: -, k_per_port: list[-])"},
+
+    // -------------------------------------------------------------------------
     // friction.h - Friction Factor Correlations
     // -------------------------------------------------------------------------
     {"friction_haaland", "Re: -, e_D: -", "- (f)"},
