@@ -131,3 +131,6 @@ test_uv_env/
 
 # Local validation data and reference papers
 docs/bassett/
+
+# pnpm content-addressable store, created when pnpm runs outside gui/frontend
+.pnpm-store/
