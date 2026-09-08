@@ -40,6 +40,30 @@ It also means the converged q is an output, not the target.
 
 ## Finding 1: the model's coefficient difference is not monotonic
 
+> **Its conclusion is SUPERSEDED (2026-09-08, PR #314).** The U-shaped `D(q)`
+> is real and so is its minimum of 0.551. The TARGETS it was compared against
+> were not: all three network adapters built the pressure-driven boundary
+> conditions by reading Bassett's `K5` and `K6` off the same abscissa, when
+> Table 1 indexes `K5` on the straight leg and `K6` on the lateral. At one
+> operating point they are `K5(1 - q)` and `K6(q)`. The corrected target at
+> q = 0.2 is 0.422, not 0.122, and the model reaches it exactly.
+>
+> So "infeasible, not mis-seeded" is wrong, and both points converge. The
+> method below -- compare the target against the range the model can produce
+> -- was sound; the input to it was not.
+>
+> The paragraph beginning "Why the minimum sits so high is the K_straight gap"
+> is void for the same reason. It compared the model's `K_straight` against
+> Bassett's `K5` on mismatched axes. On the correct axis, at psi = 3, the model
+> spans -0.0625..+0.4848 against Bassett's -0.0625..+0.4704, a maximum
+> difference of **0.014** -- not the "wrong sign and magnitude at low q" this
+> section reports.
+>
+> Kept rather than rewritten: the reasoning is worth reading, and this is the
+> third time an axis convention has produced a convincing physics story out of
+> an index error (#295, #301, #314).
+
+
 `D(q) = K_lat_model(q) - K_str_model(q)` is U-shaped. Mapped through the
 `imposed_q` topology (where q is a boundary condition, so `D` is well defined):
 
@@ -1243,6 +1267,55 @@ scale-dependence are in [MPCE_CPP_PORT_DESIGN.md] sections 7c and 7d.
 - `python/combaero/network/solver.py` -- `_propagate_analytical_pt_prop`
   (the seed) and `verify_solution_consistent`'s call site (the detector).
 
+## Closing the record (2026-09-08)
+
+[Issue #271] is closed. This document served the operating-point
+investigation that preceded the C++ port; the port itself is recorded in
+[MPCE_CPP_PORT_DESIGN.md] section 8a, and what follows is only what a reader
+of THIS file needs in order to know where it stands.
+
+**The findings above held up, with two exceptions recorded in place.**
+Finding 12 ("the residual landscape is clean; the failures are outside the
+model") is true of the q-endpoint cases it examined and not of the plateau
+class -- see Finding 16. And Finding 16's own first reading, that the plateau
+was a mode seam and the soft-barrier penalty was cleared, was itself wrong;
+the correction is in the design doc's 7c and 7d.
+
+**What closed the arc.** The barrier's fixed point at
+`slack* = sqrt(dP / alpha)` was the plateau (7d), and the weight that sets it
+is dimensional, so it is now derived from the network's own scales rather than
+declared (7e). The whole-element `(f, J)` moved to C++ and, in doing so,
+supplied two Jacobian columns the Python never had.
+
+**What did not close, and is tracked elsewhere.** The `K_straight` gap is
+[issue #272]'s. Its acceptance gate is met -- the closure scores 0.0498
+against the 0.2405 bar -- and the residual disagreement was located in the
+closure rather than the coupling.
+
+That gap is also **smaller than this document makes it look**. A day after
+this entry was first written, the "Bassett Fig 7b has no root" result that
+Finding 1 rests on turned out to be an artefact of boundary targets built by
+reading `K5` and `K6` off the same abscissa (PR #314). On the correct axis the
+model matches Bassett's `K5` to 0.014 and his `K6` to three decimals. What is
+left of `K_straight` is an accuracy question inside the closure, not an
+infeasibility.
+
+**A caution for anyone reading this file later.** Several claims in it were
+repeated from these notes long after the suite had moved on: the equal-area
+identity xfail came off on 2026-09-05, and the "model creates energy below
+q ~ 0.2" finding was an artefact of `eta_scale = 1.0` and never was an xfail.
+Read the suite, not the record.
+
+And a second caution, which cost more. **Three separate findings in this file
+and the design doc were built on an axis convention that was wrong**, each
+time producing a convincing physics story out of an index error -- the scoring
+axis (#295), the type-4 leg labels (#301), and the pressure-driven targets
+(#314). The tell each time was the same: a model that reproduces a paper's
+analytics to three decimals in one place while apparently failing badly in
+another. When those two things are true at once, check the index before
+building a theory.
+
 [MPCE_CPP_PORT_DESIGN.md]: ../../validation/junction/MPCE_CPP_PORT_DESIGN.md
 [JUNCTION_JACOBIAN_271.md]: JUNCTION_JACOBIAN_271.md
 [issue #271]: https://github.com/thiemom/combaero/issues/271
+[issue #272]: https://github.com/thiemom/combaero/issues/272

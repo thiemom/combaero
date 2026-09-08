@@ -321,7 +321,17 @@ problems have no solution.** The model's `K_lat - K_str` has a minimum of
 reaches a root that does not exist. They stay pinned as xfail targets in
 `python/tests/test_bassett_fig7b_case.py`, now labelled infeasible rather
 than solver-path failures, and they come off when #272 closes the
-`K_straight` gap. **The `three_pb` assertions in that test were tautological
+`K_straight` gap.
+
+> **Superseded 2026-09-08 (PR #314).** The targets were built by reading
+> Bassett's `K5` and `K6` off the same abscissa; Table 1 indexes them on
+> opposite legs, so at one operating point they are `K5(1 - q)` and `K6(q)`.
+> The corrected target at q = 0.2 is 0.422, which the model reaches exactly.
+> Both points converge, and `mfb_two_pb` now lands within 0.005 of the q it
+> was asked for instead of drifting. `three_pb` above q ~ 0.5 is the only
+> remaining failure and the system there is feasible by construction, so it
+> is a solver and seeding problem -- the opposite of what this paragraph
+> concluded. **The `three_pb` assertions in that test were tautological
 and have been removed** -- see the next section.
 
 ## 4e. The pressure-driven topologies score less than they appear to (2026-09-05)
@@ -360,10 +370,16 @@ continuing collector: its K_straight was exactly `q^2` where Bassett and
 Hager both give `q^2 - 0.5q`. Restoring it made Mynard's CFD-fitted
 energy-transfer factor redundant, and the factor's default is now 0.
 
-**Second motivation, added 2026-09-05:** `K_straight`'s size at low q also
-decides whether the pressure-driven problem has a unique solution. The
-model's `K_lat - K_str` is U-shaped, which makes low-q targets infeasible
-and mid-range targets doubly-rooted. The acceptance criterion this yields is
+**Second motivation, added 2026-09-05 -- WITHDRAWN 2026-09-08 (PR #314).**
+`K_straight`'s size at low q was thought to decide whether the pressure-driven
+problem has a unique solution: the model's `K_lat - K_str` is U-shaped, which
+appeared to make low-q targets infeasible and mid-range targets doubly-rooted.
+The U shape is real; the infeasibility was an artefact of targets built from
+mismatched axes, and on the correct axis the model's `K_straight` matches
+Bassett's `K5` to 0.014 across the range at psi = 3. The multiplicity at
+mid-range is a property of the topology, not of `K_straight`. What survives
+below -- the equal-area identity as an exact acceptance criterion -- does not
+depend on this motivation. The acceptance criterion this yields is
 an exact identity, not an error metric: at `psi = 1` the source gives
 `K_lateral - K_straight = q (1.5 - 2 cos(0.75 theta)) + 0.5`, linear in q with
 slope and intercept fixed by geometry. The model violates it in both slope and
@@ -533,7 +549,14 @@ must preserve; it does not buy convergence here.
 and then reverting with `git checkout` reverted the fix as well. Commit
 first, then instrument.
 
-## 7c. Step 2 follow-up: the residual plateau is a mode seam (2026-09-07)
+## 7c. Step 2 follow-up: the residual plateau, first reading (2026-09-07)
+
+> **Superseded by 7d.** This section named a mode seam and cleared the
+> soft-barrier penalty. Both were wrong, and the corrections are inline
+> below. Kept rather than rewritten because how the wrong answer was
+> reached is the useful part: a downward-only parameter sweep looked
+> like a falsification, and `alpha = 0` is not the same as the barrier
+> being off.
 
 Some non-converged solves have a well-behaved residual history that flattens
 onto a floor well above zero. A minimum that is not a root says an equation,
@@ -865,6 +888,94 @@ silently move 22 roots with nothing able to tell which branch is wanted.
 `MultiPortChamberElement` as the M -> 0 regression target; close the #272
 pressure-representation item as superseded.
 
+## 8a. The port as it landed (2026-09-08)
+
+Section 8 is the plan. This is what shipped, and where it diverged. Issue #271
+is closed on it.
+
+| step | what | PR |
+|---|---|---|
+| 4.1 | `DualN` to `include/dual_number.h`, plus `dexp` `dsin` `dcos` `datan2` `dlog` `dabs` and the two angle wraps | #305 |
+| 4.2 + 4.3 | Mynard closure on duals, `include/mynard_junction.h` | #307 |
+| 4.4a | whole-element (f, J), `include/mpce_junction.h`, seeded over `DualN<10>` | #308 |
+| 4.4b | pybind11 binding and the Python shim | #309 |
+| -- | `ConstantKTeeElement` audited, deliberately NOT ported | #312 |
+
+**What it bought.** Not speed. The Python assembled its Jacobian from a
+sympy `dKQ/dmdot` block plus a hand-derived `dR/dP` column for the common
+port alone, but `K` depends on every port's velocity and every velocity on its
+own density. Against central differences of the assembled network Jacobian the
+worst relative error fell from **4.4e-3 to 1.4e-6**. Accuracy identical to four
+decimals on every source; scorecard 2108 -> 2109 of 2546; random harness
+root-exists 92.9% -> 93.7%.
+
+### Seven divergences from the plan
+
+1. **Steps 4.2 and 4.3 merged.** The pseudosupplier block alone produces
+   nothing comparable against Python. The whole closure is a testable unit:
+   given `(U, A, theta)`, return `C` and `K`.
+2. **`theta` never becomes a dual.** The plan assumed the pseudosupplier block
+   would carry duals throughout. It does not: angles derive from declared
+   geometry and from means over it, and the flows enter only through *which*
+   entries are selected. The dual set is `Q`, `Qtot`, `flow_ratio`, the two
+   pseudosupplier angles, `phi` and everything downstream.
+3. **Six branch-on-primal decisions, not the two the plan named.** The
+   supplier/collector split, the second-quadrant flip, the direction flip, the
+   two wraps' multiples, the common-port choice and the collinearity test. All
+   are marked at their sites in the header.
+4. **The step-4 gate changed shape.** It could not be "equivalence with the
+   Python Jacobian", because the C++ one is *more complete* -- comparing
+   against the Python's would mark the C++ wrong exactly where it is right.
+   Residual VALUES are compared against the Python; the Jacobian is compared
+   against central differences of that residual. The `imposed_q` table gate
+   held as written.
+5. **The guards stayed in Python.** Not in the plan. The degenerate-state
+   fallbacks and the wrong-direction soft barrier are solver policy rather
+   than junction physics, they changed twice during the work (7d, 7e), and the
+   barrier's Jacobian is three lines. So "the Python element becomes a
+   relabelling shim" is true of the physics and not of the policy.
+6. **`_mpce_v2_jacobian.py` was kept**, as step 4's own sentence allowed: the
+   sympy derivation survives as an offline cross-check
+   (`test_mpce_v2_jacobian.py`), not a runtime path. The FD fallback is gone.
+   `jacobian_method` is retired and documented as selecting nothing.
+7. **`ConstantKTeeElement` was not ported** (#312). Its `K` is a fixed
+   per-port constant, so `q_dyn` depends on the common port alone and every
+   other column is genuinely zero rather than missing -- the opposite of the
+   situation that made the MPCEv2 port worth doing. FD-checked over all twelve
+   columns in both directions: complete already. A port would buy consistency
+   of pattern, not correctness.
+
+### Three things the port found that were not defects it went looking for
+
+- **`_wrap_to_pi`'s real range is `[-pi, pi)`, not the `(-pi, pi]` its
+  docstring claimed.** At exactly `+pi` the Python expression returns `-pi`.
+  It matters only where a lateral is exactly anti-parallel to the main duct,
+  which the dataset contains. The C++ matches the implementation; the Python
+  docstring was corrected.
+- **The element re-points the axial-back port at `pi`** before calling the
+  closure, because Mynard's vessel-direction convention needs it while the
+  declared angles are measured from the main axis. Missing this was worth
+  4293 Pa on the first golden case.
+- **The two non-common `dR/dP` columns were absent**, which is the finding in
+  "what it bought" above. It was measured while designing the seeding, not
+  suspected beforehand.
+
+### Method note, worth reading before the next port
+
+Falsification and coverage caught **different** things in every one of the four
+PRs, and neither substitutes for the other. Seven to eight perturbations per PR
+found nothing new; coverage found a real gap in three of four (an angle below
+`-pi`, the joining term with a single supplier, a `1e-9` dead band a comment
+made a claim about). The one time falsification earned its keep it did so by
+*passing* where it should have failed, which named an untested semantic in the
+mass row.
+
+Coverage on a templated numerics header also lies: `dual_number.h` reported
+100% of regions, lines and branches while five of thirteen operator overloads
+were never called, because an uninstantiated template is never emitted and so
+cannot be counted as missed. **Check instantiation counts, not percentages.**
+Both lessons are now in the `model-provenance` skill.
+
 ## 9. Decisions
 
 Taken (user, 2026-09-04):
@@ -872,6 +983,12 @@ Taken (user, 2026-09-04):
 1. **Residual form: stepwise and tested.** Port the faithful `Pt`-based form
    first with an exact equivalence gate; move to Mynard-native `C_j` as a
    separate, later, data-gated change. Never both in one step.
+
+   *Status 2026-09-08: first half DONE (sec 8a). The `C_j` move is still open
+   and unscheduled. Note that it would lift the `n <= 3` limit natively, which
+   nothing currently needs -- `MPCEv2Element` refuses `N > 3` at construction
+   and no shipped network asks for one -- so the case for it rests on matching
+   the paper's residual set, not on capability.*
 2. **Tuned corrections** (`alpha`, `eta`, damping, and any future one) prove
    themselves against validation data for our regime, and are labelled as
    tuned. CFD-derived corrections count as tuning; the CFD they came from is
