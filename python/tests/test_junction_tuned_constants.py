@@ -39,14 +39,16 @@ def test_tuned_constants_carry_their_documented_values():
     assert MPCEv2Element.DEFAULT_JOINING_ETRANSFER_ALPHA == 0.2
 
 
-def test_eta_scale_default_reproduces_the_faithful_port():
-    """Adding the switch must not move the closure at its default."""
-    explicit = mynard.junction_loss_coefficient(_U_DIVIDING, _A, _THETA, eta_scale=1.0)
-    implicit = mynard.junction_loss_coefficient(_U_DIVIDING, _A, _THETA)
+def test_eta_scale_default_is_off_and_one_restores_the_faithful_port():
+    """The default moved to 0.0 on 2026-09-05, and eta_scale=1.0 must still
+    reproduce Mynard's own Eq 36 for anyone measuring against the paper."""
+    off = mynard.junction_loss_coefficient(_U_DIVIDING, _A, _THETA)
+    explicit_off = mynard.junction_loss_coefficient(_U_DIVIDING, _A, _THETA, eta_scale=0.0)
+    faithful = mynard.junction_loss_coefficient(_U_DIVIDING, _A, _THETA, eta_scale=1.0)
 
-    assert implicit.K is not None and explicit.K is not None
-    np.testing.assert_array_equal(explicit.K, implicit.K)
-    np.testing.assert_array_equal(explicit.C, implicit.C)
+    assert off.K is not None and faithful.K is not None
+    np.testing.assert_array_equal(off.K, explicit_off.K)
+    assert not np.allclose(off.K, faithful.K), "eta_scale=1.0 must still be live"
 
 
 def test_eta_switch_is_live():
@@ -128,7 +130,11 @@ def test_element_constructor_accepts_and_defaults_eta_scale():
         outlet_angles_deg=[0.0, 90.0],
         port_areas=[0.01, 0.01, 0.01],
     )
-    assert element.eta_scale == 1.0
+    # 0.0 since 2026-09-05: with the dividing-streamline recovery restored,
+    # Mynard's fitted transfer duplicates it on the continuing collector and
+    # makes the junction a net source. See MPCEv2Element.DEFAULT_ETA_SCALE.
+    assert element.eta_scale == 0.0
+    assert MPCEv2Element.DEFAULT_ETA_SCALE == 0.0
 
     scaled = MPCEv2Element(
         id="jct",

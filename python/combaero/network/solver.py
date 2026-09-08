@@ -1,6 +1,7 @@
 import math
 import time
 import warnings
+from enum import StrEnum
 from typing import Any, Literal
 
 import numpy as np
@@ -26,6 +27,47 @@ from .graph import FlowNetwork
 
 class SolverTimeoutError(Exception):
     """Raised when the solver exceeds the specified wall-clock timeout."""
+
+
+class SolveOutcome(StrEnum):
+    """Why a solve ended, in one machine-readable value.
+
+    A ``StrEnum``, so it compares and serialises as a plain string and an
+    existing ``== "converged"`` keeps working.
+
+    ``NetworkSolver`` used to report only ``__success__`` and a free-text
+    ``__message__``, so every consumer that needed to know WHY a solve failed
+    matched on substrings of that message -- and the messages come partly from
+    SciPy, which is free to reword them. This does that classification once, at
+    the point that knows the answer.
+    """
+
+    #: A root was found, and it passed every element's consistency check (or
+    #: no element had one).
+    CONVERGED = "converged"
+    #: A root was found and then rejected by an element's own physical
+    #: consistency check. ``__inconsistent_elements__`` names them.
+    INCONSISTENT = "inconsistent"
+    #: The minimiser stopped improving before reaching tolerance.
+    NO_PROGRESS = "no_progress"
+    #: The method reported success at a non-zero local minimum of ||F||.
+    RESIDUAL_TOO_LARGE = "residual_too_large"
+    #: The wall-clock budget ran out.
+    TIMEOUT = "timeout"
+    #: An exception was raised while evaluating residuals.
+    ERROR = "error"
+    #: Did not converge, with no more specific reason available.
+    NOT_CONVERGED = "not_converged"
+    #: Nothing to solve: the network is empty or fully constrained.
+    NO_UNKNOWNS = "no_unknowns"
+
+
+def _classify_solver_message(message: str) -> SolveOutcome:
+    """The one place SciPy's free-text failure message is interpreted."""
+    text = (message or "").lower()
+    if "not making good progress" in text:
+        return SolveOutcome.NO_PROGRESS
+    return SolveOutcome.NOT_CONVERGED
 
     pass
 
@@ -298,9 +340,74 @@ class NetworkSolver:
             ref_Y = list(self._default_Y)
 
         n_elems = max(len(self.network.elements), 1)
-        ref_mdot = total_mdot / n_elems if total_mdot > 0 else 0.1
+        if total_mdot > 0:
+            ref_mdot = total_mdot / n_elems
+        else:
+            ref_mdot = self._bernoulli_reference_mdot(pressures, ref_P, ref_T, ref_Y)
 
         return {"P": ref_P, "T": ref_T, "Y": ref_Y, "m_dot": ref_mdot}
+
+    def _bernoulli_reference_mdot(
+        self,
+        pressures: list[float],
+        ref_P: float,
+        ref_T: float,
+        ref_Y: list[float],
+    ) -> float:
+        """Reference mass flow for a network driven only by pressures.
+
+        With no ``MassFlowBoundary`` anywhere, nothing tells the solver the
+        scale of the flow, and this used to return a hard 0.1 kg/s. The level
+        is then set entirely by the imposed pressure differences, which is
+        exactly what a Bernoulli estimate reads off:
+
+            m = A sqrt(2 rho dP)
+
+        the same estimate ``_propagate_analytical_pt_prop`` already makes for a
+        ``ChannelElement``; it was simply never made for the reference level.
+
+        Measured on the random-boundary-condition sweep
+        (``validation/junction/random_robustness.py``), over junctions driven
+        by three pressure boundaries: the implied level spans 2e-3 to 36 kg/s,
+        the fixed 0.1 was off by more than a decade in 27 of 60 draws, and
+        replacing it with this estimate takes convergence from 80% to 93% with
+        stalls falling from 18% to 3%.
+
+        Falls back to the old constant when the network offers no area or no
+        pressure spread to work from.
+        """
+        if len(pressures) < 2:
+            return 0.1
+        # Per ELEMENT, not the whole network's spread. The same step
+        # `_propagate_pressure_guess` uses for its BFS: in a chain the total
+        # drop is shared out, and charging all of it to one element
+        # overestimates the flow by roughly the square root of the chain
+        # length. Measured: the global spread broke a bypass scenario that
+        # converges either side of this change.
+        n_elems = max(len(self.network.elements), 1)
+        dp = float(max(pressures) - min(pressures)) / n_elems
+        if dp <= 0.0:
+            return 0.1
+        areas = [
+            float(a)
+            for a in (
+                getattr(obj, "area", None)
+                for obj in (*self.network.nodes.values(), *self.network.elements.values())
+            )
+            if a is not None and float(a) > 0.0
+        ]
+        if not areas:
+            return 0.1
+        try:
+            rho = float(cb.density(ref_T, ref_P, list(cb.mass_to_mole(ref_Y))))
+        except Exception:  # noqa: BLE001 -- a reference estimate must not raise
+            return 0.1
+        if rho <= 0.0:
+            return 0.1
+        # The median area, so one unusually small or large port does not set
+        # the scale for the whole network.
+        area = float(np.median(areas))
+        return max(area * math.sqrt(2.0 * rho * dp), 1e-9)
 
     def _propagate_pressure_guess(self, ref: dict[str, Any]) -> dict[str, float]:
         """Estimate per-node pressures by walking the graph from boundaries.
@@ -582,6 +689,46 @@ class NetworkSolver:
             if port_elems[i]:
                 out[f"{port_elems[i]}.m_dot"] = share * scale
         return out
+
+    def _apply_barrier_scale(self) -> None:
+        """Give every chamber element a soft-barrier weight matched to this
+        network's scales.
+
+        The barrier's penalty shares a residual row with the continuity
+        relation, so it balances against a pressure error instead of driving
+        the offending mass flow to zero, and its fixed point sits at
+        ``slack* = sqrt(dP / alpha)``. ``alpha`` therefore carries
+        Pa/(kg/s)^2 and a fixed value only holds the fixed point at a sensible
+        fraction of the flow for ONE network size. Measured on a single
+        junction scaled over five decades with every dimensionless group held
+        fixed, the alpha needed to converge follows ``1/m_ref^2`` exactly, and
+        the shipped fallback fails on that junction at a hundredth of its size
+        (issue #272).
+
+        The weight is frozen for the solve rather than recomputed per
+        iterate, so it stays a constant in the residual and the Jacobian is
+        unchanged. A caller who sets ``soft_penalty_alpha`` explicitly keeps
+        it; see ``MPCEv2Element.effective_penalty_alpha``.
+        """
+        # Only elements that actually own a soft barrier. The chamber base is
+        # shared with EjectorElement and ConstantKTeeElement, and reaching for
+        # every subclass is how the junction seed broke the GUI ejector.
+        elements = [
+            e
+            for e in self.network.elements.values()
+            if isinstance(e, MultiPortChamberElement) and hasattr(e, "effective_penalty_alpha")
+        ]
+        if not elements:
+            return
+        # Imported here, not at module scope: mpce_v2_element pulls in the
+        # sympy-derived Jacobian, and sympy is not installed in the minimal
+        # build environments that only import combaero (Windows/MSVC CI).
+        from .mpce_v2_element import scaled_penalty_alpha
+
+        ref = self._infer_reference_state()
+        alpha = scaled_penalty_alpha(float(ref["P"]), float(ref["m_dot"]))
+        for element in elements:
+            element._barrier_alpha_scaled = alpha
 
     def _build_x0(self) -> np.ndarray:
         """
@@ -1601,6 +1748,7 @@ class NetworkSolver:
         topologies, 11/16 on merge -- prefer 'default' /
         'analytical_pt_prop' for merge networks.
         """
+        self._apply_barrier_scale()
         retry_applicable = (
             auto_retry
             and x0 is None
@@ -1708,6 +1856,24 @@ class NetworkSolver:
             f"'{init_strategy}' attempt failed at |F|={primary_norm:.3e} "
             f"with: {primary_msg[:120]}]"
         )
+        # Neither attempt converged, so hand back whichever got closer. The
+        # retry used to be returned unconditionally, which could replace a
+        # near-miss with something far worse and still warn that the best
+        # iterate was being returned.
+        retry_norm = retry_sol.get("__final_norm__")
+        if (
+            primary_norm is not None
+            and retry_norm is not None
+            and float(retry_norm) > float(primary_norm)
+        ):
+            if _primary_diag is not None:
+                self._diagnostic_data = _primary_diag
+            sol["__message__"] = (
+                f"{primary_msg} [{_seed_kind} warm-start auto-retry also "
+                f"failed, at |F|={float(retry_norm):.3e}, so the closer "
+                f"primary result is returned]"
+            )
+            return sol
         return retry_sol
 
     def _outlet_ref_incompressible_seed(
@@ -1934,6 +2100,11 @@ class NetworkSolver:
                 "__success__": True,
                 "__message__": "Network is empty or fully constrained (no unknowns).",
                 "__iterations__": 0,
+                "__converged__": True,
+                "__consistent__": None,
+                "__inconsistent_elements__": [],
+                "__outcome__": SolveOutcome.NO_UNKNOWNS,
+                "__worst_residuals__": [],
             }
 
         # Set default iteration limit based on problem size (matches hybr's own default
@@ -2298,6 +2469,7 @@ class NetworkSolver:
         # Solve with timing
         _RESIDUAL_TOL = 1e-3
         solve_start_time = time.time()
+        outcome: SolveOutcome = SolveOutcome.NOT_CONVERGED
         try:
             sol = root(residuals_wrapper, x0_scaled, method=method, options=options, jac=use_jac)
             solve_end_time = time.time()
@@ -2305,12 +2477,14 @@ class NetworkSolver:
             final_x = best_x
             success = sol.success
             message = sol.message
+            outcome = SolveOutcome.CONVERGED if success else _classify_solver_message(message)
             # Efficiently use tracked norm instead of re-evaluating
             final_norm = float(best_res_norm)
             # Guard against methods (e.g. lm) that report success at a
             # non-zero local minimum of ||F||^2.
             if success and final_norm > _RESIDUAL_TOL:
                 success = False
+                outcome = SolveOutcome.RESIDUAL_TOO_LARGE
                 message = (
                     f"Solver reported success but |F|={final_norm:.3e} "
                     f"exceeds residual tolerance ({_RESIDUAL_TOL})."
@@ -2320,12 +2494,14 @@ class NetworkSolver:
         except SolverTimeoutError as e:
             final_x = best_x
             success = False
+            outcome = SolveOutcome.TIMEOUT
             message = str(e)
             final_norm = float(best_res_norm)
         except Exception as e:
             # Fallback for unexpected errors during residuals evaluation
             final_x = best_x
             success = False
+            outcome = SolveOutcome.ERROR
             message = f"Unexpected error during residual evaluation: {e}"
             final_norm = float(best_res_norm)
 
@@ -2340,6 +2516,7 @@ class NetworkSolver:
                 if sol2.success and fallback_norm < _RESIDUAL_TOL:
                     final_x = fallback_x
                     success = True
+                    outcome = SolveOutcome.CONVERGED
                     message = f"Converged after fallback to hybr (original {method} failed)."
                     final_norm = fallback_norm
             except Exception:
@@ -2377,6 +2554,7 @@ class NetworkSolver:
                     if _lm_norm < _RESIDUAL_TOL:
                         final_x = best_x
                         success = True
+                        outcome = SolveOutcome.CONVERGED
                         _hybr_end = "stalled at" if _stall_fired[0] else "|F|="
                         message = (
                             f"Converged with LM fallback "
@@ -2393,6 +2571,27 @@ class NetworkSolver:
                         f"{message} LM fallback also stalled at |F|={float(best_res_norm):.3e}."
                     )
 
+        # Honour the promise made in the non-convergence warning: return the
+        # BEST iterate, not the one that happened to be current when the
+        # primary phase ended.
+        #
+        # `final_x` and `final_norm` are captured immediately after the primary
+        # root() call. Every later phase -- the hybr fallback, and above all
+        # the LM fallback -- keeps evaluating through the same wrapper, so
+        # `best_x` and `best_res_norm` go on improving; but those phases only
+        # re-point `final_x` when they REACH the convergence tolerance. An
+        # improvement that falls short of it was being thrown away. Measured
+        # over 38 non-converged junction solves before this guard: 30 returned
+        # a state worse than the best they had evaluated, by a median of 5.8x
+        # and up to 2e5x, and in every case inspected the better point was
+        # found after the LM fallback started.
+        #
+        # Placed before the consistency verification below so the junction
+        # checks judge the state that is actually returned.
+        if float(best_res_norm) < final_norm:
+            final_x = best_x
+            final_norm = float(best_res_norm)
+
         # Post-solve physical-consistency verification for junctions.
         # Two known ways a junction net converges (|F| ~ 1e-10) onto an
         # unphysical exact root: (a) MPCEv2 strict=False soft-barrier
@@ -2407,6 +2606,22 @@ class NetworkSolver:
         # higher-Pt port (a passive junction manufacturing flow work).
         # Each element's verify_solution_consistent encodes its own
         # criterion; demote failures to honest non-convergence.
+        #
+        # The verdict is REPORTED as well as applied. "Not checked" is not the
+        # same as "fine": a network whose elements carry no verifier gets
+        # ``__consistent__ = None``, never True, so a caller cannot read a
+        # silent absence of checking as a clean bill of health.
+        # The root finder's own verdict, before the consistency check can
+        # demote it. ``__success__`` folds the two together and must keep
+        # doing so; this is the half that says whether Newton got there.
+        converged = bool(success)
+        _bad_junctions: list[str] = []
+        _checkable = [
+            element
+            for element in self.network.elements.values()
+            if hasattr(element, "verify_solution_consistent")
+        ]
+        consistent: bool | None = None
         if success:
             _sol_names = dict(zip(self.unknown_names, final_x, strict=False))
             _bad_junctions = [
@@ -2415,8 +2630,11 @@ class NetworkSolver:
                 if hasattr(element, "verify_solution_consistent")
                 and not element.verify_solution_consistent(_sol_names)
             ]
+            if _checkable:
+                consistent = not _bad_junctions
             if _bad_junctions:
                 success = False
+                outcome = SolveOutcome.INCONSISTENT
                 message = (
                     "Converged to an unphysical artifact root at "
                     f"junction(s) {_bad_junctions}: the solution failed "
@@ -2627,6 +2845,17 @@ class NetworkSolver:
         sol_dict["__success__"] = success
         sol_dict["__message__"] = message
         sol_dict["__final_norm__"] = final_norm
+        # Why the solve ended, split into the two questions ``__success__``
+        # conflates: did the root finder get there, and is what it found
+        # physically admissible. ``__success__`` keeps its meaning -- both.
+        sol_dict["__converged__"] = bool(converged)
+        sol_dict["__consistent__"] = consistent
+        sol_dict["__inconsistent_elements__"] = list(_bad_junctions)
+        sol_dict["__outcome__"] = outcome
+        # The rows carrying the residual, largest first. Already computed for
+        # the diagnostic payload; a failed solve is far easier to read with
+        # them than with a single norm.
+        sol_dict["__worst_residuals__"] = [{"name": n, "residual": v} for n, v in _worst]
         sol_dict["__unknown_names__"] = list(self.unknown_names)
         sol_dict["__x_solution__"] = list(final_x)
         # Convergence history: per-eval (eval_idx, t_elapsed_s, residual_norm)

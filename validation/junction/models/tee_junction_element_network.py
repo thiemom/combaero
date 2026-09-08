@@ -90,8 +90,7 @@ class TeeJunctionElementNetwork:
         if topology == "imposed_q":
             return self._separating_imposed_q(q, psi, theta_rad)
         # For PB-based topologies, use Bassett analytical K to set up BCs.
-        K_lat = bassett2001.K6(q, psi, theta_rad)
-        K_str = bassett2001.K5(q)
+        K_str, K_lat = bassett2001.separating_pair_at(q, psi, theta_rad)
         if topology == "three_pb":
             net = build_separating_three_pb_skeleton(
                 K_lateral_target=K_lat, K_straight_target=K_str

@@ -75,6 +75,31 @@ def K6(q: float, psi: float, theta: float) -> float:
     return q * q * psi * psi + 1.0 - 2.0 * q * psi * math.cos(0.75 * theta)
 
 
+def separating_pair_at(q_lateral: float, psi: float, theta: float) -> tuple[float, float]:
+    """(K_straight, K_lateral) for flow type 3 at ONE operating point.
+
+    Table 1 indexes each coefficient on the mass-flow fraction in ITS OWN leg:
+    ``K5`` on ``q = mdot_A/mdot_C`` (the straight leg) and ``K6`` on
+    ``q = mdot_B/mdot_C`` (the lateral). At a single physical state those are
+    ``1 - q_lateral`` and ``q_lateral``, so the pair must never be read off the
+    same abscissa.
+
+    Reading both at the same ``q`` mixes two different operating points. Doing
+    exactly that is what made Bassett Fig 7b look unreachable: the pressure-
+    driven skeletons were handed a target of ``K6(0.2) - K5(0.2) = 0.122``
+    against a model whose ``K_lat - K_str`` bottoms out at 0.551, and the
+    solver reported an infeasible system -- honestly, but about a state nobody
+    meant to ask for. The correct pairing at that point is
+    ``K6(0.2) - K5(0.8) = 0.422``, which the model hits exactly, because it
+    reproduces both of Bassett's coefficients to three decimals.
+
+    Exists so the pairing lives in one place. The same slip has been fixed
+    twice before in the scoring axis (#295) and the type-4 leg labels (#301);
+    three adapters had independently repeated it here (#272).
+    """
+    return K5(1.0 - q_lateral), K6(q_lateral, psi, theta)
+
+
 # ---------------------------------------------------------------------------
 # Joining flows (Section 3.1). Table 2 raw forms + body-text angle-corrected
 # forms per Section 4.2.
@@ -82,13 +107,21 @@ def K6(q: float, psi: float, theta: float) -> float:
 
 
 def K7_raw(q: float, psi: float, theta: float) -> float:
-    """Joining type 4, straight path (Table 2, no angle correction)."""
+    """Joining type 4, LATERAL path (Table 2, no angle correction).
+
+    Table 1: K7 = [(p_B + rho u_B^2/2) - (p_A + rho u_A^2/2)] / (rho u_A^2/2)
+    with q = m_B/m_A. In flow type 4 the common branch is A, B is the lateral
+    and C the other straight leg, so this is the LATERAL-to-common coefficient
+    indexed on the lateral fraction -- K8 is the straight one. The docstrings
+    here said the opposite until 2026-09-06, and nothing caught it because
+    neither coefficient was scored.
+    """
     c = math.cos(theta)
     return 4.0 * q - 1.0 + q * q * (psi * psi - 2.0 + 2.0 * psi * c)
 
 
 def K7_corr(q: float, psi: float, theta: float) -> float:
-    """Joining type 4, straight path with Eq 34 correction:
+    """Joining type 4, LATERAL path with Eq 34 correction:
     theta' = pi - (3/4)*(pi - theta) substituted everywhere theta appears."""
     tc = math.pi - 0.75 * (math.pi - theta)
     c = math.cos(tc)
@@ -96,13 +129,19 @@ def K7_corr(q: float, psi: float, theta: float) -> float:
 
 
 def K8_raw(q: float, psi: float, theta: float) -> float:
-    """Joining type 4, lateral path (Table 2, no angle correction).
-    K8 = 1 - q^2 + 2 * (1-q)^2 * psi * cos(theta)."""
+    """Joining type 4, STRAIGHT path (Table 2, no angle correction).
+
+    Table 1: K8 = [(p_C + rho u_C^2/2) - (p_A + rho u_A^2/2)] / (rho u_A^2/2)
+    with q = m_C/m_A, so it is the straight-inlet coefficient on the straight
+    fraction. See K7 for the naming correction.
+
+    K8 = 1 - q^2 + 2 * (1-q)^2 * psi * cos(theta).
+    """
     return 1.0 - q * q + 2.0 * (1.0 - q) * (1.0 - q) * psi * math.cos(theta)
 
 
 def K8_corr(q: float, psi: float, theta: float) -> float:
-    """Joining type 4, lateral path with Eq 34 correction."""
+    """Joining type 4, STRAIGHT path with Eq 34 correction."""
     tc = math.pi - 0.75 * (math.pi - theta)
     return 1.0 - q * q + 2.0 * (1.0 - q) * (1.0 - q) * psi * math.cos(tc)
 

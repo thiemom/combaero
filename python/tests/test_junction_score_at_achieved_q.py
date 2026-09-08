@@ -50,26 +50,35 @@ def model():
 def test_three_pb_K_is_the_imposed_target_whatever_the_model_does():
     """A deliberately wrong model must still reproduce three_pb's target.
 
-    ``eta_scale=0.5`` halves Mynard's energy-transfer factor, moving the
-    model's own answer (imposed_q) by 0.045. If three_pb's K moved with it, the
-    topology would be scoring the model and the exclusion below would be wrong.
+    ``eta_scale=0.3`` turns Mynard's energy-transfer factor partly back on
+    (the production default is 0.0 since the dividing-streamline recovery
+    landed), moving the model's own answer by 0.027. If three_pb's K moved with
+    it, the topology would be scoring the model and the exclusion below would
+    be wrong.
 
-    The perturbation used to be ``eta_scale=3.0``, which moves the model four
-    times further. It no longer serves: since the energy check of defect 10,
-    the tripled model is inadmissible in three_pb at every q and is rejected
-    before a K can be extracted. A perturbation has to stay inside the physics
-    to demonstrate anything, which is why this one is milder.
+    The perturbation has shrunk twice, from 3.0 to 0.5 to 0.3, and for the same
+    reason each time: since the energy check of defect 10 a strongly perturbed
+    model is inadmissible in three_pb and is rejected before a K can be
+    extracted. A perturbation has to stay inside the physics to demonstrate
+    anything.
+
+    The operating point moved from q = 0.8 to 0.4 when the pressure-driven
+    boundary targets were corrected to pair Bassett's K5 and K6 at one state
+    rather than off the same abscissa. three_pb converges below q ~ 0.5 and
+    not above it (see test_bassett_fig7b_case), so the falsification has to be
+    demonstrated where the topology runs at all. The point being made is
+    unchanged and does not depend on which q it is made at.
     """
     honest = MPCEv2Network(strict=False)
-    wrong = MPCEv2Network(strict=False, eta_scale=0.5)
-    q = 0.8
+    wrong = MPCEv2Network(strict=False, eta_scale=0.3)
+    q = 0.4
     target = bassett2001.K6(q, _PSI, _THETA)
 
     honest_imposed = honest.evaluate_network("bassett2001", "K6", q, _PSI, _THETA)
     wrong_imposed = wrong.evaluate_network("bassett2001", "K6", q, _PSI, _THETA)
     assert honest_imposed.converged and wrong_imposed.converged
     moved = abs(wrong_imposed.K_lateral - honest_imposed.K_lateral)
-    assert moved > 0.03, f"the perturbation must actually change the model: moved only {moved:.4f}"
+    assert moved > 0.02, f"the perturbation must actually change the model: moved only {moved:.4f}"
 
     wrong_three_pb = wrong.evaluate_network(
         "bassett2001", "K6", q, _PSI, _THETA, topology="three_pb"
@@ -158,16 +167,35 @@ def test_imposed_q_reaches_the_operating_point_it_was_given(model, q):
 
 
 def test_pressure_driven_solve_reports_where_it_actually_landed(model):
-    """Bassett Fig 7b mfb_two_pb q=0.8 settles at q=0.857, not 0.8.
+    """A pressure-driven solve reports the operating point it REACHED, which
+    need not be the one it was asked for.
 
-    Reported as a mirror root before this field existed, because the K was
-    compared against the paper at 0.8 while the solve sat elsewhere.
+    Originally written on ``mfb_two_pb`` at q = 0.8, which settled at 0.857 --
+    reported as a mirror root before this field existed, because the K was
+    compared against the paper at 0.8 while the solve sat elsewhere. That
+    drift is gone: it came from a boundary target built by reading Bassett's
+    K5 and K6 off the same abscissa when Table 1 indexes them on opposite
+    legs, and with the pairing corrected ``mfb_two_pb`` lands within 0.005 of
+    what it was asked for.
+
+    So the case moved to ``three_pb``, which still drifts and for a reason
+    that is not a defect: it imposes every total pressure and leaves the flow
+    level free, so the residual constrains only ``K_lat - K_str`` and any
+    point on that curve is a root. The field has to report which one.
+
+    Written against a measured drift rather than a pinned number -- the old
+    0.857/0.831 constant had already been re-derived twice.
     """
-    r = model.evaluate_network("bassett2001", "K6", 0.8, _PSI, _THETA, topology="mfb_two_pb")
+    q_asked = 0.3
+    r = model.evaluate_network("bassett2001", "K6", q_asked, _PSI, _THETA, topology="three_pb")
 
     assert r.converged, r.message
-    assert r.q_converged == pytest.approx(0.857, abs=0.005)
-    assert r.q_converged != pytest.approx(0.8, abs=0.01)
+    assert r.q_converged is not None, "a pressure-driven solve must report where it landed"
+    assert r.q_converged != pytest.approx(q_asked, abs=0.01), (
+        "this case no longer drifts, so it cannot show that the field reports "
+        f"the achieved point (asked {q_asked}, reached {r.q_converged})"
+    )
+    assert 0.0 < r.q_converged < 1.0
 
 
 def test_bassett_K11_drift_is_reported_on_the_papers_own_axis(model):

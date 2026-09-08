@@ -321,7 +321,17 @@ problems have no solution.** The model's `K_lat - K_str` has a minimum of
 reaches a root that does not exist. They stay pinned as xfail targets in
 `python/tests/test_bassett_fig7b_case.py`, now labelled infeasible rather
 than solver-path failures, and they come off when #272 closes the
-`K_straight` gap. **The `three_pb` assertions in that test were tautological
+`K_straight` gap.
+
+> **Superseded 2026-09-08 (PR #314).** The targets were built by reading
+> Bassett's `K5` and `K6` off the same abscissa; Table 1 indexes them on
+> opposite legs, so at one operating point they are `K5(1 - q)` and `K6(q)`.
+> The corrected target at q = 0.2 is 0.422, which the model reaches exactly.
+> Both points converge, and `mfb_two_pb` now lands within 0.005 of the q it
+> was asked for instead of drifting. `three_pb` above q ~ 0.5 is the only
+> remaining failure and the system there is feasible by construction, so it
+> is a solver and seeding problem -- the opposite of what this paragraph
+> concluded. **The `three_pb` assertions in that test were tautological
 and have been removed** -- see the next section.
 
 ## 4e. The pressure-driven topologies score less than they appear to (2026-09-05)
@@ -354,10 +364,22 @@ scored at the achieved q.
 
 ## 5. What the papers settle about the K_straight question (#272)
 
-**Second motivation, added 2026-09-05:** `K_straight`'s size at low q also
-decides whether the pressure-driven problem has a unique solution. The
-model's `K_lat - K_str` is U-shaped, which makes low-q targets infeasible
-and mid-range targets doubly-rooted. The acceptance criterion this yields is
+**RESOLVED 2026-09-05 (defect 14, Finding 10 of the operating-point
+record).** The model was missing the dividing-streamline recovery on the
+continuing collector: its K_straight was exactly `q^2` where Bassett and
+Hager both give `q^2 - 0.5q`. Restoring it made Mynard's CFD-fitted
+energy-transfer factor redundant, and the factor's default is now 0.
+
+**Second motivation, added 2026-09-05 -- WITHDRAWN 2026-09-08 (PR #314).**
+`K_straight`'s size at low q was thought to decide whether the pressure-driven
+problem has a unique solution: the model's `K_lat - K_str` is U-shaped, which
+appeared to make low-q targets infeasible and mid-range targets doubly-rooted.
+The U shape is real; the infeasibility was an artefact of targets built from
+mismatched axes, and on the correct axis the model's `K_straight` matches
+Bassett's `K5` to 0.014 across the range at psi = 3. The multiplicity at
+mid-range is a property of the topology, not of `K_straight`. What survives
+below -- the equal-area identity as an exact acceptance criterion -- does not
+depend on this motivation. The acceptance criterion this yields is
 an exact identity, not an error metric: at `psi = 1` the source gives
 `K_lateral - K_straight = q (1.5 - 2 cos(0.75 theta)) + 0.5`, linear in q with
 slope and intercept fixed by geometry. The model violates it in both slope and
@@ -449,6 +471,7 @@ Consequences:
 | 11 | ~~`analytical_pt_prop` seeds no mass flow through `LosslessConnectionElement`~~ **fixed** | x0 violates continuity at every junction (0.1 in, 0.2 out); a junction-aware mass-conserving seed gains ~70 solves | **done.** Split and continuity fixed at x0 from the propagated pressures; the total still comes from the existing propagator, so no new flow-scale heuristic. Opt-in per class (`seeds_ports_by_pressure_split`) because it must not overwrite `EjectorElement`'s own warm start. Rejections as inadmissible/artifact 227 -> 163; converged 1625 -> 1732; accuracy unchanged on the common subset; it does NOT steer toward the requested q (that earlier claim withdrawn) | done |
 | 12 | ~~Solver results depend on `PYTHONHASHSEED`~~ **fixed** | `_propagate_pressure_guess` seeds its BFS from `list(set(p_guess.keys()))`; the same case converges in 5 of 10 identical processes, and is deterministic per fixed hash seed | **done.** `queue = list(p_guess.keys())`; scorecard identical (1700/2073) under seeds 0/1/7/13, against 1700 or 1711 before | done |
 | 13 | ~~Bassett K5/K2 scored on a mirrored axis in three of four network adapters~~ **fixed** | K5's q is the STRAIGHT fraction (equivalences.py, the algebra, the digitised fit, and the zero-dissipation limit all agree); every adapter builds from the lateral fraction | **done.** `1 - q` in and the inverse on `q_converged` out, at all sites. Straight-leg RMSE 0.377 -> 0.318 (imposed_q), 0.196 -> 0.140 (mfb_two_pb); every other coefficient bit-identical | done |
+| 14 | ~~The closure omits the dividing-streamline recovery on the continuing collector~~ **fixed** | K_straight came out as q^2 at every geometry; Bassett K5(1-q) and Hager xi_t(q) are both q^2 - 0.5q | **done.** `DIVIDING_STREAMLINE_RECOVERY = 0.5`, derived from p* = p + (1/4) rho u^2, applied in K for a single supplier. Made Mynard's fitted eta redundant: `DEFAULT_ETA_SCALE` is now 0.0. K_straight RMSE 0.333 -> 0.098; equal-area identity and energy admissibility both now hold | done |
 
 Items 1, 2, 5, 6 are an afternoon. Item 3 is the one that changes what the
 port can be held to. Item 12 is done; it blocked reproducible measurement of everything else.
@@ -526,6 +549,263 @@ must preserve; it does not buy convergence here.
 and then reverting with `git checkout` reverted the fix as well. Commit
 first, then instrument.
 
+## 7c. Step 2 follow-up: the residual plateau, first reading (2026-09-07)
+
+> **Superseded by 7d.** This section named a mode seam and cleared the
+> soft-barrier penalty. Both were wrong, and the corrections are inline
+> below. Kept rather than rewritten because how the wrong answer was
+> reached is the useful part: a downward-only parameter sweep looked
+> like a falsification, and `alpha = 0` is not the same as the barrier
+> being off.
+
+Some non-converged solves have a well-behaved residual history that flattens
+onto a floor well above zero. A minimum that is not a root says an equation,
+a coefficient or a penalty is blocking the real root. One such case was taken
+apart to find which.
+
+**The case,** from the random-boundary sweep: joining flow, `flow_and_pressures`
+drive, branch at 156.3 deg (nearly head-on to the straight inlet), area ratio
+2.565, `k_straight` +0.710, `k_branch` +4.285. Floor `|F|` = 1.598e4 with the
+soft barrier on, 2.44e4 with it off.
+
+**The soft barrier IS the cause -- the first sweep tested the wrong thing.**
+The magnitudes make it the obvious suspect: `soft_penalty_alpha` is 1e7 and
+the reversed port sits at 0.04 kg/s, whose product is the right order.
+Sweeping alpha 1e7 -> 0 gave floors 1.598e4, 2.367e4, 2.435e4, 2.443e4,
+2.443e4, 2.443e4, which looked like a falsification: the floor does not scale
+with alpha and is *higher* with the barrier off. It is not. Setting alpha to
+zero does not remove the barrier, it turns the element into a **lossless
+junction** (`Pt_i = Pt_jct`), which is a different wrong model that happens to
+sit further from the boundary conditions. The sweep tested the penalty's
+WEIGHT while the barrier's PATH was what mattered, and only the downward
+direction was tried. See section 7d.
+
+**Choking is not the cause.** With the barrier off the port Machs are 0.171,
+0.050 and 0.722 against a critical `Pt/P` of 1.892.
+
+**Two rows carry the floor, equal and opposite.** With the barrier off,
+`port_bra.Pt` at -1.2213e4 and `b_com.P` at +1.2213e4, 31.5% of `|F|` each.
+That 12213 Pa is exactly `b_bra.Pt - port_bra.Pt`: the total-pressure equality
+across a *lossless* connection cannot be closed.
+
+**The Jacobian is singular there, but that is not what blocks it.** SVD of the
+12x12 at the floor: rank 11, singular values 2.35e-1 down to 1.25e-7,
+condition 2.6e13. The null direction is almost purely `port_bra.P` (0.9987);
+the left null space pairs the `port_bra.P` and `jct.P_jct` rows at
+-0.707/+0.707, i.e. two rows have become linearly dependent. **But 0.0% of
+`|F|^2` lies in the unreachable directions.** So the residual is reducible in
+principle. Newton simply has no well-defined step.
+
+**It is not a mode seam either.** The element is declared
+`flow_direction="merge"` with the straight and branch ports as inlets. At the floor the straight port
+carries **-0.0268 kg/s**: physically the junction has become a *dividing* one.
+The closure reads supplier and collector from the signed flows at runtime, so
+it does switch. Sweeping the straight port's flow through zero with the other
+unknowns held at the floor:
+
+| `lc_str.m_dot` | `\|F\|` | sigma_min | cond | mode |
+|---|---|---|---|---|
+| -1e-4 | 2.596e4 | 1.251e-7 | 2.65e13 | dividing |
+| 0 | 1.840e5 | 3.06e-17 | 1.09e23 | on the seam |
+| +1e-4 | 3.278e5 | 6.585e-7 | 9.11e12 | merging |
+
+The residual jumps by an order of magnitude across a flow change of 2e-4 kg/s,
+and the system is near-singular on **both** sides, not only at the seam. At
+exactly zero the third behaviour is the step-2(b) fix: the excluded port is
+snapped to its *declared* direction, which is why `|F|` there sits near the
+merging value rather than between the two. The solve parks on this surface.
+
+**Limits of the evidence.** The sweep varies one unknown while holding the
+others at the dividing-side solution, so part of that jump is the far side
+being an inconsistent state rather than the residual being discontinuous in
+the full state. And the near-singularity is present on both sides, so the seam
+alone does not create it. What is established is that the plateau is neither a
+penalty artefact nor a blocked root, and that a port reversal changes which
+residual formula is evaluated.
+
+**What this means for the port.** The supplier/collector classification is a
+branch on a primal quantity that changes the residual formula, and the
+analytic Jacobian does not see it -- it differentiates whichever branch is
+active as though the classification were constant. Step 4's branch-on-primal
+note covers the pseudosupplier reorientation but not this one. A C++ port that
+transcribes the Python faithfully inherits the seam, so this is a defect to
+resolve before the port, not after. It is the one open item behind the
+"implementation correct first, then port" decision in section 9.
+
+## 7d. The plateau, fixed: the barrier's fixed point (2026-09-07)
+
+Section 7c identified the plateau's shape but named the wrong cause twice.
+Instrumenting the element settled it.
+
+**What the element was actually doing.** At the floor, 95.7% of residual
+evaluations took the **soft-barrier path**, not the closure. The straight
+port's declared direction is "in"; the iterate had it flowing out by 0.0413
+kg/s, and `residuals` routes any wrong-direction port to
+`_soft_barrier_residual`. Everything section 7c measured -- the two equal and
+opposite rows, the rank deficiency, the residual jump across the port's
+reversal -- was a property of the barrier, not of the junction physics. The
+"mode seam" was the boundary between the barrier path and the closure path.
+
+**Why the barrier had a fixed point.** Its docstring promises it "pulls Newton
+back toward mdot_i = 0, from which a sign flip restores the strict-physics
+residual on the next iteration". It cannot, because the penalty is added into
+the same residual row as the continuity relation:
+
+    R_i = (Pt_i - Pt_jct) + alpha * max(0, -e_i * mdot_i)^2
+
+The element has exactly N+1 rows for N+1 unknowns, so the penalty has no row
+of its own. The solver can therefore zero that row by carrying a pressure
+error equal and opposite to the penalty, instead of by driving the slack to
+zero. The penalty is not a barrier at all: it is a fabricated pressure loss
+the network accommodates, with a fixed point at
+
+    slack* = sqrt(dP / alpha)
+
+**Confirmed to six digits.** The traced case parked at slack = 0.041338 kg/s
+carrying a fabricated 17088.3 Pa, against a predicted
+`sqrt(17088.3 / 1e7)` = 0.041338. That is 45% of the common mass flow -- the
+sign flip the barrier exists to enable was never remotely close.
+
+**There was an in-regime root the whole time.** Seeded at the operating point
+the reduced incompressible system predicts, the same network converges to
+`|F|` = 1.0e-5 with every port in its declared direction. The floor was never
+the model running out of solutions.
+
+**The dead end: removing the barrier.** The first fix let the closure solve
+whatever regime the flows actually present, on the argument that a reversed
+port is a regime and not a wrong basin -- Mynard classifies from the signed
+flows at every call, and the element's own regime branches are already written
+from those masks rather than from the declaration. It fixed the traced case
+and made both aggregates **worse**: scorecard 2080 -> 1895 converged, random
+harness 98.3% -> 97.6% in range. Reverted. The barrier is doing real work
+pulling transient wrong-direction iterates back; the defect was where it
+parks, not that it exists.
+
+**The fix is the weight.** `soft_penalty_alpha` 1e7 -> 1e11 moves the fixed
+point from 45% of the common flow to 0.45%.
+
+| | alpha 1e7 | drop the barrier | alpha 1e9 | **alpha 1e11** |
+|---|---|---|---|---|
+| scorecard converged | 2080 / 2546 | 1895 | 2101 | **2108** |
+| scorecard scored | 2062 | 1873 | 2076 | **2081** |
+| Bassett mean err | 0.1548 | 0.1515 | 0.1541 | **0.1538** |
+| Idelchik mean err | 0.8902 | 0.9430 | 0.8898 | **0.8880** |
+| all sources mean err | 0.5017 | 0.4966 | 0.4995 | **0.4984** |
+| random: root exists | 91.4% | 90.4% | 92.9% | **92.9%** |
+| random: within Mach 0.3 | 98.3% | 97.6% | 99.3% | **99.3%** |
+
+Hager and Wang are unchanged to four decimals throughout.
+
+**Not a tuned optimum.** Swept across the whole random harness the response is
+monotone in alpha and flat from 1e9 upward, so 1e11 sits on a saturation
+plateau rather than at a peak. That is what makes it safe against fitting to
+the validation set: there is no peak to find.
+
+**Where the old value came from.** 1e7 was chosen so that a wrong-sign mdot of
+0.1 kg/s contributes about 1e5 Pa, "the natural Pt scale". Sizing a penalty to
+*equal* the pressure scale at a representative mdot is the worst available
+choice, because that is precisely the condition that places the fixed point at
+that mdot. The criterion is the fixed point's location, not the penalty's
+size.
+
+**Declared limitation -- since measured and removed, see section 7e.**
+`alpha` carries Pa/(kg/s)^2, so 1e11 is tied to the scales of the validation
+set. Measured on one junction scaled over five decades, the alpha needed
+follows 1/m_ref^2 exactly and 1e11 fails at a hundredth of the size. The
+weight is now derived from the network's own scales. Calling it a
+residual-form change was also wrong: frozen for the solve it is not one.
+
+**What this means for the port.** Less than section 7c claimed. There is no
+branch-on-primal defect in the closure to resolve first: the supplier and
+collector classification is continuous through the crossing, and the angle
+construction, the common-port selection and the K sign were all measured
+identical on both sides of the traced seam. What the port must carry across is
+the barrier and its weight, since a C++ transcription with the old constant
+would reproduce the fixed point exactly.
+
+## 7e. The barrier weight has units, so it cannot be a constant (2026-09-07)
+
+Section 7d fixed the barrier's fixed point by raising `soft_penalty_alpha`
+from 1e7 to 1e11, and closed with the scale-dependence as a declared
+limitation. It was declared but not measured. Measuring it overturned the
+"1e11 is fine" reading.
+
+**The controlled experiment.** Take one junction and change only its SIZE.
+Scaling the port area at fixed pressure, Mach, angle, area ratio, split and
+loss coefficients leaves every dimensionless group untouched -- it is the same
+junction, bigger or smaller -- so anything that changes is a scale artefact.
+For each size, the smallest `alpha` (swept by decades) that converges:
+
+| size factor | m_ref (kg/s) | alpha needed | predicted `alpha_ref (m_ref/m)^2` |
+|---|---|---|---|
+| 1e-3 | 9.26e-5 | 1e14 | |
+| 1e-2 | 9.26e-4 | 1e12 | |
+| 1e-1 | 9.26e-3 | 1e10 | |
+| 1e0 | 9.26e-2 | 1e8 | 1e8 |
+| 1e1 | 9.26e-1 | 1e6 | 1e6 |
+| 1e2 | 9.26 | 1e4 | 1e4 |
+
+Two decades of `alpha` per decade of size, exactly, over five decades. The
+prediction column is not fitted -- it is `alpha_ref * (m_ref/m)^2` -- and it
+lands on the measured value every time. **The shipped 1e11 fails on the
+identical junction at a hundredth of its size** (measured: sizes 1e-2, 1e-3
+and 1e-4 do not converge with the hand-off disabled).
+
+**Why, dimensionally.** The row is a pressure balance in Pa, so `alpha`
+carries Pa/(kg/s)^2. It is not a tolerance or a dimensionless weight but a
+conversion factor between a mass-flow error and a pressure, meaningful only
+against a network's own scales. The governing group is
+
+    Pi = alpha m_ref^2 / dP        and        slack*/m_ref = 1 / sqrt(Pi)
+
+so a fixed `alpha` holds the fixed point at a sensible fraction of the flow
+for exactly one network size.
+
+**One correction to 7d.** It called this a residual-form change. It only is if
+`alpha` is recomputed from the state each iterate, because then it enters the
+Jacobian. **Frozen for the solve it is not a form change at all** -- the
+residual is character-for-character unchanged and only the constant is
+computed instead of declared. That is the version implemented.
+
+**What was built.** `NetworkSolver._apply_barrier_scale` derives
+
+    alpha = P_ref / (f m_ref)^2,   f = BARRIER_SLACK_FRACTION = 0.005
+
+from the reference state `_infer_reference_state` already computes for
+seeding, and hands it to each element that owns a barrier before the solve.
+The 0.5% is a margin, not a fit: solves stop parking in the barrier at roughly
+14% of the reference flow for the traced case (case-dependent), and the
+response saturates far below 0.5%. Taking `P_ref` as the pressure error the
+network can absorb overestimates it, which errs toward a larger `alpha` and a
+smaller fixed point -- the safe direction. A degenerate reference state falls
+back to the fixed default rather than producing a weaker barrier. An
+explicitly set `soft_penalty_alpha` always wins, so the tuning knob the
+earlier sweeps used still works.
+
+The hand-off is restricted to elements that actually own a barrier rather than
+to every `MultiPortChamberElement`: the chamber base is shared with
+`EjectorElement` and `ConstantKTeeElement`, and reaching for every subclass is
+how the junction seed broke the GUI ejector in step 5a.
+
+**Measured.**
+
+| | fixed 1e11 | scale-aware |
+|---|---|---|
+| scorecard converged | 2108 / 2546 | 2108 / 2546 |
+| scorecard scored | 2081 | 2081 |
+| Bassett / Hager / Idelchik / Wang mean err | 0.1538 / 0.0787 / 0.8880 / 0.1184 | identical |
+| random: within Mach 0.3 | 99.3% | 99.3% |
+| random: root exists | 92.9% | 92.7% |
+| same junction, sizes 1e-4 to 1e3 | 5 of 8 converge | **8 of 8** |
+
+The scorecard is identical to the digit, and that is the point: the validation
+set sits in the range where 1e11 was already on the saturation plateau, so the
+derived weight must reproduce it exactly. It is not a no-op -- across 982
+scorecard solves the barrier is evaluated 4809 times and the derived weight is
+used every one of them, spanning 1.8e10 to 6.4e12. The `root exists` cell
+moves by one draw of 395, which is noise. The gain is entirely in the size
+range the validation set does not cover.
+
 ## 8. The port, sequenced by provenance
 
 Each step has a gate that is a table against digitised data, not a green suite.
@@ -586,6 +866,13 @@ Plus whole-row FD tests
 item 1 is lifted) at `< 1e-6`; a ctest comparing the C++ kernel against golden
 Python values (the ejector recipe's `.h` golden-data pattern).
 
+**Step 5 -- compressibility. THE PREMISE HAS WEAKENED (2026-09-06).** Wang's
+200 measured points are now scored in-network (Finding 14 of the
+operating-point record) and an incompressible closure, read with Wang's own K
+definition, holds to MAE 0.15 at Mach 0.6 and 0.097 below Mach 0.15 -- about
+what it manages against Bassett and Hager. A `kappa M^2` correction must now
+beat 0.15 to earn its place; it can no longer be assumed necessary.
+
 **Step 5 -- compressibility.** Port `K_dat_j_closed`'s `kappa M_dat^2`
 correction into the closure (it is already in `tee_junction.h`, templated, with
 the v3 spec's derivation). Gate: Wang 2014 (digitised) and Perez-Garcia
@@ -601,6 +888,94 @@ silently move 22 roots with nothing able to tell which branch is wanted.
 `MultiPortChamberElement` as the M -> 0 regression target; close the #272
 pressure-representation item as superseded.
 
+## 8a. The port as it landed (2026-09-08)
+
+Section 8 is the plan. This is what shipped, and where it diverged. Issue #271
+is closed on it.
+
+| step | what | PR |
+|---|---|---|
+| 4.1 | `DualN` to `include/dual_number.h`, plus `dexp` `dsin` `dcos` `datan2` `dlog` `dabs` and the two angle wraps | #305 |
+| 4.2 + 4.3 | Mynard closure on duals, `include/mynard_junction.h` | #307 |
+| 4.4a | whole-element (f, J), `include/mpce_junction.h`, seeded over `DualN<10>` | #308 |
+| 4.4b | pybind11 binding and the Python shim | #309 |
+| -- | `ConstantKTeeElement` audited, deliberately NOT ported | #312 |
+
+**What it bought.** Not speed. The Python assembled its Jacobian from a
+sympy `dKQ/dmdot` block plus a hand-derived `dR/dP` column for the common
+port alone, but `K` depends on every port's velocity and every velocity on its
+own density. Against central differences of the assembled network Jacobian the
+worst relative error fell from **4.4e-3 to 1.4e-6**. Accuracy identical to four
+decimals on every source; scorecard 2108 -> 2109 of 2546; random harness
+root-exists 92.9% -> 93.7%.
+
+### Seven divergences from the plan
+
+1. **Steps 4.2 and 4.3 merged.** The pseudosupplier block alone produces
+   nothing comparable against Python. The whole closure is a testable unit:
+   given `(U, A, theta)`, return `C` and `K`.
+2. **`theta` never becomes a dual.** The plan assumed the pseudosupplier block
+   would carry duals throughout. It does not: angles derive from declared
+   geometry and from means over it, and the flows enter only through *which*
+   entries are selected. The dual set is `Q`, `Qtot`, `flow_ratio`, the two
+   pseudosupplier angles, `phi` and everything downstream.
+3. **Six branch-on-primal decisions, not the two the plan named.** The
+   supplier/collector split, the second-quadrant flip, the direction flip, the
+   two wraps' multiples, the common-port choice and the collinearity test. All
+   are marked at their sites in the header.
+4. **The step-4 gate changed shape.** It could not be "equivalence with the
+   Python Jacobian", because the C++ one is *more complete* -- comparing
+   against the Python's would mark the C++ wrong exactly where it is right.
+   Residual VALUES are compared against the Python; the Jacobian is compared
+   against central differences of that residual. The `imposed_q` table gate
+   held as written.
+5. **The guards stayed in Python.** Not in the plan. The degenerate-state
+   fallbacks and the wrong-direction soft barrier are solver policy rather
+   than junction physics, they changed twice during the work (7d, 7e), and the
+   barrier's Jacobian is three lines. So "the Python element becomes a
+   relabelling shim" is true of the physics and not of the policy.
+6. **`_mpce_v2_jacobian.py` was kept**, as step 4's own sentence allowed: the
+   sympy derivation survives as an offline cross-check
+   (`test_mpce_v2_jacobian.py`), not a runtime path. The FD fallback is gone.
+   `jacobian_method` is retired and documented as selecting nothing.
+7. **`ConstantKTeeElement` was not ported** (#312). Its `K` is a fixed
+   per-port constant, so `q_dyn` depends on the common port alone and every
+   other column is genuinely zero rather than missing -- the opposite of the
+   situation that made the MPCEv2 port worth doing. FD-checked over all twelve
+   columns in both directions: complete already. A port would buy consistency
+   of pattern, not correctness.
+
+### Three things the port found that were not defects it went looking for
+
+- **`_wrap_to_pi`'s real range is `[-pi, pi)`, not the `(-pi, pi]` its
+  docstring claimed.** At exactly `+pi` the Python expression returns `-pi`.
+  It matters only where a lateral is exactly anti-parallel to the main duct,
+  which the dataset contains. The C++ matches the implementation; the Python
+  docstring was corrected.
+- **The element re-points the axial-back port at `pi`** before calling the
+  closure, because Mynard's vessel-direction convention needs it while the
+  declared angles are measured from the main axis. Missing this was worth
+  4293 Pa on the first golden case.
+- **The two non-common `dR/dP` columns were absent**, which is the finding in
+  "what it bought" above. It was measured while designing the seeding, not
+  suspected beforehand.
+
+### Method note, worth reading before the next port
+
+Falsification and coverage caught **different** things in every one of the four
+PRs, and neither substitutes for the other. Seven to eight perturbations per PR
+found nothing new; coverage found a real gap in three of four (an angle below
+`-pi`, the joining term with a single supplier, a `1e-9` dead band a comment
+made a claim about). The one time falsification earned its keep it did so by
+*passing* where it should have failed, which named an untested semantic in the
+mass row.
+
+Coverage on a templated numerics header also lies: `dual_number.h` reported
+100% of regions, lines and branches while five of thirteen operator overloads
+were never called, because an uninstantiated template is never emitted and so
+cannot be counted as missed. **Check instantiation counts, not percentages.**
+Both lessons are now in the `model-provenance` skill.
+
 ## 9. Decisions
 
 Taken (user, 2026-09-04):
@@ -608,6 +983,12 @@ Taken (user, 2026-09-04):
 1. **Residual form: stepwise and tested.** Port the faithful `Pt`-based form
    first with an exact equivalence gate; move to Mynard-native `C_j` as a
    separate, later, data-gated change. Never both in one step.
+
+   *Status 2026-09-08: first half DONE (sec 8a). The `C_j` move is still open
+   and unscheduled. Note that it would lift the `n <= 3` limit natively, which
+   nothing currently needs -- `MPCEv2Element` refuses `N > 3` at construction
+   and no shipped network asks for one -- so the case for it rests on matching
+   the paper's residual set, not on capability.*
 2. **Tuned corrections** (`alpha`, `eta`, damping, and any future one) prove
    themselves against validation data for our regime, and are labelled as
    tuned. CFD-derived corrections count as tuning; the CFD they came from is

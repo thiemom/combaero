@@ -381,6 +381,49 @@ print(f"System Mass Flow: {results.elements['feed'].m_dot} kg/s")
 
 ## Network Solver
 
+### What a solve reports
+
+`NetworkSolver.solve` returns the solved unknowns plus a set of `__dunder__`
+bookkeeping keys. Five of them say what happened:
+
+| key | type | meaning |
+|---|---|---|
+| `__success__` | `bool` | converged **and** consistent. Unchanged; keep using it for "can I trust this result". |
+| `__converged__` | `bool` | the root finder reached the residual tolerance, whatever the consistency checks then said |
+| `__consistent__` | `bool \| None` | the elements' own physical-consistency verdict. **`None` means not checked** -- either the solve never converged, or no element in this network has a verifier. It is not a pass. |
+| `__inconsistent_elements__` | `list[str]` | ids of the elements that rejected the solution |
+| `__outcome__` | `SolveOutcome` | why it ended, in one machine-readable value |
+| `__worst_residuals__` | `list[dict]` | the rows carrying the residual, largest first |
+
+`__success__` is False in two quite different situations, and reading it alone
+cannot tell them apart: Newton never got there, or Newton got there and a
+junction rejected the root as unphysical. The second reports a *small*
+`__final_norm__` next to `success=False`, which looks like a contradiction
+until `__converged__` and `__consistent__` are read separately.
+
+```python
+from combaero.network import SolveOutcome
+
+result = solver.solve()
+if result["__outcome__"] == SolveOutcome.INCONSISTENT:
+    print("converged, then rejected by", result["__inconsistent_elements__"])
+elif not result["__success__"]:
+    worst = result["__worst_residuals__"][0]
+    print(f"{result['__outcome__']}: {worst['name']} carries {worst['residual']:.3e}")
+```
+
+`SolveOutcome` is a `StrEnum`, so it compares and serialises as a plain
+string: `CONVERGED`, `INCONSISTENT`, `NO_PROGRESS`, `RESIDUAL_TOO_LARGE`,
+`TIMEOUT`, `ERROR`, `NOT_CONVERGED`, `NO_UNKNOWNS`.
+
+> [!TIP]
+> Prefer `__outcome__` over matching on `__message__`. Part of that text comes
+> from SciPy and can be reworded without notice; `__outcome__` is classified
+> once, by the code that knows the answer.
+
+Note there is no `__residual_norm__`; the norm is `__final_norm__`.
+
+
 ### Basic Usage
 ```python
 from combaero.network import FlowNetwork, NetworkSolver, OrificeElement
@@ -620,6 +663,49 @@ junction_loss_coefficient(U, A, theta, eta_scale=0.0)
 Changing any of these values is a retune and needs a before/after table
 before it lands, not a silent edit -- `python/tests/test_junction_tuned_constants.py`
 pins the documented values.
+
+### The Junction Soft-Barrier Weight
+
+Distinct from the tuned constants above: this is a **numerical** parameter, not
+physics, and it is derived rather than declared.
+
+When `strict=False` and a port flows against its declared direction,
+`MPCEv2Element` replaces the physics with a continuity residual plus a
+one-sided quadratic penalty, `alpha * max(0, -e_i * mdot_i)^2`. The penalty
+shares its row with the continuity relation, so it balances against a pressure
+error rather than driving the offending flow to zero, and has a fixed point at
+`slack* = sqrt(dP / alpha)`. A solve that reaches it parks there.
+
+`alpha` therefore carries `Pa/(kg/s)^2` and cannot be a constant: the weight
+needed scales as `1/m_ref^2`, two decades per decade of network size.
+`NetworkSolver` derives it before each solve from the reference state it
+already computes for seeding:
+
+```python
+alpha = P_ref / (BARRIER_SLACK_FRACTION * m_ref) ** 2   # f = 0.005
+```
+
+placing the fixed point at 0.5% of the reference mass flow whatever the
+network's size. It is frozen for the solve, so the residual and Jacobian are
+unchanged in form.
+
+| name | where | meaning |
+|---|---|---|
+| `BARRIER_SLACK_FRACTION` | `combaero.network.mpce_v2_element` | where the fixed point is placed, as a fraction of `m_ref` |
+| `DEFAULT_SOFT_PENALTY_ALPHA` | same | fallback when no solver has supplied a weight, or the reference state is degenerate |
+| `scaled_penalty_alpha(P_ref, m_ref)` | same | the derivation, exposed for testing |
+| `MPCEv2Element.effective_penalty_alpha()` | element | the weight actually used, after precedence |
+
+Precedence: an explicitly set `soft_penalty_alpha` always wins, then the
+solver-supplied scale-aware weight, then the fallback. So the tuning knob keeps
+working:
+
+```python
+element.soft_penalty_alpha = 5.0e7   # explicit: overrides the derived weight
+```
+
+Raising `alpha` shrinks the fixed point and never destabilises the solve --
+the response is monotone and saturates -- so when in doubt, larger.
 
 ### Combustion Integration
 ```python
