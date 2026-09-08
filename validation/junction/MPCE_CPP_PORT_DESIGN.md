@@ -321,7 +321,17 @@ problems have no solution.** The model's `K_lat - K_str` has a minimum of
 reaches a root that does not exist. They stay pinned as xfail targets in
 `python/tests/test_bassett_fig7b_case.py`, now labelled infeasible rather
 than solver-path failures, and they come off when #272 closes the
-`K_straight` gap. **The `three_pb` assertions in that test were tautological
+`K_straight` gap.
+
+> **Superseded 2026-09-08 (PR #314).** The targets were built by reading
+> Bassett's `K5` and `K6` off the same abscissa; Table 1 indexes them on
+> opposite legs, so at one operating point they are `K5(1 - q)` and `K6(q)`.
+> The corrected target at q = 0.2 is 0.422, which the model reaches exactly.
+> Both points converge, and `mfb_two_pb` now lands within 0.005 of the q it
+> was asked for instead of drifting. `three_pb` above q ~ 0.5 is the only
+> remaining failure and the system there is feasible by construction, so it
+> is a solver and seeding problem -- the opposite of what this paragraph
+> concluded. **The `three_pb` assertions in that test were tautological
 and have been removed** -- see the next section.
 
 ## 4e. The pressure-driven topologies score less than they appear to (2026-09-05)
@@ -360,10 +370,16 @@ continuing collector: its K_straight was exactly `q^2` where Bassett and
 Hager both give `q^2 - 0.5q`. Restoring it made Mynard's CFD-fitted
 energy-transfer factor redundant, and the factor's default is now 0.
 
-**Second motivation, added 2026-09-05:** `K_straight`'s size at low q also
-decides whether the pressure-driven problem has a unique solution. The
-model's `K_lat - K_str` is U-shaped, which makes low-q targets infeasible
-and mid-range targets doubly-rooted. The acceptance criterion this yields is
+**Second motivation, added 2026-09-05 -- WITHDRAWN 2026-09-08 (PR #314).**
+`K_straight`'s size at low q was thought to decide whether the pressure-driven
+problem has a unique solution: the model's `K_lat - K_str` is U-shaped, which
+appeared to make low-q targets infeasible and mid-range targets doubly-rooted.
+The U shape is real; the infeasibility was an artefact of targets built from
+mismatched axes, and on the correct axis the model's `K_straight` matches
+Bassett's `K5` to 0.014 across the range at psi = 3. The multiplicity at
+mid-range is a property of the topology, not of `K_straight`. What survives
+below -- the equal-area identity as an exact acceptance criterion -- does not
+depend on this motivation. The acceptance criterion this yields is
 an exact identity, not an error metric: at `psi = 1` the source gives
 `K_lateral - K_straight = q (1.5 - 2 cos(0.75 theta)) + 0.5`, linear in q with
 slope and intercept fixed by geometry. The model violates it in both slope and
