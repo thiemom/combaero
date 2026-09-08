@@ -34,7 +34,25 @@ def parse_units_data(path: Path) -> list[UnitEntry]:
     section_pattern = re.compile(r"//\s*[-]+\s*\n\s*//\s*(.+?)\s*\n\s*//\s*[-]+")
 
     # Match entries like: {"name", "input", "output"},
-    entry_pattern = re.compile(r'\{"([^"]+)",\s*"([^"]*)",\s*"([^"]*)"\}')
+    #
+    # Each of the three fields may be written as SEVERAL adjacent string
+    # literals, which C++ concatenates:
+    #
+    #     {"name",
+    #      "a: Pa, "
+    #      "b: kg/s",
+    #      "Result (x: Pa)"},
+    #
+    # The original pattern required exactly one literal per field and so
+    # matched none of those, silently dropping 35 of the entries in
+    # units_data.h from docs/UNITS.md -- the whole solver-interface family
+    # (merging_tee, branching_tee, multi_port_chamber, border_carnot_loss,
+    # the compressible orifice and channel), the acoustics liner family and
+    # the cooling channel family among them. Nothing failed; the generated
+    # document was simply short, which is the worst way for a generator to be
+    # wrong.
+    _field = r'((?:\s*"[^"]*")+)'
+    entry_pattern = re.compile(r"\{" + _field + r"\s*," + _field + r"\s*," + _field + r"\s*\}")
 
     # Find all sections and their positions
     sections: list[tuple[int, str]] = []
@@ -44,7 +62,10 @@ def parse_units_data(path: Path) -> list[UnitEntry]:
     # Find all entries
     for match in entry_pattern.finditer(content):
         pos = match.start()
-        name, input_units, output_units = match.groups()
+        # Join each field's adjacent literals, exactly as C++ would.
+        name, input_units, output_units = (
+            "".join(re.findall(r'"([^"]*)"', group)) for group in match.groups()
+        )
 
         # Determine which section this entry belongs to
         section = ""
