@@ -250,3 +250,85 @@ TEST(EjectorJacobians, ElementResidualsMatchCentralDifference) {
     }
   }
 }
+
+
+// -----------------------------------------------------------------------------
+// The s_choke blend band (issue #306)
+// -----------------------------------------------------------------------------
+//
+// The element test above chooses its points "away from the s_choke/s_sub seams
+// so no partial is genuinely ~0". That is right for its purpose and is exactly
+// why `ejector_smootherstep`'s INTERIOR was executed by nothing: every case sat
+// on a saturated end, where the function returns a constant 0 or 1 and its
+// derivative term is never evaluated. Measured with llvm-cov, the three lines
+// computing `val`, `dval` and the chained result had zero coverage, so a
+// shipping analytic derivative had no cross-check at all -- which the repo's
+// solver rule forbids.
+//
+// The seam-avoidance does not apply here, and inverting it is the point.
+// Inside the band `s` is strictly between 0 and 1 and its slope is nonzero, so
+// the partials are LIVE rather than degenerate; it is the saturated ends that
+// zero them. A band point is therefore a better finite-difference test than
+// the ones above, not a worse one.
+//
+// The thresholds are arguments, so rather than hunting for a state that
+// happens to land in a fixed band, the band is placed around the state's own
+// mp/cap ratio -- 0.6857 for the "jetpump" point.
+TEST(EjectorJacobians, SmootherstepBandIsExercisedAndItsDerivativeIsCorrect) {
+  const double A_t = 3.14e-5, A_e = 1.0e-4, A_mix = 8.0e-4, A_s = A_mix - A_e;
+  const EjectorGeometry geom{A_e / A_t, A_mix / A_t};
+  const double R = 287.0, ep = 0.95, es = 0.85, rec = 1.0, eps = 1e-3, g = 1.4;
+  const double ss_lo = 0.98, ss_hi = 1.02;
+
+  // mp/cap = 0.6857 at this state.
+  const double u[9] = {0.0051, 0.030, 0.0351, 105000.0, 305.0, 100000.0, 295.0, 100500.0, 99000.0};
+
+  auto evaluate = [&](const double v[9], double sc_lo, double sc_hi) {
+    return ejector_element_residuals_and_jacobian(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7],
+                                                  v[8], geom, A_t, A_e, A_s, g, R, ep, es, rec, eps,
+                                                  sc_lo, sc_hi, ss_lo, ss_hi);
+  };
+
+  // Three bands: one that saturates s to 0, one that saturates it to 1, and
+  // one straddling the state's ratio.
+  const double kBandLo = 0.60, kBandHi = 0.75;
+  auto below = evaluate(u, 0.90, 0.999);  // ratio 0.686 < lo  -> s = 0
+  auto above = evaluate(u, 0.30, 0.50);   // ratio 0.686 > hi  -> s = 1
+  auto band = evaluate(u, kBandLo, kBandHi);
+
+  // The band result must sit strictly between the two saturated ones on at
+  // least one row, or the interior is not being reached and everything below
+  // would be testing a saturated end again.
+  bool strictly_between = false;
+  for (int row = 0; row < 4; ++row) {
+    double a = below.residuals[row];
+    double b = above.residuals[row];
+    double m = band.residuals[row];
+    if (std::abs(a - b) < 1e-9) continue;
+    double lo = std::min(a, b);
+    double hi = std::max(a, b);
+    if (m > lo + 1e-9 * std::abs(hi - lo) && m < hi - 1e-9 * std::abs(hi - lo)) {
+      strictly_between = true;
+    }
+  }
+  EXPECT_TRUE(strictly_between)
+      << "the blend is saturated, so the smootherstep interior is still unreached";
+
+  // And the analytic Jacobian must be right there, which is the cross-check
+  // the derivative never had.
+  auto resid = [&](const double v[9], int row) { return evaluate(v, kBandLo, kBandHi).residuals[row]; };
+  for (int row = 0; row < 4; ++row) {
+    for (int k = 0; k < 9; ++k) {
+      double a[9], b[9];
+      for (int m = 0; m < 9; ++m) a[m] = b[m] = u[m];
+      double h = 1e-6 * std::abs(u[k]);
+      if (h == 0.0) h = 1e-6;
+      a[k] += h;
+      b[k] -= h;
+      double cd = (resid(a, row) - resid(b, row)) / (2 * h);
+      double an = band.jacobian[row][k];
+      double floor = 1e-6 * std::abs(band.residuals[row]) + 1e-7;
+      EXPECT_NEAR(an, cd, 1e-5 * std::abs(cd) + floor) << "row " << row << " seed " << k;
+    }
+  }
+}
