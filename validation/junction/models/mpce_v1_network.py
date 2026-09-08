@@ -108,8 +108,7 @@ class MPCEv1Network:
             net = build_separating_network_skeleton(m_in=m_in, m_lateral=q * m_in)
             lateral_terminal = "mb_lat"
         else:
-            K_lat = bassett2001.K6(q, psi, theta_rad)
-            K_str = bassett2001.K5(q)
+            K_str, K_lat = bassett2001.separating_pair_at(q, psi, theta_rad)
             if topology == "three_pb":
                 net = build_separating_three_pb_skeleton(
                     K_lateral_target=K_lat, K_straight_target=K_str

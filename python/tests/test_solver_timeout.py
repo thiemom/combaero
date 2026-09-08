@@ -1,5 +1,6 @@
 import time
 
+import numpy as np
 import pytest
 
 from combaero.network import FlowNetwork, NetworkSolver, OrificeElement, PressureBoundary
@@ -48,9 +49,13 @@ def test_solver_timeout_trigger():
     with pytest.warns(UserWarning, match="Solver timed out"):
         solution = solver.solve(timeout=0.1)  # 0.1s is shorter than one evaluation
 
-    # It should return the initial guess (the 'best' seen so far)
+    # It should return the initial guess (the 'best' seen so far). Compare
+    # against the solver's OWN initial guess rather than a constant: on a
+    # network with no MassFlowBoundary the reference flow used to be a hard
+    # 0.1 kg/s and is now estimated from the imposed pressure difference.
     assert "orf.m_dot" in solution
-    assert solution["orf.m_dot"] == 0.1  # Default initial guess for m_dot
+    seeded = dict(zip(solver.unknown_names, solver._build_x0(), strict=True))
+    assert solution["orf.m_dot"] == pytest.approx(seeded["orf.m_dot"])
 
 
 def test_solver_maxfev_limit():
@@ -66,9 +71,20 @@ def test_solver_maxfev_limit():
 
     solver = NetworkSolver(graph)
 
-    # Force failure via low maxfev
+    # Force failure via low maxfev, from an x0 that is deliberately far from
+    # the answer. Relying on a poor default seed to make this fail stopped
+    # working when the reference flow started being estimated from the
+    # imposed pressure difference rather than fixed at 0.1 kg/s: one
+    # evaluation from a good seed can already be close enough.
+    solver._build_x0()
+    far = np.array(
+        [
+            1e-6 if name.endswith(".m_dot") else v
+            for name, v in zip(solver.unknown_names, solver._build_x0(), strict=True)
+        ]
+    )
     with pytest.warns(UserWarning, match="NetworkSolver did not converge"):
-        solution = solver.solve(method="hybr", options={"maxfev": 1})
+        solution = solver.solve(method="hybr", x0=far, options={"maxfev": 1})
 
     assert "orf.m_dot" in solution
 

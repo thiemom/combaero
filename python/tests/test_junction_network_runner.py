@@ -154,10 +154,61 @@ def test_topology_filter_in_run_network():
     assert topologies == {"imposed_q"}
 
 
-def test_iter_skips_x_axis_M3_files():
-    """Wang files (x_axis=M_3) should be skipped -- network mode uses q only."""
-    ds = load_dataset()
-    tee = TeeJunctionElementNetwork()
-    records = list(iter_network_records(tee, ds, topologies=("imposed_q",)))
-    papers = {r.paper for r in records}
-    assert "wang2014" not in papers, "wang files should be skipped (M_3 axis)"
+def test_mach_indexed_files_are_scored_at_their_own_mach():
+    """Wang 2014 sweeps Mach at a fixed split, and network mode used to drop
+    every such file because it only understood a q abscissa.
+
+    That silently excluded the only measured compressible data in the set --
+    200 points from Mach 0.09 to 0.60 -- so the roles are swapped for these
+    files: the abscissa is the Mach and the split comes from the metadata.
+    """
+    from validation.junction.models.mpce_v2_network import MPCEv2Network
+
+    records = [
+        r
+        for r in iter_network_records(
+            MPCEv2Network(strict=False), load_dataset(), topologies=("imposed_q",)
+        )
+        if r.paper == "wang2014"
+    ]
+
+    assert records, "the compressible source is being dropped again"
+    assert all(r.mach is not None for r in records), "a Mach-indexed record must carry its Mach"
+    machs = [r.mach for r in records]
+    assert min(machs) < 0.15 and max(machs) > 0.45, "the Mach sweep is not being covered"
+    # the split is metadata here, not the abscissa
+    assert {round(r.q, 2) for r in records} <= {0.0, 0.2, 0.5, 0.8, 1.0}
+
+
+def test_incompressible_sources_carry_no_mach():
+    """Bassett, Hager and Idelchik specify no Mach, and must not be given a
+    fabricated one -- the same "not checked is not the same as fine" rule the
+    consistency field follows."""
+    from validation.junction.models.mpce_v2_network import MPCEv2Network
+
+    records = [
+        r
+        for r in iter_network_records(
+            MPCEv2Network(strict=False), load_dataset(), topologies=("imposed_q",)
+        )
+        if r.paper != "wang2014"
+    ]
+
+    assert records
+    assert all(r.mach is None for r in records)
+
+
+def test_a_mach_indexed_source_is_not_charged_for_topologies_it_cannot_use():
+    """The pressure-driven skeletons size their boundaries from Bassett's
+    analytical K, which means nothing for another source. Emitting them as
+    failures would count a skip as a failure."""
+    from validation.junction.models.mpce_v2_network import MPCEv2Network
+
+    records = [
+        r
+        for r in iter_network_records(MPCEv2Network(strict=False), load_dataset())
+        if r.paper == "wang2014"
+    ]
+
+    assert records
+    assert {r.topology for r in records} == {"imposed_q"}

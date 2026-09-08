@@ -7,6 +7,190 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Deprecated
+- **`MultiPortChamberElement`'s own junction model, for removal in 0.6.0.**
+  Its `residuals`, `diagnostics` and `verify_solution_consistent` now emit a
+  `DeprecationWarning` once per element. Use `MPCEv2Element`: on the same
+  Bassett separating cells it scores a mean absolute error of 0.0564 against
+  this model's 0.5260 and converges on 94 of 105 points against 77, and it
+  computes its residual and Jacobian in C++. This model is also energetically
+  inconsistent for joining flow and sign-symmetric, so it admits mirror roots.
+  Nothing in the package or the GUI instantiates it.
+
+  **Only the model is deprecated.** The class also owns the topology and port
+  machinery that `MPCEv2Element` and `ConstantKTeeElement` inherit unchanged --
+  13 of its 17 public members -- and that is staying. The warning is guarded on
+  the exact type rather than on `isinstance`, because
+  `MPCEv2Element.diagnostics` delegates here through `super()` and would
+  otherwise warn every user of the element that replaces this one.
+
+  0.5.0 is the last release carrying it, so a network built on it can be run by
+  pinning `combaero~=0.5`.
+
+### Fixed
+- **The junction validation harness built its pressure-driven boundary targets
+  from two different operating points.** Bassett Table 1 indexes each loss
+  coefficient on the mass-flow fraction in its own leg -- `K5` on
+  `mdot_A/mdot_C` (the straight leg), `K6` on `mdot_B/mdot_C` (the lateral) --
+  so at one physical state they are `K5(1-q)` and `K6(q)`. All three network
+  adapters read both off the same abscissa, which asked the `three_pb` and
+  `mfb_two_pb` skeletons for boundary pressures corresponding to a state that
+  does not exist. The pairing now lives in one place,
+  `bassett2001.separating_pair_at`. Measured: the junction scorecard goes from
+  2109 to **2178** of 2546 converged and 2082 to **2152** points scored, with
+  the pooled mean absolute error improving from 0.4982 to **0.4809** and
+  Bassett's own from 0.1538 to **0.1416**. `mfb_two_pb` changes character --
+  it used to drift far from the operating point it was asked for (q=0.8
+  settling at 0.857) and now lands within 0.005 across the range, because the
+  drift was the solve honestly chasing a mismatched target. Two strict xfails
+  recorded as "no root exists, waiting on the K_straight gap" come off: the
+  root existed, and the corrected target at q=0.2 is 0.422 rather than 0.122.
+  Affects the validation harness only -- no shipped model or solver behaviour
+  changes.
+
+### Changed
+- **The momentum-CV junction's residual and Jacobian are now computed in C++.**
+  `MPCEv2Element` becomes a shim: it applies the guards -- the degenerate-state
+  fallbacks and the wrong-direction soft barrier, which are solver policy
+  rather than junction physics -- and then calls
+  `_core.mpce_v2_residuals_and_jacobian`, which seeds the whole element over
+  `(P_i, Pt_i, outer_mdot_i, Pt_jct)` and returns exact partials for every one.
+  This replaces a Python closure evaluation, a sympy-lambdified Jacobian block
+  for the canonical separating tee, an N+1-call finite-difference fallback for
+  every other topology, and a hand-derived `dR/dP` column.
+  **The Jacobian is now more complete, not merely faster.** The hand-derived
+  column covered the common port only, but `K` depends on every port's velocity
+  and every velocity on its own density; measured against central differences of
+  the assembled network Jacobian, the worst relative error falls from 4.4e-3 to
+  1.4e-6. Accuracy is unchanged to four decimals on every validation source
+  (Bassett 0.1538, Hager 0.0787, Idelchik 0.8880, Wang 0.1184) and convergence
+  is slightly better: the scorecard goes from 2108 to 2109 of 2546, and the
+  random boundary sweep from 92.9% to 93.7% of draws that admit a root.
+  `MPCEv2Element.jacobian_method` is retired and now selects nothing; it is kept
+  so existing callers do not break. The sympy derivation remains in
+  `_mpce_v2_jacobian.py` as an offline cross-check rather than a runtime path.
+
+### Added
+- **`NetworkSolver.solve` now reports why a solve ended, separately from
+  whether it succeeded.** Five new keys: `__converged__` (the root finder's own
+  verdict), `__consistent__` (the elements' physical-consistency verdict, with
+  **`None` meaning not checked** -- never `True`), `__inconsistent_elements__`,
+  `__outcome__` (a `SolveOutcome` `StrEnum`, always set) and
+  `__worst_residuals__` (the rows carrying the residual, largest first).
+  `__success__` keeps its exact meaning, converged **and** consistent, so
+  existing callers are unaffected. The motivation: `__success__` is False both
+  when Newton never got there and when it found a root a junction then rejected
+  as unphysical -- the latter reporting a tiny `__final_norm__` next to
+  `success=False` -- and everything else about the failure was only available
+  by matching substrings of `__message__`, part of which comes from SciPy.
+  `SolveOutcome` is exported from `combaero.network`. The GUI's `NetworkResult`
+  surfaces the same fields, and its docstring no longer describes `success` as
+  "converged within the residual tolerance", which it has not been since the
+  consistency checks landed.
+
+### Fixed
+- **The junction soft-barrier weight is derived from the network's scales
+  instead of being a fixed constant.** `soft_penalty_alpha` multiplies a
+  squared mass flow to produce a pressure, so it carries `Pa/(kg/s)^2` and is
+  only meaningful against a particular network's scales; the barrier's fixed
+  point sits at `slack* = sqrt(dP/alpha)`, and what matters is that as a
+  fraction of the flow. Measured on one junction scaled over five decades with
+  every dimensionless group held fixed, the weight needed to converge follows
+  `1/m_ref^2` exactly -- two decades of weight per decade of size -- and the
+  previous fixed value failed on the same junction at a hundredth of its size.
+  `NetworkSolver` now derives `alpha = P_ref / (f*m_ref)^2` from the reference
+  state it already computes for seeding and hands it to each element that owns
+  a barrier, frozen for the solve so the residual and Jacobian are unchanged in
+  form. A degenerate reference state falls back to the fixed default rather
+  than producing a weaker barrier, and an explicitly set `soft_penalty_alpha`
+  always wins. Measured: the junction validation scorecard is identical to the
+  digit (2108 of 2546 converged, every source's mean error unchanged) because
+  that set already sat on the saturation plateau, while the same junction now
+  converges across seven decades of size instead of five.
+- **The junction soft barrier no longer has a fixed point that solves park
+  in.** `MPCEv2Element` replaces the physics with a "soft barrier" when a port
+  flows against its declared direction, meant to pull Newton back toward
+  `mdot = 0` so a sign flip can restore the declared regime. It could not: the
+  penalty is added into the same residual row as the continuity relation,
+  `R_i = (Pt_i - Pt_jct) + alpha*max(0, -e_i*mdot_i)^2`, and the element has no
+  spare row to give it, so the solver could zero that row by carrying a
+  pressure error equal and opposite to the penalty instead of by driving the
+  slack to zero. The barrier therefore behaved as a fabricated pressure loss
+  with a fixed point at `slack* = sqrt(dP/alpha)`. At the previous
+  `soft_penalty_alpha` of 1e7 that put it at 45% of the common mass flow, and
+  affected solves plateaued on a residual floor with an ordinary in-regime root
+  available. `soft_penalty_alpha` is now 1e11, which moves the fixed point to
+  0.45%. Measured: the junction validation scorecard goes from 2080 to 2108
+  converged of 2546 with every source's mean error equal or better (Bassett
+  0.1548 -> 0.1538, Idelchik 0.8902 -> 0.8880, Hager and Wang unchanged), and
+  the random boundary-condition sweep from 98.3% to 99.3% inside the closure's
+  documented Mach range. The response is monotone in `alpha` and flat above
+  1e9, so this is a saturation point rather than a fitted value. Note that
+  `alpha` carries Pa/(kg/s)^2 and is therefore tied to the scales it was
+  measured on; a network far outside them wants a scale-aware weight.
+- **A failed solve now really does return its best iterate.**
+  `NetworkSolver.solve` warns "Returning best iterate" on non-convergence, but
+  the returned state and its residual norm were captured immediately after the
+  primary root-finding phase. Later phases -- above all the
+  Levenberg-Marquardt fallback -- keep evaluating through the same wrapper and
+  improve the tracked best, yet only re-pointed the returned state when they
+  reached the convergence tolerance, so an improvement that fell short was
+  discarded. Measured over 38 non-converged junction solves, 30 returned a
+  state worse than the best they had evaluated, by a median factor of 5.8 and
+  up to 2e5. The returned state is now re-pointed at the tracked best whenever
+  that is closer, before the junction consistency checks run, so those checks
+  judge the state actually handed back. **This does not change whether any
+  solve converges** -- the junction validation scorecard and the random
+  boundary-condition sweep are identical either side of the change.
+- **The automatic warm-start retry no longer replaces a closer result with a
+  worse one.** When both the primary attempt and the retry failed, the retry's
+  result was returned unconditionally. Whichever got closer is now returned,
+  with the other's residual norm quoted in the message.
+- **The junction validation harness records a real residual norm.** It read
+  `__residual_norm__`, a key `NetworkSolver` has never set, so every record's
+  residual norm was silently infinity; the solver's key is `__final_norm__`.
+
+
+### Fixed
+- **A network driven only by pressures no longer starts from a hard-coded
+  0.1 kg/s.** `NetworkSolver._infer_reference_state` fell back to that constant
+  whenever no `MassFlowBoundary` set the scale, so the initial guess was
+  independent of the network's size and of the imposed pressure differences.
+  The reference flow is now a Bernoulli estimate, `m = A sqrt(2 rho dP)`, using
+  the median flow area and the per-element share of the boundary pressure
+  spread -- the same estimate `analytical_pt_prop` already made for channels,
+  and the same per-element pressure step the guess propagator already used. On
+  a sweep of junctions driven by three pressure boundaries, where the implied
+  level spans 2e-3 to 36 kg/s and the constant was off by more than a decade in
+  27 of 60 cases, convergence rises from 76% to 90%; the junction validation
+  scorecard rises from 1697 to 1708 of 2073. Networks that already carry a
+  mass-flow boundary are unaffected.
+
+### Changed
+- **The MPCE junction closure now carries the dividing-streamline pressure
+  recovery, and Mynard's fitted energy-transfer factor is off by default.**
+  With the transfer factor disabled, the closure's straight-leg coefficient was
+  exactly `q^2` -- the plain velocity-difference loss -- at every area ratio and
+  branch angle, while Bassett 2001 (K5) and Hager 1984 (xi_t) independently give
+  `q^2 - 0.5 q`. The missing `-0.5 q` is the dividing-streamline pressure
+  `p* = p + (1/4) rho u^2` acting over the diverted flow fraction; Mynard
+  carries the same term but only through the contraction analysis of a turning
+  collector, whose control volume degenerates for a collinear one.
+  `_mynard2010.DIVIDING_STREAMLINE_RECOVERY` restores it for the single-supplier
+  diverging case that both papers analysed.
+  Restoring it made Mynard's `eta` a duplicate of the same physics, so
+  `MPCEv2Element.DEFAULT_ETA_SCALE` is now `0.0`; `eta_scale=1.0` still
+  reproduces the faithful port. Measured at pinned operating points on the
+  digitised data, the straight-leg RMSE improves from 0.333 to 0.098 while the
+  lateral regresses from 0.079 to 0.097: the fitted factor was buying lateral
+  accuracy by making the junction a net source of flow work below a lateral
+  flow fraction of about 0.25. The closure is now dissipative everywhere and
+  reproduces the analytical identity `K_lateral - K_straight =
+  q (0.5 - 2 cos(0.75 theta)) + 1` at equal areas. The analytical Jacobian was
+  re-derived with the term and with `eta_scale` as a parameter rather than
+  baked in at 1. **Junction pressure drops will change**, most in dividing flow
+  at a small lateral fraction.
+
 ### Fixed
 - **The initial guess at a junction now conserves mass and follows the
   boundary pressures.** `NetworkSolver`'s `analytical_pt_prop` seeding applied
