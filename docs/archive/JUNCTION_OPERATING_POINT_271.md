@@ -1243,6 +1243,39 @@ scale-dependence are in [MPCE_CPP_PORT_DESIGN.md] sections 7c and 7d.
 - `python/combaero/network/solver.py` -- `_propagate_analytical_pt_prop`
   (the seed) and `verify_solution_consistent`'s call site (the detector).
 
+## Closing the record (2026-09-08)
+
+[Issue #271] is closed. This document served the operating-point
+investigation that preceded the C++ port; the port itself is recorded in
+[MPCE_CPP_PORT_DESIGN.md] section 8a, and what follows is only what a reader
+of THIS file needs in order to know where it stands.
+
+**The findings above held up, with two exceptions recorded in place.**
+Finding 12 ("the residual landscape is clean; the failures are outside the
+model") is true of the q-endpoint cases it examined and not of the plateau
+class -- see Finding 16. And Finding 16's own first reading, that the plateau
+was a mode seam and the soft-barrier penalty was cleared, was itself wrong;
+the correction is in the design doc's 7c and 7d.
+
+**What closed the arc.** The barrier's fixed point at
+`slack* = sqrt(dP / alpha)` was the plateau (7d), and the weight that sets it
+is dimensional, so it is now derived from the network's own scales rather than
+declared (7e). The whole-element `(f, J)` moved to C++ and, in doing so,
+supplied two Jacobian columns the Python never had.
+
+**What did not close, and is tracked elsewhere.** The `K_straight` gap is
+[issue #272]'s and is untouched by any of this. Its acceptance gate is
+now met -- the closure scores 0.0498 against the 0.2405 bar -- and the
+residual disagreement was located in the closure rather than the coupling,
+which narrows the search without ending it.
+
+**A caution for anyone reading this file later.** Several claims in it were
+repeated from these notes long after the suite had moved on: the equal-area
+identity xfail came off on 2026-09-05, and the "model creates energy below
+q ~ 0.2" finding was an artefact of `eta_scale = 1.0` and never was an xfail.
+Read the suite, not the record.
+
 [MPCE_CPP_PORT_DESIGN.md]: ../../validation/junction/MPCE_CPP_PORT_DESIGN.md
 [JUNCTION_JACOBIAN_271.md]: JUNCTION_JACOBIAN_271.md
 [issue #271]: https://github.com/thiemom/combaero/issues/271
+[issue #272]: https://github.com/thiemom/combaero/issues/272
