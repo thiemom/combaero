@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **The junction validation harness built its pressure-driven boundary targets
+  from two different operating points.** Bassett Table 1 indexes each loss
+  coefficient on the mass-flow fraction in its own leg -- `K5` on
+  `mdot_A/mdot_C` (the straight leg), `K6` on `mdot_B/mdot_C` (the lateral) --
+  so at one physical state they are `K5(1-q)` and `K6(q)`. All three network
+  adapters read both off the same abscissa, which asked the `three_pb` and
+  `mfb_two_pb` skeletons for boundary pressures corresponding to a state that
+  does not exist. The pairing now lives in one place,
+  `bassett2001.separating_pair_at`. Measured: the junction scorecard goes from
+  2109 to **2178** of 2546 converged and 2082 to **2152** points scored, with
+  the pooled mean absolute error improving from 0.4982 to **0.4809** and
+  Bassett's own from 0.1538 to **0.1416**. `mfb_two_pb` changes character --
+  it used to drift far from the operating point it was asked for (q=0.8
+  settling at 0.857) and now lands within 0.005 across the range, because the
+  drift was the solve honestly chasing a mismatched target. Two strict xfails
+  recorded as "no root exists, waiting on the K_straight gap" come off: the
+  root existed, and the corrected target at q=0.2 is 0.422 rather than 0.122.
+  Affects the validation harness only -- no shipped model or solver behaviour
+  changes.
+
 ### Changed
 - **The momentum-CV junction's residual and Jacobian are now computed in C++.**
   `MPCEv2Element` becomes a shim: it applies the guards -- the degenerate-state

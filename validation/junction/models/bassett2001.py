@@ -75,6 +75,31 @@ def K6(q: float, psi: float, theta: float) -> float:
     return q * q * psi * psi + 1.0 - 2.0 * q * psi * math.cos(0.75 * theta)
 
 
+def separating_pair_at(q_lateral: float, psi: float, theta: float) -> tuple[float, float]:
+    """(K_straight, K_lateral) for flow type 3 at ONE operating point.
+
+    Table 1 indexes each coefficient on the mass-flow fraction in ITS OWN leg:
+    ``K5`` on ``q = mdot_A/mdot_C`` (the straight leg) and ``K6`` on
+    ``q = mdot_B/mdot_C`` (the lateral). At a single physical state those are
+    ``1 - q_lateral`` and ``q_lateral``, so the pair must never be read off the
+    same abscissa.
+
+    Reading both at the same ``q`` mixes two different operating points. Doing
+    exactly that is what made Bassett Fig 7b look unreachable: the pressure-
+    driven skeletons were handed a target of ``K6(0.2) - K5(0.2) = 0.122``
+    against a model whose ``K_lat - K_str`` bottoms out at 0.551, and the
+    solver reported an infeasible system -- honestly, but about a state nobody
+    meant to ask for. The correct pairing at that point is
+    ``K6(0.2) - K5(0.8) = 0.422``, which the model hits exactly, because it
+    reproduces both of Bassett's coefficients to three decimals.
+
+    Exists so the pairing lives in one place. The same slip has been fixed
+    twice before in the scoring axis (#295) and the type-4 leg labels (#301);
+    three adapters had independently repeated it here (#272).
+    """
+    return K5(1.0 - q_lateral), K6(q_lateral, psi, theta)
+
+
 # ---------------------------------------------------------------------------
 # Joining flows (Section 3.1). Table 2 raw forms + body-text angle-corrected
 # forms per Section 4.2.
