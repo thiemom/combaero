@@ -567,6 +567,15 @@ double pin_fin_friction(double Re_d, bool is_staggered) {
 // -------------------------------------------------------------
 
 // Validate dimple parameters
+void validate_dimple_geometry(double d_Dh, double h_d) {
+    if (d_Dh < 0.1 || d_Dh > 0.3) {
+        throw std::runtime_error("Dimple d_Dh must be in range [0.1, 0.3], got " + std::to_string(d_Dh));
+    }
+    if (h_d < 0.1 || h_d > 0.3) {
+        throw std::runtime_error("Dimple h_d must be in range [0.1, 0.3], got " + std::to_string(h_d));
+    }
+}
+
 void validate_dimple_params(double Re_Dh, double d_Dh, double h_d) {
     // Re_Dh: correlation is Nu_enh = C*Re^m (power law, smooth extrapolation).
     // Warn rather than throw — the function is well-behaved outside [10000, 80000].
@@ -575,12 +584,7 @@ void validate_dimple_params(double Re_Dh, double d_Dh, double h_d) {
                   << " is outside validated range [10000, 80000]."
                      " Extrapolating power-law correlation; check results.\n";
     }
-    if (d_Dh < 0.1 || d_Dh > 0.3) {
-        throw std::runtime_error("Dimple d_Dh must be in range [0.1, 0.3], got " + std::to_string(d_Dh));
-    }
-    if (h_d < 0.1 || h_d > 0.3) {
-        throw std::runtime_error("Dimple h_d must be in range [0.1, 0.3], got " + std::to_string(h_d));
-    }
+    validate_dimple_geometry(d_Dh, h_d);
 }
 
 void validate_dimple_params(double Re_Dh, double d_Dh, double h_d, double S_d) {
@@ -630,7 +634,11 @@ double dimple_friction_multiplier(
     double d_Dh,
     double h_d
 ) {
-    validate_dimple_params(Re_Dh, d_Dh, h_d);
+    // Geometry only. The Re range warning in validate_dimple_params belongs to
+    // the Nusselt correlation, which really is a power law in Re; this friction
+    // form is not, so warning about extrapolating one would be noise.
+    (void)Re_Dh;
+    validate_dimple_geometry(d_Dh, h_d);
 
     // Friction penalty for dimples (Chyu et al. 1997)
     // Much lower than ribs (1.5-2.0x vs 6-10x)

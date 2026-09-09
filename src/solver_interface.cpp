@@ -419,16 +419,6 @@ dimple_nusselt_enhancement_and_jacobian(double Re_Dh, double d_Dh, double h_d,
 }
 
 CorrelationResult<std::tuple<double, double>>
-dimple_friction_multiplier_and_jacobian(double Re_Dh, double d_Dh, double h_d) {
-  const double eps = std::max(1e-6, Re_Dh * 1e-6);
-  double f_plus = cooling::dimple_friction_multiplier(Re_Dh + eps, d_Dh, h_d);
-  double f_minus = cooling::dimple_friction_multiplier(Re_Dh - eps, d_Dh, h_d);
-  double df_dRe = (f_plus - f_minus) / (2.0 * eps);
-  double f = cooling::dimple_friction_multiplier(Re_Dh, d_Dh, h_d);
-  return {{f, df_dRe}, CorrelationValidity::VALID, ""};
-}
-
-CorrelationResult<std::tuple<double, double>>
 rib_enhancement_factor_high_re_and_jacobian(double e_D, double pitch_to_height,
                                              double alpha_deg, double Re) {
   const double eps = std::max(1e-6, Re * 1e-6);
