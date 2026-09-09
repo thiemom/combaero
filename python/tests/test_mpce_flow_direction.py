@@ -1,5 +1,5 @@
 """
-Tests for the constrained-topology ``flow_direction`` field on MPCEv2Element.
+Tests for the constrained-topology ``flow_direction`` field on MultiPortChamberElement.
 
 The element accepts ``flow_direction = "merge" | "branch"`` and raises
 ``ValueError`` at solve time if the observed flow pattern at residual
@@ -12,12 +12,12 @@ import math
 
 import pytest
 
-from combaero.network.mpce_v2_element import MPCEv2Element
+from combaero.network.mpce_element import MultiPortChamberElement
 
 
-def _branch_element() -> MPCEv2Element:
+def _branch_element() -> MultiPortChamberElement:
     """Canonical 3-port separating T at theta=90deg, equal areas."""
-    return MPCEv2Element(
+    return MultiPortChamberElement(
         id="jct",
         inlet_nodes=["port_com"],
         outlet_nodes=["port_str", "port_bra"],
@@ -28,9 +28,9 @@ def _branch_element() -> MPCEv2Element:
     )
 
 
-def _merge_element() -> MPCEv2Element:
+def _merge_element() -> MultiPortChamberElement:
     """Canonical 3-port joining T at theta=90deg, equal areas."""
-    return MPCEv2Element(
+    return MultiPortChamberElement(
         id="jct",
         inlet_nodes=["port_str", "port_bra"],
         outlet_nodes=["port_com"],
@@ -59,7 +59,7 @@ class _State:
 
 def test_invalid_flow_direction_rejected_at_construction() -> None:
     with pytest.raises(ValueError, match="flow_direction"):
-        MPCEv2Element(
+        MultiPortChamberElement(
             id="jct",
             inlet_nodes=["port_com"],
             outlet_nodes=["port_str", "port_bra"],
@@ -117,7 +117,7 @@ def test_degenerate_flow_does_not_trip_constraint() -> None:
 
 def test_soft_mode_does_not_raise_on_wrong_direction() -> None:
     """strict=False replaces the raise with a soft-barrier residual."""
-    e = MPCEv2Element(
+    e = MultiPortChamberElement(
         id="jct",
         inlet_nodes=["port_com"],
         outlet_nodes=["port_str", "port_bra"],

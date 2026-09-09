@@ -1,6 +1,6 @@
-"""Coverage for the MPCEv2 FD-fallback guards, which nothing exercised.
+"""Coverage for the MultiPortChamberElement FD-fallback guards, which nothing exercised.
 
-`MPCEv2Element` falls back to finite differences whenever the sympy branch
+`MultiPortChamberElement` falls back to finite differences whenever the sympy branch
 declines, and that loop carries three guards that `continue` past a perturbed
 evaluation -- leaving the corresponding Jacobian column at its initialised
 ZERO. A zero column is a wrong derivative, not an error: indistinguishable at
@@ -50,7 +50,7 @@ def test_mynard_supplies_K_for_three_ports():
 def test_mynard_returns_no_K_beyond_three_ports():
     """Mynard's closure is 3-branch by derivation, so K is None for N > 3.
 
-    This is what makes MPCEv2's `K is None` guard reachable. If the closure ever
+    This is what makes MultiPortChamberElement `K is None` guard reachable. If the closure ever
     gains N > 3 support, this test fails and the guard -- and the zero-Jacobian
     consequence pinned below -- must be revisited.
     """
@@ -105,7 +105,7 @@ def test_perturbing_a_near_zero_port_flips_its_velocity_sign():
 
 
 # The N > 3 consequence (a silently all-zero loss Jacobian) is no longer
-# reachable: MPCEv2Element refuses more than three ports at construction, and
-# that refusal is pinned in test_mpce_v2_degenerate_iterates.py. The closure-
+# reachable: MultiPortChamberElement refuses more than three ports at construction, and
+# that refusal is pinned in test_mpce_degenerate_iterates.py. The closure-
 # level precondition above (K is None beyond three ports) is what makes the
 # refusal necessary and stays.

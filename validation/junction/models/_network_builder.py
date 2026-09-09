@@ -2,7 +2,7 @@
 Shared helpers for the network-mode validation adapters.
 
 The network mode tests the *wrapped* junction element (TeeJunctionElement,
-MultiPortChamberElement) as it behaves inside a NetworkSolver, not the raw
+MultiPortChamberBase) as it behaves inside a NetworkSolver, not the raw
 K math.
 
 Three separating-flow topologies are supported. The same junction element
@@ -94,7 +94,7 @@ def _achieved_q(
     operating point, so every record carries the q it actually reached.
 
     Callers that re-index q onto a paper's own axis must apply the same
-    transform to this value -- see `MPCEv2Network`.
+    transform to this value -- see `MPCENetwork`.
     """
 
     def _mdot_at(node_id: str) -> float | None:

@@ -60,7 +60,7 @@ from combaero.network import (
     PressureBoundary,
 )
 from combaero.network._mynard2010 import junction_loss_coefficient
-from combaero.network.mpce_v2_element import MPCEv2Element
+from combaero.network.mpce_element import MultiPortChamberElement
 
 _Y = list(cb.mole_to_mass(cb.species.dry_air()))
 _X = list(cb.mass_to_mole(_Y))
@@ -181,7 +181,7 @@ def build(case: Case) -> FlowNetwork:
         net.add_element(LosslessConnectionElement("lc_str", "b_str", "port_str"))
         net.add_element(LosslessConnectionElement("lc_bra", "b_bra", "port_bra"))
         net.add_element(LosslessConnectionElement("lc_com", "port_com", "b_com"))
-        junction = MPCEv2Element(
+        junction = MultiPortChamberElement(
             id="jct",
             inlet_nodes=["port_str", "port_bra"],
             outlet_nodes=["port_com"],
@@ -208,7 +208,7 @@ def build(case: Case) -> FlowNetwork:
         net.add_element(LosslessConnectionElement("lc_com", "b_com", "port_com"))
         net.add_element(LosslessConnectionElement("lc_str", "port_str", "b_str"))
         net.add_element(LosslessConnectionElement("lc_bra", "port_bra", "b_bra"))
-        junction = MPCEv2Element(
+        junction = MultiPortChamberElement(
             id="jct",
             inlet_nodes=["port_com"],
             outlet_nodes=["port_str", "port_bra"],

@@ -25,10 +25,11 @@ from .components import (
     AreaChangeElement,
     TeeJunctionElement,
     VortexElement,
-    MultiPortChamberElement,
+    MultiPortChamberBase,
     BorderCarnotLossElement,
     WallNode,
 )
+from .mpce_element import ConstantKTeeElement, MultiPortChamberElement
 from .combustion import (
     CombustionResult,
     combustion_from_streams,
@@ -63,7 +64,9 @@ __all__: list[str] = [
     "AreaChangeElement",
     "TeeJunctionElement",
     "VortexElement",
+    "MultiPortChamberBase",
     "MultiPortChamberElement",
+    "ConstantKTeeElement",
     "BorderCarnotLossElement",
     "EnergyBoundary",
     "NetworkMixtureState",

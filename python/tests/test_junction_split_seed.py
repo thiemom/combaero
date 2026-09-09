@@ -34,9 +34,9 @@ from combaero.network import (
     NetworkSolver,
     PressureBoundary,
 )
-from combaero.network.components import MultiPortChamberElement
+from combaero.network.components import MultiPortChamberBase
 from combaero.network.ejector_element import EjectorElement
-from combaero.network.mpce_v2_element import MPCEv2Element
+from combaero.network.mpce_element import MultiPortChamberElement
 
 _Y = list(cb.mole_to_mass(cb.species.dry_air()))
 _A = 0.01
@@ -55,7 +55,7 @@ def _net(pt_str: float, pt_bra: float, area_bra: float = _A) -> FlowNetwork:
     net.add_element(LosslessConnectionElement("lc_str", "port_str", "pb_str"))
     net.add_element(LosslessConnectionElement("lc_bra", "port_bra", "pb_bra"))
     net.add_element(
-        MPCEv2Element(
+        MultiPortChamberElement(
             id="jct",
             inlet_nodes=["port_com"],
             outlet_nodes=["port_str", "port_bra"],
@@ -155,8 +155,8 @@ def test_the_total_comes_from_the_existing_propagator():
 
 
 def test_the_chamber_junction_opts_in():
+    assert MultiPortChamberBase.seeds_ports_by_pressure_split is True
     assert MultiPortChamberElement.seeds_ports_by_pressure_split is True
-    assert MPCEv2Element.seeds_ports_by_pressure_split is True
 
 
 def test_the_ejector_opts_out():
@@ -200,7 +200,7 @@ def test_a_channel_wired_junction_still_gets_a_forward_seed():
     )
     net.add_element(LosslessConnectionElement("lc_bra", "port_bra", "pb_bra"))
     net.add_element(
-        MPCEv2Element(
+        MultiPortChamberElement(
             id="jct",
             inlet_nodes=["port_com"],
             outlet_nodes=["port_str", "port_bra"],

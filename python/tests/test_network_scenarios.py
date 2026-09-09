@@ -125,25 +125,25 @@ def test_step_4_adding_bypass():
     """Bypass branch: splits at mc1, rejoins at mc2.
 
     mc1 (splitting) and mc2 (merging) are momentum-CV junctions built from
-    MPCEv2Element + MomentumChamberNode port faces. The earlier incarnation
+    MultiPortChamberElement + MomentumChamberNode port faces. The earlier incarnation
     of this test used bare MomentumChamberNode at both splits and was
     xfailed against #174 because MCN's scalar Pt = P + 0.5 rho v^2 cannot
     represent merging or splitting streams in the chamber itself. Migration
     onto the momentum-CV junction (closes #174) restores the expected
     diameter-driven split: smaller-bore bypass < main branch.
 
-    The junctions are the Mynard-based MPCEv2Element rather than the v1
-    impulse MultiPortChamberElement: once collector ports carry their real
+    The junctions are the Mynard-based MultiPortChamberElement rather than the v1
+    impulse MultiPortChamberBase: once collector ports carry their real
     face flow (honest Pt = P + 0.5 rho v^2 closure), v1's per-port
     sin^2(theta) impulse rows -- whose Bassett correspondence is derived
     for separating flow -- create flow work out of nothing at a joining
     junction, and the rejoin at mc2 has no energetically consistent
-    all-forward root. MPCEv2's stagnation-pressure residual handles
+    all-forward root. MultiPortChamberElement stagnation-pressure residual handles
     joining natively and converges from the default cold start.
     """
     import math
 
-    from combaero.network.mpce_v2_element import MPCEv2Element
+    from combaero.network.mpce_element import MultiPortChamberElement
 
     D_main = 0.1
     D_bypass = 0.08
@@ -172,7 +172,7 @@ def test_step_4_adding_bypass():
         delta_geom_deg=90.0,
         area=A_bypass,
     )
-    mpce_mc1 = MPCEv2Element(
+    mpce_mc1 = MultiPortChamberElement(
         id="mpce_mc1",
         inlet_nodes=["mc1_com"],
         outlet_nodes=["mc1_str", "mc1_bra"],
@@ -196,7 +196,7 @@ def test_step_4_adding_bypass():
         delta_geom_deg=90.0,
         area=A_bypass,
     )
-    mpce_mc2 = MPCEv2Element(
+    mpce_mc2 = MultiPortChamberElement(
         id="mpce_mc2",
         inlet_nodes=["mc2_str", "mc2_bra"],
         outlet_nodes=["mc2_com"],

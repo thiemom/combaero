@@ -271,7 +271,7 @@ def cd_nozzle_mass_flow(
     the mass flow saturates at the sonic-throat value (`choked_mass_flow`,
     area_throat). The two branches are equal at the choke threshold (the throat
     passes the same mass either way), so their minimum is continuous; a C1
-    smooth-min (sqrt-rounded, the MPCEv2 idiom) rounds the corner for the
+    smooth-min (sqrt-rounded, the MultiPortChamberElement idiom) rounds the corner for the
     Newton Jacobian. See OPERATING_REGIMES_DESIGN.md sec 3.1.
 
     Parameters mirror `choked_mass_flow` plus `p_static_down` (the exit/mixing
@@ -687,7 +687,7 @@ def blended_entrainment_ratio(
     The realized entrainment is the smaller of the choke-limited plateau value
     omega_crit and the back-pressure-limited droop omega_sub(P_b), joined by a
     C1 smooth-min so a Newton solver sees a continuous derivative through the
-    critical point P_c* (the same sqrt-smoothing idiom as MPCEv2Element's
+    critical point P_c* (the same sqrt-smoothing idiom as MultiPortChamberElement's
     soft barrier):
 
         omega_eff = 0.5 * (a + b - sqrt((a - b)^2 + eps^2)),  a = omega_crit,

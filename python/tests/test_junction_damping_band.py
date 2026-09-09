@@ -2,7 +2,7 @@
 
 ``damping = 1 - exp(-FlowRatio / tau)`` multiplies Mynard's collector
 coefficient C. The Matlab reference justifies it as "avoids infinite C when
-FlowRatio approaches zero". In the K form MPCEv2 uses (Mynard Eq 18) that
+FlowRatio approaches zero". In the K form MultiPortChamberElement uses (Mynard Eq 18) that
 divergence is multiplied by FlowRatio^2, so K reaches the dead-branch limit
 with or without the knob. These tests pin that -- exactly, because it is a
 limit, not a tuning -- and pin the band over which the knob is inert.
@@ -113,7 +113,7 @@ def test_exact_zero_flow_edge_is_not_guarded_by_damping(damping):
 
     Not a loss at all -- Mynard classifies Q = -0.0 as a supplier, the K
     broadcast pairs the live collector with a zero-flow supplier, and the
-    spurious entry evaluates to -1. MPCEv2Element no longer lets an exact
+    spurious entry evaluates to -1. MultiPortChamberElement no longer lets an exact
     zero reach the closure (it snaps an excluded port into its declared
     direction, #271 step 2), so this is a property of the raw closure only.
     Pinned so a future closure change that alters it is noticed.

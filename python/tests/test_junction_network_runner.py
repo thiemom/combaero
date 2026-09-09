@@ -6,7 +6,7 @@ import math
 
 import pytest
 
-from validation.junction.models.mpce_v2_network import MPCEv2Network
+from validation.junction.models.mpce_network import MPCENetwork
 from validation.junction.models.tee_junction_element_network import (
     TeeJunctionElementNetwork,
 )
@@ -34,7 +34,7 @@ def test_mpce_network_adapter_evaluates_K6_case():
     removed in 0.6.0. The claim is about the ADAPTER, not about which junction
     model sits behind it.
     """
-    r = MPCEv2Network(strict=False).evaluate_network("bassett2001", "K6", 0.5, 1.0, math.pi / 2.0)
+    r = MPCENetwork(strict=False).evaluate_network("bassett2001", "K6", 0.5, 1.0, math.pi / 2.0)
     assert r.converged, f"MPCE network must converge at K6/psi=1/theta=90/q=0.5; msg={r.message}"
     assert r.K_lateral is not None
     assert 0.0 < r.K_lateral < 5.0
@@ -50,7 +50,7 @@ def test_mpce_K5_is_evaluated_not_declared_unsupported():
     outlived the model: whatever the junction predicts, the harness has to
     produce a value the scorecard can hold against Bassett Fig 7c.
     """
-    r = MPCEv2Network(strict=False).evaluate_network("bassett2001", "K5", 0.5, 1.0, math.pi / 2.0)
+    r = MPCENetwork(strict=False).evaluate_network("bassett2001", "K5", 0.5, 1.0, math.pi / 2.0)
     assert r.converged, f"K5 must be evaluated, not skipped: {r.message}"
     assert r.K_straight is not None
 
@@ -63,7 +63,7 @@ def test_mpce_straight_K_uses_the_straight_leg_fraction():
     a mirrored operating point. Pinned by symmetry: evaluating K5 at q and K6
     at 1-q must land on the SAME network, hence the same extracted pair.
     """
-    model = MPCEv2Network(strict=False)
+    model = MPCENetwork(strict=False)
     straight = model.evaluate_network("bassett2001", "K5", 0.3, 1.0, math.pi / 2.0)
     lateral = model.evaluate_network("bassett2001", "K6", 0.7, 1.0, math.pi / 2.0)
 
@@ -72,7 +72,7 @@ def test_mpce_straight_K_uses_the_straight_leg_fraction():
     assert straight.K_lateral == pytest.approx(lateral.K_lateral, rel=1e-9)
 
 
-def test_mpce_v2_joining_K11_uses_the_straight_inlet_fraction():
+def test_mpce_joining_K11_uses_the_straight_inlet_fraction():
     """K11's q is the straight inlet fraction; K12's is the lateral one.
 
     Bassett Table 1 indexes each joining coefficient by the fraction in its own
@@ -81,7 +81,7 @@ def test_mpce_v2_joining_K11_uses_the_straight_inlet_fraction():
     operating point, the same defect the separating side carried. Pinned by
     symmetry: K11 at q and K12 at 1-q must be the SAME network.
     """
-    model = MPCEv2Network()
+    model = MPCENetwork()
     straight = model.evaluate_network("bassett2001", "K11", 0.3, 1.0, math.pi / 2.0)
     lateral = model.evaluate_network("bassett2001", "K12", 0.7, 1.0, math.pi / 2.0)
 
@@ -99,7 +99,7 @@ def test_hager_xi_t_is_scored_on_the_lateral_fraction_directly():
     the K6 path, which is indexed on the lateral leg too: xi_t at q and K6 at
     the same q must build the same separating network.
     """
-    model = MPCEv2Network()
+    model = MPCENetwork()
     hager = model.evaluate_network("hager1984", "xi_t", 0.3, 1.0, math.pi / 2.0)
     bassett = model.evaluate_network("bassett2001", "K6", 0.3, 1.0, math.pi / 2.0)
 
@@ -116,7 +116,7 @@ def test_idelchik_K11_is_indexed_on_the_lateral_fraction_unlike_bassett():
     Idelchik K11 and K12 at the SAME q must build the same joining network,
     whereas Bassett K11 at q pairs with K12 at 1-q.
     """
-    model = MPCEv2Network()
+    model = MPCENetwork()
     k11 = model.evaluate_network("idelchik1966", "K11", 0.3, 2.5, math.radians(45.0))
     k12 = model.evaluate_network("idelchik1966", "K12", 0.3, 2.5, math.radians(45.0))
 
@@ -167,12 +167,12 @@ def test_mach_indexed_files_are_scored_at_their_own_mach():
     200 points from Mach 0.09 to 0.60 -- so the roles are swapped for these
     files: the abscissa is the Mach and the split comes from the metadata.
     """
-    from validation.junction.models.mpce_v2_network import MPCEv2Network
+    from validation.junction.models.mpce_network import MPCENetwork
 
     records = [
         r
         for r in iter_network_records(
-            MPCEv2Network(strict=False), load_dataset(), topologies=("imposed_q",)
+            MPCENetwork(strict=False), load_dataset(), topologies=("imposed_q",)
         )
         if r.paper == "wang2014"
     ]
@@ -189,12 +189,12 @@ def test_incompressible_sources_carry_no_mach():
     """Bassett, Hager and Idelchik specify no Mach, and must not be given a
     fabricated one -- the same "not checked is not the same as fine" rule the
     consistency field follows."""
-    from validation.junction.models.mpce_v2_network import MPCEv2Network
+    from validation.junction.models.mpce_network import MPCENetwork
 
     records = [
         r
         for r in iter_network_records(
-            MPCEv2Network(strict=False), load_dataset(), topologies=("imposed_q",)
+            MPCENetwork(strict=False), load_dataset(), topologies=("imposed_q",)
         )
         if r.paper != "wang2014"
     ]
@@ -207,11 +207,11 @@ def test_a_mach_indexed_source_is_not_charged_for_topologies_it_cannot_use():
     """The pressure-driven skeletons size their boundaries from Bassett's
     analytical K, which means nothing for another source. Emitting them as
     failures would count a skip as a failure."""
-    from validation.junction.models.mpce_v2_network import MPCEv2Network
+    from validation.junction.models.mpce_network import MPCENetwork
 
     records = [
         r
-        for r in iter_network_records(MPCEv2Network(strict=False), load_dataset())
+        for r in iter_network_records(MPCENetwork(strict=False), load_dataset())
         if r.paper == "wang2014"
     ]
 

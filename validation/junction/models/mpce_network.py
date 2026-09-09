@@ -1,7 +1,7 @@
 """
 Network-mode adapter for MPCE-v2 (Mynard Unified0D residual).
 
-Mirrors `MPCEv1Network` but builds the junction with `MPCEv2Element`
+Mirrors `MPCEv1Network` but builds the junction with `MultiPortChamberElement`
 (subclass of MPCE-v1 with Mynard's K-based residual replacing the
 cross-coupling impulse formula). No BorderCarnotLossElement on the
 lateral branch because Mynard's K already captures the full loss.
@@ -14,7 +14,7 @@ from collections.abc import Callable
 from dataclasses import replace
 
 from combaero.network import LosslessConnectionElement
-from combaero.network.mpce_v2_element import MPCEv2Element
+from combaero.network.mpce_element import MultiPortChamberElement
 from validation.junction.models import bassett2001
 from validation.junction.models._network_builder import (
     _F_C,
@@ -49,10 +49,10 @@ def _to_file_axis(result: NetworkResult, *, flip: bool) -> NetworkResult:
     return replace(result, q_converged=1.0 - result.q_converged)
 
 
-class MPCEv2Network:
+class MPCENetwork:
     """MPCE-v2 (Mynard residual) in the three separating topologies."""
 
-    name = "mpce_v2_network"
+    name = "mpce_network"
 
     SUPPORTED_TOPOLOGIES: tuple[Topology, ...] = ALL_TOPOLOGIES
 
@@ -80,11 +80,11 @@ class MPCEv2Network:
         reported (docs/archive/JUNCTION_OPERATING_POINT_271.md).
 
         ``strict=False`` enables the soft-barrier fallback on the underlying
-        MPCEv2Element so the solver gets a quadratic pull-back when it
+        MultiPortChamberElement so the solver gets a quadratic pull-back when it
         starts in the wrong basin instead of an immediate raise.
 
         ``joining_etransfer_alpha=None`` uses the calibrated default on
-        ``MPCEv2Element`` (currently 0.2). Pass ``0.0`` to disable the
+        ``MultiPortChamberElement`` (currently 0.2). Pass ``0.0`` to disable the
         joining-side correction entirely (faithful Mynard), or a custom
         float to override.
         """
@@ -93,7 +93,7 @@ class MPCEv2Network:
         # None means "whatever the element ships as its default", so the
         # scorecard measures production rather than a value frozen here.
         self.eta_scale = (
-            MPCEv2Element.DEFAULT_ETA_SCALE if eta_scale is None else float(eta_scale)
+            MultiPortChamberElement.DEFAULT_ETA_SCALE if eta_scale is None else float(eta_scale)
         )
 
     def evaluate_network(
@@ -250,7 +250,7 @@ class MPCEv2Network:
         net.nodes["port_bra"].area = A_bra
 
         net.add_element(LosslessConnectionElement("lc_bra", "port_bra", lateral_terminal))
-        jct = MPCEv2Element(
+        jct = MultiPortChamberElement(
             id="jct",
             inlet_nodes=["port_com"],
             outlet_nodes=["port_str", "port_bra"],
@@ -286,7 +286,7 @@ class MPCEv2Network:
 
         Geometry mirrors the separating case (str at 0deg, bra at theta) but
         flow reverses: str and bra are inlets, com is the outlet. The
-        ``MPCEv2Element`` residual reads the flow direction from the
+        ``MultiPortChamberElement`` residual reads the flow direction from the
         signed mass flows at runtime, so the same element handles both.
 
         ``m_in`` places the network at a chosen flow level, which is what lets
@@ -316,7 +316,7 @@ class MPCEv2Network:
 
         # MPCE-v1 inlet/outlet declaration: for joining, str and bra are
         # inlets (flow into junction from supply), com is the outlet.
-        jct = MPCEv2Element(
+        jct = MultiPortChamberElement(
             id="jct",
             inlet_nodes=["port_str", "port_bra"],
             outlet_nodes=["port_com"],

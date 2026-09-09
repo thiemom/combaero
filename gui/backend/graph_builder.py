@@ -28,7 +28,7 @@ from combaero.network import (
     WallNode,
 )
 from combaero.network.ejector_element import EjectorElement
-from combaero.network.mpce_v2_element import ConstantKTeeElement, MPCEv2Element
+from combaero.network.mpce_element import ConstantKTeeElement, MultiPortChamberElement
 
 from .schemas import (
     AreaChangeData,
@@ -770,7 +770,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                     K_ports=_k_ports,
                 )
             else:
-                _mpce = MPCEv2Element(
+                _mpce = MultiPortChamberElement(
                     id=elem_id,
                     inlet_nodes=_inlets,
                     outlet_nodes=_outlets,
@@ -787,7 +787,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             net.add_element(_mpce)
             continue
 
-        # Ejector: 3-port MultiPortChamberElement with fixed roles (primary +
+        # Ejector: 3-port MultiPortChamberBase with fixed roles (primary +
         # secondary inlets, one outlet). Reuses the same named-port resolution
         # and per-port MomentumChamberNode auto-insertion as the tee.
         if elem_type == "ejector":

@@ -1,7 +1,7 @@
 """Calibrate ``joining_etransfer_alpha`` against analytical and tabulated anchors.
 
 This is the script that produces the value of
-``MPCEv2Element.DEFAULT_JOINING_ETRANSFER_ALPHA``. It lives in the validation
+``MultiPortChamberElement.DEFAULT_JOINING_ETRANSFER_ALPHA``. It lives in the validation
 tree so the tune is reproducible from a checkout; the earlier copy lived in a
 gitignored scratch directory, which meant a production constant had no
 in-repo provenance.

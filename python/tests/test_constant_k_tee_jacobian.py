@@ -1,11 +1,11 @@
 """`ConstantKTeeElement`'s residual and Jacobian, audited before porting it.
 
-#271 covers this element alongside `MPCEv2Element`, and the obvious next step
+#271 covers this element alongside `MultiPortChamberElement`, and the obvious next step
 after #309 was to port it to C++ the same way. Measuring first said otherwise,
 and the measurements are pinned here so the decision can be revisited on
 evidence rather than memory.
 
-**Its Jacobian is already complete.** `MPCEv2Element`'s was not -- its `K` came
+**Its Jacobian is already complete.** `MultiPortChamberElement`'s was not -- its `K` came
 from the Mynard closure and so depended on every port's velocity, while its
 hand-derived `dR/dP` column covered only the common port, leaving two columns
 absent and wrong by 4.4e-3 and 2.3e-3. Whole-element seeding in C++ supplied
@@ -30,7 +30,7 @@ import pytest
 
 import combaero as cb
 from combaero.network.components import NetworkMixtureState
-from combaero.network.mpce_v2_element import ConstantKTeeElement
+from combaero.network.mpce_element import ConstantKTeeElement
 
 _Y = list(cb.mole_to_mass(cb.species.dry_air()))
 _PT_JCT = 2.05e5
@@ -149,7 +149,7 @@ def test_only_the_common_port_enters_the_loss_term(direction):
     """The structural reason the Jacobian is already complete, stated
     directly: K is a fixed constant, so q_dyn depends on the common port
     alone and the other ports' P and mdot columns are genuinely zero -- not
-    missing. This is exactly what was NOT true of MPCEv2Element, whose K came
+    missing. This is exactly what was NOT true of MultiPortChamberElement, whose K came
     from the closure and moved with every port's velocity.
     """
     element = _element(direction)

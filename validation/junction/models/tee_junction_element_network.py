@@ -76,7 +76,7 @@ class TeeJunctionElementNetwork:
                 converged=False,
                 message=f"K_id {K_id} requires non-separating topology, not yet wired",
             )
-        # See mpce_v2_network: a K5/K2 file's q is the STRAIGHT fraction while
+        # See mpce_network: a K5/K2 file's q is the STRAIGHT fraction while
         # this network is built from the lateral one.
         q_lateral = 1.0 - q if K_id in {"K5", "K2"} else q
         result = self._separating(q_lateral, psi or 1.0, theta_rad or math.pi / 2.0, topology)

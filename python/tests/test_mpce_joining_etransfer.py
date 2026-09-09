@@ -14,7 +14,7 @@ import math
 import numpy as np
 import pytest
 
-from combaero.network.mpce_v2_element import MPCEv2Element
+from combaero.network.mpce_element import MultiPortChamberElement
 from validation.junction.models.mynard2010 import junction_loss_coefficient
 
 CALIBRATED_ALPHA = 0.2
@@ -41,12 +41,12 @@ def _joining_K(psi: float, theta_deg: float, q: float, alpha: float) -> tuple[fl
 
 def test_default_alpha_value() -> None:
     """The calibrated alpha is a published constant; changing it is deliberate."""
-    assert MPCEv2Element.DEFAULT_JOINING_ETRANSFER_ALPHA == CALIBRATED_ALPHA
+    assert MultiPortChamberElement.DEFAULT_JOINING_ETRANSFER_ALPHA == CALIBRATED_ALPHA
 
 
 def test_alpha_passes_through_constructor() -> None:
     """``joining_etransfer_alpha=None`` resolves to the class default."""
-    e = MPCEv2Element(
+    e = MultiPortChamberElement(
         id="jct",
         inlet_nodes=["port_str", "port_bra"],
         outlet_nodes=["port_com"],
@@ -60,7 +60,7 @@ def test_alpha_passes_through_constructor() -> None:
 
 def test_explicit_alpha_override() -> None:
     """Passing an explicit value overrides the default."""
-    e = MPCEv2Element(
+    e = MultiPortChamberElement(
         id="jct",
         inlet_nodes=["port_str", "port_bra"],
         outlet_nodes=["port_com"],

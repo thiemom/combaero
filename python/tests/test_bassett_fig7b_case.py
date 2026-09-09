@@ -64,7 +64,7 @@ import math
 
 import pytest
 
-from validation.junction.models.mpce_v2_network import MPCEv2Network
+from validation.junction.models.mpce_network import MPCENetwork
 
 _THETA = math.radians(45.0)
 _PSI = 3.0
@@ -79,7 +79,7 @@ def model():
     # solver.py's _propagate_pressure_guess seeded its BFS from a set of
     # node-ID strings. Fixed in the same change as this file; the assertions
     # below hold under hash seeds 0, 1, 7 and 13, and would flap without it.
-    return MPCEv2Network(strict=False)
+    return MPCENetwork(strict=False)
 
 
 def _run(model, topology: str, q: float):

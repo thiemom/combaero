@@ -7,11 +7,11 @@ are reproduced from `validation.junction.network_runner.run_network`.
 
 ## The defect that started it
 
-`MPCEv2Element`'s Jacobian omitted the common-port static-pressure column. The
+`MultiPortChamberElement`'s Jacobian omitted the common-port static-pressure column. The
 Mynard loss term `K_i * q_dyn_com` depends on the common port's density, hence
 on its static pressure, which is a solver unknown. `ConstantKTeeElement` gained
 that term in PR #230 after an FD test caught a `K*q/P` error; the same defect
-survived in `MPCEv2Element` because `test_mpce_v2_jacobian.py` FD-checks
+survived in `MultiPortChamberElement` because `test_mpce_v2_jacobian.py` FD-checks
 `dKQ_dmdot_separating_T` **in isolation** -- the `d/dmdot` block only -- and
 nothing pinned the assembled row against the residual it differentiates.
 
@@ -67,7 +67,7 @@ iterates. Checked by construction instead:
 | `K_shape` | `_mynard2010` assigns `K` only under `len(U) <= 3`, so **K is None for any junction with more than 3 ports** | 4-port probe returns `K is None` |
 | `mynard_raised` | the collector mask is empty (`float(U[Ci][0])` -> `IndexError`) or the supplier mask is (`ValueError`) -- both are plausible transient Newton iterates | all-suppliers raises `IndexError`, all-collectors raises `ValueError` |
 
-The `K_shape` case is the serious one. `MPCEv2Element` does not restrict `N`,
+The `K_shape` case is the serious one. `MultiPortChamberElement` does not restrict `N`,
 so a 4-port junction is constructible through the public API, and it produces
 **finite residuals with an entirely zero `dKQ` Jacobian block** -- every
 mass-flow derivative of the loss term absent, silently. That is not a 0.16%

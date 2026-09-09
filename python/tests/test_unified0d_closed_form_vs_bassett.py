@@ -152,7 +152,7 @@ def test_the_closed_form_matches_the_acceptance_gate_cells(measured):
     """
     import warnings
 
-    from validation.junction.models.mpce_v2_network import MPCEv2Network
+    from validation.junction.models.mpce_network import MPCENetwork
     from validation.junction.network_runner import iter_network_records
 
     # Closed form, per cell.
@@ -169,7 +169,7 @@ def test_the_closed_form_matches_the_acceptance_gate_cells(measured):
         records = [
             r
             for r in iter_network_records(
-                MPCEv2Network(strict=False), load_dataset(), topologies=("imposed_q",)
+                MPCENetwork(strict=False), load_dataset(), topologies=("imposed_q",)
             )
             if r.K_id in _SEPARATING_K_IDS and r.error is not None
         ]

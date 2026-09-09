@@ -2,7 +2,7 @@
 GUI dispatch tests for the mpce_tee element type.
 
 Verifies that the graph_builder converts an `mpce_tee` node to an
-`MPCEv2Element` with the correct inlet/outlet wiring per the
+`MultiPortChamberElement` with the correct inlet/outlet wiring per the
 ``flow_direction`` field, and that the schema accepts both values.
 """
 
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from combaero.network.mpce_v2_element import MPCEv2Element
+from combaero.network.mpce_element import MultiPortChamberElement
 from gui.backend.graph_builder import build_network_from_schema
 from gui.backend.schemas import MPCETeeData, NetworkGraphSchema
 
@@ -98,7 +98,7 @@ def test_mpce_tee_branch_builds_separating_element():
     schema = _three_plenum_mpce_schema("branch")
     net = build_network_from_schema(schema)
     e = _get_element(net, "mpce")
-    assert isinstance(e, MPCEv2Element)
+    assert isinstance(e, MultiPortChamberElement)
     assert e.flow_direction == "branch"
     assert e.strict is False, (
         "GUI junctions must use soft mode: strict raises on transient "
@@ -114,7 +114,7 @@ def test_mpce_tee_merge_builds_joining_element():
     schema = _three_plenum_mpce_schema("merge")
     net = build_network_from_schema(schema)
     e = _get_element(net, "mpce")
-    assert isinstance(e, MPCEv2Element)
+    assert isinstance(e, MultiPortChamberElement)
     assert e.flow_direction == "merge"
     assert e.strict is False
     assert len(e.inlet_nodes) == 2
@@ -334,7 +334,7 @@ def test_inheritance_falls_back_to_default_when_no_channels():
 def test_constant_k_model_builds_constant_k_element_branch():
     """junction_model='constant_k' dispatches to ConstantKTeeElement with
     K_ports mapped by port order (branch: [common, straight, branch])."""
-    from combaero.network.mpce_v2_element import ConstantKTeeElement
+    from combaero.network.mpce_element import ConstantKTeeElement
 
     schema = _three_plenum_mpce_schema("branch")
     mpce_node = next(n for n in schema.nodes if n.id == "mpce")
@@ -350,7 +350,7 @@ def test_constant_k_model_builds_constant_k_element_branch():
 
 def test_constant_k_model_builds_constant_k_element_merge():
     """Merge port order is [straight, branch, common]."""
-    from combaero.network.mpce_v2_element import ConstantKTeeElement
+    from combaero.network.mpce_element import ConstantKTeeElement
 
     schema = _three_plenum_mpce_schema("merge")
     mpce_node = next(n for n in schema.nodes if n.id == "mpce")
@@ -365,20 +365,20 @@ def test_constant_k_model_builds_constant_k_element_merge():
 
 def test_default_and_legacy_schemas_build_mynard_element():
     """junction_model absent (legacy save files) or 'mynard' keeps the
-    full MPCEv2 element -- and NOT the ConstantKTeeElement subclass."""
-    from combaero.network.mpce_v2_element import ConstantKTeeElement
+    full MultiPortChamberElement element -- and NOT the ConstantKTeeElement subclass."""
+    from combaero.network.mpce_element import ConstantKTeeElement
 
     legacy = _three_plenum_mpce_schema("branch")
     net = build_network_from_schema(legacy)
     e = _get_element(net, "mpce")
-    assert type(e) is MPCEv2Element
+    assert type(e) is MultiPortChamberElement
     assert not isinstance(e, ConstantKTeeElement)
 
     explicit = _three_plenum_mpce_schema("branch")
     node = next(n for n in explicit.nodes if n.id == "mpce")
     node.data["junction_model"] = "mynard"
     e2 = _get_element(build_network_from_schema(explicit), "mpce")
-    assert type(e2) is MPCEv2Element
+    assert type(e2) is MultiPortChamberElement
 
 
 def test_mpce_tee_data_constant_k_defaults():

@@ -20,7 +20,7 @@
 //     Biomedical Engineering 31(7) (2015) e02717.
 //
 // Scope: three ports. The Python computes C for general N and K only for
-// N <= 3; MPCEv2Element refuses N > 3 at construction, so nothing that ships
+// N <= 3; MultiPortChamberElement refuses N > 3 at construction, so nothing that ships
 // exercises the general-N path and this port does not carry it.
 //
 // BRANCH-ON-PRIMAL. Six decisions are taken on primal values rather than on
@@ -51,7 +51,7 @@
 namespace combaero::solver {
 
 // Mynard Eq 36's CFD-fitted energy-transfer coefficients. Gated by eta_scale,
-// whose production default is 0.0 -- see MPCEv2Element.DEFAULT_ETA_SCALE for
+// whose production default is 0.0 -- see MultiPortChamberElement.DEFAULT_ETA_SCALE for
 // why the term is off and what measurement retired it.
 constexpr double kMynardEtaA0 = 0.8;
 constexpr double kMynardEtaA1 = -0.2;
@@ -193,7 +193,7 @@ MynardResult<M> mynard_junction_loss_coefficient(
   }
 
   // combaero's joining-side asymmetry correction (not in the paper). Vanishes
-  // at equal supplier areas; provenance on MPCEv2Element.
+  // at equal supplier areas; provenance on MultiPortChamberElement.
   if (joining_etransfer_alpha != 0.0 && out.n_supplier >= 2) {
     double a_max = 0.0;
     double a_min = 0.0;

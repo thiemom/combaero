@@ -1,13 +1,13 @@
-"""Whole-row FD guardrail for MPCEv2Element / ConstantKTeeElement.
+"""Whole-row FD guardrail for MultiPortChamberElement / ConstantKTeeElement.
 
-``test_mpce_v2_jacobian.py`` FD-checks ``dKQ_dmdot_separating_T`` in ISOLATION
+``test_mpce_jacobian.py`` FD-checks ``dKQ_dmdot_separating_T`` in ISOLATION
 -- the d/dmdot block only. Nothing pinned the assembled Jacobian row against
 the residual it differentiates, so an entire column could be, and was, absent:
 the loss term ``K_i * q_dyn_com`` depends on the common port's density and
-hence on its static pressure, but ``MPCEv2Element`` emitted no ``.P`` entry.
+hence on its static pressure, but ``MultiPortChamberElement`` emitted no ``.P`` entry.
 
 ``ConstantKTeeElement`` gained exactly that term in PR #230 after an FD test
-caught a ``K*q/P`` error; the same defect survived in ``MPCEv2Element`` because
+caught a ``K*q/P`` error; the same defect survived in ``MultiPortChamberElement`` because
 no equivalent test existed. These tests are that test, for both classes.
 
 The unknowns a ``MomentumChamberNode`` exposes are ``.P`` and ``.Pt``
@@ -23,7 +23,7 @@ import pytest
 
 import combaero as cb
 from combaero.network.components import NetworkMixtureState
-from combaero.network.mpce_v2_element import ConstantKTeeElement, MPCEv2Element
+from combaero.network.mpce_element import ConstantKTeeElement, MultiPortChamberElement
 
 _Y = list(cb.mole_to_mass(cb.species.dry_air()))
 _AREA = 0.01
@@ -50,8 +50,8 @@ def _wire(element):
     return element
 
 
-def _mpce_v2():
-    return _wire(MPCEv2Element.__new__(MPCEv2Element))
+def _mpce():
+    return _wire(MultiPortChamberElement.__new__(MultiPortChamberElement))
 
 
 def _constant_k():
@@ -75,7 +75,7 @@ def _states(p_common: float = _P_COMMON, pt_shift: float = 0.0):
 
 
 ELEMENTS = [
-    pytest.param(_mpce_v2, id="MPCEv2Element"),
+    pytest.param(_mpce, id="MultiPortChamberElement"),
     pytest.param(_constant_k, id="ConstantKTee"),
 ]
 
@@ -170,7 +170,7 @@ def test_row_derivative_wrt_port_mass_flow(factory, row: int, port: int):
 
 
 def test_mass_row_is_the_signed_port_sum():
-    element = _mpce_v2()
+    element = _mpce()
     residuals, jac = element.residuals(_states(), _PT_JCT, _PORT_MDOTS)
     assert residuals[3] == pytest.approx(sum(_PORT_MDOTS))
     for i in range(3):
@@ -179,5 +179,5 @@ def test_mass_row_is_the_signed_port_sum():
 
 def test_angle_is_in_radians_where_the_closure_expects_it():
     """Guard against a degree/radian slip in the port-angle plumbing."""
-    element = _mpce_v2()
+    element = _mpce()
     assert math.isclose(math.radians(element.port_angles_deg[2]), math.pi / 2.0)

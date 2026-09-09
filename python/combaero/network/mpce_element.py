@@ -1,7 +1,7 @@
 """
 MPCE-v2: Mynard Unified0D residual structure on top of MPCE-v1's topology.
 
-Subclasses :class:`MultiPortChamberElement` so all the topology resolution
+Subclasses :class:`MultiPortChamberBase` so all the topology resolution
 (port-MCN flagging, port area inheritance, sign convention validation) is
 inherited unchanged. Only the residuals method differs: instead of the
 impulse-CV formula with the empirical cross-coupling correction
@@ -44,7 +44,7 @@ import numpy as np
 from combaero import _core
 from combaero.network._mynard2010 import junction_loss_coefficient
 from combaero.network.components import (
-    MultiPortChamberElement,
+    MultiPortChamberBase,
     NetworkMixtureState,
 )
 
@@ -92,11 +92,11 @@ def scaled_penalty_alpha(ref_pressure: float, ref_mdot: float) -> float:
     return float(ref_pressure / (slack * slack))
 
 
-class MPCEv2Element(MultiPortChamberElement):
+class MultiPortChamberElement(MultiPortChamberBase):
     """Mynard Unified0D residual on MPCE-v1's topology framework.
 
     The residual and its Jacobian come from
-    ``_core.mpce_v2_residuals_and_jacobian``, which seeds the whole element
+    ``_core.mpce_residuals_and_jacobian``, which seeds the whole element
     over ``(P_i, Pt_i, outer_mdot_i, Pt_jct)`` and returns exact partials for
     every one. What stays here is the GUARDS -- the degenerate-state
     fallbacks and the wrong-direction soft barrier -- which are solver policy
@@ -105,8 +105,8 @@ class MPCEv2Element(MultiPortChamberElement):
     ``jacobian_method`` is RETIRED and selects nothing. It chose between a
     sympy derivation for the canonical 3-port separating T and an N+1-call
     finite-difference fallback for every other topology; both are gone. The
-    sympy derivation survives in ``_mpce_v2_jacobian.py`` as an offline
-    cross-check (``test_mpce_v2_jacobian.py``), not as a runtime path. The
+    sympy derivation survives in ``_mpce_jacobian.py`` as an offline
+    cross-check (``test_mpce_jacobian.py``), not as a runtime path. The
     attribute is kept so existing callers that set it do not break, and is
     documented here rather than removed silently -- a knob that quietly does
     nothing is worse than one that says so.
@@ -253,7 +253,7 @@ class MPCEv2Element(MultiPortChamberElement):
         )
         if flow_direction not in ("merge", "branch"):
             raise ValueError(
-                f"MPCEv2Element '{id}': flow_direction must be 'merge' or "
+                f"MultiPortChamberElement '{id}': flow_direction must be 'merge' or "
                 f"'branch', got {flow_direction!r}."
             )
         self.flow_direction: FlowDirection = flow_direction
@@ -281,9 +281,9 @@ class MPCEv2Element(MultiPortChamberElement):
         # residual is the route to N > 3 (design doc sec 8 step 3b).
         if self.N > 3:
             raise ValueError(
-                f"MPCEv2Element '{id}': {self.N} ports, but the Mynard K closure is "
+                f"MultiPortChamberElement '{id}': {self.N} ports, but the Mynard K closure is "
                 f"defined for 3-branch junctions only. Split the junction, or use "
-                f"MultiPortChamberElement."
+                f"MultiPortChamberBase."
             )
 
     def verify_solution_consistent(
@@ -306,7 +306,7 @@ class MPCEv2Element(MultiPortChamberElement):
 
             dissipation = sum_in |m_i| Pt_i - sum_out |m_i| Pt_i >= 0
 
-        v1 has an energy check (`MultiPortChamberElement`); v2 had none, which
+        v1 has an energy check (`MultiPortChamberBase`); v2 had none, which
         is the gap this closes (issue #271, defect 10). The v1 form bounds each
         collector's Pt by the single supplier's, which is deliberately weak and
         single-supplier only. The mass-weighted balance is both stricter and
@@ -613,7 +613,7 @@ class MPCEv2Element(MultiPortChamberElement):
                     for i in wrong_ports
                 ]
                 raise ValueError(
-                    f"MPCEv2Element '{self.id}': declared "
+                    f"MultiPortChamberElement '{self.id}': declared "
                     f"flow_direction={self.flow_direction!r} but observed "
                     f"wrong flow direction at port(s) {wrong_ports} "
                     f"(expected {expected})."
@@ -681,7 +681,7 @@ class MPCEv2Element(MultiPortChamberElement):
         geom.joining_etransfer_alpha = float(self.joining_etransfer_alpha)
         geom.eta_scale = float(self.eta_scale)
 
-        kernel = _core.mpce_v2_residuals_and_jacobian(
+        kernel = _core.mpce_residuals_and_jacobian(
             p_static,
             [float(s.Pt) for s in states],
             [float(r) for r in rho_port],
@@ -698,7 +698,7 @@ class MPCEv2Element(MultiPortChamberElement):
             # turned a plumbing error into a plausible-looking junction
             # mid-solve (issue #271).
             raise RuntimeError(
-                f"MPCEv2Element '{self.id}': the C++ kernel refused a state the "
+                f"MultiPortChamberElement '{self.id}': the C++ kernel refused a state the "
                 f"guards accepted (port_mdots={list(port_mdots)}, "
                 f"suppliers={sup_mask.tolist()}, collectors={col_mask.tolist()})."
             )
@@ -730,7 +730,7 @@ class MPCEv2Element(MultiPortChamberElement):
         return residuals, jac
 
 
-class ConstantKTeeElement(MPCEv2Element):
+class ConstantKTeeElement(MultiPortChamberElement):
     """Junction with FIXED per-port loss coefficients (the "simplest
     model" tier): handbook/datasheet K values instead of the Mynard
     closure.
@@ -750,7 +750,7 @@ class ConstantKTeeElement(MPCEv2Element):
     The rows are smooth and even in m_com (no strict/soft barrier
     machinery; the ``strict`` flag is ignored). Like every even-form
     junction, the sign-flipped image of a root is also a root; the
-    inherited MPCEv2 ``verify_solution_consistent`` direction guard
+    inherited MultiPortChamberElement ``verify_solution_consistent`` direction guard
     demotes wrong-direction results post-solve.
 
     Promoted from the certified-audit prototype
@@ -859,12 +859,12 @@ class ConstantKTeeElement(MPCEv2Element):
     ) -> dict[str, float]:
         """Parent per-port fields plus the FIXED K values actually used.
 
-        Deliberately skips MPCEv2's diagnostics (which re-evaluate the
+        Deliberately skips MultiPortChamberElement diagnostics (which re-evaluate the
         Mynard closure -- not the model in use here). For the 3-port tee
         the two non-common ports are aliased ``K_straight`` / ``K_branch``
         in port order, matching the GUI wiring.
         """
-        diag = MultiPortChamberElement.diagnostics(self, states, Pt_jct, port_mdots)
+        diag = MultiPortChamberBase.diagnostics(self, states, Pt_jct, port_mdots)
         common = self._common_port_index()
         noncommon = [i for i in range(self.N) if i != common]
         for i in noncommon:

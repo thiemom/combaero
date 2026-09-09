@@ -129,11 +129,11 @@ entrainment closure still needs its own regime handling.
 
 ## 3. Proposed design
 
-Keep the residual **layout** (`P_jct` + N+1 rows on the `MultiPortChamberElement`
+Keep the residual **layout** (`P_jct` + N+1 rows on the `MultiPortChamberBase`
 topology) and the C++ `(f, J)` discipline. Only the **content** of R0 and R1
 changes, plus `verify_solution_consistent`. Recovery of a single self-consistent
 root across regimes is achieved with C1 blends, not discrete re-solves, matching
-the house soft-barrier idiom already used by `MPCEv2Element`
+the house soft-barrier idiom already used by `MultiPortChamberElement`
 (`alpha * max(0, -e_i * mdot_i)^2`, C1 at the kink).
 
 ### 3.1 R0: choked/unchoked primary via the compressible-nozzle closure
@@ -232,7 +232,7 @@ selection) make the whole element a single C1 residual system that Newton solves
 in one pass across all regimes -- no outer regime detection, no two-phase
 re-solve, no chatter across the boundary. This is the "critical <-> subcritical
 interop" requirement, and it mirrors how `OrificeElement` already spans
-choked/unchoked and how `MPCEv2Element` spans merge/branch within one C1
+choked/unchoked and how `MultiPortChamberElement` spans merge/branch within one C1
 residual.
 
 ## 4. Validation strategy
@@ -378,7 +378,7 @@ R0-R3. So **`P_py` cannot be a Newton unknown**. (The earlier "A' reduces to
 critical" claim was never validated -- that spike case was buggy.)
 
 Settled structure -- **four rows, `P_py` DERIVED** (not a solver unknown); the
-element keeps the base `MultiPortChamberElement` unknown/row count, so **no
+element keeps the base `MultiPortChamberBase` unknown/row count, so **no
 solver-dispatch change is needed**:
 
     P_py = s_choke*P_sy + (1 - s_choke)*nozzle_inverse(mp, Pt_p)   derived
@@ -510,8 +510,8 @@ assembled in Python via a forward-mode dual (`_D`) chaining the C++ scalar
 closures' partials -- correct and FD-validated, but a pattern used by no other
 element. A repo survey established that the house practice for a multi-row
 COUPLED junction is whole-element `(f, J)` in C++ (the base
-`MultiPortChamberElement` and `TeeJunctionElement` both do this; the ejector is
-a `MultiPortChamberElement` subclass), so the assembly was ported to a single
+`MultiPortChamberBase` and `TeeJunctionElement` both do this; the ejector is
+a `MultiPortChamberBase` subclass), so the assembly was ported to a single
 C++ function `ejector_element_residuals_and_jacobian` (`src/ejector.cpp`) that
 seeds a `DualN<9>` over the nine unknowns and runs the identical smootherstep /
 branch-skip / `w_pin` blend, returning the 4 residuals + a 4x9 Jacobian. The
@@ -573,7 +573,7 @@ byte-identically). omega_sub is the Tier-1 linear chord between the two anchors;
 Tier-2 (mixing-curve inversion) was deliberately deferred, not implemented, per
 the "Tier 1 first" open decision (sec 5.2). The critical<->subcritical join is a
 C1 smooth-min (0.5*(a+b-sqrt((a-b)^2+eps^2))), the same sqrt-smoothing idiom as
-`MPCEv2Element`'s soft barrier; a bare `min()` was rejected because its
+`MultiPortChamberElement`'s soft barrier; a bare `min()` was rejected because its
 derivative jump would break the single-Newton-solve requirement (sec 3.5).
 
 **Literature basis.** Mixing closure: Kracik & Dvorak 2016 (Eqs. 7-13). The

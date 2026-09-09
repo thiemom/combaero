@@ -1,9 +1,9 @@
 #pragma once
 
 // -----------------------------------------------------------------------------
-// Whole-element (f, J) for the momentum-CV junction (MPCEv2Element).
+// Whole-element (f, J) for the momentum-CV junction (MultiPortChamberElement).
 //
-// C++ port of python/combaero/network/mpce_v2_element.py::MPCEv2Element.residuals
+// C++ port of python/combaero/network/mpce_element.py::MultiPortChamberElement.residuals
 // -- the Mynard physics path only. See that module for the derivation and
 // MPCE_CPP_PORT_DESIGN.md for the port's sequence and gates.
 //
@@ -77,7 +77,7 @@ struct MpceGeometry {
   double eta_scale = 0.0;
 };
 
-inline MpceResidualJacobian mpce_v2_residuals_and_jacobian(
+inline MpceResidualJacobian mpce_residuals_and_jacobian(
     const std::array<double, kMpcePorts>& p_static,
     const std::array<double, kMpcePorts>& p_total,
     const std::array<double, kMpcePorts>& rho,

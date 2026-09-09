@@ -23,7 +23,7 @@ import math
 import pytest
 
 from validation.junction.models import bassett2001
-from validation.junction.models.mpce_v2_network import MPCEv2Network
+from validation.junction.models.mpce_network import MPCENetwork
 from validation.junction.network_runner import (
     _K_SCORING_TOPOLOGIES,
     _Q_OFF_POINT,
@@ -39,7 +39,7 @@ _PSI = 3.0
 
 @pytest.fixture
 def model():
-    return MPCEv2Network(strict=False)
+    return MPCENetwork(strict=False)
 
 
 # ---------------------------------------------------------------------------
@@ -69,8 +69,8 @@ def test_three_pb_K_is_the_imposed_target_whatever_the_model_does():
     demonstrated where the topology runs at all. The point being made is
     unchanged and does not depend on which q it is made at.
     """
-    honest = MPCEv2Network(strict=False)
-    wrong = MPCEv2Network(strict=False, eta_scale=0.3)
+    honest = MPCENetwork(strict=False)
+    wrong = MPCENetwork(strict=False, eta_scale=0.3)
     q = 0.4
     target = bassett2001.K6(q, _PSI, _THETA)
 

@@ -1,9 +1,9 @@
 """The Python element as a shim over the C++ whole-element (f, J).
 
-`MPCEv2Element.residuals` no longer computes the junction physics. It applies
+`MultiPortChamberElement.residuals` no longer computes the junction physics. It applies
 the guards -- the degenerate-state fallbacks and the wrong-direction soft
 barrier, which are solver policy and stay in Python -- and then calls
-`_core.mpce_v2_residuals_and_jacobian`, whose Jacobian comes back seeded over
+`_core.mpce_residuals_and_jacobian`, whose Jacobian comes back seeded over
 `(P_i, Pt_i, outer_mdot_i, Pt_jct)` in that fixed order.
 
 All that is left is relabelling those ten columns onto the solver's unknown
@@ -25,16 +25,16 @@ import pytest
 import combaero as cb
 from combaero.network import NetworkSolver
 from combaero.network.components import NetworkMixtureState
-from combaero.network.mpce_v2_element import MPCEv2Element
+from combaero.network.mpce_element import MultiPortChamberElement
 from validation.junction import random_robustness as rr
 
 _Y = list(cb.mole_to_mass(cb.species.dry_air()))
 
 
-def _element(flow_direction: str = "branch") -> MPCEv2Element:
+def _element(flow_direction: str = "branch") -> MultiPortChamberElement:
     ports = ["p0", "p1", "p2"]
     if flow_direction == "branch":
-        element = MPCEv2Element(
+        element = MultiPortChamberElement(
             id="jct",
             inlet_nodes=ports[:1],
             outlet_nodes=ports[1:],
@@ -45,7 +45,7 @@ def _element(flow_direction: str = "branch") -> MPCEv2Element:
             strict=False,
         )
     else:
-        element = MPCEv2Element(
+        element = MultiPortChamberElement(
             id="jct",
             inlet_nodes=ports[:2],
             outlet_nodes=ports[2:],

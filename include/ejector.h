@@ -240,7 +240,7 @@ EjectorCriticalPressureJacobian ejector_critical_back_pressure_and_jacobian(
 // regimes by two smootherstep weights, and returns all four residuals with
 // their analytic Jacobian w.r.t. the nine Newton unknowns -- forward-mode dual
 // (DualN<9>) through the whole blend. This is the C++ home of the assembly
-// (matching the whole-element (f, J) practice of MultiPortChamberElement /
+// (matching the whole-element (f, J) practice of MultiPortChamberBase /
 // TeeJunctionElement); the Python EjectorElement is a thin relabeling shim.
 // 1:1 with EjectorElement.residuals() in ejector_element.py. Full derivation
 // and provenance: validation/ejector/OPERATING_REGIMES_DESIGN.md sec 6c/8.3.
