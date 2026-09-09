@@ -485,8 +485,9 @@ from combaero.network import (
     OrificeElement, ChannelElement, EffectiveAreaConnectionElement,
     LosslessConnectionElement, DiameterDischargeCoefficientConnectionElement,
     TeeJunctionElement, VortexElement,
-    MultiPortChamberElement, BorderCarnotLossElement,
+    BorderCarnotLossElement,
 )
+from combaero.network.mpce_v2_element import ConstantKTeeElement, MPCEv2Element
 
 # Flow elements
 orifice = OrificeElement("orifice", "node1", "node2", Cd=0.65, diameter=0.011284, regime="compressible")
@@ -519,12 +520,16 @@ mc_com = MomentumChamberNode("mc_com", area=0.01)
 mc_str = MomentumChamberNode("mc_str", area=0.01)
 mc_bra = MomentumChamberNode("mc_bra", area=0.008)
 
-jct = MultiPortChamberElement(
+# MultiPortChamberElement is the ABSTRACT BASE since 0.6.0 -- it owns the port
+# machinery and no longer carries a residual. Use MPCEv2Element (the Mynard
+# closure) or ConstantKTeeElement (fixed handbook K).
+jct = MPCEv2Element(
     "jct",
     inlet_nodes=["mc_com"],
     outlet_nodes=["mc_str", "mc_bra"],
     inlet_angles_deg=[0.0],
     outlet_angles_deg=[0.0, 90.0],   # geometric branch angles per outlet port
+    flow_direction="branch",         # 1 supplier + N-1 collectors
     # port_areas (length = N_in + N_out) inherited from connecting channels if not given
 )
 # Lateral port turning loss (sharp-edged 90 deg branch). Straight ports
@@ -536,8 +541,9 @@ loss_bra = BorderCarnotLossElement(
 )
 # Solved unknowns: jct.P_jct (junction static pressure). Per-port mass flows
 # live on the connecting channels / loss elements; the junction reads them via
-# the graph. The N+1 residuals = N impulse-function residuals (one per port,
-# sign-free in m_dot) + global sum-of-port-mdots = 0.
+# the graph. The N+1 residuals = N port total-pressure relations
+# (Pt_i - Pt_jct +/- K_i * q_dyn_com) + global sum-of-port-mdots = 0, computed
+# in C++ (see mpce_v2_residuals_and_jacobian in API_CPP.md).
 
 # Constant-K junction (the "simplest model" tier): fixed handbook loss
 # coefficients instead of the Mynard closure. K is referenced to the

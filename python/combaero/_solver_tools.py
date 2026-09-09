@@ -47,7 +47,6 @@ lossless_pressure_and_jacobian = _core.lossless_pressure_and_jacobian
 mach_number_and_jacobian_v = _core.mach_number_and_jacobian_v
 mixer_from_streams_and_jacobians = _core.mixer_from_streams_and_jacobians
 momentum_chamber_residual_and_jacobian = _core.momentum_chamber_residual_and_jacobian
-multi_port_chamber_residuals_and_jacobian = _core.multi_port_chamber_residuals_and_jacobian
 border_carnot_loss_residual_and_jacobian = _core.border_carnot_loss_residual_and_jacobian
 nusselt_and_jacobian_dittus_boelter = _core.nusselt_and_jacobian_dittus_boelter
 nusselt_and_jacobian_gnielinski = _core.nusselt_and_jacobian_gnielinski
@@ -102,7 +101,6 @@ __all__ = [
     "mach_number_and_jacobian_v",
     "mixer_from_streams_and_jacobians",
     "momentum_chamber_residual_and_jacobian",
-    "multi_port_chamber_residuals_and_jacobian",
     "border_carnot_loss_residual_and_jacobian",
     "nusselt_and_jacobian_dittus_boelter",
     "nusselt_and_jacobian_gnielinski",

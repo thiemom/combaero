@@ -572,61 +572,6 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
 // on companion BorderCarnotLossElement instances bolted onto lateral ports.
 
 // Per-port impulse-residual Jacobian.
-// dR_mom_i/dP_jct = -1 (constant, omitted from struct; caller adds).
-// Mass-row Jacobian dR_mass/dmdot_i = +1 (constant, omitted).
-struct PortImpulseJacobian {
-  double dR_dP;     // d(R_mom_i)/d(P_i)
-  double dR_dmdot;  // d(R_mom_i)/d(mdot_i)
-  double dR_dT;     // d(R_mom_i)/d(T_i)
-};
-
-struct MultiPortChamberResult {
-  std::vector<double> impulse_residuals;     // size N
-  std::vector<PortImpulseJacobian> port_jac; // size N
-
-  // Cross-coupling Jacobian: each non-axial port's impulse residual depends
-  // on the AXIAL REFERENCE port (port 0) state through rho_0 and u_0 in the
-  // -2*sin(theta_i)*cos((3/4)*theta_i)*rho_0*u_0*u_i term. Zero at axial
-  // ports (sin(theta_i)=0) and at port 0 itself.
-  std::vector<double> cross_dR_dP_axial;     // size N: d(R_mom_i)/d(P_0)
-  std::vector<double> cross_dR_dT_axial;     // size N: d(R_mom_i)/d(T_0)
-  std::vector<double> cross_dR_dmdot_axial;  // size N: d(R_mom_i)/d(mdot_0)
-
-  double mass_residual;                      // sum_i mdot_i
-};
-
-// Inputs (per-port vectors must all be length N >= 2):
-//   P_jct       : junction internal static pressure [Pa]
-//   P           : port-face static pressures [Pa]
-//   mdot        : port mass flows [kg/s], positive = out of junction
-//   T           : port temperatures [K]
-//   Y           : per-port mass-fraction vectors (each length n_species)
-//   A           : port cross-section areas [m^2]
-//   theta_rad   : per-port geometric branch angles [rad]; the impulse term
-//                 picks up a cos^2(theta) projection so the residual recovers
-//                 1D-duct momentum at theta=0 (straight) and decouples
-//                 entirely at theta=pi/2 (perpendicular branch). This is the
-//                 angle-aware extension of the PDF Section 2.2 spec; at
-//                 theta=0 for every port it reduces to the original
-//                 P + rho*u^2 form.
-MultiPortChamberResult multi_port_chamber_residuals_and_jacobian(
-    double P_jct,
-    const std::vector<double> &P,
-    const std::vector<double> &mdot,
-    const std::vector<double> &T,
-    const std::vector<std::vector<double>> &Y,
-    const std::vector<double> &A,
-    const std::vector<double> &theta_rad);
-
-// -----------------------------------------------------------------------------
-// Border-Carnot loss element (companion to multi-port chamber).
-// Two-port in-line element: stagnation drop across the port.
-//   R = Pt_in - Pt_out - L(delta_geom) * 0.5 * rho_in * u_in^2 = 0
-//   L = 4 * (1 - cos((3/4) * delta_geom))^2     (PDF Section 3.1)
-// Sign-free (mdot^2 in the dynamic head). The (3/4) correction is INTENDED to
-// match Hager xi_l and Bassett K_inc at M -> 0 on a sharp-edged lateral; that
-// agreement is unverified (Tier-1 tests are xfail at 11-29% deviation, see
-// issue #272), so treat the anchoring as a design goal, not a property.
 struct BorderCarnotLossResult {
   double residual;
   double d_res_dPt_in;

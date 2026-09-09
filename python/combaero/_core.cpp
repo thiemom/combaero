@@ -296,7 +296,6 @@ PYBIND11_MODULE(_core, m) {
         py::arg("area"),
         "Momentum chamber residual: P_total = P + 0.5*rho*v^2");
 
-  // Multi-port chamber (momentum-CV junction)
   // --- Momentum-CV junction: whole-element (f, J) -------------------------
   py::class_<solver::MpceGeometry>(
       m, "MpceGeometry",
@@ -334,38 +333,6 @@ PYBIND11_MODULE(_core, m) {
         "the Jacobian comes back already in the solver's own unknowns.\n\n"
         "Returns: MpceResidualJacobian (valid=False when the flow pattern\n"
         "is not a junction at all).");
-
-  py::class_<solver::PortImpulseJacobian>(
-      m, "PortImpulseJacobian",
-      "Per-port impulse-residual Jacobian for MultiPortChamberResult")
-      .def_readonly("dR_dP", &solver::PortImpulseJacobian::dR_dP)
-      .def_readonly("dR_dmdot", &solver::PortImpulseJacobian::dR_dmdot)
-      .def_readonly("dR_dT", &solver::PortImpulseJacobian::dR_dT);
-
-  py::class_<solver::MultiPortChamberResult>(
-      m, "MultiPortChamberResult",
-      "Result of multi-port chamber (momentum-CV junction) residuals")
-      .def_readonly("impulse_residuals",
-                    &solver::MultiPortChamberResult::impulse_residuals)
-      .def_readonly("port_jac", &solver::MultiPortChamberResult::port_jac)
-      .def_readonly("cross_dR_dP_axial",
-                    &solver::MultiPortChamberResult::cross_dR_dP_axial)
-      .def_readonly("cross_dR_dT_axial",
-                    &solver::MultiPortChamberResult::cross_dR_dT_axial)
-      .def_readonly("cross_dR_dmdot_axial",
-                    &solver::MultiPortChamberResult::cross_dR_dmdot_axial)
-      .def_readonly("mass_residual",
-                    &solver::MultiPortChamberResult::mass_residual);
-
-  m.def("multi_port_chamber_residuals_and_jacobian",
-        &solver::multi_port_chamber_residuals_and_jacobian, py::arg("P_jct"),
-        py::arg("P"), py::arg("mdot"), py::arg("T"), py::arg("Y"), py::arg("A"),
-        py::arg("theta_rad"),
-        "Momentum-CV junction: N impulse residuals "
-        "R_mom_i = (P_i + cos^2(theta_i)*rho_i*u_i^2) - P_jct plus mass "
-        "residual sum_i mdot_i. mdot_i > 0 = flow out of junction. The "
-        "cos^2(theta) projection recovers 1D-duct impulse at theta=0 and "
-        "static equality at theta=pi/2.");
 
   // Border-Carnot loss element
   py::class_<solver::BorderCarnotLossResult>(
