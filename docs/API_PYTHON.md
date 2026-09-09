@@ -436,7 +436,7 @@ solver = NetworkSolver(graph)
 # "continuation", "outletref_warmstart", "incompressible_warmstart"
 # (deprecated).
 # "default" auto-upgrades to "analytical_pt_prop" for networks that
-# contain a MultiPortChamberElement; pass another strategy or an
+# contain a MultiPortChamberBase; pass another strategy or an
 # explicit x0 to opt out.
 # "outletref_warmstart" solves the outlet-referenced incompressible
 # proxy (densities at the downstream static) and warm-starts the
@@ -487,7 +487,7 @@ from combaero.network import (
     TeeJunctionElement, VortexElement,
     BorderCarnotLossElement,
 )
-from combaero.network.mpce_v2_element import ConstantKTeeElement, MPCEv2Element
+from combaero.network.mpce_element import ConstantKTeeElement, MultiPortChamberElement
 
 # Flow elements
 orifice = OrificeElement("orifice", "node1", "node2", Cd=0.65, diameter=0.011284, regime="compressible")
@@ -520,10 +520,10 @@ mc_com = MomentumChamberNode("mc_com", area=0.01)
 mc_str = MomentumChamberNode("mc_str", area=0.01)
 mc_bra = MomentumChamberNode("mc_bra", area=0.008)
 
-# MultiPortChamberElement is the ABSTRACT BASE since 0.6.0 -- it owns the port
-# machinery and no longer carries a residual. Use MPCEv2Element (the Mynard
+# MultiPortChamberBase is the ABSTRACT BASE since 0.6.0 -- it owns the port
+# machinery and no longer carries a residual. Use MultiPortChamberElement (the Mynard
 # closure) or ConstantKTeeElement (fixed handbook K).
-jct = MPCEv2Element(
+jct = MultiPortChamberElement(
     "jct",
     inlet_nodes=["mc_com"],
     outlet_nodes=["mc_str", "mc_bra"],
@@ -543,7 +543,7 @@ loss_bra = BorderCarnotLossElement(
 # live on the connecting channels / loss elements; the junction reads them via
 # the graph. The N+1 residuals = N port total-pressure relations
 # (Pt_i - Pt_jct +/- K_i * q_dyn_com) + global sum-of-port-mdots = 0, computed
-# in C++ (see mpce_v2_residuals_and_jacobian in API_CPP.md).
+# in C++ (see mpce_residuals_and_jacobian in API_CPP.md).
 
 # Constant-K junction (the "simplest model" tier): fixed handbook loss
 # coefficients instead of the Mynard closure. K is referenced to the
@@ -552,7 +552,7 @@ loss_bra = BorderCarnotLossElement(
 # the common port (single inlet for 'branch', single outlet for 'merge')
 # is ignored. Exposed in the GUI as the tee's "Constant K (handbook)"
 # junction model.
-from combaero.network.mpce_v2_element import ConstantKTeeElement
+from combaero.network.mpce_element import ConstantKTeeElement
 jct_k = ConstantKTeeElement(
     "jct",
     inlet_nodes=["mc_com"],
@@ -647,22 +647,22 @@ MomentumChamberNode("chamber", area=0.15)  # neighbour the area change can read
 
 ### Tuned Constants in the Junction Closure
 
-`MPCEv2Element`'s Mynard closure carries three tuned constants, each named
+`MultiPortChamberElement`'s Mynard closure carries three tuned constants, each named
 and documented at its definition in `combaero.network._mynard2010`:
 
 | constant | value | what it is | switch |
 |---|---|---|---|
 | `MYNARD_ETA_A0`, `MYNARD_ETA_A1` | 0.8, -0.2 | Mynard 2015 Eq 36 energy-transfer factor, CFD-fitted | `eta_scale` |
 | `FLOW_RATIO_DAMPING` | 0.02 | regulariser from the Matlab reference, not physics | -- |
-| `MPCEv2Element.DEFAULT_JOINING_ETRANSFER_ALPHA` | 0.2 | combaero's joining-side correction, fitted by `validation/junction/calibrate_etransfer.py` | pass `joining_etransfer_alpha=0.0` |
+| `MultiPortChamberElement.DEFAULT_JOINING_ETRANSFER_ALPHA` | 0.2 | combaero's joining-side correction, fitted by `validation/junction/calibrate_etransfer.py` | pass `joining_etransfer_alpha=0.0` |
 
 Under this repo's policy a tuned constant earns its place only by improving
 agreement on the digitised validation data; the on/off tables live on issue
 #271. `eta_scale` exists for that measurement:
 
 ```python
-MPCEv2Element(..., eta_scale=1.0)   # default: the faithful Mynard port
-MPCEv2Element(..., eta_scale=0.0)   # energy-transfer term off, for scoring
+MultiPortChamberElement(..., eta_scale=1.0)   # default: the faithful Mynard port
+MultiPortChamberElement(..., eta_scale=0.0)   # energy-transfer term off, for scoring
 junction_loss_coefficient(U, A, theta, eta_scale=0.0)
 ```
 
@@ -676,7 +676,7 @@ Distinct from the tuned constants above: this is a **numerical** parameter, not
 physics, and it is derived rather than declared.
 
 When `strict=False` and a port flows against its declared direction,
-`MPCEv2Element` replaces the physics with a continuity residual plus a
+`MultiPortChamberElement` replaces the physics with a continuity residual plus a
 one-sided quadratic penalty, `alpha * max(0, -e_i * mdot_i)^2`. The penalty
 shares its row with the continuity relation, so it balances against a pressure
 error rather than driving the offending flow to zero, and has a fixed point at
@@ -697,10 +697,10 @@ unchanged in form.
 
 | name | where | meaning |
 |---|---|---|
-| `BARRIER_SLACK_FRACTION` | `combaero.network.mpce_v2_element` | where the fixed point is placed, as a fraction of `m_ref` |
+| `BARRIER_SLACK_FRACTION` | `combaero.network.mpce_element` | where the fixed point is placed, as a fraction of `m_ref` |
 | `DEFAULT_SOFT_PENALTY_ALPHA` | same | fallback when no solver has supplied a weight, or the reference state is degenerate |
 | `scaled_penalty_alpha(P_ref, m_ref)` | same | the derivation, exposed for testing |
-| `MPCEv2Element.effective_penalty_alpha()` | element | the weight actually used, after precedence |
+| `MultiPortChamberElement.effective_penalty_alpha()` | element | the weight actually used, after precedence |
 
 Precedence: an explicitly set `soft_penalty_alpha` always wins, then the
 solver-supplied scale-aware weight, then the fallback. So the tuning knob keeps

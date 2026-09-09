@@ -607,7 +607,7 @@ It steers toward admissible roots, which is a different and better thing.
 
 ### Two things it broke, and what they turned out to mean
 
-**The ejector.** `EjectorElement` extends `MultiPortChamberElement`, so a
+**The ejector.** `EjectorElement` extends `MultiPortChamberBase`, so a
 blanket junction seed reached it and overwrote the physics-based warm start it
 carries for its own port pressures and `P_jct`. The cold reference network in
 `test_gui_ejector.py` stopped converging. The seed is now opt-in through a
@@ -666,7 +666,7 @@ Four independent lines settle the convention:
 | adapter | state |
 |---|---|
 | `mpce_v1_network` | input transform present (added with #277) |
-| `mpce_v2_network` | **mirrored** |
+| `mpce_network` | **mirrored** |
 | `tee_junction_element_network` | **mirrored** |
 | `mynard_analytical` | **mirrored** |
 | `tee_junction_raw` | correct: it calls Bassett's own formula on Bassett's own axis |
@@ -1201,7 +1201,7 @@ both wrong.
 
 **The barrier, not the physics.** At the floor, 95.7% of residual evaluations
 took the soft-barrier path rather than the Mynard closure: the straight port
-was flowing against its declared direction, and `MPCEv2Element.residuals`
+was flowing against its declared direction, and `MultiPortChamberElement.residuals`
 routes any such state to `_soft_barrier_residual`. Every anomaly first
 attributed to the junction model -- two equal and opposite rows, a rank-11
 Jacobian, a residual that jumps across the port's reversal -- belongs to the

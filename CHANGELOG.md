@@ -7,11 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The momentum-CV junction drops its version suffix.** `MPCEv2Element` is now
+  `MultiPortChamberElement`, taking the name freed by the removal below. The
+  abstract base that owns the port machinery is now `MultiPortChamberBase`; it
+  has three subclasses -- the junction, `ConstantKTeeElement` and
+  `EjectorElement` -- so it stays a class of its own rather than being merged
+  away. `MultiPortChamberElement` and `ConstantKTeeElement` are now exported
+  from `combaero.network`, which they were not before.
+
+  Renamed with them: the module `mpce_v2_element` -> `mpce_element`, the
+  offline Jacobian cross-check `_mpce_v2_jacobian` -> `_mpce_jacobian`, the C++
+  entry point `mpce_v2_residuals_and_jacobian` ->
+  `mpce_residuals_and_jacobian`, the validation adapter `MPCEv2Network` ->
+  `MPCENetwork`, and the `test_mpce_v2_*` files.
+
+  **Breaking for anyone importing the old names.** `from combaero.network
+  import MultiPortChamberElement` still works and now yields the concrete
+  junction rather than an instantiable base; code importing `MPCEv2Element`
+  from `combaero.network.mpce_v2_element` must move to
+  `combaero.network.mpce_element`. The GUI's persisted `mpce_tee` node type is
+  UNCHANGED, so saved networks still load. No behaviour change: the junction
+  scorecard is identical at 2178 of 2546 converged and a mean absolute error of
+  0.4809.
+
+  Past CHANGELOG entries and `docs/archive/` keep the old names, because they
+  record what the code was called at the time.
+
 ### Removed
-- **`MultiPortChamberElement`'s own junction model, and the C++ stack behind
+- **`MultiPortChamberBase`'s own junction model, and the C++ stack behind
   it.** Deprecated in 0.5.0, removed here as announced. The class remains as
   the ABSTRACT BASE owning the topology and port machinery that
-  `MPCEv2Element` and `ConstantKTeeElement` inherit -- port ordering, the
+  `MultiPortChamberElement` and `ConstantKTeeElement` inherit -- port ordering, the
   inlet/outlet sign map, area and angle resolution, the wiring checks, and
   `diagnostics`, which reports the port map and computes no physics. What went
   is `residuals` and `verify_solution_consistent`, so the class is no longer
@@ -25,9 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `HAGER_FRACTION`, which `border_carnot_loss_residual_and_jacobian` is built
   on, and `BorderCarnotLossElement` is unaffected.
 
-  Migration: use `MPCEv2Element` (the Mynard closure) or `ConstantKTeeElement`
+  Migration: use `MultiPortChamberElement` (the Mynard closure) or `ConstantKTeeElement`
   (fixed handbook K). On the same Bassett separating cells the removed model
-  scored a mean absolute error of 0.5260 against `MPCEv2Element`'s 0.0564 and
+  scored a mean absolute error of 0.5260 against `MultiPortChamberElement`'s 0.0564 and
   converged on 77 of 105 points against 94; it was also energetically
   inconsistent for joining flow and sign-symmetric, so it admitted mirror
   roots. Nothing in the package or the GUI instantiated it. Pin
@@ -59,7 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `MYNARD_ETA_A1 = -0.2` (Mynard & Valen-Sendstad 2015 Eq 36, fitted to their
   Fig 4 CFD at blood-flow Reynolds numbers) and `FLOW_RATIO_DAMPING = 0.02`
   (a regulariser from the Matlab reference, not in the paper), each documented
-  at its definition. `MPCEv2Element` and `junction_loss_coefficient` accept a
+  at its definition. `MultiPortChamberElement` and `junction_loss_coefficient` accept a
   new `eta_scale` keyword (default `1.0`, the faithful port; `0.0` switches
   Mynard's energy-transfer term off) so the term can be scored on and off
   against the digitised validation data alongside `joining_etransfer_alpha`.
@@ -85,7 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   analytic Jacobian are assembled in C++ (a single
   `ejector_element_residuals_and_jacobian` chaining the scalar closures through
   a forward-mode `DualN<9>`), matching the whole-element `(f, J)` practice of
-  the base `MultiPortChamberElement`/`TeeJunctionElement`; the Python element is
+  the base `MultiPortChamberBase`/`TeeJunctionElement`; the Python element is
   a thin relabeling shim. The critical regime is exactly the limit of the new
   blend so existing critical-mode behaviour is unchanged.
   `diagnostics()` now reports the ACTUAL entrainment ratio (`omega = ms/mp`,
@@ -141,7 +168,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   6.2%/13.2%, vs. 25%/35% for Huang's original chain and 9.0%/16.0% for a
   Lienhard/McGovern zero-loss closure also evaluated; see
   `validation/ejector/README.md` for the full comparison and paper
-  references). Sits on the `MultiPortChamberElement` 3-port junction
+  references). Sits on the `MultiPortChamberBase` 3-port junction
   topology (primary/secondary inlets, one outlet); `P_jct` is repurposed
   as a diagnostic critical back pressure P_c*, not the outlet's actual
   pressure, since critical-mode entrainment ratio is independent of back
@@ -183,10 +210,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **The momentum-CV junction's residual and Jacobian are now computed in C++.**
-  `MPCEv2Element` becomes a shim: it applies the guards -- the degenerate-state
+  `MultiPortChamberElement` becomes a shim: it applies the guards -- the degenerate-state
   fallbacks and the wrong-direction soft barrier, which are solver policy
   rather than junction physics -- and then calls
-  `_core.mpce_v2_residuals_and_jacobian`, which seeds the whole element over
+  `_core.mpce_residuals_and_jacobian`, which seeds the whole element over
   `(P_i, Pt_i, outer_mdot_i, Pt_jct)` and returns exact partials for every one.
   This replaces a Python closure evaluation, a sympy-lambdified Jacobian block
   for the canonical separating tee, an N+1-call finite-difference fallback for
@@ -199,9 +226,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (Bassett 0.1538, Hager 0.0787, Idelchik 0.8880, Wang 0.1184) and convergence
   is slightly better: the scorecard goes from 2108 to 2109 of 2546, and the
   random boundary sweep from 92.9% to 93.7% of draws that admit a root.
-  `MPCEv2Element.jacobian_method` is retired and now selects nothing; it is kept
+  `MultiPortChamberElement.jacobian_method` is retired and now selects nothing; it is kept
   so existing callers do not break. The sympy derivation remains in
-  `_mpce_v2_jacobian.py` as an offline cross-check rather than a runtime path.
+  `_mpce_jacobian.py` as an offline cross-check rather than a runtime path.
 - **The MPCE junction closure now carries the dividing-streamline pressure
   recovery, and Mynard's fitted energy-transfer factor is off by default.**
   With the transfer factor disabled, the closure's straight-leg coefficient was
@@ -214,7 +241,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `_mynard2010.DIVIDING_STREAMLINE_RECOVERY` restores it for the single-supplier
   diverging case that both papers analysed.
   Restoring it made Mynard's `eta` a duplicate of the same physics, so
-  `MPCEv2Element.DEFAULT_ETA_SCALE` is now `0.0`; `eta_scale=1.0` still
+  `MultiPortChamberElement.DEFAULT_ETA_SCALE` is now `0.0`; `eta_scale=1.0` still
   reproduces the faithful port. Measured at pinned operating points on the
   digitised data, the straight-leg RMSE improves from 0.333 to 0.098 while the
   lateral regresses from 0.079 to 0.097: the fitted factor was buying lateral
@@ -264,14 +291,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is exact -- only the weak implicit `d(gamma)/d(Tt)` term is dropped from
   the step). `combaero.network._ejector_huang1999` is now the validation
   reference only.
-- **`MultiPortChamberElement` subclasses can now override
+- **`MultiPortChamberBase` subclasses can now override
   `row_scale_kinds()`** to declare their own per-row scale-kind pattern
   ("p" or "mdot") for `solver.py`'s row-scaling vector, instead of the
   solver unconditionally assuming every subclass shares the base class's
   N-pressure-rows-then-one-mass-row pattern. Needed for `EjectorElement`,
   whose four rows are the opposite pattern (three mass-flow rows, one
   pressure row); the default matches prior hard-coded behaviour so
-  existing subclasses (`ConstantKTeeElement`, `MPCEv2Element`) are
+  existing subclasses (`ConstantKTeeElement`, `MultiPortChamberElement`) are
   unaffected.
 - **Dev tooling: Biome pinned to 2.5.10 across all three sources.** The
   Dependabot frontend bumps of `@biomejs/biome` (2.5.6 -> 2.5.9 -> 2.5.10 in
@@ -280,9 +307,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   version-sync checklist.
 
 ### Deprecated
-- **`MultiPortChamberElement`'s own junction model, for removal in 0.6.0.**
+- **`MultiPortChamberBase`'s own junction model, for removal in 0.6.0.**
   Its `residuals`, `diagnostics` and `verify_solution_consistent` now emit a
-  `DeprecationWarning` once per element. Use `MPCEv2Element`: on the same
+  `DeprecationWarning` once per element. Use `MultiPortChamberElement`: on the same
   Bassett separating cells it scores a mean absolute error of 0.0564 against
   this model's 0.5260 and converges on 94 of 105 points against 77, and it
   computes its residual and Jacobian in C++. This model is also energetically
@@ -290,10 +317,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Nothing in the package or the GUI instantiates it.
 
   **Only the model is deprecated.** The class also owns the topology and port
-  machinery that `MPCEv2Element` and `ConstantKTeeElement` inherit unchanged --
+  machinery that `MultiPortChamberElement` and `ConstantKTeeElement` inherit unchanged --
   13 of its 17 public members -- and that is staying. The warning is guarded on
   the exact type rather than on `isinstance`, because
-  `MPCEv2Element.diagnostics` delegates here through `super()` and would
+  `MultiPortChamberElement.diagnostics` delegates here through `super()` and would
   otherwise warn every user of the element that replaces this one.
 
   0.5.0 is the last release carrying it, so a network built on it can be run by
@@ -338,7 +365,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that set already sat on the saturation plateau, while the same junction now
   converges across seven decades of size instead of five.
 - **The junction soft barrier no longer has a fixed point that solves park
-  in.** `MPCEv2Element` replaces the physics with a "soft barrier" when a port
+  in.** `MultiPortChamberElement` replaces the physics with a "soft barrier" when a port
   flows against its declared direction, meant to pull Newton back toward
   `mdot = 0` so a sign flip can restore the declared regime. It could not: the
   penalty is added into the same residual row as the continuity relation,
@@ -411,9 +438,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rather than a pressure split, and it carries its own warm start. Networks
   with more than one admissible operating mode may now report a different one
   than before; see `docs/archive/JUNCTION_OPERATING_POINT_271.md`.
-- **`MPCEv2Element` now rejects converged states in which the junction would
+- **`MultiPortChamberElement` now rejects converged states in which the junction would
   create flow work.** Its post-solve `verify_solution_consistent` checked only
-  that port flows kept their declared direction; `MultiPortChamberElement` (v1)
+  that port flows kept their declared direction; `MultiPortChamberBase` (v1)
   has had an energy check since #229, and v2 had none, so a solution where the
   junction manufactured total pressure was reported as a success. The new
   criterion is a mass-weighted energy balance,
@@ -492,7 +519,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.2] - 2026-07-09
 
 ### Fixed
-- **`MPCEv2Element` degenerate iterates now carry a Jacobian, dead ports are
+- **`MultiPortChamberElement` degenerate iterates now carry a Jacobian, dead ports are
   classified consistently, and junctions with more than three ports are
   refused (issue #271).** Measured on the scorecard before changing anything:
   the pre-check fallback for an all-same-sign iterate returned a lossless
@@ -507,14 +534,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the soft barrier, both of which pull the offending port back with a real
   derivative; an excluded port is snapped to a tiny flow in its declared
   direction before the closure sees it, so both classifications agree by
-  construction and the dead-branch limit `K -> 1` applies. `MPCEv2Element`
+  construction and the dead-branch limit `K -> 1` applies. `MultiPortChamberElement`
   (and `ConstantKTeeElement`) raise `ValueError` at construction for more than
   three ports, since Mynard's `K` conversion is defined for three branches
   only and a 4-port junction returned finite residuals with an all-zero loss
   Jacobian. **Converged results are unchanged** -- the scorecard reproduces
   the previous tables to the digit and the 26 doomed solves remain unconverged
   (the empty Jacobian was wrong but was not what killed them).
-- **`MPCEv2Element` no longer turns an exception inside the Mynard closure
+- **`MultiPortChamberElement` no longer turns an exception inside the Mynard closure
   into a silent lossless junction (issue #271).** Three call sites wrapped
   `junction_loss_coefficient` in `except Exception`; the residual site
   returned a lossless continuity residual with an *empty* Jacobian for any
@@ -532,7 +559,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   omitting the `K` fields. **Converged results are unchanged** -- the
   scorecard reproduces the previous tables to the digit -- because the
   removed path was never taken on a legitimate state.
-- **`MPCEv2Element`'s Jacobian was missing the common-port static-pressure
+- **`MultiPortChamberElement`'s Jacobian was missing the common-port static-pressure
   column (issue #271).** The Mynard loss term `K_i * q_dyn_com` depends on the
   common port's density, and hence on its static pressure, through two paths:
   `q_dyn_com ~ 1/rho`, and Mynard's `K` itself being a function of the port
@@ -548,7 +575,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (a Jacobian correction moves the solver path, not the solution): scored
   against the Bassett separating curves the K values are identical to 3
   decimals. New whole-row FD guardrail in
-  `python/tests/test_mpce_v2_jacobian_rows.py` covers both `MPCEv2Element` and
+  `python/tests/test_mpce_v2_jacobian_rows.py` covers both `MultiPortChamberElement` and
   `ConstantKTeeElement`.
 - **CI: `publish-gui.yml` verify job had two more release-blocking races,
   both hit on the v0.4.1 release attempt.** (1) The "wait for combaero"
@@ -564,7 +591,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.1] - 2026-07-08
 
 ### Fixed
-- **`MPCEv2Element`/`ConstantKTeeElement` raised `ModuleNotFoundError: No
+- **`MultiPortChamberElement`/`ConstantKTeeElement` raised `ModuleNotFoundError: No
   module named 'validation'` on a real PyPI install.** The Mynard
   Unified0D loss-coefficient implementation lived in the dev-only
   `validation/` tree (not shipped in the wheel) and was imported
@@ -616,7 +643,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pressure drops reproduce ``K * q_common`` exactly (anchored in
   tests).
 - **Solver: energy-consistency verification for v1
-  ``MultiPortChamberElement`` -- mirror roots are demoted like
+  ``MultiPortChamberBase`` -- mirror roots are demoted like
   MPCEv2's wrong-direction roots.** The v1 impulse rows are even in
   the port flows, so the sign-flipped image of any root is also an
   exact root, and the image of a physical root is energetically
@@ -739,7 +766,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Solver: MPCE impulse rows were residual-scaled as mass flows --
   the root cause of the "doomed primary" stall class on junction
   networks.** ``_build_residual_scales`` classified all N+1
-  ``MultiPortChamberElement`` rows as ``ref_mdot``, but the N impulse
+  ``MultiPortChamberBase`` rows as ``ref_mdot``, but the N impulse
   rows ``(P_i + rho_i u_i^2) - P_jct`` are PRESSURE-magnitude: in the
   scaled system hybr/LM actually optimize they were over-weighted by
   ``ref_p/ref_mdot`` (~1e5; measured 7.5e4 vs O(0.1) for correctly
@@ -808,7 +835,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MPCE networks now default to ``analytical_pt_prop`` initialization.**
   ``NetworkSolver.solve(init_strategy="default")`` auto-upgrades to
   ``analytical_pt_prop`` when the network contains a
-  ``MultiPortChamberElement``; passing any other strategy or an
+  ``MultiPortChamberBase``; passing any other strategy or an
   explicit ``x0`` opts out, and the strategy actually used is recorded
   in ``solver_settings_used``. Evidence: on the certified inverse-design
   audit (``tmp/mpce_audit_v2_generator.py`` + ``_runner.py``, 32
@@ -896,14 +923,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Strict mode raises whenever a Newton ITERATE (not the converged
   answer) explores a wrong-sign port m_dot, killing GUI solves that
   would otherwise converge with "Unexpected error during residual
-  evaluation: MPCEv2Element ... declared flow_direction=... but
+  evaluation: MultiPortChamberElement ... declared flow_direction=... but
   observed wrong flow direction". Soft mode lets the solver explore
   wrong-direction states transiently; the post-solve
   ``verify_solution_consistent`` guard (see entry below) rejects any
   wrong-direction artifact root at convergence, so this switch does
   not admit silently wrong answers.
 - **Soft-barrier artifact roots are demoted to honest failures.**
-  ``MPCEv2Element`` with ``strict=False`` replaces a wrong-direction
+  ``MultiPortChamberElement`` with ``strict=False`` replaces a wrong-direction
   port's physics row with Pt continuity plus a one-sided penalty
   ``alpha * mdot^2`` -- and that penalty can exactly cancel the
   continuity mismatch, so the solver converges (|F| ~ 1e-10) to a state
@@ -942,7 +969,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default path leaves at arbitrary constants:
   ``ChannelElement.m_dot`` from a Bernoulli estimate on the propagated
   Pt drop (default fallback is ``ref["m_dot"] = 0.1``), and
-  ``MultiPortChamberElement.P_jct`` from the propagated Pt at the
+  ``MultiPortChamberBase.P_jct`` from the propagated Pt at the
   junction's "common" port (default fallback is ``min(boundary Pt)``,
   almost never near the true junction static). User-provided
   ``initial_guess`` entries take precedence; single-shot semantics
@@ -973,7 +1000,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **MPCE-v2 default Jacobian method flipped from ``"fd"`` to ``"sympy"``**
-  (``MPCEv2Element.jacobian_method``). The sympy analytical Jacobian for
+  (``MultiPortChamberElement.jacobian_method``). The sympy analytical Jacobian for
   the canonical 3-port separating T has been wired since the prototype
   PR but was kept disabled because the iteration-4 commit message
   noted FD's tiny truncation acting as regularization on some hard
@@ -987,11 +1014,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Newton step on the canonical case. Joining flow and non-canonical
   geometries (theta != 0 on straight, N != 3, port 0 not supplier)
   auto-fall-back to FD via the existing canonical-check, so the flip
-  only affects separating canonical cases. Set ``MPCEv2Element.jacobian_method = "fd"``
+  only affects separating canonical cases. Set ``MultiPortChamberElement.jacobian_method = "fd"``
   on a per-instance basis to revert.
 
 ### Added
-- **K diagnostics for MPCE-v2 tee element**. ``MPCEv2Element.diagnostics``
+- **K diagnostics for MPCE-v2 tee element**. ``MultiPortChamberElement.diagnostics``
   re-evaluates Mynard at the converged state and emits per-port K values
   plus topology-aware named aliases:
     - separating (``flow_direction='branch'``): ``K_straight``, ``K_branch``,
@@ -1005,7 +1032,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   / Hager / Idelchik reference data without back-calculating from port
   pressures. Falls back to the parent fields only when ``port_mdots`` is
   not provided (legacy callers).
-- Per-port ``port_{i}_m_dot`` field on ``MultiPortChamberElement.diagnostics``
+- Per-port ``port_{i}_m_dot`` field on ``MultiPortChamberBase.diagnostics``
   when the solver supplies ``port_mdots``.
 
 ### Fixed
@@ -1035,7 +1062,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   re-run showed 25/32 all-strategy failures, most of which trace to this
   staircase because the audit's channel geometry leaves the subsonic
   envelope at Pt ratio ~1.19.
-- **MultiPortChamberElement ports now report their real throughflow to the
+- **MultiPortChamberBase ports now report their real throughflow to the
   solver's state propagation.** ``flow_at_node`` returned 0 "for safety",
   so every port-MCN fed by the junction (all collector/outflow ports)
   received zero-mass upstream streams. Three consequences, all fixed:
@@ -1056,7 +1083,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   collectors carry their own outer flow, multi-supplier collectors the
   sum of the supplier feeds, with matching ``flow_jac_at_node`` entries
   so the closure Jacobian stays consistent. Additionally,
-  ``MultiPortChamberElement.resolve_topology`` pushes inferred port areas
+  ``MultiPortChamberBase.resolve_topology`` pushes inferred port areas
   onto auto-sized port-MCNs (collector ports have no upstream channel to
   inherit ``Dh`` from and previously kept the 0.1 m^2 fallback, hiding
   the face velocity even when flows were known). Converged results for
@@ -1069,7 +1096,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   inconsistent for JOINING flow -- a v1 merge junction can manufacture
   flow work and may lose its all-forward root entirely.
   ``test_step_4_adding_bypass`` migrated its junctions to
-  ``MPCEv2Element`` (the production model, joining-capable by design);
+  ``MultiPortChamberElement`` (the production model, joining-capable by design);
   the v1 vs K-closure comparison test now seeds the forward basin
   explicitly since v1's sign-symmetric residuals admit the mirrored
   all-reverse root from a cold start.
@@ -1112,7 +1139,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (channel -> Pt, orifice -> static) produced a non-physical 17 kPa
   asymmetry at a high-q merging MCN. ``FlowNetwork.validate`` now raises
   ``ValueError`` for any MCN with > 1 incoming or > 1 outgoing edges,
-  pointing the user at ``MultiPortChamberElement`` (momentum-CV junction
+  pointing the user at ``MultiPortChamberBase`` (momentum-CV junction
   with one MCN per port) as the correct migration target. The
   formerly-xfailed ``test_step_4_adding_bypass`` is restored as a
   passing test on the MPCE topology and now exhibits the expected
@@ -1121,7 +1148,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   port faces) remain valid.
 - **MPCE Tee GUI shows ``m: 0.000 kg/s`` on the node card and in Live
   Telemetry** even when the junction is actually flowing. Root cause:
-  ``MPCEv2Element.diagnostics`` only emitted per-port ``port_i_m_dot``
+  ``MultiPortChamberElement.diagnostics`` only emitted per-port ``port_i_m_dot``
   values, so ``runner._build_result_objects`` (which derives
   ``ElementResult.m_dot`` from ``diag["m_dot_com"]``) fell through to
   ``0.0``. Now emits the topology-aware aliases ``m_dot_com``,
@@ -1154,7 +1181,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for the MPCE-v2 joining-side calibration.
 - **MPCE-v2 joining-side etransfer correction** (combaero extension to
   faithful Mynard 2010): `joining_etransfer_alpha: float = 0.2` on
-  `MPCEv2Element`. Mynard's original etransfer collapses to zero for
+  `MultiPortChamberElement`. Mynard's original etransfer collapses to zero for
   converging flow (the `(1 - flow_ratio)` factor); the asymmetric supplier
   areas in joining-T networks then leave Mynard underpredicting K_avg at
   psi > 1. The correction adds `alpha * (A_max - A_min) / (A_max + A_min)`
@@ -1189,7 +1216,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   data in one pass (K1, K3, K4, K7, K8, K9, K10 now contribute real
   numbers instead of being silently unsupported). `units_data.h` and
   `docs/API_CPP.md` / `docs/API_PYTHON.md` updated to match.
-- **`MultiPortChamberElement` + `BorderCarnotLossElement`** (Phase 1 of the
+- **`MultiPortChamberBase` + `BorderCarnotLossElement`** (Phase 1 of the
   momentum-CV junction). Sanctioned successor to `TeeJunctionElement` for
   n-port manifolds, ejector / merge-split-reverse regimes, and high-Mach
   operation outside the K-closure's structural `K_run ~ 0.30` ceiling

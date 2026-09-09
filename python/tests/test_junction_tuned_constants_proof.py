@@ -18,7 +18,7 @@ import statistics
 
 import pytest
 
-from validation.junction.models.mpce_v2_network import MPCEv2Network
+from validation.junction.models.mpce_network import MPCENetwork
 from validation.junction.network_runner import run_network
 
 
@@ -26,7 +26,7 @@ def _mae_bias(alpha: float, eta: float, paper: str, K_ids: set[str]) -> tuple[fl
     recs = [
         r
         for r in run_network(
-            MPCEv2Network(joining_etransfer_alpha=alpha, eta_scale=eta),
+            MPCENetwork(joining_etransfer_alpha=alpha, eta_scale=eta),
             topologies=("imposed_q",),
         )
         if r.paper == paper and r.K_id in K_ids and r.converged and r.K_extracted is not None

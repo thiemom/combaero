@@ -176,9 +176,9 @@ def test_no_solve_returns_worse_than_it_reached(seed):
 
 
 def test_the_junction_harness_records_a_finite_residual_norm():
-    from validation.junction.models.mpce_v2_network import MPCEv2Network
+    from validation.junction.models.mpce_network import MPCENetwork
 
-    model = MPCEv2Network(strict=False)
+    model = MPCENetwork(strict=False)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         converged = model.evaluate_network("bassett2001", "K6", 0.6, 3.0, math.radians(45.0))
@@ -206,7 +206,7 @@ def _retryable_network():
         MomentumChamberNode,
         PressureBoundary,
     )
-    from combaero.network.mpce_v2_element import MPCEv2Element
+    from combaero.network.mpce_element import MultiPortChamberElement
 
     Y = list(cb.mole_to_mass(cb.species.dry_air()))
     net = FlowNetwork()
@@ -223,7 +223,7 @@ def _retryable_network():
     net.add_element(LosslessConnectionElement("lc_str", "port_str", "pb_str"))
     net.add_element(LosslessConnectionElement("lc_bra", "port_bra", "pb_bra"))
     net.add_element(
-        MPCEv2Element(
+        MultiPortChamberElement(
             id="jct",
             inlet_nodes=["port_com"],
             outlet_nodes=["port_str", "port_bra"],

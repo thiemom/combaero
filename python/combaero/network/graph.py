@@ -240,7 +240,7 @@ class FlowNetwork:
             # Pt = P + 0.5 rho v^2 only models a single bulk velocity, so it
             # cannot represent merging or splitting streams in the chamber
             # itself. >1 incoming or >1 outgoing edges puts MCN outside its
-            # valid envelope; use MultiPortChamberElement (momentum-CV
+            # valid envelope; use MultiPortChamberBase (momentum-CV
             # junction with one MCN per port) for those topologies.
             if type(node).__name__ == "MomentumChamberNode" and (
                 len(upstream) > 1 or len(downstream) > 1
@@ -251,7 +251,7 @@ class FlowNetwork:
                     f"FlowNetwork validation failed: MomentumChamberNode "
                     f"'{node_id}' has multiple {direction} edges ({sorted(edges)}). "
                     "MCN's scalar Pt = P + 0.5 rho v^2 closure cannot represent "
-                    "merging or splitting streams. Use a MultiPortChamberElement "
+                    "merging or splitting streams. Use a MultiPortChamberBase "
                     "junction (one MCN per port) instead -- see "
                     "python/tests/test_multi_port_chamber.py for the pattern. "
                     "Tracked in #174."

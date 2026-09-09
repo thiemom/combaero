@@ -1,4 +1,4 @@
-"""What happens when the Mynard closure raises inside MPCEv2Element.
+"""What happens when the Mynard closure raises inside MultiPortChamberElement.
 
 Three call sites wrapped ``junction_loss_coefficient`` in ``except Exception``.
 The residual site returned a lossless residual with an EMPTY Jacobian for any
@@ -12,7 +12,7 @@ with the cause chained; anything else propagates untouched.
 
 The rule outlived its original site. Since the whole-element (f, J) moved to
 C++ (#271 step 4.4), the residual path no longer calls the Python closure at
-all -- it calls ``_core.mpce_v2_residuals_and_jacobian``, which reports a
+all -- it calls ``_core.mpce_residuals_and_jacobian``, which reports a
 state it cannot classify as ``valid=False`` rather than by raising. The
 residual-path tests below therefore inject at the KERNEL, and the rule they
 pin is unchanged: a refusal the guards should have caught first is a named
@@ -27,15 +27,15 @@ from __future__ import annotations
 import pytest
 
 import combaero as cb
-from combaero.network import mpce_v2_element as v2
+from combaero.network import mpce_element as v2
 from combaero.network.components import NetworkMixtureState
-from combaero.network.mpce_v2_element import MPCEv2Element
+from combaero.network.mpce_element import MultiPortChamberElement
 
 _Y = list(cb.mole_to_mass(cb.species.dry_air()))
 
 
-def _element(flow_direction: str = "branch") -> MPCEv2Element:
-    element = MPCEv2Element.__new__(MPCEv2Element)
+def _element(flow_direction: str = "branch") -> MultiPortChamberElement:
+    element = MultiPortChamberElement.__new__(MultiPortChamberElement)
     element.id = "jct"
     element.N = 3
     element.port_nodes = ["p0", "p1", "p2"]
@@ -104,7 +104,7 @@ def test_programming_error_in_the_kernel_propagates(monkeypatch):
     def boom(*args, **kwargs):
         raise AttributeError("plumbing")
 
-    monkeypatch.setattr(v2._core, "mpce_v2_residuals_and_jacobian", boom)
+    monkeypatch.setattr(v2._core, "mpce_residuals_and_jacobian", boom)
 
     with pytest.raises(AttributeError, match="plumbing"):
         _element().residuals(_states(), 100_300.0, _BRANCH_MDOTS)
@@ -116,7 +116,7 @@ def test_a_kernel_refusal_becomes_a_named_failure(monkeypatch):
     which must be loud, and must name the element and the flows."""
     monkeypatch.setattr(
         v2._core,
-        "mpce_v2_residuals_and_jacobian",
+        "mpce_residuals_and_jacobian",
         lambda *a, **k: _FakeKernelResult(valid=False),
     )
 
@@ -124,7 +124,7 @@ def test_a_kernel_refusal_becomes_a_named_failure(monkeypatch):
         _element().residuals(_states(), 100_300.0, _BRANCH_MDOTS)
 
     message = str(info.value)
-    assert "MPCEv2Element 'jct'" in message
+    assert "MultiPortChamberElement 'jct'" in message
     assert "port_mdots" in message
 
 
@@ -132,7 +132,7 @@ def test_residual_never_returns_an_empty_jacobian_on_a_refusal(monkeypatch):
     """The specific defect: a residual with jac = {} looks like a solved row."""
     monkeypatch.setattr(
         v2._core,
-        "mpce_v2_residuals_and_jacobian",
+        "mpce_residuals_and_jacobian",
         lambda *a, **k: _FakeKernelResult(valid=False),
     )
 

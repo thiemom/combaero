@@ -2909,7 +2909,7 @@ class TeeJunctionElement(NetworkElement):
     """
     Three-port tee junction element using Bassett 2001 pressure-loss coefficients.
 
-    Superseded by ``MultiPortChamberElement`` / ``MPCEv2Element`` (momentum-CV
+    Superseded by ``MultiPortChamberBase`` / ``MultiPortChamberElement`` (momentum-CV
     junction, #177). Retained as the M -> 0 regression baseline for the
     junction validation suite (see ``validation/junction/models/
     tee_junction_element_network.py``) and for the existing Python tests
@@ -3232,7 +3232,7 @@ class TeeJunctionElement(NetworkElement):
 # ---------------------------------------------------------------------------
 
 
-class MultiPortChamberElement(NetworkElement):
+class MultiPortChamberBase(NetworkElement):
     """
     Momentum-CV junction element (N >= 2 ports).
 
@@ -3240,7 +3240,7 @@ class MultiPortChamberElement(NetworkElement):
     port ordering, the inlet/outlet sign map, area and angle resolution, the
     connecting-element wiring checks -- and no longer carries a residual of
     its own. Its impulse-function model was deprecated in 0.5.0 and removed
-    here; ``MPCEv2Element`` supersedes it (issue #271).
+    here; ``MultiPortChamberElement`` supersedes it (issue #271).
 
     Owns one scalar unknown ``{id}.P_jct`` (junction internal static pressure).
     Emits N per-port impulse-function residuals plus a global mass residual:
@@ -3319,9 +3319,9 @@ class MultiPortChamberElement(NetworkElement):
                 connecting channels at resolve time.
         """
         if not inlet_nodes:
-            raise ValueError(f"MultiPortChamberElement '{id}': need >= 1 inlet port.")
+            raise ValueError(f"MultiPortChamberBase '{id}': need >= 1 inlet port.")
         if not outlet_nodes:
-            raise ValueError(f"MultiPortChamberElement '{id}': need >= 1 outlet port.")
+            raise ValueError(f"MultiPortChamberBase '{id}': need >= 1 outlet port.")
         n_in = len(inlet_nodes)
         n_out = len(outlet_nodes)
 
@@ -3344,12 +3344,12 @@ class MultiPortChamberElement(NetworkElement):
         outlet_angles = list(outlet_angles_deg) if outlet_angles_deg is not None else [0.0] * n_out
         if len(inlet_angles) != n_in:
             raise ValueError(
-                f"MultiPortChamberElement '{id}': inlet_angles_deg has "
+                f"MultiPortChamberBase '{id}': inlet_angles_deg has "
                 f"{len(inlet_angles)} entries, need {n_in}."
             )
         if len(outlet_angles) != n_out:
             raise ValueError(
-                f"MultiPortChamberElement '{id}': outlet_angles_deg has "
+                f"MultiPortChamberBase '{id}': outlet_angles_deg has "
                 f"{len(outlet_angles)} entries, need {n_out}."
             )
         self.port_angles_deg = inlet_angles + outlet_angles
@@ -3359,7 +3359,7 @@ class MultiPortChamberElement(NetworkElement):
         )
         if len(self.port_areas) != self.N:
             raise ValueError(
-                f"MultiPortChamberElement '{id}': port_areas has "
+                f"MultiPortChamberBase '{id}': port_areas has "
                 f"{len(self.port_areas)} entries, need {self.N}."
             )
 
@@ -3451,12 +3451,12 @@ class MultiPortChamberElement(NetworkElement):
             port_node = graph.nodes.get(port_id)
             if port_node is None:
                 raise ValueError(
-                    f"MultiPortChamberElement '{self.id}': port node "
+                    f"MultiPortChamberBase '{self.id}': port node "
                     f"'{port_id}' is not in the network."
                 )
             if not isinstance(port_node, MomentumChamberNode):
                 raise ValueError(
-                    f"MultiPortChamberElement '{self.id}': port '{port_id}' "
+                    f"MultiPortChamberBase '{self.id}': port '{port_id}' "
                     f"must be a MomentumChamberNode, got "
                     f"'{type(port_node).__name__}'."
                 )
@@ -3473,7 +3473,7 @@ class MultiPortChamberElement(NetworkElement):
             ]
             if len(outside_elems) != 1:
                 raise ValueError(
-                    f"MultiPortChamberElement '{self.id}': port '{port_id}' "
+                    f"MultiPortChamberBase '{self.id}': port '{port_id}' "
                     f"must have exactly one outside element (channel, loss "
                     f"element, etc.), found {len(outside_elems)}."
                 )
@@ -3494,7 +3494,7 @@ class MultiPortChamberElement(NetworkElement):
                 topo_sign = -1.0  # outer feeds flow INTO port = -1 outflow
             else:
                 raise ValueError(
-                    f"MultiPortChamberElement '{self.id}': connecting element "
+                    f"MultiPortChamberBase '{self.id}': connecting element "
                     f"'{outer.id}' at port '{port_id}' has no direct from/to "
                     f"link to that port (multi-port outer elements are not "
                     f"supported)."
@@ -3502,7 +3502,7 @@ class MultiPortChamberElement(NetworkElement):
             if topo_sign != expected_sign:
                 role = "inlet" if expected_sign < 0 else "outlet"
                 raise ValueError(
-                    f"MultiPortChamberElement '{self.id}': port '{port_id}' is "
+                    f"MultiPortChamberBase '{self.id}': port '{port_id}' is "
                     f"declared as an {role} (sign={expected_sign:+.0f}) but the "
                     f"connecting element '{outer.id}' is wired in the opposite "
                     f"direction (sign={topo_sign:+.0f}). For an inlet port, the "
@@ -3519,7 +3519,7 @@ class MultiPortChamberElement(NetworkElement):
                     self.port_areas[i] = outer.area
             if self.port_areas[i] is None:
                 raise ValueError(
-                    f"MultiPortChamberElement '{self.id}': could not infer "
+                    f"MultiPortChamberBase '{self.id}': could not infer "
                     f"area at port '{port_id}'. Provide port_areas explicitly "
                     f"or attach a ChannelElement with diameter set."
                 )
@@ -3549,11 +3549,11 @@ class MultiPortChamberElement(NetworkElement):
 
         MACHINERY, not model. It reports the port map and the states handed
         in and computes no physics, which is why it survives the 0.6.0
-        removal of this class's residual. ``MPCEv2Element.diagnostics``
+        removal of this class's residual. ``MultiPortChamberElement.diagnostics``
         calls it through ``super()`` and adds its closure quantities on top.
         """
         """DEPRECATED, removal in 0.6.0 -- see ``_warn_v1_junction_model``.
-        Note that ``MPCEv2Element.diagnostics`` delegates here via ``super()``,
+        Note that ``MultiPortChamberElement.diagnostics`` delegates here via ``super()``,
         which is why the warning is guarded on the exact type rather than on
         ``isinstance``.
         """
@@ -3571,7 +3571,7 @@ class MultiPortChamberElement(NetworkElement):
 class BorderCarnotLossElement(NetworkElement):
     """
     Per-port Border-Carnot turning-loss element. Companion to
-    :class:`MultiPortChamberElement`; bolted onto lateral ports of the junction.
+    :class:`MultiPortChamberBase`; bolted onto lateral ports of the junction.
 
     Residual (PDF Section 3.1):
 

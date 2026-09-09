@@ -1,5 +1,5 @@
 """EjectorElement: 3-port supersonic ejector on the momentum-CV junction
-topology (``MultiPortChamberElement``).
+topology (``MultiPortChamberBase``).
 
 Ports: ``primary_node`` (motive, high-pressure inlet), ``secondary_node``
 (suction/entrained inlet), ``outlet_node``. Reuses the validated closed-form
@@ -84,7 +84,7 @@ Jacobian are built in C++ -- a single ``_solver_tools.
 ejector_element_residuals_and_jacobian`` call (``include/ejector.h`` /
 ``src/ejector.cpp``) that chains the scalar closures through a forward-mode
 ``DualN<9>`` across the regime blend, matching the whole-element (f, J)
-practice of the base ``MultiPortChamberElement`` and ``TeeJunctionElement``.
+practice of the base ``MultiPortChamberBase`` and ``TeeJunctionElement``.
 ``residuals()`` here is only the relabeling shim: physical-flow signs and
 mapping the nine Jacobian seeds to solver column names.
 (``combaero.network._ejector_huang1999`` remains the Python validation
@@ -110,7 +110,7 @@ from typing import Any
 import combaero as cb
 from combaero import _solver_tools
 from combaero.network._ejector_huang1999 import ETA_P, ETA_S, EjectorGeometry
-from combaero.network.components import MultiPortChamberElement, NetworkMixtureState
+from combaero.network.components import MultiPortChamberBase, NetworkMixtureState
 
 
 def _real_gamma(t: float, x: Any) -> float:
@@ -138,7 +138,7 @@ def choke_plane_gamma(t_e: float, x: Any, *, iterations: int = 12) -> float:
     return gamma
 
 
-class EjectorElement(MultiPortChamberElement):
+class EjectorElement(MultiPortChamberBase):
     """Supersonic ejector across operating regimes: 2 inlets (primary, secondary),
     1 outlet. Critical (double-choked), subcritical, and unchoked-primary
     (subsonic jet-pump) in one C1 residual system."""
@@ -295,7 +295,7 @@ class EjectorElement(MultiPortChamberElement):
 
         # The 4-row residual system + its 9-column analytic Jacobian are
         # assembled in C++ (whole-element (f, J), matching the base
-        # MultiPortChamberElement / TeeJunctionElement practice): the scalar
+        # MultiPortChamberBase / TeeJunctionElement practice): the scalar
         # closures are chained through a forward-mode DualN<9> across the
         # regime blend. See src/ejector.cpp / OPERATING_REGIMES_DESIGN.md sec
         # 6c. This Python is only the relabeling shim.

@@ -318,8 +318,8 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("k_term_sign", &solver::MpceResidualJacobian::k_term_sign)
       .def_readonly("k_per_port", &solver::MpceResidualJacobian::k_per_port);
 
-  m.def("mpce_v2_residuals_and_jacobian",
-        &solver::mpce_v2_residuals_and_jacobian, py::arg("p_static"),
+  m.def("mpce_residuals_and_jacobian",
+        &solver::mpce_residuals_and_jacobian, py::arg("p_static"),
         py::arg("p_total"), py::arg("rho"), py::arg("drho_dp"),
         py::arg("outer_mdot"), py::arg("pt_jct"), py::arg("geom"),
         "Momentum-CV junction whole-element (f, J), three ports.\n\n"
@@ -357,7 +357,7 @@ PYBIND11_MODULE(_core, m) {
         "Border-Carnot turning loss: Pt_in - Pt_out - L*0.5*rho*u^2 = 0 with "
         "L = 4*(1 - cos((3/4)*delta_geom))^2 (Hager sharp-edge correction).");
 
-  // Ejector (supersonic ejector on the MultiPortChamberElement topology,
+  // Ejector (supersonic ejector on the MultiPortChamberBase topology,
   // spanning the critical / subcritical / unchoked jet-pump regimes). Physics
   // + analytic Jacobians in include/ejector.h. The critical-mode scalar
   // closures expose Jacobians w.r.t. the 4 thermodynamic inputs (p_g, t_g,

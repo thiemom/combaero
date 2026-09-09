@@ -88,11 +88,11 @@ class MynardResult:
 #: (1 - lambda) factor is zero there), verified to 4 decimals.
 #: Switch: ``eta_scale``.
 # Mynard Eq 36's fitted coefficients. Since 2026-09-05 the production default
-# switches this term OFF (`MPCEv2Element.DEFAULT_ETA_SCALE = 0.0`): with the
+# switches this term OFF (`MultiPortChamberElement.DEFAULT_ETA_SCALE = 0.0`): with the
 # dividing-streamline recovery restored below, it duplicates that term on the
 # continuing collector, and it makes the junction a net source of flow work
 # below a lateral fraction of about 0.25. The table justifying the switch is on
-# `MPCEv2Element.DEFAULT_ETA_SCALE`. The coefficients stay because
+# `MultiPortChamberElement.DEFAULT_ETA_SCALE`. The coefficients stay because
 # `eta_scale=1.0` must keep reproducing the faithful port.
 MYNARD_ETA_A0: float = 0.8
 MYNARD_ETA_A1: float = -0.2
@@ -109,7 +109,7 @@ MYNARD_ETA_A1: float = -0.2
 #:   tau >= 0.05       degrades monotonically (interior MAE +0.0007 at 0.05,
 #:                     +0.016 at 0.2).
 #: Why it is cancelled here: C ~ 1/FlowRatio without damping, but the K
-#: conversion (Mynard Eq 18, what MPCEv2 uses) multiplies by FlowRatio^2,
+#: conversion (Mynard Eq 18, what MultiPortChamberElement uses) multiplies by FlowRatio^2,
 #: so K -> 1 (the dead-branch limit) with or without it. The knob bounds a
 #: quantity the production path never exposes. It WOULD matter for
 #: Mynard's native C-form residual (p_i - p_j = C_j rho u_j^2), which is why
@@ -172,7 +172,7 @@ def junction_loss_coefficient(
             at psi=1 (equal areas), and grows monotonically toward 1 at
             extreme asymmetry. Default 0.0 preserves the faithful-port
             Mynard behavior. The production default lives on
-            MPCEv2Element.DEFAULT_JOINING_ETRANSFER_ALPHA with its
+            MultiPortChamberElement.DEFAULT_JOINING_ETRANSFER_ALPHA with its
             provenance; the fit is validation/junction/calibrate_etransfer.py
             and the validation is the in-network scorecard (issue #271).
 

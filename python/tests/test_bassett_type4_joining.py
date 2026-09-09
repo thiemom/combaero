@@ -32,7 +32,7 @@ import pytest
 
 from combaero.network._mynard2010 import junction_loss_coefficient
 from validation.junction.models import bassett2001
-from validation.junction.models.mpce_v2_network import MPCEv2Network
+from validation.junction.models.mpce_network import MPCENetwork
 from validation.junction.network_runner import (
     _LATERAL_K_IDS,
     _STRAIGHT_K_IDS,
@@ -46,7 +46,7 @@ _A = 0.01
 
 @pytest.fixture(scope="module")
 def model():
-    return MPCEv2Network(strict=False)
+    return MPCENetwork(strict=False)
 
 
 @pytest.fixture(scope="module")

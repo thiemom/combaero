@@ -1,6 +1,6 @@
 """The soft barrier had a fixed point, and solves parked in it.
 
-`MPCEv2Element` refuses a port flowing against its declared direction. In
+`MultiPortChamberElement` refuses a port flowing against its declared direction. In
 non-strict mode it replaces the physics with a "soft barrier" whose docstring
 promises it "pulls Newton back toward mdot_i = 0, from which a sign flip
 restores the strict-physics residual on the next iteration". Measured, it did
@@ -43,7 +43,7 @@ import numpy as np
 import pytest
 
 from combaero.network import NetworkSolver
-from combaero.network.mpce_v2_element import MPCEv2Element
+from combaero.network.mpce_element import MultiPortChamberElement
 from validation.junction import random_robustness as rr
 
 _TRACED_SEED = 20260906
@@ -69,14 +69,14 @@ def traced_case():
 
 
 def _solve(case, alpha: float):
-    original = MPCEv2Element.soft_penalty_alpha
-    MPCEv2Element.soft_penalty_alpha = alpha
+    original = MultiPortChamberElement.soft_penalty_alpha
+    MultiPortChamberElement.soft_penalty_alpha = alpha
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             return NetworkSolver(rr.build(case)).solve(timeout=30.0)
     finally:
-        MPCEv2Element.soft_penalty_alpha = original
+        MultiPortChamberElement.soft_penalty_alpha = original
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ def _solve(case, alpha: float):
 def test_the_penalty_shares_a_row_with_the_continuity_relation():
     """The structural cause. If the penalty ever gets a row of its own this
     test should be the one that fails, because the fixed point goes with it."""
-    element = MPCEv2Element(
+    element = MultiPortChamberElement(
         id="jct",
         inlet_nodes=["a", "b"],
         outlet_nodes=["c"],
@@ -149,14 +149,14 @@ def test_an_in_regime_root_existed_all_along(traced_case):
     ):
         x0[names.index(name)] = value
 
-    original = MPCEv2Element.soft_penalty_alpha
-    MPCEv2Element.soft_penalty_alpha = 1.0e7
+    original = MultiPortChamberElement.soft_penalty_alpha
+    MultiPortChamberElement.soft_penalty_alpha = 1.0e7
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             sol = solver.solve(timeout=30.0, x0=x0)
     finally:
-        MPCEv2Element.soft_penalty_alpha = original
+        MultiPortChamberElement.soft_penalty_alpha = original
 
     assert sol["__success__"], "the in-regime root is not reachable even when seeded"
     assert sol["__final_norm__"] < 1e-3
@@ -168,7 +168,7 @@ def test_an_in_regime_root_existed_all_along(traced_case):
 
 
 def test_the_traced_case_converges_at_the_shipped_weight(traced_case):
-    sol = _solve(traced_case, MPCEv2Element.soft_penalty_alpha)
+    sol = _solve(traced_case, MultiPortChamberElement.soft_penalty_alpha)
 
     assert sol["__success__"], f"|F| = {sol['__final_norm__']:.4e}"
     assert sol["__final_norm__"] < 1e-3
@@ -178,7 +178,7 @@ def test_it_converges_into_the_declared_regime(traced_case):
     """Not merely to something. The element is declared a merge, and the
     solution must have both inlets flowing in -- otherwise the barrier has
     been traded for a reversed root, which is a different answer."""
-    sol = _solve(traced_case, MPCEv2Element.soft_penalty_alpha)
+    sol = _solve(traced_case, MultiPortChamberElement.soft_penalty_alpha)
     names = list(sol["__unknown_names__"])
     x = np.array(sol["__x_solution__"])
 
@@ -190,7 +190,7 @@ def test_it_converges_into_the_declared_regime(traced_case):
 def test_the_weight_is_on_the_saturation_plateau():
     """Guards against the constant being a tuned optimum: the response must be
     flat above it, so neighbouring decades do as well."""
-    assert MPCEv2Element.soft_penalty_alpha >= 1.0e9
+    assert MultiPortChamberElement.soft_penalty_alpha >= 1.0e9
 
 
 @pytest.mark.parametrize("alpha", [1.0e9, 1.0e10, 1.0e11, 1.0e12])

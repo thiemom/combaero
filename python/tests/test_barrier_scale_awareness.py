@@ -37,10 +37,10 @@ import warnings
 import pytest
 
 from combaero.network import NetworkSolver
-from combaero.network.mpce_v2_element import (
+from combaero.network.mpce_element import (
     BARRIER_SLACK_FRACTION,
     DEFAULT_SOFT_PENALTY_ALPHA,
-    MPCEv2Element,
+    MultiPortChamberElement,
     scaled_penalty_alpha,
 )
 from validation.junction import random_robustness as rr
@@ -109,8 +109,8 @@ def test_a_degenerate_reference_state_falls_back(pressure, mdot):
 # ---------------------------------------------------------------------------
 
 
-def _element() -> MPCEv2Element:
-    return MPCEv2Element(
+def _element() -> MultiPortChamberElement:
+    return MultiPortChamberElement(
         id="jct",
         inlet_nodes=["a", "b"],
         outlet_nodes=["c"],
@@ -145,7 +145,9 @@ def test_an_explicit_setting_always_wins():
 
 def test_the_solver_hands_the_scale_to_every_chamber_element(base_case):
     solver = NetworkSolver(rr.build(base_case))
-    elements = [e for e in solver.network.elements.values() if isinstance(e, MPCEv2Element)]
+    elements = [
+        e for e in solver.network.elements.values() if isinstance(e, MultiPortChamberElement)
+    ]
     assert elements
     assert all(e._barrier_alpha_scaled is None for e in elements)
 
@@ -162,7 +164,9 @@ def test_the_weight_is_frozen_for_the_solve_not_recomputed_per_iterate(base_case
     """If it tracked the state it would enter the Jacobian, which is the one
     thing that would make this a residual-form change."""
     solver = NetworkSolver(rr.build(base_case))
-    element = next(e for e in solver.network.elements.values() if isinstance(e, MPCEv2Element))
+    element = next(
+        e for e in solver.network.elements.values() if isinstance(e, MultiPortChamberElement)
+    )
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")

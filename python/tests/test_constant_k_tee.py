@@ -25,7 +25,7 @@ from combaero.network import (
     NetworkSolver,
     PressureBoundary,
 )
-from combaero.network.mpce_v2_element import ConstantKTeeElement
+from combaero.network.mpce_element import ConstantKTeeElement
 
 _D = 0.05
 _A = math.pi * (_D / 2.0) ** 2
@@ -198,7 +198,7 @@ def test_jacobian_matches_fd(make_net):
 
 
 def test_direction_guard_inherited_from_v2():
-    """The MPCEv2 direction check applies: a wrong-direction solution
+    """The MultiPortChamberElement direction check applies: a wrong-direction solution
     dict is rejected (memory rule: constant-K merges always pair with
     the post-solve guard)."""
     net = _merge_net(0.4, 1.0)

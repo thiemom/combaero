@@ -791,7 +791,7 @@ the common port, `psi` = A_branch / A_com, `theta` = branch angle [rad].
 
 ### Momentum-CV Junction: whole-element (f, J)
 
-Backs `MPCEv2Element`. Unlike the tee functions above, this returns the whole
+Backs `MultiPortChamberElement`. Unlike the tee functions above, this returns the whole
 element's residual vector and its full Jacobian from one seeded evaluation --
 forward-mode dual numbers over every unknown, so there is no separate
 derivation to keep in sync (`include/mpce_junction.h`).
@@ -811,7 +811,7 @@ struct MpceResidualJacobian {
     std::array<double, 3> k_per_port;
 };
 
-MpceResidualJacobian mpce_v2_residuals_and_jacobian(
+MpceResidualJacobian mpce_residuals_and_jacobian(
     const std::array<double, 3>& p_static, const std::array<double, 3>& p_total,
     const std::array<double, 3>& rho,      const std::array<double, 3>& drho_dp,
     const std::array<double, 3>& outer_mdot, double pt_jct,
@@ -833,7 +833,7 @@ expressed in the solver's own unknowns.
 
 **Physics only.** The kernel does not own the degenerate-state guards or the
 wrong-direction soft barrier -- those are solver policy and live in
-`MPCEv2Element`. It reports `valid = false` for a flow pattern that is not a
+`MultiPortChamberElement`. It reports `valid = false` for a flow pattern that is not a
 junction in any regime rather than guessing.
 
 **Thermodynamics stays at the call site**: pass `rho` and `drho/dP` per port.
@@ -849,7 +849,7 @@ Sanctioned successor to the K-closure tee for N-port junctions
 (`docs/junction/momentum cv implementation guide.pdf`). Junction = pure
 conservation, loss = separate per-port `BorderCarnotLossElement`s.
 
-> **The junction half of this was removed in 0.6.0.** `multi_port_chamber_residuals_and_jacobian` and its result structs backed `MultiPortChamberElement`'s own impulse model, which is gone; `MPCEv2Element` supersedes it and computes its own whole-element `(f, J)` (see the Momentum-CV Junction section above). What remains here is the Border-Carnot loss element, which is unaffected.
+> **The junction half of this was removed in 0.6.0.** `multi_port_chamber_residuals_and_jacobian` and its result structs backed `MultiPortChamberBase`'s own impulse model, which is gone; `MultiPortChamberElement` supersedes it and computes its own whole-element `(f, J)` (see the Momentum-CV Junction section above). What remains here is the Border-Carnot loss element, which is unaffected.
 
 ```cpp
 // Loss-element constants (multi_port_chamber.h)

@@ -4,8 +4,17 @@ Deep-dive read of the three source papers on disk (Bassett 2001, Hager 1984,
 Mynard & Valen-Sendstad 2015), the internal compressible spec
 (`compressible_junction_model_v3.pdf`), the Matlab reference
 (`JunctionLossCoefficient.m`), and the code. Written to decide *how* to port
-`MPCEv2Element` to C++, what has to be fixed before that is safe, and what the
+`MultiPortChamberElement` to C++, what has to be fixed before that is safe, and what the
 digitised data can and cannot prove.
+
+
+> **Naming note (0.6.0).** This document was written while the junction was
+> called `MPCEv2Element` and its base `MultiPortChamberElement`. Those names
+> have since swapped roles: the concrete junction is now
+> `MultiPortChamberElement` and the abstract base is `MultiPortChamberBase`.
+> The old names are left in place below because they are what the referenced
+> PRs and measurements were made against; read `MPCEv2Element` as the junction
+> element and `MPCEv1`/`v1` as its removed predecessor.
 
 ## 0. Policy checklist -- re-read before starting ANY step
 
@@ -66,7 +75,7 @@ decisions (2026-09-04), not mine.
 | `compressible_junction_model_v3.pdf` sec 8-9 | n+1 residual set, full analytical Jacobian tables for pseudodatum and branch primitives, C++ pseudodatum + kernel + outer-chain fragments, choking guard | design only; never wired to MPCE |
 | `src/ejector.cpp` `DualN<N>` | forward-mode dual with `+ - * /`, `dsqrt`, `dpow` | used by the ejector port (#270) |
 | `_mynard2010.py` | faithful port of the Matlab + combaero's `joining_etransfer_alpha` extension | production, 100% Python |
-| `_mpce_v2_jacobian.py` | sympy `dKQ/dmdot` for the 3-port separating T only | production; joining has none |
+| `_mpce_jacobian.py` | sympy `dKQ/dmdot` for the 3-port separating T only | production; joining has none |
 
 So the C++ that the port needs to *write* is: the pseudosupplier angle/area
 construction (Mynard Eqs 31-35), the energy-transfer factor (Eq 36), the
@@ -103,7 +112,7 @@ where Mynard's energy-transfer factor `eta_j` (Eq 36) enters. So:
 - **No Mach dependence anywhere.** `q_dyn_com` is `0.5 rho u^2` with rho from
   the port static state; `K` is incompressible Mynard. The retired tee's
   `K_dat_j_closed` carried `K_inc (1 + kappa M_dat^2)`; the header states the
-  incompressible assumption needs `Ma < 0.2`. Nothing in `MPCEv2Element`
+  incompressible assumption needs `Ma < 0.2`. Nothing in `MultiPortChamberElement`
   says this.
 
 ## 4. Provenance audit of the closure
@@ -117,11 +126,11 @@ Every constant and structural choice, traced to its source or flagged.
 | Dividing-streamline pressure `p* = (p_1 + p_s)/2` | inside Bassett K5 (Eq 14), Hager Eq 3, Mynard Eq 26 | all three papers, 2D plane-duct origin (Hager: "appropriate for plane duct flow") | **grounded, with a stated 2D limitation** |
 | `eta_j = [0.8 (pi - theta_dat) sign(theta_j) - 0.2] (1 - lambda_j)` | `_mynard2010.py` etransfer | Mynard Eq 36, "determined only from CFD data in Figure 4", Re 350-2400 blood flow, 3-branch, T and Y only | **empirical fit outside combaero's regime**; Mynard sec 4.5.1 argues high-Re validity via Gardel/Levin agreement, not by test |
 | `damping = 1 - exp(-FR/0.02)` | `_mynard2010.py` | Matlab line 60-63 comment only: "avoids infinite C when FlowRatio approaches zero". **Not in the paper.** | **numerical regulariser presented as physics**; the 0.02 is a knob |
-| `joining_etransfer_alpha = 0.2` | `mpce_v2_element.py` `DEFAULT_JOINING_ETRANSFER_ALPHA` | combaero invention (docstring says so); fitted by `tmp/calibrate_etransfer_join.py` to Bassett K11_corr/K12_corr + Idelchik at psi 1.25-3.33, "validated" on held-out measured points; memory note: "calibrated on pre-#212 degenerate plumbing -- revisit" | **stale calibration**; never validated in-network |
+| `joining_etransfer_alpha = 0.2` | `mpce_element.py` `DEFAULT_JOINING_ETRANSFER_ALPHA` | combaero invention (docstring says so); fitted by `tmp/calibrate_etransfer_join.py` to Bassett K11_corr/K12_corr + Idelchik at psi 1.25-3.33, "validated" on held-out measured points; memory note: "calibrated on pre-#212 degenerate plumbing -- revisit" | **stale calibration**; never validated in-network |
 | Pseudosupplier angle via `atan2` of flow-weighted sin/cos | Mynard Eq 34 | grounded | fine, but non-analytic for complex-step |
 | `+pi` flip and `theta -> -theta` mirror | `_mynard2010.py` lines 91-102 | Matlab angle normalisation (Fig 5 flowchart "reorient branch angles") | **implementation, not physics**; creates derivative discontinuities |
 | `K` conversion restricted to `n <= 3` | `_mynard2010.py` | Matlab line 65 | design limit of the *conversion*, not the model |
-| `Pt`-based residual instead of Mynard's static `C_j` form | `MPCEv2Element.residuals` | combaero choice ("ITERATION-2" comment) | the choice that imports the n <= 3 limit |
+| `Pt`-based residual instead of Mynard's static `C_j` form | `MultiPortChamberElement.residuals` | combaero choice ("ITERATION-2" comment) | the choice that imports the n <= 3 limit |
 
 Three items are fudge-shaped in the sense the model-provenance discipline
 means: the damping knob, the alpha term, and -- less severely -- `eta`, which
@@ -277,7 +286,7 @@ fixes the edge, rather than rediscovering it.
 
 Found while characterising one of the solves the step-2 fallback could not
 rescue. The validation adapter defaulted to `strict=True`; production
-(`gui/backend/graph_builder.py`) builds `MPCEv2Element` with `strict=False`.
+(`gui/backend/graph_builder.py`) builds `MultiPortChamberElement` with `strict=False`.
 `strict=True` raises on any transient wrong-sign Newton iterate instead of
 steering it back through the soft barrier, **and** disables the post-solve
 direction verifier. Measured on the full scorecard:
@@ -399,7 +408,7 @@ physics**, not a solver artefact:
 - Bassett Fig 7c: K5 measured minimum -0.06 at q ~ 0.8 (straight fraction).
 
 `MPCEv2` uses Mynard's `K`, which carries this. The v1
-`MultiPortChamberElement` uses the gated impulse residual, which cannot. The
+`MultiPortChamberBase` uses the gated impulse residual, which cannot. The
 scored data agrees:
 
 | K5 (straight, separating) | v1 bias | v2 bias |
@@ -458,9 +467,9 @@ Consequences:
 
 | # | defect | evidence | fix | cost |
 |---|---|---|---|---|
-| 1 | ~~`N > 3` returns finite residuals with an all-zero `dKQ` block~~ | **fixed, step 2.** `MPCEv2Element.__init__` raises for N > 3 naming the Mynard 3-branch limit; ConstantKTee inherits it. The strict xfail is retired (the state is unconstructible); the closure-level precondition test stays | done |
-| 2 | ~~Residual-level silent physics switch: `mpce_v2_element.py` catches *any* exception from Mynard and returns a **lossless** continuity residual with an **empty** Jacobian `{}`~~ | **fixed, step 2.1.** Measured first: 0 hits across 2073 scorecard records + the full suite (the pre-check guard ahead of the call fired 145 times -- that is the legitimate degenerate path). All three wide `except`s (residual, FD loop, diagnostics) narrowed to `(IndexError, ValueError)`; residual and FD paths raise a named `RuntimeError` with the cause chained, diagnostics annotates `closure_error`. Falsified 8/9 against pre-fix; scorecard identical to the digit | done |
-| 3 | Hager and Idelchik unscored | sec 6 | extend `MPCEv2Network.evaluate_network` to `hager1984` (separating, `q -> 1 - q`) and `idelchik1966` (joining, `q` = Bassett's) | small; data + `q_transform` exist |
+| 1 | ~~`N > 3` returns finite residuals with an all-zero `dKQ` block~~ | **fixed, step 2.** `MultiPortChamberElement.__init__` raises for N > 3 naming the Mynard 3-branch limit; ConstantKTee inherits it. The strict xfail is retired (the state is unconstructible); the closure-level precondition test stays | done |
+| 2 | ~~Residual-level silent physics switch: `mpce_element.py` catches *any* exception from Mynard and returns a **lossless** continuity residual with an **empty** Jacobian `{}`~~ | **fixed, step 2.1.** Measured first: 0 hits across 2073 scorecard records + the full suite (the pre-check guard ahead of the call fired 145 times -- that is the legitimate degenerate path). All three wide `except`s (residual, FD loop, diagnostics) narrowed to `(IndexError, ValueError)`; residual and FD paths raise a named `RuntimeError` with the cause chained, diagnostics annotates `closure_error`. Falsified 8/9 against pre-fix; scorecard identical to the digit | done |
+| 3 | Hager and Idelchik unscored | sec 6 | extend `MPCENetwork.evaluate_network` to `hager1984` (separating, `q -> 1 - q`) and `idelchik1966` (joining, `q` = Bassett's) | small; data + `q_transform` exist |
 | 4 | `alpha = 0.2` calibrated pre-#212 | memory + `tmp/calibrate_etransfer_join.py` | re-run the calibration on current plumbing **after** #3 lands, so its validation is in-network; if it no longer earns its place, set the default to 0 | script exists |
 | 5 | `damping` 0.02 undocumented as a regulariser | Matlab comment | name it (`FLOW_RATIO_DAMPING = 0.02`) with the Matlab citation and the sentence "numerical regulariser, not physics" | trivial |
 | 6 | No compressibility, no stated limit | sec 3 | short-term: document `Ma < 0.2` on the element as `tee_junction.h` does; long-term: sec 8 step 5 | trivial now |
@@ -482,10 +491,10 @@ on: 9 before 11, and 8 before either.
 ## 7a. Step 2.1 note: the wide-except audit (2026-09-05)
 
 Every `except` in the junction model, adapters and Jacobian helper was
-listed. Only three were wide, all in `mpce_v2_element.py`, all around
+listed. Only three were wide, all in `mpce_element.py`, all around
 `junction_loss_coefficient`. `_network_builder.py`'s `except Exception` is
 the correct pattern -- it reports `converged=False` *with the message*.
-`_mpce_v2_jacobian.py:118` is narrow in type (`ZeroDivisionError`,
+`_mpce_jacobian.py:118` is narrow in type (`ZeroDivisionError`,
 `FloatingPointError`) but wide in effect (a zero Jacobian entry); it belongs
 with the degenerate-iterate work below.
 
@@ -783,7 +792,7 @@ explicitly set `soft_penalty_alpha` always wins, so the tuning knob the
 earlier sweeps used still works.
 
 The hand-off is restricted to elements that actually own a barrier rather than
-to every `MultiPortChamberElement`: the chamber base is shared with
+to every `MultiPortChamberBase`: the chamber base is shared with
 `EjectorElement` and `ConstantKTeeElement`, and reaching for every subclass is
 how the junction seed broke the GUI ejector in step 5a.
 
@@ -847,12 +856,12 @@ useless.
    header. (The v3 spec's alternative -- pseudodatum in `double`, analytic
    outer chain -- is equivalent and already written; pick one, do not mix.)
 3. `C_j` and `K` conversion: ~10 lines on `DualN`.
-4. Whole-element `(f, J)`: `mpce_v2_residuals_and_jacobian` seeded over
+4. Whole-element `(f, J)`: `mpce_residuals_and_jacobian` seeded over
    `(P_i, Pt_i, mdot_i)` per port plus `P_jct`, returning the `N+1` rows and
    the full Jacobian. Follow `ejector_element_residuals_and_jacobian`'s
    shape. The Python element becomes a relabelling shim, exactly as the
    ejector did.
-5. Delete `_mpce_v2_jacobian.py` and the FD fallback. The sympy derivation
+5. Delete `_mpce_jacobian.py` and the FD fallback. The sympy derivation
    stays as an offline cross-check of the canonical case (the ejector recipe),
    not as a runtime path.
 
@@ -885,7 +894,7 @@ verifier, then land the junction-aware seed. Doing the seed first would
 silently move 22 roots with nothing able to tell which branch is wanted.
 
 **Step 6 -- retire v1 as a solver element** (sec 5). Keep
-`MultiPortChamberElement` as the M -> 0 regression target; close the #272
+`MultiPortChamberBase` as the M -> 0 regression target; close the #272
 pressure-representation item as superseded.
 
 ## 8a. The port as it landed (2026-09-08)
@@ -934,7 +943,7 @@ root-exists 92.9% -> 93.7%.
    than junction physics, they changed twice during the work (7d, 7e), and the
    barrier's Jacobian is three lines. So "the Python element becomes a
    relabelling shim" is true of the physics and not of the policy.
-6. **`_mpce_v2_jacobian.py` was kept**, as step 4's own sentence allowed: the
+6. **`_mpce_jacobian.py` was kept**, as step 4's own sentence allowed: the
    sympy derivation survives as an offline cross-check
    (`test_mpce_v2_jacobian.py`), not a runtime path. The FD fallback is gone.
    `jacobian_method` is retired and documented as selecting nothing.
@@ -986,7 +995,7 @@ Taken (user, 2026-09-04):
 
    *Status 2026-09-08: first half DONE (sec 8a). The `C_j` move is still open
    and unscheduled. Note that it would lift the `n <= 3` limit natively, which
-   nothing currently needs -- `MPCEv2Element` refuses `N > 3` at construction
+   nothing currently needs -- `MultiPortChamberElement` refuses `N > 3` at construction
    and no shipped network asks for one -- so the case for it rests on matching
    the paper's residual set, not on capability.*
 2. **Tuned corrections** (`alpha`, `eta`, damping, and any future one) prove

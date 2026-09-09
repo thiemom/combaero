@@ -36,7 +36,7 @@ import math
 import pytest
 
 from validation.junction.models import bassett2001
-from validation.junction.models.mpce_v2_network import MPCEv2Network
+from validation.junction.models.mpce_network import MPCENetwork
 
 _GEOMS = [(1.0, 45), (1.0, 90), (1.0, 120), (2.0, 45), (3.0, 45), (3.333, 90)]
 
@@ -122,7 +122,7 @@ def test_model_reproduces_the_equal_area_identity(theta_deg):
     """
     theta = math.radians(theta_deg)
     slope = 0.5 - 2.0 * math.cos(0.75 * theta)
-    model = MPCEv2Network(strict=False)
+    model = MPCENetwork(strict=False)
 
     for q in (0.2, 0.5, 0.8):
         r = model.evaluate_network("bassett2001", "K6", q, 1.0, theta)

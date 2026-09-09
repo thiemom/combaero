@@ -15,7 +15,7 @@ from .components import (
     EnergyBoundary,
     LosslessConnectionElement,
     MassFlowBoundary,
-    MultiPortChamberElement,
+    MultiPortChamberBase,
     NetworkMixtureState,
     NetworkNode,
     OrificeElement,
@@ -233,16 +233,16 @@ class NetworkSolver:
             scales.extend([ref_p] * len(node_res))
 
             # Node mass conservation equation appended in _residuals_and_jacobian,
-            # unless the node is a junction port (then the MultiPortChamberElement's
+            # unless the node is a junction port (then the MultiPortChamberBase's
             # sum-mass residual covers conservation; mass row is skipped).
             if not getattr(node, "_is_junction_port", False):
                 scales.append(ref_mdot)
 
-        from .components import MultiPortChamberElement, TeeJunctionElement
+        from .components import MultiPortChamberBase, TeeJunctionElement
 
         _row_scale_kind_map = {"p": ref_p, "mdot": ref_mdot}
         for element in self.network.elements.values():
-            # MultiPortChamberElement's rows are a MIX of pressure- and
+            # MultiPortChamberBase's rows are a MIX of pressure- and
             # mass-flow-magnitude residuals, and which row is which depends
             # on the subclass's own physics (row_scale_kinds()). The base
             # class's own impulse rows, (P_i + rho_i u_i^2) - P_jct, are all
@@ -259,7 +259,7 @@ class NetworkSolver:
             # silently reintroduces the same class of stall, hence
             # row_scale_kinds() being a real per-subclass override point
             # rather than a hard-coded N-then-1 pattern.
-            if isinstance(element, MultiPortChamberElement):
+            if isinstance(element, MultiPortChamberBase):
                 scales.extend(_row_scale_kind_map[k] for k in element.row_scale_kinds())
                 continue
             elem_scale = (
@@ -564,7 +564,7 @@ class NetworkSolver:
         it, seed the m_dot unknown via a Bernoulli estimate
         ``m_dot = sign(dP) * A * sqrt(2 * rho_ref * |dP|)``.
 
-        For each ``MultiPortChamberElement`` (and subclasses), seed the
+        For each ``MultiPortChamberBase`` (and subclasses), seed the
         ``P_jct`` unknown from the propagated Pt at the junction's
         "common" port (the arm on the single-inlet side for a branch or
         the single-outlet side for a merge). The default
@@ -575,7 +575,7 @@ class NetworkSolver:
         Returns a dict mapping unknown name to seed value. Consumed by
         ``_build_x0`` via ``self._init_overrides``.
         """
-        from .components import MultiPortChamberElement
+        from .components import MultiPortChamberBase
 
         p_guess = self._propagate_pressure_guess(ref)
         if not p_guess:
@@ -605,7 +605,7 @@ class NetworkSolver:
                 area = math.pi * (float(diameter) / 2.0) ** 2
                 mdot_mag = area * math.sqrt(2.0 * rho_ref * abs(dp))
                 overrides[f"{elem_id}.m_dot"] = math.copysign(mdot_mag, dp)
-            elif isinstance(elem, MultiPortChamberElement):
+            elif isinstance(elem, MultiPortChamberBase):
                 inlets = list(getattr(elem, "inlet_nodes", []))
                 outlets = list(getattr(elem, "outlet_nodes", []))
                 if len(inlets) == 1:
@@ -708,7 +708,7 @@ class NetworkSolver:
         The weight is frozen for the solve rather than recomputed per
         iterate, so it stays a constant in the residual and the Jacobian is
         unchanged. A caller who sets ``soft_penalty_alpha`` explicitly keeps
-        it; see ``MPCEv2Element.effective_penalty_alpha``.
+        it; see ``MultiPortChamberElement.effective_penalty_alpha``.
         """
         # Only elements that actually own a soft barrier. The chamber base is
         # shared with EjectorElement and ConstantKTeeElement, and reaching for
@@ -716,14 +716,14 @@ class NetworkSolver:
         elements = [
             e
             for e in self.network.elements.values()
-            if isinstance(e, MultiPortChamberElement) and hasattr(e, "effective_penalty_alpha")
+            if isinstance(e, MultiPortChamberBase) and hasattr(e, "effective_penalty_alpha")
         ]
         if not elements:
             return
-        # Imported here, not at module scope: mpce_v2_element pulls in the
+        # Imported here, not at module scope: mpce_element pulls in the
         # sympy-derived Jacobian, and sympy is not installed in the minimal
         # build environments that only import combaero (Windows/MSVC CI).
-        from .mpce_v2_element import scaled_penalty_alpha
+        from .mpce_element import scaled_penalty_alpha
 
         ref = self._infer_reference_state()
         alpha = scaled_penalty_alpha(float(ref["P"]), float(ref["m_dot"]))
@@ -860,7 +860,7 @@ class NetworkSolver:
                             )
                         )
                     elif unk.endswith(".P_jct"):
-                        # MultiPortChamberElement: P_jct should be close to the
+                        # MultiPortChamberBase: P_jct should be close to the
                         # ambient port static pressure. Use the max boundary Pt
                         # as a stand-in (P_jct >= Pt at every port since the
                         # impulse equation gives P_jct = Pt + q with q >= 0).
@@ -872,13 +872,13 @@ class NetworkSolver:
         # Build name to index mapping
         self._name_to_index = {name: i for i, name in enumerate(self.unknown_names)}
 
-        # MultiPortChamberElement ports carry their throughflow on the outer
+        # MultiPortChamberBase ports carry their throughflow on the outer
         # connecting elements' m_dot unknowns. Stash the resolved global
         # indices on each junction so flow_at_node / flow_jac_at_node can
         # report real port flows during state propagation: collector-port
         # MCNs need them for the Pt = P + 0.5*rho*v^2 closure and for
         # mass-weighted mixing of merging streams.
-        from .components import MultiPortChamberElement as _MPCElem
+        from .components import MultiPortChamberBase as _MPCElem
 
         for element in self.network.elements.values():
             if isinstance(element, _MPCElem):
@@ -1557,7 +1557,7 @@ class NetworkSolver:
 
             # Mass Conservation: Sum(m_dot_in) - Sum(m_dot_out) = 0
             #
-            # Skip for port-MCNs of a MultiPortChamberElement: the junction's
+            # Skip for port-MCNs of a MultiPortChamberBase: the junction's
             # sum-mdot residual replaces the per-port mass row. Without this
             # skip the row degenerates to 0=0 (both the channel and the junction
             # report the same flow at the node with opposite signs, producing a
@@ -1608,7 +1608,7 @@ class NetworkSolver:
             res.append(m_dot_in - m_dot_out)
 
         # 2. Element Residuals
-        from .components import MultiPortChamberElement, TeeJunctionElement
+        from .components import MultiPortChamberBase, TeeJunctionElement
 
         for elem_id, element in self.network.elements.items():
             start_res_idx = len(res)
@@ -1625,7 +1625,7 @@ class NetworkSolver:
                     state_branch.m_dot = float(x[m_indices[1]])
                     state_straight.m_dot = float(x[m_indices[0]]) - float(x[m_indices[1]])
                 elem_res, elem_jac = element.residuals(state_com, state_straight, state_branch)
-            elif isinstance(element, MultiPortChamberElement):
+            elif isinstance(element, MultiPortChamberBase):
                 # N-port momentum-CV junction: one P_jct unknown plus N+1 residuals.
                 # Port mdots are sourced from each connecting element's m_dot
                 # unknown, sign-mapped to junction convention (positive = out).
@@ -1723,7 +1723,7 @@ class NetworkSolver:
 
         For cold solves (``x0=None``, ``init_strategy`` 'default' or
         'analytical_pt_prop') on COMPRESSIBLE networks containing a
-        ``MultiPortChamberElement``, a failed solve is automatically
+        ``MultiPortChamberBase``, a failed solve is automatically
         retried once from an outlet-referenced incompressible warm
         start (disable via ``auto_retry=False``): the network is
         re-solved in the incompressible regime with element densities
@@ -1753,7 +1753,7 @@ class NetworkSolver:
             auto_retry
             and x0 is None
             and init_strategy in ("default", "analytical_pt_prop")
-            and any(isinstance(e, MultiPortChamberElement) for e in self.network.elements.values())
+            and any(isinstance(e, MultiPortChamberBase) for e in self.network.elements.values())
             and bool(self._compressible_element_overrides())
         )
         if not retry_applicable:
@@ -1981,7 +1981,7 @@ class NetworkSolver:
                 parameter sweeps.
             init_strategy: Initialization strategy. ``default`` uses
                 direct x0 construction; for networks containing a
-                ``MultiPortChamberElement`` AND at least two
+                ``MultiPortChamberBase`` AND at least two
                 ``PressureBoundary`` nodes it auto-upgrades to
                 ``analytical_pt_prop`` (32/32 vs 28/32 certified-root
                 convergence on the 2026-07 inverse-design audit,
@@ -2077,7 +2077,7 @@ class NetworkSolver:
             and init_strategy == "default"
             and not getattr(self, "_in_warmstart_proxy", False)
         ):
-            from .components import MultiPortChamberElement as _MPCElem
+            from .components import MultiPortChamberBase as _MPCElem
 
             _n_pb = sum(isinstance(n, PressureBoundary) for n in self.network.nodes.values())
             if _n_pb >= 2 and any(isinstance(e, _MPCElem) for e in self.network.elements.values()):
@@ -2303,10 +2303,10 @@ class NetworkSolver:
         # Tee junctions couple two supplier stagnation pressures whose
         # common mode leaves hybr's Jacobian near-singular; LM's regularised
         # step resolves it, so route tee networks through the same fallback.
-        # Same near-singularity affects MultiPortChamberElement networks (the
+        # Same near-singularity affects MultiPortChamberBase networks (the
         # P_jct unknown couples N port-pressure rows that share a common-mode
         # direction at low-Mach).
-        from .components import MultiPortChamberElement as _MPCElem
+        from .components import MultiPortChamberBase as _MPCElem
         from .components import TeeJunctionElement as _TeeJE
 
         _has_tee = any(isinstance(e, _TeeJE) for e in self.network.elements.values())
@@ -2594,7 +2594,7 @@ class NetworkSolver:
 
         # Post-solve physical-consistency verification for junctions.
         # Two known ways a junction net converges (|F| ~ 1e-10) onto an
-        # unphysical exact root: (a) MPCEv2 strict=False soft-barrier
+        # unphysical exact root: (a) MultiPortChamberElement strict=False soft-barrier
         # mode, where the one-sided penalty alpha * mdot^2 on a slightly
         # reversed port cancels that row's Pt-continuity mismatch
         # (exposed by constant-K warm starts on the certified audit,
@@ -2727,7 +2727,7 @@ class NetworkSolver:
 
         # Element-specific diagnostics (e.g. throat Mach, P-ratio)
         from .components import (
-            MultiPortChamberElement as _MultiPortChamberElement,
+            MultiPortChamberBase as _MultiPortChamberBase,
         )
         from .components import (
             TeeJunctionElement as _TeeJunctionElement,
@@ -2748,7 +2748,7 @@ class NetworkSolver:
                         final_x[m_indices[1]]
                     )
                 diag = element.diagnostics(state_com, state_straight, state_branch)
-            elif isinstance(element, _MultiPortChamberElement):
+            elif isinstance(element, _MultiPortChamberBase):
                 nodes = self.network.nodes
                 port_states = [
                     self._get_node_state(nodes[pid], final_x) for pid in element.port_nodes

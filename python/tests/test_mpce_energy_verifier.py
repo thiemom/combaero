@@ -1,6 +1,6 @@
-"""MPCEv2's post-solve verifier must reject a junction that creates flow work.
+"""MultiPortChamberElement post-solve verifier must reject a junction that creates flow work.
 
-v1 (`MultiPortChamberElement`) has had an energy check since #229. v2 had only
+v1 (`MultiPortChamberBase`) has had an energy check since #229. v2 had only
 a flow-direction check, so a converged state where the junction manufactures
 total pressure was reported as a success (issue #271, defect 10).
 
@@ -44,13 +44,13 @@ collectors, but nothing in Eq 35-36 constrains the credit to equal the debit.
 from __future__ import annotations
 
 import combaero as cb
-from combaero.network.mpce_v2_element import MPCEv2Element
+from combaero.network.mpce_element import MultiPortChamberElement
 
 _Y = list(cb.mole_to_mass(cb.species.dry_air()))
 
 
-def _element(flow_direction: str = "branch") -> MPCEv2Element:
-    element = MPCEv2Element.__new__(MPCEv2Element)
+def _element(flow_direction: str = "branch") -> MultiPortChamberElement:
+    element = MultiPortChamberElement.__new__(MultiPortChamberElement)
     element.id = "jct"
     element.N = 3
     element.port_nodes = ["p0", "p1", "p2"]

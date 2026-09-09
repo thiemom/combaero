@@ -1,5 +1,5 @@
 """
-End-to-end test that ``MPCEv2Element.diagnostics`` emits K_straight,
+End-to-end test that ``MultiPortChamberElement.diagnostics`` emits K_straight,
 K_branch (separating) / K11, K12 (joining), and mass_flow_ratio so the
 GUI can display them and validation cross-checks can use them.
 
@@ -15,7 +15,7 @@ import math
 import numpy as np
 import pytest
 
-from validation.junction.models.mpce_v2_network import MPCEv2Network
+from validation.junction.models.mpce_network import MPCENetwork
 from validation.junction.models.mynard2010 import junction_loss_coefficient
 
 
@@ -46,7 +46,7 @@ def _mynard_K_direct(
 def test_separating_emits_K_straight_K_branch_and_matches_direct_mynard():
     """The K values the element emits must match a direct Mynard call at
     the same (q, psi, theta)."""
-    net = MPCEv2Network(joining_etransfer_alpha=0.0)  # alpha=0 for separating test
+    net = MPCENetwork(joining_etransfer_alpha=0.0)  # alpha=0 for separating test
     # imposed_q at theta=90, psi=1, q=0.3 — a sane separating operating point
     q, psi, theta_deg = 0.3, 1.0, 90.0
     r = net.evaluate_network(
@@ -83,9 +83,9 @@ def test_diagnostics_element_level_separating_emits_K_named_aliases():
     check the new fields are present + match direct Mynard call.
 
     This verifies the new emission path independently from solve_and_extract."""
-    from combaero.network.mpce_v2_element import MPCEv2Element
+    from combaero.network.mpce_element import MultiPortChamberElement
 
-    e = MPCEv2Element(
+    e = MultiPortChamberElement(
         id="jct",
         inlet_nodes=["port_com"],
         outlet_nodes=["port_str", "port_bra"],
@@ -125,9 +125,9 @@ def test_diagnostics_element_level_separating_emits_K_named_aliases():
 
 def test_diagnostics_element_level_joining_emits_K11_K12():
     """Same shape for joining: K11/K12 + mass_flow_ratio."""
-    from combaero.network.mpce_v2_element import MPCEv2Element
+    from combaero.network.mpce_element import MultiPortChamberElement
 
-    e = MPCEv2Element(
+    e = MultiPortChamberElement(
         id="jct",
         inlet_nodes=["port_str", "port_bra"],
         outlet_nodes=["port_com"],
@@ -161,9 +161,9 @@ def test_diagnostics_element_level_joining_emits_K11_K12():
 def test_diagnostics_without_port_mdots_returns_parent_fields_only():
     """Without port_mdots (legacy callers), diagnostics returns the parent
     class fields only — no K, no aliases. Ensures backward compatibility."""
-    from combaero.network.mpce_v2_element import MPCEv2Element
+    from combaero.network.mpce_element import MultiPortChamberElement
 
-    e = MPCEv2Element(
+    e = MultiPortChamberElement(
         id="jct",
         inlet_nodes=["port_com"],
         outlet_nodes=["port_str", "port_bra"],
@@ -184,7 +184,7 @@ def test_diagnostics_without_port_mdots_returns_parent_fields_only():
 def test_joining_emits_K11_K12_and_matches_direct_mynard():
     """Joining flow: K11 (str->com), K12 (bra->com) match direct Mynard
     + the alpha=0.2 correction."""
-    net = MPCEv2Network()  # default alpha=0.2
+    net = MPCENetwork()  # default alpha=0.2
     q, psi, theta_deg = 0.5, 1.0, 90.0
     r = net.evaluate_network(
         "bassett2001", "K12", q, psi, math.radians(theta_deg), topology="imposed_q"

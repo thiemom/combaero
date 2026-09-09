@@ -1,4 +1,4 @@
-"""The tuned constants in the MPCEv2 junction closure, and their switches.
+"""The tuned constants in the MultiPortChamberElement junction closure, and their switches.
 
 Under this repo's policy a tuned constant is labelled at its definition and
 must be switchable so it can be scored on and off against the validation
@@ -19,7 +19,7 @@ import pytest
 import combaero as cb
 from combaero.network import _mynard2010 as mynard
 from combaero.network.components import NetworkMixtureState
-from combaero.network.mpce_v2_element import MPCEv2Element
+from combaero.network.mpce_element import MultiPortChamberElement
 
 _Y = list(cb.mole_to_mass(cb.species.dry_air()))
 _A = np.array([0.01, 0.01, 0.01])
@@ -36,7 +36,7 @@ def test_tuned_constants_carry_their_documented_values():
     assert mynard.MYNARD_ETA_A0 == 0.8
     assert mynard.MYNARD_ETA_A1 == -0.2
     assert mynard.FLOW_RATIO_DAMPING == 0.02
-    assert MPCEv2Element.DEFAULT_JOINING_ETRANSFER_ALPHA == 0.2
+    assert MultiPortChamberElement.DEFAULT_JOINING_ETRANSFER_ALPHA == 0.2
 
 
 def test_eta_scale_default_is_off_and_one_restores_the_faithful_port():
@@ -86,8 +86,8 @@ def test_eta_off_matches_the_formula_with_a0_a1_zeroed():
     np.testing.assert_allclose(off.K, zeroed.K, rtol=1e-12)
 
 
-def _element(**kwargs) -> MPCEv2Element:
-    element = MPCEv2Element.__new__(MPCEv2Element)
+def _element(**kwargs) -> MultiPortChamberElement:
+    element = MultiPortChamberElement.__new__(MultiPortChamberElement)
     element.id = "jct"
     element.N = 3
     element.port_nodes = ["p0", "p1", "p2"]
@@ -122,7 +122,7 @@ def test_element_plumbs_eta_scale_into_its_residual():
 
 
 def test_element_constructor_accepts_and_defaults_eta_scale():
-    element = MPCEv2Element(
+    element = MultiPortChamberElement(
         id="jct",
         inlet_nodes=["a"],
         outlet_nodes=["b", "c"],
@@ -132,11 +132,11 @@ def test_element_constructor_accepts_and_defaults_eta_scale():
     )
     # 0.0 since 2026-09-05: with the dividing-streamline recovery restored,
     # Mynard's fitted transfer duplicates it on the continuing collector and
-    # makes the junction a net source. See MPCEv2Element.DEFAULT_ETA_SCALE.
+    # makes the junction a net source. See MultiPortChamberElement.DEFAULT_ETA_SCALE.
     assert element.eta_scale == 0.0
-    assert MPCEv2Element.DEFAULT_ETA_SCALE == 0.0
+    assert MultiPortChamberElement.DEFAULT_ETA_SCALE == 0.0
 
-    scaled = MPCEv2Element(
+    scaled = MultiPortChamberElement(
         id="jct",
         inlet_nodes=["a"],
         outlet_nodes=["b", "c"],

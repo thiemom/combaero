@@ -1,11 +1,11 @@
-"""Degenerate iterates in MPCEv2Element: what the solver is handed.
+"""Degenerate iterates in MultiPortChamberElement: what the solver is handed.
 
 Three faces of one question, measured on the scorecard before any of this was
 written (issue #271, step 2):
 
 * the pre-check fallback returned a lossless residual with an EMPTY Jacobian
   on 145 iterates from 26 solves -- and 0 of those 26 converged;
-* a port at exactly zero flow was excluded from MPCEv2's masks but classified
+* a port at exactly zero flow was excluded from MultiPortChamberElement masks but classified
   as a supplier by Mynard, so K came back mis-shaped and was silently zeroed
   -- 384 times per scorecard, a lossless junction at initialization;
 * a 4-port junction returned finite residuals with an all-zero loss Jacobian.
@@ -21,15 +21,15 @@ import numpy as np
 import pytest
 
 import combaero as cb
-from combaero.network import mpce_v2_element as v2
+from combaero.network import mpce_element as v2
 from combaero.network.components import NetworkMixtureState
-from combaero.network.mpce_v2_element import ConstantKTeeElement, MPCEv2Element
+from combaero.network.mpce_element import ConstantKTeeElement, MultiPortChamberElement
 
 _Y = list(cb.mole_to_mass(cb.species.dry_air()))
 
 
-def _element(flow_direction: str = "branch", strict: bool = False) -> MPCEv2Element:
-    element = MPCEv2Element.__new__(MPCEv2Element)
+def _element(flow_direction: str = "branch", strict: bool = False) -> MultiPortChamberElement:
+    element = MultiPortChamberElement.__new__(MultiPortChamberElement)
     element.id = "jct"
     element.N = 3
     element.port_nodes = ["p0", "p1", "p2"]
@@ -111,7 +111,7 @@ def _spy_outer_mdot(monkeypatch, element, states, pt_jct, mdots):
     (rho_i A_i), which is sign-equivalent to -port_sign_i * outer_i.
     """
     seen = {}
-    real = v2._core.mpce_v2_residuals_and_jacobian
+    real = v2._core.mpce_residuals_and_jacobian
 
     def spy(p_static, p_total, rho, drho_dp, outer_mdot, pt, geom):
         seen["U"] = np.array(
@@ -124,7 +124,7 @@ def _spy_outer_mdot(monkeypatch, element, states, pt_jct, mdots):
         )
         return real(p_static, p_total, rho, drho_dp, outer_mdot, pt, geom)
 
-    monkeypatch.setattr(v2._core, "mpce_v2_residuals_and_jacobian", spy)
+    monkeypatch.setattr(v2._core, "mpce_residuals_and_jacobian", spy)
     element.residuals(states, pt_jct, list(mdots))
     assert "U" in seen, "the kernel was never reached"
     return seen["U"]
@@ -133,7 +133,7 @@ def _spy_outer_mdot(monkeypatch, element, states, pt_jct, mdots):
 def test_exact_zero_outlet_is_classified_as_a_dead_collector(monkeypatch):
     """[-0.1, -0.0, 0.125]: the straight outlet at -0.0 (an initial guess).
 
-    Mynard's `Q < 0` puts -0.0 with the suppliers; MPCEv2 excluded it. The
+    Mynard's `Q < 0` puts -0.0 with the suppliers; MultiPortChamberElement excluded it. The
     closure must now be handed a tiny flow in the port's DECLARED direction,
     so it sees one supplier and two collectors.
     """
@@ -177,7 +177,7 @@ def _four_port(cls):
     )
 
 
-@pytest.mark.parametrize("cls", [MPCEv2Element, ConstantKTeeElement])
+@pytest.mark.parametrize("cls", [MultiPortChamberElement, ConstantKTeeElement])
 def test_four_port_junction_is_rejected_at_construction(cls):
     """Mynard's K conversion is defined for three branches only. A 4-port
     junction used to return finite residuals with an all-zero loss Jacobian,
@@ -187,7 +187,7 @@ def test_four_port_junction_is_rejected_at_construction(cls):
 
 
 def test_three_port_junction_is_still_accepted():
-    element = MPCEv2Element(
+    element = MultiPortChamberElement(
         id="jct",
         inlet_nodes=["a"],
         outlet_nodes=["b", "c"],

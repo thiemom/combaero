@@ -48,7 +48,7 @@ Falsification perturbs the implementation and asserts a test goes red. It
 catches a test that passes for the wrong reason — a tautology, a vacuous
 assertion, a fixture where every quantity is imposed. Its most useful outcome
 is the perturbation that does **not** go red: that names a behaviour nothing
-tests. Porting `MPCEv2Element` to C++, deleting the line that keeps the
+tests. Porting `MultiPortChamberElement` to C++, deleting the line that keeps the
 snapping out of the mass-conservation row changed no test result. The line was
 right and the gap was real, so the semantic got its own test.
 

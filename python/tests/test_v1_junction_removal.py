@@ -1,17 +1,17 @@
-"""`MultiPortChamberElement`'s own junction model is gone; its machinery is not.
+"""`MultiPortChamberBase`'s own junction model is gone; its machinery is not.
 
 Deprecated in 0.5.0, removed here. The retirement was decided on measurement:
 on the same Bassett separating cells the v1 model scored 0.5260 against
-`MPCEv2Element`'s 0.0564 and converged on 77 of 105 points against 94. It was
+`MultiPortChamberElement`'s 0.0564 and converged on 77 of 105 points against 94. It was
 also energetically inconsistent for joining flow and sign-symmetric, so it
 admitted mirror roots. Nothing in the package or the GUI instantiated it
 (issue #271).
 
 **Only the model went.** The class still owns the topology and port machinery
-that `MPCEv2Element` and `ConstantKTeeElement` inherit -- port ordering, the
+that `MultiPortChamberElement` and `ConstantKTeeElement` inherit -- port ordering, the
 inlet/outlet sign map, area and angle resolution, the connecting-element
 wiring checks -- and `diagnostics`, which reports the port map and computes no
-physics. `MPCEv2Element.diagnostics` calls that one through `super()`.
+physics. `MultiPortChamberElement.diagnostics` calls that one through `super()`.
 
 These tests exist because "remove the model" and "remove the class" are one
 careless step apart, and the second would take both shipped junction elements
@@ -26,9 +26,9 @@ import pytest
 
 from combaero.network.components import (
     BorderCarnotLossElement,
-    MultiPortChamberElement,
+    MultiPortChamberBase,
 )
-from combaero.network.mpce_v2_element import ConstantKTeeElement, MPCEv2Element
+from combaero.network.mpce_element import ConstantKTeeElement, MultiPortChamberElement
 
 # ---------------------------------------------------------------------------
 # The model is gone
@@ -37,8 +37,8 @@ from combaero.network.mpce_v2_element import ConstantKTeeElement, MPCEv2Element
 
 @pytest.mark.parametrize("method", ["residuals", "verify_solution_consistent"])
 def test_the_v1_model_methods_are_removed(method):
-    assert method not in MultiPortChamberElement.__dict__, (
-        f"{method} is back on MultiPortChamberElement; it was removed in 0.6.0"
+    assert method not in MultiPortChamberBase.__dict__, (
+        f"{method} is back on MultiPortChamberBase; it was removed in 0.6.0"
     )
 
 
@@ -47,7 +47,7 @@ def test_the_class_is_abstract_and_cannot_be_instantiated():
     to give a working junction, so this is the visible break for anyone who
     had one."""
     with pytest.raises(TypeError, match="abstract"):
-        MultiPortChamberElement(
+        MultiPortChamberBase(
             id="jct",
             inlet_nodes=["a"],
             outlet_nodes=["b", "c"],
@@ -73,7 +73,7 @@ def test_the_cpp_kernel_behind_it_is_gone_too():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("cls", [MPCEv2Element, ConstantKTeeElement])
+@pytest.mark.parametrize("cls", [MultiPortChamberElement, ConstantKTeeElement])
 def test_the_shipped_junctions_still_build_and_carry_the_inherited_machinery(cls):
     kwargs = {
         "id": "jct",
@@ -89,7 +89,7 @@ def test_the_shipped_junctions_still_build_and_carry_the_inherited_machinery(cls
         kwargs["K_ports"] = {1: 0.35, 2: 1.20}
     element = cls(**kwargs)
 
-    assert isinstance(element, MultiPortChamberElement)
+    assert isinstance(element, MultiPortChamberBase)
     assert element.N == 3
     assert list(element._port_signs) == [-1.0, 1.0, 1.0]
     assert list(element.port_nodes) == ["a", "b", "c"]
@@ -97,10 +97,10 @@ def test_the_shipped_junctions_still_build_and_carry_the_inherited_machinery(cls
 
 def test_diagnostics_survived_as_machinery():
     """It reports the port map and computes no physics, so it belongs with the
-    machinery rather than the model -- and `MPCEv2Element` reaches it through
+    machinery rather than the model -- and `MultiPortChamberElement` reaches it through
     `super()`, so removing it breaks the element that replaced v1."""
-    assert "diagnostics" in MultiPortChamberElement.__dict__
-    assert "super()" in inspect.getsource(MPCEv2Element.diagnostics)
+    assert "diagnostics" in MultiPortChamberBase.__dict__
+    assert "super()" in inspect.getsource(MultiPortChamberElement.diagnostics)
 
 
 def test_the_border_carnot_loss_element_is_untouched():

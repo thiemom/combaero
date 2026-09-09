@@ -19,7 +19,7 @@ from combaero.network import (
     ThermalWall,
     WallLayer,
 )
-from combaero.network.mpce_v2_element import MPCEv2Element
+from combaero.network.mpce_element import MultiPortChamberElement
 
 
 def test_compressible_orifice_network():
@@ -570,7 +570,7 @@ def _mpce_tee_network(
             )
         )
         net.add_element(
-            MPCEv2Element(
+            MultiPortChamberElement(
                 id="jct",
                 inlet_nodes=["mc_com"],
                 outlet_nodes=["mc_str", "mc_bra"],
@@ -614,7 +614,7 @@ def _mpce_tee_network(
             )
         )
         net.add_element(
-            MPCEv2Element(
+            MultiPortChamberElement(
                 id="jct",
                 inlet_nodes=["mc_str", "mc_bra"],
                 outlet_nodes=["mc_com"],
@@ -658,7 +658,7 @@ def test_analytical_pt_prop_rescues_cold_stuck_case():
     assert sol["__success__"], f"analytical_pt_prop failed: {sol.get('__message__')}"
     assert sol["__final_norm__"] < 1e-3
     # Mass conservation at the merge junction (sum of port flows into the
-    # chamber = 0, per sign convention of MultiPortChamberElement).
+    # chamber = 0, per sign convention of MultiPortChamberBase).
     m_str, m_bra, m_out = sol["ch_str.m_dot"], sol["ch_bra.m_dot"], sol["ch_out.m_dot"]
     # Either supply -> outlet or reverse; either root is valid without a
     # flow_direction constraint. Just require mass balance.
@@ -699,7 +699,7 @@ def _mpce_mfb_merge_network(theta_deg: float = 45.0) -> FlowNetwork:
         )
     )
     net.add_element(
-        MPCEv2Element(
+        MultiPortChamberElement(
             id="jct",
             inlet_nodes=["mc_str", "mc_bra"],
             outlet_nodes=["mc_com"],
@@ -717,7 +717,7 @@ def test_mpce_collector_port_carries_dynamic_head():
     """Collector-port MCNs must see their real face flow in the
     Pt = P + 0.5*rho*v^2 closure.
 
-    Before the throughflow fix, MultiPortChamberElement.flow_at_node
+    Before the throughflow fix, MultiPortChamberBase.flow_at_node
     returned 0, so any port fed by the junction had _total_m_dot = 0 and
     its closure silently degenerated to Pt = P -- the outflow dynamic head
     (tens of kPa at these conditions) vanished from the bookkeeping.
@@ -764,7 +764,7 @@ def test_mpce_collector_port_mcn_inherits_area():
 
     Nodes resolve before elements, and a collector port has no upstream
     channel to inherit Dh from, so MomentumChamberNode.resolve_topology
-    leaves it at the 0.1 m^2 fallback; MultiPortChamberElement.resolve_
+    leaves it at the 0.1 m^2 fallback; MultiPortChamberBase.resolve_
     topology must then push the inferred port area onto it, otherwise the
     Pt closure sees a near-zero face velocity.
     """
@@ -792,7 +792,7 @@ def test_mpce_collector_port_mcn_inherits_area():
         )
     )
     net.add_element(
-        MPCEv2Element(
+        MultiPortChamberElement(
             id="jct",
             inlet_nodes=["mc_com"],
             outlet_nodes=["mc_str", "mc_bra"],
@@ -977,7 +977,7 @@ def _certified_merge_case1_network() -> FlowNetwork:
     slightly reversed (-0.0035 kg/s), where the one-sided penalty
     cancels the Pt-continuity mismatch.
     """
-    from combaero.network.mpce_v2_element import MPCEv2Element
+    from combaero.network.mpce_element import MultiPortChamberElement
 
     D_com = 0.08
     A_com = math.pi * (D_com / 2.0) ** 2
@@ -1035,7 +1035,7 @@ def _certified_merge_case1_network() -> FlowNetwork:
         )
     )
     net.add_element(
-        MPCEv2Element(
+        MultiPortChamberElement(
             id="jct",
             inlet_nodes=["mc_str", "mc_bra"],
             outlet_nodes=["mc_com"],
@@ -1102,13 +1102,13 @@ def _mfb_branch_tee_orifice_network(m_dot: float, regime: str) -> FlowNetwork:
     """Practical flow -> tee -> pressure topology (GUI parity fixture).
 
     Mirrors gui/tmp/one_mpce_tee_mdot_to_p.json: a mass-flow inlet feeds a
-    separating MPCEv2 tee whose two legs each end in an orifice discharging
+    separating MultiPortChamberElement tee whose two legs each end in an orifice discharging
     to a single ambient PressureBoundary. The orifices provide the leg
     resistance that makes the fixture family feasible (bare equal-Pt sinks
     with resistance-free constant-area legs have no root for any physical
     tee closure -- see the 2026-07-04 case-31 analysis).
     """
-    from combaero.network.mpce_v2_element import MPCEv2Element
+    from combaero.network.mpce_element import MultiPortChamberElement
 
     D_main, D_leg = 0.1, 0.06
     A_main = math.pi * (D_main / 2.0) ** 2
@@ -1153,7 +1153,7 @@ def _mfb_branch_tee_orifice_network(m_dot: float, regime: str) -> FlowNetwork:
         )
     )
     net.add_element(
-        MPCEv2Element(
+        MultiPortChamberElement(
             id="tee",
             inlet_nodes=["mc_com"],
             outlet_nodes=["mc_str", "mc_bra"],

@@ -2,7 +2,7 @@
 Mynard & Valen-Sendstad 2010 Unified0D junction-loss model.
 
 The canonical implementation lives in `combaero.network._mynard2010` --
-`MPCEv2Element`/`ConstantKTeeElement` depend on it at runtime, so it must
+`MultiPortChamberElement`/`ConstantKTeeElement` depend on it at runtime, so it must
 ship inside the `combaero` wheel rather than this dev-only `validation/`
 tree (see CHANGELOG: PyPI install of combaero-gui 0.4.0 hit
 `ModuleNotFoundError: No module named 'validation'` before this move).

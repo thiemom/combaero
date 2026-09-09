@@ -33,7 +33,7 @@
 using combaero::solver::kMpcePorts;
 using combaero::solver::kMpceRows;
 using combaero::solver::kMpceSeeds;
-using combaero::solver::mpce_v2_residuals_and_jacobian;
+using combaero::solver::mpce_residuals_and_jacobian;
 using combaero::solver::MpceGeometry;
 using combaero::validation::junction::kMpceCases;
 using combaero::validation::junction::MpceCase;
@@ -47,7 +47,7 @@ combaero::solver::MpceResidualJacobian Evaluate(const MpceCase& c) {
   geom.port_sign = c.port_sign;
   geom.joining_etransfer_alpha = c.joining_etransfer_alpha;
   geom.eta_scale = c.eta_scale;
-  return mpce_v2_residuals_and_jacobian(c.p_static, c.p_total, c.rho, c.drho_dp,
+  return mpce_residuals_and_jacobian(c.p_static, c.p_total, c.rho, c.drho_dp,
                                         c.outer_mdot, c.pt_jct, geom);
 }
 
@@ -192,9 +192,9 @@ TEST(MpceJunction, AllInflowOrAllOutflowIsRefusedNotGuessed) {
   std::array<double, kMpcePorts> all_out{-1.0, 1.0, 1.0};
   std::array<double, kMpcePorts> all_in{1.0, -1.0, -1.0};
   EXPECT_FALSE(
-      mpce_v2_residuals_and_jacobian(p, pt, rho, drho, all_out, 2.05e5, geom).valid);
+      mpce_residuals_and_jacobian(p, pt, rho, drho, all_out, 2.05e5, geom).valid);
   EXPECT_FALSE(
-      mpce_v2_residuals_and_jacobian(p, pt, rho, drho, all_in, 2.05e5, geom).valid);
+      mpce_residuals_and_jacobian(p, pt, rho, drho, all_in, 2.05e5, geom).valid);
 }
 
 TEST(MpceJunction, APortInsideTheDeadBandLeavesTheAnglesAlone) {
@@ -223,8 +223,8 @@ TEST(MpceJunction, APortInsideTheDeadBandLeavesTheAnglesAlone) {
 
   std::array<double, kMpcePorts> in_band{0.9, 0.9, 1.0e-12};
   std::array<double, kMpcePorts> outside{0.9, 0.9, 1.0e-3};
-  auto banded = mpce_v2_residuals_and_jacobian(p, pt, rho, drho, in_band, 2.05e5, geom);
-  auto fired = mpce_v2_residuals_and_jacobian(p, pt, rho, drho, outside, 2.05e5, geom);
+  auto banded = mpce_residuals_and_jacobian(p, pt, rho, drho, in_band, 2.05e5, geom);
+  auto fired = mpce_residuals_and_jacobian(p, pt, rho, drho, outside, 2.05e5, geom);
 
   ASSERT_TRUE(banded.valid);
   ASSERT_TRUE(fired.valid);

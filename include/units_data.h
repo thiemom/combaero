@@ -332,7 +332,7 @@ inline constexpr Entry function_units[] = {
     // -------------------------------------------------------------------------
     // mpce_junction.h - Momentum-CV junction, whole-element (f, J)
     // -------------------------------------------------------------------------
-    {"mpce_v2_residuals_and_jacobian",
+    {"mpce_residuals_and_jacobian",
      "p_static: list[Pa], p_total: list[Pa], rho: list[kg/m^3], "
      "drho_dp: list[kg/(m^3*Pa)], outer_mdot: list[kg/s] (the CONNECTING "
      "element's flow; geom.port_sign maps it to junction convention), "

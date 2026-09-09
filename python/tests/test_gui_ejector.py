@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from combaero.network.components import MultiPortChamberElement
+from combaero.network.components import MultiPortChamberBase
 from combaero.network.ejector_element import EjectorElement
 from gui.backend.graph_builder import build_network_from_schema
 from gui.backend.runner import NetworkRunner
@@ -94,7 +94,7 @@ def test_ejector_dispatch_builds_element_with_correct_ports():
     net = build_network_from_schema(_three_plenum_ejector_schema())
     e = net.elements["ej1"]
     assert isinstance(e, EjectorElement)
-    assert isinstance(e, MultiPortChamberElement)
+    assert isinstance(e, MultiPortChamberBase)
     assert e.primary_node == "p_pri"
     assert e.secondary_node == "p_sec"
     assert e.outlet_node == "p_out"
