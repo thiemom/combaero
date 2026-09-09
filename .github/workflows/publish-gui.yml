@@ -105,9 +105,19 @@ jobs:
           # instead of failing.
           GUI_WHEEL=$(ls dist/combaero_gui-*.whl)
           VERSION=$(basename "$GUI_WHEEL" | cut -d- -f2)
+          #
+          # Ask for the JSON representation, because that is the one uv reads.
+          # pypi.org/simple/<pkg>/ serves two variants of the same URL --
+          # text/html and application/vnd.pypi.simple.v1+json -- and they are
+          # cached separately. On the v0.6.0 release the HTML variant listed
+          # 0.6.0 while uv, resolving against the JSON variant one second
+          # later, still saw only <=0.5.0 and failed with "No solution found".
+          # Waiting on the wrong representation is waiting on nothing.
           echo "Waiting for combaero==$VERSION on the PyPI simple index..."
           for i in $(seq 1 40); do
-            if curl -fsS "https://pypi.org/simple/combaero/" 2>/dev/null | grep -q "combaero-$VERSION"; then
+            if curl -fsS -H "Accept: application/vnd.pypi.simple.v1+json" \
+                 "https://pypi.org/simple/combaero/" 2>/dev/null \
+               | grep -q "\"$VERSION\""; then
               echo "Found combaero==$VERSION on PyPI after $((i - 1)) retries."
               exit 0
             fi
@@ -119,8 +129,11 @@ jobs:
       - name: Install wheel and smoke-test server
         run: |
           uv venv .test-venv
-          # install wheel (combaero is a dependency, pulled from PyPI)
-          uv pip install --python .test-venv dist/combaero_gui-*.whl
+          # install wheel (combaero is a dependency, pulled from PyPI).
+          # --refresh-package: belt and braces against uv reusing a cached
+          # index listing that predates the combaero release we just waited for.
+          uv pip install --python .test-venv --refresh-package combaero \
+            dist/combaero_gui-*.whl
           .test-venv/bin/combaero-gui &
           SERVER_PID=$!
           # poll instead of a fixed sleep -- a fixed 4s sleep flaked on the
