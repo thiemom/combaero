@@ -5914,6 +5914,10 @@ PYBIND11_MODULE(_core, m) {
                     "Jacobian: dh/dT [W/(m^2*K^2)]")
       .def_readonly("ddP_dmdot", &ChannelResult::ddP_dmdot,
                     "Jacobian: d(dP)/dmdot [Pa*s/kg]")
+      .def_readonly("ddP_dvelocity", &ChannelResult::ddP_dvelocity,
+                    "Jacobian: d(dP)/d(velocity) [Pa*s/m]. Chain from this, not "
+                    "ddP_dmdot, when converting to a caller's own mass flow: "
+                    "ddP_dmdot uses the correlation's internal flow area.")
       .def_readonly("ddP_dT", &ChannelResult::ddP_dT,
                     "Jacobian: d(dP)/dT [Pa/K]")
       .def_readonly("dT_aw_dmdot", &ChannelResult::dT_aw_dmdot,

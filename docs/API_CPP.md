@@ -476,6 +476,8 @@ struct ChannelResult {
     double dh_dmdot;       // dh/dmdot [W/(m²·K·kg/s)]
     double dh_dT;          // dh/dT [W/(m²·K²)]
     double ddP_dmdot;      // d(dP)/dmdot [Pa·s/kg]
+    double ddP_dvelocity;  // d(dP)/d(velocity) [Pa·s/m] - chain from this, not
+                           // ddP_dmdot, which uses the correlation's own flow area
     double ddP_dT;         // d(dP)/dT [Pa/K]
     double dT_aw_dmdot;    // dT_aw/dmdot [K·s/kg]
     double dT_aw_dT;       // dT_aw/dT [-] (approx 1 at low Mach)

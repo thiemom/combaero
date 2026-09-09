@@ -249,14 +249,7 @@ class ConvectiveSurface:
             rho, _ = _safe_rho(cb.density(T, P, X))
             mdot_total = rho * velocity * (math.pi / 4 * diameter**2)
 
-            x = self.model.x_D * self.model.d_jet
-            y = self.model.y_D * self.model.d_jet
-            A_per_jet = x * y
-            if A_per_jet > 0 and self.model.A_target > 0:
-                N_jets = self.model.A_target / A_per_jet
-                mdot_jet = mdot_total / max(1.0, N_jets)
-            else:
-                mdot_jet = mdot_total  # fallback
+            mdot_jet = mdot_total / self._jet_split()
 
             result = cb.channel_impingement(
                 T,
@@ -277,6 +270,34 @@ class ConvectiveSurface:
             raise TypeError(f"Unknown channel model type: {type(self.model)}")
 
         return result
+
+    def _jet_split(self) -> float:
+        """Jets sharing the element mass flow (>= 1). Impingement only."""
+        x = self.model.x_D * self.model.d_jet
+        y = self.model.y_D * self.model.d_jet
+        A_per_jet = x * y
+        if A_per_jet > 0 and self.model.A_target > 0:
+            return max(1.0, self.model.A_target / A_per_jet)
+        return 1.0
+
+    def ddP_dmdot_element(self, result, rho: float, area: float) -> float:
+        """Chain the correlation dP sensitivity onto the ELEMENT mass flow.
+
+        Each correlation is driven by a different quantity -- the pin-fin
+        routine by channel velocity, the impingement routine by per-jet mass
+        flow -- so the conversion lives beside the code that built those
+        inputs. ``ChannelResult.ddP_dmdot`` is never the element's: it is
+        taken w.r.t. the correlation's own internal flow area.
+        """
+        if isinstance(self.model, PinFinModel):
+            if rho <= 0.0 or area <= 0.0:
+                return 0.0
+            return result.ddP_dvelocity / (rho * area)
+        if isinstance(self.model, ImpingementModel):
+            # The surface builds mdot_total from the element's own area, so
+            # mdot_total is the element mass flow and only the split remains.
+            return result.ddP_dmdot / self._jet_split()
+        return 0.0
 
 
 # ============================================================================
@@ -2454,6 +2475,8 @@ class ChannelElement(NetworkElement):
         m_dot = state_in.m_dot
 
         f_mult = self.surface.f_multiplier if self.surface else 1.0
+        # Set by the pin-fin / impingement branch below, which returns early.
+        array_result = None
 
         if self.surface and not isinstance(self.surface.model, SmoothModel):
             cs = cb.complete_state(state_in.T, state_in.Pt, state_in.X)
@@ -2483,14 +2506,50 @@ class ChannelElement(NetworkElement):
                         Re, self.surface.model.d_Dh, self.surface.model.h_d
                     )
                 elif isinstance(self.surface.model, (PinFinModel, ImpingementModel)):
-                    # Explicit geometry drop from localized array physics
-                    h_res = self.htc_and_T(state_in)
-                    if h_res is not None:
-                        dP_target = h_res.dP
-                        dynamic_head = 0.5 * rho * v**2
-                        if dynamic_head > 0:
-                            f_total = dP_target / ((self.length / dh) * dynamic_head)
-                            f_mult *= f_total / f_base
+                    # Localized arrays own their drop outright: the pin-array
+                    # and jet correlations return dP directly, so the element
+                    # takes it rather than converting it into a multiplier on
+                    # pipe friction. The former route divided by a locally
+                    # restated f_base and let the C++ friction factor multiply
+                    # it back in, which cancels exactly only when both pick the
+                    # same correlation. With friction_model="petukhov" the
+                    # round-trip moved the drop by -24.7%.
+                    array_result = self.htc_and_T(state_in)
+
+        if array_result is not None:
+            # dP is the correlation's own, so its analytic derivatives are the
+            # element's. Chain through VELOCITY, not ddP_dmdot: that field is
+            # taken w.r.t. the mass flow through the array's internal minimum
+            # section, which for a 25 mm channel over a 3 mm pin array differs
+            # from the element's by 45x (see ChannelResult in heat_transfer.h).
+            f_surf = self.surface.f_multiplier if self.surface else 1.0
+            rho_ref, _ = _safe_rho(state_in.density())
+            area = self.area if self.area else 0.0
+            d_dP_d_mdot = f_surf * self.surface.ddP_dmdot_element(array_result, rho_ref, area)
+            # Friction opposes the flow, so the drop follows the sign of m_dot
+            # while its magnitude depends on |m_dot| -- which leaves the
+            # derivative sign-independent.
+            dP_array = math.copysign(f_surf * array_result.dP, m_dot)
+            d_dP_dT = math.copysign(f_surf * array_result.ddP_dT, m_dot)
+
+            res = [state_in.Pt - state_out.Pt - dP_array]
+            jac = {
+                0: {
+                    f"{self.id}.m_dot": -d_dP_d_mdot,
+                    f"{self.from_node}.Pt": 1.0,
+                    f"{self.from_node}.T": -d_dP_dT,
+                    f"{self.to_node}.Pt": -1.0,
+                }
+            }
+            # Known gap: the array correlations expose no dP sensitivity to
+            # static pressure or composition, so those columns are absent
+            # rather than approximated from a pipe-friction stand-in.
+            #
+            # This path is taken in both regimes. The array correlations are
+            # incompressible by construction, and layering Fanno friction on
+            # top of a drop the array already owns was never meaningful, so
+            # regime="compressible" gets the same array drop.
+            return res, jac
 
         if self.regime == "compressible":
             # Use compressible Fanno flow with friction
