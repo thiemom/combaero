@@ -1,0 +1,51 @@
+---
+name: write-pr
+description: Use when writing or editing a pull request title or body.
+---
+
+### Title Rules
+- Conventional Commits, under 72 chars, scope in parens. The type list is open:
+  `feat`, `fix`, `refactor`, `perf`, `chore`, `docs`, `test`, `ci`, plus the
+  API-lifecycle pair this repo uses -- `remove(junction):`, `rename(junction):`.
+
+### Tone & General Rules
+- Be direct and high-signal. No conversational fluff, boilerplate templates, or
+  statements like "All tests pass".
+- Write for the final squash commit -- ignore WIP commits and review
+  iterations. Branch protection means the PR body IS the permanent record.
+- Size the body to blast radius, not to commit type. A one-line `docs:` change
+  to the release process earns more explanation than a large `feat:` nothing
+  depends on yet. Anything touching release, publish, or packaging machinery is
+  never "just a chore".
+- End with the required attribution footer.
+
+### Standard PR Body Structure
+1. **Summary:** 1-3 bullet points on *what* changed and *why*.
+2. **Context & decisions:** edge cases, non-obvious implementation details, and
+   dead ends worth not repeating.
+3. **Not changed:** what you deliberately left alone, and why -- a tag not
+   moved, a name not renamed, a deprecation kept. Omit when there is nothing.
+4. **Artifacts (include only when relevant):**
+   - **Measurement / evidence:** the numbers that justify the change --
+     validation scorecard, MAE, analytic-vs-FD agreement, a falsification
+     result, coverage instantiation counts. A physics, solver or correlation
+     change without one is unfinished; see the `model-provenance` skill.
+   - **Architecture / flow:** minimal Mermaid diagram for new state machines or
+     inter-service flows.
+   - **UI / visual:** table with `Before` and `After` screenshot columns.
+   - **Performance:** table comparing target-branch baseline against this branch.
+   - **API / contract:** short snippet showing breaking changes or public
+     signature updates.
+
+### What not to claim
+- State what you measured. State separately what you did NOT verify, and why.
+  An untested path named in the PR is cheap; one discovered during a release is
+  not.
+- A negative result, reported, is a good outcome. Never widen a tolerance, drop
+  a case, or tune against the score to make a PR look clean.
+
+### High-Risk / Architecture Changes (Exception)
+Expand into an RFC-style write-up -- problem statement, alternatives considered,
+failure modes, rollout and rollback -- when the change removes or renames public
+API, alters a physics closure or a residual form, changes release or packaging
+behaviour, or carries high regression risk.
