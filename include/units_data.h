@@ -731,6 +731,7 @@ inline constexpr Entry function_units[] = {
     {"ChannelResult::dh_dmdot", "-", "W/(m^2*K*kg/s)"},
     {"ChannelResult::dh_dT", "-", "W/(m^2*K^2)"},
     {"ChannelResult::ddP_dmdot", "-", "Pa*s/kg"},
+    {"ChannelResult::ddP_dvelocity", "-", "Pa*s/m"},
     {"ChannelResult::ddP_dT", "-", "Pa/K"},
     {"ChannelResult::dT_aw_dmdot", "-", "K*s/kg"},
     {"ChannelResult::dT_aw_dT", "-", "- (dimensionless)"},

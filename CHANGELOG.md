@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`ChannelElement`'s Jacobian was wrong for pin-fin and impingement
+  surfaces.** Those surfaces vary their friction multiplier with mass flow,
+  but the multiplier was handed to the C++ friction routine frozen, so the
+  element reported `d(dP)/d(mdot)` short by **10.5%** and `d(dP)/dT` short by
+  **13.1%** against central differences. Both now agree to 1e-10. Ribbed and
+  dimpled were exact throughout -- their multipliers carry no Reynolds
+  dependence, which is what localised the fault. Newton convergence on
+  networks using either surface should improve; the converged solution for the
+  default `friction_model="haaland"` is unchanged.
+
+### Changed
+- **A localised array's pressure drop is now the correlation's own.** The
+  pin-fin and impingement correlations return `dP` directly, and
+  `ChannelElement` takes it instead of converting it into a multiplier on pipe
+  friction. The former route divided by a friction factor restated in Python
+  and let the C++ one multiply it back in, which cancels only when both pick
+  the same correlation. The Python side always used Haaland (rough) or
+  Petukhov (smooth) regardless of the element's `friction_model`, so the drop
+  moved by **+0.48%** for `colebrook`/`serghides` and **-24.7%** for
+  `petukhov`. For the default `haaland` the drop is unchanged bit for bit.
+
+  A channel carrying one of these surfaces now takes the array drop in both
+  regimes. The array correlations are incompressible by construction, so
+  `regime="compressible"` no longer layers Fanno friction on top of a drop the
+  array already owns.
+
+### Added
+- **`ChannelResult.ddP_dvelocity`** [Pa*s/m], for chaining a channel
+  correlation's pressure sensitivity onto a caller's own mass flow.
+  `ddP_dmdot` is taken w.r.t. the mass flow through the correlation's internal
+  flow area -- the pin-array minimum section, the jet holes -- so chaining it
+  directly is wrong by the area ratio, **45x** for a 25 mm channel over a 3 mm
+  pin array. The impingement routine is driven by per-jet mass flow rather
+  than a velocity and so leaves the new field unset; `ConvectiveSurface`
+  carries the split that converts it.
+
+
 ## [0.6.0] - 2026-09-09
 
 ### Changed

@@ -1005,6 +1005,8 @@ channel_smooth(double T, double P, const std::vector<double> &X,
     double dP_factor = (length / diameter) / (2.0 * rho * A_cross * A_cross);
     result.ddP_dmdot = df_dRe * dRe_dmdot * dP_factor * mdot * mdot
                      + f * (length / diameter) * mdot / (rho * A_cross * A_cross);
+    // mdot = rho * velocity * A_cross at fixed rho, so d(mdot)/d(velocity) = rho * A_cross
+    result.ddP_dvelocity = result.ddP_dmdot * rho * A_cross;
 
     // d(dP)/dT: includes df/dT and drho/dT terms
     // dP = f * (L/D) * mdot^2 / (2*rho*A^2), so d(dP)/dT has df/dT and d(1/rho)/dT = -drho/dT/rho^2
@@ -1082,6 +1084,7 @@ ChannelResult channel_ribbed(double T, double P, const std::vector<double> &X,
   result.dh_dmdot = enh * base.dh_dmdot;
   result.dh_dT = enh * base.dh_dT;
   result.ddP_dmdot = fmul * base.ddP_dmdot;
+  result.ddP_dvelocity = fmul * base.ddP_dvelocity;
   result.ddP_dT = fmul * base.ddP_dT;
   result.dT_aw_dmdot = base.dT_aw_dmdot;
   result.dT_aw_dT = base.dT_aw_dT;
@@ -1138,6 +1141,7 @@ ChannelResult channel_dimpled(double T, double P, const std::vector<double> &X,
     result.dh_dmdot = enh * base.dh_dmdot + base.h * denh_dRe * dRe_dmdot;
     result.dh_dT = enh * base.dh_dT + base.h * denh_dRe * dRe_dT;
     result.ddP_dmdot = fmul * base.ddP_dmdot; // fmul is Re-independent in this model
+  result.ddP_dvelocity = fmul * base.ddP_dvelocity;
     result.ddP_dT = fmul * base.ddP_dT;
     result.dT_aw_dmdot = base.dT_aw_dmdot;
     result.dT_aw_dT = base.dT_aw_dT;
@@ -1250,6 +1254,9 @@ ChannelResult channel_pin_fin(double T, double P, const std::vector<double> &X,
     result.ddP_dmdot = static_cast<double>(N_rows) *
                        (df_dRe * dRe_dmdot * rho * v_max * v_max / 2.0 +
                         f_pin * v_max_factor * v_max_factor * mdot / (rho * A_cross * A_cross));
+    // A_cross here is the pin-array minimum section, not the caller's channel
+    // area, which is why ddP_dmdot cannot be chained by a caller directly.
+    result.ddP_dvelocity = result.ddP_dmdot * rho * A_cross;
 
     // ddP/dT: includes df/dT and drho/dT terms
     // dP = N * f * mdot^2 / (2 * rho * A_min^2)
@@ -1368,6 +1375,9 @@ ChannelResult channel_impingement(double T, double P,
 
     // ddP/dmdot: dP = f * rho * (mdot/(rho*A_jet))^2 / 2 = f * mdot^2 / (2*rho*A_jet^2)
     result.ddP_dmdot = f * mdot_jet / (std::max(rho, 1e-6) * A_jet * A_jet);
+    // ddP_dvelocity is deliberately left unset here: this routine is driven
+    // by per-jet mass flow, not by a velocity, so no such derivative exists.
+    // A caller chains ddP_dmdot through its own mdot_jet split instead.
     // Fix: remove spurious /rho in ddP/dT
     result.ddP_dT = -f * v_jet * v_jet / 2.0 * drho_dT;
 

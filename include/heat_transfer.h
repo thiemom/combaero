@@ -542,6 +542,14 @@ struct ChannelResult {
   double dh_dmdot = 0.0;     // ∂h/∂ṁ  [W/(m²·K·kg/s)]
   double dh_dT = 0.0;        // ∂h/∂T  [W/(m²·K²)]
   double ddP_dmdot = 0.0;    // ∂(dP)/∂ṁ [Pa·s/kg]
+  // d(dP)/d(velocity) [Pa*s/m]. Prefer this over ddP_dmdot when chaining
+  // from a caller's own mass flow: ddP_dmdot is taken w.r.t. the mass flow
+  // through THIS correlation's internal flow area (the pin-array minimum
+  // section, the jet holes), which is not the caller's element area. A
+  // caller that chains ddP_dmdot directly is wrong by the area ratio --
+  // 45x for a 25 mm channel over a 3 mm pin array. Velocity is the
+  // quantity the caller actually passes in, so it needs no such factor.
+  double ddP_dvelocity = 0.0;
   double ddP_dT = 0.0;       // ∂(dP)/∂T [Pa/K]
   double dT_aw_dmdot = 0.0;  // ∂T_aw/∂ṁ [K·s/kg]
   double dT_aw_dT = 0.0;     // ∂T_aw/∂T [-] (≈1 at low Mach)
