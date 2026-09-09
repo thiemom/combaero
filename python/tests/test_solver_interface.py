@@ -423,9 +423,6 @@ def test_dimple_jacobians():
     def nu_func(Re_Dh):
         return cb._core.dimple_nusselt_enhancement_and_jacobian(Re_Dh, d_Dh, h_d, S_d).result[0]
 
-    def f_func(Re_Dh):
-        return cb._core.dimple_friction_multiplier_and_jacobian(Re_Dh, d_Dh, h_d).result[0]
-
     for Re_Dh in [10000.0, 50000.0]:
         Nu_ana, dNu_ana = cb._core.dimple_nusselt_enhancement_and_jacobian(
             Re_Dh, d_Dh, h_d, S_d
@@ -433,9 +430,28 @@ def test_dimple_jacobians():
         dNu_num = central_difference(nu_func, Re_Dh, max(1e-4, Re_Dh * 1e-6))
         np.testing.assert_allclose(dNu_ana, dNu_num, rtol=1e-5)
 
-        f_ana, df_ana = cb._core.dimple_friction_multiplier_and_jacobian(Re_Dh, d_Dh, h_d).result
-        df_num = central_difference(f_func, Re_Dh, max(1e-4, Re_Dh * 1e-6))
-        np.testing.assert_allclose(df_ana, df_num, rtol=1e-5)
+
+def test_dimple_friction_multiplier_has_no_reynolds_dependence():
+    """The friction multiplier is a function of dimple geometry alone.
+
+    This replaces half of test_dimple_jacobians, which compared the analytic
+    derivative of dimple_friction_multiplier_and_jacobian against a central
+    difference of the same function. Both sides were identically 0.0, so the
+    assertion held no matter what the implementation did -- the function
+    finite-differenced a constant. It has been removed; this pins the fact it
+    was failing to state.
+
+    If a future Re dependence is added -- see the provenance note on
+    dimple_friction_multiplier in cooling_correlations.h -- this test fails and
+    forces the derivative question to be answered deliberately.
+    """
+    d_Dh, h_d = 0.2, 0.1
+    reference = cb.dimple_friction_multiplier(10000.0, d_Dh, h_d)
+    for Re_Dh in (2.0e4, 5.0e4, 8.0e4, 2.0e5):
+        assert cb.dimple_friction_multiplier(Re_Dh, d_Dh, h_d) == reference
+
+    # Geometry, by contrast, does move it.
+    assert cb.dimple_friction_multiplier(3.0e4, 0.3, 0.3) > reference
 
 
 def test_rib_enhancement_jacobian():

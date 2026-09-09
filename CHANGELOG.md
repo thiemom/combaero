@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **`dimple_friction_multiplier_and_jacobian`** (C++, its pybind11 binding and
+  the `combaero._solver_tools` re-export). It reported a derivative w.r.t.
+  `Re_Dh` that was **identically zero at every Reynolds number**, because
+  `dimple_friction_multiplier` accepts `Re_Dh` and never uses it -- the
+  multiplier is a function of dimple geometry alone. It obtained that zero by
+  central finite difference, which the Solver (f, J) rule in `CLAUDE.md`
+  forbids. Nothing called it: `channel_dimpled` uses the plain multiplier, and
+  the archived note claiming otherwise was wrong. Callers wanting the value use
+  `dimple_friction_multiplier`; there is no derivative to want.
+
+### Fixed
+- **`dimple_friction_multiplier` no longer warns about a Reynolds range it does
+  not have.** It shared a validator written for `dimple_nusselt_enhancement`,
+  which really is a power law in Re, so it emitted "Re_Dh is outside validated
+  range [10000, 80000]. Extrapolating power-law correlation" -- naming the
+  Nusselt function, about an extrapolation that cannot occur. Geometry limits
+  on `d_Dh` and `h_d` are still enforced, and the Nusselt path is unchanged.
+- **A test that could not fail has been replaced.** `test_dimple_jacobians`
+  compared the analytic derivative against a central difference of the same
+  function; both were 0.0, so it held regardless of the implementation. The
+  Nusselt half was real and is kept. The friction half is now a test that the
+  multiplier does not vary with Re, which goes red if a Re dependence is added.
+
+
 ### Fixed
 - **`ChannelElement`'s Jacobian was wrong for pin-fin and impingement
   surfaces.** Those surfaces vary their friction multiplier with mass flow,

@@ -373,10 +373,6 @@ CorrelationResult<std::tuple<double, double>>
 dimple_nusselt_enhancement_and_jacobian(double Re_Dh, double d_Dh, double h_d,
                                         double S_d);
 
-// Dimple Friction Multiplier and Jacobian wrt Re_Dh
-CorrelationResult<std::tuple<double, double>>
-dimple_friction_multiplier_and_jacobian(double Re_Dh, double d_Dh, double h_d);
-
 // Rib Enhancement Factor (High-Re) and Jacobian wrt Re
 CorrelationResult<std::tuple<double, double>>
 rib_enhancement_factor_high_re_and_jacobian(double e_D, double pitch_to_height,

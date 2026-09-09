@@ -25,7 +25,6 @@ channel_residuals_and_jacobian = _core.channel_residuals_and_jacobian
 combustor_residuals_and_jacobians = _core.combustor_residuals_and_jacobians
 conical_area_change_residuals_and_jacobian = _core.conical_area_change_residuals_and_jacobian
 density_and_jacobians = _core.density_and_jacobians
-dimple_friction_multiplier_and_jacobian = _core.dimple_friction_multiplier_and_jacobian
 dimple_nusselt_enhancement_and_jacobian = _core.dimple_nusselt_enhancement_and_jacobian
 effusion_effectiveness_and_jacobian = _core.effusion_effectiveness_and_jacobian
 ejector_cd_nozzle_mass_flow_and_jacobian = _core.ejector_cd_nozzle_mass_flow_and_jacobian
@@ -79,7 +78,6 @@ __all__ = [
     "combustor_residuals_and_jacobians",
     "conical_area_change_residuals_and_jacobian",
     "density_and_jacobians",
-    "dimple_friction_multiplier_and_jacobian",
     "dimple_nusselt_enhancement_and_jacobian",
     "effusion_effectiveness_and_jacobian",
     "ejector_cd_nozzle_mass_flow_and_jacobian",

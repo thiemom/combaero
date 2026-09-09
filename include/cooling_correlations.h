@@ -288,14 +288,20 @@ double dimple_nusselt_enhancement(
 // Friction penalty for dimpled surfaces
 //
 // Parameters:
-//   Re_Dh : Reynolds number based on channel hydraulic diameter [-]
+//   Re_Dh : accepted for signature symmetry with dimple_nusselt_enhancement,
+//           but the implemented form DOES NOT USE IT -- the multiplier is a
+//           function of dimple geometry alone. Whether Chyu's measured f/f0
+//           carries a weak Re dependence that this form drops is an open
+//           provenance question; do not add a derivative w.r.t. Re without
+//           settling it, because it can only be zero today.
 //   d_Dh  : dimple diameter / channel height [-]
 //   h_d   : dimple depth / diameter [-]
 //
 // Returns: Friction multiplier f_dimple/f_smooth [-]
 //
 // Source: Chyu et al. (1997)
-// Valid: Re_Dh = 10000-80000, d_Dh = 0.1-0.3, h_d = 0.1-0.3
+// Valid: d_Dh = 0.1-0.3, h_d = 0.1-0.3 (enforced). No Re range is enforced
+//        here: with no Re dependence there is nothing to extrapolate.
 // Accuracy: +/-15%
 double dimple_friction_multiplier(
     double Re_Dh,
@@ -349,6 +355,7 @@ void validate_film_cooling_params(double M, double DR, double alpha_deg);
 void validate_effusion_params(double M, double DR, double porosity, double s_D, double alpha_deg);
 void validate_effusion_discharge_params(double Re_d, double P_ratio, double alpha_deg, double L_D);
 void validate_pin_fin_params(double Re_d, double L_D, double S_D, double X_D);
+void validate_dimple_geometry(double d_Dh, double h_d);
 void validate_dimple_params(double Re_Dh, double d_Dh, double h_d);
 void validate_dimple_params(double Re_Dh, double d_Dh, double h_d, double S_d);
 

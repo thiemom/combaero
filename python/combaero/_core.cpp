@@ -6258,11 +6258,6 @@ PYBIND11_MODULE(_core, m) {
         py::arg("d_Dh"), py::arg("h_d"), py::arg("S_d"),
         "Calculate Dimple Nusselt enhancement and its Jacobian w.r.t Re_Dh.");
 
-  m.def("dimple_friction_multiplier_and_jacobian",
-        &solver::dimple_friction_multiplier_and_jacobian, py::arg("Re_Dh"),
-        py::arg("d_Dh"), py::arg("h_d"),
-        "Calculate Dimple Friction multiplier and its Jacobian w.r.t Re_Dh.");
-
   m.def("rib_enhancement_factor_high_re_and_jacobian",
         &solver::rib_enhancement_factor_high_re_and_jacobian, py::arg("e_D"),
         py::arg("pitch_to_height"), py::arg("alpha_deg"), py::arg("Re"),
