@@ -117,6 +117,7 @@ TODO.md
 !.claude/skills/
 .claude/skills/*
 !.claude/skills/model-provenance/
+!.claude/skills/write-pr/
 
 # Benchmark run outputs (auto-generated, not for tracking)
 benchmarks/runs/
