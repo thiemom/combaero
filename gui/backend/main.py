@@ -177,7 +177,13 @@ async def export_results(schema: NetworkGraphSchema):
     hard_timeout = soft_timeout + 10.0
     try:
         # Solve quickly to get states
-        raw, node_results, element_results, edge_results, net = await asyncio.wait_for(
+        # Six values, not five. `_solve_sync` gained a `diag` return in #168
+        # (2026-05-27) and this call site was not updated, so every export that
+        # got as far as solving died with "too many values to unpack
+        # (expected 5)" -- for three and a half months, because `to_dataframe`
+        # is unit-tested but the route that calls it was not. Named rather
+        # than discarded with `*_` so the next addition breaks loudly here too.
+        raw, node_results, element_results, edge_results, net, _diag = await asyncio.wait_for(
             asyncio.to_thread(_solve_sync, schema),
             timeout=hard_timeout,
         )
