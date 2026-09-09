@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-09
+
 ### Changed
 - **The momentum-CV junction drops its version suffix.** `MPCEv2Element` is now
   `MultiPortChamberElement`, taking the name freed by the removal below. The
@@ -61,7 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `combaero~=0.5` to keep running a network built on it.
 
 
-## [0.5.0] - 2026-09-08
+## [0.5.0] - 2026-09-09
 
 ### Added
 - **`NetworkSolver.solve` now reports why a solve ended, separately from
@@ -1754,7 +1756,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - State property units mismatch in example runner
 - Solver stability under degenerate initial conditions
 
-[Unreleased]: https://github.com/thiemom/combaero/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/thiemom/combaero/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/thiemom/combaero/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/thiemom/combaero/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/thiemom/combaero/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/thiemom/combaero/compare/v0.4.0...v0.4.1
