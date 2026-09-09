@@ -2427,8 +2427,36 @@ class PressureLossElement(NetworkElement):
 
 
 class ChannelElement(NetworkElement):
-    """
-    Channel element applying frictional pressure drop.
+    """Duct with frictional pressure drop and optional convective surface.
+
+    Couples STAGNATION pressures: Pt_up - Pt_down = dP_friction. The
+    static-versus-stagnation distinction lives in the node constitutive
+    relation, not here (see the note in ``residuals``).
+
+    Pressure drop
+        ``regime="incompressible"`` uses Darcy-Weisbach with a friction factor
+        selected by ``friction_model`` from Haaland, Colebrook, Serghides or
+        Petukhov; ``regime="compressible"`` uses Fanno flow. Both are computed
+        in C++ -- ``friction.h`` owns the correlations and
+        ``solver_interface.h`` the (f, J) entry points. Nothing about the
+        friction factor is restated in this file.
+
+    Convective surfaces
+        A ``ConvectiveSurface`` adds heat transfer and modifies the drop, in
+        one of two ways. Ribbed and dimpled surfaces contribute a MULTIPLIER on
+        pipe friction, both geometry-only. Pin-fin and impingement arrays
+        instead OWN their drop: those correlations return dP directly, and the
+        element takes it rather than converting it into a multiplier -- see
+        ``residuals``. Provenance for each correlation lives with it in
+        ``cooling_correlations.h`` and ``heat_transfer.h``: Chyu et al. (1997)
+        for dimples, Metzger for pin fins, Florschuetz (1981) / Martin (1977)
+        for impingement.
+
+    Known gaps
+        The array correlations expose no dP sensitivity to static pressure or
+        composition, so those Jacobian columns are absent rather than
+        approximated; ``test_channel_element_jacobian_fd.py`` pins this as a
+        strict xfail carrying the magnitude.
     """
 
     def __init__(
@@ -2468,6 +2496,23 @@ class ChannelElement(NetworkElement):
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
 
+    def _reynolds(self, state: NetworkMixtureState) -> float:
+        """Reynolds number on the hydraulic diameter, for surface correlations.
+
+        Density cancels: rho * v is m_dot / area, so Re = m_dot * Dh / (A * mu)
+        and no density guard is needed. This replaced a block that substituted
+        air at STP (rho = 1.2, mu = 1.8e-5) whenever a state looked unphysical
+        -- fabricated properties that a mid-Newton iterate would silently pick
+        up, in the path where a discontinuity costs most.
+        """
+        area = self.area or 0.0
+        if area <= 0.0:
+            return 0.0
+        mu = cb.complete_state(state.T, state.Pt, state.X).transport.mu
+        if mu <= 0.0:
+            return 0.0
+        return abs(state.m_dot) * (self.Dh or self.diameter or 1.0) / (area * mu)
+
     def residuals(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> list[float]:
@@ -2478,43 +2523,32 @@ class ChannelElement(NetworkElement):
         # Set by the pin-fin / impingement branch below, which returns early.
         array_result = None
 
-        if self.surface and not isinstance(self.surface.model, SmoothModel):
-            cs = cb.complete_state(state_in.T, state_in.Pt, state_in.X)
-            rho = state_in.density() if state_in.density() > 0 else 1.2
-            mu = cs.transport.mu if cs.transport.mu > 0 else 1.8e-5
-            v = abs(m_dot) / (rho * self.area) if self.area > 0.0 else 0.0
-            dh = self.Dh or self.diameter or 1.0
-            Re = rho * v * dh / mu if mu > 0 else 1.0
-
-            # Base pure pipe friction calculation
-            if Re < 2300:
-                f_base = 64.0 / Re if Re > 0 else 0.0
-            else:
-                e_D = self.roughness / dh if dh > 0 else 0.0
-                if e_D > 1e-8:
-                    f_base = 1.0 / (-1.8 * math.log10((e_D / 3.7) ** 1.11 + 6.9 / Re)) ** 2
-                else:
-                    f_base = (0.79 * math.log(Re) - 1.64) ** -2
-
-            if f_base > 0 and self.length > 0:
-                if isinstance(self.surface.model, RibbedModel):
-                    f_mult *= cb._core.rib_friction_multiplier(
-                        self.surface.model.e_D, self.surface.model.pitch_to_height
-                    )
-                elif isinstance(self.surface.model, DimpledModel):
-                    f_mult *= cb._core.dimple_friction_multiplier(
-                        Re, self.surface.model.d_Dh, self.surface.model.h_d
-                    )
-                elif isinstance(self.surface.model, (PinFinModel, ImpingementModel)):
-                    # Localized arrays own their drop outright: the pin-array
-                    # and jet correlations return dP directly, so the element
-                    # takes it rather than converting it into a multiplier on
-                    # pipe friction. The former route divided by a locally
-                    # restated f_base and let the C++ friction factor multiply
-                    # it back in, which cancels exactly only when both pick the
-                    # same correlation. With friction_model="petukhov" the
-                    # round-trip moved the drop by -24.7%.
-                    array_result = self.htc_and_T(state_in)
+        if self.surface and not isinstance(self.surface.model, SmoothModel) and self.length > 0:
+            if isinstance(self.surface.model, RibbedModel):
+                f_mult *= cb._core.rib_friction_multiplier(
+                    self.surface.model.e_D, self.surface.model.pitch_to_height
+                )
+            elif isinstance(self.surface.model, DimpledModel):
+                # Re is supplied because the correlation's signature takes
+                # it. The implemented form ignores it (see the provenance
+                # note in cooling_correlations.h), so this is forward
+                # compatibility rather than a live dependence -- if that
+                # form ever gains an Re term, the element already feeds it.
+                f_mult *= cb._core.dimple_friction_multiplier(
+                    self._reynolds(state_in),
+                    self.surface.model.d_Dh,
+                    self.surface.model.h_d,
+                )
+            elif isinstance(self.surface.model, (PinFinModel, ImpingementModel)):
+                # Localized arrays own their drop outright: the pin-array
+                # and jet correlations return dP directly, so the element
+                # takes it rather than converting it into a multiplier on
+                # pipe friction. The former route divided by a locally
+                # restated f_base and let the C++ friction factor multiply
+                # it back in, which cancels exactly only when both pick the
+                # same correlation. With friction_model="petukhov" the
+                # round-trip moved the drop by -24.7%.
+                array_result = self.htc_and_T(state_in)
 
         if array_result is not None:
             # dP is the correlation's own, so its analytic derivatives are the
@@ -2657,11 +2691,15 @@ class ChannelElement(NetworkElement):
             # (Re_eff = sqrt(Re^2 + 64^2)) so f stays finite at near-zero flow.
             re_eff = math.sqrt(re_in * re_in + 64.0 * 64.0)
             if re_eff < 2300:
+                # Poiseuille, the physical law, not a choice of correlation.
                 f = 64.0 / re_eff
-            elif e_D > 1e-8:
-                f = (1.0 / (-1.8 * math.log10((e_D / 3.7) ** 1.11 + 6.9 / re_eff))) ** 2
             else:
-                f = (0.79 * math.log(re_eff) - 1.64) ** -2
+                # Report the correlation the residual actually uses. This
+                # branch used to hardcode Haaland (rough) or Petukhov (smooth)
+                # regardless of friction_model, so a channel set to petukhov
+                # reported a friction factor 7.5% away from the one driving
+                # its own pressure drop.
+                f = cb._core.friction_and_jacobian(self.friction_model, re_eff, e_D).result[0]
 
         return {
             "m_dot": float(state_in.m_dot),

@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`ChannelElement.diagnostics` reported a friction factor from a different
+  correlation than the one driving the residual.** It hardcoded Haaland
+  (rough) or Petukhov (smooth) regardless of the element's `friction_model`,
+  so a channel set to `petukhov` reported **0.016834** while its own pressure
+  drop used **0.012928** -- a 30% misreport. It now asks the same C++
+  dispatcher the residual uses. The laminar branch stays `64/Re`, which is
+  Poiseuille rather than a choice of correlation.
+
+### Changed
+- **`ChannelElement.residuals` no longer restates pipe friction in Python.**
+  It computed a `f_base` from a hardcoded Haaland/Petukhov branch, plus the
+  density, viscosity, velocity and Reynolds number feeding it, on every
+  residual evaluation -- including a `complete_state` call. After the pin-fin
+  and dimple fixes, all of it fed nothing but a guard: `rib_friction_multiplier`
+  takes no Reynolds number and `dimple_friction_multiplier` ignores the one it
+  is given. Removed, along with the air-at-STP fallbacks (`rho = 1.2`,
+  `mu = 1.8e-5`) it substituted whenever a state looked unphysical -- fabricated
+  properties a mid-Newton iterate would silently pick up.
+
+  Verified behaviour-neutral: residual and every Jacobian entry **identical
+  across 108 cases** -- four surface models, nine mass flows including zero,
+  1e-12 and reversed, three temperatures.
+
+  Reynolds number for the dimple correlation is now computed by a small helper.
+  Density cancels out of it (`rho * v` is `m_dot / area`), so no density guard
+  is needed at all.
+
+- **`ChannelElement` carries its provenance.** The docstring was one line with
+  no literature. It now names the formulations, points at the files that own
+  each correlation rather than transcribing them, and records the known
+  Jacobian gap.
+
+- **`test_channel_jacobians.py` checks derivatives rather than field
+  presence.** Its assertions were `assert result.ddP_dmdot != 0.0`, which says
+  a field was written, not that it is right -- an element-level defect 10.5%
+  in size survived it. The ribbed and pin-fin cases now verify `ddP_dvelocity`
+  against a central difference of `dP` in velocity.
+
+
 ### Removed
 - **`dimple_friction_multiplier_and_jacobian`** (C++, its pybind11 binding and
   the `combaero._solver_tools` re-export). It reported a derivative w.r.t.
