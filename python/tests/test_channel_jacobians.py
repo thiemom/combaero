@@ -6,6 +6,24 @@ import pytest
 import combaero as cb
 
 
+def _assert_ddP_dvelocity_matches_fd(rebuild, velocity, analytic, rel=1e-5):
+    """ddP_dvelocity reproduces a central difference of dP w.r.t. velocity.
+
+    ``!= 0.0`` only says a field was written. These correlations are the ones
+    whose derivatives feed ChannelElement, and an element-level defect
+    (pin-fin, 10.5% low) survived a suite whose only check here was that the
+    number was non-zero. Velocity is the right variable to perturb:
+    ``ddP_dmdot`` is taken w.r.t. the correlation's own internal flow area, so
+    a central difference in the caller's mass flow would not match it.
+    """
+    h = max(1e-6, abs(velocity) * 1e-6)
+    numeric = (rebuild(velocity + h).dP - rebuild(velocity - h).dP) / (2.0 * h)
+    scale = max(abs(numeric), abs(analytic), 1e-12)
+    assert abs(analytic - numeric) / scale < rel, (
+        f"ddP_dvelocity {analytic:.6e} vs central difference {numeric:.6e}"
+    )
+
+
 def test_channel_smooth_jacobians_gnielinski():
     """Verify channel_smooth Jacobians for Gnielinski correlation."""
     # Test conditions
@@ -176,14 +194,18 @@ def test_channel_ribbed_jacobians():
     pitch_to_height = 10.0
     alpha_deg = 60.0
 
-    result = cb.channel_ribbed(
-        T, P, X, velocity, diameter, length, e_D, pitch_to_height, alpha_deg, T_hot
-    )
+    def _rebuild(v):
+        return cb.channel_ribbed(
+            T, P, X, v, diameter, length, e_D, pitch_to_height, alpha_deg, T_hot
+        )
+
+    result = _rebuild(velocity)
 
     # Verify Jacobian fields are populated
     assert result.dh_dmdot != 0.0
     assert result.ddP_dmdot != 0.0
     assert abs(result.dq_dT_hot + result.h) < 1e-9, "dq/dT_hot should equal -h"
+    _assert_ddP_dvelocity_matches_fd(_rebuild, velocity, result.ddP_dvelocity)
 
     # Verify multipliers work
     Nu_mult = 1.1
@@ -216,14 +238,16 @@ def test_channel_pin_fin_jacobians():
     N_rows = 5
     T_hot = 900.0
 
-    result = cb.channel_pin_fin(
-        T, P, X, velocity, channel_height, pin_diameter, S_D, X_D, N_rows, T_hot
-    )
+    def _rebuild(v):
+        return cb.channel_pin_fin(T, P, X, v, channel_height, pin_diameter, S_D, X_D, N_rows, T_hot)
+
+    result = _rebuild(velocity)
 
     # Verify Jacobian fields are populated
     assert result.dh_dmdot != 0.0
     assert result.ddP_dmdot != 0.0
     assert abs(result.dq_dT_hot + result.h) < 1e-9, "dq/dT_hot should equal -h"
+    _assert_ddP_dvelocity_matches_fd(_rebuild, velocity, result.ddP_dvelocity)
 
 
 if __name__ == "__main__":
