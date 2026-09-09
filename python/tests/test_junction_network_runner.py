@@ -6,7 +6,6 @@ import math
 
 import pytest
 
-from validation.junction.models.mpce_v1_network import MPCEv1Network
 from validation.junction.models.mpce_v2_network import MPCEv2Network
 from validation.junction.models.tee_junction_element_network import (
     TeeJunctionElementNetwork,
@@ -29,8 +28,13 @@ def test_tee_network_adapter_evaluates_K6_case():
 
 
 def test_mpce_network_adapter_evaluates_K6_case():
-    """MPCE adapter converges at the same K6 case."""
-    r = MPCEv1Network().evaluate_network("bassett2001", "K6", 0.5, 1.0, math.pi / 2.0)
+    """MPCE adapter converges at the same K6 case.
+
+    Was written against the v1 adapter; retargeted when the v1 model was
+    removed in 0.6.0. The claim is about the ADAPTER, not about which junction
+    model sits behind it.
+    """
+    r = MPCEv2Network(strict=False).evaluate_network("bassett2001", "K6", 0.5, 1.0, math.pi / 2.0)
     assert r.converged, f"MPCE network must converge at K6/psi=1/theta=90/q=0.5; msg={r.message}"
     assert r.K_lateral is not None
     assert 0.0 < r.K_lateral < 5.0
@@ -39,13 +43,14 @@ def test_mpce_network_adapter_evaluates_K6_case():
 def test_mpce_K5_is_evaluated_not_declared_unsupported():
     """K_straight is a real prediction and must be scored, not skipped.
 
-    MPCE-v1 used to hard-code ``converged=False`` for K5/K2 on the reasoning
-    that ``sin^2(theta=0)`` loses the axial coupling. That assumption was never
-    measured, so the straight-flow coefficient carried no error number at all
-    for the whole of the junction arc. Whatever the model predicts, the harness
-    has to produce a value the scorecard can hold against Bassett Fig 7c.
+    The now-removed MPCE-v1 model used to hard-code ``converged=False`` for
+    K5/K2, on the reasoning that ``sin^2(theta=0)`` loses the axial coupling.
+    That assumption was never measured, so the straight-flow coefficient
+    carried no error number at all for the whole of the junction arc. The rule
+    outlived the model: whatever the junction predicts, the harness has to
+    produce a value the scorecard can hold against Bassett Fig 7c.
     """
-    r = MPCEv1Network().evaluate_network("bassett2001", "K5", 0.5, 1.0, math.pi / 2.0)
+    r = MPCEv2Network(strict=False).evaluate_network("bassett2001", "K5", 0.5, 1.0, math.pi / 2.0)
     assert r.converged, f"K5 must be evaluated, not skipped: {r.message}"
     assert r.K_straight is not None
 
@@ -58,7 +63,7 @@ def test_mpce_straight_K_uses_the_straight_leg_fraction():
     a mirrored operating point. Pinned by symmetry: evaluating K5 at q and K6
     at 1-q must land on the SAME network, hence the same extracted pair.
     """
-    model = MPCEv1Network()
+    model = MPCEv2Network(strict=False)
     straight = model.evaluate_network("bassett2001", "K5", 0.3, 1.0, math.pi / 2.0)
     lateral = model.evaluate_network("bassett2001", "K6", 0.7, 1.0, math.pi / 2.0)
 

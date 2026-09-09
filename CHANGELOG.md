@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **`MultiPortChamberElement`'s own junction model, and the C++ stack behind
+  it.** Deprecated in 0.5.0, removed here as announced. The class remains as
+  the ABSTRACT BASE owning the topology and port machinery that
+  `MPCEv2Element` and `ConstantKTeeElement` inherit -- port ordering, the
+  inlet/outlet sign map, area and angle resolution, the wiring checks, and
+  `diagnostics`, which reports the port map and computes no physics. What went
+  is `residuals` and `verify_solution_consistent`, so the class is no longer
+  instantiable on its own.
+
+  Also removed: `multi_port_chamber_residuals_and_jacobian` (C++ and its
+  pybind11 binding), the `MultiPortChamberResult` and `PortImpulseJacobian`
+  structs, the `combaero._solver_tools` re-export, and the `units_data.h`
+  entry. That function had exactly one caller -- the method removed above.
+  `include/multi_port_chamber.h` is KEPT: it also holds `border_carnot_L` and
+  `HAGER_FRACTION`, which `border_carnot_loss_residual_and_jacobian` is built
+  on, and `BorderCarnotLossElement` is unaffected.
+
+  Migration: use `MPCEv2Element` (the Mynard closure) or `ConstantKTeeElement`
+  (fixed handbook K). On the same Bassett separating cells the removed model
+  scored a mean absolute error of 0.5260 against `MPCEv2Element`'s 0.0564 and
+  converged on 77 of 105 points against 94; it was also energetically
+  inconsistent for joining flow and sign-symmetric, so it admitted mirror
+  roots. Nothing in the package or the GUI instantiated it. Pin
+  `combaero~=0.5` to keep running a network built on it.
+
+
 ## [0.5.0] - 2026-09-08
 
 ### Added

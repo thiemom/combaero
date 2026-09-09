@@ -3232,48 +3232,15 @@ class TeeJunctionElement(NetworkElement):
 # ---------------------------------------------------------------------------
 
 
-#: v0.5.0 is the last release carrying MultiPortChamberElement's own model.
-_V1_JUNCTION_REMOVAL = "0.6.0"
-
-
-def _warn_v1_junction_model(element: object, method: str) -> None:
-    """Warn once per element that this junction MODEL is going away.
-
-    Only the model is deprecated -- ``residuals``, ``diagnostics`` and
-    ``verify_solution_consistent`` on :class:`MultiPortChamberElement` itself.
-    The class also owns the topology and port machinery that
-    ``MPCEv2Element`` and ``ConstantKTeeElement`` inherit unchanged, 13 of its
-    17 public members, and none of that is going anywhere. So the check is
-    ``type(element) is MultiPortChamberElement`` and not ``isinstance``:
-    ``MPCEv2Element.diagnostics`` calls ``super().diagnostics()``, and warning
-    there would fire on every user of the element that REPLACES this one.
-
-    Why it is going: the model scores 0.5260 against Bassett's separating
-    curves where MPCEv2Element scores 0.0564 on the same cells, converges on
-    77 of 105 against 94, is energetically inconsistent for joining flow, and
-    is sign-symmetric so it admits mirror roots. Nothing in the package or the
-    GUI instantiates it. See issue #271.
-    """
-    if type(element) is not MultiPortChamberElement:
-        return
-    if getattr(element, "_v1_model_deprecation_warned", False):
-        return
-    element._v1_model_deprecation_warned = True  # type: ignore[attr-defined]
-    warnings.warn(
-        f"MultiPortChamberElement.{method} is deprecated and will be removed "
-        f"in combaero {_V1_JUNCTION_REMOVAL}. Use MPCEv2Element, which is "
-        f"roughly nine times more accurate on Bassett's separating curves, "
-        f"converges more often, and computes its residual and Jacobian in "
-        f"C++. The topology machinery this class also provides is NOT "
-        f"deprecated -- MPCEv2Element inherits it. See issue #271.",
-        DeprecationWarning,
-        stacklevel=3,
-    )
-
-
 class MultiPortChamberElement(NetworkElement):
     """
     Momentum-CV junction element (N >= 2 ports).
+
+    ABSTRACT SINCE 0.6.0. This class owns the topology and port machinery --
+    port ordering, the inlet/outlet sign map, area and angle resolution, the
+    connecting-element wiring checks -- and no longer carries a residual of
+    its own. Its impulse-function model was deprecated in 0.5.0 and removed
+    here; ``MPCEv2Element`` supersedes it (issue #271).
 
     Owns one scalar unknown ``{id}.P_jct`` (junction internal static pressure).
     Emits N per-port impulse-function residuals plus a global mass residual:
@@ -3421,62 +3388,6 @@ class MultiPortChamberElement(NetworkElement):
         guards against).
         """
         return ["p"] * self.N + ["mdot"]
-
-    def verify_solution_consistent(
-        self,
-        sol: dict[str, float],
-        rel_tol: float = 1e-4,
-    ) -> bool:
-        """Post-solve energy-consistency check: no collector port may end
-        up with a higher total pressure than the best supplier port.
-
-        DEPRECATED, removal in 0.6.0. Note that this per-branch bound is the
-        form MPCEv2Element deliberately does NOT use: a passive junction may
-        raise one branch's total pressure at another's expense, which is real
-        physics and is why Bassett's K5 and Hager's xi_t go negative in
-        dividing flow. The replacement asserts the aggregate
-        ``sum_in |m| Pt >= sum_out |m| Pt`` instead.
-
-        The v1 impulse rows are even in the port flows (u_i^2), so the
-        sign-flipped image of any root is also an exact root -- and the
-        image of a physical root is energetically impossible (flow
-        collected from low-Pt ports and delivered to a higher-Pt port,
-        i.e. a passive junction manufacturing flow work). Canonical
-        direction CANNOT be checked instead: v1 legitimately supports
-        runtime reversal (ejector regimes, Bassett 2001 Section 3), where
-        a below-supply-Pt port feeds the junction. The max-Pt bound is
-        deliberately weak -- Pt and m_dot are the only quantities in the
-        solution dict, and the goal is demoting mirror images, not fine
-        energy accounting. Missing keys => True (do not police
-        incomplete dicts; same convention as MPCEv2's direction check).
-
-        SCOPE: the check applies only when the converged state has
-        exactly ONE supplier port (separating mode). In joining mode
-        (>= 2 suppliers) the v1 impulse rows themselves can manufacture
-        flow work -- the documented deficiency that motivated MPCEv2,
-        which merge networks must use -- so policing energy there would
-        reject the v1 model's own legitimate solutions (observed on the
-        certified-audit merge fixtures).
-        """
-        _warn_v1_junction_model(self, "verify_solution_consistent")
-        flows: list[float] = []
-        pts: list[float] = []
-        for i in range(self.N):
-            eid = self._port_element_ids[i]
-            m_key = f"{eid}.m_dot"
-            pt_key = f"{self.port_nodes[i]}.Pt"
-            if not eid or m_key not in sol or pt_key not in sol:
-                return True
-            # Junction convention: positive = flow OUT of the junction.
-            flows.append(float(self._port_signs[i]) * float(sol[m_key]))
-            pts.append(float(sol[pt_key]))
-        m_ref = max(abs(f) for f in flows)
-        thr = max(1e-9, 1e-6 * m_ref)
-        suppliers = [pt for f, pt in zip(flows, pts, strict=True) if f < -thr]
-        collectors = [pt for f, pt in zip(flows, pts, strict=True) if f > thr]
-        if len(suppliers) != 1 or not collectors:
-            return True
-        return max(collectors) <= suppliers[0] * (1.0 + rel_tol)
 
     def all_source_nodes(self) -> list[str]:
         # Inlet ports = nodes the junction draws flow FROM (canonical orientation).
@@ -3628,97 +3539,24 @@ class MultiPortChamberElement(NetworkElement):
                 port_node.area = area_i
                 port_node.surface.area = area_i
 
-    def residuals(
-        self, states: list[NetworkMixtureState], P_jct: float, port_mdots: list[float]
-    ) -> tuple[list[float], dict[int, dict[str, float]]]:
-        """Evaluate residuals + Jacobian. Called from the solver special-case.
-
-        DEPRECATED, removal in 0.6.0 -- see ``_warn_v1_junction_model``.
-
-        Args:
-            states: per-port NetworkMixtureState (carries P, T, Y at each port).
-            P_jct: junction's internal static pressure unknown value.
-            port_mdots: per-port mass flow IN JUNCTION CONVENTION (positive = out
-                of junction). Already sign-mapped by the solver via
-                self._port_signs.
-
-        Returns:
-            (residuals, jac) where residuals = [R_mom_0, ..., R_mom_{N-1}, R_mass]
-            and jac maps row index -> {unknown_name: derivative}. The mass-row
-            Jacobian uses the connecting elements' m_dot unknown names with the
-            port-orientation sign baked in.
-        """
-        _warn_v1_junction_model(self, "residuals")
-        P = [s.P for s in states]
-        T = [s.T for s in states]
-        Y = [list(s.Y) for s in states]
-        A = [float(a) for a in self.port_areas]
-        theta_rad = [math.radians(float(t)) for t in self.port_angles_deg]
-
-        cpp = _solver_tools.multi_port_chamber_residuals_and_jacobian(
-            P_jct=P_jct, P=P, mdot=port_mdots, T=T, Y=Y, A=A, theta_rad=theta_rad
-        )
-
-        residuals = list(cpp.impulse_residuals) + [cpp.mass_residual]
-        jac: dict[int, dict[str, float]] = {}
-
-        # Axial reference (port 0): cross-coupling Jacobian goes here.
-        axial_port_node = self.port_nodes[0]
-        axial_outer_id = self._port_element_ids[0]
-        axial_sign = self._port_signs[0]
-
-        # Impulse rows: each depends on (P_jct, port P, port mdot, port T) and
-        # on the axial reference port 0's state via the cross-coupling.
-        for i in range(self.N):
-            row = {
-                f"{self.id}.P_jct": -1.0,
-                f"{self.port_nodes[i]}.P": cpp.port_jac[i].dR_dP,
-                f"{self.port_nodes[i]}.T": cpp.port_jac[i].dR_dT,
-            }
-            # mdot Jacobian: chain rule through port sign.
-            # d(R_mom_i)/d(outer.m_dot) = dR/dmdot_port * sign_i
-            mdot_var = f"{self._port_element_ids[i]}.m_dot"
-            row[mdot_var] = cpp.port_jac[i].dR_dmdot * self._port_signs[i]
-
-            # Cross-coupling: non-axial ports also depend on port 0's state.
-            # Add to existing entries if same unknown (e.g. axial port mdot)
-            # to avoid clobbering.
-            cross_P = cpp.cross_dR_dP_axial[i]
-            cross_T = cpp.cross_dR_dT_axial[i]
-            cross_mdot = cpp.cross_dR_dmdot_axial[i] * axial_sign
-            if cross_P != 0.0:
-                key = f"{axial_port_node}.P"
-                row[key] = row.get(key, 0.0) + cross_P
-            if cross_T != 0.0:
-                key = f"{axial_port_node}.T"
-                row[key] = row.get(key, 0.0) + cross_T
-            if cross_mdot != 0.0:
-                key = f"{axial_outer_id}.m_dot"
-                row[key] = row.get(key, 0.0) + cross_mdot
-            jac[i] = row
-
-        # Mass row: d(sum mdot_port)/d(outer_i.m_dot) = sign_i.
-        mass_row = {}
-        for i in range(self.N):
-            mass_var = f"{self._port_element_ids[i]}.m_dot"
-            mass_row[mass_var] = mass_row.get(mass_var, 0.0) + self._port_signs[i]
-        jac[self.N] = mass_row
-
-        return residuals, jac
-
     def diagnostics(
         self,
         states: list[NetworkMixtureState],
         P_jct: float,
         port_mdots: list[float] | None = None,
     ) -> dict[str, float]:
-        """DEPRECATED, removal in 0.6.0 -- see ``_warn_v1_junction_model``.
+        """Per-port bookkeeping: pressures, temperatures, areas, signs, flows.
 
+        MACHINERY, not model. It reports the port map and the states handed
+        in and computes no physics, which is why it survives the 0.6.0
+        removal of this class's residual. ``MPCEv2Element.diagnostics``
+        calls it through ``super()`` and adds its closure quantities on top.
+        """
+        """DEPRECATED, removal in 0.6.0 -- see ``_warn_v1_junction_model``.
         Note that ``MPCEv2Element.diagnostics`` delegates here via ``super()``,
         which is why the warning is guarded on the exact type rather than on
         ``isinstance``.
         """
-        _warn_v1_junction_model(self, "diagnostics")
         diag: dict[str, float] = {"P_jct": float(P_jct), "n_ports": float(self.N)}
         for i in range(self.N):
             diag[f"port_{i}_P"] = float(states[i].P)

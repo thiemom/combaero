@@ -849,10 +849,11 @@ Sanctioned successor to the K-closure tee for N-port junctions
 (`docs/junction/momentum cv implementation guide.pdf`). Junction = pure
 conservation, loss = separate per-port `BorderCarnotLossElement`s.
 
+> **The junction half of this was removed in 0.6.0.** `multi_port_chamber_residuals_and_jacobian` and its result structs backed `MultiPortChamberElement`'s own impulse model, which is gone; `MPCEv2Element` supersedes it and computes its own whole-element `(f, J)` (see the Momentum-CV Junction section above). What remains here is the Border-Carnot loss element, which is unaffected.
+
 ```cpp
 // Loss-element constants (multi_port_chamber.h)
 inline constexpr double HAGER_FRACTION       = 0.75;  // sharp-edge angle correction
-inline constexpr double MACH_CHOKE_THRESHOLD = 0.95;  // per-port choke switch
 inline constexpr double BC_LOSS_PREFACTOR    = 4.0;   // L = 4*(1 - cos(theta_eff))^2
 
 // Loss coefficient L = 4*(1 - cos((3/4)*delta_geom))^2  [-]
@@ -860,38 +861,6 @@ double border_carnot_L(double delta_geom);
 double dborder_carnot_L_ddelta(double delta_geom);
 
 // Result structs (solver_interface.h)
-struct PortImpulseJacobian {
-    double dR_dP;     // d(R_mom_i)/d(P_i)     [-]
-    double dR_dmdot;  // d(R_mom_i)/d(mdot_i)  [Pa*s/kg]
-    double dR_dT;     // d(R_mom_i)/d(T_i)     [Pa/K]
-};
-
-struct MultiPortChamberResult {
-    std::vector<double> impulse_residuals;     // size N, [Pa]
-    std::vector<PortImpulseJacobian> port_jac; // size N
-    double mass_residual;                      // sum_i mdot_i [kg/s]
-};
-
-struct BorderCarnotLossResult {
-    double residual;          // [Pa]
-    double d_res_dPt_in;      // [-]
-    double d_res_dPt_out;     // [-]
-    double d_res_dP_in;       // [-]
-    double d_res_dT_in;       // [Pa/K]
-    double d_res_dmdot;       // [Pa*s/kg]
-};
-
-// N-port impulse + mass residual; emits N + 1 rows. Sign convention: mdot_i > 0
-// means flow OUT of the junction through port i. dR_mom_i/dP_jct = -1 (constant,
-// caller adds); dR_mass/dmdot_i = +1 (constant, caller adds).
-MultiPortChamberResult multi_port_chamber_residuals_and_jacobian(
-    double P_jct,
-    const std::vector<double>& P,
-    const std::vector<double>& mdot,
-    const std::vector<double>& T,
-    const std::vector<std::vector<double>>& Y,
-    const std::vector<double>& A);
-
 // Two-port in-line loss element: Pt_in - Pt_out - L*0.5*rho*u_in^2 = 0.
 // L applies the Hager (3/4) effective-angle correction, INTENDED to reproduce
 // Hager xi_l and Bassett K_inc at M -> 0 on a sharp-edged lateral -- unverified,

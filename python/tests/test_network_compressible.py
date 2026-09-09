@@ -12,7 +12,6 @@ from combaero.network import (
     FlowNetwork,
     MassFlowBoundary,
     MomentumChamberNode,
-    MultiPortChamberElement,
     NetworkSolver,
     OrificeElement,
     PlenumNode,
@@ -20,6 +19,7 @@ from combaero.network import (
     ThermalWall,
     WallLayer,
 )
+from combaero.network.mpce_v2_element import MPCEv2Element
 
 
 def test_compressible_orifice_network():
@@ -570,12 +570,14 @@ def _mpce_tee_network(
             )
         )
         net.add_element(
-            MultiPortChamberElement(
+            MPCEv2Element(
                 id="jct",
                 inlet_nodes=["mc_com"],
                 outlet_nodes=["mc_str", "mc_bra"],
                 inlet_angles_deg=[0.0],
                 outlet_angles_deg=[0.0, theta_deg],
+                flow_direction="branch",
+                strict=False,
                 port_areas=[A_com, A_com, A_bra],
             )
         )
@@ -612,12 +614,14 @@ def _mpce_tee_network(
             )
         )
         net.add_element(
-            MultiPortChamberElement(
+            MPCEv2Element(
                 id="jct",
                 inlet_nodes=["mc_str", "mc_bra"],
                 outlet_nodes=["mc_com"],
                 inlet_angles_deg=[0.0, theta_deg],
                 outlet_angles_deg=[0.0],
+                flow_direction="merge",
+                strict=False,
                 port_areas=[A_com, A_bra, A_com],
             )
         )
@@ -695,12 +699,14 @@ def _mpce_mfb_merge_network(theta_deg: float = 45.0) -> FlowNetwork:
         )
     )
     net.add_element(
-        MultiPortChamberElement(
+        MPCEv2Element(
             id="jct",
             inlet_nodes=["mc_str", "mc_bra"],
             outlet_nodes=["mc_com"],
             inlet_angles_deg=[0.0, theta_deg],
             outlet_angles_deg=[0.0],
+            flow_direction="merge",
+            strict=False,
             port_areas=[A, A, A],
         )
     )
@@ -786,7 +792,7 @@ def test_mpce_collector_port_mcn_inherits_area():
         )
     )
     net.add_element(
-        MultiPortChamberElement(
+        MPCEv2Element(
             id="jct",
             inlet_nodes=["mc_com"],
             outlet_nodes=["mc_str", "mc_bra"],
