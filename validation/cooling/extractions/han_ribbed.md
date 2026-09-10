@@ -1,16 +1,19 @@
 # Extraction: Han rib correlations
 
-**Status: UNCONFIRMED -- all flags closed, awaiting a status decision.**
+**Status: CONFIRMED -- reviewed against the book on 2026-09-10.**
 
-Every flagged item has been checked against the book or resolved by
-derivation, and no open items remain. The status is still UNCONFIRMED because
-setting it is the reviewer's call, not the extractor's: sign the review log at
-the bottom and change this line to CONFIRMED to release it for implementation.
+Every item was checked against the source or resolved by derivation, and the
+reviewer has signed off in the review log. This document is released for
+implementation under #334.
 
-Two modelling decisions need agreeing with it -- **D1** (treat `R` as constant
-in `e+`) and **D2** (use `12.31`). **D3 has been withdrawn**: it recorded a
+Two modelling decisions are accepted with it -- **D1** (treat `R` as constant
+in `e+`) and **D2** (use `12.31`). **D3 was withdrawn**: it recorded a
 departure from the printed four-sided friction factor that turned out not to
-exist. Nothing in the implementation now diverges from the source.
+exist. Nothing in the implementation diverges from the source.
+
+Changes after this point go in the review log, not silently into the tables. If
+implementation surfaces something the extraction got wrong, that reopens the
+status rather than being patched in the code.
 
 Tracked by #334, under #339.
 
@@ -751,6 +754,7 @@ than extrapolating past it.
 | date | reviewer | outcome |
 |---|---|---|
 | 2026-09-10 | extracted by Claude | UNCONFIRMED -- submitted for review |
+| 2026-09-10 | reviewer | **CONFIRMED.** All items checked against the book or resolved by derivation; no open flags. D1 and D2 accepted, D3 withdrawn. Released for implementation under #334. |
 | 2026-09-10 | reviewer | re-read the layout: the trailing `* f_bar` is a full stop plus the next sentence's subject on the same line. Han prints `f = f_bar + (H/W)(f_bar - f_s)`, matching the derivation. **D3 withdrawn** -- no departure from the source exists. |
 | 2026-09-10 | reviewer | closed the last flags. 24 and 26 confirmed against the book. **Item 6 resolved by derivation**: supplied Han's area-weighted assumption, from which `f = f_bar + (H/W)(f_bar - f_s)` follows exactly -- the printed trailing `* f_bar` is a typo (decision D3). Item 35 decided in favour of the figure's `12.31` (D2). Item 27b: the name comes from Gee & Webb (1980), not Webb & Eckert (1972). **No open items remain.** |
 | 2026-09-10 | reviewer | supplied the Webb, Eckert & Goldstein paper. **Items 10 and 25 resolved together**: their Eq. (2) gives `g_bar = G Pr^(-0.57)`, and `3.7/0.703^0.57 = 4.5231` reproduces Fig. 4.46's dashed `4.5` to 0.51%. The dashed line is the Prandtl-normalised `G`, not a four-wall average, and the Pr scaling is already inside Han's figure rather than borrowed. |
