@@ -65,7 +65,7 @@ move that produced the defects this rebuild exists to undo.
 
 | # | item | as extracted | state |
 |---|---|---|---|
-| 7 | roughness function | `R / (P/e/10)^0.35 = 3.2`, independent of e+ | confirmed |
+| 7 | roughness function | `R / (P/e/10)^0.35 = 3.2`, printed with a leader line to the plotted curve | **needs review -- see below** |
 | 8 | heat-transfer roughness function, solid line | `G = 3.7 * (e+)^0.28` | confirmed |
 | 9 | heat-transfer roughness function, dashed line | `G_bar = 4.5 * (e+)^0.28` | confirmed |
 | 10 | which of items 8 and 9 is the ribbed wall vs the channel average | unbarred = ribbed sidewall, barred = channel average | **assumed, needs the surrounding text** |
@@ -73,8 +73,39 @@ move that produced the defects this rebuild exists to undo.
 | 12 | figure validity, Han (1984) data | `alpha = 90 deg`, `8,000 <= Re <= 80,000` | confirmed |
 | 13 | plotted e+ range | roughly 40 to 1000 | confirmed |
 
-Item 7 is the important structural fact: the lower panel is a **horizontal
-line**, so `R` does not depend on `e+`. Consequences below.
+**Item 7 needs a reviewer's eye on the figure itself.** The label is printed as
+a constant, `R/(P/e/10)^0.35 = 3.2`, joined to the plotted curve by a leader
+line. But the lower panel's y-axis is **logarithmic**, and the drawn curve is
+not quite flat.
+
+Measured from the page image, using the panel frame as a control for scan skew:
+
+| structure | fitted slope | rise across 1000 px |
+|---|---|---|
+| upper panel bottom frame (control) | -0.000124 px/px | 0.12 px |
+| the R curve | -0.011800 px/px | 11.80 px |
+
+The curve's slope is ~100x the frame's, so it is **not** scan skew. Across the
+plotted range that is roughly 10.6 px, or about **4.5%** on a log axis of
+~554 px/decade -- equivalently `R` proportional to `(e+)^0.02`.
+
+So the two readings disagree:
+
+- the **printed equation** says `R` is a constant, which makes Eq. 4.15 invert
+  directly for `f` and the whole chain closed form
+- the **drawn curve** rises ~4.5% across the range, which would make `R` weakly
+  dependent on `e+`, and the chain implicit again
+
+4.5% is small -- propagated through Eq. 4.15 it moves `f` by about 4% -- but
+the distinction decides whether an implementation needs an inner iteration.
+A reviewer with the book should judge whether the drawn curve is meant to be
+horizontal (drafting, or my measurement picking up the marker trend) or
+genuinely sloped.
+
+**This corrects an earlier reading of mine.** I recorded the panel as a
+horizontal line from visual inspection, and asserted on #334 that the chain is
+therefore closed form. The measurement above was prompted by a reviewer
+challenging that reading, and it does not support the confident version.
 
 Geometries carried in the figure legend, usable as harness cases:
 
@@ -150,7 +181,10 @@ reported 0.30 where everything else reported 1.00.
 
 ## Derived prediction chain
 
-Follows from items 4, 5, 7 and 8. **Closed form -- no iteration.**
+Follows from items 4, 5, 7 and 8, **and only if item 7 is a true constant.**
+If `R` carries the ~4.5% `e+` dependence the drawn curve suggests, the first
+two steps become implicit and need an inner solve with its own analytic
+derivative. The chain below assumes the printed equation.
 
 ```
 R    = 3.2 * (P/e/10)^0.35                                  item 7
@@ -160,11 +194,13 @@ G    = 3.7 * (e+)^0.28                                      item 8
 St_r = f / ( 2 * [ 1 + (G - R) * (f/2)^(1/2) ] )            invert item 5
 ```
 
-This corrects an earlier claim on #334 that the correlation is implicit and
-would need an inner iteration carrying its own analytic derivative. It does
-not: `R` is independent of `e+` (item 7), so Eq. 4.15 inverts directly for `f`.
-The error came from reasoning about the structure instead of reading the
-figure.
+History of this item, kept because the oscillation is itself evidence about the
+process. It was first claimed on #334 that the correlation is implicit, from
+reasoning about the structure rather than reading the figure. Reading the
+figure suggested a horizontal line and a closed-form chain. Measuring the
+figure, after a reviewer objected, showed a small but real slope. It is
+currently **open**, and the printed equation is the better authority until a
+reviewer rules otherwise.
 
 Worked values from the chain, for review against the book if it carries an
 example:
@@ -196,6 +232,9 @@ fall from the printed line is the accuracy of Han's correlation against his own
 measurements -- which is what a harness tolerance should be set from, rather
 than a number chosen for convenience. Digitising the scatter is therefore worth
 doing, but for the band, not for the values.
+
+Both panels use **logarithmic y-axes**, so a band read off them is
+multiplicative. A tolerance expressed as a ratio, not as an absolute offset.
 
 Keeping these apart matters. Our code is not obliged to reproduce Han's
 measurements; it is obliged to reproduce Han's correlation, and to be honest
@@ -249,6 +288,7 @@ and is consistent with the friction side ending up 4-5x low.
 | date | reviewer | outcome |
 |---|---|---|
 | 2026-09-10 | extracted by Claude | UNCONFIRMED -- submitted for review |
+| 2026-09-10 | reviewer | item 7 challenged: y-axis is logarithmic and the curve is not flat. Measured against the panel frame as a skew control: curve slope is ~100x the frame's, about 4.5% rise across the range. Item 7 reopened; the closed-form claim now conditional. |
 
 Change **Status** at the top of this file when reviewed, and record corrections
 here rather than silently editing the tables above -- a correction is evidence
