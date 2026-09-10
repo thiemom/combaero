@@ -34,23 +34,25 @@ rules, the `W/H` cap, the validity ranges, `R = 3.2 (P/e/10)^0.35`, and
 
 | # | question | why it matters |
 |---|---|---|
-| **24** | Does Eq. 4.17's denominator contain `(W/H)^m`? | image says yes, text extraction says no. The image is likelier -- the next sentence defines `m` and would otherwise be orphaned -- but it should be seen, not inferred |
-| **6** | Is the four-sided friction factor printed as `f = f_bar + (H/W)(f_bar - f_s) * f_bar`? | three transcriptions agree on the trailing `* f_bar`, so this is not a reading problem. But the prose right after it is damaged in the text extraction -- "is the average friction factor" with no subject -- so that region extracts badly and the equation may be affected. As printed the correction is negligible; without the tail it is 1.18x-3.77x larger by `W/H` |
-| **10b** | Does the text near Fig. 4.46 state what `G_bar` denotes? | item 10 was resolved by a numerical argument (below) that is strong -- 0.51% -- but it is an inference. One sentence in the book would make it a fact |
-| **26** | Eq. 4.14: are both wall laws `2.5 ln(y/e)`, with the same constant 2.5? | taken from the text extraction only, so it has one channel rather than two |
-| **27** | Which Webb & Eckert 1972 paper backs `thermal_performance_factor`? The repo cites IJHMT **15(8), 1647-1658**; the Prandtl source is Webb, Eckert & Goldstein, IJHMT **15(1), 180-184** | two near-identical citations are in scope. `thermal_performance_factor` survived #332 as a definition, but its attribution was never verified |
-| **18** | Figure 4.47, angled ribs | the angled-rib branch cannot be implemented without it. Available as `docs/heat_transfer/han/han_fig4.47_pp377.png`, not yet read |
+| **35** | Eq. 4.17's leading constant: **12.3** in the printed equation (p. 376), **12.31** in Figure 4.47 | a disagreement inside the book, not a reading problem. 0.3% at `alpha = 90`, but an implementation must pick one |
+| **27b** | Did Webb and Eckert name the quantity `(Nu/Nu0)/(f/f0)^(1/3)` in the 1972 paper, or is "thermal performance factor" later usage? | naming only. The citation itself is now corrected -- see Resolved |
+| **6b** | The four-sided friction factor is confirmed as printed. Is it *correct* in the book? As printed the sidewall correction is negligible | 1.18x-3.77x on `f` by `W/H`. Needs a worked example or Han (1988) itself |
 
 **Resolved:**
 
 | # | outcome |
 |---|---|
-| 7 | `R` is independent of `e+`, stated in the text; valid `e+ >= 50`, 6% for 95% of data. The measured 4.5% curve slope was artefact |
-| 10 | `G_bar = 4.5 (e+)^0.28` is the **Prandtl-normalised** `G`, not a four-wall average. `3.7 / 0.703^0.57 = 4.5231`, 0.51% from the printed 4.5 |
-| 15-17 | `m` rule, `W/H` cap and Eq. 4.17 validity, from page 377 |
+| 7 | `R` is independent of `e+`; valid `e+ >= 50`, 6% for 95% of data. The measured 4.5% curve slope was artefact |
+| 10 | `G_bar = 1.2 G`, **stated on Fig. 4.47**. Not a Prandtl normalisation -- an earlier resolution in this document was wrong and is recorded as such |
+| 15-17 | `m` rule, `W/H` cap, Eq. 4.17 validity (p. 377) |
+| 18 | Figure 4.47 read; items 28-34 |
 | 19-22 | Eq. 4.18 and its `m`/`n` exponents |
-| 23 | Fig. 4.46 and Fig. 4.47 cover different configurations, so they need not agree |
-| 25 | `G` scales as `Pr^0.57`, from Webb, Eckert & Goldstein Eq. (2). Not a cross-source borrowing -- the normalisation is already in Han's figure |
+| 23 | Fig. 4.46 is Han (1988) JHT 110, 321; Fig. 4.47 is Han and Park (1988) IJHMT 31(1), 183 -- different papers, different configurations |
+| 24 | Eq. 4.17 **does** carry `(W/H)^m`. The image was right; the text extraction dropped it |
+| 25 | `G ~ Pr^0.57` from Webb, Eckert and Goldstein Eq. (2). A **cross-source decision**, not something already in Han's figure |
+| 26 | Eq. 4.14: both wall laws are `2.5 ln(y/e) + term`, with `R(e+)` for `u+` and `G(e+, Pr)` for `T+` |
+| 27 | The repo's citation issue number is wrong: **15(9)**, not 15(8). Webb, R.L. and Eckert, E.R.G. (1972), "Application of rough surfaces to heat exchanger design", *IJHMT* **15(9)**, 1647-1658 |
+| 6 | The four-sided friction factor **is** printed with the trailing `* f_bar`. Transcription closed; correctness reopened as 6b |
 
 ### Item 25: the Prandtl gap, and the trap in closing it
 
@@ -310,49 +312,43 @@ Geometries carried in the figure legend, usable as harness cases:
 | Han (1984) | 0.042 | 10 | 1 |
 | Han (1984) | 0.021 | 10 | 1 |
 
-### Items 10 and 25 resolved together: the Prandtl scaling is inside Fig. 4.46
+### Item 10: `G_bar = 1.2 G`, stated on Fig. 4.47
 
-Webb, Eckert and Goldstein (1972) define, for repeated-rib roughness:
-
-```
-g_bar(e+) = [ (f/2St - 1)/sqrt(f/2) + u+_e ] Pr^(-0.57)          their Eq. (2)
-u+_e      = sqrt(2/f) + 2.5 ln(2e/D) + 3.75                      their Eq. (1)
-e+        = e u*/nu = (e/D) Re sqrt(f/2)                          their nomenclature
-```
-
-correlated within +/-9%. Read from page images at 400 dpi, not from OCR, which
-garbled the exponent.
-
-The bracket is **exactly Han's `G`**: `(f/2St - 1)/sqrt(f/2)` is Eq. 4.16's
-numerator term, and `u+_e` is Han's `R` for a pipe -- same form, constant 3.75
-where Han has 2.5, and without Han's aspect-ratio factor `2W/(W+H)`. `e+` is
-defined identically in both.
-
-So `g_bar = G * Pr^(-0.57)`. Testing that against Han's own figure:
+**This corrects an earlier resolution in this document.** Figure 4.47 labels its
+dashed line directly:
 
 ```
-Han solid line   G     = 3.7 (e+)^0.28   at Pr = 0.703
-=> g_bar coefficient   = 3.7 / 0.703^0.57 = 3.7 / 0.81802 = 4.5231
-Han dashed line  G_bar = 4.5 (e+)^0.28
-agreement                                              0.51%
+G_bar = 1.2 G
 ```
 
-**Item 10 is answered:** the dashed line is not a four-wall average. It is the
-Prandtl-normalised function, carrying Webb, Eckert and Goldstein's overbar
-notation for exactly that reason.
+That is the answer. `G_bar` is not a Prandtl normalisation.
 
-**Item 25 is answered, and reframed.** Adopting `Pr^0.57` is not a cross-source
-construction after all -- the normalisation is already present in Han's own
-figure, and the two printed lines are related by the WEG factor to half a
-percent. Han plotted `G` at his test Prandtl number and `G_bar` generalised.
+Physically it is consistent: `G` is inversely proportional to Stanton number,
+so `G_bar = 1.2 G` describes the *lower*-heat-transfer quantity -- a four-wall
+channel average dragged down by the smooth walls, against `G` for the ribbed
+wall alone.
 
-This is a cross-check that could have failed: two independently read sources,
-one a 1972 paper and one a 2012 textbook figure, agreeing on a coefficient
-neither states in terms of the other.
+**The withdrawn argument, kept because the way it failed is instructive.**
+Webb, Eckert and Goldstein's Eq. (2) defines `g_bar = G Pr^(-0.57)`, and at
+`Pr = 0.703` that factor is 1.2225. Applied to Han's `G = 3.7 (e+)^0.28` it
+predicts 4.5231 against the printed 4.5 -- 0.51%. That looked like a
+confirmation across two independently read sources.
 
-**One confirmation still wanted.** The inference rests on a numerical
-agreement, strong as it is. If the text near Fig. 4.46 says anything about what
-`G_bar` denotes, it should be checked -- see the flag list.
+It was a coincidence. The two candidate explanations of Fig. 4.46's ratio:
+
+| explanation | factor | implies `G_bar` | vs printed 4.5 |
+|---|---|---|---|
+| `G_bar = 1.2 G`, **stated on Fig. 4.47** | 1.2000 | 4.440 | 1.33% |
+| `G_bar = G Pr^(-0.57)`, inferred | 1.2225 | 4.523 | 0.51% |
+
+The inference fits the digits better and is still wrong, because the other is
+printed. **A stated relationship beats a better-fitting coincidence** -- and a
+numerical agreement at half a percent is not evidence of mechanism when the
+mechanism is written down two pages away.
+
+Note also that this restores the reading item 10 started with -- ribbed wall
+versus channel average -- which was abandoned on the strength of the
+coincidence and then confirmed by the figure.
 
 ### Correlation with rib angle (Eq. 4.17)
 
@@ -432,6 +428,37 @@ at the boundary -- a 90-degree rib in a broad-aspect duct satisfies both
 descriptions.
 
 ---
+
+### Figure 4.47 (item 18) and what it settles
+
+Read from `docs/heat_transfer/han/han_fig4.47_pp377.png`.
+
+| # | item | as extracted | state |
+|---|---|---|---|
+| 28 | Fig. 4.47 left panel, R correlation | `R/[(P/e/10)^0.35 (W/H)^m] = 12.31 - 27.07(alpha/90) + 17.86(alpha/90)^2` | confirmed |
+| 29 | Fig. 4.47 right panel, G correlation | `G = 2.24 (W/H)^0.1 (alpha/90)^m (p/e/10)^n (e+)^0.35` | confirmed, matches Eq. 4.18 |
+| 30 | dashed line | `G_bar = 1.2 G` | confirmed -- resolves item 10 |
+| 31 | exponent switch | square channel `m = 0.35, n = 0.1`; **rectangular channels I and II** `m = 0, n = 0` | confirmed, matches items 20-21 |
+| 32 | validity box, both panels | `P/e = 10-20`, `e/D = 0.047-0.078`, `alpha = 90-30 deg`, `W/H = 1-4`, `Re = 10,000-60,000` | confirmed, matches item 17 |
+| 33 | `e+` axis range | 50 to 1000 | consistent with the `e+ >= 50` floor |
+| 34 | source of Fig. 4.47 | Han, J.C. and Park, J.S., *Int. J. Heat Mass Transfer*, 31(1), 183, 1988 | confirmed |
+
+**Item 34 independently confirms item 23.** Figure 4.46 is credited to Han,
+J.C., *ASME J. Heat Transfer*, 110, 321, 1988; Figure 4.47 to Han and Park,
+*IJHMT*, 31(1), 183, 1988. Two different papers, two different configurations.
+They are not obliged to agree, which is what item 23 concluded on weaker
+grounds.
+
+### Discrepancy inside the book (item 35)
+
+| # | item | state |
+|---|---|---|
+| 35 | Eq. 4.17's leading constant | **12.3** in the printed equation on p. 376, **12.31** in Figure 4.47 | needs review |
+
+Small -- at `alpha = 90 deg` it moves `R/(P/e/10)^0.35` from 3.09 to 3.10, about
+0.3% -- but it is a disagreement between two places in the same book rather
+than a reading problem, and an implementation has to pick one. `12.31` is the
+likelier intent, being the more precise of the two, but that is an inference.
 
 ### Transcription discrepancy between two of our own records (item 24)
 
