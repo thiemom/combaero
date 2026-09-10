@@ -125,6 +125,7 @@ TODO.md
 # extraction documents under validation/cooling/extractions/ are the tracked
 # artifact.
 docs/sources/
+docs/heat_transfer/
 
 # Benchmark run outputs (auto-generated, not for tracking)
 benchmarks/runs/

@@ -22,6 +22,41 @@ for each is in the tables below under the same number.
 | **18** | Fig. 4.47, angled ribs | the angled-rib branch cannot be implemented without it, and it is where 4.17/4.18 belong |
 | -- | Does the book carry a **worked example** for ribs? | would resolve item 6 and give the whole chain an end-to-end check |
 
+### Flag list -- checkable against the printed page
+
+Every quantity appearing in both the page images and the text extraction
+(`docs/heat_transfer/han/han_ribs.md`) was compared. These agree exactly and
+need no checking: `u+`, `T+`, `e+`, Eq. 4.15, Eq. 4.16, Eq. 4.18, the `m`/`n`
+rules, the `W/H` cap, the validity ranges, `R = 3.2 (P/e/10)^0.35`, and
+`G = 3.7 (e+)^0.28`.
+
+These need one look each:
+
+| # | question for the book | why |
+|---|---|---|
+| **24** | Does Eq. 4.17's denominator contain `(W/H)^m`? | image says yes, text extraction says no. The image is likelier -- the next sentence defines `m` and would otherwise be orphaned -- but it should be seen, not inferred |
+| **6** | Is the four-sided friction factor printed as `f = f_bar + (H/W)(f_bar - f_s) * f_bar`? | three transcriptions now agree on the trailing `* f_bar`, so this is not a reading problem. But the prose immediately after it is damaged in the text extraction -- "is the average friction factor" with no subject -- so that region of the page extracts badly, and the equation may be affected too. As printed the correction is negligible (1.18x-3.77x by `W/H`) |
+| **10** | What does the dashed line `G_bar = 4.5 (e+)^0.28` in Fig. 4.46 represent? | it appears in the figure but nowhere in the section text. If it is the four-wall average while `G = 3.7` is the ribbed wall, an implementation must pick deliberately -- they differ by 22% |
+| **25** | Is `G = 3.7 (e+)^0.28` given only for `Pr = 0.703`? Is a Pr-generalised form given anywhere? | the text says "For a Prandtl number of 0.703 ..." and neither this nor Eq. 4.18 carries a `Pr` term, yet `G` is written `G(e+, Pr)` throughout. See below |
+| **26** | Eq. 4.14: are both wall laws `2.5 ln(y/e)`, with the same constant 2.5? | taken from the text extraction only; no page image seen, so it has one channel rather than two |
+
+### Item 25 matters more than it looks
+
+`G` is written `G(e+, Pr)` in Eq. 4.14 and Eq. 4.16 -- it is a function of
+Prandtl number by definition. But both correlations that would let you
+*evaluate* it, `G = 3.7 (e+)^0.28` and Eq. 4.18, carry no `Pr` term at all, and
+the text attaches the first to `Pr = 0.703` specifically.
+
+A `ChannelElement` computes `Pr` from the local mixture and temperature, so it
+will routinely sit away from 0.703 -- combustion products and high temperatures
+both move it. Using either correlation there is extrapolation in a variable the
+correlation does not expose, with no stated behaviour.
+
+Either the book gives a Pr-generalised form elsewhere, or the implementation
+must declare `Pr = 0.703` as a validity condition and warn outside it. That is
+a decision for the re-add, and it needs settling before implementation rather
+than after.
+
 ### What I still need sent
 
 - **Figure 4.47** and its surrounding text
@@ -65,6 +100,20 @@ time. State is one of **confirmed**, **suspect**, or **missing**.
 
 ### Definitions
 
+Eq. 4.14 gives the wall laws these all sit on, after Nikuradse (1950) and
+Dipprey and Sabersky (1963):
+
+```
+u+ = 2.5 ln(y/e) + R(e+)
+T+ = 2.5 ln(y/e) + G(e+, Pr)
+```
+
+`R` and `G` are the dimensionless velocity and temperature **at the rib tip**,
+`y = e`. This is why `G` has `R`'s structure with temperature in place of
+velocity, and it is the external anchor that made cross-check 1 below
+non-circular.
+
+
 | # | item | as extracted | state |
 |---|---|---|---|
 | 1 | dimensionless average velocity | `u+ = (2/f)^(1/2)` | confirmed |
@@ -97,15 +146,33 @@ move that produced the defects this rebuild exists to undo.
 
 | # | item | as extracted | state |
 |---|---|---|---|
-| 7 | roughness function | `R / (P/e/10)^0.35 = 3.2`, printed with a leader line to the plotted curve | **needs review -- see below** |
+| 7 | roughness function | `R = 3.2 * (P/e/10)^0.35`, **independent of `e+`**, for `e+ >= 50` | confirmed by the section text |
 | 8 | heat-transfer roughness function, solid line | `G = 3.7 * (e+)^0.28` | confirmed |
 | 9 | heat-transfer roughness function, dashed line | `G_bar = 4.5 * (e+)^0.28` | confirmed |
-| 10 | which of items 8 and 9 is the ribbed wall vs the channel average | unbarred = ribbed sidewall, barred = channel average | **assumed, needs the surrounding text** |
+| 10 | which of items 8 and 9 Han presents as the correlation | the text names `G = 3.7 (e+)^0.28` at `Pr = 0.703`, `e+ >= 50`, 8% deviation for 95% of data. What `G_bar = 4.5 (e+)^0.28` represents is still unstated | **partly resolved** |
 | 11 | figure validity, this study | `alpha = 90 deg`, `10,000 <= Re <= 60,000` | confirmed |
 | 12 | figure validity, Han (1984) data | `alpha = 90 deg`, `8,000 <= Re <= 80,000` | confirmed |
 | 13 | plotted e+ range | roughly 40 to 1000 | confirmed |
 
-**Item 7 needs a reviewer's eye on the figure itself.** The label is printed as
+**Item 7 is now settled by the running text**, which states it directly:
+
+> The correlation of friction roughness function R is `R = 3.2*((P/e)/10)^0.35`
+> for `e+` greater than or equal to 50. The equation correlates 95% of the
+> experimental data within 6% deviation. **Note that R is independent of the
+> roughness Reynolds number e+.** This implies that the average friction factor
+> is independent of roughness Reynolds number.
+
+So `R` does not depend on `e+`, the prediction chain below is closed form, and
+the ~4.5% slope measured off the drawn curve is drafting or marker
+contamination rather than physics. Two further facts come with it: the
+correlation holds for **`e+ >= 50`**, and it carries a stated accuracy of
+**6% for 95% of the data**.
+
+The measurement that prompted the doubt is kept below, because a reading that
+was challenged, measured, and then confirmed by the text is a better record
+than a reading that was simply right.
+
+**Superseded discussion.** The label is printed as
 a constant, `R/(P/e/10)^0.35 = 3.2`, joined to the plotted curve by a leader
 line. But the lower panel's y-axis is **logarithmic**, and the drawn curve is
 not quite flat.
@@ -193,7 +260,7 @@ channel, which is the stated consequence in item 22. Note that `(W/H)^0.1` sits
 
 | # | item | state |
 |---|---|---|
-| 23 | Fig. 4.46's `G = 3.7 (e+)^0.28` and Eq. 4.18's `G = 2.24 (W/H)^0.1 ... (e+)^0.35` do not agree | **needs review** |
+| 23 | Fig. 4.46's `G` and Eq. 4.18's `G` disagree | **resolved -- different configurations** |
 
 At `alpha = 90 deg`, `P/e = 10`, over the plotted range:
 
@@ -208,8 +275,15 @@ The `e+` exponents differ (0.28 against 0.35), and Eq. 4.18's `(W/H)^0.1` term
 lies outside the `m`/`n` switch, so it cannot collapse `W/H` onto a single line
 -- yet Fig. 4.46 shows `W/H` = 1, 2 and 4 doing exactly that.
 
-The probable explanation is that these are correlations for **different
-configurations**: Fig. 4.46 is Han (1988) for 90-degree orthogonal ribs, while
+**Resolved by the section text.** They are correlations for **different
+configurations**, and the text frames them separately: Figure 4.46 is Han
+(1988) for two-sided orthogonal 90-degree ribs, while Figure 4.47 covers
+broad-aspect ratio rectangular ducts with angled ribs. They are not obliged to
+agree, and the earlier concern about the R/G asymmetry falls away -- the R
+comparison being close at 90 degrees is a coincidence of the fits, not evidence
+that the two describe the same thing.
+
+Original reasoning, kept for the record: Fig. 4.46 is Han (1988) for 90-degree orthogonal ribs, while
 Eqs. 4.17 and 4.18 belong to Figure 4.47, introduced in the text as
 "broad-aspect ratio rectangular ducts with angled ribs". On that reading they
 are not obliged to agree.
@@ -225,6 +299,28 @@ at the boundary -- a 90-degree rib in a broad-aspect duct satisfies both
 descriptions.
 
 ---
+
+### Transcription discrepancy between two of our own records (item 24)
+
+| # | item | state |
+|---|---|---|
+| 24 | Eq. 4.17's denominator | **needs a third look** |
+
+Two transcriptions of Eq. 4.17 disagree:
+
+| source | denominator |
+|---|---|
+| page image `han_2012_rib_fig_4.46_eq_4.17.png` | `(P/e/10)^0.35 * (W/H)^m` |
+| text extraction, `docs/heat_transfer/han/han_ribs.md` line 125 | `(P/e/10)^0.35` only |
+
+The image version is the more likely correct one, because the sentence
+immediately following the equation reads "where `m = 0` for `alpha = 90` and
+`m = 0.35` for `alpha < 90`" -- which is meaningless unless `m` appears in the
+equation. Recorded rather than assumed: it needs one look at the printed page.
+
+This is what two extraction channels are for. The text extraction carried
+things the images did not -- Eq. 4.14, the `e+ >= 50` floor, the stated
+deviation bands -- and the image carried a factor the text dropped.
 
 ## Cross-checks performed
 
@@ -321,7 +417,20 @@ digitising.** An implementation of Han's correlation must reproduce
 `R/(P/e/10)^0.35 = 3.2` and `G = 3.7 (e+)^0.28` exactly, because those *are*
 the correlation. Reproducing them is a closed-form check.
 
-**The scatter is the target for tolerance.** How far the experimental points
+**The tolerance is stated in the text, so the scatter need not be digitised
+after all.** Han gives it directly:
+
+| correlation | stated accuracy | validity |
+|---|---|---|
+| `R = 3.2 (P/e/10)^0.35` | 95% of data within **6%** | `e+ >= 50` |
+| `G = 3.7 (e+)^0.28` | 95% of data within **8%** | `e+ >= 50`, `Pr = 0.703` |
+
+That is a better tolerance than a digitised band would have been: it is the
+author's own figure for his own fit, rather than our reading of his plot. The
+harness should use 6% and 8%, and treat them as the multiplicative bands they
+are on a log axis.
+
+**The scatter, if ever digitised, is the target for tolerance.** How far the experimental points
 fall from the printed line is the accuracy of Han's correlation against his own
 measurements -- which is what a harness tolerance should be set from, rather
 than a number chosen for convenience. Digitising the scatter is therefore worth
@@ -399,6 +508,8 @@ than extrapolating past it.
 | date | reviewer | outcome |
 |---|---|---|
 | 2026-09-10 | extracted by Claude | UNCONFIRMED -- submitted for review |
+| 2026-09-10 | extracted by Claude | systematic comparison of both channels. Five quantities agree exactly. Flag list raised: items 24 (`(W/H)^m` in Eq. 4.17), 6, 10, 25 (`Pr = 0.703` only) and 26 (Eq. 4.14 has one channel). |
+| 2026-09-10 | reviewer | section text supplied (`docs/heat_transfer/han/han_ribs.md`). **Item 7 resolved**: the text states R is independent of `e+`, valid `e+ >= 50`, 6% deviation for 95% of data -- the measured 4.5% slope was artefact. **Item 23 resolved**: Fig. 4.46 and Fig. 4.47 cover different configurations. **Item 10 partly resolved.** Adds Eq. 4.14, the stated tolerances, and opens item 24 -- the text extraction dropped `(W/H)^m` from Eq. 4.17 where the image has it. |
 | 2026-09-10 | reviewer | Eq. 4.18 image supplied: item 19 confirmed, items 20-22 now interpretable. Opened item 23 -- Eq. 4.18 and Fig. 4.46 disagree on `G` by up to 22%, with different `e+` exponents (0.35 vs 0.28). |
 | 2026-09-10 | reviewer | page 377 supplied: resolves the `m` rule (item 15), adds the `W/H` cap (16), the validity range (17) and the Eq. 4.18 exponents (20-22). Eq. 4.18 itself still missing -- plain text drops equation images. |
 | 2026-09-10 | reviewer | item 7 challenged: y-axis is logarithmic and the curve is not flat. Measured against the panel frame as a skew control: curve slope is ~100x the frame's, about 4.5% rise across the range. Item 7 reopened; the closed-form claim now conditional. |
