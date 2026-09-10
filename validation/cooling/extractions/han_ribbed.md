@@ -30,16 +30,27 @@ need no checking: `u+`, `T+`, `e+`, Eq. 4.15, Eq. 4.16, Eq. 4.18, the `m`/`n`
 rules, the `W/H` cap, the validity ranges, `R = 3.2 (P/e/10)^0.35`, and
 `G = 3.7 (e+)^0.28`.
 
-These need one look each:
+**Open -- these need a look at the book:**
 
-| # | question for the book | why |
+| # | question | why it matters |
 |---|---|---|
 | **24** | Does Eq. 4.17's denominator contain `(W/H)^m`? | image says yes, text extraction says no. The image is likelier -- the next sentence defines `m` and would otherwise be orphaned -- but it should be seen, not inferred |
-| **6** | Is the four-sided friction factor printed as `f = f_bar + (H/W)(f_bar - f_s) * f_bar`? | three transcriptions now agree on the trailing `* f_bar`, so this is not a reading problem. But the prose immediately after it is damaged in the text extraction -- "is the average friction factor" with no subject -- so that region of the page extracts badly, and the equation may be affected too. As printed the correction is negligible (1.18x-3.77x by `W/H`) |
-| **10** | What does the dashed line `G_bar = 4.5 (e+)^0.28` in Fig. 4.46 represent? | it appears in the figure but nowhere in the section text. If it is the four-wall average while `G = 3.7` is the ribbed wall, an implementation must pick deliberately -- they differ by 22% |
-| **25** | Confirmed: the text presents the correlations for `Pr ~ 0.7`. Open question is whether Dipprey and Sabersky (1963), cited at Eq. 4.14, carries a `Pr`-explicit form of `G` -- and if so, whether extending Han's rib correlation with a sand-grain Prandtl exponent is acceptable | the text says "For a Prandtl number of 0.703 ..." and neither this nor Eq. 4.18 carries a `Pr` term, yet `G` is written `G(e+, Pr)` throughout. See below |
-| **26** | Eq. 4.14: are both wall laws `2.5 ln(y/e)`, with the same constant 2.5? | taken from the text extraction only; no page image seen, so it has one channel rather than two |
-| **27** | Which Webb & Eckert 1972 paper backs `thermal_performance_factor`? The repo cites IJHMT **15(8), 1647-1658**; the Prandtl candidate is Webb, Eckert & Goldstein, IJHMT **15(1), 180-184** | two near-identical citations are now in scope. `thermal_performance_factor` survived #332 as a definition, but its attribution was never verified |
+| **6** | Is the four-sided friction factor printed as `f = f_bar + (H/W)(f_bar - f_s) * f_bar`? | three transcriptions agree on the trailing `* f_bar`, so this is not a reading problem. But the prose right after it is damaged in the text extraction -- "is the average friction factor" with no subject -- so that region extracts badly and the equation may be affected. As printed the correction is negligible; without the tail it is 1.18x-3.77x larger by `W/H` |
+| **10b** | Does the text near Fig. 4.46 state what `G_bar` denotes? | item 10 was resolved by a numerical argument (below) that is strong -- 0.51% -- but it is an inference. One sentence in the book would make it a fact |
+| **26** | Eq. 4.14: are both wall laws `2.5 ln(y/e)`, with the same constant 2.5? | taken from the text extraction only, so it has one channel rather than two |
+| **27** | Which Webb & Eckert 1972 paper backs `thermal_performance_factor`? The repo cites IJHMT **15(8), 1647-1658**; the Prandtl source is Webb, Eckert & Goldstein, IJHMT **15(1), 180-184** | two near-identical citations are in scope. `thermal_performance_factor` survived #332 as a definition, but its attribution was never verified |
+| **18** | Figure 4.47, angled ribs | the angled-rib branch cannot be implemented without it. Available as `docs/heat_transfer/han/han_fig4.47_pp377.png`, not yet read |
+
+**Resolved:**
+
+| # | outcome |
+|---|---|
+| 7 | `R` is independent of `e+`, stated in the text; valid `e+ >= 50`, 6% for 95% of data. The measured 4.5% curve slope was artefact |
+| 10 | `G_bar = 4.5 (e+)^0.28` is the **Prandtl-normalised** `G`, not a four-wall average. `3.7 / 0.703^0.57 = 4.5231`, 0.51% from the printed 4.5 |
+| 15-17 | `m` rule, `W/H` cap and Eq. 4.17 validity, from page 377 |
+| 19-22 | Eq. 4.18 and its `m`/`n` exponents |
+| 23 | Fig. 4.46 and Fig. 4.47 cover different configurations, so they need not agree |
+| 25 | `G` scales as `Pr^0.57`, from Webb, Eckert & Goldstein Eq. (2). Not a cross-source borrowing -- the normalisation is already in Han's figure |
 
 ### Item 25: the Prandtl gap, and the trap in closing it
 
