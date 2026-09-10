@@ -119,6 +119,13 @@ TODO.md
 !.claude/skills/model-provenance/
 !.claude/skills/write-pr/
 
+# Copyrighted source material for correlation extraction (#339).
+# Page scans and figures live here so an extraction can be re-checked against
+# them, but they are NOT redistributable and must never be committed. The
+# extraction documents under validation/cooling/extractions/ are the tracked
+# artifact.
+docs/sources/
+
 # Benchmark run outputs (auto-generated, not for tracking)
 benchmarks/runs/
 benchmarks/network_solver_benchmark_latest.json
