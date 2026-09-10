@@ -63,6 +63,21 @@ reproduce, and where it is printed as an equation it needs no digitising. The
 harness tolerance should be set from. Conflating them is how a tolerance ends
 up wide enough to admit a 4-5x error.
 
+## Facts and decisions are kept apart
+
+Extracted items are facts about a page: a reviewer checks them against the
+source and they are right or wrong. **Modelling decisions** are choices about
+what to implement, and a reviewer can reasonably disagree with one without
+doubting the transcription. They live in their own section, each recording the
+decision, why it is defensible, what it buys, and what symptom would call it
+back into question.
+
+The first such decision is instructive. Han states that `R` is independent of
+`e+`; the drawn figure shows a real ~4.5% rise. Following the text is right,
+but the reason is not deference -- it is that the neglected slope is smaller
+than the 6% scatter the correlation itself admits, while keeping it would turn
+a closed-form chain into an implicit solve needing its own derivative.
+
 ## Tracking
 
 Filed under #339. Each correlation family has its own issue: ribbed #334,

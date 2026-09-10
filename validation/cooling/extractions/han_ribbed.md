@@ -322,6 +322,35 @@ This is what two extraction channels are for. The text extraction carried
 things the images did not -- Eq. 4.14, the `e+ >= 50` floor, the stated
 deviation bands -- and the image carried a factor the text dropped.
 
+## Modelling decisions
+
+Choices made in implementing what was extracted. Kept apart from the extracted
+items above, because those are facts about a page and these are not -- a
+reviewer should be able to disagree with one of these without doubting the
+transcription.
+
+### D1. Treat `R` as independent of `e+`, following Han
+
+**Decision.** Implement `R = 3.2 (P/e/10)^0.35` as a constant in `e+`, as the
+text states, rather than fitting the slope visible in the drawn curve.
+
+**Why it is defensible, not merely convenient.** The drawn curve does rise --
+measured at ~4.5% across the plotted range, about 100x the scan skew of the
+panel frame, so it is real. But Han's stated accuracy for this correlation is
+**6% for 95% of the data**. The neglected slope is *smaller than the scatter
+the correlation already admits*, so treating `R` as constant is consistent with
+its own accuracy claim rather than in tension with it.
+
+**What it buys.** Eq. 4.15 inverts directly for `f`, making the whole
+prediction chain closed form. Keeping the slope would make `R` depend on `e+`,
+`e+` depends on `f`, and `f` would then need an inner solve carrying its own
+analytic derivative to satisfy the Solver (f, J) rule -- a substantial cost for
+a correction below the noise floor.
+
+**What to watch.** If the harness ever shows systematic bias in `f` that grows
+with `e+`, this decision is the first place to look. The effect is bounded at
+roughly 4.5% and one-signed, so it would appear as a drift rather than scatter.
+
 ## Cross-checks performed
 
 These are checks that could have failed and did not. They test the extraction,
@@ -508,6 +537,7 @@ than extrapolating past it.
 | date | reviewer | outcome |
 |---|---|---|
 | 2026-09-10 | extracted by Claude | UNCONFIRMED -- submitted for review |
+| 2026-09-10 | reviewer | accepted D1: follow Han in treating `R` as constant in `e+`. The figure does show a slope, but it is smaller than Han's own 6% band and following the text keeps the chain closed form. |
 | 2026-09-10 | extracted by Claude | systematic comparison of both channels. Five quantities agree exactly. Flag list raised: items 24 (`(W/H)^m` in Eq. 4.17), 6, 10, 25 (`Pr = 0.703` only) and 26 (Eq. 4.14 has one channel). |
 | 2026-09-10 | reviewer | section text supplied (`docs/heat_transfer/han/han_ribs.md`). **Item 7 resolved**: the text states R is independent of `e+`, valid `e+ >= 50`, 6% deviation for 95% of data -- the measured 4.5% slope was artefact. **Item 23 resolved**: Fig. 4.46 and Fig. 4.47 cover different configurations. **Item 10 partly resolved.** Adds Eq. 4.14, the stated tolerances, and opens item 24 -- the text extraction dropped `(W/H)^m` from Eq. 4.17 where the image has it. |
 | 2026-09-10 | reviewer | Eq. 4.18 image supplied: item 19 confirmed, items 20-22 now interpretable. Opened item 23 -- Eq. 4.18 and Fig. 4.46 disagree on `G` by up to 22%, with different `e+` exponents (0.35 vs 0.28). |
