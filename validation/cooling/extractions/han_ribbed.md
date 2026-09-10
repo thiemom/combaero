@@ -18,13 +18,12 @@ for each is in the tables below under the same number.
 | **7** | Fig. 4.46 lower panel: is the drawn curve meant to be flat? Its label reads `= 3.2`, a constant, but measurement gives a ~4.5% rise across the range, ~100x the scan skew. Is there surrounding text stating an `e+` range over which `R` is taken as constant? | decides whether an implementation is closed form or needs an inner solve with its own derivative -- the difference between a cheap and an expensive #334 |
 | **6** | The four-sided friction factor. Is it printed as `f = f_bar + (H/W)(f_bar - f_s) * f_bar`? The transcription is settled; the question is whether the book itself is right, since as printed the correction is negligible. | 1.18x to 3.77x on `f`, depending on `W/H` |
 | **10** | Which of `G = 3.7(e+)^0.28` and `G_bar = 4.5(e+)^0.28` is the ribbed wall and which the channel average? | a 22% error in `St` if swapped |
-| **19** | Eq. 4.18 -- needs a page image | items 20-22 are recorded but meaningless without it |
-| **18** | Fig. 4.47, angled ribs | the angled-rib branch cannot be implemented without it |
+| **23** | Fig. 4.46 and Eq. 4.18 give different `G`. Are they meant for different configurations -- Fig. 4.46 for 90-degree orthogonal ribs, 4.17/4.18 for broad-aspect ducts with angled ribs? What applies to a 90-degree rib in a broad-aspect duct, which fits both? | up to 22% in `G`, and it decides which correlation an implementation selects |
+| **18** | Fig. 4.47, angled ribs | the angled-rib branch cannot be implemented without it, and it is where 4.17/4.18 belong |
 | -- | Does the book carry a **worked example** for ribs? | would resolve item 6 and give the whole chain an end-to-end check |
 
 ### What I still need sent
 
-- an image of **Eq. 4.18** (page 377) -- plain text drops equation images
 - **Figure 4.47** and its surrounding text
 - any **worked example** using these correlations
 - the text around Figure 4.46 that distinguishes `G` from `G_bar` (item 10)
@@ -54,7 +53,8 @@ copyrighted and must not be committed. This document is the tracked artifact.
 |---|---|
 | Eq. 4.15, 4.16, e+, four-sided f | `han_2012_rib_eq_4.15_4.16.png` |
 | Fig. 4.46, Eq. 4.17 | `han_2012_rib_fig_4.46_eq_4.17.png` |
-| page 377 text: `m` rules, validity, Eq. 4.18 exponents | supplied as text; **Eq. 4.18 image still needed** |
+| page 377 text: `m` rules, validity, Eq. 4.18 exponents | supplied as text |
+| Eq. 4.18 | `han_2012_rib_eq_4.18.png` |
 
 ---
 
@@ -174,7 +174,7 @@ the other.
 
 | # | item | as extracted | state |
 |---|---|---|---|
-| 19 | Eq. 4.18 itself | not transmitted -- supplied as plain text, which drops equation images | **missing** |
+| 19 | Eq. 4.18 | `G = 2.24 * (W/H)^0.1 * (alpha/90)^m * (P/e/10)^n * (e+)^0.35` | confirmed |
 | 20 | exponents, square channel | `m = 0.35`, `n = 0.1` | confirmed (p. 377) |
 | 21 | exponents, rectangular channel | `m = n = 0` | confirmed (p. 377) |
 | 22 | stated consequence | rib angle `alpha` and rib spacing `P/e` are not significant for `G` in a rectangular channel | confirmed (p. 377) |
@@ -184,8 +184,45 @@ the other.
 channel shape) are different quantities that happen to share a letter and even
 share the value 0.35. Items 15 and 20 must not be conflated.
 
-Items 20 and 21 cannot be interpreted without item 19 -- the exponents are
-known but not what they attach to.
+Item 19 shows what items 20 and 21 attach to: `m` is the exponent of
+`(alpha/90)` and `n` the exponent of `(P/e/10)`. Both vanish for a rectangular
+channel, which is the stated consequence in item 22. Note that `(W/H)^0.1` sits
+**outside** the switch and therefore applies always.
+
+### Conflict: two G correlations that disagree (item 23)
+
+| # | item | state |
+|---|---|---|
+| 23 | Fig. 4.46's `G = 3.7 (e+)^0.28` and Eq. 4.18's `G = 2.24 (W/H)^0.1 ... (e+)^0.35` do not agree | **needs review** |
+
+At `alpha = 90 deg`, `P/e = 10`, over the plotted range:
+
+| `e+` | Fig. 4.46 | Eq. 4.18, `W/H`=1 | ratio |
+|---|---|---|---|
+| 40 | 10.39 | 8.15 | 0.78 |
+| 100 | 13.43 | 11.23 | 0.84 |
+| 400 | 19.81 | 18.24 | 0.92 |
+| 1000 | 25.60 | 25.13 | 0.98 |
+
+The `e+` exponents differ (0.28 against 0.35), and Eq. 4.18's `(W/H)^0.1` term
+lies outside the `m`/`n` switch, so it cannot collapse `W/H` onto a single line
+-- yet Fig. 4.46 shows `W/H` = 1, 2 and 4 doing exactly that.
+
+The probable explanation is that these are correlations for **different
+configurations**: Fig. 4.46 is Han (1988) for 90-degree orthogonal ribs, while
+Eqs. 4.17 and 4.18 belong to Figure 4.47, introduced in the text as
+"broad-aspect ratio rectangular ducts with angled ribs". On that reading they
+are not obliged to agree.
+
+What makes it worth a reviewer's judgement is the **asymmetry**: at
+`alpha = 90 deg` the two `R` correlations agree to 3.44%, while the two `G`
+correlations differ by up to 22%. Two correlations for genuinely different
+configurations would not be expected to agree closely on one function and
+poorly on the other.
+
+An implementation must know which correlation applies where, and what happens
+at the boundary -- a 90-degree rib in a broad-aspect duct satisfies both
+descriptions.
 
 ---
 
@@ -349,7 +386,7 @@ than extrapolating past it.
 - **6** four-sided friction factor: transcription settled, correctness suspect
 - **10** which of `G` and `G_bar` is the ribbed wall
 - **18** Figure 4.47, angled ribs
-- **19** Eq. 4.18 itself, needed before items 20-22 mean anything
+- **23** Fig. 4.46 and Eq. 4.18 disagree on `G` by up to 22%
 - whether the book carries a worked example, which would resolve item 6 and
   give the chain an end-to-end check
 - digitise the Figure 4.46 scatter, to set the harness tolerance from the
@@ -362,6 +399,7 @@ than extrapolating past it.
 | date | reviewer | outcome |
 |---|---|---|
 | 2026-09-10 | extracted by Claude | UNCONFIRMED -- submitted for review |
+| 2026-09-10 | reviewer | Eq. 4.18 image supplied: item 19 confirmed, items 20-22 now interpretable. Opened item 23 -- Eq. 4.18 and Fig. 4.46 disagree on `G` by up to 22%, with different `e+` exponents (0.35 vs 0.28). |
 | 2026-09-10 | reviewer | page 377 supplied: resolves the `m` rule (item 15), adds the `W/H` cap (16), the validity range (17) and the Eq. 4.18 exponents (20-22). Eq. 4.18 itself still missing -- plain text drops equation images. |
 | 2026-09-10 | reviewer | item 7 challenged: y-axis is logarithmic and the curve is not flat. Measured against the panel frame as a skew control: curve slope is ~100x the frame's, about 4.5% rise across the range. Item 7 reopened; the closed-form claim now conditional. |
 
