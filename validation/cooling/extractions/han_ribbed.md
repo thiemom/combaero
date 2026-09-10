@@ -1,9 +1,19 @@
 # Extraction: Han rib correlations
 
-**Status: UNCONFIRMED -- awaiting review against the book.**
+**Status: UNCONFIRMED -- all flags closed, awaiting a status decision.**
 
-Nothing here may be implemented until this document is reviewed and its status
-changed. See the review log at the bottom. Tracked by #334, under #339.
+Every flagged item has been checked against the book or resolved by
+derivation, and no open items remain. The status is still UNCONFIRMED because
+setting it is the reviewer's call, not the extractor's: sign the review log at
+the bottom and change this line to CONFIRMED to release it for implementation.
+
+Three modelling decisions need agreeing with it -- **D1** (treat `R` as
+constant in `e+`), **D2** (use `12.31`), and **D3** (implement the four-sided
+friction factor as derived, departing from what the book prints). D3 in
+particular is a knowing divergence from the source and should be assented to
+explicitly.
+
+Tracked by #334, under #339.
 
 ---
 
@@ -30,20 +40,16 @@ need no checking: `u+`, `T+`, `e+`, Eq. 4.15, Eq. 4.16, Eq. 4.18, the `m`/`n`
 rules, the `W/H` cap, the validity ranges, `R = 3.2 (P/e/10)^0.35`, and
 `G = 3.7 (e+)^0.28`.
 
-**Open -- these need a look at the book:**
-
-| # | question | why it matters |
-|---|---|---|
-| **35** | Eq. 4.17's leading constant: **12.3** in the printed equation (p. 376), **12.31** in Figure 4.47 | a disagreement inside the book, not a reading problem. 0.3% at `alpha = 90`, but an implementation must pick one |
-| **27b** | Did Webb and Eckert name the quantity `(Nu/Nu0)/(f/f0)^(1/3)` in the 1972 paper, or is "thermal performance factor" later usage? | naming only. The citation itself is now corrected -- see Resolved |
-| **6b** | The four-sided friction factor is confirmed as printed. Is it *correct* in the book? As printed the sidewall correction is negligible | 1.18x-3.77x on `f` by `W/H`. Needs a worked example or Han (1988) itself |
+**Open: none.** Every flagged item has been checked against the book or
+resolved by derivation. The document is ready for a status decision.
 
 **Resolved:**
 
 | # | outcome |
 |---|---|
+| 6 | The trailing `* f_bar` **is** printed, and **is a typo**. Han's stated area-weighted assumption derives `f = f_bar + (H/W)(f_bar - f_s)` exactly, verified symbolically. See decision D3 |
 | 7 | `R` is independent of `e+`; valid `e+ >= 50`, 6% for 95% of data. The measured 4.5% curve slope was artefact |
-| 10 | `G_bar = 1.2 G`, **stated on Fig. 4.47**. Not a Prandtl normalisation -- an earlier resolution in this document was wrong and is recorded as such |
+| 10 | `G_bar = 1.2 G`, **stated on Fig. 4.47**. Not a Prandtl normalisation -- an earlier resolution here was wrong and is recorded as such |
 | 15-17 | `m` rule, `W/H` cap, Eq. 4.17 validity (p. 377) |
 | 18 | Figure 4.47 read; items 28-34 |
 | 19-22 | Eq. 4.18 and its `m`/`n` exponents |
@@ -51,8 +57,9 @@ rules, the `W/H` cap, the validity ranges, `R = 3.2 (P/e/10)^0.35`, and
 | 24 | Eq. 4.17 **does** carry `(W/H)^m`. The image was right; the text extraction dropped it |
 | 25 | `G ~ Pr^0.57` from Webb, Eckert and Goldstein Eq. (2). A **cross-source decision**, not something already in Han's figure |
 | 26 | Eq. 4.14: both wall laws are `2.5 ln(y/e) + term`, with `R(e+)` for `u+` and `G(e+, Pr)` for `T+` |
-| 27 | The repo's citation issue number is wrong: **15(9)**, not 15(8). Webb, R.L. and Eckert, E.R.G. (1972), "Application of rough surfaces to heat exchanger design", *IJHMT* **15(9)**, 1647-1658 |
-| 6 | The four-sided friction factor **is** printed with the trailing `* f_bar`. Transcription closed; correctness reopened as 6b |
+| 27 | Citation corrected: Webb, R.L. and Eckert, E.R.G. (1972), "Application of rough surfaces to heat exchanger design", *IJHMT* **15(9)**, 1647-1658. The repo says 15(8) |
+| 27b | Webb and Eckert (1972) derived the `1/3` exponent. The **name** "thermal performance factor", and the factor as commonly defined, comes later -- Gee, D.L. and Webb, R.L. (1980), "Forced convection heat transfer in helically rib-roughened tubes", *IJHMT* **23(8)**, 1127-1136 |
+| 35 | `12.3` (p. 376) vs `12.31` (Fig. 4.47). Resolved by decision D2: use `12.31` |
 
 ### Item 25: the Prandtl gap, and the trap in closing it
 
@@ -489,6 +496,56 @@ items above, because those are facts about a page and these are not -- a
 reviewer should be able to disagree with one of these without doubting the
 transcription.
 
+### D2. Use `12.31`, not `12.3`, in Eq. 4.17
+
+**Decision.** Where the printed equation on p. 376 gives `12.3` and Figure 4.47
+gives `12.31`, use `12.31`.
+
+**Why.** The figure carries the more precise value, and a rounded `12.3` in
+running text is the likelier abbreviation of a fitted `12.31` than the reverse.
+The difference is 0.3% at `alpha = 90 deg` -- 3.09 against 3.10 -- so nothing
+turns on it numerically. Recorded so the choice is visible rather than
+arbitrary.
+
+### D3. Implement the four-sided friction factor as DERIVED, not as printed
+
+**Decision.** Implement
+
+```
+f = f_bar + (H/W) * (f_bar - f_s)
+```
+
+and **not** the form printed in the book, which carries a trailing `* f_bar`.
+
+**Why this is a correction rather than a disagreement.** Han's stated
+assumption is that `f_bar` is the area-weighted average of the ribbed walls
+(width `W`) and the smooth walls (height `H`):
+
+```
+f_bar = (W f + H f_s) / (W + H)
+```
+
+Solving that for `f` gives `f = f_bar + (H/W)(f_bar - f_s)` exactly. Verified
+symbolically: the derived expression matches the form without the trailing
+factor and does not match the form with it. So the printed `* f_bar` is a
+typographical error in the book, not a modelling choice of Han's.
+
+**What it changes.** As printed the sidewall correction is negligible -- about
+1.02x at `H/W = 1` for typical friction factors. Derived, it is substantial:
+1.18x to 3.77x across `W/H` from 0.25 to 4. An implementation following the
+printed form would have applied essentially no aspect-ratio correction at all.
+
+**How it was found, and why that matters.** The trailing factor was flagged as
+*suspect* early, on the grounds that the correction it produced was too small
+to be worth an equation. It was **not** acted on at that point -- plausibility
+is not evidence, and acting on it would have been the same move that turned
+`C = 0.38` into `~40` in the removed implementation. It was held open until the
+underlying assumption was supplied and the algebra settled it.
+
+**What to watch.** This is a knowing departure from the printed source. Any
+comparison against a worked example in the book will disagree if that example
+was computed with the printed form.
+
 ### D1. Treat `R` as independent of `e+`, following Han
 
 **Decision.** Implement `R = 3.2 (P/e/10)^0.35` as a constant in `e+`, as the
@@ -697,6 +754,7 @@ than extrapolating past it.
 | date | reviewer | outcome |
 |---|---|---|
 | 2026-09-10 | extracted by Claude | UNCONFIRMED -- submitted for review |
+| 2026-09-10 | reviewer | closed the last flags. 24 and 26 confirmed against the book. **Item 6 resolved by derivation**: supplied Han's area-weighted assumption, from which `f = f_bar + (H/W)(f_bar - f_s)` follows exactly -- the printed trailing `* f_bar` is a typo (decision D3). Item 35 decided in favour of the figure's `12.31` (D2). Item 27b: the name comes from Gee & Webb (1980), not Webb & Eckert (1972). **No open items remain.** |
 | 2026-09-10 | reviewer | supplied the Webb, Eckert & Goldstein paper. **Items 10 and 25 resolved together**: their Eq. (2) gives `g_bar = G Pr^(-0.57)`, and `3.7/0.703^0.57 = 4.5231` reproduces Fig. 4.46's dashed `4.5` to 0.51%. The dashed line is the Prandtl-normalised `G`, not a four-wall average, and the Pr scaling is already inside Han's figure rather than borrowed. |
 | 2026-09-10 | reviewer | proposed Webb, Eckert & Goldstein (1972), IJHMT 15(1), 180-184 as the Prandtl basis. Better fit than Dipprey & Sabersky: same roughness family (repeated ribs) and same `R`/`G` formalism. The book does not cite it, so adopting it is a modelling decision, not an extraction. Opens item 27, a citation collision with the Webb & Eckert 1972 already cited for `thermal_performance_factor`. |
 | 2026-09-10 | reviewer | item 25: confirmed the text presents the correlations for `Pr ~ 0.7`. Raised Dipprey and Sabersky (1963) as a possible source of a `Pr`-explicit form; its role in the book is at Eq. 4.14, as the conceptual origin of the wall laws. Not yet consulted. |
