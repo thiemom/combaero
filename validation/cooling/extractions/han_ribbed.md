@@ -23,6 +23,7 @@ copyrighted and must not be committed. This document is the tracked artifact.
 |---|---|
 | Eq. 4.15, 4.16, e+, four-sided f | `han_2012_rib_eq_4.15_4.16.png` |
 | Fig. 4.46, Eq. 4.17 | `han_2012_rib_fig_4.46_eq_4.17.png` |
+| page 377 text: `m` rules, validity, Eq. 4.18 exponents | supplied as text; **Eq. 4.18 image still needed** |
 
 ---
 
@@ -127,8 +128,33 @@ Geometries carried in the figure legend, usable as harness cases:
 | # | item | as extracted | state |
 |---|---|---|---|
 | 14 | Eq. 4.17 | `R / [ (P/e/10)^0.35 * (W/H)^m ] = 12.3 - 27.07*(alpha/90) + 17.86*(alpha/90)^2` | confirmed |
-| 15 | the exponent `m` | not given on the extracted page | **missing** |
-| 16 | Figure 4.47, angled ribs | referenced in the text, not extracted | **missing** |
+| 15 | the exponent `m` in Eq. 4.17 | `m = 0` for `alpha = 90 deg`; `m = 0.35` for `alpha < 90 deg` | confirmed (p. 377) |
+| 16 | aspect-ratio cap | if `W/H > 2`, set `W/H = 2` | confirmed (p. 377) |
+| 17 | Eq. 4.17 validity | `P/e = 10-20`, `e/D = 0.047-0.078`, `alpha = 90-30 deg`, `W/H = 1-4`, `Re = 10,000-60,000` | confirmed (p. 377) |
+| 18 | Figure 4.47, angled ribs | referenced in the text, not extracted | **missing** |
+
+**Item 15 carries its own corroboration.** `m = 0` at `alpha = 90 deg` means
+`(W/H)^m = 1` for *any* aspect ratio. Figure 4.46 is all-90-degree data and its
+legend spans `W/H = 1, 2 and 4` -- all of which fall on the single line at 3.2.
+The rule and the figure support each other without either being derived from
+the other.
+
+### Correlation for G with e+ (Eq. 4.18, page 377)
+
+| # | item | as extracted | state |
+|---|---|---|---|
+| 19 | Eq. 4.18 itself | not transmitted -- supplied as plain text, which drops equation images | **missing** |
+| 20 | exponents, square channel | `m = 0.35`, `n = 0.1` | confirmed (p. 377) |
+| 21 | exponents, rectangular channel | `m = n = 0` | confirmed (p. 377) |
+| 22 | stated consequence | rib angle `alpha` and rib spacing `P/e` are not significant for `G` in a rectangular channel | confirmed (p. 377) |
+
+**Symbol collision, worth a comment in any implementation.** `m` in Eq. 4.17
+(0 or 0.35, selected by rib angle) and `m` in Eq. 4.18 (0.35 or 0, selected by
+channel shape) are different quantities that happen to share a letter and even
+share the value 0.35. Items 15 and 20 must not be conflated.
+
+Items 20 and 21 cannot be interpreted without item 19 -- the exponents are
+known but not what they attach to.
 
 ---
 
@@ -270,12 +296,29 @@ and is consistent with the friction side ending up 4-5x low.
 
 ---
 
+## Validity, against what the removed code claimed
+
+Item 17 gives Han's operating range. The implementation removed in #332
+validated a **wider** band, so it accepted extrapolation silently and threw
+only outside its own inflated limits.
+
+| parameter | Han (item 17) | removed code | effect |
+|---|---|---|---|
+| `e/D` | 0.047-0.078 | 0.02-0.1 | accepted down to less than half the source's lower bound |
+| `P/e` | 10-20 | 5-20 | accepted half the source's lower bound |
+| `alpha` | 30-90 deg | 30-90 deg | matches |
+| `W/H` | 1-4 | not validated | absent |
+| `Re` | 10,000-60,000 | not validated | absent |
+
+A re-add should validate item 17's band, and apply item 16's `W/H` cap rather
+than extrapolating past it.
+
 ## Open items
 
 - **6** four-sided friction factor: transcription settled, correctness suspect
 - **10** which of `G` and `G_bar` is the ribbed wall
-- **15** the exponent `m` in `(W/H)^m`
-- **16** Figure 4.47, angled ribs
+- **18** Figure 4.47, angled ribs
+- **19** Eq. 4.18 itself, needed before items 20-22 mean anything
 - whether the book carries a worked example, which would resolve item 6 and
   give the chain an end-to-end check
 - digitise the Figure 4.46 scatter, to set the harness tolerance from the
@@ -288,6 +331,7 @@ and is consistent with the friction side ending up 4-5x low.
 | date | reviewer | outcome |
 |---|---|---|
 | 2026-09-10 | extracted by Claude | UNCONFIRMED -- submitted for review |
+| 2026-09-10 | reviewer | page 377 supplied: resolves the `m` rule (item 15), adds the `W/H` cap (16), the validity range (17) and the Eq. 4.18 exponents (20-22). Eq. 4.18 itself still missing -- plain text drops equation images. |
 | 2026-09-10 | reviewer | item 7 challenged: y-axis is logarithmic and the curve is not flat. Measured against the panel frame as a skew control: curve slope is ~100x the frame's, about 4.5% rise across the range. Item 7 reopened; the closed-form claim now conditional. |
 
 Change **Status** at the top of this file when reviewed, and record corrections
