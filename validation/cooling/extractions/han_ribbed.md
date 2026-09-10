@@ -7,6 +7,37 @@ changed. See the review log at the bottom. Tracked by #334, under #339.
 
 ---
 
+## For the reviewer
+
+Six items need judgement against the book. Everything else is either confirmed
+by two independent channels or marked missing. Work through these; the detail
+for each is in the tables below under the same number.
+
+| # | what to check | why it matters |
+|---|---|---|
+| **7** | Fig. 4.46 lower panel: is the drawn curve meant to be flat? Its label reads `= 3.2`, a constant, but measurement gives a ~4.5% rise across the range, ~100x the scan skew. Is there surrounding text stating an `e+` range over which `R` is taken as constant? | decides whether an implementation is closed form or needs an inner solve with its own derivative -- the difference between a cheap and an expensive #334 |
+| **6** | The four-sided friction factor. Is it printed as `f = f_bar + (H/W)(f_bar - f_s) * f_bar`? The transcription is settled; the question is whether the book itself is right, since as printed the correction is negligible. | 1.18x to 3.77x on `f`, depending on `W/H` |
+| **10** | Which of `G = 3.7(e+)^0.28` and `G_bar = 4.5(e+)^0.28` is the ribbed wall and which the channel average? | a 22% error in `St` if swapped |
+| **19** | Eq. 4.18 -- needs a page image | items 20-22 are recorded but meaningless without it |
+| **18** | Fig. 4.47, angled ribs | the angled-rib branch cannot be implemented without it |
+| -- | Does the book carry a **worked example** for ribs? | would resolve item 6 and give the whole chain an end-to-end check |
+
+### What I still need sent
+
+- an image of **Eq. 4.18** (page 377) -- plain text drops equation images
+- **Figure 4.47** and its surrounding text
+- any **worked example** using these correlations
+- the text around Figure 4.46 that distinguishes `G` from `G_bar` (item 10)
+
+### How to record a correction
+
+Put it in the review log at the bottom rather than editing the tables. A
+correction is evidence about the extraction process, not only about the number
+-- item 7 has now been claimed three ways, and that history is worth more than
+any one of the three claims.
+
+---
+
 ## Source
 
 > Han, J., Dutta, S. and Ekkad, S. (2012). *Gas Turbine Heat Transfer and

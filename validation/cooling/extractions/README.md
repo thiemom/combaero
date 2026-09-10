@@ -9,6 +9,25 @@ An extraction starts at **Status: UNCONFIRMED** and may not be implemented
 while it stays there. A human reviews it against the source, then sets the
 status and signs the review log. Only then is it treated as correct.
 
+Extraction is expected to take several rounds. A source rarely gives everything
+in one place, and each round tends to reopen something the previous one settled
+too confidently. That is the process working, not a delay in it.
+
+## The document has to be reviewable, not just complete
+
+These documents grow. The record of everything read is the point, but a
+reviewer should never have to read all of it to find what needs their
+judgement. Every extraction therefore opens with:
+
+- **For the reviewer** -- the handful of items needing judgement, each with the
+  specific question and what turns on the answer. Not a summary of the
+  document; a work list.
+- **What I still need sent** -- the specific pages, figures or examples that
+  would close the open items.
+
+Confirmed items stay in the tables below and are not repeated at the top. If an
+item is neither confirmed nor listed for review, that is a bug in the document.
+
 This exists because the correlations removed in #332 were not wrong through
 carelessness so much as through a missing gate: a plausible reading became a
 constant, the constant became code, and the tests then measured the code
