@@ -39,6 +39,7 @@ These need one look each:
 | **10** | What does the dashed line `G_bar = 4.5 (e+)^0.28` in Fig. 4.46 represent? | it appears in the figure but nowhere in the section text. If it is the four-wall average while `G = 3.7` is the ribbed wall, an implementation must pick deliberately -- they differ by 22% |
 | **25** | Confirmed: the text presents the correlations for `Pr ~ 0.7`. Open question is whether Dipprey and Sabersky (1963), cited at Eq. 4.14, carries a `Pr`-explicit form of `G` -- and if so, whether extending Han's rib correlation with a sand-grain Prandtl exponent is acceptable | the text says "For a Prandtl number of 0.703 ..." and neither this nor Eq. 4.18 carries a `Pr` term, yet `G` is written `G(e+, Pr)` throughout. See below |
 | **26** | Eq. 4.14: are both wall laws `2.5 ln(y/e)`, with the same constant 2.5? | taken from the text extraction only; no page image seen, so it has one channel rather than two |
+| **27** | Which Webb & Eckert 1972 paper backs `thermal_performance_factor`? The repo cites IJHMT **15(8), 1647-1658**; the Prandtl candidate is Webb, Eckert & Goldstein, IJHMT **15(1), 180-184** | two near-identical citations are now in scope. `thermal_performance_factor` survived #332 as a definition, but its attribution was never verified |
 
 ### Item 25: the Prandtl gap, and the trap in closing it
 
@@ -48,6 +49,32 @@ These need one look each:
 number by definition. Both correlations that let you *evaluate* it,
 `G = 3.7 (e+)^0.28` and Eq. 4.18, carry no `Pr` term, and the text ties them to
 `Pr ~ 0.7`.
+
+**Preferred candidate: Webb, Eckert and Goldstein (1972).**
+
+> Webb, R.L., Eckert, E.R.G. and Goldstein, R.J. (1972). Generalized heat
+> transfer and friction correlations for tubes with repeated-rib roughness.
+> *International Journal of Heat and Mass Transfer*, 15(1), 180-184.
+> doi:10.1016/0017-9310(72)90179-2
+
+Two structural reasons it fits better than Dipprey and Sabersky:
+
+- **Same roughness family.** It treats *repeated-rib* roughness, which is Han's
+  geometry class. Dipprey and Sabersky fitted sand grains, so borrowing from
+  them would be an extrapolation across roughness types.
+- **Same formalism.** "Generalized ... for tubes with repeated-rib roughness"
+  is the `R(e+)` / `G(e+, Pr)` wall-function framework Han builds on, which
+  raises the possibility that Han's `Pr ~ 0.7` fit is a special case of it
+  rather than something needing a correction bolted on.
+
+**But the book does not cite it.** Section 4.2.3 references only Nikuradse
+(1950) and Dipprey and Sabersky (1963). So adopting it is a **modelling
+decision made on merit**, not an extraction, and it belongs in the decisions
+section with its own justification once the paper is in hand. It must not be
+recorded in a way that reads as something Han said.
+
+**It still needs the paper.** A Prandtl exponent recalled rather than read is
+the failure this process exists to prevent.
 
 **Where Dipprey and Sabersky (1963) enters.** The book cites it at Eq. 4.14, as
 the conceptual origin of the wall-law formulation, alongside Nikuradse (1950) --
@@ -72,7 +99,13 @@ cross-source construction is what produced the correlations removed in #332. If
 it is done, it belongs in the modelling decisions section with its own
 justification and its own error estimate, not in the extracted items.
 
-**The two honest outcomes**, whichever the reading supports:
+**A third possible outcome, if Webb, Eckert and Goldstein carries a
+`Pr`-explicit `G` for repeated ribs:** adopt it as a labelled decision, and
+check that it reproduces Han's `G = 3.7 (e+)^0.28` at `Pr = 0.703` within
+Han's stated 8%. That check is the thing that would make the adoption
+defensible rather than merely plausible -- and it can fail.
+
+**The two outcomes if it does not:**
 
 1. Han's `G` gets `Pr ~ 0.7` as a **declared validity condition**, with a
    warning outside it. For a `ChannelElement` running combustion products at
@@ -582,6 +615,7 @@ than extrapolating past it.
 | date | reviewer | outcome |
 |---|---|---|
 | 2026-09-10 | extracted by Claude | UNCONFIRMED -- submitted for review |
+| 2026-09-10 | reviewer | proposed Webb, Eckert & Goldstein (1972), IJHMT 15(1), 180-184 as the Prandtl basis. Better fit than Dipprey & Sabersky: same roughness family (repeated ribs) and same `R`/`G` formalism. The book does not cite it, so adopting it is a modelling decision, not an extraction. Opens item 27, a citation collision with the Webb & Eckert 1972 already cited for `thermal_performance_factor`. |
 | 2026-09-10 | reviewer | item 25: confirmed the text presents the correlations for `Pr ~ 0.7`. Raised Dipprey and Sabersky (1963) as a possible source of a `Pr`-explicit form; its role in the book is at Eq. 4.14, as the conceptual origin of the wall laws. Not yet consulted. |
 | 2026-09-10 | reviewer | accepted D1: follow Han in treating `R` as constant in `e+`. The figure does show a slope, but it is smaller than Han's own 6% band and following the text keeps the chain closed form. |
 | 2026-09-10 | extracted by Claude | systematic comparison of both channels. Five quantities agree exactly. Flag list raised: items 24 (`(W/H)^m` in Eq. 4.17), 6, 10, 25 (`Pr = 0.703` only) and 26 (Eq. 4.14 has one channel). |
