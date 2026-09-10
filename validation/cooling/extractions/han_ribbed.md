@@ -227,7 +227,7 @@ move that produced the defects this rebuild exists to undo.
 | 7 | roughness function | `R = 3.2 * (P/e/10)^0.35`, **independent of `e+`**, for `e+ >= 50` | confirmed by the section text |
 | 8 | heat-transfer roughness function, solid line | `G = 3.7 * (e+)^0.28` | confirmed |
 | 9 | heat-transfer roughness function, dashed line | `G_bar = 4.5 * (e+)^0.28` | confirmed |
-| 10 | which of items 8 and 9 Han presents as the correlation | the text names `G = 3.7 (e+)^0.28` at `Pr = 0.703`, `e+ >= 50`, 8% deviation for 95% of data. What `G_bar = 4.5 (e+)^0.28` represents is still unstated | **partly resolved** |
+| 10 | what `G_bar = 4.5 (e+)^0.28` is | the **Prandtl-normalised** roughness function, `G_bar = G * Pr^(-0.57)`, in Webb, Eckert and Goldstein's notation | **resolved -- see below** |
 | 11 | figure validity, this study | `alpha = 90 deg`, `10,000 <= Re <= 60,000` | confirmed |
 | 12 | figure validity, Han (1984) data | `alpha = 90 deg`, `8,000 <= Re <= 80,000` | confirmed |
 | 13 | plotted e+ range | roughly 40 to 1000 | confirmed |
@@ -298,6 +298,50 @@ Geometries carried in the figure legend, usable as harness cases:
 | Han (1984) | 0.063 | 20 | 1 |
 | Han (1984) | 0.042 | 10 | 1 |
 | Han (1984) | 0.021 | 10 | 1 |
+
+### Items 10 and 25 resolved together: the Prandtl scaling is inside Fig. 4.46
+
+Webb, Eckert and Goldstein (1972) define, for repeated-rib roughness:
+
+```
+g_bar(e+) = [ (f/2St - 1)/sqrt(f/2) + u+_e ] Pr^(-0.57)          their Eq. (2)
+u+_e      = sqrt(2/f) + 2.5 ln(2e/D) + 3.75                      their Eq. (1)
+e+        = e u*/nu = (e/D) Re sqrt(f/2)                          their nomenclature
+```
+
+correlated within +/-9%. Read from page images at 400 dpi, not from OCR, which
+garbled the exponent.
+
+The bracket is **exactly Han's `G`**: `(f/2St - 1)/sqrt(f/2)` is Eq. 4.16's
+numerator term, and `u+_e` is Han's `R` for a pipe -- same form, constant 3.75
+where Han has 2.5, and without Han's aspect-ratio factor `2W/(W+H)`. `e+` is
+defined identically in both.
+
+So `g_bar = G * Pr^(-0.57)`. Testing that against Han's own figure:
+
+```
+Han solid line   G     = 3.7 (e+)^0.28   at Pr = 0.703
+=> g_bar coefficient   = 3.7 / 0.703^0.57 = 3.7 / 0.81802 = 4.5231
+Han dashed line  G_bar = 4.5 (e+)^0.28
+agreement                                              0.51%
+```
+
+**Item 10 is answered:** the dashed line is not a four-wall average. It is the
+Prandtl-normalised function, carrying Webb, Eckert and Goldstein's overbar
+notation for exactly that reason.
+
+**Item 25 is answered, and reframed.** Adopting `Pr^0.57` is not a cross-source
+construction after all -- the normalisation is already present in Han's own
+figure, and the two printed lines are related by the WEG factor to half a
+percent. Han plotted `G` at his test Prandtl number and `G_bar` generalised.
+
+This is a cross-check that could have failed: two independently read sources,
+one a 1972 paper and one a 2012 textbook figure, agreeing on a coefficient
+neither states in terms of the other.
+
+**One confirmation still wanted.** The inference rests on a numerical
+agreement, strong as it is. If the text near Fig. 4.46 says anything about what
+`G_bar` denotes, it should be checked -- see the flag list.
 
 ### Correlation with rib angle (Eq. 4.17)
 
@@ -615,6 +659,7 @@ than extrapolating past it.
 | date | reviewer | outcome |
 |---|---|---|
 | 2026-09-10 | extracted by Claude | UNCONFIRMED -- submitted for review |
+| 2026-09-10 | reviewer | supplied the Webb, Eckert & Goldstein paper. **Items 10 and 25 resolved together**: their Eq. (2) gives `g_bar = G Pr^(-0.57)`, and `3.7/0.703^0.57 = 4.5231` reproduces Fig. 4.46's dashed `4.5` to 0.51%. The dashed line is the Prandtl-normalised `G`, not a four-wall average, and the Pr scaling is already inside Han's figure rather than borrowed. |
 | 2026-09-10 | reviewer | proposed Webb, Eckert & Goldstein (1972), IJHMT 15(1), 180-184 as the Prandtl basis. Better fit than Dipprey & Sabersky: same roughness family (repeated ribs) and same `R`/`G` formalism. The book does not cite it, so adopting it is a modelling decision, not an extraction. Opens item 27, a citation collision with the Webb & Eckert 1972 already cited for `thermal_performance_factor`. |
 | 2026-09-10 | reviewer | item 25: confirmed the text presents the correlations for `Pr ~ 0.7`. Raised Dipprey and Sabersky (1963) as a possible source of a `Pr`-explicit form; its role in the book is at Eq. 4.14, as the conceptual origin of the wall laws. Not yet consulted. |
 | 2026-09-10 | reviewer | accepted D1: follow Han in treating `R` as constant in `e+`. The figure does show a slope, but it is smaller than Han's own 6% band and following the text keeps the chain closed form. |
