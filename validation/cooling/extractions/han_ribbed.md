@@ -7,11 +7,10 @@ derivation, and no open items remain. The status is still UNCONFIRMED because
 setting it is the reviewer's call, not the extractor's: sign the review log at
 the bottom and change this line to CONFIRMED to release it for implementation.
 
-Three modelling decisions need agreeing with it -- **D1** (treat `R` as
-constant in `e+`), **D2** (use `12.31`), and **D3** (implement the four-sided
-friction factor as derived, departing from what the book prints). D3 in
-particular is a knowing divergence from the source and should be assented to
-explicitly.
+Two modelling decisions need agreeing with it -- **D1** (treat `R` as constant
+in `e+`) and **D2** (use `12.31`). **D3 has been withdrawn**: it recorded a
+departure from the printed four-sided friction factor that turned out not to
+exist. Nothing in the implementation now diverges from the source.
 
 Tracked by #334, under #339.
 
@@ -47,7 +46,7 @@ resolved by derivation. The document is ready for a status decision.
 
 | # | outcome |
 |---|---|
-| 6 | The trailing `* f_bar` **is** printed, and **is a typo**. Han's stated area-weighted assumption derives `f = f_bar + (H/W)(f_bar - f_s)` exactly, verified symbolically. See decision D3 |
+| 6 | Han prints `f = f_bar + (H/W)(f_bar - f_s)`, which the area-weighted assumption derives exactly. The apparent trailing `* f_bar` was a **typesetting artefact in our reading** -- a full stop followed by the next sentence's subject. Three channels misread it; the algebraic cross-check caught it. See D3, withdrawn |
 | 7 | `R` is independent of `e+`; valid `e+ >= 50`, 6% for 95% of data. The measured 4.5% curve slope was artefact |
 | 10 | `G_bar = 1.2 G`, **stated on Fig. 4.47**. Not a Prandtl normalisation -- an earlier resolution here was wrong and is recorded as such |
 | 15-17 | `m` rule, `W/H` cap, Eq. 4.17 validity (p. 377) |
@@ -507,44 +506,42 @@ The difference is 0.3% at `alpha = 90 deg` -- 3.09 against 3.10 -- so nothing
 turns on it numerically. Recorded so the choice is visible rather than
 arbitrary.
 
-### D3. Implement the four-sided friction factor as DERIVED, not as printed
+### D3. WITHDRAWN -- there was no decision to make
 
-**Decision.** Implement
+**Superseded.** This section previously recorded a decision to implement the
+four-sided friction factor as derived, departing from a printed form that
+carried a trailing `* f_bar`. There is no such departure. The book prints
 
 ```
 f = f_bar + (H/W) * (f_bar - f_s)
 ```
 
-and **not** the form printed in the book, which carries a trailing `* f_bar`.
+which is exactly what Han's area-weighted assumption derives. The apparent
+trailing factor was **a typesetting artefact in our reading**: the dot is a
+full stop ending the equation, and the `f_bar` after it is the *subject of the
+next sentence* -- "`f_bar` is the average friction factor in a channel with two
+opposite ribbed walls" -- sitting on the same line.
 
-**Why this is a correction rather than a disagreement.** Han's stated
-assumption is that `f_bar` is the area-weighted average of the ribbed walls
-(width `W`) and the smooth walls (height `H`):
+**Why this episode is worth keeping.** Three independent extraction channels
+all reported the trailing factor: a visual read, macOS Vision OCR, and a
+separate text extraction. All three were reading the same real glyphs; all
+three misattributed them. Agreement between channels does not establish
+meaning, only that they saw the same marks.
 
-```
-f_bar = (W f + H f_s) / (W + H)
-```
+What caught it was the **algebraic cross-check**. Deriving `f` from Han's
+stated area-weighting gave the form without the trailing factor, disagreeing
+with every reading channel. That disagreement was the signal, and it was right.
 
-Solving that for `f` gives `f = f_bar + (H/W)(f_bar - f_s)` exactly. Verified
-symbolically: the derived expression matches the form without the trailing
-factor and does not match the form with it. So the printed `* f_bar` is a
-typographical error in the book, not a modelling choice of Han's.
+The tell was also present and misread. The prose immediately after the equation
+was flagged in this document as an orphaned subject -- "is the average friction
+factor", with nothing in front of it -- and attributed to that region of the
+page extracting badly. The cause was the opposite: the subject was not lost, it
+had been absorbed into the equation line. The anomaly and the spurious factor
+were one artefact, not two.
 
-**What it changes.** As printed the sidewall correction is negligible -- about
-1.02x at `H/W = 1` for typical friction factors. Derived, it is substantial:
-1.18x to 3.77x across `W/H` from 0.25 to 4. An implementation following the
-printed form would have applied essentially no aspect-ratio correction at all.
-
-**How it was found, and why that matters.** The trailing factor was flagged as
-*suspect* early, on the grounds that the correction it produced was too small
-to be worth an equation. It was **not** acted on at that point -- plausibility
-is not evidence, and acting on it would have been the same move that turned
-`C = 0.38` into `~40` in the removed implementation. It was held open until the
-underlying assumption was supplied and the algebra settled it.
-
-**What to watch.** This is a knowing departure from the printed source. Any
-comparison against a worked example in the book will disagree if that example
-was computed with the printed form.
+**Net effect on implementation:** none, beyond simplification. The derived form
+and the printed form are the same, so nothing departs from the source and no
+worked example in the book can disagree with us on this point.
 
 ### D1. Treat `R` as independent of `e+`, following Han
 
@@ -754,6 +751,7 @@ than extrapolating past it.
 | date | reviewer | outcome |
 |---|---|---|
 | 2026-09-10 | extracted by Claude | UNCONFIRMED -- submitted for review |
+| 2026-09-10 | reviewer | re-read the layout: the trailing `* f_bar` is a full stop plus the next sentence's subject on the same line. Han prints `f = f_bar + (H/W)(f_bar - f_s)`, matching the derivation. **D3 withdrawn** -- no departure from the source exists. |
 | 2026-09-10 | reviewer | closed the last flags. 24 and 26 confirmed against the book. **Item 6 resolved by derivation**: supplied Han's area-weighted assumption, from which `f = f_bar + (H/W)(f_bar - f_s)` follows exactly -- the printed trailing `* f_bar` is a typo (decision D3). Item 35 decided in favour of the figure's `12.31` (D2). Item 27b: the name comes from Gee & Webb (1980), not Webb & Eckert (1972). **No open items remain.** |
 | 2026-09-10 | reviewer | supplied the Webb, Eckert & Goldstein paper. **Items 10 and 25 resolved together**: their Eq. (2) gives `g_bar = G Pr^(-0.57)`, and `3.7/0.703^0.57 = 4.5231` reproduces Fig. 4.46's dashed `4.5` to 0.51%. The dashed line is the Prandtl-normalised `G`, not a four-wall average, and the Pr scaling is already inside Han's figure rather than borrowed. |
 | 2026-09-10 | reviewer | proposed Webb, Eckert & Goldstein (1972), IJHMT 15(1), 180-184 as the Prandtl basis. Better fit than Dipprey & Sabersky: same roughness family (repeated ribs) and same `R`/`G` formalism. The book does not cite it, so adopting it is a modelling decision, not an extraction. Opens item 27, a citation collision with the Webb & Eckert 1972 already cited for `thermal_performance_factor`. |
