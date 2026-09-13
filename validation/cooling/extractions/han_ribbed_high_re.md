@@ -165,9 +165,59 @@ digit is misread -- the `1.24`, or the `0.42`, whose free fit comes out at
 0.3996 -- or the curve is drawn for parameters outside the stated ranges, or
 there is an error in the figure.
 
-**This needs the Rallabandi papers themselves**, not further inference from
-this figure. Recorded and left open; the old correlation is unaffected and
-fully corroborated.
+### The unclassified data cloud (items 28-30) narrows it further
+
+38 experimental points digitised without classification, spanning `e+ = 85` to
+`25,091`: `fig_4.193_all_data_points_no classifcation.csv`.
+
+| # | item | state |
+|---|---|---|
+| 28 | free fit to the cloud | `G = 1.3942 (e+)^0.3974` | confirmed |
+| 29 | curve 2 **is** the fit to the cloud | curve 2 is `1.3763 (e+)^0.3996` -- within **1.3%** on the constant and **0.5%** on the exponent | confirmed |
+| 30 | the old correlation genuinely misses the extended-range data | mean residual **-15.0%**, RMS 16.6% | confirmed |
+
+Item 29 settles where the fault lies. The digitised curve 2 reproduces the
+cloud with a mean residual of **+0.6%** and RMS 6.0%, so the curve and the data
+agree with each other. **The printed equation is what disagrees with both**:
+evaluated anywhere in its stated parameter box it gives only 0.73-0.81 of the
+measured data -- 20-27% low.
+
+Item 30 independently confirms the text's own claim that the old correlation
+does not extend: -15% mean bias, and one-signed, which is the signature of a
+correlation applied outside its range rather than of scatter.
+
+### Which misreading? (item 31)
+
+Scoring candidate single-digit variants against the cloud, at the box centre
+`e/D = 0.15`, `p/e = 7.5`:
+
+| constant | `(e/D)^a` | `(p/e)^b` | `(e+)^n` | mean pred/data |
+|---|---|---|---|---|
+| 1.24 | **0.014** | -0.021 | 0.42 | **0.992** |
+| **1.64** | 0.14 | -0.031 | 0.42 | **1.012** |
+| 1.24 | **0.014** | -0.031 | 0.42 | **0.972** |
+| **1.64** | 0.14 | -0.021 | 0.42 | **1.033** |
+| 1.24 | 0.14 | -0.021 | 0.42 | 0.781 *(as printed)* |
+| 1.24 | **-0.14** | -0.021 | 0.47 | 1.971 |
+
+Two conclusions, and one of them is negative about an earlier hypothesis here:
+
+1. **The `(e/D)^-0.14` reading -- item 20's "alternative", and the percentage
+   convention equivalent to it -- is decisively excluded**, landing at 2.0-2.6x
+   the data. It was proposed because it fixed the curve ordering; the cloud
+   shows it overshoots badly. Both of item 20's hypotheses are now dead.
+2. The fault is **one digit**, and the two candidates that fit are
+   `(e/D)^0.014` rather than `^0.14`, or a constant of `1.64` rather than
+   `1.24`. Both land within 1-3%.
+
+**Not choosing between them.** They are numerically close over this box but
+diverge outside it, and picking the better-fitting of two is how item 10 in the
+companion document went wrong. What the data does establish is the *direction*:
+the `(e/D)` exponent is small and **positive**, or the constant is larger --
+never the negative exponent previously proposed.
+
+**This still needs the Rallabandi papers.** Figure 4.193 is exhausted; the
+old correlation is unaffected and now corroborated from three directions.
 
 
 
@@ -240,5 +290,6 @@ come from this section.
 | 2026-09-10 | extracted by Claude | UNCONFIRMED and INCOMPLETE. Surrounding text extracted; Figure 4.193 needed before anything here can be used |
 | 2026-09-13 | reviewer | supplied Figure 4.193 (p. 513) and Figure 4.192. Correlations now extracted as items 12-19 |
 | 2026-09-13 | reviewer | read the Fig. 4.193c exponents as `(p/e/10)^0.2` (old) and `(p/e)^-0.031` (new), both flagged as partly guesswork. The old-correlation exponent is settled at `0.1` by the confirmed p. 377 items; the new one is recorded as item 21, bounded at 1.6-2.3% |
+| 2026-09-13 | reviewer | supplied the unclassified 38-point data cloud. **Item 29**: curve 2 is the fit to the cloud, agreeing to 1.3%. So the curve and data agree and the printed equation disagrees with both, running 20-27% low. **Item 31**: the `(e/D)^-0.14` hypothesis is excluded at 2.0-2.6x; the fault is one digit, either `(e/D)^0.014` or a constant of 1.64. |
 | 2026-09-13 | reviewer | supplied digitised curves for both correlation lines. **Item 26**: curve 1 matches the old correlation to 3.5% at `alpha = 45 deg`, `p/e = 10` -- validating the reading, the digitisation, and the stated rib angle together. **Item 27**: curve 2's prefactor is 1.190 where the two candidate readings predict 0.856-0.943 and 1.502-1.655. Both excluded; needs the Rallabandi papers. |
 | 2026-09-13 | extracted by Claude | **Item 20 raised.** The new correlation's `(e/D)^0.14`, as transcribed, puts curve 2 below curve 1 everywhere, where the figure shows the opposite. A negative exponent or a percentage convention both resolve it and are numerically identical. Not resolved here |
