@@ -16,7 +16,7 @@ Nothing to judge yet. The blocking need is material, not decisions.
 
 | # | question | why it matters |
 |---|---|---|
-| **20** | Does the new correlation's `(e/D)` term carry a **negative** exponent, or is `e/D` expressed as a **percentage** there? As literally transcribed it contradicts the figure it is printed on | a factor of 1.9 in `G` at `e+ = 18,000`, and it inverts which curve lies above the other |
+| **20/27** | The printed new correlation does not reproduce its own plotted curve under **any** sign or units convention on `(e/D)`. Needs the Rallabandi papers -- Fig. 4.193 has been exhausted | the extended-range correlation cannot be implemented until it is settled. The old correlation is unaffected |
 | **21** | Is the `(p/e)` exponent `-0.021` or `-0.031`? | 1.6-2.3% over the stated `p/e = 5-10` |
 | **22** | Is the `e+` exponent `0.42`? | read consistently, but the digits are small |
 | **23** | Is there a separate **friction** (`R`) correlation for the extended range? | the text says both `R` and `G` were modified, but only `G` appears on Fig. 4.193c |
@@ -127,7 +127,48 @@ printed statement (item 10 there, settled at 0.51% and wrong).
 
 Note the minus sign on `(p/e)^-0.021` **is** legible in the same equation at
 the same size, which is evidence against a simply-missed minus on `(e/D)` --
-but not conclusive, and it is the reviewer's call.
+but not conclusive.
+
+### Digitised curves (items 25-27): curve 1 confirmed, curve 2 excludes both readings
+
+Both plotted correlation lines were digitised, five points each, spanning
+`e+ = 85` to `31,000`:
+`docs/heat_transfer/han/fig_4.193_correlation_{1,2}_data.csv`.
+
+| # | item | state |
+|---|---|---|
+| 25 | curve 1 fits `G = 1.696 (e+)^0.35` | confirmed |
+| 26 | curve 1 matches the OLD correlation at `alpha = 45 deg`, `p/e = 10`, `W/H = 1` -- predicted 1.7575 against 1.6960 measured, **3.5%** | confirmed |
+| 27 | curve 2 fits `G = 1.190 (e+)^0.42`, which matches **no** reading of the printed new correlation | **unresolved** |
+
+**Item 26 validates three things at once.** The old correlation as read, the
+digitisation itself, and `alpha = 45 deg` -- which is what the text states the
+experiments used. A 3.5% agreement across a digitised curve is about as good as
+this method gets, and it means the digitisation can be trusted for item 27.
+
+**Item 27 excludes both hypotheses from item 20.** With the exponent fixed at
+the stated 0.42, the measured prefactor is 1.190, while:
+
+| reading | predicted prefactor range | measured |
+|---|---|---|
+| literal, `(e/D)^+0.14` | 0.856 - 0.943 | **1.190 -- outside** |
+| alternative, `(e/D)^-0.14` (equivalently `e/D` in percent) | 1.502 - 1.655 | **1.190 -- outside** |
+
+Measured sits *between* them. Working backwards, the base constant each reading
+would need is 1.619, 0.952 or 0.850 against the printed 1.24 -- each off by
+23-31%, and in different directions.
+
+So the earlier framing was too narrow: this is not a choice between two
+readings of the `(e/D)` term. **No sign or units convention on `(e/D)` alone
+reconciles the printed equation with its own plotted curve.** Either another
+digit is misread -- the `1.24`, or the `0.42`, whose free fit comes out at
+0.3996 -- or the curve is drawn for parameters outside the stated ranges, or
+there is an error in the figure.
+
+**This needs the Rallabandi papers themselves**, not further inference from
+this figure. Recorded and left open; the old correlation is unaffected and
+fully corroborated.
+
 
 
 
@@ -199,4 +240,5 @@ come from this section.
 | 2026-09-10 | extracted by Claude | UNCONFIRMED and INCOMPLETE. Surrounding text extracted; Figure 4.193 needed before anything here can be used |
 | 2026-09-13 | reviewer | supplied Figure 4.193 (p. 513) and Figure 4.192. Correlations now extracted as items 12-19 |
 | 2026-09-13 | reviewer | read the Fig. 4.193c exponents as `(p/e/10)^0.2` (old) and `(p/e)^-0.031` (new), both flagged as partly guesswork. The old-correlation exponent is settled at `0.1` by the confirmed p. 377 items; the new one is recorded as item 21, bounded at 1.6-2.3% |
+| 2026-09-13 | reviewer | supplied digitised curves for both correlation lines. **Item 26**: curve 1 matches the old correlation to 3.5% at `alpha = 45 deg`, `p/e = 10` -- validating the reading, the digitisation, and the stated rib angle together. **Item 27**: curve 2's prefactor is 1.190 where the two candidate readings predict 0.856-0.943 and 1.502-1.655. Both excluded; needs the Rallabandi papers. |
 | 2026-09-13 | extracted by Claude | **Item 20 raised.** The new correlation's `(e/D)^0.14`, as transcribed, puts curve 2 below curve 1 everywhere, where the figure shows the opposite. A negative exponent or a percentage convention both resolve it and are numerically identical. Not resolved here |
