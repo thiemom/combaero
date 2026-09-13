@@ -16,7 +16,8 @@ Nothing to judge yet. The blocking need is material, not decisions.
 
 | # | question | why it matters |
 |---|---|---|
-| **20/27** | The printed new correlation does not reproduce its own plotted curve under **any** sign or units convention on `(e/D)`. Needs the Rallabandi papers -- Fig. 4.193 has been exhausted | the extended-range correlation cannot be implemented until it is settled. The old correlation is unaffected |
+| **20/27/31** | The printed new correlation under-predicts its own plotted data by **22%**, and the reviewer has confirmed the constant (1.24) and `(e/D)` exponent (0.14) against the page. No misreading explains it. Needs the Rallabandi papers | the extended-range correlation cannot be implemented until settled. The old correlation is unaffected and corroborated from three directions |
+| **32** | Worth digitising Fig. 4.193c **by symbol class** (9 classes in the legend) before giving up on the figure | would separate the `e/D` and `p/e` exponents rather than only their product |
 | **21** | Is the `(p/e)` exponent `-0.021` or `-0.031`? | 1.6-2.3% over the stated `p/e = 5-10` |
 | **22** | Is the `e+` exponent `0.42`? | read consistently, but the digits are small |
 | **23** | Is there a separate **friction** (`R`) correlation for the extended range? | the text says both `R` and `G` were modified, but only `G` appears on Fig. 4.193c |
@@ -186,35 +187,68 @@ Item 30 independently confirms the text's own claim that the old correlation
 does not extend: -15% mean bias, and one-signed, which is the signature of a
 correlation applied outside its range rather than of scatter.
 
-### Which misreading? (item 31)
+### Item 31: not a misreading -- the printed equation disagrees with its own figure
 
-Scoring candidate single-digit variants against the cloud, at the box centre
-`e/D = 0.15`, `p/e = 7.5`:
+A reviewer has confirmed against the page that the constant reads **1.24** and
+the `(e/D)` exponent reads **0.14**. That closes the search for a misread digit
+and changes the conclusion.
 
-| constant | `(e/D)^a` | `(p/e)^b` | `(e+)^n` | mean pred/data |
-|---|---|---|---|---|
-| 1.24 | **0.014** | -0.021 | 0.42 | **0.992** |
-| **1.64** | 0.14 | -0.031 | 0.42 | **1.012** |
-| 1.24 | **0.014** | -0.031 | 0.42 | **0.972** |
-| **1.64** | 0.14 | -0.021 | 0.42 | **1.033** |
-| 1.24 | 0.14 | -0.021 | 0.42 | 0.781 *(as printed)* |
-| 1.24 | **-0.14** | -0.021 | 0.47 | 1.971 |
+Every candidate has now been eliminated:
 
-Two conclusions, and one of them is negative about an earlier hypothesis here:
+| candidate | mean pred/data | verdict |
+|---|---|---|
+| as printed, `1.24 (e/D)^0.14 (p/e)^-0.021 (e+)^0.42` | **0.781** | 22% low |
+| `(e/D)^-0.14` (item 20's alternative, or `e/D` as percent) | 1.97-2.6 | excluded by data |
+| `(e/D)^0.014` | 0.992 | excluded by the reviewer's reading |
+| constant `1.64` | 1.012 | excluded by the reviewer's reading |
 
-1. **The `(e/D)^-0.14` reading -- item 20's "alternative", and the percentage
-   convention equivalent to it -- is decisively excluded**, landing at 2.0-2.6x
-   the data. It was proposed because it fixed the curve ordering; the cloud
-   shows it overshoots badly. Both of item 20's hypotheses are now dead.
-2. The fault is **one digit**, and the two candidates that fit are
-   `(e/D)^0.014` rather than `^0.14`, or a constant of `1.64` rather than
-   `1.24`. Both land within 1-3%.
+Nor can the `(p/e)` term absorb it. Holding the confirmed constant and `(e/D)`
+exponent, the data would require `(p/e)^+0.111` where the figure legibly shows a
+minus sign and a magnitude near 0.02-0.03. A sign flip **and** a five-fold
+magnitude change is not a plausible misreading.
 
-**Not choosing between them.** They are numerically close over this box but
-diverge outside it, and picking the better-fitting of two is how item 10 in the
-companion document went wrong. What the data does establish is the *direction*:
-the `(e/D)` exponent is small and **positive**, or the constant is larger --
-never the negative exponent previously proposed.
+**So the finding is about the source, not the reading.** The new correlation as
+printed in Han, Dutta and Ekkad under-predicts the data plotted beside it by
+about 22%. The book already shows one internal inconsistency of this kind --
+`12.3` against `12.31` for Eq. 4.17, recorded as item 35 in the companion
+document -- so a transcription error between the Rallabandi papers and this
+figure is the most economical explanation. It is not the only one.
+
+**What is solid, and what is not:**
+
+- solid: the digitisation, validated on curve 1 to 3.5% against an
+  independently confirmed correlation
+- solid: curve 2 and the data cloud agree with each other to 1.3%
+- solid: the printed equation agrees with neither
+- **not** solid: why
+
+### If the extended range is needed before the papers arrive
+
+The digitised curve is a usable empirical stand-in, and should be labelled as
+exactly that:
+
+```
+G = 1.394 (e+)^0.397          6% RMS against 38 digitised points,
+                              e+ = 85 to 25,000
+```
+
+This is **a fit to our own digitisation of a figure**, not a published
+correlation. It carries **no `e/D` or `p/e` dependence**, because the cloud was
+digitised without symbol classification and those cannot be separated from it.
+Given that the text's whole point is that `e/D` had to be included explicitly,
+that is a material limitation, not a rounding one.
+
+If it is ever used it belongs in the modelling decisions section with those
+caveats attached, never in the extracted items.
+
+### What would separate the exponents
+
+The figure's legend carries **nine symbol classes** -- `e/d` of 0.1, 0.15, 0.18
+crossed with `p/e` of 5, 7.5, 10. Digitised **by class**, the data would
+separate the `e/D` and `p/e` exponents instead of constraining only their
+product, and would show directly whether the printed exponents are consistent
+with the plotted points. That is the one measurement left that this figure can
+still yield.
 
 **This still needs the Rallabandi papers.** Figure 4.193 is exhausted; the
 old correlation is unaffected and now corroborated from three directions.
@@ -290,6 +324,7 @@ come from this section.
 | 2026-09-10 | extracted by Claude | UNCONFIRMED and INCOMPLETE. Surrounding text extracted; Figure 4.193 needed before anything here can be used |
 | 2026-09-13 | reviewer | supplied Figure 4.193 (p. 513) and Figure 4.192. Correlations now extracted as items 12-19 |
 | 2026-09-13 | reviewer | read the Fig. 4.193c exponents as `(p/e/10)^0.2` (old) and `(p/e)^-0.031` (new), both flagged as partly guesswork. The old-correlation exponent is settled at `0.1` by the confirmed p. 377 items; the new one is recorded as item 21, bounded at 1.6-2.3% |
+| 2026-09-13 | reviewer | confirmed against the page that the constant reads **1.24** and the `(e/D)` exponent reads **0.14**. That eliminates the last surviving misreading candidates, so **item 31 is no longer a transcription question**: the printed equation disagrees with its own figure by 22%. |
 | 2026-09-13 | reviewer | supplied the unclassified 38-point data cloud. **Item 29**: curve 2 is the fit to the cloud, agreeing to 1.3%. So the curve and data agree and the printed equation disagrees with both, running 20-27% low. **Item 31**: the `(e/D)^-0.14` hypothesis is excluded at 2.0-2.6x; the fault is one digit, either `(e/D)^0.014` or a constant of 1.64. |
 | 2026-09-13 | reviewer | supplied digitised curves for both correlation lines. **Item 26**: curve 1 matches the old correlation to 3.5% at `alpha = 45 deg`, `p/e = 10` -- validating the reading, the digitisation, and the stated rib angle together. **Item 27**: curve 2's prefactor is 1.190 where the two candidate readings predict 0.856-0.943 and 1.502-1.655. Both excluded; needs the Rallabandi papers. |
 | 2026-09-13 | extracted by Claude | **Item 20 raised.** The new correlation's `(e/D)^0.14`, as transcribed, puts curve 2 below curve 1 everywhere, where the figure shows the opposite. A negative exponent or a percentage convention both resolve it and are numerically identical. Not resolved here |
