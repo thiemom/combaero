@@ -1,12 +1,10 @@
 # Extraction: rib correlations at high Reynolds number
 
-**Status: UNCONFIRMED and INCOMPLETE -- the correlations themselves are not
-yet extracted.**
+**Status: UNCONFIRMED -- Figure 4.193 now extracted, one item unresolved.**
 
-Nothing here may be implemented. Unlike `han_ribbed.md`, this document does not
-yet contain a usable correlation: the surrounding text has been extracted but
-Figure 4.193 has not, and the coefficients live there. Tracked by #334, under
-#339.
+Nothing here may be implemented. The correlations are now present, but the
+`(e/D)` term of the new correlation fails a check against the figure it is
+printed on -- see item 20. Tracked by #334, under #339.
 
 ---
 
@@ -14,13 +12,15 @@ Figure 4.193 has not, and the coefficients live there. Tracked by #334, under
 
 Nothing to judge yet. The blocking need is material, not decisions.
 
-### What I still need sent
+### For the reviewer
 
-- **Figure 4.193**, all three panels. (a) and (b) are the rib profiles studied;
-  **(c) carries the R and G correlations** and is the one that matters
-- the coefficients `C1`, `C2`, `m`, `n` and the explicit `e/D` dependence, if
-  they are given in text rather than on the figure
-- whether the round-edged and sharp-edged cases have separate coefficient sets
+| # | question | why it matters |
+|---|---|---|
+| **20** | Does the new correlation's `(e/D)` term carry a **negative** exponent, or is `e/D` expressed as a **percentage** there? As literally transcribed it contradicts the figure it is printed on | a factor of 1.9 in `G` at `e+ = 18,000`, and it inverts which curve lies above the other |
+| **21** | Is the `(p/e)` exponent `-0.021` or `-0.031`? | 1.6-2.3% over the stated `p/e = 5-10` |
+| **22** | Is the `e+` exponent `0.42`? | read consistently, but the digits are small |
+| **23** | Is there a separate **friction** (`R`) correlation for the extended range? | the text says both `R` and `G` were modified, but only `G` appears on Fig. 4.193c |
+| **24** | Are there separate coefficient sets for round-edged vs sharp-edged ribs, or does round-edged simply use the old correlation? | the text implies the latter; confirmation would close the selection rule |
 
 ---
 
@@ -61,7 +61,75 @@ episode in the companion document is the precedent for why.
 | 9 | `e+` definition | `e+ = (e/D)(Re)(f/2)^(1/2)` -- unchanged from Han | confirmed |
 | 10 | disagreement | Fig. 4.193c indicates `R` and `G` **do not agree** with the earlier published correlations in the extended range | confirmed |
 | 11 | attributed cause | parameter range differences, specifically `e/D` considerably larger than in prior work | confirmed |
-| 12 | **the coefficients** | `C1`, `C2`, `m`, `n` and the `e/D` dependence | **missing -- Figure 4.193c** |
+| 12 | old correlation, as printed on Fig. 4.193c | `G = 2.24 (W/H)^0.1 (alpha/90)^0.35 (p/e/10)^0.1 (e+)^0.35`, `P/e = 10-20`, `e/D = 0.047-0.078` | confirmed |
+| 13 | **new correlation**, as printed on Fig. 4.193c | `G = 1.24 (e/D)^0.14 (p/e)^-0.021 (e+)^0.42`, `P/e = 5-10`, `e/D = 0.1-0.18` | **see item 20** |
+| 14 | new correlation `p/e` range | `P/e = 5-10` | confirmed |
+| 15 | new correlation `e/D` range | `e/D = 0.1-0.18` | confirmed |
+| 16 | data sets plotted | `e/d` = 0.1, 0.15, 0.18 crossed with `p/e` = 5, 7.5, 10, plus 1984 and 1986 reference data | confirmed |
+| 17 | plotted axes | `e+` from `10^2` to `2x10^4`; `G` log axis, ~550 px/decade measured | confirmed |
+| 18 | curve behaviour | curves 1 and 2 near-coincident at low `e+`; curve **2 (new, solid) rises ABOVE curve 1 (old, dashed)** at high `e+` | confirmed |
+| 19 | extended-range friction (`R`) correlation | not present on Fig. 4.193c | **missing** |
+
+### Item 12 independently confirms the CONFIRMED extraction
+
+The "old correlation" printed on Figure 4.193c (p. 513) is character-for-
+character Eq. 4.18 from p. 377, with the square-channel exponents substituted:
+
+```
+Fig. 4.193c :  G = 2.24 (W/H)^0.1 (alpha/90)^0.35 (p/e/10)^0.1 (e+)^0.35
+Eq. 4.18    :  G = 2.24 (W/H)^0.1 (alpha/90)^m    (p/e/10)^n   (e+)^0.35
+               square channel: m = 0.35, n = 0.1
+```
+
+**136 pages apart, in different chapters, by different routes into this
+extraction.** That is the strongest corroboration `han_ribbed.md` has received.
+
+It also settles a reading dispute. A reviewer read the `(p/e/10)` exponent on
+Fig. 4.193c as `0.2`; this extraction read `0.1`. Both were flagged as partly
+guesswork. The confirmed items on p. 377 -- established from a page image, the
+running text, and Figure 4.47 independently -- give `n = 0.1`. The dispute is
+resolved by material already in hand, not by re-reading a blurred superscript.
+For scale, the difference reaches 7.2% at `p/e = 20`.
+
+### Item 20: the new correlation's `(e/D)` term fails its own figure
+
+| # | item | state |
+|---|---|---|
+| 20 | `(e/D)^0.14` as literally transcribed | **contradicts Fig. 4.193c** |
+
+Evaluating both printed correlations at the figure's own conditions -- square
+channel, 45 deg ribs, `p/e = 10`, `e/D = 0.1`:
+
+| `e+` | old (curve 1) | new, as transcribed | ratio | new, with `(e/D)^-0.14` | ratio |
+|---|---|---|---|---|---|
+| 100 | 8.81 | 5.92 | 0.67 | 11.28 | 1.28 |
+| 1,000 | 19.72 | 15.57 | 0.79 | 29.68 | 1.51 |
+| 18,000 | 54.23 | 52.44 | 0.97 | 99.92 | 1.84 |
+
+**As transcribed, curve 2 sits below curve 1 everywhere.** Item 18 records the
+opposite: the figure shows them near-coincident at low `e+` with curve 2 rising
+above. On the measured 550 px/decade axis the transcribed reading would put a
+**95 px gap** at low `e+` -- roughly a quarter of the plot height, impossible to
+miss. The curves visibly touch there.
+
+Two readings remove the contradiction, and they are numerically identical
+because `0.1^-0.14 = 10^0.14`:
+
+1. the exponent is **negative**: `(e/D)^-0.14`
+2. `e/D` is expressed as a **percentage** in this correlation: `(10)^0.14` for
+   `e/D = 0.1`
+
+Either reproduces the figure. **Not resolved here.** Choosing between two
+hypotheses that fit equally well, on the strength of which looks more natural,
+is the move this process exists to prevent -- and the companion document
+records what happened the last time a well-fitting inference was preferred to a
+printed statement (item 10 there, settled at 0.51% and wrong).
+
+Note the minus sign on `(p/e)^-0.021` **is** legible in the same equation at
+the same size, which is evidence against a simply-missed minus on `(e/D)` --
+but not conclusive, and it is the reviewer's call.
+
+
 
 ## Why the correlations diverge, per the text
 
@@ -129,3 +197,6 @@ come from this section.
 | date | reviewer | outcome |
 |---|---|---|
 | 2026-09-10 | extracted by Claude | UNCONFIRMED and INCOMPLETE. Surrounding text extracted; Figure 4.193 needed before anything here can be used |
+| 2026-09-13 | reviewer | supplied Figure 4.193 (p. 513) and Figure 4.192. Correlations now extracted as items 12-19 |
+| 2026-09-13 | reviewer | read the Fig. 4.193c exponents as `(p/e/10)^0.2` (old) and `(p/e)^-0.031` (new), both flagged as partly guesswork. The old-correlation exponent is settled at `0.1` by the confirmed p. 377 items; the new one is recorded as item 21, bounded at 1.6-2.3% |
+| 2026-09-13 | extracted by Claude | **Item 20 raised.** The new correlation's `(e/D)^0.14`, as transcribed, puts curve 2 below curve 1 everywhere, where the figure shows the opposite. A negative exponent or a percentage convention both resolve it and are numerically identical. Not resolved here |
