@@ -1,10 +1,15 @@
 # Extraction: rib correlations at high Reynolds number
 
-**Status: UNCONFIRMED -- complete, awaiting review.**
+**Status: CONFIRMED -- reviewed 2026-09-14.**
 
-The primary source has been obtained and every open item is resolved. The
-correlations below come from **the paper itself**, not from the textbook figure,
-which misprints one exponent. Tracked by #334, under #339.
+Every item is resolved against the primary source and the reviewer has signed
+off. The correlations below come from **the paper itself**, not from the
+textbook figure, which misprints one exponent. Released for implementation
+under #334.
+
+Changes after this point go in the review log, not silently into the tables.
+
+Tracked by #334, under #339.
 
 ---
 
@@ -18,8 +23,32 @@ All items resolved. Two things to sign off:
 
 | # | what | note |
 |---|---|---|
-| **33** | the correlations below are taken from **Rallabandi, Yang and Han (2009)** directly, in preference to the textbook figure | the figure misprints the `(e/D)` exponent as `0.14` where the paper gives `0.014` -- a factor of 10 in the exponent, 22% in `G` |
-| **D4** | decision: implement the paper's values, and record the textbook discrepancy | the spine source is wrong here; the primary source wins |
+| **33** | the correlations below are taken from **Rallabandi, Yang and Han (2009)** directly, in preference to the textbook figure | ACCEPTED 2026-09-14 |
+| **D4** | implement the paper's values; record the textbook discrepancy | ACCEPTED 2026-09-14 |
+
+### D4. Follow the primary source where it disagrees with the spine
+
+**Decision, accepted 2026-09-14.** Implement Rallabandi, Yang and Han (2009)
+Eq. (17) and (18) as printed in the paper, not as reprinted in Han, Dutta and
+Ekkad Figure 4.193c.
+
+**Why.** Three independent reasons, and the first is sufficient on its own:
+
+1. the paper is the primary source and the textbook is reprinting it
+2. the paper's form lands at 0.994 against the digitised data; the textbook's
+   at 0.781
+3. the paper is a **cleaner print**. The textbook figure's exponents are small
+   superscripts on a scanned page, which is where a lost decimal place is most
+   likely to originate and hardest to catch
+
+**Scope.** This decision is about this one disagreement, not a general demotion
+of the spine source. Where the textbook is the only source, it remains the
+source; `han_ribbed.md` is unaffected and was independently corroborated by
+this paper's Eq. (12) and (13).
+
+**Recorded for the next reader.** Anyone comparing an implementation against
+Figure 4.193c will find a 22% discrepancy in `G` and should not treat it as an
+implementation bug.
 
 ### The correlations, from the primary source
 
@@ -377,6 +406,7 @@ come from this section.
 | 2026-09-10 | extracted by Claude | UNCONFIRMED and INCOMPLETE. Surrounding text extracted; Figure 4.193 needed before anything here can be used |
 | 2026-09-13 | reviewer | supplied Figure 4.193 (p. 513) and Figure 4.192. Correlations now extracted as items 12-19 |
 | 2026-09-13 | reviewer | read the Fig. 4.193c exponents as `(p/e/10)^0.2` (old) and `(p/e)^-0.031` (new), both flagged as partly guesswork. The old-correlation exponent is settled at `0.1` by the confirmed p. 377 items; the new one is recorded as item 21, bounded at 1.6-2.3% |
+| 2026-09-14 | reviewer | **CONFIRMED.** D4 accepted: follow the paper over the textbook where they disagree, noting the paper is also the cleaner print -- small superscripts on a scanned textbook page being where a lost decimal is most likely to arise. Released for implementation. |
 | 2026-09-14 | reviewer | supplied the primary source, Rallabandi, Yang & Han (2009), *JHT* 131(7), 071703. **Item 31 resolved**: the paper's Eq. (18) gives `(e/D)^0.014`; the textbook figure prints `0.14`, a lost decimal worth 22%. Eq. (17) closes the missing `R` correlation. The paper's Eq. (12) and (13) reproduce Han's Eq. 4.15 and 4.16 exactly, corroborating the confirmed document from the primary source. **No open items.** |
 | 2026-09-13 | reviewer | supplied a scanned paper as `Rallabandi_2009.pdf`. **It is a different paper**: Alkhamis, Rallabandi & Han (2011), *JHT* 133, 111901, on **V-shaped** ribs -- not the 45 deg angled-rib papers the book cites for Fig. 4.193. Its Eq. (18) and (19) are recorded, and its `(e/D)^-0.08` corroborates the data-driven estimate, but they are not the Fig. 4.193 correlation. |
 | 2026-09-13 | reviewer | confirmed against the page that the constant reads **1.24** and the `(e/D)` exponent reads **0.14**. That eliminates the last surviving misreading candidates, so **item 31 is no longer a transcription question**: the printed equation disagrees with its own figure by 22%. |
