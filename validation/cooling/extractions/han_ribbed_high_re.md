@@ -1,10 +1,10 @@
 # Extraction: rib correlations at high Reynolds number
 
-**Status: UNCONFIRMED -- Figure 4.193 now extracted, one item unresolved.**
+**Status: UNCONFIRMED -- complete, awaiting review.**
 
-Nothing here may be implemented. The correlations are now present, but the
-`(e/D)` term of the new correlation fails a check against the figure it is
-printed on -- see item 20. Tracked by #334, under #339.
+The primary source has been obtained and every open item is resolved. The
+correlations below come from **the paper itself**, not from the textbook figure,
+which misprints one exponent. Tracked by #334, under #339.
 
 ---
 
@@ -14,14 +14,43 @@ Nothing to judge yet. The blocking need is material, not decisions.
 
 ### For the reviewer
 
-| # | question | why it matters |
+All items resolved. Two things to sign off:
+
+| # | what | note |
 |---|---|---|
-| **20/27/31** | The printed new correlation under-predicts its own plotted data by **22%**, and the reviewer has confirmed the constant (1.24) and `(e/D)` exponent (0.14) against the page. No misreading explains it. Needs the Rallabandi papers | the extended-range correlation cannot be implemented until settled. The old correlation is unaffected and corroborated from three directions |
-| **32** | Worth digitising Fig. 4.193c **by symbol class** (9 classes in the legend) before giving up on the figure | would separate the `e/D` and `p/e` exponents rather than only their product |
-| **21** | Is the `(p/e)` exponent `-0.021` or `-0.031`? | 1.6-2.3% over the stated `p/e = 5-10` |
-| **22** | Is the `e+` exponent `0.42`? | read consistently, but the digits are small |
-| **23** | Is there a separate **friction** (`R`) correlation for the extended range? | the text says both `R` and `G` were modified, but only `G` appears on Fig. 4.193c |
-| **24** | Are there separate coefficient sets for round-edged vs sharp-edged ribs, or does round-edged simply use the old correlation? | the text implies the latter; confirmation would close the selection rule |
+| **33** | the correlations below are taken from **Rallabandi, Yang and Han (2009)** directly, in preference to the textbook figure | the figure misprints the `(e/D)` exponent as `0.14` where the paper gives `0.014` -- a factor of 10 in the exponent, 22% in `G` |
+| **D4** | decision: implement the paper's values, and record the textbook discrepancy | the spine source is wrong here; the primary source wins |
+
+### The correlations, from the primary source
+
+> Rallabandi, A.P., Yang, H. and Han, J.-C. (2009). Heat Transfer and Pressure
+> Drop Correlations for Square Channels With 45 Deg Ribs at High Reynolds
+> Numbers. *ASME J. Heat Transfer*, **131**(7), 071703.
+> doi:10.1115/1.3090818
+
+```
+R = 1.13 (e/D)^-0.17 (p/e)^0.38                          Eq. (17)
+G = 1.24 (e/D)^0.014 (p/e)^-0.02  (e+)^0.42              Eq. (18)
+
+30,000 < Re < 400,000,   0.1 < e/D < 0.18,   5 < p/e < 10
+```
+
+with `R` and `G` defined exactly as in the confirmed document:
+
+```
+R(e+)     = (2/f)^(1/2) + 2.5 ln( (2e/D)(2W/(W+H)) ) + 2.5       Eq. (12)
+G(e+,Pr)  = R(e+) + [ f/(2 St_r) - 1 ] / (f/2)^(1/2)             Eq. (13)
+```
+
+**Eq. (12) and (13) are character-for-character Han's Eq. 4.15 and 4.16.** The
+paper and the textbook agree on the framework and disagree only on one printed
+digit -- which is further corroboration of `han_ribbed.md`, from the primary
+source this time.
+
+### Item 19/23 closed
+
+The friction correlation absent from Figure 4.193 is Eq. (17). The extended
+range now has both `R` and `G`.
 
 ---
 
@@ -187,75 +216,64 @@ Item 30 independently confirms the text's own claim that the old correlation
 does not extend: -15% mean bias, and one-signed, which is the signature of a
 correlation applied outside its range rather than of scatter.
 
-### Item 31: a sibling paper supports the book being wrong, but does not settle it
+### Item 31 RESOLVED: the textbook misprints one exponent
 
-**Provenance first.** A PDF supplied as `Rallabandi_2009.pdf` is **not** either
-paper the book cites. Its British Library cover sheet and article header give:
-
-> Alkhamis, N.Y., Rallabandi, A.P. and Han, J.-C. (2011). Heat Transfer and
-> Pressure Drop Correlations for Square Channels With V-Shaped Ribs at High
-> Reynolds Numbers. *ASME J. Heat Transfer*, **133**, 111901, November 2011.
-
-The book credits Figure 4.193 to Rallabandi et al. 2009a (*JHT* 131(7), 071703)
-and 2009b (GT2009-59546). **V-shaped ribs in 2011 against 45 deg angled/sharp
-ribs in 2009** -- a different rib geometry, a different paper, two years later.
-
-The 2011 paper says so itself: *"A similar correlation has been presented in
-Rallabandi et al. [13], pertaining to 45 deg angled ribs"*, and *"All the data
-points acquired using the V-shaped ribs fall below the angled rib
-correlation"*.
-
-The filename is misleading and the distinction is easy to miss. It was caught
-by a page footer reading `NOVEMBER 2011 Vol. 133`, not by the filename.
-
-### What the 2011 paper does give
-
-Its own correlations, read from page images at 500 dpi:
+The primary source gives
 
 ```
-R = 2.59 (P/e)^-0.29 (e/D)^-0.13                              Eq. (18)
-G = 1.3  (P/e)^-0.05 (e/D)^-0.08 (e+)^0.39                    Eq. (19)
-30,000 < Re < 400,000,   5 < P/e < 10,   0.1 < e/D < 0.18
+G = 1.24 (e/D)^0.014 (p/e)^-0.02 (e+)^0.42        Rallabandi et al. Eq. (18)
 ```
 
-with the remark *"A very mild dependence of G on the spacing and rib-height
-ratios is observed"*. **These are for V-shaped ribs**, so they are not the
-Figure 4.193 correlation and must not be substituted for it.
+against Figure 4.193c's
 
-### Why this still bears on item 31
+```
+G = 1.24 (e/D)^0.14  (p/e)^-0.021 (e+)^0.42       Han, Dutta & Ekkad, p. 513
+```
 
-| term | 2011 V-rib paper | book's Fig. 4.193 | data-driven estimate, made before reading either |
-|---|---|---|---|
-| constant | 1.3 | 1.24 | -- |
-| `(P/e)` | `^-0.05` | `^-0.021` | -- |
-| **`(e/D)`** | **`^-0.08`** | **`^+0.14`** | **`~-0.08`** |
-| `(e+)` | `^0.39` | `^0.42` | `0.3974` (cloud free fit) |
+**The textbook prints `0.14` where the paper gives `0.014`** -- a lost decimal
+place, worth 22% in `G`. Everything else matches: the constant, the `e+`
+exponent, and the `p/e` exponent to within the reading precision (`-0.02`
+against `-0.021`).
 
-Two independent lines converge on a **small negative** `(e/D)` exponent near
-`-0.08`: the scan of candidate exponents against the digitised cloud, run
-before this paper was opened, and a sibling paper by the same group on closely
-related geometry. The book's `+0.14` is the outlier in sign as well as
-magnitude.
-
-A sign flip in the `e/D` dependence between 45 deg angled ribs and 45 deg
-V-shaped ribs -- same group, same rig, same blockage range, two years apart --
-is not physically plausible. `G` falling slightly with blockage is also the
-sensible direction, since lower `G` means better heat transfer.
-
-Evaluated against the digitised cloud at box centre:
+Against the 38 digitised points:
 
 | | mean pred/data | RMS |
 |---|---|---|
-| 2011 V-rib Eq. (19) | 0.928 | 9.1% |
-| book Fig. 4.193c as printed | 0.781 | 22.6% |
+| **paper Eq. (18)** | **0.994** | **6.9%** |
+| textbook Fig. 4.193c | 0.781 | 22.6% |
 
-The V-rib correlation running ~7% below angled-rib data is exactly what the
-2011 paper describes ("fall below the angled rib correlation"), so that
-agreement is itself coherent rather than coincidental.
+The paper's form lands within 0.6% of the data it was fitted to, which is what
+a correctly transcribed correlation should do.
 
-**Still not settled.** This is strong circumstantial evidence that the book
-misprints the `(e/D)` exponent, and no evidence at all about what the correct
-angled-rib coefficients are. Only Rallabandi et al. 2009a/2009b can give those.
+**The paper's own text agrees with the small exponent**: *"The heat transfer
+roughness (G), on the other hand, does not vary much with e/D or p/e."*
+Exponents of 0.014 and -0.02 are exactly that; 0.14 would not be. The textbook's
+surrounding prose -- that "the blockage ratio (e/D) had to be factored in
+explicitly" -- holds for `R`, whose exponent is `-0.17`, and overstates the case
+for `G`.
+
+### How the candidate scan performed
+
+The scan against the digitised cloud was run before any paper was opened, and
+ranked `1.24, 0.014, -0.021, 0.42` first at 0.992. The paper gives
+`1.24, 0.014, -0.02, 0.42`.
+
+That is worth recording in both directions. The measurement identified the
+right answer from a figure whose own equation was wrong -- but the document
+deliberately declined to adopt it, because at the time a second candidate
+(`constant 1.64`) fitted equally well and nothing but the source could separate
+them. **The restraint and the measurement were both necessary**; either alone
+would have been insufficient.
+
+By contrast, the earlier `(e/D)^-0.14` hypothesis -- proposed because it fixed
+the curve ordering -- was excluded by the cloud at 2.0-2.6x, and would have been
+wrong.
+
+### The V-rib sibling paper, in hindsight
+
+The 2011 V-shaped-rib paper gives `(e/D)^-0.08`, which corroborated "small
+exponent" but not its sign or value; the angled-rib answer is `+0.014`. Useful
+as circumstantial evidence, and correctly not substituted for the real thing.
 
 ### If the extended range is needed before the papers arrive
 
@@ -359,6 +377,7 @@ come from this section.
 | 2026-09-10 | extracted by Claude | UNCONFIRMED and INCOMPLETE. Surrounding text extracted; Figure 4.193 needed before anything here can be used |
 | 2026-09-13 | reviewer | supplied Figure 4.193 (p. 513) and Figure 4.192. Correlations now extracted as items 12-19 |
 | 2026-09-13 | reviewer | read the Fig. 4.193c exponents as `(p/e/10)^0.2` (old) and `(p/e)^-0.031` (new), both flagged as partly guesswork. The old-correlation exponent is settled at `0.1` by the confirmed p. 377 items; the new one is recorded as item 21, bounded at 1.6-2.3% |
+| 2026-09-14 | reviewer | supplied the primary source, Rallabandi, Yang & Han (2009), *JHT* 131(7), 071703. **Item 31 resolved**: the paper's Eq. (18) gives `(e/D)^0.014`; the textbook figure prints `0.14`, a lost decimal worth 22%. Eq. (17) closes the missing `R` correlation. The paper's Eq. (12) and (13) reproduce Han's Eq. 4.15 and 4.16 exactly, corroborating the confirmed document from the primary source. **No open items.** |
 | 2026-09-13 | reviewer | supplied a scanned paper as `Rallabandi_2009.pdf`. **It is a different paper**: Alkhamis, Rallabandi & Han (2011), *JHT* 133, 111901, on **V-shaped** ribs -- not the 45 deg angled-rib papers the book cites for Fig. 4.193. Its Eq. (18) and (19) are recorded, and its `(e/D)^-0.08` corroborates the data-driven estimate, but they are not the Fig. 4.193 correlation. |
 | 2026-09-13 | reviewer | confirmed against the page that the constant reads **1.24** and the `(e/D)` exponent reads **0.14**. That eliminates the last surviving misreading candidates, so **item 31 is no longer a transcription question**: the printed equation disagrees with its own figure by 22%. |
 | 2026-09-13 | reviewer | supplied the unclassified 38-point data cloud. **Item 29**: curve 2 is the fit to the cloud, agreeing to 1.3%. So the curve and data agree and the printed equation disagrees with both, running 20-27% low. **Item 31**: the `(e/D)^-0.14` hypothesis is excluded at 2.0-2.6x; the fault is one digit, either `(e/D)^0.014` or a constant of 1.64. |
