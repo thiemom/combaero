@@ -1,6 +1,6 @@
 # Extraction: Han rib correlations
 
-**Status: items 1-35 CONFIRMED (2026-09-10). Items 36-41 ADDED 2026-09-13 and
+**Status: items 1-35 CONFIRMED (2026-09-10). Items 36-46 ADDED later and
 UNCONFIRMED.**
 
 The originally reviewed items stand. A later pass added the narrow-aspect-ratio
@@ -554,6 +554,66 @@ their intervals, needs a reviewer.
 
 Item 36 states `Pr = 0.7`, consistent with item 25. The narrow-channel
 correlation carries no `Pr` term either.
+
+## High-performance ribs (section 4.2.4) -- ADDED 2026-09-15
+
+Angled-rib derivatives: V-shaped, broken, wedge- and delta-shaped. Recorded for
+scope, because the section contains **no closed-form correlations** -- it is
+comparative, presenting `G` and `R` against `e+` as plots.
+
+| # | item | as extracted | state |
+|---|---|---|---|
+| 42 | V-shaped ribs, Figs. 4.49-4.51 | after Han, J.C. et al., *ASME J. Heat Transfer*, **113**, 590, 1991 | confirmed |
+| 43 | broken ribs, Figs. 4.52-4.54 | after Han, J.C. and Zhang, Y.M., *IJHMT*, **35**(2), 513, 1992 | confirmed |
+| 44 | wedge- and delta-shaped ribs, Figs. 4.55-4.58 | after Han, J.C. et al., *Enhanced Heat Transfer*, **1**(1), 37, 1993 | confirmed |
+| 45 | closed-form correlations for any of these | **none given** -- performance is reported as plots and as ratios in the text | **missing** |
+| 46 | best performers, per the text | 60 deg V-shaped broken rib; backward-aligned delta ribs at 3-4x heat transfer for 7-9x pressure drop | confirmed |
+
+**Implication for #334.** These configurations cannot be implemented as
+correlations from this source. What the section supports is a *comparative*
+statement -- that a 60 deg V-broken rib outperforms a 90 deg continuous rib --
+not a predictive one. Implementing them would need the three primary papers,
+and is out of scope for the current issue.
+
+### Cross-check: Figure 4.54 independently confirms items 8 and 10
+
+Figure 4.54 (Han and Zhang 1992) plots `G_bar` against `e+` for broken ribs,
+with the 90 deg continuous rib as a reference line. The section text states:
+
+> The heat-transfer roughness function for the 90 deg rib is the same as the
+> previous correlation that was developed for the 90 deg rib by Han (1988).
+
+Testing that against the digitised line, using **only** quantities from the
+confirmed items -- `G = 3.7 (e+)^0.28` (item 8) and `G_bar = 1.2 G` (item 10):
+
+| comparison | mean pred/data | RMS |
+|---|---|---|
+| `G_bar = 4.44 (e+)^0.28` vs Fig. 4.54 line | 0.967 | **3.5%** |
+| same vs Fig. 4.54 data points | 0.949 | 5.4% |
+
+Free fit to the digitised line gives `G_bar = 4.201 (e+)^0.2952` against the
+confirmed `4.44 (e+)^0.28`.
+
+**This corroborates item 10 from a third independent direction**, which matters
+because item 10 is the one this document got wrong and then right: it was first
+assumed, then "resolved" via a Prandtl coincidence that fitted to 0.51% and was
+wrong, then settled by a label printed on Figure 4.47. A different paper, a
+different figure and a different rib family now reproduce it to 3.5%.
+
+### Digitised reference point for a high-performance rib
+
+Not a correlation, and not to be implemented as one. Recorded because it
+quantifies the section's qualitative claim:
+
+```
+90 deg continuous (Fig. 4.54 line)   G_bar = 4.201 (e+)^0.2952
+45 deg V-shaped broken (data)        G_bar = 3.242 (e+)^0.2882
+at e+ = 500:  26.3 against 19.4, a ratio of 0.739
+```
+
+Lower `G` means better heat transfer, so the 45 deg V-broken rib sits about 26%
+better on this measure -- consistent with the text, which calls the broken
+V-shaped ribs the best performers of the group.
 
 ## Modelling decisions
 

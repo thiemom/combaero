@@ -399,6 +399,22 @@ come from this section.
 
 ---
 
+## Re-digitisation check (2026-09-15)
+
+Figure 4.193c was digitised a second time, independently. The confirmed
+correlations are unaffected.
+
+| | first digitisation | re-digitisation |
+|---|---|---|
+| curve 1 | `1.5669 (e+)^0.3610` | `1.5856 (e+)^0.3617` |
+| curve 2 | `1.3763 (e+)^0.3996` | `1.3558 (e+)^0.4024` |
+| cloud | `1.3942 (e+)^0.3974` | `1.3717 (e+)^0.4023` |
+| Rallabandi Eq. (18) against the cloud | 0.994, 6.9% RMS | **0.973, 6.9% RMS** |
+
+Agreement between two independent digitisations is within 1.5% on the
+constants and 1.3% on the exponents, and Eq. (18) reproduces both at the same
+RMS. The textbook's printed form remains the outlier.
+
 ## Review log
 
 | date | reviewer | outcome |
@@ -406,6 +422,7 @@ come from this section.
 | 2026-09-10 | extracted by Claude | UNCONFIRMED and INCOMPLETE. Surrounding text extracted; Figure 4.193 needed before anything here can be used |
 | 2026-09-13 | reviewer | supplied Figure 4.193 (p. 513) and Figure 4.192. Correlations now extracted as items 12-19 |
 | 2026-09-13 | reviewer | read the Fig. 4.193c exponents as `(p/e/10)^0.2` (old) and `(p/e)^-0.031` (new), both flagged as partly guesswork. The old-correlation exponent is settled at `0.1` by the confirmed p. 377 items; the new one is recorded as item 21, bounded at 1.6-2.3% |
+| 2026-09-15 | reviewer | re-digitised Fig. 4.193c independently. Both curves and the cloud reproduce within 1.5%; Eq. (18) still fits at 6.9% RMS. **CONFIRMED status unaffected.** |
 | 2026-09-14 | reviewer | **CONFIRMED.** D4 accepted: follow the paper over the textbook where they disagree, noting the paper is also the cleaner print -- small superscripts on a scanned textbook page being where a lost decimal is most likely to arise. Released for implementation. |
 | 2026-09-14 | reviewer | supplied the primary source, Rallabandi, Yang & Han (2009), *JHT* 131(7), 071703. **Item 31 resolved**: the paper's Eq. (18) gives `(e/D)^0.014`; the textbook figure prints `0.14`, a lost decimal worth 22%. Eq. (17) closes the missing `R` correlation. The paper's Eq. (12) and (13) reproduce Han's Eq. 4.15 and 4.16 exactly, corroborating the confirmed document from the primary source. **No open items.** |
 | 2026-09-13 | reviewer | supplied a scanned paper as `Rallabandi_2009.pdf`. **It is a different paper**: Alkhamis, Rallabandi & Han (2011), *JHT* 133, 111901, on **V-shaped** ribs -- not the 45 deg angled-rib papers the book cites for Fig. 4.193. Its Eq. (18) and (19) are recorded, and its `(e/D)^-0.08` corroborates the data-driven estimate, but they are not the Fig. 4.193 correlation. |
