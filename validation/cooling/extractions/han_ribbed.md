@@ -1,6 +1,11 @@
 # Extraction: Han rib correlations
 
-**Status: CONFIRMED -- reviewed against the book on 2026-09-10.**
+**Status: items 1-35 CONFIRMED (2026-09-10). Items 36-41 ADDED 2026-09-13 and
+UNCONFIRMED.**
+
+The originally reviewed items stand. A later pass added the narrow-aspect-ratio
+correlation (Eq. 4.19, Figure 4.48), which extends coverage to `W/H` below 1
+and contradicts nothing already confirmed. Those items await review.
 
 Every item was checked against the source or resolved by derivation, and the
 reviewer has signed off in the review log. This document is released for
@@ -490,6 +495,65 @@ equation. Recorded rather than assumed: it needs one look at the printed page.
 This is what two extraction channels are for. The text extraction carried
 things the images did not -- Eq. 4.14, the `e+ >= 50` floor, the stated
 deviation bands -- and the image carried a factor the text dropped.
+
+## Narrow-aspect-ratio channels (Eq. 4.19, Figure 4.48) -- ADDED 2026-09-13
+
+Extends coverage to `W/H < 1`. The confirmed items cover `W/H = 1-4`; this
+covers `1/4 < W/H < 1`, so together they span `1/4` to `4`.
+
+after: Han, J.C. et al., *Int. J. Heat Mass Transfer*, **31**(1), 183, 1988,
+with the `G` correlation attributed in the text to Han et al. (1989).
+
+| # | item | as extracted | state |
+|---|---|---|---|
+| 36 | Eq. 4.19 form | `G = C (e+)^n`, at `Pr = 0.7` | confirmed by text |
+| 37 | `1/2 < W/H < 1` | `n = 0.35`; `C = 2.24` at `alpha = 90 deg`, `C = 1.80` for `30 < alpha < 90` | confirmed by text |
+| 38 | `1/4 < W/H < 1/2` | `n = 0.35 (W/H)^0.44`; `C = 2.24 (W/H)^-0.76` at `alpha = 90 deg`, `C = 1.80 (W/H)^-0.76` for `30 < alpha < 90` | confirmed by text |
+| 39 | `R` behaviour, Fig. 4.48 | `R` increases with decreasing `W/H`; all three aspect ratios coincide at `alpha = 30 deg` | confirmed by text |
+| 40 | `R` correlation for narrow channels | plotted in Fig. 4.48a, no closed form in the extracted text | **missing** |
+
+### Cross-check: Eq. 4.18 and Eq. 4.19 meet exactly at `W/H = 1`
+
+Different papers, adjoining ranges. At their shared boundary, `alpha = 90 deg`,
+`P/e = 10`:
+
+| `e+` | Eq. 4.18 | Eq. 4.19 | difference |
+|---|---|---|---|
+| 50 | 8.8082 | 8.8082 | 0 |
+| 100 | 11.2266 | 11.2266 | 0 |
+| 300 | 16.4908 | 16.4908 | 0 |
+| 1000 | 25.1332 | 25.1332 | 0 |
+
+Exact to every digit: Eq. 4.18's square-channel branch reduces to
+`2.24 (e+)^0.35`, which is Eq. 4.19's upper branch. A check that could have
+failed and did not.
+
+### Discontinuity at the `W/H = 1/2` branch boundary (item 41)
+
+| # | item | state |
+|---|---|---|
+| 41 | Eq. 4.19's two branches disagree at `W/H = 1/2` | **needs review** |
+
+Evaluated at `W/H = 1/2`, `alpha = 90 deg`, from either side:
+
+| `e+` | upper branch | lower branch | ratio |
+|---|---|---|---|
+| 100 | 11.2266 | 12.4459 | 1.109 |
+| 1000 | 25.1332 | 22.5435 | 0.897 |
+
+A **10% step** at the boundary, in opposite directions at the two ends of the
+range. Unlike the `W/H = 1` junction above, these branches do not meet.
+
+The text gives open intervals, so `W/H = 1/2` exactly may be intended to fall
+in neither. But an implementation has to choose, and a 10% discontinuity inside
+the validated range will appear in any solve that crosses it. Whether the
+correlation is meant to be discontinuous, or the branches used only well inside
+their intervals, needs a reviewer.
+
+### Prandtl number
+
+Item 36 states `Pr = 0.7`, consistent with item 25. The narrow-channel
+correlation carries no `Pr` term either.
 
 ## Modelling decisions
 
