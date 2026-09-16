@@ -138,7 +138,7 @@ CompressibleFlowSolution nozzle_flow(
     // Set up stagnation state
     sol.stagnation.T = T0;
     sol.stagnation.P = P0;
-    sol.stagnation.X = X;
+    sol.stagnation.set_X(X);
 
     double h0 = sol.stagnation.h();
     double s0 = sol.stagnation.s();
@@ -162,7 +162,7 @@ CompressibleFlowSolution nozzle_flow(
     double T_outlet = solve_T_isentropic(P_outlet, s0, T0, X, tol, max_iter);
     sol.outlet.T = T_outlet;
     sol.outlet.P = P_outlet;
-    sol.outlet.X = X;
+    sol.outlet.set_X(X);
 
     double h_outlet = sol.outlet.h();
     double dh = h0 - h_outlet;
@@ -197,7 +197,7 @@ double solve_A_eff_from_mdot(
     State stag;
     stag.T = T0;
     stag.P = P0;
-    stag.X = X;
+    stag.set_X(X);
     double h0 = stag.h();
     double s0 = stag.s();
 
@@ -232,7 +232,7 @@ double solve_P_back_from_mdot(
     State stag;
     stag.T = T0;
     stag.P = P0;
-    stag.X = X;
+    stag.set_X(X);
     double h0 = stag.h();
     double s0 = stag.s();
 
@@ -335,7 +335,7 @@ double critical_pressure_ratio(
     State stag;
     stag.T = T0;
     stag.P = P0;
-    stag.X = X;
+    stag.set_X(X);
     double h0 = stag.h();
     double s0 = stag.s();
 
@@ -353,7 +353,7 @@ double mach_from_pressure_ratio(
     State stag;
     stag.T = T0;
     stag.P = P0;
-    stag.X = X;
+    stag.set_X(X);
     double h0 = stag.h();
     double s0 = stag.s();
 
@@ -378,7 +378,7 @@ double mass_flux_isentropic(
     State stag;
     stag.T = T0;
     stag.P = P0;
-    stag.X = X;
+    stag.set_X(X);
     double h0 = stag.h();
     double s0 = stag.s();
 
@@ -495,7 +495,7 @@ FannoSolution fanno_channel(
     // Inlet state
     sol.inlet.T = T_in;
     sol.inlet.P = P_in;
-    sol.inlet.X = X;
+    sol.inlet.set_X(X);
     double mw_g = sol.inlet.mw();  // g/mol
     double mw_kg = mw_g / 1000.0;  // kg/mol
     double A = M_PI * D * D / 4.0;  // m²
@@ -593,7 +593,7 @@ FannoSolution fanno_channel(
         State current;
         current.T = T;
         current.P = P;
-        current.X = X;
+        current.set_X(X);
         double a = current.a();
         double M = u / a;
 
@@ -628,7 +628,7 @@ FannoSolution fanno_channel(
     // Set outlet state
     sol.outlet.T = T;
     sol.outlet.P = P;
-    sol.outlet.X = X;
+    sol.outlet.set_X(X);
 
     return sol;
 }
@@ -648,7 +648,7 @@ static double local_friction(double T, double P, double u, double D,
                              const std::string& correlation, double f_multiplier)
 {
     State s;
-    s.T = T; s.P = P; s.X = X;
+    s.T = T; s.P = P; s.set_X(X);
     const double Re_local = s.rho() * u * D / s.mu();
     const double e_D = (D > 0.0) ? roughness / D : 0.0;
     double f = 0.0;
@@ -691,7 +691,7 @@ FannoSolution fanno_channel_rough(
     // Inlet state
     sol.inlet.T = T_in;
     sol.inlet.P = P_in;
-    sol.inlet.X = X;
+    sol.inlet.set_X(X);
     const double mw_g  = sol.inlet.mw();       // g/mol
     const double mw_kg = mw_g / 1000.0;        // kg/mol
     const double A     = M_PI * D * D / 4.0;   // m²
@@ -787,7 +787,7 @@ FannoSolution fanno_channel_rough(
         f_sum += f_step;
 
         State current;
-        current.T = T; current.P = P; current.X = X;
+        current.T = T; current.P = P; current.set_X(X);
         const double a = current.a();
         const double M = u / a;
 
@@ -820,7 +820,7 @@ FannoSolution fanno_channel_rough(
 
     sol.outlet.T = T;
     sol.outlet.P = P;
-    sol.outlet.X = X;
+    sol.outlet.set_X(X);
 
     // f_avg = mean over (n_steps + 1) samples (inlet + one per step)
     sol.f_avg = f_sum / static_cast<double>(n_steps + 1);
@@ -852,7 +852,7 @@ double fanno_max_length(
     State inlet;
     inlet.T = T_in;
     inlet.P = P_in;
-    inlet.X = X;
+    inlet.set_X(X);
     double M_in = u_in / inlet.a();
 
     if (M_in >= 1.0) {
@@ -1082,7 +1082,7 @@ NozzleSolution nozzle_quasi1d(
     State stag;
     stag.T = T0;
     stag.P = P0;
-    stag.X = X;
+    stag.set_X(X);
     double mw_g = stag.mw();  // g/mol
     double mw_kg = mw_g / 1000.0;  // kg/mol
 
@@ -1279,7 +1279,7 @@ NozzleSolution nozzle_quasi1d(
         State st;
         st.T = T;
         st.P = P;
-        st.X = X;
+        st.set_X(X);
         double M = M_guess;  // M is fixed by the ideal-gas solution
 
         // Store station

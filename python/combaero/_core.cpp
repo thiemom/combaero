@@ -1882,7 +1882,7 @@ PYBIND11_MODULE(_core, m) {
         State in;
         in.T = T_in;
         in.P = P;
-        in.X = X_in;
+        in.set_X(X_in);
 
         EquilibriumResult out = wgs_equilibrium_adiabatic(in);
         return out.state.T;
@@ -2497,7 +2497,7 @@ PYBIND11_MODULE(_core, m) {
         State in;
         in.T = T;
         in.P = P;
-        in.X = to_vec(X_arr);
+        in.set_X(to_vec(X_arr));
         return complete_combustion(in, smooth_phi0, smooth_phi1, k0, k1);
       },
       py::arg("T"), py::arg("X"), py::arg("P") = 101325.0,
@@ -2515,7 +2515,7 @@ PYBIND11_MODULE(_core, m) {
         State in;
         in.T = T;
         in.P = P;
-        in.X = to_vec(X_arr);
+        in.set_X(to_vec(X_arr));
         return complete_combustion_isothermal(in, smooth_phi0, smooth_phi1, k0,
                                               k1);
       },
@@ -2534,7 +2534,7 @@ PYBIND11_MODULE(_core, m) {
         State s;
         s.T = T;
         s.P = P;
-        s.X = to_vec(X_arr);
+        s.set_X(to_vec(X_arr));
         return s;
       };
 
