@@ -134,6 +134,14 @@ class _RibbedChannelResult:
     T_aw: float
     e_plus: float
     extrapolated: bool
+    # Derivatives the solver's wall-coupling path reads. They are not
+    # decoration: without them a ribbed channel joined by a ThermalWall raises
+    # AttributeError mid-solve, which is how the coupled combustor example
+    # found this after the unit tests missed it -- none of them coupled a wall.
+    dh_dmdot: float = 0.0
+    dh_dT: float = 0.0
+    dT_aw_dmdot: float = 0.0
+    dT_aw_dT: float = 0.0
 
 
 ChannelModel = SmoothModel | RibbedModel
@@ -233,7 +241,26 @@ class ConvectiveSurface:
         # The correlation's f is already the four-sided channel value.
         dP = rib.f * (length / diameter) * 0.5 * rho * velocity * abs(velocity)
 
+        # Wall-coupling derivatives. The ribbed side moves with mass flow
+        # through e+; the smooth side brings its own, already computed by the
+        # base correlation. Both are area-weighted exactly as h is, so the
+        # derivative of the average is the average of the derivatives.
+        dSt_dRe = rib.dSt_dRe
+        dRe_dmdot = abs(Re / m_dot_ref) if (m_dot_ref := rho * velocity * self.area or 0.0) else 0.0
+        dh_ribbed_dmdot = dSt_dRe * dRe_dmdot * rho * abs(velocity) * cp
+        dh_dmdot = (
+            frac_ribbed * dh_ribbed_dmdot + frac_smooth * smooth.dh_dmdot
+        ) * self.Nu_multiplier
+        # Temperature sensitivity of the ribbed side is not exposed by the
+        # correlation, so only the smooth side contributes. Recorded rather
+        # than approximated from a stand-in, the same gap the array path had.
+        dh_dT = frac_smooth * smooth.dh_dT * self.Nu_multiplier
+
         return _RibbedChannelResult(
+            dh_dmdot=dh_dmdot,
+            dh_dT=dh_dT,
+            dT_aw_dmdot=smooth.dT_aw_dmdot,
+            dT_aw_dT=smooth.dT_aw_dT,
             h=h_avg * self.Nu_multiplier,
             h_ribbed=h_ribbed,
             h_smooth=smooth.h,

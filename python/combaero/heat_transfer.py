@@ -115,6 +115,7 @@ def smooth(
 from combaero.network.components import (
     ChannelModel,
     ConvectiveSurface,
+    RibbedModel,
     SmoothModel,
 )
 
@@ -122,5 +123,6 @@ from combaero.network.components import (
 __all__ = [
     "ChannelModel",
     "ConvectiveSurface",
+    "RibbedModel",
     "SmoothModel",
 ]

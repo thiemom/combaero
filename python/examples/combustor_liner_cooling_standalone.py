@@ -29,7 +29,6 @@ that keeps T_metal < 800 C for three channel geometries:
     Note: channel_ribbed uses the geometry-only rib_enhancement_factor internally.
     For standalone high-Re Nu/Nu0 and f/f0 use rib_enhancement_factor_high_re
     and rib_friction_multiplier_high_re (Singh & Ekkad 2017, Re=30k-400k).
-  - Dimpled        (Chyu et al. 1997, d/Dh=0.2, h/d=0.2, S/d=2)
 
 Wall configurations compared:
   - Bare Inconel 718
@@ -52,6 +51,7 @@ import numpy as np
 from plot_utils import show_or_save
 
 import combaero as cb
+from combaero.heat_transfer import ConvectiveSurface, RibbedModel
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -74,9 +74,15 @@ def channel_result(
     if name == "Smooth":
         return cb.channel_smooth(T, P, X, u, D_h, L)
     if name == "Ribbed":
-        return cb.channel_ribbed(T, P, X, u, D_h, L, e_D=0.07, pitch_to_height=8.0, alpha_deg=60.0)
-    if name == "Dimpled":
-        return cb.channel_dimpled(T, P, X, u, D_h, L, d_Dh=0.20, h_d=0.20, S_d=2.0)
+        # Ribs are evaluated through a ConvectiveSurface rather than a bare
+        # correlation call: the correlation gives the RIBBED SIDE, and
+        # combining it with the smooth walls depends on how many walls carry
+        # ribs, which is the element's job. See issue #334.
+        surface = ConvectiveSurface(
+            area=1.0,
+            model=RibbedModel(e_D=0.07, p_e=8.0, alpha_deg=60.0, W_H=1.0, n_ribbed_walls=2),
+        )
+        return surface.htc_and_T(T, P, X, u, D_h, L)
     raise ValueError(f"Unknown channel type: {name}")
 
 
@@ -244,7 +250,7 @@ def main() -> None:
     # Bypass sweep
     # -----------------------------------------------------------------------
     f_cool_vals = np.linspace(0.05, 0.35, 25)
-    channel_names = ["Smooth", "Ribbed", "Dimpled"]
+    channel_names = ["Smooth", "Ribbed"]
 
     # Primary wall config for sweep plots
     primary_cfg = "Inconel only"
@@ -341,7 +347,7 @@ def main() -> None:
     # -----------------------------------------------------------------------
     # Plots
     # -----------------------------------------------------------------------
-    colors = {"Smooth": "steelblue", "Ribbed": "darkorange", "Dimpled": "green"}
+    colors = {"Smooth": "steelblue", "Ribbed": "darkorange"}
 
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     fig.suptitle(
