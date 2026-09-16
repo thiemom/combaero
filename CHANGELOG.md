@@ -7,45 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-- **Every example runs again, and CI now notices when one stops.** The 0.7.0
-  correlation removal broke five examples, and the 0.6.0 `pipe_* -> channel_*`
-  rename had quietly broken three more that nobody had run since. All eight
-  are fixed.
-
-  `scripts/run_examples.py` already ran every example headless and exited
-  non-zero on failure; it just was not wired to anything. It now gates
-  `status-check`, so an example that stops running blocks the merge.
-
-  **The job runs each example rather than importing it.** An example calling a
-  removed function from inside a function imports cleanly and only fails when
-  the function actually runs -- measured on four of them, an import check
-  caught two.
-
-  Two examples are beyond a rename and are listed in the runner's
-  `KNOWN_BROKEN` map with their reason and issue (#351): one demonstrates a
-  `CombustorNode(pressure_loss=...)` callback that no longer exists, the other
-  builds a merging `MomentumChamberNode` topology that `FlowNetwork.validate`
-  now rejects. Both are still run, so one that starts passing again fails the
-  job asking for its entry to be removed, rather than sitting on the list
-  forever.
-
-- **Three C++ examples segfaulted and nothing noticed.**
-  `stagnation_example`, `compressible_example` and `combustion_state_example`
-  crashed on a null read inside `combaero::mix()`. They assigned the public
-  `State::X` member directly instead of calling `set_X()`, so `Y` stayed
-  empty and `mix()` indexed it. They compiled and linked cleanly throughout.
-
-  The examples were built by CMake but never registered as tests, so building
-  them was the only thing ever checked. Each is now an `add_test` smoke case,
-  which puts them in `ctest` and so in CI across the existing matrix.
-
-- **`_RibbedChannelResult` carries the wall-coupling derivatives.**
-  `dh_dmdot`, `dh_dT`, `dT_aw_dmdot` and `dT_aw_dT` were missing, so a ribbed
-  channel coupled to a wall fed the solver an incomplete Jacobian. Nineteen
-  unit tests missed it because none of them coupled a wall; re-enabling the
-  skipped coupled-liner example test is what surfaced it.
-
 ### Added
 - **Ribbed surfaces are selectable in the GUI again.** The node type returns
   with the fields the rebuilt correlation needs: rib geometry, the channel
@@ -61,8 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dropdown, so a pre-0.7.0 network's parameters stay visible rather than being
   silently dropped on the next save.
 
-
-### Added
 - **Ribbed channels are back**, built on the parametrised correlation sets.
   `RibbedModel` carries a `RibCorrelationSet`, the rib geometry, the channel
   aspect ratio, and `n_ribbed_walls`.
@@ -101,16 +60,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reversed. Verified against central differences to 1e-10, including reversed
   flow.
 
-### Changed
-- **`CLAUDE.md`'s explicit-includes rule names both strictnesses.** It said
-  "macOS-only implicit includes break Linux CI", which is one direction of a
-  two-directional problem and misleading: a `std::max({a,b,c})` here passed on
-  macOS **and** Linux and was caught only by MinGW. libstdc++ is strict about
-  transitive headers; MSVC is strict about POSIX-ish macros like `M_PI`. Any
-  platform can be the permissive one, and two agreeing is not evidence.
-
-
-### Added
 - **Parametrised rib correlations.** Rib correlations are now data rather than
   code: a `RibCorrelationSet` carries the coefficients, each term's
   **normaliser**, the advisory validity band, the stated accuracy, and the
@@ -151,6 +100,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Not yet wired into `ChannelElement`: that needs the ribbed-versus-smooth wall
   weighting, and is tracked in #334.
 
+- **`ChannelResult.ddP_dvelocity`** [Pa*s/m], for chaining a channel
+  correlation's pressure sensitivity onto a caller's own mass flow.
+  `ddP_dmdot` is taken w.r.t. the mass flow through the correlation's internal
+  flow area -- the pin-array minimum section, the jet holes -- so chaining it
+  directly is wrong by the area ratio, **45x** for a 25 mm channel over a 3 mm
+  pin array. The impingement routine is driven by per-jet mass flow rather
+  than a velocity and so leaves the new field unset; `ConvectiveSurface`
+  carries the split that converts it.
+
+
+### Changed
+- **`CLAUDE.md`'s explicit-includes rule names both strictnesses.** It said
+  "macOS-only implicit includes break Linux CI", which is one direction of a
+  two-directional problem and misleading: a `std::max({a,b,c})` here passed on
+  macOS **and** Linux and was caught only by MinGW. libstdc++ is strict about
+  transitive headers; MSVC is strict about POSIX-ish macros like `M_PI`. Any
+  platform can be the permissive one, and two agreeing is not evidence.
+
+- **`ChannelElement` supports smooth surfaces only** for now. The
+  user-set `Nu_multiplier` and `f_multiplier` on `ConvectiveSurface` are
+  **unaffected** -- they encode nothing, default to 1.0, and remain the
+  supported way to match measured data at an operating point.
+
+- **The GUI rejects saved networks carrying removed surface types** rather than
+  silently substituting smooth, which would answer a different question than
+  the one asked. Ribbed reports that it returns in a later release; the other
+  three report removal.
+
+- **`ChannelElement.residuals` no longer restates pipe friction in Python.**
+  It computed a `f_base` from a hardcoded Haaland/Petukhov branch, plus the
+  density, viscosity, velocity and Reynolds number feeding it, on every
+  residual evaluation -- including a `complete_state` call. After the pin-fin
+  and dimple fixes, all of it fed nothing but a guard: `rib_friction_multiplier`
+  takes no Reynolds number and `dimple_friction_multiplier` ignores the one it
+  is given. Removed, along with the air-at-STP fallbacks (`rho = 1.2`,
+  `mu = 1.8e-5`) it substituted whenever a state looked unphysical -- fabricated
+  properties a mid-Newton iterate would silently pick up.
+
+  Verified behaviour-neutral: residual and every Jacobian entry **identical
+  across 108 cases** -- four surface models, nine mass flows including zero,
+  1e-12 and reversed, three temperatures.
+
+  Reynolds number for the dimple correlation is now computed by a small helper.
+  Density cancels out of it (`rho * v` is `m_dot / area`), so no density guard
+  is needed at all.
+
+- **`ChannelElement` carries its provenance.** The docstring was one line with
+  no literature. It now names the formulations, points at the files that own
+  each correlation rather than transcribing them, and records the known
+  Jacobian gap.
+
+- **`test_channel_jacobians.py` checks derivatives rather than field
+  presence.** Its assertions were `assert result.ddP_dmdot != 0.0`, which says
+  a field was written, not that it is right -- an element-level defect 10.5%
+  in size survived it. The ribbed and pin-fin cases now verify `ddP_dvelocity`
+  against a central difference of `dP` in velocity.
+
+- **A localised array's pressure drop is now the correlation's own.** The
+  pin-fin and impingement correlations return `dP` directly, and
+  `ChannelElement` takes it instead of converting it into a multiplier on pipe
+  friction. The former route divided by a friction factor restated in Python
+  and let the C++ one multiply it back in, which cancels only when both pick
+  the same correlation. The Python side always used Haaland (rough) or
+  Petukhov (smooth) regardless of the element's `friction_model`, so the drop
+  moved by **+0.48%** for `colebrook`/`serghides` and **-24.7%** for
+  `petukhov`. For the default `haaland` the drop is unchanged bit for bit.
+
+  A channel carrying one of these surfaces now takes the array drop in both
+  regimes. The array correlations are incompressible by construction, so
+  `regime="compressible"` no longer layers Fanno friction on top of a drop the
+  array already owns.
+
 
 ### Removed
 - **Every cooling correlation whose provenance did not survive review.** A
@@ -186,63 +207,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Migration: pin `combaero~=0.6` to keep the previous behaviour. Rebuilt
   correlations land per issue #339, ribs first (#334).
 
-### Changed
-- **`ChannelElement` supports smooth surfaces only** for now. The
-  user-set `Nu_multiplier` and `f_multiplier` on `ConvectiveSurface` are
-  **unaffected** -- they encode nothing, default to 1.0, and remain the
-  supported way to match measured data at an operating point.
-- **The GUI rejects saved networks carrying removed surface types** rather than
-  silently substituting smooth, which would answer a different question than
-  the one asked. Ribbed reports that it returns in a later release; the other
-  three report removal.
-
-### Fixed
-- **`ChannelResult::ddP_dvelocity` is retained** and still set by
-  `channel_smooth`, though its only consumer went with the pin-fin path. It is
-  correct, tested, and is the interface the re-added correlations will use.
-
-
-### Fixed
-- **`ChannelElement.diagnostics` reported a friction factor from a different
-  correlation than the one driving the residual.** It hardcoded Haaland
-  (rough) or Petukhov (smooth) regardless of the element's `friction_model`,
-  so a channel set to `petukhov` reported **0.016834** while its own pressure
-  drop used **0.012928** -- a 30% misreport. It now asks the same C++
-  dispatcher the residual uses. The laminar branch stays `64/Re`, which is
-  Poiseuille rather than a choice of correlation.
-
-### Changed
-- **`ChannelElement.residuals` no longer restates pipe friction in Python.**
-  It computed a `f_base` from a hardcoded Haaland/Petukhov branch, plus the
-  density, viscosity, velocity and Reynolds number feeding it, on every
-  residual evaluation -- including a `complete_state` call. After the pin-fin
-  and dimple fixes, all of it fed nothing but a guard: `rib_friction_multiplier`
-  takes no Reynolds number and `dimple_friction_multiplier` ignores the one it
-  is given. Removed, along with the air-at-STP fallbacks (`rho = 1.2`,
-  `mu = 1.8e-5`) it substituted whenever a state looked unphysical -- fabricated
-  properties a mid-Newton iterate would silently pick up.
-
-  Verified behaviour-neutral: residual and every Jacobian entry **identical
-  across 108 cases** -- four surface models, nine mass flows including zero,
-  1e-12 and reversed, three temperatures.
-
-  Reynolds number for the dimple correlation is now computed by a small helper.
-  Density cancels out of it (`rho * v` is `m_dot / area`), so no density guard
-  is needed at all.
-
-- **`ChannelElement` carries its provenance.** The docstring was one line with
-  no literature. It now names the formulations, points at the files that own
-  each correlation rather than transcribing them, and records the known
-  Jacobian gap.
-
-- **`test_channel_jacobians.py` checks derivatives rather than field
-  presence.** Its assertions were `assert result.ddP_dmdot != 0.0`, which says
-  a field was written, not that it is right -- an element-level defect 10.5%
-  in size survived it. The ribbed and pin-fin cases now verify `ddP_dvelocity`
-  against a central difference of `dP` in velocity.
-
-
-### Removed
 - **`dimple_friction_multiplier_and_jacobian`** (C++, its pybind11 binding and
   the `combaero._solver_tools` re-export). It reported a derivative w.r.t.
   `Re_Dh` that was **identically zero at every Reynolds number**, because
@@ -253,21 +217,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the archived note claiming otherwise was wrong. Callers wanting the value use
   `dimple_friction_multiplier`; there is no derivative to want.
 
+
 ### Fixed
+- **Every example runs again, and CI now notices when one stops.** The 0.7.0
+  correlation removal broke five examples, and the 0.6.0 `pipe_* -> channel_*`
+  rename had quietly broken three more that nobody had run since. All eight
+  are fixed.
+
+  `scripts/run_examples.py` already ran every example headless and exited
+  non-zero on failure; it just was not wired to anything. It now gates
+  `status-check`, so an example that stops running blocks the merge.
+
+  **The job runs each example rather than importing it.** An example calling a
+  removed function from inside a function imports cleanly and only fails when
+  the function actually runs -- measured on four of them, an import check
+  caught two.
+
+  Two examples are beyond a rename and are listed in the runner's
+  `KNOWN_BROKEN` map with their reason and issue (#351): one demonstrates a
+  `CombustorNode(pressure_loss=...)` callback that no longer exists, the other
+  builds a merging `MomentumChamberNode` topology that `FlowNetwork.validate`
+  now rejects. Both are still run, so one that starts passing again fails the
+  job asking for its entry to be removed, rather than sitting on the list
+  forever.
+
+- **Three C++ examples segfaulted and nothing noticed.**
+  `stagnation_example`, `compressible_example` and `combustion_state_example`
+  crashed on a null read inside `combaero::mix()`. They assigned the public
+  `State::X` member directly instead of calling `set_X()`, so `Y` stayed
+  empty and `mix()` indexed it. They compiled and linked cleanly throughout.
+
+  The examples were built by CMake but never registered as tests, so building
+  them was the only thing ever checked. Each is now an `add_test` smoke case,
+  which puts them in `ctest` and so in CI across the existing matrix.
+
+- **`_RibbedChannelResult` carries the wall-coupling derivatives.**
+  `dh_dmdot`, `dh_dT`, `dT_aw_dmdot` and `dT_aw_dT` were missing, so a ribbed
+  channel coupled to a wall fed the solver an incomplete Jacobian. Nineteen
+  unit tests missed it because none of them coupled a wall; re-enabling the
+  skipped coupled-liner example test is what surfaced it.
+
+- **`ChannelResult::ddP_dvelocity` is retained** and still set by
+  `channel_smooth`, though its only consumer went with the pin-fin path. It is
+  correct, tested, and is the interface the re-added correlations will use.
+
+- **`ChannelElement.diagnostics` reported a friction factor from a different
+  correlation than the one driving the residual.** It hardcoded Haaland
+  (rough) or Petukhov (smooth) regardless of the element's `friction_model`,
+  so a channel set to `petukhov` reported **0.016834** while its own pressure
+  drop used **0.012928** -- a 30% misreport. It now asks the same C++
+  dispatcher the residual uses. The laminar branch stays `64/Re`, which is
+  Poiseuille rather than a choice of correlation.
+
 - **`dimple_friction_multiplier` no longer warns about a Reynolds range it does
   not have.** It shared a validator written for `dimple_nusselt_enhancement`,
   which really is a power law in Re, so it emitted "Re_Dh is outside validated
   range [10000, 80000]. Extrapolating power-law correlation" -- naming the
   Nusselt function, about an extrapolation that cannot occur. Geometry limits
   on `d_Dh` and `h_d` are still enforced, and the Nusselt path is unchanged.
+
 - **A test that could not fail has been replaced.** `test_dimple_jacobians`
   compared the analytic derivative against a central difference of the same
   function; both were 0.0, so it held regardless of the implementation. The
   Nusselt half was real and is kept. The friction half is now a test that the
   multiplier does not vary with Re, which goes red if a Re dependence is added.
 
-
-### Fixed
 - **`ChannelElement`'s Jacobian was wrong for pin-fin and impingement
   surfaces.** Those surfaces vary their friction multiplier with mass flow,
   but the multiplier was handed to the C++ friction routine frozen, so the
@@ -277,33 +291,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dependence, which is what localised the fault. Newton convergence on
   networks using either surface should improve; the converged solution for the
   default `friction_model="haaland"` is unchanged.
-
-### Changed
-- **A localised array's pressure drop is now the correlation's own.** The
-  pin-fin and impingement correlations return `dP` directly, and
-  `ChannelElement` takes it instead of converting it into a multiplier on pipe
-  friction. The former route divided by a friction factor restated in Python
-  and let the C++ one multiply it back in, which cancels only when both pick
-  the same correlation. The Python side always used Haaland (rough) or
-  Petukhov (smooth) regardless of the element's `friction_model`, so the drop
-  moved by **+0.48%** for `colebrook`/`serghides` and **-24.7%** for
-  `petukhov`. For the default `haaland` the drop is unchanged bit for bit.
-
-  A channel carrying one of these surfaces now takes the array drop in both
-  regimes. The array correlations are incompressible by construction, so
-  `regime="compressible"` no longer layers Fanno friction on top of a drop the
-  array already owns.
-
-### Added
-- **`ChannelResult.ddP_dvelocity`** [Pa*s/m], for chaining a channel
-  correlation's pressure sensitivity onto a caller's own mass flow.
-  `ddP_dmdot` is taken w.r.t. the mass flow through the correlation's internal
-  flow area -- the pin-array minimum section, the jet holes -- so chaining it
-  directly is wrong by the area ratio, **45x** for a 25 mm channel over a 3 mm
-  pin array. The impingement routine is driven by per-jet mass flow rather
-  than a velocity and so leaves the new field unset; `ConvectiveSurface`
-  carries the split that converts it.
-
 
 ## [0.6.0] - 2026-09-09
 
