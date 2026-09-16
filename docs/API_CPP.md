@@ -423,30 +423,10 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double>& X,
                               bool heating = true, double Nu_multiplier = 1.0,
                               double f_multiplier = 1.0);
 
-// Enhanced surfaces
-ChannelResult channel_ribbed(double T, double P, const std::vector<double>& X,
-                             double velocity, double diameter, double length,
-                             double e_D, double p_e, double w_e,
-                             double T_hot = std::numeric_limits<double>::quiet_NaN(),
-                             double Nu_multiplier = 1.0, double f_multiplier = 1.0);
-
-ChannelResult channel_dimpled(double T, double P, const std::vector<double>& X,
-                              double velocity, double diameter, double length,
-                              double d_Dh, double h_d, double S_d,
-                              double T_hot = std::numeric_limits<double>::quiet_NaN(),
-                              double Nu_multiplier = 1.0, double f_multiplier = 1.0);
-
-ChannelResult channel_pin_fin(double T, double P, const std::vector<double>& X,
-                              double velocity, double diameter, double length,
-                              double L_H, double S_H, double S_L, double t_D,
-                              double T_hot = std::numeric_limits<double>::quiet_NaN(),
-                              double Nu_multiplier = 1.0, double f_multiplier = 1.0);
-
-ChannelResult channel_impingement(double T, double P, const std::vector<double>& X,
-                                  double velocity, double diameter, double length,
-                                  double H_D, double S_n, double d_j, double N_j,
-                                  double T_hot = std::numeric_limits<double>::quiet_NaN(),
-                                  double Nu_multiplier = 1.0, double f_multiplier = 1.0);
+// Enhanced surfaces (ribbed, dimpled, pin-fin, impingement) were removed in
+// 0.7.0: their correlations could not be traced to their cited sources. A
+// provenanced rib correlation is tracked in issue #334; see issue #339 for
+// the rebuild. channel_smooth is unaffected.
 ```
 
 ### Wall Coupling

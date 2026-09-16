@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **Every cooling correlation whose provenance did not survive review.** A
+  correlation-by-correlation audit against the cited sources found that the
+  base convective layer is exact and almost nothing above it is. Removed:
+  `rib_enhancement_factor`, `rib_friction_multiplier`, their `_high_re`
+  variants, `dimple_nusselt_enhancement`, `dimple_friction_multiplier`,
+  `pin_fin_nusselt`, `pin_fin_friction`, `impingement_nusselt`,
+  `film_cooling_effectiveness` and its `_avg` and Sellers multi-row
+  companions, `effusion_effectiveness`, `effusion_discharge_coefficient`,
+  the `channel_ribbed`/`channel_dimpled`/`channel_pin_fin`/`channel_impingement`
+  wrappers, the seven finite-difference `_and_jacobian` helpers built on them,
+  their pybind11 bindings and `units_data.h` entries, the `RibbedModel`,
+  `DimpledModel`, `PinFinModel` and `ImpingementModel` surface types, and the
+  matching GUI node types.
+
+  Why removal rather than repair: repair needs a known-good target and the
+  citations did not provide one. `rib_friction_multiplier` returned **1.4534**
+  where the only rib datum in the repository gives ~6.3 -- a factor of 4-5, in
+  the pair the element actually shipped. The dimple pair swept depth and
+  spacing that its cited source held fixed, and its `S_d` validation would have
+  rejected that source's own geometry. `impingement_nusselt` cited a
+  correlation whose defining term is the crossflow-to-jet mass flux ratio and
+  had no mass flux argument. `film_cooling_effectiveness` decayed
+  exponentially where film effectiveness decays as a power law.
+  `effusion_effectiveness` used `I = M^2*DR` for a momentum flux ratio that is
+  `M^2/DR` -- with the correct definition present but unused in the same file.
+
+  The tests did not catch any of it because they measured the code against
+  itself: `assert 1.0 < multiplier < 10.0` for a value 4-5x off, and
+  `assert 1.3 <= f <= 2.2` against the function's own clamp.
+
+  Migration: pin `combaero~=0.6` to keep the previous behaviour. Rebuilt
+  correlations land per issue #339, ribs first (#334).
+
+### Changed
+- **`ChannelElement` supports smooth surfaces only** for now. The
+  user-set `Nu_multiplier` and `f_multiplier` on `ConvectiveSurface` are
+  **unaffected** -- they encode nothing, default to 1.0, and remain the
+  supported way to match measured data at an operating point.
+- **The GUI rejects saved networks carrying removed surface types** rather than
+  silently substituting smooth, which would answer a different question than
+  the one asked. Ribbed reports that it returns in a later release; the other
+  three report removal.
+
+### Fixed
+- **`ChannelResult::ddP_dvelocity` is retained** and still set by
+  `channel_smooth`, though its only consumer went with the pin-fin path. It is
+  correct, tested, and is the interface the re-added correlations will use.
+
+
 ### Fixed
 - **`ChannelElement.diagnostics` reported a friction factor from a different
   correlation than the one driving the residual.** It hardcoded Haaland

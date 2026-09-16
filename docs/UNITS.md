@@ -428,22 +428,9 @@ All functions use consistent units to avoid conversion errors.
 
 ### cooling_correlations.h - Advanced Cooling Correlations
 
-| Function                          | Input Units                                                               | Output Unit |
-|-----------------------------------|---------------------------------------------------------------------------|-------------|
-| `rib_enhancement_factor`          | e_D: -, pitch_to_height: -, alpha_deg: deg                                | -           |
-| `rib_enhancement_factor_high_re`  | e_D: -, pitch_to_height: -, alpha_deg: deg, Re: -                         | -           |
-| `rib_friction_multiplier`         | e_D: -, pitch_to_height: -                                                | -           |
-| `rib_friction_multiplier_high_re` | e_D: -, pitch_to_height: -                                                | -           |
-| `thermal_performance_factor`      | Nu_ratio: -, f_ratio: -                                                   | -           |
-| `impingement_nusselt`             | Re_jet: -, Pr: -, z_D: -, x_D: - (default 0), y_D: - (default 0)          | -           |
-| `film_cooling_effectiveness`      | x_D: -, M: -, DR: -, alpha_deg: deg                                       | -           |
-| `film_cooling_effectiveness_avg`  | x_D: -, M: -, DR: -, alpha_deg: deg, s_D: - (default 3.0)                 | -           |
-| `film_cooling_multirow_sellers`   | row_positions_xD: list[-], eval_xD: -, M: -, DR: -, alpha_deg: deg        | -           |
-| `effusion_effectiveness`          | x_D: -, M: -, DR: -, porosity: -, s_D: -, alpha_deg: deg                  | -           |
-| `pin_fin_nusselt`                 | Re_d: -, Pr: -, L_D: -, S_D: -, X_D: -, is_staggered: bool (default True) | -           |
-| `dimple_nusselt_enhancement`      | Re_Dh: -, d_Dh: -, h_d: -, S_d: -                                         | -           |
-| `dimple_friction_multiplier`      | Re_Dh: -, d_Dh: -, h_d: -                                                 | -           |
-| `effusion_discharge_coefficient`  | Re_d: -, P_ratio: -, alpha_deg: deg, L_D: - (default 4.0)                 | -           |
+| Function                     | Input Units             | Output Unit |
+|------------------------------|-------------------------|-------------|
+| `thermal_performance_factor` | Nu_ratio: -, f_ratio: - | -           |
 
 ### acoustics.h - Acoustic Properties
 
@@ -669,42 +656,33 @@ All functions use consistent units to avoid conversion errors.
 
 ### heat_transfer.h - ChannelResult fields
 
-| Function                     | Input Units | Output Unit             |
-|------------------------------|-------------|-------------------------|
-| `ChannelResult::h`           | -           | W/(m^2*K)               |
-| `ChannelResult::Nu`          | -           | - (Nu)                  |
-| `ChannelResult::Re`          | -           | - (Re)                  |
-| `ChannelResult::Pr`          | -           | - (Pr)                  |
-| `ChannelResult::f`           | -           | - (friction/loss coeff) |
-| `ChannelResult::dP`          | -           | Pa                      |
-| `ChannelResult::M`           | -           | - (M)                   |
-| `ChannelResult::T_aw`        | -           | K                       |
-| `ChannelResult::q`           | -           | W/m^2                   |
-| `ChannelResult::dh_dmdot`    | -           | W/(m^2*K*kg/s)          |
-| `ChannelResult::dh_dT`       | -           | W/(m^2*K^2)             |
-| `ChannelResult::ddP_dmdot`   | -           | Pa*s/kg                 |
-| `ChannelResult::ddP_dT`      | -           | Pa/K                    |
-| `ChannelResult::dT_aw_dmdot` | -           | K*s/kg                  |
-| `ChannelResult::dT_aw_dT`    | -           | - (dimensionless)       |
-| `ChannelResult::dq_dmdot`    | -           | W*s/(m^2*kg)            |
-| `ChannelResult::dq_dT`       | -           | W/(m^2*K)               |
-| `ChannelResult::dq_dT_hot`   | -           | W/(m^2*K)               |
+| Function                       | Input Units | Output Unit             |
+|--------------------------------|-------------|-------------------------|
+| `ChannelResult::h`             | -           | W/(m^2*K)               |
+| `ChannelResult::Nu`            | -           | - (Nu)                  |
+| `ChannelResult::Re`            | -           | - (Re)                  |
+| `ChannelResult::Pr`            | -           | - (Pr)                  |
+| `ChannelResult::f`             | -           | - (friction/loss coeff) |
+| `ChannelResult::dP`            | -           | Pa                      |
+| `ChannelResult::M`             | -           | - (M)                   |
+| `ChannelResult::T_aw`          | -           | K                       |
+| `ChannelResult::q`             | -           | W/m^2                   |
+| `ChannelResult::dh_dmdot`      | -           | W/(m^2*K*kg/s)          |
+| `ChannelResult::dh_dT`         | -           | W/(m^2*K^2)             |
+| `ChannelResult::ddP_dmdot`     | -           | Pa*s/kg                 |
+| `ChannelResult::ddP_dvelocity` | -           | Pa*s/m                  |
+| `ChannelResult::ddP_dT`        | -           | Pa/K                    |
+| `ChannelResult::dT_aw_dmdot`   | -           | K*s/kg                  |
+| `ChannelResult::dT_aw_dT`      | -           | - (dimensionless)       |
+| `ChannelResult::dq_dmdot`      | -           | W*s/(m^2*kg)            |
+| `ChannelResult::dq_dT`         | -           | W/(m^2*K)               |
+| `ChannelResult::dq_dT_hot`     | -           | W/(m^2*K)               |
 
 ### heat_transfer.h - Channel flow functions (HTC + pressure drop)
 
-| Function              | Input Units                                                                                                          | Output Unit   |
-|-----------------------|----------------------------------------------------------------------------------------------------------------------|---------------|
-| `channel_smooth`      | T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, T_wall: K                                            | ChannelResult |
-| `channel_ribbed`      | T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, e_D: -, pitch_to_height: -, alpha_deg: deg, T_hot: K | ChannelResult |
-| `channel_dimpled`     | T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, d_Dh: -, h_d: -, S_d: -, T_hot: K                    | ChannelResult |
-| `channel_pin_fin`     | T: K, P: Pa, X: mol/mol, velocity: m/s, channel_height: m, pin_diameter: m, S_D: -, X_D: -, N_rows: -, T_hot: K      | ChannelResult |
-| `channel_impingement` | T: K, P: Pa, X: mol/mol, mdot_jet: kg/s, d_jet: m, z_D: -, x_D: -, y_D: -, A_target: m^2, T_hot: K                   | ChannelResult |
-
-### cooling_correlations.h - Pin fin friction (new scalar)
-
-| Function           | Input Units | Output Unit |
-|--------------------|-------------|-------------|
-| `pin_fin_friction` | Re_d: -     | - (f_pin)   |
+| Function         | Input Units                                                               | Output Unit   |
+|------------------|---------------------------------------------------------------------------|---------------|
+| `channel_smooth` | T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, T_wall: K | ChannelResult |
 
 ### correlation_status.h - Extrapolation validity utilities
 

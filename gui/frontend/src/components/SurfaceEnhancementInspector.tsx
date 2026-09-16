@@ -90,10 +90,17 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 					}
 				>
 					<option value="smooth">Smooth (Default)</option>
-					<option value="ribbed">Ribbed</option>
-					<option value="dimpled">Dimpled</option>
-					<option value="pin_fin">Pin Fin Array</option>
-					<option value="impingement">Jet Impingement</option>
+					{/* Enhanced surfaces were removed in 0.7.0: their correlations
+					    could not be traced to their cited sources. Ribbed returns
+					    with a provenanced replacement (issue #334); the others are
+					    deferred (issue #339).
+
+					    The parameter blocks below are deliberately KEPT. They are
+					    unreachable from this dropdown, so no new enhanced node can
+					    be created -- but a network saved before 0.7.0 still carries
+					    one, and removing the blocks would hide its parameters and
+					    risk losing them on the next save. The user can see what is
+					    there; the backend explains on solve why it will not run. */}
 				</select>
 			</div>
 

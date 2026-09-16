@@ -355,44 +355,6 @@ friction_and_jacobian_petukhov(double Re);
 CorrelationResult<std::tuple<double, double>>
 friction_and_jacobian(const std::string &tag, double Re, double e_D);
 
-// -----------------------------------------------------------------------------
-// 3. Cooling Correlations
-// -----------------------------------------------------------------------------
-
-// Pin Fin Nusselt Number and Jacobian wrt Re_d
-CorrelationResult<std::tuple<double, double>>
-pin_fin_nusselt_and_jacobian(double Re_d, double Pr, double L_D, double S_D,
-                             double X_D, bool is_staggered = true);
-
-// Pin Fin Friction and Jacobian wrt Re_d
-CorrelationResult<std::tuple<double, double>>
-pin_fin_friction_and_jacobian(double Re_d, bool is_staggered = true);
-
-// Dimple Nusselt Enhancement and Jacobian wrt Re_Dh
-CorrelationResult<std::tuple<double, double>>
-dimple_nusselt_enhancement_and_jacobian(double Re_Dh, double d_Dh, double h_d,
-                                        double S_d);
-
-// Rib Enhancement Factor (High-Re) and Jacobian wrt Re
-CorrelationResult<std::tuple<double, double>>
-rib_enhancement_factor_high_re_and_jacobian(double e_D, double pitch_to_height,
-                                            double alpha_deg, double Re);
-
-// Impingement Nusselt Number and Jacobian wrt Re_jet
-CorrelationResult<std::tuple<double, double>>
-impingement_nusselt_and_jacobian(double Re_jet, double Pr, double z_D,
-                                 double x_D = 0.0, double y_D = 0.0);
-
-// Film Cooling Effectiveness and Jacobian wrt Blowing Ratio M
-CorrelationResult<std::tuple<double, double>>
-film_cooling_effectiveness_and_jacobian(double x_D, double M, double DR,
-                                        double alpha_deg);
-
-// Effusion Effectiveness and Jacobian wrt Blowing Ratio M
-CorrelationResult<std::tuple<double, double>>
-effusion_effectiveness_and_jacobian(double x_D, double M, double DR,
-                                    double porosity, double s_D,
-                                    double alpha_deg);
 
 // -----------------------------------------------------------------------------
 // 4. Thermodynamic & Transport Components

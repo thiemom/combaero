@@ -8,7 +8,21 @@ import combaero as ca
 from combaero.species import SpeciesLocator
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "examples"))
-from combustor_liner_cooling_network import solve_operating_point_network_coupled
+
+# The example this exercises uses enhanced-surface models removed in 0.7.0 and
+# is deliberately left broken until a provenanced rib correlation lands
+# (issue #334). Skipped rather than deleted, so it returns with the example.
+#
+# Worth noting: CI does not execute the examples, but this test imports one --
+# so an example CAN break a build, via its test.
+pytest.skip(
+    "combustor_liner_cooling_network example is broken pending #334",
+    allow_module_level=True,
+)
+
+from combustor_liner_cooling_network import (  # noqa: E402
+    solve_operating_point_network_coupled,
+)
 
 
 def test_coupled_combustor_network_converges_without_warning() -> None:
