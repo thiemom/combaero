@@ -217,3 +217,36 @@ def test_friction_multiplier_scales_the_ribbed_drop() -> None:
     dp0 = a.Pt - b.Pt - plain.residuals(a, b)[0][0]
     dp1 = a.Pt - b.Pt - scaled.residuals(a, b)[0][0]
     assert dp1 == pytest.approx(2.5 * dp0, rel=1e-12)
+
+
+def test_a_ribbed_channel_solves_in_a_network() -> None:
+    """The test that actually matters: does it converge in a real solve?
+
+    Unit tests confirm the residual and its Jacobian in isolation. This
+    confirms the element works where it is used -- the solver probes states the
+    unit tests never construct, which is the reason the guards in the
+    correlation exist at all.
+
+    Ribs restrict flow, so at a fixed pressure drop a ribbed channel must pass
+    less than a smooth one.
+    """
+    from combaero.network import FlowNetwork, NetworkSolver
+    from combaero.network.components import PressureBoundary
+
+    def solve(model) -> dict:
+        g = FlowNetwork()
+        a = PressureBoundary("A")
+        a.Pt, a.Tt, a.Y = 2.4e5, 600.0, Y_AIR
+        b = PressureBoundary("B")
+        b.Pt, b.Tt, b.Y = 2.0e5, 600.0, Y_AIR
+        g.add_node(a)
+        g.add_node(b)
+        g.add_element(_element(model))
+        return NetworkSolver(g).solve()
+
+    smooth = solve(SmoothModel())
+    ribbed = solve(RibbedModel(e_D=0.06, p_e=10.0, W_H=1.0, n_ribbed_walls=2))
+
+    assert smooth["__success__"], smooth.get("__message__")
+    assert ribbed["__success__"], ribbed.get("__message__")
+    assert 0.0 < ribbed["ch.m_dot"] < smooth["ch.m_dot"]
