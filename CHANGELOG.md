@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Parametrised rib correlations.** Rib correlations are now data rather than
+  code: a `RibCorrelationSet` carries the coefficients, each term's
+  **normaliser**, the advisory validity band, the stated accuracy, and the
+  provenance of all of it. `han_1988_orthogonal()` ships Han (1988) for 90 deg
+  orthogonal ribs, taken from the confirmed extraction in
+  `validation/cooling/extractions/han_ribbed.md`, and reproduces its worked
+  values -- `R = 3.2000`, `f = 0.04576`, `e+ = 71.1`, `G = 12.21`,
+  `St_r = 0.00968`.
+
+  **Users can supply their own**, which is the expected path for real
+  hardware: no published correlation is precise enough for a specific rig. A
+  set carries a `RibProvenance` of `Extracted`, `Fitted` or `User`, so a
+  coefficient tuned on a rig is structurally distinguishable from one
+  transcribed out of a paper rather than distinguishable only by convention.
+
+  Three design points, each earned by a defect in what preceded it:
+
+  - **The normaliser is data, not a convention.** `3.2 (p/e/10)^0.35` and
+    `1.4294 (p/e)^0.35` are the same function; applying one source's constant
+    under another's convention is wrong by `10^0.35 = 2.24x` **uniformly**,
+    which never looks like a trend and so survives review. A set whose
+    reference is missing fails to load rather than defaulting to 1.0.
+  - **Validity is advisory.** `RibResult.extrapolated` reports; nothing
+    refuses. A band belongs to the source's rig, not the caller's hardware.
+    Malformed *parameters*, by contrast, are rejected loudly by
+    `validate_rib_set` -- they are mistakes, not operating points.
+  - **`evaluate_rib` never throws.** Reverse flow, zero flow and extreme values
+    are guarded smoothly rather than clamped, because the solver probes states
+    that are not physical and a hard `abs()` or `max()` puts a kink in the
+    Jacobian exactly where Newton iterates. The `e+` floor distorts the
+    physical region by 1.4e-07 at `e+ = 1000`.
+
+  `R` carries no `e+` term by construction, so **`f` is independent of
+  Reynolds number** for this family and `df/d(mdot)` is identically zero. True
+  of both correlations in scope. A correlation whose `R` varies with `e+`
+  cannot be expressed here and would need its own implicit solve.
+
+  Not yet wired into `ChannelElement`: that needs the ribbed-versus-smooth wall
+  weighting, and is tracked in #334.
+
+
 ### Removed
 - **Every cooling correlation whose provenance did not survive review.** A
   correlation-by-correlation audit against the cited sources found that the

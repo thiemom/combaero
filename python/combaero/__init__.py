@@ -36,6 +36,15 @@ try:
     # Preferred: local extension in the same package (installed wheel or
     # in-tree build where _core was successfully built next to this file).
     from ._core import (
+        RibCorrelationSet,
+        RibGeometry,
+        RibProvenance,
+        RibRange,
+        RibResult,
+        RibTerm,
+        evaluate_rib,
+        han_1988_orthogonal,
+        validate_rib_set,
         AcousticMedium,
         AcousticMode,
         AcousticProperties,
@@ -811,6 +820,15 @@ def suppress_warnings() -> Generator[None, None, None]:
 
 
 __all__ = [
+    "RibCorrelationSet",
+    "RibGeometry",
+    "RibProvenance",
+    "RibRange",
+    "RibResult",
+    "RibTerm",
+    "evaluate_rib",
+    "han_1988_orthogonal",
+    "validate_rib_set",
     "FlowSolution",
     "compressible",
     "geometry",
