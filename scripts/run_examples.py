@@ -13,6 +13,23 @@ class ExampleResult(TypedDict):
     error: str | None
 
 
+# Examples that are known-broken for a reason that is not a quick fix, and why.
+# These are reported as SKIP rather than failing the run, so that CI stays a
+# real signal instead of a permanently red check nobody reads. An entry here is
+# tracked debt, not a dismissal: each one names the issue that owns it, and the
+# entry comes out the moment the example runs again.
+KNOWN_BROKEN: dict[str, str] = {
+    "combustor_pressure_loss_example.py": (
+        "CombustorNode lost its pressure_loss= callback; the example exists to "
+        "demonstrate that capability, so it needs rewriting, not renaming (#351)"
+    ),
+    "network_runner_bc_swap.py": (
+        "builds a merging MomentumChamberNode topology that FlowNetwork.validate "
+        "now rejects; needs rebuilding on a MultiPortChamberBase junction (#351)"
+    ),
+}
+
+
 def run_example(example_path: Path, timeout: int = 120) -> ExampleResult:
     """Run a single example script and return the result."""
     start_time = time.perf_counter()
@@ -81,7 +98,11 @@ def main() -> None:
         res = run_example(example_file)
         results.append(res)
 
-        if res["success"]:
+        if res["name"] in KNOWN_BROKEN:
+            # Known-broken examples are still run, so that one which starts
+            # working again is noticed instead of sitting on the list forever.
+            print("PASSED (was expected to fail)" if res["success"] else "SKIP (known broken)")
+        elif res["success"]:
             print(f"SUCCESS ({res['duration']:.2f}s)")
         else:
             print("FAILED")
@@ -90,16 +111,26 @@ def main() -> None:
     print("SUMMARY REPORT")
     print("=" * 60)
 
-    successful = [r for r in results if r["success"]]
-    failed = [r for r in results if not r["success"]]
+    successful = [r for r in results if r["success"] and r["name"] not in KNOWN_BROKEN]
+    failed = [r for r in results if not r["success"] and r["name"] not in KNOWN_BROKEN]
+    skipped = [r for r in results if not r["success"] and r["name"] in KNOWN_BROKEN]
+    unexpected_pass = [r for r in results if r["success"] and r["name"] in KNOWN_BROKEN]
 
     total_time = sum(r["duration"] for r in results)
 
     print(f"Total Examples: {len(results)}")
     print(f"Successful:     {len(successful)}")
     print(f"Failed:         {len(failed)}")
+    print(f"Skipped:        {len(skipped)} (known broken)")
     print(f"Total Wall Time: {total_time:.2f}s")
     print("-" * 60)
+
+    if skipped:
+        print("\nSKIPPED (known broken, tracked):")
+        for res in skipped:
+            print(f"  {res['name']}")
+            print(f"    {KNOWN_BROKEN[res['name']]}")
+        print("-" * 60)
 
     if failed:
         print("\nFAILED EXAMPLES DIAGNOSIS:")
@@ -107,10 +138,19 @@ def main() -> None:
             print(f"\n--- {res['name']} ---")
             print(f"Error:\n{res['error']}")
         print("-" * 60)
+
+    if unexpected_pass:
+        print("\nThese examples are listed in KNOWN_BROKEN but now pass.")
+        print("Remove their entries from scripts/run_examples.py:")
+        for res in unexpected_pass:
+            print(f"  {res['name']}")
+        print("-" * 60)
+
+    if failed or unexpected_pass:
         sys.exit(1)
-    else:
-        print("\nAll examples ran successfully!")
-        sys.exit(0)
+
+    print("\nAll examples ran successfully!")
+    sys.exit(0)
 
 
 if __name__ == "__main__":

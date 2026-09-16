@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Every example runs again, and CI now notices when one stops.** The 0.7.0
+  correlation removal broke five examples, and the 0.6.0 `pipe_* -> channel_*`
+  rename had quietly broken three more that nobody had run since. All eight
+  are fixed.
+
+  `scripts/run_examples.py` already ran every example headless and exited
+  non-zero on failure; it just was not wired to anything. It now gates
+  `status-check`, so an example that stops running blocks the merge.
+
+  **The job runs each example rather than importing it.** An example calling a
+  removed function from inside a function imports cleanly and only fails when
+  the function actually runs -- measured on four of them, an import check
+  caught two.
+
+  Two examples are beyond a rename and are listed in the runner's
+  `KNOWN_BROKEN` map with their reason and issue (#351): one demonstrates a
+  `CombustorNode(pressure_loss=...)` callback that no longer exists, the other
+  builds a merging `MomentumChamberNode` topology that `FlowNetwork.validate`
+  now rejects. Both are still run, so one that starts passing again fails the
+  job asking for its entry to be removed, rather than sitting on the list
+  forever.
+
+- **Three C++ examples segfaulted and nothing noticed.**
+  `stagnation_example`, `compressible_example` and `combustion_state_example`
+  crashed on a null read inside `combaero::mix()`. They assigned the public
+  `State::X` member directly instead of calling `set_X()`, so `Y` stayed
+  empty and `mix()` indexed it. They compiled and linked cleanly throughout.
+
+  The examples were built by CMake but never registered as tests, so building
+  them was the only thing ever checked. Each is now an `add_test` smoke case,
+  which puts them in `ctest` and so in CI across the existing matrix.
+
+- **`_RibbedChannelResult` carries the wall-coupling derivatives.**
+  `dh_dmdot`, `dh_dT`, `dT_aw_dmdot` and `dT_aw_dT` were missing, so a ribbed
+  channel coupled to a wall fed the solver an incomplete Jacobian. Nineteen
+  unit tests missed it because none of them coupled a wall; re-enabling the
+  skipped coupled-liner example test is what surfaced it.
+
 ### Added
 - **Ribbed surfaces are selectable in the GUI again.** The node type returns
   with the fields the rebuilt correlation needs: rib geometry, the channel

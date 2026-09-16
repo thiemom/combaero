@@ -82,14 +82,14 @@ int main()
     Stream air_stream;
     air_stream.state.T = T_react;
     air_stream.state.P = P_comb;
-    air_stream.state.X = X_air;
+    air_stream.state.set_X(X_air);
     air_stream.mdot    = 10.0;
 
     // Fuel stream: mdot set to achieve phi = 0.8
     Stream fuel_base_s;
     fuel_base_s.state.T = T_react;
     fuel_base_s.state.P = P_comb;
-    fuel_base_s.state.X = X_fuel;
+    fuel_base_s.state.set_X(X_fuel);
     Stream fuel_stream = set_fuel_stream_for_phi(0.8, fuel_base_s, air_stream);
 
     CombustionState cs_streams = combustion_state_from_streams(fuel_stream, air_stream,
@@ -169,7 +169,7 @@ int main()
     Stream fuel_base;
     fuel_base.state.T = T_react;
     fuel_base.state.P = P_comb;
-    fuel_base.state.X = X_fuel;
+    fuel_base.state.set_X(X_fuel);
 
     Stream fuel_for_Tad = set_fuel_stream_for_Tad(T_ad_target, fuel_base, air_stream);
     CombustionState cs_Tad = combustion_state_from_streams(fuel_for_Tad, air_stream);

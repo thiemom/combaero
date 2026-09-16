@@ -250,3 +250,22 @@ def test_a_ribbed_channel_solves_in_a_network() -> None:
     assert smooth["__success__"], smooth.get("__message__")
     assert ribbed["__success__"], ribbed.get("__message__")
     assert 0.0 < ribbed["ch.m_dot"] < smooth["ch.m_dot"]
+
+
+def test_ribbed_result_carries_the_wall_coupling_derivatives() -> None:
+    """A ribbed channel joined by a ThermalWall must not die mid-solve.
+
+    The solver's wall-coupling path reads `dh_dmdot`, `dh_dT`, `dT_aw_dmdot`
+    and `dT_aw_dT` off the channel result. The first version of
+    `_RibbedChannelResult` had none of them, and nothing in this file caught it
+    -- not one test coupled a wall. The coupled combustor example did, which is
+    the argument for examples being executed rather than only read.
+    """
+    r = _run(_surface())
+    for field in ("dh_dmdot", "dh_dT", "dT_aw_dmdot", "dT_aw_dT"):
+        assert hasattr(r, field), f"missing {field}"
+        assert isinstance(getattr(r, field), float)
+
+    # dh/dmdot must be real, not a placeholder zero: heat transfer rises with
+    # flow, so the ribbed side has to contribute.
+    assert r.dh_dmdot != 0.0
