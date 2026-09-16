@@ -219,6 +219,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Fixed
+- **Every compressible solver returned a state that could not be mixed.**
+  `State::X` and `State::Y` are both public members, and only `set_X()` /
+  `set_Y()` keep them in sync. All seventeen state-producing sites in
+  `compressible.cpp` assigned the `X` member directly, so `fanno_channel`,
+  `fanno_channel_rough`, `nozzle_flow`, `nozzle_quasi1d` and
+  `solve_A_eff_from_mdot` handed back states with a populated `X` and an
+  empty `Y`.
+
+  Nothing caught it because every `State` property getter -- `h`, `cp`, `rho`,
+  `mw`, `mu`, `gamma`, all of them -- reads `X`. Such a state computes every
+  property correctly and looks healthy. `Y` is read in exactly one place a
+  caller is likely to reach, `mix()`, which indexed it unchecked: passing a
+  solver's own output straight into `mix()` segfaulted, with no misuse of the
+  API anywhere.
+
+  The producers now build through `set_X()`. `mix()` additionally checks the
+  two sizes agree and throws naming `set_X()`, so a state built by hand the
+  same way fails with something actionable instead of a crash. The four
+  state-assembling sites at the pybind boundary were converted too.
+
+  One visible consequence: `set_X()` normalises, so a solver given an
+  unnormalised `X` now returns a normalised one. Previously the returned `X`
+  echoed the raw input while every property was computed from the normalised
+  composition, so the state disagreed with itself; it now does not.
+
+  Python was never exposed: the `X` property setter on the binding has always
+  synced `Y`. `MixtureState` maintains its own invariant correctly, and
+  `solver_interface`'s `Stream` carries mass fractions only, so neither was
+  affected. Tracked as #352; making the invariant structurally unbreakable is
+  still open there.
+
+- **Every example runs again, and CI now notices when one stops.** The 0.7.0
+  correlation removal broke five examples, and the 0.6.0 `pipe_* -> channel_*`
+  rename had quietly broken three more that nobody had run since. All eight
+  are fixed.
+
+  `scripts/run_examples.py` already ran every example headless and exited
+  non-zero on failure; it just was not wired to anything. It now gates
+  `status-check`, so an example that stops running blocks the merge.
+
+  **The job runs each example rather than importing it.** An example calling a
+  removed function from inside a function imports cleanly and only fails when
+  the function actually runs -- measured on four of them, an import check
+  caught two.
+
+  Two examples are beyond a rename and are listed in the runner's
+  `KNOWN_BROKEN` map with their reason and issue (#351): one demonstrates a
+  `CombustorNode(pressure_loss=...)` callback that no longer exists, the other
+  builds a merging `MomentumChamberNode` topology that `FlowNetwork.validate`
+  now rejects. Both are still run, so one that starts passing again fails the
+  job asking for its entry to be removed, rather than sitting on the list
+  forever.
+
+- **Three C++ examples segfaulted and nothing noticed.**
+  `stagnation_example`, `compressible_example` and `combustion_state_example`
+  crashed on a null read inside `combaero::mix()`. They assigned the public
+  `State::X` member directly instead of calling `set_X()`, so `Y` stayed
+  empty and `mix()` indexed it. They compiled and linked cleanly throughout.
+
+  The examples were built by CMake but never registered as tests, so building
+  them was the only thing ever checked. Each is now an `add_test` smoke case,
+  which puts them in `ctest` and so in CI across the existing matrix.
+
+- **`_RibbedChannelResult` carries the wall-coupling derivatives.**
+  `dh_dmdot`, `dh_dT`, `dT_aw_dmdot` and `dT_aw_dT` were missing, so a ribbed
+  channel coupled to a wall fed the solver an incomplete Jacobian. Nineteen
+  unit tests missed it because none of them coupled a wall; re-enabling the
+  skipped coupled-liner example test is what surfaced it.
+
 - **Every example runs again, and CI now notices when one stops.** The 0.7.0
   correlation removal broke five examples, and the 0.6.0 `pipe_* -> channel_*`
   rename had quietly broken three more that nobody had run since. All eight

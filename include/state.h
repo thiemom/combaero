@@ -26,8 +26,18 @@ namespace combaero {
 struct State {
   double T = 298.15;     // Temperature [K]
   double P = 101325.0;   // Pressure [Pa]
-  std::vector<double> X; // Mole fractions [-]
-  std::vector<double> Y; // Mass fractions [-]
+
+  // X and Y describe the same composition and must stay consistent. Only
+  // set_X()/set_Y() maintain that: they normalise and derive the other one.
+  // Assigning either member directly leaves the other stale or empty.
+  //
+  // Nothing about the state will look wrong if you do: every property getter
+  // below (h, cp, rho, mw, mu, gamma, ...) reads X, so a state with an empty
+  // Y computes every property correctly. Y is read when mixing, so the
+  // mistake surfaces far from where it was made -- see issue #352, and
+  // mix()'s size check in state.cpp.
+  std::vector<double> X; // Mole fractions [-]  -- set via set_X()
+  std::vector<double> Y; // Mass fractions [-]  -- set via set_Y()
 
   // Property getters (implemented in state.cpp)
   double mw() const;
