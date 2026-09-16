@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Ribbed surfaces are selectable in the GUI again.** The node type returns
+  with the fields the rebuilt correlation needs: rib geometry, the channel
+  aspect ratio `W/H`, `n_ribbed_walls` as a 1/2/4 choice, and the
+  smooth-wall Nu multiplier with an inline note on what it is for.
+
+  The mapping tolerates an older saved network: a rib node stored before the
+  newer fields existed loads with them defaulted rather than raising an
+  `AttributeError` a user cannot act on.
+
+  Dimpled, pin-fin and impingement stay unavailable and still reject on solve.
+  Their parameter blocks remain in the inspector, unreachable from the
+  dropdown, so a pre-0.7.0 network's parameters stay visible rather than being
+  silently dropped on the next save.
+
+
+### Added
 - **Ribbed channels are back**, built on the parametrised correlation sets.
   `RibbedModel` carries a `RibCorrelationSet`, the rib geometry, the channel
   aspect ratio, and `n_ribbed_walls`.

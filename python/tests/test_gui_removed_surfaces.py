@@ -5,9 +5,9 @@ could not be traced to their cited sources. A saved network asking for a ribbed
 channel and getting an unribbed one back would be a wrong answer presented as a
 right one, so `map_surface_model` raises instead of falling through.
 
-The two messages differ on purpose. Ribbed returns once a provenanced
-correlation lands (#334); the other three are deferred indefinitely. Telling a
-user with a ribbed network that their surface is gone for good would be false.
+Ribbed returned in 0.8.0 on a provenanced correlation set; the other three are
+deferred indefinitely (#339). This file now pins both halves: that ribbed maps
+again, and that the deferred three still refuse.
 """
 
 from __future__ import annotations
@@ -30,10 +30,19 @@ def test_smooth_still_maps() -> None:
     assert isinstance(map_surface_model(_Surface("smooth")), SmoothModel)
 
 
-def test_ribbed_says_it_is_coming_back() -> None:
-    with pytest.raises(ValueError, match="temporarily unavailable") as exc:
-        map_surface_model(_Surface("ribbed"))
-    assert "#334" in str(exc.value)
+def test_ribbed_maps_again_and_tolerates_an_older_saved_network() -> None:
+    """Ribbed returned in 0.8.0 on a provenanced correlation set.
+
+    A network saved before the newer fields existed carries only `type`, so the
+    mapping falls back to the schema defaults rather than raising an
+    AttributeError the user cannot act on.
+    """
+    from combaero.network.components import RibbedModel
+
+    m = map_surface_model(_Surface("ribbed"))
+    assert isinstance(m, RibbedModel)
+    assert m.n_ribbed_walls == 2
+    assert m.smooth_wall_Nu_multiplier == 1.0
 
 
 @pytest.mark.parametrize("surface", ["dimpled", "pin_fin", "impingement"])
@@ -52,3 +61,51 @@ def test_unknown_surface_is_rejected_too() -> None:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+# ---------------------------------------------------------------------------
+# The ribbed round trip, restored in 0.8.0
+# ---------------------------------------------------------------------------
+
+
+def test_ribbed_survives_the_json_to_element_round_trip() -> None:
+    """A saved network's JSON must reach the element with every field intact.
+
+    The schema discriminates the surface union, so `map_surface_model` receives
+    a typed `RibbedModelData` rather than a dict. Pinned because the fields are
+    easy to lose one at a time -- `p_e` was called `pitch_to_height` before the
+    rebuild, and a silent default would look like a working network giving
+    quietly wrong answers.
+    """
+    from combaero.network.components import RibbedModel
+    from gui.backend.schemas import ChannelData
+
+    data = ChannelData(
+        length=0.6,
+        diameter=0.025,
+        surface={
+            "type": "ribbed",
+            "e_D": 0.06,
+            "p_e": 12.0,
+            "alpha_deg": 60.0,
+            "W_H": 2.0,
+            "n_ribbed_walls": 4,
+            "smooth_wall_Nu_multiplier": 1.67,
+        },
+    )
+    model = map_surface_model(data.surface)
+    assert isinstance(model, RibbedModel)
+    assert model.e_D == 0.06
+    assert model.p_e == 12.0
+    assert model.alpha_deg == 60.0
+    assert model.W_H == 2.0
+    assert model.n_ribbed_walls == 4
+    assert model.smooth_wall_Nu_multiplier == 1.67
+
+
+def test_a_channel_with_no_surface_still_defaults_to_smooth() -> None:
+    from combaero.network.components import SmoothModel
+    from gui.backend.schemas import ChannelData
+
+    data = ChannelData(length=0.6, diameter=0.025)
+    assert isinstance(map_surface_model(data.surface), SmoothModel)

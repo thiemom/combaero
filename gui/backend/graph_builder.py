@@ -17,6 +17,7 @@ from combaero.network import (
     PlenumNode,
     PressureBoundary,
     PressureLossElement,
+    RibbedModel,
     SmoothModel,
     ThermalWall,
     VortexElement,
@@ -44,6 +45,7 @@ from .schemas import (
     OrificeData,
     PlenumData,
     PressureBoundaryData,
+    RibbedModelData,
     SmoothModelData,
     ThermalWallData,
     VortexData,
@@ -71,18 +73,26 @@ def map_surface_model(data):
     """Maps UI SurfaceModelData to combaero.network models."""
     if isinstance(data, SmoothModelData) or data.type == "smooth":
         return SmoothModel()
+    if isinstance(data, RibbedModelData) or data.type == "ribbed":
+        # getattr with the schema's own defaults: a network saved before a
+        # field existed should load with that field defaulted, not raise an
+        # AttributeError the user cannot act on.
+        d = RibbedModelData()
+        return RibbedModel(
+            e_D=getattr(data, "e_D", d.e_D),
+            p_e=getattr(data, "p_e", d.p_e),
+            alpha_deg=getattr(data, "alpha_deg", d.alpha_deg),
+            W_H=getattr(data, "W_H", d.W_H),
+            n_ribbed_walls=getattr(data, "n_ribbed_walls", d.n_ribbed_walls),
+            smooth_wall_Nu_multiplier=getattr(
+                data, "smooth_wall_Nu_multiplier", d.smooth_wall_Nu_multiplier
+            ),
+        )
 
     # Enhanced surfaces were removed in 0.7.0. Reject rather than silently
     # falling back to smooth: a saved network asking for a ribbed channel and
     # getting an unribbed one back is a wrong answer presented as a right one.
     surface_type = getattr(data, "type", "unknown")
-    if surface_type == "ribbed":
-        raise ValueError(
-            "Ribbed surfaces are temporarily unavailable. The previous "
-            "correlation could not be traced to its cited source and was "
-            "removed in 0.7.0; a provenanced replacement is tracked in "
-            "issue #334. Use a smooth surface in the meantime."
-        )
     raise ValueError(
         f"Surface type {surface_type!r} was removed in 0.7.0: its correlation "
         "could not be traced to its cited source. See issue #339. Use a "
