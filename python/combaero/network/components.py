@@ -60,7 +60,83 @@ class SmoothModel:
     roughness: float = 0.0  # absolute roughness [m]
 
 
-ChannelModel = SmoothModel
+@dataclass
+class RibbedModel:
+    """Rib-roughened walls, evaluated from a provenanced parameter set.
+
+    The correlation gives the RIBBED-SIDE heat transfer. Combining it with the
+    smooth walls is this element's job, because how many walls are ribbed is a
+    design choice rather than a property of the correlation -- the channel is
+    the internal wall by definition, and the other side of it is a different
+    channel.
+
+    Parameters
+    ----------
+    correlation_set : object
+        A ``combaero.RibCorrelationSet``. Defaults to Han (1988) for 90 deg
+        orthogonal ribs. Supply your own to match measured data: the set
+        records its own source and provenance class, so a tuned coefficient
+        cannot pass for a published one.
+    e_D, p_e, alpha_deg : float
+        Rib height / hydraulic diameter, pitch / height, and angle to the flow.
+    W_H : float
+        Channel width / height. It lives here rather than on the element
+        because a channel is defined by its hydraulic diameter, which does not
+        determine an aspect ratio -- a 2:1 duct and a square one can share a
+        Dh. The correlation needs the ratio for both the wall-law geometry
+        group and the ribbed/smooth area split, so the rib model carries it.
+    n_ribbed_walls : int
+        How many of the four walls carry ribs. 2 means two OPPOSITE walls,
+        which is the configuration Han measured.
+    smooth_wall_Nu_multiplier : float
+        A user knob on the SMOOTH walls' contribution to the channel average.
+        It encodes nothing and defaults to 1.0.
+
+        It exists because the ribbed side already has a better knob -- change
+        ``C_G`` on the parameter set, which records what you did -- while the
+        smooth walls come from the base Gnielinski correlation and have none.
+
+        Its practical use is the documented gap below. A plain smooth wall
+        gives ``h_s/h_r`` around 0.42, where Han's own channel average implies
+        0.70, because ribs enhance the adjacent smooth wall by 10-50% as well.
+        Setting this to about **1.67** reproduces Han's measured average for
+        the two-ribbed-wall square-channel case.
+    """
+
+    correlation_set: object = None
+    e_D: float = 0.0
+    p_e: float = 0.0
+    alpha_deg: float = 90.0
+    W_H: float = 1.0
+    n_ribbed_walls: int = 2
+    smooth_wall_Nu_multiplier: float = 1.0
+
+
+@dataclass
+class _RibbedChannelResult:
+    """What a ribbed channel returns.
+
+    Deliberately NOT a ``ChannelResult``: that type is the C++ correlation's
+    output and carries derivative fields this path computes differently. It
+    also exposes ``h_ribbed`` and ``h_smooth`` separately, because the channel
+    average hides a 20% modelling choice and a user should be able to see both
+    halves of it.
+    """
+
+    h: float
+    h_ribbed: float
+    h_smooth: float
+    Nu: float
+    Re: float
+    Pr: float
+    f: float
+    dP: float
+    T_aw: float
+    e_plus: float
+    extrapolated: bool
+
+
+ChannelModel = SmoothModel | RibbedModel
 
 
 @dataclass
@@ -87,6 +163,118 @@ class ConvectiveSurface:
     heating: bool | None = None  # None = auto-detect
     Nu_multiplier: float = 1.0  # empirical correction on Nu
     f_multiplier: float = 1.0  # empirical correction on f
+
+    def _ribbed_result(self, T, P, X, velocity, diameter, length, T_hot, heating):
+        """Ribbed-channel heat transfer and pressure drop.
+
+        Two things are asymmetric here and both follow from the source rather
+        than from convenience.
+
+        FRICTION NEEDS NO WALL WEIGHTING. The ``f`` in the roughness function's
+        definition is already the equivalent four-sided channel friction
+        factor, so the correlation returns a channel-level value directly. The
+        element does not multiply pipe friction by anything -- correlations own
+        their ``f``, which is what #331 established after a round-trip through
+        a restated friction factor moved a drop by -24.7%.
+
+        HEAT TRANSFER DOES. The correlation gives the ribbed side; the smooth
+        walls come from the base correlation, and the channel average is the
+        area-weighted combination.
+
+        A DOCUMENTED GAP. Using the plain smooth correlation for the smooth
+        walls gives h_s/h_r around 0.42, where Han's own reported channel
+        average implies 0.70 -- because ribs enhance the adjacent smooth wall
+        by 10-50% as well, which no correlation here covers. The channel
+        average is therefore about 20% below Han's measurement for the
+        two-ribbed-wall square case. That is a knowable, quantified
+        under-prediction rather than an invented constant, and
+        ``smooth_wall_Nu_multiplier`` is how a user closes it: about 1.67
+        reproduces Han.
+        """
+        model = self.model
+        rib_set = model.correlation_set or cb.han_1988_orthogonal()
+
+        rho, _ = _safe_rho(cb.density(T, P, X))
+        cs = cb.complete_state(T, P, X)
+        mu = cs.transport.mu
+        Re = rho * velocity * diameter / mu if mu > 0.0 else 0.0
+        Pr = cs.transport.Pr
+
+        geom = cb.RibGeometry(
+            e_D=model.e_D,
+            p_e=model.p_e,
+            W_H=model.W_H,
+            alpha_deg=model.alpha_deg,
+        )
+        rib = cb.evaluate_rib(rib_set, geom, Re)
+
+        # Ribbed side, from the correlation's Stanton number.
+        k = cs.transport.k
+        cp = cs.thermo.cp
+        h_ribbed = rib.St_r * rho * abs(velocity) * cp
+
+        # Smooth walls, from the base correlation, with the user's knob.
+        smooth = cb.channel_smooth(
+            T,
+            P,
+            X,
+            velocity,
+            diameter,
+            length,
+            T_hot=T_hot,
+            heating=heating,
+            Nu_multiplier=model.smooth_wall_Nu_multiplier,
+            f_multiplier=1.0,
+        )
+
+        frac_ribbed, frac_smooth = self._ribbed_wall_fractions()
+        h_avg = frac_ribbed * h_ribbed + frac_smooth * smooth.h
+
+        # The correlation's f is already the four-sided channel value.
+        dP = rib.f * (length / diameter) * 0.5 * rho * velocity * abs(velocity)
+
+        return _RibbedChannelResult(
+            h=h_avg * self.Nu_multiplier,
+            h_ribbed=h_ribbed,
+            h_smooth=smooth.h,
+            Nu=h_avg * diameter / k if k > 0.0 else 0.0,
+            Re=Re,
+            Pr=Pr,
+            f=rib.f * self.f_multiplier,
+            dP=dP * self.f_multiplier,
+            T_aw=smooth.T_aw,
+            e_plus=rib.e_plus,
+            extrapolated=rib.extrapolated,
+        )
+
+    def _ribbed_wall_fractions(self) -> tuple[float, float]:
+        """Area fractions of the ribbed and smooth walls, for a W x H duct.
+
+        Han's configuration is two OPPOSITE walls, which for a duct of width W
+        and height H are the two of width W. The ribbed fraction is then
+        W/(W+H) -- the same area weighting the four-sided friction conversion
+        uses, so friction and heat transfer are treated alike.
+
+        One and four ribbed walls follow from the same picture. Anything else
+        is rejected rather than interpolated: "three ribbed walls" has no
+        unambiguous geometry.
+        """
+        model = self.model
+        W_H = model.W_H
+        n = model.n_ribbed_walls
+        if n == 4:
+            return 1.0, 0.0
+        if n == 2:
+            ribbed = W_H / (W_H + 1.0)
+            return ribbed, 1.0 - ribbed
+        if n == 1:
+            ribbed = W_H / (2.0 * (W_H + 1.0))
+            return ribbed, 1.0 - ribbed
+        raise ValueError(
+            f"n_ribbed_walls must be 1, 2 or 4, got {n}. 2 means two opposite "
+            "walls, which is the configuration the correlations were measured "
+            "on."
+        )
 
     def htc_and_T(
         self,
@@ -152,6 +340,8 @@ class ConvectiveSurface:
                 Nu_multiplier=self.Nu_multiplier,
                 f_multiplier=self.f_multiplier,
             )
+        elif isinstance(self.model, RibbedModel):
+            result = self._ribbed_result(T, P, X, velocity, diameter, length, T_hot, heating)
         else:
             raise TypeError(
                 f"Unsupported channel model {type(self.model).__name__}. "
@@ -2375,6 +2565,77 @@ class ChannelElement(NetworkElement):
             return 0.0
         return abs(state.m_dot) * (self.Dh or self.diameter or 1.0) / (area * mu)
 
+    def _ribbed_residuals(self, state_in: NetworkMixtureState, state_out: NetworkMixtureState):
+        """Ribbed channel: the correlation owns the friction factor.
+
+        No multiplier on pipe friction. The `f` the roughness function is
+        defined against is already the equivalent four-sided channel value, so
+        the correlation returns what the channel needs and the element uses it
+        directly. Routing it through a locally restated smooth friction factor
+        is what #331 removed, after the round-trip moved a drop by -24.7%.
+
+        The Jacobian is simpler than it looks. `R` carries no `e+` term in this
+        correlation family, so **f does not depend on Reynolds number** and
+        therefore not on mass flow: `df/d(mdot) = 0`. The drop is
+        `f (L/D) rho v |v| / 2` with `v = mdot / (rho A)`, so
+
+            dP          = f (L/D) mdot |mdot| / (2 rho A^2)
+            d(dP)/dmdot = f (L/D) |mdot| / (rho A^2)
+
+        which is even in `mdot` and so does not flip sign at zero -- the drop
+        itself carries the sign. That is the odd-quantity case: magnitude from
+        the correlation, direction from the flow.
+        """
+        m_dot = state_in.m_dot
+        model = self.surface.model
+        f_mult = self.surface.f_multiplier
+
+        rho, drho_draw = _safe_rho(state_in.density())
+        area = self.area or 0.0
+        if area <= 0.0:
+            return [state_in.Pt - state_out.Pt], {
+                0: {
+                    f"{self.from_node}.Pt": 1.0,
+                    f"{self.to_node}.Pt": -1.0,
+                }
+            }
+
+        dh = self.Dh or self.diameter or 1.0
+        mu = cb.complete_state(state_in.T, state_in.P, state_in.X).transport.mu
+        Re = abs(m_dot) * dh / (area * mu) if mu > 0.0 else 0.0
+        Re = math.copysign(Re, m_dot)
+
+        rib = cb.evaluate_rib(
+            model.correlation_set or cb.han_1988_orthogonal(),
+            cb.RibGeometry(
+                e_D=model.e_D,
+                p_e=model.p_e,
+                W_H=model.W_H,
+                alpha_deg=model.alpha_deg,
+            ),
+            Re,
+        )
+        f = rib.f * f_mult
+
+        coeff = f * (self.length / dh) / (2.0 * rho * area * area)
+        dP = coeff * m_dot * abs(m_dot)
+        d_dP_d_mdot = 2.0 * coeff * abs(m_dot)
+
+        res = [state_in.Pt - state_out.Pt - dP]
+        jac = {
+            0: {
+                f"{self.id}.m_dot": -d_dP_d_mdot,
+                f"{self.from_node}.Pt": 1.0,
+                f"{self.to_node}.Pt": -1.0,
+            }
+        }
+        # Known gap, the same one the array path had before removal: the
+        # correlation exposes no dP sensitivity to upstream temperature,
+        # pressure or composition, so those columns are absent rather than
+        # approximated from a smooth-friction stand-in. Density enters only
+        # through rho here, which the solver sees via the node states.
+        return res, jac
+
     def residuals(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> list[float]:
@@ -2386,6 +2647,9 @@ class ChannelElement(NetworkElement):
         # for it. Correlation-derived multipliers were removed in 0.7.0; this
         # one is a tuning knob and stays. See issue #339.
         f_mult = self.surface.f_multiplier if self.surface else 1.0
+
+        if self.surface and isinstance(self.surface.model, RibbedModel):
+            return self._ribbed_residuals(state_in, state_out)
 
         if self.regime == "compressible":
             # Use compressible Fanno flow with friction
