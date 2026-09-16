@@ -1063,12 +1063,16 @@ t_res_ann = cb.residence_time_annulus(V=0.01, Q=0.1, R_outer=0.1, R_inner=0.05)
 t_res_can = cb.residence_time_can_annular(V=0.01, Q=0.1, N_cans=12, R_can=0.05)
 ```
 
-### Pin Fin Heat Transfer
-```python
-# Pin fin correlations
-Nu_pin = cb.pin_fin_nusselt(Re=1e4, Pr=0.7, height=0.01, diameter=0.001)
-f_pin = cb.pin_fin_friction(Re=1e4, height=0.01, diameter=0.001, spacing=0.02)
-```
+### Enhanced Cooling Surfaces
+
+Removed in 0.7.0. The pin-fin, dimple, rib and impingement correlations could
+not be traced to their cited sources -- the rib friction multiplier was 4-5x
+below the only rib datum in the repository. A provenanced rib correlation is
+tracked in issue #334; see issue #339 for the rebuild.
+
+`channel_smooth` and the base convective correlations (Gnielinski,
+Dittus-Boelter, Sieder-Tate, Petukhov) are unaffected, as are the user-set
+`Nu_multiplier` and `f_multiplier` knobs on `ConvectiveSurface`.
 
 ---
 

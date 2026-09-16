@@ -8,47 +8,12 @@ class SmoothModelData(BaseModel):
     type: Literal["smooth"] = "smooth"
 
 
-class RibbedModelData(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    type: Literal["ribbed"] = "ribbed"
-    e_D: float = 0.05
-    pitch_to_height: float = 10.0
-    alpha_deg: float = 90.0
-
-
-class DimpledModelData(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    type: Literal["dimpled"] = "dimpled"
-    d_Dh: float = 0.2
-    h_d: float = 0.15
-    S_d: float = 2.0
-
-
-class PinFinModelData(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    type: Literal["pin_fin"] = "pin_fin"
-    pin_diameter: float = 0.005
-    channel_height: float = 0.01  # [m]
-    S_D: float = 2.5
-    X_D: float = 2.5
-    N_rows: int = 10
-    is_staggered: bool = True
-
-
-class ImpingementModelData(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    type: Literal["impingement"] = "impingement"
-    d_jet: float = 0.002
-    z_D: float = 4.0
-    x_D: float = 6.0
-    y_D: float = 6.0
-    A_target: float = 0.01
-    Cd_jet: float = 0.8
-
-
-SurfaceModelData = (
-    SmoothModelData | RibbedModelData | DimpledModelData | PinFinModelData | ImpingementModelData
-)
+# Enhanced-surface types (ribbed, dimpled, pin_fin, impingement) were removed
+# in 0.7.0 -- their correlations could not be traced to their cited sources.
+# Saved networks carrying them are rejected with a message naming the reason;
+# see graph_builder. Ribbed returns once a provenanced correlation lands
+# (issue #334); the others are deferred (issue #339).
+SurfaceModelData = SmoothModelData
 
 
 # --- Node Data Definitions ---

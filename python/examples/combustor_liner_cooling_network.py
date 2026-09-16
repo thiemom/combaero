@@ -35,6 +35,18 @@ Wall configurations compared:
   - Bare Inconel 718
   - Inconel 718 + YSZ APS TBC (fresh and aged 1000 h)
   - Inconel 718 + YSZ EB-PVD TBC
+
+
+NOTE (0.7.0): this example is currently BROKEN and is left so deliberately.
+
+It uses enhanced-surface models whose correlations were removed because they
+could not be traced to their cited sources -- the rib friction multiplier was
+4-5x below the only rib datum in the repository. See issue #339 for the
+rebuild and #334 for the provenanced rib correlation that will replace them;
+this example is updated when that lands.
+
+CI does not execute the examples, so this does not fail a build -- which is
+exactly why it carries the issue reference: nothing else will remind anyone.
 """
 
 import numpy as np

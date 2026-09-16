@@ -60,49 +60,7 @@ class SmoothModel:
     roughness: float = 0.0  # absolute roughness [m]
 
 
-@dataclass
-class RibbedModel:
-    """Parameters for channel_ribbed."""
-
-    e_D: float = 0.0  # rib height / hydraulic diameter  # noqa: N815
-    pitch_to_height: float = 0.0  # rib pitch / rib height
-    alpha_deg: float = 90.0  # rib angle [deg]
-
-
-@dataclass
-class DimpledModel:
-    """Parameters for channel_dimpled."""
-
-    d_Dh: float = 0.0  # dimple diameter / hydraulic diameter  # noqa: N815
-    h_d: float = 0.0  # dimple depth / dimple diameter
-    S_d: float = 0.0  # dimple pitch / dimple diameter
-
-
-@dataclass
-class PinFinModel:
-    """Parameters for channel_pin_fin."""
-
-    pin_diameter: float = 0.0  # pin diameter [m]
-    channel_height: float = 0.0  # channel height [m]
-    S_D: float = 2.0  # transverse pitch / pin diameter
-    X_D: float = 2.0  # streamwise pitch / pin diameter
-    N_rows: int = 1  # number of pin rows
-    is_staggered: bool = True
-
-
-@dataclass
-class ImpingementModel:
-    """Parameters for channel_impingement."""
-
-    d_jet: float = 0.0  # jet hole diameter [m]
-    z_D: float = 0.0  # jet-to-target distance / d_jet  # noqa: N815
-    x_D: float = 0.0  # streamwise pitch / d_jet  # noqa: N815
-    y_D: float = 0.0  # spanwise pitch / d_jet  # noqa: N815
-    A_target: float = 0.0  # target area [m^2]
-    Cd_jet: float = 0.8  # jet discharge coefficient
-
-
-ChannelModel = SmoothModel | RibbedModel | DimpledModel | PinFinModel | ImpingementModel
+ChannelModel = SmoothModel
 
 
 @dataclass
@@ -194,110 +152,14 @@ class ConvectiveSurface:
                 Nu_multiplier=self.Nu_multiplier,
                 f_multiplier=self.f_multiplier,
             )
-        elif isinstance(self.model, RibbedModel):
-            result = cb.channel_ribbed(
-                T,
-                P,
-                X,
-                velocity,
-                diameter,
-                length,
-                self.model.e_D,
-                self.model.pitch_to_height,
-                self.model.alpha_deg,
-                T_hot=T_hot,
-                heating=heating,
-                Nu_multiplier=self.Nu_multiplier,
-                f_multiplier=self.f_multiplier,
-            )
-        elif isinstance(self.model, DimpledModel):
-            result = cb.channel_dimpled(
-                T,
-                P,
-                X,
-                velocity,
-                diameter,
-                length,
-                self.model.d_Dh,
-                self.model.h_d,
-                self.model.S_d,
-                T_hot=T_hot,
-                heating=heating,
-                Nu_multiplier=self.Nu_multiplier,
-                f_multiplier=self.f_multiplier,
-            )
-        elif isinstance(self.model, PinFinModel):
-            result = cb.channel_pin_fin(
-                T,
-                P,
-                X,
-                velocity,
-                self.model.channel_height,
-                self.model.pin_diameter,
-                self.model.S_D,
-                self.model.X_D,
-                self.model.N_rows,
-                T_hot=T_hot,
-                is_staggered=self.model.is_staggered,
-                Nu_multiplier=self.Nu_multiplier,
-                f_multiplier=self.f_multiplier,
-            )
-        elif isinstance(self.model, ImpingementModel):
-            # Impingement requires mdot_jet (flow PER JET).
-            # The total mass flow in the channel is rho * velocity * A_channel.
-            # The number of jets is A_target / (x * y), where x, y are pitches.
-            rho, _ = _safe_rho(cb.density(T, P, X))
-            mdot_total = rho * velocity * (math.pi / 4 * diameter**2)
-
-            mdot_jet = mdot_total / self._jet_split()
-
-            result = cb.channel_impingement(
-                T,
-                P,
-                X,
-                mdot_jet,
-                self.model.d_jet,
-                self.model.z_D,
-                self.model.x_D,
-                self.model.y_D,
-                self.model.A_target,
-                T_hot=T_hot,
-                Cd_jet=self.model.Cd_jet,
-                Nu_multiplier=self.Nu_multiplier,
-                f_multiplier=self.f_multiplier,
-            )
         else:
-            raise TypeError(f"Unknown channel model type: {type(self.model)}")
+            raise TypeError(
+                f"Unsupported channel model {type(self.model).__name__}. "
+                "Enhanced-surface correlations were removed in 0.7.0 pending "
+                "provenanced replacements; see issue #339."
+            )
 
         return result
-
-    def _jet_split(self) -> float:
-        """Jets sharing the element mass flow (>= 1). Impingement only."""
-        x = self.model.x_D * self.model.d_jet
-        y = self.model.y_D * self.model.d_jet
-        A_per_jet = x * y
-        if A_per_jet > 0 and self.model.A_target > 0:
-            return max(1.0, self.model.A_target / A_per_jet)
-        return 1.0
-
-    def ddP_dmdot_element(self, result, rho: float, area: float) -> float:
-        """Chain the correlation dP sensitivity onto the ELEMENT mass flow.
-
-        Each correlation is driven by a different quantity -- the pin-fin
-        routine by channel velocity, the impingement routine by per-jet mass
-        flow -- so the conversion lives beside the code that built those
-        inputs. ``ChannelResult.ddP_dmdot`` is never the element's: it is
-        taken w.r.t. the correlation's own internal flow area.
-        """
-        if isinstance(self.model, PinFinModel):
-            if rho <= 0.0 or area <= 0.0:
-                return 0.0
-            return result.ddP_dvelocity / (rho * area)
-        if isinstance(self.model, ImpingementModel):
-            # The surface builds mdot_total from the element's own area, so
-            # mdot_total is the element mass flow and only the split remains.
-            return result.ddP_dmdot / self._jet_split()
-        return 0.0
 
 
 # ============================================================================
@@ -2519,71 +2381,11 @@ class ChannelElement(NetworkElement):
 
         m_dot = state_in.m_dot
 
+        # User-set empirical correction on f. Not a correlation: it encodes
+        # nothing and defaults to 1.0, so it is inert unless a caller reaches
+        # for it. Correlation-derived multipliers were removed in 0.7.0; this
+        # one is a tuning knob and stays. See issue #339.
         f_mult = self.surface.f_multiplier if self.surface else 1.0
-        # Set by the pin-fin / impingement branch below, which returns early.
-        array_result = None
-
-        if self.surface and not isinstance(self.surface.model, SmoothModel) and self.length > 0:
-            if isinstance(self.surface.model, RibbedModel):
-                f_mult *= cb._core.rib_friction_multiplier(
-                    self.surface.model.e_D, self.surface.model.pitch_to_height
-                )
-            elif isinstance(self.surface.model, DimpledModel):
-                # Re is supplied because the correlation's signature takes
-                # it. The implemented form ignores it (see the provenance
-                # note in cooling_correlations.h), so this is forward
-                # compatibility rather than a live dependence -- if that
-                # form ever gains an Re term, the element already feeds it.
-                f_mult *= cb._core.dimple_friction_multiplier(
-                    self._reynolds(state_in),
-                    self.surface.model.d_Dh,
-                    self.surface.model.h_d,
-                )
-            elif isinstance(self.surface.model, (PinFinModel, ImpingementModel)):
-                # Localized arrays own their drop outright: the pin-array
-                # and jet correlations return dP directly, so the element
-                # takes it rather than converting it into a multiplier on
-                # pipe friction. The former route divided by a locally
-                # restated f_base and let the C++ friction factor multiply
-                # it back in, which cancels exactly only when both pick the
-                # same correlation. With friction_model="petukhov" the
-                # round-trip moved the drop by -24.7%.
-                array_result = self.htc_and_T(state_in)
-
-        if array_result is not None:
-            # dP is the correlation's own, so its analytic derivatives are the
-            # element's. Chain through VELOCITY, not ddP_dmdot: that field is
-            # taken w.r.t. the mass flow through the array's internal minimum
-            # section, which for a 25 mm channel over a 3 mm pin array differs
-            # from the element's by 45x (see ChannelResult in heat_transfer.h).
-            f_surf = self.surface.f_multiplier if self.surface else 1.0
-            rho_ref, _ = _safe_rho(state_in.density())
-            area = self.area if self.area else 0.0
-            d_dP_d_mdot = f_surf * self.surface.ddP_dmdot_element(array_result, rho_ref, area)
-            # Friction opposes the flow, so the drop follows the sign of m_dot
-            # while its magnitude depends on |m_dot| -- which leaves the
-            # derivative sign-independent.
-            dP_array = math.copysign(f_surf * array_result.dP, m_dot)
-            d_dP_dT = math.copysign(f_surf * array_result.ddP_dT, m_dot)
-
-            res = [state_in.Pt - state_out.Pt - dP_array]
-            jac = {
-                0: {
-                    f"{self.id}.m_dot": -d_dP_d_mdot,
-                    f"{self.from_node}.Pt": 1.0,
-                    f"{self.from_node}.T": -d_dP_dT,
-                    f"{self.to_node}.Pt": -1.0,
-                }
-            }
-            # Known gap: the array correlations expose no dP sensitivity to
-            # static pressure or composition, so those columns are absent
-            # rather than approximated from a pipe-friction stand-in.
-            #
-            # This path is taken in both regimes. The array correlations are
-            # incompressible by construction, and layering Fanno friction on
-            # top of a drop the array already owns was never meaningful, so
-            # regime="compressible" gets the same array drop.
-            return res, jac
 
         if self.regime == "compressible":
             # Use compressible Fanno flow with friction

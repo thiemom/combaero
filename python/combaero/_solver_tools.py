@@ -25,8 +25,6 @@ channel_residuals_and_jacobian = _core.channel_residuals_and_jacobian
 combustor_residuals_and_jacobians = _core.combustor_residuals_and_jacobians
 conical_area_change_residuals_and_jacobian = _core.conical_area_change_residuals_and_jacobian
 density_and_jacobians = _core.density_and_jacobians
-dimple_nusselt_enhancement_and_jacobian = _core.dimple_nusselt_enhancement_and_jacobian
-effusion_effectiveness_and_jacobian = _core.effusion_effectiveness_and_jacobian
 ejector_cd_nozzle_mass_flow_and_jacobian = _core.ejector_cd_nozzle_mass_flow_and_jacobian
 ejector_cd_nozzle_exit_static_and_jacobian = _core.ejector_cd_nozzle_exit_static_and_jacobian
 ejector_choked_mass_flow_and_jacobian = _core.ejector_choked_mass_flow_and_jacobian
@@ -35,13 +33,11 @@ ejector_element_residuals_and_jacobian = _core.ejector_element_residuals_and_jac
 ejector_entrainment_ratio_and_jacobian = _core.ejector_entrainment_ratio_and_jacobian
 ejector_jetpump_discharge_and_jacobian = _core.ejector_jetpump_discharge_and_jacobian
 enthalpy_and_jacobian = _core.enthalpy_and_jacobian
-film_cooling_effectiveness_and_jacobian = _core.film_cooling_effectiveness_and_jacobian
 friction_and_jacobian = _core.friction_and_jacobian
 friction_and_jacobian_colebrook = _core.friction_and_jacobian_colebrook
 friction_and_jacobian_haaland = _core.friction_and_jacobian_haaland
 friction_and_jacobian_petukhov = _core.friction_and_jacobian_petukhov
 friction_and_jacobian_serghides = _core.friction_and_jacobian_serghides
-impingement_nusselt_and_jacobian = _core.impingement_nusselt_and_jacobian
 lossless_pressure_and_jacobian = _core.lossless_pressure_and_jacobian
 mach_number_and_jacobian_v = _core.mach_number_and_jacobian_v
 mixer_from_streams_and_jacobians = _core.mixer_from_streams_and_jacobians
@@ -55,10 +51,7 @@ orifice_compressible_mdot_and_jacobian = _core.orifice_compressible_mdot_and_jac
 orifice_compressible_residuals_and_jacobian = _core.orifice_compressible_residuals_and_jacobian
 orifice_mdot_and_jacobian = _core.orifice_mdot_and_jacobian
 orifice_residuals_and_jacobian = _core.orifice_residuals_and_jacobian
-pin_fin_friction_and_jacobian = _core.pin_fin_friction_and_jacobian
-pin_fin_nusselt_and_jacobian = _core.pin_fin_nusselt_and_jacobian
 pressure_loss_and_jacobian = _core.pressure_loss_and_jacobian
-rib_enhancement_factor_high_re_and_jacobian = _core.rib_enhancement_factor_high_re_and_jacobian
 viscosity_and_jacobians = _core.viscosity_and_jacobians
 wall_coupling_and_jacobian = _core.wall_coupling_and_jacobian
 wall_coupling_and_jacobian_multilayer = _core.wall_coupling_and_jacobian_multilayer
@@ -78,8 +71,6 @@ __all__ = [
     "combustor_residuals_and_jacobians",
     "conical_area_change_residuals_and_jacobian",
     "density_and_jacobians",
-    "dimple_nusselt_enhancement_and_jacobian",
-    "effusion_effectiveness_and_jacobian",
     "ejector_cd_nozzle_mass_flow_and_jacobian",
     "ejector_cd_nozzle_exit_static_and_jacobian",
     "ejector_choked_mass_flow_and_jacobian",
@@ -88,13 +79,11 @@ __all__ = [
     "ejector_entrainment_ratio_and_jacobian",
     "ejector_jetpump_discharge_and_jacobian",
     "enthalpy_and_jacobian",
-    "film_cooling_effectiveness_and_jacobian",
     "friction_and_jacobian",
     "friction_and_jacobian_colebrook",
     "friction_and_jacobian_haaland",
     "friction_and_jacobian_petukhov",
     "friction_and_jacobian_serghides",
-    "impingement_nusselt_and_jacobian",
     "lossless_pressure_and_jacobian",
     "mach_number_and_jacobian_v",
     "mixer_from_streams_and_jacobians",
@@ -108,10 +97,7 @@ __all__ = [
     "orifice_compressible_residuals_and_jacobian",
     "orifice_mdot_and_jacobian",
     "orifice_residuals_and_jacobian",
-    "pin_fin_friction_and_jacobian",
-    "pin_fin_nusselt_and_jacobian",
     "pressure_loss_and_jacobian",
-    "rib_enhancement_factor_high_re_and_jacobian",
     "viscosity_and_jacobians",
     "wall_coupling_and_jacobian",
     "wall_coupling_and_jacobian_multilayer",

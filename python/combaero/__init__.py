@@ -120,10 +120,6 @@ try:
         dcp_dT,
         can_annular_eigenmodes,
         capacity_ratio,
-        channel_dimpled,
-        channel_impingement,
-        channel_pin_fin,
-        channel_ribbed,
         channel_smooth,
         ChannelResult,
         WallCouplingResult,
@@ -152,8 +148,6 @@ try:
         density,
         dewpoint,
         dry_air,
-        dimple_friction_multiplier,
-        dimple_nusselt_enhancement,
         dT_edge_dq,
         dT_edge_dT_bulk,
         dT_edge_dT_cold,
@@ -162,8 +156,6 @@ try:
         effective_viscothermal_layer,
         effectiveness_counterflow,
         effectiveness_parallelflow,
-        effusion_discharge_coefficient,
-        effusion_effectiveness,
         equivalence_ratio,
         equivalence_ratio_from_bilger_Z_mass,
         equivalence_ratio_mass,
@@ -171,9 +163,6 @@ try:
         expansibility_factor,
         fanno_max_length,
         # Nozzle flow is already channel-like
-        film_cooling_effectiveness,
-        film_cooling_effectiveness_avg,
-        film_cooling_multirow_sellers,
         formula,
         formula_to_name,
         frequency_from_strouhal,
@@ -208,7 +197,6 @@ try:
         hydraulic_diameter,
         hydraulic_diameter_annulus,
         hydraulic_diameter_rect,
-        impingement_nusselt,
         input_units,
         is_whistling_risk,
         isentropic_expansion_coefficient,
@@ -287,8 +275,6 @@ try:
         P0_from_static,
         P_from_stagnation,
         peclet,
-        pin_fin_friction,
-        pin_fin_nusselt,
         prandtl,
         pressure_loss,
         quarter_wave_frequency,
@@ -304,10 +290,6 @@ try:
         residence_time_mdot_can_annular,
         residence_time_tube,
         reynolds,
-        rib_enhancement_factor,
-        rib_enhancement_factor_high_re,
-        rib_friction_multiplier,
-        rib_friction_multiplier_high_re,
         thermal_performance_factor,
         s,
         s_mass,
@@ -429,7 +411,6 @@ except (ModuleNotFoundError, ImportError) as e:
     molar_volume = _core.molar_volume
     viscosity = _core.viscosity
     thermal_conductivity = _core.thermal_conductivity
-    pin_fin_nusselt = _core.pin_fin_nusselt
     prandtl = _core.prandtl
     thermal_diffusivity = _core.thermal_diffusivity
     reynolds = _core.reynolds
@@ -705,11 +686,6 @@ except (ModuleNotFoundError, ImportError) as e:
     # Channel flow (HTC + pressure drop)
     ChannelResult = _core.ChannelResult
     channel_smooth = _core.channel_smooth
-    channel_ribbed = _core.channel_ribbed
-    channel_dimpled = _core.channel_dimpled
-    channel_pin_fin = _core.channel_pin_fin
-    channel_impingement = _core.channel_impingement
-    pin_fin_friction = _core.pin_fin_friction
     geometry = _core.geometry
 
     htc_circular_channel = _core.htc_circular_channel
@@ -941,30 +917,12 @@ __all__ = [
     "k_tbc_ysz",
     "list_materials",
     # Advanced cooling correlations
-    "rib_enhancement_factor",
-    "rib_enhancement_factor_high_re",
-    "rib_friction_multiplier",
-    "rib_friction_multiplier_high_re",
     "thermal_performance_factor",
-    "impingement_nusselt",
-    "film_cooling_effectiveness",
-    "film_cooling_effectiveness_avg",
-    "film_cooling_multirow_sellers",
-    "effusion_effectiveness",
-    "effusion_discharge_coefficient",
-    "pin_fin_nusselt",
-    "pin_fin_friction",
-    "dimple_nusselt_enhancement",
-    "dimple_friction_multiplier",
     "adiabatic_wall_temperature",
     "cooled_wall_heat_flux",
     # Channel flow (HTC + pressure drop)
     "ChannelResult",
     "channel_smooth",
-    "channel_ribbed",
-    "channel_dimpled",
-    "channel_pin_fin",
-    "channel_impingement",
     "heat_transfer",
     # Inverse solvers - find fuel stream
     "set_fuel_stream_for_Tad",

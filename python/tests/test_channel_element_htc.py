@@ -8,9 +8,7 @@ import combaero as cb
 from combaero.network import (
     ChannelElement,
     ConvectiveSurface,
-    DimpledModel,
     NetworkMixtureState,
-    RibbedModel,
     SmoothModel,
 )
 
@@ -134,10 +132,8 @@ def _assert_jacobians_not_discarded(result: object, label: str) -> None:
     "model_name, model",
     [
         ("Smooth", SmoothModel()),
-        ("Ribbed", RibbedModel(e_D=0.1, pitch_to_height=10.0, alpha_deg=90.0)),
-        ("Dimpled", DimpledModel(d_Dh=0.2, h_d=0.2, S_d=2.0)),
     ],
-    ids=["Smooth", "Ribbed", "Dimpled"],
+    ids=["Smooth"],
 )
 def test_convective_surface_exposes_jacobians(model_name: str, model: object) -> None:
     """ConvectiveSurface.htc_and_T() must not discard ChannelResult Jacobians."""
@@ -166,10 +162,8 @@ def test_convective_surface_exposes_jacobians(model_name: str, model: object) ->
     "model_name, model",
     [
         ("Smooth", SmoothModel()),
-        ("Ribbed", RibbedModel(e_D=0.1, pitch_to_height=10.0, alpha_deg=90.0)),
-        ("Dimpled", DimpledModel(d_Dh=0.2, h_d=0.2, S_d=2.0)),
     ],
-    ids=["Smooth", "Ribbed", "Dimpled"],
+    ids=["Smooth"],
 )
 def test_channel_element_exposes_jacobians(model_name: str, model: object) -> None:
     """ChannelElement.htc_and_T() must not discard ChannelResult Jacobians."""

@@ -7,20 +7,16 @@ from combaero.network import (
     ConstantFractionLoss,
     ConstantHeadLoss,
     ConvectiveSurface,
-    DimpledModel,
     FlowNetwork,
-    ImpingementModel,
     LinearThetaFractionLoss,
     LinearThetaHeadLoss,
     LosslessConnectionElement,
     MassFlowBoundary,
     MomentumChamberNode,
     OrificeElement,
-    PinFinModel,
     PlenumNode,
     PressureBoundary,
     PressureLossElement,
-    RibbedModel,
     SmoothModel,
     ThermalWall,
     VortexElement,
@@ -37,10 +33,8 @@ from .schemas import (
     CompositionData,
     ConstantFractionLossData,
     ConstantHeadLossData,
-    DimpledModelData,
     DiscreteLossData,
     EjectorData,
-    ImpingementModelData,
     LinearThetaFractionLossData,
     LinearThetaHeadLossData,
     MassBoundaryData,
@@ -48,10 +42,8 @@ from .schemas import (
     MPCETeeData,
     NetworkGraphSchema,
     OrificeData,
-    PinFinModelData,
     PlenumData,
     PressureBoundaryData,
-    RibbedModelData,
     SmoothModelData,
     ThermalWallData,
     VortexData,
@@ -79,37 +71,23 @@ def map_surface_model(data):
     """Maps UI SurfaceModelData to combaero.network models."""
     if isinstance(data, SmoothModelData) or data.type == "smooth":
         return SmoothModel()
-    elif isinstance(data, RibbedModelData) or data.type == "ribbed":
-        return RibbedModel(
-            e_D=data.e_D,
-            pitch_to_height=data.pitch_to_height,
-            alpha_deg=data.alpha_deg,
+
+    # Enhanced surfaces were removed in 0.7.0. Reject rather than silently
+    # falling back to smooth: a saved network asking for a ribbed channel and
+    # getting an unribbed one back is a wrong answer presented as a right one.
+    surface_type = getattr(data, "type", "unknown")
+    if surface_type == "ribbed":
+        raise ValueError(
+            "Ribbed surfaces are temporarily unavailable. The previous "
+            "correlation could not be traced to its cited source and was "
+            "removed in 0.7.0; a provenanced replacement is tracked in "
+            "issue #334. Use a smooth surface in the meantime."
         )
-    elif isinstance(data, DimpledModelData) or data.type == "dimpled":
-        return DimpledModel(
-            d_Dh=data.d_Dh,
-            h_d=data.h_d,
-            S_d=data.S_d,
-        )
-    elif isinstance(data, PinFinModelData) or data.type == "pin_fin":
-        return PinFinModel(
-            pin_diameter=data.pin_diameter,
-            channel_height=data.channel_height,
-            S_D=data.S_D,
-            X_D=data.X_D,
-            N_rows=data.N_rows,
-            is_staggered=data.is_staggered,
-        )
-    elif isinstance(data, ImpingementModelData) or data.type == "impingement":
-        return ImpingementModel(
-            d_jet=data.d_jet,
-            z_D=data.z_D,
-            x_D=data.x_D,
-            y_D=data.y_D,
-            A_target=data.A_target,
-            Cd_jet=data.Cd_jet,
-        )
-    return SmoothModel()
+    raise ValueError(
+        f"Surface type {surface_type!r} was removed in 0.7.0: its correlation "
+        "could not be traced to its cited source. See issue #339. Use a "
+        "smooth surface."
+    )
 
 
 def resolve_composition(
