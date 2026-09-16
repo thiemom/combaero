@@ -1110,6 +1110,47 @@ raise: reverse flow, zero flow and extreme values are guarded smoothly, because
 a solver probes states that are not physical and a throw inside a residual
 kills the solve.
 
+### Ribbed Channels
+
+```python
+from combaero.network import ChannelElement, ConvectiveSurface, RibbedModel
+
+surface = ConvectiveSurface(
+    area=0.1,
+    model=RibbedModel(
+        e_D=0.06, p_e=10.0, alpha_deg=90.0,
+        W_H=1.0,                  # aspect ratio: a Dh does not determine it
+        n_ribbed_walls=2,         # 2 = two OPPOSITE walls, as Han measured
+    ),
+)
+```
+
+`n_ribbed_walls` accepts 1, 2 or 4. Three is rejected -- it has no unambiguous
+geometry.
+
+**Two asymmetries, both from the source rather than convenience:**
+
+- **Friction needs no wall weighting.** The correlation's `f` is already the
+  four-sided channel value, so the element uses it directly. Nothing multiplies
+  pipe friction.
+- **Heat transfer does.** The correlation gives the ribbed side; the smooth
+  walls come from the base correlation and the channel average is the
+  area-weighted combination. The result exposes `h_ribbed` and `h_smooth`
+  separately, because the average hides a modelling choice worth seeing.
+
+**A documented gap.** Plain smooth walls give `h_s/h_r` around 0.42 where Han's
+own channel average implies 0.70 -- ribs enhance the adjacent smooth wall by
+10-50% too, which no correlation here covers. The channel average is therefore
+about **20% below** Han's measurement for the two-ribbed-wall square case.
+
+```python
+model = RibbedModel(..., smooth_wall_Nu_multiplier=1.67)   # reproduces Han
+```
+
+That knob exists because the ribbed side already has a better one: change `C_G`
+on the parameter set, which records what you changed and why. The smooth walls
+come from Gnielinski and have no set of their own.
+
 ### Enhanced Cooling Surfaces
 
 Removed in 0.7.0. The pin-fin, dimple, rib and impingement correlations could

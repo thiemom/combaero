@@ -8,6 +8,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Ribbed channels are back**, built on the parametrised correlation sets.
+  `RibbedModel` carries a `RibCorrelationSet`, the rib geometry, the channel
+  aspect ratio, and `n_ribbed_walls`.
+
+  **The correlation gives the ribbed side; the element does the combining.**
+  How many walls carry ribs is a design choice rather than a property of the
+  correlation -- the channel is the internal wall by definition, and the other
+  side of it is a different channel. `n_ribbed_walls` of 1, 2 or 4 sets the
+  area weighting, with 2 meaning two OPPOSITE walls, the configuration Han
+  measured. Three is rejected rather than interpolated: it has no unambiguous
+  geometry.
+
+  **Friction needs no wall weighting.** The `f` the roughness function is
+  defined against is already the equivalent four-sided channel value, so the
+  correlation returns what the channel needs and `ChannelElement` uses it
+  directly. Nothing multiplies pipe friction -- correlations own their `f`,
+  which is what #331 established after a round-trip through a restated
+  friction factor moved a drop by -24.7%.
+
+  **A documented gap, with the knob that closes it.** Using the plain smooth
+  correlation for the smooth walls gives `h_s/h_r` of about **0.42**, where
+  Han's own reported channel average implies **0.70** -- because ribs enhance
+  the adjacent smooth wall by 10-50% as well, which no correlation here
+  covers. The channel average is therefore about **20% below** Han's
+  measurement for the two-ribbed-wall square case.
+
+  That is recorded rather than papered over with an invented constant.
+  `smooth_wall_Nu_multiplier` is the supported way to close it: about **1.67**
+  reproduces Han. The size of the gap and the effect of the knob are both
+  pinned as regression tests.
+
+  The Jacobian is simple because `R` carries no `e+` term, so `f` does not
+  depend on Reynolds number and `df/d(mdot)` is zero. The drop is odd in mass
+  flow and its derivative therefore even -- it does not flip sign at zero,
+  which is the direction that puts a sign error exactly at the crossing if
+  reversed. Verified against central differences to 1e-10, including reversed
+  flow.
+
+### Changed
+- **`CLAUDE.md`'s explicit-includes rule names both strictnesses.** It said
+  "macOS-only implicit includes break Linux CI", which is one direction of a
+  two-directional problem and misleading: a `std::max({a,b,c})` here passed on
+  macOS **and** Linux and was caught only by MinGW. libstdc++ is strict about
+  transitive headers; MSVC is strict about POSIX-ish macros like `M_PI`. Any
+  platform can be the permissive one, and two agreeing is not evidence.
+
+
+### Added
 - **Parametrised rib correlations.** Rib correlations are now data rather than
   code: a `RibCorrelationSet` carries the coefficients, each term's
   **normaliser**, the advisory validity band, the stated accuracy, and the
