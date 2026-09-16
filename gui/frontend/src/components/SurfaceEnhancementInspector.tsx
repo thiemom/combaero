@@ -5,9 +5,15 @@ import NumericInput from "./NumericInput";
 
 interface SurfaceModelData {
 	type: "smooth" | "ribbed" | "dimpled" | "pin_fin" | "impingement";
+	// Ribbed, rebuilt in 0.8.0 on a provenanced correlation set.
 	e_D?: number;
-	pitch_to_height?: number;
+	p_e?: number;
 	alpha_deg?: number;
+	W_H?: number;
+	n_ribbed_walls?: number;
+	smooth_wall_Nu_multiplier?: number;
+	// Kept for pre-0.7.0 networks whose rib nodes used the old field name.
+	pitch_to_height?: number;
 	d_Dh?: number;
 	h_d?: number;
 	S_d?: number;
