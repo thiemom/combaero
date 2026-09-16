@@ -1063,6 +1063,53 @@ t_res_ann = cb.residence_time_annulus(V=0.01, Q=0.1, R_outer=0.1, R_inner=0.05)
 t_res_can = cb.residence_time_can_annular(V=0.01, Q=0.1, N_cans=12, R_can=0.05)
 ```
 
+### Rib Correlations (parametrised)
+
+Rib correlations are **data, not code**. A parameter set carries the
+coefficients, their normalisers, the validity band, the stated accuracy, and
+where all of it came from -- so a built-in set and a set you tuned on your own
+rig are structurally distinguishable.
+
+```python
+import combaero as cb
+
+s = cb.han_1988_orthogonal()          # Han (1988), 90 deg orthogonal ribs
+g = cb.RibGeometry(e_D=0.047, p_e=10.0, W_H=1.0, alpha_deg=90.0)
+
+r = cb.evaluate_rib(s, g, Re=10_000)
+r.R, r.f, r.e_plus, r.G, r.St_r       # 3.2000, 0.04576, 71.1, 12.21, 0.00968
+r.extrapolated                        # outside the set's advisory validity
+```
+
+**Supply your own.** Real hardware needs it -- no published correlation is
+precise enough for a specific rig:
+
+```python
+mine = cb.han_1988_orthogonal()
+mine.name = "rig_3"
+mine.source = "measured 2026-09"
+mine.provenance = cb.RibProvenance.User   # not Extracted -- the claim differs
+mine.C_G = 4.1
+cb.validate_rib_set(mine)                 # rejects malformed sets, loudly
+```
+
+Three things worth knowing:
+
+- **The normaliser is data.** `RibTerm(exponent, reference)` divides by
+  `reference` before applying the exponent. `3.2 (p/e/10)^0.35` and
+  `1.4294 (p/e)^0.35` are the same function; using one constant under the
+  other convention is wrong by `10^0.35 = 2.24x`, uniformly, which never looks
+  like a trend.
+- **Validity is advisory.** `r.extrapolated` reports; nothing refuses. A band
+  belongs to the source's rig, not to yours.
+- **`St_r` is the ribbed side.** Combining it with the smooth walls is the
+  caller's job, and depends on how many walls are ribbed.
+
+Bad *parameters* raise from `validate_rib_set`. Bad *operating points* never
+raise: reverse flow, zero flow and extreme values are guarded smoothly, because
+a solver probes states that are not physical and a throw inside a residual
+kills the solve.
+
 ### Enhanced Cooling Surfaces
 
 Removed in 0.7.0. The pin-fin, dimple, rib and impingement correlations could

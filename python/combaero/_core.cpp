@@ -11,6 +11,7 @@
 #include "common_names.h"
 #include "compressible.h"
 #include "cooling_correlations.h"
+#include "rib_correlation.h"
 #include "correlation_status.h"
 #include "ejector.h"
 #include "equilibrium.h"
@@ -46,6 +47,119 @@ to_vec(py::array_t<double, py::array::c_style | py::array::forcecast> arr) {
 }
 
 PYBIND11_MODULE(_core, m) {
+
+  // ---------------------------------------------------------------------
+  // Parametrised rib correlations
+  // ---------------------------------------------------------------------
+  py::enum_<combaero::cooling::RibProvenance>(m, "RibProvenance")
+      .value("Extracted", combaero::cooling::RibProvenance::Extracted,
+             "An equation printed in a source, transcribed and checked "
+             "against it.")
+      .value("Fitted", combaero::cooling::RibProvenance::Fitted,
+             "A form we chose, fitted to data we digitised from a figure. "
+             "The exponents are ours.")
+      .value("User", combaero::cooling::RibProvenance::User,
+             "Supplied by the caller. Carries no claim.");
+
+  py::class_<combaero::cooling::RibTerm>(m, "RibTerm")
+      .def(py::init<>())
+      .def(py::init([](double exponent, double reference) {
+             return combaero::cooling::RibTerm{exponent, reference};
+           }),
+           py::arg("exponent") = 0.0, py::arg("reference") = 1.0)
+      .def_readwrite("exponent", &combaero::cooling::RibTerm::exponent)
+      .def_readwrite("reference", &combaero::cooling::RibTerm::reference,
+                     "What the variable is divided by before the exponent is "
+                     "applied. Data, not a convention: (p/e/10)^b and (p/e)^b "
+                     "are the same function with different constants.");
+
+  py::class_<combaero::cooling::RibRange>(m, "RibRange")
+      .def(py::init<>())
+      .def(py::init([](double lo, double hi) {
+             return combaero::cooling::RibRange{lo, hi};
+           }),
+           py::arg("lo") = 0.0, py::arg("hi") = 0.0)
+      .def_readwrite("lo", &combaero::cooling::RibRange::lo)
+      .def_readwrite("hi", &combaero::cooling::RibRange::hi);
+
+  py::class_<combaero::cooling::RibGeometry>(m, "RibGeometry")
+      .def(py::init<>())
+      .def(py::init([](double e_D, double p_e, double W_H, double alpha_deg) {
+             return combaero::cooling::RibGeometry{e_D, p_e, W_H, alpha_deg};
+           }),
+           py::arg("e_D") = 0.0, py::arg("p_e") = 0.0, py::arg("W_H") = 1.0,
+           py::arg("alpha_deg") = 90.0)
+      .def_readwrite("e_D", &combaero::cooling::RibGeometry::e_D)
+      .def_readwrite("p_e", &combaero::cooling::RibGeometry::p_e)
+      .def_readwrite("W_H", &combaero::cooling::RibGeometry::W_H)
+      .def_readwrite("alpha_deg", &combaero::cooling::RibGeometry::alpha_deg);
+
+  py::class_<combaero::cooling::RibResult>(m, "RibResult")
+      .def_readonly("R", &combaero::cooling::RibResult::R)
+      .def_readonly("f", &combaero::cooling::RibResult::f)
+      .def_readonly("e_plus", &combaero::cooling::RibResult::e_plus)
+      .def_readonly("G", &combaero::cooling::RibResult::G)
+      .def_readonly("St_r", &combaero::cooling::RibResult::St_r,
+                    "Ribbed-side Stanton number. Combining it with the smooth "
+                    "walls is the caller's job.")
+      .def_readonly("dSt_dRe", &combaero::cooling::RibResult::dSt_dRe)
+      .def_readonly("extrapolated",
+                    &combaero::cooling::RibResult::extrapolated,
+                    "Outside the set's advisory validity. Advisory because a "
+                    "band belongs to the source's rig, not the caller's.");
+
+  py::class_<combaero::cooling::RibCorrelationSet>(m, "RibCorrelationSet")
+      .def(py::init<>())
+      .def_readwrite("name", &combaero::cooling::RibCorrelationSet::name)
+      .def_readwrite("source", &combaero::cooling::RibCorrelationSet::source)
+      .def_readwrite("validity_source",
+                     &combaero::cooling::RibCorrelationSet::validity_source)
+      .def_readwrite("provenance",
+                     &combaero::cooling::RibCorrelationSet::provenance)
+      .def_readwrite("symmetric",
+                     &combaero::cooling::RibCorrelationSet::symmetric)
+      .def_readwrite("C_R", &combaero::cooling::RibCorrelationSet::C_R)
+      .def_readwrite("R_eD", &combaero::cooling::RibCorrelationSet::R_eD)
+      .def_readwrite("R_pe", &combaero::cooling::RibCorrelationSet::R_pe)
+      .def_readwrite("R_WH", &combaero::cooling::RibCorrelationSet::R_WH)
+      .def_readwrite("R_alpha", &combaero::cooling::RibCorrelationSet::R_alpha)
+      .def_readwrite("C_G", &combaero::cooling::RibCorrelationSet::C_G)
+      .def_readwrite("G_eD", &combaero::cooling::RibCorrelationSet::G_eD)
+      .def_readwrite("G_pe", &combaero::cooling::RibCorrelationSet::G_pe)
+      .def_readwrite("G_WH", &combaero::cooling::RibCorrelationSet::G_WH)
+      .def_readwrite("G_alpha", &combaero::cooling::RibCorrelationSet::G_alpha)
+      .def_readwrite("G_eplus_exponent",
+                     &combaero::cooling::RibCorrelationSet::G_eplus_exponent)
+      .def_readwrite("valid_Re",
+                     &combaero::cooling::RibCorrelationSet::valid_Re)
+      .def_readwrite("valid_eD",
+                     &combaero::cooling::RibCorrelationSet::valid_eD)
+      .def_readwrite("valid_pe",
+                     &combaero::cooling::RibCorrelationSet::valid_pe)
+      .def_readwrite("valid_WH",
+                     &combaero::cooling::RibCorrelationSet::valid_WH)
+      .def_readwrite("valid_alpha",
+                     &combaero::cooling::RibCorrelationSet::valid_alpha)
+      .def_readwrite("valid_eplus",
+                     &combaero::cooling::RibCorrelationSet::valid_eplus)
+      .def_readwrite("valid_Pr",
+                     &combaero::cooling::RibCorrelationSet::valid_Pr)
+      .def_readwrite("accuracy_R",
+                     &combaero::cooling::RibCorrelationSet::accuracy_R)
+      .def_readwrite("accuracy_G",
+                     &combaero::cooling::RibCorrelationSet::accuracy_G);
+
+  m.def("han_1988_orthogonal", &combaero::cooling::han_1988_orthogonal,
+        "Han (1988) 90 deg orthogonal ribs. Extracted and confirmed; see "
+        "validation/cooling/extractions/han_ribbed.md.");
+  m.def("validate_rib_set", &combaero::cooling::validate_rib_set,
+        py::arg("correlation_set"),
+        "Reject a set that cannot be evaluated. Hard errors, unlike the "
+        "advisory validity ranges: these are mistakes, not operating points.");
+  m.def("evaluate_rib", &combaero::cooling::evaluate_rib,
+        py::arg("correlation_set"), py::arg("geometry"), py::arg("Re"),
+        "Evaluate the chain. Re may be negative or zero; the guards are "
+        "smooth through both.");
   m.doc() = "Python bindings for combaero core";
 
   // Expose the CorrelationValidity enum

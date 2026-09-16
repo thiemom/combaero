@@ -423,6 +423,20 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double>& X,
                               bool heating = true, double Nu_multiplier = 1.0,
                               double f_multiplier = 1.0);
 
+// Parametrised rib correlations -- rib_correlation.h
+//
+//   R = C_R * (e/D / nD)^a * (p/e / nP)^b * (W/H / nW)^c * (alpha/90)^d
+//   G = C_G * (same geometry terms) * (e+)^n
+//
+// R carries no e+ term by construction, so f is independent of Reynolds
+// number and df/d(mdot) is identically zero for this family.
+RibCorrelationSet han_1988_orthogonal();
+void validate_rib_set(const RibCorrelationSet& set);   // throws on a bad set
+RibResult evaluate_rib(const RibCorrelationSet& set,
+                       const RibGeometry& geom, double Re);
+// evaluate_rib never throws: Re may be negative or zero and the guards are
+// smooth through both, because the solver probes states that are not physical.
+
 // Enhanced surfaces (ribbed, dimpled, pin-fin, impingement) were removed in
 // 0.7.0: their correlations could not be traced to their cited sources. A
 // provenanced rib correlation is tracked in issue #334; see issue #339 for

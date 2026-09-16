@@ -432,6 +432,59 @@ All functions use consistent units to avoid conversion errors.
 |------------------------------|-------------------------|-------------|
 | `thermal_performance_factor` | Nu_ratio: -, f_ratio: - | -           |
 
+### rib_correlation.h - Parametrised rib correlations
+
+| Function                              | Input Units                                                      | Output Unit       |
+|---------------------------------------|------------------------------------------------------------------|-------------------|
+| `han_1988_orthogonal`                 | -                                                                | RibCorrelationSet |
+| `validate_rib_set`                    | correlation_set: RibCorrelationSet                               | None              |
+| `evaluate_rib`                        | correlation_set: RibCorrelationSet, geometry: RibGeometry, Re: - | RibResult         |
+| `RibGeometry::e_D`                    | -                                                                | -                 |
+| `RibGeometry::p_e`                    | -                                                                | -                 |
+| `RibGeometry::W_H`                    | -                                                                | -                 |
+| `RibGeometry::alpha_deg`              | -                                                                | deg               |
+| `RibTerm::exponent`                   | -                                                                | -                 |
+| `RibTerm::reference`                  | -                                                                | -                 |
+| `RibResult::R`                        | -                                                                | -                 |
+| `RibResult::f`                        | -                                                                | -                 |
+| `RibResult::e_plus`                   | -                                                                | -                 |
+| `RibResult::G`                        | -                                                                | -                 |
+| `RibResult::St_r`                     | -                                                                | -                 |
+| `RibResult::dSt_dRe`                  | -                                                                | -                 |
+| `RibCorrelationSet::name`             | -                                                                | -                 |
+| `RibCorrelationSet::source`           | -                                                                | -                 |
+| `RibCorrelationSet::validity_source`  | -                                                                | -                 |
+| `RibCorrelationSet::provenance`       | -                                                                | -                 |
+| `RibCorrelationSet::symmetric`        | -                                                                | -                 |
+| `RibCorrelationSet::C_R`              | -                                                                | -                 |
+| `RibCorrelationSet::C_G`              | -                                                                | -                 |
+| `RibCorrelationSet::R_eD`             | -                                                                | -                 |
+| `RibCorrelationSet::R_pe`             | -                                                                | -                 |
+| `RibCorrelationSet::R_WH`             | -                                                                | -                 |
+| `RibCorrelationSet::R_alpha`          | -                                                                | -                 |
+| `RibCorrelationSet::G_eD`             | -                                                                | -                 |
+| `RibCorrelationSet::G_pe`             | -                                                                | -                 |
+| `RibCorrelationSet::G_WH`             | -                                                                | -                 |
+| `RibCorrelationSet::G_alpha`          | -                                                                | -                 |
+| `RibCorrelationSet::G_eplus_exponent` | -                                                                | -                 |
+| `RibCorrelationSet::valid_Re`         | -                                                                | -                 |
+| `RibCorrelationSet::valid_eD`         | -                                                                | -                 |
+| `RibCorrelationSet::valid_pe`         | -                                                                | -                 |
+| `RibCorrelationSet::valid_WH`         | -                                                                | -                 |
+| `RibCorrelationSet::valid_alpha`      | -                                                                | deg               |
+| `RibCorrelationSet::valid_eplus`      | -                                                                | -                 |
+| `RibCorrelationSet::valid_Pr`         | -                                                                | -                 |
+| `RibCorrelationSet::accuracy_R`       | -                                                                | -                 |
+| `RibCorrelationSet::accuracy_G`       | -                                                                | -                 |
+| `RibRange::lo`                        | -                                                                | -                 |
+| `RibRange::hi`                        | -                                                                | -                 |
+| `RibResult::extrapolated`             | -                                                                | -                 |
+| `RibProvenance::Extracted`            | -                                                                | -                 |
+| `RibProvenance::Fitted`               | -                                                                | -                 |
+| `RibProvenance::User`                 | -                                                                | -                 |
+| `RibProvenance::name`                 | -                                                                | -                 |
+| `RibProvenance::value`                | -                                                                | -                 |
+
 ### acoustics.h - Acoustic Properties
 
 | Function                    | Input Units                                                                      | Output Unit               |
