@@ -199,6 +199,7 @@ def test_the_assembled_network_jacobian_matches_finite_differences():
 
     rng = random.Random(20260906)
     worst = 0.0
+    worst_detail = ""
     checked = 0
     for _ in range(40):
         case = rr.sample(rng)
@@ -214,20 +215,59 @@ def test_the_assembled_network_jacobian_matches_finite_differences():
         _, jac = solver._residuals_and_jacobian(x)
         J = jac.toarray() if hasattr(jac, "toarray") else np.asarray(jac)
         fd = np.zeros_like(J)
+        # Per-column noise floor of the difference itself. A central difference
+        # of a residual of magnitude |R| carries roundoff ~ eps*|R|/h, so an
+        # entry smaller than that is measuring the stencil, not the Jacobian.
+        # Comparing against it is what the old max(|fd|, 1.0) denominator did
+        # by accident: it turned near-zero entries into an ABSOLUTE 1e-4
+        # tolerance, which no implementation can satisfy -- a structurally zero
+        # entry (K[common] is never assigned, so the common port's row carries
+        # no loss term) failed on pure roundoff.
+        fd_half = np.zeros_like(J)
         for j in range(len(x)):
             h = max(abs(x[j]) * 1e-6, 1e-6)
-            xp = x.copy()
-            xm = x.copy()
-            xp[j] += h
-            xm[j] -= h
-            fd[:, j] = (solver._residuals(xp) - solver._residuals(xm)) / (2.0 * h)
-        worst = max(worst, float(np.max(np.abs(J - fd) / np.maximum(np.abs(fd), 1.0))))
+            for target, step in ((fd, h), (fd_half, 0.5 * h)):
+                xp = x.copy()
+                xm = x.copy()
+                xp[j] += step
+                xm[j] -= step
+                target[:, j] = (solver._residuals(xp) - solver._residuals(xm)) / (2.0 * step)
+
+        # Only compare where the difference quotient has actually converged.
+        # Halving the step must not move it: where it does, the reference is
+        # not a derivative and the entry says nothing about the Jacobian.
+        # Two things make that happen here, neither of them an implementation
+        # fault -- roundoff on a structurally zero term, and the supplier /
+        # collector classification flipping under the perturbation, which puts
+        # a kink where a difference quotient has no meaning.
+        settled = np.abs(fd - fd_half) <= 1e-3 * np.abs(fd_half) + 1e-9
+        diff = np.abs(J - fd)
+        tol = 1e-4 * np.abs(fd) + 1e-9
+        offenders = settled & (diff > tol)
+
+        # The exclusion must not become a way to pass by testing nothing.
+        frac = float(settled.sum()) / settled.size
+        assert frac > 0.90, (
+            f"only {frac:.1%} of Jacobian entries had a converged finite "
+            "difference; the comparison is no longer meaningful"
+        )
+        if offenders.any():
+            ratio = np.where(offenders, diff / tol, 0.0)
+            i, j = np.unravel_index(np.argmax(ratio), ratio.shape)
+            worst = max(worst, float(ratio[i, j]))
+            worst_detail = (
+                f"row {i} col {j} ({solver.unknown_names[j]}): "
+                f"analytic {J[i, j]:.6e} vs fd {fd[i, j]:.6e} "
+                f"(fd at h/2: {fd_half[i, j]:.6e}), tol {tol[i, j]:.3e}"
+            )
         checked += 1
         if checked >= 6:
             break
 
     assert checked > 0, "no converged network was available to check"
-    assert worst < 1e-4, f"worst relative Jacobian error {worst:.3e}"
+    # worst is now a multiple of the per-entry tolerance: <= 1 means every term
+    # is either relatively accurate or inside the difference's own noise.
+    assert worst <= 1.0, f"Jacobian term exceeds tolerance by {worst:.2f}x -- {worst_detail}"
 
 
 def test_math_is_still_imported_for_the_angle_conversion():

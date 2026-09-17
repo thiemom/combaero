@@ -733,12 +733,28 @@ def test_mpce_collector_port_carries_dynamic_head():
     assert node._total_m_dot == pytest.approx(m_out, rel=1e-6)
 
     T_com, _, _ = solver._derived_states["mc_com"]
-    rho = cb.density(T_com, sol["mc_com.P"], cb.species.dry_air())
+    P_com = sol["mc_com.P"]
+    X = cb.species.dry_air()
+    rho = cb.density(T_com, P_com, X)
     A = node.area
-    q_expected = 0.5 * rho * (m_out / (rho * A)) ** 2
-    q_solved = sol["mc_com.Pt"] - sol["mc_com.P"]
+    u = m_out / (rho * A)
+
+    # MomentumChamberNode closes on the isentropic stagnation state, not on
+    # 0.5*rho*u^2. The two agree to a fraction of a percent at low Mach but
+    # diverge as the square of it -- this collector runs near M = 0.85, where
+    # the incompressible form is ~20% low. Expect the compressible rise, and
+    # keep the incompressible value alongside it as the limit it reduces to.
+    M = u / cb.speed_of_sound(T_com, X)
+    q_expected = cb.P0_from_static(P_com, T_com, M, X) - P_com
+    q_incompressible = 0.5 * rho * u * u
+
+    q_solved = sol["mc_com.Pt"] - P_com
     assert q_solved > 1e3, "collector dynamic head must not degenerate to zero"
     assert q_solved == pytest.approx(q_expected, rel=1e-4)
+    assert q_expected > q_incompressible, (
+        "the compressible rise must exceed the incompressible one at M > 0; "
+        f"got {q_expected:.1f} vs {q_incompressible:.1f} at M = {M:.3f}"
+    )
 
 
 def test_mpce_merge_outlet_temperature_mass_weighted():

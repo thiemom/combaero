@@ -1,6 +1,7 @@
 #include "area_change.h"
 #include "composition.h"
 #include "solver_interface.h"
+#include "stagnation.h"
 #include "thermo.h"
 #include <cmath>
 #include <fstream>
@@ -445,13 +446,23 @@ TEST(SolverJacobianTest, MomentumChamberDerivatives) {
                              res.d_res_dmdot, fd_dmdot);
   EXPECT_NEAR(res.d_res_dmdot, fd_dmdot, std::abs(fd_dmdot) * 1e-8 + 1e-12);
 
-  // Verify residual is correct: P_total - P - 0.5*rho*v^2 = 0
+  // Verify the residual is the COMPRESSIBLE closure: P_total - P0(P, T, M),
+  // the isentropic stagnation state from entropy conservation with variable
+  // cp. It used to be P_total - P - 0.5*rho*v^2, which under-predicts the
+  // stagnation rise -- 0.2% at M = 0.33 but 11% at M = 1.0 and 34% at M = 1.4
+  // -- and does so without bound past sonic, so a station driven transonic got
+  // a closure that was both wrong and unable to say so. See issue #357.
   std::vector<double> X = mass_to_mole(normalize_fractions(Y));
   double rho = density(T, P, X);
   double v = m_dot / (rho * area);
-  double q_dynamic = 0.5 * rho * v * v;
-  double expected_residual = P_total - P - q_dynamic;
+  double M = std::abs(v) / speed_of_sound(T, X);
+  double expected_residual = P_total - P0_from_static(P, T, M, X);
   EXPECT_NEAR(res.residual, expected_residual, 1e-6);
+
+  // The incompressible form is the limit it reduces to, not an equal: the
+  // stagnation rise must exceed 0.5*rho*v^2 at any finite Mach.
+  double q_incompressible = 0.5 * rho * v * v;
+  EXPECT_GT(P0_from_static(P, T, M, X) - P, q_incompressible);
 }
 
 TEST(SolverJacobianTest, AdiabaticTCompleteDerivatives) {

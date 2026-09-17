@@ -441,7 +441,8 @@ T0_from_static_and_jacobian_M(double T, double M, const std::vector<double> &X);
 // Method: Central Finite Difference
 std::tuple<double, double>
 P0_from_static_and_jacobian_M(double P, double T, double M,
-                              const std::vector<double> &X);
+                              const std::vector<double> &X,
+                              double tol = 1e-8, std::size_t max_iter = 50);
 
 // -----------------------------------------------------------------------------
 // 6. Combustion Interfaces
@@ -523,6 +524,11 @@ struct MomentumChamberResult {
   double d_res_dP;
   double d_res_dP_total;
   double d_res_dmdot;
+  // Temperature sensitivity. The incompressible closure this replaced touched
+  // T only through rho, weakly enough that the assembled Jacobian tolerated
+  // its absence; the stagnation closure also depends on T through T0, a(T)
+  // and s(T), and leaving it out costs ~1.6e-4 on the network Jacobian check.
+  double d_res_dT;
 };
 
 MomentumChamberResult momentum_chamber_residual_and_jacobian(

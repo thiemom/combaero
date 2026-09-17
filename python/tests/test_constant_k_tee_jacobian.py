@@ -255,7 +255,25 @@ def test_the_residual_matches_the_documented_closed_form(direction):
     rho = float(states[common].density())
     area = float(element.port_areas[common])
     m_common = element._port_signs[common] * _OUTER[common]
-    q_dyn = m_common * m_common / (2.0 * rho * area * area)
+
+    # q_dyn_com is the common port's isentropic stagnation rise, which is what
+    # its port MomentumChamberNode also calls dynamic head. It was the
+    # incompressible m^2/(2*rho*A^2); the two agree to ~0.006% at this
+    # operating point and diverge as the square of Mach, so the change is
+    # invisible here but not at a transonic port. K is tabulated as
+    # dPt/q_dyn, so the reference has to follow the ports. See issue #357.
+    P_c = float(states[common].P)
+    T_c = float(states[common].T)
+    X_c = states[common].X
+    g_c = float(cb.isentropic_expansion_coefficient(T_c, X_c))
+    m2 = (m_common * m_common) / (rho * area * area * g_c * P_c)
+    q_dyn = P_c * ((1.0 + 0.5 * (g_c - 1.0) * m2) ** (g_c / (g_c - 1.0)) - 1.0)
+
+    q_incompressible = m_common * m_common / (2.0 * rho * area * area)
+    assert q_dyn > q_incompressible, (
+        "the compressible rise must exceed the incompressible one at M > 0: "
+        f"{q_dyn:.3f} against {q_incompressible:.3f}"
+    )
 
     expected = []
     for i in range(3):
