@@ -219,6 +219,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Fixed
+
+- **The Fanno march handed Newton a staircase, and the choke barrier hid it
+  behind a bigger one.** Two defects in the compressible channel's drop, both
+  in the region a solver has to cross.
+
+  When the flow chokes before the duct end the march truncates mid-step.
+  `L_choke` was interpolated within the breaking step -- a comment above the
+  loop explains why -- but the **outlet state was not**, so it stayed snapped
+  to the march grid. `channel_compressible_mdot_and_jacobian` builds its drop
+  from that outlet and differentiates it by central finite differences with a
+  1e-6 relative step, about 0.1 Pa against risers of ~55 Pa. Scanning `m_dot`
+  through the choked band, the gradient alternated sample to sample by 22%,
+  and the reported Jacobian disagreed with a coarse finite difference by
+  7 - 62% inside the band while matching it exactly outside. The outlet is now
+  interpolated to the same station as `L_choke`.
+
+  The barrier that keeps Newton out of infeasible flow then turned out to be
+  compensating rather than correcting. The truncated drop covers the marched
+  part only, so it collapses as choking moves upstream -- slope +13934 just
+  below onset against -86257 just above, a sign reversal in the base term
+  itself. The linear barrier did not remove that; it outshouted it, and the
+  mismatch was the 74.5x derivative step at onset. The drop is now
+  extrapolated to full length before the barrier is added, which is continuous
+  through onset, and the barrier is quadratic in the truncated fraction so it
+  switches on with zero slope. Monotonicity matters as much as smoothness
+  here: a quadratic barrier alone leaves the drop decreasing with rising
+  `m_dot`, which is exactly the spurious-root condition the barrier exists to
+  prevent.
+
+  Unchoked results are unchanged to the printed digits; RK4 was already
+  grid-converged by `n_steps = 25` there. Pinned by
+  `tests/test_fanno_choke_smoothness.cpp`, whose three cases were each
+  falsified against the specific defect they cover. See issue #356.
+
 - **Every compressible solver returned a state that could not be mixed.**
   `State::X` and `State::Y` are both public members, and only `set_X()` /
   `set_Y()` keep them in sync. All seventeen state-producing sites in
@@ -249,44 +283,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `solver_interface`'s `Stream` carries mass fractions only, so neither was
   affected. Tracked as #352; making the invariant structurally unbreakable is
   still open there.
-
-- **Every example runs again, and CI now notices when one stops.** The 0.7.0
-  correlation removal broke five examples, and the 0.6.0 `pipe_* -> channel_*`
-  rename had quietly broken three more that nobody had run since. All eight
-  are fixed.
-
-  `scripts/run_examples.py` already ran every example headless and exited
-  non-zero on failure; it just was not wired to anything. It now gates
-  `status-check`, so an example that stops running blocks the merge.
-
-  **The job runs each example rather than importing it.** An example calling a
-  removed function from inside a function imports cleanly and only fails when
-  the function actually runs -- measured on four of them, an import check
-  caught two.
-
-  Two examples are beyond a rename and are listed in the runner's
-  `KNOWN_BROKEN` map with their reason and issue (#351): one demonstrates a
-  `CombustorNode(pressure_loss=...)` callback that no longer exists, the other
-  builds a merging `MomentumChamberNode` topology that `FlowNetwork.validate`
-  now rejects. Both are still run, so one that starts passing again fails the
-  job asking for its entry to be removed, rather than sitting on the list
-  forever.
-
-- **Three C++ examples segfaulted and nothing noticed.**
-  `stagnation_example`, `compressible_example` and `combustion_state_example`
-  crashed on a null read inside `combaero::mix()`. They assigned the public
-  `State::X` member directly instead of calling `set_X()`, so `Y` stayed
-  empty and `mix()` indexed it. They compiled and linked cleanly throughout.
-
-  The examples were built by CMake but never registered as tests, so building
-  them was the only thing ever checked. Each is now an `add_test` smoke case,
-  which puts them in `ctest` and so in CI across the existing matrix.
-
-- **`_RibbedChannelResult` carries the wall-coupling derivatives.**
-  `dh_dmdot`, `dh_dT`, `dT_aw_dmdot` and `dT_aw_dT` were missing, so a ribbed
-  channel coupled to a wall fed the solver an incomplete Jacobian. Nineteen
-  unit tests missed it because none of them coupled a wall; re-enabling the
-  skipped coupled-liner example test is what surfaced it.
 
 - **Every example runs again, and CI now notices when one stops.** The 0.7.0
   correlation removal broke five examples, and the 0.6.0 `pipe_* -> channel_*`

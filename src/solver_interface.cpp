@@ -1619,9 +1619,23 @@ std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobia
              0.5 * kChannelChokeBarrierBeta * rho * (u_abs * u_abs - a * a);
     }
     // Subsonic inlet choked at L_choke < L: this m_dot cannot traverse the
-    // full channel. The penalty grows as choking moves toward the inlet and
-    // meets the supersonic branch (kappa * P) at L_choke -> 0.
-    return dP + kChannelChokeBarrierKappa * P * (1.0 - sol.L_choke / L);
+    // full channel.
+    //
+    // dP here is the drop over the MARCHED part only, so it collapses as the
+    // choke point moves upstream -- measured slope +13934 just below onset
+    // against -86257 just above, a sign reversal in the base term itself. The
+    // old linear barrier did not remove that kink, it merely outshouted it
+    // (+1124234 of barrier against -86257 of collapse, a 74.5x derivative
+    // step at onset that Newton stalls against).
+    //
+    // So extrapolate the marched drop to the full length first -- same drop
+    // per unit length, applied over L -- which is continuous through onset
+    // because L_choke -> L there. The barrier then only has to encode
+    // infeasibility depth, and can be quadratic in s = 1 - L_choke/L so that
+    // it switches on with zero slope. See issue #356.
+    const double s_trunc = 1.0 - sol.L_choke / L;
+    const double frac_marched = std::max(sol.L_choke / L, kChannelChokeMinMarched);
+    return dP / frac_marched + kChannelChokeBarrierKappa * P * s_trunc * s_trunc;
   };
 
   double dP = dp_forward(T_in, P_in, u_fwd);

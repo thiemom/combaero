@@ -206,11 +206,24 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
 // flat attractor with exact spurious network roots (dead branch arms,
 // reversed supplies). channel_compressible_mdot_and_jacobian therefore
 // replaces the truncated result with a monotone barrier:
-//   in-channel choking: dP = dP_truncated + kappa * P_in * (1 - L_choke/L)
+//   in-channel choking: dP = dP_truncated + kappa * P_in * (1 - L_choke/L)^2
 //   supersonic inlet:   dP = kappa * P_in + (beta/2) * rho_in * (u^2 - a^2)
 // Both branches are continuous at their region boundaries and increase with
 // the depth of infeasibility, so the residual always pushes m_dot back
 // toward the feasible branch.
+//
+// The in-channel term is QUADRATIC in the truncated fraction s = 1 - L_choke/L
+// rather than linear, so that d/ds vanishes at s = 0. A linear barrier is
+// continuous at onset but switches on at full slope: measured on a D=0.1 m
+// duct at 1700 K, d(dP)/d(m_dot) jumped 13934 -> 1037977 across the onset
+// point, a 74.5x step. Newton reads that kink as a wall and stalls against it.
+// Quadratic keeps both endpoints (0 at onset, kappa * P_in when choking
+// reaches the inlet) and the monotone push back toward feasibility, while
+// being C1 where the solver actually crosses. See issue #356.
+// Floor on the marched fraction L_choke/L when extrapolating the truncated
+// drop to full length. Keeps dP/frac finite as choking reaches the inlet,
+// where the supersonic branch takes over anyway.
+constexpr double kChannelChokeMinMarched = 1e-3;
 constexpr double kChannelChokeBarrierKappa = 1.0;
 constexpr double kChannelChokeBarrierBeta = 2.0;
 

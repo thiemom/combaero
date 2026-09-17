@@ -584,7 +584,11 @@ FannoSolution fanno_channel(
             break;
         }
 
-        // Update state
+        // Update state. Keep the pre-step values: if this step is the one
+        // that chokes, the outlet has to be interpolated back to the choke
+        // station alongside L_choke (see the choke block below).
+        const double P_prev = P;
+        const double T_prev = T;
         x += dx;
         P = P_new;
         T = solve_T_from_energy(P, sol.h0, sol.mdot, A, X, mw_kg, T, u, rho);
@@ -603,7 +607,18 @@ FannoSolution fanno_channel(
             if (M - M_prev > 1e-12) {
                 frac = (kFannoChokeMach - M_prev) / (M - M_prev);
             }
-            sol.L_choke = x - dx * (1.0 - std::clamp(frac, 0.0, 1.0));
+            const double w = std::clamp(frac, 0.0, 1.0);
+            sol.L_choke = x - dx * (1.0 - w);
+            // The outlet must land on the same station as L_choke. Leaving it
+            // at the overshooting step boundary snaps it to the march grid,
+            // and a caller differencing P - outlet.P then sees a staircase in
+            // m_dot -- the very thing interpolating L_choke avoids. Measured
+            // on the network's compressible channel residual: a 22% sawtooth
+            // in d(dP)/d(m_dot), which the Jacobian's 1e-6 relative FD step
+            // samples at random. See issue #352's sibling in #356.
+            P = P_prev + w * (P - P_prev);
+            T = T_prev + w * (T - T_prev);
+            x = sol.L_choke;
             break;
         }
         M_prev = M;
@@ -778,6 +793,11 @@ FannoSolution fanno_channel_rough(
         const double P_new = P + dx * (k1 + 2.0*k2 + 2.0*k3 + k4) / 6.0;
         if (P_new <= 0.0) { sol.choked = true; sol.L_choke = x + dx * P / (P - P_new); break; }
 
+        // Keep the pre-step values: if this step is the one that chokes, the
+        // outlet has to be interpolated back to the choke station alongside
+        // L_choke (see the choke block below).
+        const double P_prev = P;
+        const double T_prev = T;
         x += dx;
         P = P_new;
         T = solve_T_from_energy(P, sol.h0, sol.mdot, A, X, mw_kg, T, u, rho);
@@ -797,7 +817,15 @@ FannoSolution fanno_channel_rough(
             if (M - M_prev > 1e-12) {
                 frac = (kFannoChokeMach - M_prev) / (M - M_prev);
             }
-            sol.L_choke = x - dx * (1.0 - std::clamp(frac, 0.0, 1.0));
+            const double w = std::clamp(frac, 0.0, 1.0);
+            sol.L_choke = x - dx * (1.0 - w);
+            // Same reason as the constant-f march above: the outlet has to
+            // land on the choke station, not the overshooting step boundary.
+            // This is the variant the network's compressible channel residual
+            // calls, so the staircase landed straight in Newton's Jacobian.
+            P = P_prev + w * (P - P_prev);
+            T = T_prev + w * (T - T_prev);
+            x = sol.L_choke;
             break;
         }
         M_prev = M;
