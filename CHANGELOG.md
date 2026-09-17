@@ -220,6 +220,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The momentum chamber closed on incompressible Bernoulli.**
+  `MomentumChamberNode` enforced `Pt = P + 0.5*rho*v^2`, which under-predicts
+  the stagnation rise by 11% at M = 1.0 and 34% at M = 1.4 -- and does so
+  without bound past sonic, so a station driven transonic got a closure that
+  was both wrong and unable to say so. It now closes on the isentropic
+  stagnation state from entropy conservation with variable cp, which
+  `stagnation.h` already provided.
+
+  It is also a large convergence win where a root exists: the combustor network
+  behind #351 solves in 1.2 s where it took 18.3 s, because the correct
+  relation is 1.8 - 2.4x steeper through the transonic region and pushes Newton
+  out of that territory on physics rather than on a tuned penalty.
+
+  **The junction reference head follows.** `K` is tabulated as `dPt/q_dyn`, so
+  the reference has to be whatever the ports call their dynamic head. While the
+  node was incompressible the two agreed and their errors cancelled; correcting
+  the node alone would have left the two halves of a junction disagreeing about
+  one quantity. Both junction models now take the common port's own isentropic
+  rise, computed from its `P`, `rho` and `u` rather than from `Pt - P` -- the
+  same value at the solution, but it keeps the dependency set unchanged and so
+  preserves the one-`Pt`-per-row structure the assembled Jacobian relies on.
+  Taking it from `Pt - P` instead measured 7x slower.
+
+  `MpceGeometry` gains `gamma` per port, following the kernel's own rule that
+  the equation of state is evaluated at the call site where the mixture is
+  known. For an ideal gas `a^2 = g*P/rho`, so `M^2 = rho*u^2/(g*P)` and no
+  temperature is needed. Left at zero it falls back to the incompressible head,
+  so a caller that cannot supply one keeps its previous behaviour.
+
+  `MomentumChamberResult` gains `d_res_dT`: the incompressible form touched T
+  only through `rho`, weakly enough that the assembled Jacobian tolerated its
+  absence, which the stagnation closure does not. All derivatives are
+  FD-verified to ~1e-9, including reverse flow and the `m_dot = 0` symmetry
+  point.
+
+  Nine tests asserted `0.5*rho*v^2` directly. Each now asserts the compressible
+  rise **and** that it exceeds the incompressible value, so the relationship
+  between the two is pinned rather than just the new number. Three others had
+  lost their subject entirely -- the closure removed the pathology they were
+  built around -- and were re-derived rather than relaxed:
+
+  - the barrier-weight control now measures over a population, because the
+    traced case stopped discriminating at any size across twelve decades;
+    re-measured, the derived weight still beats the fixed fallback on 2 of 100
+    scaled junctions, so the machinery stays.
+  - the barrier fixed point is pinned at the element level, because the traced
+    case now converges at every alpha from 1e4 to 1e9 and never goes
+    wrong-direction, leaving no stalled iterate to read it from.
+  - the assembled-Jacobian check now gates on whether each finite difference
+    has converged, instead of an absolute floor that made it test roundoff on a
+    structurally zero term.
+
+  See issue #357.
+
+
 - **The Fanno march handed Newton a staircase, and the choke barrier hid it
   behind a bigger one.** Two defects in the compressible channel's drop, both
   in the region a solver has to cross.

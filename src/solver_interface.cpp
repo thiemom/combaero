@@ -505,12 +505,13 @@ T0_from_static_and_jacobian_M(double T, double M,
 
 std::tuple<double, double>
 P0_from_static_and_jacobian_M(double P, double T, double M,
-                               const std::vector<double> &X) {
+                               const std::vector<double> &X,
+                               double tol, std::size_t max_iter) {
   // Enforce non-negative M with a leaky floor for differentiability.
   double M_eff = (M >= 0.0) ? M : 0.01 * M;
   double dMeff_dM = (M >= 0.0) ? 1.0 : 0.01;
 
-  double P0 = P0_from_static(P, T, M_eff, X);
+  double P0 = P0_from_static(P, T, M_eff, X, tol, max_iter);
 
   // Chain rule: P0 = P * exp((s(T0) - s(T,P)) / R_specific)
   // where s(T0) = s(T0, X, P_REF) and T0 = T0_from_static(T, M_eff, X).
@@ -1372,29 +1373,75 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
   // Velocity from mass flow
   double v = m_dot / (rho * area);
 
-  // Dynamic pressure
-  double q_dynamic = 0.5 * rho * v * v;
-
-  // Residual: P_total - (P + q_dynamic) = 0
   MomentumChamberResult res;
-  res.residual = P_total - P - q_dynamic;
 
-  // Analytical Jacobians
-  // d(res)/d(P_total) = 1.0
+  // Compressible stagnation closure: Pt = P0(P, T, M), from entropy
+  // conservation s(T0, P0) = s(T, P) with variable cp, rather than the
+  // incompressible Pt = P + 0.5*rho*v^2.
+  //
+  // The incompressible form UNDER-predicts the stagnation rise, and it does so
+  // without bound past sonic -- 0.2% at M = 0.33 but 11% at M = 1.0 and 34% at
+  // M = 1.4 -- so a station driven transonic gets a closure that is both wrong
+  // and unable to say so. Measured on the network this was found in, the
+  // correct relation is also 1.8 - 2.4x steeper in dPt/dM through the
+  // transonic region, which pushes Newton back out of that territory on
+  // physics rather than on a hand-tuned penalty. See issue #357.
+  //
+  // The stagnation rise does not depend on flow direction, so the Mach number
+  // is taken on |v| and the sign is carried back into d(res)/d(m_dot); this
+  // keeps the residual even in m_dot exactly as 0.5*rho*v^2 was.
+  const double a_sound = combaero::speed_of_sound(T, X);
+  const double M_mag = (a_sound > 1e-9) ? std::abs(v) / a_sound : 0.0;
+
+  auto [P0, dP0_dM] = P0_from_static_and_jacobian_M(P, T, M_mag, X);
+
+  res.residual = P_total - P0;
+
+  // d(res)/d(P_total) = 1
   res.d_res_dP_total = 1.0;
 
-  // d(res)/d(P) = -1.0 - d(q_dynamic)/d(P)
-  // q_dynamic = 0.5 * m_dot^2 / (rho * A^2)
-  // d(q_dynamic)/d(P) = d(q_dynamic)/d(rho) * d(rho)/d(P)
-  //                   = -0.5 * m_dot^2 / (rho^2 * A^2) * drho_dP
-  double dq_dP = -0.5 * m_dot * m_dot / (rho * rho * area * area) * drho_dP;
-  res.d_res_dP = -1.0 - dq_dP;
+  // P0 = P * exp((s(T0) - s(T)) / R) at fixed (M, T, X), so dP0/dP = P0/P.
+  // M also moves with P through rho: M = |m_dot| / (rho * A * a), hence
+  // dM/dP = -(M / rho) * drho/dP.
+  const double dP0_dP_direct = (P > 1e-9) ? P0 / P : 1.0;
+  const double dM_dP = (rho > 1e-12) ? -(M_mag / rho) * drho_dP : 0.0;
+  res.d_res_dP = -(dP0_dP_direct + dP0_dM * dM_dP);
 
-  // d(res)/d(m_dot) = -d(q_dynamic)/d(m_dot)
-  // q_dynamic = 0.5 * m_dot^2 / (rho * A^2)
-  // d(q_dynamic)/d(m_dot) = m_dot / (rho * A^2)
-  double dq_dmdot = m_dot / (rho * area * area);
-  res.d_res_dmdot = -dq_dmdot;
+  // dM/d(m_dot) = sign(m_dot) / (rho * A * a); the sign restores the even
+  // dependence the magnitude discarded.
+  const double dM_dmdot_mag =
+      (rho > 1e-12 && area > 1e-12 && a_sound > 1e-9)
+          ? 1.0 / (rho * area * a_sound)
+          : 0.0;
+  const double sgn = (m_dot >= 0.0) ? 1.0 : -1.0;
+  res.d_res_dmdot = -dP0_dM * dM_dmdot_mag * sgn;
+
+  // d(res)/dT. T enters P0 three ways -- through T0, through a(T) in the Mach
+  // number, and through s(T) in the entropy balance -- and also through rho in
+  // the velocity. Hand-deriving that chain invites a silent sign error, so it
+  // is taken as a central difference on the residual itself, which is what
+  // channel_compressible_mdot_and_jacobian already does for its own T and P
+  // sensitivities.
+  //
+  // This is safe here in a way it was NOT for the Fanno march (#356): the
+  // entropy solve underlying P0_from_static is smooth through M = 1 -- a local
+  // difference tracks its analytic dP0/dM to a flat 0.9995 across the sonic
+  // point, with no staircase -- so there is no inner discretisation for the
+  // difference to pick up. It stays inside C++; the Python API still receives
+  // a derivative rather than computing one.
+  {
+    const double hT = std::max(1e-4, std::abs(T) * 1e-6);
+    auto res_at = [&](double T_probe) -> double {
+      auto [rho_p, drho_dT_p, drho_dP_p] = density_and_jacobians(T_probe, P, X);
+      (void)drho_dT_p;
+      (void)drho_dP_p;
+      const double v_p = m_dot / (rho_p * area);
+      const double a_p = combaero::speed_of_sound(T_probe, X);
+      const double M_p = (a_p > 1e-9) ? std::abs(v_p) / a_p : 0.0;
+      return P_total - P0_from_static(P, T_probe, M_p, X);
+    };
+    res.d_res_dT = (res_at(T + hT) - res_at(T - hT)) / (2.0 * hT);
+  }
 
   return res;
 }

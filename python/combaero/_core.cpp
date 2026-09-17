@@ -357,7 +357,8 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("d_res_dP", &solver::MomentumChamberResult::d_res_dP)
       .def_readonly("d_res_dP_total",
                     &solver::MomentumChamberResult::d_res_dP_total)
-      .def_readonly("d_res_dmdot", &solver::MomentumChamberResult::d_res_dmdot);
+      .def_readonly("d_res_dmdot", &solver::MomentumChamberResult::d_res_dmdot)
+      .def_readonly("d_res_dT", &solver::MomentumChamberResult::d_res_dT);
 
   m.def("orifice_residuals_and_jacobian",
         &solver::orifice_residuals_and_jacobian, py::arg("m_dot"),
@@ -420,7 +421,8 @@ PYBIND11_MODULE(_core, m) {
       .def_readwrite("port_sign", &solver::MpceGeometry::port_sign)
       .def_readwrite("joining_etransfer_alpha",
                      &solver::MpceGeometry::joining_etransfer_alpha)
-      .def_readwrite("eta_scale", &solver::MpceGeometry::eta_scale);
+      .def_readwrite("eta_scale", &solver::MpceGeometry::eta_scale)
+      .def_readwrite("gamma", &solver::MpceGeometry::gamma);
 
   py::class_<solver::MpceResidualJacobian>(
       m, "MpceResidualJacobian",
@@ -6003,6 +6005,7 @@ PYBIND11_MODULE(_core, m) {
   m.def(
       "P0_from_static_and_jacobian_M", &solver::P0_from_static_and_jacobian_M,
       py::arg("P"), py::arg("T"), py::arg("M"), py::arg("X"),
+      py::arg("tol") = 1e-8, py::arg("max_iter") = 50,
       "Calculate Stagnation Pressure from Static and its Jacobian w.r.t Mach.");
 
   m.def("friction_and_jacobian_haaland", &solver::friction_and_jacobian_haaland,

@@ -92,6 +92,25 @@ def scaled_penalty_alpha(ref_pressure: float, ref_mdot: float) -> float:
     return float(ref_pressure / (slack * slack))
 
 
+def _port_gamma(state) -> float:
+    """Ratio of specific heats at a port, or 0.0 when the state cannot give one.
+
+    Evaluated on the Python side because this is where the mixture is known --
+    the same rule the MPCE kernel applies to rho and drho_dp. Minimal state
+    stand-ins used in unit tests carry Pt, P and density but no temperature or
+    composition; 0.0 tells the kernel to use the incompressible reference head,
+    so those callers keep exactly the behaviour they had.
+    """
+    T = getattr(state, "T", None)
+    X = getattr(state, "X", None)
+    if T is None or X is None:
+        return 0.0
+    try:
+        return float(_core.isentropic_expansion_coefficient(float(T), X))
+    except Exception:
+        return 0.0
+
+
 class MultiPortChamberElement(MultiPortChamberBase):
     """Mynard Unified0D residual on MPCE-v1's topology framework.
 
@@ -680,6 +699,14 @@ class MultiPortChamberElement(MultiPortChamberBase):
         geom.port_sign = [float(s) for s in self._port_signs]
         geom.joining_etransfer_alpha = float(self.joining_etransfer_alpha)
         geom.eta_scale = float(self.eta_scale)
+        # Ratio of specific heats per port, so the kernel can form the
+        # compressible reference head. Evaluated here because this is where the
+        # mixture is known -- the same rule the kernel applies to rho and
+        # drho_dp. See issue #357.
+        # A state without a temperature or composition cannot give gamma; the
+        # kernel treats a non-positive value as "fall back to the incompressible
+        # head", which is the behaviour such a caller had before.
+        geom.gamma = [_port_gamma(st) for st in states]
 
         kernel = _core.mpce_residuals_and_jacobian(
             p_static,
@@ -814,12 +841,50 @@ class ConstantKTeeElement(MultiPortChamberElement):
         P_c = float(states[common].P)
         T_c = float(states[common].T)
         m_c = float(port_mdots[common])
+        # Reference head = the common port's isentropic stagnation rise, so it
+        # matches what the port MomentumChamberNode calls dynamic head. K is
+        # tabulated as dPt/q_dyn, and the incompressible 0.5*rho*u^2 this
+        # replaced drifts from the real rise above M ~ 0.3 (11% at M = 1.0).
+        # It reduces to 0.5*rho*u^2 as M -> 0, i.e. where the K data was taken.
+        #
+        # Taken from the port's OWN state rather than Pt_c - P_c: the latter is
+        # the same value at the solution but puts the common port's Pt into
+        # every other port's row, which breaks the one-Pt-per-row structure of
+        # the assembled Jacobian. Here the dependency set is unchanged -- P, T
+        # and m_dot of the common port. See issue #357.
+        g_c = float(_core.isentropic_expansion_coefficient(T_c, states[common].X))
         q_dyn = m_c * m_c / (2.0 * rho_c * A_c * A_c)
         dq_dm = m_c / (rho_c * A_c * A_c)
-        # q ~ 1/rho with rho ~ P/T (near-ideal gas): d q/dP = -q/P and
-        # d q/dT = +q/T at the common port's static state.
         dq_dP = -q_dyn / P_c if P_c > 0.0 else 0.0
         dq_dT = q_dyn / T_c if T_c > 0.0 else 0.0
+        if g_c > 1.0 and P_c > 0.0 and rho_c > 0.0:
+
+            def _q(P_x: float, T_x: float, m_x: float) -> float:
+                """Isentropic stagnation rise of the common port's own state.
+
+                M^2 = rho*u^2/(g*P) for an ideal gas (a^2 = g*P/rho), so no
+                temperature is needed beyond what gamma and rho carry.
+                """
+                g = float(_core.isentropic_expansion_coefficient(T_x, states[common].X))
+                rho_x = float(_core.density(T_x, P_x, states[common].X))
+                m2 = (m_x * m_x) / (rho_x * A_c * A_c * g * P_x)
+                return P_x * ((1.0 + 0.5 * (g - 1.0) * m2) ** (g / (g - 1.0)) - 1.0)
+
+            q_dyn = _q(P_c, T_c, m_c)
+            # dq/dP and dq/dm are analytic; dq/dT is differenced because gamma
+            # itself varies with T and freezing it costs ~3e-5 relative here
+            # (and ~1e-2 at M ~ 1.1), which the assembled Jacobian check sees.
+            # The expression is a cheap closed form with no inner solve, so the
+            # difference is clean -- unlike the Fanno march in #356.
+            m2 = (m_c * m_c) / (rho_c * A_c * A_c * g_c * P_c)
+            k = 0.5 * (g_c - 1.0)
+            n = g_c / (g_c - 1.0)
+            base = 1.0 + k * m2
+            dq_dm2 = P_c * n * k * base ** (n - 1.0)
+            dq_dm = dq_dm2 * (2.0 * m2 / m_c) if m_c != 0.0 else 0.0
+            dq_dP = q_dyn / P_c + dq_dm2 * (-2.0 * m2 / P_c)
+            h_T = max(1e-4, abs(T_c) * 1e-6)
+            dq_dT = (_q(P_c, T_c + h_T, m_c) - _q(P_c, T_c - h_T, m_c)) / (2.0 * h_T)
 
         residuals: list[float] = []
         jac: dict[int, dict[str, float]] = {}

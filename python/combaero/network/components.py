@@ -1146,6 +1146,12 @@ class MomentumChamberNode(NetworkNode):
             0: {
                 f"{self.id}.P": result.d_res_dP,
                 f"{self.id}.Pt": result.d_res_dP_total,
+                # T is not an unknown at this node; the solver relays the
+                # entry through the propagation chain (see the "." branch in
+                # _residuals_and_jacobian). The compressible closure depends on
+                # T through T0, a(T) and s(T), not just through rho, so the
+                # term is no longer small enough to omit.
+                f"{self.id}.T": result.d_res_dT,
             }
         }
 

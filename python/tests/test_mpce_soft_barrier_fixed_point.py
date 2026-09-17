@@ -42,9 +42,13 @@ import warnings
 import numpy as np
 import pytest
 
+import combaero as cb
 from combaero.network import NetworkSolver
+from combaero.network.components import NetworkMixtureState
 from combaero.network.mpce_element import MultiPortChamberElement
 from validation.junction import random_robustness as rr
+
+_Y = list(cb.species.dry_air_mass())
 
 _TRACED_SEED = 20260906
 
@@ -102,33 +106,65 @@ def test_the_penalty_shares_a_row_with_the_continuity_relation():
     assert len(element.port_nodes) + 1 == 4
 
 
-def test_the_barrier_fixed_point_follows_the_closed_form(traced_case):
+def test_the_barrier_fixed_point_follows_the_closed_form():
     """slack* = sqrt(dP / alpha). Measured against the formula rather than
-    against a recorded number, so it pins the mechanism and not an output."""
-    sol = _solve(traced_case, 1.0e7)
+    against a recorded number, so it pins the mechanism and not an output.
 
-    assert not sol["__success__"], "the old weight is expected to fail here"
-    names = list(sol["__unknown_names__"])
-    x = np.array(sol["__x_solution__"])
+    Evaluated on the element directly. This used to force the traced case with
+    the old weight, assert the solve failed, and read the fixed point off the
+    stalled iterate. That no longer works: with the compressible stagnation
+    closure at the port momentum chambers (#357) the traced case converges at
+    every alpha from 1e4 to 1e9 and never goes wrong-direction, so there is no
+    stalled iterate to inspect and the barrier term is identically zero -- the
+    quantity the old test read back was an ordinary port flow, not a slack.
 
-    # Two quantities measured independently of each other: the slack comes
-    # from a mass-flow unknown, dP from two pressure unknowns. The claim is
-    # that the barrier balances one against the other.
-    slack = abs(float(x[names.index("lc_str.m_dot")]))
-    dP = abs(float(x[names.index("port_str.Pt")]) - float(x[names.index("jct.P_jct")]))
-    assert slack > 0.0 and dP > 0.0
+    The barrier itself is still live (invoked 32 times across 40 sampled
+    junctions), so the mechanism is worth pinning; it just has to be pinned
+    where it is deterministic rather than where a solve happens to stall.
+    """
+    element = MultiPortChamberElement(
+        id="jct",
+        inlet_nodes=["a", "b"],
+        outlet_nodes=["c"],
+        inlet_angles_deg=[0.0, 90.0],
+        outlet_angles_deg=[0.0],
+        port_areas=[0.01, 0.01, 0.01],
+        flow_direction="merge",
+        strict=False,
+    )
+    element.soft_penalty_alpha = 1.0e7
+    alpha = element.effective_penalty_alpha()
+    assert alpha == pytest.approx(1.0e7)
 
-    predicted = math.sqrt(dP / 1.0e7)
-    assert predicted == pytest.approx(slack, rel=0.25), (
-        f"slack {slack:.6f} kg/s against sqrt(dP/alpha) = {predicted:.6f} "
-        f"for dP = {dP:.1f} Pa: the barrier is not balancing the pressure error"
+    Pt_jct = 100_300.0
+    dP = 2_500.0
+    slack_star = math.sqrt(dP / alpha)
+
+    # Port 0 is an inlet for a merge, so its canonical sign wants m_dot < 0.
+    # Put it wrong-direction with exactly the predicted slack, and place its
+    # Pt the predicted pressure error below the junction.
+    e0 = float(element._port_signs[0])
+    port_mdots = [-e0 * slack_star, -0.04, 0.10]
+    states = [
+        NetworkMixtureState(P=98_000.0, Pt=Pt_jct - dP, T=300.0, Tt=300.5, m_dot=0.0, Y=list(_Y)),
+        NetworkMixtureState(P=98_000.0, Pt=Pt_jct, T=300.0, Tt=300.5, m_dot=0.0, Y=list(_Y)),
+        NetworkMixtureState(P=98_000.0, Pt=Pt_jct, T=300.0, Tt=300.5, m_dot=0.0, Y=list(_Y)),
+    ]
+
+    residuals, _ = element._soft_barrier_residual(states, Pt_jct, port_mdots)
+
+    # R_0 = (Pt_0 - Pt_jct) + alpha * slack^2 = -dP + alpha * (dP/alpha) = 0.
+    assert residuals[0] == pytest.approx(0.0, abs=1e-6 * dP), (
+        f"slack* = sqrt(dP/alpha) = {slack_star:.6f} kg/s did not zero the "
+        f"barrier row for dP = {dP:.1f} Pa: got {residuals[0]:.6e}"
     )
 
-    # And the balance point is a large fraction of the flow, which is why the
-    # sign flip the barrier is supposed to enable never happens.
-    m_com = abs(float(x[names.index("lc_com.m_dot")]))
-    assert slack / m_com > 0.3, (
-        f"the fixed point sat at {100.0 * slack / m_com:.1f}% of the common flow"
+    # And it is genuinely the penalty doing it: halve the slack and the row
+    # must no longer balance.
+    off, _ = element._soft_barrier_residual(states, Pt_jct, [-e0 * 0.5 * slack_star, -0.04, 0.10])
+    assert abs(off[0]) > 0.5 * dP, (
+        "the row balanced without the penalty carrying it; the fixed point is "
+        "not the mechanism this test claims"
     )
 
 
