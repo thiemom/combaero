@@ -1267,11 +1267,45 @@ class PressureBoundary(NetworkNode):
         Pt: float = 101325.0,
         Tt: float = 300.0,
         Y: list[float] | None = None,
+        coupling: str = "auto",
     ) -> None:
         super().__init__(id)
         self.Pt = Pt
         self.Tt = Tt
         self.Y = Y
+        #: How the supplied pressure couples to a duct meeting this boundary.
+        #:
+        #: ``"total"``   -- it is the stagnation pressure at the connection.
+        #:                  Correct for an INFLOW: a reservoir supplying the
+        #:                  network, where Pt is what the reservoir holds.
+        #: ``"static"``  -- it is the static pressure at the duct face, and the
+        #:                  duct's exit dynamic head is dissipated in the
+        #:                  expansion. The standard model for a bare duct
+        #:                  discharging into a plenum or to atmosphere.
+        #: ``"auto"``    -- infer from flow direction: inflow takes total,
+        #:                  outflow takes static.
+        #:
+        #: ``auto`` is well defined wherever a boundary has one role. It cannot
+        #: decide for a boundary whose flow REVERSES during a solve, or that
+        #: serves both roles -- inflow wants total, outflow wants static, and
+        #: there is no single right answer. That case is what the explicit
+        #: setting is for; whoever builds such a network knows whether the exit
+        #: is a plain opening or a diffuser, and the solver does not.
+        #:
+        #: Pinning stagnation pressure at an outflow caps the mass flux at the
+        #: sonic value FOR THAT PRESSURE, a constraint the physical problem
+        #: never imposed. Measured on the combustor of #351: 1.34x an
+        #: impossible ceiling under total coupling, M = 0.752 and comfortable
+        #: under static. See issue #360.
+        self.coupling: str = coupling
+
+    def exit_head_lost(self, is_outflow: bool) -> bool:
+        """Whether a duct meeting this boundary loses its exit dynamic head."""
+        if self.coupling == "static":
+            return True
+        if self.coupling == "total":
+            return False
+        return bool(is_outflow)
 
     def unknowns(self) -> list[str]:
         return []
@@ -2669,6 +2703,19 @@ class ChannelElement(NetworkElement):
         # through rho here, which the solver sees via the node states.
         return res, jac
 
+    def _exit_head_lost(self, m_dot: float) -> bool:
+        """Whether this channel's exit dynamic head is lost downstream.
+
+        Only a PressureBoundary declares a coupling; anything else (a plenum, a
+        momentum chamber, a junction port) carries its own constitutive
+        relation and receives the stagnation pressure as before. See #360.
+        """
+        node = getattr(self, "_downstream_node", None)
+        if node is None or not hasattr(node, "exit_head_lost"):
+            return False
+        # Flow leaving this element toward the boundary is an OUTflow at it.
+        return bool(node.exit_head_lost(m_dot >= 0.0))
+
     def residuals(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> list[float]:
@@ -2697,6 +2744,7 @@ class ChannelElement(NetworkElement):
                 self.roughness,
                 self.friction_model,
                 f_mult,
+                self._exit_head_lost(m_dot),
             )
         else:
             # Use incompressible Darcy-Weisbach formulation. Density
@@ -2897,6 +2945,9 @@ class ChannelElement(NetworkElement):
         return 1
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
+        # Cached for the exit-coupling lookup in residuals (#360); done before
+        # the early return so it is set even when the diameter is explicit.
+        self._downstream_node = graph.nodes.get(self.to_node)
         if self.diameter is not None:
             return
         # Inherit diameter from the nearest geometry source. The channel's

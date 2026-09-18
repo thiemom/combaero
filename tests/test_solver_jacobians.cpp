@@ -341,6 +341,19 @@ TEST(SolverJacobianTest, OrificeCompressibleDerivatives) {
 }
 
 TEST(SolverJacobianTest, PipeCompressibleDerivatives) {
+  // The compressible channel derives its inlet STATIC state by inverting
+  // (Pt, Tt, m_dot, A) -- a root find whose stagnation relations are
+  // themselves iterative to 1e-8 (issue #359). The chain rule runs through
+  // that inversion by central difference, so the reported derivative tracks a
+  // finite difference to ~1e-7 rather than to machine precision: the floor is
+  // the inner solves' own tolerance, not the step, and larger steps do not
+  // move it.
+  //
+  // This is a deliberate reduction in derivative PRECISION, not in
+  // correctness. Before the chain went through the inversion the same
+  // comparison was off by 4.7e-2, 3.1e-2 and 2.9e-2 -- five orders worse --
+  // because it treated the march's inputs as the element's unknowns.
+  constexpr double kCompressiblePipeJacTol = 1e-6;
   std::size_t ns = num_species();
   std::vector<double> Y(ns, 0.0);
   for (size_t i = 0; i < ns; ++i) {
@@ -372,7 +385,7 @@ TEST(SolverJacobianTest, PipeCompressibleDerivatives) {
   double fd_dmdot = (res_m_p.dP_calc - res_m_m.dP_calc) / (2.0 * eps_m);
   report_jacobian_difference("PipeCompressibleDerivatives", "d_dP_d_mdot",
                              res.d_dP_d_mdot, fd_dmdot);
-  EXPECT_NEAR(res.d_dP_d_mdot, fd_dmdot, std::abs(fd_dmdot) * 1e-8 + 1e-12);
+  EXPECT_NEAR(res.d_dP_d_mdot, fd_dmdot, std::abs(fd_dmdot) * kCompressiblePipeJacTol + 1e-12);
 
   double eps_P = 1.0;
   auto res_P_p = channel_compressible_residuals_and_jacobian(
@@ -384,7 +397,7 @@ TEST(SolverJacobianTest, PipeCompressibleDerivatives) {
   double fd_dP = (res_P_p.dP_calc - res_P_m.dP_calc) / (2.0 * eps_P);
   report_jacobian_difference("PipeCompressibleDerivatives", "d_dP_dP_static_up",
                              res.d_dP_dP_static_up, fd_dP);
-  EXPECT_NEAR(res.d_dP_dP_static_up, fd_dP, std::abs(fd_dP) * 1e-8 + 1e-12);
+  EXPECT_NEAR(res.d_dP_dP_static_up, fd_dP, std::abs(fd_dP) * kCompressiblePipeJacTol + 1e-12);
 
   double eps_T = 1e-3;
   auto res_T_p = channel_compressible_residuals_and_jacobian(
@@ -396,7 +409,7 @@ TEST(SolverJacobianTest, PipeCompressibleDerivatives) {
   double fd_dT = (res_T_p.dP_calc - res_T_m.dP_calc) / (2.0 * eps_T);
   report_jacobian_difference("PipeCompressibleDerivatives", "d_dP_dT_up",
                              res.d_dP_dT_up, fd_dT);
-  EXPECT_NEAR(res.d_dP_dT_up, fd_dT, std::abs(fd_dT) * 1e-8 + 1e-12);
+  EXPECT_NEAR(res.d_dP_dT_up, fd_dT, std::abs(fd_dT) * kCompressiblePipeJacTol + 1e-12);
 }
 
 TEST(SolverJacobianTest, MomentumChamberDerivatives) {

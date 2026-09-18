@@ -220,6 +220,12 @@ NozzleSolution nozzle_cd(
 // singularity (dP/dx -> -inf as M -> 1).
 constexpr double kFannoChokeMach = 0.999;
 
+// Floor on (1 - M^2) in the Fanno gradient. The gradient is genuinely singular
+// at M = 1; the march's choke detection is what should stop the integration,
+// so this only keeps an infinity out of the RK4 stages on the way there.
+// 1 - 0.999^2 = 2.0e-3, so this sits an order below the choke threshold.
+constexpr double kFannoGradientFloor = 2.0e-4;
+
 // Result of Fanno flow calculation at a single station
 struct FannoStation {
     double x   = 0.0;    // Position along channel [m]
