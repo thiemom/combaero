@@ -30,10 +30,20 @@ Run:  uv run python -m validation.cooling.verify
 
 from __future__ import annotations
 
+import argparse
 import math
 from dataclasses import dataclass
+from pathlib import Path
 
-from validation.cooling.schema import Point, SeriesMetadata, load_dataset, load_points
+import yaml
+
+from validation.cooling.schema import (
+    Point,
+    SeriesMetadata,
+    SourceMetadata,
+    load_dataset,
+    load_points,
+)
 
 # A digitised point may sit slightly outside the outermost tick: the axis
 # usually runs a little past it, and the mark has width. Wide enough to
@@ -265,7 +275,60 @@ def render(findings: list[Finding]) -> str:
     return "\n".join(lines).lstrip("\n")
 
 
+def check_candidate(csv_path: Path, card_path: Path) -> list[Finding]:
+    """Check a freshly digitised CSV before it joins the dataset.
+
+    The workflow the cards are for is digitise -> check -> commit, not
+    commit -> discover. This runs the same checks against a loose file and
+    a loose card, so a bad calibration is caught while the figure is still
+    open rather than after it is in the tree.
+    """
+    card = yaml.safe_load(card_path.read_text())
+    series = SeriesMetadata(
+        path=csv_path,
+        source=SourceMetadata(name="candidate", citation="(not yet filed)",
+                              secondary=True),
+        after=None,
+        page=None,
+        item=card.get("item", "(candidate)"),
+        series=card.get("series", csv_path.stem),
+        geometry=None,
+        alpha_deg=None,
+        x_axis=card.get("x_axis", "e_plus"),
+        x_scale=float(card.get("x_scale", 1.0)),
+        y_axis=card.get("y_axis", "G"),
+        kind=card.get("kind", "correlation"),
+        extraction="figure-digitised",
+        confidence="band",
+        uncertainty=card.get("uncertainty"),
+        cross_check="(candidate; not yet recorded)",
+        scores=None,
+        verification=card.get("verification", card),
+    )
+    return check_series(series)
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Check digitised series against their figure cards."
+    )
+    parser.add_argument(
+        "--candidate",
+        type=Path,
+        help="a freshly digitised CSV, not yet in the dataset",
+    )
+    parser.add_argument(
+        "--card",
+        type=Path,
+        help="the figure card for --candidate, as a YAML file",
+    )
+    args = parser.parse_args()
+
+    if args.candidate:
+        if not args.card:
+            parser.error("--candidate needs --card")
+        print(render(check_candidate(args.candidate, args.card)))
+        return
     print(render(check_all()))
 
 
