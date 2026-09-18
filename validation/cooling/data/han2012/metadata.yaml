@@ -307,6 +307,75 @@ files:
       expected_points: null
     scores: null
 
+  # -- Figure 4.46 panel frames: distortion standards, not data ----------
+  #
+  # A plot frame is horizontal by construction, so its fitted slope is the
+  # panel's distortion and nothing else. Unlike a printed equation it does
+  # not assume the draftsman drew the equation faithfully -- which is the
+  # very thing in question when a line and its label disagree.
+  #
+  # Both panels come out flat to picking noise (upper +0.00078, lower
+  # -0.00036, neither monotonic), against the drawn R line's +0.00857.
+  # That is what establishes the R rise as drafting rather than scan skew.
+
+  - path: fig4.46_frame_upper.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    item: "Figure 4.46 upper panel, bottom frame line"
+    series: "panel frame, picked as a distortion standard"
+    geometry: null
+    alpha_deg: null
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: frame_position
+    kind: frame
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Slope must be zero: the frame is horizontal by construction. Measured
+      +0.00078, non-monotonic. The frame also lands at y = 7.65, just below
+      the lowest labelled tick of 8, which confirms the ordinate
+      calibration from a direction the tick marks cannot.
+    scores: null
+    verification:
+      kind: frame
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: []
+      frame_tolerance: 0.002
+      monotonic: null
+      expected_points: null
+
+  - path: fig4.46_frame_lower.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    item: "Figure 4.46 lower panel, bottom frame line"
+    series: "panel frame, picked as a distortion standard"
+    geometry: null
+    alpha_deg: null
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: frame_position
+    kind: frame
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Slope must be zero. Measured -0.00036, non-monotonic, and NEGATIVE
+      while the R line drawn in this same panel rises at +0.00857 -- 23x
+      the distortion and in the opposite direction. This is the measurement
+      that rules out scan skew as the explanation for extraction item 7.
+    scores: null
+    verification:
+      kind: frame
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: []
+      frame_tolerance: 0.002
+      monotonic: null
+      expected_points: null
+
 # The Han and Zhang (1992) rig geometry (e/D, P/e, W/H) is NOT stated in the
 # extracted text and is recorded as missing rather than guessed. It costs
 # nothing for han_1988_orthogonal, whose G carries zero exponents on all

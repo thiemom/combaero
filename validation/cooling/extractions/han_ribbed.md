@@ -877,6 +877,7 @@ than extrapolating past it.
 
 | date | reviewer | outcome |
 |---|---|---|
+| 2026-09-18 | reviewer + Claude | **Item 7 closed with evidence, not deference.** D1 stands, but the reason improves: the `R` slope is in the DRAWING, not the scan. Both panel frames were digitised as distortion standards -- a frame is horizontal by construction, so its fitted slope is the panel's distortion and nothing else, and unlike a printed equation it does not presume the draftsman drew the equation faithfully. Upper frame `+0.00078`, lower frame `-0.00036`, neither monotonic, i.e. picking noise. The drawn `R` line rises at `+0.00857` -- **23x the distortion of the panel it sits in, and in the opposite direction**. No page skew lifts `R` by 2.7% while leaving its own frame flat to 0.04%. Independently, `G_bar` in the upper panel reproduces its printed `4.5 (e+)^0.28` to 0.25% RMS off the same scan. Filed as `validation/cooling/data/han2012/fig4.46_frame_*.csv`. |
 | 2026-09-10 | extracted by Claude | UNCONFIRMED -- submitted for review |
 | 2026-09-10 | reviewer | **CONFIRMED.** All items checked against the book or resolved by derivation; no open flags. D1 and D2 accepted, D3 withdrawn. Released for implementation under #334. |
 | 2026-09-10 | reviewer | re-read the layout: the trailing `* f_bar` is a full stop plus the next sentence's subject on the same line. Han prints `f = f_bar + (H/W)(f_bar - f_s)`, matching the derivation. **D3 withdrawn** -- no departure from the source exists. |

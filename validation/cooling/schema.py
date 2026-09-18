@@ -21,7 +21,7 @@ import yaml
 
 DATA_ROOT = Path(__file__).parent / "data"
 
-Kind = Literal["measured", "correlation"]
+Kind = Literal["measured", "correlation", "frame"]
 Extraction = Literal["tabulated", "figure-digitised"]
 Confidence = Literal["exact", "band"]
 

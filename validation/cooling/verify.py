@@ -74,6 +74,16 @@ def _span(ticks: list[float], multiplier: float) -> tuple[float, float]:
     return lo - pad, hi + pad
 
 
+def _power_slope(points: list[Point]) -> float:
+    """Least-squares exponent of a power law through the points."""
+    n = len(points)
+    sx = sum(math.log(p.x) for p in points)
+    sy = sum(math.log(p.y) for p in points)
+    sxx = sum(math.log(p.x) ** 2 for p in points)
+    sxy = sum(math.log(p.x) * math.log(p.y) for p in points)
+    return (n * sxy - sx * sy) / (n * sxx - sx * sx)
+
+
 def _evaluate_printed(spec: dict, x: float) -> float:
     """The curve the figure prints, at x."""
     if "constant" in spec:
@@ -175,12 +185,7 @@ def check_series(series: SeriesMetadata) -> list[Finding]:
     expected_exp = card.get("printed_exponent")
     if expected_exp is not None:
         tol = float(card.get("exponent_tolerance", 0.03))
-        n = len(points)
-        sx = sum(math.log(p.x) for p in points)
-        sy = sum(math.log(p.y) for p in points)
-        sxx = sum(math.log(p.x) ** 2 for p in points)
-        sxy = sum(math.log(p.x) * math.log(p.y) for p in points)
-        fitted = (n * sxy - sx * sy) / (n * sxx - sx * sx)
+        fitted = _power_slope(points)
         out.append(
             Finding(
                 label,
@@ -203,7 +208,31 @@ def check_series(series: SeriesMetadata) -> list[Finding]:
             )
         )
 
-    # 5. Double-picked marks.
+    # 5. Panel distortion, measured on a frame line.
+    #
+    # A plot frame is horizontal BY CONSTRUCTION, so its fitted slope is
+    # the panel's distortion and nothing else. This is a better yardstick
+    # than a printed equation, which assumes the draftsman drew the
+    # equation faithfully -- exactly what is in question when a line and
+    # its label disagree. Figure 4.46 is the case: its R line rises 2.7%
+    # against a label reading "= 3.2", and the frame of the panel it is
+    # drawn in is flat to -0.00036, so the rise is in the drawing rather
+    # than the scan.
+    if card.get("kind") == "frame" or series.kind == "frame":
+        tol = float(card.get("frame_tolerance", 0.002))
+        fitted = _power_slope(points)
+        out.append(
+            Finding(
+                label,
+                "frame-slope",
+                abs(fitted) <= tol,
+                f"frame is horizontal by construction; measured slope "
+                f"{fitted:+.5f} (tolerance {tol:g}) -- this is the panel's "
+                f"distortion, use it to judge every other line in the panel",
+            )
+        )
+
+    # 6. Double-picked marks.
     xs = [p.x for p in points]
     ys = [p.y for p in points]
     x_span = max(xs) - min(xs) or 1.0
@@ -224,7 +253,7 @@ def check_series(series: SeriesMetadata) -> list[Finding]:
         )
     )
 
-    # 6. Declared monotonicity, where the physics or the figure demands it.
+    # 7. Declared monotonicity, where the physics or the figure demands it.
     trend = card.get("monotonic")
     if trend in ("increasing", "decreasing"):
         ordered = sorted(points, key=lambda p: p.x)
