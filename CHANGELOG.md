@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Figure 4.46 digitised: `han_1988_orthogonal` validated against its own
+  source.** 23 series -- both panels, all ten symbol classes, the three
+  drawn correlation lines -- plus both panel frames as distortion
+  standards. Pooled, the lower panel sits at **+0.1% bias across 64
+  points** against the printed `R/(P/e/10)^0.35 = 3.2`.
+
+  **Scoring is pooled, not per-class.** Symbols on the figure overlap and
+  a mark cannot always be assigned to its class; some runs appear in only
+  one panel. That costs nothing here, because the set carries zero
+  geometry exponents in both `R` and `G` -- Han normalised `P/e` out of the
+  R ordinate himself and `W/H` drops at 90 degrees -- so every class must
+  land on one curve. Class labels are kept as provenance, marked
+  provisional, rather than as something the scoring leans on.
+
+  **Han's stated accuracy is a standard deviation, not a 95% bound.** The
+  book says "within 6% for 95% of the data"; the digitised cloud puts 70%
+  inside 6% with sd 5.9%, which is 1 sigma. Harness tolerances are set
+  from the measured figure. A test pins it, because the alternative
+  reading would justify a band twice as wide, and a band twice as wide is
+  how a real error hides.
+
 - **Digitised series are cross-verified against a figure card.** `uv run
   python -m validation.cooling.verify` checks every series against what the
   printed axes and equations say, read off the page independently of where

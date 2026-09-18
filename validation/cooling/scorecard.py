@@ -70,11 +70,38 @@ def build(records: list[Record]) -> list[Cell]:
     return cells
 
 
+def pool(records: list[Record], prefix: str) -> tuple:
+    """Aggregate every series whose label starts with prefix.
+
+    Where class attribution is provisional -- overlapping symbols, marks
+    that appear in only one panel -- the pooled cloud is what the scoring
+    should rest on. For a set with no geometry exponents every class must
+    land on one curve anyway, so pooling costs nothing and removes a
+    dependence on labels that cannot be fully trusted.
+    """
+    errs = [r.rel_error for r in records
+            if r.series.label.startswith(prefix) and r.rel_error is not None]
+    if not errs:
+        return (0, float("nan"), float("nan"), float("nan"), float("nan"))
+    within = [r for r in records
+              if r.series.label.startswith(prefix) and r.rel_error is not None
+              and r.within_uncertainty]
+    mean = sum(errs) / len(errs)
+    return (
+        len(errs),
+        sum(abs(e) for e in errs) / len(errs),
+        math.sqrt(sum(e * e for e in errs) / len(errs)),
+        mean,
+        len(within) / len(errs),
+    )
+
+
 def _pct(v: float) -> str:
     return "-" if math.isnan(v) else f"{v * 100:6.1f}%"
 
 
-def render(cells: list[Cell]) -> str:
+def render(cells: list[Cell], pools: dict | None = None) -> str:
+    pools = pools or {}
     head = (
         f"{'series':<44} {'kind':<12} {'N':>3} {'scored':>6} "
         f"{'MAE':>7} {'RMSE':>7} {'bias':>7} {'within':>7} {'extrap':>6}"
@@ -87,6 +114,14 @@ def render(cells: list[Cell]) -> str:
             f"{c.n_extrapolated:>6}"
         )
     unsupported = [c for c in cells if c.unsupported]
+    if pools:
+        lines.append("")
+        lines.append("Pooled (the scored path where class attribution is provisional):")
+        for name, (n, mae, rmse, bias, within) in sorted(pools.items()):
+            lines.append(
+                f"  {name:<44} {'':<12} {n:>3} {n:>6} "
+                f"{_pct(mae)} {_pct(rmse)} {_pct(bias)} {_pct(within)}"
+            )
     if unsupported:
         lines.append("")
         lines.append("Not scored:")
@@ -100,7 +135,12 @@ def main() -> None:
     from validation.cooling.schema import load_dataset
 
     dataset = load_dataset()
-    print(render(build(run_all(dataset))))
+    records = run_all(dataset)
+    pools = {
+        "han2012/fig4.46_R_*  (lower panel)": pool(records, "han2012/fig4.46_R_eD"),
+        "han2012/fig4.46_G_*  (upper panel)": pool(records, "han2012/fig4.46_G_eD"),
+    }
+    print(render(build(records), pools))
 
 
 if __name__ == "__main__":

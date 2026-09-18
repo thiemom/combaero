@@ -131,8 +131,13 @@ def _assert_geometry_free(rib_set: "cb.RibCorrelationSet") -> None:
 
 def _g_at_eplus(
     rib_set: "cb.RibCorrelationSet", geom: cb.RibGeometry, target: float
-) -> tuple[float, bool, float] | None:
-    """G at a target e+, found by bisecting Re through the real chain."""
+) -> tuple[float, float, bool, float] | None:
+    """G and the normalised R at a target e+, via the real chain.
+
+    The lower panel of Figure 4.46 plots R/(P/e/10)^0.35, which is what
+    the set's C_R is defined as, so the normalised value is returned
+    alongside G rather than being recomputed by the caller.
+    """
     lo, hi = RE_LO, RE_HI
     if cb.evaluate_rib(rib_set, geom, lo).e_plus > target:
         return None
@@ -148,7 +153,10 @@ def _g_at_eplus(
             break
     re = 0.5 * (lo + hi)
     res = cb.evaluate_rib(rib_set, geom, re)
-    return res.G, res.extrapolated, re
+    pe_term = rib_set.R_pe
+    norm = (geom.p_e / pe_term.reference) ** pe_term.exponent if pe_term.reference else 1.0
+    r_norm = res.R / norm if norm else res.R
+    return res.G, r_norm, res.extrapolated, re
 
 
 def run_series(series: SeriesMetadata) -> list[Record]:
@@ -176,6 +184,12 @@ def run_series(series: SeriesMetadata) -> list[Record]:
         ]
 
     geom = _probe_geometry(rib_set)
+    if series.geometry:
+        # The figure 4.46 legend states each class's geometry, so use it.
+        # It matters for R, whose plotted ordinate is normalised by P/e.
+        geom.e_D = float(series.geometry.get("e_D", geom.e_D))
+        geom.p_e = float(series.geometry.get("p_e", geom.p_e))
+        geom.W_H = float(series.geometry.get("W_H", geom.W_H))
 
     records: list[Record] = []
     for p in points:
@@ -185,8 +199,13 @@ def run_series(series: SeriesMetadata) -> list[Record]:
                 Record(series, p.x, p.y, None, True, None, "e+ unreachable")
             )
             continue
-        g, extrapolated, re = found
-        predicted = g * G_BAR_OVER_G if series.y_axis == "G_bar" else g
+        g, r_norm, extrapolated, re = found
+        if series.y_axis == "G_bar":
+            predicted = g * G_BAR_OVER_G
+        elif series.y_axis == "R_normalised":
+            predicted = r_norm
+        else:
+            predicted = g
         records.append(Record(series, p.x, p.y, predicted, extrapolated, re))
     return records
 

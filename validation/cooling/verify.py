@@ -304,6 +304,69 @@ def render(findings: list[Finding]) -> str:
     return "\n".join(lines).lstrip("\n")
 
 
+def check_panel_pairing(
+    directory: Path, pattern_a: str, pattern_b: str, tol_pct: float = 3.0
+) -> list[Finding]:
+    """Pair one symbol class across two panels of the same figure.
+
+    Where a figure stacks two panels over one abscissa, each experimental
+    run is plotted ONCE IN EACH PANEL at the same abscissa. So a class's
+    two files must hold the same number of points, pairing to within a
+    per cent or two.
+
+    This assumes nothing -- no card, no model, no legend reading -- which
+    makes it the sharpest check available on a scatter pass. It catches
+    what a span check cannot see: a missed mark, a mark picked twice, and
+    a series filed under the wrong class.
+    """
+    suffix_a = pattern_a.rsplit("*", 1)[-1]
+    suffix_b = pattern_b.rsplit("*", 1)[-1]
+
+    out: list[Finding] = []
+    for path_a in sorted(directory.glob(pattern_a)):
+        stem = path_a.name
+        label = stem[: -len(suffix_a)] if suffix_a else stem
+        path_b = directory / (label + suffix_b)
+        if not path_b.exists():
+            out.append(Finding(label, "pairing", False, f"no counterpart {path_b.name}"))
+            continue
+        a = sorted(load_points_from(path_a), key=lambda p: p.x)
+        b = sorted(load_points_from(path_b), key=lambda p: p.x)
+        if len(a) != len(b):
+            out.append(
+                Finding(label, "pair-count", False,
+                        f"{len(a)} points here against {len(b)} in "
+                        f"{path_b.name}; every run appears in both panels")
+            )
+        matched = 0
+        worst = 0.0
+        for pa in a:
+            nearest = min(b, key=lambda pb: abs(math.log(pb.x / pa.x)))
+            d = (nearest.x / pa.x - 1.0) * 100.0
+            if abs(d) < tol_pct:
+                matched += 1
+            worst = max(worst, abs(d))
+        out.append(
+            Finding(label, "pair-abscissa", matched == len(a),
+                    f"{matched}/{len(a)} paired within {tol_pct:g}%"
+                    f" (worst {worst:.1f}%)")
+        )
+    return out
+
+
+def load_points_from(path: Path) -> list[Point]:
+    """Read a bare x,y CSV with no metadata around it."""
+    import csv as _csv
+
+    pts: list[Point] = []
+    with open(path, newline="") as fh:
+        for row in _csv.reader(fh):
+            if not row or not row[0].strip() or row[0].strip() == "x":
+                continue
+            pts.append(Point(float(row[0]), float(row[1])))
+    return pts
+
+
 def check_candidate(csv_path: Path, card_path: Path) -> list[Finding]:
     """Check a freshly digitised CSV before it joins the dataset.
 
@@ -361,7 +424,19 @@ def main() -> None:
         type=Path,
         help="the figure card for the candidate(s), as a YAML file",
     )
+    parser.add_argument(
+        "--pair",
+        nargs=2,
+        metavar=("GLOB_A", "GLOB_B"),
+        help="pair one class across two panels, e.g. '*_R.csv' '*_G.csv'",
+    )
     args = parser.parse_args()
+
+    if args.pair:
+        if not args.candidate_dir:
+            parser.error("--pair needs --candidate-dir")
+        print(render(check_panel_pairing(args.candidate_dir, *args.pair)))
+        return
 
     if args.candidate or args.candidate_dir:
         if not args.card:

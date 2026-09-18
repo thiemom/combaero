@@ -144,3 +144,44 @@ def test_every_digitised_series_passes_its_figure_card() -> None:
 
     failures = [f for f in check_all() if not f.ok]
     assert not failures, "\n".join(f"{f.series}: {f.check}: {f.detail}" for f in failures)
+
+
+def test_pooled_figure_446_validates_the_implemented_set(records) -> None:
+    """han_1988_orthogonal against the figure it was extracted from.
+
+    Pooled rather than per-class: symbols on figure 4.46 overlap and a
+    mark cannot always be assigned to its class, but the set carries zero
+    geometry exponents in both R and G, so every class must land on one
+    curve and pooling removes a dependence on labels that cannot be fully
+    trusted. See the note at the head of the han2012 metadata.
+
+    The bands are Han's own stated accuracy, not fitted to the code.
+    """
+    from validation.cooling.scorecard import pool
+
+    n_r, mae_r, _, bias_r, _ = pool(records, "han2012/fig4.46_R_eD")
+    assert n_r >= 60, f"only {n_r} R points pooled"
+    assert abs(bias_r) < 0.02, f"R bias {bias_r:.1%} against the printed 3.2"
+    assert mae_r < 0.06
+
+    n_g, mae_g, _, bias_g, _ = pool(records, "han2012/fig4.46_G_eD")
+    assert n_g >= 40, f"only {n_g} G points pooled"
+    assert abs(bias_g) < 0.06, f"G bias {bias_g:.1%}"
+
+
+def test_stated_6pct_behaves_as_one_sigma_not_a_95pct_bound(records) -> None:
+    """Han states 'within 6% for 95% of the data'. The data says otherwise.
+
+    About 70% of the lower-panel cloud falls inside 6%, with a measured
+    standard deviation near 6%. That is 1 sigma, not a 95% bound -- which
+    is what harness tolerances here are set from. Pinned because the
+    alternative reading would justify a band roughly twice as wide, and a
+    band twice as wide is how a real error hides.
+    """
+    from validation.cooling.scorecard import pool
+
+    _, _, rmse, _, within = pool(records, "han2012/fig4.46_R_eD")
+    assert 0.04 < rmse < 0.08, f"spread {rmse:.1%} is not near Han's 6%"
+    assert 0.55 < within < 0.85, (
+        f"{within:.0%} inside 6% -- consistent with 1 sigma (~68%), not with the stated 95%"
+    )
