@@ -55,6 +55,16 @@ files:
       G_bar = 1.2 * 3.7 e+^0.28 = 4.44 e+^0.28, agreeing to 3.5%. This
       reaches item 10 (G_bar = 1.2 G) from a different paper, a different
       figure and a different rib family than the label it was settled by.
+    verification:
+      # Abscissa prints as `e+ x 10^-2`, ticks 1 2 4 6 8 10 -> e+ 100..1000.
+      x_ticks: [1, 2, 4, 6, 8, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      # The dashed line is labelled "Correlation for 90 deg Continuous ribs
+      # [3]" -- a citation, not an equation. Nothing printed to check against.
+      printed_curve: null
+      monotonic: increasing
+      expected_points: 7
     scores: han_1988_orthogonal
 
   - path: fig4.54_90deg_continuous_Gbar_data.csv
@@ -74,6 +84,15 @@ files:
     cross_check: >-
       Scatter about its own drawn line (the curve series above) must exceed
       the line's own deviation from the correlation; 5.4% against 3.5%.
+    verification:
+      x_ticks: [1, 2, 4, 6, 8, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve: null
+      monotonic: increasing
+      # NEEDS HUMAN READ: filled circles in the lower panel overlap the
+      # dashed line; count them on the page.
+      expected_points: null
     scores: han_1988_orthogonal
 
   - path: fig4.54_45deg_vbroken_Gbar_data.csv
@@ -101,6 +120,15 @@ files:
     # han_1988_orthogonal has no binding for them. Carried because it is the
     # reference point behind the extraction's "26% better" claim, and a
     # scorecard row of 'unsupported' is more honest than omitting the series.
+    verification:
+      x_ticks: [1, 2, 4, 6, 8, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve: null
+      monotonic: increasing
+      # NEEDS HUMAN READ: the lower panel's open symbols are dense and the
+      # 45 deg V class must be separated from 45 deg parallel by shape.
+      expected_points: null
     scores: null
 
   # -- Figure 4.193c: G against e+, extended Reynolds range ---------------
@@ -124,6 +152,24 @@ files:
     cross_check: >-
       Free fit must recover the printed exponent 0.35 rather than the new
       correlation's 0.42; the two curves are separated by that exponent.
+    verification:
+      # Plain e+ abscissa, log decades 10^2 10^3 10^4.
+      x_ticks: [100, 1000, 10000]
+      x_multiplier: 1.0
+      y_ticks: [20, 40, 60, 80, 100, 120]
+      # Log axis; minor ticks continue below the lowest LABELLED tick, and
+      # the 1984/1986 reference marks sit near G = 8. The lower bound is
+      # not readable off the scan, so it is left unchecked rather than
+      # guessed. The upper bound still catches an upward decade error.
+      y_limits: [null, 120]
+      # Printed on the figure as
+      #   G = 2.24 (W/H)^0.1 (alpha/90)^0.35 (p/e/10)^0.1 e+^0.35
+      # The coefficient depends on the geometry the curve was drawn at,
+      # which the figure does not state, so only the exponent is checkable.
+      printed_exponent: 0.35
+      exponent_tolerance: 0.03
+      monotonic: increasing
+      expected_points: 6
     scores: han_1988_orthogonal
 
   - path: fig4.193c_new_correlation_G_curve.csv
@@ -146,6 +192,21 @@ files:
     # The extended-range set is not implemented: extraction item 20 records
     # that (e/D)^0.14 as transcribed contradicts the figure, and item 19
     # records the matching friction correlation as missing outright.
+    verification:
+      x_ticks: [100, 1000, 10000]
+      x_multiplier: 1.0
+      y_ticks: [20, 40, 60, 80, 100, 120]
+      # Log axis; minor ticks continue below the lowest LABELLED tick, and
+      # the 1984/1986 reference marks sit near G = 8. The lower bound is
+      # not readable off the scan, so it is left unchecked rather than
+      # guessed. The upper bound still catches an upward decade error.
+      y_limits: [null, 120]
+      # Printed as G = 1.24 (e/D)^0.14 (p/e)^-0.031 e+^0.42. The exponent
+      # on e+ is what separates this curve from the old one (0.35).
+      printed_exponent: 0.42
+      exponent_tolerance: 0.03
+      monotonic: increasing
+      expected_points: 6
     scores: null
 
   - path: fig4.193c_G_scatter.csv
@@ -165,6 +226,22 @@ files:
     cross_check: >-
       The cloud must straddle the new-correlation curve and sit above the
       old one at high e+, which is the figure's whole point.
+    verification:
+      x_ticks: [100, 1000, 10000]
+      x_multiplier: 1.0
+      y_ticks: [20, 40, 60, 80, 100, 120]
+      # Log axis; minor ticks continue below the lowest LABELLED tick, and
+      # the 1984/1986 reference marks sit near G = 8. The lower bound is
+      # not readable off the scan, so it is left unchecked rather than
+      # guessed. The upper bound still catches an upward decade error.
+      y_limits: [null, 120]
+      printed_curve: null
+      # Scatter, so no trend is asserted point to point.
+      monotonic: null
+      # NEEDS HUMAN READ: the legend carries 11 symbol classes (e/d 0.1,
+      # 0.15, 0.18 x p/e 10, 7.5, 5, plus 1984 and 1986 reference sets) and
+      # this CSV pools them all. Count the marks on the page.
+      expected_points: null
     scores: han_1988_orthogonal
 
   # -- Figure 4.53: Nu ratio against friction ratio -----------------------
@@ -190,6 +267,18 @@ files:
     cross_check: >-
       Nu ratio must fall and f ratio rise with Reynolds number along the
       series, the trend the section text states for all ribs.
+    verification:
+      # Linear axes, upper (ribbed-side) panel.
+      x_ticks: [0, 2, 4, 6, 8, 10, 12]
+      x_multiplier: 1.0
+      y_ticks: [0, 1, 2, 3, 4, 5, 6]
+      printed_curve: null
+      # NOT declared: the text's "Nu ratio falls as f ratio rises with Re"
+      # holds across the sweep, but these five marks overlap inside a tight
+      # cluster and one adjacent pair inverts. Flagging that as a defect
+      # would be a check that fails on correct data.
+      monotonic: null
+      expected_points: null
     scores: null
 
   - path: fig4.53_60deg_vcontinuous_Nu_ratio.csv
@@ -209,6 +298,13 @@ files:
     cross_check: >-
       Must sit above the 90 deg continuous series at every Reynolds number;
       the text calls the 60 deg V continuous rib the highest of the group.
+    verification:
+      x_ticks: [0, 2, 4, 6, 8, 10, 12]
+      x_multiplier: 1.0
+      y_ticks: [0, 1, 2, 3, 4, 5, 6]
+      printed_curve: null
+      monotonic: decreasing
+      expected_points: null
     scores: null
 
 # The Han and Zhang (1992) rig geometry (e/D, P/e, W/H) is NOT stated in the

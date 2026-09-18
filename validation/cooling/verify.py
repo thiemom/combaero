@@ -1,0 +1,273 @@
+"""Check digitised series against a figure card read off the printed page.
+
+The card and the points are two independent channels. The card records
+what the AXES and the PRINTED EQUATIONS say -- read from the page, without
+looking at where the digitiser put anything. The points record where the
+marks are. A digitisation bug shows up as disagreement between them.
+
+This is the same discipline validation/cooling/extractions/README.md
+applies to reading equations, moved to reading plots. Neither channel is
+authoritative; the disagreement is the signal.
+
+What the card catches, with no second digitisation:
+
+  - a dropped axis multiplier (the figure 4.54 bug: two decades)
+  - a mis-calibrated axis origin or span
+  - points read off the wrong panel
+  - a drawn correlation line that does not reproduce its own printed
+    equation, which means the calibration is wrong however plausible the
+    numbers look
+  - double-picked or missed points
+
+What it cannot catch, and still needs a human read:
+
+  - which symbol belongs to which geometry in the legend
+  - whether a point was assigned to the right series
+  - a figure whose axes are unlabelled in the first place
+
+Run:  uv run python -m validation.cooling.verify
+"""
+
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass
+
+from validation.cooling.schema import Point, SeriesMetadata, load_dataset, load_points
+
+# A digitised point may sit slightly outside the outermost tick: the axis
+# usually runs a little past it, and the mark has width. Wide enough to
+# accept honest reading, far too tight to accept a decade.
+SPAN_MARGIN = 0.25
+
+# Two points closer than this in both coordinates, relative to the span,
+# are almost certainly one mark picked twice.
+DUPLICATE_TOL = 1e-3
+
+
+@dataclass
+class Finding:
+    series: str
+    check: str
+    ok: bool
+    detail: str
+
+
+def _span(ticks: list[float], multiplier: float) -> tuple[float, float]:
+    lo, hi = min(ticks) * multiplier, max(ticks) * multiplier
+    # Log axes are the norm here; widen geometrically so the margin means
+    # the same thing at both ends.
+    if lo > 0.0:
+        factor = (hi / lo) ** SPAN_MARGIN
+        return lo / factor, hi * factor
+    pad = (hi - lo) * SPAN_MARGIN
+    return lo - pad, hi + pad
+
+
+def _evaluate_printed(spec: dict, x: float) -> float:
+    """The curve the figure prints, at x."""
+    if "constant" in spec:
+        return float(spec["constant"])
+    if "power_law" in spec:
+        pl = spec["power_law"]
+        return float(pl["C"]) * x ** float(pl["n"])
+    if "polynomial" in spec:
+        poly = spec["polynomial"]
+        scale = float(poly.get("variable_scale", 1.0))
+        u = x / scale
+        return sum(float(c) * u**i for i, c in enumerate(poly["coeffs"]))
+    raise ValueError(f"unrecognised printed-curve spec: {sorted(spec)}")
+
+
+def check_series(series: SeriesMetadata) -> list[Finding]:
+    card = series.verification
+    label = series.label
+    if card is None:
+        return [
+            Finding(label, "card", False, "no verification card; series unchecked")
+        ]
+
+    points: list[Point] = load_points(series)
+    out: list[Finding] = []
+
+    # 1. Axis span. This is what catches a dropped multiplier.
+    #
+    # `<axis>_limits` overrides the tick span, and either entry may be null
+    # for a bound that cannot be read off the scan -- a log axis whose
+    # minor ticks continue past the last LABELLED one is the usual case,
+    # and Figure 4.193c is exactly that below G = 20. A null bound is not
+    # checked rather than being invented, which keeps the card a record of
+    # what the page shows.
+    for axis, values, ticks_key, mult_key, lim_key in (
+        ("x", [p.x for p in points], "x_ticks", "x_multiplier", "x_limits"),
+        ("y", [p.y for p in points], "y_ticks", "y_multiplier", "y_limits"),
+    ):
+        ticks = card.get(ticks_key)
+        if not ticks:
+            continue
+        mult = float(card.get(mult_key, 1.0))
+        limits = card.get(lim_key)
+        if limits is not None:
+            lo = float(limits[0]) * mult if limits[0] is not None else None
+            hi = float(limits[1]) * mult if limits[1] is not None else None
+        else:
+            lo, hi = _span([float(t) for t in ticks], mult)
+
+        outside = [
+            v
+            for v in values
+            if (lo is not None and v < lo) or (hi is not None and v > hi)
+        ]
+        bound = (
+            f"{'unread' if lo is None else format(lo, 'g')} to "
+            f"{'unread' if hi is None else format(hi, 'g')}"
+        )
+        out.append(
+            Finding(
+                label,
+                f"{axis}-span",
+                not outside,
+                f"axis bounds {bound}; "
+                + (
+                    f"{len(outside)} of {len(values)} points outside "
+                    f"(e.g. {outside[0]:g})"
+                    if outside
+                    else f"all {len(values)} points inside"
+                ),
+            )
+        )
+
+    # 2. Printed equation. The strongest check available: the equation
+    #    comes from the page text, the points from the plot area, and a
+    #    mis-calibrated axis cannot reproduce it by accident.
+    printed = card.get("printed_curve")
+    if printed is not None:
+        tol = float(card.get("curve_tolerance", 0.02))
+        errs = [_evaluate_printed(printed, p.x) / p.y - 1.0 for p in points]
+        rms = math.sqrt(sum(e * e for e in errs) / len(errs))
+        out.append(
+            Finding(
+                label,
+                "printed-curve",
+                rms <= tol,
+                f"RMS against the equation printed on the figure = "
+                f"{rms * 100:.2f}% (tolerance {tol * 100:.1f}%)",
+            )
+        )
+
+    # 3. Printed exponent, where the figure prints a power law whose
+    #    COEFFICIENT depends on geometry the curve was drawn at but whose
+    #    EXPONENT does not. A free fit must recover it. This is what
+    #    separates two curves on one figure -- the 4.193c pair differ only
+    #    as 0.35 against 0.42 -- so it catches a swap, which a span check
+    #    cannot. It is deliberately NOT a decade check: rescaling x moves
+    #    the coefficient and leaves the exponent alone.
+    expected_exp = card.get("printed_exponent")
+    if expected_exp is not None:
+        tol = float(card.get("exponent_tolerance", 0.03))
+        n = len(points)
+        sx = sum(math.log(p.x) for p in points)
+        sy = sum(math.log(p.y) for p in points)
+        sxx = sum(math.log(p.x) ** 2 for p in points)
+        sxy = sum(math.log(p.x) * math.log(p.y) for p in points)
+        fitted = (n * sxy - sx * sy) / (n * sxx - sx * sx)
+        out.append(
+            Finding(
+                label,
+                "printed-exponent",
+                abs(fitted - float(expected_exp)) <= tol,
+                f"figure prints {float(expected_exp):g}; free fit gives "
+                f"{fitted:.4f} (tolerance {tol:g})",
+            )
+        )
+
+    # 4. Point count, against what the reader counted on the page.
+    expected = card.get("expected_points")
+    if expected is not None:
+        out.append(
+            Finding(
+                label,
+                "count",
+                len(points) == int(expected),
+                f"card says {expected} marks, CSV has {len(points)}",
+            )
+        )
+
+    # 5. Double-picked marks.
+    xs = [p.x for p in points]
+    ys = [p.y for p in points]
+    x_span = max(xs) - min(xs) or 1.0
+    y_span = max(ys) - min(ys) or 1.0
+    dupes = [
+        (a, b)
+        for i, a in enumerate(points)
+        for b in points[i + 1 :]
+        if abs(a.x - b.x) / x_span < DUPLICATE_TOL
+        and abs(a.y - b.y) / y_span < DUPLICATE_TOL
+    ]
+    out.append(
+        Finding(
+            label,
+            "distinct",
+            not dupes,
+            f"{len(dupes)} coincident pairs" if dupes else "no coincident marks",
+        )
+    )
+
+    # 6. Declared monotonicity, where the physics or the figure demands it.
+    trend = card.get("monotonic")
+    if trend in ("increasing", "decreasing"):
+        ordered = sorted(points, key=lambda p: p.x)
+        if trend == "increasing":
+            bad = sum(
+                1
+                for a, b in zip(ordered, ordered[1:], strict=False)
+                if b.y < a.y
+            )
+        else:
+            bad = sum(
+                1
+                for a, b in zip(ordered, ordered[1:], strict=False)
+                if b.y > a.y
+            )
+        out.append(
+            Finding(
+                label,
+                "monotonic",
+                bad == 0,
+                f"{bad} steps against the declared {trend} trend",
+            )
+        )
+
+    return out
+
+
+def check_all() -> list[Finding]:
+    out: list[Finding] = []
+    for series in load_dataset():
+        out.extend(check_series(series))
+    return out
+
+
+def render(findings: list[Finding]) -> str:
+    lines = []
+    current = None
+    for f in findings:
+        if f.series != current:
+            lines.append("")
+            lines.append(f.series)
+            current = f.series
+        mark = "ok  " if f.ok else "FAIL"
+        lines.append(f"  [{mark}] {f.check:<16} {f.detail}")
+    failed = [f for f in findings if not f.ok]
+    lines.append("")
+    lines.append(f"{len(findings) - len(failed)} passed, {len(failed)} failed")
+    return "\n".join(lines).lstrip("\n")
+
+
+def main() -> None:
+    print(render(check_all()))
+
+
+if __name__ == "__main__":
+    main()
