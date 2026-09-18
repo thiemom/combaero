@@ -42,20 +42,6 @@ double dP_at(double m_dot, const std::vector<double>& Y) {
 // reported drop snaps to the march grid and the gradient develops a sawtooth
 // -- measured at 22% peak-to-peak before the fix.
 TEST(FannoChokeSmoothnessTest, ChokedBranchGradientHasNoMarchGridSawtooth) {
-    // KNOWN LIMITATION, tracked in #362 (adaptive marching).
-    //
-    // The corrected Fanno gradient carries the 1/(1 - M^2) compressibility
-    // group, which a fixed-step RK4 cannot resolve near choking: the
-    // march-grid sawtooth this case pins scales cleanly with step count --
-    // 988% at 100 steps, 502% at 1600, 9.8% at 6400, 0.8% at 25600 -- so it is
-    // discretisation, not a regression of the interpolation fix this file was
-    // written for. Raising the default step count everywhere would be
-    // wasteful; the fine steps are only needed where a duct approaches sonic.
-    //
-    // Skipped rather than re-toleranced: the property is real and should hold
-    // once the march refines its steps near M -> 1.
-    GTEST_SKIP() << "pending adaptive marching near M -> 1 (issue #362)";
-
     const std::vector<double> Y = mole_to_mass(dry_air());
 
     // Inside the choked band for this duct. Re-derived: choke onset for this
@@ -109,23 +95,13 @@ TEST(FannoChokeSmoothnessTest, DropIsMonotoneThroughChokeOnset) {
 // L_choke. If it lags at the overshooting step boundary, refining the march
 // moves the reported outlet -- the signature of grid snapping.
 TEST(FannoChokeSmoothnessTest, ChokedOutletIsGridIndependent) {
-    // KNOWN LIMITATION, tracked in #362 (adaptive marching).
-    //
-    // The corrected Fanno gradient carries the 1/(1 - M^2) compressibility
-    // group, which a fixed-step RK4 cannot resolve near choking: the
-    // march-grid sawtooth this case pins scales cleanly with step count --
-    // 988% at 100 steps, 502% at 1600, 9.8% at 6400, 0.8% at 25600 -- so it is
-    // discretisation, not a regression of the interpolation fix this file was
-    // written for. Raising the default step count everywhere would be
-    // wasteful; the fine steps are only needed where a duct approaches sonic.
-    //
-    // Skipped rather than re-toleranced: the property is real and should hold
-    // once the march refines its steps near M -> 1.
-    GTEST_SKIP() << "pending adaptive marching near M -> 1 (issue #362)";
-
     const std::vector<double> X = dry_air();
     const double T = 1700.0;
-    const double M_in = 0.70;  // chokes before the duct end
+    // Chokes well before the duct end: L* = 0.20 m against L = 1 m with the
+    // corrected gradient (#362). Earlier values here (0.91, then 0.70) were
+    // picked against a march that never choked -- 0.70 now has L* = 1.15 m and
+    // traverses the duct, which is the right answer, not a regression.
+    const double M_in = 0.85;
     const double a = speed_of_sound(T, X);
     const double u = M_in * a;
     const double A = 0.25 * M_PI * kD * kD;

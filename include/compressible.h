@@ -226,6 +226,25 @@ constexpr double kFannoChokeMach = 0.999;
 // 1 - 0.999^2 = 2.0e-3, so this sits an order below the choke threshold.
 constexpr double kFannoGradientFloor = 2.0e-4;
 
+// Adaptive-march controls (issue #363).
+//
+// The Fanno gradient is singular at M = 1, so a step that is fine over most of
+// a duct is useless in the last part of one that approaches sonic. A uniform
+// increase in step count pays for that everywhere; most ducts never go near
+// M = 1. Instead the step is halved whenever a trial step would close more
+// than kFannoApproachFraction of the remaining distance to sonic, measured on
+// (1 - M^2) because that is the quantity the singularity is in.
+//
+// Measured on a choked band before this: the worst consecutive-slope jump ran
+// 988% at 100 fixed steps and only reached 0.8% at 25600.
+constexpr double kFannoApproachFraction = 0.25;
+// Floor on refinement, relative to the nominal step. Prevents a genuinely
+// sonic state from refining without bound; the choke detection stops the
+// march there instead.
+constexpr double kFannoMinStepFraction = 1.0 / 8192.0;
+// Hard cap on accepted steps, so a pathological state cannot spin.
+constexpr std::size_t kFannoMaxSteps = 200000;
+
 // Result of Fanno flow calculation at a single station
 struct FannoStation {
     double x   = 0.0;    // Position along channel [m]
