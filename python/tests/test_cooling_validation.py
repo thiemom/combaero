@@ -126,3 +126,21 @@ def test_45deg_vbroken_outperforms_90deg_line(dataset) -> None:
     at = 500.0
     ratio = (c_v * at**n_v) / (c_l * at**n_l)
     assert 0.70 < ratio < 0.78, f"expected ~0.739 at e+=500, got {ratio:.3f}"
+
+
+def test_every_digitised_series_passes_its_figure_card() -> None:
+    """The figure card and the points are two independent channels.
+
+    The card records what the printed axes and equations say, read off the
+    page without reference to where the digitiser put anything. A
+    disagreement means one of the two is wrong, and which one is not
+    decided here -- it is raised for a human.
+
+    Verified against injected bugs: a dropped axis multiplier (the real
+    figure 4.54 defect) fails x-span, two curves swapped fails
+    printed-exponent, a double-picked mark fails count and distinct.
+    """
+    from validation.cooling.verify import check_all
+
+    failures = [f for f in check_all() if not f.ok]
+    assert not failures, "\n".join(f"{f.series}: {f.check}: {f.detail}" for f in failures)

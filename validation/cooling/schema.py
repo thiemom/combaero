@@ -54,6 +54,10 @@ class SeriesMetadata:
     uncertainty: float | None
     cross_check: str
     scores: str | None  # correlation-set name, or None if not scored
+    # The figure card: what the printed axes and equations say, read off
+    # the page independently of where the digitiser put the points. See
+    # validation/cooling/verify.py.
+    verification: dict | None = None
 
     @property
     def label(self) -> str:
@@ -113,6 +117,7 @@ def load_dataset(root: Path | None = None) -> list[SeriesMetadata]:
                     uncertainty=entry.get("uncertainty"),
                     cross_check=entry["cross_check"],
                     scores=entry.get("scores"),
+                    verification=entry.get("verification"),
                 )
             )
     return out

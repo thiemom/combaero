@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Digitised series are cross-verified against a figure card.** `uv run
+  python -m validation.cooling.verify` checks every series against what the
+  printed axes and equations say, read off the page independently of where
+  the digitiser put the points. The two are separate channels and the check
+  is their disagreement; which one is wrong is raised for a human rather
+  than decided by the tool.
+
+  It catches a dropped axis multiplier (the real figure 4.54 defect, two
+  decades), a mis-calibrated span, two curves on one figure swapped, a
+  drawn line that fails to reproduce its own printed equation, and
+  double-picked or missed marks. Each was verified by injecting the bug.
+
+  A bound that cannot be read off the scan is recorded as null and left
+  unchecked rather than invented -- figure 4.193c's ordinate continues
+  below its lowest labelled tick. The verifier's first run caught that
+  mistake in the card itself.
+
 - **A scored validation harness for the cooling correlations**, on the
   pattern `validation/junction/` uses. `uv run python -m
   validation.cooling.scorecard` reports MAE, RMSE, bias and in-band counts

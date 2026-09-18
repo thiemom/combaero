@@ -45,6 +45,73 @@ metadata and pinned by a test that fails at every neighbouring decade.
 stay a faithful record of the measurement; the interpretation is metadata,
 where a reviewer can disagree with it.
 
+## Cross-verifying a digitisation
+
+Digitised points are only as good as the axis calibration behind them, and
+a plausible-looking CSV can be two decades out. Every series therefore
+carries a **figure card** in its metadata: what the printed axes and
+equations say, read off the page WITHOUT reference to where the digitiser
+put anything.
+
+```bash
+uv run python -m validation.cooling.verify
+```
+
+The card and the points are two independent channels, and the check is
+their disagreement. Which one is wrong is not decided by the tool -- it is
+raised for a human.
+
+**What the card catches on its own**, with no second digitisation:
+
+| bug | caught by |
+|---|---|
+| dropped axis multiplier (the real figure 4.54 defect) | `x-span` |
+| mis-calibrated axis origin or span | `x-span` / `y-span` |
+| two curves on one figure swapped | `printed-exponent` |
+| a drawn line that does not reproduce its own printed equation | `printed-curve` |
+| double-picked or missed marks | `count`, `distinct` |
+| a series read off the wrong panel | `y-span`, `monotonic` |
+
+Each of those was verified by injecting the bug and confirming the right
+check goes red.
+
+**What still needs a human read**, and is why the cards carry
+`NEEDS HUMAN READ` markers rather than guesses:
+
+- which symbol belongs to which geometry in the legend
+- whether a mark was assigned to the right series
+- the point count, where marks overlap too densely to count from a scan
+- a figure whose axes are unlabelled in the first place
+
+**A bound that cannot be read is left null, not invented.** Figure 4.193c's
+ordinate is log with minor ticks continuing below the lowest labelled one,
+so its lower limit is `null` and unchecked. Writing a plausible number
+there would have made the card agree with the data by construction, which
+is the whole failure this guards against. The first run of the verifier
+caught exactly that mistake in the card itself.
+
+## Filling a card
+
+Before or independently of digitising, read off the page:
+
+```yaml
+verification:
+  x_ticks: [1, 2, 4, 6, 8, 10]   # the printed tick LABELS
+  x_multiplier: 1.0e2            # the `x 10^-2` on the axis label
+  y_ticks: [10, 20, 30, 40]
+  y_limits: [null, 120]          # only where ticks understate the axis
+  printed_curve:                 # where the figure prints the equation
+    power_law: {C: 3.7, n: 0.28}
+  printed_exponent: 0.35         # where only the exponent is checkable
+  monotonic: increasing          # only where the figure or text demands it
+  expected_points: 7             # null if the marks are too dense to count
+```
+
+Declare `monotonic` only where a violation would be a real defect. Figure
+4.53's five marks sit in a tight overlapping cluster and one adjacent pair
+inverts, so it is left null: a check that fails on correct data trains
+people to ignore it.
+
 ## Adding a source
 
 Create `data/<source>/` with the CSVs and a `metadata.yaml`. Every series
