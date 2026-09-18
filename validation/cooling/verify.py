@@ -315,8 +315,8 @@ def check_candidate(csv_path: Path, card_path: Path) -> list[Finding]:
     card = yaml.safe_load(card_path.read_text())
     series = SeriesMetadata(
         path=csv_path,
-        source=SourceMetadata(name="candidate", citation="(not yet filed)",
-                              secondary=True),
+        source=SourceMetadata(name=csv_path.parent.name or "candidate",
+                              citation="(not yet filed)", secondary=True),
         after=None,
         page=None,
         item=card.get("item", "(candidate)"),
@@ -347,16 +347,35 @@ def main() -> None:
         help="a freshly digitised CSV, not yet in the dataset",
     )
     parser.add_argument(
+        "--candidate-dir",
+        type=Path,
+        help="a directory of freshly digitised CSVs, all from one panel",
+    )
+    parser.add_argument(
+        "--glob",
+        default="*.csv",
+        help="which files in --candidate-dir to check (default: *.csv)",
+    )
+    parser.add_argument(
         "--card",
         type=Path,
-        help="the figure card for --candidate, as a YAML file",
+        help="the figure card for the candidate(s), as a YAML file",
     )
     args = parser.parse_args()
 
-    if args.candidate:
+    if args.candidate or args.candidate_dir:
         if not args.card:
-            parser.error("--candidate needs --card")
-        print(render(check_candidate(args.candidate, args.card)))
+            parser.error("a candidate needs --card")
+        if args.candidate:
+            print(render(check_candidate(args.candidate, args.card)))
+            return
+        paths = sorted(args.candidate_dir.glob(args.glob))
+        if not paths:
+            parser.error(f"no files matching {args.glob} in {args.candidate_dir}")
+        findings = []
+        for path in paths:
+            findings.extend(check_candidate(path, args.card))
+        print(render(findings))
         return
     print(render(check_all()))
 
