@@ -252,7 +252,14 @@ std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobia
     double L, double D, double roughness,
     const std::string& friction_model,
     double f_multiplier = 1.0,
-    bool compute_jacobians = true);
+    bool compute_jacobians = true,
+    // Whether the caller resolved the inlet STATIC state (issue #359). When
+    // false the drop stays the previous static difference, so the region where
+    // no static state exists keeps exactly its previous behaviour.
+    bool inlet_static_resolved = true,
+    // Whether the exit dynamic head is lost to what the duct discharges into
+    // (issue #360). False keeps the previous full-recovery coupling.
+    bool exit_head_lost = false);
 
 
 // Full compressible channel evaluation with all derivatives for network solver.
@@ -261,7 +268,10 @@ ChannelResult channel_compressible_residuals_and_jacobian(
     const std::vector<double>& Y_up,
     double P_static_down, double L, double D, double roughness,
     const std::string& friction_model,
-    double f_multiplier = 1.0);
+    double f_multiplier = 1.0,
+    // Exit coupling: true when the duct discharges into a plenum and loses its
+    // dynamic head, false for full recovery. See issue #360.
+    bool exit_head_lost = false);
 
 
 // -----------------------------------------------------------------------------

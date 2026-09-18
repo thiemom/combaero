@@ -394,6 +394,8 @@ PYBIND11_MODULE(_core, m) {
       py::arg("P_in"), py::arg("u_in"), py::arg("X"), py::arg("L"),
       py::arg("D"), py::arg("roughness"), py::arg("friction_model"),
       py::arg("f_multiplier") = 1.0, py::arg("compute_jacobians") = true,
+      py::arg("inlet_static_resolved") = true,
+      py::arg("exit_head_lost") = false,
       "Compressible channel flow using Fanno model with variable friction.\n\n"
       "Returns: (dP, d_dP_dP_in, d_dP_dT_in, d_dP_du_in)");
 
@@ -402,7 +404,7 @@ PYBIND11_MODULE(_core, m) {
         py::arg("P_total_up"), py::arg("T_up"), py::arg("Y_up"),
         py::arg("P_static_down"), py::arg("L"), py::arg("D"),
         py::arg("roughness"), py::arg("friction_model"),
-        py::arg("f_multiplier") = 1.0,
+        py::arg("f_multiplier") = 1.0, py::arg("exit_head_lost") = false,
         "Compressible channel for network solver with all derivatives.");
 
   m.def("momentum_chamber_residual_and_jacobian",

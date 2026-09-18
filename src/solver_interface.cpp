@@ -1642,7 +1642,9 @@ std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobia
     double L, double D, double roughness,
     const std::string& friction_model,
     double f_multiplier,
-    bool compute_jacobians) {
+    bool compute_jacobians,
+    bool inlet_static_resolved,
+    bool exit_head_lost) {
 
   // Handle reverse flow by swapping direction
   bool reverse_flow = (u_in < 0.0);
@@ -1651,10 +1653,61 @@ std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobia
   // Forward-direction friction drop with an infeasibility barrier on top of
   // the truncated Fanno march (see kChannelChokeBarrierKappa in the header
   // for the rationale and the barrier shape).
+  const double duct_area = 0.25 * M_PI * D * D;
+
+  // Stagnation drop across the march, not the static one.
+  //
+  // This returned P - sol.outlet.P, a STATIC difference, while ChannelElement
+  // consumes it as a TOTAL drop (Pt_up - Pt_down = dP_calc). In Fanno flow
+  // those are not interchangeable: the flow accelerates along the duct and
+  // converts static head into dynamic, so static falls much faster than total
+  // -- tens of kPa apart at M ~ 0.8, the same order as the drop itself.
+  // Friction is what lowers Pt, so Pt_in - Pt_out is the quantity the element
+  // is asking for. See issue #359.
+  // exit_head_lost selects how the duct couples to what it discharges into:
+  //
+  //   false -- full recovery. The drop is Pt_in - Pt_out, i.e. the downstream
+  //            node receives the duct's STAGNATION pressure. Appropriate when a
+  //            diffuser recovers the dynamic head.
+  //   true  -- full loss. The drop is Pt_in - Ps_out, so the downstream node
+  //            receives the duct's STATIC pressure and the exit dynamic head is
+  //            dissipated in the sudden expansion. This is the standard model
+  //            for a bare duct discharging into a plenum or to atmosphere.
+  //
+  // Reality lies between; these are the two limits, and a bare exit is much
+  // nearer the second. Pinning stagnation pressure at such an exit caps the
+  // mass flux at the sonic value for that pressure -- a constraint the physical
+  // problem never imposed. See issue #360.
+  auto total_drop = [&](const combaero::FannoSolution& sol, double T_in,
+                        double P_in, double u_abs) -> double {
+    const double a_in = combaero::speed_of_sound(T_in, X);
+    const double M_in = (a_in > 1e-9) ? u_abs / a_in : 0.0;
+    const double Pt_in = combaero::P0_from_static(P_in, T_in, M_in, X);
+
+    const double rho_out = combaero::density(sol.outlet.T, sol.outlet.P, X);
+    const double u_out =
+        (rho_out > 1e-12) ? std::abs(sol.mdot) / (rho_out * duct_area) : 0.0;
+    const double a_out = combaero::speed_of_sound(sol.outlet.T, X);
+    const double M_out = (a_out > 1e-9) ? u_out / a_out : 0.0;
+    if (exit_head_lost) {
+      return Pt_in - sol.outlet.P;
+    }
+    const double Pt_out =
+        combaero::P0_from_static(sol.outlet.P, sol.outlet.T, M_out, X);
+    return Pt_in - Pt_out;
+  };
+
   auto dp_forward = [&](double T, double P, double u_abs) -> double {
     auto sol = combaero::fanno_channel_rough(T, P, u_abs, L, D, roughness, X,
                                              friction_model, f_multiplier);
-    double dP = P - sol.outlet.P;
+    // Stagnation drop where the inlet static state was resolved by the
+    // inversion; the old static drop where it was not. Mixing the two -- the
+    // previous density with the new drop -- is not monotone in m_dot past the
+    // sonic limit, which breaks the property test_fanno_choke_smoothness pins
+    // (#358). The fallback region is deliberately out of scope here, so it
+    // keeps its previous behaviour exactly rather than half of it.
+    double dP = inlet_static_resolved ? total_drop(sol, T, P, u_abs)
+                                      : P - sol.outlet.P;
     if (!sol.choked) {
       return dP;
     }
@@ -1729,48 +1782,195 @@ std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobia
   return {dP, d_dP_dP_in, d_dP_dT_in, d_dP_du_in};
 }
 
+namespace {
+
+// Static state at a duct station, from the stagnation state and the flow.
+//
+// The compressible channel used to take rho at the TOTAL pressure and derive
+// velocity from it, with the comment "uses P_total as proxy for P_static
+// (low-Mach approximation)". Above M ~ 0.3 that is not a small error, and it
+// fails in a particular way: it makes the channel report a converged solution
+// for a flow that cannot exist. Measured on the outlet duct of #351 at
+// D = 0.1 m and 1.03 kg/s, the proxy is 1.59x too dense at sonic, reports
+// M = 0.759, and happily solves at 1.37x its own choked limit.
+//
+// The static state is fixed by three relations in (Ts, Ps, u):
+//   energy      h0 = h(Ts) + u^2/2        adiabatic, h0 conserved
+//   isentropic  s(Ts, Ps) = s(Tt, Pt)     static<->total, isentropic BY DEFINITION
+//   continuity  mdot = rho(Ts, Ps) * u * A
+// Fanno is irreversible ALONG the duct -- Pt falls station to station -- but
+// the static/total relation AT a station stays isentropic, which is what
+// "total" means, so the two are compatible.
+//
+// Parameterised by Mach it is a 1-D root find: T_from_stagnation and
+// P_from_stagnation give (Ts, Ps), leaving one scalar residual in the mass
+// flux. G(M) is monotone on the subsonic branch and peaks at M = 1, so the
+// bracket (0, 1] is unconditionally safe and bisection cannot stray onto the
+// supersonic branch.
+//
+// No root means the duct cannot pass this flow at this stagnation state --
+// which IS choking, exactly, with no constant to tune. See issue #359.
+struct ChannelStaticState {
+  bool feasible = false;
+  double M = 0.0;
+  double T = 0.0;
+  double P = 0.0;
+  double u = 0.0;
+  double G_required = 0.0;
+  double G_max = 0.0;
+};
+
+ChannelStaticState channel_static_state(double P_total, double T_total,
+                                        double m_dot, double area,
+                                        const std::vector<double>& X) {
+  ChannelStaticState out;
+  if (area <= 0.0 || P_total <= 0.0 || T_total <= 0.0) {
+    return out;
+  }
+  const double G_req = std::abs(m_dot) / area;
+  out.G_required = G_req;
+
+  auto flux_at = [&](double M, double& Ts, double& Ps) -> double {
+    Ts = combaero::T_from_stagnation(T_total, M, X);
+    Ps = combaero::P_from_stagnation(P_total, T_total, M, X);
+    if (Ts <= 0.0 || Ps <= 0.0) {
+      return 0.0;
+    }
+    return combaero::density(Ts, Ps, X) * M * combaero::speed_of_sound(Ts, X);
+  };
+
+  double Ts = 0.0, Ps = 0.0;
+  out.G_max = flux_at(1.0, Ts, Ps);
+  if (G_req <= 0.0) {
+    out.feasible = true;
+    out.M = 0.0;
+    out.T = T_total;
+    out.P = P_total;
+    out.u = 0.0;
+    return out;
+  }
+  if (G_req > out.G_max) {
+    return out;  // choked: no state carries this flux at this stagnation state
+  }
+
+  double lo = 0.0, hi = 1.0;
+  for (int i = 0; i < 80; ++i) {
+    const double mid = 0.5 * (lo + hi);
+    if (flux_at(mid, Ts, Ps) < G_req) {
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+  out.M = hi;
+  flux_at(out.M, Ts, Ps);
+  out.T = Ts;
+  out.P = Ps;
+  out.u = std::copysign(out.M * combaero::speed_of_sound(Ts, X), m_dot);
+  out.feasible = true;
+  return out;
+}
+
+}  // namespace
+
 ChannelResult channel_compressible_residuals_and_jacobian(
     double m_dot, double P_total_up, double T_up,
     const std::vector<double>& Y_up,
     double P_static_down, double L, double D, double roughness,
     const std::string& friction_model,
-    double f_multiplier) {
+    double f_multiplier, bool exit_head_lost) {
 
   (void)P_static_down;  // Computed from Fanno flow, not an input
 
   const std::vector<double> X_up = combaero::mass_to_mole(combaero::normalize_fractions(Y_up));
 
-  // Compute density at (T_up, P_total_up) and derive velocity from continuity.
-  // Uses P_total as proxy for P_static (low-Mach approximation).
-  // The Jacobians below include the full chain rule through rho(T,P) -> u -> dP
-  // so that Newton converges correctly even at moderate Mach numbers.
-  auto [rho, drho_dT, drho_dP] = density_and_jacobians(T_up, P_total_up, X_up);
+  // Solve the inlet STATIC state from the stagnation state and the flow, then
+  // march from it. P_total_up and T_up are both TOTAL (the element passes
+  // state_in.Pt and state_in.Tt); using them as static is the defect this
+  // replaces -- see channel_static_state above and issue #359.
   double area = 0.25 * M_PI * D * D;
-  double u_in = m_dot / (rho * area);
+  const ChannelStaticState st =
+      channel_static_state(P_total_up, T_up, m_dot, area, X_up);
+
+  ChannelResult res;
+
+  // Where no static state exists -- the demanded flux exceeds the sonic
+  // ceiling for this stagnation state -- fall back to the previous behaviour
+  // rather than invent a barrier for it.
+  //
+  // Detecting infeasibility precisely, across every driving mode and topology,
+  // is deliberately out of scope (see #359 / #360): the criterion differs for
+  // imposed and free mass flow, a choked PRESSURE-driven duct settling at
+  // mdot_choke is the physical answer rather than an artifact, and most of the
+  // infeasibility seen on #351 was manufactured by how the pressure boundary
+  // couples rather than by physics. #360 addresses that root. Here the aim is
+  // narrower and unconditional: where a static state exists, use it.
+  double inlet_T = T_up;
+  double inlet_P = P_total_up;
+  if (st.feasible) {
+    inlet_T = st.T;
+    inlet_P = st.P;
+  }
+
+  auto [rho, drho_dT, drho_dP] = density_and_jacobians(inlet_T, inlet_P, X_up);
+  double u_in = st.feasible ? st.u : m_dot / (rho * area);
 
   // Get pressure drop and partial Jacobians w.r.t. (P_in, T_in, u_in)
   auto [dP_calc, d_dP_dP_in, d_dP_dT_in, d_dP_du_in] =
-      channel_compressible_mdot_and_jacobian(T_up, P_total_up, u_in, X_up, L, D, roughness, friction_model, f_multiplier, true);
+      channel_compressible_mdot_and_jacobian(inlet_T, inlet_P, u_in, X_up, L, D, roughness, friction_model, f_multiplier, true, st.feasible, exit_head_lost);
 
-  ChannelResult res;
   res.dP_calc = dP_calc;
 
-  // --- Full chain rule through u = m_dot / (rho(T,P) * area) ---
-  // d(u)/d(m_dot) = 1 / (rho * area)
-  // d(u)/d(P)     = -m_dot / (rho^2 * area) * drho/dP
-  // d(u)/d(T)     = -m_dot / (rho^2 * area) * drho/dT
-  double du_dmdot = 1.0 / (rho * area);
-  double du_dP = -m_dot / (rho * rho * area) * drho_dP;
-  double du_dT = -m_dot / (rho * rho * area) * drho_dT;
+  // --- Chain rule through the static-state inversion ---
+  //
+  // The march's partials are with respect to its OWN inputs (P_in, T_in,
+  // u_in), which are now the static state, not the element's unknowns. Those
+  // three all move together when Pt, Tt or m_dot moves, through the inversion:
+  //
+  //   d(dP)/dX = dP/dP_in * dPs/dX + dP/dT_in * dTs/dX + dP/du_in * du/dX
+  //
+  // Before this the code chained only through u and treated P_in = P_total,
+  // T_in = T_total as independent, which was consistent while the density came
+  // from the total state. With the inversion it is not, and the error is
+  // large: 4.7% on d/dm_dot, 3.1% on d/dP, 2.9% on d/dT against a central
+  // difference.
+  //
+  // dPs/dX, dTs/dX and du/dX come from differencing the INVERSION only -- it
+  // is a bisection on a smooth monotone flux, with no march and no Fanno
+  // integration, so this is cheap and clean. Differencing the whole pipeline
+  // instead would mean six more marches per residual.
+  (void)drho_dT;
+  (void)drho_dP;
+  auto invert_at = [&](double Pt_x, double Tt_x, double m_x) {
+    return channel_static_state(Pt_x, Tt_x, m_x, area, X_up);
+  };
+  // Structured bindings cannot be captured in C++17, so copy the march's
+  // partials into plain locals first.
+  const double dP_dPin = d_dP_dP_in;
+  const double dP_dTin = d_dP_dT_in;
+  const double dP_duin = d_dP_du_in;
+  auto chain = [&](const ChannelStaticState& plus,
+                   const ChannelStaticState& minus, double h) -> double {
+    if (!plus.feasible || !minus.feasible || h <= 0.0) {
+      return 0.0;
+    }
+    const double dPs = (plus.P - minus.P) / (2.0 * h);
+    const double dTs = (plus.T - minus.T) / (2.0 * h);
+    const double du = (plus.u - minus.u) / (2.0 * h);
+    return dP_dPin * dPs + dP_dTin * dTs + dP_duin * du;
+  };
 
-  // d(dP)/d(m_dot) = d(dP)/d(u) * d(u)/d(m_dot)
-  res.d_dP_d_mdot = d_dP_du_in * du_dmdot;
+  const double h_m = std::max(1e-9, std::abs(m_dot) * 1e-6);
+  res.d_dP_d_mdot = chain(invert_at(P_total_up, T_up, m_dot + h_m),
+                          invert_at(P_total_up, T_up, m_dot - h_m), h_m);
 
-  // d(dP)/d(P_total) = d(dP)/d(P_in) + d(dP)/d(u) * d(u)/d(P)
-  res.d_dP_dP_static_up = d_dP_dP_in + d_dP_du_in * du_dP;
+  const double h_P = std::max(1e-3, std::abs(P_total_up) * 1e-6);
+  res.d_dP_dP_static_up = chain(invert_at(P_total_up + h_P, T_up, m_dot),
+                                invert_at(P_total_up - h_P, T_up, m_dot), h_P);
 
-  // d(dP)/d(T) = d(dP)/d(T_in) + d(dP)/d(u) * d(u)/d(T)
-  res.d_dP_dT_up = d_dP_dT_in + d_dP_du_in * du_dT;
+  const double h_T = std::max(1e-4, std::abs(T_up) * 1e-6);
+  res.d_dP_dT_up = chain(invert_at(P_total_up, T_up + h_T, m_dot),
+                         invert_at(P_total_up, T_up - h_T, m_dot), h_T);
 
   // Compute d(dP)/d(Y[i]) using finite differences
   res.d_dP_dY_up.resize(Y_up.size(), 0.0);
@@ -1783,7 +1983,7 @@ ChannelResult channel_compressible_residuals_and_jacobian(
     double u_plus = m_dot / (rho_plus * area);
 
     auto [dP_plus, dummy3, dummy4, dummy5] =
-        channel_compressible_mdot_and_jacobian(T_up, P_total_up, u_plus, X_plus, L, D, roughness, friction_model, f_multiplier, false);
+        channel_compressible_mdot_and_jacobian(T_up, P_total_up, u_plus, X_plus, L, D, roughness, friction_model, f_multiplier, false, true, exit_head_lost);
     res.d_dP_dY_up[i] = (dP_plus - dP_calc) / eps_Y;
   }
 

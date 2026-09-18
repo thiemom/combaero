@@ -126,6 +126,13 @@ TODO.md
 # artifact.
 docs/sources/
 docs/heat_transfer/
+docs/lefebvre/
+# Copyrighted source material must never be committed. The rules above name
+# directories, which only helps for material filed in them -- a PDF dropped
+# straight into docs/ slipped past and was staged by a `git add -A`. Digitised
+# COORDINATES from these sources are measurements and may be committed to
+# validation/; the scans themselves may not.
+docs/*.pdf
 
 # Benchmark run outputs (auto-generated, not for tracking)
 benchmarks/runs/

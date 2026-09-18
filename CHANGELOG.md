@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - **Ribbed surfaces are selectable in the GUI again.** The node type returns
   with the fields the rebuilt correlation needs: rib geometry, the channel
   aspect ratio `W/H`, `n_ribbed_walls` as a 1/2/4 choice, and the
@@ -108,117 +109,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pin array. The impingement routine is driven by per-jet mass flow rather
   than a velocity and so leaves the new field unset; `ConvectiveSurface`
   carries the split that converts it.
+- **Pressure boundaries declare how they couple to a duct.**
+  `PressureBoundary(coupling=...)` takes `"auto"` (default), `"static"` or
+  `"total"`. A duct meeting a boundary either keeps its exit dynamic head (full
+  recovery, a diffuser) or loses it to the plenum (a bare exit discharging to
+  atmosphere) -- the previous behaviour was always the first, which is an ideal
+  diffuser on every outlet.
+
+  Pinning stagnation pressure at an outflow caps the mass flux at the sonic
+  value FOR THAT PRESSURE, a constraint the physical problem never imposed.
+  Measured on a 1.04 kg/s combustor duct at Tt = 1738 K: under total coupling
+  D = 0.10 m demands 1.34x an impossible ceiling and will not solve; under
+  static it runs at M = 0.752 and solves at Pt_in = 155 kPa. A genuinely
+  oversized demand (D = 0.08 m) still fails either way, so real limits surface.
+
+  `auto` infers from flow direction -- inflow takes total, outflow takes
+  static. It cannot decide for a boundary whose flow reverses, or that serves
+  both roles; that is what the explicit setting is for. Whoever builds such a
+  network knows whether the exit is a plain opening or a diffuser, and the
+  solver does not.
 
 
-### Changed
-- **`CLAUDE.md`'s explicit-includes rule names both strictnesses.** It said
-  "macOS-only implicit includes break Linux CI", which is one direction of a
-  two-directional problem and misleading: a `std::max({a,b,c})` here passed on
-  macOS **and** Linux and was caught only by MinGW. libstdc++ is strict about
-  transitive headers; MSVC is strict about POSIX-ish macros like `M_PI`. Any
-  platform can be the permissive one, and two agreeing is not evidence.
-
-- **`ChannelElement` supports smooth surfaces only** for now. The
-  user-set `Nu_multiplier` and `f_multiplier` on `ConvectiveSurface` are
-  **unaffected** -- they encode nothing, default to 1.0, and remain the
-  supported way to match measured data at an operating point.
-
-- **The GUI rejects saved networks carrying removed surface types** rather than
-  silently substituting smooth, which would answer a different question than
-  the one asked. Ribbed reports that it returns in a later release; the other
-  three report removal.
-
-- **`ChannelElement.residuals` no longer restates pipe friction in Python.**
-  It computed a `f_base` from a hardcoded Haaland/Petukhov branch, plus the
-  density, viscosity, velocity and Reynolds number feeding it, on every
-  residual evaluation -- including a `complete_state` call. After the pin-fin
-  and dimple fixes, all of it fed nothing but a guard: `rib_friction_multiplier`
-  takes no Reynolds number and `dimple_friction_multiplier` ignores the one it
-  is given. Removed, along with the air-at-STP fallbacks (`rho = 1.2`,
-  `mu = 1.8e-5`) it substituted whenever a state looked unphysical -- fabricated
-  properties a mid-Newton iterate would silently pick up.
-
-  Verified behaviour-neutral: residual and every Jacobian entry **identical
-  across 108 cases** -- four surface models, nine mass flows including zero,
-  1e-12 and reversed, three temperatures.
-
-  Reynolds number for the dimple correlation is now computed by a small helper.
-  Density cancels out of it (`rho * v` is `m_dot / area`), so no density guard
-  is needed at all.
-
-- **`ChannelElement` carries its provenance.** The docstring was one line with
-  no literature. It now names the formulations, points at the files that own
-  each correlation rather than transcribing them, and records the known
-  Jacobian gap.
-
-- **`test_channel_jacobians.py` checks derivatives rather than field
-  presence.** Its assertions were `assert result.ddP_dmdot != 0.0`, which says
-  a field was written, not that it is right -- an element-level defect 10.5%
-  in size survived it. The ribbed and pin-fin cases now verify `ddP_dvelocity`
-  against a central difference of `dP` in velocity.
-
-- **A localised array's pressure drop is now the correlation's own.** The
-  pin-fin and impingement correlations return `dP` directly, and
-  `ChannelElement` takes it instead of converting it into a multiplier on pipe
-  friction. The former route divided by a friction factor restated in Python
-  and let the C++ one multiply it back in, which cancels only when both pick
-  the same correlation. The Python side always used Haaland (rough) or
-  Petukhov (smooth) regardless of the element's `friction_model`, so the drop
-  moved by **+0.48%** for `colebrook`/`serghides` and **-24.7%** for
-  `petukhov`. For the default `haaland` the drop is unchanged bit for bit.
-
-  A channel carrying one of these surfaces now takes the array drop in both
-  regimes. The array correlations are incompressible by construction, so
-  `regime="compressible"` no longer layers Fanno friction on top of a drop the
-  array already owns.
-
-
-### Removed
-- **Every cooling correlation whose provenance did not survive review.** A
-  correlation-by-correlation audit against the cited sources found that the
-  base convective layer is exact and almost nothing above it is. Removed:
-  `rib_enhancement_factor`, `rib_friction_multiplier`, their `_high_re`
-  variants, `dimple_nusselt_enhancement`, `dimple_friction_multiplier`,
-  `pin_fin_nusselt`, `pin_fin_friction`, `impingement_nusselt`,
-  `film_cooling_effectiveness` and its `_avg` and Sellers multi-row
-  companions, `effusion_effectiveness`, `effusion_discharge_coefficient`,
-  the `channel_ribbed`/`channel_dimpled`/`channel_pin_fin`/`channel_impingement`
-  wrappers, the seven finite-difference `_and_jacobian` helpers built on them,
-  their pybind11 bindings and `units_data.h` entries, the `RibbedModel`,
-  `DimpledModel`, `PinFinModel` and `ImpingementModel` surface types, and the
-  matching GUI node types.
-
-  Why removal rather than repair: repair needs a known-good target and the
-  citations did not provide one. `rib_friction_multiplier` returned **1.4534**
-  where the only rib datum in the repository gives ~6.3 -- a factor of 4-5, in
-  the pair the element actually shipped. The dimple pair swept depth and
-  spacing that its cited source held fixed, and its `S_d` validation would have
-  rejected that source's own geometry. `impingement_nusselt` cited a
-  correlation whose defining term is the crossflow-to-jet mass flux ratio and
-  had no mass flux argument. `film_cooling_effectiveness` decayed
-  exponentially where film effectiveness decays as a power law.
-  `effusion_effectiveness` used `I = M^2*DR` for a momentum flux ratio that is
-  `M^2/DR` -- with the correct definition present but unused in the same file.
-
-  The tests did not catch any of it because they measured the code against
-  itself: `assert 1.0 < multiplier < 10.0` for a value 4-5x off, and
-  `assert 1.3 <= f <= 2.2` against the function's own clamp.
-
-  Migration: pin `combaero~=0.6` to keep the previous behaviour. Rebuilt
-  correlations land per issue #339, ribs first (#334).
-
-- **`dimple_friction_multiplier_and_jacobian`** (C++, its pybind11 binding and
-  the `combaero._solver_tools` re-export). It reported a derivative w.r.t.
-  `Re_Dh` that was **identically zero at every Reynolds number**, because
-  `dimple_friction_multiplier` accepts `Re_Dh` and never uses it -- the
-  multiplier is a function of dimple geometry alone. It obtained that zero by
-  central finite difference, which the Solver (f, J) rule in `CLAUDE.md`
-  forbids. Nothing called it: `channel_dimpled` uses the plain multiplier, and
-  the archived note claiming otherwise was wrong. Callers wanting the value use
-  `dimple_friction_multiplier`; there is no derivative to want.
-
-
-### Fixed
 
 - **The momentum chamber closed on incompressible Bernoulli.**
   `MomentumChamberNode` enforced `Pt = P + 0.5*rho*v^2`, which under-predicts
@@ -411,6 +322,150 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dependence, which is what localised the fault. Newton convergence on
   networks using either surface should improve; the converged solution for the
   default `friction_model="haaland"` is unchanged.
+
+
+### Changed
+- **`CLAUDE.md`'s explicit-includes rule names both strictnesses.** It said
+  "macOS-only implicit includes break Linux CI", which is one direction of a
+  two-directional problem and misleading: a `std::max({a,b,c})` here passed on
+  macOS **and** Linux and was caught only by MinGW. libstdc++ is strict about
+  transitive headers; MSVC is strict about POSIX-ish macros like `M_PI`. Any
+  platform can be the permissive one, and two agreeing is not evidence.
+
+- **`ChannelElement` supports smooth surfaces only** for now. The
+  user-set `Nu_multiplier` and `f_multiplier` on `ConvectiveSurface` are
+  **unaffected** -- they encode nothing, default to 1.0, and remain the
+  supported way to match measured data at an operating point.
+
+- **The GUI rejects saved networks carrying removed surface types** rather than
+  silently substituting smooth, which would answer a different question than
+  the one asked. Ribbed reports that it returns in a later release; the other
+  three report removal.
+
+- **`ChannelElement.residuals` no longer restates pipe friction in Python.**
+  It computed a `f_base` from a hardcoded Haaland/Petukhov branch, plus the
+  density, viscosity, velocity and Reynolds number feeding it, on every
+  residual evaluation -- including a `complete_state` call. After the pin-fin
+  and dimple fixes, all of it fed nothing but a guard: `rib_friction_multiplier`
+  takes no Reynolds number and `dimple_friction_multiplier` ignores the one it
+  is given. Removed, along with the air-at-STP fallbacks (`rho = 1.2`,
+  `mu = 1.8e-5`) it substituted whenever a state looked unphysical -- fabricated
+  properties a mid-Newton iterate would silently pick up.
+
+  Verified behaviour-neutral: residual and every Jacobian entry **identical
+  across 108 cases** -- four surface models, nine mass flows including zero,
+  1e-12 and reversed, three temperatures.
+
+  Reynolds number for the dimple correlation is now computed by a small helper.
+  Density cancels out of it (`rho * v` is `m_dot / area`), so no density guard
+  is needed at all.
+
+- **`ChannelElement` carries its provenance.** The docstring was one line with
+  no literature. It now names the formulations, points at the files that own
+  each correlation rather than transcribing them, and records the known
+  Jacobian gap.
+
+- **`test_channel_jacobians.py` checks derivatives rather than field
+  presence.** Its assertions were `assert result.ddP_dmdot != 0.0`, which says
+  a field was written, not that it is right -- an element-level defect 10.5%
+  in size survived it. The ribbed and pin-fin cases now verify `ddP_dvelocity`
+  against a central difference of `dP` in velocity.
+
+- **A localised array's pressure drop is now the correlation's own.** The
+  pin-fin and impingement correlations return `dP` directly, and
+  `ChannelElement` takes it instead of converting it into a multiplier on pipe
+  friction. The former route divided by a friction factor restated in Python
+  and let the C++ one multiply it back in, which cancels only when both pick
+  the same correlation. The Python side always used Haaland (rough) or
+  Petukhov (smooth) regardless of the element's `friction_model`, so the drop
+  moved by **+0.48%** for `colebrook`/`serghides` and **-24.7%** for
+  `petukhov`. For the default `haaland` the drop is unchanged bit for bit.
+
+  A channel carrying one of these surfaces now takes the array drop in both
+  regimes. The array correlations are incompressible by construction, so
+  `regime="compressible"` no longer layers Fanno friction on top of a drop the
+  array already owns.
+
+
+### Removed
+- **Every cooling correlation whose provenance did not survive review.** A
+  correlation-by-correlation audit against the cited sources found that the
+  base convective layer is exact and almost nothing above it is. Removed:
+  `rib_enhancement_factor`, `rib_friction_multiplier`, their `_high_re`
+  variants, `dimple_nusselt_enhancement`, `dimple_friction_multiplier`,
+  `pin_fin_nusselt`, `pin_fin_friction`, `impingement_nusselt`,
+  `film_cooling_effectiveness` and its `_avg` and Sellers multi-row
+  companions, `effusion_effectiveness`, `effusion_discharge_coefficient`,
+  the `channel_ribbed`/`channel_dimpled`/`channel_pin_fin`/`channel_impingement`
+  wrappers, the seven finite-difference `_and_jacobian` helpers built on them,
+  their pybind11 bindings and `units_data.h` entries, the `RibbedModel`,
+  `DimpledModel`, `PinFinModel` and `ImpingementModel` surface types, and the
+  matching GUI node types.
+
+  Why removal rather than repair: repair needs a known-good target and the
+  citations did not provide one. `rib_friction_multiplier` returned **1.4534**
+  where the only rib datum in the repository gives ~6.3 -- a factor of 4-5, in
+  the pair the element actually shipped. The dimple pair swept depth and
+  spacing that its cited source held fixed, and its `S_d` validation would have
+  rejected that source's own geometry. `impingement_nusselt` cited a
+  correlation whose defining term is the crossflow-to-jet mass flux ratio and
+  had no mass flux argument. `film_cooling_effectiveness` decayed
+  exponentially where film effectiveness decays as a power law.
+  `effusion_effectiveness` used `I = M^2*DR` for a momentum flux ratio that is
+  `M^2/DR` -- with the correct definition present but unused in the same file.
+
+  The tests did not catch any of it because they measured the code against
+  itself: `assert 1.0 < multiplier < 10.0` for a value 4-5x off, and
+  `assert 1.3 <= f <= 2.2` against the function's own clamp.
+
+  Migration: pin `combaero~=0.6` to keep the previous behaviour. Rebuilt
+  correlations land per issue #339, ribs first (#334).
+
+- **`dimple_friction_multiplier_and_jacobian`** (C++, its pybind11 binding and
+  the `combaero._solver_tools` re-export). It reported a derivative w.r.t.
+  `Re_Dh` that was **identically zero at every Reynolds number**, because
+  `dimple_friction_multiplier` accepts `Re_Dh` and never uses it -- the
+  multiplier is a function of dimple geometry alone. It obtained that zero by
+  central finite difference, which the Solver (f, J) rule in `CLAUDE.md`
+  forbids. Nothing called it: `channel_dimpled` uses the plain multiplier, and
+  the archived note claiming otherwise was wrong. Callers wanting the value use
+  `dimple_friction_multiplier`; there is no derivative to want.
+
+
+### Fixed
+
+- **The Fanno march was integrating an incompressible gradient.**
+  `dpdx_fanno` returned `-f/(2D) rho u^2` -- Darcy-Weisbach. The Fanno static
+  pressure gradient carries `(1 + (g-1)M^2)/(1 - M^2)`, and the `1/(1 - M^2)`
+  term is what produces the choking singularity. Without it the flow never
+  choked however long the duct: marched over its OWN `fanno_max_length`, where
+  M must reach 1 by definition, it reached M = 0.37 / 0.55 / 0.72 from inlet
+  Mach 0.3 / 0.5 / 0.7 and reported `choked = false` every time. It now agrees
+  with an independent integration of the standard ODE (M = 0.9841 against
+  0.9714 at L*).
+
+  `fanno_max_length` returned **half** the correct length: its estimate divided
+  by `4f` where `f` is Darcy, putting it at L*/4, and with a bracket of only
+  twice the estimate the bisection saturated at its own upper bound. It now
+  matches the tables to 0.02% from M = 0.3 to 0.85.
+
+- **The compressible channel confused static and total pressure, three ways.**
+  It evaluated density at `P_total` ("uses P_total as proxy for P_static
+  (low-Mach approximation)"), so at M ~ 0.76 it was 1.59x too dense and
+  reported converged solutions for flows 1.37x past its own choked limit. The
+  inlet static state is now inverted from `(Pt, Tt, m_dot, A)` -- energy,
+  isentropic static/total, continuity -- as a 1-D root find on Mach, using the
+  entropy-based relations `stagnation.h` already provided.
+
+  The march returned a STATIC drop while `ChannelElement` consumed it as a
+  stagnation drop; in Fanno flow the flow accelerates and converts static head
+  into dynamic, so the two differ by 1.09 - 1.58x over M = 0.34 - 0.64. It now
+  returns `Pt_in - Pt_out`.
+
+  The Jacobian chained through the march's inputs as if they were the element's
+  unknowns, which held only while density came from the total state. Chained
+  through the inversion instead, the error against a central difference fell
+  from 4.7e-2 to 3.1e-8.
 
 ## [0.6.0] - 2026-09-09
 

@@ -455,9 +455,32 @@ double solve_T_from_energy(
     return T;
 }
 
-// Compute dp/dx from momentum equation: dp/dx = -f/(2D) * rho * u²
-double dpdx_fanno(double rho, double u, double f, double D) {
-    return -f / (2.0 * D) * rho * u * u;
+// Fanno static-pressure gradient.
+//
+//   dP/dx = -(f / 2D) * rho * u^2 * (1 + (g-1) M^2) / (1 - M^2)
+//
+// This was the leading factor alone, i.e. plain Darcy-Weisbach. Without the
+// compressibility group the march integrates an INCOMPRESSIBLE drop under a
+// Fanno name: there is no 1/(1 - M^2) singularity, so the flow never chokes
+// however long the duct. Marched over its own fanno_max_length, which is where
+// M must reach 1 by definition, it reached M = 0.37 / 0.55 / 0.72 from inlet
+// Mach 0.3 / 0.5 / 0.7 and reported choked = false every time (issue #362).
+//
+// The Mach number is taken from the local state rather than passed in, so the
+// call sites keep their signature; a is evaluated on the same (T, X) the
+// caller used for rho.
+//
+// Guarded at M -> 1: the gradient is genuinely singular there, and the march's
+// own choke detection is what should stop it, not an infinity propagating
+// through RK4.
+double dpdx_fanno(double rho, double u, double f, double D,
+                  double T, const std::vector<double>& X) {
+    const double a = speed_of_sound(T, X);
+    const double M2 = (a > 1e-9) ? (u * u) / (a * a) : 0.0;
+    const double g = isentropic_expansion_coefficient(T, X);
+    const double denom = std::max(1.0 - M2, kFannoGradientFloor);
+    const double compressibility = (1.0 + (g - 1.0) * M2) / denom;
+    return -f / (2.0 * D) * rho * u * u * compressibility;
 }
 
 }  // namespace
@@ -552,28 +575,28 @@ FannoSolution fanno_channel(
     for (std::size_t step = 0; step < n_steps; ++step) {
         // RK4 integration of dp/dx
         // k1
-        double k1 = dpdx_fanno(rho, u, f, D);
+        double k1 = dpdx_fanno(rho, u, f, D, T, X);
 
         // k2: evaluate at x + dx/2, P + k1*dx/2
         double P2 = P + 0.5 * k1 * dx;
         if (P2 <= 0.0) { sol.choked = true; sol.L_choke = x + 0.5 * dx * P / (P - P2); break; }
         [[maybe_unused]] double T2, u2, rho2;
         T2 = solve_T_from_energy(P2, sol.h0, sol.mdot, A, X, mw_kg, T, u2, rho2);
-        double k2 = dpdx_fanno(rho2, u2, f, D);
+        double k2 = dpdx_fanno(rho2, u2, f, D, T2, X);
 
         // k3: evaluate at x + dx/2, P + k2*dx/2
         double P3 = P + 0.5 * k2 * dx;
         if (P3 <= 0.0) { sol.choked = true; sol.L_choke = x + 0.5 * dx * P / (P - P3); break; }
         [[maybe_unused]] double T3, u3, rho3;
         T3 = solve_T_from_energy(P3, sol.h0, sol.mdot, A, X, mw_kg, T, u3, rho3);
-        double k3 = dpdx_fanno(rho3, u3, f, D);
+        double k3 = dpdx_fanno(rho3, u3, f, D, T3, X);
 
         // k4: evaluate at x + dx, P + k3*dx
         double P4 = P + k3 * dx;
         if (P4 <= 0.0) { sol.choked = true; sol.L_choke = x + dx * P / (P - P4); break; }
         [[maybe_unused]] double T4, u4, rho4;
         T4 = solve_T_from_energy(P4, sol.h0, sol.mdot, A, X, mw_kg, T, u4, rho4);
-        double k4 = dpdx_fanno(rho4, u4, f, D);
+        double k4 = dpdx_fanno(rho4, u4, f, D, T4, X);
 
         // Update P
         double P_new = P + dx * (k1 + 2.0*k2 + 2.0*k3 + k4) / 6.0;
@@ -764,7 +787,7 @@ FannoSolution fanno_channel_rough(
     for (std::size_t step = 0; step < n_steps; ++step) {
         // k1: local f at current state
         const double f1 = local_friction(T, P, u, D, roughness, X, correlation, f_multiplier);
-        const double k1 = dpdx_fanno(rho, u, f1, D);
+        const double k1 = dpdx_fanno(rho, u, f1, D, T, X);
 
         // k2
         const double P2 = P + 0.5 * k1 * dx;
@@ -772,7 +795,7 @@ FannoSolution fanno_channel_rough(
         double T2, u2, rho2;
         T2 = solve_T_from_energy(P2, sol.h0, sol.mdot, A, X, mw_kg, T, u2, rho2);
         const double f2 = local_friction(T2, P2, u2, D, roughness, X, correlation, f_multiplier);
-        const double k2 = dpdx_fanno(rho2, u2, f2, D);
+        const double k2 = dpdx_fanno(rho2, u2, f2, D, T2, X);
 
         // k3
         const double P3 = P + 0.5 * k2 * dx;
@@ -780,7 +803,7 @@ FannoSolution fanno_channel_rough(
         double T3, u3, rho3;
         T3 = solve_T_from_energy(P3, sol.h0, sol.mdot, A, X, mw_kg, T, u3, rho3);
         const double f3 = local_friction(T3, P3, u3, D, roughness, X, correlation, f_multiplier);
-        const double k3 = dpdx_fanno(rho3, u3, f3, D);
+        const double k3 = dpdx_fanno(rho3, u3, f3, D, T3, X);
 
         // k4
         const double P4 = P + k3 * dx;
@@ -788,7 +811,7 @@ FannoSolution fanno_channel_rough(
         double T4, u4, rho4;
         T4 = solve_T_from_energy(P4, sol.h0, sol.mdot, A, X, mw_kg, T, u4, rho4);
         const double f4 = local_friction(T4, P4, u4, D, roughness, X, correlation, f_multiplier);
-        const double k4 = dpdx_fanno(rho4, u4, f4, D);
+        const double k4 = dpdx_fanno(rho4, u4, f4, D, T4, X);
 
         const double P_new = P + dx * (k1 + 2.0*k2 + 2.0*k3 + k4) / 6.0;
         if (P_new <= 0.0) { sol.choked = true; sol.L_choke = x + dx * P / (P - P_new); break; }
@@ -894,11 +917,21 @@ double fanno_max_length(
     double term1 = (1.0 - M2) / (gamma * M2);
     double term2 = (gamma + 1.0) / (2.0 * gamma) *
                    std::log((gamma + 1.0) * M2 / (2.0 + (gamma - 1.0) * M2));
-    double L_star_estimate = D * (term1 + term2) / (4.0 * f);
+    // The tabulated group 4fL*/D is defined on FANNING friction, and f here is
+    // DARCY (the march's dpdx_fanno = -f/(2D) rho u^2 is Darcy-Weisbach), so
+    // f_Darcy = 4 f_Fanning and the length is D * term / f_Darcy. Dividing by
+    // 4f instead put the estimate at a quarter of the true L*, and since the
+    // bracket below is only twice the estimate, the bisection could never
+    // reach the answer -- it saturated at its own upper bound and returned
+    // exactly L*/2 at every inlet Mach. See issue #362.
+    double L_star_estimate = D * (term1 + term2) / f;
 
-    // Binary search
+    // Binary search. The bracket is generous rather than tight: the estimate
+    // is an ideal-gas relation and the march it is being reconciled with uses
+    // real properties, so an upper bound that merely doubles the estimate can
+    // sit below the answer.
     double L_low = 0.0;
-    double L_high = 2.0 * L_star_estimate;
+    double L_high = 4.0 * L_star_estimate;
 
     for (std::size_t iter = 0; iter < max_iter; ++iter) {
         double L_mid = 0.5 * (L_low + L_high);
