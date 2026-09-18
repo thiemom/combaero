@@ -71,9 +71,39 @@ raised for a human.
 | a drawn line that does not reproduce its own printed equation | `printed-curve` |
 | double-picked or missed marks | `count`, `distinct` |
 | a series read off the wrong panel | `y-span`, `monotonic` |
+| an ordinate calibration carried over from another panel | `y-span` + `x-span` PASSING |
 
 Each of those was verified by injecting the bug and confirming the right
-check goes red.
+check goes red -- except the last, which was caught on live data.
+
+### The carried-over calibration, a worked case
+
+Figure 4.46 stacks two panels sharing one abscissa: `G` above with ticks
+8 to 40, `R/(P/e/10)^0.35` below with ticks 2 to 5. The lower panel was
+digitised first. On the upper panel the ordinate calibration was left at
+the lower panel's `y0 = 2, y1 = 5` where it needed `y0 = 8, y1 = 40`, and
+the four points came back as 2.34 to 3.76 where the printed line runs
+10.6 to 25.1.
+
+The card reported `y-span` failing on all four and `printed-curve` at
+**469.71%**. The diagnosis came from what PASSED: `x-span` was clean.
+A shared abscissa cannot be disturbed by an ordinate mis-calibration, so
+a clean x with a broken y points at the panel, not at the reading.
+
+Applying the anchors `2 -> 8` and `5 -> 40` on the log axis -- a recovery
+with no free parameters -- brought the RMS from 469.71% to 2.11% and
+returned `3.787 (e+)^0.2722` against the printed `3.7 (e+)^0.28`, which
+confirmed the cause.
+
+**The recovered values were not used.** Their residual drifts
+systematically with `e+` (-0.72% to -3.31%), so the assumed anchors are
+not quite the true axis ends. A recovery good enough to identify a bug is
+not automatically good enough to be data: a 2-3% systematic tilt would
+consume half of Han's stated 6% band before the model is involved. The
+points were re-picked against a correctly calibrated ordinate instead.
+
+Because the panels share an abscissa, this trap recurs on every panel
+switch. Set the ordinate first, on the panel actually being read.
 
 **What still needs a human read**, and is why the cards carry
 `NEEDS HUMAN READ` markers rather than guesses:
