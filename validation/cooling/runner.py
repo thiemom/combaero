@@ -1,0 +1,198 @@
+"""Evaluate an implemented correlation set against the digitised series.
+
+The runner never computes G from a set's coefficients itself. It calls
+cb.evaluate_rib and bisects the Reynolds number until the chain's own e+
+lands on the digitised abscissa, so the whole chain -- friction factor,
+e+, then G -- is what gets scored. Reimplementing the formula here would
+score the model against a second copy of itself, which is the failure
+mode #333 exists to prevent.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import combaero as cb
+
+from validation.cooling.schema import Point, SeriesMetadata, load_points
+
+# Han states G_bar (the ribbed/smooth average) as 1.2 G. Confirmed as item
+# 10 of validation/cooling/extractions/han_ribbed.md, from the label on
+# Figure 4.47.
+G_BAR_OVER_G = 1.2
+
+# Bracket for the Re bisection. Deliberately far wider than any set's
+# stated validity: a series may sit outside it, and reporting that as
+# extrapolated is the point rather than something to avoid.
+RE_LO = 1.0e3
+RE_HI = 1.0e8
+BISECT_STEPS = 200
+
+
+@dataclass(frozen=True)
+class Record:
+    """One digitised point, evaluated."""
+
+    series: SeriesMetadata
+    x: float  # e+
+    measured: float
+    predicted: float | None  # None when the set has no binding
+    extrapolated: bool
+    re_used: float | None
+    reason: str | None = None  # why there is no prediction
+
+    @property
+    def rel_error(self) -> float | None:
+        if self.predicted is None or self.measured == 0.0:
+            return None
+        return self.predicted / self.measured - 1.0
+
+    @property
+    def within_uncertainty(self) -> bool:
+        band = self.series.uncertainty
+        err = self.rel_error
+        if band is None or err is None:
+            return False
+        return abs(err) <= band
+
+
+SETS = {
+    "han_1988_orthogonal": cb.han_1988_orthogonal,
+}
+
+
+def _binding_reason(
+    rib_set: "cb.RibCorrelationSet", series: SeriesMetadata
+) -> str | None:
+    """Why this set cannot answer for this series, or None if it can.
+
+    A set outside its NUMERIC validity is still answering the question --
+    that is an extrapolation, and the scorecard reports it as one. A set
+    asked about a CONFIGURATION it has no binding for is not: scoring
+    han_1988_orthogonal, whose valid_alpha is [90, 90] and whose G carries
+    no alpha term, against 45 deg rib data produced a 26.7% bias that reads
+    as model error when it is really the wrong correlation entirely. That
+    is the shape of misleading metric this harness exists to prevent, so
+    the configuration mismatch is refused rather than scored.
+    """
+    alpha = series.alpha_deg
+    rng = rib_set.valid_alpha
+    if alpha is not None and rng.hi >= rng.lo:
+        if not (rng.lo <= alpha <= rng.hi):
+            return (
+                f"{alpha:g} deg ribs; {rib_set.name} binds "
+                f"{rng.lo:g}-{rng.hi:g} deg only"
+            )
+    return None
+
+
+def _probe_geometry(rib_set: "cb.RibCorrelationSet") -> cb.RibGeometry:
+    """A geometry at the centre of the set's stated validity.
+
+    Only legitimate when the set's G carries no geometry dependence -- see
+    _assert_geometry_free. The probe then fixes only WHICH Reynolds number
+    reaches a given e+, not the G reported there.
+    """
+    geom = cb.RibGeometry()
+    geom.e_D = _mid(rib_set.valid_eD, 0.0625)
+    geom.p_e = _mid(rib_set.valid_pe, 10.0)
+    geom.W_H = _mid(rib_set.valid_WH, 1.0)
+    geom.alpha_deg = 90.0
+    return geom
+
+
+def _mid(rng: "cb.RibRange", fallback: float) -> float:
+    return 0.5 * (rng.lo + rng.hi) if rng.hi > rng.lo else fallback
+
+
+def _assert_geometry_free(rib_set: "cb.RibCorrelationSet") -> None:
+    """Refuse to score a geometry-dependent set against geometry-less data.
+
+    The Han and Zhang (1992) rig geometry is not stated in the source we
+    extracted, so it is recorded as missing. For a set whose G has zero
+    exponents on e/D, P/e, W/H and alpha this costs nothing. For any other
+    set it would mean substituting a default and reporting the result as a
+    measurement, so the runner stops instead.
+    """
+    terms = {
+        "e/D": rib_set.G_eD,
+        "P/e": rib_set.G_pe,
+        "W/H": rib_set.G_WH,
+        "alpha": rib_set.G_alpha,
+    }
+    bound = [name for name, t in terms.items() if t.exponent != 0.0]
+    if bound:
+        raise ValueError(
+            f"{rib_set.name} binds G to {', '.join(bound)}, but the digitised "
+            "series carries no rig geometry. Supply the geometry in "
+            "metadata.yaml from the primary paper before scoring this set."
+        )
+
+
+def _g_at_eplus(
+    rib_set: "cb.RibCorrelationSet", geom: cb.RibGeometry, target: float
+) -> tuple[float, bool, float] | None:
+    """G at a target e+, found by bisecting Re through the real chain."""
+    lo, hi = RE_LO, RE_HI
+    if cb.evaluate_rib(rib_set, geom, lo).e_plus > target:
+        return None
+    if cb.evaluate_rib(rib_set, geom, hi).e_plus < target:
+        return None
+    for _ in range(BISECT_STEPS):
+        mid = 0.5 * (lo + hi)
+        if cb.evaluate_rib(rib_set, geom, mid).e_plus < target:
+            lo = mid
+        else:
+            hi = mid
+        if hi - lo < 1e-9 * max(1.0, hi):
+            break
+    re = 0.5 * (lo + hi)
+    res = cb.evaluate_rib(rib_set, geom, re)
+    return res.G, res.extrapolated, re
+
+
+def run_series(series: SeriesMetadata) -> list[Record]:
+    """Evaluate one series. Unscored series yield records with no prediction."""
+    points: list[Point] = load_points(series)
+
+    if series.scores is None:
+        return [
+            Record(series, p.x, p.y, None, False, None, "not scored by any set")
+            for p in points
+        ]
+    if series.x_axis != "e_plus":
+        return [
+            Record(series, p.x, p.y, None, False, None, f"x axis is {series.x_axis}")
+            for p in points
+        ]
+
+    rib_set = SETS[series.scores]()
+    _assert_geometry_free(rib_set)
+
+    unsupported = _binding_reason(rib_set, series)
+    if unsupported is not None:
+        return [
+            Record(series, p.x, p.y, None, False, None, unsupported) for p in points
+        ]
+
+    geom = _probe_geometry(rib_set)
+
+    records: list[Record] = []
+    for p in points:
+        found = _g_at_eplus(rib_set, geom, p.x)
+        if found is None:
+            records.append(
+                Record(series, p.x, p.y, None, True, None, "e+ unreachable")
+            )
+            continue
+        g, extrapolated, re = found
+        predicted = g * G_BAR_OVER_G if series.y_axis == "G_bar" else g
+        records.append(Record(series, p.x, p.y, predicted, extrapolated, re))
+    return records
+
+
+def run_all(dataset: list[SeriesMetadata]) -> list[Record]:
+    out: list[Record] = []
+    for series in dataset:
+        out.extend(run_series(series))
+    return out

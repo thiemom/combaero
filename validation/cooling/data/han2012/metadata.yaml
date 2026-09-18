@@ -1,0 +1,219 @@
+# Digitised points from figures in Han, Dutta & Ekkad (2012).
+#
+# The book is a SECONDARY source for every series here: each figure is
+# reprinted from a primary paper, named per-series under `after`. The
+# scans stay gitignored under docs/heat_transfer/; only these coordinates
+# are committed.
+
+paper:
+  name: han2012
+  citation: >-
+    Han, J.C., Dutta, S. and Ekkad, S. (2012). Gas Turbine Heat Transfer
+    and Cooling Technology, 2nd Edition. CRC Press.
+  secondary: true
+
+files:
+  # -- Figure 4.54: G_bar against e+ -------------------------------------
+  #
+  # The digitised x axis is e+ / 1e4, established from two independent
+  # channels that agree:
+  #
+  #   READ: the printed abscissa is labelled `e+ x 10^-2` with ticks at
+  #   1, 2, 4, 6, 8, 10, so the figure spans e+ = 100 to 1000. Applying
+  #   x_scale = 1e4 places the digitised points at e+ = 179 to 972, inside
+  #   that span and filling it.
+  #
+  #   FITTED: only x_scale = 1e4 reproduces the extraction's free fits
+  #   (G_bar = 4.201 e+^0.2952 for the 90 deg line, 3.242 e+^0.2882 for the
+  #   45 deg V data) -- 0.5-1.9% RMS, against 48-97% at every neighbouring
+  #   decade.
+  #
+  # The digitiser evidently calibrated on the tick labels without the
+  # `x 10^-2` multiplier, shifting two decades; the fitted channel found
+  # the same shift the printed axis states. Figure 4.51 carries the same
+  # `x 10^-2` axis and will need the same treatment.
+  #
+  # Both series below are read from the LOWER panel (G_bar). The figure has
+  # two panels, G above and G_bar below, sharing one abscissa.
+
+  - path: fig4.54_90deg_continuous_Gbar_curve.csv
+    after: "Han, J.C. and Zhang, Y.M. (1992). IJHMT 35(2), 513."
+    page: 386
+    item: "Figure 4.54"
+    series: "90 deg continuous rib, drawn correlation line"
+    geometry: null          # not stated in the extracted text; see note below
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G_bar
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.06       # Han's stated 6% for 95% of the data
+    cross_check: >-
+      Free fit gives G_bar = 4.201 e+^0.2952 against the confirmed
+      G_bar = 1.2 * 3.7 e+^0.28 = 4.44 e+^0.28, agreeing to 3.5%. This
+      reaches item 10 (G_bar = 1.2 G) from a different paper, a different
+      figure and a different rib family than the label it was settled by.
+    scores: han_1988_orthogonal
+
+  - path: fig4.54_90deg_continuous_Gbar_data.csv
+    after: "Han, J.C. and Zhang, Y.M. (1992). IJHMT 35(2), 513."
+    page: 386
+    item: "Figure 4.54"
+    series: "90 deg continuous rib, measured points"
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G_bar
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.06
+    cross_check: >-
+      Scatter about its own drawn line (the curve series above) must exceed
+      the line's own deviation from the correlation; 5.4% against 3.5%.
+    scores: han_1988_orthogonal
+
+  - path: fig4.54_45deg_vbroken_Gbar_data.csv
+    after: "Han, J.C. and Zhang, Y.M. (1992). IJHMT 35(2), 513."
+    page: 386
+    item: "Figure 4.54"
+    series: "45 deg V-shaped broken rib, measured points"
+    geometry: null
+    alpha_deg: 45.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G_bar
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.06
+    cross_check: >-
+      Free fit gives G_bar = 3.242 e+^0.2882 against the 90 deg line's
+      4.201 e+^0.2952. Lower G is better heat transfer, so this series must
+      sit BELOW the 90 deg line across the range -- 0.739 of it at
+      e+ = 500 -- matching the text's claim that broken V ribs are the best
+      performers of the group. A sign error in the digitisation would
+      invert it.
+    # Deliberately NOT scored: broken V ribs are a different rib family and
+    # han_1988_orthogonal has no binding for them. Carried because it is the
+    # reference point behind the extraction's "26% better" claim, and a
+    # scorecard row of 'unsupported' is more honest than omitting the series.
+    scores: null
+
+  # -- Figure 4.193c: G against e+, extended Reynolds range ---------------
+  #
+  # x is e+ directly here; no scale recovery was needed.
+
+  - path: fig4.193c_old_correlation_G_curve.csv
+    after: "Rallabandi, A.P., Yang, H. and Han, J.C. (2009). ASME J. Heat Transfer 131, 071703."
+    page: 513
+    item: "Figure 4.193c, curve labelled 'old correlation'"
+    series: "Han/Han-Park correlation as printed on the figure"
+    geometry: null
+    alpha_deg: 45.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.08
+    cross_check: >-
+      Free fit must recover the printed exponent 0.35 rather than the new
+      correlation's 0.42; the two curves are separated by that exponent.
+    scores: han_1988_orthogonal
+
+  - path: fig4.193c_new_correlation_G_curve.csv
+    after: "Rallabandi, A.P., Yang, H. and Han, J.C. (2009). ASME J. Heat Transfer 131, 071703."
+    page: 513
+    item: "Figure 4.193c, curve labelled 'new correlation'"
+    series: "extended-range correlation as printed on the figure"
+    geometry: null
+    alpha_deg: 45.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.08
+    cross_check: >-
+      Free fit must recover the printed exponent 0.42, distinguishing it
+      from the old-correlation curve.
+    # The extended-range set is not implemented: extraction item 20 records
+    # that (e/D)^0.14 as transcribed contradicts the figure, and item 19
+    # records the matching friction correlation as missing outright.
+    scores: null
+
+  - path: fig4.193c_G_scatter.csv
+    after: "Rallabandi, A.P., Yang, H. and Han, J.C. (2009). ASME J. Heat Transfer 131, 071703."
+    page: 513
+    item: "Figure 4.193c, data cloud"
+    series: "sharp-edged 45 deg ribs, all measured points, unclassified"
+    geometry: null
+    alpha_deg: 45.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.08
+    cross_check: >-
+      The cloud must straddle the new-correlation curve and sit above the
+      old one at high e+, which is the figure's whole point.
+    scores: han_1988_orthogonal
+
+  # -- Figure 4.53: Nu ratio against friction ratio -----------------------
+  #
+  # Carried as data, not scored. The axes are a thermal-performance curve
+  # (Nu_r/Nu_s against f/f_s), and scoring it needs both a Nusselt and a
+  # friction binding for BROKEN ribs, which no implemented set has.
+
+  - path: fig4.53_90deg_continuous_Nu_ratio.csv
+    after: "Han, J.C. and Zhang, Y.M. (1992). IJHMT 35(2), 513."
+    page: 385
+    item: "Figure 4.53, solid circles"
+    series: "90 deg continuous rib, ribbed-side Nu ratio"
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: f_ratio
+    x_scale: 1.0
+    y_axis: Nu_ratio
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.08
+    cross_check: >-
+      Nu ratio must fall and f ratio rise with Reynolds number along the
+      series, the trend the section text states for all ribs.
+    scores: null
+
+  - path: fig4.53_60deg_vcontinuous_Nu_ratio.csv
+    after: "Han, J.C. and Zhang, Y.M. (1992). IJHMT 35(2), 513."
+    page: 385
+    item: "Figure 4.53, solid diamonds"
+    series: "60 deg V-shaped continuous rib, ribbed-side Nu ratio"
+    geometry: null
+    alpha_deg: 60.0
+    x_axis: f_ratio
+    x_scale: 1.0
+    y_axis: Nu_ratio
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.08
+    cross_check: >-
+      Must sit above the 90 deg continuous series at every Reynolds number;
+      the text calls the 60 deg V continuous rib the highest of the group.
+    scores: null
+
+# The Han and Zhang (1992) rig geometry (e/D, P/e, W/H) is NOT stated in the
+# extracted text and is recorded as missing rather than guessed. It costs
+# nothing for han_1988_orthogonal, whose G carries zero exponents on all
+# three -- G = 3.7 (e+)^0.28 and nothing else. Any set with a geometry
+# binding cannot be scored against these series until the primary paper
+# supplies it, and the runner refuses rather than substituting a default.

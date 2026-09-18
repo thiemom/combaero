@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A scored validation harness for the cooling correlations**, on the
+  pattern `validation/junction/` uses. `uv run python -m
+  validation.cooling.scorecard` reports MAE, RMSE, bias and in-band counts
+  per digitised series.
+
+  It scores THROUGH the model rather than around it: the runner bisects the
+  Reynolds number until `evaluate_rib`'s own `e+` reaches the digitised
+  abscissa, so friction factor, `e+` and `G` are all exercised. Recomputing
+  the formula in the harness would score the model against a second copy of
+  itself, which is the failure #333 exists to catch.
+
+  The first source is eight series digitised from Han, Dutta & Ekkad
+  (2012), figures 4.53, 4.54 and 4.193c. `han_1988_orthogonal` meets its
+  own correlation line at 3.5% RMSE and the measured points at 5.4%,
+  against Han's stated 6%. The digitised coordinates are committed; the
+  scans stay gitignored.
+
+  **Refusing to score is itself a result.** A set outside its numeric
+  validity is still answering, and is reported as extrapolating. A set
+  asked about a configuration it has no binding for is not:
+  `han_1988_orthogonal` is 90 degree only, and scoring it against 45 degree
+  rib data produced a 26.7% bias that reads as model error when it is the
+  wrong correlation entirely. The runner declines and prints why.
+
 - **Ribbed surfaces are selectable in the GUI again.** The node type returns
   with the fields the rebuilt correlation needs: rib geometry, the channel
   aspect ratio `W/H`, `n_ribbed_walls` as a 1/2/4 choice, and the
