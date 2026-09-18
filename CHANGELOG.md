@@ -431,8 +431,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the archived note claiming otherwise was wrong. Callers wanting the value use
   `dimple_friction_multiplier`; there is no derivative to want.
 
-
 ### Fixed
+
+- **The Fanno march refines its step near the sonic point.** Fixing the
+  gradient (below) gave the march a `1/(1 - M^2)` term that a fixed-step RK4
+  cannot resolve: the step that is ample over most of a duct steps straight
+  past the singularity in the last few percent of one that chokes. The
+  reported outlet then snapped to the march grid, so the pressure drop moved
+  with `n_steps` and its gradient with respect to mass flow developed a
+  sawtooth -- 988% peak-to-peak at 100 steps.
+
+  Both marches (constant-`f` and rough-wall) now halve the step whenever a
+  trial step would close more than a quarter of the remaining distance to
+  sonic, and relax back toward the nominal step once clear. `n_steps` sets
+  the nominal step rather than a fixed one. A choked duct's outlet pressure
+  is now identical to within a millipascal from 100 to 6400 nominal steps,
+  where it previously moved 1.5 kPa between coarse and fine.
+
+  Refining everywhere would have cost the same accuracy for every duct that
+  never approaches sonic, which is most of them. The extra steps are spent
+  only where the gradient is actually stiff. See issue #363.
+
 
 - **The Fanno march was integrating an incompressible gradient.**
   `dpdx_fanno` returned `-f/(2D) rho u^2` -- Darcy-Weisbach. The Fanno static

@@ -559,8 +559,15 @@ FannoSolution fanno_channel(
         sol.profile.push_back(st);
     }
 
-    // Integration using RK4
-    double dx = L / static_cast<double>(n_steps);
+    // Integration using RK4 with an adaptive step. n_steps sets the NOMINAL
+    // step; it is halved whenever a trial step would close more than
+    // kFannoApproachFraction of the remaining distance to sonic. Same control
+    // as the rough overload and for the same reason: the gradient is singular
+    // at M = 1, so a fixed step ample over most of a duct is useless in the
+    // last part of one that chokes. See issue #363.
+    const double dx_nominal = L / static_cast<double>(n_steps);
+    const double dx_min = dx_nominal * kFannoMinStepFraction;
+    double dx = dx_nominal;
     double x = 0.0;
     double P = P_in;
     double T = T_in;
@@ -572,7 +579,10 @@ FannoSolution fanno_channel(
     // to the march grid makes any closure built on it (e.g. the network
     // choke barrier) a staircase in m_dot whose jumps can leave residuals
     // rootless near choke onset.
-    for (std::size_t step = 0; step < n_steps; ++step) {
+    for (std::size_t step = 0; step < kFannoMaxSteps && x < L - 1e-14; ++step) {
+        if (x + dx > L) {
+            dx = L - x;
+        }
         // RK4 integration of dp/dx
         // k1
         double k1 = dpdx_fanno(rho, u, f, D, T, X);
@@ -624,6 +634,19 @@ FannoSolution fanno_channel(
         double a = current.a();
         double M = u / a;
 
+        // Step control on (1 - M^2), the quantity the gradient is singular in.
+        const double gap_prev = std::max(1.0 - M_prev * M_prev, 0.0);
+        const double gap_now = std::max(1.0 - M * M, 0.0);
+        if (dx > dx_min && gap_prev > 0.0 &&
+            gap_prev - gap_now > kFannoApproachFraction * gap_prev) {
+            P = P_prev;
+            T = T_prev;
+            solve_T_from_energy(P, sol.h0, sol.mdot, A, X, mw_kg, T, u, rho);
+            x -= dx;
+            dx *= 0.5;
+            continue;
+        }
+
         if (M >= kFannoChokeMach) {
             sol.choked = true;
             double frac = 1.0;
@@ -660,6 +683,11 @@ FannoSolution fanno_channel(
             st.f   = f;
             st.Re  = rho * u * D / sol.inlet.mu();
             sol.profile.push_back(st);
+        }
+
+        // Relax back toward the nominal step once clear of the singularity.
+        if (gap_now > 0.5 && dx < dx_nominal) {
+            dx = std::min(dx * 2.0, dx_nominal);
         }
     }
 
@@ -773,18 +801,30 @@ FannoSolution fanno_channel_rough(
         sol.profile.push_back(st);
     }
 
-    const double dx = L / static_cast<double>(n_steps);
+    // Adaptive step. n_steps sets the NOMINAL step; the march halves it
+    // whenever a trial step would close more than kFannoApproachFraction of
+    // the remaining distance to sonic. The gradient is singular at M = 1, so a
+    // fixed step that is ample over most of a duct is useless in the last part
+    // of one that chokes -- and refining everywhere would charge every duct
+    // for a case most never reach. See issue #363.
+    const double dx_nominal = L / static_cast<double>(n_steps);
+    const double dx_min = dx_nominal * kFannoMinStepFraction;
+    double dx  = dx_nominal;
     double x   = 0.0;
     double P   = P_in;
     double T   = T_in;
     double rho = rho_in;
     double u   = u_in;
-    double f_sum = f_in;  // accumulate for f_avg
+    double f_weighted = 0.0;  // length-weighted, since steps now vary
+    double f_len = 0.0;
     double M_prev = M_in;
 
     // L_choke is interpolated within the breaking step below (see the
     // constant-f overload for why grid-snapped L_choke is harmful).
-    for (std::size_t step = 0; step < n_steps; ++step) {
+    for (std::size_t step = 0; step < kFannoMaxSteps && x < L - 1e-14; ++step) {
+        if (x + dx > L) {
+            dx = L - x;
+        }
         // k1: local f at current state
         const double f1 = local_friction(T, P, u, D, roughness, X, correlation, f_multiplier);
         const double k1 = dpdx_fanno(rho, u, f1, D, T, X);
@@ -825,14 +865,32 @@ FannoSolution fanno_channel_rough(
         P = P_new;
         T = solve_T_from_energy(P, sol.h0, sol.mdot, A, X, mw_kg, T, u, rho);
 
-        // RK4-weighted local f for this step
+        // RK4-weighted local f for this step, length-weighted into the mean.
         const double f_step = (f1 + 2.0*f2 + 2.0*f3 + f4) / 6.0;
-        f_sum += f_step;
 
         State current;
         current.T = T; current.P = P; current.set_X(X);
         const double a = current.a();
         const double M = u / a;
+
+        // Step control: reject and refine when this step closed too much of
+        // the remaining distance to sonic. Measured on (1 - M^2), which is the
+        // quantity the gradient is singular in.
+        const double gap_prev = std::max(1.0 - M_prev * M_prev, 0.0);
+        const double gap_now = std::max(1.0 - M * M, 0.0);
+        if (dx > dx_min && gap_prev > 0.0 &&
+            gap_prev - gap_now > kFannoApproachFraction * gap_prev) {
+            // Undo and retry at half the step.
+            P = P_prev;
+            T = T_prev;
+            solve_T_from_energy(P, sol.h0, sol.mdot, A, X, mw_kg, T, u, rho);
+            x -= dx;
+            dx *= 0.5;
+            continue;
+        }
+
+        f_weighted += f_step * dx;
+        f_len += dx;
 
         if (M >= kFannoChokeMach) {
             sol.choked = true;
@@ -867,14 +925,22 @@ FannoSolution fanno_channel_rough(
             st.Re  = rho * u * D / current.mu();
             sol.profile.push_back(st);
         }
+
+        // Relax back toward the nominal step once clear of the singularity,
+        // so a duct that merely passes through a fast region does not finish
+        // it at the refined step.
+        if (gap_now > 0.5 && dx < dx_nominal) {
+            dx = std::min(dx * 2.0, dx_nominal);
+        }
     }
 
     sol.outlet.T = T;
     sol.outlet.P = P;
     sol.outlet.set_X(X);
 
-    // f_avg = mean over (n_steps + 1) samples (inlet + one per step)
-    sol.f_avg = f_sum / static_cast<double>(n_steps + 1);
+    // Length-weighted mean: steps vary now, so a count-weighted average would
+    // over-represent the refined steps near choking.
+    sol.f_avg = (f_len > 0.0) ? f_weighted / f_len : f_in;
 
     return sol;
 }
