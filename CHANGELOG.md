@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Figure 4.51 digitised, both panels**: nine rib configurations in `G`
+  and `G_bar`, two drawn reference lines, and four panel frames -- 24
+  series, 135 points.
+
+  **Extraction item 10 is now confirmed against data.** `G_bar/G` measured
+  over the seven undisputed classes gives **1.2193** at 90 degrees against
+  the printed `4.5/3.7 = 1.2162`, agreeing to 0.3%. Until now that ratio
+  rested on two printed coefficients and a figure label. The angled
+  configurations average 1.155, 4.5% below, against 2.6% scatter -- which
+  is what justifies the runner refusing to convert `G_bar` off 90 degrees.
+
+  **Two classes are unresolved and marked disputed.** `45 deg //` and
+  `45 deg x` return `G_bar/G` below 1, which is impossible, and their two
+  panels hold what appear to be the same marks. Three readings survive and
+  the digitised data separates none of them; resolving it needs the
+  primary paper rather than the reprint.
+
+  Frames now declare `frame_orientation`. A vertical frame must be fitted
+  across the other axis, and it measures shear -- which a horizontal frame
+  cannot see. The two y-axis frames also pinned this figure's panels as
+  aligned to 0.53%, which is what validated transferring the abscissa to
+  the upper panel, whose x ticks are unlabelled.
+
 - **Digitised figures can be redrawn from the committed data.** `uv run
   python -m validation.cooling.plot --figure 4.46` puts the data back on
   axes so it can be held next to the scan -- the check numbers cannot

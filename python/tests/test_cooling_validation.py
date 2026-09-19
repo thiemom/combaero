@@ -206,8 +206,11 @@ def test_disputed_class_labels_are_declared_and_surfaced(dataset) -> None:
     assert disputed, "the known disputed series has lost its marking"
 
     for s in disputed:
-        assert "NEEDS THE PAGE" in s.cross_check, (
-            f"{s.label} is disputed but records no question to resolve it"
+        # The route to resolution differs -- a figure may settle one, a
+        # primary paper another -- but a dispute with no route recorded is
+        # just an unexplained flag.
+        assert "NEEDS THE" in s.cross_check, (
+            f"{s.label} is disputed but records no route to resolve it"
         )
 
     reported = {f.series for f in check_all() if f.check == "class-label"}
@@ -232,13 +235,23 @@ def test_disputed_labels_are_refused_by_geometry_binding_sets(dataset) -> None:
         "be resolved against the page before it can be scored again"
     )
 
-    disputed = [s for s in dataset if s.class_confidence == "disputed"]
+    # A dispute must not by itself stop a series scoring. Check one that
+    # is otherwise scorable: 90 degrees, so the set's valid_alpha admits
+    # it, and G rather than G_bar so no ratio conversion is involved.
     from validation.cooling.runner import run_series
 
-    for s in disputed:
+    scorable = [
+        s
+        for s in dataset
+        if s.class_confidence == "disputed"
+        and s.scores
+        and s.alpha_deg in (None, 90.0)
+        and s.y_axis == "G"
+    ]
+    for s in scorable:
         recs = run_series(s)
         assert any(r.predicted is not None for r in recs), (
-            "disputed series should still pool while nothing binds geometry"
+            f"{s.label} is disputed but otherwise scorable, and was refused"
         )
 
 

@@ -118,12 +118,19 @@ def check_series(series: SeriesMetadata) -> list[Finding]:
     # and Figure 4.193c is exactly that below G = 20. A null bound is not
     # checked rather than being invented, which keeps the card a record of
     # what the page shows.
+    vertical_frame = (
+        series.kind == "frame"
+        and card.get("frame_orientation", "horizontal") == "vertical"
+    )
     for axis, values, ticks_key, mult_key, lim_key in (
         ("x", [p.x for p in points], "x_ticks", "x_multiplier", "x_limits"),
         ("y", [p.y for p in points], "y_ticks", "y_multiplier", "y_limits"),
     ):
         ticks = card.get(ticks_key)
         if not ticks:
+            continue
+        if vertical_frame and axis == "x":
+            # A vertical frame sits AT one abscissa; it has no span to check.
             continue
         mult = float(card.get(mult_key, 1.0))
         limits = card.get(lim_key)
@@ -256,13 +263,22 @@ def check_series(series: SeriesMetadata) -> list[Finding]:
     # than the scan.
     if card.get("kind") == "frame" or series.kind == "frame":
         tol = float(card.get("frame_tolerance", 0.002))
-        fitted = _power_slope(points)
+        # A horizontal frame is fitted y against x; a VERTICAL one has x
+        # constant and y varying, so it must be fitted the other way round
+        # or the slope diverges. A vertical frame measures shear, which a
+        # horizontal one cannot see, and it also pins the panel's edge --
+        # which is how figure 4.51's two panels were shown aligned before
+        # its unlabelled upper abscissa was transferred.
+        vertical = card.get("frame_orientation", "horizontal") == "vertical"
+        pts = [Point(p.y, p.x) for p in points] if vertical else points
+        fitted = _power_slope(pts)
+        which = "vertical" if vertical else "horizontal"
         out.append(
             Finding(
                 label,
                 "frame-slope",
                 abs(fitted) <= tol,
-                f"frame is horizontal by construction; measured slope "
+                f"frame is {which} by construction; measured slope "
                 f"{fitted:+.5f} (tolerance {tol:g}) -- this is the panel's "
                 f"distortion, use it to judge every other line in the panel",
             )
