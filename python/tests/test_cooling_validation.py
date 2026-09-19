@@ -8,6 +8,7 @@ See validation/cooling/ and issue #333.
 
 from __future__ import annotations
 
+import dataclasses
 import math
 
 import pytest
@@ -287,20 +288,33 @@ def test_gbar_ratio_is_not_applied_off_90_degrees(dataset) -> None:
     Applying 1.2 off 90 degrees would manufacture a number that looks like
     a measurement. The runner must refuse and say why.
     """
-    from validation.cooling.runner import run_series
+    from validation.cooling.runner import _gbar_reason, run_series
 
-    checked = 0
+    # The guard itself, at every angle the figures carry. It is preventive:
+    # figure 4.51 brings eight angled configurations, and none of the G_bar
+    # series filed today is both off 90 degrees AND scored.
+    for alpha in (30.0, 45.0, 60.0):
+        series = dataclasses.replace(
+            next(s for s in dataset if s.y_axis == "G_bar"),
+            alpha_deg=alpha,
+        )
+        reason = _gbar_reason(series)
+        assert reason and "90 deg result" in reason, f"G_bar at {alpha} deg was not refused"
+    assert (
+        _gbar_reason(
+            dataclasses.replace(next(s for s in dataset if s.y_axis == "G_bar"), alpha_deg=90.0)
+        )
+        is None
+    ), "90 degrees must still convert"
+
+    # And no off-90 G_bar series may come back with a prediction.
     for s in dataset:
         if s.y_axis != "G_bar" or s.alpha_deg in (None, 90.0):
             continue
-        checked += 1
         recs = run_series(s)
         assert all(r.predicted is None for r in recs), (
             f"{s.label} is G_bar at {s.alpha_deg} deg and was scaled by 1.2"
         )
-        assert any("90 deg result" in (r.reason or "") for r in recs)
-
-    assert checked, "no off-90-degree G_bar series to check"
 
 
 def test_90_degree_gbar_still_scores(dataset) -> None:
