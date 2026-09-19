@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Figure 4.47 digitised**: the angled-rib correlation of Han and Park
+  (1988), both panels plus four frames, 186 points.
+
+  Equation 4.18 confirmed -- the pooled cloud free-fits `(e+)^0.3453`
+  against the printed exponent of **0.35**. Equation 4.17 confirmed too:
+  the quadratic in rib angle is reproduced with a minimum near 60-68
+  degrees, mean bias -3.0% against Han's stated 6% band.
+
+  **Pooling is forced here, not chosen.** Both panels draw several
+  distinct symbols and carry no legend at all, so there is nothing to
+  attribute them against -- unlike figures 4.46 and 4.51, where a legend
+  made attribution hard but possible. It costs little: the left panel's
+  ordinate is already normalised by `(P/e/10)^0.35 (W/H)^m`, and on the
+  right only the exponent is comparable anyway.
+
+  This figure is the source of extraction item 10 -- `G_bar = 1.2 G` is
+  printed on its dashed line -- which figure 4.51 later measured at 1.2193.
+
+  Not scored by any implemented set: `han_1988_orthogonal` binds 90 degrees
+  only, and this IS the angled correlation. It is the acceptance data for
+  a `han_park_1988_angled` set (#334).
+
 - **Figure 4.51 digitised, both panels**: nine rib configurations in `G`
   and `G_bar`, two drawn reference lines, and four panel frames -- 24
   series, 135 points.
