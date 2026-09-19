@@ -31,6 +31,13 @@ MARKERS = ["o", "s", "^", "v", "D", "<", ">", "P", "X", "*", "h", "p"]
 
 PANEL_ORDER = {"upper": 0, "single": 1, "lower": 2}
 
+# Default output. Gitignored: a redrawn figure is a derived artefact, and
+# regenerating it is one command. It carries its source citation on the
+# image itself, so committing one later is a policy choice rather than a
+# rework -- a reproduction from our own measurements is ours to publish
+# provided the source stays named on it.
+PLOT_DIR = Path(__file__).parent / "plots"
+
 # What the figures actually print on their axes, rather than the terse
 # keys the metadata uses.
 AXIS_NAMES = {
@@ -162,7 +169,19 @@ def plot_figure(
         ax.legend(seen.values(), seen.keys(), fontsize=6.5, loc="best",
                   ncol=2, framealpha=0.9)
 
-    fig.tight_layout()
+    # Source citation travels with the image, always. Wrapped, because a
+    # citation clipped at the page edge is not a citation.
+    import textwrap
+
+    lines = ["Redrawn from digitised measurements."]
+    lines += textwrap.wrap(f"Source: {chosen[0].source.citation}", 110)
+    if chosen[0].after:
+        lines += textwrap.wrap(f"After: {chosen[0].after}", 110)
+    fig.text(0.5, 0.004, "\n".join(lines), ha="center", va="bottom",
+             fontsize=6, color="0.35", linespacing=1.5)
+
+    fig.tight_layout(rect=(0, 0.013 * len(lines) + 0.01, 1, 1))
+    out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=150)
     plt.close(fig)
     return out
@@ -189,7 +208,7 @@ def main() -> None:
                   f"{', '.join(sorted(seen[figure]))}")
         return
 
-    out = args.out or Path(f"fig{args.figure}_redrawn.png")
+    out = args.out or PLOT_DIR / f"fig{args.figure}_redrawn.png"
     print(f"wrote {plot_figure(args.figure, out, dataset, args.frames)}")
 
 

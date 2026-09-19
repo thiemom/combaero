@@ -166,6 +166,13 @@ Panel frames are off by default (`--frames` to include them): a frame sits
 outside the labelled ticks, so drawing it forces the axes open and
 squashes the data into a strip, and its job is already done numerically.
 
+Output goes to `validation/cooling/plots/`, which is **gitignored**: a
+redrawn figure is a derived artefact and regenerating it is one command.
+Every image carries its source citation in a footer -- the book and the
+primary paper behind the figure -- so committing one later is a policy
+choice rather than a rework. A reproduction built from our own
+measurements is ours to publish as long as the source stays named on it.
+
 Needs matplotlib: `uv pip install -e ".[examples]"`.
 
 ## Adding a source
