@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Redrawn figures are committed.** All six live in
+  `validation/cooling/plots/`, so a diff shows the plot rather than
+  requiring a reviewer to regenerate it, and a change that moves points
+  shows up as a changed image. Each carries its source citation in a
+  footer naming the book and the primary paper behind the figure.
+
+  `--all` redraws the whole dataset in one command, and a test pins that
+  every figure has a committed plot -- the way this goes stale is filing a
+  figure and forgetting to regenerate.
+
 - **Figure 4.47 digitised**: the angled-rib correlation of Han and Park
   (1988), both panels plus four frames, 186 points.
 

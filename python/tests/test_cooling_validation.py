@@ -275,6 +275,30 @@ def test_every_figure_redraws(tmp_path, dataset) -> None:
         assert out.exists() and out.stat().st_size > 5000, f"{figure} drew nothing"
 
 
+def test_every_figure_has_a_committed_plot(dataset) -> None:
+    """A figure in the dataset must have its redrawn image committed.
+
+    The images are committed so a reviewer sees the cloud's shape in the
+    diff. That only works if they exist, and the way it fails is filing a
+    new figure and forgetting to regenerate -- so that case is pinned.
+
+    This does not check the image is CURRENT; PNG bytes are not stable
+    across matplotlib versions, so comparing them would fail for reasons
+    that have nothing to do with the data. Regenerate with
+    `uv run python -m validation.cooling.plot --all` after changing data
+    or a card.
+    """
+    from validation.cooling.plot import PLOT_DIR
+
+    for figure in sorted({s.figure for s in dataset if s.figure}):
+        img = PLOT_DIR / f"fig{figure}_redrawn.png"
+        assert img.exists(), (
+            f"figure {figure} has no committed plot; run "
+            "`uv run python -m validation.cooling.plot --all`"
+        )
+        assert img.stat().st_size > 5000, f"{img.name} looks empty"
+
+
 def test_axis_specs_are_declared_for_plotting(dataset) -> None:
     """Every series needs a log/linear declaration and plot limits.
 
