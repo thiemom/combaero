@@ -245,6 +245,7 @@ people to ignore it.
 ```bash
 uv run python -m validation.cooling.plot --list
 uv run python -m validation.cooling.plot --figure 4.46
+uv run python -m validation.cooling.plot --figure han2012/4.46
 uv run python -m validation.cooling.plot --all
 ```
 
@@ -285,6 +286,21 @@ uv run python -m validation.cooling.plot --all
 ```
 
 Needs matplotlib: `uv pip install -e ".[examples]"`.
+
+## Everything is namespaced by source
+
+A figure number is not a unique identifier -- two books can each have a
+figure 4.46 -- so `data/`, `cards/` and `plots/` are all keyed by source:
+
+```
+data/han2012/fig4.46_R_eD0.047_pe10_wh1.csv
+cards/han2012/fig4.46_R_scatter.yaml
+plots/han2012/fig4.46_redrawn.png
+```
+
+`--figure` accepts a bare number while it is unambiguous and the
+qualified `source/figure` form always. A bare number matching more than
+one source is an **error naming the alternatives**, never a silent pick.
 
 ## Adding a source
 

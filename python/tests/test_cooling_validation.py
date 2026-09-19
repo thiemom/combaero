@@ -288,15 +288,48 @@ def test_every_figure_has_a_committed_plot(dataset) -> None:
     `uv run python -m validation.cooling.plot --all` after changing data
     or a card.
     """
-    from validation.cooling.plot import PLOT_DIR
+    from validation.cooling.plot import plot_path
 
-    for figure in sorted({s.figure for s in dataset if s.figure}):
-        img = PLOT_DIR / f"fig{figure}_redrawn.png"
+    pairs = sorted({(s.source.name, s.figure) for s in dataset if s.figure})
+    for source, figure in pairs:
+        img = plot_path(source, figure)
         assert img.exists(), (
-            f"figure {figure} has no committed plot; run "
+            f"{source}/{figure} has no committed plot; run "
             "`uv run python -m validation.cooling.plot --all`"
         )
         assert img.stat().st_size > 5000, f"{img.name} looks empty"
+
+
+def test_figure_references_are_namespaced_by_source(dataset) -> None:
+    """A figure number alone is not a unique identifier.
+
+    Two books can each have a figure 4.46. Data, cards and plots are all
+    namespaced by source; a bare number is accepted only while it happens
+    to be unique, and becomes an error naming the alternatives rather than
+    a silent pick once it is not.
+    """
+    from validation.cooling.plot import resolve_figure
+
+    source, figure = resolve_figure(dataset, "4.46")
+    assert (source, figure) == ("han2012", "4.46")
+    assert resolve_figure(dataset, "han2012/4.46") == ("han2012", "4.46")
+
+    for bad in ("nope/4.46", "han2012/9.99", "9.99"):
+        with pytest.raises(SystemExit):
+            resolve_figure(dataset, bad)
+
+    # Ambiguity must be refused, not resolved by luck of ordering.
+    import dataclasses
+
+    other = dataclasses.replace(
+        next(s for s in dataset if s.figure == "4.46"),
+        source=dataclasses.replace(
+            next(s for s in dataset if s.figure == "4.46").source,
+            name="someoneelse2030",
+        ),
+    )
+    with pytest.raises(SystemExit, match="ambiguous"):
+        resolve_figure([*dataset, other], "4.46")
 
 
 def test_axis_specs_are_declared_for_plotting(dataset) -> None:
@@ -372,3 +405,67 @@ def test_90_degree_gbar_still_scores(dataset) -> None:
             scored += 1
 
     assert scored, "the 90 degree G_bar series stopped scoring"
+
+
+def test_candidate_mode_runs(tmp_path, dataset) -> None:
+    """The digitising path must keep working, not just the filed path.
+
+    check_candidate builds a SeriesMetadata by hand, so every field added
+    to that dataclass has to be added here too. It broke silently when
+    `figure`, `panel` and `class_confidence` arrived, because 262 checks
+    covered the filed data and none covered the path actually used while
+    picking points.
+    """
+    import yaml
+
+    from validation.cooling.verify import check_candidate
+
+    csv_path = tmp_path / "candidate.csv"
+    csv_path.write_text("x, y\n100, 12.0\n300, 17.0\n900, 22.0\n")
+    card_path = tmp_path / "card.yaml"
+    card_path.write_text(
+        yaml.safe_dump(
+            {
+                "verification": {
+                    "x_axis_type": "log",
+                    "y_axis_type": "log",
+                    "x_ticks": [50, 100, 1000],
+                    "x_multiplier": 1.0,
+                    "y_ticks": [8, 40],
+                    "printed_curve": {"power_law": {"C": 3.7, "n": 0.28}},
+                    "curve_tolerance": 0.2,
+                }
+            }
+        )
+    )
+    findings = check_candidate(csv_path, card_path)
+    assert findings, "candidate mode produced no findings at all"
+    assert all(f.ok for f in findings), [f"{f.check}: {f.detail}" for f in findings if not f.ok]
+
+
+def test_candidate_mode_catches_a_dropped_multiplier(tmp_path) -> None:
+    """The bug candidate mode exists to catch, end to end."""
+    import yaml
+
+    from validation.cooling.verify import check_candidate
+
+    csv_path = tmp_path / "candidate.csv"
+    # Two decades low: the real figure 4.54 and 4.51 defect.
+    csv_path.write_text("x, y\n1.0, 12.0\n3.0, 17.0\n9.0, 22.0\n")
+    card_path = tmp_path / "card.yaml"
+    card_path.write_text(
+        yaml.safe_dump(
+            {
+                "verification": {
+                    "x_axis_type": "log",
+                    "y_axis_type": "log",
+                    "x_ticks": [1, 10],
+                    "x_multiplier": 1.0e2,
+                    "y_ticks": [8, 40],
+                }
+            }
+        )
+    )
+    findings = check_candidate(csv_path, card_path)
+    failed = [f.check for f in findings if not f.ok]
+    assert "x-span" in failed, f"dropped multiplier not caught; got {failed}"

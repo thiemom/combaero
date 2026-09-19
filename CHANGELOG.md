@@ -9,8 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Everything is namespaced by source.** A figure number is not a unique
+  identifier -- two books can each have a figure 4.46 -- so `cards/` and
+  `plots/` are now keyed by source as `data/` already was:
+
+  ```
+  data/han2012/fig4.46_R_eD0.047_pe10_wh1.csv
+  cards/han2012/fig4.46_R_scatter.yaml
+  plots/han2012/fig4.46_redrawn.png
+  ```
+
+  `--figure` takes a bare number while it is unambiguous and the
+  qualified `source/figure` form always. A bare number matching more than
+  one source is an error naming the alternatives, never a silent pick.
+
 - **Redrawn figures are committed.** All six live in
-  `validation/cooling/plots/`, so a diff shows the plot rather than
+  `validation/cooling/plots/<source>/`, so a diff shows the plot rather than
   requiring a reviewer to regenerate it, and a change that moves points
   shows up as a changed image. Each carries its source citation in a
   footer naming the book and the primary paper behind the figure.
