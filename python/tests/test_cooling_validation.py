@@ -273,3 +273,51 @@ def test_axis_specs_are_declared_for_plotting(dataset) -> None:
         assert card.get("x_axis_type") in ("log", "linear"), f"{s.label} declares no x_axis_type"
         assert card.get("y_axis_type") in ("log", "linear"), f"{s.label} declares no y_axis_type"
         assert s.figure and s.panel, f"{s.label} is not assigned to a panel"
+
+
+def test_gbar_ratio_is_not_applied_off_90_degrees(dataset) -> None:
+    """G_bar/G = 1.2 is a 90 degree result, not a universal one.
+
+    Figure 4.51 ranks nine rib configurations in both G and G_bar, and the
+    lowest series differs between the panels -- 60 deg V wins on G, 45 deg
+    parallel wins on G_bar. A ranking cannot flip under a constant
+    multiplier, so the ratio varies by configuration; from the measured
+    G_bar gap it differs by at least 13% between those two at e+ = 500.
+
+    Applying 1.2 off 90 degrees would manufacture a number that looks like
+    a measurement. The runner must refuse and say why.
+    """
+    from validation.cooling.runner import run_series
+
+    checked = 0
+    for s in dataset:
+        if s.y_axis != "G_bar" or s.alpha_deg in (None, 90.0):
+            continue
+        checked += 1
+        recs = run_series(s)
+        assert all(r.predicted is None for r in recs), (
+            f"{s.label} is G_bar at {s.alpha_deg} deg and was scaled by 1.2"
+        )
+        assert any("90 deg result" in (r.reason or "") for r in recs)
+
+    assert checked, "no off-90-degree G_bar series to check"
+
+
+def test_90_degree_gbar_still_scores(dataset) -> None:
+    """The guard must not block where the ratio was actually established.
+
+    Figure 4.46 prints both lines, 3.7 and 4.5, a ratio of 1.216, and
+    figure 4.47 labels its dashed line G_bar = 1.2 G. At 90 degrees the
+    conversion is evidenced and must keep working.
+    """
+    from validation.cooling.runner import run_series
+
+    scored = 0
+    for s in dataset:
+        if s.y_axis != "G_bar" or s.alpha_deg != 90.0 or not s.scores:
+            continue
+        recs = run_series(s)
+        if any(r.predicted is not None for r in recs):
+            scored += 1
+
+    assert scored, "the 90 degree G_bar series stopped scoring"

@@ -18,8 +18,19 @@ from validation.cooling.schema import Point, SeriesMetadata, load_points
 
 # Han states G_bar (the ribbed/smooth average) as 1.2 G. Confirmed as item
 # 10 of validation/cooling/extractions/han_ribbed.md, from the label on
-# Figure 4.47.
+# Figure 4.47, and independently by Figure 4.46's printed pair 3.7 and 4.5
+# (ratio 1.216).
+#
+# IT IS NOT UNIVERSAL. Figure 4.51 ranks nine rib configurations in both
+# G and G_bar, and the lowest series differs between the panels: 60 deg V
+# wins on G, 45 deg parallel wins on G_bar. A ranking cannot flip under a
+# constant multiplier, so G_bar/G must vary by configuration -- by at
+# least 13% between those two at e+ = 500, from the measured G_bar gap.
+#
+# So this applies to 90 deg ribs, where it was established. Anything else
+# is refused rather than scaled; see _gbar_reason.
 G_BAR_OVER_G = 1.2
+G_BAR_VALID_ALPHA = 90.0
 
 # Bracket for the Re bisection. Deliberately far wider than any set's
 # stated validity: a series may sit outside it, and reporting that as
@@ -105,6 +116,27 @@ def _mid(rng: "cb.RibRange", fallback: float) -> float:
     return 0.5 * (rng.lo + rng.hi) if rng.hi > rng.lo else fallback
 
 
+def _gbar_reason(series: SeriesMetadata) -> str | None:
+    """Why a G_bar series cannot be converted, or None if it can.
+
+    G_bar/G is a per-configuration quantity, not a constant: figure 4.51
+    ranks nine configurations in both and the lowest differs between the
+    panels, which a constant multiplier cannot do. The 1.2 is a 90 degree
+    result. Applying it to an angled rib would silently manufacture a
+    number, so it is refused instead.
+    """
+    if series.y_axis != "G_bar":
+        return None
+    alpha = series.alpha_deg
+    if alpha is None or alpha == G_BAR_VALID_ALPHA:
+        return None
+    return (
+        f"G_bar at {alpha:g} deg: the 1.2 ratio is a 90 deg result and "
+        "varies by configuration (figure 4.51 ranks G and G_bar "
+        "differently), so it is not applied here"
+    )
+
+
 def _binds_geometry(rib_set: "cb.RibCorrelationSet") -> bool:
     """True when the set's G actually depends on the rig geometry."""
     return any(
@@ -186,6 +218,13 @@ def run_series(series: SeriesMetadata) -> list[Record]:
         ]
 
     rib_set = SETS[series.scores]()
+
+    gbar_block = _gbar_reason(series)
+    if gbar_block is not None:
+        return [
+            Record(series, p.x, p.y, None, False, None, gbar_block)
+            for p in points
+        ]
 
     if series.class_confidence == "disputed" and _binds_geometry(rib_set):
         # A disputed label is usable while nothing depends on it. The
