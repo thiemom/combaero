@@ -130,7 +130,7 @@ def _combustor_pressure_loss_budget(
     k_mixer = 3.2
     dp_burner_mixer = k_mixer * q_dyn_hot
 
-    dp_primary_friction, re_primary, f_primary = cb.pressure_drop_pipe(
+    dp_primary_friction, re_primary, f_primary = cb.channel_pressure_drop(
         T=gas_temperature_k,
         P=inputs.pressure_pa,
         X=gas_x,
@@ -144,7 +144,7 @@ def _combustor_pressure_loss_budget(
     k_dilution = 0.8
     dp_dilution_entry = k_dilution * q_dyn_hot
 
-    dp_coolant_friction, re_cooling, f_cooling = cb.pressure_drop_pipe(
+    dp_coolant_friction, re_cooling, f_cooling = cb.channel_pressure_drop(
         T=inputs.air_inlet_temperature_k + 40.0,
         P=inputs.pressure_pa,
         X=coolant_x,
@@ -230,16 +230,18 @@ def main() -> None:
         geom.cooling_channel_dh_m,
     )
 
-    # Front-plate effusion estimate from burner-side jets
-    # Use correlation-friendly representative design point
-    effusion_eta = cb.effusion_effectiveness(
-        x_D=8.0,
-        M=2.0,
-        DR=1.75,
-        porosity=0.055,
-        s_D=6.0,
-        alpha_deg=30.0,
-    )
+    # Front-plate effusion effectiveness, ASSUMED rather than predicted.
+    #
+    # The effusion correlation was removed in 0.7.0: its momentum flux ratio
+    # was defined as M^2 * DR where the definition is M^2 / DR, and its form
+    # could not be traced to the cited source. A provenanced replacement is
+    # tracked in issue #338.
+    #
+    # Until then this example takes a representative value from the literature
+    # range for an effusion plate at this porosity rather than computing one.
+    # It is an input to the example, not a result of it -- the wall heat flux
+    # below is still computed, the effectiveness feeding it is not.
+    effusion_eta = 0.45
 
     # Baseline front plate: bare Haynes 230 metal wall
     k_haynes = cb.k_haynes230(min(max(900.0, t_cool_in), 1400.0))

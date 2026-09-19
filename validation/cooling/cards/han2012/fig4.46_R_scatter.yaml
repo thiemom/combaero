@@ -1,0 +1,28 @@
+# Figure card: Figure 4.46 LOWER panel scatter, any symbol class.
+#
+# One card for every series picked off the lower panel. The ordinate is
+# R/(P/e/10)^0.35, which is normalised so all P/e collapse onto one band
+# regardless of geometry -- so a single card covers all ten symbol classes.
+#
+# This card exists mainly to catch the panel-switch slip. The two panels
+# share an abscissa but not an ordinate, and a calibration carried across
+# has now happened in BOTH directions: 2..5 applied to the upper panel,
+# and 8..40 applied to the lower one. Either shows up here instantly.
+item: "Figure 4.46 lower panel, scatter"
+series: "measured points, one symbol class"
+x_axis: e_plus
+y_axis: R_normalised
+kind: measured
+uncertainty: 0.06
+
+verification:
+  x_ticks: [50, 100, 200, 300, 500, 1000]
+  x_multiplier: 1.0
+  # The panel is drawn from 2 to 5. Real scatter reaches ~2.6 at low e+,
+  # comfortably inside; a series picked with the UPPER panel's 8..40
+  # calibration lands at 10-20 and fails at once.
+  y_ticks: [2, 3, 4, 5]
+  printed_curve: null
+  # Scatter, so no trend is asserted.
+  monotonic: null
+  expected_points: null

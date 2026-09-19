@@ -13,7 +13,6 @@ using namespace combaero;
 
 int main() {
     using combaero::cooling::cooled_wall_heat_flux;
-    using combaero::cooling::effusion_effectiveness;
 
     std::cout << std::fixed << std::setprecision(3);
 
@@ -48,33 +47,22 @@ int main() {
     std::cout << "Hot side:  Re=" << re_hot << ", h=" << h_hot << " W/(m^2*K)\n";
     std::cout << "Cool side: Re=" << re_cool << ", h=" << h_cool << " W/(m^2*K)\n\n";
 
-    // Effusion design inputs (front-plate-like compact pattern)
-    const double blowing_ratio = 2.0;
-    const double density_ratio = 1.7;
-    const double porosity = 0.05;
-    const double spacing_over_d = 6.0;
-    const double injection_angle_deg = 30.0;
-
-    std::cout << "x/D    eta_eff   q_cooled [kW/m^2]   q_uncooled [kW/m^2]\n";
+    std::cout << "eta_eff   q_cooled [kW/m^2]   q_uncooled [kW/m^2]\n";
     std::cout << "---------------------------------------------------------\n";
 
+    // The effusion effectiveness correlation this example used was removed in
+    // 0.7.0: its momentum flux ratio was defined as M^2 * DR where the
+    // definition is M^2 / DR, and its form could not be traced to the cited
+    // source. See issue #339. Until a provenanced replacement lands, the
+    // example sweeps effectiveness directly rather than predicting it.
     const double q_uncooled =
         cooled_wall_heat_flux(t_hot, t_cool, h_hot, h_cool, 0.0, t_wall, k_wall) / 1000.0;
 
-    for (double x_over_d = 4.0; x_over_d <= 24.0; x_over_d += 4.0) {
-        const double eta = effusion_effectiveness(
-            x_over_d,
-            blowing_ratio,
-            density_ratio,
-            porosity,
-            spacing_over_d,
-            injection_angle_deg);
-
+    for (double eta = 0.0; eta <= 0.6; eta += 0.1) {
         const double q_cooled =
             cooled_wall_heat_flux(t_hot, t_cool, h_hot, h_cool, eta, t_wall, k_wall) / 1000.0;
 
-        std::cout << std::setw(4) << x_over_d << "   "
-                  << std::setw(7) << eta << "   "
+        std::cout << std::setw(7) << eta << "   "
                   << std::setw(15) << q_cooled << "   "
                   << std::setw(16) << q_uncooled << "\n";
     }

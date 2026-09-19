@@ -11,6 +11,7 @@
 #include "common_names.h"
 #include "compressible.h"
 #include "cooling_correlations.h"
+#include "rib_correlation.h"
 #include "correlation_status.h"
 #include "ejector.h"
 #include "equilibrium.h"
@@ -46,6 +47,119 @@ to_vec(py::array_t<double, py::array::c_style | py::array::forcecast> arr) {
 }
 
 PYBIND11_MODULE(_core, m) {
+
+  // ---------------------------------------------------------------------
+  // Parametrised rib correlations
+  // ---------------------------------------------------------------------
+  py::enum_<combaero::cooling::RibProvenance>(m, "RibProvenance")
+      .value("Extracted", combaero::cooling::RibProvenance::Extracted,
+             "An equation printed in a source, transcribed and checked "
+             "against it.")
+      .value("Fitted", combaero::cooling::RibProvenance::Fitted,
+             "A form we chose, fitted to data we digitised from a figure. "
+             "The exponents are ours.")
+      .value("User", combaero::cooling::RibProvenance::User,
+             "Supplied by the caller. Carries no claim.");
+
+  py::class_<combaero::cooling::RibTerm>(m, "RibTerm")
+      .def(py::init<>())
+      .def(py::init([](double exponent, double reference) {
+             return combaero::cooling::RibTerm{exponent, reference};
+           }),
+           py::arg("exponent") = 0.0, py::arg("reference") = 1.0)
+      .def_readwrite("exponent", &combaero::cooling::RibTerm::exponent)
+      .def_readwrite("reference", &combaero::cooling::RibTerm::reference,
+                     "What the variable is divided by before the exponent is "
+                     "applied. Data, not a convention: (p/e/10)^b and (p/e)^b "
+                     "are the same function with different constants.");
+
+  py::class_<combaero::cooling::RibRange>(m, "RibRange")
+      .def(py::init<>())
+      .def(py::init([](double lo, double hi) {
+             return combaero::cooling::RibRange{lo, hi};
+           }),
+           py::arg("lo") = 0.0, py::arg("hi") = 0.0)
+      .def_readwrite("lo", &combaero::cooling::RibRange::lo)
+      .def_readwrite("hi", &combaero::cooling::RibRange::hi);
+
+  py::class_<combaero::cooling::RibGeometry>(m, "RibGeometry")
+      .def(py::init<>())
+      .def(py::init([](double e_D, double p_e, double W_H, double alpha_deg) {
+             return combaero::cooling::RibGeometry{e_D, p_e, W_H, alpha_deg};
+           }),
+           py::arg("e_D") = 0.0, py::arg("p_e") = 0.0, py::arg("W_H") = 1.0,
+           py::arg("alpha_deg") = 90.0)
+      .def_readwrite("e_D", &combaero::cooling::RibGeometry::e_D)
+      .def_readwrite("p_e", &combaero::cooling::RibGeometry::p_e)
+      .def_readwrite("W_H", &combaero::cooling::RibGeometry::W_H)
+      .def_readwrite("alpha_deg", &combaero::cooling::RibGeometry::alpha_deg);
+
+  py::class_<combaero::cooling::RibResult>(m, "RibResult")
+      .def_readonly("R", &combaero::cooling::RibResult::R)
+      .def_readonly("f", &combaero::cooling::RibResult::f)
+      .def_readonly("e_plus", &combaero::cooling::RibResult::e_plus)
+      .def_readonly("G", &combaero::cooling::RibResult::G)
+      .def_readonly("St_r", &combaero::cooling::RibResult::St_r,
+                    "Ribbed-side Stanton number. Combining it with the smooth "
+                    "walls is the caller's job.")
+      .def_readonly("dSt_dRe", &combaero::cooling::RibResult::dSt_dRe)
+      .def_readonly("extrapolated",
+                    &combaero::cooling::RibResult::extrapolated,
+                    "Outside the set's advisory validity. Advisory because a "
+                    "band belongs to the source's rig, not the caller's.");
+
+  py::class_<combaero::cooling::RibCorrelationSet>(m, "RibCorrelationSet")
+      .def(py::init<>())
+      .def_readwrite("name", &combaero::cooling::RibCorrelationSet::name)
+      .def_readwrite("source", &combaero::cooling::RibCorrelationSet::source)
+      .def_readwrite("validity_source",
+                     &combaero::cooling::RibCorrelationSet::validity_source)
+      .def_readwrite("provenance",
+                     &combaero::cooling::RibCorrelationSet::provenance)
+      .def_readwrite("symmetric",
+                     &combaero::cooling::RibCorrelationSet::symmetric)
+      .def_readwrite("C_R", &combaero::cooling::RibCorrelationSet::C_R)
+      .def_readwrite("R_eD", &combaero::cooling::RibCorrelationSet::R_eD)
+      .def_readwrite("R_pe", &combaero::cooling::RibCorrelationSet::R_pe)
+      .def_readwrite("R_WH", &combaero::cooling::RibCorrelationSet::R_WH)
+      .def_readwrite("R_alpha", &combaero::cooling::RibCorrelationSet::R_alpha)
+      .def_readwrite("C_G", &combaero::cooling::RibCorrelationSet::C_G)
+      .def_readwrite("G_eD", &combaero::cooling::RibCorrelationSet::G_eD)
+      .def_readwrite("G_pe", &combaero::cooling::RibCorrelationSet::G_pe)
+      .def_readwrite("G_WH", &combaero::cooling::RibCorrelationSet::G_WH)
+      .def_readwrite("G_alpha", &combaero::cooling::RibCorrelationSet::G_alpha)
+      .def_readwrite("G_eplus_exponent",
+                     &combaero::cooling::RibCorrelationSet::G_eplus_exponent)
+      .def_readwrite("valid_Re",
+                     &combaero::cooling::RibCorrelationSet::valid_Re)
+      .def_readwrite("valid_eD",
+                     &combaero::cooling::RibCorrelationSet::valid_eD)
+      .def_readwrite("valid_pe",
+                     &combaero::cooling::RibCorrelationSet::valid_pe)
+      .def_readwrite("valid_WH",
+                     &combaero::cooling::RibCorrelationSet::valid_WH)
+      .def_readwrite("valid_alpha",
+                     &combaero::cooling::RibCorrelationSet::valid_alpha)
+      .def_readwrite("valid_eplus",
+                     &combaero::cooling::RibCorrelationSet::valid_eplus)
+      .def_readwrite("valid_Pr",
+                     &combaero::cooling::RibCorrelationSet::valid_Pr)
+      .def_readwrite("accuracy_R",
+                     &combaero::cooling::RibCorrelationSet::accuracy_R)
+      .def_readwrite("accuracy_G",
+                     &combaero::cooling::RibCorrelationSet::accuracy_G);
+
+  m.def("han_1988_orthogonal", &combaero::cooling::han_1988_orthogonal,
+        "Han (1988) 90 deg orthogonal ribs. Extracted and confirmed; see "
+        "validation/cooling/extractions/han_ribbed.md.");
+  m.def("validate_rib_set", &combaero::cooling::validate_rib_set,
+        py::arg("correlation_set"),
+        "Reject a set that cannot be evaluated. Hard errors, unlike the "
+        "advisory validity ranges: these are mistakes, not operating points.");
+  m.def("evaluate_rib", &combaero::cooling::evaluate_rib,
+        py::arg("correlation_set"), py::arg("geometry"), py::arg("Re"),
+        "Evaluate the chain. Re may be negative or zero; the guards are "
+        "smooth through both.");
   m.doc() = "Python bindings for combaero core";
 
   // Expose the CorrelationValidity enum
@@ -243,7 +357,8 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("d_res_dP", &solver::MomentumChamberResult::d_res_dP)
       .def_readonly("d_res_dP_total",
                     &solver::MomentumChamberResult::d_res_dP_total)
-      .def_readonly("d_res_dmdot", &solver::MomentumChamberResult::d_res_dmdot);
+      .def_readonly("d_res_dmdot", &solver::MomentumChamberResult::d_res_dmdot)
+      .def_readonly("d_res_dT", &solver::MomentumChamberResult::d_res_dT);
 
   m.def("orifice_residuals_and_jacobian",
         &solver::orifice_residuals_and_jacobian, py::arg("m_dot"),
@@ -279,6 +394,8 @@ PYBIND11_MODULE(_core, m) {
       py::arg("P_in"), py::arg("u_in"), py::arg("X"), py::arg("L"),
       py::arg("D"), py::arg("roughness"), py::arg("friction_model"),
       py::arg("f_multiplier") = 1.0, py::arg("compute_jacobians") = true,
+      py::arg("inlet_static_resolved") = true,
+      py::arg("exit_head_lost") = false,
       "Compressible channel flow using Fanno model with variable friction.\n\n"
       "Returns: (dP, d_dP_dP_in, d_dP_dT_in, d_dP_du_in)");
 
@@ -287,7 +404,7 @@ PYBIND11_MODULE(_core, m) {
         py::arg("P_total_up"), py::arg("T_up"), py::arg("Y_up"),
         py::arg("P_static_down"), py::arg("L"), py::arg("D"),
         py::arg("roughness"), py::arg("friction_model"),
-        py::arg("f_multiplier") = 1.0,
+        py::arg("f_multiplier") = 1.0, py::arg("exit_head_lost") = false,
         "Compressible channel for network solver with all derivatives.");
 
   m.def("momentum_chamber_residual_and_jacobian",
@@ -306,7 +423,8 @@ PYBIND11_MODULE(_core, m) {
       .def_readwrite("port_sign", &solver::MpceGeometry::port_sign)
       .def_readwrite("joining_etransfer_alpha",
                      &solver::MpceGeometry::joining_etransfer_alpha)
-      .def_readwrite("eta_scale", &solver::MpceGeometry::eta_scale);
+      .def_readwrite("eta_scale", &solver::MpceGeometry::eta_scale)
+      .def_readwrite("gamma", &solver::MpceGeometry::gamma);
 
   py::class_<solver::MpceResidualJacobian>(
       m, "MpceResidualJacobian",
@@ -1768,7 +1886,7 @@ PYBIND11_MODULE(_core, m) {
         State in;
         in.T = T_in;
         in.P = P;
-        in.X = X_in;
+        in.set_X(X_in);
 
         EquilibriumResult out = wgs_equilibrium_adiabatic(in);
         return out.state.T;
@@ -2383,7 +2501,7 @@ PYBIND11_MODULE(_core, m) {
         State in;
         in.T = T;
         in.P = P;
-        in.X = to_vec(X_arr);
+        in.set_X(to_vec(X_arr));
         return complete_combustion(in, smooth_phi0, smooth_phi1, k0, k1);
       },
       py::arg("T"), py::arg("X"), py::arg("P") = 101325.0,
@@ -2401,7 +2519,7 @@ PYBIND11_MODULE(_core, m) {
         State in;
         in.T = T;
         in.P = P;
-        in.X = to_vec(X_arr);
+        in.set_X(to_vec(X_arr));
         return complete_combustion_isothermal(in, smooth_phi0, smooth_phi1, k0,
                                               k1);
       },
@@ -2420,7 +2538,7 @@ PYBIND11_MODULE(_core, m) {
         State s;
         s.T = T;
         s.P = P;
-        s.X = to_vec(X_arr);
+        s.set_X(to_vec(X_arr));
         return s;
       };
 
@@ -5065,52 +5183,8 @@ PYBIND11_MODULE(_core, m) {
   // =========================================================================
 
   // Rib-enhanced cooling
-  m.def("rib_enhancement_factor",
-        static_cast<double (*)(double, double, double)>(
-            &combaero::cooling::rib_enhancement_factor),
-        py::arg("e_D"), py::arg("pitch_to_height"), py::arg("alpha_deg"),
-        "Rib enhancement factor for heat transfer [-] (geometry only, "
-        "Re-independent).\n\n"
-        "Parameters:\n"
-        "  e_D            : rib height / hydraulic diameter [-]\n"
-        "  pitch_to_height: rib pitch / rib height [-]\n"
-        "  alpha_deg      : rib angle [deg]\n\n"
-        "Valid range: e_D = 0.02-0.1, pitch_to_height = 5-20, alpha_deg = "
-        "30-90 deg\n"
-        "Source: Han et al. (1988)\n\n"
-        "Returns: Enhancement factor Nu_rib/Nu_smooth [-]");
 
-  m.def("rib_enhancement_factor_high_re",
-        &combaero::cooling::rib_enhancement_factor_high_re, py::arg("e_D"),
-        py::arg("pitch_to_height"), py::arg("alpha_deg"), py::arg("Re"),
-        "Rib enhancement factor - high-Re direct empirical fit (Singh & Ekkad "
-        "2017).\n\n"
-        "Nu/Nu0 = 40.0 * Re^(-0.12) * (e/D)^0.38 * (P/e)^(-0.11) * F(alpha)\n"
-        "F(alpha) = 1.0 + 0.15*sin(2*alpha_rad)  -- peaks at 45 deg (~1.15), "
-        "1.0 at 90 deg.\n\n"
-        "Parameters:\n"
-        "  e_D            : rib height / hydraulic diameter [-]\n"
-        "  pitch_to_height: rib pitch / rib height [-]\n"
-        "  alpha_deg      : rib angle [deg]\n"
-        "  Re             : channel Reynolds number [-]\n\n"
-        "Valid range: Re = 30000-400000, e_D = 0.04-0.10, pitch_to_height = "
-        "8-12, alpha_deg = 45-90\n"
-        "Source: Singh & Ekkad (2017) ASME GT2016-56363\n\n"
-        "Returns: Nu_rib/Nu_smooth [-]");
 
-  m.def("rib_friction_multiplier_high_re",
-        &combaero::cooling::rib_friction_multiplier_high_re, py::arg("e_D"),
-        py::arg("pitch_to_height"),
-        "Rib friction multiplier - high-Re direct empirical fit (Singh & Ekkad "
-        "2017).\n\n"
-        "f/f0 = 125.0 * (e/D)^0.85 * (P/e)^(-0.25)  (Re-independent, "
-        "fully-rough regime).\n\n"
-        "Parameters:\n"
-        "  e_D            : rib height / hydraulic diameter [-]\n"
-        "  pitch_to_height: rib pitch / rib height [-]\n\n"
-        "Valid range: e_D = 0.04-0.10, pitch_to_height = 8-12\n"
-        "Source: Singh & Ekkad (2017) ASME GT2016-56363\n\n"
-        "Returns: f_rib/f_smooth [-]");
 
   m.def("thermal_performance_factor",
         &combaero::cooling::thermal_performance_factor, py::arg("Nu_ratio"),
@@ -5130,216 +5204,11 @@ PYBIND11_MODULE(_core, m) {
         "1647-1658\n\n"
         "Returns: thermal-hydraulic performance factor eta [-]");
 
-  m.def("rib_friction_multiplier", &combaero::cooling::rib_friction_multiplier,
-        py::arg("e_D"), py::arg("pitch_to_height"),
-        "Rib friction factor multiplier [-].\n\n"
-        "Accounts for increased pressure drop from ribs.\n\n"
-        "Parameters:\n"
-        "  e_D            : rib height / hydraulic diameter [-]\n"
-        "  pitch_to_height: rib pitch / rib height [-]\n\n"
-        "Valid range: e_D = 0.02-0.1, pitch_to_height = 5-20\n"
-        "Source: Han et al. (1988)\n\n"
-        "Returns: Friction multiplier f_rib/f_smooth [-]");
 
   // Impingement cooling
-  m.def("impingement_nusselt", &combaero::cooling::impingement_nusselt,
-        py::arg("Re_jet"), py::arg("Pr"), py::arg("z_D"), py::arg("x_D") = 0.0,
-        py::arg("y_D") = 0.0,
-        "Impingement jet Nusselt number correlation [-].\n\n"
-        "For single jet or jet array impinging on flat plate.\n\n"
-        "Parameters:\n"
-        "  Re_jet : Reynolds number based on jet diameter [-]\n"
-        "  Pr     : Prandtl number [-]\n"
-        "  z_D    : jet-to-plate distance / jet diameter [-]\n"
-        "  x_D    : streamwise spacing / jet diameter [-] (default: 0 for "
-        "single jet)\n"
-        "  y_D    : spanwise spacing / jet diameter [-] (default: 0 for single "
-        "jet)\n\n"
-        "Valid range: Re_jet = 5000-80000, z_D = 1-12, x_D/y_D = 4-16\n"
-        "Source: Florschuetz et al. (1981), Martin (1977)\n\n"
-        "Returns: Average Nusselt number [-]");
 
-  // Film cooling
-  m.def(
-      "film_cooling_effectiveness",
-      &combaero::cooling::film_cooling_effectiveness, py::arg("x_D"),
-      py::arg("M"), py::arg("DR"), py::arg("alpha_deg"),
-      "Adiabatic film cooling effectiveness [-].\n\n"
-      "Measures how well coolant film protects surface from hot gas.\n\n"
-      "Parameters:\n"
-      "  x_D       : downstream distance / hole diameter [-]\n"
-      "  M         : blowing ratio (rho_c*v_c)/(rho_inf*v_inf) [-]\n"
-      "  DR        : density ratio rho_c/rho_inf [-]\n"
-      "  alpha_deg : injection angle [degrees]\n\n"
-      "Valid range: M = 0.3-2.5, DR = 1.2-2.0, alpha = 20-90 deg, x_D >= 0\n"
-      "Source: Baldauf et al. (2002)\n\n"
-      "Returns: Adiabatic effectiveness eta [-] (0 = no cooling, 1 = perfect)");
 
-  m.def("film_cooling_effectiveness_avg",
-        &combaero::cooling::film_cooling_effectiveness_avg, py::arg("x_D"),
-        py::arg("M"), py::arg("DR"), py::arg("alpha_deg"), py::arg("s_D") = 3.0,
-        "Laterally averaged film cooling effectiveness [-].\n\n"
-        "Averaged across span for design calculations.\n\n"
-        "Parameters:\n"
-        "  x_D       : downstream distance / hole diameter [-]\n"
-        "  M         : blowing ratio [-]\n"
-        "  DR        : density ratio [-]\n"
-        "  alpha_deg : injection angle [degrees]\n"
-        "  s_D       : hole spacing / hole diameter [-] (default: 3.0)\n\n"
-        "Valid range: M = 0.3-2.5, DR = 1.2-2.0, s_D = 2-6\n"
-        "Source: Baldauf et al. (2002)\n\n"
-        "Returns: Laterally averaged effectiveness eta_avg [-]");
 
-  m.def(
-      "film_cooling_multirow_sellers",
-      &combaero::cooling::film_cooling_multirow_sellers,
-      py::arg("row_positions_xD"), py::arg("eval_xD"), py::arg("M"),
-      py::arg("DR"), py::arg("alpha_deg"),
-      "Multi-row film cooling using Sellers (1963) superposition.\n\n"
-      "Combines effectiveness from multiple upstream rows using the\n"
-      "Sellers superposition principle: eta_total = 1 - product(1 - eta_i).\n\n"
-      "Parameters:\n"
-      "  row_positions_xD : streamwise positions of hole rows [x/D]\n"
-      "  eval_xD          : evaluation location [x/D]\n"
-      "  M                : blowing ratio [-]\n"
-      "  DR               : density ratio [-]\n"
-      "  alpha_deg        : injection angle [deg]\n\n"
-      "Returns: total adiabatic effectiveness [-]\n\n"
-      "References:\n"
-      "  - Sellers (1963): Superposition principle for multiple rows\n"
-      "  - Baldauf et al. (2002): Single-row effectiveness correlation\n\n"
-      "Accuracy: +/-15-20% (flat plate; curvature requires Ito correction)\n\n"
-      "Example:\n"
-      "  >>> rows = [0, 10, 20]  # Three rows at x/D = 0, 10, 20\n"
-      "  >>> eta = cb.film_cooling_multirow_sellers(rows, eval_xD=30, M=0.5, "
-      "DR=1.8, alpha_deg=30)\n"
-      "  >>> print(eta)  # Combined effectiveness at x/D = 30");
-
-  m.def(
-      "effusion_effectiveness", &combaero::cooling::effusion_effectiveness,
-      py::arg("x_D"), py::arg("M"), py::arg("DR"), py::arg("porosity"),
-      py::arg("s_D"), py::arg("alpha_deg"),
-      "Effusion cooling effectiveness for high-density hole arrays.\n\n"
-      "Used in combustor liners with continuous coolant injection.\n"
-      "Based on Lefebvre (1984) momentum flux ratio approach with\n"
-      "crossflow accumulation effects (L'Ecuyer & Matsuura 1985).\n\n"
-      "Parameters:\n"
-      "  x_D      : streamwise distance from first row / hole diameter [-]\n"
-      "  M        : blowing ratio (rho_c*v_c)/(rho_inf*v_inf) [-]\n"
-      "  DR       : density ratio rho_c/rho_inf [-]\n"
-      "  porosity : hole area / total surface area [-]\n"
-      "  s_D      : hole pitch / hole diameter [-]\n"
-      "  alpha_deg: injection angle [degrees]\n\n"
-      "Returns: adiabatic effectiveness eta [-] (0 = no cooling, 1 = "
-      "perfect)\n\n"
-      "Valid ranges:\n"
-      "  M = 1-4, DR = 1.2-2.0, porosity = 0.02-0.10\n"
-      "  s_D = 4-8, alpha = 20-45 deg\n\n"
-      "Accuracy: +/-20-25% (high-density arrays, combustor liner geometry)\n\n"
-      "References:\n"
-      "  - Lefebvre (1984): Gas Turbine Combustion\n"
-      "  - L'Ecuyer & Matsuura (1985): Crossflow effects\n\n"
-      "Example:\n"
-      "  >>> eta = cb.effusion_effectiveness(x_D=10, M=2.0, DR=1.8, "
-      "porosity=0.05, s_D=6.0, alpha_deg=30)\n"
-      "  >>> print(eta)  # Effectiveness at x/D = 10");
-
-  m.def("effusion_discharge_coefficient",
-        &combaero::cooling::effusion_discharge_coefficient, py::arg("Re_d"),
-        py::arg("P_ratio"), py::arg("alpha_deg"), py::arg("L_D") = 4.0,
-        "Effusion hole discharge coefficient.\n\n"
-        "Accounts for compressibility, inclination, and hole geometry.\n"
-        "Uses isentropic flow relations for subsonic flow.\n\n"
-        "Parameters:\n"
-        "  Re_d      : hole Reynolds number based on diameter [-]\n"
-        "  P_ratio   : plenum/mainstream pressure ratio [-]\n"
-        "  alpha_deg : hole inclination angle [degrees]\n"
-        "  L_D       : hole length / diameter [-] (default: 4.0)\n\n"
-        "Returns: discharge coefficient Cd [-]\n\n"
-        "Valid ranges:\n"
-        "  Re_d > 3000, 1.02 < P_ratio < 1.15\n"
-        "  20 < alpha < 45 deg, 2 < L_D < 8\n\n"
-        "Accuracy: +/-10-15%\n\n"
-        "References:\n"
-        "  - Hay & Spencer (1992): Compressible flow through inclined holes\n"
-        "  - Gritsch et al. (1998): Shaped hole discharge\n\n"
-        "Example:\n"
-        "  >>> Cd = cb.effusion_discharge_coefficient(Re_d=10000, "
-        "P_ratio=1.05, alpha_deg=30, L_D=4.0)\n"
-        "  >>> print(Cd)  # Discharge coefficient");
-
-  m.def("pin_fin_nusselt", &combaero::cooling::pin_fin_nusselt, py::arg("Re_d"),
-        py::arg("Pr"), py::arg("L_D"), py::arg("S_D"), py::arg("X_D"),
-        py::arg("is_staggered") = true,
-        "Pin fin array Nusselt number for internal cooling.\n\n"
-        "Staggered or inline arrangements of cylindrical pins.\n"
-        "Based on Metzger et al. (1982) correlations.\n\n"
-        "Parameters:\n"
-        "  Re_d         : Reynolds number based on pin diameter [-]\n"
-        "  Pr           : Prandtl number [-]\n"
-        "  L_D          : pin length / diameter [-]\n"
-        "  S_D          : spanwise spacing / diameter [-]\n"
-        "  X_D          : streamwise spacing / diameter [-]\n"
-        "  is_staggered : True for staggered, False for inline (default: "
-        "True)\n\n"
-        "Returns: Average Nusselt number Nu_d [-]\n\n"
-        "Valid ranges:\n"
-        "  Re_d = 3000-90000, Pr = 0.5-1.0, L_D = 0.5-4.0\n"
-        "  S_D = 1.5-4.0, X_D = 1.5-4.0\n\n"
-        "Accuracy: +/-15-20%\n\n"
-        "References:\n"
-        "  - Metzger et al. (1982): Effects of Pin Shape and Array "
-        "Orientation\n\n"
-        "Example:\n"
-        "  >>> Nu = cb.pin_fin_nusselt(Re_d=20000, Pr=0.7, L_D=2.0, S_D=2.5, "
-        "X_D=2.5)\n"
-        "  >>> print(Nu)  # Nusselt number for staggered array");
-
-  m.def("dimple_nusselt_enhancement",
-        &combaero::cooling::dimple_nusselt_enhancement, py::arg("Re_Dh"),
-        py::arg("d_Dh"), py::arg("h_d"), py::arg("S_d"),
-        "Dimpled surface heat transfer enhancement factor.\n\n"
-        "Semi-spherical indentations for internal cooling.\n"
-        "Returns enhancement ratio Nu_dimple/Nu_smooth.\n\n"
-        "Parameters:\n"
-        "  Re_Dh : Reynolds number based on channel hydraulic diameter [-]\n"
-        "  d_Dh  : dimple diameter / channel height [-]\n"
-        "  h_d   : dimple depth / diameter [-]\n"
-        "  S_d   : dimple spacing / diameter [-]\n\n"
-        "Returns: Enhancement factor Nu_dimple/Nu_smooth [-]\n\n"
-        "Valid ranges:\n"
-        "  Re_Dh = 10000-80000, d_Dh = 0.1-0.3\n"
-        "  h_d = 0.1-0.3, S_d = 1.5-3.0\n\n"
-        "Accuracy: +/-20%\n\n"
-        "References:\n"
-        "  - Chyu et al. (1997): Heat Transfer of Arrays of Semi-Spherical "
-        "Indentations\n\n"
-        "Key advantage: Lower friction penalty than ribs (1.5-2x vs 6-10x)\n\n"
-        "Example:\n"
-        "  >>> enhancement = cb.dimple_nusselt_enhancement(Re_Dh=30000, "
-        "d_Dh=0.2, h_d=0.2, S_d=2.0)\n"
-        "  >>> print(enhancement)  # Typically 1.8-2.5x");
-
-  m.def("dimple_friction_multiplier",
-        &combaero::cooling::dimple_friction_multiplier, py::arg("Re_Dh"),
-        py::arg("d_Dh"), py::arg("h_d"),
-        "Dimpled surface friction multiplier.\n\n"
-        "Friction penalty for dimpled surfaces (f_dimple/f_smooth).\n\n"
-        "Parameters:\n"
-        "  Re_Dh : Reynolds number based on channel hydraulic diameter [-]\n"
-        "  d_Dh  : dimple diameter / channel height [-]\n"
-        "  h_d   : dimple depth / diameter [-]\n\n"
-        "Returns: Friction multiplier f_dimple/f_smooth [-]\n\n"
-        "Valid ranges:\n"
-        "  Re_Dh = 10000-80000, d_Dh = 0.1-0.3, h_d = 0.1-0.3\n\n"
-        "Accuracy: +/-15%\n\n"
-        "References:\n"
-        "  - Chyu et al. (1997)\n\n"
-        "Typical range: 1.3-2.2x (much lower than ribs)\n\n"
-        "Example:\n"
-        "  >>> f_ratio = cb.dimple_friction_multiplier(Re_Dh=30000, d_Dh=0.2, "
-        "h_d=0.2)\n"
-        "  >>> print(f_ratio)  # Typically 1.5-2.0x");
 
   m.def("adiabatic_wall_temperature",
         &combaero::cooling::adiabatic_wall_temperature, py::arg("T_hot"),
@@ -6048,147 +5917,14 @@ PYBIND11_MODULE(_core, m) {
       "  f_multiplier  : empirical correction factor on f (default 1.0)\n\n"
       "Returns: ChannelResult with Jacobian fields populated");
 
-  // -----------------------------------------------------------------
-  // channel_ribbed
-  // -----------------------------------------------------------------
-  m.def(
-      "channel_ribbed",
-      [](double T, double P,
-         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-         double velocity, double diameter, double length, double e_D,
-         double pitch_to_height, double alpha_deg, double T_hot, bool heating,
-         double Nu_multiplier, double f_multiplier) {
-        return channel_ribbed(T, P, to_vec(X_arr), velocity, diameter, length,
-                              e_D, pitch_to_height, alpha_deg, T_hot, heating,
-                              Nu_multiplier, f_multiplier);
-      },
-      py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
-      py::arg("diameter"), py::arg("length"), py::arg("e_D"),
-      py::arg("pitch_to_height"), py::arg("alpha_deg"),
-      py::arg("T_hot") = std::numeric_limits<double>::quiet_NaN(),
-      py::arg("heating") = true, py::arg("Nu_multiplier") = 1.0,
-      py::arg("f_multiplier") = 1.0,
-      "Rib-enhanced cooling channel (Han et al. 1988).\n\n"
-      "Applies rib_enhancement_factor to Nu and rib_friction_multiplier to f\n"
-      "from a smooth-channel Gnielinski baseline.\n\n"
-      "Parameters:\n"
-      "  e_D            : rib height / hydraulic diameter [-]  (valid: "
-      "0.02-0.1)\n"
-      "  pitch_to_height: rib pitch / rib height [-]           (valid: 5-20)\n"
-      "  alpha_deg      : rib angle [deg]                      (valid: "
-      "30-90)\n\n"
-      "Returns: ChannelResult");
 
-  // -----------------------------------------------------------------
-  // channel_dimpled
-  // -----------------------------------------------------------------
-  m.def(
-      "channel_dimpled",
-      [](double T, double P,
-         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-         double velocity, double diameter, double length, double d_Dh,
-         double h_d, double S_d, double T_hot, bool heating,
-         double Nu_multiplier, double f_multiplier) {
-        return channel_dimpled(T, P, to_vec(X_arr), velocity, diameter, length,
-                               d_Dh, h_d, S_d, T_hot, heating, Nu_multiplier,
-                               f_multiplier);
-      },
-      py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
-      py::arg("diameter"), py::arg("length"), py::arg("d_Dh"), py::arg("h_d"),
-      py::arg("S_d"),
-      py::arg("T_hot") = std::numeric_limits<double>::quiet_NaN(),
-      py::arg("heating") = true, py::arg("Nu_multiplier") = 1.0,
-      py::arg("f_multiplier") = 1.0,
-      "Dimpled surface cooling channel (Chyu et al. 1997).\n\n"
-      "Applies dimple_nusselt_enhancement to Nu and dimple_friction_multiplier "
-      "to f\n"
-      "from a smooth-channel Gnielinski baseline.\n\n"
-      "Parameters:\n"
-      "  d_Dh : dimple diameter / channel height [-]  (valid: 0.1-0.3)\n"
-      "  h_d  : dimple depth / diameter [-]           (valid: 0.1-0.3)\n"
-      "  S_d  : dimple spacing / diameter [-]         (valid: 1.5-3.0)\n\n"
-      "Returns: ChannelResult");
 
-  // -----------------------------------------------------------------
-  // channel_pin_fin
-  // -----------------------------------------------------------------
-  m.def(
-      "channel_pin_fin",
-      [](double T, double P,
-         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-         double velocity, double channel_height, double pin_diameter,
-         double S_D, double X_D, int N_rows, double T_hot, bool is_staggered,
-         double Nu_multiplier, double f_multiplier) {
-        return channel_pin_fin(T, P, to_vec(X_arr), velocity, channel_height,
-                               pin_diameter, S_D, X_D, N_rows, T_hot,
-                               is_staggered, Nu_multiplier, f_multiplier);
-      },
-      py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
-      py::arg("channel_height"), py::arg("pin_diameter"), py::arg("S_D"),
-      py::arg("X_D"), py::arg("N_rows"),
-      py::arg("T_hot") = std::numeric_limits<double>::quiet_NaN(),
-      py::arg("is_staggered") = true, py::arg("Nu_multiplier") = 1.0,
-      py::arg("f_multiplier") = 1.0,
-      "Pin-fin array cooling channel (Metzger et al. 1982).\n\n"
-      "Re and Nu are based on pin diameter d.\n"
-      "dP = N_rows * f_pin * (rho * v_max^2 / 2)\n"
-      "  v_max = velocity * S_D / (S_D - 1)  (minimum cross-section)\n\n"
-      "Parameters:\n"
-      "  velocity       : approach velocity [m/s]\n"
-      "  channel_height : pin length H [m]\n"
-      "  pin_diameter   : pin diameter d [m]\n"
-      "  S_D            : spanwise pitch / d [-]   (valid: 1.5-4.0)\n"
-      "  X_D            : streamwise pitch / d [-] (valid: 1.5-4.0)\n"
-      "  N_rows         : number of pin rows\n"
-      "  is_staggered   : True = staggered (default), False = inline\n\n"
-      "Returns: ChannelResult");
 
-  // -----------------------------------------------------------------
-  // channel_impingement
-  // -----------------------------------------------------------------
-  m.def(
-      "channel_impingement",
-      [](double T, double P,
-         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-         double mdot_jet, double d_jet, double z_D, double x_D, double y_D,
-         double A_target, double T_hot, double Cd_jet, double Nu_multiplier,
-         double f_multiplier) {
-        return channel_impingement(T, P, to_vec(X_arr), mdot_jet, d_jet, z_D,
-                                   x_D, y_D, A_target, T_hot, Cd_jet,
-                                   Nu_multiplier, f_multiplier);
-      },
-      py::arg("T"), py::arg("P"), py::arg("X"), py::arg("mdot_jet"),
-      py::arg("d_jet"), py::arg("z_D"), py::arg("x_D") = 0.0,
-      py::arg("y_D") = 0.0, py::arg("A_target"),
-      py::arg("T_hot") = std::numeric_limits<double>::quiet_NaN(),
-      py::arg("Cd_jet") = 0.65, py::arg("Nu_multiplier") = 1.0,
-      py::arg("f_multiplier") = 1.0,
-      "Impingement jet array cooling (Florschuetz et al. 1981 / Martin "
-      "1977).\n\n"
-      "Re and Nu are based on jet diameter d_jet.\n"
-      "dP = (1/Cd_jet^2) * rho * v_jet^2 / 2  (jet-plate orifice loss)\n\n"
-      "Parameters:\n"
-      "  mdot_jet : total jet mass flow [kg/s]\n"
-      "  d_jet    : jet hole diameter [m]\n"
-      "  z_D      : jet-to-target distance / d_jet [-]  (valid: 1-12)\n"
-      "  x_D      : streamwise jet spacing / d_jet [-]  (0 = single jet)\n"
-      "  y_D      : spanwise jet spacing / d_jet [-]    (0 = single jet)\n"
-      "  A_target : target surface area [m^2]\n"
-      "  Cd_jet   : jet hole discharge coefficient [-]  (default 0.65)\n\n"
-      "Returns: ChannelResult");
 
   // -----------------------------------------------------------------
   // pin_fin_friction (scalar, low-level)
   // -----------------------------------------------------------------
-  m.def("pin_fin_friction", &combaero::cooling::pin_fin_friction,
-        py::arg("Re_d"), py::arg("is_staggered") = true,
-        "Pin-fin array pressure drop friction coefficient.\n\n"
-        "For use in: dP = N_rows * f_pin * (rho * v_max^2 / 2)\n\n"
-        "Parameters:\n"
-        "  Re_d         : Reynolds number based on pin diameter [-]\n"
-        "  is_staggered : True = staggered (default), False = inline\n\n"
-        "Returns: friction coefficient f_pin [-]\n\n"
-        "Source: Metzger et al. (1982), Simoneau & VanFossen (1984)");
+
   // -----------------------------------------------------------------
   // Internal Solver Tools (f, J) exact Jacobians
   // -----------------------------------------------------------------
@@ -6244,43 +5980,12 @@ PYBIND11_MODULE(_core, m) {
         "Calculate Nusselt number and its Jacobian w.r.t Re using Petukhov.");
 
   // Cooling Correlations (f, J) tuples
-  m.def("pin_fin_nusselt_and_jacobian", &solver::pin_fin_nusselt_and_jacobian,
-        py::arg("Re_d"), py::arg("Pr"), py::arg("L_D"), py::arg("S_D"),
-        py::arg("X_D"), py::arg("is_staggered") = true,
-        "Calculate Pin Fin Nusselt number and its Jacobian w.r.t Re_d.");
 
-  m.def("pin_fin_friction_and_jacobian", &solver::pin_fin_friction_and_jacobian,
-        py::arg("Re_d"), py::arg("is_staggered") = true,
-        "Calculate Pin Fin Friction factor and its Jacobian w.r.t Re_d.");
 
-  m.def("dimple_nusselt_enhancement_and_jacobian",
-        &solver::dimple_nusselt_enhancement_and_jacobian, py::arg("Re_Dh"),
-        py::arg("d_Dh"), py::arg("h_d"), py::arg("S_d"),
-        "Calculate Dimple Nusselt enhancement and its Jacobian w.r.t Re_Dh.");
 
-  m.def("rib_enhancement_factor_high_re_and_jacobian",
-        &solver::rib_enhancement_factor_high_re_and_jacobian, py::arg("e_D"),
-        py::arg("pitch_to_height"), py::arg("alpha_deg"), py::arg("Re"),
-        "Calculate Rib enhancement factor and its Jacobian w.r.t Re.");
 
-  m.def("impingement_nusselt_and_jacobian",
-        &solver::impingement_nusselt_and_jacobian, py::arg("Re_jet"),
-        py::arg("Pr"), py::arg("z_D"), py::arg("x_D") = 0.0,
-        py::arg("y_D") = 0.0,
-        "Calculate Impingement Nusselt number and its Jacobian w.r.t Re_jet.");
 
-  m.def("film_cooling_effectiveness_and_jacobian",
-        &solver::film_cooling_effectiveness_and_jacobian, py::arg("x_D"),
-        py::arg("M"), py::arg("DR"), py::arg("alpha_deg"),
-        "Calculate Film cooling effectiveness and its Jacobian w.r.t Blowing "
-        "Ratio M.");
 
-  m.def("effusion_effectiveness_and_jacobian",
-        &solver::effusion_effectiveness_and_jacobian, py::arg("x_D"),
-        py::arg("M"), py::arg("DR"), py::arg("porosity"), py::arg("s_D"),
-        py::arg("alpha_deg"),
-        "Calculate Effusion effectiveness and its Jacobian w.r.t Blowing Ratio "
-        "M.");
 
   // Stagnation (f, J) tuples
   m.def("mach_number_and_jacobian_v", &solver::mach_number_and_jacobian_v,
@@ -6302,6 +6007,7 @@ PYBIND11_MODULE(_core, m) {
   m.def(
       "P0_from_static_and_jacobian_M", &solver::P0_from_static_and_jacobian_M,
       py::arg("P"), py::arg("T"), py::arg("M"), py::arg("X"),
+      py::arg("tol") = 1e-8, py::arg("max_iter") = 50,
       "Calculate Stagnation Pressure from Static and its Jacobian w.r.t Mach.");
 
   m.def("friction_and_jacobian_haaland", &solver::friction_and_jacobian_haaland,

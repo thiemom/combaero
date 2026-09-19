@@ -1,6 +1,11 @@
 # Extraction: Han rib correlations
 
-**Status: CONFIRMED -- reviewed against the book on 2026-09-10.**
+**Status: items 1-35 CONFIRMED (2026-09-10). Items 36-46 ADDED later and
+UNCONFIRMED.**
+
+The originally reviewed items stand. A later pass added the narrow-aspect-ratio
+correlation (Eq. 4.19, Figure 4.48), which extends coverage to `W/H` below 1
+and contradicts nothing already confirmed. Those items await review.
 
 Every item was checked against the source or resolved by derivation, and the
 reviewer has signed off in the review log. This document is released for
@@ -491,6 +496,125 @@ This is what two extraction channels are for. The text extraction carried
 things the images did not -- Eq. 4.14, the `e+ >= 50` floor, the stated
 deviation bands -- and the image carried a factor the text dropped.
 
+## Narrow-aspect-ratio channels (Eq. 4.19, Figure 4.48) -- ADDED 2026-09-13
+
+Extends coverage to `W/H < 1`. The confirmed items cover `W/H = 1-4`; this
+covers `1/4 < W/H < 1`, so together they span `1/4` to `4`.
+
+after: Han, J.C. et al., *Int. J. Heat Mass Transfer*, **31**(1), 183, 1988,
+with the `G` correlation attributed in the text to Han et al. (1989).
+
+| # | item | as extracted | state |
+|---|---|---|---|
+| 36 | Eq. 4.19 form | `G = C (e+)^n`, at `Pr = 0.7` | confirmed by text |
+| 37 | `1/2 < W/H < 1` | `n = 0.35`; `C = 2.24` at `alpha = 90 deg`, `C = 1.80` for `30 < alpha < 90` | confirmed by text |
+| 38 | `1/4 < W/H < 1/2` | `n = 0.35 (W/H)^0.44`; `C = 2.24 (W/H)^-0.76` at `alpha = 90 deg`, `C = 1.80 (W/H)^-0.76` for `30 < alpha < 90` | confirmed by text |
+| 39 | `R` behaviour, Fig. 4.48 | `R` increases with decreasing `W/H`; all three aspect ratios coincide at `alpha = 30 deg` | confirmed by text |
+| 40 | `R` correlation for narrow channels | plotted in Fig. 4.48a, no closed form in the extracted text | **missing** |
+
+### Cross-check: Eq. 4.18 and Eq. 4.19 meet exactly at `W/H = 1`
+
+Different papers, adjoining ranges. At their shared boundary, `alpha = 90 deg`,
+`P/e = 10`:
+
+| `e+` | Eq. 4.18 | Eq. 4.19 | difference |
+|---|---|---|---|
+| 50 | 8.8082 | 8.8082 | 0 |
+| 100 | 11.2266 | 11.2266 | 0 |
+| 300 | 16.4908 | 16.4908 | 0 |
+| 1000 | 25.1332 | 25.1332 | 0 |
+
+Exact to every digit: Eq. 4.18's square-channel branch reduces to
+`2.24 (e+)^0.35`, which is Eq. 4.19's upper branch. A check that could have
+failed and did not.
+
+### Discontinuity at the `W/H = 1/2` branch boundary (item 41)
+
+| # | item | state |
+|---|---|---|
+| 41 | Eq. 4.19's two branches disagree at `W/H = 1/2` | **needs review** |
+
+Evaluated at `W/H = 1/2`, `alpha = 90 deg`, from either side:
+
+| `e+` | upper branch | lower branch | ratio |
+|---|---|---|---|
+| 100 | 11.2266 | 12.4459 | 1.109 |
+| 1000 | 25.1332 | 22.5435 | 0.897 |
+
+A **10% step** at the boundary, in opposite directions at the two ends of the
+range. Unlike the `W/H = 1` junction above, these branches do not meet.
+
+The text gives open intervals, so `W/H = 1/2` exactly may be intended to fall
+in neither. But an implementation has to choose, and a 10% discontinuity inside
+the validated range will appear in any solve that crosses it. Whether the
+correlation is meant to be discontinuous, or the branches used only well inside
+their intervals, needs a reviewer.
+
+### Prandtl number
+
+Item 36 states `Pr = 0.7`, consistent with item 25. The narrow-channel
+correlation carries no `Pr` term either.
+
+## High-performance ribs (section 4.2.4) -- ADDED 2026-09-15
+
+Angled-rib derivatives: V-shaped, broken, wedge- and delta-shaped. Recorded for
+scope, because the section contains **no closed-form correlations** -- it is
+comparative, presenting `G` and `R` against `e+` as plots.
+
+| # | item | as extracted | state |
+|---|---|---|---|
+| 42 | V-shaped ribs, Figs. 4.49-4.51 | after Han, J.C. et al., *ASME J. Heat Transfer*, **113**, 590, 1991 | confirmed |
+| 43 | broken ribs, Figs. 4.52-4.54 | after Han, J.C. and Zhang, Y.M., *IJHMT*, **35**(2), 513, 1992 | confirmed |
+| 44 | wedge- and delta-shaped ribs, Figs. 4.55-4.58 | after Han, J.C. et al., *Enhanced Heat Transfer*, **1**(1), 37, 1993 | confirmed |
+| 45 | closed-form correlations for any of these | **none given** -- performance is reported as plots and as ratios in the text | **missing** |
+| 46 | best performers, per the text | 60 deg V-shaped broken rib; backward-aligned delta ribs at 3-4x heat transfer for 7-9x pressure drop | confirmed |
+
+**Implication for #334.** These configurations cannot be implemented as
+correlations from this source. What the section supports is a *comparative*
+statement -- that a 60 deg V-broken rib outperforms a 90 deg continuous rib --
+not a predictive one. Implementing them would need the three primary papers,
+and is out of scope for the current issue.
+
+### Cross-check: Figure 4.54 independently confirms items 8 and 10
+
+Figure 4.54 (Han and Zhang 1992) plots `G_bar` against `e+` for broken ribs,
+with the 90 deg continuous rib as a reference line. The section text states:
+
+> The heat-transfer roughness function for the 90 deg rib is the same as the
+> previous correlation that was developed for the 90 deg rib by Han (1988).
+
+Testing that against the digitised line, using **only** quantities from the
+confirmed items -- `G = 3.7 (e+)^0.28` (item 8) and `G_bar = 1.2 G` (item 10):
+
+| comparison | mean pred/data | RMS |
+|---|---|---|
+| `G_bar = 4.44 (e+)^0.28` vs Fig. 4.54 line | 0.967 | **3.5%** |
+| same vs Fig. 4.54 data points | 0.949 | 5.4% |
+
+Free fit to the digitised line gives `G_bar = 4.201 (e+)^0.2952` against the
+confirmed `4.44 (e+)^0.28`.
+
+**This corroborates item 10 from a third independent direction**, which matters
+because item 10 is the one this document got wrong and then right: it was first
+assumed, then "resolved" via a Prandtl coincidence that fitted to 0.51% and was
+wrong, then settled by a label printed on Figure 4.47. A different paper, a
+different figure and a different rib family now reproduce it to 3.5%.
+
+### Digitised reference point for a high-performance rib
+
+Not a correlation, and not to be implemented as one. Recorded because it
+quantifies the section's qualitative claim:
+
+```
+90 deg continuous (Fig. 4.54 line)   G_bar = 4.201 (e+)^0.2952
+45 deg V-shaped broken (data)        G_bar = 3.242 (e+)^0.2882
+at e+ = 500:  26.3 against 19.4, a ratio of 0.739
+```
+
+Lower `G` means better heat transfer, so the 45 deg V-broken rib sits about 26%
+better on this measure -- consistent with the text, which calls the broken
+V-shaped ribs the best performers of the group.
+
 ## Modelling decisions
 
 Choices made in implementing what was extracted. Kept apart from the extracted
@@ -753,6 +877,7 @@ than extrapolating past it.
 
 | date | reviewer | outcome |
 |---|---|---|
+| 2026-09-18 | reviewer + Claude | **Item 7 closed with evidence, not deference.** D1 stands, but the reason improves: the `R` slope is in the DRAWING, not the scan. Both panel frames were digitised as distortion standards -- a frame is horizontal by construction, so its fitted slope is the panel's distortion and nothing else, and unlike a printed equation it does not presume the draftsman drew the equation faithfully. Upper frame `+0.00078`, lower frame `-0.00036`, neither monotonic, i.e. picking noise. The drawn `R` line rises at `+0.00857` -- **23x the distortion of the panel it sits in, and in the opposite direction**. No page skew lifts `R` by 2.7% while leaving its own frame flat to 0.04%. Independently, `G_bar` in the upper panel reproduces its printed `4.5 (e+)^0.28` to 0.25% RMS off the same scan. Filed as `validation/cooling/data/han2012/fig4.46_frame_*.csv`. |
 | 2026-09-10 | extracted by Claude | UNCONFIRMED -- submitted for review |
 | 2026-09-10 | reviewer | **CONFIRMED.** All items checked against the book or resolved by derivation; no open flags. D1 and D2 accepted, D3 withdrawn. Released for implementation under #334. |
 | 2026-09-10 | reviewer | re-read the layout: the trailing `* f_bar` is a full stop plus the next sentence's subject on the same line. Han prints `f = f_bar + (H/W)(f_bar - f_s)`, matching the derivation. **D3 withdrawn** -- no departure from the source exists. |

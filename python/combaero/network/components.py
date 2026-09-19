@@ -62,47 +62,89 @@ class SmoothModel:
 
 @dataclass
 class RibbedModel:
-    """Parameters for channel_ribbed."""
+    """Rib-roughened walls, evaluated from a provenanced parameter set.
 
-    e_D: float = 0.0  # rib height / hydraulic diameter  # noqa: N815
-    pitch_to_height: float = 0.0  # rib pitch / rib height
-    alpha_deg: float = 90.0  # rib angle [deg]
+    The correlation gives the RIBBED-SIDE heat transfer. Combining it with the
+    smooth walls is this element's job, because how many walls are ribbed is a
+    design choice rather than a property of the correlation -- the channel is
+    the internal wall by definition, and the other side of it is a different
+    channel.
+
+    Parameters
+    ----------
+    correlation_set : object
+        A ``combaero.RibCorrelationSet``. Defaults to Han (1988) for 90 deg
+        orthogonal ribs. Supply your own to match measured data: the set
+        records its own source and provenance class, so a tuned coefficient
+        cannot pass for a published one.
+    e_D, p_e, alpha_deg : float
+        Rib height / hydraulic diameter, pitch / height, and angle to the flow.
+    W_H : float
+        Channel width / height. It lives here rather than on the element
+        because a channel is defined by its hydraulic diameter, which does not
+        determine an aspect ratio -- a 2:1 duct and a square one can share a
+        Dh. The correlation needs the ratio for both the wall-law geometry
+        group and the ribbed/smooth area split, so the rib model carries it.
+    n_ribbed_walls : int
+        How many of the four walls carry ribs. 2 means two OPPOSITE walls,
+        which is the configuration Han measured.
+    smooth_wall_Nu_multiplier : float
+        A user knob on the SMOOTH walls' contribution to the channel average.
+        It encodes nothing and defaults to 1.0.
+
+        It exists because the ribbed side already has a better knob -- change
+        ``C_G`` on the parameter set, which records what you did -- while the
+        smooth walls come from the base Gnielinski correlation and have none.
+
+        Its practical use is the documented gap below. A plain smooth wall
+        gives ``h_s/h_r`` around 0.42, where Han's own channel average implies
+        0.70, because ribs enhance the adjacent smooth wall by 10-50% as well.
+        Setting this to about **1.67** reproduces Han's measured average for
+        the two-ribbed-wall square-channel case.
+    """
+
+    correlation_set: object = None
+    e_D: float = 0.0
+    p_e: float = 0.0
+    alpha_deg: float = 90.0
+    W_H: float = 1.0
+    n_ribbed_walls: int = 2
+    smooth_wall_Nu_multiplier: float = 1.0
 
 
 @dataclass
-class DimpledModel:
-    """Parameters for channel_dimpled."""
+class _RibbedChannelResult:
+    """What a ribbed channel returns.
 
-    d_Dh: float = 0.0  # dimple diameter / hydraulic diameter  # noqa: N815
-    h_d: float = 0.0  # dimple depth / dimple diameter
-    S_d: float = 0.0  # dimple pitch / dimple diameter
+    Deliberately NOT a ``ChannelResult``: that type is the C++ correlation's
+    output and carries derivative fields this path computes differently. It
+    also exposes ``h_ribbed`` and ``h_smooth`` separately, because the channel
+    average hides a 20% modelling choice and a user should be able to see both
+    halves of it.
+    """
+
+    h: float
+    h_ribbed: float
+    h_smooth: float
+    Nu: float
+    Re: float
+    Pr: float
+    f: float
+    dP: float
+    T_aw: float
+    e_plus: float
+    extrapolated: bool
+    # Derivatives the solver's wall-coupling path reads. They are not
+    # decoration: without them a ribbed channel joined by a ThermalWall raises
+    # AttributeError mid-solve, which is how the coupled combustor example
+    # found this after the unit tests missed it -- none of them coupled a wall.
+    dh_dmdot: float = 0.0
+    dh_dT: float = 0.0
+    dT_aw_dmdot: float = 0.0
+    dT_aw_dT: float = 0.0
 
 
-@dataclass
-class PinFinModel:
-    """Parameters for channel_pin_fin."""
-
-    pin_diameter: float = 0.0  # pin diameter [m]
-    channel_height: float = 0.0  # channel height [m]
-    S_D: float = 2.0  # transverse pitch / pin diameter
-    X_D: float = 2.0  # streamwise pitch / pin diameter
-    N_rows: int = 1  # number of pin rows
-    is_staggered: bool = True
-
-
-@dataclass
-class ImpingementModel:
-    """Parameters for channel_impingement."""
-
-    d_jet: float = 0.0  # jet hole diameter [m]
-    z_D: float = 0.0  # jet-to-target distance / d_jet  # noqa: N815
-    x_D: float = 0.0  # streamwise pitch / d_jet  # noqa: N815
-    y_D: float = 0.0  # spanwise pitch / d_jet  # noqa: N815
-    A_target: float = 0.0  # target area [m^2]
-    Cd_jet: float = 0.8  # jet discharge coefficient
-
-
-ChannelModel = SmoothModel | RibbedModel | DimpledModel | PinFinModel | ImpingementModel
+ChannelModel = SmoothModel | RibbedModel
 
 
 @dataclass
@@ -129,6 +171,137 @@ class ConvectiveSurface:
     heating: bool | None = None  # None = auto-detect
     Nu_multiplier: float = 1.0  # empirical correction on Nu
     f_multiplier: float = 1.0  # empirical correction on f
+
+    def _ribbed_result(self, T, P, X, velocity, diameter, length, T_hot, heating):
+        """Ribbed-channel heat transfer and pressure drop.
+
+        Two things are asymmetric here and both follow from the source rather
+        than from convenience.
+
+        FRICTION NEEDS NO WALL WEIGHTING. The ``f`` in the roughness function's
+        definition is already the equivalent four-sided channel friction
+        factor, so the correlation returns a channel-level value directly. The
+        element does not multiply pipe friction by anything -- correlations own
+        their ``f``, which is what #331 established after a round-trip through
+        a restated friction factor moved a drop by -24.7%.
+
+        HEAT TRANSFER DOES. The correlation gives the ribbed side; the smooth
+        walls come from the base correlation, and the channel average is the
+        area-weighted combination.
+
+        A DOCUMENTED GAP. Using the plain smooth correlation for the smooth
+        walls gives h_s/h_r around 0.42, where Han's own reported channel
+        average implies 0.70 -- because ribs enhance the adjacent smooth wall
+        by 10-50% as well, which no correlation here covers. The channel
+        average is therefore about 20% below Han's measurement for the
+        two-ribbed-wall square case. That is a knowable, quantified
+        under-prediction rather than an invented constant, and
+        ``smooth_wall_Nu_multiplier`` is how a user closes it: about 1.67
+        reproduces Han.
+        """
+        model = self.model
+        rib_set = model.correlation_set or cb.han_1988_orthogonal()
+
+        rho, _ = _safe_rho(cb.density(T, P, X))
+        cs = cb.complete_state(T, P, X)
+        mu = cs.transport.mu
+        Re = rho * velocity * diameter / mu if mu > 0.0 else 0.0
+        Pr = cs.transport.Pr
+
+        geom = cb.RibGeometry(
+            e_D=model.e_D,
+            p_e=model.p_e,
+            W_H=model.W_H,
+            alpha_deg=model.alpha_deg,
+        )
+        rib = cb.evaluate_rib(rib_set, geom, Re)
+
+        # Ribbed side, from the correlation's Stanton number.
+        k = cs.transport.k
+        cp = cs.thermo.cp
+        h_ribbed = rib.St_r * rho * abs(velocity) * cp
+
+        # Smooth walls, from the base correlation, with the user's knob.
+        smooth = cb.channel_smooth(
+            T,
+            P,
+            X,
+            velocity,
+            diameter,
+            length,
+            T_hot=T_hot,
+            heating=heating,
+            Nu_multiplier=model.smooth_wall_Nu_multiplier,
+            f_multiplier=1.0,
+        )
+
+        frac_ribbed, frac_smooth = self._ribbed_wall_fractions()
+        h_avg = frac_ribbed * h_ribbed + frac_smooth * smooth.h
+
+        # The correlation's f is already the four-sided channel value.
+        dP = rib.f * (length / diameter) * 0.5 * rho * velocity * abs(velocity)
+
+        # Wall-coupling derivatives. The ribbed side moves with mass flow
+        # through e+; the smooth side brings its own, already computed by the
+        # base correlation. Both are area-weighted exactly as h is, so the
+        # derivative of the average is the average of the derivatives.
+        dSt_dRe = rib.dSt_dRe
+        dRe_dmdot = abs(Re / m_dot_ref) if (m_dot_ref := rho * velocity * self.area or 0.0) else 0.0
+        dh_ribbed_dmdot = dSt_dRe * dRe_dmdot * rho * abs(velocity) * cp
+        dh_dmdot = (
+            frac_ribbed * dh_ribbed_dmdot + frac_smooth * smooth.dh_dmdot
+        ) * self.Nu_multiplier
+        # Temperature sensitivity of the ribbed side is not exposed by the
+        # correlation, so only the smooth side contributes. Recorded rather
+        # than approximated from a stand-in, the same gap the array path had.
+        dh_dT = frac_smooth * smooth.dh_dT * self.Nu_multiplier
+
+        return _RibbedChannelResult(
+            dh_dmdot=dh_dmdot,
+            dh_dT=dh_dT,
+            dT_aw_dmdot=smooth.dT_aw_dmdot,
+            dT_aw_dT=smooth.dT_aw_dT,
+            h=h_avg * self.Nu_multiplier,
+            h_ribbed=h_ribbed,
+            h_smooth=smooth.h,
+            Nu=h_avg * diameter / k if k > 0.0 else 0.0,
+            Re=Re,
+            Pr=Pr,
+            f=rib.f * self.f_multiplier,
+            dP=dP * self.f_multiplier,
+            T_aw=smooth.T_aw,
+            e_plus=rib.e_plus,
+            extrapolated=rib.extrapolated,
+        )
+
+    def _ribbed_wall_fractions(self) -> tuple[float, float]:
+        """Area fractions of the ribbed and smooth walls, for a W x H duct.
+
+        Han's configuration is two OPPOSITE walls, which for a duct of width W
+        and height H are the two of width W. The ribbed fraction is then
+        W/(W+H) -- the same area weighting the four-sided friction conversion
+        uses, so friction and heat transfer are treated alike.
+
+        One and four ribbed walls follow from the same picture. Anything else
+        is rejected rather than interpolated: "three ribbed walls" has no
+        unambiguous geometry.
+        """
+        model = self.model
+        W_H = model.W_H
+        n = model.n_ribbed_walls
+        if n == 4:
+            return 1.0, 0.0
+        if n == 2:
+            ribbed = W_H / (W_H + 1.0)
+            return ribbed, 1.0 - ribbed
+        if n == 1:
+            ribbed = W_H / (2.0 * (W_H + 1.0))
+            return ribbed, 1.0 - ribbed
+        raise ValueError(
+            f"n_ribbed_walls must be 1, 2 or 4, got {n}. 2 means two opposite "
+            "walls, which is the configuration the correlations were measured "
+            "on."
+        )
 
     def htc_and_T(
         self,
@@ -195,109 +368,15 @@ class ConvectiveSurface:
                 f_multiplier=self.f_multiplier,
             )
         elif isinstance(self.model, RibbedModel):
-            result = cb.channel_ribbed(
-                T,
-                P,
-                X,
-                velocity,
-                diameter,
-                length,
-                self.model.e_D,
-                self.model.pitch_to_height,
-                self.model.alpha_deg,
-                T_hot=T_hot,
-                heating=heating,
-                Nu_multiplier=self.Nu_multiplier,
-                f_multiplier=self.f_multiplier,
-            )
-        elif isinstance(self.model, DimpledModel):
-            result = cb.channel_dimpled(
-                T,
-                P,
-                X,
-                velocity,
-                diameter,
-                length,
-                self.model.d_Dh,
-                self.model.h_d,
-                self.model.S_d,
-                T_hot=T_hot,
-                heating=heating,
-                Nu_multiplier=self.Nu_multiplier,
-                f_multiplier=self.f_multiplier,
-            )
-        elif isinstance(self.model, PinFinModel):
-            result = cb.channel_pin_fin(
-                T,
-                P,
-                X,
-                velocity,
-                self.model.channel_height,
-                self.model.pin_diameter,
-                self.model.S_D,
-                self.model.X_D,
-                self.model.N_rows,
-                T_hot=T_hot,
-                is_staggered=self.model.is_staggered,
-                Nu_multiplier=self.Nu_multiplier,
-                f_multiplier=self.f_multiplier,
-            )
-        elif isinstance(self.model, ImpingementModel):
-            # Impingement requires mdot_jet (flow PER JET).
-            # The total mass flow in the channel is rho * velocity * A_channel.
-            # The number of jets is A_target / (x * y), where x, y are pitches.
-            rho, _ = _safe_rho(cb.density(T, P, X))
-            mdot_total = rho * velocity * (math.pi / 4 * diameter**2)
-
-            mdot_jet = mdot_total / self._jet_split()
-
-            result = cb.channel_impingement(
-                T,
-                P,
-                X,
-                mdot_jet,
-                self.model.d_jet,
-                self.model.z_D,
-                self.model.x_D,
-                self.model.y_D,
-                self.model.A_target,
-                T_hot=T_hot,
-                Cd_jet=self.model.Cd_jet,
-                Nu_multiplier=self.Nu_multiplier,
-                f_multiplier=self.f_multiplier,
-            )
+            result = self._ribbed_result(T, P, X, velocity, diameter, length, T_hot, heating)
         else:
-            raise TypeError(f"Unknown channel model type: {type(self.model)}")
+            raise TypeError(
+                f"Unsupported channel model {type(self.model).__name__}. "
+                "Enhanced-surface correlations were removed in 0.7.0 pending "
+                "provenanced replacements; see issue #339."
+            )
 
         return result
-
-    def _jet_split(self) -> float:
-        """Jets sharing the element mass flow (>= 1). Impingement only."""
-        x = self.model.x_D * self.model.d_jet
-        y = self.model.y_D * self.model.d_jet
-        A_per_jet = x * y
-        if A_per_jet > 0 and self.model.A_target > 0:
-            return max(1.0, self.model.A_target / A_per_jet)
-        return 1.0
-
-    def ddP_dmdot_element(self, result, rho: float, area: float) -> float:
-        """Chain the correlation dP sensitivity onto the ELEMENT mass flow.
-
-        Each correlation is driven by a different quantity -- the pin-fin
-        routine by channel velocity, the impingement routine by per-jet mass
-        flow -- so the conversion lives beside the code that built those
-        inputs. ``ChannelResult.ddP_dmdot`` is never the element's: it is
-        taken w.r.t. the correlation's own internal flow area.
-        """
-        if isinstance(self.model, PinFinModel):
-            if rho <= 0.0 or area <= 0.0:
-                return 0.0
-            return result.ddP_dvelocity / (rho * area)
-        if isinstance(self.model, ImpingementModel):
-            # The surface builds mdot_total from the element's own area, so
-            # mdot_total is the element mass flow and only the split remains.
-            return result.ddP_dmdot / self._jet_split()
-        return 0.0
 
 
 # ============================================================================
@@ -1067,6 +1146,12 @@ class MomentumChamberNode(NetworkNode):
             0: {
                 f"{self.id}.P": result.d_res_dP,
                 f"{self.id}.Pt": result.d_res_dP_total,
+                # T is not an unknown at this node; the solver relays the
+                # entry through the propagation chain (see the "." branch in
+                # _residuals_and_jacobian). The compressible closure depends on
+                # T through T0, a(T) and s(T), not just through rho, so the
+                # term is no longer small enough to omit.
+                f"{self.id}.T": result.d_res_dT,
             }
         }
 
@@ -1182,11 +1267,45 @@ class PressureBoundary(NetworkNode):
         Pt: float = 101325.0,
         Tt: float = 300.0,
         Y: list[float] | None = None,
+        coupling: str = "auto",
     ) -> None:
         super().__init__(id)
         self.Pt = Pt
         self.Tt = Tt
         self.Y = Y
+        #: How the supplied pressure couples to a duct meeting this boundary.
+        #:
+        #: ``"total"``   -- it is the stagnation pressure at the connection.
+        #:                  Correct for an INFLOW: a reservoir supplying the
+        #:                  network, where Pt is what the reservoir holds.
+        #: ``"static"``  -- it is the static pressure at the duct face, and the
+        #:                  duct's exit dynamic head is dissipated in the
+        #:                  expansion. The standard model for a bare duct
+        #:                  discharging into a plenum or to atmosphere.
+        #: ``"auto"``    -- infer from flow direction: inflow takes total,
+        #:                  outflow takes static.
+        #:
+        #: ``auto`` is well defined wherever a boundary has one role. It cannot
+        #: decide for a boundary whose flow REVERSES during a solve, or that
+        #: serves both roles -- inflow wants total, outflow wants static, and
+        #: there is no single right answer. That case is what the explicit
+        #: setting is for; whoever builds such a network knows whether the exit
+        #: is a plain opening or a diffuser, and the solver does not.
+        #:
+        #: Pinning stagnation pressure at an outflow caps the mass flux at the
+        #: sonic value FOR THAT PRESSURE, a constraint the physical problem
+        #: never imposed. Measured on the combustor of #351: 1.34x an
+        #: impossible ceiling under total coupling, M = 0.752 and comfortable
+        #: under static. See issue #360.
+        self.coupling: str = coupling
+
+    def exit_head_lost(self, is_outflow: bool) -> bool:
+        """Whether a duct meeting this boundary loses its exit dynamic head."""
+        if self.coupling == "static":
+            return True
+        if self.coupling == "total":
+            return False
+        return bool(is_outflow)
 
     def unknowns(self) -> list[str]:
         return []
@@ -2513,77 +2632,104 @@ class ChannelElement(NetworkElement):
             return 0.0
         return abs(state.m_dot) * (self.Dh or self.diameter or 1.0) / (area * mu)
 
+    def _ribbed_residuals(self, state_in: NetworkMixtureState, state_out: NetworkMixtureState):
+        """Ribbed channel: the correlation owns the friction factor.
+
+        No multiplier on pipe friction. The `f` the roughness function is
+        defined against is already the equivalent four-sided channel value, so
+        the correlation returns what the channel needs and the element uses it
+        directly. Routing it through a locally restated smooth friction factor
+        is what #331 removed, after the round-trip moved a drop by -24.7%.
+
+        The Jacobian is simpler than it looks. `R` carries no `e+` term in this
+        correlation family, so **f does not depend on Reynolds number** and
+        therefore not on mass flow: `df/d(mdot) = 0`. The drop is
+        `f (L/D) rho v |v| / 2` with `v = mdot / (rho A)`, so
+
+            dP          = f (L/D) mdot |mdot| / (2 rho A^2)
+            d(dP)/dmdot = f (L/D) |mdot| / (rho A^2)
+
+        which is even in `mdot` and so does not flip sign at zero -- the drop
+        itself carries the sign. That is the odd-quantity case: magnitude from
+        the correlation, direction from the flow.
+        """
+        m_dot = state_in.m_dot
+        model = self.surface.model
+        f_mult = self.surface.f_multiplier
+
+        rho, drho_draw = _safe_rho(state_in.density())
+        area = self.area or 0.0
+        if area <= 0.0:
+            return [state_in.Pt - state_out.Pt], {
+                0: {
+                    f"{self.from_node}.Pt": 1.0,
+                    f"{self.to_node}.Pt": -1.0,
+                }
+            }
+
+        dh = self.Dh or self.diameter or 1.0
+        mu = cb.complete_state(state_in.T, state_in.P, state_in.X).transport.mu
+        Re = abs(m_dot) * dh / (area * mu) if mu > 0.0 else 0.0
+        Re = math.copysign(Re, m_dot)
+
+        rib = cb.evaluate_rib(
+            model.correlation_set or cb.han_1988_orthogonal(),
+            cb.RibGeometry(
+                e_D=model.e_D,
+                p_e=model.p_e,
+                W_H=model.W_H,
+                alpha_deg=model.alpha_deg,
+            ),
+            Re,
+        )
+        f = rib.f * f_mult
+
+        coeff = f * (self.length / dh) / (2.0 * rho * area * area)
+        dP = coeff * m_dot * abs(m_dot)
+        d_dP_d_mdot = 2.0 * coeff * abs(m_dot)
+
+        res = [state_in.Pt - state_out.Pt - dP]
+        jac = {
+            0: {
+                f"{self.id}.m_dot": -d_dP_d_mdot,
+                f"{self.from_node}.Pt": 1.0,
+                f"{self.to_node}.Pt": -1.0,
+            }
+        }
+        # Known gap, the same one the array path had before removal: the
+        # correlation exposes no dP sensitivity to upstream temperature,
+        # pressure or composition, so those columns are absent rather than
+        # approximated from a smooth-friction stand-in. Density enters only
+        # through rho here, which the solver sees via the node states.
+        return res, jac
+
+    def _exit_head_lost(self, m_dot: float) -> bool:
+        """Whether this channel's exit dynamic head is lost downstream.
+
+        Only a PressureBoundary declares a coupling; anything else (a plenum, a
+        momentum chamber, a junction port) carries its own constitutive
+        relation and receives the stagnation pressure as before. See #360.
+        """
+        node = getattr(self, "_downstream_node", None)
+        if node is None or not hasattr(node, "exit_head_lost"):
+            return False
+        # Flow leaving this element toward the boundary is an OUTflow at it.
+        return bool(node.exit_head_lost(m_dot >= 0.0))
+
     def residuals(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> list[float]:
 
         m_dot = state_in.m_dot
 
+        # User-set empirical correction on f. Not a correlation: it encodes
+        # nothing and defaults to 1.0, so it is inert unless a caller reaches
+        # for it. Correlation-derived multipliers were removed in 0.7.0; this
+        # one is a tuning knob and stays. See issue #339.
         f_mult = self.surface.f_multiplier if self.surface else 1.0
-        # Set by the pin-fin / impingement branch below, which returns early.
-        array_result = None
 
-        if self.surface and not isinstance(self.surface.model, SmoothModel) and self.length > 0:
-            if isinstance(self.surface.model, RibbedModel):
-                f_mult *= cb._core.rib_friction_multiplier(
-                    self.surface.model.e_D, self.surface.model.pitch_to_height
-                )
-            elif isinstance(self.surface.model, DimpledModel):
-                # Re is supplied because the correlation's signature takes
-                # it. The implemented form ignores it (see the provenance
-                # note in cooling_correlations.h), so this is forward
-                # compatibility rather than a live dependence -- if that
-                # form ever gains an Re term, the element already feeds it.
-                f_mult *= cb._core.dimple_friction_multiplier(
-                    self._reynolds(state_in),
-                    self.surface.model.d_Dh,
-                    self.surface.model.h_d,
-                )
-            elif isinstance(self.surface.model, (PinFinModel, ImpingementModel)):
-                # Localized arrays own their drop outright: the pin-array
-                # and jet correlations return dP directly, so the element
-                # takes it rather than converting it into a multiplier on
-                # pipe friction. The former route divided by a locally
-                # restated f_base and let the C++ friction factor multiply
-                # it back in, which cancels exactly only when both pick the
-                # same correlation. With friction_model="petukhov" the
-                # round-trip moved the drop by -24.7%.
-                array_result = self.htc_and_T(state_in)
-
-        if array_result is not None:
-            # dP is the correlation's own, so its analytic derivatives are the
-            # element's. Chain through VELOCITY, not ddP_dmdot: that field is
-            # taken w.r.t. the mass flow through the array's internal minimum
-            # section, which for a 25 mm channel over a 3 mm pin array differs
-            # from the element's by 45x (see ChannelResult in heat_transfer.h).
-            f_surf = self.surface.f_multiplier if self.surface else 1.0
-            rho_ref, _ = _safe_rho(state_in.density())
-            area = self.area if self.area else 0.0
-            d_dP_d_mdot = f_surf * self.surface.ddP_dmdot_element(array_result, rho_ref, area)
-            # Friction opposes the flow, so the drop follows the sign of m_dot
-            # while its magnitude depends on |m_dot| -- which leaves the
-            # derivative sign-independent.
-            dP_array = math.copysign(f_surf * array_result.dP, m_dot)
-            d_dP_dT = math.copysign(f_surf * array_result.ddP_dT, m_dot)
-
-            res = [state_in.Pt - state_out.Pt - dP_array]
-            jac = {
-                0: {
-                    f"{self.id}.m_dot": -d_dP_d_mdot,
-                    f"{self.from_node}.Pt": 1.0,
-                    f"{self.from_node}.T": -d_dP_dT,
-                    f"{self.to_node}.Pt": -1.0,
-                }
-            }
-            # Known gap: the array correlations expose no dP sensitivity to
-            # static pressure or composition, so those columns are absent
-            # rather than approximated from a pipe-friction stand-in.
-            #
-            # This path is taken in both regimes. The array correlations are
-            # incompressible by construction, and layering Fanno friction on
-            # top of a drop the array already owns was never meaningful, so
-            # regime="compressible" gets the same array drop.
-            return res, jac
+        if self.surface and isinstance(self.surface.model, RibbedModel):
+            return self._ribbed_residuals(state_in, state_out)
 
         if self.regime == "compressible":
             # Use compressible Fanno flow with friction
@@ -2598,6 +2744,7 @@ class ChannelElement(NetworkElement):
                 self.roughness,
                 self.friction_model,
                 f_mult,
+                self._exit_head_lost(m_dot),
             )
         else:
             # Use incompressible Darcy-Weisbach formulation. Density
@@ -2798,6 +2945,9 @@ class ChannelElement(NetworkElement):
         return 1
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
+        # Cached for the exit-coupling lookup in residuals (#360); done before
+        # the early return so it is set even when the diameter is explicit.
+        self._downstream_node = graph.nodes.get(self.to_node)
         if self.diameter is not None:
             return
         # Inherit diameter from the nearest geometry source. The channel's

@@ -23,7 +23,9 @@
 - `#pragma once`, sorted minimal includes, `//` comments only (no `/* */`).
 - Smart pointers, RAII. No raw `new`/`delete`.
 - Use `math_constants.h` for `M_PI` (MSVC compatibility).
-- Explicit standard library includes — macOS-only implicit includes break Linux CI.
+- **Explicit standard library includes.** Include what you use — any platform can be the permissive one, and two agreeing is not evidence. Two distinct strictnesses bite here, in opposite directions:
+  - **libstdc++ (Linux, MinGW) is strict about transitive headers.** `std::max`/`std::min`/`std::clamp` need `<algorithm>`, `std::accumulate` needs `<numeric>`. macOS *and* Linux once passed a `std::max({a,b,c})` that only MinGW caught.
+  - **MSVC is strict about POSIX-ish macros.** `M_PI` and friends are not defined by default — use `math_constants.h` (there is a pre-commit hook for it).
 
 ## Python Style
 - `ruff` for lint + format. Run `./scripts/check-python-style.sh --fix` before committing.

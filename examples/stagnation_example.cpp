@@ -180,12 +180,12 @@ int main()
     Stream fuel_t;
     fuel_t.state.T = 600.0;   // K  preheated fuel
     fuel_t.state.P = 20.0e5;  // Pa
-    fuel_t.state.X = X_CH4;
+    fuel_t.state.set_X(X_CH4);
 
     Stream air_t;
     air_t.state.T = 700.0;    // K  compressed air
     air_t.state.P = 20.0e5;
-    air_t.state.X = X_air;
+    air_t.state.set_X(X_air);
     air_t.mdot    = 50.0;     // kg/s
 
     Stream fuel_lean = set_fuel_stream_for_phi(0.6, fuel_t, air_t);

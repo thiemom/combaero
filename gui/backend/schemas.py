@@ -9,46 +9,35 @@ class SmoothModelData(BaseModel):
 
 
 class RibbedModelData(BaseModel):
+    """Rib-roughened walls, on a provenanced correlation set.
+
+    Restored in 0.8.0 after the previous rib correlation was removed for
+    failing provenance review -- its friction multiplier was 4-5x below the
+    only rib datum in the repository. See issue #334.
+    """
+
     model_config = ConfigDict(extra="ignore")
     type: Literal["ribbed"] = "ribbed"
-    e_D: float = 0.05
-    pitch_to_height: float = 10.0
+    e_D: float = 0.06
+    p_e: float = 10.0
     alpha_deg: float = 90.0
+    # Aspect ratio. Carried here rather than on the channel because a
+    # hydraulic diameter does not determine one -- a 2:1 duct and a square
+    # duct can share a Dh.
+    W_H: float = 1.0
+    # 1, 2 or 4. Two means two OPPOSITE walls, the configuration Han measured.
+    n_ribbed_walls: int = 2
+    # A user knob on the smooth walls' contribution. Plain smooth walls give
+    # h_s/h_r ~ 0.42 where Han's own channel average implies 0.70, because ribs
+    # enhance the adjacent smooth wall too. About 1.67 reproduces Han.
+    smooth_wall_Nu_multiplier: float = 1.0
 
 
-class DimpledModelData(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    type: Literal["dimpled"] = "dimpled"
-    d_Dh: float = 0.2
-    h_d: float = 0.15
-    S_d: float = 2.0
-
-
-class PinFinModelData(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    type: Literal["pin_fin"] = "pin_fin"
-    pin_diameter: float = 0.005
-    channel_height: float = 0.01  # [m]
-    S_D: float = 2.5
-    X_D: float = 2.5
-    N_rows: int = 10
-    is_staggered: bool = True
-
-
-class ImpingementModelData(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    type: Literal["impingement"] = "impingement"
-    d_jet: float = 0.002
-    z_D: float = 4.0
-    x_D: float = 6.0
-    y_D: float = 6.0
-    A_target: float = 0.01
-    Cd_jet: float = 0.8
-
-
-SurfaceModelData = (
-    SmoothModelData | RibbedModelData | DimpledModelData | PinFinModelData | ImpingementModelData
-)
+# Dimpled, pin-fin and impingement surfaces were removed in 0.7.0 -- their
+# correlations could not be traced to their cited sources -- and remain
+# deferred (issue #339). Saved networks carrying them are rejected with a
+# message naming the reason; see graph_builder.
+SurfaceModelData = SmoothModelData | RibbedModelData
 
 
 # --- Node Data Definitions ---

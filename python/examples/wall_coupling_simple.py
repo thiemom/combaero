@@ -47,7 +47,7 @@ hot_surface = ConvectiveSurface(
 # Cold side: ribbed channel for enhanced cooling
 cold_surface = ConvectiveSurface(
     area=3.14159 * D_cold * L_cold,
-    model=RibbedModel(e_D=0.05, pitch_to_height=10.0, alpha_deg=60.0),
+    model=RibbedModel(e_D=0.05, p_e=10.0, alpha_deg=60.0, W_H=1.0, n_ribbed_walls=2),
     heating=True,  # Coolant is being heated
     Nu_multiplier=1.1,  # 10% enhancement from test data
 )

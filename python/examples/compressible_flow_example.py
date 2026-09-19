@@ -136,7 +136,7 @@ def main() -> None:
     print(f"Maximum length before choking: L* = {L_star:.2f} m")
 
     # Solve Fanno flow
-    sol_fanno = cb.fanno_pipe(T_in, P_in, u_in, L, D, f, X, store_profile=True)
+    sol_fanno = cb.fanno_channel(T_in, P_in, u_in, L, D, f, X, store_profile=True)
 
     print(f"\nOutlet conditions (L = {L:.1f} m):")
     print(f"  T = {sol_fanno.outlet.T:.1f} K")

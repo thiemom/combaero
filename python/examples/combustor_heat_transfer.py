@@ -124,10 +124,10 @@ def main() -> None:
     # Flow velocity
     v_avg = mixed.mdot / (rho_avg * A_annular)
 
-    # Use pressure_drop_pipe composite function
+    # Use pressure_drop_channel composite function
     # Note: Using cast_iron roughness as proxy for combustor liner
-    eps = cb.pipe_roughness("cast_iron")
-    dP_friction, Re, f = cb.pressure_drop_pipe(
+    eps = cb.channel_roughness("cast_iron")
+    dP_friction, Re, f = cb.pressure_drop_channel(
         T_avg, P_combustor, burned.state.X, v_avg, Dh, L_combustor, eps, "haaland"
     )
 
@@ -288,8 +288,8 @@ def main() -> None:
         tau_test = cb.residence_time_mdot(V_combustor, mixed_test.mdot, rho_avg_test)
 
         v_avg_test = mixed_test.mdot / (rho_avg_test * A_annular)
-        # Use pressure_drop_pipe composite function
-        dP_friction_test, Re_test, f_test = cb.pressure_drop_pipe(
+        # Use pressure_drop_channel composite function
+        dP_friction_test, Re_test, f_test = cb.pressure_drop_channel(
             T_avg_test,
             P_combustor,
             burned_test.state.X,

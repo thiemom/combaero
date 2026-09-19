@@ -8,7 +8,10 @@ import combaero as ca
 from combaero.species import SpeciesLocator
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "examples"))
-from combustor_liner_cooling_network import solve_operating_point_network_coupled
+
+from combustor_liner_cooling_network import (  # noqa: E402
+    solve_operating_point_network_coupled,
+)
 
 
 def test_coupled_combustor_network_converges_without_warning() -> None:

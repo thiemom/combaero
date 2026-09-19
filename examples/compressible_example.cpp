@@ -208,12 +208,12 @@ int main()
     Stream fuel_r;
     fuel_r.state.T = 300.0;
     fuel_r.state.P = P0_rocket;
-    fuel_r.state.X = X_H2;
+    fuel_r.state.set_X(X_H2);
 
     Stream air_r;
     air_r.state.T = 300.0;
     air_r.state.P = P0_rocket;
-    air_r.state.X = dry_air();
+    air_r.state.set_X(dry_air());
     air_r.mdot    = 1.0;  // kg/s reference
 
     Stream fuel_stoich_r = set_fuel_stream_for_phi(1.0, fuel_r, air_r);
