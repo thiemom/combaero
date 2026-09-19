@@ -245,6 +245,7 @@ people to ignore it.
 ```bash
 uv run python -m validation.cooling.plot --list
 uv run python -m validation.cooling.plot --figure 4.46
+uv run python -m validation.cooling.plot --all
 ```
 
 Puts the committed data back on axes so it can be held next to the scan.

@@ -192,11 +192,21 @@ def main() -> None:
     ap.add_argument("--figure", help='which figure, e.g. "4.46"')
     ap.add_argument("--out", type=Path, help="output image path")
     ap.add_argument("--list", action="store_true", help="list known figures")
+    ap.add_argument("--all", action="store_true",
+                    help="redraw every figure in the dataset")
     ap.add_argument("--frames", action="store_true",
                     help="draw panel frames too (opens the axes wide)")
     args = ap.parse_args()
 
     dataset = load_dataset()
+
+    if args.all:
+        figures = sorted({s.figure for s in dataset if s.figure})
+        for figure in figures:
+            out = PLOT_DIR / f"fig{figure}_redrawn.png"
+            print(f"wrote {plot_figure(figure, out, dataset, args.frames)}")
+        return
+
     if args.list or not args.figure:
         seen: dict[str, set] = defaultdict(set)
         for s in dataset:
