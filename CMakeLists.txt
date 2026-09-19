@@ -105,6 +105,14 @@ if(COMBAERO_BUILD_EXAMPLES)
                     ${CMAKE_CURRENT_BINARY_DIR}/thermo_transport_data.json
                 )
             endif()
+
+            # Register each example as a smoke test. The examples are the only
+            # C++ code exercised end-to-end the way a user writes it, and
+            # building them is not enough: three of them segfaulted for some
+            # time in mix() because they assigned the public State::X member
+            # directly instead of calling set_X(), leaving Y empty. They
+            # compiled and linked cleanly the whole time.
+            add_test(NAME ${example}_smoke COMMAND ${example})
         endif()
     endforeach()
 endif()

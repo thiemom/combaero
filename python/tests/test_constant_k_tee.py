@@ -118,10 +118,27 @@ def _merge_net(K_straight: float, K_branch: float) -> FlowNetwork:
 
 
 def _q_com(sol: dict, m_key: str, p_key: str) -> float:
+    """The common port's reference head: its isentropic stagnation rise.
+
+    ConstantKTeeElement references K to whatever its port MomentumChamberNodes
+    call dynamic head, and those close on the isentropic stagnation state
+    rather than on 0.5*rho*u^2 (issue #357). K is tabulated as dPt/q_dyn, so
+    the reference has to follow the ports. The incompressible form is the
+    low-Mach limit this reduces to, kept below as the cross-check.
+    """
     X_air = list(cb.mass_to_mole(_DRY_AIR_Y))
-    rho = float(cb.density(300.0, sol[p_key], X_air))
+    T = 300.0
+    P = sol[p_key]
+    rho = float(cb.density(T, P, X_air))
     m = sol[m_key]
-    return m * m / (2.0 * rho * _A * _A)
+    g = float(cb.isentropic_expansion_coefficient(T, X_air))
+    # M^2 = rho*u^2/(g*P) for an ideal gas (a^2 = g*P/rho).
+    m2 = (m * m) / (rho * _A * _A * g * P)
+    q = P * ((1.0 + 0.5 * (g - 1.0) * m2) ** (g / (g - 1.0)) - 1.0)
+    assert q > m * m / (2.0 * rho * _A * _A), (
+        "the compressible rise must exceed the incompressible one at M > 0"
+    )
+    return q
 
 
 def test_branch_pt_drops_match_K_analytically():

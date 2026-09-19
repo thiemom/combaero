@@ -7,16 +7,13 @@ from combaero.network import (
     ConstantFractionLoss,
     ConstantHeadLoss,
     ConvectiveSurface,
-    DimpledModel,
     FlowNetwork,
-    ImpingementModel,
     LinearThetaFractionLoss,
     LinearThetaHeadLoss,
     LosslessConnectionElement,
     MassFlowBoundary,
     MomentumChamberNode,
     OrificeElement,
-    PinFinModel,
     PlenumNode,
     PressureBoundary,
     PressureLossElement,
@@ -37,10 +34,8 @@ from .schemas import (
     CompositionData,
     ConstantFractionLossData,
     ConstantHeadLossData,
-    DimpledModelData,
     DiscreteLossData,
     EjectorData,
-    ImpingementModelData,
     LinearThetaFractionLossData,
     LinearThetaHeadLossData,
     MassBoundaryData,
@@ -48,7 +43,6 @@ from .schemas import (
     MPCETeeData,
     NetworkGraphSchema,
     OrificeData,
-    PinFinModelData,
     PlenumData,
     PressureBoundaryData,
     RibbedModelData,
@@ -79,37 +73,31 @@ def map_surface_model(data):
     """Maps UI SurfaceModelData to combaero.network models."""
     if isinstance(data, SmoothModelData) or data.type == "smooth":
         return SmoothModel()
-    elif isinstance(data, RibbedModelData) or data.type == "ribbed":
+    if isinstance(data, RibbedModelData) or data.type == "ribbed":
+        # getattr with the schema's own defaults: a network saved before a
+        # field existed should load with that field defaulted, not raise an
+        # AttributeError the user cannot act on.
+        d = RibbedModelData()
         return RibbedModel(
-            e_D=data.e_D,
-            pitch_to_height=data.pitch_to_height,
-            alpha_deg=data.alpha_deg,
+            e_D=getattr(data, "e_D", d.e_D),
+            p_e=getattr(data, "p_e", d.p_e),
+            alpha_deg=getattr(data, "alpha_deg", d.alpha_deg),
+            W_H=getattr(data, "W_H", d.W_H),
+            n_ribbed_walls=getattr(data, "n_ribbed_walls", d.n_ribbed_walls),
+            smooth_wall_Nu_multiplier=getattr(
+                data, "smooth_wall_Nu_multiplier", d.smooth_wall_Nu_multiplier
+            ),
         )
-    elif isinstance(data, DimpledModelData) or data.type == "dimpled":
-        return DimpledModel(
-            d_Dh=data.d_Dh,
-            h_d=data.h_d,
-            S_d=data.S_d,
-        )
-    elif isinstance(data, PinFinModelData) or data.type == "pin_fin":
-        return PinFinModel(
-            pin_diameter=data.pin_diameter,
-            channel_height=data.channel_height,
-            S_D=data.S_D,
-            X_D=data.X_D,
-            N_rows=data.N_rows,
-            is_staggered=data.is_staggered,
-        )
-    elif isinstance(data, ImpingementModelData) or data.type == "impingement":
-        return ImpingementModel(
-            d_jet=data.d_jet,
-            z_D=data.z_D,
-            x_D=data.x_D,
-            y_D=data.y_D,
-            A_target=data.A_target,
-            Cd_jet=data.Cd_jet,
-        )
-    return SmoothModel()
+
+    # Enhanced surfaces were removed in 0.7.0. Reject rather than silently
+    # falling back to smooth: a saved network asking for a ribbed channel and
+    # getting an unribbed one back is a wrong answer presented as a right one.
+    surface_type = getattr(data, "type", "unknown")
+    raise ValueError(
+        f"Surface type {surface_type!r} was removed in 0.7.0: its correlation "
+        "could not be traced to its cited source. See issue #339. Use a "
+        "smooth surface."
+    )
 
 
 def resolve_composition(

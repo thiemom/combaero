@@ -110,7 +110,8 @@ def main() -> int:
         (0.10, "Smooth"),
         (0.20, "Smooth"),
         (0.15, "Ribbed"),
-        (0.15, "Dimpled"),
+        # The dimpled case was removed in 0.7.0 along with its correlation and
+        # has not returned; see issue #336.
     ]
 
     all_tests_pass = True

@@ -5,10 +5,6 @@ import pytest
 import combaero as cb
 from combaero.heat_transfer import (
     ConvectiveSurface,
-    DimpledModel,
-    ImpingementModel,
-    PinFinModel,
-    RibbedModel,
     SmoothModel,
 )
 
@@ -19,44 +15,6 @@ def test_smooth_model_defaults():
     assert model.correlation == "gnielinski"
     assert model.mu_ratio == 1.0
     assert model.roughness == 0.0
-
-
-def test_ribbed_model_defaults():
-    """Verify RibbedModel default values."""
-    model = RibbedModel()
-    assert model.e_D == 0.0
-    assert model.pitch_to_height == 0.0
-    assert model.alpha_deg == 90.0
-
-
-def test_dimpled_model_defaults():
-    """Verify DimpledModel default values."""
-    model = DimpledModel()
-    assert model.d_Dh == 0.0
-    assert model.h_d == 0.0
-    assert model.S_d == 0.0
-
-
-def test_pin_fin_model_defaults():
-    """Verify PinFinModel default values."""
-    model = PinFinModel()
-    assert model.pin_diameter == 0.0
-    assert model.channel_height == 0.0
-    assert model.S_D == 2.0
-    assert model.X_D == 2.0
-    assert model.N_rows == 1
-    assert model.is_staggered is True
-
-
-def test_impingement_model_defaults():
-    """Verify ImpingementModel default values."""
-    model = ImpingementModel()
-    assert model.d_jet == 0.0
-    assert model.z_D == 0.0
-    assert model.x_D == 0.0
-    assert model.y_D == 0.0
-    assert model.A_target == 0.0
-    assert model.Cd_jet == 0.8
 
 
 def test_convective_surface_defaults():
@@ -100,80 +58,6 @@ def test_convective_surface_smooth_model():
     assert result.h > 0.0
     assert result.T_aw > 700.0  # Should be higher due to recovery
     assert surface.area == 0.1
-
-
-def test_convective_surface_ribbed_model():
-    """Test ConvectiveSurface with RibbedModel."""
-    surface = ConvectiveSurface(
-        area=0.15,
-        model=RibbedModel(e_D=0.05, pitch_to_height=10.0, alpha_deg=60.0),
-        heating=True,
-    )
-
-    result = surface.htc_and_T(
-        T=700.0,
-        P=2.5e5,
-        X=cb.species.dry_air(),
-        velocity=60.0,
-        diameter=0.025,
-        length=0.6,
-        T_hot=1100.0,
-    )
-
-    assert result.h > 0.0
-    assert result.T_aw > 700.0
-    assert surface.area == 0.15
-
-
-def test_convective_surface_dimpled_model():
-    """Test ConvectiveSurface with DimpledModel."""
-    surface = ConvectiveSurface(
-        area=0.12, model=DimpledModel(d_Dh=0.2, h_d=0.2, S_d=2.0), heating=True
-    )
-
-    result = surface.htc_and_T(
-        T=650.0,
-        P=2e5,
-        X=cb.species.dry_air(),
-        velocity=45.0,
-        diameter=0.022,
-        length=0.55,
-        T_hot=950.0,
-    )
-
-    assert result.h > 0.0
-    assert result.T_aw > 650.0
-    assert surface.area == 0.12
-
-
-def test_convective_surface_pin_fin_model():
-    """Test ConvectiveSurface with PinFinModel."""
-    surface = ConvectiveSurface(
-        area=0.08,
-        model=PinFinModel(
-            pin_diameter=0.003,
-            channel_height=0.006,
-            S_D=2.5,
-            X_D=2.5,
-            N_rows=5,
-            is_staggered=True,
-        ),
-        heating=True,
-    )
-
-    result = surface.htc_and_T(
-        T=600.0,
-        P=2e5,
-        X=cb.species.dry_air(),
-        velocity=40.0,
-        diameter=0.003,  # Use pin diameter
-        length=0.015,  # 5 rows * 2.5 * 0.003 = 0.0375m streamwise
-        T_hot=900.0,
-    )
-
-    assert result.h > 0.0
-    assert result.T_aw > 600.0
-    assert surface.area == 0.08
 
 
 def test_convective_surface_multipliers():

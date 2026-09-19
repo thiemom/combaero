@@ -29,12 +29,18 @@ Design sweep: vary bypass fraction f_cool to find minimum cooling flow
 that keeps T_metal < 800 C for three channel geometries:
   - Smooth
   - Rib-roughened  (Han et al. 1988, e/D=0.07, P/e=8, alpha=60 deg)
-  - Dimpled        (Chyu et al. 1997, d/Dh=0.2, h/d=0.2, S/d=2)
 
 Wall configurations compared:
   - Bare Inconel 718
   - Inconel 718 + YSZ APS TBC (fresh and aged 1000 h)
   - Inconel 718 + YSZ EB-PVD TBC
+
+
+NOTE: the dimpled channel this example used to compare was removed in 0.7.0 and
+has not returned. Its correlation could not be traced to its cited source --
+Chyu et al. (1997) held dimple depth and pitch FIXED, where the code swept
+both -- and whether it comes back at all is open (issue #336). The comparison
+is smooth against ribbed until then.
 """
 
 import numpy as np
@@ -42,7 +48,6 @@ import numpy as np
 import combaero as cb
 from combaero.heat_transfer import (
     ConvectiveSurface,
-    DimpledModel,
     RibbedModel,
     SmoothModel,
 )
@@ -88,12 +93,13 @@ def create_cooling_network(
     elif ch_name == "Ribbed":
         surface = ConvectiveSurface(
             area=A_liner,
-            model=RibbedModel(e_D=0.07, pitch_to_height=8.0, alpha_deg=60.0),
-        )
-    elif ch_name == "Dimpled":
-        surface = ConvectiveSurface(
-            area=A_liner,
-            model=DimpledModel(d_Dh=0.20, h_d=0.20, S_d=2.0),
+            model=RibbedModel(
+                e_D=0.07,
+                p_e=8.0,
+                alpha_deg=60.0,
+                W_H=1.0,
+                n_ribbed_walls=2,
+            ),
         )
     else:
         raise ValueError(f"Unknown channel type: {ch_name}")
@@ -559,7 +565,7 @@ def main() -> None:
 
     # Bypass sweep
     f_cool_vals = np.linspace(0.05, 0.35, 25)
-    channel_names = ["Smooth", "Ribbed", "Dimpled"]
+    channel_names = ["Smooth", "Ribbed"]
 
     primary_cfg = "Inconel only"
     primary_layers = wall_configs[primary_cfg]
@@ -649,7 +655,7 @@ def main() -> None:
                 print(f"  {ch_name:10}  {cfg_name:35}  {'NOT MET':>6}")
 
     # Plots (same as standalone)
-    colors = {"Smooth": "steelblue", "Ribbed": "darkorange", "Dimpled": "green"}
+    colors = {"Smooth": "steelblue", "Ribbed": "darkorange"}
 
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     fig.suptitle(

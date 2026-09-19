@@ -148,6 +148,41 @@ jobs:
         run: |
           uv run pytest -n auto --dist loadscope -q --tb=short --durations=25
 
+  examples-smoke:
+    name: Examples Smoke (run, not import)
+    needs: changes
+    if: needs.changes.outputs.source == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          python-version: '3.12'
+
+      - name: Install dependencies
+        env:
+          SETUPTOOLS_SCM_PRETEND_VERSION: "0.0.0.dev0"
+        run: uv sync --all-extras --all-groups
+
+      # scripts/run_examples.py RUNS each example rather than importing it.
+      # Importing is not enough: an example calling a removed function from
+      # inside a function imports cleanly and only fails when the function
+      # runs. Measured on four of the broken examples -- an import check
+      # caught two.
+      #
+      # The runner owns the known-broken skip list and the headless plotting
+      # env, so the same command reproduces this job locally.
+      - name: Run every example
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          MPLBACKEND: Agg
+        run: uv run scripts/run_examples.py
+
   frontend-validation:
     name: Frontend Validation (Node 24 LTS)
     needs: changes
@@ -180,7 +215,7 @@ jobs:
     # IMPORTANT: Keep this literal name in sync with Iron ruleset required context:
     # "Validation Tests / status-check". Ruleset matching is strict and relies on exact string equality.
     name: Validation Tests / status-check
-    needs: [changes, cantera-validation, python-unit-tests, frontend-validation]
+    needs: [changes, cantera-validation, python-unit-tests, examples-smoke, frontend-validation]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -191,12 +226,14 @@ jobs:
           gui_changed="${{ needs.changes.outputs.gui }}"
           cantera_result="${{ needs.cantera-validation.result }}"
           py_unit_result="${{ needs.python-unit-tests.result }}"
+          examples_result="${{ needs.examples-smoke.result }}"
           frontend_result="${{ needs.frontend-validation.result }}"
 
           echo "source_changed=${source_changed}"
           echo "gui_changed=${gui_changed}"
           echo "cantera_result=${cantera_result}"
           echo "py_unit_result=${py_unit_result}"
+          echo "examples_result=${examples_result}"
           echo "frontend_result=${frontend_result}"
 
           # Allow success OR skipped
@@ -205,7 +242,8 @@ jobs:
           }
 
           if [[ "${source_changed}" == "true" ]]; then
-            if ! is_success "${cantera_result}" || ! is_success "${py_unit_result}"; then
+            if ! is_success "${cantera_result}" || ! is_success "${py_unit_result}" \
+               || ! is_success "${examples_result}"; then
               echo "One or more source validation jobs failed or were cancelled."
               exit 1
             fi

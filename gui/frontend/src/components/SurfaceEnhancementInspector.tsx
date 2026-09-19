@@ -5,9 +5,15 @@ import NumericInput from "./NumericInput";
 
 interface SurfaceModelData {
 	type: "smooth" | "ribbed" | "dimpled" | "pin_fin" | "impingement";
+	// Ribbed, rebuilt in 0.8.0 on a provenanced correlation set.
 	e_D?: number;
-	pitch_to_height?: number;
+	p_e?: number;
 	alpha_deg?: number;
+	W_H?: number;
+	n_ribbed_walls?: number;
+	smooth_wall_Nu_multiplier?: number;
+	// Kept for pre-0.7.0 networks whose rib nodes used the old field name.
+	pitch_to_height?: number;
 	d_Dh?: number;
 	h_d?: number;
 	S_d?: number;
@@ -41,9 +47,12 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 			smooth: { type: "smooth" },
 			ribbed: {
 				type: "ribbed",
-				e_D: 0.05,
-				pitch_to_height: 10.0,
+				e_D: 0.06,
+				p_e: 10.0,
 				alpha_deg: 90.0,
+				W_H: 1.0,
+				n_ribbed_walls: 2,
+				smooth_wall_Nu_multiplier: 1.0,
 			},
 			dimpled: { type: "dimpled", d_Dh: 0.2, h_d: 0.15, S_d: 2.0 },
 			pin_fin: {
@@ -91,9 +100,17 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 				>
 					<option value="smooth">Smooth (Default)</option>
 					<option value="ribbed">Ribbed</option>
-					<option value="dimpled">Dimpled</option>
-					<option value="pin_fin">Pin Fin Array</option>
-					<option value="impingement">Jet Impingement</option>
+					{/* Dimpled, pin-fin and impingement were removed in 0.7.0: their correlations
+					    because their correlations could not be traced to their
+					    cited sources, and remain deferred (issue #339). Ribbed
+					    returned in 0.8.0 on a provenanced correlation set.
+
+					    Their parameter blocks below are deliberately KEPT. They are
+					    unreachable from this dropdown, so no new one can be created
+					    -- but a network saved before 0.7.0 still carries one, and
+					    removing the blocks would hide its parameters and risk losing
+					    them on the next save. The user can see what is there; the
+					    backend explains on solve why it will not run. */}
 				</select>
 			</div>
 
@@ -114,8 +131,8 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 							P/e (Rib Pitch Ratio)
 						</label>
 						<NumericInput
-							value={surface.pitch_to_height || 10.0}
-							onChange={(val) => updateFields({ pitch_to_height: val })}
+							value={surface.p_e || 10.0}
+							onChange={(val) => updateFields({ p_e: val })}
 							className="p-1 border rounded text-xs"
 						/>
 					</div>
@@ -126,6 +143,49 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 							onChange={(val) => updateFields({ alpha_deg: val })}
 							className="p-1 border rounded text-xs"
 						/>
+					</div>
+					<div className="flex flex-col gap-1">
+						<label className="text-[10px] text-stone-500">
+							W/H (Channel Aspect Ratio)
+						</label>
+						<NumericInput
+							value={surface.W_H || 1.0}
+							onChange={(val) => updateFields({ W_H: val })}
+							className="p-1 border rounded text-xs"
+						/>
+					</div>
+					<div className="flex flex-col gap-1">
+						<label className="text-[10px] text-stone-500">
+							Ribbed walls (1, 2 or 4)
+						</label>
+						<select
+							value={surface.n_ribbed_walls ?? 2}
+							onChange={(e) =>
+								updateFields({ n_ribbed_walls: Number(e.target.value) })
+							}
+							className="p-1 border rounded text-xs"
+						>
+							<option value={1}>1</option>
+							<option value={2}>2 (opposite walls)</option>
+							<option value={4}>4 (all walls)</option>
+						</select>
+					</div>
+					<div className="flex flex-col gap-1">
+						<label className="text-[10px] text-stone-500">
+							Smooth-wall Nu multiplier
+						</label>
+						<NumericInput
+							value={surface.smooth_wall_Nu_multiplier || 1.0}
+							onChange={(val) =>
+								updateFields({ smooth_wall_Nu_multiplier: val })
+							}
+							className="p-1 border rounded text-xs"
+						/>
+						<span className="text-[9px] text-stone-400">
+							Plain smooth walls under-predict the channel average by about 20%
+							against Han&apos;s data, because ribs enhance the adjacent smooth
+							wall too. ~1.67 reproduces Han.
+						</span>
 					</div>
 				</div>
 			)}

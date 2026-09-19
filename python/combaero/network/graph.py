@@ -253,8 +253,7 @@ class FlowNetwork:
                     "MCN's scalar Pt = P + 0.5 rho v^2 closure cannot represent "
                     "merging or splitting streams. Use a MultiPortChamberBase "
                     "junction (one MCN per port) instead -- see "
-                    "python/tests/test_multi_port_chamber.py for the pattern. "
-                    "Tracked in #174."
+                    "python/tests/test_multi_port_chamber.py for the pattern."
                 )
 
     def to_dict(self) -> dict:
