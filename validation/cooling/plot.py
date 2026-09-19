@@ -31,12 +31,42 @@ MARKERS = ["o", "s", "^", "v", "D", "<", ">", "P", "X", "*", "h", "p"]
 
 PANEL_ORDER = {"upper": 0, "single": 1, "lower": 2}
 
-# Default output. Gitignored: a redrawn figure is a derived artefact, and
-# regenerating it is one command. It carries its source citation on the
-# image itself, so committing one later is a policy choice rather than a
-# rework -- a reproduction from our own measurements is ours to publish
-# provided the source stays named on it.
+# Redrawn figures are committed. They are namespaced BY SOURCE, as data
+# and cards are: a figure number alone is not unique -- two books can each
+# have a figure 4.46 -- and a collision would silently overwrite one
+# source's plot with another's.
 PLOT_DIR = Path(__file__).parent / "plots"
+
+
+def plot_path(source: str, figure: str) -> Path:
+    """Where a source's redrawn figure lives."""
+    return PLOT_DIR / source / f"fig{figure}_redrawn.png"
+
+
+def resolve_figure(dataset, wanted: str) -> tuple[str, str]:
+    """Resolve a figure reference to (source, figure).
+
+    Accepts a bare figure number while it is unambiguous, and the
+    qualified `source/figure` form always. A bare number that matches more
+    than one source is an error naming the alternatives rather than a
+    silent pick.
+    """
+    if "/" in wanted:
+        source, figure = wanted.split("/", 1)
+        hits = [s for s in dataset if s.source.name == source and s.figure == figure]
+        if not hits:
+            raise SystemExit(f"no series for {wanted}")
+        return source, figure
+
+    sources = sorted({s.source.name for s in dataset if s.figure == wanted})
+    if not sources:
+        raise SystemExit(f"no series for figure {wanted}")
+    if len(sources) > 1:
+        alts = ", ".join(f"{src}/{wanted}" for src in sources)
+        raise SystemExit(
+            f"figure {wanted} is ambiguous across sources; use one of: {alts}"
+        )
+    return sources[0], wanted
 
 # What the figures actually print on their axes, rather than the terse
 # keys the metadata uses.
@@ -81,7 +111,11 @@ def _label(s: SeriesMetadata) -> str:
 
 
 def plot_figure(
-    figure: str, out: Path, dataset=None, show_frames: bool = False
+    figure: str,
+    out: Path,
+    dataset=None,
+    show_frames: bool = False,
+    source: str | None = None,
 ) -> Path:
     import matplotlib
 
@@ -89,7 +123,11 @@ def plot_figure(
     import matplotlib.pyplot as plt
 
     dataset = dataset or load_dataset()
-    chosen = [s for s in dataset if s.figure == figure]
+    chosen = [
+        s
+        for s in dataset
+        if s.figure == figure and (source is None or s.source.name == source)
+    ]
     if not chosen:
         raise SystemExit(f"no series for figure {figure}")
 
@@ -160,7 +198,10 @@ def plot_figure(
             if ylabels
             else sample.y_axis
         )
-        ax.set_title(f"Figure {figure} -- {panel} panel", fontsize=10)
+        ax.set_title(
+            f"{chosen[0].source.name}  figure {figure} -- {panel} panel",
+            fontsize=10,
+        )
         ax.grid(True, which="both", alpha=0.25, lw=0.5)
         handles, labels = ax.get_legend_handles_labels()
         seen: dict[str, object] = {}
@@ -189,27 +230,48 @@ def plot_figure(
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--figure", help='which figure, e.g. "4.46"')
+    ap.add_argument(
+        "--figure",
+        help='which figure: "4.46", or "han2012/4.46" when ambiguous',
+    )
     ap.add_argument("--out", type=Path, help="output image path")
     ap.add_argument("--list", action="store_true", help="list known figures")
+    ap.add_argument("--all", action="store_true",
+                    help="redraw every figure in the dataset")
     ap.add_argument("--frames", action="store_true",
                     help="draw panel frames too (opens the axes wide)")
     args = ap.parse_args()
 
     dataset = load_dataset()
-    if args.list or not args.figure:
-        seen: dict[str, set] = defaultdict(set)
-        for s in dataset:
-            if s.figure:
-                seen[s.figure].add(s.panel)
-        for figure in sorted(seen):
-            n = sum(1 for s in dataset if s.figure == figure)
-            print(f"  {figure:<8} {n:>3} series, panels: "
-                  f"{', '.join(sorted(seen[figure]))}")
+
+    if args.all:
+        pairs = sorted({(s.source.name, s.figure) for s in dataset if s.figure})
+        for source, figure in pairs:
+            out = plot_path(source, figure)
+            print(
+                f"wrote {plot_figure(figure, out, dataset, args.frames, source)}"
+            )
         return
 
-    out = args.out or PLOT_DIR / f"fig{args.figure}_redrawn.png"
-    print(f"wrote {plot_figure(args.figure, out, dataset, args.frames)}")
+    if args.list or not args.figure:
+        seen: dict[tuple[str, str], set] = defaultdict(set)
+        for s in dataset:
+            if s.figure:
+                seen[(s.source.name, s.figure)].add(s.panel)
+        for source, figure in sorted(seen):
+            n = sum(
+                1
+                for s in dataset
+                if s.figure == figure and s.source.name == source
+            )
+            ref = f"{source}/{figure}"
+            print(f"  {ref:<20} {n:>3} series, panels: "
+                  f"{', '.join(sorted(seen[(source, figure)]))}")
+        return
+
+    source, figure = resolve_figure(dataset, args.figure)
+    out = args.out or plot_path(source, figure)
+    print(f"wrote {plot_figure(figure, out, dataset, args.frames, source)}")
 
 
 if __name__ == "__main__":

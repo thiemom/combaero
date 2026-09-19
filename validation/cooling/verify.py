@@ -459,7 +459,10 @@ def check_candidate(csv_path: Path, card_path: Path) -> list[Finding]:
         confidence="band",
         uncertainty=card.get("uncertainty"),
         cross_check="(candidate; not yet recorded)",
+        class_confidence=card.get("class_confidence", "confirmed"),
         scores=None,
+        figure=card.get("figure"),
+        panel=card.get("panel"),
         verification=card.get("verification", card),
     )
     return check_series(series)

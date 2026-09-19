@@ -245,6 +245,8 @@ people to ignore it.
 ```bash
 uv run python -m validation.cooling.plot --list
 uv run python -m validation.cooling.plot --figure 4.46
+uv run python -m validation.cooling.plot --figure han2012/4.46
+uv run python -m validation.cooling.plot --all
 ```
 
 Puts the committed data back on axes so it can be held next to the scan.
@@ -264,14 +266,41 @@ Panel frames are off by default (`--frames` to include them): a frame sits
 outside the labelled ticks, so drawing it forces the axes open and
 squashes the data into a strip, and its job is already done numerically.
 
-Output goes to `validation/cooling/plots/`, which is **gitignored**: a
-redrawn figure is a derived artefact and regenerating it is one command.
+Output goes to `validation/cooling/plots/`, and the images **are
+committed**. A redrawn figure is derived, but a diff that shows the plot
+is worth more than the few hundred kB: a reviewer can see the cloud's
+shape without regenerating anything, and a change that moves points shows
+up as a changed image.
+
 Every image carries its source citation in a footer -- the book and the
-primary paper behind the figure -- so committing one later is a policy
-choice rather than a rework. A reproduction built from our own
-measurements is ours to publish as long as the source stays named on it.
+primary paper behind the figure. A reproduction built from our own
+measurements is ours to publish as long as the source stays named on it,
+which is why the footer is not optional and is rendered before the file
+is written.
+
+**Regenerate after changing any data or card**, or the committed image
+goes stale against the metadata it was drawn from:
+
+```bash
+uv run python -m validation.cooling.plot --all
+```
 
 Needs matplotlib: `uv pip install -e ".[examples]"`.
+
+## Everything is namespaced by source
+
+A figure number is not a unique identifier -- two books can each have a
+figure 4.46 -- so `data/`, `cards/` and `plots/` are all keyed by source:
+
+```
+data/han2012/fig4.46_R_eD0.047_pe10_wh1.csv
+cards/han2012/fig4.46_R_scatter.yaml
+plots/han2012/fig4.46_redrawn.png
+```
+
+`--figure` accepts a bare number while it is unambiguous and the
+qualified `source/figure` form always. A bare number matching more than
+one source is an **error naming the alternatives**, never a silent pick.
 
 ## Adding a source
 
