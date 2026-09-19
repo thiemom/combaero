@@ -32,6 +32,36 @@ number that looks like model error and is not:
 
 A series nothing can score shows `-`, never `0`.
 
+## A drawn line is not its printed equation
+
+Three times now, a line Han draws has had a measurably different slope
+from the equation printed on it:
+
+| figure | drawn line measures | its printed label |
+|---|---|---|
+| 4.46 lower | slope `+0.00874` | `R/(P/e/10)^0.35 = 3.2`, a constant |
+| 4.46 upper | `3.774 (e+)^0.2725` | `G = 3.7 (e+)^0.28` |
+| 4.51 lower | `3.427 (e+)^0.3220` | `G_bar = 4.5 (e+)^0.28` |
+
+Each was established against controls that rule out the alternatives. The
+4.46 R line tilts at 23x the distortion of the panel it sits in, measured
+on that panel's own frame, and in the opposite direction. The 4.51 line
+drifts monotonically while the DATA in the same panel, under the same
+calibration, scatters without trend -- which no calibration fault and no
+picking error can produce.
+
+In all three the data tracks the printed equation better than the drawn
+line does. So:
+
+- **Score against printed equations and against data. Never against a
+  digitised drawn line.** Series with `kind: correlation` carry
+  `scores: null` for this reason.
+- A drawn line is still worth digitising: it verifies the axis
+  calibration, and `G_bar` on figure 4.46 did that to 0.25%. It is a
+  calibration standard, not a source of truth.
+- Give drawn lines a wider `curve_tolerance` than data would need, and
+  record the deviation rather than treating it as a defect.
+
 ## The decade trap
 
 Han plots `e+` two ways: figures 4.46-4.48 use a plain `e+` axis, while
