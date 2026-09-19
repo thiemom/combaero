@@ -62,6 +62,30 @@ line does. So:
 - Give drawn lines a wider `curve_tolerance` than data would need, and
   record the deviation rather than treating it as a defect.
 
+## G and G_bar do not rank the same
+
+Figure 4.51 plots nine rib configurations twice: `G` (ribbed side) above,
+`G_bar` (ribbed and smooth averaged) below. The lowest series is NOT the
+same in both panels -- the 60 deg V-shaped rib wins on `G`, while the
+45 deg parallel rib wins on `G_bar`.
+
+That is physically coherent: the 45 deg parallel rib drives secondary flow
+that lifts the SMOOTH wall, which helps the average without helping the
+ribbed side. But it means `G_bar / G` is a per-configuration quantity,
+not a constant.
+
+Two consequences:
+
+- **A claim about `G` cannot be tested against `G_bar` data**, or the
+  reverse. Han's text for figure 4.51 ranks configurations by `G`; testing
+  those sentences against the `G_bar` panel produced a confident and wrong
+  diagnosis here before the figure was consulted.
+- **Extraction item 10's `G_bar = 1.2 G` is a 90 deg and Han-and-Park
+  fact.** It is confirmed for those -- figure 4.46 prints 3.7 and 4.5, a
+  ratio of 1.216, and figure 4.47 labels its dashed line `G_bar = 1.2 G`.
+  Whether it generalises to nine configurations is open, and digitising
+  4.51's upper panel measures it nine times over.
+
 ## The decade trap
 
 Han plots `e+` two ways: figures 4.46-4.48 use a plain `e+` axis, while
