@@ -185,3 +185,57 @@ def test_stated_6pct_behaves_as_one_sigma_not_a_95pct_bound(records) -> None:
     assert 0.55 < within < 0.85, (
         f"{within:.0%} inside 6% -- consistent with 1 sigma (~68%), not with the stated 95%"
     )
+
+
+def test_disputed_class_labels_are_declared_and_surfaced(dataset) -> None:
+    """A disputed class label must stay visible, not decay into a comment.
+
+    fig4.46_G_eD0.047_pe10_wh2 pairs with its own R counterpart on only 2
+    of 4 marks. The coordinates are sound; which symbol they belong to is
+    not, and the digitised data cannot settle it -- it needs the page.
+
+    This pins three things: the series stays marked disputed, its
+    cross_check still carries the specific question to ask of the book,
+    and the verifier reports it on every run. Deleting any of those makes
+    the uncertainty invisible, which is worse than the uncertainty.
+    """
+    from validation.cooling.verify import check_all
+
+    disputed = [s for s in dataset if s.class_confidence == "disputed"]
+    assert disputed, "the known disputed series has lost its marking"
+
+    for s in disputed:
+        assert "NEEDS THE PAGE" in s.cross_check, (
+            f"{s.label} is disputed but records no question to resolve it"
+        )
+
+    reported = {f.series for f in check_all() if f.check == "class-label"}
+    for s in disputed:
+        assert s.label in reported, f"{s.label} is disputed but not surfaced"
+
+
+def test_disputed_labels_are_refused_by_geometry_binding_sets(dataset) -> None:
+    """Harmless today, refused the moment it would matter.
+
+    han_1988_orthogonal carries zero geometry exponents, so a wrong class
+    label changes nothing and the series scores normally. A set that binds
+    geometry uses the label AS an input, and the runner must decline
+    rather than feed a disputed one in. This guards the 4.47/4.48 work
+    before it exists.
+    """
+    import combaero as cb
+    from validation.cooling.runner import _binds_geometry
+
+    assert not _binds_geometry(cb.han_1988_orthogonal()), (
+        "han_1988_orthogonal now binds geometry; the disputed series must "
+        "be resolved against the page before it can be scored again"
+    )
+
+    disputed = [s for s in dataset if s.class_confidence == "disputed"]
+    from validation.cooling.runner import run_series
+
+    for s in disputed:
+        recs = run_series(s)
+        assert any(r.predicted is not None for r in recs), (
+            "disputed series should still pool while nothing binds geometry"
+        )

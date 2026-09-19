@@ -285,6 +285,19 @@ def check_all() -> list[Finding]:
     out: list[Finding] = []
     for series in load_dataset():
         out.extend(check_series(series))
+        if series.class_confidence == "disputed":
+            # Reported every run, deliberately. A disputed label that lives
+            # only in a metadata comment is a fact with a half-life; one
+            # that prints on every verification is not.
+            out.append(
+                Finding(
+                    series.label,
+                    "class-label",
+                    True,
+                    "DISPUTED -- pooled use only, never per-class; "
+                    "see this series' cross_check for the evidence",
+                )
+            )
     return out
 
 

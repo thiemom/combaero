@@ -24,6 +24,10 @@ DATA_ROOT = Path(__file__).parent / "data"
 Kind = Literal["measured", "correlation", "frame"]
 Extraction = Literal["tabulated", "figure-digitised"]
 Confidence = Literal["exact", "band"]
+# How much the SYMBOL-CLASS label is trusted, as distinct from the
+# coordinate values. "disputed" means the evidence actively conflicts;
+# such a series may be pooled but must never be used per-class.
+ClassConfidence = Literal["confirmed", "provisional", "disputed"]
 
 
 @dataclass(frozen=True)
@@ -53,6 +57,7 @@ class SeriesMetadata:
     confidence: Confidence
     uncertainty: float | None
     cross_check: str
+    class_confidence: ClassConfidence
     scores: str | None  # correlation-set name, or None if not scored
     # The figure card: what the printed axes and equations say, read off
     # the page independently of where the digitiser put the points. See
@@ -116,6 +121,9 @@ def load_dataset(root: Path | None = None) -> list[SeriesMetadata]:
                     confidence=entry["confidence"],
                     uncertainty=entry.get("uncertainty"),
                     cross_check=entry["cross_check"],
+                    class_confidence=entry.get(
+                        "class_confidence", "confirmed"
+                    ),
                     scores=entry.get("scores"),
                     verification=entry.get("verification"),
                 )

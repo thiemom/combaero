@@ -105,14 +105,25 @@ def _mid(rng: "cb.RibRange", fallback: float) -> float:
     return 0.5 * (rng.lo + rng.hi) if rng.hi > rng.lo else fallback
 
 
+def _binds_geometry(rib_set: "cb.RibCorrelationSet") -> bool:
+    """True when the set's G actually depends on the rig geometry."""
+    return any(
+        t.exponent != 0.0
+        for t in (rib_set.G_eD, rib_set.G_pe, rib_set.G_WH, rib_set.G_alpha)
+    )
+
+
 def _assert_geometry_free(rib_set: "cb.RibCorrelationSet") -> None:
     """Refuse to score a geometry-dependent set against geometry-less data.
 
-    The Han and Zhang (1992) rig geometry is not stated in the source we
-    extracted, so it is recorded as missing. For a set whose G has zero
-    exponents on e/D, P/e, W/H and alpha this costs nothing. For any other
-    set it would mean substituting a default and reporting the result as a
-    measurement, so the runner stops instead.
+    Applies only to series with NO recorded rig geometry -- the Han and
+    Zhang (1992) figures, whose rig the extracted text never states. For a
+    set whose G has zero exponents on e/D, P/e, W/H and alpha this costs
+    nothing. For any other set it would mean substituting a default and
+    reporting the result as a measurement, so the runner stops instead.
+
+    Figure 4.46 states a geometry per class in its legend, so those series
+    are exempt and reach the disputed-label check above instead.
     """
     terms = {
         "e/D": rib_set.G_eD,
@@ -175,7 +186,23 @@ def run_series(series: SeriesMetadata) -> list[Record]:
         ]
 
     rib_set = SETS[series.scores]()
-    _assert_geometry_free(rib_set)
+
+    if series.class_confidence == "disputed" and _binds_geometry(rib_set):
+        # A disputed label is usable while nothing depends on it. The
+        # moment a set binds geometry, the label IS the input, and a
+        # disputed input must not be fed in silently.
+        return [
+            Record(
+                series, p.x, p.y, None, False, None,
+                f"class label disputed and {rib_set.name} binds geometry",
+            )
+            for p in points
+        ]
+
+    if not series.geometry:
+        # Only series with no recorded rig geometry need this. The figure
+        # 4.46 legend states one per class, so those are exempt.
+        _assert_geometry_free(rib_set)
 
     unsupported = _binding_reason(rib_set, series)
     if unsupported is not None:

@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A disputed class label is now a first-class state, not a comment.**
+  `class_confidence` records how much a digitised series' SYMBOL-CLASS
+  label is trusted -- `confirmed`, `provisional` or `disputed` -- as
+  distinct from `confidence`, which is about the coordinates.
+
+  A disputed series still pools, because its coordinates are sound and
+  nothing in the current scoring depends on which symbol produced them.
+  The runner refuses it the moment a correlation set actually binds
+  geometry, since then the label IS an input. The verifier reports it on
+  every run, and a test asserts the marking, the report, and the presence
+  of a specific question to put to the source page. A fact that lives only
+  in a metadata comment has a half-life; one that prints on every
+  verification does not.
+
+  One series is currently disputed: figure 4.46's `eD0.047/pe10/wh2` upper
+  panel marks pair with their own R counterpart on only 2 of 4. The
+  digitised data cannot settle it -- identification by elimination put the
+  best alternative at 1 of 4 -- so it carries the question to ask of
+  p. 376 rather than a guess.
+
 - **Figure 4.46 digitised: `han_1988_orthogonal` validated against its own
   source.** 23 series -- both panels, all ten symbol classes, the three
   drawn correlation lines -- plus both panel frames as distortion

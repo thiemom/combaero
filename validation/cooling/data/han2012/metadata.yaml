@@ -413,6 +413,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
+    class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
       Class attribution is PROVISIONAL (overlapping symbols). What is
@@ -441,6 +442,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
+    class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
       Class attribution is PROVISIONAL (overlapping symbols). What is
@@ -469,6 +471,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
+    class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
       Class attribution is PROVISIONAL (overlapping symbols). What is
@@ -497,6 +500,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
+    class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
       Class attribution is PROVISIONAL (overlapping symbols). What is
@@ -525,6 +529,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
+    class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
       Class attribution is PROVISIONAL (overlapping symbols). What is
@@ -553,6 +558,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
+    class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
       Class attribution is PROVISIONAL (overlapping symbols). What is
@@ -581,6 +587,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
+    class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
       Class attribution is PROVISIONAL (overlapping symbols). What is
@@ -609,6 +616,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
+    class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
       Class attribution is PROVISIONAL (overlapping symbols). What is
@@ -637,6 +645,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
+    class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
       Class attribution is PROVISIONAL (overlapping symbols). What is
@@ -665,6 +674,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
+    class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
       Class attribution is PROVISIONAL (overlapping symbols). What is
@@ -693,6 +703,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
+    class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
       Class attribution is PROVISIONAL (overlapping symbols). What is
@@ -721,6 +732,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
+    class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
       Class attribution is PROVISIONAL (overlapping symbols). What is
@@ -740,7 +752,7 @@ files:
     after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
     page: 376
     item: "Figure 4.46 upper panel"
-    series: "this study, e/D 0.047, P/e 10, W/H 2, Re 10,000-60,000"
+    series: "class label DISPUTED -- see cross_check"
     geometry: {e_D: 0.047, p_e: 10, W_H: 2}
     alpha_deg: 90.0
     x_axis: e_plus
@@ -749,12 +761,38 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
+    class_confidence: disputed
     uncertainty: 0.06
     cross_check: >-
-      Class attribution is PROVISIONAL (overlapping symbols). What is
-      checkable: every mark lies on the upper panel, and the class's e+
-      span agrees with what Re 10,000-60,000 and e/D 0.047 predict through the
-      friction chain. Scoring uses the pooled cloud, not this label.
+      DISPUTED CLASS LABEL. Pool these marks; never use them per-class.
+      The coordinates themselves are sound -- on-panel, distinct, and
+      inside the span this class predicts -- so the values are usable.
+      What is in doubt is only which symbol they belong to.
+
+      Evidence against the label: this class's R file holds marks at
+      e+ = 79.2, 80.8, 149.8, 263.2 while this G file holds 153.1, 275.2,
+      493.9, 546.6. Only two pair (+2.2%, +4.6%); R's two low marks and
+      G's two high marks have no partner. An earlier pick of this same
+      series reached e+ = 561.7, outside the class's predicted 80..479
+      entirely.
+
+      Evidence for it: after the re-pick the span does fit, at 546.6
+      against a predicted ceiling of 479 with the 15% margin. And marks
+      genuinely do go unpaired -- the two low R marks sit at G = 12.58 and
+      12.66, 0.6% apart, which would merge into one blob in the upper
+      panel.
+
+      The digitised data cannot separate these. Attempted identification
+      by elimination put the best alternative class at 1 of 4 unclaimed
+      matches, which settles nothing.
+
+      NEEDS THE PAGE, p. 376 upper panel: does the 0.047/10/2 symbol
+      appear at e+ ~ 494 and ~ 547, and is it absent near e+ ~ 80? If yes,
+      the label is right and the pairing gaps are merged and omitted
+      marks. If no, these four marks belong to another class. Nothing in
+      the current scoring turns on the answer -- the set has zero geometry
+      exponents and scoring is pooled -- but 4.47 and 4.48 bind geometry,
+      and this series must not be carried into them unresolved.
     scores: han_1988_orthogonal
     verification:
       x_ticks: [50, 100, 200, 300, 500, 1000]
@@ -777,6 +815,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
+    class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
       Class attribution is PROVISIONAL (overlapping symbols). What is
@@ -805,6 +844,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
+    class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
       Class attribution is PROVISIONAL (overlapping symbols). What is
@@ -833,6 +873,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
+    class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
       Class attribution is PROVISIONAL (overlapping symbols). What is
@@ -861,6 +902,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
+    class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
       Class attribution is PROVISIONAL (overlapping symbols). What is
@@ -889,6 +931,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
+    class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
       Class attribution is PROVISIONAL (overlapping symbols). What is
@@ -917,6 +960,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
+    class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
       Class attribution is PROVISIONAL (overlapping symbols). What is
@@ -945,6 +989,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
+    class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
       Class attribution is PROVISIONAL (overlapping symbols). What is
