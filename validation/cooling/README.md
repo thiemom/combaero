@@ -78,29 +78,57 @@ So `slope-span` fails a narrow series until the metadata carries
 score -- only the acknowledgement is compulsory, which puts the limitation
 where a later reader will find it rather than in a comment.
 
-## G and G_bar do not rank the same
+## G_bar/G varies by configuration
 
 Figure 4.51 plots nine rib configurations twice: `G` (ribbed side) above,
-`G_bar` (ribbed and smooth averaged) below. The lowest series is NOT the
-same in both panels -- the 60 deg V-shaped rib wins on `G`, while the
-45 deg parallel rib wins on `G_bar`.
+`G_bar` (ribbed and smooth averaged) below. Digitising both measures
+`G_bar/G` directly -- the first time extraction item 10 has been checked
+against data rather than against printed coefficients and a figure label.
 
-That is physically coherent: the 45 deg parallel rib drives secondary flow
-that lifts the SMOOTH wall, which helps the average without helping the
-ribbed side. But it means `G_bar / G` is a per-configuration quantity,
-not a constant.
+| class | ratio | | class | ratio |
+|---|---|---|---|---|
+| 90 deg | **1.2193** | | 60 deg V | 1.1655 |
+| 60 deg // | 1.1772 | | 45 deg V | 1.1613 |
+| 60 deg x | 1.1528 | | 45 deg ^ | 1.1572 |
+| 60 deg ^ | 1.1763 | | | |
 
-Two consequences:
+The 90 deg value lands on the printed `4.5/3.7 = 1.2162` to **0.3%**, which
+is item 10 confirmed. The angled configurations average `1.155`, **4.5%
+below** it, against a 2.6% measurement scatter. So the ratio is
+configuration-dependent by a small but real margin, and applying the
+90 deg value to an angled rib is an error -- which is what `_gbar_reason`
+in the runner refuses.
 
-- **A claim about `G` cannot be tested against `G_bar` data**, or the
-  reverse. Han's text for figure 4.51 ranks configurations by `G`; testing
-  those sentences against the `G_bar` panel produced a confident and wrong
-  diagnosis here before the figure was consulted.
-- **Extraction item 10's `G_bar = 1.2 G` is a 90 deg and Han-and-Park
-  fact.** It is confirmed for those -- figure 4.46 prints 3.7 and 4.5, a
-  ratio of 1.216, and figure 4.47 labels its dashed line `G_bar = 1.2 G`.
-  Whether it generalises to nine configurations is open, and digitising
-  4.51's upper panel measures it nine times over.
+### Two classes are unresolved and must be treated with care
+
+`45 deg //` and `45 deg x` return `G_bar/G` of `0.988` and `0.992`. Their
+two panels hold what appear to be the same marks: 5/5 and 4/5 points
+agreeing within 2%, abscissae within 0.3%.
+
+Three readings survive the evidence, and **the data cannot separate them**:
+
+1. **The figure duplicates their `G` marks into the `G_bar` panel.** Then
+   the `G` panel is right and `G_bar` for these two is unknown.
+2. **The figure duplicates the other way.** Then `G_bar` is right and `G`
+   is unknown.
+3. **These two configurations genuinely have `G_bar ~ G`** -- their smooth
+   wall performing almost as well as their ribbed wall. Striking, but not
+   impossible for a rib angle that drives strong secondary flow.
+
+A ratio strictly below 1 is unphysical, which leans against (3) -- but
+only by 1%, inside the digitisation scatter, so it decides nothing.
+Reconstructing the missing panel from the seven clean ratios makes (1)
+consistent with Han's text and (2) inconsistent, but **that is an
+inference from the text, not evidence about the plot**, and plausibility
+does not promote a reading here.
+
+Both series are therefore marked `class_confidence: disputed`. They pool
+and their points score; they are excluded from any `G_bar/G` conclusion,
+and from the question of whether the two panels rank the same -- which
+stays **open**, since it turns on exactly these two classes.
+
+Resolving it needs the primary paper, Han, J.C. et al. (1991), ASME JHT
+113, 590, not the reprint.
 
 ## The decade trap
 

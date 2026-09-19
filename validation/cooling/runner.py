@@ -21,14 +21,15 @@ from validation.cooling.schema import Point, SeriesMetadata, load_points
 # Figure 4.47, and independently by Figure 4.46's printed pair 3.7 and 4.5
 # (ratio 1.216).
 #
-# IT IS NOT UNIVERSAL. Figure 4.51 ranks nine rib configurations in both
-# G and G_bar, and the lowest series differs between the panels: 60 deg V
-# wins on G, 45 deg parallel wins on G_bar. A ranking cannot flip under a
-# constant multiplier, so G_bar/G must vary by configuration -- by at
-# least 13% between those two at e+ = 500, from the measured G_bar gap.
+# IT IS NOT UNIVERSAL. Digitising both panels of Figure 4.51 measures
+# G_bar/G for seven rib configurations directly: 90 deg gives 1.2193,
+# matching the printed 1.2162 to 0.3%, while the angled configurations
+# average 1.155 -- 4.5% below it, with a spread of 1.153 to 1.220.
 #
-# So this applies to 90 deg ribs, where it was established. Anything else
-# is refused rather than scaled; see _gbar_reason.
+# So this applies to 90 deg ribs, where it was established. Applying it to
+# an angled rib is wrong by about 4.5%, which is larger than the 2.6%
+# scatter of the measurement itself. Anything off 90 deg is refused rather
+# than scaled; see _gbar_reason.
 G_BAR_OVER_G = 1.2
 G_BAR_VALID_ALPHA = 90.0
 

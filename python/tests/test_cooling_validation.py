@@ -279,11 +279,11 @@ def test_axis_specs_are_declared_for_plotting(dataset) -> None:
 def test_gbar_ratio_is_not_applied_off_90_degrees(dataset) -> None:
     """G_bar/G = 1.2 is a 90 degree result, not a universal one.
 
-    Figure 4.51 ranks nine rib configurations in both G and G_bar, and the
-    lowest series differs between the panels -- 60 deg V wins on G, 45 deg
-    parallel wins on G_bar. A ranking cannot flip under a constant
-    multiplier, so the ratio varies by configuration; from the measured
-    G_bar gap it differs by at least 13% between those two at e+ = 500.
+    Digitising both panels of figure 4.51 measures G_bar/G directly for
+    seven rib configurations: 90 deg gives 1.2193, matching the printed
+    1.2162 to 0.3%, while the angled ones average 1.155 -- 4.5% below it,
+    against a 2.6% measurement scatter. The ratio is configuration
+    dependent, so the 90 deg value is not a universal converter.
 
     Applying 1.2 off 90 degrees would manufacture a number that looks like
     a measurement. The runner must refuse and say why.
