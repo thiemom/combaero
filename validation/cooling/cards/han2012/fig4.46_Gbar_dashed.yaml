@@ -1,0 +1,28 @@
+# Figure card: Han, Dutta & Ekkad (2012) Figure 4.46, p. 376, UPPER panel,
+# the DASHED line. After Han, J.C. (1988), ASME JHT 110, 321.
+#
+# Read off the printed page, independently of any digitised point.
+item: "Figure 4.46 upper panel, dashed line"
+series: "G_bar = 4.5 (e+)^0.28, the drawn correlation"
+x_axis: e_plus
+y_axis: G_bar
+kind: correlation
+uncertainty: 0.06
+
+verification:
+  # Shared abscissa for both panels: plain e+, log, no multiplier on the
+  # label. Ticks 50 100 200 300 500 1000.
+  x_ticks: [50, 100, 200, 300, 500, 1000]
+  x_multiplier: 1.0
+  # Upper ordinate, log, labelled 8 10 20 30 40.
+  y_ticks: [8, 10, 20, 30, 40]
+  # Printed ON the figure, which makes this line self-verifying: a
+  # mis-calibrated abscissa moves the fitted coefficient by k^0.28, so one
+  # decade shows up as 4.5 -> 8.59.
+  printed_curve:
+    power_law: {C: 4.5, n: 0.28}
+  curve_tolerance: 0.02
+  printed_exponent: 0.28
+  exponent_tolerance: 0.02
+  monotonic: increasing
+  expected_points: null   # a drawn line; pick as many as you like

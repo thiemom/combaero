@@ -138,7 +138,7 @@ CompressibleFlowSolution nozzle_flow(
     // Set up stagnation state
     sol.stagnation.T = T0;
     sol.stagnation.P = P0;
-    sol.stagnation.X = X;
+    sol.stagnation.set_X(X);
 
     double h0 = sol.stagnation.h();
     double s0 = sol.stagnation.s();
@@ -162,7 +162,7 @@ CompressibleFlowSolution nozzle_flow(
     double T_outlet = solve_T_isentropic(P_outlet, s0, T0, X, tol, max_iter);
     sol.outlet.T = T_outlet;
     sol.outlet.P = P_outlet;
-    sol.outlet.X = X;
+    sol.outlet.set_X(X);
 
     double h_outlet = sol.outlet.h();
     double dh = h0 - h_outlet;
@@ -197,7 +197,7 @@ double solve_A_eff_from_mdot(
     State stag;
     stag.T = T0;
     stag.P = P0;
-    stag.X = X;
+    stag.set_X(X);
     double h0 = stag.h();
     double s0 = stag.s();
 
@@ -232,7 +232,7 @@ double solve_P_back_from_mdot(
     State stag;
     stag.T = T0;
     stag.P = P0;
-    stag.X = X;
+    stag.set_X(X);
     double h0 = stag.h();
     double s0 = stag.s();
 
@@ -335,7 +335,7 @@ double critical_pressure_ratio(
     State stag;
     stag.T = T0;
     stag.P = P0;
-    stag.X = X;
+    stag.set_X(X);
     double h0 = stag.h();
     double s0 = stag.s();
 
@@ -353,7 +353,7 @@ double mach_from_pressure_ratio(
     State stag;
     stag.T = T0;
     stag.P = P0;
-    stag.X = X;
+    stag.set_X(X);
     double h0 = stag.h();
     double s0 = stag.s();
 
@@ -378,7 +378,7 @@ double mass_flux_isentropic(
     State stag;
     stag.T = T0;
     stag.P = P0;
-    stag.X = X;
+    stag.set_X(X);
     double h0 = stag.h();
     double s0 = stag.s();
 
@@ -455,9 +455,32 @@ double solve_T_from_energy(
     return T;
 }
 
-// Compute dp/dx from momentum equation: dp/dx = -f/(2D) * rho * u²
-double dpdx_fanno(double rho, double u, double f, double D) {
-    return -f / (2.0 * D) * rho * u * u;
+// Fanno static-pressure gradient.
+//
+//   dP/dx = -(f / 2D) * rho * u^2 * (1 + (g-1) M^2) / (1 - M^2)
+//
+// This was the leading factor alone, i.e. plain Darcy-Weisbach. Without the
+// compressibility group the march integrates an INCOMPRESSIBLE drop under a
+// Fanno name: there is no 1/(1 - M^2) singularity, so the flow never chokes
+// however long the duct. Marched over its own fanno_max_length, which is where
+// M must reach 1 by definition, it reached M = 0.37 / 0.55 / 0.72 from inlet
+// Mach 0.3 / 0.5 / 0.7 and reported choked = false every time (issue #362).
+//
+// The Mach number is taken from the local state rather than passed in, so the
+// call sites keep their signature; a is evaluated on the same (T, X) the
+// caller used for rho.
+//
+// Guarded at M -> 1: the gradient is genuinely singular there, and the march's
+// own choke detection is what should stop it, not an infinity propagating
+// through RK4.
+double dpdx_fanno(double rho, double u, double f, double D,
+                  double T, const std::vector<double>& X) {
+    const double a = speed_of_sound(T, X);
+    const double M2 = (a > 1e-9) ? (u * u) / (a * a) : 0.0;
+    const double g = isentropic_expansion_coefficient(T, X);
+    const double denom = std::max(1.0 - M2, kFannoGradientFloor);
+    const double compressibility = (1.0 + (g - 1.0) * M2) / denom;
+    return -f / (2.0 * D) * rho * u * u * compressibility;
 }
 
 }  // namespace
@@ -495,7 +518,7 @@ FannoSolution fanno_channel(
     // Inlet state
     sol.inlet.T = T_in;
     sol.inlet.P = P_in;
-    sol.inlet.X = X;
+    sol.inlet.set_X(X);
     double mw_g = sol.inlet.mw();  // g/mol
     double mw_kg = mw_g / 1000.0;  // kg/mol
     double A = M_PI * D * D / 4.0;  // m²
@@ -536,8 +559,15 @@ FannoSolution fanno_channel(
         sol.profile.push_back(st);
     }
 
-    // Integration using RK4
-    double dx = L / static_cast<double>(n_steps);
+    // Integration using RK4 with an adaptive step. n_steps sets the NOMINAL
+    // step; it is halved whenever a trial step would close more than
+    // kFannoApproachFraction of the remaining distance to sonic. Same control
+    // as the rough overload and for the same reason: the gradient is singular
+    // at M = 1, so a fixed step ample over most of a duct is useless in the
+    // last part of one that chokes. See issue #363.
+    const double dx_nominal = L / static_cast<double>(n_steps);
+    const double dx_min = dx_nominal * kFannoMinStepFraction;
+    double dx = dx_nominal;
     double x = 0.0;
     double P = P_in;
     double T = T_in;
@@ -549,31 +579,34 @@ FannoSolution fanno_channel(
     // to the march grid makes any closure built on it (e.g. the network
     // choke barrier) a staircase in m_dot whose jumps can leave residuals
     // rootless near choke onset.
-    for (std::size_t step = 0; step < n_steps; ++step) {
+    for (std::size_t step = 0; step < kFannoMaxSteps && x < L - 1e-14; ++step) {
+        if (x + dx > L) {
+            dx = L - x;
+        }
         // RK4 integration of dp/dx
         // k1
-        double k1 = dpdx_fanno(rho, u, f, D);
+        double k1 = dpdx_fanno(rho, u, f, D, T, X);
 
         // k2: evaluate at x + dx/2, P + k1*dx/2
         double P2 = P + 0.5 * k1 * dx;
         if (P2 <= 0.0) { sol.choked = true; sol.L_choke = x + 0.5 * dx * P / (P - P2); break; }
         [[maybe_unused]] double T2, u2, rho2;
         T2 = solve_T_from_energy(P2, sol.h0, sol.mdot, A, X, mw_kg, T, u2, rho2);
-        double k2 = dpdx_fanno(rho2, u2, f, D);
+        double k2 = dpdx_fanno(rho2, u2, f, D, T2, X);
 
         // k3: evaluate at x + dx/2, P + k2*dx/2
         double P3 = P + 0.5 * k2 * dx;
         if (P3 <= 0.0) { sol.choked = true; sol.L_choke = x + 0.5 * dx * P / (P - P3); break; }
         [[maybe_unused]] double T3, u3, rho3;
         T3 = solve_T_from_energy(P3, sol.h0, sol.mdot, A, X, mw_kg, T, u3, rho3);
-        double k3 = dpdx_fanno(rho3, u3, f, D);
+        double k3 = dpdx_fanno(rho3, u3, f, D, T3, X);
 
         // k4: evaluate at x + dx, P + k3*dx
         double P4 = P + k3 * dx;
         if (P4 <= 0.0) { sol.choked = true; sol.L_choke = x + dx * P / (P - P4); break; }
         [[maybe_unused]] double T4, u4, rho4;
         T4 = solve_T_from_energy(P4, sol.h0, sol.mdot, A, X, mw_kg, T, u4, rho4);
-        double k4 = dpdx_fanno(rho4, u4, f, D);
+        double k4 = dpdx_fanno(rho4, u4, f, D, T4, X);
 
         // Update P
         double P_new = P + dx * (k1 + 2.0*k2 + 2.0*k3 + k4) / 6.0;
@@ -584,7 +617,11 @@ FannoSolution fanno_channel(
             break;
         }
 
-        // Update state
+        // Update state. Keep the pre-step values: if this step is the one
+        // that chokes, the outlet has to be interpolated back to the choke
+        // station alongside L_choke (see the choke block below).
+        const double P_prev = P;
+        const double T_prev = T;
         x += dx;
         P = P_new;
         T = solve_T_from_energy(P, sol.h0, sol.mdot, A, X, mw_kg, T, u, rho);
@@ -593,9 +630,22 @@ FannoSolution fanno_channel(
         State current;
         current.T = T;
         current.P = P;
-        current.X = X;
+        current.set_X(X);
         double a = current.a();
         double M = u / a;
+
+        // Step control on (1 - M^2), the quantity the gradient is singular in.
+        const double gap_prev = std::max(1.0 - M_prev * M_prev, 0.0);
+        const double gap_now = std::max(1.0 - M * M, 0.0);
+        if (dx > dx_min && gap_prev > 0.0 &&
+            gap_prev - gap_now > kFannoApproachFraction * gap_prev) {
+            P = P_prev;
+            T = T_prev;
+            solve_T_from_energy(P, sol.h0, sol.mdot, A, X, mw_kg, T, u, rho);
+            x -= dx;
+            dx *= 0.5;
+            continue;
+        }
 
         if (M >= kFannoChokeMach) {
             sol.choked = true;
@@ -603,7 +653,18 @@ FannoSolution fanno_channel(
             if (M - M_prev > 1e-12) {
                 frac = (kFannoChokeMach - M_prev) / (M - M_prev);
             }
-            sol.L_choke = x - dx * (1.0 - std::clamp(frac, 0.0, 1.0));
+            const double w = std::clamp(frac, 0.0, 1.0);
+            sol.L_choke = x - dx * (1.0 - w);
+            // The outlet must land on the same station as L_choke. Leaving it
+            // at the overshooting step boundary snaps it to the march grid,
+            // and a caller differencing P - outlet.P then sees a staircase in
+            // m_dot -- the very thing interpolating L_choke avoids. Measured
+            // on the network's compressible channel residual: a 22% sawtooth
+            // in d(dP)/d(m_dot), which the Jacobian's 1e-6 relative FD step
+            // samples at random. See issue #352's sibling in #356.
+            P = P_prev + w * (P - P_prev);
+            T = T_prev + w * (T - T_prev);
+            x = sol.L_choke;
             break;
         }
         M_prev = M;
@@ -623,12 +684,17 @@ FannoSolution fanno_channel(
             st.Re  = rho * u * D / sol.inlet.mu();
             sol.profile.push_back(st);
         }
+
+        // Relax back toward the nominal step once clear of the singularity.
+        if (gap_now > 0.5 && dx < dx_nominal) {
+            dx = std::min(dx * 2.0, dx_nominal);
+        }
     }
 
     // Set outlet state
     sol.outlet.T = T;
     sol.outlet.P = P;
-    sol.outlet.X = X;
+    sol.outlet.set_X(X);
 
     return sol;
 }
@@ -648,7 +714,7 @@ static double local_friction(double T, double P, double u, double D,
                              const std::string& correlation, double f_multiplier)
 {
     State s;
-    s.T = T; s.P = P; s.X = X;
+    s.T = T; s.P = P; s.set_X(X);
     const double Re_local = s.rho() * u * D / s.mu();
     const double e_D = (D > 0.0) ? roughness / D : 0.0;
     double f = 0.0;
@@ -691,7 +757,7 @@ FannoSolution fanno_channel_rough(
     // Inlet state
     sol.inlet.T = T_in;
     sol.inlet.P = P_in;
-    sol.inlet.X = X;
+    sol.inlet.set_X(X);
     const double mw_g  = sol.inlet.mw();       // g/mol
     const double mw_kg = mw_g / 1000.0;        // kg/mol
     const double A     = M_PI * D * D / 4.0;   // m²
@@ -735,21 +801,33 @@ FannoSolution fanno_channel_rough(
         sol.profile.push_back(st);
     }
 
-    const double dx = L / static_cast<double>(n_steps);
+    // Adaptive step. n_steps sets the NOMINAL step; the march halves it
+    // whenever a trial step would close more than kFannoApproachFraction of
+    // the remaining distance to sonic. The gradient is singular at M = 1, so a
+    // fixed step that is ample over most of a duct is useless in the last part
+    // of one that chokes -- and refining everywhere would charge every duct
+    // for a case most never reach. See issue #363.
+    const double dx_nominal = L / static_cast<double>(n_steps);
+    const double dx_min = dx_nominal * kFannoMinStepFraction;
+    double dx  = dx_nominal;
     double x   = 0.0;
     double P   = P_in;
     double T   = T_in;
     double rho = rho_in;
     double u   = u_in;
-    double f_sum = f_in;  // accumulate for f_avg
+    double f_weighted = 0.0;  // length-weighted, since steps now vary
+    double f_len = 0.0;
     double M_prev = M_in;
 
     // L_choke is interpolated within the breaking step below (see the
     // constant-f overload for why grid-snapped L_choke is harmful).
-    for (std::size_t step = 0; step < n_steps; ++step) {
+    for (std::size_t step = 0; step < kFannoMaxSteps && x < L - 1e-14; ++step) {
+        if (x + dx > L) {
+            dx = L - x;
+        }
         // k1: local f at current state
         const double f1 = local_friction(T, P, u, D, roughness, X, correlation, f_multiplier);
-        const double k1 = dpdx_fanno(rho, u, f1, D);
+        const double k1 = dpdx_fanno(rho, u, f1, D, T, X);
 
         // k2
         const double P2 = P + 0.5 * k1 * dx;
@@ -757,7 +835,7 @@ FannoSolution fanno_channel_rough(
         double T2, u2, rho2;
         T2 = solve_T_from_energy(P2, sol.h0, sol.mdot, A, X, mw_kg, T, u2, rho2);
         const double f2 = local_friction(T2, P2, u2, D, roughness, X, correlation, f_multiplier);
-        const double k2 = dpdx_fanno(rho2, u2, f2, D);
+        const double k2 = dpdx_fanno(rho2, u2, f2, D, T2, X);
 
         // k3
         const double P3 = P + 0.5 * k2 * dx;
@@ -765,7 +843,7 @@ FannoSolution fanno_channel_rough(
         double T3, u3, rho3;
         T3 = solve_T_from_energy(P3, sol.h0, sol.mdot, A, X, mw_kg, T, u3, rho3);
         const double f3 = local_friction(T3, P3, u3, D, roughness, X, correlation, f_multiplier);
-        const double k3 = dpdx_fanno(rho3, u3, f3, D);
+        const double k3 = dpdx_fanno(rho3, u3, f3, D, T3, X);
 
         // k4
         const double P4 = P + k3 * dx;
@@ -773,23 +851,46 @@ FannoSolution fanno_channel_rough(
         double T4, u4, rho4;
         T4 = solve_T_from_energy(P4, sol.h0, sol.mdot, A, X, mw_kg, T, u4, rho4);
         const double f4 = local_friction(T4, P4, u4, D, roughness, X, correlation, f_multiplier);
-        const double k4 = dpdx_fanno(rho4, u4, f4, D);
+        const double k4 = dpdx_fanno(rho4, u4, f4, D, T4, X);
 
         const double P_new = P + dx * (k1 + 2.0*k2 + 2.0*k3 + k4) / 6.0;
         if (P_new <= 0.0) { sol.choked = true; sol.L_choke = x + dx * P / (P - P_new); break; }
 
+        // Keep the pre-step values: if this step is the one that chokes, the
+        // outlet has to be interpolated back to the choke station alongside
+        // L_choke (see the choke block below).
+        const double P_prev = P;
+        const double T_prev = T;
         x += dx;
         P = P_new;
         T = solve_T_from_energy(P, sol.h0, sol.mdot, A, X, mw_kg, T, u, rho);
 
-        // RK4-weighted local f for this step
+        // RK4-weighted local f for this step, length-weighted into the mean.
         const double f_step = (f1 + 2.0*f2 + 2.0*f3 + f4) / 6.0;
-        f_sum += f_step;
 
         State current;
-        current.T = T; current.P = P; current.X = X;
+        current.T = T; current.P = P; current.set_X(X);
         const double a = current.a();
         const double M = u / a;
+
+        // Step control: reject and refine when this step closed too much of
+        // the remaining distance to sonic. Measured on (1 - M^2), which is the
+        // quantity the gradient is singular in.
+        const double gap_prev = std::max(1.0 - M_prev * M_prev, 0.0);
+        const double gap_now = std::max(1.0 - M * M, 0.0);
+        if (dx > dx_min && gap_prev > 0.0 &&
+            gap_prev - gap_now > kFannoApproachFraction * gap_prev) {
+            // Undo and retry at half the step.
+            P = P_prev;
+            T = T_prev;
+            solve_T_from_energy(P, sol.h0, sol.mdot, A, X, mw_kg, T, u, rho);
+            x -= dx;
+            dx *= 0.5;
+            continue;
+        }
+
+        f_weighted += f_step * dx;
+        f_len += dx;
 
         if (M >= kFannoChokeMach) {
             sol.choked = true;
@@ -797,7 +898,15 @@ FannoSolution fanno_channel_rough(
             if (M - M_prev > 1e-12) {
                 frac = (kFannoChokeMach - M_prev) / (M - M_prev);
             }
-            sol.L_choke = x - dx * (1.0 - std::clamp(frac, 0.0, 1.0));
+            const double w = std::clamp(frac, 0.0, 1.0);
+            sol.L_choke = x - dx * (1.0 - w);
+            // Same reason as the constant-f march above: the outlet has to
+            // land on the choke station, not the overshooting step boundary.
+            // This is the variant the network's compressible channel residual
+            // calls, so the staircase landed straight in Newton's Jacobian.
+            P = P_prev + w * (P - P_prev);
+            T = T_prev + w * (T - T_prev);
+            x = sol.L_choke;
             break;
         }
         M_prev = M;
@@ -816,14 +925,22 @@ FannoSolution fanno_channel_rough(
             st.Re  = rho * u * D / current.mu();
             sol.profile.push_back(st);
         }
+
+        // Relax back toward the nominal step once clear of the singularity,
+        // so a duct that merely passes through a fast region does not finish
+        // it at the refined step.
+        if (gap_now > 0.5 && dx < dx_nominal) {
+            dx = std::min(dx * 2.0, dx_nominal);
+        }
     }
 
     sol.outlet.T = T;
     sol.outlet.P = P;
-    sol.outlet.X = X;
+    sol.outlet.set_X(X);
 
-    // f_avg = mean over (n_steps + 1) samples (inlet + one per step)
-    sol.f_avg = f_sum / static_cast<double>(n_steps + 1);
+    // Length-weighted mean: steps vary now, so a count-weighted average would
+    // over-represent the refined steps near choking.
+    sol.f_avg = (f_len > 0.0) ? f_weighted / f_len : f_in;
 
     return sol;
 }
@@ -852,7 +969,7 @@ double fanno_max_length(
     State inlet;
     inlet.T = T_in;
     inlet.P = P_in;
-    inlet.X = X;
+    inlet.set_X(X);
     double M_in = u_in / inlet.a();
 
     if (M_in >= 1.0) {
@@ -866,11 +983,21 @@ double fanno_max_length(
     double term1 = (1.0 - M2) / (gamma * M2);
     double term2 = (gamma + 1.0) / (2.0 * gamma) *
                    std::log((gamma + 1.0) * M2 / (2.0 + (gamma - 1.0) * M2));
-    double L_star_estimate = D * (term1 + term2) / (4.0 * f);
+    // The tabulated group 4fL*/D is defined on FANNING friction, and f here is
+    // DARCY (the march's dpdx_fanno = -f/(2D) rho u^2 is Darcy-Weisbach), so
+    // f_Darcy = 4 f_Fanning and the length is D * term / f_Darcy. Dividing by
+    // 4f instead put the estimate at a quarter of the true L*, and since the
+    // bracket below is only twice the estimate, the bisection could never
+    // reach the answer -- it saturated at its own upper bound and returned
+    // exactly L*/2 at every inlet Mach. See issue #362.
+    double L_star_estimate = D * (term1 + term2) / f;
 
-    // Binary search
+    // Binary search. The bracket is generous rather than tight: the estimate
+    // is an ideal-gas relation and the march it is being reconciled with uses
+    // real properties, so an upper bound that merely doubles the estimate can
+    // sit below the answer.
     double L_low = 0.0;
-    double L_high = 2.0 * L_star_estimate;
+    double L_high = 4.0 * L_star_estimate;
 
     for (std::size_t iter = 0; iter < max_iter; ++iter) {
         double L_mid = 0.5 * (L_low + L_high);
@@ -1082,7 +1209,7 @@ NozzleSolution nozzle_quasi1d(
     State stag;
     stag.T = T0;
     stag.P = P0;
-    stag.X = X;
+    stag.set_X(X);
     double mw_g = stag.mw();  // g/mol
     double mw_kg = mw_g / 1000.0;  // kg/mol
 
@@ -1279,7 +1406,7 @@ NozzleSolution nozzle_quasi1d(
         State st;
         st.T = T;
         st.P = P;
-        st.X = X;
+        st.set_X(X);
         double M = M_guess;  // M is fixed by the ideal-gas solution
 
         // Store station

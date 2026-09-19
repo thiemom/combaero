@@ -181,6 +181,25 @@ Stream mix(const std::vector<Stream> &streams, double P_out, double delta_h) {
   std::vector<double> Y_mix(n_spec, 0.0);
   double P_min = streams[0].state.P;
 
+  // Mixing is the one place that reads Y rather than X, so it is where a
+  // State whose Y never got populated shows up. X and Y are both public and
+  // only set_X()/set_Y() keep them in sync, so `state.X = X;` -- the obvious
+  // thing to write -- leaves Y empty and an unchecked Y[k] below reads off
+  // the end of it. Check rather than crash: the message has to name set_X(),
+  // because the size mismatch on its own does not tell the caller what they
+  // did wrong. See issue #352.
+  for (std::size_t i = 0; i < streams.size(); ++i) {
+    const std::size_t n_y = streams[i].state.Y.size();
+    if (n_y != n_spec) {
+      throw std::invalid_argument(
+          "mix: stream " + std::to_string(i) + " has " + std::to_string(n_y) +
+          " mass fractions but " + std::to_string(n_spec) +
+          " mole fractions. State::X and State::Y are kept in sync by "
+          "set_X()/set_Y(); assigning the X or Y member directly leaves the "
+          "other stale. Build the state with set_X(...) or set_Y(...).");
+    }
+  }
+
   for (const auto &s : streams) {
     mdot_tot += s.mdot;
     H_tot += s.mdot * s.state.h();

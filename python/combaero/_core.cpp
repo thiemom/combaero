@@ -357,7 +357,8 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("d_res_dP", &solver::MomentumChamberResult::d_res_dP)
       .def_readonly("d_res_dP_total",
                     &solver::MomentumChamberResult::d_res_dP_total)
-      .def_readonly("d_res_dmdot", &solver::MomentumChamberResult::d_res_dmdot);
+      .def_readonly("d_res_dmdot", &solver::MomentumChamberResult::d_res_dmdot)
+      .def_readonly("d_res_dT", &solver::MomentumChamberResult::d_res_dT);
 
   m.def("orifice_residuals_and_jacobian",
         &solver::orifice_residuals_and_jacobian, py::arg("m_dot"),
@@ -393,6 +394,8 @@ PYBIND11_MODULE(_core, m) {
       py::arg("P_in"), py::arg("u_in"), py::arg("X"), py::arg("L"),
       py::arg("D"), py::arg("roughness"), py::arg("friction_model"),
       py::arg("f_multiplier") = 1.0, py::arg("compute_jacobians") = true,
+      py::arg("inlet_static_resolved") = true,
+      py::arg("exit_head_lost") = false,
       "Compressible channel flow using Fanno model with variable friction.\n\n"
       "Returns: (dP, d_dP_dP_in, d_dP_dT_in, d_dP_du_in)");
 
@@ -401,7 +404,7 @@ PYBIND11_MODULE(_core, m) {
         py::arg("P_total_up"), py::arg("T_up"), py::arg("Y_up"),
         py::arg("P_static_down"), py::arg("L"), py::arg("D"),
         py::arg("roughness"), py::arg("friction_model"),
-        py::arg("f_multiplier") = 1.0,
+        py::arg("f_multiplier") = 1.0, py::arg("exit_head_lost") = false,
         "Compressible channel for network solver with all derivatives.");
 
   m.def("momentum_chamber_residual_and_jacobian",
@@ -420,7 +423,8 @@ PYBIND11_MODULE(_core, m) {
       .def_readwrite("port_sign", &solver::MpceGeometry::port_sign)
       .def_readwrite("joining_etransfer_alpha",
                      &solver::MpceGeometry::joining_etransfer_alpha)
-      .def_readwrite("eta_scale", &solver::MpceGeometry::eta_scale);
+      .def_readwrite("eta_scale", &solver::MpceGeometry::eta_scale)
+      .def_readwrite("gamma", &solver::MpceGeometry::gamma);
 
   py::class_<solver::MpceResidualJacobian>(
       m, "MpceResidualJacobian",
@@ -1882,7 +1886,7 @@ PYBIND11_MODULE(_core, m) {
         State in;
         in.T = T_in;
         in.P = P;
-        in.X = X_in;
+        in.set_X(X_in);
 
         EquilibriumResult out = wgs_equilibrium_adiabatic(in);
         return out.state.T;
@@ -2497,7 +2501,7 @@ PYBIND11_MODULE(_core, m) {
         State in;
         in.T = T;
         in.P = P;
-        in.X = to_vec(X_arr);
+        in.set_X(to_vec(X_arr));
         return complete_combustion(in, smooth_phi0, smooth_phi1, k0, k1);
       },
       py::arg("T"), py::arg("X"), py::arg("P") = 101325.0,
@@ -2515,7 +2519,7 @@ PYBIND11_MODULE(_core, m) {
         State in;
         in.T = T;
         in.P = P;
-        in.X = to_vec(X_arr);
+        in.set_X(to_vec(X_arr));
         return complete_combustion_isothermal(in, smooth_phi0, smooth_phi1, k0,
                                               k1);
       },
@@ -2534,7 +2538,7 @@ PYBIND11_MODULE(_core, m) {
         State s;
         s.T = T;
         s.P = P;
-        s.X = to_vec(X_arr);
+        s.set_X(to_vec(X_arr));
         return s;
       };
 
@@ -6003,6 +6007,7 @@ PYBIND11_MODULE(_core, m) {
   m.def(
       "P0_from_static_and_jacobian_M", &solver::P0_from_static_and_jacobian_M,
       py::arg("P"), py::arg("T"), py::arg("M"), py::arg("X"),
+      py::arg("tol") = 1e-8, py::arg("max_iter") = 50,
       "Calculate Stagnation Pressure from Static and its Jacobian w.r.t Mach.");
 
   m.def("friction_and_jacobian_haaland", &solver::friction_and_jacobian_haaland,

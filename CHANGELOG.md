@@ -7,46 +7,175 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-- **Every example runs again, and CI now notices when one stops.** The 0.7.0
-  correlation removal broke five examples, and the 0.6.0 `pipe_* -> channel_*`
-  rename had quietly broken three more that nobody had run since. All eight
-  are fixed.
-
-  `scripts/run_examples.py` already ran every example headless and exited
-  non-zero on failure; it just was not wired to anything. It now gates
-  `status-check`, so an example that stops running blocks the merge.
-
-  **The job runs each example rather than importing it.** An example calling a
-  removed function from inside a function imports cleanly and only fails when
-  the function actually runs -- measured on four of them, an import check
-  caught two.
-
-  Two examples are beyond a rename and are listed in the runner's
-  `KNOWN_BROKEN` map with their reason and issue (#351): one demonstrates a
-  `CombustorNode(pressure_loss=...)` callback that no longer exists, the other
-  builds a merging `MomentumChamberNode` topology that `FlowNetwork.validate`
-  now rejects. Both are still run, so one that starts passing again fails the
-  job asking for its entry to be removed, rather than sitting on the list
-  forever.
-
-- **Three C++ examples segfaulted and nothing noticed.**
-  `stagnation_example`, `compressible_example` and `combustion_state_example`
-  crashed on a null read inside `combaero::mix()`. They assigned the public
-  `State::X` member directly instead of calling `set_X()`, so `Y` stayed
-  empty and `mix()` indexed it. They compiled and linked cleanly throughout.
-
-  The examples were built by CMake but never registered as tests, so building
-  them was the only thing ever checked. Each is now an `add_test` smoke case,
-  which puts them in `ctest` and so in CI across the existing matrix.
-
-- **`_RibbedChannelResult` carries the wall-coupling derivatives.**
-  `dh_dmdot`, `dh_dT`, `dT_aw_dmdot` and `dT_aw_dT` were missing, so a ribbed
-  channel coupled to a wall fed the solver an incomplete Jacobian. Nineteen
-  unit tests missed it because none of them coupled a wall; re-enabling the
-  skipped coupled-liner example test is what surfaced it.
-
 ### Added
+
+- **Everything is namespaced by source.** A figure number is not a unique
+  identifier -- two books can each have a figure 4.46 -- so `cards/` and
+  `plots/` are now keyed by source as `data/` already was:
+
+  ```
+  data/han2012/fig4.46_R_eD0.047_pe10_wh1.csv
+  cards/han2012/fig4.46_R_scatter.yaml
+  plots/han2012/fig4.46_redrawn.png
+  ```
+
+  `--figure` takes a bare number while it is unambiguous and the
+  qualified `source/figure` form always. A bare number matching more than
+  one source is an error naming the alternatives, never a silent pick.
+
+- **Redrawn figures are committed.** All six live in
+  `validation/cooling/plots/<source>/`, so a diff shows the plot rather than
+  requiring a reviewer to regenerate it, and a change that moves points
+  shows up as a changed image. Each carries its source citation in a
+  footer naming the book and the primary paper behind the figure.
+
+  `--all` redraws the whole dataset in one command, and a test pins that
+  every figure has a committed plot -- the way this goes stale is filing a
+  figure and forgetting to regenerate.
+
+- **Figure 4.47 digitised**: the angled-rib correlation of Han and Park
+  (1988), both panels plus four frames, 186 points.
+
+  Equation 4.18 confirmed -- the pooled cloud free-fits `(e+)^0.3453`
+  against the printed exponent of **0.35**. Equation 4.17 confirmed too:
+  the quadratic in rib angle is reproduced with a minimum near 60-68
+  degrees, mean bias -3.0% against Han's stated 6% band.
+
+  **Pooling is forced here, not chosen.** Both panels draw several
+  distinct symbols and carry no legend at all, so there is nothing to
+  attribute them against -- unlike figures 4.46 and 4.51, where a legend
+  made attribution hard but possible. It costs little: the left panel's
+  ordinate is already normalised by `(P/e/10)^0.35 (W/H)^m`, and on the
+  right only the exponent is comparable anyway.
+
+  This figure is the source of extraction item 10 -- `G_bar = 1.2 G` is
+  printed on its dashed line -- which figure 4.51 later measured at 1.2193.
+
+  Not scored by any implemented set: `han_1988_orthogonal` binds 90 degrees
+  only, and this IS the angled correlation. It is the acceptance data for
+  a `han_park_1988_angled` set (#334).
+
+- **Figure 4.51 digitised, both panels**: nine rib configurations in `G`
+  and `G_bar`, two drawn reference lines, and four panel frames -- 24
+  series, 135 points.
+
+  **Extraction item 10 is now confirmed against data.** `G_bar/G` measured
+  over the seven undisputed classes gives **1.2193** at 90 degrees against
+  the printed `4.5/3.7 = 1.2162`, agreeing to 0.3%. Until now that ratio
+  rested on two printed coefficients and a figure label. The angled
+  configurations average 1.155, 4.5% below, against 2.6% scatter -- which
+  is what justifies the runner refusing to convert `G_bar` off 90 degrees.
+
+  **Two classes are unresolved and marked disputed.** `45 deg //` and
+  `45 deg x` return `G_bar/G` below 1, which is impossible, and their two
+  panels hold what appear to be the same marks. Three readings survive and
+  the digitised data separates none of them; resolving it needs the
+  primary paper rather than the reprint.
+
+  Frames now declare `frame_orientation`. A vertical frame must be fitted
+  across the other axis, and it measures shear -- which a horizontal frame
+  cannot see. The two y-axis frames also pinned this figure's panels as
+  aligned to 0.53%, which is what validated transferring the abscissa to
+  the upper panel, whose x ticks are unlabelled.
+
+- **Digitised figures can be redrawn from the committed data.** `uv run
+  python -m validation.cooling.plot --figure 4.46` puts the data back on
+  axes so it can be held next to the scan -- the check numbers cannot
+  make, since a self-consistent series can still have the wrong shape or
+  be swapped with another.
+
+  It reads the same metadata the verifier and scorecard use, so a plot
+  cannot drift from what the checks believe. Series now declare
+  `x_axis_type`/`y_axis_type` and plot limits in their figure card, and a
+  `figure`/`panel` assignment; a test pins that every series has them,
+  since defaulting a linear figure to log looks plausible and is wrong.
+
+  The equation a figure PRINTS is overlaid on the line it DRAWS, making
+  that gap visible directly. Disputed class labels are marked in the
+  legend.
+
+- **A disputed class label is now a first-class state, not a comment.**
+  `class_confidence` records how much a digitised series' SYMBOL-CLASS
+  label is trusted -- `confirmed`, `provisional` or `disputed` -- as
+  distinct from `confidence`, which is about the coordinates.
+
+  A disputed series still pools, because its coordinates are sound and
+  nothing in the current scoring depends on which symbol produced them.
+  The runner refuses it the moment a correlation set actually binds
+  geometry, since then the label IS an input. The verifier reports it on
+  every run, and a test asserts the marking, the report, and the presence
+  of a specific question to put to the source page. A fact that lives only
+  in a metadata comment has a half-life; one that prints on every
+  verification does not.
+
+  One series is currently disputed: figure 4.46's `eD0.047/pe10/wh2` upper
+  panel marks pair with their own R counterpart on only 2 of 4. The
+  digitised data cannot settle it -- identification by elimination put the
+  best alternative at 1 of 4 -- so it carries the question to ask of
+  p. 376 rather than a guess.
+
+- **Figure 4.46 digitised: `han_1988_orthogonal` validated against its own
+  source.** 23 series -- both panels, all ten symbol classes, the three
+  drawn correlation lines -- plus both panel frames as distortion
+  standards. Pooled, the lower panel sits at **+0.1% bias across 64
+  points** against the printed `R/(P/e/10)^0.35 = 3.2`.
+
+  **Scoring is pooled, not per-class.** Symbols on the figure overlap and
+  a mark cannot always be assigned to its class; some runs appear in only
+  one panel. That costs nothing here, because the set carries zero
+  geometry exponents in both `R` and `G` -- Han normalised `P/e` out of the
+  R ordinate himself and `W/H` drops at 90 degrees -- so every class must
+  land on one curve. Class labels are kept as provenance, marked
+  provisional, rather than as something the scoring leans on.
+
+  **Han's stated accuracy is a standard deviation, not a 95% bound.** The
+  book says "within 6% for 95% of the data"; the digitised cloud puts 70%
+  inside 6% with sd 5.9%, which is 1 sigma. Harness tolerances are set
+  from the measured figure. A test pins it, because the alternative
+  reading would justify a band twice as wide, and a band twice as wide is
+  how a real error hides.
+
+- **Digitised series are cross-verified against a figure card.** `uv run
+  python -m validation.cooling.verify` checks every series against what the
+  printed axes and equations say, read off the page independently of where
+  the digitiser put the points. The two are separate channels and the check
+  is their disagreement; which one is wrong is raised for a human rather
+  than decided by the tool.
+
+  It catches a dropped axis multiplier (the real figure 4.54 defect, two
+  decades), a mis-calibrated span, two curves on one figure swapped, a
+  drawn line that fails to reproduce its own printed equation, and
+  double-picked or missed marks. Each was verified by injecting the bug.
+
+  A bound that cannot be read off the scan is recorded as null and left
+  unchecked rather than invented -- figure 4.193c's ordinate continues
+  below its lowest labelled tick. The verifier's first run caught that
+  mistake in the card itself.
+
+- **A scored validation harness for the cooling correlations**, on the
+  pattern `validation/junction/` uses. `uv run python -m
+  validation.cooling.scorecard` reports MAE, RMSE, bias and in-band counts
+  per digitised series.
+
+  It scores THROUGH the model rather than around it: the runner bisects the
+  Reynolds number until `evaluate_rib`'s own `e+` reaches the digitised
+  abscissa, so friction factor, `e+` and `G` are all exercised. Recomputing
+  the formula in the harness would score the model against a second copy of
+  itself, which is the failure #333 exists to catch.
+
+  The first source is eight series digitised from Han, Dutta & Ekkad
+  (2012), figures 4.53, 4.54 and 4.193c. `han_1988_orthogonal` meets its
+  own correlation line at 3.5% RMSE and the measured points at 5.4%,
+  against Han's stated 6%. The digitised coordinates are committed; the
+  scans stay gitignored.
+
+  **Refusing to score is itself a result.** A set outside its numeric
+  validity is still answering, and is reported as extrapolating. A set
+  asked about a configuration it has no binding for is not:
+  `han_1988_orthogonal` is 90 degree only, and scoring it against 45 degree
+  rib data produced a 26.7% bias that reads as model error when it is the
+  wrong correlation entirely. The runner declines and prints why.
+
 - **Ribbed surfaces are selectable in the GUI again.** The node type returns
   with the fields the rebuilt correlation needs: rib geometry, the channel
   aspect ratio `W/H`, `n_ribbed_walls` as a 1/2/4 choice, and the
@@ -61,8 +190,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dropdown, so a pre-0.7.0 network's parameters stay visible rather than being
   silently dropped on the next save.
 
-
-### Added
 - **Ribbed channels are back**, built on the parametrised correlation sets.
   `RibbedModel` carries a `RibCorrelationSet`, the rib geometry, the channel
   aspect ratio, and `n_ribbed_walls`.
@@ -101,16 +228,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reversed. Verified against central differences to 1e-10, including reversed
   flow.
 
-### Changed
-- **`CLAUDE.md`'s explicit-includes rule names both strictnesses.** It said
-  "macOS-only implicit includes break Linux CI", which is one direction of a
-  two-directional problem and misleading: a `std::max({a,b,c})` here passed on
-  macOS **and** Linux and was caught only by MinGW. libstdc++ is strict about
-  transitive headers; MSVC is strict about POSIX-ish macros like `M_PI`. Any
-  platform can be the permissive one, and two agreeing is not evidence.
-
-
-### Added
 - **Parametrised rib correlations.** Rib correlations are now data rather than
   code: a `RibCorrelationSet` carries the coefficients, each term's
   **normaliser**, the advisory validity band, the stated accuracy, and the
@@ -151,6 +268,291 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Not yet wired into `ChannelElement`: that needs the ribbed-versus-smooth wall
   weighting, and is tracked in #334.
 
+- **`ChannelResult.ddP_dvelocity`** [Pa*s/m], for chaining a channel
+  correlation's pressure sensitivity onto a caller's own mass flow.
+  `ddP_dmdot` is taken w.r.t. the mass flow through the correlation's internal
+  flow area -- the pin-array minimum section, the jet holes -- so chaining it
+  directly is wrong by the area ratio, **45x** for a 25 mm channel over a 3 mm
+  pin array. The impingement routine is driven by per-jet mass flow rather
+  than a velocity and so leaves the new field unset; `ConvectiveSurface`
+  carries the split that converts it.
+- **Pressure boundaries declare how they couple to a duct.**
+  `PressureBoundary(coupling=...)` takes `"auto"` (default), `"static"` or
+  `"total"`. A duct meeting a boundary either keeps its exit dynamic head (full
+  recovery, a diffuser) or loses it to the plenum (a bare exit discharging to
+  atmosphere) -- the previous behaviour was always the first, which is an ideal
+  diffuser on every outlet.
+
+  Pinning stagnation pressure at an outflow caps the mass flux at the sonic
+  value FOR THAT PRESSURE, a constraint the physical problem never imposed.
+  Measured on a 1.04 kg/s combustor duct at Tt = 1738 K: under total coupling
+  D = 0.10 m demands 1.34x an impossible ceiling and will not solve; under
+  static it runs at M = 0.752 and solves at Pt_in = 155 kPa. A genuinely
+  oversized demand (D = 0.08 m) still fails either way, so real limits surface.
+
+  `auto` infers from flow direction -- inflow takes total, outflow takes
+  static. It cannot decide for a boundary whose flow reverses, or that serves
+  both roles; that is what the explicit setting is for. Whoever builds such a
+  network knows whether the exit is a plain opening or a diffuser, and the
+  solver does not.
+
+
+
+- **The momentum chamber closed on incompressible Bernoulli.**
+  `MomentumChamberNode` enforced `Pt = P + 0.5*rho*v^2`, which under-predicts
+  the stagnation rise by 11% at M = 1.0 and 34% at M = 1.4 -- and does so
+  without bound past sonic, so a station driven transonic got a closure that
+  was both wrong and unable to say so. It now closes on the isentropic
+  stagnation state from entropy conservation with variable cp, which
+  `stagnation.h` already provided.
+
+  It is also a large convergence win where a root exists: the combustor network
+  behind #351 solves in 1.2 s where it took 18.3 s, because the correct
+  relation is 1.8 - 2.4x steeper through the transonic region and pushes Newton
+  out of that territory on physics rather than on a tuned penalty.
+
+  **The junction reference head follows.** `K` is tabulated as `dPt/q_dyn`, so
+  the reference has to be whatever the ports call their dynamic head. While the
+  node was incompressible the two agreed and their errors cancelled; correcting
+  the node alone would have left the two halves of a junction disagreeing about
+  one quantity. Both junction models now take the common port's own isentropic
+  rise, computed from its `P`, `rho` and `u` rather than from `Pt - P` -- the
+  same value at the solution, but it keeps the dependency set unchanged and so
+  preserves the one-`Pt`-per-row structure the assembled Jacobian relies on.
+  Taking it from `Pt - P` instead measured 7x slower.
+
+  `MpceGeometry` gains `gamma` per port, following the kernel's own rule that
+  the equation of state is evaluated at the call site where the mixture is
+  known. For an ideal gas `a^2 = g*P/rho`, so `M^2 = rho*u^2/(g*P)` and no
+  temperature is needed. Left at zero it falls back to the incompressible head,
+  so a caller that cannot supply one keeps its previous behaviour.
+
+  `MomentumChamberResult` gains `d_res_dT`: the incompressible form touched T
+  only through `rho`, weakly enough that the assembled Jacobian tolerated its
+  absence, which the stagnation closure does not. All derivatives are
+  FD-verified to ~1e-9, including reverse flow and the `m_dot = 0` symmetry
+  point.
+
+  Nine tests asserted `0.5*rho*v^2` directly. Each now asserts the compressible
+  rise **and** that it exceeds the incompressible value, so the relationship
+  between the two is pinned rather than just the new number. Three others had
+  lost their subject entirely -- the closure removed the pathology they were
+  built around -- and were re-derived rather than relaxed:
+
+  - the barrier-weight control now measures over a population, because the
+    traced case stopped discriminating at any size across twelve decades;
+    re-measured, the derived weight still beats the fixed fallback on 2 of 100
+    scaled junctions, so the machinery stays.
+  - the barrier fixed point is pinned at the element level, because the traced
+    case now converges at every alpha from 1e4 to 1e9 and never goes
+    wrong-direction, leaving no stalled iterate to read it from.
+  - the assembled-Jacobian check now gates on whether each finite difference
+    has converged, instead of an absolute floor that made it test roundoff on a
+    structurally zero term.
+
+  See issue #357.
+
+
+- **The Fanno march handed Newton a staircase, and the choke barrier hid it
+  behind a bigger one.** Two defects in the compressible channel's drop, both
+  in the region a solver has to cross.
+
+  When the flow chokes before the duct end the march truncates mid-step.
+  `L_choke` was interpolated within the breaking step -- a comment above the
+  loop explains why -- but the **outlet state was not**, so it stayed snapped
+  to the march grid. `channel_compressible_mdot_and_jacobian` builds its drop
+  from that outlet and differentiates it by central finite differences with a
+  1e-6 relative step, about 0.1 Pa against risers of ~55 Pa. Scanning `m_dot`
+  through the choked band, the gradient alternated sample to sample by 22%,
+  and the reported Jacobian disagreed with a coarse finite difference by
+  7 - 62% inside the band while matching it exactly outside. The outlet is now
+  interpolated to the same station as `L_choke`.
+
+  The barrier that keeps Newton out of infeasible flow then turned out to be
+  compensating rather than correcting. The truncated drop covers the marched
+  part only, so it collapses as choking moves upstream -- slope +13934 just
+  below onset against -86257 just above, a sign reversal in the base term
+  itself. The linear barrier did not remove that; it outshouted it, and the
+  mismatch was the 74.5x derivative step at onset. The drop is now
+  extrapolated to full length before the barrier is added, which is continuous
+  through onset, and the barrier is quadratic in the truncated fraction so it
+  switches on with zero slope. Monotonicity matters as much as smoothness
+  here: a quadratic barrier alone leaves the drop decreasing with rising
+  `m_dot`, which is exactly the spurious-root condition the barrier exists to
+  prevent.
+
+  Unchoked results are unchanged to the printed digits; RK4 was already
+  grid-converged by `n_steps = 25` there. Pinned by
+  `tests/test_fanno_choke_smoothness.cpp`, whose three cases were each
+  falsified against the specific defect they cover. See issue #356.
+
+- **Every compressible solver returned a state that could not be mixed.**
+  `State::X` and `State::Y` are both public members, and only `set_X()` /
+  `set_Y()` keep them in sync. All seventeen state-producing sites in
+  `compressible.cpp` assigned the `X` member directly, so `fanno_channel`,
+  `fanno_channel_rough`, `nozzle_flow`, `nozzle_quasi1d` and
+  `solve_A_eff_from_mdot` handed back states with a populated `X` and an
+  empty `Y`.
+
+  Nothing caught it because every `State` property getter -- `h`, `cp`, `rho`,
+  `mw`, `mu`, `gamma`, all of them -- reads `X`. Such a state computes every
+  property correctly and looks healthy. `Y` is read in exactly one place a
+  caller is likely to reach, `mix()`, which indexed it unchecked: passing a
+  solver's own output straight into `mix()` segfaulted, with no misuse of the
+  API anywhere.
+
+  The producers now build through `set_X()`. `mix()` additionally checks the
+  two sizes agree and throws naming `set_X()`, so a state built by hand the
+  same way fails with something actionable instead of a crash. The four
+  state-assembling sites at the pybind boundary were converted too.
+
+  One visible consequence: `set_X()` normalises, so a solver given an
+  unnormalised `X` now returns a normalised one. Previously the returned `X`
+  echoed the raw input while every property was computed from the normalised
+  composition, so the state disagreed with itself; it now does not.
+
+  Python was never exposed: the `X` property setter on the binding has always
+  synced `Y`. `MixtureState` maintains its own invariant correctly, and
+  `solver_interface`'s `Stream` carries mass fractions only, so neither was
+  affected. Tracked as #352; making the invariant structurally unbreakable is
+  still open there.
+
+- **Every example runs again, and CI now notices when one stops.** The 0.7.0
+  correlation removal broke five examples, and the 0.6.0 `pipe_* -> channel_*`
+  rename had quietly broken three more that nobody had run since. All eight
+  are fixed.
+
+  `scripts/run_examples.py` already ran every example headless and exited
+  non-zero on failure; it just was not wired to anything. It now gates
+  `status-check`, so an example that stops running blocks the merge.
+
+  **The job runs each example rather than importing it.** An example calling a
+  removed function from inside a function imports cleanly and only fails when
+  the function actually runs -- measured on four of them, an import check
+  caught two.
+
+  Two examples are beyond a rename and are listed in the runner's
+  `KNOWN_BROKEN` map with their reason and issue (#351): one demonstrates a
+  `CombustorNode(pressure_loss=...)` callback that no longer exists, the other
+  builds a merging `MomentumChamberNode` topology that `FlowNetwork.validate`
+  now rejects. Both are still run, so one that starts passing again fails the
+  job asking for its entry to be removed, rather than sitting on the list
+  forever.
+
+- **Three C++ examples segfaulted and nothing noticed.**
+  `stagnation_example`, `compressible_example` and `combustion_state_example`
+  crashed on a null read inside `combaero::mix()`. They assigned the public
+  `State::X` member directly instead of calling `set_X()`, so `Y` stayed
+  empty and `mix()` indexed it. They compiled and linked cleanly throughout.
+
+  The examples were built by CMake but never registered as tests, so building
+  them was the only thing ever checked. Each is now an `add_test` smoke case,
+  which puts them in `ctest` and so in CI across the existing matrix.
+
+- **`_RibbedChannelResult` carries the wall-coupling derivatives.**
+  `dh_dmdot`, `dh_dT`, `dT_aw_dmdot` and `dT_aw_dT` were missing, so a ribbed
+  channel coupled to a wall fed the solver an incomplete Jacobian. Nineteen
+  unit tests missed it because none of them coupled a wall; re-enabling the
+  skipped coupled-liner example test is what surfaced it.
+
+- **`ChannelResult::ddP_dvelocity` is retained** and still set by
+  `channel_smooth`, though its only consumer went with the pin-fin path. It is
+  correct, tested, and is the interface the re-added correlations will use.
+
+- **`ChannelElement.diagnostics` reported a friction factor from a different
+  correlation than the one driving the residual.** It hardcoded Haaland
+  (rough) or Petukhov (smooth) regardless of the element's `friction_model`,
+  so a channel set to `petukhov` reported **0.016834** while its own pressure
+  drop used **0.012928** -- a 30% misreport. It now asks the same C++
+  dispatcher the residual uses. The laminar branch stays `64/Re`, which is
+  Poiseuille rather than a choice of correlation.
+
+- **`dimple_friction_multiplier` no longer warns about a Reynolds range it does
+  not have.** It shared a validator written for `dimple_nusselt_enhancement`,
+  which really is a power law in Re, so it emitted "Re_Dh is outside validated
+  range [10000, 80000]. Extrapolating power-law correlation" -- naming the
+  Nusselt function, about an extrapolation that cannot occur. Geometry limits
+  on `d_Dh` and `h_d` are still enforced, and the Nusselt path is unchanged.
+
+- **A test that could not fail has been replaced.** `test_dimple_jacobians`
+  compared the analytic derivative against a central difference of the same
+  function; both were 0.0, so it held regardless of the implementation. The
+  Nusselt half was real and is kept. The friction half is now a test that the
+  multiplier does not vary with Re, which goes red if a Re dependence is added.
+
+- **`ChannelElement`'s Jacobian was wrong for pin-fin and impingement
+  surfaces.** Those surfaces vary their friction multiplier with mass flow,
+  but the multiplier was handed to the C++ friction routine frozen, so the
+  element reported `d(dP)/d(mdot)` short by **10.5%** and `d(dP)/dT` short by
+  **13.1%** against central differences. Both now agree to 1e-10. Ribbed and
+  dimpled were exact throughout -- their multipliers carry no Reynolds
+  dependence, which is what localised the fault. Newton convergence on
+  networks using either surface should improve; the converged solution for the
+  default `friction_model="haaland"` is unchanged.
+
+
+### Changed
+- **`CLAUDE.md`'s explicit-includes rule names both strictnesses.** It said
+  "macOS-only implicit includes break Linux CI", which is one direction of a
+  two-directional problem and misleading: a `std::max({a,b,c})` here passed on
+  macOS **and** Linux and was caught only by MinGW. libstdc++ is strict about
+  transitive headers; MSVC is strict about POSIX-ish macros like `M_PI`. Any
+  platform can be the permissive one, and two agreeing is not evidence.
+
+- **`ChannelElement` supports smooth surfaces only** for now. The
+  user-set `Nu_multiplier` and `f_multiplier` on `ConvectiveSurface` are
+  **unaffected** -- they encode nothing, default to 1.0, and remain the
+  supported way to match measured data at an operating point.
+
+- **The GUI rejects saved networks carrying removed surface types** rather than
+  silently substituting smooth, which would answer a different question than
+  the one asked. Ribbed reports that it returns in a later release; the other
+  three report removal.
+
+- **`ChannelElement.residuals` no longer restates pipe friction in Python.**
+  It computed a `f_base` from a hardcoded Haaland/Petukhov branch, plus the
+  density, viscosity, velocity and Reynolds number feeding it, on every
+  residual evaluation -- including a `complete_state` call. After the pin-fin
+  and dimple fixes, all of it fed nothing but a guard: `rib_friction_multiplier`
+  takes no Reynolds number and `dimple_friction_multiplier` ignores the one it
+  is given. Removed, along with the air-at-STP fallbacks (`rho = 1.2`,
+  `mu = 1.8e-5`) it substituted whenever a state looked unphysical -- fabricated
+  properties a mid-Newton iterate would silently pick up.
+
+  Verified behaviour-neutral: residual and every Jacobian entry **identical
+  across 108 cases** -- four surface models, nine mass flows including zero,
+  1e-12 and reversed, three temperatures.
+
+  Reynolds number for the dimple correlation is now computed by a small helper.
+  Density cancels out of it (`rho * v` is `m_dot / area`), so no density guard
+  is needed at all.
+
+- **`ChannelElement` carries its provenance.** The docstring was one line with
+  no literature. It now names the formulations, points at the files that own
+  each correlation rather than transcribing them, and records the known
+  Jacobian gap.
+
+- **`test_channel_jacobians.py` checks derivatives rather than field
+  presence.** Its assertions were `assert result.ddP_dmdot != 0.0`, which says
+  a field was written, not that it is right -- an element-level defect 10.5%
+  in size survived it. The ribbed and pin-fin cases now verify `ddP_dvelocity`
+  against a central difference of `dP` in velocity.
+
+- **A localised array's pressure drop is now the correlation's own.** The
+  pin-fin and impingement correlations return `dP` directly, and
+  `ChannelElement` takes it instead of converting it into a multiplier on pipe
+  friction. The former route divided by a friction factor restated in Python
+  and let the C++ one multiply it back in, which cancels only when both pick
+  the same correlation. The Python side always used Haaland (rough) or
+  Petukhov (smooth) regardless of the element's `friction_model`, so the drop
+  moved by **+0.48%** for `colebrook`/`serghides` and **-24.7%** for
+  `petukhov`. For the default `haaland` the drop is unchanged bit for bit.
+
+  A channel carrying one of these surfaces now takes the array drop in both
+  regimes. The array correlations are incompressible by construction, so
+  `regime="compressible"` no longer layers Fanno friction on top of a drop the
+  array already owns.
+
 
 ### Removed
 - **Every cooling correlation whose provenance did not survive review.** A
@@ -186,63 +588,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Migration: pin `combaero~=0.6` to keep the previous behaviour. Rebuilt
   correlations land per issue #339, ribs first (#334).
 
-### Changed
-- **`ChannelElement` supports smooth surfaces only** for now. The
-  user-set `Nu_multiplier` and `f_multiplier` on `ConvectiveSurface` are
-  **unaffected** -- they encode nothing, default to 1.0, and remain the
-  supported way to match measured data at an operating point.
-- **The GUI rejects saved networks carrying removed surface types** rather than
-  silently substituting smooth, which would answer a different question than
-  the one asked. Ribbed reports that it returns in a later release; the other
-  three report removal.
-
-### Fixed
-- **`ChannelResult::ddP_dvelocity` is retained** and still set by
-  `channel_smooth`, though its only consumer went with the pin-fin path. It is
-  correct, tested, and is the interface the re-added correlations will use.
-
-
-### Fixed
-- **`ChannelElement.diagnostics` reported a friction factor from a different
-  correlation than the one driving the residual.** It hardcoded Haaland
-  (rough) or Petukhov (smooth) regardless of the element's `friction_model`,
-  so a channel set to `petukhov` reported **0.016834** while its own pressure
-  drop used **0.012928** -- a 30% misreport. It now asks the same C++
-  dispatcher the residual uses. The laminar branch stays `64/Re`, which is
-  Poiseuille rather than a choice of correlation.
-
-### Changed
-- **`ChannelElement.residuals` no longer restates pipe friction in Python.**
-  It computed a `f_base` from a hardcoded Haaland/Petukhov branch, plus the
-  density, viscosity, velocity and Reynolds number feeding it, on every
-  residual evaluation -- including a `complete_state` call. After the pin-fin
-  and dimple fixes, all of it fed nothing but a guard: `rib_friction_multiplier`
-  takes no Reynolds number and `dimple_friction_multiplier` ignores the one it
-  is given. Removed, along with the air-at-STP fallbacks (`rho = 1.2`,
-  `mu = 1.8e-5`) it substituted whenever a state looked unphysical -- fabricated
-  properties a mid-Newton iterate would silently pick up.
-
-  Verified behaviour-neutral: residual and every Jacobian entry **identical
-  across 108 cases** -- four surface models, nine mass flows including zero,
-  1e-12 and reversed, three temperatures.
-
-  Reynolds number for the dimple correlation is now computed by a small helper.
-  Density cancels out of it (`rho * v` is `m_dot / area`), so no density guard
-  is needed at all.
-
-- **`ChannelElement` carries its provenance.** The docstring was one line with
-  no literature. It now names the formulations, points at the files that own
-  each correlation rather than transcribing them, and records the known
-  Jacobian gap.
-
-- **`test_channel_jacobians.py` checks derivatives rather than field
-  presence.** Its assertions were `assert result.ddP_dmdot != 0.0`, which says
-  a field was written, not that it is right -- an element-level defect 10.5%
-  in size survived it. The ribbed and pin-fin cases now verify `ddP_dvelocity`
-  against a central difference of `dP` in velocity.
-
-
-### Removed
 - **`dimple_friction_multiplier_and_jacobian`** (C++, its pybind11 binding and
   the `combaero._solver_tools` re-export). It reported a derivative w.r.t.
   `Re_Dh` that was **identically zero at every Reynolds number**, because
@@ -254,56 +599,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dimple_friction_multiplier`; there is no derivative to want.
 
 ### Fixed
-- **`dimple_friction_multiplier` no longer warns about a Reynolds range it does
-  not have.** It shared a validator written for `dimple_nusselt_enhancement`,
-  which really is a power law in Re, so it emitted "Re_Dh is outside validated
-  range [10000, 80000]. Extrapolating power-law correlation" -- naming the
-  Nusselt function, about an extrapolation that cannot occur. Geometry limits
-  on `d_Dh` and `h_d` are still enforced, and the Nusselt path is unchanged.
-- **A test that could not fail has been replaced.** `test_dimple_jacobians`
-  compared the analytic derivative against a central difference of the same
-  function; both were 0.0, so it held regardless of the implementation. The
-  Nusselt half was real and is kept. The friction half is now a test that the
-  multiplier does not vary with Re, which goes red if a Re dependence is added.
+
+- **The Fanno march refines its step near the sonic point.** Fixing the
+  gradient (below) gave the march a `1/(1 - M^2)` term that a fixed-step RK4
+  cannot resolve: the step that is ample over most of a duct steps straight
+  past the singularity in the last few percent of one that chokes. The
+  reported outlet then snapped to the march grid, so the pressure drop moved
+  with `n_steps` and its gradient with respect to mass flow developed a
+  sawtooth -- 988% peak-to-peak at 100 steps.
+
+  Both marches (constant-`f` and rough-wall) now halve the step whenever a
+  trial step would close more than a quarter of the remaining distance to
+  sonic, and relax back toward the nominal step once clear. `n_steps` sets
+  the nominal step rather than a fixed one. A choked duct's outlet pressure
+  is now identical to within a millipascal from 100 to 6400 nominal steps,
+  where it previously moved 1.5 kPa between coarse and fine.
+
+  Refining everywhere would have cost the same accuracy for every duct that
+  never approaches sonic, which is most of them. The extra steps are spent
+  only where the gradient is actually stiff. See issue #363.
 
 
-### Fixed
-- **`ChannelElement`'s Jacobian was wrong for pin-fin and impingement
-  surfaces.** Those surfaces vary their friction multiplier with mass flow,
-  but the multiplier was handed to the C++ friction routine frozen, so the
-  element reported `d(dP)/d(mdot)` short by **10.5%** and `d(dP)/dT` short by
-  **13.1%** against central differences. Both now agree to 1e-10. Ribbed and
-  dimpled were exact throughout -- their multipliers carry no Reynolds
-  dependence, which is what localised the fault. Newton convergence on
-  networks using either surface should improve; the converged solution for the
-  default `friction_model="haaland"` is unchanged.
+- **The Fanno march was integrating an incompressible gradient.**
+  `dpdx_fanno` returned `-f/(2D) rho u^2` -- Darcy-Weisbach. The Fanno static
+  pressure gradient carries `(1 + (g-1)M^2)/(1 - M^2)`, and the `1/(1 - M^2)`
+  term is what produces the choking singularity. Without it the flow never
+  choked however long the duct: marched over its OWN `fanno_max_length`, where
+  M must reach 1 by definition, it reached M = 0.37 / 0.55 / 0.72 from inlet
+  Mach 0.3 / 0.5 / 0.7 and reported `choked = false` every time. It now agrees
+  with an independent integration of the standard ODE (M = 0.9841 against
+  0.9714 at L*).
 
-### Changed
-- **A localised array's pressure drop is now the correlation's own.** The
-  pin-fin and impingement correlations return `dP` directly, and
-  `ChannelElement` takes it instead of converting it into a multiplier on pipe
-  friction. The former route divided by a friction factor restated in Python
-  and let the C++ one multiply it back in, which cancels only when both pick
-  the same correlation. The Python side always used Haaland (rough) or
-  Petukhov (smooth) regardless of the element's `friction_model`, so the drop
-  moved by **+0.48%** for `colebrook`/`serghides` and **-24.7%** for
-  `petukhov`. For the default `haaland` the drop is unchanged bit for bit.
+  `fanno_max_length` returned **half** the correct length: its estimate divided
+  by `4f` where `f` is Darcy, putting it at L*/4, and with a bracket of only
+  twice the estimate the bisection saturated at its own upper bound. It now
+  matches the tables to 0.02% from M = 0.3 to 0.85.
 
-  A channel carrying one of these surfaces now takes the array drop in both
-  regimes. The array correlations are incompressible by construction, so
-  `regime="compressible"` no longer layers Fanno friction on top of a drop the
-  array already owns.
+- **The compressible channel confused static and total pressure, three ways.**
+  It evaluated density at `P_total` ("uses P_total as proxy for P_static
+  (low-Mach approximation)"), so at M ~ 0.76 it was 1.59x too dense and
+  reported converged solutions for flows 1.37x past its own choked limit. The
+  inlet static state is now inverted from `(Pt, Tt, m_dot, A)` -- energy,
+  isentropic static/total, continuity -- as a 1-D root find on Mach, using the
+  entropy-based relations `stagnation.h` already provided.
 
-### Added
-- **`ChannelResult.ddP_dvelocity`** [Pa*s/m], for chaining a channel
-  correlation's pressure sensitivity onto a caller's own mass flow.
-  `ddP_dmdot` is taken w.r.t. the mass flow through the correlation's internal
-  flow area -- the pin-array minimum section, the jet holes -- so chaining it
-  directly is wrong by the area ratio, **45x** for a 25 mm channel over a 3 mm
-  pin array. The impingement routine is driven by per-jet mass flow rather
-  than a velocity and so leaves the new field unset; `ConvectiveSurface`
-  carries the split that converts it.
+  The march returned a STATIC drop while `ChannelElement` consumed it as a
+  stagnation drop; in Fanno flow the flow accelerates and converts static head
+  into dynamic, so the two differ by 1.09 - 1.58x over M = 0.34 - 0.64. It now
+  returns `Pt_in - Pt_out`.
 
+  The Jacobian chained through the march's inputs as if they were the element's
+  unknowns, which held only while density came from the total state. Chained
+  through the inversion instead, the error against a central difference fell
+  from 4.7e-2 to 3.1e-8.
 
 ## [0.6.0] - 2026-09-09
 

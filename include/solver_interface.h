@@ -206,11 +206,24 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
 // flat attractor with exact spurious network roots (dead branch arms,
 // reversed supplies). channel_compressible_mdot_and_jacobian therefore
 // replaces the truncated result with a monotone barrier:
-//   in-channel choking: dP = dP_truncated + kappa * P_in * (1 - L_choke/L)
+//   in-channel choking: dP = dP_truncated + kappa * P_in * (1 - L_choke/L)^2
 //   supersonic inlet:   dP = kappa * P_in + (beta/2) * rho_in * (u^2 - a^2)
 // Both branches are continuous at their region boundaries and increase with
 // the depth of infeasibility, so the residual always pushes m_dot back
 // toward the feasible branch.
+//
+// The in-channel term is QUADRATIC in the truncated fraction s = 1 - L_choke/L
+// rather than linear, so that d/ds vanishes at s = 0. A linear barrier is
+// continuous at onset but switches on at full slope: measured on a D=0.1 m
+// duct at 1700 K, d(dP)/d(m_dot) jumped 13934 -> 1037977 across the onset
+// point, a 74.5x step. Newton reads that kink as a wall and stalls against it.
+// Quadratic keeps both endpoints (0 at onset, kappa * P_in when choking
+// reaches the inlet) and the monotone push back toward feasibility, while
+// being C1 where the solver actually crosses. See issue #356.
+// Floor on the marched fraction L_choke/L when extrapolating the truncated
+// drop to full length. Keeps dP/frac finite as choking reaches the inlet,
+// where the supersonic branch takes over anyway.
+constexpr double kChannelChokeMinMarched = 1e-3;
 constexpr double kChannelChokeBarrierKappa = 1.0;
 constexpr double kChannelChokeBarrierBeta = 2.0;
 
@@ -239,7 +252,14 @@ std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobia
     double L, double D, double roughness,
     const std::string& friction_model,
     double f_multiplier = 1.0,
-    bool compute_jacobians = true);
+    bool compute_jacobians = true,
+    // Whether the caller resolved the inlet STATIC state (issue #359). When
+    // false the drop stays the previous static difference, so the region where
+    // no static state exists keeps exactly its previous behaviour.
+    bool inlet_static_resolved = true,
+    // Whether the exit dynamic head is lost to what the duct discharges into
+    // (issue #360). False keeps the previous full-recovery coupling.
+    bool exit_head_lost = false);
 
 
 // Full compressible channel evaluation with all derivatives for network solver.
@@ -248,7 +268,10 @@ ChannelResult channel_compressible_residuals_and_jacobian(
     const std::vector<double>& Y_up,
     double P_static_down, double L, double D, double roughness,
     const std::string& friction_model,
-    double f_multiplier = 1.0);
+    double f_multiplier = 1.0,
+    // Exit coupling: true when the duct discharges into a plenum and loses its
+    // dynamic head, false for full recovery. See issue #360.
+    bool exit_head_lost = false);
 
 
 // -----------------------------------------------------------------------------
@@ -428,7 +451,8 @@ T0_from_static_and_jacobian_M(double T, double M, const std::vector<double> &X);
 // Method: Central Finite Difference
 std::tuple<double, double>
 P0_from_static_and_jacobian_M(double P, double T, double M,
-                              const std::vector<double> &X);
+                              const std::vector<double> &X,
+                              double tol = 1e-8, std::size_t max_iter = 50);
 
 // -----------------------------------------------------------------------------
 // 6. Combustion Interfaces
@@ -510,6 +534,11 @@ struct MomentumChamberResult {
   double d_res_dP;
   double d_res_dP_total;
   double d_res_dmdot;
+  // Temperature sensitivity. The incompressible closure this replaced touched
+  // T only through rho, weakly enough that the assembled Jacobian tolerated
+  // its absence; the stagnation closure also depends on T through T0, a(T)
+  // and s(T), and leaving it out costs ~1.6e-4 on the network Jacobian check.
+  double d_res_dT;
 };
 
 MomentumChamberResult momentum_chamber_residual_and_jacobian(

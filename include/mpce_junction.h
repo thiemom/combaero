@@ -75,6 +75,15 @@ struct MpceGeometry {
   std::array<double, kMpcePorts> port_sign{};
   double joining_etransfer_alpha = 0.0;
   double eta_scale = 0.0;
+  // Ratio of specific heats per port, for the compressible reference head.
+  // Follows the same rule as rho and drho_dp above: the equation of state is
+  // evaluated at the call site where the mixture is known, and enters here as
+  // a value. gamma is a weak function of T, so carrying it as a constant is
+  // the same order of approximation as the ideal drho_dp = rho/P already used.
+  //
+  // Left at zero, the head falls back to the incompressible 0.5*rho*u^2, so a
+  // caller that has not been updated keeps its previous behaviour.
+  std::array<double, kMpcePorts> gamma{};
 };
 
 inline MpceResidualJacobian mpce_residuals_and_jacobian(
@@ -160,10 +169,38 @@ inline MpceResidualJacobian mpce_residuals_and_jacobian(
   std::array<D, kMpcePorts> K{};
   for (int j = 0; j < kMpcePorts - 1; ++j) K[mynard.k_port[j]] = mynard.K[j];
 
-  // Common-side dynamic head. u_com^2 rather than |u_com|^2 so no absolute
-  // value enters the derivative.
+  // Common-side reference head.
+  //
+  // K is tabulated as dPt / q_dyn, so the reference has to be the same notion
+  // of dynamic head the port nodes use. While MomentumChamberNode closed
+  // incompressibly, 0.5*rho*u^2 was that notion and the two agreed. Once the
+  // port node closes on the isentropic stagnation state, the incompressible
+  // head drifts from it -- 11% at M = 1.0, 34% at M = 1.4 -- and the two
+  // halves of the junction disagree about the same quantity (issue #357).
+  //
+  // So take the isentropic stagnation rise of the common port's OWN state:
+  //   q = P * [(1 + (g-1)/2 * M^2)^(g/(g-1)) - 1]
+  // which reduces to 0.5*rho*u^2 as M -> 0, i.e. exactly where the K data was
+  // measured, and tracks the real rise above it.
+  //
+  // Computed from the port's own P, rho and u rather than from Pt - P: the
+  // latter is the same number at the solution but couples every port row to
+  // the COMMON port's Pt, which breaks the one-Pt-per-row structure the
+  // assembled Jacobian relies on (and measured 7x slower on the bc_swap
+  // network). Here the dependency set is unchanged from the incompressible
+  // head -- P, rho, u of the common port -- so the sparsity is preserved.
+  //
+  // For an ideal gas a^2 = g*P/rho, hence M^2 = rho*u^2/(g*P); no temperature
+  // is needed, which is why gamma alone is threaded through MpceGeometry.
+  // u_com^2 rather than |u_com|^2 so no absolute value enters the derivative.
   D u_com = U[common];
+  const double g_com = geom.gamma[common];
   D q_dyn_com = Rho[common] * u_com * u_com * 0.5;
+  if (g_com > 1.0) {
+    D M2 = (Rho[common] * u_com * u_com) / (P[common] * g_com);
+    D base = M2 * (0.5 * (g_com - 1.0)) + 1.0;
+    q_dyn_com = P[common] * (dpow(base, g_com / (g_com - 1.0)) - 1.0);
+  }
 
   for (int i = 0; i < kMpcePorts; ++i) {
     D row = Pt[i] - Pt_jct + K[i] * q_dyn_com * k_term_sign;
