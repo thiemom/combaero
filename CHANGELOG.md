@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Digitised figures can be redrawn from the committed data.** `uv run
+  python -m validation.cooling.plot --figure 4.46` puts the data back on
+  axes so it can be held next to the scan -- the check numbers cannot
+  make, since a self-consistent series can still have the wrong shape or
+  be swapped with another.
+
+  It reads the same metadata the verifier and scorecard use, so a plot
+  cannot drift from what the checks believe. Series now declare
+  `x_axis_type`/`y_axis_type` and plot limits in their figure card, and a
+  `figure`/`panel` assignment; a test pins that every series has them,
+  since defaulting a linear figure to log looks plausible and is wrong.
+
+  The equation a figure PRINTS is overlaid on the line it DRAWS, making
+  that gap visible directly. Disputed class labels are marked in the
+  legend.
+
 - **A disputed class label is now a first-class state, not a comment.**
   `class_confidence` records how much a digitised series' SYMBOL-CLASS
   label is trusted -- `confirmed`, `provisional` or `disputed` -- as

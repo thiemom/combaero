@@ -239,3 +239,37 @@ def test_disputed_labels_are_refused_by_geometry_binding_sets(dataset) -> None:
         assert any(r.predicted is not None for r in recs), (
             "disputed series should still pool while nothing binds geometry"
         )
+
+
+def test_every_figure_redraws(tmp_path, dataset) -> None:
+    """The plotter must run for every figure in the dataset.
+
+    A visual check only helps if it still works, and it is the kind of
+    tool that rots silently -- nobody notices until they need it. This
+    also pins that every series carries the axis spec the plot needs, so
+    a new series cannot be added without one.
+    """
+    pytest.importorskip("matplotlib", reason="needs the 'examples' extra")
+
+    from validation.cooling.plot import plot_figure
+
+    figures = {s.figure for s in dataset if s.figure}
+    assert figures, "no series declares a figure"
+
+    for figure in sorted(figures):
+        out = plot_figure(figure, tmp_path / f"{figure}.png", dataset)
+        assert out.exists() and out.stat().st_size > 5000, f"{figure} drew nothing"
+
+
+def test_axis_specs_are_declared_for_plotting(dataset) -> None:
+    """Every series needs a log/linear declaration and plot limits.
+
+    Defaulting these would silently draw a log figure on linear axes,
+    which looks plausible and is wrong -- figure 4.53 is linear while the
+    rest are log-log.
+    """
+    for s in dataset:
+        card = s.verification or {}
+        assert card.get("x_axis_type") in ("log", "linear"), f"{s.label} declares no x_axis_type"
+        assert card.get("y_axis_type") in ("log", "linear"), f"{s.label} declares no y_axis_type"
+        assert s.figure and s.panel, f"{s.label} is not assigned to a panel"

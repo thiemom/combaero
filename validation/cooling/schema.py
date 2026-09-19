@@ -47,6 +47,8 @@ class SeriesMetadata:
     page: int | None
     item: str
     series: str
+    figure: str | None  # e.g. "4.46"; groups series for plotting
+    panel: str | None  # "upper" / "lower" / "single"
     geometry: dict[str, float] | None
     alpha_deg: float | None
     x_axis: str
@@ -111,6 +113,8 @@ def load_dataset(root: Path | None = None) -> list[SeriesMetadata]:
                     page=entry.get("page"),
                     item=entry["item"],
                     series=entry["series"],
+                    figure=entry.get("figure"),
+                    panel=entry.get("panel"),
                     geometry=entry.get("geometry"),
                     alpha_deg=entry.get("alpha_deg"),
                     x_axis=entry["x_axis"],

@@ -142,6 +142,32 @@ Declare `monotonic` only where a violation would be a real defect. Figure
 inverts, so it is left null: a check that fails on correct data trains
 people to ignore it.
 
+## Redrawing a figure
+
+```bash
+uv run python -m validation.cooling.plot --list
+uv run python -m validation.cooling.plot --figure 4.46
+```
+
+Puts the committed data back on axes so it can be held next to the scan.
+Numbers tell you a series is self-consistent; they do not tell you the
+cloud has the shape the page shows, that a class sits where your eye says
+it should, or that two series were swapped in a way the arithmetic
+tolerates.
+
+It reads the same metadata the verifier and scorecard use, so a plot
+cannot drift from what the checks believe. Scatter is drawn as markers
+with one per class, drawn correlation lines as dashes, and the equation
+each figure PRINTS is overlaid as a solid line -- so the gap between what
+a figure draws and what it claims is visible directly. A disputed class
+label is marked in the legend.
+
+Panel frames are off by default (`--frames` to include them): a frame sits
+outside the labelled ticks, so drawing it forces the axes open and
+squashes the data into a strip, and its job is already done numerically.
+
+Needs matplotlib: `uv pip install -e ".[examples]"`.
+
 ## Adding a source
 
 Create `data/<source>/` with the CSVs and a `metadata.yaml`. Every series
