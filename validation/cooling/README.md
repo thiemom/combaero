@@ -62,6 +62,22 @@ line does. So:
 - Give drawn lines a wider `curve_tolerance` than data would need, and
   record the deviation rather than treating it as a defect.
 
+## A short span is not a defect, but its slope is not a measurement
+
+Marks hide behind each other. When only three of a class's points are
+legible, three is the right answer and re-picking will not find more --
+figure 4.51's 60 deg crossed series is exactly that.
+
+What must not happen is a short span passing unnoticed and its fitted
+exponent being read as physics. That series spans 0.30 decades and its
+slope inverts the ordering every other class shows, which is noise, not a
+finding.
+
+So `slope-span` fails a narrow series until the metadata carries
+`slope_unreliable: true`. The series still pools, and its points still
+score -- only the acknowledgement is compulsory, which puts the limitation
+where a later reader will find it rather than in a comment.
+
 ## G and G_bar do not rank the same
 
 Figure 4.51 plots nine rib configurations twice: `G` (ribbed side) above,

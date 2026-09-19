@@ -208,7 +208,43 @@ def check_series(series: SeriesMetadata) -> list[Finding]:
             )
         )
 
-    # 5. Panel distortion, measured on a frame line.
+    # 5. Abscissa span, against what a fitted slope needs.
+    #
+    # A power-law exponent fitted over a short span is dominated by
+    # picking noise, however clean the points look. Figure 4.51's 60 deg
+    # crossed series is the case: three marks over 0.30 decades, the rest
+    # obscured behind other symbols, giving a slope that inverts the
+    # ordering every other class shows. The marks are real; the SLOPE is
+    # not a measurement, and saying so here keeps a later reader from
+    # treating it as one.
+    min_decades = card.get("min_decades_for_slope", 0.5)
+    if series.kind != "frame" and card.get("x_axis_type", "log") == "log":
+        xs_all = [p.x for p in points]
+        decades = math.log10(max(xs_all) / min(xs_all)) if min(xs_all) > 0 else 0.0
+        wide = decades >= float(min_decades)
+        # A short span is not a defect -- marks hide behind each other and
+        # three legible points are then the right answer. What must not
+        # happen is a short span passing unnoticed and its slope being read
+        # as physics. So a narrow series passes only once the metadata
+        # ACKNOWLEDGES it, which puts the limitation where a later reader
+        # will find it.
+        acknowledged = bool(card.get("slope_unreliable", False))
+        detail = f"spans {decades:.2f} decades"
+        if wide:
+            pass
+        elif acknowledged:
+            detail += (
+                f" (< {float(min_decades):g}), acknowledged: usable as data, "
+                "its fitted exponent is not a measurement"
+            )
+        else:
+            detail += (
+                f" (< {float(min_decades):g}) and not acknowledged; set "
+                "slope_unreliable: true if the remaining marks are obscured"
+            )
+        out.append(Finding(label, "slope-span", wide or acknowledged, detail))
+
+    # 6. Panel distortion, measured on a frame line.
     #
     # A plot frame is horizontal BY CONSTRUCTION, so its fitted slope is
     # the panel's distortion and nothing else. This is a better yardstick
@@ -232,7 +268,7 @@ def check_series(series: SeriesMetadata) -> list[Finding]:
             )
         )
 
-    # 6. Double-picked marks.
+    # 7. Double-picked marks.
     xs = [p.x for p in points]
     ys = [p.y for p in points]
     x_span = max(xs) - min(xs) or 1.0
@@ -253,7 +289,7 @@ def check_series(series: SeriesMetadata) -> list[Finding]:
         )
     )
 
-    # 7. Declared monotonicity, where the physics or the figure demands it.
+    # 8. Declared monotonicity, where the physics or the figure demands it.
     trend = card.get("monotonic")
     if trend in ("increasing", "decreasing"):
         ordered = sorted(points, key=lambda p: p.x)

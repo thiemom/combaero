@@ -598,6 +598,7 @@ files:
       y_ticks: [2, 3, 4, 5]
       printed_curve: null
       monotonic: null
+      slope_unreliable: true
       expected_points: null
 
   - path: fig4.46_R_eD0.078_pe10_wh4.csv
@@ -973,6 +974,7 @@ files:
       y_ticks: [8, 10, 20, 30, 40]
       printed_curve: null
       monotonic: null
+      slope_unreliable: true
       expected_points: null
 
   - path: fig4.46_G_eD0.078_pe10_wh4.csv
@@ -1043,6 +1045,7 @@ files:
       y_ticks: [8, 10, 20, 30, 40]
       printed_curve: null
       monotonic: null
+      slope_unreliable: true
       expected_points: null
 
   - path: fig4.46_G_eD0.063_pe10_wh1.csv
