@@ -95,6 +95,12 @@ thermo_data_generator/*.json
 thermo_data_generator/*.csv
 
 # Example output (plots, data)
+# Redrawn figures are derived artefacts -- regenerate with
+# `uv run python -m validation.cooling.plot --figure <n>`. They carry
+# their source citation on the image, so one can be committed later as a
+# deliberate choice rather than by accident.
+validation/cooling/plots/
+
 examples/*.png
 examples/*.csv
 examples/*.dat

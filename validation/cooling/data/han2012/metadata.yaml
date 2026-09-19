@@ -39,6 +39,8 @@ files:
   - path: fig4.54_90deg_continuous_Gbar_curve.csv
     after: "Han, J.C. and Zhang, Y.M. (1992). IJHMT 35(2), 513."
     page: 386
+    figure: "4.54"
+    panel: lower
     item: "Figure 4.54"
     series: "90 deg continuous rib, drawn correlation line"
     geometry: null          # not stated in the extracted text; see note below
@@ -56,6 +58,10 @@ files:
       reaches item 10 (G_bar = 1.2 G) from a different paper, a different
       figure and a different rib family than the label it was settled by.
     verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [100, 1100]
+      plot_y_limits: [10, 40]
       # Abscissa prints as `e+ x 10^-2`, ticks 1 2 4 6 8 10 -> e+ 100..1000.
       x_ticks: [1, 2, 4, 6, 8, 10]
       x_multiplier: 1.0e2
@@ -70,6 +76,8 @@ files:
   - path: fig4.54_90deg_continuous_Gbar_data.csv
     after: "Han, J.C. and Zhang, Y.M. (1992). IJHMT 35(2), 513."
     page: 386
+    figure: "4.54"
+    panel: lower
     item: "Figure 4.54"
     series: "90 deg continuous rib, measured points"
     geometry: null
@@ -85,6 +93,10 @@ files:
       Scatter about its own drawn line (the curve series above) must exceed
       the line's own deviation from the correlation; 5.4% against 3.5%.
     verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [100, 1100]
+      plot_y_limits: [10, 40]
       x_ticks: [1, 2, 4, 6, 8, 10]
       x_multiplier: 1.0e2
       y_ticks: [10, 20, 30, 40]
@@ -98,6 +110,8 @@ files:
   - path: fig4.54_45deg_vbroken_Gbar_data.csv
     after: "Han, J.C. and Zhang, Y.M. (1992). IJHMT 35(2), 513."
     page: 386
+    figure: "4.54"
+    panel: lower
     item: "Figure 4.54"
     series: "45 deg V-shaped broken rib, measured points"
     geometry: null
@@ -121,6 +135,10 @@ files:
     # reference point behind the extraction's "26% better" claim, and a
     # scorecard row of 'unsupported' is more honest than omitting the series.
     verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [100, 1100]
+      plot_y_limits: [10, 40]
       x_ticks: [1, 2, 4, 6, 8, 10]
       x_multiplier: 1.0e2
       y_ticks: [10, 20, 30, 40]
@@ -138,6 +156,8 @@ files:
   - path: fig4.193c_old_correlation_G_curve.csv
     after: "Rallabandi, A.P., Yang, H. and Han, J.C. (2009). ASME J. Heat Transfer 131, 071703."
     page: 513
+    figure: "4.193c"
+    panel: single
     item: "Figure 4.193c, curve labelled 'old correlation'"
     series: "Han/Han-Park correlation as printed on the figure"
     geometry: null
@@ -153,6 +173,10 @@ files:
       Free fit must recover the printed exponent 0.35 rather than the new
       correlation's 0.42; the two curves are separated by that exponent.
     verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [80, 32000]
+      plot_y_limits: [6, 120]
       # Plain e+ abscissa, log decades 10^2 10^3 10^4.
       x_ticks: [100, 1000, 10000]
       x_multiplier: 1.0
@@ -175,6 +199,8 @@ files:
   - path: fig4.193c_new_correlation_G_curve.csv
     after: "Rallabandi, A.P., Yang, H. and Han, J.C. (2009). ASME J. Heat Transfer 131, 071703."
     page: 513
+    figure: "4.193c"
+    panel: single
     item: "Figure 4.193c, curve labelled 'new correlation'"
     series: "extended-range correlation as printed on the figure"
     geometry: null
@@ -193,6 +219,10 @@ files:
     # that (e/D)^0.14 as transcribed contradicts the figure, and item 19
     # records the matching friction correlation as missing outright.
     verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [80, 32000]
+      plot_y_limits: [6, 120]
       x_ticks: [100, 1000, 10000]
       x_multiplier: 1.0
       y_ticks: [20, 40, 60, 80, 100, 120]
@@ -212,6 +242,8 @@ files:
   - path: fig4.193c_G_scatter.csv
     after: "Rallabandi, A.P., Yang, H. and Han, J.C. (2009). ASME J. Heat Transfer 131, 071703."
     page: 513
+    figure: "4.193c"
+    panel: single
     item: "Figure 4.193c, data cloud"
     series: "sharp-edged 45 deg ribs, all measured points, unclassified"
     geometry: null
@@ -227,6 +259,10 @@ files:
       The cloud must straddle the new-correlation curve and sit above the
       old one at high e+, which is the figure's whole point.
     verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [80, 32000]
+      plot_y_limits: [6, 120]
       x_ticks: [100, 1000, 10000]
       x_multiplier: 1.0
       y_ticks: [20, 40, 60, 80, 100, 120]
@@ -253,6 +289,8 @@ files:
   - path: fig4.53_90deg_continuous_Nu_ratio.csv
     after: "Han, J.C. and Zhang, Y.M. (1992). IJHMT 35(2), 513."
     page: 385
+    figure: "4.53"
+    panel: upper
     item: "Figure 4.53, solid circles"
     series: "90 deg continuous rib, ribbed-side Nu ratio"
     geometry: null
@@ -268,6 +306,10 @@ files:
       Nu ratio must fall and f ratio rise with Reynolds number along the
       series, the trend the section text states for all ribs.
     verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0, 12]
+      plot_y_limits: [0, 6]
       # Linear axes, upper (ribbed-side) panel.
       x_ticks: [0, 2, 4, 6, 8, 10, 12]
       x_multiplier: 1.0
@@ -284,6 +326,8 @@ files:
   - path: fig4.53_60deg_vcontinuous_Nu_ratio.csv
     after: "Han, J.C. and Zhang, Y.M. (1992). IJHMT 35(2), 513."
     page: 385
+    figure: "4.53"
+    panel: upper
     item: "Figure 4.53, solid diamonds"
     series: "60 deg V-shaped continuous rib, ribbed-side Nu ratio"
     geometry: null
@@ -299,6 +343,10 @@ files:
       Must sit above the 90 deg continuous series at every Reynolds number;
       the text calls the 60 deg V continuous rib the highest of the group.
     verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0, 12]
+      plot_y_limits: [0, 6]
       x_ticks: [0, 2, 4, 6, 8, 10, 12]
       x_multiplier: 1.0
       y_ticks: [0, 1, 2, 3, 4, 5, 6]
@@ -306,6 +354,1898 @@ files:
       monotonic: decreasing
       expected_points: null
     scores: null
+
+  # -- Figure 4.46 panel frames: distortion standards, not data ----------
+  #
+  # A plot frame is horizontal by construction, so its fitted slope is the
+  # panel's distortion and nothing else. Unlike a printed equation it does
+  # not assume the draftsman drew the equation faithfully -- which is the
+  # very thing in question when a line and its label disagree.
+  #
+  # Both panels come out flat to picking noise (upper +0.00078, lower
+  # -0.00036, neither monotonic), against the drawn R line's +0.00857.
+  # That is what establishes the R rise as drafting rather than scan skew.
+
+  - path: fig4.46_frame_upper.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: upper
+    item: "Figure 4.46 upper panel, bottom frame line"
+    series: "panel frame, picked as a distortion standard"
+    geometry: null
+    alpha_deg: null
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: frame_position
+    kind: frame
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Slope must be zero: the frame is horizontal by construction. Measured
+      +0.00078, non-monotonic. The frame also lands at y = 7.65, just below
+      the lowest labelled tick of 8, which confirms the ordinate
+      calibration from a direction the tick marks cannot.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [8, 42]
+      kind: frame
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: []
+      frame_tolerance: 0.002
+      monotonic: null
+      expected_points: null
+
+  - path: fig4.46_frame_lower.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: lower
+    item: "Figure 4.46 lower panel, bottom frame line"
+    series: "panel frame, picked as a distortion standard"
+    geometry: null
+    alpha_deg: null
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: frame_position
+    kind: frame
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Slope must be zero. Measured -0.00036, non-monotonic, and NEGATIVE
+      while the R line drawn in this same panel rises at +0.00857 -- 23x
+      the distortion and in the opposite direction. This is the measurement
+      that rules out scan skew as the explanation for extraction item 7.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [2, 5.2]
+      kind: frame
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: []
+      frame_tolerance: 0.002
+      monotonic: null
+      expected_points: null
+
+  # -- Figure 4.46: the source figure for han_1988_orthogonal -------------
+  #
+  # Both panels, all ten symbol classes, plus the three drawn correlation
+  # lines. After Han, J.C. (1988), ASME JHT 110, 321.
+  #
+  # CLASS ATTRIBUTION IS PROVISIONAL. Symbols are similar and overlap, so a
+  # mark cannot always be assigned to its class with confidence, and not
+  # every run appears in both panels -- some marks merge, some were never
+  # plotted. This costs nothing here: han_1988_orthogonal carries ZERO
+  # geometry exponents in both R and G, Han normalised P/e out of the R
+  # ordinate himself, and W/H drops at alpha = 90 (Eq. 4.17 has m = 0). So
+  # every class must land on one curve and the POOLED cloud is the scored
+  # path. The labels are kept as provenance, not as something scoring leans
+  # on -- see the confidence note on each series.
+  #
+  # Two marks were dropped as contaminants, each sitting outside its
+  # class's physically possible e+ range: 1078.2 from eD0.047/pe20/wh2 and
+  # 57.5 from eD0.063/pe10/wh1.
+  #
+  # MEASURED SCATTER: pooled R gives +0.29% bias with sd 5.94% (70% within
+  # 6%); pooled G gives -2.97% with sd 6.13%. Han states "within 6% for 95%
+  # of the data", but 70% inside 6% with sd 5.9% says 6% is a STANDARD
+  # DEVIATION, not a 95% bound. Harness tolerances are set from that.
+
+  - path: fig4.46_R_eD0.047_pe10_wh1.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: lower
+    item: "Figure 4.46 lower panel"
+    series: "this study, e/D 0.047, P/e 10, W/H 1, Re 10,000-60,000"
+    geometry: {e_D: 0.047, p_e: 10, W_H: 1}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: R_normalised
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: provisional
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is PROVISIONAL (overlapping symbols). What is
+      checkable: every mark lies on the lower panel, and the class's e+
+      span agrees with what Re 10,000-60,000 and e/D 0.047 predict through the
+      friction chain. Scoring uses the pooled cloud, not this label.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [2, 5.2]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [2, 3, 4, 5]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+
+  - path: fig4.46_R_eD0.047_pe20_wh1.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: lower
+    item: "Figure 4.46 lower panel"
+    series: "this study, e/D 0.047, P/e 20, W/H 1, Re 10,000-60,000"
+    geometry: {e_D: 0.047, p_e: 20, W_H: 1}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: R_normalised
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: provisional
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is PROVISIONAL (overlapping symbols). What is
+      checkable: every mark lies on the lower panel, and the class's e+
+      span agrees with what Re 10,000-60,000 and e/D 0.047 predict through the
+      friction chain. Scoring uses the pooled cloud, not this label.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [2, 5.2]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [2, 3, 4, 5]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+
+  - path: fig4.46_R_eD0.047_pe10_wh2.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: lower
+    item: "Figure 4.46 lower panel"
+    series: "this study, e/D 0.047, P/e 10, W/H 2, Re 10,000-60,000"
+    geometry: {e_D: 0.047, p_e: 10, W_H: 2}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: R_normalised
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: provisional
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is PROVISIONAL (overlapping symbols). What is
+      checkable: every mark lies on the lower panel, and the class's e+
+      span agrees with what Re 10,000-60,000 and e/D 0.047 predict through the
+      friction chain. Scoring uses the pooled cloud, not this label.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [2, 5.2]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [2, 3, 4, 5]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+
+  - path: fig4.46_R_eD0.047_pe20_wh2.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: lower
+    item: "Figure 4.46 lower panel"
+    series: "this study, e/D 0.047, P/e 20, W/H 2, Re 10,000-60,000"
+    geometry: {e_D: 0.047, p_e: 20, W_H: 2}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: R_normalised
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: provisional
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is PROVISIONAL (overlapping symbols). What is
+      checkable: every mark lies on the lower panel, and the class's e+
+      span agrees with what Re 10,000-60,000 and e/D 0.047 predict through the
+      friction chain. Scoring uses the pooled cloud, not this label.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [2, 5.2]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [2, 3, 4, 5]
+      printed_curve: null
+      monotonic: null
+      slope_unreliable: true
+      expected_points: null
+
+  - path: fig4.46_R_eD0.078_pe10_wh4.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: lower
+    item: "Figure 4.46 lower panel"
+    series: "this study, e/D 0.078, P/e 10, W/H 4, Re 10,000-60,000"
+    geometry: {e_D: 0.078, p_e: 10, W_H: 4}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: R_normalised
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: provisional
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is PROVISIONAL (overlapping symbols). What is
+      checkable: every mark lies on the lower panel, and the class's e+
+      span agrees with what Re 10,000-60,000 and e/D 0.078 predict through the
+      friction chain. Scoring uses the pooled cloud, not this label.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [2, 5.2]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [2, 3, 4, 5]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+
+  - path: fig4.46_R_eD0.078_pe20_wh4.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: lower
+    item: "Figure 4.46 lower panel"
+    series: "this study, e/D 0.078, P/e 20, W/H 4, Re 10,000-60,000"
+    geometry: {e_D: 0.078, p_e: 20, W_H: 4}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: R_normalised
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: provisional
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is PROVISIONAL (overlapping symbols). What is
+      checkable: every mark lies on the lower panel, and the class's e+
+      span agrees with what Re 10,000-60,000 and e/D 0.078 predict through the
+      friction chain. Scoring uses the pooled cloud, not this label.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [2, 5.2]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [2, 3, 4, 5]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+
+  - path: fig4.46_R_eD0.063_pe10_wh1.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: lower
+    item: "Figure 4.46 lower panel"
+    series: "Han (1984), e/D 0.063, P/e 10, W/H 1, Re 8,000-80,000"
+    geometry: {e_D: 0.063, p_e: 10, W_H: 1}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: R_normalised
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: provisional
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is PROVISIONAL (overlapping symbols). What is
+      checkable: every mark lies on the lower panel, and the class's e+
+      span agrees with what Re 8,000-80,000 and e/D 0.063 predict through the
+      friction chain. Scoring uses the pooled cloud, not this label.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [2, 5.2]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [2, 3, 4, 5]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+
+  - path: fig4.46_R_eD0.063_pe20_wh1.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: lower
+    item: "Figure 4.46 lower panel"
+    series: "Han (1984), e/D 0.063, P/e 20, W/H 1, Re 8,000-80,000"
+    geometry: {e_D: 0.063, p_e: 20, W_H: 1}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: R_normalised
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: provisional
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is PROVISIONAL (overlapping symbols). What is
+      checkable: every mark lies on the lower panel, and the class's e+
+      span agrees with what Re 8,000-80,000 and e/D 0.063 predict through the
+      friction chain. Scoring uses the pooled cloud, not this label.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [2, 5.2]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [2, 3, 4, 5]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+
+  - path: fig4.46_R_eD0.042_pe10_wh1.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: lower
+    item: "Figure 4.46 lower panel"
+    series: "Han (1984), e/D 0.042, P/e 10, W/H 1, Re 8,000-80,000"
+    geometry: {e_D: 0.042, p_e: 10, W_H: 1}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: R_normalised
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: provisional
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is PROVISIONAL (overlapping symbols). What is
+      checkable: every mark lies on the lower panel, and the class's e+
+      span agrees with what Re 8,000-80,000 and e/D 0.042 predict through the
+      friction chain. Scoring uses the pooled cloud, not this label.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [2, 5.2]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [2, 3, 4, 5]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+
+  - path: fig4.46_R_eD0.021_pe10_wh1.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: lower
+    item: "Figure 4.46 lower panel"
+    series: "Han (1984), e/D 0.021, P/e 10, W/H 1, Re 8,000-80,000"
+    geometry: {e_D: 0.021, p_e: 10, W_H: 1}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: R_normalised
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: provisional
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is PROVISIONAL (overlapping symbols). What is
+      checkable: every mark lies on the lower panel, and the class's e+
+      span agrees with what Re 8,000-80,000 and e/D 0.021 predict through the
+      friction chain. Scoring uses the pooled cloud, not this label.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [2, 5.2]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [2, 3, 4, 5]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+
+  - path: fig4.46_G_eD0.047_pe10_wh1.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: upper
+    item: "Figure 4.46 upper panel"
+    series: "this study, e/D 0.047, P/e 10, W/H 1, Re 10,000-60,000"
+    geometry: {e_D: 0.047, p_e: 10, W_H: 1}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: provisional
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is PROVISIONAL (overlapping symbols). What is
+      checkable: every mark lies on the upper panel, and the class's e+
+      span agrees with what Re 10,000-60,000 and e/D 0.047 predict through the
+      friction chain. Scoring uses the pooled cloud, not this label.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [8, 42]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [8, 10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+
+  - path: fig4.46_G_eD0.047_pe20_wh1.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: upper
+    item: "Figure 4.46 upper panel"
+    series: "this study, e/D 0.047, P/e 20, W/H 1, Re 10,000-60,000"
+    geometry: {e_D: 0.047, p_e: 20, W_H: 1}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: provisional
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is PROVISIONAL (overlapping symbols). What is
+      checkable: every mark lies on the upper panel, and the class's e+
+      span agrees with what Re 10,000-60,000 and e/D 0.047 predict through the
+      friction chain. Scoring uses the pooled cloud, not this label.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [8, 42]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [8, 10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+
+  - path: fig4.46_G_eD0.047_pe10_wh2.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: upper
+    item: "Figure 4.46 upper panel"
+    series: "class label DISPUTED -- see cross_check"
+    geometry: {e_D: 0.047, p_e: 10, W_H: 2}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: disputed
+    uncertainty: 0.06
+    cross_check: >-
+      DISPUTED CLASS LABEL. Pool these marks; never use them per-class.
+      The coordinates themselves are sound -- on-panel, distinct, and
+      inside the span this class predicts -- so the values are usable.
+      What is in doubt is only which symbol they belong to.
+
+      Evidence against the label: this class's R file holds marks at
+      e+ = 79.2, 80.8, 149.8, 263.2 while this G file holds 153.1, 275.2,
+      493.9, 546.6. Only two pair (+2.2%, +4.6%); R's two low marks and
+      G's two high marks have no partner. An earlier pick of this same
+      series reached e+ = 561.7, outside the class's predicted 80..479
+      entirely.
+
+      Evidence for it: after the re-pick the span does fit, at 546.6
+      against a predicted ceiling of 479 with the 15% margin. And marks
+      genuinely do go unpaired -- the two low R marks sit at G = 12.58 and
+      12.66, 0.6% apart, which would merge into one blob in the upper
+      panel.
+
+      The digitised data cannot separate these. Attempted identification
+      by elimination put the best alternative class at 1 of 4 unclaimed
+      matches, which settles nothing.
+
+      NEEDS THE PAGE, p. 376 upper panel: does the 0.047/10/2 symbol
+      appear at e+ ~ 494 and ~ 547, and is it absent near e+ ~ 80? If yes,
+      the label is right and the pairing gaps are merged and omitted
+      marks. If no, these four marks belong to another class. Nothing in
+      the current scoring turns on the answer -- the set has zero geometry
+      exponents and scoring is pooled -- but 4.47 and 4.48 bind geometry,
+      and this series must not be carried into them unresolved.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [8, 42]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [8, 10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+
+  - path: fig4.46_G_eD0.047_pe20_wh2.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: upper
+    item: "Figure 4.46 upper panel"
+    series: "this study, e/D 0.047, P/e 20, W/H 2, Re 10,000-60,000"
+    geometry: {e_D: 0.047, p_e: 20, W_H: 2}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: provisional
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is PROVISIONAL (overlapping symbols). What is
+      checkable: every mark lies on the upper panel, and the class's e+
+      span agrees with what Re 10,000-60,000 and e/D 0.047 predict through the
+      friction chain. Scoring uses the pooled cloud, not this label.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [8, 42]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [8, 10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      slope_unreliable: true
+      expected_points: null
+
+  - path: fig4.46_G_eD0.078_pe10_wh4.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: upper
+    item: "Figure 4.46 upper panel"
+    series: "this study, e/D 0.078, P/e 10, W/H 4, Re 10,000-60,000"
+    geometry: {e_D: 0.078, p_e: 10, W_H: 4}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: provisional
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is PROVISIONAL (overlapping symbols). What is
+      checkable: every mark lies on the upper panel, and the class's e+
+      span agrees with what Re 10,000-60,000 and e/D 0.078 predict through the
+      friction chain. Scoring uses the pooled cloud, not this label.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [8, 42]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [8, 10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+
+  - path: fig4.46_G_eD0.078_pe20_wh4.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: upper
+    item: "Figure 4.46 upper panel"
+    series: "this study, e/D 0.078, P/e 20, W/H 4, Re 10,000-60,000"
+    geometry: {e_D: 0.078, p_e: 20, W_H: 4}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: provisional
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is PROVISIONAL (overlapping symbols). What is
+      checkable: every mark lies on the upper panel, and the class's e+
+      span agrees with what Re 10,000-60,000 and e/D 0.078 predict through the
+      friction chain. Scoring uses the pooled cloud, not this label.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [8, 42]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [8, 10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      slope_unreliable: true
+      expected_points: null
+
+  - path: fig4.46_G_eD0.063_pe10_wh1.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: upper
+    item: "Figure 4.46 upper panel"
+    series: "Han (1984), e/D 0.063, P/e 10, W/H 1, Re 8,000-80,000"
+    geometry: {e_D: 0.063, p_e: 10, W_H: 1}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: provisional
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is PROVISIONAL (overlapping symbols). What is
+      checkable: every mark lies on the upper panel, and the class's e+
+      span agrees with what Re 8,000-80,000 and e/D 0.063 predict through the
+      friction chain. Scoring uses the pooled cloud, not this label.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [8, 42]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [8, 10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+
+  - path: fig4.46_G_eD0.063_pe20_wh1.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: upper
+    item: "Figure 4.46 upper panel"
+    series: "Han (1984), e/D 0.063, P/e 20, W/H 1, Re 8,000-80,000"
+    geometry: {e_D: 0.063, p_e: 20, W_H: 1}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: provisional
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is PROVISIONAL (overlapping symbols). What is
+      checkable: every mark lies on the upper panel, and the class's e+
+      span agrees with what Re 8,000-80,000 and e/D 0.063 predict through the
+      friction chain. Scoring uses the pooled cloud, not this label.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [8, 42]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [8, 10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+
+  - path: fig4.46_G_eD0.042_pe10_wh1.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: upper
+    item: "Figure 4.46 upper panel"
+    series: "Han (1984), e/D 0.042, P/e 10, W/H 1, Re 8,000-80,000"
+    geometry: {e_D: 0.042, p_e: 10, W_H: 1}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: provisional
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is PROVISIONAL (overlapping symbols). What is
+      checkable: every mark lies on the upper panel, and the class's e+
+      span agrees with what Re 8,000-80,000 and e/D 0.042 predict through the
+      friction chain. Scoring uses the pooled cloud, not this label.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [8, 42]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [8, 10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+
+  - path: fig4.46_G_eD0.021_pe10_wh1.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: upper
+    item: "Figure 4.46 upper panel"
+    series: "Han (1984), e/D 0.021, P/e 10, W/H 1, Re 8,000-80,000"
+    geometry: {e_D: 0.021, p_e: 10, W_H: 1}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: provisional
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is PROVISIONAL (overlapping symbols). What is
+      checkable: every mark lies on the upper panel, and the class's e+
+      span agrees with what Re 8,000-80,000 and e/D 0.021 predict through the
+      friction chain. Scoring uses the pooled cloud, not this label.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [8, 42]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [8, 10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+
+  - path: fig4.46_G_solid.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: upper
+    item: "Figure 4.46 upper panel, solid line"
+    series: "drawn correlation, labelled G = 3.7 (e+)^0.28"
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.06
+    cross_check: >-
+      Free fit gives 3.774 (e+)^0.2725 against the printed 3.7 (e+)^0.28,
+      RMS 2.18% and drifting monotonically. Picked twice independently --
+      once through a mis-calibrated ordinate, recovered analytically --
+      agreeing to 0.34% in C and 0.0003 in n, so the DRAWN line really
+      does sit below its printed label. It runs through the data cloud
+      while the dashed G_bar line sits above it in clear space, which is
+      the likely reason one traces cleanly and the other does not.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [8, 42]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [8, 10, 20, 30, 40]
+      printed_curve:
+        power_law: {C: 3.7, n: 0.28}
+      curve_tolerance: 0.03
+      monotonic: increasing
+      expected_points: null
+
+  - path: fig4.46_Gbar_dashed.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: upper
+    item: "Figure 4.46 upper panel, dashed line"
+    series: "drawn correlation, labelled G_bar = 4.5 (e+)^0.28"
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G_bar
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.06
+    cross_check: >-
+      Free fit gives 4.5323 (e+)^0.2788 against the printed 4.5 (e+)^0.28
+      -- 0.25% RMS, residuals changing sign rather than drifting. This is
+      what pins the ABSCISSA as well as the ordinate: the coefficient
+      moves as k^0.28, so a decade error would read 2.39 or 8.61 rather
+      than 4.53.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [8, 42]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [8, 10, 20, 30, 40]
+      printed_curve:
+        power_law: {C: 4.5, n: 0.28}
+      curve_tolerance: 0.02
+      printed_exponent: 0.28
+      exponent_tolerance: 0.02
+      monotonic: increasing
+      expected_points: null
+
+  - path: fig4.46_R_constant.csv
+    after: "Han, J.C. (1988). ASME J. Heat Transfer 110, 321."
+    page: 376
+    figure: "4.46"
+    panel: lower
+    item: "Figure 4.46 lower panel, horizontal line"
+    series: "drawn correlation, labelled R/(P/e/10)^0.35 = 3.2"
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: R_normalised
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.06
+    cross_check: >-
+      RMS 1.48% against the printed 3.2, but with an excess slope of
+      +0.00874 where a constant must have none. That rise is in the
+      DRAWING: the frame of the panel it is drawn in measures -0.00036,
+      so the line tilts 23x its own panel's distortion and in the opposite
+      direction. See extraction item 7 and the review log.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [40, 1200]
+      plot_y_limits: [2, 5.2]
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [2, 3, 4, 5]
+      printed_curve:
+        constant: 3.2
+      curve_tolerance: 0.05
+      monotonic: null
+      expected_points: null
+
+  # -- Figure 4.51: nine rib configurations, both panels -----------------
+  #
+  # After Han, J.C. et al. (1991), ASME JHT 113, 590. G above, G_bar below,
+  # sharing one abscissa. Only the LOWER panel carries x tick labels; the
+  # upper panel's abscissa was transferred, and the two panels' left edges
+  # were shown aligned to 0.53% by digitising both y-axis frames.
+  #
+  # SECOND FIGURE WITH THE e+ x 10^-2 TRAP, after 4.54. x_scale is 1e4.
+  #
+  # BOTH PANELS SPAN 10..40, so a residency check cannot tell them apart --
+  # unlike figure 4.46, whose panels ran 8..40 and 2..5. The discriminator
+  # here is physical: G < G_bar for every class, always.
+  #
+  # Panel distortion, from this figure's own frames:
+  #   upper  x +0.00146  y -0.00267
+  #   lower  x +0.00327  y -0.00885
+  # Figure 4.46 measured +0.00078 and -0.00036, so 4.51's lower panel is
+  # roughly 4x more distorted and the upper about 3x.
+  #
+  # G_bar/G measured over the seven undisputed classes: 90 deg gives
+  # 1.2193 against the printed 4.5/3.7 = 1.2162, confirming extraction
+  # item 10 against DATA for the first time. The angled configurations
+  # average 1.155, 4.5% below, against 2.6% scatter -- which is why the
+  # runner refuses to convert G_bar off 90 degrees.
+
+  - path: fig4.51_G_90.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: upper
+    item: "Figure 4.51 upper panel"
+    series: "90 deg transverse, solid circle"
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is by marker shape and fill, read off the legend.
+      Checkable here: every mark lies on its panel, the abscissae pair
+      with the other panel's same-class marks to under 1% (same runs,
+      same e+), and G < G_bar as the physics requires.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_Gbar_90.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: lower
+    item: "Figure 4.51 lower panel"
+    series: "90 deg transverse, solid circle"
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G_bar
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is by marker shape and fill, read off the legend.
+      Checkable here: every mark lies on its panel, the abscissae pair
+      with the other panel's same-class marks to under 1% (same runs,
+      same e+), and G < G_bar as the physics requires.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_G_60par.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: upper
+    item: "Figure 4.51 upper panel"
+    series: "60 deg parallel, solid triangle up"
+    geometry: null
+    alpha_deg: 60.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is by marker shape and fill, read off the legend.
+      Checkable here: every mark lies on its panel, the abscissae pair
+      with the other panel's same-class marks to under 1% (same runs,
+      same e+), and G < G_bar as the physics requires.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_Gbar_60par.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: lower
+    item: "Figure 4.51 lower panel"
+    series: "60 deg parallel, solid triangle up"
+    geometry: null
+    alpha_deg: 60.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G_bar
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is by marker shape and fill, read off the legend.
+      Checkable here: every mark lies on its panel, the abscissae pair
+      with the other panel's same-class marks to under 1% (same runs,
+      same e+), and G < G_bar as the physics requires.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_G_60crs.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: upper
+    item: "Figure 4.51 upper panel"
+    series: "60 deg crossed, solid diamond"
+    geometry: null
+    alpha_deg: 60.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is by marker shape and fill, read off the legend.
+      Checkable here: every mark lies on its panel, the abscissae pair
+      with the other panel's same-class marks to under 1% (same runs,
+      same e+), and G < G_bar as the physics requires.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_Gbar_60crs.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: lower
+    item: "Figure 4.51 lower panel"
+    series: "60 deg crossed, solid diamond"
+    geometry: null
+    alpha_deg: 60.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G_bar
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is by marker shape and fill, read off the legend.
+      Checkable here: every mark lies on its panel, the abscissae pair
+      with the other panel's same-class marks to under 1% (same runs,
+      same e+), and G < G_bar as the physics requires.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      slope_unreliable: true
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_G_60vee.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: upper
+    item: "Figure 4.51 upper panel"
+    series: "60 deg V-shaped, solid square"
+    geometry: null
+    alpha_deg: 60.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is by marker shape and fill, read off the legend.
+      Checkable here: every mark lies on its panel, the abscissae pair
+      with the other panel's same-class marks to under 1% (same runs,
+      same e+), and G < G_bar as the physics requires.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_Gbar_60vee.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: lower
+    item: "Figure 4.51 lower panel"
+    series: "60 deg V-shaped, solid square"
+    geometry: null
+    alpha_deg: 60.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G_bar
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is by marker shape and fill, read off the legend.
+      Checkable here: every mark lies on its panel, the abscissae pair
+      with the other panel's same-class marks to under 1% (same runs,
+      same e+), and G < G_bar as the physics requires.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_G_60lam.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: upper
+    item: "Figure 4.51 upper panel"
+    series: "60 deg lambda-shaped, solid triangle down"
+    geometry: null
+    alpha_deg: 60.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is by marker shape and fill, read off the legend.
+      Checkable here: every mark lies on its panel, the abscissae pair
+      with the other panel's same-class marks to under 1% (same runs,
+      same e+), and G < G_bar as the physics requires.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_Gbar_60lam.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: lower
+    item: "Figure 4.51 lower panel"
+    series: "60 deg lambda-shaped, solid triangle down"
+    geometry: null
+    alpha_deg: 60.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G_bar
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is by marker shape and fill, read off the legend.
+      Checkable here: every mark lies on its panel, the abscissae pair
+      with the other panel's same-class marks to under 1% (same runs,
+      same e+), and G < G_bar as the physics requires.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_G_45par.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: upper
+    item: "Figure 4.51 upper panel"
+    series: "45 deg parallel, open triangle up"
+    geometry: null
+    alpha_deg: 45.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: disputed
+    uncertainty: 0.06
+    cross_check: >-
+      DISPUTED CLASS DATA -- pool, never use per-class, and exclude from
+      any G_bar/G conclusion. This class returns G_bar/G below 1, which is
+      impossible: G_bar averages the ribbed and smooth sides and the
+      smooth side carries the lower h, so G_bar > G strictly. Its two
+      panels hold what appear to be the same marks -- points agreeing
+      within 2%, abscissae within 0.3%.
+
+      Three readings survive and the digitised data separates none:
+      (1) the figure duplicates this class's G marks into the G_bar panel,
+      (2) it duplicates the other way, (3) this configuration genuinely
+      has G_bar ~ G, its smooth wall performing nearly as well as its
+      ribbed wall. Reconstructing the missing panel from the seven clean
+      classes makes (1) consistent with Han's text and (2) inconsistent,
+      but that is an inference from the TEXT, not evidence about the PLOT,
+      and plausibility does not promote a reading.
+
+      NEEDS THE PRIMARY PAPER: Han, J.C. et al. (1985/1991), ASME J. Heat
+      Transfer 113, 590 -- not the reprint. Whether the two panels rank
+      configurations identically turns on exactly this pair and stays open
+      until then.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_Gbar_45par.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: lower
+    item: "Figure 4.51 lower panel"
+    series: "45 deg parallel, open triangle up"
+    geometry: null
+    alpha_deg: 45.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G_bar
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: disputed
+    uncertainty: 0.06
+    cross_check: >-
+      DISPUTED CLASS DATA -- pool, never use per-class, and exclude from
+      any G_bar/G conclusion. This class returns G_bar/G below 1, which is
+      impossible: G_bar averages the ribbed and smooth sides and the
+      smooth side carries the lower h, so G_bar > G strictly. Its two
+      panels hold what appear to be the same marks -- points agreeing
+      within 2%, abscissae within 0.3%.
+
+      Three readings survive and the digitised data separates none:
+      (1) the figure duplicates this class's G marks into the G_bar panel,
+      (2) it duplicates the other way, (3) this configuration genuinely
+      has G_bar ~ G, its smooth wall performing nearly as well as its
+      ribbed wall. Reconstructing the missing panel from the seven clean
+      classes makes (1) consistent with Han's text and (2) inconsistent,
+      but that is an inference from the TEXT, not evidence about the PLOT,
+      and plausibility does not promote a reading.
+
+      NEEDS THE PRIMARY PAPER: Han, J.C. et al. (1985/1991), ASME J. Heat
+      Transfer 113, 590 -- not the reprint. Whether the two panels rank
+      configurations identically turns on exactly this pair and stays open
+      until then.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_G_45crs.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: upper
+    item: "Figure 4.51 upper panel"
+    series: "45 deg crossed, open diamond"
+    geometry: null
+    alpha_deg: 45.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: disputed
+    uncertainty: 0.06
+    cross_check: >-
+      DISPUTED CLASS DATA -- pool, never use per-class, and exclude from
+      any G_bar/G conclusion. This class returns G_bar/G below 1, which is
+      impossible: G_bar averages the ribbed and smooth sides and the
+      smooth side carries the lower h, so G_bar > G strictly. Its two
+      panels hold what appear to be the same marks -- points agreeing
+      within 2%, abscissae within 0.3%.
+
+      Three readings survive and the digitised data separates none:
+      (1) the figure duplicates this class's G marks into the G_bar panel,
+      (2) it duplicates the other way, (3) this configuration genuinely
+      has G_bar ~ G, its smooth wall performing nearly as well as its
+      ribbed wall. Reconstructing the missing panel from the seven clean
+      classes makes (1) consistent with Han's text and (2) inconsistent,
+      but that is an inference from the TEXT, not evidence about the PLOT,
+      and plausibility does not promote a reading.
+
+      NEEDS THE PRIMARY PAPER: Han, J.C. et al. (1985/1991), ASME J. Heat
+      Transfer 113, 590 -- not the reprint. Whether the two panels rank
+      configurations identically turns on exactly this pair and stays open
+      until then.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_Gbar_45crs.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: lower
+    item: "Figure 4.51 lower panel"
+    series: "45 deg crossed, open diamond"
+    geometry: null
+    alpha_deg: 45.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G_bar
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: disputed
+    uncertainty: 0.06
+    cross_check: >-
+      DISPUTED CLASS DATA -- pool, never use per-class, and exclude from
+      any G_bar/G conclusion. This class returns G_bar/G below 1, which is
+      impossible: G_bar averages the ribbed and smooth sides and the
+      smooth side carries the lower h, so G_bar > G strictly. Its two
+      panels hold what appear to be the same marks -- points agreeing
+      within 2%, abscissae within 0.3%.
+
+      Three readings survive and the digitised data separates none:
+      (1) the figure duplicates this class's G marks into the G_bar panel,
+      (2) it duplicates the other way, (3) this configuration genuinely
+      has G_bar ~ G, its smooth wall performing nearly as well as its
+      ribbed wall. Reconstructing the missing panel from the seven clean
+      classes makes (1) consistent with Han's text and (2) inconsistent,
+      but that is an inference from the TEXT, not evidence about the PLOT,
+      and plausibility does not promote a reading.
+
+      NEEDS THE PRIMARY PAPER: Han, J.C. et al. (1985/1991), ASME J. Heat
+      Transfer 113, 590 -- not the reprint. Whether the two panels rank
+      configurations identically turns on exactly this pair and stays open
+      until then.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_G_45vee.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: upper
+    item: "Figure 4.51 upper panel"
+    series: "45 deg V-shaped, open square"
+    geometry: null
+    alpha_deg: 45.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is by marker shape and fill, read off the legend.
+      Checkable here: every mark lies on its panel, the abscissae pair
+      with the other panel's same-class marks to under 1% (same runs,
+      same e+), and G < G_bar as the physics requires.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_Gbar_45vee.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: lower
+    item: "Figure 4.51 lower panel"
+    series: "45 deg V-shaped, open square"
+    geometry: null
+    alpha_deg: 45.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G_bar
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is by marker shape and fill, read off the legend.
+      Checkable here: every mark lies on its panel, the abscissae pair
+      with the other panel's same-class marks to under 1% (same runs,
+      same e+), and G < G_bar as the physics requires.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_G_45lam.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: upper
+    item: "Figure 4.51 upper panel"
+    series: "45 deg lambda-shaped, open triangle down"
+    geometry: null
+    alpha_deg: 45.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is by marker shape and fill, read off the legend.
+      Checkable here: every mark lies on its panel, the abscissae pair
+      with the other panel's same-class marks to under 1% (same runs,
+      same e+), and G < G_bar as the physics requires.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_Gbar_45lam.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: lower
+    item: "Figure 4.51 lower panel"
+    series: "45 deg lambda-shaped, open triangle down"
+    geometry: null
+    alpha_deg: 45.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G_bar
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Class attribution is by marker shape and fill, read off the legend.
+      Checkable here: every mark lies on its panel, the abscissae pair
+      with the other panel's same-class marks to under 1% (same runs,
+      same e+), and G < G_bar as the physics requires.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_G_correlation.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: upper
+    item: "Figure 4.51 upper panel, dashed reference line"
+    series: "drawn line labelled 90 deg Han (1988)"
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Free fit 3.368 (e+)^0.2971 against the G = 3.7 (e+)^0.28 it is
+      labelled as, RMS 0.98%. Not scored: a drawn line is a calibration
+      standard, not a source of truth -- see the README.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve:
+        power_law: {C: 3.7, n: 0.28}
+      curve_tolerance: 0.03
+      monotonic: increasing
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_Gbar_correlation.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: lower
+    item: "Figure 4.51 lower panel, dashed reference line"
+    series: "drawn line labelled 90 deg Han (1988)"
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: G_bar
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Free fit 3.427 (e+)^0.3220 against the G_bar = 4.5 (e+)^0.28 it is
+      labelled as, RMS 3.16%, drifting monotonically -5.51% to +2.51%
+      while the DATA in the same panel under the same calibration scatters
+      without trend. The third case of a drawn line disagreeing with its
+      own printed equation; see the README.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: [10, 20, 30, 40]
+      printed_curve:
+        power_law: {C: 4.5, n: 0.28}
+      curve_tolerance: 0.05
+      monotonic: increasing
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_frame_x_upper.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: upper
+    item: "Figure 4.51 upper panel, x-axis frame"
+    series: "panel frame, picked as a distortion standard"
+    geometry: null
+    alpha_deg: null
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: frame_position
+    kind: frame
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: null
+    cross_check: >-
+      A horizontal frame is horizontal by construction, so its fitted slope is
+      this panel's distortion and nothing else. Measured +0.00146.
+      The two y-axis frames also pin each panel's left edge, which is what
+      showed the panels aligned to 0.53% -- the check that validated
+      transferring the abscissa to the unlabelled upper panel.
+    scores: null
+    verification:
+      kind: frame
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: []
+      frame_tolerance: 0.01
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_frame_y_upper.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: upper
+    item: "Figure 4.51 upper panel, y-axis frame"
+    series: "panel frame, picked as a distortion standard"
+    geometry: null
+    alpha_deg: null
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: frame_position
+    kind: frame
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: null
+    cross_check: >-
+      A vertical frame is vertical by construction, so its fitted slope is
+      this panel's distortion and nothing else. Measured -0.00267.
+      The two y-axis frames also pin each panel's left edge, which is what
+      showed the panels aligned to 0.53% -- the check that validated
+      transferring the abscissa to the unlabelled upper panel.
+    scores: null
+    verification:
+      kind: frame
+      frame_orientation: vertical
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: []
+      frame_tolerance: 0.01
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_frame_x_lower.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: lower
+    item: "Figure 4.51 lower panel, x-axis frame"
+    series: "panel frame, picked as a distortion standard"
+    geometry: null
+    alpha_deg: null
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: frame_position
+    kind: frame
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: null
+    cross_check: >-
+      A horizontal frame is horizontal by construction, so its fitted slope is
+      this panel's distortion and nothing else. Measured +0.00327.
+      The two y-axis frames also pin each panel's left edge, which is what
+      showed the panels aligned to 0.53% -- the check that validated
+      transferring the abscissa to the unlabelled upper panel.
+    scores: null
+    verification:
+      kind: frame
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: []
+      frame_tolerance: 0.01
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
+
+  - path: fig4.51_frame_y_lower.csv
+    after: "Han, J.C. et al. (1991). ASME J. Heat Transfer 113, 590."
+    page: 383
+    figure: "4.51"
+    panel: lower
+    item: "Figure 4.51 lower panel, y-axis frame"
+    series: "panel frame, picked as a distortion standard"
+    geometry: null
+    alpha_deg: null
+    x_axis: e_plus
+    x_scale: 1.0e4
+    y_axis: frame_position
+    kind: frame
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: null
+    cross_check: >-
+      A vertical frame is vertical by construction, so its fitted slope is
+      this panel's distortion and nothing else. Measured -0.00885.
+      The two y-axis frames also pin each panel's left edge, which is what
+      showed the panels aligned to 0.53% -- the check that validated
+      transferring the abscissa to the unlabelled upper panel.
+    scores: null
+    verification:
+      kind: frame
+      frame_orientation: vertical
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [1, 2, 4, 6, 10]
+      x_multiplier: 1.0e2
+      y_ticks: []
+      frame_tolerance: 0.01
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [100, 1400]
+      plot_y_limits: [10, 42]
 
 # The Han and Zhang (1992) rig geometry (e/D, P/e, W/H) is NOT stated in the
 # extracted text and is recorded as missing rather than guessed. It costs

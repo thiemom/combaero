@@ -1,0 +1,23 @@
+# Figure card: Figure 4.46 UPPER panel scatter, any symbol class.
+#
+# Scatter, not a drawn line. It is NOT checked against the printed
+# correlation and carries no monotonic declaration: data is entitled to
+# sit off the line, and Han's own band is 6% for 95% of it. Checking
+# scatter against a curve at a line tolerance is how a tolerance ends up
+# wide enough to admit a real error.
+item: "Figure 4.46 upper panel, scatter"
+series: "measured points, one symbol class"
+x_axis: e_plus
+y_axis: G
+kind: measured
+uncertainty: 0.06
+
+verification:
+  x_ticks: [50, 100, 200, 300, 500, 1000]
+  x_multiplier: 1.0
+  # Panel drawn 8 to 40. A series picked with the LOWER panel's 2..5
+  # calibration lands near 2-4 and fails here at once.
+  y_ticks: [8, 10, 20, 30, 40]
+  printed_curve: null
+  monotonic: null
+  expected_points: null

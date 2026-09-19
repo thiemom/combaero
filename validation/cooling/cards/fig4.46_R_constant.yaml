@@ -1,0 +1,25 @@
+# Figure card: Figure 4.46, p. 376, LOWER panel. After Han, J.C. (1988).
+item: "Figure 4.46 lower panel, horizontal line"
+series: "R/(P/e/10)^0.35 = 3.2, the drawn correlation"
+x_axis: e_plus
+y_axis: R_normalised
+kind: correlation
+uncertainty: 0.06
+
+verification:
+  x_ticks: [50, 100, 200, 300, 500, 1000]
+  x_multiplier: 1.0
+  # Lower ordinate, log, labelled 2 3 4 5.
+  y_ticks: [2, 3, 4, 5]
+  printed_curve:
+    constant: 3.2
+  # Wider than the G lines on purpose. The drawn line rises ~2.7-4.5%
+  # across the range although the text states R is independent of e+ --
+  # extraction item 7, resolved as artefact. A 2% band would fail on
+  # correct data at the high-e+ end.
+  curve_tolerance: 0.05
+  # NOT declared. A flat line is blind to the abscissa: it reads 3.2
+  # whether x is right, a decade out, or read as linear. The abscissa is
+  # pinned by the G panel above, which shares it.
+  monotonic: null
+  expected_points: null

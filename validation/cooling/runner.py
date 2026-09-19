@@ -18,8 +18,20 @@ from validation.cooling.schema import Point, SeriesMetadata, load_points
 
 # Han states G_bar (the ribbed/smooth average) as 1.2 G. Confirmed as item
 # 10 of validation/cooling/extractions/han_ribbed.md, from the label on
-# Figure 4.47.
+# Figure 4.47, and independently by Figure 4.46's printed pair 3.7 and 4.5
+# (ratio 1.216).
+#
+# IT IS NOT UNIVERSAL. Digitising both panels of Figure 4.51 measures
+# G_bar/G for seven rib configurations directly: 90 deg gives 1.2193,
+# matching the printed 1.2162 to 0.3%, while the angled configurations
+# average 1.155 -- 4.5% below it, with a spread of 1.153 to 1.220.
+#
+# So this applies to 90 deg ribs, where it was established. Applying it to
+# an angled rib is wrong by about 4.5%, which is larger than the 2.6%
+# scatter of the measurement itself. Anything off 90 deg is refused rather
+# than scaled; see _gbar_reason.
 G_BAR_OVER_G = 1.2
+G_BAR_VALID_ALPHA = 90.0
 
 # Bracket for the Re bisection. Deliberately far wider than any set's
 # stated validity: a series may sit outside it, and reporting that as
@@ -105,14 +117,46 @@ def _mid(rng: "cb.RibRange", fallback: float) -> float:
     return 0.5 * (rng.lo + rng.hi) if rng.hi > rng.lo else fallback
 
 
+def _gbar_reason(series: SeriesMetadata) -> str | None:
+    """Why a G_bar series cannot be converted, or None if it can.
+
+    G_bar/G is a per-configuration quantity, not a constant: figure 4.51
+    ranks nine configurations in both and the lowest differs between the
+    panels, which a constant multiplier cannot do. The 1.2 is a 90 degree
+    result. Applying it to an angled rib would silently manufacture a
+    number, so it is refused instead.
+    """
+    if series.y_axis != "G_bar":
+        return None
+    alpha = series.alpha_deg
+    if alpha is None or alpha == G_BAR_VALID_ALPHA:
+        return None
+    return (
+        f"G_bar at {alpha:g} deg: the 1.2 ratio is a 90 deg result and "
+        "varies by configuration (figure 4.51 ranks G and G_bar "
+        "differently), so it is not applied here"
+    )
+
+
+def _binds_geometry(rib_set: "cb.RibCorrelationSet") -> bool:
+    """True when the set's G actually depends on the rig geometry."""
+    return any(
+        t.exponent != 0.0
+        for t in (rib_set.G_eD, rib_set.G_pe, rib_set.G_WH, rib_set.G_alpha)
+    )
+
+
 def _assert_geometry_free(rib_set: "cb.RibCorrelationSet") -> None:
     """Refuse to score a geometry-dependent set against geometry-less data.
 
-    The Han and Zhang (1992) rig geometry is not stated in the source we
-    extracted, so it is recorded as missing. For a set whose G has zero
-    exponents on e/D, P/e, W/H and alpha this costs nothing. For any other
-    set it would mean substituting a default and reporting the result as a
-    measurement, so the runner stops instead.
+    Applies only to series with NO recorded rig geometry -- the Han and
+    Zhang (1992) figures, whose rig the extracted text never states. For a
+    set whose G has zero exponents on e/D, P/e, W/H and alpha this costs
+    nothing. For any other set it would mean substituting a default and
+    reporting the result as a measurement, so the runner stops instead.
+
+    Figure 4.46 states a geometry per class in its legend, so those series
+    are exempt and reach the disputed-label check above instead.
     """
     terms = {
         "e/D": rib_set.G_eD,
@@ -131,8 +175,13 @@ def _assert_geometry_free(rib_set: "cb.RibCorrelationSet") -> None:
 
 def _g_at_eplus(
     rib_set: "cb.RibCorrelationSet", geom: cb.RibGeometry, target: float
-) -> tuple[float, bool, float] | None:
-    """G at a target e+, found by bisecting Re through the real chain."""
+) -> tuple[float, float, bool, float] | None:
+    """G and the normalised R at a target e+, via the real chain.
+
+    The lower panel of Figure 4.46 plots R/(P/e/10)^0.35, which is what
+    the set's C_R is defined as, so the normalised value is returned
+    alongside G rather than being recomputed by the caller.
+    """
     lo, hi = RE_LO, RE_HI
     if cb.evaluate_rib(rib_set, geom, lo).e_plus > target:
         return None
@@ -148,7 +197,10 @@ def _g_at_eplus(
             break
     re = 0.5 * (lo + hi)
     res = cb.evaluate_rib(rib_set, geom, re)
-    return res.G, res.extrapolated, re
+    pe_term = rib_set.R_pe
+    norm = (geom.p_e / pe_term.reference) ** pe_term.exponent if pe_term.reference else 1.0
+    r_norm = res.R / norm if norm else res.R
+    return res.G, r_norm, res.extrapolated, re
 
 
 def run_series(series: SeriesMetadata) -> list[Record]:
@@ -167,7 +219,30 @@ def run_series(series: SeriesMetadata) -> list[Record]:
         ]
 
     rib_set = SETS[series.scores]()
-    _assert_geometry_free(rib_set)
+
+    gbar_block = _gbar_reason(series)
+    if gbar_block is not None:
+        return [
+            Record(series, p.x, p.y, None, False, None, gbar_block)
+            for p in points
+        ]
+
+    if series.class_confidence == "disputed" and _binds_geometry(rib_set):
+        # A disputed label is usable while nothing depends on it. The
+        # moment a set binds geometry, the label IS the input, and a
+        # disputed input must not be fed in silently.
+        return [
+            Record(
+                series, p.x, p.y, None, False, None,
+                f"class label disputed and {rib_set.name} binds geometry",
+            )
+            for p in points
+        ]
+
+    if not series.geometry:
+        # Only series with no recorded rig geometry need this. The figure
+        # 4.46 legend states one per class, so those are exempt.
+        _assert_geometry_free(rib_set)
 
     unsupported = _binding_reason(rib_set, series)
     if unsupported is not None:
@@ -176,6 +251,12 @@ def run_series(series: SeriesMetadata) -> list[Record]:
         ]
 
     geom = _probe_geometry(rib_set)
+    if series.geometry:
+        # The figure 4.46 legend states each class's geometry, so use it.
+        # It matters for R, whose plotted ordinate is normalised by P/e.
+        geom.e_D = float(series.geometry.get("e_D", geom.e_D))
+        geom.p_e = float(series.geometry.get("p_e", geom.p_e))
+        geom.W_H = float(series.geometry.get("W_H", geom.W_H))
 
     records: list[Record] = []
     for p in points:
@@ -185,8 +266,13 @@ def run_series(series: SeriesMetadata) -> list[Record]:
                 Record(series, p.x, p.y, None, True, None, "e+ unreachable")
             )
             continue
-        g, extrapolated, re = found
-        predicted = g * G_BAR_OVER_G if series.y_axis == "G_bar" else g
+        g, r_norm, extrapolated, re = found
+        if series.y_axis == "G_bar":
+            predicted = g * G_BAR_OVER_G
+        elif series.y_axis == "R_normalised":
+            predicted = r_norm
+        else:
+            predicted = g
         records.append(Record(series, p.x, p.y, predicted, extrapolated, re))
     return records
 

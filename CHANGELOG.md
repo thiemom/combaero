@@ -9,6 +9,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Figure 4.51 digitised, both panels**: nine rib configurations in `G`
+  and `G_bar`, two drawn reference lines, and four panel frames -- 24
+  series, 135 points.
+
+  **Extraction item 10 is now confirmed against data.** `G_bar/G` measured
+  over the seven undisputed classes gives **1.2193** at 90 degrees against
+  the printed `4.5/3.7 = 1.2162`, agreeing to 0.3%. Until now that ratio
+  rested on two printed coefficients and a figure label. The angled
+  configurations average 1.155, 4.5% below, against 2.6% scatter -- which
+  is what justifies the runner refusing to convert `G_bar` off 90 degrees.
+
+  **Two classes are unresolved and marked disputed.** `45 deg //` and
+  `45 deg x` return `G_bar/G` below 1, which is impossible, and their two
+  panels hold what appear to be the same marks. Three readings survive and
+  the digitised data separates none of them; resolving it needs the
+  primary paper rather than the reprint.
+
+  Frames now declare `frame_orientation`. A vertical frame must be fitted
+  across the other axis, and it measures shear -- which a horizontal frame
+  cannot see. The two y-axis frames also pinned this figure's panels as
+  aligned to 0.53%, which is what validated transferring the abscissa to
+  the upper panel, whose x ticks are unlabelled.
+
+- **Digitised figures can be redrawn from the committed data.** `uv run
+  python -m validation.cooling.plot --figure 4.46` puts the data back on
+  axes so it can be held next to the scan -- the check numbers cannot
+  make, since a self-consistent series can still have the wrong shape or
+  be swapped with another.
+
+  It reads the same metadata the verifier and scorecard use, so a plot
+  cannot drift from what the checks believe. Series now declare
+  `x_axis_type`/`y_axis_type` and plot limits in their figure card, and a
+  `figure`/`panel` assignment; a test pins that every series has them,
+  since defaulting a linear figure to log looks plausible and is wrong.
+
+  The equation a figure PRINTS is overlaid on the line it DRAWS, making
+  that gap visible directly. Disputed class labels are marked in the
+  legend.
+
+- **A disputed class label is now a first-class state, not a comment.**
+  `class_confidence` records how much a digitised series' SYMBOL-CLASS
+  label is trusted -- `confirmed`, `provisional` or `disputed` -- as
+  distinct from `confidence`, which is about the coordinates.
+
+  A disputed series still pools, because its coordinates are sound and
+  nothing in the current scoring depends on which symbol produced them.
+  The runner refuses it the moment a correlation set actually binds
+  geometry, since then the label IS an input. The verifier reports it on
+  every run, and a test asserts the marking, the report, and the presence
+  of a specific question to put to the source page. A fact that lives only
+  in a metadata comment has a half-life; one that prints on every
+  verification does not.
+
+  One series is currently disputed: figure 4.46's `eD0.047/pe10/wh2` upper
+  panel marks pair with their own R counterpart on only 2 of 4. The
+  digitised data cannot settle it -- identification by elimination put the
+  best alternative at 1 of 4 -- so it carries the question to ask of
+  p. 376 rather than a guess.
+
+- **Figure 4.46 digitised: `han_1988_orthogonal` validated against its own
+  source.** 23 series -- both panels, all ten symbol classes, the three
+  drawn correlation lines -- plus both panel frames as distortion
+  standards. Pooled, the lower panel sits at **+0.1% bias across 64
+  points** against the printed `R/(P/e/10)^0.35 = 3.2`.
+
+  **Scoring is pooled, not per-class.** Symbols on the figure overlap and
+  a mark cannot always be assigned to its class; some runs appear in only
+  one panel. That costs nothing here, because the set carries zero
+  geometry exponents in both `R` and `G` -- Han normalised `P/e` out of the
+  R ordinate himself and `W/H` drops at 90 degrees -- so every class must
+  land on one curve. Class labels are kept as provenance, marked
+  provisional, rather than as something the scoring leans on.
+
+  **Han's stated accuracy is a standard deviation, not a 95% bound.** The
+  book says "within 6% for 95% of the data"; the digitised cloud puts 70%
+  inside 6% with sd 5.9%, which is 1 sigma. Harness tolerances are set
+  from the measured figure. A test pins it, because the alternative
+  reading would justify a band twice as wide, and a band twice as wide is
+  how a real error hides.
+
 - **Digitised series are cross-verified against a figure card.** `uv run
   python -m validation.cooling.verify` checks every series against what the
   printed axes and equations say, read off the page independently of where

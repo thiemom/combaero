@@ -30,10 +30,20 @@ Run:  uv run python -m validation.cooling.verify
 
 from __future__ import annotations
 
+import argparse
 import math
 from dataclasses import dataclass
+from pathlib import Path
 
-from validation.cooling.schema import Point, SeriesMetadata, load_dataset, load_points
+import yaml
+
+from validation.cooling.schema import (
+    Point,
+    SeriesMetadata,
+    SourceMetadata,
+    load_dataset,
+    load_points,
+)
 
 # A digitised point may sit slightly outside the outermost tick: the axis
 # usually runs a little past it, and the mark has width. Wide enough to
@@ -62,6 +72,16 @@ def _span(ticks: list[float], multiplier: float) -> tuple[float, float]:
         return lo / factor, hi * factor
     pad = (hi - lo) * SPAN_MARGIN
     return lo - pad, hi + pad
+
+
+def _power_slope(points: list[Point]) -> float:
+    """Least-squares exponent of a power law through the points."""
+    n = len(points)
+    sx = sum(math.log(p.x) for p in points)
+    sy = sum(math.log(p.y) for p in points)
+    sxx = sum(math.log(p.x) ** 2 for p in points)
+    sxy = sum(math.log(p.x) * math.log(p.y) for p in points)
+    return (n * sxy - sx * sy) / (n * sxx - sx * sx)
 
 
 def _evaluate_printed(spec: dict, x: float) -> float:
@@ -98,12 +118,19 @@ def check_series(series: SeriesMetadata) -> list[Finding]:
     # and Figure 4.193c is exactly that below G = 20. A null bound is not
     # checked rather than being invented, which keeps the card a record of
     # what the page shows.
+    vertical_frame = (
+        series.kind == "frame"
+        and card.get("frame_orientation", "horizontal") == "vertical"
+    )
     for axis, values, ticks_key, mult_key, lim_key in (
         ("x", [p.x for p in points], "x_ticks", "x_multiplier", "x_limits"),
         ("y", [p.y for p in points], "y_ticks", "y_multiplier", "y_limits"),
     ):
         ticks = card.get(ticks_key)
         if not ticks:
+            continue
+        if vertical_frame and axis == "x":
+            # A vertical frame sits AT one abscissa; it has no span to check.
             continue
         mult = float(card.get(mult_key, 1.0))
         limits = card.get(lim_key)
@@ -165,12 +192,7 @@ def check_series(series: SeriesMetadata) -> list[Finding]:
     expected_exp = card.get("printed_exponent")
     if expected_exp is not None:
         tol = float(card.get("exponent_tolerance", 0.03))
-        n = len(points)
-        sx = sum(math.log(p.x) for p in points)
-        sy = sum(math.log(p.y) for p in points)
-        sxx = sum(math.log(p.x) ** 2 for p in points)
-        sxy = sum(math.log(p.x) * math.log(p.y) for p in points)
-        fitted = (n * sxy - sx * sy) / (n * sxx - sx * sx)
+        fitted = _power_slope(points)
         out.append(
             Finding(
                 label,
@@ -193,7 +215,76 @@ def check_series(series: SeriesMetadata) -> list[Finding]:
             )
         )
 
-    # 5. Double-picked marks.
+    # 5. Abscissa span, against what a fitted slope needs.
+    #
+    # A power-law exponent fitted over a short span is dominated by
+    # picking noise, however clean the points look. Figure 4.51's 60 deg
+    # crossed series is the case: three marks over 0.30 decades, the rest
+    # obscured behind other symbols, giving a slope that inverts the
+    # ordering every other class shows. The marks are real; the SLOPE is
+    # not a measurement, and saying so here keeps a later reader from
+    # treating it as one.
+    min_decades = card.get("min_decades_for_slope", 0.5)
+    if series.kind != "frame" and card.get("x_axis_type", "log") == "log":
+        xs_all = [p.x for p in points]
+        decades = math.log10(max(xs_all) / min(xs_all)) if min(xs_all) > 0 else 0.0
+        wide = decades >= float(min_decades)
+        # A short span is not a defect -- marks hide behind each other and
+        # three legible points are then the right answer. What must not
+        # happen is a short span passing unnoticed and its slope being read
+        # as physics. So a narrow series passes only once the metadata
+        # ACKNOWLEDGES it, which puts the limitation where a later reader
+        # will find it.
+        acknowledged = bool(card.get("slope_unreliable", False))
+        detail = f"spans {decades:.2f} decades"
+        if wide:
+            pass
+        elif acknowledged:
+            detail += (
+                f" (< {float(min_decades):g}), acknowledged: usable as data, "
+                "its fitted exponent is not a measurement"
+            )
+        else:
+            detail += (
+                f" (< {float(min_decades):g}) and not acknowledged; set "
+                "slope_unreliable: true if the remaining marks are obscured"
+            )
+        out.append(Finding(label, "slope-span", wide or acknowledged, detail))
+
+    # 6. Panel distortion, measured on a frame line.
+    #
+    # A plot frame is horizontal BY CONSTRUCTION, so its fitted slope is
+    # the panel's distortion and nothing else. This is a better yardstick
+    # than a printed equation, which assumes the draftsman drew the
+    # equation faithfully -- exactly what is in question when a line and
+    # its label disagree. Figure 4.46 is the case: its R line rises 2.7%
+    # against a label reading "= 3.2", and the frame of the panel it is
+    # drawn in is flat to -0.00036, so the rise is in the drawing rather
+    # than the scan.
+    if card.get("kind") == "frame" or series.kind == "frame":
+        tol = float(card.get("frame_tolerance", 0.002))
+        # A horizontal frame is fitted y against x; a VERTICAL one has x
+        # constant and y varying, so it must be fitted the other way round
+        # or the slope diverges. A vertical frame measures shear, which a
+        # horizontal one cannot see, and it also pins the panel's edge --
+        # which is how figure 4.51's two panels were shown aligned before
+        # its unlabelled upper abscissa was transferred.
+        vertical = card.get("frame_orientation", "horizontal") == "vertical"
+        pts = [Point(p.y, p.x) for p in points] if vertical else points
+        fitted = _power_slope(pts)
+        which = "vertical" if vertical else "horizontal"
+        out.append(
+            Finding(
+                label,
+                "frame-slope",
+                abs(fitted) <= tol,
+                f"frame is {which} by construction; measured slope "
+                f"{fitted:+.5f} (tolerance {tol:g}) -- this is the panel's "
+                f"distortion, use it to judge every other line in the panel",
+            )
+        )
+
+    # 7. Double-picked marks.
     xs = [p.x for p in points]
     ys = [p.y for p in points]
     x_span = max(xs) - min(xs) or 1.0
@@ -214,7 +305,7 @@ def check_series(series: SeriesMetadata) -> list[Finding]:
         )
     )
 
-    # 6. Declared monotonicity, where the physics or the figure demands it.
+    # 8. Declared monotonicity, where the physics or the figure demands it.
     trend = card.get("monotonic")
     if trend in ("increasing", "decreasing"):
         ordered = sorted(points, key=lambda p: p.x)
@@ -246,6 +337,19 @@ def check_all() -> list[Finding]:
     out: list[Finding] = []
     for series in load_dataset():
         out.extend(check_series(series))
+        if series.class_confidence == "disputed":
+            # Reported every run, deliberately. A disputed label that lives
+            # only in a metadata comment is a fact with a half-life; one
+            # that prints on every verification is not.
+            out.append(
+                Finding(
+                    series.label,
+                    "class-label",
+                    True,
+                    "DISPUTED -- pooled use only, never per-class; "
+                    "see this series' cross_check for the evidence",
+                )
+            )
     return out
 
 
@@ -265,7 +369,154 @@ def render(findings: list[Finding]) -> str:
     return "\n".join(lines).lstrip("\n")
 
 
+def check_panel_pairing(
+    directory: Path, pattern_a: str, pattern_b: str, tol_pct: float = 3.0
+) -> list[Finding]:
+    """Pair one symbol class across two panels of the same figure.
+
+    Where a figure stacks two panels over one abscissa, each experimental
+    run is plotted ONCE IN EACH PANEL at the same abscissa. So a class's
+    two files must hold the same number of points, pairing to within a
+    per cent or two.
+
+    This assumes nothing -- no card, no model, no legend reading -- which
+    makes it the sharpest check available on a scatter pass. It catches
+    what a span check cannot see: a missed mark, a mark picked twice, and
+    a series filed under the wrong class.
+    """
+    suffix_a = pattern_a.rsplit("*", 1)[-1]
+    suffix_b = pattern_b.rsplit("*", 1)[-1]
+
+    out: list[Finding] = []
+    for path_a in sorted(directory.glob(pattern_a)):
+        stem = path_a.name
+        label = stem[: -len(suffix_a)] if suffix_a else stem
+        path_b = directory / (label + suffix_b)
+        if not path_b.exists():
+            out.append(Finding(label, "pairing", False, f"no counterpart {path_b.name}"))
+            continue
+        a = sorted(load_points_from(path_a), key=lambda p: p.x)
+        b = sorted(load_points_from(path_b), key=lambda p: p.x)
+        if len(a) != len(b):
+            out.append(
+                Finding(label, "pair-count", False,
+                        f"{len(a)} points here against {len(b)} in "
+                        f"{path_b.name}; every run appears in both panels")
+            )
+        matched = 0
+        worst = 0.0
+        for pa in a:
+            nearest = min(b, key=lambda pb: abs(math.log(pb.x / pa.x)))
+            d = (nearest.x / pa.x - 1.0) * 100.0
+            if abs(d) < tol_pct:
+                matched += 1
+            worst = max(worst, abs(d))
+        out.append(
+            Finding(label, "pair-abscissa", matched == len(a),
+                    f"{matched}/{len(a)} paired within {tol_pct:g}%"
+                    f" (worst {worst:.1f}%)")
+        )
+    return out
+
+
+def load_points_from(path: Path) -> list[Point]:
+    """Read a bare x,y CSV with no metadata around it."""
+    import csv as _csv
+
+    pts: list[Point] = []
+    with open(path, newline="") as fh:
+        for row in _csv.reader(fh):
+            if not row or not row[0].strip() or row[0].strip() == "x":
+                continue
+            pts.append(Point(float(row[0]), float(row[1])))
+    return pts
+
+
+def check_candidate(csv_path: Path, card_path: Path) -> list[Finding]:
+    """Check a freshly digitised CSV before it joins the dataset.
+
+    The workflow the cards are for is digitise -> check -> commit, not
+    commit -> discover. This runs the same checks against a loose file and
+    a loose card, so a bad calibration is caught while the figure is still
+    open rather than after it is in the tree.
+    """
+    card = yaml.safe_load(card_path.read_text())
+    series = SeriesMetadata(
+        path=csv_path,
+        source=SourceMetadata(name=csv_path.parent.name or "candidate",
+                              citation="(not yet filed)", secondary=True),
+        after=None,
+        page=None,
+        item=card.get("item", "(candidate)"),
+        series=card.get("series", csv_path.stem),
+        geometry=None,
+        alpha_deg=None,
+        x_axis=card.get("x_axis", "e_plus"),
+        x_scale=float(card.get("x_scale", 1.0)),
+        y_axis=card.get("y_axis", "G"),
+        kind=card.get("kind", "correlation"),
+        extraction="figure-digitised",
+        confidence="band",
+        uncertainty=card.get("uncertainty"),
+        cross_check="(candidate; not yet recorded)",
+        scores=None,
+        verification=card.get("verification", card),
+    )
+    return check_series(series)
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Check digitised series against their figure cards."
+    )
+    parser.add_argument(
+        "--candidate",
+        type=Path,
+        help="a freshly digitised CSV, not yet in the dataset",
+    )
+    parser.add_argument(
+        "--candidate-dir",
+        type=Path,
+        help="a directory of freshly digitised CSVs, all from one panel",
+    )
+    parser.add_argument(
+        "--glob",
+        default="*.csv",
+        help="which files in --candidate-dir to check (default: *.csv)",
+    )
+    parser.add_argument(
+        "--card",
+        type=Path,
+        help="the figure card for the candidate(s), as a YAML file",
+    )
+    parser.add_argument(
+        "--pair",
+        nargs=2,
+        metavar=("GLOB_A", "GLOB_B"),
+        help="pair one class across two panels, e.g. '*_R.csv' '*_G.csv'",
+    )
+    args = parser.parse_args()
+
+    if args.pair:
+        if not args.candidate_dir:
+            parser.error("--pair needs --candidate-dir")
+        print(render(check_panel_pairing(args.candidate_dir, *args.pair)))
+        return
+
+    if args.candidate or args.candidate_dir:
+        if not args.card:
+            parser.error("a candidate needs --card")
+        if args.candidate:
+            print(render(check_candidate(args.candidate, args.card)))
+            return
+        paths = sorted(args.candidate_dir.glob(args.glob))
+        if not paths:
+            parser.error(f"no files matching {args.glob} in {args.candidate_dir}")
+        findings = []
+        for path in paths:
+            findings.extend(check_candidate(path, args.card))
+        print(render(findings))
+        return
     print(render(check_all()))
 
 
