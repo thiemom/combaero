@@ -99,12 +99,14 @@ def _curve(spec: dict, xs: list[float]) -> list[float]:
 
 def _label(s: SeriesMetadata) -> str:
     geom = s.geometry or {}
-    if geom:
-        base = (
-            f"e/D {geom.get('e_D')}  P/e {geom.get('p_e')}  W/H {geom.get('W_H')}"
-        )
-    else:
-        base = s.series[:46]
+    parts = []
+    if "e_D" in geom:
+        parts.append(f"e/D {geom['e_D']}")
+    if "p_e" in geom:
+        parts.append(f"P/e {geom['p_e']}")
+    if "W_H" in geom:
+        parts.append(f"W/H {geom['W_H']}")
+    base = "  ".join(parts) if parts else s.series[:46]
     if s.class_confidence == "disputed":
         base += "  [DISPUTED]"
     return base

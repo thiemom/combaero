@@ -469,3 +469,65 @@ def test_candidate_mode_catches_a_dropped_multiplier(tmp_path) -> None:
     findings = check_candidate(csv_path, card_path)
     failed = [f.check for f in findings if not f.ok]
     assert "x-span" in failed, f"dropped multiplier not caught; got {failed}"
+
+
+def test_figure_448_resolves_extraction_item_41(dataset) -> None:
+    """The W/H=1/2 branch boundary: which side does Han's own figure use?
+
+    Extraction item 41 found Eq. 4.19's two branches disagreeing by ~10%
+    at W/H=0.5, unresolved. Figure 4.48's own drawn correlation at that
+    exact W/H settles it: its exponent must sit far closer to the wide
+    branch (n=0.35) than the narrow one (n=0.258).
+    """
+    series = next(s for s in dataset if s.path.name == "fig4.48_G_correlation_WH0.5.csv")
+    pts = load_points(series)
+    fitted = _power_slope_test(pts)
+    assert abs(fitted - 0.35) < abs(fitted - 0.258), (
+        f"fitted exponent {fitted:.4f} is closer to the narrow branch "
+        "(0.258) than the wide one (0.35) -- item 41's resolution direction "
+        "has reversed"
+    )
+    assert 0.30 < fitted < 0.36
+
+
+def _power_slope_test(points) -> float:
+    xs = [math.log(p.x) for p in points]
+    ys = [math.log(p.y) for p in points]
+    n = len(points)
+    sx, sy = sum(xs), sum(ys)
+    sxx = sum(v * v for v in xs)
+    sxy = sum(a * b for a, b in zip(xs, ys, strict=False))
+    return (n * sxy - sx * sy) / (n * sxx - sx * sx)
+
+
+def test_figure_448_R_axis_is_linear_not_log(dataset) -> None:
+    """Panel (a)'s y-axis was initially misread as log; it is linear.
+
+    The tell is the digitised frame's own picks: 1.5, 2.5, 3.5, 4.5 are
+    half-integer minor ticks, which a log axis cannot produce -- its
+    conventional minor ticks sit at the same mantissa (2..9) in every
+    decade, never at a half-integer. Confirmed on the printed page too:
+    one minor tick sits exactly centred between each major label.
+    """
+    for s in dataset:
+        if s.figure == "4.48" and s.panel == "top":
+            card = s.verification or {}
+            assert card.get("y_axis_type") == "linear", (
+                f"{s.label} declares y_axis_type={card.get('y_axis_type')}, "
+                "but panel (a)'s R axis is linear"
+            )
+
+
+def test_figure_448_nothing_is_scored_against_the_wrong_paper(dataset) -> None:
+    """Overlapping data must not silently score against a cross-paper gap.
+
+    The '[Ref. 3]' W/H=1 curve on figure 4.48 sits inside
+    han_1988_orthogonal's valid range, but it reproduces Eq. 4.18
+    (C=2.24, n=0.35), a DIFFERENT published form from the one
+    han_1988_orthogonal encodes (Eq. 4.15/16, n=0.28). Scoring it would
+    report that ~15% cross-paper gap as model error. Every figure 4.48
+    series is therefore unscored, regardless of geometry.
+    """
+    fig448 = [s for s in dataset if s.figure == "4.48"]
+    assert fig448, "figure 4.48 is not filed"
+    assert all(s.scores is None for s in fig448), [s.label for s in fig448 if s.scores is not None]
