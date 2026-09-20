@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`rallabandi_2009_high_re()`, a second rib correlation set** for 45 deg
+  sharp-edged ribs at Reynolds numbers an order of magnitude above
+  `han_1988_orthogonal`'s range (30,000-400,000 vs 10,000-60,000). Named
+  and user-selected, same as the existing set -- there is no
+  auto-switching, matching #334's decision that users pick and define
+  correlations explicitly, with provenance and validity visible.
+
+  Scored against the 38-point digitised cloud from figure 4.193c: mean
+  bias -2.8%, RMS 7.0%, independently reproducing the extraction
+  document's own comparison (0.994 mean, 6.9% RMS) through the full
+  `Re -> R -> f -> e+ -> G` chain rather than a direct `G(e+)` evaluation.
+
+  Round-edged ribs at this Reynolds range are reported by the source to
+  instead follow `han_1988_orthogonal`'s correlation, but the source
+  calls that agreement "coincidental" rather than physically grounded, so
+  it is not wired as an automatic fallback -- a caller with round-edged
+  ribs chooses the correlation directly, the same as any other set
+  choice.
+
 - **Figure 4.48 digitised**: narrow-aspect-ratio channels (Eq. 4.19), both
   panels, plus a reference curve labelled `[Ref. 3]` and its error bars --
   16 series, 111 points.

@@ -98,6 +98,22 @@ struct RibCorrelationSet {
 // validation/cooling/extractions/han_ribbed.md.
 RibCorrelationSet han_1988_orthogonal();
 
+// Rallabandi, A.P., Yang, H. and Han, J.-C. (2009), ASME J. Heat Transfer
+// 131(7), 071703, for 45 deg square/sharp-edged ribs in a square channel at
+// Reynolds numbers an order of magnitude above han_1988_orthogonal's range --
+// "typical of land-based turbines" per the source. A separate regime, not a
+// revision: different experiments, and per the source the correlations do
+// not agree with Han's in the extended range. Selected explicitly, never
+// blended -- see validation/cooling/extractions/han_ribbed_high_re.md.
+//
+// Sharp-edged ribs only. The source reports round-edged ribs at the same
+// conditions instead following Han's correlation, but "coincidentally" --
+// its own word, meaning reported as fortuitous rather than physically
+// grounded, so it is not encoded as a switch here. A caller with round-edged
+// ribs above this Reynolds range chooses the correlation directly, same as
+// any other set choice.
+RibCorrelationSet rallabandi_2009_high_re();
+
 // Geometry of the ribbed channel, as the correlation sees it.
 struct RibGeometry {
   double e_D = 0.0;        // rib height / hydraulic diameter

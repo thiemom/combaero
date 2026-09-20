@@ -78,8 +78,25 @@ def test_45deg_series_is_refused_not_scored(dataset) -> None:
 
     Scoring it produced a 26.7% bias that reads as model error when it is
     really the wrong correlation entirely. The refusal is the feature.
+
+    Built from a synthetic series (dataclasses.replace on a real one) rather
+    than pinned to a specific filed CSV: which series happen to carry
+    scores=han_1988_orthogonal at alpha=45 is metadata, and changes as
+    understanding improves -- fig4.193c_old_correlation_G_curve was scored
+    against han_1988_orthogonal via this exact refusal path once, then
+    re-labelled scores=null once a better reason (drawn line, no
+    angled-correlation set yet) was found. The mechanism under test should
+    not depend on any one series still holding that combination.
     """
-    recs = run_series(_series(dataset, "fig4.193c_old_correlation_G_curve"))
+    import dataclasses
+
+    series_45 = dataclasses.replace(
+        next(s for s in dataset if s.y_axis == "G"),
+        alpha_deg=45.0,
+        scores="han_1988_orthogonal",
+        geometry=None,
+    )
+    recs = run_series(series_45)
     assert all(r.predicted is None for r in recs)
     assert all("90-90 deg only" in (r.reason or "") for r in recs)
 

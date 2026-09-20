@@ -1,6 +1,6 @@
 # Extraction: rib correlations at high Reynolds number
 
-**Status: CONFIRMED -- reviewed 2026-09-14.**
+**Status: CONFIRMED -- reviewed 2026-09-14. IMPLEMENTED 2026-09-20.**
 
 Every item is resolved against the primary source and the reviewer has signed
 off. The correlations below come from **the paper itself**, not from the
@@ -419,6 +419,7 @@ RMS. The textbook's printed form remains the outlier.
 
 | date | reviewer | outcome |
 |---|---|---|
+| 2026-09-20 | Claude | **Implemented** as `combaero.rallabandi_2009_high_re()`, following the same `RibCorrelationSet`/`evaluate_rib` structure as `han_1988_orthogonal`. Scored against the 38-point unclassified cloud from Figure 4.193c (already digitised for #333): mean bias -2.8%, RMS 7.0%, reproducing this document's own comparison (mean pred/data 0.994, RMS 6.9%) through a completely different computational path -- the full `Re -> R -> f -> e+ -> G` chain via `evaluate_rib`, bisected to reach each digitised `e+`, rather than the direct `G(e+)` evaluation used above. Scored with a representative `e_D=0.14, p_e=7.5` (the cloud's own midpoints), justified by the paper's own text that `G` does not vary much with either. `valid_alpha` and `valid_WH` are recorded as point ranges (45 deg, `W/H=1`), matching how the source's own experiments were run rather than a modelling choice. Round-edged ribs are deliberately NOT wired as an automatic fallback to Han's correlation: the source calls that agreement "coincidental", and the project's own decision (per #334) is that users pick and define correlations explicitly, with provenance and validity visible, rather than have the tool switch on their behalf. |
 | 2026-09-10 | extracted by Claude | UNCONFIRMED and INCOMPLETE. Surrounding text extracted; Figure 4.193 needed before anything here can be used |
 | 2026-09-13 | reviewer | supplied Figure 4.193 (p. 513) and Figure 4.192. Correlations now extracted as items 12-19 |
 | 2026-09-13 | reviewer | read the Fig. 4.193c exponents as `(p/e/10)^0.2` (old) and `(p/e)^-0.031` (new), both flagged as partly guesswork. The old-correlation exponent is settled at `0.1` by the confirmed p. 377 items; the new one is recorded as item 21, bounded at 1.6-2.3% |

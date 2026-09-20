@@ -70,6 +70,7 @@ class Record:
 
 SETS = {
     "han_1988_orthogonal": cb.han_1988_orthogonal,
+    "rallabandi_2009_high_re": cb.rallabandi_2009_high_re,
 }
 
 
