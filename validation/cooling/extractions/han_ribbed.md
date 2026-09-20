@@ -11,10 +11,14 @@ Every item was checked against the source or resolved by derivation, and the
 reviewer has signed off in the review log. This document is released for
 implementation under #334.
 
-Two modelling decisions are accepted with it -- **D1** (treat `R` as constant
-in `e+`) and **D2** (use `12.31`). **D3 was withdrawn**: it recorded a
+Modelling decisions accepted with it -- **D1** (treat `R` as constant
+in `e+`), **D2** (use `12.31`), and **D5** (extend `RibCorrelationSet` rather
+than give Eq. 4.17/4.18 its own type). **D3 was withdrawn**: it recorded a
 departure from the printed four-sided friction factor that turned out not to
 exist. Nothing in the implementation diverges from the source.
+
+Eq. 4.17 (R vs alpha) and Eq. 4.18 (G, square/rectangular switch)
+IMPLEMENTED 2026-09-20 as `combaero.han_park_1988_angled()`.
 
 Changes after this point go in the review log, not silently into the tables. If
 implementation surfaces something the extraction got wrong, that reopens the
@@ -714,6 +718,41 @@ items above, because those are facts about a page and these are not -- a
 reviewer should be able to disagree with one of these without doubting the
 transcription.
 
+### D5. Extend `RibCorrelationSet` rather than give Eq. 4.17/4.18 a separate type
+
+**Decision, 2026-09-20.** `han_park_1988_angled()` needed two shapes the
+existing `RibCorrelationSet` schema could not express: R as a QUADRATIC in
+`alpha` rather than a power law (Eq. 4.17), and G's `alpha`/`p_e` exponents
+SWITCHING on channel shape (Eq. 4.18's square-vs-rectangular split) rather
+than being fixed. Both are genuine discontinuities the source states, not
+numerical artefacts.
+
+Two ways to add this: extend the shared struct with new, opt-in fields
+(`RAlphaShape`/`GShapeModel` discriminators plus the quadratic/switch
+fields), or give the angled correlation its own parallel type and
+`evaluate_rib`-like function.
+
+**Chose extension.** `RibbedModel.correlation_set` (the Python/GUI surface)
+already accepts any `RibCorrelationSet` and needs nothing else to use a new
+one -- the whole point of "users pick and define correlations, with
+provenance and validity visible" (this issue's own framing). A parallel
+type would break that substitutability and need dispatch logic wherever a
+set is consumed. The cost is a larger shared struct; the two new
+discriminators default to the plain power-law behaviour, so
+`han_1988_orthogonal` and `rallabandi_2009_high_re` are provably unaffected
+-- their full pre-existing test suites pass unmodified, byte for byte,
+after this change.
+
+**What is NOT done: no smoothing across either switch.** At `alpha = 90`
+the `(W/H)^m` jump reaches 62.5% at `W/H = 4`; at `W/H = 1` the
+square/rectangular switch reaches 27% at low `alpha`. Neither source states
+a smooth transition, so none is invented -- consistent with the earlier
+decision to record, not guess, Eq. 4.17's behaviour outside 30-90 degrees.
+A caller whose solver traverses either boundary exactly needs a guard this
+evaluator does not supply; the jump sizes are pinned by
+`HanParkRAndGSwitchesAreGenuineDiscontinuities` in `test_rib_correlation.cpp`
+so a future "helpful" smoothing change cannot land silently.
+
 ### D2. Use `12.31`, not `12.3`, in Eq. 4.17
 
 **Decision.** Where the printed equation on p. 376 gives `12.3` and Figure 4.47
@@ -969,6 +1008,7 @@ than extrapolating past it.
 
 | date | reviewer | outcome |
 |---|---|---|
+| 2026-09-20 | Claude | **Eq. 4.17/4.18 implemented** as `combaero.han_park_1988_angled()`, following the schema extension recorded as decision D5 (quadratic-in-alpha R, square/rectangular G switch, both opt-in and provably not affecting `han_1988_orthogonal` or `rallabandi_2009_high_re`). Scored against this document's own source, figure 4.47: R at RMS 10.5% over 39 points, G at RMS 8.8% over 115 points (representative geometry, the cloud carries no legend). Independently cross-checked against figure 4.51's parallel-rib classes (a different paper, Han et al. 1991) at RMS 8.5%; the other seven rib shapes on that figure (crossed, V, lambda) are deliberately not scored, since this equation cannot represent rib shape beyond angle and doing so would repeat item 23's lesson. Along the way, corrected two more stale `scores` fields: figure 4.51's 45/60 deg parallel series had been scored against `han_1988_orthogonal`, silently refused every time by the alpha guard (valid range 90-90) since before `han_park_1988_angled` existed to score them correctly. |
 | 2026-09-20 | reviewer + Claude | **Item 41 resolved, item 40 given data.** Figure 4.48 digitised: both panels, `[Ref. 3]` curve, and its error bars (16 series, 111 points). The `W/H=2/4` correlation at the branch boundary matches the WIDE branch of Eq. 4.19 (10%/6%), not the narrow one (69%/22%), settling which form Han's own figure uses at `W/H=1/2`. Along the way, corrected an initial misreading of panel (a)'s y-axis as log -- the half-integer minor ticks (1.5, 2.5, 3.5, 4.5) are only possible on a linear axis, confirmed on the printed page and independently by the digitised frame. One error-bar end (alpha=30, top panel) was initially obscured; the rescanned value agreed with the earlier partial read to 0.7%. |
 | 2026-09-18 | reviewer + Claude | **Item 7 closed with evidence, not deference.** D1 stands, but the reason improves: the `R` slope is in the DRAWING, not the scan. Both panel frames were digitised as distortion standards -- a frame is horizontal by construction, so its fitted slope is the panel's distortion and nothing else, and unlike a printed equation it does not presume the draftsman drew the equation faithfully. Upper frame `+0.00078`, lower frame `-0.00036`, neither monotonic, i.e. picking noise. The drawn `R` line rises at `+0.00857` -- **23x the distortion of the panel it sits in, and in the opposite direction**. No page skew lifts `R` by 2.7% while leaving its own frame flat to 0.04%. Independently, `G_bar` in the upper panel reproduces its printed `4.5 (e+)^0.28` to 0.25% RMS off the same scan. Filed as `validation/cooling/data/han2012/fig4.46_frame_*.csv`. |
 | 2026-09-10 | extracted by Claude | UNCONFIRMED -- submitted for review |

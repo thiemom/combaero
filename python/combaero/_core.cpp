@@ -61,6 +61,30 @@ PYBIND11_MODULE(_core, m) {
       .value("User", combaero::cooling::RibProvenance::User,
              "Supplied by the caller. Carries no claim.");
 
+  py::enum_<combaero::cooling::RibCorrelationSet::RAlphaShape>(
+      m, "RAlphaShape")
+      .value("PowerLaw",
+             combaero::cooling::RibCorrelationSet::RAlphaShape::PowerLaw,
+             "R is a power-law product, R_alpha's exponent applied to "
+             "alpha/90 like any other geometry term.")
+      .value("QuadraticAlpha",
+             combaero::cooling::RibCorrelationSet::RAlphaShape::QuadraticAlpha,
+             "R/[(p/e/10)^0.35 (W/H)^m] is a quadratic in alpha/90 (the "
+             "R_quad_* fields), with m switching on alpha == 90 deg. "
+             "R_eD, R_WH and R_alpha are ignored in this shape.");
+
+  py::enum_<combaero::cooling::RibCorrelationSet::GShapeModel>(
+      m, "GShapeModel")
+      .value("Fixed", combaero::cooling::RibCorrelationSet::GShapeModel::Fixed,
+             "G_alpha and G_pe are fixed power-law terms, as for a set with "
+             "no channel-shape switch.")
+      .value("SquareVsRectangular",
+             combaero::cooling::RibCorrelationSet::GShapeModel::
+                 SquareVsRectangular,
+             "G's alpha and p/e exponents switch on whether W/H == 1 "
+             "(square, the G_shape_*_square fields) or not (rectangular, "
+             "the G_shape_*_rect fields). G_alpha and G_pe are ignored.");
+
   py::class_<combaero::cooling::RibTerm>(m, "RibTerm")
       .def(py::init<>())
       .def(py::init([](double exponent, double reference) {
@@ -118,11 +142,29 @@ PYBIND11_MODULE(_core, m) {
                      &combaero::cooling::RibCorrelationSet::provenance)
       .def_readwrite("symmetric",
                      &combaero::cooling::RibCorrelationSet::symmetric)
+      .def_readwrite("R_alpha_shape",
+                     &combaero::cooling::RibCorrelationSet::R_alpha_shape)
       .def_readwrite("C_R", &combaero::cooling::RibCorrelationSet::C_R)
       .def_readwrite("R_eD", &combaero::cooling::RibCorrelationSet::R_eD)
       .def_readwrite("R_pe", &combaero::cooling::RibCorrelationSet::R_pe)
       .def_readwrite("R_WH", &combaero::cooling::RibCorrelationSet::R_WH)
       .def_readwrite("R_alpha", &combaero::cooling::RibCorrelationSet::R_alpha)
+      .def_readwrite("R_quad_c0",
+                     &combaero::cooling::RibCorrelationSet::R_quad_c0)
+      .def_readwrite("R_quad_c1",
+                     &combaero::cooling::RibCorrelationSet::R_quad_c1)
+      .def_readwrite("R_quad_c2",
+                     &combaero::cooling::RibCorrelationSet::R_quad_c2)
+      .def_readwrite(
+          "R_quad_WH_exponent_at_90",
+          &combaero::cooling::RibCorrelationSet::R_quad_WH_exponent_at_90)
+      .def_readwrite(
+          "R_quad_WH_exponent_off_90",
+          &combaero::cooling::RibCorrelationSet::R_quad_WH_exponent_off_90)
+      .def_readwrite("R_quad_WH_cap",
+                     &combaero::cooling::RibCorrelationSet::R_quad_WH_cap)
+      .def_readwrite("G_shape_model",
+                     &combaero::cooling::RibCorrelationSet::G_shape_model)
       .def_readwrite("C_G", &combaero::cooling::RibCorrelationSet::C_G)
       .def_readwrite("G_eD", &combaero::cooling::RibCorrelationSet::G_eD)
       .def_readwrite("G_pe", &combaero::cooling::RibCorrelationSet::G_pe)
@@ -130,6 +172,18 @@ PYBIND11_MODULE(_core, m) {
       .def_readwrite("G_alpha", &combaero::cooling::RibCorrelationSet::G_alpha)
       .def_readwrite("G_eplus_exponent",
                      &combaero::cooling::RibCorrelationSet::G_eplus_exponent)
+      .def_readwrite(
+          "G_shape_alpha_exponent_square",
+          &combaero::cooling::RibCorrelationSet::G_shape_alpha_exponent_square)
+      .def_readwrite(
+          "G_shape_alpha_exponent_rect",
+          &combaero::cooling::RibCorrelationSet::G_shape_alpha_exponent_rect)
+      .def_readwrite(
+          "G_shape_pe_exponent_square",
+          &combaero::cooling::RibCorrelationSet::G_shape_pe_exponent_square)
+      .def_readwrite(
+          "G_shape_pe_exponent_rect",
+          &combaero::cooling::RibCorrelationSet::G_shape_pe_exponent_rect)
       .def_readwrite("valid_Re",
                      &combaero::cooling::RibCorrelationSet::valid_Re)
       .def_readwrite("valid_eD",
@@ -156,6 +210,10 @@ PYBIND11_MODULE(_core, m) {
         "Rallabandi, Yang and Han (2009) 45 deg sharp-edged ribs at high "
         "Reynolds number. Extracted and confirmed; see "
         "validation/cooling/extractions/han_ribbed_high_re.md.");
+  m.def("han_park_1988_angled", &combaero::cooling::han_park_1988_angled,
+        "Han and Park (1988) angled ribs in broad-aspect-ratio rectangular "
+        "ducts. Extracted and confirmed; see "
+        "validation/cooling/extractions/han_ribbed.md.");
   m.def("validate_rib_set", &combaero::cooling::validate_rib_set,
         py::arg("correlation_set"),
         "Reject a set that cannot be evaluated. Hard errors, unlike the "

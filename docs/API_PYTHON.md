@@ -1099,6 +1099,31 @@ reports round-edged ribs at the same conditions instead following Han's
 correlation, but calls the agreement "coincidental" rather than physically
 grounded, so it is not wired as an automatic edge-profile switch.
 
+**A third set covers angled ribs generally**, `han_park_1988_angled` (Eq.
+4.17/4.18, `alpha` 30-90 deg, `W/H` 1-4):
+
+```python
+angled = cb.han_park_1988_angled()
+g = cb.RibGeometry(e_D=0.06, p_e=15.0, W_H=2.0, alpha_deg=60.0)
+r = cb.evaluate_rib(angled, g, Re=30_000)
+r.R, r.G                              # 3.2332, 18.4408
+```
+
+Its `R` and `G` carry genuine, unsmoothed discontinuities the source
+states rather than a numerical artefact: `R`'s `(W/H)^m` term switches at
+`alpha == 90 deg` (up to 62.5% at `W/H = 4`), and `G`'s `alpha`/`p_e`
+exponents switch on whether the channel is square (`W/H == 1`, up to 27%
+at low `alpha`). Neither the printed equations nor the extraction record a
+smooth transition between the branches, so none is invented -- a caller
+whose solver traverses either boundary exactly needs its own guard.
+
+`RAlphaShape` and `GShapeModel` (both importable from `combaero`) are what
+make this representable as data: setting `R_alpha_shape` to
+`QuadraticAlpha` and populating `R_quad_c0/c1/c2` plus the two
+`R_quad_WH_exponent_*` fields lets a user-supplied set describe its own
+angle-dependent `R`, the same way `RibTerm`'s normaliser lets one describe
+its own geometry dependence.
+
 **Supply your own.** Real hardware needs it -- no published correlation is
 precise enough for a specific rig:
 

@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`han_park_1988_angled()`, a third rib correlation set** for angled
+  ribs in broad-aspect-ratio rectangular ducts (Han and Park 1988, Eq.
+  4.17/4.18): `alpha` 30-90 deg, `W/H` 1-4. Han's original power-law
+  schema couldn't express this equation's two shapes -- `R` is a
+  quadratic in `alpha`, and `G`'s `alpha`/`p_e` exponents switch on
+  whether the channel is square -- so `RibCorrelationSet` gained two new,
+  opt-in discriminators (`RAlphaShape`, `GShapeModel`). Both default to
+  the existing plain power-law behaviour: `han_1988_orthogonal`'s and
+  `rallabandi_2009_high_re`'s full pre-existing test suites pass
+  unmodified, byte for byte.
+
+  Both switches are genuine discontinuities the source states, not
+  numerical artefacts -- up to 62.5% in `R` at `alpha=90`, `W/H=4`; up to
+  27% in `G` at `W/H=1`, low `alpha`. Neither is smoothed, since no smooth
+  transition is stated anywhere in the confirmed extraction; a solver
+  that traverses either boundary exactly needs its own guard.
+
+  Scored against its own source, figure 4.47: `R` at RMS 10.5% over 39
+  points, `G` at RMS 8.8% over 115 (representative geometry, the cloud
+  carries no legend). Independently cross-checked against figure 4.51's
+  parallel-rib classes -- a different paper, Han et al. (1991) -- at RMS
+  8.5%. The other seven rib shapes on that figure (crossed, V, lambda)
+  are deliberately not scored: this equation has no way to represent rib
+  shape beyond angle, and scoring a shape mismatch would repeat the
+  mistake extraction item 23 already recorded once.
+
+  Along the way, the validation harness gained a second scoring path (`R`
+  indexed by `alpha` rather than `G` bisected to a target `e+`, since `R`
+  carries no Reynolds-number dependence in every set implemented so far)
+  and corrected two more stale `scores` fields on figure 4.51's parallel
+  classes, silently refused since before this set existed to score them.
+
 - **`rallabandi_2009_high_re()`, a second rib correlation set** for 45 deg
   sharp-edged ribs at Reynolds numbers an order of magnitude above
   `han_1988_orthogonal`'s range (30,000-400,000 vs 10,000-60,000). Named

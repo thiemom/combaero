@@ -548,3 +548,75 @@ def test_figure_448_nothing_is_scored_against_the_wrong_paper(dataset) -> None:
     fig448 = [s for s in dataset if s.figure == "4.48"]
     assert fig448, "figure 4.48 is not filed"
     assert all(s.scores is None for s in fig448), [s.label for s in fig448 if s.scores is not None]
+
+
+def test_han_park_1988_angled_scores_its_own_source(records) -> None:
+    """han_park_1988_angled must reproduce figure 4.47, its own source.
+
+    Both R and G panels scored through evaluate_rib with a representative
+    geometry (the cloud carries no legend). Bands are what this project
+    measured, not an author claim -- see the C++ set's accuracy_R/accuracy_G
+    comment for why that distinction matters here specifically.
+    """
+    from validation.cooling.scorecard import build
+
+    cells = {c.label: c for c in build(records)}
+    r_cell = cells["han2012/fig4.47_R_vs_alpha"]
+    g_cell = cells["han2012/fig4.47_G_vs_eplus"]
+
+    assert r_cell.n_scored == 39
+    assert r_cell.rmse < 0.12
+    assert g_cell.n_scored == 115
+    assert g_cell.rmse < 0.10
+
+
+def test_han_park_1988_angled_confirmed_independently_by_figure_451(
+    records,
+) -> None:
+    """A different paper's parallel-rib data, scored against this equation.
+
+    Figure 4.51 (Han et al. 1991) is not han_park_1988_angled's own source
+    (Han and Park 1988) -- an independent cross-paper check, on the two
+    classes (45/60 deg PARALLEL) that match the rib shape Eq. 4.17/4.18
+    was fitted to. The other seven shapes on figure 4.51 (crossed, V,
+    lambda) are deliberately not scored against this set: it has no way to
+    represent rib shape beyond angle, and scoring a shape it cannot model
+    would repeat the mistake extraction item 23 already recorded once.
+    """
+    from validation.cooling.scorecard import build
+
+    cells = {c.label: c for c in build(records)}
+    scored_parallel = [
+        c for name, c in cells.items() if "par" in name and "4.51" in name and not c.unsupported
+    ]
+    assert scored_parallel, "no figure 4.51 parallel class scored"
+    for c in scored_parallel:
+        assert c.rmse < 0.15, f"{c.label}: RMSE {c.rmse:.1%}"
+
+    # The other seven shapes must NOT be silently scored against this set.
+    unscored_shapes = [
+        c
+        for name, c in cells.items()
+        if "4.51" in name and any(t in name for t in ("crs", "vee", "lam")) and c.n > 0
+    ]
+    assert unscored_shapes
+    assert all(c.unsupported for c in unscored_shapes), [
+        c.label for c in unscored_shapes if not c.unsupported
+    ]
+
+
+def test_han_park_r_alpha_normalisation_is_not_raw_R(records) -> None:
+    """Figure 4.47's R panel plots R divided by its own normalisers.
+
+    Falsifiable directly: if the runner scored raw R instead of the
+    normalised quantity, the bias would be enormous (R_pe and the W/H^m
+    term are both > 1 across the validity box), not a few percent.
+    """
+    from validation.cooling.scorecard import build
+
+    cells = {c.label: c for c in build(records)}
+    r_cell = cells["han2012/fig4.47_R_vs_alpha"]
+    assert abs(r_cell.bias) < 0.15, (
+        f"bias {r_cell.bias:.1%} -- looks like raw R is being compared "
+        "against the normalised digitised values"
+    )
