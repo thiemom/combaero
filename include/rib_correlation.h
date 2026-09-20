@@ -125,7 +125,16 @@ struct RibResult {
 
 // Evaluate at a Reynolds number. `Re` may be negative (reverse flow) or zero;
 // the guards are smooth through both, so the derivative is continuous where
-// Newton iterates.
+// Newton iterates. `geom.alpha_deg` is NOT guarded the same way: a set's R/G
+// terms are polynomials in alpha with no built-in symmetry, so an angle
+// outside `valid_alpha` is evaluated raw rather than folded or clamped. See
+// validation/cooling/extractions/han_ribbed.md, "Eq. 4.17 outside its stated
+// 30-90 degree range" for the numerical characterisation this rests on: the
+// raw polynomial stays finite and positive well past the fitted range, but
+// its vertex sits at 68 deg (not 90), so it is unbounded and physically
+// unmotivated beyond 30-90, not a safe extrapolation. No guard exists yet;
+// if one is added, reflection-folding (alpha_eff = 180 - alpha) is the
+// bounded, `symmetric`-consistent choice documented there, not the raw value.
 RibResult evaluate_rib(const RibCorrelationSet &set, const RibGeometry &geom,
                        double Re);
 

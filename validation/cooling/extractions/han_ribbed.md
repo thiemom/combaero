@@ -563,6 +563,53 @@ itself is not removed -- the two forms still disagree by 10% approaching `1/2`
 from below -- but which side the boundary belongs to is now settled by the
 source's own figure rather than left to an implementer's guess.
 
+### Eq. 4.17 outside its stated 30-90 degree range -- not a validity claim
+
+Han states Eq. 4.17 for `alpha = 30-90 deg`. Investigated the raw quadratic's
+behaviour beyond that purely to characterise it numerically -- e.g. what a
+solver would see if an iterate briefly overshot the range -- not to extend the
+correlation's claimed validity.
+
+At `W/H=1`, `m=0`:
+
+| `alpha` | `R` (raw, unclamped) |
+|---|---|
+| 0 | 12.31 |
+| 30 | 5.27 |
+| 68.2 (vertex) | 2.05 |
+| 90 | 3.10 |
+| 120 | 7.97 |
+| 150 | 16.80 |
+| 180 | 29.61 |
+
+The quadratic has no real roots (discriminant `-146.6`), so it stays positive
+and finite for any `alpha` -- no blow-up, no sign change. But its vertex sits
+at `alpha=68.2 deg`, not `90`, so the raw formula has no reflective symmetry
+about `90` and simply keeps climbing past it: `R(180) = 29.6`, higher than
+`R(0) = 12.3`, a number with no connection to anything measured.
+
+**Reflection-folding gives a bounded, physically motivated alternative.**
+Mapping `alpha_eff = 180 - alpha` for `alpha > 90` (equivalently `abs`-folding
+into `[0, 90]`) exactly reproduces the fitted 0-90 curve by construction, so it
+never exceeds the range's own extremes (`R` between `2.05` and `12.31`):
+
+| `alpha` | raw (unclamped) | folded (`alpha_eff = 180 - alpha`) |
+|---|---|---|
+| 120 | 7.97 | 2.20 (= `R(60)`) |
+| 150 | 16.80 | 5.27 (= `R(30)`) |
+| 180 | 29.61 | 12.31 (= `R(0)`) |
+
+This is the same convention `RibCorrelationSet::symmetric` already applies
+elsewhere (true for 90 deg orthogonal and parallel angled ribs, where
+reversing the flow is a mirror operation) -- reflection-folding the *angle*
+input is that same idea applied consistently, not a new one.
+
+**Not implemented.** No guard exists in `evaluate_rib` for out-of-range
+`alpha`; this is a numerical characterisation for whoever adds one, recording
+that reflection-fold is the bounded, convention-consistent choice and that
+leaving the raw polynomial unclamped is not dangerous (no negative or complex
+output) but is unbounded and physically unmotivated beyond the fitted range.
+
 ### Prandtl number
 
 Item 36 states `Pr = 0.7`, consistent with item 25. The narrow-channel
