@@ -111,6 +111,7 @@ inline constexpr Entry function_units[] = {
     // rib_correlation.h - Parametrised rib correlations
     // -------------------------------------------------------------------------
     {"han_1988_orthogonal", "-", "RibCorrelationSet"},
+    {"rallabandi_2009_high_re", "-", "RibCorrelationSet"},
     {"validate_rib_set", "correlation_set: RibCorrelationSet", "None"},
     {"evaluate_rib",
      "correlation_set: RibCorrelationSet, geometry: RibGeometry, Re: -",

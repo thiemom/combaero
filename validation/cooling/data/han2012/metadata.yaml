@@ -172,6 +172,11 @@ files:
     cross_check: >-
       Free fit must recover the printed exponent 0.35 rather than the new
       correlation's 0.42; the two curves are separated by that exponent.
+      Confirmed by han_ribbed_high_re.md item 26: matches Eq. 4.18's
+      square-channel form at alpha=45 (the "30<alpha<90" branch, C=1.80) to
+      3.5%. Not scored: a drawn line (never a source of truth), and there is
+      no implemented set for Han's angled correlation at alpha=45 yet --
+      han_1988_orthogonal is alpha=90 only.
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -194,7 +199,7 @@ files:
       exponent_tolerance: 0.03
       monotonic: increasing
       expected_points: 6
-    scores: han_1988_orthogonal
+    scores: null
 
   - path: fig4.193c_new_correlation_G_curve.csv
     after: "Rallabandi, A.P., Yang, H. and Han, J.C. (2009). ASME J. Heat Transfer 131, 071703."
@@ -246,7 +251,7 @@ files:
     panel: single
     item: "Figure 4.193c, data cloud"
     series: "sharp-edged 45 deg ribs, all measured points, unclassified"
-    geometry: null
+    geometry: {e_D: 0.14, p_e: 7.5, W_H: 1.0}
     alpha_deg: 45.0
     x_axis: e_plus
     x_scale: 1.0
@@ -254,10 +259,19 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.08
+    uncertainty: 0.069
     cross_check: >-
       The cloud must straddle the new-correlation curve and sit above the
-      old one at high e+, which is the figure's whole point.
+      old one at high e+, which is the figure's whole point. Scored against
+      rallabandi_2009_high_re (Eq. 18): han_ribbed_high_re.md's own
+      comparison, evaluating G(e+) directly, gives mean pred/data 0.994,
+      RMS 6.9%. The geometry here is a REPRESENTATIVE value, not per-point
+      truth -- the cloud was digitised without symbol classification, so
+      individual e/D and p/e are unrecoverable. This barely matters:
+      Rallabandi's own text states "G does not vary much with e/D or p/e",
+      matching the correlation's own near-zero exponents (0.014, -0.02).
+      e_D=0.14, p_e=7.5 are the midpoints of the set's stated validity
+      ranges (0.1-0.18, 5-10).
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -278,7 +292,7 @@ files:
       # 0.15, 0.18 x p/e 10, 7.5, 5, plus 1984 and 1986 reference sets) and
       # this CSV pools them all. Count the marks on the page.
       expected_points: null
-    scores: han_1988_orthogonal
+    scores: rallabandi_2009_high_re
 
   # -- Figure 4.53: Nu ratio against friction ratio -----------------------
   #

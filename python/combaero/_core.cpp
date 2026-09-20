@@ -152,6 +152,10 @@ PYBIND11_MODULE(_core, m) {
   m.def("han_1988_orthogonal", &combaero::cooling::han_1988_orthogonal,
         "Han (1988) 90 deg orthogonal ribs. Extracted and confirmed; see "
         "validation/cooling/extractions/han_ribbed.md.");
+  m.def("rallabandi_2009_high_re", &combaero::cooling::rallabandi_2009_high_re,
+        "Rallabandi, Yang and Han (2009) 45 deg sharp-edged ribs at high "
+        "Reynolds number. Extracted and confirmed; see "
+        "validation/cooling/extractions/han_ribbed_high_re.md.");
   m.def("validate_rib_set", &combaero::cooling::validate_rib_set,
         py::arg("correlation_set"),
         "Reject a set that cannot be evaluated. Hard errors, unlike the "

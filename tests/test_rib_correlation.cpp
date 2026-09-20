@@ -7,6 +7,7 @@
 
 using combaero::cooling::evaluate_rib;
 using combaero::cooling::han_1988_orthogonal;
+using combaero::cooling::rallabandi_2009_high_re;
 using combaero::cooling::RibCorrelationSet;
 using combaero::cooling::RibGeometry;
 using combaero::cooling::validate_rib_set;
@@ -19,6 +20,15 @@ RibGeometry ref_geometry() {
   g.p_e = 10.0;
   g.W_H = 1.0;
   g.alpha_deg = 90.0;
+  return g;
+}
+
+RibGeometry rallabandi_ref_geometry() {
+  RibGeometry g;
+  g.e_D = 0.1;
+  g.p_e = 10.0;
+  g.W_H = 1.0;
+  g.alpha_deg = 45.0;
   return g;
 }
 
@@ -139,6 +149,106 @@ TEST(RibCorrelationTest, MalformedSetsAreRejected) {
   auto negative = han_1988_orthogonal();
   negative.C_R = -1.0;
   EXPECT_THROW(validate_rib_set(negative), std::invalid_argument);
+}
+
+// The numbers below are hand-computed from Eq. (17)/(18) as printed in
+// Rallabandi, Yang and Han (2009), independently of this implementation --
+// see validation/cooling/extractions/han_ribbed_high_re.md. R carries no e+
+// term here either, so it repeats across Re exactly as for han_1988_orthogonal.
+TEST(RibCorrelationTest, ReproducesTheConfirmedRallabandiExtraction) {
+  const auto set = rallabandi_2009_high_re();
+  const auto g = rallabandi_ref_geometry();
+
+  const auto lo = evaluate_rib(set, g, 30000.0);
+  EXPECT_NEAR(lo.R, 4.00939, 1e-4);
+  EXPECT_NEAR(lo.f, 0.06533, 1e-4);
+  EXPECT_NEAR(lo.e_plus, 542.20, 0.1);
+  EXPECT_NEAR(lo.G, 16.1350, 0.01);
+  EXPECT_NEAR(lo.St_r, 0.010235, 1e-5);
+
+  const auto hi = evaluate_rib(set, g, 400000.0);
+  EXPECT_NEAR(hi.e_plus, 7229.37, 0.1);
+  EXPECT_NEAR(hi.G, 47.8899, 0.01);
+  EXPECT_NEAR(hi.St_r, 0.003658, 1e-5);
+}
+
+// han_1988_orthogonal (90 deg) and rallabandi_2009_high_re (45 deg, sharp
+// ribs) are different papers a caller must choose between explicitly. Their
+// Reynolds-number bands actually OVERLAP (10e3-60e3 vs 30e3-400e3, sharing
+// 30e3-60e3) -- Re alone does not distinguish them, which is exactly why
+// there is no auto-switching on Re. What is genuinely disjoint is alpha and
+// e/D, confirmed here so a future edit cannot silently narrow either band
+// into the other's territory without this test noticing.
+TEST(RibCorrelationTest, TheTwoSetsDoNotOverlapInAlphaOrEd) {
+  const auto han = han_1988_orthogonal();
+  const auto rallabandi = rallabandi_2009_high_re();
+
+  EXPECT_EQ(han.valid_alpha.lo, 90.0);
+  EXPECT_EQ(han.valid_alpha.hi, 90.0);
+  EXPECT_EQ(rallabandi.valid_alpha.lo, 45.0);
+  EXPECT_EQ(rallabandi.valid_alpha.hi, 45.0);
+
+  // Rallabandi's study was a square channel only.
+  EXPECT_EQ(rallabandi.valid_WH.lo, 1.0);
+  EXPECT_EQ(rallabandi.valid_WH.hi, 1.0);
+
+  // e/D bands do not overlap: Han's is small ribs, Rallabandi's is large.
+  EXPECT_LT(han.valid_eD.hi, rallabandi.valid_eD.lo);
+
+  // Their Re bands DO overlap -- recorded as a fact, not a defect. See the
+  // comment above: this is why the two sets are named and chosen, not
+  // switched on Reynolds number.
+  EXPECT_GT(han.valid_Re.hi, rallabandi.valid_Re.lo);
+}
+
+// Reversing the flow must not change the magnitude, same reasoning as the
+// 90 deg set: a 45 deg parallel rib reversed is its mirror image.
+TEST(RibCorrelationTest, RallabandiReverseFlowIsSymmetricInMagnitude) {
+  const auto set = rallabandi_2009_high_re();
+  const auto g = rallabandi_ref_geometry();
+  const auto fwd = evaluate_rib(set, g, 100000.0);
+  const auto rev = evaluate_rib(set, g, -100000.0);
+
+  EXPECT_NEAR(fwd.G, rev.G, 1e-9);
+  EXPECT_NEAR(fwd.St_r, rev.St_r, 1e-9);
+  EXPECT_NEAR(fwd.e_plus, -rev.e_plus, 1e-6);
+}
+
+// Same guard discipline as the 90 deg set: every state a solver can probe
+// must return finite, positive numbers, never NaN or a complex result.
+TEST(RibCorrelationTest, RallabandiGuardsHoldForStatesTheSolverActuallyProbes) {
+  const auto set = rallabandi_2009_high_re();
+  const auto g = rallabandi_ref_geometry();
+  for (double Re : {-1e6, -1e4, -1.0, 0.0, 1e-12, 1.0, 1e8}) {
+    const auto r = evaluate_rib(set, g, Re);
+    EXPECT_TRUE(std::isfinite(r.f)) << "Re = " << Re;
+    EXPECT_TRUE(std::isfinite(r.G)) << "Re = " << Re;
+    EXPECT_TRUE(std::isfinite(r.St_r)) << "Re = " << Re;
+    EXPECT_TRUE(std::isfinite(r.dSt_dRe)) << "Re = " << Re;
+    EXPECT_GT(r.f, 0.0) << "Re = " << Re;
+    EXPECT_GT(r.St_r, 0.0) << "Re = " << Re;
+  }
+}
+
+// The analytic Stanton derivative must match a central difference through
+// this set's own guards too -- not assumed to inherit correctness from the
+// shared evaluate_rib code path just because han_1988_orthogonal's does.
+TEST(RibCorrelationTest, RallabandiStantonDerivativeMatchesCentralDifferences) {
+  const auto set = rallabandi_2009_high_re();
+  const auto g = rallabandi_ref_geometry();
+  for (double Re : {200000.0, 50000.0, 100.0, 10.0}) {
+    const double h = std::max(1e-6, std::abs(Re) * 1e-6);
+    const double fd = (evaluate_rib(set, g, Re + h).St_r -
+                       evaluate_rib(set, g, Re - h).St_r) /
+                      (2.0 * h);
+    const double analytic = evaluate_rib(set, g, Re).dSt_dRe;
+    const double scale = std::max({std::abs(fd), std::abs(analytic), 1e-14});
+    EXPECT_LT(std::abs(analytic - fd) / scale, 1e-5) << "Re = " << Re;
+  }
+}
+
+TEST(RibCorrelationTest, RallabandiSetPassesValidation) {
+  EXPECT_NO_THROW(validate_rib_set(rallabandi_2009_high_re()));
 }
 
 // The normaliser is data, not a convention: the same correlation written

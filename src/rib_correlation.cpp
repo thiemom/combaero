@@ -40,6 +40,65 @@ RibCorrelationSet han_1988_orthogonal() {
   return s;
 }
 
+RibCorrelationSet rallabandi_2009_high_re() {
+  RibCorrelationSet s;
+  s.name = "rallabandi_2009_high_re";
+  s.source = "Rallabandi, A.P., Yang, H. and Han, J.-C. (2009). ASME J. Heat "
+             "Transfer 131(7), 071703. Eq. (17)/(18)";
+  s.validity_source = s.source;
+  s.provenance = RibProvenance::Extracted;
+  // 45 deg square/sharp-edged ribs, same family as Han and Park's angled
+  // ribs: reversing the flow gives the mirror image, same magnitude in a
+  // symmetric duct. Not orthogonal (unlike han_1988_orthogonal), but still
+  // symmetric -- see the case A/B/C reverse-flow discussion on #334.
+  s.symmetric = true;
+
+  // R = 1.13 (e/D)^-0.17 (p/e)^0.38. Raw e/D and p/e, no /10 normaliser --
+  // unlike han_1988_orthogonal's R_pe, which divides by 10 because that is
+  // how Han's Eq. 4.16 is printed. Two different papers, two different
+  // normalisations; carrying han_1988_orthogonal's convention here would be
+  // silently wrong by (p/e)^0.38 evaluated at the wrong reference.
+  s.C_R = 1.13;
+  s.R_eD = {-0.17, 1.0};
+  s.R_pe = {0.38, 1.0};
+
+  // G = 1.24 (e/D)^0.014 (p/e)^-0.02 (e+)^0.42. The exponents on e/D and p/e
+  // are the resolved reading (extraction item 31): the textbook reprint at
+  // Fig. 4.193c prints 0.14 for the e/D exponent, a lost decimal place
+  // against the paper's own 0.014, worth 22% in G. Confirmed against the
+  // paper directly, not the reprint -- see han_ribbed_high_re.md, D4.
+  s.C_G = 1.24;
+  s.G_eD = {0.014, 1.0};
+  s.G_pe = {-0.02, 1.0};
+  s.G_eplus_exponent = 0.42;
+
+  s.valid_Re = {30000.0, 400000.0};
+  s.valid_eD = {0.1, 0.18};
+  s.valid_pe = {5.0, 10.0};
+  // Square channel only (W/H = 1) and 45 deg ribs only: both are how the
+  // source's own experiments were run, not modelling choices, so they are
+  // recorded as point ranges the same way han_1988_orthogonal pins alpha.
+  s.valid_WH = {1.0, 1.0};
+  s.valid_alpha = {45.0, 45.0};
+  // Derived, not separately stated: the e+ reached at the corners of the
+  // Re x e/D x p/e validity box above, through this set's own R -> f -> e+
+  // chain. The source's item-8 anchor (e+ = 18,000 at Re = 400K, e/D = 0.18)
+  // falls inside this box; it does not fix p/e, which this box does span.
+  s.valid_eplus = {542.0, 25340.0};
+  s.valid_Pr = 0.7;  // unchanged from Han; the source does not restate it
+
+  // accuracy_G is NOT an author-stated band, unlike han_1988_orthogonal's
+  // (Han's own "95% within X%" claims). Rallabandi et al. state no percentage
+  // accuracy for Eq. (18) in the extracted text. This is the RMS this
+  // project measured, of Eq. (18) itself against 38 digitised points from
+  // Fig. 4.193c (validation/cooling/data/han2012/fig4.193c_G_scatter.csv):
+  // mean pred/data 0.994, RMS 6.9% -- see han_ribbed_high_re.md, items 27-31.
+  // accuracy_R is left at 0 (unstated): no R data was digitised for this
+  // range, so there is nothing to measure it against.
+  s.accuracy_G = 0.069;
+  return s;
+}
+
 namespace {
 
 void require_positive_reference(const RibTerm &t, const std::string &field) {

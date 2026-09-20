@@ -1081,6 +1081,24 @@ r.R, r.f, r.e_plus, r.G, r.St_r       # 3.2000, 0.04576, 71.1, 12.21, 0.00968
 r.extrapolated                        # outside the set's advisory validity
 ```
 
+**Two named sets, chosen explicitly.** They cover disjoint Reynolds-number
+regimes reported by different papers, not one superseding the other -- so
+there is no auto-switching between them:
+
+```python
+s90 = cb.han_1988_orthogonal()        # 90 deg, Re 10,000-60,000
+s45 = cb.rallabandi_2009_high_re()    # 45 deg sharp ribs, Re 30,000-400,000
+
+g = cb.RibGeometry(e_D=0.14, p_e=7.5, W_H=1.0, alpha_deg=45.0)
+r = cb.evaluate_rib(s45, g, Re=100_000)
+r.G                                    # 35.40 -- see han_ribbed_high_re.md
+```
+
+`rallabandi_2009_high_re` is 45 deg and sharp-edged ribs only: the source
+reports round-edged ribs at the same conditions instead following Han's
+correlation, but calls the agreement "coincidental" rather than physically
+grounded, so it is not wired as an automatic edge-profile switch.
+
 **Supply your own.** Real hardware needs it -- no published correlation is
 precise enough for a specific rig:
 

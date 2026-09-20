@@ -430,17 +430,23 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double>& X,
 //
 // R carries no e+ term by construction, so f is independent of Reynolds
 // number and df/d(mdot) is identically zero for this family.
-RibCorrelationSet han_1988_orthogonal();
+//
+// Named sets, selected explicitly -- there is no auto-switching between
+// them, since they cover disjoint regimes rather than one being an update
+// of the other:
+RibCorrelationSet han_1988_orthogonal();       // 90 deg, Re 10e3-60e3
+RibCorrelationSet rallabandi_2009_high_re();   // 45 deg sharp ribs, Re 30e3-400e3
 void validate_rib_set(const RibCorrelationSet& set);   // throws on a bad set
 RibResult evaluate_rib(const RibCorrelationSet& set,
                        const RibGeometry& geom, double Re);
 // evaluate_rib never throws: Re may be negative or zero and the guards are
 // smooth through both, because the solver probes states that are not physical.
 
-// Enhanced surfaces (ribbed, dimpled, pin-fin, impingement) were removed in
-// 0.7.0: their correlations could not be traced to their cited sources. A
-// provenanced rib correlation is tracked in issue #334; see issue #339 for
-// the rebuild. channel_smooth is unaffected.
+// Enhanced surfaces removed in 0.7.0 for unprovenanced correlations (issue
+// #339). Ribbed is re-added on han_1988_orthogonal / rallabandi_2009_high_re
+// above, wired through RibbedModel (components.py) into the GUI and network
+// solver. Dimpled, pin-fin and impingement remain removed, tracked
+// individually (#335-338).
 ```
 
 ### Wall Coupling
