@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Figure 4.48 digitised**: narrow-aspect-ratio channels (Eq. 4.19), both
+  panels, plus a reference curve labelled `[Ref. 3]` and its error bars --
+  16 series, 111 points.
+
+  **Extraction item 41 resolved.** The `W/H=2/4` correlation, at Eq. 4.19's
+  branch boundary, free-fits `(e+)^0.3302` -- matching the wide branch
+  (`n=0.35`, 6-10% off) far better than the narrow one (`n=0.258`, 22-69%
+  off). Han's own figure uses the wide-branch form at the boundary; the
+  discontinuity itself remains, but which side it falls on no longer does.
+
+  **A cross-paper gap surfaced, and nothing is scored across it.** The
+  `[Ref. 3]` curve matches Eq. 4.17 and Eq. 4.18 (already confirmed on
+  figures 4.46/4.47) to 4.16% and 3.70% RMS -- a third independent
+  confirmation of both. But `Eq. 4.18`'s form (`C=2.24`, `n=0.35`)
+  disagrees with `han_1988_orthogonal`'s own equation (`n=0.28`) by 11-21%
+  at the same operating points, a real difference between two published
+  papers rather than a model defect. Every series in this figure is
+  therefore unscored, for three independent reasons recorded in the
+  metadata: the new data falls outside the implemented set's valid `W/H`
+  range, the reference curve is a drawn line, and scoring the overlap
+  would report the cross-paper gap as model error.
+
+  **A misread axis, corrected before filing.** Panel (a)'s `R` axis was
+  initially logged as log; it is linear. The tell was the digitised
+  frame's own picks -- `1.5, 2.5, 3.5, 4.5` are half-integer minor ticks,
+  which a log axis cannot produce.
+
+  **A third confirmation of Han's ~6% accuracy band**, this time from the
+  source's own printed error bars: four reconstructed centers give
+  half-widths of 6.5-8.2%, mean 7.2%. One bar's upper end was initially
+  obscured; the rescan agreed with the earlier partial reading to 0.7%.
+
 - **Everything is namespaced by source.** A figure number is not a unique
   identifier -- two books can each have a figure 4.46 -- so `cards/` and
   `plots/` are now keyed by source as `data/` already was:

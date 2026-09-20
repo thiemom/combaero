@@ -510,7 +510,7 @@ with the `G` correlation attributed in the text to Han et al. (1989).
 | 37 | `1/2 < W/H < 1` | `n = 0.35`; `C = 2.24` at `alpha = 90 deg`, `C = 1.80` for `30 < alpha < 90` | confirmed by text |
 | 38 | `1/4 < W/H < 1/2` | `n = 0.35 (W/H)^0.44`; `C = 2.24 (W/H)^-0.76` at `alpha = 90 deg`, `C = 1.80 (W/H)^-0.76` for `30 < alpha < 90` | confirmed by text |
 | 39 | `R` behaviour, Fig. 4.48 | `R` increases with decreasing `W/H`; all three aspect ratios coincide at `alpha = 30 deg` | confirmed by text |
-| 40 | `R` correlation for narrow channels | plotted in Fig. 4.48a, no closed form in the extracted text | **missing** |
+| 40 | `R` correlation for narrow channels | plotted in Fig. 4.48a, no closed form in the extracted text | **missing -- digitised as data, see below** |
 
 ### Cross-check: Eq. 4.18 and Eq. 4.19 meet exactly at `W/H = 1`
 
@@ -532,7 +532,7 @@ failed and did not.
 
 | # | item | state |
 |---|---|---|
-| 41 | Eq. 4.19's two branches disagree at `W/H = 1/2` | **needs review** |
+| 41 | Eq. 4.19's two branches disagree at `W/H = 1/2` | **RESOLVED, see below** |
 
 Evaluated at `W/H = 1/2`, `alpha = 90 deg`, from either side:
 
@@ -546,14 +546,106 @@ range. Unlike the `W/H = 1` junction above, these branches do not meet.
 
 The text gives open intervals, so `W/H = 1/2` exactly may be intended to fall
 in neither. But an implementation has to choose, and a 10% discontinuity inside
-the validated range will appear in any solve that crosses it. Whether the
-correlation is meant to be discontinuous, or the branches used only well inside
-their intervals, needs a reviewer.
+the validated range will appear in any solve that crosses it.
+
+**Resolved by digitising Figure 4.48's own `W/H = 2/4` correlation line**
+(`validation/cooling/data/han2012/fig4.48_G_correlation_WH0.5.csv`). Free fit
+gives `G = 2.458 (e+)^0.3302`, against:
+
+| branch | form at `W/H=0.5`, `alpha=90` | match to the digitised line |
+|---|---|---|
+| wide (`1/2<W/H<1`) | `C=2.24`, `n=0.35` | 10% in `C`, 6% in `n` |
+| narrow (`1/4<W/H<1/2`) | `C=3.79`, `n=0.258` | 69% in `C`, 22% in `n` |
+
+The wide-branch form is unambiguously closer, on both parameters. Han's own
+plotted correlation at the boundary uses the wide branch. The discontinuity
+itself is not removed -- the two forms still disagree by 10% approaching `1/2`
+from below -- but which side the boundary belongs to is now settled by the
+source's own figure rather than left to an implementer's guess.
+
+### Eq. 4.17 outside its stated 30-90 degree range -- not a validity claim
+
+Han states Eq. 4.17 for `alpha = 30-90 deg`. Investigated the raw quadratic's
+behaviour beyond that purely to characterise it numerically -- e.g. what a
+solver would see if an iterate briefly overshot the range -- not to extend the
+correlation's claimed validity.
+
+At `W/H=1`, `m=0`:
+
+| `alpha` | `R` (raw, unclamped) |
+|---|---|
+| 0 | 12.31 |
+| 30 | 5.27 |
+| 68.2 (vertex) | 2.05 |
+| 90 | 3.10 |
+| 120 | 7.97 |
+| 150 | 16.80 |
+| 180 | 29.61 |
+
+The quadratic has no real roots (discriminant `-146.6`), so it stays positive
+and finite for any `alpha` -- no blow-up, no sign change. But its vertex sits
+at `alpha=68.2 deg`, not `90`, so the raw formula has no reflective symmetry
+about `90` and simply keeps climbing past it: `R(180) = 29.6`, higher than
+`R(0) = 12.3`, a number with no connection to anything measured.
+
+**Reflection-folding gives a bounded, physically motivated alternative.**
+Mapping `alpha_eff = 180 - alpha` for `alpha > 90` (equivalently `abs`-folding
+into `[0, 90]`) exactly reproduces the fitted 0-90 curve by construction, so it
+never exceeds the range's own extremes (`R` between `2.05` and `12.31`):
+
+| `alpha` | raw (unclamped) | folded (`alpha_eff = 180 - alpha`) |
+|---|---|---|
+| 120 | 7.97 | 2.20 (= `R(60)`) |
+| 150 | 16.80 | 5.27 (= `R(30)`) |
+| 180 | 29.61 | 12.31 (= `R(0)`) |
+
+This is the same convention `RibCorrelationSet::symmetric` already applies
+elsewhere (true for 90 deg orthogonal and parallel angled ribs, where
+reversing the flow is a mirror operation) -- reflection-folding the *angle*
+input is that same idea applied consistently, not a new one.
+
+**Not implemented.** No guard exists in `evaluate_rib` for out-of-range
+`alpha`; this is a numerical characterisation for whoever adds one, recording
+that reflection-fold is the bounded, convention-consistent choice and that
+leaving the raw polynomial unclamped is not dangerous (no negative or complex
+output) but is unbounded and physically unmotivated beyond the fitted range.
 
 ### Prandtl number
 
 Item 36 states `Pr = 0.7`, consistent with item 25. The narrow-channel
 correlation carries no `Pr` term either.
+
+### Figure 4.48 digitised: both panels, plus a labelled `[Ref. 3]` curve
+
+`validation/cooling/data/han2012/fig4.48_*.csv`, 16 series, 111 points.
+Attribution by marker fill (solid = `W/H=1/4`, open = `W/H=2/4`), cross-checked
+against the physics: `R` must rise as `W/H` falls, and the solid points do
+measure higher `R` than the open points at every `alpha`.
+
+A third curve, labelled `W/H = 2/2 [Ref. 3]` on the figure, carries no scatter
+of its own -- only a drawn line, with error bars at a few points and no raw
+markers. `[Ref. 3]` is not resolved to a specific citation; what is measurable
+is that this curve's `R` matches Eq. 4.17 (`W/H=1`, `m=0`) to 4.16% RMS, and its
+`G` matches Eq. 4.18's square-channel form (`C=2.24`, `n=0.35`) to 3.70% RMS --
+a third confirmation of both equations, after Figures 4.46 and 4.47.
+
+**A cross-paper gap surfaced by the same comparison.** Eq. 4.17 evaluated at
+`alpha=90` gives `R=3.10`, against Han (1988)'s own direct `R=3.2` (`-3.1%`).
+Eq. 4.18's square-channel form gives `G=2.24(e+)^0.35`, against
+`han_1988_orthogonal`'s `G=3.7(e+)^0.28` -- diverging from `-20.9%` at `e+=70`
+to `-11.4%` at `e+=404`. Both are small, real disagreements between two
+published forms for nominally the same case, not a defect in either. **Nothing
+in Figure 4.48 is scored against `han_1988_orthogonal`** for three independent
+reasons: the new `W/H<1` data falls outside its valid range; the `[Ref. 3]`
+curve is a drawn line (never a source of truth, per the harness rule); and
+scoring the overlapping points would report the cross-paper gap as model
+error. See the metadata header for the full reasoning.
+
+**Error bars gave a third independent measurement of Han's accuracy band.**
+Four reconstructed centers on the `R` panel: half-widths 6.5%, 8.0%, 6.2%,
+8.2%, mean 7.2%. This is the first time in this dataset the uncertainty comes
+from the source's own printed error bars rather than from scatter or a stated
+blanket percentage.
 
 ## High-performance ribs (section 4.2.4) -- ADDED 2026-09-15
 
@@ -877,6 +969,7 @@ than extrapolating past it.
 
 | date | reviewer | outcome |
 |---|---|---|
+| 2026-09-20 | reviewer + Claude | **Item 41 resolved, item 40 given data.** Figure 4.48 digitised: both panels, `[Ref. 3]` curve, and its error bars (16 series, 111 points). The `W/H=2/4` correlation at the branch boundary matches the WIDE branch of Eq. 4.19 (10%/6%), not the narrow one (69%/22%), settling which form Han's own figure uses at `W/H=1/2`. Along the way, corrected an initial misreading of panel (a)'s y-axis as log -- the half-integer minor ticks (1.5, 2.5, 3.5, 4.5) are only possible on a linear axis, confirmed on the printed page and independently by the digitised frame. One error-bar end (alpha=30, top panel) was initially obscured; the rescanned value agreed with the earlier partial read to 0.7%. |
 | 2026-09-18 | reviewer + Claude | **Item 7 closed with evidence, not deference.** D1 stands, but the reason improves: the `R` slope is in the DRAWING, not the scan. Both panel frames were digitised as distortion standards -- a frame is horizontal by construction, so its fitted slope is the panel's distortion and nothing else, and unlike a printed equation it does not presume the draftsman drew the equation faithfully. Upper frame `+0.00078`, lower frame `-0.00036`, neither monotonic, i.e. picking noise. The drawn `R` line rises at `+0.00857` -- **23x the distortion of the panel it sits in, and in the opposite direction**. No page skew lifts `R` by 2.7% while leaving its own frame flat to 0.04%. Independently, `G_bar` in the upper panel reproduces its printed `4.5 (e+)^0.28` to 0.25% RMS off the same scan. Filed as `validation/cooling/data/han2012/fig4.46_frame_*.csv`. |
 | 2026-09-10 | extracted by Claude | UNCONFIRMED -- submitted for review |
 | 2026-09-10 | reviewer | **CONFIRMED.** All items checked against the book or resolved by derivation; no open flags. D1 and D2 accepted, D3 withdrawn. Released for implementation under #334. |

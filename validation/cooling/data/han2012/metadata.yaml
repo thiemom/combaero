@@ -2515,6 +2515,655 @@ files:
       plot_x_limits: [50, 1100]
       plot_y_limits: [8, 32]
 
+  # -- Figure 4.48: narrow-aspect-ratio channels (Eq. 4.19) ---------------
+  #
+  # After Han, J.C. et al. (1988), IJHMT 31(1), 183. Two panels STACKED,
+  # (a) R vs alpha top, (b) G vs e+ bottom -- unlike 4.47's side-by-side
+  # layout, this matches 4.51's stacking, but shares NO abscissa with it:
+  # each panel has its own.
+  #
+  #   (a)  R vs alpha,  x LINEAR (ticks every 15 deg, labelled 90,60,45,30),
+  #        y LINEAR (ticks every 0.5 from 1.5, every 1 above 5). NOTE: read
+  #        off the page as log at first pass; the half-integer minor ticks
+  #        (1.5, 2.5, 3.5, 4.5) are the tell that rules that out -- a log
+  #        axis never places a minor tick at a half-integer, only linear
+  #        does. Confirmed on the printed page (one minor tick exactly
+  #        centred between each major label) and independently by the
+  #        frame's own picks.
+  #   (b)  G vs e+, both LOG, same ticks as every other e+ panel in this
+  #        dataset (50, 100, 200, 300, 500, 1000 -- no multiplier).
+  #
+  # NO LEGEND, but attribution is possible by marker FILL, unlike figure
+  # 4.47: solid = W/H 1/4, open = W/H 2/4, confirmed by the caption arrows
+  # AND cross-validated against the physics -- R must increase as W/H
+  # decreases, and the solid (nominally smaller W/H) points measure higher
+  # R at every alpha than the open points do, exactly as required.
+  #
+  # A third curve, labelled "W/H = 2/2 [Ref. 3]" on the figure, is drawn
+  # with NO scatter markers of its own -- only a line, with error bars at
+  # a few points. "[Ref. 3]" is not resolved to a specific citation here;
+  # it is not claimed to be any particular paper. What is measurable is
+  # that its R curve matches Eq. 4.17 (W/H=1, m=0) to 4.16% RMS, and its G
+  # curve matches Eq. 4.18's square-channel form (C=2.24, n=0.35) to 3.70%
+  # RMS -- both already confirmed on figures 4.46/4.47. So whatever "[Ref.
+  # 3]" is, its plotted line reproduces correlations this project already
+  # has independent evidence for.
+  #
+  # NOTHING IN THIS FIGURE IS SCORED. Three separate reasons, not one:
+  #
+  #   1. W/H = 0.5 and 0.25 (the new narrow-channel data) fall OUTSIDE
+  #      han_1988_orthogonal's valid_WH = [1, 4] -- this figure's whole
+  #      point is behaviour the implemented set does not cover, and the
+  #      correlation lines are the acceptance data for the eventual
+  #      extension (Eq. 4.19), same treatment as figure 4.47.
+  #
+  #   2. The "[Ref. 3]" W/H=1 curve sits inside the implemented set's
+  #      valid range, but it is a DRAWN LINE (with error bars describing
+  #      its own reported scatter, not independent raw measurement) --
+  #      the established rule from figures 4.46/4.51 is to never score a
+  #      digitised drawn line, only data and printed equations.
+  #
+  #   3. Even where the "[Ref. 3]" curve overlaps the implemented set's
+  #      domain, THE TWO PUBLISHED FORMS DISAGREE WITH EACH OTHER. Eq.
+  #      4.17 evaluated at alpha=90 gives R=3.10 against Han (1988)'s
+  #      direct R=3.2 (-3.1%); Eq. 4.18's square-channel form gives
+  #      G=2.24(e+)^0.35 against han_1988_orthogonal's G=3.7(e+)^0.28,
+  #      diverging from -20.9% at e+=70 to -11.4% at e+=404. Scoring the
+  #      "[Ref. 3]" G data against han_1988_orthogonal would report that
+  #      15-20% gap as model error, when it is a cross-paper exponent
+  #      disagreement (0.35 vs 0.28) that exists independently of any
+  #      W/H<1 question. Both comparisons are recorded below as text,
+  #      not as a scored number that would blend the two effects.
+  #
+  # ITEM 41 RESOLVED: extraction item 41 flagged a 10% discontinuity in
+  # Eq. 4.19 at the W/H=1/2 branch boundary, unresolved pending review.
+  # The W/H=2/4 (=0.5) correlation drawn in THIS figure settles which side
+  # Han's own plot falls on: free fit gives (e+)^0.330, far closer to the
+  # WIDE branch's n=0.35 (matching C=2.24 to 10%) than the NARROW branch's
+  # n=0.258 (C=3.79, off by 35%+ in exponent). The wide-branch form is what
+  # is actually plotted at the boundary.
+
+  - path: fig4.48_R_WH0.25.csv
+    after: "Han, J.C. et al. (1988). IJHMT 31(1), 183."
+    page: 378
+    figure: "4.48"
+    panel: top
+    item: "Figure 4.48a, solid symbols"
+    series: "W/H = 1/4, R vs alpha, all alpha pooled"
+    geometry: {W_H: 0.25}
+    alpha_deg: null
+    x_axis: alpha_deg
+    x_scale: 1.0
+    y_axis: R
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Attribution by marker fill (solid), no legend. Cross-validated
+      against the physics: R must rise as W/H falls, and these solid
+      points measure R(alpha=90) ~ 6.23 against the open (W/H=2/4)
+      points' 5.05 and the W/H=1 reference curve's 3.20 -- monotonic in
+      the right direction. Not scored: outside han_1988_orthogonal's
+      valid_WH=[1,4]; acceptance data for Eq. 4.19 (#334).
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [30, 45, 60, 90]
+      x_multiplier: 1.0
+      y_ticks: [2, 3, 4, 5, 6, 7]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [25, 95]
+      plot_y_limits: [1.5, 7.5]
+
+  - path: fig4.48_R_WH0.5.csv
+    after: "Han, J.C. et al. (1988). IJHMT 31(1), 183."
+    page: 378
+    figure: "4.48"
+    panel: top
+    item: "Figure 4.48a, open symbols"
+    series: "W/H = 2/4, R vs alpha, all alpha pooled"
+    geometry: {W_H: 0.5}
+    alpha_deg: null
+    x_axis: alpha_deg
+    x_scale: 1.0
+    y_axis: R
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Attribution by marker fill (open). R(alpha=90) ~ 5.05, between the
+      solid (W/H=1/4) points at 6.23 and the W/H=1 reference at 3.20 --
+      the required ordering. Not scored: outside valid_WH=[1,4];
+      acceptance data for Eq. 4.19 (#334).
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [30, 45, 60, 90]
+      x_multiplier: 1.0
+      y_ticks: [2, 3, 4, 5, 6, 7]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [25, 95]
+      plot_y_limits: [1.5, 7.5]
+
+  - path: fig4.48_R_correlation_WH0.25.csv
+    after: "Han, J.C. et al. (1988). IJHMT 31(1), 183."
+    page: 378
+    figure: "4.48"
+    panel: top
+    item: "Figure 4.48a, drawn line, W/H = 1/4"
+    series: "drawn correlation, no closed form given in the extracted text"
+    geometry: {W_H: 0.25}
+    alpha_deg: null
+    x_axis: alpha_deg
+    x_scale: 1.0
+    y_axis: R
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      No printed equation for R at W/H < 1 (extraction item 40, still
+      missing). Recorded as data only. Not scored.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [30, 45, 60, 90]
+      x_multiplier: 1.0
+      y_ticks: [2, 3, 4, 5, 6, 7]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [25, 95]
+      plot_y_limits: [1.5, 7.5]
+
+  - path: fig4.48_R_correlation_WH0.5.csv
+    after: "Han, J.C. et al. (1988). IJHMT 31(1), 183."
+    page: 378
+    figure: "4.48"
+    panel: top
+    item: "Figure 4.48a, drawn line, W/H = 2/4"
+    series: "drawn correlation, no closed form given in the extracted text"
+    geometry: {W_H: 0.5}
+    alpha_deg: null
+    x_axis: alpha_deg
+    x_scale: 1.0
+    y_axis: R
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      No printed R equation for this W/H either (item 40, missing).
+      Recorded as data only. Not scored.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [30, 45, 60, 90]
+      x_multiplier: 1.0
+      y_ticks: [2, 3, 4, 5, 6, 7]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [25, 95]
+      plot_y_limits: [1.5, 7.5]
+
+  - path: fig4.48_R_correlation_WH1_ref3.csv
+    after: "Han, J.C. et al. (1988). IJHMT 31(1), 183."
+    page: 378
+    figure: "4.48"
+    panel: top
+    item: "Figure 4.48a, drawn line labelled W/H = 2/2 [Ref. 3]"
+    series: "reference curve, no scatter markers of its own"
+    geometry: {W_H: 1.0}
+    alpha_deg: null
+    x_axis: alpha_deg
+    x_scale: 1.0
+    y_axis: R
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      "[Ref. 3]" is not resolved to a specific citation -- recorded as
+      printed, not guessed. Matches Eq. 4.17 (W/H=1, m=0) to 4.16% RMS
+      across 9 points, confirming that equation from a THIRD figure (after
+      4.46, 4.47). Eq. 4.17 itself evaluates to R=3.10 at alpha=90 against
+      Han (1988)'s direct R=3.2, a -3.1% cross-paper gap that exists
+      independently of this figure. Not scored: a drawn line, never a
+      source of truth (see README).
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [30, 45, 60, 90]
+      x_multiplier: 1.0
+      y_ticks: [2, 3, 4, 5, 6, 7]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [25, 95]
+      plot_y_limits: [1.5, 7.5]
+
+  - path: fig4.48_R_errorbar_WH1_ref3.csv
+    after: "Han, J.C. et al. (1988). IJHMT 31(1), 183."
+    page: 378
+    figure: "4.48"
+    panel: top
+    item: "Figure 4.48a, error bars on the [Ref. 3] line"
+    series: "reconstructed centers of the printed error bars, W/H=1"
+    geometry: {W_H: 1.0}
+    alpha_deg: null
+    x_axis: alpha_deg
+    x_scale: 1.0
+    y_axis: R
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.075
+    cross_check: >-
+      Centers are the midpoint of each printed bar's lo and hi ends (both
+      digitised directly; the alpha=30 bar's hi end was initially
+      obscured, then rescanned -- the rescanned lo, 4.659, agrees with the
+      original partial read, 4.693, to 0.7%, confirming no drift between
+      sessions). Half-widths: 6.5% (30 deg), 8.0% (45), 6.2% (60), 8.2%
+      (90), mean 7.2% -- a third independent confirmation of Han's ~6%
+      band, this time from the source's OWN stated uncertainty rather than
+      from scatter. The alpha=90 point alone agrees with
+      han_1988_orthogonal's R=3.2 to 1.3%, but is not scored: this whole
+      series represents a published correlation's own reported scatter
+      band, the same category as the drawn line above, and scoring only
+      the point that happens to agree would be selection bias.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [30, 45, 60, 90]
+      x_multiplier: 1.0
+      y_ticks: [2, 3, 4, 5, 6, 7]
+      printed_curve: null
+      monotonic: null
+      expected_points: 4
+      plot_x_limits: [25, 95]
+      plot_y_limits: [1.5, 7.5]
+
+  - path: fig4.48_G_WH0.5.csv
+    after: "Han, J.C. et al. (1988). IJHMT 31(1), 183."
+    page: 378
+    figure: "4.48"
+    panel: bottom
+    item: "Figure 4.48b, open symbols"
+    series: "W/H = 2/4, G vs e+, all alpha pooled"
+    geometry: {W_H: 0.5}
+    alpha_deg: null
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Attribution by fill (open), matching panel (a)'s split. Not scored:
+      outside valid_WH=[1,4]; acceptance data for Eq. 4.19 (#334).
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [5, 8, 10, 15, 20, 25]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [45, 1100]
+      plot_y_limits: [4, 30]
+
+  - path: fig4.48_G_WH0.25.csv
+    after: "Han, J.C. et al. (1988). IJHMT 31(1), 183."
+    page: 378
+    figure: "4.48"
+    panel: bottom
+    item: "Figure 4.48b, solid symbols"
+    series: "W/H = 1/4, G vs e+, all alpha pooled"
+    geometry: {W_H: 0.25}
+    alpha_deg: null
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Attribution by fill (solid). Not scored: outside valid_WH=[1,4];
+      acceptance data for Eq. 4.19 (#334).
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [5, 8, 10, 15, 20, 25]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [45, 1100]
+      plot_y_limits: [4, 30]
+
+  - path: fig4.48_G_correlation_WH0.5.csv
+    after: "Han, J.C. et al. (1988). IJHMT 31(1), 183."
+    page: 378
+    figure: "4.48"
+    panel: bottom
+    item: "Figure 4.48b, drawn line, W/H = 2/4"
+    series: "drawn correlation -- RESOLVES extraction item 41"
+    geometry: {W_H: 0.5}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      W/H=0.5 is Eq. 4.19's branch boundary (item 41: the two branches
+      disagree by ~10% there, unresolved). Free fit gives (e+)^0.3302,
+      matching the WIDE branch's n=0.35, C=2.24 (alpha=90) to 10% in C and
+      6% in n -- far closer than the NARROW branch's n=0.258, C=3.79. Han's
+      own plotted correlation at the boundary uses the wide-branch form.
+      Not scored: a drawn line; the resolution above is the point of
+      filing this series, not a number for the scorecard.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [5, 8, 10, 15, 20, 25]
+      printed_curve: null
+      monotonic: increasing
+      expected_points: null
+      plot_x_limits: [45, 1100]
+      plot_y_limits: [4, 30]
+
+  - path: fig4.48_G_correlation_WH0.25.csv
+    after: "Han, J.C. et al. (1988). IJHMT 31(1), 183."
+    page: 378
+    figure: "4.48"
+    panel: bottom
+    item: "Figure 4.48b, drawn line, W/H = 1/4"
+    series: "drawn correlation"
+    geometry: {W_H: 0.25}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Free fit (e+)^0.2014, matching Eq. 4.19's NARROW branch at alpha=90
+      (n=0.190, C=6.42) to 6% in n and 10% in C -- clearly the narrow form,
+      not the wide one (n=0.35 would be 42% off). Cannot discriminate the
+      alpha=90 vs 30<alpha<90 C-root from this alone: measured C=5.81 sits
+      almost equidistant between both (6.42 and 5.16). Not scored: a drawn
+      line.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [5, 8, 10, 15, 20, 25]
+      printed_curve: null
+      monotonic: increasing
+      expected_points: null
+      plot_x_limits: [45, 1100]
+      plot_y_limits: [4, 30]
+
+  - path: fig4.48_G_correlation_WH1_ref3.csv
+    after: "Han, J.C. et al. (1988). IJHMT 31(1), 183."
+    page: 378
+    figure: "4.48"
+    panel: bottom
+    item: "Figure 4.48b, drawn line labelled W/H = 2/2 [Ref. 3]"
+    series: "reference curve, no scatter markers of its own"
+    geometry: {W_H: 1.0}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.06
+    cross_check: >-
+      Matches Eq. 4.18's square-channel form (C=2.24, n=0.35) to 3.70% RMS
+      -- a third confirmation of that equation, after figures 4.46 and
+      4.47. It does NOT match han_1988_orthogonal's G=3.7(e+)^0.28: that
+      form diverges from -20.9% at e+=70 to -11.4% at e+=404, a cross-paper
+      exponent disagreement (0.35 vs 0.28) for nominally the same alpha=90
+      case. Not scored, for two independent reasons: it is a drawn line,
+      and scoring it would report a known cross-paper gap as model error.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [5, 8, 10, 15, 20, 25]
+      printed_curve: null
+      monotonic: increasing
+      expected_points: null
+      plot_x_limits: [45, 1100]
+      plot_y_limits: [4, 30]
+
+  - path: fig4.48_G_errorbar_WH1_ref3.csv
+    after: "Han, J.C. et al. (1988). IJHMT 31(1), 183."
+    page: 378
+    figure: "4.48"
+    panel: bottom
+    item: "Figure 4.48b, error bars on the [Ref. 3] line"
+    series: "reconstructed centers of the printed error bars, W/H=1"
+    geometry: {W_H: 1.0}
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: 0.09
+    cross_check: >-
+      Centers are the geometric mean of each bar's lo/hi ends (appropriate
+      on a log axis). Spreads ~8.8%, 9.6%, 8.6% -- consistent with the
+      panel (a) bars and Han's stated band. Against han_1988_orthogonal:
+      -20.9% at e+=70 to -11.4% at e+=404, the same cross-paper gap the
+      drawn line above shows. Not scored, for the same two reasons: it
+      represents a published correlation's own reported scatter, and the
+      gap to han_1988_orthogonal is a known cross-paper exponent
+      difference (0.35 vs 0.28), not a measurement of model error.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: [5, 8, 10, 15, 20, 25]
+      printed_curve: null
+      monotonic: increasing
+      expected_points: 3
+      plot_x_limits: [45, 1100]
+      plot_y_limits: [4, 30]
+
+  - path: fig4.48_frame_x_top.csv
+    after: "Han, J.C. et al. (1988). IJHMT 31(1), 183."
+    page: 378
+    figure: "4.48"
+    panel: top
+    item: "Figure 4.48a, x-axis frame"
+    series: "panel frame, picked as a distortion standard"
+    geometry: null
+    alpha_deg: null
+    x_axis: alpha_deg
+    x_scale: 1.0
+    y_axis: frame_position
+    kind: frame
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: null
+    cross_check: >-
+      A horizontal frame is horizontal by construction, so its fitted slope is
+      this panel's distortion and nothing else. Picked past the labelled
+      30-90 range at both ends (down to 8.7), which is the real box edge,
+      not a stray click -- the frame runs well past its last label here,
+      same as every other frame in this dataset.
+    scores: null
+    verification:
+      kind: frame
+      frame_orientation: horizontal
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [30, 45, 60, 90]
+      x_multiplier: 1.0
+      x_limits: [5, 120]
+      y_ticks: []
+      frame_tolerance: 0.02
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [5, 120]
+      plot_y_limits: [1.5, 7.5]
+
+  - path: fig4.48_frame_y_top.csv
+    after: "Han, J.C. et al. (1988). IJHMT 31(1), 183."
+    page: 378
+    figure: "4.48"
+    panel: top
+    item: "Figure 4.48a, y-axis frame"
+    series: "panel frame, picked as a distortion standard"
+    geometry: null
+    alpha_deg: null
+    x_axis: alpha_deg
+    x_scale: 1.0
+    y_axis: frame_position
+    kind: frame
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: null
+    cross_check: >-
+      A vertical frame is vertical by construction, so its fitted slope is
+      this panel's distortion and nothing else.
+    scores: null
+    verification:
+      kind: frame
+      frame_orientation: vertical
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [30, 45, 60, 90]
+      x_multiplier: 1.0
+      y_ticks: []
+      frame_tolerance: 0.02
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [25, 95]
+      plot_y_limits: [1.5, 7.5]
+
+  - path: fig4.48_frame_x_bottom.csv
+    after: "Han, J.C. et al. (1988). IJHMT 31(1), 183."
+    page: 378
+    figure: "4.48"
+    panel: bottom
+    item: "Figure 4.48b, x-axis frame"
+    series: "panel frame, picked as a distortion standard"
+    geometry: null
+    alpha_deg: null
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: frame_position
+    kind: frame
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: null
+    cross_check: >-
+      A horizontal frame is horizontal by construction, so its fitted slope is
+      this panel's distortion and nothing else.
+    scores: null
+    verification:
+      kind: frame
+      frame_orientation: horizontal
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: []
+      frame_tolerance: 0.02
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [45, 1100]
+      plot_y_limits: [4, 30]
+
+  - path: fig4.48_frame_y_bottom.csv
+    after: "Han, J.C. et al. (1988). IJHMT 31(1), 183."
+    page: 378
+    figure: "4.48"
+    panel: bottom
+    item: "Figure 4.48b, y-axis frame"
+    series: "panel frame, picked as a distortion standard"
+    geometry: null
+    alpha_deg: null
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: frame_position
+    kind: frame
+    extraction: figure-digitised
+    confidence: band
+    class_confidence: confirmed
+    uncertainty: null
+    cross_check: >-
+      A vertical frame is vertical by construction, so its fitted slope is
+      this panel's distortion and nothing else.
+    scores: null
+    verification:
+      kind: frame
+      frame_orientation: vertical
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [50, 100, 200, 300, 500, 1000]
+      x_multiplier: 1.0
+      y_ticks: []
+      frame_tolerance: 0.02
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [45, 1100]
+      plot_y_limits: [4, 30]
+
 # The Han and Zhang (1992) rig geometry (e/D, P/e, W/H) is NOT stated in the
 # extracted text and is recorded as missing rather than guessed. It costs
 # nothing for han_1988_orthogonal, whose G carries zero exponents on all
