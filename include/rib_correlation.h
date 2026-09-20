@@ -75,14 +75,54 @@ struct RibCorrelationSet {
   // and parallel angled ribs, where reversal is a mirror operation.
   bool symmetric = true;
 
-  // Friction roughness function.
+  // Friction roughness function. Two shapes exist in the sources:
+  //
+  //   PowerLaw       R = C_R * (e/D)^.. * (p/e)^.. * (W/H)^.. * (alpha/90)^d
+  //                  (Han 1988, Rallabandi 2009 -- both have d = 0)
+  //
+  //   QuadraticAlpha R / [(p/e/10)^0.35 * (W/H)^m] = R_quad_c0 +
+  //                      R_quad_c1*(alpha/90) + R_quad_c2*(alpha/90)^2
+  //                  where m switches on the rib angle itself:
+  //                      m = R_quad_WH_exponent_at_90   if alpha == 90 deg
+  //                      m = R_quad_WH_exponent_off_90  otherwise
+  //                  (Han and Park 1988, Eq. 4.17). R_eD, R_pe, R_WH and
+  //                  R_alpha are IGNORED in this shape -- the quadratic
+  //                  fields replace them entirely, they do not compose.
+  //
+  // The switch on m is a genuine discontinuity the source states, not a
+  // numerical artefact: at W/H = 2 it is a 27.5% jump in R exactly at
+  // alpha = 90, at W/H = 4 it is 62.5%. No smooth interpolation is given by
+  // the source, so none is invented here -- see evaluate_rib's comment for
+  // what that means for a solver that traverses this exact angle.
+  enum class RAlphaShape { PowerLaw, QuadraticAlpha };
+  RAlphaShape R_alpha_shape = RAlphaShape::PowerLaw;
   double C_R = 0.0;
   RibTerm R_eD, R_pe, R_WH, R_alpha;
+  double R_quad_c0 = 0.0, R_quad_c1 = 0.0, R_quad_c2 = 0.0;
+  double R_quad_WH_exponent_at_90 = 0.0;
+  double R_quad_WH_exponent_off_90 = 0.0;
+  // Eq. 4.17's own cap: "if W/H > 2, set W/H = 2". 0 means uncapped.
+  double R_quad_WH_cap = 0.0;
 
-  // Heat-transfer roughness function.
+  // Heat-transfer roughness function. G_alpha and G_pe are either fixed
+  // constants (Fixed, the default -- Han 1988, Rallabandi 2009) or switch
+  // on whether the channel is square (Han and Park 1988, Eq. 4.18):
+  //
+  //   m = G_shape_alpha_exponent_square, n = G_shape_pe_exponent_square
+  //       if W/H == 1 (square)
+  //   m = G_shape_alpha_exponent_rect,   n = G_shape_pe_exponent_rect
+  //       otherwise (rectangular)
+  //
+  // G_alpha and G_pe are IGNORED when G_shape_model is SquareVsRectangular.
+  // Same caveat as R's switch: a genuine, unsmoothed discontinuity at
+  // W/H = 1, up to 27% at alpha = 30, p/e = 20.
+  enum class GShapeModel { Fixed, SquareVsRectangular };
+  GShapeModel G_shape_model = GShapeModel::Fixed;
   double C_G = 0.0;
   RibTerm G_eD, G_pe, G_WH, G_alpha;
   double G_eplus_exponent = 0.0;
+  double G_shape_alpha_exponent_square = 0.0, G_shape_alpha_exponent_rect = 0.0;
+  double G_shape_pe_exponent_square = 0.0, G_shape_pe_exponent_rect = 0.0;
 
   // Advisory validity.
   RibRange valid_Re, valid_eD, valid_pe, valid_WH, valid_alpha, valid_eplus;
@@ -113,6 +153,16 @@ RibCorrelationSet han_1988_orthogonal();
 // ribs above this Reynolds range chooses the correlation directly, same as
 // any other set choice.
 RibCorrelationSet rallabandi_2009_high_re();
+
+// Han, J.C. and Park, J.S. (1988), IJHMT 31(1), 183, Eq. 4.17/4.18, for
+// broad-aspect-ratio rectangular ducts with angled ribs -- alpha 30-90 deg,
+// W/H 1-4. A different paper and configuration from han_1988_orthogonal
+// (which is 90 deg only): the two R correlations happen to agree closely
+// at alpha=90 (3.44%), but the two G correlations disagree by up to 22%
+// there, because Fig. 4.46 and this set describe genuinely different rib
+// configurations that are not obliged to agree. See
+// validation/cooling/extractions/han_ribbed.md, item 23.
+RibCorrelationSet han_park_1988_angled();
 
 // Geometry of the ribbed channel, as the correlation sees it.
 struct RibGeometry {

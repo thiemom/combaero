@@ -431,11 +431,21 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double>& X,
 // R carries no e+ term by construction, so f is independent of Reynolds
 // number and df/d(mdot) is identically zero for this family.
 //
+// han_park_1988_angled uses two shapes the plain power law above cannot
+// express: R is a quadratic in alpha (Eq. 4.17), and G's alpha/p_e
+// exponents switch on channel shape, square vs rectangular (Eq. 4.18).
+// Both are genuine discontinuities the source states -- up to 62.5% in R
+// at alpha=90, W/H=4; up to 27% in G at W/H=1 -- and neither is smoothed,
+// since no smooth transition is stated. See
+// validation/cooling/extractions/han_ribbed.md, decision D5, and
+// RibCorrelationSet::RAlphaShape / GShapeModel in rib_correlation.h.
+//
 // Named sets, selected explicitly -- there is no auto-switching between
 // them, since they cover disjoint regimes rather than one being an update
 // of the other:
 RibCorrelationSet han_1988_orthogonal();       // 90 deg, Re 10e3-60e3
 RibCorrelationSet rallabandi_2009_high_re();   // 45 deg sharp ribs, Re 30e3-400e3
+RibCorrelationSet han_park_1988_angled();      // 30-90 deg, W/H 1-4, Re 10e3-60e3
 void validate_rib_set(const RibCorrelationSet& set);   // throws on a bad set
 RibResult evaluate_rib(const RibCorrelationSet& set,
                        const RibGeometry& geom, double Re);

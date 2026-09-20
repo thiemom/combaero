@@ -71,6 +71,7 @@ class Record:
 SETS = {
     "han_1988_orthogonal": cb.han_1988_orthogonal,
     "rallabandi_2009_high_re": cb.rallabandi_2009_high_re,
+    "han_park_1988_angled": cb.han_park_1988_angled,
 }
 
 
@@ -174,6 +175,40 @@ def _assert_geometry_free(rib_set: "cb.RibCorrelationSet") -> None:
         )
 
 
+def _normalised_R(
+    rib_set: "cb.RibCorrelationSet", geom: cb.RibGeometry, raw_R: float
+) -> float:
+    """Raw R divided back down to what a figure's y-axis actually plots.
+
+    Both R shapes in this project print their correlation as R divided by
+    its own normalisers (Han 1988: R/(p/e/10)^0.35; Han and Park 1988:
+    R/[(p/e/10)^0.35 (W/H)^m]) -- never raw R. Recomputing the divisor from
+    the SAME exposed fields evaluate_rib used keeps this from silently
+    drifting out of step with a future change to either set's shape.
+    """
+    pe_term = rib_set.R_pe
+    pe_factor = (
+        (geom.p_e / pe_term.reference) ** pe_term.exponent
+        if pe_term.reference and pe_term.exponent
+        else 1.0
+    )
+    WH_factor = 1.0
+    if rib_set.R_alpha_shape == cb.RAlphaShape.QuadraticAlpha:
+        at_90 = abs(geom.alpha_deg - 90.0) < 1e-9
+        m = (
+            rib_set.R_quad_WH_exponent_at_90
+            if at_90
+            else rib_set.R_quad_WH_exponent_off_90
+        )
+        if m:
+            W_H = geom.W_H
+            if rib_set.R_quad_WH_cap > 0.0:
+                W_H = min(W_H, rib_set.R_quad_WH_cap)
+            WH_factor = W_H**m
+    divisor = pe_factor * WH_factor
+    return raw_R / divisor if divisor else raw_R
+
+
 def _g_at_eplus(
     rib_set: "cb.RibCorrelationSet", geom: cb.RibGeometry, target: float
 ) -> tuple[float, float, bool, float] | None:
@@ -204,6 +239,24 @@ def _g_at_eplus(
     return res.G, r_norm, res.extrapolated, re
 
 
+def _r_at_alpha(
+    rib_set: "cb.RibCorrelationSet", geom: cb.RibGeometry, alpha_deg: float
+) -> float:
+    """R at a given rib angle. No Re bisection needed.
+
+    Every set in this project has R carrying no e+ term (see
+    rib_correlation.h's header comment: "R CARRIES NO e+ TERM by
+    construction"), so R does not depend on Reynolds number at all. Any Re
+    gives the same R -- ARBITRARY_RE below is not a choice that matters,
+    only a value evaluate_rib needs to run.
+    """
+    geom.alpha_deg = alpha_deg
+    return cb.evaluate_rib(rib_set, geom, ARBITRARY_RE).R
+
+
+ARBITRARY_RE = 30000.0
+
+
 def run_series(series: SeriesMetadata) -> list[Record]:
     """Evaluate one series. Unscored series yield records with no prediction."""
     points: list[Point] = load_points(series)
@@ -213,9 +266,22 @@ def run_series(series: SeriesMetadata) -> list[Record]:
             Record(series, p.x, p.y, None, False, None, "not scored by any set")
             for p in points
         ]
-    if series.x_axis != "e_plus":
+    if series.x_axis not in ("e_plus", "alpha_deg"):
         return [
             Record(series, p.x, p.y, None, False, None, f"x axis is {series.x_axis}")
+            for p in points
+        ]
+    if series.x_axis == "alpha_deg" and not series.y_axis.startswith("R"):
+        # The alpha-indexed path below only computes R (R, R_normalised,
+        # R_normalised_angled -- every R-family name in this dataset starts
+        # with "R"), the only quantity independent of e+/Re in every set
+        # implemented so far.
+        return [
+            Record(
+                series, p.x, p.y, None, False, None,
+                f"alpha-indexed scoring is only implemented for an R "
+                f"quantity, not {series.y_axis}",
+            )
             for p in points
         ]
 
@@ -258,6 +324,30 @@ def run_series(series: SeriesMetadata) -> list[Record]:
         geom.e_D = float(series.geometry.get("e_D", geom.e_D))
         geom.p_e = float(series.geometry.get("p_e", geom.p_e))
         geom.W_H = float(series.geometry.get("W_H", geom.W_H))
+
+    if series.x_axis == "alpha_deg":
+        # R vs alpha (figure 4.47's own axis): no e+/Re bisection needed --
+        # R does not depend on Re for any set in this project. alpha itself
+        # is the point's x-value, not a fixed series field, so extrapolation
+        # is read per point from evaluate_rib's own flag rather than the
+        # series-level _binding_reason check above (which only applies when
+        # alpha is fixed for the whole series).
+        records = []
+        for pt in points:
+            geom.alpha_deg = pt.x
+            res = cb.evaluate_rib(rib_set, geom, ARBITRARY_RE)
+            predicted = res.R
+            if series.y_axis in ("R_normalised", "R_normalised_angled"):
+                # The figure plots R divided by its own normalisers, not raw
+                # R -- dividing them back out here, from the SAME fields
+                # evaluate_rib used, rather than duplicating Eq. 4.17's
+                # formula. Mirrors what _g_at_eplus does for han_1988's
+                # R_pe division below.
+                predicted = _normalised_R(rib_set, geom, res.R)
+            records.append(
+                Record(series, pt.x, pt.y, predicted, res.extrapolated, ARBITRARY_RE)
+            )
+        return records
 
     records: list[Record] = []
     for p in points:
