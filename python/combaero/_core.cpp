@@ -11,6 +11,7 @@
 #include "common_names.h"
 #include "compressible.h"
 #include "cooling_correlations.h"
+#include "impingement_correlation.h"
 #include "rib_correlation.h"
 #include "correlation_status.h"
 #include "ejector.h"
@@ -222,6 +223,148 @@ PYBIND11_MODULE(_core, m) {
         py::arg("correlation_set"), py::arg("geometry"), py::arg("Re"),
         "Evaluate the chain. Re may be negative or zero; the guards are "
         "smooth through both.");
+
+  // ---------------------------------------------------------------------
+  // Jet impingement correlations
+  // ---------------------------------------------------------------------
+  py::enum_<combaero::cooling::ImpingementThermalBC>(m, "ImpingementThermalBC")
+      .value("ConstantHeatFlux",
+             combaero::cooling::ImpingementThermalBC::ConstantHeatFlux)
+      .value("ConstantWallTemperature",
+             combaero::cooling::ImpingementThermalBC::ConstantWallTemperature);
+
+  py::class_<combaero::cooling::SingleJetImpingementSet>(
+      m, "SingleJetImpingementSet")
+      .def(py::init<>())
+      .def_readwrite("name",
+                     &combaero::cooling::SingleJetImpingementSet::name)
+      .def_readwrite("source",
+                     &combaero::cooling::SingleJetImpingementSet::source)
+      .def_readwrite("A", &combaero::cooling::SingleJetImpingementSet::A)
+      .def_readwrite("B", &combaero::cooling::SingleJetImpingementSet::B)
+      .def_readwrite("C", &combaero::cooling::SingleJetImpingementSet::C)
+      .def_readwrite("Re_exponent",
+                     &combaero::cooling::SingleJetImpingementSet::Re_exponent)
+      .def_readwrite(
+          "n_const_heat_flux",
+          &combaero::cooling::SingleJetImpingementSet::n_const_heat_flux)
+      .def_readwrite(
+          "n_const_wall_temp",
+          &combaero::cooling::SingleJetImpingementSet::n_const_wall_temp);
+
+  m.def("goldstein_1986_single_jet",
+        &combaero::cooling::goldstein_1986_single_jet,
+        "Goldstein, Behbahani and Heppelmann (1986) single round jet on a "
+        "flat plate. Extracted and confirmed; see "
+        "validation/cooling/extractions/han_impingement.md.");
+  m.def("validate_single_jet_set", &combaero::cooling::validate_single_jet_set,
+        py::arg("correlation_set"),
+        "Reject a set that cannot be evaluated. Hard error, not an "
+        "operating-point guard.");
+  m.def("single_jet_impingement_nu",
+        &combaero::cooling::single_jet_impingement_nu,
+        py::arg("correlation_set"), py::arg("bc"), py::arg("Re"),
+        py::arg("L_D"), py::arg("R_D"),
+        "Nu_bar for a single round jet impinging on a flat plate.");
+
+  py::enum_<combaero::cooling::JetHolePattern>(m, "JetHolePattern")
+      .value("Inline", combaero::cooling::JetHolePattern::Inline)
+      .value("Staggered", combaero::cooling::JetHolePattern::Staggered);
+
+  py::class_<combaero::cooling::ImpingementRange>(m, "ImpingementRange")
+      .def(py::init<>())
+      .def(py::init([](double lo, double hi) {
+             return combaero::cooling::ImpingementRange{lo, hi};
+           }),
+           py::arg("lo") = 0.0, py::arg("hi") = 0.0)
+      .def_readwrite("lo", &combaero::cooling::ImpingementRange::lo)
+      .def_readwrite("hi", &combaero::cooling::ImpingementRange::hi);
+
+  py::class_<combaero::cooling::JetArrayGeometricFit>(
+      m, "JetArrayGeometricFit")
+      .def(py::init<>())
+      .def(py::init([](double C, double nx, double ny, double nz) {
+             return combaero::cooling::JetArrayGeometricFit{C, nx, ny, nz};
+           }),
+           py::arg("C") = 0.0, py::arg("nx") = 0.0, py::arg("ny") = 0.0,
+           py::arg("nz") = 0.0)
+      .def_readwrite("C", &combaero::cooling::JetArrayGeometricFit::C)
+      .def_readwrite("nx", &combaero::cooling::JetArrayGeometricFit::nx)
+      .def_readwrite("ny", &combaero::cooling::JetArrayGeometricFit::ny)
+      .def_readwrite("nz", &combaero::cooling::JetArrayGeometricFit::nz);
+
+  py::class_<combaero::cooling::JetArrayCorrelationSet>(
+      m, "JetArrayCorrelationSet")
+      .def(py::init<>())
+      .def_readwrite("name", &combaero::cooling::JetArrayCorrelationSet::name)
+      .def_readwrite("source",
+                     &combaero::cooling::JetArrayCorrelationSet::source)
+      .def_readwrite(
+          "validity_source",
+          &combaero::cooling::JetArrayCorrelationSet::validity_source)
+      .def_readwrite("pattern",
+                     &combaero::cooling::JetArrayCorrelationSet::pattern)
+      .def_readwrite("A_fit", &combaero::cooling::JetArrayCorrelationSet::A_fit)
+      .def_readwrite("m_fit", &combaero::cooling::JetArrayCorrelationSet::m_fit)
+      .def_readwrite("B_fit", &combaero::cooling::JetArrayCorrelationSet::B_fit)
+      .def_readwrite("n_fit", &combaero::cooling::JetArrayCorrelationSet::n_fit)
+      .def_readwrite("valid_Re_j",
+                     &combaero::cooling::JetArrayCorrelationSet::valid_Re_j)
+      .def_readwrite("valid_Gc_Gj",
+                     &combaero::cooling::JetArrayCorrelationSet::valid_Gc_Gj)
+      .def_readwrite("valid_xn_d",
+                     &combaero::cooling::JetArrayCorrelationSet::valid_xn_d)
+      .def_readwrite("valid_yn_d",
+                     &combaero::cooling::JetArrayCorrelationSet::valid_yn_d)
+      .def_readwrite("valid_z_d",
+                     &combaero::cooling::JetArrayCorrelationSet::valid_z_d)
+      .def_readwrite(
+          "valid_aspect_ratio",
+          &combaero::cooling::JetArrayCorrelationSet::valid_aspect_ratio)
+      .def_readwrite(
+          "standard_error",
+          &combaero::cooling::JetArrayCorrelationSet::standard_error);
+
+  py::class_<combaero::cooling::JetArrayImpingementResult>(
+      m, "JetArrayImpingementResult")
+      .def_readonly("Nu", &combaero::cooling::JetArrayImpingementResult::Nu)
+      .def_readonly(
+          "extrapolated",
+          &combaero::cooling::JetArrayImpingementResult::extrapolated);
+
+  m.attr("FLORSCHUETZ_1981_DEFAULT_CD") =
+      combaero::cooling::FLORSCHUETZ_1981_DEFAULT_CD;
+
+  m.def("florschuetz_1981_inline", &combaero::cooling::florschuetz_1981_inline,
+        "Florschuetz, Truman and Metzger (1981) jet array with crossflow, "
+        "inline hole pattern. Extracted and confirmed against the primary "
+        "paper; see validation/cooling/extractions/han_impingement.md.");
+  m.def("florschuetz_1981_staggered",
+        &combaero::cooling::florschuetz_1981_staggered,
+        "Florschuetz, Truman and Metzger (1981) jet array with crossflow, "
+        "staggered hole pattern. Extracted and confirmed against the "
+        "primary paper; see "
+        "validation/cooling/extractions/han_impingement.md.");
+  m.def("validate_jet_array_set", &combaero::cooling::validate_jet_array_set,
+        py::arg("correlation_set"),
+        "Reject a set that cannot be evaluated. Hard error, not an "
+        "operating-point guard.");
+  m.def("jet_array_impingement_nu", &combaero::cooling::jet_array_impingement_nu,
+        py::arg("correlation_set"), py::arg("Re_j"), py::arg("Gc_Gj"),
+        py::arg("Pr"), py::arg("xn_d"), py::arg("yn_d"), py::arg("z_d"),
+        "Nu at one spanwise row. Re_j and Gc_Gj are that row's own local "
+        "values, not an array mean.");
+  m.def("crossflow_to_jet_ratio_at_x",
+        &combaero::cooling::crossflow_to_jet_ratio_at_x, py::arg("yn_d"),
+        py::arg("z_d"), py::arg("C_D"), py::arg("x_over_xn"),
+        "Gc/Gj at continuous streamwise position x/xn (Florschuetz Eq. 8). "
+        "Depends on (yn/d)(z/d) only, not xn/d.");
+  m.def("crossflow_to_jet_ratio_at_row",
+        &combaero::cooling::crossflow_to_jet_ratio_at_row, py::arg("yn_d"),
+        py::arg("z_d"), py::arg("C_D"), py::arg("row"),
+        "Gc/Gj at discrete spanwise row (1-indexed, counting from "
+        "upstream). Row 1 is exactly 0.");
+
   m.doc() = "Python bindings for combaero core";
 
   // Expose the CorrelationValidity enum
