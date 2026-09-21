@@ -2936,12 +2936,29 @@ class ChannelElement(NetworkElement):
         which is even in `mdot` and so does not flip sign at zero -- the drop
         itself carries the sign. That is the odd-quantity case: magnitude from
         the correlation, direction from the flow.
+
+        `dP` also depends on upstream temperature and static pressure through
+        `rho(T, P)` -- `d(dP)/d(rho) = -dP/rho`, chained through
+        `density_and_jacobians`' analytic `d(rho)/dT`, `d(rho)/dP` and
+        `_safe_rho`'s own floor derivative. This was a real, measured gap
+        (issue #378): the analytic `A.T` column was exactly 0.0 against a
+        finite-difference value of roughly -486 for a representative case,
+        because `_safe_rho(state_in.density())` computed `rho` without ever
+        differentiating it. Composition (`Y`) sensitivity through molecular
+        weight remains an accepted gap -- no correlation-level Jacobian for
+        it exists yet, and no other channel-friction path in this file
+        exposes one either.
         """
         m_dot = state_in.m_dot
         model = self.surface.model
         f_mult = self.surface.f_multiplier
 
-        rho, drho_draw = _safe_rho(state_in.density())
+        rho_raw, drho_raw_dT, drho_raw_dP = _solver_tools.density_and_jacobians(
+            state_in.T, state_in.P, state_in.X
+        )
+        rho, drho_draw = _safe_rho(rho_raw)
+        drho_dT = drho_draw * drho_raw_dT
+        drho_dP = drho_draw * drho_raw_dP
         area = self.area or 0.0
         if area <= 0.0:
             return [state_in.Pt - state_out.Pt], {
@@ -2971,6 +2988,11 @@ class ChannelElement(NetworkElement):
         coeff = f * (self.length / dh) / (2.0 * rho * area * area)
         dP = coeff * m_dot * abs(m_dot)
         d_dP_d_mdot = 2.0 * coeff * abs(m_dot)
+        # dP = K * mdot|mdot| / rho for K independent of rho, so
+        # d(dP)/d(rho) = -dP/rho.
+        d_dP_drho = -dP / rho if rho > 0.0 else 0.0
+        d_dP_dT = d_dP_drho * drho_dT
+        d_dP_dP_static = d_dP_drho * drho_dP
 
         res = [state_in.Pt - state_out.Pt - dP]
         jac = {
@@ -2978,13 +3000,10 @@ class ChannelElement(NetworkElement):
                 f"{self.id}.m_dot": -d_dP_d_mdot,
                 f"{self.from_node}.Pt": 1.0,
                 f"{self.to_node}.Pt": -1.0,
+                f"{self.from_node}.T": -d_dP_dT,
+                f"{self.from_node}.P": -d_dP_dP_static,
             }
         }
-        # Known gap, the same one the array path had before removal: the
-        # correlation exposes no dP sensitivity to upstream temperature,
-        # pressure or composition, so those columns are absent rather than
-        # approximated from a smooth-friction stand-in. Density enters only
-        # through rho here, which the solver sees via the node states.
         return res, jac
 
     def _exit_head_lost(self, m_dot: float) -> bool:

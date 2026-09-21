@@ -85,14 +85,6 @@ def test_every_jacobian_column_matches_a_finite_difference(
     surface_key: str, var: str, column: str, step: float
 ) -> None:
     """Each analytic entry reproduces a central difference of the residual."""
-    if surface_key == "ribbed" and column == "A.T":
-        pytest.skip(
-            "_ribbed_residuals' own docstring: the correlation's f has no "
-            "Re-dependence, so dP's sensitivity to upstream temperature is "
-            "deliberately absent rather than approximated -- a pre-existing, "
-            "documented gap surfaced by adding 'ribbed' here, not a "
-            "regression from it."
-        )
     elem = _channel(surface_key)
     _, jac = elem.residuals(*_states(**BASE))
     analytic = jac[0].get(column, 0.0)
@@ -100,6 +92,25 @@ def test_every_jacobian_column_matches_a_finite_difference(
     scale = max(abs(numeric), abs(analytic), 1e-12)
     assert abs(analytic - numeric) / scale < 1e-6, (
         f"{surface_key}/{column}: analytic {analytic:.6e} vs FD {numeric:.6e}"
+    )
+
+
+def test_ribbed_static_pressure_column_matches_finite_difference() -> None:
+    """Issue #378: dP depends on upstream static pressure through rho(T, P)
+    the same way it depends on T -- fixed alongside the T column, but not
+    folded into the shared COLUMNS matrix above since only the ribbed path
+    (hand-rolled in Python) has been checked to expose an 'A.P' column at
+    all; the C++-backed paths are not verified here."""
+    elem = _channel("ribbed")
+    step = 1.0
+
+    _, jac = elem.residuals(*_states(**BASE))
+    analytic = jac[0].get("A.P", 0.0)
+    numeric = _central_difference(elem, "P_up", step)
+
+    scale = max(abs(numeric), abs(analytic), 1e-12)
+    assert abs(analytic - numeric) / scale < 1e-6, (
+        f"ribbed/A.P: analytic {analytic:.6e} vs FD {numeric:.6e}"
     )
 
 
