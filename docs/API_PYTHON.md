@@ -1194,12 +1194,83 @@ That knob exists because the ribbed side already has a better one: change `C_G`
 on the parameter set, which records what you changed and why. The smooth walls
 come from Gnielinski and have no set of their own.
 
+### Jet Impingement Correlations (parametrised)
+
+Two independent regimes, matching
+`validation/cooling/extractions/han_impingement.md`'s own split. Not yet
+wired into a network element (#337) -- these are the correlation math only.
+
+**Single jet** (Goldstein, Behbahani and Heppelmann, 1986): one free round
+jet on a flat plate, no crossflow, no array.
+
+```python
+import combaero as cb
+
+s = cb.goldstein_1986_single_jet()
+nu_q = cb.single_jet_impingement_nu(
+    s, cb.ImpingementThermalBC.ConstantHeatFlux, Re=25_000, L_D=7.75, R_D=5.0)
+nu_t = cb.single_jet_impingement_nu(
+    s, cb.ImpingementThermalBC.ConstantWallTemperature, Re=25_000, L_D=7.75, R_D=5.0)
+nu_q, nu_t                            # 59.93, 55.71 -- Han's own check point (60, 56)
+```
+
+`L_D = 7.75` is the optimum spacing -- structural, not a separately fitted
+fact: `A` itself is the numerator's value there, for any `Re` or `R_D`.
+
+**Jet array with crossflow** (Florschuetz, Truman and Metzger, 1981): a
+staggered or inline array fed from a common plenum, where every row's Nu is
+degraded by the crossflow accumulated from every row upstream of it.
+
+```python
+inline = cb.florschuetz_1981_inline()
+
+result = cb.jet_array_impingement_nu(
+    inline, Re_j=10_000, Gc_Gj=0.3, Pr=0.7, xn_d=10.0, yn_d=6.0, z_d=2.0)
+result.Nu, result.extrapolated        # 27.93, False
+```
+
+`Re_j` and `Gc_Gj` are that ROW's own local values, not an array mean --
+Florschuetz correlates "the individual spanwise row jet Reynolds number".
+`Gc_Gj` at a row has its own closed form (the paper's own Eq. 8), needing
+only geometry and a jet-plate discharge coefficient:
+
+```python
+cb.crossflow_to_jet_ratio_at_row(yn_d=8.0, z_d=2.0, C_D=cb.FLORSCHUETZ_1981_DEFAULT_CD, row=1)   # 0.0 -- Nu1's own definition
+cb.crossflow_to_jet_ratio_at_row(yn_d=8.0, z_d=2.0, C_D=cb.FLORSCHUETZ_1981_DEFAULT_CD, row=10)  # 0.404
+```
+
+It depends on `(yn/d)(z/d)` only, not `xn/d` -- the source states the flow
+distribution is independent of streamwise hole spacing and hole pattern.
+`FLORSCHUETZ_1981_DEFAULT_CD` (0.79) is the paper's own recommended default
+absent a measured value; combaero has no jet-plate discharge-coefficient
+correlation of its own yet (issue #375 -- the existing `Cd_sharp_thin_plate`
+family in `orifice.h` is an ISO 5167 pipe-metering model and does not apply
+to a plenum-fed jet-plate array).
+
+**Two named sets**, chosen explicitly by hole pattern -- their coefficients
+differ, not just their validity:
+
+```python
+inl = cb.florschuetz_1981_inline()      # xn/d 5-15
+stg = cb.florschuetz_1981_staggered()   # xn/d 5-10, genuinely tighter
+```
+
+Bad *parameters* raise from `validate_single_jet_set`/`validate_jet_array_set`.
+Bad *operating points* never raise: reverse flow and out-of-range crossflow
+ratios are guarded smoothly, matching the ribs' policy above.
+
+Leading-edge/curved-surface impingement (Section 4.1.4) and the simpler,
+looser forms (Eq. 4.6 Kercher-Tabakoff -- graphical, not closed-form anyway;
+Eq. 4.7/4.8 -- Florschuetz's own less-tight alternate) are out of scope,
+deferred per the extraction's I3.
+
 ### Enhanced Cooling Surfaces
 
 Removed in 0.7.0. The pin-fin, dimple, rib and impingement correlations could
 not be traced to their cited sources -- the rib friction multiplier was 4-5x
-below the only rib datum in the repository. A provenanced rib correlation is
-tracked in issue #334; see issue #339 for the rebuild.
+below the only rib datum in the repository. Provenanced rib and jet
+impingement correlations are re-added above (issues #334, #337); see issue
+#339 for the rebuild.
 
 `channel_smooth` and the base convective correlations (Gnielinski,
 Dittus-Boelter, Sieder-Tate, Petukhov) are unaffected, as are the user-set

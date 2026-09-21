@@ -455,8 +455,51 @@ RibResult evaluate_rib(const RibCorrelationSet& set,
 // Enhanced surfaces removed in 0.7.0 for unprovenanced correlations (issue
 // #339). Ribbed is re-added on han_1988_orthogonal / rallabandi_2009_high_re
 // above, wired through RibbedModel (components.py) into the GUI and network
-// solver. Dimpled, pin-fin and impingement remain removed, tracked
-// individually (#335-338).
+// solver. Dimpled and pin-fin remain removed, tracked individually
+// (#335-336). Impingement's correlations are re-added below, but not yet
+// wired into a network element -- see #337.
+```
+
+### Jet Impingement Correlations
+```cpp
+// impingement_correlation.h -- two independent regimes, matching
+// han_impingement.md's own split. Not yet wired into a network element
+// (#337): converting an array's total/mean mass flow into a per-row local
+// Re_j is a design question that has not been made yet.
+
+// Single jet (Goldstein, Behbahani and Heppelmann, 1986):
+//   Nu_bar = Re^0.76 * (A - |L/D - 7.75|) / (B + C*(R/D)^n)
+// n switches with the boundary condition the correlation was fitted under.
+enum class ImpingementThermalBC { ConstantHeatFlux, ConstantWallTemperature };
+SingleJetImpingementSet goldstein_1986_single_jet();
+void validate_single_jet_set(const SingleJetImpingementSet& set);
+double single_jet_impingement_nu(const SingleJetImpingementSet& set,
+                                 ImpingementThermalBC bc, double Re,
+                                 double L_D, double R_D);
+
+// Jet array with crossflow (Florschuetz, Truman and Metzger, 1981):
+//   Nu = A * Re_j^m * {1 - B*[(z/d)(Gc/Gj)]^n} * Pr^(1/3)
+// A, m, B, n are each C*(xn/d)^nx*(yn/d)^ny*(z/d)^nz (Table 4.1). Re_j and
+// Gc/Gj are the ROW's own local values, not an array mean.
+enum class JetHolePattern { Inline, Staggered };
+JetArrayCorrelationSet florschuetz_1981_inline();
+JetArrayCorrelationSet florschuetz_1981_staggered();
+void validate_jet_array_set(const JetArrayCorrelationSet& set);
+JetArrayImpingementResult jet_array_impingement_nu(
+    const JetArrayCorrelationSet& set, double Re_j, double Gc_Gj, double Pr,
+    double xn_d, double yn_d, double z_d);
+
+// Crossflow-to-jet mass flux ratio, Florschuetz's own closed form (Eq. 8),
+// depending on (yn/d)(z/d) only -- not xn/d, per the source. C_D is the
+// jet-plate discharge coefficient (FLORSCHUETZ_1981_DEFAULT_CD = 0.79
+// absent a measured value; combaero has no correlation of its own for a
+// jet-plate array yet -- see #375, distinct from orifice.h's pipe-metering
+// Cd family, which does not apply to this geometry).
+constexpr double FLORSCHUETZ_1981_DEFAULT_CD = 0.79;
+double crossflow_to_jet_ratio_at_x(double yn_d, double z_d, double C_D,
+                                   double x_over_xn);
+double crossflow_to_jet_ratio_at_row(double yn_d, double z_d, double C_D,
+                                     int row);  // row 1 is exactly 0
 ```
 
 ### Wall Coupling

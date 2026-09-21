@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Jet impingement correlations re-added, with provenance** (`include/impingement_correlation.h`),
+  closing issue #337. Two independent regimes:
+
+  `goldstein_1986_single_jet()` -- a single free round jet on a flat plate
+  (Goldstein, Behbahani and Heppelmann 1986, Han's Eq. 4.1). Reproduces the
+  source's own closed-form check point (`Re=25000, R/D=5, L/D=7.75` ->
+  `Nu=60` constant-heat-flux, `56` constant-wall-temperature) to within
+  rounding.
+
+  `florschuetz_1981_inline()`/`florschuetz_1981_staggered()` -- a jet array
+  fed from a common plenum, where every row's Nu is degraded by crossflow
+  accumulated from every row upstream of it (Florschuetz, Truman and Metzger
+  1981, Han's Eq. 4.9/Table 4.1). The crossflow-to-jet mass flux ratio
+  `Gc/Gj`, the correlation's defining input, is derived in closed form
+  (`crossflow_to_jet_ratio_at_row`/`_at_x`, the paper's own Eq. 8) rather
+  than left for a caller to supply -- it depends on `(yn/d)(z/d)` only, not
+  `xn/d`, exactly as the source states.
+
+  The prior removed implementation (#332) cited this same 1981 paper but
+  took no crossflow-ratio input at all, making it structurally unable to be
+  Florschuetz's correlation. This re-add was obtained and checked directly
+  against a scan of the primary paper (not just Han's secondary reprint),
+  page-image by page-image since it is a scanned copy -- every equation and
+  Table 4.1's coefficients matched digit-for-digit, and the paper closed
+  three gaps Han's reprint left open: the real validity range (Han's Table
+  4.1 carries a misprinted rib-validity box instead, unrelated to jet
+  arrays), the `Gc/Gj` closed form itself, and Eq. 4.7/4.8's attribution
+  (the same paper's own less-tight alternate form, not a separate later
+  one). See `validation/cooling/extractions/han_impingement.md`.
+
+  Not yet wired into a network element or the GUI: converting an array's
+  total/mean mass flow into a per-row local `Re_j` is a design question
+  deferred to a follow-up, tracked under #337. Leading-edge/curved-surface
+  impingement and the simpler forms (Eq. 4.6, Eq. 4.7/4.8) remain
+  documented-but-unimplemented, matching how ribs staged their own re-add.
+
+  Surfaced a related gap: combaero has no discharge-coefficient correlation
+  for a jet-plate array (`orifice.h`'s `Cd_sharp_thin_plate` family is an
+  ISO 5167 pipe-metering model and does not apply). Tracked separately,
+  not blocking, as issue #375; the paper's own default (`C_D=0.79`) is used
+  as-is.
+
 - **`han_park_1988_angled()`, a third rib correlation set** for angled
   ribs in broad-aspect-ratio rectangular ducts (Han and Park 1988, Eq.
   4.17/4.18): `alpha` 30-90 deg, `W/H` 1-4. Han's original power-law
