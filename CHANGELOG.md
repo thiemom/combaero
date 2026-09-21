@@ -775,6 +775,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Ribbed channels' pressure-drop Jacobian had no temperature or pressure
+  column** (issue #378). `ChannelElement._ribbed_residuals` computed `rho`
+  via `_safe_rho(state_in.density())` and never differentiated it, even
+  though `dP` depends on upstream temperature and static pressure through
+  `rho(T, P)` -- its own docstring already flagged this as a known,
+  deliberate simplification, but it went unmeasured because
+  `tests/test_channel_element_jacobian_fd.py` (built for exactly this class
+  of gap) never actually added `"ribbed"` to its surface matrix, despite
+  that file's own docstring earmarking it for #334.
+
+  Adding `"ribbed"` there while extending the file for #337's impingement
+  elements surfaced the gap with a number: the analytic `A.T` column was
+  exactly `0.0` against a finite-difference value of roughly `-486` for a
+  representative case. Not a wrong converged answer -- the residual itself
+  is exact at every iterate -- but a real, non-negligible missing term in
+  the Newton step direction, costing convergence speed and robustness for
+  any network solving upstream temperature near a ribbed channel.
+
+  Fixed with `density_and_jacobians`' analytic `d(rho)/dT`/`d(rho)/dP`
+  (already used elsewhere in this file), chained through `_safe_rho`'s own
+  floor derivative and `d(dP)/d(rho) = -dP/rho`. Composition (`Y`)
+  sensitivity through molecular weight remains an accepted gap -- no
+  correlation-level Jacobian for it exists yet, matching every other
+  channel-friction path in this file. Verified against finite differences,
+  including a dedicated static-pressure check not folded into the shared
+  test matrix (that column isn't verified for the other, C++-backed surface
+  types).
+
 - **The Fanno march refines its step near the sonic point.** Fixing the
   gradient (below) gave the march a `1/(1 - M^2)` term that a fixed-step RK4
   cannot resolve: the step that is ample over most of a duct steps straight
