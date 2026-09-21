@@ -13,6 +13,7 @@ using combaero::cooling::goldstein_1986_single_jet;
 using combaero::cooling::ImpingementThermalBC;
 using combaero::cooling::jet_array_impingement_nu;
 using combaero::cooling::JetArrayCorrelationSet;
+using combaero::cooling::single_jet_impingement;
 using combaero::cooling::single_jet_impingement_nu;
 using combaero::cooling::validate_jet_array_set;
 using combaero::cooling::validate_single_jet_set;
@@ -84,6 +85,26 @@ TEST(SingleJetImpingementTest, StaysFiniteForReversedFlow) {
   EXPECT_TRUE(std::isfinite(Nu));
 }
 
+// Falsify the analytic derivative against a central finite difference, per
+// the model-provenance discipline: never let a hand-derived formula stand
+// unconfirmed by an independent check.
+TEST(SingleJetImpingementTest, DerivativeMatchesFiniteDifference) {
+  const auto set = goldstein_1986_single_jet();
+  const double Re = 25000.0, L_D = 6.0, R_D = 4.0;
+  const double h = 1.0;
+
+  const auto result =
+      single_jet_impingement(set, ImpingementThermalBC::ConstantHeatFlux, Re,
+                             L_D, R_D);
+  const double plus = single_jet_impingement_nu(
+      set, ImpingementThermalBC::ConstantHeatFlux, Re + h, L_D, R_D);
+  const double minus = single_jet_impingement_nu(
+      set, ImpingementThermalBC::ConstantHeatFlux, Re - h, L_D, R_D);
+  const double fd = (plus - minus) / (2.0 * h);
+
+  EXPECT_NEAR(result.dNu_dRe, fd, std::abs(fd) * 1e-4 + 1e-8);
+}
+
 // -----------------------------------------------------------------
 // Jet array with crossflow (Florschuetz, Truman and Metzger, 1981)
 // -----------------------------------------------------------------
@@ -153,6 +174,23 @@ TEST(JetArrayCorrelationTest, ValidateRejectsNonFiniteFit) {
   auto set = florschuetz_1981_inline();
   set.m_fit.nx = std::nan("");
   EXPECT_THROW(validate_jet_array_set(set), std::invalid_argument);
+}
+
+TEST(JetArrayCorrelationTest, DerivativeMatchesFiniteDifference) {
+  const auto set = florschuetz_1981_inline();
+  const double Re_j = 10000.0, Gc_Gj = 0.3, Pr = 0.7;
+  const double xn_d = 10.0, yn_d = 6.0, z_d = 2.0;
+  const double h = 1.0;
+
+  const auto result =
+      jet_array_impingement_nu(set, Re_j, Gc_Gj, Pr, xn_d, yn_d, z_d);
+  const double plus =
+      jet_array_impingement_nu(set, Re_j + h, Gc_Gj, Pr, xn_d, yn_d, z_d).Nu;
+  const double minus =
+      jet_array_impingement_nu(set, Re_j - h, Gc_Gj, Pr, xn_d, yn_d, z_d).Nu;
+  const double fd = (plus - minus) / (2.0 * h);
+
+  EXPECT_NEAR(result.dNu_dRe_j, fd, std::abs(fd) * 1e-4 + 1e-8);
 }
 
 TEST(JetArrayCorrelationTest, StaysFiniteForReversedFlowAndOutOfRangeGcGj) {

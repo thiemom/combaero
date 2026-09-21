@@ -5,9 +5,12 @@ could not be traced to their cited sources. A saved network asking for a ribbed
 channel and getting an unribbed one back would be a wrong answer presented as a
 right one, so `map_surface_model` raises instead of falling through.
 
-Ribbed returned in 0.8.0 on a provenanced correlation set; the other three are
-deferred indefinitely (#339). This file now pins both halves: that ribbed maps
-again, and that the deferred three still refuse.
+Ribbed returned in 0.8.0 on a provenanced correlation set; impingement (both
+the jet array and the single-jet form) returned in 0.9.0 on Florschuetz,
+Truman and Metzger (1981) with a real crossflow term (#337). Dimpled and
+pin-fin remain deferred indefinitely (#339). This file pins three things:
+that ribbed and both impingement forms map again, that the still-deferred two
+refuse, and that every field survives the JSON round trip.
 """
 
 from __future__ import annotations
@@ -45,7 +48,28 @@ def test_ribbed_maps_again_and_tolerates_an_older_saved_network() -> None:
     assert m.smooth_wall_Nu_multiplier == 1.0
 
 
-@pytest.mark.parametrize("surface", ["dimpled", "pin_fin", "impingement"])
+def test_impingement_maps_again_and_tolerates_an_older_saved_network() -> None:
+    """Impingement (jet array) returned in 0.9.0 on Florschuetz, Truman and
+    Metzger (1981) with a real crossflow term -- see issue #337."""
+    from combaero.network.components import ImpingementModel
+
+    m = map_surface_model(_Surface("impingement"))
+    assert isinstance(m, ImpingementModel)
+    assert m.row == 1
+    assert pytest.approx(0.79) == m.C_D
+
+
+def test_single_jet_impingement_maps_again() -> None:
+    import combaero as cb
+    from combaero.network.components import SingleJetImpingementModel
+
+    m = map_surface_model(_Surface("single_jet_impingement"))
+    assert isinstance(m, SingleJetImpingementModel)
+    assert m.bc == cb.ImpingementThermalBC.ConstantHeatFlux
+    assert pytest.approx(7.75) == m.L_D
+
+
+@pytest.mark.parametrize("surface", ["dimpled", "pin_fin"])
 def test_deferred_surfaces_report_removal(surface: str) -> None:
     with pytest.raises(ValueError, match="removed in 0.7.0") as exc:
         map_surface_model(_Surface(surface))
@@ -109,3 +133,62 @@ def test_a_channel_with_no_surface_still_defaults_to_smooth() -> None:
 
     data = ChannelData(length=0.6, diameter=0.025)
     assert isinstance(map_surface_model(data.surface), SmoothModel)
+
+
+# ---------------------------------------------------------------------------
+# Impingement, restored in 0.9.0
+# ---------------------------------------------------------------------------
+
+
+def test_impingement_survives_the_json_to_element_round_trip() -> None:
+    """Same rationale as the ribbed round trip above: every field must reach
+    the element intact, not silently default -- xn_d/yn_d/z_d/row/C_D are all
+    new, easy to typo or drop one at a time."""
+    from combaero.network.components import ImpingementModel
+    from gui.backend.schemas import ChannelData
+
+    data = ChannelData(
+        length=0.6,
+        diameter=0.025,
+        surface={
+            "type": "impingement",
+            "d_jet": 0.0025,
+            "xn_d": 10.0,
+            "yn_d": 5.0,
+            "z_d": 1.5,
+            "row": 4,
+            "C_D": 0.82,
+        },
+    )
+    model = map_surface_model(data.surface)
+    assert isinstance(model, ImpingementModel)
+    assert model.d_jet == 0.0025
+    assert model.xn_d == 10.0
+    assert model.yn_d == 5.0
+    assert model.z_d == 1.5
+    assert model.row == 4
+    assert pytest.approx(0.82) == model.C_D
+
+
+def test_single_jet_impingement_survives_the_json_to_element_round_trip() -> None:
+    import combaero as cb
+    from combaero.network.components import SingleJetImpingementModel
+    from gui.backend.schemas import ChannelData
+
+    data = ChannelData(
+        length=0.6,
+        diameter=0.025,
+        surface={
+            "type": "single_jet_impingement",
+            "bc": "constant_wall_temperature",
+            "d_jet": 0.004,
+            "L_D": 6.0,
+            "R_D": 3.0,
+        },
+    )
+    model = map_surface_model(data.surface)
+    assert isinstance(model, SingleJetImpingementModel)
+    assert model.bc == cb.ImpingementThermalBC.ConstantWallTemperature
+    assert model.d_jet == 0.004
+    assert model.L_D == 6.0
+    assert model.R_D == 3.0

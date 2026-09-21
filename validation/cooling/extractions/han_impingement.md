@@ -232,13 +232,17 @@ a caller composes with `jet_array_impingement_nu` themselves, the same way a
 caller would compute `Re_j` themselves before calling `evaluate_rib`.
 
 **D3: Eq. 7 (the jet velocity distribution, mean-to-per-row `Re_j`) is
-deliberately NOT implemented here.** It answers a different question --
-how a total/mean array mass flow splits across rows -- which is a network
-element's design question (how a `NetworkElement` scales `mdot` to
-per-hole/per-row flow), not a correlation fact. Implementing it now would be
-building API surface for an interface that has not been decided (see #337:
-the network-element wiring, `ImpingementModel`/`channel_impingement`'s
-successor, is a follow-up, not part of this change).
+deliberately NOT implemented, in the correlation library OR the network
+element.** It answers a different question -- how a total/mean array mass
+flow splits across rows -- which stayed a design question even once
+`ImpingementModel` was built: the element resolves it by treating
+`ConvectiveSurface.area` as ONE ROW's own footprint and recovering that
+row's own mass flow from it (the same "total flow through this element's
+own area" convention every `ConvectiveSurface` model already uses, not a
+new one), leaving row-to-row flow distribution to whoever chains multiple
+row elements together. Eq. 7 would let a caller start from a single
+array-mean flow instead; nobody has asked for that yet, and building it
+speculatively would be the same mistake D3 originally flagged.
 
 **D4: the crossflow bracket and Reynolds terms are floored the same way
 ribs floor `e+`** (`smooth_magnitude`, `sqrt(x^2 + floor^2)`) -- a solver
@@ -253,14 +257,28 @@ to be invisible across the sets' real operating ranges.
 array with crossflow, Eq. 4.9/Table 4.1), in `impingement_correlation.h`/
 `.cpp`. Single-jet reproduces the closed-form check point (item 4) to
 rounding precision. Table 4.1's coefficients match the primary paper
-digit-for-digit (items 17/18/23). 19 C++ tests, 11 Python pybind-boundary
+digit-for-digit (items 17/18/23). 21 C++ tests, 11 Python pybind-boundary
 tests; one real bug caught before any test ran: the `Re` exponent (fixed
 0.76) and the `(R/D)` exponent (`n`, boundary-condition-dependent) were
 initially swapped, missing the check point by two orders of magnitude --
-now pinned by a dedicated falsification test. NOT wired into a network
-element or the GUI (D3). Figure-based validation-harness scoring (Figs. 8/9)
-not yet done -- proposed as candidates in "Validation targets" above, not
-yet digitised.
+now pinned by a dedicated falsification test.
+
+**Wired into the network solver and GUI, same day.** `ImpingementModel`
+(jet array, one row) and `SingleJetImpingementModel`
+(`python/combaero/network/components.py`), following D1-D3 above. Both
+correlation functions gained an analytic-derivative sibling
+(`single_jet_impingement`, `JetArrayImpingementResult::dNu_dRe_j`) for the
+wall-coupling Jacobian, FD-verified in C++; the new mdot-to-h composition
+chain (recovering a row's mass flow from `ConvectiveSurface.area`) is
+independently FD-verified again at the element level, since that chain is
+new code the correlation-level check does not cover. Wired into the GUI the
+same way ribbed was (`ImpingementModelData`/`SingleJetImpingementModelData`
+in `gui/backend/schemas.py`, mapped in `graph_builder.py`, reachable from
+`SurfaceEnhancementInspector.tsx`'s dropdown), replacing the old,
+unreachable, pre-0.7.0 impingement UI block that used the crossflow-less
+field names. Figure-based validation-harness scoring (Figs. 8/9) still not
+done -- proposed as candidates in "Validation targets" above, not yet
+digitised.
 
 ---
 

@@ -33,11 +33,65 @@ class RibbedModelData(BaseModel):
     smooth_wall_Nu_multiplier: float = 1.0
 
 
-# Dimpled, pin-fin and impingement surfaces were removed in 0.7.0 -- their
-# correlations could not be traced to their cited sources -- and remain
-# deferred (issue #339). Saved networks carrying them are rejected with a
-# message naming the reason; see graph_builder.
-SurfaceModelData = SmoothModelData | RibbedModelData
+class ImpingementModelData(BaseModel):
+    """Jet array impingement cooling, one row (Florschuetz, Truman and
+    Metzger 1981), on a real crossflow term.
+
+    Restored in 0.9.0 after the previous impingement correlation was removed
+    for citing this same paper while taking no crossflow input at all,
+    making it structurally unable to be that correlation. See issue #337.
+
+    One element models one spanwise row. A full array is a chain of these,
+    each with its own ``row`` -- there is no single "channel Nu" for a whole
+    array the way there is for a smooth or ribbed duct, since downstream
+    rows see progressively more crossflow than upstream ones.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+    type: Literal["impingement"] = "impingement"
+    d_jet: float = 0.002
+    xn_d: float = 8.0
+    yn_d: float = 6.0
+    z_d: float = 2.0
+    # 1-indexed, counting from upstream. Row 1 sees zero crossflow by
+    # definition (Gc/Gj = 0, Florschuetz's own Nu1).
+    row: int = 1
+    # Jet-plate discharge coefficient. 0.79 is the source's own recommended
+    # default absent a measured value; combaero has no discharge-coefficient
+    # correlation of its own for a jet-plate array yet (issue #375).
+    C_D: float = 0.79
+
+
+class SingleJetImpingementModelData(BaseModel):
+    """A single free round jet (Goldstein, Behbahani and Heppelmann 1986),
+    at a representative radial position.
+
+    Unlike ImpingementModelData, there is no array and no crossflow. Nu is
+    LOCAL to the radial position R_D, not area-averaged -- this reports one
+    representative value for the target patch, not a profile.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+    type: Literal["single_jet_impingement"] = "single_jet_impingement"
+    bc: Literal["constant_heat_flux", "constant_wall_temperature"] = "constant_heat_flux"
+    d_jet: float = 0.003
+    # Jet-to-target-plate spacing / d_jet. 7.75 is the correlation's own
+    # optimum spacing.
+    L_D: float = 7.75
+    # Radial distance from the jet centerline / d_jet. 5.0 matches the
+    # source's own closed-form check point, a worked example, not a default
+    # that suits every rig.
+    R_D: float = 5.0
+
+
+# Dimpled and pin-fin surfaces were removed in 0.7.0 -- their correlations
+# could not be traced to their cited sources -- and remain deferred (issue
+# #339). Saved networks carrying them are rejected with a message naming the
+# reason; see graph_builder. Ribbed and impingement were both restored on
+# provenanced replacements (#334, #337).
+SurfaceModelData = (
+    SmoothModelData | RibbedModelData | ImpingementModelData | SingleJetImpingementModelData
+)
 
 
 # --- Node Data Definitions ---
