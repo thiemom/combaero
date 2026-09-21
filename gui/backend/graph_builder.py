@@ -8,6 +8,7 @@ from combaero.network import (
     ConstantHeadLoss,
     ConvectiveSurface,
     FlowNetwork,
+    ImpingementModel,
     LinearThetaFractionLoss,
     LinearThetaHeadLoss,
     LosslessConnectionElement,
@@ -18,6 +19,7 @@ from combaero.network import (
     PressureBoundary,
     PressureLossElement,
     RibbedModel,
+    SingleJetImpingementModel,
     SmoothModel,
     ThermalWall,
     VortexElement,
@@ -36,6 +38,7 @@ from .schemas import (
     ConstantHeadLossData,
     DiscreteLossData,
     EjectorData,
+    ImpingementModelData,
     LinearThetaFractionLossData,
     LinearThetaHeadLossData,
     MassBoundaryData,
@@ -46,6 +49,7 @@ from .schemas import (
     PlenumData,
     PressureBoundaryData,
     RibbedModelData,
+    SingleJetImpingementModelData,
     SmoothModelData,
     ThermalWallData,
     VortexData,
@@ -88,10 +92,37 @@ def map_surface_model(data):
                 data, "smooth_wall_Nu_multiplier", d.smooth_wall_Nu_multiplier
             ),
         )
+    if isinstance(data, ImpingementModelData) or data.type == "impingement":
+        d = ImpingementModelData()
+        return ImpingementModel(
+            d_jet=getattr(data, "d_jet", d.d_jet),
+            xn_d=getattr(data, "xn_d", d.xn_d),
+            yn_d=getattr(data, "yn_d", d.yn_d),
+            z_d=getattr(data, "z_d", d.z_d),
+            row=getattr(data, "row", d.row),
+            C_D=getattr(data, "C_D", d.C_D),
+        )
+    if isinstance(data, SingleJetImpingementModelData) or data.type == "single_jet_impingement":
+        import combaero as cb
 
-    # Enhanced surfaces were removed in 0.7.0. Reject rather than silently
-    # falling back to smooth: a saved network asking for a ribbed channel and
-    # getting an unribbed one back is a wrong answer presented as a right one.
+        d = SingleJetImpingementModelData()
+        bc_str = getattr(data, "bc", d.bc)
+        bc = (
+            cb.ImpingementThermalBC.ConstantWallTemperature
+            if bc_str == "constant_wall_temperature"
+            else cb.ImpingementThermalBC.ConstantHeatFlux
+        )
+        return SingleJetImpingementModel(
+            bc=bc,
+            d_jet=getattr(data, "d_jet", d.d_jet),
+            L_D=getattr(data, "L_D", d.L_D),
+            R_D=getattr(data, "R_D", d.R_D),
+        )
+
+    # Dimpled and pin-fin were removed in 0.7.0. Reject rather than silently
+    # falling back to smooth: a saved network asking for one of these and
+    # getting an unenhanced surface back is a wrong answer presented as a
+    # right one.
     surface_type = getattr(data, "type", "unknown")
     raise ValueError(
         f"Surface type {surface_type!r} was removed in 0.7.0: its correlation "

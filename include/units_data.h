@@ -193,6 +193,10 @@ inline constexpr Entry function_units[] = {
      "correlation_set: SingleJetImpingementSet, bc: ImpingementThermalBC, "
      "Re: -, L_D: -, R_D: -",
      "-"},
+    {"single_jet_impingement",
+     "correlation_set: SingleJetImpingementSet, bc: ImpingementThermalBC, "
+     "Re: -, L_D: -, R_D: -",
+     "SingleJetImpingementResult"},
     {"florschuetz_1981_inline", "-", "JetArrayCorrelationSet"},
     {"florschuetz_1981_staggered", "-", "JetArrayCorrelationSet"},
     {"validate_jet_array_set", "correlation_set: JetArrayCorrelationSet",
@@ -233,7 +237,10 @@ inline constexpr Entry function_units[] = {
     {"JetArrayCorrelationSet::valid_aspect_ratio", "-", "-"},
     {"JetArrayCorrelationSet::standard_error", "-", "-"},
     {"JetArrayImpingementResult::Nu", "-", "-"},
+    {"JetArrayImpingementResult::dNu_dRe_j", "-", "-"},
     {"JetArrayImpingementResult::extrapolated", "-", "-"},
+    {"SingleJetImpingementResult::Nu", "-", "-"},
+    {"SingleJetImpingementResult::dNu_dRe", "-", "-"},
     {"ImpingementRange::lo", "-", "-"},
     {"ImpingementRange::hi", "-", "-"},
     {"ImpingementThermalBC::ConstantHeatFlux", "-", "-"},

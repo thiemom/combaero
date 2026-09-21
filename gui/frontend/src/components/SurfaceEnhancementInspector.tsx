@@ -1,10 +1,15 @@
 import type React from "react";
-import AreaInput from "./AreaInput";
 import LengthInput from "./LengthInput";
 import NumericInput from "./NumericInput";
 
 interface SurfaceModelData {
-	type: "smooth" | "ribbed" | "dimpled" | "pin_fin" | "impingement";
+	type:
+		| "smooth"
+		| "ribbed"
+		| "dimpled"
+		| "pin_fin"
+		| "impingement"
+		| "single_jet_impingement";
 	// Ribbed, rebuilt in 0.8.0 on a provenanced correlation set.
 	e_D?: number;
 	p_e?: number;
@@ -23,7 +28,22 @@ interface SurfaceModelData {
 	N_rows?: number;
 	is_staggered?: boolean;
 	channel_height?: number;
+	// Impingement (array), rebuilt in 0.9.0 on Florschuetz, Truman and Metzger
+	// (1981) with a real Gc/Gj crossflow term -- see issue #337. d_jet is
+	// shared with the single-jet block below.
 	d_jet?: number;
+	xn_d?: number;
+	yn_d?: number;
+	z_d?: number;
+	row?: number;
+	C_D?: number;
+	// Impingement, single jet (Goldstein, Behbahani and Heppelmann 1986).
+	bc?: "constant_heat_flux" | "constant_wall_temperature";
+	L_D?: number;
+	R_D?: number;
+	// Kept for pre-0.7.0 networks whose impingement nodes used the old,
+	// crossflow-less field names -- see #332 for why that correlation was
+	// removed. Unreachable from this dropdown's new "impingement" defaults.
 	z_D?: number;
 	x_D?: number;
 	y_D?: number;
@@ -67,11 +87,18 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 			impingement: {
 				type: "impingement",
 				d_jet: 0.002,
-				z_D: 4.0,
-				x_D: 6.0,
-				y_D: 6.0,
-				A_target: 0.01,
-				Cd_jet: 0.8,
+				xn_d: 8.0,
+				yn_d: 6.0,
+				z_d: 2.0,
+				row: 1,
+				C_D: 0.79,
+			},
+			single_jet_impingement: {
+				type: "single_jet_impingement",
+				bc: "constant_heat_flux",
+				d_jet: 0.003,
+				L_D: 7.75,
+				R_D: 5.0,
 			},
 		};
 		onChange(defaults[type]);
@@ -100,17 +127,23 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 				>
 					<option value="smooth">Smooth (Default)</option>
 					<option value="ribbed">Ribbed</option>
-					{/* Dimpled, pin-fin and impingement were removed in 0.7.0: their correlations
-					    because their correlations could not be traced to their
-					    cited sources, and remain deferred (issue #339). Ribbed
-					    returned in 0.8.0 on a provenanced correlation set.
+					<option value="impingement">Impingement (Jet Array)</option>
+					<option value="single_jet_impingement">
+						Impingement (Single Jet)
+					</option>
+					{/* Dimpled and pin-fin were removed in 0.7.0: their correlations
+					    could not be traced to their cited sources, and remain
+					    deferred (issue #339). Ribbed returned in 0.8.0 on a
+					    provenanced correlation set; impingement returned in 0.9.0
+					    on Florschuetz (1981) with a real crossflow term (#337).
 
-					    Their parameter blocks below are deliberately KEPT. They are
-					    unreachable from this dropdown, so no new one can be created
-					    -- but a network saved before 0.7.0 still carries one, and
-					    removing the blocks would hide its parameters and risk losing
-					    them on the next save. The user can see what is there; the
-					    backend explains on solve why it will not run. */}
+					    Dimpled/pin-fin's parameter blocks below are deliberately
+					    KEPT. They are unreachable from this dropdown, so no new one
+					    can be created -- but a network saved before 0.7.0 still
+					    carries one, and removing the blocks would hide its
+					    parameters and risk losing them on the next save. The user
+					    can see what is there; the backend explains on solve why it
+					    will not run. */}
 				</select>
 			</div>
 
@@ -288,48 +321,123 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 						value={surface.d_jet || 0.002}
 						onChange={(val) => updateFields({ d_jet: val })}
 					/>
-					<AreaInput
-						label="Target Area"
-						value={surface.A_target || 0.01}
-						onChange={(val) => updateFields({ A_target: val })}
+					<div className="flex flex-col gap-1">
+						<label className="text-[10px] text-stone-500">
+							xn/d (Streamwise Spacing Ratio)
+						</label>
+						<NumericInput
+							value={surface.xn_d || 8.0}
+							onChange={(val) => updateFields({ xn_d: val })}
+							className="p-1 border rounded text-xs"
+						/>
+					</div>
+					<div className="flex flex-col gap-1">
+						<label className="text-[10px] text-stone-500">
+							yn/d (Spanwise Spacing Ratio)
+						</label>
+						<NumericInput
+							value={surface.yn_d || 6.0}
+							onChange={(val) => updateFields({ yn_d: val })}
+							className="p-1 border rounded text-xs"
+						/>
+					</div>
+					<div className="flex flex-col gap-1">
+						<label className="text-[10px] text-stone-500">
+							z/d (Channel Height Ratio)
+						</label>
+						<NumericInput
+							value={surface.z_d || 2.0}
+							onChange={(val) => updateFields({ z_d: val })}
+							className="p-1 border rounded text-xs"
+						/>
+					</div>
+					<div className="flex flex-col gap-1">
+						<label className="text-[10px] text-stone-500">
+							Row (1 = first, no crossflow)
+						</label>
+						<NumericInput
+							value={surface.row ?? 1}
+							onChange={(val) =>
+								updateFields({ row: Math.max(1, Math.round(val)) })
+							}
+							className="p-1 border rounded text-xs"
+						/>
+						<span className="text-[9px] text-stone-400">
+							One row per element. A full array is a chain of these, each with
+							its own row number -- downstream rows see progressively more
+							crossflow from the rows upstream of them.
+						</span>
+					</div>
+					<div className="flex flex-col gap-1">
+						<label className="text-[10px] text-stone-500">
+							C_D (Jet Plate Discharge Coefficient)
+						</label>
+						<NumericInput
+							value={surface.C_D ?? 0.79}
+							onChange={(val) => updateFields({ C_D: val })}
+							className="p-1 border rounded text-xs"
+						/>
+						<span className="text-[9px] text-stone-400">
+							0.79 is Florschuetz&apos;s own recommended default absent a
+							measured value; combaero has no discharge-coefficient correlation
+							of its own for a jet-plate array yet (issue #375).
+						</span>
+					</div>
+				</div>
+			)}
+
+			{currentType === "single_jet_impingement" && (
+				<div className="grid grid-cols-1 gap-3 bg-stone-50 p-2 rounded border border-stone-100">
+					<div className="flex flex-col gap-1">
+						<label className="text-[10px] text-stone-500">
+							Boundary Condition
+						</label>
+						<select
+							value={surface.bc || "constant_heat_flux"}
+							onChange={(e) =>
+								updateFields({
+									bc: e.target.value as SurfaceModelData["bc"],
+								})
+							}
+							className="p-1 border rounded text-xs"
+						>
+							<option value="constant_heat_flux">Constant Heat Flux</option>
+							<option value="constant_wall_temperature">
+								Constant Wall Temperature
+							</option>
+						</select>
+					</div>
+					<LengthInput
+						label="Jet Diameter"
+						value={surface.d_jet || 0.003}
+						onChange={(val) => updateFields({ d_jet: val })}
 					/>
 					<div className="flex flex-col gap-1">
 						<label className="text-[10px] text-stone-500">
-							z/D (Jet Dist Ratio)
+							L/D (Jet-to-Plate Spacing Ratio)
 						</label>
 						<NumericInput
-							value={surface.z_D || 4.0}
-							onChange={(val) => updateFields({ z_D: val })}
+							value={surface.L_D ?? 7.75}
+							onChange={(val) => updateFields({ L_D: val })}
 							className="p-1 border rounded text-xs"
 						/>
+						<span className="text-[9px] text-stone-400">
+							7.75 is the correlation&apos;s own optimum spacing.
+						</span>
 					</div>
 					<div className="flex flex-col gap-1">
 						<label className="text-[10px] text-stone-500">
-							x/D (Streamwise Spacing)
+							R/D (Radial Position Ratio)
 						</label>
 						<NumericInput
-							value={surface.x_D || 6.0}
-							onChange={(val) => updateFields({ x_D: val })}
+							value={surface.R_D ?? 5.0}
+							onChange={(val) => updateFields({ R_D: val })}
 							className="p-1 border rounded text-xs"
 						/>
-					</div>
-					<div className="flex flex-col gap-1">
-						<label className="text-[10px] text-stone-500">
-							y/D (Spanwise Spacing)
-						</label>
-						<NumericInput
-							value={surface.y_D || 6.0}
-							onChange={(val) => updateFields({ y_D: val })}
-							className="p-1 border rounded text-xs"
-						/>
-					</div>
-					<div className="flex flex-col gap-1">
-						<label className="text-[10px] text-stone-500">Cd (Discharge)</label>
-						<NumericInput
-							value={surface.Cd_jet || 0.8}
-							onChange={(val) => updateFields({ Cd_jet: val })}
-							className="p-1 border rounded text-xs"
-						/>
+						<span className="text-[9px] text-stone-400">
+							Nu is local to this radial position, not area-averaged -- pick a
+							representative value for the target patch this surface covers.
+						</span>
 					</div>
 				</div>
 			)}

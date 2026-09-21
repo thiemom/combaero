@@ -267,6 +267,18 @@ PYBIND11_MODULE(_core, m) {
         py::arg("L_D"), py::arg("R_D"),
         "Nu_bar for a single round jet impinging on a flat plate.");
 
+  py::class_<combaero::cooling::SingleJetImpingementResult>(
+      m, "SingleJetImpingementResult")
+      .def_readonly("Nu", &combaero::cooling::SingleJetImpingementResult::Nu)
+      .def_readonly("dNu_dRe",
+                    &combaero::cooling::SingleJetImpingementResult::dNu_dRe);
+
+  m.def("single_jet_impingement", &combaero::cooling::single_jet_impingement,
+        py::arg("correlation_set"), py::arg("bc"), py::arg("Re"),
+        py::arg("L_D"), py::arg("R_D"),
+        "Same as single_jet_impingement_nu, plus its analytic Re-derivative "
+        "for a network element's wall-coupling Jacobian.");
+
   py::enum_<combaero::cooling::JetHolePattern>(m, "JetHolePattern")
       .value("Inline", combaero::cooling::JetHolePattern::Inline)
       .value("Staggered", combaero::cooling::JetHolePattern::Staggered);
@@ -328,6 +340,9 @@ PYBIND11_MODULE(_core, m) {
   py::class_<combaero::cooling::JetArrayImpingementResult>(
       m, "JetArrayImpingementResult")
       .def_readonly("Nu", &combaero::cooling::JetArrayImpingementResult::Nu)
+      .def_readonly(
+          "dNu_dRe_j",
+          &combaero::cooling::JetArrayImpingementResult::dNu_dRe_j)
       .def_readonly(
           "extrapolated",
           &combaero::cooling::JetArrayImpingementResult::extrapolated);

@@ -60,6 +60,19 @@ double crossflow_beta(double yn_d, double z_d, double C_D) {
   return C_D * M_SQRT2 * (M_PI / 4.0) / denom;
 }
 
+// d(Re_safe^p)/d(Re) * (numerator/denominator), expressed as a factor on the
+// already-computed Nu: Nu itself is (numerator/denominator) * Re_safe^p, so
+// d(Nu)/d(Re) = Nu * p * Re / Re_safe^2 -- both single-jet and jet-array
+// share this exact shape once the non-Re terms are held fixed, since
+// Re_safe = sqrt(Re^2 + floor^2) and d(Re_safe)/d(Re) = Re/Re_safe.
+double re_derivative_factor(double Nu, double exponent, double Re,
+                            double Re_safe) {
+  if (Re_safe == 0.0) {
+    return 0.0;
+  }
+  return Nu * exponent * Re / (Re_safe * Re_safe);
+}
+
 void validate_fit(const JetArrayGeometricFit &fit, const char *name) {
   if (!std::isfinite(fit.C) || !std::isfinite(fit.nx) ||
       !std::isfinite(fit.ny) || !std::isfinite(fit.nz)) {
@@ -94,6 +107,16 @@ double single_jet_impingement_nu(const SingleJetImpingementSet &set,
   const double numerator = set.A - std::abs(L_D - 7.75);
   const double denominator = set.B + set.C * guarded_power(R_D, n);
   return std::pow(Re_safe, set.Re_exponent) * numerator / denominator;
+}
+
+SingleJetImpingementResult single_jet_impingement(
+    const SingleJetImpingementSet &set, ImpingementThermalBC bc, double Re,
+    double L_D, double R_D) {
+  SingleJetImpingementResult out;
+  const double Re_safe = smooth_magnitude(Re, RE_FLOOR);
+  out.Nu = single_jet_impingement_nu(set, bc, Re, L_D, R_D);
+  out.dNu_dRe = re_derivative_factor(out.Nu, set.Re_exponent, Re, Re_safe);
+  return out;
 }
 
 JetArrayCorrelationSet florschuetz_1981_inline() {
@@ -175,6 +198,7 @@ JetArrayImpingementResult jet_array_impingement_nu(
   const double Pr_term = (Pr > 0.0 && std::isfinite(Pr)) ? std::cbrt(Pr) : 1.0;
 
   out.Nu = A * Re_term * bracket * Pr_term;
+  out.dNu_dRe_j = re_derivative_factor(out.Nu, m, Re_j, Re_j_safe);
   out.extrapolated = outside(set.valid_Re_j, std::abs(Re_j)) ||
                      outside(set.valid_Gc_Gj, Gc_Gj) ||
                      outside(set.valid_xn_d, xn_d) ||

@@ -95,6 +95,22 @@ double single_jet_impingement_nu(const SingleJetImpingementSet &set,
                                   ImpingementThermalBC bc, double Re,
                                   double L_D, double R_D);
 
+struct SingleJetImpingementResult {
+  double Nu = 0.0;
+  // d(Nu)/d(Re), analytic -- L_D and R_D are fixed geometry for a given
+  // element, not solver-iterated states, so only the Re dependence needs a
+  // derivative. Per the project's (f, J) rule: solver-facing code gets an
+  // analytical derivative from C++, not a Python-side finite difference.
+  double dNu_dRe = 0.0;
+};
+
+// Same formula as single_jet_impingement_nu, plus its analytic Re-derivative
+// -- for a network element's wall-coupling Jacobian. The scalar function
+// above stays as the simple, already-shipped entry point; this is additive.
+SingleJetImpingementResult single_jet_impingement(
+    const SingleJetImpingementSet &set, ImpingementThermalBC bc, double Re,
+    double L_D, double R_D);
+
 // ---------------------------------------------------------------
 // Jet array with crossflow (Florschuetz, Truman and Metzger, 1981)
 // ---------------------------------------------------------------
@@ -146,6 +162,11 @@ constexpr double FLORSCHUETZ_1981_DEFAULT_CD = 0.79;
 
 struct JetArrayImpingementResult {
   double Nu = 0.0;
+  // d(Nu)/d(Re_j), analytic. Gc_Gj is purely geometric (crossflow_to_jet_ratio
+  // depends on yn_d, z_d, C_D and row position only, never on Re_j or mdot),
+  // so it and the geometry terms are held fixed here -- only the Re_j power
+  // law needs differentiating, same rationale as SingleJetImpingementResult.
+  double dNu_dRe_j = 0.0;
   bool extrapolated = false;  // outside the set's advisory validity
 };
 

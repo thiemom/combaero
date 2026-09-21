@@ -113,6 +113,160 @@ class RibbedModel:
 
 
 @dataclass
+class ImpingementModel:
+    """Jet array impingement cooling for ONE spanwise row, evaluated from a
+    provenanced parameter set (Florschuetz, Truman and Metzger 1981).
+
+    A real array's rows see progressively more crossflow as spent air from
+    upstream rows accumulates -- there is no single "channel Nu" for a whole
+    array the way there is for a smooth or ribbed duct. Model the array by
+    chaining ``n_rows`` separate elements, each with its own ``ImpingementModel``
+    and ``row``, the same way a real duct is built from segments elsewhere in
+    this codebase. This element does not do that chaining or the row-to-row
+    mass-flow bookkeeping for you: see ``row`` below for what it assumes
+    instead.
+
+    Parameters
+    ----------
+    correlation_set : object
+        A ``combaero.JetArrayCorrelationSet``. Defaults to
+        ``florschuetz_1981_inline()``. Supply ``florschuetz_1981_staggered()``
+        for a staggered hole pattern, or your own tuned set.
+    d_jet : float
+        Jet hole diameter [m]. This row's characteristic length for both
+        ``Re_j`` and ``h = Nu * k / d_jet``.
+    xn_d, yn_d, z_d : float
+        Streamwise hole spacing, spanwise hole spacing, and channel height
+        (jet-plate-to-target-plate gap), each normalised by ``d_jet``.
+    row : int
+        This row's position, 1-indexed counting from upstream. Row 1 sees
+        zero crossflow by definition (``Gc/Gj = 0``, matching Florschuetz's
+        own ``Nu1``); ``crossflow_to_jet_ratio_at_row`` computes the rest
+        from geometry alone, so no other row's state is needed here.
+    C_D : float
+        Jet-plate discharge coefficient, feeding the ``Gc/Gj`` closed form.
+        Defaults to the source's own recommendation absent a measured value
+        (``FLORSCHUETZ_1981_DEFAULT_CD = 0.79``) -- combaero has no
+        discharge-coefficient correlation of its own for a jet-plate array
+        yet, see issue #375.
+
+    What this element assumes about mass flow. ``self.area`` (on the
+    enclosing ``ConvectiveSurface``) is taken as THIS ROW's own target-plate
+    footprint, so the number of holes in the row is recovered as
+    ``area / (xn_d * d_jet * yn_d * d_jet)`` and this row's own jet velocity
+    from the upstream state's total mass flow through that area -- the same
+    "total flow over this element's own area" convention every other
+    ``ConvectiveSurface`` model uses, not a new one. Whether every row gets
+    the same total flow (a uniform-supply approximation) or a row-dependent
+    one (Florschuetz's own Eq. 7, deliberately not implemented -- see
+    ``impingement_correlation.h``'s module comment) is up to how the caller
+    assembles the chain of elements, not this model.
+
+    What this element does NOT model. The jet plate's own orifice pressure
+    loss: model that with a proper ``OrificeElement`` upstream, using a real
+    discharge-coefficient correlation -- duplicating it here with a
+    hand-rolled formula would risk double-counting it. Friction/pressure
+    drop reported here (``f``, ``dP``) is the CROSSFLOW's own plain
+    smooth-duct value: Han's book gives no friction correlation for
+    impingement the way it does for ribs (there is no ``R``/``f``
+    relationship in Eq. 4.9), so this is the best available proxy for the
+    spent-air flow along the channel, not a claim that impingement leaves
+    friction unchanged.
+    """
+
+    correlation_set: object = None
+    d_jet: float = 0.0
+    xn_d: float = 0.0
+    yn_d: float = 0.0
+    z_d: float = 0.0
+    row: int = 1
+    C_D: float = cb.FLORSCHUETZ_1981_DEFAULT_CD
+    Nu_multiplier: float = 1.0
+    f_multiplier: float = 1.0
+
+
+@dataclass
+class SingleJetImpingementModel:
+    """A single free round jet impinging on a flat plate (Goldstein,
+    Behbahani and Heppelmann 1986), at a representative radial position.
+
+    Unlike ``ImpingementModel``, there is no array and no crossflow -- this
+    is one jet, one target patch. ``R_D`` is a real modelling choice, not a
+    detail: the correlation's Nu is LOCAL (a function of radial distance from
+    the jet centerline), so using it for one lumped ``ConvectiveSurface``
+    means picking a representative position rather than area-averaging the
+    source's own radial profile, which this element does not do.
+
+    Parameters
+    ----------
+    correlation_set : object
+        A ``combaero.SingleJetImpingementSet``. Defaults to
+        ``goldstein_1986_single_jet()``.
+    bc : object
+        A ``combaero.ImpingementThermalBC``. The correlation's ``(R/D)``
+        exponent switches on which surface boundary condition it was fitted
+        under; this does not change what the element computes for, only
+        which of the source's two curves it reads from.
+    d_jet : float
+        Jet diameter [m].
+    L_D : float
+        Jet-to-target-plate spacing / ``d_jet``. Defaults to 7.75, the
+        source's own optimum spacing -- a defensible default, not a claim
+        about any particular rig.
+    R_D : float
+        Radial distance from the jet centerline / ``d_jet``, at the
+        representative position this element reports Nu for. No default:
+        the source's closed-form check point uses 5.0, but that is a
+        worked example, not a universal choice.
+
+    Mass flow. Same convention as ``ImpingementModel``: ``self.area`` is
+    taken as this jet's own target patch, and its own jet velocity comes
+    from the upstream state's total mass flow through that area -- with no
+    hole-density division, since there is exactly one hole.
+
+    Pressure drop is not modelled here for the same reason as
+    ``ImpingementModel``: model the nozzle's own loss with a proper
+    ``OrificeElement`` upstream, not a formula duplicated inside this
+    heat-transfer model. ``f``/``dP`` reported here are the target-side
+    channel's own plain smooth-duct values, borrowed for a T_aw computation
+    Han's Eq. 4.2/4.3 recovery-factor model would otherwise have to supply
+    -- see ``han_impingement.md`` items 6-7, not yet wired in.
+    """
+
+    correlation_set: object = None
+    bc: object = cb.ImpingementThermalBC.ConstantHeatFlux
+    d_jet: float = 0.0
+    L_D: float = 7.75
+    R_D: float = 0.0
+    Nu_multiplier: float = 1.0
+    f_multiplier: float = 1.0
+
+
+@dataclass
+class _ImpingementChannelResult:
+    """What either impingement model returns.
+
+    Deliberately NOT a ``ChannelResult``: same rationale as
+    ``_RibbedChannelResult`` -- this path computes its own derivatives and
+    (for the array case) an ``extrapolated`` flag the C++ correlation
+    already carries.
+    """
+
+    h: float
+    Nu: float
+    Re: float
+    Pr: float
+    f: float
+    dP: float
+    T_aw: float
+    extrapolated: bool = False
+    dh_dmdot: float = 0.0
+    dh_dT: float = 0.0
+    dT_aw_dmdot: float = 0.0
+    dT_aw_dT: float = 0.0
+
+
+@dataclass
 class _RibbedChannelResult:
     """What a ribbed channel returns.
 
@@ -144,7 +298,7 @@ class _RibbedChannelResult:
     dT_aw_dT: float = 0.0
 
 
-ChannelModel = SmoothModel | RibbedModel
+ChannelModel = SmoothModel | RibbedModel | ImpingementModel | SingleJetImpingementModel
 
 
 @dataclass
@@ -303,6 +457,130 @@ class ConvectiveSurface:
             "on."
         )
 
+    def _impingement_result(self, T, P, X, velocity, diameter, length, T_hot, heating):
+        """Jet array impingement, one row (Florschuetz, Truman and Metzger 1981).
+
+        See ``ImpingementModel``'s docstring for the mass-flow and
+        pressure-drop conventions this follows.
+        """
+        model = self.model
+        jet_set = model.correlation_set or cb.florschuetz_1981_inline()
+
+        rho, _ = _safe_rho(cb.density(T, P, X))
+        cs = cb.complete_state(T, P, X)
+        mu = cs.transport.mu
+        k = cs.transport.k
+        Pr = cs.transport.Pr
+
+        mdot_total = rho * velocity * self.area if self.area > 0.0 else 0.0
+        hole_footprint = model.xn_d * model.d_jet * model.yn_d * model.d_jet
+        n_holes = self.area / hole_footprint if hole_footprint > 0.0 else 0.0
+        mdot_per_hole = mdot_total / n_holes if n_holes > 0.0 else 0.0
+        hole_area = math.pi / 4.0 * model.d_jet**2
+        v_jet = mdot_per_hole / (rho * hole_area) if rho * hole_area > 0.0 else 0.0
+        Re_j = rho * v_jet * model.d_jet / mu if mu > 0.0 else 0.0
+
+        Gc_Gj = cb.crossflow_to_jet_ratio_at_row(model.yn_d, model.z_d, model.C_D, model.row)
+        jet = cb.jet_array_impingement_nu(
+            jet_set, Re_j, Gc_Gj, Pr, model.xn_d, model.yn_d, model.z_d
+        )
+        h = jet.Nu * k / model.d_jet if model.d_jet > 0.0 else 0.0
+
+        # T_aw, f and dP are not covered by Eq. 4.9 at all -- Han's book gives
+        # no impingement-specific friction/recovery model, unlike ribs' own
+        # R/f relationship. Borrowed wholesale from the plain smooth
+        # correlation applied to the crossflow's own bulk state, per
+        # ImpingementModel's docstring.
+        smooth = cb.channel_smooth(
+            T,
+            P,
+            X,
+            velocity,
+            diameter,
+            length,
+            T_hot=T_hot,
+            heating=heating,
+            Nu_multiplier=1.0,
+            f_multiplier=1.0,
+        )
+
+        dRe_j_dmdot = abs(Re_j / mdot_total) if mdot_total else 0.0
+        dh_dmdot = jet.dNu_dRe_j * dRe_j_dmdot * (k / model.d_jet if model.d_jet > 0.0 else 0.0)
+        dh_dmdot *= self.Nu_multiplier
+        # Temperature sensitivity of the correlation itself is not exposed;
+        # only the borrowed smooth-side contributes, the same documented gap
+        # ribs accepted for their own T-sensitivity.
+        dh_dT = smooth.dh_dT * self.Nu_multiplier
+
+        return _ImpingementChannelResult(
+            h=h * self.Nu_multiplier,
+            Nu=jet.Nu,
+            Re=Re_j,
+            Pr=Pr,
+            f=smooth.f * self.f_multiplier,
+            dP=smooth.dP * self.f_multiplier,
+            T_aw=smooth.T_aw,
+            extrapolated=jet.extrapolated,
+            dh_dmdot=dh_dmdot,
+            dh_dT=dh_dT,
+            dT_aw_dmdot=smooth.dT_aw_dmdot,
+            dT_aw_dT=smooth.dT_aw_dT,
+        )
+
+    def _single_jet_impingement_result(self, T, P, X, velocity, diameter, length, T_hot, heating):
+        """A single free jet (Goldstein, Behbahani and Heppelmann 1986).
+
+        See ``SingleJetImpingementModel``'s docstring for the mass-flow and
+        pressure-drop conventions this follows.
+        """
+        model = self.model
+        jet_set = model.correlation_set or cb.goldstein_1986_single_jet()
+
+        rho, _ = _safe_rho(cb.density(T, P, X))
+        cs = cb.complete_state(T, P, X)
+        mu = cs.transport.mu
+        k = cs.transport.k
+
+        mdot_total = rho * velocity * self.area if self.area > 0.0 else 0.0
+        hole_area = math.pi / 4.0 * model.d_jet**2
+        v_jet = mdot_total / (rho * hole_area) if rho * hole_area > 0.0 else 0.0
+        Re = rho * v_jet * model.d_jet / mu if mu > 0.0 else 0.0
+
+        jet = cb.single_jet_impingement(jet_set, model.bc, Re, model.L_D, model.R_D)
+        h = jet.Nu * k / model.d_jet if model.d_jet > 0.0 else 0.0
+
+        smooth = cb.channel_smooth(
+            T,
+            P,
+            X,
+            velocity,
+            diameter,
+            length,
+            T_hot=T_hot,
+            heating=heating,
+            Nu_multiplier=1.0,
+            f_multiplier=1.0,
+        )
+
+        dRe_dmdot = abs(Re / mdot_total) if mdot_total else 0.0
+        dh_dmdot = jet.dNu_dRe * dRe_dmdot * (k / model.d_jet if model.d_jet > 0.0 else 0.0)
+        dh_dmdot *= self.Nu_multiplier
+        dh_dT = smooth.dh_dT * self.Nu_multiplier
+
+        return _ImpingementChannelResult(
+            h=h * self.Nu_multiplier,
+            Nu=jet.Nu,
+            Re=Re,
+            Pr=cs.transport.Pr,
+            f=smooth.f * self.f_multiplier,
+            dP=smooth.dP * self.f_multiplier,
+            T_aw=smooth.T_aw,
+            dh_dmdot=dh_dmdot,
+            dh_dT=dh_dT,
+            dT_aw_dmdot=smooth.dT_aw_dmdot,
+            dT_aw_dT=smooth.dT_aw_dT,
+        )
+
     def htc_and_T(
         self,
         T: float,
@@ -369,6 +647,12 @@ class ConvectiveSurface:
             )
         elif isinstance(self.model, RibbedModel):
             result = self._ribbed_result(T, P, X, velocity, diameter, length, T_hot, heating)
+        elif isinstance(self.model, ImpingementModel):
+            result = self._impingement_result(T, P, X, velocity, diameter, length, T_hot, heating)
+        elif isinstance(self.model, SingleJetImpingementModel):
+            result = self._single_jet_impingement_result(
+                T, P, X, velocity, diameter, length, T_hot, heating
+            )
         else:
             raise TypeError(
                 f"Unsupported channel model {type(self.model).__name__}. "

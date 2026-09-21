@@ -1194,11 +1194,70 @@ That knob exists because the ribbed side already has a better one: change `C_G`
 on the parameter set, which records what you changed and why. The smooth walls
 come from Gnielinski and have no set of their own.
 
+### Impingement Channels
+
+```python
+from combaero.network import ConvectiveSurface, ImpingementModel, SingleJetImpingementModel
+
+surface = ConvectiveSurface(
+    area=0.01,   # this ROW's own target-plate footprint
+    model=ImpingementModel(
+        d_jet=0.002, xn_d=8.0, yn_d=6.0, z_d=2.0,
+        row=3,       # 1-indexed, counting from upstream
+    ),
+)
+```
+
+**One element models one spanwise row**, not a whole array -- there is no
+single "channel Nu" for a jet array the way there is for a smooth or ribbed
+duct, since downstream rows see progressively more crossflow than upstream
+ones. Model a real array by chaining `n_rows` separate elements, each with
+its own `row`; row 1 sees zero crossflow by definition (`Gc/Gj = 0`,
+Florschuetz's own `Nu1`).
+
+**Mass flow is recovered from `area`, the same convention every
+`ConvectiveSurface` model uses** -- `ImpingementModel` does not introduce a
+new one. The element treats `area` as this row's own footprint, divides by
+`xn_d * d_jet * yn_d * d_jet` to get the row's hole count, and gets this
+row's own jet velocity from the upstream state's total mass flow through
+that area. Whether every row gets the same total flow (a uniform-supply
+approximation) or a row-dependent one (Florschuetz's own Eq. 7, deliberately
+not implemented -- see `impingement_correlation.h`'s module comment) is a
+choice for whoever assembles the chain, not something this element decides.
+
+**Pressure drop is not modelled here.** Model the jet plate's own orifice
+loss with a proper `OrificeElement` upstream, using a real
+discharge-coefficient correlation -- duplicating it inside this heat-transfer
+model would risk double-counting it. `f`/`dP` reported by this element are
+the crossflow's own plain smooth-duct values (Han's book gives no
+impingement-specific friction correlation, unlike ribs' own `R`/`f`
+relationship), borrowed to compute a `T_aw` Eq. 4.2/4.3's own recovery-factor
+model would otherwise have to supply.
+
+**A single free jet** (Goldstein, Behbahani and Heppelmann 1986) is a
+separate model, since there is no array and no crossflow:
+
+```python
+surface = ConvectiveSurface(
+    area=0.001,   # this jet's own target patch
+    model=SingleJetImpingementModel(d_jet=0.003, L_D=7.75, R_D=5.0),
+)
+```
+
+`R_D` is a real modelling choice, not a detail: the correlation's `Nu` is
+LOCAL to the radial position, so this reports one representative value
+rather than an area-averaged profile.
+
+Both models expose the same wall-coupling derivatives (`dh_dmdot`, `dh_dT`,
+`dT_aw_dmdot`, `dT_aw_dT`) and an `extrapolated` flag (array only -- a single
+jet has no stated validity range to be outside of), matching `RibbedModel`'s
+contract.
+
 ### Jet Impingement Correlations (parametrised)
 
 Two independent regimes, matching
-`validation/cooling/extractions/han_impingement.md`'s own split. Not yet
-wired into a network element (#337) -- these are the correlation math only.
+`validation/cooling/extractions/han_impingement.md`'s own split, wired into
+the network elements above (`ImpingementModel`, `SingleJetImpingementModel`).
 
 **Single jet** (Goldstein, Behbahani and Heppelmann, 1986): one free round
 jet on a flat plate, no crossflow, no array.

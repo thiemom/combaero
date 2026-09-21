@@ -9,6 +9,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Jet impingement wired into the network solver and GUI**: `ImpingementModel`
+  and `SingleJetImpingementModel` (`python/combaero/network/components.py`),
+  completing #337's re-add. `ImpingementModel` models ONE spanwise row of a
+  jet array -- there is no single "channel Nu" for a whole array the way
+  there is for a smooth or ribbed duct, since downstream rows see
+  progressively more crossflow than upstream ones. A full array is a chain
+  of these elements, one per row.
+
+  Mass flow is recovered from `ConvectiveSurface.area`, the same convention
+  every other channel model already uses -- no new one introduced. The
+  element treats `area` as the row's own footprint, divides by the hole
+  spacing product to get its hole count, and derives this row's own jet
+  Reynolds number from the upstream state's total mass flow through that
+  area. Converting an array's total/mean flow into a genuinely row-dependent
+  distribution (Florschuetz's own Eq. 7) is deliberately left to whoever
+  assembles the chain, not decided inside the element.
+
+  Pressure drop is deliberately NOT modelled by either element: the jet
+  plate's own orifice loss belongs on a proper `OrificeElement` upstream
+  (with a real discharge-coefficient correlation), not duplicated here where
+  it risks double-counting. `f`/`dP` reported by these elements are the
+  crossflow/target channel's own plain smooth-duct values (Han's book gives
+  no impingement-specific friction correlation, unlike ribs' own `R`/`f`
+  relationship), borrowed to compute a `T_aw` in place of Eq. 4.2/4.3's own
+  recovery-factor model, which is not wired in either.
+
+  Both `impingement_correlation.h` functions (`single_jet_impingement_nu`,
+  `jet_array_impingement_nu`) gained an analytic-derivative sibling
+  (`single_jet_impingement`, and a new `dNu_dRe_j` field) for the wall-
+  coupling Jacobian, per the project's (f, J) rule -- both FD-verified in
+  `tests/test_impingement_correlation.cpp`, and the mdot-to-h composition
+  chain independently FD-verified again at the element level in
+  `python/tests/test_impingement_channel_element.py`, since that chain is
+  new code the correlation-level check does not cover.
+
+  Wired into the GUI the same way ribbed was: `ImpingementModelData` and
+  `SingleJetImpingementModelData` (`gui/backend/schemas.py`), mapped in
+  `graph_builder.py`, and a reachable "Impingement (Jet Array)" /
+  "Impingement (Single Jet)" choice in `SurfaceEnhancementInspector.tsx` --
+  replacing the old, unreachable, pre-0.7.0 impingement UI block that used
+  the crossflow-less field names.
+
+  Surfaced (not caused) a pre-existing, already-documented gap while
+  extending `tests/test_channel_element_jacobian_fd.py` to cover the new
+  elements: `ChannelElement._ribbed_residuals`'s own docstring already
+  states its pressure-drop Jacobian has no temperature column, by design --
+  adding "ribbed" to that test's surface matrix (which the file's own
+  docstring had earmarked for #334, but was never done) required a
+  documented skip for that one known combination, not a code change.
+
 - **Jet impingement correlations re-added, with provenance** (`include/impingement_correlation.h`),
   closing issue #337. Two independent regimes:
 

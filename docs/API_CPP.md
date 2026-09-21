@@ -455,17 +455,21 @@ RibResult evaluate_rib(const RibCorrelationSet& set,
 // Enhanced surfaces removed in 0.7.0 for unprovenanced correlations (issue
 // #339). Ribbed is re-added on han_1988_orthogonal / rallabandi_2009_high_re
 // above, wired through RibbedModel (components.py) into the GUI and network
-// solver. Dimpled and pin-fin remain removed, tracked individually
-// (#335-336). Impingement's correlations are re-added below, but not yet
-// wired into a network element -- see #337.
+// solver. Impingement is re-added below, wired through ImpingementModel /
+// SingleJetImpingementModel (components.py) into the GUI and network solver
+// the same way. Dimpled and pin-fin remain removed, tracked individually
+// (#335-336).
 ```
 
 ### Jet Impingement Correlations
 ```cpp
 // impingement_correlation.h -- two independent regimes, matching
-// han_impingement.md's own split. Not yet wired into a network element
-// (#337): converting an array's total/mean mass flow into a per-row local
-// Re_j is a design question that has not been made yet.
+// han_impingement.md's own split, wired into ImpingementModel /
+// SingleJetImpingementModel (components.py). Converting an array's
+// total/mean mass flow into a per-row local Re_j (Florschuetz's own Eq. 7)
+// is deliberately NOT implemented here -- ImpingementModel recovers each
+// row's own mass flow from its own ConvectiveSurface.area instead, leaving
+// row-to-row flow distribution to whoever assembles the chain of elements.
 
 // Single jet (Goldstein, Behbahani and Heppelmann, 1986):
 //   Nu_bar = Re^0.76 * (A - |L/D - 7.75|) / (B + C*(R/D)^n)
@@ -476,11 +480,18 @@ void validate_single_jet_set(const SingleJetImpingementSet& set);
 double single_jet_impingement_nu(const SingleJetImpingementSet& set,
                                  ImpingementThermalBC bc, double Re,
                                  double L_D, double R_D);
+// Same formula, plus an analytic d(Nu)/d(Re) -- for a network element's
+// wall-coupling Jacobian, per the project's (f, J) rule.
+SingleJetImpingementResult single_jet_impingement(
+    const SingleJetImpingementSet& set, ImpingementThermalBC bc, double Re,
+    double L_D, double R_D);
 
 // Jet array with crossflow (Florschuetz, Truman and Metzger, 1981):
 //   Nu = A * Re_j^m * {1 - B*[(z/d)(Gc/Gj)]^n} * Pr^(1/3)
 // A, m, B, n are each C*(xn/d)^nx*(yn/d)^ny*(z/d)^nz (Table 4.1). Re_j and
 // Gc/Gj are the ROW's own local values, not an array mean.
+// JetArrayImpingementResult::dNu_dRe_j is analytic, holding Gc/Gj and
+// geometry fixed -- Gc/Gj never depends on Re_j or mdot, only on geometry.
 enum class JetHolePattern { Inline, Staggered };
 JetArrayCorrelationSet florschuetz_1981_inline();
 JetArrayCorrelationSet florschuetz_1981_staggered();
