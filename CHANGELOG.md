@@ -101,6 +101,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not blocking, as issue #375; the paper's own default (`C_D=0.79`) is used
   as-is.
 
+- **Figure 6 digitised, validating `florschuetz_1981_inline()` against its
+  own source**: all nine panels (three streamwise spacings times three
+  spanwise spacings, three `z/d` symbol series each) -- 27 series, 242
+  points, `validation/cooling/data/florschuetz1981/`.
+
+  Scoring needs no Reynolds-number bisection, unlike every rib figure: the
+  paper's own algebra makes `Nu/Nu1 = 1 - B[(z/d)(Gc/Gj)]^n` exactly, since
+  `Nu1` is the same correlation's value at `Gc/Gj=0` and the
+  `A*Re_j^m*Pr^(1/3)` factor cancels between the two. `jet_array_runner.py`
+  calls `jet_array_impingement_nu` twice per point (at the point's own
+  `Gc/Gj` and at `0`) and takes the ratio, rather than reimplementing the
+  formula to compute an "expected" value.
+
+  242 points score at bias +3.7%, RMS 9.6% against the implementation --
+  close to the fit's own stated 5.6% standard error, given this is raw
+  scatter rather than the fit's own training residual. One panel is a
+  genuine outlier: `B(5,4)I`'s `z/d=1` series sits at the correlation's
+  validity corner (`xn/d`, `yn/d`, `z/d` simultaneously at their lower
+  bounds of 5, 4, 1) and underpredicts measured crossflow degradation
+  there, error growing from +14% to +42% with `Gc/Gj` -- calibration ticks
+  on that same panel read back within 0.9% of round numbers, so this reads
+  as a real weak spot of the fit at its own domain corner, not a
+  digitisation artifact.
+
+  Axis calibration checked two ways per panel (tick positions against
+  round numbers, corners against the nominal box) rather than relying on
+  `verify.py`'s frame-slope check, which assumes a physically-drawn
+  distortion line spanning a real data range and throws on the
+  near-origin coordinates a tick-mark click produces.
+
+  Figure 6 covers the inline pattern only, per its own caption --
+  `florschuetz_1981_staggered()` remains unvalidated against scatter data.
+  The paper's Figure 7 gives a staggered/inline Nu ratio for a handful of
+  geometries, which could support an indirect check later, but is not
+  digitised.
+
 - **`han_park_1988_angled()`, a third rib correlation set** for angled
   ribs in broad-aspect-ratio rectangular ducts (Han and Park 1988, Eq.
   4.17/4.18): `alpha` 30-90 deg, `W/H` 1-4. Han's original power-law

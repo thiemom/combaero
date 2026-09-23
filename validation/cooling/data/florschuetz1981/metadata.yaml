@@ -1,0 +1,886 @@
+# Calibration files (rc_XX_corners.csv, rc_XX_xaxis.csv, rc_XX_yaxis.csv)
+# are committed alongside the measured series below but deliberately NOT
+# listed here: they are single-digit point clouds hugging the plot
+# origin, and verify.py's frame-slope check (a log-log power-law fit,
+# built for a physically-drawn distortion line spanning a real data
+# range) throws a math domain error on coordinates this close to zero --
+# checked directly, not assumed (log(0) from an exact x=0 tick click).
+# Their calibration quality was measured once, off the harness, instead:
+# every panel's five x-ticks (0/0.2/0.4/0.6/0.8) land within 0.32%
+# of round numbers, every panel's four y-ticks (0.4/0.6/0.8/1.0) land within
+# 0.97%, and all four corners land within 3.4% of the
+# nominal x=[0,0.8], y=[0.4,1.0] box -- worst case across all 9 panels.
+# See validation/cooling/extractions/han_impingement.md for the
+# per-panel numbers.
+
+paper:
+  name: florschuetz1981
+  citation: >-
+    Florschuetz, L.W., Truman, C.R. and Metzger, D.E. (1981). "Streamwise Flow
+    and Heat Transfer Distributions for Jet Array Impingement with Crossflow."
+    ASME J. Heat Transfer 103, 337-342.
+  secondary: false
+
+files:
+  - path: rc_00_circles_zd_1.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel B(5,4)I (row 0, col 0)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=1 (circle symbol)"
+    figure: "6"
+    panel: "row0col0"
+    geometry:
+      xn_d: 5.0
+      yn_d: 4.0
+      z_d: 1.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.324
+    cross_check: >-
+      Worst agreement in the set: this panel sits at the correlation's own
+      validity corner (xn/d=5, yn/d=4, z/d=1 all simultaneously at their lower
+      bounds) and florschuetz_1981_inline() underpredicts the measured
+      crossflow degradation there, error growing from +14% at Gc/Gj=0.19 to
+      +42% at Gc/Gj=0.72 (n=9, bias +31%, RMS 32%, max 42%). Calibration ticks
+      on this same panel land within 0.9% of round numbers
+      (rc_00_xaxis/yaxis), so this reads as a genuine weak spot of the fit at
+      its own domain corner, not a digitisation artifact. Series is
+      monotonically non-increasing with Gc/Gj.
+    class_confidence: confirmed
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_00_squares_zd_2.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel B(5,4)I (row 0, col 0)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=2 (square symbol)"
+    figure: "6"
+    panel: "row0col0"
+    geometry:
+      xn_d: 5.0
+      yn_d: 4.0
+      z_d: 2.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.03
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias -0.7%, RMS 2.8%, max
+      |err| 5.8%. Series is monotonically non-increasing with Gc/Gj.
+    class_confidence: confirmed
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_00_triangles_zd_3.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel B(5,4)I (row 0, col 0)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=3 (triangle symbol)"
+    figure: "6"
+    panel: "row0col0"
+    geometry:
+      xn_d: 5.0
+      yn_d: 4.0
+      z_d: 3.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.07
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias -6.6%, RMS 7.0%, max
+      |err| 10.9%. Series is monotonically non-increasing with Gc/Gj.
+    class_confidence: confirmed
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_01_circles_zd_1.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel C(5,6)I (row 0, col 1)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=1 (circle symbol)"
+    figure: "6"
+    panel: "row0col1"
+    geometry:
+      xn_d: 5.0
+      yn_d: 6.0
+      z_d: 1.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.098
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias +9.0%, RMS 9.8%, max
+      |err| 12.3%. Series is non-monotonic (2 of 8 steps increase --
+      consistent with the reported leveling-off/uptick at high crossflow for
+      some z/d).
+    class_confidence: confirmed
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_01_squares_zd_2.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel C(5,6)I (row 0, col 1)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=2 (square symbol)"
+    figure: "6"
+    panel: "row0col1"
+    geometry:
+      xn_d: 5.0
+      yn_d: 6.0
+      z_d: 2.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.034
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias -2.6%, RMS 3.4%, max
+      |err| 5.7%. Series is non-monotonic (1 of 8 steps increase -- consistent
+      with the reported leveling-off/uptick at high crossflow for some z/d).
+    class_confidence: confirmed
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_01_triangles_zd_3.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel C(5,6)I (row 0, col 1)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=3 (triangle symbol)"
+    figure: "6"
+    panel: "row0col1"
+    geometry:
+      xn_d: 5.0
+      yn_d: 6.0
+      z_d: 3.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.071
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias -6.2%, RMS 7.1%, max
+      |err| 13.2%. Series is monotonically non-increasing with Gc/Gj.
+    class_confidence: confirmed
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_02_circles_zd_1.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel B(5,8)I (row 0, col 2)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=1 (circle symbol)"
+    figure: "6"
+    panel: "row0col2"
+    geometry:
+      xn_d: 5.0
+      yn_d: 8.0
+      z_d: 1.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.178
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias +16.9%, RMS 17.8%,
+      max |err| 23.3%. Series is non-monotonic (2 of 8 steps increase --
+      consistent with the reported leveling-off/uptick at high crossflow for
+      some z/d).
+    class_confidence: provisional
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_02_squares_zd_2.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel B(5,8)I (row 0, col 2)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=2 (square symbol)"
+    figure: "6"
+    panel: "row0col2"
+    geometry:
+      xn_d: 5.0
+      yn_d: 8.0
+      z_d: 2.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.038
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias +3.0%, RMS 3.8%, max
+      |err| 7.8%. Series is non-monotonic (1 of 8 steps increase -- consistent
+      with the reported leveling-off/uptick at high crossflow for some z/d).
+    class_confidence: provisional
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_02_triangles_zd_3.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel B(5,8)I (row 0, col 2)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=3 (triangle symbol)"
+    figure: "6"
+    panel: "row0col2"
+    geometry:
+      xn_d: 5.0
+      yn_d: 8.0
+      z_d: 3.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.043
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias -0.4%, RMS 4.3%, max
+      |err| 10.7%. Series is non-monotonic (1 of 8 steps increase --
+      consistent with the reported leveling-off/uptick at high crossflow for
+      some z/d).
+    class_confidence: provisional
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_10_circles_zd_1.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel B(10,4)I (row 1, col 0)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=1 (circle symbol)"
+    figure: "6"
+    panel: "row1col0"
+    geometry:
+      xn_d: 10.0
+      yn_d: 4.0
+      z_d: 1.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.071
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=8, bias +6.8%, RMS 7.1%, max
+      |err| 9.4%. Series is non-monotonic (2 of 7 steps increase -- consistent
+      with the reported leveling-off/uptick at high crossflow for some z/d).
+    class_confidence: confirmed
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_10_squares_zd_2.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel B(10,4)I (row 1, col 0)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=2 (square symbol)"
+    figure: "6"
+    panel: "row1col0"
+    geometry:
+      xn_d: 10.0
+      yn_d: 4.0
+      z_d: 2.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.089
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias +6.6%, RMS 8.9%, max
+      |err| 12.8%. Series is monotonically non-increasing with Gc/Gj.
+    class_confidence: confirmed
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_10_triangles_zd_3.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel B(10,4)I (row 1, col 0)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=3 (triangle symbol)"
+    figure: "6"
+    panel: "row1col0"
+    geometry:
+      xn_d: 10.0
+      yn_d: 4.0
+      z_d: 3.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.059
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias +4.4%, RMS 5.9%, max
+      |err| 9.8%. Series is monotonically non-increasing with Gc/Gj.
+    class_confidence: confirmed
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_11_circles_zd_1.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel C(10,6)I (row 1, col 1)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=1 (circle symbol)"
+    figure: "6"
+    panel: "row1col1"
+    geometry:
+      xn_d: 10.0
+      yn_d: 6.0
+      z_d: 1.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.084
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias +7.6%, RMS 8.4%, max
+      |err| 13.9%. Series is non-monotonic (5 of 8 steps increase --
+      consistent with the reported leveling-off/uptick at high crossflow for
+      some z/d).
+    class_confidence: confirmed
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_11_squares_zd_2.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel C(10,6)I (row 1, col 1)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=2 (square symbol)"
+    figure: "6"
+    panel: "row1col1"
+    geometry:
+      xn_d: 10.0
+      yn_d: 6.0
+      z_d: 2.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.062
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias +4.7%, RMS 6.2%, max
+      |err| 10.2%. Series is monotonically non-increasing with Gc/Gj.
+    class_confidence: confirmed
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_11_triangles_zd_3.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel C(10,6)I (row 1, col 1)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=3 (triangle symbol)"
+    figure: "6"
+    panel: "row1col1"
+    geometry:
+      xn_d: 10.0
+      yn_d: 6.0
+      z_d: 3.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.034
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias +2.4%, RMS 3.4%, max
+      |err| 6.9%. Series is monotonically non-increasing with Gc/Gj.
+    class_confidence: confirmed
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_12_circles_zd_1.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel B(10,8)I (row 1, col 2)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=1 (circle symbol)"
+    figure: "6"
+    panel: "row1col2"
+    geometry:
+      xn_d: 10.0
+      yn_d: 8.0
+      z_d: 1.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.121
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias +11.4%, RMS 12.1%,
+      max |err| 16.8%. Series is non-monotonic (4 of 8 steps increase --
+      consistent with the reported leveling-off/uptick at high crossflow for
+      some z/d).
+    class_confidence: provisional
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_12_squares_zd_2.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel B(10,8)I (row 1, col 2)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=2 (square symbol)"
+    figure: "6"
+    panel: "row1col2"
+    geometry:
+      xn_d: 10.0
+      yn_d: 8.0
+      z_d: 2.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.108
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias +8.7%, RMS 10.8%,
+      max |err| 16.3%. Series is monotonically non-increasing with Gc/Gj.
+    class_confidence: provisional
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_12_triangles_zd_3.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel B(10,8)I (row 1, col 2)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=3 (triangle symbol)"
+    figure: "6"
+    panel: "row1col2"
+    geometry:
+      xn_d: 10.0
+      yn_d: 8.0
+      z_d: 3.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.073
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias +6.6%, RMS 7.3%, max
+      |err| 11.4%. Series is monotonically non-increasing with Gc/Gj.
+    class_confidence: provisional
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_20_circles_zd_1.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel D(15,4)I (row 2, col 0)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=1 (circle symbol)"
+    figure: "6"
+    panel: "row2col0"
+    geometry:
+      xn_d: 15.0
+      yn_d: 4.0
+      z_d: 1.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.03
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias -1.1%, RMS 1.9%, max
+      |err| 3.6%. Series is non-monotonic (3 of 8 steps increase -- consistent
+      with the reported leveling-off/uptick at high crossflow for some z/d).
+    class_confidence: confirmed
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_20_squares_zd_2.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel D(15,4)I (row 2, col 0)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=2 (square symbol)"
+    figure: "6"
+    panel: "row2col0"
+    geometry:
+      xn_d: 15.0
+      yn_d: 4.0
+      z_d: 2.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.073
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias -7.1%, RMS 7.3%, max
+      |err| 9.3%. Series is non-monotonic (1 of 8 steps increase -- consistent
+      with the reported leveling-off/uptick at high crossflow for some z/d).
+    class_confidence: confirmed
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_20_triangles_zd_3.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel D(15,4)I (row 2, col 0)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=3 (triangle symbol)"
+    figure: "6"
+    panel: "row2col0"
+    geometry:
+      xn_d: 15.0
+      yn_d: 4.0
+      z_d: 3.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.051
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias -4.6%, RMS 5.1%, max
+      |err| 8.9%. Series is monotonically non-increasing with Gc/Gj.
+    class_confidence: confirmed
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_21_circles_zd_1.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel D(15,6)I (row 2, col 1)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=1 (circle symbol)"
+    figure: "6"
+    panel: "row2col1"
+    geometry:
+      xn_d: 15.0
+      yn_d: 6.0
+      z_d: 1.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.06
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias -3.1%, RMS 6.0%, max
+      |err| 10.8%. Series is non-monotonic (5 of 8 steps increase --
+      consistent with the reported leveling-off/uptick at high crossflow for
+      some z/d).
+    class_confidence: provisional
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_21_squares_zd_2.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel D(15,6)I (row 2, col 1)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=2 (square symbol)"
+    figure: "6"
+    panel: "row2col1"
+    geometry:
+      xn_d: 15.0
+      yn_d: 6.0
+      z_d: 2.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.03
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias -0.7%, RMS 1.7%, max
+      |err| 3.5%. Series is monotonically non-increasing with Gc/Gj.
+    class_confidence: provisional
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_21_triangles_zd_3.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel D(15,6)I (row 2, col 1)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=3 (triangle symbol)"
+    figure: "6"
+    panel: "row2col1"
+    geometry:
+      xn_d: 15.0
+      yn_d: 6.0
+      z_d: 3.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.03
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias +0.9%, RMS 2.4%, max
+      |err| 3.4%. Series is non-monotonic (1 of 8 steps increase -- consistent
+      with the reported leveling-off/uptick at high crossflow for some z/d).
+    class_confidence: provisional
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_22_circles_zd_1.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel D(15,8)I (row 2, col 2)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=1 (circle symbol)"
+    figure: "6"
+    panel: "row2col2"
+    geometry:
+      xn_d: 15.0
+      yn_d: 8.0
+      z_d: 1.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.051
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias -0.7%, RMS 5.1%, max
+      |err| 9.3%. Series is non-monotonic (7 of 8 steps increase -- consistent
+      with the reported leveling-off/uptick at high crossflow for some z/d).
+    class_confidence: provisional
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_22_squares_zd_2.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel D(15,8)I (row 2, col 2)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=2 (square symbol)"
+    figure: "6"
+    panel: "row2col2"
+    geometry:
+      xn_d: 15.0
+      yn_d: 8.0
+      z_d: 2.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.074
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias +7.0%, RMS 7.4%, max
+      |err| 9.6%. Series is monotonically non-increasing with Gc/Gj.
+    class_confidence: provisional
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: rc_22_triangles_zd_3.csv
+    after: null
+    page: 339
+    item: "Figure 6, panel D(15,8)I (row 2, col 2)"
+    series: "measured Nu/Nu1 vs Gc/Gj, z/d=3 (triangle symbol)"
+    figure: "6"
+    panel: "row2col2"
+    geometry:
+      xn_d: 15.0
+      yn_d: 8.0
+      z_d: 3.0
+    alpha_deg: null
+    x_axis: Gc_Gj
+    x_scale: 1.0
+    y_axis: Nu_over_Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.08
+    cross_check: >-
+      Scored against florschuetz_1981_inline(): n=9, bias +7.9%, RMS 8.0%, max
+      |err| 10.2%. Series is monotonically non-increasing with Gc/Gj.
+    class_confidence: provisional
+    scores: florschuetz_1981_inline
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 0.8]
+      plot_y_limits: [0.4, 1.0]
+      kind: measured

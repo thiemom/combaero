@@ -102,7 +102,7 @@ what changed.
 | 24a | cross-check against combaero's existing `Cd` correlations (`include/orifice.h`) | **Not reusable -- checked and rejected, not just skipped.** `Cd_sharp_thin_plate`/`Cd_ReaderHarrisGallagher` and siblings implement ISO 5167-2 flow-metering orifice plates: a single round hole IN A PIPE RUN, `beta = d/D` with `d < D` enforced, `Re_D >= 5000`, `D >= 50mm`, upstream/downstream pipe flow with defined tap locations. A jet-impingement plate is a different physical configuration entirely -- an array of small holes discharging from a plenum into an open/confined channel, no pipe, no `D`. Item 24's `C_D = 0.79` default (and Table 1's measured `0.73-0.85` range) is Florschuetz's own value for exactly this configuration and should be used directly, not derived from or reconciled with the pipe-orifice family | confirmed rejected -- use the literature value as-is |
 | 24b | plate `C_D` is a real gap for combaero, not just for this correlation | Reviewer's rule of thumb in practice is `C_D = 0.8` -- consistent with Florschuetz's `0.79` default and Table 1's measured `0.73-0.85` band, but combaero has no jet-plate-array discharge-coefficient correlation of its own (item 24a: the existing family is for pipe-run metering orifices, a different configuration). Worth its own tracked scope, separate from #337 -- `han_park_1988_angled`-style parametrised set, or a fixed default with a literature citation, is a later decision, not one this extraction needs to make to implement Eq. 4.9 | noted, not yet actioned -- see #337 vs a possible new issue |
 | 25 | open area ratio, `A0*` | `A0* = (pi/4) / [(xn/d)(yn/d)]` for a uniform rectangular array (both inline and staggered use the same formula -- staggered offsets rows spanwise, it does not change hole density) | confirmed against `page-3.png` |
-| 26 | additional validation-figure candidates in the primary paper, not reprinted by Han at all | Fig. 5 (`Nu1` vs `yn/d`, `Re_j=1e4`, `xn/d in {5,10,15}`, inline); Fig. 6 (`Nu/Nu1` vs `Gc/Gj`, 9-panel matrix over `(xn/d,yn/d)` combinations, `z/d in {1,2,3}`, inline); Fig. 7 (staggered/inline `Nu` ratio vs `Gc/Gj`, 4-panel); Fig. 8 (`Nu1` vs `Re_j`, this correlation vs Kercher-Tabakoff vs Chance, at `(5,5)` and `(8,8)`); Fig. 9 (`Nu/Nu1` vs `(z/d)(Gc/Gj)`, same three correlations compared, at `(5,5,1)I`/`(5,5,3)I`/`(8,8,1)I`/`(8,8,3)I`) | seen, not yet digitised -- see "Validation targets" below |
+| 26 | additional validation-figure candidates in the primary paper, not reprinted by Han at all | Fig. 5 (`Nu1` vs `yn/d`, `Re_j=1e4`, `xn/d in {5,10,15}`, inline); Fig. 6 (`Nu/Nu1` vs `Gc/Gj`, 9-panel matrix over `(xn/d,yn/d)` combinations, `z/d in {1,2,3}`, inline); Fig. 7 (staggered/inline `Nu` ratio vs `Gc/Gj`, 4-panel); Fig. 8 (`Nu1` vs `Re_j`, this correlation vs Kercher-Tabakoff vs Chance, at `(5,5)` and `(8,8)`); Fig. 9 (`Nu/Nu1` vs `(z/d)(Gc/Gj)`, same three correlations compared, at `(5,5,1)I`/`(5,5,3)I`/`(8,8,1)I`/`(8,8,3)I`) | Fig. 6 digitised and scored 2026-09-23 (see "Validation targets" below); Figs. 5, 7, 8, 9 seen, not digitised |
 | 27 | Martin (1977) reference, as it actually appears | Martin, H., "Heat and Mass Transfer Between Impinging Gas Jets and Solid Surfaces," *Advances in Heat Transfer*, Vol. 13, Academic Press, New York, 1977, pp. 1-60 -- Florschuetz's reference [5], cited only as precedent for the one-dimensional crossflow *flow-distribution* model (Eqs. 2-6 below, for an array of slot nozzles), not for any single-jet heat-transfer correlation | confirmed against `page-3.png` and `page-6.png`; see I2 |
 
 ### The Gc/Gj closed form (Florschuetz Eqs. 1-8, item 21)
@@ -174,35 +174,102 @@ correlation's real validity range needs instead.
 
 ---
 
-## Validation targets (candidates, not yet digitised)
-
-Per the reviewer's instruction, listed here for agreement before any
-digitising or implementation work starts -- not yet acted on.
+## Validation targets
 
 For single-jet (Eq. 4.1, fully closed already): the closed-form check itself
 (item 4, `Re=25000, R/D=5, L/D=7.75` -> `Nu=60`/`56`) is a sufficient
-regression target; no figure digitisation is obviously needed beyond it.
+regression target; no figure digitisation is needed beyond it.
 
 For multi-jet array with crossflow (Eq. 4.9/Table 4.1, the actual target of
-#337), candidates from the primary paper (item 26), preferred over Han's
-reprinted Fig. 4.12/4.13 because they are the primary source's own plots with
-no reprint-transcription risk:
-- **Fig. 8**: `Nu1` vs `Re_j`, this correlation vs Kercher-Tabakoff vs Chance,
-  at `(xn/d,yn/d) = (5,5)` and `(8,8)`, `z/d in {1,3}` -- tests the `Re_j^m`
-  power-law form and the `A,m` geometry dependence at two extremes.
-- **Fig. 9**: `Nu/Nu1` vs `(z/d)(Gc/Gj)`, same three correlations, at
-  `(5,5,1)I`, `(5,5,3)I`, `(8,8,1)I`, `(8,8,3)I` -- tests the crossflow term
-  `{1 - B[(z/d)(Gc/Gj)]^n}` directly, which is the part item 21's closed form
-  feeds.
-- **Table 1** itself (measured `C_D` per configuration, item 24) is usable as
-  a direct data table rather than a digitised figure, for testing the
-  `Gc/Gj` closed form (item 21) against the measured flow-distribution curves
-  (Figs. 2, 3) that the paper verified it against.
+#337), **2026-09-22 correction**: an earlier pass here filed Figs. 5/6
+alongside 2/3/7 as "supporting results, not the Nu correlation itself" and
+proposed Figs. 8/9 as the targets instead. That was backwards. Rendered at
+400dpi and inspected directly:
 
-Not proposed as targets: Figs. 2/3/5/6/7 -- these validate the flow-
-distribution model (Eqs. 5-8) and the hole-pattern effect, which are
-supporting results, not the Nu correlation itself; useful for a deeper check
-later but not needed to accept Eq. 4.9/Table 4.1 into the codebase.
+- **Fig. 8** and **Fig. 9** plot the paper's own correlation curve alongside
+  Kercher-Tabakoff's and Chance's -- THREE FITTED CORRELATIONS COMPARED, no
+  raw measured points at all. Digitising the "Present Work" curve off either
+  would only confirm this implementation reproduces Table 4.1's own formula,
+  which is already confirmed digit-for-digit (items 17/18) and by the
+  algebraic identity below -- not independent validation.
+- **Fig. 6** ("Effect of crossflow and geometric parameters on streamwise
+  resolved Nusselt numbers. Inline hole pattern", p. 340) is genuine measured
+  scatter, and unambiguous: a 3x3 panel matrix, each panel printed with its
+  exact geometry label -- `B(5,4)I, C(5,6)I, B(5,8)I / B(10,4)I, C(10,6)I,
+  B(10,8)I / D(15,4)I, D(15,6)I, D(15,8)I` -- x-axis `Gc/Gj`, y-axis `Nu/Nu1`,
+  three symbol classes for `z/d in {1,2,3}` (circle/square/triangle) printed
+  in-panel. No leader-line tracing or attribution ambiguity: this is the
+  **primary validation target**, ~15-20 points per panel per symbol.
+- **Fig. 5** ("Effect of geometric parameters on Nusselt number for initial
+  upstream row of array", p. 339) is also genuine measured scatter (`Nu1` vs
+  `yn/d`, fixed `Re_j=1e4`, `z/d in {1,2,3}` by symbol, `xn/d in {5,10,15}` by
+  point cluster) but geometry-to-cluster attribution runs through curved
+  leader lines from a legend rather than an in-panel label, unlike Fig. 6 --
+  usable, but needs careful tracing at digitisation time, flagged rather than
+  guessed at.
+
+**Why Fig. 6 alone is enough to validate the crossflow term, algebraically:**
+`Nu = A*Re_j^m*{1-B[(z/d)(Gc/Gj)]^n}*Pr^(1/3)` and `Nu1` is the same
+expression at `Gc/Gj=0` (bracket=1), so `Nu/Nu1 = 1 - B[(z/d)(Gc/Gj)]^n`
+EXACTLY -- every `Re_j` and `Pr` dependence cancels in the ratio. Fig. 6's
+`Nu/Nu1` vs `Gc/Gj` scatter therefore scores `jet_array_impingement_nu`'s
+bracket term directly, with no `Re_j` or `Pr` assumption needed at all --
+simpler to score than any rib figure, which all needed a Re bisection.
+
+**Table 1** (measured `C_D` per configuration, item 24) remains relevant to
+#375 (jet-plate discharge coefficient), not to Eq. 4.9/Table 4.1's own `Nu`
+fit.
+
+Not proposed as targets: Figs. 2/3 -- these genuinely are about the flow-
+distribution model (Eqs. 5-8), supporting results rather than the Nu
+correlation's own fit. Fig. 7 (staggered/inline `Nu` RATIO vs `Gc/Gj`, not
+raw scatter) is discussed separately below, under staggered validation.
+
+**Fig. 6, digitised 2026-09-23** (all nine panels, `xn_d in {5,10,15}` rows
+by `yn_d in {4,6,8}` columns, `z_d in {1,2,3}` circle/square/triangle
+symbols per panel): `validation/cooling/data/florschuetz1981/`, 27 series,
+242 points. All nine panels share the SAME axis box, `x=[0,0.8]`,
+`y=[0.4,1.0]` -- the original digitisation plan's guess that the x-range
+differed per column was wrong, caught during digitisation itself (a shared
+boundary label between adjacent rows read as a per-row bound at first).
+
+Scored via `validation/cooling/jet_array_runner.py` (deliberately not
+folded into `runner.py`, which is rib-specific and always bisects a
+Reynolds number -- the algebraic identity above means this needs none):
+pooled bias +3.7%, RMS 9.6% over all 242 points, close to
+`florschuetz_1981_inline().standard_error` (5.6%, the FIT's own training
+residual, not a bound on raw scatter). One panel is a genuine, understood
+outlier: `B(5,4)I`'s `z/d=1` series sits at the correlation's validity
+corner (`xn/d=5, yn/d=4, z/d=1`, all three simultaneously at their lower
+bound) and underpredicts crossflow degradation there, error growing from
++14% to +42% with `Gc/Gj` -- axis calibration on that same panel reads
+back within 0.9% of round numbers, so this is a real weak spot of the fit
+at its own domain corner, not a digitisation artifact. See
+`rc_00_circles_zd_1`'s `cross_check` in `metadata.yaml` for the full
+figure.
+
+Per-panel axis calibration was checked two ways rather than through
+`verify.py`'s frame-slope machinery: tick positions against round numbers
+(x-ticks within 0.32%, y-ticks within 0.97% across all nine panels) and
+corners against the nominal box (within 3.4%). The `rc_XX_corners.csv` /
+`_xaxis.csv` / `_yaxis.csv` files are committed but not listed in
+`metadata.yaml` -- `verify.py`'s frame check is a log-log power-law fit
+built for a physically-drawn distortion line spanning a real data range,
+and throws a math-domain error on coordinates this close to the plot
+origin (an exact `x=0` tick click takes `log(0)`).
+
+**Staggered pattern (`florschuetz_1981_staggered()`) remains unvalidated
+against scatter data.** Fig. 6 is Inline-only per its own caption -- there
+is no staggered equivalent of it in this paper. Fig. 7 gives a
+staggered/inline Nu RATIO (not raw Nu or Nu/Nu1) for a handful of
+geometries, which could support an INDIRECT check later (multiply an
+inline-scored Nu by the digitised ratio and compare against a staggered
+measurement, if one existed) -- but Fig. 7 itself is not digitised, and no
+figure in this paper gives raw staggered scatter directly. Recommendation:
+leave `florschuetz_1981_staggered()` unvalidated by digitised data for now
+(it is still confirmed digit-for-digit against Table 4.1, items 17/18,
+the same as inline) rather than spend a digitisation pass on an indirect
+ratio check; revisit if a staggered-specific source surfaces.
 
 ---
 
@@ -286,6 +353,8 @@ digitised.
 
 | date | reviewer | outcome |
 |---|---|---|
+| 2026-09-23 | reviewer + Claude | **Fig. 6 digitised and scored -- `florschuetz_1981_inline()` validated against its own source.** All nine panels, 27 series, 242 points, `validation/cooling/data/florschuetz1981/`; scoring via a new `jet_array_runner.py` using the `Nu/Nu1` algebraic identity (no Re bisection needed). Pooled bias +3.7%, RMS 9.6%. One genuine outlier found and kept, not hidden: `B(5,4)I`'s `z/d=1` series sits at the correlation's own validity corner and the fit underpredicts crossflow degradation there badly (+14% to +42% across the panel) -- axis calibration on that panel checked clean, so this reads as a real weak spot of the fit rather than a digitisation error. Two digitisation-time calibration bugs were caught and fixed along the way (a log10-instead-of-linear y-axis misread on one panel; a shared-boundary-label misread that made row 0/1 look like they spanned 0.6-1.0 instead of the correct, uniform 0.4-1.0 across all nine panels). Staggered validation considered and deferred: Fig. 6 is Inline-only, and Fig. 7's staggered/inline ratio is the only staggered-adjacent data in the paper -- not raw scatter, not digitised. See "Validation targets" above for the full writeup. |
+| 2026-09-22 | Claude | **Corrected "Validation targets": Figs. 5/6 are the real targets, not Figs. 8/9.** Rendered Figs. 5, 6, 8, 9 at 400dpi and inspected directly, per reviewer's request to identify what needs digitising to validate Eq. 4.9/Table 4.1. Found Figs. 8/9 plot THREE FITTED CORRELATIONS against each other with no raw data at all -- digitising the "Present Work" curve would only re-confirm Table 4.1's coefficients, already confirmed digit-for-digit. Fig. 6 (p. 340) is genuine measured scatter, a 3x3 panel matrix with geometry printed in-panel (no attribution ambiguity), `Nu/Nu1` vs `Gc/Gj` -- and since `Nu/Nu1 = 1-B[(z/d)(Gc/Gj)]^n` exactly (the `Re_j^m*Pr^(1/3)` factor cancels between `Nu` and `Nu1`), it scores the crossflow term directly with no `Re_j`/`Pr` assumption at all. Fig. 5 is also real data but needs careful leader-line tracing for geometry attribution, unlike Fig. 6. Digitisation itself not yet done. |
 | 2026-09-21 | Claude | **Item 24a: cross-checked `C_D` against combaero's existing discharge-coefficient correlations (`include/orifice.h`) and rejected them as inapplicable.** That family (`Cd_sharp_thin_plate`/Reader-Harris-Gallagher, Stolz, Miller, thickness/rounded-entry corrections) implements ISO 5167-2 flow-metering pipe orifices -- a single hole in a pipe run with `beta=d/D`, `Re_D>=5000`, `D>=50mm` -- not a plenum-fed multi-hole jet plate. Florschuetz's own `C_D=0.79` default (item 24) stands as-is, with Table 1's measured `0.73-0.85` available if a specific plate's value is known. Nothing left blocking I3. |
 | 2026-09-21 | reviewer | **I3 resolved -- cleared for implementation.** Scope confirmed: single-jet (Goldstein) + multi-jet array with crossflow (Florschuetz), using item 21's closed-form `Gc/Gj`. `C_D` (item 24) to be cross-checked against combaero's existing discharge-coefficient correlation rather than always defaulting to the paper's `0.79` for a bare/unmeasured plate -- see item 24a for the outcome. Leading-edge/curved-surface impingement deferred as an edge case; the simpler forms (Eq. 4.6, Eq. 4.7/4.8) deferred and may never be needed. |
 | 2026-09-21 | reviewer + Claude | **Items 13, 20, 21 resolved; basis review complete.** Reviewer supplied a scan of their own paper copy of Florschuetz, Truman and Metzger (1981) (`docs/heat_transfer/flohrshuetz/`, gitignored). Read page-image by page-image (it is a scanned copy, OCR text layer unreliable -- confirmed by the mangled two-column Nomenclature). Found: (a) item 13 -- Eq. 4.7/4.8 is the SAME paper's own Eq. (11a)/(11b), an alternate hand-computation form presented right after Eq. (10a)/Table 2, not a separate later paper as Han's presentation order suggested; (b) item 20 -- the paper's own stated overall ranges (`Re_j=2.5e3-7e4`, `Gc/Gj=0-0.8`, `xn/d=5-15`/`5-10`, `yn/d=4-8`, `z/d=1-3`) replace the misprinted Table 4.1 box entirely; (c) item 21 -- the paper's Eqs. (1)-(8) give a full closed-form `Gc/Gj` at any spanwise row, needing only `C_D` (recommended default `0.79`) and geometry, no accumulation loop; (d) Martin (1977) turned up as Florschuetz's own reference [5] -- real, but cited only for the crossflow flow-distribution model precedent, not for any single-jet correlation, which supports rather than reopens I2. Also found richer accuracy data (item 23) and new validation-figure candidates (item 26, Figs. 8/9) not present in Han's reprint at all. Nothing from Han's reprinted equations or Table 4.1 constants disagreed with the primary source -- every digit checked matched. |
