@@ -1,0 +1,166 @@
+# Rohde Figure 10: orifice Cd against velocity head ratio, three inlet edge
+# conditions at one thickness and one duct Mach number.
+#
+# The only data in this project that tests the INLET CORNER RADIUS term of
+# McGreehan and Schotsch (Eq. 12). Digitised by the reviewer.
+#
+# WHY THE RAW PICKS ARE COMMITTED UNCORRECTED. The calibration files
+# (fig10_corners.csv, fig10_xaxis.csv, fig10_yaxis.csv) are committed
+# alongside but deliberately NOT listed under `files:` below, following the
+# florschuetz1981 precedent: they are calibration, not measurement, and
+# verify.py's checks are built for data series. They are what makes the
+# skew below a measurement rather than a guess.
+#
+# THE Y-SKEW. The corners file shows the canvas reading high on its right-hand
+# side: mean dy is +0.00082 in Cd at the left edge and +0.02132 at the right,
+# a skew of +0.0205 across the log abscissa. This is page/scan rotation, not
+# picking error -- the y TICKS, all picked at the left edge, are accurate to
+# 0.00185 in Cd.
+#
+# The skew is NOT applied to these files. Per the dataset's rule the committed
+# numbers stay a faithful record of what was picked; orifice_runner.py derives
+# the correction from fig10_corners.csv at scoring time, so the correction is
+# reproducible from committed data rather than being a constant someone typed.
+#
+# The correction is independently confirmed by Rohde's own prose, which says
+# the largest inlet radius reaches "as high as 0.94". The circle series' raw
+# maximum is 0.9569 (+1.8% against that text); skew-removed it is 0.9362
+# (-0.4%). A third channel -- the page's words -- agreeing with a correction
+# derived from a fourth -- the canvas corners -- is why this is recorded as a
+# measured distortion and not a fudge.
+#
+# COORDINATES ARE ROHDE'S, NOT THE CORRELATION'S. x is the velocity head ratio
+# (P_T - p_j)/(P_T - p_d), referenced to duct TOTAL conditions. Converting to
+# the correlation's static-referenced U1/Vi is done in the runner and is
+# derived in the extraction; it diverges as VHR -> 1, so scores are reported
+# per VHR band rather than pooled. See the extraction for the ratio test that
+# sidesteps the conversion entirely.
+
+paper:
+  name: rohde1969
+  citation: >-
+    Rohde, J.E., Richards, H.T. and Metzger, G.W. (1969). "Discharge
+    Coefficients for Thick Plate Orifices With Approach Flow Perpendicular and
+    Inclined to the Orifice Axis." NASA TN D-5467, Lewis Research Center.
+  secondary: false
+
+files:
+  - path: fig10_rd0_triangles.csv
+    after: null
+    page: 17
+    item: "Figure 10, triangle series"
+    series: "Cd vs velocity head ratio, sharp inlet edge"
+    figure: "10"
+    panel: single
+    geometry:
+      r_over_d: 0.0
+      L_over_d: 1.06
+      inlet_radius_in: 0.0
+      orifice_d_in: 0.0615
+      duct_mach: 0.14
+    alpha_deg: null
+    x_axis: velocity_head_ratio
+    x_scale: 1.0
+    y_axis: Cd
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.00185
+    verification:
+      x_axis_type: log
+      x_ticks: [1, 2, 4, 6, 8, 10, 20, 40, 60]
+      x_multiplier: 1.0
+      y_axis_type: linear
+      y_ticks: [0.2, 0.4, 0.6, 0.8, 1.0]
+      y_multiplier: 1.0
+      expected_points: 12
+      # The densest of the three series and the one the reviewer flagged as
+      # most likely to be off by one. Two independent counts agreed at 12.
+      monotonic: increasing
+      printed_curve: null
+    cross_check: >-
+      Counted independently by two channels before comparison (reviewer and an
+      automated pass), both 12. Strictly increasing with no reversals. This is
+      the series the correlation fits WORST: bias +40.6% over VHR 1-10,
+      +25.9% over 10-25, +8.9% over 25-60.
+
+  - path: fig10_rd0p195_squares.csv
+    after: null
+    page: 17
+    item: "Figure 10, square series"
+    series: "Cd vs velocity head ratio, inlet radius 0.012 in (r/d = 0.195)"
+    figure: "10"
+    panel: single
+    geometry:
+      r_over_d: 0.1951
+      L_over_d: 1.06
+      inlet_radius_in: 0.012
+      orifice_d_in: 0.0615
+      duct_mach: 0.14
+    alpha_deg: null
+    x_axis: velocity_head_ratio
+    x_scale: 1.0
+    y_axis: Cd
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.00185
+    verification:
+      x_axis_type: log
+      x_ticks: [1, 2, 4, 6, 8, 10, 20, 40, 60]
+      x_multiplier: 1.0
+      y_axis_type: linear
+      y_ticks: [0.2, 0.4, 0.6, 0.8, 1.0]
+      y_multiplier: 1.0
+      expected_points: 10
+      # NOT declared increasing. One reversal, VHR 45.71 -> 53.73, a drop of
+      # 0.00093 in Cd -- half the y-tick picking accuracy (0.00185), i.e.
+      # noise on a plateau, not a trend. Declaring "increasing" would fail on
+      # a reversal smaller than the measurement can resolve.
+      monotonic: null
+      printed_curve: null
+    cross_check: >-
+      Two independent counts, both 10. r/d = 0.012/0.0615 from Table I of the
+      report (model 8). Fits the correlation best of the three at high
+      velocity head ratio: bias +4.0% over VHR 25-60.
+
+  - path: fig10_rd0p488_circles.csv
+    after: null
+    page: 17
+    item: "Figure 10, circle series"
+    series: "Cd vs velocity head ratio, inlet radius 0.030 in (r/d = 0.488)"
+    figure: "10"
+    panel: single
+    geometry:
+      r_over_d: 0.4878
+      L_over_d: 1.06
+      inlet_radius_in: 0.030
+      orifice_d_in: 0.0615
+      duct_mach: 0.14
+    alpha_deg: null
+    x_axis: velocity_head_ratio
+    x_scale: 1.0
+    y_axis: Cd
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.00185
+    verification:
+      x_axis_type: log
+      x_ticks: [1, 2, 4, 6, 8, 10, 20, 40, 60]
+      x_multiplier: 1.0
+      y_axis_type: linear
+      y_ticks: [0.2, 0.4, 0.6, 0.8, 1.0]
+      y_multiplier: 1.0
+      expected_points: 8
+      # NOT declared increasing. One reversal, VHR 2.56 -> 2.91, a drop of
+      # 0.00195 in Cd, level with the y-tick picking accuracy. The two marks
+      # sit close together on the page and were the reviewer's and the
+      # automated pass's joint lowest-confidence call; both still counted 8.
+      monotonic: null
+      printed_curve: null
+    cross_check: >-
+      Two independent counts, both 8. r/d = 0.030/0.0615 from Table I (model
+      8). At r/d = 0.488 the corner-radius term is past its knee, so this
+      series sits near the nozzle limit: skew-removed maximum 0.9362 against
+      Rohde's stated "as high as 0.94".

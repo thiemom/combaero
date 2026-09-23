@@ -295,3 +295,232 @@ TEST_F(OrificeTest, CdRoundedHighBetaStability) {
     EXPECT_TRUE(std::isfinite(Cd_val));
     EXPECT_LE(Cd_val, 1.5);
 }
+
+// -------------------------------------------------------------
+// McGreehan and Schotsch (1988)
+//
+// Every expectation below is anchored OUTSIDE the implementation: a value
+// printed elsewhere in the paper, a different author's correlation, a curve
+// drawn on the page, a physical identity, or another paper entirely. None is
+// a golden value captured from this code. Provenance and the measured
+// agreement for each are in
+// validation/cooling/extractions/orifice_discharge_coefficient.md.
+// -------------------------------------------------------------
+
+namespace ms = orifice::mcgreehan_schotsch;
+
+// The paper states a baseline sharp-edged Cd of 0.60 at Re = 3.2e4 in running
+// text on p.213, independently of Eq. (8) on p.214. Eq. (8) must reproduce it.
+TEST(McGreehanSchotsch, ReynoldsBaselineReproducesStatedReferencePoint) {
+    EXPECT_NEAR(ms::reynolds_baseline(3.2e4), ms::cd_reference, 5e-4);
+}
+
+// Eq. (12) against Schoder and Dawson's Eq. (10), dCd/Cd = 3.10 (r/d), which
+// the paper cites as "a good approximation for 0 < r/d < 0.1" but does not use.
+// A different author's correlation, so this could genuinely have disagreed.
+TEST(McGreehanSchotsch, CornerFactorAgreesWithSchoderDawson) {
+    for (const double rd : {0.02, 0.05, 0.10}) {
+        const double schoder = ms::cd_reference * (1.0 + 3.10 * rd);
+        const double got     = 1.0 - ms::corner_factor(rd) * (1.0 - ms::cd_reference);
+        EXPECT_NEAR(got, schoder, 0.015 * schoder) << "at r/d = " << rd;
+    }
+}
+
+// p.214: an ASME nozzle Cd is the limiting value, reached at r/d = 0.82.
+// Extrapolating the corner-radius fit that far must land on Eq. (9)'s own
+// high-Re nozzle asymptote -- a different equation fitted to different data.
+TEST(McGreehanSchotsch, CornerRadiusExtrapolatesToNozzleAsymptote) {
+    const double fully_rounded =
+        1.0 - ms::corner_factor(ms::r_over_d_nozzle_limit) * (1.0 - ms::re_c0);
+    EXPECT_NEAR(fully_rounded, ms::nozzle_c0, 0.005 * ms::nozzle_c0);
+}
+
+// Identities the fitted constants must satisfy for the chain to be consistent.
+// g(0) = 1 is a property of 1.3 and 0.435 conspiring, not something imposed.
+TEST(McGreehanSchotsch, FactorsAreIdentitiesAtZero) {
+    EXPECT_NEAR(ms::length_factor(0.0), 1.0, 1e-3);
+    EXPECT_DOUBLE_EQ(ms::corner_factor(0.0), 1.0);
+}
+
+// Eq. (17) must reduce exactly to its input at zero crossflow.
+TEST(McGreehanSchotsch, CrossflowIsIdentityAtZero) {
+    const double base = ms::cd_with_corner_and_length(1.0e4, 0.0, 1.0);
+    EXPECT_DOUBLE_EQ(ms::cd(1.0e4, 0.0, 1.0, 0.0), base);
+}
+
+// Eq. (13)/(14) against the curve drawn in Fig. 3, read at ~0.01 in Cd.
+// Fig. 3 is drawn for a basic Cd of 0.60, which Eq. (8) gives at Re = 3.2e4.
+// L/d = 0.5 is excluded: it sits on the steepest part of the curve, where a
+// 0.1 error in reading L/d moves Cd by 0.017 (see check E of the extraction).
+TEST(McGreehanSchotsch, LengthEffectMatchesFigure3) {
+    const struct { double L_over_d; double Cd_drawn; } points[] = {
+        {1.0, 0.77}, {2.0, 0.81}, {3.0, 0.81}, {5.0, 0.78}, {8.0, 0.76}, {10.0, 0.74},
+    };
+    for (const auto& p : points) {
+        const double got = ms::cd_with_corner_and_length(3.2e4, 0.0, p.L_over_d);
+        EXPECT_NEAR(got, p.Cd_drawn, 0.02 * p.Cd_drawn) << "at L/d = " << p.L_over_d;
+    }
+}
+
+// Eq. (17) against the Cd:r,L = 0.6 curve drawn in Figs. 4 and 7. A basic Cd
+// of 0.60 is reached at Re = 3.2e4 with r/d = L/d = 0.
+TEST(McGreehanSchotsch, CrossflowEffectMatchesFigure4) {
+    const struct { double U1_over_Vi; double Cd_drawn; } points[] = {
+        {1.0, 0.40}, {2.0, 0.24}, {4.0, 0.12},
+    };
+    for (const auto& p : points) {
+        const double got = ms::cd(3.2e4, 0.0, 0.0, p.U1_over_Vi);
+        EXPECT_NEAR(got, p.Cd_drawn, 0.05 * p.Cd_drawn) << "at U1/Vi = " << p.U1_over_Vi;
+    }
+}
+
+// The rise before the fall is drawn on Fig. 4 and supported by Rohde's own
+// result 2 (slanting an orifice into the flow increases Cd). It is deliberate,
+// so it gets a test: anyone who "fixes" Eq. (17) into a monotone decay, or
+// clamps the factor at 1, breaks this.
+TEST(McGreehanSchotsch, CrossflowIsNonMonotonicNearTheOrigin) {
+    const double base = ms::cd(3.2e4, 0.0, 0.0, 0.0);
+
+    double peak = base;
+    double peak_at = 0.0;
+    for (int i = 1; i <= 400; ++i) {
+        const double u  = 0.005 * i;
+        const double cd = ms::cd(3.2e4, 0.0, 0.0, u);
+        if (cd > peak) { peak = cd; peak_at = u; }
+    }
+
+    // Fig. 4's drawn peak is ~0.635 at U1/Vi ~ 0.1, against a 0.60 baseline.
+    EXPECT_GT(peak, base) << "the rise before the fall has been lost";
+    EXPECT_NEAR(peak, 0.635, 0.02 * 0.635);
+    EXPECT_NEAR(peak_at, 0.1, 0.05);
+    // ...and it really does fall away afterwards.
+    EXPECT_LT(ms::cd(3.2e4, 0.0, 0.0, 4.0), 0.5 * base);
+}
+
+// The #375 anchor. A bare plenum-fed jet plate -- sharp holes, t/d = 1, no
+// supply-side crossflow -- against Florschuetz, Truman and Metzger (1981),
+// who recommend C_D = 0.79 and measure 0.73-0.85 (their Table 1). A different
+// paper, rig and decade, and the value combaero currently hard-codes.
+TEST(McGreehanSchotsch, BareJetPlateAgreesWithFlorschuetzDefault) {
+    EXPECT_NEAR(ms::cd(1.0e4, 0.0, 1.0, 0.0), 0.79, 0.01 * 0.79);
+}
+
+TEST(McGreehanSchotsch, JetPlateStaysInsideFlorschuetzMeasuredBand) {
+    for (const double Re : {5.0e3, 1.0e4, 3.0e4, 7.0e4}) {
+        for (const double t_over_d : {1.0, 1.5, 2.0, 3.0}) {
+            const double got = ms::cd(Re, 0.0, t_over_d, 0.0);
+            EXPECT_GE(got, 0.73) << "Re = " << Re << ", t/d = " << t_over_d;
+            EXPECT_LE(got, 0.85) << "Re = " << Re << ", t/d = " << t_over_d;
+        }
+    }
+}
+
+// Eqs. (15)/(16) only engage when a corner radius is present, so the chain has
+// a branch at r/d = 0. g(0) = 1.0005 rather than exactly 1, so the branch is
+// not perfectly continuous. Bound the step, so that if anyone widens it the
+// test says so.
+TEST(McGreehanSchotsch, CombinedCorrectionBranchIsEffectivelyContinuous) {
+    const double at_zero = ms::cd_with_corner_and_length(3.2e4, 0.0, 2.0);
+    const double just_above = ms::cd_with_corner_and_length(3.2e4, 1e-9, 2.0);
+    EXPECT_NEAR(just_above, at_zero, 5e-4);
+}
+
+// Eqs. (13)+(15)+(16) collapse algebraically to a single product form,
+//   Cd = 1 - g(L/d - r/d) * g(r/d) * (1 - Cd:r),
+// derived by hand from the two sequential steps the implementation actually
+// performs. An independent expression of the same thing: it catches a dropped
+// Eq. (16) subtraction, a g() evaluated at the wrong argument, or the printed
+// "L/D" being taken literally.
+TEST(McGreehanSchotsch, CombinedCorrectionMatchesItsClosedProductForm) {
+    const struct { double r_over_d; double L_over_d; } cases[] = {
+        {0.1, 1.0}, {0.3, 2.0}, {0.5, 3.0}, {0.05, 0.5},
+    };
+    for (const auto& c : cases) {
+        const double cd_r = ms::cd_with_corner(3.2e4, c.r_over_d);
+        const double expected =
+            1.0 - ms::length_factor(c.L_over_d - c.r_over_d) *
+                      ms::length_factor(c.r_over_d) * (1.0 - cd_r);
+        EXPECT_NEAR(ms::cd_with_corner_and_length(3.2e4, c.r_over_d, c.L_over_d),
+                    expected, 1e-12)
+            << "at r/d = " << c.r_over_d << ", L/d = " << c.L_over_d;
+    }
+}
+
+// Rounding the inlet must raise Cd monotonically, and at the r/d = 0.82 knee
+// the paper says an ASME nozzle is reached -- so a long, well-rounded orifice
+// must sit close to 1.
+TEST(McGreehanSchotsch, CornerRadiusRaisesCdTowardTheNozzleLimit) {
+    double previous = ms::cd_with_corner_and_length(3.2e4, 0.0, 2.0);
+    for (const double rd : {0.05, 0.1, 0.2, 0.3, 0.5, 0.82}) {
+        const double got = ms::cd_with_corner_and_length(3.2e4, rd, 2.0);
+        EXPECT_GT(got, previous) << "not monotone at r/d = " << rd;
+        previous = got;
+    }
+    EXPECT_GT(previous, 0.98);
+    EXPECT_LE(previous, 1.0);
+}
+
+TEST(McGreehanSchotsch, WrapperMatchesNamespacedChain) {
+    EXPECT_DOUBLE_EQ(orifice::Cd_McGreehanSchotsch(2.0e4, 0.1, 1.5, 0.3),
+                     ms::cd(2.0e4, 0.1, 1.5, 0.3));
+}
+
+TEST(McGreehanSchotsch, StaysFiniteOnSolverExcursions) {
+    for (const double Re : {1.0e-3, 1.0, 1.0e3, 1.0e9}) {
+        for (const double u : {0.0, 1.0e-12, 50.0}) {
+            const double got = ms::cd(Re, 0.0, 1.0, u);
+            EXPECT_TRUE(std::isfinite(got)) << "Re = " << Re << ", U1/Vi = " << u;
+            EXPECT_GT(got, 0.0);
+            EXPECT_LE(got, 1.5);
+        }
+    }
+    // Negative inputs are clamped rather than producing NaN from pow().
+    EXPECT_TRUE(std::isfinite(ms::cd(1.0e4, -1.0, -1.0, -1.0)));
+}
+
+// A constant Cd must be settable, not just selectable: make_correlation() can
+// only hand back the default.
+TEST(McGreehanSchotsch, ConstantCorrelationTakesAnExplicitValue) {
+    OrificeGeometry g;
+    g.d = 0.001;
+    g.D = 0.010;
+    OrificeState s;
+    s.Re_D = 1.0e4;
+
+    auto fixed = make_constant_correlation(0.79);
+    ASSERT_NE(fixed, nullptr);
+    EXPECT_DOUBLE_EQ(fixed->Cd(g, s), 0.79);
+}
+
+// Eq. (8) diverges below its stated floor (it reaches Cd = 1.0 at Re = 904),
+// so the chain holds Re at re_min rather than extrapolating into nonsense.
+// Constant below the floor is a deliberate, documented choice.
+TEST(McGreehanSchotsch, ReynoldsBaselineIsHeldAtItsValidityFloor) {
+    // Eq. (8) at its own stated floor: 0.5885 + 372/1e4.
+    const double at_floor = ms::reynolds_baseline(ms::re_min);
+    EXPECT_NEAR(at_floor, 0.6257, 1e-4);
+
+    for (const double Re : {1.0e-3, 1.0, 9.0e2, 5.0e3}) {
+        EXPECT_DOUBLE_EQ(ms::reynolds_baseline(Re), at_floor)
+            << "not held at the floor for Re = " << Re;
+    }
+    // Above the floor it must still respond to Re.
+    EXPECT_LT(ms::reynolds_baseline(1.0e5), at_floor);
+    EXPECT_NEAR(ms::reynolds_baseline(3.2e4), ms::cd_reference, 5e-4);
+}
+
+// Eq. (17) applied to a caller-supplied baseline. This is how the source uses
+// it in its own validation, so the chain must decompose exactly this way.
+TEST(McGreehanSchotsch, ChainDecomposesIntoBaselineAndCrossflow) {
+    for (const double u : {0.0, 0.1, 0.5, 1.0, 3.0}) {
+        const double base = ms::cd_with_corner_and_length(3.2e4, 0.1, 2.0);
+        EXPECT_DOUBLE_EQ(ms::cd(3.2e4, 0.1, 2.0, u),
+                         ms::cd_with_crossflow(base, u))
+            << "at U1/Vi = " << u;
+    }
+}
+
+// Eq. (17) is otherwise validated against a DRAWN curve by
+// CrossflowEffectMatchesFigure4, and against Rohde's digitised data by
+// python/tests/test_orifice_validation.py. No figure-read test is duplicated
+// here for the Fig. 6 baseline curves.

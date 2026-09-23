@@ -662,6 +662,10 @@ inline constexpr Entry function_units[] = {
     {"Cd_thick_plate", "OrificeGeometry, OrificeState", "- (Cd)"},
     {"Cd_rounded_entry", "OrificeGeometry, OrificeState", "- (Cd)"},
     {"Cd", "OrificeGeometry, OrificeState", "- (Cd)"},
+    {"mcgreehan_schotsch_1988_cd",
+     "Re: -, r_over_d: -, L_over_d: -, U1_over_Vi: -", "- (Cd)"},
+    {"mcgreehan_schotsch_1988_crossflow_cd",
+     "cd_base: - (Cd), U1_over_Vi: -", "- (Cd)"},
 
     // -------------------------------------------------------------------------
     // humidair.h - Humid Air Properties

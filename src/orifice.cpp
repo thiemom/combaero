@@ -224,6 +224,91 @@ double Cd_rounded(double r_over_d, double beta, double Re_D) {
 }
 
 // Convert between Cd and loss coefficient K
+// -------------------------------------------------------------
+// McGreehan and Schotsch (1988)
+// -------------------------------------------------------------
+
+namespace mcgreehan_schotsch {
+
+// Below its stated floor Eq. (8) does not merely lose accuracy, it diverges:
+// 0.5885 + 372/Re reaches Cd = 1.0 at Re = 904 and grows without bound below
+// that. So Re is held AT the validity floor rather than merely kept positive.
+// The result is constant for Re < re_min, which is a documented "held at the
+// edge of validity" extrapolation and not a claim about the laminar regime --
+// that regime belongs to Wu, Burton and Schoenau (2002), deliberately not
+// implemented (item I5 / decision D7 of the extraction).
+double reynolds_baseline(double Re) {
+    return re_c0 + re_c1 / std::max(Re, re_min);
+}
+
+double nozzle_baseline(double Re) {
+    return nozzle_c0 - nozzle_c1 / std::sqrt(std::max(Re, re_min));
+}
+
+double corner_factor(double r_over_d) {
+    const double rd = std::max(r_over_d, 0.0);
+    return corner_floor +
+           corner_coef * std::exp(-corner_exp1 * rd - corner_exp2 * rd * rd);
+}
+
+double length_factor(double L_over_d) {
+    const double ld = std::max(L_over_d, 0.0);
+    return (1.0 + length_coef * std::exp(-length_decay * ld * ld)) *
+           (length_a + length_b * ld);
+}
+
+double cd_with_corner(double Re, double r_over_d) {
+    // Eq. (11)
+    return 1.0 - corner_factor(r_over_d) * (1.0 - reynolds_baseline(Re));
+}
+
+double cd_with_corner_and_length(double Re, double r_over_d, double L_over_d) {
+    const double rd = std::max(r_over_d, 0.0);
+    double basic   = cd_with_corner(Re, rd);
+    double ld      = std::max(L_over_d, 0.0);
+
+    if (rd > 0.0) {
+        // Eq. (15): a revised basic Cd, with g evaluated at r/d in place of
+        // L/d. The corner radius suppresses inlet separation and so removes
+        // part of the long orifice's dynamic-pressure-recovery benefit.
+        basic = 1.0 - length_factor(rd) * (1.0 - basic);
+        // Eq. (16): the inlet radius is subtracted from the flat length.
+        ld = std::max(ld - rd, 0.0);
+    }
+
+    // Eq. (13)
+    return 1.0 - length_factor(ld) * (1.0 - basic);
+}
+
+double cd_with_crossflow(double cd_base, double U1_over_Vi) {
+    const double u = std::max(U1_over_Vi, 0.0);
+
+    // Eq. (17) is an identity at zero crossflow (C1 = 1, C2 = 0). Returning
+    // early keeps that exact and avoids pow(0, fractional) entirely.
+    if (u == 0.0) return cd_base;
+
+    const double cd_ratio = cd_base / cd_reference;
+    const double Rv       = u * std::pow(cd_ratio, rv_cd_exp);
+
+    const double C1 = std::exp(-std::pow(Rv, c1_exp));
+    const double C2 = c2_coef * std::pow(Rv, c2_exp) * std::pow(cd_ratio, c2_cd_exp);
+    const double C3 = std::exp(-c3_coef * std::pow(Rv, c3_exp));
+
+    return cd_base * (C1 + C2 * C3);
+}
+
+double cd(double Re, double r_over_d, double L_over_d, double U1_over_Vi) {
+    return cd_with_crossflow(cd_with_corner_and_length(Re, r_over_d, L_over_d),
+                             U1_over_Vi);
+}
+
+} // namespace mcgreehan_schotsch
+
+double Cd_McGreehanSchotsch(double Re, double r_over_d, double L_over_d,
+                            double U1_over_Vi) {
+    return mcgreehan_schotsch::cd(Re, r_over_d, L_over_d, U1_over_Vi);
+}
+
 double K_from_Cd(double Cd, double beta) {
     if (Cd <= 0.0 || Cd > 1.5) {
         throw std::invalid_argument("Cd must be in (0, 1.5]");
@@ -455,6 +540,10 @@ std::unique_ptr<OrificeCorrelationBase> make_correlation(CdCorrelation id) {
             return nullptr;  // Use make_user_correlation instead
     }
     return nullptr;
+}
+
+std::unique_ptr<OrificeCorrelationBase> make_constant_correlation(double Cd) {
+    return std::make_unique<ConstantCdCorrelation>(Cd);
 }
 
 std::unique_ptr<OrificeCorrelationBase> make_user_correlation(
