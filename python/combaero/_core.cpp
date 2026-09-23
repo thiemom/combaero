@@ -5019,6 +5019,53 @@ PYBIND11_MODULE(_core, m) {
         "  - t/d > 0.02: thick plate\n"
         "  - otherwise: sharp thin plate");
 
+  m.def("mcgreehan_schotsch_1988_cd", &orifice::Cd_McGreehanSchotsch,
+        py::arg("Re"), py::arg("r_over_d"), py::arg("L_over_d"),
+        py::arg("U1_over_Vi") = 0.0,
+        "Discharge coefficient for a long orifice with corner radiusing and\n"
+        "inlet crossflow (McGreehan and Schotsch 1988, ASME J. Turbomachinery\n"
+        "110(2), 213-217, Eqs. 8-17).\n\n"
+        "This is the plenum-to-plenum configuration -- a cooling transfer hole\n"
+        "or a jet-plate hole -- NOT an ISO 5167 metering orifice in a pipe run;\n"
+        "for that use Cd_sharp_thin_plate and its siblings.\n\n"
+        "Args:\n"
+        "  Re: orifice Reynolds number, V_i * d / nu. Stated valid Re >= 1e4;\n"
+        "      below that the correlation is held at that floor, because Eq. 8\n"
+        "      diverges (it reaches Cd = 1.0 at Re = 904).\n"
+        "  r_over_d: inlet corner radius / bore. 0 for a sharp hole. An ASME\n"
+        "      nozzle is reached at 0.82; further radiusing buys nothing.\n"
+        "  L_over_d: orifice flat length / bore (plate thickness ratio).\n"
+        "  U1_over_Vi: INLET (approach, supply-side) tangential velocity over\n"
+        "      ideal through-flow velocity. Defaults to 0, the plenum-fed case.\n\n"
+        "      This is NOT a discharge-side crossflow ratio. Do not pass\n"
+        "      Florschuetz's Gc/Gj: that is spent-air crossflow in the\n"
+        "      impingement channel, on the far face of the plate, and using it\n"
+        "      here gives a plausible number that is biased low.\n\n"
+        "      V_i must be built from STATIC inlet conditions, not from a total\n"
+        "      pressure that already contains the tangential velocity head.\n\n"
+        "Not monotonic in U1_over_Vi: Cd rises up to ~5.7% above its\n"
+        "zero-crossflow value near U1_over_Vi ~ 0.09 before falling. That is\n"
+        "the source's Fig. 4 and its data, not an artifact.\n\n"
+        "For a bare plenum-fed jet plate (r/d=0, t/d=1, Re=1e4) this returns\n"
+        "0.785, against Florschuetz's recommended 0.79 for the same thing.\n\n"
+        "See validation/cooling/extractions/orifice_discharge_coefficient.md.");
+
+  m.def("mcgreehan_schotsch_1988_crossflow_cd",
+        &orifice::mcgreehan_schotsch::cd_with_crossflow, py::arg("cd_base"),
+        py::arg("U1_over_Vi"),
+        "McGreehan and Schotsch (1988) Eq. (17) alone: the inlet-crossflow\n"
+        "correction applied to a baseline discharge coefficient you supply.\n\n"
+        "Use when the plate's zero-crossflow Cd is KNOWN -- measured, or a\n"
+        "literature value such as Florschuetz's per-configuration Table 1 --\n"
+        "and only the crossflow correction is wanted. Otherwise use\n"
+        "mcgreehan_schotsch_1988_cd, which computes the baseline too.\n\n"
+        "This is how the source uses Eq. (17) in its own validation: Figs. 5\n"
+        "and 6 anchor to 'a set baseline point at U1/Vi = 0' from Rohde's\n"
+        "measurements (0.64, 0.73, 0.88) rather than to the chain's own\n"
+        "prediction, which runs 3-12% higher for the same geometry.\n\n"
+        "U1_over_Vi is the INLET (supply-side) tangential velocity ratio; see\n"
+        "mcgreehan_schotsch_1988_cd for the trap this must not be fed.");
+
   m.def("solve_orifice_mdot", &solve_orifice_mdot, py::arg("geom"),
         py::arg("dP"), py::arg("rho"), py::arg("mu"),
         py::arg("P_upstream") = 101325.0, py::arg("kappa") = 0.0,

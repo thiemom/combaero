@@ -182,6 +182,72 @@ Cd = cb.Cd_rounded_entry(geom, state)
 Cd = cb.Cd_orifice(geom, state)
 ```
 
+#### Plenum-to-plenum holes: McGreehan and Schotsch (1988)
+
+The correlations above are ISO 5167 pipe metering -- a single hole IN a pipe
+run. For a cooling transfer hole or a jet-plate hole discharging
+plenum-to-plenum, use the composite chain of McGreehan and Schotsch (1988),
+ASME J. Turbomachinery 110(2), 213-217, which covers Reynolds number, inlet
+corner radius, orifice length and inlet crossflow:
+
+```python
+# A bare, sharp-edged jet plate, plate thickness = hole diameter
+cb.mcgreehan_schotsch_1988_cd(Re=1e4, r_over_d=0.0, L_over_d=1.0)   # 0.785
+
+# A radiused, long cooling hole
+cb.mcgreehan_schotsch_1988_cd(Re=3e4, r_over_d=0.1, L_over_d=3.0)   # 0.889
+
+# Fed from a duct rather than a plenum: supply-side crossflow
+cb.mcgreehan_schotsch_1988_cd(Re=3e4, r_over_d=0.0, L_over_d=1.0,
+                              U1_over_Vi=0.5)                       # 0.770
+```
+
+`U1_over_Vi` is the **inlet (approach, supply-side)** tangential velocity over
+the ideal through-flow velocity, and defaults to 0 for a plenum-fed plate. It
+is *not* a discharge-side crossflow ratio -- do not pass Florschuetz's
+`Gc/Gj`, which is spent air in the impingement channel on the far face of the
+plate. `V_i` must be built from static inlet conditions, not from a total
+pressure that already contains the tangential velocity head.
+
+Two behaviours that look like bugs and are not:
+
+- **Not monotonic in `U1_over_Vi`.** `Cd` rises up to ~5.7% above its
+  zero-crossflow value near `U1_over_Vi ~ 0.09` before falling away. This is
+  drawn in the source's Fig. 4 and supported by Rohde (NASA TN D-5467), whose
+  result 2 is that slanting an orifice into the flow increases `Cd`.
+- **Constant below `Re = 1e4`.** That is the correlation's stated floor, and
+  below it the underlying equation diverges (it reaches `Cd = 1.0` at
+  `Re = 904`), so the value is held at the floor rather than extrapolated.
+
+When the plate's zero-crossflow `Cd` is already known -- measured, or a
+literature value such as Florschuetz's per-configuration Table 1 -- apply only
+the crossflow correction:
+
+```python
+cb.mcgreehan_schotsch_1988_crossflow_cd(cd_base=0.79, U1_over_Vi=0.5)  # 0.794
+cb.mcgreehan_schotsch_1988_crossflow_cd(cd_base=0.79, U1_over_Vi=2.0)  # 0.541
+```
+
+Note the first: at a 0.79 baseline, `U1/Vi = 0.5` still sits inside the rise,
+because a higher baseline pushes the peak to larger `U1/Vi` (`R_v` carries a
+`(Cd/0.6)^-3` factor). The decay is well established by `U1/Vi = 2`.
+
+This is how the source uses Eq. (17) in its own validation. Its Figs. 5 and 6
+anchor to "a set baseline point at `U1/Vi = 0`" taken from Rohde's
+measurements (0.64, 0.73, 0.88), not to the chain's prediction for the same
+geometry -- the chain runs 3-12% higher, which is the paper's own remark that
+Rohde's "basic values are lower".
+
+**Measured agreement.** Against Rohde's data as replotted in Fig. 6
+(`t/d = 0.51`, baseline 0.64, 11 points), Eq. (17) scores bias `+5.95%`,
+RMS `7.54%` -- reading high, and increasingly so with crossflow (`+3%` below
+`U1/Vi = 0.4`, `+16%` at 1.41). Scored by
+`validation/cooling/orifice_runner.py`.
+
+Provenance, the ten checks behind every constant, and the two errata found in
+the paper are in
+`validation/cooling/extractions/orifice_discharge_coefficient.md`.
+
 ### Geometry and Flow Analysis
 ```python
 # Area calculations
@@ -1301,10 +1367,20 @@ cb.crossflow_to_jet_ratio_at_row(yn_d=8.0, z_d=2.0, C_D=cb.FLORSCHUETZ_1981_DEFA
 It depends on `(yn/d)(z/d)` only, not `xn/d` -- the source states the flow
 distribution is independent of streamwise hole spacing and hole pattern.
 `FLORSCHUETZ_1981_DEFAULT_CD` (0.79) is the paper's own recommended default
-absent a measured value; combaero has no jet-plate discharge-coefficient
-correlation of its own yet (issue #375 -- the existing `Cd_sharp_thin_plate`
-family in `orifice.h` is an ISO 5167 pipe-metering model and does not apply
-to a plenum-fed jet-plate array).
+absent a measured value, and remains the default. To predict `C_D` from the
+plate's own geometry instead, pass `mcgreehan_schotsch_1988_cd` (see above);
+for a plenum-fed plate leave its `U1_over_Vi` at 0, since Florschuetz's
+`Gc/Gj` is discharge-side crossflow and must not be fed to it:
+
+```python
+C_D = cb.mcgreehan_schotsch_1988_cd(Re=1e4, r_over_d=0.0, L_over_d=t_over_d)
+cb.crossflow_to_jet_ratio_at_row(yn_d=8.0, z_d=2.0, C_D=C_D, row=10)
+```
+
+At `t/d = 1` the two agree to 0.6%, so this changes little; at `t/d = 0.5` the
+correlation gives 0.688 and the predicted `Gc/Gj` rises by up to 12% at
+downstream rows (about 1% in `Nu`). The ISO 5167 `Cd_sharp_thin_plate` family
+in `orifice.h` remains inapplicable here -- it models a hole in a pipe run.
 
 **Two named sets**, chosen explicitly by hole pattern -- their coefficients
 differ, not just their validity:

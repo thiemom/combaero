@@ -9,6 +9,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Jet-plate / cooling-hole discharge coefficient**: `mcgreehan_schotsch_1988_cd`
+  (Python) and `orifice::Cd_McGreehanSchotsch` plus the per-equation stages in
+  `orifice::mcgreehan_schotsch` (C++), implementing McGreehan and Schotsch
+  (1988), ASME J. Turbomachinery 110(2), 213-217, Eqs. (8)-(17). Closes the
+  gap tracked by #375: a hole discharging plenum-to-plenum over Reynolds
+  number, inlet corner radius `r/d`, orifice length `L/d` and inlet crossflow
+  `U1/Vi`. The existing `Cd_sharp_thin_plate` family stays what it was, ISO
+  5167 metering for a hole in a pipe run, which does not apply here.
+
+  Validated against the source's own figures and against a second paper: the
+  chain reproduces the paper's separately stated 0.60 baseline at
+  `Re = 3.2e4` to 0.02%, lands on its nozzle asymptote to 0.18% when the
+  corner-radius fit is extrapolated to the `r/d = 0.82` knee, and tracks the
+  drawn curves of Figs. 3, 4 and 7 to 0.1-3%. For a bare plenum-fed jet plate
+  (`r/d = 0`, `t/d = 1`, `Re = 1e4`) it gives 0.785 against Florschuetz,
+  Truman and Metzger's independently recommended 0.79, and stays inside their
+  measured 0.73-0.85 band across `t/d = 1-3`.
+
+  Two behaviours are faithful to the source and deliberately kept: `Cd` is
+  **not monotonic** in crossflow (it rises ~5.7% near `U1/Vi ~ 0.09` before
+  falling, as drawn in Fig. 4 and supported by Rohde's NASA TN D-5467), and
+  it is **held constant below `Re = 1e4`**, the stated validity floor, because
+  Eq. (8) diverges below it. `U1/Vi` is a SUPPLY-side ratio and must not be
+  fed Florschuetz's discharge-side `Gc/Gj`.
+
+  `mcgreehan_schotsch_1988_crossflow_cd` applies Eq. (17) alone to a baseline
+  the caller supplies -- for a plate whose zero-crossflow `Cd` is measured or
+  taken from literature (Florschuetz's Table 1, say). This is also how the
+  source uses Eq. (17) in its own validation.
+
+  **Scored against Rohde's data** (NASA TN D-5467), as replotted in the
+  source's Fig. 6 with the conversion to static parameters done by the paper's
+  own authors: `t/d = 0.51`, 11 digitised points, bias `+5.95%`, RMS `7.54%`.
+  The correlation reads high against Rohde and increasingly so with crossflow,
+  which is the paper's own observation that Rohde's "basic values are lower".
+  Quantified here for the first time: the chain's baseline exceeds Rohde's
+  measured basic value by `+4.6%` at `(r/d, L/d) = (0, 0.51)`, `+8.6%` at
+  `(0, 4.0)` and `+12.5%` at `(0.49, 1.06)`. Digitised data under
+  `validation/cooling/data/mcgreehan_schotsch1988/`, scored by
+  `validation/cooling/orifice_runner.py`. A 1.25x scaling of `U1/Vi` would cut
+  RMS to 1.88% and is deliberately NOT applied: Eq. (17) was fitted to Rohde,
+  Grimm, and Meyfarth and Shine pooled, so refitting it to the single series it
+  is judged against would be tuning against the score.
+
+  **Also scored against Rohde Fig. 10** (`validation/cooling/data/rohde1969/`,
+  30 points, three inlet-edge conditions at `t/d = 1.06`), the only data in the
+  project that tests the corner-radius term. Two independent marker counts
+  agreed exactly (8/10/12); x-tick calibration 0.59%, y-tick 0.00185 in `Cd`;
+  the `circle > square > triangle` ordering invariant holds everywhere.
+
+  This surfaced a **measured limit of the correlation**: it reads high, and
+  increasingly so with supply-side crossflow, but NOT equally across inlet
+  radii -- `+40.6%` for a sharp edge over `VHR 1-10` against `+15.4%` for
+  `r/d = 0.488`. The total-to-static conversion is identical for all three
+  series at a given velocity head ratio, so it cannot produce an error that is
+  monotone in `r/d`: **rounding protects against crossflow degradation more
+  than Eqs. (12)+(17) predict**. A conversion-free ratio test puts it at bias
+  `-13.1%`, RMS `15.7%`, while agreeing to `+3.3%` at low crossflow -- so
+  Eq. (12) itself is sound and the interaction is what is missing. At
+  `VHR >= 25` all three series converge on `+4%` to `+9%`, matching the
+  independent Fig. 6 result. Nothing was tuned; pinned by
+  `test_rohde_reveals_the_crossflow_limit_of_the_rd_term`.
+
+  Practical bound: a plenum-fed jet plate has `U1/Vi = 0` and is unaffected. A
+  duct-fed orifice is good to roughly `+8%` while `U1/Vi <~ 0.2`, and degrades
+  badly beyond `U1/Vi ~ 0.35`, worst for sharp edges.
+
+  Provenance, the cross-checks, and two errata found in the paper are recorded
+  in `validation/cooling/extractions/orifice_discharge_coefficient.md`.
+
+- **`make_constant_correlation(double Cd)`** (C++, `orifice.h`): pins the
+  discharge coefficient to an explicit value. `CdCorrelation::Constant` could
+  previously be selected but its value could not be set --
+  `make_correlation()` always returned the 0.61 default.
+
 - **Jet impingement wired into the network solver and GUI**: `ImpingementModel`
   and `SingleJetImpingementModel` (`python/combaero/network/components.py`),
   completing #337's re-add. `ImpingementModel` models ONE spanwise row of a

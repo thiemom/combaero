@@ -200,6 +200,109 @@ constexpr double re_correction_ref  = 1.0e5;
 constexpr double re_correction_exp  = 0.2;
 } // namespace rounded
 
+// McGreehan and Schotsch (1988) - composite Cd for a long orifice with
+// corner radiusing and inlet crossflow. ASME J. Turbomachinery 110(2),
+// 213-217. Equation numbers below are the paper's own.
+//
+// This is a DIFFERENT configuration from the ISO 5167 family above: a hole
+// discharging plenum-to-plenum (beta = 0), not a metering orifice in a pipe
+// run. It is the correlation for a gas-turbine jet plate or cooling transfer
+// hole. See validation/cooling/extractions/orifice_discharge_coefficient.md
+// for the extraction and the checks behind every constant here.
+namespace mcgreehan_schotsch {
+// Eq. (8), orifice Reynolds baseline: Cd = re_c0 + re_c1/Re
+constexpr double re_c0        = 0.5885;
+constexpr double re_c1        = 372.0;
+// Eq. (9), nozzle Reynolds baseline: Cd = nozzle_c0 - nozzle_c1/sqrt(Re)
+constexpr double nozzle_c0    = 0.9981;
+constexpr double nozzle_c1    = 4.73;
+// Eq. (12), corner-radius effects function f
+constexpr double corner_floor = 0.008;
+constexpr double corner_coef  = 0.992;
+constexpr double corner_exp1  = 5.5;
+constexpr double corner_exp2  = 3.5;
+// Eq. (14), L/d effects function g
+constexpr double length_coef  = 1.3;
+constexpr double length_decay = 1.606;
+constexpr double length_a     = 0.435;
+constexpr double length_b     = 0.021;
+// Eq. (17), relative tangential (crossflow) velocity terms
+constexpr double c1_exp       = 1.2;
+constexpr double c2_coef      = 0.5;
+constexpr double c2_exp       = 0.6;
+constexpr double c2_cd_exp    = -0.5;
+constexpr double c3_coef      = 0.5;
+constexpr double c3_exp       = 0.9;
+constexpr double rv_cd_exp    = -3.0;
+// The paper's reference point: a sharp-edged Cd of 0.60 at Re = 3.2e4, which
+// Eq. (8) reproduces to 0.02%. Every /0.6 divisor in Eqs. (1) and (17) is this
+// number, so it is defined once here rather than repeated as a literal.
+constexpr double cd_reference = 0.6;
+// Stated validity floor for Eqs. (8) and (9).
+constexpr double re_min       = 1.0e4;
+// Above this r/d an ASME nozzle Cd is reached and further radiusing buys
+// nothing (p.214). Eq. (12) is evaluated as-is; this is the documented knee.
+constexpr double r_over_d_nozzle_limit = 0.82;
+
+// Eq. (8). Sharp-edged orifice, plenum-to-plenum. Stated valid Re >= re_min.
+double reynolds_baseline(double Re);
+
+// Eq. (9). Nozzle equivalent of Eq. (8). Stated valid Re >= re_min.
+double nozzle_baseline(double Re);
+
+// Eq. (12), the f factor. f(0) = 1 (sharp corner, no correction);
+// f decays to corner_floor for a fully rounded inlet.
+double corner_factor(double r_over_d);
+
+// Eq. (14), the g factor. g(0) = 1 to within 0.05%, so Eq. (13) reduces to
+// its input at zero length -- an identity the fitted constants satisfy rather
+// than one imposed here.
+double length_factor(double L_over_d);
+
+// Eq. (11). Reynolds baseline corrected for inlet corner radius.
+double cd_with_corner(double Re, double r_over_d);
+
+// Eqs. (13), (15) and (16). Adds the long-orifice effect.
+//
+// When r/d > 0 the paper applies its combined-effects correction: a revised
+// basic Cd from Eq. (15) with g taken at r/d, and an effective length
+// (L/d)' = L/d - r/d from Eq. (16). Eq. (16) is PRINTED as "L/D - r/d"; the
+// capital D is an erratum in the paper (D is pipe diameter, undefined for
+// plenum-to-plenum flow). See item 17a of the extraction.
+double cd_with_corner_and_length(double Re, double r_over_d, double L_over_d);
+
+// Eq. (17). Adds the relative tangential velocity effect.
+//
+// U1_over_Vi is the ratio of INLET (approach, supply-side) tangential
+// velocity to ideal through-flow velocity. It is NOT a discharge-side
+// crossflow ratio: feeding it Florschuetz's Gc/Gj -- spent-air crossflow in
+// an impingement channel, on the far face of the plate -- is wrong and
+// produces a plausible number biased low. A plenum-fed jet plate has
+// U1_over_Vi = 0. See decision D8 of the extraction.
+//
+// Vi must be built from STATIC inlet conditions, not from a total pressure
+// that already includes the tangential velocity head (item 22).
+//
+// Not monotonic: Cd rises above its zero-crossflow value by up to ~5.7% near
+// U1_over_Vi ~ 0.09 before falling away. That is the source's own Fig. 4 and
+// its data, not an artifact -- see check F of the extraction.
+double cd(double Re, double r_over_d, double L_over_d, double U1_over_Vi);
+
+// Eq. (17) applied to a baseline supplied by the caller, rather than one
+// computed from Eqs. (8)-(16).
+//
+// This is how the source itself uses Eq. (17) in its own validation: Figs. 5
+// and 6 plot Rohde's data against curves anchored to "a set baseline point at
+// U1/Vi = 0" taken from Rohde's measurements (0.64, 0.73, 0.88), not to the
+// chain's prediction for the same geometry -- the chain runs 3-12% higher,
+// which is the paper's own remark that Rohde's "basic values are lower".
+//
+// Use it when a plate's zero-crossflow Cd is KNOWN -- a measured value, or a
+// literature one such as Florschuetz's per-configuration Table 1 -- and only
+// the crossflow correction is wanted.
+double cd_with_crossflow(double cd_base, double U1_over_Vi);
+} // namespace mcgreehan_schotsch
+
 // Reader-Harris/Gallagher (1998) - ISO 5167-2
 // The standard correlation for sharp-edged orifices
 double Cd_ReaderHarrisGallagher(double beta, double Re_D, double D);
@@ -218,6 +321,12 @@ double thickness_correction(double t_over_d, double beta, double Re_d);
 // Rounded-entry Cd (Idelchik-based)
 // For well-rounded entries, Cd approaches 1.0
 double Cd_rounded(double r_over_d, double beta, double Re_D);
+
+// McGreehan and Schotsch (1988) - the full chain, Eqs. (8) through (17).
+// Convenience wrapper over orifice::mcgreehan_schotsch::cd; see that
+// namespace for the per-equation stages and for what U1_over_Vi means.
+double Cd_McGreehanSchotsch(double Re, double r_over_d, double L_over_d,
+                            double U1_over_Vi);
 
 // Loss coefficient K from Cd: K = (1/Cd^2 - 1) * (1 - beta^4)
 double K_from_Cd(double Cd, double beta);
@@ -241,6 +350,14 @@ public:
 // Factory function to create correlation objects
 // Returns nullptr for UserFunction (use make_user_correlation instead)
 std::unique_ptr<OrificeCorrelationBase> make_correlation(CdCorrelation id);
+
+// Fixed-Cd correlation from an explicit value.
+//
+// make_correlation(CdCorrelation::Constant) can only give you the default,
+// so this is the way to pin Cd to a chosen number -- a measured plate value,
+// or a literature constant such as Florschuetz's 0.79 for a jet plate -- and
+// to switch deliberately between a fixed Cd and a computed one.
+std::unique_ptr<OrificeCorrelationBase> make_constant_correlation(double Cd);
 
 // User-defined correlation from function
 //

@@ -160,3 +160,65 @@ class TestUtilityFunctions:
         corr_long = cb.orifice_thickness_correction(3.0, 0.5, Re_d)
         assert corr_long < corr_peak  # Falls at large t/d due to friction
         assert corr_long < 1.0  # Long-tube behavior: k_t < 1.0
+
+
+class TestMcGreehanSchotsch1988:
+    """McGreehan and Schotsch (1988) composite Cd.
+
+    The C++ suite (tests/test_orifice.cpp) holds the full set of literature
+    anchors. These cover the Python surface: the binding, its default, and the
+    two behaviours a caller can most easily get wrong.
+    """
+
+    def test_bare_jet_plate_agrees_with_florschuetz_default(self):
+        # A different paper, rig and decade: Florschuetz, Truman and Metzger
+        # (1981) recommend C_D = 0.79 for a plenum-fed jet plate.
+        cd = cb.mcgreehan_schotsch_1988_cd(1.0e4, 0.0, 1.0)
+        assert cd == pytest.approx(cb.FLORSCHUETZ_1981_DEFAULT_CD, rel=0.01)
+
+    def test_reproduces_the_papers_stated_baseline(self):
+        # p.213 states a baseline sharp-edged Cd of 0.60 at Re = 3.2e4.
+        assert cb.mcgreehan_schotsch_1988_cd(3.2e4, 0.0, 0.0) == pytest.approx(0.60, abs=5e-4)
+
+    def test_crossflow_defaults_to_zero(self):
+        assert cb.mcgreehan_schotsch_1988_cd(1.0e4, 0.0, 1.0) == cb.mcgreehan_schotsch_1988_cd(
+            1.0e4, 0.0, 1.0, 0.0
+        )
+
+    def test_crossflow_is_not_monotonic(self):
+        # Fig. 4 draws a rise to ~0.635 near U1/Vi ~ 0.1 before the decay.
+        # Deliberate; see the extraction's item I3.
+        base = cb.mcgreehan_schotsch_1988_cd(3.2e4, 0.0, 0.0, 0.0)
+        peak = cb.mcgreehan_schotsch_1988_cd(3.2e4, 0.0, 0.0, 0.085)
+        far = cb.mcgreehan_schotsch_1988_cd(3.2e4, 0.0, 0.0, 4.0)
+        assert peak > base
+        assert peak == pytest.approx(0.635, rel=0.02)
+        assert far < 0.5 * base
+
+    def test_held_at_the_reynolds_validity_floor(self):
+        # Eq. (8) diverges below Re ~ 904, so it is held at its stated floor
+        # rather than extrapolated.
+        at_floor = cb.mcgreehan_schotsch_1988_cd(1.0e4, 0.0, 1.0)
+        for re in (1.0e-3, 1.0, 9.0e2, 5.0e3):
+            assert cb.mcgreehan_schotsch_1988_cd(re, 0.0, 1.0) == at_floor
+        assert cb.mcgreehan_schotsch_1988_cd(1.0e5, 0.0, 1.0) < at_floor
+
+    def test_stays_inside_florschuetz_measured_band(self):
+        # Florschuetz Table 1 measures 0.73-0.85 across his configurations.
+        for re in (5.0e3, 1.0e4, 3.0e4, 7.0e4):
+            for t_over_d in (1.0, 1.5, 2.0, 3.0):
+                cd = cb.mcgreehan_schotsch_1988_cd(re, 0.0, t_over_d)
+                assert 0.73 <= cd <= 0.85, f"Re={re}, t/d={t_over_d} -> {cd}"
+
+    def test_a_constant_cd_remains_available_for_the_jet_plate(self):
+        # The correlation is opt-in: ImpingementModel.C_D stays a plain float,
+        # so a caller can pin a measured or literature value instead.
+        from combaero.network.components import ImpingementModel
+
+        assert ImpingementModel().C_D == cb.FLORSCHUETZ_1981_DEFAULT_CD
+
+        measured = ImpingementModel(C_D=0.82)
+        assert measured.C_D == 0.82
+
+        computed = ImpingementModel(C_D=cb.mcgreehan_schotsch_1988_cd(1.0e4, 0.0, 2.0))
+        assert pytest.approx(0.8211, rel=1e-3) == computed.C_D

@@ -254,6 +254,8 @@ try:
         mass_flux_isentropic,
         MassStream,
         mass_to_mole,
+        mcgreehan_schotsch_1988_cd,
+        mcgreehan_schotsch_1988_crossflow_cd,
         min_mode_separation,
         mix,
         mixture_h,
@@ -693,6 +695,8 @@ except (ModuleNotFoundError, ImportError) as e:
     Cd_thick_plate = _core.Cd_thick_plate
     Cd_rounded_entry = _core.Cd_rounded_entry
     Cd_orifice = _core.Cd_orifice
+    mcgreehan_schotsch_1988_cd = _core.mcgreehan_schotsch_1988_cd
+    mcgreehan_schotsch_1988_crossflow_cd = _core.mcgreehan_schotsch_1988_crossflow_cd
     orifice_mdot_Cd = _core.orifice_mdot_Cd
     orifice_dP_Cd = _core.orifice_dP_Cd
     orifice_Cd_from_measurement = _core.orifice_Cd_from_measurement
@@ -1176,6 +1180,8 @@ __all__ = [
     "Cd_thick_plate",
     "Cd_rounded_entry",
     "Cd_orifice",
+    "mcgreehan_schotsch_1988_cd",
+    "mcgreehan_schotsch_1988_crossflow_cd",
     "orifice_mdot_Cd",
     "orifice_dP_Cd",
     "orifice_Cd_from_measurement",
