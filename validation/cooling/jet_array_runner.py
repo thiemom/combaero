@@ -71,6 +71,16 @@ def _nu_ratio(
     return ratio, at_point.extrapolated
 
 
+def owns(series: SeriesMetadata) -> bool:
+    """Whether this runner is the one that should score ``series``.
+
+    Explicit, because ``run_series`` deliberately returns reason-carrying
+    records rather than nothing for series it cannot score -- useful when it
+    is driven directly, but useless as an ownership test.
+    """
+    return series.x_axis == "Gc_Gj" and series.y_axis == "Nu_over_Nu1"
+
+
 def run_series(series: SeriesMetadata) -> list[Record]:
     """Evaluate one series. Unscored series yield records with no prediction."""
     points: list[Point] = load_points(series)

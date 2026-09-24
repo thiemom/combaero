@@ -64,10 +64,14 @@ files:
     x_axis: U1_over_Vi
     x_scale: 1.0
     y_axis: Cd
+    scores: mcgreehan_schotsch_1988_crossflow_cd
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.0026
+    # No stated accuracy band in the paper. The 0.0026 that sat here was
+    # the x-axis CALIBRATION residual, which is not a band for judging a
+    # y-error against at all; it is recorded in the header comment.
+    uncertainty: null
     verification:
       # The abscissa is LINEAR (0 to 5, six ticks), not log. Declared
       # explicitly: verify.py defaults to log and would compute a decade

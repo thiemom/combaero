@@ -62,10 +62,15 @@ files:
     x_axis: velocity_head_ratio
     x_scale: 1.0
     y_axis: Cd
+    scores: mcgreehan_schotsch_1988_cd
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.00185
+    # No stated accuracy band in the report. `uncertainty` is the band a
+    # reader judges MODEL agreement against, not digitising precision --
+    # the y-tick precision (0.00185 in Cd) is recorded in the header
+    # comment instead, where it cannot be mistaken for a tolerance.
+    uncertainty: null
     verification:
       x_axis_type: log
       x_ticks: [1, 2, 4, 6, 8, 10, 20, 40, 60]
@@ -101,10 +106,15 @@ files:
     x_axis: velocity_head_ratio
     x_scale: 1.0
     y_axis: Cd
+    scores: mcgreehan_schotsch_1988_cd
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.00185
+    # No stated accuracy band in the report. `uncertainty` is the band a
+    # reader judges MODEL agreement against, not digitising precision --
+    # the y-tick precision (0.00185 in Cd) is recorded in the header
+    # comment instead, where it cannot be mistaken for a tolerance.
+    uncertainty: null
     verification:
       x_axis_type: log
       x_ticks: [1, 2, 4, 6, 8, 10, 20, 40, 60]
@@ -141,10 +151,15 @@ files:
     x_axis: velocity_head_ratio
     x_scale: 1.0
     y_axis: Cd
+    scores: mcgreehan_schotsch_1988_cd
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.00185
+    # No stated accuracy band in the report. `uncertainty` is the band a
+    # reader judges MODEL agreement against, not digitising precision --
+    # the y-tick precision (0.00185 in Cd) is recorded in the header
+    # comment instead, where it cannot be mistaken for a tolerance.
+    uncertainty: null
     verification:
       x_axis_type: log
       x_ticks: [1, 2, 4, 6, 8, 10, 20, 40, 60]
