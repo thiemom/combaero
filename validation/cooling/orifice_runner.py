@@ -81,13 +81,55 @@ def vhr_to_static_cd(vhr: float, cd_total_referenced: float) -> float:
     return cd_total_referenced * math.sqrt(vhr / (vhr - 1.0))
 
 
+# Rohde scores are reported per velocity-head-ratio band, never pooled: the
+# static-referencing factor sqrt(VHR/(VHR-1)) is 1.33 at VHR 2 and 1.01 at
+# VHR 50, so one number would mix a near-exact comparison with one dominated
+# by the conversion. The bands travel with the records so the scorecard can
+# keep them apart without knowing why.
+VHR_BANDS = ((1.0, 10.0), (10.0, 25.0), (25.0, 60.0))
+
+
+def _band_label(vhr: float) -> str | None:
+    for lo, hi in VHR_BANDS:
+        if lo <= vhr < hi:
+            return f"VHR {lo:g}-{hi:g}"
+    return None
+
+
 @dataclass(frozen=True)
 class Record:
+    """One digitised point, evaluated.
+
+    Carries the same reporting surface as the rib and jet-array runners
+    (``rel_error``, ``within_uncertainty``, ``extrapolated``, ``reason``) so
+    one scorecard can aggregate all three without special-casing.
+    """
+
     series: SeriesMetadata
     x: float  # U1/Vi
     measured: float  # Cd
-    predicted: float
+    predicted: float | None
     vhr: float | None = None  # set for Rohde series, else None
+    extrapolated: bool = False
+    reason: str | None = None
+    #: Sub-partition for reporting. Rohde series are split by VHR band.
+    group: str | None = None
+    #: Which correlation actually produced the prediction.
+    scored_by: str | None = None
+
+    @property
+    def rel_error(self) -> float | None:
+        if self.predicted is None or self.measured == 0.0:
+            return None
+        return self.predicted / self.measured - 1.0
+
+    @property
+    def within_uncertainty(self) -> bool:
+        band = self.series.uncertainty
+        err = self.rel_error
+        if band is None or err is None:
+            return False
+        return abs(err) <= band
 
 
 def predict(series: SeriesMetadata, x: float, mode: Mode) -> float:
@@ -113,14 +155,23 @@ def score_by_vhr_band(records: list[Record], bands) -> "dict":
     return out
 
 
+def owns(series: SeriesMetadata) -> bool:
+    """Whether this runner is the one that should score ``series``."""
+    return series.y_axis == "Cd" and series.x_axis in (
+        "U1_over_Vi",
+        "velocity_head_ratio",
+    )
+
+
 def run_series(series: SeriesMetadata, mode: Mode = "eq17") -> list[Record]:
-    if series.y_axis != "Cd":
+    if not owns(series):
         return []
 
     if series.x_axis == "U1_over_Vi":
         return [
             Record(series=series, x=p.x, measured=p.y,
-                   predicted=predict(series, p.x, mode))
+                   predicted=predict(series, p.x, mode),
+                   scored_by=series.scores)
             for p in load_points(series)
         ]
 
@@ -135,7 +186,8 @@ def run_series(series: SeriesMetadata, mode: Mode = "eq17") -> list[Record]:
             u = vhr_to_crossflow_ratio(p.x)
             out.append(
                 Record(series=series, x=u, measured=cd,
-                       predicted=predict(series, u, "chain"), vhr=p.x)
+                       predicted=predict(series, u, "chain"), vhr=p.x,
+                       group=_band_label(p.x), scored_by=series.scores)
             )
         return out
 

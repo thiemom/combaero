@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The cooling scorecard now aggregates all three runners** (#333).
+  `validation/cooling/scorecard.py` knew only `runner.py`, so the Florschuetz
+  and orifice series read as "not scored by any set" and there was no single
+  place to see whether cooling as a whole was healthy. `run_dataset()` gives
+  every series to exactly one runner and a rollup reports per correlation
+  set -- six sets, 680 points, in one view for the first time.
+
+  Dispatch is on an explicit `owns()` predicate per runner, not on "the runner
+  returned something". Every runner deliberately returns reason-carrying
+  records for series it cannot score, precisely so a silent zero never
+  masquerades as a good score -- which makes truthiness useless as an
+  ownership test, and was the first version's bug: the jet-array runner
+  claimed the orifice series and reported them unscored.
+
+  Rohde's series are rolled up **per velocity-head-ratio band**, never pooled:
+  the total-to-static factor is 1.01 at VHR 50 and 1.33 at VHR 2, so one
+  number would mix a near-exact comparison with one dominated by the
+  conversion.
+
+### Fixed
+
+- **`uncertainty` now means one thing across the cooling dataset** (#333).
+  `han2012` and `florschuetz1981` declare it as the band model agreement is
+  judged against (3-8%); the two orifice sources added in #381 declared
+  digitisation precision instead (0.2%), and for McGreehan-Schotsch it was an
+  *x-axis* calibration residual being compared against a y-error. Both are now
+  `null` -- neither source states an accuracy band -- with the precision
+  figures kept in the metadata headers where they cannot be mistaken for
+  tolerances. A series with no stated band now reports `-` for `within`
+  rather than a structural `0%`.
+
 ### Added
 
 - **Adiabatic expansion factor for the McGreehan-Schotsch orifice** (#382):
