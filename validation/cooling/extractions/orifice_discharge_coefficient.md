@@ -226,6 +226,110 @@ fix rather than a new mechanism:
   no way to pass one -- the enum can be selected but the constant cannot be
   set. That is a real gap in the switch, not a style point.
 
+**D10: `Y` belongs to the INCOMPRESSIBLE path only.** Settled by reading the
+code, not by preference. combaero's `regime='compressible'` calls
+`combaero::nozzle_flow` with `A_eff = Cd E A` (`src/solver_interface.cpp`), a
+full isentropic solve with a choked branch and real-gas properties. Eq. (5)'s
+`Y_n` **reproduces that solve to 0.008%** over `0.6 <= S <= 0.99` -- measured,
+not assumed. So `nozzle_flow` already *is* the expansion factor, and applying
+`Y` on top of it corrects for compressibility twice (worth >8% at `S = 0.7`,
+pinned by `test_applying_y_on_top_of_nozzle_flow_would_double_count`).
+
+`Y` therefore does exactly one job: it extends the incompressible form
+`m_dot = Cd A sqrt(2 rho dP)` to finite pressure ratio. `orifice.h`'s module
+comment, which claimed the incompressible correlations combine with
+`compressible.h` without saying who owns the expansion term, is updated.
+
+That 0.008% agreement is also the strongest single check on the Eq. (5)
+transcription: a closed form from a 1988 paper against combaero's own
+independent numerical solve.
+
+**D11: saturate Eq. (7)'s blend weight smoothly, not with a hard clamp.**
+The paper prints `X = 8.333 (Cd - 0.82)` as a bare ramp: it says the blend
+applies "for `C_d > 0.82`", `X` reaches 1 at `C_d = 0.94`, and no upper bound
+is given. Unclamped, our own chain reaches `X = 1.45` at `Cd = 0.994`, giving
+`Y = -0.45 Y_o + 1.45 Y_n` -- an extrapolation past a nozzle with no backing.
+So a clamp is needed, and **the clamp is a decision the source did not make**.
+
+A HARD clamp was rejected on measurement. It puts `dY/dCd` at *exactly zero*
+outside `[0.82, 0.94]` -- and `Cd > 0.94` is a real design point (`r/d >= 0.2`
+at `t/d = 2`) -- plus a discontinuous jump of **0.734** in `dY/dCd` at both
+knees. The discontinuity is the disqualifying part: it breaks the
+finite-difference agreement any `(f, J)` pair has to satisfy, which is
+squarely in the way of #383.
+
+The chosen form is a smooth saturation whose `eps -> 0` limit is *exactly* the
+paper's hard clamp, so the fidelity case is available rather than lost:
+
+| | hard clamp | smoothed, `eps = 0.05` |
+|---|---|---|
+| `dY/dCd` outside the blend | exactly 0 | non-zero everywhere reachable |
+| change in `dY/dCd` across a knee, sampled at `h` | **0.73353 for every `h`** | halves each time `h` halves |
+| worst `|Y_soft - Y_hard|` | -- | **0.0042, i.e. 0.47% of a typical `Y`** |
+
+Continuity is tested by that scaling rather than against a threshold: a
+genuine discontinuity holds the same jump however closely it is sampled, a
+continuous derivative's shrinks with the interval.
+
+**`eps = 0.05` is chosen by measurement, not judgement.** Two independent
+properties bound it from opposite directions, and the window between them is
+narrow:
+
+| `eps` | width in `Cd` | cost in `Y` | continuity ratio | min `dY/dCd` | verdict |
+|---|---|---|---|---|---|
+| 0 (hard) | 0 | 0 | 1.00 | **0** | floor + kink |
+| 0.005 | 0.0006 | 0.03% | 0.90 | 1.4e-6 | effectively floored |
+| 0.02 | 0.0024 | 0.14% | 0.60 | 2.2e-5 | continuity fails |
+| **0.05** | **0.0060** | **0.35%** | **0.52** | **1.4e-4** | **ok** |
+| 0.10 | 0.0120 | 0.68% | 0.51 | 5.4e-4 | fidelity fails |
+| 0.30 | 0.0360 | 1.95% | 0.50 | 4.8e-3 | fidelity fails |
+
+Bisected walls: continuity holds for `eps >= 0.0304`, fidelity for
+`eps <= 0.0976`. The admissible window is **[0.0304, 0.0976]** and the default
+sits 29% across it. Falsified in both directions -- setting the constant to
+0.005 or 0.02 turns the dead-zone and window tests red, 0.15 turns the
+fidelity and window tests red, and the failing test names which wall was hit.
+
+A note on the lower wall, because it is easy to get wrong: "non-zero
+derivative" is not the same as "usable derivative". The first version of the
+dead-zone assertion tested `!= 0`, which passes at `eps = 0.005` where the
+smallest slope is `1.4e-6`. It now requires room (`> 5e-5`), which makes it a
+second, independent lower wall agreeing with the continuity one.
+
+**D13: every bound in the expansion factor is soft, and that is scanned for,
+not assumed.** A sweep for zero-derivative regions and derivative
+discontinuities across `Cd`, `S` and `Re` caught a bound this document had
+already claimed was handled: an earlier revision smoothed the choke point but
+left a hard `min(S, 1)`, putting a kink of `~0.455` in `dY/dS` at `S = 1` and
+a floor above it. `S > 1` is reverse flow and a solver iterate reaches it. The
+scan found it; reading the code had not. Pinned by
+`PressureRatioIsSmoothAtBothBounds`, falsified against the original bug.
+
+That scan is now `validation/solver_smoothness.py`, reusable and tested
+against hazards with known analytic answers; `test_orifice_expansion.py` runs
+it over the whole `Y` surface as a standing guard, and over the `Cd` chain
+with #383's two known hazards named in `allow=` so the rest stays guarded and
+a NEW hazard still fails. Three defects in the detector itself were found and
+fixed by those reference cases: it measured floor width linearly on log scans
+(hiding a flat decade), it skipped domain-edge points (hiding the one hazard
+that matters most, since `U1/Vi = 0` is both an edge and the default operating
+point), and its first boundary test confused "derivative still changing" with
+"derivative unbounded", flagging `log(x)`.
+
+The same scan re-confirms the two hazards already tracked in #383 and finds no
+others: `dCd/dRe` is exactly zero below `Re = 1e4`, and `dCd/d(U1/Vi)` at
+`U1/Vi = 0` is not merely discontinuous but divergent -- its jump *grows* from
+24.7 to 43.1 as the sampling interval is quartered, where a kink would hold
+constant and a smooth point would fall by four.
+
+**D12: saturate `S` at the critical pressure ratio, for the same reason.**
+Below `S* = 0.5283` (for `gamma = 1.4`) the isentropic form turns over and
+predicts *decreasing* flow -- the classic non-physical branch, and the proxy
+mass flux `Y_n sqrt(1-S)` was confirmed to peak exactly at `S*`. Y saturates
+there. The paper gives no choked branch (Eq. (5) is a subsonic isentropic
+form), so this closure is ours; it is the textbook one, and it is smoothed
+with the same mechanism so it does not reintroduce a dead `dY/dS`.
+
 **D7: defer Wu** (item I5). Implement only when a case needs `Re < 10 000`, and
 then as its own labelled correlation with its valve provenance stated, never
 blended into this chain.

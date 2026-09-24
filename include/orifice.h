@@ -26,8 +26,16 @@
 //   remains dominated by geometry and Reynolds number. These incompressible
 //   correlations provide adequate Cd values into the choked-flow regime when
 //   combined with compressible mass-flow relations (see compressible.h).
-//   Pressure-ratio corrections are typically < 5% and may be added via
-//   empirical factors (e.g., Spink) or user-supplied test data.
+//
+//   WHO OWNS THE EXPANSION TERM. Two routes exist and they must not be
+//   combined:
+//     - regime='compressible' solves the isentropic nozzle exactly via
+//       combaero::nozzle_flow, choked branch included. Apply NO expansion
+//       factor on top of it.
+//     - the incompressible form m_dot = Cd A sqrt(2 rho dP) carries no
+//       compressibility at all, and is extended to finite pressure ratio by
+//       orifice::mcgreehan_schotsch::expansion_factor (Eqs. 4-7).
+//   Eq. (5) reproduces nozzle_flow to 0.008%, so using both double-counts.
 //
 // References:
 // - ISO 5167-2:2003 - Orifice plates
@@ -238,6 +246,21 @@ constexpr double rv_cd_exp    = -3.0;
 // Eq. (8) reproduces to 0.02%. Every /0.6 divisor in Eqs. (1) and (17) is this
 // number, so it is defined once here rather than repeated as a literal.
 constexpr double cd_reference = 0.6;
+// Eq. (4), orifice adiabatic expansion factor
+constexpr double y_orifice_coef = 0.41;
+// Eq. (7), the Cd-dependent blend between orifice and nozzle expansion
+constexpr double x_blend_cd0   = 0.82;   // below this, Y = Y_o
+constexpr double x_blend_slope = 8.333;  // X reaches 1 at Cd = 0.94
+// Saturation smoothing widths. The paper's Eq. (7) is a bare linear ramp with
+// no clamp at either end, and a HARD clamp would put an exactly-zero
+// derivative outside [0.82, 0.94] plus a discontinuous jump of ~0.73 in
+// dY/dCd at both knees -- a Newton hazard, and Cd > 0.94 is a real design
+// point (r/d >= 0.2 at t/d = 2). These widths saturate smoothly instead.
+// Passing eps = 0 recovers the paper's exact hard clamp.
+// Cost, measured: max |Y_soft - Y_hard| = 0.0042, i.e. 0.47% of a typical Y.
+constexpr double x_smooth_eps  = 0.05;   // in X units
+constexpr double s_smooth_eps  = 0.01;   // in pressure-ratio units
+
 // Stated validity floor for Eqs. (8) and (9).
 constexpr double re_min       = 1.0e4;
 // Above this r/d an ASME nozzle Cd is reached and further radiusing buys
@@ -301,6 +324,47 @@ double cd(double Re, double r_over_d, double L_over_d, double U1_over_Vi);
 // literature one such as Florschuetz's per-configuration Table 1 -- and only
 // the crossflow correction is wanted.
 double cd_with_crossflow(double cd_base, double U1_over_Vi);
+
+// -------------------------------------------------------------
+// Adiabatic expansion factor Y, Eqs. (4)-(7)
+// -------------------------------------------------------------
+//
+// The paper's mass flow is Eq. (2):
+//     W = Cd * Y * A_a * sqrt(2 g_c P_t1/(R T_t1) (P_t1 - P_s2))
+// so Y is what carries compressibility in an otherwise incompressible
+// orifice equation.
+//
+// WHERE THIS BELONGS. Y is for the INCOMPRESSIBLE formulation only. combaero's
+// regime='compressible' path solves the isentropic nozzle exactly
+// (solver_interface.cpp -> combaero::nozzle_flow, with a choked branch), and
+// Eq. (5) reproduces that solve to 0.008% -- verified against it directly.
+// Applying Y there would correct for compressibility twice.
+
+// Critical pressure ratio, (2/(g+1))^(g/(g-1)). Below it the isentropic form
+// gives DECREASING flow, so Y saturates here rather than following it down.
+double critical_pressure_ratio(double gamma);
+
+// Eq. (4). Orifice form: Y_o = 1 - 0.41 (1 - S)/gamma, S = P_s2/P_t1.
+double expansion_orifice(double S, double gamma);
+
+// Eq. (5). Nozzle form, the exact isentropic expansion factor. Reproduces
+// combaero's own nozzle_flow to 0.008% over 0.6 <= S <= 0.99.
+double expansion_nozzle(double S, double gamma);
+
+// Eq. (7). Blend weight X = 8.333 (Cd - 0.82), saturated smoothly into [0, 1].
+// eps = 0 gives the paper's exact unsaturated ramp clamped hard; the default
+// trades 0.47% in Y for a derivative that is continuous and non-zero. See
+// x_smooth_eps.
+double expansion_blend_weight(double cd, double eps = x_smooth_eps);
+
+// Eq. (6). Y = (1 - X) Y_o + X Y_n.
+//
+// An orifice is not a nozzle, and Y_o and Y_n differ by up to 17% at
+// S = 0.6; the Cd-dependent blend is what interpolates. A sharp-edged hole
+// (Cd < 0.82) gets Y_o; one rounded enough to behave like a nozzle
+// (Cd > 0.94) gets Y_n.
+double expansion_factor(double cd, double S, double gamma,
+                        double eps = x_smooth_eps);
 } // namespace mcgreehan_schotsch
 
 // Reader-Harris/Gallagher (1998) - ISO 5167-2

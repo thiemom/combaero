@@ -643,6 +643,16 @@ double cd(double Re, double r_over_d, double L_over_d,
           double U1_over_Vi);                        // Eq. (17)
 double cd_with_crossflow(double cd_base,
                          double U1_over_Vi);         // Eq. (17) alone
+
+// Adiabatic expansion factor, for the INCOMPRESSIBLE form only.
+// regime='compressible' already solves the isentropic nozzle exactly via
+// nozzle_flow; Eq. (5) reproduces that to 0.008%, so using both double-counts.
+double critical_pressure_ratio(double gamma);
+double expansion_orifice(double S, double gamma);                 // Eq. (4)
+double expansion_nozzle(double S, double gamma);                  // Eq. (5)
+double expansion_blend_weight(double cd, double eps = x_smooth_eps);  // Eq. (7)
+double expansion_factor(double cd, double S, double gamma,
+                        double eps = x_smooth_eps);               // Eq. (6)
 }
 
 // The full chain

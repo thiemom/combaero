@@ -5066,6 +5066,38 @@ PYBIND11_MODULE(_core, m) {
         "U1_over_Vi is the INLET (supply-side) tangential velocity ratio; see\n"
         "mcgreehan_schotsch_1988_cd for the trap this must not be fed.");
 
+  m.def("mcgreehan_schotsch_1988_expansion_orifice",
+        &orifice::mcgreehan_schotsch::expansion_orifice, py::arg("S"),
+        py::arg("gamma"),
+        "Eq. (4): orifice adiabatic expansion factor, Y_o = 1 - 0.41(1-S)/gamma.\n"
+        "S is the pressure ratio P_s2/P_t1.");
+
+  m.def("mcgreehan_schotsch_1988_expansion_nozzle",
+        &orifice::mcgreehan_schotsch::expansion_nozzle, py::arg("S"),
+        py::arg("gamma"),
+        "Eq. (5): nozzle adiabatic expansion factor -- the exact isentropic\n"
+        "one. Reproduces combaero's own nozzle_flow to 0.008% over\n"
+        "0.6 <= S <= 0.99, which is what establishes that applying Y on the\n"
+        "regime='compressible' path would double-count compressibility.");
+
+  m.def("mcgreehan_schotsch_1988_expansion_factor",
+        &orifice::mcgreehan_schotsch::expansion_factor, py::arg("cd"),
+        py::arg("S"), py::arg("gamma"),
+        py::arg("eps") = orifice::mcgreehan_schotsch::x_smooth_eps,
+        "Eqs. (6)/(7): the blended expansion factor Y = (1-X) Y_o + X Y_n,\n"
+        "with X = 8.333 (Cd - 0.82) saturated into [0, 1].\n\n"
+        "For the INCOMPRESSIBLE orifice equation only:\n"
+        "    m_dot = Cd * Y * A * sqrt(2 rho_t1 (P_t1 - P_s2))\n"
+        "Do NOT apply it on regime='compressible', which already solves the\n"
+        "isentropic nozzle exactly (and Eq. (5) reproduces that solve to\n"
+        "0.008%) -- you would correct for compressibility twice.\n\n"
+        "eps is the saturation smoothing width. eps=0 gives the paper's exact\n"
+        "hard clamp, which has an exactly-zero derivative outside\n"
+        "[Cd 0.82, 0.94] and a discontinuous jump of 0.734 in dY/dCd at both\n"
+        "knees. The default trades 0.47% in Y for a continuous, non-zero\n"
+        "derivative. Y also saturates at the critical pressure ratio, below\n"
+        "which the isentropic form predicts decreasing flow.");
+
   m.def("solve_orifice_mdot", &solve_orifice_mdot, py::arg("geom"),
         py::arg("dP"), py::arg("rho"), py::arg("mu"),
         py::arg("P_upstream") = 101325.0, py::arg("kappa") = 0.0,

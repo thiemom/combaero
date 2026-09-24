@@ -256,6 +256,9 @@ try:
         mass_to_mole,
         mcgreehan_schotsch_1988_cd,
         mcgreehan_schotsch_1988_crossflow_cd,
+        mcgreehan_schotsch_1988_expansion_factor,
+        mcgreehan_schotsch_1988_expansion_nozzle,
+        mcgreehan_schotsch_1988_expansion_orifice,
         min_mode_separation,
         mix,
         mixture_h,
@@ -697,6 +700,9 @@ except (ModuleNotFoundError, ImportError) as e:
     Cd_orifice = _core.Cd_orifice
     mcgreehan_schotsch_1988_cd = _core.mcgreehan_schotsch_1988_cd
     mcgreehan_schotsch_1988_crossflow_cd = _core.mcgreehan_schotsch_1988_crossflow_cd
+    mcgreehan_schotsch_1988_expansion_factor = _core.mcgreehan_schotsch_1988_expansion_factor
+    mcgreehan_schotsch_1988_expansion_nozzle = _core.mcgreehan_schotsch_1988_expansion_nozzle
+    mcgreehan_schotsch_1988_expansion_orifice = _core.mcgreehan_schotsch_1988_expansion_orifice
     orifice_mdot_Cd = _core.orifice_mdot_Cd
     orifice_dP_Cd = _core.orifice_dP_Cd
     orifice_Cd_from_measurement = _core.orifice_Cd_from_measurement
@@ -1182,6 +1188,9 @@ __all__ = [
     "Cd_orifice",
     "mcgreehan_schotsch_1988_cd",
     "mcgreehan_schotsch_1988_crossflow_cd",
+    "mcgreehan_schotsch_1988_expansion_factor",
+    "mcgreehan_schotsch_1988_expansion_nozzle",
+    "mcgreehan_schotsch_1988_expansion_orifice",
     "orifice_mdot_Cd",
     "orifice_dP_Cd",
     "orifice_Cd_from_measurement",

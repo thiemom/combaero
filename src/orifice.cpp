@@ -302,6 +302,81 @@ double cd(double Re, double r_over_d, double L_over_d, double U1_over_Vi) {
                              U1_over_Vi);
 }
 
+// -------------------------------------------------------------
+// Expansion factor Y, Eqs. (4)-(7)
+// -------------------------------------------------------------
+
+namespace {
+
+// Smooth min/max. At eps = 0 these reduce EXACTLY to std::min / std::max, so
+// the paper's hard clamp is the eps -> 0 limit rather than a separate branch.
+// Away from the knee the deviation falls off quadratically; at the knee it is
+// eps/2.
+double soft_min(double x, double limit, double eps) {
+    const double d = x - limit;
+    return 0.5 * (x + limit - std::sqrt(d * d + eps * eps));
+}
+
+double soft_max(double x, double limit, double eps) {
+    const double d = x - limit;
+    return 0.5 * (x + limit + std::sqrt(d * d + eps * eps));
+}
+
+} // namespace
+
+double critical_pressure_ratio(double gamma) {
+    return std::pow(2.0 / (gamma + 1.0), gamma / (gamma - 1.0));
+}
+
+double expansion_orifice(double S, double gamma) {
+    // Eq. (4). Written as (1 - S)/gamma, identical to the printed
+    // (P_t1 - P_s2)/(gamma P_t1).
+    return 1.0 - y_orifice_coef * (1.0 - S) / gamma;
+}
+
+double expansion_nozzle(double S, double gamma) {
+    // Eq. (5). The bracket is 0/0 at S = 1; the limit of
+    // (1 - S^((g-1)/g))/(1 - S) there is (g-1)/g, which makes Y_n(1) = 1.
+    if (S >= 1.0) return 1.0;
+    const double e = (gamma - 1.0) / gamma;
+    const double one_minus_S = 1.0 - S;
+    if (one_minus_S < 1.0e-9) return 1.0;
+    const double ratio = (1.0 - std::pow(S, e)) / one_minus_S;
+    const double val = std::pow(S, 2.0 / gamma) * (gamma / (gamma - 1.0)) * ratio;
+    return val > 0.0 ? std::sqrt(val) : 0.0;
+}
+
+double expansion_blend_weight(double cd, double eps) {
+    const double x = x_blend_slope * (cd - x_blend_cd0);
+    // Saturate into [0, 1]. The paper prints neither bound: it states the
+    // blend applies "for Cd > 0.82" and X reaches 1 at Cd = 0.94, but gives
+    // no clamp above. Unclamped, Cd = 0.99 would give X = 1.45 and
+    // Y = -0.45 Y_o + 1.45 Y_n, extrapolating past a nozzle. Clamping is a
+    // decision the source did not make; see decision D10 of the extraction.
+    return soft_max(soft_min(x, 1.0, eps), 0.0, eps);
+}
+
+double expansion_factor(double cd, double S, double gamma, double eps) {
+    if (!(gamma > 1.0)) return 1.0;
+
+    // Below the critical pressure ratio the isentropic form turns over and
+    // predicts DECREASING flow -- the classic non-physical branch. Saturate S
+    // at the choke point, smoothly for the same reason the blend weight is
+    // smoothed: a hard clamp here would zero dY/dS discontinuously.
+    // Both bounds are SOFT. An earlier revision smoothed the choke point but
+    // left a hard std::min(S, 1.0) at the top, which a scan for zero-derivative
+    // regions and derivative discontinuities caught: it put a kink of ~0.455 in
+    // dY/dS at S = 1 and a floor above it. S > 1 is reverse flow, which a
+    // solver iterate can reach, so it gets the same treatment as the rest.
+    const double S_eff = soft_max(soft_min(S, 1.0, s_smooth_eps),
+                                  critical_pressure_ratio(gamma),
+                                  s_smooth_eps);
+
+    const double X = expansion_blend_weight(cd, eps);
+    return (1.0 - X) * expansion_orifice(S_eff, gamma)
+           + X * expansion_nozzle(S_eff, gamma);
+}
+
 } // namespace mcgreehan_schotsch
 
 double Cd_McGreehanSchotsch(double Re, double r_over_d, double L_over_d,
