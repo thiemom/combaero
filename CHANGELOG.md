@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Lau, Kukreja and McMillin (1990) as validation data** (#385), the first rib
+  source outside Han and a primary paper rather than a textbook reprint. Its
+  Table 2 prints the roughness functions as closed forms, so the 90 deg
+  baseline needed no digitising at all (`extraction: tabulated`,
+  `confidence: exact`).
+
+  **`han_1988_orthogonal`'s heat-transfer roughness function is independently
+  confirmed**: Han prints `G = 3.7 (e+)^0.28`, Lau `4.218 (e+)^0.257` --
+  different coefficient and exponent, agreeing to RMSE 1.4%, bias -0.1% over
+  `e+ = 106-636`, with every point inside Lau's own stated +/-5.8% Stanton
+  uncertainty. A different lab, rig and decade.
+
+  **The friction roughness function does not agree**: Lau's `R` runs 12.4-13.1%
+  above combaero's constant 3.2, which converts to two labs ~12% apart in
+  ribbed-wall friction factor for nominally the same configuration.
+  Definitional causes were checked and ruled out. Recorded, not reconciled;
+  committed with `scores: null` because `runner.py`'s `e+` path has no
+  absolute-`R` branch.
+
+  **Reflection folding is falsified.** `han_ribbed.md` recorded
+  `alpha -> 180 - alpha` as the bounded alternative if Eq. 4.17 were ever
+  guarded past 90 deg. Lau measured both sides: V-120 differs from V-60 by
+  15-23%, and the paper's own conclusion says reversal lowers heat transfer.
+  The open item is closed -- no guard should be written on that basis.
+
+  **Lau's `Gbar` is deliberately NOT committed.** It is a four-wall average;
+  Han's `G_bar` is the Prandtl-normalised `G Pr^-0.57`, which
+  `han_ribbed.md` item 10 explicitly resolved as "not a four-wall average".
+  Their ratios to `G` differ by only 2-3%, so scoring one against the other
+  would read as a confirmation -- and `runner.py` multiplies anything tagged
+  `y_axis: G_bar` by Han's Prandtl factor automatically. A test asserts the
+  trap stays shut.
+
 ### Changed
 
 - **The cooling scorecard now aggregates all three runners** (#333).

@@ -128,3 +128,53 @@ def test_within_is_blank_where_no_band_is_stated(cells) -> None:
             assert math.isnan(c.within), f"{c.label} reports a within fraction"
         if c.label.startswith("han2012/fig4.46_R_eD") and c.n_scored:
             assert not math.isnan(c.within)
+
+
+# ---------------------------------------------------------------------------
+# Lau 1990 -- the first rib source outside Han (#385)
+# ---------------------------------------------------------------------------
+
+
+def test_lau_independently_confirms_han_G(cells) -> None:
+    """A different lab, rig and decade reproducing han_1988_orthogonal's
+    heat-transfer roughness function.
+
+    Han prints G = 3.7 (e+)^0.28, Lau 4.218 (e+)^0.257 -- different
+    coefficient AND exponent, agreeing because the forms cross near e+ = 300.
+    """
+    c = next(c for c in cells if c.label == "lau1990/fig_table2_90deg_G")
+    assert c.n_scored == 9
+    assert c.rmse < 0.03, f"agreement degraded to {c.rmse:.4f}"
+    assert abs(c.bias) < 0.02
+    # Every point inside Lau's own stated +/-5.8% Stanton uncertainty -- a
+    # MEASUREMENT band from the source, not a model-derived one.
+    assert c.within == 1.0
+
+
+def test_lau_R_is_committed_but_not_scored(cells) -> None:
+    """runner.py's e+ path has no absolute-R branch. The series is committed
+    so the ~13% disagreement is visible rather than absent, and reports '-'
+    rather than a zero that would read as agreement."""
+    import math
+
+    c = next(c for c in cells if c.label == "lau1990/fig_table2_90deg_R")
+    assert c.n == 9
+    assert c.n_scored == 0
+    assert math.isnan(c.rmse)
+
+
+def test_lau_Gbar_is_not_in_the_dataset(dataset) -> None:
+    """Lau's Gbar is a FOUR-WALL AVERAGE; Han's G_bar is the PRANDTL-NORMALISED
+    roughness function (han_ribbed.md item 10, "not a four-wall average").
+    Their ratios to G differ by only 2-3%, so scoring one against the other
+    reads as a confirmation -- and runner.py would silently apply Han's
+    G_BAR_OVER_G factor to anything tagged y_axis: G_bar.
+
+    This asserts the trap stays shut.
+    """
+    for s in dataset:
+        if s.source.name == "lau1990":
+            assert s.y_axis != "G_bar", (
+                f"{s.label} is tagged G_bar; Lau's Gbar is a four-wall average "
+                "and would be multiplied by Han's Prandtl factor"
+            )
