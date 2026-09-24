@@ -1,12 +1,13 @@
 # Lau, Kukreja and McMillin (1990): the first rib source outside Han.
 #
-# Table 2 is confirmed on two independent channels throughout -- a visual read
-# at 300 dpi and macOS Vision OCR at 600 dpi, agreeing on 41 of 42 numbers --
-# and on three channels where it mattered: the reviewer separately read the
-# R a column, the G b column and the 7/-V-135 row. The one OCR disagreement
-# (G exponent, rows 6/-V-120 and 6a/-V-120) was escalated to a high-resolution
-# crop and has since been independently confirmed. No cell rests on a single
-# read. See the review log in extractions/lau_1990_v_ribs.md.
+# Table 2 is confirmed CELL BY CELL on three independent channels -- a visual
+# read at 300 dpi, macOS Vision OCR at 600 dpi, and the reviewer -- across all
+# 42 numbers with no exceptions. The two channels that run automatically
+# agreed on 41; the 42nd (G exponent, rows 6/-V-120 and 6a/-V-120) was an OCR
+# merge that flagged itself at confidence 0.30, was escalated to a
+# high-resolution crop per extractions/README.md, and was later confirmed by
+# the reviewer independently. See the review log in
+# extractions/lau_1990_v_ribs.md.
 #
 # WHAT THESE FILES ARE. Not digitised points. Lau's Table 2 prints the
 # roughness functions as closed forms, `R(e+) = a(e+)^b` and
