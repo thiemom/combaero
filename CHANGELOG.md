@@ -9,6 +9,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Adiabatic expansion factor for the McGreehan-Schotsch orifice** (#382):
+  `mcgreehan_schotsch_1988_expansion_factor` / `_expansion_orifice` /
+  `_expansion_nozzle`, and `orifice::mcgreehan_schotsch::expansion_*` in C++.
+  Eqs. (4)-(7) of the source, which #381 left unimplemented -- the paper's
+  mass flow is `W = Cd * Y * A * sqrt(...)` and only `Cd` had been shipped.
+
+  **`Y` is for the incompressible formulation only.** combaero's
+  `regime='compressible'` already solves the isentropic nozzle exactly via
+  `nozzle_flow`, and Eq. (5) reproduces that solve to **0.008%** over
+  `0.6 <= S <= 0.99` -- so applying `Y` there would correct for
+  compressibility twice (worth >8% at `S = 0.7`). That agreement, between a
+  1988 closed form and combaero's own independent numerical solve with
+  real-gas properties, is also the strongest check on the transcription.
+  `orifice.h`'s module comment is corrected to say which route owns the
+  expansion term.
+
+  **Eq. (7)'s blend weight saturates smoothly rather than with a hard clamp.**
+  The paper prints a bare ramp with no upper bound, and our own chain reaches
+  `X = 1.45`, extrapolating past a nozzle. A hard clamp would put `dY/dCd` at
+  *exactly zero* outside `Cd` in `[0.82, 0.94]` -- a reachable design point --
+  plus a discontinuous jump of 0.734 at both knees, which would break the
+  finite-difference agreement required of the `(f, J)` work in #383. The
+  smoothed form costs 0.47% in `Y` at worst and its `eps = 0` limit is exactly
+  the paper's clamp, so the exact form remains available. Continuity is tested
+  by how the derivative change scales with sampling interval, not against a
+  threshold: the hard clamp holds 0.73353 at every interval, the smoothed one
+  halves as the interval halves.
+
+  `Y` also saturates at the critical pressure ratio, below which the
+  isentropic form predicts decreasing flow; the proxy mass flux was confirmed
+  to peak exactly at `S*`. Decisions D10-D13 in
+  `validation/cooling/extractions/orifice_discharge_coefficient.md`.
+
+- **`validation/solver_smoothness.py`**: a reusable scan for the three ways a
+  blend or clamp stalls a Newton solve -- FLOOR (derivative exactly zero over
+  a run), KINK (derivative discontinuous), DIVERGENCE (derivative unbounded).
+  They are told apart by how the derivative behaves as the sampling interval
+  shrinks, which also separates all three from an honest steep gradient.
+  `assert_smooth()` for tests, with `allow=` so a known, documented limitation
+  narrows the check instead of switching it off; `python -m
+  validation.solver_smoothness` for a report.
+
+  Written because reading the code does not find these: the expansion factor
+  above had two bounds smoothed deliberately and still shipped a hard
+  `min(S, 1)` putting a kink at the no-flow boundary, which the scan caught.
+  The detector is itself tested against hazards with known analytic answers in
+  both directions -- it must fire on `max(x,0)`, a hard clamp, and `sqrt|x|`,
+  and must stay quiet on `tanh(40x)` (steep is not broken), on `x**2`'s
+  isolated stationary point, and on smooth saturation.
+
 - **Jet-plate / cooling-hole discharge coefficient**: `mcgreehan_schotsch_1988_cd`
   (Python) and `orifice::Cd_McGreehanSchotsch` plus the per-equation stages in
   `orifice::mcgreehan_schotsch` (C++), implementing McGreehan and Schotsch

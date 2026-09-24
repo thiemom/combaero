@@ -244,7 +244,44 @@ RMS `7.54%` -- reading high, and increasingly so with crossflow (`+3%` below
 `U1/Vi = 0.4`, `+16%` at 1.41). Scored by
 `validation/cooling/orifice_runner.py`.
 
-Provenance, the ten checks behind every constant, and the two errata found in
+##### Compressibility: the expansion factor
+
+The paper's mass flow is `W = Cd * Y * A * sqrt(2 rho_t1 (P_t1 - P_s2))`. `Y`
+carries compressibility in an otherwise incompressible orifice equation:
+
+```python
+S = P_s2 / P_t1
+cb.mcgreehan_schotsch_1988_expansion_factor(cd=0.80, S=0.7, gamma=1.4)  # 0.912
+```
+
+**Only for the incompressible formulation.** `regime='compressible'` already
+solves the isentropic nozzle exactly (`nozzle_flow`, choked branch included),
+and Eq. (5) reproduces that solve to 0.008% -- applying `Y` on top of it
+corrects for compressibility twice, worth over 8% at `S = 0.7`.
+
+The paper carries two forms because an orifice is not a nozzle, and blends
+between them on `Cd`:
+
+```python
+cb.mcgreehan_schotsch_1988_expansion_orifice(S=0.7, gamma=1.4)  # 0.912, Eq. (4)
+cb.mcgreehan_schotsch_1988_expansion_nozzle(S=0.7, gamma=1.4)   # 0.824, Eq. (5)
+```
+
+A sharp hole (`Cd < 0.82`) gets the orifice form, one rounded enough to behave
+like a nozzle (`Cd > 0.94`) gets the nozzle form. Two departures from the
+printed equations, both deliberate and both recorded as decisions D11/D12 in
+the extraction:
+
+- **The blend weight saturates smoothly.** The paper prints `X = 8.333(Cd -
+  0.82)` with no upper bound, which reaches 1.45 for a well-rounded long hole
+  and extrapolates past a nozzle. A hard clamp would give an exactly-zero
+  `dY/dCd` outside the blend and a discontinuous jump of 0.734 at each knee.
+  Pass `eps=0` for the paper's exact hard clamp; the default costs 0.47% in
+  `Y` and keeps the derivative continuous and non-zero.
+- **`Y` saturates at the critical pressure ratio.** Below `S*` the isentropic
+  form predicts *decreasing* flow. The paper has no choked branch.
+
+Provenance, the checks behind every constant, and the two errata found in
 the paper are in
 `validation/cooling/extractions/orifice_discharge_coefficient.md`.
 

@@ -524,3 +524,243 @@ TEST(McGreehanSchotsch, ChainDecomposesIntoBaselineAndCrossflow) {
 // CrossflowEffectMatchesFigure4, and against Rohde's digitised data by
 // python/tests/test_orifice_validation.py. No figure-read test is duplicated
 // here for the Fig. 6 baseline curves.
+
+// -------------------------------------------------------------
+// Expansion factor Y, Eqs. (4)-(7)
+// -------------------------------------------------------------
+
+TEST(McGreehanSchotschY, NozzleFormIsTheIsentropicExpansionFactor) {
+    // Eq. (5) IS the isentropic nozzle expansion factor. Checked here against
+    // the closed-form isentropic mass flux ratio, derived independently:
+    //   Y_n = [mdot_isentropic / mdot_incompressible] at the same dP.
+    // (The stronger check, against combaero's own nozzle_flow with real gas
+    // properties, lives in python/tests/test_orifice_expansion.py.)
+    const double g = 1.4;
+    for (const double S : {0.99, 0.95, 0.90, 0.80, 0.70, 0.60}) {
+        // Isentropic mass flux, normalised the same way Y is defined.
+        const double num = std::sqrt(
+            (2.0 * g / (g - 1.0)) *
+            (std::pow(S, 2.0 / g) - std::pow(S, (g + 1.0) / g)));
+        const double den = std::sqrt(2.0 * (1.0 - S));
+        EXPECT_NEAR(ms::expansion_nozzle(S, g), num / den, 1e-10)
+            << "at S = " << S;
+    }
+}
+
+TEST(McGreehanSchotschY, BothFormsTendToOneAtZeroPressureDrop) {
+    for (const double g : {1.3, 1.4, 1.67}) {
+        EXPECT_NEAR(ms::expansion_orifice(1.0, g), 1.0, 1e-12);
+        EXPECT_NEAR(ms::expansion_nozzle(1.0, g), 1.0, 1e-9);
+        EXPECT_NEAR(ms::expansion_nozzle(1.0 - 1e-10, g), 1.0, 1e-6);
+    }
+}
+
+TEST(McGreehanSchotschY, OrificeFormMatchesThePrintedCoefficient) {
+    // Eq. (4) printed as 1 - 0.41 (P_t1 - P_s2)/(gamma P_t1). Checked against
+    // that literal form rather than the (1-S)/gamma rewrite used internally.
+    const double g = 1.4, P_t1 = 4.0e5, P_s2 = 3.0e5;
+    const double printed = 1.0 - 0.41 * (P_t1 - P_s2) / (g * P_t1);
+    EXPECT_NEAR(ms::expansion_orifice(P_s2 / P_t1, g), printed, 1e-12);
+}
+
+TEST(McGreehanSchotschY, BlendWeightReducesToThePaperAtZeroSmoothing) {
+    // eps = 0 must recover Eq. (7) clamped hard, exactly.
+    for (const double cd : {0.70, 0.80, 0.82, 0.86, 0.90, 0.94, 0.99}) {
+        const double x = ms::x_blend_slope * (cd - ms::x_blend_cd0);
+        const double hard = std::max(0.0, std::min(1.0, x));
+        EXPECT_NEAR(ms::expansion_blend_weight(cd, 0.0), hard, 1e-12)
+            << "at Cd = " << cd;
+    }
+    // X reaches 1 at Cd = 0.94, as the paper's constants imply.
+    EXPECT_NEAR(ms::expansion_blend_weight(0.94, 0.0), 1.0, 1e-3);
+}
+
+// The reviewer's concern, made a test: a hard clamp puts an exactly-zero
+// derivative outside [0.82, 0.94] and a discontinuous jump at both knees.
+// The smoothed default must have neither.
+TEST(McGreehanSchotschY, SmoothedBlendHasNoDeadZoneAndNoJump) {
+    const double g = 1.4, S = 0.7;
+    const double h = 1e-6;
+    auto dY = [&](double cd, double eps) {
+        return (ms::expansion_factor(cd + h, S, g, eps)
+                - ms::expansion_factor(cd - h, S, g, eps)) / (2.0 * h);
+    };
+
+    // Hard clamp: dead on both sides. This documents what is being avoided.
+    EXPECT_DOUBLE_EQ(dY(0.78, 0.0), 0.0);
+    EXPECT_DOUBLE_EQ(dY(0.99, 0.0), 0.0);
+
+    // Smoothed: not merely non-zero but with ROOM in it. An earlier version
+    // of this assertion tested != 0, which passes at eps = 0.005 where the
+    // smallest slope is 1.4e-6 -- numerically a floor. 5e-5 is below the
+    // 1.36e-4 the default achieves and above the 2.2e-5 that eps = 0.02 gets,
+    // so this assertion is itself a lower wall on eps.
+    for (const double cd : {0.70, 0.78, 0.818, 0.822, 0.90, 0.936, 0.944,
+                            0.97, 0.99}) {
+        EXPECT_GT(std::abs(dY(cd, ms::x_smooth_eps)), 5.0e-5)
+            << "derivative is effectively floored at Cd = " << cd;
+    }
+
+    // ...and CONTINUOUS across both knees. Tested by how the change scales
+    // with the sampling interval rather than against a threshold: a genuine
+    // discontinuity holds the same jump however closely you sample, while a
+    // continuous derivative's change shrinks with the interval. Measured, the
+    // hard clamp sits at 0.73353 for every h; the smoothed one halves each
+    // time h halves.
+    for (const double knee : {0.82, 0.94}) {
+        auto jump = [&](double half, double eps) {
+            return std::abs(dY(knee + half, eps) - dY(knee - half, eps));
+        };
+
+        // Hard clamp: the jump does not shrink. This is what is being avoided.
+        EXPECT_NEAR(jump(0.004, 0.0), jump(0.00025, 0.0), 1e-6);
+        EXPECT_NEAR(jump(0.004, 0.0), 0.7335, 1e-3);
+
+        // Smoothed: halving the interval halves the change, to within 5%.
+        const double wide = jump(0.002, ms::x_smooth_eps);
+        const double half = jump(0.001, ms::x_smooth_eps);
+        EXPECT_NEAR(half / wide, 0.5, 0.05)
+            << "derivative is not continuous at the knee Cd = " << knee;
+    }
+}
+
+TEST(McGreehanSchotschY, SmoothingCostIsBounded) {
+    // What the smoothing buys must be paid for in a quantified amount of Y.
+    double worst = 0.0;
+    for (int i = 0; i <= 300; ++i) {
+        const double cd = 0.70 + 0.30 * i / 300.0;
+        for (const double S : {0.6, 0.7, 0.8, 0.9, 0.99}) {
+            worst = std::max(worst,
+                             std::abs(ms::expansion_factor(cd, S, 1.4, ms::x_smooth_eps)
+                                      - ms::expansion_factor(cd, S, 1.4, 0.0)));
+        }
+    }
+    EXPECT_LT(worst, 0.006) << "smoothing deviation grew: " << worst;
+}
+
+// Below the critical pressure ratio the isentropic form turns over and
+// predicts decreasing flow. Y must saturate instead.
+// The evidence for x_smooth_eps, rather than an assurance that it is sensible.
+//
+// Two independent properties bound it from opposite directions, and the
+// default has to sit between them. Measured walls: continuity is satisfied
+// for eps >= 0.0304, fidelity for eps <= 0.0976. The default sits 29% across
+// that window. If someone moves the constant, this says which wall they hit.
+TEST(McGreehanSchotschY, DefaultSmoothingSitsInsideItsAdmissibleWindow) {
+    const double g = 1.4, S = 0.7, h = 1e-6;
+    auto dY = [&](double cd, double eps) {
+        return (ms::expansion_factor(cd + h, S, g, eps)
+                - ms::expansion_factor(cd - h, S, g, eps)) / (2.0 * h);
+    };
+    // Continuity, as the ratio of the derivative change at two sampling
+    // intervals. 0.5 means continuous; 1.0 means a kink.
+    auto continuity = [&](double eps) {
+        auto jump = [&](double half) {
+            return std::abs(dY(0.94 + half, eps) - dY(0.94 - half, eps));
+        };
+        const double wide = jump(0.002);
+        return wide > 0.0 ? jump(0.001) / wide : 1.0;
+    };
+    // Departure from the paper's exact Eq. (7).
+    auto cost = [&](double eps) {
+        double worst = 0.0;
+        for (int i = 0; i <= 300; ++i) {
+            const double cd = 0.70 + 0.30 * i / 300.0;
+            for (const double s : {0.6, 0.7, 0.8, 0.9, 0.99}) {
+                worst = std::max(worst,
+                                 std::abs(ms::expansion_factor(cd, s, g, eps)
+                                          - ms::expansion_factor(cd, s, g, 0.0)));
+            }
+        }
+        return worst;
+    };
+
+    // The default satisfies both.
+    EXPECT_NEAR(continuity(ms::x_smooth_eps), 0.5, 0.05);
+    EXPECT_LT(cost(ms::x_smooth_eps), 0.006);
+
+    // Below the window, continuity goes -- the transition becomes narrower
+    // than anything a Newton step can resolve.
+    EXPECT_GT(std::abs(continuity(0.02) - 0.5), 0.05)
+        << "the lower wall has moved; re-measure the window";
+
+    // Above it, fidelity goes.
+    EXPECT_GT(cost(0.15), 0.006)
+        << "the upper wall has moved; re-measure the window";
+
+    // And the window really is narrow, so the default is not free to drift.
+    EXPECT_LT(cost(ms::x_smooth_eps) / 0.006, 0.9);
+}
+
+TEST(McGreehanSchotschY, SaturatesAtChoking) {
+    const double g = 1.4;
+    const double s_crit = ms::critical_pressure_ratio(g);
+    EXPECT_NEAR(s_crit, 0.5283, 1e-3);
+
+    auto flux = [&](double S) {
+        return ms::expansion_factor(0.99, S, g) * std::sqrt(std::max(1.0 - S, 0.0));
+    };
+    // The proxy mass flux must not fall away below the choke point.
+    const double at_crit = flux(s_crit);
+    for (const double S : {0.45, 0.35, 0.20, 0.05}) {
+        EXPECT_GT(flux(S), 0.97 * at_crit) << "flow collapses below S* at S = " << S;
+    }
+}
+
+// Both bounds on the pressure ratio must be soft, not just the choke point.
+// A scan for zero-derivative regions and derivative discontinuities caught an
+// earlier revision that smoothed S* but left a hard min(S, 1): it put a kink
+// of ~0.455 in dY/dS at S = 1 and a floor above it. S > 1 is reverse flow,
+// which a solver iterate can reach.
+TEST(McGreehanSchotschY, PressureRatioIsSmoothAtBothBounds) {
+    const double g = 1.4, cd = 0.90, h = 1e-7;
+    auto dS = [&](double S) {
+        return (ms::expansion_factor(cd, S + h, g)
+                - ms::expansion_factor(cd, S - h, g)) / (2.0 * h);
+    };
+    auto continuous_at = [&](double S0) {
+        auto jump = [&](double half) {
+            return std::abs(dS(S0 + half) - dS(S0 - half));
+        };
+        const double wide = jump(0.004);
+        if (wide < 1e-9) return true;   // already flat on both sides
+        return jump(0.002) / wide < 0.75;  // shrinks with the interval
+    };
+
+    EXPECT_TRUE(continuous_at(1.0)) << "kink at the no-flow bound S = 1";
+    EXPECT_TRUE(continuous_at(ms::critical_pressure_ratio(g)))
+        << "kink at the choke point";
+
+    // No floor anywhere a solver can wander, including into reverse flow.
+    for (const double S : {0.2, 0.4, ms::critical_pressure_ratio(g), 0.7,
+                           0.95, 0.999, 1.0, 1.05, 1.2}) {
+        EXPECT_NE(dS(S), 0.0) << "derivative floored at S = " << S;
+    }
+}
+
+TEST(McGreehanSchotschY, BlendSelectsOrificeWhenSharpAndNozzleWhenRounded) {
+    const double g = 1.4, S = 0.7;
+    // A sharp hole (Cd well under 0.82) is pure orifice.
+    EXPECT_NEAR(ms::expansion_factor(0.70, S, g),
+                ms::expansion_orifice(S, g), 5e-3);
+    // One rounded enough to act like a nozzle is pure nozzle.
+    EXPECT_NEAR(ms::expansion_factor(0.995, S, g),
+                ms::expansion_nozzle(S, g), 5e-3);
+    // They genuinely differ, so the blend is doing work.
+    EXPECT_GT(std::abs(ms::expansion_orifice(S, g) - ms::expansion_nozzle(S, g)),
+              0.08);
+}
+
+TEST(McGreehanSchotschY, StaysFiniteAndBounded) {
+    for (const double g : {1.1, 1.4, 1.67}) {
+        for (const double S : {1.5, 1.0, 0.5, 0.1, 0.0, -0.1}) {
+            for (const double cd : {0.3, 0.8, 1.2}) {
+                const double y = ms::expansion_factor(cd, S, g);
+                EXPECT_TRUE(std::isfinite(y)) << "g=" << g << " S=" << S;
+                EXPECT_GT(y, 0.0);
+                EXPECT_LE(y, 1.01);
+            }
+        }
+    }
+    EXPECT_DOUBLE_EQ(ms::expansion_factor(0.8, 0.7, 1.0), 1.0);  // degenerate gamma
+}

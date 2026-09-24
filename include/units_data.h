@@ -666,6 +666,10 @@ inline constexpr Entry function_units[] = {
      "Re: -, r_over_d: -, L_over_d: -, U1_over_Vi: -", "- (Cd)"},
     {"mcgreehan_schotsch_1988_crossflow_cd",
      "cd_base: - (Cd), U1_over_Vi: -", "- (Cd)"},
+    {"mcgreehan_schotsch_1988_expansion_orifice", "S: -, gamma: -", "- (Y)"},
+    {"mcgreehan_schotsch_1988_expansion_nozzle", "S: -, gamma: -", "- (Y)"},
+    {"mcgreehan_schotsch_1988_expansion_factor",
+     "cd: - (Cd), S: -, gamma: -, eps: -", "- (Y)"},
 
     // -------------------------------------------------------------------------
     // humidair.h - Humid Air Properties
