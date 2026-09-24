@@ -1,0 +1,165 @@
+# Lau, Kukreja and McMillin (1990): the first rib source outside Han.
+#
+# Table 2 is confirmed CELL BY CELL on three independent channels -- a visual
+# read at 300 dpi, macOS Vision OCR at 600 dpi, and the reviewer -- across all
+# 42 numbers with no exceptions. The two channels that run automatically
+# agreed on 41; the 42nd (G exponent, rows 6/-V-120 and 6a/-V-120) was an OCR
+# merge that flagged itself at confidence 0.30, was escalated to a
+# high-resolution crop per extractions/README.md, and was later confirmed by
+# the reviewer independently. See the review log in
+# extractions/lau_1990_v_ribs.md.
+#
+# WHAT THESE FILES ARE. Not digitised points. Lau's Table 2 prints the
+# roughness functions as closed forms, `R(e+) = a(e+)^b` and
+# `G(e+, Pr) = a(e+)^b`, so the series below are that printed correlation
+# EVALUATED, with no digitisation error at all. `extraction: tabulated`,
+# `confidence: exact`. Only case 1a/-90 -- 90 deg full ribs, p/e = 10 -- is
+# committed here, because it is the only configuration `han_1988_orthogonal`
+# can be compared against.
+#
+# What that means for the score: this is correlation-against-correlation, not
+# correlation-against-data. Lau's coefficients are Lau's own fit to Lau's own
+# measurements, so his fit error is folded in. It is still the most
+# independent check available -- a different lab, rig and decade than the
+# textbook the implemented set came from.
+#
+# GEOMETRY. Square aluminium channel, 1.52 m long, 7.62 x 7.62 cm cross
+# section, so D = 0.0762 m and L/D = 19.9. Rib height 4.76 mm, giving
+# e/D = 0.0625. That ratio is exact by design rather than by rounding: the
+# channel is 3 inches and the ribs 3/16 inch, so e/D = (3/16)/3 = 1/16.
+# Two opposite walls ribbed, two smooth. Re_D 10 000 to 60 000. Measured over
+# x/D = 7.66 to 15.16, thermally fully developed. Properties at average bulk
+# temperature.
+#
+# STATED EXPERIMENTAL UNCERTAINTY (Kline and McClintock, the paper's ref [6]):
+# Reynolds number +/-2.9%, Stanton numbers +/-5.8%, friction factor +/-10.9%.
+# `uncertainty` below is the Stanton figure, because these series are heat
+# transfer quantities and it is a property of the MEASUREMENT, not of any
+# model -- see #389.
+#
+# DEFINITIONAL COMPARABILITY -- read before adding anything here.
+# Lau's Eqs. (5)-(8), p.4:
+#
+#   e+   = (e/D) Re_D [(2 fbar - f_ss)/2]^0.5
+#   R    = [(2 fbar - f_ss)/2]^-0.5      + 2.5 ln[2(e/D)] + 2.5
+#   G    = [(2 fbar - f_ss)/2]^0.5 / St_r   + 2.5 ln[2(e/D)] + 2.5
+#   Gbar = [(2 fbar - f_ss)/2]^0.5 / St_avg + 2.5 ln[2(e/D)] + 2.5
+#
+# Three things do NOT mean what the same names mean elsewhere in this dataset:
+#
+#  1. **Lau's `Gbar` is a FOUR-WALL AVERAGE** (uses St_avg over two ribbed and
+#     two smooth walls). Han's `G_bar` is the PRANDTL-NORMALISED roughness
+#     function `G Pr^-0.57` -- item 10 of han_ribbed.md resolved that and
+#     explicitly records it is "not a four-wall average". They are different
+#     quantities sharing a symbol, and their ratios to `G` sit only 2-3%
+#     apart (Lau 1.239-1.257, Han 1.2162), so scoring one against the other
+#     would read as a CONFIRMATION. `runner.py` multiplies any series tagged
+#     `y_axis: G_bar` by `G_BAR_OVER_G`, so mislabelling Lau's Gbar would
+#     apply Han's Prandtl factor silently. **Lau's Gbar is deliberately not
+#     committed.**
+#  2. **Lau's `fbar` is the channel average**, not the ribbed-wall friction.
+#     `(2 fbar - f_ss)/2` is how he extracts the ribbed-wall value.
+#     combaero's `RibResult.f` is already ribbed-wall.
+#  3. **`St_r` is on projected area**, "not including the increased rib
+#     surface area" (Lau's own words).
+#
+# The geometry group DOES match: combaero uses `(2 e/D)(2W/(W+H))`, which for
+# a square channel is exactly Lau's `2(e/D)`. So the R and G comparisons below
+# are like-for-like.
+
+paper:
+  name: lau1990
+  citation: >-
+    Lau, S.C., Kukreja, R.T. and McMillin, R.D. (1990). "Effects of V-shaped
+    rib arrays on turbulent heat transfer and friction of fully developed flow
+    in a square channel." Int. J. Heat Mass Transfer 34(7), 1605-1616.
+  secondary: false
+
+files:
+  - path: fig_table2_90deg_G.csv
+    after: null
+    page: 8
+    item: "Table 2, case 1a/-90"
+    series: "printed G(e+) = 4.218 (e+)^0.257, 90 deg full ribs, p/e = 10"
+    figure: "table2"
+    panel: single
+    geometry:
+      e_D: 0.0625
+      p_e: 10.0
+      W_H: 1.0
+      alpha_deg: 90.0
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: correlation
+    extraction: tabulated
+    confidence: exact
+    uncertainty: 0.058
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      x_ticks: [100, 200, 400, 640]
+      x_multiplier: 1.0
+      y_axis_type: log
+      y_ticks: [10, 15, 20, 25]
+      y_multiplier: 1.0
+      expected_points: 9
+      monotonic: increasing
+      printed_curve: null
+    cross_check: >-
+      Independent confirmation of han_1988_orthogonal's heat-transfer
+      roughness function by a different lab: Han's printed G = 3.7 (e+)^0.28
+      against Lau's 4.218 (e+)^0.257. Different coefficient AND exponent, yet
+      they agree to 0.1-2.4% over the whole overlapping e+ range because the
+      two forms cross near e+ = 300. Robust to the e/D used, since
+      han_1988_orthogonal carries no e/D exponent for G and the comparison is
+      made at matched e+ (spread under 0.9% across e/D = 0.047-0.078).
+
+  - path: fig_table2_90deg_R.csv
+    after: null
+    page: 8
+    item: "Table 2, case 1a/-90"
+    series: "printed R(e+) = 3.674 (e+)^-0.0033, 90 deg full ribs, p/e = 10"
+    figure: "table2"
+    panel: single
+    geometry:
+      e_D: 0.0625
+      p_e: 10.0
+      W_H: 1.0
+      alpha_deg: 90.0
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: R
+    kind: correlation
+    extraction: tabulated
+    confidence: exact
+    uncertainty: 0.109
+    # NOT scored. runner.py's e+ path resolves y_axis to G, G_bar or
+    # R_normalised; there is no absolute-R branch, and inventing one is a
+    # runner change rather than a data one. Committed so the measurement is
+    # not lost and the gap is visible. `uncertainty` is the friction figure
+    # (+/-10.9%), since R is built from the friction factor.
+    scores: null
+    verification:
+      x_axis_type: log
+      x_ticks: [100, 200, 400, 640]
+      x_multiplier: 1.0
+      y_axis_type: linear
+      y_ticks: [3.5, 3.6, 3.7]
+      y_multiplier: 1.0
+      expected_points: 9
+      monotonic: null
+      printed_curve: null
+    cross_check: >-
+      The disagreement worth explaining. Lau's R is 3.618 to 3.597 over the
+      range against han_1988_orthogonal's constant 3.200 -- +12.4% to +13.1%,
+      and not an artefact of geometry: han_1988_orthogonal carries no e/D
+      exponent for R, and at p/e = 10 its p/e term is exactly at reference.
+      Converted to friction via R = sqrt(2/f_r) + 2.5 ln(2 e/D) + 2.5, Han's
+      R = 3.2 implies f_r = 0.0575 and Lau's 3.6 implies 0.0504: two labs
+      about 12% apart in ribbed-wall friction factor for nominally the same
+      90 deg configuration. Definitional causes were checked and ruled out --
+      the geometry group matches for a square channel, and both R are built
+      on the ribbed-wall friction.

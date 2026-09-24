@@ -614,6 +614,27 @@ that reflection-fold is the bounded, convention-consistent choice and that
 leaving the raw polynomial unclamped is not dangerous (no negative or complex
 output) but is unbounded and physically unmotivated beyond the fitted range.
 
+**FALSIFIED BY DATA (2026-09-24, #385).** Reflection-folding is bounded and
+convention-consistent, and it is also **wrong as physics**. Lau, Kukreja and
+McMillin (1990) measured both sides of the fold -- V-45 and V-60 against their
+reversals V-135 and V-120 -- and they are not the same:
+
+| `e+` | `G(V-60)` | `G(V-120)` | | `G(V-45)` | `G(V-135)` | |
+|---|---|---|---|---|---|---|
+| 100 | 8.16 | 10.03 | **+22.9%** | 9.33 | 10.55 | **+13.1%** |
+| 400 | 14.19 | 16.34 | +15.2% | 15.26 | 17.43 | +14.2% |
+
+Higher `G` is lower heat transfer, so reversed arrays transfer less, and the
+paper's own conclusion 4 states it independently: "Reversing the 45 and 60
+V-shaped rib arrays lowers the heat transfer from the channel walls and
+increases the channel pressure drop."
+
+So a guard **must not** be written on the reflection-fold basis. The bounded
+behaviour it offers is real; the physical claim underneath it is not. If a
+guard is ever needed past 90 deg, it should refuse or extrapolate explicitly
+rather than pretend `alpha` and `180 - alpha` are equivalent. See
+`lau_1990_v_ribs.md`.
+
 ### Prandtl number
 
 Item 36 states `Pr = 0.7`, consistent with item 25. The narrow-channel
