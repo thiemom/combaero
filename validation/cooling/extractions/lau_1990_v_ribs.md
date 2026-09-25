@@ -79,7 +79,7 @@ committed metadata -- the distinction #389 exists to enforce.
 | 5 | `(2 fbar - f_ss)/2` | the ribbed-wall friction extracted from the channel average, because only two of four walls are ribbed. `fbar` alone is the channel average | confirmed |
 | 6 | `St_r` basis | ribbed-wall heat flux divided by the **projected** area, "not including the increased rib surface area" | confirmed |
 | 7 | Table 2 | seven cases, `R`/`G`/`G_bar,Lau` each as `a(e+)^b` -- reproduced below | **confirmed cell by cell on three independent channels, all 42 numbers.** Visual read at 300 dpi, macOS Vision OCR at 600 dpi, and the reviewer. The single OCR disagreement was escalated to a high-resolution crop, resolved, and subsequently confirmed independently |
-| 8 | **`Gbar` is a four-wall average** | uses `St_avg` over two ribbed and two smooth walls. Han's `G_bar` is the **Prandtl-normalised** `G Pr^-0.57`, which `han_ribbed.md` item 10 resolved and explicitly recorded as "not a four-wall average" | confirmed -- **a false-confirmation hazard, see below** |
+| 8 | **`Gbar` is a four-wall average** | uses `St_avg` over two ribbed and two smooth walls. **So is Han's `G_bar`** -- `han_ribbed.md` item 10's current resolution is `G_bar = 1.2 G`, printed on figure 4.47, with the Prandtl reading recorded there as withdrawn. An earlier version of this document quoted the withdrawn form and inverted the conclusion; see #392 and the section below | confirmed -- the two are the **same quantity**, and Lau's is committed |
 | 9 | geometry group | Lau's `2(e/D)`; combaero's `(2 e/D)(2W/(W+H))`. For a square channel `2W/(W+H) = 1`, so they coincide | confirmed by derivation |
 
 ### Table 2, as printed
@@ -96,34 +96,59 @@ committed metadata -- the distinction #389 exists to enforce.
 
 ---
 
-## The false-confirmation hazard: `Gbar`
+## `Gbar`: a hazard that turned out to be the opposite
 
-The most important thing in this document, because it fails *quietly and in
-the flattering direction*.
+This section previously argued that Lau's `Gbar` and Han's `G_bar` were
+different quantities sharing a symbol, and that committing Lau's would read
+as a false confirmation. **That was wrong, and the way it was wrong is worth
+keeping.**
 
-Lau's `Gbar` and Han's `G_bar` are different quantities sharing a symbol, and
-their ratios to `G` land 2-3% apart:
+It rested on `han_ribbed.md` item 10 in its **withdrawn** form -- the reading
+that Han's `G_bar` is the Prandtl-normalised `G Pr^-0.57` (factor 1.2162).
+Item 10 had already corrected itself three hundred lines further down: figure
+4.47 **prints** `G_bar = 1.2 G`, and it is a four-wall channel average, the
+same construction as Lau's. The superseded paragraph was the one that got
+quoted.
+
+### Confirmed from primary raw data
+
+NASA CR-3837's appendix prints `Nu(R)`, `Nu(S)` and `Nu(AV)` per run.
+`Nu(AV)` is the two-way mean of the ribbed and smooth walls to **0.084% over
+33 rows**, and in a 2-ribbed / 2-smooth square duct that is exactly the
+four-wall average. Reconstructing the report's printed `Gbar` column from
+`St(AV)` reproduces it to +/-0.02 on 29 of 33 rows. So Han's `G_bar` is a
+wall average on Han's own measurements, not on a figure label.
+
+### What Lau's `Gbar` is actually worth
+
+Han's `G_bar = 1.2 G` otherwise rests on a **single printed label**. Lau is
+an independent lab measuring the same quantity, so committing it checks a
+relationship nothing else in the dataset touches:
 
 | | Lau `Gbar/G` | Han `G_bar/G` |
 |---|---|---|
-| `e+` = 50 | 1.2572 | 1.2162 |
-| `e+` = 100 | 1.2511 | 1.2162 |
-| `e+` = 400 | 1.2390 | 1.2162 |
+| `e+` = 106 | 1.2506 | 1.2000 |
+| `e+` = 300 | 1.2410 | 1.2000 |
+| `e+` = 636 | 1.2350 | 1.2000 |
 
-Scoring one against the other returns a few percent and reads as an
-independent confirmation. Nothing in the schema objects: same symbol, same
-units, overlapping range, plausible number.
+Scored: **N=9, MAE 3.5%, RMSE 3.9%, bias -3.5%, 88.9% within** Lau's stated
++/-5.8% Stanton uncertainty. Han's factor sits consistently a few percent
+below Lau's -- a real, recorded gap between two labs' wall-averaging ratios,
+not agreement manufactured by a conversion.
 
-Worse, the mistake is **automated**: `runner.py` multiplies any series tagged
-`y_axis: G_bar` by `G_BAR_OVER_G`, Han's Prandtl factor. Mislabelling Lau's
-`Gbar` would silently apply a conversion that does not belong to it.
+### The structural tell is retired
 
-**So Lau's `Gbar` is deliberately not committed.**
+The old argument offered a generalisable signature: Lau's ratio drifts with
+`e+` (exponents 0.250 against 0.257) while Han's is constant (both 0.28), and
+claimed a Prandtl normalisation must be constant while a wall-averaging ratio
+need not be. The observation is correct and the inference is **falsified** --
+both are wall averages, and one of them is constant. Constancy does not
+identify the mechanism. Do not reuse this tell.
 
-A structural tell, free here and worth generalising (see #389): Lau's ratio
-**drifts with `e+`** (exponents 0.250 vs 0.257) while Han's is **constant**
-(both 0.28). A Prandtl normalisation is a constant factor; a wall-averaging
-ratio is not.
+What does survive is the lesson item 10 already drew: a numerical agreement
+at the few-percent level is not evidence of mechanism when the mechanism is
+printed two pages away. This document reproduced that error rather than
+learning from it, one section after citing it.
 
 ---
 

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Lau's `Gbar` committed as an independent check of Han's `G_bar = 1.2 G`**
+  (#392). The relationship previously rested on a single printed label on
+  figure 4.47. Lau's Eq. (8) measures the same quantity -- `St_avg` over two
+  ribbed and two smooth walls -- so it is a like-for-like comparison by
+  another lab: N=9, MAE 3.5%, RMSE 3.9%, bias -3.5%, 88.9% inside Lau's
+  stated +/-5.8% Stanton uncertainty. Han's factor sits a few percent below
+  Lau's, recorded rather than reconciled.
+
 - **Lau, Kukreja and McMillin (1990) as validation data** (#385), the first rib
   source outside Han and a primary paper rather than a textbook reprint. Its
   Table 2 prints the roughness functions as closed forms, so the 90 deg
@@ -64,6 +72,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   conversion.
 
 ### Fixed
+
+- **Lau metadata quoted a withdrawn resolution** (#392). `lau1990`'s
+  `metadata.yaml` and extraction doc stated that Han's `G_bar` is the
+  Prandtl-normalised `G Pr^-0.57` and "not a four-wall average", citing
+  `han_ribbed.md` item 10. That is item 10's **superseded** form; its current
+  resolution is `G_bar = 1.2 G`, a four-wall average, with the Prandtl
+  reading recorded there as withdrawn. The inverted claim was the stated
+  reason for withholding Lau's `Gbar` and for a test asserting it stay out of
+  the dataset.
+
+  Confirmed from primary raw data rather than re-reading the figure: NASA
+  CR-3837's appendix prints `Nu(R)`, `Nu(S)` and `Nu(AV)` per run, and
+  `Nu(AV)` is their two-way mean to 0.084% over 33 rows. No code defect --
+  `runner.py`'s `G_BAR_OVER_G = 1.2` was correct throughout. The test that
+  pinned the wrong conclusion is replaced by one pinning the guard that
+  actually matters: the `G_bar` path stays restricted to 90 deg ribs.
 
 - **`uncertainty` now means one thing across the cooling dataset** (#333).
   `han2012` and `florschuetz1981` declare it as the band model agreement is

@@ -48,15 +48,22 @@
 # Three things do NOT mean what the same names mean elsewhere in this dataset:
 #
 #  1. **Lau's `Gbar` is a FOUR-WALL AVERAGE** (uses St_avg over two ribbed and
-#     two smooth walls). Han's `G_bar` is the PRANDTL-NORMALISED roughness
-#     function `G Pr^-0.57` -- item 10 of han_ribbed.md resolved that and
-#     explicitly records it is "not a four-wall average". They are different
-#     quantities sharing a symbol, and their ratios to `G` sit only 2-3%
-#     apart (Lau 1.239-1.257, Han 1.2162), so scoring one against the other
-#     would read as a CONFIRMATION. `runner.py` multiplies any series tagged
-#     `y_axis: G_bar` by `G_BAR_OVER_G`, so mislabelling Lau's Gbar would
-#     apply Han's Prandtl factor silently. **Lau's Gbar is deliberately not
-#     committed.**
+#     two smooth walls) -- and so is Han's. An earlier version of this file
+#     said Han's `G_bar` is the Prandtl-normalised `G Pr^-0.57`; that quoted
+#     the WITHDRAWN form of han_ribbed.md item 10. The current resolution
+#     there (lines 333-365) is `G_bar = 1.2 G`, printed on figure 4.47, and
+#     it records the Prandtl reading as a coincidence that fitted the digits
+#     better and was still wrong. See #392.
+#     Confirmed from primary raw data: NASA CR-3837's appendix prints
+#     Nu(R), Nu(S) and Nu(AV) per run, and Nu(AV) is the two-way mean of the
+#     ribbed and smooth walls to 0.084% over 33 rows -- in a 2-ribbed /
+#     2-smooth square duct that IS the four-wall average, i.e. Lau's St_avg
+#     construction exactly. Reconstructing CR-3837's printed `Gbar` column
+#     from St(AV) reproduces it to +/-0.02 on 29 of 33 rows.
+#     So the two are the same quantity and the comparison is like-for-like.
+#     `runner.py` multiplies any series tagged `y_axis: G_bar` by
+#     `G_BAR_OVER_G = 1.2`, restricted to alpha = 90, which is the correct
+#     factor for this series rather than a category error.
 #  2. **Lau's `fbar` is the channel average**, not the ribbed-wall friction.
 #     `(2 fbar - f_ss)/2` is how he extracts the ribbed-wall value.
 #     combaero's `RibResult.f` is already ribbed-wall.
@@ -115,6 +122,52 @@ files:
       two forms cross near e+ = 300. Robust to the e/D used, since
       han_1988_orthogonal carries no e/D exponent for G and the comparison is
       made at matched e+ (spread under 0.9% across e/D = 0.047-0.078).
+
+  - path: fig_table2_90deg_Gbar.csv
+    after: null
+    page: 8
+    item: "Table 2, case 1a/-90"
+    series: "printed Gbar,Lau(e+) = 5.450 (e+)^0.250, 90 deg full ribs, p/e = 10"
+    figure: "table2"
+    panel: single
+    geometry:
+      e_D: 0.0625
+      p_e: 10.0
+      W_H: 1.0
+      alpha_deg: 90.0
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G_bar
+    kind: correlation
+    extraction: tabulated
+    confidence: exact
+    uncertainty: 0.058
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      x_ticks: [100, 200, 400, 640]
+      x_multiplier: 1.0
+      y_axis_type: log
+      y_ticks: [15, 20, 25, 30]
+      y_multiplier: 1.0
+      expected_points: 9
+      monotonic: increasing
+      printed_curve: null
+    cross_check: >-
+      An independent check of Han's `G_bar = 1.2 G`, which otherwise rests on
+      a single printed label on figure 4.47. Lau's Eq. (8) builds Gbar,Lau
+      from St_avg over two ribbed and two smooth walls; Han's Nu(AV) is the
+      two-way ribbed/smooth mean, verified to 0.084% over 33 rows of NASA
+      CR-3837's appendix, which in a 2-ribbed/2-smooth square duct is the
+      same four-wall average. So this is like-for-like, not the symbol clash
+      an earlier version of this file described -- see #392 and the comment
+      block above.
+      Lau's own ratio Gbar/G runs 1.235 to 1.251 across the range against
+      Han's constant 1.200. The drift is real and expected: Lau's exponents
+      differ (0.250 for Gbar against 0.257 for G) while Han's are equal, and
+      a wall-averaging ratio need not be constant where a Prandtl factor
+      would be.
 
   - path: fig_table2_90deg_R.csv
     after: null

@@ -12,7 +12,7 @@ import math
 
 import pytest
 
-from validation.cooling import jet_array_runner, orifice_runner
+from validation.cooling import jet_array_runner, orifice_runner, runner
 from validation.cooling.schema import load_dataset
 from validation.cooling.scorecard import build, rollup, run_dataset
 
@@ -163,18 +163,53 @@ def test_lau_R_is_committed_but_not_scored(cells) -> None:
     assert math.isnan(c.rmse)
 
 
-def test_lau_Gbar_is_not_in_the_dataset(dataset) -> None:
-    """Lau's Gbar is a FOUR-WALL AVERAGE; Han's G_bar is the PRANDTL-NORMALISED
-    roughness function (han_ribbed.md item 10, "not a four-wall average").
-    Their ratios to G differ by only 2-3%, so scoring one against the other
-    reads as a confirmation -- and runner.py would silently apply Han's
-    G_BAR_OVER_G factor to anything tagged y_axis: G_bar.
+def test_lau_Gbar_independently_confirms_hans_1p2_factor(cells) -> None:
+    """Han's `G_bar = 1.2 G` rests on a single printed label on figure 4.47.
+    Lau's Eq. (8) Gbar is the same construction -- St_avg over two ribbed and
+    two smooth walls -- so it is a like-for-like check by another lab.
 
-    This asserts the trap stays shut.
+    That Han's Nu(AV) really is that average is verified, not assumed: NASA
+    CR-3837's appendix prints Nu(R), Nu(S) and Nu(AV) per run, and Nu(AV) is
+    their two-way mean to 0.084% over 33 rows.
+
+    An earlier version of this test asserted the opposite -- that tagging
+    Lau's Gbar would apply a "Prandtl factor" -- by quoting the WITHDRAWN
+    form of han_ribbed.md item 10. See #392.
     """
-    for s in dataset:
-        if s.source.name == "lau1990":
-            assert s.y_axis != "G_bar", (
-                f"{s.label} is tagged G_bar; Lau's Gbar is a four-wall average "
-                "and would be multiplied by Han's Prandtl factor"
+    c = next(c for c in cells if c.label == "lau1990/fig_table2_90deg_Gbar")
+    assert c.n == 9
+    assert c.n_scored == 9
+    # Two labs' wall-averaging ratios differ by 3-4% (Lau 1.235-1.251 against
+    # Han's constant 1.200), so this confirms the relationship without
+    # reproducing it exactly. Pinned as a band, not a point.
+    assert 0.02 < c.rmse < 0.06, f"RMSE {c.rmse:.3f} outside the recorded band"
+    assert c.bias < 0.0, "Han's 1.2 should sit below Lau's ratio, not above"
+    assert c.within >= 0.85
+
+
+def test_gbar_path_stays_restricted_to_90_deg(dataset, cells) -> None:
+    """The real guard on the G_bar path is the rib angle, not the source.
+    G_BAR_OVER_G = 1.2 was established at 90 deg; applying it to an angled
+    rib is wrong by about 4.5%, larger than the measurement scatter, so
+    runner.py refuses off-90 series rather than scaling them.
+
+    This pins the refusal behaviourally: an off-90 G_bar series may carry a
+    `scores:` target, but it must come back unscored.
+    """
+    by_label = {c.label: c for c in cells}
+    seen_on, seen_off = False, False
+    for series in dataset:
+        if series.y_axis != "G_bar" or series.scores is None:
+            continue
+        cell = by_label.get(series.label)
+        if cell is None:
+            continue
+        if series.alpha_deg == runner.G_BAR_VALID_ALPHA:
+            seen_on = True
+        else:
+            seen_off = True
+            assert cell.n_scored == 0, (
+                f"{series.label} at alpha={series.alpha_deg} was scored "
+                "through the G_bar path; G_BAR_OVER_G only holds at 90 deg"
             )
+    assert seen_on and seen_off, "fixture no longer covers both sides of the guard"
