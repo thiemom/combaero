@@ -17,9 +17,24 @@ Metrics per series:
     within        fraction inside the source's stated uncertainty
     extrap        points outside the set's advisory validity
 
+    sampling      how completely the marks could be picked
+    bnd           runs recovered as interval observations
+    held          fraction of those the prediction lands inside
+
 A series the set has no binding for reports '-' rather than 0. A zero
 there would read as a perfect score for a model that answered nothing,
 which is the shape of mistake this harness exists to catch.
+
+**Rows are segregated by sampling completeness and never pooled across
+it.** A figure that overplots several symbol classes yields only its
+spatially isolated marks to a digitisation, and those are the ones
+furthest from the cluster centre -- so a `partial` row's MAE/RMSE/within
+are an UPPER BOUND on the model's error, not an estimate of it. The
+difference is not academic: pooled, `han_1988_orthogonal` reported 73.0%
+within against Han's own printed claim of 95%, which reads as a model
+deficiency. Segregated, its completely-sampled series reach 91.1% and
+its partially-sampled ones 65.3%. The gap was the pick, not the
+correlation. See #393 and `recovery.py`.
 """
 
 from __future__ import annotations
@@ -29,6 +44,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 from validation.cooling.runner import Record
+from validation.cooling.schema import Point, load_points
 
 
 @dataclass
@@ -44,6 +60,14 @@ class Cell:
     within: float = float("nan")
     n_extrapolated: int = 0
     reason: str | None = None  # why nothing was scored
+    # Sampling completeness -- see `sampling_of`. "partial" means the
+    # digitisation could not pick every mark, so MAE/RMSE/within are an
+    # UPPER BOUND on the model's error rather than an estimate of it: the
+    # marks that could be picked are the ones furthest from the cluster
+    # centre (#393).
+    sampling: str = "unknown"
+    n_bounded: int = 0  # runs recovered as interval observations
+    held: float = float("nan")  # fraction of those the prediction lands inside
 
     @property
     def unsupported(self) -> bool:
@@ -81,7 +105,83 @@ def run_dataset(dataset) -> list[Record]:
     return out
 
 
-def build(records: list[Record]) -> list[Cell]:
+def sampling_of(series, dataset) -> str:
+    """How completely this series' marks could be picked.
+
+    "complete"  a table, a drawn curve, or a panel it does not share --
+                nothing could have occluded a mark.
+    "partial"   MEASURED shortfall: the figure's other panel proves runs
+                exist that this panel has no mark for.
+    "unknown"   shares a panel with other classes, but nothing independent
+                says how many runs it should have.
+
+    Derived, never declared, so it cannot go stale against the data.
+    """
+    from validation.cooling.recovery import PAIR_TOL, _partner
+
+    if series.extraction == "tabulated" or series.kind in ("correlation", "frame"):
+        return "complete"
+    partner = _partner(series, dataset)
+    if partner is not None:
+        mine = [p.x for p in load_points(series)]
+        missing = sum(
+            1
+            for q in load_points(partner)
+            if not any(abs(q.x / x - 1.0) <= PAIR_TOL for x in mine)
+        )
+        return "partial" if missing else "complete"
+    shares = sum(
+        1
+        for other in dataset
+        if other.kind == "measured"
+        and other.source.name == series.source.name
+        and other.figure == series.figure
+        and other.panel == series.panel
+        and other.path != series.path
+    )
+    return "unknown" if shares else "complete"
+
+
+def score_recovered(series, dataset) -> tuple[int, float]:
+    """Check the set against runs the digitisation could not pick.
+
+    Returns (count, fraction the prediction lands inside the bound).
+
+    Deliberately NOT folded into MAE/RMSE. A point observation gives a
+    signed error; an interval gives containment. Averaging the two into
+    one number would be a category error, and would let a loose bound
+    flatter a set that a tight point disagrees with.
+
+    Read `held` with the envelope in mind: it is the spread of OTHER
+    classes near that abscissa, so it measures whether the prediction
+    lands in the local cloud -- not whether it matches this class.
+    """
+    from validation.cooling.recovery import recover
+    from validation.cooling.runner import run_series
+
+    bounds = recover(series, dataset)
+    if not bounds:
+        return 0, float("nan")
+    probes = [Point(x=b.x, y=(b.lo + b.hi) / 2.0) for b in bounds]
+    records = run_series(series, probes)
+    checked = [
+        (b, r.predicted)
+        for b, r in zip(bounds, records, strict=True)
+        if r.predicted is not None
+    ]
+    if not checked:
+        return 0, float("nan")
+    inside = sum(1 for b, pred in checked if b.contains(pred))
+    return len(checked), inside / len(checked)
+
+
+def build(records: list[Record], dataset=None) -> list[Cell]:
+    """One row per series.
+
+    Pass `dataset` to fill in sampling completeness and the recovered
+    interval observations. Without it those columns stay 'unknown' and
+    empty -- the metrics are unchanged either way.
+    """
     grouped: dict[str, list[Record]] = defaultdict(list)
     for r in records:
         # A runner may split one series into reported groups -- Rohde's are
@@ -106,6 +206,9 @@ def build(records: list[Record]) -> list[Cell]:
                 (r.reason for r in rs if getattr(r, "reason", None)), None
             ),
         )
+        if dataset is not None:
+            cell.sampling = sampling_of(series, dataset)
+            cell.n_bounded, cell.held = score_recovered(series, dataset)
         if errs:
             cell.mae = sum(abs(e) for e in errs) / len(errs)
             cell.rmse = math.sqrt(sum(e * e for e in errs) / len(errs))
@@ -159,25 +262,37 @@ def rollup(cells: list[Cell]) -> list[Cell]:
     Unscored series contribute their point count but no error, so a set that
     answered nothing cannot look perfect.
     """
-    buckets: dict[tuple[str, str], list[Cell]] = defaultdict(list)
+    buckets: dict[tuple[str, str, str], list[Cell]] = defaultdict(list)
     for c in cells:
         if c.scored_by is None:
             continue
         group = c.label.split("  [")[1].rstrip("]") if "  [" in c.label else ""
-        buckets[(c.scored_by, group)].append(c)
+        # Segregated by sampling completeness as well as by set and group.
+        # A tabulated series and an overplotted one do not measure the same
+        # thing: the first gives the model's error, the second an upper
+        # bound on it, because only the marks furthest from the cluster
+        # centre could be picked. Averaging them produces a number that is
+        # neither (#393).
+        buckets[(c.scored_by, group, c.sampling)].append(c)
 
     out: list[Cell] = []
-    for (set_name, group), cs in sorted(buckets.items()):
+    for (set_name, group, sampling), cs in sorted(buckets.items()):
         n = sum(c.n for c in cs)
         n_scored = sum(c.n_scored for c in cs)
+        tag = "" if sampling == "complete" else f"  <{sampling}>"
         agg = Cell(
-            label=set_name + (f"  [{group}]" if group else ""),
+            label=set_name + (f"  [{group}]" if group else "") + tag,
             kind=f"{len(cs)} series",
             scored_by=set_name,
             n=n,
             n_scored=n_scored,
             n_extrapolated=sum(c.n_extrapolated for c in cs),
+            sampling=sampling,
+            n_bounded=sum(c.n_bounded for c in cs),
         )
+        held = [(c.held, c.n_bounded) for c in cs if c.n_bounded]
+        if held:
+            agg.held = sum(h * k for h, k in held) / sum(k for _, k in held)
         if n_scored:
             # Weight each series by the points it actually scored, so a
             # nine-point series does not count the same as a one-point one.
@@ -198,14 +313,16 @@ def render(cells: list[Cell], pools: dict | None = None) -> str:
     pools = pools or {}
     head = (
         f"{'series':<44} {'kind':<12} {'N':>3} {'scored':>6} "
-        f"{'MAE':>7} {'RMSE':>7} {'bias':>7} {'within':>7} {'extrap':>6}"
+        f"{'MAE':>7} {'RMSE':>7} {'bias':>7} {'within':>7} {'extrap':>6} "
+        f"{'sampling':<9} {'bnd':>3} {'held':>7}"
     )
     lines = [head, "-" * len(head)]
     for c in cells:
         lines.append(
             f"{c.label:<44} {c.kind:<12} {c.n:>3} {c.n_scored:>6} "
             f"{_pct(c.mae)} {_pct(c.rmse)} {_pct(c.bias)} {_pct(c.within)} "
-            f"{c.n_extrapolated:>6}"
+            f"{c.n_extrapolated:>6} {c.sampling:<9} "
+            f"{c.n_bounded if c.n_bounded else '':>3} {_pct(c.held)}"
         )
     summary = rollup(cells)
     if summary:
@@ -216,7 +333,22 @@ def render(cells: list[Cell], pools: dict | None = None) -> str:
             lines.append(
                 f"{c.label:<44} {c.kind:<12} {c.n:>3} {c.n_scored:>6} "
                 f"{_pct(c.mae)} {_pct(c.rmse)} {_pct(c.bias)} {_pct(c.within)} "
-                f"{c.n_extrapolated:>6}"
+                f"{c.n_extrapolated:>6} {c.sampling:<9} "
+                f"{c.n_bounded if c.n_bounded else '':>3} {_pct(c.held)}"
+            )
+        if any(c.sampling == "partial" for c in summary):
+            lines.append("")
+            lines.append(
+                "  <partial>: only the marks a digitisation could separate are in "
+                "these rows, and those are the ones"
+            )
+            lines.append(
+                "  furthest from the cluster centre, so MAE/RMSE/within are an "
+                "UPPER BOUND on the error, not an estimate."
+            )
+            lines.append(
+                "  <unknown>: shares a panel with other classes, with nothing "
+                "independent to say how many runs it should have."
             )
     unsupported = [c for c in cells if c.unsupported]
     if pools:
@@ -244,7 +376,7 @@ def main() -> None:
         "han2012/fig4.46_R_*  (lower panel)": pool(records, "han2012/fig4.46_R_eD"),
         "han2012/fig4.46_G_*  (upper panel)": pool(records, "han2012/fig4.46_G_eD"),
     }
-    print(render(build(records), pools))
+    print(render(build(records, dataset), pools))
 
 
 if __name__ == "__main__":
