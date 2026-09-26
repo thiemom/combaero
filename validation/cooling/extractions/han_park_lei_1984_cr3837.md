@@ -95,10 +95,21 @@ Out-of-sample against Eq. 4.17/4.18, scored through the harness:
 | 45 | 11.6% | -10.1% | 14.3% |
 | 30 | 19.9% | -19.9% | 0.0% |
 
-**`R` (Eq. 4.17) is confirmed**: offline, bias -2.2% and MAE 6.8% over the
-angled sets, inside the source's own 6.6% friction uncertainty. Committed
-unscored because `runner.py`'s `e+` path has no absolute-`R` branch -- the
-same gap that leaves `lau1990`'s `R` unscored.
+**`R` (Eq. 4.17) is confirmed, and now scored through the harness** since
+the absolute-`R` branch landed (#339 plan 1a):
+
+| alpha | `R` MAE | `R` bias | within 6.6% |
+|---|---|---|---|
+| 90 | 3.9% | -2.3% | **100%** |
+| 75 | 7.6% | -3.1% | 83.3% |
+| 60 | 6.1% | +6.1% | 83.3% |
+| 45 | 1.9% | +1.7% | 85.7% |
+| 30 | 13.7% | +10.4% | 57.1% |
+
+Four of five angles sit inside the source's own 6.6% friction uncertainty
+for most of their points. Only 30 deg is poor, which is also where Eq. 4.18
+reads furthest low -- worth noting that the shallowest angle is the weakest
+for both quantities, and not explained here.
 
 **`G` (Eq. 4.18) reads systematically low**, and the bias is negative at
 every angle. That bears on **item 23** of `han_ribbed.md`, an unresolved

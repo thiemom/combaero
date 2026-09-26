@@ -189,12 +189,12 @@ files:
     extraction: tabulated
     confidence: exact
     uncertainty: 0.109
-    # NOT scored. runner.py's e+ path resolves y_axis to G, G_bar or
-    # R_normalised; there is no absolute-R branch, and inventing one is a
-    # runner change rather than a data one. Committed so the measurement is
-    # not lost and the gap is visible. `uncertainty` is the friction figure
-    # (+/-10.9%), since R is built from the friction factor.
-    scores: null
+    # Scored since the absolute-R branch landed (#339 plan item 1a). This
+    # series was committed `scores: null` ONLY because runner.py's e+ path
+    # had no branch for raw R -- the measurement was never in doubt.
+    # `uncertainty` is the friction figure (+/-10.9%), since R is built from
+    # the friction factor.
+    scores: han_1988_orthogonal
     verification:
       x_axis_type: log
       x_ticks: [100, 200, 400, 640]
