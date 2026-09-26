@@ -492,10 +492,29 @@ files:
     class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
-      Class attribution is PROVISIONAL (overlapping symbols). What is
-      checkable: every mark lies on the lower panel, and the class's e+
-      span agrees with what Re 10,000-60,000 and e/D 0.047 predict through the
-      friction chain. Scoring uses the pooled cloud, not this label.
+      Class attribution is PROVISIONAL (overlapping symbols).
+
+      SOUND: every mark lies on the lower panel.
+
+      WEAK, and recorded as such: the class's e+ span sits inside what
+      Re 10,000-60,000 and e/D 0.047 predict through the friction chain. This is
+      ONE-SIDED. Only spatially isolated marks can be picked, so the
+      picked span is always a subset of the true span and fitting inside
+      the band is close to vacuous -- across the 20 measured fig4.46
+      series the picked marks cover on average 79% of the predicted
+      range. EXCEEDING the band is the informative direction, and 4 of
+      those 20 do (G_eD0.063_pe10_wh1, R_eD0.042_pe10_wh1,
+      R_eD0.063_pe10_wh1, R_eD0.063_pe20_wh1). The band is itself
+      uncertain: f comes from the printed R = 3.2, worth about +/-3% on
+      e+, and CR-3837 records Re 7,000-90,000 for the e/D 0.063 rig where
+      this figure's legend prints 8,000-80,000.
+
+      NOT EVIDENCE: absence of a mark, of a cross-panel partner, or of a
+      neighbour. The visible marks are a biased subset, so absence is
+      uninformative -- this is what put the W/H 2 class under dispute on
+      a false premise until CR-4015's runs settled it. See #393.
+
+      Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log
@@ -527,10 +546,29 @@ files:
     class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
-      Class attribution is PROVISIONAL (overlapping symbols). What is
-      checkable: every mark lies on the lower panel, and the class's e+
-      span agrees with what Re 10,000-60,000 and e/D 0.047 predict through the
-      friction chain. Scoring uses the pooled cloud, not this label.
+      Class attribution is PROVISIONAL (overlapping symbols).
+
+      SOUND: every mark lies on the lower panel.
+
+      WEAK, and recorded as such: the class's e+ span sits inside what
+      Re 10,000-60,000 and e/D 0.047 predict through the friction chain. This is
+      ONE-SIDED. Only spatially isolated marks can be picked, so the
+      picked span is always a subset of the true span and fitting inside
+      the band is close to vacuous -- across the 20 measured fig4.46
+      series the picked marks cover on average 79% of the predicted
+      range. EXCEEDING the band is the informative direction, and 4 of
+      those 20 do (G_eD0.063_pe10_wh1, R_eD0.042_pe10_wh1,
+      R_eD0.063_pe10_wh1, R_eD0.063_pe20_wh1). The band is itself
+      uncertain: f comes from the printed R = 3.2, worth about +/-3% on
+      e+, and CR-3837 records Re 7,000-90,000 for the e/D 0.063 rig where
+      this figure's legend prints 8,000-80,000.
+
+      NOT EVIDENCE: absence of a mark, of a cross-panel partner, or of a
+      neighbour. The visible marks are a biased subset, so absence is
+      uninformative -- this is what put the W/H 2 class under dispute on
+      a false premise until CR-4015's runs settled it. See #393.
+
+      Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log
@@ -604,10 +642,29 @@ files:
     class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
-      Class attribution is PROVISIONAL (overlapping symbols). What is
-      checkable: every mark lies on the lower panel, and the class's e+
-      span agrees with what Re 10,000-60,000 and e/D 0.047 predict through the
-      friction chain. Scoring uses the pooled cloud, not this label.
+      Class attribution is PROVISIONAL (overlapping symbols).
+
+      SOUND: every mark lies on the lower panel.
+
+      WEAK, and recorded as such: the class's e+ span sits inside what
+      Re 10,000-60,000 and e/D 0.047 predict through the friction chain. This is
+      ONE-SIDED. Only spatially isolated marks can be picked, so the
+      picked span is always a subset of the true span and fitting inside
+      the band is close to vacuous -- across the 20 measured fig4.46
+      series the picked marks cover on average 79% of the predicted
+      range. EXCEEDING the band is the informative direction, and 4 of
+      those 20 do (G_eD0.063_pe10_wh1, R_eD0.042_pe10_wh1,
+      R_eD0.063_pe10_wh1, R_eD0.063_pe20_wh1). The band is itself
+      uncertain: f comes from the printed R = 3.2, worth about +/-3% on
+      e+, and CR-3837 records Re 7,000-90,000 for the e/D 0.063 rig where
+      this figure's legend prints 8,000-80,000.
+
+      NOT EVIDENCE: absence of a mark, of a cross-panel partner, or of a
+      neighbour. The visible marks are a biased subset, so absence is
+      uninformative -- this is what put the W/H 2 class under dispute on
+      a false premise until CR-4015's runs settled it. See #393.
+
+      Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log
@@ -640,10 +697,29 @@ files:
     class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
-      Class attribution is PROVISIONAL (overlapping symbols). What is
-      checkable: every mark lies on the lower panel, and the class's e+
-      span agrees with what Re 10,000-60,000 and e/D 0.078 predict through the
-      friction chain. Scoring uses the pooled cloud, not this label.
+      Class attribution is PROVISIONAL (overlapping symbols).
+
+      SOUND: every mark lies on the lower panel.
+
+      WEAK, and recorded as such: the class's e+ span sits inside what
+      Re 10,000-60,000 and e/D 0.078 predict through the friction chain. This is
+      ONE-SIDED. Only spatially isolated marks can be picked, so the
+      picked span is always a subset of the true span and fitting inside
+      the band is close to vacuous -- across the 20 measured fig4.46
+      series the picked marks cover on average 79% of the predicted
+      range. EXCEEDING the band is the informative direction, and 4 of
+      those 20 do (G_eD0.063_pe10_wh1, R_eD0.042_pe10_wh1,
+      R_eD0.063_pe10_wh1, R_eD0.063_pe20_wh1). The band is itself
+      uncertain: f comes from the printed R = 3.2, worth about +/-3% on
+      e+, and CR-3837 records Re 7,000-90,000 for the e/D 0.063 rig where
+      this figure's legend prints 8,000-80,000.
+
+      NOT EVIDENCE: absence of a mark, of a cross-panel partner, or of a
+      neighbour. The visible marks are a biased subset, so absence is
+      uninformative -- this is what put the W/H 2 class under dispute on
+      a false premise until CR-4015's runs settled it. See #393.
+
+      Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log
@@ -675,10 +751,29 @@ files:
     class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
-      Class attribution is PROVISIONAL (overlapping symbols). What is
-      checkable: every mark lies on the lower panel, and the class's e+
-      span agrees with what Re 10,000-60,000 and e/D 0.078 predict through the
-      friction chain. Scoring uses the pooled cloud, not this label.
+      Class attribution is PROVISIONAL (overlapping symbols).
+
+      SOUND: every mark lies on the lower panel.
+
+      WEAK, and recorded as such: the class's e+ span sits inside what
+      Re 10,000-60,000 and e/D 0.078 predict through the friction chain. This is
+      ONE-SIDED. Only spatially isolated marks can be picked, so the
+      picked span is always a subset of the true span and fitting inside
+      the band is close to vacuous -- across the 20 measured fig4.46
+      series the picked marks cover on average 79% of the predicted
+      range. EXCEEDING the band is the informative direction, and 4 of
+      those 20 do (G_eD0.063_pe10_wh1, R_eD0.042_pe10_wh1,
+      R_eD0.063_pe10_wh1, R_eD0.063_pe20_wh1). The band is itself
+      uncertain: f comes from the printed R = 3.2, worth about +/-3% on
+      e+, and CR-3837 records Re 7,000-90,000 for the e/D 0.063 rig where
+      this figure's legend prints 8,000-80,000.
+
+      NOT EVIDENCE: absence of a mark, of a cross-panel partner, or of a
+      neighbour. The visible marks are a biased subset, so absence is
+      uninformative -- this is what put the W/H 2 class under dispute on
+      a false premise until CR-4015's runs settled it. See #393.
+
+      Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log
@@ -710,10 +805,29 @@ files:
     class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
-      Class attribution is PROVISIONAL (overlapping symbols). What is
-      checkable: every mark lies on the lower panel, and the class's e+
-      span agrees with what Re 8,000-80,000 and e/D 0.063 predict through the
-      friction chain. Scoring uses the pooled cloud, not this label.
+      Class attribution is PROVISIONAL (overlapping symbols).
+
+      SOUND: every mark lies on the lower panel.
+
+      WEAK, and recorded as such: the class's e+ span sits inside what
+      Re 8,000-80,000 and e/D 0.063 predict through the friction chain. This is
+      ONE-SIDED. Only spatially isolated marks can be picked, so the
+      picked span is always a subset of the true span and fitting inside
+      the band is close to vacuous -- across the 20 measured fig4.46
+      series the picked marks cover on average 79% of the predicted
+      range. EXCEEDING the band is the informative direction, and 4 of
+      those 20 do (G_eD0.063_pe10_wh1, R_eD0.042_pe10_wh1,
+      R_eD0.063_pe10_wh1, R_eD0.063_pe20_wh1). The band is itself
+      uncertain: f comes from the printed R = 3.2, worth about +/-3% on
+      e+, and CR-3837 records Re 7,000-90,000 for the e/D 0.063 rig where
+      this figure's legend prints 8,000-80,000.
+
+      NOT EVIDENCE: absence of a mark, of a cross-panel partner, or of a
+      neighbour. The visible marks are a biased subset, so absence is
+      uninformative -- this is what put the W/H 2 class under dispute on
+      a false premise until CR-4015's runs settled it. See #393.
+
+      Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log
@@ -745,10 +859,29 @@ files:
     class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
-      Class attribution is PROVISIONAL (overlapping symbols). What is
-      checkable: every mark lies on the lower panel, and the class's e+
-      span agrees with what Re 8,000-80,000 and e/D 0.063 predict through the
-      friction chain. Scoring uses the pooled cloud, not this label.
+      Class attribution is PROVISIONAL (overlapping symbols).
+
+      SOUND: every mark lies on the lower panel.
+
+      WEAK, and recorded as such: the class's e+ span sits inside what
+      Re 8,000-80,000 and e/D 0.063 predict through the friction chain. This is
+      ONE-SIDED. Only spatially isolated marks can be picked, so the
+      picked span is always a subset of the true span and fitting inside
+      the band is close to vacuous -- across the 20 measured fig4.46
+      series the picked marks cover on average 79% of the predicted
+      range. EXCEEDING the band is the informative direction, and 4 of
+      those 20 do (G_eD0.063_pe10_wh1, R_eD0.042_pe10_wh1,
+      R_eD0.063_pe10_wh1, R_eD0.063_pe20_wh1). The band is itself
+      uncertain: f comes from the printed R = 3.2, worth about +/-3% on
+      e+, and CR-3837 records Re 7,000-90,000 for the e/D 0.063 rig where
+      this figure's legend prints 8,000-80,000.
+
+      NOT EVIDENCE: absence of a mark, of a cross-panel partner, or of a
+      neighbour. The visible marks are a biased subset, so absence is
+      uninformative -- this is what put the W/H 2 class under dispute on
+      a false premise until CR-4015's runs settled it. See #393.
+
+      Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log
@@ -780,10 +913,29 @@ files:
     class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
-      Class attribution is PROVISIONAL (overlapping symbols). What is
-      checkable: every mark lies on the lower panel, and the class's e+
-      span agrees with what Re 8,000-80,000 and e/D 0.042 predict through the
-      friction chain. Scoring uses the pooled cloud, not this label.
+      Class attribution is PROVISIONAL (overlapping symbols).
+
+      SOUND: every mark lies on the lower panel.
+
+      WEAK, and recorded as such: the class's e+ span sits inside what
+      Re 8,000-80,000 and e/D 0.042 predict through the friction chain. This is
+      ONE-SIDED. Only spatially isolated marks can be picked, so the
+      picked span is always a subset of the true span and fitting inside
+      the band is close to vacuous -- across the 20 measured fig4.46
+      series the picked marks cover on average 79% of the predicted
+      range. EXCEEDING the band is the informative direction, and 4 of
+      those 20 do (G_eD0.063_pe10_wh1, R_eD0.042_pe10_wh1,
+      R_eD0.063_pe10_wh1, R_eD0.063_pe20_wh1). The band is itself
+      uncertain: f comes from the printed R = 3.2, worth about +/-3% on
+      e+, and CR-3837 records Re 7,000-90,000 for the e/D 0.063 rig where
+      this figure's legend prints 8,000-80,000.
+
+      NOT EVIDENCE: absence of a mark, of a cross-panel partner, or of a
+      neighbour. The visible marks are a biased subset, so absence is
+      uninformative -- this is what put the W/H 2 class under dispute on
+      a false premise until CR-4015's runs settled it. See #393.
+
+      Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log
@@ -815,10 +967,29 @@ files:
     class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
-      Class attribution is PROVISIONAL (overlapping symbols). What is
-      checkable: every mark lies on the lower panel, and the class's e+
-      span agrees with what Re 8,000-80,000 and e/D 0.021 predict through the
-      friction chain. Scoring uses the pooled cloud, not this label.
+      Class attribution is PROVISIONAL (overlapping symbols).
+
+      SOUND: every mark lies on the lower panel.
+
+      WEAK, and recorded as such: the class's e+ span sits inside what
+      Re 8,000-80,000 and e/D 0.021 predict through the friction chain. This is
+      ONE-SIDED. Only spatially isolated marks can be picked, so the
+      picked span is always a subset of the true span and fitting inside
+      the band is close to vacuous -- across the 20 measured fig4.46
+      series the picked marks cover on average 79% of the predicted
+      range. EXCEEDING the band is the informative direction, and 4 of
+      those 20 do (G_eD0.063_pe10_wh1, R_eD0.042_pe10_wh1,
+      R_eD0.063_pe10_wh1, R_eD0.063_pe20_wh1). The band is itself
+      uncertain: f comes from the printed R = 3.2, worth about +/-3% on
+      e+, and CR-3837 records Re 7,000-90,000 for the e/D 0.063 rig where
+      this figure's legend prints 8,000-80,000.
+
+      NOT EVIDENCE: absence of a mark, of a cross-panel partner, or of a
+      neighbour. The visible marks are a biased subset, so absence is
+      uninformative -- this is what put the W/H 2 class under dispute on
+      a false premise until CR-4015's runs settled it. See #393.
+
+      Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log
@@ -850,10 +1021,29 @@ files:
     class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
-      Class attribution is PROVISIONAL (overlapping symbols). What is
-      checkable: every mark lies on the upper panel, and the class's e+
-      span agrees with what Re 10,000-60,000 and e/D 0.047 predict through the
-      friction chain. Scoring uses the pooled cloud, not this label.
+      Class attribution is PROVISIONAL (overlapping symbols).
+
+      SOUND: every mark lies on the upper panel.
+
+      WEAK, and recorded as such: the class's e+ span sits inside what
+      Re 10,000-60,000 and e/D 0.047 predict through the friction chain. This is
+      ONE-SIDED. Only spatially isolated marks can be picked, so the
+      picked span is always a subset of the true span and fitting inside
+      the band is close to vacuous -- across the 20 measured fig4.46
+      series the picked marks cover on average 79% of the predicted
+      range. EXCEEDING the band is the informative direction, and 4 of
+      those 20 do (G_eD0.063_pe10_wh1, R_eD0.042_pe10_wh1,
+      R_eD0.063_pe10_wh1, R_eD0.063_pe20_wh1). The band is itself
+      uncertain: f comes from the printed R = 3.2, worth about +/-3% on
+      e+, and CR-3837 records Re 7,000-90,000 for the e/D 0.063 rig where
+      this figure's legend prints 8,000-80,000.
+
+      NOT EVIDENCE: absence of a mark, of a cross-panel partner, or of a
+      neighbour. The visible marks are a biased subset, so absence is
+      uninformative -- this is what put the W/H 2 class under dispute on
+      a false premise until CR-4015's runs settled it. See #393.
+
+      Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log
@@ -885,10 +1075,29 @@ files:
     class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
-      Class attribution is PROVISIONAL (overlapping symbols). What is
-      checkable: every mark lies on the upper panel, and the class's e+
-      span agrees with what Re 10,000-60,000 and e/D 0.047 predict through the
-      friction chain. Scoring uses the pooled cloud, not this label.
+      Class attribution is PROVISIONAL (overlapping symbols).
+
+      SOUND: every mark lies on the upper panel.
+
+      WEAK, and recorded as such: the class's e+ span sits inside what
+      Re 10,000-60,000 and e/D 0.047 predict through the friction chain. This is
+      ONE-SIDED. Only spatially isolated marks can be picked, so the
+      picked span is always a subset of the true span and fitting inside
+      the band is close to vacuous -- across the 20 measured fig4.46
+      series the picked marks cover on average 79% of the predicted
+      range. EXCEEDING the band is the informative direction, and 4 of
+      those 20 do (G_eD0.063_pe10_wh1, R_eD0.042_pe10_wh1,
+      R_eD0.063_pe10_wh1, R_eD0.063_pe20_wh1). The band is itself
+      uncertain: f comes from the printed R = 3.2, worth about +/-3% on
+      e+, and CR-3837 records Re 7,000-90,000 for the e/D 0.063 rig where
+      this figure's legend prints 8,000-80,000.
+
+      NOT EVIDENCE: absence of a mark, of a cross-panel partner, or of a
+      neighbour. The visible marks are a biased subset, so absence is
+      uninformative -- this is what put the W/H 2 class under dispute on
+      a false premise until CR-4015's runs settled it. See #393.
+
+      Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log
@@ -991,10 +1200,29 @@ files:
     class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
-      Class attribution is PROVISIONAL (overlapping symbols). What is
-      checkable: every mark lies on the upper panel, and the class's e+
-      span agrees with what Re 10,000-60,000 and e/D 0.047 predict through the
-      friction chain. Scoring uses the pooled cloud, not this label.
+      Class attribution is PROVISIONAL (overlapping symbols).
+
+      SOUND: every mark lies on the upper panel.
+
+      WEAK, and recorded as such: the class's e+ span sits inside what
+      Re 10,000-60,000 and e/D 0.047 predict through the friction chain. This is
+      ONE-SIDED. Only spatially isolated marks can be picked, so the
+      picked span is always a subset of the true span and fitting inside
+      the band is close to vacuous -- across the 20 measured fig4.46
+      series the picked marks cover on average 79% of the predicted
+      range. EXCEEDING the band is the informative direction, and 4 of
+      those 20 do (G_eD0.063_pe10_wh1, R_eD0.042_pe10_wh1,
+      R_eD0.063_pe10_wh1, R_eD0.063_pe20_wh1). The band is itself
+      uncertain: f comes from the printed R = 3.2, worth about +/-3% on
+      e+, and CR-3837 records Re 7,000-90,000 for the e/D 0.063 rig where
+      this figure's legend prints 8,000-80,000.
+
+      NOT EVIDENCE: absence of a mark, of a cross-panel partner, or of a
+      neighbour. The visible marks are a biased subset, so absence is
+      uninformative -- this is what put the W/H 2 class under dispute on
+      a false premise until CR-4015's runs settled it. See #393.
+
+      Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log
@@ -1027,10 +1255,29 @@ files:
     class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
-      Class attribution is PROVISIONAL (overlapping symbols). What is
-      checkable: every mark lies on the upper panel, and the class's e+
-      span agrees with what Re 10,000-60,000 and e/D 0.078 predict through the
-      friction chain. Scoring uses the pooled cloud, not this label.
+      Class attribution is PROVISIONAL (overlapping symbols).
+
+      SOUND: every mark lies on the upper panel.
+
+      WEAK, and recorded as such: the class's e+ span sits inside what
+      Re 10,000-60,000 and e/D 0.078 predict through the friction chain. This is
+      ONE-SIDED. Only spatially isolated marks can be picked, so the
+      picked span is always a subset of the true span and fitting inside
+      the band is close to vacuous -- across the 20 measured fig4.46
+      series the picked marks cover on average 79% of the predicted
+      range. EXCEEDING the band is the informative direction, and 4 of
+      those 20 do (G_eD0.063_pe10_wh1, R_eD0.042_pe10_wh1,
+      R_eD0.063_pe10_wh1, R_eD0.063_pe20_wh1). The band is itself
+      uncertain: f comes from the printed R = 3.2, worth about +/-3% on
+      e+, and CR-3837 records Re 7,000-90,000 for the e/D 0.063 rig where
+      this figure's legend prints 8,000-80,000.
+
+      NOT EVIDENCE: absence of a mark, of a cross-panel partner, or of a
+      neighbour. The visible marks are a biased subset, so absence is
+      uninformative -- this is what put the W/H 2 class under dispute on
+      a false premise until CR-4015's runs settled it. See #393.
+
+      Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log
@@ -1062,10 +1309,29 @@ files:
     class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
-      Class attribution is PROVISIONAL (overlapping symbols). What is
-      checkable: every mark lies on the upper panel, and the class's e+
-      span agrees with what Re 10,000-60,000 and e/D 0.078 predict through the
-      friction chain. Scoring uses the pooled cloud, not this label.
+      Class attribution is PROVISIONAL (overlapping symbols).
+
+      SOUND: every mark lies on the upper panel.
+
+      WEAK, and recorded as such: the class's e+ span sits inside what
+      Re 10,000-60,000 and e/D 0.078 predict through the friction chain. This is
+      ONE-SIDED. Only spatially isolated marks can be picked, so the
+      picked span is always a subset of the true span and fitting inside
+      the band is close to vacuous -- across the 20 measured fig4.46
+      series the picked marks cover on average 79% of the predicted
+      range. EXCEEDING the band is the informative direction, and 4 of
+      those 20 do (G_eD0.063_pe10_wh1, R_eD0.042_pe10_wh1,
+      R_eD0.063_pe10_wh1, R_eD0.063_pe20_wh1). The band is itself
+      uncertain: f comes from the printed R = 3.2, worth about +/-3% on
+      e+, and CR-3837 records Re 7,000-90,000 for the e/D 0.063 rig where
+      this figure's legend prints 8,000-80,000.
+
+      NOT EVIDENCE: absence of a mark, of a cross-panel partner, or of a
+      neighbour. The visible marks are a biased subset, so absence is
+      uninformative -- this is what put the W/H 2 class under dispute on
+      a false premise until CR-4015's runs settled it. See #393.
+
+      Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log
@@ -1098,10 +1364,29 @@ files:
     class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
-      Class attribution is PROVISIONAL (overlapping symbols). What is
-      checkable: every mark lies on the upper panel, and the class's e+
-      span agrees with what Re 8,000-80,000 and e/D 0.063 predict through the
-      friction chain. Scoring uses the pooled cloud, not this label.
+      Class attribution is PROVISIONAL (overlapping symbols).
+
+      SOUND: every mark lies on the upper panel.
+
+      WEAK, and recorded as such: the class's e+ span sits inside what
+      Re 8,000-80,000 and e/D 0.063 predict through the friction chain. This is
+      ONE-SIDED. Only spatially isolated marks can be picked, so the
+      picked span is always a subset of the true span and fitting inside
+      the band is close to vacuous -- across the 20 measured fig4.46
+      series the picked marks cover on average 79% of the predicted
+      range. EXCEEDING the band is the informative direction, and 4 of
+      those 20 do (G_eD0.063_pe10_wh1, R_eD0.042_pe10_wh1,
+      R_eD0.063_pe10_wh1, R_eD0.063_pe20_wh1). The band is itself
+      uncertain: f comes from the printed R = 3.2, worth about +/-3% on
+      e+, and CR-3837 records Re 7,000-90,000 for the e/D 0.063 rig where
+      this figure's legend prints 8,000-80,000.
+
+      NOT EVIDENCE: absence of a mark, of a cross-panel partner, or of a
+      neighbour. The visible marks are a biased subset, so absence is
+      uninformative -- this is what put the W/H 2 class under dispute on
+      a false premise until CR-4015's runs settled it. See #393.
+
+      Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log
@@ -1133,10 +1418,29 @@ files:
     class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
-      Class attribution is PROVISIONAL (overlapping symbols). What is
-      checkable: every mark lies on the upper panel, and the class's e+
-      span agrees with what Re 8,000-80,000 and e/D 0.063 predict through the
-      friction chain. Scoring uses the pooled cloud, not this label.
+      Class attribution is PROVISIONAL (overlapping symbols).
+
+      SOUND: every mark lies on the upper panel.
+
+      WEAK, and recorded as such: the class's e+ span sits inside what
+      Re 8,000-80,000 and e/D 0.063 predict through the friction chain. This is
+      ONE-SIDED. Only spatially isolated marks can be picked, so the
+      picked span is always a subset of the true span and fitting inside
+      the band is close to vacuous -- across the 20 measured fig4.46
+      series the picked marks cover on average 79% of the predicted
+      range. EXCEEDING the band is the informative direction, and 4 of
+      those 20 do (G_eD0.063_pe10_wh1, R_eD0.042_pe10_wh1,
+      R_eD0.063_pe10_wh1, R_eD0.063_pe20_wh1). The band is itself
+      uncertain: f comes from the printed R = 3.2, worth about +/-3% on
+      e+, and CR-3837 records Re 7,000-90,000 for the e/D 0.063 rig where
+      this figure's legend prints 8,000-80,000.
+
+      NOT EVIDENCE: absence of a mark, of a cross-panel partner, or of a
+      neighbour. The visible marks are a biased subset, so absence is
+      uninformative -- this is what put the W/H 2 class under dispute on
+      a false premise until CR-4015's runs settled it. See #393.
+
+      Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log
@@ -1168,10 +1472,29 @@ files:
     class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
-      Class attribution is PROVISIONAL (overlapping symbols). What is
-      checkable: every mark lies on the upper panel, and the class's e+
-      span agrees with what Re 8,000-80,000 and e/D 0.042 predict through the
-      friction chain. Scoring uses the pooled cloud, not this label.
+      Class attribution is PROVISIONAL (overlapping symbols).
+
+      SOUND: every mark lies on the upper panel.
+
+      WEAK, and recorded as such: the class's e+ span sits inside what
+      Re 8,000-80,000 and e/D 0.042 predict through the friction chain. This is
+      ONE-SIDED. Only spatially isolated marks can be picked, so the
+      picked span is always a subset of the true span and fitting inside
+      the band is close to vacuous -- across the 20 measured fig4.46
+      series the picked marks cover on average 79% of the predicted
+      range. EXCEEDING the band is the informative direction, and 4 of
+      those 20 do (G_eD0.063_pe10_wh1, R_eD0.042_pe10_wh1,
+      R_eD0.063_pe10_wh1, R_eD0.063_pe20_wh1). The band is itself
+      uncertain: f comes from the printed R = 3.2, worth about +/-3% on
+      e+, and CR-3837 records Re 7,000-90,000 for the e/D 0.063 rig where
+      this figure's legend prints 8,000-80,000.
+
+      NOT EVIDENCE: absence of a mark, of a cross-panel partner, or of a
+      neighbour. The visible marks are a biased subset, so absence is
+      uninformative -- this is what put the W/H 2 class under dispute on
+      a false premise until CR-4015's runs settled it. See #393.
+
+      Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log
@@ -1203,10 +1526,29 @@ files:
     class_confidence: provisional
     uncertainty: 0.06
     cross_check: >-
-      Class attribution is PROVISIONAL (overlapping symbols). What is
-      checkable: every mark lies on the upper panel, and the class's e+
-      span agrees with what Re 8,000-80,000 and e/D 0.021 predict through the
-      friction chain. Scoring uses the pooled cloud, not this label.
+      Class attribution is PROVISIONAL (overlapping symbols).
+
+      SOUND: every mark lies on the upper panel.
+
+      WEAK, and recorded as such: the class's e+ span sits inside what
+      Re 8,000-80,000 and e/D 0.021 predict through the friction chain. This is
+      ONE-SIDED. Only spatially isolated marks can be picked, so the
+      picked span is always a subset of the true span and fitting inside
+      the band is close to vacuous -- across the 20 measured fig4.46
+      series the picked marks cover on average 79% of the predicted
+      range. EXCEEDING the band is the informative direction, and 4 of
+      those 20 do (G_eD0.063_pe10_wh1, R_eD0.042_pe10_wh1,
+      R_eD0.063_pe10_wh1, R_eD0.063_pe20_wh1). The band is itself
+      uncertain: f comes from the printed R = 3.2, worth about +/-3% on
+      e+, and CR-3837 records Re 7,000-90,000 for the e/D 0.063 rig where
+      this figure's legend prints 8,000-80,000.
+
+      NOT EVIDENCE: absence of a mark, of a cross-panel partner, or of a
+      neighbour. The visible marks are a biased subset, so absence is
+      uninformative -- this is what put the W/H 2 class under dispute on
+      a false premise until CR-4015's runs settled it. See #393.
+
+      Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log
