@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The cooling scorecard segregates by sampling completeness, and recovers
+  the marks a digitisation could not pick** (#393). A paper prints graphs,
+  not tables, so where a figure overplots symbol classes only the spatially
+  isolated marks can be digitised -- and those are the ones furthest from
+  the cluster centre. Rows are no longer pooled across that divide.
+
+  **What it revealed.** Pooled, `han_1988_orthogonal` reported 73.0% of
+  points within the source's stated band, against Han's own printed claim
+  of 95% -- a 22-point gap that read as a deficiency in the correlation.
+  Segregated, its completely-sampled series reach **91.1% within, MAE 2.9%**
+  and its partially-sampled ones **65.3%, MAE 5.3%**. The gap was the pick,
+  not the model.
+
+  `partial` rows are labelled in the rendered scorecard as an **upper bound**
+  on the error rather than an estimate of it.
+
+  **Recovery** (`validation/cooling/recovery.py`). A mark that could not be
+  picked is not lost: where a figure stacks two panels over one abscissa, a
+  mark visible in either proves the run exists in both, and its ordinate is
+  bounded by the envelope of the marks that are visible nearby. That turns a
+  missing mark into an interval observation -- 26 of them, envelopes 1.3% to
+  13.9% wide.
+
+  The envelope is drawn from other digitised marks, never from the
+  correlation plus its stated band. The latter is tighter and tempting and
+  would bound the observation with the model being scored. Recoveries whose
+  envelope exceeds 15% are discarded rather than counted as weak evidence,
+  which is why figure 4.46 yields 25 and figure 4.51 yields 1 -- 4.46's
+  classes hug one correlation, 4.51's genuinely separate.
+
+  Containment is reported as its own column (`held`, currently 48%) and
+  deliberately **not** folded into MAE/RMSE: a point gives a signed error, an
+  interval gives containment, and averaging the two would let a loose bound
+  flatter a set that a tight point disagrees with.
+
 - **Lau's `Gbar` committed as an independent check of Han's `G_bar = 1.2 G`**
   (#392). The relationship previously rested on a single printed label on
   figure 4.47. Lau's Eq. (8) measures the same quantity -- `St_avg` over two

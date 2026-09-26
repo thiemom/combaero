@@ -24,7 +24,7 @@ def dataset():
 
 @pytest.fixture(scope="module")
 def cells(dataset):
-    return build(run_dataset(dataset))
+    return build(run_dataset(dataset), dataset)
 
 
 def test_every_series_is_claimed_exactly_once(dataset) -> None:
@@ -96,18 +96,34 @@ def test_rollup_matches_the_runners_own_numbers(dataset) -> None:
     Scored independently here, through each runner's own API, and compared
     against what the rollup reports.
     """
-    summary = {c.label: c for c in rollup(build(run_dataset(dataset)))}
+    rows = rollup(build(run_dataset(dataset), dataset))
+
+    def only(set_name: str):
+        """The one rollup row for a set.
+
+        Rollup rows are segregated by sampling completeness, so a set with
+        both completely- and partially-sampled series has several. The two
+        cross-checked here have one apiece; assert that rather than assume
+        it, so this stops being a valid comparison loudly if it changes.
+        """
+        matching = [c for c in rows if c.scored_by == set_name]
+        assert len(matching) == 1, (
+            f"{set_name} now spans {len(matching)} sampling classes; comparing "
+            "it against a single whole-set number from the runner is no "
+            "longer like-for-like"
+        )
+        return matching[0]
 
     flor = [s for s in dataset if s.source.name == "florschuetz1981"]
     recs = [r for r in jet_array_runner.run_all(flor) if r.predicted is not None]
     errs = [r.rel_error for r in recs]
     direct_bias = sum(errs) / len(errs)
-    assert summary["florschuetz_1981_inline"].bias == pytest.approx(direct_bias, abs=1e-9)
-    assert summary["florschuetz_1981_inline"].n_scored == len(errs)
+    assert only("florschuetz_1981_inline").bias == pytest.approx(direct_bias, abs=1e-9)
+    assert only("florschuetz_1981_inline").n_scored == len(errs)
 
     ms = [s for s in dataset if s.source.name == "mcgreehan_schotsch1988"]
     sc = orifice_runner.score(orifice_runner.run_all(ms))
-    assert summary["mcgreehan_schotsch_1988_crossflow_cd"].bias == pytest.approx(sc.bias, abs=1e-9)
+    assert only("mcgreehan_schotsch_1988_crossflow_cd").bias == pytest.approx(sc.bias, abs=1e-9)
 
 
 def test_a_set_that_answered_nothing_cannot_look_perfect(cells) -> None:
@@ -213,3 +229,87 @@ def test_gbar_path_stays_restricted_to_90_deg(dataset, cells) -> None:
                 "through the G_bar path; G_BAR_OVER_G only holds at 90 deg"
             )
     assert seen_on and seen_off, "fixture no longer covers both sides of the guard"
+
+
+def test_rollup_never_pools_across_sampling_completeness(dataset) -> None:
+    """A tabulated series and an overplotted one do not measure the same
+    thing, so the rollup must not average them into one row.
+
+    Where a figure overplots symbol classes, only the spatially isolated
+    marks can be digitised, and those are the ones furthest from the
+    cluster centre. So a `partial` row's error is an upper bound, and a
+    `complete` row's is an estimate. One number covering both is neither.
+    """
+    summary = rollup(build(run_dataset(dataset), dataset))
+    han = {c.sampling: c for c in summary if c.scored_by == "han_1988_orthogonal"}
+    assert "complete" in han and "partial" in han, (
+        "han_1988_orthogonal must report completely- and partially-sampled "
+        f"series separately; got {sorted(han)}"
+    )
+    assert han["complete"].label != han["partial"].label
+
+
+def test_segregation_recovers_the_sources_own_stated_agreement(dataset) -> None:
+    """The reason segregation matters, pinned as a number.
+
+    Han prints that 95% of his data lies within 8% on G and 6% on R.
+    Pooled, `han_1988_orthogonal` reported 73% within, which reads as a
+    deficiency in the correlation. Segregated, the completely-sampled
+    series reach about 91% -- close to the source's own claim -- and the
+    partially-sampled ones about 65%.
+
+    The gap is the pick, not the model. If this test fails because the
+    complete subset fell, something real changed in the correlation; if
+    it fails because the two converged, the sampling classification has
+    stopped discriminating and is no longer worth its complexity.
+    """
+    summary = rollup(build(run_dataset(dataset), dataset))
+    han = {c.sampling: c for c in summary if c.scored_by == "han_1988_orthogonal"}
+    complete, partial = han["complete"], han["partial"]
+
+    assert complete.within > 0.85, (
+        f"completely-sampled series now agree only {complete.within:.0%} of "
+        "the time, against the source's stated 95%"
+    )
+    assert partial.within < 0.80
+    assert complete.within - partial.within > 0.15, (
+        "sampling completeness no longer separates the two populations "
+        f"({complete.within:.0%} against {partial.within:.0%})"
+    )
+    # And the upper-bound reading must hold: partial error is the larger.
+    assert partial.mae > complete.mae
+
+
+def test_recovered_bounds_are_model_free_and_discarded_when_loose(dataset) -> None:
+    """Recovery bounds a missing mark by the OTHER marks near that
+    abscissa -- never by the correlation plus its stated band, which
+    would bound the observation with the model being scored.
+
+    The price is that the envelope is only sometimes tight enough to
+    constrain, and that is a property of the figure. Figure 4.46's
+    classes hug one correlation, so its envelopes are usable; figure
+    4.51's classes genuinely separate, so most of its are not and are
+    discarded rather than counted as weak evidence.
+    """
+    from validation.cooling.recovery import MAX_WIDTH, recover
+
+    by_figure: dict[str, int] = {}
+    for series in dataset:
+        bounds = recover(series, dataset)
+        for bound in bounds:
+            assert bound.lo < bound.hi
+            assert bound.width <= MAX_WIDTH, (
+                f"{series.label} kept a {bound.width:.0%} envelope; anything "
+                f"over {MAX_WIDTH:.0%} admits nearly any prediction"
+            )
+            assert bound.n_marks >= 2
+        if bounds:
+            by_figure[series.figure] = by_figure.get(series.figure, 0) + len(bounds)
+
+    assert by_figure.get("4.46", 0) >= 20, (
+        f"figure 4.46 should recover a useful number of runs; got {by_figure.get('4.46', 0)}"
+    )
+    assert by_figure.get("4.51", 0) <= 3, (
+        "figure 4.51's classes separate, so its envelopes should almost all "
+        f"be discarded; kept {by_figure.get('4.51', 0)}"
+    )
