@@ -1058,8 +1058,25 @@ with its own evidence bar, not a bug fix.
 
 ### Genuinely still open
 
-- whether the book carries a **worked example** for ribs, which would give
-  the whole chain an end-to-end check. Nobody has looked.
+**Nothing.** The last item -- whether the book carries a worked example --
+was answered on 2026-09-26: **it does not.**
+
+Searched all 865 pages of the text layer: no `Example N` or `Solution:`
+block anywhere, no problems or exercises section, no walk-through
+language (`consider a`, `as an example`, `let us`, `suppose`) in the rib
+chapter, and nothing that substitutes numbers into Eq. 4.17 or 4.18. The
+book states correlations and plots data; it never works one through.
+
+**The end-to-end check it would have given now exists anyway, and is
+better.** NASA CR-3837's appendix tabulates `Re`, the friction chain, `e+`,
+`R` and `Gbar` per run for 33 runs (#398), which exercises the same chain
+against MEASURED numbers rather than against the author's own arithmetic.
+A worked example would only have confirmed that Han computes his own
+equations consistently; the tabulated runs test whether the equations
+match a rig.
+
+So item 6 stands as resolved by derivation, and the independent
+confirmation it was waiting for came from a different and stronger place.
 
 ---
 
