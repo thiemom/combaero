@@ -734,3 +734,38 @@ def test_fig446_span_check_is_one_sided_and_its_exceedances_are_known(dataset) -
         f"added {sorted(exceed - KNOWN_EXCEEDANCES)}, "
         f"gone {sorted(KNOWN_EXCEEDANCES - exceed)}"
     )
+
+
+def test_rib_angle_reaches_the_correlation_on_the_eplus_path() -> None:
+    """A series' rib angle must reach `evaluate_rib`, not be replaced by the
+    probe geometry's default of 90 degrees.
+
+    It was. `run_series` copied `e_D`, `p_e` and `W_H` out of
+    `series.geometry` but never `alpha_deg`, which is a top-level field
+    rather than part of that mapping. Every angled series on the e+ path was
+    therefore scored as though its ribs were transverse -- against
+    `han_park_1988_angled`, the one set whose entire subject is rib angle.
+
+    Checked against the library directly rather than against a stored
+    number, so the test cannot drift with the data.
+    """
+    import combaero as cb
+    from validation.cooling.runner import run_series
+
+    dataset = load_dataset()
+    series = next(s for s in dataset if s.path.stem == "fig4.51_G_60par")
+    assert series.alpha_deg == 60.0
+
+    record = next(r for r in run_series(series) if r.predicted is not None)
+    geometry = cb.RibGeometry(e_D=0.0625, p_e=10.0, W_H=1.0, alpha_deg=series.alpha_deg)
+    at_declared = cb.evaluate_rib(cb.han_park_1988_angled(), geometry, record.re_used)
+    geometry.alpha_deg = 90.0
+    at_ninety = cb.evaluate_rib(cb.han_park_1988_angled(), geometry, record.re_used)
+    # The two must be far enough apart for this to be a real check.
+    assert abs(at_declared.G / at_ninety.G - 1.0) > 0.05
+
+    assert abs(record.predicted / at_declared.G - 1.0) < 0.05, (
+        f"prediction {record.predicted:.3f} is not the declared "
+        f"alpha={series.alpha_deg} value ({at_declared.G:.3f}); it matches "
+        f"alpha=90 ({at_ninety.G:.3f}), so the rib angle is being dropped"
+    )

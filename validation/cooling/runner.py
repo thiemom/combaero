@@ -333,6 +333,14 @@ def run_series(
         geom.e_D = float(series.geometry.get("e_D", geom.e_D))
         geom.p_e = float(series.geometry.get("p_e", geom.p_e))
         geom.W_H = float(series.geometry.get("W_H", geom.W_H))
+    # Rib angle, which _probe_geometry defaults to 90. Omitting it scored
+    # every angled series as though its ribs were transverse: figure 4.51's
+    # 45 and 60 deg classes were evaluated at 90 against
+    # han_park_1988_angled, the one set whose whole subject is rib angle.
+    # `alpha_deg` is a top-level field, not part of the geometry mapping,
+    # which is how it was missed when e_D/p_e/W_H were wired through.
+    if series.alpha_deg is not None:
+        geom.alpha_deg = float(series.alpha_deg)
 
     if series.x_axis == "alpha_deg":
         # R vs alpha (figure 4.47's own axis): no e+/Re bisection needed --
