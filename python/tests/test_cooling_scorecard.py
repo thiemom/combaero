@@ -414,3 +414,63 @@ def test_unknown_y_axis_on_the_eplus_path_is_refused(dataset) -> None:
             "an unpredictable y_axis was given a number; the catch-all is back"
         )
         assert "Nu_ratio" in (record.reason or "")
+
+
+def test_fidelity_and_accuracy_are_never_pooled(dataset) -> None:
+    """Fidelity (the correlation's own paper) and accuracy (cross-source)
+    answer different questions and fail differently: a fidelity miss is our
+    transcription, an accuracy miss is the model's limitation. One number
+    covering both is neither.
+
+    See docs/VALIDATION_POLICY.md.
+    """
+    rows = rollup(build(run_dataset(dataset), dataset))
+    for set_name in ("han_1988_orthogonal", "han_park_1988_angled"):
+        bases = {r.basis for r in rows if r.scored_by == set_name}
+        assert {"fidelity", "accuracy"} <= bases, (
+            f"{set_name} reports {sorted(bases)}; both must appear as separate rows"
+        )
+    for row in rows:
+        assert row.basis in ("fidelity", "accuracy", "unknown")
+
+
+def test_every_scored_set_declares_which_paper_it_is(dataset) -> None:
+    """`basis_of` returns "unknown" for a set with no recorded origin rather
+    than defaulting to fidelity, so a new set cannot quietly claim the
+    stronger of the two. This asserts none is currently unknown -- i.e. the
+    map has kept up with the sets."""
+    from validation.cooling.scorecard import SET_ORIGIN
+
+    scored = {c.scored_by for c in build(run_dataset(dataset), dataset) if c.n_scored}
+    missing = {s for s in scored if s not in SET_ORIGIN}
+    assert not missing, (
+        f"these sets score series but declare no origin paper: {sorted(missing)}. "
+        "Add them to SET_ORIGIN or their results cannot be read as fidelity "
+        "or accuracy."
+    )
+
+
+def test_han_1988_fidelity_rests_on_very_few_clean_points(dataset) -> None:
+    """The interaction the pooled number hid, pinned so it stays visible.
+
+    `han_1988_orthogonal`'s own data survives only as an overplotted
+    scatter, so almost all its FIDELITY evidence is sampling-biased and its
+    cross-source ACCURACY looks better than its fidelity purely because the
+    cross-source data is tabulated.
+
+    If this starts failing because the clean fidelity set grew, that is
+    good news and the number should be updated.
+    """
+    rows = rollup(build(run_dataset(dataset), dataset))
+    clean = [
+        r
+        for r in rows
+        if r.scored_by == "han_1988_orthogonal"
+        and r.basis == "fidelity"
+        and r.sampling == "complete"
+    ]
+    assert clean, "han_1988_orthogonal reports no cleanly-sampled own-data row"
+    assert sum(r.n_scored for r in clean) < 30, (
+        "the clean fidelity set has grown; update docs/VALIDATION_POLICY.md's "
+        "worked example, which says it rests on eight points"
+    )
