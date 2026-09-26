@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Absolute `R` is scoreable, unblocking six committed series** (#339
+  plan 1a). `runner.py`'s `e+` path resolved `y_axis` to `G`, `G_bar` or
+  `R_normalised` only, so sources that TABULATE the roughness functions --
+  which print `R` itself, not the normalised ordinate figure 4.46 plots --
+  had to be committed `scores: null`. The measurements were never in doubt;
+  only the branch was missing.
+
+  **Reviewer item L2 becomes a number rather than an argument.** Lau's `R`
+  now scores MAE 11.3%, bias -11.3%, with **0 of 9 points inside Lau's own
+  stated +/-10.9% friction band**. Two labs ~12% apart in ribbed-wall
+  friction for nominally the same 90 deg configuration, reported on every
+  run instead of argued in a document.
+
+  **Eq. 4.17 is confirmed out-of-sample**: NASA CR-3837's `R` scores 100%
+  within band at 90 deg and 83-86% at 75/60/45, inside the source's own
+  6.6% friction uncertainty. Only 30 deg is poor (57%), which is also where
+  Eq. 4.18 reads furthest low.
+
 - **NASA CR-3837 (Han, Park and Lei, 1984) as a tabulated primary source**
   (#391). The first source in the cooling dataset whose every run is
   tabulated rather than plotted, and the only one printing the ribbed- and
@@ -130,6 +148,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   conversion.
 
 ### Fixed
+
+- **The `e+` path scored unrecognised quantities against `G`** (#339 plan
+  1a). The branch ended in a catch-all `else: predicted = g`, so any
+  `y_axis` that was not `G_bar` or `R_normalised` -- an absolute `R` among
+  them -- would have been compared against a different physical quantity
+  entirely. Nothing hit it only because every such series carried
+  `scores: null`. Now explicit per quantity, with anything unpredictable
+  returned unscored and with a reason.
 
 - **`han_park_1988_angled` scored every angled series at 90 degrees**
   (#391). On the `e+` path `run_series` copied `e_D`, `p_e` and `W_H` out of

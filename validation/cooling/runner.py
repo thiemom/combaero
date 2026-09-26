@@ -209,14 +209,16 @@ def _normalised_R(
     return raw_R / divisor if divisor else raw_R
 
 
-def _g_at_eplus(
+def _at_eplus(
     rib_set: "cb.RibCorrelationSet", geom: cb.RibGeometry, target: float
-) -> tuple[float, float, bool, float] | None:
-    """G and the normalised R at a target e+, via the real chain.
+) -> tuple[float, float, float, bool, float] | None:
+    """G, absolute R and normalised R at a target e+, via the real chain.
 
     The lower panel of Figure 4.46 plots R/(P/e/10)^0.35, which is what
     the set's C_R is defined as, so the normalised value is returned
-    alongside G rather than being recomputed by the caller.
+    alongside G rather than being recomputed by the caller. Absolute R is
+    returned too: sources that TABULATE the roughness functions print R
+    itself, not the figure's normalised ordinate.
     """
     lo, hi = RE_LO, RE_HI
     if cb.evaluate_rib(rib_set, geom, lo).e_plus > target:
@@ -236,7 +238,7 @@ def _g_at_eplus(
     pe_term = rib_set.R_pe
     norm = (geom.p_e / pe_term.reference) ** pe_term.exponent if pe_term.reference else 1.0
     r_norm = res.R / norm if norm else res.R
-    return res.G, r_norm, res.extrapolated, re
+    return res.G, res.R, r_norm, res.extrapolated, re
 
 
 def _r_at_alpha(
@@ -358,7 +360,7 @@ def run_series(
                 # The figure plots R divided by its own normalisers, not raw
                 # R -- dividing them back out here, from the SAME fields
                 # evaluate_rib used, rather than duplicating Eq. 4.17's
-                # formula. Mirrors what _g_at_eplus does for han_1988's
+                # formula. Mirrors what _at_eplus does for han_1988's
                 # R_pe division below.
                 predicted = _normalised_R(rib_set, geom, res.R)
             records.append(
@@ -368,19 +370,31 @@ def run_series(
 
     records: list[Record] = []
     for p in points:
-        found = _g_at_eplus(rib_set, geom, p.x)
+        found = _at_eplus(rib_set, geom, p.x)
         if found is None:
             records.append(
                 Record(series, p.x, p.y, None, True, None, "e+ unreachable")
             )
             continue
-        g, r_norm, extrapolated, re = found
-        if series.y_axis == "G_bar":
+        g, r_abs, r_norm, extrapolated, re = found
+        # Explicit per quantity. This was a catch-all `else: predicted = g`,
+        # so any y_axis that was not G_bar or R_normalised -- an absolute R
+        # among them -- was silently scored against G. Nothing hit it only
+        # because every absolute-R series carried `scores: null`.
+        if series.y_axis == "G":
+            predicted = g
+        elif series.y_axis == "G_bar":
             predicted = g * G_BAR_OVER_G
         elif series.y_axis == "R_normalised":
             predicted = r_norm
+        elif series.y_axis == "R":
+            predicted = r_abs
         else:
-            predicted = g
+            records.append(
+                Record(series, p.x, p.y, None, extrapolated, re,
+                       f"no prediction for y_axis {series.y_axis} on the e+ path")
+            )
+            continue
         records.append(Record(series, p.x, p.y, predicted, extrapolated, re))
     return records
 

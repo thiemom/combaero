@@ -167,16 +167,18 @@ def test_lau_independently_confirms_han_G(cells) -> None:
     assert c.within == 1.0
 
 
-def test_lau_R_is_committed_but_not_scored(cells) -> None:
-    """runner.py's e+ path has no absolute-R branch. The series is committed
-    so the ~13% disagreement is visible rather than absent, and reports '-'
-    rather than a zero that would read as agreement."""
-    import math
+def test_lau_R_is_scored_now_that_an_absolute_R_branch_exists(cells) -> None:
+    """This asserted the opposite until the e+ path gained an absolute-R
+    branch: the series was committed `scores: null` so the ~13%
+    disagreement stayed visible rather than absent, because scoring it
+    would have compared R against G.
 
+    The disagreement itself is pinned in
+    test_lau_R_disagreement_is_now_scored_not_just_narrated."""
     c = next(c for c in cells if c.label == "lau1990/fig_table2_90deg_R")
     assert c.n == 9
-    assert c.n_scored == 0
-    assert math.isnan(c.rmse)
+    assert c.n_scored == 9
+    assert not math.isnan(c.rmse)
 
 
 def test_lau_Gbar_independently_confirms_hans_1p2_factor(cells) -> None:
@@ -263,21 +265,42 @@ def test_segregation_recovers_the_sources_own_stated_agreement(dataset) -> None:
     it fails because the two converged, the sampling classification has
     stopped discriminating and is no longer worth its complexity.
     """
-    summary = rollup(build(run_dataset(dataset), dataset))
-    han = {c.sampling: c for c in summary if c.scored_by == "han_1988_orthogonal"}
-    complete, partial = han["complete"], han["partial"]
+    # Restricted to G. The comparison has to be like-for-like in QUANTITY:
+    # pooling R in drags the completely-sampled figure from 84% to 76%, not
+    # because sampling got worse but because lau1990's R carries a genuine
+    # ~11% disagreement between two labs. A real model disagreement in one
+    # quantity would otherwise masquerade as a sampling effect -- the same
+    # comparability trap #389 is about.
+    cells_by_label = {c.label.split("  [")[0]: c for c in build(run_dataset(dataset), dataset)}
+    buckets: dict[str, list[tuple[float, float, int]]] = {"complete": [], "partial": []}
+    for series in dataset:
+        cell = cells_by_label.get(series.label)
+        if cell is None or cell.scored_by != "han_1988_orthogonal":
+            continue
+        if series.y_axis != "G" or not cell.n_scored:
+            continue
+        if cell.sampling in buckets:
+            buckets[cell.sampling].append((cell.within, cell.mae, cell.n_scored))
 
-    assert complete.within > 0.85, (
-        f"completely-sampled series now agree only {complete.within:.0%} of "
+    def weighted(rows, index):
+        n = sum(k for *_, k in rows)
+        return sum(row[index] * row[2] for row in rows) / n
+
+    assert buckets["complete"] and buckets["partial"]
+    complete_within = weighted(buckets["complete"], 0)
+    partial_within = weighted(buckets["partial"], 0)
+
+    assert complete_within > 0.80, (
+        f"completely-sampled G series now agree only {complete_within:.0%} of "
         "the time, against the source's stated 95%"
     )
-    assert partial.within < 0.80
-    assert complete.within - partial.within > 0.15, (
+    assert partial_within < 0.70
+    assert complete_within - partial_within > 0.15, (
         "sampling completeness no longer separates the two populations "
-        f"({complete.within:.0%} against {partial.within:.0%})"
+        f"({complete_within:.0%} against {partial_within:.0%})"
     )
     # And the upper-bound reading must hold: partial error is the larger.
-    assert partial.mae > complete.mae
+    assert weighted(buckets["partial"], 1) > weighted(buckets["complete"], 1)
 
 
 def test_recovered_bounds_are_model_free_and_discarded_when_loose(dataset) -> None:
@@ -313,3 +336,81 @@ def test_recovered_bounds_are_model_free_and_discarded_when_loose(dataset) -> No
         "figure 4.51's classes separate, so its envelopes should almost all "
         f"be discarded; kept {by_figure.get('4.51', 0)}"
     )
+
+
+def test_absolute_R_series_are_scored_against_R_not_G(cells) -> None:
+    """Sources that TABULATE the roughness functions print absolute `R`,
+    not the normalised ordinate figure 4.46 plots. The e+ path had no
+    branch for it, so six series sat committed with `scores: null` purely
+    for want of one -- the measurements were never in doubt.
+
+    Pinned as a band rather than a point: these are measurements, and the
+    numbers should move if the correlation does.
+    """
+    for label in (
+        "han_park_lei1984/table_a90_R",
+        "han_park_lei1984/table_a45_R",
+        "lau1990/fig_table2_90deg_R",
+    ):
+        cell = next(c for c in cells if c.label == label)
+        assert cell.n_scored == cell.n > 0, f"{label} is still unscored"
+        assert not math.isnan(cell.rmse)
+
+
+def test_eq_4_17_is_confirmed_out_of_sample_on_R(cells) -> None:
+    """CR-3837 is e/D = 0.063, a blockage Han and Park never measured, so
+    scoring its R against Eq. 4.17 is a genuine out-of-sample test of the
+    friction roughness function.
+
+    It passes: inside the source's own 6.6% friction uncertainty at 90 and
+    45 deg, and the 90 deg set has every point within band.
+    """
+    ninety = next(c for c in cells if c.label == "han_park_lei1984/table_a90_R")
+    assert ninety.mae < 0.066, (
+        f"Eq. 4.17 now misses CR-3837's 90 deg R by {ninety.mae:.1%}, outside "
+        "the source's stated 6.6% friction uncertainty"
+    )
+    assert ninety.within == 1.0
+
+
+def test_lau_R_disagreement_is_now_scored_not_just_narrated(cells) -> None:
+    """Reviewer item L2. Lau's R runs well above `han_1988_orthogonal`'s
+    constant 3.2, which converts to two labs ~12% apart in ribbed-wall
+    friction for nominally the same 90 deg configuration.
+
+    Until the absolute-R branch existed this lived only in prose. It is now
+    a harness number, and the point of pinning it is that it must stay
+    VISIBLE -- a silent drift to agreement would mean the correlation or the
+    conversion moved, not that two labs reconciled.
+    """
+    cell = next(c for c in cells if c.label == "lau1990/fig_table2_90deg_R")
+    assert cell.bias < -0.08, (
+        f"Lau's R bias is now {cell.bias:.1%}; the recorded disagreement is "
+        "about -11%, so something moved"
+    )
+    # Lau states +/-10.9% on friction, and the gap is larger than his own band.
+    assert cell.within == 0.0
+
+
+def test_unknown_y_axis_on_the_eplus_path_is_refused(dataset) -> None:
+    """The branch used to end in `else: predicted = g`, so any y_axis that
+    was not G_bar or R_normalised -- absolute R among them -- was silently
+    scored against G. Nothing hit it only because every such series carried
+    `scores: null`.
+
+    A quantity the path cannot predict must come back unscored with a
+    reason, never compared against a different quantity.
+    """
+    import dataclasses
+
+    from validation.cooling.runner import run_series
+
+    series = next(s for s in dataset if s.label == "han_park_lei1984/table_a90_R" and s.scores)
+    impostor = dataclasses.replace(series, y_axis="Nu_ratio")
+    records = run_series(impostor)
+    assert records
+    for record in records:
+        assert record.predicted is None, (
+            "an unpredictable y_axis was given a number; the catch-all is back"
+        )
+        assert "Nu_ratio" in (record.reason or "")

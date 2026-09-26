@@ -29,7 +29,7 @@ the preference `extractions/README.md` states.
 | # | what needs judgement | what turns on it |
 |---|---|---|
 | **L1** | **Is a Lau V-rib `RibCorrelationSet` wanted?** Table 2 gives `R`/`G`/`G_bar,Lau` coefficients for V-45, V-60, V-120 and V-135, a shape `han_park_1988_angled` cannot express (it carries angle only, which is why Han figure 4.51's own V classes are deliberately unscored). | A code task shaped like #334, not a data task. **The coefficients are now three-channel verified**, so this is purely a modelling decision -- nothing further needs reading. |
-| **L2** | **Is the ~13% `R` gap acceptable as a recorded disagreement?** Definitional causes were checked and ruled out (below). Two labs differ by ~12% in ribbed-wall friction for nominally the same 90 deg configuration. | Nothing breaks either way, but it bounds how much trust the friction side of `han_1988_orthogonal` should carry. A third source would settle whether Han or Lau is the outlier. |
+| **L2** | **Is the ~13% `R` gap acceptable as a recorded disagreement?** **Now SCORED rather than narrated** (#339 plan 1a): MAE 11.3%, bias -11.3%, and **0 of 9 points inside Lau's own stated +/-10.9% friction band**. The harness reports it on every run instead of a doc arguing it. Definitional causes were checked and ruled out (below). Two labs differ by ~12% in ribbed-wall friction for nominally the same 90 deg configuration. | Nothing breaks either way, but it bounds how much trust the friction side of `han_1988_orthogonal` should carry. A third source would settle whether Han or Lau is the outlier. |
 
 ### What I still need sent
 

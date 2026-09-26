@@ -145,7 +145,7 @@ files:
     extraction: tabulated
     confidence: band
     uncertainty: 0.066
-    scores: null
+    scores: han_park_1988_angled
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -228,7 +228,7 @@ files:
     extraction: tabulated
     confidence: band
     uncertainty: 0.066
-    scores: null
+    scores: han_park_1988_angled
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -308,7 +308,7 @@ files:
     extraction: tabulated
     confidence: band
     uncertainty: 0.066
-    scores: null
+    scores: han_park_1988_angled
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -388,7 +388,7 @@ files:
     extraction: tabulated
     confidence: band
     uncertainty: 0.066
-    scores: null
+    scores: han_park_1988_angled
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -468,7 +468,7 @@ files:
     extraction: tabulated
     confidence: band
     uncertainty: 0.066
-    scores: null
+    scores: han_park_1988_angled
     verification:
       x_axis_type: log
       y_axis_type: log
