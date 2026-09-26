@@ -66,6 +66,9 @@ class Cell:
     # marks that could be picked are the ones furthest from the cluster
     # centre (#393).
     sampling: str = "unknown"
+    # "fidelity" (the correlation's own paper) or "accuracy" (cross-source).
+    # Never pooled: they answer different questions and fail differently.
+    basis: str = "unknown"
     n_bounded: int = 0  # runs recovered as interval observations
     held: float = float("nan")  # fraction of those the prediction lands inside
 
@@ -103,6 +106,39 @@ def run_dataset(dataset) -> list[Record]:
             # dropping a series no specialist wanted.
             out.extend(rib_run(series))
     return out
+
+
+# Which paper each correlation set IS. Fidelity can only be judged on data
+# from that paper; everything else is accuracy, and must be labelled so --
+# see docs/VALIDATION_POLICY.md.
+#
+# This cannot be read off the C++ set: `RibCorrelationSet.provenance` is an
+# Extracted/Fitted/User enum, not a citation. It is matched against a
+# series' `after` field (the original author of a reprinted figure) and
+# falling back to its source name, so a textbook reprint of the set's own
+# paper still counts as the author's own data.
+SET_ORIGIN: dict[str, str] = {
+    "han_1988_orthogonal": "ASME J. Heat Transfer 110, 321",
+    "han_park_1988_angled": "IJHMT 31(1), 183",
+    "rallabandi_2009_high_re": "rallabandi",
+    "florschuetz_1981_inline": "florschuetz1981",
+    "mcgreehan_schotsch_1988_cd": "mcgreehan_schotsch1988",
+    "mcgreehan_schotsch_1988_crossflow_cd": "mcgreehan_schotsch1988",
+}
+
+
+def basis_of(series, set_name: str | None) -> str:
+    """"fidelity" when the data is the correlation's own paper, else "accuracy".
+
+    A set with no recorded origin returns "unknown" rather than defaulting
+    to fidelity, so adding a set without declaring its paper cannot quietly
+    claim the stronger of the two.
+    """
+    origin = SET_ORIGIN.get(set_name or "")
+    if origin is None:
+        return "unknown"
+    haystack = f"{series.after or ''} {series.source.name}".lower()
+    return "fidelity" if origin.lower() in haystack else "accuracy"
 
 
 def sampling_of(series, dataset) -> str:
@@ -207,6 +243,7 @@ def build(records: list[Record], dataset=None) -> list[Cell]:
             ),
         )
         if dataset is not None:
+            cell.basis = basis_of(series, cell.scored_by)
             cell.sampling = sampling_of(series, dataset)
             cell.n_bounded, cell.held = score_recovered(series, dataset)
         if errs:
@@ -262,7 +299,7 @@ def rollup(cells: list[Cell]) -> list[Cell]:
     Unscored series contribute their point count but no error, so a set that
     answered nothing cannot look perfect.
     """
-    buckets: dict[tuple[str, str, str], list[Cell]] = defaultdict(list)
+    buckets: dict[tuple[str, str, str, str], list[Cell]] = defaultdict(list)
     for c in cells:
         if c.scored_by is None:
             continue
@@ -273,13 +310,13 @@ def rollup(cells: list[Cell]) -> list[Cell]:
         # bound on it, because only the marks furthest from the cluster
         # centre could be picked. Averaging them produces a number that is
         # neither (#393).
-        buckets[(c.scored_by, group, c.sampling)].append(c)
+        buckets[(c.scored_by, group, c.sampling, c.basis)].append(c)
 
     out: list[Cell] = []
-    for (set_name, group, sampling), cs in sorted(buckets.items()):
+    for (set_name, group, sampling, basis), cs in sorted(buckets.items()):
         n = sum(c.n for c in cs)
         n_scored = sum(c.n_scored for c in cs)
-        tag = "" if sampling == "complete" else f"  <{sampling}>"
+        tag = f"  [{basis[:3]}]" + ("" if sampling == "complete" else f" <{sampling[:4]}>")
         agg = Cell(
             label=set_name + (f"  [{group}]" if group else "") + tag,
             kind=f"{len(cs)} series",
@@ -288,6 +325,7 @@ def rollup(cells: list[Cell]) -> list[Cell]:
             n_scored=n_scored,
             n_extrapolated=sum(c.n_extrapolated for c in cs),
             sampling=sampling,
+            basis=basis,
             n_bounded=sum(c.n_bounded for c in cs),
         )
         held = [(c.held, c.n_bounded) for c in cs if c.n_bounded]
@@ -314,14 +352,14 @@ def render(cells: list[Cell], pools: dict | None = None) -> str:
     head = (
         f"{'series':<44} {'kind':<12} {'N':>3} {'scored':>6} "
         f"{'MAE':>7} {'RMSE':>7} {'bias':>7} {'within':>7} {'extrap':>6} "
-        f"{'sampling':<9} {'bnd':>3} {'held':>7}"
+        f"{'basis':<9} {'sampling':<9} {'bnd':>3} {'held':>7}"
     )
     lines = [head, "-" * len(head)]
     for c in cells:
         lines.append(
             f"{c.label:<44} {c.kind:<12} {c.n:>3} {c.n_scored:>6} "
             f"{_pct(c.mae)} {_pct(c.rmse)} {_pct(c.bias)} {_pct(c.within)} "
-            f"{c.n_extrapolated:>6} {c.sampling:<9} "
+            f"{c.n_extrapolated:>6} {c.basis:<9} {c.sampling:<9} "
             f"{c.n_bounded if c.n_bounded else '':>3} {_pct(c.held)}"
         )
     summary = rollup(cells)
@@ -333,7 +371,7 @@ def render(cells: list[Cell], pools: dict | None = None) -> str:
             lines.append(
                 f"{c.label:<44} {c.kind:<12} {c.n:>3} {c.n_scored:>6} "
                 f"{_pct(c.mae)} {_pct(c.rmse)} {_pct(c.bias)} {_pct(c.within)} "
-                f"{c.n_extrapolated:>6} {c.sampling:<9} "
+                f"{c.n_extrapolated:>6} {c.basis:<9} {c.sampling:<9} "
                 f"{c.n_bounded if c.n_bounded else '':>3} {_pct(c.held)}"
             )
         if any(c.sampling == "partial" for c in summary):
@@ -350,6 +388,14 @@ def render(cells: list[Cell], pools: dict | None = None) -> str:
                 "  <unknown>: shares a panel with other classes, with nothing "
                 "independent to say how many runs it should have."
             )
+        lines.append(
+            "  [fidelity]: the correlation's OWN paper -- a miss is our "
+            "transcription. [accuracy]: cross-source, so a miss is the"
+        )
+        lines.append(
+            "  model's limitation, not ours. Never pooled. See "
+            "docs/VALIDATION_POLICY.md."
+        )
     unsupported = [c for c in cells if c.unsupported]
     if pools:
         lines.append("")

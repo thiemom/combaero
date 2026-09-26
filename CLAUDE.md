@@ -15,6 +15,12 @@
 - **Documentation Hygiene:** Active references (API, build, workflow, schemas) live in `docs/`; historical feature reports and design records go to `docs/archive/`. Keep core guides high-signal — a doc points at the file that owns a fact rather than transcribing it.
 - **Unit sync test:** every exported Python symbol needs a `units_data.h` entry, or an `IGNORE_LIST` entry in `python/tests/test_units_sync.py`.
 - **Solver (f, J) rule:** solver-facing calculations must expose a C++ PyBind11 API returning `std::tuple<double, double>` (value, derivative). Analytical derivatives via chain rule; no finite differences exposed to Python.
+- **Validation policy — fidelity, accuracy and tuning are three questions, never one number.** See [docs/VALIDATION_POLICY.md](docs/VALIDATION_POLICY.md).
+  - **Fidelity** (does the implementation mirror the paper?) is judged **only on the author's own data**. A miss is our bug.
+  - **Accuracy** (what will it do on another rig?) is judged **cross-source and must be labelled cross-source** in the report, not just in a doc beside it. A miss is the model's limitation. Same lab, different study counts as cross-source.
+  - **Matching a specific rig is the user's job.** `Nu_multiplier`/`f_multiplier` exist for that; the harness never scores, recommends or applies a tuner.
+  - A stated uncertainty band must be a **measurement** band, never derived from the model's own error on that series — a declared band correlating with measured RMS is circular.
+  - Fidelity claimed on **overplotted** data is an upper bound, not an estimate; say how many cleanly-sampled points it rests on.
 - **Define Once:** physics constants go as `constexpr` in the relevant public header namespace — never as magic numbers in `.cpp` files.
 - **ASCII only:** no non-ASCII characters in any C++ or Python source file.
 - **`python/combaero/` must never import from `validation/`, `cantera_validation_tests/`, `thermo_data_generator/`, or `gui/`.** Those trees are dev-only and excluded from the sdist/wheel (see `pyproject.toml`'s `sdist.exclude`); a production module importing from any of them installs fine from a repo checkout but raises `ModuleNotFoundError` on a real `pip install` (hit in the v0.4.0 release for `MultiPortChamberElement`/`ConstantKTeeElement` importing `validation.junction.models.mynard2010` — fixed by moving the implementation into `python/combaero/network/_mynard2010.py`). If a model implementation is needed by production code, it belongs in `python/combaero/`, not the validation tree.
