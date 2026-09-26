@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Han's `G_bar = 1.2 G` is now applied at every rib angle, as published**
+  (#339 plan 1b). The runner refused anything off 90 degrees on the grounds
+  that 1.2 is a 90 degree result. It is -- but refusing withheld a number
+  Han does publish, and turned a known accuracy limit into a missing
+  answer. Faithful implementation uses the published constant; what it
+  costs is measured and labelled (see docs/VALIDATION_POLICY.md).
+
+  **A generalised replacement was considered and rejected on evidence.**
+  Pooling every closed-form measurement available -- 91-GT-3 table 3
+  (extracted and two-channel verified for this), Lau table 2, and
+  CR-3837's per-run `Nu(R)`/`Nu(AV)` split -- gives 16 configurations
+  across three rigs spanning **1.096 to 1.413** at `e+` = 300, and
+  **69% of that variance is BETWEEN RIGS**:
+
+  | source | n | mean | internal spread |
+  |---|---|---|---|
+  | 91-GT-3 | 4 | 1.160 | 12% |
+  | CR-3837 | 5 | 1.323 | 3% |
+  | lau1990 | 7 | 1.327 | 14% |
+
+  No angle or shape term can reach a rig offset, so a "better" correlation
+  would be fitting rig identity. Han's 1.2 scores MAE 8.3% against that
+  population -- a defensible one-number answer. Pinned by a test that fails
+  if the between-rig share drops, which is the condition under which
+  revisiting would be worthwhile.
+
+  Even at 90 degrees the measured ratio runs 1.29 down to 1.13 across
+  `e+`, so the constant was always a fit, including where it was trusted
+  most.
+
 ### Added
 
 - **Validation policy: fidelity, accuracy and tuning are three questions,
