@@ -559,13 +559,20 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    class_confidence: provisional
+    class_confidence: confirmed
     uncertainty: 0.06
     cross_check: >-
-      Class attribution is PROVISIONAL (overlapping symbols). What is
-      checkable: every mark lies on the lower panel, and the class's e+
-      span agrees with what Re 10,000-60,000 and e/D 0.047 predict through the
-      friction chain. Scoring uses the pooled cloud, not this label.
+      CLASS LABEL CONFIRMED with its G counterpart, 2026-09-26, against the
+      five source runs in NASA CR-4015 appendix 7.3, pages 141-145
+      (E/D=0.047, P/E=10.0, ALPHA=90, HYD DIA=2.667 IN). This file's marks
+      at e+ 80.8, 149.8 and 263.2 map to runs 22, 23 and 26 at e+ 80.7,
+      150.5 and 256.2 (+0.1%, -0.5%, +2.7%). The class's runs at e+ 485.8
+      and 512.1 are buried in this panel's dense flat band and were not
+      picked, which is overplotting rather than absence. Full reasoning on
+      the G entry above.
+
+      Residual: this file holds two marks near e+ 80 (79.2 and 80.8) where
+      the class has one run. One is a neighbouring class or a double-pick.
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log
@@ -901,7 +908,7 @@ files:
     figure: "4.46"
     panel: upper
     item: "Figure 4.46 upper panel"
-    series: "class label DISPUTED -- see cross_check"
+    series: "this study, e/D 0.047, P/e 10, W/H 2, Re 10,000-60,000"
     geometry: {e_D: 0.047, p_e: 10, W_H: 2}
     alpha_deg: 90.0
     x_axis: e_plus
@@ -910,38 +917,49 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    class_confidence: disputed
+    class_confidence: confirmed
     uncertainty: 0.06
     cross_check: >-
-      DISPUTED CLASS LABEL. Pool these marks; never use them per-class.
-      The coordinates themselves are sound -- on-panel, distinct, and
-      inside the span this class predicts -- so the values are usable.
-      What is in doubt is only which symbol they belong to.
+      CLASS LABEL CONFIRMED against the source runs, 2026-09-26. Resolved
+      not by reading the figure but by going behind it: NASA CR-4015
+      (= AVSCOM 86-C-25), Han, Park and Ibrahim, contract NAS3-24227,
+      September 1986, is the report this figure's "This study" classes come
+      from. Its appendix 7.3 tabulates every run with a self-identifying
+      header, so the class is found BY LABEL and the overplotted cluster
+      never has to be resolved.
 
-      Evidence against the label: this class's R file holds marks at
-      e+ = 79.2, 80.8, 149.8, 263.2 while this G file holds 153.1, 275.2,
-      493.9, 546.6. Only two pair (+2.2%, +4.6%); R's two low marks and
-      G's two high marks have no partner. An earlier pick of this same
-      series reached e+ = 561.7, outside the class's predicted 80..479
-      entirely.
+      Five runs carry E/D=0.047, P/E=10.0, ALPHA=90, HYD DIA=2.667 IN
+      (2.667 in is the W/H = 2 hydraulic diameter; the square channel is
+      2.000 in), on pages 141-145:
 
-      Evidence for it: after the re-pick the span does fit, at 546.6
-      against a predicted ceiling of 479 with the 15% margin. And marks
-      genuinely do go unpaired -- the two low R marks sit at G = 12.58 and
-      12.66, 0.6% apart, which would merge into one blob in the upper
-      panel.
+        22HR10-90/10  MDOT 0.0321  Re 10111  -> e+  80.7
+        23HR30-90/10  MDOT 0.0596  Re 18869  -> e+ 150.5
+        26HR30-90/10  MDOT 0.1010  Re 32117  -> e+ 256.2
+        24HR60-90/10  MDOT 0.1925  Re 60898  -> e+ 485.8
+        27HR60-90/10  MDOT 0.2020  Re 64193  -> e+ 512.1
 
-      The digitised data cannot separate these. Attempted identification
-      by elimination put the best alternative class at 1 of 4 unclaimed
-      matches, which settles nothing.
+      e+ from the printed R = 3.2 via f, so it carries roughly +/-3% (the
+      paper states R holds 95% of its data within 6%). Every digitised mark
+      in BOTH panels lands on one of these runs: this file's 153.1, 275.2,
+      493.9 and 546.6 map to runs 23, 26, 24 and 27 (+1.7%, +7.4%, +1.7%,
+      +6.7%), and the R counterpart's 149.8 and 263.2 map to runs 23 and 26.
+      No mark is left unexplained.
 
-      NEEDS THE PAGE, p. 376 upper panel: does the 0.047/10/2 symbol
-      appear at e+ ~ 494 and ~ 547, and is it absent near e+ ~ 80? If yes,
-      the label is right and the pairing gaps are merged and omitted
-      marks. If no, these four marks belong to another class. Nothing in
-      the current scoring turns on the answer -- the set has zero geometry
-      exponents and scoring is pooled -- but 4.47 and 4.48 bind geometry,
-      and this series must not be carried into them unresolved.
+      WHAT THE OLD DISPUTE GOT WRONG, worth keeping. It asked whether the
+      symbol is "absent near e+ ~ 80" and treated absence as informative.
+      Run 22 sits at e+ = 80.7 and the R counterpart picked it up to 0.1%,
+      so there is no absence. It also recorded that an earlier pick reached
+      e+ = 561.7, "outside the class's predicted 80..479 entirely" -- the
+      predicted ceiling was simply wrong, the true maximum is 512.1. The
+      non-pairing between the two panels was overplotting, not evidence:
+      the panels share e+, so a mark visible in one proves the run exists
+      in both, and silence in the other only means it is buried. See #393.
+
+      Residual, recorded not resolved: the R counterpart holds two marks
+      near e+ 80 (79.2 and 80.8) where this class has only one run. One of
+      them is a neighbouring class or a double-pick. It does not bear on
+      the label.
+
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log

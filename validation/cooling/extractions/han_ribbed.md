@@ -1015,13 +1015,20 @@ than extrapolating past it.
 ## Open items
 
 - **6** four-sided friction factor: transcription settled, correctness suspect
-- **10** which of `G` and `G_bar` is the ribbed wall
 - **18** Figure 4.47, angled ribs
 - **23** Fig. 4.46 and Eq. 4.18 disagree on `G` by up to 22%
 - whether the book carries a worked example, which would resolve item 6 and
   give the chain an end-to-end check
-- digitise the Figure 4.46 scatter, to set the harness tolerance from the
-  source's own spread rather than from a chosen number
+- ~~digitise the Figure 4.46 scatter, to set the harness tolerance from the
+  source's own spread~~ **do not do this without the correction in #393.**
+  The digitised subset over-represents the tails by about 5x -- 26% of picked
+  marks fall outside a band the source says holds 95% of its data -- because
+  only spatially isolated marks can be picked. A tolerance set from it would
+  be far too wide. NASA CR-4015's tabulated runs give the true spread instead.
+
+Item **10** is resolved (`G_bar = 1.2 G`, a four-wall average -- see the
+section below and #392); it was listed here as open after its own correction
+had been written, which is the hazard #392 is about.
 
 ---
 
@@ -1029,6 +1036,7 @@ than extrapolating past it.
 
 | date | reviewer | outcome |
 |---|---|---|
+| 2026-09-26 | reviewer + Claude | **The `e/D` 0.047 / `P/e` 10 / `W/H` 2 class dispute is closed, from behind the figure rather than by re-reading it.** Its two panels paired on only 2 of 4 marks, and the digitised data could not say which symbol they belonged to. Resolved with **NASA CR-4015** (= AVSCOM 86-C-25), Han, Park and Ibrahim, contract NAS3-24227, September 1986 -- the report Fig. 4.46's "This study" classes come from, traced through the acknowledgement in Han and Park (1988), which names NAS3-24227 where CR-3837 carries NAG3-311. Its appendix 7.3 tabulates every run with a self-identifying header (`E/D`, `P/E`, `ALPHA`, `HYD DIA`), so the class is found BY LABEL and the overplotted cluster is never resolved. Five runs on pp.141-145 at `Re` 10111, 18869, 32117, 60898, 64193 give `e+` 80.7, 150.5, 256.2, 485.8, 512.1, and **every mark in both panels lands on one of them**. Two recorded claims were wrong: the class is not "absent near `e+` ~ 80" (run 22 sits at 80.7 and the `R` panel picked it up to 0.1%), and its predicted ceiling of 479 was too low (the true maximum is 512.1, so the 546.6 mark is 6.7% out, not outside the class). The non-pairing was overplotting: the panels share `e+`, so a mark visible in one proves the run exists in both and silence in the other only means buried -- see #393. Reviewer independently confirmed the one clipped digit (`Re` 32117) by mass-flow ratio against run 24. |
 | 2026-09-20 | Claude | **Eq. 4.17/4.18 implemented** as `combaero.han_park_1988_angled()`, following the schema extension recorded as decision D5 (quadratic-in-alpha R, square/rectangular G switch, both opt-in and provably not affecting `han_1988_orthogonal` or `rallabandi_2009_high_re`). Scored against this document's own source, figure 4.47: R at RMS 10.5% over 39 points, G at RMS 8.8% over 115 points (representative geometry, the cloud carries no legend). Independently cross-checked against figure 4.51's parallel-rib classes (a different paper, Han et al. 1991) at RMS 8.5%; the other seven rib shapes on that figure (crossed, V, lambda) are deliberately not scored, since this equation cannot represent rib shape beyond angle and doing so would repeat item 23's lesson. Along the way, corrected two more stale `scores` fields: figure 4.51's 45/60 deg parallel series had been scored against `han_1988_orthogonal`, silently refused every time by the alpha guard (valid range 90-90) since before `han_park_1988_angled` existed to score them correctly. |
 | 2026-09-20 | reviewer + Claude | **Item 41 resolved, item 40 given data.** Figure 4.48 digitised: both panels, `[Ref. 3]` curve, and its error bars (16 series, 111 points). The `W/H=2/4` correlation at the branch boundary matches the WIDE branch of Eq. 4.19 (10%/6%), not the narrow one (69%/22%), settling which form Han's own figure uses at `W/H=1/2`. Along the way, corrected an initial misreading of panel (a)'s y-axis as log -- the half-integer minor ticks (1.5, 2.5, 3.5, 4.5) are only possible on a linear axis, confirmed on the printed page and independently by the digitised frame. One error-bar end (alpha=30, top panel) was initially obscured; the rescanned value agreed with the earlier partial read to 0.7%. |
 | 2026-09-18 | reviewer + Claude | **Item 7 closed with evidence, not deference.** D1 stands, but the reason improves: the `R` slope is in the DRAWING, not the scan. Both panel frames were digitised as distortion standards -- a frame is horizontal by construction, so its fitted slope is the panel's distortion and nothing else, and unlike a printed equation it does not presume the draftsman drew the equation faithfully. Upper frame `+0.00078`, lower frame `-0.00036`, neither monotonic, i.e. picking noise. The drawn `R` line rises at `+0.00857` -- **23x the distortion of the panel it sits in, and in the opposite direction**. No page skew lifts `R` by 2.7% while leaving its own frame flat to 0.04%. Independently, `G_bar` in the upper panel reproduces its printed `4.5 (e+)^0.28` to 0.25% RMS off the same scan. Filed as `validation/cooling/data/han2012/fig4.46_frame_*.csv`. |

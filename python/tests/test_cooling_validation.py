@@ -208,9 +208,13 @@ def test_stated_6pct_behaves_as_one_sigma_not_a_95pct_bound(records) -> None:
 def test_disputed_class_labels_are_declared_and_surfaced(dataset) -> None:
     """A disputed class label must stay visible, not decay into a comment.
 
-    fig4.46_G_eD0.047_pe10_wh2 pairs with its own R counterpart on only 2
-    of 4 marks. The coordinates are sound; which symbol they belong to is
-    not, and the digitised data cannot settle it -- it needs the page.
+    The four fig4.51 45-deg series return G_bar/G below 1, which is not
+    physically attainable; which panel duplicated the other cannot be
+    settled from the digitised data and needs the primary paper, Han,
+    Zhang and Lee (1991) ASME JHT 113, 590-598.
+
+    fig4.46_G_eD0.047_pe10_wh2 was the fifth and is now resolved -- see
+    test_fig446_wh2_class_is_pinned_to_its_source_runs.
 
     This pins three things: the series stays marked disputed, its
     cross_check still carries the specific question to ask of the book,
@@ -233,6 +237,47 @@ def test_disputed_class_labels_are_declared_and_surfaced(dataset) -> None:
     reported = {f.series for f in check_all() if f.check == "class-label"}
     for s in disputed:
         assert s.label in reported, f"{s.label} is disputed but not surfaced"
+
+
+def test_fig446_wh2_class_is_pinned_to_its_source_runs(dataset) -> None:
+    """The e/D 0.047, P/e 10, W/H 2 class was disputed on the grounds that
+    its two panels pair on only 2 of 4 marks. Resolved 2026-09-26 by going
+    behind the figure to NASA CR-4015 appendix 7.3 (pages 141-145), which
+    tabulates the five source runs with self-identifying headers, so the
+    class is found by label and the overplotted cluster is never resolved.
+
+    This pins the finding rather than the prose: every digitised mark in
+    both panels must land on one of the five documented runs. If someone
+    re-picks these series and a mark drifts off the run grid, that is a
+    digitisation error and should fail here.
+    """
+    # CR-4015 p.141-145, E/D=0.047 P/E=10.0 ALPHA=90 HYD DIA=2.667 IN.
+    # e+ from the printed R = 3.2 via f; the paper states R holds 95% of
+    # its data within 6%, which is about +/-3% on e+, so the tolerance is
+    # that plus digitisation error at the crowded right-hand edge.
+    RUN_EPLUS = [80.7, 150.5, 256.2, 485.8, 512.1]
+    TOL = 0.10
+
+    seen = 0
+    for series in dataset:
+        if "fig4.46" not in series.label or "eD0.047_pe10_wh2" not in series.label:
+            continue
+        assert series.class_confidence == "confirmed", (
+            f"{series.label} lost its resolution against CR-4015"
+        )
+        assert "CR-4015" in series.cross_check, (
+            f"{series.label} no longer records how the dispute was closed"
+        )
+        seen += 1
+        for pt in load_points(series):
+            x = pt.x
+            nearest = min(RUN_EPLUS, key=lambda r: abs(x / r - 1.0))
+            assert abs(x / nearest - 1.0) <= TOL, (
+                f"{series.label}: mark at e+={x:.1f} is "
+                f"{100 * abs(x / nearest - 1):.1f}% from the nearest "
+                f"CR-4015 run ({nearest}); no source run explains it"
+            )
+    assert seen == 2, f"expected the G and R pair, found {seen}"
 
 
 def test_disputed_labels_are_refused_by_geometry_binding_sets(dataset) -> None:

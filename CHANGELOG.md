@@ -73,6 +73,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The `fig4.46` class-label dispute is closed** (#393). The `e/D` 0.047,
+  `P/e` 10, `W/H` 2 series was marked `disputed` because its `G` and `R`
+  panels paired on only 2 of 4 marks and the digitised data could not say
+  which symbol the marks belonged to.
+
+  Resolved by going behind the figure rather than re-reading it. **NASA
+  CR-4015** (= AVSCOM 86-C-25, Han/Park/Ibrahim, contract NAS3-24227,
+  September 1986) is the report Fig. 4.46's "This study" classes come from,
+  traced through Han and Park (1988)'s acknowledgement. Its appendix
+  tabulates every run with a self-identifying header, so the class is found
+  by label and the overplotted cluster never has to be resolved: five runs
+  at `Re` 10111-64193 give `e+` 80.7, 150.5, 256.2, 485.8, 512.1, and every
+  mark in both panels lands on one of them.
+
+  Two recorded claims were wrong. The class is not "absent near `e+` ~ 80"
+  -- run 22 sits at 80.7 and the `R` panel picked it up to 0.1% -- and its
+  predicted ceiling of 479 was too low, the true maximum being 512.1. The
+  non-pairing was overplotting, not evidence about the label.
+
+  Both series move to `class_confidence: confirmed`, and a new test pins the
+  finding rather than the prose: every digitised mark must land on one of
+  the five documented runs.
+
 - **Lau metadata quoted a withdrawn resolution** (#392). `lau1990`'s
   `metadata.yaml` and extraction doc stated that Han's `G_bar` is the
   Prandtl-normalised `G Pr^-0.57` and "not a four-wall average", citing
