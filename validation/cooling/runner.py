@@ -21,17 +21,30 @@ from validation.cooling.schema import Point, SeriesMetadata, load_points
 # Figure 4.47, and independently by Figure 4.46's printed pair 3.7 and 4.5
 # (ratio 1.216).
 #
-# IT IS NOT UNIVERSAL. Digitising both panels of Figure 4.51 measures
-# G_bar/G for seven rib configurations directly: 90 deg gives 1.2193,
-# matching the printed 1.2162 to 0.3%, while the angled configurations
-# average 1.155 -- 4.5% below it, with a spread of 1.153 to 1.220.
+# IT IS A FIT, AND HAN MADE IT A CONSTANT. That is the point: the ratio
+# is measurably not constant, and 1.2 is the single number Han settled on
+# anyway. Pooling every closed-form measurement available -- 91-GT-3's
+# table 3, Lau's table 2, and CR-3837's per-run Nu(R)/Nu(AV) split, 16
+# configurations across three rigs at e+ = 300:
 #
-# So this applies to 90 deg ribs, where it was established. Applying it to
-# an angled rib is wrong by about 4.5%, which is larger than the 2.6%
-# scatter of the measurement itself. Anything off 90 deg is refused rather
-# than scaled; see _gbar_reason.
+#     min 1.096   max 1.413   mean 1.284   spread 29%
+#
+# and it drifts with e+ within a configuration too (91-GT-3's 90 deg rib
+# runs 1.29 down to 1.13 over e+ 150-1000).
+#
+# A generalised replacement was considered and REJECTED on the evidence:
+# 69% of that variance is BETWEEN RIGS, not within them (per-source means
+# 1.160 / 1.323 / 1.327, internal spreads 12% / 3% / 14%). No angle or
+# shape term can reach a rig offset, so a "better" correlation would be
+# fitting rig identity. Against the pooled population Han's 1.2 scores
+# bias -6.1%, MAE 8.3% -- a defensible compromise for one number, and
+# close to what a least-squares fit over the same population would give.
+#
+# So it is applied AS PUBLISHED, at every rib angle. The error that
+# produces is ACCURACY -- the model's limitation, reported and labelled --
+# not a harness defect. See docs/VALIDATION_POLICY.md. An earlier version
+# refused anything off 90 deg; that withheld a number Han does publish.
 G_BAR_OVER_G = 1.2
-G_BAR_VALID_ALPHA = 90.0
 
 # Bracket for the Re bisection. Deliberately far wider than any set's
 # stated validity: a series may sit outside it, and reporting that as
@@ -122,22 +135,18 @@ def _mid(rng: "cb.RibRange", fallback: float) -> float:
 def _gbar_reason(series: SeriesMetadata) -> str | None:
     """Why a G_bar series cannot be converted, or None if it can.
 
-    G_bar/G is a per-configuration quantity, not a constant: figure 4.51
-    ranks nine configurations in both and the lowest differs between the
-    panels, which a constant multiplier cannot do. The 1.2 is a 90 degree
-    result. Applying it to an angled rib would silently manufacture a
-    number, so it is refused instead.
+    Nothing is refused on rib angle any more. `G_bar = 1.2 G` is what Han
+    publishes, so applying it at every angle is the faithful
+    implementation; what that costs is measured and reported as accuracy
+    rather than hidden by declining to answer. See G_BAR_OVER_G.
+
+    Kept as a hook because a future G_bar series may be unconvertible for
+    a reason that is NOT rib angle -- a different averaging basis, say.
+    Lau's Gbar is a four-wall average like Han's (#392), but another
+    source's need not be.
     """
-    if series.y_axis != "G_bar":
-        return None
-    alpha = series.alpha_deg
-    if alpha is None or alpha == G_BAR_VALID_ALPHA:
-        return None
-    return (
-        f"G_bar at {alpha:g} deg: the 1.2 ratio is a 90 deg result and "
-        "varies by configuration (figure 4.51 ranks G and G_bar "
-        "differently), so it is not applied here"
-    )
+    del series  # no refusal applies today; see the docstring
+    return None
 
 
 def _binds_geometry(rib_set: "cb.RibCorrelationSet") -> bool:

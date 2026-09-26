@@ -88,7 +88,6 @@ def test_45deg_series_is_refused_not_scored(dataset) -> None:
     angled-correlation set yet) was found. The mechanism under test should
     not depend on any one series still holding that combination.
     """
-    import dataclasses
 
     series_45 = dataclasses.replace(
         next(s for s in dataset if s.y_axis == "G"),
@@ -381,7 +380,6 @@ def test_figure_references_are_namespaced_by_source(dataset) -> None:
             resolve_figure(dataset, bad)
 
     # Ambiguity must be refused, not resolved by luck of ordering.
-    import dataclasses
 
     other = dataclasses.replace(
         next(s for s in dataset if s.figure == "4.46"),
@@ -408,45 +406,91 @@ def test_axis_specs_are_declared_for_plotting(dataset) -> None:
         assert s.figure and s.panel, f"{s.label} is not assigned to a panel"
 
 
-def test_gbar_ratio_is_not_applied_off_90_degrees(dataset) -> None:
-    """G_bar/G = 1.2 is a 90 degree result, not a universal one.
+def test_gbar_ratio_is_hans_published_constant_at_every_angle(dataset) -> None:
+    """`G_bar = 1.2 G` is what Han publishes, so it is applied everywhere.
 
-    Digitising both panels of figure 4.51 measures G_bar/G directly for
-    seven rib configurations: 90 deg gives 1.2193, matching the printed
-    1.2162 to 0.3%, while the angled ones average 1.155 -- 4.5% below it,
-    against a 2.6% measurement scatter. The ratio is configuration
-    dependent, so the 90 deg value is not a universal converter.
+    This test asserted the OPPOSITE until 2026-09-26: that 1.2 is a 90
+    degree result and applying it to an angled rib "would manufacture a
+    number that looks like a measurement", so the runner refused.
 
-    Applying 1.2 off 90 degrees would manufacture a number that looks like
-    a measurement. The runner must refuse and say why.
+    What changed is not the evidence but what to do about it. The ratio is
+    indeed not constant -- pooling every closed-form measurement available
+    (91-GT-3 table 3, Lau table 2, CR-3837's per-run Nu(R)/Nu(AV) split,
+    16 configurations across three rigs) gives 1.096 to 1.413 at
+    e+ = 300, a 29% spread. But refusing withheld a number Han does
+    publish, and turned a known ACCURACY limit into a missing answer.
+
+    Faithful implementation uses the published constant; what it costs is
+    measured and labelled. See docs/VALIDATION_POLICY.md and G_BAR_OVER_G.
     """
-    from validation.cooling.runner import _gbar_reason, run_series
 
-    # The guard itself, at every angle the figures carry. It is preventive:
-    # figure 4.51 brings eight angled configurations, and none of the G_bar
-    # series filed today is both off 90 degrees AND scored.
-    for alpha in (30.0, 45.0, 60.0):
-        series = dataclasses.replace(
-            next(s for s in dataset if s.y_axis == "G_bar"),
-            alpha_deg=alpha,
-        )
-        reason = _gbar_reason(series)
-        assert reason and "90 deg result" in reason, f"G_bar at {alpha} deg was not refused"
-    assert (
-        _gbar_reason(
-            dataclasses.replace(next(s for s in dataset if s.y_axis == "G_bar"), alpha_deg=90.0)
-        )
-        is None
-    ), "90 degrees must still convert"
+    from validation.cooling.runner import _gbar_reason
 
-    # And no off-90 G_bar series may come back with a prediction.
-    for s in dataset:
-        if s.y_axis != "G_bar" or s.alpha_deg in (None, 90.0):
-            continue
-        recs = run_series(s)
-        assert all(r.predicted is None for r in recs), (
-            f"{s.label} is G_bar at {s.alpha_deg} deg and was scaled by 1.2"
+    template = next(s for s in dataset if s.y_axis == "G_bar")
+    for alpha in (30.0, 45.0, 60.0, 90.0):
+        series = dataclasses.replace(template, alpha_deg=alpha)
+        assert _gbar_reason(series) is None, (
+            f"G_bar at {alpha} deg was refused; Han publishes 1.2 for it"
         )
+
+
+def test_keeping_hans_constant_is_justified_by_the_pooled_measurements() -> None:
+    """Why no "improved" G_bar/G correlation was written.
+
+    A generalised replacement was considered and rejected on evidence, and
+    this pins the evidence so the decision can be revisited rather than
+    re-argued. 16 configurations, three rigs:
+
+        91-GT-3  mean 1.160, internal spread 12%
+        CR-3837  mean 1.323, internal spread  3%
+        lau1990  mean 1.327, internal spread 14%
+
+    **69% of the variance is BETWEEN rigs, not within them.** No angle or
+    shape term can reach a rig offset, so a "better" correlation would be
+    fitting rig identity. Against the pooled population Han's 1.2 scores
+    MAE 8.3%, a defensible one-number answer to a quantity spanning 29%.
+    """
+    import statistics
+
+    def ratio(g, gb, e_plus=300.0):
+        return (gb[0] * e_plus ** gb[1]) / (g[0] * e_plus ** g[1])
+
+    gt3 = [
+        ratio(g, gb)
+        for g, gb in (
+            ((1.61, 0.42), (2.94, 0.35)),
+            ((1.82, 0.41), (1.90, 0.42)),
+            ((1.04, 0.48), (1.14, 0.48)),
+            ((1.01, 0.47), (1.63, 0.42)),
+        )
+    ]
+    lau = [
+        ratio(g, gb)
+        for g, gb in (
+            ((4.218, 0.257), (5.450, 0.250)),
+            ((1.819, 0.355), (2.656, 0.335)),
+            ((1.299, 0.399), (2.163, 0.360)),
+            ((1.685, 0.376), (2.719, 0.336)),
+            ((1.983, 0.352), (3.460, 0.315)),
+            ((2.739, 0.324), (4.351, 0.291)),
+            ((1.992, 0.362), (3.685, 0.313)),
+        )
+    ]
+    cr = [1.340, 1.328, 1.325, 1.301, 1.320]
+
+    groups = (gt3, lau, cr)
+    pooled = gt3 + lau + cr
+    grand = statistics.mean(pooled)
+    between = sum(len(g) * (statistics.mean(g) - grand) ** 2 for g in groups)
+    within = sum(sum((x - statistics.mean(g)) ** 2 for x in g) for g in groups)
+
+    assert max(pooled) / min(pooled) > 1.25, "the spread that rules out one exact constant"
+    assert between / (between + within) > 0.6, (
+        "the between-rig share has dropped; if most variance is now WITHIN "
+        "rigs, a generalised correlation may be worth revisiting"
+    )
+    mae = statistics.mean(abs(1.2 / v - 1) for v in pooled)
+    assert mae < 0.12, f"Han's 1.2 now misses the pooled population by {mae:.1%}"
 
 
 def test_90_degree_gbar_still_scores(dataset) -> None:

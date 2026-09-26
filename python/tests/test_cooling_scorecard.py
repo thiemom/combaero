@@ -12,9 +12,9 @@ import math
 
 import pytest
 
-from validation.cooling import jet_array_runner, orifice_runner, runner
+from validation.cooling import jet_array_runner, orifice_runner
 from validation.cooling.schema import load_dataset
-from validation.cooling.scorecard import build, rollup, run_dataset
+from validation.cooling.scorecard import Cell, build, rollup, run_dataset
 
 
 @pytest.fixture(scope="module")
@@ -205,32 +205,36 @@ def test_lau_Gbar_independently_confirms_hans_1p2_factor(cells) -> None:
     assert c.within >= 0.85
 
 
-def test_gbar_path_stays_restricted_to_90_deg(dataset, cells) -> None:
-    """The real guard on the G_bar path is the rib angle, not the source.
-    G_BAR_OVER_G = 1.2 was established at 90 deg; applying it to an angled
-    rib is wrong by about 4.5%, larger than the measurement scatter, so
-    runner.py refuses off-90 series rather than scaling them.
+def test_gbar_series_score_at_every_angle_and_are_labelled_accuracy(dataset, cells) -> None:
+    """`G_bar = 1.2 G` applied as published, with the cost reported.
 
-    This pins the refusal behaviourally: an off-90 G_bar series may carry a
-    `scores:` target, but it must come back unscored.
+    This asserted the opposite until 2026-09-26 -- that off-90 G_bar
+    series must come back unscored. Refusing withheld a number Han
+    publishes; the ratio's real variability is an accuracy limit, and
+    accuracy limits get measured, not hidden.
+
+    `fig4.51_Gbar_60par` is the case that moved: 60 deg parallel ribs,
+    scored against han_park_1988_angled at MAE 4.9%, which is the size of
+    error the 1.2 approximation actually costs there.
     """
-    by_label = {c.label: c for c in cells}
-    seen_on, seen_off = False, False
-    for series in dataset:
-        if series.y_axis != "G_bar" or series.scores is None:
-            continue
-        cell = by_label.get(series.label)
-        if cell is None:
-            continue
-        if series.alpha_deg == runner.G_BAR_VALID_ALPHA:
-            seen_on = True
-        else:
-            seen_off = True
-            assert cell.n_scored == 0, (
-                f"{series.label} at alpha={series.alpha_deg} was scored "
-                "through the G_bar path; G_BAR_OVER_G only holds at 90 deg"
-            )
-    assert seen_on and seen_off, "fixture no longer covers both sides of the guard"
+    by_label = {c.label.split("  [")[0]: c for c in cells}
+    scored_off_90 = [
+        s
+        for s in dataset
+        if s.y_axis == "G_bar"
+        and s.alpha_deg not in (None, 90.0)
+        and (by_label.get(s.label) or Cell("", "", None)).n_scored
+    ]
+    assert scored_off_90, (
+        "no off-90 G_bar series scores; the published constant is being withheld again"
+    )
+    cell = by_label["han2012/fig4.51_Gbar_60par"]
+    assert cell.n_scored == cell.n
+    assert cell.basis == "accuracy", (
+        "figure 4.51 is Han, Zhang and Lee (1991), a different paper from "
+        "the set scoring it, so this is an accuracy result"
+    )
+    assert 0.02 < cell.mae < 0.10
 
 
 def test_rollup_never_pools_across_sampling_completeness(dataset) -> None:
