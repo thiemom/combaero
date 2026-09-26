@@ -374,15 +374,34 @@ def check_panel_pairing(
 ) -> list[Finding]:
     """Pair one symbol class across two panels of the same figure.
 
-    Where a figure stacks two panels over one abscissa, each experimental
-    run is plotted ONCE IN EACH PANEL at the same abscissa. So a class's
-    two files must hold the same number of points, pairing to within a
-    per cent or two.
+    A DIGITISATION TRIAGE TOOL, not evidence. Read the asymmetry before
+    using the output.
 
-    This assumes nothing -- no card, no model, no legend reading -- which
-    makes it the sharpest check available on a scatter pass. It catches
-    what a span check cannot see: a missed mark, a mark picked twice, and
-    a series filed under the wrong class.
+    Where a figure stacks two panels over one abscissa, each experimental
+    run is plotted once in each panel at the same abscissa. That is true
+    of the FIGURE. It is not true of the PICK: only spatially isolated
+    marks can be digitised, so a class routinely yields different point
+    counts in the two panels whenever one panel is more crowded -- which
+    is systematic, not a defect.
+
+    So the finding is one-sided:
+
+      - a pair that MATCHES is positive evidence, and useful;
+      - a pair that does NOT match means "look here again", and nothing
+        more. It is not evidence of a missed mark, a double pick, or a
+        wrong class label.
+
+    An earlier version of this docstring claimed the check catches "a
+    series filed under the wrong class". That claim put fig4.46's
+    e/D 0.047 / P/e 10 / W/H 2 class under dispute for weeks on the
+    strength of 2 unpaired marks out of 4. NASA CR-4015's tabulated runs
+    later showed the label was right all along and every unpaired mark
+    was simply buried in the other panel's dense region. See #393.
+
+    Since the panels share an abscissa, the useful inference runs the
+    other way: a mark visible in EITHER panel proves the run exists in
+    both, which turns the other panel's silence into a bounded
+    observation rather than a missing one.
     """
     suffix_a = pattern_a.rsplit("*", 1)[-1]
     suffix_b = pattern_b.rsplit("*", 1)[-1]

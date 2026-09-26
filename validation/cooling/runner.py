@@ -257,9 +257,18 @@ def _r_at_alpha(
 ARBITRARY_RE = 30000.0
 
 
-def run_series(series: SeriesMetadata) -> list[Record]:
-    """Evaluate one series. Unscored series yield records with no prediction."""
-    points: list[Point] = load_points(series)
+def run_series(
+    series: SeriesMetadata, points: list[Point] | None = None
+) -> list[Record]:
+    """Evaluate one series. Unscored series yield records with no prediction.
+
+    `points` overrides the series' own CSV. Its only use is asking the set
+    what it predicts at abscissae the digitisation could not pick -- see
+    `recovery.py` -- so the recovered bounds are checked against the same
+    chain as everything else rather than a second implementation of it.
+    """
+    if points is None:
+        points = load_points(series)
 
     if series.scores is None:
         return [

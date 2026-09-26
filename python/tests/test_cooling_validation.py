@@ -665,3 +665,72 @@ def test_han_park_r_alpha_normalisation_is_not_raw_R(records) -> None:
         f"bias {r_cell.bias:.1%} -- looks like raw R is being compared "
         "against the normalised digitised values"
     )
+
+
+def test_fig446_span_check_is_one_sided_and_its_exceedances_are_known(dataset) -> None:
+    """The fig4.46 cross_checks record that their span argument is ONE-SIDED:
+    only isolated marks can be picked, so the picked span is a subset of the
+    true span and fitting inside the predicted band is close to vacuous.
+    Exceeding it is the informative direction.
+
+    This pins both halves of that claim so neither can rot:
+
+      1. the check really is weak where it passes -- mean coverage of the
+         predicted range is well under 100%;
+      2. the series that DO exceed the band are exactly the four recorded.
+
+    A re-pick that moves a series across the boundary changes this list and
+    should make someone look, rather than silently joining a set of series
+    whose prose says they agree.
+    """
+    import csv as _csv
+    import math
+
+    # Figure 4.46's own legend: "This study" 10,000-60,000 (e/D 0.047, 0.078);
+    # "Han (1984)" 8,000-80,000 (e/D 0.063, 0.042, 0.021).
+    RE_RANGE = {0.047: (10000, 60000), 0.078: (10000, 60000)}
+    DEFAULT_RE = (8000, 80000)
+    MARGIN = 0.15  # f comes from the printed R = 3.2, worth about +/-3% on e+
+    KNOWN_EXCEEDANCES = {
+        "fig4.46_G_eD0.063_pe10_wh1",
+        "fig4.46_R_eD0.042_pe10_wh1",
+        "fig4.46_R_eD0.063_pe10_wh1",
+        "fig4.46_R_eD0.063_pe20_wh1",
+    }
+
+    def e_plus(re_d: float, e_over_d: float, w_over_h: float) -> float:
+        geom = 2 * e_over_d * (2 * w_over_h / (w_over_h + 1.0))
+        f = 2.0 / (3.2 - 2.5 * math.log(geom) - 2.5) ** 2
+        return e_over_d * re_d * math.sqrt(f / 2.0)
+
+    coverage: list[float] = []
+    exceed: set[str] = set()
+    for series in dataset:
+        stem = series.path.stem
+        if not stem.startswith("fig4.46_") or series.kind != "measured":
+            continue
+        geom = series.geometry or {}
+        e_over_d, w_over_h = geom.get("e_D"), geom.get("W_H")
+        if e_over_d is None or w_over_h is None:
+            continue
+        with open(series.path) as fh:
+            xs = [float(r[0]) for r in list(_csv.reader(fh))[1:] if r]
+        if not xs:
+            continue
+        lo_re, hi_re = RE_RANGE.get(e_over_d, DEFAULT_RE)
+        lo, hi = e_plus(lo_re, e_over_d, w_over_h), e_plus(hi_re, e_over_d, w_over_h)
+        coverage.append((max(xs) / min(xs)) / (hi / lo))
+        if any(x < lo * (1 - MARGIN) or x > hi * (1 + MARGIN) for x in xs):
+            exceed.add(stem)
+
+    assert coverage, "no fig4.46 measured series found"
+    mean_cov = sum(coverage) / len(coverage)
+    assert mean_cov < 0.95, (
+        f"picked marks now cover {mean_cov:.0%} of the predicted range; the "
+        "cross_checks describe this check as weak because coverage is partial"
+    )
+    assert exceed == KNOWN_EXCEEDANCES, (
+        f"the set of series exceeding the predicted band changed: "
+        f"added {sorted(exceed - KNOWN_EXCEEDANCES)}, "
+        f"gone {sorted(KNOWN_EXCEEDANCES - exceed)}"
+    )
