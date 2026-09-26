@@ -1,0 +1,488 @@
+# Han, Park and Lei (1984), NASA CR-3837 -- the first source in this dataset
+# whose every run is TABULATED rather than plotted.
+#
+# NASA Contractor Report 3837, "Heat Transfer and Pressure Drop in Blade
+# Cooling Channels With Turbulence Promoters", grant NAG3-311, November 1984.
+# The journal version is Han, Park and Lei (1985), ASME J. Engng Gas Turbines
+# Power 107, 628-635 -- reference [8] of Han and Park (1988).
+#
+# SCOPE. Square duct only (W/H = 1), e/D = 0.063 only, P/e = 10 and 20,
+# rib angles 90/75/60/45/30/15, Re 7,000-90,000 (long duct entrance) and
+# 8,000-80,000 (sudden contraction). Committed here: the long-entrance
+# heat-transfer runs at P/e = 10, appendix 7.3, page 128, X/D = 11.5.
+#
+# WHY IT CAN SCORE ONE SET AND NOT THE OTHER -- the circularity gate, #391.
+#
+#  * `han_park_1988_angled` (Eq. 4.17/4.18): **INDEPENDENT, scored here.**
+#    Han and Park (1988) measured e/D = 0.047 and 0.078 only -- no 0.063
+#    anywhere in the paper -- on a different contract (NAS3-24227), a
+#    different rig, and its own data report is CR-4015, cited there as ref
+#    [9]. Its conclusion (4) says the square-channel results "confirm
+#    observations in the previous study [8]", i.e. compared against, not
+#    pooled into. Eq. 4.17/4.18's stated validity e/D = 0.047-0.078
+#    BRACKETS 0.063 by interpolation without ever having measured it, so
+#    this is a genuine out-of-sample test.
+#
+#  * `han_1988_orthogonal` (R = 3.2, G = 3.7(e+)^0.28): **CIRCULAR, not
+#    scored.** Figure 4.46's right-hand legend box prints "Han (1984),
+#    8,000 <= Re <= 80,000" at e/D 0.063 for both P/e 10 and 20 -- a
+#    four-way fingerprint match to CR-3837's sudden-contraction table
+#    (Table 2, "e/D = 0.063, Re = 8,000 to 80,000"). Those marks are these
+#    runs. Figure 4.46 is where R = 3.2 and G = 3.7(e+)^0.28 were fitted.
+#    The box pools more than one study -- it also carries e/D 0.042 and
+#    0.021, which CR-3837 never ran.
+#
+# THE VALUES HERE ARE DERIVED, and the conversion is the point.
+# The appendix prints `Rbar` and `Gbar`, both on the CHANNEL-AVERAGE
+# friction `fbar` and, for Gbar, the four-wall average Stanton number.
+# combaero's sets use Han's four-sided equivalent f and the RIBBED-WALL
+# Stanton number. Comparing the printed columns directly would be a silent
+# definitional error of exactly the kind #389 names -- the printed Rbar is
+# 5.35 where the same measurement on Han's basis is 3.195, a 67% gap.
+#
+#   fbar = 2 / (Rbar - 2.5 ln(2 e/D) - 2.5)^2        invert the printed Rbar
+#   f_s  = 0.046 Re^-0.2                             Han and Park's own smooth form,
+#                                                    which reproduces CR-3837's
+#                                                    tabulated smooth duct to ~1%
+#   f    = 2 fbar - f_s                              Han's four-sided equivalent at W/H = 1
+#   St_r = St(AV) Nu(R)/Nu(AV)                       ribbed wall from the printed split
+#   e+   = (e/D) Re sqrt(f/2)
+#   R    = sqrt(2/f) + 2.5 ln(2 e/D) + 2.5
+#   G    = R + (f/(2 St_r) - 1) / sqrt(f/2)
+#
+# The `Nu(R)`/`Nu(S)`/`Nu(AV)` split is printed per run, so St_r is read
+# rather than assumed. That split is unique to this source in the dataset.
+#
+# VERIFICATION. Page 128 was read on two independent channels -- a visual
+# read at 200-400 dpi and macOS Vision OCR at 400 dpi upscaled -- across all
+# five angle blocks. Every discrepancy was an OCR error caught by an
+# independent check: `Nu(AV)` 247.6 against the mean identity
+# (62.6+32.6)/2 = 47.6; `Gbar` 22.57 against a reconstruction giving 21.59;
+# `Re` 152,257 against the stated 7,000-90,000 range; `Rbar` 1.58 against the
+# monotone 8.17 -> 5.93 sequence. No cell survives where the channels
+# disagree. OCR also recovered a seventh 90 deg row (Re 16,544) that the
+# visual pass had dropped because it prints no e+.
+#
+# STATED UNCERTAINTY: average friction factor < 6.6%, Nusselt number < 6.8%,
+# both "for Reynolds number greater than 10,000". Five committed runs sit
+# below that (Re 8,314 / 6,281 / 6,385 / 6,571 / 9,637) and the source makes
+# no claim for them.
+#
+# St_r is on PROJECTED area -- "not including the increased rib surface
+# area", the source's own words, matching Lau's convention.
+
+paper:
+  name: han_park_lei1984
+  citation: >-
+    Han, J.C., Park, J.S. and Lei, C.K. (1984). "Heat Transfer and Pressure
+    Drop in Blade Cooling Channels With Turbulence Promoters." NASA
+    Contractor Report 3837, grant NAG3-311. Journal version: ASME J. Engng
+    Gas Turbines Power 107, 628-635 (1985).
+  secondary: false
+
+files:
+  - path: table_a90_G.csv
+    after: null
+    page: 128
+    item: "Appendix 7.3, P/e = 10, alpha = 90 deg, X/D = 11.5"
+    series: "tabulated runs, derived to Han's four-sided basis"
+    figure: "table_a7.3"
+    panel: single
+    geometry:
+      e_D: 0.063
+      p_e: 10.0
+      W_H: 1.0
+      alpha_deg: 90.0
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: measured
+    extraction: tabulated
+    confidence: band
+    uncertainty: 0.068
+    scores: han_park_1988_angled
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_multiplier: 1.0
+      y_multiplier: 1.0
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+    cross_check: >-
+      Out-of-sample test of Eq. 4.18 at a blockage Han and Park never
+      measured. Pooled over all five angles, G runs +12.4% above the
+      equation (MAE 13.3%); over the four ANGLED sets alone, which is the
+      clean comparison, +13.3% bias and 14.3% MAE. Eq. 4.18 reads
+      systematically low.
+
+      That bears on item 23 of han_ribbed.md, an unresolved internal
+      disagreement between figure 4.46 and Eq. 4.18 of up to 22% on G with
+      different e+ exponents (0.28 against 0.35). An independent dataset
+      now lands on the figure's side. Recorded, not reconciled.
+
+      alpha = 90 is additionally CIRCULAR against han_1988_orthogonal --
+      these runs are figure 4.46's right-box marks. Never score it there.
+
+  - path: table_a90_R.csv
+    after: null
+    page: 128
+    item: "Appendix 7.3, P/e = 10, alpha = 90 deg, X/D = 11.5"
+    series: "tabulated runs, derived to Han's four-sided basis"
+    figure: "table_a7.3"
+    panel: single
+    geometry:
+      e_D: 0.063
+      p_e: 10.0
+      W_H: 1.0
+      alpha_deg: 90.0
+    alpha_deg: 90.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: R
+    kind: measured
+    extraction: tabulated
+    confidence: band
+    uncertainty: 0.066
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_multiplier: 1.0
+      y_multiplier: 1.0
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+    cross_check: >-
+      Out-of-sample test of Eq. 4.17: bias -2.2% and MAE 6.8% over the
+      angled sets, inside the source's own 6.6% friction uncertainty.
+      **The friction roughness function is confirmed on data it was not
+      fitted to.**
+
+      Committed unscored: runner.py's e+ path resolves y_axis to G, G_bar
+      or R_normalised and has no absolute-R branch, the same gap that
+      leaves lau1990's R unscored. The comparison above was made offline.
+
+      alpha = 90 is additionally CIRCULAR against han_1988_orthogonal --
+      these runs are figure 4.46's right-box marks. Never score it there.
+
+  - path: table_a75_G.csv
+    after: null
+    page: 128
+    item: "Appendix 7.3, P/e = 10, alpha = 75 deg, X/D = 11.5"
+    series: "tabulated runs, derived to Han's four-sided basis"
+    figure: "table_a7.3"
+    panel: single
+    geometry:
+      e_D: 0.063
+      p_e: 10.0
+      W_H: 1.0
+      alpha_deg: 75.0
+    alpha_deg: 75.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: measured
+    extraction: tabulated
+    confidence: band
+    uncertainty: 0.068
+    scores: han_park_1988_angled
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_multiplier: 1.0
+      y_multiplier: 1.0
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+    cross_check: >-
+      Out-of-sample test of Eq. 4.18 at a blockage Han and Park never
+      measured. Pooled over all five angles, G runs +12.4% above the
+      equation (MAE 13.3%); over the four ANGLED sets alone, which is the
+      clean comparison, +13.3% bias and 14.3% MAE. Eq. 4.18 reads
+      systematically low.
+
+      That bears on item 23 of han_ribbed.md, an unresolved internal
+      disagreement between figure 4.46 and Eq. 4.18 of up to 22% on G with
+      different e+ exponents (0.28 against 0.35). An independent dataset
+      now lands on the figure's side. Recorded, not reconciled.
+
+  - path: table_a75_R.csv
+    after: null
+    page: 128
+    item: "Appendix 7.3, P/e = 10, alpha = 75 deg, X/D = 11.5"
+    series: "tabulated runs, derived to Han's four-sided basis"
+    figure: "table_a7.3"
+    panel: single
+    geometry:
+      e_D: 0.063
+      p_e: 10.0
+      W_H: 1.0
+      alpha_deg: 75.0
+    alpha_deg: 75.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: R
+    kind: measured
+    extraction: tabulated
+    confidence: band
+    uncertainty: 0.066
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_multiplier: 1.0
+      y_multiplier: 1.0
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+    cross_check: >-
+      Out-of-sample test of Eq. 4.17: bias -2.2% and MAE 6.8% over the
+      angled sets, inside the source's own 6.6% friction uncertainty.
+      **The friction roughness function is confirmed on data it was not
+      fitted to.**
+
+      Committed unscored: runner.py's e+ path resolves y_axis to G, G_bar
+      or R_normalised and has no absolute-R branch, the same gap that
+      leaves lau1990's R unscored. The comparison above was made offline.
+
+  - path: table_a60_G.csv
+    after: null
+    page: 128
+    item: "Appendix 7.3, P/e = 10, alpha = 60 deg, X/D = 11.5"
+    series: "tabulated runs, derived to Han's four-sided basis"
+    figure: "table_a7.3"
+    panel: single
+    geometry:
+      e_D: 0.063
+      p_e: 10.0
+      W_H: 1.0
+      alpha_deg: 60.0
+    alpha_deg: 60.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: measured
+    extraction: tabulated
+    confidence: band
+    uncertainty: 0.068
+    scores: han_park_1988_angled
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_multiplier: 1.0
+      y_multiplier: 1.0
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+    cross_check: >-
+      Out-of-sample test of Eq. 4.18 at a blockage Han and Park never
+      measured. Pooled over all five angles, G runs +12.4% above the
+      equation (MAE 13.3%); over the four ANGLED sets alone, which is the
+      clean comparison, +13.3% bias and 14.3% MAE. Eq. 4.18 reads
+      systematically low.
+
+      That bears on item 23 of han_ribbed.md, an unresolved internal
+      disagreement between figure 4.46 and Eq. 4.18 of up to 22% on G with
+      different e+ exponents (0.28 against 0.35). An independent dataset
+      now lands on the figure's side. Recorded, not reconciled.
+
+  - path: table_a60_R.csv
+    after: null
+    page: 128
+    item: "Appendix 7.3, P/e = 10, alpha = 60 deg, X/D = 11.5"
+    series: "tabulated runs, derived to Han's four-sided basis"
+    figure: "table_a7.3"
+    panel: single
+    geometry:
+      e_D: 0.063
+      p_e: 10.0
+      W_H: 1.0
+      alpha_deg: 60.0
+    alpha_deg: 60.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: R
+    kind: measured
+    extraction: tabulated
+    confidence: band
+    uncertainty: 0.066
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_multiplier: 1.0
+      y_multiplier: 1.0
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+    cross_check: >-
+      Out-of-sample test of Eq. 4.17: bias -2.2% and MAE 6.8% over the
+      angled sets, inside the source's own 6.6% friction uncertainty.
+      **The friction roughness function is confirmed on data it was not
+      fitted to.**
+
+      Committed unscored: runner.py's e+ path resolves y_axis to G, G_bar
+      or R_normalised and has no absolute-R branch, the same gap that
+      leaves lau1990's R unscored. The comparison above was made offline.
+
+  - path: table_a45_G.csv
+    after: null
+    page: 128
+    item: "Appendix 7.3, P/e = 10, alpha = 45 deg, X/D = 11.5"
+    series: "tabulated runs, derived to Han's four-sided basis"
+    figure: "table_a7.3"
+    panel: single
+    geometry:
+      e_D: 0.063
+      p_e: 10.0
+      W_H: 1.0
+      alpha_deg: 45.0
+    alpha_deg: 45.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: measured
+    extraction: tabulated
+    confidence: band
+    uncertainty: 0.068
+    scores: han_park_1988_angled
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_multiplier: 1.0
+      y_multiplier: 1.0
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+    cross_check: >-
+      Out-of-sample test of Eq. 4.18 at a blockage Han and Park never
+      measured. Pooled over all five angles, G runs +12.4% above the
+      equation (MAE 13.3%); over the four ANGLED sets alone, which is the
+      clean comparison, +13.3% bias and 14.3% MAE. Eq. 4.18 reads
+      systematically low.
+
+      That bears on item 23 of han_ribbed.md, an unresolved internal
+      disagreement between figure 4.46 and Eq. 4.18 of up to 22% on G with
+      different e+ exponents (0.28 against 0.35). An independent dataset
+      now lands on the figure's side. Recorded, not reconciled.
+
+  - path: table_a45_R.csv
+    after: null
+    page: 128
+    item: "Appendix 7.3, P/e = 10, alpha = 45 deg, X/D = 11.5"
+    series: "tabulated runs, derived to Han's four-sided basis"
+    figure: "table_a7.3"
+    panel: single
+    geometry:
+      e_D: 0.063
+      p_e: 10.0
+      W_H: 1.0
+      alpha_deg: 45.0
+    alpha_deg: 45.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: R
+    kind: measured
+    extraction: tabulated
+    confidence: band
+    uncertainty: 0.066
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_multiplier: 1.0
+      y_multiplier: 1.0
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+    cross_check: >-
+      Out-of-sample test of Eq. 4.17: bias -2.2% and MAE 6.8% over the
+      angled sets, inside the source's own 6.6% friction uncertainty.
+      **The friction roughness function is confirmed on data it was not
+      fitted to.**
+
+      Committed unscored: runner.py's e+ path resolves y_axis to G, G_bar
+      or R_normalised and has no absolute-R branch, the same gap that
+      leaves lau1990's R unscored. The comparison above was made offline.
+
+  - path: table_a30_G.csv
+    after: null
+    page: 128
+    item: "Appendix 7.3, P/e = 10, alpha = 30 deg, X/D = 11.5"
+    series: "tabulated runs, derived to Han's four-sided basis"
+    figure: "table_a7.3"
+    panel: single
+    geometry:
+      e_D: 0.063
+      p_e: 10.0
+      W_H: 1.0
+      alpha_deg: 30.0
+    alpha_deg: 30.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: G
+    kind: measured
+    extraction: tabulated
+    confidence: band
+    uncertainty: 0.068
+    scores: han_park_1988_angled
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_multiplier: 1.0
+      y_multiplier: 1.0
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+    cross_check: >-
+      Out-of-sample test of Eq. 4.18 at a blockage Han and Park never
+      measured. Pooled over all five angles, G runs +12.4% above the
+      equation (MAE 13.3%); over the four ANGLED sets alone, which is the
+      clean comparison, +13.3% bias and 14.3% MAE. Eq. 4.18 reads
+      systematically low.
+
+      That bears on item 23 of han_ribbed.md, an unresolved internal
+      disagreement between figure 4.46 and Eq. 4.18 of up to 22% on G with
+      different e+ exponents (0.28 against 0.35). An independent dataset
+      now lands on the figure's side. Recorded, not reconciled.
+
+  - path: table_a30_R.csv
+    after: null
+    page: 128
+    item: "Appendix 7.3, P/e = 10, alpha = 30 deg, X/D = 11.5"
+    series: "tabulated runs, derived to Han's four-sided basis"
+    figure: "table_a7.3"
+    panel: single
+    geometry:
+      e_D: 0.063
+      p_e: 10.0
+      W_H: 1.0
+      alpha_deg: 30.0
+    alpha_deg: 30.0
+    x_axis: e_plus
+    x_scale: 1.0
+    y_axis: R
+    kind: measured
+    extraction: tabulated
+    confidence: band
+    uncertainty: 0.066
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_multiplier: 1.0
+      y_multiplier: 1.0
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+    cross_check: >-
+      Out-of-sample test of Eq. 4.17: bias -2.2% and MAE 6.8% over the
+      angled sets, inside the source's own 6.6% friction uncertainty.
+      **The friction roughness function is confirmed on data it was not
+      fitted to.**
+
+      Committed unscored: runner.py's e+ path resolves y_axis to G, G_bar
+      or R_normalised and has no absolute-R branch, the same gap that
+      leaves lau1990's R unscored. The comparison above was made offline.

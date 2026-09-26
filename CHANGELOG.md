@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **NASA CR-3837 (Han, Park and Lei, 1984) as a tabulated primary source**
+  (#391). The first source in the cooling dataset whose every run is
+  tabulated rather than plotted, and the only one printing the ribbed- and
+  smooth-wall Nusselt numbers separately, so the ribbed-wall Stanton number
+  is read rather than assumed. 33 runs across five rib angles.
+
+  Scored **out-of-sample** against `han_park_1988_angled`: Eq. 4.17/4.18
+  were fitted to `e/D` = 0.047 and 0.078 on a different contract, and this
+  is `e/D` = 0.063, a blockage they never measured. `R` is confirmed (bias
+  -2.2%, MAE 6.8%, inside the source's own 6.6% friction uncertainty); `G`
+  reads low at every angle, which takes the figure's side in item 23 of
+  `han_ribbed.md`.
+
+  Deliberately **not** scored against `han_1988_orthogonal`: figure 4.46's
+  right-hand box prints "Han (1984), 8,000 <= Re <= 80,000" at `e/D` 0.063
+  for both `P/e`, a four-way match to CR-3837's own Table 2, so those marks
+  are these runs and that correlation was fitted to them.
+
+  Values are derived to Han's four-sided friction basis and ribbed-wall
+  Stanton number; the printed `Rbar` is 5.35 where the same measurement on
+  Han's basis is 3.195, so committing the printed columns would have been a
+  67% definitional error. Page 128 is two-channel verified.
+
 - **The cooling scorecard segregates by sampling completeness, and recovers
   the marks a digitisation could not pick** (#393). A paper prints graphs,
   not tables, so where a figure overplots symbol classes only the spatially
@@ -107,6 +130,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   conversion.
 
 ### Fixed
+
+- **`han_park_1988_angled` scored every angled series at 90 degrees**
+  (#391). On the `e+` path `run_series` copied `e_D`, `p_e` and `W_H` out of
+  `series.geometry` but never `alpha_deg`, a top-level field, so
+  `_probe_geometry`'s default of 90 survived. Every angled series was scored
+  as though its ribs were transverse -- against the one correlation set
+  whose entire subject is rib angle.
+
+  This invalidates the "RMS 8.5%" cross-check against figure 4.51's
+  parallel-rib classes recorded in `han_ribbed.md`. Re-scored,
+  `fig4.51_G_60par` reports MAE 6.8% and bias -6.8%, and the set moves from
+  bias +4.4% to +1.5%. Nothing failed before the fix; the numbers simply
+  meant something other than what they said.
 
 - **The `fig4.46` class-label dispute is closed** (#393). The `e/D` 0.047,
   `P/e` 10, `W/H` 2 series was marked `disputed` because its `G` and `R`
