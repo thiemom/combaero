@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Validation policy: fidelity, accuracy and tuning are three questions,
+  never one number** ([docs/VALIDATION_POLICY.md](docs/VALIDATION_POLICY.md),
+  and a Hard Rule in `CLAUDE.md` -- it applies to the whole `validation/`
+  tree, not only cooling).
+
+  **Fidelity** -- does the implementation mirror the paper -- is judged
+  **only on the author's own data**; a miss is our transcription.
+  **Accuracy** -- what the model does on another rig -- is judged
+  **cross-source and labelled cross-source in the report**; a miss is the
+  model's limitation. Same lab, different study counts as cross-source.
+  Matching a particular rig stays the user's job with
+  `Nu_multiplier`/`f_multiplier`, and the harness never scores,
+  recommends or applies a tuner.
+
+  The scorecard renders `basis` per row and the rollup segregates on it, so
+  the two can no longer be averaged together.
+
+  **What separating them showed.** `han_1988_orthogonal`'s fidelity rests on
+  **eight cleanly-sampled points** -- its own data survives only as an
+  overplotted scatter -- while its cross-source accuracy reads *better*
+  (78.3% within against 62.5%) purely because the cross-source data is
+  tabulated. Pooled, that read as a single unremarkable number.
+
 - **Absolute `R` is scoreable, unblocking six committed series** (#339
   plan 1a). `runner.py`'s `e+` path resolved `y_axis` to `G`, `G_bar` or
   `R_normalised` only, so sources that TABULATE the roughness functions --
