@@ -1014,27 +1014,52 @@ than extrapolating past it.
 
 ## Open items
 
-- **6** four-sided friction factor: transcription settled, correctness suspect
-- **18** Figure 4.47, angled ribs
-- **23** Fig. 4.46 and Eq. 4.18 disagree on `G` by up to 22% -- **an
-  independent dataset now takes the figure's side.** NASA CR-3837's 33
-  tabulated runs score against Eq. 4.18 with a NEGATIVE bias at every
-  rib angle (-0.8% to -19.9%), i.e. the equation reads low, which is the
-  same direction as the internal disagreement. Out-of-sample: CR-3837 is
-  `e/D` 0.063, a blockage Han and Park never measured. Still not
-  reconciled, but no longer only an internal inconsistency
-- whether the book carries a worked example, which would resolve item 6 and
-  give the chain an end-to-end check
-- ~~digitise the Figure 4.46 scatter, to set the harness tolerance from the
-  source's own spread~~ **do not do this without the correction in #393.**
-  The digitised subset over-represents the tails by about 5x -- 26% of picked
-  marks fall outside a band the source says holds 95% of its data -- because
-  only spatially isolated marks can be picked. A tolerance set from it would
-  be far too wide. NASA CR-4015's tabulated runs give the true spread instead.
+**Swept 2026-09-26 against the document's own Resolved table and the
+dataset. Almost nothing was still open; the list had simply not been
+updated as items closed.** That is the fourth time a superseded record in
+this project was read as current (see also item 10 here, the `lau1990`
+metadata in #392, and the orphaned docstring in `components.py`).
 
-Item **10** is resolved (`G_bar = 1.2 G`, a four-wall average -- see the
-section below and #392); it was listed here as open after its own correction
-had been written, which is the hazard #392 is about.
+Closed in the sweep, with where each was already resolved:
+
+- **6** four-sided friction factor -- resolved by derivation, Resolved
+  table above. The apparent trailing `* f_bar` was a typesetting artefact
+  in our reading; D3 withdrawn. It had stayed on this list saying
+  "correctness suspect" after the correctness question was answered.
+- **18** Figure 4.47 -- read; items 28-34 confirmed, and six series are
+  digitised from it in `data/han2012/`. It had stayed here as "missing".
+- **23** -- was recorded TWICE with different content: resolved above as
+  "Fig. 4.46 and Fig. 4.47 are different papers and different
+  configurations", and open here as "they disagree on `G` by up to 22%".
+  Both are true and they are not the same statement. Superseded by the
+  finding below, which is evidence rather than an internal comparison.
+- ~~digitise the Figure 4.46 scatter to set the harness tolerance~~ --
+  **do not.** The digitised subset over-represents the tails about 5x
+  (#393): 26% of picked marks fall outside a band the source says holds
+  95% of its data, because only spatially isolated marks can be picked. A
+  tolerance set from it would be far too wide. CR-3837's tabulated runs
+  give the true spread instead.
+
+### Recorded as a known accuracy limit, not an open question
+
+**Eq. 4.18 reads low on `G`.** NASA CR-3837's 33 tabulated runs score
+against it with a NEGATIVE bias at every rib angle, -0.8% to -19.9%
+(#398). That is out-of-sample: CR-3837 is `e/D` = 0.063, a blockage Han
+and Park never measured. It is the same direction as the old item 23
+internal disagreement, so an independent dataset now takes the figure's
+side.
+
+`han_park_1988_angled` ships Eq. 4.18, so this is a property of the model
+a user should know, not a defect to fix. Per
+`docs/VALIDATION_POLICY.md` it is an ACCURACY result and the harness
+reports it as one. **Not reconciled, and deliberately not corrected** --
+"improving" a published correlation against one dataset is a new feature
+with its own evidence bar, not a bug fix.
+
+### Genuinely still open
+
+- whether the book carries a **worked example** for ribs, which would give
+  the whole chain an end-to-end check. Nobody has looked.
 
 ---
 
@@ -1042,6 +1067,7 @@ had been written, which is the hazard #392 is about.
 
 | date | reviewer | outcome |
 |---|---|---|
+| 2026-09-26 | reviewer + Claude | **Han's rib implementation wrapped up; open-items list swept.** Items 6, 18 and 23 were all already resolved in this document's own Resolved table while still listed as open -- item 23 twice, with different content in each place. Nothing was reopened by the sweep. Two decisions recorded rather than left hanging. **(1) Eq. 4.18 reads low on `G`**, confirmed out-of-sample by CR-3837 at every rib angle (-0.8% to -19.9%); recorded as a known accuracy limit of the published correlation, not a defect, since "improving" a paper against one dataset is a new feature with its own evidence bar. **(2) No generalised `G_bar/G`.** Pooling 91-GT-3's table 3 (extracted for this), Lau's table 2 and CR-3837's per-run split gives 16 configurations over three rigs spanning 1.096-1.413, and **69% of that variance is BETWEEN rigs** -- no angle or shape term can reach a rig offset, so a "better" correlation would fit rig identity. Han's 1.2 scores MAE 8.3% against the pooled population and is applied as published at every angle (#401). Pinned by a test that fails if the between-rig share drops, which is the condition for revisiting. |
 | 2026-09-26 | reviewer + Claude | **`han_park_1988_angled` was scoring every angled series at 90 degrees.** Found while wiring NASA CR-3837 in as a tabulated primary (see `han_park_lei_1984_cr3837.md`): on the `e+` path `run_series` copied `e_D`, `p_e` and `W_H` out of `series.geometry` but never `alpha_deg`, which is a top-level field rather than part of that mapping, so `_probe_geometry`'s default of 90 survived. Every angled series was therefore scored as though its ribs were transverse -- against the one set whose entire subject is rib angle. **This invalidates the "RMS 8.5%" cross-check against figure 4.51's parallel-rib classes recorded in the 2026-09-20 entry below**; that number was computed at 90 degrees for 45 and 60 degree data. Re-scored after the fix, `fig4.51_G_60par` reports MAE 6.8%, bias -6.8%, and the set as a whole moves from bias +4.4% to +1.5%. Fixed with a test that checks the prediction against `evaluate_rib` at the declared angle rather than against a stored number, falsified by reverting the fix. The defect is the shape this project exists to catch: nothing failed, the numbers merely meant something other than what they said. |
 | 2026-09-26 | reviewer + Claude | **The `e/D` 0.047 / `P/e` 10 / `W/H` 2 class dispute is closed, from behind the figure rather than by re-reading it.** Its two panels paired on only 2 of 4 marks, and the digitised data could not say which symbol they belonged to. Resolved with **NASA CR-4015** (= AVSCOM 86-C-25), Han, Park and Ibrahim, contract NAS3-24227, September 1986 -- the report Fig. 4.46's "This study" classes come from, traced through the acknowledgement in Han and Park (1988), which names NAS3-24227 where CR-3837 carries NAG3-311. Its appendix 7.3 tabulates every run with a self-identifying header (`E/D`, `P/E`, `ALPHA`, `HYD DIA`), so the class is found BY LABEL and the overplotted cluster is never resolved. Five runs on pp.141-145 at `Re` 10111, 18869, 32117, 60898, 64193 give `e+` 80.7, 150.5, 256.2, 485.8, 512.1, and **every mark in both panels lands on one of them**. Two recorded claims were wrong: the class is not "absent near `e+` ~ 80" (run 22 sits at 80.7 and the `R` panel picked it up to 0.1%), and its predicted ceiling of 479 was too low (the true maximum is 512.1, so the 546.6 mark is 6.7% out, not outside the class). The non-pairing was overplotting: the panels share `e+`, so a mark visible in one proves the run exists in both and silence in the other only means buried -- see #393. Reviewer independently confirmed the one clipped digit (`Re` 32117) by mass-flow ratio against run 24. |
 | 2026-09-20 | Claude | **Eq. 4.17/4.18 implemented** as `combaero.han_park_1988_angled()`, following the schema extension recorded as decision D5 (quadratic-in-alpha R, square/rectangular G switch, both opt-in and provably not affecting `han_1988_orthogonal` or `rallabandi_2009_high_re`). Scored against this document's own source, figure 4.47: R at RMS 10.5% over 39 points, G at RMS 8.8% over 115 points (representative geometry, the cloud carries no legend). Independently cross-checked against figure 4.51's parallel-rib classes (a different paper, Han et al. 1991) at RMS 8.5%; the other seven rib shapes on that figure (crossed, V, lambda) are deliberately not scored, since this equation cannot represent rib shape beyond angle and doing so would repeat item 23's lesson. Along the way, corrected two more stale `scores` fields: figure 4.51's 45/60 deg parallel series had been scored against `han_1988_orthogonal`, silently refused every time by the alpha guard (valid range 90-90) since before `han_park_1988_angled` existed to score them correctly. |
