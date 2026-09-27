@@ -7,7 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Analytic `(f, J)` for the McGreehan and Schotsch discharge coefficient**
+  (#383). `mcgreehan_schotsch_1988_cd_and_derivatives` returns
+  `(Cd, dCd/dRe, dCd/d(U1/Vi))` via forward-mode `DualN`, cross-checked
+  against finite differences to 3.7e-7 relative. `r/d` and `L/d` are geometry
+  and carry no partials. This is what `OrificeElement` needs before the
+  correlation can be selected there -- without it the Jacobian would be
+  knowingly incomplete, since `Cd` moves 0.60 to 0.99 over the geometry range
+  and is halved by crossflow.
+
+  **The two hazards needed different treatments, and measurement decided
+  which.** Eq. (17)'s `Rv^0.6` and `Rv^0.9` diverge in slope at `U1/Vi = 0` --
+  the default, and the physically right value for a plenum-fed jet plate -- so
+  the input is **regularised in the model**: `U1/Vi -> sqrt((U1/Vi)^2 + eps^2)`
+  with `rv_smooth_eps = 3e-5`. Below `Re = 1e4` the value is held at the
+  validity floor and the derivative was exactly zero; softening the *value*
+  there was measured and **rejected** (a soft-max recovers only 16% of the
+  live slope for 7.1e-3 on `Cd`, in a region the correlation does not cover),
+  so the **Jacobian alone** is continued from the floor. No reported `Cd`
+  changes for that one, and `dCd/dRe` becomes continuous across the floor.
+
+  `eps = 3e-5` sits between two bisected walls, both sourced: worst
+  `|dCd/du|` within 10x the physical derivative scale (0.663, measured on the
+  exact chain over the range Figs. 4-6 carry data for) gives `eps >= 1.86e-5`;
+  departure from Eq. (17) within 10% of the `+/-0.02` scatter the correlation
+  sits in (**the paper states no error statistic at all**) gives
+  `eps <= 4.15e-4`. The default sits 15% across, deliberately towards the
+  low-smoothing end -- over-smoothing stalls this solver harder than a stiff
+  Jacobian does.
+
 ### Changed
+
+- **`Cd_McGreehanSchotsch`, `mcgreehan_schotsch::cd` and `cd_with_crossflow`
+  take an `eps` argument** (#383), defaulting to `rv_smooth_eps`. Passing
+  `eps = 0` recovers Eq. (17) exactly at every entry point, as it already did
+  for the expansion factor. At the default the zero-crossflow value sits
+  ~4e-4 above the unregularised one -- 2% of the correlation's own data
+  scatter -- stated rather than silent; the paper's printed 0.60 baseline is
+  still reproduced to 5e-4 at `eps = 0`.
 
 - **Han's `G_bar = 1.2 G` is now applied at every rib angle, as published**
   (#339 plan 1b). The runner refused anything off 90 degrees on the grounds

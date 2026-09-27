@@ -5019,9 +5019,33 @@ PYBIND11_MODULE(_core, m) {
         "  - t/d > 0.02: thick plate\n"
         "  - otherwise: sharp thin plate");
 
+  m.def("mcgreehan_schotsch_1988_cd_and_derivatives",
+        &orifice::mcgreehan_schotsch::cd_and_derivatives, py::arg("Re"),
+        py::arg("r_over_d"), py::arg("L_over_d"), py::arg("U1_over_Vi") = 0.0,
+        "Cd and its derivatives: (Cd, dCd/dRe, dCd/d(U1/Vi)).\n\n"
+        "The solver-facing form of mcgreehan_schotsch_1988_cd. r/d and L/d are\n"
+        "geometry, never solver unknowns, so they carry no partials.\n\n"
+        "TWO NUMERICAL TREATMENTS, both solver aids and both stated:\n\n"
+        "1. The crossflow input is regularised,\n"
+        "   U1/Vi -> sqrt((U1/Vi)^2 + eps^2) with eps = 1e-6. Eq. (17)'s\n"
+        "   Rv^0.6 and Rv^0.9 have unbounded slope at Rv = 0, and U1/Vi = 0 is\n"
+        "   both the default and the physically right value for a plenum-fed\n"
+        "   jet plate, so the singularity sits where the solver lives. This\n"
+        "   bounds dCd/d(U1/Vi) at 1.451 instead of 1.4e4 and DOES move Cd, by\n"
+        "   5.5e-5 (0.007%). eps sits mid-plateau: the bound is flat at 1.451\n"
+        "   for every eps in [1e-7, 1e-4], so there is no peak being fitted.\n\n"
+        "2. Below Re = 1e4 the VALUE stays exactly floored -- Eq. (8) is\n"
+        "   invalid and divergent there -- but the DERIVATIVE is continued\n"
+        "   from the floor rather than reported as the true zero, so a Newton\n"
+        "   step below it can climb back and dCd/dRe is continuous across the\n"
+        "   floor. This changes no reported Cd.\n\n"
+        "Returns:\n"
+        "  (Cd, dCd/dRe, dCd/d(U1_over_Vi))");
+
   m.def("mcgreehan_schotsch_1988_cd", &orifice::Cd_McGreehanSchotsch,
         py::arg("Re"), py::arg("r_over_d"), py::arg("L_over_d"),
         py::arg("U1_over_Vi") = 0.0,
+        py::arg("eps") = orifice::mcgreehan_schotsch::rv_smooth_eps,
         "Discharge coefficient for a long orifice with corner radiusing and\n"
         "inlet crossflow (McGreehan and Schotsch 1988, ASME J. Turbomachinery\n"
         "110(2), 213-217, Eqs. 8-17).\n\n"
@@ -5053,6 +5077,7 @@ PYBIND11_MODULE(_core, m) {
   m.def("mcgreehan_schotsch_1988_crossflow_cd",
         &orifice::mcgreehan_schotsch::cd_with_crossflow, py::arg("cd_base"),
         py::arg("U1_over_Vi"),
+        py::arg("eps") = orifice::mcgreehan_schotsch::rv_smooth_eps,
         "McGreehan and Schotsch (1988) Eq. (17) alone: the inlet-crossflow\n"
         "correction applied to a baseline discharge coefficient you supply.\n\n"
         "Use when the plate's zero-crossflow Cd is KNOWN -- measured, or a\n"
@@ -5064,7 +5089,12 @@ PYBIND11_MODULE(_core, m) {
         "measurements (0.64, 0.73, 0.88) rather than to the chain's own\n"
         "prediction, which runs 3-12% higher for the same geometry.\n\n"
         "U1_over_Vi is the INLET (supply-side) tangential velocity ratio; see\n"
-        "mcgreehan_schotsch_1988_cd for the trap this must not be fed.");
+        "mcgreehan_schotsch_1988_cd for the trap this must not be fed.\n\n"
+        "eps regularises the input, U1/Vi -> sqrt((U1/Vi)^2 + eps^2), so that\n"
+        "Eq. (17)'s Rv^0.6 and Rv^0.9 do not give an unbounded derivative at\n"
+        "U1/Vi = 0 -- which is the default AND the physically right value for\n"
+        "a plenum-fed jet plate. Costs 5.5e-5 on Cd. Pass eps = 0 for the\n"
+        "paper exactly. See mcgreehan_schotsch_1988_cd_and_derivatives.");
 
   m.def("mcgreehan_schotsch_1988_expansion_orifice",
         &orifice::mcgreehan_schotsch::expansion_orifice, py::arg("S"),

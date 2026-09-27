@@ -223,12 +223,18 @@ All functions use consistent units to avoid conversion errors.
 
 #### Discharge Coefficients
 
-| Function              | Input Units                   | Output Unit |
-|-----------------------|-------------------------------|-------------|
-| `Cd_sharp_thin_plate` | OrificeGeometry, OrificeState | - (Cd)      |
-| `Cd_thick_plate`      | OrificeGeometry, OrificeState | - (Cd)      |
-| `Cd_rounded_entry`    | OrificeGeometry, OrificeState | - (Cd)      |
-| `Cd`                  | OrificeGeometry, OrificeState | - (Cd)      |
+| Function                                     | Input Units                                            | Output Unit             |
+|----------------------------------------------|--------------------------------------------------------|-------------------------|
+| `Cd_sharp_thin_plate`                        | OrificeGeometry, OrificeState                          | - (Cd)                  |
+| `Cd_thick_plate`                             | OrificeGeometry, OrificeState                          | - (Cd)                  |
+| `Cd_rounded_entry`                           | OrificeGeometry, OrificeState                          | - (Cd)                  |
+| `Cd`                                         | OrificeGeometry, OrificeState                          | - (Cd)                  |
+| `mcgreehan_schotsch_1988_cd`                 | Re: -, r_over_d: -, L_over_d: -, U1_over_Vi: -, eps: - | - (Cd)                  |
+| `mcgreehan_schotsch_1988_cd_and_derivatives` | Re: -, r_over_d: -, L_over_d: -, U1_over_Vi: -         | - (Cd, dCd/dRe, dCd/du) |
+| `mcgreehan_schotsch_1988_crossflow_cd`       | cd_base: - (Cd), U1_over_Vi: -, eps: -                 | - (Cd)                  |
+| `mcgreehan_schotsch_1988_expansion_orifice`  | S: -, gamma: -                                         | - (Y)                   |
+| `mcgreehan_schotsch_1988_expansion_nozzle`   | S: -, gamma: -                                         | - (Y)                   |
+| `mcgreehan_schotsch_1988_expansion_factor`   | cd: - (Cd), S: -, gamma: -, eps: -                     | - (Y)                   |
 
 ---
 

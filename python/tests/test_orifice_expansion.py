@@ -203,17 +203,51 @@ def test_cd_chain_has_exactly_the_two_hazards_tracked_in_383() -> None:
         label="Cd vs Re above the validity floor",
     )
 
-    # Known hazard 2: dCd/d(U1/Vi) is unbounded at zero crossflow -- a
-    # DIVERGENCE, not a kink, which is why #383 cannot fix it by smoothing a
-    # corner. It sits exactly on the domain edge.
-    u_found = scan(lambda u: cb.mcgreehan_schotsch_1988_cd(3.2e4, 0.0, 1.0, u), 0.0, 3.0)
-    assert {g.hazard for g in u_found} == {Hazard.DIVERGENCE}
-    assert all(g.x == 0.0 for g in u_found), "a new hazard away from the origin"
-
-    # Above the singular point the crossflow term is clean.
-    assert_smooth(
+    # Hazard 2 is FIXED as of #383: dCd/d(U1/Vi) was unbounded at zero
+    # crossflow -- a DIVERGENCE sitting exactly on the domain edge, and on the
+    # default operating point. The input is now regularised by rv_smooth_eps,
+    # so the derivative is bounded and the divergence is gone.
+    #
+    # Scanned on a LOG grid, which is what this function's structure requires:
+    # the whole transition lives below u = 1e-3, and a linear scan's first
+    # interval strides over it and reports a KINK that finer sampling does not
+    # find. That mis-sampling is also how the eps window was first got wrong.
+    u_found = scan(
         lambda u: cb.mcgreehan_schotsch_1988_cd(3.2e4, 0.0, 1.0, u),
-        0.05,
+        1e-8,
         3.0,
-        label="Cd vs U1/Vi away from the origin",
+        log=True,
+        n=1500,
     )
+    assert u_found == [], f"a new hazard in Cd vs U1/Vi: {u_found}"
+
+    # The substantive guard is the BOUND, not the absence of a label. The
+    # worst slope must stay within 10x the physical scale (0.663, measured on
+    # the exact chain over the range Figs. 4-6 carry data for) -- the lower
+    # wall of rv_smooth_eps's admissible window.
+    worst = 0.0
+    for i in range(801):
+        u = 1e-8 * (3.0 / 1e-8) ** (i / 800.0)
+        h = u * 1e-4
+        worst = max(
+            worst,
+            abs(
+                cb.mcgreehan_schotsch_1988_cd(3.2e4, 0.0, 1.0, u + h)
+                - cb.mcgreehan_schotsch_1988_cd(3.2e4, 0.0, 1.0, u - h)
+            )
+            / (2.0 * h),
+        )
+    assert worst < 10.0 * 0.663, (
+        f"worst |dCd/d(U1/Vi)| is {worst:.2f}, outside the 10x-physical wall "
+        "that rv_smooth_eps is chosen against"
+    )
+
+    # Hazard 1 is handled in the JACOBIAN, not the value, so the value scan
+    # above still shows the floor and that is correct. What must hold is that
+    # the derivative below the floor is non-zero and equals the live slope at
+    # it, so a Newton step can climb back out.
+    below = cb.mcgreehan_schotsch_1988_cd_and_derivatives(5.0e3, 0.0, 1.0, 0.2)
+    at_floor = cb.mcgreehan_schotsch_1988_cd_and_derivatives(1.0e4, 0.0, 1.0, 0.2)
+    assert below[1] < 0.0, "the Re dead zone is back in the Jacobian"
+    assert below[1] == at_floor[1], "the floor continuation is not continuous"
+    assert below[0] == at_floor[0], "the floored value moved"

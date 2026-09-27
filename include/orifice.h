@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <tuple>
 
 // -------------------------------------------------------------
 // Orifice Discharge Coefficient (Cd) Correlations
@@ -246,6 +247,70 @@ constexpr double rv_cd_exp    = -3.0;
 // Eq. (8) reproduces to 0.02%. Every /0.6 divisor in Eqs. (1) and (17) is this
 // number, so it is defined once here rather than repeated as a literal.
 constexpr double cd_reference = 0.6;
+
+// Crossflow regularisation width, in U1/Vi units. See cd_and_derivatives.
+//
+// Eq. (17) carries Rv^0.6 and Rv^0.9, both with unbounded slope at Rv = 0 --
+// and U1/Vi = 0 is the DEFAULT, and the physically correct value for a
+// plenum-fed jet plate. The singularity therefore sits exactly where a Newton
+// solver spends most of its time, not in a remote corner of the envelope.
+//
+// The treatment regularises the INPUT, U1/Vi -> sqrt((U1/Vi)^2 + eps^2),
+// rather than Rv: U1/Vi is the physical quantity eps should be scaled
+// against, and Rv carries a cd_base-dependent factor that would make eps mean
+// something different for every geometry.
+//
+// CHOSEN BY MEASUREMENT, between two walls bisected from opposite directions,
+// the same way x_smooth_eps was. Both walls are sourced rather than picked:
+//
+//   LOWER WALL, eps >= 1.86e-5. The worst |dCd/d(U1/Vi)| anywhere must stay
+//   within 10x the PHYSICAL derivative scale, which is 0.663 -- measured on
+//   the exact correlation over u >= 0.01, the range Figs. 4-6 actually carry
+//   data for. Below the wall the Jacobian entry is stiff enough to dominate
+//   a Newton step for no physical reason.
+//
+//   UPPER WALL, eps <= 4.15e-4. The departure from Eq. (17) exactly must stay
+//   within 10% of the scatter the correlation itself sits in. The paper gives
+//   NO error statistic anywhere (extraction item 25); the +/-0.02 in Cd comes
+//   from digitising the spread of its own Fig. 4 data.
+//
+//   The cost MUST be measured including u = 0. That is the default, and the
+//   physically right value for a plenum-fed jet plate, and it is where the
+//   regularisation bites hardest. An earlier sweep that started at u = 0.01
+//   reported the cost as 3.3e-7 when it is really 8.6e-4 -- three orders out,
+//   and it moved the upper wall by a factor of 21.
+//
+// | eps   | max |dCd/du| | x physical | cost     | % of bound | verdict |
+// |-------|--------------|------------|----------|------------|---------|
+// | 0     | unbounded    | --         | 0        | 0%         | stiff   |
+// | 1e-6  | 21.5         | 32.4       | 5.5e-5   | 3%         | stiff   |
+// | 2e-5  | 6.45         | 9.7        | 3.3e-4   | 16%        | no margin |
+// | 3e-5  | 5.47         | 8.2        | 4.2e-4   | 21%        | ok      |  <-- default
+// | 1e-4  | 3.35         | 5.1        | 8.6e-4   | 43%        | ok      |
+// | 1e-3  | 1.26         | 1.9        | 3.4e-3   | 168%       | infidel |
+//
+// The default sits 15% across the window, deliberately towards the LOW-
+// smoothing end -- below where the Y blend's default sits in its own window
+// (29%). Operational experience on this solver is that OVER-smoothing is the
+// worse failure: a residual that no longer matches the physics stalls the
+// solve ("ghost residuals"), and that bit harder than a stiff Jacobian ever
+// did. 3e-5 keeps a factor of 5 of headroom against the fidelity wall while
+// still holding a margin against the stiffness one (8.2x of a 10x limit);
+// 2e-5 would smooth marginally less but sits at 9.7x, with no room for a
+// re-measurement to move it.
+//
+// There is NO PLATEAU here, and looking for one is how this was first got
+// wrong: max |dCd/du| follows a clean eps^-0.4 power law, exactly as the
+// Rv^-0.4 singularity predicts, so every eps trades derivative against
+// fidelity and the choice has to come from the two walls. An early linear
+// sweep appeared to show a plateau at 1.451 -- it had simply never sampled
+// u below 0.002, which is where the whole singularity lives.
+//
+// Honest about what it does: it caps a derivative that physically diverges.
+// It removes a mathematical spike, not a physical one.
+//
+// Passing eps = 0 recovers Eq. (17) exactly, as for the Y smoothing above.
+constexpr double rv_smooth_eps = 3.0e-5;
 // Eq. (4), orifice adiabatic expansion factor
 constexpr double y_orifice_coef = 0.41;
 // Eq. (7), the Cd-dependent blend between orifice and nozzle expansion
@@ -309,7 +374,8 @@ double cd_with_corner_and_length(double Re, double r_over_d, double L_over_d);
 // Not monotonic: Cd rises above its zero-crossflow value by up to ~5.7% near
 // U1_over_Vi ~ 0.09 before falling away. That is the source's own Fig. 4 and
 // its data, not an artifact -- see check F of the extraction.
-double cd(double Re, double r_over_d, double L_over_d, double U1_over_Vi);
+double cd(double Re, double r_over_d, double L_over_d, double U1_over_Vi,
+          double eps = rv_smooth_eps);
 
 // Eq. (17) applied to a baseline supplied by the caller, rather than one
 // computed from Eqs. (8)-(16).
@@ -323,7 +389,39 @@ double cd(double Re, double r_over_d, double L_over_d, double U1_over_Vi);
 // Use it when a plate's zero-crossflow Cd is KNOWN -- a measured value, or a
 // literature one such as Florschuetz's per-configuration Table 1 -- and only
 // the crossflow correction is wanted.
-double cd_with_crossflow(double cd_base, double U1_over_Vi);
+double cd_with_crossflow(double cd_base, double U1_over_Vi,
+                         double eps = rv_smooth_eps);
+
+// Cd and its derivatives with respect to the two solver unknowns it depends
+// on: (Cd, dCd/dRe, dCd/d(U1/Vi)). r/d and L/d are geometry and stay
+// constant, so they never enter the Jacobian.
+//
+// TWO NUMERICAL TREATMENTS, both solver aids and both stated:
+//
+//  1. The crossflow input is regularised by rv_smooth_eps (above), which
+//     bounds the worst dCd/d(U1/Vi) at 5.47 -- 8.2x the physical derivative
+//     scale -- where the exact chain is unbounded. This one DOES move the
+//     value, worst 4.2e-4 in Cd at U1/Vi = 0, which is 2% of the +/-0.02
+//     scatter the correlation's own data sits in.
+//
+//  2. Below re_min the VALUE stays exactly floored -- Eq. (8) is outside its
+//     validity there and diverges -- but the DERIVATIVE is continued from
+//     re_min rather than reported as the true zero. A Newton step that
+//     wanders below the floor would otherwise see no Re sensitivity at all
+//     and stall, and the exact derivative also jumps discontinuously at
+//     re_min (a KINK the smoothness scan reports at Re ~ 9908).
+//
+//     Softening the VALUE was measured and rejected: a soft-max floor buys
+//     almost no gradient for real Cd error (eps = 1e4 in Re units recovers
+//     only 16% of the live slope while moving Cd by 7.1e-3), and it would
+//     distort a region where the correlation does not apply. Continuing the
+//     derivative alone changes no reported Cd, and makes dCd/dRe continuous
+//     across re_min. The value this returns agrees with cd() to within a
+//     few ULP (measured worst 3.9e-16): same expression, different operation
+//     order through the dual, so it is not bit-identical.
+std::tuple<double, double, double> cd_and_derivatives(double Re, double r_over_d,
+                                                      double L_over_d,
+                                                      double U1_over_Vi);
 
 // -------------------------------------------------------------
 // Adiabatic expansion factor Y, Eqs. (4)-(7)
@@ -390,7 +488,8 @@ double Cd_rounded(double r_over_d, double beta, double Re_D);
 // Convenience wrapper over orifice::mcgreehan_schotsch::cd; see that
 // namespace for the per-equation stages and for what U1_over_Vi means.
 double Cd_McGreehanSchotsch(double Re, double r_over_d, double L_over_d,
-                            double U1_over_Vi);
+                            double U1_over_Vi,
+                            double eps = mcgreehan_schotsch::rv_smooth_eps);
 
 // Loss coefficient K from Cd: K = (1/Cd^2 - 1) * (1 - beta^4)
 double K_from_Cd(double Cd, double beta);

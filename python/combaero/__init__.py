@@ -255,6 +255,7 @@ try:
         MassStream,
         mass_to_mole,
         mcgreehan_schotsch_1988_cd,
+        mcgreehan_schotsch_1988_cd_and_derivatives,
         mcgreehan_schotsch_1988_crossflow_cd,
         mcgreehan_schotsch_1988_expansion_factor,
         mcgreehan_schotsch_1988_expansion_nozzle,
@@ -699,6 +700,7 @@ except (ModuleNotFoundError, ImportError) as e:
     Cd_rounded_entry = _core.Cd_rounded_entry
     Cd_orifice = _core.Cd_orifice
     mcgreehan_schotsch_1988_cd = _core.mcgreehan_schotsch_1988_cd
+    mcgreehan_schotsch_1988_cd_and_derivatives = _core.mcgreehan_schotsch_1988_cd_and_derivatives
     mcgreehan_schotsch_1988_crossflow_cd = _core.mcgreehan_schotsch_1988_crossflow_cd
     mcgreehan_schotsch_1988_expansion_factor = _core.mcgreehan_schotsch_1988_expansion_factor
     mcgreehan_schotsch_1988_expansion_nozzle = _core.mcgreehan_schotsch_1988_expansion_nozzle
@@ -1187,6 +1189,7 @@ __all__ = [
     "Cd_rounded_entry",
     "Cd_orifice",
     "mcgreehan_schotsch_1988_cd",
+    "mcgreehan_schotsch_1988_cd_and_derivatives",
     "mcgreehan_schotsch_1988_crossflow_cd",
     "mcgreehan_schotsch_1988_expansion_factor",
     "mcgreehan_schotsch_1988_expansion_nozzle",

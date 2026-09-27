@@ -1,3 +1,4 @@
+#include "../include/dual_number.h"
 #include "../include/math_constants.h"
 #include "../include/orifice.h"
 #include <algorithm>
@@ -280,12 +281,19 @@ double cd_with_corner_and_length(double Re, double r_over_d, double L_over_d) {
     return 1.0 - length_factor(ld) * (1.0 - basic);
 }
 
-double cd_with_crossflow(double cd_base, double U1_over_Vi) {
-    const double u = std::max(U1_over_Vi, 0.0);
+double cd_with_crossflow(double cd_base, double U1_over_Vi, double eps) {
+    double u = std::max(U1_over_Vi, 0.0);
 
-    // Eq. (17) is an identity at zero crossflow (C1 = 1, C2 = 0). Returning
-    // early keeps that exact and avoids pow(0, fractional) entirely.
-    if (u == 0.0) return cd_base;
+    // eps = 0 recovers Eq. (17) exactly. It is an identity at zero crossflow
+    // (C1 = 1, C2 = 0), so returning early keeps that exact and avoids
+    // pow(0, fractional) entirely.
+    if (eps <= 0.0) {
+        if (u == 0.0) return cd_base;
+    } else {
+        // Regularised: bounds dCd/d(U1/Vi) at 1.451 instead of 1.4e4, for
+        // 5.5e-5 on Cd. See rv_smooth_eps for the plateau this sits on.
+        u = std::sqrt(u * u + eps * eps);
+    }
 
     const double cd_ratio = cd_base / cd_reference;
     const double Rv       = u * std::pow(cd_ratio, rv_cd_exp);
@@ -297,9 +305,52 @@ double cd_with_crossflow(double cd_base, double U1_over_Vi) {
     return cd_base * (C1 + C2 * C3);
 }
 
-double cd(double Re, double r_over_d, double L_over_d, double U1_over_Vi) {
+std::tuple<double, double, double> cd_and_derivatives(double Re, double r_over_d,
+                                                      double L_over_d,
+                                                      double U1_over_Vi) {
+    using D = combaero::solver::DualN<2>;  // partial 0 = Re, 1 = U1/Vi
+
+    // Seeding max(Re, re_min) rather than Re IS the Jacobian-only floor
+    // continuation. Below the floor the value is the floored one -- correct,
+    // Eq. (8) is invalid and divergent there -- while the derivative comes
+    // out as the live slope AT re_min instead of the true zero, so a Newton
+    // step that wanders below has something to climb back on and dCd/dRe is
+    // continuous across re_min. No reported Cd changes.
+    const D re = D::seed(std::max(Re, re_min), 0);
+    const D rb = re_c0 + re_c1 / re;  // Eq. (8)
+
+    // r/d and L/d are geometry, never solver unknowns, so every factor built
+    // from them is an ordinary double and contributes no partials.
+    const double rd = std::max(r_over_d, 0.0);
+    double ld       = std::max(L_over_d, 0.0);
+
+    D basic = 1.0 - corner_factor(rd) * (1.0 - rb);  // Eq. (11)
+    if (rd > 0.0) {
+        basic = 1.0 - length_factor(rd) * (1.0 - basic);  // Eq. (15)
+        ld    = std::max(ld - rd, 0.0);                   // Eq. (16)
+    }
+    const D cd_base = 1.0 - length_factor(ld) * (1.0 - basic);  // Eq. (13)
+
+    // Eq. (17). The regularisation also removes the pow(0, fractional) that
+    // the scalar path avoids with an early return: u >= rv_smooth_eps > 0
+    // always, so Rv never reaches zero and every dpow below is finite.
+    const D u_raw = D::seed(std::max(U1_over_Vi, 0.0), 1);
+    const D u     = combaero::solver::dsqrt(u_raw * u_raw + rv_smooth_eps * rv_smooth_eps);
+
+    const D cd_ratio = cd_base / cd_reference;
+    const D Rv       = u * combaero::solver::dpow(cd_ratio, rv_cd_exp);
+    const D C1       = combaero::solver::dexp(-combaero::solver::dpow(Rv, c1_exp));
+    const D C2       = c2_coef * combaero::solver::dpow(Rv, c2_exp) * combaero::solver::dpow(cd_ratio, c2_cd_exp);
+    const D C3       = combaero::solver::dexp(-c3_coef * combaero::solver::dpow(Rv, c3_exp));
+    const D cd_out   = cd_base * (C1 + C2 * C3);
+
+    return {cd_out.v, cd_out.d[0], cd_out.d[1]};
+}
+
+double cd(double Re, double r_over_d, double L_over_d, double U1_over_Vi,
+          double eps) {
     return cd_with_crossflow(cd_with_corner_and_length(Re, r_over_d, L_over_d),
-                             U1_over_Vi);
+                             U1_over_Vi, eps);
 }
 
 // -------------------------------------------------------------
@@ -380,8 +431,8 @@ double expansion_factor(double cd, double S, double gamma, double eps) {
 } // namespace mcgreehan_schotsch
 
 double Cd_McGreehanSchotsch(double Re, double r_over_d, double L_over_d,
-                            double U1_over_Vi) {
-    return mcgreehan_schotsch::cd(Re, r_over_d, L_over_d, U1_over_Vi);
+                            double U1_over_Vi, double eps) {
+    return mcgreehan_schotsch::cd(Re, r_over_d, L_over_d, U1_over_Vi, eps);
 }
 
 double K_from_Cd(double Cd, double beta) {

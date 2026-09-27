@@ -345,7 +345,19 @@ TEST(McGreehanSchotsch, FactorsAreIdentitiesAtZero) {
 // Eq. (17) must reduce exactly to its input at zero crossflow.
 TEST(McGreehanSchotsch, CrossflowIsIdentityAtZero) {
     const double base = ms::cd_with_corner_and_length(1.0e4, 0.0, 1.0);
-    EXPECT_DOUBLE_EQ(ms::cd(1.0e4, 0.0, 1.0, 0.0), base);
+
+    // Eq. (17) is an identity at zero crossflow (C1 = 1, C2 = 0), and eps = 0
+    // reproduces that exactly. This asserted only the line below until the
+    // regularisation landed; it is kept because the paper's own behaviour is
+    // what the correlation must still be able to give.
+    EXPECT_DOUBLE_EQ(ms::cd_with_crossflow(base, 0.0, 0.0), base);
+
+    // At the default eps the identity holds to the documented cost instead of
+    // exactly -- that is the whole point of the regularisation, and the bound
+    // is what makes it acceptable rather than the exactness.
+    EXPECT_NE(ms::cd(1.0e4, 0.0, 1.0, 0.0), base);
+    EXPECT_NEAR(ms::cd(1.0e4, 0.0, 1.0, 0.0), base, 5.0e-4)
+        << "the zero-crossflow departure exceeds what rv_smooth_eps documents";
 }
 
 // Eq. (13)/(14) against the curve drawn in Fig. 3, read at ~0.01 in Cd.
@@ -763,4 +775,132 @@ TEST(McGreehanSchotschY, StaysFiniteAndBounded) {
         }
     }
     EXPECT_DOUBLE_EQ(ms::expansion_factor(0.8, 0.7, 1.0), 1.0);  // degenerate gamma
+}
+
+// The crossflow regularisation width, bounded from both sides by measurement
+// rather than chosen. Mirrors DefaultSmoothingSitsInsideItsAdmissibleWindow
+// for the Y blend, but the hazard is the opposite one: Eq. (17) has an
+// UNBOUNDED derivative at U1/Vi = 0, not a dead zone, so the lower wall is a
+// cap on |dCd/du| rather than a floor on it.
+TEST(McGreehanSchotsch, CrossflowSmoothingSitsInsideItsAdmissibleWindow) {
+    const double base = ms::cd(3.2e4, 0.0, 1.0, 0.0);
+
+    // Worst |dCd/du| anywhere. Sampled on a LOG grid: the singularity lives
+    // below u = 1e-3 and a linear sweep walks straight past it, which is how
+    // an early version of this analysis reported a plateau that is not there.
+    auto max_slope = [&](double eps, double lo) {
+        const int per_decade = 80;
+        const double hi = 10.0;
+        const int n = static_cast<int>(std::log10(hi / lo) * per_decade);
+        double worst = 0.0;
+        for (int i = 0; i <= n; ++i) {
+            const double u = lo * std::pow(hi / lo, static_cast<double>(i) / n);
+            const double h = u * 1e-4;
+            worst = std::max(worst,
+                             std::abs((ms::cd_with_crossflow(base, u + h, eps)
+                                       - ms::cd_with_crossflow(base, u - h, eps))
+                                      / (2.0 * h)));
+        }
+        return worst;
+    };
+    // Departure from Eq. (17) exactly, over the range Figs. 4-6 carry data.
+    auto cost = [&](double eps) {
+        double worst = 0.0;
+        for (int i = 0; i <= 240; ++i) {
+            const double u = 0.01 * std::pow(1000.0, static_cast<double>(i) / 240.0);
+            worst = std::max(worst, std::abs(ms::cd_with_crossflow(base, u, eps)
+                                             - ms::cd_with_crossflow(base, u, 0.0)));
+        }
+        return worst;
+    };
+
+    // The physical derivative scale, from the exact correlation over the
+    // validated range. Everything below is measured against this, not against
+    // a round number.
+    const double physical = max_slope(0.0, 0.01);
+    EXPECT_NEAR(physical, 0.663, 0.02) << "the physical scale moved; re-measure the window";
+
+    // The data scatter the correlation sits in. The paper states no error
+    // statistic at all -- this is digitised from its own Fig. 4.
+    const double scatter = 0.02;
+
+    // The default satisfies both walls.
+    EXPECT_LT(max_slope(ms::rv_smooth_eps, 1e-9), 10.0 * physical);
+    EXPECT_LT(cost(ms::rv_smooth_eps), 0.1 * scatter);
+
+    // Below the window the Jacobian entry goes stiff for no physical reason.
+    EXPECT_GT(max_slope(1e-6, 1e-9), 10.0 * physical)
+        << "the lower wall has moved; re-measure the window";
+
+    // Above it, the residual stops matching the physics -- the ghost-residual
+    // stall that over-smoothing causes, which is the worse failure of the two.
+    EXPECT_GT(cost(3e-2), 0.1 * scatter)
+        << "the upper wall has moved; re-measure the window";
+
+    // And the default sits towards the LOW-smoothing end deliberately, so it
+    // cannot drift upward into the region where ghost residuals appear.
+    EXPECT_LT(cost(ms::rv_smooth_eps) / (0.1 * scatter), 0.30);
+
+    // eps = 0 still recovers the paper exactly.
+    EXPECT_DOUBLE_EQ(ms::cd_with_crossflow(base, 0.0, 0.0), base);
+}
+
+// The (f, J) rule: an analytic derivative is cross-checked against finite
+// differences, never shipped on the strength of the derivation alone.
+TEST(McGreehanSchotsch, AnalyticDerivativesAgreeWithFiniteDifferences) {
+    struct Case { double Re, rd, ld, u; };
+    const Case cases[] = {
+        {3.2e4, 0.00, 1.0, 0.05}, {3.2e4, 0.00, 1.0, 0.50},
+        {1.0e5, 0.10, 2.0, 0.20}, {2.0e4, 0.20, 3.0, 1.00},
+        {5.0e4, 0.05, 0.5, 2.00}, {1.5e4, 0.00, 5.0, 0.01},
+        {8.0e5, 0.15, 1.5, 0.30},
+    };
+    for (const auto& c : cases) {
+        const auto [cd, dRe, du] = ms::cd_and_derivatives(c.Re, c.rd, c.ld, c.u);
+
+        const double hRe = c.Re * 1e-6;
+        const double fdRe = (std::get<0>(ms::cd_and_derivatives(c.Re + hRe, c.rd, c.ld, c.u))
+                             - std::get<0>(ms::cd_and_derivatives(c.Re - hRe, c.rd, c.ld, c.u)))
+                            / (2.0 * hRe);
+        EXPECT_NEAR(dRe, fdRe, 1e-5 * std::max(std::abs(fdRe), 1e-12))
+            << "dCd/dRe disagrees with FD at Re = " << c.Re;
+
+        const double hu = c.u * 1e-6;
+        const double fdu = (std::get<0>(ms::cd_and_derivatives(c.Re, c.rd, c.ld, c.u + hu))
+                            - std::get<0>(ms::cd_and_derivatives(c.Re, c.rd, c.ld, c.u - hu)))
+                           / (2.0 * hu);
+        EXPECT_NEAR(du, fdu, 1e-5 * std::max(std::abs(fdu), 1e-12))
+            << "dCd/d(U1/Vi) disagrees with FD at U1/Vi = " << c.u;
+
+        // The value must be the same correlation, not a reimplementation of
+        // it: same expression through the dual, so a few ULP but no more.
+        EXPECT_NEAR(cd, ms::cd(c.Re, c.rd, c.ld, c.u), 1e-14);
+    }
+
+    // u = 0 is deliberately excluded above: max(U1_over_Vi, 0) makes a
+    // central difference one-sided there, so FD measures a forward slope and
+    // cannot be compared. The analytic value is zero because the regularised
+    // input sqrt(u^2 + eps^2) has zero slope at u = 0 -- a smooth stationary
+    // point, not a floor.
+    const auto [cd0, dRe0, du0] = ms::cd_and_derivatives(3.2e4, 0.0, 1.0, 0.0);
+    EXPECT_DOUBLE_EQ(du0, 0.0);
+    EXPECT_LT(dRe0, 0.0) << "Cd must still fall with Re at zero crossflow";
+    EXPECT_GT(cd0, 0.0);
+}
+
+// The Jacobian-only floor continuation: below re_min the VALUE is held, but
+// the derivative is continued from the floor rather than reported as zero.
+TEST(McGreehanSchotsch, ReynoldsFloorKeepsValueButContinuesTheDerivative) {
+    const auto below = ms::cd_and_derivatives(5.0e3, 0.0, 1.0, 0.2);
+    const auto at    = ms::cd_and_derivatives(ms::re_min, 0.0, 1.0, 0.2);
+
+    // Value: floored, exactly as cd() reports it. No Cd changes.
+    EXPECT_DOUBLE_EQ(std::get<0>(below), std::get<0>(at));
+    EXPECT_NEAR(std::get<0>(below), ms::cd(5.0e3, 0.0, 1.0, 0.2), 1e-14);
+
+    // Derivative: NOT the true zero, but the live slope at the floor, so a
+    // Newton step that wanders below has something to climb back on and
+    // dCd/dRe is continuous across re_min rather than jumping.
+    EXPECT_LT(std::get<1>(below), 0.0) << "the dead zone is back";
+    EXPECT_DOUBLE_EQ(std::get<1>(below), std::get<1>(at));
 }
