@@ -358,6 +358,27 @@ FD cross-checked to 3.7e-7 relative on `dCd/dRe` and ~1e-9 on `dCd/du`.
 measures a forward slope that cannot be compared; the analytic zero is correct
 because `sqrt(u^2 + eps^2)` has zero slope at the origin.
 
+**The walls hold across the geometry range, and that was checked rather than
+assumed.** Both were bisected at one operating point, and there was a
+specific reason to doubt them elsewhere: `Rv` carries `(cd_base/0.6)^-3`, so
+a rounded long hole at `Cd ~ 0.95` sees the same `U1/Vi` as a 4.5x smaller
+`Rv`, and the regularisation is applied to `U1/Vi` rather than `Rv`. Swept
+over `Re` 1e4-1e6, `r/d` 0-0.2, `L/d` 0.5-5 (`cd_base` 0.76-0.95):
+
+| | across the sweep | wall |
+|---|---|---|
+| ratio to physical scale | 7.8 - 8.3x | 10x |
+| cost | 3.2e-4 - 4.2e-4 | 2.0e-3 |
+
+The ratio is nearly geometry-INVARIANT, and the reason matters: the `Rv`
+stretching moves the regularised peak and the physical maximum together, so
+they cancel. That is what makes a single-point bisection a safe way to set
+`eps` here -- and the prediction that high `cd_base` would be stiffer was
+wrong in direction (it is 7.8x there against 8.2x at `cd_base` 0.77). Pinned
+by `CrossflowSmoothingWallsHoldAcrossTheGeometryRange`, which also asserts
+the invariance itself, since if the ratio stops being flat the single-point
+method stops being valid.
+
 Falsified four ways: `eps` below the lower wall, `eps` above the upper wall,
 and each derivative partial dropped in turn.
 

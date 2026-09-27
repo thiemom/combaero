@@ -904,3 +904,60 @@ TEST(McGreehanSchotsch, ReynoldsFloorKeepsValueButContinuesTheDerivative) {
     EXPECT_LT(std::get<1>(below), 0.0) << "the dead zone is back";
     EXPECT_DOUBLE_EQ(std::get<1>(below), std::get<1>(at));
 }
+
+// The eps walls were bisected at one operating point (r/d = 0, t/d = 1,
+// Re = 3.2e4). They must hold across the geometry range, and there is a
+// specific reason to doubt it: Eq. (17)'s Rv carries (cd_base/0.6)^-3, so a
+// rounded long hole at Cd ~ 0.95 sees the same U1/Vi as a 4.5x smaller Rv --
+// and the regularisation is applied to U1/Vi, not Rv, so its effect in
+// Rv-space is geometry-dependent.
+//
+// Measured, the ratio to the physical scale is nearly geometry-INVARIANT
+// (7.8-8.3x across the range) because the Rv stretching moves the regularised
+// peak and the physical maximum together. That is why the lower wall is
+// robust rather than a coincidence of where it was measured.
+TEST(McGreehanSchotsch, CrossflowSmoothingWallsHoldAcrossTheGeometryRange) {
+    auto sweep = [](double Re, double rd, double ld, double eps, double lo) {
+        const double hi = 10.0;
+        const int n = 360;
+        double worst = 0.0;
+        for (int i = 0; i <= n; ++i) {
+            const double u = lo * std::pow(hi / lo, static_cast<double>(i) / n);
+            const double h = u * 1e-4;
+            worst = std::max(worst, std::abs((ms::cd(Re, rd, ld, u + h, eps)
+                                              - ms::cd(Re, rd, ld, u - h, eps))
+                                             / (2.0 * h)));
+        }
+        return worst;
+    };
+    auto cost = [](double Re, double rd, double ld, double eps) {
+        double worst = std::abs(ms::cd(Re, rd, ld, 0.0, eps)
+                                - ms::cd(Re, rd, ld, 0.0, 0.0));
+        for (int i = 0; i <= 240; ++i) {
+            const double u = 1e-9 * std::pow(1e10, static_cast<double>(i) / 240.0);
+            worst = std::max(worst, std::abs(ms::cd(Re, rd, ld, u, eps)
+                                             - ms::cd(Re, rd, ld, u, 0.0)));
+        }
+        return worst;
+    };
+
+    struct G { double Re, rd, ld; };
+    const G geoms[] = {
+        {1.0e4, 0.00, 1.0}, {1.0e4, 0.00, 5.0}, {1.0e4, 0.20, 3.0},
+        {3.2e4, 0.00, 1.0}, {3.2e4, 0.10, 2.0}, {3.2e4, 0.20, 0.5},
+        {1.0e6, 0.00, 1.0}, {1.0e6, 0.20, 3.0},
+    };
+    for (const auto& g : geoms) {
+        const double phys = sweep(g.Re, g.rd, g.ld, 0.0, 0.01);
+        const double got  = sweep(g.Re, g.rd, g.ld, ms::rv_smooth_eps, 1e-9);
+        EXPECT_LT(got, 10.0 * phys)
+            << "stiffness wall broken at Re=" << g.Re << " r/d=" << g.rd
+            << " L/d=" << g.ld;
+        EXPECT_LT(cost(g.Re, g.rd, g.ld, ms::rv_smooth_eps), 0.1 * 0.02)
+            << "fidelity wall broken at Re=" << g.Re << " r/d=" << g.rd
+            << " L/d=" << g.ld;
+        // The ratio really is near-invariant; if it stops being so, the
+        // single-point bisection is no longer a safe way to set eps.
+        EXPECT_LT(got / phys, 9.0);
+    }
+}
