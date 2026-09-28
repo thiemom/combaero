@@ -639,10 +639,20 @@ double length_factor(double L_over_d);               // Eq. (14), g
 double cd_with_corner(double Re, double r_over_d);   // Eq. (11)
 double cd_with_corner_and_length(double Re, double r_over_d,
                                  double L_over_d);   // Eqs. (13), (15), (16)
-double cd(double Re, double r_over_d, double L_over_d,
-          double U1_over_Vi);                        // Eq. (17)
-double cd_with_crossflow(double cd_base,
-                         double U1_over_Vi);         // Eq. (17) alone
+double cd(double Re, double r_over_d, double L_over_d, double U1_over_Vi,
+          double eps = rv_smooth_eps);               // Eq. (17)
+double cd_with_crossflow(double cd_base, double U1_over_Vi,
+                         double eps = rv_smooth_eps);  // Eq. (17) alone
+
+// Solver-facing form: (Cd, dCd/dRe, dCd/d(U1/Vi)). r/d and L/d are geometry
+// and carry no partials. Two numerical treatments, both stated in the header:
+// the crossflow input is regularised by rv_smooth_eps (Eq. (17) is unbounded
+// in slope at U1/Vi = 0, which is the default), and below re_min the value
+// stays floored while the derivative is continued from the floor.
+std::tuple<double, double, double> cd_and_derivatives(double Re,
+                                                      double r_over_d,
+                                                      double L_over_d,
+                                                      double U1_over_Vi);
 
 // Adiabatic expansion factor, for the INCOMPRESSIBLE form only.
 // regime='compressible' already solves the isentropic nozzle exactly via
